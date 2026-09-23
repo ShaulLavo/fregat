@@ -1,9 +1,11 @@
 import { createHash, randomUUID } from 'node:crypto'
+import { statSync } from 'node:fs'
 import {
   chmod,
   lstat,
   mkdir,
   mkdtemp,
+  open,
   readFile,
   readdir,
   rename,
@@ -16,12 +18,14 @@ import {
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import type {
+  WorkspaceEditCategory,
   WorkspaceEditPrepareRequest,
   WorkspaceEditReleaseRequest,
   WorkspaceEditResult,
   WorkspaceEditTransitionRequest,
   WorkspacePersistenceOperation,
   WorkspaceResourcePrecondition,
+  WorkspaceResourceType,
 } from '@workspace/contracts'
 import { Elysia } from 'elysia'
 import type { WideEvent } from 'evlog'
@@ -35,6 +39,7 @@ import { fsRoutes } from '../routes'
 import { FileSystemService } from '../service'
 import { textFileVersion } from '../version'
 import {
+  MAX_WORKSPACE_EDIT_OPERATION_BYTES,
   WORKSPACE_EDIT_STABLE_TTL_MS,
   nodeWorkspaceEditFileSystemDriver,
   type WorkspaceEditFileSystemDriver,
@@ -45,9 +50,15 @@ import type { WatchServerMessage } from '../contracts'
 
 type FixtureOptions = {
   readonly clock?: () => number
+  /** Journal at the top of the "drive", which tests place at the workspace root. */
+  readonly driveJournals?: boolean
   readonly driver?: (workspaceRoot: string, journalRoot: string) => WorkspaceEditFileSystemDriver
   readonly journalInsideWorkspace?: boolean
+  /** Parent of the home journal, for a journal on another filesystem. */
+  readonly journalParent?: string
   readonly watch?: boolean
+  /** Parent of the fixture root. */
+  readonly workspaceParent?: string
 }
 
 type WorkspaceEditFixture = {
@@ -72,11 +83,15 @@ type ResourceSnapshot = {
 }
 
 const fixtures: WorkspaceEditFixture[] = []
+const fixtureCleanup: string[] = []
 
 afterEach(async () => {
   for (const fixture of fixtures.splice(0).reverse()) {
     await fixture.service.close()
     await rm(fixture.baseRoot, { force: true, recursive: true })
+  }
+  for (const directory of fixtureCleanup.splice(0)) {
+    await rm(directory, { force: true, recursive: true })
   }
 })
 
@@ -1008,7 +1023,7 @@ describe('workspace edit transactions', () => {
     expect(await readText(fixture, 'real-folder/nested.txt')).toBe('nested')
   })
 
-  it('allows a missing create across devices but rejects resource moves across them', async () => {
+  it('stages a resource on another device by copy then remove and restores it', async () => {
     const fixture = await createFixture({
       driver: (workspaceRoot, journalRoot) => splitDeviceDriver(workspaceRoot, journalRoot),
     })
@@ -1018,36 +1033,21 @@ describe('workspace edit transactions', () => {
         prepareRequest(randomUUID(), [createOperation(0, 'created.txt')]),
       ),
     )
-
     expect(created.state).toBe('finalized')
     expect(await readText(fixture, 'created.txt')).toBe('')
 
-    const createdSnapshot = await snapshotPrecondition(fixture, 'created.txt')
-    await expect(
-      fixture.service.workspaceEditPrepare(
-        prepareRequest(randomUUID(), [
-          {
-            ...createOperation(0, 'created.txt'),
-            destination: createdSnapshot,
-            overwrite: true,
-          },
-        ]),
-      ),
-    ).rejects.toMatchObject({ code: 'WORKSPACE_EDIT_DEVICE_UNSUPPORTED' })
-
     const source = await seedFile(fixture, 'source.txt', 'source')
-    await expect(
-      fixture.service.workspaceEditPrepare(
-        prepareRequest(randomUUID(), [
-          renameOperation(0, 'source.txt', 'renamed.txt', source, missingPrecondition(), false),
-        ]),
-      ),
-    ).rejects.toMatchObject({ code: 'WORKSPACE_EDIT_DEVICE_UNSUPPORTED' })
-    await expect(
-      fixture.service.workspaceEditPrepare(
+    const deleted = await commitAndFinalize(
+      fixture.service,
+      await fixture.service.workspaceEditPrepare(
         prepareRequest(randomUUID(), [deleteOperation(0, 'source.txt', source)]),
       ),
-    ).rejects.toMatchObject({ code: 'WORKSPACE_EDIT_DEVICE_UNSUPPORTED' })
+    )
+    expect(deleted.state).toBe('finalized')
+    expect(await pathExists(workspacePath(fixture, 'source.txt'))).toBe(false)
+
+    await undoAndFinalize(fixture.service, deleted)
+    expect(await readText(fixture, 'source.txt')).toBe('source')
   })
 
   it('executes overwrite cycle and explicit temp swap with reversible exact graphs', async () => {
@@ -1352,26 +1352,478 @@ describe('workspace edit transactions', () => {
   })
 })
 
+describe('file operations', () => {
+  it('moves a folder with its contents and returns it through undo and redo', async () => {
+    const fixture = await createFixture()
+    await seedFiles(fixture, { 'src/a/x.txt': 'x', 'src/a/deep/y.txt': 'y' })
+    await mkdir(workspacePath(fixture, 'lib'))
+    const directory = await lstat(workspacePath(fixture, 'src/a'))
+
+    const moved = await runFileOperation(fixture, 'Move a into lib', [
+      moveOperation(0, 'src/a', 'lib/a', 'directory'),
+    ])
+    expect(moved.state).toBe('finalized')
+    expect(moved.entries).toContainEqual(
+      expect.objectContaining({ path: 'lib/a', type: 'directory' }),
+    )
+    expect(await readTexts(fixture, ['lib/a/x.txt', 'lib/a/deep/y.txt'])).toEqual(['x', 'y'])
+    expect((await lstat(workspacePath(fixture, 'lib/a'))).ino).toBe(directory.ino)
+
+    const undone = await undoAndFinalize(fixture.service, moved)
+    expect(undone.state).toBe('undone')
+    expect(await readTexts(fixture, ['src/a/x.txt', 'src/a/deep/y.txt'])).toEqual(['x', 'y'])
+    expect(await pathExists(workspacePath(fixture, 'lib/a'))).toBe(false)
+
+    await redoAndFinalize(fixture.service, undone)
+    expect(await readText(fixture, 'lib/a/deep/y.txt')).toBe('y')
+  })
+
+  it('publishes a folder move as one renamed event each way', async () => {
+    const fixture = await createFixture({ watch: true })
+    await seedFiles(fixture, { 'src/a/x.txt': 'x' })
+    const stream = await startEvents(fixture.service)
+    try {
+      const moved = await runFileOperation(fixture, 'Rename a to b', [
+        moveOperation(0, 'src/a', 'src/b', 'directory'),
+      ])
+      expect(await nextEvent(stream.events)).toMatchObject({
+        oldPath: 'src/a',
+        path: 'src/b',
+        type: 'renamed',
+        writeId: `${moved.operationId}#${moved.generation}`,
+      })
+      await undoAndFinalize(fixture.service, moved)
+      expect(await nextEvent(stream.events)).toMatchObject({
+        oldPath: 'src/b',
+        path: 'src/a',
+        type: 'renamed',
+      })
+      expect(await nextEvent(stream.events, 150)).toBeUndefined()
+    } finally {
+      await stopEvents(stream)
+    }
+  })
+
+  it('stages a deleted folder whole and restores every file inside it', async () => {
+    const fixture = await createFixture()
+    await seedFiles(fixture, {
+      'utils/a.ts': 'a',
+      'utils/nested/b.ts': 'b',
+      'utils/nested/c.ts': 'c',
+    })
+    await symlink('a.ts', workspacePath(fixture, 'utils/link.ts'))
+
+    const deleted = await runFileOperation(fixture, 'Delete utils', [
+      folderDeleteOperation(0, 'utils'),
+    ])
+    expect(await pathExists(workspacePath(fixture, 'utils'))).toBe(false)
+    expect((await readManifest(fixture, deleted.operationId)).stagedBytes).toBeGreaterThan(0)
+
+    const undone = await undoAndFinalize(fixture.service, deleted)
+    expect(
+      await readTexts(fixture, ['utils/a.ts', 'utils/nested/b.ts', 'utils/nested/c.ts']),
+    ).toEqual(['a', 'b', 'c'])
+    expect((await lstat(workspacePath(fixture, 'utils/link.ts'))).isSymbolicLink()).toBe(true)
+
+    await redoAndFinalize(fixture.service, undone)
+    expect(await pathExists(workspacePath(fixture, 'utils'))).toBe(false)
+  })
+
+  it('parks an undone create so its redo returns the later edits', async () => {
+    const fixture = await createFixture()
+    const created = await runFileOperation(fixture, 'New folder docs', [
+      { ...createOperation(0, 'docs'), folder: true },
+    ])
+    expect((await lstat(workspacePath(fixture, 'docs'))).isDirectory()).toBe(true)
+    const file = await runFileOperation(fixture, 'New file docs/note.md', [
+      createOperation(0, 'docs/note.md'),
+    ])
+    await writeFile(workspacePath(fixture, 'docs/note.md'), 'written after create')
+
+    const fileUndone = await undoAndFinalize(fixture.service, file)
+    expect(await pathExists(workspacePath(fixture, 'docs/note.md'))).toBe(false)
+    const fileRedone = await redoAndFinalize(fixture.service, fileUndone)
+    expect(await readText(fixture, 'docs/note.md')).toBe('written after create')
+
+    await undoAndFinalize(fixture.service, fileRedone)
+    const folderUndone = await undoAndFinalize(fixture.service, created)
+    expect(await pathExists(workspacePath(fixture, 'docs'))).toBe(false)
+    await redoAndFinalize(fixture.service, folderUndone)
+    expect((await lstat(workspacePath(fixture, 'docs'))).isDirectory()).toBe(true)
+  })
+
+  it('duplicates a folder and parks the copy on undo', async () => {
+    const fixture = await createFixture()
+    await seedFiles(fixture, { 'src/a.ts': 'a', 'src/nested/b.ts': 'b' })
+    const copied = await runFileOperation(fixture, 'Duplicate src', [
+      {
+        destination: missingPrecondition(),
+        index: 0,
+        kind: 'copy',
+        newPath: 'src copy',
+        oldPath: 'src',
+        source: { kind: 'present', type: 'directory' },
+      },
+    ])
+    expect(await readTexts(fixture, ['src copy/a.ts', 'src copy/nested/b.ts'])).toEqual(['a', 'b'])
+    await writeFile(workspacePath(fixture, 'src copy/a.ts'), 'edited copy')
+
+    const undone = await undoAndFinalize(fixture.service, copied)
+    expect(await pathExists(workspacePath(fixture, 'src copy'))).toBe(false)
+    expect(await readText(fixture, 'src/a.ts')).toBe('a')
+    await redoAndFinalize(fixture.service, undone)
+    expect(await readText(fixture, 'src copy/a.ts')).toBe('edited copy')
+  })
+
+  it('refuses an undo whose restore target is occupied and names the path', async () => {
+    const fixture = await createFixture()
+    await seedFiles(fixture, { 'a/x.txt': 'x' })
+    const moved = await runFileOperation(fixture, 'Rename a to b', [
+      moveOperation(0, 'a', 'b', 'directory'),
+    ])
+    await seedFiles(fixture, { 'a/other.txt': 'someone else' })
+
+    await expect(fixture.service.workspaceEditUndo(transition(moved))).rejects.toMatchObject({
+      code: 'WORKSPACE_EDIT_TARGET_OCCUPIED',
+      message: 'a already exists',
+    })
+    expect(await readTexts(fixture, ['a/other.txt', 'b/x.txt'])).toEqual(['someone else', 'x'])
+  })
+
+  it('guards moved entries on type, so a save or a replaced folder never strands the undo', async () => {
+    const fixture = await createFixture()
+    await seedFiles(fixture, { 'a.txt': 'a', 'folder/x.txt': 'x', 'other/y.txt': 'y' })
+    const file = await runFileOperation(fixture, 'Rename a.txt to b.txt', [
+      moveOperation(0, 'a.txt', 'b.txt', 'file'),
+    ])
+    await writeFile(workspacePath(fixture, '.b.txt.tmp'), 'saved')
+    await rename(workspacePath(fixture, '.b.txt.tmp'), workspacePath(fixture, 'b.txt'))
+    await undoAndFinalize(fixture.service, file)
+    expect(await readText(fixture, 'a.txt')).toBe('saved')
+
+    const folder = await runFileOperation(fixture, 'Rename folder to moved', [
+      moveOperation(0, 'folder', 'moved', 'directory'),
+    ])
+    await rm(workspacePath(fixture, 'moved'), { recursive: true })
+    await seedFiles(fixture, { 'moved/z.txt': 'z' })
+    await undoAndFinalize(fixture.service, folder)
+    expect(await readText(fixture, 'folder/z.txt')).toBe('z')
+
+    const other = await runFileOperation(fixture, 'Rename other to kept', [
+      moveOperation(0, 'other', 'kept', 'directory'),
+    ])
+    await rm(workspacePath(fixture, 'kept'), { recursive: true })
+    await writeFile(workspacePath(fixture, 'kept'), 'now a file')
+    await expect(fixture.service.workspaceEditUndo(transition(other))).rejects.toMatchObject({
+      code: 'WORKSPACE_EDIT_STALE',
+    })
+  })
+
+  it('keeps one ordered history per category and reverses only its head', async () => {
+    const fixture = await createFixture()
+    await seedFiles(fixture, { 'a.txt': 'a', 'b.txt': 'b' })
+    const first = await runFileOperation(fixture, 'Rename a.txt to c.txt', [
+      moveOperation(0, 'a.txt', 'c.txt', 'file'),
+    ])
+    const second = await runFileOperation(fixture, 'Rename b.txt to d.txt', [
+      moveOperation(0, 'b.txt', 'd.txt', 'file'),
+    ])
+
+    const listed = await fileHistory(fixture)
+    expect(listed.undo.map((entry) => entry.label)).toEqual([
+      'Rename b.txt to d.txt',
+      'Rename a.txt to c.txt',
+    ])
+    expect(listed.undo[0]).toMatchObject({
+      generation: second.generation,
+      legs: [{ kind: 'rename', newPath: 'd.txt', oldPath: 'b.txt' }],
+      operationId: second.operationId,
+    })
+    await expect(fixture.service.workspaceEditUndo(transition(first))).rejects.toMatchObject({
+      code: 'WORKSPACE_EDIT_NOT_HEAD',
+    })
+
+    await undoAndFinalize(fixture.service, second)
+    expect((await fileHistory(fixture)).redo.map((entry) => entry.operationId)).toEqual([
+      second.operationId,
+    ])
+    await runFileOperation(fixture, 'Rename c.txt to e.txt', [
+      moveOperation(0, 'c.txt', 'e.txt', 'file'),
+    ])
+    const afterForward = await fileHistory(fixture)
+    expect(afterForward.redo).toEqual([])
+    expect(afterForward.undo.map((entry) => entry.label)).toEqual([
+      'Rename c.txt to e.txt',
+      'Rename a.txt to c.txt',
+    ])
+    expect(await pathExists(path.join(fixture.journalRoot, second.operationId))).toBe(false)
+  })
+
+  it('evicts file operations a later resource edit touches but not a text edit', async () => {
+    const fixture = await createFixture()
+    await seedFiles(fixture, { 'src/x.ts': 'x', 'other.ts': 'other' })
+    await runFileOperation(fixture, 'Rename src to lib', [
+      moveOperation(0, 'src', 'lib', 'directory'),
+    ])
+    const unrelated = await runFileOperation(fixture, 'Rename other.ts to kept.ts', [
+      moveOperation(0, 'other.ts', 'kept.ts', 'file'),
+    ])
+
+    const edited = await snapshotPrecondition(fixture, 'lib/x.ts')
+    await commitAndFinalize(
+      fixture.service,
+      await fixture.service.workspaceEditPrepare(
+        prepareRequest(randomUUID(), [writeOperation(0, 'lib/x.ts', edited, 'edited')]),
+      ),
+    )
+    expect((await fileHistory(fixture)).undo).toHaveLength(2)
+
+    const renamed = await snapshotPrecondition(fixture, 'lib/x.ts')
+    await commitAndFinalize(
+      fixture.service,
+      await fixture.service.workspaceEditPrepare(
+        prepareRequest(randomUUID(), [
+          renameOperation(0, 'lib/x.ts', 'lib/y.ts', renamed, missingPrecondition(), false),
+        ]),
+      ),
+    )
+    expect((await fileHistory(fixture)).undo.map((entry) => entry.operationId)).toEqual([
+      unrelated.operationId,
+    ])
+  })
+
+  it('keeps the file history across a restart and undoes from it', async () => {
+    const fixture = await createFixture()
+    await seedFiles(fixture, { 'folder/x.txt': 'x' })
+    const moved = await runFileOperation(fixture, 'Rename folder to renamed', [
+      moveOperation(0, 'folder', 'renamed', 'directory'),
+    ])
+    const edit = await seedFile(fixture, 'edit.txt', 'before')
+    const lspEdit = await commitAndFinalize(
+      fixture.service,
+      await fixture.service.workspaceEditPrepare(
+        prepareRequest(randomUUID(), [writeOperation(0, 'edit.txt', edit, 'after')]),
+      ),
+    )
+    await fixture.service.close()
+
+    const restarted = restartedService(fixture)
+    try {
+      const listed = await restarted.workspaceEditHistory({
+        category: 'file-operation',
+        workspace: '',
+      })
+      expect(listed.undo.map((entry) => entry.operationId)).toEqual([moved.operationId])
+      expect(await restarted.workspaceEditStatus(lspEdit.operationId)).toMatchObject({
+        found: false,
+      })
+      const head = listed.undo[0]!
+      const undo = await restarted.workspaceEditUndo({
+        expectedGeneration: head.generation,
+        operationId: head.operationId,
+        transitionId: randomUUID(),
+      })
+      await restarted.workspaceEditFinalize(transition(undo))
+      expect(await readText(fixture, 'folder/x.txt')).toBe('x')
+    } finally {
+      await restarted.close()
+    }
+  })
+
+  it('refuses a delete too large for the journal before touching anything', async () => {
+    const fixture = await createFixture()
+    await seedFiles(fixture, { 'big/small.txt': 'small' })
+    const handle = await open(workspacePath(fixture, 'big/sparse.bin'), 'w')
+    await handle.truncate(MAX_WORKSPACE_EDIT_OPERATION_BYTES + 1)
+    await handle.close()
+
+    await expect(
+      fixture.service.workspaceEditPrepare(
+        fileOperationRequest('Delete big', [folderDeleteOperation(0, 'big')]),
+      ),
+    ).rejects.toMatchObject({ code: 'WORKSPACE_EDIT_QUOTA' })
+    expect(await readText(fixture, 'big/small.txt')).toBe('small')
+  })
+
+  it('startup restores a folder delete interrupted after staging and before finalize', async () => {
+    const fixture = await createFixture()
+    await seedFiles(fixture, { 'gone/a.txt': 'a', 'gone/nested/b.txt': 'b' })
+    const prepared = await fixture.service.workspaceEditPrepare(
+      fileOperationRequest('Delete gone', [folderDeleteOperation(0, 'gone')]),
+    )
+    const committed = await fixture.service.workspaceEditCommit(transition(prepared))
+    expect(committed.state).toBe('committed')
+    expect(await pathExists(workspacePath(fixture, 'gone'))).toBe(false)
+
+    const restarted = restartedService(fixture)
+    try {
+      expect(await restarted.workspaceEditStatus(committed.operationId)).toMatchObject({
+        found: false,
+      })
+      expect(await readTexts(fixture, ['gone/a.txt', 'gone/nested/b.txt'])).toEqual(['a', 'b'])
+    } finally {
+      await restarted.close()
+    }
+  })
+
+  it('startup keeps an interrupted redo in the history with its parked contents', async () => {
+    const fixture = await createFixture()
+    const created = await runFileOperation(fixture, 'New file note.md', [
+      createOperation(0, 'note.md'),
+    ])
+    await writeFile(workspacePath(fixture, 'note.md'), 'kept')
+    const undone = await undoAndFinalize(fixture.service, created)
+    const redoCommitted = await fixture.service.workspaceEditRedo(transition(undone))
+    expect(redoCommitted.state).toBe('redo-committed')
+    await fixture.service.close()
+
+    const restarted = restartedService(fixture)
+    try {
+      const listed = await restarted.workspaceEditHistory({
+        category: 'file-operation',
+        workspace: '',
+      })
+      expect(listed.redo.map((entry) => entry.operationId)).toEqual([created.operationId])
+      expect(await pathExists(workspacePath(fixture, 'note.md'))).toBe(false)
+      const head = listed.redo[0]!
+      const redo = await restarted.workspaceEditRedo({
+        expectedGeneration: head.generation,
+        operationId: head.operationId,
+        transitionId: randomUUID(),
+      })
+      await restarted.workspaceEditFinalize(transition(redo))
+      expect(await readText(fixture, 'note.md')).toBe('kept')
+    } finally {
+      await restarted.close()
+    }
+  })
+
+  it('counts what an undo parks against the quota and refuses one too large', async () => {
+    const fixture = await createFixture()
+    const created = await runFileOperation(fixture, 'New folder docs', [
+      { ...createOperation(0, 'docs'), folder: true },
+    ])
+    await writeFile(workspacePath(fixture, 'docs/note.md'), 'x'.repeat(1000))
+    const undone = await undoAndFinalize(fixture.service, created)
+    expect((await readManifest(fixture, created.operationId)).stagedBytes).toBeGreaterThanOrEqual(
+      1000,
+    )
+    await redoAndFinalize(fixture.service, undone)
+    expect((await readManifest(fixture, created.operationId)).stagedBytes).toBe(0)
+
+    const big = await runFileOperation(fixture, 'New folder big', [
+      { ...createOperation(0, 'big'), folder: true },
+    ])
+    const handle = await open(workspacePath(fixture, 'big/sparse.bin'), 'w')
+    await handle.truncate(MAX_WORKSPACE_EDIT_OPERATION_BYTES + 1)
+    await handle.close()
+    await expect(fixture.service.workspaceEditUndo(transition(big))).rejects.toMatchObject({
+      code: 'WORKSPACE_EDIT_QUOTA',
+    })
+    expect((await stat(workspacePath(fixture, 'big/sparse.bin'))).size).toBe(
+      MAX_WORKSPACE_EDIT_OPERATION_BYTES + 1,
+    )
+  })
+
+  it.skipIf(!crossDeviceDirectories())(
+    'keeps older history undoable after a restore across devices',
+    async () => {
+      const directories = crossDeviceDirectories()!
+      const fixture = await createFixture({
+        journalParent: directories.journal,
+        workspaceParent: directories.workspace,
+      })
+      const created = await runFileOperation(fixture, 'New folder x', [
+        { ...createOperation(0, 'x'), folder: true },
+      ])
+      await writeFile(workspacePath(fixture, 'x/a.txt'), 'a')
+      const deleted = await runFileOperation(fixture, 'Delete x', [folderDeleteOperation(0, 'x')])
+      await undoAndFinalize(fixture.service, deleted)
+      expect(await readText(fixture, 'x/a.txt')).toBe('a')
+
+      const head = (await fileHistory(fixture)).undo[0]!
+      expect(head.operationId).toBe(created.operationId)
+      await undoAndFinalize(fixture.service, { ...created, generation: head.generation })
+      expect(await pathExists(workspacePath(fixture, 'x'))).toBe(false)
+    },
+  )
+
+  it('places the journal at the top of the drive and hides it from the tree', async () => {
+    const fixture = await createFixture({
+      driveJournals: true,
+      driver: (workspaceRoot, journalRoot) => splitDeviceDriver(workspaceRoot, journalRoot),
+    })
+    await seedFiles(fixture, { 'doomed/a.txt': 'a' })
+    const deleted = await runFileOperation(fixture, 'Delete doomed', [
+      folderDeleteOperation(0, 'doomed'),
+    ])
+    const driveJournal = path.join(fixture.workspaceRoot, `.platform-journal-${process.getuid!()}`)
+
+    expect(await pathExists(path.join(driveJournal, deleted.operationId))).toBe(true)
+    expect(await pathExists(path.join(fixture.journalRoot, deleted.operationId))).toBe(false)
+    const tree = await fixture.service.tree('', 1)
+    expect(JSON.stringify(tree)).not.toContain('.platform-journal-')
+    await undoAndFinalize(fixture.service, deleted)
+    expect(await readText(fixture, 'doomed/a.txt')).toBe('a')
+  })
+
+  it.skipIf(!crossDeviceDirectories())(
+    'stages across real filesystems with the journal on another device',
+    async () => {
+      const directories = crossDeviceDirectories()!
+      const fixture = await createFixture({
+        journalParent: directories.journal,
+        workspaceParent: directories.workspace,
+      })
+      await seedFiles(fixture, { 'folder/a.txt': 'a', 'folder/nested/b.txt': 'b' })
+      const deleted = await runFileOperation(fixture, 'Delete folder', [
+        folderDeleteOperation(0, 'folder'),
+      ])
+      expect(await pathExists(workspacePath(fixture, 'folder'))).toBe(false)
+
+      const undone = await undoAndFinalize(fixture.service, deleted)
+      expect(await readTexts(fixture, ['folder/a.txt', 'folder/nested/b.txt'])).toEqual(['a', 'b'])
+      await redoAndFinalize(fixture.service, undone)
+      expect(await pathExists(workspacePath(fixture, 'folder'))).toBe(false)
+    },
+  )
+})
+
 async function createFixture(options: FixtureOptions = {}): Promise<WorkspaceEditFixture> {
-  const baseRoot = await mkdtemp(path.join(tmpdir(), 'platform-workspace-edit-test-'))
+  const baseRoot = await mkdtemp(
+    path.join(options.workspaceParent ?? tmpdir(), 'platform-workspace-edit-test-'),
+  )
   const workspaceRoot = path.join(baseRoot, 'workspace')
   await mkdir(workspaceRoot)
-  const journalRoot = options.journalInsideWorkspace
-    ? path.join(workspaceRoot, 'journals-visible')
-    : path.join(baseRoot, 'journals')
+  const journalRoot = await fixtureJournalRoot(options, baseRoot, workspaceRoot)
   const driver = options.driver?.(workspaceRoot, journalRoot)
   const service = new FileSystemService({
     metadataDatabasePath: ':memory:',
     watch: options.watch ?? false,
     watchBackend: 'node',
     workspaceEditClock: options.clock,
+    workspaceEditDriveJournals: options.driveJournals ?? false,
     workspaceEditDriver: driver,
     workspaceEditJournalRoot: journalRoot,
+    workspaceEditMountTop: async () => workspaceRoot,
     workspaceRoot,
   })
   const fixture = { baseRoot, journalRoot, service, workspaceRoot }
   fixtures.push(fixture)
   return fixture
+}
+
+async function fixtureJournalRoot(
+  options: FixtureOptions,
+  baseRoot: string,
+  workspaceRoot: string,
+) {
+  if (options.journalInsideWorkspace) return path.join(workspaceRoot, 'journals-visible')
+  if (!options.journalParent) return path.join(baseRoot, 'journals')
+
+  const parent = await mkdtemp(path.join(options.journalParent, 'platform-journal-test-'))
+  fixtureCleanup.push(parent)
+  return path.join(parent, 'journals')
 }
 
 async function seedFile(
@@ -1406,6 +1858,7 @@ function restartedService(
   return new FileSystemService({
     metadataDatabasePath: ':memory:',
     watch: false,
+    workspaceEditDriveJournals: false,
     workspaceEditDriver,
     workspaceEditJournalRoot: fixture.journalRoot,
     workspaceRoot: fixture.workspaceRoot,
@@ -1416,15 +1869,24 @@ function prepareRequest(
   operationId: string,
   operations: readonly WorkspacePersistenceOperation[],
   workspace = '',
+  category: WorkspaceEditCategory = 'workspace-edit',
 ): WorkspaceEditPrepareRequest {
   const bodyDigest = `sha256:${createHash('sha256').update(JSON.stringify({ operations, workspace })).digest('hex')}`
-  return { bodyDigest, operationId, operations, origin: 'workspace-edit', workspace }
+  return {
+    bodyDigest,
+    category,
+    label: 'Test edit',
+    operationId,
+    operations,
+    origin: 'workspace-edit',
+    workspace,
+  }
 }
 
 function writeOperation(
   index: number,
   relativePath: string,
-  expected: Exclude<WorkspaceResourcePrecondition, { kind: 'missing' }>,
+  expected: Exclude<WorkspaceResourcePrecondition, { kind: 'missing' | 'present' }>,
   text: string,
 ): Extract<WorkspacePersistenceOperation, { kind: 'write' }> {
   return { expected, index, kind: 'write', path: relativePath, text }
@@ -1476,6 +1938,69 @@ function deleteOperation(
     kind: 'delete',
     path: relativePath,
     recursive: false,
+  }
+}
+
+function fileOperationRequest(label: string, operations: readonly WorkspacePersistenceOperation[]) {
+  return { ...prepareRequest(randomUUID(), operations, '', 'file-operation'), label }
+}
+
+async function runFileOperation(
+  fixture: WorkspaceEditFixture,
+  label: string,
+  operations: readonly WorkspacePersistenceOperation[],
+) {
+  const prepared = await fixture.service.workspaceEditPrepare(
+    fileOperationRequest(label, operations),
+  )
+  return commitAndFinalize(fixture.service, prepared)
+}
+
+function fileHistory(fixture: WorkspaceEditFixture) {
+  return fixture.service.workspaceEditHistory({ category: 'file-operation', workspace: '' })
+}
+
+function moveOperation(
+  index: number,
+  oldPath: string,
+  newPath: string,
+  type: WorkspaceResourceType,
+): Extract<WorkspacePersistenceOperation, { kind: 'rename' }> {
+  return renameOperation(
+    index,
+    oldPath,
+    newPath,
+    { kind: 'present', type },
+    missingPrecondition(),
+    false,
+  )
+}
+
+function folderDeleteOperation(
+  index: number,
+  relativePath: string,
+): Extract<WorkspacePersistenceOperation, { kind: 'delete' }> {
+  return {
+    ...deleteOperation(index, relativePath, { kind: 'present', type: 'directory' }),
+    recursive: true,
+  }
+}
+
+async function seedFiles(fixture: WorkspaceEditFixture, files: Record<string, string>) {
+  for (const [relativePath, content] of Object.entries(files)) {
+    await seedFile(fixture, relativePath, content)
+  }
+}
+
+/** A workspace parent and a journal parent on two different filesystems, when this host has them. */
+function crossDeviceDirectories() {
+  const workspace = '/work/tmp'
+  const journal = '/dev/shm'
+  try {
+    if (statSync(workspace).dev === statSync(journal).dev) return null
+    return { journal, workspace }
+  } catch {
+    return null
   }
 }
 
@@ -1532,6 +2057,7 @@ async function readManifest(fixture: WorkspaceEditFixture, operationId: string) 
   const bytes = await readFile(path.join(fixture.journalRoot, operationId, 'manifest.json'))
   return JSON.parse(bytes.toString('utf8')) as {
     legs: readonly { readonly reservedPath?: string }[]
+    stagedBytes: number
     recoveryProgram?: readonly {
       readonly direction: 'forward' | 'reverse'
       readonly step: { readonly kind: string }

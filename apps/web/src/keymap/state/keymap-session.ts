@@ -131,7 +131,11 @@ function runtimeBindings(
         : rawHotkeyToParsedHotkey(first, platform)
     return {
       chord: binding.chord,
-      payload: { binding, firesWhileTyping: stroke.ctrl || stroke.meta || stroke.key === 'Escape' },
+      payload: {
+        binding,
+        firesWhileTyping:
+          !binding.yieldsToTextEntry && (stroke.ctrl || stroke.meta || stroke.key === 'Escape'),
+      },
       preventDefault: binding.preventDefault,
       stopPropagation: binding.stopPropagation,
     }

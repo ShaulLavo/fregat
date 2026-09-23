@@ -120,6 +120,7 @@ function keyBinding(
       source: 'default',
       stopPropagation: key.stopPropagation,
       vscodeCommandId: key.vscodeCommandId,
+      yieldsToTextEntry: key.yieldsToTextEntry,
     },
   ]
 }

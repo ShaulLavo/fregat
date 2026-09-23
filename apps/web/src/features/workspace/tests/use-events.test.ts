@@ -105,6 +105,7 @@ describe('planWorkspaceFilesystemEvents', () => {
 
     expect(plan).toEqual({
       openFileOperations: [{ path: 'repo/a.ts', reason: 'changed', type: 'refresh-open-file' }],
+      shouldInvalidateFileHistory: false,
       shouldInvalidateGitState: true,
       treeOperations: [{ entries: [entry], type: 'patch-changed-tree-entries' }],
     })
@@ -195,9 +196,30 @@ describe('workspace transaction event reconciliation', () => {
 
     expect(plan).toEqual({
       openFileOperations: [],
+      shouldInvalidateFileHistory: true,
       shouldInvalidateGitState: true,
       treeOperations: [{ entries: [entry], type: 'patch-changed-tree-entries' }],
     })
+  })
+
+  it('refreshes the file history when another window lands a journaled operation', () => {
+    const renamed = {
+      oldPath: 'repo/src',
+      origin: 'workspace-edit',
+      path: 'repo/lib',
+      type: 'renamed' as const,
+      writeId: 'another-window',
+    }
+    const external = planWorkspaceEditAwareEventBatch([renamed], openFiles, 'repo', isOwnEvent)
+    const ordinary = planWorkspaceEditAwareEventBatch(
+      [{ path: 'repo/a.ts', type: 'changed', writeId: 'other' }],
+      openFiles,
+      'repo',
+      isOwnEvent,
+    )
+
+    expect(external.shouldInvalidateFileHistory).toBe(true)
+    expect(ordinary.shouldInvalidateFileHistory).toBe(false)
   })
 
   it('does not conflict or remap a dirty buffer on its own delete and rename replay', () => {
@@ -311,6 +333,7 @@ describe('planWorkspaceReady', () => {
 
     expect(plan).toEqual({
       openFileOperations: [{ path: 'repo/a.ts', reason: 'ready', type: 'refresh-open-file' }],
+      shouldInvalidateFileHistory: true,
       shouldInvalidateGitState: true,
       treeOperations: [{ path: 'repo', type: 'refresh-ready-root-tree' }],
     })

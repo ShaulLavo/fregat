@@ -41,6 +41,8 @@ const TEXT_MENU_EDITOR_COMMANDS = [
 ] as const
 
 const ASYNC_COMMAND_IDS = [
+  'fileTree.undo',
+  'fileTree.redo',
   'workspace.splitEditorRight',
   'workspace.splitEditorDown',
   'workspace.showHistory',
@@ -173,6 +175,8 @@ const TEXT_EDIT_COMMAND_IDS = [
 const FILE_OPERATION_COMMAND_IDS = [
   'fileTree.newFile',
   'fileTree.newFolder',
+  'fileTree.undo',
+  'fileTree.redo',
   'workspace.saveFile',
   'workspace.saveAllFiles',
   'workspace.revertFile',
@@ -310,6 +314,8 @@ describe('command table', () => {
     expect(commandIdsWithWhen('chatMode')).toEqual(expectedCommandIds(CHAT_MODE_COMMAND_IDS))
     expect(commandIdsWithWhen('workspaceEditUndoable')).toEqual(['workspace.undoWorkspaceEdit'])
     expect(commandIdsWithWhen('workspaceEditRedoable')).toEqual(['workspace.redoWorkspaceEdit'])
+    expect(commandIdsWithWhen('fileOperationUndoable')).toEqual(['fileTree.undo'])
+    expect(commandIdsWithWhen('fileOperationRedoable')).toEqual(['fileTree.redo'])
   })
 
   it('registers the four hidden Editor commands exposed by the text menu', () => {

@@ -16,9 +16,13 @@ export function planWorkspaceEditAwareEventBatch(
   rootPath: string,
   isOwnWorkspaceEditEvent: (writeId: string) => boolean,
 ): WorkspaceEventPlan {
+  const shouldInvalidateFileHistory = events.some((event) => event.origin === 'workspace-edit')
   const externalEvents = events.filter((event) => !isOwnEvent(event, isOwnWorkspaceEditEvent))
   if (externalEvents.length === events.length) {
-    return planWorkspaceFilesystemEvents({ events, openFiles, rootPath })
+    return {
+      ...planWorkspaceFilesystemEvents({ events, openFiles, rootPath }),
+      shouldInvalidateFileHistory,
+    }
   }
 
   const allEffects = planWorkspaceFilesystemEvents({ events, openFiles: [], rootPath })
@@ -29,6 +33,7 @@ export function planWorkspaceEditAwareEventBatch(
   })
   return {
     openFileOperations: externalEffects.openFileOperations,
+    shouldInvalidateFileHistory,
     shouldInvalidateGitState: allEffects.shouldInvalidateGitState,
     treeOperations: allEffects.treeOperations,
   }

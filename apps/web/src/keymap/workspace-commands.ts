@@ -39,6 +39,12 @@ import {
 import type { QueryClient } from '@tanstack/react-query'
 
 import { getNavigation } from '@/state/navigation-binding'
+import { filesystemPath } from '@/lib/documents/utils/identity'
+import {
+  fileOperationDocuments,
+  reverseLatestFileOperation,
+  type FileOperationRuntime,
+} from '@/features/workspace/state/file-operations'
 import type { NavigationResult } from '@/state/navigation-coordinator'
 import {
   jumpToSession,
@@ -156,6 +162,27 @@ function operationStart(operation: Promise<boolean>): StartedCommand {
     completion: operation.then((accepted) => dispositionFor(accepted)),
     status: 'started',
   }
+}
+
+function reverseFileOperationStart(
+  { runtime, snapshot }: WorkspaceCommandHandlerContext,
+  direction: 'redo' | 'undo',
+) {
+  const rootPath = snapshot.rootPath
+  if (!rootPath) return declined
+  const commands = getNavigation().editorCommands(runtime.workspace)
+  const fileOperations: FileOperationRuntime = {
+    documents: fileOperationDocuments({
+      documentStore: runtime.documents.store,
+      queryClient: runtime.documents.queryClient,
+      renameLiveEditorDocument: commands.renameLiveEditorDocument,
+      workspaceStore: runtime.workspace,
+    }),
+    queryClient: runtime.documents.queryClient,
+    rootPath: filesystemPath(rootPath),
+    workspaceEdits: runtime.workspaceEdits,
+  }
+  return operationStart(reverseLatestFileOperation(fileOperations, direction))
 }
 
 function navigationStart(operation: Promise<NavigationResult>): StartedCommand {
@@ -469,6 +496,16 @@ export const workspaceCommands = [
     ...workspaceCommandMetadata['workspace.redoWorkspaceEdit'],
     icon: ArrowClockwiseIcon,
     run: ({ runtime }) => operationStart(runtime.workspaceEdits.redo()),
+  }),
+  defineCommand({
+    ...workspaceCommandMetadata['fileTree.undo'],
+    icon: ArrowCounterClockwiseIcon,
+    run: (context) => reverseFileOperationStart(context, 'undo'),
+  }),
+  defineCommand({
+    ...workspaceCommandMetadata['fileTree.redo'],
+    icon: ArrowClockwiseIcon,
+    run: (context) => reverseFileOperationStart(context, 'redo'),
   }),
   defineCommand({
     ...workspaceCommandMetadata['workspace.showQuickAccess'],

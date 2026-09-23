@@ -18,6 +18,12 @@ The Files side panel is open by default in a workspace. `aria-label="Folder tree
 
 Mutations go through `runTreeIntent`, so the tree shows the change before the server confirms it. A refused change disappears from the projection; do not read the optimistic state as success.
 
+Every create, rename, drag, duplicate and delete is a journaled `file-operation` workspace edit. `GET /fs/workspace-edit/history?category=file-operation&workspace=…` is the shared undo and redo list; the disk flips at undo-commit, before the client lands, so wait for the "Undid …" toast rather than the file. A second window needs its own browser context (see the connection limit in the skill's Drive section).
+
+## Undo and redo
+
+`bun run agent:browser scenario file-tree-undo` drags a folder holding a dirty file into another folder, undoes and redoes it with Ctrl+Z / Ctrl+Shift+Z in the tree, deletes a folder and undoes it from the toast with the editor focused, after a reload, and from a second window. The fixture is `/work/tmp/plan136-undo`.
+
 ## Sticky folders over wallpaper
 
 `bun run agent:browser scenario tree-sticky-scroll --headed --width 1360 --height 840 --scale 2 --product-wallpaper apps/site/src/assets/garden.jpeg` opens nested source files and scrolls through partial rows and folder boundaries. Inspect the screenshot and JSON at each step. The first file row's covered portion and a sticky child pushed above its own slot must be clipped; making the folder background opaque hides the symptom by covering the wallpaper.

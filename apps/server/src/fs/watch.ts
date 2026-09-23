@@ -717,10 +717,21 @@ function isSubscribedPath(relativePath: string, subscribed: Set<string>) {
 
 function eventTouchesBarrier(event: WatchServerMessage, paths: ReadonlySet<string>) {
   if (!isFilesystemEvent(event)) return false
-  if (paths.has(event.path)) return true
+  if (pathOrAncestorIn(event.path, paths)) return true
   if (event.type !== 'renamed') return false
 
-  return paths.has(event.oldPath)
+  return pathOrAncestorIn(event.oldPath, paths)
+}
+
+/** A moved or deleted folder holds back the native events of everything inside it too. */
+function pathOrAncestorIn(relativePath: string, paths: ReadonlySet<string>) {
+  let candidate = relativePath
+  while (true) {
+    if (paths.has(candidate)) return true
+    const separator = candidate.lastIndexOf('/')
+    if (separator < 0) return false
+    candidate = candidate.slice(0, separator)
+  }
 }
 
 function eventMatchesTransactionResult(event: WatchServerMessage, marker: TransactionResultMarker) {

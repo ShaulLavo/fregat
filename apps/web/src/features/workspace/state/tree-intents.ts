@@ -78,12 +78,15 @@ export async function runTreeIntent<TResult>({
   perform,
   queryClient,
   context,
+  rendersError,
 }: {
   readonly patch: TreePatch
   readonly perform: () => Promise<TResult>
   readonly queryClient: QueryClient
   /** Extra fields for the wide event, resolved after the transport so late values land. */
   readonly context?: () => Record<string, unknown>
+  /** Failures the caller shows itself, such as a delete too large to undo. */
+  readonly rendersError?: (error: unknown) => boolean
 }): Promise<IntentOutcome<TResult>> {
   const outcome = await runMutation(
     queryClient,
@@ -105,7 +108,7 @@ export async function runTreeIntent<TResult>({
     },
     undefined,
   )
-  settleTreeOutcome(outcome)
+  settleTreeOutcome(outcome, rendersError)
   return outcome
 }
 
@@ -124,11 +127,15 @@ function confirmedTreeAcknowledgement(
   }
 }
 
-function settleTreeOutcome(outcome: IntentOutcome<unknown>) {
+function settleTreeOutcome(
+  outcome: IntentOutcome<unknown>,
+  rendersError: ((error: unknown) => boolean) | undefined,
+) {
   if (outcome.ok) return
   // The projection already dropped the patch; the failed entry has served its purpose.
   treeIntents.discardFailed(outcome.intentId)
   if (outcome.reason !== 'transport') return
+  if (rendersError?.(outcome.error)) return
 
   reportError(toClientError(outcome.error))
 }

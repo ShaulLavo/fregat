@@ -24,7 +24,7 @@ export type StatResult = Omit<FileSystemEntryMetadata, 'path' | 'canonicalPath'>
 export type TreeEntry = StatResult & { name: string; children?: TreeEntry[] }
 export type TreeResult = { path: FilesystemPath; entries: TreeEntry[] }
 
-type TypedPersistenceOperation<T> = T extends { readonly kind: 'rename' }
+type TypedPersistenceOperation<T> = T extends { readonly kind: 'copy' | 'rename' }
   ? Omit<T, 'oldPath' | 'newPath'> & {
       readonly oldPath: FilesystemPath
       readonly newPath: FilesystemPath

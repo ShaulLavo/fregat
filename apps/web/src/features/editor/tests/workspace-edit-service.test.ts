@@ -1788,7 +1788,7 @@ function fileUri(target: string | DocumentRef): string {
 function requestAffectedPaths(request: WorkspaceEditPrepareRequest): readonly string[] {
   const paths = new Set<string>()
   for (const operation of request.operations) {
-    if (operation.kind === 'rename') {
+    if (operation.kind === 'rename' || operation.kind === 'copy') {
       paths.add(operation.oldPath)
       paths.add(operation.newPath)
       continue

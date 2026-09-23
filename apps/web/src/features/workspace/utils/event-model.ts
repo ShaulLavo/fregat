@@ -1,3 +1,4 @@
+import { isSameOrInside } from '@workspace/utils/slash-paths'
 import { parentPath } from '@/lib/path-formatters'
 import type { TreeEntry } from '@workspace/contracts'
 
@@ -37,6 +38,8 @@ export type WorkspaceFetchedOpenFileOperation =
 
 export type WorkspaceEventPlan = {
   openFileOperations: WorkspaceOpenFileOperation[]
+  /** A journaled operation landed, possibly in another window: the undo history moved. */
+  shouldInvalidateFileHistory: boolean
   shouldInvalidateGitState: boolean
   treeOperations: WorkspaceTreeOperation[]
 }
@@ -54,6 +57,7 @@ export function planWorkspaceFilesystemEvents({
 
   return {
     openFileOperations: planOpenFileOperations(events, openFiles, recreatedPaths, rootPath),
+    shouldInvalidateFileHistory: false,
     shouldInvalidateGitState: events.length > 0,
     treeOperations: planTreeOperations(events, rootPath),
   }
@@ -70,6 +74,8 @@ export function planWorkspaceReady({
     openFileOperations: openFiles.flatMap((file) =>
       shouldRefreshReadyOpenFile(file) ? [readyOpenFileRefresh(file.path)] : [],
     ),
+    // A reconnect may have missed another window's operation.
+    shouldInvalidateFileHistory: true,
     shouldInvalidateGitState: true,
     treeOperations: [{ type: 'refresh-ready-root-tree', path: rootPath }],
   }
@@ -199,7 +205,7 @@ function planDeletedOpenFileOperations(
   const operations: WorkspaceOpenFileOperation[] = []
 
   for (const openFile of openFiles) {
-    if (!isSameOrChildPath(openFile.path, deletedPath)) continue
+    if (!isSameOrInside(openFile.path, deletedPath)) continue
     operations.push({ type: 'refresh-open-file', reason: 'deleted', path: openFile.path })
   }
 
@@ -326,14 +332,10 @@ function isLikelyTemporarySavePath(path: string) {
 
 function isWithinAnyPath(path: string, parents: ReadonlySet<string>) {
   for (const parent of parents) {
-    if (isSameOrChildPath(path, parent)) return true
+    if (isSameOrInside(path, parent)) return true
   }
 
   return false
-}
-
-function isSameOrChildPath(path: string, parent: string) {
-  return path === parent || path.startsWith(`${parent}/`)
 }
 
 function recreatedOpenFilePaths(events: readonly WorkspaceFilesystemEvent[]) {

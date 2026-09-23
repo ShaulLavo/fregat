@@ -46,6 +46,8 @@ describe('workspace edit contracts', () => {
     ] as const satisfies readonly WorkspacePersistenceOperation[]
     const request = {
       bodyDigest: `sha256:${'a'.repeat(64)}`,
+      category: 'workspace-edit',
+      label: 'Workspace edit',
       operationId: 'd96f733e-61f8-42c4-b043-f18dc8cce052',
       operations,
       origin: 'workspace-edit',

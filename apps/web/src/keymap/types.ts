@@ -54,6 +54,7 @@ export type PlatformKeyBinding = {
   readonly vscodeCommandId?: string
   readonly preventDefault?: boolean
   readonly stopPropagation?: boolean
+  readonly yieldsToTextEntry?: boolean
   readonly meta?: HotkeyMeta
 }
 

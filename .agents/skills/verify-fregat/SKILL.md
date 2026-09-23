@@ -39,6 +39,8 @@ Scenarios live in `scripts/agent/scenarios/`. They open a file through the comma
 
 A scenario that makes a fixture workspace releases it with `releaseFixture` from `scripts/agent/fixture-workspace.ts`, not `rm`: the workspace's terminal shell persists by design and its language servers idle for minutes, so a bare `rm` leaves them running on the server under test.
 
+A second window in the same browser context stalls against the dev server. Each tab holds four event streams (`/settings/events`, `/machines/events`, two `/fs/events`), and a browser allows six HTTP/1.1 connections per host across every tab in a profile, so a second tab's requests queue until a stream closes — for tens of seconds, and a keypress that needs a read looks like it did nothing. Open a second window with `browser.newContext()`, which has its own pool. The mesh serves HTTP/2 and is unaffected; the desktop app talks HTTP/1.1 to `127.0.0.1`.
+
 The scenarios land on a workspace by registering a root-relative folder (`--workspace`, default `work/projects/platform`) and opening its address URL. A fresh browser context has no workspace otherwise.
 
 ## Landing page and product assets

@@ -25,6 +25,8 @@ export async function commitWorkspaceEdits({
   try {
     const prepared = await api.prepare.post(
       {
+        category: 'workspace-edit',
+        label: 'Workspace edit',
         origin: 'workspace-edit',
         operationId,
         operations,

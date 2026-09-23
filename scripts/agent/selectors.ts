@@ -317,6 +317,10 @@ export const selectors = {
   editorSplitHandles: (page: Page) => page.locator('[data-editor-groups]').getByRole('separator'),
   treeItem: (page: Page, name: string) =>
     page.getByLabel('Folder tree', { exact: true }).getByRole('treeitem', { name, exact: true }),
+  treeNewFileButton: (page: Page) =>
+    page.getByRole('button', { name: 'New file at workspace root', exact: true }),
+  confirmTreeDelete: (page: Page) =>
+    page.getByRole('dialog').getByRole('button', { name: /^Delete( permanently)?$/ }),
   fileConflict: (page: Page, name: string) =>
     page.getByRole('alertdialog', { name: `${name} changed on disk`, exact: true }),
   resizablePanel: (page: Page, id: string) =>

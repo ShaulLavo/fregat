@@ -1,3 +1,4 @@
+import { slashPathsOverlap } from '@workspace/utils/slash-paths'
 import {
   themeCustomizeOperationSchema,
   themeResetOperationSchema,
@@ -371,9 +372,7 @@ export function settingsMutationResourcesIntersect(
   left: SettingsMutationResourceKey,
   right: SettingsMutationResourceKey,
 ): boolean {
-  if (left === right) return true
-
-  return left.startsWith(`${right}/`) || right.startsWith(`${left}/`)
+  return slashPathsOverlap(left, right)
 }
 
 function applySettingsOperation(

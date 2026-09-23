@@ -1,5 +1,12 @@
+export type WorkspaceResourceType = 'directory' | 'file'
+
 export type WorkspaceResourcePrecondition =
   | { readonly kind: 'missing' }
+  | {
+      /** Exists as `type`; the server guards it on identity rather than content. */
+      readonly kind: 'present'
+      readonly type: WorkspaceResourceType
+    }
   | {
       readonly kind: 'snapshot'
       readonly mtimeMs: number
@@ -12,7 +19,7 @@ export type WorkspaceResourcePrecondition =
 
 export type WorkspacePersistenceOperation =
   | {
-      readonly expected: Exclude<WorkspaceResourcePrecondition, { kind: 'missing' }>
+      readonly expected: Exclude<WorkspaceResourcePrecondition, { kind: 'missing' | 'present' }>
       readonly index: number
       readonly kind: 'write'
       readonly path: string
@@ -20,11 +27,20 @@ export type WorkspacePersistenceOperation =
     }
   | {
       readonly destination: WorkspaceResourcePrecondition
+      readonly folder?: boolean
       readonly ignoreIfExists: boolean
       readonly index: number
       readonly kind: 'create'
       readonly overwrite: boolean
       readonly path: string
+    }
+  | {
+      readonly destination: Extract<WorkspaceResourcePrecondition, { kind: 'missing' }>
+      readonly index: number
+      readonly kind: 'copy'
+      readonly newPath: string
+      readonly oldPath: string
+      readonly source: Exclude<WorkspaceResourcePrecondition, { kind: 'missing' }>
     }
   | {
       readonly destination: WorkspaceResourcePrecondition
@@ -61,6 +77,19 @@ export type WorkspaceEditState =
 
 export type WorkspaceEditRecoveryTarget = 'rolled-back' | 'finalized' | 'undone' | 'redone'
 
+/**
+ * The writer id on a file operation's events: one per transition, so the window that ran it can
+ * claim exactly its own events, including a late one from its own earlier undo.
+ */
+export function fileOperationWriteId(operationId: string, generation: number) {
+  return `${operationId}#${generation}`
+}
+
+/** A transition has moved files but not yet finalized: a crash or a failure rolls it back. */
+export function isProvisionalWorkspaceEditState(state: WorkspaceEditState) {
+  return state === 'committed' || state === 'undo-committed' || state === 'redo-committed'
+}
+
 export type WorkspaceEditEventPublication = 'pending' | 'published' | 'suppressed'
 
 export type WorkspaceEditResultEntry =
@@ -76,9 +105,21 @@ export type WorkspaceEditResultEntry =
       readonly type: 'file'
       readonly version: string
     }
+  | {
+      readonly exists: true
+      readonly mtimeMs: number
+      readonly path: string
+      readonly type: 'directory'
+    }
+
+/** Which undo history a journaled operation belongs to. Each category is its own stack. */
+export type WorkspaceEditCategory = 'file-operation' | 'workspace-edit'
 
 export type WorkspaceEditPrepareRequest = {
   readonly bodyDigest: string
+  readonly category: WorkspaceEditCategory
+  /** What the history names this operation, such as "Move 3 items into src". */
+  readonly label: string
   readonly operationId: string
   readonly operations: readonly WorkspacePersistenceOperation[]
   readonly origin: 'workspace-edit'
@@ -139,4 +180,28 @@ export type WorkspaceEditRecoverySummary = {
 export type WorkspaceEditRecoveryListResult = {
   readonly operations: readonly WorkspaceEditRecoverySummary[]
   readonly serverEpoch: string
+}
+
+/** One resource change of a history entry, in workspace-relative paths. */
+export type WorkspaceEditHistoryLeg =
+  | { readonly kind: 'copy'; readonly newPath: string; readonly oldPath: string }
+  | { readonly folder: boolean; readonly kind: 'create'; readonly path: string }
+  | { readonly kind: 'delete'; readonly path: string }
+  | { readonly kind: 'rename'; readonly newPath: string; readonly oldPath: string }
+  | { readonly kind: 'write'; readonly path: string }
+
+export type WorkspaceEditHistoryEntry = {
+  readonly category: WorkspaceEditCategory
+  readonly generation: number
+  readonly label: string
+  readonly legs: readonly WorkspaceEditHistoryLeg[]
+  readonly operationId: string
+  readonly state: WorkspaceEditState
+}
+
+/** Newest first: `undo[0]` is the only entry that can be undone, `redo[0]` the only redo. */
+export type WorkspaceEditHistoryResult = {
+  readonly redo: readonly WorkspaceEditHistoryEntry[]
+  readonly serverEpoch: string
+  readonly undo: readonly WorkspaceEditHistoryEntry[]
 }

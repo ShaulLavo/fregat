@@ -57,10 +57,12 @@ import type {
   WorkspaceEditRecoverBody,
   WorkspaceEditReleaseBody,
   WorkspaceEditTransitionBody,
+  WorkspaceEditHistoryQuery,
   WriteBody,
 } from './contracts'
 import type { WorkspacePaths } from './path'
 import { WorkspaceEditController, type WorkspaceEditControllerOptions } from './workspace-edit'
+import { driveJournalName } from './workspace-edit-journals'
 
 export type FileSystemSearchOptions = Omit<FindOptions, 'maxContentBytes'>
 
@@ -79,6 +81,10 @@ export type FileSystemServiceOptions = {
   metadataDatabasePath?: string
   /** Internal durable transaction root. Tests must always inject an isolated path. */
   workspaceEditJournalRoot?: string
+  /** A journal at the top of each drive. Defaults on only when no journal root is injected. */
+  workspaceEditDriveJournals?: boolean
+  /** Test seam: where a drive's journal goes instead of its real mount top. */
+  workspaceEditMountTop?: WorkspaceEditControllerOptions['mountTop']
   /** Test seam for deterministic transaction timing. */
   workspaceEditClock?: WorkspaceEditControllerOptions['clock']
   /** Test seam for deterministic transaction filesystem failures. */
@@ -139,6 +145,7 @@ export class FileSystemService {
     this.workspaceEditJournalRoot = workspaceEditJournalRoot
     this.paths = createWorkspacePaths(options.workspaceRoot ?? this.systemRoot, {
       excludedAbsolutePaths: [this.workspaceEditJournalRoot],
+      excludedNames: [driveJournalName(process.getuid?.() ?? 0)],
     })
     this.homePath = resolveHomePath(this.paths, homeDirectory)
     this.defaultPath = this.homePath
@@ -156,8 +163,10 @@ export class FileSystemService {
     this.workspaceEdits = new WorkspaceEditController({
       changes: this.changes,
       clock: options.workspaceEditClock,
+      driveJournals: options.workspaceEditDriveJournals ?? !options.workspaceEditJournalRoot,
       driver: options.workspaceEditDriver,
       journalRoot: this.workspaceEditJournalRoot,
+      mountTop: options.workspaceEditMountTop,
       paths: this.paths,
     })
     this.workspaceEditReady = this.workspaceEdits.ready()
@@ -603,6 +612,10 @@ export class FileSystemService {
     return this.workspaceEdits.recovery(workspace)
   }
 
+  workspaceEditHistory(query: WorkspaceEditHistoryQuery) {
+    return this.workspaceEdits.history(query.workspace, query.category)
+  }
+
   async close() {
     if (this.workspaceIndexScope) this.retireWorkspaceIndexScope(this.workspaceIndexScope)
     this.workspaceIndexScope = undefined
@@ -663,6 +676,7 @@ export class FileSystemService {
     const previous = this.workspaceIndexScope
     const paths = createWorkspacePaths(absoluteRoot, {
       excludedAbsolutePaths: [this.workspaceEditJournalRoot],
+      excludedNames: this.paths.internalNames,
     })
     const index = new WorkspaceIndex(paths)
     const abort = new AbortController()

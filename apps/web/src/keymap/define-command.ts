@@ -38,6 +38,8 @@ export type WorkspaceCommandSnapshot = {
   readonly chatMode: boolean
   readonly chatModePanels: ChatModePanels
   readonly diffViewMode: EditorDiffViewMode
+  readonly fileOperationRedoable: boolean
+  readonly fileOperationUndoable: boolean
   readonly rootPath: WorkspaceRoot | null
   readonly uiMode: WorkspaceUiMode
   readonly wallpaperEnabled: boolean
@@ -95,10 +97,13 @@ export type WorkspaceCommandRuntime = {
   readonly workspace: EditorWorkspaceStoreApi
   readonly workspaceEdits: Pick<
     WorkspaceEditService,
+    | 'applyFileOperation'
     | 'canMutateWorkspace'
+    | 'discoverRecovery'
     | 'getSnapshot'
     | 'hasHistoryBarrier'
     | 'redo'
+    | 'reverseFileOperation'
     | 'runWorkspaceMutation'
     | 'undo'
   >

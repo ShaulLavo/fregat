@@ -432,7 +432,9 @@ function transitionState(
 }
 
 function operationPaths(operation: WorkspaceEditPrepareRequest['operations'][number]): string[] {
-  if (operation.kind === 'rename') return [operation.oldPath, operation.newPath]
+  if (operation.kind === 'rename' || operation.kind === 'copy') {
+    return [operation.oldPath, operation.newPath]
+  }
   return [operation.path]
 }
 

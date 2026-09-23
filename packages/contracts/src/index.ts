@@ -100,7 +100,11 @@ export {
 export type { ErrorCategory } from './error-category'
 export { errorNumberField, errorStringField, type ErrorStringFieldOptions } from './error-fields'
 export type {
+  WorkspaceEditCategory,
   WorkspaceEditEventPublication,
+  WorkspaceEditHistoryEntry,
+  WorkspaceEditHistoryLeg,
+  WorkspaceEditHistoryResult,
   WorkspaceEditPartialAcknowledgement,
   WorkspaceEditPrepareRequest,
   WorkspaceEditRecoverRequest,
@@ -115,7 +119,9 @@ export type {
   WorkspaceEditTransitionRequest,
   WorkspacePersistenceOperation,
   WorkspaceResourcePrecondition,
+  WorkspaceResourceType,
 } from './workspace-edit'
+export { fileOperationWriteId, isProvisionalWorkspaceEditState } from './workspace-edit'
 export {
   approvalRequestIdSchema,
   commandIdSchema,

@@ -1,41 +1,43 @@
 import { useUnavailableEnvironment } from '@/lib/environments/hooks/use-unavailable-environment'
-import { filePathsForTabs, filesystemResource } from '@/lib/documents/utils/capabilities'
-import { filesystemPath } from '@/lib/documents/utils/identity'
 import type { FilesystemPath } from '@/lib/documents/utils/types'
-import type { Client } from '@/lib/client'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import type { FileTreeRenameEvent } from '@workspace/tree'
 import type { FileTreeModel } from '@workspace/tree'
-import { useQueryClient } from '@tanstack/react-query'
-import { useRef, useState, useTransition, type RefObject } from 'react'
+import { useIsMutating, useQueryClient } from '@tanstack/react-query'
+import { useRef, useState, type RefObject } from 'react'
 
 import { useWorkspaceMutationAllowed } from '@/features/editor/hooks/use-workspace-mutation-allowed'
 import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
 import { useEditorDocumentStoreApi } from '@/features/editor/state/document-state'
 import { useEditorWorkspaceStoreApi } from '@/features/editor/state/workspace-state'
 import { useOptionalWorkspaceEditService } from '@/features/editor/providers/workspace-edit-context'
+import type { FileOperationLeg } from '@/features/editor/state/workspace-edit-service'
 import {
   containerContentsLoaded,
   duplicateTreePath,
   newEntryTreePath,
   workspacePathForTreePath,
 } from '@/features/workspace/utils/entry-paths'
-import { editorPathRenames } from '@/features/workspace/utils/editor-path-renames'
 import { expandTreeDirectory } from '@/features/workspace/utils/tree-pane-state'
-import { runTreeIntent } from '@/features/workspace/state/tree-intents'
-import { setFileSnapshotQueryData } from '@/lib/file-snapshot-query-cache'
-import type { FileResult } from '@/lib/file-system-types'
-import { fileSystemKeys } from '@/lib/query-keys'
 import {
-  copyPath,
-  createFileContent,
-  deletePath,
-  ensureFolderPath,
-  errorMessage,
-  renamePath,
-} from '@/lib/file-server'
+  fileOperationDocuments,
+  runFileOperation,
+  type FileOperationRuntime,
+} from '@/features/workspace/state/file-operations'
+import { runTreeIntent } from '@/features/workspace/state/tree-intents'
+import {
+  createLabel,
+  deleteLabel,
+  duplicateLabel,
+  moveLabel,
+} from '@/features/workspace/utils/file-operation-labels'
+import { workspaceMutationKeys } from '@/features/workspace/utils/mutation-keys'
+import { toClientError } from '@/lib/client-error-taxonomy'
+import { isDirectoryEntry } from '@/lib/file-system-types'
+import { fileSystemKeys } from '@/lib/query-keys'
+import { deletePath, errorMessage } from '@/lib/file-server'
 import { canonicalTreePath, toTreePath } from '@/lib/path-formatters'
-import type { TreeModel } from '@/lib/tree-model'
+import type { TreeModel, TreePathMove } from '@/lib/tree-model'
 
 export type DeleteTarget = {
   readonly isDirectory: boolean
@@ -52,6 +54,7 @@ export type TreeFsActions = {
   readonly mutationsEnabled: boolean
   readonly createEntry: (containerPath: string, isFolder: boolean) => void
   readonly duplicateEntry: (treePath: string, isDirectory: boolean) => void
+  readonly moveEntries: (moves: readonly TreePathMove[]) => void
   readonly renameEntry: (rowPath: string) => void
   readonly requestDelete: (target: DeleteTarget) => void
 }
@@ -63,9 +66,8 @@ type DeferredCreate = { containerPath: string; isFolder: boolean }
  * confirmation the menu cannot host itself — the menu unmounts the moment it
  * closes, so the dialog has to outlive it here.
  *
- * Each mutation is an intent: the projected tree shows it at once, and it
- * disappears from the projection on its own if the server refuses. Nothing
- * here corrects the tree by hand.
+ * Each mutation is one journaled operation: the projected tree shows it at once, open
+ * documents follow it, and Ctrl+Z in the tree reverses it.
  */
 export function useFsActions({
   modelRef,
@@ -79,23 +81,41 @@ export function useFsActions({
   const queryClient = useQueryClient()
   const unavailable = useUnavailableEnvironment()
   const workspaceMutationAllowed = useWorkspaceMutationAllowed()
+  const workspaceEdits = useOptionalWorkspaceEditService()
   const mutationsEnabled =
     !unavailable &&
     workspaceMutationAllowed &&
+    workspaceEdits !== null &&
     Boolean(queryClient.getQueryData(fileSystemKeys.tree(rootPath)))
-  const workspaceEdits = useOptionalWorkspaceEditService()
   const documentStore = useEditorDocumentStoreApi()
   const workspaceStore = useEditorWorkspaceStoreApi()
   const { renameLiveEditorDocument } = useEditorCommands()
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
-  const [deleting, startDelete] = useTransition()
+  // Set once the journal has refused to keep this delete for undo.
+  const [deletePermanently, setDeletePermanently] = useState(false)
+  const deleting =
+    useIsMutating({ mutationKey: workspaceMutationKeys.tree('delete', rootPath) }) > 0
   // Set while an inline edit is creating rather than renaming, so the commit
   // handler knows to write a new entry instead of moving an existing one.
   const pendingCreatePathRef = useRef<string | null>(null)
   // Set while a create is waiting on its target directory to finish loading.
   const deferredCreateRef = useRef<DeferredCreate | null>(null)
-  const client = () => clientForQueryClient(queryClient)
+
+  function fileOperations(): FileOperationRuntime | null {
+    if (!workspaceEdits) return null
+    return {
+      documents: fileOperationDocuments({
+        documentStore,
+        queryClient,
+        renameLiveEditorDocument,
+        workspaceStore,
+      }),
+      queryClient,
+      rootPath,
+      workspaceEdits,
+    }
+  }
 
   function createEntry(containerPath: string, isFolder: boolean) {
     if (!mutationsEnabled) return
@@ -111,41 +131,6 @@ export function useFsActions({
     // `resumeDeferredCreate` start the edit once they have landed.
     deferredCreateRef.current = { containerPath, isFolder }
     expandTreeDirectory(tree, containerPath)
-  }
-
-  function runWorkspaceMutation<T>(
-    affectedPaths: readonly FilesystemPath[] | 'all',
-    operation: () => Promise<T>,
-  ) {
-    if (!workspaceEdits) return operation()
-    return workspaceEdits.runWorkspaceMutation(affectedPaths, operation)
-  }
-
-  function renameEditorPaths(from: FilesystemPath, to: FilesystemPath) {
-    const workspace = workspaceStore.getState()
-    const renames = editorPathRenames(
-      [
-        ...filePathsForTabs([
-          ...workspace.openTabContents,
-          ...workspace.editorHistory,
-          ...workspace.recentlyClosedTabs,
-        ]),
-        ...Object.values(documentStore.getState().liveDocumentsByKey).flatMap((document) => {
-          const resource = filesystemResource(document.target)
-          return resource ? [resource.path] : []
-        }),
-      ],
-      from,
-      to,
-    )
-    for (const rename of renames) {
-      const queryKey = fileSystemKeys.fileSnapshot(rename.from)
-      const file = queryClient.getQueryData<FileResult>(queryKey)
-      if (file) setFileSnapshotQueryData(queryClient, { ...file, path: filesystemPath(rename.to) })
-      renameLiveEditorDocument(filesystemPath(rename.from), filesystemPath(rename.to))
-      queryClient.removeQueries({ exact: true, queryKey })
-    }
-    return renames
   }
 
   /** Called by the pane after each model sync, once per settled tree. */
@@ -173,36 +158,34 @@ export function useFsActions({
   }
 
   function createOnDisk(treePath: string, isFolder: boolean) {
+    const runtime = fileOperations()
+    if (!runtime) return
     const path = workspacePathForTreePath(rootPath, treePath)
-    void runTreeIntent({
+    void runFileOperation(runtime, {
+      label: createLabel(path, isFolder),
+      legs: [{ folder: isFolder, kind: 'create', path }],
       patch: { kind: 'create', rootPath, treePath, isFolder },
-      queryClient,
-      perform: () =>
-        runWorkspaceMutation([path], () => createEntryOnDisk(path, isFolder, client())),
     })
   }
 
-  function renameOnDisk(from: string, to: string, isFolder: boolean) {
-    const fromPath = workspacePathForTreePath(rootPath, from)
-    const toPath = workspacePathForTreePath(rootPath, to)
-    let renamedEditorPathCount = 0
-    void runTreeIntent({
-      patch: { kind: 'move', rootPath, moves: [{ fromTreePath: from, toTreePath: to }] },
-      queryClient,
-      perform: async () => {
-        const affectedPaths = isFolder ? 'all' : [fromPath, toPath]
-        const entry = await runWorkspaceMutation(affectedPaths, () =>
-          renamePath(fromPath, toPath, client()),
-        )
-        renamedEditorPathCount = renameEditorPaths(fromPath, toPath).length
-        return entry
-      },
-      context: () => ({ from: fromPath, path: toPath, isFolder, renamedEditorPathCount }),
+  function moveEntries(moves: readonly TreePathMove[], announce = true) {
+    const runtime = fileOperations()
+    if (!runtime || moves.length === 0) return
+    const legs = moves.map((move) => moveLeg(move, modelRef.current, rootPath))
+    void runFileOperation(runtime, {
+      announce,
+      label: moveLabel(
+        legs.map((leg) => ({ from: leg.from, to: leg.to })),
+        rootPath,
+      ),
+      legs,
+      patch: { kind: 'move', rootPath, moves },
     })
   }
 
   function duplicateEntry(treePath: string, isDirectory: boolean) {
-    if (!mutationsEnabled) return
+    const runtime = fileOperations()
+    if (!mutationsEnabled || !runtime) return
     const from = canonicalTreePath(treePath)
     const to = duplicateTreePath({
       existingPaths: modelRef.current.entriesByTreePath,
@@ -210,14 +193,17 @@ export function useFsActions({
       treePath,
     })
     const fromPath = workspacePathForTreePath(rootPath, from)
-    const toPath = workspacePathForTreePath(rootPath, to)
-    void runTreeIntent({
+    void runFileOperation(runtime, {
+      label: duplicateLabel(fromPath),
+      legs: [
+        {
+          from: fromPath,
+          kind: 'copy',
+          to: workspacePathForTreePath(rootPath, to),
+          type: isDirectory ? 'directory' : 'file',
+        },
+      ],
       patch: { kind: 'duplicate', rootPath, from, to, isFolder: isDirectory },
-      queryClient,
-      perform: () =>
-        runWorkspaceMutation(isDirectory ? 'all' : [toPath], () =>
-          copyPath(fromPath, toPath, client()),
-        ),
     })
   }
 
@@ -231,34 +217,74 @@ export function useFsActions({
       return
     }
 
-    renameOnDisk(event.sourcePath, event.destinationPath, event.isFolder)
+    // An inline rename happens where the user is looking; only a drag needs the toast.
+    moveEntries([{ fromTreePath: event.sourcePath, toTreePath: event.destinationPath }], false)
+  }
+
+  function closeDeleteDialog() {
+    setDeleteError(null)
+    setDeletePermanently(false)
+    setDeleteTarget(null)
+  }
+
+  async function deleteJournaled(target: DeleteTarget, runtime: FileOperationRuntime) {
+    const outcome = await runFileOperation(runtime, {
+      announce: true,
+      label: deleteLabel(target.path),
+      legs: [
+        { kind: 'delete', path: target.path, type: target.isDirectory ? 'directory' : 'file' },
+      ],
+      patch: { kind: 'delete', rootPath, treePath: toTreePath(target.path, rootPath) },
+      rendersError: isQuotaError,
+    })
+    if (outcome.ok || outcome.reason !== 'transport') {
+      closeDeleteDialog()
+      return
+    }
+    if (isQuotaError(outcome.error)) {
+      setDeletePermanently(true)
+      return
+    }
+    setDeleteError(errorMessage(outcome.error))
+  }
+
+  /** Only after the dialog has said so: the journal cannot hold this delete. */
+  async function deleteForever(target: DeleteTarget) {
+    const outcome = await runTreeIntent({
+      patch: { kind: 'delete', rootPath, treePath: toTreePath(target.path, rootPath) },
+      queryClient,
+      perform: () => {
+        const remove = () =>
+          deletePath(target.path, target.isDirectory, clientForQueryClient(queryClient))
+        if (!workspaceEdits) return remove()
+        return workspaceEdits.runWorkspaceMutation([target.path], remove)
+      },
+    })
+    if (outcome.ok || outcome.reason !== 'transport') {
+      closeDeleteDialog()
+      return
+    }
+    setDeleteError(errorMessage(outcome.error))
   }
 
   function confirmDelete() {
     const target = deleteTarget
-    if (!target || !mutationsEnabled) return
+    const runtime = fileOperations()
+    if (!target || !mutationsEnabled || !runtime) return
 
-    startDelete(async () => {
-      const outcome = await runTreeIntent({
-        patch: { kind: 'delete', rootPath, treePath: toTreePath(target.path, rootPath) },
-        queryClient,
-        perform: () =>
-          runWorkspaceMutation(target.isDirectory ? 'all' : [target.path], () =>
-            deletePath(target.path, target.isDirectory, client()),
-          ),
-      })
-      if (outcome.ok || outcome.reason !== 'transport') {
-        setDeleteError(null)
-        setDeleteTarget(null)
-        return
-      }
-      setDeleteError(errorMessage(outcome.error))
-    })
+    if (deletePermanently) {
+      void deleteForever(target)
+      return
+    }
+    void deleteJournaled(target, runtime)
   }
 
   const actions: TreeFsActions = {
     createEntry,
     duplicateEntry,
+    moveEntries: (moves) => {
+      if (mutationsEnabled) moveEntries(moves)
+    },
     mutationsEnabled,
     renameEntry: (rowPath) => {
       if (!mutationsEnabled) return
@@ -267,6 +293,7 @@ export function useFsActions({
     requestDelete: (target) => {
       if (!mutationsEnabled) return
       setDeleteError(null)
+      setDeletePermanently(false)
       setDeleteTarget(target)
     },
   }
@@ -279,15 +306,28 @@ export function useFsActions({
       deleting,
       mutationsEnabled,
       error: deleteError,
-      onCancel: () => setDeleteTarget(null),
+      onCancel: closeDeleteDialog,
       onConfirm: confirmDelete,
+      permanent: deletePermanently,
       target: deleteTarget,
     },
   }
 }
 
-function createEntryOnDisk(path: FilesystemPath, isFolder: boolean, client: Client) {
-  if (isFolder) return ensureFolderPath(path, client)
+function moveLeg(
+  move: TreePathMove,
+  model: TreeModel,
+  rootPath: FilesystemPath,
+): Extract<FileOperationLeg, { kind: 'rename' }> {
+  const entry = model.entriesByTreePath.get(canonicalTreePath(move.fromTreePath))
+  return {
+    from: workspacePathForTreePath(rootPath, move.fromTreePath),
+    kind: 'rename',
+    to: workspacePathForTreePath(rootPath, move.toTreePath),
+    type: entry && isDirectoryEntry(entry) ? 'directory' : 'file',
+  }
+}
 
-  return createFileContent(path, '', client)
+function isQuotaError(error: unknown) {
+  return toClientError(error).code === 'WORKSPACE_EDIT_QUOTA'
 }

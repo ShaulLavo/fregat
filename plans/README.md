@@ -19,6 +19,7 @@ a bare root `bun run verify`.
 
 | Plan                                                                                    | State                                                        |
 | --------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| [136 — file tree undo and redo](136-file-tree-undo.md)                                  | **IMPLEMENTED — ALL THREE PHASES; SCENARIO GREEN**           |
 | [135 — TanStack async ownership and route preparation](135-tanstack-async-ownership.md) | **PROPOSED — RESEARCH COMPLETE; IMPLEMENTATION NOT STARTED** |
 | [134 — external edits and LSP freshness](134-external-edit-and-lsp-freshness.md)        | **PROPOSED — REPRODUCE AND TRACE FIRST**                     |
 | [133 — one owner per fact](133-one-owner-per-fact.md)                                   | **PROPOSED — PHASE 1 READY; D1 NEEDS AN ANSWER**             |

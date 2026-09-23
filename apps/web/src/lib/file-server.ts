@@ -27,6 +27,8 @@ import { createRpcError } from '@/lib/structured-errors'
 import { collectWorkspaceSearch } from '@workspace/client-core/files/search-client'
 import type {
   WorkspaceEditRecoverRequest,
+  WorkspaceEditCategory,
+  WorkspaceEditHistoryResult,
   WorkspaceEditRecoveryListResult,
   WorkspaceEditReleaseRequest,
   WorkspaceEditResult,
@@ -173,6 +175,19 @@ export async function fetchWorkspaceEditRecovery(
   const response = await client.fs['workspace-edit'].recovery.get({
     fetch: { signal },
     query: { workspace },
+  })
+  return unwrapWorkspaceEditResponse(response)
+}
+
+export async function fetchWorkspaceEditHistory(
+  workspace: FilesystemPath,
+  category: WorkspaceEditCategory,
+  signal: AbortSignal,
+  client: Client,
+): Promise<WorkspaceEditHistoryResult> {
+  const response = await client.fs['workspace-edit'].history.get({
+    fetch: { signal },
+    query: { category, workspace },
   })
   return unwrapWorkspaceEditResponse(response)
 }

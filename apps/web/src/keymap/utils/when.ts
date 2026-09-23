@@ -21,6 +21,8 @@ export type CommandWhenSnapshot = {
   readonly activeDocument: DocumentRef | null
   readonly activeTabId: TabId | null
   readonly chatMode: boolean
+  readonly fileOperationRedoable?: boolean
+  readonly fileOperationUndoable?: boolean
   readonly workspaceOpen: boolean
   readonly workspaceEditRedoable?: boolean
   readonly workspaceEditUndoable?: boolean
@@ -37,6 +39,8 @@ export const commandWhenDisabledReasons = {
   editorTarget: 'No text editor is active.',
   editorWritable: 'The active editor is read-only.',
   fileBackedTab: 'No file-backed surface is active.',
+  fileOperationRedoable: 'No file operation can be redone.',
+  fileOperationUndoable: 'No file operation can be undone.',
   saveableTab: 'Nothing here can be saved.',
   tabOpen: 'No editor tab is open.',
   workspaceOpen: 'No workspace open.',
@@ -78,6 +82,12 @@ function conditionDisabledReason(
     return filesystemResource(snapshot.activeDocument)
       ? null
       : commandWhenDisabledReasons.fileBackedTab
+  }
+  if (condition === 'fileOperationRedoable') {
+    return snapshot.fileOperationRedoable ? null : commandWhenDisabledReasons.fileOperationRedoable
+  }
+  if (condition === 'fileOperationUndoable') {
+    return snapshot.fileOperationUndoable ? null : commandWhenDisabledReasons.fileOperationUndoable
   }
   if (condition === 'saveableTab') {
     const savable =

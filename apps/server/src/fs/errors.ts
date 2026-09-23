@@ -26,6 +26,8 @@ export type FsErrorCode =
   | 'WORKSPACE_EDIT_DEVICE_UNSUPPORTED'
   | 'WORKSPACE_EDIT_QUOTA'
   | 'WORKSPACE_EDIT_PARTIAL'
+  | 'WORKSPACE_EDIT_TARGET_OCCUPIED'
+  | 'WORKSPACE_EDIT_NOT_HEAD'
   | 'OPERATION_FAILED'
 
 const redactedDiagnosticValue = '[redacted]'
@@ -62,6 +64,8 @@ const statusByCode: Record<FsErrorCode, number> = {
   WORKSPACE_EDIT_DEVICE_UNSUPPORTED: 409,
   WORKSPACE_EDIT_QUOTA: 507,
   WORKSPACE_EDIT_PARTIAL: 409,
+  WORKSPACE_EDIT_TARGET_OCCUPIED: 409,
+  WORKSPACE_EDIT_NOT_HEAD: 409,
   OPERATION_FAILED: 500,
 }
 
@@ -88,19 +92,35 @@ const messageByCode: Record<FsErrorCode, string> = {
   WORKSPACE_EDIT_DEVICE_UNSUPPORTED: 'workspace edit resource paths are on unsupported devices',
   WORKSPACE_EDIT_QUOTA: 'workspace edit journal quota exceeded',
   WORKSPACE_EDIT_PARTIAL: 'workspace edit requires recovery',
+  WORKSPACE_EDIT_TARGET_OCCUPIED: 'a path the operation would restore already exists',
+  WORKSPACE_EDIT_NOT_HEAD: 'only the newest operation in a history can be undone or redone',
   OPERATION_FAILED: 'filesystem operation failed',
+}
+
+/** Runtime facts and user guidance an FsError carries beyond its code and message. */
+export type FsErrorDetails = {
+  readonly fix?: string
+  readonly internal?: Record<string, unknown>
+  readonly why?: string
 }
 
 export class FsError extends EvlogError {
   declare readonly code: FsErrorCode
 
-  constructor(code: FsErrorCode, message = messageByCode[code], cause?: unknown) {
+  constructor(
+    code: FsErrorCode,
+    message = messageByCode[code],
+    cause?: unknown,
+    details: FsErrorDetails = {},
+  ) {
     super({
       cause: sanitizeCause(cause) as Error | undefined,
       code,
-      internal: cause === undefined ? undefined : { cause: sanitizeCause(cause) },
+      fix: details.fix,
+      internal: errorInternal(cause, details.internal),
       message,
       status: statusByCode[code],
+      why: details.why,
     })
     this.name = 'FsError'
   }
@@ -126,8 +146,15 @@ export function errorPayload(error: FsError) {
     error: {
       code: error.code,
       message: error.message,
+      ...(error.why === undefined ? {} : { why: error.why }),
+      ...(error.fix === undefined ? {} : { fix: error.fix }),
     },
   }
+}
+
+function errorInternal(cause: unknown, internal: Record<string, unknown> | undefined) {
+  if (cause === undefined) return internal
+  return { ...internal, cause: sanitizeCause(cause) }
 }
 
 function sanitizeCause(cause: unknown, seen = new WeakSet<object>()): unknown {

@@ -53,15 +53,18 @@ function treeEntry(
   entry: Extract<WorkspaceEditResultEntry, { readonly exists: true }>,
   current: TreeEntry | undefined,
 ): TreeEntry {
+  const contents =
+    entry.type === 'file'
+      ? { size: entry.size, version: entry.version }
+      : { size: current?.size ?? 0, version: current?.version ?? '' }
   return {
     birthtimeMs: current?.birthtimeMs ?? entry.mtimeMs,
     ...(current?.children ? { children: current.children } : {}),
     mtimeMs: entry.mtimeMs,
     name: basename(entry.path),
     path: filesystemPath(entry.path),
-    size: entry.size,
     type: entry.type,
-    version: entry.version,
+    ...contents,
   }
 }
 

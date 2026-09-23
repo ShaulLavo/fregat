@@ -18,7 +18,10 @@ import type {
 import { activeEditorTabForWorkbenchPanels } from '@/features/workbench/utils/panels'
 import type { FocusArea, FocusTargetId, FocusTargetRegistration } from '@/lib/focus/state/service'
 import { FocusService, focusTargetById } from '@/lib/focus/state/service'
-import { createTestCommandRuntime } from '../../../test/factories/command-runtime'
+import {
+  createTestCommandRuntime,
+  unusedFileOperations,
+} from '../../../test/factories/command-runtime'
 import { expect, test } from '../../../test/fixtures'
 import { createTestQueryClient } from '../../../test/render'
 import { navigationWorkspace } from '../../../test/factories/navigation-workspace'
@@ -292,6 +295,7 @@ test.each([
         rootPath: '/repo',
         runtime: {
           workspaceEdits: {
+            ...unusedFileOperations,
             canMutateWorkspace: () => true,
             getSnapshot: idleWorkspaceEditSnapshot,
             hasHistoryBarrier: () => false,
@@ -322,6 +326,7 @@ test('workspace history commands are disabled while the coordinator has no avail
       rootPath: '/repo',
       runtime: {
         workspaceEdits: {
+          ...unusedFileOperations,
           canMutateWorkspace: () => true,
           getSnapshot: idleWorkspaceEditSnapshot,
           hasHistoryBarrier: () => false,

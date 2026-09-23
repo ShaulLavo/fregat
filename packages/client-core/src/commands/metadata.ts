@@ -11,6 +11,8 @@ export type CommandWhen =
   | 'editorTarget'
   | 'editorWritable'
   | 'fileBackedTab'
+  | 'fileOperationRedoable'
+  | 'fileOperationUndoable'
   | 'saveableTab'
   | 'tabOpen'
   | 'workspaceOpen'
@@ -34,6 +36,8 @@ export type CommandKeyDefault = {
   readonly platforms?: readonly CommandPlatformName[]
   readonly preventDefault?: boolean
   readonly stopPropagation?: boolean
+  /** A modifier chord that leaves a focused text box its own meaning, such as Mod+Z. */
+  readonly yieldsToTextEntry?: boolean
   /** VS Code command represented by this specific default binding, used for keymap import/export. */
   readonly vscodeCommandId?: string
 }

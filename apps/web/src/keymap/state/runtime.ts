@@ -3,6 +3,8 @@ import {
   type FocusTransitionOutcome,
 } from '@workspace/client-core/commands/focus'
 import type { CommandTargetKind } from '@workspace/client-core/commands/metadata'
+import type { WorkspaceEditHistoryResult } from '@workspace/contracts'
+import { fileSystemKeys } from '@/lib/query-keys'
 import { isSavableEditorDocument } from '@/features/editor/utils/save'
 import { settingsSelection } from '@/features/settings/state/selection'
 import { documentKey } from '@/lib/documents/utils/identity'
@@ -55,6 +57,12 @@ export function captureCommandSnapshot(runtime: WorkspaceCommandRuntime): Worksp
   const liveDocument = activeDocument
     ? runtime.documents.store.getState().getLiveEditorDocument(documentKey(activeDocument))
     : null
+  const workspaceMutable = runtime.workspaceEdits.canMutateWorkspace()
+  const fileHistory = state.rootFolder
+    ? runtime.documents.queryClient.getQueryData<WorkspaceEditHistoryResult>(
+        fileSystemKeys.fileOperationHistory(state.rootFolder.path),
+      )
+    : undefined
   return {
     activeDocumentSavable: liveDocument ? isSavableEditorDocument(liveDocument) : false,
     activeTabContent,
@@ -63,6 +71,9 @@ export function captureCommandSnapshot(runtime: WorkspaceCommandRuntime): Worksp
     chatMode: state.uiMode === 'chat',
     chatModePanels: state.chatModePanels,
     diffViewMode: settings.diffViewMode,
+    // Until the history has loaded the handler decides; it always reads the server's list first.
+    fileOperationRedoable: workspaceMutable && (fileHistory?.redo.length ?? 1) > 0,
+    fileOperationUndoable: workspaceMutable && (fileHistory?.undo.length ?? 1) > 0,
     rootPath: state.rootFolder?.path ?? null,
     uiMode: state.uiMode,
     wallpaperEnabled: settings.wallpaperEnabled,
@@ -70,7 +81,7 @@ export function captureCommandSnapshot(runtime: WorkspaceCommandRuntime): Worksp
     workspaceOpen: state.rootFolder !== null,
     workspaceEditRedoable: workspaceEdit.canRedo,
     workspaceEditUndoable: workspaceEdit.canUndo,
-    workspaceMutable: runtime.workspaceEdits.canMutateWorkspace(),
+    workspaceMutable,
   }
 }
 

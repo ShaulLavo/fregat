@@ -414,6 +414,9 @@ async function applyWorkspaceEventPlan({
   }
 
   if (plan.shouldInvalidateGitState) scheduleGitInvalidation()
+  if (plan.shouldInvalidateFileHistory) {
+    void queryClient.invalidateQueries({ queryKey: fileSystemKeys.fileOperationHistory(rootPath) })
+  }
 
   await applyTreeOperations(queryClient, rootPath, plan.treeOperations, signal)
   await applyOpenFileOperations({

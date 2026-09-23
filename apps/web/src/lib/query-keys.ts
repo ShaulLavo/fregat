@@ -4,6 +4,8 @@ export const fileSystemKeys = {
   fileMetadata: (path: string) => [...fileSystemKeys.all, 'file-metadata', path] as const,
   fileSnapshots: () => [...fileSystemKeys.all, 'file-snapshots'] as const,
   fileSnapshot: (path: string) => [...fileSystemKeys.fileSnapshots(), path] as const,
+  fileOperationHistory: (rootPath: string) =>
+    [...fileSystemKeys.all, 'file-operation-history', rootPath] as const,
   quickOpenFiles: (rootPath: string, query: string) =>
     [...fileSystemKeys.fileSnapshots(), 'quick-open', rootPath, query] as const,
   trees: () => [...fileSystemKeys.all, 'trees'] as const,

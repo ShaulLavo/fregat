@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import type { Dirent, Stats } from 'node:fs'
 import {
   chmod,
+  cp,
   lstat,
   mkdir,
   open,
@@ -18,10 +19,12 @@ import {
 } from 'node:fs/promises'
 import path from 'node:path'
 import type {
+  WorkspaceEditCategory,
   WorkspaceEditEventPublication,
   WorkspaceEditRecoveryTarget,
   WorkspaceEditResult,
   WorkspaceEditState,
+  WorkspaceResourceType,
 } from '@workspace/contracts'
 import { FsError } from './errors'
 import { nodeErrorCode } from '@workspace/contracts'
@@ -50,6 +53,16 @@ export type WorkspaceEditJournalGuard =
       readonly size: number
       readonly version: string
     }
+  | {
+      /**
+       * Type only. A save replaces a file's inode and a restore across drives replaces a
+       * folder's; an undo only ever moves or parks, so identity would strand it for nothing.
+       */
+      readonly exists: true
+      readonly guard: 'entry'
+      readonly path: string
+      readonly type: WorkspaceResourceType
+    }
 
 export type WorkspaceEditPreparedLeg =
   | {
@@ -63,12 +76,22 @@ export type WorkspaceEditPreparedLeg =
     }
   | {
       readonly destinationExists: boolean
+      readonly folder: boolean
       readonly index: number
       readonly kind: 'create'
       readonly noOp: boolean
       readonly overwrite: boolean
       readonly path: string
       readonly reservedPath?: string
+      /** Where an undo parks the created resource, so a redo returns it with later edits intact. */
+      readonly undoSlot: string
+    }
+  | {
+      readonly index: number
+      readonly kind: 'copy'
+      readonly newPath: string
+      readonly oldPath: string
+      readonly undoSlot: string
     }
   | {
       readonly destinationExists: boolean
@@ -107,8 +130,14 @@ export type WorkspaceEditProgramStep =
       readonly path: string
     }
   | {
+      readonly folder?: boolean
       readonly kind: 'create'
       readonly path: string
+    }
+  | {
+      readonly from: string
+      readonly kind: 'copy'
+      readonly to: string
     }
 
 export type WorkspaceEditIntentPathGuard = {
@@ -119,6 +148,7 @@ export type WorkspaceEditIntentPathGuard = {
   readonly mtimeMs?: number
   readonly reference: string
   readonly size?: number
+  readonly type?: WorkspaceResourceType
   readonly version?: string
 }
 
@@ -161,11 +191,15 @@ export type WorkspaceEditJournalManifest = {
   }
   readonly affectedPaths: readonly string[]
   readonly bodyDigest: string
+  readonly category: WorkspaceEditCategory
   readonly createdAt: number
   readonly eventPublication: WorkspaceEditEventPublication
   readonly forwardGuards?: readonly WorkspaceEditJournalGuard[]
   readonly generation: number
   readonly guards: readonly WorkspaceEditJournalGuard[]
+  /** Orders the history lists: bumped whenever the operation lands forward or back. */
+  readonly historySequence: number
+  readonly label: string
   readonly legs: readonly WorkspaceEditPreparedLeg[]
   readonly operationId: string
   readonly provisionalFrom?: 'finalized' | 'redone' | 'undone'
@@ -174,6 +208,8 @@ export type WorkspaceEditJournalManifest = {
   readonly recoveryTarget?: WorkspaceEditRecoveryTarget
   readonly rolledBackPaths: readonly string[]
   readonly reverseGuards?: readonly WorkspaceEditJournalGuard[]
+  /** Bytes the journal holds for this operation, counted against its quota. */
+  readonly stagedBytes: number
   readonly state: WorkspaceEditState
   readonly touchedAt: number
   readonly transitionResults: Readonly<Record<string, WorkspaceEditTransitionCacheEntry>>
@@ -186,6 +222,17 @@ export type WorkspaceEditFileHandle = Pick<FileHandle, 'close' | 'sync' | 'write
 
 export type WorkspaceEditFileSystemDriver = {
   chmod(path: string, mode: number): Promise<void>
+  cp(
+    from: string,
+    to: string,
+    options: {
+      errorOnExist: boolean
+      force: boolean
+      preserveTimestamps: boolean
+      recursive: boolean
+      verbatimSymlinks: boolean
+    },
+  ): Promise<void>
   lstat(path: string): Promise<Stats>
   mkdir(path: string, options: { mode: number; recursive: boolean }): Promise<unknown>
   open(path: string, flags: string, mode?: number): Promise<WorkspaceEditFileHandle>
@@ -205,6 +252,7 @@ export type WorkspaceEditFileSystemDriver = {
 
 export const nodeWorkspaceEditFileSystemDriver: WorkspaceEditFileSystemDriver = {
   chmod,
+  cp,
   lstat,
   mkdir,
   open,
@@ -392,11 +440,6 @@ export class WorkspaceEditJournal {
     await syncPath(this.driver, operationPath)
   }
 
-  async sizeBytes() {
-    await this.initialize()
-    return this.directorySize(this.root)
-  }
-
   operationPath(operationId: string) {
     if (!/^[0-9a-f-]{36}$/u.test(operationId)) throw new FsError('WORKSPACE_EDIT_INVALID')
     return path.join(this.root, operationId)
@@ -456,25 +499,6 @@ export class WorkspaceEditJournal {
       if (nodeErrorCode(error) === 'ENOENT') return null
       throw error
     }
-  }
-
-  private async directorySize(root: string): Promise<number> {
-    const entries = await this.driver.readdir(root, { withFileTypes: true })
-    let size = 0
-
-    for (const entry of entries) {
-      if (entry.isSymbolicLink()) throw new FsError('WORKSPACE_EDIT_INVALID')
-      const target = path.join(root, entry.name)
-      if (entry.isDirectory()) {
-        size += await this.directorySize(target)
-        continue
-      }
-      if (!entry.isFile()) throw new FsError('WORKSPACE_EDIT_INVALID')
-
-      size += (await this.driver.stat(target)).size
-    }
-
-    return size
   }
 }
 

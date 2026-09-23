@@ -50,9 +50,53 @@ describe('filesystem contracts', () => {
         path: 'src/b.ts',
         recursive: true,
       },
+      {
+        destination: { kind: 'missing' },
+        folder: true,
+        ignoreIfExists: false,
+        index: 5,
+        kind: 'create',
+        overwrite: false,
+        path: 'lib',
+      },
+      {
+        destination: { kind: 'missing' },
+        index: 6,
+        kind: 'copy',
+        newPath: 'lib copy',
+        oldPath: 'lib',
+        source: { afterOperation: 5, kind: 'transaction' },
+      },
     ])
 
     expect(v.parse(workspaceEditPrepareBodySchema, body)).toEqual(body)
+  })
+
+  it('rejects a present precondition on a write and a copy onto itself', () => {
+    const present = { kind: 'present', type: 'file' }
+    expect(() =>
+      v.parse(
+        workspaceEditPrepareBodySchema,
+        workspaceEditPrepareBody([
+          { expected: present, index: 0, kind: 'write', path: 'a.ts', text: '' },
+        ]),
+      ),
+    ).toThrow()
+    expect(() =>
+      v.parse(
+        workspaceEditPrepareBodySchema,
+        workspaceEditPrepareBody([
+          {
+            destination: { kind: 'missing' },
+            index: 0,
+            kind: 'copy',
+            newPath: 'a.ts',
+            oldPath: 'a.ts',
+            source: present,
+          },
+        ]),
+      ),
+    ).toThrow()
   })
 
   it('rejects invalid workspace edit paths preconditions order and unknown fields', () => {
@@ -309,6 +353,8 @@ function workspaceEditPrepareBody(
 ) {
   return {
     bodyDigest: `sha256:${'a'.repeat(64)}`,
+    category: 'workspace-edit',
+    label: 'Rename symbol',
     operationId: 'd96f733e-61f8-42c4-b043-f18dc8cce052',
     operations,
     origin: 'workspace-edit',

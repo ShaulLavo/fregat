@@ -324,6 +324,7 @@ function userKeyBinding(
       source: 'user',
       stopPropagation: template?.stopPropagation,
       vscodeCommandId: template?.vscodeCommandId,
+      yieldsToTextEntry: template?.yieldsToTextEntry,
     },
   ]
 }

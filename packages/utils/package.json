@@ -15,7 +15,8 @@
     "./compare": "./src/compare.ts",
     "./strings": "./src/strings.ts",
     "./token-match": "./src/token-match.ts",
-    "./json": "./src/json.ts"
+    "./json": "./src/json.ts",
+    "./slash-paths": "./src/slash-paths.ts"
   },
   "scripts": {
     "typecheck": "tsgo --noEmit",

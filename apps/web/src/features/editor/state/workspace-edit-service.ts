@@ -1,4 +1,3 @@
-import { workspaceRelativePath } from '@/lib/workspace-relative-path'
 import { fileDocumentKey, filesystemPath } from '@/lib/documents/utils/identity'
 import type {
   TextChangePreparation,
@@ -41,9 +40,11 @@ import {
   type EditorTextBuffer,
 } from '@singapore-editor/core/document'
 import type {
+  WorkspaceEditHistoryEntry,
   WorkspaceEditResult,
   WorkspaceEditResultEntry,
   WorkspaceResourcePrecondition,
+  WorkspaceResourceType,
 } from '@workspace/contracts'
 
 import type {
@@ -71,12 +72,28 @@ import {
   type WorkspaceFileSnapshot,
   type WorkspaceMutationProjectionReceipt,
 } from '@/features/editor/state/file-sync-service'
-import { normalizeWorkspaceRoot } from '@workspace/client-core/files/path'
 import { toClientError } from '@/lib/client-error-taxonomy'
 import { createClientError } from '@workspace/client-core/errors'
+import { isProvisionalWorkspaceEditState } from '@workspace/contracts'
 import { log } from '@/lib/client-logging'
 import { createHistoryBuffer } from '@/features/editor/state/history-buffer'
 import { createClientInvariantError } from '@/lib/structured-errors'
+import {
+  secureOperationId,
+  workspaceEditPrepareBody,
+} from '@/features/editor/utils/workspace-edit-request'
+import {
+  commitFileOperation,
+  fileOperationDocumentPaths,
+  fileOperationHistoryLegs,
+  reverseFileOperation,
+} from '@/features/editor/state/file-operations'
+import {
+  workspaceDocumentPath,
+  workspaceEditRelativePath,
+  workspaceEditRequestPath,
+  workspaceEditUriPath,
+} from '@/features/editor/utils/workspace-edit-paths'
 
 type WorkspacePersistenceOperation = WorkspaceEditPrepareRequest['operations'][number]
 
@@ -161,6 +178,35 @@ export type WorkspaceEditRoot = {
   readonly uriPath?: FilesystemPath
   /** Server workspace-edit request namespace. Defaults to `path` for injected callers. */
   readonly workspacePath?: FilesystemPath
+}
+
+/** One tree change, in document paths. Every leg of an operation lands or reverses together. */
+export type FileOperationLeg =
+  | {
+      readonly from: FilesystemPath
+      readonly kind: 'copy'
+      readonly to: FilesystemPath
+      readonly type: WorkspaceResourceType
+    }
+  | { readonly folder: boolean; readonly kind: 'create'; readonly path: FilesystemPath }
+  | { readonly kind: 'delete'; readonly path: FilesystemPath; readonly type: WorkspaceResourceType }
+  | {
+      readonly from: FilesystemPath
+      readonly kind: 'rename'
+      readonly to: FilesystemPath
+      readonly type: WorkspaceResourceType
+    }
+
+export type DocumentMove = { readonly from: FilesystemPath; readonly to: FilesystemPath }
+
+/** What a file operation does to open documents, which only the window running it can do. */
+export type FileOperationDocuments = {
+  /** Re-keys open documents, tabs and history under each moved path. */
+  readonly move: (moves: readonly DocumentMove[]) => void
+  /** Clears the orphaned mark on open documents a restore brought back. */
+  readonly restore: (paths: readonly FilesystemPath[]) => void
+  /** Marks open documents under removed paths orphaned: this window skips its own events. */
+  readonly vanish: (paths: readonly FilesystemPath[]) => void
 }
 
 declare const workspaceMutationReservationBrand: unique symbol
@@ -630,6 +676,46 @@ export class WorkspaceEditService {
 
   releaseRootSwitchReservation(reservation: WorkspaceEditRootSwitchReservation): boolean {
     return this.releaseWorkspaceMutationReservation(reservation)
+  }
+
+  /** Runs a journaled tree change as one undoable group in the file-operation history. */
+  applyFileOperation(
+    label: string,
+    legs: readonly FileOperationLeg[],
+    documents: FileOperationDocuments,
+  ): Promise<WorkspaceEditResult> {
+    const root = this.requireRoot()
+    const paths = fileOperationDocumentPaths(root, fileOperationHistoryLegs(root, legs))
+    return this.runWorkspaceMutation(paths, () =>
+      commitFileOperation(this.fileOperationPorts(root, documents), label, legs),
+    )
+  }
+
+  /** Undoes or redoes the head of the server's file-operation history. */
+  reverseFileOperation(
+    entry: WorkspaceEditHistoryEntry,
+    direction: 'redo' | 'undo',
+    documents: FileOperationDocuments,
+  ): Promise<WorkspaceEditResult> {
+    const root = this.requireRoot()
+    return this.runWorkspaceMutation(fileOperationDocumentPaths(root, entry.legs), () =>
+      reverseFileOperation(this.fileOperationPorts(root, documents), entry, direction),
+    )
+  }
+
+  private fileOperationPorts(root: WorkspaceEditRoot, documents: FileOperationDocuments) {
+    return {
+      claimEvents: (writeId: string) => this.ownOperationIds.add(writeId),
+      documents,
+      fileSync: this.options.fileSync,
+      root,
+    }
+  }
+
+  private requireRoot(): WorkspaceEditRoot {
+    const root = this.options.getRoot()
+    if (root) return root
+    throw workspaceEditError('workspace-missing', 'No workspace is open')
   }
 
   canUndoWorkspaceEdit(): boolean {
@@ -1262,7 +1348,7 @@ export class WorkspaceEditService {
     const retained: WorkspaceEditGroup[] = []
     const invalidatedPaths = paths === 'all' ? null : new Set(paths)
     for (const group of this.undoStack.splice(0)) {
-      if (!invalidatedPaths || stringSetIntersects(group.affectedPaths, invalidatedPaths)) {
+      if (!invalidatedPaths || pathSetsOverlap(group.affectedPaths, invalidatedPaths)) {
         discarded.push(group)
         for (const path of group.affectedPaths) invalidatedPaths?.add(path)
         continue
@@ -1382,7 +1468,7 @@ export class WorkspaceEditService {
         )
         if (restored) group.receipts = restored
       }
-      if (provisional && isProvisionalWorkspaceState(provisional.state)) {
+      if (provisional && isProvisionalWorkspaceEditState(provisional.state)) {
         try {
           provisional = await this.options.fileSync.rollbackWorkspaceMutation(provisional)
         } catch {
@@ -1471,7 +1557,7 @@ export class WorkspaceEditService {
     const retained: WorkspaceEditGroup[] = []
     for (let index = source.length - 1; index >= 0; index -= 1) {
       const candidate = source[index]!
-      if (!stringSetIntersects(candidate.affectedPaths, invalidatedPaths)) {
+      if (!pathSetsOverlap(candidate.affectedPaths, invalidatedPaths)) {
         retained.push(candidate)
         continue
       }
@@ -2399,12 +2485,13 @@ function requiredGuard(
   throw workspaceEditError('invalid-resource-plan', 'Resource plan has no guarded path state')
 }
 
+/** Language-server edits guard on content, never on bare presence. */
 function requiredExistingGuard(
   guards: ReadonlyMap<FilesystemPath, WorkspaceResourcePrecondition>,
   path: FilesystemPath,
-): Exclude<WorkspaceResourcePrecondition, { readonly kind: 'missing' }> {
+): Exclude<WorkspaceResourcePrecondition, { readonly kind: 'missing' | 'present' }> {
   const guard = requiredGuard(guards, path)
-  if (guard.kind !== 'missing') return guard
+  if (guard.kind !== 'missing' && guard.kind !== 'present') return guard
   throw workspaceEditError('missing-target', 'Text or rename source does not exist')
 }
 
@@ -2418,38 +2505,6 @@ function requiredRelativePath(rootPath: FilesystemPath, path: FilesystemPath): F
   throw workspaceEditError('outside-workspace', 'Workspace edit target is outside the workspace')
 }
 
-function workspaceEditRelativePath(
-  rootPath: FilesystemPath,
-  path: FilesystemPath,
-): FilesystemPath | null {
-  const root = normalizeWorkspaceNamespacePath(rootPath)
-  const target = normalizeWorkspaceNamespacePath(path)
-  if (root === '/') {
-    if (!target.startsWith('/')) return null
-    return filesystemPath(target === '/' ? '.' : target.slice(1))
-  }
-  if (!root) {
-    if (target.startsWith('/')) return null
-    return filesystemPath(target || '.')
-  }
-  if (target === root) return filesystemPath('.')
-  const relative = workspaceRelativePath(target, root)
-  return relative === null ? null : filesystemPath(relative)
-}
-
-function workspaceDocumentPath(
-  rootPath: FilesystemPath,
-  relativePath: string,
-): FilesystemPath | null {
-  if (!relativePath || relativePath.startsWith('/')) return null
-  const root = normalizeWorkspaceNamespacePath(rootPath)
-  if (relativePath === '.') return root
-  if (relativePath.split('/').some((segment) => segment === '.' || segment === '..')) return null
-  if (root === '/') return filesystemPath(`/${relativePath}`)
-  if (!root) return filesystemPath(relativePath)
-  return filesystemPath(`${root}/${relativePath}`)
-}
-
 function recoveryDocumentPaths(
   root: WorkspaceEditRoot,
   relativePaths: readonly string[],
@@ -2458,19 +2513,6 @@ function recoveryDocumentPaths(
     const documentPath = workspaceDocumentPath(root.path, path)
     return documentPath ? [documentPath] : []
   })
-}
-
-function normalizeWorkspaceNamespacePath(path: FilesystemPath): FilesystemPath {
-  if (path === '/') return path
-  return filesystemPath(normalizeWorkspaceRoot(path))
-}
-
-function workspaceEditUriPath(root: WorkspaceEditRoot): FilesystemPath {
-  return root.uriPath ?? root.path
-}
-
-function workspaceEditRequestPath(root: WorkspaceEditRoot): FilesystemPath {
-  return root.workspacePath ?? root.path
 }
 
 function sameWorkspaceEditRoot(left: WorkspaceEditRoot, right: WorkspaceEditRoot): boolean {
@@ -2670,11 +2712,6 @@ function decodeUriPathSegments(rawPath: string): string[] {
   } catch (cause) {
     throw workspaceEditError('unsupported-uri', 'Workspace file URI has malformed escaping', cause)
   }
-}
-
-function secureOperationId(): string {
-  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID()
-  throw createClientInvariantError('Secure workspace operation identifiers are unavailable')
 }
 
 function linkedAbortController(signal: AbortSignal): AbortController {
@@ -3104,34 +3141,17 @@ function releaseLocalReceipts(local: LocalCommit): void {
   local.receipts.clear()
 }
 
-async function workspaceEditPrepareRequest(
+function workspaceEditPrepareRequest(
   prepared: PreparedWorkspaceEdit,
 ): Promise<WorkspaceEditPrepareRequest> {
-  const body = {
+  return workspaceEditPrepareBody({
+    category: 'workspace-edit',
+    label: prepared.preview.label || 'Workspace edit',
     operationId: prepared.operationId,
     operations: prepared.persistence,
-    origin: 'workspace-edit' as const,
+    origin: 'workspace-edit',
     workspace: workspaceEditRequestPath(prepared.root),
-  }
-  return { ...body, bodyDigest: await workspaceEditBodyDigest(body) }
-}
-
-async function workspaceEditBodyDigest(body: {
-  readonly operationId: string
-  readonly operations: readonly WorkspacePersistenceOperation[]
-  readonly origin: 'workspace-edit'
-  readonly workspace: string
-}): Promise<string> {
-  if (!globalThis.crypto?.subtle) {
-    throw createClientInvariantError('Secure workspace edit digest support is unavailable')
-  }
-  const bytes = new TextEncoder().encode(JSON.stringify(body))
-  const digest = new Uint8Array(await globalThis.crypto.subtle.digest('SHA-256', bytes))
-  return `sha256:${Array.from(digest, hexByte).join('')}`
-}
-
-function hexByte(value: number): string {
-  return value.toString(16).padStart(2, '0')
+  })
 }
 
 async function commitServer(
@@ -3209,7 +3229,7 @@ async function settleFailedServerMutation(
     if (server.state === 'prepared' || server.state === 'preparing') {
       return fileSync.abortWorkspaceMutation(server.operationId, server.generation)
     }
-    if (isProvisionalWorkspaceState(server.state)) {
+    if (isProvisionalWorkspaceEditState(server.state)) {
       return fileSync.rollbackWorkspaceMutation(server)
     }
     return server
@@ -3473,10 +3493,6 @@ function completeGroupReverseCursors(
   return true
 }
 
-function isProvisionalWorkspaceState(state: WorkspaceEditResult['state']): boolean {
-  return state === 'committed' || state === 'redo-committed' || state === 'undo-committed'
-}
-
 function isStableRecoverySettlement(state: WorkspaceEditResult['state']): boolean {
   return (
     state === 'finalized' ||
@@ -3532,8 +3548,15 @@ function sameStringSet(left: readonly string[], right: readonly string[]): boole
   return left.every((value) => expected.has(value))
 }
 
-function stringSetIntersects(left: readonly string[], right: ReadonlySet<string>): boolean {
-  return left.some((value) => right.has(value))
+/** Whether any path equals, contains or lies inside one of `right`: a moved folder touches its files. */
+function pathSetsOverlap(left: readonly string[], right: ReadonlySet<string>): boolean {
+  return left.some((value) => {
+    if (right.has(value)) return true
+    for (const other of right) {
+      if (value.startsWith(`${other}/`) || other.startsWith(`${value}/`)) return true
+    }
+    return false
+  })
 }
 
 function changedFileDocumentPaths(

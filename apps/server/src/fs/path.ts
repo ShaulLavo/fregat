@@ -29,6 +29,8 @@ export type WorkspacePaths = ReturnType<typeof createWorkspacePaths>
 
 export type WorkspacePathsOptions = {
   excludedAbsolutePaths?: readonly string[]
+  /** Directory names hidden wherever they appear, such as each drive's undo journal. */
+  excludedNames?: readonly string[]
 }
 
 export async function resolveExistingPath(paths: WorkspacePaths, input: string) {
@@ -48,9 +50,11 @@ export function createWorkspacePaths(
   const excludedAbsolutePaths = (options.excludedAbsolutePaths ?? []).map((input) =>
     path.resolve(input),
   )
+  const internalNames = options.excludedNames ?? []
 
   return {
     internalAbsolutePaths: excludedAbsolutePaths,
+    internalNames,
     workspaceRoot,
     workspaceRootReal,
     resolve(input = ''): WorkspacePath {
@@ -76,6 +80,7 @@ export function createWorkspacePaths(
     },
     isInternalPath(input: string) {
       const relativePath = normalizeClientPath(input)
+      if (relativePath.split('/').some((segment) => internalNames.includes(segment))) return true
       const absolutePath = path.resolve(workspaceRoot, relativePath)
       return excludedAbsolutePaths.some((excluded) => isSameOrDescendant(excluded, absolutePath))
     },

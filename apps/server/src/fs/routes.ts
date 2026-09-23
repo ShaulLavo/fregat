@@ -17,6 +17,7 @@ import {
   writeBodySchema,
   workspaceEditPrepareBodySchema,
   workspaceEditRecoverBodySchema,
+  workspaceEditHistoryQuerySchema,
   workspaceEditRecoveryQuerySchema,
   workspaceEditReleaseBodySchema,
   workspaceEditStatusQuerySchema,
@@ -147,6 +148,9 @@ export function fsRoutes(fs: FileSystemService) {
           })
           .get('/recovery', ({ query }) => fs.workspaceEditRecovery(query.workspace), {
             query: workspaceEditRecoveryQuerySchema,
+          })
+          .get('/history', ({ query }) => fs.workspaceEditHistory(query), {
+            query: workspaceEditHistoryQuerySchema,
           }),
       ),
   )

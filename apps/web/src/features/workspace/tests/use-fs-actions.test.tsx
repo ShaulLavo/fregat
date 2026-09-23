@@ -4,18 +4,30 @@ import { testDocumentKey, testTabContent } from '../../../../test/factories/docu
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { FileTreeModel } from '@workspace/tree'
+import { open } from 'node:fs/promises'
+import path from 'node:path'
 import type { ReactNode } from 'react'
 import { createEditorBufferSession } from '@singapore-editor/core/document'
 
 import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
 import { useEditorRuntime } from '@/features/editor/hooks/use-runtime'
-import { WorkspaceEditServiceContext } from '@/features/editor/providers/workspace-edit-context'
-import type { WorkspaceEditService } from '@/features/editor/state/workspace-edit-service'
 import { useFsActions } from '@/features/workspace/hooks/use-fs-actions'
-import { createFileContent, ensureFolderPath, fetchFile, fetchTree } from '@/lib/file-server'
+import {
+  fileOperationDocuments,
+  fileOperationHistoryQuery,
+  reverseLatestFileOperation,
+  type FileOperationRuntime,
+} from '@/features/workspace/state/file-operations'
+import {
+  createFileContent,
+  ensureFolderPath,
+  fetchFile,
+  fetchTree,
+  statPath,
+} from '@/lib/file-server'
 import type { TreeEntry } from '@/lib/file-system-types'
-import { createClientError } from '@workspace/client-core/errors'
 import { treeModel } from '@/lib/tree-model'
+import { fileOperationWriteId } from '@workspace/contracts'
 import {
   projectedTreeModel,
   resetTreeIntents,
@@ -27,13 +39,14 @@ import { AppProviders, createTestQueryClient } from '../../../../test/render'
 import { setFileSnapshotQueryData } from '@/lib/file-snapshot-query-cache'
 import { fileSystemKeys } from '@/lib/query-keys'
 import { TestEditorStateProvider } from '../../../../test/factories/editor-state-provider'
+import { registerTestWorkspaceAddress } from '../../../../test/factories/workspace-address'
 
 for (const { isFolder, dirty } of [
   { isFolder: false, dirty: false },
   { isFolder: false, dirty: true },
   { isFolder: true, dirty: true },
 ]) {
-  test(`retargets open tabs after a tree rename, directory: ${isFolder}, dirty: ${dirty}`, async ({
+  test(`open tabs follow a tree rename and its undo, directory: ${isFolder}, dirty: ${dirty}`, async ({
     client,
   }) => {
     void client
@@ -46,35 +59,13 @@ for (const { isFolder, dirty } of [
     await createFileContent(filesystemPath(sibling), 'sibling\n', getClient())
     await createFileContent(filesystemPath(unrelated), 'unrelated\n', getClient())
     const file = await fetchFile(filesystemPath(from), signal(), getClient())
-    const modelRef = {
-      current: treeModel(await fetchTree(filesystemPath('repo'), signal(), getClient()), 'repo'),
-    }
-    const treeRef = {
-      current: new FileTreeModel({ paths: modelRef.current.paths, renaming: true }),
-    }
-    const queryClient = createTestQueryClient()
-    queryClient.setQueryData(fileSystemKeys.tree('repo'), modelRef.current)
-    function Wrapper({ children }: { readonly children: ReactNode }) {
-      return (
-        <AppProviders queryClient={queryClient}>
-          <TestEditorStateProvider>{children}</TestEditorStateProvider>
-        </AppProviders>
-      )
-    }
-    const hook = renderHook(
-      () => ({
-        commands: useEditorCommands(),
-        fs: useFsActions({ modelRef, rootPath: filesystemPath('repo'), treeRef }),
-        runtime: useEditorRuntime(),
-      }),
-      { wrapper: Wrapper },
-    )
-    const { documentStore, workspaceStore } = hook.result.current.runtime
-    setFileSnapshotQueryData(queryClient, file)
+    const harness = await renderFsActions('repo')
+    const { documentStore, workspaceStore } = harness.result.current.runtime
+    setFileSnapshotQueryData(harness.queryClient, file)
     await act(async () => {
-      await hook.result.current.commands.openFileSurface(filesystemPath(sibling))
-      await hook.result.current.commands.openFileSurface(filesystemPath(unrelated))
-      await hook.result.current.commands.openFileSurface(filesystemPath(from))
+      await harness.result.current.commands.openFileSurface(filesystemPath(sibling))
+      await harness.result.current.commands.openFileSurface(filesystemPath(unrelated))
+      await harness.result.current.commands.openFileSurface(filesystemPath(from))
     })
     const tabId = (selectedGroupTab(workspaceStore.getState().workbenchPanels.editorGroups)?.id ??
       null)!
@@ -83,7 +74,7 @@ for (const { isFolder, dirty } of [
     const text = view.buffer.materializeFullText()
 
     act(() =>
-      hook.result.current.fs.completeRename({
+      harness.result.current.completeRename({
         sourcePath: isFolder ? 'src' : 'src/a.ts',
         destinationPath: isFolder ? 'renamed' : 'src/b.ts',
         isFolder,
@@ -107,22 +98,38 @@ for (const { isFolder, dirty } of [
     )
     expect(view.buffer.materializeFullText()).toBe(text)
     expect(documentStore.getState().dirtyDocumentKeys.has(testDocumentKey(to))).toBe(dirty)
-    expect(queryClient.getQueryData(fileSystemKeys.fileSnapshot(from))).toBeUndefined()
-    expect(queryClient.getQueryData(fileSystemKeys.fileSnapshot(to))).toMatchObject({ path: to })
-    await expect(readContent(to)).resolves.toBe('original\n')
-    await act(async () => {
-      expect(await hook.result.current.runtime.saveService.save(testDocumentKey(to))).toBe(true)
+    expect(harness.queryClient.getQueryData(fileSystemKeys.fileSnapshot(from))).toBeUndefined()
+    expect(harness.queryClient.getQueryData(fileSystemKeys.fileSnapshot(to))).toMatchObject({
+      path: to,
     })
-    await expect(readContent(to)).resolves.toBe(text)
+    await expect(readContent(to)).resolves.toBe('original\n')
     await expect(treePaths('repo')).resolves.not.toContain(from)
 
-    hook.unmount()
-    treeRef.current.cleanUp()
-    queryClient.clear()
+    await act(async () => {
+      expect(await reverseLatestFileOperation(harness.fileOperations(), 'undo')).toBe(true)
+    })
+    expect(workspaceStore.getState().selectedTabContent).toEqual(testTabContent(from))
+    expect(documentStore.getState().getLiveEditorDocument(testDocumentKey(from))?.buffer).toBe(
+      view.buffer,
+    )
+    expect(view.buffer.materializeFullText()).toBe(text)
+    expect(documentStore.getState().dirtyDocumentKeys.has(testDocumentKey(from))).toBe(dirty)
+    await expect(readContent(from)).resolves.toBe('original\n')
+
+    await act(async () => {
+      expect(await reverseLatestFileOperation(harness.fileOperations(), 'redo')).toBe(true)
+    })
+    expect(workspaceStore.getState().selectedTabContent).toEqual(testTabContent(to))
+    await act(async () => {
+      expect(await harness.result.current.runtime.saveService.save(testDocumentKey(to))).toBe(true)
+    })
+    await expect(readContent(to)).resolves.toBe(text)
+
+    harness.cleanUp()
   })
 }
 
-test('gates file create, rename, copy, and delete with their exact mutated paths', async ({
+test('journals create, rename, duplicate and delete as one undoable operation each', async ({
   client,
 }) => {
   void client
@@ -140,8 +147,7 @@ test('gates file create, rename, copy, and delete with their exact mutated paths
       sourcePath: 'untitled',
     })
   })
-  await harness.service.waitForSettled(1)
-
+  await waitForHistory(harness, 1)
   act(() => {
     harness.result.current.completeRename({
       destinationPath: 'renamed.ts',
@@ -149,11 +155,9 @@ test('gates file create, rename, copy, and delete with their exact mutated paths
       sourcePath: 'rename.ts',
     })
   })
-  await harness.service.waitForSettled(2)
-
+  await waitForHistory(harness, 2)
   act(() => harness.result.current.actions.duplicateEntry('copy.ts', false))
-  await harness.service.waitForSettled(3)
-
+  await waitForHistory(harness, 3)
   act(() => {
     harness.result.current.actions.requestDelete({
       isDirectory: false,
@@ -163,81 +167,96 @@ test('gates file create, rename, copy, and delete with their exact mutated paths
   })
   await waitFor(() => expect(harness.result.current.deleteDialog.target).not.toBeNull())
   act(() => harness.result.current.deleteDialog.onConfirm())
-  await harness.service.waitForSettled(4)
+  await waitForHistory(harness, 4)
 
-  expect(harness.service.affectedPaths).toEqual([
-    ['repo/created.ts'],
-    ['repo/rename.ts', 'repo/renamed.ts'],
-    ['repo/copy copy.ts'],
-    ['repo/delete.ts'],
+  const history = await harness.history()
+  expect(history.undo.map((entry) => entry.label)).toEqual([
+    'Delete delete.ts',
+    'Duplicate copy.ts',
+    'Rename rename.ts to renamed.ts',
+    'New file created.ts',
   ])
   await expect(readContent('repo/created.ts')).resolves.toBe('')
   await expect(readContent('repo/renamed.ts')).resolves.toBe('rename\n')
   await expect(readContent('repo/copy copy.ts')).resolves.toBe('copy\n')
   await expect(treePaths('repo')).resolves.not.toContain('repo/delete.ts')
 
+  for (let index = 0; index < 4; index += 1) {
+    await act(async () => {
+      expect(await reverseLatestFileOperation(harness.fileOperations(), 'undo')).toBe(true)
+    })
+  }
+  await expect(treePaths('repo')).resolves.toEqual([
+    'repo/copy.ts',
+    'repo/delete.ts',
+    'repo/rename.ts',
+  ])
+  await expect(readContent('repo/delete.ts')).resolves.toBe('delete\n')
+  expect((await harness.history()).redo).toHaveLength(4)
+
   harness.cleanUp()
 })
 
-test('invalidates all workspace-edit history for directory tree mutations', async ({ client }) => {
+test('a dragged selection moves as one operation and a deleted folder comes back whole', async ({
+  client,
+}) => {
   void client
-  await ensureFolderPath(filesystemPath('repo/rename-dir'), getClient())
-  await ensureFolderPath(filesystemPath('repo/copy-dir'), getClient())
-  await ensureFolderPath(filesystemPath('repo/delete-dir'), getClient())
-  await createFileContent(filesystemPath('repo/rename-dir/a.ts'), 'rename\n', getClient())
-  await createFileContent(filesystemPath('repo/copy-dir/a.ts'), 'copy\n', getClient())
-  await createFileContent(filesystemPath('repo/delete-dir/a.ts'), 'delete\n', getClient())
+  await ensureFolderPath(filesystemPath('repo/target'), getClient())
+  await ensureFolderPath(filesystemPath('repo/two'), getClient())
+  await createFileContent(filesystemPath('repo/one.ts'), 'one\n', getClient())
+  await createFileContent(filesystemPath('repo/two/nested.ts'), 'nested\n', getClient())
   const harness = await renderFsActions('repo')
 
-  act(() => {
-    harness.result.current.completeRename({
-      destinationPath: 'renamed-dir',
-      isFolder: true,
-      sourcePath: 'rename-dir',
-    })
+  act(() =>
+    harness.result.current.actions.moveEntries([
+      { fromTreePath: 'one.ts', toTreePath: 'target/one.ts' },
+      { fromTreePath: 'two', toTreePath: 'target/two' },
+    ]),
+  )
+  await waitForHistory(harness, 1)
+  expect((await harness.history()).undo[0]).toMatchObject({
+    label: 'Move 2 items into target',
+    legs: [
+      { kind: 'rename', newPath: 'target/one.ts', oldPath: 'one.ts' },
+      { kind: 'rename', newPath: 'target/two', oldPath: 'two' },
+    ],
   })
-  await harness.service.waitForSettled(1)
-
-  act(() => harness.result.current.actions.duplicateEntry('copy-dir', true))
-  await harness.service.waitForSettled(2)
+  await expect(readContent('repo/target/two/nested.ts')).resolves.toBe('nested\n')
 
   act(() => {
     harness.result.current.actions.requestDelete({
       isDirectory: true,
-      name: 'delete-dir',
-      path: filesystemPath('repo/delete-dir'),
+      name: 'target',
+      path: filesystemPath('repo/target'),
     })
   })
-  await waitFor(() => expect(harness.result.current.deleteDialog.target).not.toBeNull())
   act(() => harness.result.current.deleteDialog.onConfirm())
-  await harness.service.waitForSettled(3)
+  await waitForHistory(harness, 2)
+  await expect(treePaths('repo')).resolves.not.toContain('repo/target')
 
-  expect(harness.service.affectedPaths).toEqual(['all', 'all', 'all'])
-  await expect(readContent('repo/renamed-dir/a.ts')).resolves.toBe('rename\n')
-  await expect(readContent('repo/copy-dir copy/a.ts')).resolves.toBe('copy\n')
-  await expect(treePaths('repo')).resolves.not.toContain('repo/delete-dir')
+  await act(async () => {
+    expect(await reverseLatestFileOperation(harness.fileOperations(), 'undo')).toBe(true)
+  })
+  await expect(readContent('repo/target/one.ts')).resolves.toBe('one\n')
+  await expect(readContent('repo/target/two/nested.ts')).resolves.toBe('nested\n')
+  await act(async () => {
+    expect(await reverseLatestFileOperation(harness.fileOperations(), 'undo')).toBe(true)
+  })
+  await expect(readContent('repo/one.ts')).resolves.toBe('one\n')
+  await expect(readContent('repo/two/nested.ts')).resolves.toBe('nested\n')
 
   harness.cleanUp()
 })
 
-test('withdraws the projected rename when the authoritative mutation reservation rejects', async ({
+test('withdraws the projected rename when the journal refuses an occupied destination', async ({
   client,
 }) => {
   void client
   await ensureFolderPath(filesystemPath('repo'), getClient())
   await createFileContent(filesystemPath('repo/old.ts'), 'old\n', getClient())
-  const service = new RecordingWorkspaceEditService({ reject: true })
-  const harness = await renderFsActions('repo', service)
-  const file = await fetchFile(filesystemPath('repo/old.ts'), signal(), getClient())
-  setFileSnapshotQueryData(harness.queryClient, file)
-  await act(async () => {
-    await harness.result.current.commands.openFileSurface(file.path)
-  })
-  const { documentStore, workspaceStore } = harness.result.current.runtime
-  const tabId = (selectedGroupTab(workspaceStore.getState().workbenchPanels.editorGroups)?.id ??
-    null)!
-  const view = documentStore.getState().ensureEditorView(tabId, file)
-  harness.tree.move('old.ts', 'new.ts')
+  const harness = await renderFsActions('repo')
+  // Lands after the tree loaded, so the tree still thinks the name is free.
+  await createFileContent(filesystemPath('repo/new.ts'), 'someone else\n', getClient())
   const rootPath = filesystemPath('repo')
 
   act(() => {
@@ -248,20 +267,153 @@ test('withdraws the projected rename when the authoritative mutation reservation
     })
   })
 
-  // The projection shows the rename until the reservation refuses it, then drops it.
-  await waitFor(() => expect(treeIntents.getState().active).toHaveLength(0))
+  await waitFor(() => expect(harness.queryClient.isMutating()).toBe(0))
+  expect(treeIntents.getState().active).toHaveLength(0)
   expect(treeIntents.getState().failed).toHaveLength(0)
-  const projected = projectedTreeModel(harness.model, rootPath)
-  expect(projected).toBe(harness.model)
-  expect(projected.entriesByTreePath.has('new.ts')).toBe(false)
-  expect(service.affectedPaths).toEqual([['repo/old.ts', 'repo/new.ts']])
-  expect(workspaceStore.getState().selectedTabContent).toEqual(testTabContent('repo/old.ts'))
-  expect(
-    documentStore.getState().getLiveEditorDocument(testDocumentKey('repo/old.ts'))?.buffer,
-  ).toBe(view.buffer)
-  expect(documentStore.getState().getLiveEditorDocument(testDocumentKey('repo/new.ts'))).toBeNull()
+  expect(projectedTreeModel(harness.model, rootPath)).toBe(harness.model)
   await expect(readContent('repo/old.ts')).resolves.toBe('old\n')
-  await expect(treePaths('repo')).resolves.not.toContain('repo/new.ts')
+  await expect(readContent('repo/new.ts')).resolves.toBe('someone else\n')
+  expect((await harness.history()).undo).toEqual([])
+
+  harness.cleanUp()
+})
+
+test('a delete too large to undo asks again before deleting permanently', async ({
+  client,
+  server,
+}) => {
+  void client
+  await ensureFolderPath(filesystemPath('repo/big'), getClient())
+  await createFileContent(filesystemPath('repo/big/small.ts'), 'small\n', getClient())
+  const sparse = await open(path.join(server.root, 'repo/big/sparse.bin'), 'w')
+  await sparse.truncate(129 * 1024 * 1024)
+  await sparse.close()
+  const harness = await renderFsActions('repo')
+
+  act(() => {
+    harness.result.current.actions.requestDelete({
+      isDirectory: true,
+      name: 'big',
+      path: filesystemPath('repo/big'),
+    })
+  })
+  act(() => harness.result.current.deleteDialog.onConfirm())
+  await waitFor(() => expect(harness.result.current.deleteDialog.permanent).toBe(true))
+  await expect(readContent('repo/big/small.ts')).resolves.toBe('small\n')
+  expect(harness.result.current.deleteDialog.target).not.toBeNull()
+
+  act(() => harness.result.current.deleteDialog.onConfirm())
+  await waitFor(async () => expect(await treePaths('repo')).not.toContain('repo/big'))
+  expect((await harness.history()).undo).toEqual([])
+
+  harness.cleanUp()
+})
+
+test('an undo survives a history refresh cancelling its read', async ({ client }) => {
+  void client
+  await ensureFolderPath(filesystemPath('repo'), getClient())
+  await createFileContent(filesystemPath('repo/old.ts'), 'old\n', getClient())
+  const harness = await renderFsActions('repo')
+  act(() =>
+    harness.result.current.completeRename({
+      destinationPath: 'new.ts',
+      isFolder: false,
+      sourcePath: 'old.ts',
+    }),
+  )
+  await waitForHistory(harness, 1)
+  const historyKey = fileSystemKeys.fileOperationHistory('repo')
+  // As after a reload: nothing cached, so a cancelled read has no older answer to fall back on.
+  harness.queryClient.removeQueries({ queryKey: historyKey })
+  let cancelled = false
+  // What another window's event does: a fresher read replaces the one the undo is waiting on.
+  const unsubscribe = harness.queryClient.getQueryCache().subscribe((event) => {
+    if (cancelled || event.type !== 'updated' || event.action.type !== 'fetch') return
+    if (event.query.queryHash !== JSON.stringify(historyKey)) return
+    cancelled = true
+    // After the dispatch: the read it announces starts only once this listener returns.
+    queueMicrotask(() => void harness.queryClient.cancelQueries({ queryKey: historyKey }))
+  })
+
+  await act(async () => {
+    expect(await reverseLatestFileOperation(harness.fileOperations(), 'undo')).toBe(true)
+  })
+  unsubscribe()
+  expect(cancelled).toBe(true)
+  await expect(readContent('repo/old.ts')).resolves.toBe('old\n')
+
+  harness.cleanUp()
+})
+
+test('a window claims the events of its own transitions and no others', async ({ client }) => {
+  void client
+  await ensureFolderPath(filesystemPath('repo'), getClient())
+  await createFileContent(filesystemPath('repo/old.ts'), 'old\n', getClient())
+  const harness = await renderFsActions('repo')
+  act(() =>
+    harness.result.current.completeRename({
+      destinationPath: 'new.ts',
+      isFolder: false,
+      sourcePath: 'old.ts',
+    }),
+  )
+  await waitForHistory(harness, 1)
+  const [moved] = (await harness.history()).undo
+  await act(async () => {
+    expect(await reverseLatestFileOperation(harness.fileOperations(), 'undo')).toBe(true)
+  })
+  const [undone] = (await harness.history()).redo
+  const service = harness.result.current.runtime.workspaceEditService
+
+  // A late event from this window's own move must not move the document back after the undo.
+  expect(service.isOwnEvent(fileOperationWriteId(moved!.operationId, moved!.generation))).toBe(true)
+  expect(service.isOwnEvent(fileOperationWriteId(undone!.operationId, undone!.generation))).toBe(
+    true,
+  )
+  // Another window's redo of the same operation is not this window's to ignore.
+  expect(
+    service.isOwnEvent(fileOperationWriteId(undone!.operationId, undone!.generation + 2)),
+  ).toBe(false)
+
+  harness.cleanUp()
+})
+
+test('deleting an open file orphans its document here and undo brings it back', async ({
+  client,
+}) => {
+  void client
+  await ensureFolderPath(filesystemPath('repo/dir'), getClient())
+  await createFileContent(filesystemPath('repo/dir/open.ts'), 'open\n', getClient())
+  const file = await fetchFile(filesystemPath('repo/dir/open.ts'), signal(), getClient())
+  const harness = await renderFsActions('repo')
+  const { documentStore, workspaceStore } = harness.result.current.runtime
+  setFileSnapshotQueryData(harness.queryClient, file)
+  await act(async () => {
+    await harness.result.current.commands.openFileSurface(file.path)
+  })
+  const tabId = selectedGroupTab(workspaceStore.getState().workbenchPanels.editorGroups)!.id
+  documentStore.getState().ensureEditorView(tabId, file)
+  const orphaned = () => {
+    const document = documentStore.getState().getLiveEditorDocument(testDocumentKey(file.path))
+    return document?.sync.kind === 'file' && document.sync.orphaned
+  }
+
+  act(() => {
+    harness.result.current.actions.requestDelete({
+      isDirectory: true,
+      name: 'dir',
+      path: filesystemPath('repo/dir'),
+    })
+  })
+  act(() => harness.result.current.deleteDialog.onConfirm())
+  await waitForHistory(harness, 1)
+  await waitFor(() => expect(orphaned()).toBe(true))
+
+  await act(async () => {
+    expect(await reverseLatestFileOperation(harness.fileOperations(), 'undo')).toBe(true)
+  })
+  expect(orphaned()).toBe(false)
+  await expect(readContent('repo/dir/open.ts')).resolves.toBe('open\n')
 
   harness.cleanUp()
 })
@@ -269,19 +421,18 @@ test('withdraws the projected rename when the authoritative mutation reservation
 test('saved rows cannot start mutations until the tree is confirmed', async ({ client }) => {
   await ensureFolderPath(filesystemPath('repo'), client)
   const harness = await renderFsActions('repo')
-  await waitFor(() => expect(harness.result.current).not.toBeNull())
   harness.queryClient.removeQueries({ queryKey: fileSystemKeys.tree('repo') })
   harness.rerender()
   expect(harness.result.current.actions.mutationsEnabled).toBe(false)
   act(() => harness.result.current.actions.createEntry('', false))
-  expect(harness.service.affectedPaths).toEqual([])
+  expect(harness.tree.getItem('untitled')).toBeNull()
   harness.queryClient.setQueryData(fileSystemKeys.tree('repo'), harness.model)
   harness.rerender()
   expect(harness.result.current.actions.mutationsEnabled).toBe(true)
   harness.cleanUp()
 })
 
-async function renderFsActions(rootPath: string, service = new RecordingWorkspaceEditService()) {
+async function renderFsActions(rootPath: string) {
   // The queue is global; an earlier test's unacknowledged intents must not leak in.
   resetTreeIntents()
   const model = treeModel(
@@ -295,11 +446,7 @@ async function renderFsActions(rootPath: string, service = new RecordingWorkspac
   function Wrapper({ children }: { readonly children: ReactNode }) {
     return (
       <AppProviders queryClient={queryClient}>
-        <TestEditorStateProvider>
-          <WorkspaceEditServiceContext value={service.asService()}>
-            {children}
-          </WorkspaceEditServiceContext>
-        </TestEditorStateProvider>
+        <TestEditorStateProvider>{children}</TestEditorStateProvider>
       </AppProviders>
     )
   }
@@ -314,9 +461,34 @@ async function renderFsActions(rootPath: string, service = new RecordingWorkspac
     }),
     { wrapper: Wrapper },
   )
+  const root = await statPath(filesystemPath(rootPath), signal(), getClient())
+  const workspaceAddress = await registerTestWorkspaceAddress(getClient(), rootPath)
+  act(() =>
+    hook.result.current.runtime.workspaceStore
+      .getState()
+      .switchWorkspace({ ...root, name: rootPath, type: 'directory', workspaceAddress }),
+  )
+
+  function fileOperations(): FileOperationRuntime {
+    const { commands, runtime } = hook.result.current
+    return {
+      documents: fileOperationDocuments({
+        documentStore: runtime.documentStore,
+        queryClient,
+        renameLiveEditorDocument: commands.renameLiveEditorDocument,
+        workspaceStore: runtime.workspaceStore,
+      }),
+      queryClient,
+      rootPath: filesystemPath(rootPath),
+      workspaceEdits: runtime.workspaceEditService,
+    }
+  }
 
   return {
     ...hook,
+    fileOperations,
+    history: () =>
+      queryClient.fetchQuery(fileOperationHistoryQuery(queryClient, filesystemPath(rootPath))),
     model,
     queryClient,
     cleanUp: () => {
@@ -324,51 +496,12 @@ async function renderFsActions(rootPath: string, service = new RecordingWorkspac
       queryClient.clear()
       tree.cleanUp()
     },
-    service,
     tree,
   }
 }
 
-class RecordingWorkspaceEditService {
-  readonly affectedPaths: Array<readonly string[] | 'all'> = []
-  readonly canMutateWorkspace = () => true
-  readonly subscribe = () => () => undefined
-  #settled = 0
-  readonly #reject: boolean
-
-  constructor({ reject = false }: { readonly reject?: boolean } = {}) {
-    this.#reject = reject
-  }
-
-  asService() {
-    return this as unknown as WorkspaceEditService
-  }
-
-  async runWorkspaceMutation<T>(
-    affectedPaths: readonly string[] | 'all',
-    operation: () => Promise<T>,
-  ): Promise<T> {
-    this.affectedPaths.push(affectedPaths)
-    if (this.#reject) throw busyError()
-
-    const result = await operation()
-    this.#settled += 1
-    return result
-  }
-
-  async waitForSettled(count: number) {
-    await waitFor(() => expect(this.#settled).toBe(count))
-  }
-}
-
-function busyError() {
-  return createClientError({
-    code: 'workspace-edit-busy',
-    fix: 'Retry after the active workspace mutation finishes.',
-    message: 'Another workspace mutation is active',
-    status: 409,
-    why: 'The workspace mutation coordinator is already reserved.',
-  })
+async function waitForHistory(harness: Awaited<ReturnType<typeof renderFsActions>>, count: number) {
+  await waitFor(async () => expect((await harness.history()).undo).toHaveLength(count))
 }
 
 async function readContent(path: string) {

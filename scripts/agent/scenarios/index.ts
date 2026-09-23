@@ -84,6 +84,7 @@ import { editorAutoClose } from './editor-auto-close'
 import { editorFormatChord } from './editor-format-chord'
 import { editorLspCompletion } from './editor-lsp-completion'
 import { editorExternalDeletion } from './editor-external-deletion'
+import { fileTreeUndo } from './file-tree-undo'
 import { editorDefinitionCrlf } from './editor-definition-crlf'
 import { editorLspHover } from './editor-lsp-hover'
 import { editorLspSignatureHelp } from './editor-lsp-signature-help'
@@ -241,6 +242,7 @@ export const scenarios: readonly Scenario[] = [
   editorLspServerExit,
   editorDefinitionCrlf,
   editorExternalDeletion,
+  fileTreeUndo,
   editorLspSignatureHelp,
   editorMarkdownPunctuation,
   fileIcons,

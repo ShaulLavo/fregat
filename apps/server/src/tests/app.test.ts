@@ -624,6 +624,8 @@ describe('fs workspace edit rpc', () => {
           text: 'after',
         },
       ],
+      category: 'workspace-edit',
+      label: 'Route edit',
       origin: 'workspace-edit',
       workspace: '',
     })
@@ -682,6 +684,8 @@ describe('fs workspace edit rpc', () => {
           secondStats.mtimeMs,
         ),
       ],
+      category: 'workspace-edit',
+      label: 'Route edit',
       origin: 'workspace-edit',
       workspace: '',
     })
@@ -722,6 +726,8 @@ describe('fs workspace edit rpc', () => {
       bodyDigest: `sha256:${'c'.repeat(64)}`,
       operationId,
       operations: [workspaceWriteOperation(0, 'paused.txt', 'before', 'after', stats.mtimeMs)],
+      category: 'workspace-edit',
+      label: 'Route edit',
       origin: 'workspace-edit',
       workspace: '',
     })

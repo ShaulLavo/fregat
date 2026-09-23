@@ -335,6 +335,7 @@ function createRuntime(
     ...overrides?.tabs,
   }
   const workspaceEdits: WorkspaceCommandRuntime['workspaceEdits'] = overrides?.workspaceEdits ?? {
+    ...unusedFileOperations,
     canMutateWorkspace: () => true,
     hasHistoryBarrier: () => false,
     getSnapshot: () =>
@@ -352,6 +353,16 @@ function createRuntime(
   const git = { setPendingMessageFile: () => undefined }
 
   return { documents, editor, files, focus, git, settings, shell, tabs, workspace, workspaceEdits }
+}
+
+/** File operations need the real journal; command tests that run one override these. */
+export const unusedFileOperations: Pick<
+  WorkspaceCommandRuntime['workspaceEdits'],
+  'applyFileOperation' | 'discoverRecovery' | 'reverseFileOperation'
+> = {
+  applyFileOperation: () => Promise.reject(new Error('No file operation expected')),
+  discoverRecovery: async () => undefined,
+  reverseFileOperation: () => Promise.reject(new Error('No file operation expected')),
 }
 
 function createTestEditor(

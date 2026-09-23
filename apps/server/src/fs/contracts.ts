@@ -248,21 +248,31 @@ const workspaceEditSnapshotPreconditionSchema = v.strictObject({
 const workspaceEditMissingPreconditionSchema = v.strictObject({
   kind: v.literal('missing'),
 })
+const workspaceEditPresentPreconditionSchema = v.strictObject({
+  kind: v.literal('present'),
+  type: v.union([v.literal('directory'), v.literal('file')]),
+})
 const workspaceEditTransactionPreconditionSchema = v.strictObject({
   afterOperation: workspaceEditIndexSchema,
   kind: v.literal('transaction'),
 })
+const workspaceEditContentPreconditionSchema = v.union([
+  workspaceEditSnapshotPreconditionSchema,
+  workspaceEditTransactionPreconditionSchema,
+])
 const workspaceEditExistingPreconditionSchema = v.union([
+  workspaceEditPresentPreconditionSchema,
   workspaceEditSnapshotPreconditionSchema,
   workspaceEditTransactionPreconditionSchema,
 ])
 const workspaceEditPreconditionSchema = v.union([
   workspaceEditMissingPreconditionSchema,
+  workspaceEditPresentPreconditionSchema,
   workspaceEditSnapshotPreconditionSchema,
   workspaceEditTransactionPreconditionSchema,
 ])
 const workspaceEditWriteOperationSchema = v.strictObject({
-  expected: workspaceEditExistingPreconditionSchema,
+  expected: workspaceEditContentPreconditionSchema,
   index: workspaceEditIndexSchema,
   kind: v.literal('write'),
   path: workspaceEditRelativePathSchema,
@@ -270,6 +280,7 @@ const workspaceEditWriteOperationSchema = v.strictObject({
 })
 const workspaceEditCreateOperationSchema = v.strictObject({
   destination: workspaceEditPreconditionSchema,
+  folder: v.optional(v.boolean()),
   ignoreIfExists: v.boolean(),
   index: workspaceEditIndexSchema,
   kind: v.literal('create'),
@@ -286,6 +297,14 @@ const workspaceEditRenameOperationSchema = v.strictObject({
   overwrite: v.boolean(),
   source: workspaceEditExistingPreconditionSchema,
 })
+const workspaceEditCopyOperationSchema = v.strictObject({
+  destination: workspaceEditMissingPreconditionSchema,
+  index: workspaceEditIndexSchema,
+  kind: v.literal('copy'),
+  newPath: workspaceEditRelativePathSchema,
+  oldPath: workspaceEditRelativePathSchema,
+  source: workspaceEditExistingPreconditionSchema,
+})
 const workspaceEditDeleteOperationSchema = v.strictObject({
   expected: workspaceEditPreconditionSchema,
   ignoreIfNotExists: v.boolean(),
@@ -299,11 +318,19 @@ export const workspacePersistenceOperationSchema = v.variant('kind', [
   workspaceEditWriteOperationSchema,
   workspaceEditCreateOperationSchema,
   workspaceEditRenameOperationSchema,
+  workspaceEditCopyOperationSchema,
   workspaceEditDeleteOperationSchema,
+])
+
+export const workspaceEditCategorySchema = v.union([
+  v.literal('file-operation'),
+  v.literal('workspace-edit'),
 ])
 
 export const workspaceEditPrepareBodySchema = v.strictObject({
   bodyDigest: workspaceEditDigestSchema,
+  category: workspaceEditCategorySchema,
+  label: v.pipe(v.string(), v.nonEmpty(), v.maxLength(512)),
   operationId: workspaceEditIdSchema,
   operations: v.pipe(
     v.array(workspacePersistenceOperationSchema),
@@ -363,6 +390,11 @@ export const workspaceEditRecoveryQuerySchema = v.strictObject({
   workspace: workspaceEditWorkspaceSchema,
 })
 
+export const workspaceEditHistoryQuerySchema = v.strictObject({
+  category: workspaceEditCategorySchema,
+  workspace: workspaceEditWorkspaceSchema,
+})
+
 const workspaceEditResultEntrySchema = v.union([
   v.strictObject({
     exists: v.literal(false),
@@ -375,6 +407,12 @@ const workspaceEditResultEntrySchema = v.union([
     size: v.pipe(v.number(), v.safeInteger(), v.minValue(0)),
     type: v.literal('file'),
     version: v.pipe(v.string(), v.nonEmpty()),
+  }),
+  v.strictObject({
+    exists: v.literal(true),
+    mtimeMs: v.pipe(v.number(), v.finite(), v.minValue(0)),
+    path: workspaceEditRelativePathSchema,
+    type: v.literal('directory'),
   }),
 ])
 
@@ -428,6 +466,7 @@ export type WorkspaceEditPrepareBody = v.InferOutput<typeof workspaceEditPrepare
 export type WorkspaceEditTransitionBody = v.InferOutput<typeof workspaceEditTransitionBodySchema>
 export type WorkspaceEditRecoverBody = v.InferOutput<typeof workspaceEditRecoverBodySchema>
 export type WorkspaceEditReleaseBody = v.InferOutput<typeof workspaceEditReleaseBodySchema>
+export type WorkspaceEditHistoryQuery = v.InferOutput<typeof workspaceEditHistoryQuerySchema>
 
 export type { EntryTypeFilter, TreeEntry, WatchServerMessage } from '@workspace/contracts'
 
@@ -506,6 +545,7 @@ function operationPreconditionsAreValid(
       currentGeneration,
     )
   }
+  if (operation.kind === 'copy' && operation.oldPath === operation.newPath) return false
 
   if (
     !preconditionIsValid(operation.source, operation.oldPath, operation.index, currentGeneration)
@@ -538,7 +578,7 @@ function recordOperationGeneration(
   operation: v.InferOutput<typeof workspacePersistenceOperationSchema>,
   currentGeneration: Map<string, number>,
 ) {
-  if (operation.kind === 'rename') {
+  if (operation.kind === 'rename' || operation.kind === 'copy') {
     currentGeneration.set(operation.oldPath, operation.index)
     currentGeneration.set(operation.newPath, operation.index)
     return

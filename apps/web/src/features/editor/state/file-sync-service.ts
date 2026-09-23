@@ -386,14 +386,14 @@ export class FileSyncService {
   }
 
   undoWorkspaceMutation(
-    current: WorkspaceEditResult,
+    current: Pick<WorkspaceEditResult, 'generation' | 'operationId'>,
     signal: AbortSignal = neverAbortedSignal(),
   ): Promise<WorkspaceEditResult> {
     return this.runWorkspaceTransition('undo', current, signal)
   }
 
   redoWorkspaceMutation(
-    current: WorkspaceEditResult,
+    current: Pick<WorkspaceEditResult, 'generation' | 'operationId'>,
     signal: AbortSignal = neverAbortedSignal(),
   ): Promise<WorkspaceEditResult> {
     return this.runWorkspaceTransition('redo', current, signal)
@@ -579,7 +579,7 @@ export class FileSyncService {
     entry: WorkspaceEditResultEntry,
     content: string | undefined,
   ): void {
-    if (!entry.exists || content === undefined) {
+    if (!entry.exists || entry.type !== 'file' || content === undefined) {
       this.queryClient.removeQueries({ exact: true, queryKey })
       return
     }

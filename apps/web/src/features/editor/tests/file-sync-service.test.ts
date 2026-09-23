@@ -227,6 +227,8 @@ describe('FileSyncService', () => {
     })
     const request: WorkspaceEditPrepareRequest = {
       bodyDigest: `sha256:${'a'.repeat(64)}`,
+      category: 'workspace-edit',
+      label: 'Rename symbol',
       operationId: '10000000-0000-4000-8000-000000000001',
       operations: [
         {
