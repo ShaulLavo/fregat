@@ -1,22 +1,16 @@
 import { ActionCluster } from '@/features/git/components/action-cluster'
 import { ArrowBendUpLeftIcon, MinusIcon, PlusIcon } from '@phosphor-icons/react'
 
-import { useDiscardPathMutation } from '@/features/git/hooks/use-discard-path-mutation'
 import { useStagePathMutation } from '@/features/git/hooks/use-stage-path-mutation'
 import { useUnstagePathMutation } from '@/features/git/hooks/use-unstage-path-mutation'
-import type { PanelSection } from '@/features/git/utils/types'
+import { useGitStoreApi } from '@/features/git/state/store'
+import { discardRequest } from '@/features/git/utils/discard-prompt'
+import type { ChangeRow } from '@/features/git/utils/types'
 import { RowActionButton } from './row-action-button'
 
-export function FileActions({
-  path,
-  rootPath,
-  section,
-}: {
-  path: string
-  rootPath: string
-  section: PanelSection
-}) {
-  if (section === 'staged') {
+export function FileActions({ rootPath, row }: { rootPath: string; row: ChangeRow }) {
+  const path = row.file.path
+  if (row.section === 'staged') {
     return (
       <ActionCluster hoverGroup='row'>
         <UnstageFileButton path={path} rootPath={rootPath} />
@@ -26,7 +20,7 @@ export function FileActions({
 
   return (
     <ActionCluster hoverGroup='row'>
-      <DiscardFileButton path={path} rootPath={rootPath} />
+      <DiscardFileButton row={row} />
       <StageFileButton path={path} rootPath={rootPath} />
     </ActionCluster>
   )
@@ -56,14 +50,15 @@ function UnstageFileButton({ path, rootPath }: { path: string; rootPath: string 
   )
 }
 
-function DiscardFileButton({ path, rootPath }: { path: string; rootPath: string }) {
-  const discard = useDiscardPathMutation(path, rootPath)
+function DiscardFileButton({ row }: { row: ChangeRow }) {
+  // The store API, not a selector: rows must not subscribe to the dialog's state.
+  const store = useGitStoreApi()
 
   return (
     <RowActionButton
-      disabled={discard.isPending}
+      disabled={false}
       label='Discard file'
-      onClick={() => discard.mutate()}
+      onClick={() => store.getState().requestDiscard(discardRequest(row.section, [row]))}
     >
       <ArrowBendUpLeftIcon />
     </RowActionButton>

@@ -612,6 +612,15 @@ export const selectors = {
     page
       .getByRole('region', { name: 'Git panel' })
       .getByRole('button', { name: label, exact: true }),
+  /** A row's own action; every row mounts its buttons, so the page-wide one is ambiguous. */
+  gitFileRowAction: (page: Page, name: string, label: 'Stage file' | 'Discard file') =>
+    page
+      .getByRole('region', { name: 'Git panel' })
+      .locator('[data-git-file]')
+      .filter({ has: page.getByText(name, { exact: true }) })
+      .getByRole('button', { name: label, exact: true }),
+  gitDiscardDialog: (page: Page, title: string) =>
+    page.getByRole('alertdialog', { name: title, exact: true }),
   unexpectedError: (page: Page) => page.getByText('Something unexpected went wrong.'),
   focusGitCommand: (page: Page) => page.getByRole('option', { name: /Focus Git/ }),
   graphButton: (page: Page) => page.getByRole('button', { name: 'Graph', exact: true }),

@@ -3,11 +3,11 @@ import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { expect, test } from '../../../../test/fixtures'
 import { createTestQueryClient } from '../../../../test/render'
-import { admitGitMutation } from '@/features/git/utils/admit-mutation'
+import { admitDiscard } from '@/features/git/utils/admit-mutation'
 import { fetchStatus } from '@/features/git/utils/api'
 import { gitKeys } from '@/lib/query-keys'
 
-test('Git admission rejects a changed affected set and settles the new observation', async ({
+test('Discard admission rejects a changed affected set and settles the new observation', async ({
   client,
   server,
 }) => {
@@ -16,8 +16,8 @@ test('Git admission rejects a changed affected set and settles the new observati
   const owner = createTestQueryClient()
   owner.setQueryData(gitKeys.status(''), await fetchStatus('', undefined, client))
   execFileSync('git', ['add', 'a.txt'], { cwd: server.root, stdio: 'pipe' })
-  await expect(admitGitMutation(owner, '', ['a.txt'])).rejects.toMatchObject({ status: 409 })
-  await expect(admitGitMutation(owner, '', ['a.txt'])).resolves.toMatchObject({
+  await expect(admitDiscard(owner, '', ['a.txt'])).rejects.toMatchObject({ status: 409 })
+  await expect(admitDiscard(owner, '', ['a.txt'])).resolves.toMatchObject({
     files: [{ index: 'added' }],
   })
 })

@@ -6,12 +6,17 @@ import { clientForQueryClient, originForQueryClient } from '@/lib/environments/s
 import { gitKeys } from '@/lib/query-keys'
 import { fetchStatus } from '@/features/git/utils/api'
 
-export async function admitGitMutation(
-  owner: QueryClient,
-  rootPath: string,
-  paths?: readonly string[],
-) {
+/** Every git write: a read-only environment refuses it before anything runs. */
+export function admitGitWrite(owner: QueryClient) {
   assertEnvironmentWritable(originForQueryClient(owner))
+}
+
+/**
+ * Discard destroys work, so it runs only against the changes on screen. Stage, unstage
+ * and commit are recoverable and skip this fresh status read, as VS Code does.
+ */
+export async function admitDiscard(owner: QueryClient, rootPath: string, paths: readonly string[]) {
+  admitGitWrite(owner)
   const expected = owner.getQueryData<GitStatusResult>(gitKeys.status(rootPath))
   await owner.cancelQueries({ queryKey: gitKeys.status(rootPath), exact: true })
   const status = await owner.fetchQuery({
@@ -21,16 +26,16 @@ export async function admitGitMutation(
   })
   if (expected && statusIdentity(expected, paths) !== statusIdentity(status, paths))
     throw changedStatus()
-  assertEnvironmentWritable(originForQueryClient(owner))
+  admitGitWrite(owner)
   return status
 }
 
-function statusIdentity(status: GitStatusResult, paths?: readonly string[]) {
-  const selected = paths ? new Set(paths) : null
+function statusIdentity(status: GitStatusResult, paths: readonly string[]) {
+  const selected = new Set(paths)
   return JSON.stringify({
     repository: status.repository,
     files: status.files
-      .filter((file) => !selected || selected.has(file.path))
+      .filter((file) => selected.has(file.path))
       .toSorted((a, b) => a.path.localeCompare(b.path)),
   })
 }

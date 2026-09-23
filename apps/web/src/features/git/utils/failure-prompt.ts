@@ -9,8 +9,7 @@ export type GitFailure = {
 const OPERATION_LABELS: Readonly<Record<string, string>> = {
   'create-branch': 'Create branch',
   'create-pull-request': 'Create pull request',
-  'discard-many': 'Discard',
-  'discard-staged-many': 'Discard staged',
+  'discard-staged': 'Discard staged',
   'stage-many': 'Stage',
   'unstage-many': 'Unstage',
 }

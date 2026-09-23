@@ -1,9 +1,10 @@
-import { admitGitMutation } from '@/features/git/utils/admit-mutation'
+import { admitGitWrite } from '@/features/git/utils/admit-mutation'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
-import { fileSystemKeys } from '@/lib/query-keys'
+import type { GitStatusResult } from '@workspace/contracts'
+import { fileSystemKeys, gitKeys } from '@/lib/query-keys'
 import { commitChangesStreaming, type CommitRequest } from '@/features/git/utils/api'
 import { mutationKeys } from '@/features/git/utils/mutation-keys'
 import { notifyMutationError } from '@/features/git/utils/notify-mutation-error'
@@ -21,9 +22,12 @@ export function useCommitMutation(rootPath: string) {
     // one git command that runs arbitrary user code, and the previous one-shot
     // call left a slow hook looking exactly like a hung button.
     mutationFn: async (request: CommitRequest, { client }) => {
-      const status = await admitGitMutation(client, rootPath)
+      admitGitWrite(client)
+      // The cached HEAD, not a fresh read: reconciliation compares against the same cache.
+      const head = client.getQueryData<GitStatusResult>(gitKeys.status(rootPath))?.repository
+        ?.commit
       const progress = commitProgressStoreFor(client).getState()
-      progress.beginCommitProgress(rootPath, status.repository?.commit ?? null)
+      progress.beginCommitProgress(rootPath, head ?? null)
 
       return commitChangesStreaming(
         rootPath,

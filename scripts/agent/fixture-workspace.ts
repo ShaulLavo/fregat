@@ -32,6 +32,12 @@ export async function installPreCommitHook(fixture: string, script: string) {
   await chmod(hook, 0o755)
 }
 
+/** `git status --porcelain` of a fixture repository, trimmed. */
+export async function fixturePorcelain(project: string) {
+  const child = Bun.spawn(['git', '-C', project, 'status', '--porcelain'], { stdout: 'pipe' })
+  return (await new Response(child.stdout).text()).trim()
+}
+
 /** The subject of the fixture repository's HEAD commit, or '' when it has none. */
 export async function fixtureHeadSubject(project: string) {
   const child = Bun.spawn(['git', '-C', project, 'log', '-1', '--pretty=%s'], {

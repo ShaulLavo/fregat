@@ -14,3 +14,10 @@ export type ChangeRow = {
   section: PanelSection
   status: GitFileStatus['index'] | GitFileStatus['worktree']
 }
+
+export type DiscardRequest = {
+  readonly section: PanelSection
+  readonly paths: readonly string[]
+  /** Untracked, or staged as new: discarding deletes these outright. */
+  readonly newFiles: number
+}

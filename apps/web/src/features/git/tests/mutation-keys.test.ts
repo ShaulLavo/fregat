@@ -18,11 +18,11 @@ describe('mutationKeys', () => {
       'b.ts',
       'a.ts',
     ])
-    expect(mutationKeys.discardStagedMany('repo', ['one', 'two'])).toEqual([
+    expect(mutationKeys.discardStaged('repo', ['one', 'two'])).toEqual([
       'git',
       'mutation',
       'repo',
-      'discard-staged-many',
+      'discard-staged',
       'one',
       'two',
     ])

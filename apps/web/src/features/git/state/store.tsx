@@ -3,6 +3,7 @@ import { useStore } from 'zustand'
 import { createStore, type StoreApi as ZustandStoreApi } from 'zustand/vanilla'
 
 import { clientErrors } from '@/lib/structured-errors'
+import type { DiscardRequest } from '@/features/git/utils/types'
 
 type PendingMessageFile = {
   readonly path: string
@@ -16,6 +17,8 @@ type StoreState = {
   commitMessageRevision: number
   /** COMMIT_EDITMSG awaiting its commit; closing its tab, once seen open, commits. */
   pendingMessageFile: PendingMessageFile | null
+  /** A discard waiting on the panel's confirmation dialog. */
+  discardRequest: DiscardRequest | null
 }
 
 type StoreActions = {
@@ -24,6 +27,8 @@ type StoreActions = {
   resetCommitMessage: () => void
   setCommitMessage: (message: string) => void
   setPendingMessageFile: (pending: PendingMessageFile | null) => void
+  requestDiscard: (request: DiscardRequest) => void
+  closeDiscard: () => void
 }
 
 export type GitStore = StoreState & StoreActions
@@ -70,6 +75,9 @@ export function createGitStore(draft?: CommitMessageDraft) {
     commitMessageRevision: 0,
     pendingMessageFile: null,
     setPendingMessageFile: (pendingMessageFile) => set({ pendingMessageFile }),
+    discardRequest: null,
+    requestDiscard: (discardRequest) => set({ discardRequest }),
+    closeDiscard: () => set({ discardRequest: null }),
     resetCommitMessage: () => set(nextCommitMessageState(get(), '')),
     setCommitMessage: (commitMessage) => set(nextCommitMessageState(get(), commitMessage)),
   }))

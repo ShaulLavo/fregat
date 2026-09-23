@@ -42,7 +42,7 @@ export function ChangeFileRow({
         status={gitStatusSymbol(row.status, row.section)}
         stat={row.file.lines?.[row.section]}
         loading={loading || opening}
-        actions={<FileActions path={row.file.path} rootPath={rootPath} section={row.section} />}
+        actions={<FileActions rootPath={rootPath} row={row} />}
         onOpen={() => {
           void openDiff(row)
         }}

@@ -11,12 +11,10 @@ export const mutationKeys = {
   createBranch: (rootPath: string) => ['git', 'mutation', rootPath, 'create-branch'] as const,
   createPullRequest: (rootPath: string) =>
     ['git', 'mutation', rootPath, 'create-pull-request'] as const,
-  discard: (rootPath: string, path: string) =>
-    ['git', 'mutation', rootPath, 'discard', path] as const,
-  discardMany: (rootPath: string, paths: readonly string[]) =>
-    ['git', 'mutation', rootPath, 'discard-many', ...paths] as const,
-  discardStagedMany: (rootPath: string, paths: readonly string[]) =>
-    ['git', 'mutation', rootPath, 'discard-staged-many', ...paths] as const,
+  discard: (rootPath: string, paths: readonly string[]) =>
+    ['git', 'mutation', rootPath, 'discard', ...paths] as const,
+  discardStaged: (rootPath: string, paths: readonly string[]) =>
+    ['git', 'mutation', rootPath, 'discard-staged', ...paths] as const,
   fetch: (rootPath: string) => ['git', 'mutation', rootPath, 'fetch'] as const,
   pull: (rootPath: string) => ['git', 'mutation', rootPath, 'pull'] as const,
   push: (rootPath: string) => ['git', 'mutation', rootPath, 'push'] as const,

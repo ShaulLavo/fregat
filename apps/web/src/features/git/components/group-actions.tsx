@@ -2,11 +2,11 @@ import { useStatus } from '@/features/git/hooks/use-status'
 import { ActionCluster } from '@/features/git/components/action-cluster'
 import { ArrowBendUpLeftIcon, FilePlusIcon, MinusIcon, PlusIcon } from '@phosphor-icons/react'
 
-import { useDiscardPathsMutation } from '@/features/git/hooks/use-discard-paths-mutation'
-import { useDiscardStagedPathsMutation } from '@/features/git/hooks/use-discard-staged-paths-mutation'
 import { useOpenDiffDocument } from '@/features/git/hooks/use-open-diff-document'
 import { useStagePathsMutation } from '@/features/git/hooks/use-stage-paths-mutation'
 import { useUnstagePathsMutation } from '@/features/git/hooks/use-unstage-paths-mutation'
+import { useGitStoreApi } from '@/features/git/state/store'
+import { discardRequest } from '@/features/git/utils/discard-prompt'
 import type { ChangeRow, PanelSection } from '@/features/git/utils/types'
 import { RowActionButton } from './row-action-button'
 
@@ -38,15 +38,15 @@ function WorktreeGroupActions({
   rows: readonly ChangeRow[]
 }) {
   const confirmed = Boolean(useStatus(rootPath).data)
-  const discard = useDiscardPathsMutation(paths, rootPath)
+  const store = useGitStoreApi()
   const stage = useStagePathsMutation(paths, rootPath)
 
   return (
     <ActionCluster hoverGroup='group'>
       <RowActionButton
-        disabled={!confirmed || discard.isPending}
+        disabled={!confirmed}
         label='Discard all changes'
-        onClick={() => discard.mutate()}
+        onClick={() => store.getState().requestDiscard(discardRequest('worktree', rows))}
       >
         <ArrowBendUpLeftIcon />
       </RowActionButton>
@@ -72,15 +72,15 @@ function StagedGroupActions({
   rows: readonly ChangeRow[]
 }) {
   const confirmed = Boolean(useStatus(rootPath).data)
-  const discard = useDiscardStagedPathsMutation(paths, rootPath)
+  const store = useGitStoreApi()
   const unstage = useUnstagePathsMutation(paths, rootPath)
 
   return (
     <ActionCluster hoverGroup='group'>
       <RowActionButton
-        disabled={!confirmed || discard.isPending}
+        disabled={!confirmed}
         label='Discard all staged changes'
-        onClick={() => discard.mutate()}
+        onClick={() => store.getState().requestDiscard(discardRequest('staged', rows))}
       >
         <ArrowBendUpLeftIcon />
       </RowActionButton>

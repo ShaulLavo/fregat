@@ -1,14 +1,14 @@
 import { strictEqual } from 'node:assert/strict'
 import { mkdtemp, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { fixtureGit, openFixtureWorkspace, releaseFixture } from '../fixture-workspace'
+import {
+  fixtureGit,
+  fixturePorcelain,
+  openFixtureWorkspace,
+  releaseFixture,
+} from '../fixture-workspace'
 import { openGitPanel, selectors } from '../selectors'
 import type { Scenario } from './index'
-
-async function porcelain(project: string) {
-  const process = Bun.spawn(['git', '-C', project, 'status', '--porcelain'], { stdout: 'pipe' })
-  return (await new Response(process.stdout).text()).trim()
-}
 
 export const gitStageSettles: Scenario = {
   name: 'git-stage-settles',
@@ -16,14 +16,9 @@ export const gitStageSettles: Scenario = {
   async run(page, { step }) {
     // Never the dev workspace: clicking Stage there would stage real work.
     const fixture = await mkdtemp('/work/tmp/fregat-git-stage-')
-    // Every write first reads `fresh=true` status to admit itself; only a read after the write is a refetch.
-    let admissions = 0
-    let refetches = 0
+    let statusRequests = 0
     page.on('request', (request) => {
-      const url = new URL(request.url())
-      if (!url.pathname.endsWith('/git/status')) return
-      if (url.searchParams.get('fresh') === 'true') admissions += 1
-      else refetches += 1
+      if (new URL(request.url()).pathname.endsWith('/git/status')) statusRequests += 1
     })
     try {
       await fixtureGit(fixture, ['init', '-b', 'main'])
@@ -50,13 +45,12 @@ export const gitStageSettles: Scenario = {
 
       // Row actions only take the pointer while their row is hovered.
       await row.hover()
-      admissions = 0
-      refetches = 0
+      statusRequests = 0
       await stage.click()
       await unstage.waitFor({ state: 'attached' })
-      const atSettle = { admissions, refetches }
+      const atSettle = statusRequests
       await step('staged')
-      strictEqual(await porcelain(fixture), 'A  change.txt')
+      strictEqual(await fixturePorcelain(fixture), 'A  change.txt')
 
       await row.hover()
       await unstage.click()
@@ -68,11 +62,11 @@ export const gitStageSettles: Scenario = {
       await unstage.click()
       await stage.waitFor({ state: 'attached' })
       await step('unstaged-again')
-      console.log(JSON.stringify({ atSettle, afterBurst: { admissions, refetches } }))
-      strictEqual(await porcelain(fixture), '?? change.txt')
-      strictEqual(atSettle.refetches, 0, 'Stage must settle the panel without refetching status')
-      strictEqual(atSettle.admissions, 1, 'Stage admits itself with exactly one fresh status read')
-      strictEqual(refetches, 0, 'Stage and unstage bursts must not refetch status')
+      console.log(JSON.stringify({ statusRequestsAtSettle: atSettle, afterBurst: statusRequests }))
+      strictEqual(await fixturePorcelain(fixture), '?? change.txt')
+      // Only discard reads status before it writes; stage and unstage never do.
+      strictEqual(atSettle, 0, 'Stage must settle the panel without a /git/status request')
+      strictEqual(statusRequests, 0, 'Stage and unstage bursts must not read status')
     } finally {
       await releaseFixture(fixture)
     }
