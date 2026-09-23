@@ -1,6 +1,6 @@
 # Ask the editor; do not model it
 
-Status: **PHASE 2 IMPLEMENTED — REMAINING PHASES NEED EDITOR APIs.** Requested
+Status: **PHASES 1, 2 AND 4 IMPLEMENTED — PHASES 3 AND 5 NEED EDITOR APIs.** Requested
 2026-09-21, after the diff line-comment fix. Inspected at Platform `d1ca6472` and Editor
 `aeba6783`.
 
@@ -50,6 +50,20 @@ Unicode hover uses `markerAtPoint`; delete the marker scan.
 Scenarios: add `search-result-line-pick` (click a result line in a multi-line excerpt, assert the
 selected line) and run the existing unicode hover surface with `look`.
 
+Implemented 2026-09-23. `rowAtPoint` has no Y-only form and answers null outside the editor's box,
+but the source-line gutter and the action column sit beside it and share its rows; the open and
+replace buttons only show while their row is hovered. The query is therefore made at the editor
+host's horizontal centre with the pointer's Y, and a row gap still answers null. The gutter takes
+its line height from `EXCERPT_EDITOR_LINE_HEIGHT` through its style. A keyboard hover has no point,
+so the unicode hover asks `markerAtPoint` at the character's own `getRangeClientRect` box; no
+`data-editor-hidden-character*` read remains.
+
+Verification: `search-result-line-pick` hovers a text row, the action column and a row gap, then
+picks source line 4 (the third excerpt row) from the gutter and proves it by the opened editor's
+cursor line. `editor-markdown-punctuation` gained a keyboard Show hover on the zero-width
+character. Evidence: `/work/tmp/fregat-evidence/20260923T135447Z-scenario-search-result-line-pick/`,
+`/work/tmp/fregat-evidence/20260923T135636Z-scenario-editor-markdown-punctuation/`.
+
 ## Phase 2 — delete the duplicate line index (implemented)
 
 Replace `rowStartOffset`, `textLineAt` and `textSnapshotRowStartOffset` with `TextSnapshot.lineStart`
@@ -68,9 +82,8 @@ saved line endings to LF. Screenshot inspected; evidence:
 `/work/tmp/fregat-evidence/20260921T174304Z-scenario-editor-definition-crlf/`.
 The capture also records a `LoadedTerminalPanel` React `use()` error outside the changed code.
 
-E047 and E050 remain proposed in the linked Editor checkout; `rowAtPoint`, `markerAtPoint`,
-`getStackedRows` and `onDidScroll` are absent. Phases 1, 3, 4 and 5 remain pending their
-Editor implementations. No compatibility layer was added.
+E047 has since landed (Editor `6656eb7`); E050, `getStackedRows` and `onDidScroll` are still
+absent, so Phases 3 and 5 wait on the Editor.
 
 ## Phase 3 — stacked rows from the plugin (small Editor change)
 
@@ -80,6 +93,9 @@ Editor implementations. No compatibility layer was added.
 
 `diffRowAtEvent` stops reading the row attribute and loses its private Y scan; both are replaced
 by `rowAtPoint`. Scenario `git-diff-line-comment` already covers it.
+
+Done in the Editor with E047: `rowHitAt` in `packages/diff/src/editorDiffPlugin.ts` asks
+`context.rowAtPoint`, and nothing in the package reads `data-editor-virtual-row`.
 
 ## Phase 5 — obligations (each needs its E050 row)
 

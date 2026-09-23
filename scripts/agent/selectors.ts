@@ -425,6 +425,7 @@ export const selectors = {
       .getByRole('button', { name: 'Ask the agent about these lines', exact: true })
       .locator('xpath=preceding-sibling::span'),
   editorRows: (page: Page) => page.locator('.editor-virtualized-row'),
+  editorCursorLineRow: (page: Page) => page.locator('.editor-virtualized-cursor-line-row:visible'),
   editorTabNamed: (page: Page, label: RegExp) =>
     page.locator('[data-editor-tab-path]').filter({ hasText: label }),
   workspaceEditApplyAll: (page: Page) =>
@@ -487,6 +488,14 @@ export const selectors = {
     page.locator(searchEditorSelector).locator('.search-result-file-editor-host'),
   searchEditorRows: (page: Page) =>
     page.locator(searchEditorSelector).locator('.editor-virtualized-row'),
+  searchEditorRowWithText: (page: Page, text: string) =>
+    page.locator(searchEditorSelector).locator('.editor-virtualized-row').filter({ hasText: text }),
+  searchEditorLineOpen: (page: Page, sourceLine: number) =>
+    page
+      .locator(searchEditorSelector)
+      .getByRole('button', { name: new RegExp(`^Open result at line ${sourceLine}\\b`) }),
+  searchEditorHoveredLineActions: (page: Page) =>
+    page.locator(searchEditorSelector).locator('[data-hovered="true"]'),
   searchEditorVisibleRows: (page: Page) =>
     page.locator(searchEditorSelector).locator('.editor-virtualized-row:visible'),
   editorHighlightStyles: (page: Page) =>

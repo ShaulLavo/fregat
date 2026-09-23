@@ -1,3 +1,4 @@
+import type { EditorPointHit } from '@singapore-editor/core'
 import type { EditorRangeDecoration, EditorScrollMode } from '@singapore-editor/core/editor'
 import type { CSSProperties, KeyboardEvent, RefObject } from 'react'
 
@@ -289,27 +290,23 @@ export function isSearchResultEditorActionTarget(target: EventTarget | null) {
   return target.closest('button') !== null
 }
 
+/**
+ * The line under `clientY`, answered by the editor. The source-line and action columns share its
+ * rows, so the query is made at the editor's own centre rather than at the pointer's X.
+ */
 export function searchResultFileLineIdAtClientY(
   document: SearchResultFileDocument,
-  element: HTMLElement,
+  editor: { rowAtPoint(clientX: number, clientY: number): EditorPointHit | null } | null,
+  host: HTMLElement | null,
   clientY: number,
 ) {
-  const rect = element.getBoundingClientRect()
-  const style = getComputedStyle(element)
-  const offsetY = clientY - rect.top - Number.parseFloat(style.paddingTop)
+  if (!editor || !host) return null
 
-  return searchResultFileLineIdAtOffsetY(document, offsetY)
-}
+  const rect = host.getBoundingClientRect()
+  const hit = editor.rowAtPoint(rect.left + rect.width / 2, clientY)
+  if (!hit) return null
 
-function searchResultFileLineIdAtOffsetY(document: SearchResultFileDocument, offsetY: number) {
-  if (offsetY < 0) return null
-
-  const rowStride = EXCERPT_EDITOR_LINE_HEIGHT + SEARCH_RESULT_FILE_EDITOR_ROW_GAP
-  const row = Math.floor(offsetY / rowStride)
-  const rowTop = row * rowStride
-  if (offsetY > rowTop + EXCERPT_EDITOR_LINE_HEIGHT) return null
-
-  return document.lines[row]?.id ?? null
+  return document.lines[hit.bufferRow]?.id ?? null
 }
 
 export function currentSearchResultFileLine(
@@ -474,6 +471,7 @@ export function searchResultSourceLineGutterStyle(
     gap: SEARCH_RESULT_FILE_EDITOR_ROW_GAP,
     gridTemplateRows: `repeat(${lineCount}, ${EXCERPT_EDITOR_LINE_HEIGHT}px)`,
     height: searchResultFileEditorHeight(lineCount),
+    lineHeight: `${EXCERPT_EDITOR_LINE_HEIGHT}px`,
     minWidth: 26,
     width: `calc(${Math.max(3, minDigits)}ch + 8px)`,
   }

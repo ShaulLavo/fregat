@@ -22,6 +22,8 @@ The Search side panel, or the address URL search parameters (`s.*`).
 
 `visual-search-scroll-content` checks that file blocks intersecting the viewport retain mounted editors and text after wheel scrolling and jumps. It then clicks a visible excerpt, presses Enter, and verifies the opened file path.
 
+`search-result-line-pick` builds a one-file fixture whose third excerpt row is source line 4, hovers a text row, the action column and a row gap in the search editor, then picks a line from the source-line gutter and checks the opened editor's cursor line. Rows are asked of the editor (`rowAtPoint`), so a pointer beside it still resolves one.
+
 ## Gotchas
 
 Replace runs through the workspace-edit lifecycle with a preview dialog. The dialog's confirm needs the rendered operation id; a stale dialog cannot confirm a newer operation.

@@ -72,7 +72,7 @@ The click scenario waits 750ms between clicks so debounced document highlights, 
 
 `scenario editor-reload-paint-slow-font` is the same reload with the font response held for a second. It is the case a fast device or a remote link hits: the editor mounts while `document.fonts` is still loading, and the cached paint must be shown anyway. A failure lists the admission as `appearance` with `differs: ["unavailable"]`.
 
-`scenario editor-markdown-punctuation --file README.md` hovers en dashes and invisible characters in the editor and a saved-file diff, checks their explanations, opens Unicode settings, and undoes its sample.
+`scenario editor-markdown-punctuation --file README.md` hovers en dashes and invisible characters in the editor and a saved-file diff, checks their explanations, shows the zero-width character's hover from the keyboard (no pointer, so the marker is found from the caret's character), opens Unicode settings, and undoes its sample.
 
 Native grammar coverage: `editor-native-coverage-light` and `editor-native-coverage-dark` open an MDX, SQL or Astro file or a Markdown fence fixture, check native worker use, edit syntax, undo and redo. Use `--workspace work/tmp/fregat-evidence/syntax-benchmark-fixtures --file Component.astro`, `--file Component.mdx`, `--file mdx-injections.md`, `--file queries.sql`, `--file sql-injections.md` or `--file injections.md`. Fenced MDX must retain its heading and emphasis markers in Markdown preview; injected code is displayed as source. `editor-syntax-native` retains the whitespace control for timing comparisons.
 

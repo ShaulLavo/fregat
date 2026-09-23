@@ -107,6 +107,7 @@ import { quickOpenNoFlicker } from './quick-open-no-flicker'
 import { gitHistorySearchNoFlicker } from './git-history-search-no-flicker'
 import { logsSearchNoFlicker } from './logs-search-no-flicker'
 import { searchTypeDelete } from './search-type-delete'
+import { searchResultLinePick } from './search-result-line-pick'
 import { paneRenderCrash } from './pane-render-crash'
 import type { Page } from 'playwright'
 
@@ -256,6 +257,7 @@ export const scenarios: readonly Scenario[] = [
   gitHistorySearchNoFlicker,
   logsSearchNoFlicker,
   searchTypeDelete,
+  searchResultLinePick,
   paneRenderCrash,
   wallpaperModeToggle,
   wallpaperLibrary,

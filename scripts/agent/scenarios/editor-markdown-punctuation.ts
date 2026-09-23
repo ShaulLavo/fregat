@@ -1,7 +1,7 @@
 import type { Locator, Page } from 'playwright'
 import { match, strictEqual } from 'node:assert'
 import type { Scenario } from './index'
-import { chords, focusEditor, openFileByName, selectors } from '../selectors'
+import { chords, focusEditor, openFileByName, runPaletteCommand, selectors } from '../selectors'
 
 export const editorMarkdownPunctuation: Scenario = {
   name: 'editor-markdown-punctuation',
@@ -20,6 +20,19 @@ export const editorMarkdownPunctuation: Scenario = {
     await hoverMarker(page, selectors.editorInvisibleCharacters(page).first())
     match(await selectors.editorHover(page).innerText(), /U\+200B.*invisible/s)
     await step('invisible-explanation')
+    await page.mouse.move(0, 0)
+    await page.keyboard.press('Escape')
+    await page.keyboard.press('Control+Home')
+    for (let line = 0; line < 7; line++) await page.keyboard.press('ArrowDown')
+    await page.keyboard.press('Home')
+    // Before the zero-width character: a keyboard hover has no point, only the caret's offset.
+    for (let column = 0; column < 'pаssword and hidden'.length; column++) {
+      await page.keyboard.press('ArrowRight')
+    }
+    await runPaletteCommand(page, 'Show hover')
+    await selectors.editorHover(page).waitFor({ state: 'visible', timeout: 5000 })
+    match(await selectors.editorHover(page).innerText(), /U\+200B.*invisible/s)
+    await step('invisible-keyboard-explanation')
     const ambiguous = await selectors.editorAmbiguousCharacters(page).count()
     const invisible = await selectors.editorInvisibleCharacters(page).count()
     await page.keyboard.press(chords.commandPalette)

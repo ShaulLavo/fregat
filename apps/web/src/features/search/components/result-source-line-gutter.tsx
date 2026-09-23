@@ -22,7 +22,7 @@ export const SearchResultSourceLineGutter = memo(
         style={searchResultSourceLineGutterStyle(lines.length, minDigits)}
       >
         {lines.map((line) => (
-          <span className='block overflow-hidden leading-[22px] tabular-nums' key={line.id}>
+          <span className='block overflow-hidden tabular-nums' key={line.id}>
             {line.sourceLine}
           </span>
         ))}

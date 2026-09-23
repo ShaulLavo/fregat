@@ -38,15 +38,11 @@ function partsAt(
   anchor: HoverAnchor,
   openSettings: () => void,
 ): readonly HoverPart[] {
-  const marker =
-    markerUnder(context.scrollElement, anchor) ?? markerAt(context.scrollElement, anchor.offset)
+  const marker = markerUnder(context, anchor) ?? markerAt(context, anchor.offset)
   if (!marker) return []
 
-  const kind = marker.dataset.editorHiddenCharacter
+  const { kind, offset } = marker
   if (kind !== 'ambiguous' && kind !== 'invisible') return []
-
-  const offset = Number(marker.dataset.editorHiddenCharacterOffset)
-  if (!Number.isInteger(offset)) return []
 
   const snapshot = context.getSnapshot()
   const text =
@@ -68,25 +64,17 @@ function partsAt(
 
 /**
  * The marker under the pointer. A zero-width character has no text extent, so the offset the hit
- * test reports is a neighbour's; the marker the view paints for it is what the pointer is on, and
- * it is found by its rect because the markers are not hit-testable elements.
+ * test reports is a neighbour's; the marker the view paints for it is what the pointer is on.
  */
-function markerUnder(element: HTMLElement, anchor: HoverAnchor): HTMLElement | null {
+function markerUnder(context: EditorViewContributionContext, anchor: HoverAnchor) {
   const point = anchor.point
   if (!point) return null
-  const markers = element.querySelectorAll<HTMLElement>('[data-editor-hidden-character]')
-  for (const marker of markers) {
-    const rect = marker.getBoundingClientRect()
-    if (point.clientX < rect.left || point.clientX > rect.right) continue
-    if (point.clientY < rect.top || point.clientY > rect.bottom) continue
-    return marker
-  }
-  return null
+  return context.markerAtPoint(point.clientX, point.clientY)
 }
 
-/** The painted marker for the character at `offset`; the view stamps each with its offset. */
-function markerAt(element: HTMLElement, offset: number): HTMLElement | null {
-  return element.querySelector<HTMLElement>(
-    `[data-editor-hidden-character][data-editor-hidden-character-offset="${offset}"]`,
-  )
+/** A keyboard hover has no point, so ask at the character's own box; +1px lands on a 2px marker. */
+function markerAt(context: EditorViewContributionContext, offset: number) {
+  const rect = context.getRangeClientRect(offset, offset + 1)
+  if (!rect) return null
+  return context.markerAtPoint(rect.left + Math.max(1, rect.width / 2), rect.top + rect.height / 2)
 }

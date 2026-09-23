@@ -422,7 +422,7 @@ day swept both repositories for the same shape and for workarounds generally. Th
 grouped by owner into four Platform plans and five Editor backlog entries. Items marked verified in
 each plan were confirmed in source; the rest are audit findings an implementer re-checks first.
 
-Suggested order (step 1 done and deployed 2026-09-23):
+Suggested order (steps 1–3 done 2026-09-23; step 4 is next):
 
 1. [Plan 131](plans/131-provider-codes-not-prose.md) Phase 1 and
    [Plan 132](plans/132-process-and-dev-ownership.md) Phase 1. A tool permission's lifetime is
@@ -431,7 +431,7 @@ Suggested order (step 1 done and deployed 2026-09-23):
 2. [E047](../Editor/plans/e047-point-and-row-queries.md), then
    [Plan 130](plans/130-ask-the-editor.md) Phases 1 and 4. One point query in the Editor removes the
    search-result row arithmetic, the unicode hover's marker scan and the residue in `diffRowAtEvent`.
-   Plan 130 Phase 2 is implemented and verified; the remaining phases need Editor APIs.
+   Done: E047 landed in Editor `6656eb7`, and Plan 130 Phases 1, 2 and 4 are implemented and verified.
 3. [E048](../Editor/docs/display/e048-minimap-document-space.md) and
    [E051](../Editor/plans/e051-fast-path-equivalence.md). The minimap repeats the display-row bug,
    and the row-layout fast path has no equivalence test.

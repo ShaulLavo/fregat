@@ -118,6 +118,7 @@ export const SearchResultFileEditor = memo(
         surface: 'search-result',
       },
     })
+    const editorHostRef = useRef<HTMLDivElement | null>(null)
     const pendingActivationFrameRef = useRef<number | null>(null)
     const lineActionRowsRef = useRef(new Map<SearchResultId, HTMLDivElement>())
     const hoveredLineActionRowRef = useRef<HTMLDivElement | null>(null)
@@ -144,11 +145,18 @@ export const SearchResultFileEditor = memo(
     })
     useEffect(() => () => clearHoveredLineAction(), [])
 
+    const lineIdAtClientY = (clientY: number) =>
+      searchResultFileLineIdAtClientY(
+        visibleDocument,
+        controller.getEditor(),
+        editorHostRef.current,
+        clientY,
+      )
+
     const handlePointerUp = (event: PointerEvent<HTMLDivElement>) => {
       if (isSearchResultEditorActionTarget(event.target)) return
 
-      const nextResultId =
-        searchResultFileLineIdAtClientY(fileDocument, event.currentTarget, event.clientY) ?? file.id
+      const nextResultId = lineIdAtClientY(event.clientY) ?? file.id
       if (pendingActivationFrameRef.current !== null) {
         window.cancelAnimationFrame(pendingActivationFrameRef.current)
       }
@@ -159,12 +167,7 @@ export const SearchResultFileEditor = memo(
     }
 
     const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
-      const lineId = searchResultFileLineIdAtClientY(
-        fileDocument,
-        event.currentTarget,
-        event.clientY,
-      )
-      setHoveredLineActionRow(lineId)
+      setHoveredLineActionRow(lineIdAtClientY(event.clientY))
     }
 
     const handlePointerLeave = () => {
@@ -220,11 +223,13 @@ export const SearchResultFileEditor = memo(
         >
           <div className='grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start'>
             <SearchResultSourceLineGutter document={visibleDocument} minDigits={sourceLineDigits} />
-            <EditorHost
-              className='app-editor-host search-result-file-editor-host min-w-0'
-              controller={controller}
-              style={editorStyle}
-            />
+            <div className='min-w-0' ref={editorHostRef}>
+              <EditorHost
+                className='app-editor-host search-result-file-editor-host'
+                controller={controller}
+                style={editorStyle}
+              />
+            </div>
           </div>
           <SearchResultFileLineActions
             canReplace={canReplace}
