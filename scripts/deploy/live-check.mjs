@@ -40,12 +40,10 @@ try {
   const rendered = await page.evaluate(() => ({
     crossOriginIsolated,
     rootChildren: document.querySelector('#root')?.childElementCount ?? 0,
-    wallpaperPreloads: [...document.querySelectorAll('[data-workbench-wallpaper-preload]')].map(
-      (link) => ({
-        url: link.href,
-        state: link.dataset.workbenchWallpaperPreload,
-      }),
+    wallpaperPreloads: [...document.querySelectorAll('link[rel="preload"][as="image"]')].map(
+      (link) => link.href,
     ),
+    wallpaperHandoff: window.platformBootWallpaper ?? null,
   }))
   await page.screenshot({ path: resolve(values.out, 'live.png') })
   Object.assign(report, {
@@ -90,6 +88,8 @@ function failures({ served, rendered, publicFavicon, observed }) {
   if (!(publicFavicon.width > 0)) found.push('public favicon did not load')
   if (rendered.wallpaperPreloads.length !== 1)
     found.push(`wallpaper preloads: ${rendered.wallpaperPreloads.length}`)
+  if (rendered.wallpaperHandoff?.href !== rendered.wallpaperPreloads[0])
+    found.push('the boot wallpaper record does not name the preloaded image')
   // Plan 106: boot is entry + runtime + stylesheet; everything else loads after first paint.
   if (observed.assets.size < 3) found.push(`only ${observed.assets.size} boot assets loaded`)
   if (!observed.apiResponses.some((item) => item.url === `${base}health` && item.status === 200))
