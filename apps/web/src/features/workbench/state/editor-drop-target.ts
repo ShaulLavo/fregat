@@ -1,5 +1,5 @@
 import type { DragMoveEvent } from '@dnd-kit/core'
-import { editorGroupElement, canSplitEditorGroup } from '@/lib/documents/state/group-geometry'
+import { groupSplitVerdict } from '@/features/workbench/state/group-geometry'
 import { groupById, groupForTab, placeTabInGroups } from '@/lib/documents/utils/groups'
 import type { EditorGroups, PlacementIds, TabPlacement } from '@/lib/documents/utils/group-types'
 import type { TabId } from '@/lib/documents/utils/types'
@@ -7,6 +7,7 @@ import {
   dragPoint,
   editorDropData,
   splitEdgeAt,
+  type Bounds,
   type EditorDropPreview,
 } from '@/features/workbench/utils/editor-drag'
 
@@ -41,24 +42,23 @@ function dropTarget(
   const destination = groupById(groups, over.groupId)
   if (!destination) return null
   const point = dragPoint(event.collisions)
+  // dnd-kit measured the droppable: a tab's box for a tab, the content overlay for a group.
+  const rect = event.over?.rect ?? null
   if (over.kind !== 'group') {
     const beforeTabId = insertionAnchor(
       destination.tabs,
       sourceTabId,
       over,
       point?.x ?? null,
+      rect,
       source.id === destination.id,
     )
     return { kind: 'strip', groupId: destination.id, beforeTabId }
   }
-  if (!point) return null
-  const content = editorGroupElement(destination.id)?.querySelector<HTMLElement>(
-    '[data-editor-group-content]',
-  )
-  if (!content) return null
-  const edge = splitEdgeAt(content.getBoundingClientRect(), point)
+  if (!point || !rect) return null
+  const edge = splitEdgeAt(rect, point)
   if (!edge) return { kind: 'group', groupId: destination.id }
-  if (!canSplitEditorGroup(destination.id, edge)) return null
+  if (groupSplitVerdict(destination.id, edge) === 'too-small') return null
   if (mode === 'move' && source.id === destination.id && source.tabs.length === 1) return null
   return { kind: 'edge', groupId: destination.id, edge }
 }
@@ -68,14 +68,11 @@ function insertionAnchor(
   sourceTabId: TabId,
   over: NonNullable<ReturnType<typeof editorDropData>>,
   pointerX: number | null,
+  bounds: Bounds | null,
   sameGroup: boolean,
 ): TabId | null {
   if (over.kind !== 'tab') return null
   const index = tabs.findIndex((tab) => tab.id === over.tabId)
-  const element = editorGroupElement(over.groupId)?.querySelector<HTMLElement>(
-    `[data-editor-tab-id="${CSS.escape(over.tabId)}"]`,
-  )
-  const bounds = element?.getBoundingClientRect()
   const sourceIndex = tabs.findIndex((tab) => tab.id === sourceTabId)
   const after =
     pointerX === null

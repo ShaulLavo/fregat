@@ -1,6 +1,6 @@
 # One owner per fact in the web app
 
-Status: **PROPOSED — PHASE 1 READY; D1 NEEDS THE OWNER'S ANSWER.** Requested 2026-09-21. Inspected
+Status: **PHASE 1 IMPLEMENTED 2026-09-23; PHASES 2–4 PROPOSED. D1 moved to Plan 134.** Requested 2026-09-21. Inspected
 at Platform `d1ca6472`. `apps/web/src` and the contracts it shares with the server.
 
 Inside Platform's own code the same shape recurs that [plan 130](130-ask-the-editor.md) removes at
@@ -68,8 +68,19 @@ guard about another layer's rendering.
 
 ## Phase 1 — geometry registry (items 1, 2, 3)
 
-Per D2. The drop target reads dnd-kit's `over.rect` and the registry. The tab-strip cache keys on a
-store revision. Scenario: a deep link that asks for an edge placement opens split on a cold load.
+Done 2026-09-23. `features/workbench/state/group-geometry.ts` holds `groupId → size` from one
+`ResizeObserver`; `editor-group.tsx` registers from its ref callback, and
+`lib/documents/state/group-geometry.ts` is deleted. The registry is a module store rather than the
+workspace store: sizes are not workspace state and must not persist. `groupSplitVerdict` answers
+`allowed`, `too-small` or `unknown`; navigation, the split commands and the tab menu refuse only
+`too-small`, and the menu re-reads when a group registers. The drop target reads `over.rect` for both
+the content overlay and the hovered tab. The tab strip is told the store's tab order in a layout
+effect and answers only when it measured under that order.
+
+No address carries a placement, so the cold-load case is a split requested while no group is
+mounted. `scenario editor-split-unmounted` splits from chat mode with the editor tool closed; before
+this phase the command declined and left the palette open. `scenario editor-tab-reveal` covers the
+strip cache.
 
 ## Phase 2 — one source per constant (items 11, 12, 13)
 

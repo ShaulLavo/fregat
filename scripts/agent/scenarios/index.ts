@@ -62,6 +62,8 @@ import { chatFollowUp } from './chat-follow-up'
 import { chatDiffSyntax } from './chat-diff-syntax'
 import { editorSplitDrag } from './editor-split-drag'
 import { editorSplitActions } from './editor-split-actions'
+import { editorSplitUnmounted } from './editor-split-unmounted'
+import { editorTabReveal } from './editor-tab-reveal'
 import { editorSplitContent } from './editor-split-content'
 import { editorSplitState } from './editor-split-state'
 import { editorSplitFolds } from './editor-split-folds'
@@ -208,6 +210,8 @@ export const scenarios: readonly Scenario[] = [
   chatDiffSyntax,
   editorSplitDrag,
   editorSplitActions,
+  editorSplitUnmounted,
+  editorTabReveal,
   editorSplitContent,
   editorSplitState,
   editorSplitFolds,

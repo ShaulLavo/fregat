@@ -5,7 +5,7 @@ import { useActiveTabStripScroll } from '@/features/workbench/hooks/use-active-t
 import { expect, test } from '../../../../test/fixtures'
 
 function Strip({ activeTabId }: { activeTabId: string | null }) {
-  const stripRef = useActiveTabStripScroll(activeTabId)
+  const stripRef = useActiveTabStripScroll(activeTabId, ['a', 'b'])
 
   return (
     <div ref={stripRef}>

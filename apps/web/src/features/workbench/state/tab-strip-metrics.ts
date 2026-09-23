@@ -7,6 +7,8 @@ const ARRIVAL_EPSILON_PX = 1
 type TabStripGeometry = Omit<TabStripScrollBounds, 'gutter'>
 
 export type TabStripMetrics = {
+  /** The store's tab order, noted in the commit that renders it. A new order voids the cache. */
+  noteTabs(key: string): void
   /** Content-space bounds for a tab, or null when the cache cannot prove it is current. */
   boundsFor(tabId: string): TabStripGeometry | null
   /** The same bounds, measured. The fallback for a strip the cache cannot vouch for. */
@@ -32,7 +34,9 @@ export function createTabStripMetrics(strip: HTMLElement): TabStripMetrics {
   const observed = new Set<Element>()
   let scrollLeft = strip.scrollLeft
   let clientWidth = strip.clientWidth
-  let signature = ''
+  // The order the store last announced, and the order the cache last measured under.
+  let tabsKey = ''
+  let measuredKey = ''
   let pendingTarget: number | null = null
 
   const readLayout = (): void => {
@@ -41,18 +45,16 @@ export function createTabStripMetrics(strip: HTMLElement): TabStripMetrics {
     scrollLeft = strip.scrollLeft
     offsets.clear()
 
-    const ids: string[] = []
     const present = new Set<Element>()
     for (const element of strip.querySelectorAll<HTMLElement>(TAB_SELECTOR)) {
       const id = element.dataset.editorTabId
       if (!id) continue
 
-      ids.push(id)
       present.add(element)
       offsets.set(id, contentBox(element.getBoundingClientRect(), stripBox, scrollLeft))
     }
 
-    signature = ids.join(' ')
+    measuredKey = tabsKey
     syncObserved(present)
   }
 
@@ -99,10 +101,13 @@ export function createTabStripMetrics(strip: HTMLElement): TabStripMetrics {
   readLayout()
 
   return {
+    noteTabs: (key) => {
+      tabsKey = key
+    },
     boundsFor: (tabId) => {
-      // Cheap because it touches the DOM tree and no geometry: a tab added, removed or dragged
-      // since the last observer callback changes this before it changes any measurement.
-      if (currentSignature(strip) !== signature) return null
+      // Observers measure after the commit's layout effects, so a tab added, removed or dragged in
+      // this commit has not been measured yet.
+      if (measuredKey !== tabsKey) return null
 
       const tab = offsets.get(tabId)
       if (!tab) return null
@@ -117,7 +122,7 @@ export function createTabStripMetrics(strip: HTMLElement): TabStripMetrics {
       }
     },
     measure: (tabId) => {
-      const tab = strip.querySelector(`[data-editor-tab-id="${tabId}"]`)
+      const tab = strip.querySelector(`[data-editor-tab-id="${CSS.escape(tabId)}"]`)
       if (!tab) return null
 
       const live = strip.scrollLeft
@@ -153,14 +158,4 @@ function contentBox(
   scrollLeft: number,
 ): { left: number; width: number } {
   return { left: box.left - stripBox.left + scrollLeft, width: box.width }
-}
-
-function currentSignature(strip: HTMLElement): string {
-  const ids: string[] = []
-  for (const element of strip.querySelectorAll<HTMLElement>(TAB_SELECTOR)) {
-    const id = element.dataset.editorTabId
-    if (id) ids.push(id)
-  }
-
-  return ids.join(' ')
 }

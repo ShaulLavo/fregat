@@ -27,10 +27,11 @@ export function EditorTabBar({
   const closeTargets = editorTabCloseTargets(tabs, dirtyDocumentKeys)
   const activeTab = tabs.find((tab) => tab.active) ?? null
   const { setNodeRef } = useDroppable({ id: `strip:${groupId}`, data: { kind: 'strip', groupId } })
-  const setStripRef = useActiveTabStripScroll(activeTab?.id ?? null, setNodeRef)
+  const tabIds = tabs.map((tab) => tab.id)
+  const setStripRef = useActiveTabStripScroll(activeTab?.id ?? null, tabIds, setNodeRef)
 
   return (
-    <SortableContext items={tabs.map((tab) => tab.id)} strategy={horizontalListSortingStrategy}>
+    <SortableContext items={tabIds} strategy={horizontalListSortingStrategy}>
       <div
         aria-label='Editor tabs'
         className={BAR_TAB_STRIP_CLASS}

@@ -301,6 +301,8 @@ export const selectors = {
     page.locator('[data-editor-group-id]').nth(index).locator('[data-editor-group-content]'),
   editorGroupTabs: (page: Page, index: number) =>
     page.locator('[data-editor-group-id]').nth(index).getByRole('tab'),
+  editorTabStrip: (page: Page, index: number) =>
+    page.locator('[data-editor-group-id]').nth(index).locator('[data-editor-tab-strip]'),
   editorGroupInput: (page: Page, index: number) =>
     page
       .locator('[data-editor-group-id]')

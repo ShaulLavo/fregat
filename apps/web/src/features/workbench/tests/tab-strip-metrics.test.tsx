@@ -48,29 +48,31 @@ test('answering from the cache measures nothing', () => {
   strip.remove()
 })
 
-test('a strip whose tabs changed since the last read refuses to answer', () => {
+test('a new tab order refuses to answer until the strip is measured under it', async () => {
   const strip = mountStrip(['a', 'b'])
   const metrics = createTabStripMetrics(strip)
   expect(metrics.boundsFor('b')).not.toBeNull()
 
   addTab(strip, 'c')
+  metrics.noteTabs('a b c')
 
   // Null rather than a stale offset: the caller measures instead, so a freshly opened tab is
-  // still revealed on the frame it appears.
+  // still revealed on the commit it appears.
   expect(metrics.boundsFor('b')).toBeNull()
   expect(metrics.boundsFor('c')).toBeNull()
+
+  await new Promise((resolve) => setTimeout(resolve))
+  expect(metrics.boundsFor('c')).not.toBeNull()
   metrics.dispose()
   strip.remove()
 })
 
-test('a reordered strip refuses to answer even though the tabs are the same', () => {
+test('noting the order it already measured keeps the cache', () => {
   const strip = mountStrip(['a', 'b'])
   const metrics = createTabStripMetrics(strip)
+  metrics.noteTabs('')
+
   expect(metrics.boundsFor('a')).not.toBeNull()
-
-  strip.insertBefore(strip.children[1]!, strip.children[0]!)
-
-  expect(metrics.boundsFor('a')).toBeNull()
   metrics.dispose()
   strip.remove()
 })

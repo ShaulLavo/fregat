@@ -102,7 +102,7 @@ import { matchesActiveSurface } from '@/lib/focus/utils/active-surface'
 import { toggledWorkspaceUiMode } from '@/lib/ui-mode'
 import { allEditorGroups, activeEditorGroup } from '@/lib/documents/utils/groups'
 import type { GroupEdge } from '@/lib/documents/utils/group-types'
-import { canSplitEditorGroup } from '@/lib/documents/state/group-geometry'
+import { groupSplitVerdict } from '@/features/workbench/state/group-geometry'
 
 import {
   defineCommand,
@@ -195,7 +195,7 @@ function splitActiveEditor(runtime: WorkspaceCommandRuntime, edge: GroupEdge) {
   const tab = activeEditorTabForWorkbenchPanels(panels)
   if (!tab || tab.content.kind !== 'document' || tab.content.document.kind === 'search')
     return declined
-  if (!canSplitEditorGroup(group.id, edge)) return declined
+  if (groupSplitVerdict(group.id, edge) === 'too-small') return declined
   return afterNavigation(
     runtime.editor.placeTab({
       tabId: tab.id,

@@ -17,8 +17,10 @@ const TAB_STRIP_GUTTER = 8
  */
 export function useActiveTabStripScroll(
   activeTabId: string | null,
+  tabIds: readonly string[],
   onNode?: (node: HTMLDivElement | null) => void,
 ) {
+  const tabsKey = tabIds.join(' ')
   const stripRef = useRef<HTMLDivElement>(null)
   const metricsRef = useRef<TabStripMetrics | null>(null)
   const hasRevealedRef = useRef(false)
@@ -37,6 +39,11 @@ export function useActiveTabStripScroll(
       metrics.dispose()
     }
   }, [])
+
+  // Declared above the reveal so a tab opened in this commit voids the cache before it is asked.
+  useLayoutEffect(() => {
+    metricsRef.current?.noteTabs(tabsKey)
+  }, [tabsKey])
 
   // Layout effect, not effect: starting the scroll after paint shows the old offset for a frame.
   useLayoutEffect(() => {

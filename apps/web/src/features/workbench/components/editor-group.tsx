@@ -3,11 +3,13 @@ import { FileDashedIcon } from '@phosphor-icons/react'
 import { EmptyState } from '@workspace/ui/components/empty-state'
 import { cn } from '@workspace/ui/lib/utils'
 import { RenderErrorBoundary } from '@workspace/ui/patterns/render-error-boundary'
+import { useCallback } from 'react'
 import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
 import { EditorBreadcrumbs } from '@/features/workbench/components/editor-breadcrumbs'
 import { EditorGroupDropOverlay } from '@/features/workbench/components/editor-group-drop-overlay'
 import { EditorSurfaceTabBody } from '@/features/workbench/components/editor-surface-tab-body'
 import { EditorTabBar } from '@/features/workbench/components/editor-tab-bar'
+import { registerEditorGroup } from '@/features/workbench/state/group-geometry'
 import { useEditorInputPending } from '@/features/workbench/hooks/use-editor-input-pending'
 import { editorTabModel } from '@/features/workspace/utils/tab-model'
 import type { EditorTabConflictMap } from '@/features/workspace/utils/tab-types'
@@ -36,6 +38,13 @@ export function EditorGroup({
     editorTabModel({ conflicts, gitFiles, rootPath, selectedTabId: group.selectedTabId, tab }),
   )
 
+  // Manual memo: React unregisters and re-registers a ref callback whose identity changes, and the
+  // compiler's cache is not an identity guarantee.
+  const registerGeometry = useCallback(
+    (element: HTMLElement) => registerEditorGroup(group.id, element),
+    [group.id],
+  )
+
   function activate() {
     if (!active) void commands.setActiveGroup(group.id)
   }
@@ -47,6 +56,7 @@ export function EditorGroup({
       data-editor-group-active={active || undefined}
       onPointerDownCapture={activate}
       onFocusCapture={activate}
+      ref={registerGeometry}
     >
       <EditorTabBar
         groupId={group.id}
