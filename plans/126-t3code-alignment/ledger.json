@@ -444,7 +444,7 @@
       "report": "runtime.md",
       "wave": "4",
       "status": "in-progress",
-      "evidence_level": "paired-pure-policy-and-local-native-browser-verified; deployment-and-full-acceptance-pending",
+      "evidence_level": "paired-pure-policy-and-deployed-native-browser-verified; full-acceptance-pending",
       "acceptance": "runtime.md, RUNTIME-06, Acceptance / verification",
       "execution_evidence": [
         "model-options-delivery.md",
@@ -452,7 +452,11 @@
         "/work/tmp/fregat-evidence/20260923T174530Z-scenario-provider-model-options/: development browser passed in 37.833 seconds; all eight screenshots inspected; six native turn/start payloads verify omitted options, exact default/priority/flex IDs, future-effort-v3 in both native fields, clearing and alternate low/economy-v2 defaults",
         "All seven fixture native processes exited; API reads confirm session/provider removal and original project model restoration; fixture directory absent. No browser/console errors or non-abort network failures; seven unrelated application warnings retained in evidence",
         "Claude five pinned catalog profiles, effort/context defaults, [1m], Fast Mode, Haiku Thinking, Ultracode and Ultrathink native consumers covered by focused tests. Focused server 195, UI 51, shared core 10, contracts 7, TUI 4 and Git 5 tests pass",
-        "Remaining: deployment and served-release browser repeat, whole-workspace checks during linked Editor API migration, live Claude/provider-account checks and paired upstream full-workflow evidence. Finding remains in-progress"
+        "/work/tmp/fregat-evidence/20260923T175433Z-scenario-provider-model-options/: mesh browser passed in 11.971 seconds; all eight screenshots inspected; six native payloads match. Before/after release checks confirm web+server 20260923T175207Z-758e97e2-t3-model-options, clean commit 758e97e248e528fd11f5e84495968f6c64c674f3",
+        "Mesh cleanup follow-up API checks confirm session/provider removed, original project model restored, fixture directory absent and all seven native processes exited. No browser/console errors or non-abort network failures. Seven unrelated application warnings inspected and retained: PR lookup503 and six older title-fixture reaper warnings",
+        "/work/tmp/fregat-evidence/20260923T175135Z-scenario-visual-search-scroll-content/: linked Editor caller migration content/navigation check passed in 4.905 seconds; all eleven screenshots inspected, syntax excerpts render after wheel/jump scrolling and selected result opens source editor. No application warnings/errors; not full LSP proof",
+        "Whole-workspace typecheck and lint, structural gates, and changed-file formatting pass. Full unused check retains baseline cache-budget.ts, workspaceEditCategorySchema and normalizeWorkspaceNamespacePath findings; no aggregate verify-green claim",
+        "Remaining: CLI-version gating, legacy Claude model-catalog expansion, live Claude/provider-account checks and paired upstream full-workflow evidence. Finding remains in-progress"
       ]
     },
     {
