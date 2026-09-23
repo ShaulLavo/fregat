@@ -1,4 +1,4 @@
-import { providerInstanceIdSchema } from '@workspace/contracts'
+import { providerInstanceIdSchema, providerDriverKindSchema } from '@workspace/contracts'
 import * as v from 'valibot'
 
 import { resolveChatModelSelection } from '@workspace/client-core/chat/providers/selection'
@@ -16,6 +16,7 @@ const opus = providerModel({
 
 const claude = providerSnapshot({
   displayLabel: 'Claude',
+  driverKind: v.parse(providerDriverKindSchema, 'claude'),
   models: [opus],
   providerInstanceId: claudeInstanceId,
   status: 'ready',
@@ -23,12 +24,23 @@ const claude = providerSnapshot({
 
 const reasoningClaude = providerSnapshot({
   displayLabel: 'Claude',
+  driverKind: v.parse(providerDriverKindSchema, 'claude'),
   models: [
     providerModel({
       ...opus,
       capabilities: {
-        defaultReasoningEffort: 'high',
-        reasoningEfforts: [{ effort: 'high' }, { effort: 'max' }],
+        optionDescriptors: [
+          {
+            id: 'effort',
+            label: 'Reasoning',
+            type: 'select',
+            currentValue: 'high',
+            options: [
+              { id: 'high', label: 'High', isDefault: true },
+              { id: 'max', label: 'Max' },
+            ],
+          },
+        ],
       },
     }),
   ],
@@ -88,13 +100,13 @@ test('resolves to null before the provider list has loaded', () => {
 test('a stored reasoning level survives on a model that still advertises it', () => {
   const resolved = resolveChatModelSelection([reasoningClaude], {
     model: 'claude-opus-5',
-    options: { reasoningEffort: 'max' },
+    options: { effort: 'max' },
     providerInstanceId: claudeInstanceId,
   })
 
   expect(resolved).toEqual({
     model: 'claude-opus-5',
-    options: { reasoningEffort: 'max' },
+    options: { effort: 'max' },
     providerInstanceId: claudeInstanceId,
   })
 })
@@ -102,13 +114,13 @@ test('a stored reasoning level survives on a model that still advertises it', ()
 test('a stored level the catalog dropped falls back to the model default', () => {
   const resolved = resolveChatModelSelection([reasoningClaude], {
     model: 'claude-opus-5',
-    options: { reasoningEffort: 'ultra' },
+    options: { effort: 'ultra' },
     providerInstanceId: claudeInstanceId,
   })
 
   expect(resolved).toEqual({
     model: 'claude-opus-5',
-    options: { reasoningEffort: 'high' },
+    options: { effort: 'high' },
     providerInstanceId: claudeInstanceId,
   })
 })
@@ -116,9 +128,45 @@ test('a stored level the catalog dropped falls back to the model default', () =>
 test('a stored level is dropped by a model that advertises none', () => {
   const resolved = resolveChatModelSelection([claude], {
     model: 'claude-opus-5',
-    options: { reasoningEffort: 'max' },
+    options: { effort: 'max' },
     providerInstanceId: claudeInstanceId,
   })
 
   expect(resolved).toEqual({ model: 'claude-opus-5', providerInstanceId: claudeInstanceId })
+})
+
+test('a stored selection preserves all advertised native options, including false', () => {
+  const provider = providerSnapshot({
+    ...reasoningClaude,
+    models: [
+      providerModel({
+        ...opus,
+        capabilities: {
+          optionDescriptors: [
+            ...reasoningClaude.models.flatMap(
+              (model) => model.capabilities?.optionDescriptors ?? [],
+            ),
+            {
+              id: 'contextWindow',
+              label: 'Context window',
+              type: 'select',
+              options: [
+                { id: 'standard', label: 'Standard' },
+                { id: '1m', label: '1M' },
+              ],
+            },
+            { id: 'fastMode', label: 'Fast mode', type: 'boolean', currentValue: true },
+            { id: 'thinking', label: 'Extended thinking', type: 'boolean' },
+          ],
+        },
+      }),
+    ],
+  })
+  const stored = {
+    model: 'claude-opus-5',
+    providerInstanceId: claudeInstanceId,
+    options: { effort: 'max', contextWindow: '1m', fastMode: false, thinking: true },
+  }
+
+  expect(resolveChatModelSelection([provider], stored)).toEqual(stored)
 })

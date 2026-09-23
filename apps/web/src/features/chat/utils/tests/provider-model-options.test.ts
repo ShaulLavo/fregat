@@ -58,10 +58,17 @@ test('an option carries the reasoning levels its model advertises', () => {
       models: [
         model({
           capabilities: {
-            defaultReasoningEffort: 'medium',
-            reasoningEfforts: [
-              { description: 'Fastest.', effort: 'low' },
-              { description: 'Balanced.', effort: 'medium' },
+            optionDescriptors: [
+              {
+                id: 'reasoningEffort',
+                label: 'Reasoning',
+                type: 'select',
+                currentValue: 'medium',
+                options: [
+                  { description: 'Fastest.', id: 'low', label: 'Low' },
+                  { description: 'Balanced.', id: 'medium', label: 'Medium', isDefault: true },
+                ],
+              },
             ],
           },
         }),

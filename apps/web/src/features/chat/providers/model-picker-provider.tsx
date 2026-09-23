@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 
 import { useProvider } from '@/features/chat/hooks/use-provider'
 import type { ProviderModelOption } from '@workspace/client-core/chat/providers/models'
-import { reconcileModelEffort } from '@workspace/client-core/chat/providers/effort'
+import { reconcileModelOptions } from '@workspace/client-core/chat/providers/options'
 import {
   ChatModelPickerContext,
   type ChatModelPicker,
@@ -41,7 +41,11 @@ export function ChatModelPickerProvider({
     )
       return
 
-    const next = reconcileModelEffort(activeModelSelection, option.modelSelection, option)
+    const next = reconcileModelOptions(
+      activeModelSelection,
+      option.modelSelection,
+      option.optionDescriptors,
+    )
     setModelSelection(draftTarget, next)
     persistModelSelection(next)
   }

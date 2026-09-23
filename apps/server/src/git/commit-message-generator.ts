@@ -198,12 +198,13 @@ function lunaCandidate(provider: ProviderSnapshot): CommitMessageModel | null {
 
   const model = provider.models.find((candidate) => candidate.slug === LUNA_MODEL)
   if (!model) return null
-  if (!supportsEffort(model, 'low')) return null
+  const effort = effortOption(model, 'low')
+  if (!effort) return null
 
   return {
     modelSelection: {
       model: model.slug,
-      options: { reasoningEffort: 'low' },
+      options: { [effort.id]: 'low' },
       providerInstanceId: provider.providerInstanceId,
     },
     provider,
@@ -211,7 +212,8 @@ function lunaCandidate(provider: ProviderSnapshot): CommitMessageModel | null {
 }
 
 function commitMessageModel(provider: ProviderSnapshot, model: ProviderModel): CommitMessageModel {
-  const options = supportsEffort(model, 'low') ? { reasoningEffort: 'low' } : undefined
+  const effort = effortOption(model, 'low')
+  const options = effort ? { [effort.id]: 'low' } : undefined
   return {
     modelSelection: {
       model: model.slug,
@@ -237,8 +239,13 @@ function isReadyForGeneration(provider: ProviderSnapshot) {
   return provider.models.length > 0
 }
 
-function supportsEffort(model: ProviderModel, effort: string) {
-  return model.capabilities?.reasoningEfforts?.some((option) => option.effort === effort) === true
+function effortOption(model: ProviderModel, value: string) {
+  return model.capabilities?.optionDescriptors?.find(
+    (option) =>
+      option.type === 'select' &&
+      (option.id === 'reasoningEffort' || option.id === 'effort') &&
+      option.options.some((choice) => choice.id === value),
+  )
 }
 
 function modelMatches(model: ProviderModel, hint: string) {

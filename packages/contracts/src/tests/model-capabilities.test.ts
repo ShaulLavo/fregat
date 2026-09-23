@@ -1,101 +1,68 @@
 import { describe, expect, it } from 'vitest'
 import * as v from 'valibot'
-import { modelSelectionSchema, providerModelSchema } from '../index'
+import { modelSelectionSchema, providerModelSchema, providerOptionDescriptorSchema } from '../index'
 
-const baseModel = {
-  isCustom: false,
-  name: 'GPT-5.5',
-  shortName: 'GPT-5.5',
-  slug: 'gpt-5.5',
-}
+const baseModel = { isCustom: false, name: 'GPT-5.5', slug: 'gpt-5.5' }
 
-describe('provider model capabilities', () => {
-  it('parses a model that advertises nothing', () => {
-    const parsed = v.parse(providerModelSchema, baseModel as unknown)
-
-    expect(parsed.capabilities).toBeNull()
+describe('provider model options', () => {
+  it('allows a model to advertise no options', () => {
+    expect(v.parse(providerModelSchema, baseModel).capabilities).toBeNull()
     expect(
       v.parse(providerModelSchema, { ...baseModel, capabilities: null }).capabilities,
     ).toBeNull()
   })
 
-  it('parses efforts with descriptions plus a default level', () => {
-    const parsed = v.parse(providerModelSchema, {
-      ...baseModel,
-      capabilities: {
-        defaultReasoningEffort: 'medium',
-        reasoningEfforts: [
-          { description: 'Balanced', effort: 'medium' },
-          { description: 'Maximum reasoning depth', effort: 'max' },
-        ],
-        supportsExtendedThinking: true,
-      },
-    } as unknown)
-
-    expect(parsed.capabilities?.defaultReasoningEffort).toBe('medium')
-    expect(parsed.capabilities?.reasoningEfforts).toEqual([
-      { description: 'Balanced', effort: 'medium' },
-      { description: 'Maximum reasoning depth', effort: 'max' },
-    ])
-    expect(parsed.capabilities?.supportsExtendedThinking).toBe(true)
-  })
-
-  it('accepts effort ids this schema has never heard of', () => {
-    // A closed picklist here once emptied the whole model list when Codex
-    // shipped `ultra`. Providers add levels; the contract must not gate them.
-    const parsed = v.parse(providerModelSchema, {
-      ...baseModel,
-      capabilities: {
-        defaultReasoningEffort: 'hyperdrive',
-        reasoningEfforts: [
-          { effort: 'ultra' },
-          { description: 'Newer than us', effort: 'hyperdrive' },
+  it('preserves provider IDs, labels, descriptions, defaults and prompt-injected values', () => {
+    const optionDescriptors = [
+      {
+        id: 'serviceTier',
+        label: 'Service tier',
+        description: 'Provider-defined scheduling',
+        type: 'select',
+        currentValue: 'economy-v2',
+        options: [
+          { id: 'default', label: 'Standard', isDefault: true },
+          { id: 'economy-v2', label: 'Economy', description: 'Lower priority' },
         ],
       },
-    } as unknown)
-
-    expect(parsed.capabilities?.reasoningEfforts?.map((option) => option.effort)).toEqual([
-      'ultra',
-      'hyperdrive',
-    ])
-    expect(parsed.capabilities?.defaultReasoningEffort).toBe('hyperdrive')
+      {
+        id: 'effort',
+        label: 'Effort',
+        type: 'select',
+        options: [{ id: 'future-effort', label: 'Future effort' }],
+        promptInjectedValues: ['future-effort'],
+      },
+      { id: 'thinking', label: 'Thinking', type: 'boolean', currentValue: false },
+    ]
+    const parsed = v.parse(providerModelSchema, {
+      ...baseModel,
+      capabilities: { optionDescriptors },
+    })
+    expect(parsed.capabilities?.optionDescriptors).toEqual(optionDescriptors)
   })
 
-  it('rejects an empty effort id', () => {
+  it.each([
+    { type: 'select', currentValue: false, options: [] },
+    { type: 'boolean', currentValue: 'on' },
+    { type: 'select', options: [{ id: ' ', label: 'Empty ID' }] },
+  ])('rejects mismatched descriptor values at the boundary: %j', (fields) => {
     expect(() =>
-      v.parse(providerModelSchema, {
-        ...baseModel,
-        capabilities: { reasoningEfforts: [{ effort: '  ' }] },
-      } as unknown),
+      v.parse(providerOptionDescriptorSchema, { id: 'option', label: 'Option', ...fields }),
     ).toThrow()
   })
-})
 
-describe('model selection effort', () => {
-  it('types the chosen effort while leaving other adapter options open', () => {
-    const parsed = v.parse(modelSelectionSchema, {
+  it('keeps future effort and tier IDs and real booleans in the selection', () => {
+    const selection = {
       model: 'gpt-5.5',
-      options: { fastMode: true, reasoningEffort: 'xhigh' },
       providerInstanceId: 'codex',
-    } as unknown)
-
-    expect(parsed.options?.reasoningEffort).toBe('xhigh')
-    expect(parsed.options?.fastMode).toBe(true)
+      options: { reasoningEffort: 'future-effort', serviceTier: 'economy-v2', thinking: false },
+    }
+    expect(v.parse(modelSelectionSchema, selection)).toEqual(selection)
   })
 
-  it('keeps effort optional and accepts levels only one provider knows', () => {
+  it('does not materialize absent provider defaults into the selection', () => {
     expect(
-      v.parse(modelSelectionSchema, {
-        model: 'gpt-5.5',
-        providerInstanceId: 'codex',
-      } as unknown).options,
+      v.parse(modelSelectionSchema, { model: 'gpt-5.5', providerInstanceId: 'codex' }).options,
     ).toBeUndefined()
-    expect(
-      v.parse(modelSelectionSchema, {
-        model: 'gpt-5.5',
-        options: { reasoningEffort: 'ultra' },
-        providerInstanceId: 'codex',
-      } as unknown).options?.reasoningEffort,
-    ).toBe('ultra')
   })
 })

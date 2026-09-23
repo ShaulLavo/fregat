@@ -189,3 +189,27 @@ as agent work. This checks pure classification, not native-provider delivery or 
 extracted buffering body against local delivery: 248 splitter cases, 190 mode/clock
 steps, two rejected splitter controls. Cache lifetimes and reasoning activity
 representation are outside this comparison.
+
+## Paired model-option reconciliation
+
+`bun scripts/parity/model-options.ts` extracts the pinned option-selection helpers
+from `packages/shared/src/model.ts`, asserting both extraction boundaries. Bun removes
+TypeScript syntax only. The upstream descriptor resolver and explicit-selection builder
+run against the same descriptors and stored values as local `reconcileModelOptions`.
+
+The corpus compares 190 cases: 24 select descriptors and three boolean descriptors against
+seven stored values, plus a combined selection with an obsolete option key. It covers empty
+and populated choices, current/default values, whitespace, future and stale IDs, wrong
+types, and prompt-injected values. Five negative controls reject forcing a fast tier,
+overriding a chosen boolean, preserving obsolete keys, losing a selected tier and persisting
+an untouched select default.
+
+The same runner reads pinned `apps/server/src/provider/model-manifest.json` and checks
+the default Claude model plus all five local Claude profiles against the upstream
+capability descriptors. Its summary reports `claudeProfiles: 5` alongside the 190
+reconciliation cases and five negative controls.
+
+This proves bounded selection reconciliation. Provider catalog mapping, native parameter
+serialization, composer interaction and model switching require their own evidence. The
+runner prints its upstream pin and counts; its stdout is not a provenance-stamped runtime
+comparison report for closing an entire finding.

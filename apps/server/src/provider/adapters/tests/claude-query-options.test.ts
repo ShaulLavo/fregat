@@ -160,13 +160,13 @@ describe('claudeQueryOptions', () => {
 })
 
 describe('claudeModelId', () => {
-  it('uses the selected model when the instance matches', () => {
+  it('resolves the selected model default context when the instance matches', () => {
     const model = claudeModelId({
       modelSelection: modelSelection(),
       providerInstanceId: CLAUDE_INSTANCE,
     })
 
-    expect(model).toBe('claude-opus-5')
+    expect(model).toBe('claude-opus-5[1m]')
   })
 
   it('falls back to the default model when the selection targets another provider', () => {
@@ -184,7 +184,7 @@ describe('claudeModelId', () => {
       providerInstanceId: CLAUDE_INSTANCE,
     })
 
-    expect(model).toBe(DEFAULT_CLAUDE_MODEL)
+    expect(model).toBe(`${DEFAULT_CLAUDE_MODEL}[1m]`)
   })
 
   it('appends the [1m] suffix when the 1M context window is selected', () => {
@@ -196,33 +196,22 @@ describe('claudeModelId', () => {
     expect(model).toBe('claude-opus-5[1m]')
   })
 
-  it('reads the 1M selection from the array-shaped options too', () => {
-    const model = claudeModelId({
-      modelSelection: modelSelection({
-        options: [{ id: 'contextWindow', value: '1M' }] as unknown as ModelSelection['options'],
-      }),
-      providerInstanceId: CLAUDE_INSTANCE,
-    })
-
-    expect(model).toBe('claude-opus-5[1m]')
-  })
-
-  it('omits the suffix for every other context-window selection', () => {
-    const selections: Array<ModelSelection['options']> = [
-      undefined,
-      {},
-      { contextWindow: '200k' },
-      { contextWindow: 1_000_000 },
-    ]
-
-    for (const options of selections) {
-      const model = claudeModelId({
-        modelSelection: modelSelection(options ? { options } : {}),
+  it.each([
+    ['claude-opus-5', undefined, 'claude-opus-5[1m]'],
+    ['claude-opus-5', '200k', 'claude-opus-5'],
+    ['claude-opus-5', 'unsupported', 'claude-opus-5[1m]'],
+    ['claude-sonnet-5', undefined, 'claude-sonnet-5'],
+    ['claude-sonnet-5', '1m', 'claude-sonnet-5[1m]'],
+    ['claude-fable-5-1', undefined, 'claude-fable-5-1[1m]'],
+    ['claude-haiku-4-5', '1m', 'claude-haiku-4-5'],
+    ['claude-unknown', '1m', 'claude-unknown'],
+  ])('resolves %s context %s to %s', (slug, contextWindow, expected) => {
+    expect(
+      claudeModelId({
+        modelSelection: modelSelection({ model: slug, options: { contextWindow } }),
         providerInstanceId: CLAUDE_INSTANCE,
-      })
-
-      expect(model).toBe('claude-opus-5')
-    }
+      }),
+    ).toBe(expected)
   })
 
   it('does not double-suffix a slug that already carries [1m]', () => {

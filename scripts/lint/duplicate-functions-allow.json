@@ -3,6 +3,7 @@
     "name": "send",
     "files": [
       "scripts/agent/fixtures/native-codex.mjs",
+      "scripts/agent/fixtures/native-model-options.mjs",
       "scripts/agent/fixtures/native-queue.mjs",
       "scripts/agent/fixtures/native-titles.mjs"
     ],

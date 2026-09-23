@@ -2,6 +2,7 @@ import type {
   ModelSelection,
   ProviderDriverKind,
   ProviderInstanceId,
+  ProviderOptionDescriptor,
   ProviderSnapshot,
   ProviderStatus,
 } from '@workspace/contracts'
@@ -14,8 +15,9 @@ import {
 import {
   modelDefaultEffort,
   modelEffortLevels,
+  modelOptionDescriptors,
   type ModelEffortLevel,
-} from '@workspace/client-core/chat/providers/effort'
+} from '@workspace/client-core/chat/providers/options'
 import {
   providerRequiresSignIn,
   providerSignInTarget,
@@ -53,6 +55,7 @@ export type ProviderModelOption = {
   key: string
   label: string
   modelSelection: ModelSelection
+  optionDescriptors: readonly ProviderOptionDescriptor[]
   name: string
   providerInstanceId: ProviderInstanceId
   providerLabel: string
@@ -130,12 +133,13 @@ function providerOptions(provider: ProviderSnapshot): ProviderModelOption[] {
       model: model.slug,
       providerInstanceId: provider.providerInstanceId,
     },
+    optionDescriptors: modelOptionDescriptors(model),
     name: model.name,
     providerInstanceId: provider.providerInstanceId,
     providerLabel: provider.displayLabel,
     shortName: model.shortName ?? null,
     statusLabel,
-    supportsThinking: model.capabilities?.supportsExtendedThinking === true,
+    supportsThinking: modelOptionDescriptors(model).some((option) => option.id === 'thinking'),
   }))
 }
 

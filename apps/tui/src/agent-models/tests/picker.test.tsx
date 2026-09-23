@@ -15,7 +15,16 @@ test('native model filtering and advertised effort selection return focus to the
           shortName: 'Think',
           slug: 'thinking-model',
           isCustom: false,
-          capabilities: { reasoningEfforts: [{ effort: 'ultra', description: 'Deep reasoning' }] },
+          capabilities: {
+            optionDescriptors: [
+              {
+                id: 'reasoningEffort',
+                label: 'Reasoning effort',
+                type: 'select',
+                options: [{ id: 'ultra', label: 'Ultra', description: 'Deep reasoning' }],
+              },
+            ],
+          },
         },
       ],
     }),

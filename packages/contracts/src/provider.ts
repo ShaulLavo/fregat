@@ -2,7 +2,6 @@ import * as v from 'valibot'
 import { providerInstanceIdSchema, type ProviderInstanceId } from './chat-ids'
 import {
   providerDriverKindSchema,
-  reasoningEffortSchema,
   runtimeModeSchema,
   type ProviderDriverKind,
 } from './orchestration-runtime'
@@ -56,26 +55,36 @@ export const providerAuthResultSchema = v.object({
   signInMethods: v.array(providerSignInMethodSchema),
 })
 
-/**
- * One reasoning level a model accepts. `effort` is an open string, not a shared
- * enum: Codex advertises `low..ultra` and adds levels on its own schedule, and
- * a closed picklist would fail the whole snapshot and empty the model list.
- * `description` is the provider's own copy for the level, when it ships one.
- */
-const modelReasoningEffortOptionSchema = v.object({
-  effort: reasoningEffortSchema,
-  description: v.optional(v.string()),
+const providerOptionChoiceSchema = v.object({
+  id: trimmedNonEmptyStringSchema,
+  label: trimmedNonEmptyStringSchema,
+  description: v.optional(trimmedNonEmptyStringSchema),
+  isDefault: v.optional(v.boolean()),
 })
 
-/**
- * What a model advertises about how it can be run. Every field is optional so a
- * model that advertises nothing still parses. Key names match what the Codex
- * adapter already emits from `model/list`.
- */
+const providerOptionDescriptorBase = {
+  id: trimmedNonEmptyStringSchema,
+  label: trimmedNonEmptyStringSchema,
+  description: v.optional(trimmedNonEmptyStringSchema),
+}
+
+export const providerOptionDescriptorSchema = v.variant('type', [
+  v.object({
+    ...providerOptionDescriptorBase,
+    type: v.literal('select'),
+    options: v.array(providerOptionChoiceSchema),
+    currentValue: v.optional(trimmedNonEmptyStringSchema),
+    promptInjectedValues: v.optional(v.array(trimmedNonEmptyStringSchema)),
+  }),
+  v.object({
+    ...providerOptionDescriptorBase,
+    type: v.literal('boolean'),
+    currentValue: v.optional(v.boolean()),
+  }),
+])
+
 const providerModelCapabilitiesSchema = v.object({
-  defaultReasoningEffort: v.optional(v.nullable(reasoningEffortSchema)),
-  reasoningEfforts: v.optional(v.array(modelReasoningEffortOptionSchema)),
-  supportsExtendedThinking: v.optional(v.boolean()),
+  optionDescriptors: v.optional(v.array(providerOptionDescriptorSchema)),
 })
 
 export const providerModelSchema = v.object({
@@ -180,7 +189,8 @@ export type ProviderLoginAttempt = v.InferOutput<typeof providerLoginAttemptSche
 export type ProviderAuthResult = v.InferOutput<typeof providerAuthResultSchema>
 export type ProviderStatus = v.InferOutput<typeof providerStatusSchema>
 export type ProviderAuth = v.InferOutput<typeof providerAuthSchema>
-export type ModelReasoningEffortOption = v.InferOutput<typeof modelReasoningEffortOptionSchema>
+export type ProviderOptionChoice = v.InferOutput<typeof providerOptionChoiceSchema>
+export type ProviderOptionDescriptor = v.InferOutput<typeof providerOptionDescriptorSchema>
 export type ProviderModelCapabilities = v.InferOutput<typeof providerModelCapabilitiesSchema>
 export type ProviderModel = v.InferOutput<typeof providerModelSchema>
 export type ProviderInstanceSettings = v.InferOutput<typeof providerInstanceSettingsSchema>

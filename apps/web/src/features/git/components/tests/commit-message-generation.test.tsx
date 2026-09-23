@@ -4,6 +4,7 @@ import path from 'node:path'
 
 import { cleanup, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import type { ProviderModel } from '@workspace/contracts'
 import { MockProviderAdapter } from 'server/testing'
 import { afterEach } from 'vitest'
 
@@ -20,18 +21,36 @@ const GENERATED_MESSAGE = 'feat: add generated feature'
 
 // The commit draft persists per repository, and every case here shares a root path.
 afterEach(() => localStorage.clear())
-const LUNA_MODELS = [
+const LUNA_MODELS: ProviderModel[] = [
   {
-    capabilities: { reasoningEfforts: [{ effort: 'low' }] },
+    capabilities: {
+      optionDescriptors: [
+        {
+          id: 'reasoningEffort',
+          label: 'Reasoning',
+          type: 'select',
+          options: [{ id: 'low', label: 'Low' }],
+        },
+      ],
+    },
     isCustom: false,
     name: 'GPT-5.6 Luna',
     shortName: 'Luna',
     slug: 'gpt-5.6-luna',
   },
 ]
-const CHEAP_FALLBACK_MODELS = [
+const CHEAP_FALLBACK_MODELS: ProviderModel[] = [
   {
-    capabilities: { reasoningEfforts: [{ effort: 'low' }] },
+    capabilities: {
+      optionDescriptors: [
+        {
+          id: 'reasoningEffort',
+          label: 'Reasoning',
+          type: 'select',
+          options: [{ id: 'low', label: 'Low' }],
+        },
+      ],
+    },
     isCustom: false,
     name: 'GPT-5.5 Mini',
     shortName: 'Mini',

@@ -96,7 +96,7 @@
     "./chat/rail/multi-select": "./src/chat/rail/multi-select.ts",
     "./chat/providers/models": "./src/chat/providers/models.ts",
     "./chat/providers/auth": "./src/chat/providers/auth.ts",
-    "./chat/providers/effort": "./src/chat/providers/effort.ts",
+    "./chat/providers/options": "./src/chat/providers/options.ts",
     "./chat/providers/preferences": "./src/chat/providers/preferences.ts",
     "./chat/providers/selection": "./src/chat/providers/selection.ts",
     "./chat/snapshots": "./src/chat/snapshots.ts",

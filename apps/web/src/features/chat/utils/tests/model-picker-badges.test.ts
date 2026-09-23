@@ -28,7 +28,13 @@ function claudeOption(slug: string) {
 
 test('a model advertising extended thinking earns the capability badge', () => {
   const option = optionFor({
-    models: [model({ capabilities: { supportsExtendedThinking: true } })],
+    models: [
+      model({
+        capabilities: {
+          optionDescriptors: [{ id: 'thinking', label: 'Extended thinking', type: 'boolean' }],
+        },
+      }),
+    ],
   })
 
   expect(option.supportsThinking).toBe(true)
@@ -43,7 +49,14 @@ test('a plain model earns no badges at all', () => {
 
 test('a custom model leads the badges and its capability follows it', () => {
   const option = optionFor({
-    models: [model({ capabilities: { supportsExtendedThinking: true }, isCustom: true })],
+    models: [
+      model({
+        capabilities: {
+          optionDescriptors: [{ id: 'thinking', label: 'Extended thinking', type: 'boolean' }],
+        },
+        isCustom: true,
+      }),
+    ],
   })
 
   expect(modelPickerRowBadges(option).map((badge) => badge.label)).toEqual(['Custom', 'Thinks'])

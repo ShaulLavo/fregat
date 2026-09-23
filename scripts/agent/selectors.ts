@@ -129,6 +129,13 @@ export const selectors = {
   modelPickerPanel: (page: Page) =>
     page.getByRole('dialog').filter({ has: page.getByLabel('Models') }),
   modelPickerSearch: (page: Page) => page.getByPlaceholder('Search models'),
+  modelPickerOption: (page: Page, label: string) =>
+    page.getByRole('option').filter({ has: page.getByText(label, { exact: true }) }),
+  modelOptions: (page: Page) => page.getByRole('button', { name: 'Model options', exact: true }),
+  modelOptionChoice: (page: Page, group: string, choice: string) =>
+    page
+      .getByRole('group', { name: group, exact: true })
+      .getByRole('menuitemradio', { name: choice, exact: true }),
   listTabStops: (list: Locator) =>
     list.locator(
       '[tabindex="0"], button:not([tabindex="-1"]), input:not([tabindex="-1"]), select:not([tabindex="-1"]), a[href]:not([tabindex="-1"])',

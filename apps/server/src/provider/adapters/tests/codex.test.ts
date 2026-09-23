@@ -161,7 +161,7 @@ function assertStartParams(message) {
     fail(message.id, 'sandbox mismatch');
     return false;
   }
-  if (message.params.serviceTier !== undefined && message.params.serviceTier !== 'fast') {
+  if (message.params.serviceTier !== undefined && typeof message.params.serviceTier !== 'string') {
     fail(message.id, 'thread service tier mismatch');
     return false;
   }
@@ -188,7 +188,7 @@ function assertTurnParams(message) {
     fail(message.id, 'turn sandbox policy mismatch');
     return false;
   }
-  if (message.params.serviceTier !== undefined && message.params.serviceTier !== 'fast') {
+  if (message.params.serviceTier !== undefined && typeof message.params.serviceTier !== 'string') {
     fail(message.id, 'turn service tier mismatch');
     return false;
   }
@@ -258,7 +258,7 @@ function sendOldTurnCompletion() {
 
 function handleSteerStopSequence(message) {
   if (message.method === 'turn/start') {
-    record({ event: 'turn/start' });
+    record({ event: 'turn/start', params: message.params });
     turnStartCount += 1;
     const turn = fakeTurn('inProgress');
     if (turnStartCount === 1) {
@@ -335,6 +335,7 @@ function handle(message) {
     return;
   }
   if (message.method === 'thread/start') {
+    record({ event: message.method, params: message.params });
     threadStartCount += 1;
     lastSessionStartParams = message.params;
     if (mode !== 'echo-mode-params' && !assertStartParams(message)) return;
@@ -365,7 +366,7 @@ function handle(message) {
   }
   if (message.method === 'turn/start') {
     turnStartCount += 1;
-    record({ event: 'turn/start' });
+    record({ event: 'turn/start', params: message.params });
     if (mode !== 'echo-mode-params' && !assertTurnParams(message)) return;
     if (mode === 'hold-turn-start') return;
     process.stderr.write('2026-05-28T00:00:00Z INFO codex: harmless diagnostic\\n');
@@ -726,6 +727,7 @@ type FakeCodexContext = { readonly projectPath: string; readonly spawnLogPath: s
 
 type FakeCodexLogEntry = {
   readonly cwd?: string
+  readonly params?: Record<string, unknown>
   readonly cwds?: readonly string[] | null
   readonly event:
     | 'skills/list'
@@ -737,6 +739,7 @@ type FakeCodexLogEntry = {
     | 'thread/list'
     | 'thread/read'
     | 'thread/resume'
+    | 'thread/start'
     | 'thread/turns/list'
     | 'thread/revert'
 }
@@ -894,15 +897,26 @@ describe('CodexProviderAdapter', () => {
       // Efforts newer than the pinned protocol schema (`max`, `ultra`) and one
       // it has never heard of must reach the snapshot instead of emptying it.
       expect(snapshot.models[0]?.capabilities).toEqual({
-        defaultReasoningEffort: 'medium',
-        reasoningEfforts: [
-          { description: 'Fastest responses', effort: 'low' },
-          { description: 'Balanced', effort: 'medium' },
-          { description: 'Deeper reasoning', effort: 'high' },
-          { description: 'Even deeper reasoning', effort: 'xhigh' },
-          { description: 'Maximum reasoning depth', effort: 'max' },
-          { description: 'Maximum reasoning with delegation', effort: 'ultra' },
-          { description: 'An effort level this schema predates', effort: 'hyperdrive' },
+        optionDescriptors: [
+          {
+            id: 'reasoningEffort',
+            label: 'Reasoning',
+            type: 'select',
+            currentValue: 'medium',
+            options: [
+              { description: 'Fastest responses', id: 'low', label: 'Low' },
+              { description: 'Balanced', id: 'medium', label: 'Medium', isDefault: true },
+              { description: 'Deeper reasoning', id: 'high', label: 'High' },
+              { description: 'Even deeper reasoning', id: 'xhigh', label: 'Extra High' },
+              { description: 'Maximum reasoning depth', id: 'max', label: 'Max' },
+              { description: 'Maximum reasoning with delegation', id: 'ultra', label: 'Ultra' },
+              {
+                description: 'An effort level this schema predates',
+                id: 'hyperdrive',
+                label: 'hyperdrive',
+              },
+            ],
+          },
         ],
       })
       expect(hasRuntime).toBe(true)
@@ -996,7 +1010,7 @@ describe('CodexProviderAdapter', () => {
       input.modelSelection = {
         model: 'codex',
         options: {
-          fastMode: true,
+          serviceTier: 'fast',
           reasoningEffort: 'high',
         },
         providerInstanceId: DEFAULT_PROVIDER_INSTANCE_ID as ProviderInstanceId,
@@ -1063,6 +1077,47 @@ describe('CodexProviderAdapter', () => {
       { mode: 'echo-turn-params' },
     )
   })
+
+  it.each([undefined, 'default', 'priority', 'flex', 'economy-v2'])(
+    'relays service tier %s through native start, resume and turns',
+    async (serviceTier) => {
+      await withFakeCodex(
+        async ({ spawnLogPath }) => {
+          const adapter = new CodexProviderAdapter()
+          const input = providerTurnInput()
+          input.modelSelection.options = {
+            reasoningEffort: 'future-effort-v3',
+            ...(serviceTier ? { serviceTier } : {}),
+          }
+          try {
+            await adapter.sendTurn(input)
+            await adapter.stopRuntime({ sessionId: input.sessionId })
+            await adapter.startRuntime({ ...input, providerResumeCursor: 'provider-thread-1' })
+            await adapter.sendTurn({ ...input, turnId: v.parse(turnIdSchema, 'turn-2') })
+            const records = await readFakeCodexLog(spawnLogPath)
+            const nativeRequests = records.filter((entry) =>
+              ['thread/start', 'thread/resume', 'turn/start'].includes(entry.event),
+            )
+            expect(nativeRequests).toHaveLength(4)
+            for (const request of nativeRequests) {
+              expect(request.params?.serviceTier).toBe(serviceTier)
+              expect(Object.hasOwn(request.params ?? {}, 'serviceTier')).toBe(
+                serviceTier !== undefined,
+              )
+            }
+            const turns = nativeRequests.filter((entry) => entry.event === 'turn/start')
+            expect(turns.map((entry) => entry.params?.effort)).toEqual([
+              'future-effort-v3',
+              'future-effort-v3',
+            ])
+          } finally {
+            await adapter.stopAll()
+          }
+        },
+        { mode: 'echo-turn-params' },
+      )
+    },
+  )
 
   it('switches a live session into plan mode without restarting the Codex thread', async () => {
     await withFakeCodex(

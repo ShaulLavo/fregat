@@ -443,10 +443,17 @@
       "title": "Preserve advertised model option descriptors and service tiers",
       "report": "runtime.md",
       "wave": "4",
-      "status": "open",
-      "evidence_level": "source-reviewed",
+      "status": "in-progress",
+      "evidence_level": "paired-pure-policy-and-local-native-browser-verified; deployment-and-full-acceptance-pending",
       "acceptance": "runtime.md, RUNTIME-06, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "model-options-delivery.md",
+        "scripts/parity/model-options.ts: 190 paired reconciliation cases agree at pinned 7445aa733ada33e45289e5aa5055f79142556513; five wrong-behavior controls rejected; actual pinned provider manifest also matches the default Claude model and all five local catalog profiles. Pure selection/catalog comparison, not full applications",
+        "/work/tmp/fregat-evidence/20260923T174530Z-scenario-provider-model-options/: development browser passed in 37.833 seconds; all eight screenshots inspected; six native turn/start payloads verify omitted options, exact default/priority/flex IDs, future-effort-v3 in both native fields, clearing and alternate low/economy-v2 defaults",
+        "All seven fixture native processes exited; API reads confirm session/provider removal and original project model restoration; fixture directory absent. No browser/console errors or non-abort network failures; seven unrelated application warnings retained in evidence",
+        "Claude five pinned catalog profiles, effort/context defaults, [1m], Fast Mode, Haiku Thinking, Ultracode and Ultrathink native consumers covered by focused tests. Focused server 195, UI 51, shared core 10, contracts 7, TUI 4 and Git 5 tests pass",
+        "Remaining: deployment and served-release browser repeat, whole-workspace checks during linked Editor API migration, live Claude/provider-account checks and paired upstream full-workflow evidence. Finding remains in-progress"
+      ]
     },
     {
       "id": "RUNTIME-07",

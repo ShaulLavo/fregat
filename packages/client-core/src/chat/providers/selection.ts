@@ -1,6 +1,6 @@
 import type { ModelSelection, ProviderSnapshot } from '@workspace/contracts'
 
-import { reconcileModelEffort } from '@workspace/client-core/chat/providers/effort'
+import { reconcileModelOptions } from '@workspace/client-core/chat/providers/options'
 import {
   providerModelOptions,
   providerModelSelectionKey,
@@ -24,9 +24,7 @@ export function resolveChatModelSelection(
 
   const storedKey = stored ? providerModelSelectionKey(stored) : null
   const kept = options.find((option) => option.key === storedKey && !option.disabledReason)
-  // The stored reasoning level rides along, but only if the model still
-  // advertises it: a catalog that dropped a level must not keep sending it.
-  if (kept) return reconcileModelEffort(stored, kept.modelSelection, kept)
+  if (kept) return reconcileModelOptions(stored, kept.modelSelection, kept.optionDescriptors)
 
   // A different model entirely, so the stored level belonged to something else.
   return options.find((option) => !option.disabledReason)?.modelSelection ?? null

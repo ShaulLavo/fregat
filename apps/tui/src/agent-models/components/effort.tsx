@@ -1,7 +1,10 @@
 import { useState } from 'react'
 import type { ModelSelection } from '@workspace/contracts'
 import type { ProviderModelOption } from '@workspace/client-core/chat/providers/models'
-import { withModelEffort } from '@workspace/client-core/chat/providers/effort'
+import {
+  modelEffortDescriptor,
+  withModelOption,
+} from '@workspace/client-core/chat/providers/options'
 import { useCommandFocus } from '@/commands/hooks/use-command-focus'
 import { useCommands } from '@/commands/hooks/use-commands'
 import { Dialog } from '@/components/dialog'
@@ -20,6 +23,7 @@ export function ModelEffort({
   readonly onClose: () => void
 }) {
   const commands = useCommands()
+  const descriptor = modelEffortDescriptor(option.optionDescriptors)
   const [selected, setSelected] = useState(0)
   const options = [
     {
@@ -51,9 +55,12 @@ export function ModelEffort({
         options={options}
         selectedIndex={selected}
         onChange={setSelected}
-        onSelect={(index) =>
-          onSelect(withModelEffort(option.modelSelection, options[index]?.value ?? null))
-        }
+        onSelect={(index) => {
+          if (descriptor)
+            onSelect(
+              withModelOption(option.modelSelection, descriptor, options[index]?.value ?? null),
+            )
+        }}
         focused
         height={Math.min(14, options.length * 2 + 1)}
         textColor={theme.foreground}

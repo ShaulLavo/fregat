@@ -6,9 +6,13 @@ import type {
   RuntimeMode,
   SessionId,
 } from '@workspace/contracts'
-import { DEFAULT_CLAUDE_MODEL, ONE_MILLION_CONTEXT_SUFFIX } from './claude-models'
+import {
+  claudeModelCapabilities,
+  DEFAULT_CLAUDE_MODEL,
+  ONE_MILLION_CONTEXT_SUFFIX,
+} from './claude-models'
 import { claudeReasoningQueryOptions, type ClaudeReasoning } from './claude-reasoning'
-import { modelOptionValue, type ModelOptions } from './model-options'
+import { modelOptionDescriptor, modelOptionValue, modelSelectValue } from './model-options'
 
 /**
  * Pure translation layer between our runtime/interaction modes and the agent
@@ -75,7 +79,9 @@ export function claudeModelId(input: {
   }
 
   const model = input.modelSelection.model.trim() || DEFAULT_CLAUDE_MODEL
-  if (!wantsOneMillionContext(input.modelSelection.options)) return model
+  const descriptor = modelOptionDescriptor(claudeModelCapabilities(model), 'contextWindow')
+  const selected = modelOptionValue(input.modelSelection.options, 'contextWindow')
+  if (modelSelectValue(descriptor, selected) !== '1m') return model
   if (model.endsWith(ONE_MILLION_CONTEXT_SUFFIX)) return model
 
   return `${model}${ONE_MILLION_CONTEXT_SUFFIX}`
@@ -116,11 +122,4 @@ export function claudeQueryOptions(input: ClaudeQueryOptionsInput): Options {
     // CLI cannot find its stored OAuth credentials, and it reports "Not logged in".
     ...(input.env ? { env: input.env } : {}),
   }
-}
-
-function wantsOneMillionContext(options: ModelOptions): boolean {
-  const value = modelOptionValue(options, 'contextWindow')
-  if (typeof value !== 'string') return false
-
-  return value.trim().toLowerCase() === '1m'
 }

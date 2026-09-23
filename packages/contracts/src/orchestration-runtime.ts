@@ -10,22 +10,13 @@ export const interactionModeSchema = v.picklist(['default', 'plan'])
 
 export const providerDriverKindSchema = v.pipe(providerSlugSchema, v.brand('ProviderDriverKind'))
 
-/**
- * Reasoning effort ids stay open strings: Codex speaks `low..ultra` and the
- * Claude SDK stops at `max`, so any closed enum shared across providers would
- * reject the other's levels.
- */
-export const reasoningEffortSchema = v.pipe(v.string(), v.trim(), v.minLength(1))
+const modelOptionIdSchema = v.pipe(v.string(), v.trim(), v.minLength(1))
 
-/**
- * Still open — adapters read their own keys out of it — but the reasoning
- * effort is typed because it is the one option the picker, the persisted
- * per-session selection, and every adapter must agree on. Typed *inside*
- * `options` rather than as a sibling field so the Codex adapter, which already
- * reads `options.reasoningEffort`, keeps working untouched.
- */
+// Provider-owned IDs stay open; native adapters consume their own keys.
 const modelSelectionOptionsSchema = v.looseObject({
-  reasoningEffort: v.optional(reasoningEffortSchema),
+  reasoningEffort: v.optional(modelOptionIdSchema),
+  effort: v.optional(modelOptionIdSchema),
+  serviceTier: v.optional(modelOptionIdSchema),
 })
 
 export const modelSelectionSchema = v.object({

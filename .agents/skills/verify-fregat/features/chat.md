@@ -52,6 +52,7 @@ Commands dispatch over the orchestration socket when it is live and over HTTP ot
 - `file-attachments`: user upload, reload draft recovery, native provider file bytes, transcript text preview and exact download; isolated fixture and settings cleanup.
 
 - `chat-stash-context`: image-only stash, complete image/file draft swap, reload recovery, isolated native file delivery and retention of the separate draft. Terminal-context pairing has a focused store/composer check; this scenario does not simulate terminal selection.
+- `provider-model-options`: advertised Standard and provider service tiers, future reasoning IDs, clearing to provider defaults, and model-change reconciliation through real composer choices and exact native `turn/start` parameters. Restores the project model preference and removes its provider/session/processes.
 
 - `chat-queue`: isolated native provider and owned terminal. Checks default FIFO queueing, one message per tool boundary, pending approval hold/resume, Send now, Restore, and text/file/terminal recovery before a held interrupt rejects. It sends the recovered payload through the real provider pipeline and checks exact file bytes. Restores settings and removes its session, provider and terminal. Queue reload persistence is not expected.
 

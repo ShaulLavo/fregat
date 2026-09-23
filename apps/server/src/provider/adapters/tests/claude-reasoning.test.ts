@@ -26,21 +26,33 @@ function modelSelection(overrides: Partial<ModelSelection> = {}): ModelSelection
 
 function capabilities(
   efforts: readonly string[],
-  overrides: Partial<ProviderModelCapabilities> = {},
+  defaultEffort = 'high',
 ): ProviderModelCapabilities {
   return {
-    defaultReasoningEffort: 'high',
-    reasoningEfforts: efforts.map((effort) => ({ effort })),
-    ...overrides,
+    optionDescriptors: [
+      {
+        id: 'effort',
+        label: 'Reasoning',
+        type: 'select',
+        options: efforts.map((id) => ({
+          id,
+          label: id,
+          ...(id === defaultEffort ? { isDefault: true } : {}),
+        })),
+        promptInjectedValues: ['ultrathink'],
+      },
+    ],
   }
 }
 
 describe('effortPlan', () => {
-  it('sends nothing when no level was chosen', () => {
+  it('resolves the advertised default when no level was chosen', () => {
     expect(
       effortPlan({ capabilities: capabilities(['low', 'high']), requested: undefined }),
-    ).toEqual({})
-    expect(effortPlan({ capabilities: capabilities(['low', 'high']), requested: '  ' })).toEqual({})
+    ).toEqual({ effort: 'high' })
+    expect(effortPlan({ capabilities: capabilities(['low', 'high']), requested: '  ' })).toEqual({
+      effort: 'high',
+    })
   })
 
   it('passes through every level the model advertises', () => {
@@ -52,10 +64,10 @@ describe('effortPlan', () => {
   })
 
   /** The guard: an unadvertised level must degrade, never reach the SDK blind. */
-  it('degrades xhigh to max on a model without xhigh', () => {
+  it('resolves unadvertised xhigh to the descriptor default', () => {
     const caps = capabilities(['low', 'medium', 'high', 'max'])
 
-    expect(effortPlan({ capabilities: caps, requested: 'xhigh' })).toEqual({ effort: 'max' })
+    expect(effortPlan({ capabilities: caps, requested: 'xhigh' })).toEqual({ effort: 'high' })
   })
 
   it('falls back to the model default for any other unadvertised level', () => {
@@ -86,9 +98,7 @@ describe('effortPlan', () => {
    * the ids themselves never survive.
    */
   it('never lets a non-SDK level become an effort flag', () => {
-    const caps = capabilities(['ultrathink', 'ultracode', 'ultra', 'xhigh'], {
-      defaultReasoningEffort: 'ultra',
-    })
+    const caps = capabilities(['ultrathink', 'ultracode', 'ultra', 'xhigh'], 'ultra')
 
     for (const requested of ['ultrathink', 'ultracode', 'ultra', 'hyperdrive']) {
       const { effort } = effortPlan({ capabilities: caps, requested })
@@ -116,30 +126,42 @@ describe('effortPlan', () => {
 })
 
 describe('claudeReasoning', () => {
+  it.each([
+    ['claude-opus-5', 'high'],
+    ['claude-fable-5-1', 'medium'],
+    ['claude-sonnet-5', 'high'],
+    ['', 'medium'],
+  ])('resolves %s default effort without an explicit selection', (model, effort) => {
+    expect(
+      claudeReasoning({
+        modelSelection: modelSelection({ model }),
+        providerInstanceId: CLAUDE_INSTANCE,
+      }),
+    ).toEqual({ effort })
+  })
+
+  it('ignores a thinking toggle for a known model that only advertises effort', () => {
+    expect(
+      claudeReasoning({
+        modelSelection: modelSelection({ options: { thinking: true } }),
+        providerInstanceId: CLAUDE_INSTANCE,
+      }),
+    ).toEqual({ effort: 'high' })
+  })
+
   it('reads the effort out of the per-session selection', () => {
     const reasoning = claudeReasoning({
-      modelSelection: modelSelection({ options: { reasoningEffort: 'max' } }),
+      modelSelection: modelSelection({ options: { effort: 'max' } }),
       providerInstanceId: CLAUDE_INSTANCE,
     })
 
     expect(reasoning).toEqual({ effort: 'max' })
   })
 
-  it('reads the effort from the array-shaped options too', () => {
-    const reasoning = claudeReasoning({
-      modelSelection: modelSelection({
-        options: [{ id: 'reasoningEffort', value: 'low' }] as unknown as ModelSelection['options'],
-      }),
-      providerInstanceId: CLAUDE_INSTANCE,
-    })
-
-    expect(reasoning).toEqual({ effort: 'low' })
-  })
-
   it('ignores a selection aimed at another provider', () => {
     const reasoning = claudeReasoning({
       modelSelection: modelSelection({
-        options: { reasoningEffort: 'max' },
+        options: { effort: 'max' },
         providerInstanceId: CODEX_INSTANCE,
       }),
       providerInstanceId: CLAUDE_INSTANCE,
@@ -152,7 +174,7 @@ describe('claudeReasoning', () => {
     const reasoning = claudeReasoning({
       modelSelection: modelSelection({
         model: 'claude-opus-5[1m]',
-        options: { reasoningEffort: 'xhigh' },
+        options: { effort: 'xhigh' },
       }),
       providerInstanceId: CLAUDE_INSTANCE,
     })
@@ -164,7 +186,7 @@ describe('claudeReasoning', () => {
     const reasoning = claudeReasoning({
       modelSelection: modelSelection({
         model: 'claude-next-9',
-        options: { reasoningEffort: 'max' },
+        options: { effort: 'max' },
       }),
       providerInstanceId: CLAUDE_INSTANCE,
     })
@@ -172,27 +194,25 @@ describe('claudeReasoning', () => {
     expect(reasoning).toEqual({})
   })
 
-  it('enables thinking as adaptive alongside the settings twin', () => {
+  it('enables the advertised Haiku thinking setting', () => {
     const reasoning = claudeReasoning({
-      modelSelection: modelSelection({ options: { thinking: true } }),
+      modelSelection: modelSelection({ model: 'claude-haiku-4-5', options: { thinking: true } }),
       providerInstanceId: CLAUDE_INSTANCE,
     })
 
     expect(reasoning).toEqual({
       settings: { alwaysThinkingEnabled: true },
-      thinking: { type: 'adaptive' },
     })
   })
 
   it('disables thinking on both sides at once', () => {
     const reasoning = claudeReasoning({
-      modelSelection: modelSelection({ options: { thinking: false } }),
+      modelSelection: modelSelection({ model: 'claude-haiku-4-5', options: { thinking: false } }),
       providerInstanceId: CLAUDE_INSTANCE,
     })
 
     expect(reasoning).toEqual({
       settings: { alwaysThinkingEnabled: false },
-      thinking: { type: 'disabled' },
     })
   })
 
@@ -205,9 +225,23 @@ describe('claudeReasoning', () => {
     expect(reasoning).toEqual({})
   })
 
+  it.each([
+    ['claude-opus-5', true, { effort: 'high', settings: { fastMode: true } }],
+    ['claude-opus-5', false, { effort: 'high' }],
+    ['claude-fable-5', true, { effort: 'medium' }],
+    ['claude-sonnet-5', true, { effort: 'high' }],
+  ])('gates fast mode on the %s descriptor (%s)', (model, fastMode, expected) => {
+    expect(
+      claudeReasoning({
+        modelSelection: modelSelection({ model, options: { fastMode } }),
+        providerInstanceId: CLAUDE_INSTANCE,
+      }),
+    ).toEqual(expected)
+  })
+
   it('carries ultracode through as a session setting, never as a level', () => {
     const reasoning = claudeReasoning({
-      modelSelection: modelSelection({ options: { reasoningEffort: 'ultracode' } }),
+      modelSelection: modelSelection({ options: { effort: 'ultracode' } }),
       providerInstanceId: CLAUDE_INSTANCE,
     })
 
@@ -238,10 +272,11 @@ describe('claudeReasoningKey', () => {
       claudeReasoningKey({}),
       claudeReasoningKey({ effort: 'high' }),
       claudeReasoningKey({ effort: 'max' }),
+      claudeReasoningKey({ effort: 'high', settings: { fastMode: true } }),
       claudeReasoningKey({ effort: 'high', promptPrefix: 'ultrathink' }),
       claudeReasoningKey({ effort: 'xhigh', settings: { ultracode: true } }),
-      claudeReasoningKey({ thinking: { type: 'adaptive' } }),
-      claudeReasoningKey({ thinking: { type: 'disabled' } }),
+      claudeReasoningKey({ settings: { alwaysThinkingEnabled: true } }),
+      claudeReasoningKey({ settings: { alwaysThinkingEnabled: false } }),
     ]
 
     expect(new Set(keys).size).toBe(keys.length)
@@ -275,34 +310,43 @@ describe('claudePromptText', () => {
 })
 
 describe('claudeModelCapabilities', () => {
-  it('advertises a default that is itself one of the levels', () => {
-    for (const slug of [
-      'claude-opus-5',
-      'claude-opus-5[1m]',
-      'claude-sonnet-5',
-      'claude-fable-5',
-    ]) {
-      const caps = claudeModelCapabilities(slug)
-      const efforts = caps?.reasoningEfforts?.map((option) => option.effort) ?? []
-
-      expect(caps?.defaultReasoningEffort).toBe('high')
-      expect(efforts).toContain('high')
-      expect(caps?.supportsExtendedThinking).toBe(true)
-    }
+  it.each([
+    ['claude-opus-5', 'high', '1m'],
+    ['claude-opus-5[1m]', 'high', '1m'],
+    ['claude-fable-5', 'medium', '1m'],
+    ['claude-fable-5-1', 'medium', '1m'],
+    ['claude-sonnet-5', 'high', '200k'],
+  ])('advertises the pinned defaults for %s', (slug, effort, context) => {
+    const descriptors = claudeModelCapabilities(slug)?.optionDescriptors
+    const choices = descriptors?.flatMap((descriptor) =>
+      descriptor.type === 'select'
+        ? descriptor.options
+            .filter((choice) => choice.isDefault)
+            .map((choice) => [descriptor.id, choice.id])
+        : [],
+    )
+    expect(choices).toEqual([
+      ['effort', effort],
+      ['contextWindow', context],
+    ])
   })
 
-  it('offers ultracode only where the reference does', () => {
-    const ultracode = (slug: string) =>
-      claudeModelCapabilities(slug)?.reasoningEfforts?.some(
-        (option) => option.effort === 'ultracode',
+  it('offers ultracode only on Opus and Fable', () => {
+    const hasUltracode = (slug: string) =>
+      claudeModelCapabilities(slug)?.optionDescriptors?.some(
+        (descriptor) =>
+          descriptor.type === 'select' &&
+          descriptor.options.some((choice) => choice.id === 'ultracode'),
       )
-
-    expect(ultracode('claude-opus-5')).toBe(true)
-    expect(ultracode('claude-fable-5')).toBe(true)
-    expect(ultracode('claude-sonnet-5')).toBe(false)
+    expect(hasUltracode('claude-opus-5')).toBe(true)
+    expect(hasUltracode('claude-fable-5')).toBe(true)
+    expect(hasUltracode('claude-sonnet-5')).toBe(false)
   })
 
-  it('knows nothing about a model outside the catalog', () => {
+  it('advertises only thinking for Haiku and no capabilities for an unknown model', () => {
+    expect(claudeModelCapabilities('claude-haiku-4-5')).toEqual({
+      optionDescriptors: [{ id: 'thinking', label: 'Thinking', type: 'boolean' }],
+    })
     expect(claudeModelCapabilities('claude-next-9')).toBeNull()
   })
 })

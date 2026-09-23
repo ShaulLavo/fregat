@@ -1,5 +1,5 @@
 import { BrainIcon, CaretUpDownIcon } from '@phosphor-icons/react'
-import type { ModelSelection } from '@workspace/contracts'
+import type { ProviderOptionDescriptor } from '@workspace/contracts'
 import { Button } from '@workspace/ui/components/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import {
@@ -17,27 +17,23 @@ import {
   modelOptionDescriptors,
   modelSelectionOptionValue,
   withModelOption,
-  type ModelOptionDescriptor,
-} from '@workspace/client-core/chat/providers/effort'
+} from '@workspace/client-core/chat/providers/options'
 import {
   useChatInputDraftStore,
   type ChatInputDraftTarget,
 } from '@/features/chat/state/chat-input-draft-store'
 
-/** Radio value that clears the key, leaving the provider's own default in charge. */
-const PROVIDER_DEFAULT_VALUE = ''
+import {
+  PROVIDER_DEFAULT_VALUE,
+  descriptorSummary,
+  defaultChoiceLabel,
+  radioValue,
+  descriptorChoices,
+  promptEffortState,
+  withUltrathinkPrefix,
+  withoutUltrathinkPrefix,
+} from '../utils/model-options'
 
-/**
- * The selected model's option descriptors, as one composer control. Every knob
- * the model advertises renders from the same descriptor shape, so a provider
- * that starts advertising a second one costs a descriptor rather than a second
- * menu — extended thinking arrived this way, already advertised and previously
- * unreachable.
- *
- * Writes land on the draft's model selection, the same override the picker and
- * the send path already read, so the pick is live for the next turn without a
- * round trip through the session projection.
- */
 export function ModelOptionsMenu({
   compact,
   disabled,
@@ -50,15 +46,29 @@ export function ModelOptionsMenu({
 }) {
   const { modelSelection, provider } = useModelPicker()
   const setModelSelection = useChatInputDraftStore((state) => state.setModelSelection)
+  const prompt = useChatInputDraftStore((state) => state.getDraft(draftTarget).prompt)
   const model = provider?.models.find((candidate) => candidate.slug === modelSelection?.model)
   const descriptors = model ? modelOptionDescriptors(model) : []
   if (!modelSelection || descriptors.length === 0) return null
 
   const selection = modelSelection
-  const summary = descriptorSummary(descriptors, selection)
+  const summary = descriptorSummary(descriptors, selection, prompt)
+  const effort = promptEffortState(descriptors, prompt)
 
-  function selectOption(descriptor: ModelOptionDescriptor, value: string) {
-    const next = value === PROVIDER_DEFAULT_VALUE ? null : value
+  function selectOption(descriptor: ProviderOptionDescriptor, value: string) {
+    const drafts = useChatInputDraftStore.getState()
+    const currentPrompt = drafts.getDraft(draftTarget).prompt
+    if (descriptor.type === 'select' && descriptor.promptInjectedValues?.includes(value)) {
+      drafts.setPrompt(draftTarget, withUltrathinkPrefix(currentPrompt))
+      return
+    }
+    const currentEffort = promptEffortState(descriptors, currentPrompt)
+    if (descriptor.id === currentEffort.descriptorId && currentEffort.inBody) return
+    if (descriptor.id === currentEffort.descriptorId && currentEffort.controlled)
+      drafts.setPrompt(draftTarget, withoutUltrathinkPrefix(currentPrompt))
+    let next: string | boolean | null = value
+    if (value === PROVIDER_DEFAULT_VALUE) next = null
+    else if (descriptor.type === 'boolean') next = value === 'on'
     setModelSelection(draftTarget, withModelOption(selection, descriptor, next))
   }
 
@@ -92,24 +102,48 @@ export function ModelOptionsMenu({
         {descriptors.map((descriptor, index) => (
           <DropdownMenuRadioGroup
             key={descriptor.id}
-            value={modelSelectionOptionValue(selection, descriptor) ?? PROVIDER_DEFAULT_VALUE}
+            aria-label={descriptor.label}
+            value={
+              effort.controlled && descriptor.id === effort.descriptorId
+                ? 'ultrathink'
+                : radioValue(modelSelectionOptionValue(selection, descriptor))
+            }
           >
             {index === 0 ? null : <DropdownMenuSeparator />}
             {/* Inside the group: base-ui resolves the label against its group context. */}
             <DropdownMenuLabel>{descriptor.label}</DropdownMenuLabel>
+            {effort.inBody && descriptor.id === effort.descriptorId ? (
+              <p className='text-muted-foreground px-2 pb-1 text-xs'>
+                Your prompt contains “ultrathink”. Remove it from the text to change this option.
+              </p>
+            ) : null}
             <DropdownMenuRadioItem
+              closeOnClick
+              disabled={effort.inBody && descriptor.id === effort.descriptorId}
               value={PROVIDER_DEFAULT_VALUE}
               onClick={() => selectOption(descriptor, PROVIDER_DEFAULT_VALUE)}
             >
               {defaultChoiceLabel(descriptor)}
             </DropdownMenuRadioItem>
-            {descriptor.choices.map((choice) => (
+            {descriptor.description ? (
+              <p className='text-muted-foreground px-2 pb-1 text-xs'>{descriptor.description}</p>
+            ) : null}
+            {descriptorChoices(descriptor).map((choice) => (
               <DropdownMenuRadioItem
-                key={choice.value}
-                value={choice.value}
-                onClick={() => selectOption(descriptor, choice.value)}
+                key={choice.id}
+                closeOnClick
+                aria-label={choice.label}
+                aria-description={choice.description}
+                disabled={effort.inBody && descriptor.id === effort.descriptorId}
+                value={choice.id}
+                onClick={() => selectOption(descriptor, choice.id)}
               >
-                {choice.label}
+                <span className='flex min-w-0 flex-col gap-0.5'>
+                  <span>{choice.label}</span>
+                  {choice.description ? (
+                    <span className='text-muted-foreground text-xs'>{choice.description}</span>
+                  ) : null}
+                </span>
               </DropdownMenuRadioItem>
             ))}
           </DropdownMenuRadioGroup>
@@ -117,31 +151,4 @@ export function ModelOptionsMenu({
       </DropdownMenuContent>
     </DropdownMenu>
   )
-}
-
-/** What the trigger says: chosen values first, the model's own defaults after. */
-function descriptorSummary(
-  descriptors: readonly ModelOptionDescriptor[],
-  selection: ModelSelection,
-) {
-  const labels = descriptors
-    .map((descriptor) => activeChoiceLabel(descriptor, selection))
-    .filter((label): label is string => label !== null)
-  if (labels.length === 0) return 'Options'
-
-  return labels.join(' · ')
-}
-
-function activeChoiceLabel(descriptor: ModelOptionDescriptor, selection: ModelSelection) {
-  const value = modelSelectionOptionValue(selection, descriptor) ?? descriptor.defaultValue
-  if (value === null) return null
-
-  return descriptor.choices.find((choice) => choice.value === value)?.label ?? null
-}
-
-function defaultChoiceLabel(descriptor: ModelOptionDescriptor) {
-  const fallback = descriptor.choices.find((choice) => choice.value === descriptor.defaultValue)
-  if (!fallback) return 'Provider default'
-
-  return `Provider default (${fallback.label})`
 }

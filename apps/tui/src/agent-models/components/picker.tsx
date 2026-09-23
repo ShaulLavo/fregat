@@ -5,6 +5,7 @@ import {
   type ProviderModelOption,
 } from '@workspace/client-core/chat/providers/models'
 import { createProviderCatalog } from '@/agent-models/state/catalog'
+import { modelSelectionEffort } from '@workspace/client-core/chat/providers/options'
 import { ModelChoices } from '@/agent-models/components/choices'
 import { ModelEffort } from '@/agent-models/components/effort'
 import { ProviderAccount } from '@/agent-models/components/account'
@@ -89,6 +90,7 @@ export function ModelPicker({
     provider?.models.find((model) => model.slug === value?.model)?.shortName ??
     value?.model ??
     'Choose model'
+  const effort = modelSelectionEffort(value)
   return (
     <box flexDirection='column' flexShrink={1} minWidth={0}>
       <box flexDirection='row' gap={1} height={1}>
@@ -100,7 +102,7 @@ export function ModelPicker({
           }}
         >
           {label}
-          {value?.options?.reasoningEffort ? ` · ${value.options.reasoningEffort}` : ''}
+          {effort ? ` · ${effort}` : ''}
           {' ▾'}
         </text>
       </box>

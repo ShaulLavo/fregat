@@ -7,6 +7,7 @@ import { sessionNotifications } from './session-notifications'
 import { terminalHistory } from './terminal-history'
 import { chatStashContext } from './chat-stash-context'
 import { chatQueue } from './chat-queue'
+import { providerModelOptions } from './provider-model-options'
 import { fileAttachments } from './file-attachments'
 import { sessionTitles } from './session-titles'
 import { sessionNavigation } from './session-navigation'
@@ -178,6 +179,7 @@ export const scenarios: readonly Scenario[] = [
   fileAttachments,
   chatStashContext,
   chatQueue,
+  providerModelOptions,
   draftRecovery,
   asyncQuestions,
   backgroundLiveness,

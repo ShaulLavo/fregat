@@ -759,11 +759,11 @@ describe('ClaudeProviderAdapter', () => {
   })
 
   it('passes every advertised level through to the SDK effort option', async () => {
-    for (const reasoningEffort of ['low', 'medium', 'high', 'xhigh', 'max']) {
+    for (const effort of ['low', 'medium', 'high', 'xhigh', 'max']) {
       const harness = claudeHarness()
-      await harness.adapter.startRuntime(sessionStartInput({ options: { reasoningEffort } }))
+      await harness.adapter.startRuntime(sessionStartInput({ options: { effort } }))
 
-      expect(latestOptions(harness).effort).toBe(reasoningEffort)
+      expect(latestOptions(harness).effort).toBe(effort)
       await harness.adapter.stopAll()
     }
   })
@@ -773,19 +773,20 @@ describe('ClaudeProviderAdapter', () => {
     const harness = claudeHarness()
 
     // 'ultra' is a Codex level; the Claude catalog stops at 'max'.
-    await harness.adapter.startRuntime(sessionStartInput({ options: { reasoningEffort: 'ultra' } }))
+    await harness.adapter.startRuntime(sessionStartInput({ options: { effort: 'ultra' } }))
 
     expect(latestOptions(harness).effort).toBe('high')
     await harness.adapter.stopAll()
   })
 
-  it('sends no effort, settings or thinking when the selection carries none', async () => {
+  it('sends the catalog effort and context defaults without explicit selections', async () => {
     const harness = claudeHarness()
 
     await harness.adapter.startRuntime(sessionStartInput({}))
 
     const options = latestOptions(harness)
-    expect('effort' in options).toBe(false)
+    expect(options.effort).toBe('high')
+    expect(options.model).toBe('claude-opus-5[1m]')
     expect('settings' in options).toBe(false)
     expect('thinking' in options).toBe(false)
     await harness.adapter.stopAll()
@@ -807,7 +808,7 @@ describe('ClaudeProviderAdapter', () => {
     const harness = claudeHarness()
     const input = providerTurnInput({
       messageText: 'Investigate the edge cases',
-      options: { reasoningEffort: 'ultrathink' },
+      options: { effort: 'ultrathink' },
     })
 
     const pending = harness.adapter.sendTurn(input)
@@ -826,9 +827,7 @@ describe('ClaudeProviderAdapter', () => {
   it('pairs ultracode with xhigh and the session setting', async () => {
     const harness = claudeHarness()
 
-    await harness.adapter.startRuntime(
-      sessionStartInput({ options: { reasoningEffort: 'ultracode' } }),
-    )
+    await harness.adapter.startRuntime(sessionStartInput({ options: { effort: 'ultracode' } }))
 
     const options = latestOptions(harness)
     expect(options.effort).toBe('xhigh')
@@ -836,25 +835,29 @@ describe('ClaudeProviderAdapter', () => {
     await harness.adapter.stopAll()
   })
 
-  it('passes the thinking config and its settings twin when thinking is enabled', async () => {
+  it('passes the advertised thinking toggle as a native session setting', async () => {
     const harness = claudeHarness()
 
-    await harness.adapter.startRuntime(sessionStartInput({ options: { thinking: true } }))
+    await harness.adapter.startRuntime(
+      sessionStartInput({ model: 'claude-haiku-4-5', options: { thinking: true } }),
+    )
 
     const options = latestOptions(harness)
-    expect(options.thinking).toEqual({ type: 'adaptive' })
+    expect(options.thinking).toBeUndefined()
     expect(options.settings).toEqual({ alwaysThinkingEnabled: true })
     expect('maxThinkingTokens' in options).toBe(false)
     await harness.adapter.stopAll()
   })
 
-  it('disables thinking on both sides when the selection turns it off', async () => {
+  it('disables the native thinking setting when the selection turns it off', async () => {
     const harness = claudeHarness()
 
-    await harness.adapter.startRuntime(sessionStartInput({ options: { thinking: false } }))
+    await harness.adapter.startRuntime(
+      sessionStartInput({ model: 'claude-haiku-4-5', options: { thinking: false } }),
+    )
 
     const options = latestOptions(harness)
-    expect(options.thinking).toEqual({ type: 'disabled' })
+    expect(options.thinking).toBeUndefined()
     expect(options.settings).toEqual({ alwaysThinkingEnabled: false })
     await harness.adapter.stopAll()
   })
@@ -867,19 +870,23 @@ describe('ClaudeProviderAdapter', () => {
     const harness = claudeHarness()
     const sessionId = v.parse(sessionIdSchema, '15b75762-df30-5533-9c86-1a6e6d4af593')
 
-    await harness.adapter.startRuntime(
-      sessionStartInput({ options: { reasoningEffort: 'low' }, sessionId }),
-    )
-    await harness.adapter.startRuntime(
-      sessionStartInput({ options: { reasoningEffort: 'low' }, sessionId }),
-    )
+    await harness.adapter.startRuntime(sessionStartInput({ options: { effort: 'low' }, sessionId }))
+    await harness.adapter.startRuntime(sessionStartInput({ options: { effort: 'low' }, sessionId }))
     expect(harness.queries).toHaveLength(1)
 
-    await harness.adapter.startRuntime(
-      sessionStartInput({ options: { reasoningEffort: 'max' }, sessionId }),
-    )
+    await harness.adapter.startRuntime(sessionStartInput({ options: { effort: 'max' }, sessionId }))
     expect(harness.queries).toHaveLength(2)
     expect(latestOptions(harness).effort).toBe('max')
+    await harness.adapter.stopAll()
+  })
+
+  it('restarts the SDK query when the supported fast-mode selection changes', async () => {
+    const harness = claudeHarness()
+    await harness.adapter.startRuntime(sessionStartInput({ options: { fastMode: true } }))
+    expect(latestOptions(harness).settings).toEqual({ fastMode: true })
+    await harness.adapter.startRuntime(sessionStartInput({ options: { fastMode: false } }))
+    expect(harness.queries).toHaveLength(2)
+    expect(latestOptions(harness).settings).toBeUndefined()
     await harness.adapter.stopAll()
   })
 
@@ -1060,6 +1067,7 @@ function modelSelection(options?: ModelSelection['options']): ModelSelection {
 }
 
 function sessionStartInput(overrides: {
+  model?: string
   ephemeral?: boolean
   interactionMode?: InteractionMode
   options?: ModelSelection['options']
@@ -1071,7 +1079,10 @@ function sessionStartInput(overrides: {
     cwd: WORKSPACE_ROOT,
     ...(overrides.ephemeral === undefined ? {} : { ephemeral: overrides.ephemeral }),
     interactionMode: overrides.interactionMode ?? DEFAULT_INTERACTION_MODE,
-    modelSelection: modelSelection(overrides.options),
+    modelSelection: {
+      ...modelSelection(overrides.options),
+      ...(overrides.model ? { model: overrides.model } : {}),
+    },
     providerInstanceId: DEFAULT_CLAUDE_PROVIDER_SETTINGS.providerInstanceId,
     runtimeMode: overrides.runtimeMode ?? 'full-access',
     runtimeEpoch: 'runtime-epoch',

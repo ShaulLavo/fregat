@@ -1,0 +1,170 @@
+import { deepStrictEqual, notDeepStrictEqual, ok, strictEqual } from 'node:assert/strict'
+import * as v from 'valibot'
+import {
+  DEFAULT_PROVIDER_INSTANCE_ID,
+  type ModelSelection,
+  type ProviderOptionDescriptor,
+} from '../../packages/contracts/src/index'
+import { reconcileModelOptions } from '../../packages/client-core/src/chat/providers/options'
+import {
+  claudeModelCatalog,
+  DEFAULT_CLAUDE_MODEL,
+} from '../../apps/server/src/provider/adapters/utils/claude-models'
+import { pin, readPinned } from './pinned'
+
+const source = readPinned('packages/shared/src/model.ts')
+function extract(start: string, end: string) {
+  strictEqual(source.split(start).length, 2)
+  strictEqual(source.split(end).length, 2)
+  return source.slice(source.indexOf(start), source.indexOf(end, source.indexOf(start)))
+}
+const selected = extract(
+  'function getRawSelectionValueById(',
+  'export function isClaudeUltrathinkPrompt(',
+)
+const trim = extract('function trimOrNull<', 'function cloneSelections(')
+const javascript = new Bun.Transpiler({ loader: 'ts' }).transformSync(`${selected}\n${trim}`)
+const upstream = await import(
+  `data:text/javascript;base64,${Buffer.from(javascript).toString('base64')}`
+)
+const selectionsSchema = v.optional(
+  v.array(
+    v.object({
+      id: v.string(),
+      value: v.union([v.string(), v.boolean()]),
+    }),
+  ),
+)
+const base = { model: 'fixture-model', providerInstanceId: DEFAULT_PROVIDER_INSTANCE_ID }
+
+function pinnedOptions(
+  descriptors: readonly ProviderOptionDescriptor[],
+  selection: ModelSelection,
+) {
+  const selections = Object.entries(selection.options ?? {}).map(([id, value]) => ({ id, value }))
+  const resolved: unknown = upstream.getProviderOptionDescriptors({
+    caps: { optionDescriptors: descriptors },
+    selections,
+  })
+  const result: unknown = upstream.buildExplicitProviderOptionSelectionsFromDescriptors(
+    resolved,
+    selections,
+  )
+  const parsed = v.parse(selectionsSchema, result)
+  return Object.fromEntries((parsed ?? []).map(({ id, value }) => [id, value]))
+}
+
+const choiceSets = [
+  [],
+  [{ id: 'standard', label: 'Standard' }],
+  [
+    { id: 'standard', label: 'Standard', isDefault: true },
+    { id: 'future-id', label: 'Future' },
+  ],
+]
+const currents = [undefined, 'standard', 'future-id', 'stale-id']
+const values = [undefined, '', ' standard ', 'future-id', 'stale-id', true, false]
+const descriptors: ProviderOptionDescriptor[] = choiceSets.flatMap((options) =>
+  currents.flatMap(
+    (currentValue) =>
+      [
+        { id: 'serviceTier', label: 'Service tier', type: 'select', options, currentValue },
+        {
+          id: 'serviceTier',
+          label: 'Service tier',
+          type: 'select',
+          options,
+          currentValue,
+          promptInjectedValues: ['future-id'],
+        },
+      ] satisfies ProviderOptionDescriptor[],
+  ),
+)
+descriptors.push(
+  ...[undefined, true, false].map((currentValue) => ({
+    id: 'thinking',
+    label: 'Thinking',
+    type: 'boolean' as const,
+    currentValue,
+  })),
+)
+
+let cases = 0
+for (const descriptor of descriptors) {
+  for (const value of values) {
+    const previous = { ...base, options: value === undefined ? {} : { [descriptor.id]: value } }
+    const expected = pinnedOptions([descriptor], previous)
+    const actual = reconcileModelOptions(previous, base, [descriptor]).options ?? {}
+    deepStrictEqual(actual, expected, JSON.stringify({ descriptor, value }))
+    cases += 1
+  }
+}
+
+const tier: ProviderOptionDescriptor = {
+  id: 'serviceTier',
+  label: 'Service tier',
+  type: 'select',
+  options: [
+    { id: 'default', label: 'Standard', isDefault: true },
+    { id: 'priority', label: 'Priority' },
+  ],
+}
+const thinking: ProviderOptionDescriptor = {
+  id: 'thinking',
+  label: 'Thinking',
+  type: 'boolean',
+  currentValue: true,
+}
+const capabilities = [tier, thinking]
+const previous = {
+  ...base,
+  options: { serviceTier: 'priority', thinking: false, unrelated: 'drop-me' },
+}
+const expected = pinnedOptions(capabilities, previous)
+deepStrictEqual(reconcileModelOptions(previous, base, capabilities).options, expected)
+cases += 1
+
+const controls = [
+  { serviceTier: 'fast', thinking: false },
+  { serviceTier: 'priority', thinking: true },
+  { serviceTier: 'priority', thinking: false, unrelated: 'drop-me' },
+  { thinking: false },
+]
+for (const control of controls) notDeepStrictEqual(control, expected)
+notDeepStrictEqual(
+  { serviceTier: 'default', thinking: true },
+  pinnedOptions(capabilities, base),
+  'Untouched defaults must not be persisted as explicit choices',
+)
+
+const manifestSchema = v.object({
+  providers: v.object({
+    claudeAgent: v.object({
+      defaults: v.object({ chat: v.string() }),
+      models: v.array(v.object({ slug: v.string(), profile: v.string() })),
+      profiles: v.record(v.string(), v.object({ capabilities: v.unknown() })),
+    }),
+  }),
+})
+const manifest = v.parse(
+  manifestSchema,
+  JSON.parse(readPinned('apps/server/src/provider/model-manifest.json')),
+)
+const claude = manifest.providers.claudeAgent
+strictEqual(DEFAULT_CLAUDE_MODEL, claude.defaults.chat)
+const catalog = claudeModelCatalog()
+strictEqual(catalog.length, 5)
+for (const model of catalog) {
+  const advertised = claude.models.find((candidate) => candidate.slug === model.slug)
+  ok(advertised, `Pinned Claude model ${model.slug}`)
+  deepStrictEqual(model.capabilities, claude.profiles[advertised.profile]?.capabilities, model.slug)
+}
+console.log(
+  JSON.stringify({
+    upstreamCommit: pin,
+    cases,
+    negativeControls: controls.length + 1,
+    claudeProfiles: catalog.length,
+    result: 'matched',
+  }),
+)

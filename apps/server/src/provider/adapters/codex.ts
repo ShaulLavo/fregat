@@ -15,11 +15,9 @@ import {
   type ApprovalRequestId,
   type ChatAgent,
   type InteractionMode,
-  type ModelReasoningEffortOption,
   type ProviderModel,
   type ProviderInstanceId,
   type ProviderInstanceSettings,
-  type ProviderModelCapabilities,
   type ProviderSkill,
   type ProviderSnapshot,
   type RuntimeMode,
@@ -65,6 +63,7 @@ import { prepareCodexRewind } from './utils/codex-rewind'
 import { activeProviderTurn, type ActiveProviderTurn } from './utils/active-turn'
 import { codexDeveloperInstructions } from './utils/codex-instructions'
 import { modelOptionValue, type ModelOptions } from './utils/model-options'
+import { codexModelCapabilities } from './utils/codex-models'
 import { asRecord, numberField, stringField } from './utils/records'
 import { noop, runtimeEventId } from './utils/runtime-ids'
 import { isPresent } from '@workspace/utils/objects'
@@ -168,7 +167,7 @@ type CodexSkillCatalog = {
 
 type CodexModelOptions = {
   effort?: CodexReasoningEffort
-  serviceTier?: 'fast'
+  serviceTier?: NonNullable<CodexClientRequestParamsByMethod['turn/start']['serviceTier']>
 }
 
 type CodexReasoningEffort = NonNullable<CodexClientRequestParamsByMethod['turn/start']['effort']>
@@ -2735,8 +2734,8 @@ function codexModelOptions(
   if (input.modelSelection.providerInstanceId !== input.providerInstanceId) return {}
 
   const effort = codexReasoningEffort(input.modelSelection.options)
-  const serviceTier =
-    modelOptionValue(input.modelSelection.options, 'fastMode') === true ? 'fast' : undefined
+  const selectedTier = modelOptionValue(input.modelSelection.options, 'serviceTier')
+  const serviceTier = typeof selectedTier === 'string' ? selectedTier.trim() : undefined
 
   return {
     ...(effort ? { effort } : {}),
@@ -2845,45 +2844,6 @@ function modelFromCodexModel(
     name,
     shortName: name,
     slug,
-  }
-}
-
-/**
- * Absent capabilities are `null`, never `{ reasoningEfforts: [] }`: an empty
- * list reads to the client as "this model has levels, just none of them" and
- * would render an empty picker. A default with nothing to pick from is equally
- * useless, so the whole object hangs on the list having members.
- */
-function codexModelCapabilities(
-  value: CodexClientRequestResultByMethod['model/list']['data'][number],
-): ProviderModelCapabilities | null {
-  const reasoningEfforts = value.supportedReasoningEfforts
-    .map(codexReasoningEffortChoice)
-    .filter(isPresent)
-  if (reasoningEfforts.length === 0) return null
-
-  const defaultReasoningEffort = value.defaultReasoningEffort.trim()
-  return {
-    ...(defaultReasoningEffort.length > 0 ? { defaultReasoningEffort } : {}),
-    reasoningEfforts,
-  }
-}
-
-/**
- * Codex is the authority on which efforts a model accepts, so the advertised
- * list is relayed verbatim — including members this pinned schema predates.
- * Only a blank id is dropped, because it can never be sent back to `turn/start`.
- */
-function codexReasoningEffortChoice(
-  value: CodexClientRequestResultByMethod['model/list']['data'][number]['supportedReasoningEfforts'][number],
-): ModelReasoningEffortOption | null {
-  const effort = value.reasoningEffort.trim()
-  if (effort.length === 0) return null
-
-  const description = value.description.trim()
-  return {
-    ...(description.length > 0 ? { description } : {}),
-    effort,
   }
 }
 

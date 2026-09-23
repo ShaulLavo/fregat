@@ -70,6 +70,7 @@
         "parity/composer-defaults.ts",
         "parity/follow-ups.ts",
         "parity/local-commands.ts",
+        "parity/model-options.ts",
         "parity/notifications.ts",
         "parity/ordering.ts",
         "parity/response-delivery.ts",
