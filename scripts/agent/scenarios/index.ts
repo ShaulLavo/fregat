@@ -79,6 +79,7 @@ import { editorSplitTargets } from './editor-split-targets'
 import { editorSplitBreadcrumbs } from './editor-split-breadcrumbs'
 import { editorSplitHistoryState } from './editor-split-history-state'
 import { pageLifecycle } from './page-lifecycle'
+import { editorConflictMerge } from './editor-conflict-merge'
 import { editorExternalEdit } from './editor-external-edit'
 import { editorThemePreview } from './editor-theme-preview'
 import { editorNativeCoverage } from './editor-native-coverage'
@@ -228,6 +229,7 @@ export const scenarios: readonly Scenario[] = [
   editorSplitTargets,
   editorSplitBreadcrumbs,
   editorSplitHistoryState,
+  editorConflictMerge,
   editorExternalEdit,
   terminalBackground,
   bottomPanelPersistence,
@@ -303,10 +305,10 @@ export const scenarios: readonly Scenario[] = [
   gitDiffInlineTint,
   gitDiffLineComment,
   chatCardNarrow,
-  chatGitTabSwitch,
-  chatGitTurnRows,
   chatComposerInsert,
   chatDisclosureSettle,
+  chatGitTabSwitch,
+  chatGitTurnRows,
   editorUndoReopen,
   editorReloadPaint,
   editorReloadPaintSlowFont,

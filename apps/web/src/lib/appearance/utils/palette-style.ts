@@ -1,10 +1,6 @@
 import { bundledPalette, DEFAULT_PALETTE_ID } from '@workspace/contracts'
 import { paletteStylesheet } from '@workspace/client-core/themes/palette'
-
-// Also read inline by the boot script in apps/web/index.html, which runs
-// before any module can load — renaming either means changing both.
-export const PALETTE_STYLE_ID = 'platform-palette'
-const PALETTE_BOOT_KEY = 'platform.palette-boot.v1'
+import { PALETTE_BOOT_KEY, PALETTE_STYLE_ID } from '@/lib/boot-keys'
 
 type StyleHost = Pick<Document, 'getElementById' | 'createElement' | 'head'>
 

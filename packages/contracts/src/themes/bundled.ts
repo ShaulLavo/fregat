@@ -220,8 +220,6 @@ export const SAGE_PALETTE_DOCUMENT = {
   },
 } as const satisfies PaletteDocument
 
-export const DEFAULT_PALETTE_ID = 'graphite'
-
 const BUNDLED_PALETTE_DOCUMENTS: readonly unknown[] = [
   GRAPHITE_PALETTE_DOCUMENT,
   SAGE_PALETTE_DOCUMENT,

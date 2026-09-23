@@ -1,22 +1,21 @@
 import { queryOptions } from '@tanstack/react-query'
+import { DEFAULT_EDITOR_FONT_FAMILY } from '@workspace/contracts'
 import { activeServerOrigin } from '@/lib/client'
 import { appearanceKeys } from '@/lib/query-keys'
-
-const DEFAULT_NERD_FONT_ID = 'JetBrainsMono'
 
 /**
  * The family a fetched Nerd Font is registered under.
  *
  * Derived from the id rather than the vendor's display name (`JetBrainsMono` the
  * id ships as `JetBrains Mono Nerd Font`), because nothing maps between the two
- * and the id is the only name the client and server share. index.html registers
+ * and the id is the only name the client and server share. src/boot-appearance.ts registers
  * the same name before the bundle loads, so the two must change together.
  */
 function nerdFontFamily(fontId: string): string {
   return `${fontId} Nerd Font`
 }
 
-export const DEFAULT_NERD_FONT_FAMILY = nerdFontFamily(DEFAULT_NERD_FONT_ID)
+export const DEFAULT_NERD_FONT_FAMILY = nerdFontFamily(DEFAULT_EDITOR_FONT_FAMILY)
 
 /**
  * The CSS stack for a font setting, which may be a Nerd Font id or a family the
@@ -37,7 +36,7 @@ export function fontStack(value: string): string {
 }
 
 /** Derived, not written out again: one definition of what a font stack is. */
-export const DEFAULT_MONO_FONT_STACK = fontStack(DEFAULT_NERD_FONT_ID)
+export const DEFAULT_MONO_FONT_STACK = fontStack(DEFAULT_EDITOR_FONT_FAMILY)
 
 type FontSetTarget = Iterable<FontFace> & {
   add(fontFace: FontFace): unknown

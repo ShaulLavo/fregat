@@ -550,7 +550,7 @@ export class SemanticTokenController {
     // count is close enough to matter: UTF-8 is at most three bytes per UTF-16
     // unit, so anything under a third of the cap cannot reach it.
     if (length <= cap / 3) return false
-    if (length <= cap && utf8Length(document.textSnapshot.readRange(0, length)) <= cap) return false
+    if (length <= cap && utf8ByteLength(document.textSnapshot) <= cap) return false
 
     // Logged once per document rather than per request: above the cap every
     // request would say the same thing, and the user's only symptom is that
@@ -766,9 +766,30 @@ function paddedRange(document: LspDocument, demand: SemanticTokenRangeRequest): 
   }
 }
 
-/** What the file weighs on the wire, which is the unit every server's size limit is in. */
-function utf8Length(text: string): number {
-  return new TextEncoder().encode(text).length
+/**
+ * UTF-8 bytes on the wire, the unit every server's size limit is in, counted chunk by chunk so
+ * measuring never copies the document. An unpaired surrogate is written as U+FFFD: three bytes.
+ */
+function utf8ByteLength(source: LspDocument['textSnapshot']): number {
+  let bytes = 0
+  let highSurrogate = false
+  source.forEachTextChunk((chunk) => {
+    for (let index = 0; index < chunk.length; index += 1) {
+      const code = chunk.charCodeAt(index)
+      const paired = highSurrogate && code >= 0xdc00 && code <= 0xdfff
+      if (highSurrogate) bytes += paired ? 4 : 3
+      highSurrogate = !paired && code >= 0xd800 && code <= 0xdbff
+      if (paired || highSurrogate) continue
+      bytes += utf8UnitBytes(code)
+    }
+  })
+  return highSurrogate ? bytes + 3 : bytes
+}
+
+function utf8UnitBytes(code: number): number {
+  if (code < 0x80) return 1
+  if (code < 0x800) return 2
+  return 3
 }
 
 /** The protocol spells an offered sub-capability as `true` or as an options object. */

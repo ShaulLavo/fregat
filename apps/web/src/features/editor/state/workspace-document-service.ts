@@ -3,11 +3,8 @@ import { markEditorOpenBenchmark } from '@/lib/editor-open-benchmark-mark'
 import { createHistoryBuffer } from '@/features/editor/state/history-buffer'
 import { createClientInvariantError } from '@/lib/structured-errors'
 
-import {
-  contentRevisionForText,
-  fileContentRevision,
-  textSnapshotEqualsText,
-} from '@/features/editor/utils/text-snapshot'
+import { contentRevisionForText, fileContentRevision } from '@/features/editor/utils/text-snapshot'
+import { textSnapshotEqualsText } from '@/lib/text-snapshot-equality'
 import type { PreparedFileOpenClaim } from '@/lib/file-open-intent/types'
 import { documentKey, fileDocument, fileDocumentKey } from '@/lib/documents/utils/identity'
 import { filesystemResource } from '@/lib/documents/utils/capabilities'

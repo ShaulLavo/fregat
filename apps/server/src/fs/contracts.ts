@@ -3,6 +3,7 @@ import {
   workspaceSearchMatchSchema as sharedSearchMatchSchema,
 } from '@workspace/contracts'
 import {
+  WORKSPACE_SEARCH_LIMIT_MAX,
   workspaceAddressIdSchema,
   workspaceSearchGlobPatterns,
   type WorkspaceResourcePrecondition,
@@ -11,9 +12,7 @@ import * as v from 'valibot'
 
 export const pathSchema = v.pipe(v.string(), v.maxLength(4096))
 const depthQueryValueSchema = integerQueryValueSchema('1', 10)
-// 20000 matches VS Code's default result cap. Truncation is where a parallel
-// ripgrep run stops being deterministic, so the cap is high enough to be rare.
-const limitQueryValueSchema = integerQueryValueSchema('50', 20000)
+const limitQueryValueSchema = integerQueryValueSchema('50', WORKSPACE_SEARCH_LIMIT_MAX)
 const recentLimitQueryValueSchema = integerQueryValueSchema('20', 50)
 
 export const booleanQueryValueSchema = v.pipe(

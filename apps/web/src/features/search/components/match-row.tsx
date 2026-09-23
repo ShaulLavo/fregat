@@ -15,6 +15,7 @@ import {
   searchMatchOpenLabel,
   matchPreviewMaxLength,
 } from '@/features/search/utils/row-labels'
+import type { MeasurePreviewCell } from '@/features/search/state/preview-budget'
 
 export const SearchMatchRow = memo(
   ({
@@ -24,6 +25,7 @@ export const SearchMatchRow = memo(
     canReplace,
     compact,
     match,
+    measurePreviewCell,
     previewMaxLength,
     replaceQuery,
     replaceText,
@@ -38,6 +40,7 @@ export const SearchMatchRow = memo(
     canReplace?: boolean
     compact?: boolean
     match: WorkspaceSearchMatch
+    measurePreviewCell?: MeasurePreviewCell
     previewMaxLength?: number
     replaceQuery: WorkspaceSearchQuery | null
     replaceText: string
@@ -82,6 +85,7 @@ export const SearchMatchRow = memo(
             className={cn('flex min-w-0 items-center gap-2 overflow-hidden', compact && 'gap-1.5')}
           >
             <span
+              ref={measurePreviewCell}
               className={cn(
                 'block min-w-0 flex-1 truncate font-mono text-2xs leading-5',
                 compact && 'leading-4',

@@ -6,6 +6,7 @@ import { SearchMatchRow } from '@/features/search/components/match-row'
 import { SearchNameMatchRow } from '@/features/search/components/name-match-row'
 import { useSearchResultActions } from '@/features/search/hooks/use-result-actions'
 import type { SearchResultItem } from '@/features/search/utils/result-items'
+import type { MeasurePreviewCell } from '@/features/search/state/preview-budget'
 
 export const SearchResultRow = memo(
   ({
@@ -14,6 +15,7 @@ export const SearchResultRow = memo(
     item,
     canReplace,
     compact,
+    measurePreviewCell,
     previewMaxLength,
     query,
     replaceQuery,
@@ -25,6 +27,7 @@ export const SearchResultRow = memo(
     item: SearchResultItem
     canReplace?: boolean
     compact?: boolean
+    measurePreviewCell?: MeasurePreviewCell
     previewMaxLength?: number
     query: string
     replaceQuery: WorkspaceSearchQuery | null
@@ -58,6 +61,7 @@ export const SearchResultRow = memo(
           rowProps={rowProps}
           compact={compact}
           match={item.match}
+          measurePreviewCell={measurePreviewCell}
           previewMaxLength={previewMaxLength}
           query={query}
           onOpenMatch={() => {
@@ -75,6 +79,7 @@ export const SearchResultRow = memo(
         canReplace={canReplace}
         compact={compact}
         match={item.match}
+        measurePreviewCell={measurePreviewCell}
         previewMaxLength={previewMaxLength}
         replaceQuery={replaceQuery}
         replaceText={replaceText}

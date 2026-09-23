@@ -1,4 +1,7 @@
-import { errorSummary as searchErrorSummary } from '@workspace/contracts'
+import {
+  errorSummary as searchErrorSummary,
+  WORKSPACE_SEARCH_LIMIT_MAX,
+} from '@workspace/contracts'
 import { matchesWorkspaceRoot as isPathInWorkspace } from '@/lib/path-formatters'
 import { elapsedMs } from '@workspace/utils/timing'
 import type { Client } from '@/lib/client'
@@ -17,9 +20,6 @@ import {
 import { log } from '@/lib/client-logging'
 import { streamWorkspaceSearch } from '@workspace/client-core/files/search-client'
 import { compareSearchPaths } from '@/features/search/utils/sort'
-
-// Mirrors the route's cap on `limit`.
-const MAX_DISK_SEARCH_LIMIT = 20000
 
 export type SearchProvider = {
   search(query: WorkspaceSearchQuery, signal?: AbortSignal): AsyncIterable<WorkspaceSearchEvent>
@@ -247,7 +247,7 @@ function diskSearchLimit(queryLimit: number, emittedCount: number, dirtyPathCoun
   if (dirtyPathCount === 0) return remaining
 
   const dirtyPathAllowance = dirtyPathCount * queryLimit
-  return Math.min(MAX_DISK_SEARCH_LIMIT, Math.max(queryLimit, remaining + dirtyPathAllowance))
+  return Math.min(WORKSPACE_SEARCH_LIMIT_MAX, Math.max(queryLimit, remaining + dirtyPathAllowance))
 }
 
 function appendCompositeEvent(

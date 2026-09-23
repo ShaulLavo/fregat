@@ -10,7 +10,8 @@ export const searchEditorGeometrySelectors = {
   header: searchEditorFileRowSelector,
   row: '[data-index]',
   listRow: '[data-slot="list-row"]',
-  excerpt: '.editor-virtualized-row',
+  // The editor parks recycled rows with `hidden`, whose rect is all zeros.
+  excerpt: '.editor-virtualized-row:not([hidden])',
   result: '[role="treeitem"][aria-level="2"]',
   editor: '.search-result-file-editor-host',
 }
@@ -332,6 +333,8 @@ export const selectors = {
     page.getByRole('dialog').getByRole('button', { name: /^Delete( permanently)?$/ }),
   fileConflict: (page: Page, name: string) =>
     page.getByRole('alertdialog', { name: `${name} changed on disk`, exact: true }),
+  mergeConflictLensAction: (page: Page, label: string) =>
+    page.locator('.editor-merge-conflict-lens').getByRole('button', { name: label, exact: true }),
   resizablePanel: (page: Page, id: string) =>
     page.locator(`[data-slot="resizable-panel"][id="${id}"]`),
   bottomTab: (page: Page, name: 'Terminal' | 'Problems') =>
@@ -565,9 +568,6 @@ export const selectors = {
   terminalAskAgent: (page: Page) =>
     page.getByRole('menuitem', { name: 'Ask the Agent', exact: true }),
   chatMessages: (page: Page) => page.getByRole('log', { name: 'Messages', exact: true }),
-  stageChanges: (page: Page) =>
-    page.getByRole('button', { name: 'Stage all changes', exact: true }),
-  changesHeader: (page: Page) => page.getByRole('button', { name: 'Changes', exact: true }),
   chatDisclosures: (page: Page) =>
     page
       .getByRole('log', { name: 'Messages', exact: true })
@@ -581,6 +581,9 @@ export const selectors = {
   composerActions: (page: Page) => page.locator('[data-composer-actions]'),
   askAgentAboutLines: (page: Page) =>
     page.getByRole('button', { name: 'Ask the agent about these lines', exact: true }),
+  stageChanges: (page: Page) =>
+    page.getByRole('button', { name: 'Stage all changes', exact: true }),
+  changesHeader: (page: Page) => page.getByRole('button', { name: 'Changes', exact: true }),
   commitMessage: (page: Page) => page.getByRole('textbox', { name: 'Commit message', exact: true }),
   commitButton: (page: Page) => page.getByRole('button', { name: /^Commit\b/ }),
   commitOutput: (page: Page) => page.getByRole('log', { name: 'Commit output', exact: true }),

@@ -6,6 +6,7 @@ import { memo } from 'react'
 import { searchMatchDisplay } from '@/features/search/utils/match-display'
 import { HighlightedPreview } from '@/features/search/components/highlight'
 import { cn } from '@workspace/ui/lib/utils'
+import type { MeasurePreviewCell } from '@/features/search/state/preview-budget'
 
 export const SearchNameMatchRow = memo(
   ({
@@ -14,6 +15,7 @@ export const SearchNameMatchRow = memo(
     className,
     compact,
     match,
+    measurePreviewCell,
     previewMaxLength,
     query,
     onOpenMatch,
@@ -23,6 +25,7 @@ export const SearchNameMatchRow = memo(
     className?: string
     compact?: boolean
     match: WorkspaceSearchMatch
+    measurePreviewCell?: MeasurePreviewCell
     previewMaxLength?: number
     query: string
     onOpenMatch: (match: WorkspaceSearchMatch) => void
@@ -56,7 +59,7 @@ export const SearchNameMatchRow = memo(
             compact && 'size-(--icon-size-sm)',
           )}
         />
-        <span className='block min-w-0 truncate text-xs'>
+        <span ref={measurePreviewCell} className='block min-w-0 truncate text-xs'>
           <HighlightedPreview preview={display.text} query={query} range={display.range} />
         </span>
         <span

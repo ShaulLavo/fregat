@@ -11,6 +11,7 @@ import {
 } from '@singapore-editor/lsp-plugin/diagnostics-presenter'
 
 import { documentKey, settingsJsonDocument } from '@/lib/documents/utils/identity'
+import { textSnapshotEqualsText } from '@/lib/text-snapshot-equality'
 import { settingsEditorDiagnostics } from '@/features/settings/utils/diagnostics'
 import type { SettingsDiagnosticsSource } from '@/features/settings/state/diagnostics-source'
 
@@ -69,10 +70,7 @@ class SettingsDiagnosticsContribution implements EditorViewContribution {
       this.presenter.clear()
       return
     }
-    if (
-      editor.textSnapshot.length !== snapshot.file.text.length ||
-      editor.textSnapshot.readRange(0, editor.textSnapshot.length) !== snapshot.file.text
-    ) {
+    if (!textSnapshotEqualsText(editor.textSnapshot, snapshot.file.text)) {
       this.presenter.clear()
       return
     }

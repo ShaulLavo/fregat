@@ -52,7 +52,7 @@ export function SearchResultsView({
   const parentRef = useRef<HTMLDivElement>(null)
   const virtualRef = useRef<VirtualListHandle>(null)
   const { openMatch, selectResult, toggleGroup } = useSearchResultActions()
-  const previewMaxLength = useSearchPreviewMaxLength(parentRef, replaceVisible)
+  const preview = useSearchPreviewMaxLength()
   const items = searchResultItems(groups)
   function toggle(id: string) {
     const item = searchResultItemById(items, id)
@@ -171,7 +171,8 @@ export function SearchResultsView({
           }}
           canReplace={canReplace}
           compact={compact}
-          previewMaxLength={previewMaxLength}
+          measurePreviewCell={preview.measureCell}
+          previewMaxLength={preview.maxLength}
           query={query}
           replaceQuery={resultsSearchQuery}
           replaceText={replaceText}

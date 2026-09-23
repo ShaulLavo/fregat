@@ -18,12 +18,10 @@ import { EnvironmentTransportsProvider } from '@/providers/environment-transport
 import { primaryQueryClient } from '@/lib/environments/state/query-clients'
 
 export function ApplicationBootstrap({
-  boot,
   bootstrap,
   children,
 }: {
   readonly bootstrap: ReturnType<typeof createBootstrap>
-  readonly boot: { readonly 'workbench.density': 'compact' | 'cozy' }
   readonly children: ReactNode
 }) {
   const { application, error } = useStore(bootstrap)
@@ -75,9 +73,7 @@ export function ApplicationBootstrap({
             <FocusProvider>
               <HotkeysProvider>
                 <CommandBusProvider binding={application.commandBinding}>
-                  <ActiveEnvironmentApplication bootDensity={boot['workbench.density']}>
-                    {children}
-                  </ActiveEnvironmentApplication>
+                  <ActiveEnvironmentApplication>{children}</ActiveEnvironmentApplication>
                 </CommandBusProvider>
               </HotkeysProvider>
             </FocusProvider>

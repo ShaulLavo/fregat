@@ -3,9 +3,9 @@ import { describe, expect, it } from 'vitest'
 import {
   applyPaletteStylesheet,
   bootPaletteStylesheet,
-  PALETTE_STYLE_ID,
   writePaletteBootCache,
 } from '../utils/palette-style'
+import { PALETTE_STYLE_ID } from '@/lib/boot-keys'
 
 describe('applyPaletteStylesheet', () => {
   it('creates, rewrites and removes one style element', () => {

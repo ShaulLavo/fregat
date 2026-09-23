@@ -1,4 +1,5 @@
 import { WORKSPACE_CACHE_STORAGE_KEYS } from '@/features/workspace/state/cache'
+import { BOOT_MIRROR_KEY, PALETTE_BOOT_KEY } from '@/lib/boot-keys'
 
 /**
  * Which state is a place, which is a preference, and which must never be replayed.
@@ -68,7 +69,7 @@ export const STATE_CLASSIFICATIONS: Readonly<Record<string, ClassifiedState>> = 
   },
   paletteBoot: {
     classification: 'preference',
-    storageKey: 'platform.palette-boot.v1',
+    storageKey: PALETTE_BOOT_KEY,
     why: 'the palette CSS cached for first paint, derived from the palette preference',
   },
   environmentBinding: {
@@ -182,7 +183,7 @@ export const STATE_CLASSIFICATIONS: Readonly<Record<string, ClassifiedState>> = 
   },
   settingsBootMirror: {
     classification: 'preference',
-    storageKey: 'platform.settings-boot-mirror.v1',
+    storageKey: BOOT_MIRROR_KEY,
     why: 'the settings snapshot read before the first query lands',
   },
   settingsCategory: {

@@ -430,6 +430,17 @@ export {
 } from './settings/schema'
 export { settingControl, type SettingControl } from './settings/control'
 export {
+  COLOR_THEME_MODES,
+  DEFAULT_COLOR_THEME,
+  DEFAULT_EDITOR_FONT_FAMILY,
+  DEFAULT_PALETTE_ID,
+  DEFAULT_WALLPAPER_SELECTION,
+  DEFAULT_WORKBENCH_DENSITY,
+  WORKBENCH_DENSITIES,
+  isWorkbenchDensity,
+  type WorkbenchDensity,
+} from './settings/boot-defaults'
+export {
   DEFAULT_SETTINGS_DOCUMENT_REVISION,
   defaultSettingsDocument,
 } from './settings/defaults-document'
@@ -800,7 +811,6 @@ export {
 } from './themes/palette'
 export {
   BUNDLED_PALETTES,
-  DEFAULT_PALETTE_ID,
   GRAPHITE_PALETTE_DOCUMENT,
   SAGE_PALETTE_DOCUMENT,
   bundledPalette,
@@ -846,7 +856,11 @@ export { nodeErrorCode } from './error-fields'
 
 export { chatCommandSummary } from './command-summary'
 
-export { entryTypeSchema, workspaceSearchMatchSchema } from './workspace-search'
+export {
+  WORKSPACE_SEARCH_LIMIT_MAX,
+  entryTypeSchema,
+  workspaceSearchMatchSchema,
+} from './workspace-search'
 
 export {
   attachmentUploadInputSchema,

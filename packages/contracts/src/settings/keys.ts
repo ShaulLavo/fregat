@@ -12,9 +12,18 @@ import {
   providerInstanceConfigsSchema,
   semanticTokenServerOverridesSchema,
 } from '../settings'
-import { DEFAULT_PALETTE_ID } from '../themes/bundled'
 import { paletteIdSchema } from '../themes/palette'
+import {
+  COLOR_THEME_MODES,
+  DEFAULT_COLOR_THEME,
+  DEFAULT_EDITOR_FONT_FAMILY,
+  DEFAULT_PALETTE_ID,
+  DEFAULT_WALLPAPER_SELECTION,
+  DEFAULT_WORKBENCH_DENSITY,
+  WORKBENCH_DENSITIES,
+} from './boot-defaults'
 import { defineSetting, type SettingDescriptor } from './registry'
+import { WORKSPACE_SEARCH_LIMIT_MAX } from '../workspace-search'
 
 /**
  * Every setting this build knows about, keyed by its dotted id.
@@ -181,8 +190,8 @@ export const SETTINGS_REGISTRY = {
     keywords: ['remote', 'ssh', 'environment', 'server', 'connect'],
   }),
   'workbench.colorTheme': defineSetting({
-    schema: v.picklist(['dark', 'light', 'system'] as const),
-    default: 'system',
+    schema: v.picklist(COLOR_THEME_MODES),
+    default: DEFAULT_COLOR_THEME,
     scope: 'window',
     widget: 'enum',
     category: 'Appearance',
@@ -274,8 +283,8 @@ export const SETTINGS_REGISTRY = {
     keywords: ['tui', 'terminal', 'animation', 'accessibility', 'motion'],
   }),
   'workbench.density': defineSetting({
-    schema: v.picklist(['compact', 'cozy'] as const),
-    default: 'compact',
+    schema: v.picklist(WORKBENCH_DENSITIES),
+    default: DEFAULT_WORKBENCH_DENSITY,
     scope: 'window',
     widget: 'enum',
     category: 'Appearance',
@@ -342,7 +351,7 @@ export const SETTINGS_REGISTRY = {
   }),
   'workbench.wallpaper': defineSetting({
     schema: wallpaperSelectionSchema,
-    default: { enabled: true, source: { kind: 'desktop' } },
+    default: DEFAULT_WALLPAPER_SELECTION,
     scope: 'application',
     widget: 'wallpaper',
     category: 'Appearance',
@@ -365,7 +374,7 @@ export const SETTINGS_REGISTRY = {
     // of these on demand, so naming one is a font the user actually gets — where
     // a free-text stack naming a font nobody has installed silently does nothing.
     schema: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(64)),
-    default: 'JetBrainsMono',
+    default: DEFAULT_EDITOR_FONT_FAMILY,
     scope: 'window',
     widget: 'font',
     category: 'Editor',
@@ -600,26 +609,25 @@ export const SETTINGS_REGISTRY = {
     keywords: ['search', 'word', 'boundary'],
   }),
   'search.maxResults': defineSetting({
-    schema: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(20000)),
-    default: 20000,
+    schema: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(WORKSPACE_SEARCH_LIMIT_MAX)),
+    default: WORKSPACE_SEARCH_LIMIT_MAX,
     scope: 'window',
     widget: 'number',
     category: 'Search',
-    // The route caps this at 20000 and rejects rather than clamps, so the schema
-    // has to agree or a legal-looking setting produces a failed request.
+    // The route rejects rather than clamps, so the schema shares its cap or a legal-looking
+    // setting produces a failed request.
     description: 'How many matches a workspace search returns.',
     keywords: ['search', 'results', 'limit'],
   }),
   'search.maxResultFiles': defineSetting({
-    schema: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(20000)),
-    default: 20000,
+    schema: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(WORKSPACE_SEARCH_LIMIT_MAX)),
+    default: WORKSPACE_SEARCH_LIMIT_MAX,
     scope: 'window',
     widget: 'number',
     category: 'Search',
     // Separate from `search.maxResults`: one pathological file can hold every
     // match in the budget, so bounding matches alone still yields a one-file
-    // result set. The route caps this at 20000 for the same reason as the match
-    // limit.
+    // result set. The route caps it at the same limit.
     description: 'How many files a workspace search returns matches from.',
     visibility: 'advanced',
     keywords: ['search', 'results', 'files', 'limit'],

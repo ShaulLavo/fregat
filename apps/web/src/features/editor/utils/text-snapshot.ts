@@ -1,24 +1,10 @@
-import type { TextSnapshot } from '@singapore-editor/core/document'
+import type { TextReadSnapshot } from '@singapore-editor/core/document'
 import { updateStableHashCode } from '@workspace/client-core/address/path-hash'
 
 export type TextSnapshotLineRange = {
   end: number
   start: number
   text: string
-}
-
-export function textSnapshotEqualsText(textSnapshot: TextSnapshot, text: string) {
-  if (textSnapshot.length !== text.length) return false
-
-  let equal = true
-  textSnapshot.forEachTextChunk((chunk, start, end) => {
-    if (!equal) return
-    if (text.slice(start, end) === chunk) return
-
-    equal = false
-  })
-
-  return equal
 }
 
 export function contentRevisionForText(text: string) {
@@ -30,7 +16,7 @@ export function fileContentRevision(fileVersion: string) {
 }
 
 export function textSnapshotLineRange(
-  textSnapshot: TextSnapshot,
+  textSnapshot: TextReadSnapshot,
   row: number,
 ): TextSnapshotLineRange | null {
   if (row < 0 || row >= textSnapshot.lineCount) return null

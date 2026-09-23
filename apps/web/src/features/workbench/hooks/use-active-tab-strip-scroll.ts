@@ -7,9 +7,6 @@ import {
 } from '@/features/workbench/state/tab-strip-metrics'
 import { tabStripScrollLeft } from '@/features/workbench/utils/tab-strip-scroll'
 
-/** Matches the strip's `px-2`, so a revealed tab never sits flush against the edge. */
-const TAB_STRIP_GUTTER = 8
-
 /**
  * Scrolls the strip to the selected tab. Anything that opens a file — the tree,
  * quick access, a git diff, go-to-definition, a chat checkpoint — selects a tab
@@ -56,7 +53,7 @@ export function useActiveTabStripScroll(
 
     const behavior = hasRevealedRef.current ? revealBehavior() : 'instant'
     hasRevealedRef.current = true
-    const left = tabStripScrollLeft({ gutter: TAB_STRIP_GUTTER, ...bounds })
+    const left = tabStripScrollLeft({ gutter: scrollGutter(strip), ...bounds })
     if (left === null) return
 
     metrics.noteScrollTarget(left)
@@ -71,6 +68,11 @@ export function useActiveTabStripScroll(
     },
     [onNode],
   )
+}
+
+/** The strip's own `scroll-padding`, so a revealed tab never sits flush against the edge. */
+function scrollGutter(strip: HTMLElement): number {
+  return Number.parseFloat(getComputedStyle(strip).scrollPaddingInlineStart) || 0
 }
 
 /** Motion is the point, but not against the wishes of someone who asked the OS for less of it. */

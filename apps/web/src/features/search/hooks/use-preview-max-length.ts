@@ -1,12 +1,11 @@
-import { useElementWidth } from '@/hooks/use-element-width'
-import { useMemo, type RefObject } from 'react'
-import { searchPreviewMaxLength } from '@/features/search/utils/preview-length'
+import { useState, useSyncExternalStore } from 'react'
 
-export function useSearchPreviewMaxLength(
-  ref: RefObject<HTMLDivElement | null>,
-  replaceVisible: boolean | undefined,
-) {
-  const width = useElementWidth(ref)
+import { createPreviewBudget } from '@/features/search/state/preview-budget'
 
-  return useMemo(() => searchPreviewMaxLength(width, replaceVisible), [replaceVisible, width])
+export function useSearchPreviewMaxLength() {
+  // Lazy state, not a memo: the rows' ref callback must keep one identity across renders.
+  const [budget] = useState(createPreviewBudget)
+  const maxLength = useSyncExternalStore(budget.subscribe, budget.maxLength)
+
+  return { maxLength, measureCell: budget.measureCell }
 }

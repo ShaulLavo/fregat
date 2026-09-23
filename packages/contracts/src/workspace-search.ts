@@ -1,6 +1,10 @@
 import * as v from 'valibot'
 import type { EntryTypeFilter } from './tree-entry'
 
+// VS Code's default result cap. Truncation is where a parallel ripgrep run stops being
+// deterministic, so the cap is high enough to be rare. The route rejects rather than clamps.
+export const WORKSPACE_SEARCH_LIMIT_MAX = 20000
+
 export type WorkspaceSearchMatchMode = 'literal' | 'regex' | 'fuzzy'
 export type WorkspaceSearchProviderSource = 'fallback' | 'fd' | 'index' | 'rg'
 type WorkspaceSearchIndexReadiness = 'cold' | 'building' | 'ready' | 'stale' | 'failed'

@@ -36,14 +36,9 @@ import { usePaletteCatalog } from '@/features/settings/hooks/use-palette-catalog
 import { useSettingsActions } from '@/features/settings/hooks/use-settings-actions'
 import { useSettingsDocument } from '@/features/settings/hooks/use-settings-document'
 import { useSettingsProjection } from '@/features/settings/hooks/use-settings-projection'
-import { WorkbenchDensityBootContext } from '@/features/settings/providers/density-context'
 import { ThemeContext, type Theme } from '@/features/settings/providers/theme-context'
 import type { SettingsSubmission } from '@workspace/client-core/settings/intent-store'
-import {
-  applyAppearance,
-  resolveColorTheme,
-  type AppearanceValues,
-} from '@/features/settings/utils/apply-appearance'
+import { applyAppearance, resolveColorTheme } from '@/features/settings/utils/apply-appearance'
 import { readSettingsMirror, writeBootMirror } from '@/lib/settings-boot-mirror'
 
 type Preview<T> = {
@@ -56,13 +51,7 @@ type Preview<T> = {
 const GRAPHITE = bundledPalette(DEFAULT_PALETTE_ID)!
 
 /** Owns all projected appearance, confirmed boot state, and color-mode preview. */
-export function AppearanceProvider({
-  bootDensity,
-  children,
-}: {
-  bootDensity: AppearanceValues['workbench.density']
-  children: ReactNode
-}) {
+export function AppearanceProvider({ children }: { children: ReactNode }) {
   const confirmedQuery = useSettingsDocument()
   const projection = useSettingsProjection()
   const { selectBundle, setColorTheme, setSetting } = useSettingsActions()
@@ -267,37 +256,32 @@ export function AppearanceProvider({
       }}
     >
       <AppearancePreviewContext value={renderedValues}>
-        <WorkbenchDensityBootContext value={bootDensity}>
-          <ThemeContext
+        <ThemeContext
+          value={{
+            clearThemePreview,
+            previewTheme,
+            resolvedTheme: resolvedMode,
+            setTheme,
+            theme: committedTheme,
+          }}
+        >
+          <PaletteContext
             value={{
-              clearThemePreview,
-              previewTheme,
-              resolvedTheme: resolvedMode,
-              setTheme,
-              theme: committedTheme,
+              paletteId: committedPaletteId,
+              catalog,
+              resolved: resolvePalette(renderedPalette ?? GRAPHITE, resolvedMode),
+              previewPalette,
+              clearPalettePreview,
+              selectPalette,
             }}
           >
-            <PaletteContext
-              value={{
-                paletteId: committedPaletteId,
-                catalog,
-                resolved: resolvePalette(renderedPalette ?? GRAPHITE, resolvedMode),
-                previewPalette,
-                clearPalettePreview,
-                selectPalette,
-              }}
-            >
-              <ViewTransition
-                default='none'
-                update={{ 'color-mode': 'color-mode', default: 'none' }}
-              >
-                <div className='size-full' data-color-mode={resolvedMode}>
-                  {children}
-                </div>
-              </ViewTransition>
-            </PaletteContext>
-          </ThemeContext>
-        </WorkbenchDensityBootContext>
+            <ViewTransition default='none' update={{ 'color-mode': 'color-mode', default: 'none' }}>
+              <div className='size-full' data-color-mode={resolvedMode}>
+                {children}
+              </div>
+            </ViewTransition>
+          </PaletteContext>
+        </ThemeContext>
       </AppearancePreviewContext>
     </BundleContext>
   )

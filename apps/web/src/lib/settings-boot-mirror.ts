@@ -9,15 +9,13 @@ import {
 } from '@workspace/contracts'
 import * as v from 'valibot'
 
+import { BOOT_MIRROR_KEY } from '@/lib/boot-keys'
+
 /**
  * Also mirrored, though they are not appearance: the editor's plugin list is
  * built outside React, at module scope, so it cannot read a React query. The
  * mirror is the only synchronous source of the user's choice at that point.
  */
-
-// Also read inline by the boot script in apps/web/index.html, which runs
-// before any module can load — renaming the key means changing both.
-const BOOT_MIRROR_KEY = 'platform.settings-boot-mirror.v1'
 
 /**
  * The keys readable synchronously, outside React.

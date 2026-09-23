@@ -11,7 +11,6 @@ import { StrictMode, useEffect, useState, type ReactElement, type ReactNode } fr
 
 import { EditorColorThemeProvider } from '@/features/editor/providers/color-theme-provider'
 import { AppearanceProvider } from '@/features/settings/providers/appearance-provider'
-import { readSettingsMirror } from '@/lib/settings-boot-mirror'
 import { FocusProvider } from '@/lib/focus/providers/provider'
 import type { FocusService } from '@/lib/focus/state/service'
 import { TestCommandProvider, type TestCommandRuntimeOptions } from './factories/command-runtime'
@@ -121,7 +120,7 @@ export function AppProviders({
           <SettingsOwnerProvider queryClient={settingsOwner ?? queryClient}>
             <LanguageServerMatchProvider>
               <FocusProvider service={focusService}>
-                <AppearanceProvider bootDensity={readSettingsMirror()['workbench.density']}>
+                <AppearanceProvider>
                   <EditorColorThemeProvider>
                     {command === false ? (
                       <CommandBusProvider binding={binding}>{content}</CommandBusProvider>
@@ -228,9 +227,7 @@ export function renderApplication(
             <FocusProvider>
               <HotkeysProvider>
                 <CommandBusProvider binding={application.commandBinding}>
-                  <ActiveEnvironmentApplication bootDensity='cozy'>
-                    {ui}
-                  </ActiveEnvironmentApplication>
+                  <ActiveEnvironmentApplication>{ui}</ActiveEnvironmentApplication>
                 </CommandBusProvider>
               </HotkeysProvider>
             </FocusProvider>

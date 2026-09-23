@@ -116,7 +116,7 @@ createRoot(document.getElementById('root')!, {
   <StrictMode>
     <LoggingErrorBoundary>
       <NavigationProvider navigation={navigation}>
-        <ApplicationBootstrap boot={boot} bootstrap={bootstrap}>
+        <ApplicationBootstrap bootstrap={bootstrap}>
           <App />
         </ApplicationBootstrap>
       </NavigationProvider>

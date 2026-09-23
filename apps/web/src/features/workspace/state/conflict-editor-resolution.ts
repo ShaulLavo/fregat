@@ -21,7 +21,7 @@ import type {
   WorkspaceDocumentPathReservationRequest,
 } from '@/features/editor/state/workspace-document-service'
 import type { WorkspaceEditRoot } from '@/features/editor/state/workspace-edit-service'
-import { textSnapshotEqualsText } from '@/features/editor/utils/text-snapshot'
+import { textSnapshotEqualsText } from '@/lib/text-snapshot-equality'
 import { observeClientOperation } from '@/lib/client-logging'
 import type { Client } from '@/lib/client'
 import { clientLogContext } from '@/lib/environments/state/log-context'

@@ -1141,12 +1141,6 @@
   },
   {
     "from": "workspace",
-    "to": "editor",
-    "module": "features/editor/utils/text-snapshot.ts",
-    "reason": "shared \u2192 lib: textSnapshotEqualsText is reused by workspace outside editor; move this shared behavior with its consumers."
-  },
-  {
-    "from": "workspace",
     "to": "git",
     "module": "features/git/hooks/use-status.ts",
     "reason": "shared \u2192 lib: useStatus is reused by workspace outside git; move this shared behavior with its consumers."
