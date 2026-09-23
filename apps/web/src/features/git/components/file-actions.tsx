@@ -1,4 +1,3 @@
-import { useStatus } from '@/features/git/hooks/use-status'
 import { ActionCluster } from '@/features/git/components/action-cluster'
 import { ArrowBendUpLeftIcon, MinusIcon, PlusIcon } from '@phosphor-icons/react'
 
@@ -34,27 +33,21 @@ export function FileActions({
 }
 
 function StageFileButton({ path, rootPath }: { path: string; rootPath: string }) {
-  const confirmed = Boolean(useStatus(rootPath).data)
   const stage = useStagePathMutation(path, rootPath)
 
   return (
-    <RowActionButton
-      disabled={!confirmed || stage.isPending}
-      label='Stage file'
-      onClick={() => stage.mutate()}
-    >
+    <RowActionButton disabled={stage.isPending} label='Stage file' onClick={() => stage.mutate()}>
       <PlusIcon />
     </RowActionButton>
   )
 }
 
 function UnstageFileButton({ path, rootPath }: { path: string; rootPath: string }) {
-  const confirmed = Boolean(useStatus(rootPath).data)
   const unstage = useUnstagePathMutation(path, rootPath)
 
   return (
     <RowActionButton
-      disabled={!confirmed || unstage.isPending}
+      disabled={unstage.isPending}
       label='Unstage file'
       onClick={() => unstage.mutate()}
     >
@@ -64,12 +57,11 @@ function UnstageFileButton({ path, rootPath }: { path: string; rootPath: string 
 }
 
 function DiscardFileButton({ path, rootPath }: { path: string; rootPath: string }) {
-  const confirmed = Boolean(useStatus(rootPath).data)
   const discard = useDiscardPathMutation(path, rootPath)
 
   return (
     <RowActionButton
-      disabled={!confirmed || discard.isPending}
+      disabled={discard.isPending}
       label='Discard file'
       onClick={() => discard.mutate()}
     >

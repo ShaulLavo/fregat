@@ -433,8 +433,10 @@ function recordElement(census, file, element, lineAt) {
 }
 
 function iconHintProblem(element) {
-  if (hasTitle(element.opening)) return 'icon-only title'
-  if (!hasTooltipTrigger(element)) return 'missing Tooltip'
+  // `data-tooltip` is the shared tooltip layer, not a native title: rows use it so nothing mounts per control.
+  const sharedTooltip = hasAttribute(element.opening, 'data-tooltip')
+  if (!sharedTooltip && hasTitle(element.opening)) return 'icon-only title'
+  if (!sharedTooltip && !hasTooltipTrigger(element)) return 'missing Tooltip'
   if (!['Button', 'InputGroupButton'].includes(element.name)) return null
   if (!booleanAttribute(element.opening, 'disabled')) return null
   if (booleanAttribute(element.opening, 'focusableWhenDisabled')) return null

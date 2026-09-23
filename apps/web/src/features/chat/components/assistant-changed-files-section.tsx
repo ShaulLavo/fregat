@@ -95,6 +95,7 @@ export function AssistantChangedFilesSection({ summary }: { summary: ChatTurnDif
           {hasNonZeroChatTurnDiffStat(summaryStat) ? (
             <span className='text-3xs shrink-0 font-mono tabular-nums @max-2xs/changed-files:hidden'>
               <DiffStatLabel
+                live
                 size='3xs'
                 additions={summaryStat.additions}
                 deletions={summaryStat.deletions}

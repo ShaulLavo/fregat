@@ -38,6 +38,8 @@ Graph roots exclude `refs/platform/*`. A browsing session pins tips and ref labe
 
 `git-commit-slow-hook` commits through a `pre-commit` hook that prints once and then stays silent for 35 seconds. It takes about 45 seconds and proves two things: hook-running git commands get the 15 minute limit rather than the 30 second local one, and the commit stream's reader skips the server's 15 second heartbeats.
 
+`scenario git-changes-scroll` builds a 3,000-file fixture repository, wheel-scrolls the Changes list and prints rAF frame gaps (`idle` is the control) plus mounted rows, then requires a recycled row's Stage button to show its tooltip through the shared layer. Rows carry no per-row ticker, `Tooltip` root or query observer; those made scrolling lag.
+
 `scenario git-open-all-diffs-spam` clicks Open all diffs eight times in a row on a six-file fixture. No error banner may appear and all six diff tabs must open: a superseded navigation must not abort the diff fetch the next one joined.
 
 `scenario git-diff-inline-tint` opens a diff where one line becomes several and reads `CSS.highlights`: the word tint must be present on open, unchanged after a hide/unhide of unmodified lines, and never cover a whole added line.

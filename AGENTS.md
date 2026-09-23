@@ -75,7 +75,7 @@
 - Panes compose `ToolPane` and its `ToolPaneHeader`: `PaneBar` headers, pending before error before empty, and a body focus ring. A terminal's host stays mounted while its loading overlay is visible.
 - Icons have two density tokens: `size-(--icon-size)` on controls and headings, `size-(--icon-size-sm)` in rows and text. Never choose a numeric icon size at a call site.
 - Text has two colors, `text-foreground` and `text-muted-foreground`; use `text-2xs` for a quieter size, never alpha. Disabled controls may use whole-control `opacity-50`.
-- Icon-only controls carry a `Tooltip`; `title` recovers truncated values and never duplicates a tooltip. Tooltip delays belong to the shared provider.
+- Icon-only controls carry a `Tooltip`; `title` recovers truncated values and never duplicates a tooltip. Tooltip delays belong to the shared provider. Controls inside virtualized rows use `data-tooltip` (the shared layer) instead: a `Tooltip` root per recycled row is a scroll cost.
 
 - Style with Tailwind classes and the `@workspace/ui` primitives. Do not write raw CSS or inline `style` props except for values that must be computed at runtime (dynamic positions, measured sizes).
 - Use theme tokens only. Color classes must resolve to a token: `bg-background`, `text-foreground`, `text-muted-foreground`, `bg-primary`, `bg-card`, `border-border`, etc.

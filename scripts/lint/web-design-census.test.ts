@@ -488,6 +488,15 @@ test('icon-only controls require a Tooltip and reject a native title beside it',
   expect(gate(subject).offenders.iconOnlyHint).toHaveLength(4)
 })
 
+test('icon-only controls accept the shared tooltip layer but still need focusableWhenDisabled', () => {
+  const subject = census(
+    "export const Controls = () => <><Button data-tooltip='Stage' disabled focusableWhenDisabled><PlusIcon /></Button><Button data-tooltip='Discard' disabled><UndoIcon /></Button></>",
+  )
+  expect(values(subject, 'iconOnlyHint')).toEqual([
+    'disabled Tooltip trigger needs focusableWhenDisabled',
+  ])
+})
+
 test('icon-only controls recognize conditional icons and TooltipTrigger render props', () => {
   const subject = census(
     'export const Controls = () => <><Button>{open ? <MinusIcon /> : <PlusIcon />}</Button><Tooltip><TooltipTrigger render={<Button><PlusIcon /></Button>} /></Tooltip><IconTooltip label="Add"><Button aria-label="Add"><AddIcon /></Button></IconTooltip></>',

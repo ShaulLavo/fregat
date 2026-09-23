@@ -57,6 +57,7 @@ import { terminalBackground } from './terminal-background'
 import { bottomPanelPersistence } from './bottom-panel-persistence'
 import { gitOpenAllDiffsSpam } from './git-open-all-diffs-spam'
 import { gitStageSettles } from './git-stage-settles'
+import { gitChangesScroll } from './git-changes-scroll'
 import { commandPaletteTypeBurst } from './command-palette-type-burst'
 import { paletteScriptsPending } from './palette-scripts-pending'
 import { settingsModelsPending } from './settings-models-pending'
@@ -229,6 +230,7 @@ export const scenarios: readonly Scenario[] = [
   bottomPanelPersistence,
   gitOpenAllDiffsSpam,
   gitStageSettles,
+  gitChangesScroll,
   commandPaletteTypeBurst,
   paletteScriptsPending,
   settingsModelsPending,
