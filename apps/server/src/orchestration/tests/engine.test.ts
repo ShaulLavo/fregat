@@ -673,66 +673,74 @@ describe('orchestration engine', () => {
     fixture.close()
   })
 
-  it('restores checkpoint refs and emits reverted after provider rollback', async () => {
-    const fixture = createFixture()
-    const root = await fixtureRoot()
-    await initGitRepository(root)
-    // The agent's edit lands inside the turn, so the ref `CheckpointReactor`
-    // captures when the turn settles is that turn's own result.
-    let turnFileContent = 'one\n'
-    const adapter = new MockProviderAdapter({
-      beforeComplete: () => writeFile(path.join(root, 'app.txt'), turnFileContent),
-    })
-    const engine = new OrchestrationEngine(fixture.database, {
-      providerRuntime: {
-        checkpointGit: new GitService(createWorkspacePaths(root), {
-          maxTextFileBytes: DEFAULT_MAX_TEXT_FILE_BYTES,
+  it.each([
+    { restoreFiles: true, fileContent: 'one\n' },
+    { restoreFiles: false, fileContent: 'two\n' },
+  ])(
+    'reverts the conversation with restoreFiles=$restoreFiles',
+    async ({ restoreFiles, fileContent }) => {
+      const fixture = createFixture()
+      const repositoryRoot = await fixtureRoot()
+      await initGitRepository(repositoryRoot)
+      await commitFile(repositoryRoot, 'base\n', 'base commit')
+      const root = path.join(repositoryRoot, 'linked')
+      await runGit(repositoryRoot, ['worktree', 'add', '--detach', root])
+      // The agent's edit lands inside the turn, so the ref `CheckpointReactor`
+      // captures when the turn settles is that turn's own result.
+      let turnFileContent = 'one\n'
+      const adapter = new MockProviderAdapter({
+        beforeComplete: () => writeFile(path.join(root, 'app.txt'), turnFileContent),
+      })
+      const engine = new OrchestrationEngine(fixture.database, {
+        providerRuntime: {
+          checkpointGit: new GitService(createWorkspacePaths(root), {
+            maxTextFileBytes: DEFAULT_MAX_TEXT_FILE_BYTES,
+          }),
+          adapterRegistry: new ProviderAdapterRegistry({ adapters: [adapter] }),
+        },
+      })
+      const turnTwoRef = checkpointRefForSessionTurn('00000000-0000-4000-8000-000000000001', 2)
+
+      await dispatchCheckpointRuntimeSession(engine, repositoryRoot, root, () => {
+        turnFileContent = 'two\n'
+      })
+
+      await engine.dispatch(
+        command({
+          commandId: 'cmd-checkpoint-revert',
+          createdAt: assistantCompleted,
+          sessionId: '00000000-0000-4000-8000-000000000001',
+          turnCount: 1,
+          type: 'session.checkpoint.revert',
+          restoreFiles,
         }),
-        adapterRegistry: new ProviderAdapterRegistry({ adapters: [adapter] }),
-      },
-    })
-    const turnTwoRef = checkpointRefForSessionTurn('00000000-0000-4000-8000-000000000001', 2)
+      )
+      await engine.providerRuntimeIdle()
 
-    await commitFile(root, 'base\n', 'base commit')
-    await dispatchCheckpointRuntimeSession(engine, root, () => {
-      turnFileContent = 'two\n'
-    })
+      const events = (await engine.replay({ afterSequence: 0 })).events
+      const detail = await engine.sessionDetailSnapshot('00000000-0000-4000-8000-000000000001')
 
-    await engine.dispatch(
-      command({
-        commandId: 'cmd-checkpoint-revert',
-        createdAt: assistantCompleted,
-        sessionId: '00000000-0000-4000-8000-000000000001',
-        turnCount: 1,
-        type: 'session.checkpoint.revert',
-        restoreFiles: false,
-      }),
-    )
-    await engine.providerRuntimeIdle()
-
-    const events = (await engine.replay({ afterSequence: 0 })).events
-    const detail = await engine.sessionDetailSnapshot('00000000-0000-4000-8000-000000000001')
-
-    expect(events.map((event) => event.type)).toContain('session.checkpoint-revert-requested')
-    expect(events.at(-1)).toMatchObject({
-      payload: { sessionId: '00000000-0000-4000-8000-000000000001', turnCount: 1 },
-      type: 'session.reverted',
-    })
-    expect(await readFile(path.join(root, 'app.txt'), 'utf8')).toBe('one\n')
-    expect(await gitRefExists(root, turnTwoRef)).toBe(false)
-    expect(adapter.rollbacks).toContainEqual({
-      numTurns: 1,
-      sessionId: v.parse(sessionIdSchema, '00000000-0000-4000-8000-000000000001'),
-    })
-    expect(detail.session.messages.map((message) => message.turnId)).not.toContain('turn-2')
-    expect(
-      Object.keys(
-        (await engine.readModelSnapshot()).sessions.get('00000000-0000-4000-8000-000000000001')
-          ?.checkpointByTurnId ?? {},
-      ),
-    ).toEqual(['turn-1'])
-    fixture.close()
-  })
+      expect(events.map((event) => event.type)).toContain('session.checkpoint-revert-requested')
+      expect(events.at(-1)).toMatchObject({
+        payload: { sessionId: '00000000-0000-4000-8000-000000000001', turnCount: 1 },
+        type: 'session.reverted',
+      })
+      expect(await readFile(path.join(root, 'app.txt'), 'utf8')).toBe(fileContent)
+      expect(await gitRefExists(root, turnTwoRef)).toBe(false)
+      expect(adapter.rollbacks).toContainEqual({
+        numTurns: 1,
+        sessionId: v.parse(sessionIdSchema, '00000000-0000-4000-8000-000000000001'),
+      })
+      expect(detail.session.messages.map((message) => message.turnId)).not.toContain('turn-2')
+      expect(
+        Object.keys(
+          (await engine.readModelSnapshot()).sessions.get('00000000-0000-4000-8000-000000000001')
+            ?.checkpointByTurnId ?? {},
+        ),
+      ).toEqual(['turn-1'])
+      fixture.close()
+    },
+  )
 
   it('projects interrupt and stop provider failures with operation-specific kinds', async () => {
     const interruptFixture = createFixture()
@@ -899,10 +907,32 @@ async function dispatchFirstSession(engine: OrchestrationEngine) {
 
 async function dispatchCheckpointRuntimeSession(
   engine: OrchestrationEngine,
+  repositoryRoot: string,
   workspaceRoot: string,
   beforeSecondTurn: () => void,
 ) {
-  await engine.dispatch(projectCreateCommand({ workspaceRoot }))
+  await engine.dispatch(
+    command({
+      ...projectCreateCommand({ workspaceRoot: repositoryRoot }),
+      worktreeId: '20000000-0000-4000-8000-000000000002',
+    }),
+  )
+  await engine.dispatch(
+    command({
+      type: 'worktree.register',
+      commandId: 'cmd-linked-register',
+      createdAt: now,
+      worktreeId: '20000000-0000-4000-8000-000000000001',
+      projectId: '10000000-0000-4000-8000-000000000001',
+      canonicalPath: workspaceRoot,
+      path: workspaceRoot,
+      branch: null,
+      kind: 'linked',
+      ownership: 'external',
+      registrationGeneration: 0,
+      updatedAt: now,
+    }),
+  )
   await engine.dispatch(
     sessionCreateCommand('00000000-0000-4000-8000-000000000001', 'cmd-session-create-checkpoint'),
   )

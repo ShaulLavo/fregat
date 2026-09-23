@@ -5,7 +5,7 @@ import { projectionTurns } from '../../db/schema'
 import { OrchestrationEventStore } from '../event-store'
 import { OrchestrationProjectionPipeline } from '../projection-pipeline'
 import { OrchestrationSnapshotQuery } from '../snapshot-query'
-import { ProjectionShellRowReader } from '../shell-row-reader'
+import { createShellRowReader, ProjectionShellRowReader } from '../shell-row-reader'
 import { DOMAIN_AT, DOMAIN_IDS, domainBootstrap, domainEvent } from './factories/session-domain'
 
 const handles: MetadataDatabaseHandle[] = []
@@ -159,6 +159,24 @@ describe('session domain projection', () => {
       pendingApprovalCount: 1,
       hasError: false,
     })
+  })
+  it('keeps streamed point reads aligned with changing live background tasks', () => {
+    const db = database()
+    new OrchestrationProjectionPipeline(db).applyEvents(domainBootstrap())
+    const states: Array<'working' | 'monitoring' | null> = ['working', 'monitoring', null]
+    let liveness: (typeof states)[number] = null
+    const snapshots = new OrchestrationSnapshotQuery(db, (sessionId) =>
+      sessionId === DOMAIN_IDS.session ? liveness : null,
+    )
+    const reader = createShellRowReader(snapshots, db)
+
+    for (const state of states) {
+      liveness = state
+      reader.beginWindow()
+      const session = reader.sessionShell(DOMAIN_IDS.session)
+      expect(session?.backgroundLiveness).toBe(state)
+      expect(session).toEqual(snapshots.shellSnapshot().sessions[0])
+    }
   })
   it('persists claims and exposes recovery interruptions after acknowledgement', () => {
     const db = database()

@@ -61,7 +61,7 @@ import {
 
 export class OrchestrationSnapshotQuery {
   private readonly database: OrchestrationDatabase
-  private readonly backgroundLiveness: (sessionId: string) => 'working' | 'monitoring' | null
+  readonly backgroundLiveness: (sessionId: string) => 'working' | 'monitoring' | null
 
   constructor(
     database: OrchestrationDatabase = getDefaultPlatformDatabase(),
