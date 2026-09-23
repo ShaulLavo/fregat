@@ -1,7 +1,7 @@
 import {
-  createDocumentTextSnapshot,
   type DocumentSessionChange,
-  type PieceTableSnapshot,
+  type DocumentTextSnapshot,
+  type TextReadSnapshot,
 } from '@singapore-editor/core/document'
 import {
   createEmptySyntaxResult,
@@ -79,23 +79,19 @@ class SearchResultSyntaxSession implements EditorSyntaxSession {
     this.result = this.createResult([], options.snapshot, 0)
   }
 
-  public async refresh(
-    snapshot: PieceTableSnapshot,
-    fullText?: string,
-  ): Promise<EditorSyntaxResult> {
+  public async refresh(textSnapshot: DocumentTextSnapshot): Promise<EditorSyntaxResult> {
     if (this.disposed) return this.result
 
-    const text = fullText ?? createDocumentTextSnapshot(snapshot).materializeFullText()
     const snapshotVersion = this.nextSnapshotVersion()
-    const tokens = await this.parseLines(searchResultSyntaxLines(text), snapshotVersion)
+    const tokens = await this.parseLines(searchResultSyntaxLines(textSnapshot), snapshotVersion)
     if (!this.canApplySnapshotVersion(snapshotVersion)) return this.result
 
-    this.result = this.createResult(tokens, snapshot, snapshotVersion)
+    this.result = this.createResult(tokens, textSnapshot, snapshotVersion)
     return this.result
   }
 
   public applyChange(change: DocumentSessionChange): Promise<EditorSyntaxResult> {
-    return this.refresh(change.snapshot, change.textSnapshot.materializeFullText())
+    return this.refresh(change.textSnapshot)
   }
 
   public getResult(): EditorSyntaxResult {
@@ -167,7 +163,7 @@ class SearchResultSyntaxSession implements EditorSyntaxSession {
 
   private createResult(
     tokens: readonly EditorToken[],
-    snapshot: PieceTableSnapshot,
+    snapshot: Pick<TextReadSnapshot, 'length'>,
     snapshotVersion: number,
   ): EditorSyntaxResult {
     return {
@@ -189,30 +185,13 @@ class SearchResultSyntaxSession implements EditorSyntaxSession {
   }
 }
 
-function searchResultSyntaxLines(text: string): readonly SearchResultSyntaxLine[] {
+function searchResultSyntaxLines(snapshot: TextReadSnapshot): readonly SearchResultSyntaxLine[] {
   const lines: SearchResultSyntaxLine[] = []
-  let start = 0
-
-  while (start <= text.length) {
-    const end = searchResultSyntaxLineEnd(text, start)
-    lines.push({
-      end,
-      start,
-      text: text.slice(start, end),
-    })
-    if (end === text.length) break
-
-    start = end + 1
+  for (let index = 0; index < snapshot.lineCount; index += 1) {
+    const { start, end } = snapshot.lineRange(index)
+    lines.push({ start, end, text: snapshot.readRange(start, end) })
   }
-
   return lines
-}
-
-function searchResultSyntaxLineEnd(text: string, start: number) {
-  const index = text.indexOf('\n', start)
-  if (index === -1) return text.length
-
-  return index
 }
 
 function offsetEditorTokens(

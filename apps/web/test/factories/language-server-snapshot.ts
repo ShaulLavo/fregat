@@ -12,10 +12,19 @@ export function languageServerSnapshot(
   const view = {
     documentId,
     languageId,
-    fullText: buffer.materializeFullText(),
     textVersion: 0,
     initialHighlightStatus: 'plain' as const,
     lineStarts,
+    lineStartsView: {
+      length: lineStarts.length,
+      at: (index: number) => lineStarts[index],
+      indexForOffset: (offset: number) => buffer.getTextSnapshot().lineAt(offset),
+      firstIndexAtOrAfter: (offset: number) => {
+        const index = lineStarts.findIndex((start) => start >= offset)
+        return index === -1 ? lineStarts.length : index
+      },
+      toArray: () => lineStarts,
+    },
     lineCount: lineStarts.length,
     tokens: EditorTokenStore.empty(),
     brackets: [],
@@ -49,13 +58,6 @@ export function languageServerSnapshot(
     documentSyncPoint: buffer.getDocumentSyncPoint(),
     changesSinceDocumentSyncPoint: (point, scope) =>
       buffer.changesSinceDocumentSyncPoint(point, scope),
-    toJSON: () => ({
-      ...view,
-      kind: 'editor-view',
-      schemaVersion: 1,
-      theme: null,
-      tokens: { starts: [], ends: [], styleIds: [], styles: [] },
-    }),
     toVisibleSnapshot: () => null,
   }
 }

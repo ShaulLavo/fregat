@@ -72,7 +72,7 @@ function tokenBackend(): DiffSyntaxBackend {
 }
 
 function result(options: EditorSyntaxSessionOptions) {
-  const start = options.fullText.indexOf('const')
+  const start = options.textSnapshot.readRange(0, options.textSnapshot.length).indexOf('const')
   const tokens: EditorToken[] =
     start === -1 ? [] : [{ end: start + 5, start, style: { color: 'rgb(1, 2, 3)' } }]
 

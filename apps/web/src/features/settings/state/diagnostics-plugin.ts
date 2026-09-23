@@ -69,7 +69,10 @@ class SettingsDiagnosticsContribution implements EditorViewContribution {
       this.presenter.clear()
       return
     }
-    if (editor.fullText !== snapshot.file.text) {
+    if (
+      editor.textSnapshot.length !== snapshot.file.text.length ||
+      editor.textSnapshot.readRange(0, editor.textSnapshot.length) !== snapshot.file.text
+    ) {
       this.presenter.clear()
       return
     }

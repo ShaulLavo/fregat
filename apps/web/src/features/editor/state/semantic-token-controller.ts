@@ -550,7 +550,7 @@ export class SemanticTokenController {
     // count is close enough to matter: UTF-8 is at most three bytes per UTF-16
     // unit, so anything under a third of the cap cannot reach it.
     if (length <= cap / 3) return false
-    if (utf8Length(document.textSnapshot.materializeFullText()) <= cap) return false
+    if (length <= cap && utf8Length(document.textSnapshot.readRange(0, length)) <= cap) return false
 
     // Logged once per document rather than per request: above the cap every
     // request would say the same thing, and the user's only symptom is that

@@ -99,8 +99,8 @@ export class ConflictEditorResolutionCoordinator {
 
   private capture(target: ConflictTarget, textSnapshot: TextSnapshot): CapturedResolution | null {
     const { documentStore, conflictStore } = this.context
+    if (parseMergeConflicts(textSnapshot).length) return null
     const text = textSnapshot.materializeFullText()
-    if (parseMergeConflicts(text).length) return null
     const conflict = conflictStore.getState().conflicts[target.conflictId]
     const resolution = documentStore.getState().getLiveEditorDocument(documentKey(target))
     const root = this.context.getOperationRoot()

@@ -11,7 +11,7 @@ import {
   type EditorSyntaxSessionOptions,
   type EditorToken,
 } from '@singapore-editor/core/syntax'
-import { describe } from 'vitest'
+import { describe, vi } from 'vitest'
 
 import { expect, test as it } from '../../../../test/fixtures'
 
@@ -33,7 +33,7 @@ describe('search result syntax provider', () => {
     const session = searchResultSession(provider, snapshot, text)
 
     expect(session.foldingSupport).toBe('unsupported')
-    const result = await session.refresh(snapshot, text)
+    const result = await session.refresh(createDocumentTextSnapshot(snapshot, text))
 
     expect(recording.sessionCount).toBe(2)
     expect(new Set(recording.documentIds).size).toBe(2)
@@ -50,6 +50,30 @@ describe('search result syntax provider', () => {
     ])
   })
 
+  it('reads bounded line ranges without materializing the excerpt document', async () => {
+    const recording = recordingSyntaxState()
+    const provider = createSearchResultSyntaxProvider(recordingSyntaxProvider(recording))
+    const text = 'const first = 1\n\nconst last = 2\n'
+    const snapshot = createPieceTableSnapshot(text)
+    const source = createDocumentTextSnapshot(snapshot)
+    const materialize = vi.spyOn(source, 'materializeFullText')
+    const read = vi.spyOn(source, 'readRange')
+    const session = searchResultSession(provider, snapshot, text)
+
+    const result = await session.refresh(source)
+
+    expect(recording.parsedTexts).toEqual(['const first = 1', 'const last = 2'])
+    expect(result.tokens).toEqual([syntaxToken(0, 5), syntaxToken(17, 22)])
+    expect(materialize).not.toHaveBeenCalled()
+    expect(read.mock.calls).toEqual([
+      [0, 15],
+      [16, 16],
+      [17, 31],
+      [32, 32],
+    ])
+    session.dispose()
+  })
+
   it('does not handle normal editor documents', () => {
     const provider = createSearchResultSyntaxProvider(
       recordingSyntaxProvider(recordingSyntaxState()),
@@ -59,7 +83,6 @@ describe('search result syntax provider', () => {
     expect(
       provider.createSession({
         documentId: 'workspace-file:test.ts',
-        fullText: 'const value = 1',
         languageId: 'typescript',
         snapshot,
         textSnapshot: createDocumentTextSnapshot(snapshot, 'const value = 1'),
@@ -74,7 +97,7 @@ describe('search result syntax provider', () => {
     const snapshot = createPieceTableSnapshot(text)
     const session = searchResultSession(provider, snapshot, text)
 
-    const result = await session.refresh(snapshot, text)
+    const result = await session.refresh(createDocumentTextSnapshot(snapshot, text))
 
     expect(result.tokens).toEqual(tokens)
   })
@@ -86,17 +109,17 @@ describe('search result syntax provider', () => {
     const firstText = 'const first = 1\nconst second = 2'
     const firstSnapshot = createPieceTableSnapshot(firstText)
     const session = searchResultSession(provider, firstSnapshot, firstText)
-    await session.refresh(firstSnapshot, firstText)
+    await session.refresh(createDocumentTextSnapshot(firstSnapshot, firstText))
 
     const nextText = 'const second = 2\nconst third = 3'
-    await session.refresh(createPieceTableSnapshot(nextText), nextText)
+    await session.refresh(createDocumentTextSnapshot(createPieceTableSnapshot(nextText), nextText))
     session.dispose()
 
     const remounted = createSearchResultSyntaxProvider(source)
     const lastText = 'const third = 3\nconst first = 1'
     const lastSnapshot = createPieceTableSnapshot(lastText)
     const lastSession = searchResultSession(remounted, lastSnapshot, lastText)
-    const result = await lastSession.refresh(lastSnapshot, lastText)
+    const result = await lastSession.refresh(createDocumentTextSnapshot(lastSnapshot, lastText))
 
     expect(recording.parsedTexts).toEqual([
       'const first = 1',
@@ -116,7 +139,7 @@ describe('search result syntax provider', () => {
     const text = 'const first = 1\nconst obsolete = 2'
     const snapshot = createPieceTableSnapshot(text)
     const session = searchResultSession(provider, snapshot, text)
-    const pending = session.refresh(snapshot, text)
+    const pending = session.refresh(createDocumentTextSnapshot(snapshot, text))
 
     session.dispose()
     expect(recording.disposedTexts).toEqual(['const first = 1'])
@@ -132,9 +155,11 @@ describe('search result syntax provider', () => {
     const previousText = 'const old = 1\nconst obsolete = 2'
     const previousSnapshot = createPieceTableSnapshot(previousText)
     const session = searchResultSession(provider, previousSnapshot, previousText)
-    const previous = session.refresh(previousSnapshot, previousText)
+    const previous = session.refresh(createDocumentTextSnapshot(previousSnapshot, previousText))
     const nextText = 'const current = 3\nconst next = 4'
-    const next = session.refresh(createPieceTableSnapshot(nextText), nextText)
+    const next = session.refresh(
+      createDocumentTextSnapshot(createPieceTableSnapshot(nextText), nextText),
+    )
 
     expect(recording.disposedTexts).toEqual(['const old = 1'])
     recording.finish('const old = 1')
@@ -159,8 +184,8 @@ describe('search result syntax provider', () => {
     const snapshot = createPieceTableSnapshot(text)
     const first = searchResultSession(createSearchResultSyntaxProvider(source), snapshot, text)
     const second = searchResultSession(createSearchResultSyntaxProvider(source), snapshot, text)
-    const firstRefresh = first.refresh(snapshot, text)
-    const secondRefresh = second.refresh(snapshot, text)
+    const firstRefresh = first.refresh(createDocumentTextSnapshot(snapshot, text))
+    const secondRefresh = second.refresh(createDocumentTextSnapshot(snapshot, text))
 
     first.dispose()
     expect(recording.disposedTexts).toEqual([])
@@ -252,15 +277,16 @@ function controlledSyntaxSession(
   recording: ControlledSyntaxState,
 ): EditorSyntaxSession {
   let parsedText = ''
-  let result = createLineSyntaxResult(options.snapshot, options.fullText)
+  let result = createLineSyntaxResult(options.textSnapshot)
   return {
     foldingSupport: 'unsupported',
-    refresh: (snapshot, text = options.fullText) => {
+    refresh: (snapshot) => {
+      const text = snapshot.readRange(0, snapshot.length)
       parsedText = text
       recording.parsedTexts.push(text)
       const pending = Promise.withResolvers<EditorSyntaxResult>()
       recording.pending.set(text, () => {
-        result = createLineSyntaxResult(snapshot, text)
+        result = createLineSyntaxResult(snapshot)
         pending.resolve(result)
       })
       return pending.promise
@@ -298,7 +324,6 @@ function searchResultSession(
 ): EditorSyntaxSession {
   const session = provider.createSession({
     documentId: 'search-result-file:test.ts',
-    fullText: text,
     languageId: 'typescript',
     snapshot,
     textSnapshot: createDocumentTextSnapshot(snapshot, text),
@@ -313,18 +338,18 @@ function recordingSyntaxSession(
   options: EditorSyntaxSessionOptions,
   recording: RecordingSyntaxState,
 ): EditorSyntaxSession {
-  let result = createLineSyntaxResult(options.snapshot, options.fullText)
+  let result = createLineSyntaxResult(options.textSnapshot)
 
   return {
     foldingSupport: 'supported',
-    refresh: async (snapshot, fullText) => {
-      const text = fullText ?? options.fullText
+    refresh: async (snapshot) => {
+      const text = snapshot.readRange(0, snapshot.length)
       recordingText(recording, text)
-      result = createLineSyntaxResult(snapshot, text)
+      result = createLineSyntaxResult(snapshot)
       return result
     },
     applyChange: async (change) => {
-      result = createLineSyntaxResult(change.snapshot, change.textSnapshot.materializeFullText())
+      result = createLineSyntaxResult(change.textSnapshot)
       return result
     },
     dispose: () => undefined,
@@ -369,19 +394,19 @@ function tokenSyntaxSession(
   }
 }
 
-function createLineSyntaxResult(snapshot: PieceTableSnapshot, text: string): EditorSyntaxResult {
+function createLineSyntaxResult(snapshot: Pick<PieceTableSnapshot, 'length'>): EditorSyntaxResult {
   return {
     ...createEmptySyntaxResult({
       snapshot: {
         length: snapshot.length,
       },
     }),
-    tokens: text.length > 0 ? [syntaxToken(0, Math.min(5, text.length))] : [],
+    tokens: snapshot.length > 0 ? [syntaxToken(0, Math.min(5, snapshot.length))] : [],
   }
 }
 
 function createTokenSyntaxResult(
-  snapshot: PieceTableSnapshot,
+  snapshot: Pick<PieceTableSnapshot, 'length'>,
   tokens: readonly EditorToken[],
 ): EditorSyntaxResult {
   return {

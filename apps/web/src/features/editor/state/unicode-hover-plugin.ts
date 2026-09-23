@@ -45,9 +45,7 @@ function partsAt(
   if (kind !== 'ambiguous' && kind !== 'invisible') return []
 
   const snapshot = context.getSnapshot()
-  const text =
-    snapshot.textSnapshot?.readRange(offset, offset + 2) ??
-    snapshot.fullText.slice(offset, offset + 2)
+  const text = snapshot.textSnapshot.readRange(offset, offset + 2)
   const codePoint = text.codePointAt(0)
   if (codePoint === undefined) return []
 

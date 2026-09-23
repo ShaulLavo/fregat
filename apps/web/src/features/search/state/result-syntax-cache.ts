@@ -80,14 +80,13 @@ export class SearchResultSyntaxCache {
       includeCaptures: options.includeCaptures,
       includeHighlights: options.includeHighlights,
       syntaxMode: 'full',
-      fullText: '',
       snapshot,
       textSnapshot: createDocumentTextSnapshot(snapshot, ''),
     })
     if (!session) return null
 
     const result = session
-      .refresh(createPieceTableSnapshot(options.text), options.text)
+      .refresh(createDocumentTextSnapshot(createPieceTableSnapshot(options.text), options.text))
       .then((syntax) => toEditorTokenStore(syntax.tokens).toTokens())
     const entry = { readers: 0, result, session }
     this.pending.set(key, entry)
