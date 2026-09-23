@@ -91,11 +91,14 @@
       "report": "runtime.md",
       "wave": "1",
       "status": "in-progress",
-      "evidence_level": "source-reviewed",
+      "evidence_level": "historical-local-and-browser-evidence; full-acceptance-pending",
       "acceptance": "runtime.md, RUNTIME-03, Acceptance / verification",
       "execution_evidence": [
         "live-delivery-approvals-delivery.md",
-        "Focused local integration tests pass; next deployment and browser checks pending; no paired upstream execution"
+        "async-questions-delivery.md",
+        "Historical release 20260920T132650Z-b915d3e0-plan126-live-delivery; /work/tmp/fregat-evidence/20260920T132758Z-scenario-mcp-approval/summary.md records completed native request reload, advertised choices and exact permanent reply",
+        "A later MCP rerun is recorded at /work/tmp/fregat-evidence/20260920T135957Z-scenario-mcp-approval/; no real external app grant was made",
+        "Remaining: complete supported/unknown/unpopulatable schema comparison and paired upstream runtime execution"
       ]
     },
     {
@@ -104,11 +107,13 @@
       "report": "runtime.md",
       "wave": "1",
       "status": "in-progress",
-      "evidence_level": "source-reviewed",
+      "evidence_level": "historical-local-evidence; live-overflow-comparison-pending",
       "acceptance": "runtime.md, RUNTIME-04, Acceptance / verification",
       "execution_evidence": [
         "live-delivery-approvals-delivery.md",
-        "Focused local integration tests pass; next deployment and browser checks pending; no paired upstream execution"
+        "Historical release 20260920T132650Z-b915d3e0-plan126-live-delivery includes bounded delivery and acknowledgment recovery",
+        "Recorded local tests cover budgets, streams, sockets, client queues and actual engine/client oversized-event recovery",
+        "Remaining: live overflow/reconnect recovery and paired upstream runtime comparison; the MCP approval browser run does not verify stream overflow"
       ]
     },
     {
@@ -130,10 +135,15 @@
       "title": "Add input/completion notifications and sound behavior",
       "report": "adjacent.md",
       "wave": "2",
-      "status": "open",
-      "evidence_level": "source-reviewed",
+      "status": "in-progress",
+      "evidence_level": "historical-local-and-browser-evidence; full-acceptance-pending",
       "acceptance": "adjacent.md, EXT-06, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "notifications-delivery.md",
+        "Historical release 20260920T153923Z-b915d3e0-plan126-stash-notices-history; /work/tmp/fregat-evidence/20260920T154618Z-scenario-session-notifications/summary.md records completed headed browser verification",
+        "Recorded proof covers toast navigation, native Notification construction, favicon count, click/focus cleanup, silent reload and archive; pinned decision comparison covers 900 cases",
+        "Remaining: visible operating-system popup and audible output, desktop bridges and badges, cross-machine live navigation, and full upstream runtime comparison"
+      ]
     },
     {
       "id": "LIFE-03",
@@ -181,10 +191,15 @@
       "title": "P1: Match unread defaults, manual unread, and wake state",
       "report": "lifecycle.md",
       "wave": "2",
-      "status": "open",
-      "evidence_level": "source-reviewed",
+      "status": "in-progress",
+      "evidence_level": "historical-local-and-browser-evidence; full-acceptance-pending",
       "acceptance": "lifecycle.md, LIFE-07, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "unread-delivery.md",
+        "Historical release 20260920T132650Z-b915d3e0-plan126-live-delivery; /work/tmp/fregat-evidence/20260920T132724Z-scenario-session-unread/summary.md records completed browser verification",
+        "Recorded proof covers completion while away, visit acknowledgment, manual unread after reload, timer wake retention and explicit wake acknowledgment; pinned wake comparison covers 189 cases",
+        "Remaining: live background-tab visibility, native/mobile controls and full upstream runtime comparison"
+      ]
     },
     {
       "id": "LIFE-08",
@@ -218,11 +233,14 @@
       "report": "lifecycle.md",
       "wave": "2",
       "status": "in-progress",
-      "evidence_level": "source-reviewed",
+      "evidence_level": "historical-local-and-browser-evidence; full-acceptance-pending",
       "acceptance": "lifecycle.md, LIFE-10, Acceptance / verification",
       "execution_evidence": [
-        "lifecycle-grouping-delivery.md",
-        "Live lifecycle evidence /work/tmp/fregat-evidence/20260920T140116Z-scenario-session-lifecycle; screenshots reviewed; multi-owner grouping live prerequisite unavailable; repository_path subproject registration remains open"
+        "navigation-delivery.md",
+        "common-actions-delivery.md",
+        "/work/tmp/fregat-evidence/20260920T152347Z-scenario-session-navigation/summary.md records completed copy, current/background archive and deletion navigation checks",
+        "Recorded tests cover two owners with identical session IDs, partial deletion failure and route changes during an archive; native renderer tests cover bulk failure retention",
+        "Remaining: two-owner live navigation, independently removed failed rows, interruption semantics and full upstream navigation comparison"
       ]
     },
     {
@@ -231,11 +249,15 @@
       "report": "lifecycle.md",
       "wave": "2",
       "status": "in-progress",
-      "evidence_level": "source-reviewed",
+      "evidence_level": "historical-local-and-browser-evidence; full-acceptance-pending",
       "acceptance": "lifecycle.md, LIFE-11, Acceptance / verification",
       "execution_evidence": [
-        "Title lifecycle/reactor/model settings implemented; server38focusedtests include migrations and pinnedcontext144cases",
-        "UI and native browser verification in progress; source not yet deployed"
+        "titles-delivery.md",
+        "title-context-delivery.md",
+        "title-links-delivery.md",
+        "Historical release 20260920T151610Z-b915d3e0-plan126-titles-files; /work/tmp/fregat-evidence/20260920T152237Z-scenario-session-titles/summary.md records completed initial generation, regeneration, manual rename during pending generation, reload, visible failure and retry",
+        "Recorded pure context comparison covers 144 pinned cases; linked-source lookup has local policy/process tests only and its deployment is unconfirmed",
+        "Remaining: text-generation policy overrides, authenticated linked-source lookup, full provider/source-control matrix and upstream runtime comparison; fixture titles do not measure provider output quality"
       ]
     },
     {
@@ -243,14 +265,15 @@
       "title": "P2: Complete row affordances, draft recovery, and delete-worktree flow",
       "report": "lifecycle.md",
       "wave": "2",
-      "status": "open",
-      "evidence_level": "source-reviewed",
+      "status": "in-progress",
+      "evidence_level": "historical-local-and-browser-evidence; full-acceptance-pending",
       "acceptance": "lifecycle.md, LIFE-12, Acceptance / verification",
       "execution_evidence": [
-        "Bounded draft recovery delivered; plans/126-t3code-alignment/draft-recovery-delivery.md",
-        "Live draft-recovery PASS on 20260920T161132Z-b915d3e0-plan126-draft-recovery; /work/tmp/fregat-evidence/20260920T161205Z-scenario-draft-recovery/; all three screenshots inspected and owned upload cleanup confirmed",
-        "Focused regression verifies pointer open, keyboard Enter open and discard preserving surviving selection",
-        "Group remains open: orphaned-worktree cleanup and session-owned terminal deletion are not delivered by this unit"
+        "draft-recovery-delivery.md",
+        "common-actions-delivery.md",
+        "/work/tmp/fregat-evidence/20260920T161205Z-scenario-draft-recovery/summary.md records completed distinct-draft reload, uploaded-file and worktree-target recovery, and safe discard",
+        "/work/tmp/fregat-evidence/20260920T152347Z-scenario-session-navigation/summary.md records completed owner path, branch and session-ID clipboard checks",
+        "Remaining: owner-scoped project settings, orphaned-worktree cleanup, session-owned terminal deletion and full upstream runtime comparison"
       ]
     },
     {
@@ -258,30 +281,50 @@
       "title": "Match queued follow-ups and the default send behavior",
       "report": "interaction.md",
       "wave": "3",
-      "status": "open",
-      "evidence_level": "source-reviewed",
+      "status": "in-progress",
+      "evidence_level": "paired-pure-policy-and-deployed-browser-verified; full-acceptance-pending",
       "acceptance": "interaction.md, INTERACTION-01, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "queue-delivery.md",
+        "scripts/parity/follow-ups.ts: 5396 paired pure-policy cases agree at pinned 7445aa733ada33e45289e5aa5055f79142556513; eight wrong-behavior controls rejected; durable reports in evidence/follow-ups-final/turn-start/ and turn-interrupt/",
+        "/work/tmp/fregat-evidence/20260923T165735Z-scenario-chat-queue/: local development browser passed FIFO, one-per-tool delivery, approval hold/resume, Send now, Restore, and text/file/terminal Stop recovery before native interruption rejection",
+        "Mesh release 20260923T170912Z-081135ba-t3-parity-follow-ups; /work/tmp/fregat-evidence/20260923T170958Z-scenario-chat-queue/ passed all eight steps in 12.166 seconds; screenshots inspected, exact native file/context input and owned cleanup verified",
+        "Repeated against current served web 20260923T171042Z-081135ba-e049-review-fixes and parity server 20260923T170912Z-081135ba-t3-parity-follow-ups: /work/tmp/fregat-evidence/20260923T171228Z-scenario-chat-queue/ passed in 7.856 seconds; all eight screenshots inspected, stable release-before/after snapshots and web build manifest retained; native payload and cleanup verified",
+        "Stop restores unsent content; uncertain delivery stays held with exact receipt IDs and Retry delivery, with Restore disabled until confirmation; covered by store and row-interaction tests",
+        "Whole lint/format/typecheck/gates/generated/boundaries pass; web 166 files/1420 tests, contracts 26 files/321 tests, parity Python 47 tests pass; unused check retains three unchanged findings documented in queue-delivery.md",
+        "Remaining: Stop during attachment preparation before queue admission, non-Codex mid-turn delivery, complete live overflow/connection/ownership/shortcut matrix, INTERACTION-09 source contexts and provider/OS checks; no paired upstream full-workflow claim"
+      ]
     },
     {
       "id": "INTERACTION-02",
       "title": "Carry general files and recover staged attachments",
       "report": "interaction.md",
       "wave": "3",
-      "status": "open",
-      "evidence_level": "source-reviewed",
+      "status": "in-progress",
+      "evidence_level": "historical-local-and-browser-evidence; full-acceptance-pending",
       "acceptance": "interaction.md, INTERACTION-02, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "attachment-upload-delivery.md",
+        "file-preview-delivery.md",
+        "Historical release 20260920T151610Z-b915d3e0-plan126-titles-files; /work/tmp/fregat-evidence/20260920T152332Z-scenario-file-attachments/summary.md records completed upload, draft reload, native exact-byte consumption, preview and download",
+        "Recorded upload/store tests cover interleaved claim/delete, ownership and incomplete streams; question attachment evidence is shared with INTERACTION-04",
+        "Remaining: complete pick/drop/paste and concurrent-limit matrix, offline retry and expired-upload recovery, capability-loss and removal races, multi-owner live checks and provider matrix"
+      ]
     },
     {
       "id": "INTERACTION-03",
       "title": "Stash the complete composed message",
       "report": "interaction.md",
       "wave": "3",
-      "status": "open",
-      "evidence_level": "source-reviewed",
+      "status": "in-progress",
+      "evidence_level": "historical-local-and-browser-evidence; full-acceptance-pending",
       "acceptance": "interaction.md, INTERACTION-03, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "stash-delivery.md",
+        "Historical release 20260920T153923Z-b915d3e0-plan126-stash-notices-history; /work/tmp/fregat-evidence/20260920T154026Z-scenario-chat-stash-context/summary.md records completed image-only stash, image/file swap, reload and native file consumption",
+        "Recorded tests cover atomic terminal-context transfer, quota failure, pending preparation, ownership and late restore after navigation",
+        "Remaining: INTERACTION-09 review/annotation/citation context, cross-environment live restore and complete paired upstream acceptance"
+      ]
     },
     {
       "id": "INTERACTION-04",
@@ -289,11 +332,15 @@
       "report": "interaction.md",
       "wave": "3",
       "status": "in-progress",
-      "evidence_level": "implementation-deployed; local-regressions-and-browser-verified; live-upstream-comparison-pending",
+      "evidence_level": "historical-local-and-browser-evidence; full-acceptance-pending",
       "acceptance": "interaction.md, INTERACTION-04, Acceptance / verification",
       "execution_evidence": [
         "async-questions-delivery.md",
-        "Server135727/web135934; running answer steers, idle answer starts, dismissal and pending reload verified in /work/tmp/fregat-evidence/20260920T140014Z-scenario-async-questions; attachments and digit shortcuts in progress"
+        "attachment-upload-delivery.md",
+        "file-preview-delivery.md",
+        "/work/tmp/fregat-evidence/20260920T152410Z-scenario-async-questions/summary.md records completed running/idle native answers, image/file delivery, reload and dismissal observed by a second browser page",
+        "Guarded digit shortcuts and independent per-question attachment drafts are implemented; native submitted-answer history has local component tests",
+        "Remaining: unsent per-question attachments after reload, native answer-history browser proof and complete blocking/async/capability comparison"
       ]
     },
     {
@@ -321,10 +368,15 @@
       "title": "Match composition and keyboard preferences",
       "report": "interaction.md",
       "wave": "3",
-      "status": "open",
-      "evidence_level": "source-reviewed",
+      "status": "in-progress",
+      "evidence_level": "historical-local-and-browser-evidence; full-acceptance-pending",
       "acceptance": "interaction.md, INTERACTION-11, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "composer-defaults-delivery.md",
+        "Historical release 20260920T155743Z-b915d3e0-plan126-final-batch; /work/tmp/fregat-evidence/20260920T160544Z-scenario-composer-defaults/summary.md records completed default-hidden controls, opt-in occupancy, retained preference and effective native default-mode submission",
+        "Recorded comparison executes the pinned interaction-mode resolver over 20 flag/provider/mode combinations",
+        "Remaining: rich composition, send shortcut preferences, large-paste folding and full upstream runtime comparison"
+      ]
     },
     {
       "id": "INTERACTION-06",

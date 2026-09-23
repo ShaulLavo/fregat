@@ -1,4 +1,5 @@
 import { useStatus } from '@/features/git/hooks/use-status'
+import { useReconcileCommitProgress } from '@/features/git/hooks/use-reconcile-commit-progress'
 import { TickerText } from '@/components/ticker-text'
 import type { GitRepositoryInfo } from '@workspace/contracts'
 import { ArrowsClockwiseIcon, CheckIcon, SparkleIcon } from '@phosphor-icons/react'
@@ -31,6 +32,7 @@ export function CommitControls({
   repository: GitRepositoryInfo
   rootPath: string
 }) {
+  useReconcileCommitProgress(rootPath)
   const confirmed = Boolean(useStatus(rootPath).data)
   const commit = useCommitAction(rootPath)
   const generation = useGenerateCommitMessage(rootPath)

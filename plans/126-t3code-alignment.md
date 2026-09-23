@@ -1,6 +1,6 @@
 # Plan 126: Align Platform behavior with pinned T3 Code
 
-Status: **IN PROGRESS; FINAL AUTHORIZED BATCH DEPLOYED AND VERIFIED**. Two source-audit passes and independent
+Status: **IN PROGRESS; FULL PARITY EXECUTION RESUMED 2026-09-23**. Two source-audit passes and independent
 cross-review completed on 2026-09-20. The audit found **48 implementation groups**, including
 paired client/server work. This is not a count of independently reproduced bugs.
 
@@ -10,7 +10,7 @@ Priority: P0 for the archive defect and conformance foundation; execute the rema
 the dependency order below. Overall effort is large and spans multiple deliveries. No honest
 date estimate is possible before provider/platform prerequisites and live comparison are measured.
 
-The user ended this run after the active batch on 2026-09-20. See [the wrap-up record](126-t3code-alignment/wrap-up.md) for the four bounded deliveries, browser evidence and remaining limits. This stopping boundary does not mark the broader plan complete.
+The user resumed all parity work on 2026-09-23, including providers, remote access, browser/device tools, mobile, desktop and distribution. The previous stop applied to the 2026-09-20 run only. See [the resumed execution record](126-t3code-alignment/resumed-execution.md) for the first batch and [the historical wrap-up](126-t3code-alignment/wrap-up.md) for completed deliveries and their limits.
 
 ## Authority and completion rule
 
@@ -20,8 +20,9 @@ a local test intentionally enforces behavior that upstream does not have.
 
 - Platform planning baseline: `3c9b88c35784e571e706600b0cee8e95a2656f77`.
 - T3 Code baseline: [`7445aa733ada33e45289e5aa5055f79142556513`](https://github.com/pingdotgg/t3code/tree/7445aa733ada33e45289e5aa5055f79142556513).
-- Compare the pinned object, not `references/t3code`'s older working tree. The object is fetched
-  locally. Read it with `git -C references/t3code show <sha>:<path>`.
+- Compare the pinned object, not `references/t3code`'s working tree. The object is available
+  locally. Read it with `git -C references/t3code show <sha>:<path>`. Newer reference commits
+  are a separate explicit delta and do not silently change the acceptance baseline.
 - Match reachable behavior, defaults, eligibility, error outcomes, ownership, persistence,
   navigation and cleanup. Different labels, frameworks, renderer libraries and file layouts
   are implementation mappings, not evidence of parity or automatic reasons to rewrite them.
@@ -56,6 +57,12 @@ Each finding report contains the exact local/upstream source anchors, impact, co
 effort/risk, change boundaries and acceptance cases. They are executable appendices to this
 plan; no conversation context is required. The ledger gives one owner to each group, and
 the delivery units below join overlapping UI/server work rather than implementing it twice.
+
+The reports describe gaps found in the 2026-09-20 source audit. Consult the ledger and linked
+delivery records for subsequent implementation; an audit's absence claim does not override
+a delivered capability. The 2026-09-23 reconciliation recovered historical evidence for eleven
+groups. None became fully verified from that review. Historical browser evidence does not
+establish the current checkout's runtime behavior.
 
 Historical `docs/t3code-*` and `docs/chat-t3code-parity.md` are evidence of prior work, not the
 acceptance authority for this baseline. Do not revive their stale absence claims or percentages.

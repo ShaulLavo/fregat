@@ -53,6 +53,8 @@ Commands dispatch over the orchestration socket when it is live and over HTTP ot
 
 - `chat-stash-context`: image-only stash, complete image/file draft swap, reload recovery, isolated native file delivery and retention of the separate draft. Terminal-context pairing has a focused store/composer check; this scenario does not simulate terminal selection.
 
+- `chat-queue`: isolated native provider and owned terminal. Checks default FIFO queueing, one message per tool boundary, pending approval hold/resume, Send now, Restore, and text/file/terminal recovery before a held interrupt rejects. It sends the recovered payload through the real provider pipeline and checks exact file bytes. Restores settings and removes its session, provider and terminal. Queue reload persistence is not expected.
+
 `session-notifications --headed` verifies completion notices on the browser host: focused-other-session toast and scoped Open session, background native construction and favicon badge, native click/focus cleanup, reload-history silence and archived suppression. It uses an isolated delayed native provider and restores notification settings. Browser permission and native construction are exercised; actual desktop popup delivery and macOS/Windows bridges require host-specific evidence.
 
 `composer-defaults` checks the Plan picker and built-in slash commands are hidden by default, context occupancy remains hidden after real native usage, opting in exposes both, disabling preserves the unsent preference, and a hidden-mode send reaches the native provider as `default`. Rich editing, keyboard preference modes and large-paste folding are separate open work.

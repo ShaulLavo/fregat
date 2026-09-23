@@ -45,6 +45,7 @@ test('new session opens the actual project checkout before selecting its draft',
       kind: 'draft',
       environmentId: h.environmentId,
       projectId: h.projectId,
+      draftId: expect.stringMatching(/\S/),
     }),
   )
   expect(h.application.getSnapshot().editor.workspaceStore.getState().rootFolder?.path).toBe(

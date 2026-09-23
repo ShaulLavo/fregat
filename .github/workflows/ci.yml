@@ -52,6 +52,13 @@ jobs:
       - name: Pinned background liveness comparison
         run: bun scripts/parity/background.ts
 
+      - name: Pinned queued follow-up policy comparison
+        run: >-
+          python3 -B scripts/parity/run.py
+          --operation client-command:thread.turn.start
+          --scenario follow-up-queue-policy
+          --check
+
       - name: Alignment checker negative cases
         run: python3 -B -m unittest discover -s scripts/parity -p 'test_*.py'
 

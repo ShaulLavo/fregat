@@ -537,6 +537,26 @@ export const selectors = {
     page.getByRole('button', { name: 'Send correction', exact: true }),
   chatStop: (page: Page) => page.getByRole('button', { name: 'Stop current turn', exact: true }),
   chatSend: (page: Page) => page.getByRole('button', { name: 'Send message', exact: true }),
+  chatQueue: (page: Page) => page.getByRole('button', { name: 'Queue message', exact: true }),
+  chatQueuedMessages: (page: Page) =>
+    page.getByRole('region', { name: 'Queued messages', exact: true }),
+  chatQueuedEntry: (page: Page, prompt: string) =>
+    page
+      .getByRole('region', { name: 'Queued messages', exact: true })
+      .getByTitle(prompt, { exact: true }),
+  chatSendQueued: (page: Page) =>
+    page.getByRole('button', { name: 'Send queued message now', exact: true }),
+  chatRestoreQueued: (page: Page) =>
+    page.getByRole('button', { name: 'Restore queued message', exact: true }),
+  chatTerminalContext: (page: Page) =>
+    page
+      .locator('form')
+      .filter({ has: page.getByRole('textbox', { name: 'Message', exact: true }) })
+      .locator('[data-terminal-context-source]'),
+  terminalSelectAll: (page: Page) =>
+    page.getByRole('menuitem', { name: 'Select All', exact: true }),
+  terminalAskAgent: (page: Page) =>
+    page.getByRole('menuitem', { name: 'Ask the Agent', exact: true }),
   chatMessages: (page: Page) => page.getByRole('log', { name: 'Messages', exact: true }),
   stageChanges: (page: Page) =>
     page.getByRole('button', { name: 'Stage all changes', exact: true }),

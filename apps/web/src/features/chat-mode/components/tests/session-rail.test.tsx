@@ -235,6 +235,7 @@ test('New session opens the scoped project before selecting its draft', async ({
       kind: 'draft',
       environmentId: harness.environmentId,
       projectId: harness.projectId,
+      draftId: expect.stringMatching(/\S/),
     }),
   )
   expect(harness.application.getSnapshot().editor.workspaceStore.getState().rootFolder?.path).toBe(

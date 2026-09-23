@@ -7,27 +7,20 @@ import {
   composerPendingAction,
   correctionUnavailableReason,
 } from '@/features/chat/utils/composer-state'
-import { sessionStopFailure } from '@/features/chat/utils/session-stop'
-import type { ModelSelection, SessionId, SessionTurnInterruptCommand } from '@workspace/contracts'
+import type { ModelSelection, SessionId } from '@workspace/contracts'
 import { useEffect, useMemo, useState } from 'react'
 
 import { notifyChatCommandError } from '@/features/chat/notify-command-error'
 import type { ChatTransport } from '@/features/chat/transport/chat-transport'
-import {
-  createProjectDefaultModelCommand,
-  createSessionInterruptCommand,
-  createTurnSubmission,
-  createSteerSubmission,
-} from '@workspace/client-core/chat/commands'
-import { dispatchChatCommand, replayAfterDispatch } from '@/features/chat/utils/command-dispatch'
-import { scheduleSessionProjectionSyncAfterDispatch } from '@/features/chat/utils/command-sync'
+import { createProjectDefaultModelCommand } from '@workspace/client-core/chat/commands'
+import { dispatchChatCommand } from '@/features/chat/utils/command-dispatch'
 import { isChatSessionBusy } from '@workspace/client-core/chat/session-busy'
 import { createChatSessionSelector } from '@workspace/client-core/chat/selectors'
 import { useOptimisticMessages } from '@/features/chat/hooks/use-optimistic-messages'
-import { placeChatMessage } from '@/features/chat/state/place-chat-message'
-import { type ChatSession } from '@workspace/client-core/chat/types'
 import { ChatTransportContext } from '@/features/chat/providers/transport-context'
-import { ChatInput, type ChatInputSubmitPayload } from './chat-input'
+import { ChatInput } from './chat-input'
+import { QueuedMessages } from './queued-messages'
+import { useSessionComposer } from '../hooks/use-session-composer'
 import { ImportedChatNotice } from '@/features/chat/components/imported-chat-notice'
 import { CheckpointRevertDialog } from '@/features/chat/components/checkpoint-revert-dialog'
 import { ChatRuntimeStatus } from './chat-runtime-status'
@@ -79,24 +72,22 @@ export function ChatView({
   )
   const optimisticMessages = useOptimisticMessages(transport.environmentId, activeSessionId)
   const [sendError, setSendError] = useState<string | null>(null)
-  const [interruptCommand, setInterruptCommand] = useState<SessionTurnInterruptCommand | null>(null)
   const rewind = useCheckpointRewind(transport, activeSessionId)
   const revertingCheckpoint = rewind.isPending
   const [pendingCheckpoint, setPendingCheckpoint] = useState<{
     turnCount: number
     messageId: string
   } | null>(null)
-  const [sending, setSending] = useState(false)
   const busy = isChatSessionBusy(session)
-  const interruptFailure = sessionStopFailure(session, interruptCommand)
-  const interrupting =
-    busy &&
-    interruptCommand !== null &&
-    interruptCommand.sessionId === session?.id &&
-    interruptCommand.turnId === session?.latestTurn?.turnId &&
-    interruptFailure === null
   const connection = useComposerConnection(transport, activeSessionId)
   const disabledReason = connection.kind === 'live' ? null : connection.label
+  const composer = useSessionComposer({
+    transport,
+    session,
+    target: draftTarget,
+    blocked: disabledReason !== null || !currentDetail || revertingCheckpoint,
+  })
+  const { sending, interrupting } = composer
   // Stable identity is required because this is part of the timeline action context value.
   const handleRevertToCheckpoint = (turnCount: number, messageId: string) => {
     if (!currentDetail || !session || revertingCheckpoint) return
@@ -140,24 +131,6 @@ export function ChatView({
         <div className='skeleton-sweep h-24 w-3/4 rounded-md' />
       </LoadingState>
     )
-  }
-
-  async function handleSend(payload: ChatInputSubmitPayload) {
-    if (!session) return false
-
-    setInterruptCommand(null)
-    return submitChatTurn({ transport, payload, setSendError, setSending, session })
-  }
-
-  async function handleStop() {
-    if (!session || interrupting || disabledReason) return
-
-    await dispatchSessionStop({
-      transport,
-      setInterruptCommand,
-      setSendError,
-      session,
-    })
   }
 
   function handleConfirmRevert(restoreFiles: boolean) {
@@ -209,7 +182,7 @@ export function ChatView({
           </ChatTimelineActionsProvider>
         </ChatTransportContext>
       </ChatWorkspaceRootContext>
-      <ChatRuntimeStatus commandFailure={sendError ?? interruptFailure} session={session} />
+      <ChatRuntimeStatus commandFailure={sendError ?? composer.error} session={session} />
       {/* The panels sit above the composer rather than inside it: each one is a
           request holding the turn open, so it stays visible while the user
           types their answer. */}
@@ -250,6 +223,12 @@ export function ChatView({
           {session.origin === 'discovered' && !session.latestTurn && !session.runtime ? (
             <ImportedChatNotice />
           ) : null}
+          <QueuedMessages
+            messages={composer.queue}
+            disabled={composer.sendBlocked}
+            onSendNow={composer.sendNow}
+            onRestore={composer.restore}
+          />
           <ChatInput
             busy={busy}
             correctionDisabledReason={correctionUnavailableReason(session)}
@@ -274,111 +253,11 @@ export function ChatView({
             rootPath={rootPath}
             runtimeMode={session.runtimeMode}
             onPersistModelSelection={handlePersistModelSelection}
-            onStop={handleStop}
-            onSubmit={handleSend}
+            onStop={composer.stop}
+            onSubmit={composer.send}
           />
         </ChatPendingRequestsProvider>
       </ChatComposerModesProvider>
     </section>
   )
-}
-
-async function submitChatTurn({
-  transport,
-  payload,
-  setSendError,
-  setSending,
-  session,
-}: {
-  transport: ChatTransport
-  payload: ChatInputSubmitPayload
-  setSendError: (value: string | null) => void
-  setSending: (value: boolean) => void
-  session: ChatSession
-}): Promise<boolean> {
-  const { attachments, interactionMode, modelSelection, runtimeMode, terminalContexts, text } =
-    payload
-  const input = {
-    attachments,
-    createdAt: new Date().toISOString(),
-    interactionMode,
-    modelSelection,
-    runtimeMode,
-    terminalContexts,
-    text,
-    sessionId: session.id,
-  }
-  const submission =
-    isChatSessionBusy(session) && session.latestTurn
-      ? createSteerSubmission({ ...input, turnId: session.latestTurn.turnId })
-      : createTurnSubmission(input)
-  setSendError(null)
-  setSending(true)
-  try {
-    const outcome = await placeChatMessage({
-      action: 'chat.command.dispatch.summary',
-      command: submission.command,
-      context: {
-        attachmentCount: attachments.length,
-        interactionMode,
-        model: modelSelection.model,
-        providerInstanceId: modelSelection.providerInstanceId,
-        runtimeMode,
-        terminalContextCount: terminalContexts.length,
-        textLength: text.length,
-      },
-      dispatchCommand: transport.dispatchCommand,
-      onAccepted: (result) =>
-        scheduleSessionProjectionSyncAfterDispatch({
-          transport,
-          replayAfterSequence: replayAfterDispatch(submission.command, result),
-          sessionId: session.id,
-        }),
-      placement: {
-        environmentId: transport.environmentId,
-        commandId: submission.command.commandId,
-        message: submission.optimisticMessage,
-      },
-    })
-    if (outcome.ok) return true
-
-    setSendError(outcome.message)
-    return false
-  } finally {
-    setSending(false)
-  }
-}
-
-async function dispatchSessionStop({
-  transport,
-  setInterruptCommand,
-  setSendError,
-  session,
-}: {
-  transport: ChatTransport
-  setInterruptCommand: (value: SessionTurnInterruptCommand | null) => void
-  setSendError: (value: string | null) => void
-  session: ChatSession
-}) {
-  const command = createSessionInterruptCommand({
-    sessionId: session.id,
-    turnId: session.latestTurn?.turnId,
-  })
-  setInterruptCommand(command)
-  setSendError(null)
-  const outcome = await dispatchChatCommand({
-    action: 'chat.stop.dispatch.summary',
-    command,
-    dispatchCommand: transport.dispatchCommand,
-    onAccepted: (result) =>
-      scheduleSessionProjectionSyncAfterDispatch({
-        transport,
-        replayAfterSequence: replayAfterDispatch(command, result),
-        sessionId: session.id,
-      }),
-  })
-  if (outcome.ok) return
-
-  setSendError(outcome.message)
-  setInterruptCommand(null)
 }

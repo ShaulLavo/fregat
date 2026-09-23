@@ -21,7 +21,8 @@ import { scheduleSessionProjectionSyncAfterDispatch } from '@/features/chat/util
 import { placeChatMessage } from '@/features/chat/state/place-chat-message'
 import { ChatComposerModesProvider } from '../providers/composer-modes-provider'
 import { useChatInputDraftStore, type ChatInputDraftTarget } from '../state/chat-input-draft-store'
-import { ChatInput, type ChatInputSubmitPayload } from './chat-input'
+import { ChatInput } from './chat-input'
+import type { ChatInputSubmitPayload, ChatInputSubmitResult } from '../utils/composed-message'
 import { ChatWelcomeView } from './chat-welcome-view'
 import { WorktreePicker } from '@/features/chat/components/worktree-picker'
 import { newWorktreeTarget } from '@/features/chat/utils/worktree-target'
@@ -118,10 +119,10 @@ export function ChatDraftView({
     runtimeMode,
     terminalContexts,
     text,
-  }: ChatInputSubmitPayload) {
+  }: ChatInputSubmitPayload): Promise<ChatInputSubmitResult> {
     if (!project || !worktree || !target || !targetReady) {
       setSendError('Workspace chat is still preparing.')
-      return false
+      return 'rejected'
     }
     const operation = navigation.getSnapshot()
 
@@ -166,14 +167,14 @@ export function ChatDraftView({
     })
     if (!outcome.ok) {
       setSendError(outcome.message)
-      return false
+      return 'rejected'
     }
 
     useChatInputDraftStore.getState().setIdentity(draftTarget, null)
     setSendError(null)
     if (navigation.getSnapshot() === operation) onSessionCreated(submission.command.sessionId)
 
-    return true
+    return 'sent'
   }
 
   return (

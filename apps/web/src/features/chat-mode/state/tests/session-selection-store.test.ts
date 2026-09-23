@@ -43,17 +43,28 @@ test('a session pick records both the project and the session', () => {
   })
 })
 
-test('a new-session request stays a request for that project alone', () => {
+test('a new-session request creates a distinct draft in the requested project', () => {
   const store = reset()
   store.selectSession(TEST_ENVIRONMENT_ID, projectA, sessionB)
 
   store.startDraft(TEST_ENVIRONMENT_ID, projectB)
 
-  expect(useSessionSelectionStore.getState().selection).toEqual({
+  const firstDraft = useSessionSelectionStore.getState().selection
+  expect(firstDraft).toEqual({
     kind: 'draft',
     environmentId: TEST_ENVIRONMENT_ID,
     projectId: projectB,
+    draftId: expect.stringMatching(/\S/),
   })
+  store.startDraft(TEST_ENVIRONMENT_ID, projectB)
+  const secondDraft = useSessionSelectionStore.getState().selection
+  expect(secondDraft).toEqual({
+    kind: 'draft',
+    environmentId: TEST_ENVIRONMENT_ID,
+    projectId: projectB,
+    draftId: expect.stringMatching(/\S/),
+  })
+  expect(secondDraft).not.toEqual(firstDraft)
 })
 
 test('releasing the session on stage lands on the row below it', () => {

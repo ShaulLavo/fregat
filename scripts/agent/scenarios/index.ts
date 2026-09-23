@@ -6,6 +6,7 @@ import { composerDefaults } from './composer-defaults'
 import { sessionNotifications } from './session-notifications'
 import { terminalHistory } from './terminal-history'
 import { chatStashContext } from './chat-stash-context'
+import { chatQueue } from './chat-queue'
 import { fileAttachments } from './file-attachments'
 import { sessionTitles } from './session-titles'
 import { sessionNavigation } from './session-navigation'
@@ -176,6 +177,7 @@ export const scenarios: readonly Scenario[] = [
   mcpApproval,
   fileAttachments,
   chatStashContext,
+  chatQueue,
   draftRecovery,
   asyncQuestions,
   backgroundLiveness,

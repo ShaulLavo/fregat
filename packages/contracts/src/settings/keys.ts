@@ -36,6 +36,16 @@ import { defineSetting, type SettingDescriptor } from './registry'
 const percentSchema = v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(100))
 
 export const SETTINGS_REGISTRY = {
+  'chat.followUpBehavior': defineSetting({
+    schema: v.picklist(['queue', 'steer']),
+    default: 'queue',
+    scope: 'application',
+    widget: 'enum',
+    category: 'Chat',
+    title: 'Follow-up behavior',
+    description:
+      'Queue messages during a running turn or send them immediately as corrections. Ctrl/Cmd+Enter uses the other behavior.',
+  }),
   'chat.planModeEnabled': defineSetting({
     schema: v.boolean(),
     default: false,

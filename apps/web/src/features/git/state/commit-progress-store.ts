@@ -1,17 +1,7 @@
 import type { QueryClient } from '@tanstack/react-query'
 import { createStore, type StoreApi } from 'zustand/vanilla'
 
-/**
- * What a commit's hooks have said so far, per repository.
- *
- * A store rather than mutation state because the lines arrive while the
- * mutation is still pending: TanStack Query has no notion of partial progress,
- * and the whole point is to show the hook talking before the commit resolves.
- *
- * Bounded, because a hook can run a whole test suite and its output is not
- * something anyone scrolls back through — the last screenful is what says
- * whether it is progressing or wedged.
- */
+// TanStack owns the mutation; this store holds its bounded streaming output.
 const MAX_COMMIT_PROGRESS_LINES = 200
 
 type CommitProgressLine = {
@@ -20,10 +10,19 @@ type CommitProgressLine = {
 }
 
 type CommitProgressState = {
-  linesByRootPath: Readonly<Record<string, readonly CommitProgressLine[]>>
+  runsByRootPath: Readonly<
+    Record<
+      string,
+      {
+        readonly commit: string | null
+        readonly lines: readonly CommitProgressLine[]
+      }
+    >
+  >
 }
 
 type CommitProgressActions = {
+  beginCommitProgress: (rootPath: string, commit: string | null) => void
   appendCommitProgress: (rootPath: string, line: CommitProgressLine) => void
   clearCommitProgress: (rootPath: string) => void
 }
@@ -45,30 +44,39 @@ export function commitProgressStoreFor(queryClient: QueryClient) {
 
 function createCommitProgressStore() {
   return createStore<CommitProgressStore>((set) => ({
-    linesByRootPath: {},
-    appendCommitProgress: (rootPath, line) =>
+    runsByRootPath: {},
+    beginCommitProgress: (rootPath, commit) =>
       set((state) => ({
-        linesByRootPath: {
-          ...state.linesByRootPath,
-          [rootPath]: boundedLines(state.linesByRootPath[rootPath] ?? NO_LINES, line),
-        },
+        runsByRootPath: { ...state.runsByRootPath, [rootPath]: { commit, lines: NO_LINES } },
       })),
+    appendCommitProgress: (rootPath, line) => set((state) => appendLine(state, rootPath, line)),
     clearCommitProgress: (rootPath) => set((state) => withoutRootProgress(state, rootPath)),
   }))
 }
 
 function withoutRootProgress(state: CommitProgressStore, rootPath: string) {
-  if (!state.linesByRootPath[rootPath]) return state
+  if (!state.runsByRootPath[rootPath]) return state
 
-  const { [rootPath]: _cleared, ...linesByRootPath } = state.linesByRootPath
-  return { linesByRootPath }
+  const { [rootPath]: _cleared, ...runsByRootPath } = state.runsByRootPath
+  return { runsByRootPath }
+}
+
+function appendLine(state: CommitProgressStore, rootPath: string, line: CommitProgressLine) {
+  const run = state.runsByRootPath[rootPath]
+  if (!run) return state
+  return {
+    runsByRootPath: {
+      ...state.runsByRootPath,
+      [rootPath]: { ...run, lines: boundedLines(run.lines, line) },
+    },
+  }
 }
 
 export function selectCommitProgress(
-  state: Pick<CommitProgressStore, 'linesByRootPath'>,
+  state: Pick<CommitProgressStore, 'runsByRootPath'>,
   rootPath: string,
 ) {
-  return state.linesByRootPath[rootPath] ?? NO_LINES
+  return state.runsByRootPath[rootPath]?.lines ?? NO_LINES
 }
 
 function boundedLines(lines: readonly CommitProgressLine[], line: CommitProgressLine) {

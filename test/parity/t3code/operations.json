@@ -1,6 +1,6 @@
 {
   "upstreamCommit": "7445aa733ada33e45289e5aa5055f79142556513",
-  "evidence": "source-derived; operation identity only, no behavioral comparison",
+  "evidence": "source-derived; reviewed mappings link bounded scenarios, no whole-operation runtime verification",
   "sources": {
     "rpc": "packages/contracts/src/rpc.ts",
     "commands": "packages/contracts/src/orchestration.ts"
@@ -432,17 +432,169 @@
     },
     {
       "id": "client-command:thread.turn.interrupt",
-      "review": "unverified",
-      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
-      "localMapping": null,
-      "scenarios": []
+      "review": "source-reviewed",
+      "reason": "Local command and composer ownership reviewed. The executable comparison covers only completed-tool selection and queued-message eligibility. Full turn execution, Stop races, payload recovery, provider delivery and browser behavior remain unverified.",
+      "localMapping": {
+        "entryPoints": [
+          {
+            "path": "apps/web/src/features/chat/hooks/use-session-composer.ts",
+            "contains": "export function useSessionComposer("
+          },
+          {
+            "path": "apps/web/src/features/chat/utils/follow-up-policy.ts",
+            "contains": "export function followUpDue("
+          },
+          {
+            "path": "apps/web/src/features/chat/utils/follow-up-policy.ts",
+            "contains": "export function latestCompletedToolActivityId("
+          },
+          {
+            "path": "apps/web/src/features/chat/state/follow-up-store.ts",
+            "contains": "export const useFollowUpStore"
+          },
+          {
+            "path": "packages/client-core/src/chat/commands.ts",
+            "contains": "export function createSessionInterruptCommand("
+          },
+          {
+            "path": "apps/web/src/features/chat/state/send-follow-up.ts",
+            "contains": "export async function sendFollowUp("
+          },
+          {
+            "path": "apps/web/src/features/chat/state/stash-transfer.ts",
+            "contains": "export async function releaseUnusedDraftAttachments("
+          },
+          {
+            "path": "apps/web/src/features/chat/state/restore-follow-ups.ts",
+            "contains": "export function restoreFollowUps("
+          }
+        ],
+        "owner": "Chat session composer owns queued intent; client-core builds commands; server orchestration owns accepted turns.",
+        "capability": "Interrupt a running turn and recover unsent queued follow-ups.",
+        "defaults": "chat.followUpBehavior defaults to queue and can select steer; the alternate shortcut inverts it. Held messages require explicit action; connecting blocks automatic send.",
+        "results": "The composer drains queued intent before dispatching session.turn.interrupt and then settles the session projection.",
+        "navigation": "The same scoped environment/session owns its draft and queue. Queue policy does not change the active session.",
+        "persistence": "Queued intents are in memory. Stop restores never-submitted draft content; unknown-outcome submissions stay held with their original command IDs for deduplicated retry. Full attachment persistence, reload and cross-client behavior require separate runtime acceptance.",
+        "negativePaths": "The paired corpus rejects connecting sends, automatic held sends, repeated same-tool sends, positional tool ordering and timestamp-first ordering. Provider errors, interruption races and complete command failures remain unverified."
+      },
+      "scenarios": [
+        {
+          "id": "follow-up-queue-policy",
+          "runner": "scripts/parity/follow-ups.ts",
+          "command": ["bun", "scripts/parity/follow-ups.ts"],
+          "cases": [
+            "latest-empty",
+            "latest-singletons",
+            "latest-pairs",
+            "latest-permutations",
+            "due-phase-matrix",
+            "latest-sequence-before-position-and-time",
+            "latest-time-breaks-sequence-tie",
+            "due-connecting-is-blocked",
+            "due-held-is-blocked",
+            "due-new-tool-boundary",
+            "due-same-tool-is-blocked",
+            "due-disconnected-is-ready"
+          ]
+        }
+      ],
+      "upstreamAnchors": [
+        {
+          "path": "packages/contracts/src/orchestration.ts",
+          "contains": "type: Schema.Literal(\"thread.turn.interrupt\")"
+        },
+        {
+          "path": "apps/web/src/queuedMessageStore.ts",
+          "contains": "export function latestCompletedToolActivityId("
+        },
+        {
+          "path": "apps/web/src/queuedMessageStore.ts",
+          "contains": "export function isQueuedMessageDue("
+        }
+      ]
     },
     {
       "id": "client-command:thread.turn.start",
-      "review": "unverified",
-      "reason": "Behavior, capability, local entry point, defaults and negative paths need review.",
-      "localMapping": null,
-      "scenarios": []
+      "review": "source-reviewed",
+      "reason": "Local command and composer ownership reviewed. The executable comparison covers only completed-tool selection and queued-message eligibility. Full turn execution, Stop races, payload recovery, provider delivery and browser behavior remain unverified.",
+      "localMapping": {
+        "entryPoints": [
+          {
+            "path": "apps/web/src/features/chat/hooks/use-session-composer.ts",
+            "contains": "export function useSessionComposer("
+          },
+          {
+            "path": "apps/web/src/features/chat/utils/follow-up-policy.ts",
+            "contains": "export function followUpDue("
+          },
+          {
+            "path": "apps/web/src/features/chat/utils/follow-up-policy.ts",
+            "contains": "export function latestCompletedToolActivityId("
+          },
+          {
+            "path": "apps/web/src/features/chat/state/follow-up-store.ts",
+            "contains": "export const useFollowUpStore"
+          },
+          {
+            "path": "apps/web/src/features/chat/state/submit-message.ts",
+            "contains": "export function messageSubmission("
+          },
+          {
+            "path": "apps/web/src/features/chat/state/send-follow-up.ts",
+            "contains": "export async function sendFollowUp("
+          },
+          {
+            "path": "apps/web/src/features/chat/state/stash-transfer.ts",
+            "contains": "export async function releaseUnusedDraftAttachments("
+          },
+          {
+            "path": "apps/web/src/features/chat/state/restore-follow-ups.ts",
+            "contains": "export function restoreFollowUps("
+          }
+        ],
+        "owner": "Chat session composer owns queued intent; client-core builds commands; server orchestration owns accepted turns.",
+        "capability": "Start a new turn or queue a follow-up at a completed-tool boundary.",
+        "defaults": "chat.followUpBehavior defaults to queue and can select steer; the alternate shortcut inverts it. Held messages require explicit action; connecting blocks automatic send.",
+        "results": "Queued intent stays local until eligible; submitMessage dispatches session.turn.start or session.turn.steer and settles session projection.",
+        "navigation": "The same scoped environment/session owns its draft and queue. Queue policy does not change the active session.",
+        "persistence": "Queued intents are in memory. Stop restores never-submitted draft content; unknown-outcome submissions stay held with their original command IDs for deduplicated retry. Full attachment persistence, reload and cross-client behavior require separate runtime acceptance.",
+        "negativePaths": "The paired corpus rejects connecting sends, automatic held sends, repeated same-tool sends, positional tool ordering and timestamp-first ordering. Provider errors, interruption races and complete command failures remain unverified."
+      },
+      "scenarios": [
+        {
+          "id": "follow-up-queue-policy",
+          "runner": "scripts/parity/follow-ups.ts",
+          "command": ["bun", "scripts/parity/follow-ups.ts"],
+          "cases": [
+            "latest-empty",
+            "latest-singletons",
+            "latest-pairs",
+            "latest-permutations",
+            "due-phase-matrix",
+            "latest-sequence-before-position-and-time",
+            "latest-time-breaks-sequence-tie",
+            "due-connecting-is-blocked",
+            "due-held-is-blocked",
+            "due-new-tool-boundary",
+            "due-same-tool-is-blocked",
+            "due-disconnected-is-ready"
+          ]
+        }
+      ],
+      "upstreamAnchors": [
+        {
+          "path": "packages/contracts/src/orchestration.ts",
+          "contains": "type: Schema.Literal(\"thread.turn.start\")"
+        },
+        {
+          "path": "apps/web/src/queuedMessageStore.ts",
+          "contains": "export function latestCompletedToolActivityId("
+        },
+        {
+          "path": "apps/web/src/queuedMessageStore.ts",
+          "contains": "export function isQueuedMessageDue("
+        }
+      ]
     },
     {
       "id": "client-command:thread.unarchive",

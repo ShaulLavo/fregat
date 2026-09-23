@@ -12,7 +12,7 @@ import {
 import { openGitPanel, selectors } from '../selectors'
 import { createScriptError } from '../../structured-errors'
 
-// Rejects, so the run never lands a commit and can be repeated on one fixture.
+// The initial attempt fails; an external commit later resolves it.
 const HOOK = ['#!/bin/sh', 'echo "lint failed on src/app.ts" >&2', 'exit 1', ''].join('\n')
 
 const EXISTING_DRAFT = 'a question I was already writing'
@@ -58,6 +58,18 @@ export const gitFixWithAgent: Scenario = {
       if (text.includes(EXISTING_DRAFT))
         throw createScriptError('Fix with agent reused the open chat instead of starting a new one')
       await composer.fill('')
+
+      await openGitPanel(page)
+      await writeFile(path.join(fixture, 'a.txt'), 'fixed\n')
+      await selectors.commitOutput(page).waitFor({ timeout: 10_000 })
+      await step('failure-before-external-commit')
+      await installPreCommitHook(fixture, '#!/bin/sh\nexit 0\n')
+      await fixtureGit(fixture, ['add', 'a.txt'])
+      await fixtureGit(fixture, ['commit', '--quiet', '-m', 'fixed externally'])
+      await selectors.commitOutput(page).waitFor({ state: 'hidden', timeout: 15_000 })
+      if (await selectors.gitFixWithAgent(page).isVisible())
+        throw createScriptError('The resolved commit still offers Fix with agent')
+      await step('external-commit-cleared-failure')
     } finally {
       await releaseFixture(fixture)
     }

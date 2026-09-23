@@ -8,6 +8,7 @@ import subprocess
 from pathlib import Path
 
 from check import ROOT, InvalidRecord, read_json, require, unique
+from evidence import check_comparison, check_scenario, checked_artifact, relative_path, text
 
 COMMAND_PATH = "packages/contracts/src/orchestration.ts"
 ARTIFACT = "test/parity/t3code/operations.json"
@@ -100,7 +101,61 @@ def initial_artifact(commit, upstream, local):
     }
 
 
-def check_operations(artifact, commit, upstream, local):
+def check_anchors(anchors, read, label):
+    require(isinstance(anchors, list) and bool(anchors), f"{label}: missing source anchors")
+    for anchor in anchors:
+        require(isinstance(anchor, dict), f"{label}: invalid source anchor")
+        path = str(relative_path(anchor.get("path"), f"{label} source path"))
+        text(anchor.get("contains"), f"{label} source anchor")
+        require(anchor["contains"] in read(path), f"{label}: source anchor absent from {path}")
+
+
+def check_mapping(row, root, reference, commit):
+    identifier = row["id"]
+    check_anchors(row.get("upstreamAnchors"), lambda path: source(reference, commit, path), identifier)
+    mapping = row.get("localMapping")
+    require(isinstance(mapping, dict), f"{identifier}: missing local mapping")
+    check_anchors(mapping.get("entryPoints"), lambda path: checked_artifact(root, path).read_text(), identifier)
+    for field in ("owner", "capability", "defaults", "results", "navigation", "persistence", "negativePaths"):
+        text(mapping.get(field), f"{identifier} {field}")
+    scenarios = row.get("scenarios")
+    require(isinstance(scenarios, list) and bool(scenarios), f"{identifier}: missing executable scenarios")
+    for scenario in scenarios:
+        check_scenario(scenario, root)
+    unique([scenario["id"] for scenario in scenarios], f"{identifier} scenario")
+
+
+def check_runtime(row, root, commit):
+    comparisons = row.get("runtimeComparisons")
+    require(isinstance(comparisons, list) and bool(comparisons), f"{row['id']}: missing runtime comparisons")
+    scenarios = {scenario["id"]: scenario for scenario in row["scenarios"]}
+    sources = [anchor["path"] for anchor in row["localMapping"]["entryPoints"]]
+    recorded = [check_comparison(comparison, root, commit, row["id"], required_sources=sources)
+                for comparison in comparisons]
+    identifiers = [scenario["id"] for scenario in recorded]
+    unique(identifiers, f"{row['id']} runtime scenario")
+    require(set(identifiers) == set(scenarios), f"{row['id']}: runtime scenario coverage mismatch")
+    for scenario in recorded:
+        require(scenario == scenarios[scenario["id"]], "Comparison executable scenario mismatch")
+
+
+def check_operation(row, root, reference, commit):
+    identifier = row["id"]
+    review = row.get("review")
+    require(review in {"unverified", "source-reviewed", "runtime-verified"}, f"{identifier}: invalid review state")
+    text(row.get("reason"), f"{identifier} review reason")
+    if review == "unverified":
+        require(row.get("localMapping") is None, f"{identifier}: unreviewed mapping cannot claim equivalence")
+        require(not row.get("runtimeComparisons"), f"{identifier}: unreviewed mapping cannot claim runtime evidence")
+        return
+    check_mapping(row, root, reference, commit)
+    if review == "source-reviewed":
+        require(not row.get("runtimeComparisons"), f"{identifier}: source review cannot claim runtime evidence")
+        return
+    check_runtime(row, root, commit)
+
+
+def check_operations(artifact, commit, upstream, local, root=ROOT, reference=None):
     require(artifact["upstreamCommit"] == commit, "Operation artifact pin drift; review required")
     require(artifact["upstream"] == upstream, "Upstream operation census drift; review required")
     require(artifact["localCommands"] == local, "Local command census drift; review required")
@@ -109,9 +164,7 @@ def check_operations(artifact, commit, upstream, local):
     unique(identifiers, "operation row")
     require(set(identifiers) == set(operation_ids(upstream)), "Missing or unknown operation rows; review required")
     for row in rows:
-        require(row.get("review") == "unverified", f"{row['id']}: reviewed mappings need a behavioral checker")
-        require(bool(row.get("reason")), f"{row['id']}: missing review reason")
-        require(row.get("localMapping") is None, f"{row['id']}: unreviewed mapping cannot claim equivalence")
+        check_operation(row, root, reference or root / "references/t3code", commit)
     return len(rows)
 
 
@@ -135,8 +188,12 @@ def run(args):
     if args.initialize:
         require(not path.exists(), "Operation artifact exists; refusing to overwrite reviewed data")
         path.write_text(json.dumps(initial_artifact(inventory["upstream_commit"], upstream, local), indent=2) + "\n")
-    count = check_operations(read_json(path), inventory["upstream_commit"], upstream, local)
-    print(f"Pinned source and command census valid: {count} operation rows, all unverified. Behavioral parity remains unproven.")
+    artifact = read_json(path)
+    count = check_operations(artifact, inventory["upstream_commit"], upstream, local, args.root, args.reference)
+    states = {state: sum(row["review"] == state for row in artifact["operations"])
+              for state in ("unverified", "source-reviewed", "runtime-verified")}
+    counts = ", ".join(f"{count} {state}" for state, count in states.items())
+    print(f"Pinned source and command census valid: {count} operation rows, {counts}. Recorded cases do not establish whole-operation parity.")
 
 
 if __name__ == "__main__":

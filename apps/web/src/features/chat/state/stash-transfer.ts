@@ -13,6 +13,7 @@ import {
 } from './prompt-stash-store'
 import { cloneStashAttachments, releaseStashAttachments } from './stash-attachments'
 import { composedMessageEmpty, stashMessage } from '../utils/stash-message'
+import { useFollowUpStore } from './follow-up-store'
 
 export async function transferStash(
   target: ChatInputDraftTarget,
@@ -89,8 +90,12 @@ export async function releaseUnusedDraftAttachments(
   const stashed = promptStashStoreFor(environmentId)
     .getState()
     .entries.flatMap((entry) => entry.attachments)
+  const queued = Object.values(useFollowUpStore.getState().queues)
+    .flatMap((queue) => queue)
+    .filter((entry) => entry.target.environmentId === environmentId)
+    .flatMap((entry) => entry.content.attachments)
   const used = new Set(
-    [...draftAttachments, ...stashed].flatMap((item) =>
+    [...draftAttachments, ...stashed, ...queued].flatMap((item) =>
       item.upload?.status === 'ready' ? [item.id, item.upload.attachment.id] : [item.id],
     ),
   )

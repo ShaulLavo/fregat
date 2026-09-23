@@ -31,9 +31,9 @@ export const chatFollowUp: Scenario = {
       await selectors
         .chatMessage(page)
         .fill('When the command finishes, reply with exactly CHAT_FOLLOWUP_ACCEPTED.')
-      await selectors.chatCorrection(page).click()
+      await selectors.chatQueue(page).click()
       await page.waitForTimeout(1_000)
-      await step('follow-up-sent')
+      await step('follow-up-queued')
       strictEqual(
         (await selectors.chatMessage(page).innerText()).trim(),
         '',

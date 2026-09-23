@@ -9,6 +9,7 @@ import {
 import { useEffect } from 'react'
 
 export function ChatInputSubmitPlugin({
+  busy = false,
   commandMenuOpen,
   disabled,
   onCommandMenuCommit,
@@ -16,10 +17,11 @@ export function ChatInputSubmitPlugin({
   onSubmitRequest,
 }: {
   commandMenuOpen: boolean
+  busy?: boolean
   disabled: boolean
   onCommandMenuCommit: () => boolean
   onCommandMenuMove: (offset: number) => boolean
-  onSubmitRequest: () => Promise<boolean>
+  onSubmitRequest: (alternate?: boolean) => Promise<boolean>
 }) {
   const [editor] = useLexicalComposerContext()
 
@@ -28,6 +30,7 @@ export function ChatInputSubmitPlugin({
       KEY_ENTER_COMMAND,
       (event) =>
         handleEnterCommand({
+          busy,
           commandMenuOpen,
           disabled,
           event,
@@ -58,23 +61,33 @@ export function ChatInputSubmitPlugin({
       unregisterArrowDown()
       unregisterArrowUp()
     }
-  }, [commandMenuOpen, disabled, editor, onCommandMenuCommit, onCommandMenuMove, onSubmitRequest])
+  }, [
+    busy,
+    commandMenuOpen,
+    disabled,
+    editor,
+    onCommandMenuCommit,
+    onCommandMenuMove,
+    onSubmitRequest,
+  ])
 
   return null
 }
 
 function handleEnterCommand({
+  busy,
   commandMenuOpen,
   disabled,
   event,
   onCommandMenuCommit,
   onSubmitRequest,
 }: {
+  busy: boolean
   commandMenuOpen: boolean
   disabled: boolean
   event: KeyboardEvent | null
   onCommandMenuCommit: () => boolean
-  onSubmitRequest: () => Promise<boolean>
+  onSubmitRequest: (alternate?: boolean) => Promise<boolean>
 }) {
   if (disabled) return false
   if (event && isImeCompositionEnter(event)) {
@@ -89,7 +102,7 @@ function handleEnterCommand({
 
   event?.preventDefault()
   event?.stopPropagation()
-  void onSubmitRequest()
+  void onSubmitRequest(busy && Boolean(event?.metaKey || event?.ctrlKey))
 
   return true
 }

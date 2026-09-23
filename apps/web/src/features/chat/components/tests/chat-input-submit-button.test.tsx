@@ -1,3 +1,5 @@
+import { AppearancePreviewContext } from '@/features/settings/providers/appearance-preview-context'
+import { DEFAULT_SETTING_VALUES } from '@workspace/contracts'
 import { Profiler } from 'react'
 import { act, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -77,7 +79,7 @@ test('sending replaces the arrow with a disabled progress control', () => {
 
   const button = screen.getByRole('button', { name: 'Sending…' })
   expect(button).toHaveAttribute('aria-disabled', 'true')
-  expect(button.querySelector('.animate-spin')).not.toBeNull()
+  expect(button.querySelector('[data-slot="orbit-loader"]')).not.toBeNull()
 })
 
 test('a starting turn remains stoppable when the session is busy', async () => {
@@ -136,7 +138,7 @@ test('an unavailable connection explains why stop is disabled', () => {
   )
 })
 
-test('a running turn can receive a correction while Stop remains available', async () => {
+test('a running turn queues follow-ups by default while Stop remains available', async () => {
   const sent = vi.fn(async () => true)
   const stop = vi.fn()
   renderWithProviders(
@@ -151,10 +153,33 @@ test('a running turn can receive a correction while Stop remains available', asy
       onSubmit={sent}
     />,
   )
-  await userEvent.click(screen.getByRole('button', { name: 'Send correction' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Queue message' }))
   expect(sent).toHaveBeenCalledOnce()
   expect(stop).not.toHaveBeenCalled()
   expect(screen.getByRole('button', { name: 'Stop current turn' })).not.toHaveAttribute(
+    'aria-disabled',
+    'true',
+  )
+})
+
+test('the steer preference labels the running send as a correction', () => {
+  renderWithProviders(
+    <AppearancePreviewContext
+      value={{ ...DEFAULT_SETTING_VALUES, 'chat.followUpBehavior': 'steer' }}
+    >
+      <ChatInputSubmitButton
+        draftTarget={draftTarget}
+        busy
+        disabled={false}
+        disabledReason={null}
+        pendingAction={null}
+        sendDisabled={false}
+        onStop={() => {}}
+        onSubmit={async () => true}
+      />
+    </AppearancePreviewContext>,
+  )
+  expect(screen.getByRole('button', { name: 'Send correction' })).not.toHaveAttribute(
     'aria-disabled',
     'true',
   )

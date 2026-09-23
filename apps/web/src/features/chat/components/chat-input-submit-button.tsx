@@ -1,3 +1,4 @@
+import { useSettingValue } from '@/hooks/use-setting-value'
 import { ArrowUpIcon, StopIcon } from '@phosphor-icons/react'
 import { Button } from '@workspace/ui/components/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
@@ -23,13 +24,15 @@ export function ChatInputSubmitButton({
   pendingAction,
   sendDisabled,
 }: ChatInputSubmitButtonProps) {
+  const followUpBehavior = useSettingValue('chat.followUpBehavior')
+  const followUpLabel = followUpBehavior === 'queue' ? 'Queue message' : 'Send correction'
   const hasContent = useChatInputDraftStore((state) =>
     selectChatInputDraftHasContent(state, draftTarget),
   )
   const action = composerSubmitAction({ busy: false, disabledReason, pendingAction })
   const label =
     correctionDisabledReason ??
-    (busy && action.kind === 'send' && !disabledReason ? 'Send correction' : action.label)
+    (busy && action.kind === 'send' && !disabledReason ? followUpLabel : action.label)
 
   async function handleClick() {
     await onSubmit()

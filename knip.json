@@ -68,6 +68,7 @@
         "themes/import-omarchy-theme.ts",
         "parity/background.ts",
         "parity/composer-defaults.ts",
+        "parity/follow-ups.ts",
         "parity/local-commands.ts",
         "parity/notifications.ts",
         "parity/ordering.ts",

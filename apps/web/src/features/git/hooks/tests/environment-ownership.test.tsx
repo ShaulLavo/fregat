@@ -75,6 +75,7 @@ test('commit output for the same checkout path stays with its query client', () 
   const progressA = commitProgressStoreFor(first)
   const progressB = commitProgressStoreFor(second)
 
+  progressA.getState().beginCommitProgress('repo', null)
   progressA.getState().appendCommitProgress('repo', { stream: 'stdout', text: 'A hook running' })
   expect(selectCommitProgress(progressB.getState(), 'repo')).toEqual([])
   progressB.getState().clearCommitProgress('repo')

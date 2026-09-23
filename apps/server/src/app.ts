@@ -315,7 +315,7 @@ export function createApp(options: AppOptions) {
           'x-fs-mtime-ms',
           'x-fs-path',
         ],
-        methods: ['GET', 'POST', 'OPTIONS'],
+        methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
         origin: (request) => isCorsOriginAllowed(auth, request.headers.get('origin')),
       }),
     )

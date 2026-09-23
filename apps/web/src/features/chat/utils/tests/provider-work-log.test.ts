@@ -100,15 +100,26 @@ test.each([
   ['I am ', 'Thinking', ' about the gutter background.'],
   ['Thinking'],
 ])('preserves reasoning stream chunks %j', async (...chunks) => {
-  const activities = await ingestProviderActivities(
-    chunks.map((delta, index) => ({
+  const activities = await ingestProviderActivities([
+    ...chunks.map((delta, index) => ({
       ...runtime,
       eventId: `reason-${index}`,
       itemId: 'reasoning-item',
-      type: 'content.delta',
-      payload: { delta, streamKind: 'reasoning_summary_text', contentIndex: 0, summaryIndex: 0 },
+      type: 'content.delta' as const,
+      payload: {
+        delta,
+        streamKind: 'reasoning_summary_text' as const,
+        contentIndex: 0,
+        summaryIndex: 0,
+      },
     })),
-  )
+    {
+      ...runtime,
+      eventId: 'reason-complete',
+      type: 'turn.completed',
+      payload: { state: 'completed' },
+    },
+  ])
   const entries = chatWorkLogEntries({ activities })
 
   expect(entries).toHaveLength(1)

@@ -38,7 +38,7 @@ class SettingsDiagnosticsContribution implements EditorViewContribution {
     context: EditorViewContributionContext,
     private readonly source: SettingsDiagnosticsSource,
   ) {
-    this.presenter = new DiagnosticsPresenter(context, context.highlightPrefix ?? 'editor', {
+    this.presenter = new DiagnosticsPresenter(context, context.highlightPrefix, {
       highlightNameNamespace: HIGHLIGHT_NAMESPACE,
       markerTimingNamePrefix: MARKER_TIMING_PREFIX,
       minimapSourceId: MINIMAP_SOURCE_ID,

@@ -1,3 +1,5 @@
+import { settingsKeys } from '@workspace/client-core/settings/query-keys'
+import { settingsSnapshot } from '../../../../../test/factories/settings'
 import { createClientError } from '@workspace/client-core/errors'
 import { providerListQueryOptions } from '@/features/chat/utils/provider-query'
 import {
@@ -334,6 +336,14 @@ test('correction retry consumes content while model and mode choices reach the n
   const disconnect = registerChatTransport(transport)
   const height = vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(600)
   const view = renderCachedChatSelection(running.id)
+  await view.queryClient.cancelQueries({ queryKey: settingsKeys.document() })
+  view.queryClient.setQueryData(
+    settingsKeys.document(),
+    settingsSnapshot({
+      userRaw: { 'chat.followUpBehavior': 'steer', 'chat.planModeEnabled': true },
+      values: { 'chat.followUpBehavior': 'steer', 'chat.planModeEnabled': true },
+    }),
+  )
   view.queryClient.setQueryData(providerListQueryOptions().queryKey, {
     providers: [providerSnapshot()],
   })

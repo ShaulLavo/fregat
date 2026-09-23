@@ -21,9 +21,9 @@ export function useCommitMutation(rootPath: string) {
     // one git command that runs arbitrary user code, and the previous one-shot
     // call left a slow hook looking exactly like a hung button.
     mutationFn: async (request: CommitRequest, { client }) => {
-      await admitGitMutation(client, rootPath)
+      const status = await admitGitMutation(client, rootPath)
       const progress = commitProgressStoreFor(client).getState()
-      progress.clearCommitProgress(rootPath)
+      progress.beginCommitProgress(rootPath, status.repository?.commit ?? null)
 
       return commitChangesStreaming(
         rootPath,

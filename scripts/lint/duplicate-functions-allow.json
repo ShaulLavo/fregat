@@ -3,8 +3,9 @@
     "name": "send",
     "files": [
       "scripts/agent/fixtures/native-codex.mjs",
+      "scripts/agent/fixtures/native-queue.mjs",
       "scripts/agent/fixtures/native-titles.mjs"
     ],
-    "reason": "Each fixture is copied on its own into an isolated temp directory and spawned as a standalone mock binary, so neither can import a shared module."
+    "reason": "Each fixture is copied on its own into an isolated temp directory and spawned as a standalone mock binary, so none can import a shared module."
   }
 ]

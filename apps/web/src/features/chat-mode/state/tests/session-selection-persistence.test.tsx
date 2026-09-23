@@ -40,18 +40,23 @@ test('the session on the stage survives a restart', () => {
   expect(reloaded.getState().restored).toBe(true)
 })
 
-test('a draft is remembered as a draft, not as the newest session', () => {
+test('a draft keeps its identity through persistence and restart', () => {
   resetSessionSelectionStore()
 
-  createSessionSelectionStore(testScopedStorage)
-    .getState()
-    .startDraft(TEST_ENVIRONMENT_ID, projectId)
+  const store = createSessionSelectionStore(testScopedStorage)
+  store.getState().startDraft(TEST_ENVIRONMENT_ID, projectId)
 
-  expect(createSessionSelectionStore(testScopedStorage).getState().selection).toEqual({
+  const draft = store.getState().selection
+  expect(draft).toEqual({
     kind: 'draft',
     environmentId: TEST_ENVIRONMENT_ID,
     projectId,
+    draftId: expect.stringMatching(/\S/),
   })
+  expect(readSessionSelectionCache(testScopedStorage)).toEqual(draft)
+  const reloaded = createSessionSelectionStore(testScopedStorage)
+  expect(reloaded.getState().selection).toEqual(draft)
+  expect(reloaded.getState().restored).toBe(true)
 })
 
 test('a cold profile starts on the auto pick', () => {

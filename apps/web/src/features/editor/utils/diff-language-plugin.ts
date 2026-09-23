@@ -65,7 +65,7 @@ export function createDiffLanguagePlugin(options: DiffLanguageOptions): EditorPl
 
 function createContribution(context: EditorViewContributionContext, options: DiffLanguageOptions) {
   const element = context.scrollElement
-  const hover = context.registerProvider?.(
+  const hover = context.registerProvider(
     EDITOR_HOVER_PARTICIPANT,
     { language: '*' },
     { computeAsync: (request, emit) => answerHover(options, request, emit) },
@@ -158,7 +158,7 @@ function createContribution(context: EditorViewContributionContext, options: Dif
   return {
     update: () => undefined,
     dispose: () => {
-      hover?.dispose()
+      hover.dispose()
       cancelPendingMove()
       element.removeEventListener('mousemove', handleMouseMove)
       element.removeEventListener('mousedown', handleMouseDown, { capture: true })

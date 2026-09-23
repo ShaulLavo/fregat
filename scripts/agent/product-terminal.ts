@@ -70,7 +70,7 @@ export function installCaptureSocketPrefix(prefix: string) {
   })
 }
 
-async function killCaptureTerminal(request: APIRequestContext, session: CaptureTerminal) {
+export async function killCaptureTerminal(request: APIRequestContext, session: CaptureTerminal) {
   try {
     const response = await request.post(session.killUrl, {
       data: { worktreeId: session.worktreeId, terminalId: session.terminalId },

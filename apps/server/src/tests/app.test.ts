@@ -98,6 +98,30 @@ describe('fs rpc auth', () => {
     expect(response.headers.get('access-control-allow-origin')).toBe(TRUSTED_ORIGIN)
   })
 
+  it.each(['PUT', 'DELETE'])(
+    'allows attachment %s preflights only for trusted origins',
+    async (method) => {
+      const app = testApp(await fixtureRoot())
+      const preflight = (origin: string) =>
+        app.handle(
+          new Request('http://local/attachments/uploads/upload-example', {
+            method: 'OPTIONS',
+            headers: {
+              origin,
+              'access-control-request-method': method,
+              'access-control-request-headers': 'content-type',
+            },
+          }),
+        )
+      const allowed = await preflight(TRUSTED_ORIGIN)
+      expect(allowed.headers.get('access-control-allow-origin')).toBe(TRUSTED_ORIGIN)
+      expect(allowed.headers.get('access-control-allow-methods')?.split(/,\s*/)).toContain(method)
+      expect(
+        (await preflight('http://evil.localhost')).headers.get('access-control-allow-origin'),
+      ).toBeNull()
+    },
+  )
+
   // The regression gate: before the exact-origin collapse this returned 200,
   // because dev-origin mode widened the allowlist to any loopback port.
   it('rejects a loopback origin that is not on the allowlist', async () => {

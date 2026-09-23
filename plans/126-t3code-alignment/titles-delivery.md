@@ -17,4 +17,6 @@ Verification:
 
 Row/header/bulk title actions now pass 19 focused UI/menu/streaming tests. They show pending/error/retry, preserve failed bulk selections, and wait for canonical shell settlement before the mutation resolves.
 
-Pending: controlled native browser verification, deployment, and comparison of linked-source lookup and text-generation policy overrides. Provider output quality has not been measured.
+The retained browser run at `/work/tmp/fregat-evidence/20260920T152237Z-scenario-session-titles/` completed in 4.649 seconds. Its seven recorded steps cover initial generation, regeneration, a pending request, manual rename surviving a late result and reload, visible failure, and retry. The 2026-09-23 reconciliation checked the stored summary, not a fresh run. The summary records graphics warnings and two application warn/error entries, so this is not a clean-log claim.
+
+Linked-source policy and process tests are documented in `title-links-delivery.md`; their deployment and authenticated external lookup remain unconfirmed. Text-generation policy overrides, the full provider/source-control matrix, and paired upstream runtime comparison remain open. Fixture output does not establish provider title quality.

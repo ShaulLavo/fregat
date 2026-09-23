@@ -271,7 +271,7 @@
     "thread.cwd": 1,
     "thread.id": 2,
     "thread/compacted": 2,
-    "thread/list": 2,
+    "thread/list": 3,
     "thread/name/updated": 2,
     "thread/read": 1,
     "thread/realtime/closed": 3,
@@ -391,6 +391,10 @@
   },
   "apps/server/src/provider/adapters/utils/codex-session.ts": {
     "thread": 1
+  },
+  "apps/server/src/provider/adapters/utils/tests/codex-elicitation.test.ts": {
+    "thread": 1,
+    "threadId": 1
   },
   "apps/server/src/provider/background-liveness.ts": {
     "parentThreadId": 1,

@@ -18,6 +18,7 @@ import { ChatInputSurroundPlugin } from './chat-input-surround-plugin'
 import { ChatInputHistoryPlugin } from '@/features/chat/components/chat-input-history-plugin'
 
 export function ChatInputEditor({
+  busy = false,
   disabled,
   draftKey,
   onCommandMenuCommit,
@@ -30,13 +31,14 @@ export function ChatInputEditor({
   rootPath,
   trigger,
 }: {
+  busy?: boolean
   disabled: boolean
   draftKey: string
   onCommandMenuCommit: () => boolean
   onCommandMenuMove: (offset: number) => boolean
   onEditorReady: (editor: LexicalEditor | null) => void
   onImageFiles: (files: readonly File[]) => void
-  onSubmitRequest: () => Promise<boolean>
+  onSubmitRequest: (alternate?: boolean) => Promise<boolean>
   onTriggerChange: (trigger: ChatInputTrigger | null) => void
   placeholder: string
   rootPath: string
@@ -92,6 +94,7 @@ export function ChatInputEditor({
         onTriggerChange={onTriggerChange}
       />
       <ChatInputSubmitPlugin
+        busy={busy}
         commandMenuOpen={trigger !== null}
         disabled={disabled}
         onCommandMenuCommit={onCommandMenuCommit}

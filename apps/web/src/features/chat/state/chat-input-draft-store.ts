@@ -61,6 +61,10 @@ type ChatInputDraftState = {
 }
 
 type ChatInputDraftActions = {
+  appendContent: (
+    target: ChatInputDraftTarget,
+    content: Pick<ChatInputDraft, 'prompt' | 'attachments' | 'terminalContexts'>,
+  ) => void
   setIdentity: (target: ChatInputDraftTarget, identity: DraftIdentity | null) => void
   restoreContent: (
     target: ChatInputDraftTarget,
@@ -127,6 +131,18 @@ const draftPersist = new Debouncer(() => flushChatInputDraftStorage(), {
 
 export const useChatInputDraftStore = create<ChatInputDraftStore>((set, get) => ({
   ...createInitialChatInputDraftState(),
+  appendContent: (target, content) => {
+    set((state) =>
+      updateDraftForTarget(state, target, (draft) =>
+        withDraftPatch(draft, {
+          prompt: [draft.prompt, content.prompt].filter(Boolean).join('\n\n'),
+          attachments: draft.attachments.concat(content.attachments),
+          terminalContexts: draft.terminalContexts.concat(content.terminalContexts),
+        }),
+      ),
+    )
+    draftPersist.maybeExecute()
+  },
   setIdentity: (target, identity) => {
     set((state) =>
       updateDraftForTarget(state, target, (draft) => withDraftPatch(draft, { identity })),

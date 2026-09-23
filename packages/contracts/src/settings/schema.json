@@ -24,6 +24,12 @@
       "enum": ["approval-required", "auto-accept-edits", "full-access"],
       "type": "string"
     },
+    "chat.followUpBehavior": {
+      "default": "queue",
+      "description": "Queue messages during a running turn or send them immediately as corrections. Ctrl/Cmd+Enter uses the other behavior.",
+      "enum": ["queue", "steer"],
+      "type": "string"
+    },
     "chat.inAppNotificationsEnabled": {
       "default": false,
       "description": "Show an Open session action when another session needs attention or completes while this window is focused.",

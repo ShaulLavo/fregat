@@ -1,6 +1,12 @@
 import type { ProviderInstanceId } from '@workspace/contracts'
 
 export const chatMutationKeys = {
+  composer: (environmentId: string, sessionId: string | null) =>
+    ['chat', 'composer', environmentId, sessionId] as const,
+  stop: (environmentId: string, sessionId: string | null) =>
+    ['chat', 'stop', environmentId, sessionId] as const,
+  restoreFollowUp: (environmentId: string, sessionId: string | null) =>
+    ['chat', 'restore-follow-up', environmentId, sessionId] as const,
   draftRecovery: (action: 'open' | 'discard') => ['chat', 'draft-recovery', action] as const,
   stash: (environmentId: string, draftKey: string | null) =>
     ['chat', 'stash', environmentId, draftKey] as const,

@@ -1,6 +1,6 @@
 # Live delivery and MCP approvals
 
-Implementation is ready for deployment on 2026-09-20. Full alignment remains unverified.
+Implementation shipped in release `20260920T132650Z-b915d3e0-plan126-live-delivery`. The MCP browser evidence is recorded below; live overflow recovery and full upstream alignment remain unverified.
 
 ## Bounded delivery
 

@@ -1,6 +1,6 @@
 # Final batch delivery
 
-The user ended this run after the four active units. The broader 48-group alignment plan remains in progress. No new implementation units follow this batch.
+The user ended the 2026-09-20 run after the four active units. The broader 48-group alignment plan remained in progress. That stopping instruction applied to that run; the user resumed full parity execution on 2026-09-23, recorded in [resumed execution](resumed-execution.md).
 
 | Unit                                      | Evidence                                                                 | Scope limit                                                                                                                              |
 | ----------------------------------------- | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |

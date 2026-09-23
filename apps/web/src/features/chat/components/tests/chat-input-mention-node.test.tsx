@@ -1,3 +1,9 @@
+import { beforeEach } from 'vitest'
+import {
+  resetChatInputDraftStore,
+  useChatInputDraftStore,
+} from '../../state/chat-input-draft-store'
+import { TEST_ENVIRONMENT_ID } from '../../../../../test/factories/chat'
 import { LexicalComposer } from '@lexical/react/LexicalComposer'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import {
@@ -21,6 +27,8 @@ import {
 } from '@/features/chat/utils/input-editor-actions'
 import { expect, test } from '../../../../../test/fixtures'
 import { renderWithProviders } from '../../../../../test/render'
+
+beforeEach(() => resetChatInputDraftStore())
 
 test('a mention in the prompt renders as a chip labelled with its file', () => {
   const composer = renderComposer('read @"src/my file.ts" now')
@@ -71,6 +79,14 @@ test('a paste with no mention in it is left to the editor to handle', () => {
 })
 
 function renderComposer(initialText: string) {
+  useChatInputDraftStore.getState().setPrompt(
+    {
+      environmentId: TEST_ENVIRONMENT_ID,
+      draftKey: 'mention-node-test',
+      rootPath: '/tmp/mention-node-test',
+    },
+    initialText,
+  )
   const state = { editor: null as LexicalEditor | null }
 
   const rendered = renderWithProviders(

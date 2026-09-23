@@ -1,0 +1,169 @@
+{
+  "schemaVersion": 1,
+  "upstreamCommit": "7445aa733ada33e45289e5aa5055f79142556513",
+  "subject": "client-command:thread.turn.interrupt",
+  "result": "matched",
+  "scenario": {
+    "id": "follow-up-queue-policy",
+    "runner": "scripts/parity/follow-ups.ts",
+    "command": ["bun", "scripts/parity/follow-ups.ts"],
+    "cases": [
+      "latest-empty",
+      "latest-singletons",
+      "latest-pairs",
+      "latest-permutations",
+      "due-phase-matrix",
+      "latest-sequence-before-position-and-time",
+      "latest-time-breaks-sequence-tie",
+      "due-connecting-is-blocked",
+      "due-held-is-blocked",
+      "due-new-tool-boundary",
+      "due-same-tool-is-blocked",
+      "due-disconnected-is-ready"
+    ]
+  },
+  "sources": [
+    {
+      "path": "apps/web/src/features/chat/hooks/use-session-composer.ts",
+      "sha256": "6d255a8eb337f25dbc2061d9f13f9c79797ae62022167220c8d326e9be7c49ea"
+    },
+    {
+      "path": "apps/web/src/features/chat/state/follow-up-store.ts",
+      "sha256": "635f5bbdb78556b48dfe053d61a67dcf2e14635ca70249278f62510e99885a76"
+    },
+    {
+      "path": "apps/web/src/features/chat/state/restore-follow-ups.ts",
+      "sha256": "1e4f21c0861e90de5d5c680f31acc943a8c38cad6f358d7e01f2ff27c7d2a073"
+    },
+    {
+      "path": "apps/web/src/features/chat/state/send-follow-up.ts",
+      "sha256": "3c8e371144d0f735df6a37e565650f5a74cedb492fbea68c53ca90459ab6aff6"
+    },
+    {
+      "path": "apps/web/src/features/chat/state/stash-transfer.ts",
+      "sha256": "746b9cbcb4840de3497d0e86de19042a217f78ac48b6946eb102e325718ef190"
+    },
+    {
+      "path": "apps/web/src/features/chat/utils/follow-up-policy.ts",
+      "sha256": "e6892b4e074c618e9ab6e6ca73b3549d28c7c84fa629ca034fea82f603e0ab29"
+    },
+    {
+      "path": "packages/client-core/src/chat/commands.ts",
+      "sha256": "9afa9d16b18a177b80edd86181bfb6428de3737d3689635c7541d94a261010b9"
+    },
+    {
+      "path": "scripts/parity/follow-ups.ts",
+      "sha256": "2747bb8aa68eb774818e54b5125cd482ecb45801e17b300b09bbfe0d4745fdb4"
+    }
+  ],
+  "artifacts": {
+    "upstream": {
+      "path": "plans/126-t3code-alignment/evidence/follow-ups-final/turn-interrupt/upstream.json",
+      "sha256": "f94d8d8a2ca7f4c9a6ff0e066eb22657a80f9bcc5a2ef0054d2f8e579fd457a2"
+    },
+    "local": {
+      "path": "plans/126-t3code-alignment/evidence/follow-ups-final/turn-interrupt/local.json",
+      "sha256": "f94d8d8a2ca7f4c9a6ff0e066eb22657a80f9bcc5a2ef0054d2f8e579fd457a2"
+    }
+  },
+  "cases": [
+    {
+      "id": "latest-empty",
+      "result": "matched"
+    },
+    {
+      "id": "latest-singletons",
+      "result": "matched"
+    },
+    {
+      "id": "latest-pairs",
+      "result": "matched"
+    },
+    {
+      "id": "latest-permutations",
+      "result": "matched"
+    },
+    {
+      "id": "due-phase-matrix",
+      "result": "matched"
+    },
+    {
+      "id": "latest-sequence-before-position-and-time",
+      "result": "matched"
+    },
+    {
+      "id": "latest-time-breaks-sequence-tie",
+      "result": "matched"
+    },
+    {
+      "id": "due-connecting-is-blocked",
+      "result": "matched"
+    },
+    {
+      "id": "due-held-is-blocked",
+      "result": "matched"
+    },
+    {
+      "id": "due-new-tool-boundary",
+      "result": "matched"
+    },
+    {
+      "id": "due-same-tool-is-blocked",
+      "result": "matched"
+    },
+    {
+      "id": "due-disconnected-is-ready",
+      "result": "matched"
+    }
+  ],
+  "negativeControls": [
+    {
+      "id": "array-position-instead-of-sequence",
+      "caseId": "latest-sequence-before-position-and-time",
+      "output": "low-sequence",
+      "result": "rejected"
+    },
+    {
+      "id": "timestamp-instead-of-sequence",
+      "caseId": "latest-sequence-before-position-and-time",
+      "output": "low-sequence",
+      "result": "rejected"
+    },
+    {
+      "id": "ignore-timestamp-tiebreak",
+      "caseId": "latest-time-breaks-sequence-tie",
+      "output": "older",
+      "result": "rejected"
+    },
+    {
+      "id": "send-while-connecting",
+      "caseId": "due-connecting-is-blocked",
+      "output": true,
+      "result": "rejected"
+    },
+    {
+      "id": "ignore-stop-or-failure-hold",
+      "caseId": "due-held-is-blocked",
+      "output": true,
+      "result": "rejected"
+    },
+    {
+      "id": "wait-until-idle",
+      "caseId": "due-new-tool-boundary",
+      "output": false,
+      "result": "rejected"
+    },
+    {
+      "id": "any-completed-tool-is-due",
+      "caseId": "due-same-tool-is-blocked",
+      "output": true,
+      "result": "rejected"
+    },
+    {
+      "id": "wait-for-ready-after-disconnect",
+      "caseId": "due-disconnected-is-ready",
+      "output": false,
+      "result": "rejected"
+    }
+  ]
+}

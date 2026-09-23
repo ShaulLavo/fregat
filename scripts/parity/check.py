@@ -2,9 +2,10 @@
 """Validate committed alignment records offline, without asserting behavioral parity."""
 
 import argparse
-import json
 import re
 from pathlib import Path
+
+from evidence import InvalidRecord, check_comparison, read_json, require, unique
 
 ROOT = Path(__file__).resolve().parents[2]
 REPORTS = ("lifecycle.md", "interaction.md", "runtime.md", "adjacent.md")
@@ -12,23 +13,6 @@ FINDING = re.compile(
     r"^### \[?((?:LIFE|INTERACTION|RUNTIME|EXT)-\d+)\]?(?:\s*—|:)?\s+(.+)$",
     re.MULTILINE,
 )
-
-
-class InvalidRecord(ValueError):
-    pass
-
-
-def require(condition, message):
-    if not condition:
-        raise InvalidRecord(message)
-
-
-def read_json(path):
-    return json.loads(path.read_text())
-
-
-def unique(values, label):
-    require(len(values) == len(set(values)), f"Duplicate {label}")
 
 
 def report_findings(directory):
@@ -40,31 +24,13 @@ def report_findings(directory):
     return findings
 
 
-def checked_artifact(root, value):
-    require(isinstance(value, str) and bool(value), "Missing comparison artifact")
-    path = Path(value)
-    require(not path.is_absolute(), "Comparison artifacts must be repository-relative")
-    resolved = (root / path).resolve()
-    require(resolved.is_relative_to(root.resolve()), "Comparison artifact escapes repository")
-    require(resolved.is_file(), f"Missing comparison artifact: {value}")
-
-
 def check_verified(finding, root, commit):
     identifier = finding["id"]
     require(
         finding["evidence_level"] == "runtime-compared",
         f"{identifier}: verified requires runtime-compared evidence, not source review",
     )
-    comparison = finding.get("runtime_comparison")
-    require(isinstance(comparison, dict), f"{identifier}: missing runtime_comparison")
-    require(comparison.get("upstream_commit") == commit, f"{identifier}: stale comparison pin")
-    require(comparison.get("result") == "matched", f"{identifier}: comparison did not match")
-    for field in ("upstream_artifact", "local_artifact", "comparison_artifact"):
-        checked_artifact(root, comparison.get(field))
-    artifacts = [comparison[field] for field in (
-        "upstream_artifact", "local_artifact", "comparison_artifact"
-    )]
-    unique(artifacts, "comparison artifacts")
+    check_comparison(finding.get("runtime_comparison"), root, commit, identifier)
 
 
 def check_finding(finding, reports, root, commit):
@@ -131,7 +97,7 @@ def check(root=ROOT):
         f"{len(findings)} finding groups, {remaining} unverified, {fixtures} provenance-stamped fixtures.\n"
         "Operation/default mapping and source drift are not checked. "
         "Type discriminants include events and data variants; they are not a command inventory.\n"
-        "Artifact references do not establish semantic equivalence. Behavioral parity remains unproven."
+        "Validated runtime reports establish recorded case agreement only. Behavioral parity remains unproven."
     )
 
 

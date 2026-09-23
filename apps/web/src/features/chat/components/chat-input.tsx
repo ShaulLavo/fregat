@@ -4,7 +4,6 @@ import { useEnvironmentId } from '@/lib/environments/hooks/use-environment-id'
 import { LexicalComposer, type InitialConfigType } from '@lexical/react/LexicalComposer'
 import { useQuery } from '@tanstack/react-query'
 import type {
-  ChatAttachmentUpload,
   InteractionMode,
   ModelSelection,
   ProviderInstanceId,
@@ -42,7 +41,6 @@ import { useProvider } from '@/features/chat/hooks/use-provider'
 import { chatSubmissionValidation } from '@/features/chat/utils/submission-validation'
 import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
 import { ChatModelPickerProvider } from '../providers/model-picker-provider'
-import type { TerminalContextSelection } from '@workspace/client-core/chat/terminal-context'
 import {
   readChatInputDraftPrompt,
   selectChatInputDraftAttachments,
@@ -60,15 +58,7 @@ import { CHAT_INPUT_EDITOR_NODES } from './chat-input-mention-node'
 import { useFocusTarget } from '@/lib/focus/hooks/use-target'
 import type { ComposerPendingAction } from '@/features/chat/utils/composer-state'
 
-export type ChatInputSubmitPayload = {
-  attachments: ChatAttachmentUpload[]
-  interactionMode: InteractionMode
-  modelSelection: ModelSelection
-  runtimeMode: RuntimeMode
-  /** Captured output to serialize after the prompt. Never part of `text`. */
-  terminalContexts: readonly TerminalContextSelection[]
-  text: string
-}
+import type { ChatInputSubmitPayload, ChatInputSubmitResult } from '../utils/composed-message'
 
 export function ChatInput({
   busy,
@@ -99,7 +89,7 @@ export function ChatInput({
   sessionProviderInstanceId?: ProviderInstanceId | null
   onPersistModelSelection: (modelSelection: ModelSelection) => void
   onStop: () => void
-  onSubmit: (payload: ChatInputSubmitPayload) => Promise<boolean>
+  onSubmit: (payload: ChatInputSubmitPayload, alternate?: boolean) => Promise<ChatInputSubmitResult>
   rootPath: string
   runtimeMode: RuntimeMode
 }) {
@@ -124,6 +114,7 @@ export function ChatInput({
     [draftTarget],
   )
   const planModeEnabled = useSettingValue('chat.planModeEnabled')
+  const followUpBehavior = useSettingValue('chat.followUpBehavior')
   const draftProviderId = useChatInputDraftStore(
     (state) => state.getDraft(draftTarget).modelSelection?.providerInstanceId,
   )
@@ -164,22 +155,20 @@ export function ChatInput({
   const [activeCommandItemId, setActiveCommandItemId] = useState<string | null>(null)
   const imagePreparation = useAttachmentPreparation(draftTarget)
   const sessionProvider = useProvider(sessionProviderInstanceId ?? undefined)
-  const busySendDisabledReason = busy
+  const steerDisabledReason = busy
     ? (correctionDisabledReason ??
       (sessionProvider?.driverKind === 'codex'
         ? null
         : 'Wait for the current turn to finish before sending'))
     : null
+  const busySendDisabledReason = followUpBehavior === 'queue' ? null : steerDisabledReason
   const [validationError, setValidationError] = useState<string | null>(null)
   const [dropTargetActive, setDropTargetActive] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [trigger, setTrigger] = useState<ChatInputTrigger | null>(null)
   const composerDisabled = disabled || submitting
   const submissionDisabled =
-    disabledReason !== null ||
-    busySendDisabledReason !== null ||
-    imagePreparation.preparing ||
-    (!busy && pendingAction !== null)
+    disabledReason !== null || imagePreparation.preparing || (!busy && pendingAction !== null)
   const visiblePendingAction = submitting ? 'sending' : pendingAction
   const statusLabel = validationError ?? imagePreparation.error ?? persistenceError ?? error
   const projectEntries = useProjectEntrySearch({
@@ -241,20 +230,23 @@ export function ChatInput({
     editorRef.current = editor
     setEditorReady(editor !== null)
   }
-  function clearDraft() {
-    const editor = editorRef.current
-    if (editor) clearChatInputEditor(editor)
+  function clearDraft(editor: LexicalEditor | null) {
+    if (editor && editorRef.current === editor) clearChatInputEditor(editor)
 
     // A correction consumes content; model and mode picks apply to the next new turn.
     if (busy) clearStoredDraftContent(draftTarget)
     else clearStoredDraft(draftTarget)
+    if (editorRef.current !== editor) return
     imagePreparation.clearError()
     setValidationError(null)
     setTrigger(null)
   }
 
-  async function handleSubmit() {
+  async function handleSubmit(alternate = false) {
     if (disabled || submitting || submissionDisabled || imagePreparation.isPreparing()) return false
+
+    const queuesFollowUp = busy && (followUpBehavior === 'queue') !== alternate
+    if (busy && !queuesFollowUp && steerDisabledReason !== null) return false
 
     const editor = editorRef.current
     const text = editor ? readChatInputText(editor).trim() : ''
@@ -271,28 +263,35 @@ export function ChatInput({
 
     setSubmitting(true)
     try {
-      const sent = await onSubmit({
-        attachments,
-        interactionMode: resolveComposerInteractionMode({
-          planModeEnabled,
-          provider:
-            modeProvider?.providerInstanceId === selected.providerInstanceId
-              ? modeProvider
-              : undefined,
-          interactionMode: draft.interactionMode ?? interactionMode,
-        }).interactionMode,
-        modelSelection: selected,
-        runtimeMode: draft.runtimeMode ?? runtimeMode,
-        terminalContexts: draft.terminalContexts,
-        text,
-      })
-      if (sent) {
-        imagePreparation.clearSent()
-        clearDraft()
+      const result = await onSubmit(
+        {
+          attachments,
+          interactionMode: resolveComposerInteractionMode({
+            planModeEnabled,
+            provider:
+              modeProvider?.providerInstanceId === selected.providerInstanceId
+                ? modeProvider
+                : undefined,
+            interactionMode: draft.interactionMode ?? interactionMode,
+          }).interactionMode,
+          modelSelection: selected,
+          runtimeMode: draft.runtimeMode ?? runtimeMode,
+          terminalContexts: draft.terminalContexts,
+          text,
+        },
+        alternate,
+      )
+      if (
+        result !== 'rejected' &&
+        useChatInputDraftStore.getState().getDraft(draftTarget) === draft
+      ) {
+        // A navigated attachment mutation now belongs to the new editor; its old upload can expire.
+        if (result === 'sent' && editorRef.current === editor) imagePreparation.clearSent()
+        clearDraft(editor)
       }
       setSubmitting(false)
 
-      return sent
+      return result !== 'rejected'
     } catch (error) {
       // Not `finally`: the compiler refuses the whole component over one.
       setSubmitting(false)
@@ -436,6 +435,7 @@ export function ChatInput({
               onDrop={handleComposerDrop}
             >
               <ChatInputEditor
+                busy={busy}
                 disabled={composerDisabled}
                 draftKey={draftKey}
                 placeholder='Use @ to mention, / for commands.'
@@ -477,7 +477,7 @@ export function ChatInput({
                 draftTarget={draftTarget}
                 interactionMode={interactionMode}
                 runtimeMode={runtimeMode}
-                sendDisabled={submissionDisabled}
+                sendDisabled={submissionDisabled || busySendDisabledReason !== null}
                 statusLabel={statusLabel}
                 onSelectImageFiles={handleImageFiles}
                 onStop={onStop}

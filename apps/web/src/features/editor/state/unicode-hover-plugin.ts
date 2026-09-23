@@ -19,14 +19,14 @@ export function createUnicodeHoverPlugin(openSettings: () => void): EditorPlugin
     activate: (context) =>
       context.registerViewContribution({
         createContribution: (view) => {
-          const registration = view.registerProvider?.(
+          const registration = view.registerProvider(
             EDITOR_HOVER_PARTICIPANT,
             { language: '*' },
             { computeSync: (request) => partsAt(view, request.anchor, openSettings) },
           )
           return {
             update: () => undefined,
-            dispose: () => registration?.dispose(),
+            dispose: () => registration.dispose(),
           }
         },
       }),

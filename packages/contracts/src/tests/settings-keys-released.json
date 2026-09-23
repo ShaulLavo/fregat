@@ -13,6 +13,7 @@
     "chat.contextWindowMeterEnabled",
     "chat.defaultInteractionMode",
     "chat.defaultRuntimeMode",
+    "chat.followUpBehavior",
     "chat.inAppNotificationsEnabled",
     "chat.keepImportedSessionsUpdated",
     "chat.notificationMode",

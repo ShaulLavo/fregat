@@ -5,6 +5,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from evidence import digest
+from run import save_comparison
+
 SPEC = importlib.util.spec_from_file_location("parity_check", Path(__file__).with_name("check.py"))
 checker = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(checker)
@@ -88,24 +91,32 @@ class RecordTests(unittest.TestCase):
         self.assert_invalid("missing runtime_comparison")
 
     def comparison(self):
-        for name in ("upstream.json", "local.json", "comparison.json"):
-            (self.root / name).write_text("{}")
+        (self.root / "scenario.py").write_text("print('archive')\n")
+        scenario = {"id": "archive", "runner": "scenario.py", "command": ["python3", "scenario.py"],
+                    "cases": ["archive-idle"]}
+        comparison = save_comparison(
+            self.root, "evidence", "LIFE-01", PIN, scenario,
+            [{"path": "scenario.py", "sha256": digest(self.root / "scenario.py")}],
+            {"cases": [{"id": "archive-idle", "upstream": {"archived": True}, "local": {"archived": True}}],
+             "negativeControls": [{"id": "archive-without-persistence", "result": "rejected", "caseId": "archive-idle", "output": {"archived": False}}]},
+        )
         self.finding.update(
             status="verified", evidence_level="runtime-compared",
-            execution_evidence=["comparison.json"],
-            runtime_comparison={
-                "upstream_commit": PIN, "result": "matched",
-                "upstream_artifact": "upstream.json", "local_artifact": "local.json",
-                "comparison_artifact": "comparison.json",
-            },
+            execution_evidence=["evidence/comparison.json"], runtime_comparison=comparison,
         )
 
-    def test_artifact_references_still_do_not_claim_parity(self):
+    def test_validated_cases_still_do_not_claim_whole_application_parity(self):
         self.comparison()
         self.save_finding()
         result = checker.check(self.root)
         self.assertIn("0 unverified", result)
-        self.assertIn("Artifact references do not establish semantic equivalence", result)
+        self.assertIn("recorded case agreement only", result)
+
+    def test_empty_existing_artifacts_cannot_verify_finding(self):
+        self.comparison()
+        (self.root / "evidence/comparison.json").write_text("{}")
+        self.save_finding()
+        self.assert_invalid("Unsupported comparison report schema")
 
     def test_comparison_requires_current_pin_and_existing_artifacts(self):
         self.comparison()
@@ -115,7 +126,7 @@ class RecordTests(unittest.TestCase):
             ("upstream_artifact", "missing.json", "Missing comparison artifact"),
             ("upstream_artifact", "../outside.json", "escapes repository"),
             ("upstream_artifact", "/tmp/outside.json", "repository-relative"),
-            ("local_artifact", "upstream.json", "Duplicate comparison artifacts"),
+            ("local_artifact", "evidence/upstream.json", "Duplicate comparison artifacts"),
             ("result", "different", "did not match"),
         )
         for field, value, error in cases:
@@ -124,6 +135,80 @@ class RecordTests(unittest.TestCase):
                 self.finding["runtime_comparison"][field] = value
                 self.save_finding()
                 self.assert_invalid(error)
+
+    def rewrite_report(self, change):
+        path = self.root / "evidence/comparison.json"
+        report = json.loads(path.read_text())
+        change(report)
+        path.write_text(json.dumps(report))
+
+    def test_false_report_metadata_fails(self):
+        self.comparison()
+        self.save_finding()
+        path = self.root / "evidence/comparison.json"
+        original = path.read_text()
+        cases = (
+            (lambda report: report.update(upstreamCommit="b" * 40), "Stale comparison report pin"),
+            (lambda report: report.update(subject="LIFE-02"), "subject mismatch"),
+            (lambda report: report.update(cases=[]), "Missing comparison case results"),
+            (lambda report: report["cases"][0].update(result="skipped"), "failed or skipped"),
+            (lambda report: report["cases"][0].update(id="invented"), "case coverage mismatch"),
+            (lambda report: report.update(negativeControls=[]), "Missing negative controls"),
+            (lambda report: report["negativeControls"][0].update(result="matched"), "not rejected"),
+            (lambda report: report["negativeControls"][0].update(output={"archived": True}), "matches the upstream observation"),
+            (lambda report: report["negativeControls"][0].update(caseId="invented"), "unknown case"),
+            (lambda report: report["negativeControls"][0].pop("output"), "omitted its observation"),
+            (lambda report: report.update(sources=[]), "Missing source snapshots"),
+            (lambda report: report["scenario"].update(command=["python3", "other.py", "scenario.py"]), "command entry point"),
+        )
+        for change, error in cases:
+            with self.subTest(error=error):
+                path.write_text(original)
+                self.rewrite_report(change)
+                self.assert_invalid(error)
+
+    def test_changed_observation_fails_even_when_hash_is_updated(self):
+        self.comparison()
+        self.save_finding()
+        path = self.root / "evidence/local.json"
+        artifact = json.loads(path.read_text())
+        artifact["cases"][0]["output"] = {"archived": False}
+        path.write_text(json.dumps(artifact))
+        self.assert_invalid("Artifact content changed")
+        self.rewrite_report(lambda report: report["artifacts"]["local"].update(sha256=digest(path)))
+        self.assert_invalid("observed outputs differ")
+
+    def test_boolean_and_number_observations_are_not_equivalent(self):
+        self.comparison()
+        self.save_finding()
+        path = self.root / "evidence/local.json"
+        artifact = json.loads(path.read_text())
+        artifact["cases"][0]["output"] = {"archived": 1}
+        path.write_text(json.dumps(artifact))
+        self.rewrite_report(lambda report: report["artifacts"]["local"].update(sha256=digest(path)))
+        self.assert_invalid("observed outputs differ")
+
+    def test_changed_runner_invalidates_recorded_comparison(self):
+        self.comparison()
+        self.save_finding()
+        (self.root / "scenario.py").write_text("print('changed behavior')\n")
+        self.assert_invalid("Artifact content changed: scenario.py")
+
+    def test_observation_case_coverage_is_checked_independently(self):
+        self.comparison()
+        self.save_finding()
+        path = self.root / "evidence/local.json"
+        artifact = json.loads(path.read_text())
+        artifact["cases"][0]["id"] = "wrong-case"
+        path.write_text(json.dumps(artifact))
+        self.rewrite_report(lambda report: report["artifacts"]["local"].update(sha256=digest(path)))
+        self.assert_invalid("Observation case coverage mismatch")
+
+    def test_report_cannot_substitute_another_artifact(self):
+        self.comparison()
+        self.save_finding()
+        self.rewrite_report(lambda report: report["artifacts"].update(local=report["artifacts"]["upstream"]))
+        self.assert_invalid("artifact reference mismatch")
 
     def test_stale_fixture_pin_fails(self):
         fixtures = self.root / "test/parity/t3code"
