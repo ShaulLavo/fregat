@@ -2,7 +2,7 @@ import { strictEqual } from 'node:assert/strict'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { Scenario } from './index'
-import { openFixtureWorkspace, waitForFileContent } from '../fixture-workspace'
+import { openFixtureWorkspace, releaseFixture, waitForFileContent } from '../fixture-workspace'
 import { focusEditor, openFileByName, selectors } from '../selectors'
 
 export const editorExternalDeletion: Scenario = {
@@ -54,7 +54,7 @@ export const editorExternalDeletion: Scenario = {
       await step('remote-recreation-refreshed')
     } finally {
       await page.goto(originalUrl)
-      await rm(fixture, { recursive: true, force: true })
+      await releaseFixture(fixture)
     }
   },
 }

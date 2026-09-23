@@ -1,11 +1,10 @@
-import { rm } from 'node:fs/promises'
-
 import type { Scenario } from './index'
 import {
   createGitFixture,
   fixtureHeadSubject,
   installPreCommitHook,
   openFixtureWorkspace,
+  releaseFixture,
 } from '../fixture-workspace'
 import { openGitPanel, selectors } from '../selectors'
 import { createScriptError } from '../../structured-errors'
@@ -38,7 +37,7 @@ export const gitCommitSlowHook: Scenario = {
         throw createScriptError('The commit landed but the panel still reports a failure')
       await step('committed')
     } finally {
-      await rm(fixture, { force: true, recursive: true })
+      await releaseFixture(fixture)
     }
   },
 }

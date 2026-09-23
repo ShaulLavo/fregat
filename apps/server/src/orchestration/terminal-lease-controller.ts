@@ -8,12 +8,17 @@ import {
 } from '@workspace/contracts'
 import type { TerminalExecutionLease } from '../terminal/lease'
 import { recordProcessWarning } from '../observability'
+import { orchestrationErrors } from '../observability/structured-errors'
 import type { WorktreeExecutionGate } from './worktree-execution-gate'
 import { internalCommandKey } from './utils/repository-ids'
 import type { OrchestrationReadModel } from './read-model'
 import { isDurableCommandRejection } from './command-receipts'
 
 type TerminalCommand = Extract<OrchestrationCommand, { type: `terminal.lease.${string}` }>
+
+// 250 ms doubling: about four seconds before a failing store is reported instead of retried.
+const PERSIST_ATTEMPTS = 5
+const PERSIST_FIRST_DELAY_MS = 250
 
 type TerminalLeaseControllerOptions = {
   gate: WorktreeExecutionGate
@@ -34,19 +39,18 @@ export class TerminalLeaseController {
     const terminalLeaseId = v.parse(terminalLeaseIdSchema, crypto.randomUUID())
     const send = (type: TerminalCommand['type']) =>
       this.send(type, worktreeId, terminalLeaseId, this.runtimeEpoch)
-    await this.untilAccepted(() => send('terminal.lease.request'))
+    await this.untilAccepted(send, 'terminal.lease.request')
     const shared = await this.acquireShared(worktreeId, send)
     try {
-      await this.untilAccepted(() => send('terminal.lease.claim'))
+      await this.untilAccepted(send, 'terminal.lease.claim')
     } catch (error) {
-      await this.untilAccepted(() => send('terminal.lease.end'))
-      shared.release()
+      await this.endAfterFailure(send).finally(() => shared.release())
       throw error
     }
     let ended: Promise<void> | null = null
     let queue = Promise.resolve()
     const enqueue = (type: TerminalCommand['type']) => {
-      queue = queue.catch(() => {}).then(() => this.untilAccepted(() => send(type)))
+      queue = queue.catch(() => {}).then(() => this.untilAccepted(send, type))
       return queue
     }
     return {
@@ -55,7 +59,13 @@ export class TerminalLeaseController {
       activate: () => ended ?? enqueue('terminal.lease.activate'),
       terminate: () => ended ?? enqueue('terminal.lease.terminate'),
       end: () => {
-        ended ??= enqueue('terminal.lease.end').then(() => shared.release())
+        // A rejected end is forgotten, so the terminal's reconnect retry writes it again.
+        ended ??= enqueue('terminal.lease.end')
+          .finally(() => shared.release())
+          .catch((error: unknown) => {
+            ended = null
+            throw error
+          })
         return ended
       },
     }
@@ -68,7 +78,7 @@ export class TerminalLeaseController {
     try {
       return this.options.gate.acquireShared(worktreeId, 'terminal')
     } catch (error) {
-      await this.untilAccepted(() => send('terminal.lease.end'))
+      await this.endAfterFailure(send)
       throw error
     }
   }
@@ -108,20 +118,59 @@ export class TerminalLeaseController {
     })
   }
 
-  private async untilAccepted(operation: () => Promise<unknown>) {
-    for (;;) {
+  /** Cleanup for a lease that failed to start: the original failure is the one to report. */
+  private async endAfterFailure(send: (type: TerminalCommand['type']) => Promise<unknown>) {
+    try {
+      await this.untilAccepted(send, 'terminal.lease.end')
+    } catch (error) {
+      recordProcessWarning('terminal.lease.cleanup_failed', {
+        area: 'terminal',
+        command: 'terminal.lease.end',
+        error,
+        operation: 'lease',
+      })
+    }
+  }
+
+  private async untilAccepted(
+    send: (type: TerminalCommand['type']) => Promise<unknown>,
+    type: TerminalCommand['type'],
+  ) {
+    let lastError: unknown
+    for (let attempt = 1; ; attempt += 1) {
       try {
-        await operation()
+        await send(type)
+        if (attempt > 1) recordPersistenceRetried(type, attempt, lastError)
         return
       } catch (error) {
         if (isDurableCommandRejection(error)) throw error
-        recordProcessWarning('terminal.lease.persistence_failed', {
-          area: 'terminal',
-          operation: 'lease',
-          error,
-        })
-        await new Promise<void>((resolve) => setTimeout(resolve, 250))
+        lastError = error
+        if (attempt >= PERSIST_ATTEMPTS) throw persistenceFailed(type, attempt, error)
+        const delay = PERSIST_FIRST_DELAY_MS * 2 ** (attempt - 1)
+        await new Promise<void>((resolve) => setTimeout(resolve, delay))
       }
     }
   }
+}
+
+function recordPersistenceRetried(
+  command: TerminalCommand['type'],
+  attempts: number,
+  error: unknown,
+) {
+  recordProcessWarning('terminal.lease.persistence_retried', {
+    area: 'terminal',
+    attempts,
+    command,
+    error,
+    operation: 'lease',
+  })
+}
+
+function persistenceFailed(command: TerminalCommand['type'], attempts: number, cause: unknown) {
+  return orchestrationErrors.TERMINAL_LEASE_UNPERSISTED({
+    attempts,
+    command,
+    ...(cause instanceof Error ? { cause } : { internal: { cause: String(cause) } }),
+  })
 }

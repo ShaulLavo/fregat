@@ -1,6 +1,19 @@
 # Provider adapters branch on codes, not on prose
 
-Status: **PROPOSED — PHASE 1 IS A SECURITY FIX AND SHOULD GO FIRST.** Requested 2026-09-21.
+Status: **PHASE 1 IMPLEMENTED AND DEPLOYED 2026-09-23** (release
+`20260923T083633Z-51995766-plan-131-132-phase1`); Phases 2 and 3 proposed. Requested 2026-09-21.
+Phase 1 outcome: persistence comes only from `_meta.persist` with the exact values `session` and
+`always` that `codex-rs/protocol/src/mcp_approval_meta.rs` declares; a form option supplies the wire
+value only when its `const` is exactly `once`, `session` or `always`, and only for a persistence the
+metadata declared. Boolean-field and label inference are gone, as are the undocumented
+`app_name`/`appName`/`target`/`tool_params` keys, `allowPersistentApproval` (a Codex config
+requirement, never elicitation metadata) and the "Allow ChatGPT to use" regex; the app name is
+`_meta.connector_name`, else `serverName`. The tests use Codex's own tool-approval payload from
+`mcp_tool_call_tests.rs`; 5 of 9 fail against the old parser. The one-time Approve value follows
+t3code (`/once|accept|approve|allow/`), with the persistence words used only to exclude a value;
+a form whose Approve cannot be filled is still declined unasked, as t3code does, now with a
+`chat.pipeline.codex_adapter.elicitation_declined` warning. Not yet observed: a live Codex
+approval in `bun run logs`.
 Inspected at Platform `d1ca6472`. Server-only; every phase needs `bun run deploy --server`, which
 drops live terminal and agent sessions, so batch the phases into as few deploys as possible.
 
@@ -26,8 +39,9 @@ and an explicit "unknown" when there is none.
 
 ## Decisions
 
-- D1: an unrecognized persistence value means **no persistence**, and the option is shown with its
-  own label. Never guess upward. This is the only acceptable default for item 1.
+- D1: an unrecognized persistence value means **no persistence**. Never guess upward. This is the
+  only acceptable default for item 1. (Revised 2026-09-23: such an option is not offered. Offering
+  it sends its value, and the provider may read that value as persistence.)
 - D2: items 7 and 8 drop old-CLI support instead of keeping the string pass. State the minimum
   Claude CLI version in the provider's availability check and report below it as unsupported.
 - D3: for item 5, stderr stops being classified. It is attached to the wide event as opaque

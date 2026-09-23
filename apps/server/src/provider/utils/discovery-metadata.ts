@@ -2,9 +2,7 @@ import { sessionIdSchema } from '@workspace/contracts'
 import * as v from 'valibot'
 
 export const discoveryInputSchema = v.object({
-  cwd: v.pipe(v.string(), v.minLength(1)),
-  limit: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(100)),
-  offset: v.pipe(v.number(), v.integer(), v.minValue(0)),
+  cwds: v.pipe(v.array(v.pipe(v.string(), v.minLength(1))), v.minLength(1)),
 })
 
 const discoveredSessionSchema = v.object({

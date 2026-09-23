@@ -1,7 +1,7 @@
 import { strictEqual } from 'node:assert'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { openFixtureWorkspace } from '../fixture-workspace'
+import { openFixtureWorkspace, releaseFixture } from '../fixture-workspace'
 import { openFileFromTree, selectors } from '../selectors'
 import type { Scenario } from './index'
 
@@ -35,7 +35,7 @@ export const treeFileClicks: Scenario = {
       strictEqual(await selectors.treeItem(page, 'nested').getAttribute('aria-expanded'), 'true')
       await step('nested-refresh-and-deletion')
     } finally {
-      await rm(fixture, { recursive: true, force: true })
+      await releaseFixture(fixture)
     }
   },
 }

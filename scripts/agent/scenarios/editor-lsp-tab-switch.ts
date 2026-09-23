@@ -1,10 +1,16 @@
 import type { Page } from 'playwright'
 import { strictEqual, ok } from 'node:assert/strict'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { Scenario } from './index'
-import { openFixtureWorkspace } from '../fixture-workspace'
-import { focusEditor, openFileFromTree, selectors } from '../selectors'
+import { openFixtureWorkspace, releaseFixture } from '../fixture-workspace'
+import {
+  focusEditor,
+  lspErrorPainted,
+  openFileFromTree,
+  selectors,
+  waitForLspErrorPaint,
+} from '../selectors'
 
 type ProtocolMessage = {
   direction: string
@@ -40,14 +46,7 @@ export const editorLspTabSwitch: Scenario = {
         .editorTab(page, path.join(fixture, 'lsp-retained-error.ts').slice(1))
         .waitFor()
       await focusEditor(page)
-      await page.waitForFunction(
-        () =>
-          Array.from(CSS.highlights).some(
-            ([name, highlight]) => name.endsWith('-lsp-plugin-error') && highlight.size > 0,
-          ),
-        undefined,
-        { timeout: 30_000 },
-      )
+      await waitForLspErrorPaint(page)
       await step('diagnostics-visible')
       const uri = `file://${fixture}/lsp-retained-error.ts`
       const opens = messages.filter(
@@ -64,11 +63,7 @@ export const editorLspTabSwitch: Scenario = {
       )
       await selectors.editorTab(page, path.join(fixture, 'lsp-retained-error.ts').slice(1)).click()
       await focusEditor(page)
-      const painted = await page.evaluate(() =>
-        Array.from(CSS.highlights).some(
-          ([name, highlight]) => name.endsWith('-lsp-plugin-error') && highlight.size > 0,
-        ),
-      )
+      const painted = await lspErrorPainted(page)
       strictEqual(painted, true, 'diagnostics are already painted on return')
       strictEqual(
         messages.filter(
@@ -97,7 +92,7 @@ export const editorLspTabSwitch: Scenario = {
       throw error
     } finally {
       await page.goto(originalUrl)
-      await rm(fixture, { recursive: true, force: true })
+      await releaseFixture(fixture)
     }
   },
 }

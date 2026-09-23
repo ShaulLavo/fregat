@@ -585,6 +585,8 @@ export const selectors = {
   historyList: (page: Page) => page.getByRole('listbox', { name: 'Commit history' }),
   historyRowSelector: '[data-history-commit]',
   logRowSelector: '[data-log-row-summary]',
+  logCopyButtons: (page: Page) => page.getByRole('button', { name: 'Copy log event', exact: true }),
+  logCleared: (page: Page) => page.getByText('Visible logs cleared.', { exact: true }),
   logRows: (page: Page) => page.locator('[data-log-row-summary]'),
   logsSearch: (page: Page) => page.getByRole('textbox', { name: 'Search logs' }),
   logsTab: (page: Page) => page.getByRole('button', { name: 'Logs', exact: true }),
@@ -637,6 +639,21 @@ export async function openGitPanel(page: Page) {
 export async function focusEditor(page: Page) {
   await selectors.editorSurface(page).first().click()
   await selectors.editorInput(page).first().focus()
+}
+
+/** Whether any language-server error is painted, read from the CSS highlight registry. */
+export function lspErrorPainted(page: Page) {
+  return page.evaluate(hasLspErrorHighlight)
+}
+
+export async function waitForLspErrorPaint(page: Page) {
+  await page.waitForFunction(hasLspErrorHighlight, undefined, { timeout: 30_000 })
+}
+
+function hasLspErrorHighlight() {
+  return Array.from(CSS.highlights).some(
+    ([name, highlight]) => name.endsWith('-lsp-plugin-error') && highlight.size > 0,
+  )
 }
 
 export async function openFileByName(page: Page, name: string) {

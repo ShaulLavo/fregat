@@ -1,7 +1,7 @@
-import { openFixtureWorkspace, fixtureGit } from '../fixture-workspace'
+import { fixtureGit, openFixtureWorkspace, releaseFixture } from '../fixture-workspace'
 import { selectedEditorTabId as selectedTabId } from '../selectors'
 import { deepStrictEqual, ok, strictEqual } from 'node:assert'
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { Page } from 'playwright'
 import { openFileByName, runPaletteCommand, selectors, waitForApp } from '../selectors'
@@ -111,7 +111,7 @@ export const editorSplitContent: Scenario = {
     } finally {
       await page.goto(originalUrl)
       await waitForApp(page)
-      await rm(fixture, { recursive: true, force: true })
+      await releaseFixture(fixture)
     }
   },
   async inspect(page) {

@@ -11,9 +11,10 @@ import {
 } from '../claude-discovery'
 import { crashingDiscoveryProcess } from '../../../test/factories/discovery-process'
 import { claudeTerminalResumeArgv } from '../utils/claude-terminal-resume'
+import type { ProviderSessionDiscoveryInput } from '../types'
 
 const sessionId = v.parse(sessionIdSchema, 'a6035591-a607-4a70-bc57-9b59f595b664')
-const request = { cwd: '/workspace', limit: 50, offset: 100 }
+const request: ProviderSessionDiscoveryInput = { cwds: ['/workspace', '/other'] }
 const metadata = {
   sessionId,
   cwd: '/workspace',
@@ -90,6 +91,47 @@ describe('Claude discovery boundary', () => {
     }
   })
 
+  it('lists every root in one SDK process', async () => {
+    const configDir = await mkdtemp(path.join(tmpdir(), 'claude-discovery-'))
+    const second = v.parse(sessionIdSchema, 'a6035591-a607-4a70-bc57-9b59f595b665')
+    const record = (id: string, cwd: string) =>
+      JSON.stringify({
+        uuid: `user-${id}`,
+        parentUuid: null,
+        type: 'user',
+        message: { role: 'user', content: `Question in ${cwd}` },
+        sessionId: id,
+        cwd,
+        timestamp: '2026-09-05T00:00:00.000Z',
+        isSidechain: false,
+      }) + '\n'
+    let spawns = 0
+    try {
+      for (const [id, cwd, dir] of [
+        [sessionId, '/workspace', '-workspace'],
+        [second, '/other', '-other'],
+      ] as const) {
+        await mkdir(path.join(configDir, 'projects', dir), { recursive: true })
+        await writeFile(path.join(configDir, 'projects', dir, `${id}.jsonl`), record(id, cwd))
+      }
+      const sessions = await discoverClaudeSessions({
+        request,
+        env: { ...process.env, CLAUDE_CONFIG_DIR: configDir },
+        runner: (input) => {
+          spawns += 1
+          return runClaudeDiscovery(input)
+        },
+      })
+      expect(sessions.map((session) => [session.sessionId, session.cwd])).toEqual([
+        [sessionId, '/workspace'],
+        [second, '/other'],
+      ])
+      expect(spawns).toBe(1)
+    } finally {
+      await rm(configDir, { recursive: true, force: true })
+    }
+  })
+
   it('retains process exit status and stderr when the metadata child crashes', async () => {
     await expect(
       runClaudeDiscovery({ request, env: {} }, crashingDiscoveryProcess),
@@ -104,7 +146,7 @@ describe('Claude discovery boundary', () => {
     })
   })
 
-  it('isolates instance environments and forwards bounded paging without mutating process state', async () => {
+  it('isolates instance environments and forwards every root without mutating process state', async () => {
     const original = process.env.CLAUDE_CONFIG_DIR
     const received: string[] = []
     const runner = async (input: { request: typeof request; env: NodeJS.ProcessEnv }) => {
@@ -122,7 +164,7 @@ describe('Claude discovery boundary', () => {
     expect(process.env.CLAUDE_CONFIG_DIR).toBe(original)
   })
 
-  it('rejects invalid UUIDs and oversized provider pages at the boundary', async () => {
+  it('rejects invalid UUIDs and an empty root list at the boundary', async () => {
     await expect(
       discoverClaudeSessions({
         request,
@@ -133,7 +175,7 @@ describe('Claude discovery boundary', () => {
     let calls = 0
     await expect(
       discoverClaudeSessions({
-        request: { ...request, limit: 101 },
+        request: { cwds: [] },
         env: {},
         runner: async () => {
           calls += 1

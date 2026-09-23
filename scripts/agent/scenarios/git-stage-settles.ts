@@ -1,7 +1,7 @@
 import { strictEqual } from 'node:assert/strict'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { fixtureGit, openFixtureWorkspace } from '../fixture-workspace'
+import { fixtureGit, openFixtureWorkspace, releaseFixture } from '../fixture-workspace'
 import { openGitPanel, selectors } from '../selectors'
 import type { Scenario } from './index'
 
@@ -66,7 +66,7 @@ export const gitStageSettles: Scenario = {
       strictEqual(await porcelain(fixture), '?? change.txt')
       strictEqual(atSettle, 0, 'Stage must settle the panel without a /git/status request')
     } finally {
-      await rm(fixture, { recursive: true, force: true })
+      await releaseFixture(fixture)
     }
   },
 }

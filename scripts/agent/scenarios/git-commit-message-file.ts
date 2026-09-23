@@ -1,8 +1,11 @@
-import { rm } from 'node:fs/promises'
-
 import type { Scenario } from './index'
 import type { Page } from 'playwright'
-import { createGitFixture, fixtureHeadSubject, openFixtureWorkspace } from '../fixture-workspace'
+import {
+  createGitFixture,
+  fixtureHeadSubject,
+  openFixtureWorkspace,
+  releaseFixture,
+} from '../fixture-workspace'
 import { focusEditor, openGitPanel, selectors } from '../selectors'
 import { createScriptError } from '../../structured-errors'
 
@@ -36,7 +39,7 @@ export const gitCommitMessageFile: Scenario = {
       await waitForHeadSubject(fixture)
       await step('committed')
     } finally {
-      await rm(fixture, { force: true, recursive: true })
+      await releaseFixture(fixture)
     }
   },
 }

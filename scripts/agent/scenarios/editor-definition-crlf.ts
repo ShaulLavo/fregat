@@ -1,7 +1,7 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { Scenario } from './index'
-import { openFixtureWorkspace, waitForFileContent } from '../fixture-workspace'
+import { openFixtureWorkspace, releaseFixture, waitForFileContent } from '../fixture-workspace'
 import { focusEditor, openFileByName, runPaletteCommand, selectors } from '../selectors'
 
 const targetText = '// Definition fixture\r\n\r\nexport const crlfTarget = 42\r\n'
@@ -46,7 +46,7 @@ export const editorDefinitionCrlf: Scenario = {
       await step('selection-proven-on-disk')
     } finally {
       await page.goto(originalUrl)
-      await rm(fixture, { recursive: true, force: true })
+      await releaseFixture(fixture)
     }
   },
 }

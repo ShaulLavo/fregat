@@ -1,7 +1,5 @@
-import { rm } from 'node:fs/promises'
-
 import type { Scenario } from './index'
-import { createGitFixture, openFixtureWorkspace } from '../fixture-workspace'
+import { createGitFixture, openFixtureWorkspace, releaseFixture } from '../fixture-workspace'
 import { openGitPanel, selectors } from '../selectors'
 import { createScriptError } from '../../structured-errors'
 
@@ -29,7 +27,7 @@ export const gitCommitMessagePersists: Scenario = {
       // Leave no draft behind in the browser profile.
       await selectors.commitMessage(page).fill('')
     } finally {
-      await rm(fixture, { force: true, recursive: true })
+      await releaseFixture(fixture)
     }
   },
 }

@@ -17,7 +17,7 @@ function metadata(cwd: string | null): ProviderDiscoveredSession {
 }
 
 describe('session discovery reconciliation', () => {
-  it('imports every metadata page with bounded offsets', async () => {
+  it('imports every session from one discovery call for all roots', async () => {
     const fixture = await discoveryFixture()
     const rows = Array.from({ length: 105 }, (_, index) => ({
       ...metadata(fixture.main),
@@ -26,28 +26,23 @@ describe('session discovery reconciliation', () => {
         `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`,
       ),
     }))
-    const pages: Array<{ limit: number; offset: number }> = []
+    const calls: Array<readonly string[]> = []
     const reconciler = new SessionDiscoveryReconciler({
       ...fixture,
       dispatch: (command) => fixture.engine.dispatch(command),
       providerService: {
         ...fixture.providerHistory,
         discoveryInstances: () => [instance],
-        discoverSessions: async ({ limit, offset }) => {
-          pages.push({ limit, offset })
-          if (pages.length > 3) throw new TypeError('Discovery repeated a completed metadata page')
-          return rows.slice(offset, offset + limit)
+        discoverSessions: async ({ cwds }) => {
+          calls.push(cwds)
+          return rows
         },
       },
     })
     try {
       await fixture.register()
       expect(await reconciler.scan()).toMatchObject({ scanned: 105, imported: 105, skipped: {} })
-      expect(pages).toEqual([
-        { limit: 50, offset: 0 },
-        { limit: 50, offset: 50 },
-        { limit: 50, offset: 100 },
-      ])
+      expect(calls).toEqual([[fixture.main]])
       expect(
         (await fixture.engine.shellSnapshot()).sessions.map((session) => session.id).sort(),
       ).toEqual(rows.map((row) => row.sessionId).sort())

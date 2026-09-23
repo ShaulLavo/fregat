@@ -411,7 +411,7 @@ export class FileChangeHub {
           })
         }
       },
-      { ignore: watcherIgnoredChildGlobs },
+      { backend: nativeParcelBackend(process.platform), ignore: watcherIgnoredChildGlobs },
     )
 
     return () => subscription.unsubscribe()
@@ -877,4 +877,15 @@ function pathInputs(input?: string | string[]) {
   if (Array.isArray(input)) return input
 
   return input.split(',')
+}
+
+/**
+ * Named, never left to parcel: its default probes Watchman through `popen` on every
+ * subscribe and never reaps the shell when Watchman is absent, one zombie per watch.
+ */
+function nativeParcelBackend(platform: NodeJS.Platform) {
+  if (platform === 'linux') return 'inotify'
+  if (platform === 'darwin') return 'fs-events'
+  if (platform === 'win32') return 'windows'
+  return undefined
 }

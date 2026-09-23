@@ -1,5 +1,5 @@
-import { openFixtureWorkspace, waitForFileContent } from '../fixture-workspace'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { openFixtureWorkspace, releaseFixture, waitForFileContent } from '../fixture-workspace'
+import { mkdtemp, writeFile } from 'node:fs/promises'
 import { strictEqual, ok } from 'node:assert'
 import path from 'node:path'
 import type { Page } from 'playwright'
@@ -126,7 +126,7 @@ export const editorSplitState: Scenario = {
       await step('last-view-saved-and-closed')
     } finally {
       await page.goto(originalUrl)
-      await rm(fixture, { recursive: true, force: true })
+      await releaseFixture(fixture)
     }
   },
   async inspect(page) {

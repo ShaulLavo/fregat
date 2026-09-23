@@ -20,19 +20,18 @@ async function readHistory(input: v.InferOutput<typeof sessionHistoryInputSchema
 }
 
 async function discover(input: v.InferOutput<typeof discoveryInputSchema>) {
-  const sessions = await listSessions({
-    dir: input.cwd,
-    limit: input.limit,
-    offset: input.offset,
-    includeWorktrees: true,
-    includeProgrammatic: false,
-  })
-  const metadata = sessions.map((session) => ({
-    sessionId: session.sessionId,
-    cwd: session.cwd ?? null,
-    title: session.customTitle?.trim() || session.summary.trim() || 'Claude session',
-    sourceUpdatedAt: new Date(session.lastModified).toISOString(),
-    gitBranch: session.gitBranch ?? null,
-  }))
+  const metadata = []
+  for (const dir of input.cwds) {
+    const sessions = await listSessions({ dir, includeWorktrees: true, includeProgrammatic: false })
+    metadata.push(
+      ...sessions.map((session) => ({
+        sessionId: session.sessionId,
+        cwd: session.cwd ?? null,
+        title: session.customTitle?.trim() || session.summary.trim() || 'Claude session',
+        sourceUpdatedAt: new Date(session.lastModified).toISOString(),
+        gitBranch: session.gitBranch ?? null,
+      })),
+    )
+  }
   return v.parse(discoveredSessionsSchema, metadata)
 }

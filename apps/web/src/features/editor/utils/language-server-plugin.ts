@@ -38,6 +38,7 @@ import {
   clientCapabilitiesForServer,
 } from '@/lib/language-server-capabilities'
 import { languageServerWebSocketConstructor } from '@/lib/server-sockets'
+import { notifyServerExit } from '@/features/editor/utils/notify-server-exit'
 import { environmentClientFor } from '@/lib/client'
 import { environmentActivitySignal } from '@/lib/environments/state/activity'
 import { markerStore } from '@/lib/markers/store'
@@ -324,8 +325,9 @@ function laneNotificationHandlers(
       if (semanticTokens) for (const controller of semanticTokens) controller.handleRefresh()
       return (semanticTokens?.size ?? 0) > 0
     },
-    [LSP_SERVER_EXITED]: () => {
+    [LSP_SERVER_EXITED]: (_client: unknown, params: unknown) => {
       statusSource.setServerStatus(serverId, 'error')
+      notifyServerExit(serverId, params)
       return true
     },
   }

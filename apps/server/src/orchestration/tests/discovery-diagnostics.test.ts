@@ -77,8 +77,7 @@ test.each([
           {
             stage: 'provider-scan',
             providerInstanceId,
-            cwd: fixture.main,
-            offset: 0,
+            rootCount: 1,
             error: {
               code: 'provider.DISCOVERY_FAILED',
               internal: {

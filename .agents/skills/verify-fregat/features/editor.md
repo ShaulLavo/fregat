@@ -83,3 +83,5 @@ Editor title actions are the active tab's controls at the end of its tab strip, 
 `scenario editor-external-deletion` verifies that externally deleted clean and dirty files stay open, retain their text across tab switches, can be recreated with Save, and refresh when another process restores them.
 
 `scenario editor-lsp-tab-switch` opens a TypeScript error in an isolated workspace, switches away and back, checks the diagnostic is already painted with no LSP close/reopen, then closes the tab and checks `didClose`.
+
+`scenario editor-lsp-server-exit` opens a TypeScript error in an isolated workspace, SIGKILLs the language server running in that fixture (never the user's), and checks the `lsp.SERVER_EXITED` toast names the server and the fix. Run against the mesh with `OBSERVABILITY_DIR=/work/platform-production/logs`.

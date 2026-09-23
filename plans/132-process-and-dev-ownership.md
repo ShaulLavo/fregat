@@ -1,6 +1,27 @@
 # Processes, leases and dev plumbing each get an owner
 
-Status: **PROPOSED — PHASE 1 FIRST; D4 DECIDED 2026-09-21: DELETE THE MIGRATIONS.** Requested 2026-09-21. Inspected
+Status: **PHASE 1 IMPLEMENTED AND DEPLOYED 2026-09-23** (release
+`20260923T083633Z-51995766-plan-131-132-phase1`); Phases 2–4 proposed; D4 decided
+2026-09-21: delete the migrations. Requested 2026-09-21. Phase 1 outcome:
+item 1 — each desktop child is spawned `detached` (its own process group, so one signal also reaches
+Vite's node child) and recorded with its `ps lstart` in `~/.platform/desktop/<hash of root>.json`;
+launch stops only live leased groups, then a held port is `desktop.PORT_IN_USE` in a native dialog
+naming the holder, never a kill. Item 2 — backend death was already broadcast as
+`$/platform/serverExited`, but the client dropped its params; a failed exit now carries
+`lsp.SERVER_EXITED` (message, why, fix) and the editor toasts it, and the rust-analyzer shim
+directory rule became a `--version` probe run from the project root. Item 4 — `untilAccepted` makes 5
+attempts at 250 ms doubling, then throws `orchestration.TERMINAL_LEASE_UNPERSISTED`; `end` releases
+the worktree hold in `finally`. Verified: `scenario editor-lsp-server-exit` on the mesh; not verified:
+a real desktop launch against a held port (unit-tested in `apps/desktop/src/bun/tests/ports.test.ts`).
+Review fixes the same day: lease-file writes are serialized (two children exiting at quit raced
+the rename every time), the conflict names the holder's executable, not its command line, a
+failed lease `end` can be written again, cleanup failures no longer mask the original error, and
+the rust-analyzer probe times out after 5 s. Found on the way and fixed the same day: each
+`@parcel/watcher` subscribe left one zombie `sh` on the server, because parcel's default backend
+order probes Watchman through `popen` and never reaps it when Watchman is absent; `fs/watch.ts`
+now names the native backend. Session discovery started one `claude-discovery-worker` per root
+per page every minute (168 roots, 13.4 s per scan); it is now one call with every root, one
+worker (or one Codex app-server) per scan, 185 ms for the same 106 sessions. Inspected
 at Platform `d1ca6472`. Covers `apps/desktop`, `apps/tui`, `apps/server` outside the provider
 adapters ([plan 131](131-provider-codes-not-prose.md)), `apps/web/vite.config.ts` and `scripts/`.
 

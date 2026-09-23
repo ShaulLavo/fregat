@@ -1,7 +1,7 @@
 import { ok, strictEqual } from 'node:assert/strict'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { openFixtureWorkspace } from '../fixture-workspace'
+import { openFixtureWorkspace, releaseFixture } from '../fixture-workspace'
 import { chords, selectors } from '../selectors'
 import type { Scenario } from './index'
 
@@ -34,7 +34,7 @@ export const paletteScriptsPending: Scenario = {
       await page.keyboard.press('Escape')
     } finally {
       await page.unroute(/\/fs\//)
-      await rm(fixture, { recursive: true, force: true })
+      await releaseFixture(fixture)
     }
   },
 }

@@ -88,6 +88,7 @@ const DEFAULT_CODEX_BINARY = 'codex'
 const DEFAULT_CODEX_MODEL = 'gpt-5.5'
 const REQUEST_TIMEOUT_MS = 30_000
 const PROVIDER_PROBE_TIMEOUT_MS = 8_000
+const CODEX_DISCOVERY_PAGE_SIZE = 50
 const ANSI_ESCAPE_CHAR = String.fromCharCode(27)
 const ANSI_ESCAPE_REGEX = new RegExp(`${ANSI_ESCAPE_CHAR}\\[[0-9;]*m`, 'g')
 const CODEX_STDERR_LOG_REGEX =
@@ -920,6 +921,11 @@ class CodexAppServerSession extends SessionContext {
 
     const approval = pendingApprovalKind(method, message.params)
     if (!approval && method === 'mcpServer/elicitation/request' && message.id !== undefined) {
+      const params = asRecord(message.params)
+      recordChatPipelineWarning('chat.pipeline.codex_adapter.elicitation_declined', {
+        mode: stringField(params, 'mode'),
+        serverName: stringField(params, 'serverName'),
+      })
       this.client.respondSuccess(message.id, { action: 'decline' })
       return true
     }
@@ -2375,19 +2381,24 @@ function parseRawCodexResult(method: string, value: unknown) {
 
 async function listCodexSessions(
   client: CodexAppServerRpcClient,
-  input: ProviderSessionDiscoveryInput,
+  input: v.InferOutput<typeof discoveryInputSchema>,
 ) {
+  const rows: CodexClientRequestResultByMethod['thread/list']['data'] = []
+  for (const cwd of input.cwds) rows.push(...(await listCodexSessionsIn(client, cwd)))
+  return rows
+}
+
+async function listCodexSessionsIn(client: CodexAppServerRpcClient, cwd: string) {
   const rows: CodexClientRequestResultByMethod['thread/list']['data'] = []
   const cursors = new Set<string>()
   let cursor: string | undefined
-  let skipped = 0
-  while (rows.length < input.limit) {
+  for (;;) {
     const page = await client.request(
       'thread/list',
       {
-        cwd: normalizeWorkspaceCwd(input.cwd),
+        cwd: normalizeWorkspaceCwd(cwd),
         cursor,
-        limit: input.limit,
+        limit: CODEX_DISCOVERY_PAGE_SIZE,
         archived: false,
         modelProviders: [],
         sourceKinds: ['cli', 'vscode', 'appServer'],
@@ -2396,17 +2407,13 @@ async function listCodexSessions(
       },
       REQUEST_TIMEOUT_MS,
     )
-    rows.push(
-      ...page.data.slice(Math.max(0, input.offset - skipped), input.offset + input.limit - skipped),
-    )
-    skipped += page.data.length
-    if (!page.nextCursor) break
+    rows.push(...page.data)
+    if (!page.nextCursor) return rows
     if (cursors.has(page.nextCursor))
       throw createInternalError('Codex returned a repeated conversation page cursor.')
     cursors.add(page.nextCursor)
     cursor = page.nextCursor
   }
-  return rows
 }
 
 // A dedicated process keeps a failed skill read from taking model and auth probes down.

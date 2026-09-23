@@ -1,9 +1,9 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { strictEqual } from 'node:assert'
 
 import type { Scenario } from './index'
-import { fixtureGit, openFixtureWorkspace } from '../fixture-workspace'
+import { fixtureGit, openFixtureWorkspace, releaseFixture } from '../fixture-workspace'
 import {
   diffPaneSelector,
   hoverShowedPlainCode,
@@ -47,7 +47,7 @@ export const gitDiffHoverTokens: Scenario = {
       strictEqual(await hoverShowedPlainCode(page), false, 'the hover opens coloured, never plain')
       await step('diff-hover')
     } finally {
-      await rm(fixture, { force: true, recursive: true })
+      await releaseFixture(fixture)
     }
   },
 }

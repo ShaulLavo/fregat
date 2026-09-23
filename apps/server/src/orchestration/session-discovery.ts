@@ -21,16 +21,16 @@ import type { OrchestrationReadModel, OrchestrationProjectedWorktree } from './r
 import { resolveRepositoryIdentity, type RegistrationBoundary } from './registration'
 import { internalCommandKey, repositoryKey, worktreeIdForCheckout } from './utils/repository-ids'
 
-const DISCOVERY_PAGE_SIZE = 50
 const DISCOVERY_INTERVAL_MS = 60_000
 const DISCOVERY_FAILURE_EXAMPLE_LIMIT = 10
 
-type DiscoveryFailureContext = {
-  providerInstanceId: ProviderInstanceId
-  cwd: string | null
-} & (
-  | { stage: 'provider-scan'; offset: number }
-  | { stage: 'reconciliation'; sessionId: ProviderDiscoveredSession['sessionId'] }
+type DiscoveryFailureContext = { providerInstanceId: ProviderInstanceId } & (
+  | { stage: 'provider-scan'; rootCount: number }
+  | {
+      stage: 'reconciliation'
+      cwd: string | null
+      sessionId: ProviderDiscoveredSession['sessionId']
+    }
 )
 
 type DiscoveryFailure = DiscoveryFailureContext & {
@@ -171,42 +171,28 @@ export class SessionDiscoveryReconciler {
     result: DiscoveryScanResult,
     importedOnly: boolean,
   ) {
-    for (const root of roots) {
-      if (this.closed) return
-      await this.scanDirectory(providerInstanceId, root.canonicalPath, seen, result, importedOnly)
-    }
+    if (this.closed || roots.length === 0) return
+    const rows = await this.discoverRoots(providerInstanceId, roots, result)
+    if (rows) await this.importPage(providerInstanceId, rows, seen, result, importedOnly)
   }
 
-  private async scanDirectory(
+  // One call for every root: a provider may start a process per call.
+  private async discoverRoots(
     providerInstanceId: ProviderInstanceId,
-    cwd: string,
-    seen: Set<string>,
-    result: DiscoveryScanResult,
-    importedOnly: boolean,
-  ) {
-    for (let offset = 0; !this.closed; offset += DISCOVERY_PAGE_SIZE) {
-      const rows = await this.discoverPage(providerInstanceId, cwd, offset, result)
-      if (!rows) return
-      await this.importPage(providerInstanceId, rows, seen, result, importedOnly)
-      if (rows.length < DISCOVERY_PAGE_SIZE) return
-    }
-  }
-
-  private async discoverPage(
-    providerInstanceId: ProviderInstanceId,
-    cwd: string,
-    offset: number,
+    roots: readonly OrchestrationWorktree[],
     result: DiscoveryScanResult,
   ) {
     try {
       return await this.options.providerService.discoverSessions({
         providerInstanceId,
-        cwd,
-        limit: DISCOVERY_PAGE_SIZE,
-        offset,
+        cwds: roots.map((root) => root.canonicalPath),
       })
     } catch (error) {
-      recordScanFailure(result, { stage: 'provider-scan', providerInstanceId, cwd, offset }, error)
+      recordScanFailure(
+        result,
+        { stage: 'provider-scan', providerInstanceId, rootCount: roots.length },
+        error,
+      )
       return null
     }
   }

@@ -1,4 +1,5 @@
-import { mkdtemp, rm } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -25,28 +26,55 @@ describe('LSP download policy', () => {
 })
 
 /**
- * The shim, and why resolving past it is the whole point.
- *
- * `which rust-analyzer` finds `~/.cargo/bin/rust-analyzer` on any machine with
- * rustup, and that file is a proxy: unless the component is installed for the
- * active toolchain it prints `error: 'rust-analyzer' is not installed for the
- * toolchain '<tc>'` and exits — which this stack reports to the browser as a
- * socket closing with no message. The real server lives inside the toolchain.
+ * `~/.cargo/bin/rust-analyzer` is either the rustup proxy, which exits at once
+ * when the component is missing, or a real `cargo install`. Only running it can tell.
  */
 describe('rust-analyzer resolution', () => {
-  it('never spawns the rustup shim', async ({ skip }) => {
+  // Installed toolchains are scanned before PATH, and Bun's homedir() ignores a changed HOME.
+  const hasToolchains = existsSync(path.join(homedir(), '.rustup', 'toolchains'))
+
+  async function resolveWith(script: string) {
     const root = await mkdtemp(path.join(tmpdir(), 'platform-rust-analyzer-'))
+    const bin = path.join(root, '.cargo', 'bin')
+    const savedPath = process.env.PATH
+    await mkdir(bin, { recursive: true })
+    await writeFile(path.join(bin, 'rust-analyzer'), script, { mode: 0o755 })
+    process.env.PATH = bin
     try {
       const handle = await spawnRustAnalyzer(root)
-      if (!handle) return skip('no rust-analyzer on this machine, shimmed or otherwise')
-
-      const spawned = handle.process.spawnfile
-      handle.process.kill()
-
-      expect(path.dirname(spawned)).not.toBe(path.join(homedir(), '.cargo', 'bin'))
-      expect(spawned.endsWith('rust-analyzer')).toBe(true)
+      handle?.process.kill()
+      return handle?.process.spawnfile ?? null
     } finally {
+      process.env.PATH = savedPath
       await rm(root, { force: true, recursive: true })
     }
-  }, 30_000)
+  }
+
+  it.skipIf(hasToolchains)('keeps a real server installed beside the rustup proxies', async () => {
+    const spawned = await resolveWith(
+      '#!/bin/sh\n[ "$1" = --version ] && echo "rust-analyzer 1.0.0" && exit 0\nexec sleep 30\n',
+    )
+
+    expect(spawned).toMatch(/\.cargo\/bin\/rust-analyzer$/)
+  })
+
+  it.skipIf(hasToolchains)('skips a proxy whose toolchain has no rust-analyzer', async () => {
+    const spawned = await resolveWith(
+      "#!/bin/sh\necho \"error: 'rust-analyzer' is not installed for the toolchain 'stable'\" >&2\nexit 1\n",
+    )
+
+    expect(spawned).toBeNull()
+  })
+
+  it.skipIf(hasToolchains)(
+    'gives up on a candidate that never answers',
+    async () => {
+      const started = Date.now()
+      const spawned = await resolveWith('#!/bin/sh\nexec sleep 60\n')
+
+      expect(spawned).toBeNull()
+      expect(Date.now() - started).toBeLessThan(10_000)
+    },
+    15_000,
+  )
 })

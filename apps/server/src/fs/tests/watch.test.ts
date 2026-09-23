@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -135,6 +135,35 @@ describe('file change hub', () => {
     }
   })
 })
+
+// One `sh` per subscribe was left behind on the production server while Watchman is absent.
+describe.runIf(process.platform === 'linux')('native watch lifetime', () => {
+  it('opens a live watch without leaving an unreaped shell', async () => {
+    const root = await fixtureRoot()
+    const before = await zombieShells()
+    const hub = new FileChangeHub(createWorkspacePaths(root), { enabled: true })
+    const abort = new AbortController()
+    const events = hub.stream([''], abort.signal)[Symbol.asyncIterator]()
+
+    expect(await nextRequiredEvent(events)).toMatchObject({ type: 'ready' })
+    abort.abort()
+    await delay(200)
+
+    expect(await zombieShells()).toEqual(before)
+  })
+})
+
+async function zombieShells() {
+  const children = await readFile(`/proc/${process.pid}/task/${process.pid}/children`, 'utf8')
+  const stats = await Promise.all(
+    children
+      .trim()
+      .split(' ')
+      .filter(Boolean)
+      .map((pid) => readFile(`/proc/${pid}/stat`, 'utf8').catch(() => '')),
+  )
+  return stats.filter((stat) => /\(sh\) Z /.test(stat)).map((stat) => stat.split(' ')[0])
+}
 
 async function fixtureRoot() {
   const root = await mkdtemp(path.join(tmpdir(), 'platform-watch-'))

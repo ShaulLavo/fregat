@@ -1,9 +1,9 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
 import type { Scenario } from './index'
 import type { Page } from 'playwright'
-import { fixtureGit, openFixtureWorkspace } from '../fixture-workspace'
+import { fixtureGit, openFixtureWorkspace, releaseFixture } from '../fixture-workspace'
 import { openGitPanel, selectors } from '../selectors'
 import { createScriptError } from '../../structured-errors'
 
@@ -50,7 +50,7 @@ export const gitDiffInlineTint: Scenario = {
       await step('hidden-again')
       assertTint(toggled, 'after hide/unhide')
     } finally {
-      await rm(fixture, { force: true, recursive: true })
+      await releaseFixture(fixture)
     }
   },
 }

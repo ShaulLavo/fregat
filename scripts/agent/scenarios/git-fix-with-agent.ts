@@ -1,4 +1,4 @@
-import { rm, writeFile } from 'node:fs/promises'
+import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
 import type { Scenario } from './index'
@@ -7,6 +7,7 @@ import {
   fixtureGit,
   installPreCommitHook,
   openFixtureWorkspace,
+  releaseFixture,
 } from '../fixture-workspace'
 import { openGitPanel, selectors } from '../selectors'
 import { createScriptError } from '../../structured-errors'
@@ -58,7 +59,7 @@ export const gitFixWithAgent: Scenario = {
         throw createScriptError('Fix with agent reused the open chat instead of starting a new one')
       await composer.fill('')
     } finally {
-      await rm(fixture, { force: true, recursive: true })
+      await releaseFixture(fixture)
     }
   },
 }

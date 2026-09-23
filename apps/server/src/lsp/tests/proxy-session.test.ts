@@ -1133,9 +1133,29 @@ describe('LspSessionPool ownership', () => {
 
     expect(fixture.firstSocket.sent.at(-1)).toMatchObject({
       method: '$/platform/serverExited',
-      params: { exitCode: 3, outcome: 'process_exit', serverId: 'typescript' },
+      params: {
+        error: {
+          code: 'lsp.SERVER_EXITED',
+          message: 'The typescript language server stopped',
+          fix: expect.any(String),
+        },
+        exitCode: 3,
+        outcome: 'process_exit',
+        serverId: 'typescript',
+      },
     })
     expect(fixture.firstSocket.closed).toBe(true)
+  })
+
+  it('carries no error when this app closed a healthy backend', async () => {
+    const fixture = await initializedFixture()
+
+    fixture.pool.disposeAll()
+    fixture.process.process.emit('exit', 0, null)
+
+    const exit = fixture.firstSocket.sent.at(-1) as { params?: Record<string, unknown> }
+    expect(exit.params).toMatchObject({ outcome: 'app_shutdown' })
+    expect(exit.params?.error).toBeUndefined()
   })
 
   it('refuses to spawn a backend after disposeAll', async () => {

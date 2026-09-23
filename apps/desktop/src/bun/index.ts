@@ -3,9 +3,10 @@ import { errorMessage } from '@workspace/contracts'
 import { createDesktopError } from './structured-errors'
 
 import { existsSync, readdirSync } from 'node:fs'
-import net from 'node:net'
+import { homedir } from 'node:os'
 import path from 'node:path'
 import Electrobun, { BrowserView, BrowserWindow, Utils } from 'electrobun/main'
+import { EvlogError } from 'evlog'
 import type { SettingsValues } from '@workspace/contracts'
 import { applyEnvFileOverrides } from '@workspace/observability/env-file'
 import {
@@ -34,6 +35,15 @@ import {
 } from './observability'
 import { attachWindowVibrancy } from './vibrancy'
 import { createQuitHandler } from './quit'
+import {
+  childLeaseFile,
+  clearLease,
+  leaseChild,
+  releaseChild,
+  stopLeftoverChildren,
+} from './child-lease'
+import { requireFreePort } from './ports'
+import { groupAlive, signalGroup } from './processes'
 
 type ChildProcess = ReturnType<typeof Bun.spawn>
 
@@ -57,6 +67,7 @@ const SERVER_ALLOWED_ORIGINS = allowedOriginsForWebPort(
   WEB_HOST,
   WEB_PORT,
 )
+const CHILD_LEASE = childLeaseFile(homedir(), ROOT_DIR)
 const childProcesses = new Set<ChildProcess>()
 
 let stopping: Promise<void> | null = null
@@ -77,9 +88,10 @@ Electrobun.events.on(
 try {
   await startDesktop()
 } catch (error) {
-  recordDesktopError('desktop.start_failed', { error: errorMessage(error) })
+  recordDesktopError('desktop.start_failed', startFailureContext(error))
   await stopProcesses()
   await flushDesktopObservability()
+  await showStartFailure(error)
   Utils.quit()
 }
 
@@ -101,10 +113,11 @@ async function startSharedDesktop() {
 }
 
 async function startStandaloneDesktop() {
-  await releasePlatformPort(SERVER_HOST, SERVER_PORT, 'server')
-  await releasePlatformPort(WEB_HOST, WEB_PORT, 'web')
-  spawnServer()
-  spawnWeb()
+  await stopLeftoverChildren(CHILD_LEASE)
+  await requireFreePort(SERVER_HOST, SERVER_PORT, 'server')
+  await requireFreePort(WEB_HOST, WEB_PORT, 'web')
+  await spawnServer()
+  await spawnWeb()
   await waitForHttp(`${SERVER_URL}/health`)
   await waitForHttp(WEB_URL)
   await openMainWindow()
@@ -261,7 +274,7 @@ async function openFileDialog(options: PlatformPickOptions, startingFolder: stri
   }
 }
 
-function spawnProcess(
+async function spawnProcess(
   name: string,
   command: string[],
   cwd: string,
@@ -269,9 +282,11 @@ function spawnProcess(
 ) {
   recordDesktopInfo('desktop.process.spawn', { command, cwd, name })
   const output = shouldInheritChildOutput() ? 'inherit' : 'ignore'
+  // Its own process group, so one signal also reaches helpers such as Vite's node process.
   const child = Bun.spawn({
     cmd: command,
     cwd,
+    detached: true,
     env,
     stderr: output,
     stdout: output,
@@ -279,12 +294,19 @@ function spawnProcess(
 
   childProcesses.add(child)
   void monitorProcess(name, child)
+  await leaseChild(CHILD_LEASE, name, child.pid)
   return child
 }
 
 async function monitorProcess(name: string, child: ChildProcess) {
   const exitCode = await child.exited
   childProcesses.delete(child)
+  // Helpers such as Vite's node process outlive their leader. A group id is not
+  // reused while any member lives, so a live group here is still this child's.
+  if (groupAlive(child.pid)) signalGroup(child.pid, 'SIGTERM')
+  await releaseChild(CHILD_LEASE, child.pid).catch((error: unknown) =>
+    recordDesktopError('desktop.lease.release_failed', { error: errorMessage(error), name }),
+  )
   if (stopping) return
 
   recordDesktopError('desktop.process.exited', { exitCode, name })
@@ -322,148 +344,37 @@ function requestHeadersForProbe(url: string) {
   return { Origin: SERVER_PROBE_ORIGIN }
 }
 
-async function releasePlatformPort(host: string, port: number, label: string) {
-  if (!(await canConnect(host, port))) return
-
-  const processes = await platformProcessesOnPort(port)
-  if (processes.length === 0) {
-    throw createDesktopError(
-      `The desktop ${label} port ${host}:${port} is already in use by a non-platform process.`,
-    )
-  }
-
-  recordDesktopInfo('desktop.port.release', {
-    host,
-    label,
-    port,
-    processCount: processes.length,
-  })
-
-  killProcesses(processes, 'SIGTERM')
-
-  if (await waitForPortRelease(host, port, 2_500)) return
-
-  const stubbornProcesses = await platformProcessesOnPort(port)
-  killProcesses(stubbornProcesses, 'SIGKILL')
-
-  if (await waitForPortRelease(host, port, 2_500)) return
-
-  throw createDesktopError(
-    `The desktop ${label} port ${host}:${port} did not clear after stopping old platform processes.`,
-  )
-}
-
-async function waitForPortRelease(host: string, port: number, timeoutMs: number) {
-  const deadline = Date.now() + timeoutMs
-
-  while (Date.now() < deadline) {
-    if (!(await canConnect(host, port))) return true
-
-    await Bun.sleep(100)
-  }
-
-  return false
-}
-
-function killProcesses(processes: Array<{ command: string; pid: number }>, signal: NodeJS.Signals) {
-  for (const processInfo of processes) {
-    recordDesktopInfo('desktop.process.kill', {
-      command: processInfo.command,
-      pid: processInfo.pid,
-      signal,
-    })
-    process.kill(processInfo.pid, signal)
-  }
-}
-
-async function platformProcessesOnPort(port: number) {
-  const pids = await listenerPids(port)
-  const processes = await Promise.all(pids.map(processInfo))
-  return processes.filter(isPlatformProcess)
-}
-
-async function listenerPids(port: number) {
-  const output = await commandOutput(['lsof', '-nP', `-iTCP:${port}`, '-sTCP:LISTEN', '-Fp'])
-  return output
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line.startsWith('p'))
-    .map((line) => Number(line.slice(1)))
-    .filter((pid) => Number.isInteger(pid) && pid > 0)
-}
-
-async function processInfo(pid: number) {
-  const [command, cwd] = await Promise.all([processCommand(pid), processCwd(pid)])
-  return { command, cwd, pid }
-}
-
-async function processCommand(pid: number) {
-  const output = await commandOutput(['ps', '-p', String(pid), '-o', 'command='])
-  return output.trim()
-}
-
-async function processCwd(pid: number) {
-  const output = await commandOutput(['lsof', '-a', '-p', String(pid), '-d', 'cwd', '-Fn'])
-  const cwd = output
-    .split('\n')
-    .map((line) => line.trim())
-    .find((line) => line.startsWith('n'))
-
-  return cwd ? cwd.slice(1) : ''
-}
-
-function isPlatformProcess(processInfo: { command: string; cwd: string }) {
-  return isInsidePlatformRoot(processInfo.cwd) || processInfo.command.includes(ROOT_DIR)
-}
-
-function isInsidePlatformRoot(input: string) {
-  if (!input) return false
-
-  const relative = path.relative(ROOT_DIR, input)
-  if (relative === '') return true
-  if (relative.startsWith('..')) return false
-
-  return !path.isAbsolute(relative)
-}
-
-async function commandOutput(command: string[]) {
-  const child = Bun.spawn({
-    cmd: command,
-    stderr: 'pipe',
-    stdout: 'pipe',
-  })
-  const output = await new Response(child.stdout).text()
-  await child.exited
-
-  return output
-}
-
-function canConnect(host: string, port: number) {
-  return new Promise<boolean>((resolve) => {
-    const socket = net.createConnection({ host, port })
-    const done = (available: boolean) => {
-      socket.removeAllListeners()
-      socket.destroy()
-      resolve(available)
-    }
-
-    socket.once('connect', () => done(true))
-    socket.once('error', () => done(false))
-    socket.setTimeout(500, () => done(false))
-  })
-}
-
 function stopProcesses(): Promise<void> {
   if (stopping) return stopping
   const children = [...childProcesses]
   childProcesses.clear()
 
   for (const child of children) {
-    child.kill()
+    signalGroup(child.pid, 'SIGTERM')
   }
 
-  stopping = Promise.allSettled(children.map((child) => child.exited)).then(() => undefined)
+  stopping = Promise.allSettled(children.map((child) => child.exited)).then(() =>
+    clearLease(CHILD_LEASE),
+  )
   return stopping
+}
+
+function startFailureContext(error: unknown) {
+  if (!(error instanceof EvlogError)) return { error: errorMessage(error) }
+
+  return { error: error.message, code: error.code, internal: error.internal }
+}
+
+/** Before the window exists, a dialog is the only place the user can read why. */
+async function showStartFailure(error: unknown) {
+  const fix = error instanceof EvlogError ? error.fix : undefined
+  await Utils.showMessageBox({
+    type: 'error',
+    title: 'Platform could not start',
+    message: errorMessage(error),
+    detail: fix ?? '',
+    buttons: ['Quit'],
+  })
 }
 
 function allowedFileTypes(accept: readonly string[] | undefined) {

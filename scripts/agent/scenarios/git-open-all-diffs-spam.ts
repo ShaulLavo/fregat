@@ -1,7 +1,7 @@
 import { strictEqual } from 'node:assert/strict'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { fixtureGit, openFixtureWorkspace } from '../fixture-workspace'
+import { fixtureGit, openFixtureWorkspace, releaseFixture } from '../fixture-workspace'
 import { openGitPanel, selectors } from '../selectors'
 import type { Scenario } from './index'
 
@@ -33,7 +33,7 @@ export const gitOpenAllDiffsSpam: Scenario = {
       strictEqual(errors, 0, 'Spamming Open all diffs must not surface an error')
       strictEqual(tabs, files.length, 'Every change must end up with a diff tab')
     } finally {
-      await rm(fixture, { recursive: true, force: true })
+      await releaseFixture(fixture)
     }
   },
 }

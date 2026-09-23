@@ -1,6 +1,6 @@
-import { openFixtureWorkspace } from '../fixture-workspace'
+import { openFixtureWorkspace, releaseFixture } from '../fixture-workspace'
 import { deepStrictEqual, ok, strictEqual } from 'node:assert'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, writeFile } from 'node:fs/promises'
 import type { Page } from 'playwright'
 import { createScriptError } from '../../structured-errors'
 import { openFileFromTree, selectors, waitForApp } from '../selectors'
@@ -77,7 +77,7 @@ export const editorSplitTargets: Scenario = {
     } finally {
       await page.goto(originalUrl)
       await waitForApp(page)
-      await rm(fixture, { recursive: true, force: true })
+      await releaseFixture(fixture)
     }
   },
 }

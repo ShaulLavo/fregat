@@ -1,7 +1,7 @@
 import { lineStartOffset } from '@workspace/utils/strings'
 import { errorMessage } from '@workspace/contracts'
 import { elapsedMs } from '@workspace/utils/timing'
-import { createInternalError } from '../observability/structured-errors'
+import { createInternalError, lspErrors } from '../observability/structured-errors'
 
 import {
   DEFAULT_SETTING_VALUES,
@@ -1460,6 +1460,7 @@ class PooledLspProxySession {
       jsonrpc: '2.0',
       method: LSP_SERVER_EXITED,
       params: {
+        error: this.exitError(outcome),
         exitCode: this.exitCode,
         exitSignal: this.exitSignal,
         outcome,
@@ -1472,6 +1473,14 @@ class PooledLspProxySession {
       connection.closeSocket()
     }
     this.connections.clear()
+  }
+
+  /** The catalog's guidance for a backend that died; absent when this app closed it. */
+  private exitError(outcome: string) {
+    if (!isFailedLspSession(outcome, this.exitCode, this.exitSignal)) return undefined
+
+    const error = lspErrors.SERVER_EXITED({ serverId: this.match.server.id })
+    return { code: error.code, fix: error.fix, message: error.message, why: error.why }
   }
 
   private rejectPendingRequests(error: Error): void {

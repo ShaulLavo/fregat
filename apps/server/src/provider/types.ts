@@ -475,10 +475,9 @@ export type ProviderCommandCatalogResult = {
   skills: ProviderSkill[]
 }
 
+/** Every root in one call: discovery may start a provider process per call. */
 export type ProviderSessionDiscoveryInput = {
-  cwd: string
-  limit: number
-  offset: number
+  cwds: readonly string[]
 }
 
 export type ProviderDiscoveredSession = {

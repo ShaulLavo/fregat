@@ -20,6 +20,13 @@ export const serverErrors = defineErrorCatalog('server', {
 })
 
 export const orchestrationErrors = defineErrorCatalog('orchestration', {
+  TERMINAL_LEASE_UNPERSISTED: {
+    status: 503,
+    message: ({ command, attempts }: { command: string; attempts: number }) =>
+      `${command} was not persisted after ${attempts} attempts`,
+    why: 'The orchestration store refused the terminal lease write on every attempt.',
+    fix: 'Check that the disk has free space and no other Platform server holds the database, then open the terminal again.',
+  },
   COMMAND_PREVIOUSLY_REJECTED: {
     status: 409,
     message: ({ commandId }: { commandId: string }) => `Command previously rejected: ${commandId}`,
@@ -151,6 +158,12 @@ export const lspErrors = defineErrorCatalog('lsp', {
     message: ({ packageName }: { packageName: string }) => `Failed to install ${packageName}`,
     why: 'The language server package installer exited with a non-zero status.',
     fix: 'Review the installer output and retry the language server install.',
+  },
+  SERVER_EXITED: {
+    status: 502,
+    message: ({ serverId }: { serverId: string }) => `The ${serverId} language server stopped`,
+    why: 'The language server process exited or failed while the editor was connected to it.',
+    fix: 'Run the language server from a terminal to see why it exits, then reopen the file.',
   },
 })
 

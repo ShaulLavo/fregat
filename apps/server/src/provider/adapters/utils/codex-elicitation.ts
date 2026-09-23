@@ -2,16 +2,10 @@ import * as v from 'valibot'
 import type { ProviderApprovalDecision, ProviderApprovalOption } from '@workspace/contracts'
 
 const nullableText = v.nullish(v.string())
+// Keys and values declared in codex-rs/protocol/src/mcp_approval_meta.rs.
 const metadataSchema = v.object({
-  app: nullableText,
-  app_name: nullableText,
-  appName: nullableText,
   connector_name: nullableText,
-  connectorName: nullableText,
-  allowPersistentApproval: v.nullish(v.boolean()),
-  persist: v.nullish(v.union([v.string(), v.array(v.string())])),
-  target: v.nullish(v.object({ app: nullableText, name: nullableText })),
-  tool_params: v.nullish(v.object({ app: nullableText, app_name: nullableText })),
+  persist: v.nullish(v.union([v.string(), v.array(v.unknown())])),
 })
 const fieldSchema = v.object({
   type: nullableText,
@@ -34,7 +28,12 @@ const requestSchema = v.object({
   _meta: v.optional(v.unknown()),
 })
 type Field = v.InferOutput<typeof fieldSchema>
-type PersistenceDecision = Extract<ProviderApprovalDecision, 'acceptForSession' | 'acceptAlways'>
+type Form = v.InferOutput<typeof formSchema>
+type AcceptDecision = Extract<
+  ProviderApprovalDecision,
+  'accept' | 'acceptForSession' | 'acceptAlways'
+>
+type PersistenceDecision = Exclude<AcceptDecision, 'accept'>
 type ElicitationResponse =
   | { action: 'decline' | 'cancel' }
   | {
@@ -48,12 +47,15 @@ export type CodexElicitation = {
   responses: ReadonlyMap<ProviderApprovalDecision, ElicitationResponse>
 }
 
-function persistenceDecision(value: string): PersistenceDecision | null {
-  const normalized = value.toLowerCase()
-  if (normalized.includes('session')) return 'acceptForSession'
-  if (/always|permanent|forever|persistent/.test(normalized)) return 'acceptAlways'
-  return null
+// Exact values only: an unrecognized value grants no persistence, never a guessed one.
+const persistValues: Readonly<Record<PersistenceDecision, 'session' | 'always'>> = {
+  acceptForSession: 'session',
+  acceptAlways: 'always',
 }
+// t3code's rule for the one-time answer. The persistence words only ever exclude, so a
+// one-time approval can never send a value like `allow_always`.
+const ONE_TIME_VALUE = /once|accept|approve|allow/i
+const PERSISTENT_WORD = /session|always|permanent|forever|persistent/i
 
 function fieldOptions(field: Field) {
   if (field.oneOf)
@@ -61,53 +63,38 @@ function fieldOptions(field: Field) {
   return (field.enum ?? []).map((value, index) => ({ value, label: field.enumNames?.[index] }))
 }
 
-function isPersistenceField(key: string, field: Field) {
-  return (
-    key.toLowerCase() === 'persist' ||
-    persistenceDecision(key) !== null ||
-    persistenceDecision(field.title ?? '') !== null ||
-    persistenceDecision(field.description ?? '') !== null
+function optionFor(field: Field, decision: AcceptDecision) {
+  if (decision !== 'accept')
+    return fieldOptions(field).find((option) => option.value === persistValues[decision])
+
+  return fieldOptions(field).find(
+    (option) => ONE_TIME_VALUE.test(option.value) && !PERSISTENT_WORD.test(option.value),
   )
 }
 
-function fieldValue(key: string, field: Field, decision: ProviderApprovalDecision) {
-  const persistent = decision === 'acceptForSession' || decision === 'acceptAlways'
-  const chosen = fieldOptions(field).find((option) =>
-    persistent
-      ? persistenceDecision(option.value) === decision
-      : /once|accept|approve|allow/i.test(option.value) &&
-        persistenceDecision(option.value) === null,
-  )
-  if (chosen) return chosen.value
-  if (field.type === 'boolean' && isPersistenceField(key, field)) return decision === 'acceptAlways'
-  return field.default ?? undefined
-}
-
-function responseFor(
-  form: v.InferOutput<typeof formSchema> | undefined,
-  decision: ProviderApprovalDecision,
-): ElicitationResponse {
-  if (decision === 'decline' || decision === 'cancel') return { action: decision }
+function responseFor(form: Form | undefined, decision: AcceptDecision): ElicitationResponse {
   const content: Record<string, unknown> = {}
   for (const [key, field] of Object.entries(form?.properties ?? {})) {
-    const value = fieldValue(key, field, decision)
+    const value = optionFor(field, decision)?.value ?? field.default ?? undefined
     if (value !== undefined) content[key] = value
   }
   if (form?.required?.some((key) => !Object.hasOwn(content, key))) return { action: 'decline' }
   const response: ElicitationResponse = { action: 'accept', ...(form ? { content } : {}) }
-  if (decision === 'acceptForSession') response._meta = { persist: 'session' }
-  if (decision === 'acceptAlways') response._meta = { persist: 'always' }
+  if (decision !== 'accept') response._meta = { persist: persistValues[decision] }
   return response
 }
 
-function addFieldPersistence(options: Map<PersistenceDecision, string>, key: string, field: Field) {
-  for (const option of fieldOptions(field)) {
-    const decision = persistenceDecision(option.value)
-    if (decision) options.set(decision, option.label ?? '')
+function declaredPersistence(persist: string | readonly unknown[] | null | undefined) {
+  const values: readonly unknown[] = typeof persist === 'string' ? [persist] : (persist ?? [])
+  return new Set(values)
+}
+
+function formLabel(form: Form | undefined, decision: AcceptDecision) {
+  for (const field of Object.values(form?.properties ?? {})) {
+    const label = optionFor(field, decision)?.label
+    if (label) return label
   }
-  if (field.type === 'boolean' && isPersistenceField(key, field)) {
-    options.set('acceptAlways', field.title ?? '')
-  }
+  return undefined
 }
 
 export function parseCodexElicitation(params: unknown): CodexElicitation | null {
@@ -120,27 +107,8 @@ export function parseCodexElicitation(params: unknown): CodexElicitation | null 
   if (accepted.action !== 'accept') return null
   const parsedMetadata = v.safeParse(metadataSchema, request._meta)
   const metadata = parsedMetadata.success ? parsedMetadata.output : undefined
-  const appName =
-    metadata?.app_name ??
-    metadata?.appName ??
-    metadata?.app ??
-    metadata?.target?.app ??
-    metadata?.target?.name ??
-    metadata?.tool_params?.app_name ??
-    metadata?.tool_params?.app ??
-    request.message.match(/^Allow ChatGPT to use (.+?)\?$/i)?.[1] ??
-    metadata?.connector_name ??
-    metadata?.connectorName ??
-    request.serverName
-  const persistence = new Map<PersistenceDecision, string>()
-  const values = metadata?.persist
-  for (const value of typeof values === 'string' ? [values] : (values ?? [])) {
-    const decision = persistenceDecision(value)
-    if (decision) persistence.set(decision, '')
-  }
-  if (metadata?.allowPersistentApproval) persistence.set('acceptAlways', '')
-  for (const [key, field] of Object.entries(form?.properties ?? {}))
-    addFieldPersistence(persistence, key, field)
+  const appName = metadata?.connector_name || request.serverName
+  const persistence = declaredPersistence(metadata?.persist)
   const options: ProviderApprovalOption[] = [
     { decision: 'cancel', label: 'Cancel' },
     { decision: 'decline', label: 'Decline' },
@@ -150,30 +118,17 @@ export function parseCodexElicitation(params: unknown): CodexElicitation | null 
     ['decline', { action: 'decline' }],
     ['accept', accepted],
   ])
-  addPersistenceOption(
-    'acceptForSession',
-    'Always allow this session',
-    form,
-    persistence,
-    options,
-    responses,
-  )
-  addPersistenceOption('acceptAlways', 'Always allow', form, persistence, options, responses)
+  const persistenceOptions = [
+    ['acceptForSession', 'Always allow this session'],
+    ['acceptAlways', 'Always allow'],
+  ] as const
+  for (const [decision, fallbackLabel] of persistenceOptions) {
+    if (!persistence.has(persistValues[decision])) continue
+    const response = responseFor(form, decision)
+    if (response.action !== 'accept') continue
+    options.push({ decision, label: formLabel(form, decision) ?? fallbackLabel })
+    responses.set(decision, response)
+  }
   options.push({ decision: 'accept', label: 'Approve' })
   return { detail: `${appName}\n${request.message}`, options, responses }
-}
-
-function addPersistenceOption(
-  decision: PersistenceDecision,
-  fallbackLabel: string,
-  form: v.InferOutput<typeof formSchema> | undefined,
-  persistence: ReadonlyMap<PersistenceDecision, string>,
-  options: ProviderApprovalOption[],
-  responses: Map<ProviderApprovalDecision, ElicitationResponse>,
-) {
-  if (!persistence.has(decision)) return
-  const response = responseFor(form, decision)
-  if (response.action !== 'accept') return
-  options.push({ decision, label: persistence.get(decision) || fallbackLabel })
-  responses.set(decision, response)
 }

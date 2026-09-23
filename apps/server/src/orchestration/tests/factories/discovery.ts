@@ -61,11 +61,9 @@ export async function sessionImportFixture() {
     providerService: {
       ...fixture.providerHistory,
       discoveryInstances: () => [instance, otherInstance],
-      discoverSessions: async ({ providerInstanceId, offset, limit }) => {
+      discoverSessions: async ({ providerInstanceId }) => {
         source.scans.push(providerInstanceId)
-        return source.rows
-          .filter((entry) => entry.providerInstanceId === providerInstanceId)
-          .slice(offset, offset + limit)
+        return source.rows.filter((entry) => entry.providerInstanceId === providerInstanceId)
       },
       readSessionHistory: async ({ sessionId: id }) => {
         source.reads.push(id)

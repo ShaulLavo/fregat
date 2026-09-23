@@ -1,5 +1,5 @@
-import { openFixtureWorkspace } from '../fixture-workspace'
-import { mkdir, mkdtemp, readFile, rename, rm, symlink, writeFile } from 'node:fs/promises'
+import { openFixtureWorkspace, releaseFixture } from '../fixture-workspace'
+import { mkdir, mkdtemp, readFile, rename, symlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { Page } from 'playwright'
 
@@ -158,7 +158,7 @@ export const editorExternalEdit: Scenario = {
       await step('reverted-to-disk')
     } finally {
       await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pagehide')))
-      await rm(fixture, { recursive: true, force: true })
+      await releaseFixture(fixture)
     }
   },
   async inspect(page) {

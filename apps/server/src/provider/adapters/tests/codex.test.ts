@@ -767,20 +767,27 @@ describe('CodexProviderAdapter', () => {
     ).toBe(false)
   })
 
-  it('imports local conversation metadata with cursor paging and reads text without resuming', async () => {
+  it('imports conversation metadata for every root through cursor pages and reads text without resuming', async () => {
     await withFakeCodex(
       async ({ projectPath, spawnLogPath }) => {
         const adapter = new CodexProviderAdapter()
-        const sessions = await adapter.discoverSessions({ cwd: projectPath, limit: 1, offset: 1 })
-        expect(sessions).toEqual([
-          {
-            sessionId: 'a6035591-a607-4a70-bc57-9b59f595b661',
-            cwd: projectPath,
-            title: 'Imported 1',
-            sourceUpdatedAt: '2026-02-02T02:39:59.000Z',
-            gitBranch: null,
-          },
+        const otherPath = `${projectPath}-other`
+        const sessions = await adapter.discoverSessions({ cwds: [projectPath, otherPath] })
+        expect(sessions.map((session) => [session.title, session.cwd])).toEqual([
+          ['Imported 0', projectPath],
+          ['Imported 1', projectPath],
+          ['Imported 2', projectPath],
+          ['Imported 0', otherPath],
+          ['Imported 1', otherPath],
+          ['Imported 2', otherPath],
         ])
+        expect(sessions[1]).toEqual({
+          sessionId: 'a6035591-a607-4a70-bc57-9b59f595b661',
+          cwd: projectPath,
+          title: 'Imported 1',
+          sourceUpdatedAt: '2026-02-02T02:39:59.000Z',
+          gitBranch: null,
+        })
         const sessionId = v.parse(sessionIdSchema, 'a6035591-a607-4a70-bc57-9b59f595b661')
         expect(await adapter.readSessionHistory({ sessionId, cwd: projectPath })).toEqual([
           {
@@ -800,12 +807,14 @@ describe('CodexProviderAdapter', () => {
         expect(entries.filter((entry) => entry.event === 'thread/list')).toEqual([
           expect.objectContaining({
             cwd: projectPath,
-            limit: 1,
+            limit: 50,
             sourceKinds: ['cli', 'vscode', 'appServer'],
             archived: false,
           }),
-          expect.objectContaining({ cwd: projectPath, cursor: '1', limit: 1 }),
+          expect.objectContaining({ cwd: otherPath, limit: 50 }),
         ])
+        // One app-server for every root, not one per root.
+        expect(entries.filter((entry) => entry.event === 'spawn')).toHaveLength(2)
         expect(entries.filter((entry) => entry.event === 'thread/read')).toEqual([
           expect.objectContaining({ threadId: sessionId, includeTurns: true }),
         ])

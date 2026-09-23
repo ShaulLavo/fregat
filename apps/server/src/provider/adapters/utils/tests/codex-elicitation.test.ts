@@ -1,11 +1,33 @@
 import { describe, expect, it } from 'vitest'
 import { parseCodexElicitation } from '../codex-elicitation'
 
-const request = {
+// Codex's MCP tool-call approval, as `build_mcp_tool_approval_elicitation_request` emits it
+// (codex-rs/core/src/mcp_tool_call_tests.rs).
+const toolApproval = {
+  threadId: 'provider-thread-1',
+  turnId: 'turn-1',
+  serverName: 'codex_apps',
+  mode: 'form',
+  message: 'Allow Calendar to create an event?',
+  requestedSchema: { type: 'object', properties: {} },
+  _meta: {
+    codex_approval_kind: 'mcp_tool_call',
+    persist: ['session', 'always'],
+    source: 'connector',
+    connector_id: 'calendar',
+    connector_name: 'Calendar',
+    connector_description: 'Manage events and schedules.',
+    tool_title: 'Create Event',
+    tool_description: 'Create a calendar event.',
+    tool_params: { calendar_id: 'primary', title: 'Roadmap review' },
+  },
+}
+
+const appAccessForm = {
   mode: 'form',
   message: 'Allow ChatGPT to use Safari?',
   serverName: 'computer-use',
-  _meta: { app_name: 'Safari', persist: ['session', 'always'] },
+  _meta: { persist: ['session', 'always'] },
   requestedSchema: {
     type: 'object',
     properties: {
@@ -13,7 +35,7 @@ const request = {
         type: 'string',
         oneOf: [
           { const: 'once', title: 'Allow once' },
-          { const: 'session', title: 'Allow this session' },
+          { const: 'session', title: 'Always allow Safari for this session' },
           { const: 'always', title: 'Always allow Safari' },
         ],
       },
@@ -22,14 +44,81 @@ const request = {
   },
 }
 
+function decisions(params: unknown) {
+  return parseCodexElicitation(params)?.options.map((option) => option.decision)
+}
+
+function withPersist(persist: unknown) {
+  return { ...toolApproval, _meta: { ...toolApproval._meta, persist } }
+}
+
 describe('Codex MCP elicitation', () => {
-  it('preserves app identity and generates exact advertised response choices', () => {
-    const parsed = parseCodexElicitation(request)
-    expect(parsed?.detail).toContain('Safari')
+  it('offers exactly the persistence Codex declares on a tool-call approval', () => {
+    const parsed = parseCodexElicitation(toolApproval)
+    expect(parsed?.detail).toBe('Calendar\nAllow Calendar to create an event?')
     expect(parsed?.options).toEqual([
       { decision: 'cancel', label: 'Cancel' },
       { decision: 'decline', label: 'Decline' },
-      { decision: 'acceptForSession', label: 'Allow this session' },
+      { decision: 'acceptForSession', label: 'Always allow this session' },
+      { decision: 'acceptAlways', label: 'Always allow' },
+      { decision: 'accept', label: 'Approve' },
+    ])
+    expect(parsed?.responses.get('accept')).toEqual({ action: 'accept', content: {} })
+    expect(parsed?.responses.get('acceptForSession')).toEqual({
+      action: 'accept',
+      content: {},
+      _meta: { persist: 'session' },
+    })
+    expect(parsed?.responses.get('acceptAlways')).toEqual({
+      action: 'accept',
+      content: {},
+      _meta: { persist: 'always' },
+    })
+  })
+
+  it('reads a single declared persist value', () => {
+    expect(decisions(withPersist('session'))).toEqual([
+      'cancel',
+      'decline',
+      'acceptForSession',
+      'accept',
+    ])
+    expect(decisions(withPersist('always'))).toEqual([
+      'cancel',
+      'decline',
+      'acceptAlways',
+      'accept',
+    ])
+    expect(decisions(withPersist(undefined))).toEqual(['cancel', 'decline', 'accept'])
+  })
+
+  it('grants no persistence for values Codex does not declare', () => {
+    for (const persist of [
+      'forever',
+      'permanent',
+      'Always',
+      'session-and-always',
+      ['always allow for this session', 'persistent'],
+      [true, 1],
+      { session: true },
+    ]) {
+      expect(decisions(withPersist(persist))).toEqual(['cancel', 'decline', 'accept'])
+    }
+  })
+
+  it('names the app by the declared connector, else the server', () => {
+    const undocumented = { app_name: 'Safari', appName: 'Safari', target: { app: 'Safari' } }
+    expect(parseCodexElicitation({ ...appAccessForm, _meta: undocumented })?.detail).toBe(
+      'computer-use\nAllow ChatGPT to use Safari?',
+    )
+  })
+
+  it('maps form options by their declared value, whatever their label says', () => {
+    const parsed = parseCodexElicitation(appAccessForm)
+    expect(parsed?.options).toEqual([
+      { decision: 'cancel', label: 'Cancel' },
+      { decision: 'decline', label: 'Decline' },
+      { decision: 'acceptForSession', label: 'Always allow Safari for this session' },
       { decision: 'acceptAlways', label: 'Always allow Safari' },
       { decision: 'accept', label: 'Approve' },
     ])
@@ -47,15 +136,17 @@ describe('Codex MCP elicitation', () => {
       content: { approval: 'always' },
       _meta: { persist: 'always' },
     })
-    expect(parsed?.responses.get('cancel')).toEqual({ action: 'cancel' })
-    expect(parsed?.responses.get('decline')).toEqual({ action: 'decline' })
   })
 
-  it('keeps once-only forms from advertising unusable persistence choices', () => {
+  it('does not infer persistence from form fields the metadata never declared', () => {
     const parsed = parseCodexElicitation({
-      ...request,
+      ...appAccessForm,
+      _meta: { persist: null },
       requestedSchema: {
-        properties: { approval: { enum: ['once'] } },
+        properties: {
+          approval: { type: 'string', enum: ['once', 'session', 'always'] },
+          persist: { type: 'boolean', title: 'Remember this choice permanently' },
+        },
         required: ['approval'],
       },
     })
@@ -64,57 +155,71 @@ describe('Codex MCP elicitation', () => {
       'decline',
       'accept',
     ])
-    expect(parsed?.responses.has('acceptAlways')).toBe(false)
-    expect(parsed?.responses.has('acceptForSession')).toBe(false)
-  })
-
-  it('preserves nullable fields, enum labels, defaults and permanent boolean choices', () => {
-    const parsed = parseCodexElicitation({
-      ...request,
-      _meta: { app_name: null, appName: 'Calendar', persist: null },
-      requestedSchema: {
-        properties: {
-          approval: {
-            type: 'string',
-            title: null,
-            description: null,
-            default: null,
-            enum: ['once', 'always'],
-            enumNames: null,
-          },
-          persist: { type: 'boolean', title: 'Remember this choice' },
-          constant: { default: 'fixed' },
-        },
-        required: ['approval', 'persist', 'constant'],
-      },
-    })
-    expect(parsed?.detail).toContain('Calendar')
-    expect(parsed?.responses.get('acceptAlways')).toEqual({
-      action: 'accept',
-      _meta: { persist: 'always' },
-      content: { approval: 'always', persist: true, constant: 'fixed' },
-    })
     expect(parsed?.responses.get('accept')).toEqual({
       action: 'accept',
-      content: { approval: 'once', persist: false, constant: 'fixed' },
+      content: { approval: 'once' },
     })
+  })
+
+  it('withholds a declared persistence the required form cannot express', () => {
+    const parsed = parseCodexElicitation({
+      ...appAccessForm,
+      requestedSchema: {
+        properties: { approval: { enum: ['once', 'forever'] } },
+        required: ['approval'],
+      },
+    })
+    expect(parsed?.options.map((option) => option.decision)).toEqual([
+      'cancel',
+      'decline',
+      'accept',
+    ])
   })
 
   it('declines URL requests and required fields an approval cannot populate', () => {
-    expect(parseCodexElicitation({ ...request, mode: 'url' })).toBeNull()
+    expect(parseCodexElicitation({ ...appAccessForm, mode: 'url' })).toBeNull()
     expect(
       parseCodexElicitation({
-        ...request,
+        ...appAccessForm,
         requestedSchema: { properties: { email: { type: 'string' } }, required: ['email'] },
+      }),
+    ).toBeNull()
+    expect(
+      parseCodexElicitation({
+        ...appAccessForm,
+        requestedSchema: {
+          properties: { approval: { enum: ['allow_always'] } },
+          required: ['approval'],
+        },
       }),
     ).toBeNull()
   })
 
   it('matches the pinned unknown-schema acceptance without content', () => {
-    const parsed = parseCodexElicitation({ ...request, requestedSchema: { properties: 123 } })
+    const parsed = parseCodexElicitation({ ...appAccessForm, requestedSchema: { properties: 123 } })
     expect(parsed?.responses.get('accept')).toEqual({ action: 'accept' })
     expect(parsed?.responses.get('acceptAlways')).toEqual({
       action: 'accept',
+      _meta: { persist: 'always' },
+    })
+  })
+
+  it('approves once with the first one-time value, as t3code does', () => {
+    const parsed = parseCodexElicitation({
+      ...appAccessForm,
+      _meta: { persist: 'always' },
+      requestedSchema: {
+        properties: { approval: { enum: ['allow_always', 'accept', 'decline', 'always'] } },
+        required: ['approval'],
+      },
+    })
+    expect(parsed?.responses.get('accept')).toEqual({
+      action: 'accept',
+      content: { approval: 'accept' },
+    })
+    expect(parsed?.responses.get('acceptAlways')).toEqual({
+      action: 'accept',
+      content: { approval: 'always' },
       _meta: { persist: 'always' },
     })
   })

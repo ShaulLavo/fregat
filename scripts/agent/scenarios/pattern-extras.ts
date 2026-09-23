@@ -1,9 +1,9 @@
 import { ok, strictEqual } from 'node:assert/strict'
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { Locator, Page } from 'playwright'
 import type { Scenario } from './index'
-import { fixtureGit, openFixtureWorkspace } from '../fixture-workspace'
+import { fixtureGit, openFixtureWorkspace, releaseFixture } from '../fixture-workspace'
 import { openFileFromTree, runPaletteCommand, selectors, waitForApp } from '../selectors'
 
 const source = `export function patternExample() {
@@ -170,7 +170,7 @@ async function withPatternFixture(page: Page, run: () => Promise<void>) {
   } finally {
     await page.goto(original)
     await waitForApp(page)
-    await rm(fixture, { recursive: true, force: true })
+    await releaseFixture(fixture)
   }
 }
 

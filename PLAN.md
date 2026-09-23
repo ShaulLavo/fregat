@@ -83,6 +83,13 @@ The deleted plans remain in git history.
 
 ## Ordered Platform editor lane
 
+Editor E006 is in progress as of 2026-09-23.
+[Automatic text reclamation](../Editor/docs/storage/e006-text-reclamation.md) now runs in live
+buffers with incremental scheduling, unchanged snapshot identity and retained undo history.
+Chunk-owned measurement caches release deleted strings too. Mounted multi-view browser checks
+and the linked Platform WorkspaceEdit service/event suites pass. Partial/original chunks and
+position metadata remain open. This does not reorder the other lanes.
+
 Editor E002 is complete as of 2026-09-07. Correlated input diagnostics, bounded source-range
 indexing, and stale secondary-work guards are live. Three fresh controls calibrated the
 [local browser gate](../Editor/examples/stress/results/input-latency/README.md): the optimized candidate
@@ -415,7 +422,7 @@ day swept both repositories for the same shape and for workarounds generally. Th
 grouped by owner into four Platform plans and five Editor backlog entries. Items marked verified in
 each plan were confirmed in source; the rest are audit findings an implementer re-checks first.
 
-Suggested order:
+Suggested order (step 1 done and deployed 2026-09-23):
 
 1. [Plan 131](plans/131-provider-codes-not-prose.md) Phase 1 and
    [Plan 132](plans/132-process-and-dev-ownership.md) Phase 1. A tool permission's lifetime is

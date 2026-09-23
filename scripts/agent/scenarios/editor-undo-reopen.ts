@@ -1,8 +1,13 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, writeFile } from 'node:fs/promises'
 import { strictEqual } from 'node:assert'
 import path from 'node:path'
 import type { Page } from 'playwright'
-import { fixtureGit, openFixtureWorkspace, waitForFileContent } from '../fixture-workspace'
+import {
+  fixtureGit,
+  openFixtureWorkspace,
+  releaseFixture,
+  waitForFileContent,
+} from '../fixture-workspace'
 import { focusEditor, openFileFromTree, selectors } from '../selectors'
 import type { Scenario } from './index'
 
@@ -42,7 +47,7 @@ export const editorUndoReopen: Scenario = {
       await step('undone-after-reload')
       await pressUntil(page, 'Control+y', EDITED.trimEnd())
     } finally {
-      await rm(fixture, { force: true, recursive: true })
+      await releaseFixture(fixture)
     }
   },
 }

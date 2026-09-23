@@ -46,8 +46,8 @@ export class MetadataProviderAdapter extends MockProviderAdapter {
     })
   }
 
-  async discoverSessions(input: ProviderSessionDiscoveryInput) {
-    return this.rows.slice(input.offset, input.offset + input.limit)
+  async discoverSessions(_input: ProviderSessionDiscoveryInput) {
+    return this.rows
   }
 
   async readSessionHistory({ sessionId }: { readonly sessionId: SessionId }) {

@@ -1,7 +1,10 @@
-import { rm } from 'node:fs/promises'
-
 import type { Scenario } from './index'
-import { createGitFixture, installPreCommitHook, openFixtureWorkspace } from '../fixture-workspace'
+import {
+  createGitFixture,
+  installPreCommitHook,
+  openFixtureWorkspace,
+  releaseFixture,
+} from '../fixture-workspace'
 import { openGitPanel, selectors } from '../selectors'
 import { createScriptError } from '../../structured-errors'
 
@@ -42,7 +45,7 @@ export const gitCommitHookColors: Scenario = {
         .evaluate((node) => node.style.color)
       if (!red) throw createScriptError('An SGR color did not reach the rendered span')
     } finally {
-      await rm(fixture, { force: true, recursive: true })
+      await releaseFixture(fixture)
     }
   },
 }
