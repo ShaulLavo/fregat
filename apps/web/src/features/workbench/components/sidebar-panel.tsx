@@ -1,6 +1,4 @@
-import { RailTabs } from '@/components/rail-tabs'
 import type { FilesystemPath } from '@/lib/documents/utils/types'
-import { useNavigation } from '@/hooks/use-navigation'
 import { cn } from '@workspace/ui/lib/utils'
 import { usePanelSurface } from '@/hooks/use-panel-surface'
 import { RenderErrorBoundary } from '@workspace/ui/patterns/render-error-boundary'
@@ -11,7 +9,6 @@ import { LogsPanel } from '@/features/logs/components/panel'
 import { FileNavigatorPanel } from '@/features/workbench/components/file-navigator-panel'
 import { GitChangesPanel } from '@/features/workbench/components/git-changes-panel'
 import {
-  WORKBENCH_SIDEBAR_TABS,
   workbenchSidebarTabLabel,
   type WorkbenchPanels,
   type WorkbenchSidebarTab,
@@ -24,23 +21,10 @@ export function SidebarPanel({
   readonly panels: WorkbenchPanels
   readonly rootPath: FilesystemPath
 }) {
-  const navigation = useNavigation()
   const surface = usePanelSurface()
-
-  function selectTab(tab: WorkbenchSidebarTab) {
-    void navigation.setSidePanel(tab)
-  }
 
   return (
     <aside className={cn(surface.panel, 'flex h-full min-h-0 min-w-0 overflow-hidden')}>
-      <RailTabs
-        activeTab={panels.activeSidebarTab}
-        label='Sidebar tabs'
-        side='left'
-        tabLabel={workbenchSidebarTabLabel}
-        tabs={WORKBENCH_SIDEBAR_TABS}
-        onSelectTab={selectTab}
-      />
       <div className='min-h-0 min-w-0 flex-1 overflow-hidden'>
         <RenderErrorBoundary
           label={workbenchSidebarTabLabel(panels.activeSidebarTab)}

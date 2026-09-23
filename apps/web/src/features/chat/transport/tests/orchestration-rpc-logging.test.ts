@@ -2,9 +2,45 @@ import { initLogger, type WideEvent } from 'evlog'
 import { vi } from 'vitest'
 
 import { createOrchestrationRpcClient } from '@/features/chat/transport/orchestration-rpc-client'
+import { createRpcEventScope } from '@/features/chat/transport/rpc-event-scope'
 import { replaceEnvironmentEndpoint } from '@/lib/client'
 import { FakeOrchestrationSocket } from '@workspace/client-core/test/orchestration-socket'
 import { expect, test } from '../../../../../test/fixtures'
+
+test('connection diagnostics capture browser state when the connection ends', async () => {
+  const events: WideEvent[] = []
+  vi.stubEnv('OBSERVABILITY_ENABLED', 'true')
+  vi.stubGlobal('document', { visibilityState: 'visible', hasFocus: () => true })
+  vi.stubGlobal('navigator', { onLine: true })
+  initLogger({
+    enabled: true,
+    silent: true,
+    drain: ({ event }) => {
+      events.push(event)
+    },
+  })
+
+  try {
+    const scope = createRpcEventScope({
+      action: 'orchestration.ws.connection.summary',
+      area: 'orchestration',
+    })
+    vi.stubGlobal('document', { visibilityState: 'hidden', hasFocus: () => false })
+    vi.stubGlobal('navigator', { onLine: false })
+    scope.end({ transportError: true })
+
+    await vi.waitFor(() => expect(events).toHaveLength(1))
+    expect(events[0]).toMatchObject({
+      transportError: true,
+      browserAtStart: { visibility: 'visible', focused: true, online: true },
+      browserAtEnd: { visibility: 'hidden', focused: false, online: false },
+    })
+  } finally {
+    vi.unstubAllGlobals()
+    vi.unstubAllEnvs()
+    initLogger({ enabled: false, silent: true, _suppressDrainWarning: true })
+  }
+})
 
 test('the connection summary names the proxied endpoint a remote machine opens', async () => {
   const events: WideEvent[] = []
@@ -81,11 +117,13 @@ test('owner closure stays informational while a transport failure remains an err
 
     await vi.waitFor(() => {
       expect(
-        events.filter((event) => event.action === 'orchestration.ws.subscription.summary'),
+        events.filter(
+          (event) => event.action === 'orchestration.ws.subscription.summary' && !event.checkpoint,
+        ),
       ).toHaveLength(2)
     })
     const summaries = events.filter(
-      (event) => event.action === 'orchestration.ws.subscription.summary',
+      (event) => event.action === 'orchestration.ws.subscription.summary' && !event.checkpoint,
     )
     expect(summaries[0]).toMatchObject({ aborted: true, explicitlyClosed: true, level: 'info' })
     expect(summaries[0]?.error).toBeUndefined()

@@ -21,7 +21,6 @@ import {
   TOOL_PANE_MAX_SIZE,
   TOOL_PANE_MIN_SIZE,
   chatModeToolTabLabel,
-  toggleChatModeToolTab,
   type ChatModePanels,
   type ChatModeToolTab,
 } from '@/features/chat-mode/utils/panels'
@@ -47,8 +46,8 @@ export function ChatModeLayout({
 }) {
   const surface = usePanelSurface()
 
-  function handleSelectToolTab(tab: ChatModeToolTab) {
-    onPanelsChange(toggleChatModeToolTab(panels, tab))
+  function handleSelectToolTab(tab: ChatModeToolTab, open: boolean) {
+    onPanelsChange({ ...panels, activeToolTab: tab, toolPaneOpen: open })
   }
 
   return (

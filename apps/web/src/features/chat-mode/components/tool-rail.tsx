@@ -13,7 +13,7 @@ export function ToolRail({
 }: {
   readonly className?: string
   readonly panels: ChatModePanels
-  readonly onSelectTab: (tab: ChatModeToolTab) => void
+  readonly onSelectTab: (tab: ChatModeToolTab, open: boolean) => void
 }) {
   return (
     <RailTabs

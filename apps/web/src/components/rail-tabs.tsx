@@ -5,7 +5,7 @@ import { WorkspaceRail } from '@/components/workspace-rail'
 
 /**
  * The tab strip both rails show. A mode passes its own tabs and its own labels;
- * `activeTab` is null when the panel is closed, so no tab reads as pressed.
+ * `activeTab` is null when closed. Clicking the active tab closes its panel.
  */
 export function RailTabs<Tab extends PanelTab>({
   activeTab,
@@ -22,7 +22,7 @@ export function RailTabs<Tab extends PanelTab>({
   readonly side: 'left' | 'right'
   readonly tabLabel: (tab: Tab) => string
   readonly tabs: readonly Tab[]
-  readonly onSelectTab: (tab: Tab) => void
+  readonly onSelectTab: (tab: Tab, open: boolean) => void
 }) {
   return (
     <WorkspaceRail className={className} label={label} side={side}>
@@ -33,7 +33,7 @@ export function RailTabs<Tab extends PanelTab>({
           key={tab}
           label={tabLabel(tab)}
           tooltipSide={side === 'left' ? 'right' : 'left'}
-          onClick={() => onSelectTab(tab)}
+          onClick={() => onSelectTab(tab, activeTab !== tab)}
         />
       ))}
     </WorkspaceRail>

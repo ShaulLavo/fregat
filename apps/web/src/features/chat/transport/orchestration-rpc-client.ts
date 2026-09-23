@@ -8,7 +8,7 @@ import {
 
 import { observeClientOperation } from '@/lib/client-logging'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
-import { createWideEventScope } from '@/lib/wide-event-scope'
+import { createRpcEventScope } from '@/features/chat/transport/rpc-event-scope'
 
 export type WebOrchestrationRpcClientOptions = Omit<
   OrchestrationRpcClientOptions,
@@ -30,7 +30,7 @@ export function createOrchestrationRpcClient(options: WebOrchestrationRpcClientO
           summarize,
         ),
       createScope: (event) =>
-        createWideEventScope({ ...environmentLogContext(options.origin), ...event }),
+        createRpcEventScope({ ...environmentLogContext(options.origin), ...event }),
     },
   })
 }

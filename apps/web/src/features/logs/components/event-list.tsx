@@ -1,4 +1,4 @@
-import { CopyIcon, BroomIcon, ArrowCounterClockwiseIcon, XIcon } from '@phosphor-icons/react'
+import { CopyIcon, BroomIcon, XIcon } from '@phosphor-icons/react'
 import {
   ContextMenu,
   ContextMenuTrigger,
@@ -136,12 +136,6 @@ export function LogsEventList({
           onClick={() => dismissEvents(visibleEvents.map((event) => event.id))}
         >
           <BroomIcon className='size-(--icon-size)' /> Clear visible logs
-        </ContextMenuItem>
-        <ContextMenuItem
-          disabled={dismissedIds.size === 0}
-          onClick={() => setDismissedIds(new Set())}
-        >
-          <ArrowCounterClockwiseIcon className='size-(--icon-size)' /> Restore cleared logs
         </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>

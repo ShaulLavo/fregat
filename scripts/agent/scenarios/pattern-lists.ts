@@ -86,15 +86,6 @@ export const logsPanel: Scenario = {
     const clearedId = await firstRow.getAttribute('id')
     await selectors.menuItem(page, 'Clear current log').click()
     ok((await selectors.logRows(page).first().getAttribute('id')) !== clearedId)
-    await selectors.logRows(page).first().click({ button: 'right' })
-    await selectors.menuItem(page, 'Clear visible logs').click()
-    await selectors.logCleared(page).waitFor()
-    strictEqual(await selectors.logRows(page).count(), 0)
-    await step('logs-cleared')
-    await selectors.logCleared(page).click({ button: 'right' })
-    await selectors.menuItem(page, 'Restore cleared logs').click()
-    await selectors.logRows(page).first().waitFor()
-    strictEqual(await selectors.logRows(page).first().getAttribute('id'), clearedId)
     await step('log-events')
     await selectors.logRows(page).first().click()
     await step('inspected-event')
@@ -108,6 +99,11 @@ export const logsPanel: Scenario = {
     strictEqual(await selectors.menuItem(page, 'Copy current log').isEnabled(), true)
     await step('keyboard-log-menu')
     await page.keyboard.press('Escape')
+    await selectors.logRows(page).first().click({ button: 'right' })
+    await selectors.menuItem(page, 'Clear visible logs').click()
+    await selectors.logCleared(page).waitFor()
+    strictEqual(await selectors.logRows(page).count(), 0)
+    await step('logs-cleared')
   },
 }
 

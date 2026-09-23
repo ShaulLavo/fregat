@@ -1,5 +1,10 @@
 # Repository Guidelines
 
+## Reference Clones
+
+- Upstream code we compare against (vscode, t3code, opencode, codex, …) is cloned under `references/` at the repo root, gitignored. Look there before cloning anything, and add new clones there — not in `/work/projects/references/`.
+- CI, the parity scripts and several tests resolve `references/t3code` by relative path, so the directory stays inside the repo.
+
 ## Code Organization
 
 - Features are leaves: import shared code from `@workspace/*`, `@/lib/*`, `@/components/*`, `@/hooks/*`, or `@/keymap/*`; never add a feature-to-feature import. Existing exact modules are frozen in `scripts/lint/web-feature-allow.json` with reasons.
