@@ -2,6 +2,7 @@ import { strictEqual } from 'node:assert/strict'
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { Page } from 'playwright'
+import { BOOT_MIRROR_KEY } from '../../../apps/web/src/lib/boot-keys'
 import type { Scenario } from './index'
 import { createGitFixture, openFixtureWorkspace, releaseFixture } from '../fixture-workspace'
 import { preserveAppearance, writeUserSetting } from '../preserve-settings'
@@ -129,6 +130,13 @@ export const editorEditContextInput: Scenario = {
       const results: Partial<Record<Route, RouteResult>> = {}
       for (const route of ['edit-context', 'textarea'] as const) {
         await writeUserSetting(page, 'editor.inputRoute', route)
+        // The write went around the app, which hears of it over its settings stream; editors are
+        // built from the boot mirror, so the reload waits until the page has mirrored the change.
+        await page.waitForFunction(
+          ([key, expected]) =>
+            JSON.parse(localStorage.getItem(key) ?? '{}')['editor.inputRoute'] === expected,
+          [BOOT_MIRROR_KEY, route] as const,
+        )
         // An editor takes its route when it is built, and the reload rebuilds the restored tab's.
         await page.reload()
         await waitForApp(page)
