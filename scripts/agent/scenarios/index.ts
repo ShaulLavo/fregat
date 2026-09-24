@@ -159,6 +159,7 @@ import { gitFixWithAgent } from './git-fix-with-agent'
 import { gitHistory } from './git-history'
 import { editorCaretBurst } from './editor-caret-burst'
 import { editorFocusClicks } from './editor-focus-clicks'
+import { editorProportionalFont } from './editor-proportional-font'
 import { editorProduct } from './editor-product'
 import { treeFileClicks } from './tree-file-clicks'
 import { treeStickyScroll } from './tree-sticky-scroll'
@@ -325,6 +326,7 @@ export const scenarios: readonly Scenario[] = [
   gitFixWithAgent,
   editorCaretBurst,
   editorFocusClicks,
+  editorProportionalFont,
   editorProduct,
   treeStickyScroll,
   treeFileClicks,
