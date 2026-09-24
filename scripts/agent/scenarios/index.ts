@@ -42,6 +42,7 @@ import { panelSeams } from './panel-seams'
 import { surfaceAudit } from './surface-audit'
 import { surfaceStacking } from './surface-stacking'
 import { chatTimelinePattern } from './chat-timeline-pattern'
+import { settingsStaleDiagnostics } from './settings-stale-diagnostics'
 import { settingsFontInput } from './settings-font-input'
 import { settingsSaveRejected } from './settings-save-rejected'
 import { settingsResponsive } from './settings-responsive'
@@ -208,6 +209,7 @@ export const scenarios: readonly Scenario[] = [
   filePicker,
   filePickerNavigation,
   gitHistoryScroll,
+  settingsStaleDiagnostics,
   settingsResponsive,
   settingsSaveRejected,
   searchResults,

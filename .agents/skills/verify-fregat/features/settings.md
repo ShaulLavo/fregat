@@ -41,3 +41,5 @@ Scope is a security boundary: a window-scoped value never reaches execution. Sec
 `scenario settings-cold-load` delays the settings module in the Vite dev server, verifies the loading state, then releases the import and checks that rendering resumes without console errors.
 
 `scenario wallpaper-boot-handoff` reloads as a macOS tab with a theme-less boot mirror whose wallpaper is the desktop. Linux composites over the real desktop, and a theme's own wallpaper wins, so neither preloads. The boot script's preload must report `ready` on `window.platformBootWallpaper`, the record the app reads instead of the link's attributes.
+
+`scenario settings-stale-diagnostics` plants an unknown key in the user `settings.json` (`PLATFORM_SETTINGS_FILE` or `~/.platform/settings.json`) and checks that the User JSON view marks it. It then types a space after the opening brace, which hides the marks while the text differs from the file, and undoes to bring them back. The original bytes are restored even if the run fails. A highlight holds only mounted rows, so the edit stays on a row near the marked one.

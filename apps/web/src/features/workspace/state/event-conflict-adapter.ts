@@ -1,3 +1,4 @@
+import { log } from '@/lib/client-logging'
 import { parentFilesystemPath } from '@/lib/path-formatters'
 import { decodedAsText } from '@workspace/contracts'
 import { FilesystemConflictToast } from '@/features/editor/components/filesystem-conflict-toast'
@@ -148,6 +149,15 @@ function notifyFilesystemConflict(conflict: FilesystemConflict, context: Workspa
     { id: current?.toastId, dismissible: false, duration: Infinity },
   )
   context.conflictStore.getState().updateConflict(next.id, { toastId })
+  log.info({
+    action: 'conflict.notify',
+    area: 'fs',
+    conflictId: next.id,
+    eventType: next.eventType,
+    path: next.remotePath,
+    refreshed: current !== undefined,
+    toastId: String(toastId),
+  })
 }
 
 function matchingConflict(conflict: FilesystemConflict, context: WorkspaceConflictContext) {

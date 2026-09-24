@@ -144,6 +144,7 @@ export class ConflictEditorResolutionCoordinator {
           area: 'fs',
           conflictId: capture.conflict.id,
           path: capture.conflict.remotePath,
+          toastId: capture.conflict.toastId === undefined ? null : String(capture.conflict.toastId),
           rootGeneration: capture.root.generation,
           sourceRevision: capture.revision,
           writeId,

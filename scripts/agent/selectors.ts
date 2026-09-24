@@ -393,6 +393,8 @@ export const selectors = {
     page.getByRole('combobox', { name: 'Interface density', exact: true }),
   settingsDensityOption: (page: Page, density: 'compact' | 'cozy') =>
     page.getByRole('option', { name: density, exact: true }),
+  settingsJsonView: (page: Page) =>
+    page.getByRole('button', { name: 'settings.json', exact: true }),
   settingsScopeTab: (page: Page, name: 'User' | 'Workspace' | 'Defaults') =>
     page.getByRole('tab', { name, exact: true }),
   settingsDefaultsBanner: (page: Page) => page.getByText('Defaults are read-only', { exact: true }),

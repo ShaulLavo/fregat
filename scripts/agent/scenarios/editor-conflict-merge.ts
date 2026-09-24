@@ -41,6 +41,8 @@ export const editorConflictMerge: Scenario = {
       const saved = await waitForResolvedFile(disk)
       ok(saved.includes('LOCAL_EDIT'), `the local side was not kept: ${JSON.stringify(saved)}`)
       ok(!saved.includes('REMOTE_EDIT'), `the incoming side survived: ${JSON.stringify(saved)}`)
+      // The toast leaves after the save lands: dismissal waits a frame, then an exit animation.
+      await dialog.waitFor({ state: 'hidden', timeout: 5000 })
       await step('resolved-and-saved')
     } finally {
       await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pagehide')))

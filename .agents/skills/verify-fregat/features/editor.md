@@ -54,7 +54,7 @@ The click scenario waits 750ms between clicks so debounced document highlights, 
 
 `scenario editor-row-height-audit` opens `--file`, then forces `--editor-row-height: 0px` on the editor and opens `README.md`. Every initial text paint logs `editor.layout.rows_audited` (debug) with the row pitch, painted height, line-height and the CSS vars on the editor and the root; a disagreement logs `editor.layout.row_height_mismatch` (warn) with the same fields. The client batches logs about once a minute, so the run's `logs.txt` is usually empty: read `bun run logs --action editor.layout.row_height_mismatch` a minute after the run. A rows-stacked or text-clipped editor without that warn is a gap in the audit itself.
 
-`scenario editor-conflict-merge` opens a disposable file, types an unsaved edit, writes the file externally, chooses Compare in the conflict toast, and takes Accept Current Change from the merge lens. The resolved file on disk must keep the local edit and drop the incoming one, with no marker left.
+`scenario editor-conflict-merge` opens a disposable file, types an unsaved edit, writes the file externally, chooses Compare in the conflict toast, and takes Accept Current Change from the merge lens. The resolved file on disk must keep the local edit and drop the incoming one, with no marker left, and the conflict toast must close. A clean external write goes first, so the file watch is live before the conflicting one.
 
 `scenario editor-lsp-hover --file main.tsx` inserts a `const`, hovers its name, checks the language server tooltip names it, then inserts a name with a Cyrillic letter and checks that its diagnostic and its character warning share one tooltip. Undoes both edits.
 
