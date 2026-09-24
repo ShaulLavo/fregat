@@ -25,6 +25,15 @@ import {
 import * as v from 'valibot'
 import { writeAttachmentFromDataUrl } from '../../../attachments/store'
 import { ClaudeProviderAdapter } from '../claude'
+import { ClaudeAuthRunner } from '../utils/claude-auth'
+import { resolveClaudeExecutable } from '../utils/claude-executable'
+import {
+  claudeModelRows,
+  FAKE_CLAUDE_EXECUTABLE,
+  resolveFakeClaudeExecutable,
+  SYNTHETIC_HAIKU,
+  SYNTHETIC_OPUS,
+} from '../../../../test/factories/claude-models'
 import type {
   ProviderRuntimeEvent,
   ProviderRuntimeStartInput,
@@ -45,6 +54,7 @@ const PNG_BYTES = new Uint8Array(Buffer.from(PNG_BASE64, 'base64'))
 const WORKSPACE_ROOT = '/Users/shaul/Desktop/platform'
 /** Only the CLI's own id, used where a `system`/`init` message is faked. */
 const SESSION_ID = 'ee84050b-1b17-5fe8-9f71-0983f1fceccc'
+const SECOND_SESSION_ID = '5d0c3a4e-8f1b-4c2d-9e7a-6b5c4d3e2f10'
 const SYSTEM_UUID = '44444444-4444-4444-8444-444444444444'
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
@@ -58,7 +68,7 @@ const INITIALIZE_RESPONSE = {
   agents: [],
   available_output_styles: ['default'],
   commands: [],
-  models: [],
+  models: claudeModelRows(),
   output_style: 'default',
 }
 
@@ -154,6 +164,8 @@ type ClaudeHarness = {
   adapter: ClaudeProviderAdapter
   events: ProviderRuntimeEvent[]
   options: Options[]
+  /** Capability probes, kept apart so `queries` counts sessions only. */
+  probes: Options[]
   prompts: SDKUserMessage[]
   queries: FakeClaudeQuery[]
 }
@@ -786,7 +798,7 @@ describe('ClaudeProviderAdapter', () => {
 
     const options = latestOptions(harness)
     expect(options.effort).toBe('high')
-    expect(options.model).toBe('claude-opus-5[1m]')
+    expect(options.model).toBe(`${SYNTHETIC_OPUS}[1m]`)
     expect('settings' in options).toBe(false)
     expect('thinking' in options).toBe(false)
     await harness.adapter.stopAll()
@@ -839,7 +851,7 @@ describe('ClaudeProviderAdapter', () => {
     const harness = claudeHarness()
 
     await harness.adapter.startRuntime(
-      sessionStartInput({ model: 'claude-haiku-4-5', options: { thinking: true } }),
+      sessionStartInput({ model: SYNTHETIC_HAIKU, options: { thinking: true } }),
     )
 
     const options = latestOptions(harness)
@@ -853,7 +865,7 @@ describe('ClaudeProviderAdapter', () => {
     const harness = claudeHarness()
 
     await harness.adapter.startRuntime(
-      sessionStartInput({ model: 'claude-haiku-4-5', options: { thinking: false } }),
+      sessionStartInput({ model: SYNTHETIC_HAIKU, options: { thinking: false } }),
     )
 
     const options = latestOptions(harness)
@@ -910,15 +922,87 @@ describe('ClaudeProviderAdapter', () => {
   })
 })
 
+describe('ClaudeProviderAdapter catalog', () => {
+  it('lists the CLI catalog and reports the CLI that answered it', async () => {
+    const harness = claudeHarness()
+    const snapshot = await harness.adapter.snapshot()
+
+    expect(snapshot.version).toBe(FAKE_CLAUDE_EXECUTABLE.version)
+    expect(snapshot.models.filter((model) => model.status === 'current')[0]?.slug).toBe(
+      SYNTHETIC_OPUS,
+    )
+    expect(harness.probes.map((probe) => probe.pathToClaudeCodeExecutable)).toEqual([
+      FAKE_CLAUDE_EXECUTABLE.path,
+    ])
+  })
+
+  it('runs sessions on the resolved CLI', async () => {
+    const harness = claudeHarness()
+
+    await harness.adapter.startRuntime(sessionStartInput({}))
+
+    expect(latestOptions(harness).pathToClaudeCodeExecutable).toBe(FAKE_CLAUDE_EXECUTABLE.path)
+    await harness.adapter.stopAll()
+  })
+
+  /** Without the probe a first session would start with no effort or context window. */
+  it('probes once before the first session and reuses the catalog after', async () => {
+    const harness = claudeHarness()
+
+    await harness.adapter.startRuntime(sessionStartInput({}))
+    await harness.adapter.startRuntime(
+      sessionStartInput({ sessionId: v.parse(sessionIdSchema, SECOND_SESSION_ID) }),
+    )
+
+    expect(harness.probes).toHaveLength(1)
+    expect(latestOptions(harness).effort).toBe('high')
+    await harness.adapter.stopAll()
+  })
+
+  it('reports a missing configured binary with its fix instead of falling back', async () => {
+    const adapter = new ClaudeProviderAdapter({
+      attachmentsDir,
+      auth: signedInAuth(),
+      createQuery: () => expect.unreachable('No CLI may run without an executable.'),
+      resolveExecutable: () =>
+        resolveClaudeExecutable({
+          binaryPath: '/missing/claude',
+          env: {},
+          probe: { bundled: () => null, version: async () => null, which: () => null },
+        }),
+    })
+
+    const snapshot = await adapter.snapshot()
+
+    expect(snapshot.status).toBe('error')
+    expect(snapshot.message).toContain('clear it to use the installed `claude`')
+  })
+})
+
+function signedInAuth() {
+  return new ClaudeAuthRunner({
+    spawn: () => ({
+      exited: Promise.resolve({ exitCode: 0, stderr: '', stdout: '{"loggedIn":true}' }),
+      kill: () => undefined,
+    }),
+  })
+}
+
 function claudeHarness(acknowledgeStop = true): ClaudeHarness {
   const events: ProviderRuntimeEvent[] = []
   const options: Options[] = []
   const prompts: SDKUserMessage[] = []
+  const probes: Options[] = []
   const queries: FakeClaudeQuery[] = []
 
   const adapter = new ClaudeProviderAdapter({
     attachmentsDir,
+    auth: signedInAuth(),
     createQuery: (input) => {
+      if (input.options.strictMcpConfig) {
+        probes.push(input.options)
+        return new FakeClaudeQuery() as unknown as Query
+      }
       const query = new FakeClaudeQuery()
       query.acknowledgeClose = acknowledgeStop
       queries.push(query)
@@ -940,12 +1024,13 @@ function claudeHarness(acknowledgeStop = true): ClaudeHarness {
       // deadlock from this suite. Tests that want `init` emit it themselves.
       return query as unknown as Query
     },
+    resolveExecutable: resolveFakeClaudeExecutable,
   })
   adapter.subscribeEvents((event) => {
     events.push(event)
   })
 
-  return { adapter, events, options, prompts, queries }
+  return { adapter, events, options, probes, prompts, queries }
 }
 
 async function collectPrompts(prompt: AsyncIterable<SDKUserMessage>, prompts: SDKUserMessage[]) {
@@ -1060,7 +1145,7 @@ function imageAttachment(
 
 function modelSelection(options?: ModelSelection['options']): ModelSelection {
   return {
-    model: 'claude-opus-5',
+    model: SYNTHETIC_OPUS,
     providerInstanceId: DEFAULT_CLAUDE_PROVIDER_SETTINGS.providerInstanceId,
     ...(options ? { options } : {}),
   }

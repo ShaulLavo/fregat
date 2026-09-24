@@ -2,13 +2,28 @@
 
 ## Status and authorization
 
-- Status: PROPOSED — research complete and D1–D4 decided 2026-09-24; Phase 1 ready.
+- Status: IMPLEMENTED 2026-09-24 — all four phases; scenario `chat-claude-catalog` green.
 - Priority: P1. A released model (Opus 5.5) is unreachable from the picker and from chat.
 - Effort: M overall. Phase 1 is S and ships alone.
 - Risk: MED. Phase 2 changes which binary every Claude spawn runs.
 - Planned at: Platform `c2af88b4`, 2026-09-24.
 - Every phase changes the server: deploy with `bun run deploy --server`, which drops live
   terminal and agent sessions. Say so before deploying.
+
+## Implementation notes
+
+- Phase 1 skipped its temporary `CLAUDE_MODELS` entry: Phase 3 landed in the same pass.
+- The bundled CLI version comes from the SDK's own `package.json` (`claudeCodeVersion`), not the
+  platform package, which ships no `manifest.json`.
+- Opus 5.5 defaults to `medium` effort through a slug overlay entry, matching T3's `opus-5-5`
+  profile; the rest of the family stays `high`.
+- Slugs drop the date suffix as well as `[1m]` (`claude-haiku-4-5-20251001` → `claude-haiku-4-5`),
+  as T3's aliases do.
+- Terminal resume asks the adapter for its executable (`ProviderAdapter.executablePath`); the
+  registry leases synchronously and the service resolves the command after claiming the session.
+- The TUI picker labels legacy models instead of folding them.
+- Not driven live: a bogus configured `binaryPath` in the providers UI. The adapter test pins the
+  error snapshot and its fix.
 
 ## Outcome
 

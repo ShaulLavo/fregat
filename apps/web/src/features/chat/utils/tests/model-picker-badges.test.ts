@@ -63,8 +63,10 @@ test('a custom model leads the badges and its capability follows it', () => {
 })
 
 test('the new marker is keyed by driver kind and slug together', () => {
-  expect(isNewProviderModel(claudeOption('claude-opus-5'))).toBe(true)
+  expect(isNewProviderModel(claudeOption('claude-opus-5-5'))).toBe(true)
   expect(isNewProviderModel(claudeOption('claude-sonnet-5'))).toBe(false)
   // Same slug under a different driver is a different model.
-  expect(isNewProviderModel(optionFor({ models: [model({ slug: 'claude-opus-5' })] }))).toBe(false)
+  expect(isNewProviderModel(optionFor({ models: [model({ slug: 'claude-opus-5-5' })] }))).toBe(
+    false,
+  )
 })

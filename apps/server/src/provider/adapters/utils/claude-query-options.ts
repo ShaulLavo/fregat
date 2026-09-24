@@ -8,8 +8,8 @@ import type {
 } from '@workspace/contracts'
 import {
   claudeModelCapabilities,
-  DEFAULT_CLAUDE_MODEL,
   ONE_MILLION_CONTEXT_SUFFIX,
+  type ClaudeCatalog,
 } from './claude-models'
 import { claudeReasoningQueryOptions, type ClaudeReasoning } from './claude-reasoning'
 import { modelOptionDescriptor, modelOptionValue, modelSelectValue } from './model-options'
@@ -33,6 +33,8 @@ export type ClaudeQueryOptionsInput = ClaudeRuntimeSelection & {
   cwd: string
   /** Per-instance spawn env. Absent means "inherit the server's env untouched". */
   env?: NodeJS.ProcessEnv
+  /** The instance's resolved CLI; without it the SDK runs its bundled one. */
+  executablePath: string
   model: string
   /** False keeps isolated utility turns out of the provider's transcript store. */
   persistSession?: boolean
@@ -69,17 +71,21 @@ function claudePermissionOptions(input: ClaudeRuntimeSelection): ClaudePermissio
 }
 
 export function claudeModelId(input: {
+  catalog: ClaudeCatalog
   modelSelection: ModelSelection
   providerInstanceId: ProviderInstanceId
 }): string {
   // Same instance-mismatch guard as codexModelOptions: a selection aimed at
   // another provider carries none of our model's options, so ignore it wholesale.
   if (input.modelSelection.providerInstanceId !== input.providerInstanceId) {
-    return DEFAULT_CLAUDE_MODEL
+    return input.catalog.defaultModel
   }
 
-  const model = input.modelSelection.model.trim() || DEFAULT_CLAUDE_MODEL
-  const descriptor = modelOptionDescriptor(claudeModelCapabilities(model), 'contextWindow')
+  const model = input.modelSelection.model.trim() || input.catalog.defaultModel
+  const descriptor = modelOptionDescriptor(
+    claudeModelCapabilities(input.catalog.models, model),
+    'contextWindow',
+  )
   const selected = modelOptionValue(input.modelSelection.options, 'contextWindow')
   if (modelSelectValue(descriptor, selected) !== '1m') return model
   if (model.endsWith(ONE_MILLION_CONTEXT_SUFFIX)) return model
@@ -108,6 +114,7 @@ export function claudeQueryOptions(input: ClaudeQueryOptionsInput): Options {
     cwd: input.cwd,
     includePartialMessages: true,
     model: input.model,
+    pathToClaudeCodeExecutable: input.executablePath,
     ...(input.persistSession === undefined ? {} : { persistSession: input.persistSession }),
     settingSources: ['user', 'project', 'local'],
     systemPrompt: { preset: 'claude_code', type: 'preset' },

@@ -1,0 +1,82 @@
+import { describe, expect, it } from 'vitest'
+import {
+  parseClaudeVersion,
+  resolveClaudeExecutable,
+  type ClaudeExecutable,
+  type ClaudeExecutableProbe,
+} from '../utils/claude-executable'
+
+const BUNDLED: ClaudeExecutable = { path: '/sdk/claude', source: 'bundled', version: '2.1.10' }
+const INSTALLED_PATH = '/usr/local/bin/claude'
+
+function probe(overrides: {
+  bundled?: ClaudeExecutable | null
+  installed?: string | null
+  versions?: Readonly<Record<string, string | null>>
+}): ClaudeExecutableProbe {
+  const installed = overrides.installed === undefined ? INSTALLED_PATH : overrides.installed
+
+  return {
+    bundled: () => (overrides.bundled === undefined ? BUNDLED : overrides.bundled),
+    version: async (executablePath) => overrides.versions?.[executablePath] ?? null,
+    which: (command) => {
+      if (command === 'claude') return installed
+      return command.startsWith('/present/') ? command : null
+    },
+  }
+}
+
+describe('resolveClaudeExecutable', () => {
+  it('runs the installed CLI when it is at least as new as the bundled one', async () => {
+    const executable = await resolveClaudeExecutable({
+      env: {},
+      probe: probe({ versions: { [INSTALLED_PATH]: '2.1.10' } }),
+    })
+
+    expect(executable).toEqual({ path: INSTALLED_PATH, source: 'installed', version: '2.1.10' })
+  })
+
+  it('compares versions numerically, not as text', async () => {
+    const executable = await resolveClaudeExecutable({
+      env: {},
+      probe: probe({ versions: { [INSTALLED_PATH]: '2.1.9' } }),
+    })
+
+    expect(executable).toEqual(BUNDLED)
+  })
+
+  it('runs the bundled CLI when the installed one cannot state its version', async () => {
+    const executable = await resolveClaudeExecutable({ env: {}, probe: probe({}) })
+
+    expect(executable).toEqual(BUNDLED)
+  })
+
+  it('runs the bundled CLI when none is installed', async () => {
+    const executable = await resolveClaudeExecutable({ env: {}, probe: probe({ installed: null }) })
+
+    expect(executable).toEqual(BUNDLED)
+  })
+
+  it('always runs a configured binary, whatever its version', async () => {
+    const executable = await resolveClaudeExecutable({
+      binaryPath: '/present/claude',
+      env: {},
+      probe: probe({ versions: { '/present/claude': '1.0.0' } }),
+    })
+
+    expect(executable).toEqual({ path: '/present/claude', source: 'configured', version: '1.0.0' })
+  })
+
+  it('fails on a configured binary that does not exist', async () => {
+    await expect(
+      resolveClaudeExecutable({ binaryPath: '/missing/claude', env: {}, probe: probe({}) }),
+    ).rejects.toMatchObject({ fix: expect.stringContaining('provider settings') })
+  })
+})
+
+describe('parseClaudeVersion', () => {
+  it('reads the version out of `claude --version`', () => {
+    expect(parseClaudeVersion('2.1.281 (Claude Code)\n')).toBe('2.1.281')
+    expect(parseClaudeVersion('command not found')).toBeNull()
+  })
+})

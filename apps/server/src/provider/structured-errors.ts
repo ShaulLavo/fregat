@@ -85,6 +85,12 @@ export const sessionIdentityErrors = defineErrorCatalog('provider', {
     why: 'The isolated provider process could not return the local conversation transcript.',
     fix: 'Check that this provider instance can access the session files and retry the import.',
   },
+  CLAUDE_BINARY_MISSING: {
+    status: 500,
+    message: 'The configured Claude binary was not found',
+    why: 'The provider instance names a binary path that does not resolve to an executable.',
+    fix: 'Correct the binary path in the provider settings, or clear it to use the installed `claude`.',
+  },
   HISTORY_UNSUPPORTED: {
     status: 400,
     message: 'This provider does not support conversation imports',

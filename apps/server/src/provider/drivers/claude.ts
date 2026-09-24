@@ -21,6 +21,7 @@ export const claudeDriver: ProviderDriver<ClaudeDriverConfig> = {
   credentialPaths: ({ config }) => [path.join(claudeConfigDir(config), '.credentials.json')],
   create: async (input) => {
     const adapter = new ClaudeProviderAdapter({
+      ...(input.binaryPath ? { binaryPath: input.binaryPath } : {}),
       displayLabel: input.displayLabel,
       enabled: input.enabled,
       env: input.env,

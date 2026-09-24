@@ -26,7 +26,7 @@ a bare root `bun run verify`.
 | [141 — usage and rate limits](141-usage-and-rate-limits.md)                             | **PROPOSED — PHASE 1 READY**                                 |
 | [140 — the editor as the agent's advantage](140-editor-agent-advantage.md)              | **RESEARCH — RESEARCH PHASE FIRST**                          |
 | [139 — acting on agent diffs](139-acting-on-agent-diffs.md)                             | **RESEARCH — RESEARCH PHASE FIRST**                          |
-| [138 — Claude models from the CLI](138-claude-model-discovery.md)                       | **PROPOSED — D1–D4 DECIDED; PHASE 1 READY**                  |
+| [138 — Claude models from the CLI](138-claude-model-discovery.md)                       | **IMPLEMENTED 2026-09-24 — ALL FOUR PHASES**                 |
 | [137 — shared workspace interactions](137-shared-workspace-interactions.md)             | **IMPLEMENTED 2026-09-24 — ALL SEVEN PHASES DEPLOYED**       |
 | [136 — file tree undo and redo](136-file-tree-undo.md)                                  | **IMPLEMENTED — ALL THREE PHASES; SCENARIO GREEN**           |
 | [135 — TanStack async ownership and route preparation](135-tanstack-async-ownership.md) | **PROPOSED — RESEARCH COMPLETE; IMPLEMENTATION NOT STARTED** |

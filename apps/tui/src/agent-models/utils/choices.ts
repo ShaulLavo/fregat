@@ -30,7 +30,7 @@ export function modelChoiceRows({
   return [
     ...models.map((option): Row => ({
       name: `${value?.providerInstanceId === option.providerInstanceId && value.model === option.modelSelection.model ? '✓ ' : ''}${option.label}`,
-      description: option.disabledReason?.message ?? option.providerLabel,
+      description: option.disabledReason?.message ?? modelDescription(option),
       value: { kind: 'model', option },
     })),
     ...providers
@@ -46,4 +46,9 @@ export function modelChoiceRows({
       value: { kind: 'refresh' },
     },
   ]
+}
+
+/** Retired models trail their provider's list; the web picker folds them, the TUI labels them. */
+function modelDescription(option: ProviderModelOption) {
+  return option.legacy ? `${option.providerLabel} · legacy` : option.providerLabel
 }

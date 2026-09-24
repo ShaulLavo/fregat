@@ -7,7 +7,7 @@ import {
 } from '../../packages/contracts/src/index'
 import { reconcileModelOptions } from '../../packages/client-core/src/chat/providers/options'
 import {
-  claudeModelCatalog,
+  claudeCatalog,
   DEFAULT_CLAUDE_MODEL,
 } from '../../apps/server/src/provider/adapters/utils/claude-models'
 import { pin, readPinned } from './pinned'
@@ -152,9 +152,41 @@ const manifest = v.parse(
 )
 const claude = manifest.providers.claudeAgent
 strictEqual(DEFAULT_CLAUDE_MODEL, claude.defaults.chat)
-const catalog = claudeModelCatalog()
-strictEqual(catalog.length, 5)
-for (const model of catalog) {
+// The scripts package cannot resolve the SDK, so the row type comes through the mapping.
+type ModelInfo = Parameters<typeof claudeCatalog>[0][number]
+// supportedModels() as CLI 2.1.281 answered it (Plan 138), trimmed to the fields the mapping reads.
+const EFFORT_LEVELS: ModelInfo['supportedEffortLevels'] = ['low', 'medium', 'high', 'xhigh', 'max']
+const CLI_2_1_281_ROWS: ModelInfo[] = [
+  cliRow('default', 'claude-opus-5-5[1m]', { supportsFastMode: true }),
+  cliRow('opus[1m]', 'claude-opus-5-5[1m]', { supportsFastMode: true }),
+  cliRow('claude-fable-5-1[1m]', 'claude-fable-5-1', {}),
+  cliRow('sonnet', 'claude-sonnet-5', {}),
+  {
+    value: 'haiku',
+    resolvedModel: 'claude-haiku-4-5-20251001',
+    displayName: 'Haiku',
+    description: '',
+  },
+]
+function cliRow(
+  value: string,
+  resolvedModel: string,
+  flags: Partial<Pick<ModelInfo, 'supportsFastMode'>>,
+) {
+  return {
+    value,
+    resolvedModel,
+    displayName: value,
+    description: '',
+    supportedEffortLevels: EFFORT_LEVELS,
+    ...flags,
+  } satisfies ModelInfo
+}
+const catalog = claudeCatalog(CLI_2_1_281_ROWS).models
+// Every model the pinned manifest names must map to its profile; a newer CLI model may be absent there.
+const pinned = catalog.filter((model) => claude.models.some((entry) => entry.slug === model.slug))
+strictEqual(pinned.length, 5)
+for (const model of pinned) {
   const advertised = claude.models.find((candidate) => candidate.slug === model.slug)
   ok(advertised, `Pinned Claude model ${model.slug}`)
   deepStrictEqual(model.capabilities, claude.profiles[advertised.profile]?.capabilities, model.slug)
@@ -164,7 +196,7 @@ console.log(
     upstreamCommit: pin,
     cases,
     negativeControls: controls.length + 1,
-    claudeProfiles: catalog.length,
+    claudeProfiles: pinned.length,
     result: 'matched',
   }),
 )

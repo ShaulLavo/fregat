@@ -87,11 +87,15 @@ const providerModelCapabilitiesSchema = v.object({
   optionDescriptors: v.optional(v.array(providerOptionDescriptorSchema)),
 })
 
+/** `legacy` is a retired model still accepted by id; absent means current. */
+const providerModelStatusSchema = v.picklist(['current', 'legacy'])
+
 export const providerModelSchema = v.object({
   slug: trimmedNonEmptyStringSchema,
   name: trimmedNonEmptyStringSchema,
   shortName: v.optional(trimmedNonEmptyStringSchema),
   isCustom: v.boolean(),
+  status: v.optional(providerModelStatusSchema),
   capabilities: v.optional(v.nullable(providerModelCapabilitiesSchema), null),
 })
 

@@ -756,9 +756,10 @@ export class ProviderService {
       launch.release()
     }
     try {
+      const command = await launch.resolveCommand()
       await this.stopRuntime({ sessionId: input.sessionId })
       this.requireRunning()
-      return { ...launch, release }
+      return { command, env: launch.env, release }
     } catch (error) {
       release()
       throw error

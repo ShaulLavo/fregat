@@ -7,6 +7,7 @@ import type { ProviderAuthResult, ProviderLoginAttempt } from '@workspace/contra
 import type { App } from '../../app'
 import { closeTestApps, createTestApp } from '../../../test/server'
 import { ClaudeProviderAdapter } from '../adapters/claude'
+import { resolveFakeClaudeExecutable } from '../../../test/factories/claude-models'
 import { MockProviderAdapter } from '../adapters/mock'
 import {
   ClaudeAuthRunner,
@@ -99,6 +100,7 @@ async function testHarness() {
     attachmentsDir: path.join(root, 'attachments'),
     auth: new ClaudeAuthRunner({ spawn: cli.spawn }),
     createQuery: fakeProbeQuery,
+    resolveExecutable: resolveFakeClaudeExecutable,
   })
   const app = createTestApp({
     auth: { allowedOrigins: [TRUSTED_ORIGIN] },

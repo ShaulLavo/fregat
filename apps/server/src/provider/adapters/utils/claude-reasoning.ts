@@ -4,7 +4,7 @@ import type {
   ProviderInstanceId,
   ProviderModelCapabilities,
 } from '@workspace/contracts'
-import { claudeModelCapabilities, DEFAULT_CLAUDE_MODEL } from './claude-models'
+import { claudeModelCapabilities, type ClaudeCatalog } from './claude-models'
 import {
   modelOptionDescriptor,
   modelOptionValue,
@@ -30,13 +30,15 @@ export type ClaudeEffortPlan = {
 const ULTRATHINK_PROMPT_PREFIX = 'Ultrathink:'
 
 export function claudeReasoning(input: {
+  catalog: ClaudeCatalog
   modelSelection: ModelSelection
   providerInstanceId: ProviderInstanceId
 }): ClaudeReasoning {
   if (input.modelSelection.providerInstanceId !== input.providerInstanceId) return {}
 
   const capabilities = claudeModelCapabilities(
-    input.modelSelection.model.trim() || DEFAULT_CLAUDE_MODEL,
+    input.catalog.models,
+    input.modelSelection.model.trim() || input.catalog.defaultModel,
   )
   const options = input.modelSelection.options
   const requested = modelOptionValue(options, 'effort')

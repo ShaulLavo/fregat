@@ -525,6 +525,8 @@ export type ProviderAdapter = {
   capabilities: ProviderAdapterCapabilities
   driverKind: ProviderDriverKind
   discoverSessions?: (input: ProviderSessionDiscoveryInput) => Promise<ProviderDiscoveredSession[]>
+  /** The CLI this instance spawns. Present on drivers whose sessions resume in a terminal. */
+  executablePath?: () => Promise<string>
   readSessionHistory?: (input: ProviderSessionHistoryInput) => Promise<ProviderHistoryMessage[]>
   hasRuntime: (input: { sessionId: SessionId }) => Promise<boolean>
   interruptTurn: (input: ProviderTurnControlInput) => Promise<void>

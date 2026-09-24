@@ -7,6 +7,7 @@ import type { ProviderCommandCatalog } from '@workspace/contracts'
 import type { App } from '../../app'
 import { closeTestApps, createTestApp } from '../../../test/server'
 import { ClaudeProviderAdapter, type ClaudeCreateQuery } from '../adapters/claude'
+import { resolveFakeClaudeExecutable } from '../../../test/factories/claude-models'
 import { MockProviderAdapter } from '../adapters/mock'
 import { ClaudeAuthRunner, type ClaudeAuthProcess } from '../adapters/utils/claude-auth'
 import { ProviderAdapterRegistry } from '../provider-adapter-registry'
@@ -68,6 +69,7 @@ async function testHarness(createQuery?: ClaudeCreateQuery) {
     attachmentsDir: path.join(root, 'attachments'),
     auth: neverSpawningAuth(),
     createQuery: createQuery ?? fakeClaudeCli(cwds),
+    resolveExecutable: resolveFakeClaudeExecutable,
   })
   const app = createTestApp({
     auth: { allowedOrigins: [TRUSTED_ORIGIN] },

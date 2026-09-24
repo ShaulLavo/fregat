@@ -484,7 +484,7 @@ phases or splits them into executable plans; not all research happens up front.
 
 Suggested order:
 
-1. Plan 138 Phase 1. A released model is unreachable today, and the fix is a dependency bump.
+1. ~~Plan 138~~ — implemented 2026-09-24.
 2. Quick wins, batched so one `--server` restart covers them: Plan 141 Phase 1, the small
    Plan 145 plans, and the small new Plan 126 rows.
 3. Plan 142 after its spike. It needs only a minimal web app manifest, not Plan 143.

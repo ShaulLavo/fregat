@@ -10,11 +10,10 @@ export type ModelPickerBadge = {
 /**
  * Models worth flagging as newly added, keyed `driverKind:slug`. A hand-kept set
  * because no provider tells us a release date: the snapshot carries a slug, a
- * name and capabilities, and nothing that orders two models in time. Codex pages
- * its catalog live, so only the hardcoded Claude catalog can be flagged here.
+ * name and capabilities, and nothing that orders two models in time.
  * Emptying this set is the correct edit once a model stops being news.
  */
-const NEW_MODEL_KEYS = new Set<string>(['claude:claude-opus-5', 'claude:claude-opus-5[1m]'])
+const NEW_MODEL_KEYS = new Set<string>(['claude:claude-opus-5-5'])
 
 export function isNewProviderModel(option: ProviderModelOption): boolean {
   return NEW_MODEL_KEYS.has(`${option.driverKind}:${option.modelSelection.model}`)

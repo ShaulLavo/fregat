@@ -62,6 +62,7 @@ import { wallpaperBootHandoff } from './wallpaper-boot-handoff'
 import { chatGitTabSwitch } from './chat-git-tab-switch'
 import { chatGitTurnRows } from './chat-git-turn-rows'
 import { chatModelPicker } from './chat-model-picker'
+import { chatClaudeCatalog } from './chat-claude-catalog'
 import { wallpaperIconHints } from './wallpaper-icon-hints'
 import { terminalBackground } from './terminal-background'
 import { bottomPanelPersistence } from './bottom-panel-persistence'
@@ -212,6 +213,7 @@ export const scenarios: readonly Scenario[] = [
   iconHints,
   chatIconHints,
   chatModelPicker,
+  chatClaudeCatalog,
   wallpaperIconHints,
   gitChanges,
   logsPanel,

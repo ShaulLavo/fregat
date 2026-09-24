@@ -4,7 +4,14 @@ import type {
   ProviderInstanceId,
   ProviderModelCapabilities,
 } from '@workspace/contracts'
-import { claudeModelCapabilities } from '../utils/claude-models'
+import {
+  claudeModelRows,
+  SYNTHETIC_FABLE,
+  SYNTHETIC_HAIKU,
+  SYNTHETIC_OPUS,
+  SYNTHETIC_SONNET,
+} from '../../../../test/factories/claude-models'
+import { claudeCatalog } from '../utils/claude-models'
 import {
   claudePromptText,
   claudeReasoning,
@@ -13,12 +20,13 @@ import {
   effortPlan,
 } from '../utils/claude-reasoning'
 
+const CATALOG = claudeCatalog(claudeModelRows())
 const CLAUDE_INSTANCE = 'claude' as ProviderInstanceId
 const CODEX_INSTANCE = 'codex' as ProviderInstanceId
 
 function modelSelection(overrides: Partial<ModelSelection> = {}): ModelSelection {
   return {
-    model: 'claude-opus-5',
+    model: SYNTHETIC_OPUS,
     providerInstanceId: CLAUDE_INSTANCE,
     ...overrides,
   }
@@ -127,13 +135,14 @@ describe('effortPlan', () => {
 
 describe('claudeReasoning', () => {
   it.each([
-    ['claude-opus-5', 'high'],
-    ['claude-fable-5-1', 'medium'],
-    ['claude-sonnet-5', 'high'],
-    ['', 'medium'],
+    [SYNTHETIC_OPUS, 'high'],
+    [SYNTHETIC_FABLE, 'medium'],
+    [SYNTHETIC_SONNET, 'high'],
+    ['', 'high'],
   ])('resolves %s default effort without an explicit selection', (model, effort) => {
     expect(
       claudeReasoning({
+        catalog: CATALOG,
         modelSelection: modelSelection({ model }),
         providerInstanceId: CLAUDE_INSTANCE,
       }),
@@ -143,6 +152,7 @@ describe('claudeReasoning', () => {
   it('ignores a thinking toggle for a known model that only advertises effort', () => {
     expect(
       claudeReasoning({
+        catalog: CATALOG,
         modelSelection: modelSelection({ options: { thinking: true } }),
         providerInstanceId: CLAUDE_INSTANCE,
       }),
@@ -151,6 +161,7 @@ describe('claudeReasoning', () => {
 
   it('reads the effort out of the per-session selection', () => {
     const reasoning = claudeReasoning({
+      catalog: CATALOG,
       modelSelection: modelSelection({ options: { effort: 'max' } }),
       providerInstanceId: CLAUDE_INSTANCE,
     })
@@ -160,6 +171,7 @@ describe('claudeReasoning', () => {
 
   it('ignores a selection aimed at another provider', () => {
     const reasoning = claudeReasoning({
+      catalog: CATALOG,
       modelSelection: modelSelection({
         options: { effort: 'max' },
         providerInstanceId: CODEX_INSTANCE,
@@ -172,8 +184,9 @@ describe('claudeReasoning', () => {
 
   it('resolves the [1m] slug against the base model capabilities', () => {
     const reasoning = claudeReasoning({
+      catalog: CATALOG,
       modelSelection: modelSelection({
-        model: 'claude-opus-5[1m]',
+        model: `${SYNTHETIC_OPUS}[1m]`,
         options: { effort: 'xhigh' },
       }),
       providerInstanceId: CLAUDE_INSTANCE,
@@ -184,6 +197,7 @@ describe('claudeReasoning', () => {
 
   it('sends no effort for a model outside the catalog', () => {
     const reasoning = claudeReasoning({
+      catalog: CATALOG,
       modelSelection: modelSelection({
         model: 'claude-next-9',
         options: { effort: 'max' },
@@ -196,7 +210,8 @@ describe('claudeReasoning', () => {
 
   it('enables the advertised Haiku thinking setting', () => {
     const reasoning = claudeReasoning({
-      modelSelection: modelSelection({ model: 'claude-haiku-4-5', options: { thinking: true } }),
+      catalog: CATALOG,
+      modelSelection: modelSelection({ model: SYNTHETIC_HAIKU, options: { thinking: true } }),
       providerInstanceId: CLAUDE_INSTANCE,
     })
 
@@ -207,7 +222,8 @@ describe('claudeReasoning', () => {
 
   it('disables thinking on both sides at once', () => {
     const reasoning = claudeReasoning({
-      modelSelection: modelSelection({ model: 'claude-haiku-4-5', options: { thinking: false } }),
+      catalog: CATALOG,
+      modelSelection: modelSelection({ model: SYNTHETIC_HAIKU, options: { thinking: false } }),
       providerInstanceId: CLAUDE_INSTANCE,
     })
 
@@ -218,6 +234,7 @@ describe('claudeReasoning', () => {
 
   it('ignores a thinking selection on a model that does not support it', () => {
     const reasoning = claudeReasoning({
+      catalog: CATALOG,
       modelSelection: modelSelection({ model: 'claude-next-9', options: { thinking: true } }),
       providerInstanceId: CLAUDE_INSTANCE,
     })
@@ -226,13 +243,14 @@ describe('claudeReasoning', () => {
   })
 
   it.each([
-    ['claude-opus-5', true, { effort: 'high', settings: { fastMode: true } }],
-    ['claude-opus-5', false, { effort: 'high' }],
-    ['claude-fable-5', true, { effort: 'medium' }],
-    ['claude-sonnet-5', true, { effort: 'high' }],
+    [SYNTHETIC_OPUS, true, { effort: 'high', settings: { fastMode: true } }],
+    [SYNTHETIC_OPUS, false, { effort: 'high' }],
+    [SYNTHETIC_FABLE, true, { effort: 'medium' }],
+    [SYNTHETIC_SONNET, true, { effort: 'high' }],
   ])('gates fast mode on the %s descriptor (%s)', (model, fastMode, expected) => {
     expect(
       claudeReasoning({
+        catalog: CATALOG,
         modelSelection: modelSelection({ model, options: { fastMode } }),
         providerInstanceId: CLAUDE_INSTANCE,
       }),
@@ -241,6 +259,7 @@ describe('claudeReasoning', () => {
 
   it('carries ultracode through as a session setting, never as a level', () => {
     const reasoning = claudeReasoning({
+      catalog: CATALOG,
       modelSelection: modelSelection({ options: { effort: 'ultracode' } }),
       providerInstanceId: CLAUDE_INSTANCE,
     })
@@ -306,47 +325,5 @@ describe('claudePromptText', () => {
 
   it('leaves an empty message empty', () => {
     expect(claudePromptText('', { promptPrefix: 'ultrathink' })).toBe('')
-  })
-})
-
-describe('claudeModelCapabilities', () => {
-  it.each([
-    ['claude-opus-5', 'high', '1m'],
-    ['claude-opus-5[1m]', 'high', '1m'],
-    ['claude-fable-5', 'medium', '1m'],
-    ['claude-fable-5-1', 'medium', '1m'],
-    ['claude-sonnet-5', 'high', '200k'],
-  ])('advertises the pinned defaults for %s', (slug, effort, context) => {
-    const descriptors = claudeModelCapabilities(slug)?.optionDescriptors
-    const choices = descriptors?.flatMap((descriptor) =>
-      descriptor.type === 'select'
-        ? descriptor.options
-            .filter((choice) => choice.isDefault)
-            .map((choice) => [descriptor.id, choice.id])
-        : [],
-    )
-    expect(choices).toEqual([
-      ['effort', effort],
-      ['contextWindow', context],
-    ])
-  })
-
-  it('offers ultracode only on Opus and Fable', () => {
-    const hasUltracode = (slug: string) =>
-      claudeModelCapabilities(slug)?.optionDescriptors?.some(
-        (descriptor) =>
-          descriptor.type === 'select' &&
-          descriptor.options.some((choice) => choice.id === 'ultracode'),
-      )
-    expect(hasUltracode('claude-opus-5')).toBe(true)
-    expect(hasUltracode('claude-fable-5')).toBe(true)
-    expect(hasUltracode('claude-sonnet-5')).toBe(false)
-  })
-
-  it('advertises only thinking for Haiku and no capabilities for an unknown model', () => {
-    expect(claudeModelCapabilities('claude-haiku-4-5')).toEqual({
-      optionDescriptors: [{ id: 'thinking', label: 'Thinking', type: 'boolean' }],
-    })
-    expect(claudeModelCapabilities('claude-next-9')).toBeNull()
   })
 })

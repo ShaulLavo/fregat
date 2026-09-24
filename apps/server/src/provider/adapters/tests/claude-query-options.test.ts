@@ -8,7 +8,14 @@ import type {
   ProviderInstanceId,
   RuntimeMode,
 } from '@workspace/contracts'
-import { DEFAULT_CLAUDE_MODEL } from '../utils/claude-models'
+import {
+  claudeModelRows,
+  SYNTHETIC_FABLE,
+  SYNTHETIC_HAIKU,
+  SYNTHETIC_OPUS,
+  SYNTHETIC_SONNET,
+} from '../../../../test/factories/claude-models'
+import { claudeCatalog } from '../utils/claude-models'
 import {
   claudeModelId,
   claudePermissionMode,
@@ -17,12 +24,14 @@ import {
 
 const SESSION_ID = v.parse(sessionIdSchema, '7b37c40b-ad92-4800-94aa-b3c4a7c64828')
 
+const CATALOG = claudeCatalog(claudeModelRows())
+const EXECUTABLE_PATH = '/opt/claude/bin/claude'
 const CLAUDE_INSTANCE = 'claude' as ProviderInstanceId
 const CODEX_INSTANCE = 'codex' as ProviderInstanceId
 
 function modelSelection(overrides: Partial<ModelSelection> = {}): ModelSelection {
   return {
-    model: 'claude-opus-5',
+    model: SYNTHETIC_OPUS,
     providerInstanceId: CLAUDE_INSTANCE,
     ...overrides,
   }
@@ -37,7 +46,8 @@ function queryOptions(overrides: {
   return claudeQueryOptions({
     abortController: new AbortController(),
     cwd: '/tmp/workspace',
-    model: 'claude-opus-5',
+    executablePath: EXECUTABLE_PATH,
+    model: SYNTHETIC_OPUS,
     sessionId: SESSION_ID,
     ...overrides,
   })
@@ -108,13 +118,15 @@ describe('claudeQueryOptions', () => {
     const options = claudeQueryOptions({
       abortController,
       cwd: '/tmp/workspace',
-      model: 'claude-opus-5',
+      executablePath: EXECUTABLE_PATH,
+      model: SYNTHETIC_OPUS,
       sessionId: SESSION_ID,
       runtimeMode: 'full-access',
     })
 
     expect(options.cwd).toBe('/tmp/workspace')
-    expect(options.model).toBe('claude-opus-5')
+    expect(options.model).toBe(SYNTHETIC_OPUS)
+    expect(options.pathToClaudeCodeExecutable).toBe(EXECUTABLE_PATH)
     expect(options.abortController).toBe(abortController)
     expect(options.includePartialMessages).toBe(true)
     expect(options.settingSources).toEqual(['user', 'project', 'local'])
@@ -150,7 +162,8 @@ describe('claudeQueryOptions', () => {
       abortController: new AbortController(),
       canUseTool,
       cwd: '/tmp/workspace',
-      model: 'claude-opus-5',
+      executablePath: EXECUTABLE_PATH,
+      model: SYNTHETIC_OPUS,
       sessionId: SESSION_ID,
       runtimeMode: 'approval-required',
     })
@@ -162,52 +175,57 @@ describe('claudeQueryOptions', () => {
 describe('claudeModelId', () => {
   it('resolves the selected model default context when the instance matches', () => {
     const model = claudeModelId({
+      catalog: CATALOG,
       modelSelection: modelSelection(),
       providerInstanceId: CLAUDE_INSTANCE,
     })
 
-    expect(model).toBe('claude-opus-5[1m]')
+    expect(model).toBe(`${SYNTHETIC_OPUS}[1m]`)
   })
 
   it('falls back to the default model when the selection targets another provider', () => {
     const model = claudeModelId({
+      catalog: CATALOG,
       modelSelection: modelSelection({ model: 'gpt-5.5', providerInstanceId: CODEX_INSTANCE }),
       providerInstanceId: CLAUDE_INSTANCE,
     })
 
-    expect(model).toBe(DEFAULT_CLAUDE_MODEL)
+    expect(model).toBe(CATALOG.defaultModel)
   })
 
   it('falls back to the default model when the slug is blank', () => {
     const model = claudeModelId({
+      catalog: CATALOG,
       modelSelection: modelSelection({ model: '   ' }),
       providerInstanceId: CLAUDE_INSTANCE,
     })
 
-    expect(model).toBe(`${DEFAULT_CLAUDE_MODEL}[1m]`)
+    expect(model).toBe(`${CATALOG.defaultModel}[1m]`)
   })
 
   it('appends the [1m] suffix when the 1M context window is selected', () => {
     const model = claudeModelId({
+      catalog: CATALOG,
       modelSelection: modelSelection({ options: { contextWindow: '1m' } }),
       providerInstanceId: CLAUDE_INSTANCE,
     })
 
-    expect(model).toBe('claude-opus-5[1m]')
+    expect(model).toBe(`${SYNTHETIC_OPUS}[1m]`)
   })
 
   it.each([
-    ['claude-opus-5', undefined, 'claude-opus-5[1m]'],
-    ['claude-opus-5', '200k', 'claude-opus-5'],
-    ['claude-opus-5', 'unsupported', 'claude-opus-5[1m]'],
-    ['claude-sonnet-5', undefined, 'claude-sonnet-5'],
-    ['claude-sonnet-5', '1m', 'claude-sonnet-5[1m]'],
-    ['claude-fable-5-1', undefined, 'claude-fable-5-1[1m]'],
-    ['claude-haiku-4-5', '1m', 'claude-haiku-4-5'],
+    [SYNTHETIC_OPUS, undefined, `${SYNTHETIC_OPUS}[1m]`],
+    [SYNTHETIC_OPUS, '200k', SYNTHETIC_OPUS],
+    [SYNTHETIC_OPUS, 'unsupported', `${SYNTHETIC_OPUS}[1m]`],
+    [SYNTHETIC_SONNET, undefined, SYNTHETIC_SONNET],
+    [SYNTHETIC_SONNET, '1m', `${SYNTHETIC_SONNET}[1m]`],
+    [SYNTHETIC_FABLE, undefined, `${SYNTHETIC_FABLE}[1m]`],
+    [SYNTHETIC_HAIKU, '1m', SYNTHETIC_HAIKU],
     ['claude-unknown', '1m', 'claude-unknown'],
   ])('resolves %s context %s to %s', (slug, contextWindow, expected) => {
     expect(
       claudeModelId({
+        catalog: CATALOG,
         modelSelection: modelSelection({ model: slug, options: { contextWindow } }),
         providerInstanceId: CLAUDE_INSTANCE,
       }),
@@ -216,18 +234,20 @@ describe('claudeModelId', () => {
 
   it('does not double-suffix a slug that already carries [1m]', () => {
     const model = claudeModelId({
+      catalog: CATALOG,
       modelSelection: modelSelection({
-        model: 'claude-opus-5[1m]',
+        model: `${SYNTHETIC_OPUS}[1m]`,
         options: { contextWindow: '1m' },
       }),
       providerInstanceId: CLAUDE_INSTANCE,
     })
 
-    expect(model).toBe('claude-opus-5[1m]')
+    expect(model).toBe(`${SYNTHETIC_OPUS}[1m]`)
   })
 
   it('never suffixes the fallback model on an instance mismatch', () => {
     const model = claudeModelId({
+      catalog: CATALOG,
       modelSelection: modelSelection({
         options: { contextWindow: '1m' },
         providerInstanceId: CODEX_INSTANCE,
@@ -235,6 +255,6 @@ describe('claudeModelId', () => {
       providerInstanceId: CLAUDE_INSTANCE,
     })
 
-    expect(model).toBe(DEFAULT_CLAUDE_MODEL)
+    expect(model).toBe(CATALOG.defaultModel)
   })
 })

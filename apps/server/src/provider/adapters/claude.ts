@@ -1,10 +1,12 @@
 import { spawn } from 'node:child_process'
 import { ProviderProcessLifetime } from './process-lifetime'
-import { createInternalError } from '../../observability/structured-errors'
+import { createInternalError, isEvlogError } from '../../observability/structured-errors'
 
 import {
   query as claudeSdkQuery,
+  type AccountInfo,
   type CanUseTool,
+  type ModelInfo,
   type Options,
   type PermissionResult,
   type Query,
@@ -71,7 +73,8 @@ import {
   type ClaudeAuthState,
   type ClaudeLoginAttempt,
 } from './utils/claude-auth'
-import { claudeModelCatalog } from './utils/claude-models'
+import { resolveClaudeExecutable, type ClaudeExecutable } from './utils/claude-executable'
+import { claudeCatalog, type ClaudeCatalog } from './utils/claude-models'
 import { claudeModelId, claudeQueryOptions } from './utils/claude-query-options'
 import {
   claudePromptText,
@@ -126,6 +129,8 @@ export type ClaudeAdapterOptions = {
   historyRunner?: ClaudeHistoryRunner
   attachmentsDir?: string
   auth?: ClaudeAuthRunner
+  /** Settings-level CLI path; empty resolves the installed or bundled `claude`. */
+  binaryPath?: string
   createQuery?: ClaudeCreateQuery
   displayLabel?: string
   enabled?: boolean
@@ -135,6 +140,13 @@ export type ClaudeAdapterOptions = {
    */
   env?: NodeJS.ProcessEnv
   providerInstanceId?: ProviderInstanceId
+  /** Replaces executable resolution, which runs `claude --version`. */
+  resolveExecutable?: () => Promise<ClaudeExecutable>
+}
+
+type ClaudeInitialization = {
+  account: AccountInfo | undefined
+  catalog: ClaudeCatalog
 }
 
 type PendingClaudeApproval = {
@@ -183,6 +195,12 @@ export class ClaudeProviderAdapter
   private readonly historyRunner: ClaudeHistoryRunner | undefined
   private readonly env: NodeJS.ProcessEnv
   private readonly settings: ProviderInstanceSettings
+  private readonly resolveExecutable: () => Promise<ClaudeExecutable>
+  /** One resolution per instance; a `binaryPath` change recreates the instance. */
+  private executablePromise: Promise<ClaudeExecutable> | null = null
+  /** The newest non-empty catalog; sessions read capabilities from it. */
+  private catalog: ClaudeCatalog | null = null
+  private initializationProbe: Promise<ClaudeInitialization> | null = null
 
   /**
    * `createQuery` is the seam every test depends on: without it each test spawns
@@ -198,7 +216,12 @@ export class ClaudeProviderAdapter
       options.providerInstanceId ?? DEFAULT_CLAUDE_PROVIDER_SETTINGS.providerInstanceId
     this.attachmentsDir = options.attachmentsDir ?? defaultAttachmentsDir()
     this.env = options.env ?? process.env
-    this.auth = options.auth ?? new ClaudeAuthRunner({ env: this.env })
+    const env = this.env
+    this.resolveExecutable =
+      options.resolveExecutable ??
+      (() => resolveClaudeExecutable({ binaryPath: options.binaryPath, env }))
+    this.auth =
+      options.auth ?? new ClaudeAuthRunner({ command: () => this.executablePath(), env: this.env })
     this.createQuery = options.createQuery ?? defaultClaudeCreateQuery
     this.discoveryRunner = options.discoveryRunner
     this.historyRunner = options.historyRunner
@@ -215,12 +238,16 @@ export class ClaudeProviderAdapter
     recordChatPipelineInfo('chat.pipeline.claude_adapter.snapshot.start')
 
     try {
-      const state = await this.readAuthState()
-      const models = claudeModelCatalog()
+      const executable = await this.executable()
+      const { catalog, state } = await this.readAuthState()
       recordChatPipelineInfo('chat.pipeline.claude_adapter.snapshot.complete', {
         authStatus: state.auth.status,
+        cliVersion: executable.version,
+        defaultFallback: catalog.defaultFallback,
+        defaultModel: catalog.defaultModel,
+        executableSource: executable.source,
         installed: true,
-        modelCount: models.length,
+        modelCount: catalog.models.length,
         status: state.status,
       })
 
@@ -229,10 +256,10 @@ export class ClaudeProviderAdapter
         auth: state.auth,
         checkedAt,
         installed: true,
-        models,
+        models: catalog.models,
         status: state.status,
         supportsSignIn: true,
-        version: null,
+        version: executable.version,
         ...(state.message ? { message: state.message } : {}),
       }
     } catch (error) {
@@ -248,7 +275,7 @@ export class ClaudeProviderAdapter
         auth: { status: 'unknown' },
         checkedAt,
         installed: true,
-        message: providerErrorMessage(error),
+        message: claudeSnapshotErrorMessage(error),
         models: [],
         status: 'error',
         supportsSignIn: true,
@@ -258,8 +285,14 @@ export class ClaudeProviderAdapter
   }
 
   async authStatus() {
-    const state = await this.readAuthState()
+    const { state } = await this.readAuthState()
     return state.auth
+  }
+
+  /** The CLI every spawn of this instance runs, terminal resume included. */
+  async executablePath() {
+    const executable = await this.executable()
+    return executable.path
   }
 
   /**
@@ -268,7 +301,7 @@ export class ClaudeProviderAdapter
    * control request on the already-running CLI. No turn is spent either way.
    */
   async listCommands({ cwd }: ProviderCommandCatalogInput) {
-    return probeClaudeCommandCatalog(this.createQuery, this.env, cwd)
+    return probeClaudeCommandCatalog(this.createQuery, this.env, await this.executablePath(), cwd)
   }
 
   async signIn(input: ProviderSignInInput) {
@@ -307,12 +340,53 @@ export class ClaudeProviderAdapter
    * when the CLI read itself is unreadable.
    */
   private async readAuthState() {
-    const [cli, account] = await Promise.all([
+    const [cli, initialization] = await Promise.all([
       this.auth.status(),
-      probeClaudeAccount(this.createQuery, this.env),
+      this.probeInitialization(),
     ])
 
-    return claudeAuthState(cli, account)
+    return {
+      catalog: initialization.catalog,
+      state: claudeAuthState(cli, initialization.account),
+    }
+  }
+
+  private executable() {
+    this.executablePromise ??= this.resolveExecutable().catch((error: unknown) => {
+      // A configured binary installed later must not need a restart to be found.
+      this.executablePromise = null
+      throw error
+    })
+
+    return this.executablePromise
+  }
+
+  /** Shared by concurrent callers, so a session start rides the snapshot's probe. */
+  private probeInitialization() {
+    this.initializationProbe ??= this.readInitialization().finally(() => {
+      this.initializationProbe = null
+    })
+
+    return this.initializationProbe
+  }
+
+  private async readInitialization(): Promise<ClaudeInitialization> {
+    const initialization = await probeClaudeInitialization(
+      this.createQuery,
+      this.env,
+      await this.executablePath(),
+    )
+    const catalog = claudeCatalog(initialization.models)
+    if (catalog.models.length > 0) this.catalog = catalog
+
+    return { account: initialization.account, catalog }
+  }
+
+  private async currentCatalog() {
+    if (this.catalog) return this.catalog
+
+    const initialization = await this.probeInitialization()
+    return initialization.catalog
   }
 
   /** Adapter-local inspection, not part of the driver SPI. */
@@ -376,7 +450,9 @@ export class ClaudeProviderAdapter
   protected async ensureRuntimeSession(input: ProviderRuntimeStartInput) {
     const existing = this.sessions.get(input.sessionId)
     const cwd = normalizeWorkspaceCwd(input.cwd)
+    const catalog = await this.currentCatalog()
     const model = claudeModelId({
+      catalog,
       modelSelection: input.modelSelection,
       providerInstanceId: input.providerInstanceId,
     })
@@ -384,6 +460,7 @@ export class ClaudeProviderAdapter
     // they join cwd/model/runtimeMode in the reuse check: a session that switched
     // level has to get a new query, not a stale one that ignores it.
     const reasoning = claudeReasoning({
+      catalog,
       modelSelection: input.modelSelection,
       providerInstanceId: input.providerInstanceId,
     })
@@ -445,6 +522,7 @@ export class ClaudeProviderAdapter
       emit: (event) => this.events.publish(event),
       env: this.env,
       ephemeral,
+      executablePath: await this.executablePath(),
       interactionMode,
       model,
       providerInstanceId: input.providerInstanceId,
@@ -517,6 +595,7 @@ class ClaudeAgentSession extends SessionContext {
     emit: (event: ProviderRuntimeEvent) => void
     env: NodeJS.ProcessEnv
     ephemeral: boolean
+    executablePath: string
     interactionMode: InteractionMode
     model: string
     providerInstanceId: ProviderTurnInput['providerInstanceId']
@@ -546,6 +625,7 @@ class ClaudeAgentSession extends SessionContext {
       canUseTool: session.canUseTool(),
       cwd: input.cwd,
       env: input.env,
+      executablePath: input.executablePath,
       persistSession: input.ephemeral ? false : undefined,
       interactionMode: input.interactionMode,
       model: input.model,
@@ -2016,16 +2096,17 @@ function defaultClaudeCreateQuery(input: {
 
 /**
  * Capability probe. The prompt generator NEVER yields, so the CLI completes its
- * local initialization IPC — returning account and auth state — without ever
- * sending a request to Anthropic or burning a turn. We read init, then abort.
+ * local initialization IPC — returning account state and its model list —
+ * without ever sending a request to Anthropic or burning a turn. We read init, then abort.
  */
-async function probeClaudeAccount(
+async function probeClaudeInitialization(
   createQuery: ClaudeCreateQuery,
   env: NodeJS.ProcessEnv,
-): Promise<unknown> {
+  executablePath: string,
+): Promise<{ account: AccountInfo | undefined; models: readonly ModelInfo[] }> {
   const abortController = new AbortController()
   const query = createQuery({
-    options: claudeProbeOptions(abortController, env),
+    options: claudeProbeOptions(abortController, env, executablePath),
     prompt: neverYieldingPrompt(abortController.signal),
   })
 
@@ -2036,7 +2117,7 @@ async function probeClaudeAccount(
       'Claude capability probe timed out.',
     )
 
-    return initialization.account
+    return { account: initialization.account, models: initialization.models ?? [] }
   } finally {
     abortController.abort()
   }
@@ -2052,11 +2133,15 @@ async function probeClaudeAccount(
 async function probeClaudeCommandCatalog(
   createQuery: ClaudeCreateQuery,
   env: NodeJS.ProcessEnv,
+  executablePath: string,
   cwd: string | undefined,
 ): Promise<ProviderCommandCatalogResult> {
   const abortController = new AbortController()
   const query = createQuery({
-    options: { ...claudeProbeOptions(abortController, env), ...(cwd ? { cwd } : {}) },
+    options: {
+      ...claudeProbeOptions(abortController, env, executablePath),
+      ...(cwd ? { cwd } : {}),
+    },
     prompt: neverYieldingPrompt(abortController.signal),
   })
 
@@ -2138,7 +2223,11 @@ function claudeText(value: string | undefined) {
   return trimmed ? trimmed : null
 }
 
-function claudeProbeOptions(abortController: AbortController, env: NodeJS.ProcessEnv): Options {
+function claudeProbeOptions(
+  abortController: AbortController,
+  env: NodeJS.ProcessEnv,
+  executablePath: string,
+): Options {
   return {
     abortController,
     // MCP must be neutralized or the health check becomes heavyweight and flaky.
@@ -2147,6 +2236,7 @@ function claudeProbeOptions(abortController: AbortController, env: NodeJS.Proces
     allowedTools: [],
     env: { ...env, ENABLE_CLAUDEAI_MCP_SERVERS: 'false' },
     mcpServers: {},
+    pathToClaudeCodeExecutable: executablePath,
     persistSession: false,
     settingSources: ['user', 'project', 'local'],
     stderr: noop,
@@ -2273,7 +2363,16 @@ function isMissingClaudeBinaryError(error: unknown) {
   if ('code' in error && error.code === 'ENOENT') return true
 
   const message = providerErrorMessage(error).toLowerCase()
+  if (message.includes('executable not found')) return true
   return message.includes('enoent') || message.includes('exited with code 127')
+}
+
+/** The snapshot has one line for the providers UI, so a catalog error brings its fix along. */
+function claudeSnapshotErrorMessage(error: unknown) {
+  const message = providerErrorMessage(error)
+  if (!isEvlogError(error) || !error.fix) return message
+
+  return `${message}. ${error.fix}`
 }
 
 function claudePermissionResult(

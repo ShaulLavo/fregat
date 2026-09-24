@@ -47,7 +47,10 @@ export async function createAgentTerminalFixture(
   const driver: ProviderDriver<null> = {
     capabilities: { ...MOCK_ADAPTER_CAPABILITIES, multiInstance: true },
     credentialPaths: () => [],
-    create: async () => ({ adapter, dispose: () => adapter.stopAll() }),
+    create: async (input) => {
+      adapter.binaryPath = input.binaryPath ?? 'claude'
+      return { adapter, dispose: () => adapter.stopAll() }
+    },
     defaultConfig: () => null,
     displayName: 'Terminal account',
     driverKind,
@@ -165,9 +168,15 @@ export async function createAgentTerminalFixture(
 }
 
 class HistoryProviderAdapter extends MockProviderAdapter {
+  /** Mirrors the Claude driver: the settings-level binary is what terminal resume runs. */
+  binaryPath = 'claude'
   history: ProviderHistoryMessage[] = []
   historyError: string | null = null
   historyReadGate: Promise<void> | null = null
+
+  async executablePath() {
+    return this.binaryPath
+  }
 
   async readSessionHistory() {
     await this.historyReadGate

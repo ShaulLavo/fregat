@@ -29,7 +29,7 @@
     "typecheck": "tsgo --noEmit"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.3.269",
+    "@anthropic-ai/claude-agent-sdk": "^0.3.281",
     "@elysiajs/cors": "^1.4.2",
     "@parcel/watcher": "^2.6.0",
     "@singapore-editor/lsp": "0.1.1",

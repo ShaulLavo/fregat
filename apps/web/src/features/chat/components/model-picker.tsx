@@ -19,6 +19,7 @@ import {
   type ProviderModelOptionGroup,
 } from '@workspace/client-core/chat/providers/models'
 import { providerListQueryOptions } from '@/features/chat/utils/provider-query'
+import { ModelPickerLegacyRow } from '@/features/chat/components/model-picker-legacy-row'
 import { ModelPickerRail } from '@/features/chat/components/model-picker-rail'
 import { ModelPickerRow } from '@/features/chat/components/model-picker-row'
 import { ModelPickerSignInItem } from '@/features/chat/components/model-picker-sign-in-item'
@@ -27,6 +28,8 @@ import { ModelsLoading } from '@/features/chat/components/models-loading'
 
 /** What the list shows right now, and whether a sign-in row belongs under it. */
 type ModelPickerList = {
+  /** Retired models, shown under a collapsible row after `options`. Empty while searching. */
+  readonly legacyOptions: readonly ProviderModelOption[]
   readonly options: readonly ProviderModelOption[]
   /** Set when every option above is blocked on signing this provider in. */
   readonly signInTarget: ProviderSignInTarget | null
@@ -74,6 +77,7 @@ export function ModelPicker({
   const providersQuery = useQuery(providerListQueryOptions())
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
+  const [legacyExpanded, setLegacyExpanded] = useState(false)
   const [railProviderInstanceId, setRailProviderInstanceId] = useState<ProviderInstanceId | null>(
     null,
   )
@@ -113,6 +117,8 @@ export function ModelPicker({
     if (disabled) return
 
     setQuery('')
+    // A legacy model in use opens its section, so the check mark is never hidden.
+    if (nextOpen) setLegacyExpanded(selectedIsLegacy(groups, selectedKey))
     setOpen(nextOpen)
   }
 
@@ -172,6 +178,23 @@ export function ModelPicker({
                   onSelect={handleSelect}
                 />
               ))}
+              {list.legacyOptions.length > 0 ? (
+                <ModelPickerLegacyRow
+                  count={list.legacyOptions.length}
+                  expanded={legacyExpanded}
+                  onToggle={() => setLegacyExpanded(!legacyExpanded)}
+                />
+              ) : null}
+              {legacyExpanded
+                ? list.legacyOptions.map((option) => (
+                    <ModelPickerRow
+                      key={option.key}
+                      option={option}
+                      selected={option.key === selectedKey}
+                      onSelect={handleSelect}
+                    />
+                  ))
+                : null}
             </CommandList>
           </div>
         </Command>
@@ -207,13 +230,23 @@ function pickerList(
       trimmedQuery,
     )
 
-    return { options, signInTarget: null }
+    return { legacyOptions: [], options, signInTarget: null }
   }
 
   const group = activeGroup ?? groups[0] ?? null
-  if (!group) return { options: [], signInTarget: null }
+  if (!group) return { legacyOptions: [], options: [], signInTarget: null }
 
-  return { options: group.options, signInTarget: group.signInTarget }
+  return {
+    legacyOptions: group.options.filter((option) => option.legacy),
+    options: group.options.filter((option) => !option.legacy),
+    signInTarget: group.signInTarget,
+  }
+}
+
+function selectedIsLegacy(groups: readonly ProviderModelOptionGroup[], selectedKey: string | null) {
+  return groups.some((group) =>
+    group.options.some((option) => option.key === selectedKey && option.legacy),
+  )
 }
 
 function pickerEmptyLabel(loading: boolean, hasProviders: boolean) {

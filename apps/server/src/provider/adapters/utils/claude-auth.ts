@@ -1,6 +1,4 @@
 import { randomUUID } from 'node:crypto'
-import { createRequire } from 'node:module'
-import path from 'node:path'
 import type { ProviderLoginAttempt, ProviderSignInMethod } from '@workspace/contracts'
 import * as v from 'valibot'
 import { createInternalError } from '../../../observability/structured-errors'
@@ -13,8 +11,6 @@ import { errorMessage as providerErrorMessage } from '@workspace/contracts'
  * OAuth round trip and short enough that a walked-away user is cleaned up.
  */
 const LOGIN_TIMEOUT_MS = 5 * 60_000
-
-const SDK_ENTRY = '@anthropic-ai/claude-agent-sdk'
 
 /** Lines of combined stdout/stderr kept on an attempt for the failure UI. */
 const OUTPUT_TAIL_LINES = 20
@@ -67,6 +63,8 @@ export type ClaudeLoginInput = {
 }
 
 export type ClaudeAuthRunnerOptions = {
+  /** The instance's resolved CLI, so the account signed in is the one its sessions read. */
+  command?: () => Promise<string>
   /** Per-instance env; carries CLAUDE_CONFIG_DIR so each account reads its own credentials. */
   env?: NodeJS.ProcessEnv
   spawn?: ClaudeAuthSpawn
@@ -89,9 +87,7 @@ type MutableLoginAttempt = {
  * spawn failure all resolve to `unknown` — this runs inside `snapshot()`, and a
  * throw there would take the whole provider list down over a CLI hiccup.
  */
-export async function claudeAuthStatus(
-  spawn: ClaudeAuthSpawn = defaultClaudeAuthSpawn,
-): Promise<ClaudeAuthState> {
+export async function claudeAuthStatus(spawn: ClaudeAuthSpawn): Promise<ClaudeAuthState> {
   const result = await runClaudeAuth(spawn, ['auth', 'status', '--json'])
   if (!result || result.exitCode !== 0) return unknownAuthState()
 
@@ -121,7 +117,8 @@ export class ClaudeAuthRunner {
 
   constructor(options: ClaudeAuthRunnerOptions = {}) {
     const env = options.env ?? process.env
-    this.spawn = options.spawn ?? ((args) => defaultClaudeAuthSpawn(args, env))
+    const command = options.command ?? (async () => 'claude')
+    this.spawn = options.spawn ?? ((args) => defaultClaudeAuthSpawn(command, args, env))
     this.timeoutMs = options.timeoutMs ?? LOGIN_TIMEOUT_MS
   }
 
@@ -298,40 +295,42 @@ function unknownAuthState(): ClaudeAuthState {
   return { apiProvider: null, authMethod: null, status: 'unknown' }
 }
 
+/**
+ * The command resolves before the child exists, so `kill` can arrive first; it
+ * then settles as a failed run instead of spawning an orphan.
+ */
 function defaultClaudeAuthSpawn(
+  command: () => Promise<string>,
   args: readonly string[],
-  env: NodeJS.ProcessEnv = process.env,
+  env: NodeJS.ProcessEnv,
 ): ClaudeAuthProcess {
-  const child = Bun.spawn([claudeBinaryPath(), ...args], {
+  let child: ReturnType<typeof spawnClaudeAuth> | null = null
+  let killed = false
+  const exited = command().then((executable) => {
+    if (killed) return { exitCode: 1, stderr: '', stdout: '' }
+
+    child = spawnClaudeAuth(executable, args, env)
+    return Promise.all([
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+      child.exited,
+    ]).then(([stdout, stderr, exitCode]) => ({ exitCode, stderr, stdout }))
+  })
+
+  return {
+    exited,
+    kill: () => {
+      killed = true
+      child?.kill()
+    },
+  }
+}
+
+function spawnClaudeAuth(executable: string, args: readonly string[], env: NodeJS.ProcessEnv) {
+  return Bun.spawn([executable, ...args], {
     env,
     stderr: 'pipe',
     stdin: 'ignore',
     stdout: 'pipe',
   })
-
-  const exited = Promise.all([
-    new Response(child.stdout).text(),
-    new Response(child.stderr).text(),
-    child.exited,
-  ]).then(([stdout, stderr, exitCode]) => ({ exitCode, stderr, stdout }))
-
-  return { exited, kill: () => child.kill() }
-}
-
-/**
- * Prefer the executable the agent SDK itself drives, so the account the app
- * signs in is the account the SDK reads back. Falls back to `claude` on PATH
- * when the platform package is absent (musl builds, global CLI installs).
- */
-function claudeBinaryPath() {
-  try {
-    const fromSdk = createRequire(createRequire(import.meta.url).resolve(SDK_ENTRY))
-    const manifest = fromSdk.resolve(
-      `${SDK_ENTRY}-${process.platform}-${process.arch}/package.json`,
-    )
-
-    return path.join(path.dirname(manifest), process.platform === 'win32' ? 'claude.exe' : 'claude')
-  } catch {
-    return 'claude'
-  }
 }

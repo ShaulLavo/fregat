@@ -1,5 +1,9 @@
 import type { SessionId } from '@workspace/contracts'
 import type { AgentTerminalProcess } from '../terminal/agent-launch'
+
+export type AgentTerminalReservation = Omit<AgentTerminalProcess, 'command'> & {
+  readonly resolveCommand: () => Promise<AgentTerminalProcess['command']>
+}
 import { sessionIdentityErrors } from './structured-errors'
 import { claudeTerminalResumeArgv } from './utils/claude-terminal-resume'
 import { createInternalError } from '../observability/structured-errors'
@@ -284,10 +288,11 @@ export class ProviderAdapterRegistry {
     }
   }
 
+  /** Checks and leases synchronously; the command resolves after the caller claims the session. */
   acquireTerminalLaunch(
     providerInstanceId: ProviderInstanceId,
     sessionId: SessionId,
-  ): AgentTerminalProcess {
+  ): AgentTerminalReservation {
     const instance = this.instances.get(providerInstanceId)
     if (!instance || instance.config.driverKind !== 'claude' || instance.config.enabled === false)
       throw sessionIdentityErrors.TERMINAL_UNSUPPORTED({
@@ -301,10 +306,11 @@ export class ProviderAdapterRegistry {
       })
     const lease = this.acquireInstanceLease(providerInstanceId)
     const [, ...args] = claudeTerminalResumeArgv(sessionId)
+    const adapter = lease.adapter
     return {
-      command: [instance.config.binaryPath || 'claude', ...args],
       env: instance.env,
       release: lease.release,
+      resolveCommand: async () => [(await adapter.executablePath?.()) ?? 'claude', ...args],
     }
   }
 

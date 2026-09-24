@@ -132,6 +132,10 @@ export const selectors = {
   modelPickerPanel: (page: Page) =>
     page.getByRole('dialog').filter({ has: page.getByLabel('Models') }),
   modelPickerSearch: (page: Page) => page.getByPlaceholder('Search models'),
+  modelPickerProvider: (page: Page, provider: string) =>
+    selectors.modelPickerPanel(page).getByRole('button', { name: provider, exact: true }),
+  modelPickerLegacy: (page: Page) =>
+    page.getByRole('option').filter({ has: page.getByText('Legacy models', { exact: true }) }),
   modelPickerOption: (page: Page, label: string) =>
     page.getByRole('option').filter({ has: page.getByText(label, { exact: true }) }),
   modelOptions: (page: Page) => page.getByRole('button', { name: 'Model options', exact: true }),

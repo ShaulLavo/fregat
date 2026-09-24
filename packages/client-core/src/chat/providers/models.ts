@@ -54,6 +54,8 @@ export type ProviderModelOption = {
   isCustom: boolean
   key: string
   label: string
+  /** A retired model still accepted by id; the picker folds these under their own row. */
+  legacy: boolean
   modelSelection: ModelSelection
   optionDescriptors: readonly ProviderOptionDescriptor[]
   name: string
@@ -129,6 +131,7 @@ function providerOptions(provider: ProviderSnapshot): ProviderModelOption[] {
       providerInstanceId: provider.providerInstanceId,
     }),
     label: model.shortName ?? model.name,
+    legacy: model.status === 'legacy',
     modelSelection: {
       model: model.slug,
       providerInstanceId: provider.providerInstanceId,
