@@ -474,10 +474,9 @@ export const SETTINGS_REGISTRY = {
     scope: 'application',
     widget: 'enum',
     category: 'Editor',
-    // EditContext exists only in Chromium; other engines keep the textarea whatever this says. Its
-    // element carries no text for screen readers yet, which is why it is not the default.
+    // EditContext exists only in Chromium; other engines keep the textarea whatever this says.
     description:
-      'How typed text reaches the editor. EditContext (Chromium) receives IME, autocorrect and dictation edits with their exact ranges; the textarea works everywhere and is what screen readers read.',
+      'How typed text reaches the editor. EditContext (Chromium) receives IME, autocorrect and dictation edits with their exact ranges instead of reading them back out of a hidden textarea; other browsers always use the textarea.',
     // Editors are reused across tabs and take the route only when they are built.
     requiresRestart: true,
     visibility: 'advanced',

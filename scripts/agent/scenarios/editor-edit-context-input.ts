@@ -8,7 +8,11 @@ import { preserveAppearance, writeUserSetting } from '../preserve-settings'
 import { focusEditor, openFileByName, waitForApp } from '../selectors'
 
 type Route = 'edit-context' | 'textarea'
-type RouteResult = { readonly element: string | undefined; readonly line: string }
+type RouteResult = {
+  readonly element: string | undefined
+  readonly line: string
+  readonly accessibleValue: string | null
+}
 
 /** The window of text the focused input element holds, whichever route put it there. */
 async function inputWindow(page: Page): Promise<string> {
@@ -18,6 +22,20 @@ async function inputWindow(page: Page): Promise<string> {
       | null
     return active?.editContext?.text ?? active?.value ?? ''
   })
+}
+
+/** What the accessibility tree hands a screen reader as the editor input's value. */
+async function accessibleValue(page: Page): Promise<string | null> {
+  const cdp = await page.context().newCDPSession(page)
+  const { root } = await cdp.send('DOM.getDocument', { depth: 0 })
+  const { nodes } = await cdp.send('Accessibility.queryAXTree', {
+    nodeId: root.nodeId,
+    accessibleName: 'Editor input',
+    role: 'textbox',
+  })
+  await cdp.detach()
+  const value = nodes.find((node) => !node.ignored)?.value?.value
+  return typeof value === 'string' ? value : null
 }
 
 /** Rendered text of the last line, where every input below lands. */
@@ -57,7 +75,7 @@ async function drive(page: Page, file: string): Promise<RouteResult> {
   await cdp.send('Input.insertText', { text: 'Hello' })
   await cdp.detach()
   await page.waitForTimeout(300)
-  return { element, line: await lastLine(page) }
+  return { element, line: await lastLine(page), accessibleValue: await accessibleValue(page) }
 }
 
 let report: unknown = null
@@ -92,6 +110,13 @@ export const editorEditContextInput: Scenario = {
         'EditContext route applies every edit',
       )
       strictEqual(results.textarea?.element, 'TEXTAREA', 'Textarea route stays the default element')
+      strictEqual(results.textarea?.line, 'Hello日本', 'Textarea route applies the correction')
+      for (const route of ['edit-context', 'textarea'] as const)
+        strictEqual(
+          results[route]?.accessibleValue?.endsWith('Hello日本'),
+          true,
+          `${route} exposes the lines around the caret to screen readers`,
+        )
     } finally {
       await restore()
       await releaseFixture(fixture)
