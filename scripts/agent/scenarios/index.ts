@@ -165,6 +165,7 @@ import { gitHistory } from './git-history'
 import { editorCaretBurst } from './editor-caret-burst'
 import { editorFocusClicks } from './editor-focus-clicks'
 import { editorProportionalFont } from './editor-proportional-font'
+import { editorEditContextInput } from './editor-edit-context-input'
 import { editorProduct } from './editor-product'
 import { treeFileClicks } from './tree-file-clicks'
 import { treeStickyScroll } from './tree-sticky-scroll'
@@ -337,6 +338,7 @@ export const scenarios: readonly Scenario[] = [
   editorCaretBurst,
   editorFocusClicks,
   editorProportionalFont,
+  editorEditContextInput,
   editorProduct,
   treeStickyScroll,
   treeFileClicks,

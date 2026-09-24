@@ -38,6 +38,7 @@
     "editor.history.persistBudget",
     "editor.history.persistDays",
     "editor.history.retainedStates",
+    "editor.inputRoute",
     "editor.lineHeight",
     "editor.minimap.enabled",
     "editor.retainedTextBudget",

@@ -468,6 +468,21 @@ export const SETTINGS_REGISTRY = {
     description: 'Show diffs side by side or stacked.',
     keywords: ['diff', 'split', 'stacked', 'compare', 'git'],
   }),
+  'editor.inputRoute': defineSetting({
+    schema: v.picklist(['textarea', 'edit-context'] as const),
+    default: 'textarea',
+    scope: 'application',
+    widget: 'enum',
+    category: 'Editor',
+    // EditContext exists only in Chromium; other engines keep the textarea whatever this says. Its
+    // element carries no text for screen readers yet, which is why it is not the default.
+    description:
+      'How typed text reaches the editor. EditContext (Chromium) receives IME, autocorrect and dictation edits with their exact ranges; the textarea works everywhere and is what screen readers read.',
+    // Editors are reused across tabs and take the route only when they are built.
+    requiresRestart: true,
+    visibility: 'advanced',
+    keywords: ['input', 'ime', 'editcontext', 'composition', 'autocorrect', 'textarea'],
+  }),
   'terminal.integrated.fontSize': defineSetting({
     schema: v.pipe(v.number(), v.integer(), v.minValue(6), v.maxValue(72)),
     default: 12,

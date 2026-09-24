@@ -108,6 +108,7 @@ export function Editor({
   const indentationGuidesEnabled = useSettingValue('editor.guides.indentation')
   const minimapEnabled = useSettingValue('editor.minimap.enabled')
   const decodeSetting = useSettingValue('editor.decode.mode')
+  const inputRoute = useSettingValue('editor.inputRoute')
   const decodeMode = effectiveDecodeMode(
     decodeSetting,
     typeof window === 'undefined' ? '' : location.search,
@@ -203,6 +204,7 @@ export function Editor({
     documentKey: paintKey,
     snapshot: decodeMode ? null : snapshot,
     editability,
+    inputRoute,
     keymap: HOSTED_EDITOR_KEYMAP,
     onChange: (_state, change) => {
       if (!liveDocument || !change || change.kind === 'selection' || change.kind === 'none') return

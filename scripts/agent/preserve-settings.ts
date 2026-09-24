@@ -1,12 +1,30 @@
 import { ok, strictEqual } from 'node:assert/strict'
 import type { Page } from 'playwright'
 
-export async function preserveAppearance(page: Page, onlyKeys?: readonly string[]) {
+/** The settings API behind the page: the mesh serves it under /platform, dev on the API port. */
+function settingsApi(page: Page) {
   const url = new URL(page.url())
   const base = url.pathname.startsWith('/platform/')
     ? `${url.origin}/platform/`
     : `http://localhost:${process.env.PORT ?? '3001'}/`
-  const headers = { origin: url.origin }
+  return { base, headers: { origin: url.origin } }
+}
+
+export async function writeUserSetting(page: Page, key: string, value: unknown) {
+  const { base, headers } = settingsApi(page)
+  const response = await page.request.post(`${base}settings/write`, {
+    headers,
+    data: {
+      mutationId: crypto.randomUUID(),
+      target: 'user',
+      operations: [{ kind: 'set', key, value }],
+    },
+  })
+  strictEqual(response.ok(), true, `Write ${key}`)
+}
+
+export async function preserveAppearance(page: Page, onlyKeys?: readonly string[]) {
+  const { base, headers } = settingsApi(page)
   const before: unknown = await (await page.request.get(`${base}settings`, { headers })).json()
   ok(before && typeof before === 'object' && 'layers' in before && Array.isArray(before.layers))
   const user: unknown = before.layers.find((layer) => layer.id === 'user')

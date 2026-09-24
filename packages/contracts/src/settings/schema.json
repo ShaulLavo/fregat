@@ -90,7 +90,15 @@
           },
           "options": {
             "properties": {
+              "effort": {
+                "minLength": 1,
+                "type": "string"
+              },
               "reasoningEffort": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "serviceTier": {
                 "minLength": 1,
                 "type": "string"
               }
@@ -143,7 +151,15 @@
         },
         "options": {
           "properties": {
+            "effort": {
+              "minLength": 1,
+              "type": "string"
+            },
             "reasoningEffort": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "serviceTier": {
               "minLength": 1,
               "type": "string"
             }
@@ -236,6 +252,12 @@
       "maximum": 5000,
       "minimum": 10,
       "type": "integer"
+    },
+    "editor.inputRoute": {
+      "default": "textarea",
+      "description": "How typed text reaches the editor. EditContext (Chromium) receives IME, autocorrect and dictation edits with their exact ranges; the textarea works everywhere and is what screen readers read.",
+      "enum": ["edit-context", "textarea"],
+      "type": "string"
     },
     "editor.lineHeight": {
       "default": 24,
