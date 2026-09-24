@@ -3,6 +3,7 @@
 Two source passes, 2026-09-20. Platform `3c9b88c35784e571e706600b0cee8e95a2656f77`;
 T3 Code `7445aa733ada33e45289e5aa5055f79142556513`. Upstream paths below are relative
 to that commit, not to the older checked-out reference. No runtime equivalence is claimed.
+EXT-14–18 come from the [2026-09-24 upstream delta](delta-2026-09-24.md).
 
 ## Coverage
 
@@ -17,6 +18,8 @@ to that commit, not to the older checked-out reference. No runtime equivalence i
 | Remote access                       | Both connect machines; pairing/session/relay model differs                            | Device revocation, reconnect, origin and environment isolation  |
 | Desktop/mobile/distribution         | Upstream has additional clients and release/update workflows                          | Packaged platform matrix; not tested in this audit              |
 | Background work/diagnostics         | Local observability exists; upstream power/lease and management APIs differ           | Measure before claiming a resource improvement                  |
+| Default branch, submodules, drift   | Absent locally (2026-09-24 delta)                                                     | Real temporary repositories with a local remote                 |
+| Load balancing, usage page          | Absent locally (2026-09-24 delta); usage implementation owned by Plan 141             | Two-machine and fixture-history scenarios                       |
 | Verification                        | Local CI exists; no pinned cross-product conformance gate                             | Build the shared scenario corpus and replay it                  |
 
 ## Findings
@@ -52,9 +55,14 @@ to that commit, not to the older checked-out reference. No runtime equivalence i
   with a second unrelated comment system.
 - Implement PR/session association, review sources and operations, refresh streams, and composed
   progress/failure outcomes through contracts, server, mutations and reachable panels.
+- Reopened 2026-09-24: pinned `apps/web/src/pullRequestReference.ts` parses PR references
+  (URLs, `#123`, forge-specific checkout forms) for `PullRequestThreadDialog.tsx` and
+  `LinkPullRequestDialog.tsx`. The earlier `adjacent-pull-request-reference` rejection assumed no
+  start-from-PR flow; this group plans that flow, so the parser belongs here.
 - Acceptance: PR create reuses an existing PR; partial commit/push failure never reports full
   success; a PR opens a correctly scoped session/worktree; comments, viewed state and review
-  survive refresh; external changes invalidate the appropriate queries. Mock forge I/O only.
+  survive refresh; external changes invalidate the appropriate queries. A pasted PR URL or
+  reference opens the same session flow. Mock forge I/O only.
 
 ### EXT-03: Add clone and repository publication workflows
 
@@ -186,6 +194,10 @@ to that commit, not to the older checked-out reference. No runtime equivalence i
 - Upstream tree contains `apps/mobile`, `apps/desktop`, `native` and release packaging.
   `packages/contracts/src/ipc.ts:77` onward includes update status, architecture/channel and
   capture support; `desktopAppActivation.ts`, `desktopBootstrap.ts` and `device.ts` add host APIs.
+- Desktop capture includes SnapShots (`apps/desktop/src/snapShot/`, `docs/user/snap-shot.md`,
+  present at the pin): a global shortcut captures the focused window with app name, title and,
+  where available, accessibility data into the current draft; off by default; macOS, Windows and
+  Linux on Wayland. Recorded by the [2026-09-24 delta](delta-2026-09-24.md).
 - Platform has an Electrobun desktop host, a native Mac editor experiment and a TUI; there is no
   `apps/mobile` package. `apps/desktop/src/shared/rpc.ts:8-24` exposes only `pickEntry` through
   this bridge. Do not infer that every desktop integration is missing solely from that bridge.
@@ -274,6 +286,91 @@ logsAfterDays|browserArtifactsAfterDays|worktreeOnDelete` across server/contract
 - Acceptance: existing, absent, auth-expired, rate-limited, timeout, malformed JSON and network
   failure are distinct; only absent permits create. Failed lookup performs no remote write.
   Extend `apps/server/src/git/tests/push-and-pull-request.test.ts` with injected CLI boundary.
+
+### EXT-14: Keep the default-branch checkout current by fast-forward pull
+
+- Priority P2; confidence HIGH; effort S/M; risk MED, an unattended write to a checkout.
+- Missed at pin; see [delta record](delta-2026-09-24.md). Pinned `docs/user/project-settings.md:93`
+  ("Keep the default branch current"): an environment default plus per-project override
+  (`packages/contracts/src/orchestration.ts:532,850,1081` `autoPull`, `decider.ts:318`) makes the
+  server pull the default-branch checkout only when it can fast-forward and the checkout has no
+  changed, untracked or local-commit work. It skips other branches and checkouts without an
+  upstream. Executor: `apps/server/src/vcs/VcsStatusBroadcaster.ts:152,222,420`.
+- Local: a bounded search for `autoPull|fast-forward|ff-only` across `apps/server/src` and
+  `packages/contracts/src` found nothing. New worktrees therefore branch from whatever the
+  checkout last fetched.
+- Implement as a registry setting (machine default, project override) consumed by the git
+  status owner; run `git pull --ff-only` only after a fresh clean-status read, and publish the
+  skip reason. Scope is `machine` or `application`: it writes to the filesystem and the network.
+- Acceptance: clean default branch fast-forwards; dirty, untracked, ahead, diverged, detached,
+  other-branch and no-upstream checkouts are skipped with a visible reason and no write; a pull
+  failure never leaves a partial merge. Real temporary repositories with a local bare remote.
+
+### EXT-15: Choose how new worktrees initialize submodules
+
+- Priority P3; confidence HIGH; effort S; risk LOW.
+- Post-pin (`0141bc2b`, `1262d2f3`); cited at `9383f4ad`. Upstream
+  `packages/contracts/src/environment.ts:63` defines the mode (recursive by default, top level,
+  or none), `packages/contracts/src/t3ProjectFile.ts:93` lets `t3.json` limit or disable it, and
+  `apps/server/src/vcs/GitVcsDriverCore.ts` applies it when creating a worktree.
+- Local `apps/server/src/git/worktrees.ts:202` runs `git worktree add` with no submodule step,
+  so a repository with submodules gets an unpopulated worktree. `submodule` appears locally only
+  in diff classification (`apps/server/src/git/history-format.ts:128`).
+- Implement the setting with a project override, applied after `worktree add`; a failed
+  submodule init reports failure without deleting the created worktree.
+- Acceptance: recursive, top-level and none each produce the expected tree on a fixture with a
+  nested submodule; the project override wins; failure is reported and retryable.
+
+### EXT-16: Balance new sessions across connected machines
+
+- Priority P3; confidence HIGH for the upstream feature; effort M; risk MED.
+- Missed at pin; see [delta record](delta-2026-09-24.md). Pinned `docs/user/remote-access.md:65`
+  ("Balance new threads across machines"): off by default; per-machine Prefer, Normal, Less
+  often and Manual only; the composer picks an eligible machine by CPU and memory, then keeps
+  that choice stable for the draft. Code: `apps/web/src/components/settings/LoadBalancingSettings.tsx`,
+  `components/chat/useAutoBalanceUpdateBanner.tsx`, `composerDraftStore.ts`.
+- Local connected machines exist (`environments.machines` setting, federated environments), but
+  a bounded search for `balanc` found no machine selection policy.
+- Depends on EXT-08 and LIFE-08/09 for multi-environment project groups. Preferences are
+  per client upstream; decide the local settings scope before registering them.
+- Acceptance: with two machines, auto balance picks the one with capacity and keeps it for the
+  draft; Manual only is never chosen; choosing a branch or worktree pins the machine; resource
+  checks failing asks the user to choose.
+
+### EXT-17: Show a usage page with estimated cost and editable model prices
+
+- Priority P2; confidence HIGH; effort M; risk LOW.
+- Missed at pin; reopens the `adjacent-usage-analytics` rejection. See [delta record](delta-2026-09-24.md).
+  Pinned `apps/web/src/routes/usage.tsx` and `docs/user/usage.md` show token use, cache
+  savings, per-model breakdown and estimated API-equivalent cost per environment, built by
+  scanning session history; users add or edit model prices, which answers the old "pricing
+  tables go stale" objection. Post-pin `b954af60` adds model-ordering coverage.
+- Local: `apps/web/src/features/chat/components/context-usage-ring.tsx` shows context occupancy
+  only; RUNTIME-08 and INTERACTION-07 cover quota windows, not historical usage.
+- **Implementation is owned by Plan 141 (usage and rate limits).** This row keeps the upstream
+  acceptance cases so parity is still judged here; do not build a second usage pipeline.
+- Acceptance: tokens, cache savings and cost per model and per environment match a fixture
+  history; a new model without a price shows no cost rather than a wrong one; an edited price
+  recomputes; refresh rescans recent sessions.
+
+### EXT-18: Follow worktree branch drift so the session's branch stays true
+
+- Priority P3; confidence MED for local impact; effort S/M; risk MED.
+- Missed at pin; reopens the `git-branch-drift-follow` rejection, whose own condition ("revisit
+  if PR affordances land") is met. Pinned `apps/server/src/orchestration/Layers/CheckpointReactor.ts:530,570–632`
+  (`followWorktreeBranchDrift`): when a `git checkout` inside a thread's dedicated worktree
+  changes the branch, the server adopts the checked-out branch as the thread's branch, only when
+  the worktree belongs to that thread alone.
+- Local: the session branch is recorded at worktree preparation
+  (`apps/server/src/orchestration/worktree-command-preparation.ts`) and not refreshed from HEAD.
+  The stage-header PR actions read the live checkout (`stage-header.tsx:41–48`), so the orphaned-PR
+  symptom upstream describes does not occur there; the stale recorded branch still feeds the rail,
+  gating and LIFE-14's badge. Runtime impact is unverified.
+- Implement as a worktree-status observation that updates a dedicated worktree's session branch;
+  shared checkouts keep strict matching.
+- Acceptance: an agent's `git checkout -b` in a dedicated worktree updates the session branch and
+  its PR state; the same checkout in a shared worktree changes nothing; a concurrent explicit
+  branch change wins over a stale drift update.
 
 ## Second pass: corrections and remaining scope
 

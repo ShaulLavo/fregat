@@ -621,6 +621,96 @@
       "evidence_level": "source-reviewed",
       "acceptance": "adjacent.md, EXT-09, Acceptance / verification",
       "execution_evidence": []
+    },
+    {
+      "id": "LIFE-13",
+      "title": "P2: Offer Undo for settle, snooze, archive and unpin, with a mod+z binding",
+      "report": "lifecycle.md",
+      "wave": "2",
+      "status": "open",
+      "evidence_level": "source-reviewed",
+      "acceptance": "lifecycle.md, LIFE-13, Acceptance / verification",
+      "execution_evidence": []
+    },
+    {
+      "id": "LIFE-14",
+      "title": "P2: Show linked pull-request state on sidebar rows with background sync",
+      "report": "lifecycle.md",
+      "wave": "2",
+      "status": "open",
+      "evidence_level": "source-reviewed",
+      "acceptance": "lifecycle.md, LIFE-14, Acceptance / verification",
+      "execution_evidence": []
+    },
+    {
+      "id": "INTERACTION-13",
+      "title": "Start a session in the background from a new draft",
+      "report": "interaction.md",
+      "wave": "3",
+      "status": "open",
+      "evidence_level": "source-reviewed",
+      "acceptance": "interaction.md, INTERACTION-13, Acceptance / verification",
+      "execution_evidence": []
+    },
+    {
+      "id": "INTERACTION-14",
+      "title": "Pin favorite models in the model picker",
+      "report": "interaction.md",
+      "wave": "4",
+      "status": "open",
+      "evidence_level": "source-reviewed",
+      "acceptance": "interaction.md, INTERACTION-14, Acceptance / verification",
+      "execution_evidence": []
+    },
+    {
+      "id": "EXT-14",
+      "title": "Keep the default-branch checkout current by fast-forward pull",
+      "report": "adjacent.md",
+      "wave": "5",
+      "status": "open",
+      "evidence_level": "source-reviewed",
+      "acceptance": "adjacent.md, EXT-14, Acceptance / verification",
+      "execution_evidence": []
+    },
+    {
+      "id": "EXT-15",
+      "title": "Choose how new worktrees initialize submodules",
+      "report": "adjacent.md",
+      "wave": "5",
+      "status": "open",
+      "evidence_level": "source-reviewed",
+      "acceptance": "adjacent.md, EXT-15, Acceptance / verification",
+      "execution_evidence": []
+    },
+    {
+      "id": "EXT-16",
+      "title": "Balance new sessions across connected machines",
+      "report": "adjacent.md",
+      "wave": "6",
+      "status": "open",
+      "evidence_level": "source-reviewed",
+      "acceptance": "adjacent.md, EXT-16, Acceptance / verification",
+      "execution_evidence": []
+    },
+    {
+      "id": "EXT-17",
+      "title": "Show a usage page with estimated cost and editable model prices",
+      "report": "adjacent.md",
+      "wave": "4",
+      "status": "open",
+      "evidence_level": "source-reviewed",
+      "acceptance": "adjacent.md, EXT-17, Acceptance / verification",
+      "execution_evidence": []
+    },
+    {
+      "id": "EXT-18",
+      "title": "Follow worktree branch drift so the session's branch stays true",
+      "report": "adjacent.md",
+      "wave": "5",
+      "status": "open",
+      "evidence_level": "source-reviewed",
+      "acceptance": "adjacent.md, EXT-18, Acceptance / verification",
+      "execution_evidence": []
     }
   ]
 }

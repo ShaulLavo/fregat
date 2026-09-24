@@ -1,6 +1,6 @@
 # Lifecycle, sidebar, and navigation alignment
 
-Compared Platform `3c9b88c35784e571e706600b0cee8e95a2656f77` with T3 Code `7445aa733ada33e45289e5aa5055f79142556513` on 2026-09-20. Upstream citations below refer to that Git object, **not** the older reference checkout. Read the audit protocol and audit-playbook correctness, coverage, architecture, and finding-format sections before auditing. This is a source audit; no application code, tests, live sessions, or deployment were changed.
+Compared Platform `3c9b88c35784e571e706600b0cee8e95a2656f77` with T3 Code `7445aa733ada33e45289e5aa5055f79142556513` on 2026-09-20. Upstream citations below refer to that Git object, **not** the older reference checkout. Read the audit protocol and audit-playbook correctness, coverage, architecture, and finding-format sections before auditing. This is a source audit; no application code, tests, live sessions, or deployment were changed. LIFE-13/14 were added from the [2026-09-24 upstream delta](delta-2026-09-24.md).
 
 ## Coverage
 
@@ -15,6 +15,7 @@ Compared Platform `3c9b88c35784e571e706600b0cee8e95a2656f77` with T3 Code `7445a
 | Project grouping and ownership                        | Repository merging exists, but grouping choices/member references missing              | LIFE-09                   |
 | Delete and bulk failures                              | Durable provider cleanup exists; selection/navigation/cleanup UX differs               | LIFE-10, 12               |
 | Titles, common row/header actions, recoverable drafts | Rename works; regeneration and several upstream affordances absent                     | LIFE-11, 12               |
+| Lifecycle Undo, PR state on rows (2026-09-24 delta)   | Snooze Undo only; PR state only in the stage header                                    | LIFE-13, 14               |
 | Native/mobile parity                                  | Upstream shares lifecycle helpers with mobile; local native consumers not audited here | Explicit open scope below |
 
 Priority meanings: P0 blocks the reported archive fix; P1 is a substantial behavioral mismatch; P2 is a smaller but confirmed parity gap. Effort includes tests: S hours, M roughly a day, L multiple days. Estimates overlap and must not be summed blindly.
@@ -166,6 +167,30 @@ LIFE-01/02 implementation shipped on 2026-09-20; [delivery evidence](archive-del
 - **Dependencies:** Draft/composer track; worktree and settings track; LIFE-10 successful-deletion set.
 - **Acceptance:** Copy values match owner paths/IDs; project settings targets owner; leave a draft containing text or attachments and recover it from rail after reload; deleting last managed-worktree session offers correct cleanup, but surviving/archived references prevent removal. Shared worktree shells remain alive; truly session-owned terminal/process state is released and cleanup failure is visible.
 - **Verification:** Extend menu tests, draft persistence tests, and `components/tests/worktree-cleanup-eligibility.test.tsx`; add deletion/draft browser scenario. Real in-process cleanup test must assert filesystem and provider state, not only dispatched action names.
+
+### LIFE-13 — P2: Offer Undo for settle, snooze, archive and unpin, with a mod+z binding
+
+- **Status/confidence:** Confirmed gap, HIGH. Post-pin delta (`5781b524`, `6b0a04ad`, `9a609a4e`); cited at `9383f4ad`. See [delta record](delta-2026-09-24.md).
+- **Evidence:** Upstream `docs/user/thread-sidebar.md:31–36` gives each of unpin, settle, snooze and archive a five-second Undo that restores the previous state, including pinned position, and reopens an archived thread the user was viewing. `mod+z` triggers the most recent Undo when no text field is focused. Code: `apps/web/src/hooks/useThreadActions.ts`, `showUndoToast.ts`, `components/sidebar/SidebarThreadUndoNotice.tsx`, `keybindings.ts`; tests in `useThreadActions.undo.test.ts`. Local `apps/web/src/features/chat-mode/hooks/use-session-actions.ts:74–86` offers Undo only after a successful snooze. A bounded search for `undo` under `apps/web/src/features/chat-mode` and `mod+z` in `apps/web/src/keymap/default-bindings.ts` found no other lifecycle undo or binding.
+- **Impact:** A mistaken settle, archive or unpin needs a manual reverse action and loses the pinned position. Bulk actions carry that risk across many rows.
+- **Effort/risk:** S–M / MED: exact restoration of pin order and archived navigation, and a `mod+z` that never steals undo from the editor, composer, terminal or file tree.
+- **Fix sketch:** Capture each row's previous lifecycle fields at dispatch and offer one inverse command that restores them exactly. Keep a single "latest undo" slot.
+- **Implementation:** Record pin order, settle override, snooze deadline and archive state before the mutation; Undo dispatches the inverse through the same lifecycle mutation and settles the rail query. Register the `mod+z` command in `keymap/` with a when-context that excludes text surfaces, editors, terminals and the file tree, whose undo belongs to Plan 136.
+- **Dependencies:** LIFE-03/04/05 for the settle, pin and order state being restored. Extends LIFE-04's bulk-snooze Undo.
+- **Acceptance:** Each action's Undo within five seconds restores identical state, including pin position; archiving the viewed session then Undo reopens it. `mod+z` with focus outside text fields undoes the latest action; inside the composer, editor, terminal or tree it performs that surface's own undo. After the notice expires, `mod+z` does nothing here. Bulk actions restore only the rows that succeeded.
+- **Verification:** DOM tests over `use-session-actions` and the keymap when-context; a live scenario that settles, archives and unpins, then undoes each by button and by `mod+z`.
+
+### LIFE-14 — P2: Show linked pull-request state on sidebar rows with background sync
+
+- **Status/confidence:** Confirmed gap, HIGH. Missed at pin; refined after it (`9f0c9f72`, `18de6bb3`). See [delta record](delta-2026-09-24.md).
+- **Evidence:** Pinned `apps/web/src/components/Sidebar.tsx` renders `ThreadPullRequestBadgeControl` on rows, fed by `apps/server/src/orchestration/PullRequestSyncReactor.ts`. At `9383f4ad` the row reuses current PR status (`Sidebar.tsx:1499`) and the reactor reads summaries in batches. Local PR state appears only in the stage header through `BranchActions` (`apps/web/src/features/chat-mode/components/stage-header.tsx:41–48`), read live from the worktree; bounded search of `features/chat-mode` for `pullRequest|PullRequest` found no row consumer.
+- **Impact:** A user cannot see which sessions have an open, merged or failing PR without opening each one.
+- **Effort/risk:** M / MED: a background sync that respects forge rate budgets and EXT-13's failure semantics.
+- **Fix sketch:** Server-owned PR summary per session worktree, refreshed in batches, projected onto the rail item; the row renders a compact badge.
+- **Implementation:** Reuse `apps/server/src/git/pull-request.ts` lookups with EXT-13's distinct not-found and failure outcomes. Batch refresh per repository, publish through the existing shell projection, and render the badge in the row's status column with the PR title as its recovery `title`. Do not add a per-row query.
+- **Dependencies:** EXT-13 first; EXT-18 so the badge follows the checked-out branch; EXT-02 for richer PR state.
+- **Acceptance:** Open, draft, merged and closed PRs show distinct badges; a lookup failure shows unknown, never "no PR". One refresh round covers every visible row of a repository. Rate-limited sync backs off without clearing known state.
+- **Verification:** Server test with an injected `gh` boundary for batching and failure cases; `session-rail` DOM test; live scenario with a real temporary repository and a mocked forge.
 
 ## Second pass: negative paths and corrections
 

@@ -10,6 +10,8 @@ Priority: P0 for the archive defect and conformance foundation; execute the rema
 the dependency order below. Overall effort is large and spans multiple deliveries. No honest
 date estimate is possible before provider/platform prerequisites and live comparison are measured.
 
+A 2026-09-24 upstream delta audit against `9383f4ad` added nine groups (57 in total) and reopened four stale non-parity rejections. The acceptance baseline stays pinned; see [the delta record](126-t3code-alignment/delta-2026-09-24.md).
+
 The user resumed all parity work on 2026-09-23, including providers, remote access, browser/device tools, mobile, desktop and distribution. The previous stop applied to the 2026-09-20 run only. See [the resumed execution record](126-t3code-alignment/resumed-execution.md) for the first batch and [the historical wrap-up](126-t3code-alignment/wrap-up.md) for completed deliveries and their limits.
 
 ## Authority and completion rule
@@ -41,17 +43,18 @@ a local test intentionally enforces behavior that upstream does not have.
 
 ## Readable audit and machine-readable records
 
-| Artifact                                                 | Purpose                                                                                                                                                      |
-| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| [Lifecycle](126-t3code-alignment/lifecycle.md)           | 12 groups: archive, shelf placement, settle/snooze/pins, ordering, unread, search, grouping, navigation, titles and cleanup UI                               |
-| [Interaction](126-t3code-alignment/interaction.md)       | 12 groups: queued sends, files/drafts/stash, questions, rewind, compaction, quotas, model fan-out, context, artifacts, editing and workflows                 |
-| [Runtime](126-t3code-alignment/runtime.md)               | 11 groups: safe rewind, native approval replies, stream bounds, providers, capabilities, compaction, liveness, usage, delivery and maintenance               |
-| [Adjacent product](126-t3code-alignment/adjacent.md)     | 13 groups: forges/PRs, clone/publish, setup, terminals, notifications, preview/devices, remote, clients/releases, background policy, cleanup and conformance |
-| [Finding ledger](126-t3code-alignment/ledger.json)       | IDs, delivery wave, source evidence level, open status and execution-evidence slots                                                                          |
-| [Contract coverage](126-t3code-alignment/coverage.json)  | Every one of 47 upstream contract modules assigned to work; assignment is not symbol-level verification                                                      |
-| [Pinned census](126-t3code-alignment/inventory.json)     | 146 RPC names, orchestration discriminants, contract exports/content hashes and upstream app inventory                                                       |
-| [Census/plan checker](126-t3code-alignment/inventory.py) | Reproducible baseline and ledger validation; does not claim behavioral equivalence                                                                           |
-| [Audit protocol](126-t3code-alignment/audit-protocol.md) | Shared evidence and review method                                                                                                                            |
+| Artifact                                                     | Purpose                                                                                                                                                                                                                                 |
+| ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Lifecycle](126-t3code-alignment/lifecycle.md)               | 14 groups: archive, shelf placement, settle/snooze/pins, ordering, unread, search, grouping, navigation, titles, cleanup UI, Undo and row PR state                                                                                      |
+| [Interaction](126-t3code-alignment/interaction.md)           | 14 groups: queued sends, files/drafts/stash, questions, rewind, compaction, quotas, model fan-out, context, artifacts, editing, workflows, background start and favorites                                                               |
+| [Runtime](126-t3code-alignment/runtime.md)                   | 11 groups: safe rewind, native approval replies, stream bounds, providers, capabilities, compaction, liveness, usage, delivery and maintenance                                                                                          |
+| [Adjacent product](126-t3code-alignment/adjacent.md)         | 18 groups: forges/PRs, clone/publish, setup, terminals, notifications, preview/devices, remote, clients/releases, background policy, cleanup, conformance, default-branch pull, submodules, load balancing, usage page and branch drift |
+| [Finding ledger](126-t3code-alignment/ledger.json)           | IDs, delivery wave, source evidence level, open status and execution-evidence slots                                                                                                                                                     |
+| [Contract coverage](126-t3code-alignment/coverage.json)      | Every one of 47 upstream contract modules assigned to work; assignment is not symbol-level verification                                                                                                                                 |
+| [Pinned census](126-t3code-alignment/inventory.json)         | 146 RPC names, orchestration discriminants, contract exports/content hashes and upstream app inventory                                                                                                                                  |
+| [Census/plan checker](126-t3code-alignment/inventory.py)     | Reproducible baseline and ledger validation; does not claim behavioral equivalence                                                                                                                                                      |
+| [Audit protocol](126-t3code-alignment/audit-protocol.md)     | Shared evidence and review method                                                                                                                                                                                                       |
+| [2026-09-24 delta](126-t3code-alignment/delta-2026-09-24.md) | Upstream `9383f4ad` delta: new groups, items folded into existing groups, reopened rejections                                                                                                                                           |
 
 Each finding report contains the exact local/upstream source anchors, impact, confidence,
 effort/risk, change boundaries and acceptance cases. They are executable appendices to this
@@ -189,7 +192,7 @@ writer per shared file and sequence contract changes; do not race unrelated agen
 
 ## Wave 2: Restore sidebar lifecycle and navigation behavior
 
-Owners LIFE-03/04/05/07/08/09/10/11/12 and EXT-06. LIFE-04's message-mode settle case depends on
+Owners LIFE-03/04/05/07/08/09/10/11/12/13/14 and EXT-06. LIFE-04's message-mode settle case depends on
 the async-question core from INTERACTION-04; pull that core forward rather than making a false
 completed settlement claim. LIFE-11's title-generation provider choice must be traced before
 implementation, and uses the catalog work in Wave 4.
@@ -224,7 +227,7 @@ has a working domain action and persistence path, then a live browser scenario w
 
 ## Wave 3: Preserve whole user intent through the composer
 
-Owners INTERACTION-01/02/03/04/09/10/11. Deliver shared payload ownership before adding UI copies.
+Owners INTERACTION-01/02/03/04/09/10/11/13. Deliver shared payload ownership before adding UI copies.
 
 1. Define a complete composed-message value: text, images/files, typed source records and captured
    draft/environment identity. Migrate send, queue, stash, restore and rewind callers together.
@@ -253,7 +256,7 @@ different content. General file support remains provider-capability-aware.
 
 ## Wave 4: Match provider and agent capabilities
 
-Owners RUNTIME-02/05/06/07/08/09/10 and INTERACTION-06/07/08/12.
+Owners RUNTIME-02/05/06/07/08/09/10, INTERACTION-06/07/08/12/14 and EXT-17.
 
 1. Port advertised typed model option descriptors and exact selected IDs/defaults; remove the
    hardcoded fast boolean API and migrate callers. Existing Claude context support stays.
@@ -283,7 +286,7 @@ every generic capability supported because the contract permits it.
 
 ## Wave 5: Complete repository, setup, terminal and background workflows
 
-Owners LIFE-06, EXT-01/02/03/04/05/10/12. EXT-13 ships earlier.
+Owners LIFE-06, EXT-01/02/03/04/05/10/12/14/15/18. EXT-13 ships earlier.
 
 1. Implement five forge providers with exact capability/support/error outcomes, then PR review,
    linked sessions, composed commit/push/PR progress, PR-based sessions and refresh invalidation.
@@ -311,7 +314,7 @@ cleanup rule is off until its upstream opt-in setting authorizes it, with tested
 
 ## Wave 6: Close the larger platform gap
 
-Owners EXT-07/08/09. These remain visible work, not an exception list.
+Owners EXT-07/08/09/16. These remain visible work, not an exception list.
 
 - Integrated browser preview/profile/navigation, capture/annotations/recording, device tools,
   browser/device automation and host failure recovery. Share composer context with Wave 3.
@@ -327,6 +330,23 @@ adapter. Then implement complete vertical paths with unavailable/permission-deni
 cases. Publish separate executable subplans if these boundaries cannot fit one reviewable unit.
 They may not be marked “done” from web screenshots or mock host responses. Plan 087/088 own related
 native MCP infrastructure; reuse that ownership while making every upstream operation explicit.
+
+## Related plans from the 2026-09-24 survey
+
+Plans 138–145 came from the same survey of T3 Code and other agent tools. Where one overlaps a
+group here, this plan keeps the upstream acceptance cases and the other plan owns the
+implementation or a Platform-specific extension. Implement once, then close both.
+
+| Plan                                                                 | Overlapping groups                     | Split                                                                |
+| -------------------------------------------------------------------- | -------------------------------------- | -------------------------------------------------------------------- |
+| [138 — Claude models from the CLI](138-claude-model-discovery.md)    | RUNTIME-06, RUNTIME-10, INTERACTION-14 | 138 owns the Claude catalog, binary and reported version             |
+| [139 — acting on the agent's diff](139-acting-on-agent-diffs.md)     | INTERACTION-09, EXT-02                 | 139 owns hunk keep/undo and review; review sources stay here         |
+| [140 — the editor as agent advantage](140-editor-agent-advantage.md) | INTERACTION-09                         | 140 owns editor-to-agent context; assistant citation stays here      |
+| [141 — usage and rate limits](141-usage-and-rate-limits.md)          | RUNTIME-08, INTERACTION-07, EXT-17     | 141 implements quota surfaces and the usage page                     |
+| [142 — web push notifications](142-web-push.md)                      | EXT-06                                 | 142 owns delivery to a closed tab or phone; policy stays here        |
+| [143 — phone layout](143-phone-layout.md)                            | EXT-09, INTERACTION-11 mobile Enter    | 143 owns the responsive layout discussion; the mobile app is EXT-09  |
+| [144 — unattended agent work](144-unattended-agent-work.md)          | INTERACTION-12, EXT-10                 | 144 owns scheduling and loops; workflow inspection stays here        |
+| [145 — harness controls](145-harness-controls.md)                    | RUNTIME-05, INTERACTION-06, RUNTIME-03 | 145 owns surfacing native CLI controls; upstream semantics stay here |
 
 ## Pinned default and policy table
 

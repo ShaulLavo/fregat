@@ -459,6 +459,40 @@ Plan 134 also owns the dirty-buffer safety verification raised by Plan 133 D1. R
 with the existing conflict implementation before adding any new conflict machinery. Coordinate
 backend lifetime changes with Plan 132. This work is independent of the AI diagnostic action plan.
 
+## Agent workbench lane
+
+Requested 2026-09-24. A survey of every reference clone (T3 Code, t1code, OpenCode, Crush, Codex,
+Paseo, Orca, herdr, VS Code's agent host, NeuralInverse, Void, Anubis, pstack, Serena, streamdown)
+asked which large agent features Platform lacks. The owner grouped the answers into the plans below.
+Research plans do enough research to be correct, then their research phase rewrites their own
+phases or splits them into executable plans; not all research happens up front.
+
+| Plan                                       | Kind                     | Owns                                                                                                                        |
+| ------------------------------------------ | ------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
+| [138](plans/138-claude-model-discovery.md) | executable               | Claude models from the Claude CLI; chat runs the installed CLI                                                              |
+| [139](plans/139-acting-on-agent-diffs.md)  | research                 | Keep or undo agent edits per hunk, batched diff comments to the agent, review mode, second-model review, plan line feedback |
+| [140](plans/140-editor-agent-advantage.md) | research                 | Editor context into chat, fix with AI, diagnostics fed back to the agent                                                    |
+| [141](plans/141-usage-and-rate-limits.md)  | executable               | Rate-limit meter, usage page with cost, usage history                                                                       |
+| [142](plans/142-web-push.md)               | executable after a spike | Web Push from the mesh server                                                                                               |
+| [143](plans/143-phone-layout.md)           | discussion               | What the phone is for; web layout versus the later companion app                                                            |
+| [144](plans/144-unattended-agent-work.md)  | research                 | Scheduled, looping and multi-agent work: surface what the harnesses already do, build only the rest                         |
+| [145](plans/145-harness-controls.md)       | small executable plans   | Fork, approval rules, MCP status, background tasks, hooks, custom agents, compact, export                                   |
+
+[Plan 126](plans/126-t3code-alignment.md) also gained the T3 features shipped after its
+2026-09-19 audit, and four reopened non-parity decisions.
+
+Suggested order:
+
+1. Plan 138 Phase 1. A released model is unreachable today, and the fix is a dependency bump.
+2. Quick wins, batched so one `--server` restart covers them: Plan 141 Phase 1, the small
+   Plan 145 plans, and the small new Plan 126 rows.
+3. Plan 142 after its spike. It needs only a minimal web app manifest, not Plan 143.
+4. The research phases of Plans 139 and 140. Plan 140's diagnostics work waits on Plans 087 and
+   088; its editor-to-chat work does not.
+5. Plan 144's capability inventory. It decides how much of that lane is built rather than surfaced.
+6. Plan 143 is a conversation with the owner first. Nothing is implemented until its direction is
+   approved.
+
 ## Verification boundaries
 
 - **Platform-only:** verify the narrow Platform tests/typechecks named by the active plan.

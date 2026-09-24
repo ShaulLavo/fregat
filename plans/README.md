@@ -19,6 +19,15 @@ a bare root `bun run verify`.
 
 | Plan                                                                                    | State                                                        |
 | --------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| [145 — harness controls](145-harness-controls.md)                                       | **PROPOSED — EIGHT SMALL PLANS**                             |
+| [144 — unattended agent work](144-unattended-agent-work.md)                             | **RESEARCH — HARNESS INVENTORY FIRST**                       |
+| [143 — phone layout](143-phone-layout.md)                                               | **DISCUSSION — OWNER DIRECTION FIRST**                       |
+| [142 — web push](142-web-push.md)                                                       | **PROPOSED — SPIKE FIRST**                                   |
+| [141 — usage and rate limits](141-usage-and-rate-limits.md)                             | **PROPOSED — PHASE 1 READY**                                 |
+| [140 — the editor as the agent's advantage](140-editor-agent-advantage.md)              | **RESEARCH — RESEARCH PHASE FIRST**                          |
+| [139 — acting on agent diffs](139-acting-on-agent-diffs.md)                             | **RESEARCH — RESEARCH PHASE FIRST**                          |
+| [138 — Claude models from the CLI](138-claude-model-discovery.md)                       | **PROPOSED — D1–D4 DECIDED; PHASE 1 READY**                  |
+| [137 — shared workspace interactions](137-shared-workspace-interactions.md)             | **IMPLEMENTED 2026-09-24 — ALL SEVEN PHASES DEPLOYED**       |
 | [136 — file tree undo and redo](136-file-tree-undo.md)                                  | **IMPLEMENTED — ALL THREE PHASES; SCENARIO GREEN**           |
 | [135 — TanStack async ownership and route preparation](135-tanstack-async-ownership.md) | **PROPOSED — RESEARCH COMPLETE; IMPLEMENTATION NOT STARTED** |
 | [134 — external edits and LSP freshness](134-external-edit-and-lsp-freshness.md)        | **PROPOSED — REPRODUCE AND TRACE FIRST**                     |

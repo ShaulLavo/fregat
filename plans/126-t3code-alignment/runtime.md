@@ -116,6 +116,7 @@ Upstream paths shortened to `provider/…` or `orchestration/…` in tables mean
 - **Implementation boundary:** Provider usage snapshot/refresh and account-keyed redemption service → contracts/route/mutation → interaction usage UI. Preserve account identity distinct from instance ID: instances sharing a credential home must share redemption serialization and pending idempotency. Do not put credentials into snapshots or logs.
 - **Dependencies:** Interaction usage surfaces; provider instance identity already exists.
 - **Acceptance / tests:** Account windows update after provider events and explicit refresh. Two instances for one account cannot consume twice concurrently; retry reuses the unresolved idempotency key. Disabled/unsupported instance cannot redeem. Refresh failure does not claim confirmed new limits. Use third-party/native boundary fixtures; no real credit consumption during automated verification.
+- **Related plan:** Plan 141 (usage and rate limits) implements the quota surfaces and the usage page (EXT-17). This group keeps the upstream acceptance cases.
 - **Bounded search:** `usageLimits`, `consumeResetCredit`, `rateLimitReset`, `rateLimits` across local provider/contracts/chat-mode/client-core; only event emission/normalization exists, not the action/snapshot workflow.
 
 ### RUNTIME-09 — Match response delivery modes and paragraph default
@@ -137,6 +138,7 @@ Upstream paths shortened to `provider/…` or `orchestration/…` in tables mean
 - **Implementation boundary:** Add driver-declared maintenance operation, instance/environment routing, serialized runner, bounded process/output lifecycle, snapshot progress and UI action. Follow pinned provider-specific supported/manual-only distinctions. Keep binary/package payloads and caches on configured data storage; do not install anything as part of this audit.
 - **Dependencies:** Root settings/notifications audit; provider registry and production instance ownership.
 - **Acceptance / tests:** Supported instance advertises update and executes its declared command once; unsupported/manual-only remains informative. Two requests serialize and observe shared state. Failure retains usable provider details; completion verifies installed version and refreshes catalog. Updating one environment never acts on another's binary.
+- **2026-09-24 delta:** Post-pin `96c4bfa0` checks each harness's installed version against remote compatibility ranges (supported, graceful, unsupported) and `7e65b226` shares sign-in flows and credential bindings across instances. Version verification stays in this group. Plan 138 owns which Claude binary runs and the version the snapshot reports; do not build a second version probe. See [delta record](delta-2026-09-24.md).
 - **Bounded search:** `maintenance`, `updateProvider`, `providerUpdate`, `installProvider`, `latestVersion` in local provider/settings/contracts/settings UI found no production maintenance route. This does not claim every upstream provider supports one-click install.
 
 ## Matched or rejected first-pass claims

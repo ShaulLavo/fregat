@@ -100,7 +100,8 @@
         "LIFE-11",
         "LIFE-12",
         "RUNTIME-01",
-        "RUNTIME-04"
+        "RUNTIME-04",
+        "EXT-14"
       ],
       "review_state": "domain-assigned; symbol-by-symbol behavioral replay still required"
     },
