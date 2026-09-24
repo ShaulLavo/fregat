@@ -1,6 +1,12 @@
 import type { Page } from 'playwright'
 import type { Scenario } from './index'
-import { focusEditor, openFileByName, selectors, waitForApp } from '../selectors'
+import {
+  EDITOR_ROW_LAYERS,
+  focusEditor,
+  focusedEditorTextBeforeCaret,
+  openFileByName,
+  waitForApp,
+} from '../selectors'
 
 // An important root rule outlives the inline `--font-mono` the appearance layer writes at boot.
 const OVERRIDE_ID = 'agent-proportional-font'
@@ -14,11 +20,10 @@ type Miss = { readonly column: number; readonly caretPrefix: string }
  * with the row's text up to that column.
  */
 async function clickColumns(page: Page) {
-  const points = await page.evaluate(() => {
-    const layers =
-      '.editor-virtualized-selection-layer,.editor-virtualized-hidden-character-layer,' +
-      '.editor-virtualized-fold-placeholder,.editor-virtualized-gutter-row'
-    for (const row of document.querySelectorAll<HTMLElement>('.editor-virtualized-row')) {
+  const points = await page.evaluate((layers) => {
+    for (const row of document.querySelectorAll<HTMLElement>(
+      '.editor-virtualized-row:not([hidden])',
+    )) {
       const walker = document.createTreeWalker(row, NodeFilter.SHOW_TEXT)
       const nodes: Text[] = []
       for (let node = walker.nextNode(); node; node = walker.nextNode()) {
@@ -44,16 +49,13 @@ async function clickColumns(page: Page) {
       return { text, columns }
     }
     return null
-  })
+  }, EDITOR_ROW_LAYERS)
   if (!points) throw new Error('No mounted row with 24 or more characters and no tab')
 
   const misses: Miss[] = []
   for (const { column, x, y } of points.columns) {
     await page.mouse.click(x, y)
-    const caretPrefix = await selectors
-      .editorInput(page)
-      .first()
-      .evaluate((input: HTMLTextAreaElement) => input.value.slice(0, input.selectionStart))
+    const caretPrefix = await page.evaluate(focusedEditorTextBeforeCaret)
     if (!caretPrefix.endsWith(points.text.slice(0, column)))
       misses.push({ column, caretPrefix: caretPrefix.slice(-column - 4) })
   }

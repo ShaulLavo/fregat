@@ -10,17 +10,24 @@ function settingsApi(page: Page) {
   return { base, headers: { origin: url.origin } }
 }
 
-export async function writeUserSetting(page: Page, key: string, value: unknown) {
+type SettingOperation =
+  | { readonly kind: 'set'; readonly key: string; readonly value: unknown }
+  | { readonly kind: 'reset'; readonly keys: readonly string[] }
+
+async function writeUserOperations(page: Page, operations: readonly SettingOperation[]) {
   const { base, headers } = settingsApi(page)
   const response = await page.request.post(`${base}settings/write`, {
     headers,
-    data: {
-      mutationId: crypto.randomUUID(),
-      target: 'user',
-      operations: [{ kind: 'set', key, value }],
-    },
+    data: { mutationId: crypto.randomUUID(), target: 'user', operations },
   })
-  strictEqual(response.ok(), true, `Write ${key}`)
+  const keys = operations.flatMap((operation) =>
+    operation.kind === 'set' ? [operation.key] : operation.keys,
+  )
+  strictEqual(response.ok(), true, `Write user settings ${keys.join(', ')}`)
+}
+
+export async function writeUserSetting(page: Page, key: string, value: unknown) {
+  await writeUserOperations(page, [{ kind: 'set', key, value }])
 }
 
 export async function preserveAppearance(page: Page, onlyKeys?: readonly string[]) {
@@ -44,15 +51,9 @@ export async function preserveAppearance(page: Page, onlyKeys?: readonly string[
     'workbench.surface.blur',
     'workbench.surface.saturation',
   ]
-  const operations = (onlyKeys ?? keys).map((key) => {
+  const operations = (onlyKeys ?? keys).map((key): SettingOperation => {
     const entry = Object.entries(raw).find(([name]) => name === key)
     return entry ? { kind: 'set', key, value: entry[1] } : { kind: 'reset', keys: [key] }
   })
-  return async () => {
-    const response = await page.request.post(`${base}settings/write`, {
-      headers,
-      data: { mutationId: crypto.randomUUID(), target: 'user', operations },
-    })
-    strictEqual(response.ok(), true, 'Restore original appearance settings')
-  }
+  return () => writeUserOperations(page, operations)
 }

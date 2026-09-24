@@ -254,7 +254,7 @@
       "type": "integer"
     },
     "editor.inputRoute": {
-      "default": "textarea",
+      "default": "edit-context",
       "description": "How typed text reaches the editor. EditContext (Chromium) receives IME, autocorrect and dictation edits with their exact ranges instead of reading them back out of a hidden textarea; other browsers always use the textarea.",
       "enum": ["edit-context", "textarea"],
       "type": "string"

@@ -827,22 +827,34 @@ export async function hoverTokenColor(page: Page, word: string): Promise<boolean
 }
 
 /** Rests the pointer on the first on-screen occurrence of the word, under `within`, until the hover shows. */
-export async function hoverWord(page: Page, word: string, within = 'body') {
+/**
+ * The centre of `part` where it first appears inside `context` on screen, under `within`. The
+ * context picks one occurrence of a word that appears on several lines.
+ */
+export async function textPoint(page: Page, context: string, part = context, within = 'body') {
   // A string: this package types without the DOM, and the callback runs in the page.
-  const point = (await page.evaluate(`((needle, root) => {
+  return (await page.evaluate(`((needle, part, root) => {
     const walker = document.createTreeWalker(document.querySelector(root) ?? document.body, NodeFilter.SHOW_TEXT)
     for (let node = walker.nextNode(); node; node = walker.nextNode()) {
       const index = node.textContent?.indexOf(needle) ?? -1
       if (index < 0) continue
+      const start = index + needle.indexOf(part)
       const range = document.createRange()
-      range.setStart(node, index)
-      range.setEnd(node, index + needle.length)
+      range.setStart(node, start)
+      range.setEnd(node, start + part.length)
       const rect = range.getBoundingClientRect()
       if (rect.width === 0) continue
       return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
     }
     throw new Error(needle + ' is not on screen')
-  })(${JSON.stringify(word)}, ${JSON.stringify(within)})`)) as { x: number; y: number }
+  })(${JSON.stringify(context)}, ${JSON.stringify(part)}, ${JSON.stringify(within)})`)) as {
+    x: number
+    y: number
+  }
+}
+
+export async function hoverWord(page: Page, word: string, within = 'body') {
+  const point = await textPoint(page, word, word, within)
   await page.mouse.move(point.x, point.y)
   await selectors.editorHover(page).waitFor({ state: 'visible', timeout: 8000 })
   await page.waitForTimeout(400)
@@ -862,4 +874,26 @@ export async function watchHoverPlainCode(page: Page) {
 
 export async function hoverShowedPlainCode(page: Page): Promise<boolean> {
   return (await page.evaluate('window.__hoverPlainCode')) as boolean
+}
+
+/** Layers an editor row draws beside its text; a row's text is what remains without them. */
+export const EDITOR_ROW_LAYERS =
+  '.editor-virtualized-selection-layer,.editor-virtualized-hidden-character-layer,' +
+  '.editor-virtualized-fold-placeholder,.editor-virtualized-gutter-row'
+
+/** Page-side: the window of text the focused editor input holds, textarea or EditContext host. */
+export function focusedEditorInputText(): string {
+  const input = document.activeElement as
+    | (HTMLElement & { value?: string; editContext?: { text: string } | null })
+    | null
+  return input?.editContext?.text ?? input?.value ?? ''
+}
+
+/** Page-side: the focused input's text before the caret, as a screen reader is shown it. */
+export function focusedEditorTextBeforeCaret(): string {
+  const input = document.activeElement
+  if (input instanceof HTMLTextAreaElement) return input.value.slice(0, input.selectionStart)
+  const selection = document.getSelection()
+  if (!input || selection?.anchorNode !== input.firstChild) return ''
+  return (input.textContent ?? '').slice(0, selection.anchorOffset)
 }

@@ -44,6 +44,8 @@ const MIRRORED_KEYS = [
   'editor.fontFamily',
   'editor.fontSize',
   'editor.lineHeight',
+  // Read once when an editor is built, which can be before the settings document arrives.
+  'editor.inputRoute',
   'editor.guides.indentation',
   'editor.minimap.enabled',
   'editor.retainedTextBudget',

@@ -470,7 +470,7 @@ export const SETTINGS_REGISTRY = {
   }),
   'editor.inputRoute': defineSetting({
     schema: v.picklist(['textarea', 'edit-context'] as const),
-    default: 'textarea',
+    default: 'edit-context',
     scope: 'application',
     widget: 'enum',
     category: 'Editor',
