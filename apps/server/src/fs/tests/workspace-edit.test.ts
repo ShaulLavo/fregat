@@ -1800,7 +1800,6 @@ async function createFixture(options: FixtureOptions = {}): Promise<WorkspaceEdi
   const service = new FileSystemService({
     metadataDatabasePath: ':memory:',
     watch: options.watch ?? false,
-    watchBackend: 'node',
     workspaceEditClock: options.clock,
     workspaceEditDriveJournals: options.driveJournals ?? false,
     workspaceEditDriver: driver,

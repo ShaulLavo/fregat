@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rename, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -136,23 +136,6 @@ describe('file change hub', () => {
   })
 })
 
-// One `sh` per subscribe was left behind on the production server while Watchman is absent.
-describe.runIf(process.platform === 'linux')('native watch lifetime', () => {
-  it('opens a live watch without leaving an unreaped shell', async () => {
-    const root = await fixtureRoot()
-    const before = await zombieShells()
-    const hub = new FileChangeHub(createWorkspacePaths(root), { enabled: true })
-    const abort = new AbortController()
-    const events = hub.stream([''], abort.signal)[Symbol.asyncIterator]()
-
-    expect(await nextRequiredEvent(events)).toMatchObject({ type: 'ready' })
-    abort.abort()
-    await delay(200)
-
-    expect(await zombieShells()).toEqual(before)
-  })
-})
-
 describe.runIf(process.platform === 'linux')('native watch coverage', () => {
   it('shows language-server paths to internal streams only', async () => {
     const root = await fixtureRoot()
@@ -185,6 +168,39 @@ describe.runIf(process.platform === 'linux')('native watch coverage', () => {
   })
 })
 
+describe.runIf(process.platform === 'linux')('native watch structure changes', () => {
+  // Each of these lost the later write under the previous watcher.
+  it('keeps watching directories that are created, moved in, renamed or recreated', async () => {
+    const base = await fixtureRoot()
+    const root = path.join(base, 'root')
+    await mkdir(path.join(root, 'existing/deep'), { recursive: true })
+    await mkdir(path.join(base, 'outside/inner'), { recursive: true })
+    const hub = new FileChangeHub(createWorkspacePaths(root), { enabled: true })
+    const abort = new AbortController()
+    const events = collect(hub.stream([''], abort.signal))
+    const expectWrite = async (relative: string) => {
+      await writeFile(path.join(root, relative), 'x')
+      await expect.poll(() => paths(events), { timeout: 3000 }).toContain(relative)
+    }
+    try {
+      await expect.poll(() => events.length).toBeGreaterThan(0)
+
+      await mkdir(path.join(root, 'fresh/a/b'), { recursive: true })
+      await expectWrite('fresh/a/b/file.txt')
+      await rename(path.join(base, 'outside'), path.join(root, 'moved'))
+      await expectWrite('moved/inner/file.txt')
+      await rename(path.join(root, 'existing'), path.join(root, 'renamed'))
+      await expectWrite('renamed/deep/file.txt')
+      await rm(path.join(root, 'renamed'), { recursive: true })
+      await mkdir(path.join(root, 'renamed/deep'), { recursive: true })
+      await expectWrite('renamed/deep/again.txt')
+    } finally {
+      abort.abort()
+      await hub.close()
+    }
+  })
+})
+
 function collect(stream: AsyncGenerator<WatchServerMessage>) {
   const events: WatchServerMessage[] = []
   void (async () => {
@@ -197,18 +213,6 @@ function paths(events: readonly WatchServerMessage[]) {
   return [
     ...new Set(events.flatMap((event) => ('path' in event && event.path ? [event.path] : []))),
   ]
-}
-
-async function zombieShells() {
-  const children = await readFile(`/proc/${process.pid}/task/${process.pid}/children`, 'utf8')
-  const stats = await Promise.all(
-    children
-      .trim()
-      .split(' ')
-      .filter(Boolean)
-      .map((pid) => readFile(`/proc/${pid}/stat`, 'utf8').catch(() => '')),
-  )
-  return stats.filter((stat) => /\(sh\) Z /.test(stat)).map((stat) => stat.split(' ')[0])
 }
 
 async function fixtureRoot() {

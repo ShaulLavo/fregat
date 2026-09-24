@@ -76,7 +76,7 @@ Repository constraints make this important:
 | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
 | `scripts/prod.ts` starts Bun and Vite preview separately                               | Replace the production launch path with one application server.                            |
 | `apps/desktop/src/bun/index.ts` launches source files and Vite from a checkout         | Packaged desktop needs a release-relative runtime path.                                    |
-| `apps/server/package.json` externalizes `@parcel/watcher` and the Claude SDK           | Include their required files and platform-specific native payloads.                        |
+| `apps/server/package.json` externalizes the Claude SDK                                 | Include their required files and platform-specific native payloads.                        |
 | `provider/claude-discovery.ts` launches a separate file using `process.execPath`       | Package that worker and preserve interpreter execution.                                    |
 | `lsp/typescript/runtime.ts` resolves package metadata and executable files             | Include runtime-resolved packages, not only statically imported code.                      |
 | `lsp/installers.ts` invokes Bun to install optional language servers                   | Keep a usable Bun CLI available without a global installation.                             |

@@ -1,4 +1,3 @@
-import parcelWatcher from '@parcel/watcher'
 import { createHash } from 'node:crypto'
 import { createReadStream, watch } from 'node:fs'
 import path from 'node:path'
@@ -13,7 +12,6 @@ import { FsError } from './errors'
 import {
   defaultIgnoredNames,
   isIgnoredPath,
-  isOutsideRoot,
   resolveExistingPath,
   toPosix,
   type WorkspacePaths,
@@ -24,7 +22,6 @@ import { isWriteTemporaryPath } from './write'
 import type { TreeEntry, WatchServerMessage } from './contracts'
 
 type Listener = (event: WatchServerMessage) => void
-type ParcelWatchEvent = parcelWatcher.Event
 type WatchRelease = () => void | Promise<void>
 type RenameWatchServerMessage = Extract<WatchServerMessage, { type: 'renamed' }>
 type WatcherEntry = {
@@ -67,11 +64,6 @@ type WriteResultMarker = {
 const watcherIgnoredNames = defaultIgnoredNames.filter(
   (name) => name !== 'node_modules' && name !== 'dist' && name !== 'build',
 )
-const watcherIgnoredChildGlobs = [
-  ...watcherIgnoredNames.flatMap((name) => [`${name}/**`, `**/${name}/**`]),
-  'node_modules/*/**',
-  '**/node_modules/*/**',
-]
 
 // A file is written after it is created, so a brand-new entry's mtime trails
 // its birthtime by however long the write took. Measured under Bun on APFS: 3ms
@@ -82,10 +74,7 @@ const createWriteSettleMs = 250
 // One kernel tick at HZ=100, the coarsest common configuration.
 const coarseClockToleranceMs = 10
 
-export type WatchBackend = 'auto' | 'node'
-
 export type WatchOptions = {
-  backend?: WatchBackend
   enabled: boolean
 }
 
@@ -98,7 +87,6 @@ export type WatchStreamOptions = {
 }
 
 export class FileChangeHub {
-  private readonly backend: WatchBackend
   private readonly listeners = new Set<Listener>()
   private readonly nativeWatchers = new Map<string, WatcherEntry>()
   private readonly shallowWatchers = new Map<string, WatcherEntry>()
@@ -113,7 +101,6 @@ export class FileChangeHub {
   private nextSequence = 1
 
   constructor(paths: WorkspacePaths, options: WatchOptions) {
-    this.backend = options.backend ?? 'auto'
     this.paths = paths
     this.watchEnabled = options.enabled
     this.openFiles = new OpenFileWatches(
@@ -360,7 +347,7 @@ export class FileChangeHub {
       return noop
     }
 
-    // A second crawl of a covered subtree would queue behind parcel's lock for nothing.
+    // A covered subtree is already watched; a second recursive watch would only crawl it again.
     const root = coveringWatcherRoot(this.nativeWatchers, relativeRoot) ?? relativeRoot
     const existing = this.nativeWatchers.get(root)
     if (existing) {
@@ -369,7 +356,8 @@ export class FileChangeHub {
       return () => this.releaseWatcher(this.nativeWatchers, root)
     }
 
-    const release = this.createWatcher(root)
+    // Bun's recursive watch cannot skip a subtree; `watcherIgnores` drops those events before any stat.
+    const release = Promise.resolve(this.createNodeWatcher(root))
     this.nativeWatchers.set(root, { refCount: 1, release })
     await release
 
@@ -404,61 +392,12 @@ export class FileChangeHub {
     await releaseWatcher(await entry.release)
   }
 
-  private async createWatcher(relativeRoot: string): Promise<WatchRelease> {
-    if (this.backend === 'node') return this.createNodeWatcher(relativeRoot)
-
-    const startedAt = performance.now()
-    try {
-      return await this.createParcelWatcher(relativeRoot)
-    } catch (error) {
-      // `@parcel/watcher` is a native module the server build marks external, so
-      // this fallback is reachable in production. The two backends do not report
-      // identically — parcel states create/update/delete, the node backend
-      // infers them from stat data — so a silent downgrade leaves "why are my
-      // file events wrong?" unanswerable from `logs/` alone.
-      recordRequestWarning('fs.watch.backend_fallback', {
-        area: 'fs',
-        backend: 'node',
-        durationMs: Math.round(performance.now() - startedAt),
-        error: errorSummary(error),
-        operation: 'fs.watch.createWatcher',
-        requestedBackend: this.backend,
-        root: relativeRoot || '/',
-      })
-
-      return this.createNodeWatcher(relativeRoot)
-    }
-  }
-
-  private async createParcelWatcher(relativeRoot: string): Promise<WatchRelease> {
-    const target = this.paths.resolve(relativeRoot)
-    const subscription = await parcelWatcher.subscribe(
-      target.absolutePath,
-      (error, events) => {
-        if (error) {
-          this.emit(watchError(error, relativeRoot))
-          return
-        }
-
-        for (const event of events) {
-          runDetached(() => this.handleParcelEvent(relativeRoot, event), {
-            area: 'fs',
-            backend: 'parcel',
-            operation: 'watch_event',
-          })
-        }
-      },
-      { backend: nativeParcelBackend(process.platform), ignore: watcherIgnoredChildGlobs },
-    )
-
-    return () => subscription.unsubscribe()
-  }
-
   private createNodeWatcher(relativeRoot: string, recursive = true): WatchRelease {
     try {
       const target = this.paths.resolve(relativeRoot)
       const attachedAtMs = wallClockMs()
       const watcher = watch(target.absolutePath, { recursive }, (event, filename) => {
+        if (filename && watcherIgnores(normalizeWatchFilename(filename.toString()))) return
         runDetached(
           () => this.handleNodeEvent(relativeRoot, event, filename?.toString() ?? '', attachedAtMs),
           { area: 'fs', backend: 'node', operation: 'watch_event' },
@@ -472,14 +411,6 @@ export class FileChangeHub {
       this.emit(watchError(error, relativeRoot))
       return noop
     }
-  }
-
-  private async handleParcelEvent(relativeRoot: string, event: ParcelWatchEvent) {
-    const relativePath = parcelEventPath(this.paths, event.path)
-    if (relativePath === null) return
-    if (isStaleParcelRootCreate(relativeRoot, event, relativePath)) return
-
-    await this.emitNativeEvent(relativePath, () => parcelEventType(event.type))
   }
 
   private async handleNodeEvent(
@@ -515,8 +446,7 @@ export class FileChangeHub {
     const abort = () => wake.current?.()
     let releases: WatchRelease[] = []
     const startedAt = performance.now()
-    // A files stream owns a watch per file: waiting on the project watcher would park its
-    // `ready` behind parcel, which serializes every subscribe behind any large crawl.
+    // A files stream owns a watch per file, so its `ready` never waits on a project crawl.
     const roots = options.onlyFiles ? new Set<string>() : subscribed
     listeners.add(listener)
     signal?.addEventListener('abort', abort)
@@ -608,6 +538,14 @@ export class FileChangeHub {
   }
 }
 
+/** What the watcher drops: ignored names, and anything below a package inside `node_modules`. */
+function watcherIgnores(relativePath: string) {
+  const parts = relativePath.split('/')
+  const modules = parts.indexOf('node_modules')
+  if (modules >= 0 && parts.length > modules + 2) return true
+  return isIgnoredPath(relativePath, watcherIgnoredNames)
+}
+
 /** Whether a recursive watcher misses part of this subtree; `node_modules` is watched one level deep. */
 function watcherHides(relativePath: string) {
   return (
@@ -643,39 +581,8 @@ function watchEventPath(relativeRoot: string, filename: string) {
   return toPosix(path.join(relativeRoot, relativeFilename))
 }
 
-function parcelEventPath(paths: WorkspacePaths, absolutePath: string) {
-  const candidate = path.resolve(absolutePath)
-  return (
-    relativePathInside(paths.workspaceRoot, candidate) ??
-    relativePathInside(paths.workspaceRootReal, candidate)
-  )
-}
-
-function relativePathInside(root: string, candidate: string) {
-  const relative = path.relative(root, candidate)
-  if (relative === '') return ''
-  if (isOutsideRoot(relative)) return null
-
-  return toPosix(relative)
-}
-
 function normalizeWatchFilename(filename: string) {
   return toPosix(filename).replace(/^\/+/u, '')
-}
-
-function parcelEventType(type: ParcelWatchEvent['type']): 'created' | 'changed' | 'deleted' {
-  if (type === 'create') return 'created'
-  if (type === 'update') return 'changed'
-
-  return 'deleted'
-}
-
-function isStaleParcelRootCreate(
-  relativeRoot: string,
-  event: ParcelWatchEvent,
-  relativePath: string,
-) {
-  return event.type === 'create' && relativePath === relativeRoot
 }
 
 function isFilesystemEvent(event: WatchServerMessage) {
@@ -953,15 +860,4 @@ function pathInputs(input?: string | string[]) {
   if (Array.isArray(input)) return input
 
   return input.split(',')
-}
-
-/**
- * Named, never left to parcel: its default probes Watchman through `popen` on every
- * subscribe and never reaps the shell when Watchman is absent, one zombie per watch.
- */
-function nativeParcelBackend(platform: NodeJS.Platform) {
-  if (platform === 'linux') return 'inotify'
-  if (platform === 'darwin') return 'fs-events'
-  if (platform === 'win32') return 'windows'
-  return undefined
 }

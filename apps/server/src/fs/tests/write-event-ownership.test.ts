@@ -12,72 +12,66 @@ type FilesystemEvent = Extract<
   { type: 'created' | 'changed' | 'deleted' | 'renamed' }
 >
 
-test.each(['node', 'auto'] as const)(
-  'correlates repeated real %s write/create echoes and hides only issued temporary files',
-  async (backend) => {
-    const { root, service, events } = await watchedFiles(backend)
-    await mkdir(path.join(root, 'physical'))
-    await symlink('physical', path.join(root, 'alias'))
-    await delay(100)
-    const content = 'a'.repeat(16 * 1024 * 1024)
-    await service.createFile({ path: 'alias/file.txt', content, origin, writeId: 'create' })
-    await vi.waitFor(() => expect(targetEvents(events).length).toBeGreaterThanOrEqual(2), {
-      timeout: 5000,
-    })
-    expect(targetEvents(events).every((event) => event.writeId === 'create')).toBe(true)
-    events.length = 0
+test('correlates repeated real write/create echoes and hides only issued temporary files', async () => {
+  const { root, service, events } = await watchedFiles()
+  await mkdir(path.join(root, 'physical'))
+  await symlink('physical', path.join(root, 'alias'))
+  await delay(100)
+  const content = 'a'.repeat(16 * 1024 * 1024)
+  await service.createFile({ path: 'alias/file.txt', content, origin, writeId: 'create' })
+  await vi.waitFor(() => expect(targetEvents(events).length).toBeGreaterThanOrEqual(2), {
+    timeout: 5000,
+  })
+  expect(targetEvents(events).every((event) => event.writeId === 'create')).toBe(true)
+  events.length = 0
 
-    await service.write({ path: 'alias/file.txt', content: 'saved', origin, writeId: 'write' })
-    await vi.waitFor(() => expect(targetEvents(events).length).toBeGreaterThanOrEqual(2))
-    await delay(100)
-    expect(targetEvents(events).every((event) => event.writeId === 'write')).toBe(true)
-    expect(events.some((event) => 'path' in event && event.path.endsWith('.tmp'))).toBe(false)
+  await service.write({ path: 'alias/file.txt', content: 'saved', origin, writeId: 'write' })
+  await vi.waitFor(() => expect(targetEvents(events).length).toBeGreaterThanOrEqual(2))
+  await delay(100)
+  expect(targetEvents(events).every((event) => event.writeId === 'write')).toBe(true)
+  expect(events.some((event) => 'path' in event && event.path.endsWith('.tmp'))).toBe(false)
 
-    events.length = 0
-    await utimes(path.join(root, 'physical/file.txt'), 1_800_000_000, 1_800_000_000)
-    await vi.waitFor(() => expect(targetEvents(events).length).toBeGreaterThan(0))
-    expect(targetEvents(events).every((event) => event.writeId === 'write')).toBe(true)
-    events.length = 0
-    await writeFile(path.join(root, 'physical/.external.tmp'), 'external save')
-    await vi.waitFor(() =>
-      expect(
-        events.some((event) => 'path' in event && event.path === 'physical/.external.tmp'),
-      ).toBe(true),
-    )
-  },
-)
+  events.length = 0
+  await utimes(path.join(root, 'physical/file.txt'), 1_800_000_000, 1_800_000_000)
+  await vi.waitFor(() => expect(targetEvents(events).length).toBeGreaterThan(0))
+  expect(targetEvents(events).every((event) => event.writeId === 'write')).toBe(true)
+  events.length = 0
+  await writeFile(path.join(root, 'physical/.external.tmp'), 'external save')
+  await vi.waitFor(() =>
+    expect(events.some((event) => 'path' in event && event.path === 'physical/.external.tmp')).toBe(
+      true,
+    ),
+  )
+})
 
-test.each(['node', 'auto'] as const)(
-  'keeps real %s writes external when bytes change with identical stat versions',
-  async (backend) => {
-    const { root, service, events } = await watchedFiles(backend)
-    const file = path.join(root, 'file.txt')
-    await delay(100)
-    await service.createFile({ path: 'file.txt', content: 'before', origin, writeId: 'own' })
-    await vi.waitFor(() => expect(fileEvents(events).length).toBeGreaterThanOrEqual(2))
-    await utimes(file, 1_800_000_000, 1_800_000_000)
-    await delay(150)
-    const before = await stat(file)
-    events.length = 0
+test('keeps real writes external when bytes change with identical stat versions', async () => {
+  const { root, service, events } = await watchedFiles()
+  const file = path.join(root, 'file.txt')
+  await delay(100)
+  await service.createFile({ path: 'file.txt', content: 'before', origin, writeId: 'own' })
+  await vi.waitFor(() => expect(fileEvents(events).length).toBeGreaterThanOrEqual(2))
+  await utimes(file, 1_800_000_000, 1_800_000_000)
+  await delay(150)
+  const before = await stat(file)
+  events.length = 0
 
-    await writeFile(file, 'change')
-    await utimes(file, 1_800_000_000, 1_800_000_000)
-    expect(fileVersion(await stat(file))).toBe(fileVersion(before))
-    await vi.waitFor(() =>
-      expect(fileEvents(events).some((event) => event.version === textFileVersion('change'))).toBe(
-        true,
-      ),
-    )
-    expect(fileEvents(events).every((event) => !event.origin && !event.writeId)).toBe(true)
-    expect(await readFile(file, 'utf8')).toBe('change')
-    events.length = 0
-    await rm(file)
-    await vi.waitFor(() =>
-      expect(fileEvents(events).some((event) => event.type === 'deleted')).toBe(true),
-    )
-    expect(fileEvents(events).every((event) => !event.origin && !event.writeId)).toBe(true)
-  },
-)
+  await writeFile(file, 'change')
+  await utimes(file, 1_800_000_000, 1_800_000_000)
+  expect(fileVersion(await stat(file))).toBe(fileVersion(before))
+  await vi.waitFor(() =>
+    expect(fileEvents(events).some((event) => event.version === textFileVersion('change'))).toBe(
+      true,
+    ),
+  )
+  expect(fileEvents(events).every((event) => !event.origin && !event.writeId)).toBe(true)
+  expect(await readFile(file, 'utf8')).toBe('change')
+  events.length = 0
+  await rm(file)
+  await vi.waitFor(() =>
+    expect(fileEvents(events).some((event) => event.type === 'deleted')).toBe(true),
+  )
+  expect(fileEvents(events).every((event) => !event.origin && !event.writeId)).toBe(true)
+})
 
 test.each(['write', 'create'] as const)('releases native events after failed %s', async (kind) => {
   const { root, service, events } = await watchedFiles()
@@ -102,7 +96,7 @@ test.each(['write', 'create'] as const)('releases native events after failed %s'
 test.each([true, false])(
   'replays queued external events after write settlement: success %s',
   async (success) => {
-    const { service, events } = await watchedFiles('node', false)
+    const { service, events } = await watchedFiles(false)
     const hub = service.changes
     const barrier = hub.beginWrite(['file.txt'])
     hub.emit({ type: 'changed', path: 'file.txt', version: textFileVersion('external') })

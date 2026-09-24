@@ -1511,7 +1511,6 @@ function testApp(
     allowedOrigins?: readonly string[]
     treeConcurrency?: number
     watch?: boolean
-    watchBackend?: 'auto' | 'node'
     workspaceEditDriver?: WorkspaceEditFileSystemDriver
     workspaceEditJournalRoot?: string
   } = {},
@@ -1525,7 +1524,6 @@ function testApp(
     settings: testSettingsOptions(root),
     treeConcurrency: options.treeConcurrency,
     watch: options.watch,
-    watchBackend: options.watchBackend ?? 'node',
     workspaceEditDriver: options.workspaceEditDriver,
     workspaceEditJournalRoot: options.workspaceEditJournalRoot,
     workspaceRoot: root,

@@ -5,16 +5,14 @@ import path from 'node:path'
 import { onTestFinished } from 'vitest'
 import { FileSystemService } from '../../src/fs/service'
 import type { WatchServerMessage } from '../../src/fs/contracts'
-import type { WatchBackend } from '../../src/fs/watch'
 
-export async function watchedFiles(backend: WatchBackend = 'node', enabled = true) {
+export async function watchedFiles(enabled = true) {
   const directory = await mkdtemp(path.join(scratchRoot(), 'platform-write-events-'))
   const root = path.join(directory, 'root')
   await mkdir(root)
   const service = new FileSystemService({
     workspaceRoot: root,
     watch: enabled,
-    watchBackend: backend,
     metadataDatabasePath: path.join(directory, 'metadata.sqlite'),
     workspaceEditJournalRoot: path.join(directory, 'journal'),
   })

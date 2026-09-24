@@ -1,6 +1,6 @@
 # 134: Keep documents and diagnostics current after external edits
 
-Status: **Phases 1–3 and Phase 4.1–4.3 implemented and deployed 2026-09-24; setup window, linked packages, backend recovery and the Phase 5 matrix open.** See [Progress](#progress-2026-09-24).
+Status: **Phases 1–3 and 4.1–4.3 deployed 2026-09-24, the watcher replaced; linked packages, backend recovery and the Phase 5 matrix open.** See [Progress](#progress-2026-09-24).
 
 ## Outcome
 
@@ -138,6 +138,6 @@ Evidence: `editor-external-edit`, `editor-external-diagnostics` (TS 7 and 6; fai
 Open:
 
 1. ~~Freshness model (Phase 4.1)~~ — done: every Editor diagnostic summary carries `freshness` (`awaiting`, `refreshing`, `current`, `silent`, `unavailable`), owned per active document by the lane; Problems shows a loader only for `awaiting` and "No diagnostics received" for `silent`.
-2. **Setup window.** A watch queued behind another crawl attaches seconds late; an edit in that window is missed by the language server until the file changes again. The main checkout's untracked `references/` is 18k of its 19k watched directories and 9 s of crawl.
+2. ~~Setup window~~ — done: the hub now uses Bun's recursive `fs.watch` and parcel is gone. With main, Editor and `/work/tmp` opened together, `ready` took 8.3 s, 9.0 s and 21.9 s under parcel and 0.13 s, 0.11 s and 0.19 s now. Parcel also dropped writes in new nested, moved-in, renamed and recreated directories, which Bun keeps; a 40k-file burst lost nothing. Earlier "15 s" figures in this plan came from `curl | head -1`, which returns on the next event, not on `ready`. Coming back online now resyncs like a new stream, because reads an event asked for can fail during an outage.
 3. **Linked packages.** Clamping `/work/**/*` to the root drops Editor packages reached through `packages/editor-*`; the linked-declaration reproduction (4.7) is unrevisited.
 4. **Backend recovery (4.6)**, the replay review (4.4) and the rest of the Phase 5 matrix (configuration, installs, branch switch, second browser).

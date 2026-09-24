@@ -5,7 +5,7 @@ import path from 'node:path'
 import { effectiveEntryType, type WorkspaceAddressId } from '@workspace/contracts'
 import { platformHomePath } from '../home'
 import { createWorkspacePaths } from './path'
-import { FileChangeHub, type WatchBackend } from './watch'
+import { FileChangeHub } from './watch'
 import { entryFromStat } from './entry'
 import { DEFAULT_MAX_TEXT_FILE_BYTES, MAX_TEXT_FILE_BYTES_UPPER_BOUND } from './limits'
 import { statPath } from './stat'
@@ -74,7 +74,6 @@ export type FileSystemServiceOptions = {
   maxSearchContentBytes?: number
   maxTextFileBytes?: number
   treeConcurrency?: number
-  watchBackend?: WatchBackend
   /** Existing metadata database handle. When omitted the service opens and owns its own. */
   metadataDatabase?: MetadataDatabaseHandle
   /** Path for the service-owned metadata database when no handle is provided. */
@@ -157,7 +156,6 @@ export class FileSystemService {
     this.maxTextFileBytes = options.maxTextFileBytes ?? resolveMaxTextFileBytes()
     this.treeConcurrency = options.treeConcurrency ?? DEFAULT_TREE_CONCURRENCY
     this.changes = new FileChangeHub(this.paths, {
-      backend: options.watchBackend,
       enabled: options.watch ?? true,
     })
     this.workspaceEdits = new WorkspaceEditController({

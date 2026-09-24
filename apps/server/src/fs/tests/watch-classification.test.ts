@@ -119,7 +119,7 @@ describe('native event type', () => {
 type EventStream = AsyncIterator<WatchServerMessage>
 
 async function startWatching(root: string) {
-  const hub = new FileChangeHub(createWorkspacePaths(root), { backend: 'node', enabled: true })
+  const hub = new FileChangeHub(createWorkspacePaths(root), { enabled: true })
   const abort = new AbortController()
   const events: EventStream = hub.stream([''], abort.signal)[Symbol.asyncIterator]()
 

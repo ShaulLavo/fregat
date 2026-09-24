@@ -215,15 +215,10 @@ test('a queued resolution survives the deleted-file folder wait', async ({ serve
   }
 })
 
-test.for([
-  { deleted: false, watchBackend: 'auto' },
-  { deleted: true, watchBackend: 'auto' },
-  { deleted: false, watchBackend: 'node' },
-  { deleted: true, watchBackend: 'node' },
-] as const)(
-  'own watcher events preserve completion and retry, deleted $deleted on $watchBackend',
-  async ({ deleted, watchBackend }) => {
-    const server = await makeTestServer({ watchBackend })
+test.for([{ deleted: false }, { deleted: true }] as const)(
+  'own watcher events preserve completion and retry, deleted $deleted',
+  async ({ deleted }) => {
+    const server = await makeTestServer()
     const fixture = await createConflictResolutionFixture(server, deleted)
     if (deleted) await rm(join(server.root, fixture.path))
     fixture.editDestination()

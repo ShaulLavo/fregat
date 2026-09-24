@@ -19,7 +19,7 @@
     "dev": "bun ../../scripts/run-with-env.ts --watch src/index.ts",
     "server": "bun --env-file=../../.env src/index.ts",
     "start": "NODE_ENV=production bun --env-file=../../.env dist/index.js",
-    "build": "tsgo --noEmit && bun scripts/package-wallpapers.ts && bun build src/index.ts --target bun --outdir dist --external sharp --external @parcel/watcher --external @anthropic-ai/claude-agent-sdk && bun build src/provider/claude-discovery-worker.ts --target bun --outfile dist/claude-discovery-worker.ts --external @anthropic-ai/claude-agent-sdk",
+    "build": "tsgo --noEmit && bun scripts/package-wallpapers.ts && bun build src/index.ts --target bun --outdir dist --external sharp --external @anthropic-ai/claude-agent-sdk && bun build src/provider/claude-discovery-worker.ts --target bun --outfile dist/claude-discovery-worker.ts --external @anthropic-ai/claude-agent-sdk",
     "codex-protocol:check": "bun src/provider/adapters/codex-protocol/generate.ts --check",
     "codex-protocol:generate": "bun src/provider/adapters/codex-protocol/generate.ts",
     "test": "bun --bun vitest run",
@@ -31,7 +31,6 @@
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.3.281",
     "@elysiajs/cors": "^1.4.2",
-    "@parcel/watcher": "^2.6.0",
     "@singapore-editor/lsp": "0.1.1",
     "@singapore-editor/typescript-lsp": "0.1.1",
     "@tanstack/pacer": "^0.21.1",

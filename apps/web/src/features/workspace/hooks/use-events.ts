@@ -56,7 +56,7 @@ import {
   type WorkspaceConflictContext,
 } from '@/features/workspace/state/event-conflict-adapter'
 import { patchTreeEntryMetadata, replaceDirectoryLoad, type TreeModel } from '@/lib/tree-model'
-import { useQueryClient, type QueryClient } from '@tanstack/react-query'
+import { onlineManager, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { useEffect, useEffectEvent } from 'react'
 import type { TreeEntry, WatchServerMessage } from '@workspace/contracts'
 import { useWorkspaceEditEventClassifier } from '@/features/editor/providers/workspace-edit-context'
@@ -229,8 +229,15 @@ export function useWorkspaceEvents(rootFolder: PickedFsEntry | null) {
         (contents) => streams.setFiles(filePathsForTabs(contents)),
         { fireImmediately: true },
       )
+      // The stream can outlive an outage that failed the reads its events asked for.
+      const unsubscribeOnline = onlineManager.subscribe((online) => {
+        if (!online) return
+        eventsScope.increment('subscription.onlineResyncCount')
+        applyReady(controller.signal, rootPath, eventsScope, gitInvalidation.maybeExecute)
+      })
 
       return () => {
+        unsubscribeOnline()
         unsubscribeFiles()
         streams.close()
         controller.abort()
