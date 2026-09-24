@@ -72,7 +72,20 @@ test('publishes semantic intent before three scoped transports can settle', asyn
     'settings-document',
     'settings-document',
   ])
-  expect(mutations.map((mutation) => mutation.state.variables)).toEqual(active)
+  // Each mutation carries its intent as submitted. The queue's private `overtaken`
+  // mark changes on the active entries afterwards, so compare the public fields.
+  expect(mutations.map((mutation) => mutation.state.variables)).toMatchObject(
+    active.map((entry) => ({
+      enqueuedAt: entry.enqueuedAt,
+      intentId: entry.intentId,
+      patch: entry.patch,
+      resources: entry.resources,
+      sequence: entry.sequence,
+      settled: entry.settled,
+      status: entry.status,
+      transportSettled: entry.transportSettled,
+    })),
+  )
   expect(mutations.filter((mutation) => mutation.state.isPaused)).toHaveLength(2)
   expect(second.result.current.isSaving).toBe(true)
 

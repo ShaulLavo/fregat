@@ -1,10 +1,9 @@
 import { getClient } from '@/lib/client'
 import { DEFAULT_SETTING_VALUES } from '@workspace/contracts'
-import { vi } from 'vitest'
 
+import { recordClientLog } from '../../../../test/factories/client-log'
 import { expect, test } from '../../../../test/fixtures'
 import { fetchSettings, saveSettings, saveSettingsText } from '@/features/settings/utils/api'
-import { log } from '@/lib/client-logging'
 
 test('reads registry defaults from an untouched server', async ({ client }) => {
   expect(client).toBeDefined()
@@ -142,8 +141,8 @@ test('raw telemetry distinguishes apply, duplicate acknowledgement, conflict, an
   client,
 }) => {
   expect(client).toBeDefined()
-  const info = vi.spyOn(log, 'info').mockImplementation(() => undefined)
-  const warn = vi.spyOn(log, 'warn').mockImplementation(() => undefined)
+  const info = recordClientLog('info')
+  const warn = recordClientLog('warn')
   const before = await fetchSettings(undefined, getClient())
   const baseRevision = before.layers.find((layer) => layer.id === 'user')?.file?.revision ?? ''
   const request = {
@@ -175,17 +174,7 @@ test('raw telemetry distinguishes apply, duplicate acknowledgement, conflict, an
     ),
   ).rejects.toMatchObject({ code: 'settings.RAW_REVISION_STALE' })
 
-  expect(settingsWriteOutcomes(info.mock.calls)).toEqual(['applied', 'duplicate-ack'])
-  expect(settingsWriteOutcomes(warn.mock.calls)).toEqual(['rejected', 'raw-conflict'])
-  info.mockRestore()
-  warn.mockRestore()
+  const outcomes = (events: readonly Record<string, unknown>[]) => events.map((e) => e.outcome)
+  expect(outcomes(info.events('settings.write-raw'))).toEqual(['applied', 'duplicate-ack'])
+  expect(outcomes(warn.events('settings.write-raw'))).toEqual(['rejected', 'raw-conflict'])
 })
-
-function settingsWriteOutcomes(calls: readonly unknown[][]) {
-  return calls.flatMap(([event]) => {
-    if (!event || typeof event !== 'object') return []
-    if (!('action' in event) || event.action !== 'settings.write-raw') return []
-
-    return 'outcome' in event && typeof event.outcome === 'string' ? [event.outcome] : []
-  })
-}

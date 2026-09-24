@@ -14,14 +14,22 @@ const alias = {
   '@': path.resolve(__dirname, './src'),
 }
 
-// A bun-linked package resolves outside the workspace, so Vite's fs allowlist
-// blocks the non-JS files it fetches at runtime — ghostty's wasm artifact.
-const linkedPackageRoots = ['ghostty-webgpu'].flatMap((name) =>
-  [__dirname, path.resolve(__dirname, '../..')].flatMap((base) => {
-    const candidate = path.join(base, 'node_modules', name)
-    return fs.existsSync(candidate) ? [fs.realpathSync(candidate)] : []
-  }),
-)
+// A linked package resolves outside the workspace, so Vite's fs allowlist blocks the non-JS
+// files it fetches at runtime: ghostty's wasm artifact, the Editor's worker scripts.
+const workspacePackages = path.resolve(__dirname, '../../packages')
+const linkedPackageRoots = [
+  ...['ghostty-webgpu'].flatMap((name) =>
+    [__dirname, path.resolve(__dirname, '../..')].flatMap((base) => {
+      const candidate = path.join(base, 'node_modules', name)
+      return fs.existsSync(candidate) ? [fs.realpathSync(candidate)] : []
+    }),
+  ),
+  ...fs
+    .readdirSync(workspacePackages)
+    .map((name) => path.join(workspacePackages, name))
+    .filter((candidate) => fs.lstatSync(candidate).isSymbolicLink())
+    .map((candidate) => fs.realpathSync(candidate)),
+]
 const browserTestPort = process.env.VITEST_BROWSER_PORT ?? '5179'
 const browserFileServerPort = process.env.VITEST_BROWSER_FILE_SERVER_PORT ?? '33201'
 const browserFileServerUrl = `http://127.0.0.1:${browserFileServerPort}`

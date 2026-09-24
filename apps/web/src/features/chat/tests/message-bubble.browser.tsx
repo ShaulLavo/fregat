@@ -267,7 +267,11 @@ describe('MessageBubble browser rendering', () => {
     await vi.waitFor(() => {
       expect(document.body.textContent).toContain('Checkpoint missing')
       expect(buttonByText('View diff')).toBeNull()
-      expect(changedFileButtonOrNull('src/features/chat/utils/timeline-items.ts')).toBeNull()
+      // The file is still named; it just offers no diff to open.
+      expect(changedFileButtonOrNull('src/features/chat/utils/timeline-items.ts')).toHaveAttribute(
+        'aria-disabled',
+        'true',
+      )
     })
   })
 

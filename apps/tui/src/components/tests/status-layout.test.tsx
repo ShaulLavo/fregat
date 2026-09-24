@@ -1,4 +1,6 @@
 import { act } from 'react'
+import { settingRowTitle } from '@workspace/client-core/settings/humanize'
+import { matchingSettingIds } from '@workspace/client-core/settings/search'
 import { Application } from '@/components/application'
 import { createControlledInProcessTransport } from '../../../test/client'
 import { createTestSettingsSession } from '../../../test/factories/session'
@@ -27,6 +29,7 @@ test.for([
         useThread: false,
       },
     )
+    const firstSetting = matchingSettingIds('')[0]
     try {
       await frame.renderOnce()
       expect(frame.captureCharFrame()).toContain('Live · ')
@@ -36,7 +39,8 @@ test.for([
       await frame.renderOnce()
       expect(frame.captureCharFrame()).toContain('Disconnected · ')
       expect(frame.captureCharFrame()).toContain('Ctrl+R refresh')
-      expect(frame.captureCharFrame()).toContain('Connected machines')
+      // The cached settings list stays on screen after the socket drops.
+      expect(frame.captureCharFrame()).toContain(settingRowTitle(firstSetting))
     } finally {
       await frame.cleanup()
       session.dispose()

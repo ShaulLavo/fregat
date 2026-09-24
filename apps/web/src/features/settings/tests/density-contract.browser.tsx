@@ -47,6 +47,8 @@ import { AppProviders, createTestQueryClient, seedBootMirrorTheme } from '../../
 // Naming it once is the contract: a bar that disagrees is the header-jump bug
 // this suite exists to catch.
 const BAR_HEIGHT = { compact: 36, cozy: 40 } as const
+// `--density-row-height`: menu items are ListRows, sized by the token rather than padding.
+const ROW_HEIGHT = { compact: 20, cozy: 24 } as const
 
 let root: Root | null = null
 
@@ -166,8 +168,8 @@ test('persistent app chrome changes compactly and leaves content text unchanged'
   seedBootMirrorTheme('dark')
   mount(
     <TooltipProvider delay={0}>
-      {/* The chat header is a pane identity row now, and its menu reads the
-          workspace store and navigation like every other pane header. */}
+      {/* The chat header's menu reads the workspace store and navigation, and the submit
+          button reads settings, so the chrome renders inside the app's providers. */}
       <AppProviders queryClient={createTestQueryClient()}>
         <EditorStateProvider>
           <section data-testid='chat-header'>
@@ -180,50 +182,50 @@ test('persistent app chrome changes compactly and leaves content text unchanged'
               onSelectSession={() => undefined}
             />
           </section>
+          <ChatInputSubmitButton
+            draftTarget={{
+              environmentId: TEST_ENVIRONMENT_ID,
+              draftKey: 'density-contract',
+              rootPath: '/repo',
+            }}
+            disabledReason={null}
+            pendingAction={null}
+            busy={false}
+            disabled={false}
+            sendDisabled={false}
+            onStop={() => undefined}
+            onSubmit={() => Promise.resolve(true)}
+          />
+          <section data-testid='chat-panel-status'>
+            <ChatPanelStatus
+              createError='Could not create chat'
+              projectError={null}
+              shellError={null}
+            />
+          </section>
+          <section className='relative h-12' data-testid='timeline-load-earlier'>
+            <TimelineLoadEarlier error={null} pending={false} onLoad={() => undefined} />
+          </section>
+          <section data-testid='logs-toolbar'>
+            <LogsToolbar
+              areas={[]}
+              filters={{
+                area: 'all',
+                level: 'all',
+                search: '',
+                slowMs: 1_000,
+                source: 'all',
+                timeRange: '1h',
+              }}
+              sources={[]}
+              onFiltersChange={() => undefined}
+            />
+          </section>
+          <section data-testid='unchanged-banner'>
+            <UnchangedDiffBanner message='No textual changes' />
+          </section>
         </EditorStateProvider>
       </AppProviders>
-      <ChatInputSubmitButton
-        draftTarget={{
-          environmentId: TEST_ENVIRONMENT_ID,
-          draftKey: 'density-contract',
-          rootPath: '/repo',
-        }}
-        disabledReason={null}
-        pendingAction={null}
-        busy={false}
-        disabled={false}
-        sendDisabled={false}
-        onStop={() => undefined}
-        onSubmit={() => Promise.resolve(true)}
-      />
-      <section data-testid='chat-panel-status'>
-        <ChatPanelStatus
-          createError='Could not create chat'
-          projectError={null}
-          shellError={null}
-        />
-      </section>
-      <section className='relative h-12' data-testid='timeline-load-earlier'>
-        <TimelineLoadEarlier error={null} pending={false} onLoad={() => undefined} />
-      </section>
-      <section data-testid='logs-toolbar'>
-        <LogsToolbar
-          areas={[]}
-          filters={{
-            area: 'all',
-            level: 'all',
-            search: '',
-            slowMs: 1_000,
-            source: 'all',
-            timeRange: '1h',
-          }}
-          sources={[]}
-          onFiltersChange={() => undefined}
-        />
-      </section>
-      <section data-testid='unchanged-banner'>
-        <UnchangedDiffBanner message='No textual changes' />
-      </section>
     </TooltipProvider>,
   )
 
@@ -379,13 +381,13 @@ test('custom composer, picker, search, and references chrome follows density', a
     '[data-slot="input-group"]:has(input[aria-label="Search workspace"])',
   )
   const referencesHeader = requiredElement<HTMLElement>(
-    '[data-testid="references-pane"] aside > div:first-child',
+    '[data-testid="references-pane"] [data-slot="tool-pane-header"]',
   )
 
   expect(pixelValue(getComputedStyle(editorShell).paddingLeft)).toBe(12)
   expect(pixelValue(getComputedStyle(editorShell).paddingTop)).toBe(12)
   expect(pixelValue(getComputedStyle(attachmentStrip).paddingLeft)).toBe(8)
-  expect(pixelValue(getComputedStyle(commandItem).paddingTop)).toBe(6)
+  expect(commandItem.getBoundingClientRect().height).toBe(ROW_HEIGHT.compact)
   expect(modelRail.getBoundingClientRect().width).toBe(BAR_HEIGHT.compact)
   expect(searchShell.getBoundingClientRect().height).toBe(BAR_HEIGHT.compact)
   expect(searchField.getBoundingClientRect().height).toBe(24)
@@ -395,7 +397,7 @@ test('custom composer, picker, search, and references chrome follows density', a
   expect(pixelValue(getComputedStyle(editorShell).paddingLeft)).toBe(16)
   expect(pixelValue(getComputedStyle(editorShell).paddingTop)).toBe(16)
   expect(pixelValue(getComputedStyle(attachmentStrip).paddingLeft)).toBe(10)
-  expect(pixelValue(getComputedStyle(commandItem).paddingTop)).toBe(8)
+  expect(commandItem.getBoundingClientRect().height).toBe(ROW_HEIGHT.cozy)
   expect(modelRail.getBoundingClientRect().width).toBe(BAR_HEIGHT.cozy)
   expect(searchShell.getBoundingClientRect().height).toBe(BAR_HEIGHT.cozy)
   expect(searchField.getBoundingClientRect().height).toBe(28)

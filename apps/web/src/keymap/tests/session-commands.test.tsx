@@ -21,6 +21,9 @@ import { expect, test } from '../../../test/fixtures'
 import { renderWithProviders } from '../../../test/render'
 import { waitForNavigation } from '../../../test/address'
 import { getNavigation } from '@/state/navigation-binding'
+import { currentRailEnvironments } from '@/features/chat-mode/state/rail-environments'
+import { sessionRailModel } from '@workspace/client-core/chat/rail/model'
+import type { ProjectId } from '@workspace/contracts'
 test('every session command is reachable from the keyboard', () => {
   const bound = boundCommands()
 
@@ -76,7 +79,7 @@ test('session navigation and new drafts accept the workspace root empty relative
   await h.dispatch(submission.command)
   const snapshot = await h.refresh()
   expect(snapshot.worktrees.find((worktree) => worktree.id === owner.worktreeId)?.path).toBe('')
-  useSessionRailStore.getState().setScope(owner.projectId)
+  scopeRailTo(owner.projectId)
   const opened = await jumpToSession(1)
   const selected = selectedSessionId()
   const drafted = await startScopedSessionDraft()
@@ -128,11 +131,12 @@ test('new session uses the scoped project and leaves the archive view', async ({
   const h = await createRailHarness(client, server)
   renderWithProviders(<></>, { application: h.application })
   await waitForNavigation(getNavigation())
-  useSessionRailStore.getState().setScope(h.projectId)
+  scopeRailTo(h.projectId)
   useSessionRailStore.getState().setView('archived')
   expect(await startScopedSessionDraft()).toBe(true)
   expect(useSessionSelectionStore.getState().selection).toEqual({
     kind: 'draft',
+    draftId: expect.any(String),
     environmentId: h.environmentId,
     projectId: h.projectId,
   })
@@ -154,7 +158,7 @@ test('an active-session draft preserves its missing checkout identity while open
   await h.refresh()
   expect((await h.worktree(target.worktreeId)).lifecycle.state).toBe('missing')
   useSessionSelectionStore.getState().selectSession(h.environmentId, h.projectId, sessionId)
-  useSessionRailStore.getState().setScope(h.projectId)
+  scopeRailTo(h.projectId)
   expect(await startScopedSessionDraft()).toBe(true)
   expect(useSessionSelectionStore.getState().draftWorktreeId).toBe(target.worktreeId)
   expect(h.application.getSnapshot().editor.workspaceStore.getState().rootFolder?.path).toBe(
@@ -175,7 +179,7 @@ test('new session uses the linked checkout of the session selected automatically
   await waitForNavigation(getNavigation())
   const target = newWorktreeTarget(h.worktreeId)
   await h.create(target)
-  useSessionRailStore.getState().setScope(h.projectId)
+  scopeRailTo(h.projectId)
   expect(useSessionSelectionStore.getState().selection).toEqual({ kind: 'auto' })
   expect(await startScopedSessionDraft()).toBe(true)
   expect(useSessionSelectionStore.getState().draftWorktreeId).toBe(target.worktreeId)
@@ -185,6 +189,14 @@ test('new session uses the linked checkout of the session selected automatically
   expect(await startScopedSessionDraft()).toBe(true)
   expect(useSessionSelectionStore.getState().draftWorktreeId).toBe(target.worktreeId)
 })
+/** Scopes the rail the way the project menu does: by the group key, not the project id. */
+function scopeRailTo(projectId: ProjectId) {
+  const project = sessionRailModel({ environments: currentRailEnvironments() }).projects.find(
+    (candidate) => candidate.members.some((member) => member.ref.projectId === projectId),
+  )
+  expect(project).toBeDefined()
+  useSessionRailStore.getState().setScope(project!.groupKey)
+}
 function selectedSessionId() {
   const { selection } = useSessionSelectionStore.getState()
   return selection.kind === 'session' ? selection.sessionId : null

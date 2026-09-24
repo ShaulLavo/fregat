@@ -62,6 +62,8 @@ test('preview-to-pending handoff has no paint gap before final rejection', async
   flushSync(() => {
     controls?.previewTheme('dark')
   })
+  // A mode change commits as a React transition, so the preview lands a frame later by design.
+  await expect.poll(rootTheme).toBe('dark')
   const transitions = [rootTheme()]
   await recordNextPaint(transitions)
 
@@ -130,8 +132,10 @@ async function recordNextPaint(transitions: string[]) {
   appendTransition(transitions, rootTheme())
 }
 
+// A color-mode view transition queues behind one still animating, so allow a transition's length.
 async function recordUntilTheme(transitions: string[], theme: 'dark' | 'light') {
-  for (let frame = 0; frame < 10; frame += 1) {
+  const deadline = performance.now() + 1_000
+  while (performance.now() < deadline) {
     await recordNextPaint(transitions)
     if (rootTheme() === theme) return
   }

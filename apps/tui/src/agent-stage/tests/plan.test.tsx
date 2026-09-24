@@ -4,6 +4,7 @@ import { selectChatSessionById } from '@workspace/client-core/chat/selectors'
 import { test, expect } from '../../../test/fixtures'
 import { makeTestServer } from '../../../test/server'
 import { appendAgentPlan, renderAgentStage } from '../../../test/factories/agent-stage'
+import { conversationTurns } from '../../../test/factories/chat'
 
 test('a terminal-context-only prompt refines the proposed plan without marking it implemented', async () => {
   const server = await makeTestServer({ providerRuntime: true })
@@ -36,12 +37,12 @@ test('a terminal-context-only prompt refines the proposed plan without marking i
     await act(async () => {
       frame.mockInput.pressEnter()
     })
-    await expect.poll(() => server.providerAdapter.startedTurns.length).toBe(2)
-    expect(server.providerAdapter.startedTurns[1]).toMatchObject({
+    await expect.poll(() => conversationTurns(server.providerAdapter).length).toBe(2)
+    expect(conversationTurns(server.providerAdapter)[1]).toMatchObject({
       interactionMode: 'plan',
       messageText: expect.stringContaining('The build needs another dependency'),
     })
-    expect(server.providerAdapter.startedTurns[1]?.messageText).not.toContain(
+    expect(conversationTurns(server.providerAdapter)[1]?.messageText).not.toContain(
       'Implement the following plan',
     )
     const plan = selectChatSessionById(chat.getSnapshot().projection, sessionId)?.proposedPlans[0]

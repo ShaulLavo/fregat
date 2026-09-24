@@ -15,10 +15,10 @@ import { fetchSettings, saveSettingsText } from '@/features/settings/utils/api'
 import { FocusService } from '@/lib/focus/state/service'
 import { statPath } from '@/lib/file-server'
 import type { Client } from '@/lib/client'
-import { log } from '@/lib/client-logging'
 
 import { createObservedInProcessClient } from '../client'
 import { createTestApplicationRuntime } from '../factories/application-runtime'
+import { recordClientLog } from '../factories/client-log'
 import { installTestClient } from '../factories/client-binding'
 import { createTestCommandRuntime } from '../factories/command-runtime'
 import { TestEditorStateProvider } from '../factories/editor-state-provider'
@@ -156,9 +156,8 @@ for (const conflict of ['already conflicted', 'newly stale'] as const) {
         )
     }
     const saves = vi.spyOn(lifecycle.editor.saveService, 'save')
-    const operationLogs = vi.spyOn(log, 'info')
+    const operationLogs = recordClientLog('info')
     onTestFinished(() => saves.mockRestore())
-    onTestFinished(() => operationLogs.mockRestore())
     fireEvent.click(screen.getByRole('button', { name: 'Close all settings' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Save', exact: true }))
     await waitFor(() =>
@@ -167,9 +166,8 @@ for (const conflict of ['already conflicted', 'newly stale'] as const) {
     expect(screen.getByLabelText('Settings tab count')).toHaveTextContent('1')
     expect(await saves.mock.results[0]?.value).toBe(false)
     expect(await saves.mock.results[1]?.value).toBe(true)
-    expect(operationLogs).toHaveBeenCalledWith(
+    expect(operationLogs.events('settings.buffer-save')).toContainEqual(
       expect.objectContaining({
-        action: 'settings.buffer-save',
         acknowledged: false,
         dirty: true,
         documentKey: documentKey(settingsJsonDocument('user')),

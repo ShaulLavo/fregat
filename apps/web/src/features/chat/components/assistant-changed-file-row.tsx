@@ -10,10 +10,12 @@ import type { TurnDiffRow } from '@/features/chat/utils/turn-diff-view'
 import { iconForEntry } from '@/lib/file-icons'
 
 export function AssistantChangedFileRow({
+  disabled,
   row,
   rowProps,
   onActivate,
 }: {
+  disabled: boolean
   row: TurnDiffRow
   rowProps: ReturnType<ReturnType<typeof useListbox>['rowProps']>
   onActivate: () => void
@@ -29,6 +31,7 @@ export function AssistantChangedFileRow({
       aria-expanded={row.hasChildren ? row.expanded : undefined}
       className='group w-full gap-1.5 text-left'
       data-scroll-anchor-ignore
+      disabled={disabled}
       title={node.path}
       style={{ paddingLeft: `calc(var(--density-row-padding-x) + ${row.depth} * 0.875rem)` }}
       onClick={(event) => {

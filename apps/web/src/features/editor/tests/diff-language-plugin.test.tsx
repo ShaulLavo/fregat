@@ -28,6 +28,7 @@ function mountContribution(hits: HitTest[], askable = false) {
     scrollElement: element,
     focusEditor: () => undefined,
     getRangeClientRect: () => null,
+    registerProvider: () => ({ dispose: () => undefined }),
     setSelection: () => undefined,
     textOffsetFromPoint: (x: number, y: number) => {
       hits.push({ x, y })

@@ -7,7 +7,7 @@ import { createDiffRegionStore, createTextDiff } from '@singapore-editor/diff'
 import { DiffPane } from '@/features/editor/components/diff-pane'
 import { expect, test } from '../../../../../test/fixtures'
 import { stubHighlightApi } from '../../../../../test/env/highlight-api'
-import { stubEditorViewport } from '../../../../../test/env/editor-viewport'
+import { editorRowPoint, stubEditorViewport } from '../../../../../test/env/editor-viewport'
 import { renderWithProviders } from '../../../../../test/render'
 
 // Expanding a collapsed region rewrites the whole buffer. The reader is somewhere in it, and the
@@ -32,7 +32,12 @@ test('expanding a skipped range splices rows in without moving the reader', asyn
     row.classList.contains('editor-diff-row-expandable'),
   )
   expect(separator).toBeDefined()
-  await userEvent.click(separator!)
+  // The plugin finds the separator by point query, so the press has to land on its row.
+  await userEvent.pointer({
+    coords: editorRowPoint(separator!),
+    keys: '[MouseLeft]',
+    target: separator!,
+  })
 
   await waitFor(() => expect(textLineCount(editor)).toBeGreaterThan(before))
   expect(editor.getScrollPosition().top).toBe(scrolled)
@@ -74,7 +79,7 @@ async function mountStackedDiff() {
     editor: mounted as unknown as Editor,
     rowElements: () => [
       ...document.querySelectorAll<HTMLElement>(
-        '.editor-diff-pane-stacked [data-editor-virtual-row]',
+        '.editor-diff-pane-stacked [data-editor-virtual-row]:not([hidden])',
       ),
     ],
   }

@@ -39,6 +39,7 @@ import {
   type EditorWorkspaceStoreApi,
 } from '@/features/editor/state/workspace-state'
 import { settingsKeys } from '@workspace/client-core/settings/query-keys'
+import { fileSystemKeys } from '@/lib/query-keys'
 import { EditorSurfaceTabBody } from '@/features/workbench/components/editor-surface-tab-body'
 import { TreePane } from '@/features/workspace/components/tree-pane'
 import {
@@ -503,6 +504,9 @@ function renderTreePane(
   } = {},
 ) {
   const rootPath = options.rootPath ?? ROOT_PATH
+  const model = options.model ?? navigatorModel()
+  // The app's tree query holds the model the pane shows; file operations stay off until it has one.
+  fixture.queryClient.setQueryData(fileSystemKeys.tree(filesystemPath(rootPath)), model)
   flushSync(() => {
     root?.render(
       <AppProviders
@@ -520,7 +524,7 @@ function renderTreePane(
               <div data-workbench=''>
                 <TreePaneHarness
                   editorMounted={options.editorMounted}
-                  initialModel={options.model}
+                  initialModel={model}
                   rootPath={filesystemPath(rootPath)}
                 />
               </div>

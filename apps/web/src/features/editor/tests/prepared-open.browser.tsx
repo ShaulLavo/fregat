@@ -10,7 +10,7 @@ import { useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { useLayoutEffect } from 'react'
 import { flushSync } from 'react-dom'
 import { createRoot, type Root } from 'react-dom/client'
-import { afterEach, expect, test } from 'vitest'
+import { afterEach, expect, test, vi } from 'vitest'
 import { ForesightManager } from 'js.foresight'
 import { createBrowserWorkspace } from '../../../../test/factories/browser-workspace'
 
@@ -78,6 +78,7 @@ afterEach(async () => {
   editorDiagnosticGlobal.__EDITOR_PERFORMANCE_DIAGNOSTICS__ = null
   editorDiagnosticGlobal.__editorPerfTrace = undefined
   history.replaceState(null, '', originalUrl)
+  vi.unstubAllEnvs()
   await Promise.all([disposeEditorShikiWorkerOwner(), disposeEditorTreeSitterSyntaxProvider()])
   resetEditorColorThemeStore()
   document.body.replaceChildren()
@@ -734,6 +735,8 @@ const editorDiagnosticGlobal = globalThis as typeof globalThis & {
 }
 
 function installBenchmarkTrace(): void {
+  // The trace installs only where client logging is on, as it is in the app it measures.
+  vi.stubEnv('OBSERVABILITY_ENABLED', 'true')
   history.replaceState(null, '', '/?editorPerfTrace=1')
   installEditorPerformanceTraceFromUrl()
   const traceSink = editorDiagnosticGlobal.__EDITOR_PERFORMANCE_DIAGNOSTICS__

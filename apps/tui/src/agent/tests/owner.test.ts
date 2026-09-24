@@ -28,6 +28,7 @@ import {
   openTestChat,
   loseNextDispatchAcknowledgement,
   appendChatMessages,
+  conversationTurns,
 } from '../../../test/factories/chat'
 
 // This exercises persisted events, real RPC and provider ingestion in one process.
@@ -54,7 +55,7 @@ test('sends a prompt, streams a provider reply, and deduplicates the same user i
       .toBe('completed')
     const repeated = await chat.dispatch(submission.command)
     expect(repeated.deduped).toBe(true)
-    expect(server.providerAdapter.startedTurns).toHaveLength(1)
+    expect(conversationTurns(server.providerAdapter)).toHaveLength(1)
     expect(selectChatSessionById(chat.getSnapshot().projection, sessionId)?.messages).toHaveLength(
       2,
     )
@@ -120,7 +121,7 @@ test('routes approvals, questions, and interrupt through the real provider servi
     const sessionId = submission.command.sessionId
     await chat.dispatch(submission.command)
     chat.selectSession(sessionId)
-    await expect.poll(() => adapter.startedTurns.length).toBe(1)
+    await expect.poll(() => conversationTurns(adapter).length).toBe(1)
     const engine = orchestrationForApp(server.app)
     assert(engine)
     await engine.providerRuntimeIdle()
@@ -281,7 +282,7 @@ test('recovers a lost acknowledgement by retrying the same persisted intent afte
     assert(resumed.kind === 'ready')
     const receipt = await resumed.chat.dispatch(submission.command)
     expect(receipt.deduped).toBe(true)
-    await expect.poll(() => server.providerAdapter.startedTurns.length).toBe(1)
+    await expect.poll(() => conversationTurns(server.providerAdapter).length).toBe(1)
     expect(resumed.chat.getSnapshot().projection.sessionIds).toEqual([submission.command.sessionId])
   } finally {
     session.dispose()

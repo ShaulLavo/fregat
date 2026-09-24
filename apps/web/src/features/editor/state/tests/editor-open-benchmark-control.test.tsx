@@ -1,7 +1,6 @@
 import { allEditorTabs, selectEditorGroupTab } from '@/lib/documents/utils/groups'
 import { groupBranch, groupLeaf, groupTree } from '../../../../../test/factories/editor-groups'
 import { testScopedStorage } from '../../../../../test/factories/scoped-storage'
-// @vitest-environment happy-dom
 
 import { QueryClient } from '@tanstack/react-query'
 import { describe, vi } from 'vitest'

@@ -20,7 +20,7 @@ import { testDiffLanguageHost } from '../../../../../test/factories/diff-languag
 import { expect, test } from '../../../../../test/fixtures'
 import { renderWithProviders } from '../../../../../test/render'
 import { saveSettings } from '@/features/settings/utils/api'
-import { stubEditorViewport } from '../../../../../test/env/editor-viewport'
+import { editorRowPoint, stubEditorViewport } from '../../../../../test/env/editor-viewport'
 
 // Real git, real routes, and the editor's real diff view, which answers where a
 // press landed through `diffRowAtEvent`. Only the CSS Custom Highlight API is stubbed —
@@ -102,7 +102,12 @@ test('a row still addresses its own line after the skipped range above it is exp
     row.classList.contains('editor-diff-row-expandable'),
   )
   expect(separator).toBeGreaterThan(0)
-  await userEvent.click(paneRows('new')[separator]!)
+  const separatorRow = paneRows('new')[separator]!
+  await userEvent.pointer({
+    coords: editorRowPoint(separatorRow),
+    keys: '[MouseLeft]',
+    target: separatorRow,
+  })
   await dragRows('new', separator + 1, separator + 1)
 
   // The row after the separator was line 32 before the expansion and is line 6
@@ -144,7 +149,7 @@ type PaneSide = 'new' | 'old' | 'stacked'
 function paneRows(side: PaneSide) {
   return [
     ...document.querySelectorAll<HTMLElement>(
-      `.editor-diff-pane-${side} [data-editor-virtual-row]`,
+      `.editor-diff-pane-${side} [data-editor-virtual-row]:not([hidden])`,
     ),
   ]
 }
@@ -153,8 +158,15 @@ async function dragRows(side: PaneSide, anchorRow: number, headRow: number) {
   await waitFor(() => expect(paneRows(side).length).toBeGreaterThan(headRow))
 
   const rows = paneRows(side)
-  rows[anchorRow]?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }))
-  rows[headRow]?.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0 }))
+  pressRow(rows[anchorRow], 'mousedown')
+  pressRow(rows[headRow], 'mouseup')
+}
+
+// The line comment finds rows by point query, so each press carries its row's coordinates.
+function pressRow(row: HTMLElement | undefined, type: 'mousedown' | 'mouseup') {
+  if (!row) return
+
+  row.dispatchEvent(new MouseEvent(type, { bubbles: true, button: 0, ...editorRowPoint(row) }))
 }
 
 async function renderDiffView(ui: ReactElement) {

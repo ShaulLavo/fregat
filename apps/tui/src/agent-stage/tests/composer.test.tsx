@@ -4,6 +4,7 @@ import { test, expect } from '../../../test/fixtures'
 import { renderAgentStage } from '../../../test/factories/agent-stage'
 import { runPaletteCommand } from '../../../test/actions'
 import { makeTestServer } from '../../../test/server'
+import { conversationTurns } from '../../../test/factories/chat'
 import type { TextareaRenderable } from '@opentui/core'
 import assert from 'node:assert/strict'
 
@@ -75,8 +76,8 @@ test('large paste is an atomic native placeholder and sends its full contents af
     await act(async () => {
       frame.mockInput.pressEnter()
     })
-    await expect.poll(() => server.providerAdapter.startedTurns.length).toBe(1)
-    expect(server.providerAdapter.startedTurns[0]?.messageText).toBe(`Inspect 🦊 ${pasted}`)
+    await expect.poll(() => conversationTurns(server.providerAdapter).length).toBe(1)
+    expect(conversationTurns(server.providerAdapter)[0]?.messageText).toBe(`Inspect 🦊 ${pasted}`)
     await expect.poll(() => app.chat.getSnapshot().selectedSessionId).not.toBeNull()
     await runPaletteCommand(frame, 'Previous prompt')
     const restored = frame.renderer.root.findDescendantById('agent-composer') as TextareaRenderable

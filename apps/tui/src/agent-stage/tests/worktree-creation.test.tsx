@@ -11,6 +11,7 @@ import { makeTestServer } from '../../../test/server'
 import { renderAgentStage } from '../../../test/factories/agent-stage'
 import { gitCommand, prepareGitWorkbench } from '../../../test/factories/git-workbench'
 import { interruptWorktreeCreation } from '../../../test/factories/worktree-creation'
+import { conversationTurns } from '../../../test/factories/chat'
 import { draftsForStorage } from '@/agent-stage/state/drafts'
 
 test('a rejected worktree send preserves its draft and retries with a fresh identity', async () => {
@@ -42,7 +43,7 @@ test('a rejected worktree send preserves its draft and retries with a fresh iden
     expect(drafts.read(key)).toEqual(sent)
     expect(drafts.pending(key, sent, 'send')).toBeNull()
     expect(chat.getSnapshot().selectedSessionId).toBeNull()
-    expect(server.providerAdapter.startedTurns).toHaveLength(0)
+    expect(conversationTurns(server.providerAdapter)).toHaveLength(0)
     await act(async () => {
       frame.mockInput.pressEnter()
     })
@@ -53,11 +54,11 @@ test('a rejected worktree send preserves its draft and retries with a fresh iden
       await engine.providerRuntimeIdle()
       await chat.refresh()
     })
-    expect(server.providerAdapter.startedTurns).toHaveLength(1)
+    expect(conversationTurns(server.providerAdapter)).toHaveLength(1)
     const accepted = chat.getSnapshot().selectedSessionId
     expect(accepted).not.toBe(rejected.sessionId)
     expect(Object.keys(chat.getSnapshot().projection.worktreeById)).toHaveLength(2)
-    expect(server.providerAdapter.startedTurns[0]?.messageText).toBe(sent.text)
+    expect(conversationTurns(server.providerAdapter)[0]?.messageText).toBe(sent.text)
   } finally {
     await app.cleanup()
     await server.cleanup()
@@ -97,7 +98,7 @@ test('accepted creation failure retries the same session and turn from its saved
     assert(worktree?.lifecycle.state === 'creation-failed')
     expect(conversation).toMatchObject({ attentionReason: 'worktree', hasError: true })
     expect(conversation.messages.filter((message) => message.role === 'user')).toHaveLength(1)
-    expect(server.providerAdapter.startedTurns).toHaveLength(0)
+    expect(conversationTurns(server.providerAdapter)).toHaveLength(0)
     expect(drafts.read(key)).toMatchObject({ text: '', worktreeMode: 'current' })
     expect(ready.storage.getItem(`agent.pending:${key}`)).toBeNull()
     stopInterrupting()
@@ -110,8 +111,8 @@ test('accepted creation failure retries the same session and turn from its saved
       await engine.providerRuntimeIdle()
       await chat.refresh()
     })
-    expect(server.providerAdapter.startedTurns).toHaveLength(1)
-    expect(server.providerAdapter.startedTurns[0]).toMatchObject({
+    expect(conversationTurns(server.providerAdapter)).toHaveLength(1)
+    expect(conversationTurns(server.providerAdapter)[0]).toMatchObject({
       sessionId,
       turnId: conversation.latestTurn?.turnId,
       cwd: worktree.canonicalPath,

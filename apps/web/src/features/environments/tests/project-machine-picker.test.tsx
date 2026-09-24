@@ -2,6 +2,7 @@ import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { onTestFinished, vi } from 'vitest'
 
 import { ProjectPicker } from '@/features/environments/components/project-picker'
 import { useChatProjectionStore } from '@/features/chat/state/chat-projection-store'
@@ -23,6 +24,9 @@ test.for(['row', 'path'])(
         h.connections.store.getState().machines.find((machine) => machine.name === 'remote')?.phase,
       ).toBe('live'),
     )
+    // The folder list is virtualized and mounts no rows while its scroll box measures zero.
+    const height = vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(600)
+    onTestFinished(() => height.mockRestore())
     renderWithProviders(
       <ProjectPicker
         machines={connectedMachines(useEnvironmentsStore.getState().entries)}

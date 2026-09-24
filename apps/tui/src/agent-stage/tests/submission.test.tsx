@@ -12,7 +12,7 @@ import { test, expect } from '../../../test/fixtures'
 import { createControlledInProcessTransport } from '../../../test/client'
 import { renderAgentStage } from '../../../test/factories/agent-stage'
 import { makeTestServer } from '../../../test/server'
-import { loseNextDispatchAcknowledgement } from '../../../test/factories/chat'
+import { loseNextDispatchAcknowledgement, conversationTurns } from '../../../test/factories/chat'
 import { runPaletteCommand } from '../../../test/actions'
 import { createDrafts, draftsForStorage } from '@/agent-stage/state/drafts'
 import { gitCommand, prepareGitWorkbench } from '../../../test/factories/git-workbench'
@@ -35,14 +35,14 @@ test('the first send creates the selected worktree and later turns keep that che
     })
     expect(createDrafts(ready.storage).read(key).worktreeMode).toBe('new')
     expect(Object.keys(chat.getSnapshot().projection.worktreeById)).toHaveLength(1)
-    expect(server.providerAdapter.startedTurns).toHaveLength(0)
+    expect(conversationTurns(server.providerAdapter)).toHaveLength(0)
     await act(async () => {
       await frame.mockInput.typeText('Use an isolated checkout')
       frame.mockInput.pressEnter()
       frame.mockInput.pressEnter()
     })
     await act(async () => {
-      await expect.poll(() => server.providerAdapter.startedTurns.length).toBe(1)
+      await expect.poll(() => conversationTurns(server.providerAdapter).length).toBe(1)
       await expect.poll(() => chat.getSnapshot().selectedSessionId).not.toBeNull()
     })
     const sessionId = chat.getSnapshot().selectedSessionId
@@ -58,7 +58,7 @@ test('the first send creates the selected worktree and later turns keep that che
       lifecycle: { state: 'ready' },
       branch: `worktree/${worktree.id}`,
     })
-    expect(server.providerAdapter.startedTurns[0]?.cwd).toBe(worktree.canonicalPath)
+    expect(conversationTurns(server.providerAdapter)[0]?.cwd).toBe(worktree.canonicalPath)
     expect(await readFile(`${worktree.canonicalPath}/sample.txt`, 'utf8')).toContain('line 20')
     expect(await readFile(`${server.root}/sample.txt`, 'utf8')).toContain('changed line')
     expect(createDrafts(ready.storage).read(key)).toMatchObject({
@@ -79,9 +79,9 @@ test('the first send creates the selected worktree and later turns keep that che
       frame.mockInput.pressEnter()
     })
     await act(async () => {
-      await expect.poll(() => server.providerAdapter.startedTurns.length).toBe(2)
+      await expect.poll(() => conversationTurns(server.providerAdapter).length).toBe(2)
     })
-    expect(server.providerAdapter.startedTurns[1]).toMatchObject({
+    expect(conversationTurns(server.providerAdapter)[1]).toMatchObject({
       sessionId,
       cwd: worktree.canonicalPath,
       messageText: 'Continue in the same checkout',
@@ -179,9 +179,11 @@ test('an unchanged prompt gets a fresh command after authoritative rejection', a
       frame.mockInput.pressEnter()
     })
     await act(async () => {
-      await expect.poll(() => server.providerAdapter.startedTurns.length).toBe(2)
+      await expect.poll(() => conversationTurns(server.providerAdapter).length).toBe(2)
     })
-    expect(server.providerAdapter.startedTurns[1]?.messageText).toBe('Retry this unchanged prompt')
+    expect(conversationTurns(server.providerAdapter)[1]?.messageText).toBe(
+      'Retry this unchanged prompt',
+    )
   } finally {
     await app.cleanup()
     await server.cleanup()
@@ -250,9 +252,9 @@ test('retrying an unknown acknowledgement keeps the original command and sends o
       assert(engine)
       await engine.providerRuntimeIdle()
     })
-    expect(server.providerAdapter.startedTurns).toHaveLength(1)
+    expect(conversationTurns(server.providerAdapter)).toHaveLength(1)
     expect(Object.keys(reconnected.chat.getSnapshot().projection.worktreeById)).toHaveLength(2)
-    expect(server.providerAdapter.startedTurns[0]?.sessionId).toBe(pending.sessionId)
+    expect(conversationTurns(server.providerAdapter)[0]?.sessionId).toBe(pending.sessionId)
     expect(drafts.pending(key, drafts.read(key), 'send')).toBeNull()
   } finally {
     await app.cleanup()

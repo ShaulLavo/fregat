@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import * as v from 'valibot'
-import { orchestrationForApp } from 'server/testing'
+import { orchestrationForApp, type MockProviderAdapter } from 'server/testing'
 import {
   commandIdSchema,
   messageIdSchema,
@@ -33,6 +33,11 @@ export function draftChatTurn(worktreeId: WorktreeId, text = 'Say hello') {
     modelSelection: { providerInstanceId: DEFAULT_PROVIDER_INSTANCE_ID, model: 'gpt-5.5' },
     worktreeTarget: { kind: 'current', worktreeId },
   })
+}
+
+// Title generation sends ephemeral turns through the same adapter; these are the user's.
+export function conversationTurns(adapter: MockProviderAdapter) {
+  return adapter.startedTurns.filter((turn) => !turn.ephemeral)
 }
 
 export async function appendChatMessages(

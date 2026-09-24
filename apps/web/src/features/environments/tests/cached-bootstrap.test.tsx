@@ -8,7 +8,6 @@ import {
   useChatProjectionStore,
 } from '@/features/chat/state/chat-projection-store'
 import { recordEnvironmentCacheBinding } from '@/lib/environments/state/binding-cache'
-import { fetchOrchestrationShellSnapshotHttp } from '@/features/chat/transport/orchestration-http-snapshots'
 import { primaryServerOrigin, activeServerOrigin, setActiveServerOrigin } from '@/lib/client'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
 import { assertEnvironmentWritable } from '@/lib/environments/state/availability'
@@ -20,9 +19,7 @@ import { createBootRuntime } from '@/state/bootstrap-runtime'
 import { createBootstrap } from '@/state/bootstrap'
 import { createTestNavigation } from '../../../../test/factories/navigation'
 import { currentRailEnvironments } from '@/features/chat-mode/state/rail-environments'
-import { sessionRailModel } from '@workspace/client-core/chat/rail/model'
 import { createInProcessClient } from '../../../../test/client'
-import { registerFederatedProject } from '../../../../test/factories/federation'
 import { expect, test } from '../../../../test/fixtures'
 import { makeTestServer } from '../../../../test/server'
 
@@ -61,9 +58,8 @@ test('warm bootstrap exists before mount and effect replay retains the same runt
   }
 })
 
-test('cached primary and remote slices paint before sockets, and cached protocol versions cannot prevent startup', async ({
+test('cached bindings start primary and remote before sockets without painting stale projections, and cached protocol versions cannot prevent startup', async ({
   client,
-  server,
 }) => {
   const second = await makeTestServer({ filesystemWatch: false })
   const clientB = createInProcessClient(second)
@@ -75,18 +71,6 @@ test('cached primary and remote slices paint before sockets, and cached protocol
   const previousProjection = useChatProjectionStore.getState()
   const previousOrigin = activeServerOrigin()
   const oldDescriptor = { ...descriptorA, protocolVersion: descriptorA.protocolVersion + 1 }
-  await registerFederatedProject(server, client, 'cached A')
-  await registerFederatedProject(second, clientB, 'cached B')
-  useChatProjectionStore.getState().resetChatProjection()
-  useChatProjectionStore
-    .getState()
-    .syncShellSnapshot(descriptorA.environmentId, await fetchOrchestrationShellSnapshotHttp(client))
-  useChatProjectionStore
-    .getState()
-    .syncShellSnapshot(
-      descriptorB.environmentId,
-      await fetchOrchestrationShellSnapshotHttp(clientB),
-    )
   recordEnvironmentCacheBinding(environmentScopedStorage(descriptorA.environmentId), {
     names: ['local'],
     origin: primary,
@@ -111,10 +95,8 @@ test('cached primary and remote slices paint before sockets, and cached protocol
   setActiveServerOrigin(primary)
   const application = createBootRuntime(oldDescriptor, parseAddressIntent('/'), true)
   try {
-    const model = sessionRailModel({ environments: currentRailEnvironments() })
-    expect(model.projects).toHaveLength(1)
-    expect(model.sessions).toHaveLength(2)
-    expect(model.sessions.every((session) => session.stale)).toBe(true)
+    // Projections are server answers, never persisted: the rail waits for each socket.
+    expect(currentRailEnvironments()).toEqual([])
     expect(transportFor(descriptorA.environmentId)?.closed).toBe(true)
     expect(transportFor(descriptorB.environmentId)?.closed).toBe(true)
     expect(application.connections.store.getState().machines[0]?.environmentId).toBe(

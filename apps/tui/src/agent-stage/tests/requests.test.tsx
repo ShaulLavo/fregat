@@ -40,8 +40,9 @@ test('an approval waits for typing to stop, preserves the draft, and sends only 
     await runPaletteCommand(frame, 'Toggle session rail')
     await expect.poll(() => frame.renderer.currentFocusedRenderable?.id).toBe('agent-approval')
     expect(server.providerAdapter.approvalResponses).toHaveLength(0)
+    // Default options are Cancel, Deny, Allow for this session, Allow; 2 is Deny.
     await act(async () => {
-      frame.mockInput.pressKey('3')
+      frame.mockInput.pressKey('2')
     })
     await expect.poll(() => server.providerAdapter.approvalResponses.length).toBe(1)
     expect(server.providerAdapter.approvalResponses[0]).toMatchObject({

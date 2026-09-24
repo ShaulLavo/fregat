@@ -90,6 +90,8 @@ export const SETTINGS_REGISTRY = {
     merge: 'record',
     scope: 'application',
     widget: 'complex',
+    // A map keyed by project UUID has no widget; the JSON view is its only editor.
+    visibility: 'internal',
     category: 'Chat',
     title: 'Project response streaming',
     description: 'Response streaming mode overrides keyed by project UUID on this machine.',
@@ -123,6 +125,8 @@ export const SETTINGS_REGISTRY = {
     },
     scope: 'application',
     widget: 'complex',
+    // No widget edits a model selection yet, so a row could only say "Edit in settings.json".
+    visibility: 'internal',
     category: 'Chat',
     title: 'Title generation model',
     description:
@@ -133,6 +137,7 @@ export const SETTINGS_REGISTRY = {
     default: {},
     scope: 'application',
     widget: 'complex',
+    visibility: 'internal',
     merge: 'record',
     category: 'Chat',
     title: 'Project title generation models',
@@ -172,6 +177,7 @@ export const SETTINGS_REGISTRY = {
     default: {},
     scope: 'application',
     widget: 'complex',
+    visibility: 'internal',
     merge: 'record',
     category: 'Chat',
     title: 'Project grouping overrides',

@@ -19,5 +19,5 @@ test('an open dialog shows the real settings page', async ({ client }) => {
   // The dialog is the folderless shell now: same page, reachable when there is
   // no tab strip to put a Settings tab in, and with a way back out.
   expect(await screen.findByLabelText('Search settings')).toBeDefined()
-  expect(await screen.findByRole('button', { name: 'None' })).toBeDefined()
+  expect(await screen.findByRole('button', { name: 'Choose wallpaper' })).toBeDefined()
 })

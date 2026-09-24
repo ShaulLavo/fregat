@@ -9,9 +9,30 @@ const SERVER_STOP_TIMEOUT_MS = 5_000
 const DEFAULT_BROWSER_PORT = '5179'
 const DEFAULT_FILE_SERVER_URL = 'http://127.0.0.1:33201'
 
+// Vitest runs global setup once for the project and again for each `browser.instances` entry,
+// in one process. They share one server; the last teardown stops it.
+type SharedServer = { ready: Promise<() => Promise<void>>; users: number }
+const sharedKey = Symbol.for('platform.browser-file-server')
+const registry = globalThis as typeof globalThis & { [sharedKey]?: SharedServer }
+
 export default async function setupBrowserFileServer() {
+  const shared = (registry[sharedKey] ??= { ready: startBrowserFileServer(), users: 0 })
+  shared.users += 1
+  const stop = await shared.ready
+
+  return async () => {
+    shared.users -= 1
+    if (shared.users > 0) return
+
+    delete registry[sharedKey]
+    await stop()
+  }
+}
+
+async function startBrowserFileServer() {
   const serverUrl = new URL(process.env.VITEST_BROWSER_FILE_SERVER_URL ?? DEFAULT_FILE_SERVER_URL)
   const browserPort = process.env.VITEST_BROWSER_PORT ?? DEFAULT_BROWSER_PORT
+  await assertPortFree(serverUrl, browserPort)
   const runtimeRoot = await mkdtemp(path.join(tmpdir(), 'platform-browser-'))
   const server = startServer(serverUrl, browserPort, runtimeRoot)
 
@@ -82,6 +103,22 @@ async function waitForServer(server: TrackedServer, serverUrl: URL, browserPort:
   }
 
   throw new Error(serverErrorMessage(`Browser file server did not start: ${lastError}`, server))
+}
+
+// The readiness poll only asks the port for /health, so a server left over from an earlier run
+// would answer it and every test would run against that stale build.
+async function assertPortFree(serverUrl: URL, browserPort: string) {
+  const answered = await fetch(new URL('/health', serverUrl), {
+    headers: { origin: `http://127.0.0.1:${browserPort}` },
+  }).then(
+    () => true,
+    () => false,
+  )
+  if (!answered) return
+
+  throw new Error(
+    `Browser file server port ${serverUrl.port} is already serving; stop the leftover process (ss -ltnp | grep ${serverUrl.port})`,
+  )
 }
 
 async function stopServer(server: TrackedServer) {

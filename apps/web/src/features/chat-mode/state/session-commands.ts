@@ -63,14 +63,27 @@ export async function startSessionDraft(ref: ScopedProjectRef, options: SessionO
   return result.status === 'applied'
 }
 export function startScopedSessionDraft() {
+  const project = draftProject()
+  return project ? startProjectDraft(project) : false
+}
+function draftProject(): ScopedProjectRef | null {
   const scope = useSessionRailStore.getState().scope
-  if (scope) {
-    const project = currentRailModel().projects.find((candidate) => candidate.groupKey === scope)
-    return project ? startSessionDraft(project.ref) : false
+  if (!scope) {
+    const projectId = activeProjectId()
+    return projectId ? { environmentId: activeEnvironmentId(), projectId } : null
   }
-  const projectId = activeProjectId()
-  if (!projectId) return false
-  const environmentId = activeEnvironmentId()
+  const group = currentRailModel().projects.find((candidate) => candidate.groupKey === scope)
+  if (!group) return null
+  // The selected owner wins over the group's representative, so the draft keeps its checkout.
+  const { selection } = useSessionSelectionStore.getState()
+  if (selection.kind === 'auto') return group.ref
+  const selected = group.members.find(
+    ({ ref }) =>
+      ref.environmentId === selection.environmentId && ref.projectId === selection.projectId,
+  )
+  return selected?.ref ?? group.ref
+}
+function startProjectDraft({ environmentId, projectId }: ScopedProjectRef) {
   const { selection, restored, draftWorktreeId } = useSessionSelectionStore.getState()
   const slice = selectChatProjectionSlice(useChatProjectionStore.getState(), environmentId)
   const resolved = activeProjectSession({

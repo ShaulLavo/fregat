@@ -1,5 +1,3 @@
-// @vitest-environment happy-dom
-
 import { afterEach, vi } from 'vitest'
 
 import {
@@ -41,6 +39,15 @@ afterEach(() => {
   delete (globalThis as typeof globalThis & { __editorPerfTrace?: TraceHandle }).__editorPerfTrace
   history.replaceState(null, '', originalUrl)
   vi.unstubAllGlobals()
+  vi.unstubAllEnvs()
+})
+
+test('the trace stays off while client logging is disabled', () => {
+  vi.stubEnv('OBSERVABILITY_ENABLED', 'false')
+  history.replaceState(null, '', '/?editorPerfTrace=1')
+  installEditorPerformanceTraceFromUrl()
+
+  expect(traceHandle()).toBeUndefined()
 })
 
 test('report drains long tasks that overlap the activation boundary', () => {
@@ -57,8 +64,7 @@ test('report drains long tasks that overlap the activation boundary', () => {
     }
   }
   vi.stubGlobal('PerformanceObserver', TestPerformanceObserver)
-  history.replaceState(null, '', '/?editorPerfTrace=1')
-  installEditorPerformanceTraceFromUrl()
+  installTraceFromUrl()
   const handle = traceHandle()
   handle?.reset()
   const reportAt = performance.now()
@@ -94,8 +100,7 @@ test('trace-only bridge forwards opaque sample controls and unregisters ownershi
   }
   const reset = vi.fn(async () => resetResult)
   const unregister = registerEditorOpenBenchmarkControl({ begin, prime, reset })
-  history.replaceState(null, '', '/?editorPerfTrace=1')
-  installEditorPerformanceTraceFromUrl()
+  installTraceFromUrl()
   const handle = traceHandle()
   const target = { path: '/repo/a.ts', rootPath: '/repo' }
 
@@ -138,6 +143,13 @@ test('benchmark control registration rejects concurrent owners', () => {
   )
   unregister()
 })
+
+/** The trace rides on client logging, which is off under test by default. */
+function installTraceFromUrl(): void {
+  vi.stubEnv('OBSERVABILITY_ENABLED', 'true')
+  history.replaceState(null, '', '/?editorPerfTrace=1')
+  installEditorPerformanceTraceFromUrl()
+}
 
 function traceHandle(): TraceHandle | undefined {
   return (globalThis as typeof globalThis & { __editorPerfTrace?: TraceHandle }).__editorPerfTrace

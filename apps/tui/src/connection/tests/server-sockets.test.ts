@@ -53,6 +53,7 @@ test('binary terminal frames reach the PTY and explicit disposal finishes its pr
     type: 'ready',
     cwd: socketServer.root,
     shell: '/bin/sh',
+    restoredHistory: false,
   })
   const bytes = new Uint8Array([0, 255, 192, 128, 27, 3, 4])
   socket.send(bytes)

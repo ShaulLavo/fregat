@@ -7,6 +7,7 @@ import { renderAgentStage } from '../../../test/factories/agent-stage'
 import { prepareGitWorkbench } from '../../../test/factories/git-workbench'
 import { chooseWorktreeOption } from '../../../test/factories/worktrees'
 import { runPaletteCommand } from '../../../test/actions'
+import { conversationTurns } from '../../../test/factories/chat'
 import { draftsForStorage, draftKey } from '@/agent-stage/state/drafts'
 
 test('native worktree choice preserves the prompt and creates only on send', async () => {
@@ -44,7 +45,7 @@ test('native worktree choice preserves the prompt and creates only on send', asy
       await engine.providerRuntimeIdle()
       await chat.refresh()
     })
-    expect(server.providerAdapter.startedTurns).toHaveLength(1)
+    expect(conversationTurns(server.providerAdapter)).toHaveLength(1)
     const created = Object.values(chat.getSnapshot().projection.sessionById)[0]
     assert(created)
     expect(created.worktreeId).not.toBe(worktreeId)

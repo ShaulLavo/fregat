@@ -39,13 +39,15 @@ describe('palette editing', () => {
     expect(deriveFromAccent(light, lime).app['primary-foreground'].l).toBeCloseTo(0.205, 3)
   })
 
-  it('flags only the known status-badge pair in Graphite and an unreadable edit', () => {
-    // Graphite light's success badge text measures 4.38:1; the readout reports
-    // it rather than hiding it. Dark is clean.
-    expect(contrastFailures(light).map((failure) => failure.foreground)).toEqual([
-      'success-foreground',
-    ])
+  it('passes Graphite in both modes and flags an unreadable edit', () => {
+    expect(contrastFailures(light)).toEqual([])
     expect(contrastFailures(dark)).toEqual([])
+    // Graphite's old success fill: its badge text measured 4.38:1, a near miss the readout must catch.
+    const oldSuccess = parseColor('oklch(0.55 0.17 165)')!
+    const nearMiss = setPaletteColor(graphite, 'light', 'app', 'success', oldSuccess)
+    expect(
+      contrastFailures(paletteColorsFor(nearMiss, 'light')).map((failure) => failure.foreground),
+    ).toEqual(['success-foreground'])
     const broken = setPaletteColor(graphite, 'dark', 'app', 'foreground', dark.app.background)
     const failures = contrastFailures(paletteColorsFor(broken, 'dark'))
     expect(failures.map((failure) => failure.foreground)).toContain('foreground')

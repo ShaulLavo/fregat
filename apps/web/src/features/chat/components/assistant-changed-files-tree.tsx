@@ -22,7 +22,11 @@ export function AssistantChangedFilesTree({
   const [expansion, setExpansion] = useState<Expansion>({ key, overrides: {} })
   const [activeId, setActiveId] = useState<string | null>(null)
   const overrides = expansion.key === key ? expansion.overrides : {}
-  const rows = turnDiffRows(nodes, allDirectoriesExpanded, overrides)
+  // Without a checkpoint diff a file row still names the file, but offers nothing to open.
+  const rows = turnDiffRows(nodes, allDirectoriesExpanded, overrides).map((row) => ({
+    ...row,
+    disabled: !row.hasChildren && !onOpenFileDiff,
+  }))
 
   function toggle(path: string) {
     setExpansion((current) => {
@@ -55,6 +59,7 @@ export function AssistantChangedFilesTree({
       {rows.map((row) => (
         <AssistantChangedFileRow
           key={row.id}
+          disabled={row.disabled}
           row={row}
           rowProps={list.rowProps(row.id)}
           onActivate={() => activate(row.id)}

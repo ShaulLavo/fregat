@@ -40,14 +40,15 @@ test('a deferred snapshot keeps the callback that owned its document', () => {
   hook.rerender({ onChange: secondOwner, path: '/repo/b.ts' })
   flushFirstFrame(frames)
 
-  expect(firstOwner).toHaveBeenCalledWith(fileDocumentKey(filesystemPath('/repo/a.ts')), {
-    left: 0,
-    top: 1_962,
-  })
+  expect(firstOwner).toHaveBeenCalledWith(
+    fileDocumentKey(filesystemPath('/repo/a.ts')),
+    { left: 0, top: 1_962 },
+    { left: 0, top: 1_962 },
+  )
   expect(secondOwner).not.toHaveBeenCalled()
 })
 
-test('persists the bottom row at the viewport bottom instead of the trailing empty area', () => {
+test('keeps the live offset but reopens with the bottom row at the viewport bottom', () => {
   const onChange = vi.fn()
   const hook = renderHook(() =>
     useScrollPersistencePlugin({
@@ -60,10 +61,11 @@ test('persists the bottom row at the viewport bottom instead of the trailing emp
   contribution.update(snapshot(fileDocumentKey(filesystemPath('/repo/a.ts')), 3_980), 'viewport')
   contribution.dispose?.()
 
-  expect(onChange).toHaveBeenCalledWith(fileDocumentKey(filesystemPath('/repo/a.ts')), {
-    left: 0,
-    top: 3_400,
-  })
+  expect(onChange).toHaveBeenCalledWith(
+    fileDocumentKey(filesystemPath('/repo/a.ts')),
+    { left: 0, top: 3_980 },
+    { left: 0, top: 3_400 },
+  )
 })
 
 function activate(plugin: EditorPlugin): EditorViewContribution {

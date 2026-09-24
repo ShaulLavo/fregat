@@ -106,7 +106,7 @@ test('connects a host selected from SSH config and saves no repository path', as
       connections: h.connections,
     },
   )
-  await userEvent.click(await screen.findByRole('button', { name: 'fixture' }))
+  await userEvent.click(await screen.findByRole('option', { name: 'fixture' }))
   await userEvent.click(screen.getByRole('button', { name: 'Connect' }))
   await waitFor(() => expect(closed).toBe(true), { timeout: 5000 })
   expect((await fetchSettings(undefined, h.clientA)).values['environments.machines']).toEqual({

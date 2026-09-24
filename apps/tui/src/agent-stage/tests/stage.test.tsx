@@ -4,7 +4,7 @@ import { Application } from '@/components/application'
 import { selectChatSessionById } from '@workspace/client-core/chat/selectors'
 import { test, expect } from '../../../test/fixtures'
 import { makeTestServer } from '../../../test/server'
-import { openTestChat } from '../../../test/factories/chat'
+import { openTestChat, conversationTurns } from '../../../test/factories/chat'
 import { renderTui } from '../../../test/render'
 import { runPaletteCommand } from '../../../test/actions'
 
@@ -38,8 +38,8 @@ test('native prompt submits complete text once, streams a reply, and keeps the n
       frame.mockInput.pressEnter()
       frame.mockInput.pressEnter()
     })
-    await expect.poll(() => server.providerAdapter.startedTurns.length).toBe(1)
-    expect(server.providerAdapter.startedTurns[0]?.messageText).toBe(
+    await expect.poll(() => conversationTurns(server.providerAdapter).length).toBe(1)
+    expect(conversationTurns(server.providerAdapter)[0]?.messageText).toBe(
       'Explain this checkout completely',
     )
     await expect.poll(() => chat.getSnapshot().selectedSessionId).not.toBeNull()

@@ -77,7 +77,13 @@ test('switching documents cancels the old burst and unmounting cancels the new o
     })
     expect(rendered.result.current).toBe(store.getState().documentContentRevisions[second.key])
 
+    const published = rendered.result.current
     act(() => secondSession.applyText('pending '))
+    // The buffer schedules its own storage maintenance; let it run so what is left is the hook's.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300)
+    })
+    expect(rendered.result.current).toBe(published)
     expect(vi.getTimerCount()).toBeGreaterThan(0)
     rendered.unmount()
     expect(vi.getTimerCount()).toBe(0)
