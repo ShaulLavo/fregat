@@ -1,4 +1,4 @@
-import { openFixtureWorkspace, releaseFixture } from '../fixture-workspace'
+import { fixtureApiBase, openFixtureWorkspace, releaseFixture } from '../fixture-workspace'
 import { mkdir, mkdtemp, readFile, rename, symlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { Page } from 'playwright'
@@ -31,6 +31,7 @@ export const editorExternalEdit: Scenario = {
       subscriptions: { before: 0, after: 0 },
     }
     inspections.set(page, inspection)
+    let busyWatch: AbortController | undefined
     let projectSubscriptions = 0
     page.on('request', (request) => {
       const url = new URL(request.url())
@@ -69,6 +70,7 @@ export const editorExternalEdit: Scenario = {
       await symlink('../target', path.join(project, 'linked'))
       await writeFile(disk, before)
       await writeFile(path.join(project, otherFile), 'ANOTHER_OPEN_TAB\n')
+      busyWatch = watchLargeTree(page)
       await openFixtureWorkspace(page, project)
       await selectors.treeItem(page, 'linked').click()
       await openFileFromTree(page, filename)
@@ -157,6 +159,7 @@ export const editorExternalEdit: Scenario = {
       await selectors.editorRows(page).filter({ hasText: 'EXTERNAL_CONFLICT' }).waitFor()
       await step('reverted-to-disk')
     } finally {
+      busyWatch?.abort()
       await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pagehide')))
       await releaseFixture(fixture)
     }
@@ -164,4 +167,22 @@ export const editorExternalEdit: Scenario = {
   async inspect(page) {
     return inspections.get(page)
   },
+}
+
+// Parcel queues every subscribe behind a crawl in progress, and a checkout takes seconds to
+// crawl: open-file events must not wait on the project watcher queued behind it.
+function watchLargeTree(page: Page) {
+  const controller = new AbortController()
+  const checkout = path.resolve(import.meta.dirname, '../../..').slice(1)
+  const url = new URL(`${fixtureApiBase(page)}/fs/events`)
+  url.searchParams.set('path', checkout)
+  url.searchParams.set('scope', 'project')
+  url.searchParams.set('files', '[]')
+  void fetch(url, {
+    headers: { Origin: new URL(page.url()).origin },
+    signal: controller.signal,
+  })
+    .then((response) => response.body?.pipeTo(new WritableStream()))
+    .catch(() => {})
+  return controller
 }

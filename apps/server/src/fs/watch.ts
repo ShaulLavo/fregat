@@ -62,16 +62,25 @@ type WriteResultMarker = {
   readonly version: string
 }
 
-const watcherIgnoredChildGlobs = defaultIgnoredNames.flatMap((name) => [
-  `${name}/**`,
-  `**/${name}/**`,
-])
+// Narrower than the tree's list: language servers and open files need rebuilt declarations in
+// `dist` and `build` and a package arriving in `node_modules`, not its contents (VS Code's default).
+const watcherIgnoredNames = defaultIgnoredNames.filter(
+  (name) => name !== 'node_modules' && name !== 'dist' && name !== 'build',
+)
+const watcherIgnoredChildGlobs = [
+  ...watcherIgnoredNames.flatMap((name) => [`${name}/**`, `**/${name}/**`]),
+  'node_modules/*/**',
+  '**/node_modules/*/**',
+]
 
 // A file is written after it is created, so a brand-new entry's mtime trails
 // its birthtime by however long the write took. Measured under Bun on APFS: 3ms
 // for 10MB, 25ms for 50MB, 112ms for 200MB. Anything past this window is a
 // later edit of a file we watched being born, not part of its creation.
 const createWriteSettleMs = 250
+
+// One kernel tick at HZ=100, the coarsest common configuration.
+const coarseClockToleranceMs = 10
 
 export type WatchBackend = 'auto' | 'node'
 
@@ -84,12 +93,15 @@ export type WatchStreamOptions = {
   onlyFiles?: boolean
   includeIgnored?: boolean
   files?: readonly string[]
+  /** Watch each input's own entries only, never its subtree. */
+  shallow?: boolean
 }
 
 export class FileChangeHub {
   private readonly backend: WatchBackend
   private readonly listeners = new Set<Listener>()
   private readonly nativeWatchers = new Map<string, WatcherEntry>()
+  private readonly shallowWatchers = new Map<string, WatcherEntry>()
   private readonly paths: WorkspacePaths
   private readonly openFiles: OpenFileWatches
   private readonly rawListeners = new Set<Listener>()
@@ -162,6 +174,7 @@ export class FileChangeHub {
     return {
       nativeWatcherCount: this.nativeWatchers.size,
       openFileWatcherCount: this.openFiles.size,
+      shallowWatcherCount: this.shallowWatchers.size,
       watchEnabled: this.watchEnabled,
     }
   }
@@ -261,9 +274,12 @@ export class FileChangeHub {
   async close() {
     this.openFiles.close()
     const releases = await Promise.all(
-      Array.from(this.nativeWatchers.values()).map((entry) => entry.release),
+      [...this.nativeWatchers.values(), ...this.shallowWatchers.values()].map(
+        (entry) => entry.release,
+      ),
     )
     this.nativeWatchers.clear()
+    this.shallowWatchers.clear()
     this.listeners.clear()
     this.rawListeners.clear()
     this.transactionBarriers.clear()
@@ -344,34 +360,54 @@ export class FileChangeHub {
       return noop
     }
 
-    const existing = this.nativeWatchers.get(relativeRoot)
+    // A second crawl of a covered subtree would queue behind parcel's lock for nothing.
+    const root = coveringWatcherRoot(this.nativeWatchers, relativeRoot) ?? relativeRoot
+    const existing = this.nativeWatchers.get(root)
     if (existing) {
       existing.refCount += 1
       await existing.release
-      return () => this.releaseWatcher(relativeRoot)
+      return () => this.releaseWatcher(this.nativeWatchers, root)
     }
 
-    const release = this.createWatcher(relativeRoot)
-    this.nativeWatchers.set(relativeRoot, { refCount: 1, release })
+    const release = this.createWatcher(root)
+    this.nativeWatchers.set(root, { refCount: 1, release })
     await release
 
-    return () => this.releaseWatcher(relativeRoot)
+    return () => this.releaseWatcher(this.nativeWatchers, root)
   }
 
-  private async releaseWatcher(relativeRoot: string) {
-    const entry = this.nativeWatchers.get(relativeRoot)
+  private async retainShallowWatcher(relativeDirectory: string): Promise<WatchRelease> {
+    if (!this.watchEnabled) return noop
+
+    const existing = this.shallowWatchers.get(relativeDirectory)
+    if (existing) {
+      existing.refCount += 1
+      await existing.release
+      return () => this.releaseWatcher(this.shallowWatchers, relativeDirectory)
+    }
+
+    const release = Promise.resolve(this.createNodeWatcher(relativeDirectory, false))
+    this.shallowWatchers.set(relativeDirectory, { refCount: 1, release })
+    await release
+
+    return () => this.releaseWatcher(this.shallowWatchers, relativeDirectory)
+  }
+
+  private async releaseWatcher(watchers: Map<string, WatcherEntry>, relativeRoot: string) {
+    const entry = watchers.get(relativeRoot)
     if (!entry) return
 
     entry.refCount -= 1
     if (entry.refCount > 0) return
 
-    this.nativeWatchers.delete(relativeRoot)
+    watchers.delete(relativeRoot)
     await releaseWatcher(await entry.release)
   }
 
   private async createWatcher(relativeRoot: string): Promise<WatchRelease> {
     if (this.backend === 'node') return this.createNodeWatcher(relativeRoot)
 
+    const startedAt = performance.now()
     try {
       return await this.createParcelWatcher(relativeRoot)
     } catch (error) {
@@ -383,6 +419,7 @@ export class FileChangeHub {
       recordRequestWarning('fs.watch.backend_fallback', {
         area: 'fs',
         backend: 'node',
+        durationMs: Math.round(performance.now() - startedAt),
         error: errorSummary(error),
         operation: 'fs.watch.createWatcher',
         requestedBackend: this.backend,
@@ -417,11 +454,11 @@ export class FileChangeHub {
     return () => subscription.unsubscribe()
   }
 
-  private createNodeWatcher(relativeRoot: string): WatchRelease {
+  private createNodeWatcher(relativeRoot: string, recursive = true): WatchRelease {
     try {
       const target = this.paths.resolve(relativeRoot)
       const attachedAtMs = wallClockMs()
-      const watcher = watch(target.absolutePath, { recursive: true }, (event, filename) => {
+      const watcher = watch(target.absolutePath, { recursive }, (event, filename) => {
         runDetached(
           () => this.handleNodeEvent(relativeRoot, event, filename?.toString() ?? '', attachedAtMs),
           { area: 'fs', backend: 'node', operation: 'watch_event' },
@@ -477,18 +514,27 @@ export class FileChangeHub {
 
     const abort = () => wake.current?.()
     let releases: WatchRelease[] = []
+    const startedAt = performance.now()
+    // A files stream owns a watch per file: waiting on the project watcher would park its
+    // `ready` behind parcel, which serializes every subscribe behind any large crawl.
+    const roots = options.onlyFiles ? new Set<string>() : subscribed
     listeners.add(listener)
     signal?.addEventListener('abort', abort)
 
     try {
-      for (const input of subscribed) releases.push(await this.retainWatcher(input))
+      for (const input of roots) {
+        releases.push(
+          await (options.shallow ? this.retainShallowWatcher(input) : this.retainWatcher(input)),
+        )
+      }
       if (this.watchEnabled) {
-        for (const file of files) releases.push(await this.retainOpenFile(file, subscribed))
+        for (const file of files) releases.push(await this.retainOpenFile(file, roots))
       }
       recordRequestContext({
         watch: {
           scope: options.onlyFiles ? 'files' : 'project',
           openFiles: [...files],
+          readyMs: Math.round(performance.now() - startedAt),
           ...this.info(),
         },
       })
@@ -560,6 +606,26 @@ export class FileChangeHub {
 
     return undefined
   }
+}
+
+/** Whether a recursive watcher misses part of this subtree; `node_modules` is watched one level deep. */
+function watcherHides(relativePath: string) {
+  return (
+    relativePath.split('/').includes('node_modules') ||
+    isIgnoredPath(relativePath, watcherIgnoredNames)
+  )
+}
+
+/** The closest watched ancestor whose ignore rules do not hide `relativeRoot`. */
+function coveringWatcherRoot(watchers: ReadonlyMap<string, WatcherEntry>, relativeRoot: string) {
+  let covering: string | null = null
+  for (const root of watchers.keys()) {
+    if (root === relativeRoot) return root
+    if (root && !relativeRoot.startsWith(`${root}/`)) continue
+    if (watcherHides(root ? relativeRoot.slice(root.length + 1) : relativeRoot)) continue
+    if (covering === null || root.length > covering.length) covering = root
+  }
+  return covering
 }
 
 function subscribedPaths(paths: WorkspacePaths, inputs: string[]) {
@@ -767,7 +833,7 @@ function nativeWatchEvent(
 // birthtime says when the inode appeared, and comparing that to the moment this
 // watcher attached tells creation from modification without keeping a cache of
 // paths that could never contain the files present at startup.
-function nativeEventType(
+export function nativeEventType(
   nativeEvent: string,
   entry: TreeEntry | undefined,
   attachedAtMs: number,
@@ -784,10 +850,9 @@ function existingPathEventType(entry: TreeEntry, attachedAtMs: number) {
   // repairs a superset of what `changed` does.
   if (!(entry.birthtimeMs > 0)) return 'created'
 
-  // Stat timestamps are whole milliseconds, so the attach time has to be
-  // compared at that resolution — otherwise a file born in the attach
-  // millisecond falls on whichever side the sub-millisecond remainder lands.
-  const attachedMs = Math.floor(attachedAtMs)
+  // File timestamps come from the kernel's coarse clock, up to a tick behind the
+  // precise one: a file born just after the attach can be stamped just before it.
+  const attachedMs = Math.floor(attachedAtMs) - coarseClockToleranceMs
   if (entry.birthtimeMs >= attachedMs) return bornWhileWatchingEventType(entry)
   // macOS replays writes made just before a watcher attaches. The event is
   // real, but its subject is not news: this inode predates us and its content

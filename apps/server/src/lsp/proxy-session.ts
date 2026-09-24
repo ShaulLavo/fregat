@@ -16,6 +16,8 @@ import type { ChildProcessWithoutNullStreams } from 'node:child_process'
 import type { LspServerHandle, LspServerMatch } from './registry'
 import { fileUriForPath } from './language'
 import { LspStdioMessageReader, writeLspStdioMessage } from './stdio-rpc'
+import { DID_CHANGE_WATCHED_FILES, LspWatchedFiles, type FileEvent } from './watched-files'
+import type { TreeWatchSource } from '../fs/tree-watch'
 import { errorSummary, limitText, recordProcessInfo, recordProcessWarning } from '../observability'
 
 type JsonRpcId = number | string | null
@@ -191,12 +193,17 @@ export class LspSessionPool implements LspSessionSource {
    */
   private readonly deltaEnabled: () => boolean
 
+  /** Backs `workspace/didChangeWatchedFiles`; without one the capability is not advertised. */
+  private readonly watchSource: TreeWatchSource | null
+
   constructor(
     idleTimeoutMs: () => number = () => DEFAULT_SETTING_VALUES['lsp.idleTimeoutMs'],
     deltaEnabled: () => boolean = () => DEFAULT_SETTING_VALUES['lsp.semanticTokens.delta'],
+    watchSource: TreeWatchSource | null = null,
   ) {
     this.idleTimeoutMs = idleTimeoutMs
     this.deltaEnabled = deltaEnabled
+    this.watchSource = watchSource
   }
 
   /** Live pooled backends. Read by teardown assertions. */
@@ -275,6 +282,7 @@ export class LspSessionPool implements LspSessionSource {
       this,
       this.idleTimeoutMs,
       this.deltaEnabled,
+      this.watchSource,
     )
       .then((session) => this.adoptSession(key, session))
       .finally(() => this.starting.delete(key))
@@ -338,6 +346,7 @@ class PooledLspProxySession {
   private stderrCount = 0
   private stderrTail = ''
   private readonly handle: LspServerHandle
+  private readonly watchedFiles: LspWatchedFiles | null
 
   private constructor(
     key: string,
@@ -347,6 +356,7 @@ class PooledLspProxySession {
     pool: LspSessionPool,
     idleTimeoutMs: () => number,
     deltaEnabled: () => boolean,
+    watchSource: TreeWatchSource | null,
   ) {
     this.deltaEnabled = deltaEnabled
     this.idleTimeoutMs = idleTimeoutMs
@@ -359,6 +369,9 @@ class PooledLspProxySession {
     this.reader = new LspStdioMessageReader((message, byteLength) =>
       this.handleServerMessage(message, byteLength),
     )
+    this.watchedFiles = watchSource
+      ? new LspWatchedFiles(match.root, watchSource, (changes) => this.notifyWatchedFiles(changes))
+      : null
     this.bindProcess()
   }
 
@@ -369,6 +382,7 @@ class PooledLspProxySession {
     pool: LspSessionPool,
     idleTimeoutMs: () => number,
     deltaEnabled: () => boolean,
+    watchSource: TreeWatchSource | null,
   ) {
     const handle = await match.server.spawn(match.root)
     if (!handle) return null
@@ -381,6 +395,7 @@ class PooledLspProxySession {
       pool,
       idleTimeoutMs,
       deltaEnabled,
+      watchSource,
     )
   }
 
@@ -823,6 +838,7 @@ class PooledLspProxySession {
       },
     ]
     params.processId = this.process.pid ?? null
+    if (this.watchedFiles) params.capabilities = withWatchedFilesCapability(params.capabilities)
     await this.applyInitializationOptions(params)
     return { ...message, params }
   }
@@ -1214,11 +1230,11 @@ class PooledLspProxySession {
       return true
     }
     if (message.method === 'client/registerCapability') {
-      this.respondToServer(message.id, null)
+      void this.registerCapability(message)
       return true
     }
     if (message.method === 'client/unregisterCapability') {
-      this.respondToServer(message.id, null)
+      void this.unregisterCapability(message)
       return true
     }
     if (message.method === LSP_SEMANTIC_TOKENS_REFRESH) {
@@ -1275,6 +1291,47 @@ class PooledLspProxySession {
     const configuration = this.match.server.configuration?.(this.match.root) ?? {}
     return items.map((item) =>
       configurationSection(configuration, isRecord(item) ? item.section : null),
+    )
+  }
+
+  /**
+   * Watched-file registrations are answered once their watches are attached, so an event the
+   * server expects after its request completes cannot be lost. A failure is reported, not
+   * acknowledged. Other registrations are acknowledged as before: nothing here acts on them.
+   */
+  private async registerCapability(message: JsonRpcRequest): Promise<void> {
+    const registrations = capabilityChanges(message.params, 'registrations')
+    try {
+      for (const registration of registrations) {
+        if (registration.method !== DID_CHANGE_WATCHED_FILES) continue
+        if (!this.watchedFiles) throw createInternalError('Watched files are not supported')
+        await this.watchedFiles.register(registration.id, registration.registerOptions)
+      }
+      this.respondToServer(message.id, null)
+    } catch (error) {
+      recordProcessWarning('lsp.watched_files.register_failed', {
+        area: 'lsp',
+        error: errorSummary(error),
+        registrationCount: registrations.length,
+        rootPath: this.rootPath,
+        serverId: this.match.server.id,
+      })
+      this.respondToServerError(message.id, -32603, errorMessage(error))
+    }
+  }
+
+  private async unregisterCapability(message: JsonRpcRequest): Promise<void> {
+    // The protocol spells the field `unregisterations`.
+    for (const unregistration of capabilityChanges(message.params, 'unregisterations')) {
+      if (unregistration.method !== DID_CHANGE_WATCHED_FILES) continue
+      await this.watchedFiles?.unregister(unregistration.id)
+    }
+    this.respondToServer(message.id, null)
+  }
+
+  private notifyWatchedFiles(changes: FileEvent[]): void {
+    this.writeToServer(
+      JSON.stringify({ jsonrpc: '2.0', method: DID_CHANGE_WATCHED_FILES, params: { changes } }),
     )
   }
 
@@ -1421,6 +1478,7 @@ class PooledLspProxySession {
     this.pool.remove(this)
     this.rejectPendingRequests(createInternalError(`LSP process closed: ${outcome}`))
     this.recordSession(outcome)
+    void this.watchedFiles?.dispose()
     this.closeConnections(outcome)
   }
 
@@ -1442,6 +1500,7 @@ class PooledLspProxySession {
     // Before `closeConnections`, so `activeConnectionCount` reports how many
     // clients shutdown actually cut off.
     this.recordSession(outcome)
+    void this.watchedFiles?.dispose()
     this.closeConnections(outcome)
   }
 
@@ -1529,6 +1588,7 @@ class PooledLspProxySession {
       stderrBytes: this.stderrBytes,
       stderrCount: this.stderrCount,
       stderrTail: this.stderrTail || undefined,
+      watchedFiles: this.watchedFiles?.stats,
     }
 
     if (isFailedLspSession(outcome, this.exitCode, this.exitSignal)) {
@@ -2242,4 +2302,25 @@ function rewriteTextDocumentVersion(message: JsonRpcNotification, version: numbe
       textDocument: { ...textDocument, version },
     },
   }
+}
+
+function withWatchedFilesCapability(capabilities: unknown) {
+  const client = isRecord(capabilities) ? capabilities : {}
+  const workspace = isRecord(client.workspace) ? client.workspace : {}
+  return {
+    ...client,
+    workspace: {
+      ...workspace,
+      didChangeWatchedFiles: { dynamicRegistration: true, relativePatternSupport: true },
+    },
+  }
+}
+
+function capabilityChanges(params: unknown, field: 'registrations' | 'unregisterations') {
+  const changes = isRecord(params) && Array.isArray(params[field]) ? params[field] : []
+  return changes.flatMap((change: unknown) =>
+    isRecord(change) && typeof change.id === 'string' && typeof change.method === 'string'
+      ? [{ id: change.id, method: change.method, registerOptions: change.registerOptions }]
+      : [],
+  )
 }

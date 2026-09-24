@@ -26,6 +26,7 @@ import { NerdFontService, type FontService } from './fonts/service'
 import { errorPayload, FsError, isFsError } from './fs/errors'
 import { fsRoutes } from './fs/routes'
 import { FileSystemService, type FileSystemServiceOptions } from './fs/service'
+import { treeWatchSource } from './fs/tree-watch'
 import { gitRoutes } from './git/routes'
 import { GitService } from './git/service'
 import { CommitMessageGenerator } from './git/commit-message-generator'
@@ -290,6 +291,7 @@ export function createApp(options: AppOptions) {
     new LspSessionPool(
       () => settings.snapshot().values['lsp.idleTimeoutMs'],
       () => settings.snapshot().values['lsp.semanticTokens.delta'],
+      treeWatchSource(fs.changes, fs.paths),
     )
   const cleanup = appCleanup(
     terminal,

@@ -30,4 +30,6 @@ The ordinary-file check passed, but two broader checks failed. The diagnostic re
 
 The native TypeScript source describes a built-in watcher fallback only for certain platforms when client watcher registration is unavailable. See [TypeScript's LSP server](https://github.com/microsoft/typescript-go/blob/main/internal/lsp/server.go). The behavioral failure above was measured against the installed version, rather than inferred from upstream source.
 
+Follow-up on 2026-09-24 (Plan 134): the symlink failure was the files stream waiting on the project watcher behind parcel's serialized crawls, and TypeScript 7 needed client file watching. Both are fixed; the plan's Progress section has the causes and what remains.
+
 The immediate concern is therefore broader than Platform opening its own repository. Ordinary external editing works in the tested case, while linked paths and native TypeScript dependency refresh still need work.

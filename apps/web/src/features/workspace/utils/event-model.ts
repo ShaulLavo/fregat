@@ -17,7 +17,7 @@ export type WorkspaceOpenFileSnapshot = {
 
 export type WorkspaceTreeOperation =
   | { type: 'patch-changed-tree-entries'; entries: TreeEntry[] }
-  | { type: 'refresh-ready-root-tree'; path: string }
+  | { type: 'refresh-ready-tree'; path: string }
   | { type: 'refresh-tree-directory'; path: string }
 
 export type WorkspaceOpenFileOperation =
@@ -34,7 +34,8 @@ export type WorkspaceOpenFileRefresh = {
 
 export type WorkspaceFetchedOpenFileOperation =
   | { type: 'changed-conflict'; path: string }
-  | { type: 'replace-open-file'; notifyDirtyOverwrite: boolean; path: string }
+  | { type: 'replace-open-file'; path: string }
+  | { type: 'unchanged-open-file'; path: string }
 
 export type WorkspaceEventPlan = {
   openFileOperations: WorkspaceOpenFileOperation[]
@@ -77,32 +78,36 @@ export function planWorkspaceReady({
     // A reconnect may have missed another window's operation.
     shouldInvalidateFileHistory: true,
     shouldInvalidateGitState: true,
-    treeOperations: [{ type: 'refresh-ready-root-tree', path: rootPath }],
+    treeOperations: [{ type: 'refresh-ready-tree', path: rootPath }],
   }
 }
 
+// Dirty files are re-read too: a disk version that moved while nothing was watching is a conflict.
 function shouldRefreshReadyOpenFile(file: WorkspaceOpenFileSnapshot) {
-  if (file.isDirty) return false
-
   return file.hasLiveDocument
 }
 
 export function planFetchedOpenFileRefresh({
+  baseVersion,
   liveText,
   isDirty,
   remoteText,
+  remoteVersion,
   path,
 }: {
+  /** The disk version the buffer was loaded or saved at. */
+  baseVersion: string | null
   liveText: string | null
   isDirty: boolean
   remoteText: string
+  remoteVersion: string
   path: string
 }): WorkspaceFetchedOpenFileOperation {
-  if (liveText === remoteText)
-    return { notifyDirtyOverwrite: false, path, type: 'replace-open-file' }
+  if (liveText === remoteText) return { path, type: 'replace-open-file' }
+  if (isDirty && baseVersion === remoteVersion) return { path, type: 'unchanged-open-file' }
   if (isDirty) return { type: 'changed-conflict', path }
 
-  return { notifyDirtyOverwrite: true, path, type: 'replace-open-file' }
+  return { path, type: 'replace-open-file' }
 }
 
 function planTreeOperations(

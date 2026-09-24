@@ -38,6 +38,47 @@ export function createObservedInProcessClient(
   return createClient(server, fetcher)
 }
 
+/** Ends every open `/fs/events` response on demand, as a server restart or dropped link would. */
+export function createCuttableEventsClient(server: TestServer) {
+  const directFetch = directInProcessFetcher(server)
+  const open = new Set<() => void>()
+  const fetcher = (async (input, init) => {
+    const request = new Request(input, init)
+    const response = await directFetch(request)
+    if (new URL(request.url).pathname !== '/fs/events' || !response.body) return response
+    const reader = response.body.getReader()
+    let end = () => {}
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        end = () => {
+          open.delete(end)
+          void reader.cancel()
+          controller.close()
+        }
+        open.add(end)
+      },
+      async pull(controller) {
+        const { done, value } = await reader.read()
+        if (!open.has(end)) return
+        if (!done) return controller.enqueue(value)
+        open.delete(end)
+        controller.close()
+      },
+      cancel(reason) {
+        open.delete(end)
+        return reader.cancel(reason)
+      },
+    })
+    return new Response(body, response)
+  }) as typeof fetch
+  return {
+    client: createClient(server, fetcher),
+    endEventStreams: () => {
+      for (const end of [...open]) end()
+    },
+  }
+}
+
 export function createControlledInProcessClient(server: TestServer) {
   const controller = new SettingsStreamFetchController()
   const directFetch = directInProcessFetcher(server)

@@ -4,6 +4,8 @@ import type { WatchServerMessage } from '@workspace/contracts'
 import { startWorkspaceEventStreams } from '@/features/workspace/state/event-streams'
 import { streamWorkspaceEvents } from '@/features/workspace/state/event-stream'
 import { test, expect } from '../../../../test/fixtures'
+import { createCuttableEventsClient } from '../../../../test/client'
+import type { StreamInterruption } from '@/features/workspace/state/event-streams'
 
 test('keeps the project stream and retained file events alive across tab changes', async ({
   server,
@@ -23,6 +25,7 @@ test('keeps the project stream and retained file events alive across tab changes
     onMessage: (message) => messages.push(message),
     onFilesReady: (files) => readyFiles.push(files),
     onError: (error) => errors.push(error),
+    onInterrupted: (interruption) => errors.push(interruption),
   })
   try {
     streams.setFiles([first])
@@ -85,5 +88,52 @@ test('a file-only subscription excludes unrelated project events', async ({ serv
   } finally {
     controller.abort()
     await completion
+  }
+})
+
+test('reopens both streams after they end and delivers later edits', async ({ server }) => {
+  await mkdir(path.join(server.root, 'project'))
+  const open = 'project/open.txt'
+  await writeFile(path.join(server.root, open), 'before')
+  const { client, endEventStreams } = createCuttableEventsClient(server)
+  const messages: WatchServerMessage[] = []
+  const readyFiles: (readonly string[])[] = []
+  const interruptions: StreamInterruption[] = []
+  const streams = startWorkspaceEventStreams({
+    client,
+    rootPath: 'project',
+    onMessage: (message) => messages.push(message),
+    onFilesReady: (files) => readyFiles.push(files),
+    onError: (error) => {
+      throw error
+    },
+    onInterrupted: (interruption) => interruptions.push(interruption),
+  })
+  try {
+    streams.setFiles([open])
+    await expect.poll(() => readyFiles).toEqual([[open]])
+    await expect.poll(() => messages.filter((message) => message.type === 'ready')).toHaveLength(1)
+
+    endEventStreams()
+    await expect
+      .poll(() => interruptions.map(({ scope, error }) => ({ scope, failed: error !== undefined })))
+      .toEqual(
+        expect.arrayContaining([
+          { scope: 'project', failed: false },
+          { scope: 'files', failed: false },
+        ]),
+      )
+    // Each replacement is a new generation, and its ready is what resynchronizes the page.
+    await expect.poll(() => messages.filter((message) => message.type === 'ready')).toHaveLength(2)
+    await expect.poll(() => readyFiles).toEqual([[open], [open]])
+
+    messages.length = 0
+    await writeFile(path.join(server.root, open), 'after the gap')
+    await writeFile(path.join(server.root, 'project', 'new.txt'), 'created after the gap')
+    await expect
+      .poll(() => messages.flatMap((message) => ('path' in message ? [message.path] : [])))
+      .toEqual(expect.arrayContaining([open, 'project/new.txt']))
+  } finally {
+    streams.close()
   }
 })

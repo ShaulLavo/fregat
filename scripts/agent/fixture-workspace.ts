@@ -88,10 +88,19 @@ export async function waitForFileContent(file: string, expected: string) {
   strictEqual(await readFile(file, 'utf8'), expected)
 }
 
+/** The API the page talks to: the dev server beside Vite, or the page's own base in production. */
+export function fixtureApiBase(page: Page) {
+  const current = new URL(page.url())
+  if (current.port === (process.env.WEB_PORT ?? '5173'))
+    return `http://localhost:${process.env.PORT ?? '3001'}`
+  const prefix = current.pathname.startsWith('/platform/') ? '/platform' : ''
+  return `${current.origin}${prefix}`
+}
+
 export async function openFixtureWorkspace(page: Page, project: string) {
   const current = new URL(page.url())
   const prefix = current.pathname.startsWith('/platform/') ? '/platform' : ''
-  const api = current.port === '5173' ? 'http://localhost:3001' : `${current.origin}${prefix}`
+  const api = fixtureApiBase(page)
   const response = await page.request.post(`${api}/fs/workspace-address`, {
     data: { path: project.slice(1) },
     headers: { Origin: current.origin },

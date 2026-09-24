@@ -38,7 +38,9 @@ Split views: `scenario editor-split-drag` checks edge previews, modifier changes
 
 ## Gotchas
 
-`scenario editor-external-edit` creates a disposable workspace with a folder linked outside the project. It removes a line on disk, atomically replaces the open file, retargets the symlink, replaces its target directory, and verifies that subsequent edits still arrive. An external write while another tab opens and closes must preserve unsaved text and offer a conflict. The project filesystem subscription count must stay unchanged across both tab operations. Fixture files are cleaned up afterward; screenshots and `inspection.json` retain the evidence.
+`scenario editor-external-edit` creates a disposable workspace with a folder linked outside the project. It removes a line on disk, atomically replaces the open file, retargets the symlink, replaces its target directory, and verifies that subsequent edits still arrive. An external write while another tab opens and closes must preserve unsaved text and offer a conflict. The project filesystem subscription count must stay unchanged across both tab operations. Fixture files are cleaned up afterward; screenshots and `inspection.json` retain the evidence. The scenario holds a project watch on the checkout while the probe opens, so a files stream that waited on the project watcher fails here.
+
+`scenario editor-external-diagnostics` opens `probe.ts` in a disposable project, then edits, atomically replaces, deletes and recreates the unopened `dependency.ts` it imports, once under the server's TypeScript 7 and once with TypeScript 6 linked into the fixture. The Problems rows must follow each change and the final hover must show the new type. It writes `watch-ready-N.txt` until one reaches the tree before the first edit: a project watch queued behind another project's crawl misses earlier edits.
 
 `trace editor-theme-preview --file syntax-highlighting.ts` previews three code themes twice and cancels. Compare traces for worker session restarts and inspect the scenario's screenshots for the editor behind the picker. It restores the committed theme without writing settings.
 

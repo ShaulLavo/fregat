@@ -30,7 +30,7 @@ a bare root `bun run verify`.
 | [137 — shared workspace interactions](137-shared-workspace-interactions.md)             | **IMPLEMENTED 2026-09-24 — ALL SEVEN PHASES DEPLOYED**       |
 | [136 — file tree undo and redo](136-file-tree-undo.md)                                  | **IMPLEMENTED — ALL THREE PHASES; SCENARIO GREEN**           |
 | [135 — TanStack async ownership and route preparation](135-tanstack-async-ownership.md) | **PROPOSED — RESEARCH COMPLETE; IMPLEMENTATION NOT STARTED** |
-| [134 — external edits and LSP freshness](134-external-edit-and-lsp-freshness.md)        | **PROPOSED — REPRODUCE AND TRACE FIRST**                     |
+| [134 — external edits and LSP freshness](134-external-edit-and-lsp-freshness.md)        | **PHASES 1–3 DONE; PHASE 4 PARTLY — NOT DEPLOYED**           |
 | [133 — one owner per fact](133-one-owner-per-fact.md)                                   | **PROPOSED — PHASE 1 READY; D1 NEEDS AN ANSWER**             |
 | [132 — process and dev ownership](132-process-and-dev-ownership.md)                     | **PROPOSED — PHASE 1 FIRST; D4 DECIDED: DELETE**             |
 | [131 — provider codes, not prose](131-provider-codes-not-prose.md)                      | **PROPOSED — PHASE 1 IS A SECURITY FIX**                     |

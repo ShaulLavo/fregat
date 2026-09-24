@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -152,6 +152,52 @@ describe.runIf(process.platform === 'linux')('native watch lifetime', () => {
     expect(await zombieShells()).toEqual(before)
   })
 })
+
+describe.runIf(process.platform === 'linux')('native watch coverage', () => {
+  it('shows language-server paths to internal streams only', async () => {
+    const root = await fixtureRoot()
+    await mkdir(path.join(root, 'dist'))
+    await mkdir(path.join(root, 'node_modules/existing'), { recursive: true })
+    const hub = new FileChangeHub(createWorkspacePaths(root), { enabled: true })
+    const abort = new AbortController()
+    const publicEvents = collect(hub.stream([''], abort.signal))
+    const rawEvents = collect(hub.stream([''], abort.signal, { includeIgnored: true }))
+    try {
+      await expect.poll(() => rawEvents.length && publicEvents.length).toBeGreaterThan(0)
+
+      await writeFile(path.join(root, 'dist/index.d.ts'), 'export {}\n')
+      await mkdir(path.join(root, 'node_modules/installed'))
+      await writeFile(path.join(root, 'node_modules/existing/index.d.ts'), 'export {}\n')
+      await writeFile(path.join(root, 'visible.txt'), 'barrier\n')
+
+      await expect
+        .poll(() => paths(rawEvents))
+        .toEqual(
+          expect.arrayContaining(['dist/index.d.ts', 'node_modules/installed', 'visible.txt']),
+        )
+      await expect.poll(() => paths(publicEvents)).toContain('visible.txt')
+      expect(paths(publicEvents)).toEqual(['visible.txt'])
+      expect(paths(rawEvents)).not.toContain('node_modules/existing/index.d.ts')
+    } finally {
+      abort.abort()
+      await hub.close()
+    }
+  })
+})
+
+function collect(stream: AsyncGenerator<WatchServerMessage>) {
+  const events: WatchServerMessage[] = []
+  void (async () => {
+    for await (const event of stream) events.push(event)
+  })()
+  return events
+}
+
+function paths(events: readonly WatchServerMessage[]) {
+  return [
+    ...new Set(events.flatMap((event) => ('path' in event && event.path ? [event.path] : []))),
+  ]
+}
 
 async function zombieShells() {
   const children = await readFile(`/proc/${process.pid}/task/${process.pid}/children`, 'utf8')

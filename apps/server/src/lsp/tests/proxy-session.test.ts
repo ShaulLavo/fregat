@@ -1,5 +1,5 @@
 import { EventEmitter } from 'node:events'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { PassThrough } from 'node:stream'
@@ -12,10 +12,15 @@ import { LspSessionPool } from '../proxy-session'
 import { closeApp, createApp } from '../../app'
 import { createMetadataDatabase } from '../../db/client'
 import { testSettingsOptions } from '../../settings/testing'
+import { createWorkspacePaths } from '../../fs/path'
+import { treeWatchSource, type TreeWatchSource } from '../../fs/tree-watch'
+import { FileChangeHub } from '../../fs/watch'
+import { fileUriForPath } from '../language'
 
 const databases: { close: () => void }[] = []
 const pools: LspSessionPool[] = []
 const roots: string[] = []
+const hubs: FileChangeHub[] = []
 
 it('review: kills the child after a framing allocation failure', async () => {
   const fixture = await lspFixture()
@@ -40,6 +45,7 @@ afterEach(async () => {
   // Same reason `appCleanup` closes the settings store: an unclosed SQLite
   // handle per app the file builds is a leaked native handle per test run.
   for (const database of databases.splice(0)) database.close()
+  await Promise.all(hubs.splice(0).map((hub) => hub.close()))
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
 })
 
@@ -1372,6 +1378,110 @@ describe('LspSessionPool server requests', () => {
   })
 })
 
+describe('LspSessionPool watched files', () => {
+  it('advertises watched files only when the pool can watch', async () => {
+    const capability = 'params.capabilities.workspace.didChangeWatchedFiles'
+    const unwatched = await initializedFixture()
+    expect(unwatched.initializeMessages()[0]).not.toHaveProperty(capability)
+
+    const watched = await initializedFixture({}, hubWatch)
+    expect(watched.initializeMessages()[0]).toHaveProperty(capability, {
+      dynamicRegistration: true,
+      relativePatternSupport: true,
+    })
+  })
+
+  it('answers a registration once its watch is attached and forwards matching changes', async () => {
+    const fixture = await initializedFixture({}, hubWatch)
+    const source = path.join(fixture.match.root, 'a.ts')
+    await writeFile(source, 'export const a = 1\n')
+    await writeFile(path.join(fixture.match.root, 'notes.md'), 'ignored\n')
+    fixture.respond(watchRegistration('watch-1', `${fixture.match.root}/**/*.ts`))
+    await expect
+      .poll(() => fixture.serverResponse('watch-1'))
+      .toEqual({
+        id: 'watch-1',
+        jsonrpc: '2.0',
+        result: null,
+      })
+    expect(fixture.hub().info().nativeWatcherCount).toBe(1)
+
+    await writeFile(path.join(fixture.match.root, 'notes.md'), 'still ignored\n')
+    await writeFile(source, 'export const a = 2\n')
+    await expect
+      .poll(() => fixture.watchedChanges(), { timeout: 3000 })
+      .toEqual([{ uri: fileUriForPath(source), type: 2 }])
+  })
+
+  it('reports a registration it cannot honour instead of acknowledging it', async () => {
+    const fixture = await initializedFixture({}, hubWatch)
+    fixture.respond({
+      id: 'watch-bad',
+      jsonrpc: '2.0',
+      method: 'client/registerCapability',
+      params: {
+        registrations: [
+          { id: 'bad', method: 'workspace/didChangeWatchedFiles', registerOptions: {} },
+        ],
+      },
+    })
+
+    await expect
+      .poll(() => fixture.serverResponse('watch-bad'))
+      .toMatchObject({
+        error: { code: -32603 },
+      })
+  })
+
+  it('releases watches on unregistration and when the backend goes away', async () => {
+    const fixture = await initializedFixture({}, hubWatch)
+    fixture.respond(watchRegistration('watch-1', `${fixture.match.root}/**/*`))
+    await expect.poll(() => fixture.serverResponse('watch-1')).toBeDefined()
+    expect(fixture.hub().info().nativeWatcherCount).toBe(1)
+
+    fixture.respond({
+      id: 'unwatch-1',
+      jsonrpc: '2.0',
+      method: 'client/unregisterCapability',
+      params: { unregisterations: [{ id: 'watch-1', method: 'workspace/didChangeWatchedFiles' }] },
+    })
+    await expect.poll(() => fixture.serverResponse('unwatch-1')).toBeDefined()
+    await expect.poll(() => fixture.hub().info().nativeWatcherCount).toBe(0)
+
+    fixture.respond(watchRegistration('watch-2', `${fixture.match.root}/**/*`))
+    await expect.poll(() => fixture.serverResponse('watch-2')).toBeDefined()
+    fixture.pool.disposeAll()
+    await expect.poll(() => fixture.hub().info().nativeWatcherCount).toBe(0)
+  })
+})
+
+const watchHubs = new Map<string, FileChangeHub>()
+
+function hubWatch(root: string) {
+  const paths = createWorkspacePaths(root)
+  const hub = new FileChangeHub(paths, { enabled: true })
+  hubs.push(hub)
+  watchHubs.set(root, hub)
+  return treeWatchSource(hub, paths)
+}
+
+function watchRegistration(id: string, globPattern: string) {
+  return {
+    id,
+    jsonrpc: '2.0',
+    method: 'client/registerCapability',
+    params: {
+      registrations: [
+        {
+          id,
+          method: 'workspace/didChangeWatchedFiles',
+          registerOptions: { watchers: [{ globPattern }] },
+        },
+      ],
+    },
+  }
+}
+
 describe('LspSessionPool semantic token delta', () => {
   const DELTA_CAPABLE = {
     capabilities: {
@@ -1872,8 +1982,11 @@ function lspTestApp(root: string, pool: LspSessionPool) {
   })
 }
 
-async function initializedFixture(server: Partial<LspServerMatch['server']> = {}) {
-  const fixture = await lspFixture(server)
+async function initializedFixture(
+  server: Partial<LspServerMatch['server']> = {},
+  watch?: (root: string) => TreeWatchSource | null,
+) {
+  const fixture = await lspFixture(server, undefined, watch)
   const first = await fixture.pool.acquire(fixture.firstSocket, fixture.match, '')
   const second = await fixture.pool.acquire(fixture.secondSocket, fixture.match, '')
   if (!first || !second) throw new Error('expected pooled LSP sessions')
@@ -1889,13 +2002,14 @@ async function initializedFixture(server: Partial<LspServerMatch['server']> = {}
 async function lspFixture(
   server: Partial<LspServerMatch['server']> = {},
   initializationOptions?: LspServerHandle['initializationOptions'],
+  watch: (root: string) => TreeWatchSource | null = () => null,
 ) {
-  const root = await fixtureRoot('platform-lsp-pool-')
+  const root = await realpath(await fixtureRoot('platform-lsp-pool-'))
   // A flag the test flips rather than a setter on the pool: `deltaEnabled` is a
   // getter in production precisely so a settings write takes effect without a
   // restart, and reading it per request is the behaviour worth exercising.
   const delta = { enabled: false }
-  const pool = new LspSessionPool(undefined, () => delta.enabled)
+  const pool = new LspSessionPool(undefined, () => delta.enabled, watch(root))
   pools.push(pool)
 
   const process = fakeProcess()
@@ -1940,6 +2054,17 @@ async function lspFixture(
       })
     },
     initializeMessages: () => serverMessages.filter((message) => message.method === 'initialize'),
+    hub: () => {
+      const hub = watchHubs.get(root)
+      if (!hub) throw new Error('fixture has no watch hub')
+      return hub
+    },
+    serverResponse: (id: string) =>
+      serverMessages.find((message) => message.id === id && !('method' in message)),
+    watchedChanges: () =>
+      serverMessages
+        .filter((message) => message.method === 'workspace/didChangeWatchedFiles')
+        .flatMap((message) => (message.params as { changes: unknown[] }).changes),
     releaseSpawn: () => openSpawnGate?.(),
     respond: (message: unknown) => {
       process.stdout.write(encodeLspStdioMessage(JSON.stringify(message)))

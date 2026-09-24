@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import type { WatchServerMessage } from '../contracts'
 import { createWorkspacePaths } from '../path'
-import { FileChangeHub } from '../watch'
+import { FileChangeHub, nativeEventType } from '../watch'
 
 // macOS reports every mutation to `fs.watch` as a bare `rename`, so these tests
 // exercise the only thing standing between an editor save and the client being
@@ -93,6 +93,26 @@ describe('native watcher event classification', () => {
     await writeFile(path.join(root, 'newborn.txt'), 'two two two')
 
     await expectEventForPath(events, 'newborn.txt', 'changed')
+  })
+})
+
+describe('native event type', () => {
+  const attachedAtMs = 1_000_000.7
+  const entry = (birthtimeMs: number, mtimeMs = birthtimeMs) =>
+    ({ birthtimeMs, mtimeMs }) as Parameters<typeof nativeEventType>[1]
+
+  it('counts a file stamped a clock tick before the attach as born while watching', () => {
+    // File timestamps come from the kernel's coarse clock, which trails the precise one.
+    expect(nativeEventType('rename', entry(attachedAtMs - 3), attachedAtMs)).toBe('created')
+    expect(
+      nativeEventType('rename', entry(attachedAtMs - 500, attachedAtMs - 3), attachedAtMs),
+    ).toBe('changed')
+  })
+
+  it('still ignores a replayed write that clearly predates the watcher', () => {
+    expect(
+      nativeEventType('rename', entry(attachedAtMs - 500, attachedAtMs - 100), attachedAtMs),
+    ).toBe(null)
   })
 })
 

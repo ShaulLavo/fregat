@@ -1,6 +1,6 @@
 # 134: Keep documents and diagnostics current after external edits
 
-Status: proposed. Investigation first; the general fixes are not implemented.
+Status: **Phases 1–3 implemented 2026-09-24; Phase 4 partly (reconnect, resync, D1); freshness model, backend recovery and linked declarations open.** Not deployed. See [Progress](#progress-2026-09-24).
 
 ## Outcome
 
@@ -119,3 +119,25 @@ Add focused tests in `features/workspace/tests/use-events.test.ts` and the exist
 Before deployment, finish the reviewable changes and evidence using the existing release workflow. Verify the actual running server and web release afterward, then repeat the ordinary-project journeys against that deployment. A changed release symlink is not deployment proof. Do not restart shared services during investigation.
 
 Done means every applicable case passes, known upstream limits have tested recovery, and production evidence names the running release. A manual project reload that clears one error is a recovery demonstration, not completion.
+
+## Progress 2026-09-24
+
+Found:
+
+- **Symlinked open file.** A `scope=files` stream retained the project-root parcel watcher before its `ready`. Parcel serializes every subscribe in the process behind any crawl in progress (a subscribe on an empty directory waited 6.5–9 s behind `/work/projects`), so the open file's events sat queued past the scenario's deadline. The mesh's `Bad file descriptor` fallback is a second parcel failure at the end of those waits; it did not reproduce in isolation and remains open.
+- **TypeScript 7.** 7.0.2 has no watcher of its own on Linux: pull and hover stay stale. Given `workspace.didChangeWatchedFiles.dynamicRegistration` it registers `<root>/**/*`, every `node_modules/**/*`, its lib directory and `{baseUri: file:///work, pattern: **/*}`. It ignores `Created` for a file it already has, which is how parcel reports a rename onto an existing path.
+- **Watcher ignore list.** Parcel inherited the tree's ignores, so rebuilt `dist`/`build` declarations and package installs never reached anything.
+- **Classifier.** File timestamps come from the kernel's coarse clock; a file born just after a watcher attached was classified `changed` and a write in that window could be dropped.
+- **D1.** No active path overwrites a dirty buffer: refresh re-checks dirtiness synchronously before replacing, and rename moves the buffer with its text. The `TODO(conflicts)` toast was unreachable on refresh and false on rename.
+- **Reconnect.** Event streams never reopened after the server restarted or the link dropped. Offline emulation does not drop a localhost stream, so the mesh is where `editor-offline-resync` proves it.
+
+Done: files streams watch their own files; hub parcel ignores follow VS Code (`node_modules/*/**`, `dist`/`build` visible to internal streams only) and a covered subtree reuses its ancestor's watcher; coarse-clock tolerance; `lsp/watched-files.ts` implements registrations at the pooled backend (bounded: `node_modules` shallow, ancestors of the root clamped to it, a missing base watched from its parent until it appears), replies after attach, reports invalid registrations, coalesces bursts and sends a replaced file as Deleted then Created; event streams reopen with capped backoff and every `ready` re-reads open files, dirty ones by base version, and re-lists loaded directories. Pyright (scratch install) also passed an edit and an atomic replace through the proxy.
+
+Evidence: `editor-external-edit`, `editor-external-diagnostics` (TS 7 and 6; fails on the unchanged mesh), `editor-offline-resync` (fails on the unchanged mesh; passes locally across a server restart).
+
+Open:
+
+1. **Freshness model (Phase 4.1).** `onInteractiveReady` marks a server usable on any successful request, so Problems can say "No problems reported" before the first result. Needs a per-document state in the Editor plugin; a server that never publishes must not spin forever.
+2. **Setup window.** A watch queued behind another crawl attaches seconds late; an edit in that window is missed by the language server until the file changes again. The main checkout's untracked `references/` is 18k of its 19k watched directories and 9 s of crawl.
+3. **Linked packages.** Clamping `/work/**/*` to the root drops Editor packages reached through `packages/editor-*`; the linked-declaration reproduction (4.7) is unrevisited.
+4. **Backend recovery (4.6)**, the replay review (4.4) and the rest of the Phase 5 matrix (configuration, installs, branch switch, second browser).

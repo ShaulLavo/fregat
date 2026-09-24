@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { rename, rm, writeFile } from 'node:fs/promises'
 import {
   defaultClientCapabilities,
   mergeClientCapabilities,
@@ -8,6 +9,9 @@ import { isRecord } from '@workspace/utils/objects'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { installedTypeScriptRuntimeFixture } from '../../../test/factories/typescript-runtime'
+import { createWorkspacePaths } from '../../fs/path'
+import { treeWatchSource } from '../../fs/tree-watch'
+import { FileChangeHub } from '../../fs/watch'
 import { createInternalError } from '../../observability/structured-errors'
 import { fileUriForPath } from '../language'
 import { LspSessionPool, type LspProxyClientSession, type LspProxySocket } from '../proxy-session'
@@ -22,11 +26,22 @@ const RUNTIMES = [
 ] as const
 const fixtures: Awaited<ReturnType<typeof installedTypeScriptRuntimeFixture>>[] = []
 const pools: LspSessionPool[] = []
+const hubs: FileChangeHub[] = []
 
 afterEach(async () => {
   for (const pool of pools.splice(0)) pool.disposeAll()
+  await Promise.all(hubs.splice(0).map((hub) => hub.close()))
   await Promise.all(fixtures.splice(0).map((fixture) => fixture.dispose()))
 })
+
+function watchedPool() {
+  const paths = createWorkspacePaths('/')
+  const hub = new FileChangeHub(paths, { enabled: true })
+  hubs.push(hub)
+  const pool = new LspSessionPool(() => 120_000, undefined, treeWatchSource(hub, paths))
+  pools.push(pool)
+  return pool
+}
 
 class RecordingSocket implements LspProxySocket {
   readonly sent: Record<string, unknown>[] = []
@@ -49,6 +64,61 @@ class RecordingSocket implements LspProxySocket {
 }
 
 describe('workspace TypeScript against real language servers', () => {
+  it.each(RUNTIMES)(
+    'refreshes diagnostics after external dependency edits with $packageName',
+    async ({ packageName, native }) => {
+      const source = 'import { value } from "./dependency";\nexport const count: number = value;\n'
+      const fixture = await installedTypeScriptRuntimeFixture(packageName, {
+        'package.json': '{"private":true,"type":"module"}\n',
+        'tsconfig.json': '{"compilerOptions":{"strict":true},"files":["probe.ts"]}\n',
+        'probe.ts': source,
+        'dependency.ts': 'export const value = "wrong";\n',
+      })
+      fixtures.push(fixture)
+      const { root } = fixture
+      const filePath = path.join(root, 'probe.ts')
+      const uri = fileUriForPath(filePath)
+      const match = await resolveLspServer({
+        filePath,
+        serverId: 'typescript',
+        settings: SETTINGS,
+        workspaceRoot: root,
+      })
+      if (!match) throw createInternalError('TypeScript fixture did not match its language server')
+      const pool = watchedPool()
+      const socket = new RecordingSocket()
+      const session = await pool.acquire(socket, match, root)
+      if (!session)
+        throw createInternalError('TypeScript fixture did not start its language server')
+      await request(session, socket, 1, 'initialize', initializeParams(root))
+      await notify(session, 'initialized', {})
+      await notify(session, 'textDocument/didOpen', {
+        textDocument: { languageId: 'typescript', text: source, uri, version: 1 },
+      })
+      await assertDiagnostics(session, socket, native, uri)
+
+      const dependency = path.join(root, 'dependency.ts')
+      const changes = [
+        { apply: () => writeFile(dependency, 'export const value = 1;\n'), codes: [] },
+        {
+          apply: async () => {
+            await writeFile(`${dependency}.tmp`, 'export const value = "wrong";\n')
+            await rename(`${dependency}.tmp`, dependency)
+          },
+          codes: [2322],
+        },
+        { apply: () => rm(dependency), codes: [2307] },
+        { apply: () => writeFile(dependency, 'export const value = 1;\n'), codes: [] },
+      ]
+      let id = 10
+      for (const change of changes) {
+        socket.sent.length = 0
+        await change.apply()
+        await assertExternalDiagnostics(session, socket, native, uri, id++, change.codes)
+      }
+    },
+  )
+
   it.each(RUNTIMES)('serves editor features with $packageName', async ({ packageName, native }) => {
     const fixture = await installedTypeScriptRuntimeFixture(packageName, {
       'package.json': '{"private":true,"type":"module"}\n',
@@ -68,8 +138,7 @@ describe('workspace TypeScript against real language servers', () => {
     })
     if (!match) throw createInternalError('TypeScript fixture did not match its language server')
 
-    const pool = new LspSessionPool(() => 120_000)
-    pools.push(pool)
+    const pool = watchedPool()
     const socket = new RecordingSocket()
     const session = await pool.acquire(socket, match, root)
     if (!session) throw createInternalError('TypeScript fixture did not start its language server')
@@ -155,6 +224,33 @@ describe('workspace TypeScript against real language servers', () => {
     }
   })
 })
+
+async function assertExternalDiagnostics(
+  session: LspProxyClientSession,
+  socket: RecordingSocket,
+  native: boolean,
+  uri: string,
+  id: number,
+  codes: readonly number[],
+) {
+  const expected = codes.map((code) => expect.objectContaining({ code }))
+  if (!native) {
+    await expect
+      .poll(() => socket.notification('textDocument/publishDiagnostics'), { timeout: 20_000 })
+      .toMatchObject({ uri, diagnostics: expected })
+    return
+  }
+  await expect
+    .poll(() => socket.sent.some((message) => message.method === 'workspace/diagnostic/refresh'), {
+      timeout: 20_000,
+    })
+    .toBe(true)
+  const result = await request(session, socket, id, 'textDocument/diagnostic', {
+    identifier: 'typescript',
+    textDocument: { uri },
+  })
+  expect(result).toMatchObject({ kind: 'full', items: expected })
+}
 
 function initializeParams(root: string) {
   const capabilities = mergeClientCapabilities(

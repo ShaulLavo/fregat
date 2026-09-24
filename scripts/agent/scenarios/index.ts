@@ -89,7 +89,9 @@ import { editorSplitBreadcrumbs } from './editor-split-breadcrumbs'
 import { editorSplitHistoryState } from './editor-split-history-state'
 import { pageLifecycle } from './page-lifecycle'
 import { editorConflictMerge } from './editor-conflict-merge'
+import { editorExternalDiagnostics } from './editor-external-diagnostics'
 import { editorExternalEdit } from './editor-external-edit'
+import { editorOfflineResync } from './editor-offline-resync'
 import { editorThemePreview } from './editor-theme-preview'
 import { editorNativeCoverage } from './editor-native-coverage'
 import { editorSyntaxBenchmark } from './editor-syntax-benchmark'
@@ -252,7 +254,9 @@ export const scenarios: readonly Scenario[] = [
   editorSplitBreadcrumbs,
   editorSplitHistoryState,
   editorConflictMerge,
+  editorExternalDiagnostics,
   editorExternalEdit,
+  editorOfflineResync,
   terminalBackground,
   bottomPanelPersistence,
   gitOpenAllDiffsSpam,

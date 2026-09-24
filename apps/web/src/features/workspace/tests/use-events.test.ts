@@ -1,6 +1,4 @@
 import { describe, expect, it } from 'vitest'
-import { fileSystemKeys } from '@/lib/query-keys'
-import { shouldRefreshReadyRootTree } from '@/features/workspace/hooks/use-events'
 import {
   affectedDirectoryPaths,
   affectedOpenFileRefreshPaths,
@@ -10,49 +8,6 @@ import {
   planWorkspaceReady,
 } from '@/features/workspace/utils/event-model'
 import { planWorkspaceEditAwareEventBatch } from '@/features/workspace/utils/workspace-edit-events'
-
-describe('shouldRefreshReadyRootTree', () => {
-  it('skips ready refresh when the root tree query is fetching', () => {
-    const queryClient = queryClientWithState('repo', {
-      data: {},
-      dataUpdatedAt: 0,
-      fetchStatus: 'fetching',
-    })
-
-    expect(shouldRefreshReadyRootTree(queryClient, 'repo', 20_000)).toBe(false)
-  })
-
-  it('skips ready refresh when the root tree query is fresh', () => {
-    const queryClient = queryClientWithState('repo', {
-      data: {},
-      dataUpdatedAt: 15_000,
-      fetchStatus: 'idle',
-    })
-
-    expect(shouldRefreshReadyRootTree(queryClient, 'repo', 20_000)).toBe(false)
-  })
-
-  it('refreshes ready root tree when cached data is stale', () => {
-    const queryClient = queryClientWithState('repo', {
-      data: {},
-      dataUpdatedAt: 1_000,
-      fetchStatus: 'idle',
-    })
-
-    expect(shouldRefreshReadyRootTree(queryClient, 'repo', 20_000)).toBe(true)
-  })
-
-  it('refreshes ready root tree when cached data was invalidated', () => {
-    const queryClient = queryClientWithState('repo', {
-      data: {},
-      dataUpdatedAt: 19_000,
-      fetchStatus: 'idle',
-      isInvalidated: true,
-    })
-
-    expect(shouldRefreshReadyRootTree(queryClient, 'repo', 20_000)).toBe(true)
-  })
-})
 
 describe('affectedOpenFileRefreshPaths', () => {
   const root = 'repo'
@@ -321,7 +276,7 @@ describe('mayTrustCachedSnapshot', () => {
 })
 
 describe('planWorkspaceReady', () => {
-  it('refreshes only clean open files with live documents', () => {
+  it('re-reads every open file with a live document, dirty ones included', () => {
     const plan = planWorkspaceReady({
       openFiles: [
         { hasLiveDocument: true, isDirty: false, path: 'repo/a.ts' },
@@ -332,36 +287,55 @@ describe('planWorkspaceReady', () => {
     })
 
     expect(plan).toEqual({
-      openFileOperations: [{ path: 'repo/a.ts', reason: 'ready', type: 'refresh-open-file' }],
+      openFileOperations: [
+        { path: 'repo/a.ts', reason: 'ready', type: 'refresh-open-file' },
+        { path: 'repo/b.ts', reason: 'ready', type: 'refresh-open-file' },
+      ],
       shouldInvalidateFileHistory: true,
       shouldInvalidateGitState: true,
-      treeOperations: [{ path: 'repo', type: 'refresh-ready-root-tree' }],
+      treeOperations: [{ path: 'repo', type: 'refresh-ready-tree' }],
     })
   })
 })
 
 describe('planFetchedOpenFileRefresh', () => {
-  it('replaces matching text without dirty-overwrite notification', () => {
+  it('replaces matching text even when the buffer is dirty', () => {
     const operation = planFetchedOpenFileRefresh({
+      baseVersion: 'v1',
       liveText: 'same',
       isDirty: true,
       path: 'repo/a.ts',
       remoteText: 'same',
+      remoteVersion: 'v2',
     })
 
     expect(operation).toEqual({
-      notifyDirtyOverwrite: false,
       path: 'repo/a.ts',
       type: 'replace-open-file',
     })
   })
 
-  it('plans a conflict for dirty documents with different remote text', () => {
+  it('leaves a dirty document alone while the disk still holds its base', () => {
     const operation = planFetchedOpenFileRefresh({
+      baseVersion: 'v1',
       liveText: 'local',
       isDirty: true,
       path: 'repo/a.ts',
       remoteText: 'remote',
+      remoteVersion: 'v1',
+    })
+
+    expect(operation).toEqual({ path: 'repo/a.ts', type: 'unchanged-open-file' })
+  })
+
+  it('plans a conflict for dirty documents whose disk version moved', () => {
+    const operation = planFetchedOpenFileRefresh({
+      baseVersion: 'v1',
+      liveText: 'local',
+      isDirty: true,
+      path: 'repo/a.ts',
+      remoteText: 'remote',
+      remoteVersion: 'v2',
     })
 
     expect(operation).toEqual({
@@ -370,16 +344,17 @@ describe('planFetchedOpenFileRefresh', () => {
     })
   })
 
-  it('replaces clean documents with dirty-overwrite notification enabled', () => {
+  it('replaces clean documents with the remote text', () => {
     const operation = planFetchedOpenFileRefresh({
+      baseVersion: 'v1',
       liveText: 'local',
       isDirty: false,
       path: 'repo/a.ts',
       remoteText: 'remote',
+      remoteVersion: 'v2',
     })
 
     expect(operation).toEqual({
-      notifyDirtyOverwrite: true,
       path: 'repo/a.ts',
       type: 'replace-open-file',
     })
@@ -405,26 +380,6 @@ describe('affectedDirectoryPaths', () => {
     expect(Array.from(paths)).toEqual(['repo/src'])
   })
 })
-
-function queryClientWithState(
-  rootPath: string,
-  state: {
-    data?: unknown
-    dataUpdatedAt: number
-    fetchStatus: string
-    isInvalidated?: boolean
-  },
-) {
-  return {
-    getQueryState: (queryKey: readonly unknown[]) => {
-      if (JSON.stringify(queryKey) !== JSON.stringify(fileSystemKeys.tree(rootPath))) {
-        return undefined
-      }
-
-      return state
-    },
-  }
-}
 
 function treeEntry(path: string) {
   return {

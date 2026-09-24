@@ -165,6 +165,12 @@ export const lspErrors = defineErrorCatalog('lsp', {
     why: 'The language server process exited or failed while the editor was connected to it.',
     fix: 'Run the language server from a terminal to see why it exits, then reopen the file.',
   },
+  WATCHED_FILES_REGISTRATION_INVALID: {
+    status: 400,
+    message: 'The language server asked to watch files in a form this client does not read',
+    why: 'A workspace/didChangeWatchedFiles registration had no watchers or an unsupported glob pattern.',
+    fix: 'Report the language server and its version; changes it asked to watch will not reach it.',
+  },
 })
 
 export function createInternalError(message: string, cause?: unknown) {

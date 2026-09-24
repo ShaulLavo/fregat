@@ -58,7 +58,6 @@ import {
 import { patchTreeEntryMetadata, replaceDirectoryLoad, type TreeModel } from '@/lib/tree-model'
 import { useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { useEffect, useEffectEvent } from 'react'
-import { toast } from 'sonner'
 import type { TreeEntry, WatchServerMessage } from '@workspace/contracts'
 import { useWorkspaceEditEventClassifier } from '@/features/editor/providers/workspace-edit-context'
 import { planWorkspaceEditAwareEventBatch } from '@/features/workspace/utils/workspace-edit-events'
@@ -73,8 +72,6 @@ const EVENT_BATCH_DELAY_MS = 100
 const FILE_REFRESH_RETRY_DELAY_MS = 80
 
 const FILE_REFRESH_RETRY_ATTEMPTS = 5
-
-const READY_ROOT_TREE_FRESH_MS = 10_000
 
 // Leading + trailing throttle so a runaway stream of filesystem events (an
 // external tool writing into the workspace) cannot refetch git status on
@@ -216,8 +213,15 @@ export function useWorkspaceEvents(rootFolder: PickedFsEntry | null) {
         onError: (error: unknown) => {
           if (controller.signal.aborted) return
 
+          eventsScope.increment('stream.errorCount')
           eventsScope.warn('Workspace event stream failed.', { error })
           reportError(toClientError(error))
+        },
+        onInterrupted: ({ scope, error, retryInMs }) => {
+          eventsScope.increment(`stream.${scope}InterruptionCount`)
+          eventsScope.set({
+            stream: { lastInterruption: { scope, failed: error !== undefined, retryInMs } },
+          })
         },
       })
       const unsubscribeFiles = workspaceStore.subscribe(
@@ -255,6 +259,8 @@ function workspaceEventsScopeHasWork(eventsScope: WideEventScope) {
   if (eventsScope.count('subscription.readyCount') > 0) return true
   if (eventsScope.count('subscription.errorCount') > 0) return true
 
+  if (eventsScope.count('stream.projectInterruptionCount') > 0) return true
+  if (eventsScope.count('stream.filesInterruptionCount') > 0) return true
   return eventsScope.count('stream.errorCount') > 0
 }
 
@@ -477,33 +483,18 @@ async function applyTreeRefreshOperation(
     await refreshTreeDirectory(queryClient, rootPath, operation.path, signal)
     return
   }
-  if (operation.type !== 'refresh-ready-root-tree') return
-  if (!shouldRefreshReadyRootTree(queryClient, rootPath)) return
+  if (operation.type !== 'refresh-ready-tree') return
 
-  await refreshTreeDirectory(queryClient, rootPath, operation.path, signal)
-}
-
-export function shouldRefreshReadyRootTree(
-  queryClient: {
-    getQueryState: (queryKey: readonly unknown[]) =>
-      | {
-          data?: unknown
-          dataUpdatedAt: number
-          fetchStatus: string
-          isInvalidated?: boolean
-        }
-      | undefined
-  },
-  rootPath: string,
-  now = Date.now(),
-) {
-  const state = queryClient.getQueryState(fileSystemKeys.tree(rootPath))
-  if (!state) return false
-  if (state.fetchStatus === 'fetching') return false
-  if (!state.data) return false
-  if (state.isInvalidated) return true
-
-  return now - state.dataUpdatedAt > READY_ROOT_TREE_FRESH_MS
+  // Whatever was listed before the watch attached can miss what changed while it attached.
+  const model = queryClient.getQueryData<TreeModel>(fileSystemKeys.tree(rootPath))
+  const directories = [...(model?.loadedDirectoryPaths ?? [])].map((treePath) =>
+    treePath ? `${operation.path}/${treePath}` : operation.path,
+  )
+  await Promise.all(
+    [operation.path, ...directories].map((path) =>
+      refreshTreeDirectory(queryClient, rootPath, path, signal),
+    ),
+  )
 }
 
 async function refreshTreeDirectory(
@@ -667,10 +658,12 @@ async function applyRefreshOpenFileOperation({
 
   setFileSnapshotQueryData(queryClient, file)
   const operation = planFetchedOpenFileRefresh({
+    baseVersion: liveDocumentVersion(path, conflictContext),
     isDirty: isDirtyLiveDocument(path, dirtyDocumentKeys, conflictContext),
     liveText: liveDocumentText(path, conflictContext),
     path,
     remoteText: file.content,
+    remoteVersion: file.version,
   })
   applyFetchedOpenFileOperation(operation, file, forceReplaceLiveEditorDocument, conflictContext)
 }
@@ -681,20 +674,20 @@ function applyFetchedOpenFileOperation(
   forceReplaceLiveEditorDocument: (file: FileResult) => { wasDirty: boolean },
   context: WorkspaceConflictContext,
 ) {
+  if (operation.type === 'unchanged-open-file') return
   if (operation.type === 'changed-conflict') {
     notifyChangedFilesystemConflict(filesystemPath(operation.path), file, context)
     return
   }
   if (!context.getLiveEditorDocument(fileDocumentKey(file.path))) return
 
-  const result = forceReplaceLiveEditorDocument(file)
-  if (result.wasDirty && operation.notifyDirtyOverwrite) notifyDirtyOverwrite(operation.path)
+  forceReplaceLiveEditorDocument(file)
 }
 
 function applyRenameOpenFileOperation(from: string, to: string, context: WorkspaceConflictContext) {
-  const result = context.renameLiveEditorDocument(filesystemPath(from), filesystemPath(to))
+  // A buffer that turned dirty after planning moves with its unsaved text; nothing is lost.
+  context.renameLiveEditorDocument(filesystemPath(from), filesystemPath(to))
   moveFileQueryData(context.queryClient, from, to)
-  if (result.wasDirty) notifyDirtyOverwrite(from)
 }
 
 async function applyRenamedConflictOperation(
@@ -729,6 +722,11 @@ function settlePendingSaves(queryClient: QueryClient, key: DocumentKey, signal: 
     })
     signal.addEventListener('abort', finish)
   })
+}
+
+function liveDocumentVersion(path: string, context: WorkspaceConflictContext) {
+  const sync = context.getLiveEditorDocument(fileDocumentKey(filesystemPath(path)))?.sync
+  return sync?.kind === 'file' ? sync.fileVersion : null
 }
 
 function liveDocumentText(path: string, context: WorkspaceConflictContext) {
@@ -817,13 +815,6 @@ function createEventQueue(onFlush: (events: FilesystemEvent[]) => void) {
       }, EVENT_BATCH_DELAY_MS)
     },
   }
-}
-
-function notifyDirtyOverwrite(path: string) {
-  // TODO(conflicts): Replace overwrite behavior with conflict resolution state/view.
-  toast.error('Local edits were overwritten', {
-    description: `${path} changed on disk. The remote version replaced your unsaved local edits.`,
-  })
 }
 
 function delay(ms: number, signal: AbortSignal) {
