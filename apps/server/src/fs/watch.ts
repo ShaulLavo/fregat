@@ -10,10 +10,10 @@ import {
 import { OpenFileWatches } from './open-file-watches'
 import { FsError } from './errors'
 import {
-  defaultIgnoredNames,
   isIgnoredPath,
   resolveExistingPath,
   toPosix,
+  watcherIgnoredNames,
   type WorkspacePaths,
 } from './path'
 import { entryFromStat } from './entry'
@@ -58,12 +58,6 @@ type WriteResultMarker = {
   readonly writeId: string
   readonly version: string
 }
-
-// Narrower than the tree's list: language servers and open files need rebuilt declarations in
-// `dist` and `build` and a package arriving in `node_modules`, not its contents (VS Code's default).
-const watcherIgnoredNames = defaultIgnoredNames.filter(
-  (name) => name !== 'node_modules' && name !== 'dist' && name !== 'build',
-)
 
 // A file is written after it is created, so a brand-new entry's mtime trails
 // its birthtime by however long the write took. Measured under Bun on APFS: 3ms

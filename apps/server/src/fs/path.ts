@@ -18,6 +18,12 @@ export const defaultIgnoredNames = [
 
 export const treeIgnoredNames = defaultIgnoredNames.filter((name) => name !== 'node_modules')
 
+// Narrower than the tree's list: language servers and open files need rebuilt declarations in
+// `dist` and `build` and a package arriving in `node_modules`, not its contents (VS Code's default).
+export const watcherIgnoredNames = defaultIgnoredNames.filter(
+  (name) => name !== 'node_modules' && name !== 'dist' && name !== 'build',
+)
+
 const ignoredNameSetCache = new WeakMap<readonly string[], ReadonlySet<string>>()
 
 export type WorkspacePath = {

@@ -1,6 +1,6 @@
 # 134: Keep documents and diagnostics current after external edits
 
-Status: **Phases 1–3 and 4.1–4.3 deployed 2026-09-24, the watcher replaced; linked packages, backend recovery and the Phase 5 matrix open.** See [Progress](#progress-2026-09-24).
+Status: **Phases 1–3 and 4.1–4.3 deployed 2026-09-24, the watcher replaced, linked packages followed; backend recovery and the Phase 5 matrix open.** See [Progress](#progress-2026-09-24).
 
 ## Outcome
 
@@ -139,5 +139,5 @@ Open:
 
 1. ~~Freshness model (Phase 4.1)~~ — done: every Editor diagnostic summary carries `freshness` (`awaiting`, `refreshing`, `current`, `silent`, `unavailable`), owned per active document by the lane; Problems shows a loader only for `awaiting` and "No diagnostics received" for `silent`.
 2. ~~Setup window~~ — done: the hub now uses Bun's recursive `fs.watch` and parcel is gone. With main, Editor and `/work/tmp` opened together, `ready` took 8.3 s, 9.0 s and 21.9 s under parcel and 0.13 s, 0.11 s and 0.19 s now. Parcel also dropped writes in new nested, moved-in, renamed and recreated directories, which Bun keeps; a 40k-file burst lost nothing. Earlier "15 s" figures in this plan came from `curl | head -1`, which returns on the next event, not on `ready`. Coming back online now resyncs like a new stream, because reads an event asked for can fail during an outage.
-3. **Linked packages.** Clamping `/work/**/*` to the root drops Editor packages reached through `packages/editor-*`; the linked-declaration reproduction (4.7) is unrevisited.
+3. ~~Linked packages~~ — done: TypeScript 7 names the common ancestor of program files outside the project, and, once a package's declarations are deleted, looks for their return through `node_modules/<link>`. The registry scans the root for directories linked in from outside (70 ms on main: the Editor repo and `ghostty-webgpu`), watches their real targets, and reports a change at the real path and at every link to it. TypeScript 6 already followed links itself. Scenario `editor-linked-package`.
 4. **Backend recovery (4.6)**, the replay review (4.4) and the rest of the Phase 5 matrix (configuration, installs, branch switch, second browser).

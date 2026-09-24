@@ -91,6 +91,7 @@ import { pageLifecycle } from './page-lifecycle'
 import { editorConflictMerge } from './editor-conflict-merge'
 import { editorExternalDiagnostics } from './editor-external-diagnostics'
 import { editorExternalEdit } from './editor-external-edit'
+import { editorLinkedPackage } from './editor-linked-package'
 import { editorOfflineResync } from './editor-offline-resync'
 import { editorThemePreview } from './editor-theme-preview'
 import { editorNativeCoverage } from './editor-native-coverage'
@@ -256,6 +257,7 @@ export const scenarios: readonly Scenario[] = [
   editorConflictMerge,
   editorExternalDiagnostics,
   editorExternalEdit,
+  editorLinkedPackage,
   editorOfflineResync,
   terminalBackground,
   bottomPanelPersistence,

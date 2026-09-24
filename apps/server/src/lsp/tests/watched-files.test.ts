@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, realpath, rename, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, realpath, rename, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -108,6 +108,29 @@ describe.runIf(process.platform === 'linux')('watched files on a real hub', () =
 
     await watched.unregister('modules')
     expect(hub.info().shallowWatcherCount).toBe(0)
+  })
+
+  it('reports a change in a linked package at its real path and through its link', async () => {
+    const outside = await directory()
+    await mkdir(path.join(outside, 'dist'))
+    const { changes, root, watched } = await fixture()
+    await mkdir(path.join(root, 'node_modules'))
+    await symlink(outside, path.join(root, 'node_modules/linked'))
+    await watched.register('modules', { watchers: [{ globPattern: `${root}/node_modules/**/*` }] })
+    await watched.register('program', {
+      watchers: [{ globPattern: { baseUri: fileUriForPath(path.dirname(root)), pattern: '**/*' } }],
+    })
+
+    await writeFile(path.join(outside, 'dist/index.d.ts'), 'export {}\n')
+
+    await expect
+      .poll(() => changes.map((change) => change.uri), { timeout: 3000 })
+      .toEqual(
+        expect.arrayContaining([
+          fileUriForPath(path.join(outside, 'dist/index.d.ts')),
+          fileUriForPath(path.join(root, 'node_modules/linked/dist/index.d.ts')),
+        ]),
+      )
   })
 
   it('watches a directory that does not exist yet from its parent', async () => {

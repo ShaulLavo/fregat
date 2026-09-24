@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { isRecord } from '@workspace/utils/objects'
 
 import { isOutsideRoot } from '../fs/path'
+import { linkedDirectories, outermostTargets, type LinkedDirectory } from '../fs/linked-directories'
 import type { TreeWatch, TreeWatchChange, TreeWatchSource } from '../fs/tree-watch'
 import { lspErrors } from '../observability/structured-errors'
 import { fileUriForPath } from './language'
@@ -30,6 +31,8 @@ type Watcher = {
   /** What the pattern needs watched; `watch` is its nearest existing stand-in. */
   readonly intended: TreeWatch
   readonly watch: TreeWatch
+  /** Directories linked into the root that the base reaches, by link or by real path. */
+  readonly linked: readonly TreeWatch[]
 }
 
 type WatchEntry = {
@@ -57,6 +60,8 @@ export class LspWatchedFiles {
   private readonly registrations = new Map<string, readonly Watcher[]>()
   private readonly watches = new Map<string, WatchEntry>()
   private readonly pending = new Map<string, FileChangeType>()
+  private links: readonly LinkedDirectory[] = []
+  private linkScan: Promise<readonly LinkedDirectory[]> | null = null
   private readonly root: string
   private readonly source: TreeWatchSource
   private readonly notify: (changes: FileEvent[]) => void
@@ -101,7 +106,7 @@ export class LspWatchedFiles {
     const watchers = this.registrations.get(id)
     if (!watchers) return
     this.registrations.delete(id)
-    await Promise.all(watchers.map((watcher) => this.release(watchKey(watcher.watch))))
+    await this.releaseAll(watchers)
   }
 
   async dispose(): Promise<void> {
@@ -122,10 +127,11 @@ export class LspWatchedFiles {
     compiled: readonly Watcher[],
     expected: readonly Watcher[] | undefined,
   ): Promise<void> {
-    const watchers = await Promise.all(compiled.map((watcher) => existingWatch(watcher, this.root)))
+    const existing = await Promise.all(compiled.map((watcher) => existingWatch(watcher, this.root)))
+    const watchers = await this.withLinkedDirectories(existing)
     const retained: string[] = []
     try {
-      for (const watcher of watchers) retained.push(await this.retain(watcher.watch))
+      for (const watch of watchers.flatMap(watchesOf)) retained.push(await this.retain(watch))
     } catch (error) {
       await Promise.all(retained.map((key) => this.release(key)))
       throw error
@@ -136,7 +142,37 @@ export class LspWatchedFiles {
       return
     }
     this.registrations.set(id, watchers)
-    await Promise.all((current ?? []).map((watcher) => this.release(watchKey(watcher.watch))))
+    await this.releaseAll(current ?? [])
+  }
+
+  /**
+   * A server reaches a linked package two ways: through the link inside the root, which a watch
+   * of the root does not follow, or by real path under a base that was clamped to the root.
+   */
+  private async withLinkedDirectories(watchers: readonly Watcher[]): Promise<Watcher[]> {
+    this.links = await this.scanLinks()
+    return watchers.map((watcher) => {
+      const reached = this.links.filter(
+        (link) =>
+          isSameOrInside(watcher.base, link.link) ||
+          (isSameOrInside(watcher.base, this.root) && isSameOrInside(watcher.base, link.target)),
+      )
+      if (reached.length === 0) return watcher
+      const linked = outermostTargets(reached).map((target) => boundedWatch(target, this.root))
+      return { ...watcher, linked }
+    })
+  }
+
+  /** One scan serves every registration that arrives while it runs. */
+  private scanLinks(): Promise<readonly LinkedDirectory[]> {
+    this.linkScan ??= linkedDirectories(this.root).finally(() => {
+      this.linkScan = null
+    })
+    return this.linkScan
+  }
+
+  private async releaseAll(watchers: readonly Watcher[]): Promise<void> {
+    await Promise.all(watchers.flatMap(watchesOf).map((watch) => this.release(watchKey(watch))))
   }
 
   /** A directory a registration was waiting for appeared: watch it for real. */
@@ -193,10 +229,12 @@ export class LspWatchedFiles {
   private changed(change: TreeWatchChange): void {
     if (this.disposed) return
     if (change.type !== 'deleted') this.reattachAppeared(change.path)
-    if (!this.matches(change)) return
-    const uri = fileUriForPath(change.path)
-    this.pending.set(uri, mergeChange(this.pending.get(uri), changeType(change.type)))
-    this.flushTimer ??= setTimeout(() => this.flush(), FLUSH_DELAY_MS)
+    for (const candidate of this.aliases(change)) {
+      if (!this.matches(candidate)) continue
+      const uri = fileUriForPath(candidate.path)
+      this.pending.set(uri, mergeChange(this.pending.get(uri), changeType(candidate.type)))
+      this.flushTimer ??= setTimeout(() => this.flush(), FLUSH_DELAY_MS)
+    }
   }
 
   private matches(change: TreeWatchChange): boolean {
@@ -204,12 +242,20 @@ export class LspWatchedFiles {
     for (const watchers of this.registrations.values()) {
       for (const watcher of watchers) {
         if ((watcher.kind & kind) === 0) continue
-        const relative = path.relative(watcher.base, change.path)
-        if (!relative || isOutsideRoot(relative)) continue
-        if (watcher.glob.match(relative)) return true
+        if (globMatches(watcher, change.path)) return true
       }
     }
     return false
+  }
+
+  /** A change inside a linked target is also a change at every link that points to it. */
+  private aliases(change: TreeWatchChange): TreeWatchChange[] {
+    const aliases = this.links.flatMap((link) => {
+      const relative = path.relative(link.target, change.path)
+      if (isOutsideRoot(relative)) return []
+      return [{ ...change, path: relative ? path.join(link.link, relative) : link.link }]
+    })
+    return [change, ...aliases]
   }
 
   private flush(): void {
@@ -250,7 +296,7 @@ function compileWatcher(watcher: unknown, root: string): Watcher {
   const kind = typeof watcher.kind === 'number' ? watcher.kind : WATCH_ALL
   const { base, pattern } = patternBase(watcher.globPattern, root)
   const watch = boundedWatch(base, root)
-  return { base, glob: new Bun.Glob(pattern), kind, intended: watch, watch }
+  return { base, glob: new Bun.Glob(pattern), kind, intended: watch, watch, linked: [] }
 }
 
 function patternBase(globPattern: unknown, root: string) {
@@ -338,6 +384,16 @@ function changeType(type: TreeWatchChange['type']): FileChangeType {
   if (type === 'created') return CREATED
   if (type === 'changed') return CHANGED
   return DELETED
+}
+
+function globMatches(watcher: Watcher, file: string) {
+  const relative = path.relative(watcher.base, file)
+  if (!relative || isOutsideRoot(relative)) return false
+  return watcher.glob.match(relative)
+}
+
+function watchesOf(watcher: Watcher): TreeWatch[] {
+  return [watcher.watch, ...watcher.linked]
 }
 
 function watchKey(watch: TreeWatch) {
