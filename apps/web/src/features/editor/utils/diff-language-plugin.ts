@@ -107,24 +107,23 @@ function createContribution(context: EditorViewContributionContext, options: Dif
     })
   }
 
-  const handleMouseDown = (event: MouseEvent): void => {
-    if (event.button !== 0) return
-    if (!isNavigationModifier(event)) return
+  // A modified click is a navigation, so the editor must not also turn it into a caret placement:
+  // leaving the selection behind on a read-only pane is the tell that nothing happened.
+  const claimNavigationPress = (event: MouseEvent): boolean => {
+    if (event.button !== 0) return false
+    if (!isNavigationModifier(event)) return false
 
     const offset = context.textOffsetFromPoint(event.clientX, event.clientY)
-    if (offset === null) return
+    if (offset === null) return false
 
     const target = options.resolve(offset)
-    if (target.kind !== 'ask') return
+    if (target.kind !== 'ask') return false
 
-    // Taken before the editor can turn it into a caret placement: a modified click is a navigation,
-    // and leaving the selection behind on a read-only pane is the tell that nothing happened.
-    event.preventDefault()
-    event.stopImmediatePropagation()
     // The frame queued by the mousemove that preceded this click would otherwise still run, and
     // repaint the cursor for a position the click has already navigated away from.
     cancelPendingMove()
     void followDefinition(target)
+    return true
   }
 
   const followDefinition = async (target: DiffAskTarget): Promise<void> => {
@@ -152,7 +151,7 @@ function createContribution(context: EditorViewContributionContext, options: Dif
   }
 
   element.addEventListener('mousemove', handleMouseMove)
-  element.addEventListener('mousedown', handleMouseDown, { capture: true })
+  const pressParticipant = context.registerPressParticipant(claimNavigationPress)
   element.addEventListener('mouseleave', handleLeave)
 
   return {
@@ -161,7 +160,7 @@ function createContribution(context: EditorViewContributionContext, options: Dif
       hover.dispose()
       cancelPendingMove()
       element.removeEventListener('mousemove', handleMouseMove)
-      element.removeEventListener('mousedown', handleMouseDown, { capture: true })
+      pressParticipant.dispose()
       element.removeEventListener('mouseleave', handleLeave)
       element.style.cursor = ''
     },

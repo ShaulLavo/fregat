@@ -128,10 +128,8 @@ export function DiffPane({
 
   const installedProjection = useRef<{ editor: Editor; text: string } | null>(null)
 
-  // `setText` clears tokens on its way through `setContent`, so they go back on in the same
-  // statement pair — an expansion toggle would otherwise repaint uncoloured until the next parse.
-  // The plugin re-projects its cached per-side token streams synchronously on a toggle, so what is
-  // read here is already correct for the rows just pushed.
+  // The plugin re-projects its cached per-side token streams synchronously on a toggle, so the
+  // tokens read here already match the rows just pushed and paint with them.
   useLayoutEffect(() => {
     const editor = controller.getEditor()
     if (!editor) return
@@ -139,14 +137,16 @@ export function DiffPane({
     if (!file || rows !== plugin.getRows()) return
     persistence?.detach()
     editor.setPresentationReady(false)
+    const tokens = plugin.getTokens()
     if (
       installedProjection.current?.editor !== editor ||
       installedProjection.current.text !== text
     ) {
-      editor.setText(text, { documentMode: 'static', languageId: null })
+      editor.setText(text, { documentMode: 'static', languageId: null, tokens })
       installedProjection.current = { editor, text }
+    } else {
+      editor.setTokens(tokens)
     }
-    editor.setTokens(plugin.getTokens())
     persistence?.restore(editor)
     editor.setPresentationReady(plugin.isSyntaxReady())
   }, [controller, file, persistence, plugin, rows, text])

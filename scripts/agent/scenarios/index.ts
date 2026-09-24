@@ -156,6 +156,8 @@ import { editorReloadPaint, editorReloadPaintSlowFont } from './editor-reload-pa
 import { gitCommitHookColors } from './git-commit-hook-colors'
 import { gitDiffHoverTokens } from './git-diff-hover-tokens'
 import { gitDiffInlineTint } from './git-diff-inline-tint'
+import { gitDiffExpandTokens } from './git-diff-expand-tokens'
+import { editorPressParticipants } from './editor-press-participants'
 import { gitDiffLineComment } from './git-diff-line-comment'
 import { gitCommitMessageFile } from './git-commit-message-file'
 import { gitCommitMessagePersists } from './git-commit-message-persists'
@@ -319,6 +321,8 @@ export const scenarios: readonly Scenario[] = [
   editorTitleDiffToggle,
   gitDiffHoverTokens,
   gitDiffInlineTint,
+  gitDiffExpandTokens,
+  editorPressParticipants,
   gitDiffLineComment,
   chatCardNarrow,
   chatComposerInsert,

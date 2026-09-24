@@ -44,6 +44,10 @@ Graph roots exclude `refs/platform/*`. A browsing session pins tips and ref labe
 
 `scenario git-open-all-diffs-spam` clicks Open all diffs eight times in a row on a six-file fixture. No error banner may appear and all six diff tabs must open: a superseded navigation must not abort the diff fetch the next one joined.
 
+`scenario editor-press-participants` double-clicks a diff separator (the diff must stay unfocused and the label unselected), then Ctrl+clicks a call in the diff and in the editor and waits for the caret on the definition line. It fails when the editor ignores press participants.
+
+`scenario git-diff-expand-tokens` samples every frame while unchanged context is expanded and collapsed in a TypeScript diff: no frame may show diff rows without syntax-token ranges. It cannot see an uncoloured frame between two layout effects, only a toggle that loses its tokens.
+
 `scenario git-diff-inline-tint` opens a diff where one line becomes several and reads `CSS.highlights`: the word tint must be present on open, unchanged after a hide/unhide of unmodified lines, and never cover a whole added line.
 
 `scenario git-diff-line-comment` presses the changed line of a diff and reads the selection bar: it must name that line, and still name it after unhiding the unmodified lines above has shifted every row.

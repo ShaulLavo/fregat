@@ -1,4 +1,8 @@
-import type { EditorPlugin, EditorViewContribution } from '@singapore-editor/core/extensions'
+import type {
+  EditorPlugin,
+  EditorPressParticipant,
+  EditorViewContribution,
+} from '@singapore-editor/core/extensions'
 
 import {
   createDiffLanguagePlugin,
@@ -24,8 +28,14 @@ function mountContribution(hits: HitTest[], askable = false) {
     theme: () => null,
   }
 
+  // The editor asks these before it turns a press into a caret; this stands in for that dispatch.
+  const pressParticipants: EditorPressParticipant[] = []
   const viewContext = {
     scrollElement: element,
+    registerPressParticipant: (participant: EditorPressParticipant) => {
+      pressParticipants.push(participant)
+      return { dispose: () => undefined }
+    },
     focusEditor: () => undefined,
     getRangeClientRect: () => null,
     registerProvider: () => ({ dispose: () => undefined }),
@@ -49,7 +59,8 @@ function mountContribution(hits: HitTest[], askable = false) {
     },
   } as never)
 
-  return { contribution: contribution as unknown as EditorViewContribution, element }
+  const press = (event: MouseEvent) => pressParticipants.some((participant) => participant(event))
+  return { contribution: contribution as unknown as EditorViewContribution, element, press }
 }
 
 function moveTo(element: HTMLElement, clientX: number, clientY: number) {
@@ -78,18 +89,13 @@ test('a burst of pointer movement costs one hit test, at the position it ended o
 
 test('following a definition drops the move queued behind it', async () => {
   const hits: HitTest[] = []
-  const { contribution, element } = mountContribution(hits, true)
+  const { contribution, element, press } = mountContribution(hits, true)
 
   moveTo(element, 40, 50)
-  element.dispatchEvent(
-    new MouseEvent('mousedown', {
-      bubbles: true,
-      button: 0,
-      clientX: 40,
-      clientY: 50,
-      metaKey: true,
-    }),
+  const claimed = press(
+    new MouseEvent('mousedown', { button: 0, clientX: 40, clientY: 50, metaKey: true }),
   )
+  expect(claimed).toBe(true)
   hits.length = 0
 
   await nextFrame()

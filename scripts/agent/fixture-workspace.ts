@@ -25,6 +25,24 @@ export async function createGitFixture(slug: string) {
   return fixture
 }
 
+/** A temp repository where `file` was committed as `before` and now reads `after`, uncommitted. */
+export async function createModifiedFileFixture(
+  slug: string,
+  file: string,
+  before: readonly string[],
+  after: readonly string[],
+) {
+  const fixture = await mkdtemp(`/work/tmp/fregat-${slug}-`)
+  await fixtureGit(fixture, ['init', '--quiet'])
+  await fixtureGit(fixture, ['config', 'user.email', 'fregat@example.com'])
+  await fixtureGit(fixture, ['config', 'user.name', 'Fregat'])
+  await writeFile(path.join(fixture, file), `${before.join('\n')}\n`)
+  await fixtureGit(fixture, ['add', file])
+  await fixtureGit(fixture, ['commit', '--quiet', '-m', 'initial'])
+  await writeFile(path.join(fixture, file), `${after.join('\n')}\n`)
+  return fixture
+}
+
 /** Installs an executable `pre-commit` hook in a fixture repository. */
 export async function installPreCommitHook(fixture: string, script: string) {
   const hook = path.join(fixture, '.git', 'hooks', 'pre-commit')

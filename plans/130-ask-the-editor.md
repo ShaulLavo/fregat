@@ -99,8 +99,10 @@ Done in the Editor with E047: `rowHitAt` in `packages/diff/src/editorDiffPlugin.
 
 ## Phase 5 — obligations (each needs its E050 row)
 
-Tokens with `setText` (item 5), typography options and the audit's deletion (6, 7), `onDidScroll`
-(8), the pointer participant (9), theme keys (10). Each lands when its Editor half does; none blocks
+Tokens with `setText` (item 5; done 2026-09-24, `diff-pane.tsx` passes them with the text, scenario
+`git-diff-expand-tokens`), typography options and the audit's deletion (6, 7), `onDidScroll`
+(8), the pointer participant (9; done 2026-09-24, `diff-language-plugin.ts` claims its
+Ctrl+click through `registerPressParticipant`, scenario `editor-press-participants`), theme keys (10). Each lands when its Editor half does; none blocks
 another.
 
 ## Verification

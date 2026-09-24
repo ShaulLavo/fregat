@@ -1,9 +1,10 @@
-import { mkdtemp, writeFile } from 'node:fs/promises'
-import path from 'node:path'
-
 import type { Scenario } from './index'
 import type { Page } from 'playwright'
-import { fixtureGit, openFixtureWorkspace, releaseFixture } from '../fixture-workspace'
+import {
+  createModifiedFileFixture,
+  openFixtureWorkspace,
+  releaseFixture,
+} from '../fixture-workspace'
 import { openGitPanel, selectors } from '../selectors'
 import { createScriptError } from '../../structured-errors'
 
@@ -24,16 +25,8 @@ export const gitDiffInlineTint: Scenario = {
   description:
     'Open a diff whose change is one line becoming several: the word tint must be there on open, stay the same across a hide/unhide of unmodified lines, and never cover a whole added line.',
   async run(page, { step }) {
-    const fixture = await mkdtemp('/work/tmp/fregat-diff-tint-')
+    const fixture = await createModifiedFileFixture('diff-tint', 'a.ts', BEFORE, AFTER)
     try {
-      await fixtureGit(fixture, ['init', '--quiet'])
-      await fixtureGit(fixture, ['config', 'user.email', 'fregat@example.com'])
-      await fixtureGit(fixture, ['config', 'user.name', 'Fregat'])
-      await writeFile(path.join(fixture, 'a.ts'), `${BEFORE.join('\n')}\n`)
-      await fixtureGit(fixture, ['add', 'a.ts'])
-      await fixtureGit(fixture, ['commit', '--quiet', '-m', 'initial'])
-      await writeFile(path.join(fixture, 'a.ts'), `${AFTER.join('\n')}\n`)
-
       await openFixtureWorkspace(page, fixture)
       await openGitPanel(page)
       await selectors.worktreeFiles(page).first().click()
