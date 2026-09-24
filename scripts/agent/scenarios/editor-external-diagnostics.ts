@@ -111,9 +111,19 @@ async function writeFixture(fixture: string, typescript: string | null) {
 
 /**
  * Waits until the visible problems are exactly one matching `expected`, or none when it is null.
- * A row shows severity and line; its `title` carries the message.
+ * A row shows severity and line; its `title` carries the message. None must be an answer from
+ * the server, not the absence of one.
  */
 async function expectProblems(page: Page, expected: RegExp | null) {
+  if (!expected) {
+    await waitForProblems(page, null)
+    await page.getByText('No problems reported', { exact: true }).waitFor({ timeout: 20_000 })
+    return
+  }
+  await waitForProblems(page, expected)
+}
+
+async function waitForProblems(page: Page, expected: RegExp | null) {
   await page.waitForFunction(
     ([source, flags]) => {
       const titles = [

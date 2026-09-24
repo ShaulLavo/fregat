@@ -1,8 +1,6 @@
-import type {
-  LanguageServerDefinitionTarget,
-  LanguageServerStatus,
-} from '@singapore-editor/lsp-plugin/websocket'
+import type { LanguageServerDefinitionTarget } from '@singapore-editor/lsp-plugin/websocket'
 import { EmptyState } from '@workspace/ui/components/empty-state'
+import { Shimmer } from '@workspace/ui/components/shimmer'
 import { useListbox } from '@workspace/ui/patterns/use-listbox'
 import { useState } from 'react'
 
@@ -23,6 +21,10 @@ import {
   type ActiveDiagnostic,
 } from '@/features/workbench/utils/diagnostic-rows'
 import { toggledSet } from '@/lib/toggled-set'
+import {
+  diagnosticsEmptyState,
+  type DiagnosticsEmptyState,
+} from '@/features/workbench/utils/diagnostics-empty-state'
 
 const idleLanguageServerStatusSource = createEditorLanguageServerStatusSource()
 
@@ -33,7 +35,7 @@ export function DiagnosticsPanel() {
   const workspaceStore = useEditorWorkspaceStoreApi()
   // Status still comes from the active tab's servers: it answers "is anything checking",
   // which the marker store cannot — an empty store and a broken server look alike.
-  const { status } = useEditorLanguageServerStatus(
+  const { diagnostics, status } = useEditorLanguageServerStatus(
     statusBarSource?.languageServerStatusSource ?? idleLanguageServerStatusSource,
   )
   const resources = useMarkerResources()
@@ -90,7 +92,9 @@ export function DiagnosticsPanel() {
         target={{ kind: 'problems' }}
         className='flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden'
       >
-        {renderDiagnosticsState(statusBarSource ? status : 'idle')}
+        {renderDiagnosticsState(
+          diagnosticsEmptyState(statusBarSource ? status : 'idle', diagnostics?.freshness),
+        )}
       </FocusablePanel>
     )
   }
@@ -129,19 +133,32 @@ export function DiagnosticsPanel() {
   )
 }
 
-function renderDiagnosticsState(status: LanguageServerStatus) {
-  if (status === 'loading') {
-    return <DiagnosticsLoading />
-  }
+function renderDiagnosticsState(state: DiagnosticsEmptyState) {
+  if (state === 'loading') return <DiagnosticsLoading />
   // No retry: no restart handle is exposed here; reopening the file restarts its language server.
-  if (status === 'error') {
+  if (state === 'unavailable') {
     return <EmptyState className='min-h-0 flex-1' title='Diagnostics unavailable' tone='error' />
+  }
+  if (state === 'silent') {
+    return (
+      <EmptyState
+        className='min-h-0 flex-1'
+        description='The language server has not reported on this file.'
+        title='No diagnostics received'
+      />
+    )
   }
 
   return (
     <EmptyState
       className='min-h-0 flex-1'
-      description='A file is checked once it is opened.'
+      description={
+        state === 'rechecking' ? (
+          <Shimmer>Checking again…</Shimmer>
+        ) : (
+          'A file is checked once it is opened.'
+        )
+      }
       title='No problems reported'
     />
   )

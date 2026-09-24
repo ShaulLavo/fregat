@@ -74,7 +74,8 @@ export function createCuttableEventsClient(server: TestServer) {
   return {
     client: createClient(server, fetcher),
     endEventStreams: () => {
-      for (const end of [...open]) end()
+      // Each end removes itself; deleting the current entry keeps a Set iteration valid.
+      for (const end of open) end()
     },
   }
 }

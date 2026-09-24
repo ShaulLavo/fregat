@@ -1,4 +1,7 @@
-import { summarizeDiagnostics } from '@singapore-editor/lsp-plugin/diagnostics'
+import {
+  combineDiagnosticsFreshness,
+  summarizeDiagnostics,
+} from '@singapore-editor/lsp-plugin/diagnostics'
 import {
   type LanguageServerDiagnosticSummary,
   type LanguageServerStatus,
@@ -134,6 +137,7 @@ function aggregateDiagnostics(
     metadata?.uri ?? null,
     metadata?.version ?? null,
     summaries.flatMap((summary) => summary.diagnostics),
+    combineDiagnosticsFreshness(summaries.map((summary) => summary.freshness)),
   )
 }
 
