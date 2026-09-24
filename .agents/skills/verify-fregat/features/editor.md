@@ -14,6 +14,8 @@ Open the command palette (`Control+Shift+P`), type a file name, press Enter. Or 
 
 `scenario editor-type-burst`, `scenario editor-large-paste`, `scenario editor-fast-scroll`, `scenario editor-caret-burst`. These open `--file` (default `use-events.ts`) through the palette. For a save, press `Control+s` in a scenario and check the file on disk plus `bun run logs --action fs.write`.
 
+`scenario editor-widget-keys` builds a fixture with an overloaded function, opens its signature hint and a completion list together, and checks the key order: the arrows move the list and not the hint, one Escape closes the list and the next the hint, Enter accepts in place, and Escape from the text closes find through the find plugin's `findVisible` key. It opens the file from the tree and clicks the viewport rather than using `focusEditor`, which cannot focus the EditContext input.
+
 `scenario editor-find` opens the find widget with `Control+f`, types a dense query, a sparse one and one that matches nothing, and steps through matches. It fails unless the count reads `N of M` with no floor marker and the position moves; the count is exact past the 19,999-highlight cap.
 
 `trace editor-fast-scroll --file keys.ts` waits for startup before the `ready` marker, then runs repeated 1,200px sweeps and alternating 6,000px jumps through the settings registry. Compare scrolling after `ready` separately from file opening. The editor holds its complete previous paint until the next scroll paint is ready; its browser regression checks this with zero overscan, including horizontal jumps.
@@ -61,6 +63,8 @@ The click scenario waits 750ms between clicks so debounced document highlights, 
 `scenario editor-conflict-merge` opens a disposable file, types an unsaved edit, writes the file externally, chooses Compare in the conflict toast, and takes Accept Current Change from the merge lens. The resolved file on disk must keep the local edit and drop the incoming one, with no marker left, and the conflict toast must close. A clean external write goes first, so the file watch is live before the conflicting one.
 
 `scenario editor-lsp-hover --file main.tsx` inserts a `const`, hovers its name, checks the language server tooltip names it, then inserts a name with a Cyrillic letter and checks that its diagnostic and its character warning share one tooltip. Undoes both edits.
+
+`scenario editor-lsp-deprecated --file main.tsx` inserts a `.substr()` call and checks the `-deprecated` CSS highlight covers exactly `substr`, then undoes it and checks the strike clears.
 
 `scenario editor-lsp-signature-help` types `console.log(`, checks the signature surface names the call, then types `)` and checks it goes away. Both characters are read as keystrokes, not as edits: auto-close writes a typed `(` as `()`, and typing over the closer it inserted changes no text at all, so neither is visible in the document change. The surface and its Markdown renderer load on that first `(`, so this also covers the lazy chunk. Undoes the edit.
 

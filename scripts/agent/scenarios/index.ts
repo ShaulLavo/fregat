@@ -104,6 +104,7 @@ import { editorExternalDeletion } from './editor-external-deletion'
 import { fileTreeUndo } from './file-tree-undo'
 import { editorDefinitionCrlf } from './editor-definition-crlf'
 import { editorLspHover } from './editor-lsp-hover'
+import { editorLspDeprecated } from './editor-lsp-deprecated'
 import { editorLspSignatureHelp } from './editor-lsp-signature-help'
 import { editorMarkdownPunctuation } from './editor-markdown-punctuation'
 import { wallpaperLibrary } from './wallpaper-library'
@@ -158,6 +159,7 @@ import { gitDiffHoverTokens } from './git-diff-hover-tokens'
 import { gitDiffInlineTint } from './git-diff-inline-tint'
 import { gitDiffExpandTokens } from './git-diff-expand-tokens'
 import { editorPressParticipants } from './editor-press-participants'
+import { editorWidgetKeys } from './editor-widget-keys'
 import { gitDiffLineComment } from './git-diff-line-comment'
 import { gitCommitMessageFile } from './git-commit-message-file'
 import { gitCommitMessagePersists } from './git-commit-message-persists'
@@ -273,6 +275,7 @@ export const scenarios: readonly Scenario[] = [
   editorFormatChord,
   editorLspCompletion,
   editorLspHover,
+  editorLspDeprecated,
   editorLspTabSwitch,
   editorLspServerExit,
   editorDefinitionCrlf,
@@ -323,6 +326,7 @@ export const scenarios: readonly Scenario[] = [
   gitDiffInlineTint,
   gitDiffExpandTokens,
   editorPressParticipants,
+  editorWidgetKeys,
   gitDiffLineComment,
   chatCardNarrow,
   chatComposerInsert,

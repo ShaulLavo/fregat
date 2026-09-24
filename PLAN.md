@@ -440,8 +440,8 @@ Suggested order (steps 1–3 done 2026-09-23; step 4 is next):
 4. [E049](../Editor/plans/e049-no-silent-misses.md), [Plan 133](plans/133-one-owner-per-fact.md).
    Plan 133 is done 2026-09-23 (all four phases; D1 moved to Plan 134). E049 waits on E033.
 5. [E050](../Editor/plans/e050-host-obligations-into-api.md) row by row, each unlocking its Plan 130
-   Phase 5 item. In progress: rows re-checked 2026-09-24; row 1 (`setText` with tokens) and row 5 (press
-   participants) done.
+   Phase 5 item. In progress: rows re-checked 2026-09-24; row 1 (`setText` with tokens), row 5 (press
+   participants) and row 6 (plugin keymap context keys) done.
 
 The owner decided Plan 132 D4 on 2026-09-21: the server's migrations are deleted and the schema
 starts from scratch (Plan 132 Phase 4). External-change

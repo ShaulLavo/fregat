@@ -3,7 +3,7 @@ import { chmod, mkdtemp, readdir, readFile, readlink, rm, writeFile } from 'node
 import path from 'node:path'
 import type { Page } from 'playwright'
 import { createScriptError } from '../structured-errors'
-import { waitForApp } from './selectors'
+import { selectors, waitForApp } from './selectors'
 
 export async function fixtureGit(project: string, args: readonly string[]) {
   const process = Bun.spawn(['git', '-C', project, ...args], { stdout: 'ignore', stderr: 'pipe' })
@@ -16,13 +16,10 @@ export async function fixtureGit(project: string, args: readonly string[]) {
  * for fixtures that never commit: it costs nothing and a missing one fails far from its cause.
  */
 export async function createGitFixture(slug: string) {
-  const fixture = await mkdtemp(`/work/tmp/fregat-${slug}-`)
-  await fixtureGit(fixture, ['init', '--quiet'])
-  await fixtureGit(fixture, ['config', 'user.email', 'fregat@example.com'])
-  await fixtureGit(fixture, ['config', 'user.name', 'Fregat'])
-  await writeFile(path.join(fixture, 'a.txt'), 'one\n')
-  await fixtureGit(fixture, ['add', 'a.txt'])
-  return fixture
+  return initFixtureRepository(slug, async (fixture) => {
+    await writeFile(path.join(fixture, 'a.txt'), 'one\n')
+    await fixtureGit(fixture, ['add', 'a.txt'])
+  })
 }
 
 /** A temp repository where `file` was committed as `before` and now reads `after`, uncommitted. */
@@ -32,15 +29,30 @@ export async function createModifiedFileFixture(
   before: readonly string[],
   after: readonly string[],
 ) {
+  return initFixtureRepository(slug, async (fixture) => {
+    await writeFile(path.join(fixture, file), `${before.join('\n')}\n`)
+    await fixtureGit(fixture, ['add', file])
+    await fixtureGit(fixture, ['commit', '--quiet', '-m', 'initial'])
+    await writeFile(path.join(fixture, file), `${after.join('\n')}\n`)
+  })
+}
+
+/**
+ * A temp repository with an identity, filled by `fill`. Removed again if any step fails, because
+ * the caller's cleanup only starts once it has the path.
+ */
+async function initFixtureRepository(slug: string, fill: (fixture: string) => Promise<void>) {
   const fixture = await mkdtemp(`/work/tmp/fregat-${slug}-`)
-  await fixtureGit(fixture, ['init', '--quiet'])
-  await fixtureGit(fixture, ['config', 'user.email', 'fregat@example.com'])
-  await fixtureGit(fixture, ['config', 'user.name', 'Fregat'])
-  await writeFile(path.join(fixture, file), `${before.join('\n')}\n`)
-  await fixtureGit(fixture, ['add', file])
-  await fixtureGit(fixture, ['commit', '--quiet', '-m', 'initial'])
-  await writeFile(path.join(fixture, file), `${after.join('\n')}\n`)
-  return fixture
+  try {
+    await fixtureGit(fixture, ['init', '--quiet'])
+    await fixtureGit(fixture, ['config', 'user.email', 'fregat@example.com'])
+    await fixtureGit(fixture, ['config', 'user.name', 'Fregat'])
+    await fill(fixture)
+    return fixture
+  } catch (error) {
+    await rm(fixture, { recursive: true, force: true })
+    throw error
+  }
 }
 
 /** Installs an executable `pre-commit` hook in a fixture repository. */
@@ -89,6 +101,12 @@ export async function openFixtureWorkspace(page: Page, project: string) {
   const token = encodeURIComponent(`${workspace.name}.${workspace.id}`)
   await page.goto(`${current.origin}${prefix}/~${token}/workbench`)
   await waitForApp(page)
+  // The reload first restores the workspace the page was on and only then opens the addressed one;
+  // a palette search in between lists the old workspace's files and opening one switches back.
+  await selectors
+    .projectSwitcher(page)
+    .and(page.locator(`[title^="${project.slice(1)}"]`))
+    .waitFor({ timeout: 20_000 })
 }
 
 /**

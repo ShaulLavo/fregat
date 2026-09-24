@@ -168,6 +168,7 @@ const TEXT_EDIT_COMMAND_IDS = [
   'editor.editor.action.autoFix',
   'editor.editor.action.inlineSuggest.commit',
   'editor.editor.action.inlineSuggest.acceptNextWord',
+  'editor.acceptSelectedSuggestion',
   'editor.editor.action.reindentlines',
   'editor.editor.action.reindentselectedlines',
 ] as const satisfies readonly PlatformCommandId[]

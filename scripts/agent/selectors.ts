@@ -367,6 +367,10 @@ export const selectors = {
   editorHover: (page: Page) => page.locator('.editor-plugin-hover:not([hidden])'),
   // Signature help keeps its own namespace, so it is distinguishable from the shared hover.
   editorSignatureHelp: (page: Page) => page.locator('.editor-lsp-plugin-hover:not([hidden])'),
+  editorCompletionFocusedLabel: (page: Page) =>
+    page
+      .locator('[class$="-completion"]:not([hidden]) [aria-selected="true"]')
+      .evaluateAll((rows) => rows.map((row) => row.children[1]?.textContent ?? '')[0] ?? null),
   editorCompletionLabels: (page: Page) =>
     page
       .locator('[class$="-completion"]:not([hidden]) [class$="-completion-item"]')
@@ -466,6 +470,9 @@ export const selectors = {
     page
       .getByRole('navigation', { name: 'Sidebar tabs' })
       .getByRole('button', { name, exact: true }),
+  /** Its title is the open workspace's root path. */
+  projectSwitcher: (page: Page) =>
+    page.getByRole('button', { name: 'Switch project', exact: true }),
   workspaceMode: (page: Page, mode: 'Workbench' | 'Chat') =>
     page.getByRole('button', { name: `${mode} mode`, exact: true }),
   workspaceRail: (page: Page, mode: 'Workbench' | 'Chat') =>
@@ -824,6 +831,19 @@ export async function hoverTokenColor(page: Page, word: string): Promise<boolean
   await spans.first().waitFor({ state: 'attached', timeout: 8000 })
   const style = await spans.getByText(word, { exact: true }).first().getAttribute('style')
   return /(^|;)\s*color:/.test(style ?? '')
+}
+
+/** The text under every range of the CSS highlight whose name ends with `suffix`. */
+export async function highlightTexts(page: Page, suffix: string): Promise<string[]> {
+  // A string: this package types without the DOM, and the callback runs in the page.
+  return (await page.evaluate(`((suffix) => {
+    const texts = []
+    for (const [name, highlight] of CSS.highlights) {
+      if (!name.endsWith(suffix)) continue
+      for (const range of highlight) texts.push(range.toString())
+    }
+    return texts
+  })(${JSON.stringify(suffix)})`)) as string[]
 }
 
 /** Rests the pointer on the first on-screen occurrence of the word, under `within`, until the hover shows. */
