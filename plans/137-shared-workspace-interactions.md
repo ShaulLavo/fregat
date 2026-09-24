@@ -2,7 +2,7 @@
 
 ## Status and authorization
 
-- Status: PROPOSED — all seven findings selected for this plan; implementation not started.
+- Status: IMPLEMENTED — all seven phases landed 2026-09-24 (`scenario copy-feedback`, `file-label-cohesion`, `sidebar-settings-button`, `bottom-panel-persistence`, `problems-panel-rows`, `lsp-references`, `checkpoint-states`, `session-actions-surfaces`, `search-file-actions`, `git-changes` green). Open items are listed under each phase's As built.
 - Priority: P1 for consistent behavior, then P2 for additional entry points.
 - Effort: L overall, split into independently verified phases below.
 - Risk: MED overall. Session ownership and focus are the main risks.
@@ -282,7 +282,7 @@ pass. These commands supplement the browser drives specified in each phase.
 
 ```bash
 # A
-bun run --cwd apps/web test src/lib/tests/clipboard.test.ts src/components/tests/copy-button.test.tsx src/features/chat/components/tests/proposed-plan-card.test.tsx
+bun run --cwd apps/web test src/lib/tests/clipboard.test.tsx src/components/tests/copy-button.test.tsx src/features/chat/components/tests/proposed-plan-card.test.tsx
 # B
 bun run --cwd apps/web test src/components/tests/file-label.test.tsx src/features/search/tests/search-match-row.test.ts src/features/chat/utils/tests/changed-files-presentation.test.ts src/features/chat/components/tests/assistant-changed-files-section.test.tsx
 # C
@@ -343,6 +343,10 @@ that are impractical to induce live. Do not add production fixture switches.
 1. Keep a single clipboard boundary in `lib/clipboard.ts`. Return an explicit success/failure
    result so a button only displays Copied after success. Route unavailable access and rejected
    writes through the same error treatment and one structured log without the payload.
+   Owner decision 2026-09-24: the boundary tries every write method in order, newest first —
+   `navigator.clipboard.writeText`, then `navigator.clipboard.write` with a `ClipboardItem`,
+   then the deprecated `document.execCommand('copy')` — and fails only when all are missing or
+   refused. The log names each method tried and its error name, never the text.
 2. Provide menu feedback (one success toast) and inline feedback (one temporary checkmark and
    accessible label, no extra success toast). Preserve caller labels and content transforms.
    Repeated success restarts the confirmation timeout; unmount clears it.
@@ -356,7 +360,7 @@ that are impractical to induce live. Do not add production fixture switches.
    serialization, and editor clipboard events alone.
 5. Delete duplicate clipboard try/catch and copied-timer implementations in migrated callers.
 
-**Tests:** add `src/lib/tests/clipboard.test.ts` and
+**Tests:** add `src/lib/tests/clipboard.test.tsx` (the `dom` project; the fallback needs a DOM) and
 `src/components/tests/copy-button.test.tsx`. Cover unavailable,
 rejected, success, repeated clicks, unmount cleanup, no false success, and one feedback event.
 Retain `features/chat/components/tests/proposed-plan-card.test.tsx` payload assertions.
@@ -389,6 +393,13 @@ clipboard output in a fresh browser context and success/error presentation in bo
 Cover long directory-only matches with a visible basename, basename matches, Unicode and narrow
 rows, exact full titles, known/unknown change kinds, and rename/zero-count changes.
 
+**As built:** workspace Search sends `includeNames: false` (since `8aa2bea9`), so the live panel
+never produces a filename row. `SearchNameMatchRow` is fixed and covered by
+`features/search/tests/name-match-row.test.tsx`, but only a content group header is reachable in the
+browser; the scenario drives that. Checkpoint file paths are relative to the machine root
+(`work/tmp/…/a.txt`), so the Turn panel's directory column and the timeline's top folder show the
+whole checkout path. That predates this plan and is left alone.
+
 **Verify:** those focused tests and web types. Add/run `scenario file-label-cohesion` using
 Search and Git in a disposable nested workspace; include checkpoint rows using the existing
 native fixture setup from Phase 0 and inspect both timeline and Turn-panel rendering. A skipped checkpoint
@@ -411,6 +422,11 @@ case is explicitly incomplete. Inspect screenshots at normal and narrow pane wid
    view lists and the obsolete always-visible sidebar assumption/tests. Keep one menu model in
    `keymap/menus/utils/`, not app-specific navigation inside `packages/ui`.
 5. Update `docs/workspace-rails.md` with provider ownership and select-versus-toggle semantics.
+
+**As built:** each view carries `select` and `toggle` bound by the provider from that host's own tab
+list, so callers never narrow a string back to a tab; the menu model moved to
+`keymap/menus/utils/pane-header-menu.ts` with its test beside it, `ToolRail` was deleted, and the
+workbench → chat-mode allow-list entry went stale and was removed.
 
 **Tests:** replace obsolete assertions in `features/workbench/utils/tests/pane-header-menu.test.ts`;
 extend `features/workbench/components/tests/tool-pane-header.test.tsx`; add
@@ -438,6 +454,11 @@ The latter must show no terminal socket closure from hiding or changing layout.
 5. When diagnostics refresh/remove a file, retain the active row if present, otherwise select a
    deterministic surviving neighbor. Keep `aria-activedescendant` valid and DOM focus stable.
 
+**As built:** no `packages/ui` helper — the flattening is domain-specific in both panes and
+`useListbox` already owns the traversal. `toggledPathSet` gained a second feature consumer and
+moved to `lib/toggled-set.ts`. The pane root now takes `flex-1`: in the bottom panel's flex body it
+had been shrinking to its content, so the empty state sat off-centre before this plan.
+
 **Tests:** add `features/workbench/utils/tests/diagnostic-rows.test.ts` and
 `features/workbench/components/tests/diagnostics-panel.test.tsx`. Use two files, duplicate messages
 at different locations, multiple severities, collapsed groups, and removal of the active result.
@@ -460,6 +481,12 @@ disposable fixture; require one list Tab stop and arrow traversal across the two
    fake Retry or start provider work to regenerate a checkpoint.
 4. Keep local errors opening an available diff distinct from summary availability. Retain the
    existing comparison-document navigation and renderer.
+
+**As built:** `canOpenCheckpointDiff` was the `available` predicate under another name; its callers
+use the selector and it is deleted. The `available` state carries its summary. In the timeline a
+ready turn with no files still renders nothing — one "No changed files" line under every chat-only
+reply would be noise — while missing and error with no files now say so. The Turn panel says all
+three. Pending cannot be reached in the browser: a turn id only appears with its summary.
 
 **Tests:** add `src/lib/tests/checkpoint-availability.test.ts` with every state; extend
 `features/chat/components/tests/assistant-changed-files-section.test.tsx` and add
@@ -504,6 +531,18 @@ Report the browser and component coverage separately rather than claiming every 
    changing modes while a dialog is open preserves its target. Add no provider token consumption
    to verification and never exercise lifecycle actions against a user's real conversation.
 
+**As built:** the common menu is `keymap/menus/utils/session-actions-menu.ts`; the rail keeps
+`sessionMenu` in chat-mode, which adds Open, New Session and Show Only This Project, so the stage
+header no longer offers those three. `hooks/use-session-menu-actions.ts` builds the shared action set,
+`hooks/use-session-rail-item.ts` gives both headers the rail's view of a session,
+`hooks/use-session-renaming.ts` isolates rename per surface ('rail' | 'header' | 'sidebar'), and
+`SessionRename` plus `SessionActionsButton` moved to `components/`. `components/session-dialogs.tsx`
+mounts Delete, Snooze and the worktree manager in `WorkspaceView`, above the mode switch.
+Found on the way: Rename from the stage header was already broken on the mesh — the open popup pulled
+focus back from the new field, whose blur ended the rename. Menu action items now take `takesFocus`;
+the surface runs such an item from `onOpenChangeComplete` and skips focus restore. Not covered: two
+environments holding the same unscoped session id (the harness has one environment).
+
 **Tests:** retain `features/chat-mode/utils/tests/session-menu.test.ts`,
 `features/chat-mode/components/tests/session-menu.test.tsx`, and
 `features/chat-mode/hooks/tests/use-session-removal.test.tsx`, updating imports to rehomed owners.
@@ -535,6 +574,14 @@ a paid provider turn. Cleanup only the fixture session and restore selection.
    files retain unavailable Open File behavior; copying a known path can still be available.
 5. Use existing absolute/relative path resolvers, not display-string concatenation. File-tree
    directories retain their own behavior and are not presented as openable files.
+
+**As built:** `keymap/menus/utils/open-file-item.ts` is the shared item; Files' "Open" became
+"Open File". Search's menu is `features/search/utils/file-menu.ts`, mounted once per list (sidebar
+`ResultsView`, search-editor surface), with a small context carrying the opener to the editor's file
+headers. Match lines inside the search editor are an embedded editor, so they get the menu through
+Shift+F10 on the active line, not right-click. The Open items take focus to the editor; everything
+else returns focus to the list through the new `MenuSurface` `returnFocusTo`, because the Search
+pane's own focus target would pick its input.
 
 **Tests:** retain `features/workspace/utils/tests/row-menu.test.ts` and
 `features/git/utils/tests/file-menu.test.ts`; add

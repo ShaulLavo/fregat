@@ -175,6 +175,7 @@ test('persistent app chrome changes compactly and leaves content text unchanged'
           <section data-testid='chat-header'>
             <ChatPanelHeader
               activeSessionId={null}
+              session={null}
               creating={false}
               disabled={false}
               sessions={[]}

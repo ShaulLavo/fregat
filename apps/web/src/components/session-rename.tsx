@@ -9,7 +9,7 @@ import { Input } from '@workspace/ui/components/input'
 
 /**
  * Takes the place of whatever was showing the session's title while it is renamed —
- * the rail row or the stage header. Enter and blur commit, Escape restores the
+ * the rail row, the stage header or the sidebar chat header. Enter and blur commit, Escape restores the
  * original title: an unmount can fire a trailing blur, and restoring first makes that
  * blur a no-op instead of a stealth commit.
  */

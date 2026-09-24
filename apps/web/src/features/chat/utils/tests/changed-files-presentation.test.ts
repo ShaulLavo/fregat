@@ -6,7 +6,7 @@ import {
   shouldAutoExpandChangedFiles,
   summarizeChangedFileScopes,
 } from '@/features/chat/utils/changed-files-presentation'
-import type { ChatTurnDiffFile } from '@/features/chat/utils/turn-diff-tree'
+import { buildChatTurnDiffTree, type ChatTurnDiffFile } from '@/features/chat/utils/turn-diff-tree'
 
 function file(path: string, additions = 1, deletions = 0): ChatTurnDiffFile {
   return { additions, deletions, kind: 'modified', path }
@@ -88,5 +88,29 @@ describe('changedFileName', () => {
   it('keeps only the leaf of a path', () => {
     expect(changedFileName('apps/web/src/a.ts')).toBe('a.ts')
     expect(changedFileName('a.ts')).toBe('a.ts')
+  })
+})
+
+describe('buildChatTurnDiffTree change kinds', () => {
+  function leaves(files: ChatTurnDiffFile[]) {
+    return buildChatTurnDiffTree(files).flatMap((node) =>
+      node.kind === 'directory' ? node.children : [node],
+    )
+  }
+
+  it('keeps each checkpoint kind on its file leaf', () => {
+    const labels = leaves([
+      { additions: 3, deletions: 0, kind: 'added', path: 'src/a.ts' },
+      { additions: 0, deletions: 2, kind: 'deleted', path: 'src/b.ts' },
+      { additions: 0, deletions: 0, kind: 'renamed', path: 'src/c.ts' },
+    ]).map((node) => (node.kind === 'file' ? node.change.label : null))
+
+    expect(labels).toEqual(['A', 'D', 'R'])
+  })
+
+  it('reads an unknown kind as modified', () => {
+    const [leaf] = leaves([{ additions: 1, deletions: 0, kind: 'copied', path: 'a.ts' }])
+
+    expect(leaf?.kind === 'file' && leaf.change.title).toBe('Historical modified')
   })
 })

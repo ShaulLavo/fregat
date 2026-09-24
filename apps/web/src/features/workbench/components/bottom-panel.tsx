@@ -2,7 +2,8 @@ import { ToolPane } from '@workspace/ui/patterns/tool-pane'
 import { RenderErrorBoundary } from '@workspace/ui/patterns/render-error-boundary'
 import { PaneBar } from '@workspace/ui/components/pane-bar'
 import type { FilesystemPath } from '@/lib/documents/utils/types'
-import { useNavigation } from '@/hooks/use-navigation'
+import { usePaneHost } from '@/hooks/use-pane-host'
+import { PaneHeaderMenu } from '@/components/pane-header-menu'
 import { TerminalIcon, WarningCircleIcon } from '@phosphor-icons/react'
 import type { ReactNode } from 'react'
 
@@ -15,7 +16,11 @@ import {
   BAR_TAB_STRIP_CLASS,
   barTabClassName,
 } from '@workspace/ui/patterns/bar-tabs'
-import { type WorkbenchBottomTab, type WorkbenchPanels } from '@/features/workbench/utils/panels'
+import {
+  workbenchBottomTabLabel,
+  type WorkbenchBottomTab,
+  type WorkbenchPanels,
+} from '@/features/workbench/utils/panels'
 import { cn } from '@workspace/ui/lib/utils'
 
 export function BottomPanel({
@@ -25,11 +30,11 @@ export function BottomPanel({
   readonly panels: WorkbenchPanels
   readonly rootPath: FilesystemPath
 }) {
-  const navigation = useNavigation()
+  const host = usePaneHost()
   const terminalActive = panels.activeBottomTab === 'terminal'
 
   function selectTab(tab: WorkbenchBottomTab) {
-    void navigation.setBottomPanel(tab)
+    host?.views.find((view) => view.value === tab)?.select()
   }
 
   return (
@@ -38,29 +43,34 @@ export function BottomPanel({
       header={null}
       bodyClassName='flex overflow-hidden'
       subheader={
-        <PaneBar className={cn(BAR_TAB_STRIP_CLASS, 'px-0')}>
-          <div
-            aria-label='Bottom panel tabs'
-            className='flex shrink-0 items-stretch'
-            role='tablist'
-          >
-            {bottomTab({
-              active: terminalActive,
-              icon: <TerminalIcon className='size-(--icon-size-sm)' />,
-              label: 'Terminal',
-              onClick: () => selectTab('terminal'),
-            })}
-            {bottomTab({
-              active: panels.activeBottomTab === 'problems',
-              count: <ProblemCount />,
-              icon: <WarningCircleIcon className='size-(--icon-size-sm)' />,
-              label: 'Problems',
-              onClick: () => selectTab('problems'),
-            })}
-          </div>
-          <div aria-hidden='true' className={BAR_TAB_FILLER_CLASS} />
-          {terminalActive ? <TerminalActions rootPath={rootPath} /> : null}
-        </PaneBar>
+        <PaneHeaderMenu
+          title={workbenchBottomTabLabel(panels.activeBottomTab)}
+          trigger={
+            <PaneBar className={cn(BAR_TAB_STRIP_CLASS, 'px-0')}>
+              <div
+                aria-label='Bottom panel tabs'
+                className='flex shrink-0 items-stretch'
+                role='tablist'
+              >
+                {bottomTab({
+                  active: terminalActive,
+                  icon: <TerminalIcon className='size-(--icon-size-sm)' />,
+                  label: 'Terminal',
+                  onClick: () => selectTab('terminal'),
+                })}
+                {bottomTab({
+                  active: panels.activeBottomTab === 'problems',
+                  count: <ProblemCount />,
+                  icon: <WarningCircleIcon className='size-(--icon-size-sm)' />,
+                  label: 'Problems',
+                  onClick: () => selectTab('problems'),
+                })}
+              </div>
+              <div aria-hidden='true' className={BAR_TAB_FILLER_CLASS} />
+              {terminalActive ? <TerminalActions rootPath={rootPath} /> : null}
+            </PaneBar>
+          }
+        />
       }
     >
       {terminalActive ? (

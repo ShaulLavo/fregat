@@ -112,17 +112,6 @@ export function referenceDocumentsByPath(
   return { revision, byPath }
 }
 
-export function toggledPathSet(paths: ReadonlySet<string>, path: string) {
-  const next = new Set(paths)
-  if (next.has(path)) {
-    next.delete(path)
-    return next
-  }
-
-  next.add(path)
-  return next
-}
-
 export type ReferenceListRow =
   | {
       kind: 'group'

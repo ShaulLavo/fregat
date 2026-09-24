@@ -1,6 +1,7 @@
 import { useRowHeight } from '@workspace/ui/patterns/use-row-height'
 import { useSearchResultScrollPosition } from '@/features/search/hooks/use-result-scroll-position'
-import { useLayoutEffect, useRef, type KeyboardEvent } from 'react'
+import { useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react'
+import { isContextMenuKey } from '@workspace/utils/keyboard'
 import type { WorkspaceSearchQuery } from '@workspace/contracts'
 import { VirtualList, type VirtualListHandle } from '@workspace/ui/patterns/virtual-list'
 import { useListbox } from '@workspace/ui/patterns/use-listbox'
@@ -13,7 +14,11 @@ import {
   searchResultItems,
   searchResultItemById,
   type SearchResultId,
+  type SearchResultItem,
 } from '@/features/search/utils/result-items'
+import { SearchFileMenu } from '@/features/search/components/file-menu'
+import { searchItemMenuTarget } from '@/features/search/utils/file-menu'
+import { useContextMenu } from '@/keymap/menus/hooks/use-context-menu'
 import type {
   SearchBufferStatus,
   WorkspaceSearchFileGroup,
@@ -52,6 +57,8 @@ export function SearchResultsView({
   const parentRef = useRef<HTMLDivElement>(null)
   const virtualRef = useRef<VirtualListHandle>(null)
   const { openMatch, selectResult, toggleGroup } = useSearchResultActions()
+  const contextMenu = useContextMenu()
+  const [menuItem, setMenuItem] = useState<SearchResultItem | null>(null)
   const preview = useSearchPreviewMaxLength()
   const items = searchResultItems(groups)
   function toggle(id: string) {
@@ -82,7 +89,8 @@ export function SearchResultsView({
     onSelect: selectResult,
     onCollapse: toggle,
     onExpand: toggle,
-    onActiveKeyDown(event) {
+    onActiveKeyDown(event, activeId) {
+      if (isContextMenuKey(event)) return openActiveMenu(event, activeId)
       if (event.key !== 'F2' || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey)
         return
       const id = event.currentTarget.getAttribute('aria-activedescendant')
@@ -99,6 +107,20 @@ export function SearchResultsView({
       if (activeResultPicked) virtualRef.current?.scrollToIndex(index, { align: 'auto' })
     },
   })
+  function openActiveMenu(event: KeyboardEvent<HTMLDivElement>, id: string) {
+    const item = searchResultItemById(items, id)
+    const row = document.getElementById(list.rowProps(id).id)
+    if (!item || !row) return
+    event.preventDefault()
+    setMenuItem(item)
+    contextMenu.openAtElement(row)
+  }
+
+  function openPointerMenu(item: SearchResultItem, event: MouseEvent<HTMLElement>) {
+    setMenuItem(item)
+    contextMenu.openAtEvent(event, event.currentTarget)
+  }
+
   function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     if (event.key === 'Escape' && event.target !== event.currentTarget) {
       event.preventDefault()
@@ -144,41 +166,55 @@ export function SearchResultsView({
     return <SearchPendingOrEmpty className={className} status={status} />
   }
 
+  const menu = contextMenu.anchor && menuItem ? searchItemMenuTarget(menuItem, groups) : null
+
   return (
-    <VirtualList
-      {...list.containerProps}
-      onKeyDown={handleKeyDown}
-      activeIndex={activeResultPicked ? list.activeIndex : undefined}
-      scrollRef={parentRef}
-      handleRef={virtualRef}
-      aria-label='Search results'
-      className={cn(
-        'focus-ring-inset app-scrollbar-thin h-full min-h-0 overflow-x-hidden',
-        className,
-      )}
-      initialOffset={initialViewport.top}
-      initialRect={{ width: 0, height: initialViewport.height }}
-      items={items}
-      getKey={(item) => item.id}
-      renderRow={(item) => (
-        <SearchResultRow
-          item={item}
-          active={item.id === activeResultId}
-          rowProps={{
-            ...list.rowProps(item.id),
-            'aria-level': item.level,
-            'aria-expanded': item.type === 'group' ? !item.group.collapsed : undefined,
-          }}
-          canReplace={canReplace}
-          compact={compact}
-          measurePreviewCell={preview.measureCell}
-          previewMaxLength={preview.maxLength}
-          query={query}
-          replaceQuery={resultsSearchQuery}
-          replaceText={replaceText}
-          replaceVisible={replaceVisible}
+    <>
+      <VirtualList
+        {...list.containerProps}
+        onKeyDown={handleKeyDown}
+        activeIndex={activeResultPicked ? list.activeIndex : undefined}
+        scrollRef={parentRef}
+        handleRef={virtualRef}
+        aria-label='Search results'
+        className={cn(
+          'focus-ring-inset app-scrollbar-thin h-full min-h-0 overflow-x-hidden',
+          className,
+        )}
+        initialOffset={initialViewport.top}
+        initialRect={{ width: 0, height: initialViewport.height }}
+        items={items}
+        getKey={(item) => item.id}
+        renderRow={(item) => (
+          <SearchResultRow
+            item={item}
+            active={item.id === activeResultId}
+            rowProps={{
+              ...list.rowProps(item.id),
+              'aria-level': item.level,
+              'aria-expanded': item.type === 'group' ? !item.group.collapsed : undefined,
+              onContextMenu: (event) => openPointerMenu(item, event),
+            }}
+            canReplace={canReplace}
+            compact={compact}
+            measurePreviewCell={preview.measureCell}
+            previewMaxLength={preview.maxLength}
+            query={query}
+            replaceQuery={resultsSearchQuery}
+            replaceText={replaceText}
+            replaceVisible={replaceVisible}
+          />
+        )}
+      />
+      {contextMenu.anchor && menu ? (
+        <SearchFileMenu
+          anchor={contextMenu.anchor}
+          relativePath={menu.relativePath}
+          returnFocusTo={() => parentRef.current}
+          target={menu.target}
+          onOpenChange={contextMenu.onOpenChange}
         />
-      )}
-    />
+      ) : null}
+    </>
   )
 }

@@ -3,21 +3,6 @@ import { describe, expect, it } from 'vitest'
 import { searchMatchDisplay } from '@/features/search/utils/match-display'
 
 describe('search match row display text', () => {
-  it('keeps filename match highlights inside the visible row text', () => {
-    const display = searchMatchDisplay(
-      {
-        kind: 'name',
-        path: `repo/${'nested/'.repeat(20)}needle-file.ts`,
-        source: 'disk',
-        type: 'file',
-      },
-      'needle',
-    )
-
-    expect(display.text).toContain('needle')
-    expect(display.range?.start).toBeLessThan(40)
-  })
-
   it('keeps exact content ranges inside the visible row text', () => {
     const display = searchMatchDisplay(
       {

@@ -1,14 +1,8 @@
-import {
-  settledSessionTimestamp,
-  sessionSortTimestamp,
-} from '@workspace/client-core/chat/rail/session-order'
-import { useSettingValue } from '@/hooks/use-setting-value'
-import { deriveProjectGroupKey } from '@workspace/client-core/chat/rail/project-grouping'
+import { useSessionRailItem } from '@/hooks/use-session-rail-item'
 import { EMPTY_ACTIVITIES } from '@/lib/empty-activities'
 import { useApplicationRuntime } from '@/hooks/use-application-runtime'
 import { confirmedEnvironmentOrigin } from '@/lib/environments/state/domain'
 import { useNavigation } from '@/hooks/use-navigation'
-import { scopedSessionKey } from '@workspace/contracts'
 import { useActiveChatProjection } from '@/features/chat/hooks/use-active-projection'
 import type { SessionId } from '@workspace/contracts'
 import { RenderErrorBoundary } from '@workspace/ui/patterns/render-error-boundary'
@@ -19,15 +13,11 @@ import { StageBody } from '@/features/chat-mode/components/stage-body'
 import { StageHeader } from '@/features/chat-mode/components/stage-header'
 import { useMarkSessionSeen } from '@/features/chat-mode/hooks/use-mark-session-seen'
 import { useChatModeSession } from '@/features/chat-mode/providers/session-context'
-import { useSessionReadStore } from '@/features/chat-mode/state/session-read-store'
 import { useSessionSelectionStore } from '@/features/chat-mode/state/session-selection-store'
 import { isDraftFor } from '@/features/chat-mode/utils/active-session'
-import { sessionRailItem } from '@workspace/client-core/chat/rail/model'
 import { sessionVisitAt } from '@workspace/client-core/chat/rail/unread'
 
 export function ChatStage() {
-  const groupingMode = useSettingValue('chat.projectGrouping')
-  const groupingOverrides = useSettingValue('chat.projectGroupingOverrides')
   const navigation = useNavigation()
   const application = useApplicationRuntime()
   const draftGeneration = useSessionSelectionStore((state) => state.draftGeneration)
@@ -38,41 +28,13 @@ export function ChatStage() {
   const summary = useActiveChatProjection(
     (state) => selectChatSessionById(state, activeSession.sessionId) ?? null,
   )
-  const seenBySessionKey = useSessionReadStore((state) => state.seenBySessionKey)
   // Activities carry the provider's context-window snapshots, and only the detail
   // projection has them — the sidebar summary stops at the turn state.
   const activities = useActiveChatProjection(
     (state) =>
       selectChatSessionById(state, activeSession.sessionId)?.activities ?? EMPTY_ACTIVITIES,
   )
-  const row = summary
-    ? sessionRailItem(
-        {
-          ...summary,
-          activityAt: summary.updatedAt,
-          settledOrderAt: settledSessionTimestamp(summary),
-          createdSortAt: sessionSortTimestamp(summary, 'created_at'),
-          updatedSortAt: sessionSortTimestamp(summary, 'updated_at'),
-        },
-        transport.environmentId,
-        null,
-        seenBySessionKey[
-          scopedSessionKey({ environmentId: transport.environmentId, sessionId: summary.id })
-        ],
-      )
-    : null
-
-  const session =
-    row && summary
-      ? {
-          ...row,
-          projectGroupKey: deriveProjectGroupKey(
-            { environmentId: transport.environmentId, projectId: summary.project.id },
-            summary.project.repositoryIdentity,
-            { mode: groupingMode, overrides: groupingOverrides },
-          ),
-        }
-      : null
+  const session = useSessionRailItem(summary, transport.environmentId)
 
   useMarkSessionSeen(summary?.id ?? null, summary ? sessionVisitAt(summary) : null)
 

@@ -112,6 +112,8 @@ export const selectors = {
   iconHintControl: (scope: Page | Locator, name: string) =>
     scope.getByRole('button', { name, exact: true }),
   chatHeaderNew: (page: Page) => page.getByRole('button', { name: 'New chat', exact: true }),
+  sessionActions: (page: Page) =>
+    page.getByRole('button', { name: 'Session actions', exact: true }),
   chatHeaderHistory: (page: Page) =>
     page.getByRole('button', { name: 'Conversation history', exact: true }),
   hint: (page: Page, label: string) =>
@@ -398,6 +400,16 @@ export const selectors = {
   settingsScopeTab: (page: Page, name: 'User' | 'Workspace' | 'Defaults') =>
     page.getByRole('tab', { name, exact: true }),
   settingsDefaultsBanner: (page: Page) => page.getByText('Defaults are read-only', { exact: true }),
+  settingsRowActions: (page: Page, id: string) =>
+    page.getByRole('button', { name: `Actions for ${id}`, exact: true }),
+  toolPaneHeader: (page: Page, title: string) =>
+    page.locator('[data-workbench-tool-pane-header]').filter({ hasText: title }).first(),
+  bottomPanelTabs: (page: Page) =>
+    page.getByRole('tablist', { name: 'Bottom panel tabs', exact: true }),
+  copyButton: (page: Page, label: string) =>
+    page.getByRole('button', { name: `Copy ${label}`, exact: true }),
+  copiedButton: (page: Page, label: string) =>
+    page.getByRole('button', { name: `Copied ${label}`, exact: true }),
   wallpaperTile: (page: Page) =>
     page.getByRole('button', { name: 'Choose wallpaper', exact: true }),
   wallpaperPicker: (page: Page) => page.getByRole('dialog', { name: 'Wallpaper', exact: true }),
@@ -597,9 +609,15 @@ export const selectors = {
   focusedTreeRow: (page: Page) =>
     page.getByLabel('Folder tree', { exact: true }).locator('[role="treeitem"][tabindex="0"]'),
   editorInput: (page: Page) => page.getByRole('textbox', { name: 'Editor input' }),
-  diagnosticsList: (page: Page) => page.getByRole('listbox', { name: 'Diagnostics' }),
+  problemsTree: (page: Page) => page.getByRole('tree', { name: 'Problems', exact: true }),
+  problemsFiles: (page: Page) =>
+    page
+      .getByRole('tree', { name: 'Problems', exact: true })
+      .locator('[role="treeitem"][aria-level="1"]'),
   diagnosticsRows: (page: Page) =>
-    page.getByRole('listbox', { name: 'Diagnostics' }).getByRole('option'),
+    page
+      .getByRole('tree', { name: 'Problems', exact: true })
+      .locator('[role="treeitem"][aria-level="2"]'),
   editorSurface: (page: Page) => page.locator('.editor-virtualized-viewport'),
   editorFindInput: (page: Page) => page.getByRole('textbox', { name: 'Find', exact: true }),
   editorFindCount: (page: Page) => page.locator('.editor-find-count'),

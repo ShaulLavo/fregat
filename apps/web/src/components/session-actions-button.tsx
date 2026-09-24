@@ -1,20 +1,28 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { DotsThreeIcon } from '@phosphor-icons/react'
 import { useState } from 'react'
-
-import { useSessionMenu } from '@/features/chat-mode/hooks/use-session-menu'
-import type { SessionRailItem } from '@workspace/client-core/chat/rail/model'
-import { MenuSurface } from '@/keymap/menus/components/surface'
-import { rectAnchor, type MenuAnchor } from '@/keymap/menus/utils/virtual-anchor'
 import { Button } from '@workspace/ui/components/button'
+import type { SessionRailItem } from '@workspace/client-core/chat/rail/model'
+
+import { useSessionMenuActions } from '@/hooks/use-session-menu-actions'
+import type { SessionRenameSurface } from '@/features/chat-mode/state/session-rail-store'
+import { MenuSurface } from '@/keymap/menus/components/surface'
+import { sessionActionsMenu } from '@/keymap/menus/utils/session-actions-menu'
+import { rectAnchor, type MenuAnchor } from '@/keymap/menus/utils/virtual-anchor'
 
 /**
- * The stage's own handle on the session it is showing — the same menu the rail row
- * carries, opened from a button instead of a right-click, because the header is where
- * you are looking when you decide to rename or archive what you are reading.
+ * A header's handle on the session it shows: the same actions the rail row offers,
+ * opened from a button, because the header is where you are looking when you decide
+ * to rename or archive what you are reading.
  */
-export function StageSessionMenu({ session }: { readonly session: SessionRailItem }) {
-  const menu = useSessionMenu(session, 'header')
+export function SessionActionsButton({
+  session,
+  surface,
+}: {
+  readonly session: SessionRailItem
+  readonly surface: Exclude<SessionRenameSurface, 'rail'>
+}) {
+  const menu = sessionActionsMenu(useSessionMenuActions(session, surface))
   const [anchor, setAnchor] = useState<MenuAnchor | null>(null)
 
   return (

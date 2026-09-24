@@ -1,12 +1,5 @@
 import { Alert, AlertDescription } from '@workspace/ui/components/alert'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
-import {
-  CheckCircleIcon,
-  CheckIcon,
-  CopyIcon,
-  SignOutIcon,
-  WarningCircleIcon,
-} from '@phosphor-icons/react'
+import { CheckCircleIcon, SignOutIcon, WarningCircleIcon } from '@phosphor-icons/react'
 import type { ProviderInstanceId } from '@workspace/contracts'
 import { Button } from '@workspace/ui/components/button'
 import {
@@ -19,9 +12,9 @@ import {
 } from '@workspace/ui/components/dialog'
 import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
 import { cn } from '@workspace/ui/lib/utils'
-import { useEffect, useState } from 'react'
-import { toast } from 'sonner'
+import { useEffect } from 'react'
 
+import { CopyButton } from '@/components/copy-button'
 import { useProviderSignIn } from '@/features/chat/hooks/use-provider-sign-in'
 import {
   DEFAULT_PROVIDER_AUTH_METHOD,
@@ -34,7 +27,6 @@ import {
   PROVIDER_AUTH_METHODS,
 } from '@workspace/client-core/chat/providers/auth'
 
-const COPIED_RESET_MS = 1_200
 const SUCCESS_CLOSE_DELAY_MS = 1_400
 
 /**
@@ -54,7 +46,6 @@ export function ProviderSignInDialog({
   readonly providerLabel: string
 }) {
   const signIn = useProviderSignIn({ enabled: open, providerInstanceId })
-  const [copied, setCopied] = useState(false)
   const busy = isProviderSignInBusy(signIn.phase)
   const phaseCopy = providerSignInPhaseCopy({ method: signIn.method, phase: signIn.phase })
   const command = providerSignInCommand(signIn.method)
@@ -66,13 +57,6 @@ export function ProviderSignInDialog({
     const timer = window.setTimeout(() => onOpenChange(false), SUCCESS_CLOSE_DELAY_MS)
     return () => window.clearTimeout(timer)
   }, [onOpenChange, signIn.phase])
-
-  useEffect(() => {
-    if (!copied) return
-
-    const timer = window.setTimeout(() => setCopied(false), COPIED_RESET_MS)
-    return () => window.clearTimeout(timer)
-  }, [copied])
 
   // Closing mid-flight kills the attempt: the CLI child process would otherwise
   // outlive the dialog with nothing left to report to.
@@ -163,24 +147,7 @@ export function ProviderSignInDialog({
             <code className='text-foreground min-w-0 flex-1 truncate font-mono text-xs'>
               {command}
             </code>
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <Button
-                    aria-label={copied ? 'Sign-in command copied' : 'Copy sign-in command'}
-                    onClick={() => void copyCommand(command, () => setCopied(true))}
-                    size='icon-xs'
-                    type='button'
-                    variant='outline'
-                  >
-                    {copied ? <CheckIcon /> : <CopyIcon />}
-                  </Button>
-                }
-              />
-              <TooltipContent>
-                {copied ? 'Sign-in command copied' : 'Copy sign-in command'}
-              </TooltipContent>
-            </Tooltip>
+            <CopyButton label='sign-in command' text={command} variant='outline' />
           </div>
         </div>
 
@@ -215,18 +182,4 @@ export function ProviderSignInDialog({
       </DialogContent>
     </Dialog>
   )
-}
-
-async function copyCommand(command: string, onCopied: () => void) {
-  if (!navigator.clipboard?.writeText) {
-    toast.error('Clipboard is unavailable')
-    return
-  }
-
-  try {
-    await navigator.clipboard.writeText(command)
-    onCopied()
-  } catch {
-    toast.error('Could not copy the sign-in command')
-  }
 }

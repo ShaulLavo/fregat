@@ -3,6 +3,8 @@ import type {
   LanguageServerStatus,
 } from '@singapore-editor/lsp-plugin/websocket'
 import { EmptyState } from '@workspace/ui/components/empty-state'
+import { useListbox } from '@workspace/ui/patterns/use-listbox'
+import { useState } from 'react'
 
 import { useEditorLanguageServerStatus } from '@/features/editor/hooks/use-editor-language-server-status'
 import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
@@ -13,8 +15,14 @@ import { activeEditorTab } from '@/lib/documents/utils/groups'
 import { useMarkerResources } from '@/hooks/use-markers'
 import { DiagnosticsLoading } from '@/features/workbench/components/diagnostics-loading'
 import { FocusablePanel } from '@/components/focusable-panel'
-import { basename, parentPath } from '@/lib/path-formatters'
-import { DiagnosticList } from '@/features/workbench/components/diagnostic-list'
+import { DiagnosticGroupRow } from '@/features/workbench/components/diagnostic-group-row'
+import { DiagnosticRow } from '@/features/workbench/components/diagnostic-row'
+import {
+  diagnosticRows,
+  survivingActiveId,
+  type ActiveDiagnostic,
+} from '@/features/workbench/utils/diagnostic-rows'
+import { toggledSet } from '@/lib/toggled-set'
 
 const idleLanguageServerStatusSource = createEditorLanguageServerStatusSource()
 
@@ -29,6 +37,10 @@ export function DiagnosticsPanel() {
     statusBarSource?.languageServerStatusSource ?? idleLanguageServerStatusSource,
   )
   const resources = useMarkerResources()
+  const [collapsedUris, setCollapsedUris] = useState<ReadonlySet<string>>(() => new Set())
+  const [active, setActive] = useState<ActiveDiagnostic | null>(null)
+  const rows = diagnosticRows(resources, collapsedUris)
+  const activeId = survivingActiveId(rows, active)
 
   function previewDiagnostic(target: LanguageServerDefinitionTarget) {
     const tab = activeEditorTab(workspaceStore.getState().workbenchPanels.editorGroups)
@@ -39,12 +51,44 @@ export function DiagnosticsPanel() {
     void commands.openDefinition(target)
   }
 
+  function toggle(uri: string) {
+    setCollapsedUris((current) => toggledSet(current, uri))
+  }
+
+  function moveTo(id: string) {
+    const index = rows.findIndex((row) => row.id === id)
+    setActive({ id, index })
+    const row = rows[index]
+    if (row?.kind === 'diagnostic') previewDiagnostic(row.target)
+  }
+
+  function commit(id: string) {
+    const row = rows.find((candidate) => candidate.id === id)
+    if (row?.kind === 'group') return toggle(row.uri)
+    if (row) openDiagnostic(row.target)
+  }
+
+  function collapseOrExpand(id: string) {
+    const row = rows.find((candidate) => candidate.id === id)
+    if (row?.kind === 'group') toggle(row.uri)
+  }
+
+  const list = useListbox({
+    role: 'tree',
+    items: rows,
+    activeId,
+    onActiveChange: moveTo,
+    onCommit: commit,
+    onCollapse: collapseOrExpand,
+    onExpand: collapseOrExpand,
+  })
+
   if (resources.length === 0) {
     return (
       <FocusablePanel
         area='problems'
         target={{ kind: 'problems' }}
-        className='flex h-full min-h-0 min-w-0 flex-col overflow-hidden'
+        className='flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden'
       >
         {renderDiagnosticsState(statusBarSource ? status : 'idle')}
       </FocusablePanel>
@@ -55,25 +99,31 @@ export function DiagnosticsPanel() {
     <FocusablePanel
       area='problems'
       target={{ kind: 'problems' }}
-      className='flex h-full min-h-0 min-w-0 flex-col overflow-hidden'
+      className='flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden'
     >
-      <div className='min-h-0 flex-1 overflow-auto p-3 text-xs'>
-        {resources.map((resource) => (
-          <section className='mb-4 last:mb-0' key={resource.uri}>
-            <div className='text-muted-foreground mb-2 truncate' title={resource.path}>
-              <span className='text-foreground'>{basename(resource.path)}</span>
-              {parentPath(resource.path) ? (
-                <span className='ml-2'>{parentPath(resource.path)}</span>
-              ) : null}
-            </div>
-            <DiagnosticList
-              diagnostics={resource.summary}
-              onOpenDiagnostic={openDiagnostic}
-              onPreviewDiagnostic={previewDiagnostic}
-              path={resource.path}
+      <div
+        {...list.containerProps}
+        aria-label='Problems'
+        className='focus-ring-inset min-h-0 flex-1 overflow-auto py-1 text-xs'
+      >
+        {rows.map((row) =>
+          row.kind === 'group' ? (
+            <DiagnosticGroupRow
+              key={row.id}
+              row={row}
+              rowProps={list.rowProps(row.id)}
+              onToggle={() => toggle(row.uri)}
             />
-          </section>
-        ))}
+          ) : (
+            <DiagnosticRow
+              key={row.id}
+              row={row}
+              rowProps={list.rowProps(row.id)}
+              onOpen={() => openDiagnostic(row.target)}
+              onPreview={() => previewDiagnostic(row.target)}
+            />
+          ),
+        )}
       </div>
     </FocusablePanel>
   )

@@ -35,6 +35,8 @@ export const WORKBENCH_SIDEBAR_TABS: readonly WorkbenchSidebarTab[] = [
 ]
 export type WorkbenchBottomTab = 'terminal' | 'problems'
 
+export const WORKBENCH_BOTTOM_TABS: readonly WorkbenchBottomTab[] = ['terminal', 'problems']
+
 export type WorkbenchPanels = {
   readonly activeBottomTab: WorkbenchBottomTab
   readonly activeGitTab: 'changes' | 'graph'
@@ -394,4 +396,8 @@ export function workbenchSidebarTabLabel(tab: WorkbenchSidebarTab) {
   if (tab === 'search') return 'Search'
 
   return 'Files'
+}
+
+export function workbenchBottomTabLabel(tab: WorkbenchBottomTab) {
+  return tab === 'problems' ? 'Problems' : 'Terminal'
 }

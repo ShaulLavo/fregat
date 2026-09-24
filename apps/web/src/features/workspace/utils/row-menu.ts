@@ -1,9 +1,9 @@
 import { copyPathSection } from '@/keymap/menus/utils/copy-path-section'
+import { openFileItem } from '@/keymap/menus/utils/open-file-item'
 import {
   ArrowBendUpLeftIcon,
   CopySimpleIcon,
   FilePlusIcon,
-  FolderOpenIcon,
   FolderPlusIcon,
   MinusIcon,
   PencilSimpleIcon,
@@ -83,15 +83,7 @@ export function treeRowMenu(context: TreeRowMenuContext): Menu {
   const mutationsDisabled = context.mutationsEnabled === false
 
   return [
-    section('open', [
-      !context.isDirectory &&
-        actionItem({
-          icon: FolderOpenIcon,
-          id: 'open',
-          label: 'Open',
-          run: context.openFile,
-        }),
-    ]),
+    section('open', [!context.isDirectory && openFileItem({ run: context.openFile })]),
     section('new', [
       actionItem({
         disabled: unresolved || mutationsDisabled,

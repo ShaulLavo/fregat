@@ -24,6 +24,8 @@ The Search side panel, or the address URL search parameters (`s.*`).
 
 `search-result-line-pick` builds a one-file fixture whose third excerpt row is source line 4, hovers a text row, the action column and a row gap in the search editor, then picks a line from the source-line gutter and checks the opened editor's cursor line. Rows are asked of the editor (`rowAtPoint`), so a pointer beside it still resolves one.
 
+`search-file-actions` makes a disposable nested workspace and checks the file menu Search shares with Files and Git: right-click a file heading (Open File, Copy Path, Copy Relative Path — the relative path must equal what Files copies) and a match row (adds Open Match, which opens the exact location), then Shift+F10 on the focused tree and Escape, which must leave the cursor where it was and focus on the tree. It repeats the heading menu and Shift+F10 in the search editor. The menu never toggles or opens the row it was opened on.
+
 ## Gotchas
 
 Replace runs through the workspace-edit lifecycle with a preview dialog. The dialog's confirm needs the rendered operation id; a stale dialog cannot confirm a newer operation.

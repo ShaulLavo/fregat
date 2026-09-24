@@ -81,7 +81,8 @@ export function MenuItemRow({
     <ContextMenuItem
       disabled={item.disabled}
       onClickCapture={() => {
-        const invocation = item.run()
+        // A focus-taking item runs once the menu has closed; the surface owns that.
+        const invocation = item.takesFocus ? undefined : item.run()
         onInvoke(item, undefined, invocation)
       }}
       variant={item.destructive ? 'destructive' : 'default'}

@@ -41,3 +41,11 @@ Expand a session's **Changed files** section. `scenario chat-changed-files` insp
 ## Surface stacking
 
 Surface tokens are translucent, so painting one inside a region that already paints it doubles the alpha instead of changing the tone — an extra layer over the wallpaper, invisible over a flat background. `scenario surface-stacking` walks the four sidebar tabs and chat mode, and records in `inspection.json` every element whose painted background matches a painted ancestor, with its box so you can find it on the screenshot. Pairs whose ancestor is the root shell or `body` sit behind the wallpaper and do not paint; everything else is a real double. Run it after touching any pane, bar, field or chip background.
+
+## Copy feedback
+
+Every explicit copy goes through `lib/clipboard.ts`, which tries `navigator.clipboard.writeText`, then `navigator.clipboard.write`, then `document.execCommand('copy')`. Menus toast "Copied {label}"; inline `CopyButton`s turn into a check and never toast. `scenario copy-feedback` copies a setting ID from its row menu, a relative path from the file tree menu and an existing assistant response (read only, no message sent), reading the clipboard after each. It then refuses both async methods in the page and copies the setting ID again, which proves the `execCommand` fallback in real Chrome.
+
+## File labels
+
+`FileLabel` (`components/file-label.tsx`) draws a file as icon, basename, then muted directory, so a right cut eats the directory; `FileStatusCell` draws the change letter. Git rows, Search group headers (sidebar and editor), the Turn panel and the timeline's changed-files tree share them. `scenario file-label-cohesion` makes a disposable repository, registers it as its own project, and runs a native checkpoint fixture (`fixtures/native-checkpoint.mjs`, no tokens) whose turn adds, deletes, renames and modifies named files. It asserts A/D/R/M in both the timeline tree and the Turn panel, then basename-first rows in Search and Git for a file twelve directories deep. It deletes the session, project and provider it created and releases the fixture; `inspection.json` records each.

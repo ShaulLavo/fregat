@@ -6,18 +6,21 @@ import { ProposedPlanCard } from '@/features/chat/components/proposed-plan-card'
 import { TestEditorStateProvider as EditorStateProvider } from '../../../../../test/factories/editor-state-provider'
 import { expect, test } from '../../../../../test/fixtures'
 import { renderWithProviders } from '../../../../../test/render'
+import { stubClipboard } from '../../../../../test/factories/clipboard'
 
 const PLAN_MARKDOWN = '# Ship the retry queue\n\n1. Add the queue\n2. Drain it on boot'
 
 test('copying puts the plan on the clipboard with its heading intact', async () => {
-  const written: string[] = []
-  stubClipboard(written)
+  const clipboard = stubClipboard()
   renderCard(proposedPlan())
 
   await userEvent.click(screen.getByRole('button', { name: 'Plan actions' }))
   await userEvent.click(await screen.findByRole('menuitem', { name: 'Copy to clipboard' }))
 
-  expect(written).toEqual(['# Ship the retry queue\n\n1. Add the queue\n2. Drain it on boot\n'])
+  await expect
+    .poll(() => clipboard.written.map((write) => write.text))
+    .toEqual(['# Ship the retry queue\n\n1. Add the queue\n2. Drain it on boot\n'])
+  clipboard.restore()
 })
 
 test('downloading offers the plan as a markdown file named after its title', async () => {
@@ -52,17 +55,6 @@ function renderCard(plan: OrchestrationProposedPlan) {
       <ProposedPlanCard plan={plan} />
     </EditorStateProvider>,
   )
-}
-
-function stubClipboard(written: string[]) {
-  Object.defineProperty(navigator, 'clipboard', {
-    configurable: true,
-    value: {
-      writeText: async (text: string) => {
-        written.push(text)
-      },
-    },
-  })
 }
 
 type CapturedDownload = { blob: Blob; filename: string }

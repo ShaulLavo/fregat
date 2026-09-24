@@ -131,3 +131,53 @@ test('the diff stat stays compact and keeps the exact counts in its name', () =>
   expect(screen.getAllByLabelText('12480 additions, 4 deletions')[0]).toHaveTextContent('+12k')
   expect(screen.queryByText('+12480')).not.toBeInTheDocument()
 })
+
+test('each file names its checkpoint change the way the Turn panel does', () => {
+  renderSection(
+    turnDiffSummary({
+      files: [
+        { additions: 4, deletions: 0, kind: 'added', path: 'src/new.ts' },
+        { additions: 0, deletions: 9, kind: 'deleted', path: 'src/old.ts' },
+        { additions: 0, deletions: 0, kind: 'renamed', path: 'src/moved.ts' },
+        { additions: 1, deletions: 1, kind: 'type-changed', path: 'src/odd.ts' },
+      ],
+    }),
+  )
+
+  const row = (name: string) => screen.getByRole('treeitem', { name: new RegExp(name) })
+  expect(row('new.ts')).toHaveTextContent(/A$/)
+  expect(row('old.ts')).toHaveTextContent(/D$/)
+  expect(row('moved.ts')).toHaveTextContent(/R$/)
+  expect(row('odd.ts')).toHaveTextContent(/M$/)
+  expect(row('moved.ts')).toHaveAttribute('title', 'src/moved.ts · Historical renamed')
+})
+
+test('a missing or failed checkpoint with no files still says so', () => {
+  const { rerender } = renderSection(turnDiffSummary({ files: [], status: 'missing' }))
+  expect(screen.getByText('Checkpoint missing for turn 1')).toBeInTheDocument()
+
+  rerender(
+    withProviders(
+      <AssistantChangedFilesSection summary={turnDiffSummary({ files: [], status: 'error' })} />,
+    ),
+  )
+  expect(screen.getByText('Checkpoint error for turn 1')).toBeInTheDocument()
+})
+
+test('a turn that changed nothing adds nothing to the transcript', () => {
+  const { container } = renderSection(turnDiffSummary({ files: [] }))
+
+  expect(container.querySelector('[data-changed-files-state]')).toBeNull()
+})
+
+test('an available checkpoint that later fails drops its diff actions and names the error', () => {
+  const { rerender } = renderSection(turnDiffSummary())
+  expect(screen.getByRole('button', { name: 'View diff' })).toBeInTheDocument()
+
+  rerender(
+    withProviders(<AssistantChangedFilesSection summary={turnDiffSummary({ status: 'error' })} />),
+  )
+
+  expect(screen.queryByRole('button', { name: 'View diff' })).not.toBeInTheDocument()
+  expect(screen.getByText('Checkpoint error for turn 1')).toBeInTheDocument()
+})

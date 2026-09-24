@@ -68,12 +68,6 @@ export function checkpointFullSessionDiffInputForSummary(
   }
 }
 
-export function canOpenCheckpointDiff(summary: ChatTurnDiffSummary) {
-  if (summary.status !== 'ready') return false
-
-  return summary.files.length > 0
-}
-
 export function checkpointFileDocument(
   summary: ChatTurnDiffSummary,
   path: FilesystemPath,

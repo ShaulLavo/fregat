@@ -1,7 +1,8 @@
+import { CopyButton } from '@/components/copy-button'
+import { codexFileCitationsMarkdown } from '@/features/chat/utils/codex-file-citations'
 import type { ChatTimelineItem } from '@/features/chat/utils/timeline-items'
 import { useChatWorkLogExpansionStore } from '../state/chat-work-log-expansion-store'
 import { ActivityGroupRow } from './activity-group-row'
-import { AssistantMessageCopyButton } from './assistant-message-copy-button'
 import { MessageBubble } from './message-bubble'
 import { MessageCompletionDivider } from './message-completion-divider'
 import { ProposedPlanCard } from './proposed-plan-card'
@@ -110,5 +111,12 @@ function timelineRowContent({
 }
 
 function renderAssistantCopyButton(text: string) {
-  return <AssistantMessageCopyButton text={text} />
+  return (
+    <CopyButton
+      className='bg-background/35 text-muted-foreground text-2xs'
+      label='response'
+      text={codexFileCitationsMarkdown(text)}
+      variant='outline'
+    />
+  )
 }

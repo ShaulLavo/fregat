@@ -25,6 +25,21 @@ The list owns both. Terminal and session drags temporarily focus the active drag
 with `data-dragging`, and restore container focus when a keyboard drag ends or is cancelled.
 Search replacement actions use F2 to enter the active row's action and Escape to return to its tree.
 
+## App-level shared pieces
+
+These live in `apps/web/src` because they know about files, sessions or the clipboard, which the
+pattern layer must not.
+
+| API                                  | Responsibility                                                                                                                                        |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `lib/clipboard.ts`                   | The one copy boundary: `writeText`, then `write` with a `ClipboardItem`, then `execCommand('copy')`. `copyTextToClipboard` toasts; failures log once. |
+| `components/copy-button.tsx`         | Inline copy: the icon turns into a check for a moment instead of a toast.                                                                             |
+| `components/file-label.tsx`          | Icon, basename, muted directory, so a right cut eats the directory. `FileStatusCell` draws the change letter beside it.                               |
+| `PaneHostProvider` / `usePaneHost`   | The container a rail or pane header sits in, with views bound to select/toggle and one Hide. See `docs/workspace-rails.md`.                           |
+| `keymap/menus/utils/open-file-item`  | "Open File", the same item in Files, Git and Search menus, beside `copyPathSection`.                                                                  |
+| `MenuSurface` `takesFocus` item flag | The item puts focus somewhere itself (a rename field, the editor); it runs a frame after the menu closes and focus is not restored over it.           |
+| `MenuSurface` `returnFocusTo`        | The list that opened the menu. Closing without handing focus elsewhere returns there, not to the pane's own focus target.                             |
+
 ## Ownership and enforcement
 
 Features are leaves. `platform-boundaries/feature-imports` checks exact importer/module pairs in

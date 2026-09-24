@@ -20,10 +20,32 @@ the application actions.
 The contract accepts `children: ReactNode`, `label: string`, and
 `side: 'left' | 'right'`. There is no optional footer or Settings visibility flag.
 `RailTabs` owns the tabs and their toggle behavior, using `ToggleIconButton` for
-button treatment and tooltips. Each mode supplies its tab order and active tab,
-or null when its panel is closed. The selection callback receives the clicked tab
-and whether its panel should open. Clicking the active tab closes the panel in
-either mode. Both rails remain mounted so the same icon can reopen it.
+button treatment and tooltips. It reads its tabs from the enclosing pane host.
+
+## Pane hosts
+
+`PaneHostProvider` (`providers/pane-host-provider.tsx`) names the container its
+children render in: `workbench-sidebar`, `workbench-bottom` or `chat-tools`. A
+layout mounts one around its rail or tab strip and one around the pane body, so
+the rail and the pane header ask the same host. `usePaneHost()` returns it, or
+null outside every host (a settings page, the chat stage).
+
+A host lists its views, the last selected one, whether the pane is visible, and
+`hide`. Each view carries `select` and `toggle` already bound to that host, built
+from the host's own tab list, so a bottom-panel tab cannot reach the sidebar.
+
+- **Select** shows a view and reveals a hidden pane. The pane header menu's view
+  group and the bottom panel's tab strip use it.
+- **Toggle** is the rail gesture: the view already showing hides the pane, any
+  other view is selected.
+- **Hide** closes that host only. The last selected view is kept, so the rail
+  icon reopens the pane on it. Both rails stay mounted for that reason.
+
+The header's view group and Hide item come from `paneHeaderMenu` in
+`keymap/menus/utils/pane-header-menu.ts`, the one menu model for every host.
+Ownership comes from the provider, never from the global UI mode: the chat tool
+pane and the workbench sidebar can show the same panel component, and each header
+acts on the host it sits in.
 
 The rail lives in app composition because it dispatches `workspace.showSettings`.
 The existing command handles the destination: a workbench editor tab or chat's
@@ -44,4 +66,6 @@ as with any component boundary. The `sidebar-settings-button` browser scenario
 checks both existing mode entry points, their different tab sets, one Settings
 action pinned to each rail's bottom, opening Settings without changing mode, and
 opening it again after collapsing chat tools. It also closes and reopens Search
-from the same icon in both modes, checking panel visibility and pressed state.
+from the same icon in both modes, checking panel visibility and pressed state,
+then hides each host from its header menu (sidebar, chat tools, bottom panel) and
+reopens it from its rail or command.

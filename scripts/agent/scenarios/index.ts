@@ -42,6 +42,11 @@ import { panelSeams } from './panel-seams'
 import { surfaceAudit } from './surface-audit'
 import { surfaceStacking } from './surface-stacking'
 import { chatTimelinePattern } from './chat-timeline-pattern'
+import { copyFeedback } from './copy-feedback'
+import { fileLabelCohesion } from './file-label-cohesion'
+import { checkpointStates } from './checkpoint-states'
+import { sessionActionsSurfaces } from './session-actions-surfaces'
+import { searchFileActions } from './search-file-actions'
 import { settingsStaleDiagnostics } from './settings-stale-diagnostics'
 import { settingsFontInput } from './settings-font-input'
 import { settingsSaveRejected } from './settings-save-rejected'
@@ -220,6 +225,11 @@ export const scenarios: readonly Scenario[] = [
   surfaceAudit,
   surfaceStacking,
   chatTimelinePattern,
+  copyFeedback,
+  fileLabelCohesion,
+  checkpointStates,
+  sessionActionsSurfaces,
+  searchFileActions,
   chatFollowUp,
   chatDiffSyntax,
   editorSplitDrag,

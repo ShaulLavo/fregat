@@ -62,3 +62,11 @@ function gitSourceTitle(source: GitSymbolSource) {
 
   return 'Historical'
 }
+
+const CHECKPOINT_CHANGE_STATUSES = ['added', 'deleted', 'renamed'] as const
+
+/** A checkpoint file's `kind` is an open string; anything unrecognized reads as modified. */
+export function checkpointChangeStatus(kind: string): StatusPresentation {
+  const status = CHECKPOINT_CHANGE_STATUSES.find((known) => known === kind) ?? 'modified'
+  return gitStatusSymbol(status, 'historical')
+}

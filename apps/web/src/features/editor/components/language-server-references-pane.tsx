@@ -7,8 +7,8 @@ import {
   referenceDocumentsRevisionKey,
   referenceDocumentsByPath,
   referenceListRows,
-  toggledPathSet,
 } from '@/features/editor/utils/language-server-references'
+import { toggledSet } from '@/lib/toggled-set'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { fileDocumentKey, filesystemPath } from '@/lib/documents/utils/identity'
 import { XIcon } from '@phosphor-icons/react'
@@ -63,7 +63,7 @@ export function LanguageServerReferencesPane({
   )
 
   function handleToggle(path: string) {
-    setCollapsedPaths((current) => toggledPathSet(current, path))
+    setCollapsedPaths((current) => toggledSet(current, path))
   }
 
   const [activeId, setActiveId] = useState<string | null>(null)

@@ -2,11 +2,8 @@ import type { SessionRuntimeState, SessionRuntimeStatus } from '@workspace/contr
 import { sessionIdSchema } from '@workspace/contracts'
 import * as v from 'valibot'
 
-import {
-  canStopAgentSession,
-  sessionMenu,
-  type SessionMenuContext,
-} from '@/features/chat-mode/utils/session-menu'
+import { sessionMenu, type SessionMenuContext } from '@/features/chat-mode/utils/session-menu'
+import { canStopAgentSession } from '@/keymap/menus/utils/session-actions-menu'
 import type { MenuActionItem, MenuItem } from '@/keymap/menus/utils/model'
 import { expect, test } from '../../../../../test/fixtures'
 

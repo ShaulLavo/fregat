@@ -179,7 +179,7 @@ test('the workspace mutation gate disables every tree write but keeps reads avai
     'Duplicate',
     'Delete',
   ])
-  expect(item(menu, 'open', 'Open')?.disabled).toBeFalsy()
+  expect(item(menu, 'open', 'Open File')?.disabled).toBeFalsy()
   expect(item(menu, 'copy', 'Copy Path')?.disabled).toBeFalsy()
 })
 

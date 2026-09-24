@@ -1,11 +1,9 @@
 import { ListRow } from '@workspace/ui/patterns/list-row'
 import type { useListbox } from '@workspace/ui/patterns/use-listbox'
-import { FileTypeIcon } from '@/components/file-type-icon'
 import type { KeyboardEvent, MouseEventHandler, ReactNode } from 'react'
-import { Shimmer } from '@workspace/ui/components/shimmer'
-import { cn } from '@workspace/ui/lib/utils'
-import { iconForEntry } from '@/lib/file-icons'
-import { basename, parentPath, toTreePath } from '@/lib/path-formatters'
+import { FileLabel } from '@/components/file-label'
+import { FileStatusCell } from '@/components/file-status-cell'
+import { toTreePath } from '@/lib/path-formatters'
 import type { GitLineStat } from '@workspace/contracts'
 import { encodeTooltipParts } from '@workspace/ui/patterns/tooltip-parts'
 import { DiffStatLabel } from '@/components/diff-stat-label'
@@ -43,9 +41,6 @@ export function GitFileRow({
   onMenuKey?: (event: KeyboardEvent<HTMLDivElement>) => boolean
 }) {
   const relativePath = toTreePath(path, rootPath)
-  const name = basename(relativePath)
-  const directory = parentPath(relativePath)
-  const icon = iconForEntry({ name, type: 'file' })
   const changed = stat && stat.additions + stat.deletions > 0 ? stat : undefined
   const tooltip = encodeTooltipParts([
     { text: oldPath ? `${toTreePath(oldPath, rootPath)} → ` : '' },
@@ -54,17 +49,6 @@ export function GitFileRow({
     ...(changed ? diffParts(changed) : []),
     { text: disabledReason ? ` · ${disabledReason}` : '', tone: 'muted' },
   ])
-  const label = (
-    <>
-      <span className={cn('font-medium', !loading && 'text-foreground')}>{name}</span>
-      {directory ? (
-        <span className={cn('ml-2 font-normal', !loading && 'text-muted-foreground')}>
-          {directory}
-        </span>
-      ) : null}
-    </>
-  )
-
   function handleOpen() {
     if (disabledReason) return
     onOpen()
@@ -96,24 +80,14 @@ export function GitFileRow({
       onContextMenu={onContextMenu}
       onKeyDown={handleKeyDown}
     >
-      <FileTypeIcon className='size-(--icon-size-sm) shrink-0 justify-self-center' icon={icon} />
-      <div className='min-w-0 truncate text-left'>
-        {loading ? <Shimmer>{label}</Shimmer> : label}
-      </div>
+      <FileLabel iconClassName='justify-self-center' loading={loading} path={relativePath} />
       <div>{actions}</div>
       <span className='text-2xs pl-1.5 tabular-nums'>
         {changed ? (
           <DiffStatLabel additions={changed.additions} deletions={changed.deletions} />
         ) : null}
       </span>
-      <span
-        className={cn(
-          'flex h-(--density-row-height) items-center justify-self-end pb-px text-xs font-semibold leading-none',
-          status.className,
-        )}
-      >
-        {status.label}
-      </span>
+      <FileStatusCell status={status} />
     </ListRow>
   )
 }

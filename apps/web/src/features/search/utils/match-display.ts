@@ -19,8 +19,6 @@ export function searchMatchDisplay(
   query: string,
   options: SearchMatchDisplayOptions = {},
 ): SearchMatchDisplay {
-  if (match.kind === 'name') return searchQueryDisplay(match.path, query, options)
-
   const preview = searchMatchPreview(match)
   const range = searchMatchPreviewRange(match, preview)
   if (range) return searchRangeDisplay(preview, range, options)

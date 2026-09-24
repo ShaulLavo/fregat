@@ -2,7 +2,6 @@ import { useSettingValue } from '@/hooks/use-setting-value'
 import { SessionTitleStatus } from '@/features/chat-mode/components/session-title-status'
 import { WorktreeChip } from '@/features/chat-mode/components/worktree-chip'
 import { SessionAttentionIndicator } from '@/features/chat-mode/components/session-attention-indicator'
-import { scopedSessionKey } from '@workspace/contracts'
 import { CaretRightIcon } from '@phosphor-icons/react'
 
 import { ContextUsageRing } from '@/features/chat/components/context-usage-ring'
@@ -12,10 +11,10 @@ import {
   sessionStatusTextClass,
 } from '@/features/chat-mode/utils/attention-state'
 import { BranchActions } from '@/features/git/components/branch-actions'
-import { SessionRename } from '@/features/chat-mode/components/session-rename'
-import { StageSessionMenu } from '@/features/chat-mode/components/stage-session-menu'
+import { SessionRename } from '@/components/session-rename'
+import { SessionActionsButton } from '@/components/session-actions-button'
 import { useChatModeSession } from '@/features/chat-mode/providers/session-context'
-import { useSessionRailStore } from '@/features/chat-mode/state/session-rail-store'
+import { useSessionRenaming } from '@/hooks/use-session-renaming'
 import { stageTitle } from '@/features/chat-mode/utils/stage-title'
 import type { SessionRailItem } from '@workspace/client-core/chat/rail/model'
 import { ToolPaneHeader } from '@workspace/ui/patterns/tool-pane-header'
@@ -33,11 +32,7 @@ export function StageHeader({
 }) {
   const contextMeterEnabled = useSettingValue('chat.contextWindowMeterEnabled')
   const { rootPath } = useChatModeSession()
-  const renaming = useSessionRailStore((state) => state.renaming)
-  const editing =
-    Boolean(session) &&
-    renaming?.surface === 'header' &&
-    scopedSessionKey(renaming.ref) === session?.key
+  const editing = useSessionRenaming(session, 'header')
 
   return (
     <ToolPaneHeader
@@ -64,7 +59,7 @@ export function StageHeader({
           ) : null}
           {session ? <SessionTitleStatus sessionRef={session.ref} /> : null}
           {contextMeterEnabled && contextUsage ? <ContextUsageRing usage={contextUsage} /> : null}
-          {session ? <StageSessionMenu session={session} /> : null}
+          {session ? <SessionActionsButton session={session} surface='header' /> : null}
         </>
       }
     >

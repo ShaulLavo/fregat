@@ -3,7 +3,8 @@ import { useSidebarSelectionStore } from '../state/sidebar-selection-store'
 import { useNavigation } from '@/hooks/use-navigation'
 import { LoadingState } from '@workspace/ui/components/loading-state'
 import type { SessionId, WorktreeId } from '@workspace/contracts'
-import { selectCurrentWorktree } from '@workspace/client-core/chat/selectors'
+import { selectChatSessionById, selectCurrentWorktree } from '@workspace/client-core/chat/selectors'
+import { useSessionRailItem } from '@/hooks/use-session-rail-item'
 import { useActiveChatProjection } from '@/features/chat/hooks/use-active-projection'
 import { memo, useEffect, useRef, useState } from 'react'
 
@@ -31,6 +32,10 @@ export const ChatSidePanelContent = memo(({ rootPath }: { rootPath: string }) =>
   const { activeSessionId, selectDraftSession, setActiveSessionId, promoteDraftSession } =
     useActiveChatSessionId({ sessionIds, environmentId: transport.environmentId, projectId })
   const selection = useSidebarSelectionStore((state) => state.selection)
+  const activeSummary = useActiveChatProjection(
+    (state) => selectChatSessionById(state, activeSessionId) ?? null,
+  )
+  const activeRailItem = useSessionRailItem(activeSummary, transport.environmentId)
   const restoredDraft = useChatInputDraftStore((state) =>
     selection.kind === 'draft' && selection.draftId
       ? Object.entries(state.draftsByKey).find(
@@ -92,6 +97,7 @@ export const ChatSidePanelContent = memo(({ rootPath }: { rootPath: string }) =>
         sessions={sessions}
         onNewChat={handleNewChat}
         onSelectSession={setActiveSessionId}
+        session={activeRailItem}
       />
       {activeSessionId ? (
         <ChatView

@@ -60,11 +60,9 @@ export const SearchResultRow = memo(
           active={active}
           rowProps={rowProps}
           compact={compact}
-          match={item.match}
-          measurePreviewCell={measurePreviewCell}
-          previewMaxLength={previewMaxLength}
+          group={item.group}
           query={query}
-          onOpenMatch={() => {
+          onOpen={() => {
             selectResult(item.id)
             openMatch(item.match)
           }}

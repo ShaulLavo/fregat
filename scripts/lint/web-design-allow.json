@@ -140,6 +140,11 @@
     "reason": "D3: an app-authored notice."
   },
   {
+    "file": "apps/web/src/components/file-label.tsx",
+    "class": "truncate",
+    "reason": "A part, not a row: every caller's row carries the full path, as a native title on Search rows and as data-tooltip on the virtualized Git rows."
+  },
+  {
     "file": "apps/web/src/features/logs/components/timeline-loading.tsx",
     "class": "truncate",
     "reason": "D3: the app-authored labels of timeline-metric.tsx, mirrored so the skeleton keeps its height."

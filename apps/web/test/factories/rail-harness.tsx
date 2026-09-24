@@ -1,7 +1,7 @@
 import { Toaster } from '@workspace/ui/components/sonner'
 import { toast } from 'sonner'
-import { SessionSnoozeDialog } from '@/features/chat-mode/components/session-snooze-dialog'
-import { WorktreeManager } from '@/features/chat-mode/components/worktree-manager'
+import { SessionDialogs } from '@/components/session-dialogs'
+import { ChatPanelHeader } from '@/features/chat/components/chat-panel-header'
 import { useWorktreeManagerStore } from '@/features/chat-mode/state/worktree-manager-store'
 import { createEnvironmentEntry } from '@workspace/client-core/environments/utils/connection'
 import { environmentScopedStorage } from '@/lib/environments/state/scoped-storage'
@@ -18,14 +18,13 @@ import {
 } from '@workspace/contracts'
 import * as v from 'valibot'
 import { onTestFinished } from 'vitest'
-import { Profiler, type ProfilerOnRenderCallback } from 'react'
+import { Profiler, type ProfilerOnRenderCallback, type ReactNode } from 'react'
 import {
   ChatModeSessionContext,
   type ChatModeSession,
 } from '@/features/chat-mode/providers/session-context'
 import { ChatRailOrderProvider } from '@/features/chat-mode/providers/rail-order-provider'
 import { SessionRail } from '@/features/chat-mode/components/session-rail'
-import { SessionDeleteDialog } from '@/features/chat-mode/components/session-delete-dialog'
 import { ProjectDeleteDialog } from '@/features/chat-mode/components/project-delete-dialog'
 import { ProjectRenameDialog } from '@/features/chat-mode/components/project-rename-dialog'
 import { StageHeader } from '@/features/chat-mode/components/stage-header'
@@ -195,40 +194,83 @@ export async function createRailHarness(
     application,
   }
 }
-export function renderRailHarness(
-  harness: Awaited<ReturnType<typeof createRailHarness>>,
-  header = false,
-  onRender: ProfilerOnRenderCallback = () => {},
-) {
+type RailHarness = Awaited<ReturnType<typeof createRailHarness>>
+
+function firstRow(harness: RailHarness) {
   const model = sessionRailModel({ environments: currentRailEnvironments() })
-  const row = model.sessions.find((session) => session.id === harness.sessionIds[0]) ?? null
+  return model.sessions.find((session) => session.id === harness.sessionIds[0]) ?? null
+}
+
+function renderInHarness(harness: RailHarness, children: ReactNode) {
   return renderWithProviders(
     <EditorStateProvider runtime={harness.application.getSnapshot().editor}>
-      <ChatModeSessionContext value={harness.context}>
-        <ChatRailOrderProvider>
-          {header ? (
-            <StageHeader
-              contextUsage={null}
-              projectTitle={harness.context.project?.title ?? null}
-              session={row}
-            />
-          ) : (
-            <Profiler id='rail' onRender={onRender}>
-              <SessionRail />
-            </Profiler>
-          )}
-          <SessionDeleteDialog />
-          <SessionSnoozeDialog />
-          <Toaster />
-          <ProjectDeleteDialog />
-          <ProjectRenameDialog />
-          <WorktreeManager />
-        </ChatRailOrderProvider>
-      </ChatModeSessionContext>
+      <ChatModeSessionContext value={harness.context}>{children}</ChatModeSessionContext>
     </EditorStateProvider>,
     {
       application: harness.application,
       queryClient: harness.application.getSnapshot().queryClient,
     },
+  )
+}
+
+export function renderRailHarness(
+  harness: RailHarness,
+  header = false,
+  onRender: ProfilerOnRenderCallback = () => {},
+) {
+  const row = firstRow(harness)
+  return renderInHarness(
+    harness,
+    <ChatRailOrderProvider>
+      {header ? (
+        <StageHeader
+          contextUsage={null}
+          projectTitle={harness.context.project?.title ?? null}
+          session={row}
+        />
+      ) : (
+        <Profiler id='rail' onRender={onRender}>
+          <SessionRail />
+        </Profiler>
+      )}
+      <SessionDialogs />
+      <Toaster />
+      <ProjectDeleteDialog />
+      <ProjectRenameDialog />
+    </ChatRailOrderProvider>,
+  )
+}
+
+/**
+ * Both headers that act on one conversation, side by side over the same scoped
+ * session: the chat stage's and the editor sidebar's. The dialogs come from the
+ * shared owner, as they do in the app.
+ */
+export function renderSessionHeaders(harness: RailHarness) {
+  const row = firstRow(harness)
+  return renderInHarness(
+    harness,
+    <>
+      <section aria-label='Stage header'>
+        <StageHeader
+          contextUsage={null}
+          projectTitle={harness.context.project?.title ?? null}
+          session={row}
+        />
+      </section>
+      <section aria-label='Sidebar header'>
+        <ChatPanelHeader
+          activeSessionId={row?.id ?? null}
+          creating={false}
+          disabled={false}
+          session={row}
+          sessions={[]}
+          onNewChat={() => {}}
+          onSelectSession={() => {}}
+        />
+      </section>
+      <SessionDialogs />
+      <Toaster />
+    </>,
   )
 }

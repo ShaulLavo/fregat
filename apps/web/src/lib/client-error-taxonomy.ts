@@ -3,6 +3,7 @@ import { isObject } from '@workspace/utils/objects'
 import { toast } from 'sonner'
 import type { ErrorCategory } from '@workspace/contracts'
 import { agentErrorReport } from './agent-error-report'
+import { copyTextToClipboard } from './clipboard'
 import { clientErrorMetadata } from './client-error-context'
 import { reportClientError } from './client-error-reporting'
 
@@ -113,10 +114,7 @@ export function clientErrorDescription(error: ClientError): string {
 
 /** Hands the failure to an agent: the catalog's answer plus how to find the log. */
 function copyAgentReport(error: ClientError) {
-  void navigator.clipboard
-    ?.writeText(agentErrorReport(error))
-    .then(() => toast.success('Copied for an agent'))
-    .catch(() => toast.error('Clipboard is unavailable'))
+  void copyTextToClipboard(agentErrorReport(error), 'error report for an agent')
 }
 
 export function reportError(error: ClientError): void {

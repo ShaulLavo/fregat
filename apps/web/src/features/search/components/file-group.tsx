@@ -1,7 +1,6 @@
-import { FileTypeIcon } from '@/components/file-type-icon'
+import { FileLabel } from '@/components/file-label'
 import { CaretRightIcon } from '@phosphor-icons/react'
 import type { WorkspaceSearchFileGroup } from '@/features/search/state/buffer-state'
-import { iconForEntry } from '@/lib/file-icons'
 import { Button } from '@workspace/ui/components/button'
 import { ListRow, type ListRowProps } from '@workspace/ui/patterns/list-row'
 import { cn } from '@workspace/ui/lib/utils'
@@ -45,14 +44,7 @@ export function SearchFileGroupHeader({
           !group.collapsed && 'rotate-90',
         )}
       />
-      <FileTypeIcon
-        className='size-(--icon-size-sm) shrink-0'
-        icon={iconForEntry({ name: group.name, type: 'file' })}
-      />
-      <span className='min-w-0 flex-1 truncate'>
-        <span className='font-medium'>{group.name}</span>
-        <span className='text-2xs text-muted-foreground ml-2'>{group.pathLabel}</span>
-      </span>
+      <FileLabel className='flex-1' path={group.pathLabel} />
       <span className='text-2xs text-muted-foreground shrink-0 tabular-nums'>
         {group.count.toLocaleString()}
       </span>

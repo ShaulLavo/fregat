@@ -2,25 +2,29 @@ import { cn } from '@workspace/ui/lib/utils'
 
 export function HighlightedPreview({
   active,
+  inline = false,
   preview,
   query,
   range,
   replacementText,
 }: {
   active?: boolean
+  /** Flows inside a larger label instead of owning its own truncating line. */
+  inline?: boolean
   preview: string
   query: string
   range?: { end: number; start: number } | null
   replacementText?: string
 }) {
   const highlight = range ? previewRangeHighlight(preview, range) : previewHighlight(preview, query)
+  const frame = inline ? undefined : 'block max-w-full truncate'
   if (!highlight) {
-    return <span className='block max-w-full truncate'>{preview}</span>
+    return <span className={frame}>{preview}</span>
   }
 
   if (replacementText !== undefined) {
     return (
-      <span className='block max-w-full truncate'>
+      <span className={frame}>
         {highlight.before}
         <mark className='bg-diff-removed/15 text-diff-removed decoration-diff-removed/70 inline-block max-w-full truncate rounded-md px-0.5 align-bottom line-through'>
           {highlight.match}
@@ -34,7 +38,7 @@ export function HighlightedPreview({
   }
 
   return (
-    <span className='block max-w-full truncate'>
+    <span className={frame}>
       {highlight.before}
       <mark
         className={cn(

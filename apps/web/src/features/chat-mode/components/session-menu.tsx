@@ -11,7 +11,7 @@ export function SessionMenu({
   readonly session: SessionRailItem
   readonly trigger: ReactElement
 }) {
-  const menu = useSessionMenu(session, 'rail')
+  const menu = useSessionMenu(session)
 
   return <MenuSurface className='w-56' menu={menu} surface='chat.session' trigger={trigger} />
 }

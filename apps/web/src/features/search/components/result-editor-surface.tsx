@@ -1,6 +1,19 @@
 import { useRowHeight } from '@workspace/ui/patterns/use-row-height'
 import { createSearchResultVirtualListMetrics } from '@/features/search/utils/result-virtual-list'
-import { memo, useId, useLayoutEffect, useMemo, useRef, type KeyboardEvent } from 'react'
+import {
+  memo,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type MouseEvent,
+} from 'react'
+import { isContextMenuKey } from '@workspace/utils/keyboard'
+import { useContextMenu } from '@/keymap/menus/hooks/use-context-menu'
+import { SearchFileMenu } from '@/features/search/components/file-menu'
+import { SearchFileMenuContext } from '@/features/search/providers/file-menu-context'
 
 import { useEditorColorTheme } from '@/lib/editor-theme/hooks/use-editor-color-theme'
 import type { WorkspaceSearchFileGroup } from '@/features/search/state/buffer-state'
@@ -23,7 +36,9 @@ import { SearchResultEditorVirtualWindow } from '@/features/search/components/re
 import type { SearchResultId } from '@/features/search/utils/result-items'
 import {
   searchResultFileBlocks,
+  searchResultOpenTargetForId,
   searchResultVirtualRowById,
+  type SearchResultOpenTarget,
   searchResultVirtualRowId,
   searchResultVirtualRows,
 } from '@/features/search/utils/result-view-model'
@@ -87,6 +102,9 @@ export const SearchResultEditorSurface = memo(
     const scrollToIndexRef = useRef<SearchResultEditorScrollToIndex>(noopScrollToIndex)
     const scrollToOffsetRef = useRef<(offset: number) => void>(noopScrollToOffset)
     const { editorTheme } = useEditorColorTheme()
+    const contextMenu = useContextMenu()
+    const [menuTarget, setMenuTarget] = useState<SearchResultOpenTarget | null>(null)
+    const menuPath = groups.find((group) => group.path === menuTarget?.path)?.pathLabel
     const selectResultWithoutReveal = (id: SearchResultId | null) => {
       if (id === activeResultId) return
 
@@ -133,7 +151,24 @@ export const SearchResultEditorSurface = memo(
       scrollToOffsetRef,
     })
 
+    function openFileMenu(target: SearchResultOpenTarget, event: MouseEvent<HTMLElement>) {
+      setMenuTarget(target)
+      contextMenu.openAtEvent(event, event.currentTarget)
+    }
+
+    function openActiveMenu(event: KeyboardEvent<HTMLDivElement>) {
+      const target = searchResultOpenTargetForId(blocks, activeResultId)
+      const row = activeRow
+        ? document.getElementById(searchResultDomId(treeId, searchResultVirtualRowId(activeRow)))
+        : null
+      if (!target) return
+      event.preventDefault()
+      setMenuTarget(target)
+      contextMenu.openAtElement(row ?? event.currentTarget)
+    }
+
     function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+      if (isContextMenuKey(event)) return openActiveMenu(event)
       handleSearchResultSurfaceKeyDown({
         activeResultId,
         blocks,
@@ -158,19 +193,30 @@ export const SearchResultEditorSurface = memo(
         onKeyDown={handleKeyDown}
       >
         <SearchResultActionsContext value={editorActions}>
-          <SearchResultEditorVirtualWindow
-            activeResultId={activeResultId}
-            canReplace={canReplace}
-            editorTheme={editorTheme}
-            initialViewport={initialViewport}
-            parentRef={parentRef}
-            prewarmEditorPool={prewarmEditorPool}
-            replaceVisible={replaceVisible}
-            rows={rows}
-            scrollToIndexRef={scrollToIndexRef}
-            scrollToOffsetRef={scrollToOffsetRef}
-            treeId={treeId}
-          />
+          <SearchFileMenuContext value={openFileMenu}>
+            <SearchResultEditorVirtualWindow
+              activeResultId={activeResultId}
+              canReplace={canReplace}
+              editorTheme={editorTheme}
+              initialViewport={initialViewport}
+              parentRef={parentRef}
+              prewarmEditorPool={prewarmEditorPool}
+              replaceVisible={replaceVisible}
+              rows={rows}
+              scrollToIndexRef={scrollToIndexRef}
+              scrollToOffsetRef={scrollToOffsetRef}
+              treeId={treeId}
+            />
+          </SearchFileMenuContext>
+          {contextMenu.anchor && menuTarget ? (
+            <SearchFileMenu
+              anchor={contextMenu.anchor}
+              relativePath={menuPath ?? menuTarget.path}
+              returnFocusTo={() => parentRef.current}
+              target={menuTarget}
+              onOpenChange={contextMenu.onOpenChange}
+            />
+          ) : null}
         </SearchResultActionsContext>
       </div>
     )

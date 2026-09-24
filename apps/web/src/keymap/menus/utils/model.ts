@@ -33,6 +33,8 @@ export type MenuActionItem = MenuItemShared & {
   readonly destructive?: boolean
   readonly disabled?: boolean
   readonly shortcut?: string
+  /** The action puts focus somewhere itself, such as a rename field; closing must not take it back. */
+  readonly takesFocus?: boolean
 }
 
 type MenuCheckboxItem = MenuItemShared & {

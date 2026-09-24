@@ -11,7 +11,11 @@ import {
   shouldAutoExpandChangedFiles,
   summarizeChangedFileScopes,
 } from '@/features/chat/utils/changed-files-presentation'
-import { canOpenCheckpointDiff } from '@/features/chat/utils/checkpoint-diff-query'
+import {
+  checkpointAvailability,
+  checkpointAvailabilityLabel,
+  type CheckpointAvailability,
+} from '@/lib/checkpoint-availability'
 import {
   hasNonZeroChatTurnDiffStat,
   summarizeChatTurnDiffStats,
@@ -36,12 +40,14 @@ export function AssistantChangedFilesSection({ summary }: { summary: ChatTurnDif
   )
   const [diffError, setDiffError] = useState<string | null>(null)
   const files = summary.files
-  if (files.length === 0) return null
+  const availability = checkpointAvailability(summary)
+  // A failed or missing capture has no files; it still says so rather than vanishing.
+  if (files.length === 0) return unlistedCheckpoint(availability)
 
   const summaryStat = summarizeChatTurnDiffStats(files)
   const expanded = expansion?.cardExpanded ?? shouldAutoExpandChangedFiles(files)
   const allDirectoriesExpanded = expansion?.directoriesExpanded ?? true
-  const diffAvailable = canOpenCheckpointDiff(summary)
+  const diffAvailable = availability.kind === 'available'
 
   async function handleOpenCheckpointDiff(path?: string) {
     if (!diffAvailable) return
@@ -115,8 +121,8 @@ export function AssistantChangedFilesSection({ summary }: { summary: ChatTurnDif
               View diff
             </Button>
           ) : (
-            <span className='text-muted-foreground text-2xs text-3xs'>
-              {checkpointStatusLabel(summary.status)}
+            <span className='text-muted-foreground text-3xs'>
+              {checkpointAvailabilityLabel(availability)}
             </span>
           )}
           {diffAvailable ? (
@@ -199,9 +205,19 @@ export function AssistantChangedFilesSection({ summary }: { summary: ChatTurnDif
   )
 }
 
-function checkpointStatusLabel(status: ChatTurnDiffSummary['status']) {
-  if (status === 'missing') return 'Checkpoint missing'
-  if (status === 'error') return 'Checkpoint error'
+/** A turn that changed nothing shows nothing; a capture that failed says which way it failed. */
+function unlistedCheckpoint(availability: CheckpointAvailability) {
+  if (availability.kind !== 'missing' && availability.kind !== 'error') return null
 
-  return 'Diff unavailable'
+  return (
+    <p
+      className={cn(
+        'text-2xs mt-2',
+        availability.kind === 'error' ? 'text-destructive' : 'text-muted-foreground',
+      )}
+      data-changed-files-state={availability.kind}
+    >
+      {checkpointAvailabilityLabel(availability)}
+    </p>
+  )
 }

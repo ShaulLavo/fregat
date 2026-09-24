@@ -7,8 +7,8 @@ import { documentTab } from '@/lib/documents/utils/tabs'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { checkpointRequest } from '@/lib/documents/utils/comparisons'
 import { useEditorWorkspaceStoreApi } from '@/features/editor/state/workspace-state'
+import { checkpointAvailability } from '@/lib/checkpoint-availability'
 import {
-  canOpenCheckpointDiff,
   checkpointFileDocument,
   checkpointDiffRetry,
   checkpointDiffRetryDelay,
@@ -31,7 +31,7 @@ export function useOpenCheckpointDiffDocument() {
   const workspaceStore = useEditorWorkspaceStoreApi()
 
   async function openCheckpointDiff(summary: ChatTurnDiffSummary, path?: string) {
-    if (!canOpenCheckpointDiff(summary)) return false
+    if (checkpointAvailability(summary).kind !== 'available') return false
 
     const rootPath = workspaceStore.getState().rootFolder?.path ?? null
     if (rootPath === null) return false
@@ -80,7 +80,7 @@ export function useOpenCheckpointDiffDocument() {
   }
 
   async function openFullSessionCheckpointDiff(summary: ChatTurnDiffSummary) {
-    if (!canOpenCheckpointDiff(summary)) return false
+    if (checkpointAvailability(summary).kind !== 'available') return false
 
     const rootPath = workspaceStore.getState().rootFolder?.path ?? null
     if (rootPath === null) return false

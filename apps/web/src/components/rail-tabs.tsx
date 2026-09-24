@@ -2,38 +2,35 @@ import { PanelTabIcon } from '@/components/panel-tab-icon'
 import { ToggleIconButton } from '@/components/toggle-icon-button'
 import type { PanelTab } from '@/components/utils/panel-tabs'
 import { WorkspaceRail } from '@/components/workspace-rail'
+import { usePaneHost } from '@/hooks/use-pane-host'
+import type { PaneHostView } from '@/providers/pane-host-context'
 
 /**
- * The tab strip both rails show. A mode passes its own tabs and its own labels;
- * `activeTab` is null when closed. Clicking the active tab closes its panel.
+ * The tab strip both rails show, drawn from the enclosing pane host. A tab is
+ * pressed while its pane shows it; clicking the pressed tab hides the pane.
  */
-export function RailTabs<Tab extends PanelTab>({
-  activeTab,
+export function RailTabs({
   className,
   label,
   side,
-  tabLabel,
-  tabs,
-  onSelectTab,
 }: {
-  readonly activeTab: Tab | null
   readonly className?: string
   readonly label: string
   readonly side: 'left' | 'right'
-  readonly tabLabel: (tab: Tab) => string
-  readonly tabs: readonly Tab[]
-  readonly onSelectTab: (tab: Tab, open: boolean) => void
 }) {
+  const host = usePaneHost()
+  const views: readonly PaneHostView<PanelTab>[] = host?.views ?? []
+
   return (
     <WorkspaceRail className={className} label={label} side={side}>
-      {tabs.map((tab) => (
+      {views.map((view) => (
         <ToggleIconButton
-          active={activeTab === tab}
-          icon={<PanelTabIcon tab={tab} />}
-          key={tab}
-          label={tabLabel(tab)}
+          active={host?.visible === true && host.activeView === view.value}
+          icon={<PanelTabIcon tab={view.value} />}
+          key={view.value}
+          label={view.label}
           tooltipSide={side === 'left' ? 'right' : 'left'}
-          onClick={() => onSelectTab(tab, activeTab !== tab)}
+          onClick={view.toggle}
         />
       ))}
     </WorkspaceRail>

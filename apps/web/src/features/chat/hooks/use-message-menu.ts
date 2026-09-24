@@ -2,7 +2,7 @@ import type { OrchestrationMessage } from '@workspace/contracts'
 import { toast } from 'sonner'
 
 import { useChatTimelineActions } from '@/features/chat/hooks/use-chat-timeline-actions'
-import { canOpenCheckpointDiff } from '@/features/chat/utils/checkpoint-diff-query'
+import { checkpointAvailability } from '@/lib/checkpoint-availability'
 import type { OptimisticChatMessage } from '@/features/chat/state/chat-message-intents'
 import type { ChatTurnDiffSummary } from '@workspace/client-core/chat/types'
 import { extractTerminalContexts } from '@workspace/client-core/chat/terminal-context'
@@ -51,7 +51,7 @@ export function useMessageMenu({
 
   return chatMessageMenu({
     canRevertCheckpoint: typeof revertTurnCount === 'number',
-    canViewChangedFiles: turnDiffSummary !== null && canOpenCheckpointDiff(turnDiffSummary),
+    canViewChangedFiles: checkpointAvailability(turnDiffSummary).kind === 'available',
     copyMarkdown: () => void copyTextToClipboard(text, 'message markdown'),
     copyText: () =>
       void copyTextToClipboard(assistant ? markdownToPlainText(text) : text, 'message'),

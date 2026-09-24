@@ -39,6 +39,7 @@ export type MenuSurfaceId =
   | 'git.file'
   | 'git.group'
   | 'pane.header'
+  | 'search.file'
   | 'sidebar.rail'
   | 'terminal'
   | 'titlebar'

@@ -1,6 +1,6 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { ListRow } from '@workspace/ui/patterns/list-row'
-import { FileTypeIcon } from '@/components/file-type-icon'
+import { FileLabel } from '@/components/file-label'
 import { CaretRightIcon } from '@phosphor-icons/react'
 import { memo } from 'react'
 
@@ -8,10 +8,8 @@ import { useSearchResultActions } from '@/features/search/hooks/use-result-actio
 import { Button } from '@workspace/ui/components/button'
 import { cn } from '@workspace/ui/lib/utils'
 
-import { fileName } from '@/features/search/utils/result-editor'
 import { matchNoun } from '@/features/search/utils/match-noun'
 import type { SearchResultFileBlock } from '@/features/search/utils/result-view-model'
-import { iconForEntry } from '@/lib/file-icons'
 
 type SearchResultFileHeaderProps = {
   active: boolean
@@ -23,8 +21,6 @@ type SearchResultFileHeaderProps = {
 export const SearchResultFileHeader = memo(
   ({ active, canReplace, file, replaceVisible }: SearchResultFileHeaderProps) => {
     const { replacePath, toggleGroup } = useSearchResultActions()
-    const name = fileName(file.path)
-    const icon = iconForEntry({ name, type: 'file' })
     const handleReplace = () => replacePath(file.path)
     const handleToggle = () => toggleGroup(file.path)
 
@@ -63,11 +59,7 @@ export const SearchResultFileHeader = memo(
           </TooltipContent>
         </Tooltip>
         <div className='grid min-w-0 grid-cols-[16px_minmax(0,1fr)] items-center gap-1.5 text-left'>
-          <FileTypeIcon className='size-(--icon-size)' icon={icon} />
-          <span className='min-w-0 truncate'>
-            <span className='text-xs font-medium'>{name}</span>
-            <span className='text-muted-foreground text-2xs ml-2'>{file.pathLabel}</span>
-          </span>
+          <FileLabel className='text-xs' iconClassName='size-(--icon-size)' path={file.pathLabel} />
         </div>
         <span className='bg-muted/55 text-muted-foreground text-3xs rounded-md px-1.5 leading-4 tabular-nums'>
           {file.matchCount.toLocaleString()} {matchNoun(file.matchCount)}

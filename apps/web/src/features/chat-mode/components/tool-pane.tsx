@@ -8,6 +8,8 @@ import { SearchPane } from '@/features/workspace/components/search-pane'
 import type { EditorTabConflictMap } from '@/features/workspace/utils/tab-types'
 import { TurnFiles } from '@/features/chat-mode/components/turn-files'
 import { CheckpointLoading } from '@/features/chat-mode/components/checkpoint-loading'
+import { CheckpointState } from '@/features/chat-mode/components/checkpoint-state'
+import { checkpointAvailability } from '@/lib/checkpoint-availability'
 import { useSessionTerminalId } from '@/features/chat-mode/hooks/use-session-terminal-id'
 import { useSessionToolRoot } from '@/features/chat-mode/hooks/use-session-tool-root'
 import { useSessionDiffScope } from '@/features/chat/hooks/use-session-diff-scope'
@@ -192,18 +194,9 @@ function scopeButton({
 }
 
 function turnScopeBody({ openTurnFile, turnSummary }: SessionDiffScopeState) {
-  // No summary yet means the checkpoint has not streamed in — pending, not
-  // absent. 'missing' below is the state that means there is nothing to show.
-  if (!turnSummary) {
-    return <CheckpointLoading />
-  }
-  if (turnSummary.status !== 'ready' || turnSummary.files.length === 0) {
-    return (
-      <p className='text-muted-foreground text-2xs px-(--density-control-padding-x) py-(--density-section-gap)'>
-        No checkpoint diff for turn {turnSummary.checkpointTurnCount}.
-      </p>
-    )
-  }
+  const availability = checkpointAvailability(turnSummary)
+  if (availability.kind === 'pending') return <CheckpointLoading />
+  if (availability.kind !== 'available') return <CheckpointState availability={availability} />
 
-  return <TurnFiles summary={turnSummary} onOpenFile={openTurnFile} />
+  return <TurnFiles summary={availability.summary} onOpenFile={openTurnFile} />
 }

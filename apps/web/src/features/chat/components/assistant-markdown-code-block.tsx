@@ -1,3 +1,4 @@
+import { CopyButton } from '@/components/copy-button'
 import { FileTypeIcon } from '@/components/file-type-icon'
 import { ArrowUDownLeftIcon } from '@phosphor-icons/react'
 import { HighlightedCode } from '@workspace/markdown/components/highlighted-code'
@@ -13,7 +14,6 @@ import { iconForEntry } from '@/lib/file-icons'
 import { MarkdownDiagramContext } from '@/features/chat/providers/markdown-diagram-context'
 import { fenceIconFileName, fenceTitle } from '@/features/chat/utils/markdown-fence'
 import { AssistantMarkdownMermaid } from './assistant-markdown-mermaid'
-import { MarkdownCopyButton } from './markdown-copy-button'
 
 const BODY_CLASS_NAME = 'overflow-x-auto bg-transparent p-2 text-xs leading-5'
 
@@ -79,7 +79,7 @@ export function AssistantMarkdownCodeBlock({
             </TooltipTrigger>
             <TooltipContent>{wrapLabel}</TooltipContent>
           </Tooltip>
-          <MarkdownCopyButton label='Copy code' text={text} />
+          <CopyButton label='code' text={text} />
         </span>
       </div>
       {/* A grammar or theme that trips the highlighter falls back to plain text. */}

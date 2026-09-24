@@ -11,8 +11,8 @@ import {
 import { cn } from '@workspace/ui/lib/utils'
 import { CaretDownIcon, CaretUpIcon, DotsThreeIcon } from '@phosphor-icons/react'
 import { useState } from 'react'
-import { toast } from 'sonner'
 
+import { copyTextToClipboard } from '@/lib/clipboard'
 import { formatChatTimestamp } from '@/features/chat/utils/formatters'
 import {
   canCollapseProposedPlan,
@@ -74,7 +74,7 @@ export function ProposedPlanCard({ plan }: { plan: OrchestrationProposedPlan }) 
               <TooltipContent>{'Plan actions'}</TooltipContent>
             </Tooltip>
             <DropdownMenuContent align='end'>
-              <DropdownMenuItem onClick={() => void copyPlanMarkdown(exportMarkdown)}>
+              <DropdownMenuItem onClick={() => void copyTextToClipboard(exportMarkdown, 'plan')}>
                 Copy to clipboard
               </DropdownMenuItem>
               <DropdownMenuItem
@@ -116,20 +116,6 @@ export function ProposedPlanCard({ plan }: { plan: OrchestrationProposedPlan }) 
       </div>
     </article>
   )
-}
-
-async function copyPlanMarkdown(markdown: string) {
-  if (!navigator.clipboard?.writeText) {
-    toast.error('Clipboard is unavailable')
-    return
-  }
-
-  try {
-    await navigator.clipboard.writeText(markdown)
-    toast.success('Plan copied')
-  } catch {
-    toast.error('Could not copy plan')
-  }
 }
 
 function downloadPlanMarkdown(filename: string, markdown: string) {

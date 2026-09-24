@@ -11,12 +11,6 @@ export const clientErrors = defineErrorCatalog('client', {
     why: 'A client-side invariant failed while handling application state.',
     fix: 'Inspect the client state and fix the invariant at the throwing call site.',
   },
-  CLIPBOARD_UNAVAILABLE: {
-    status: 400,
-    message: 'Clipboard API not available',
-    why: 'The current browser context does not expose clipboard write access.',
-    fix: 'Use a secure browser context and grant clipboard permissions.',
-  },
   CONTEXT_MISSING: {
     status: 500,
     message: ({ message }: { message: string }) => message,

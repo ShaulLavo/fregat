@@ -61,6 +61,7 @@ export function useContextMenu() {
     anchor,
     onOpenChange,
     open: anchor !== null,
+    openAtElement,
     openAtEvent,
     openOnMenuKey,
   }

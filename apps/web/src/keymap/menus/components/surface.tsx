@@ -36,6 +36,7 @@ export function MenuSurface({
   onOpenChange,
   open,
   popupProps,
+  returnFocusTo,
   surface,
   trigger,
 }: {
@@ -50,6 +51,11 @@ export function MenuSurface({
    * tree looks for `data-file-tree-context-menu-root`.
    */
   readonly popupProps?: Readonly<Record<`data-${string}`, string>>
+  /**
+   * The list that opened the menu. Closing without handing focus elsewhere
+   * returns there, where the pane's own focus target would pick its input.
+   */
+  readonly returnFocusTo?: () => HTMLElement | null
   readonly surface: MenuSurfaceId
   readonly trigger?: ReactElement
 }) {
@@ -65,6 +71,12 @@ export function MenuSurface({
     })
   }
   const pendingCommand = useRef<ResolvedMenuInvocation>(undefined)
+  /**
+   * An item that focuses something itself (a rename field, an editor) runs a frame
+   * after the menu closes: while the popup is open it pulls focus back, and a
+   * surface mounted only while open is gone before its close animation ends.
+   */
+  const afterClose = useRef<(() => void) | null>(null)
   const sections = useResolvedMenu(menu, surface, originState.origin)
 
   /**
@@ -88,6 +100,7 @@ export function MenuSurface({
     invocation?: ResolvedMenuInvocation,
   ) {
     if (invocation) pendingCommand.current = invocation
+    if (item.kind === 'run' && item.takesFocus) afterClose.current = item.run
     let command = item.kind === 'run' ? item.command : null
     if (item.kind === 'radio-group') {
       command = item.options.find((option) => option.value === value)?.command ?? null
@@ -106,6 +119,7 @@ export function MenuSurface({
   function handleOpenChange(next: boolean, details: { readonly trigger?: Element }) {
     if (next) {
       pendingCommand.current = undefined
+      afterClose.current = null
       setOriginState({
         controlledOpen: open === undefined ? undefined : true,
         origin: captureMenuOrigin(focusService, anchor, details.trigger),
@@ -122,6 +136,17 @@ export function MenuSurface({
       origin,
     })
     onOpenChange?.(false)
+    const deferred = afterClose.current
+    afterClose.current = null
+    if (deferred) {
+      requestAnimationFrame(deferred)
+      return
+    }
+    const list = command ? null : returnFocusTo?.()
+    if (list) {
+      list.focus({ preventScroll: true })
+      return
+    }
     if (!command) {
       restoreMenuOrigin(focusService, origin)
       return

@@ -1,5 +1,6 @@
 import { pathSegments as normalizePathSegments } from '@/features/chat/utils/path-segments'
 import type { ChatTurnDiffSummary } from '@workspace/client-core/chat/types'
+import { checkpointChangeStatus, type StatusPresentation } from '@/lib/git-status-symbols'
 
 export type ChatTurnDiffFile = ChatTurnDiffSummary['files'][number]
 
@@ -17,6 +18,8 @@ type ChatTurnDiffTreeDirectoryNode = {
 }
 
 type ChatTurnDiffTreeFileNode = {
+  /** The checkpoint's change kind; `kind` below only discriminates file from directory. */
+  change: StatusPresentation
   kind: 'file'
   name: string
   path: string
@@ -77,6 +80,7 @@ function appendFileToTree(root: MutableDirectoryNode, file: ChatTurnDiffFile) {
   const stat = readStat(file)
   const { ancestors, currentDirectory } = walkDirectories(root, segments.slice(0, -1))
   currentDirectory.files.push({
+    change: checkpointChangeStatus(file.kind),
     kind: 'file',
     name: fileName,
     path: segments.join('/'),

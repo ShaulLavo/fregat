@@ -1,5 +1,6 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import type { SessionId } from '@workspace/contracts'
+import type { SessionRailItem } from '@workspace/client-core/chat/rail/model'
 import { Button } from '@workspace/ui/components/button'
 import {
   DropdownMenu,
@@ -11,6 +12,9 @@ import { ChatCircleIcon, ClockCounterClockwiseIcon, PlusIcon } from '@phosphor-i
 
 import { chatSessionPreview, formatChatDateLabel } from '@/features/chat/utils/formatters'
 import { ToolPaneHeader } from '@/components/tool-pane-header'
+import { SessionActionsButton } from '@/components/session-actions-button'
+import { SessionRename } from '@/components/session-rename'
+import { useSessionRenaming } from '@/hooks/use-session-renaming'
 import type { ChatSessionListProjection } from '@workspace/client-core/chat/selectors'
 
 export function ChatPanelHeader({
@@ -19,9 +23,12 @@ export function ChatPanelHeader({
   disabled,
   onNewChat,
   onSelectSession,
+  session,
   sessions,
 }: {
   activeSessionId: SessionId | null
+  /** The open conversation; null on a draft, which has no session to act on. */
+  session: SessionRailItem | null
   creating: boolean
   disabled: boolean
   onNewChat: () => void
@@ -29,7 +36,8 @@ export function ChatPanelHeader({
   sessions: readonly ChatSessionListProjection[]
 }) {
   const historyDisabled = sessions.length === 0
-  const activeSession = sessions.find((session) => session.id === activeSessionId)
+  const activeSession = sessions.find((candidate) => candidate.id === activeSessionId)
+  const editing = useSessionRenaming(session, 'sidebar')
 
   return (
     <ToolPaneHeader
@@ -84,31 +92,41 @@ export function ChatPanelHeader({
               <TooltipContent>Conversation history</TooltipContent>
             </Tooltip>
             <DropdownMenuContent align='end' className='w-72 p-1'>
-              {sessions.map((session) => (
+              {sessions.map((item) => (
                 <DropdownMenuItem
                   className='grid grid-cols-[1fr_auto] gap-y-0.5'
-                  data-selected={session.id === activeSessionId || undefined}
-                  key={session.id}
-                  title={`${session.title} — ${chatSessionPreview(session)}`}
-                  onClick={() => onSelectSession(session.id)}
+                  data-selected={item.id === activeSessionId || undefined}
+                  key={item.id}
+                  title={`${item.title} — ${chatSessionPreview(item)}`}
+                  onClick={() => onSelectSession(item.id)}
                 >
                   <span className='truncate font-medium'>
-                    {session.id === activeSessionId ? 'Current: ' : ''}
-                    {session.title}
+                    {item.id === activeSessionId ? 'Current: ' : ''}
+                    {item.title}
                   </span>
                   <span className='text-muted-foreground text-2xs tabular-nums'>
-                    {formatChatDateLabel(session.activityAt)}
+                    {formatChatDateLabel(item.activityAt)}
                   </span>
                   <span className='text-muted-foreground text-2xs col-span-2 truncate tabular-nums'>
-                    {chatSessionPreview(session)}
+                    {chatSessionPreview(item)}
                   </span>
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
+          {session ? <SessionActionsButton session={session} surface='sidebar' /> : null}
         </>
       }
-      detail={activeSession?.title}
+      detail={
+        editing && session ? (
+          <SessionRename
+            className='text-foreground h-(--density-control-height-sm) min-w-0 flex-1 px-(--density-row-padding-x) text-xs font-medium'
+            session={session}
+          />
+        ) : (
+          activeSession?.title
+        )
+      }
       tab='chat'
     />
   )

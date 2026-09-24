@@ -73,10 +73,35 @@ async function waitForNativeExit(root: string) {
   ok(false, 'Isolated native fixture processes must exit before removing their directory')
 }
 
+/** A disposable checkout the session runs in, instead of whichever worktree is registered first. */
+type PreparedWorktree = {
+  readonly path: string
+  readonly release: () => Promise<void>
+}
+
+/** Registers `path` as its own project and resolves the exact worktree the server recorded. */
+async function registerFixtureProject(page: Page, orchestration: string, path: string) {
+  await dispatch(page, orchestration, {
+    type: 'project.create',
+    title: `Fixture ${path.split('/').at(-1)}`,
+    workspaceRoot: path,
+  })
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    const worktree = (await readShell(page, orchestration)).worktrees.find(
+      (item) => item.canonicalPath === path,
+    )
+    if (worktree) return worktree
+    await Bun.sleep(100)
+  }
+  ok(false, `The fixture checkout ${path} must be registered`)
+}
+
 export function isolatedNativeScenario(options: {
   name: string
   description: string
   fixture: URL
+  /** Runs the session in this checkout; omitted, the first registered worktree is used. */
+  prepareWorktree?: () => Promise<PreparedWorktree>
   drive: (
     page: Page,
     context: {
@@ -87,6 +112,7 @@ export function isolatedNativeScenario(options: {
       providerInstanceId: string
       projectId: string
       worktreeId: string
+      worktreePath: string
     },
   ) => Promise<void>
 }): Scenario {
@@ -118,6 +144,8 @@ export function isolatedNativeScenario(options: {
       const sessionId = crypto.randomUUID()
       const title = `${options.name} verification ${sessionId.slice(0, 8)}`
       let created = false
+      const prepared = await options.prepareWorktree?.()
+      let fixtureProjectId: string | null = null
       try {
         await writeSettings(page, base, [
           {
@@ -132,9 +160,11 @@ export function isolatedNativeScenario(options: {
             },
           },
         ])
-        const shell = await readShell(page, orchestration)
-        const worktree = shell.worktrees[0]
+        const worktree = prepared
+          ? await registerFixtureProject(page, orchestration, prepared.path)
+          : (await readShell(page, orchestration)).worktrees[0]
         ok(worktree, 'A worktree exists')
+        if (prepared) fixtureProjectId = worktree.projectId
         await dispatch(page, orchestration, {
           type: 'session.create',
           sessionId,
@@ -166,6 +196,7 @@ export function isolatedNativeScenario(options: {
           providerInstanceId,
           projectId: worktree.projectId,
           worktreeId: worktree.id,
+          worktreePath: worktree.canonicalPath,
         })
       } catch (error) {
         await step('failed-before-cleanup')
@@ -181,6 +212,12 @@ export function isolatedNativeScenario(options: {
             sessionId,
           })
         }
+        if (fixtureProjectId)
+          await dispatch(page, orchestration, {
+            type: 'project.delete',
+            projectId: fixtureProjectId,
+            force: true,
+          })
         const current = await settingsSnapshot(page, base)
         const remaining = current.values['providers.instances'].filter(
           (item) => item.providerInstanceId !== providerInstanceId,
@@ -197,12 +234,14 @@ export function isolatedNativeScenario(options: {
             (entry) => entry.event !== 'spawn' && entry.event !== 'exit',
           ),
           removedSession: sessionId,
+          removedProject: fixtureProjectId,
           removedProvider: providerInstanceId,
           processEvents: entries.filter(
             (entry) => entry.event === 'spawn' || entry.event === 'exit',
           ),
         })
         await rm(root, { recursive: true, force: true })
+        await prepared?.release()
       }
     },
   }

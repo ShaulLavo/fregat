@@ -1,4 +1,5 @@
-import { memo, useCallback } from 'react'
+import { memo, use, useCallback } from 'react'
+import { SearchFileMenuContext } from '@/features/search/providers/file-menu-context'
 
 import { useSearchResultActions } from '@/features/search/hooks/use-result-actions'
 import {
@@ -34,6 +35,7 @@ export const SearchResultFileHeaderRow = memo(
     virtualItem,
   }: SearchResultFileHeaderRowProps) => {
     const { selectResult } = useSearchResultActions()
+    const openFileMenu = use(SearchFileMenuContext)
     const id = searchResultVirtualRowId(row)
     const active = searchResultFileContainsId(row.file, activeResultId)
     // Manual keys: the compiler would key this on the whole row and its virtual item, so every
@@ -51,6 +53,7 @@ export const SearchResultFileHeaderRow = memo(
         role='treeitem'
         style={searchResultVirtualRowStyle(virtualItem)}
         onMouseDown={handleMouseDown}
+        onContextMenu={(event) => openFileMenu?.({ match: null, path: row.file.path }, event)}
       >
         <SearchResultFileHeader
           active={active}

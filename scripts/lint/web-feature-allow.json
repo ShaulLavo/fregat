@@ -745,12 +745,6 @@
   },
   {
     "from": "workbench",
-    "to": "chat-mode",
-    "module": "features/chat-mode/utils/panels.ts",
-    "reason": "owner: The workbench composes feature panes and their commands; this module supplies isChatModeToolTab, showChatModeToolTab, toggleChatModeToolTab."
-  },
-  {
-    "from": "workbench",
     "to": "chat",
     "module": "features/chat/components/chat-side-panel.tsx",
     "reason": "owner: The workbench composes feature panes and their commands; this module supplies ChatSidePanel."

@@ -1,11 +1,6 @@
 import { copyPathSection } from '@/keymap/menus/utils/copy-path-section'
-import {
-  ArrowBendUpLeftIcon,
-  FileIcon,
-  GitDiffIcon,
-  MinusIcon,
-  PlusIcon,
-} from '@phosphor-icons/react'
+import { openFileItem } from '@/keymap/menus/utils/open-file-item'
+import { ArrowBendUpLeftIcon, GitDiffIcon, MinusIcon, PlusIcon } from '@phosphor-icons/react'
 
 import { actionItem, section, type Menu } from '@/keymap/menus/utils/model'
 
@@ -44,13 +39,7 @@ export function fileMenu(context: FileMenuContext): Menu {
         label: 'Open Changes',
         run: context.openDiff,
       }),
-      actionItem({
-        disabled: !context.onDisk,
-        icon: FileIcon,
-        id: 'openFile',
-        label: 'Open File',
-        run: context.openFile,
-      }),
+      openFileItem({ onDisk: context.onDisk, run: context.openFile }),
     ]),
     section('stage', [
       !staged &&

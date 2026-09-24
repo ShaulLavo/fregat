@@ -1,4 +1,6 @@
 import { usePanelSurface } from '@/hooks/use-panel-surface'
+import { RailTabs } from '@/components/rail-tabs'
+import { PaneHostProvider } from '@/providers/pane-host-provider'
 import type { GitFileStatus } from '@workspace/contracts'
 import {
   PersistedResizablePanelGroup,
@@ -12,7 +14,6 @@ import type { EditorTabConflictMap } from '@/features/workspace/utils/tab-types'
 import { ChatStage } from '@/features/chat-mode/components/chat-stage'
 import { SessionRail } from '@/features/chat-mode/components/session-rail'
 import { ToolPane } from '@/features/chat-mode/components/tool-pane'
-import { ToolRail } from '@/features/chat-mode/components/tool-rail'
 import {
   SESSION_RAIL_DEFAULT_SIZE,
   SESSION_RAIL_MAX_SIZE,
@@ -22,7 +23,6 @@ import {
   TOOL_PANE_MIN_SIZE,
   chatModeToolTabLabel,
   type ChatModePanels,
-  type ChatModeToolTab,
 } from '@/features/chat-mode/utils/panels'
 
 import type { WorkbenchPanels } from '@/features/workbench/utils/panels'
@@ -34,7 +34,6 @@ export function ChatModeLayout({
   panels,
   rootPath,
   workbenchPanels,
-  onPanelsChange,
 }: {
   readonly conflicts: EditorTabConflictMap
 
@@ -42,13 +41,8 @@ export function ChatModeLayout({
   readonly panels: ChatModePanels
   readonly rootPath: string
   readonly workbenchPanels: WorkbenchPanels
-  readonly onPanelsChange: (panels: ChatModePanels) => void
 }) {
   const surface = usePanelSurface()
-
-  function handleSelectToolTab(tab: ChatModeToolTab, open: boolean) {
-    onPanelsChange({ ...panels, activeToolTab: tab, toolPaneOpen: open })
-  }
 
   return (
     <div
@@ -100,19 +94,23 @@ export function ChatModeLayout({
                   label={chatModeToolTabLabel(panels.activeToolTab)}
                   resetKeys={[panels.activeToolTab]}
                 >
-                  <ToolPane
-                    conflicts={conflicts}
-                    gitFiles={gitFiles}
-                    rootPath={rootPath}
-                    tab={panels.activeToolTab}
-                    workbenchPanels={workbenchPanels}
-                  />
+                  <PaneHostProvider kind='chat-tools'>
+                    <ToolPane
+                      conflicts={conflicts}
+                      gitFiles={gitFiles}
+                      rootPath={rootPath}
+                      tab={panels.activeToolTab}
+                      workbenchPanels={workbenchPanels}
+                    />
+                  </PaneHostProvider>
                 </RenderErrorBoundary>
               </ResizablePanel>
             </>
           ) : null}
         </PersistedResizablePanelGroup>
-        <ToolRail className={surface.panel} panels={panels} onSelectTab={handleSelectToolTab} />
+        <PaneHostProvider kind='chat-tools'>
+          <RailTabs className={surface.panel} label='Tool tabs' side='right' />
+        </PaneHostProvider>
       </div>
     </div>
   )

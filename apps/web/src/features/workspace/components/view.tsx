@@ -5,6 +5,7 @@ import { useEditorWorkspaceState } from '@/features/editor/state/workspace-state
 import { EditorSurfaceLayoutView } from '@/features/workbench/components/editor-surface-layout-view'
 import type { PickedFsEntry } from '@/lib/file-system-types'
 import { KeepAliveProvider } from '@/lib/keep-alive/providers/keep-alive-provider'
+import { SessionDialogs } from '@/components/session-dialogs'
 
 type WorkspaceViewProps = {
   rootFolder: PickedFsEntry
@@ -28,6 +29,9 @@ export function WorkspaceView({ rootFolder }: WorkspaceViewProps) {
                 <EditorSurfaceLayoutView rootPath={rootPath} />
               )}
             </KeepAliveProvider>
+            {/* Outside the mode switch: the row or header that asked is often the first
+                thing to unmount once the answer is yes. */}
+            <SessionDialogs />
           </div>
         </div>
       </div>

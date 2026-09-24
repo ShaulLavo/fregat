@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { useEditorColorTheme } from '@/lib/editor-theme/hooks/use-editor-color-theme'
 import type { MermaidRenderer } from '@/features/chat/state/mermaid'
 import { log } from '@/lib/client-logging'
-import { MarkdownCopyButton } from './markdown-copy-button'
+import { CopyButton } from '@/components/copy-button'
 
 type DiagramState = {
   readonly chart: string
@@ -57,7 +57,7 @@ export function AssistantMarkdownMermaid({
       >
         <span className='truncate pl-1 font-mono'>mermaid</span>
         <span aria-label='Diagram actions' className='flex items-center gap-0.5' role='toolbar'>
-          <MarkdownCopyButton label='Copy diagram source' text={chart} />
+          <CopyButton label='diagram source' text={chart} />
         </span>
       </div>
       {current?.svg ? (

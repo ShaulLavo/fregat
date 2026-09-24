@@ -56,6 +56,7 @@ import {
 import { setChatModeSessionRailOpen, showChatModeToolTab } from '@/features/chat-mode/utils/panels'
 import { documentKey } from '@/lib/documents/utils/identity'
 import { runMutation } from '@/lib/mutations/run'
+import { copyTextToClipboard } from '@/lib/clipboard'
 import { historyRestoreMutationOptions } from '@/features/editor/state/history-mutations'
 import { adjacentHistoryState } from '@/features/editor/utils/history-navigation'
 import {
@@ -229,7 +230,7 @@ function afterNavigation(
   }
 }
 
-function resolvedOperationStart(operation: Promise<void>): StartedCommand {
+function resolvedOperationStart(operation: Promise<unknown>): StartedCommand {
   return {
     completion: operation.then(() => handled),
     status: 'started',
@@ -892,10 +893,8 @@ export const workspaceCommands = [
   defineCommand({
     ...workspaceCommandMetadata['workspace.copyAddress'],
     run: () => {
-      if (!navigator.clipboard?.writeText) return declined
-
       return resolvedOperationStart(
-        navigator.clipboard.writeText(getNavigation().copyAddress().href),
+        copyTextToClipboard(getNavigation().copyAddress().href, 'address'),
       )
     },
   }),

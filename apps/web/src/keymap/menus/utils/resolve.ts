@@ -30,6 +30,7 @@ type ResolvedRunItem = {
   readonly destructive: boolean
   readonly command: PlatformCommandId | null
   readonly run: () => ResolvedMenuInvocation
+  readonly takesFocus: boolean
 }
 
 type ResolvedCheckboxItem = {
@@ -140,6 +141,7 @@ function resolveItem(item: MenuItem, context: MenuResolveContext): ResolvedMenuI
     run: () => {
       item.run()
     },
+    takesFocus: Boolean(item.takesFocus),
     trailing: item.unavailable ?? item.shortcut ?? null,
   }
 }
@@ -160,6 +162,7 @@ function resolveCommandItem(
     kind: 'run',
     label: item.label ?? spec?.title ?? item.command,
     run: () => context.dispatch(item.command),
+    takesFocus: false,
     trailing:
       item.unavailable ??
       (inspection.status === 'disabled'

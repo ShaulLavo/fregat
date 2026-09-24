@@ -1,76 +1,65 @@
 import { ListRow, type ListRowProps } from '@workspace/ui/patterns/list-row'
-import { FileTextIcon } from '@phosphor-icons/react'
-import type { WorkspaceSearchMatch } from '@workspace/contracts'
 import { memo } from 'react'
 
-import { searchMatchDisplay } from '@/features/search/utils/match-display'
+import { FileLabel } from '@/components/file-label'
 import { HighlightedPreview } from '@/features/search/components/highlight'
+import type { WorkspaceSearchFileGroup } from '@/features/search/state/buffer-state'
+import { basename, parentPath } from '@/lib/path-formatters'
 import { cn } from '@workspace/ui/lib/utils'
-import type { MeasurePreviewCell } from '@/features/search/state/preview-budget'
 
+/** A filename result: the basename always shows, with the query marked wherever it matched. */
 export const SearchNameMatchRow = memo(
   ({
     active,
     rowProps,
     className,
     compact,
-    match,
-    measurePreviewCell,
-    previewMaxLength,
+    group,
     query,
-    onOpenMatch,
+    onOpen,
   }: {
     rowProps?: Omit<ListRowProps, 'ref' | 'as'>
     active?: boolean
     className?: string
     compact?: boolean
-    match: WorkspaceSearchMatch
-    measurePreviewCell?: MeasurePreviewCell
-    previewMaxLength?: number
+    group: WorkspaceSearchFileGroup
     query: string
-    onOpenMatch: (match: WorkspaceSearchMatch) => void
-  }) => {
-    const display = searchMatchDisplay(match, query, {
-      maxLength: previewMaxLength,
-    })
-
-    return (
-      <ListRow
-        {...rowProps}
-        as='button'
-        role='treeitem'
-        selected={active}
-        title={match.path}
+    onOpen: () => void
+  }) => (
+    <ListRow
+      {...rowProps}
+      as='button'
+      role='treeitem'
+      selected={active}
+      title={group.path}
+      className={cn(
+        'relative grid w-full min-w-0 grid-cols-[16px_minmax(0,1fr)_auto] items-center gap-1.5 overflow-hidden text-left outline-none',
+        compact && 'grid-cols-[14px_minmax(0,1fr)_auto] gap-1',
+        className,
+      )}
+      tabIndex={-1}
+      type='button'
+      onClick={(event) => {
+        rowProps?.onClick?.(event)
+        onOpen()
+      }}
+    >
+      <FileLabel
+        className='text-xs'
+        directory={
+          <HighlightedPreview inline preview={parentPath(group.pathLabel)} query={query} />
+        }
+        name={<HighlightedPreview inline preview={basename(group.pathLabel)} query={query} />}
+        path={group.pathLabel}
+      />
+      <span
         className={cn(
-          'relative grid w-full min-w-0 grid-cols-[16px_minmax(0,1fr)_auto] items-center gap-1.5 overflow-hidden text-left outline-none',
-          compact && 'grid-cols-[14px_minmax(0,1fr)_auto] gap-1',
-          className,
+          'rounded-md bg-muted/50 px-1.5 text-3xs leading-4 text-muted-foreground',
+          compact && 'px-1',
         )}
-        tabIndex={-1}
-        type='button'
-        onClick={(event) => {
-          rowProps?.onClick?.(event)
-          onOpenMatch(match)
-        }}
       >
-        <FileTextIcon
-          className={cn(
-            'size-(--icon-size-sm) text-muted-foreground',
-            compact && 'size-(--icon-size-sm)',
-          )}
-        />
-        <span ref={measurePreviewCell} className='block min-w-0 truncate text-xs'>
-          <HighlightedPreview preview={display.text} query={query} range={display.range} />
-        </span>
-        <span
-          className={cn(
-            'rounded-md bg-muted/50 px-1.5 text-3xs leading-4 text-muted-foreground',
-            compact && 'px-1',
-          )}
-        >
-          name
-        </span>
-      </ListRow>
-    )
-  },
+        name
+      </span>
+    </ListRow>
+  ),
 )

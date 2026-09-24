@@ -10,6 +10,8 @@ import {
   DropdownMenuTrigger,
 } from '@workspace/ui/components/dropdown-menu'
 
+import { copyTextToClipboard } from '@/lib/clipboard'
+
 import { useSettingsActions } from '../hooks/use-settings-actions'
 import { useSettingsScope, writableSettingsScope } from '../state/scope-store'
 import { selectSettingsView } from '../state/view-store'
@@ -54,12 +56,12 @@ export function RowActions({
           Reset setting
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => void navigator.clipboard?.writeText(id)}>
+        <DropdownMenuItem onClick={() => void copyTextToClipboard(id, 'setting ID')}>
           Copy setting ID
         </DropdownMenuItem>
         <DropdownMenuItem
           onClick={() =>
-            void navigator.clipboard?.writeText(JSON.stringify({ [id]: value }, null, 2))
+            void copyTextToClipboard(JSON.stringify({ [id]: value }, null, 2), 'setting as JSON')
           }
         >
           Copy setting as JSON

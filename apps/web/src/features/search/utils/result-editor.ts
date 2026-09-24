@@ -349,10 +349,6 @@ export function searchResultFileContainsId(file: SearchResultFileBlock, id: Sear
   return file.excerpts.some((excerpt) => excerpt.id === id)
 }
 
-export function fileName(path: string) {
-  return path.split('/').at(-1) || path
-}
-
 function decimalDigitCount(value: number) {
   return String(Math.max(1, Math.floor(value))).length
 }

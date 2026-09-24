@@ -1,7 +1,7 @@
 import { cn } from '@workspace/ui/lib/utils'
 import { usePanelSurface } from '@/hooks/use-panel-surface'
-import { useNavigation } from '@/hooks/use-navigation'
 import { RailTabs } from '@/components/rail-tabs'
+import { PaneHostProvider } from '@/providers/pane-host-provider'
 import type { GitFileStatus } from '@workspace/contracts'
 import type { FilesystemPath } from '@/lib/documents/utils/types'
 import {
@@ -25,10 +25,7 @@ import {
   BOTTOM_MIN_SIZE,
   SIDEBAR_MAX_SIZE,
   SIDEBAR_MIN_SIZE,
-  WORKBENCH_SIDEBAR_TABS,
-  workbenchSidebarTabLabel,
   type WorkbenchPanels,
-  type WorkbenchSidebarTab,
 } from '@/features/workbench/utils/panels'
 
 export function WorkbenchLayout({
@@ -49,11 +46,6 @@ export function WorkbenchLayout({
   readonly onLayoutChange: (layout: WorkbenchLayout) => void
 }) {
   const surface = usePanelSurface()
-  const navigation = useNavigation()
-
-  function selectSidebarTab(tab: WorkbenchSidebarTab, open: boolean) {
-    void navigation.setWorkbenchPanels({ ...panels, activeSidebarTab: tab, sidebarOpen: open })
-  }
 
   function handleOuterLayoutChanged(next: Record<string, number>) {
     onLayoutChange(setWorkbenchOuterLayout(layout, next))
@@ -70,15 +62,9 @@ export function WorkbenchLayout({
       data-workbench=''
       role='application'
     >
-      <RailTabs
-        activeTab={panels.sidebarOpen ? panels.activeSidebarTab : null}
-        className={cn('relative z-10', surface.panel)}
-        label='Sidebar tabs'
-        side='left'
-        tabLabel={workbenchSidebarTabLabel}
-        tabs={WORKBENCH_SIDEBAR_TABS}
-        onSelectTab={selectSidebarTab}
-      />
+      <PaneHostProvider kind='workbench-sidebar'>
+        <RailTabs className={cn('relative z-10', surface.panel)} label='Sidebar tabs' side='left' />
+      </PaneHostProvider>
       <ResizablePanelGroup
         className='relative z-10 min-h-0 min-w-0 flex-1'
         defaultLayout={layout.outerLayout}
@@ -93,7 +79,9 @@ export function WorkbenchLayout({
               maxSize={SIDEBAR_MAX_SIZE}
               minSize={SIDEBAR_MIN_SIZE}
             >
-              <SidebarPanel panels={panels} rootPath={rootPath} />
+              <PaneHostProvider kind='workbench-sidebar'>
+                <SidebarPanel panels={panels} rootPath={rootPath} />
+              </PaneHostProvider>
             </ResizablePanel>
             <ResizableHandle id='sidebar-handle' withHandle />
           </>
@@ -127,7 +115,9 @@ export function WorkbenchLayout({
                   maxSize={BOTTOM_MAX_SIZE}
                   minSize={BOTTOM_MIN_SIZE}
                 >
-                  <BottomPanel panels={panels} rootPath={rootPath} />
+                  <PaneHostProvider kind='workbench-bottom'>
+                    <BottomPanel panels={panels} rootPath={rootPath} />
+                  </PaneHostProvider>
                 </ResizablePanel>
               </>
             ) : null}

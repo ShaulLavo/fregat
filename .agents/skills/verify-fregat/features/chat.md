@@ -26,6 +26,10 @@ The chat mode button in the window toolbar, or an address URL with `/chat/`.
 
 ## Gotchas
 
+`scenario checkpoint-states` needs no tokens: it runs the native checkpoint fixture in a disposable repository registered as its own project. Turn 1 edits a file, so the timeline card and the Turn panel list it; turn 2 edits nothing, so the Turn panel reads `No changed files in turn 2` and the transcript gains no card. Both surfaces take their sentence from `lib/checkpoint-availability.ts`; missing, error and pending are component-tested because a live server cannot be made to produce them without corrupting its projection.
+
+`scenario session-actions-surfaces` creates one metadata-only session (no provider turn) and drives the shared session actions from every surface: Rename from the rail row, Pin/Unpin and Rename from the chat stage header, then Rename, Snooze/Unsnooze, a cancelled Delete and Archive from the editor sidebar chat header. Each result is read back from the server's shell snapshot; the session is deleted at the end. Rename runs only after its menu has closed — an open popup pulls focus back and the field would blur shut.
+
 `scenario chat-diff-syntax --url <session-diff-address>` checks painted syntax colors in a session checkpoint diff.
 
 Commands dispatch over the orchestration socket when it is live and over HTTP otherwise. The HTTP path refetches the shell snapshot itself.

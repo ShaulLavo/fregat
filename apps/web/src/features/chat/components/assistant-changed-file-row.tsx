@@ -5,6 +5,7 @@ import { cn } from '@workspace/ui/lib/utils'
 
 import { FileTypeIcon } from '@/components/file-type-icon'
 import { DiffStatLabel } from '@/components/diff-stat-label'
+import { FileStatusCell } from '@/components/file-status-cell'
 import { hasNonZeroChatTurnDiffStat } from '@/features/chat/utils/turn-diff-tree'
 import type { TurnDiffRow } from '@/features/chat/utils/turn-diff-view'
 import { iconForEntry } from '@/lib/file-icons'
@@ -32,7 +33,7 @@ export function AssistantChangedFileRow({
       className='group w-full gap-1.5 text-left'
       data-scroll-anchor-ignore
       disabled={disabled}
-      title={node.path}
+      title={node.kind === 'file' ? `${node.path} · ${node.change.title}` : node.path}
       style={{ paddingLeft: `calc(var(--density-row-padding-x) + ${row.depth} * 0.875rem)` }}
       onClick={(event) => {
         rowProps.onClick(event)
@@ -61,11 +62,14 @@ export function AssistantChangedFileRow({
       <span className='min-w-0 truncate font-mono' data-changed-file-name>
         {node.name}
       </span>
-      {node.stat && hasNonZeroChatTurnDiffStat(node.stat) ? (
-        <span className='text-muted-foreground text-2xs ml-auto shrink-0 font-mono tabular-nums @max-2xs/changed-files:hidden'>
-          <DiffStatLabel additions={node.stat.additions} deletions={node.stat.deletions} />
-        </span>
-      ) : null}
+      <span className='ml-auto flex shrink-0 items-center gap-1.5'>
+        {node.stat && hasNonZeroChatTurnDiffStat(node.stat) ? (
+          <span className='text-muted-foreground text-2xs font-mono tabular-nums @max-2xs/changed-files:hidden'>
+            <DiffStatLabel additions={node.stat.additions} deletions={node.stat.deletions} />
+          </span>
+        ) : null}
+        {node.kind === 'file' ? <FileStatusCell status={node.change} /> : null}
+      </span>
     </ListRow>
   )
 }

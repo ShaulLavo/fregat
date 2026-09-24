@@ -1,5 +1,3 @@
-import { SessionSnoozeDialog } from '@/features/chat-mode/components/session-snooze-dialog'
-import { WorktreeManager } from '@/features/chat-mode/components/worktree-manager'
 import { useActiveChatProjection } from '@/features/chat/hooks/use-active-projection'
 import type { ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
@@ -12,7 +10,6 @@ import { selectChatSessionsForProject } from '@workspace/client-core/chat/select
 import { useEditorWorkspaceState } from '@/features/editor/state/workspace-state'
 import { ProjectDeleteDialog } from '@/features/chat-mode/components/project-delete-dialog'
 import { ProjectRenameDialog } from '@/features/chat-mode/components/project-rename-dialog'
-import { SessionDeleteDialog } from '@/features/chat-mode/components/session-delete-dialog'
 import { useProjectRetry } from '@/features/chat-mode/hooks/use-project-retry'
 import { ChatRailOrderProvider } from '@/features/chat-mode/providers/rail-order-provider'
 import {
@@ -103,13 +100,8 @@ export function ChatModeSessionController({
       {/* Inside the session context, which is where the dispatching transport
           lives, and above the rail, which is the only surface that reorders. */}
       <ChatRailOrderProvider>{children}</ChatRailOrderProvider>
-      {/* Mounted here, not in the rail: the row that asks for the delete is the first
-          thing to unmount once the answer is yes. */}
-      <SessionDeleteDialog />
-      <SessionSnoozeDialog />
       <ProjectDeleteDialog />
       <ProjectRenameDialog />
-      <WorktreeManager />
     </ChatModeSessionContext>
   )
 }

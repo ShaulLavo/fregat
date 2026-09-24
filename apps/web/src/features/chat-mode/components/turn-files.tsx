@@ -3,8 +3,7 @@ import { useListbox } from '@workspace/ui/patterns/use-listbox'
 
 import { GitFileRow } from '@/components/git-file-row'
 import type { useSessionDiffScope } from '@/features/chat/hooks/use-session-diff-scope'
-import { turnFileStatus } from '@/features/chat-mode/utils/turn-file-status'
-import { gitStatusSymbol } from '@/lib/git-status-symbols'
+import { checkpointChangeStatus } from '@/lib/git-status-symbols'
 
 export function TurnFiles({
   summary,
@@ -38,7 +37,7 @@ export function TurnFiles({
             rowProps={list.rowProps(file.path)}
             path={file.path}
             rootPath=''
-            status={gitStatusSymbol(turnFileStatus(file.kind), 'historical')}
+            status={checkpointChangeStatus(file.kind)}
             stat={file}
             onOpen={() => onOpenFile(file.path)}
           />
