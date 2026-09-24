@@ -208,6 +208,10 @@ test(
         timeout: 10_000,
       })
       .toBe(1)
+    // Structural parsing is its own request and can land after the highlight has painted.
+    await expect
+      .poll(() => workerRuntimeSessionIds('tree-sitter').length, { timeout: 10_000 })
+      .toBe(1)
     const highlighterRuntimeSessionIds = workerRuntimeSessionIds('shiki')
     const structuralRuntimeSessionIds = workerRuntimeSessionIds('tree-sitter')
     expect(highlighterRuntimeSessionIds).toHaveLength(1)

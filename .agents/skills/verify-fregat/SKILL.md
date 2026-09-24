@@ -13,6 +13,8 @@ Use the existing dev server: web on `http://localhost:5173/`, API on `http://loc
 
 When web changes depend on a server protocol change, deploy both with `bun run deploy --server`. A web-only deployment reuses the old server. Verify `/release` and exercise the changed protocol in the browser before calling the deployment done.
 
+`--engine firefox` or `--engine webkit` runs `look`, `scenario`, `renders` or `caches` in another engine; `trace` needs Chromium. The desktop app is CEF, so other engines matter for the mesh (every iPhone browser is WebKit). Playwright's WebKit does not start on this Arch host (missing libicu74, libxml2, libflite).
+
 Any verb also accepts `--url` for a different target, including the mesh build at `https://omarchy.mesh.shaulavo.dev/platform/` and any address URL the user pastes. An address URL puts you in the user's exact state (workspace, tabs, selection).
 
 ## Doctor

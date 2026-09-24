@@ -18,6 +18,10 @@ test('an open dialog shows the real settings page', async ({ client }) => {
   expect(await screen.findByRole('dialog', { name: 'Settings' })).toBeDefined()
   // The dialog is the folderless shell now: same page, reachable when there is
   // no tab strip to put a Settings tab in, and with a way back out.
-  expect(await screen.findByLabelText('Search settings')).toBeDefined()
+  // The page is a lazy chunk: under a full parallel run its import alone can outlast the default
+  // one-second wait. Once it is in, the rest of the page is already there.
+  expect(
+    await screen.findByLabelText('Search settings', undefined, { timeout: 10_000 }),
+  ).toBeDefined()
   expect(await screen.findByRole('button', { name: 'Choose wallpaper' })).toBeDefined()
 })

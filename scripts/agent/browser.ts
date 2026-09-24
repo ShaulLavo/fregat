@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { existsSync } from 'node:fs'
 import { parseArgs } from 'node:util'
-import { chromium, type Browser, type Page } from 'playwright'
+import type { Browser, Page } from 'playwright'
 
 import { createEvidence, type Evidence } from './evidence'
 import { formatLogEvent, readLogs } from './logs'
@@ -44,6 +44,7 @@ Options
   --selector   CSS selector to screenshot in addition to the page
   --no-console omit console listeners for a capture-overhead control
   --headed     show the browser
+  --engine     chromium (default), firefox or webkit; trace needs chromium
   --doctor     exit non-zero when the app is not healthy
   --compare    an earlier trace evidence directory to diff against
   --site       check a landing page document instead of app readiness (look)
@@ -63,6 +64,7 @@ type Options = CaptureSize & {
   readonly productWallpaper: string | undefined
   readonly compare: string | undefined
   readonly doctor: boolean
+  readonly engine: Engine
   readonly file: string
   readonly headed: boolean
   readonly selector: string | undefined
@@ -83,6 +85,7 @@ async function main() {
       height: { type: 'string' },
       scale: { type: 'string' },
       doctor: { type: 'boolean', default: false },
+      engine: { type: 'string', default: 'chromium' },
       file: { type: 'string' },
       headed: { type: 'boolean', default: false },
       selector: { type: 'string' },
@@ -101,6 +104,10 @@ async function main() {
     throw createScriptError(
       '--width, --height and --scale are only supported by look and scenario.',
     )
+  if (!isEngine(values.engine))
+    throw createScriptError(`--engine must be one of ${ENGINES.join(', ')}.`)
+  if (values.engine !== 'chromium' && verb === 'trace')
+    throw createScriptError('trace records a Chrome trace and needs --engine chromium.')
   const options: Options = {
     ...captureSize(values),
     consoleCapture: !values['no-console'],
@@ -119,6 +126,7 @@ async function main() {
     productWallpaper: values['product-wallpaper'],
     compare: values.compare,
     doctor: values.doctor,
+    engine: values.engine,
     file: values.file ?? (name === 'editor-product' ? 'plugins.ts' : DEFAULT_FILE),
     headed: values.headed,
     selector: values.selector,
@@ -533,9 +541,10 @@ async function withPage(
     browser: Browser,
   ) => Promise<number>,
 ) {
-  const browser = await launch(options.headed)
+  const browser = await launch(options.engine, options.headed)
   const context = await browser.newContext({
-    permissions: ['clipboard-read', 'clipboard-write'],
+    // Only Chromium knows these permission names; Firefox and WebKit reject the context.
+    permissions: options.engine === 'chromium' ? ['clipboard-read', 'clipboard-write'] : [],
     viewport: { width: options.width, height: options.height },
     deviceScaleFactor: options.scale,
     ...(options.productWallpaper ? { userAgent: PRODUCT_USER_AGENT } : {}),
@@ -660,11 +669,24 @@ async function writeSummary(evidence: Evidence, lines: readonly string[]) {
   await evidence.write('summary.md', `${lines.join('\n')}\n`)
 }
 
-function launch(headed: boolean): Promise<Browser> {
+const ENGINES = ['chromium', 'firefox', 'webkit'] as const
+
+type Engine = (typeof ENGINES)[number]
+
+function isEngine(value: string): value is Engine {
+  return (ENGINES as readonly string[]).includes(value)
+}
+
+async function launch(engine: Engine, headed: boolean): Promise<Browser> {
   const cache = '/work/cache/ms-playwright'
   if (!process.env.PLAYWRIGHT_BROWSERS_PATH && existsSync(cache)) {
     process.env.PLAYWRIGHT_BROWSERS_PATH = cache
   }
+  // Imported here: Playwright fixes its browser directory when it loads, and Bun loads a static
+  // import before any code in this file runs.
+  const playwright = await import('playwright')
+  const { chromium } = playwright
+  if (engine !== 'chromium') return playwright[engine].launch({ headless: !headed })
   // Playwright hides scrollbars by default. Users have them, and a scrollbar that appears with
   // content changes every width the app measures.
   return chromium.launch({ headless: !headed, ignoreDefaultArgs: ['--hide-scrollbars'] })

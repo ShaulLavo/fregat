@@ -6,6 +6,12 @@ export async function captureBrowserRenderer(
   evidence: Evidence,
   headed: boolean,
 ) {
+  const engine = browser.browserType().name()
+  // GPU details come over CDP, which only Chromium speaks.
+  if (engine !== 'chromium') {
+    await evidence.json('browser-renderer.json', { headed, engine, version: browser.version() })
+    return
+  }
   const session = await browser.newBrowserCDPSession()
   try {
     const version = await session.send('Browser.getVersion')

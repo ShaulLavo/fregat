@@ -484,8 +484,9 @@ function changedFileButton(path: string) {
   return button
 }
 
+// A file row's title is the path and then what changed in it, `path · Modified`.
 function changedFileButtonOrNull(path: string) {
-  const button = document.querySelector(`button[title="${path}"]`)
+  const button = document.querySelector(`button[title^="${path} · "]`)
   if (!(button instanceof HTMLButtonElement)) return null
 
   return button
