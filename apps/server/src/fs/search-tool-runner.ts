@@ -1,5 +1,6 @@
 import { elapsedMs } from '@workspace/utils/timing'
 import { spawn } from 'node:child_process'
+import { QueryClient } from '@tanstack/query-core'
 
 import { FsError } from './errors'
 import { collectDecodedStreamTail, readLines } from './search-line-decoder'
@@ -21,7 +22,23 @@ type SearchToolRunOptions = {
   onWarning?: (warning: SearchToolWarning) => void
 }
 
-const commandAvailability = new Map<string, Promise<boolean>>()
+const commandExists = createCommandAvailability()
+
+export function createCommandAvailability(client = new QueryClient(), check = checkCommand) {
+  return (command: string) => {
+    const cwd = process.cwd()
+    const env = { ...process.env }
+    return client.query({
+      queryKey: ['search', 'command', command, cwd, env.PATH ?? '', env.PATHEXT ?? ''],
+      queryFn: () => check(command, { cwd, env }),
+      // Missing tools become available on the next request after five seconds.
+      staleTime: (query) => (query.state.data === true ? 300_000 : 5_000),
+      gcTime: 300_000,
+      networkMode: 'always',
+      retry: false,
+    })
+  }
+}
 
 export async function canUseSearchTools(requirements: SearchToolRequirements) {
   if (requirements.names && !(await commandExists('fd'))) return false
@@ -72,18 +89,9 @@ export async function* runToolLines(
   throw new FsError('OPERATION_FAILED', toolErrorMessage(command, code, stderr()))
 }
 
-function commandExists(command: string) {
-  const existing = commandAvailability.get(command)
-  if (existing) return existing
-
-  const availability = checkCommand(command)
-  commandAvailability.set(command, availability)
-  return availability
-}
-
-function checkCommand(command: string) {
+function checkCommand(command: string, environment: { cwd: string; env: NodeJS.ProcessEnv }) {
   return new Promise<boolean>((resolve) => {
-    const child = spawn(command, ['--version'], { stdio: 'ignore' })
+    const child = spawn(command, ['--version'], { ...environment, stdio: 'ignore' })
     child.once('error', () => resolve(false))
     child.once('close', (code) => resolve(code === 0))
   })

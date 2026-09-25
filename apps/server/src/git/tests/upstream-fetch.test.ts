@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, symlink } from 'node:fs/promises'
+import { mkdir, mkdtemp, rename, rm, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -148,9 +148,54 @@ describe('UpstreamFetchScheduler', () => {
     expect(attempts).toBe(3)
   })
 
+  it('shares concurrent resolution and retries a failed lookup on the next request', async () => {
+    vi.useRealTimers()
+    const resolveCommonDir = vi
+      .fn(async () => '/common')
+      .mockRejectedValueOnce(new Error('fixture failure'))
+    const runFetch = vi.fn(async () => {})
+    const scheduler = new UpstreamFetchScheduler({
+      repositoryIdentity: async () => ['fixture'],
+      resolveCommonDir,
+      runFetch,
+    })
+    await Promise.all([
+      scheduler.schedule('/repo', STATUS_WITH_UPSTREAM),
+      scheduler.schedule('/repo', STATUS_WITH_UPSTREAM),
+    ])
+    expect(resolveCommonDir).toHaveBeenCalledTimes(1)
+    expect(runFetch).not.toHaveBeenCalled()
+    await Promise.all([
+      scheduler.schedule('/repo', STATUS_WITH_UPSTREAM),
+      scheduler.schedule('/repo', STATUS_WITH_UPSTREAM),
+    ])
+    expect(resolveCommonDir).toHaveBeenCalledTimes(2)
+    expect(runFetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('resolves a replacement repository at the same path without reusing the old lookup', async () => {
+    const base = await mkdtemp(path.join(tmpdir(), 'platform-upstream-replaced-'))
+    const root = path.join(base, 'repo')
+    const resolveCommonDir = vi.fn(async () => path.join(root, '.git'))
+    const scheduler = new UpstreamFetchScheduler({ resolveCommonDir, runFetch: async () => {} })
+    try {
+      await mkdir(path.join(root, '.git'), { recursive: true })
+      await scheduler.schedule(root, STATUS_WITH_UPSTREAM)
+      await scheduler.schedule(root, STATUS_WITH_UPSTREAM)
+      expect(resolveCommonDir).toHaveBeenCalledTimes(1)
+      await rename(root, path.join(base, 'previous'))
+      await mkdir(path.join(root, '.git'), { recursive: true })
+      await scheduler.schedule(root, STATUS_WITH_UPSTREAM)
+      expect(resolveCommonDir).toHaveBeenCalledTimes(2)
+    } finally {
+      await rm(base, { recursive: true, force: true })
+    }
+  })
+
   it('skips fetching when the common dir cannot be resolved', async () => {
     const fetches: string[] = []
     const scheduler = new UpstreamFetchScheduler({
+      repositoryIdentity: async () => ['fixture'],
       resolveCommonDir: async () => {
         throw new FsError('GIT_COMMAND_FAILED', 'not a repository')
       },
@@ -175,6 +220,7 @@ function testScheduler(
   options: { commonDirByRoot?: Record<string, string> } = {},
 ) {
   return new UpstreamFetchScheduler({
+    repositoryIdentity: async (root) => [root],
     resolveCommonDir: async (rootAbsolutePath) =>
       options.commonDirByRoot?.[rootAbsolutePath] ?? `${rootAbsolutePath}/.git`,
     runFetch,
