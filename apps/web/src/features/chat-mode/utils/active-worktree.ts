@@ -1,5 +1,5 @@
 import type { EnvironmentId, OrchestrationWorktreeShell, ProjectId } from '@workspace/contracts'
-import type { SessionSelection } from '@/features/chat-mode/utils/active-session'
+import type { ChatSelection } from '@/lib/chat-selection'
 
 export function activeWorktree({
   environmentId,
@@ -11,7 +11,7 @@ export function activeWorktree({
 }: {
   readonly environmentId: EnvironmentId
   readonly projectId: ProjectId | null
-  readonly selection: SessionSelection
+  readonly selection: ChatSelection
   readonly sessionWorktree: OrchestrationWorktreeShell | null | undefined
   readonly draftWorktree: OrchestrationWorktreeShell | null | undefined
   readonly currentWorktree: OrchestrationWorktreeShell | null | undefined

@@ -1,19 +1,17 @@
 import type { ProviderInstanceId } from '@workspace/contracts'
 import type { Client } from '@/lib/client'
-import { createRpcError } from '@/lib/structured-errors'
+import { unwrapEdenResponse } from '@/lib/eden-events'
 
 export async function fetchImportSources(client: Client, signal?: AbortSignal) {
-  const { data, error } = await client.orchestration['session-import'].get({ fetch: { signal } })
-  if (error || !data) throw createRpcError(error)
+  const response = await client.orchestration['session-import'].get({ fetch: { signal } })
 
-  return data.sources
+  return unwrapEdenResponse(response, { requireData: true }).sources
 }
 
 export async function importSessions(client: Client, providerInstanceId: ProviderInstanceId) {
-  const { data, error } = await client.orchestration['session-import'].post({ providerInstanceId })
-  if (error || !data) throw createRpcError(error)
+  const response = await client.orchestration['session-import'].post({ providerInstanceId })
 
-  return data
+  return unwrapEdenResponse(response, { requireData: true })
 }
 
 export type ImportSource = Awaited<ReturnType<typeof fetchImportSources>>[number]

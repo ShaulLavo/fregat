@@ -2,7 +2,7 @@ import type { GitFileDiff } from '@workspace/contracts'
 import { clientLogContext } from '@/lib/environments/state/log-context'
 import type { Client } from '@/lib/client'
 import { observeClientOperation } from '@/lib/client-logging'
-import { unwrapEdenResponse } from '@/lib/eden-events'
+import { unwrapGit } from '@/features/git/utils/api'
 import { gitKeys } from '@/lib/query-keys'
 import type { UseQueryOptions } from '@tanstack/react-query'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
@@ -59,10 +59,7 @@ export async function fetchBlobDiff(
         },
       })
 
-      const diffs = unwrapEdenResponse<GitFileDiff[]>(response, {
-        requireData: true,
-        emptyMessage: 'git server returned an empty response',
-      })
+      const diffs = unwrapGit<GitFileDiff[]>(response)
 
       return diffs.map((diff) => withRequestedPaths(diff, query))
     },

@@ -17,7 +17,7 @@ import {
   type ChatModePanels,
   type ChatModeToolTab,
 } from '@/features/chat-mode/utils/panels'
-import type { SessionSelection } from '@/features/chat-mode/utils/active-session'
+import type { ChatSelection } from '@/lib/chat-selection'
 import {
   createDefaultWorkbenchLayout,
   normalizeWorkbenchLayout,
@@ -364,7 +364,7 @@ const chatModeSelectionSchema = v.union([
   }),
 ])
 
-const AUTO_SESSION_SELECTION: SessionSelection = { kind: 'auto' }
+const AUTO_SESSION_SELECTION: ChatSelection = { kind: 'auto' }
 
 /** Each checkout keeps an independent editor slice. */
 export type CachedWorkspaceSlice = {
@@ -408,7 +408,7 @@ export function writeChatModePanelsCache(chatModePanels: ChatModePanels) {
 }
 
 // Restore selection before mounting the environment so auto-pick cannot overwrite it.
-export function readSessionSelectionCache(storage: ScopedStorage): SessionSelection {
+export function readSessionSelectionCache(storage: ScopedStorage): ChatSelection {
   return readCacheEntry(
     WORKSPACE_CACHE_STORAGE_KEYS.chatModeSelection,
     chatModeSelectionSchema,
@@ -417,7 +417,7 @@ export function readSessionSelectionCache(storage: ScopedStorage): SessionSelect
   )
 }
 
-export function writeSessionSelectionCache(storage: ScopedStorage, selection: SessionSelection) {
+export function writeSessionSelectionCache(storage: ScopedStorage, selection: ChatSelection) {
   writeCacheEntry(WORKSPACE_CACHE_STORAGE_KEYS.chatModeSelection, selection, {
     storage,
   })

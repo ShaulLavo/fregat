@@ -27,7 +27,10 @@ import type {
 } from '@/features/editor/state/document-state'
 import { conflictResolutionMutationOptions } from '@/features/workspace/utils/conflict-resolution-mutation'
 import { runMutation } from '@/lib/mutations/run'
-import { setFileSnapshotQueryData } from '@/lib/file-snapshot-query-cache'
+import {
+  moveFileSnapshotQueryData,
+  setFileSnapshotQueryData,
+} from '@/lib/file-snapshot-query-cache'
 import { createFileContent, ensureFolderPath, writeFileContent } from '@/lib/file-server'
 import type { FileResult } from '@/lib/file-system-types'
 import { fileSystemKeys } from '@/lib/query-keys'
@@ -274,7 +277,7 @@ function replaceResolvedEditorFile(
 ) {
   if (localPath !== file.path) {
     context.renameLiveEditorDocument(localPath, file.path)
-    moveFileQueryData(context.queryClient, localPath, file.path)
+    moveFileSnapshotQueryData(context.queryClient, localPath, file.path)
   }
 
   setFileSnapshotQueryData(context.queryClient, file)
@@ -326,15 +329,4 @@ function createConflictId() {
 
 function syntheticFileVersion(mtimeMs: number, size: number) {
   return `synthetic:${mtimeMs}:${size}`
-}
-
-function moveFileQueryData(queryClient: QueryClient, from: FilesystemPath, to: FilesystemPath) {
-  const file = queryClient.getQueryData<FileResult>(fileSystemKeys.fileSnapshot(from))
-  queryClient.removeQueries({
-    exact: true,
-    queryKey: fileSystemKeys.fileSnapshot(from),
-  })
-  if (!file) return
-
-  setFileSnapshotQueryData(queryClient, { ...file, path: to })
 }

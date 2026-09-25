@@ -14,12 +14,6 @@
   {
     "from": "address",
     "to": "chat-mode",
-    "module": "features/chat-mode/utils/active-session.ts",
-    "reason": "owner: URL restoration coordinates feature state; this module supplies SessionSelection."
-  },
-  {
-    "from": "address",
-    "to": "chat-mode",
     "module": "features/chat-mode/utils/panels.ts",
     "reason": "owner: URL restoration coordinates feature state; this module supplies createDefaultChatModePanels, isChatModeToolTab, showChatModeToolTab."
   },
@@ -1036,12 +1030,6 @@
     "to": "chat-mode",
     "module": "features/chat-mode/components/surface-view.tsx",
     "reason": "owner: Workspace selects the chat mode surface as one of its root layouts."
-  },
-  {
-    "from": "workspace",
-    "to": "chat-mode",
-    "module": "features/chat-mode/utils/active-session.ts",
-    "reason": "shared \u2192 lib: SessionSelection is reused by workspace outside chat-mode; move this shared behavior with its consumers."
   },
   {
     "from": "workspace",

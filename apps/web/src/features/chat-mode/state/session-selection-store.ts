@@ -8,7 +8,7 @@ import type {
 } from '@workspace/contracts'
 import { create } from 'zustand'
 
-import type { SessionSelection } from '@/features/chat-mode/utils/active-session'
+import type { ChatSelection } from '@/lib/chat-selection'
 import { neighbourSessionId } from '@/features/chat-mode/utils/session-neighbour'
 import {
   readSessionSelectionCache,
@@ -36,7 +36,7 @@ type SessionSelectionStore = {
    * made whose session is still travelling through the event stream.
    */
   readonly restored: boolean
-  readonly selection: SessionSelection
+  readonly selection: ChatSelection
   /**
    * Hands the stage over when this session stops being showable — archived or deleted.
    * Without it the stage would sit on "Opening session" forever, waiting for a session the
@@ -76,7 +76,7 @@ type SessionSelectionStore = {
 const selectionStorage = new Map<EnvironmentId, ScopedStorage>()
 let restoringSelection = false
 
-function selectionStore(remembered: SessionSelection) {
+function selectionStore(remembered: ChatSelection) {
   return create<SessionSelectionStore>()((set) => ({
     draftGeneration: 0,
     draftWorktreeId: null,
@@ -151,7 +151,7 @@ export function resetSessionSelectionStore() {
 
 /** An empty patch leaves the store untouched, so an unrelated pick survives. */
 function releasedSelection(
-  selection: SessionSelection,
+  selection: ChatSelection,
   ref: ScopedSessionRef,
   sessionIds: readonly SessionId[],
 ) {

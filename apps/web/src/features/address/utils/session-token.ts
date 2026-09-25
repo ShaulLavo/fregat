@@ -1,11 +1,11 @@
-import type { SessionSelection } from '@/features/chat-mode/utils/active-session'
+import type { ChatSelection } from '@/lib/chat-selection'
 import { type EnvironmentId, type ProjectId, type SessionId } from '@workspace/contracts'
 import {
   chatReferenceForToken,
   tokenForChatReference,
 } from '@workspace/client-core/address/references'
 
-export function sessionTokenFor(selection: SessionSelection) {
+export function sessionTokenFor(selection: ChatSelection) {
   return selection.kind === 'auto' ? null : tokenForChatReference(selection)
 }
 
@@ -23,7 +23,7 @@ export function sessionSelectionFor(
   parsed: ParsedSessionToken,
   environmentId: EnvironmentId,
   projectId: ProjectId,
-): SessionSelection | null {
+): ChatSelection | null {
   if (parsed.kind === 'draft')
     return {
       kind: 'draft',

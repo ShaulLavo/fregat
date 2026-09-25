@@ -22,7 +22,11 @@ import {
 } from '@/features/editor/state/document-state'
 import { useEditorWorkspaceStoreApi } from '@/features/editor/state/workspace-state'
 import { reportError, toClientError } from '@/lib/client-error-taxonomy'
-import { fileSnapshotQueryOptions, setFileSnapshotQueryData } from '@/lib/file-snapshot-query-cache'
+import {
+  fileSnapshotQueryOptions,
+  moveFileSnapshotQueryData,
+  setFileSnapshotQueryData,
+} from '@/lib/file-snapshot-query-cache'
 import { fetchFile, fetchTree } from '@/lib/file-server'
 import type { FileResult } from '@/lib/file-system-types'
 import type { Client } from '@/lib/client'
@@ -694,7 +698,7 @@ function applyFetchedOpenFileOperation(
 function applyRenameOpenFileOperation(from: string, to: string, context: WorkspaceConflictContext) {
   // A buffer that turned dirty after planning moves with its unsaved text; nothing is lost.
   context.renameLiveEditorDocument(filesystemPath(from), filesystemPath(to))
-  moveFileQueryData(context.queryClient, from, to)
+  moveFileSnapshotQueryData(context.queryClient, filesystemPath(from), filesystemPath(to))
 }
 
 async function applyRenamedConflictOperation(
@@ -769,21 +773,6 @@ function isDirtyLiveDocument(
     dirtyDocumentKeys.has(fileDocumentKey(filesystemPath(path))) ||
     context.getLiveEditorDocument(fileDocumentKey(filesystemPath(path)))?.buffer.isDirty() === true
   )
-}
-
-function moveFileQueryData(
-  queryClient: ReturnType<typeof useQueryClient>,
-  from: string,
-  to: string,
-) {
-  const file = queryClient.getQueryData<FileResult>(fileSystemKeys.fileSnapshot(from))
-  queryClient.removeQueries({
-    exact: true,
-    queryKey: fileSystemKeys.fileSnapshot(from),
-  })
-  if (!file) return
-
-  setFileSnapshotQueryData(queryClient, { ...file, path: filesystemPath(to) })
 }
 
 function shouldRefreshDirectory(model: TreeModel, rootPath: string, path: string) {

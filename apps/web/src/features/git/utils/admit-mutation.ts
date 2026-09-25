@@ -30,6 +30,16 @@ export async function admitDiscard(owner: QueryClient, rootPath: string, paths: 
   return status
 }
 
+/** An index write that deletes from disk is admitted as a discard. */
+export async function admitIndexWrite(
+  owner: QueryClient,
+  rootPath: string,
+  discards: readonly string[] | undefined,
+) {
+  if (discards) return admitDiscard(owner, rootPath, discards)
+  admitGitWrite(owner)
+}
+
 function statusIdentity(status: GitStatusResult, paths: readonly string[]) {
   const selected = new Set(paths)
   return JSON.stringify({

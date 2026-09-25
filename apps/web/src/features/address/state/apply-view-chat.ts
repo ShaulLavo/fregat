@@ -9,10 +9,8 @@ import {
   useChatProjectionStore,
 } from '@/features/chat/state/chat-projection-store'
 import { useSessionDiffScopeStore } from '@/features/chat/state/session-diff-scope-store'
-import {
-  useSidebarSelectionStore,
-  type SidebarSelection,
-} from '@/features/chat/state/sidebar-selection-store'
+import { useSidebarSelectionStore } from '@/features/chat/state/sidebar-selection-store'
+import type { ChatSelection } from '@/lib/chat-selection'
 import { DEFAULT_SESSION_DIFF_SCOPE } from '@/features/chat/utils/session-diff-scope-storage'
 
 type PreparedChat = {
@@ -20,8 +18,8 @@ type PreparedChat = {
   readonly rootPath: string
   readonly worktreeId: WorktreeId | null
   readonly draftWorktreeId: WorktreeId | null
-  readonly main: SidebarSelection | null
-  readonly sidebar: SidebarSelection | null
+  readonly main: ChatSelection | null
+  readonly sidebar: ChatSelection | null
 }
 
 export function needsChatSnapshot(
@@ -95,7 +93,7 @@ export function prepareAddressChat(
 }
 
 function resolveDraftWorktreeId(
-  selection: SidebarSelection | null,
+  selection: ChatSelection | null,
   addressedWorktreeId: WorktreeId,
   requestedWorktreeId: WorktreeId | undefined,
   preserveCurrentDraft: boolean,
@@ -114,8 +112,8 @@ function resolveDraftWorktreeId(
 function scopedSelection(
   ref: AddressIntent['mainChat'],
   environmentId: EnvironmentId,
-  projectId: Extract<SidebarSelection, { kind: 'draft' }>['projectId'],
-): SidebarSelection | null {
+  projectId: Extract<ChatSelection, { kind: 'draft' }>['projectId'],
+): ChatSelection | null {
   if (!ref) return null
   if (ref.kind === 'draft')
     return { kind: 'draft', environmentId, projectId, draftId: ref.draftId ?? crypto.randomUUID() }
@@ -145,7 +143,7 @@ export function applyAddressChat(
     .selectSessionDiffScope({ environmentId: main.environmentId, sessionId: main.sessionId }, scope)
 }
 
-function applyMainSelection(selection: SidebarSelection, worktreeId: WorktreeId | null) {
+function applyMainSelection(selection: ChatSelection, worktreeId: WorktreeId | null) {
   if (selection.kind === 'auto') return
   const state = useSessionSelectionStore.getState()
   if (selection.kind === 'session') {

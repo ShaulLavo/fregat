@@ -5,8 +5,8 @@ import * as v from 'valibot'
 import {
   activeSession,
   activeSessionShowsComposer,
-  type SessionSelection,
 } from '@/features/chat-mode/utils/active-session'
+import type { ChatSelection } from '@/lib/chat-selection'
 import { expect, test } from '../../../../../test/fixtures'
 
 const projectId = v.parse(projectIdSchema, '609d2bd3-7993-5564-9918-c603beaa32c6')
@@ -129,7 +129,7 @@ function resolve({
   sessionIds,
 }: {
   restored?: boolean
-  selection: SessionSelection
+  selection: ChatSelection
   sessionIds: readonly ReturnType<typeof v.parse<typeof sessionIdSchema>>[]
 }) {
   return activeSession({
