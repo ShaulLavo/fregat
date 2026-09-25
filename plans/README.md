@@ -24,7 +24,7 @@ a bare root `bun run verify`.
 | [166 — keyboard shortcuts, redone](166-shortcuts-editor.md)                             | **PROPOSED — RESEARCH FIRST; D1–D6 DECIDED**                         |
 | [165 — one font catalog, loaded on demand](165-font-catalog.md)                         | **IMPLEMENTED 2026-09-25 — ALL FIVE PHASES**                         |
 | [162 — context and cost](162-context-and-cost.md)                                       | **PROPOSED — READY; DECISIONS ACCEPTED**                             |
-| [159 — file and folder picker](159-file-picker.md)                                      | **DONE (L1) EXCEPT FILTER CHIPS (WAIT, D4)** |
+| [159 — file and folder picker](159-file-picker.md)                                      | **DONE (L1) EXCEPT FILTER CHIPS (WAIT, D4)**                         |
 | [156 — documents in the editor](156-documents-in-the-editor.md)                         | **PLACEHOLDER — FAR FUTURE; RESEARCH FIRST**                         |
 | [155 — site demo becomes an animated replica](155-site-demo-replica.md)                 | **PLACEHOLDER — RESEARCH NOT STARTED**                               |
 | [153 — TypeScript can run in the browser worker](153-typescript-worker-backend.md)      | **PROPOSED — AFTER EDITOR E054; D1–D3 NEED THE OWNER**               |

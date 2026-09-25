@@ -543,17 +543,17 @@ Requested 2026-09-25. A survey of 14 component libraries
 ([docs/ui-research](docs/ui-research/README.md)) listed what to take for the base components, chat
 surfaces, the file picker and the site. The owner is taking it one topic at a time.
 
-| Plan                                         | Owns                                                                                                        |
-| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| [159](plans/159-file-picker.md)              | File and folder picker rewrite: columns, real previews, thumbnails, history keys                            |
-| 160 (done, lane L2)                          | Reasoning fold, turn receipts, live tail, model marker, tool details, plan steps, subagents, ultra sparkle  |
-| 161 (done, lane L2)                          | Approval lifecycle, stopped turns, streaming holds, folding rules, hostile-state scenarios                  |
-| [162](plans/162-context-and-cost.md)         | Context breakdown, usable-window fullness, session totals, usage-page honesty (after Plan 141)              |
-| 163 (done, lane L2)                          | Screenshot attachment in the composer (export lives in Plan 145's export plan)                              |
-| [165](plans/165-font-catalog.md)             | Nerd Fonts + Fontsource on demand; interface-font setting; curated autocomplete picker                      |
-| [166](plans/166-shortcuts-editor.md)         | Keyboard shortcuts page rebuilt from VS Code research: full-width list, save on Enter, several per command  |
-| [155](plans/155-site-demo-replica.md)        | Placeholder: the site hero becomes an animated replica of the app, like cursor.com                          |
-| [156](plans/156-documents-in-the-editor.md)  | Placeholder, far future: PDF, DOCX, XLSX, PPTX and CSV as editor documents agents can edit                  |
+| Plan                                        | Owns                                                                                                       |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| [159](plans/159-file-picker.md)             | File and folder picker rewrite: columns, real previews, thumbnails, history keys                           |
+| 160 (done, lane L2)                         | Reasoning fold, turn receipts, live tail, model marker, tool details, plan steps, subagents, ultra sparkle |
+| 161 (done, lane L2)                         | Approval lifecycle, stopped turns, streaming holds, folding rules, hostile-state scenarios                 |
+| [162](plans/162-context-and-cost.md)        | Context breakdown, usable-window fullness, session totals, usage-page honesty (after Plan 141)             |
+| 163 (done, lane L2)                         | Screenshot attachment in the composer (export lives in Plan 145's export plan)                             |
+| [165](plans/165-font-catalog.md)            | Nerd Fonts + Fontsource on demand; interface-font setting; curated autocomplete picker                     |
+| [166](plans/166-shortcuts-editor.md)        | Keyboard shortcuts page rebuilt from VS Code research: full-width list, save on Enter, several per command |
+| [155](plans/155-site-demo-replica.md)       | Placeholder: the site hero becomes an animated replica of the app, like cursor.com                         |
+| [156](plans/156-documents-in-the-editor.md) | Placeholder, far future: PDF, DOCX, XLSX, PPTX and CSV as editor documents agents can edit                 |
 
 Suggested order:
 

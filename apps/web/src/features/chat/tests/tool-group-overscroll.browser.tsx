@@ -36,7 +36,13 @@ it('keeps the wheel inside an expanded tool group', async () => {
     <>
       <ActivityGroupRow activities={entries} />
       <LiveActivityRow
-        activity={{ entry: entries[0]!, label: 'Running', active: true, activities: entries }}
+        activity={{
+          entry: entries[0]!,
+          label: 'Running',
+          active: true,
+          activities: entries,
+          tail: [],
+        }}
         groupId='tool-0'
       />
     </>,
