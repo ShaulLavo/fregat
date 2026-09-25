@@ -585,8 +585,9 @@ Not in the [completion wave](docs/completion-wave.md), each for the reason given
 
 - [Plan 114](plans/114-polaron-shell.md), a desktop shell we own (tao, wry, Bun as a child). It
   needs an explicit go/no-go, and it collides with the desktop work in Plans 132 and 149.
-- [Plan 168](plans/168-flat-file-view.md), a flat file view under a chosen root. It was Editor
-  E030; all of its work is in Platform. Quick open covers most of the need.
+- Plan 168, a flat file view under a chosen root (ex-Editor E030): dropped 2026-09-25 by owner:
+  tree search covers it. Decided 2026-09-25: owner — drop it; the file tree's existing search
+  already covers the need. Its plan file is deleted; git history keeps it.
 - Plan 105 Phase 4, dropping the `/platform` route prefix. It needs service-level names in mesh,
   which no mesh task covers. The rest of Plan 105 is done and its file is deleted; the hashed-asset
   carry-forward between releases moved to Plan 109.
