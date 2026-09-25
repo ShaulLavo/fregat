@@ -75,6 +75,8 @@ This is a two-pass source audit and implementation plan. No app changes, tests, 
 
 ### [INTERACTION-05] Restore the rewound user message into the composer
 
+- **Closed 2026-09-25** with RUNTIME-01 on the `checkpoint-rewind` scenario; the paired upstream run is dropped. See the ledger.
+
 - **Priority/confidence:** P1 / HIGH.
 - **Evidence:** Upstream `ChatView.tsx:6995` identifies the user message and requires rollback capability; `:7035` prepares its attachments before mutation; `:7058` appends its recallable prompt to the current draft and `:7083` restores attachments. Local `apps/web/src/features/chat/components/chat-view.tsx:364` dispatches only checkpoint turn count and resyncs; `providers/timeline-actions-provider.tsx:14` drops message identity from the action contract. `components/checkpoint-revert-dialog.tsx:29` only offers destructive Revert, no file-restore choice.
 - **Impact:** Revert removes history without returning the old prompt/images for editing. The upstream “rewind then adjust” workflow needs manual copying before local revert.

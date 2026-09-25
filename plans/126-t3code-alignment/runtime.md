@@ -26,6 +26,8 @@ Upstream paths shortened to `provider/…` or `orchestration/…` in tables mean
 
 ### RUNTIME-01 — Validate rewind before touching files, and separate conversation rewind
 
+- **Closed 2026-09-25** on the `checkpoint-rewind` scenario; the paired upstream run is dropped. Claude rewind waits for Plan 145 fork. See the ledger.
+
 - **Status / priority / confidence:** Confirmed mismatch; P1; HIGH.
 - **Evidence:** Upstream `apps/server/src/orchestration/decider.ts:1798-1816` distinguishes conversation rewind with `restoreFiles:false`. `apps/server/src/orchestration/Layers/CheckpointReactor.ts:813-835` checks provider rollback support first and rejects file restore in a non-isolated workspace. Local `apps/server/src/orchestration/decider.ts:209-215` checks only that the session is not archived; `provider-command-reactor.ts:523-539` restores files before asking the provider to rewind. Local `apps/server/src/provider/adapters/claude.ts:332-333` explicitly rejects rollback. `provider/provider-service.ts:619-627` can also reject a missing binding after files were changed. Local context resolves the owning worktree but performs no isolation check at `provider-command-reactor.ts:785-824`.
 - **Impact:** A Claude or unavailable-runtime rewind can change files and then fail, leaving the transcript unchanged. A root/shared-checkout rewind can overwrite another session's changes. Users cannot rewind conversation alone.
@@ -89,6 +91,8 @@ Upstream paths shortened to `provider/…` or `orchestration/…` in tables mean
 
 ### RUNTIME-06 — Preserve advertised model option descriptors and service tiers
 
+- **Closed 2026-09-25**: Plan 138 took the remaining Claude catalog work; `provider-model-options` scenario. See the ledger.
+
 - **Status / priority / confidence:** Confirmed narrowing; P2; HIGH.
 - **Evidence:** Upstream `apps/server/src/provider/Layers/CodexProvider.ts:176-211` exposes reasoning and service-tier select descriptors with provider IDs/defaults. Local `packages/contracts/src/provider.ts:73-77` represents reasoning/extended-thinking only; `apps/server/src/provider/adapters/codex.ts:2847-2859` discards other catalog capabilities and `codex.ts:2727-2733` reduces service tier to `fastMode === true ? 'fast' : undefined`.
 - **Impact:** Non-fast advertised tiers and defaults cannot round-trip; controls are hardcoded instead of reflecting the selected model's capabilities.
@@ -120,6 +124,8 @@ Upstream paths shortened to `provider/…` or `orchestration/…` in tables mean
 - **Bounded search:** `usageLimits`, `consumeResetCredit`, `rateLimitReset`, `rateLimits` across local provider/contracts/chat-mode/client-core; only event emission/normalization exists, not the action/snapshot workflow.
 
 ### RUNTIME-09 — Match response delivery modes and paragraph default
+
+- **Closed 2026-09-25** on the `response-delivery` scenario; the reasoning UX residue is Plan 160's reasoning fold (`chat-turn-anatomy`). See the ledger.
 
 - **Status / priority / confidence:** Confirmed behavior/default divergence; P2; HIGH.
 - **Evidence:** Upstream `packages/contracts/src/settings.ts:968,1061-1062` defines turn/paragraph/token with paragraph default. `apps/server/src/orchestration/Layers/ProviderRuntimeIngestion.ts:1992-2003,2042-2071` applies project settings and never sends reasoning token-by-token. Local `apps/server/src/orchestration/provider-runtime-ingestion.ts:38,76,292-303` supports only constructor-level streaming/buffered and defaults to immediate delta dispatch. Searching `assistantDeliveryMode` through non-test server code finds no configurable consumer.
