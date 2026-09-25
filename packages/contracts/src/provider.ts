@@ -266,7 +266,13 @@ export const providerSessionMcpSchema = v.object({
   servers: v.array(providerMcpServerSchema),
 })
 
-export const providerMcpSignInSchema = v.object({ authorizationUrl: v.string() })
+export const providerMcpSignInSchema = v.object({
+  authorizationUrl: v.pipe(
+    v.string(),
+    v.url(),
+    v.regex(/^https?:\/\//i, 'Use an HTTP or HTTPS sign-in address.'),
+  ),
+})
 
 export const providerConfiguredHookSchema = v.object({
   eventName: v.string(),

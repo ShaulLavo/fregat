@@ -28,9 +28,67 @@ import { MOCK_DRIVER_KIND, mockDriver } from '../drivers/mock'
 import { ProviderAdapterRegistry } from '../provider-adapter-registry'
 import { ProviderService } from '../provider-service'
 import { ProviderSessionDirectory } from '../provider-session-directory'
+import { ProviderRuntimeEventStream } from '../provider-runtime-event-stream'
 import type { ProviderRuntimeEvent, ProviderTurnInput } from '../types'
 
 describe('ProviderService', () => {
+  it('removes a stopped task before returning, while preserving failed stops and other tasks', async () => {
+    const fixture = createFixture()
+    const stream = new ProviderRuntimeEventStream()
+    const stop = vi.fn(async () => {})
+    const adapter = Object.assign(new MockProviderAdapter(), { stopBackgroundTask: stop })
+    const subscribe = adapter.subscribeEvents.bind(adapter)
+    adapter.subscribeEvents = (subscriber) => {
+      const off = subscribe(subscriber)
+      const offTasks = stream.subscribe(subscriber)
+      return () => {
+        off()
+        offTasks()
+      }
+    }
+    const service = new ProviderService({
+      adapterRegistry: new ProviderAdapterRegistry([adapter]),
+      sessionDirectory: new ProviderSessionDirectory(fixture.database),
+    })
+    const input = providerTurnInput()
+    try {
+      await service.ensureRuntime({
+        providerInstanceId: input.providerInstanceId,
+        runtimeMode: input.runtimeMode,
+        runtimePayload: providerSessionPayload(input),
+        runtimeEpoch: input.runtimeEpoch,
+        sessionId: input.sessionId,
+      })
+      stream.publish({
+        type: 'tasks.roster',
+        eventId: 'tasks',
+        createdAt: new Date().toISOString(),
+        sessionId: input.sessionId,
+        runtimeEpoch: input.runtimeEpoch,
+        payload: {
+          tasks: [
+            { taskId: 'one', taskType: 'shell', description: 'Watch files' },
+            { taskId: 'two', taskType: 'shell', description: 'Run tests' },
+          ],
+        },
+      })
+      await service.drainRuntimeEvents()
+      stop.mockRejectedValueOnce(new Error('stop rejected'))
+      await expect(
+        service.stopBackgroundTask({ sessionId: input.sessionId, taskId: 'one' }),
+      ).rejects.toThrow('stop rejected')
+      expect(service.backgroundTaskRoster(input.sessionId).tasks).toHaveLength(2)
+      await service.stopBackgroundTask({ sessionId: input.sessionId, taskId: 'one' })
+      expect(service.backgroundTaskRoster(input.sessionId)).toEqual({
+        supported: true,
+        tasks: [{ taskId: 'two', taskType: 'shell', description: 'Run tests' }],
+      })
+    } finally {
+      await service.shutdown()
+      fixture.close()
+    }
+  })
+
   it('reclaims an idle runtime periodically without another launch and clears its timer on shutdown', async () => {
     vi.useFakeTimers()
     const fixture = createFixture()

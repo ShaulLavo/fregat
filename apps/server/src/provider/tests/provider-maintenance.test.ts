@@ -2,7 +2,7 @@ import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import type { ProviderInstanceId } from '@workspace/contracts'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { CodexProviderAdapter } from '../adapters/codex'
 import { ProviderAdapterRegistry } from '../provider-adapter-registry'
 import { ProviderMaintenance } from '../provider-maintenance'
@@ -57,6 +57,23 @@ async function fakeInstall(installDir: string, version = '0.150.0') {
 }
 
 describe('ProviderMaintenance', () => {
+  it('retains an unobserved latest-version result for an hour on the server', async () => {
+    const { fetched, maintenance } = await fakeInstall('packages/standalone/bin')
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] })
+    try {
+      await maintenance.advisory(CODEX)
+      await vi.advanceTimersByTimeAsync(6 * 60_000)
+      await maintenance.advisory(CODEX)
+      expect(fetched).toHaveLength(1)
+      await vi.advanceTimersByTimeAsync(55 * 60_000)
+      await maintenance.advisory(CODEX)
+      expect(fetched).toHaveLength(2)
+    } finally {
+      maintenance.close()
+      vi.useRealTimers()
+    }
+  })
+
   it('updates a standalone install once, however many clicks arrive while it runs', async () => {
     const { fetched, maintenance, updates } = await fakeInstall('packages/standalone/bin')
 

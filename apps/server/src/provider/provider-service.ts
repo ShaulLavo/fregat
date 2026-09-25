@@ -25,6 +25,7 @@ import {
   DEFAULT_INTERACTION_MODE,
   jsonEqual,
   DEFAULT_RUNTIME_MODE,
+  providerMcpSignInSchema,
   sessionIdSchema,
   turnIdSchema,
 } from '@workspace/contracts'
@@ -841,6 +842,12 @@ export class ProviderService {
         internal: { routed: Boolean(routed), sessionId: input.sessionId },
       })
     await stop.call(routed.adapter, input)
+    await this.drainRuntimeEvents()
+    const tasks = this.taskRosters.get(input.sessionId) ?? []
+    this.taskRosters.set(
+      input.sessionId,
+      tasks.filter((task) => task.taskId !== input.taskId),
+    )
   }
 
   async sessionMcp(sessionId: SessionId): Promise<ProviderSessionMcp> {
@@ -865,7 +872,7 @@ export class ProviderService {
     const signIn = adapter.signInMcpServer
     if (!signIn) throw sessionIdentityErrors.SESSION_CONTROL_UNSUPPORTED({ internal: input })
 
-    return signIn.call(adapter, input)
+    return v.parse(providerMcpSignInSchema, await signIn.call(adapter, input))
   }
 
   async sessionHooks(sessionId: SessionId): Promise<ProviderSessionHooks> {

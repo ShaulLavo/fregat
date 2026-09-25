@@ -1,9 +1,11 @@
-import type {
-  ProviderMcpSignIn,
-  ProviderSessionHooks,
-  ProviderSessionMcp,
-  ScopedSessionRef,
+import {
+  providerMcpSignInSchema,
+  type ProviderMcpSignIn,
+  type ProviderSessionHooks,
+  type ProviderSessionMcp,
+  type ScopedSessionRef,
 } from '@workspace/contracts'
+import * as v from 'valibot'
 
 import { environmentClientFor } from '@/lib/client'
 import { unwrapEdenResponse } from '@/lib/eden-events'
@@ -33,10 +35,11 @@ export async function reconnectMcpServer(ref: ScopedSessionRef, name: string) {
 
 export async function signInMcpServer(ref: ScopedSessionRef, name: string) {
   const response = await sessionControls(ref).mcp({ name })['sign-in'].post()
-  return unwrapEdenResponse<ProviderMcpSignIn>(response, {
+  const result = unwrapEdenResponse<ProviderMcpSignIn>(response, {
     emptyMessage: 'the sign-in response carried no address',
     requireData: true,
   })
+  return v.parse(providerMcpSignInSchema, result)
 }
 
 export async function fetchSessionHooks(ref: ScopedSessionRef, signal: AbortSignal) {

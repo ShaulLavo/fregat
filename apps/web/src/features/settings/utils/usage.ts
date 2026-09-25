@@ -77,6 +77,14 @@ export function usageModelKey(row: { readonly driverKind: string; readonly model
   return `${row.driverKind}:${row.model}`
 }
 
+export function hiddenUsageModels(
+  models: readonly ProviderUsageModelRow[],
+  hidden: ReadonlySet<string>,
+) {
+  const present = new Set(models.map(usageModelKey).filter((key) => hidden.has(key)))
+  return present.size < models.length ? present : new Set<string>()
+}
+
 /** Cost when any is known, else tokens: the same measure the bars use. */
 export function usageModelMeasure(row: ProviderUsageModelRow, byCost: boolean) {
   return byCost ? (row.costUsd ?? 0) : usageTokenCount(row)

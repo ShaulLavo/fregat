@@ -7,18 +7,16 @@ import { sessionToolKeys } from '@/features/chat/utils/query-keys'
 import { errorMessage } from '@/lib/error-message'
 import { toastError } from '@/lib/toast-error'
 
-/** Opens the provider's sign-in page; the server's state changes once the browser round trip ends. */
+/** Fetches the sign-in link; opening it remains a user gesture in the server row. */
 export function useSignInMcpServer(ref: ScopedSessionRef) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationKey: chatMutationKeys.signInMcpServer(ref.environmentId, ref.sessionId),
     mutationFn: (name: string) => signInMcpServer(ref, name),
-    onSuccess: ({ authorizationUrl }) => {
-      window.open(authorizationUrl, '_blank', 'noopener')
-      void queryClient.invalidateQueries({
+    onSuccess: () =>
+      queryClient.invalidateQueries({
         queryKey: sessionToolKeys.mcp(ref.environmentId, ref.sessionId),
-      })
-    },
+      }),
     onError: (error) =>
       toastError('Could not start the sign-in', {
         description: errorMessage(error, 'The MCP server gave no sign-in address.'),

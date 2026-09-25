@@ -10,14 +10,15 @@ import { UsageRangeTabs } from '@/features/settings/components/usage-range-tabs'
 import { UsageShareBar } from '@/features/settings/components/usage-share-bar'
 import { UsageSummary } from '@/features/settings/components/usage-summary'
 import { useUsageHistory } from '@/features/settings/hooks/use-usage-history'
-import type { UsageDays } from '@/features/settings/utils/usage'
+import { hiddenUsageModels, type UsageDays } from '@/features/settings/utils/usage'
 
 export function UsageSection() {
   const [days, setDays] = useState<UsageDays>(30)
-  const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set())
+  const [hiddenKeys, setHidden] = useState<ReadonlySet<string>>(new Set())
   const [hovered, setHovered] = useState<string | null>(null)
   const history = useUsageHistory(days)
   const models = history.data?.models ?? []
+  const hidden = hiddenUsageModels(models, hiddenKeys)
   const byCost = (history.data?.totals.costUsd ?? 0) > 0
 
   // The last shown model stays: an empty chart would read as a range with no usage.
@@ -28,12 +29,18 @@ export function UsageSection() {
     setHidden(next)
   }
 
+  function selectRange(next: UsageDays) {
+    setDays(next)
+    setHidden(new Set())
+    setHovered(null)
+  }
+
   return (
     <div
       className='flex w-full min-w-0 flex-col gap-4 @3xl/settings:w-[min(36rem,50vw)]'
       data-usage-section
     >
-      <UsageRangeTabs days={days} onSelect={setDays} />
+      <UsageRangeTabs days={days} onSelect={selectRange} />
       {history.isPending ? <UsageLoading /> : null}
       {history.isError ? (
         <EmptyState

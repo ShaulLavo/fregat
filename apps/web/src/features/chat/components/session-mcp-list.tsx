@@ -57,6 +57,9 @@ export function SessionMcpList({
 
   return mcp.data.servers.map((server) => (
     <McpServerRow
+      authorizationUrl={
+        signIn.isSuccess && signIn.variables === server.name ? signIn.data.authorizationUrl : null
+      }
       busy={busy.includes(server.name)}
       canReconnect={mcp.data.canReconnect}
       canSignIn={mcp.data.canSignIn}

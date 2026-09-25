@@ -2,11 +2,13 @@ import { ArrowsClockwiseIcon, SignInIcon } from '@phosphor-icons/react'
 import type { ProviderMcpServer } from '@workspace/contracts'
 import { ListRow } from '@workspace/ui/patterns/list-row'
 import { cn } from '@workspace/ui/lib/utils'
+import { buttonVariants } from '@workspace/ui/components/button'
 
 import { RowIconAction } from '@/features/chat/components/row-icon-action'
 import { mcpStatusClass, mcpStatusLabel } from '@/features/chat/utils/mcp-status'
 
 export function McpServerRow({
+  authorizationUrl,
   busy,
   canReconnect,
   canSignIn,
@@ -14,6 +16,7 @@ export function McpServerRow({
   onSignIn,
   server,
 }: {
+  readonly authorizationUrl: string | null
   readonly busy: boolean
   readonly canReconnect: boolean
   readonly canSignIn: boolean
@@ -34,7 +37,7 @@ export function McpServerRow({
         <span className={cn('shrink-0 text-2xs', mcpStatusClass(server.status))}>
           {mcpStatusLabel(server.status)}
         </span>
-        {needsAuth && canSignIn ? (
+        {needsAuth && canSignIn && !authorizationUrl ? (
           <RowIconAction busy={busy} label={`Sign in to ${server.name}`} onClick={onSignIn}>
             <SignInIcon className='size-(--icon-size-sm)' />
           </RowIconAction>
@@ -45,6 +48,16 @@ export function McpServerRow({
           </RowIconAction>
         ) : null}
       </span>
+      {needsAuth && authorizationUrl ? (
+        <a
+          className={buttonVariants({ size: 'sm', variant: 'outline' })}
+          href={authorizationUrl}
+          rel='noopener noreferrer'
+          target='_blank'
+        >
+          Continue sign-in to {server.name}
+        </a>
+      ) : null}
       {hint ? <span className='text-muted-foreground text-2xs truncate'>{hint}</span> : null}
     </ListRow>
   )
