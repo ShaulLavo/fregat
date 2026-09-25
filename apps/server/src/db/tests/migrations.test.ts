@@ -64,7 +64,7 @@ describe('platform migration ledger', () => {
     expect(ledgerRow(handle, 11)?.applied_at).toEqual(expect.any(String))
   })
 
-  it('adds turn metadata after the deployed worktree migrations without reusing their versions', () => {
+  it('adds push, lifecycle and turn metadata above the deployed worktree migrations', () => {
     const handle = openTempDatabase()
     migratePlatformDatabase(
       handle.db,
@@ -82,9 +82,13 @@ describe('platform migration ledger', () => {
     const applied = migratePlatformDatabase(handle.db)
 
     expect(applied.map(({ version, name }) => ({ version, name }))).toEqual([
+      { version: 27, name: 'push_devices' },
+      { version: 28, name: 'session_lifecycle_revision' },
       { version: 29, name: 'turn_end_reason' },
       { version: 30, name: 'message_model_selection' },
     ])
+    expect(columnNames(handle, 'push_devices')).toContain('revision')
+    expect(columnNames(handle, 'projection_sessions')).toContain('lifecycle_revision')
     expect(columnNames(handle, 'projection_turns')).toContain('end_reason')
     expect(columnNames(handle, 'projection_session_messages')).toContain('model_selection_json')
     expect(

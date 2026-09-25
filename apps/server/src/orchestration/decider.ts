@@ -66,7 +66,7 @@ export function decideOrchestrationCommand(
 ): PendingOrchestrationEvent[] {
   requireNoRewindConflict(command, model)
   const at = new Date().toISOString()
-  const events = decideCommandEvents(command, model, at)
+  const events = decideCommandEvents(command, model, at, restoreReceipt)
 
   return [...events, ...endedApprovalEvents(command, events, model, at)]
 }
@@ -75,6 +75,7 @@ function decideCommandEvents(
   command: OrchestrationCommand,
   model: OrchestrationReadModel,
   at: string,
+  restoreReceipt: OrchestrationCommandReceipt | null | undefined,
 ): PendingOrchestrationEvent[] {
   switch (command.type) {
     case 'session.title.generate.complete':

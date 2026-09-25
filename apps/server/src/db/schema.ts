@@ -414,8 +414,8 @@ export const projectionSessions = sqliteTable(
     updatedAt: text('updated_at').notNull(),
     archivedAt: text('archived_at'),
     deletedAt: text('deleted_at'),
-    /** null = classify on activity alone; the two values are explicit user intent. */
     lifecycleRevision: integer('lifecycle_revision').notNull().default(0),
+    /** null = classify on activity alone; the two values are explicit user intent. */
     settledOverride: text('settled_override', { enum: ['settled', 'active'] }),
     settledAt: text('settled_at'),
     snoozedUntil: text('snoozed_until'),
