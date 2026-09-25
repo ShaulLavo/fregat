@@ -135,6 +135,8 @@ touch only in small commits and say so in the PR body.
 
 ### W0 — bookkeeping (main checkout, no worktree, no PR)
 
+Done 2026-09-25. Plan 168 is the old Editor E030; Editor E055 is the `commandDocumentText` entry.
+
 Works directly in `/work/projects/platform` and `/work/projects/Editor` and pushes to `main`.
 Other sessions have uncommitted work there: commit only your own paths with
 `git commit -- <paths>`, never `git add -A`, stash or reset. Lanes pick W0 up on their next rebase.

@@ -74,7 +74,7 @@ a bare root `bun run verify`.
 | [112 — the large-file ceiling](112-large-file-ceiling.md)                               | **RESEARCH — NO IMPLEMENTATION SCOPE YET**                           |
 | [094 — client-core web and TUI parity](094-client-core-web-tui-parity.md)               | **PARTIAL — 2 OF 23 DONE; 096 COMPLETE**                             |
 | [095 — server plumbing](095-server-plumbing.md)                                         | **PARTIAL — IDENTICAL HALVES MERGED; REGISTRY STREAM BUG OPEN**      |
-| [075 — terminal renderer fallbacks](075-terminal-renderer-fallbacks.md)                 | **REWRITTEN 2026-09-25 — LOG AND SHOW THE RENDERER TIER**            |
+| [075 — say which renderer the terminal is using](075-terminal-renderer-fallbacks.md)    | **REWRITTEN 2026-09-25 — LOG AND SHOW THE RENDERER TIER**            |
 | [076 — watch-reload child reaping](076-watch-reload-child-reaping.md)                   | **PROPOSED — ROOT GO/NO-GO SCHEDULING**                              |
 
 ## Dependency notes
@@ -113,7 +113,7 @@ a bare root `bun run verify`.
   client-core work with 094, keyboard behavior with 080, native capabilities with 087/088,
   verification tooling with 119 and background telemetry with 125. This is an execution plan.
   As of 2026-09-25, 23 groups are implemented and deployed, 8 are partial and 26 are open; the
-  per-group status is in `/work/tmp/completion-wave-audit/plan-126.md`. A row closes when its
+  master plan holds the status line. A row closes when its
   `agent:browser` scenario proves the behaviour. Root `PLAN.md` remains the roadmap owner.
 
 - Plan 125 is done and deleted. The [observability reference](../docs/observability-overhead.md)

@@ -393,10 +393,10 @@
       "title": "Show provider quota limits separately from context occupancy",
       "report": "interaction.md",
       "wave": "4",
-      "status": "open",
-      "evidence_level": "source-reviewed",
+      "status": "in-progress",
+      "evidence_level": "implementation-deployed via Plan 141 (93e65be2); scenario chat-usage-meter; full-acceptance-pending",
       "acceptance": "interaction.md, INTERACTION-07, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": ["scripts/agent/scenarios/chat-usage-meter.ts"]
     },
     {
       "id": "INTERACTION-08",

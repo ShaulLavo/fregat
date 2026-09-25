@@ -1,8 +1,12 @@
 # Plan 126: Align Platform behavior with pinned T3 Code
 
 Status: **IN PROGRESS; FULL PARITY EXECUTION RESUMED 2026-09-23**. Two source-audit passes and independent
-cross-review completed on 2026-09-20. The audit found **48 implementation groups**, including
-paired client/server work. This is not a count of independently reproduced bugs.
+cross-review completed on 2026-09-20. The audit found 48 implementation groups, and the 2026-09-24
+delta added nine: **57 groups**, including paired client/server work. This is not a count of
+independently reproduced bugs. On 2026-09-25, 23 groups were implemented and deployed, 8 partial and
+26 not started. In the completion wave a row closes when its `agent:browser` scenario proves the
+behaviour; the paired run against upstream T3 Code is dropped
+([owner decision](../docs/completion-wave.md#owner-decisions-for-this-wave-2026-09-25)).
 
 LIFE-01/02 shipped on 2026-09-20. Rewind/native permissions/PR lookup have an initial deployment and follow-up validation in [delivery evidence](126-t3code-alignment/rewind-permissions-delivery.md); bounded delivery and MCP approval implementation are recorded in [their delivery evidence](126-t3code-alignment/live-delivery-approvals-delivery.md). The active-list exceptions and automatic unarchive are removed; archive eligibility is separate from settlement. See [archive delivery evidence](126-t3code-alignment/archive-delivery.md). The source-derived archive fixture is the first focused conformance case, not completion of Wave 0 or proof of full upstream parity.
 
