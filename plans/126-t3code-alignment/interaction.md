@@ -145,6 +145,7 @@ This is a two-pass source audit and implementation plan. No app changes, tests, 
 > the composer uses Lexical for: mention and chip nodes, pasted images and attachments, Markdown as you type, IME
 > composition, undo/redo, placeholder, auto-growing multiline input and serialization to the message format. That prerequisite is
 > [Plan 111](../111-editor-decorations.md) (question 7: mentions as decorations over a plain buffer) and the plans it splits into.
+> The research is [Plan 171](../171-composer-on-our-editor.md): the inventory, the gaps and their order.
 > Decided 2026-09-25: owner — 111 research authorized with the composer as its first consumer, done before the next wave.
 > The send-shortcut and large-paste parts (lane L2) are done. Mobile plain-Enter newline: see the reopened case below.
 

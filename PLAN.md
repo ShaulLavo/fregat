@@ -406,6 +406,9 @@ CodeMirror 6 decorations and Lexical's decorator nodes, and gates Plan 108 Phase
 Obsidian mode, and the question of whether the chat composer still needs Lexical.
 Decided 2026-09-25: owner — 111's research is authorized with the composer as its first consumer,
 and runs before the next wave.
+[Plan 171](plans/171-composer-on-our-editor.md) is that composer migration: it inventories what
+the composer uses Lexical for and orders the Editor gaps to close, with 111 first (decided
+2026-09-25: owner — delete Lexical; the replacement is our own editor).
 
 Coordinate shared editor and chat surfaces with Plans 101–103 and 115; do not interleave edits to the same
 files. Plan 085 owns first paint and restoration, which this lane measures but does not change.
