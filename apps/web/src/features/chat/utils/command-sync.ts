@@ -1,3 +1,4 @@
+import { chatErrors } from './structured-errors'
 import { elapsedMs } from '@workspace/utils/timing'
 import type { EnvironmentId, SessionId } from '@workspace/contracts'
 
@@ -28,13 +29,31 @@ export async function syncSessionProjectionAfterDispatch({
   scope.increment('sync.startCount')
 
   try {
-    const replayEvents = transport.replayEvents({
-      afterSequence: Math.max(0, replayAfterSequence),
-      sessionId,
-    })
-    const sessionDetailSnapshot = transport.sessionDetailSnapshot(sessionId)
+    const replayEvents = Promise.resolve().then(() =>
+      transport.replayEvents({
+        afterSequence: Math.max(0, replayAfterSequence),
+        sessionId,
+      }),
+    )
+    const sessionDetailSnapshot = Promise.resolve().then(() =>
+      transport.sessionDetailSnapshot(sessionId),
+    )
     const [replay, snapshot] = await Promise.allSettled([replayEvents, sessionDetailSnapshot])
-    if (transport.closed) return
+    if (transport.closed || (replay.status === 'rejected' && snapshot.status === 'rejected')) {
+      scope.warn('Session projection synchronization failed.', {
+        sessionId,
+        replayStatus: replay.status,
+        snapshotStatus: snapshot.status,
+      })
+      throw chatErrors.PROJECTION_SYNC_FAILED({
+        internal: {
+          sessionId,
+          transportClosed: transport.closed,
+          replayStatus: replay.status,
+          snapshotStatus: snapshot.status,
+        },
+      })
+    }
     const store = useChatProjectionStore.getState()
 
     applyReplaySyncResult(scope, store, transport.environmentId, replay, replayAfterSequence)

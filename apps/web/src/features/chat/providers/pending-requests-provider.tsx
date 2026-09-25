@@ -1,12 +1,5 @@
 import { useMutation, useMutationState } from '@tanstack/react-query'
-import type {
-  ApprovalRequestId,
-  OrchestrationSessionActivity,
-  SessionApprovalRespondCommand,
-  SessionId,
-  SessionUserInputRespondCommand,
-  SessionUserInputDismissCommand,
-} from '@workspace/contracts'
+import type { OrchestrationSessionActivity, SessionId } from '@workspace/contracts'
 import type { ReactNode } from 'react'
 
 import { useActiveChatProjection } from '@/features/chat/hooks/use-active-projection'
@@ -16,8 +9,6 @@ import {
   createUserInputRespondCommand,
   createUserInputDismissCommand,
 } from '@workspace/client-core/chat/commands'
-import { dispatchChatCommand, replayAfterDispatch } from '@/features/chat/utils/command-dispatch'
-import { scheduleSessionProjectionSyncAfterDispatch } from '@/features/chat/utils/command-sync'
 import {
   ChatPendingRequestsContext,
   type ChatPendingRequests,
@@ -27,19 +18,14 @@ import { derivePendingApprovals } from '@workspace/client-core/chat/pending-appr
 import { derivePendingUserInputs } from '@workspace/client-core/chat/pending-user-input'
 import { chatMutationKeys } from '@/features/chat/utils/mutation-keys'
 import {
+  pendingRequestMutationOptions,
+  type PendingRequestDispatch,
+} from '@/features/chat/state/pending-request-dispatch'
+import {
   pendingRequestResponse,
   type PendingRequestMutation,
 } from '@/features/chat/utils/pending-request-response'
 import { errorMessage } from '@/lib/error-message'
-
-type PendingRequestDispatch = {
-  readonly command:
-    | SessionApprovalRespondCommand
-    | SessionUserInputRespondCommand
-    | SessionUserInputDismissCommand
-  readonly context: Record<string, unknown>
-  readonly requestId: ApprovalRequestId
-}
 
 const NO_ACTIVITIES: readonly OrchestrationSessionActivity[] = []
 
@@ -67,11 +53,8 @@ export function ChatPendingRequestsProvider({
   const mutationKey = chatMutationKeys.pendingRequestResponse(transport.environmentId, sessionId)
   // One scope per session: a second click queues behind the first, and the
   // server's admission then sees the request already answered.
-  const mutation = useMutation({
-    mutationKey,
-    scope: { id: `pending-request-response:${transport.environmentId}:${sessionId}` },
-    mutationFn: (input: PendingRequestDispatch) => dispatchResponse(input, transport),
-  })
+  const mutation = useMutation(pendingRequestMutationOptions(transport, sessionId))
+
   const mutations = useMutationState<PendingRequestMutation>({
     filters: { mutationKey },
     select: (entry) => {
@@ -133,23 +116,4 @@ export function ChatPendingRequestsProvider({
   }
 
   return <ChatPendingRequestsContext value={value}>{children}</ChatPendingRequestsContext>
-}
-
-async function dispatchResponse(input: PendingRequestDispatch, transport: ChatTransport) {
-  const outcome = await dispatchChatCommand({
-    action: 'chat.pending_request.respond.summary',
-    command: input.command,
-    context: { ...input.context, requestId: input.requestId },
-    dispatchCommand: transport.dispatchCommand,
-    onAccepted: (result) => {
-      scheduleSessionProjectionSyncAfterDispatch({
-        transport,
-        replayAfterSequence: replayAfterDispatch(input.command, result),
-        sessionId: input.command.sessionId,
-      })
-    },
-  })
-  if (!outcome.ok) throw outcome.error
-
-  return outcome.result
 }
