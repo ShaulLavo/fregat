@@ -2,7 +2,7 @@ import type { LanguageServerDefinitionTarget } from '@singapore-editor/lsp-plugi
 import { EmptyState } from '@workspace/ui/components/empty-state'
 import { Shimmer } from '@workspace/ui/components/shimmer'
 import { useListbox } from '@workspace/ui/patterns/use-listbox'
-import { useState } from 'react'
+import { useState, type KeyboardEvent } from 'react'
 
 import { useEditorLanguageServerStatus } from '@/features/editor/hooks/use-editor-language-server-status'
 import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
@@ -16,10 +16,14 @@ import { FocusablePanel } from '@/components/focusable-panel'
 import { DiagnosticGroupRow } from '@/features/workbench/components/diagnostic-group-row'
 import { DiagnosticRow } from '@/features/workbench/components/diagnostic-row'
 import {
+  diagnosticFixRequest,
   diagnosticRows,
+  fixingRowId,
   survivingActiveId,
   type ActiveDiagnostic,
 } from '@/features/workbench/utils/diagnostic-rows'
+import { useDiagnosticFix } from '@/lib/diagnostic-ai/hooks/use-diagnostic-fix'
+import { isFixKey } from '@/features/workbench/utils/diagnostic-fix-key'
 import { toggledSet } from '@/lib/toggled-set'
 import {
   diagnosticsEmptyState,
@@ -42,6 +46,8 @@ export function DiagnosticsPanel() {
   const [collapsedUris, setCollapsedUris] = useState<ReadonlySet<string>>(() => new Set())
   const [active, setActive] = useState<ActiveDiagnostic | null>(null)
   const rows = diagnosticRows(resources, collapsedUris)
+  const fix = useDiagnosticFix()
+  const fixingId = fix.mutation.isPending ? fixingRowId(rows, fix.mutation.variables) : null
   const activeId = survivingActiveId(rows, active)
 
   function previewDiagnostic(target: LanguageServerDefinitionTarget) {
@@ -75,11 +81,19 @@ export function DiagnosticsPanel() {
     if (row?.kind === 'group') toggle(row.uri)
   }
 
+  function fixActive(event: KeyboardEvent<HTMLDivElement>, id: string) {
+    const row = rows.find((candidate) => candidate.id === id)
+    if (!fix.available || row?.kind !== 'diagnostic' || !isFixKey(event)) return
+    event.preventDefault()
+    fix.mutation.mutate(diagnosticFixRequest(row))
+  }
+
   const list = useListbox({
     role: 'tree',
     items: rows,
     activeId,
     onActiveChange: moveTo,
+    onActiveKeyDown: fixActive,
     onCommit: commit,
     onCollapse: collapseOrExpand,
     onExpand: collapseOrExpand,
@@ -124,9 +138,11 @@ export function DiagnosticsPanel() {
             />
           ) : (
             <DiagnosticRow
+              fixing={fix.available ? fixingId === row.id : null}
               key={row.id}
               row={row}
               rowProps={list.rowProps(row.id)}
+              onFix={() => fix.mutation.mutate(diagnosticFixRequest(row))}
               onOpen={() => openDiagnostic(row.target)}
             />
           ),

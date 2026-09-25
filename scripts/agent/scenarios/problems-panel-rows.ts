@@ -30,7 +30,7 @@ async function activeRowText(page: Page) {
 export const problemsPanelRows: Scenario = {
   name: 'problems-panel-rows',
   description:
-    'Two files with type errors in a disposable workspace: Problems is one tree with one tab stop, the arrows walk from the first file into the second, and clicking a problem moves the cursor to it.',
+    'Two files with type errors in a disposable workspace: Problems is one tree with one tab stop, the arrows walk from the first file into the second, clicking a problem moves the cursor to it, and Mod+. hands the active problem to a new chat draft.',
   async run(page, { step }) {
     const fixture = await createFixture()
     try {
@@ -89,6 +89,21 @@ export const problemsPanelRows: Scenario = {
       await betaDiagnostic.click()
       await cursorLine.filter({ hasText: 'export const beta' }).waitFor()
       await step('click-jumps-to-problem')
+
+      // Fix with AI from the keyboard: Mod+. on the active problem opens a chat draft with it.
+      await tree.focus()
+      strictEqual(await selectors.listTabStops(tree).count(), 0, 'Fix with AI adds no Tab stop')
+      await page.keyboard.press('Control+.')
+      const composer = selectors.chatMessage(page)
+      await composer.waitFor({ timeout: 15_000 })
+      await page.waitForFunction(
+        (element) => (element?.textContent ?? '').includes('Investigate and fix the cause'),
+        await composer.elementHandle(),
+        { timeout: 10_000 },
+      )
+      const prompt = (await composer.textContent()) ?? ''
+      ok(/beta\.ts/.test(prompt), `The prompt names the problem's file: "${prompt.slice(0, 120)}"`)
+      await step('fix-with-ai-draft')
     } finally {
       await releaseFixture(fixture)
     }

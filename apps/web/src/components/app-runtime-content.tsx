@@ -6,6 +6,7 @@ import { useWorkspaceCachePersistence } from '@/features/workspace/hooks/use-cac
 import { useAutoSave } from '@/features/editor/hooks/use-auto-save'
 import { CommandProvider } from '@/keymap/providers/command-provider'
 import { ComposerAttachProvider } from '@/providers/composer-attach-provider'
+import { DiagnosticFixProvider } from '@/providers/diagnostic-fix-provider'
 
 export function AppRuntimeContent() {
   const { dirtyTabCloseDialog, requestCloseTab, requestCloseTabs } = useDirtyTabCloseRequest()
@@ -21,10 +22,12 @@ export function AppRuntimeContent() {
     <EditorTabActionsProvider requestCloseTab={requestCloseTab} requestCloseTabs={requestCloseTabs}>
       <CommandProvider>
         <ComposerAttachProvider>
-          <AppShell
-            dirtyTabCloseDialog={dirtyTabCloseDialog}
-            restoringWorkspace={restoringWorkspace}
-          />
+          <DiagnosticFixProvider>
+            <AppShell
+              dirtyTabCloseDialog={dirtyTabCloseDialog}
+              restoringWorkspace={restoringWorkspace}
+            />
+          </DiagnosticFixProvider>
         </ComposerAttachProvider>
       </CommandProvider>
     </EditorTabActionsProvider>
