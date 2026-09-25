@@ -68,3 +68,7 @@ apps/web/bundle-report.json
 
 # astro generates this on every build
 .astro/
+
+# Python bytecode from scripts/parity
+__pycache__/
+*.pyc
