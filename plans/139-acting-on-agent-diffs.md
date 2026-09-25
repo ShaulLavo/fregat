@@ -194,6 +194,14 @@ hunk.patch)` (16 hex), scoped by session, turns and whitespace mode. A hunk is a
    overlap (D2). Client: the turn's diff renders git's hunks; each hunk and file gets Undo, with
    "n of m" stepping; the mutation (key in `features/chat/utils/mutation-keys.ts`) settles the
    keys in answer 3. Scenario: hunk undo on a real temp repo, including the overlap refusal.
+   **Done 2026-09-25 (lane L8)** with two changes from the sketch: a guarded route
+   (`/orchestration/checkpoint-hunks`, `…/revert`) over the read model rather than an event-sourced
+   command, and "undone" read from the worktree with `git apply --check` rather than stored.
+   The Turn tab lists each file's changes with Undo / Reapply, whole-file undo, `Mod+Backspace` on
+   the active row and "n of m"; the single-file diff view still shows the whitespace-free diff.
+   Proof: server test on a real repo (`checkpoint-hunks.test.ts`) and a DOM test through the real
+   server (`turn-files.test.tsx`). `agent:browser` cannot reach a turn's changes without a real
+   provider turn, which spends credit: **owner check** — undo one change in the Turn tab.
 3. **Review draft.** Many comments across files with the anchor from answer 4, resolve, one send
    (the prompt lists each comment under its path and lines). Replaces the single-range line
    comment. Findings from Plan 169 land in the same model, marked by author (D3).

@@ -1,5 +1,5 @@
-import { checkpointDiffRetry } from '@/features/chat/utils/checkpoint-diff-query'
-import { expect, test } from '../../../../../test/fixtures'
+import { checkpointDiffRetry } from '@/lib/checkpoint-diff-query'
+import { expect, test } from '../../../test/fixtures'
 
 test('a typed permanent range failure is not retried', () => {
   // The retry policy reads the catalog code, not the message: a reworded

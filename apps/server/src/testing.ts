@@ -20,6 +20,7 @@ export type { MetadataDatabaseHandle, PlatformDatabase } from './db/client'
 export { testSettingsOptions, type TestSettingsOverrides } from './settings/testing'
 
 export { OrchestrationEventStore } from './orchestration/event-store'
+export { checkpointRefForSessionTurn } from './orchestration/checkpoint-refs'
 export { ProviderRuntimeIngestion } from './orchestration/provider-runtime-ingestion'
 export type { ProviderRuntimeEvent } from './provider/types'
 export {
