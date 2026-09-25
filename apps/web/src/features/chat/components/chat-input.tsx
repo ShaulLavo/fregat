@@ -59,6 +59,7 @@ import { useFocusTarget } from '@/lib/focus/hooks/use-target'
 import type { ComposerPendingAction } from '@/features/chat/utils/composer-state'
 
 import type { ChatInputSubmitPayload, ChatInputSubmitResult } from '../utils/composed-message'
+import { sentDraftStillCurrent } from '@/features/chat/utils/sent-draft'
 
 export function ChatInput({
   busy,
@@ -233,11 +234,11 @@ export function ChatInput({
     editorRef.current = editor
     setEditorReady(editor !== null)
   }
-  function clearDraft(editor: LexicalEditor | null) {
+  function clearDraft(editor: LexicalEditor | null, keepDraft: boolean) {
     if (editor && editorRef.current === editor) clearChatInputEditor(editor)
 
-    // A correction consumes content; model and mode picks apply to the next new turn.
-    if (busy) clearStoredDraftContent(draftTarget)
+    // A correction or a background start consumes content; the picks apply to the next turn.
+    if (busy || keepDraft) clearStoredDraftContent(draftTarget)
     else clearStoredDraft(draftTarget)
     if (editorRef.current !== editor) return
     imagePreparation.clearError()
@@ -285,12 +286,15 @@ export function ChatInput({
         alternate,
       )
       if (
-        result !== 'rejected' &&
-        useChatInputDraftStore.getState().getDraft(draftTarget) === draft
+        sentDraftStillCurrent(
+          result,
+          useChatInputDraftStore.getState().getDraft(draftTarget),
+          draft,
+        )
       ) {
         // A navigated attachment mutation now belongs to the new editor; its old upload can expire.
-        if (result === 'sent' && editorRef.current === editor) imagePreparation.clearSent()
-        clearDraft(editor)
+        if (result !== 'queued' && editorRef.current === editor) imagePreparation.clearSent()
+        clearDraft(editor, result === 'started')
       }
       setSubmitting(false)
 
@@ -433,7 +437,6 @@ export function ChatInput({
               onDrop={handleComposerDrop}
             >
               <ChatInputEditor
-                busy={busy}
                 disabled={composerDisabled}
                 draftKey={draftKey}
                 placeholder='Use @ to mention, / for commands.'

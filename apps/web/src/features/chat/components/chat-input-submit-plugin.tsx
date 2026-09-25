@@ -8,8 +8,11 @@ import {
 } from 'lexical'
 import { useEffect } from 'react'
 
+/**
+ * Enter submits. Ctrl/Cmd+Enter submits the alternate intent, which each composer
+ * defines: a running session swaps queue and steer, a new draft starts in the background.
+ */
 export function ChatInputSubmitPlugin({
-  busy = false,
   commandMenuOpen,
   disabled,
   onCommandMenuCommit,
@@ -17,7 +20,6 @@ export function ChatInputSubmitPlugin({
   onSubmitRequest,
 }: {
   commandMenuOpen: boolean
-  busy?: boolean
   disabled: boolean
   onCommandMenuCommit: () => boolean
   onCommandMenuMove: (offset: number) => boolean
@@ -30,7 +32,6 @@ export function ChatInputSubmitPlugin({
       KEY_ENTER_COMMAND,
       (event) =>
         handleEnterCommand({
-          busy,
           commandMenuOpen,
           disabled,
           event,
@@ -62,7 +63,6 @@ export function ChatInputSubmitPlugin({
       unregisterArrowUp()
     }
   }, [
-    busy,
     commandMenuOpen,
     disabled,
     editor,
@@ -75,14 +75,12 @@ export function ChatInputSubmitPlugin({
 }
 
 function handleEnterCommand({
-  busy,
   commandMenuOpen,
   disabled,
   event,
   onCommandMenuCommit,
   onSubmitRequest,
 }: {
-  busy: boolean
   commandMenuOpen: boolean
   disabled: boolean
   event: KeyboardEvent | null
@@ -102,7 +100,7 @@ function handleEnterCommand({
 
   event?.preventDefault()
   event?.stopPropagation()
-  void onSubmitRequest(busy && Boolean(event?.metaKey || event?.ctrlKey))
+  void onSubmitRequest(Boolean(event?.metaKey || event?.ctrlKey))
 
   return true
 }

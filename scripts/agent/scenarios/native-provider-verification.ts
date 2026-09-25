@@ -270,6 +270,8 @@ export function isolatedNativeScenario(options: {
           worktreePath: sessionWorktree.canonicalPath,
         })
       } catch (error) {
+        // Printed here: a cleanup failure below would otherwise replace this error.
+        console.error(`${options.name} drive failed: ${String(error)}`)
         await step('failed-before-cleanup')
         throw error
       } finally {

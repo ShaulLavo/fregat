@@ -27,6 +27,7 @@ import { ChatWelcomeView } from './chat-welcome-view'
 import { DraftContextStrip } from '@/features/chat/components/draft-context-strip'
 import type { DraftMachine } from '@/features/chat/utils/draft-workspace'
 import { useSettingValue } from '@/hooks/use-setting-value'
+import { nextWorktreeTarget } from '@/features/chat/utils/worktree-target'
 import { useNavigation } from '@/hooks/use-navigation'
 
 export function ChatDraftView({
@@ -115,14 +116,18 @@ export function ChatDraftView({
       onFailed: (error) => notifyChatCommandError(error, 'Could not save the default model'),
     })
   }
-  async function handleSend({
-    attachments,
-    interactionMode,
-    modelSelection,
-    runtimeMode,
-    terminalContexts,
-    text,
-  }: ChatInputSubmitPayload): Promise<ChatInputSubmitResult> {
+  /** `background` (Ctrl/Cmd+Enter) starts the session and keeps the user on a fresh draft. */
+  async function handleSend(
+    {
+      attachments,
+      interactionMode,
+      modelSelection,
+      runtimeMode,
+      terminalContexts,
+      text,
+    }: ChatInputSubmitPayload,
+    background = false,
+  ): Promise<ChatInputSubmitResult> {
     if (!project || !worktree || !target || !targetReady) {
       setSendError('Workspace chat is still preparing.')
       return 'rejected'
@@ -147,6 +152,7 @@ export function ChatDraftView({
       command: submission.command,
       context: {
         attachmentCount: attachments.length,
+        background,
         interactionMode,
         model: modelSelection.model,
         projectId: project.id,
@@ -173,8 +179,17 @@ export function ChatDraftView({
       return 'rejected'
     }
 
-    useChatInputDraftStore.getState().setIdentity(draftTarget, null)
     setSendError(null)
+    // The next draft keeps this one's workspace mode and base branch; each start
+    // in new-worktree mode declares its own worktree.
+    if (background && identity) {
+      useChatInputDraftStore
+        .getState()
+        .setIdentity(draftTarget, { ...identity, worktreeTarget: nextWorktreeTarget(target) })
+      return 'started'
+    }
+
+    useChatInputDraftStore.getState().setIdentity(draftTarget, null)
     if (navigation.getSnapshot() === operation) onSessionCreated(submission.command.sessionId)
 
     return 'sent'

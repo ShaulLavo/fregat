@@ -34,8 +34,8 @@ test('an IME Enter is swallowed rather than prevented, so the commit still lands
   expect(event.defaultPrevented).toBe(false)
 })
 
-test('Ctrl/Cmd+Enter alternates the running follow-up intent while Enter keeps the default', () => {
-  const composer = renderComposer(true)
+test('Ctrl/Cmd+Enter requests the alternate intent while Enter keeps the default', () => {
+  const composer = renderComposer()
   composer.pressEnter({})
   composer.pressEnter({ ctrlKey: true })
   composer.pressEnter({ metaKey: true })
@@ -43,13 +43,7 @@ test('Ctrl/Cmd+Enter alternates the running follow-up intent while Enter keeps t
   expect(composer.intents).toEqual([false, true, true])
 })
 
-test('modifier Enter on an idle composer does not request a follow-up inversion', () => {
-  const composer = renderComposer()
-  composer.pressEnter({ ctrlKey: true })
-  expect(composer.intents).toEqual([false])
-})
-
-function renderComposer(busy = false) {
+function renderComposer() {
   const state = { editor: null as LexicalEditor | null, submits: 0, intents: [] as boolean[] }
 
   function captureEditor(editor: LexicalEditor) {
@@ -67,7 +61,6 @@ function renderComposer(busy = false) {
     >
       <CaptureEditor onReady={captureEditor} />
       <ChatInputSubmitPlugin
-        busy={busy}
         commandMenuOpen={false}
         disabled={false}
         onCommandMenuCommit={() => false}

@@ -8,3 +8,10 @@ export function newWorktreeTarget(baseWorktreeId: WorktreeId): SessionWorktreeTa
     baseWorktreeId,
   }
 }
+
+/** The target for the draft after a start: a new worktree gets a fresh id, keeping its base and branch. */
+export function nextWorktreeTarget(target: SessionWorktreeTarget): SessionWorktreeTarget {
+  if (target.kind !== 'new') return target
+
+  return { ...target, worktreeId: v.parse(worktreeIdSchema, crypto.randomUUID()) }
+}
