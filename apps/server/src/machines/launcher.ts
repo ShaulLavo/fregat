@@ -131,6 +131,7 @@ export function createSshLauncher(options: LauncherOptions) {
     await disconnecting.get(name)
     const running = updating.get(name)
     if (running) return running
+    refuseUnofferedUpdate(connections.get(name)?.state)
     const operation = update(name).finally(() => updating.delete(name))
     updating.set(name, operation)
     return operation
@@ -421,7 +422,10 @@ export function createSshLauncher(options: LauncherOptions) {
     event.errorCode = lastError.code
     event.errorInternal = isEvlogError(error) ? error.internal : undefined
     const updateFix = releaseUpdateFix(lastError.code, event.errorInternal, supply.channel)
-    if (updateFix && (await supply.available())) lastError.fix = updateFix
+    if (updateFix && (await supply.available())) {
+      lastError.fix = updateFix
+      lastError.action = lastError.code === sshProtocolCode ? 'update' : 'install'
+    }
     if (lastError.code === 'machines.SSH_IDENTITY') event.step = 'identity'
     if (lastError.code === sshProtocolCode) event.step = 'protocol'
     event.outcome = cancelled ? 'cancelled' : 'failed'
@@ -576,6 +580,13 @@ export function createSshLauncher(options: LauncherOptions) {
 
 function changedRemote(previous: SshMachineDefinition, next: SshMachineDefinition) {
   return previous.target !== next.target || previous.remotePort !== next.remotePort
+}
+
+// The client offers Update server only on `action`; a newer, external or shared server never gets one.
+function refuseUnofferedUpdate(state: MachineConnectionState | undefined) {
+  if (!state || !('lastError' in state)) return
+  if (state.lastError.code !== sshProtocolCode || state.lastError.action) return
+  throw updateErrors.refused({ internal: { phase: state.phase, code: state.lastError.code } })
 }
 
 function failurePhase(step: SshErrorStep) {

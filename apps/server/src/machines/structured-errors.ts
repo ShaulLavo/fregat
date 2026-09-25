@@ -110,6 +110,12 @@ const machineErrors = defineErrorCatalog('machines', {
     why: 'The release has different contents and a server may still load files from it.',
     fix: 'Build a new release, then select Update server again.',
   },
+  SSH_UPDATE_REFUSED: {
+    status: 409,
+    message: 'This server cannot update that machine.',
+    why: 'That machine runs a newer or external server, or other connections share it.',
+    fix: 'Follow the connection notice’s fix, then select Retry.',
+  },
   SSH_UPDATE_IN_USE: {
     status: 409,
     message: 'The previous server release is still in use.',
@@ -134,6 +140,7 @@ export const updateErrors = {
   install: machineErrors.SSH_UPDATE_INSTALL,
   inUse: machineErrors.SSH_UPDATE_IN_USE,
   immutable: machineErrors.SSH_UPDATE_IMMUTABLE,
+  refused: machineErrors.SSH_UPDATE_REFUSED,
 }
 
 const sshErrors = {

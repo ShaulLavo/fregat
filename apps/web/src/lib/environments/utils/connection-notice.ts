@@ -22,9 +22,8 @@ const retryableUpdateCodes: ReadonlySet<string> = new Set([
 /** The update button's label for a machine whose server the primary can install or replace. */
 export function serverUpdateLabel(error: ConnectionError | null) {
   if (!error) return null
-  if (error.code === 'machines.SSH_NOT_INSTALLED') return 'Install server'
-  if (error.code === 'machines.SSH_PROTOCOL' || retryableUpdateCodes.has(error.code))
-    return 'Update server'
+  if (error.action === 'install') return 'Install server'
+  if (error.action === 'update' || retryableUpdateCodes.has(error.code)) return 'Update server'
   return null
 }
 

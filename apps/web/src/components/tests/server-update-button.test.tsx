@@ -11,6 +11,7 @@ import { createObservedInProcessClient } from '../../../test/client'
 import { installTestClient } from '../../../test/factories/client-binding'
 import {
   createConnectionNoticeFixture,
+  MACHINE_NEWER_PROTOCOL_ERROR,
   MACHINE_PROTOCOL_ERROR,
   MACHINE_SETUP_ERROR,
 } from '../../../test/factories/connection-notice'
@@ -52,6 +53,12 @@ test.for([
     expect(screen.getByRole('button', { name })).toBeEnabled()
   },
 )
+
+test('a newer remote offers no update, since updating would install an older release', async () => {
+  const { connections } = await sshMachineWith(MACHINE_NEWER_PROTOCOL_ERROR)
+  renderEverywhere(connections)
+  expect(screen.queryByRole('button', { name: /server on shaul-mac/ })).toBeNull()
+})
 
 test('other machine errors offer no update', async () => {
   const { connections } = await sshMachineWith({

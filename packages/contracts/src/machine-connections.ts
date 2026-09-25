@@ -2,12 +2,16 @@ import * as v from 'valibot'
 import { healthDescriptorSchema } from './health'
 import { machineNameSchema } from './machines'
 
-/** A failure as the catalog phrased it: the code names it, `fix` is what the user does next. */
+/**
+ * A failure as the catalog phrased it: the code names it, `fix` is what the user does next.
+ * `action` is set only when the server decided installing its release would clear the failure.
+ */
 export const connectionErrorSchema = v.object({
   code: v.string(),
   message: v.string(),
   why: v.optional(v.string()),
   fix: v.optional(v.string()),
+  action: v.optional(v.picklist(['install', 'update'])),
 })
 
 export const machineConnectionStateSchema = v.variant('phase', [

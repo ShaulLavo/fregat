@@ -44,7 +44,7 @@ test('an outdated server is updated, restarted and reconnected live', async () =
 
   expect(await launcher.connectMachine('fixture')).toMatchObject({
     phase: 'blocked',
-    lastError: { code: 'machines.SSH_PROTOCOL', fix: updateFix },
+    lastError: { code: 'machines.SSH_PROTOCOL', fix: updateFix, action: 'update' },
   })
   const updated = await launcher.updateMachine('fixture')
   expect(updated).toMatchObject({
@@ -82,6 +82,7 @@ test('a machine without a server is installed from this server’s release', asy
     lastError: {
       code: 'machines.SSH_NOT_INSTALLED',
       fix: 'Select Install server to put this server’s release on that machine.',
+      action: 'install',
     },
   })
   expect(await launcher.updateMachine('fixture')).toMatchObject({
@@ -104,6 +105,25 @@ test('a live machine is moved to the new release by an update', async () => {
     phase: 'live',
     descriptor: { serverVersion: 'second' },
   })
+})
+
+test('a newer server is offered no update, and an update request is refused', async () => {
+  const fixture = await updateFixture()
+  await writeRelease(fixture.serverRoot, 'newer', expected + 1, expected + 1)
+  await pointCurrent(fixture.serverRoot, 'newer')
+  await installServerLauncher({
+    homeDirectory: fixture.home,
+    installation: releaseInstallation(fixture.serverRoot),
+  })
+  const ssh = localSsh({ home: fixture.home })
+  const { launcher } = updateLauncher(ssh, await shippableRelease(fixture.local, 'new'))
+  const blocked = await launcher.connectMachine('fixture')
+  expect(blocked).toMatchObject({ phase: 'blocked', lastError: { code: 'machines.SSH_PROTOCOL' } })
+  expect(blocked).not.toHaveProperty('lastError.action')
+  await expect(launcher.updateMachine('fixture')).rejects.toMatchObject({
+    code: 'machines.SSH_UPDATE_REFUSED',
+  })
+  expect(await readlink(path.join(fixture.serverRoot, 'current'))).toContain('newer')
 })
 
 test('concurrent updates and a connect during one join a single update', async () => {
