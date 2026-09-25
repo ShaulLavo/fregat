@@ -2,7 +2,7 @@ import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { vi } from 'vitest'
 
-import { useAttachToComposer } from '@/features/chat/hooks/use-attach-to-composer'
+import { useAttachToComposer } from '@/lib/composer-attach/hooks/use-attach-to-composer'
 import {
   resetComposerInboxStore,
   useComposerInboxStore,
@@ -62,7 +62,7 @@ test('records command claim and settled reveal outcome in one attachment event',
 })
 
 function AttachHarness({ rootPath }: { readonly rootPath: string }) {
-  const { attachText } = useAttachToComposer()
+  const { attachText } = useAttachToComposer(rootPath)
   const { ref } = useFocusTarget<HTMLButtonElement>({
     area: 'chat',
     id: { key: rootPath, kind: 'chat-composer' },

@@ -146,6 +146,10 @@ list of settings (if any) with their scopes.
 
 1. Move `useAttachToComposer` to its shared home; composer inbox entries carry environment and
    root (the gap `docs/diagnostic-ai-fix-plan.md` step 4 also names).
+   **Done 2026-09-25 (lane L8):** `lib/composer-attach` holds the context and
+   `useAttachToComposer(rootPath)`; chat implements it (`useComposerAttach`, mounted by
+   `providers/composer-attach-provider.tsx`). Inbox entries carry `{ environmentId, rootPath }` and
+   a composer takes only its own workspace's.
 2. Per-hunk and per-file undo over the checkpoint diff, as a keyed mutation that settles the
    checkpoint and git status queries; stepping in the diff view.
 3. Review draft: multi-comment model, anchoring, resolve, one send.

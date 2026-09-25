@@ -10,7 +10,7 @@ import {
 import { Button } from '@workspace/ui/components/button'
 import { useEffect, useRef, useState, type RefObject } from 'react'
 
-import { useAttachToComposer } from '@/features/chat/hooks/use-attach-to-composer'
+import { useAttachToComposer } from '@/lib/composer-attach/hooks/use-attach-to-composer'
 import {
   diffLineAddress,
   diffLineAddressLabel,
@@ -32,12 +32,14 @@ export function DiffLineCommentAction({
   file,
   hostRef,
   regions,
+  rootPath,
 }: {
   file: DiffFile
   hostRef: RefObject<HTMLElement | null>
   regions: DiffRegionStore
+  rootPath: string
 }) {
-  const { attachText } = useAttachToComposer()
+  const { attachText } = useAttachToComposer(rootPath)
   const [address, setAddress] = useState<DiffLineAddress | null>(null)
   // Not state: re-rendering mid-drag on the anchor would only throw the drag away.
   const anchor = useRef<DiffRowHit | null>(null)

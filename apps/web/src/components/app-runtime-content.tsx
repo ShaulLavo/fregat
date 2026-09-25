@@ -5,6 +5,7 @@ import { useRestoreRecentWorkspaceRoot } from '@/features/workspace/hooks/use-re
 import { useWorkspaceCachePersistence } from '@/features/workspace/hooks/use-cache-persistence'
 import { useAutoSave } from '@/features/editor/hooks/use-auto-save'
 import { CommandProvider } from '@/keymap/providers/command-provider'
+import { ComposerAttachProvider } from '@/providers/composer-attach-provider'
 
 export function AppRuntimeContent() {
   const { dirtyTabCloseDialog, requestCloseTab, requestCloseTabs } = useDirtyTabCloseRequest()
@@ -19,10 +20,12 @@ export function AppRuntimeContent() {
   return (
     <EditorTabActionsProvider requestCloseTab={requestCloseTab} requestCloseTabs={requestCloseTabs}>
       <CommandProvider>
-        <AppShell
-          dirtyTabCloseDialog={dirtyTabCloseDialog}
-          restoringWorkspace={restoringWorkspace}
-        />
+        <ComposerAttachProvider>
+          <AppShell
+            dirtyTabCloseDialog={dirtyTabCloseDialog}
+            restoringWorkspace={restoringWorkspace}
+          />
+        </ComposerAttachProvider>
       </CommandProvider>
     </EditorTabActionsProvider>
   )

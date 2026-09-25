@@ -96,6 +96,10 @@ agent is `application` or `machine`, never `window`.
 ## Phases (provisional)
 
 1. Shared attach action with workspace identity (also unblocks plan 139 phase 1).
+   **Done 2026-09-25 (lane L8):** `lib/composer-attach` holds the context and
+   `useAttachToComposer(rootPath)`; chat implements it (`useComposerAttach`, mounted by
+   `providers/composer-attach-provider.tsx`). Inbox entries carry `{ environmentId, rootPath }` and
+   a composer takes only its own workspace's.
 2. Editor selection and file to chat; active-file chip.
 3. Fix with AI, per `docs/diagnostic-ai-fix-plan.md`.
 4. Diagnostics feedback, by the route D2 picks.

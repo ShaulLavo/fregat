@@ -21,6 +21,7 @@ const TARGET: ChatInputDraftTarget = {
   draftKey: 'ad686244-5b2e-59be-805f-ef86eac80feb',
   rootPath: '/repo',
 }
+const HERE = { environmentId: TARGET.environmentId, rootPath: TARGET.rootPath }
 const FAILURE = {
   lineEnd: 812,
   lineStart: 810,
@@ -39,7 +40,7 @@ function noEditor(): RefObject<LexicalEditor | null> {
 }
 
 test('a capture queued before the composer mounts still lands on its draft', () => {
-  useComposerInboxStore.getState().queueTerminalContext(FAILURE)
+  useComposerInboxStore.getState().queueTerminalContext(FAILURE, HERE)
 
   renderHook(() => useComposerInbox(TARGET, noEditor(), false))
 
@@ -51,33 +52,51 @@ test('a capture queued before the composer mounts still lands on its draft', () 
 test('a capture queued while the composer is open is drained too', () => {
   const { rerender } = renderHook(() => useComposerInbox(TARGET, noEditor(), false))
 
-  useComposerInboxStore.getState().queueTerminalContext(FAILURE)
+  useComposerInboxStore.getState().queueTerminalContext(FAILURE, HERE)
   rerender()
 
   expect(useChatInputDraftStore.getState().getDraft(TARGET).terminalContexts).toHaveLength(1)
 })
 
 test('text stays queued until there is a caret to splice it into', () => {
-  useComposerInboxStore.getState().queueText('why did this fail?')
+  useComposerInboxStore.getState().queueText('why did this fail?', HERE)
 
   renderHook(() => useComposerInbox(TARGET, noEditor(), false))
 
   // The editor mounts a render later than the component. Taking the text here
   // would silently discard something the user explicitly asked to send.
   expect(useComposerInboxStore.getState().pending).toEqual([
-    { kind: 'text', text: 'why did this fail?' },
+    { destination: HERE, kind: 'text', text: 'why did this fail?' },
   ])
 })
 
 test('a mixed batch keeps the chip even when the text has to wait', () => {
   const store = useComposerInboxStore.getState()
-  store.queueText('look at this')
-  store.queueTerminalContext(FAILURE)
+  store.queueText('look at this', HERE)
+  store.queueTerminalContext(FAILURE, HERE)
 
   renderHook(() => useComposerInbox(TARGET, noEditor(), false))
 
   expect(useChatInputDraftStore.getState().getDraft(TARGET).terminalContexts).toHaveLength(1)
   expect(useComposerInboxStore.getState().pending.map((entry) => entry.kind)).toEqual(['text'])
+})
+
+test("another workspace's capture stays queued for its own composer", () => {
+  const elsewhere = { ...HERE, rootPath: '/other' }
+  useComposerInboxStore.getState().queueTerminalContext(FAILURE, elsewhere)
+
+  const { rerender } = renderHook(({ target }) => useComposerInbox(target, noEditor(), false), {
+    initialProps: { target: TARGET },
+  })
+
+  expect(useChatInputDraftStore.getState().getDraft(TARGET).terminalContexts).toHaveLength(0)
+  expect(useComposerInboxStore.getState().pending).toHaveLength(1)
+
+  const there = { ...TARGET, rootPath: '/other' }
+  rerender({ target: there })
+
+  expect(useChatInputDraftStore.getState().getDraft(there).terminalContexts).toHaveLength(1)
+  expect(useComposerInboxStore.getState().pending).toHaveLength(0)
 })
 
 test('an empty inbox never touches the draft', () => {

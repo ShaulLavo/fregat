@@ -9,6 +9,8 @@ import {
 } from '@/features/chat/utils/input-editor-actions'
 import { useChatInputDraftStore, type ChatInputDraftTarget } from '../state/chat-input-draft-store'
 import { useComposerInboxStore, type ComposerInboxEntry } from '../state/composer-inbox-store'
+import { sameComposerDestination } from '@/features/chat/utils/composer-destination'
+import type { ComposerDestination } from '@/lib/composer-attach/providers/context'
 
 /**
  * Moves work waiting in the inbox onto this composer — chips onto the draft,
@@ -16,8 +18,8 @@ import { useComposerInboxStore, type ComposerInboxEntry } from '../state/compose
  *
  * The draft is the durable home: it survives a session switch and a reload, so
  * the inbox only holds anything for the gap between "the user asked" and "a
- * composer exists". Draining is keyed on `pending` alone — a session switch
- * changes `draftTarget` but must not re-deliver work the previous session owns.
+ * composer exists". It takes only entries captured in this composer's workspace,
+ * and looks again when that workspace changes.
  */
 export function useComposerInbox(
   draftTarget: ChatInputDraftTarget,
@@ -27,14 +29,19 @@ export function useComposerInbox(
 ) {
   const pending = useComposerInboxStore((store) => store.pending)
 
-  // `draftTarget` and the editor ref are read, not depended on: re-running on a session switch
-  // would take from an already-empty inbox at best, and re-home someone else's capture at worst.
-  const drain = useEffectEvent((ready: boolean) => {
+  const { environmentId, rootPath } = draftTarget
+  // The draft key and editor ref are read, not depended on: a session switch inside one
+  // workspace has nothing new to take.
+  const drain = useEffectEvent((ready: boolean, destination: ComposerDestination) => {
     // Chips need only the draft; text needs somewhere to splice. Taking just
     // what can be honoured leaves the rest queued for the render that can.
     const entries = useComposerInboxStore
       .getState()
-      .take((entry) => entry.kind === 'terminal-context' || ready)
+      .take(
+        (entry) =>
+          sameComposerDestination(entry.destination, destination) &&
+          (entry.kind === 'terminal-context' || ready),
+      )
     if (entries.length === 0) return
 
     applyComposerInboxEntries(entries, draftTarget, editorRef.current)
@@ -43,8 +50,8 @@ export function useComposerInbox(
   useEffect(() => {
     if (pending.length === 0) return
 
-    drain(editorReady)
-  }, [editorReady, pending])
+    drain(editorReady, { environmentId, rootPath })
+  }, [editorReady, environmentId, pending, rootPath])
 }
 
 function applyComposerInboxEntries(
