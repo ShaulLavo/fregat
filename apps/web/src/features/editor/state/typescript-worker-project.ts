@@ -129,6 +129,7 @@ export class WorkerProject {
   })
   connectionProvider: ReturnType<LspConnectionPool['provider']>
   private readonly borrowers = new Set<Borrower>()
+  private readonly notified = new Set<Borrower>()
   private readonly ownerKeys = new Set<string>()
   private readonly connections = new Map<
     LanguageServerConnectionContext['client'],
@@ -163,6 +164,9 @@ export class WorkerProject {
       includes: (path) => this.includes(path),
       onRelease: (path) => this.receive([{ type: 'changed', path }]),
       onError: (error) => this.fail(error),
+      onRecover: () => {
+        if (this.failed) void this.enqueue(() => this.reload())
+      },
     })
     this.unsubscribe = subscribeFilesystemEvents(options.client, (events) => this.receive(events))
     this.unsubscribeDocuments = options.documents.subscribe((state, previous) => {
@@ -181,6 +185,7 @@ export class WorkerProject {
 
   remove(borrower: Borrower) {
     this.borrowers.delete(borrower)
+    this.notified.delete(borrower)
     if (![...this.borrowers].some((other) => other.key === borrower.key))
       this.ownerKeys.delete(borrower.key)
     this.reconcileConnections()
@@ -312,10 +317,15 @@ export class WorkerProject {
       undefined,
     ).catch((error) => this.fail(error))
   }
+  // Each borrower hears about a failure once; a repeat before the next good reload stays quiet.
   private fail(error: unknown) {
     if (this.disposed) return
     this.failed = true
-    for (const borrower of this.borrowers) borrower.error(error)
+    for (const borrower of this.borrowers) {
+      if (this.notified.has(borrower)) continue
+      this.notified.add(borrower)
+      borrower.error(error)
+    }
     this.retireConnections()
   }
 
@@ -367,6 +377,7 @@ export class WorkerProject {
     this.workspace.setWorkspaceFiles(program.files)
     const restart = changed || this.failed
     this.failed = false
+    this.notified.clear()
     if (restart) {
       this.retireConnections()
       this.connectionProvider = this.retainedProvider(`${this.identity}:${++this.generation}`)

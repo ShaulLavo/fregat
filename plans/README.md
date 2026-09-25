@@ -9,7 +9,7 @@ index lists executable plans only; it does not define a second roadmap.
 
 The separate [Editor backlog](../../Editor/plans/README.md) holds 55 entries covering all 28 Editor
 wishlist topics, 15 of them still executable plans (2026-09-25), with their package/host ownership and
-dependencies. Plan 071 remains the existing syntax-retry proposal here.
+dependencies.
 
 Before executing a plan, reconcile its drift check and line references against current source.
 Verification uses per-workspace baseline deltas; never gate completion on an absolute test count or
@@ -51,7 +51,6 @@ a bare root `bun run verify`.
 | [129 — dependency shape](129-dependency-shape.md)                                       | **PHASES 1–2 DEPLOYED; PHASE 3 Q2–Q4 OPEN**                              |
 | [128 — React 19 patterns](128-react-19-patterns.md)                                     | **NOT STARTED — PARTLY OBSOLETE; REWRITE SMALL FIRST**                   |
 | [126 — T3 Code behavioral alignment](126-t3code-alignment.md)                           | **IN PROGRESS — 26 OF 57 GROUPS DONE (10 VERIFIED), 9 PARTIAL, 22 OPEN** |
-| [071 — syntax highlight retry](071-syntax-highlight-retry.md)                           | **PROPOSED — ROOT GO/NO-GO SCHEDULING**                                  |
 | [080 — Platform and VS Code keybinding modes](080-platform-keybinding-modes.md)         | **PROPOSED — INTERACTION RULES CONFIRMED**                               |
 | [087 — stateless MCP support](087-stateless-mcp.md)                                     | **M0 APPROVED 2026-09-25; M1+ AWAITS THE OWNER**                         |
 | [088 — native code intelligence](088-native-code-intelligence.md)                       | **PROPOSED — DEPENDS ON 087**                                            |

@@ -84,6 +84,25 @@ test('successful requests do not republish an already usable server', () => {
   unsubscribe()
 })
 
+test('adopts relayed server states without clobbering servers it owns itself', () => {
+  const shared = createEditorLanguageServerStatusSource()
+  shared.setServers(['eslint'])
+  const target = createEditorLanguageServerStatusSource()
+  target.setServers(['eslint', 'typescript-worker'])
+  target.setServerStatus('typescript-worker', 'ready')
+  target.setServerInteractiveReady('typescript-worker')
+  target.setServerDiagnostics('typescript-worker', summary('worker'))
+
+  shared.setServerStatus('eslint', 'ready')
+  shared.setServerDiagnostics('eslint', summary('lint'))
+  target.setServerStates(shared.getServerStates())
+
+  expect(messages(target).toSorted()).toEqual(['lint', 'worker'])
+  target.setServerStatus('typescript-worker', 'error')
+  target.setServerStates(shared.getServerStates())
+  expect(target.getSnapshot().failedServerIds).toEqual(['typescript-worker'])
+})
+
 function summary(message: string, uri = 'file:///test.ts', version = 1) {
   return summarizeDiagnostics(uri, version, [
     {

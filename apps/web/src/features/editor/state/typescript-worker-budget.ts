@@ -19,6 +19,7 @@ export class WorkerBudget {
   private readonly live = new Map<string, Live>()
   private bytes = 0
   private count = 0
+  private over = false
   private readonly unsubscribe: () => void
 
   constructor(
@@ -29,6 +30,7 @@ export class WorkerBudget {
       includes(path: string): boolean
       onRelease(path: string): void
       onError(error: unknown): void
+      onRecover(): void
     },
   ) {
     this.unsubscribe = options.store.subscribe((state, previous) => {
@@ -125,15 +127,20 @@ export class WorkerBudget {
     if (restore) this.options.onRelease(path)
   }
 
+  // Reports crossings only: an edit that stays over the limit must not fail the project again.
   private checkSafely() {
+    const wasOver = this.over
     try {
       this.check()
     } catch (error) {
-      this.options.onError(error)
+      if (!wasOver) this.options.onError(error)
+      return
     }
+    if (wasOver) this.options.onRecover()
   }
   private check() {
-    if (this.bytes <= this.options.maxBytes && this.count <= this.options.maxFiles) return
+    this.over = this.bytes > this.options.maxBytes || this.count > this.options.maxFiles
+    if (!this.over) return
     throw clientErrors.TYPESCRIPT_WORKER_LIMIT({
       files: this.count,
       bytes: this.bytes,

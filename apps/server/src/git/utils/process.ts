@@ -99,7 +99,12 @@ export async function runProcess(input: GitProcessInput): Promise<GitProcessResu
  * budget and the deadline for exactly the reasons git's network commands do.
  */
 export async function runBoundedProcess(
-  input: Omit<GitProcessInput, 'args'> & { argv: readonly string[] },
+  input: Omit<GitProcessInput, 'args'> & {
+    argv: readonly string[]
+    /** Kills the whole process group, so grandchildren (a spawned `tsc`) die with the child. */
+    processGroup?: boolean
+    signal?: AbortSignal
+  },
 ): Promise<GitProcessResult> {
   const maxBytes = input.maxOutputBytes ?? MAX_OUTPUT_BYTES
   const timeoutMs = input.timeoutMs ?? NETWORK_TIMEOUT_MS
@@ -111,8 +116,10 @@ export async function runBoundedProcess(
     stderr: 'pipe',
     stdin: input.input === undefined ? 'ignore' : 'pipe',
     stdout: 'pipe',
+    ...(input.processGroup ? { detached: true } : {}),
   })
   const control = createReadControl()
+  const stop = () => (input.processGroup ? killGroup(child) : killIfRunning(child))
   let timedOut = false
   // Aborting the readers matters as much as the kill: git's own children (ssh,
   // git-remote-https) inherit the pipes, so waiting for EOF after killing git
@@ -120,8 +127,14 @@ export async function runBoundedProcess(
   const timer = setTimeout(() => {
     timedOut = true
     control.abort()
-    killIfRunning(child)
+    stop()
   }, timeoutMs)
+  const onAbort = () => {
+    control.abort()
+    stop()
+  }
+  input.signal?.addEventListener('abort', onAbort, { once: true })
+  if (input.signal?.aborted) onAbort()
 
   try {
     if (input.input !== undefined) await writeProcessInput(child.stdin, input.input)
@@ -134,13 +147,15 @@ export async function runBoundedProcess(
     if (stdout.truncated || stderr.truncated) killIfRunning(child)
 
     const exitCode = await child.exited
+    input.signal?.throwIfAborted()
     const limit = processLimit({ maxBytes, stderr, stdout, timedOut, timeoutMs })
     if (!limit) return { exitCode, stderr: stderr.text, stdout: stdout.text }
 
     return { exitCode, limit, stderr: '', stdout: '' }
   } finally {
     clearTimeout(timer)
-    killIfRunning(child)
+    input.signal?.removeEventListener('abort', onAbort)
+    stop()
   }
 }
 
@@ -235,6 +250,15 @@ function outputLimit(
   stream: 'stdout' | 'stderr',
 ): GitProcessLimit {
   return { kind: 'output-limit', maxBytes, observedBytes: read.bytes, stream }
+}
+
+// The group outlives its leader, so it is signalled even after the child exited.
+function killGroup(child: Bun.Subprocess) {
+  try {
+    process.kill(-child.pid, 'SIGKILL')
+  } catch {
+    // ESRCH: every member already exited.
+  }
 }
 
 function killIfRunning(child: Bun.Subprocess) {

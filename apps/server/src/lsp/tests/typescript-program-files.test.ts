@@ -4,6 +4,8 @@ import { fileURLToPath } from 'node:url'
 import { expect } from 'vitest'
 
 import { test, workspaceRequest as request } from '../../../test/factories/workspace-address'
+import { createWorkspacePaths } from '../../fs/path'
+import { readProgramFiles, type ProgramFileSystem } from '../typescript/program-files'
 
 const RUNTIMES = [
   { packageName: 'typescript', kind: 'native' },
@@ -254,6 +256,21 @@ test('stops batch reads at the requested byte budget', async ({ workspace }) => 
   ])
 })
 
+test('keeps a file over the per-file cap distinct from the shared budget', async ({
+  workspace,
+}) => {
+  await writeFile(path.join(workspace.root, 'first.ts'), 'ab')
+  await writeFile(path.join(workspace.root, 'big.ts'), 'abcdef')
+  await writeFile(path.join(workspace.root, 'small.ts'), 'c')
+  const result = await readProgramFiles(
+    { paths: createWorkspacePaths(workspace.root), maxTextFileBytes: 4 } as ProgramFileSystem,
+    ['first.ts', 'big.ts', 'small.ts'],
+    5,
+  )
+  expect(result.failed).toEqual([{ path: 'big.ts', code: 'FILE_TOO_LARGE' }])
+  expect(result.files.map((file) => file.path)).toEqual(['first.ts', 'small.ts'])
+})
+
 test('rejects read budgets above the server ceiling', async ({ workspace }) => {
   const response = await request(workspace.openApp(), '/lsp/typescript/program-files/read', {
     paths: [],
@@ -267,7 +284,7 @@ test('keeps project discovery context across the child process boundary', async 
   await expect(
     discoverWorkerProject(workspace.root, workspace.root, 'missing.ts'),
   ).rejects.toMatchObject({
-    code: 'lsp.PROGRAM_LIST_FAILED',
+    code: 'lsp.PROGRAM_NO_PROJECT',
     internal: expect.objectContaining({
       documentPath: 'missing.ts',
       rootPath: workspace.root,
@@ -293,6 +310,17 @@ test('resolves a shared project identity and include filters without running the
       configFiles: expect.arrayContaining(['/project/tsconfig.json']),
     },
   })
+})
+
+test('resolves a project opened through a linked folder', async ({ workspace }) => {
+  await writeProject(workspace, 'typescript')
+  await symlink(path.join(workspace.root, 'project'), path.join(workspace.root, 'linked'), 'dir')
+  const app = workspace.openApp()
+  await request(app, '/fs/workspace-address', { path: 'linked' })
+  const query = new URLSearchParams({ root: 'linked', file: 'linked/src/a.ts' })
+  const response = await request(app, `/lsp/typescript/project?${query}`)
+  expect(response.status).toBe(200)
+  expect(await response.json()).toMatchObject({ config: '/project/tsconfig.json' })
 })
 
 test('checks unchanged disk versions without retransmitting text and reports changed dependency sets', async ({

@@ -17,8 +17,10 @@ export type EditorLanguageServerStatusSnapshot = {
 }
 
 export type EditorLanguageServerStatusSource = {
-  setSnapshot: (snapshot: EditorLanguageServerStatusSnapshot) => void
   getSnapshot: () => EditorLanguageServerStatusSnapshot
+  getServerStates: () => ReadonlyMap<string, LanguageServerState>
+  /** Adopts the states of servers this source also lists; its other servers keep their own. */
+  setServerStates: (states: ReadonlyMap<string, LanguageServerState>) => void
   setServers: (serverIds: readonly string[]) => void
   setServerDiagnostics: (serverId: string, diagnostics: LanguageServerDiagnosticSummary) => void
   setServerInteractiveReady: (serverId: string) => void
@@ -26,7 +28,7 @@ export type EditorLanguageServerStatusSource = {
   subscribe: (listener: () => void) => () => void
 }
 
-type ServerState = {
+export type LanguageServerState = {
   connected: boolean
   diagnostics: LanguageServerDiagnosticSummary | null
   status: LanguageServerStatus
@@ -43,7 +45,7 @@ const idleLanguageServerStatusSnapshot: EditorLanguageServerStatusSnapshot = {
 export function createEditorLanguageServerStatusSource(): EditorLanguageServerStatusSource {
   let snapshot = idleLanguageServerStatusSnapshot
   let serverIds: readonly string[] = []
-  const servers = new Map<string, ServerState>()
+  const servers = new Map<string, LanguageServerState>()
   const listeners = new Set<() => void>()
 
   function publish() {
@@ -56,10 +58,12 @@ export function createEditorLanguageServerStatusSource(): EditorLanguageServerSt
 
   return {
     getSnapshot: () => snapshot,
-    setSnapshot: (next) => {
-      if (snapshot === next) return
-      snapshot = next
-      for (const listener of listeners) listener()
+    getServerStates: () => servers,
+    setServerStates: (states) => {
+      for (const [serverId, state] of states) {
+        if (servers.has(serverId)) servers.set(serverId, state)
+      }
+      publish()
     },
     setServers: (nextServerIds) => {
       serverIds = nextServerIds
@@ -95,7 +99,7 @@ export function createEditorLanguageServerStatusSource(): EditorLanguageServerSt
   }
 }
 
-function initialServerState(): ServerState {
+function initialServerState(): LanguageServerState {
   return {
     connected: false,
     diagnostics: null,
@@ -104,7 +108,10 @@ function initialServerState(): ServerState {
   }
 }
 
-function statusState(current: ServerState, status: LanguageServerStatus): ServerState {
+function statusState(
+  current: LanguageServerState,
+  status: LanguageServerStatus,
+): LanguageServerState {
   if (status === 'ready') return { ...current, connected: true, status }
   if (status === 'loading') return { ...current, connected: false, status, usable: false }
   if (status === 'error') {
@@ -115,7 +122,7 @@ function statusState(current: ServerState, status: LanguageServerStatus): Server
 
 function aggregateSnapshot(
   serverIds: readonly string[],
-  servers: ReadonlyMap<string, ServerState>,
+  servers: ReadonlyMap<string, LanguageServerState>,
 ): EditorLanguageServerStatusSnapshot {
   if (serverIds.length === 0) return idleLanguageServerStatusSnapshot
 
@@ -137,7 +144,7 @@ function aggregateSnapshot(
 }
 
 function aggregateDiagnostics(
-  states: readonly ServerState[],
+  states: readonly LanguageServerState[],
 ): LanguageServerDiagnosticSummary | null {
   const summaries = states.flatMap((state) => (state.diagnostics ? [state.diagnostics] : []))
   if (summaries.length === 0) return null

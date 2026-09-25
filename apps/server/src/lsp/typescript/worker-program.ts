@@ -3,7 +3,7 @@ import path from 'node:path'
 import ts from 'typescript-language-service'
 
 import { isOutsideRoot, type WorkspacePaths } from '../../fs/path'
-import { lspErrors } from '../errors'
+import { lspErrors } from '../../observability/structured-errors'
 
 export function prepareWorkerProject(
   paths: WorkspacePaths,
@@ -11,14 +11,17 @@ export function prepareWorkerProject(
   documentPath: string,
   tsconfig?: string,
 ) {
-  const document = path.resolve(paths.workspaceRootReal, documentPath.replace(/^\/+/, ''))
+  // `root` is a realpath, so a document under a linked folder must be one too.
+  const document = realpathOrSelf(
+    path.resolve(paths.workspaceRootReal, documentPath.replace(/^\/+/, '')),
+  )
   const configFiles = new Set<string>()
   const system = boundedSystem(paths.workspaceRootReal, (file) => configFiles.add(file))
   const config = tsconfig
     ? path.resolve(paths.workspaceRootReal, tsconfig)
     : ts.findConfigFile(path.dirname(document), system.fileExists)
   if (!config || isOutsideRoot(path.relative(root, config))) {
-    throw lspErrors.PROGRAM_LIST_FAILED({
+    throw lspErrors.PROGRAM_NO_PROJECT({
       internal: { documentPath, rootPath: root, reason: 'No project configuration' },
     })
   }
@@ -26,10 +29,18 @@ export function prepareWorkerProject(
     ? parseProject(config, system)
     : containingProject(config, document, new Set(), system)
   if (!project)
-    throw lspErrors.PROGRAM_LIST_FAILED({
+    throw lspErrors.PROGRAM_NO_PROJECT({
       internal: { documentPath, config, reason: 'No containing project' },
     })
   return { ...project, configFiles: [...configFiles] }
+}
+
+function realpathOrSelf(file: string) {
+  try {
+    return realpathSync(file)
+  } catch {
+    return file
+  }
 }
 
 function parseProject(config: string, system: ts.System) {

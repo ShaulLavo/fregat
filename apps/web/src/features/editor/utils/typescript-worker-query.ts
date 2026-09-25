@@ -4,6 +4,12 @@ import { clientErrors, createRpcError } from '@/lib/structured-errors'
 import { editorQueryKeys } from '@/features/editor/utils/query-keys'
 import type { QueryClient } from '@tanstack/react-query'
 
+/** A file no tsconfig includes stays on the server backend, which infers a project for it. */
+export function isMissingWorkerProject(error: unknown) {
+  if (!error || typeof error !== 'object' || !('code' in error)) return false
+  return error.code === 'lsp.PROGRAM_NO_PROJECT'
+}
+
 export function typescriptWorkerProjectQuery(root: string, file: string, config?: string) {
   return {
     queryKey: editorQueryKeys.typescriptWorkerProject(root, config ?? file),

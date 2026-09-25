@@ -23,9 +23,8 @@ import type { EditorDiffViewMode } from '@/features/editor/utils/diff-view-mode'
 /**
  * A diff, drawn as one or two real `Editor`s with the diff plugin supplying the rows.
  *
- * `editor-diff-view` on the root is not decoration: it is where both the package's own
- * `--editor-diff-*` block and the app's override of it are declared, and a context row carries no
- * row class of its own, so inheritance from here is the only way the variables reach it.
+ * `editor-diff-view` on the root is not decoration: the package declares its `--editor-diff-*`
+ * block there, and a context row carries no row class of its own, so it inherits from here.
  */
 export function DiffEditor({
   file,

@@ -14,6 +14,7 @@ import type { EditorLanguageServerStatusSource } from '@/features/editor/state/l
 import { lspLanguageIdForPath } from '@/features/editor/utils/lsp-language-id'
 import { fileUriForPath } from '@/lib/file-uri'
 import { reportError, toClientError } from '@/lib/client-error-taxonomy'
+import { isMissingWorkerProject } from '@/features/editor/utils/typescript-worker-query'
 
 const SERVER_ID = 'typescript-worker'
 
@@ -85,6 +86,8 @@ class TypeScriptWorkerOwner {
   private fail(error: unknown) {
     if (this.disposed) return
     this.stop()
+    // The hook hands a file with no project back to the server backend.
+    if (isMissingWorkerProject(error)) return
     this.options.status.setServerStatus(SERVER_ID, 'error')
     reportError(toClientError(error))
   }

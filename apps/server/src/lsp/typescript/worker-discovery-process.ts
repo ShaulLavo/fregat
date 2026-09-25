@@ -5,7 +5,7 @@ import { createWorkspacePaths, isOutsideRoot } from '../../fs/path'
 import { runBoundedProcess } from '../../git/utils/process'
 import { prepareWorkerProject, workerCompilerOptions, workerSupportFiles } from './worker-program'
 import { resolveTypeScriptCompiler } from './runtime'
-import { lspErrors } from '../errors'
+import { lspErrors } from '../../observability/structured-errors'
 import { serializeDiscoveryError } from './worker-discovery-errors'
 
 const input = v.parse(

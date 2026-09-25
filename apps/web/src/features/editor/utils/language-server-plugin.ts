@@ -475,7 +475,8 @@ function relayStatus(
   source: EditorLanguageServerStatusSource,
   target: EditorLanguageServerStatusSource,
 ): () => void {
-  const relay = () => target.setSnapshot(source.getSnapshot())
+  // Per server, so a server the target adds itself (the TypeScript worker) keeps its own state.
+  const relay = () => target.setServerStates(source.getServerStates())
   relay()
   return source.subscribe(relay)
 }

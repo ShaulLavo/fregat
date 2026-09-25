@@ -9,7 +9,11 @@ import { useLanguageServerMatchConfiguration } from '@/features/editor/providers
 import { useEditorRuntime } from '@/features/editor/hooks/use-runtime'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import type { LanguageServerDocument } from '@/lib/language-server-document'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  isMissingWorkerProject,
+  typescriptWorkerProjectQuery,
+} from '@/features/editor/utils/typescript-worker-query'
 import { originForQueryClient } from '@/lib/environments/state/query-clients'
 import type { LanguageServerDefinitionTarget } from '@singapore-editor/lsp-plugin/websocket'
 import type {
@@ -76,7 +80,12 @@ export function useLanguageServerPlugin({
     () => (available ? diagnosticHoverActions(mutateAsync) : undefined),
     [available, mutateAsync],
   )
-  const worker = enabled && backend === 'worker' && /\.[cm]?[jt]sx?$/.test(filePath)
+  const workerCandidate = enabled && backend === 'worker' && /\.[cm]?[jt]sx?$/.test(filePath)
+  const workerProject = useQuery({
+    ...typescriptWorkerProjectQuery(rootPath, filePath),
+    enabled: workerCandidate,
+  })
+  const worker = workerCandidate && !isMissingWorkerProject(workerProject.error)
   const { service: fileOpenIntent } = useFileOpenIntent()
   // Manual memo: `languageServerStatusSource` is a useMemo dependency, and the compiler's cache is a
   // cache, not an identity guarantee — when it recomputes, the useMemo re-runs.

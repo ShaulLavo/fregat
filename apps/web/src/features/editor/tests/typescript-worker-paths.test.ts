@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { workerIncludedFile } from './typescript-worker-paths'
+import { workerIncludedFile } from '@/features/editor/utils/typescript-worker-paths'
 const watch = { include: ['/repo/src'], exclude: ['/repo/src/generated'], allowJs: false }
 it.each(['/repo/src/new.ts', '/repo/src/deep/view.tsx', '/repo/src/types.d.mts'])(
   'accepts a new included source %s',

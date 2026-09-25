@@ -123,7 +123,7 @@ The correction above landed in Platform on its own; the runtime stays parked.
   still shows) and a pair over the text limit, for snapshot diffs too.
 - Proof: `diff-view-syntax-source.test.tsx` failed on the partial cases before the fix, with
   rows painted from another line's tokens. `client-core` `diff-files.test.ts` failed before on the
-  whitespace-policy and one-sided-text cases. `scenario checkpoint-diff-tokens` runs both states.
+  whitespace-policy and one-sided-text cases. `scenario checkpoint-diff-tokens` covers the complete state, and with `FS_DEV_MAX_TEXT_FILE_BYTES=500` the partial one.
 - Review fixes: the drawn file takes the entry's rooted paths (the patch header holds
   repo-relative ones), and a whitespace-only context line puts its drawn text in the old source,
   because git `-w` prints it with its new text and the split view's old pane draws that text.

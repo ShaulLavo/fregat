@@ -12,7 +12,7 @@ import { fileVersion } from '../../fs/version'
 import { sourceDependencies } from './source-dependencies'
 import { runBoundedProcess } from '../../git/utils/process'
 import { observeRequestOperation } from '../../observability'
-import { lspErrors } from '../errors'
+import { lspErrors } from '../../observability/structured-errors'
 import { resolveTypeScriptCompiler, type TypeScriptRuntime } from './runtime'
 
 const LIST_TIMEOUT_MS = 60_000
@@ -30,6 +30,7 @@ export const workerProjectQuerySchema = v.object({
 export function resolveProgramProject(
   fs: ProgramFileSystem,
   query: v.InferOutput<typeof workerProjectQuerySchema>,
+  signal?: AbortSignal,
 ) {
   return observeRequestOperation(
     {
@@ -45,6 +46,7 @@ export function resolveProgramProject(
         fs.paths.workspaceRootReal,
         query.file,
         query.tsconfig,
+        signal,
       )
     },
     (result) => ({ configPath: result.config, fileCount: result.roots.length }),
@@ -107,7 +109,11 @@ type ListedEntry = ProgramFile | 'library' | 'outside' | 'missing'
 
 type ProgramFilesQuery = v.InferOutput<typeof programFilesQuerySchema>
 
-export function listProgramFiles(fs: ProgramFileSystem, query: ProgramFilesQuery) {
+export function listProgramFiles(
+  fs: ProgramFileSystem,
+  query: ProgramFilesQuery,
+  signal?: AbortSignal,
+) {
   return observeRequestOperation(
     {
       area: 'lsp',
@@ -115,7 +121,7 @@ export function listProgramFiles(fs: ProgramFileSystem, query: ProgramFilesQuery
       rootPath: query.root,
       tsconfigPath: query.tsconfig,
     },
-    () => listObserved(fs, query),
+    () => listObserved(fs, query, signal),
     (result) => ({
       fileCount: result.totals.files,
       totalBytes: result.totals.bytes,
@@ -148,7 +154,7 @@ export function readProgramFiles(
   )
 }
 
-async function listObserved(fs: ProgramFileSystem, query: ProgramFilesQuery) {
+async function listObserved(fs: ProgramFileSystem, query: ProgramFilesQuery, signal?: AbortSignal) {
   const root = await openWorkspaceRoot(fs, query.root)
   const project =
     query.worker === 'true' && query.file
@@ -157,6 +163,7 @@ async function listObserved(fs: ProgramFileSystem, query: ProgramFilesQuery) {
           fs.paths.workspaceRootReal,
           query.file,
           query.tsconfig,
+          signal,
         )
       : null
   const configPath = project ? fs.paths.toRealRelative(project.config) : query.tsconfig
@@ -379,10 +386,14 @@ async function readOne(
     }
   } catch (error) {
     const failure = error instanceof FsError ? error : mapNodeError(error)
-    const code =
-      failure.code === 'FILE_TOO_LARGE' && remainingBytes < fs.maxTextFileBytes
-        ? 'PROGRAM_READ_LIMIT'
-        : failure.code
-    return { path: filePath, code }
+    return { path: filePath, code: readFailureCode(failure, fs.maxTextFileBytes) }
   }
+}
+
+// Only a file the per-file cap would have admitted failed on the shared budget.
+function readFailureCode(failure: FsError, maxTextFileBytes: number) {
+  if (failure.code !== 'FILE_TOO_LARGE') return failure.code
+  const size = failure.internal?.size
+  if (typeof size === 'number' && size <= maxTextFileBytes) return 'PROGRAM_READ_LIMIT'
+  return failure.code
 }

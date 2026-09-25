@@ -1,6 +1,10 @@
 import { expect, it, vi } from 'vitest'
 import { createStringTextSnapshot } from '@singapore-editor/core/document'
-import { editedByteDelta, snapshotBytes, textBytes } from './typescript-worker-bytes'
+import {
+  editedByteDelta,
+  snapshotBytes,
+  textBytes,
+} from '@/features/editor/utils/typescript-worker-bytes'
 
 it.each([
   ['a😀b', [{ from: 2, to: 2, text: 'x' }]],

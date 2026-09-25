@@ -44,10 +44,10 @@ export function DiffView({
   // not keep a copy of which regions are open — the mirror it used to keep was
   // keyed by hunk ordinal, which a trailing-tail region does not have.
   const presentation = useTabPresentation(tabId)
-  // Stable identity is required: this is pushed into the plugin, and a fresh
-  // array each render would re-project the diff and throw away scroll position.
   // A checkpoint keeps its own hunks over the loaded sources; they carry its whitespace policy.
   const hunkSource = comparison.kind === 'snapshot' ? 'text' : 'patch'
+  // Stable identity is required: this is pushed into the plugin, and a fresh
+  // array each render would re-project the diff and throw away scroll position.
   const files = useMemo(
     () => editorDiffFiles(diffs, languageIdForFilePath, hunkSource),
     [diffs, hunkSource],

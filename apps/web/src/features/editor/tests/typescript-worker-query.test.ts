@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { QueryClient } from '@tanstack/react-query'
-import { typescriptWorkerProgramQuery, typescriptWorkerFilesQuery } from './typescript-worker-query'
+import {
+  typescriptWorkerProgramQuery,
+  typescriptWorkerFilesQuery,
+} from '@/features/editor/utils/typescript-worker-query'
 
 const api = vi.hoisted(() => ({ list: vi.fn(), read: vi.fn() }))
 vi.mock('@/lib/environments/state/query-clients', () => ({

@@ -1,11 +1,11 @@
 import { createEditorBufferSession } from '@singapore-editor/core/document'
-import { createEditorDocumentStore } from './document-state'
+import { createEditorDocumentStore } from '@/features/editor/state/document-state'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { QueryClient } from '@tanstack/react-query'
 import type { EditorPlugin } from '@singapore-editor/core/extensions'
-import { configureWorkerProjects } from './typescript-worker-project'
-import { withTypeScriptWorker } from './typescript-worker-plugin'
-import { createEditorLanguageServerStatusSource } from './language-server-status-source'
+import { configureWorkerProjects } from '@/features/editor/state/typescript-worker-project'
+import { withTypeScriptWorker } from '@/features/editor/state/typescript-worker-plugin'
+import { createEditorLanguageServerStatusSource } from '@/features/editor/state/language-server-status-source'
 import { fileDocumentKey, filesystemPath } from '@/lib/documents/utils/identity'
 import { publishFilesystemEvents } from '@/lib/filesystem-events'
 
@@ -20,7 +20,6 @@ const worker = vi.hoisted(() => ({
   clear: vi.fn(),
   activate: vi.fn(),
   dispose: vi.fn(),
-  error: vi.fn(),
   actions: vi.fn(() => []),
 }))
 vi.mock('@singapore-editor/typescript-lsp', () => ({
@@ -31,7 +30,8 @@ vi.mock('@singapore-editor/typescript-lsp', () => ({
     deleteWorkspaceFiles = worker.remove
   },
 }))
-vi.mock('@/features/editor/utils/typescript-worker-query', () => ({
+vi.mock('@/features/editor/utils/typescript-worker-query', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   typescriptWorkerProjectQuery: () => ({
     queryKey: ['project'],
     queryFn: worker.project,
@@ -48,11 +48,9 @@ vi.mock('@/features/editor/utils/typescript-worker-query', () => ({
     staleTime: 0,
   }),
 }))
-vi.mock('@/lib/client-error-taxonomy', () => ({
-  reportError: worker.error,
-  toClientError: (error: unknown) => error,
-}))
 const cleanups: (() => void)[] = []
+const failed = (status: ReturnType<typeof createEditorLanguageServerStatusSource>) =>
+  status.getSnapshot().status === 'error'
 const program = () => ({
   options: {},
   aliases: [
@@ -185,8 +183,8 @@ describe('TypeScript worker lifecycle', () => {
   })
   it('retries failed project discovery on a reconnect rescan', async () => {
     worker.project.mockRejectedValueOnce(new Error('network'))
-    const { client } = mount()
-    await vi.waitFor(() => expect(worker.error).toHaveBeenCalled())
+    const { client, status } = mount()
+    await vi.waitFor(() => expect(failed(status)).toBe(true))
     publishFilesystemEvents(client, [{ type: 'rescan', path: '/repo' }])
     await vi.waitFor(() => expect(worker.activate).toHaveBeenCalledTimes(1))
   })
@@ -482,8 +480,8 @@ describe('TypeScript worker lifecycle', () => {
   })
   it('retries a failed preload on reconnect rescan', async () => {
     worker.program.mockRejectedValueOnce(new Error('network'))
-    const { client } = mount()
-    await vi.waitFor(() => expect(worker.error).toHaveBeenCalled())
+    const { client, status } = mount()
+    await vi.waitFor(() => expect(failed(status)).toBe(true))
     publishFilesystemEvents(client, [{ type: 'rescan', path: '/repo' }])
     await vi.waitFor(() => expect(worker.create).toHaveBeenCalledTimes(1))
   })
@@ -499,11 +497,38 @@ describe('TypeScript worker lifecycle', () => {
     expect(signal.aborted).toBe(true)
   })
   it('stops the old worker if a new file makes the project too large to reload', async () => {
-    const { client } = mount()
+    const { client, status } = mount()
     await vi.waitFor(() => expect(worker.activate).toHaveBeenCalled())
     worker.program.mockRejectedValue(new Error('ceiling'))
     publishFilesystemEvents(client, [{ type: 'created', path: '/repo/b.ts' }])
-    await vi.waitFor(() => expect(worker.error).toHaveBeenCalled())
+    await vi.waitFor(() => expect(failed(status)).toBe(true))
     expect(worker.dispose).toHaveBeenCalled()
+  })
+  it('reports an over-budget buffer once and restarts when it shrinks back', async () => {
+    const { documents, status } = mount(5)
+    await vi.waitFor(() => expect(worker.activate).toHaveBeenCalledTimes(1))
+    const document = documents.getState().ensureLiveEditorDocument({
+      path: filesystemPath('/repo/a.ts'),
+      content: 'a',
+      version: 'v1',
+      mtimeMs: 1,
+      size: 1,
+    })
+    const session = createEditorBufferSession(document.buffer)
+    const setStatus = vi.spyOn(status, 'setServerStatus')
+    session.applyEdits([{ from: 1, to: 1, text: 'xxxxx' }])
+    session.applyEdits([{ from: 6, to: 6, text: 'y' }])
+    session.applyEdits([{ from: 7, to: 7, text: 'z' }])
+    expect(setStatus.mock.calls.filter(([, value]) => value === 'error')).toHaveLength(1)
+    session.applyEdits([{ from: 1, to: 8, text: '' }])
+    await vi.waitFor(() => expect(worker.activate).toHaveBeenCalledTimes(2))
+  })
+  it('stays quiet for a file that no project includes', async () => {
+    worker.project.mockRejectedValue({ code: 'lsp.PROGRAM_NO_PROJECT', message: 'none' })
+    const { status } = mount()
+    const setStatus = vi.spyOn(status, 'setServerStatus')
+    await vi.waitFor(() => expect(worker.project).toHaveBeenCalled())
+    await new Promise((done) => setTimeout(done, 20))
+    expect(setStatus).not.toHaveBeenCalledWith('typescript-worker', 'error')
   })
 })

@@ -13,6 +13,7 @@ export function DiffBanner({ notice }: { notice: DiffFileNotice }) {
     <div
       className='text-muted-foreground flex shrink-0 items-center gap-(--density-control-gap) px-(--density-control-padding-x) py-(--density-control-gap) text-xs'
       role='status'
+      title={notice.message}
     >
       <Icon aria-hidden='true' className='size-(--icon-size-sm) shrink-0' />
       <span className='truncate'>{notice.message}</span>

@@ -4,7 +4,12 @@ import { join } from 'node:path'
 import type { Page } from 'playwright'
 
 import { createGitFixture, fixtureGit, releaseFixture } from '../fixture-workspace'
-import { diffPaneSelector, selectors } from '../selectors'
+import {
+  diffPaneSelector,
+  editorRowSelector,
+  selectors,
+  sharedTokenHighlightPrefix,
+} from '../selectors'
 import { isolatedNativeScenario, writeSettings } from './native-provider-verification'
 
 const FILES = ['first', 'second'] as const
@@ -77,16 +82,15 @@ export const checkpointDiffTokens = isolatedNativeScenario({
     await second.click()
     await selectors.diffRows(page).first().waitFor({ timeout: 15_000 })
     const partial = selectors.diffPartialNotice(page)
-    // Whichever lands first decides the branch; the loser's timeout is not a failure.
-    await Promise.race([
-      partial.waitFor({ timeout: 15_000 }).catch(() => undefined),
-      waitForColouredRows(page).catch(() => undefined),
-    ])
-    if (await partial.isVisible()) {
+    // The text limit is the only thing that may choose the partial patch; a fallback otherwise fails.
+    if (process.env.FS_DEV_MAX_TEXT_FILE_BYTES !== undefined) {
+      await partial.waitFor({ timeout: 15_000 })
       await step('partial')
       await assertUncoloured(page)
       return
     }
+    await waitForColouredRows(page)
+    ok(!(await partial.isVisible()), 'The complete blob pair fell back to the partial patch')
     await step('second-file')
     await assertAligned(page)
     const base = orchestration.replace(/\/orchestration$/, '')
@@ -157,8 +161,8 @@ function newestTokenStyle(page: Page): Promise<number> {
 
 // Page-side source: the highest shared token style id; a new colour always gets a higher one.
 const NEWEST_TOKEN_STYLE = `() => Math.max(-1, ...[...CSS.highlights.keys()]
-  .filter((name) => name.startsWith('editor-shared-token-'))
-  .map((name) => Number(name.slice('editor-shared-token-'.length))))`
+  .filter((name) => name.startsWith('${sharedTokenHighlightPrefix}'))
+  .map((name) => Number(name.slice(${sharedTokenHighlightPrefix.length}))))`
 
 function firstWord(row: string) {
   return /^\s*([A-Za-z]+)/.exec(row)?.[1] ?? ''
@@ -176,9 +180,9 @@ function rowChecks(page: Page): Promise<RowCheck[]> {
 const ROW_CHECKS = `() => {
   const starts = new Map()
   for (const [name, highlight] of CSS.highlights.entries()) {
-    if (!name.startsWith('editor-shared-token-')) continue
+    if (!name.startsWith('${sharedTokenHighlightPrefix}')) continue
     for (const range of highlight) {
-      const row = range.startContainer.parentElement?.closest('PANE [data-editor-virtual-row]')
+      const row = range.startContainer.parentElement?.closest('PANE ${editorRowSelector}')
       if (!row) continue
       const before = document.createRange()
       before.setStart(row, 0)
@@ -192,7 +196,7 @@ const ROW_CHECKS = `() => {
     }
   }
   const checks = []
-  for (const row of document.querySelectorAll('PANE [data-editor-virtual-row]')) {
+  for (const row of document.querySelectorAll('PANE ${editorRowSelector}')) {
     const text = row.textContent ?? ''
     const word = /^\\s*(export|let|function|const)\\b/.exec(text)
     if (!word) continue

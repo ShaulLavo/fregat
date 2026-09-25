@@ -32,7 +32,7 @@ The chat mode button in the window toolbar, or an address URL with `/chat/`.
 
 `scenario chat-diff-syntax --url <session-diff-address>` checks painted syntax colors in a session checkpoint diff.
 
-`scenario checkpoint-diff-tokens` needs no tokens: the native checkpoint fixture edits lines 5 and 30 of two files and re-indents line 3, and the second file's checkpoint diff must colour every keyword row from its own source line, stacked and then split under tree-sitter and Shiki. With `FS_DEV_MAX_TEXT_FILE_BYTES=500` the blob pair is over the text limit, so it asserts the partial notice and no parsed tokens instead.
+`scenario checkpoint-diff-tokens` needs no tokens: the native checkpoint fixture edits lines 5 and 30 of two files and re-indents line 3, and the second file's checkpoint diff must colour every keyword row from its own source line, stacked and then split under tree-sitter and Shiki. With `FS_DEV_MAX_TEXT_FILE_BYTES=500` the blob pair is over the text limit, so it asserts the partial notice and no parsed tokens instead. Without it, a partial notice fails the run.
 
 Commands dispatch over the orchestration socket when it is live and over HTTP otherwise. The HTTP path refetches the shell snapshot itself.
 

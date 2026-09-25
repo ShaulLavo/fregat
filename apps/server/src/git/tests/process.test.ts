@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -11,6 +11,7 @@ import {
   gitProcessErrors,
   LOCAL_TIMEOUT_MS,
   NETWORK_TIMEOUT_MS,
+  runBoundedProcess,
   runProcess,
 } from '../utils/process'
 
@@ -68,6 +69,28 @@ describe('git process limits', () => {
     expect(performance.now() - startedAt).toBeLessThan(3_000)
   })
 
+  it.for([
+    { name: 'timeout', abort: false },
+    { name: 'abort', abort: true },
+  ])('kills the whole process group on $name', async ({ abort }) => {
+    const root = await mkdtemp(path.join(tmpdir(), 'process-group-'))
+    roots.push(root)
+    const pidFile = path.join(root, 'pid')
+    const controller = new AbortController()
+    const run = runBoundedProcess({
+      argv: ['sh', '-c', `sleep 30 & echo $! > ${pidFile}; wait`],
+      cwd: root,
+      timeoutMs: abort ? 10_000 : 300,
+      processGroup: true,
+      signal: controller.signal,
+    })
+    await expect.poll(() => readFile(pidFile, 'utf8').catch(() => '')).not.toBe('')
+    if (abort) controller.abort()
+    await run.catch(() => undefined)
+    const pid = Number((await readFile(pidFile, 'utf8')).trim())
+    await expect.poll(() => isAlive(pid)).toBe(false)
+  })
+
   it('gives network commands the longer default bound', () => {
     expect(defaultTimeoutMs(['fetch'])).toBe(NETWORK_TIMEOUT_MS)
     expect(defaultTimeoutMs(['pull'])).toBe(NETWORK_TIMEOUT_MS)
@@ -121,4 +144,15 @@ async function fixtureRepo() {
   await runProcess({ args: ['add', 'tracked.txt'], cwd: root })
   await runProcess({ args: ['commit', '-m', 'initial'], cwd: root })
   return root
+}
+
+// A killed orphan can linger as a zombie when the container's init does not reap it.
+async function isAlive(pid: number) {
+  try {
+    process.kill(pid, 0)
+  } catch {
+    return false
+  }
+  const stat = await readFile(`/proc/${pid}/stat`, 'utf8').catch(() => '')
+  return stat.split(' ')[2] !== 'Z'
 }

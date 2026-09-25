@@ -140,11 +140,6 @@
     "reason": "D3: a section label (\"Staged Changes\")."
   },
   {
-    "file": "apps/web/src/features/git/components/diff-banner.tsx",
-    "class": "truncate",
-    "reason": "D3: an app-authored notice."
-  },
-  {
     "file": "apps/web/src/components/file-label.tsx",
     "class": "truncate",
     "reason": "A part, not a row: every caller's row carries the full path, as a native title on Search rows and as data-tooltip on the virtualized Git rows."

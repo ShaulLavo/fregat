@@ -401,12 +401,18 @@ export function createApp(options: AppOptions) {
       ({ query }) => lspRouteSemanticTokens(fs.paths, query, lspSettings(), lspPool),
       { query: lspMatchQuerySchema },
     )
-    .get('/lsp/typescript/program-files', ({ query }) => listProgramFiles(fs, query), {
-      query: programFilesQuerySchema,
-    })
-    .get('/lsp/typescript/project', ({ query }) => resolveProgramProject(fs, query), {
-      query: workerProjectQuerySchema,
-    })
+    .get(
+      '/lsp/typescript/program-files',
+      ({ query, request }) => listProgramFiles(fs, query, request.signal),
+      {
+        query: programFilesQuerySchema,
+      },
+    )
+    .get(
+      '/lsp/typescript/project',
+      ({ query, request }) => resolveProgramProject(fs, query, request.signal),
+      { query: workerProjectQuerySchema },
+    )
     .post(
       '/lsp/typescript/program-files/read',
       ({ body }) => readProgramFiles(fs, body.paths, body.maxBytes, body.versions),

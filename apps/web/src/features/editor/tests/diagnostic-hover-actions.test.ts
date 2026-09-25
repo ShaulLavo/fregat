@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { diagnosticHoverActions } from './diagnostic-hover-actions'
+import { diagnosticHoverActions } from '@/features/editor/utils/diagnostic-hover-actions'
 
 describe('diagnostic hover handoff', () => {
   it.each([1, 2])(
