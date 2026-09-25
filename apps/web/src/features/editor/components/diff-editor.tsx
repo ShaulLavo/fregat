@@ -1,3 +1,4 @@
+import type { TabPresentation } from '@/features/editor/state/tab-presentation'
 import type { TabId } from '@/lib/documents/utils/types'
 import { type DiffFile, type DiffRegionStore } from '@singapore-editor/diff'
 import {
@@ -32,12 +33,14 @@ export function DiffEditor({
   languageServer = null,
   mode,
   regions,
+  presentation: suppliedPresentation,
   tabId,
 }: {
   file: DiffFile | null
   failure?: string | null
   languageServer?: DiffLanguageServerContext | null
   mode: EditorDiffViewMode
+  presentation?: TabPresentation
   regions?: DiffRegionStore
   tabId?: TabId
 }) {
@@ -48,7 +51,8 @@ export function DiffEditor({
   // Split is two plugin instances, and a separator row is one region shown twice. Without a shared
   // store a gutter click would expand one pane and leave the other where it was, misaligning every
   // row below — the one property split mode exists to hold.
-  const presentation = useTabPresentation(tabId)
+  const tabPresentation = useTabPresentation(tabId)
+  const presentation = suppliedPresentation ?? tabPresentation
   const regionStore = regions ?? presentation.regions
   const panes = useDiffPanes()
   const layout = presentation.diffLayout

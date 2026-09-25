@@ -170,3 +170,66 @@ test('reads the listed files in one response, under the same rule as /fs/read', 
     { path: 'project/src/gone.ts', code: 'NOT_FOUND' },
   ])
 })
+
+test('prepares worker roots, inherited options and logical dependency paths', async ({
+  workspace,
+}) => {
+  await writeProject(workspace, 'typescript-language-service')
+  await mkdir(path.join(workspace.root, 'shared'), { recursive: true })
+  await writeFile(
+    path.join(workspace.root, 'shared/package.json'),
+    '{"name":"linked","types":"index.d.ts"}',
+  )
+  await writeFile(
+    path.join(workspace.root, 'shared/index.d.ts'),
+    'export declare const linked: string',
+  )
+  await symlink(
+    path.join(workspace.root, 'shared'),
+    path.join(workspace.root, 'project/node_modules/linked'),
+  )
+  await writeFile(
+    path.join(workspace.root, 'project/src/a.ts'),
+    "import { linked } from 'linked'; export const value = linked",
+  )
+  await writeFile(
+    path.join(workspace.root, 'project/base.json'),
+    '{"compilerOptions":{"strict":true,"baseUrl":".","moduleResolution":"bundler","module":"esnext"}}',
+  )
+  await writeFile(
+    path.join(workspace.root, 'project/tsconfig.json'),
+    '{"files":[],"references":[{"path":"./tsconfig.app.json"}]}',
+  )
+  await writeFile(
+    path.join(workspace.root, 'project/tsconfig.app.json'),
+    '{"extends":"./base.json","include":["src"]}',
+  )
+  const app = workspace.openApp()
+  await request(app, '/fs/workspace-address', { path: 'project' })
+  const response = await request(
+    app,
+    '/lsp/typescript/program-files?root=project&file=project/src/a.ts&worker=true',
+  )
+  expect(response.status).toBe(200)
+  const body = await response.json()
+  expect(body.tsconfig).toBe('project/tsconfig.app.json')
+  expect(body.worker).toMatchObject({ compilerOptions: { strict: true, baseUrl: '/project' } })
+  expect(body.worker.roots).toContain('/project/src/a.ts')
+  expect(body.files.map((file: { path: string }) => file.path)).toEqual(
+    expect.arrayContaining([
+      'project/node_modules/linked/index.d.ts',
+      'project/node_modules/linked/package.json',
+    ]),
+  )
+  const read = await request(app, '/lsp/typescript/program-files/read', {
+    paths: ['project/node_modules/linked/index.d.ts'],
+  })
+  expect(await read.json()).toMatchObject({
+    files: [
+      {
+        path: 'project/node_modules/linked/index.d.ts',
+        content: 'export declare const linked: string',
+      },
+    ],
+  })
+})

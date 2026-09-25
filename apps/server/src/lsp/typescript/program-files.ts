@@ -1,3 +1,4 @@
+import { discoverWorkerProject } from './worker-discovery'
 import { stat } from 'node:fs/promises'
 import path from 'node:path'
 import * as v from 'valibot'
@@ -17,7 +18,12 @@ const LIST_MAX_OUTPUT_BYTES = 64 * 1024 * 1024
 const READ_CONCURRENCY = 32
 const LIBRARY_FILE = /^lib(\.[\w.-]+)?\.d\.ts$/
 
-export const programFilesQuerySchema = v.object({ root: pathSchema, tsconfig: pathSchema })
+export const programFilesQuerySchema = v.object({
+  root: pathSchema,
+  tsconfig: v.optional(pathSchema),
+  file: v.optional(pathSchema),
+  worker: v.optional(v.literal('true')),
+})
 
 export const programFilesReadBodySchema = v.object({
   paths: v.pipe(v.array(pathSchema), v.maxLength(50_000)),
@@ -29,9 +35,9 @@ export type ProgramFileSystem = {
   readonly maxTextFileBytes: number
 }
 
-export type ProgramFile = { readonly path: string; readonly size: number }
+type ProgramFile = { readonly path: string; readonly size: number; readonly canonicalPath?: string }
 
-export type ProgramFileList = {
+type ProgramFileList = {
   readonly root: string
   readonly tsconfig: string
   readonly runtime: Pick<TypeScriptRuntime, 'kind' | 'version'>
@@ -41,16 +47,16 @@ export type ProgramFileList = {
   readonly skipped: { readonly library: number; readonly outside: number; readonly missing: number }
 }
 
-export type ProgramFileText = {
+type ProgramFileText = {
   readonly path: string
   readonly content: string
   readonly size: number
   readonly version: string
 }
 
-export type ProgramFileFailure = { readonly path: string; readonly code: string }
+type ProgramFileFailure = { readonly path: string; readonly code: string }
 
-export type ProgramFileTexts = {
+type ProgramFileTexts = {
   readonly files: readonly ProgramFileText[]
   readonly failed: readonly ProgramFileFailure[]
   readonly totals: { readonly files: number; readonly bytes: number }
@@ -97,16 +103,32 @@ export function readProgramFiles(fs: ProgramFileSystem, paths: readonly string[]
 
 async function listObserved(fs: ProgramFileSystem, query: ProgramFilesQuery) {
   const root = await openWorkspaceRoot(fs, query.root)
-  const tsconfig = await projectFile(fs.paths, root.absolutePath, query.tsconfig)
-  const compiler = await resolveTypeScriptCompiler(root.absolutePath)
-  const listed = await listFilesOnly(compiler, root.absolutePath, tsconfig.absolutePath)
+  const project =
+    query.worker === 'true' && query.file
+      ? await discoverWorkerProject(root.absolutePath, fs.paths.workspaceRootReal, query.file)
+      : null
+  const configPath = project ? fs.paths.toRealRelative(project.config) : query.tsconfig
+  if (!configPath)
+    throw lspErrors.PROGRAM_LIST_FAILED({
+      internal: { root: query.root, reason: 'Missing project configuration' },
+    })
+  const tsconfig = await projectFile(fs.paths, root.absolutePath, configPath)
+  const compiler = project?.runtime ?? (await resolveTypeScriptCompiler(root.absolutePath))
+  const sourceFiles =
+    project?.files ??
+    (await listFilesOnly(
+      await resolveTypeScriptCompiler(root.absolutePath),
+      root.absolutePath,
+      tsconfig.absolutePath,
+    ))
   const libraryDirectories = new Map<string, Promise<boolean>>()
   const entries = await Promise.all(
-    listed.map((file) => listedEntry(fs.paths, file, libraryDirectories)),
+    sourceFiles.map((file) => listedEntry(fs.paths, file, libraryDirectories)),
   )
   const files = entries.filter((entry) => typeof entry !== 'string')
 
   return {
+    ...(project ? { worker: { compilerOptions: project.options, roots: project.roots } } : {}),
     root: root.relativePath,
     tsconfig: tsconfig.relativePath,
     runtime: { kind: compiler.kind, version: compiler.version },
@@ -198,7 +220,12 @@ async function listedEntry(
     const target = await resolveExistingPath(paths, relativePath)
     const stats = await stat(target.absolutePath)
     if (!stats.isFile()) return 'missing'
-    return { path: relativePath, size: stats.size }
+    const canonicalPath = paths.toRealRelative(target.absolutePath)
+    return {
+      path: relativePath,
+      size: stats.size,
+      ...(canonicalPath === relativePath ? {} : { canonicalPath }),
+    }
   } catch (error) {
     if (error instanceof FsError) return 'outside'
     return 'missing'
@@ -257,7 +284,7 @@ async function readOne(
   try {
     // The compiler already read these as source; a NUL inside a string literal is not a binary file.
     const read = await readTextFile(fs.paths, filePath, fs.maxTextFileBytes)
-    return { path: read.path, content: read.content, size: read.size, version: read.version }
+    return { path: filePath, content: read.content, size: read.size, version: read.version }
   } catch (error) {
     if (error instanceof FsError) return { path: filePath, code: error.code }
     throw error

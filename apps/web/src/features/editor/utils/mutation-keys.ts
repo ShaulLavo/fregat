@@ -1,6 +1,8 @@
 import type { DocumentKey } from '@/lib/documents/utils/types'
 
 export const editorMutationKeys = {
+  typescriptWorkerSync: (document: string) =>
+    ['editor', 'typescript-worker-sync', document] as const,
   place: (scope: string) => ['editor', 'groups', 'place', scope] as const,
   resize: (scope: string) => ['editor', 'groups', 'resize', scope] as const,
   historyForget: (key: DocumentKey) => ['editor', 'history', 'forget', key] as const,

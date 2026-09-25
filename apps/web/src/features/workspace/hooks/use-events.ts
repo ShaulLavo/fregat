@@ -1,3 +1,4 @@
+import { publishFilesystemEvents } from '@/lib/filesystem-events'
 import { parentPath } from '@/lib/path-formatters'
 import { startWorkspaceEventStreams } from '@/features/workspace/state/event-streams'
 import { startPageSubscription } from '@/lib/state/page-subscription'
@@ -174,6 +175,7 @@ export function useWorkspaceEvents(rootFolder: PickedFsEntry | null) {
       })
       const churn = createDirectoryChurn()
       const queue = createEventQueue((events) => {
+        publishFilesystemEvents(queryClient, events)
         churn.record(events.flatMap((event) => filesystemEventDirectories(event, rootPath)))
         applyEvents(events, controller.signal, rootPath, eventsScope, gitInvalidation.maybeExecute)
       })
@@ -184,6 +186,7 @@ export function useWorkspaceEvents(rootFolder: PickedFsEntry | null) {
         rootPath,
         onMessage: (message) => {
           if (message.type === 'ready') {
+            publishFilesystemEvents(queryClient, [{ type: 'rescan', path: rootPath }])
             eventsScope.increment('subscription.readyCount')
             applyReady(controller.signal, rootPath, eventsScope, gitInvalidation.maybeExecute)
             return

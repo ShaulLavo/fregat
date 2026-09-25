@@ -1,3 +1,5 @@
+import { editorTypeScriptWorkerMemory } from './editor-typescript-worker-memory'
+import { editorTypeScriptWorker } from './editor-typescript-worker'
 import { editorLspTabSwitch } from './editor-lsp-tab-switch'
 import { editorLspServerExit } from './editor-lsp-server-exit'
 import { editorTypography } from './editor-typography'
@@ -311,6 +313,8 @@ export const scenarios: readonly Scenario[] = [
   editorLspDeprecated,
   editorLspTabSwitch,
   editorLspServerExit,
+  editorTypeScriptWorker,
+  editorTypeScriptWorkerMemory,
   editorTypography,
   editorDecodeReveal,
   editorDefinitionCrlf,

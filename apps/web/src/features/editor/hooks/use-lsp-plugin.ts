@@ -1,3 +1,8 @@
+import { useSettingValue } from '@/hooks/use-setting-value'
+import {
+  withTypeScriptWorker,
+  withWorkerStatus,
+} from '@/features/editor/state/typescript-worker-plugin'
 import { useLanguageServerMatchConfiguration } from '@/features/editor/providers/language-server-match-context'
 import { useEditorRuntime } from '@/features/editor/hooks/use-runtime'
 import { filesystemPath } from '@/lib/documents/utils/identity'
@@ -55,7 +60,12 @@ export function useLanguageServerPlugin({
   const buffer = useStore(documentStore, (state) =>
     documentKey === null ? null : (state.liveDocumentsByKey[documentKey]?.buffer ?? null),
   )
-  const origin = originForQueryClient(useQueryClient())
+  const queryClient = useQueryClient()
+  const origin = originForQueryClient(queryClient)
+  const backend = useSettingValue('lsp.typescript.backend')
+  const maxFiles = useSettingValue('lsp.typescript.workerMaxFiles')
+  const maxBytes = useSettingValue('lsp.typescript.workerMaxBytes')
+  const worker = enabled && backend === 'worker' && /\.[cm]?[jt]sx?$/.test(filePath)
   const { service: fileOpenIntent } = useFileOpenIntent()
   // Manual memo: `languageServerStatusSource` is a useMemo dependency, and the compiler's cache is a
   // cache, not an identity guarantee — when it recomputes, the useMemo re-runs.
@@ -71,7 +81,7 @@ export function useLanguageServerPlugin({
   const matches = useLanguageServerMatches(rootPath, target.matchPath, enabled && document !== null)
 
   const languageServer = useMemo(() => {
-    return createMatchedLanguageServerPlugin({
+    const server = createMatchedLanguageServerPlugin({
       document:
         documentKey !== null && documentUri !== null
           ? { key: documentKey, uri: documentUri }
@@ -82,9 +92,13 @@ export function useLanguageServerPlugin({
       documents: languageServerDocuments,
       configurationGeneration,
       buffer,
-      matches,
+      matches: worker
+        ? (matches?.filter((match) => match.serverId !== 'typescript') ?? null)
+        : matches,
       rootPath,
-      statusSource: languageServerStatusSource,
+      statusSource: worker
+        ? withWorkerStatus(languageServerStatusSource)
+        : languageServerStatusSource,
       target,
       onApplyWorkspaceEdit,
       onDefinitionLinkHover: (definition) => {
@@ -98,7 +112,29 @@ export function useLanguageServerPlugin({
       onOpenReferences,
       onDidNavigateDiagnostic,
     })
+    if (!worker || documentKey === null || documentUri === null) return server
+    return withTypeScriptWorker({
+      documents: documentStore,
+      server,
+      client: queryClient,
+      root: rootPath,
+      file: filePath,
+      document: { key: documentKey, uri: documentUri },
+      maxFiles,
+      maxBytes,
+      status: languageServerStatusSource,
+      documentSyncController,
+      onApplyWorkspaceEdit,
+      onOpenDefinition,
+      onOpenReferences,
+    })
   }, [
+    worker,
+    documentStore,
+    queryClient,
+    maxFiles,
+    maxBytes,
+    filePath,
     documentKey,
     documentUri,
     origin,

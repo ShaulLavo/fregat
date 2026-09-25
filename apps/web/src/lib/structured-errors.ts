@@ -5,6 +5,19 @@ import { rpcErrorPayload } from '@workspace/client-core/transport/rpc-error'
 import { toClientError } from './client-error-taxonomy'
 
 export const clientErrors = defineErrorCatalog('client', {
+  TYPESCRIPT_WORKER_LIMIT: {
+    status: 413,
+    message: ({ files, bytes }: { files: number; bytes: number }) =>
+      `TypeScript worker program exceeds its limits (${files} files, ${bytes} bytes).`,
+    why: 'The browser worker holds its program in memory.',
+    fix: 'Use the server backend or increase the TypeScript worker limits in Settings.',
+  },
+  TYPESCRIPT_WORKER_INCOMPLETE: {
+    status: 422,
+    message: 'TypeScript worker program could not be loaded completely.',
+    why: 'Some project files are unavailable to the file server.',
+    fix: 'Use the server backend or reopen a folder that contains the project dependencies.',
+  },
   CLIENT_INVARIANT_ERROR: {
     status: 500,
     message: ({ message }: { message: string }) => message,

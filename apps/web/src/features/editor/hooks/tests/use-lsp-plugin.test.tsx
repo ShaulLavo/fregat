@@ -30,6 +30,9 @@ vi.mock('@/features/editor/providers/workspace-edit-context', () => ({
   useWorkspaceDocumentSyncController: () => dependencies.controller,
   useWorkspaceEditHost: () => dependencies.apply,
 }))
+vi.mock('@/hooks/use-setting-value', () => ({
+  useSettingValue: (key: string) => (key === 'lsp.typescript.backend' ? 'server' : 12000),
+}))
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => null }))
 vi.mock('@/lib/environments/state/query-clients', () => ({
   originForQueryClient: () => 'http://localhost:3001',
