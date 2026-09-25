@@ -33,3 +33,18 @@ Each pair uses the same scenario and local Vite server. Values are milliseconds.
 | chat-stream        | 1691.5 / 1684.7          | 134.8 / 131.6         | 187.9 / 189.2        | 8 / 8                           |
 
 Tab traces: `/work/tmp/fregat-evidence/20260925T152742Z-trace-editor-split-order` and `/work/tmp/fregat-evidence/20260925T154551Z-trace-editor-split-order`. Work-log traces: `/work/tmp/fregat-evidence/20260925T153638Z-trace-chat-stream` and `/work/tmp/fregat-evidence/20260925T154629Z-trace-chat-stream`. The deterministic regression tests establish the avoided measurements directly.
+
+## Verification after the owner rollback
+
+The retained L2 UI renders reasoning separately, so the original reasoning-in-work-log scenario
+no longer targets the detail observer. The scenario now expands a running command and verifies
+that its completed output grows beyond the cap and follows the end. The server publishes command
+output on completion. The fixture also sends native output deltas, but this check makes no claim
+about rendering those deltas. The selector names the Output section to avoid mistaking the
+command text for its output.
+
+The updated scenario passed at
+`/work/tmp/fregat-evidence/20260925T171305Z-scenario-chat-stream`. Its capped-output screenshot was
+read and shows lines 95–100 at the end of the output. No page errors, console errors or failed
+responses were captured. The log has one Git pull-request lookup warning; browser diagnostics
+record a socket closed during navigation and GPU warnings.

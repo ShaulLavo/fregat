@@ -185,16 +185,25 @@ function streamWorkLog(message) {
       aggregatedOutput: `setup ${index}\n`,
     })
   const item = { id: 'stream-command', type: 'commandExecution', command: 'echo STREAM_START' }
-  emitItem('started', { ...item, status: 'inProgress' })
-  send({
-    method: 'item/commandExecution/outputDelta',
-    params: { threadId, turnId, itemId: item.id, delta: 'STREAM_START\n\n' },
-  })
-  let count = 0
   let output = 'STREAM_START\n\n'
+  emitItem('started', { ...item, status: 'inProgress', aggregatedOutput: output })
+  let count = 0
   const timer = setInterval(() => {
     if (!fixtureStepReady('stream-start')) return
     if (count === 100 && !fixtureStepReady('stream-finish')) return
+    if (count === 100) {
+      clearInterval(timer)
+      emitItem('completed', {
+        id: 'stream-answer',
+        type: 'agentMessage',
+        text: 'WORK_LOG_STREAM_VERIFIED',
+      })
+      send({
+        method: 'turn/completed',
+        params: { threadId, turn: { id: turnId, status: 'completed', items: [] } },
+      })
+      return
+    }
     count += 1
     const delta = `stream line ${count} output\n\n`
     output += delta
@@ -202,18 +211,8 @@ function streamWorkLog(message) {
       method: 'item/commandExecution/outputDelta',
       params: { threadId, turnId, itemId: item.id, delta },
     })
-    if (count <= 100) return
-    clearInterval(timer)
+    if (count < 100) return
     emitItem('completed', { ...item, status: 'completed', exitCode: 0, aggregatedOutput: output })
-    emitItem('completed', {
-      id: 'stream-answer',
-      type: 'agentMessage',
-      text: 'WORK_LOG_STREAM_VERIFIED',
-    })
-    send({
-      method: 'turn/completed',
-      params: { threadId, turn: { id: turnId, status: 'completed', items: [] } },
-    })
   }, 35)
 }
 

@@ -21,6 +21,10 @@ export const selectors = {
   liveWorkLogToggle: (page: Page) =>
     page.locator('[data-live-activity]').getByRole('button').first(),
   workLogGroup: (page: Page) => page.getByRole('region', { name: 'Tool calls', exact: true }),
+  workLogOutput: (page: Page) =>
+    page
+      .getByRole('region', { name: 'Tool calls', exact: true })
+      .locator('pre[aria-label="Output"]'),
   manageWorktrees: (page: Page) =>
     page.getByRole('button', { name: 'Manage worktrees', exact: true }),
   worktreeManager: (page: Page) => page.getByRole('dialog', { name: 'Worktrees', exact: true }),

@@ -7,7 +7,7 @@ import { isolatedNativeScenario } from './native-provider-verification'
 export const chatStream = isolatedNativeScenario({
   name: 'chat-stream',
   description:
-    'Expand a running work-log group and stream command output beyond the detail height cap.',
+    'Expand a running command and verify its completed output follows the end beyond the detail height cap.',
   fixture: new URL('../fixtures/native-codex.mjs', import.meta.url),
   async drive(page, { step, root }) {
     await selectors.chatMessage(page).fill('Stream the work-log fixture.')
@@ -16,10 +16,10 @@ export const chatStream = isolatedNativeScenario({
     const group = selectors.workLogGroup(page).first()
     await group.waitFor()
     await group.getByRole('button').filter({ hasText: 'STREAM_START' }).click()
-    await group.locator('pre').filter({ hasText: 'STREAM_START' }).waitFor()
-    await step('expanded-streaming-command')
+    await selectors.workLogOutput(page).filter({ hasText: 'STREAM_START' }).waitFor()
+    await step('expanded-running-command')
     await writeFile(join(root, 'stream-start'), 'start')
-    const output = group.locator('pre').filter({ hasText: 'stream line 90 ' }).first()
+    const output = selectors.workLogOutput(page).filter({ hasText: 'stream line 90 ' }).first()
     await output.waitFor({ timeout: 10_000 })
     ok(
       await output.evaluate((element) => element.scrollHeight > element.clientHeight),
@@ -27,15 +27,15 @@ export const chatStream = isolatedNativeScenario({
     )
     ok(
       await output.evaluate((element) => element.scrollTop > 0),
-      'Streaming output follows its growing end',
+      'Completed output follows its growing end',
     )
     await output.scrollIntoViewIfNeeded()
-    await step('capped-output-streamed')
+    await step('capped-output-completed')
     await writeFile(join(root, 'stream-finish'), 'finish')
     await selectors
       .chatMessages(page)
       .getByText('WORK_LOG_STREAM_VERIFIED', { exact: true })
       .waitFor({ timeout: 20_000 })
-    await step('completed-streaming-command')
+    await step('completed-turn')
   },
 })

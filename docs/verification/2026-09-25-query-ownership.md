@@ -97,3 +97,10 @@ The A→B→A TUI regression fails against the old owner in both response orders
 Real scrollback exposed another issue: a full snapshot can collapse into a short work-log group, leaving earlier history unreachable while the timeline considers itself at the live edge. The earlier-page button now appears when that loaded window fits the viewport. Long transcripts keep their existing scroll-to-top behavior. The short-window test fails against the prior condition, then passes; all eighteen timeline component cases pass. Existing scroll-anchoring and navigation tests also pass.
 
 `chat-history-pages` passed at `/work/tmp/fregat-evidence/20260925T165329Z-scenario-chat-history-pages`. Its isolated native provider emits 230 activity items. A reload limits the snapshot, and clicking Load earlier restores the original prompt while preserving the last reply. The restored-prompt screenshot was read. The run reports no console errors or failed responses, one Git pull-request-state warning, and the socket/GPU warnings recorded in its evidence. The first run also encountered a Vite outdated-dependency response. An intermediate scenario incorrectly treated the button's pending-label change as completion; it now waits for Loading earlier to disappear. Core/web/TUI/scripts types, repository gates and feature boundaries pass.
+
+The history scenario was repeated after rebasing onto the owner rollback at `638137c66`.
+`/work/tmp/fregat-evidence/20260925T171323Z-scenario-chat-history-pages` passed and its screenshots
+were read. The original prompt returned, the history count rose from 199 to 229 steps, and the
+latest message remained visible. There were no page errors, console errors or failed responses.
+The capture records two Git lookup warnings, requests aborted during navigation, socket warnings
+and GPU diagnostics.
