@@ -107,6 +107,24 @@ cd /work/worktrees/Editor/L7 && bun install && bun run build
 **Finish.** When the queue is empty: `git worktree remove /work/worktrees/platform/<lane>`, then
 `git branch -d lane/<lane>`.
 
+## Every run of a lane
+
+A lane may run under `/loop`, so every run starts by finding its place:
+
+1. Check that your worktree `/work/worktrees/platform/<lane>` exists; create it per the protocol
+   if not. Read `git log origin/main` for what your lane already landed, and your plans' status.
+2. Take the next unfinished item in your queue. Read the plan and its audit report, then
+   reconcile the plan against current source.
+3. Implement, then verify: narrow tests with `TMPDIR=/work/tmp`, `bun run gates`, and
+   `agent:browser` on your port for anything visible (read the screenshot back).
+4. Land (rebase, push `HEAD:main`), deploy from the main checkout under the lock, and update or
+   delete the plan file in the same landing.
+5. Open decision with a recommendation: apply it and write
+   `Decided 2026-09-25: recommendation (completion wave)` in the plan. Hard stop: write the
+   question under "Owner questions" in the plan, skip the item, and continue.
+6. Queue empty: remove your worktree and report what landed, what was skipped and why, and the
+   pending owner checks. Then end the loop.
+
 ## Lanes
 
 Port = the lane's `WEB_PORT`. "Owns" lists the files the lane may change freely. Anything else,
@@ -273,15 +291,5 @@ INTERACTION-13 worktree prep (hand it to L2 once it lands). Each row closes with
 
 ## Running it
 
-Start W0, then L1–L9 together (up to nine agents, plus L0 already running). The paste-in prompt
-for a lane:
-
-> ultracode. You are lane **L\<n\>** of `docs/completion-wave.md` in `/work/projects/platform`.
-> Read that file whole, then your plans, then your plans' audit report in
-> `/work/tmp/completion-wave-audit/`. Set up your worktree per the protocol and work your queue
-> top to bottom. For each plan phase: reconcile the plan against current source, implement,
-> verify (narrow tests, `bun run gates`, `agent:browser` on your port for anything visible),
-> land, deploy, and update the plan file. Take recommendations for open decisions, and stop
-> only for the hard stops. Stay inside the files your lane owns; for anything outside them,
-> land small. When the queue is empty, remove your worktree and report what landed, what is
-> parked, and any owner checks pending.
+Start W0 and let it push. Then start L2, L3, L5, L6, L7 and L9. Start L1, L4 and L8 once Plan
+165 has landed on main. Each lane's prompt names its lane and queue and points back here.
