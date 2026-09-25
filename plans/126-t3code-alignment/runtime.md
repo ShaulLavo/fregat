@@ -158,6 +158,19 @@ Upstream paths shortened to `provider/…` or `orchestration/…` in tables mean
 - **Acceptance / tests:** Supported instance advertises update and executes its declared command once; unsupported/manual-only remains informative. Two requests serialize and observe shared state. Failure retains usable provider details; completion verifies installed version and refreshes catalog. Updating one environment never acts on another's binary.
 - **2026-09-24 delta:** Post-pin `96c4bfa0` checks each harness's installed version against remote compatibility ranges (supported, graceful, unsupported) and `7e65b226` shares sign-in flows and credential bindings across instances. Version verification stays in this group. Plan 138 owns which Claude binary runs and the version the snapshot reports; do not build a second version probe. See [delta record](delta-2026-09-24.md).
 - **Bounded search:** `maintenance`, `updateProvider`, `providerUpdate`, `installProvider`, `latestVersion` in local provider/settings/contracts/settings UI found no production maintenance route. This does not claim every upstream provider supports one-click install.
+- **Delivered 2026-09-25 (lane L3):** `GET`/`POST /providers/:id/update` over `ProviderMaintenance`.
+  The install method comes from the CLI's resolved path, as upstream decides it: the CLI's own
+  `update` for a standalone install, `npm install --global --prefix <prefix>` or `bun add --global`
+  where the path proves that owner. mise, Homebrew, the SDK-bundled Claude and unknown installs are
+  manual-only and show their command. Homebrew is one-click upstream and manual here, because the
+  keg path alone does not prove which `brew` owns it. The latest version comes from the npm
+  registry, cached for an hour. Updates sharing an install run one at a time through a scoped
+  mutation, and a queued click finds nothing left to do. After an update the adapter forgets its
+  executable and the snapshot re-probes. Settings › Providers shows the installed version, the
+  latest version, and an Update button or a copyable command. Tests:
+  `provider/utils/tests/update-method.test.ts` and `provider/tests/provider-maintenance.test.ts`
+  (real fake binary). Scenario `settings-provider-update` updates a fixture codex. Not built: the
+  post-pin compatibility ranges from the 2026-09-24 delta.
 
 ## Matched or rejected first-pass claims
 

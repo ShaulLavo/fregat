@@ -511,10 +511,10 @@
       "title": "Expose capability-driven provider update operations",
       "report": "runtime.md",
       "wave": "4",
-      "status": "open",
-      "evidence_level": "source-reviewed",
+      "status": "verified",
+      "evidence_level": "scenario-verified",
       "acceptance": "runtime.md, RUNTIME-10, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": ["scripts/agent/scenarios/settings-provider-update.ts"]
     },
     {
       "id": "EXT-01",

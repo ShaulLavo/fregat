@@ -235,6 +235,9 @@ export {
   providerSignInBodySchema,
   providerSignInMethodSchema,
   providerSnapshotSchema,
+  providerUpdateAdvisorySchema,
+  providerUpdateMethodSchema,
+  providerUpdateResultSchema,
   type ProviderAuth,
   type ProviderAuthResult,
   type ProviderOptionChoice,
@@ -260,6 +263,9 @@ export {
   type ProviderSlashCommand,
   type ProviderSnapshot,
   type ProviderStatus,
+  type ProviderUpdateAdvisory,
+  type ProviderUpdateMethod,
+  type ProviderUpdateResult,
 } from './provider'
 export {
   USAGE_HISTORY_DAYS,

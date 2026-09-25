@@ -71,6 +71,7 @@ import { ProviderSessionDirectory } from './provider/provider-session-directory'
 import { ProviderService } from './provider/provider-service'
 import { ProviderUsageHistoryReader } from './provider/usage-history'
 import { ProviderPriceCatalog } from './provider/price-catalog'
+import { ProviderMaintenance } from './provider/provider-maintenance'
 import { ProviderUsageRecorder } from './provider/usage-recorder'
 import { ProviderUsageStore } from './provider/usage-store'
 import { MachineService, type MachineServiceOptions } from './machines/service'
@@ -245,6 +246,7 @@ export function createApp(options: AppOptions) {
     providerPrices,
   )
   const providerUsageHistory = new ProviderUsageHistoryReader(database)
+  const providerMaintenance = new ProviderMaintenance(providerAdapterRegistry)
   providerService.subscribeRuntimeEvents((event) => providerUsage.accept(event))
   providerService.subscribeUsage((event, purpose) => providerUsageRecorder.accept(event, purpose))
   const orchestration = new OrchestrationEngine(database, {
@@ -321,6 +323,7 @@ export function createApp(options: AppOptions) {
     orchestration,
     machines,
     providerPrices,
+    providerMaintenance,
   )
 
   const app = new Elysia({ name: 'platform' })
@@ -401,7 +404,14 @@ export function createApp(options: AppOptions) {
     })
     .post('/terminal/clear', ({ body }) => terminal.clear(body), { body: terminalClearInputSchema })
     .post('/terminal/kill', ({ body }) => terminal.kill(body), { body: terminalKillInputSchema })
-    .use(providerRoutes(providerAdapterRegistry, providerUsage, providerUsageHistory))
+    .use(
+      providerRoutes(
+        providerAdapterRegistry,
+        providerUsage,
+        providerUsageHistory,
+        providerMaintenance,
+      ),
+    )
     .use(sessionControlRoutes(providerService))
     .use(orchestrationRoutes(orchestration, checkpointDiff, sessionSearch))
     .use(
@@ -472,6 +482,7 @@ function appCleanup(
   orchestration: OrchestrationEngine,
   machines: MachineService,
   providerPrices: ProviderPriceCatalog,
+  providerMaintenance: ProviderMaintenance,
 ) {
   let closed = false
 
@@ -491,6 +502,7 @@ function appCleanup(
     await orchestration.close()
     await providerService.shutdown()
     providerPrices.close()
+    providerMaintenance.close()
     await fs.close()
     await flushObservability()
   }

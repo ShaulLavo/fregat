@@ -323,6 +323,10 @@ export class ClaudeProviderAdapter
     return executable.path
   }
 
+  forgetExecutable() {
+    this.executablePromise = null
+  }
+
   /**
    * Reuses the capability probe: the same never-yielding prompt that reads
    * account state also carries the command list, and the skill list is one more

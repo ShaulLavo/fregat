@@ -2,6 +2,12 @@ import { errorStringField } from '@workspace/contracts'
 import { defineErrorCatalog } from 'evlog'
 
 export const sessionIdentityErrors = defineErrorCatalog('provider', {
+  UPDATE_MANUAL_ONLY: {
+    status: 409,
+    message: 'This CLI updates from outside the app.',
+    why: 'Its install belongs to a version manager, Homebrew or the app itself, or its origin is unknown.',
+    fix: 'Run the command shown beside the version, or reinstall the CLI with npm or its own installer.',
+  },
   ROLLBACK_UNSUPPORTED: {
     status: 409,
     message: 'This provider cannot rewind its conversation.',

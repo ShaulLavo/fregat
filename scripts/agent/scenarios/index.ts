@@ -103,6 +103,7 @@ import { gitDiscardConfirm } from './git-discard-confirm'
 import { commandPaletteTypeBurst } from './command-palette-type-burst'
 import { paletteScriptsPending } from './palette-scripts-pending'
 import { settingsModelsPending } from './settings-models-pending'
+import { settingsProviderUpdate } from './settings-provider-update'
 import { chatFollowUp } from './chat-follow-up'
 import { chatDiffSyntax } from './chat-diff-syntax'
 import { editorSplitDrag } from './editor-split-drag'
@@ -334,6 +335,7 @@ export const scenarios: readonly Scenario[] = [
   commandPaletteTypeBurst,
   paletteScriptsPending,
   settingsModelsPending,
+  settingsProviderUpdate,
   editorThemePreview,
   editorSyntaxBenchmark('native'),
   editorNativeCoverage('light'),

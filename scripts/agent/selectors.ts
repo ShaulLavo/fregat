@@ -709,6 +709,10 @@ export const selectors = {
     page.getByRole('status', { name: 'Loading settings', exact: true }),
   settingsModelsLoading: (page: Page) => page.getByRole('status', { name: 'Loading models' }),
   settingsNoModels: (page: Page) => page.getByText('No models are available yet.'),
+  settingsProviderRow: (page: Page, providerInstanceId: string) =>
+    page.locator(`[data-provider-instance="${providerInstanceId}"]`),
+  providerUpdateChecking: (page: Page) =>
+    page.getByRole('status', { name: 'Checking for updates' }),
   paletteScriptsLoading: (page: Page) => page.getByRole('status', { name: 'Loading scripts' }),
   paletteNoScripts: (page: Page) => page.getByText('No scripts in this project.'),
   paletteDialog: (page: Page) => page.getByRole('dialog', { name: 'Command Palette', exact: true }),

@@ -11,6 +11,8 @@ import {
   providerUsageHistorySchema,
   providerUsageResultSchema,
   providerUsageSessionTotalSchema,
+  providerUpdateAdvisorySchema,
+  providerUpdateResultSchema,
   sessionIdSchema,
   trimmedNonEmptyStringSchema,
   type ProviderAuth,
@@ -25,6 +27,7 @@ import {
 } from '../orchestration/orchestration-logging'
 import { providerErrors } from '../observability/structured-errors'
 import type { ProviderAdapterRegistry } from './provider-adapter-registry'
+import type { ProviderMaintenance } from './provider-maintenance'
 import type { ProviderAdapter } from './types'
 import type { ProviderUsageHistoryReader } from './usage-history'
 import type { ProviderUsageStore } from './usage-store'
@@ -50,6 +53,7 @@ export function providerRoutes(
   adapterRegistry: ProviderAdapterRegistry,
   usage: ProviderUsageStore,
   history: ProviderUsageHistoryReader,
+  maintenance: ProviderMaintenance,
 ) {
   return new Elysia({ name: 'provider-routes' })
     .get('/providers', () => adapterRegistry.listProviders(), {
@@ -77,6 +81,16 @@ export function providerRoutes(
         query: commandCatalogQuerySchema,
         response: providerCommandCatalogSchema,
       },
+    )
+    .get(
+      '/providers/:providerInstanceId/update',
+      ({ params }) => maintenance.advisory(params.providerInstanceId),
+      { params: instanceParamsSchema, response: providerUpdateAdvisorySchema },
+    )
+    .post(
+      '/providers/:providerInstanceId/update',
+      ({ params }) => maintenance.update(params.providerInstanceId),
+      { params: instanceParamsSchema, response: providerUpdateResultSchema },
     )
     .group('/providers/:providerInstanceId/auth', (auth) =>
       auth

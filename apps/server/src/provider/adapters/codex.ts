@@ -226,6 +226,11 @@ export class CodexProviderAdapter
     }
   }
 
+  async executablePath() {
+    const binary = codexBinary(this.env)
+    return Bun.which(binary, { PATH: this.env.PATH ?? '' }) ?? binary
+  }
+
   discoverSessions(input: ProviderSessionDiscoveryInput) {
     const request = v.parse(discoveryInputSchema, input)
     return inspectCodexHistory(this.env, async (client) => {

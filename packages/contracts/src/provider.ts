@@ -146,6 +146,39 @@ export const providerListResultSchema = v.object({
 })
 
 /**
+ * How an instance's CLI got onto the machine. Only `native`, `npm` and `bun` update in
+ * one click: those are installs whose owner the path proves. The rest name a command.
+ */
+export const providerUpdateMethodSchema = v.picklist([
+  'native',
+  'npm',
+  'bun',
+  'mise',
+  'homebrew',
+  'bundled',
+  'unknown',
+])
+
+export const providerUpdateAdvisorySchema = v.object({
+  providerInstanceId: providerInstanceIdSchema,
+  installedVersion: v.nullable(trimmedNonEmptyStringSchema),
+  latestVersion: v.nullable(trimmedNonEmptyStringSchema),
+  /** `unknown` when either version could not be read. */
+  status: v.picklist(['current', 'behind', 'unknown']),
+  method: providerUpdateMethodSchema,
+  canUpdate: v.boolean(),
+  /** The one-click command, or the one to run by hand; null when none is known. */
+  command: v.nullable(trimmedNonEmptyStringSchema),
+  checkedAt: isoDateTimeSchema,
+})
+
+export const providerUpdateResultSchema = v.object({
+  /** `unchanged` when the CLI was already current, or the command left the version as it was. */
+  outcome: v.picklist(['updated', 'unchanged']),
+  advisory: providerUpdateAdvisorySchema,
+})
+
+/**
  * One slash command a provider advertises. `name` never carries the leading
  * slash: the composer owns that character, and providers disagree about whether
  * it belongs to the name.
@@ -273,6 +306,9 @@ export type ProviderModel = v.InferOutput<typeof providerModelSchema>
 export type ProviderInstanceSettings = v.InferOutput<typeof providerInstanceSettingsSchema>
 export type ProviderSnapshot = v.InferOutput<typeof providerSnapshotSchema>
 export type ProviderListResult = v.InferOutput<typeof providerListResultSchema>
+export type ProviderUpdateMethod = v.InferOutput<typeof providerUpdateMethodSchema>
+export type ProviderUpdateAdvisory = v.InferOutput<typeof providerUpdateAdvisorySchema>
+export type ProviderUpdateResult = v.InferOutput<typeof providerUpdateResultSchema>
 export type ProviderSlashCommand = v.InferOutput<typeof providerSlashCommandSchema>
 export type ProviderSkill = v.InferOutput<typeof providerSkillSchema>
 export type ProviderCommandCatalog = v.InferOutput<typeof providerCommandCatalogSchema>
