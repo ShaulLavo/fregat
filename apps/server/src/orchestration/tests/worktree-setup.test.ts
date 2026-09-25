@@ -170,6 +170,36 @@ test.each(['queued', 'running', 'cancelling'] as const)(
   },
 )
 
+test('restart fails an interrupted foreground creation instead of holding boot for its setup', async () => {
+  const fixture = await withSetup('exit 1', true)
+  expect((await fixture.create()).lifecycle.state).toBe('creation-failed')
+  const stopped = await stopLifecycleEffects(fixture)
+  await stopped.engine.dispatchClientCommand({
+    type: 'project.meta.update',
+    commandId: 'slow-setup',
+    projectId: fixture.registration.projectId,
+    scripts: [
+      { name: 'Install', command: 'sleep 30', runOnWorktreeCreate: true, waitForSetup: true },
+    ],
+  })
+  await stopped.engine.dispatchClientCommand({
+    type: 'worktree.retry',
+    commandId: 'interrupted-retry',
+    worktreeId: lifecycleWorktreeId,
+  })
+  const pending = (await stopped.engine.readModelSnapshot()).worktrees.get(lifecycleWorktreeId)
+  expect(pending?.lifecycle.state).toBe('provisioning')
+  await stopped.engine.close()
+  const startedAt = performance.now()
+  await fixture.restart()
+  expect(performance.now() - startedAt).toBeLessThan(10_000)
+  expect((await worktree(fixture))?.lifecycle).toMatchObject({
+    state: 'creation-failed',
+    errorCode: 'worktree.SETUP_FAILED',
+  })
+  expect(fixture.adapter.startedTurns).toHaveLength(0)
+})
+
 test('cancellation owns the setup before the running report completes', async () => {
   const fixture = await worktreeLifecycleFixture()
   fixtures.push(fixture)
