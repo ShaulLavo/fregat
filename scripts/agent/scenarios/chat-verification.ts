@@ -50,12 +50,18 @@ export async function openChat(page: Page) {
  * the orchestration base URL, the platform worktree and the project that owns it.
  */
 export async function openChatShell(page: Page) {
+  const workspace = await openChatWorkspace(page)
+  ok(workspace.project?.defaultModelSelection, 'Project must have a default model')
+  return { ...workspace, project: workspace.project }
+}
+
+/** Chat mode on the platform worktree, for scenarios that never run a turn and need no model. */
+export async function openChatWorkspace(page: Page) {
   const base = await openChat(page)
   const snapshot = await readShell(page, base)
   const worktree = snapshot.worktrees.find((item) => item.path.endsWith('/projects/platform'))
   ok(worktree, 'Platform worktree must be registered')
   const project = snapshot.projects.find((item) => item.id === worktree.projectId)
-  ok(project?.defaultModelSelection, 'Project must have a default model')
   return { base, project, snapshot, worktree }
 }
 

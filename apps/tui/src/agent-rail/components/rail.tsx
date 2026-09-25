@@ -36,7 +36,8 @@ import { draftsForStorage, draftKey } from '@/agent-stage/state/drafts'
 import { WorktreeManager } from '@/worktrees/components/manager'
 import { useSettingValue } from '@/settings/hooks/use-setting-value'
 import { useCommands } from '@/commands/hooks/use-commands'
-import type { CommandContext } from '@/commands/state/bus'
+import type { CommandContext, CommandHandlers } from '@/commands/state/bus'
+import { ITEM_POSITIONS, selectItemCommandId } from '@workspace/client-core/commands/item-position'
 import type { FocusToken } from '@/commands/state/focus'
 import { usePaneFocus } from '@/commands/hooks/use-pane-focus'
 import { useCommandHandlers } from '@/commands/hooks/use-command-handlers'
@@ -405,55 +406,22 @@ export function AgentRail({
     },
     enabled && modal.kind === 'closed' && !state.busy,
   )
+  const selectItemHandlers: CommandHandlers = Object.fromEntries(
+    ITEM_POSITIONS.map((position) => [
+      selectItemCommandId(position),
+      {
+        run: () => {
+          const item = visibleSessions[position - 1]
+          if (item) onSelectSession(item.id)
+        },
+      },
+    ]),
+  )
   useCommandHandlers(
     {
-      'workspace.nextSession': { run: () => adjacent(1) },
-      'workspace.previousSession': { run: () => adjacent(-1) },
-      'workspace.jumpToSession1': {
-        run: () => {
-          if (visibleSessions[0]) onSelectSession(visibleSessions[0].id)
-        },
-      },
-      'workspace.jumpToSession2': {
-        run: () => {
-          if (visibleSessions[1]) onSelectSession(visibleSessions[1].id)
-        },
-      },
-      'workspace.jumpToSession3': {
-        run: () => {
-          if (visibleSessions[2]) onSelectSession(visibleSessions[2].id)
-        },
-      },
-      'workspace.jumpToSession4': {
-        run: () => {
-          if (visibleSessions[3]) onSelectSession(visibleSessions[3].id)
-        },
-      },
-      'workspace.jumpToSession5': {
-        run: () => {
-          if (visibleSessions[4]) onSelectSession(visibleSessions[4].id)
-        },
-      },
-      'workspace.jumpToSession6': {
-        run: () => {
-          if (visibleSessions[5]) onSelectSession(visibleSessions[5].id)
-        },
-      },
-      'workspace.jumpToSession7': {
-        run: () => {
-          if (visibleSessions[6]) onSelectSession(visibleSessions[6].id)
-        },
-      },
-      'workspace.jumpToSession8': {
-        run: () => {
-          if (visibleSessions[7]) onSelectSession(visibleSessions[7].id)
-        },
-      },
-      'workspace.jumpToSession9': {
-        run: () => {
-          if (visibleSessions[8]) onSelectSession(visibleSessions[8].id)
-        },
-      },
+      'workspace.nextItem': { run: () => adjacent(1) },
+      'workspace.previousItem': { run: () => adjacent(-1) },
+      ...selectItemHandlers,
       'agent.railNext': { disabledReason: railKeyTarget, run: () => move(1) },
       'agent.railPrevious': { disabledReason: railKeyTarget, run: () => move(-1) },
       'agent.railOpen': { run: () => open() },

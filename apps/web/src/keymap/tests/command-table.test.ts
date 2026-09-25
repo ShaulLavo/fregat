@@ -13,25 +13,17 @@ import {
   type CommandEntry,
 } from '@/keymap/table'
 import {
-  SESSION_JUMP_POSITIONS,
-  sessionJumpCommandId,
+  ITEM_POSITIONS,
+  selectItemCommandId,
+  sidebarPanelCommandId,
   type PlatformCommandId,
 } from '@/keymap/types'
 
 /** Every hotkey the app claims from the browser without dispatching anything. */
-const RESERVED_HOTKEYS = [
-  'Control+Tab',
-  'Control+Q',
-  'Mod+Alt+Tab',
-  'Mod+Shift+T',
-  'Mod+1',
-  'Mod+2',
-  'Mod+3',
-  'Mod+W',
-]
+const RESERVED_HOTKEYS = ['Control+Tab', 'Control+Q', 'Mod+Alt+Tab', 'Mod+Shift+T', 'Mod+W']
 const MAC_ONLY_RESERVED_HOTKEY = 'Mod+Alt+Tab'
 
-const SESSION_COMMAND_PATTERN = /^workspace\.jumpToSession\d$/
+const NUMBERED_COMMAND_PATTERN = /^workspace\.(selectItem|sidebarPanel)\d$/
 
 const TEXT_MENU_EDITOR_COMMANDS = [
   'editor.editor.action.goToImplementation',
@@ -95,17 +87,10 @@ const ASYNC_COMMAND_IDS = [
   'workspace.revealChat',
   'workspace.revealTerminal',
   'workspace.newSession',
-  'workspace.nextSession',
-  'workspace.previousSession',
-  'workspace.jumpToSession1',
-  'workspace.jumpToSession2',
-  'workspace.jumpToSession3',
-  'workspace.jumpToSession4',
-  'workspace.jumpToSession5',
-  'workspace.jumpToSession6',
-  'workspace.jumpToSession7',
-  'workspace.jumpToSession8',
-  'workspace.jumpToSession9',
+  'workspace.nextItem',
+  'workspace.previousItem',
+  ...ITEM_POSITIONS.map(selectItemCommandId),
+  ...ITEM_POSITIONS.map(sidebarPanelCommandId),
   'workspace.closeCurrentTab',
   'workspace.newChat',
   'workspace.acceptCommitMessage',
@@ -226,10 +211,7 @@ const TAB_OPEN_COMMAND_IDS = [
 
 const CHAT_MODE_COMMAND_IDS = [
   'workspace.newSession',
-  'workspace.nextSession',
-  'workspace.previousSession',
   'workspace.toggleSessionRail',
-  ...SESSION_JUMP_POSITIONS.map(sessionJumpCommandId),
 ] satisfies readonly PlatformCommandId[]
 
 function reservedBindings(platform: 'linux' | 'mac' | 'windows') {
@@ -334,7 +316,7 @@ describe('command table', () => {
 
   it('keeps the browser-hostile chords reserved', () => {
     const mac = reservedBindings('mac')
-    expect(mac).toHaveLength(8)
+    expect(mac).toHaveLength(5)
     expect(mac.map((binding) => binding.chord[0])).toEqual(RESERVED_HOTKEYS)
 
     for (const binding of mac) {
@@ -347,11 +329,12 @@ describe('command table', () => {
     expect(reservedBindings('windows').map((binding) => binding.chord[0])).toEqual(withoutMacOnly)
   })
 
-  it('offers session commands while hiding numbered session jumps', () => {
+  it('offers session commands while hiding numbered item and panel commands', () => {
     expect(platformCommandSpecs.map((spec) => spec.id)).toEqual(
       expect.arrayContaining([
         'workspace.findInFileTree',
-        'workspace.jumpToSession1',
+        'workspace.selectItem1',
+        'workspace.sidebarPanel1',
         'workspace.newSession',
         'workspace.revealActiveFileInTree',
       ]),
@@ -361,7 +344,7 @@ describe('command table', () => {
     expect(hiddenPaletteCommandIds.has('workspace.revealActiveFileInTree')).toBe(false)
     expect(
       platformCommands
-        .filter((command) => SESSION_COMMAND_PATTERN.test(command.id))
+        .filter((command) => NUMBERED_COMMAND_PATTERN.test(command.id))
         .every((command) => hiddenPaletteCommandIds.has(command.id)),
     ).toBe(true)
   })

@@ -1,5 +1,5 @@
 import { defineMetadata } from './metadata'
-import { sessionJumpCommandId, type SessionJumpPosition } from './session-jump'
+import { selectItemCommandId, sidebarPanelCommandId, type ItemPosition } from './item-position'
 
 export const workspaceCommandMetadata = {
   'workspace.undoWorkspaceEdit': defineMetadata({
@@ -442,6 +442,14 @@ export const workspaceCommandMetadata = {
     category: 'Workspace',
     description: 'Focus the first editor group.',
     id: 'workspace.focusFirstEditorGroup',
+    keys: [
+      {
+        chord: ['Mod+1'],
+        presets: ['vscode'],
+        preventDefault: true,
+        vscodeCommandId: 'workbench.action.focusFirstEditorGroup',
+      },
+    ],
     execution: 'async',
     target: 'workspace',
     undoCategory: 'view-only',
@@ -453,6 +461,14 @@ export const workspaceCommandMetadata = {
     category: 'Workspace',
     description: 'Focus the second editor group.',
     id: 'workspace.focusSecondEditorGroup',
+    keys: [
+      {
+        chord: ['Mod+2'],
+        presets: ['vscode'],
+        preventDefault: true,
+        vscodeCommandId: 'workbench.action.focusSecondEditorGroup',
+      },
+    ],
     execution: 'async',
     target: 'workspace',
     undoCategory: 'view-only',
@@ -464,6 +480,14 @@ export const workspaceCommandMetadata = {
     category: 'Workspace',
     description: 'Focus the third editor group.',
     id: 'workspace.focusThirdEditorGroup',
+    keys: [
+      {
+        chord: ['Mod+3'],
+        presets: ['vscode'],
+        preventDefault: true,
+        vscodeCommandId: 'workbench.action.focusThirdEditorGroup',
+      },
+    ],
     execution: 'async',
     target: 'workspace',
     undoCategory: 'view-only',
@@ -833,27 +857,61 @@ export const workspaceCommandMetadata = {
     when: ['workspaceOpen', 'chatMode'],
     title: 'New session',
   }),
-  'workspace.nextSession': defineMetadata({
+  'workspace.nextItem': defineMetadata({
     category: 'Workspace',
-    description: 'Move to the next session in the rail.',
-    id: 'workspace.nextSession',
-    keys: [{ chord: ['Mod+Alt+]'], preventDefault: true }],
+    description: 'Select the next editor tab, or the next chat in chat mode.',
+    id: 'workspace.nextItem',
+    keys: [
+      { chord: ['Mod+Alt+]'], preventDefault: true },
+      {
+        chord: ['Mod+Alt+ArrowRight'],
+        platforms: ['mac'],
+        presets: ['vscode'],
+        preventDefault: true,
+        vscodeCommandId: 'workbench.action.nextEditor',
+      },
+      {
+        chord: ['Control+PageDown'],
+        platforms: ['linux', 'windows'],
+        presets: ['vscode'],
+        preventDefault: true,
+        vscodeCommandId: 'workbench.action.nextEditor',
+      },
+    ],
     execution: 'async',
     target: 'workspace',
     undoCategory: 'view-only',
-    when: ['workspaceOpen', 'chatMode'],
-    title: 'Next session',
+    when: ['workspaceOpen'],
+    title: 'Next tab or chat',
+    vscodeCommandIds: ['workbench.action.nextEditor'],
   }),
-  'workspace.previousSession': defineMetadata({
+  'workspace.previousItem': defineMetadata({
     category: 'Workspace',
-    description: 'Move to the previous session in the rail.',
-    id: 'workspace.previousSession',
-    keys: [{ chord: ['Mod+Alt+['], preventDefault: true }],
+    description: 'Select the previous editor tab, or the previous chat in chat mode.',
+    id: 'workspace.previousItem',
+    keys: [
+      { chord: ['Mod+Alt+['], preventDefault: true },
+      {
+        chord: ['Mod+Alt+ArrowLeft'],
+        platforms: ['mac'],
+        presets: ['vscode'],
+        preventDefault: true,
+        vscodeCommandId: 'workbench.action.previousEditor',
+      },
+      {
+        chord: ['Control+PageUp'],
+        platforms: ['linux', 'windows'],
+        presets: ['vscode'],
+        preventDefault: true,
+        vscodeCommandId: 'workbench.action.previousEditor',
+      },
+    ],
     execution: 'async',
     target: 'workspace',
     undoCategory: 'view-only',
-    when: ['workspaceOpen', 'chatMode'],
-    title: 'Previous session',
+    when: ['workspaceOpen'],
+    title: 'Previous tab or chat',
+    vscodeCommandIds: ['workbench.action.previousEditor'],
   }),
   'workspace.toggleSessionRail': defineMetadata({
     category: 'Workspace',
@@ -867,17 +925,52 @@ export const workspaceCommandMetadata = {
     title: 'Toggle session rail',
   }),
 }
-export function sessionJumpMetadata(position: SessionJumpPosition) {
+// VS Code mode keeps VS Code's editor-index keys and the Mod+Alt digits the app bound first.
+export function selectItemMetadata(position: ItemPosition) {
+  const vscodeCommandId = `workbench.action.openEditorAtIndex${position}`
   return defineMetadata({
     category: 'Workspace',
-    description: `Put session ${position} in the rail on the stage.`,
+    description: `Select editor tab ${position}, or chat ${position} in chat mode.`,
     hiddenInPalette: true,
-    id: sessionJumpCommandId(position),
-    keys: [{ chord: [`Mod+Alt+${position}`], preventDefault: true }],
+    id: selectItemCommandId(position),
+    keys: [
+      { chord: [`Mod+${position}`], presets: ['default'], preventDefault: true },
+      {
+        chord: [`Control+${position}`],
+        platforms: ['mac'],
+        presets: ['vscode'],
+        preventDefault: true,
+        vscodeCommandId,
+      },
+      {
+        chord: [`Alt+${position}`],
+        platforms: ['linux', 'windows'],
+        presets: ['vscode'],
+        preventDefault: true,
+        vscodeCommandId,
+      },
+      { chord: [`Mod+Alt+${position}`], presets: ['vscode'], preventDefault: true },
+    ],
     execution: 'async',
     target: 'workspace',
     undoCategory: 'view-only',
-    when: ['workspaceOpen', 'chatMode'],
-    title: `Go to session ${position}`,
+    when: ['workspaceOpen'],
+    title: `Select tab or chat ${position}`,
+    vscodeCommandIds: [vscodeCommandId],
+  })
+}
+
+export function sidebarPanelMetadata(position: ItemPosition) {
+  return defineMetadata({
+    category: 'Workspace',
+    description: `Show sidebar panel ${position}, or hide the sidebar when that panel is showing.`,
+    hiddenInPalette: true,
+    id: sidebarPanelCommandId(position),
+    keys: [{ chord: [`Mod+Alt+${position}`], presets: ['default'], preventDefault: true }],
+    execution: 'async',
+    target: 'workspace',
+    undoCategory: 'view-only',
+    when: ['workspaceOpen'],
+    title: `Sidebar panel ${position}`,
   })
 }

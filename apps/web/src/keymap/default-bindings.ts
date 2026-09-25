@@ -195,8 +195,5 @@ const reservedBrowserHotkeys: readonly ReservedHotkey[] = [
     vscodeCommandId: 'workbench.action.showAllEditors',
   },
   { chord: ['Mod+Shift+T'], vscodeCommandId: 'workbench.action.reopenClosedEditor' },
-  { chord: ['Mod+1'], vscodeCommandId: 'workbench.action.focusFirstEditorGroup' },
-  { chord: ['Mod+2'], vscodeCommandId: 'workbench.action.focusSecondEditorGroup' },
-  { chord: ['Mod+3'], vscodeCommandId: 'workbench.action.focusThirdEditorGroup' },
   { chord: ['Mod+W'], vscodeCommandId: 'workbench.action.closeActiveEditor' },
 ]

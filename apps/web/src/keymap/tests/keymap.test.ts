@@ -488,20 +488,20 @@ describe('defaultPlatformKeyBindings', () => {
     )
   })
 
-  it('does not bind browser tab switching keys to pane focus commands', () => {
-    const bindings = defaultPlatformKeyBindings('linux')
+  it('gives Mod+1 to the first tab or chat, or to the first editor group in VS Code mode', () => {
+    const platform = defaultPlatformKeyBindings('linux')
+    const vscode = defaultPlatformKeyBindings('linux', 'vscode')
 
-    expect(keysFor(bindings, 'workspace.focusFileTree')).not.toContain('Mod+1')
-    expect(commands(appKeyBindingsForPane(bindings, 'editor'))).not.toContain(
-      'workspace.focusFirstEditorGroup',
-    )
-    expect(bindings).toContainEqual(
-      expect.objectContaining({
-        command: null,
-        keys: 'Mod+1',
-        vscodeCommandId: 'workbench.action.focusFirstEditorGroup',
-      }),
-    )
+    expect(keysFor(platform, 'workspace.selectItem1')).toEqual(['Mod+1'])
+    expect(keysFor(platform, 'workspace.focusFirstEditorGroup')).toEqual([])
+    expect(keysFor(vscode, 'workspace.focusFirstEditorGroup')).toEqual(['Mod+1'])
+    expect(keysFor(vscode, 'workspace.selectItem1')).toEqual(['Alt+1', 'Mod+Alt+1'])
+    for (const bindings of [platform, vscode]) {
+      expect(keysFor(bindings, 'workspace.focusFileTree')).not.toContain('Mod+1')
+      expect(bindings.some((binding) => binding.command === null && binding.keys === 'Mod+1')).toBe(
+        false,
+      )
+    }
   })
 
   it('binds file-tree focus globally and file filtering only inside the tree', () => {

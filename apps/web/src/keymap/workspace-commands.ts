@@ -1,8 +1,9 @@
 import { clientForQueryClient, originForQueryClient } from '@/lib/environments/state/query-clients'
 import { workbenchCommandMetadata } from '@workspace/client-core/commands/workbench'
 import {
+  selectItemMetadata,
+  sidebarPanelMetadata,
   workspaceCommandMetadata,
-  sessionJumpMetadata,
 } from '@workspace/client-core/commands/workspace'
 import {
   ArrowClockwiseIcon,
@@ -66,7 +67,7 @@ import {
   saveCapability,
 } from '@/lib/documents/utils/capabilities'
 import { documentTab, sameTabContent } from '@/lib/documents/utils/tabs'
-import type { DocumentRef, TabId } from '@/lib/documents/utils/types'
+import type { DocumentRef, EditorTabRecord, TabId } from '@/lib/documents/utils/types'
 import type { EditorDocumentStoreApi } from '@/features/editor/state/document-state'
 import { nextEditorDiffViewMode } from '@/features/editor/utils/diff-view-mode'
 import { commitMessageFilePath } from '@/keymap/utils/commit-message-file'
@@ -79,8 +80,11 @@ import {
   setWorkbenchSidebarOpen,
   showWorkbenchSidebarTab,
   toggleWorkbenchBottomTab,
+  toggleWorkbenchSidebarTab,
+  WORKBENCH_SIDEBAR_TABS,
   type TerminalTabDirection,
   type WorkbenchPanels,
+  type WorkbenchSidebarTab,
 } from '@/features/workbench/utils/panels'
 import { killTerminalTab } from '@/features/workbench/state/kill-terminal-tab'
 import { fetchFile } from '@/lib/file-server'
@@ -104,7 +108,7 @@ import {
 import { matchesActiveSurface } from '@/lib/focus/utils/active-surface'
 import { toggledWorkspaceUiMode } from '@/lib/ui-mode'
 import { allEditorGroups, activeEditorGroup } from '@/lib/documents/utils/groups'
-import type { GroupEdge } from '@/lib/documents/utils/group-types'
+import type { EditorGroup, GroupEdge } from '@/lib/documents/utils/group-types'
 import { groupSplitVerdict } from '@/features/workbench/state/group-geometry'
 
 import {
@@ -112,7 +116,7 @@ import {
   type WorkspaceCommandHandlerContext,
   type WorkspaceCommandRuntime,
 } from './define-command'
-import { SESSION_JUMP_POSITIONS } from './types'
+import { ITEM_POSITIONS } from './types'
 
 const handled = { status: 'handled' } as const
 const declined = { reason: 'handler-declined', status: 'unhandled' } as const
@@ -131,11 +135,6 @@ function runSessionCommand(
   const result = run()
   if (result instanceof Promise) return operationStart(result)
   return dispositionFor(result)
-}
-
-function sessionTraversalHandler(direction: SessionTraversalDirection) {
-  return (context: WorkspaceCommandHandlerContext) =>
-    runSessionCommand(context, () => selectAdjacentSession(direction))
 }
 
 function dispositionFor(accepted: boolean): ImmediateCommandDisposition {
@@ -503,17 +502,102 @@ function toggleSessionRail({ runtime, snapshot }: WorkspaceCommandHandlerContext
 }
 
 /**
- * The nine jump slots are one shape, so they are written once. They are hidden
- * from the palette for the same reason as their four named siblings: they are
- * keyboard navigation for the visible chat rail, not general palette actions.
+ * One key per slot for both screens: the snapshot's layout picks editor tabs or chats,
+ * so a user override moves both at once. Hidden from the palette, like next/previous.
  */
-function sessionJumpCommands() {
-  return SESSION_JUMP_POSITIONS.map((position) =>
+function selectItemCommands() {
+  return ITEM_POSITIONS.map((position) =>
     defineCommand({
-      ...sessionJumpMetadata(position),
-      run: (context) => runSessionCommand(context, () => jumpToSession(position)),
+      ...selectItemMetadata(position),
+      run: (context) => {
+        if (context.snapshot.uiMode === 'chat')
+          return runSessionCommand(context, () => jumpToSession(position))
+        const group = activeEditorGroup(context.snapshot.workbenchPanels.editorGroups)
+        return selectEditorTab(context.runtime, group, group.tabs[position - 1])
+      },
     }),
   )
+}
+
+function adjacentItemHandler(direction: SessionTraversalDirection) {
+  return (context: WorkspaceCommandHandlerContext) => {
+    if (context.snapshot.uiMode === 'chat')
+      return runSessionCommand(context, () => selectAdjacentSession(direction))
+    const group = activeEditorGroup(context.snapshot.workbenchPanels.editorGroups)
+    return selectEditorTab(context.runtime, group, adjacentTab(group, direction))
+  }
+}
+
+// Wraps at both ends, like the session rail.
+function adjacentTab(group: EditorGroup, direction: SessionTraversalDirection) {
+  const count = group.tabs.length
+  if (count === 0) return undefined
+  const index = group.tabs.findIndex((tab) => tab.id === group.selectedTabId)
+  if (index < 0) return group.tabs[direction === 'next' ? 0 : count - 1]
+  const step = direction === 'next' ? 1 : -1
+  return group.tabs[(index + step + count) % count]
+}
+
+function selectEditorTab(
+  runtime: WorkspaceCommandRuntime,
+  group: EditorGroup,
+  tab: EditorTabRecord | undefined,
+) {
+  if (!tab) return declined
+  return afterNavigation(runtime.editor.selectTab({ groupId: group.id, tabId: tab.id }), () =>
+    focusActiveSurface(runtime),
+  )
+}
+
+// Panels exist only in the workbench; chat has no numbered target for these keys.
+function sidebarPanelCommands() {
+  return ITEM_POSITIONS.map((position) =>
+    defineCommand({
+      ...sidebarPanelMetadata(position),
+      run: (context) => {
+        const tab = WORKBENCH_SIDEBAR_TABS[position - 1]
+        if (context.snapshot.uiMode !== 'workbench' || !tab) return declined
+        return toggleSidebarPanel(context, tab)
+      },
+    }),
+  )
+}
+
+function toggleSidebarPanel(
+  { runtime, snapshot }: WorkspaceCommandHandlerContext,
+  tab: WorkbenchSidebarTab,
+) {
+  const rootPath = snapshot.rootPath
+  if (!rootPath) return declined
+
+  const panels = toggleWorkbenchSidebarTab(snapshot.workbenchPanels, tab)
+  const stranded = !panels.sidebarOpen && focusInsideSidebar()
+  return afterNavigation(
+    getNavigation().setWorkbenchPanels(panels, runtime.workspace, 'workbench'),
+    () => {
+      if (panels.sidebarOpen) return focusSidebarPanel(runtime, rootPath, tab)
+      return stranded ? focusActiveSurfaceOrShell(runtime) : handled
+    },
+  )
+}
+
+function focusSidebarPanel(
+  runtime: WorkspaceCommandRuntime,
+  rootPath: string,
+  tab: WorkbenchSidebarTab,
+) {
+  if (tab === 'chat') return chatFocusStart(runtime, rootPath, 'workbench')
+  return focusIdInLayoutStart(runtime, sidebarFocusTarget(rootPath, tab), 'workbench')
+}
+
+function sidebarFocusTarget(
+  rootPath: string,
+  tab: Exclude<WorkbenchSidebarTab, 'chat'>,
+): FocusTargetId {
+  if (tab === 'git') return { kind: 'git', rootPath }
+  if (tab === 'logs') return { kind: 'logs' }
+  if (tab === 'search') return { kind: 'search', rootPath, surface: 'sidebar' }
+  return { kind: 'file-tree', rootPath }
 }
 
 export const workspaceCommands = [
@@ -1165,12 +1249,12 @@ export const workspaceCommands = [
     run: (context) => runSessionCommand(context, startScopedSessionDraft),
   }),
   defineCommand({
-    ...workspaceCommandMetadata['workspace.nextSession'],
-    run: sessionTraversalHandler('next'),
+    ...workspaceCommandMetadata['workspace.nextItem'],
+    run: adjacentItemHandler('next'),
   }),
   defineCommand({
-    ...workspaceCommandMetadata['workspace.previousSession'],
-    run: sessionTraversalHandler('previous'),
+    ...workspaceCommandMetadata['workspace.previousItem'],
+    run: adjacentItemHandler('previous'),
   }),
   defineCommand({
     ...workspaceCommandMetadata['workspace.toggleSessionRail'],
@@ -1179,7 +1263,8 @@ export const workspaceCommands = [
       return toggleSessionRail(context)
     },
   }),
-  ...sessionJumpCommands(),
+  ...selectItemCommands(),
+  ...sidebarPanelCommands(),
 ]
 
 export type WorkspaceCommandId = (typeof workspaceCommands)[number]['id']

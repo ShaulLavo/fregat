@@ -30,7 +30,7 @@
     "./commands/editor": "./src/commands/editor.ts",
     "./commands/environment": "./src/commands/environment.ts",
     "./commands/foundation": "./src/commands/foundation.ts",
-    "./commands/session-jump": "./src/commands/session-jump.ts",
+    "./commands/item-position": "./src/commands/item-position.ts",
     "./commands/focus": "./src/commands/focus.ts",
     "./commands/chord": "./src/commands/chord.ts",
     "./commands/palette": "./src/commands/palette.ts",
