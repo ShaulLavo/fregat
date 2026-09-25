@@ -98,6 +98,7 @@ LIFE-01/02 implementation shipped on 2026-09-20; [delivery evidence](archive-del
 
 ### LIFE-07 — P1: Match unread defaults, manual unread, and wake state
 
+- **Closed 2026-09-25.** Decided 2026-09-25: owner — close on the existing `session-unread` scenario; native and mobile controls carry on under EXT-09.
 - **Status/confidence:** Confirmed mismatch, HIGH.
 - **Evidence:** Upstream `Sidebar.logic.ts:635–643` treats never-visited history as read; invalid stored visit as unread. Local `packages/client-core/src/chat/rail/unread.ts:25–29` treats absent seen stamp as unread. Upstream `uiStateStore.ts:250–295` makes visits monotonic and supports mark-unread by a stamp before completion; `threadActionMenu.logic.ts:122` and `Sidebar.tsx:3984–3989` expose single/bulk actions. Local `session-read-store.ts:24–49` only marks seen and permits an older stamp to replace a newer one; `use-mark-session-seen.ts:12–19` never records a visit before the first completion. Upstream `Sidebar.tsx:1112–1128` distinguishes unread and woke, including persistent timer-wake prominence.
 - **Impact:** Importing/opening the app lights historical sessions as unread; users cannot deliberately mark one unread; seeing a session before its first completion is not represented as a visit; snooze wake acknowledgment cannot be expressed.
@@ -175,6 +176,7 @@ LIFE-01/02 implementation shipped on 2026-09-20; [delivery evidence](archive-del
 > several undo implementations (the file-tree journal in `apps/server/src/fs/workspace-edit-journal.ts`, snooze Undo in
 > `session-rail-store.ts`, the Editor undo graph) but no shared stack. Extract one reusable stack and use it here. Lane L5's
 > latest-slot version (PR #38) is a first step; this row reopens.
+> The research is [Plan 172](../172-shared-undo-stack.md).
 
 - **Status/confidence:** Confirmed gap, HIGH. Post-pin delta (`5781b524`, `6b0a04ad`, `9a609a4e`); cited at `9383f4ad`. See [delta record](delta-2026-09-24.md).
 - **Evidence:** Upstream `docs/user/thread-sidebar.md:31–36` gives each of unpin, settle, snooze and archive a five-second Undo that restores the previous state, including pinned position, and reopens an archived thread the user was viewing. `mod+z` triggers the most recent Undo when no text field is focused. Code: `apps/web/src/hooks/useThreadActions.ts`, `showUndoToast.ts`, `components/sidebar/SidebarThreadUndoNotice.tsx`, `keybindings.ts`; tests in `useThreadActions.undo.test.ts`. Local `apps/web/src/features/chat-mode/hooks/use-session-actions.ts:74–86` offers Undo only after a successful snooze. A bounded search for `undo` under `apps/web/src/features/chat-mode` and `mod+z` in `apps/web/src/keymap/default-bindings.ts` found no other lifecycle undo or binding.

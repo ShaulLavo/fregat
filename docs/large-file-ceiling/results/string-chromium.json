@@ -1,0 +1,14 @@
+{
+  "engine": "chromium",
+  "version": "153.0.8010.12",
+  "oneByteMaxUnits": 536870888,
+  "oneByteAtBound": false,
+  "oneByteMaxMiB": 511.9999771118164,
+  "twoByteMaxUnits": 536870888,
+  "twoByteAtBound": false,
+  "decodeAtCeilingOk": true,
+  "decodeOverCeilingOk": true,
+  "json": { "envelopeUnits": 187, "maxContentUnits": 536870701 },
+  "heap": { "chunkMiB": 64, "heldMiB": 6144, "capMiB": 6144, "failure": null },
+  "ms": 2866
+}
