@@ -1,5 +1,4 @@
 import { dlopen } from 'bun:ffi'
-import path from 'node:path'
 
 export function foregroundJobGroup(): number | null {
   if (process.platform === 'win32' || !process.stdin.isTTY) return null
@@ -21,14 +20,10 @@ export function foregroundJobGroup(): number | null {
   }
 }
 
+// Ours when this process leads the group, or when the launcher that named itself in
+// PLATFORM_TUI_LAUNCHER_PID leads it and is our parent. A shell leading the group never is.
 function ownsJobGroup(group: number): boolean {
   if (group === process.pid) return true
-  // The launcher can lead our group; an enclosing shell must never be stopped.
-  const leader = Bun.spawnSync(['ps', '-p', String(group), '-o', 'comm='], {
-    stdin: 'ignore',
-    stdout: 'pipe',
-    stderr: 'pipe',
-  })
-  if (leader.exitCode !== 0) return false
-  return path.basename(leader.stdout.toString().trim()) === path.basename(process.execPath)
+  const launcher = Number(process.env.PLATFORM_TUI_LAUNCHER_PID)
+  return group === launcher && group === process.ppid
 }

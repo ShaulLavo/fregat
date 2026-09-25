@@ -105,6 +105,23 @@ into the FFI call. Terminal state restored by query or a documented reset, with 
 commented. Name the repaint constants, or replay stored scrollback instead of poking the app. A
 supported terminal namespace parameter so the harness asks instead of intercepting.
 
+Status 2026-09-25 (lane L4):
+
+- Item 5: done. The TUI stops its job group only when it leads the group, or when the launcher
+  that named itself in `PLATFORM_TUI_LAUNCHER_PID` (set by `scripts/tui.ts`) leads it and is the
+  TUI's parent. Walking ancestry alone would stop a non-job-control shell that leads the group,
+  which the `shared-shell` job-control test pins.
+- Item 7: done. The detach reset is a list with one comment per mode (`DETACH_RESET` in
+  `apps/tui/src/host/attach.ts`).
+- Item 6: not done. `vibrancy.m` resolves the window by title because Electrobun's `createWindow`
+  pointer type is not a public contract, and messaging a non-Objective-C pointer would crash the
+  app. The change can only be verified on the Mac: owner check.
+- Item 8: waits for Plan 149 Phase 2, which is changing `terminal/service.ts`.
+- Item 11: deferred. The capture prefix is also how `chat-queue`, `terminal-history` and product
+  captures find and kill their own terminals, and a page URL parameter does not survive the app's
+  own URL rewriting across the reloads those scenarios do. Since Plan 146 a default run has its own
+  server, so the prefix matters only for `--shared-dev` captures.
+
 ## Phase 4 — one schema, no ledger (D4)
 
 `migrations.ts` (511 lines) becomes one function that creates the current schema, which is what

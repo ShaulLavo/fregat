@@ -21,6 +21,8 @@ export async function launchTui({
       arg === '-h',
   )
   env.VITE_SERVER_URL = serverUrlFromEnv(env)
+  // The TUI stops its job group only when it or this launcher leads it.
+  env.PLATFORM_TUI_LAUNCHER_PID = String(process.pid)
   const child = Bun.spawn({
     cmd: [process.execPath, ...(watch ? ['--watch'] : []), entrypoint, ...args],
     cwd: path.join(root, 'apps/tui'),
