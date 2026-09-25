@@ -681,6 +681,8 @@ export const selectors = {
   editorSurface: (page: Page) => page.locator('.editor-virtualized-viewport'),
   editorFindInput: (page: Page) => page.getByRole('textbox', { name: 'Find', exact: true }),
   editorFindCount: (page: Page) => page.locator('.editor-find-count'),
+  editorFindWidget: (page: Page) => page.locator('.editor-find-widget'),
+  editorMinimap: (page: Page) => page.locator('.editor-minimap-right'),
   terminalSurface: (page: Page) =>
     page.locator('[data-slot="tool-pane"][aria-label="Terminal"]:visible'),
   paletteRowSelector: '[data-slot="command-list"] [role="option"]',
