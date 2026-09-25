@@ -2624,7 +2624,7 @@ async function openCodexSession(
     runtimeMode: RuntimeMode
   },
 ) {
-  if (input.fork) return forkCodexThread(client, { ...input, fork: input.fork })
+  if (input.fork) return forkCodexConversation(client, { ...input, fork: input.fork })
   const resumeSessionId =
     typeof input.providerResumeCursor === 'string' ? input.providerResumeCursor : null
   if (!resumeSessionId) return client.request('thread/start', threadStartParams(input))
@@ -2642,7 +2642,7 @@ async function openCodexSession(
 }
 
 /** A thread that never ran here was discovered, and a discovered session's id is its thread id. */
-async function forkCodexThread(
+async function forkCodexConversation(
   client: CodexAppServerRpcClient,
   input: Parameters<typeof threadResumeParams>[0] & { fork: ProviderForkStart },
 ) {

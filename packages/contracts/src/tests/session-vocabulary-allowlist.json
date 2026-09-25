@@ -316,6 +316,7 @@
     "thread.cwd": 1,
     "thread.id": 2,
     "thread/compacted": 2,
+    "thread/fork": 1,
     "thread/list": 3,
     "thread/name/updated": 2,
     "thread/read": 1,
@@ -330,8 +331,8 @@
     "thread/started": 3,
     "thread/status/changed": 2,
     "thread/tokenUsage/updated": 2,
-    "threadId": 14,
-    "threadResumeParams": 2,
+    "threadId": 17,
+    "threadResumeParams": 4,
     "threadStartParams": 2,
     "threadStateFromValue": 2
   },
@@ -374,9 +375,10 @@
     "agentThreadId": 5,
     "parent_thread_id": 4,
     "providerThreadId": 2,
-    "thread": 86,
+    "thread": 93,
     "thread_spawn": 4,
     "thread/compacted": 1,
+    "thread/fork": 3,
     "thread/list": 4,
     "thread/read": 4,
     "thread/resume": 5,
@@ -386,10 +388,10 @@
     "thread/started": 5,
     "thread/status/changed": 2,
     "thread/tokenUsage/updated": 2,
-    "thread/turns/list": 6,
+    "thread/turns/list": 8,
     "threadApprovalsReviewer": 3,
     "threadEphemeral": 4,
-    "threadId": 79,
+    "threadId": 80,
     "threadPersistsExtendedHistory": 4,
     "threadSettings": 1,
     "threadStartCount": 3,
@@ -435,7 +437,7 @@
     "thread.id": 1,
     "thread/revert": 1,
     "thread/turns/list": 1,
-    "threadId": 5
+    "threadId": 8
   },
   "apps/server/src/provider/adapters/utils/codex-session.ts": {
     "thread": 1

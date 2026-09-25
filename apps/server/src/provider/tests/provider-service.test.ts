@@ -364,7 +364,7 @@ describe('ProviderService', () => {
       providerDriverKind: adapter.driverKind,
       providerInstanceId: input.providerInstanceId,
       providerBindingHandle: `mock:${source}`,
-      providerResumeCursor: 'source-thread',
+      providerResumeCursor: 'source-conversation',
       runtimeMode: input.runtimeMode,
       runtimePayload: providerSessionPayload(input),
       sessionId: source,
@@ -385,7 +385,7 @@ describe('ProviderService', () => {
     await ensure('second-epoch')
 
     expect(adapter.startedSessions.map((session) => session.fork ?? null)).toEqual([
-      { droppedPrompts: 2, sourceResumeCursor: 'source-thread', sourceSessionId: source },
+      { droppedPrompts: 2, sourceResumeCursor: 'source-conversation', sourceSessionId: source },
       null,
     ])
     fixture.close()
