@@ -1,3 +1,4 @@
+import { foldChatInputPaste } from '@/features/chat/utils/input-editor-actions'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import { COMMAND_PRIORITY_HIGH, KEY_DOWN_COMMAND, PASTE_COMMAND } from 'lexical'
 import { useEffect, useRef } from 'react'
@@ -15,7 +16,7 @@ import {
 export function ChatInputPasteFoldPlugin({
   onFiles,
 }: {
-  readonly onFiles: (files: readonly File[]) => void
+  readonly onFiles: (files: readonly File[]) => Promise<boolean>
 }) {
   const [editor] = useLexicalComposerContext()
   // The paste event cannot see its keys, so the inline chord opens a short window for it.
@@ -43,7 +44,7 @@ export function ChatInputPasteFoldPlugin({
         event.preventDefault()
         const name = nextPastedTextFileName(foldedNames.current)
         foldedNames.current.add(name)
-        onFiles([new File([text], name, { type: 'text/plain' })])
+        void foldChatInputPaste(editor, text, name, onFiles)
         return true
       },
       COMMAND_PRIORITY_HIGH,

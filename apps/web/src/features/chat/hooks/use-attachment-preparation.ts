@@ -77,7 +77,10 @@ export function useAttachmentPreparation(target: ChatInputDraftTarget) {
     // A removal has already left the draft, so its server delete must not hold up send or stash.
     if (!('remove' in input))
       useChatInputDraftStore.getState().changeAttachmentPreparation(target, 1)
-    mutation.mutate(input)
+    return mutation.mutateAsync(input).then(
+      (count) => typeof count === 'number' && count > 0,
+      () => false,
+    )
   }
   return {
     error: filesBlocked
@@ -89,7 +92,8 @@ export function useAttachmentPreparation(target: ChatInputDraftTarget) {
       chatInputAttachmentsPreparing(useChatInputDraftStore.getState(), target) ||
       useChatInputDraftStore.getState().getDraft(target).attachments.some(attachmentDraftBlocked),
     prepare: (files: readonly File[]) => {
-      if (files.length) start({ files })
+      if (!files.length) return Promise.resolve(false)
+      return start({ files })
     },
     retry: (id: string) => start({ retry: id }),
     remove: (id: string) => {

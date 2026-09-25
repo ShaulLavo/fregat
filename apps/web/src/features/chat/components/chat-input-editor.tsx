@@ -36,7 +36,7 @@ export function ChatInputEditor({
   onCommandMenuCommit: () => boolean
   onCommandMenuMove: (offset: number) => boolean
   onEditorReady: (editor: LexicalEditor | null) => void
-  onImageFiles: (files: readonly File[]) => void
+  onImageFiles: (files: readonly File[]) => Promise<boolean>
   onSubmitRequest: (alternate?: boolean) => Promise<boolean>
   onTriggerChange: (trigger: ChatInputTrigger | null) => void
   placeholder: string

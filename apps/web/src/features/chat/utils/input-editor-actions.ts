@@ -419,3 +419,13 @@ function lexicalNodeTextSize(node: LexicalNode): number {
 
   return node.getChildren().reduce((size, child) => size + lexicalNodeTextSize(child), 0)
 }
+
+export async function foldChatInputPaste(
+  editor: LexicalEditor,
+  text: string,
+  name: string,
+  admit: (files: readonly File[]) => Promise<boolean>,
+) {
+  const accepted = await admit([new File([text], name, { type: 'text/plain' })]).catch(() => false)
+  if (!accepted) insertChatInputText(editor, text)
+}
