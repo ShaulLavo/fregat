@@ -5,6 +5,8 @@ import path from 'node:path'
 import { PassThrough } from 'node:stream'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ChildProcessWithoutNullStreams } from 'node:child_process'
+import type { WideEvent } from 'evlog'
+import { readFsLogs } from 'evlog/fs'
 
 import type { LspServerHandle, LspServerMatch } from '../registry'
 import { encodeLspStdioMessage, LspStdioMessageReader } from '../stdio-rpc'
@@ -15,6 +17,11 @@ import { testSettingsOptions } from '../../settings/testing'
 import { createWorkspacePaths } from '../../fs/path'
 import { treeWatchSource, type TreeWatchSource } from '../../fs/tree-watch'
 import { FileChangeHub } from '../../fs/watch'
+import {
+  flushObservability,
+  initializeObservability,
+  resetObservabilityForTests,
+} from '../../observability/runtime'
 import { fileUriForPath } from '../language'
 
 const databases: { close: () => void }[] = []
@@ -1247,6 +1254,57 @@ describe('LspSessionPool ownership', () => {
   })
 })
 
+describe('lsp.session level', () => {
+  afterEach(() => resetObservabilityForTests())
+
+  it('logs a backend the service manager signalled with the server as app_shutdown at info', async () => {
+    const fixture = await lspFixture()
+    const root = await fixtureRoot('platform-lsp-app-')
+    const logDir = observedLogDir(root)
+    const app = lspTestApp(root, fixture.pool)
+    await fixture.pool.acquire(fixture.firstSocket, fixture.match, '')
+
+    // systemd signals every process in the unit at once; typescript-go answers
+    // exit 1 ("context canceled") while cleanup is still awaiting other services.
+    const closing = closeApp(app)
+    fixture.process.process.emit('exit', 1, null)
+    await closing
+
+    expect(await lspSessionEvents(logDir)).toEqual([
+      expect.objectContaining({ level: 'info', outcome: 'app_shutdown' }),
+    ])
+  })
+
+  it('logs our own stop at info when the backend then exits 1', async () => {
+    const fixture = await lspFixture()
+    const logDir = observedLogDir(await fixtureRoot('platform-lsp-logs-'))
+    await fixture.pool.acquire(fixture.firstSocket, fixture.match, '')
+    fixture.kill.mockImplementation(() => {
+      fixture.process.process.emit('exit', 1, null)
+      return true
+    })
+
+    fixture.pool.disposeAll()
+
+    expect(await lspSessionEvents(logDir)).toEqual([
+      expect.objectContaining({ level: 'info', outcome: 'app_shutdown' }),
+    ])
+  })
+
+  it('warns when a backend exits on a signal this app did not send', async () => {
+    const fixture = await lspFixture()
+    const logDir = observedLogDir(await fixtureRoot('platform-lsp-logs-'))
+    await fixture.pool.acquire(fixture.firstSocket, fixture.match, '')
+
+    fixture.process.process.emit('exit', null, 'SIGTERM')
+
+    expect(fixture.kill).not.toHaveBeenCalled()
+    expect(await lspSessionEvents(logDir)).toEqual([
+      expect.objectContaining({ exitSignal: 'SIGTERM', level: 'warn', outcome: 'process_exit' }),
+    ])
+  })
+})
+
 describe('LspSessionPool server requests', () => {
   it('pushes configured settings once after the initialized notification', async () => {
     const settings = {
@@ -2012,6 +2070,27 @@ function lspTestApp(root: string, pool: LspSessionPool) {
     workspaceEditJournalRoot: path.join(root, '.workspace-edit-journals'),
     workspaceRoot: root,
   })
+}
+
+function observedLogDir(root: string) {
+  const logDir = path.join(root, 'logs')
+  initializeObservability({
+    OBSERVABILITY_CONSOLE: 'false',
+    OBSERVABILITY_DIR: logDir,
+    OBSERVABILITY_ENABLED: 'true',
+    OBSERVABILITY_INFO_SAMPLE_RATE: '100',
+    NODE_ENV: 'production',
+  })
+  return logDir
+}
+
+async function lspSessionEvents(logDir: string) {
+  await flushObservability()
+  const events: WideEvent[] = []
+  for await (const event of readFsLogs({ dir: logDir })) {
+    if (event.action === 'lsp.session') events.push(event)
+  }
+  return events
 }
 
 async function initializedFixture(

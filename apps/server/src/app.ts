@@ -486,12 +486,11 @@ function appCleanup(
 
     closed = true
     orchestrationSockets.closeAll()
+    // Kills the language servers, before any await: the service manager signals them with the
+    // server, and an exit that lands before this is logged as a crash.
+    lspPool.disposeAll()
     await machines.close()
     await terminal.dispose()
-    // Language servers are child processes. Without this, jdtls, gopls and
-    // rust-analyzer outlive the server and idle on the machine until someone
-    // notices and kills them by hand.
-    lspPool.disposeAll()
     // Releases the settings file watchers; without this a test run leaks a
     // native handle per app it builds.
     settings.close()
