@@ -1,4 +1,5 @@
-import { useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
+import { LoadingState } from '@workspace/ui/components/loading-state'
 import { HighlightedCode } from '@workspace/markdown/components/highlighted-code'
 import { CodeHighlighterContext } from '@workspace/markdown/providers/code-highlighter-context'
 
@@ -19,7 +20,8 @@ export function TextPreview({
   name: string
   path: string
 }) {
-  const query = useQuery(previewQueryOptions(path))
+  // The previous file stays up while the next one reads, so a moving highlight does not flicker.
+  const query = useQuery({ ...previewQueryOptions(path), placeholderData: keepPreviousData })
   const highlighter = useCodeHighlighter()
 
   if (query.isError)
@@ -31,7 +33,15 @@ export function TextPreview({
         </p>
       </div>
     )
-  if (!query.data || query.data.kind === 'binary') return fallback
+  if (query.isPending)
+    return (
+      <LoadingState className='flex w-full flex-col gap-1.5 p-2' label={`Loading ${name}`}>
+        {Array.from({ length: 4 }, (_, index) => (
+          <div className='skeleton-sweep h-2 w-3/4 rounded-md' key={index} />
+        ))}
+      </LoadingState>
+    )
+  if (query.data.kind === 'binary') return fallback
 
   return (
     <CodeHighlighterContext value={highlighter}>

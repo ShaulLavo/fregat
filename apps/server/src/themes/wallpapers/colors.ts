@@ -1,5 +1,4 @@
-import { randomUUID } from 'node:crypto'
-import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
+import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import sharp from 'sharp'
 import * as v from 'valibot'
@@ -11,6 +10,7 @@ import {
   type WallpaperColors,
 } from '@workspace/contracts'
 import { displayName, type WallpaperLibrary } from './library'
+import { wallpaperErrors } from './structured-errors'
 
 /** Enough pixels to find a wallpaper's colors; more only costs time. */
 const SAMPLE_WIDTH = 64
@@ -31,20 +31,16 @@ export async function wallpaperColors(
   const cache = path.join(library.directory, `${id}.colors.json`)
   const cached = await readColors(cache)
   if (cached) return cached
-  const { data, info } = await sharp(path.join(directory, displayName(id)))
+  const display = path.join(directory, displayName(id))
+  if (!(await Bun.file(display).exists()))
+    throw wallpaperErrors.NOT_FOUND({ internal: { at: 'colors', asset: id } })
+  const { data, info } = await sharp(display)
     .resize(SAMPLE_WIDTH, SAMPLE_HEIGHT, { fit: 'cover' })
     .removeAlpha()
     .raw()
     .toBuffer({ resolveWithObject: true })
   const colors = quantize(labPixels(data, info.channels), CLUSTERS)
-  await mkdir(library.directory, { recursive: true })
-  const staging = `${cache}.${randomUUID()}.tmp`
-  try {
-    await writeFile(staging, `${JSON.stringify(colors)}\n`)
-    await rename(staging, cache)
-  } finally {
-    await rm(staging, { force: true })
-  }
+  await library.writeCache(id, path.basename(cache), `${JSON.stringify(colors)}\n`)
   return colors
 }
 

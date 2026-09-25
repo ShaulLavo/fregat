@@ -56,6 +56,15 @@ export function ColumnsView({
     setFocusRequest(null)
   }, [focusRequest, folders])
 
+  // Navigating replaces every keyed column; if focus went with the old one, take it back.
+  const shownPath = useRef(currentPath)
+  useEffect(() => {
+    if (shownPath.current === currentPath) return
+    shownPath.current = currentPath
+    if (document.activeElement !== document.body) return
+    stripRef.current?.querySelector<HTMLElement>('[data-picker-column="0"]')?.focus()
+  }, [currentPath])
+
   // The deepest column stays in view as the path grows.
   useEffect(() => {
     const strip = stripRef.current

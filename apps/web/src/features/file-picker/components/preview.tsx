@@ -16,6 +16,7 @@ import { PREVIEW_SETTLE_MS } from '@/lib/file-preview/utils/preview'
  * arrow key reads nothing, and the previous preview stays up until the next one lands.
  */
 export function PreviewPane({
+  accept,
   className = 'hidden lg:flex',
   entry,
   iconMode,
@@ -23,6 +24,7 @@ export function PreviewPane({
   mode,
   showHidden,
 }: {
+  accept?: readonly string[]
   className?: string
   entry: FsEntry | null
   iconMode: FilePickerIconMode
@@ -47,7 +49,13 @@ export function PreviewPane({
           data-file-preview={shown.path}
         >
           <div className='flex max-h-72 min-h-0 w-full shrink justify-center overflow-hidden'>
-            <EntryContent entry={shown} iconMode={iconMode} mode={mode} showHidden={showHidden} />
+            <EntryContent
+              accept={accept}
+              entry={shown}
+              iconMode={iconMode}
+              mode={mode}
+              showHidden={showHidden}
+            />
           </div>
           <div className='w-full min-w-0 text-center' title={shown.path}>
             <div className='truncate text-xs font-medium'>{shown.name}</div>

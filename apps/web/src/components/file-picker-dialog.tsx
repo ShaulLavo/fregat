@@ -35,6 +35,7 @@ import { FileList } from '@/features/file-picker/components/list'
 import { ColumnsView } from '@/features/file-picker/components/columns-view'
 import { IconsView } from '@/features/file-picker/components/icons-view'
 import {
+  deepestPickable,
   initialTrail,
   pickerView,
   shownPickerView,
@@ -172,15 +173,18 @@ export function FilePickerDialog({
   const navigateTo = (path: string) => {
     loadAndNavigate(path, beginDirectoryIntent())
   }
-  const revealEntry = (entry: FsEntry) => {
-    const path = isDirectoryEntry(entry) ? entry.path : pickerParentPath(entry.path)
+  const navigateSelecting = (path: string, entry: FsEntry | null) => {
     const intentId = beginDirectoryIntent()
     void loadDirectory(path, intentId).then((loaded) => {
       if (!loaded) return
 
       navigateSessionTo(path)
-      if (!isDirectoryEntry(entry)) selectSessionEntry(entry)
+      if (entry) selectSessionEntry(entry)
     })
+  }
+  const revealEntry = (entry: FsEntry) => {
+    if (isDirectoryEntry(entry)) return navigateSelecting(entry.path, null)
+    navigateSelecting(pickerParentPath(entry.path), entry)
   }
   const pathInput = useFilePickerPathInput({
     currentPath: session.currentPath,
@@ -221,8 +225,11 @@ export function FilePickerDialog({
   const isSearchLoading = isSearching && isDirectoryFetching
   const listInteractionPending = isSearchPending || isSearchLoading
   const previewEntry = focusedEntry ?? currentEntry
-  const selectedPickable =
-    toPickedEntry(focusedEntry, mode, activeAccept) ?? currentPickableEntry(currentEntry, mode)
+  const focusedPickable =
+    view === 'columns'
+      ? deepestPickable(trail, mode, activeAccept)
+      : toPickedEntry(focusedEntry, mode, activeAccept)
+  const selectedPickable = focusedPickable ?? currentPickableEntry(currentEntry, mode)
   const homePath = serverInfo?.homePath ?? ROOT_PATH
   const settingsLayers = settings?.layers ?? []
   const hiddenWriteTarget = deriveWriteTarget('files.showHidden', settingsLayers)
@@ -317,16 +324,18 @@ export function FilePickerDialog({
       return
     }
 
-    const candidate = selectedEntry ?? entries[0] ?? null
+    const candidate = focusedEntry ?? entries[0] ?? null
     if (candidate && isDirectoryEntry(candidate) && mode === 'file') {
       event.preventDefault()
       navigateTo(candidate.path)
       return
     }
 
-    const candidatePickable = candidate
-      ? toPickedEntry(candidate, mode, activeAccept)
-      : selectedPickable
+    // In columns the footer names the deepest pickable entry, so Enter picks that one.
+    const candidatePickable =
+      candidate && !(view === 'columns' && focusedEntry)
+        ? toPickedEntry(candidate, mode, activeAccept)
+        : selectedPickable
     if (!candidatePickable) return
 
     event.preventDefault()
@@ -664,7 +673,9 @@ export function FilePickerDialog({
                   onCommit={commitEntry}
                   onDirectoryIntent={preloadDirectory}
                   onGoParent={() => {
-                    if (session.canGoUp) navigateTo(pickerParentPath(session.currentPath))
+                    // Finder keeps the folder just left selected in the new first column.
+                    if (session.canGoUp)
+                      navigateSelecting(pickerParentPath(session.currentPath), currentEntry)
                   }}
                   onOpen={handleEntryDoubleClick}
                   onTrailChange={changeTrail}
@@ -716,6 +727,7 @@ export function FilePickerDialog({
               )}
             </div>
             <PreviewPane
+              accept={activeAccept}
               entry={previewEntry}
               iconMode={displayedIconMode}
               isSearching={isSearching}

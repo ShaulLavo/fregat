@@ -22,6 +22,7 @@ import { sseResponse, toSse } from '../sse'
 import type { GitService } from './service'
 import { GitWorktreeService } from './worktrees'
 import { GitHistory } from './history'
+import { errorSummary, recordRequestWarning } from '../observability/logging'
 
 export function gitRoutes(
   git: GitService,
@@ -85,7 +86,7 @@ export function gitRoutes(
         async ({ query }) => {
           const [entries, baseBranches] = await Promise.all([
             worktrees.list(query.path),
-            options.worktreeBaseBranches?.(),
+            readBaseBranches(options.worktreeBaseBranches),
           ])
           return entries.map((worktree) => ({
             ...worktree,
@@ -162,4 +163,17 @@ export function gitRoutes(
         body: gitCreatePullRequestBodySchema,
       }),
   )
+}
+
+// Base branches only draw the lane gutter; the worktree list stays up without them.
+async function readBaseBranches(
+  read: (() => Promise<ReadonlyMap<string, string | null>>) | undefined,
+) {
+  if (!read) return null
+  try {
+    return await read()
+  } catch (error) {
+    recordRequestWarning('worktree base branches unavailable', { error: errorSummary(error) })
+    return null
+  }
 }

@@ -83,15 +83,21 @@ export function paletteFromWallpaperColors(
 /** Moves each failing text color away from its surface until the pair reads. */
 function withReadableText(colors: PaletteColors): PaletteColors {
   let result = colors
+  // A pair already at the lightness limit cannot improve; the others still get their turn.
+  const stuck = new Set<string>()
   for (let pass = 0; pass < 60; pass += 1) {
-    const [failure] = contrastFailures(result)
+    const failure = contrastFailures(result).find(
+      (entry) => !stuck.has(`${entry.foreground}/${entry.background}`),
+    )
     if (!failure) return result
     const surface = result.app[failure.background]
     const text = result.app[failure.foreground]
     const direction = surface.l < 0.6 ? 1 : -1
     const nudged = normalizeColor({ ...text, l: clamp(text.l + direction * NUDGE, [0, 1]) })
-    if (contrastRatio(nudged, surface) <= failure.ratio && (nudged.l === 0 || nudged.l === 1))
-      return result
+    if (contrastRatio(nudged, surface) <= failure.ratio && (nudged.l === 0 || nudged.l === 1)) {
+      stuck.add(`${failure.foreground}/${failure.background}`)
+      continue
+    }
     result = { ...result, app: { ...result.app, [failure.foreground]: nudged } }
   }
   return result

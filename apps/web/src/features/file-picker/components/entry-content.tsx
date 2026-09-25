@@ -13,11 +13,13 @@ import { previewKind } from '@/features/file-picker/utils/preview'
 
 /** What is in the entry: the image, the first lines, or the first children. */
 export function EntryContent({
+  accept,
   entry,
   iconMode,
   mode,
   showHidden,
 }: {
+  accept?: readonly string[]
   entry: FsEntry
   iconMode: FilePickerIconMode
   mode: FilePickerMode
@@ -30,6 +32,14 @@ export function EntryContent({
     return <FileThumbnail fallback={tile} src={previewImageUrl(origin, entry.path)} />
   if (kind === 'text') return <TextPreview fallback={tile} name={entry.name} path={entry.path} />
   if (kind === 'folder')
-    return <FolderPreview entry={entry} iconMode={iconMode} mode={mode} showHidden={showHidden} />
+    return (
+      <FolderPreview
+        accept={accept}
+        entry={entry}
+        iconMode={iconMode}
+        mode={mode}
+        showHidden={showHidden}
+      />
+    )
   return tile
 }

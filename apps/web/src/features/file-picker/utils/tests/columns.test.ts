@@ -3,6 +3,7 @@ import { expect, test } from '../../../../../test/fixtures'
 import type { FsEntry } from '@/lib/file-system-types'
 import {
   columnFolders,
+  deepestPickable,
   initialTrail,
   pickerView,
   selectInColumn,
@@ -28,6 +29,13 @@ test('selecting in a column closes the columns after it', () => {
     src,
     entry('repo/src/other', 'directory'),
   ])
+})
+
+test('the deepest pickable entry skips a file past the folder the user drilled into', () => {
+  expect(deepestPickable([src, lib, app], 'folder')).toBe(lib)
+  expect(deepestPickable([src, lib, app], 'file')).toBe(app)
+  expect(deepestPickable([src, lib, app], 'file', ['.md'])).toBeNull()
+  expect(deepestPickable([], 'folder')).toBeNull()
 })
 
 test('only a selection inside the current folder seeds the columns', () => {

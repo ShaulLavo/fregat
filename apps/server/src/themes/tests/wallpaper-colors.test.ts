@@ -97,6 +97,15 @@ it('deletes the cached colors with an uploaded wallpaper', async () => {
   expect(await readdir(library.directory)).toEqual([])
 })
 
+it('does not write a colors cache for a wallpaper deleted while they computed', async () => {
+  const { library, asset } = await fixture()
+
+  await library.delete(asset.id)
+  await library.writeCache(asset.id, `${asset.id}.colors.json`, '{"clusters":[]}\n')
+
+  expect(await readdir(library.directory)).toEqual([])
+})
+
 it('keeps imported bundles unchanged when caching wallpaper colors', async () => {
   const { root, library, asset } = await fixture()
   const bundle = path.join(root, 'imported')

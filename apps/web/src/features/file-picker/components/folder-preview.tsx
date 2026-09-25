@@ -1,4 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
+import { EmptyState } from '@workspace/ui/components/empty-state'
+import { LoadingState } from '@workspace/ui/components/loading-state'
 
 import type { FsEntry } from '@/lib/file-system-types'
 import { EntryIcon } from '@/features/file-picker/components/entry-icon'
@@ -6,26 +8,41 @@ import { directoryQueryOptions } from '@/features/file-picker/utils/directory-qu
 import type { FilePickerIconMode, FilePickerMode } from '@/features/file-picker/utils/model'
 import { sortFilePickerEntries } from '@/features/file-picker/utils/sort-entries'
 import { PREVIEW_CHILDREN } from '@/features/file-picker/utils/preview'
+import { filterPickerEntries } from '@/features/file-picker/utils/type-filter'
 
 const BY_NAME = { direction: 'ascending', key: 'name' } as const
 
 /** A folder's first children, from the listing the selection already prefetched. */
 export function FolderPreview({
+  accept,
   entry,
   iconMode,
   mode,
   showHidden,
 }: {
+  accept?: readonly string[]
   entry: FsEntry
   iconMode: FilePickerIconMode
   mode: FilePickerMode
   showHidden: boolean
 }) {
   const query = useQuery(directoryQueryOptions({ mode, path: entry.path, query: '', showHidden }))
-  const children = sortFilePickerEntries(query.data?.entries ?? [], BY_NAME).slice(
-    0,
-    PREVIEW_CHILDREN,
-  )
+  if (query.isPending)
+    return (
+      <LoadingState className='flex w-full flex-col' label={`Loading ${entry.name}`}>
+        {Array.from({ length: 3 }, (_, index) => (
+          <div className='flex h-(--density-row-height) items-center' key={index}>
+            <div className='skeleton-sweep h-3 w-28 rounded-md' />
+          </div>
+        ))}
+      </LoadingState>
+    )
+  if (query.isError)
+    return <EmptyState align='start' title='Could not read this folder.' tone='error' />
+  const shown = filterPickerEntries(query.data.entries, mode, accept)
+  if (query.data.entries.length === 0) return <EmptyState align='start' title='Empty folder' />
+  if (shown.length === 0) return <EmptyState align='start' title='No matching files' />
+  const children = sortFilePickerEntries(shown, BY_NAME).slice(0, PREVIEW_CHILDREN)
 
   return (
     <ul

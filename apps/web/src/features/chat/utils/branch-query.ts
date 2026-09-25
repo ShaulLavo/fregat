@@ -28,10 +28,8 @@ async function fetchBranches(path: string, signal: AbortSignal, client: Client) 
         client.git.branches.get({ query: { path }, fetch: { signal } }),
         client.git.worktrees.get({ query: { path }, fetch: { signal } }),
       ])
-      const worktrees = unwrapEdenResponse(worktreesResponse, {
-        requireData: true,
-        emptyMessage: 'git server returned an empty worktree response',
-      })
+      // Worktrees only draw the lane gutter; without them the branches still list, unlaned.
+      const worktrees = worktreesResponse.error ? [] : (worktreesResponse.data ?? [])
       const branches = unwrapEdenResponse(response, {
         requireData: true,
         emptyMessage: 'git server returned an empty response',
@@ -40,6 +38,7 @@ async function fetchBranches(path: string, signal: AbortSignal, client: Client) 
     },
     (result) => ({
       branchCount: result.branches.length,
+      worktreeCount: result.worktrees.length,
       hasRepository: result.repository !== null,
     }),
   )
