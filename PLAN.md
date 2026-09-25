@@ -543,7 +543,6 @@ surfaces, the file picker and the site. The owner is taking it one topic at a ti
 
 | Plan                                         | Owns                                                                                                        |
 | -------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| [157](plans/157-base-components.md)          | Tabs, scroll fades, hold-to-confirm, status dots, typeahead refine; queued next                             |
 | [158](plans/158-app-polish.md)               | Tail following with "N new" in `VirtualList`, secrets display, checkpoint restore, branch lanes, boot frame |
 | [159](plans/159-file-picker.md)              | File and folder picker rewrite: columns, real previews, thumbnails, history keys                            |
 | 160 (done, lane L2)                          | Reasoning fold, turn receipts, live tail, model marker, tool details, plan steps, subagents, ultra sparkle  |
@@ -559,11 +558,12 @@ surfaces, the file picker and the site. The owner is taking it one topic at a ti
 
 Suggested order:
 
-1. Plan 157, the base components. Queued next by the owner.
+1. Plan 157, the base components, is done (lane L1, 2026-09-25): `Tabs`, `HoldButton`, `StatusDot`,
+   scroll fades, typeahead refine.
 2. Plans 158–163 in any order once their decisions are answered. 158 builds on 157's status dot and
    scroll utilities; 160 and 161 touch the same timeline rows, so land them one after the other.
 3. Plan 164's first pass shipped (`03f241fc`, `e8156148`); what is left is a metadata font sweep. The
-   square status dots belong to Plan 157.
+   square status dots shipped with Plan 157.
 4. Plan 165, the font catalog, is done (`d9c6069e`, review `7ad4c866`, 2026-09-25).
 5. Plan 154 near the end. Phases 1–3 may land earlier; Phases 4–6 wait for the base components so
    every new primitive is wired and audited once. D6 (settings semantics) comes first.

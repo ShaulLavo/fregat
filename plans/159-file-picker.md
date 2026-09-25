@@ -3,7 +3,7 @@
 ## Status and authorization
 
 - Status: PROPOSED — ready; D1–D4 accepted as recommended on 2026-09-25. The owner wants this ("100000%").
-- Priority: P1 in the UI refresh lane. It runs after [Plan 157](157-base-components.md), whose
+- Priority: P1 in the UI refresh lane. It runs after Plan 157 (done), whose
   segmented control, scroll fades and typeahead refine it uses.
 - Effort: L. A second view with its own keyboard model, a content preview with two data paths, a
   thumbnail component, three chords and a status line. Later phases add icons, filters and the
@@ -155,7 +155,7 @@ restyled:
 - **Status line** in the `DialogFooter` beside `SelectedSummary`: "N items", or "N results" while
   searching, `tabular-nums`, in a `role="status"` region. Counts come from the entries the view
   shows, so hidden files and the accept filter are already applied.
-- **Typeahead** refines in place once [Plan 157](157-base-components.md) item 5 lands; the picker's
+- **Typeahead** refines in place once Plan 157 (done) item 5 lands; the picker's
   list already opts in (`typeahead: true` in `list.tsx`), and each column opts in the same way.
 
 ## Phase 5 — Icons grid and filter chips (later)

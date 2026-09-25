@@ -14,7 +14,7 @@
   must not replay on virtualized scroll.
 - Scheduling: near the end of the UI refresh lane in [`PLAN.md`](../PLAN.md). Phases 1–3 can land
   any time. Phases 4–6 run after the base-component work in
-  [Plan 157](157-base-components.md), so the primitives that work adds (tabs, toggle
+  Plan 157 (done), so the primitives that work adds (tabs, toggle
   group, checkbox, hold-to-confirm) are wired and audited once, not twice.
 - Planned at: Platform `9c1c45d1`, 2026-09-25.
 - Work in the current checkout; no branches, worktrees, commits, pushes or PRs unless separately

@@ -4,7 +4,7 @@
 
 - Status: PROPOSED — ready. The owner approved all five items and accepted D1–D2 as recommended on
   2026-09-25.
-- Priority: P2 in the UI refresh lane, after [Plan 157](157-base-components.md). Items 1 and 3 use its
+- Priority: P2 in the UI refresh lane, after Plan 157 (done). Items 1 and 3 use its
   `scroll-pinned` utility and its `StatusDot`.
 - Effort: M. One shared `packages/ui` pattern, two small primitives, and four surface changes.
 - Risk: LOW–MED. The chat timeline's follow logic is subtle (`timeline-scroll-anchoring.ts`, 380
