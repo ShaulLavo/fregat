@@ -111,14 +111,15 @@ Plan 136), and session and project deletes if they are recoverable. Check each b
 
 ## 4. Status dots
 
-**Today.** Nine hand-made dots, each with its own colour helper:
+**Today.** Hand-made dots, each with its own colour helper:
 
 - `session-row.tsx:98`, `session-attention-indicator.tsx:15` (`sessionStatusDotClass`)
 - `model-picker-row.tsx:85`, `model-picker-trigger.tsx:64` (`statusDotClass`)
 - `logs/components/event-row.tsx:69` (`logLevelDotClass`)
 - `workbench/components/tab-trailing-slot.tsx:57` (dirty tab)
 - `lib/environments/components/phase.tsx:24`
-- `chat/components/composer-active-plan.tsx:54` (plan step; Plan 154 and the chat plan may replace it)
+- not `chat/components/composer-active-plan.tsx:54`: that plan-step dot becomes a step mark in
+  [Plan 160](160-chat-turn-anatomy.md), so it is left alone here
 
 `logs/components/list-loading.tsx:14` is a skeleton of the dot, and it follows the same primitive.
 

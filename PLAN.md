@@ -522,19 +522,29 @@ Requested 2026-09-25. A survey of 14 component libraries
 ([docs/ui-research](docs/ui-research/README.md)) listed what to take for the base components, chat
 surfaces, the file picker and the site. The owner is taking it one topic at a time.
 
-| Plan                                        | Owns                                                                                       |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| [157](plans/157-base-components.md)         | Tabs, scroll fades, hold-to-confirm, status dots, typeahead refine; queued next            |
-| [154](plans/154-physical-mode.md)           | The seamui feel (springs, depth, motion in every primitive) and interface sounds           |
-| [155](plans/155-site-demo-replica.md)       | Placeholder: the site hero becomes an animated replica of the app, like cursor.com         |
-| [156](plans/156-documents-in-the-editor.md) | Placeholder, far future: PDF, DOCX, XLSX, PPTX and CSV as editor documents agents can edit |
+| Plan                                         | Owns                                                                                                        |
+| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| [157](plans/157-base-components.md)          | Tabs, scroll fades, hold-to-confirm, status dots, typeahead refine; queued next                             |
+| [158](plans/158-app-polish.md)               | Tail following with "N new" in `VirtualList`, secrets display, checkpoint restore, branch lanes, boot frame |
+| [159](plans/159-file-picker.md)              | File and folder picker rewrite: columns, real previews, thumbnails, history keys                            |
+| [160](plans/160-chat-turn-anatomy.md)        | Reasoning fold, turn receipts, live tail, model marker, tool details, plan steps, subagents, ultra sparkle  |
+| [161](plans/161-honest-states.md)            | Approval lifecycle, stopped turns, streaming holds, folding rules, hostile-state scenarios                  |
+| [162](plans/162-context-and-cost.md)         | Context breakdown, usable-window fullness, session totals, usage-page honesty (after Plan 141)              |
+| [163](plans/163-chat-screenshot.md)          | Screenshot attachment in the composer (export lives in Plan 145's export plan)                              |
+| [164](plans/164-what-feels-right-in-neon.md) | Research: name what makes Neon feel right, restate it as our own rules and tokens                           |
+| [154](plans/154-physical-mode.md)            | The seamui feel (springs, depth, motion in every primitive) and interface sounds                            |
+| [155](plans/155-site-demo-replica.md)        | Placeholder: the site hero becomes an animated replica of the app, like cursor.com                          |
+| [156](plans/156-documents-in-the-editor.md)  | Placeholder, far future: PDF, DOCX, XLSX, PPTX and CSV as editor documents agents can edit                  |
 
 Suggested order:
 
 1. Plan 157, the base components. Queued next by the owner.
-2. Plan 154 near the end. Phases 1–3 may land earlier; Phases 4–6 wait for the base components so
+2. Plans 158–163 in any order once their decisions are answered. 158 builds on 157's status dot and
+   scroll utilities; 160 and 161 touch the same timeline rows, so land them one after the other.
+3. Plan 164's study, ideally before most of 158–162 lands, so its rules shape them.
+4. Plan 154 near the end. Phases 1–3 may land earlier; Phases 4–6 wait for the base components so
    every new primitive is wired and audited once. D6 (settings semantics) comes first.
-3. Plan 155 is independent of both; its research phase runs whenever the site matters.
+5. Plans 155 and 156 are placeholders; their research phases run when the site or documents matter.
 
 ## Verification boundaries
 

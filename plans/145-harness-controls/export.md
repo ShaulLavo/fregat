@@ -20,6 +20,27 @@ download or a clipboard copy. Nothing leaves the machine.
 - A proposed plan downloads as Markdown (`chat/components/proposed-plan-card.tsx`,
   `downloadPlanMarkdown`, using `proposedPlanExportMarkdown`).
 
+## Context menus (owner, 2026-09-25)
+
+The owner asked for export in the context menu too, not only in the session menu button. Most of
+that comes for free: `sessionActionsMenu` (`keymap/menus/utils/session-actions-menu.ts:90`) builds
+both the header button (`components/session-actions-button.tsx`, in `stage-header.tsx` and
+`chat-panel-header.tsx`) and the rail row's right-click menu (`chat-mode/utils/session-menu.ts` →
+`chat-mode/components/session-menu.tsx`, a `ContextMenu` through `MenuSurface`, also reachable
+with the ContextMenu key and Shift+F10 in `session-rail.tsx:174`). Adding the export items to
+`sessionActionsMenu` puts them in both.
+
+One more surface: the conversation's own context menu. `chatMessageMenu`
+(`chat/utils/message-menu.ts:39`, opened from `message-bubble.tsx`) has "Copy as Markdown" for one
+message. Add a conversation section below it: "Copy conversation as Markdown" and "Export
+conversation as Markdown…", so right-clicking anywhere in the timeline offers the whole-chat
+export. Both call the same `transcriptMarkdown`. Add a command-palette command for the active
+session too, with its id in the command table.
+
+Still a read, not a mutation: nothing is written to the server or workspace, and no other
+consumer reads the result. If D1 lands on the server path, the transcript is a query
+(`queryOptions` with a key from the feature's `query-keys.ts`), which is the read-over-POST rule.
+
 ## Harness support
 
 Not needed. The export is built from Platform's own projection, which covers both providers the

@@ -19,6 +19,13 @@ a bare root `bun run verify`.
 
 | Plan                                                                                     | State                                                        |
 | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| [164 — what feels right in Neon](164-what-feels-right-in-neon.md)                        | **RESEARCH — OWNER NAMES THE PAGES FIRST**                   |
+| [163 — screenshot in the composer](163-chat-screenshot.md)                               | **PROPOSED — READY; DECISIONS ACCEPTED**                     |
+| [162 — context and cost](162-context-and-cost.md)                                        | **PROPOSED — READY; DECISIONS ACCEPTED**                     |
+| [161 — honest states](161-honest-states.md)                                              | **PROPOSED — READY; DECISIONS ACCEPTED**                     |
+| [160 — chat turn anatomy](160-chat-turn-anatomy.md)                                      | **PROPOSED — READY; DECISIONS ACCEPTED**                     |
+| [159 — file and folder picker](159-file-picker.md)                                       | **PROPOSED — READY; DECISIONS ACCEPTED**                     |
+| [158 — app polish from Neon](158-app-polish.md)                                          | **PROPOSED — READY; DECISIONS ACCEPTED**                     |
 | [157 — base components](157-base-components.md)                                          | **PROPOSED — READY; QUEUED NEXT**                            |
 | [156 — documents in the editor](156-documents-in-the-editor.md)                          | **PLACEHOLDER — FAR FUTURE; RESEARCH FIRST**                 |
 | [155 — site demo becomes an animated replica](155-site-demo-replica.md)                  | **PLACEHOLDER — RESEARCH NOT STARTED**                       |

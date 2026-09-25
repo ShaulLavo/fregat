@@ -341,6 +341,9 @@ Open:
     consistent with what exists, but it copies the part of theming that already hurts.
   - Where does it live on the settings page: under Appearance, beside density, or in a group of
     its own ("Feel")?
+    Proposed answer (Claude, 2026-09-25, not yet confirmed): Feel is a single picker like Density
+    (Flat, Seam, Brisk, Relaxed, Playful), not a mode. Sounds are a separate list of events, each on
+    or off, plus one volume, as in VS Code's accessibility signals. Neither sits under the other.
     Before deciding, sketch the whole Appearance page as it would look with the feel settings in it,
     and settle theming's shape too, since both land on that page.
 

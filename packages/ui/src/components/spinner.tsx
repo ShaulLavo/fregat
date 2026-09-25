@@ -12,14 +12,15 @@ type SpinnerProps = {
 }
 
 /**
- * Three bands that overlap by a quarter unit, so neighbours are told apart by
- * colour rather than by air — the only thing that survives a 12px render. Dash
- * pairs are whole fractions of each circumference, so no ring shows a seam.
+ * kokonutui's AI loader in a 16-unit box: its radii, its 1.6px-at-24px stroke
+ * and its 31% dash duty. Dash counts are rounded to whole numbers per ring so
+ * no ring shows a seam where the pattern restarts.
  */
 const SPINNER_BANDS = [
-  { dash: '7.78 6.36', radius: 6.75 },
-  { dash: '7.78 6.36', radius: 4.5 },
-  { dash: '8.48 5.65', radius: 2.25 },
+  { dash: '2.86 6.36', radius: 7.333 },
+  { dash: '2.92 6.5', radius: 6 },
+  { dash: '3.03 6.74', radius: 4.667 },
+  { dash: '3.25 7.22', radius: 3.333 },
 ] as const
 
 const RING_SIZE_CLASS: Record<Exclude<SpinnerSize, 'lg'>, string> = {
@@ -29,7 +30,7 @@ const RING_SIZE_CLASS: Record<Exclude<SpinnerSize, 'lg'>, string> = {
 }
 
 /**
- * The app's one busy mark. xs–md draw overlapping bands; lg draws four thin
+ * The app's one busy mark. xs–md draw four dashed rings; lg draws four thin
  * conic rings for a whole-surface wait. Both take their colours from the
  * theme's primary, so a call site never sets a colour.
  *
@@ -71,7 +72,7 @@ function Spinner({ size, label = 'Loading', className, ...props }: SpinnerProps)
           key={band.radius}
           r={band.radius}
           strokeDasharray={band.dash}
-          strokeWidth='2.5'
+          strokeWidth='1.067'
         />
       ))}
     </svg>

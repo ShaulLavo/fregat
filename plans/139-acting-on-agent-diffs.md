@@ -50,15 +50,43 @@ plan takes the same line comments before it is approved.
 
 ## What the references do
 
-| Reference | Feature                                                      | Paths                                                                                                               |
-| --------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
-| VS Code   | Keep/undo per hunk and file, "n of m" stepping, overlay      | `src/vs/workbench/contrib/chat/browser/chatEditing/` (`chatEditingEditorOverlay.ts`, `chatEditingEditorActions.ts`) |
-| VS Code   | Line-anchored feedback on a plan                             | `src/vs/workbench/contrib/chat/browser/planReviewFeedback/`                                                         |
-| Void      | Accept/reject diff zones and a command bar                   | `src/vs/workbench/contrib/void/browser/editCodeService.ts`, `voidCommandBarService.ts`                              |
-| Orca      | Batched diff comments that follow their line, then send      | `src/renderer/src/components/diff-comments/` (`diff-comment-line-range.ts`)                                         |
-| Codex     | `review/start` over uncommitted, base branch, commit, custom | `codex-rs/app-server-protocol/src/protocol/v2/review.rs`                                                            |
-| Copilot   | Review with applicable comments                              | `extensions/copilot/src/extension/review/node/doReview.ts`                                                          |
-| pstack    | Adversarial review by other models, judged by a lead         | `skills/interrogate/` (`references/rubric.md`, `lead-judgment.md`)                                                  |
+| Reference | Feature                                                       | Paths                                                                                                               |
+| --------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| VS Code   | Keep/undo per hunk and file, "n of m" stepping, overlay       | `src/vs/workbench/contrib/chat/browser/chatEditing/` (`chatEditingEditorOverlay.ts`, `chatEditingEditorActions.ts`) |
+| VS Code   | Line-anchored feedback on a plan                              | `src/vs/workbench/contrib/chat/browser/planReviewFeedback/`                                                         |
+| Void      | Accept/reject diff zones and a command bar                    | `src/vs/workbench/contrib/void/browser/editCodeService.ts`, `voidCommandBarService.ts`                              |
+| Orca      | Batched diff comments that follow their line, then send       | `src/renderer/src/components/diff-comments/` (`diff-comment-line-range.ts`)                                         |
+| Codex     | `review/start` over uncommitted, base branch, commit, custom  | `codex-rs/app-server-protocol/src/protocol/v2/review.rs`                                                            |
+| Copilot   | Review with applicable comments                               | `extensions/copilot/src/extension/review/node/doReview.ts`                                                          |
+| pstack    | Adversarial review by other models, judged by a lead          | `skills/interrogate/` (`references/rubric.md`, `lead-judgment.md`)                                                  |
+| Mischief  | Pick some hunks of a change: "3/7 hunks +12 -4", apply staged | `references/mischief-ui/registry/default/reviewable-diff/reviewable-diff.tsx`                                       |
+| Scrim UI  | Per-hunk accept on a streaming diff, keyed by hunk id         | `references/scrim-ui/src/showcase/edit-diff-view/` (`edit-diff-view.tsx`, `page-config.tsx` "mistakes")             |
+| Extend UI | Review panel: item focuses its source, per-item undo, tabs    | `references/extend-ui/apps/v4/components/extend/bounding-box-citations.tsx` (`HumanReviewPanel`)                    |
+
+Added 2026-09-25 from the UI library survey (`docs/ui-research/tinkerers-ui.md` item 4,
+`scrimui.md` "edit-diff-view", `extend-ui.md` item 7). What they teach about per-hunk action:
+
+- **Key every decision by hunk id, never by index.** A diff that is still arriving re-splits
+  itself, and index 2 stops being the hunk the reader was looking at (`page-config.tsx:18`).
+  Mischief keys by index but stores the chosen set beside the hunk list it was chosen from, so a
+  new diff starts fresh instead of inheriting stale indexes (`reviewable-diff.tsx:82-98`). Ids are
+  the stronger form; the hunk id should come from the checkpoint diff, not the render.
+- **An incomplete hunk cannot be acted on.** Scrim renders a hunk marked `complete: false` with its
+  buttons disabled and titled "Still arriving" (`edit-diff-view.tsx:210-271`). For us, that means
+  hunks of a turn that is still running.
+- **Render the structured hunks you already have; do not re-diff snapshots on the client.** A second
+  diff algorithm disagrees with the first (`page-config.tsx:21`). Our source is the checkpoint diff.
+- **The result is a function of the decisions.** Scrim's `buildMergedDocument` (`edit-diff-view.tsx:72`)
+  builds the merged text from the decisions, so a rejected edit cannot leak into "copy result".
+  For us: any "copy" or "apply" derives from the undo set, never from the raw hunks.
+- **A running tally and one batch action.** Mischief's header reads "3/7 hunks" with added and
+  removed totals, and "Apply staged" acts on the chosen set in one step. Here that is "undo
+  selected", beside per-hunk undo.
+- **Review mode shape.** Extend UI's `HumanReviewPanel` links each reviewed item to a source
+  location (`onFieldFocus` highlights it), gives each item its own undo (`onUndo`, line 1832), and
+  lets a form tab and a diff tab share one state. Mapped here: each finding or hunk focuses its
+  `file:line` range in the editor, carries its own undo, and the list and diff views share one
+  decision state.
 
 ## Scope
 
@@ -76,7 +104,8 @@ plan takes the same line comments before it is approved.
 
 - **D1 — What "keep" means.** The agent's edits are already on disk, so VS Code's accept has no
   equivalent. Recommended: no keep action; a hunk is either left alone or undone, and stepping
-  tracks position only. Alternative: persist per-hunk "reviewed" marks.
+  tracks position only. Alternative: persist per-hunk "reviewed" marks. Either way the marks and
+  undo choices are keyed by hunk id (see the 2026-09-25 notes above).
 - **D2 — Undo against which base.** Recommended: reverse-apply the hunk from the turn's
   checkpoint diff to the working tree, and refuse with a named reason when later edits overlap
   (git apply fails) rather than forcing it.
@@ -106,6 +135,9 @@ M):
    full session turn? Measure the prompt size on a real turn.
 7. Plan comments: how `proposed-plan-card.tsx` renders markdown lines, and whether the diff
    comment model can anchor to plan lines.
+8. Hunk identity (added 2026-09-25): give each checkpoint-diff hunk a stable id that survives a
+   re-render and a re-read of the same turn, and decide what "incomplete" means while the turn is
+   still running (disable undo for its hunks, or for the whole turn until it settles).
 
 Deliverable: rewritten Phases with named files, mutations and mutation keys, scenarios, and the
 list of settings (if any) with their scopes.

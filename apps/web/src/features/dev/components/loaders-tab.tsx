@@ -4,6 +4,7 @@ import { cn } from '@workspace/ui/lib/utils'
 import { OtherLoaders } from '@/features/dev/components/other-loaders'
 import { PaletteGrid } from '@/features/dev/components/palette-grid'
 import { Section } from '@/features/dev/components/section'
+import { SpinnerCandidates } from '@/features/dev/components/spinner-candidates'
 import { SpinnerContexts } from '@/features/dev/components/spinner-contexts'
 import { SpinnerSizes } from '@/features/dev/components/spinner-sizes'
 
@@ -21,6 +22,12 @@ export function LoadersTab() {
         <Switch checked={paused} onCheckedChange={setPaused} />
         Pause animations
       </label>
+      <Section
+        title='Candidates'
+        detail='Ring shapes under consideration, in the current palette. Pick one and it becomes xs–md.'
+      >
+        <SpinnerCandidates />
+      </Section>
       <Section
         title='Spinner'
         detail='One mark, four sizes. Colours come from the current palette.'

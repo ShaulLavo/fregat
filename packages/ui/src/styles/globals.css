@@ -665,8 +665,7 @@
   --spinner-ground: var(--primary-foreground);
 }
 
-/* xs–md. Each band turns the opposite way to its neighbour at an unrelated
-   speed — a shared period would lock the three into one rigid shape. */
+/* xs–md. Neighbouring rings turn opposite ways on kokonutui's shared 8s period. */
 @utility spinner-bands {
   flex-shrink: 0;
 
@@ -674,21 +673,27 @@
     opacity: 0.95;
     transform-box: view-box;
     transform-origin: 8px 8px;
+    animation: app-loader-spin 8s linear infinite;
+  }
+
+  & circle:nth-child(even) {
+    animation-name: app-loader-spin-reverse;
   }
 
   & circle:nth-child(1) {
     stroke: var(--spinner-1);
-    animation: app-loader-spin 2.4s linear infinite;
   }
 
   & circle:nth-child(2) {
     stroke: var(--spinner-2);
-    animation: app-loader-spin-reverse 3.1s linear infinite;
   }
 
   & circle:nth-child(3) {
     stroke: var(--spinner-3);
-    animation: app-loader-spin 1.9s linear infinite;
+  }
+
+  & circle:nth-child(4) {
+    stroke: var(--spinner-4);
   }
 }
 
@@ -782,7 +787,7 @@
   }
 
   .spinner-bands circle {
-    animation-duration: 12s;
+    animation-duration: 16s;
   }
 }
 
