@@ -378,7 +378,8 @@
         "composer-defaults-delivery.md",
         "Historical release 20260920T155743Z-b915d3e0-plan126-final-batch; /work/tmp/fregat-evidence/20260920T160544Z-scenario-composer-defaults/summary.md records completed default-hidden controls, opt-in occupancy, retained preference and effective native default-mode submission",
         "Recorded comparison executes the pinned interaction-mode resolver over 20 flag/provider/mode combinations",
-        "Remaining: rich composition, send shortcut preferences, large-paste folding and full upstream runtime comparison"
+        "Remaining: rich composition, send shortcut preferences, large-paste folding and full upstream runtime comparison",
+        "2026-09-25 lane L2: chat.sendShortcut (enter, mod-enter-multiline, mod-enter) and large-paste folding at 32 KB with Ctrl/Cmd+Shift+V inline; scripts/agent/scenarios/chat-composer-editing.ts passed. Open: the rich composer (owner decision D10) and mobile plain-Enter newline (Plan 143)."
       ]
     },
     {

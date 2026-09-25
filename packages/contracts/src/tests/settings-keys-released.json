@@ -26,6 +26,7 @@
     "chat.projectResponseStreamingModes",
     "chat.projectTextGenerationModels",
     "chat.responseStreamingMode",
+    "chat.sendShortcut",
     "chat.sessionSortOrder",
     "chat.textGenerationModel",
     "developer.simulatedLatencyMs",
