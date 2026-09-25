@@ -44,7 +44,8 @@ async function turnFixture(activeRuntimes = async () => [] as const) {
     { additions: 2, deletions: 2, path: 'app.txt' },
   ])
   const hunks = new OrchestrationCheckpointHunks({
-    runWorkspaceOperation: (operation) => orchestration.engine.runWorkspaceOperation(operation),
+    runWorkspaceOperation: (sessionId, operation) =>
+      orchestration.engine.runWorkspaceOperation(sessionId, operation),
     activeRuntimes,
     diffs: new OrchestrationCheckpointDiffQuery(orchestration.database, orchestration.git),
     git: orchestration.git,
@@ -122,30 +123,35 @@ it('holds turn admission until checkpoint undo finishes applying its patch', asy
   })
   const undo = hunks.revert({ sessionId, turnCount: 1, path: 'app.txt', hunkId: null })
   await entered.promise
-  let admitted = false
-  const send = engine
-    .dispatch({
-      type: 'session.turn.start',
-      commandId: v.parse(commandIdSchema, 'send-during-undo'),
-      sessionId,
-      turnId: v.parse(turnIdSchema, 'turn-during-undo'),
-      message: {
-        messageId: v.parse(messageIdSchema, 'prompt-during-undo'),
-        role: 'user',
-        text: 'Continue',
-        attachments: [],
-      },
-    })
-    .then(() => {
-      admitted = true
-    })
+  const send = {
+    type: 'session.turn.start' as const,
+    runtimeMode: 'full-access' as const,
+    interactionMode: 'default' as const,
+    commandId: v.parse(commandIdSchema, 'send-during-undo'),
+    sessionId,
+    turnId: v.parse(turnIdSchema, 'turn-during-undo'),
+    message: {
+      messageId: v.parse(messageIdSchema, 'prompt-during-undo'),
+      role: 'user' as const,
+      text: 'Continue',
+      attachments: [],
+    },
+  }
   try {
-    await new Promise((resolve) => setTimeout(resolve, 30))
-    expect(admitted).toBe(false)
+    await expect(engine.dispatch(send)).rejects.toThrow('checkout is being updated')
+    await expect(
+      engine.dispatch({
+        type: 'session.checkpoint.revert',
+        commandId: v.parse(commandIdSchema, 'rewind-during-undo'),
+        sessionId,
+        turnCount: 0,
+        restoreFiles: true,
+      }),
+    ).rejects.toThrow('checkout is being updated')
   } finally {
     release.resolve()
-    await Promise.all([undo, send])
+    await undo
   }
   expect(await read()).toBe(`${before.join('\n')}\n`)
-  expect(admitted).toBe(true)
+  await engine.dispatch(send)
 })

@@ -6,6 +6,12 @@ import { defineErrorCatalog } from 'evlog'
  * message — a rewording silently turned a permanent failure into a retry loop.
  */
 export const checkpointErrors = defineErrorCatalog('checkpoint', {
+  WORKSPACE_BUSY: {
+    status: 409,
+    message: 'The checkout is being updated.',
+    why: 'A checkpoint change is being undone or reapplied.',
+    fix: 'Retry after the change finishes.',
+  },
   HUNK_CONFLICT: {
     status: 409,
     message: ({ path }: { path: string }) =>

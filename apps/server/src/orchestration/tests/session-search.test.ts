@@ -141,7 +141,8 @@ function createSearchApp(
   })
   const checkpointDiff = new OrchestrationCheckpointDiffQuery(database, git)
   const checkpointHunks = new OrchestrationCheckpointHunks({
-    runWorkspaceOperation: (operation) => engine.runWorkspaceOperation(operation),
+    runWorkspaceOperation: (sessionId, operation) =>
+      engine.runWorkspaceOperation(sessionId, operation),
     activeRuntimes: async () => [],
     diffs: checkpointDiff,
     git,
