@@ -31,10 +31,10 @@ async function runDev() {
     isAvailable: (port) => isPortAvailable(webHost, port),
     preferredPort: preferredWebPort,
   })
-  configureRuntime(webHost, webPort)
-  configureStateHome()
-
   const args = Bun.argv.slice(2)
+  configureRuntime(webHost, webPort)
+  configureStateHome(isDryRun(args))
+
   const command = [turbo, 'dev', ...args]
 
   console.log(`[dev] Client: ${runtimeUrl(webHost, webPort)}`)
@@ -61,8 +61,14 @@ function configureRuntime(webHost: string, webPort: number) {
 }
 
 /** Dev never opens production's `~/.platform`; see `scripts/state-home.ts`. */
-function configureStateHome() {
+function configureStateHome(dryRun: boolean) {
   env.PLATFORM_HOME ??= devStateHome
-  if (seedDevStateHome(env.PLATFORM_HOME)) console.log(`[dev] Seeded ${env.PLATFORM_HOME}`)
+  if (!dryRun && seedDevStateHome(env.PLATFORM_HOME))
+    console.log(`[dev] Seeded ${env.PLATFORM_HOME}`)
   console.log(`[dev] State: ${env.PLATFORM_HOME}`)
+}
+
+/** Turbo's `--dry`/`--dry-run` only prints the task graph, so nothing is seeded (CI has no `/work`). */
+function isDryRun(args: readonly string[]) {
+  return args.some((arg) => /^--dry(-run)?(=|$)/.test(arg))
 }
