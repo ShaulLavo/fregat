@@ -2745,7 +2745,7 @@ describe('CodexProviderAdapter', () => {
     })
   })
 
-  it('refuses a fork point the native thread no longer holds', async () => {
+  it('refuses a fork point the source conversation no longer holds', async () => {
     await withFakeCodex(
       async () => {
         const adapter = new CodexProviderAdapter()
@@ -2755,7 +2755,7 @@ describe('CodexProviderAdapter', () => {
             adapter.prepareFork({
               cwd: input.cwd,
               sessionId: input.sessionId,
-              conversationId: 'source-thread',
+              conversationId: 'source-conversation',
               providerTurnId: 'reverted-turn',
             }),
           ).rejects.toThrow('The fork point is not in the source conversation')

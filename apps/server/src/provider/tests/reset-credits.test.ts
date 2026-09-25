@@ -139,10 +139,10 @@ test('a declined attempt is cleared so the next confirmation can redeem', async 
   const f = await fixture(async (key) => {
     keys.push(key)
     if (keys.length === 1)
-      throw sessionIdentityErrors.RESET_CREDIT_REJECTED({ internal: { reason: 'fixture' } })
+      throw sessionIdentityErrors.RESET_CREDIT_REJECTED({ reason: 'Fixture declined the credit.' })
     return 'reset'
   })
-  await expect(f.service.redeem(INSTANCE, input)).rejects.toThrow('declined this reset credit')
+  await expect(f.service.redeem(INSTANCE, input)).rejects.toThrow('Fixture declined the credit.')
   expect(f.rows()).toHaveLength(0)
   expect(await f.service.redeem(INSTANCE, input)).toMatchObject({ outcome: 'reset' })
   expect(keys).toHaveLength(2)

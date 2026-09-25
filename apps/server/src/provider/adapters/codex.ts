@@ -269,7 +269,7 @@ export class CodexProviderAdapter
   async prepareFork(input: ProviderForkInput): Promise<ProviderForkStart> {
     const exists = await inspectCodexHistory(this.env, (client) =>
       codexTurnExists({
-        threadId: input.conversationId,
+        conversationId: input.conversationId,
         turnId: input.providerTurnId,
         request: (method, params) =>
           client.requestRaw(method, params, REQUEST_TIMEOUT_MS, (response) => response),
@@ -307,7 +307,9 @@ export class CodexProviderAdapter
     return inspectCodexHistory(this.env, async (client) => {
       const { account } = await client.request('account/read', {}, PROVIDER_PROBE_TIMEOUT_MS)
       if (account?.type !== 'chatgpt')
-        throw sessionIdentityErrors.RESET_CREDIT_REJECTED({ internal: { reason: 'signed-out' } })
+        throw sessionIdentityErrors.RESET_CREDIT_REJECTED({
+          reason: 'Reset credits require a signed-in Codex account.',
+        })
       const usage = await client.request(
         'account/rateLimits/read',
         undefined,
@@ -315,7 +317,7 @@ export class CodexProviderAdapter
       )
       if (!usage.accountId || codexResetAccountKey(usage.accountId) !== input.accountKey)
         throw sessionIdentityErrors.RESET_CREDIT_REJECTED({
-          internal: { reason: 'account-changed' },
+          reason: 'The signed-in Codex account changed before the reset.',
         })
       const response = await client
         .request(
@@ -326,7 +328,7 @@ export class CodexProviderAdapter
         .catch((error: unknown) => {
           if (!(error instanceof Error) || !answeredRpcErrors.has(error)) throw error
           throw sessionIdentityErrors.RESET_CREDIT_REJECTED({
-            internal: { reason: 'provider-error', detail: error.message },
+            reason: `Codex declined the reset credit: ${error.message}`,
           })
         })
       return v.parse(providerResetCreditOutcomeSchema, response.outcome)

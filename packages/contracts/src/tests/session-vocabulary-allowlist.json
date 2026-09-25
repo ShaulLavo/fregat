@@ -440,7 +440,7 @@
     "thread.id": 1,
     "thread/revert": 1,
     "thread/turns/list": 1,
-    "threadId": 8
+    "threadId": 9
   },
   "apps/server/src/provider/adapters/utils/codex-session.ts": {
     "thread": 2,

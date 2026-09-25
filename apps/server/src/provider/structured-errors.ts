@@ -161,8 +161,8 @@ export const sessionIdentityErrors = defineErrorCatalog('provider', {
   },
   RESET_CREDIT_REJECTED: {
     status: 409,
-    message: 'The provider declined this reset credit.',
-    why: 'The provider answered the request, so no credit was spent.',
+    message: ({ reason }: { reason: string }) => reason,
+    why: 'The provider answered the request without spending a credit.',
     fix: 'Refresh usage, then confirm a reset again.',
   },
 })
