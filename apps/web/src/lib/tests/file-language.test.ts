@@ -175,7 +175,9 @@ test('returns null for unknown ids so they never reach shiki', () => {
 
 test('detects explicit ids, exact filenames, extensions and content hints in order', () => {
   expect(languageIdForFilePath('Cargo.lock')).toBe('toml')
-  expect(languageIdForFilePath('other.lock')).toBe('json')
+  expect(languageIdForFilePath('bun.lock')).toBe('jsonc')
+  expect(languageIdForFilePath('yarn.lock')).toBeNull()
+  expect(languageIdForFilePath('other.lock')).toBeNull()
   expect(languageIdForFilePath('script.ts', { languageId: 'tsx', firstLine: '#!/bin/bash' })).toBe(
     'tsx',
   )

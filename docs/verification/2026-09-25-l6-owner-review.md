@@ -58,3 +58,9 @@ across remount/toggle behavior. The prior full application verification remains 
 
 Logs: `owner-review-types.log`, `owner-review-static.log`, `owner-review-gates.log`,
 `owner-review-packages.log`, `review-native-paths-after.log`, `review-mermaid-browser-after.log`.
+
+The first owner-review CI run passed nine jobs and found a stale web language-detector
+expectation for `other.lock`. The caller test now checks Cargo as TOML, Bun as JSONC, and Yarn
+and unknown lock files as unclassified. The stale expectation failed locally as well; the
+updated file passes in `review-web-language-after.log`. CI output is retained in
+`owner-review-ci-web2.log`; application code required no further change.
