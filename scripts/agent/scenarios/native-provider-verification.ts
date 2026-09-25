@@ -52,6 +52,16 @@ export async function writeSettings(page: Page, base: string, operations: readon
   ok(response.ok(), `Write isolated provider settings returned ${response.status()}`)
 }
 
+/** The native Codex fixture opens an app-access approval on every turn it starts. */
+export async function requestAppApproval(
+  page: Page,
+  prompt = 'Request the isolated app approval.',
+) {
+  await selectors.chatMessage(page).fill(prompt)
+  await selectors.chatSend(page).click()
+  await selectors.appApproval(page).waitFor({ timeout: 30_000 })
+}
+
 export async function nativeLog(root: string) {
   const text = await readFile(join(root, 'native.jsonl'), 'utf8').catch(() => '')
   return text

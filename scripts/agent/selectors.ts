@@ -599,6 +599,10 @@ export const selectors = {
     page.getByRole('button', { name: 'Send correction', exact: true }),
   chatStop: (page: Page) => page.getByRole('button', { name: 'Stop current turn', exact: true }),
   chatSend: (page: Page) => page.getByRole('button', { name: 'Send message', exact: true }),
+  turnCarryOn: (page: Page) => page.getByRole('button', { name: 'Carry on', exact: true }),
+  turnTryAgain: (page: Page) => page.getByRole('button', { name: 'Try again', exact: true }),
+  incompleteAnswer: (page: Page) =>
+    page.getByRole('group', { name: 'Incomplete answer', exact: true }),
   chatQueue: (page: Page) => page.getByRole('button', { name: 'Queue message', exact: true }),
   chatQueuedMessages: (page: Page) =>
     page.getByRole('region', { name: 'Queued messages', exact: true }),

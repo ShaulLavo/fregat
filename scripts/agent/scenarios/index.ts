@@ -21,6 +21,7 @@ import { projectGrouping } from './project-grouping'
 import { sessionSearch, sessionSearchEnvironments } from './session-search'
 import { sessionUnread } from './session-unread'
 import { mcpApproval } from './mcp-approval'
+import { approvalTurnEnded } from './approval-turn-ended'
 import { claudeApprovalRules, codexApprovalRules } from './approval-rules'
 import { checkpointRewind } from './checkpoint-rewind'
 import { archiveLifecycle } from './archive-lifecycle'
@@ -227,6 +228,7 @@ export const scenarios: readonly Scenario[] = [
   sessionNotifications,
   composerDefaults,
   mcpApproval,
+  approvalTurnEnded,
   claudeApprovalRules,
   codexApprovalRules,
   fileAttachments,
