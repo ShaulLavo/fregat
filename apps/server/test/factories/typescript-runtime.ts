@@ -32,13 +32,24 @@ export async function installedTypeScriptRuntimeFixture(
 }
 
 export async function typescriptRuntimeFixture(files: Readonly<Record<string, string>> = {}) {
-  const root = await realpath(await mkdtemp(path.join(tmpdir(), 'platform-typescript-runtime-')))
+  const root = await watchableTempDirectory('platform-typescript-runtime-')
   for (const [relativePath, contents] of Object.entries(files)) {
     const filePath = path.join(root, relativePath)
     await mkdir(path.dirname(filePath), { recursive: true })
     await writeFile(filePath, contents)
   }
-  return { root, dispose: () => rm(root, { recursive: true, force: true }) }
+  return { root, dispose: () => rm(path.dirname(root), { recursive: true, force: true }) }
+}
+
+/**
+ * TypeScript refuses to watch a directory within two levels of the filesystem root, so a project
+ * at `/tmp/x` never sees a file appear. One level deeper, as real checkouts are.
+ */
+export async function watchableTempDirectory(prefix: string) {
+  const parent = await realpath(await mkdtemp(path.join(tmpdir(), prefix)))
+  const directory = path.join(parent, 'project')
+  await mkdir(directory)
+  return directory
 }
 
 export function runtimePackageFiles({

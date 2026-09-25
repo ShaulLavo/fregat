@@ -4,6 +4,7 @@ import type { AttachmentOwnership } from '../ownership'
 import type { ChatAttachment } from '@workspace/contracts'
 import { deleteAttachmentBlobs } from '../store'
 import { mkdtemp, readdir, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, expect, test, vi } from 'vitest'
 import { Elysia } from 'elysia'
@@ -23,7 +24,7 @@ afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
 })
 async function setup() {
-  const root = await mkdtemp('/work/tmp/platform-file-uploads-')
+  const root = await mkdtemp(join(tmpdir(), 'platform-file-uploads-'))
   roots.push(root)
   const attachmentsDir = join(root, 'attachments')
   const { ownership, close } = createAttachmentTestOwnership()

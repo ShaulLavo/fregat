@@ -1,6 +1,5 @@
 import path from 'node:path'
-import { mkdir, mkdtemp, realpath, rename, rm, symlink, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { mkdir, rename, rm, symlink, writeFile } from 'node:fs/promises'
 import {
   defaultClientCapabilities,
   mergeClientCapabilities,
@@ -9,7 +8,10 @@ import {
 import { isRecord } from '@workspace/utils/objects'
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { installedTypeScriptRuntimeFixture } from '../../../test/factories/typescript-runtime'
+import {
+  installedTypeScriptRuntimeFixture,
+  watchableTempDirectory,
+} from '../../../test/factories/typescript-runtime'
 import { createWorkspacePaths } from '../../fs/path'
 import { treeWatchSource } from '../../fs/tree-watch'
 import { FileChangeHub } from '../../fs/watch'
@@ -484,8 +486,8 @@ async function expectCodes(probe: Probe, native: boolean, codes: readonly number
 }
 
 async function linkedPackage(name: string, type: string) {
-  const target = await realpath(await mkdtemp(path.join(tmpdir(), `platform-linked-${name}-`)))
-  cleanups.push(() => rm(target, { recursive: true, force: true }))
+  const target = await watchableTempDirectory(`platform-linked-${name}-`)
+  cleanups.push(() => rm(path.dirname(target), { recursive: true, force: true }))
   await mkdir(path.join(target, 'dist'))
   await writeFile(
     path.join(target, 'package.json'),
