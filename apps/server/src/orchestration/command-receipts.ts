@@ -149,6 +149,10 @@ export function commandAggregate(command: ReceiptCommand) {
     case 'worktree.cleanup.fail':
     case 'worktree.mark-missing':
     case 'worktree.metadata.refresh':
+    case 'worktree.pull-request.sync':
+    case 'worktree.setup.update':
+    case 'worktree.setup.run':
+    case 'worktree.setup.cancel':
     case 'worktree.orphan.register':
     case 'terminal.lease.request':
     case 'terminal.lease.claim':
@@ -160,6 +164,7 @@ export function commandAggregate(command: ReceiptCommand) {
     case 'worktree.revive':
       return { id: command.worktreeId, kind: 'worktree' as const }
     case 'session.worktree.release':
+    case 'session.auto-settle':
     case 'session.activity.append':
     case 'session.approval.respond':
     case 'session.archive':

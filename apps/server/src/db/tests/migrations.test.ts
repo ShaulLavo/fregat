@@ -64,27 +64,12 @@ describe('platform migration ledger', () => {
     expect(ledgerRow(handle, 11)?.applied_at).toEqual(expect.any(String))
   })
 
-  it('preserves deployed extra schema and records while adding turn metadata at versions 29 and 30', () => {
+  it('adds turn metadata after the deployed worktree migrations without reusing their versions', () => {
     const handle = openTempDatabase()
     migratePlatformDatabase(
       handle.db,
-      platformMigrations.filter((migration) => migration.version <= 24),
+      platformMigrations.filter((migration) => migration.version <= 26),
     )
-    handle.db.$client.exec(`
-      ALTER TABLE projection_worktrees ADD COLUMN pull_request_json TEXT;
-      ALTER TABLE projection_worktrees ADD COLUMN setup_json TEXT;
-      ALTER TABLE projection_sessions ADD COLUMN lifecycle_revision INTEGER NOT NULL DEFAULT 0;
-      CREATE TABLE push_devices (
-        revision TEXT NOT NULL, id TEXT PRIMARY KEY NOT NULL, endpoint TEXT NOT NULL,
-        p256dh TEXT NOT NULL, auth TEXT NOT NULL, label TEXT NOT NULL, service TEXT NOT NULL,
-        origin TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
-      );
-      INSERT INTO schema_migrations (version, name, applied_at) VALUES
-        (25, 'worktree_pull_requests', '2026-09-25T00:00:00Z'),
-        (26, 'worktree_setup', '2026-09-25T00:00:00Z'),
-        (27, 'push_devices', '2026-09-25T00:00:00Z'),
-        (28, 'session_lifecycle_revision', '2026-09-25T00:00:00Z');
-    `)
     insertTopology(handle)
     handle.db.run(
       sql`UPDATE projection_worktrees SET pull_request_json = '{"number":31}', setup_json = '{"state":"ready"}'`,
@@ -105,11 +90,6 @@ describe('platform migration ledger', () => {
     expect(
       rows(handle, sql`SELECT pull_request_json, setup_json FROM projection_worktrees`),
     ).toEqual([{ pull_request_json: '{"number":31}', setup_json: '{"state":"ready"}' }])
-    expect(tableNames(handle)).toContain('push_devices')
-    expect(columnNames(handle, 'projection_sessions')).toContain('lifecycle_revision')
-    expect(ledgerVersions(handle)).toEqual(
-      [...ledgerVersionNumbers, 25, 26, 27, 28].sort((a, b) => a - b),
-    )
     expect(migratePlatformDatabase(handle.db)).toEqual([])
   })
 
@@ -123,7 +103,7 @@ describe('platform migration ledger', () => {
     expect(plan()).toEqual(expect.arrayContaining([expect.stringContaining('TEMP B-TREE')]))
 
     expect(migratePlatformDatabase(handle.db).map((migration) => migration.version)).toEqual([
-      15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 29, 30,
+      15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 29, 30,
     ])
 
     expect(plan()).toEqual(
@@ -161,7 +141,7 @@ describe('platform migration ledger', () => {
     )
     seedVersion11Worktrees(handle.db)
     expect(migratePlatformDatabase(handle.db).map((migration) => migration.version)).toEqual([
-      12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 29, 30,
+      12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 29, 30,
     ])
     const query = new OrchestrationSnapshotQuery(handle.db)
     const migrated = query.shellSnapshot()

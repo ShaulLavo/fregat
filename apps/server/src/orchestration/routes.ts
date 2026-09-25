@@ -8,6 +8,7 @@ import {
   clientOrchestrationCommandSchema,
   orchestrationReplayEventsInputSchema,
   sessionIdSchema,
+  modelSelectionSchema,
 } from '@workspace/contracts'
 
 import type { OrchestrationEngine } from './engine'
@@ -50,6 +51,13 @@ export function orchestrationRoutes(
   return new Elysia({ name: 'orchestration-routes' }).group('/orchestration', (app) =>
     app
       .get('/session-import', () => engine.sessionImportSources())
+      .post('/pull-request-session', ({ body }) => engine.startPullRequestSession(body), {
+        body: v.object({
+          worktreeId: worktreeIdSchema,
+          reference: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(2048)),
+          modelSelection: modelSelectionSchema,
+        }),
+      })
       .post(
         '/session-import',
         ({ body, request, server }) => {

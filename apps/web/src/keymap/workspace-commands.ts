@@ -24,6 +24,8 @@ import {
   FloppyDiskIcon,
   FolderOpenIcon,
   GaugeIcon,
+  GitForkIcon,
+  GitPullRequestIcon,
   GearSixIcon,
   GitDiffIcon,
   ImageIcon,
@@ -597,6 +599,22 @@ export const workspaceCommands = [
       transitionStart(
         runtime.shell.showSettings(invocation.origin as FocusTargetToken | null, 'font'),
       ),
+  }),
+  defineCommand({
+    ...workspaceCommandMetadata['workspace.cloneRepository'],
+    icon: GitForkIcon,
+    run: ({ runtime }) => {
+      runtime.shell.showCloneRepository()
+      return { status: 'handled' }
+    },
+  }),
+  defineCommand({
+    ...workspaceCommandMetadata['workspace.startPullRequestSession'],
+    icon: GitPullRequestIcon,
+    run: ({ runtime }) => {
+      runtime.shell.showStartPullRequestSession()
+      return { status: 'handled' }
+    },
   }),
   defineCommand({
     ...workspaceCommandMetadata['workspace.showUsage'],

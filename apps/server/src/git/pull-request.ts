@@ -1,66 +1,73 @@
-import {
-  errorStringField,
-  type GitPullRequest,
-  type GitPullRequestCreateResult,
-  type GitPullRequestSupport,
+import type {
+  GitForge,
+  GitForgeKind,
+  GitPublishRequest,
+  GitPullRequest,
+  GitPullRequestCreateResult,
+  GitPullRequestSupport,
 } from '@workspace/contracts'
 
-import * as v from 'valibot'
-
+import { detectForge } from './forges/detect'
+import { forgeProvider, resolveForgeContext } from './forges/registry'
+import type { CreatedRepository, ForgeContext, RunProcess } from './forges/types'
 import { gitPullRequestErrors } from './utils/pull-request-errors'
 import { runBoundedProcess } from './utils/process'
 
 /**
- * `gh` reaches the network, but only to read one branch's pull request. 20s is
- * long enough for a cold auth handshake and short enough that a wedged CLI
- * cannot hold a header render.
- */
-const GH_TIMEOUT_MS = 20_000
-
-const PR_FIELDS = 'isDraft,number,state,title,url'
-
-/**
- * Whether `gh` works here changes when someone installs it or signs in — not
- * between two renders of a header. Caching the verdict keeps the two probe
- * processes off every read; the window is short enough that signing in shows
- * up on the next poll rather than requiring a restart.
+ * Whether a forge CLI works here changes when someone installs it or signs in, not between two
+ * renders of a header. Caching the verdict keeps the probe processes off every read; the window
+ * is short enough that signing in shows up on the next poll.
  */
 const SUPPORT_CACHE_TTL_MS = 60_000
 
 const supportByCwd = new Map<string, { at: number; support: GitPullRequestSupport }>()
 
-const pullRequestSchema = v.object({
-  isDraft: v.boolean(),
-  number: v.pipe(v.number(), v.integer(), v.minValue(1)),
-  state: v.picklist(['OPEN', 'CLOSED', 'MERGED']),
-  title: v.string(),
-  url: v.pipe(v.string(), v.url()),
-})
+export type ForgeBoundaries = { run?: RunProcess; fetch?: typeof fetch }
+type Boundaries = ForgeBoundaries
 
-type RunProcess = typeof runBoundedProcess
+type Supported =
+  | { support: Exclude<GitPullRequestSupport, 'ready'>; forge: GitForge | null; context: null }
+  | { support: 'ready'; forge: GitForge; context: ForgeContext }
 
 export async function readPullRequest(
-  input: {
-    branch: string
-    cwd: string
-  },
-  runProcess: RunProcess = runBoundedProcess,
-): Promise<{ pullRequest: GitPullRequest | null; support: GitPullRequestSupport }> {
-  const support = await pullRequestSupport(input.cwd, runProcess)
-  if (support !== 'ready') return { pullRequest: null, support }
+  input: { branch: string; cwd: string },
+  boundaries: Boundaries = {},
+): Promise<{
+  pullRequest: GitPullRequest | null
+  support: GitPullRequestSupport
+  forge: GitForge | null
+}> {
+  const supported = await supportedContext(input.cwd, boundaries)
+  if (!supported.context)
+    return { pullRequest: null, support: supported.support, forge: supported.forge }
+  const found = await forgeProvider(supported.forge.kind).pullRequests(supported.context, {
+    branches: [input.branch],
+    state: 'open',
+  })
+  return { pullRequest: found.get(input.branch) ?? null, support: 'ready', forge: supported.forge }
+}
 
-  const result = await gh(
-    input.cwd,
-    ['pr', 'list', '--head', input.branch, '--state', 'open', '--limit', '1', '--json', PR_FIELDS],
-    runProcess,
-  )
-  if (result.exitCode !== 0) {
-    throw gitPullRequestErrors.PULL_REQUEST_LOOKUP_FAILED({
-      internal: { exitCode: result.exitCode, stderr: result.stderr },
-    })
-  }
+export type BranchPullRequests =
+  | { kind: 'unsupported'; support: Exclude<GitPullRequestSupport, 'ready'> }
+  /** Every requested branch has an entry: its newest pull request in any state, or null. */
+  | { kind: 'ready'; pullRequests: ReadonlyMap<string, GitPullRequest | null> }
 
-  return { pullRequest: parsePullRequest(result.stdout), support: 'ready' }
+/**
+ * The newest pull request of each branch in one repository. GitHub answers every branch in one
+ * GraphQL request; the other forges pay one request per branch. Throws on any failed read: a
+ * lookup that did not complete never becomes "no pull request".
+ */
+export async function readBranchPullRequests(
+  input: { cwd: string; branches: readonly string[] },
+  boundaries: Boundaries = {},
+): Promise<BranchPullRequests> {
+  const supported = await supportedContext(input.cwd, boundaries)
+  if (!supported.context) return { kind: 'unsupported', support: supported.support }
+  const pullRequests = await forgeProvider(supported.forge.kind).pullRequests(supported.context, {
+    branches: input.branches,
+    state: 'all',
+  })
+  return { kind: 'ready', pullRequests }
 }
 
 export async function createPullRequest(
@@ -72,144 +79,124 @@ export async function createPullRequest(
     draft?: boolean
     title: string
   },
-  runProcess: RunProcess = runBoundedProcess,
+  boundaries: Boundaries = {},
 ): Promise<GitPullRequestCreateResult> {
-  const existing = await readPullRequest({ branch: input.branch, cwd: input.cwd }, runProcess)
+  const existing = await readPullRequest({ branch: input.branch, cwd: input.cwd }, boundaries)
   if (existing.support !== 'ready') return { kind: 'unsupported', support: existing.support }
   // A branch carries at most one open pull request, so the honest answer to a
-  // second request is the first one — not a second call that `gh` will reject.
+  // second request is the first one — not a second call the forge will reject.
   if (existing.pullRequest) return { kind: 'exists', pullRequest: existing.pullRequest }
 
-  const result = await gh(
-    input.cwd,
-    [
-      'pr',
-      'create',
-      '--head',
-      input.branch,
-      '--title',
-      input.title,
-      '--body',
-      input.body ?? '',
-      ...(input.base ? ['--base', input.base] : []),
-      ...(input.draft ? ['--draft'] : []),
-    ],
-    runProcess,
-  )
-  if (result.exitCode !== 0) {
+  const supported = await supportedContext(input.cwd, boundaries)
+  if (!supported.context) return { kind: 'unsupported', support: supported.support }
+  await forgeProvider(supported.forge.kind).createPullRequest(supported.context, {
+    branch: input.branch,
+    title: input.title,
+    body: input.body ?? '',
+    draft: input.draft ?? false,
+    ...(input.base ? { base: input.base } : {}),
+  })
+
+  // Not every forge prints the new pull request; reading the branch back gives one shape.
+  const created = await readPullRequest({ branch: input.branch, cwd: input.cwd }, boundaries)
+  if (!created.pullRequest)
     throw gitPullRequestErrors.PULL_REQUEST_CREATE_FAILED({
       branch: input.branch,
-      internal: { stderr: result.stderr || result.stdout },
+      forge: supported.forge.name,
+      internal: { at: 'read-back' },
     })
-  }
-
-  // `gh pr create` prints the URL, not JSON. Reading the branch back is what
-  // turns that into the same shape every other caller already handles.
-  const created = await readPullRequest({ branch: input.branch, cwd: input.cwd }, runProcess)
-  if (!created.pullRequest) {
-    throw gitPullRequestErrors.PULL_REQUEST_CREATE_FAILED({
-      branch: input.branch,
-      internal: { stdout: result.stdout },
-    })
-  }
-
   return { kind: 'created', pullRequest: created.pullRequest }
 }
 
-async function pullRequestSupport(
+async function supportedContext(
   cwd: string,
-  runProcess: RunProcess,
-): Promise<GitPullRequestSupport> {
-  const cached = supportByCwd.get(cwd)
+  boundaries: Boundaries,
+  remoteUrl?: string,
+): Promise<Supported> {
+  const context = await resolveForgeContext({
+    cwd,
+    remoteUrl,
+    run: boundaries.run ?? runBoundedProcess,
+    fetch: boundaries.fetch ?? fetch,
+  })
+  if (!context) return { support: 'no-forge', forge: null, context: null }
+  const support = await cachedSupport(context)
+  if (support !== 'ready') return { support, forge: context.forge, context: null }
+  return { support, forge: context.forge, context }
+}
+
+async function cachedSupport(context: ForgeContext) {
+  const cached = supportByCwd.get(context.cwd)
   if (cached && Date.now() - cached.at < SUPPORT_CACHE_TTL_MS) return cached.support
-
-  const support = await probePullRequestSupport(cwd, runProcess)
-  supportByCwd.set(cwd, { at: Date.now(), support })
-
+  const support = await forgeProvider(context.forge.kind).support(context)
+  supportByCwd.set(context.cwd, { at: Date.now(), support })
   return support
 }
 
-async function probePullRequestSupport(
+const PUBLIC_HOSTS: Record<GitForgeKind, string> = {
+  github: 'github.com',
+  gitlab: 'gitlab.com',
+  forgejo: 'codeberg.org',
+  'azure-devops': 'dev.azure.com',
+  bitbucket: 'bitbucket.org',
+}
+
+const SUPPORT_REASONS = {
+  'cli-missing': 'its command-line tool is not installed',
+  unauthenticated: 'nobody is signed in',
+} as const
+
+/** Creates the repository a publish names, on the forge the user chose. */
+export async function createForgeRepository(
+  request: Pick<GitPublishRequest, 'forge' | 'host' | 'repository' | 'visibility'>,
   cwd: string,
-  runProcess: RunProcess,
-): Promise<GitPullRequestSupport> {
-  const status = await gh(cwd, ['auth', 'status'], runProcess)
-  // Bun reports a missing binary as a spawn failure, which surfaces here as a
-  // non-zero exit with nothing on either pipe.
-  if (status.exitCode !== 0 && !status.stderr && !status.stdout) return 'cli-missing'
-  if (status.exitCode !== 0) return 'unauthenticated'
-
-  const remote = await gh(cwd, ['repo', 'view', '--json', 'url'], runProcess)
-  if (remote.exitCode !== 0) return 'no-github-remote'
-
-  return 'ready'
+  boundaries: Boundaries = {},
+): Promise<CreatedRepository> {
+  const host = request.host?.trim().toLowerCase() || PUBLIC_HOSTS[request.forge]
+  const forge = detectForge(`https://${host}/`) ?? { kind: request.forge, name: host, host }
+  const context: ForgeContext = {
+    cwd,
+    forge: { ...forge, kind: request.forge },
+    remoteUrl: '',
+    remoteName: '',
+    repository: request.repository.trim().replace(/^\/+|\/+$/g, ''),
+    run: boundaries.run ?? runBoundedProcess,
+    fetch: boundaries.fetch ?? fetch,
+  }
+  const provider = forgeProvider(request.forge)
+  const support = await provider.support(context)
+  if (support !== 'ready')
+    throw gitPullRequestErrors.FORGE_NOT_READY({
+      forge: context.forge.name,
+      reason: SUPPORT_REASONS[support],
+      internal: { support },
+    })
+  return provider.createRepository(context, request.visibility)
 }
 
-async function gh(cwd: string, args: readonly string[], runProcess: RunProcess) {
-  const result = await runGh(cwd, args, runProcess)
-  if (result.limit?.kind === 'timeout') {
-    throw gitPullRequestErrors.PULL_REQUEST_LOOKUP_TIMED_OUT({ internal: result.limit })
-  }
-  if (result.limit) {
-    throw gitPullRequestErrors.PULL_REQUEST_LOOKUP_FAILED({ internal: result.limit })
-  }
-  return result
-}
-
-async function runGh(cwd: string, args: readonly string[], runProcess: RunProcess) {
-  try {
-    return await runProcess({ argv: ['gh', ...args], cwd, timeoutMs: GH_TIMEOUT_MS })
-  } catch (cause) {
-    if (
-      cause instanceof Error &&
-      'code' in cause &&
-      cause.code === 'ENOENT' &&
-      args[0] === 'auth'
-    ) {
-      return { exitCode: 127, stderr: '', stdout: '' }
-    }
-    throw gitPullRequestErrors.PULL_REQUEST_LOOKUP_FAILED({
-      cause: cause instanceof Error ? cause : undefined,
-      internal: { at: 'gh-spawn', command: args[0], errorCode: errorStringField(cause, 'code') },
+/** A pull request by reference, from the forge a checkout's remote names, with its remote. */
+export async function resolvePullRequest(
+  input: { cwd: string; number: number; remoteUrl?: string },
+  boundaries: Boundaries = {},
+) {
+  const supported = await supportedContext(input.cwd, boundaries, input.remoteUrl)
+  if (!supported.context)
+    throw gitPullRequestErrors.FORGE_NOT_READY({
+      forge: supported.forge?.name ?? 'This repository',
+      reason:
+        supported.support === 'no-forge'
+          ? 'no remote points at a known forge'
+          : SUPPORT_REASONS[supported.support],
+      internal: { support: supported.support },
     })
-  }
-}
-
-function parsePullRequest(stdout: string): GitPullRequest | null {
-  let json: unknown
-  try {
-    json = JSON.parse(stdout)
-  } catch (cause) {
-    throw gitPullRequestErrors.PULL_REQUEST_RESPONSE_INVALID({
-      cause: cause instanceof Error ? cause : undefined,
-      internal: { at: 'json-parse', outputLength: stdout.length },
-    })
-  }
-  const parsed = v.safeParse(v.array(pullRequestSchema), json)
-  if (!parsed.success)
-    throw gitPullRequestErrors.PULL_REQUEST_RESPONSE_INVALID({
-      internal: {
-        at: 'schema',
-        issueCount: parsed.issues.length,
-        summary: v.summarize(parsed.issues),
-      },
-    })
-  const pullRequest = parsed.output[0]
-  if (!pullRequest) return null
-
+  const detail = await forgeProvider(supported.forge.kind).getPullRequest(
+    supported.context,
+    input.number,
+  )
   return {
-    draft: pullRequest.isDraft,
-    number: pullRequest.number,
-    state: pullRequestState(pullRequest.state),
-    title: pullRequest.title,
-    url: pullRequest.url,
+    detail,
+    forge: supported.forge,
+    remoteName: supported.context.remoteName,
+    remoteUrl: supported.context.remoteUrl,
   }
-}
-
-function pullRequestState(
-  value: v.InferOutput<typeof pullRequestSchema>['state'],
-): GitPullRequest['state'] {
-  if (value === 'MERGED') return 'merged'
-  if (value === 'CLOSED') return 'closed'
-  return 'open'
 }

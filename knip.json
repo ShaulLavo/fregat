@@ -48,6 +48,7 @@
       "entry": [
         "agent/browser.ts",
         "agent/injected/renders.ts",
+        "agent/fixtures/fake-*.mjs",
         "agent/logs.ts",
         "deploy/mesh.ts",
         "deploy/live-check.mjs",

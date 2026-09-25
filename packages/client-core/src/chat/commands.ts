@@ -325,13 +325,16 @@ export function createSessionUnarchiveCommand({
 
 export function createSessionDeleteCommand({
   sessionId,
+  removeWorktree,
 }: {
   sessionId: SessionId
+  removeWorktree?: boolean
 }): SessionDeleteCommand {
   return {
     commandId: createCommandId(),
     sessionId,
     type: 'session.delete',
+    ...(removeWorktree ? { removeWorktree } : {}),
   }
 }
 

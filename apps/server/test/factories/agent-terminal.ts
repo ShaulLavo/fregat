@@ -82,6 +82,7 @@ export async function createAgentTerminalFixture(
         providerAdapterRegistry: registry,
         providerRuntime: true,
         attachmentsDir: path.join(root, 'attachments'),
+        pullRequestLookup: null,
       },
     })
   let app = openApp()

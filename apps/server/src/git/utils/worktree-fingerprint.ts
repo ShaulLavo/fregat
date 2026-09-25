@@ -133,7 +133,8 @@ function changedFileCount(output: string) {
   let count = 0
   for (let index = 0; index < entries.length; index += 1) {
     const entry = entries[index]
-    if (!entry) continue
+    // An ignored dependency install is reinstallable; every other ignored path counts.
+    if (!entry || /^!! (.*\/)?node_modules\//.test(entry)) continue
     count += 1
     if (entry.slice(0, 2).includes('R') || entry.slice(0, 2).includes('C')) index += 1
   }
