@@ -3,6 +3,7 @@ import { onTestFinished } from 'vitest'
 import { join } from 'node:path'
 import { createOrchestrationFixture } from '../../../../../server/test/factories/orchestration'
 import { createMetadataDatabase } from '../../../../../server/src/db/client'
+import { migratePlatformDatabase } from '../../../../../server/src/db/migrations'
 import { TerminalHistory } from '../../../../../server/src/terminal/history'
 
 // SQLite is the persistence boundary; no simulated storage or PTY is involved here.
@@ -86,21 +87,22 @@ test('matches pinned terminal history for text split across byte and line bounda
   const upstream = await import(
     `data:text/javascript;base64,${Buffer.from(javascript).toString('base64')}`
   )
-  const fixture = await createOrchestrationFixture()
-  onTestFinished(() => fixture.close())
-  let cases = 0
-  for (const count of [1, 4_999, 5_000, 5_001, 6_001]) {
-    for (const text of ['plain\n', 'λ😀\r\n', '\n', 'unterminated']) {
-      const input = text.repeat(count)
-      const expected = new upstream.BoundedTerminalHistory(5_000, '')
-      const actual = new TerminalHistory(fixture.database, `oracle-${cases++}`)
-      for (let offset = 0; offset < input.length; offset += 1_003)
-        expected.append(input.slice(offset, offset + 1_003))
-      const bytes = Buffer.from(input)
-      for (let offset = 0; offset < bytes.length; offset += 997)
-        actual.append(bytes.subarray(offset, offset + 997))
-      expect(Buffer.concat(actual.values()).toString()).toBe(expected.value())
-    }
+  // The tests above cover disk durability; this matrix exercises trimming and decoding.
+  const database = createMetadataDatabase({ databasePath: ':memory:' })
+  onTestFinished(() => database.close())
+  migratePlatformDatabase(database.db)
+  const inputs = [1, 4_999, 5_000, 5_001, 6_001].flatMap((count) =>
+    ['plain\n', 'λ😀\r\n', '\n', 'unterminated'].map((text) => text.repeat(count)),
+  )
+  for (const [index, input] of inputs.entries()) {
+    const expected = new upstream.BoundedTerminalHistory(5_000, '')
+    const actual = new TerminalHistory(database.db, `oracle-${index}`)
+    for (let offset = 0; offset < input.length; offset += 1_003)
+      expected.append(input.slice(offset, offset + 1_003))
+    const bytes = Buffer.from(input)
+    for (let offset = 0; offset < bytes.length; offset += 997)
+      actual.append(bytes.subarray(offset, offset + 997))
+    expect(Buffer.concat(actual.values()).toString()).toBe(expected.value())
   }
-  expect(cases).toBe(20)
+  expect(inputs).toHaveLength(20)
 })
