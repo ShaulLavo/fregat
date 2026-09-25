@@ -65,6 +65,25 @@ describe('provider usage history', () => {
     expect(history.totals.unpricedTokens).toBe(150)
   })
 
+  it("totals one session's priced turns and names its unpriced tokens apart", () => {
+    const fixture = historyFixture()
+    fixture.insert({ costUsd: 0.3, model: 'claude-opus-5-5', turnId: 'chat' })
+    fixture.insert({ costUsd: 0.1, model: 'claude-haiku-4-5', turnId: 'chat' })
+    fixture.insert({ costUsd: null, model: 'gpt-mystery', turnId: 'second' })
+    fixture.insert({ costUsd: 9, sessionId: 'other', turnId: 'elsewhere' })
+
+    const total = fixture.readSession('session-1')
+
+    expect(total).toMatchObject({ tokens: 450, turns: 2, unpricedTokens: 150 })
+    expect(total.costUsd).toBeCloseTo(0.4)
+    expect(fixture.readSession('empty')).toEqual({
+      costUsd: null,
+      tokens: 0,
+      turns: 0,
+      unpricedTokens: 0,
+    })
+  })
+
   it('splits spend by purpose and counts a two-model turn once', () => {
     const fixture = historyFixture()
     fixture.insert({ costUsd: 0.3, model: 'claude-opus-5-5', turnId: 'chat' })
@@ -94,6 +113,7 @@ type TurnRow = {
   outputTokens?: number
   purpose?: ProviderUsagePurpose
   recordedAt?: string
+  sessionId?: string
   turnId: string
 }
 
@@ -122,10 +142,11 @@ function historyFixture() {
           purpose: row.purpose ?? 'turn',
           reasoningTokens: 0,
           recordedAt: row.recordedAt ?? '2026-09-25T06:00:00.000Z',
-          sessionId: 'session-1',
+          sessionId: row.sessionId ?? 'session-1',
           turnId: row.turnId,
         })
         .run(),
     read: (days: 7 | 30 | 90) => reader.read({ days, utcOffsetMinutes: UTC_PLUS_3 }),
+    readSession: (sessionId: string) => reader.readSession(sessionId),
   }
 }

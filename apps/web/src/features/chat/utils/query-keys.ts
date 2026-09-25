@@ -16,6 +16,8 @@ export const providerAuthKeys = {
 
 export const providerUsageKeys = {
   all: ['providers', 'usage'] as const,
+  session: (environmentId: EnvironmentId, sessionId: SessionId) =>
+    ['providers', 'usage', 'session', environmentId, sessionId] as const,
 }
 
 export const providerCommandCatalogKeys = {

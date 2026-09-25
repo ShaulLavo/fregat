@@ -1,7 +1,7 @@
 import type { ProviderUsageHistory } from '@workspace/contracts'
 
 import { expect, test } from '../../../../../test/fixtures'
-import { formatUsd, usageDays } from '@/features/settings/utils/usage'
+import { usageDays } from '@/features/settings/utils/usage'
 
 function history(overrides: Partial<ProviderUsageHistory>): ProviderUsageHistory {
   return {
@@ -29,11 +29,4 @@ test('every day of the range is present, quiet ones as zero', () => {
   ])
   expect(days[2]).toEqual({ costUsd: 1.5, day: '2026-09-21', tokens: 900 })
   expect(days[0]?.tokens).toBe(0)
-})
-
-test('a sub-cent amount says so instead of rounding to zero', () => {
-  expect(formatUsd(0)).toBe('$0.00')
-  expect(formatUsd(0.004)).toBe('<$0.01')
-  expect(formatUsd(3.456)).toBe('$3.46')
-  expect(formatUsd(1234.5)).toBe('$1,235')
 })

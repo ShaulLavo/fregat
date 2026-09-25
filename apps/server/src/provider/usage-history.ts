@@ -6,9 +6,10 @@ import type {
   ProviderUsageModelRow,
   ProviderUsagePurpose,
   ProviderUsagePurposeRow,
+  ProviderUsageSessionTotal,
 } from '@workspace/contracts'
 import { usageTokenCount } from '@workspace/contracts'
-import { gte, sql } from 'drizzle-orm'
+import { eq, gte, sql } from 'drizzle-orm'
 import type { PlatformDatabase } from '../db/client'
 import { providerUsageTurns as turns } from '../db/schema'
 
@@ -63,6 +64,30 @@ export class ProviderUsageHistoryReader {
           usageTokenCount,
         ),
       },
+    }
+  }
+
+  /** Everything recorded for one session, every purpose included. */
+  readSession(sessionId: string): ProviderUsageSessionTotal {
+    const row = this.database
+      .select({
+        cacheReadTokens: sql<number>`coalesce(sum(${turns.cacheReadTokens}), 0)`,
+        cacheWriteTokens: sql<number>`coalesce(sum(${turns.cacheWriteTokens}), 0)`,
+        costUsd: sql<number | null>`sum(${turns.costUsd})`,
+        inputTokens: sql<number>`coalesce(sum(${turns.inputTokens}), 0)`,
+        outputTokens: sql<number>`coalesce(sum(${turns.outputTokens}), 0)`,
+        turns: sql<number>`count(DISTINCT ${turns.turnId})`,
+        unpricedTokens: sql<number>`coalesce(sum(CASE WHEN ${turns.costUsd} IS NULL THEN ${turns.inputTokens} + ${turns.outputTokens} + ${turns.cacheReadTokens} + ${turns.cacheWriteTokens} ELSE 0 END), 0)`,
+      })
+      .from(turns)
+      .where(eq(turns.sessionId, sessionId))
+      .get()
+
+    return {
+      costUsd: row?.costUsd ?? null,
+      tokens: row ? usageTokenCount(row) : 0,
+      turns: row?.turns ?? 0,
+      unpricedTokens: row?.unpricedTokens ?? 0,
     }
   }
 

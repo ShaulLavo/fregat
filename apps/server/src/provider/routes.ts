@@ -10,6 +10,8 @@ import {
   providerUsageHistoryQuerySchema,
   providerUsageHistorySchema,
   providerUsageResultSchema,
+  providerUsageSessionTotalSchema,
+  sessionIdSchema,
   trimmedNonEmptyStringSchema,
   type ProviderAuth,
   type ProviderCommandCatalog,
@@ -58,6 +60,14 @@ export function providerRoutes(
       query: providerUsageHistoryQuerySchema,
       response: providerUsageHistorySchema,
     })
+    .get(
+      '/providers/usage/sessions/:sessionId',
+      ({ params }) => history.readSession(params.sessionId),
+      {
+        params: v.object({ sessionId: sessionIdSchema }),
+        response: providerUsageSessionTotalSchema,
+      },
+    )
     .get(
       '/providers/:providerInstanceId/commands',
       ({ params, query }) =>

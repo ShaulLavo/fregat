@@ -2,7 +2,7 @@
 
 ## Status and authorization
 
-- Status: PROPOSED — the owner approved the direction on 2026-09-25 ("some good ideas, plan
+- Status: Steps 1–4 DONE 2026-09-25 (lane L3); step 5 (usage page) next. Previously PROPOSED — the owner approved the direction on 2026-09-25 ("some good ideas, plan
   that, but we like our ticker"). D1–D3 accepted as recommended the same day.
 - Priority: P2 in the UI refresh lane.
 - Effort: M. One adapter mapping, a wider context payload, a session filter on the usage read,
@@ -168,6 +168,21 @@ chart stays. Neon's charts are recharts, which we are not adding.
   model cannot be removed.
 - **Magnitude in the row.** A 2 px `bg-muted-foreground` data bar under each model row's cost,
   proportional to its share. This is a mark, not a divider, so the `hairlines` census stays green.
+
+## Landed (steps 1–4, lane L3)
+
+- D1 measured 2026-09-25 on live Haiku through the SDK: `maxTokens == rawMaxTokens` (200k),
+  `used + free` fill it, `percentage == totalTokens / maxTokens`, and a default SDK session has no
+  `buffer` row. The adapter subtracts a `buffer` category when one appears and names it as the
+  reserve. Codex reports `usable_context_window()` as `modelContextWindow` (core
+  `turn_context.rs`), so its window is already the effective one.
+- Claude's result snapshot is marked `estimated` (it sums every API call of the turn); the ring
+  and popover show `~` until the `getContextUsage` snapshot lands, which it does right after.
+- The popover: category bar and legend from `kind: 'used'` rows on the theme's chart tokens,
+  deferred rows listed apart, or a token-kind block where there are no segments (Codex); the
+  reserve; this session's tokens and cost (`GET /providers/usage/sessions/:id`, refreshed by the
+  meter's settle invalidation) on `TickerNumber` with decimals. `formatUsd` moved to `lib/usd.ts`
+  with real sub-cent digits. Scenario `claude-context-popover`.
 
 ## Decisions
 

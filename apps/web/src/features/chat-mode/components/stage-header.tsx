@@ -61,7 +61,9 @@ export function StageHeader({
             </span>
           ) : null}
           {session ? <SessionTitleStatus sessionRef={session.ref} /> : null}
-          {contextMeterEnabled && contextUsage ? <ContextUsageRing usage={contextUsage} /> : null}
+          {contextMeterEnabled && contextUsage ? (
+            <ContextUsageRing sessionRef={session?.ref ?? null} usage={contextUsage} />
+          ) : null}
           {session ? <SessionAgentChip sessionRef={session.ref} /> : null}
           {session ? <BackgroundTasksButton sessionRef={session.ref} /> : null}
           {session ? <SessionToolsButton sessionRef={session.ref} /> : null}

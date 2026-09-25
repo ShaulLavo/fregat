@@ -113,7 +113,15 @@ export function ChatInputActions({
             onSelectFiles={onSelectImageFiles}
           />
           {contextMeterEnabled && contextUsage && !tiny ? (
-            <ContextUsageRing compact={compact} usage={contextUsage} />
+            <ContextUsageRing
+              compact={compact}
+              // Usage exists only for a draft key that is a session, so this names a real one.
+              sessionRef={{
+                environmentId: draftTarget.environmentId,
+                sessionId: draftTarget.draftKey as SessionId,
+              }}
+              usage={contextUsage}
+            />
           ) : null}
           {accountUsage && !tiny ? (
             <UsageLimitsMeter account={accountUsage} compact={compact} />

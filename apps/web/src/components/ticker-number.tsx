@@ -29,9 +29,12 @@ const DIGIT_STYLES = {
  * whatever follows, so that ancestor needs to either clip or wrap.
  */
 export function TickerNumber({
+  decimals = 0,
   size = '2xs',
   value,
 }: {
+  /** Fixed fraction digits, for amounts such as dollars. */
+  decimals?: number
   /** Must match the type step of the surrounding text: the digits cannot inherit it. */
   size?: TickerSize
   value: number
@@ -44,8 +47,9 @@ export function TickerNumber({
         decrementColor='currentColor'
         digitStyles={DIGIT_STYLES}
         fontSize={TICKER_FONT_SIZES[size]}
+        decimalPrecision={decimals}
         includeCommas
-        includeDecimals={false}
+        includeDecimals={decimals > 0}
         incrementColor='currentColor'
         value={value}
       />

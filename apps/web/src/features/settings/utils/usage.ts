@@ -1,3 +1,4 @@
+import { formatUsd } from '@/lib/usd'
 import type {
   ProviderUsageDayRow,
   ProviderUsageHistory,
@@ -21,18 +22,6 @@ export function usagePurposeLabel(purpose: ProviderUsagePurpose) {
 }
 
 /** Cents while they matter; a sub-cent amount says so rather than rounding to `$0.00`. */
-export function formatUsd(value: number) {
-  if (value === 0) return '$0.00'
-  if (value < 0.01) return '<$0.01'
-
-  return new Intl.NumberFormat('en-US', {
-    currency: 'USD',
-    maximumFractionDigits: value < 100 ? 2 : 0,
-    minimumFractionDigits: value < 100 ? 2 : 0,
-    style: 'currency',
-  }).format(value)
-}
-
 /** `null` is an unknown cost, never zero. */
 export function formatModelCost(row: Pick<ProviderUsageModelRow, 'costUsd'>) {
   return row.costUsd === null ? 'Price unavailable' : formatUsd(row.costUsd)

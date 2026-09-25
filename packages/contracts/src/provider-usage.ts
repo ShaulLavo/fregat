@@ -122,6 +122,15 @@ export const providerUsageHistorySchema = v.object({
   purposes: v.array(providerUsagePurposeRowSchema),
 })
 
+/** What one session has used so far. `costUsd` sums priced turns; unpriced tokens are named apart. */
+export const providerUsageSessionTotalSchema = v.object({
+  costUsd: v.nullable(v.number()),
+  tokens: tokenCountSchema,
+  turns: tokenCountSchema,
+  unpricedTokens: tokenCountSchema,
+})
+
+export type ProviderUsageSessionTotal = v.InferOutput<typeof providerUsageSessionTotalSchema>
 export type ProviderUsagePurpose = v.InferOutput<typeof providerUsagePurposeSchema>
 export type ProviderUsageHistoryQuery = v.InferOutput<typeof providerUsageHistoryQuerySchema>
 export type ProviderUsageCostSource = v.InferOutput<typeof providerUsageCostSourceSchema>

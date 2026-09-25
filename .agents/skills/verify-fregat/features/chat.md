@@ -42,6 +42,8 @@ The chat mode button in the window toolbar, or an address URL with `/chat/`.
 
 `scenario claude-custom-agent` gives real Claude (Haiku) a fixture with `.claude/agents/reviewer.md`; the new-session strip's Run as menu lists it among the built-in agents, a session started as it opens its reply with the agent's marker line, and the header shows a `reviewer` chip. The shared Editor checkout reloading mid-edit blanks the page; rerun if the page errors name an Editor module.
 
+`scenario claude-context-popover` turns on `chat.contextWindowMeterEnabled` on its throwaway server, runs one real Haiku turn and opens the context ring: a category meter with a legend (System prompt, Messages, …), deferred tools listed apart, and "This session" with tokens and a cost.
+
 `scenario chat-diff-syntax --url <session-diff-address>` checks painted syntax colors in a session checkpoint diff.
 
 Commands dispatch over the orchestration socket when it is live and over HTTP otherwise. The HTTP path refetches the shell snapshot itself.
