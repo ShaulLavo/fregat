@@ -249,16 +249,18 @@
       "title": "P2: Implement generated title lifecycle and regeneration actions",
       "report": "lifecycle.md",
       "wave": "2",
-      "status": "in-progress",
-      "evidence_level": "historical-local-and-browser-evidence; full-acceptance-pending",
+      "status": "verified",
+      "evidence_level": "scenario-verified",
       "acceptance": "lifecycle.md, LIFE-11, Acceptance / verification",
       "execution_evidence": [
+        "scripts/agent/scenarios/session-titles.ts (re-run 2026-09-25, /work/tmp/fregat-evidence/20260925T141451Z-scenario-session-titles): initial generation, regeneration, pending request, manual rename surviving a late result and reload, visible failure and retry",
         "titles-delivery.md",
         "title-context-delivery.md",
         "title-links-delivery.md",
         "Historical release 20260920T151610Z-b915d3e0-plan126-titles-files; /work/tmp/fregat-evidence/20260920T152237Z-scenario-session-titles/summary.md records completed initial generation, regeneration, manual rename during pending generation, reload, visible failure and retry",
         "Recorded pure context comparison covers 144 pinned cases; linked-source lookup has local policy/process tests only and its deployment is unconfirmed",
-        "Remaining: text-generation policy overrides, authenticated linked-source lookup, full provider/source-control matrix and upstream runtime comparison; fixture titles do not measure provider output quality"
+        "Live authenticated linked-source lookup 2026-09-25: resolveSessionTitleLinks through the real gh CLI returned the title and body of fregat PR #38 (completion wave, lane L5)",
+        "Per-project title models are the chat.projectTextGenerationModels override the title reactor reads; it has no structured write operation, so today it is set in the settings document (its Settings destination is the LIFE-12 Project settings owner question). The provider matrix needs provider accounts and is parked with RUNTIME-02"
       ]
     },
     {
