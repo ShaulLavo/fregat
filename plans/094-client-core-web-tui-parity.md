@@ -2,7 +2,13 @@
 
 Implementation note, 2026-09-12: Plan 096 removed the five web Git contract aliases and moved menus to `keymap/menus`. Log query keys now live in `features/logs/utils/query-keys.ts`; pending logs use the shared loader before empty. Preserve the existing single error banner during this plan's client move. See [web layering](../docs/web-layering.md).
 
-Status: proposed, implementation not started. Requested 2026-09-11.
+Status: **IN PROGRESS on lane L6 (PR #36).** Done 2026-09-25: the contracts git pass and status-row
+partition (`b1d221f4`); 8.1, 8.4, 8.6, 8.8 (`07d3f878`); parallels b and h (`ce016064`); the
+language map (`5a97b4f4`). 8.3 and 8.7 were already done. Remaining, in order: the log-dashboard
+client; the attachment policy plus parallels e, f, g; 4.8, 4.9, 8.12, project registration and the
+recents ledger; parallels a, c, d; the TUI observable store. The focus transitions (U8) are dropped.
+Decisions applied so far took the written recommendations (Decided 2026-09-25: recommendation
+(completion wave)). Requested 2026-09-11.
 
 This plan owns duplication-census items 4.1, 4.2, 4.3, 4.4, 4.5, 4.7, 4.8, 4.9, 4.11, 5.4, and the
 wire-vocabulary half of Theme 8 (8.1–8.8, 8.12). Siblings own the rest:
