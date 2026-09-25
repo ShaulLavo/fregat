@@ -28,7 +28,7 @@ export type EditorLanguageServerStatusSource = {
   subscribe: (listener: () => void) => () => void
 }
 
-export type LanguageServerState = {
+type LanguageServerState = {
   connected: boolean
   diagnostics: LanguageServerDiagnosticSummary | null
   status: LanguageServerStatus
