@@ -20,6 +20,7 @@
     "apps/web": {
       "entry": [
         "boot.css",
+        "public/sw.js",
         "src/demo-entry.ts",
         "src/dev-entry.tsx",
         "src/features/address/tests/navigation.types.ts",

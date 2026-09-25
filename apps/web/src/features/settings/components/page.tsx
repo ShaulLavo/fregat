@@ -22,6 +22,8 @@ import { ScopeTabs } from '@/features/settings/components/scope-tabs'
 import { SettingsJsonView } from '@/features/settings/components/json-view'
 import { UsageSection } from '@/features/settings/components/usage-section'
 import { matchesUsageSearch } from '@/features/settings/utils/usage'
+import { PushSection } from '@/features/settings/components/push-section'
+import { matchesPushSearch } from '@/features/settings/utils/push-device'
 import { SettingRow } from '@/features/settings/components/setting-row'
 import { StatusMessage } from '@/components/status-message'
 import { ViewToggle } from '@/features/settings/components/view-toggle'
@@ -113,6 +115,8 @@ export function SettingsPage({
   )
   const categories = groupByCategory(visible)
   if (matchesUsageSearch(query)) categories.set('Usage', [])
+  const showPush = matchesPushSearch(query) || visible.includes('chat.notificationMode')
+  if (showPush && !categories.has('Chat')) categories.set('Chat', [])
   const selectedFile = document.data.layers.find((layer) => layer.id === scope)?.file ?? null
   // An address can narrow the page to one category. Unknown or absent means all of
   // them, so a stale link degrades to the full page rather than to nothing.
@@ -248,6 +252,7 @@ export function SettingsPage({
                   <h2 className='text-foreground mb-1 text-sm font-semibold'>{category}</h2>
                   {category === 'Usage' ? <UsageSection /> : null}
                   {ids.includes('chat.keepImportedSessionsUpdated') ? <ImportSection /> : null}
+                  {category === 'Chat' && showPush ? <PushSection /> : null}
                   {ids.map((id) => (
                     <SettingRow id={id} key={id} snapshot={projection} />
                   ))}

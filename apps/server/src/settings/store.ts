@@ -50,6 +50,7 @@ import {
   maskProviderSecrets,
   SecretStore,
   type SecretRef,
+  type ServerSecretRef,
 } from './secrets'
 import {
   rawRevisionStaleError,
@@ -229,6 +230,34 @@ export class SettingsStore {
     const secrets = await this.secretStore.read()
 
     return applyProviderSecrets(this.snapshot().values[PROVIDER_INSTANCES], secrets)
+  }
+
+  /**
+   * Reads a server-owned secret, creating it on first use. Runs under the same
+   * coordinator as settings writes, so two first uses agree on one value.
+   */
+  async ensureSecret(ref: ServerSecretRef, create: () => string): Promise<string> {
+    this.assertOperational()
+    return withSettingsSecretTransactionOwner(this.secretsPath, async (lease) => {
+      recoverSettingsTransactionSync(this.settingsFilePaths, this.secretsPath)
+      const existing = (await this.secretStore.read()).get(ref)
+      if (existing) return existing
+
+      const value = create()
+      const outcome = await this.secretStore.write(new Map([[ref, value]]))
+      if (outcome === 'revision-mismatch')
+        throw settingsErrors.SERVER_SECRET_CONTENDED({
+          internal: {
+            coordinatorWaitMs: lease.waitMs,
+            file: 'secrets',
+            operation: 'ensure-secret',
+            ref,
+          },
+        })
+
+      this.reloadSecretRefs()
+      return value
+    })
   }
 
   providerInstancesForSpawnSync(): SettingsValues[typeof PROVIDER_INSTANCES] {

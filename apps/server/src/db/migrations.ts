@@ -29,7 +29,24 @@ export const platformMigrations: readonly Migration[] = [
   { version: 22, name: 'provider_usage_purpose', up: applyProviderUsagePurpose },
   { version: 23, name: 'provider_usage_prices', up: applyProviderUsagePrices },
   { version: 24, name: 'provider_usage_contributions', up: applyProviderUsageContributions },
+  { version: 25, name: 'push_devices', up: applyPushDevices },
 ]
+
+function applyPushDevices(database: PlatformDatabase) {
+  database.run(sql`
+    CREATE TABLE push_devices (
+      id TEXT PRIMARY KEY NOT NULL,
+      endpoint TEXT NOT NULL,
+      p256dh TEXT NOT NULL,
+      auth TEXT NOT NULL,
+      label TEXT NOT NULL,
+      service TEXT NOT NULL,
+      origin TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+  `)
+}
 
 function applyProviderUsageContributions(database: PlatformDatabase) {
   database.run(

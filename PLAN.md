@@ -487,7 +487,7 @@ phases or splits them into executable plans; not all research happens up front.
 | [139](plans/139-acting-on-agent-diffs.md)  | research                 | Keep or undo agent edits per hunk, batched diff comments to the agent, review mode, second-model review, plan line feedback |
 | [140](plans/140-editor-agent-advantage.md) | research                 | Editor context into chat, fix with AI, diagnostics fed back to the agent                                                    |
 | [141](plans/141-usage-and-rate-limits.md)  | executable               | Rate-limit meter, usage page with cost, usage history                                                                       |
-| [142](plans/142-web-push.md)               | executable after a spike | Web Push from the mesh server                                                                                               |
+| [142](plans/142-web-push.md)               | spike + P1 done, P2 next | Web Push from the mesh server                                                                                               |
 | [143](plans/143-phone-layout.md)           | discussion               | What the phone is for; web layout versus the later companion app                                                            |
 | [144](plans/144-unattended-agent-work.md)  | research                 | Scheduled, looping and multi-agent work: surface what the harnesses already do, build only the rest                         |
 | [145](plans/145-harness-controls.md)       | small executable plans   | Fork, approval rules, MCP status, background tasks, hooks, custom agents, compact, export                                   |
@@ -500,7 +500,8 @@ Suggested order:
 1. ~~Plan 138~~ — implemented 2026-09-24.
 2. Quick wins: ~~Plan 141 Phases 1–3~~ (meter, per-turn recording, usage page; 2026-09-25), the
    small Plan 145 plans (~~approval-rules~~, merged in `89c58188`), and the small new Plan 126 rows.
-3. Plan 142 after its spike. It needs only a minimal web app manifest, not Plan 143.
+3. Plan 142: spike and Phase 1 done (completion wave, lane L5); Phase 2, session notices, next.
+   The phone checks are the owner's.
 4. The research phases of Plans 139 and 140. Plan 140's diagnostics work waits on Plans 087 and
    088; its editor-to-chat work does not.
 5. Plan 144's capability inventory. It decides how much of that lane is built rather than surfaced.

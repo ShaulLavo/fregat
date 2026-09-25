@@ -10,6 +10,7 @@ import { readFsLogs } from 'evlog/fs'
 import type { WideEvent } from 'evlog'
 
 import { closeTestApps, createTestApp } from '../../../test/server'
+import { createPushSubscriber } from '../../../test/factories/push-subscriber'
 import { flushObservability, initializeObservability, resetObservabilityForTests } from '../runtime'
 import { settingsErrors } from '../../settings/structured-errors'
 import { testSettingsOptions, type TestSettingsOverrides } from '../../settings/testing'
@@ -523,6 +524,98 @@ describe('observability runtime', () => {
       level: 'warn',
       source: 'client',
     })
+  })
+
+  it('records one push context per test send without endpoints, keys or payload', async () => {
+    const root = await fixtureRoot()
+    const logDir = await fixtureRoot()
+    initializeObservability(testObservabilityEnv(logDir))
+    const endpoint = 'https://push.example.test/PUSH_ENDPOINT_MARKER'
+    let answer: (url: string) => Promise<Response> = async () => new Response(null, { status: 201 })
+    const app = createTestApp({
+      auth: { allowedOrigins: [TRUSTED_ORIGIN] },
+      push: { fetcher: (url) => answer(url) },
+      settings: testSettingsOptions(root),
+      watch: false,
+      workspaceRoot: root,
+    })
+    const subscriber = createPushSubscriber(endpoint)
+    const { auth, p256dh } = subscriber.subscription.keys
+    const post = (pathname: string, body?: unknown) =>
+      app.handle(
+        new Request(`http://local${pathname}`, {
+          body: body === undefined ? undefined : JSON.stringify(body),
+          headers: trustedOriginHeaders({ 'content-type': 'application/json' }),
+          method: 'POST',
+        }),
+      )
+
+    const registered = await post('/push/devices', {
+      label: 'Chrome on Linux',
+      subscription: subscriber.subscription,
+    })
+    const { device } = await registered.json()
+    const sent = await post(`/push/devices/${device.id}/test`)
+    answer = async () => new Response('gone', { status: 410 })
+    const expired = await post(`/push/devices/${device.id}/test`)
+    answer = async (url) => {
+      throw new TypeError(`connect failed ${url}`)
+    }
+    const unreachable = await post(`/push/devices/${device.id}/test`)
+    const rejected = await post('/push/devices', {
+      label: 'L'.repeat(81),
+      subscription: subscriber.subscription,
+    })
+
+    expect([sent.status, expired.status, unreachable.status, rejected.status]).toEqual([
+      200, 410, 502, 400,
+    ])
+    await Promise.all([sent.text(), expired.text(), unreachable.text(), rejected.text()])
+    const events = await flushedEvents(logDir)
+    const sendPath = `/push/devices/${device.id}/test`
+    const pushContext = (status: number) =>
+      (
+        events.find((event) => event.path === sendPath && event.status === status) as
+          | (WideEvent & Record<string, unknown>)
+          | undefined
+      )?.push
+    const secrets = JSON.parse(
+      await readFile(path.join(root, '.platform-test', 'secrets.json'), 'utf8'),
+    )
+
+    expect(pushContext(200)).toEqual({
+      deviceCount: 1,
+      failure: null,
+      kind: 'test',
+      outcome: 'sent',
+      service: 'other',
+      status: 201,
+    })
+    expect(pushContext(410)).toEqual({
+      deviceCount: 1,
+      failure: null,
+      kind: 'test',
+      outcome: 'expired',
+      service: 'other',
+      status: 410,
+    })
+    expect(pushContext(502)).toEqual({
+      deviceCount: 1,
+      failure: 'TypeError',
+      kind: 'test',
+      outcome: 'unreachable',
+      service: 'other',
+      status: null,
+    })
+    const serialized = JSON.stringify(events)
+    for (const secret of [
+      'PUSH_ENDPOINT_MARKER',
+      p256dh,
+      auth,
+      secrets['push.vapid.privateKey'],
+      'reach this device',
+    ])
+      expect(serialized).not.toContain(secret)
   })
 
   it('records git summaries and streamed search context without persisting payload contents', async () => {

@@ -2,6 +2,7 @@ import type { RecordedModelPrice } from '../provider/utils/model-prices'
 import type { UsageContribution } from '../provider/utils/usage-contributions'
 import {
   providerUsagePurposeSchema,
+  pushServiceSchema,
   sessionRuntimeStatusSchema,
   type WorkspaceAddressId,
 } from '@workspace/contracts'
@@ -100,6 +101,23 @@ export const attachmentUploadOwners = sqliteTable(
   },
   (table) => [index('attachment_upload_owners_session_idx').on(table.sessionId)],
 )
+
+/**
+ * Browsers subscribed to Web Push from this server. `id` is `pushDeviceId(endpoint)`, so a
+ * browser that registers again replaces its own row. Device records, never settings.
+ */
+export const pushDevices = sqliteTable('push_devices', {
+  id: text('id').primaryKey(),
+  endpoint: text('endpoint').notNull(),
+  p256dh: text('p256dh').notNull(),
+  auth: text('auth').notNull(),
+  label: text('label').notNull(),
+  service: text('service', { enum: pushServiceSchema.options }).notNull(),
+  /** The page origin that registered it; an https one becomes the VAPID subject. */
+  origin: text('origin'),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+})
 
 export const environmentIdentity = sqliteTable('environment_identity', {
   id: text('id').primaryKey(),
