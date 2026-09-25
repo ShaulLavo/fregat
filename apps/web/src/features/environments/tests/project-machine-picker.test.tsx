@@ -49,6 +49,7 @@ test.for(['row', 'path'])(
       await userEvent.type(path, join(h.serverB.root, 'only-on-b'))
       await userEvent.keyboard('{Enter}')
       await waitFor(() => expect(screen.queryByRole('textbox', { name: 'Folder path' })).toBeNull())
+      await screen.findByRole('button', { name: 'only-on-b' })
     }
     await userEvent.click(screen.getByRole('button', { name: 'Choose folder' }))
     await waitFor(() => expect(h.application.getSnapshot().origin).toBe(h.originB))

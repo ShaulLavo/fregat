@@ -1,7 +1,7 @@
 import { statPath } from '@/lib/file-server'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { makeTestServer } from '../../../../test/server'
-import { act, waitFor } from '@testing-library/react'
+import { act } from '@testing-library/react'
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Button } from '@workspace/ui/components/button'
@@ -12,6 +12,7 @@ import { createObservedInProcessClient } from '../../../../test/client'
 import { createTestApplicationRuntime } from '../../../../test/factories/application-runtime'
 import { installTestClient } from '../../../../test/factories/client-binding'
 import { TestEditorStateProvider } from '../../../../test/factories/editor-state-provider'
+import { textChangePreview } from '../../../../test/factories/workspace-text-changes'
 import { expect, test } from '../../../../test/fixtures'
 import { renderWithProviders } from '../../../../test/render'
 
@@ -48,6 +49,13 @@ test('keeps replacement reads on the original machine when the selection changes
   await Promise.all(paths.map((path) => writeFile(join(otherServer.root, path), 'other needle')))
   const application = createTestApplicationRuntime()
   const { editor } = application.getSnapshot()
+  const replacement = Promise.withResolvers<void>()
+  const stopObservingReplacement = editor.searchBufferStore.subscribe(
+    (state) => state.active?.replaceStatus,
+    (status, previous) => {
+      if (previous === 'running' && status !== 'running') replacement.resolve()
+    },
+  )
 
   const view = renderWithProviders(
     <TestEditorStateProvider>
@@ -92,17 +100,13 @@ test('keeps replacement reads on the original machine when the selection changes
     })
     expect(button).toBeEnabled()
     act(() => button.click())
-    await waitFor(() =>
-      expect(editor.workspaceEditService.getSnapshot().phase).toBe('awaiting-confirmation'),
-    )
-    act(() =>
-      editor.workspaceEditService.confirmPreview(
-        editor.workspaceEditService.getSnapshot().preview!.operationId,
-      ),
-    )
-    await waitFor(() =>
-      expect(editor.searchBufferStore.getState().active?.replaceStatus).toBe('success'),
-    )
+    const operationId = await textChangePreview(editor.workspaceEditService)
+    expect(editor.workspaceEditService.getSnapshot().phase).toBe('awaiting-confirmation')
+    await act(async () => {
+      editor.workspaceEditService.confirmPreview(operationId)
+      await replacement.promise
+    })
+    expect(editor.searchBufferStore.getState().active?.replaceStatus).toBe('success')
     expect([...new Set(originalReads)]).toEqual(paths)
     expect(
       await Promise.all(paths.map((path) => readFile(join(server.root, path), 'utf8'))),
@@ -112,6 +116,7 @@ test('keeps replacement reads on the original machine when the selection changes
     ).toEqual(['other needle', 'other needle'])
     expect(otherReads).toEqual([])
   } finally {
+    stopObservingReplacement()
     view.unmount()
     setActiveServerOrigin(otherOrigin)
     setClient(previousOtherClient)
