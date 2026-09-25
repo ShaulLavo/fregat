@@ -1,6 +1,6 @@
 import { ForesightManager, type HitSlop } from 'js.foresight'
 
-export type IntentPrefetchRow<TIntent> = {
+type IntentPrefetchRow<TIntent> = {
   intent: TIntent
   key: string
   meta: Record<string, unknown>

@@ -35,6 +35,7 @@ test.for([false, true])(
             requestType: 'mcp_elicitation_approval',
             turnId: null,
             options,
+            defaultToNo: false,
           }}
           theme={resolveTheme('dark', 'dark', true)}
           enabled

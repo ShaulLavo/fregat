@@ -1,5 +1,5 @@
 import { ok, strictEqual } from 'node:assert/strict'
-import { access, readFile, writeFile } from 'node:fs/promises'
+import { access, readFile, rm, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import path from 'node:path'
 import type { Page } from 'playwright'
@@ -11,6 +11,7 @@ import { registerFixtureProject } from './native-provider-verification'
 
 const MARKER = 'marker-145.txt'
 const DONE = 'APPROVAL_RULE_HELD'
+const ALWAYS_TOUCH = /^Always allow commands starting with touch/
 const CODEX_RULES = path.join(homedir(), '.codex', 'rules', 'default.rules')
 
 type ApprovalRulesProvider = {
@@ -39,10 +40,11 @@ function approvalRulesScenario(provider: ApprovalRulesProvider): Scenario {
     async run(page, { step }) {
       const orchestration = await openChat(page)
       const fixture = await createGitFixture(provider.name)
-      const restore = await provider.preserve?.()
       const sessions: string[] = []
       let projectId: string | null = null
+      let restore: (() => Promise<void>) | undefined
       try {
+        restore = await provider.preserve?.()
         // A project needs a root commit for its repository identity.
         await fixtureGit(fixture, ['commit', '--quiet', '-m', 'initial'])
         const worktree = await registerFixtureProject(page, orchestration, fixture)
@@ -120,20 +122,31 @@ export const codexApprovalRules = approvalRulesScenario({
     'Real Codex in approval-required mode: the command approval offers the proposed execpolicy amendment, choosing it writes ~/.codex/rules/default.rules, and a new session runs the same command without asking. Restores the rules file byte for byte and removes the fixture, sessions and project.',
   model: { providerInstanceId: 'codex', model: 'gpt-5.5' },
   prompt: `Run exactly \`touch ${MARKER}\` in the workspace, once, and run nothing else. Then reply with exactly ${DONE}.`,
-  options: ['Cancel', 'Deny', 'Allow for this session', /^Always allow "touch/, 'Allow'],
-  always: /^Always allow "touch/,
+  // What codex 0.156.1 lists in availableDecisions for a plain command.
+  options: ['Cancel', ALWAYS_TOUCH, 'Allow'],
+  always: ALWAYS_TOUCH,
   async ruleWritten() {
     const rules = await readFile(CODEX_RULES, 'utf8')
     ok(/prefix_rule\(pattern=\["touch"/.test(rules), 'default.rules must hold the touch rule')
   },
   async preserve() {
-    const before = await readFile(CODEX_RULES, 'utf8')
+    const before = await readFile(CODEX_RULES, 'utf8').catch(nullWhenMissing)
     return async () => {
+      // A file the run created is removed, not left holding the rule.
+      if (before === null) {
+        await rm(CODEX_RULES, { force: true })
+        return
+      }
       await writeFile(CODEX_RULES, before)
       strictEqual(await readFile(CODEX_RULES, 'utf8'), before)
     }
   },
 })
+
+function nullWhenMissing(error: unknown) {
+  if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return null
+  throw error
+}
 
 function matches(label: string, expected: string | RegExp) {
   return typeof expected === 'string' ? label === expected : expected.test(label)

@@ -171,10 +171,6 @@ export async function unstagePaths(paths: readonly string[], client: Client) {
   })
 }
 
-export async function discardPath(path: string, client: Client) {
-  return discardPaths([path], client)
-}
-
 export async function discardPaths(paths: readonly string[], client: Client) {
   return observeGitPathsOperation(client, 'git.discard', paths, async () => {
     const response = await client.git.discard.post({ paths: Array.from(paths) })

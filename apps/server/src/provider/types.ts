@@ -228,6 +228,8 @@ export type ProviderRuntimeEventPayload =
       type: 'request.opened'
       payload: {
         options?: readonly ProviderApprovalOption[]
+        /** No one-keystroke approve: the harness marked this ask risky. */
+        defaultToNo?: boolean
         args?: unknown
         detail?: string
         requestType: string

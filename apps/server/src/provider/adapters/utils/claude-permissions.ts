@@ -1,9 +1,11 @@
 import type {
   PermissionResult,
+  PermissionRuleValue,
   PermissionUpdate,
   PermissionUpdateDestination,
 } from '@anthropic-ai/claude-agent-sdk'
-import type { ProviderApprovalDecision, ProviderApprovalOption } from '@workspace/contracts'
+import type { ProviderApprovalDecision } from '@workspace/contracts'
+import type { ApprovalOffer } from './approval-offers'
 
 /** What the SDK hands `canUseTool` about how the answer may be remembered. */
 export type ClaudePermissionRequest = {
@@ -11,83 +13,105 @@ export type ClaudePermissionRequest = {
   readonly suppressAlwaysAllowRule?: boolean
 }
 
+/** The only suggestions an approval may apply: they add access and change nothing else. */
+type Grant =
+  | Extract<PermissionUpdate, { type: 'addRules' }>
+  | Extract<PermissionUpdate, { type: 'addDirectories' }>
+
+// Claude resolves these tools' rule paths against the cwd or the settings file.
+const PATH_RULE_TOOLS = new Set([
+  'Read',
+  'Edit',
+  'Write',
+  'MultiEdit',
+  'NotebookEdit',
+  'Glob',
+  'Grep',
+])
+const SHELL_RULE_TOOLS = new Set(['Bash', 'PowerShell'])
+const RELATIVE_PATH_ARG = /(^|\s)\.{1,2}\//
+
+const CANCELLED: PermissionResult = { behavior: 'deny', message: 'Tool use cancelled by the user.' }
+const DENIED: PermissionResult = { behavior: 'deny', message: 'Tool use denied by the user.' }
+
 /**
- * Never `projectSettings`: that file is committed, so a rule written there
- * would ship to everyone who clones the repository.
+ * Only choices the SDK's suggestions can honour are offered. "Always" never
+ * targets `projectSettings`: that file is committed and would ship to every clone.
  */
-const ALWAYS_DESTINATIONS = {
-  acceptAlways: 'userSettings',
-  acceptAlwaysInProject: 'localSettings',
-} as const satisfies Partial<Record<ProviderApprovalDecision, PermissionUpdateDestination>>
-
-/** Only decisions the SDK's suggestions can honour are offered. */
-export function claudeApprovalOptions(
+export function claudeApprovalOffers(
   request: ClaudePermissionRequest,
-): readonly ProviderApprovalOption[] {
-  const suggestions = request.suggestions ?? []
-  const options: ProviderApprovalOption[] = [
-    { decision: 'cancel', label: 'Cancel' },
-    { decision: 'decline', label: 'Deny' },
-  ]
-  if (suggestions.length > 0)
-    options.push({ decision: 'acceptForSession', label: 'Allow for this session' })
-  if (offersAlwaysRule(request, suggestions)) {
-    options.push(
-      { decision: 'acceptAlwaysInProject', label: 'Always allow in this project' },
-      { decision: 'acceptAlways', label: 'Always allow everywhere' },
-    )
-  }
-  options.push({ decision: 'accept', label: 'Allow' })
-  return options
-}
-
-// A suggestion set that is session-only already is "for this session"; calling it "always" would lie.
-function offersAlwaysRule(
-  request: ClaudePermissionRequest,
-  suggestions: readonly PermissionUpdate[],
-) {
-  if (request.suppressAlwaysAllowRule) return false
-
-  return suggestions.some((update) => update.destination !== 'session')
-}
-
-export function claudePermissionResult(
-  decision: ProviderApprovalDecision,
   toolInput: Record<string, unknown>,
-  suggestions: readonly PermissionUpdate[],
-): PermissionResult {
-  if (decision === 'cancel') return { behavior: 'deny', message: 'Tool use cancelled by the user.' }
-  if (decision === 'decline') return { behavior: 'deny', message: 'Tool use denied by the user.' }
+): readonly ApprovalOffer<PermissionResult>[] {
+  // The flag means any rule the suggestions write grants more than this ask, session rules included.
+  const grants = request.suppressAlwaysAllowRule ? [] : grantsOf(request.suggestions ?? [])
+  const persistent = grants.filter((grant) => grant.destination !== 'session')
+  const offers: ApprovalOffer<PermissionResult>[] = [
+    { option: { decision: 'cancel', label: 'Cancel' }, response: CANCELLED },
+    { option: { decision: 'decline', label: 'Deny' }, response: DENIED },
+  ]
+  const allow = (decision: ProviderApprovalDecision, label: string, updates: PermissionUpdate[]) =>
+    offers.push({ option: { decision, label }, response: allowed(toolInput, updates) })
 
-  const updatedPermissions = claudePermissionUpdates(decision, suggestions)
-  if (updatedPermissions.length === 0) return { behavior: 'allow', updatedInput: toolInput }
-
-  return { behavior: 'allow', updatedInput: toolInput, updatedPermissions }
+  if (grants.length > 0)
+    allow(
+      'acceptForSession',
+      'Allow for this session',
+      grants.map((grant) => withDestination(grant, 'session')),
+    )
+  // A session-only set is already "for this session"; calling it "always" would lie.
+  if (persistent.length > 0)
+    allow('acceptAlwaysInProject', 'Always allow in this project', always(grants, 'localSettings'))
+  if (persistent.length > 0 && persistent.every(isPortable))
+    allow('acceptAlways', 'Always allow everywhere', always(grants, 'userSettings'))
+  allow('accept', 'Allow', [])
+  return offers
 }
 
-/**
- * "Always" keeps the updates the SDK scoped to the session where it put them and
- * moves only the persistent ones, so it never widens what the harness proposed.
- */
-export function claudePermissionUpdates(
-  decision: ProviderApprovalDecision,
-  suggestions: readonly PermissionUpdate[],
-): PermissionUpdate[] {
-  if (decision === 'acceptForSession')
-    return suggestions.map((update) => withDestination(update, 'session'))
-  if (decision !== 'acceptAlways' && decision !== 'acceptAlwaysInProject') return []
-
-  const destination = ALWAYS_DESTINATIONS[decision]
-  return suggestions.map((update) =>
-    update.destination === 'session' ? update : withDestination(update, destination),
+function grantsOf(suggestions: readonly PermissionUpdate[]) {
+  return suggestions.filter(
+    (update): update is Grant =>
+      update.type === 'addDirectories' ||
+      (update.type === 'addRules' && update.behavior === 'allow'),
   )
 }
 
-function withDestination(
-  update: PermissionUpdate,
-  destination: PermissionUpdateDestination,
-): PermissionUpdate {
-  return { ...update, destination }
+// Session grants stay where the SDK put them: "always" never widens what it proposed.
+function always(grants: readonly Grant[], destination: PermissionUpdateDestination) {
+  return grants.map((grant) =>
+    grant.destination === 'session' ? grant : withDestination(grant, destination),
+  )
+}
+
+function withDestination(grant: Grant, destination: PermissionUpdateDestination): Grant {
+  return { ...grant, destination }
+}
+
+function allowed(
+  toolInput: Record<string, unknown>,
+  updates: PermissionUpdate[],
+): PermissionResult {
+  if (updates.length === 0) return { behavior: 'allow', updatedInput: toolInput }
+
+  return { behavior: 'allow', updatedInput: toolInput, updatedPermissions: updates }
+}
+
+/** A grant means the same thing in user settings as where the SDK proposed it. */
+function isPortable(grant: Grant) {
+  if (grant.type === 'addDirectories')
+    return grant.directories.every((directory) => /^(\/|~\/)/.test(directory))
+
+  return grant.rules.every(isPortableRule)
+}
+
+// A relative path in a user-wide rule would match a different file, or run a different script, in every repository.
+function isPortableRule(rule: PermissionRuleValue) {
+  const content = rule.ruleContent
+  if (!content) return true
+  if (PATH_RULE_TOOLS.has(rule.toolName))
+    return content.startsWith('//') || content.startsWith('~/')
+  if (SHELL_RULE_TOOLS.has(rule.toolName)) return !RELATIVE_PATH_ARG.test(content)
+
+  return true
 }
 
 /** Rule and directory entries written, for the wide event; never the rules themselves. */

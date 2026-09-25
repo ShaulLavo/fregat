@@ -49,6 +49,12 @@ export const sessionIdentityErrors = defineErrorCatalog('provider', {
     why: 'The session was deleted, belongs to another checkout, or has work in progress.',
     fix: 'Wait for the active turn to finish and reopen the session in its own checkout.',
   },
+  APPROVAL_DECISION_NOT_OFFERED: {
+    status: 409,
+    message: 'This approval does not offer that choice',
+    why: 'The agent listed the answers it accepts for this request, and the chosen one is not among them.',
+    fix: 'Pick one of the choices shown on the approval.',
+  },
   SERVICE_CLOSED: {
     status: 503,
     message: 'The provider service is shutting down',

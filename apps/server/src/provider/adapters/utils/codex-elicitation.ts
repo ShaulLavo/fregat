@@ -1,5 +1,6 @@
 import * as v from 'valibot'
-import type { ProviderApprovalDecision, ProviderApprovalOption } from '@workspace/contracts'
+import type { ProviderApprovalDecision } from '@workspace/contracts'
+import type { ApprovalOffer } from './approval-offers'
 
 const nullableText = v.nullish(v.string())
 // Keys and values declared in codex-rs/protocol/src/mcp_approval_meta.rs.
@@ -43,8 +44,7 @@ type ElicitationResponse =
     }
 export type CodexElicitation = {
   detail: string
-  options: readonly ProviderApprovalOption[]
-  responses: ReadonlyMap<ProviderApprovalDecision, ElicitationResponse>
+  offers: readonly ApprovalOffer<ElicitationResponse>[]
 }
 
 // Exact values only: an unrecognized value grants no persistence, never a guessed one.
@@ -109,15 +109,10 @@ export function parseCodexElicitation(params: unknown): CodexElicitation | null 
   const metadata = parsedMetadata.success ? parsedMetadata.output : undefined
   const appName = metadata?.connector_name || request.serverName
   const persistence = declaredPersistence(metadata?.persist)
-  const options: ProviderApprovalOption[] = [
-    { decision: 'cancel', label: 'Cancel' },
-    { decision: 'decline', label: 'Decline' },
+  const offers: ApprovalOffer<ElicitationResponse>[] = [
+    { option: { decision: 'cancel', label: 'Cancel' }, response: { action: 'cancel' } },
+    { option: { decision: 'decline', label: 'Decline' }, response: { action: 'decline' } },
   ]
-  const responses = new Map<ProviderApprovalDecision, ElicitationResponse>([
-    ['cancel', { action: 'cancel' }],
-    ['decline', { action: 'decline' }],
-    ['accept', accepted],
-  ])
   const persistenceOptions = [
     ['acceptForSession', 'Always allow this session'],
     ['acceptAlways', 'Always allow'],
@@ -126,9 +121,11 @@ export function parseCodexElicitation(params: unknown): CodexElicitation | null 
     if (!persistence.has(persistValues[decision])) continue
     const response = responseFor(form, decision)
     if (response.action !== 'accept') continue
-    options.push({ decision, label: formLabel(form, decision) ?? fallbackLabel })
-    responses.set(decision, response)
+    offers.push({
+      option: { decision, label: formLabel(form, decision) ?? fallbackLabel },
+      response,
+    })
   }
-  options.push({ decision: 'accept', label: 'Approve' })
-  return { detail: `${appName}\n${request.message}`, options, responses }
+  offers.push({ option: { decision: 'accept', label: 'Approve' }, response: accepted })
+  return { detail: `${appName}\n${request.message}`, offers }
 }

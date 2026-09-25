@@ -440,7 +440,7 @@ describe('ClaudeProviderAdapter', () => {
         requestId: v.parse(approvalRequestIdSchema, requestId),
         sessionId,
       }),
-    ).rejects.toThrow('does not offer acceptForSession')
+    ).rejects.toThrow('does not offer that choice')
     await harness.adapter.respondApproval({
       decision: 'accept',
       requestId: v.parse(approvalRequestIdSchema, requestId),
@@ -474,10 +474,11 @@ describe('ClaudeProviderAdapter', () => {
     )
     const canUseTool = latestOptions(harness).canUseTool
     assert(canUseTool, 'canUseTool was not passed to the SDK')
-    const options = { ...canUseToolOptions(), suggestions: BASH_SUGGESTIONS }
+    const options = { ...canUseToolOptions(), suggestions: BASH_SUGGESTIONS, defaultToNo: true }
 
     const forSession = canUseTool('Bash', { command: 'ls -la' }, options)
     const sessionRequest = await waitForEvent(harness, 'request.opened')
+    expect(sessionRequest.payload).toMatchObject({ defaultToNo: true })
     expect(approvalDecisions(sessionRequest)).toEqual([
       'cancel',
       'decline',

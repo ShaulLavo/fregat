@@ -946,6 +946,7 @@ function requestOpenedActivity(event: Extract<ProviderRuntimeEvent, { type: 'req
   return [
     baseActivity(event, 'approval', 'approval.requested', summary, {
       options: event.payload.options,
+      defaultToNo: event.payload.defaultToNo,
       detail: event.payload.detail,
       requestId: event.requestId,
       requestKind,

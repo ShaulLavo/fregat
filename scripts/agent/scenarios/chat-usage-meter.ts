@@ -12,7 +12,7 @@ const HOUR_MS = 3_600_000
  * gets its own entry, and whichever the new session picks carries a warning. The
  * Codex reading is twenty minutes old, so its popover says it may be out of date.
  */
-export function usageFixture(nowMs: number) {
+function usageFixture(nowMs: number) {
   const resetsIn = (hours: number) => new Date(nowMs + hours * HOUR_MS).toISOString()
 
   return {

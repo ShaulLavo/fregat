@@ -9,7 +9,6 @@ import {
   type ModelInfo,
   type Options,
   type PermissionResult,
-  type PermissionUpdate,
   type Query,
   type SDKMessage,
   type SDKRateLimitEvent,
@@ -86,11 +85,8 @@ import {
   usageLimitMessage,
   type ProviderUsageProbe,
 } from '../utils/usage-windows'
-import {
-  claudeApprovalOptions,
-  claudePermissionResult,
-  claudePermissionUpdateCount,
-} from './utils/claude-permissions'
+import { offeredOptions, offeredResponse, type ApprovalOffer } from './utils/approval-offers'
+import { claudeApprovalOffers, claudePermissionUpdateCount } from './utils/claude-permissions'
 import { claudeModelId, claudeQueryOptions } from './utils/claude-query-options'
 import {
   claudePromptText,
@@ -169,10 +165,8 @@ type ClaudeInitialization = {
 }
 
 type PendingClaudeApproval = {
-  options: readonly ProviderApprovalOption[]
+  offers: readonly ApprovalOffer<PermissionResult>[]
   resolve: (result: PermissionResult) => void
-  suggestions: readonly PermissionUpdate[]
-  toolInput: Record<string, unknown>
   toolName: string
 }
 
@@ -836,10 +830,8 @@ class ClaudeAgentSession extends SessionContext {
     const pending = this.pendingApprovals.get(input.requestId)
     if (!pending) throw createInternalError(`Unknown pending approval request: ${input.requestId}`)
 
-    if (!pending.options.some((option) => option.decision === input.decision))
-      throw createInternalError(`This approval does not offer ${input.decision}.`)
+    const result = offeredResponse(pending.offers, input.decision, input.requestId)
     this.pendingApprovals.delete(input.requestId)
-    const result = claudePermissionResult(input.decision, pending.toolInput, pending.suggestions)
     const updates = result.behavior === 'allow' ? (result.updatedPermissions ?? []) : []
     recordChatPipelineInfo('chat.pipeline.claude_session.approval.resolved', {
       decision: input.decision,
@@ -1877,19 +1869,15 @@ class ClaudeAgentSession extends SessionContext {
   ): Promise<PermissionResult> {
     const requestId = v.parse(approvalRequestIdSchema, `claude:${crypto.randomUUID()}`)
 
-    const approvalOptions = claudeApprovalOptions(options)
-    const suggestions = options.suggestions ?? []
+    const offers = claudeApprovalOffers(options, toolInput)
 
     return new Promise<PermissionResult>((resolve) => {
-      this.pendingApprovals.set(requestId, {
-        options: approvalOptions,
-        resolve,
-        suggestions,
-        toolInput,
-        toolName,
-      })
+      this.pendingApprovals.set(requestId, { offers, resolve, toolName })
       options.signal.addEventListener('abort', () => this.abortApproval(requestId), { once: true })
-      this.emitApprovalOpened(requestId, toolName, toolInput, approvalOptions)
+      this.emitApprovalOpened(requestId, toolName, toolInput, {
+        defaultToNo: options.defaultToNo === true,
+        options: offeredOptions(offers),
+      })
     })
   }
 
@@ -1905,7 +1893,7 @@ class ClaudeAgentSession extends SessionContext {
     requestId: ApprovalRequestId,
     toolName: string,
     toolInput: Record<string, unknown>,
-    options: readonly ProviderApprovalOption[],
+    choices: { defaultToNo: boolean; options: readonly ProviderApprovalOption[] },
   ) {
     this.emit({
       createdAt: new Date().toISOString(),
@@ -1913,7 +1901,7 @@ class ClaudeAgentSession extends SessionContext {
       payload: {
         args: toolInput,
         detail: claudeToolSummary(toolName, toolInput),
-        options,
+        ...choices,
         requestType: claudeApprovalRequestType(toolName),
       },
       provider: DEFAULT_CLAUDE_PROVIDER_SETTINGS.driverKind,

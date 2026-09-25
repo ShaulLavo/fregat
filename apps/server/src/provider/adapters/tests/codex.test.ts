@@ -390,6 +390,8 @@ function handle(message) {
       const owner = { threadId: 'provider-thread-1', turnId: fakeTurn().id };
       send({ id: 951, method: 'item/commandExecution/requestApproval', params: { ...owner, itemId: 'amended', command: 'bun test apps', proposedExecpolicyAmendment: ['bun', 'test'] } });
       send({ id: 952, method: 'item/commandExecution/requestApproval', params: { ...owner, itemId: 'plain', command: 'rm -rf build' } });
+      const network = { applyNetworkPolicyAmendment: { network_policy_amendment: { host: 'example.com', action: 'allow' } } };
+      send({ id: 953, method: 'item/commandExecution/requestApproval', params: { ...owner, itemId: 'network', command: 'curl example.com', availableDecisions: ['accept', 'acceptForSession', network, 'cancel'] } });
     }
     if (mode === 'async-questions') {
       const parent = { threadId: 'provider-thread-1', turnId: fakeTurn().id };
@@ -1656,7 +1658,7 @@ describe('CodexProviderAdapter', () => {
     )
   })
 
-  it('offers "always" only with a proposed execpolicy amendment and answers with that amendment', async () => {
+  it('offers only the rules Codex proposes and answers with the chosen amendment', async () => {
     await withFakeCodex(
       async ({ spawnLogPath }) => {
         const adapter = new CodexProviderAdapter()
@@ -1667,21 +1669,40 @@ describe('CodexProviderAdapter', () => {
         const opened = events.filter((event) => event.type === 'request.opened')
         expect(opened.map((event) => event.payload.options?.map((option) => option.label))).toEqual(
           [
-            ['Cancel', 'Deny', 'Allow for this session', 'Always allow "bun test"', 'Allow'],
+            [
+              'Cancel',
+              'Deny',
+              'Allow for this session',
+              'Always allow commands starting with bun test',
+              'Allow',
+            ],
             ['Cancel', 'Deny', 'Allow for this session', 'Allow'],
+            [
+              'Cancel',
+              'Allow for this session',
+              'Always allow network access to example.com',
+              'Allow',
+            ],
           ],
         )
-        const [amended, plain] = opened.map((event) =>
+        const [amended, plain, network] = opened.map((event) =>
           v.parse(approvalRequestIdSchema, event.requestId),
         )
-        assert(amended && plain, 'both command approvals must open')
+        assert(amended && plain && network, 'every command approval must open')
         await expect(
           adapter.respondApproval({
             sessionId: input.sessionId,
             requestId: plain,
             decision: 'acceptAlways',
           }),
-        ).rejects.toThrow('does not offer acceptAlways')
+        ).rejects.toThrow('does not offer that choice')
+        await expect(
+          adapter.respondApproval({
+            sessionId: input.sessionId,
+            requestId: network,
+            decision: 'decline',
+          }),
+        ).rejects.toThrow('does not offer that choice')
         await adapter.respondApproval({
           sessionId: input.sessionId,
           requestId: amended,
@@ -1692,7 +1713,12 @@ describe('CodexProviderAdapter', () => {
           requestId: plain,
           decision: 'accept',
         })
-        await waitForFakeCodexEvent(spawnLogPath, 'server-response', 2)
+        await adapter.respondApproval({
+          sessionId: input.sessionId,
+          requestId: network,
+          decision: 'acceptAlways',
+        })
+        await waitForFakeCodexEvent(spawnLogPath, 'server-response', 3)
         await adapter.stopAll()
         const entries = await readFakeCodexLog(spawnLogPath)
         expect(entries.filter((entry) => entry.event === 'server-response')).toEqual([
@@ -1706,6 +1732,17 @@ describe('CodexProviderAdapter', () => {
             },
           },
           { event: 'server-response', id: 952, result: { decision: 'accept' } },
+          {
+            event: 'server-response',
+            id: 953,
+            result: {
+              decision: {
+                applyNetworkPolicyAmendment: {
+                  network_policy_amendment: { host: 'example.com', action: 'allow' },
+                },
+              },
+            },
+          },
         ])
       },
       { mode: 'command-amendment' },

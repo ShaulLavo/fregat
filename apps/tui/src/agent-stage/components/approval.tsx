@@ -19,13 +19,14 @@ export function Approval({
   readonly busy: boolean
   readonly onRespond: (decision: ProviderApprovalDecision) => void
 }) {
+  const shortcuts = !request.defaultToNo
   const choices = request.options.map((option, index) => ({
-    label: `${index + 1} ${option.label}`,
+    label: shortcuts ? `${index + 1} ${option.label}` : option.label,
     value: option.decision,
   }))
   const focused = usePaneFocus({ id: 'agent-approval', area: 'chat', enabled: enabled && !busy })
   useKeyboard((event) => {
-    if (!focused || event.defaultPrevented || event.ctrl || event.meta) return
+    if (!shortcuts || !focused || event.defaultPrevented || event.ctrl || event.meta) return
     const choice = choices[Number(event.name) - 1]
     if (!choice) return
     event.preventDefault()
