@@ -137,7 +137,7 @@ test.each([false, true])(
     const session = [...model.sessions.values()][0]!
     model.worktrees.clear()
     model.sessions.clear()
-    for (let i = 0; i < 3; i += 1) {
+    for (let i = 0; i < 4; i += 1) {
       const id = v.parse(worktreeIdSchema, crypto.randomUUID())
       const sessionId = v.parse(sessionIdSchema, crypto.randomUUID())
       model.worktrees.set(id, {
@@ -145,13 +145,16 @@ test.each([false, true])(
         id,
         branch: `branch-${i}`,
         pullRequest:
-          i === 2
+          i === 3
             ? null
             : {
                 status: 'found',
                 ...openPullRequest,
                 closedAt: null,
-                identity: { remoteUrl: 'https://github.com/acme/repo.git', number: 12 },
+                identity: {
+                  remoteUrl: 'https://github.com/acme/repo.git',
+                  number: i === 2 ? 13 : 12,
+                },
               },
       })
       model.sessions.set(sessionId, { ...session, id: sessionId, worktreeId: id })
@@ -164,10 +167,13 @@ test.each([false, true])(
       dispatch: async (command) => {
         commands.push(command)
       },
-      lookupIdentity: async () => {
+      lookupIdentities: async (_worktree, _remoteUrl, numbers) => {
+        expect(numbers).toEqual([12, 13])
         pinnedReads += 1
         if (fail) throw new Error('rate limited')
-        return { status: 'found', ...openPullRequest, state: 'merged', closedAt: null }
+        return new Map(
+          numbers.map((number) => [number, { ...openPullRequest, number, state: 'merged' }]),
+        )
       },
       lookup: async () => {
         branchReads += 1
@@ -178,7 +184,7 @@ test.each([false, true])(
     await reactor.drain()
     expect(pinnedReads).toBe(1)
     expect(branchReads).toBe(fail ? 0 : 1)
-    expect(commands).toHaveLength(fail ? 0 : 3)
+    expect(commands).toHaveLength(fail ? 0 : 4)
     if (fail) {
       reactor.schedule()
       await reactor.drain()

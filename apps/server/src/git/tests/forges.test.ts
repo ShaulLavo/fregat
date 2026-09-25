@@ -12,6 +12,7 @@ import {
   readBranchPullRequests,
   readPullRequest,
   resolvePullRequest,
+  readPullRequestsByNumber,
 } from '../pull-request'
 import type { GitProcessResult } from '../utils/process'
 
@@ -816,4 +817,40 @@ describe('owner review regressions', () => {
       headSource: { url: source, commit },
     })
   })
+})
+
+it('reads distinct pinned GitHub requests in one repository query', async () => {
+  const forge = boundary('https://github.com/acme/repo.git', (argv) => {
+    if (argv[1] === 'auth') return ok()
+    if (argv[1] !== 'api') return undefined
+    return json({
+      data: {
+        repository: {
+          p0: {
+            number: 12,
+            title: 'A',
+            url: 'https://github.com/acme/repo/pull/12',
+            state: 'OPEN',
+            isDraft: false,
+            closedAt: null,
+          },
+          p1: {
+            number: 13,
+            title: 'B',
+            url: 'https://github.com/acme/repo/pull/13',
+            state: 'MERGED',
+            isDraft: false,
+            closedAt: null,
+          },
+        },
+      },
+    })
+  })
+  const found = await readPullRequestsByNumber(
+    { cwd: await checkout(), remoteUrl: 'https://github.com/acme/repo.git', numbers: [12, 13, 12] },
+    forge,
+  )
+  expect([...found.keys()]).toEqual([12, 13])
+  expect(forge.calls.filter((call) => call.argv[1] === 'api')).toHaveLength(1)
+  expect(forge.calls.at(-1)?.argv).toEqual(expect.arrayContaining(['-F', 'n0=12', '-F', 'n1=13']))
 })

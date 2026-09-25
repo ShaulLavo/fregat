@@ -28,6 +28,11 @@ if (args[0] === 'api' && args[1] === 'graphql') {
   const branches = forge().branches ?? {}
   const repository = {}
   for (let index = 0; index < args.length; index += 1) {
+    const number = /^n(\d+)=(\d+)$/.exec(args[index] ?? '')
+    if (args[index - 1] === '-F' && number) {
+      repository[`p${number[1]}`] = forge().pullRequests?.[number[2]] ?? null
+      continue
+    }
     const match = /^h(\d+)=(.*)$/s.exec(args[index] ?? '')
     if (args[index - 1] !== '-f' || !match) continue
     const pullRequest = branches[match[2]] ?? branches['*']

@@ -855,14 +855,8 @@ export class OrchestrationEngine {
     const git = this.registration.git
     this.pullRequestSync = new PullRequestSyncReactor({
       lookup: options.pullRequestLookup,
-      lookupIdentity: async (worktree, identity) => {
-        const { detail } = await git.resolvePullRequest(
-          worktree.canonicalPath,
-          identity.number,
-          identity.remoteUrl,
-        )
-        return { status: 'found', ...detail, closedAt: detail.closedAt ?? null, identity }
-      },
+      lookupIdentities: (worktree, remoteUrl, numbers) =>
+        git.readPullRequestsByNumber(worktree.canonicalPath, remoteUrl, numbers),
       headName: async (worktree) =>
         (await git.upstreamBranch(worktree.canonicalPath, worktree.branch ?? ''))?.branch ??
         worktree.branch ??

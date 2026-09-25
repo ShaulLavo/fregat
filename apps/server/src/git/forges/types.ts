@@ -44,6 +44,10 @@ export type ForgeProvider = {
     context: ForgeContext,
     query: PullRequestQuery,
   ) => Promise<ReadonlyMap<string, GitPullRequest | null>>
+  pullRequestsByNumber?: (
+    context: ForgeContext,
+    numbers: readonly number[],
+  ) => Promise<ReadonlyMap<number, GitPullRequest>>
   createPullRequest: (context: ForgeContext, input: CreatePullRequestInput) => Promise<void>
   /** One request by number, with what a checkout of its head needs. */
   getPullRequest: (context: ForgeContext, number: number) => Promise<PullRequestDetail>

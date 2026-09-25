@@ -25,23 +25,30 @@ const MODEL = v.parse(modelSelectionSchema, FIXTURE_MODEL)
 /** Signed-in `gh` that knows one pull request: #7 from `feature/pr`, same repository or a fork. */
 function github(crossRepository = false, state: () => string = () => 'OPEN'): RunProcess {
   return async ({ argv }) => {
+    const detail = {
+      number: 7,
+      title: 'Add greeting',
+      url: 'https://github.com/acme/app/pull/7',
+      state: state(),
+      isDraft: false,
+      closedAt: null,
+      headRefName: 'feature/pr',
+      baseRefName: 'main',
+      isCrossRepository: crossRepository,
+    }
+    if (argv[1] === 'api')
+      return {
+        exitCode: 0,
+        stderr: '',
+        stdout: JSON.stringify({ data: { repository: { p0: detail } } }),
+      }
     if (argv[0] === 'git') return { exitCode: 0, stderr: '', stdout: `origin\t${REMOTE} (fetch)\n` }
     if (argv[1] === 'auth') return { exitCode: 0, stderr: '', stdout: '' }
     if (argv[1] === 'pr' && argv[2] === 'view')
       return {
         exitCode: 0,
         stderr: '',
-        stdout: JSON.stringify({
-          number: 7,
-          title: 'Add greeting',
-          url: 'https://github.com/acme/app/pull/7',
-          state: state(),
-          isDraft: false,
-          closedAt: null,
-          headRefName: 'feature/pr',
-          baseRefName: 'main',
-          isCrossRepository: crossRepository,
-        }),
+        stdout: JSON.stringify(detail),
       }
     return { exitCode: 1, stderr: 'unexpected', stdout: '' }
   }
