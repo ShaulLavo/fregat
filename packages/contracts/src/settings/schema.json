@@ -4,7 +4,7 @@
   "properties": {
     "chat.autoSettleAfterDays": {
       "default": 3,
-      "description": "Move a session to Settled once it has had no activity for this many days. 0 turns it off.",
+      "description": "Move a session to Settled once it has had no activity for this many days, including existing sessions. 0 turns it off.",
       "maximum": 365,
       "minimum": 0,
       "type": "integer"
@@ -461,7 +461,7 @@
     },
     "git.worktreeCleanupOnDelete": {
       "default": false,
-      "description": "Remove a session worktree once every session using it is deleted and has stopped. A worktree with uncommitted changes, ignored files other than node_modules, or another branch checked out stays.",
+      "description": "Remove a session worktree once every session using it is deleted and has stopped, including earlier deletions. A worktree with uncommitted changes, ignored files other than node_modules, or another branch checked out stays.",
       "type": "boolean"
     },
     "git.worktreeSubmodules": {
