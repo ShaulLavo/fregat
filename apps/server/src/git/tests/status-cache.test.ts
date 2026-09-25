@@ -102,11 +102,13 @@ describe('git status cache', () => {
       repository: null,
       files: [],
       uninitializedSubmodules: 0,
+      autoPull: null,
     })
     expect(await service.status('')).toEqual({
       repository: null,
       files: [],
       uninitializedSubmodules: 0,
+      autoPull: null,
     })
   })
 
@@ -124,11 +126,13 @@ describe('git status cache', () => {
       repository: null,
       files: [],
       uninitializedSubmodules: 0,
+      autoPull: null,
     })
     expect(await service.status('')).toEqual({
       repository: null,
       files: [],
       uninitializedSubmodules: 0,
+      autoPull: null,
     })
   })
 })
