@@ -1783,7 +1783,7 @@ describe('CodexProviderAdapter', () => {
               adapter.respondApproval({ sessionId: input.sessionId, requestId, decision }),
             ).rejects.toThrow('Unknown pending approval')
           }
-          await waitForFakeCodexEvent(spawnLogPath, 'server-response')
+          await waitForFakeCodexEvent(spawnLogPath, 'server-response', 2)
           await adapter.stopAll()
           await Promise.all(ingestion)
           await projection.ingestion.drain()
@@ -1881,7 +1881,7 @@ describe('CodexProviderAdapter', () => {
               adapter.respondApproval({ sessionId: input.sessionId, requestId, decision }),
             ).rejects.toThrow('Unknown pending approval')
           }
-          await waitForFakeCodexEvent(spawnLogPath, 'server-response')
+          await waitForFakeCodexEvent(spawnLogPath, 'server-response', 2)
           await adapter.stopAll()
           await Promise.all(ingestion)
           await projection.ingestion.drain()
@@ -1924,7 +1924,7 @@ describe('CodexProviderAdapter', () => {
           const events: ProviderRuntimeEvent[] = []
           collectAdapterEvents(adapter, events)
           await adapter.sendTurn(providerTurnInput())
-          await waitForFakeCodexEvent(spawnLogPath, 'server-response')
+          await waitForFakeCodexEvent(spawnLogPath, 'server-response', 2)
           await adapter.stopAll()
           expect(events.filter((event) => event.type === 'request.opened')).toEqual([])
           const entries = await readFakeCodexLog(spawnLogPath)
