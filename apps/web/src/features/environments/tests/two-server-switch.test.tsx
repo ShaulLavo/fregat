@@ -49,6 +49,7 @@ test('the real provider stack moves observers and mutation invalidations between
       appliedThemeId: null,
       selectedThemeId: 'dark-plus',
       syntaxHighlightingEnabled: false,
+      tabSize: 4,
     },
   })
   const view = renderApplication(<HealthView />, application)

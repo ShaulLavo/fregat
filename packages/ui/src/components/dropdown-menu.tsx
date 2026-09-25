@@ -181,6 +181,33 @@ function DropdownMenuCheckboxItem({
   )
 }
 
+/** A boolean as a switch row: toggling keeps the menu open, like a settings row. */
+function DropdownMenuSwitchItem({
+  className,
+  children,
+  ...props
+}: MenuPrimitive.CheckboxItem.Props) {
+  return (
+    <MenuPrimitive.CheckboxItem
+      data-slot='dropdown-menu-switch-item'
+      className={cn(
+        'group/switch-item relative flex cursor-default items-center gap-2 rounded-md px-2 py-(--density-menu-item-padding-y) text-xs outline-hidden select-none focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50',
+        className,
+      )}
+      {...props}
+    >
+      {children}
+      <span
+        aria-hidden
+        data-slot='dropdown-menu-switch-item-indicator'
+        className='group-data-unchecked/switch-item:bg-input dark:group-data-unchecked/switch-item:bg-input/80 group-data-checked/switch-item:bg-primary ml-auto inline-flex h-[14px] w-[24px] shrink-0 items-center rounded-full p-px transition-colors'
+      >
+        <span className='bg-card-solid dark:group-data-unchecked/switch-item:bg-foreground dark:group-data-checked/switch-item:bg-primary-foreground block size-3 rounded-full transition-transform group-data-checked/switch-item:translate-x-[calc(100%-2px)]' />
+      </span>
+    </MenuPrimitive.CheckboxItem>
+  )
+}
+
 function DropdownMenuRadioGroup({ ...props }: MenuPrimitive.RadioGroup.Props) {
   return <MenuPrimitive.RadioGroup data-slot='dropdown-menu-radio-group' {...props} />
 }
@@ -248,6 +275,7 @@ export {
   DropdownMenuLabel,
   DropdownMenuItem,
   DropdownMenuCheckboxItem,
+  DropdownMenuSwitchItem,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuSeparator,

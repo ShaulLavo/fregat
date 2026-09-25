@@ -1,5 +1,6 @@
 import { editorLspTabSwitch } from './editor-lsp-tab-switch'
 import { editorLspServerExit } from './editor-lsp-server-exit'
+import { editorTypography } from './editor-typography'
 import { responseDelivery } from './response-delivery'
 import { draftRecovery } from './draft-recovery'
 import { composerDefaults } from './composer-defaults'
@@ -152,7 +153,6 @@ export type Scenario = {
 
 import { editorDiagnosticsLifecycle } from './editor-diagnostics-lifecycle'
 import { editorFastScroll } from './editor-fast-scroll'
-import { editorRowHeightAudit } from './editor-row-height-audit'
 import { editorLargePaste } from './editor-large-paste'
 import { editorFind } from './editor-find'
 import { problemsPanelRows } from './problems-panel-rows'
@@ -296,6 +296,7 @@ export const scenarios: readonly Scenario[] = [
   editorLspDeprecated,
   editorLspTabSwitch,
   editorLspServerExit,
+  editorTypography,
   editorDefinitionCrlf,
   editorExternalDeletion,
   fileTreeUndo,
@@ -333,7 +334,6 @@ export const scenarios: readonly Scenario[] = [
   editorLargePaste,
   editorFastScroll,
   editorDiagnosticsLifecycle,
-  editorRowHeightAudit,
   editorFind,
   problemsPanelRows,
   problemsPanelWorkspace,

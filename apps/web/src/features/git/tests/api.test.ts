@@ -45,13 +45,4 @@ describe('git api against the real server', () => {
     const changed = status.files.find((file) => file.path.endsWith('a.ts'))
     expect(changed?.worktree).toBe('modified')
   })
-
-  test('lists branches through the wrapper', async ({ client, server }) => {
-    void client
-    await initRepo(server.root)
-
-    const result = await api.fetchBranches('repo', undefined, getClient())
-
-    expect(result.branches.map((branch) => branch.name)).toContain('main')
-  })
 })

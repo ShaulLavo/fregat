@@ -14,11 +14,12 @@ import { useLayoutEffect, useMemo, useRef } from 'react'
 
 import { useDiffLanguage } from '@/features/editor/hooks/use-diff-language'
 import { useDiffRows } from '@/features/editor/hooks/use-diff-rows'
+import { useEditorTypography } from '@/features/editor/hooks/use-editor-typography'
 import type { DiffLanguageServerContext } from '@/features/editor/utils/diff-language-context'
 import {
   DIFF_CURSOR_LINE_HIGHLIGHT,
   DIFF_KEYMAP,
-  DIFF_TAB_SIZE,
+  DIFF_DETECT_INDENTATION,
 } from '@/features/editor/utils/diff-options'
 import {
   createDiffScrollBridgePlugin,
@@ -91,6 +92,7 @@ export function DiffPane({
     diffLanguagePlugin,
     persistence?.plugin,
   ].filter((entry) => entry !== null && entry !== undefined)
+  const typography = useEditorTypography()
   const controller = useEditor({
     presentationReady: false,
     suspiciousCharacters: unicodeHighlights.options,
@@ -99,15 +101,16 @@ export function DiffPane({
     // position from us and therefore lands back at the top — so every expansion toggle, and every
     // keystroke behind a compare-saved diff, would throw the reader's place away. `setText` is the
     // one that carries the scroll position across, and it is what the package's own contract names.
+    detectIndentation: DIFF_DETECT_INDENTATION,
     documentMode: 'static',
     editability: 'readonly',
+    ...typography,
     keymap: DIFF_KEYMAP,
     // Only the diff plugin: the critical core set would bring line and fold gutters, find, merge
     // conflicts, shiki and LSP, none of which a diff had — and a fold gutter would break the
     // row-index identity the comment layer reads line numbers off.
     plugins,
     storeSync: 'none',
-    tabSize: DIFF_TAB_SIZE,
     theme,
     // `selectionSyncMode` is deliberately left at its default. The search-result editor sets
     // `'none'`, which short-circuits before `domSelection.addRange` and leaves copy depending

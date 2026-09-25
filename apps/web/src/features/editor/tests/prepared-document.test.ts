@@ -8,6 +8,7 @@ test('resolved theme content participates in prepared Shiki identity', () => {
     appliedThemeId: 'custom-dark',
     selectedThemeId: 'custom-dark',
     syntaxHighlightingEnabled: false,
+    tabSize: 4,
   } as const
 
   const first = editorPreparedDocumentTags('/repo/file.ts', baseEnvironment)

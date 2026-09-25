@@ -19,6 +19,7 @@ import { SearchResultFileLineActions } from '@/features/search/components/result
 import { SearchResultSourceLineGutter } from '@/features/search/components/result-source-line-gutter'
 import { createSearchResultSyntaxHighlightingPlugin } from '@/features/search/utils/result-syntax-plugin'
 import {
+  EXCERPT_EDITOR_FONT_SIZE,
   EXCERPT_EDITOR_LINE_HEIGHT,
   SEARCH_RESULT_CURSOR_LINE_HIGHLIGHT,
   SEARCH_RESULT_FILE_EDITOR_ROW_GAP,
@@ -47,6 +48,8 @@ import {
   type SearchResultFileDocumentLine,
 } from '@/features/search/utils/result-view-model'
 import { useEditorFocusTarget } from '@/lib/focus/hooks/use-editor-target'
+import { useSettingValue } from '@/hooks/use-setting-value'
+import { fontStack } from '@/lib/default-nerd-font'
 
 type SearchResultFileEditorProps = {
   activeResultId: SearchResultId | null
@@ -79,6 +82,8 @@ export const SearchResultFileEditor = memo(
       [fileDocument, lineWindow],
     )
     const sourceLineDigits = fileBlockLineDigits(file)
+    const fontFamily = fontStack(useSettingValue('editor.fontFamily'))
+    const tabSize = useSettingValue('editor.tabSize')
     const document = {
       documentId: searchResultFileDocumentId(file),
       documentMode: 'static' as const,
@@ -98,6 +103,8 @@ export const SearchResultFileEditor = memo(
       cursorLineHighlight: SEARCH_RESULT_CURSOR_LINE_HIGHLIGHT,
       document,
       editability: 'readonly',
+      fontFamily,
+      fontSize: EXCERPT_EDITOR_FONT_SIZE,
       keymap: HOSTED_EDITOR_KEYMAP,
       lineHeight: EXCERPT_EDITOR_LINE_HEIGHT,
       plugins,
@@ -106,6 +113,7 @@ export const SearchResultFileEditor = memo(
       scrollMode: editorScrollMode,
       selectionSyncMode: 'none',
       storeSync: 'none',
+      tabSize,
       textMetrics: SEARCH_RESULT_FILE_EDITOR_TEXT_METRICS,
       theme: editorTheme,
     })

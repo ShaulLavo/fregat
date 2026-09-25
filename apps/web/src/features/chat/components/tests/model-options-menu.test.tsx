@@ -36,16 +36,18 @@ test('every option the model advertises gets a control, not just the effort ladd
 
   expect(await screen.findByRole('menuitemradio', { name: 'High' })).toBeVisible()
   // Extended thinking was advertised long before anything could act on it.
-  expect(await screen.findByRole('menuitemradio', { name: 'On' })).toBeVisible()
+  expect(await screen.findByRole('menuitemcheckbox', { name: 'Extended thinking' })).toBeVisible()
 })
 
 test('a boolean option persists as a boolean, which is what the adapter reads', async () => {
   renderMenu()
 
   await userEvent.click(screen.getByRole('button', { name: 'Model options' }))
-  await userEvent.click(await screen.findByRole('menuitemradio', { name: 'On' }))
+  await userEvent.click(await screen.findByRole('menuitemcheckbox', { name: 'Extended thinking' }))
 
   expect(draftModelSelection()?.options).toEqual({ thinking: true })
+  // A switch keeps the menu open so the next option is one click away.
+  expect(screen.getByRole('menu')).toBeVisible()
 })
 
 test('a select option persists under its own key', async () => {
@@ -58,24 +60,34 @@ test('a select option persists under its own key', async () => {
   expect(screen.queryByRole('menu')).toBeNull()
 })
 
-test('a stored value comes back as the checked row, each descriptor on its own', async () => {
+test('a stored value comes back as the checked row', async () => {
   renderMenu({ options: { reasoningEffort: 'max' } })
 
   await userEvent.click(screen.getByRole('button', { name: 'Model options' }))
 
   const checked = await screen.findAllByRole('menuitemradio', { checked: true })
-  expect(checked.map((item) => item.textContent)).toEqual(['Max', 'Provider default'])
+  expect(checked.map((item) => item.getAttribute('aria-label'))).toEqual(['Max'])
 })
 
-test('clearing an option hands the knob back to the provider', async () => {
+test('with nothing stored, the default level is checked and marked, and nothing is sent', async () => {
+  renderMenu()
+
+  expect(screen.getByRole('button', { name: 'Model options' })).toHaveTextContent('High')
+  await userEvent.click(screen.getByRole('button', { name: 'Model options' }))
+
+  const high = await screen.findByRole('menuitemradio', { name: 'High' })
+  expect(high).toHaveAttribute('aria-checked', 'true')
+  expect(high).toHaveTextContent('Default')
+  expect(draftModelSelection()?.options).toBeUndefined()
+})
+
+test('picking the default level stores it, because the model default may be our guess', async () => {
   renderMenu({ options: { reasoningEffort: 'max' } })
 
   await userEvent.click(screen.getByRole('button', { name: 'Model options' }))
-  await userEvent.click(
-    await screen.findByRole('menuitemradio', { name: /Provider default \(High\)/ }),
-  )
+  await userEvent.click(await screen.findByRole('menuitemradio', { name: 'High' }))
 
-  expect(draftModelSelection()).toEqual(modelSelection)
+  expect(draftModelSelection()?.options).toEqual({ reasoningEffort: 'high' })
 })
 
 test('a model that advertises nothing shows no control at all', () => {
@@ -112,7 +124,10 @@ test('advertised service tiers retain exact provider IDs and descriptions', asyn
   })
   await userEvent.click(screen.getByRole('button', { name: 'Model options' }))
   expect(await screen.findByRole('menuitemradio', { name: 'Standard' })).toBeVisible()
-  expect(screen.getByText('Lower cost when capacity is available.')).toBeVisible()
+  expect(screen.getByRole('menuitemradio', { name: 'Economy' })).toHaveAttribute(
+    'data-tooltip',
+    'Lower cost when capacity is available.',
+  )
   await userEvent.click(screen.getByRole('menuitemradio', { name: 'Express' }))
   expect(draftModelSelection()?.options).toEqual({ serviceTier: 'priority-v2' })
 })
@@ -145,12 +160,10 @@ test('an explicit false remains distinct from an advertised true default', async
     },
   })
   await userEvent.click(screen.getByRole('button', { name: 'Model options' }))
-  expect(await screen.findByRole('menuitemradio', { name: 'Off' })).toHaveAttribute(
-    'aria-checked',
-    'true',
-  )
-  await userEvent.click(screen.getByRole('menuitemradio', { name: 'Provider default (On)' }))
-  expect(draftModelSelection()).toEqual(modelSelection)
+  const thinking = await screen.findByRole('menuitemcheckbox', { name: 'Thinking' })
+  expect(thinking).toHaveAttribute('aria-checked', 'false')
+  await userEvent.click(thinking)
+  expect(draftModelSelection()?.options).toEqual({ thinking: true })
 })
 
 const promptDescriptors: ProviderOptionDescriptor[] = [
@@ -221,7 +234,7 @@ test('body-controlled effort cannot be changed by a menu while other traits rema
     'aria-checked',
     'true',
   )
-  await userEvent.click(screen.getByRole('menuitemradio', { name: 'On' }))
+  await userEvent.click(screen.getByRole('menuitemcheckbox', { name: 'Fast mode' }))
 
   expect(useChatInputDraftStore.getState().getDraft(draftTarget).prompt).toBe(
     'Please ultrathink about this',

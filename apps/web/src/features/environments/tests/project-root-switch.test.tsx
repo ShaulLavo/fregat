@@ -73,6 +73,7 @@ test.for([
       appliedThemeId: null,
       selectedThemeId: 'dark-plus',
       syntaxHighlightingEnabled: false,
+      tabSize: 4,
     },
   })
   const view = renderApplication(<ProjectRoots />, application)

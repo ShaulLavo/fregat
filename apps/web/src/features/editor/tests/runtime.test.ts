@@ -25,6 +25,7 @@ const preparation = {
   appliedThemeId: null,
   selectedThemeId: 'dark',
   syntaxHighlightingEnabled: false,
+  tabSize: 4,
 }
 
 const preparationPath = filesystemPath('repo/review.ts')

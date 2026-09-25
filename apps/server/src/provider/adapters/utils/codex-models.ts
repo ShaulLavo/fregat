@@ -18,7 +18,7 @@ const effortLabels: Readonly<Record<string, string>> = {
   low: 'Low',
   medium: 'Medium',
   high: 'High',
-  xhigh: 'Extra High',
+  xhigh: 'Extra high',
   max: 'Max',
   ultra: 'Ultra',
 }
@@ -88,7 +88,7 @@ function serviceTierDescriptor(
   }))
   return {
     id: 'serviceTier',
-    label: 'Service Tier',
+    label: 'Service tier',
     type: 'select',
     options,
     currentValue: defaultTier,

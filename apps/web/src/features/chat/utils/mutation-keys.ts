@@ -8,6 +8,8 @@ export const chatMutationKeys = {
   restoreFollowUp: (environmentId: string, sessionId: string | null) =>
     ['chat', 'restore-follow-up', environmentId, sessionId] as const,
   draftRecovery: (action: 'open' | 'discard') => ['chat', 'draft-recovery', action] as const,
+  moveDraft: (environmentId: string, draftKey: string | null) =>
+    ['chat', 'move-draft', environmentId, draftKey] as const,
   stash: (environmentId: string, draftKey: string | null) =>
     ['chat', 'stash', environmentId, draftKey] as const,
   attachments: (environmentId: string, draftKey: string | null) =>

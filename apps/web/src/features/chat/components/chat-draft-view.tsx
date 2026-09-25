@@ -24,8 +24,8 @@ import { useChatInputDraftStore, type ChatInputDraftTarget } from '../state/chat
 import { ChatInput } from './chat-input'
 import type { ChatInputSubmitPayload, ChatInputSubmitResult } from '../utils/composed-message'
 import { ChatWelcomeView } from './chat-welcome-view'
-import { WorktreePicker } from '@/features/chat/components/worktree-picker'
-import { newWorktreeTarget } from '@/features/chat/utils/worktree-target'
+import { DraftContextStrip } from '@/features/chat/components/draft-context-strip'
+import type { DraftMachine } from '@/features/chat/utils/draft-workspace'
 import { useSettingValue } from '@/hooks/use-setting-value'
 import { useNavigation } from '@/hooks/use-navigation'
 
@@ -37,6 +37,7 @@ export function ChatDraftView({
   project,
   worktree,
   rootPath,
+  machines = null,
 }: {
   disabled: boolean
   draftId: string
@@ -45,6 +46,8 @@ export function ChatDraftView({
   project: OrchestrationProjectShell | null
   worktree: OrchestrationWorktreeShell | null
   rootPath: string
+  /** The project's checkouts on every connected machine; null where a draft cannot move. */
+  machines?: readonly DraftMachine[] | null
 }) {
   const navigation = useNavigation()
   const [sendError, setSendError] = useState<string | null>(null)
@@ -180,14 +183,6 @@ export function ChatDraftView({
   return (
     <section className='flex min-h-0 flex-1 flex-col'>
       <ChatWelcomeView />
-      {worktree && target ? (
-        <WorktreePicker
-          base={worktree}
-          target={target}
-          onCurrent={() => chooseTarget({ kind: 'current', worktreeId: worktree.id })}
-          onNew={() => chooseTarget(newWorktreeTarget(worktree.id))}
-        />
-      ) : null}
       {/* No session exists yet, so a mode pick only lands in the draft — the turn
           that creates the session carries it through `bootstrap.createSession`. */}
       <ChatComposerModesProvider
@@ -199,6 +194,18 @@ export function ChatDraftView({
           busy={false}
           disabled={disabled || !project || !targetReady}
           draftKey={draftId}
+          footer={
+            project && worktree && target ? (
+              <DraftContextStrip
+                base={worktree}
+                draftTarget={draftTarget}
+                machines={machines}
+                project={project}
+                target={target}
+                onTarget={chooseTarget}
+              />
+            ) : null
+          }
           error={
             sendError ??
             (identity &&

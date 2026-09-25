@@ -15,7 +15,8 @@ async function createFixture() {
     JSON.stringify({ compilerOptions: { strict: true, noEmit: true } }),
   )
   await writeFile(join(fixture, 'alpha.ts'), "export const alpha: number = 'one'\n")
-  await writeFile(join(fixture, 'beta.ts'), 'export const beta: string = 2\n')
+  // Padding above the error, so a jump to it visibly moves the cursor line.
+  await writeFile(join(fixture, 'beta.ts'), '// beta\n\n\nexport const beta: string = 2\n')
   return fixture
 }
 
@@ -29,7 +30,7 @@ async function activeRowText(page: Page) {
 export const problemsPanelRows: Scenario = {
   name: 'problems-panel-rows',
   description:
-    'Two files with type errors in a disposable workspace: Problems is one tree with one tab stop, and the arrows walk from the first file into the second.',
+    'Two files with type errors in a disposable workspace: Problems is one tree with one tab stop, the arrows walk from the first file into the second, and clicking a problem moves the cursor to it.',
   async run(page, { step }) {
     const fixture = await createFixture()
     try {
@@ -73,6 +74,21 @@ export const problemsPanelRows: Scenario = {
         'false',
       )
       await step('first-file-collapsed')
+
+      await selectors.editorTabNamed(page, /beta\.ts/).click()
+      const cursorLine = selectors.editorCursorLineRow(page)
+      const before = await cursorLine.innerText()
+      ok(
+        !before.includes('export const beta'),
+        `The cursor starts off the problem line: "${before}"`,
+      )
+      const betaDiagnostic = selectors
+        .diagnosticsRows(page)
+        .and(page.locator('[title*="beta.ts"]'))
+        .first()
+      await betaDiagnostic.click()
+      await cursorLine.filter({ hasText: 'export const beta' }).waitFor()
+      await step('click-jumps-to-problem')
     } finally {
       await releaseFixture(fixture)
     }

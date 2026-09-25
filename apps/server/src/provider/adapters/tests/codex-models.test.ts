@@ -51,7 +51,7 @@ describe('codexModelCapabilities', () => {
         },
         {
           id: 'serviceTier',
-          label: 'Service Tier',
+          label: 'Service tier',
           type: 'select',
           currentValue: 'economy-v2',
           options: [

@@ -62,6 +62,7 @@ export async function createFederationHarness(serverA: TestServer, remote?: Test
       appliedThemeId: null,
       selectedThemeId: 'dark-plus',
       syntaxHighlightingEnabled: false,
+      tabSize: 4,
     },
   })
   const sockets = new Map<string, FakeOrchestrationSocket[]>()

@@ -18,6 +18,8 @@ export const sessionWorktreeTargetSchema = v.variant('kind', [
     kind: v.literal('new'),
     worktreeId: worktreeIdSchema,
     baseWorktreeId: worktreeIdSchema,
+    /** A local branch to start from; absent means the base worktree's HEAD. */
+    baseBranch: v.optional(text),
   }),
 ])
 

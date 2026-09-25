@@ -921,7 +921,7 @@ describe('CodexProviderAdapter', () => {
               { description: 'Fastest responses', id: 'low', label: 'Low' },
               { description: 'Balanced', id: 'medium', label: 'Medium', isDefault: true },
               { description: 'Deeper reasoning', id: 'high', label: 'High' },
-              { description: 'Even deeper reasoning', id: 'xhigh', label: 'Extra High' },
+              { description: 'Even deeper reasoning', id: 'xhigh', label: 'Extra high' },
               { description: 'Maximum reasoning depth', id: 'max', label: 'Max' },
               { description: 'Maximum reasoning with delegation', id: 'ultra', label: 'Ultra' },
               {

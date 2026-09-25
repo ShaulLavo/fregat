@@ -128,7 +128,6 @@ export function DiagnosticsPanel() {
               row={row}
               rowProps={list.rowProps(row.id)}
               onOpen={() => openDiagnostic(row.target)}
-              onPreview={() => previewDiagnostic(row.target)}
             />
           ),
         )}

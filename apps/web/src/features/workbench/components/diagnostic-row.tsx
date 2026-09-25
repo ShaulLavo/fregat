@@ -11,12 +11,10 @@ export function DiagnosticRow({
   row,
   rowProps,
   onOpen,
-  onPreview,
 }: {
   readonly row: DiagnosticItemRow
   readonly rowProps: ReturnType<ReturnType<typeof useListbox>['rowProps']>
   readonly onOpen: () => void
-  readonly onPreview: () => void
 }) {
   const line = row.target.range.start.line + 1
   return (
@@ -33,7 +31,6 @@ export function DiagnosticRow({
           rowProps.onClick(event)
           onOpen()
         }}
-        onMouseEnter={onPreview}
       >
         <span className='text-muted-foreground'>
           {diagnosticSeverityLabel(row.diagnostic.severity)}

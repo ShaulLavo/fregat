@@ -27,9 +27,6 @@ function fakeRoot() {
 
 const appearance = (overrides: Partial<AppearanceValues> = {}): AppearanceValues => ({
   'editor.fontFamily': DEFAULT_SETTING_VALUES['editor.fontFamily'],
-  'editor.fontSize': DEFAULT_SETTING_VALUES['editor.fontSize'],
-  'editor.lineHeight': DEFAULT_SETTING_VALUES['editor.lineHeight'],
-  'editor.tabSize': DEFAULT_SETTING_VALUES['editor.tabSize'],
   'workbench.colorTheme': DEFAULT_SETTING_VALUES['workbench.colorTheme'],
   'workbench.density': DEFAULT_SETTING_VALUES['workbench.density'],
   'workbench.surface.blur': DEFAULT_SETTING_VALUES['workbench.surface.blur'],
@@ -119,22 +116,6 @@ describe('applyAppearance', () => {
 
     expect([...classes]).toEqual(['dark'])
     expect(properties.get('--surface-opacity')).toBe('80%')
-  })
-
-  it('drives editor typography through the CSS the editor package already reads', () => {
-    const { properties, root } = fakeRoot()
-
-    applyAppearance(
-      appearance({ 'editor.fontSize': 16, 'editor.lineHeight': 28, 'editor.tabSize': 2 }),
-      root,
-      false,
-    )
-
-    expect(properties.get('--editor-font-size')).toBe('16px')
-    expect(properties.get('--editor-row-height')).toBe('28px')
-    // Unitless on purpose: `tab-size` counts characters, not pixels, so a `px`
-    // suffix here silently disables the whole declaration.
-    expect(properties.get('--editor-tab-size')).toBe('2')
   })
 
   it('maps file tree indent guide visibility onto inherited package variables', () => {

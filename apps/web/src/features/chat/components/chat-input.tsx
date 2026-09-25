@@ -10,7 +10,7 @@ import type {
   RuntimeMode,
 } from '@workspace/contracts'
 import { $setSelection, type LexicalEditor } from 'lexical'
-import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from 'react'
 import { cn } from '@workspace/ui/lib/utils'
 
 import {
@@ -67,6 +67,7 @@ export function ChatInput({
   disabledReason = null,
   draftKey,
   error,
+  footer = null,
   interactionMode,
   modelSelection,
   sessionProviderInstanceId = null,
@@ -84,6 +85,8 @@ export function ChatInput({
   pendingAction?: ComposerPendingAction
   draftKey: string
   error: string | null
+  /** Under the composer box, aligned with it: where a draft says where it will run. */
+  footer?: ReactNode
   interactionMode: InteractionMode
   modelSelection: ModelSelection | null
   sessionProviderInstanceId?: ProviderInstanceId | null
@@ -487,6 +490,7 @@ export function ChatInput({
               ) : null}
             </div>
           </LexicalComposer>
+          {footer}
         </form>
       </ChatModelPickerProvider>
     </div>

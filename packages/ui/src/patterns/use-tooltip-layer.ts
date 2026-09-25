@@ -23,6 +23,7 @@ export function useTooltipLayer(describedById: string) {
   const [target, setTarget] = useState<TooltipTarget | null>(null)
   const timer = useRef<number | undefined>(undefined)
   const closedAt = useRef(0)
+  const anchor = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
     function clearTimer() {
@@ -34,6 +35,7 @@ export function useTooltipLayer(describedById: string) {
 
     function hide() {
       clearTimer()
+      anchor.current = null
       setTarget((current) => {
         if (current) closedAt.current = Date.now()
         return null
@@ -46,6 +48,7 @@ export function useTooltipLayer(describedById: string) {
         hide()
         return
       }
+      anchor.current = next.element
       if (Date.now() - closedAt.current < INSTANT_AFTER_CLOSE_MS) {
         setTarget(next)
         return
@@ -58,9 +61,19 @@ export function useTooltipLayer(describedById: string) {
       open(tooltipTargetFor(event.target))
     }
 
+    // Pointer focus is ignored, not treated as a leave: a menu focuses the item under the pointer.
     function showOnFocus(event: FocusEvent) {
       const next = tooltipTargetFor(event.target)
-      open(next?.element.matches(':focus-visible') ? next : null)
+      if (!next?.element.matches(':focus-visible')) return
+
+      open(next)
+    }
+
+    // Only the anchor's own blur ends it: focus leaving some other menu item is not a leave.
+    function hideOnBlur(event: FocusEvent) {
+      if (!(event.target instanceof Node) || !anchor.current?.contains(event.target)) return
+
+      hide()
     }
 
     function hideOnEscape(event: KeyboardEvent) {
@@ -73,14 +86,14 @@ export function useTooltipLayer(describedById: string) {
     document.addEventListener('pointerover', show, true)
     document.addEventListener('pointerdown', hide, true)
     document.addEventListener('focusin', showOnFocus, true)
-    document.addEventListener('focusout', hide, true)
+    document.addEventListener('focusout', hideOnBlur, true)
     document.addEventListener('keydown', hideOnEscape, true)
     return () => {
       clearTimer()
       document.removeEventListener('pointerover', show, true)
       document.removeEventListener('pointerdown', hide, true)
       document.removeEventListener('focusin', showOnFocus, true)
-      document.removeEventListener('focusout', hide, true)
+      document.removeEventListener('focusout', hideOnBlur, true)
       document.removeEventListener('keydown', hideOnEscape, true)
     }
   }, [])

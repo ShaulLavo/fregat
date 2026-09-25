@@ -412,11 +412,8 @@ export const SETTINGS_REGISTRY = {
     scope: 'window',
     widget: 'number',
     category: 'Editor',
-    // Rendered width only. The editor package reads `--editor-tab-size` from CSS,
-    // which is what makes this live without a cross-repo setter; what it does
-    // *not* change is the indentation the editor inserts, which is captured in
-    // the Editor constructor and has no setter.
-    description: 'Rendered width of a tab character, in spaces.',
+    description:
+      'Width of a tab character, in spaces. Also the indentation width for a file whose own cannot be detected.',
     keywords: ['tab', 'indent', 'width', 'spaces'],
   }),
   'editor.history.retainedStates': defineSetting({

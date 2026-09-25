@@ -24,6 +24,7 @@ test('a descriptor confirms storage ownership before runtime creation and identi
       appliedThemeId: null,
       selectedThemeId: 'dark-plus',
       syntaxHighlightingEnabled: false,
+      tabSize: 4,
     },
   })
   const retained = application.getSnapshot().editor

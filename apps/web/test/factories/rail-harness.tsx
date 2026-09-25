@@ -150,6 +150,7 @@ export async function createRailHarness(
       appliedThemeId: null,
       selectedThemeId: 'dark-plus',
       syntaxHighlightingEnabled: false,
+      tabSize: 4,
     },
   })
   await application.openEnvironmentWorkspaceRoot(environmentId, rootPath)

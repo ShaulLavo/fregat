@@ -1,21 +1,18 @@
-import { BrainIcon, CaretUpDownIcon } from '@phosphor-icons/react'
+import { CaretUpDownIcon } from '@phosphor-icons/react'
 import type { ProviderOptionDescriptor } from '@workspace/contracts'
 import { Button } from '@workspace/ui/components/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
   DropdownMenuSeparator,
+  DropdownMenuSwitchItem,
   DropdownMenuTrigger,
 } from '@workspace/ui/components/dropdown-menu'
 
 import { useModelPicker } from '@/features/chat/hooks/use-model-picker'
 import {
   modelOptionDescriptors,
-  modelSelectionOptionValue,
   withModelOption,
 } from '@workspace/client-core/chat/providers/options'
 import {
@@ -24,15 +21,14 @@ import {
 } from '@/features/chat/state/chat-input-draft-store'
 
 import {
-  PROVIDER_DEFAULT_VALUE,
   descriptorSummary,
-  defaultChoiceLabel,
-  radioValue,
-  descriptorChoices,
+  effectiveOptionValue,
   promptEffortState,
   withUltrathinkPrefix,
   withoutUltrathinkPrefix,
 } from '../utils/model-options'
+import { ModelOptionsGroup } from './model-options-group'
+import { ModelOptionsTriggerIcon } from './model-options-trigger-icon'
 
 export function ModelOptionsMenu({
   compact,
@@ -57,11 +53,17 @@ export function ModelOptionsMenu({
   const selection = modelSelection
   const summary = descriptorSummary(descriptors, selection, prompt)
   const effort = promptEffortState(descriptors, prompt)
+  const selects = descriptors.filter(
+    (descriptor): descriptor is Extract<ProviderOptionDescriptor, { type: 'select' }> =>
+      descriptor.type === 'select',
+  )
+  const switches = descriptors.filter((descriptor) => descriptor.type === 'boolean')
+  const tooltip = summary.fast ? `${summary.label}, fast mode on` : summary.label
 
-  function selectOption(descriptor: ProviderOptionDescriptor, value: string) {
+  function selectOption(descriptor: ProviderOptionDescriptor, value: string | boolean) {
     const drafts = useChatInputDraftStore.getState()
     const currentPrompt = drafts.getDraft(draftTarget).prompt
-    if (descriptor.type === 'select' && descriptor.promptInjectedValues?.includes(value)) {
+    if (descriptor.type === 'select' && descriptor.promptInjectedValues?.includes(String(value))) {
       drafts.setPrompt(draftTarget, withUltrathinkPrefix(currentPrompt))
       return
     }
@@ -69,10 +71,7 @@ export function ModelOptionsMenu({
     if (descriptor.id === currentEffort.descriptorId && currentEffort.inBody) return
     if (descriptor.id === currentEffort.descriptorId && currentEffort.controlled)
       drafts.setPrompt(draftTarget, withoutUltrathinkPrefix(currentPrompt))
-    let next: string | boolean | null = value
-    if (value === PROVIDER_DEFAULT_VALUE) next = null
-    else if (descriptor.type === 'boolean') next = value === 'on'
-    setModelSelection(draftTarget, withModelOption(selection, descriptor, next))
+    setModelSelection(draftTarget, withModelOption(selection, descriptor, value))
   }
 
   return (
@@ -91,8 +90,8 @@ export function ModelOptionsMenu({
                   type='button'
                   variant='ghost'
                 >
-                  <BrainIcon className='size-(--icon-size-sm) shrink-0 opacity-70' />
-                  {compact ? null : <span className='truncate'>{summary}</span>}
+                  <ModelOptionsTriggerIcon compact={compact} fast={summary.fast} />
+                  {compact ? null : <span className='truncate'>{summary.label}</span>}
                   {narrow ? null : (
                     <CaretUpDownIcon className='size-(--icon-size-sm) shrink-0 opacity-60' />
                   )}
@@ -101,57 +100,35 @@ export function ModelOptionsMenu({
             />
           }
         />
-        <TooltipContent>Model options: {summary}</TooltipContent>
+        <TooltipContent>Model options: {tooltip}</TooltipContent>
       </Tooltip>
-      <DropdownMenuContent align='start' className='w-64 p-1' side='top'>
-        {descriptors.map((descriptor, index) => (
-          <DropdownMenuRadioGroup
+      <DropdownMenuContent align='start' className='w-52 p-1' side='top'>
+        {selects.map((descriptor, index) => (
+          <ModelOptionsGroup
             key={descriptor.id}
-            aria-label={descriptor.label}
+            descriptor={descriptor}
+            first={index === 0}
+            locked={effort.inBody && descriptor.id === effort.descriptorId}
             value={
               effort.controlled && descriptor.id === effort.descriptorId
                 ? 'ultrathink'
-                : radioValue(modelSelectionOptionValue(selection, descriptor))
+                : String(effectiveOptionValue(descriptor, selection) ?? '')
             }
+            onSelect={(value) => selectOption(descriptor, value)}
+          />
+        ))}
+        {switches.length > 0 && selects.length > 0 ? (
+          <DropdownMenuSeparator className='my-1' />
+        ) : null}
+        {switches.map((descriptor) => (
+          <DropdownMenuSwitchItem
+            key={descriptor.id}
+            checked={effectiveOptionValue(descriptor, selection) === true}
+            data-tooltip={descriptor.description}
+            onCheckedChange={(checked) => selectOption(descriptor, checked)}
           >
-            {index === 0 ? null : <DropdownMenuSeparator />}
-            {/* Inside the group: base-ui resolves the label against its group context. */}
-            <DropdownMenuLabel>{descriptor.label}</DropdownMenuLabel>
-            {effort.inBody && descriptor.id === effort.descriptorId ? (
-              <p className='text-muted-foreground px-2 pb-1 text-xs'>
-                Your prompt contains “ultrathink”. Remove it from the text to change this option.
-              </p>
-            ) : null}
-            <DropdownMenuRadioItem
-              closeOnClick
-              disabled={effort.inBody && descriptor.id === effort.descriptorId}
-              value={PROVIDER_DEFAULT_VALUE}
-              onClick={() => selectOption(descriptor, PROVIDER_DEFAULT_VALUE)}
-            >
-              {defaultChoiceLabel(descriptor)}
-            </DropdownMenuRadioItem>
-            {descriptor.description ? (
-              <p className='text-muted-foreground px-2 pb-1 text-xs'>{descriptor.description}</p>
-            ) : null}
-            {descriptorChoices(descriptor).map((choice) => (
-              <DropdownMenuRadioItem
-                key={choice.id}
-                closeOnClick
-                aria-label={choice.label}
-                aria-description={choice.description}
-                disabled={effort.inBody && descriptor.id === effort.descriptorId}
-                value={choice.id}
-                onClick={() => selectOption(descriptor, choice.id)}
-              >
-                <span className='flex min-w-0 flex-col gap-0.5'>
-                  <span>{choice.label}</span>
-                  {choice.description ? (
-                    <span className='text-muted-foreground text-xs'>{choice.description}</span>
-                  ) : null}
-                </span>
-              </DropdownMenuRadioItem>
-            ))}
-          </DropdownMenuRadioGroup>
+            {descriptor.label}
+          </DropdownMenuSwitchItem>
         ))}
       </DropdownMenuContent>
     </DropdownMenu>

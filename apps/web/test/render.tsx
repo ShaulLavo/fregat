@@ -92,6 +92,7 @@ export function AppProviders({
           appliedThemeId: null,
           selectedThemeId: 'dark',
           syntaxHighlightingEnabled: false,
+          tabSize: 4,
         },
       })
     const activeNavigation = navigation ?? createTestNavigation({ application: navigationOwner })

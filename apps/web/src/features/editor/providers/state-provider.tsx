@@ -28,6 +28,7 @@ export function EditorStateProvider({
   useFileAvailability(runtime)
   const { appliedThemeContentHash, appliedThemeId, selectedThemeId } = useEditorColorTheme()
   const syntaxHighlightingEnabled = useSettingValue('editor.syntaxHighlighting.enabled')
+  const tabSize = useSettingValue('editor.tabSize')
   const languageServerMatchConfiguration = useLanguageServerMatchConfiguration()
   const { editorOpenBenchmarkControl, fileOpenIntentOwner, queryClient } = runtime
 
@@ -43,6 +44,7 @@ export function EditorStateProvider({
         appliedThemeId,
         selectedThemeId,
         syntaxHighlightingEnabled,
+        tabSize,
       }),
     )
   }, [
@@ -51,6 +53,7 @@ export function EditorStateProvider({
     fileOpenIntentOwner,
     selectedThemeId,
     syntaxHighlightingEnabled,
+    tabSize,
   ])
 
   useLayoutEffect(() => {
