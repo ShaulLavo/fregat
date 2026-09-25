@@ -17,6 +17,13 @@ export const searchEditorGeometrySelectors = {
 }
 
 // Stable handles the app already exposes. Add here, never inline a selector in a scenario.
+function sessionRowForWorktree(page: Page, worktreeId: string) {
+  return page
+    .getByRole('listbox', { name: 'Sessions', exact: true })
+    .getByRole('option')
+    .filter({ has: page.locator(`[data-worktree-id="${worktreeId}"]`) })
+}
+
 export const selectors = {
   completedWorkGroup: (page: Page) => page.getByRole('button', { name: /^Worked for / }),
   reasoningDeliveryRow: (page: Page) => page.getByRole('button', { name: /^REASONING_BEGIN / }),
@@ -284,6 +291,11 @@ export const selectors = {
   sessionDraggingRow: (page: Page) =>
     page.locator('aside [aria-roledescription="sortable session row"][data-dragging="true"]'),
   sessionRail: (page: Page) => page.getByRole('listbox', { name: 'Sessions', exact: true }),
+  sessionRowForWorktree,
+  sessionPullRequestBadge: (page: Page, worktreeId: string) =>
+    sessionRowForWorktree(page, worktreeId).locator('[data-pull-request-state]'),
+  sessionWorktreeChip: (page: Page, worktreeId: string) =>
+    sessionRowForWorktree(page, worktreeId).locator(`[data-worktree-id="${worktreeId}"]`),
   gitChangeTree: (page: Page) => page.getByRole('tree', { name: 'Git changes', exact: true }),
   logList: (page: Page) => page.getByRole('listbox', { name: 'Log events', exact: true }),
   workspaceReplaceAll: (page: Page) => page.getByRole('button', { name: 'All', exact: true }),

@@ -192,6 +192,7 @@ import { gitSubmodulesInit } from './git-submodules-init'
 import { gitAutoPull } from './git-auto-pull'
 import { sessionBranchDrift } from './session-branch-drift'
 import { sessionPullRequestSync } from './session-pull-request-sync'
+import { sessionPullRequestBadge } from './session-pull-request-badge'
 import { sessionAutoSettle } from './session-auto-settle'
 import { gitMergeRequest } from './git-merge-request'
 import { gitClonePublish } from './git-clone-publish'
@@ -395,6 +396,7 @@ export const scenarios: readonly Scenario[] = [
   gitAutoPull,
   sessionBranchDrift,
   sessionPullRequestSync,
+  sessionPullRequestBadge,
   sessionAutoSettle,
   gitMergeRequest,
   gitClonePublish,

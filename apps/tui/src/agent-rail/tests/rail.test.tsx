@@ -13,10 +13,12 @@ import {
 import { test, expect } from '../../../test/fixtures'
 import { renderAgentStage } from '../../../test/factories/agent-stage'
 import {
+  createPullRequestRailSession,
   createRailSession,
   createRailProjects,
   focusRailSession,
 } from '../../../test/factories/agent-rail'
+import { prepareGitWorkbench } from '../../../test/factories/git-workbench'
 import { runPaletteCommand } from '../../../test/actions'
 
 test('native session rail filters, marks, renames, archives, restores and deletes real sessions', async ({
@@ -393,6 +395,31 @@ test('deleting an archived session drops it from the U Undo', async ({ server, c
     })
     await h.frame.renderOnce()
     expect(h.frame.captureCharFrame()).not.toContain('Undo failed')
+  } finally {
+    await h.cleanup()
+  }
+})
+
+test('a session row names its worktree pull request ahead of the branch', async ({ server }) => {
+  await prepareGitWorkbench(server.root)
+  const h = await renderAgentStage(server)
+  try {
+    await createPullRequestRailSession(server, h.chat, h.worktreeId, 'Drafted change', {
+      status: 'found',
+      number: 7,
+      title: 'Drafted change',
+      url: 'https://github.com/fregat/fixture/pull/7',
+      state: 'open',
+      draft: true,
+      closedAt: null,
+    })
+    await createPullRequestRailSession(server, h.chat, h.worktreeId, 'Lookup failed', {
+      status: 'unknown',
+    })
+    await h.frame.renderOnce()
+    const frame = h.frame.captureCharFrame()
+    expect(frame).toContain('PR #7 draft · worktree/')
+    expect(frame).toContain('PR unknown · worktree/')
   } finally {
     await h.cleanup()
   }

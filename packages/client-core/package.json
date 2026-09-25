@@ -104,6 +104,7 @@
     "./chat/context-usage": "./src/chat/context-usage.ts",
     "./files/workspace-address": "./src/files/workspace-address.ts",
     "./chat/worktrees/label": "./src/chat/worktrees/label.ts",
+    "./chat/worktrees/pull-request": "./src/chat/worktrees/pull-request.ts",
     "./chat/worktrees/cleanup": "./src/chat/worktrees/cleanup.ts",
     "./chat/worktrees/commands": "./src/chat/worktrees/commands.ts"
   },
