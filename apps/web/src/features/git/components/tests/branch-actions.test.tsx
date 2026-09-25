@@ -1,3 +1,8 @@
+import { usePushRemoteMutation } from '@/features/git/hooks/use-push-remote-mutation'
+import { usePushAndOpenPullRequestMutation } from '@/features/git/hooks/use-push-and-open-pull-request-mutation'
+import { registerEnvironmentQueryClient } from '@/lib/environments/state/query-clients'
+import { activeServerOrigin } from '@/lib/client'
+import { createObservedInProcessClient } from '../../../../../test/client'
 import { PublishRepositoryDialog } from '@/features/git/components/publish-repository-dialog'
 import { mutationKeys } from '@/features/git/utils/mutation-keys'
 import { execFileSync } from 'node:child_process'
@@ -9,7 +14,11 @@ import userEvent from '@testing-library/user-event'
 
 import { BranchActions } from '@/features/git/components/branch-actions'
 import { expect, test } from '../../../../../test/fixtures'
-import { createTestQueryClient, renderWithProviders } from '../../../../../test/render'
+import {
+  createTestQueryClient,
+  renderHookWithProviders,
+  renderWithProviders,
+} from '../../../../../test/render'
 
 // Real git and the real route. These fixtures' origin is a local directory, so
 // no forge is detected and the component must not offer Create.
@@ -128,6 +137,47 @@ test('a second publish dialog observes the checkout publish already in flight', 
   } finally {
     barrier.resolve()
     await executing
+    rendered.unmount()
+  }
+})
+
+test('push queues behind push-and-open for the same checkout', async ({ client, server }) => {
+  void client
+  await clonedRepo(server.root)
+  const barrier = Promise.withResolvers<void>()
+  const requests: string[] = []
+  const observed = createObservedInProcessClient(server, async (request) => {
+    const path = new URL(request.url).pathname
+    if (path !== '/git/push' && path !== '/git/push-and-pull-request') return
+    requests.push(path)
+    if (path === '/git/push-and-pull-request') await barrier.promise
+  })
+  const queryClient = createTestQueryClient()
+  registerEnvironmentQueryClient(queryClient, activeServerOrigin(), observed)
+  const rendered = renderHookWithProviders(
+    () => ({
+      push: usePushRemoteMutation('repo'),
+      ship: usePushAndOpenPullRequestMutation('repo', 'Pull request'),
+    }),
+    { queryClient },
+  )
+  const shipping = rendered.result.current.ship.mutateAsync({ title: 'Change' })
+  let pushing: Promise<unknown> | undefined
+  try {
+    await waitFor(() => expect(requests).toEqual(['/git/push-and-pull-request']))
+    pushing = rendered.result.current.push.mutateAsync()
+    await waitFor(() => expect(rendered.result.current.push.isPaused).toBe(true))
+    expect(requests).toEqual(['/git/push-and-pull-request'])
+    await act(async () => {
+      barrier.resolve()
+      await shipping
+      await pushing
+    })
+    expect(requests).toEqual(['/git/push-and-pull-request', '/git/push'])
+  } finally {
+    barrier.resolve()
+    await shipping
+    await pushing
     rendered.unmount()
   }
 })
