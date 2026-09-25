@@ -12,7 +12,7 @@ export type SetupOutcome = {
   output: string[]
 }
 
-type Control = { cancelled: boolean }
+type Control = { cancelled: boolean; killTimer: ReturnType<typeof setTimeout> | null }
 type Running = { child: Bun.Subprocess; control: Control; finished: Promise<SetupOutcome> }
 
 /**
@@ -51,7 +51,7 @@ export class SetupRunner {
       // Its own process group, so a cancel reaches whatever the script started.
       detached: true,
     })
-    const control = { cancelled: false }
+    const control: Control = { cancelled: false, killTimer: null }
     const finished = this.watch(worktreeId, child, control)
     this.running.set(worktreeId, { child, control, finished })
     return finished
@@ -62,7 +62,7 @@ export class SetupRunner {
     const entry = this.running.get(worktreeId)
     if (!entry) return
     entry.control.cancelled = true
-    killGroup(entry.child)
+    terminate(entry.child, entry.control)
     await entry.finished
   }
 
@@ -76,7 +76,7 @@ export class SetupRunner {
     control: Control,
   ): Promise<SetupOutcome> {
     const output: string[] = []
-    const timer = setTimeout(() => killGroup(child), SETUP_TIMEOUT_MS)
+    const timer = setTimeout(() => terminate(child, control), SETUP_TIMEOUT_MS)
     try {
       await Promise.all([collect(child.stdout, output), collect(child.stderr, output)])
       const exitCode = await child.exited
@@ -84,6 +84,7 @@ export class SetupRunner {
       return { state: exitCode === 0 ? 'done' : 'failed', exitCode, output }
     } finally {
       clearTimeout(timer)
+      if (control.killTimer) clearTimeout(control.killTimer)
       this.running.delete(worktreeId)
     }
   }
@@ -108,10 +109,16 @@ function keep(output: string[], line: string) {
   if (output.length > OUTPUT_LINES) output.shift()
 }
 
-function killGroup(child: Bun.Subprocess) {
+function terminate(child: Bun.Subprocess, control: Control) {
+  if (control.killTimer) return
+  killGroup(child, 'SIGTERM')
+  control.killTimer = setTimeout(() => killGroup(child, 'SIGKILL'), 500)
+}
+
+function killGroup(child: Bun.Subprocess, signal: NodeJS.Signals) {
   try {
-    process.kill(-child.pid, 'SIGTERM')
+    process.kill(-child.pid, signal)
   } catch {
-    child.kill()
+    if (child.exitCode === null) child.kill(signal)
   }
 }

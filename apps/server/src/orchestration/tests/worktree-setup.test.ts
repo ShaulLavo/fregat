@@ -105,3 +105,31 @@ test('a project with no setup script runs nothing and refuses a rerun', async ()
     fixture.command({ type: 'worktree.setup.run', worktreeId: lifecycleWorktreeId }),
   ).rejects.toThrow('no setup script')
 })
+
+test('cancellation kills a setup process group that ignores TERM', async () => {
+  const fixture = await withSetup(
+    "trap '' TERM; echo $$ > ready.pid; while :; do sleep 1; done",
+    false,
+  )
+  const created = await fixture.create()
+  const ready = path.join(created.canonicalPath, 'ready.pid')
+  await expect.poll(() => readFile(ready, 'utf8')).toMatch(/\d+/)
+  const pid = Number(await readFile(ready, 'utf8'))
+  try {
+    const cancellation = fixture.command({
+      type: 'worktree.setup.cancel',
+      worktreeId: lifecycleWorktreeId,
+    })
+    await Promise.race([cancellation, Bun.sleep(2000)])
+    await expect
+      .poll(async () => (await worktree(fixture))?.setup?.state, { timeout: 2500 })
+      .toBe('cancelled')
+    expect(() => process.kill(pid, 0)).toThrow()
+  } finally {
+    try {
+      process.kill(-pid, 'SIGKILL')
+    } catch {
+      /* Already reaped. */
+    }
+  }
+})
