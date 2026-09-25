@@ -1,6 +1,7 @@
 import { editorLspTabSwitch } from './editor-lsp-tab-switch'
 import { editorLspServerExit } from './editor-lsp-server-exit'
 import { editorTypography } from './editor-typography'
+import { editorDecodeReveal } from './editor-decode-reveal'
 import { responseDelivery } from './response-delivery'
 import { draftRecovery } from './draft-recovery'
 import { composerDefaults } from './composer-defaults'
@@ -309,6 +310,7 @@ export const scenarios: readonly Scenario[] = [
   editorLspTabSwitch,
   editorLspServerExit,
   editorTypography,
+  editorDecodeReveal,
   editorDefinitionCrlf,
   editorExternalDeletion,
   fileTreeUndo,

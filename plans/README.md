@@ -9,7 +9,7 @@ index lists executable plans only; it does not define a second roadmap.
 
 The separate [Editor backlog](../../Editor/plans/README.md) holds 55 entries covering all 28 Editor
 wishlist topics, 22 of them still executable plans, with their package/host ownership and
-dependencies. Plan 071 remains the existing syntax-retry proposal here.
+dependencies.
 
 Before executing a plan, reconcile its drift check and line references against current source.
 Verification uses per-workspace baseline deltas; never gate completion on an absolute test count or
@@ -55,7 +55,6 @@ a bare root `bun run verify`.
 | [129 — dependency shape](129-dependency-shape.md)                                       | **PHASES 1–2 DEPLOYED; PHASE 3 Q2–Q4 OPEN**                          |
 | [128 — React 19 patterns](128-react-19-patterns.md)                                     | **NOT STARTED — PARTLY OBSOLETE; REWRITE SMALL FIRST**               |
 | [126 — T3 Code behavioral alignment](126-t3code-alignment.md)                           | **IN PROGRESS — 23 OF 57 GROUPS DONE, 8 PARTIAL, 26 OPEN**           |
-| [071 — syntax highlight retry](071-syntax-highlight-retry.md)                           | **PROPOSED — ROOT GO/NO-GO SCHEDULING**                              |
 | [080 — Platform and VS Code keybinding modes](080-platform-keybinding-modes.md)         | **PROPOSED — INTERACTION RULES CONFIRMED**                           |
 | [087 — stateless MCP support](087-stateless-mcp.md)                                     | **PROPOSED — IMPLEMENTATION NOT STARTED**                            |
 | [088 — native code intelligence](088-native-code-intelligence.md)                       | **PROPOSED — DEPENDS ON 087**                                        |
@@ -212,10 +211,10 @@ a bare root `bun run verify`.
   machine filtering, remote project selection, and retained workbench switching. Live Linux/macOS
   checks cover browser reconnect and managed-process ownership. Direct `https://` origins are
   accepted; direct remote deployment checks and pairing remain separate, on demand.
-- Plan 071 is an independent Editor-only resilience proposal. Its prerequisite is now stable:
-  Platform owns Shiki registration resolution, Editor's Oniguruma worker is self-contained, and
-  built-dist highlighting is covered by a real-browser and shared-log proof. Root `PLAN.md` has not
-  scheduled the retry work yet.
+- Plan 071 landed on 2026-09-25 with Editor E050 row 11 and its plan is deleted. A failed
+  highlight refresh retries once, then once on a reloaded session, then settles as `error` with one
+  `editor.syntax.highlight_retries_exhausted` warning; the Editor
+  [first-paint reference](../../Editor/docs/performance/first-paint.md) describes it.
 - Plans 066 and 067 were dropped and deleted. The
   [decision](../PLAN.md#ghostty-appearance-integration-dropped) records the package's no-disk-read boundary.
 - The paired paint and prepared-open contracts are landed. Editor owns `EditorVisibleSnapshot`,

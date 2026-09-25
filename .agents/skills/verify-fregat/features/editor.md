@@ -64,6 +64,8 @@ The click scenario waits 750ms between clicks so debounced document highlights, 
 
 `scenario editor-typography` opens a fixture file with a tab-indented line, changes `editor.fontSize`, `editor.lineHeight` and `editor.tabSize` (restored afterwards) and checks the open editor at each step: the row pitch equals the line height, the caret stands before the glyph it precedes, a tab spans the tab size, and the size variable popups copy matches.
 
+`scenario editor-decode-reveal` sets `editor.decode.mode` to `diffusion` (restored afterwards), opens a TypeScript fixture file and records the decode reveal: the rows hide on open, the diffusion overlay's glyphs already carry token colours when it appears (the reveal waited for the settled highlight), and the rows come back highlighted.
+
 `scenario editor-conflict-merge` opens a disposable file, types an unsaved edit, writes the file externally, chooses Compare in the conflict toast, and takes Accept Current Change from the merge lens. The resolved file on disk must keep the local edit and drop the incoming one, with no marker left, and the conflict toast must close. A clean external write goes first, so the file watch is live before the conflicting one.
 
 `scenario editor-lsp-hover --file main.tsx` inserts a `const`, hovers its name, checks the language server tooltip names it, then inserts a name with a Cyrillic letter and checks that its diagnostic and its character warning share one tooltip. Undoes both edits.

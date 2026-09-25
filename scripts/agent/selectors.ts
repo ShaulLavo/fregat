@@ -3,6 +3,12 @@ import type { Locator, Page } from 'playwright'
 export const fileIconSelector = '[data-file-icon], [style*="vscode-icons/"]'
 export const wallpaperLayerSelector = '[data-workbench] img[data-workbench-wallpaper-layer="still"]'
 export const diffPaneSelector = '.editor-diff-pane'
+/** The decode plugin's hidden-rows class, its diffusion overlay, and one overlay glyph. */
+export const decodeSelectors = {
+  active: '.editor-decode-active',
+  glyphLayer: '.editor-decode-glyph-layer',
+  glyph: '.editor-decode-glyph',
+} as const
 export const searchEditorSelector = '[aria-label="Search result editor"]'
 export const searchEditorFileRowSelector = '[role="treeitem"][aria-level="1"]'
 export const selectedEditorFileTabSelector = '[data-editor-tab-path][aria-selected="true"]'

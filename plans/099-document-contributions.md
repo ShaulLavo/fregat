@@ -765,8 +765,9 @@ and complete validation. Writing the plan does not schedule production execution
   decision; this plan provides no production abstraction or implementation dependency for it.
 - [E014](../../Editor/plans/e014-parallel-search.md) must reuse the common reader and job lifecycle
   if parallel search is implemented. This plan does not add a parallel search engine.
-- [Plan 071](071-syntax-highlight-retry.md) remains separate retry policy. Common endpoint lifecycle
-  must not accidentally introduce retries or replay failed requests as part of this refactor.
+- The highlight retry (Plan 071, landed with Editor E050 row 11) stays in the syntax controller.
+  Common endpoint lifecycle must not accidentally introduce retries or replay failed requests as
+  part of this refactor.
 
 ## Completion checklist
 

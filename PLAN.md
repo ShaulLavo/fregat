@@ -16,8 +16,7 @@ Git history is the archive.
 
 The [Editor backlog](../Editor/plans/README.md) contains 30 stable entries from its 22-topic
 wishlist. Its suggested order is advisory; promote selected work into this execution roadmap
-when scheduled. Completed entries link to permanent references. The backlog also links the
-existing Plan 071 syntax-retry proposal.
+when scheduled. Completed entries link to permanent references.
 
 ## Verified completed foundations
 
