@@ -280,19 +280,24 @@ INTERACTION-13 worktree prep. Each row closes with its scenario.
 
 ## Parked (not in this wave)
 
-| Plan                                                                   | Why                                                                               |
-| ---------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| 087, 088, 140 P4–P5                                                    | MCP and native code intelligence: XL and security-sensitive; research spike first |
-| 099 runtime, 122, E025–E028                                            | Plugin/document runtime touches every package; needs its own wave after 087       |
-| 110, 111, 112, E015, 108 P2–3                                          | Research with no scope yet                                                        |
-| 114 Polaron                                                            | Needs a go/no-go; conflicts with desktop work in 132/149                          |
-| 143, 154 P7                                                            | Phone direction needs a conversation first                                        |
-| 144                                                                    | Waits on 145, 148 and 087                                                         |
-| 155, 156                                                               | Placeholders                                                                      |
-| 141 P5, 126 RUNTIME-08                                                 | Spends account credit                                                             |
-| 126 RUNTIME-02, EXT-07, EXT-08, EXT-09, EXT-16, EXT-10, INTERACTION-12 | XL, need accounts or 143/144                                                      |
-| 105 P4                                                                 | Needs a mesh feature                                                              |
-| E009–E014, E016, E022–E024, E029, E052, E021 rest, E030                | Measured no-go, low value now, or P3                                              |
+| Plan                                                    | Why                                                                                                                                                                                                                                                                  |
+| ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 087, 088                                                | MCP and native code intelligence: XL and security-sensitive. Decided 2026-09-25: owner — approve 087 milestone M0 only; M1+ is discussed with the owner before anything else. 088 waits on 087 M0–M4                                                                 |
+| 140 P4–P5                                               | P4 waits on research Q3–Q5, which may route it through `/ide` without 087. Decided 2026-09-25: owner — run research Q3–Q5 now. P5 waits on 088                                                                                                                       |
+| 099 runtime, 122                                        | Plugin/document runtime touches every package; needs its own wave. Neither waits on 087: 099 units 0–1 are independent, and 122 Phase 0 waits on nothing                                                                                                             |
+| E025, E028                                              | E028 waits on E026 + E027, then E025. E026 and E027 left this table: Decided 2026-09-25: owner — E026 and E027 are unparked; rebase both on the E050 host contracts first                                                                                            |
+| 110, 111, 112, E015, 108 P2–3                           | Research with no scope yet. Decided 2026-09-25: owner — 111 research authorized with the composer as its first consumer, done before the next wave; 110's language census split out as [Plan 170](../plans/170-language-census.md); 112 runs before E015 as one lane |
+| 114 Polaron                                             | Needs a go/no-go; conflicts with desktop work in 132/149                                                                                                                                                                                                             |
+| 143                                                     | Direction approved 2026-09-25; research phase next. 154 P7 phone haptics is now a 143 follow-up                                                                                                                                                                      |
+| 144                                                     | Waits on PRs #32 (148) and #35 (145); 087 only for Q2. Decided 2026-09-25: owner — Q1–Q3 as recommended; the research phase runs after #32 and #35 merge                                                                                                             |
+| 155, 156                                                | Placeholders                                                                                                                                                                                                                                                         |
+| 141 P5, 126 RUNTIME-08                                  | Spends account credit. Decided 2026-09-25: owner — build with fixtures only; nothing is spent until the owner does one live redemption                                                                                                                               |
+| 126 RUNTIME-02, EXT-07, EXT-09, EXT-10, INTERACTION-12  | XL, need accounts, research, or 144                                                                                                                                                                                                                                  |
+| 105 P4                                                  | Needs a mesh feature                                                                                                                                                                                                                                                 |
+| E009–E014, E016, E022–E024, E029, E052, E021 rest, E030 | Measured no-go, low value now, or P3                                                                                                                                                                                                                                 |
+
+126 EXT-08 and EXT-16 left this table on 2026-09-25: 143 is approved (pairing URL now, relay later) and
+machines already connect, so neither waits on 143 or 144. EXT-16's scope is decided in the 126 ledger.
 
 ## Running it
 

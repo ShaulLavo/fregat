@@ -394,6 +394,8 @@ Two research plans feed the lane and are not executable as written:
 [Plan 110](plans/110-workspace-indexing.md) asks what belongs in a workspace index beyond the file
 index that already exists, with Shiki grammar prefetch, Plan 088's semantic retrieval, Plan 108's
 document graph and search as its waiting consumers.
+Its smallest consumer, the language census for grammar and theme prefetch, is split out as
+[Plan 170](plans/170-language-census.md) (decided 2026-09-25: owner).
 [Plan 111](plans/111-editor-decorations.md) compares `@singapore-editor`'s inline-replacement layer against
 CodeMirror 6 decorations and Lexical's decorator nodes, and gates Plan 108 Phase 2, any later
 Obsidian mode, and the question of whether the chat composer still needs Lexical.
@@ -552,7 +554,7 @@ surfaces, the file picker and the site. The owner is taking it one topic at a ti
 | [162](plans/162-context-and-cost.md)         | Context breakdown, usable-window fullness, session totals, usage-page honesty (after Plan 141)              |
 | 163 (done, lane L2)                          | Screenshot attachment in the composer (export lives in Plan 145's export plan)                              |
 | [164](plans/164-what-feels-right-in-neon.md) | First pass shipped (Inter, one mono, `section-label`, radius); a metadata font sweep is left                |
-| [165](plans/165-font-catalog.md)             | Nerd Fonts + Fontsource on demand; interface-font setting; curated autocomplete picker                      |
+| 165 (done)                                   | Nerd Fonts + Fontsource on demand; interface-font setting; curated autocomplete picker                      |
 | [166](plans/166-shortcuts-editor.md)         | Keyboard shortcuts page rebuilt from VS Code research: full-width list, save on Enter, several per command  |
 | [154](plans/154-physical-mode.md)            | The seamui feel (springs, depth, motion in every primitive) and interface sounds                            |
 | [155](plans/155-site-demo-replica.md)        | Placeholder: the site hero becomes an animated replica of the app, like cursor.com                          |
