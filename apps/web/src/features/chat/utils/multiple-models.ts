@@ -23,3 +23,11 @@ export function draftSendTargets(
   const primaryKey = modelRefKey(primary)
   return [primary, ...additional.filter((entry) => modelRefKey(entry) !== primaryKey)]
 }
+
+export function backgroundModelError(
+  models: readonly ModelSelection[],
+  background: boolean,
+): string | null {
+  if (!background || models.length <= 1) return null
+  return 'Background start supports one model. Select one model or use Send.'
+}

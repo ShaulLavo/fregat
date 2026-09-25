@@ -1,3 +1,4 @@
+import { advanceBackgroundDraft } from '@/features/chat/state/advance-background-draft'
 import {
   type ModelSelection,
   type OrchestrationProjectShell,
@@ -27,9 +28,9 @@ import { ChatWelcomeView } from './chat-welcome-view'
 import { DraftContextStrip } from '@/features/chat/components/draft-context-strip'
 import type { DraftMachine } from '@/features/chat/utils/draft-workspace'
 import { useSettingValue } from '@/hooks/use-setting-value'
-import { fanOutWorktreeTarget, nextWorktreeTarget } from '@/features/chat/utils/worktree-target'
-import { draftSendTargets } from '@/features/chat/utils/multiple-models'
-import { providerModelSelectionKey } from '@workspace/client-core/chat/providers/models'
+import { fanOutWorktreeTarget } from '@/features/chat/utils/worktree-target'
+import { backgroundModelError, draftSendTargets } from '@/features/chat/utils/multiple-models'
+import { draftSubmissionKey } from '@/features/chat/utils/draft-submission-key'
 import { useNavigation } from '@/hooks/use-navigation'
 
 export function ChatDraftView({
@@ -132,14 +133,21 @@ export function ChatDraftView({
     payload: ChatInputSubmitPayload,
     worktreeTarget: SessionWorktreeTarget,
     context: Record<string, unknown>,
+    fanOut = false,
   ) {
-    const retryKey = `${providerModelSelectionKey(payload.modelSelection)}\n${payload.text}`
+    const retryKey = draftSubmissionKey({
+      payload,
+      environmentId: transport.environmentId,
+      worktreeTarget,
+      fanOut,
+    })
     const submission =
       unsettledSubmissions.current.get(retryKey) ??
       createDraftSessionSubmission({
         ...payload,
         createdAt: new Date().toISOString(),
-        worktreeTarget,
+        worktreeTarget:
+          fanOut && worktree ? fanOutWorktreeTarget(worktreeTarget, worktree.id) : worktreeTarget,
       })
     unsettledSubmissions.current.set(retryKey, submission)
     const outcome = await placeChatMessage({
@@ -188,6 +196,11 @@ export function ChatDraftView({
       .getState()
       .getDraft(draftTarget).additionalModelSelections
     const models = draftSendTargets(payload.modelSelection, additional)
+    const backgroundError = backgroundModelError(models, background)
+    if (backgroundError) {
+      setSendError(backgroundError)
+      return 'rejected'
+    }
     if (models.length > 1 && !background) return sendToModels(payload, models, operation)
 
     const outcome = await startSession(payload, target, { background })
@@ -200,9 +213,7 @@ export function ChatDraftView({
     // The next draft keeps this one's workspace mode and base branch; each start
     // in new-worktree mode declares its own worktree.
     if (background && identity) {
-      useChatInputDraftStore
-        .getState()
-        .setIdentity(draftTarget, { ...identity, worktreeTarget: nextWorktreeTarget(target) })
+      advanceBackgroundDraft(draftTarget, identity)
       return 'started'
     }
 
@@ -227,8 +238,9 @@ export function ChatDraftView({
     for (const model of models) {
       const outcome = await startSession(
         { ...payload, modelSelection: model },
-        fanOutWorktreeTarget(target, worktree.id),
+        target,
         { modelCount: models.length },
+        true,
       )
       if (outcome.ok) started.push(outcome.sessionId)
       else failed.push({ model, message: outcome.message })
