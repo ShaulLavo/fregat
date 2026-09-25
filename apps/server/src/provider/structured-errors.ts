@@ -92,6 +92,19 @@ export const sessionIdentityErrors = defineErrorCatalog('provider', {
     why: 'The isolated provider process could not return the local conversation transcript.',
     fix: 'Check that this provider instance can access the session files and retry the import.',
   },
+  CLAUDE_CLI_TOO_OLD: {
+    status: 409,
+    message: ({ version, minimum }: { version: string; minimum: string }) =>
+      `Claude Code ${version} is older than the minimum ${minimum}`,
+    why: 'Older CLIs lack the result and sign-in fields this app reads, so their turns cannot be reported correctly.',
+    fix: 'Update the Claude CLI, or clear the binary path in the provider settings to use the bundled one.',
+  },
+  CODEX_EXITED: {
+    status: 502,
+    message: 'The Codex app-server exited',
+    why: 'The Codex process ended while this app still had requests waiting on it.',
+    fix: 'Send the message again. If it keeps exiting, run `codex app-server` in a terminal to see why.',
+  },
   CLAUDE_BINARY_MISSING: {
     status: 500,
     message: 'The configured Claude binary was not found',

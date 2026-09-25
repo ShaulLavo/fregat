@@ -2232,7 +2232,7 @@ describe('CodexProviderAdapter', () => {
     )
   })
 
-  it('logs background Codex diagnostics without chat rows and preserves actionable stderr', async ({
+  it('keeps stderr as opaque diagnostics on the exit event, never as chat rows', async ({
     onTestFinished,
   }) => {
     const logDir = await mkdtemp(path.join(tmpdir(), 'platform-codex-stderr-'))
@@ -2257,22 +2257,14 @@ describe('CodexProviderAdapter', () => {
         await settleRuntimeEvents()
         await adapter.stopAll()
 
-        const warnings = events.flatMap((event) =>
-          event.type === 'runtime.warning' ? [event.payload.message] : [],
-        )
-        expect(warnings).toEqual(
-          expect.arrayContaining([
+        expect(events.filter((event) => event.type === 'runtime.warning')).toEqual([])
+        expect(
+          await codexPipelineWarningEvent(logDir, 'chat.pipeline.codex_process.exited'),
+        ).toMatchObject({
+          stderrTail: expect.arrayContaining([
             '2026-09-07T05:01:31Z ERROR codex_api::transport: failed to connect to websocket',
             'Authentication required: sign in again',
           ]),
-        )
-        expect(warnings.some((warning) => warning.includes('codex_models_manager'))).toBe(false)
-        expect(
-          await codexPipelineWarningEvent(logDir, 'chat.pipeline.codex_process.stderr'),
-        ).toMatchObject({
-          diagnostic:
-            '2026-09-07T05:01:30.819533Z ERROR codex_models_manager::manager: failed to refresh available models: timeout waiting for child process to exit',
-          processId: expect.any(Number),
         })
       },
       { mode: 'stderr-diagnostics' },

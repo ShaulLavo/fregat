@@ -50,7 +50,6 @@ a bare root `bun run verify`.
 | [139 — acting on agent diffs](139-acting-on-agent-diffs.md)                             | **RESEARCH — RESEARCH PHASE FIRST**                                  |
 | [135 — TanStack async ownership and route preparation](135-tanstack-async-ownership.md) | **PROPOSED — RESEARCH COMPLETE; IMPLEMENTATION NOT STARTED**         |
 | [132 — process and dev ownership](132-process-and-dev-ownership.md)                     | **PHASE 1 IMPLEMENTED (`4749fd05`); PHASES 2–4 OPEN**                |
-| [131 — provider codes, not prose](131-provider-codes-not-prose.md)                      | **PHASES 1–2 IMPLEMENTED (`4749fd05`, lane L2); PHASE 3 OPEN**       |
 | [130 — ask the editor](130-ask-the-editor.md)                                           | **PHASES 1, 2, 4 AND 5 (ITEMS 5–7, 9) DONE; 3, ITEMS 8 AND 10 OPEN** |
 | [129 — dependency shape](129-dependency-shape.md)                                       | **PHASES 1–2 DEPLOYED; PHASE 3 Q2–Q4 OPEN**                          |
 | [128 — React 19 patterns](128-react-19-patterns.md)                                     | **NOT STARTED — PARTLY OBSOLETE; REWRITE SMALL FIRST**               |

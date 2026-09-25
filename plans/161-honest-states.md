@@ -10,7 +10,7 @@
   flash, and folding tests.
 - Risk: MED. Approval admission changes a command the harness answers; every change keeps today's
   happy path byte for byte and adds refusal paths only.
-- Depends on: [Plan 131](131-provider-codes-not-prose.md) Phase 2 for the "request is gone" code
+- Depends on: Plan 131 Phase 2 (done on lane L2) for the "request is gone" code
   (step 1.3 below). Try again gets better once the [Plan 145 fork](145-harness-controls/fork.md)
   lands (D1).
 - Planned at: Platform `9c1c45d1`, 2026-09-25. Research:

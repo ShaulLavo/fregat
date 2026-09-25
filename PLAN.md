@@ -440,7 +440,7 @@ each plan were confirmed in source; the rest are audit findings an implementer r
 
 Suggested order (steps 1–4 done by 2026-09-23; step 5 is in progress):
 
-1. [Plan 131](plans/131-provider-codes-not-prose.md) Phase 1 and
+1. Plan 131 Phase 1 (all of Plan 131 done on lane L2, 2026-09-25) and
    [Plan 132](plans/132-process-and-dev-ownership.md) Phase 1. A tool permission's lifetime is
    decided by substring match, and the desktop app can kill a process it does not own. Both are
    small and both need a `--server` or desktop restart, so batch them.
@@ -459,7 +459,7 @@ Suggested order (steps 1–4 done by 2026-09-23; step 5 is in progress):
    Rows 8 (`onDidScroll`) and 4 (theme keys) unlock Plan 130 Phase 5 items 8 and 10; the rest are
    Editor-only. Plan 130 Phase 3 (`getStackedRows`) is a separate small Editor change.
 
-Left in the lane: Plan 131 Phases 2–3, Plan 132 Phases 2–4, the Plan 130 remainder and the E050 rows.
+Left in the lane: Plan 132 Phases 2–4, the Plan 130 remainder and the E050 rows.
 
 The owner decided Plan 132 D4 on 2026-09-21: the server's migrations are deleted and the schema
 starts from scratch (Plan 132 Phase 4). External-change

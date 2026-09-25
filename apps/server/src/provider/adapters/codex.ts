@@ -106,14 +106,8 @@ const CODEX_USAGE_TIMEOUT_MS = 3_000
 const CODEX_DISCOVERY_PAGE_SIZE = 50
 const ANSI_ESCAPE_CHAR = String.fromCharCode(27)
 const ANSI_ESCAPE_REGEX = new RegExp(`${ANSI_ESCAPE_CHAR}\\[[0-9;]*m`, 'g')
-const CODEX_STDERR_LOG_REGEX =
-  /^\d{4}-\d{2}-\d{2}T\S+\s+(TRACE|DEBUG|INFO|WARN|ERROR)\s+\S+:\s+(.*)$/
-const CODEX_DIAGNOSTIC_STDERR_REGEX =
-  /^\d{4}-\d{2}-\d{2}T\S+\s+(TRACE|DEBUG|INFO|WARN|ERROR)\s+[a-zA-Z0-9_]+(?:::[a-zA-Z0-9_]+)*:\s+/
-const BENIGN_CODEX_STDERR_ERROR_SNIPPETS = [
-  'state db missing rollout path for thread',
-  'state db record_discrepancy: find_thread_path_by_id_str_in_subdir, falling_back',
-]
+const CODEX_STDERR_TAIL_LINES = 20
+const CODEX_STDERR_LINE_MAX = 500
 export const CODEX_ADAPTER_CAPABILITIES = {
   conversationRollback: true,
   listCommands: true,
@@ -1085,8 +1079,6 @@ class CodexAppServerSession extends SessionContext {
 
   private async handleManualNotification(method: string, params: unknown) {
     switch (method) {
-      case 'process/stderr':
-        return this.handleProcessStderrNotification(params)
       case 'thread/status/changed':
         return this.handleSessionStatusChangedNotification(params)
       case 'thread/name/updated':
@@ -1149,19 +1141,6 @@ class CodexAppServerSession extends SessionContext {
       default:
         return false
     }
-  }
-
-  private handleProcessStderrNotification(params: unknown) {
-    const message = stringField(asRecord(params), 'message')
-    if (!message) return true
-
-    this.emitRuntimeNotification(
-      'runtime.warning',
-      { detail: params, message },
-      'process/stderr',
-      params,
-    )
-    return true
   }
 
   private handleSessionStatusChangedNotification(params: unknown) {
@@ -2192,6 +2171,8 @@ class CodexAppServerRpcClient {
   private closed = false
   private nextId = 1
   private stderrBuffer = ''
+  /** Stderr is diagnostics, never classified: the last lines ride on the exit event. */
+  private readonly stderrTail: string[] = []
 
   private constructor(process: ChildProcessWithoutNullStreams) {
     this.process = process
@@ -2201,17 +2182,14 @@ class CodexAppServerRpcClient {
     this.process.stdout.on('data', (chunk: string) => this.readStdout(chunk))
     this.process.stderr.on('data', (chunk: string) => this.readStderr(chunk))
     this.process.on('error', (error) => this.closeWithError(error))
-    this.process.on('exit', (code) => {
-      if (!this.closed)
-        this.closeWithError(createInternalError(`Codex app-server exited with ${code}.`))
-    })
+    this.process.on('exit', (code) => this.handleExit(code))
   }
 
   static start(env: NodeJS.ProcessEnv = process.env, cwd?: string) {
     return new CodexAppServerRpcClient(
       spawn(codexBinary(env), ['app-server'], {
         cwd,
-        env: cwd ? { ...env, PWD: cwd } : env,
+        env,
         stdio: ['pipe', 'pipe', 'pipe'],
       }),
     )
@@ -2368,20 +2346,24 @@ class CodexAppServerRpcClient {
     }
   }
 
-  private handleStderrLine(line: string) {
-    const classified = classifyCodexStderrLine(line)
-    if (!classified) return
-    if (isBackgroundCodexDiagnostic(classified.message)) {
-      recordChatPipelineWarning('chat.pipeline.codex_process.stderr', {
-        diagnostic: classified.message,
-        processId: this.process.pid,
-      })
-      return
-    }
+  private handleStderrLine(rawLine: string) {
+    const line = rawLine.replaceAll(ANSI_ESCAPE_REGEX, '').trim()
+    if (!line) return
 
-    for (const handler of this.handlers) {
-      handler({ method: 'process/stderr', params: { message: classified.message } })
+    this.stderrTail.push(line.slice(0, CODEX_STDERR_LINE_MAX))
+    if (this.stderrTail.length > CODEX_STDERR_TAIL_LINES) this.stderrTail.shift()
+  }
+
+  private handleExit(exitCode: number | null) {
+    const context = { exitCode, processId: this.process.pid, stderrTail: [...this.stderrTail] }
+    if (exitCode === 0 || this.closed) {
+      recordChatPipelineInfo('chat.pipeline.codex_process.exited', context)
+    } else {
+      recordChatPipelineWarning('chat.pipeline.codex_process.exited', context)
     }
+    if (this.closed) return
+
+    this.closeWithError(sessionIdentityErrors.CODEX_EXITED({ internal: context }))
   }
 
   private rejectRequest(id: JsonRpcId, error: unknown) {
@@ -3345,24 +3327,4 @@ function realtimePayload(method: string, params: unknown) {
     default:
       return { message: stringField(record, 'message') ?? 'Realtime error' }
   }
-}
-
-function classifyCodexStderrLine(rawLine: string) {
-  const line = rawLine.replaceAll(ANSI_ESCAPE_REGEX, '').trim()
-  if (!line) return null
-
-  const match = line.match(CODEX_STDERR_LOG_REGEX)
-  if (!match) return { message: line }
-
-  const level = match[1]
-  if (level && level !== 'ERROR') return null
-  if (BENIGN_CODEX_STDERR_ERROR_SNIPPETS.some((snippet) => line.includes(snippet))) return null
-
-  return { message: line }
-}
-
-function isBackgroundCodexDiagnostic(message: string) {
-  if (message.toLowerCase().includes('failed to connect to websocket')) return false
-
-  return CODEX_DIAGNOSTIC_STDERR_REGEX.test(message)
 }

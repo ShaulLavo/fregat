@@ -560,11 +560,16 @@ describe('ClaudeProviderAdapter', () => {
     void canUseTool('mcp__linear__create_issue', { title: 'Bug' }, canUseToolOptions())
     void canUseTool('Read', { file_path: '/etc/hosts' }, canUseToolOptions())
     void canUseTool('SomeCustomTool', { description: 'do it' }, canUseToolOptions())
+    // Named like a shell, but only the SDK's own `Bash` runs a native command.
+    void canUseTool('mcp__tools__run_shell_command', { cmd: 'ls' }, canUseToolOptions())
+    void canUseTool('RunShellCommand', { cmd: 'ls' }, canUseToolOptions())
 
-    await waitFor(() => openedRequests(harness).length === 3, 'not every approval was opened')
+    await waitFor(() => openedRequests(harness).length === 5, 'not every approval was opened')
     expect(openedRequests(harness).map((event) => event.payload.requestType)).toEqual([
       'mcp_tool_call_approval',
       'file_read_approval',
+      'dynamic_tool_call_approval',
+      'mcp_tool_call_approval',
       'dynamic_tool_call_approval',
     ])
     expect(openedRequests(harness)[1]?.payload.detail).toBe('Read: /etc/hosts')

@@ -2407,11 +2407,10 @@ type ClaudeProviderAuthState = Pick<ProviderSnapshot, 'auth' | 'message' | 'stat
 
 /**
  * `claude auth status --json` decides authenticated vs not; the SDK account is
- * only decoration on top of it. The account heuristic survives as the fallback
- * for `unknown` (CLI too old to answer, or the read failed).
+ * only decoration on top of it. A failed read stays `unknown`.
  */
 function claudeAuthState(cli: ClaudeAuthState, account: unknown): ClaudeProviderAuthState {
-  if (cli.status === 'unknown') return claudeAccountAuthState(account)
+  if (cli.status === 'unknown') return { auth: { status: 'unknown' }, status: 'ready' }
   if (cli.status === 'unauthenticated') return signedOutClaudeAuthState()
 
   const record = asRecord(account)
@@ -2432,36 +2431,6 @@ function claudeAccountType(cli: ClaudeAuthState, record: Record<string, unknown>
   if (cli.apiProvider && cli.apiProvider !== 'firstParty') return cli.apiProvider
 
   return stringField(record, 'subscriptionType') ?? cli.authMethod
-}
-
-function claudeAccountAuthState(account: unknown): ClaudeProviderAuthState {
-  const record = asRecord(account)
-  const apiProvider = stringField(record, 'apiProvider')
-  const email = stringField(record, 'email')
-  const subscriptionType = stringField(record, 'subscriptionType')
-
-  // `tokenSource` is the literal string 'none' when signed out, which is truthy.
-  // Treating it as a presence check reports a signed-out CLI as authenticated and
-  // defers the failure to mid-turn ("OAuth session expired"), where the user has
-  // no way to act on it.
-  const tokenSource = stringField(record, 'tokenSource')
-  const hasToken = Boolean(tokenSource) && tokenSource !== 'none'
-
-  if (apiProvider && apiProvider !== 'firstParty') {
-    return { auth: { status: 'authenticated', type: apiProvider }, status: 'ready' }
-  }
-  if (email || subscriptionType || hasToken) {
-    return {
-      auth: {
-        status: 'authenticated',
-        ...(email ? { email } : {}),
-        ...(subscriptionType ? { type: subscriptionType } : {}),
-      },
-      status: 'ready',
-    }
-  }
-
-  return signedOutClaudeAuthState()
 }
 
 function signedOutClaudeAuthState(): ClaudeProviderAuthState {
@@ -2509,20 +2478,25 @@ function claudeStreamKind(deltaType: string) {
   return deltaType.includes('thinking') ? ('reasoning_text' as const) : ('assistant_text' as const)
 }
 
-function claudeItemType(toolName: string) {
-  const normalized = toolName.toLowerCase()
-  if (normalized.startsWith('mcp__')) return 'mcp_tool_call'
-  if (normalized === 'bash' || normalized.includes('command') || normalized.includes('shell')) {
-    return 'command_execution'
-  }
-  if (normalized === 'edit' || normalized === 'write' || normalized === 'notebookedit') {
-    return 'file_change'
-  }
-  if (normalized.includes('websearch') || normalized.includes('webfetch')) return 'web_search'
-  if (normalized === 'read') return 'image_view'
-  if (isClaudeTaskTool(toolName)) return 'unknown'
+/** The SDK's native tool names. A user's MCP tool is `mcp__server__tool`, whatever its display name. */
+const CLAUDE_NATIVE_ITEM_TYPES: Readonly<Record<string, string>> = {
+  Agent: 'unknown',
+  Bash: 'command_execution',
+  Edit: 'file_change',
+  MultiEdit: 'file_change',
+  NotebookEdit: 'file_change',
+  PowerShell: 'command_execution',
+  Read: 'image_view',
+  Task: 'unknown',
+  WebFetch: 'web_search',
+  WebSearch: 'web_search',
+  Write: 'file_change',
+}
 
-  return 'dynamic_tool_call'
+function claudeItemType(toolName: string) {
+  if (toolName.startsWith('mcp__')) return 'mcp_tool_call'
+
+  return CLAUDE_NATIVE_ITEM_TYPES[toolName] ?? 'dynamic_tool_call'
 }
 
 function claudeToolTitle(itemType: string) {
@@ -2536,8 +2510,7 @@ function claudeToolTitle(itemType: string) {
 }
 
 function isClaudeTaskTool(toolName: string) {
-  const normalized = toolName.toLowerCase()
-  return normalized === 'task' || normalized === 'agent'
+  return toolName === 'Task' || toolName === 'Agent'
 }
 
 function claudeToolSummary(toolName: string, toolInput: Record<string, unknown>) {
@@ -2646,19 +2619,11 @@ function claudeTokenUsage(usage: unknown) {
   return { ...record, usedTokens }
 }
 
-/**
- * The CLI stamps user aborts explicitly: interrupting mid-tool-call yields
- * `aborted_tools`, mid-stream yields `aborted_streaming`. Older CLIs only leave
- * the word in `errors`, so both are checked.
- */
+/** The CLI stamps aborts: mid-tool-call is `aborted_tools`, mid-stream `aborted_streaming`. */
 function isInterruptedClaudeResult(message: Extract<SDKMessage, { type: 'result' }>) {
-  if (message.terminal_reason === 'aborted_tools') return true
-  if (message.terminal_reason === 'aborted_streaming') return true
-
-  const errors = claudeResultErrors(message).join(' ').toLowerCase()
-  if (errors.includes('interrupt')) return true
-
-  return errors.includes('request was aborted')
+  return (
+    message.terminal_reason === 'aborted_tools' || message.terminal_reason === 'aborted_streaming'
+  )
 }
 
 /** A turn that finished but was cut short: the answer is complete as far as it goes. */
