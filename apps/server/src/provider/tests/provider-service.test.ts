@@ -528,10 +528,11 @@ describe('ProviderService', () => {
     expect(fanOutEvents.map((event) => event.type)).toContain('assistant.delta')
     expect(fanOutEvents.map((event) => event.type)).toContain('assistant.complete')
     expect(fanOutEvents.map((event) => event.type)).toContain('turn.completed')
-    expect(fanOutEvents.map((event) => event.type).slice(-4)).toEqual([
+    expect(fanOutEvents.map((event) => event.type).slice(-5)).toEqual([
       'assistant.delta',
       'assistant.complete',
       'usage.totals',
+      'conversation.token-usage.updated',
       'turn.completed',
     ])
     expect(activeSessions).toContainEqual(expect.objectContaining({ sessionId: input.sessionId }))

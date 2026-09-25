@@ -10,6 +10,7 @@ import {
   type Options,
   type PermissionResult,
   type Query,
+  type SDKControlGetContextUsageResponse,
   type SDKMessage,
   type SDKRateLimitEvent,
   type SDKUserMessage,
@@ -2177,13 +2178,7 @@ class ClaudeAgentSession extends SessionContext {
       const context = await query.getContextUsage()
       this.emitRuntimeNotification(
         'conversation.token-usage.updated',
-        {
-          usage: {
-            compactsAutomatically: true,
-            maxTokens: context.maxTokens,
-            usedTokens: context.totalTokens,
-          },
-        },
+        { usage: claudeContextUsage(context) },
         message,
       )
     } catch (error) {
@@ -2718,15 +2713,53 @@ function claudeTerminalTaskStatus(status: string | undefined) {
   return null
 }
 
+/**
+ * The result message sums every API call of the turn, so on a multi-call turn it
+ * overstates occupancy: it is an estimate until `getContextUsage` reports.
+ */
 function claudeTokenUsage(usage: unknown) {
   const record = asRecord(usage)
+  const inputTokens = numberField(record, 'input_tokens')
+  const outputTokens = numberField(record, 'output_tokens')
+  const cacheWriteTokens = numberField(record, 'cache_creation_input_tokens')
+  const cachedInputTokens = numberField(record, 'cache_read_input_tokens')
+  const reasoningOutputTokens = numberField(
+    asRecord(record.output_tokens_details),
+    'thinking_tokens',
+  )
   const usedTokens =
-    (numberField(record, 'input_tokens') ?? 0) +
-    (numberField(record, 'output_tokens') ?? 0) +
-    (numberField(record, 'cache_creation_input_tokens') ?? 0) +
-    (numberField(record, 'cache_read_input_tokens') ?? 0)
+    (inputTokens ?? 0) + (outputTokens ?? 0) + (cacheWriteTokens ?? 0) + (cachedInputTokens ?? 0)
 
-  return { ...record, usedTokens }
+  return {
+    estimated: true,
+    usedTokens,
+    ...(inputTokens === null ? {} : { inputTokens }),
+    ...(cachedInputTokens === null ? {} : { cachedInputTokens }),
+    ...(cacheWriteTokens === null ? {} : { cacheWriteTokens }),
+    ...(outputTokens === null ? {} : { outputTokens }),
+    ...(reasoningOutputTokens === null ? {} : { reasoningOutputTokens }),
+  }
+}
+
+/**
+ * `maxTokens` includes the compaction reserve when the CLI keeps one (the
+ * `buffer` category), so the usable window is the rest. Classified on `kind`,
+ * never on the English name.
+ */
+function claudeContextUsage(context: SDKControlGetContextUsageResponse) {
+  const reserveTokens = context.categories
+    .filter((category) => category.kind === 'buffer')
+    .reduce((sum, category) => sum + category.tokens, 0)
+  return {
+    compactsAutomatically: true,
+    maxTokens: Math.max(1, context.maxTokens - reserveTokens),
+    ...(reserveTokens > 0 ? { reserveTokens } : {}),
+    segments: context.categories
+      .filter((category) => category.kind === 'used' || category.kind === 'deferred')
+      .filter((category) => category.tokens > 0)
+      .map((category) => ({ kind: category.kind, name: category.name, tokens: category.tokens })),
+    usedTokens: context.totalTokens,
+  }
 }
 
 /** The CLI stamps aborts: mid-tool-call is `aborted_tools`, mid-stream `aborted_streaming`. */

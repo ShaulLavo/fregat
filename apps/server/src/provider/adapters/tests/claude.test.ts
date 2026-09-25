@@ -110,6 +110,18 @@ type FakeWaiter = {
 class FakeClaudeQuery implements AsyncIterable<SDKMessage> {
   readonly setModelCalls: Array<string | undefined> = []
   readonly stoppedTasks: string[] = []
+  readonly getContextUsage = async () => ({
+    categories: [
+      { color: 'a', kind: 'used' as const, name: 'System tools', tokens: 9_000 },
+      { color: 'b', kind: 'used' as const, name: 'Messages', tokens: 3_000 },
+      { color: 'c', kind: 'deferred' as const, name: 'MCP tools (deferred)', tokens: 21_000 },
+      { color: 'd', kind: 'buffer' as const, name: 'Autocompact buffer', tokens: 13_000 },
+      { color: 'e', kind: 'free' as const, name: 'Free space', tokens: 175_000 },
+    ],
+    maxTokens: 200_000,
+    rawMaxTokens: 200_000,
+    totalTokens: 12_000,
+  })
   readonly reconnected: string[] = []
   readonly mcpServerStatus = async () => [
     { name: 'linear', status: 'connected' as const },
@@ -320,6 +332,58 @@ describe('ClaudeProviderAdapter', () => {
 
     latestQuery(harness).emit(successResult())
     await pending
+    await harness.adapter.stopAll()
+  })
+
+  it('reports the turn usage as an estimate, then the measured window minus the reserve', async () => {
+    const harness = claudeHarness()
+    const pending = harness.adapter.sendTurn(providerTurnInput())
+    await waitForEvent(harness, 'turn.started')
+    latestQuery(harness).emit({
+      ...successResult(),
+      usage: {
+        cache_creation_input_tokens: 20,
+        cache_read_input_tokens: 11_000,
+        input_tokens: 10,
+        output_tokens: 300,
+        output_tokens_details: { thinking_tokens: 280 },
+      },
+    } as SDKMessage)
+    await pending
+    await waitFor(
+      () =>
+        harness.events.filter((event) => event.type === 'conversation.token-usage.updated')
+          .length === 2,
+      'both context snapshots',
+    )
+
+    const [turn, context] = harness.events.filter(
+      (event) => event.type === 'conversation.token-usage.updated',
+    )
+    expect(turn?.payload).toEqual({
+      usage: {
+        cachedInputTokens: 11_000,
+        cacheWriteTokens: 20,
+        estimated: true,
+        inputTokens: 10,
+        outputTokens: 300,
+        reasoningOutputTokens: 280,
+        usedTokens: 11_330,
+      },
+    })
+    expect(context?.payload).toEqual({
+      usage: {
+        compactsAutomatically: true,
+        maxTokens: 187_000,
+        reserveTokens: 13_000,
+        segments: [
+          { kind: 'used', name: 'System tools', tokens: 9_000 },
+          { kind: 'used', name: 'Messages', tokens: 3_000 },
+          { kind: 'deferred', name: 'MCP tools (deferred)', tokens: 21_000 },
+        ],
+        usedTokens: 12_000,
+      },
+    })
     await harness.adapter.stopAll()
   })
 

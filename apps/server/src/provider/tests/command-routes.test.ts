@@ -139,6 +139,7 @@ describe('provider command catalog route', () => {
 
     expect(result.status).toBe(200)
     expect(result.body).toEqual({
+      agents: [],
       commands: [],
       providerInstanceId: 'not-a-provider',
       skills: [],
@@ -152,6 +153,7 @@ describe('provider command catalog route', () => {
 
     expect(result.status).toBe(200)
     expect(result.body).toEqual({
+      agents: [],
       commands: [],
       providerInstanceId: 'claude',
       skills: [],

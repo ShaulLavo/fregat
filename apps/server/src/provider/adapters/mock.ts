@@ -73,6 +73,8 @@ export const MOCK_ADAPTER_CAPABILITIES = {
  * skill is runnable, breaks against this.
  */
 const MOCK_TURN_INPUT_TOKENS = 10
+const MOCK_CONTEXT_WINDOW = 200_000
+const MOCK_SYSTEM_TOKENS = 4_000
 
 const MOCK_COMMAND_CATALOG: ProviderCommandCatalogResult = {
   agents: [{ description: 'Reviews a diff before it lands', model: null, name: 'reviewer' }],
@@ -363,6 +365,27 @@ export class MockProviderAdapter implements ProviderAdapter {
       sessionId: input.sessionId,
       turnId: input.turnId,
       type: 'usage.totals',
+    })
+    const messageTokens = turns * (MOCK_TURN_INPUT_TOKENS + this.responseText.length)
+    this.events.publish({
+      createdAt: new Date().toISOString(),
+      eventId: `mock-context-usage:${input.turnId}`,
+      payload: {
+        usage: {
+          maxTokens: MOCK_CONTEXT_WINDOW,
+          segments: [
+            { kind: 'used', name: 'System prompt', tokens: MOCK_SYSTEM_TOKENS },
+            { kind: 'used', name: 'Messages', tokens: messageTokens },
+          ],
+          usedTokens: MOCK_SYSTEM_TOKENS + messageTokens,
+        },
+      },
+      provider: this.driverKind,
+      providerInstanceId: input.providerInstanceId,
+      runtimeEpoch: input.runtimeEpoch,
+      sessionId: input.sessionId,
+      turnId: input.turnId,
+      type: 'conversation.token-usage.updated',
     })
   }
 
