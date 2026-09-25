@@ -72,6 +72,7 @@
     "lsp.semanticTokens.enabled",
     "lsp.semanticTokens.servers",
     "lsp.servers",
+    "models.favorites",
     "models.hidden",
     "models.order",
     "providers.instances",

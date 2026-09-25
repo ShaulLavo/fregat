@@ -348,6 +348,22 @@ describe('settings operation reducer', () => {
     expect(visible.raw['models.hidden']).toEqual([MODEL_B])
   })
 
+  it('stars and unstars a favorite model at the end of the list', () => {
+    const starred = applyIdempotently(
+      { 'models.favorites': [MODEL_A] },
+      { kind: 'model.setFavorite', ref: MODEL_B, favorite: true },
+    )
+    expect(starred.raw['models.favorites']).toEqual([MODEL_A, MODEL_B])
+    expect(starred.touchedSettingIds).toEqual(['models.favorites'])
+
+    const unstarred = applyIdempotently(starred.raw, {
+      kind: 'model.setFavorite',
+      ref: MODEL_A,
+      favorite: false,
+    })
+    expect(unstarred.raw['models.favorites']).toEqual([MODEL_B])
+  })
+
   it('replaces model order atomically and resets an empty order', () => {
     const ordered = applyIdempotently(
       { 'models.order': [MODEL_B], untouched: true },

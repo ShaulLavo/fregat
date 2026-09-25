@@ -10,7 +10,6 @@ import {
   providerModelOptions,
 } from '@workspace/client-core/chat/providers/models'
 
-import { toggledFavorite } from '../utils/favorites'
 import { withMovedModel } from '../utils/patch'
 
 const ref = (model: string) => ({ model, providerInstanceId: 'codex' }) as never
@@ -193,13 +192,6 @@ describe('favorite models', () => {
         key: 'codex:gpt-4',
       }),
     ])
-  })
-
-  it('stars a model last and unstars it in place', () => {
-    const starred = toggledFavorite([codexRef('gpt-5')], claudeRef('opus'), true)
-
-    expect(starred).toEqual([codexRef('gpt-5'), claudeRef('opus')])
-    expect(toggledFavorite(starred, codexRef('gpt-5'), false)).toEqual([claudeRef('opus')])
   })
 
   it('marks favorite rows and keeps a row for a favorite the catalogue dropped', () => {

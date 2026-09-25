@@ -263,11 +263,10 @@
   "apps/server/src/provider/adapters/codex.ts": {
     "agentThreadId": 1,
     "CodexThreadTokenUsageUpdatedNotificationSchema": 3,
-    "find_thread_path_by_id_str_in_subdir": 1,
     "notificationThreadId": 11,
     "providerThreadId": 19,
     "rootThreadId": 1,
-    "thread": 10,
+    "thread": 9,
     "thread.cwd": 1,
     "thread.id": 2,
     "thread/compacted": 2,

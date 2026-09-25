@@ -8,8 +8,6 @@ import type { ModelRef } from '@workspace/contracts'
 import type { ModelPreferenceRow } from '@workspace/client-core/chat/providers/preferences'
 
 import { useSettingsActions } from '@/features/settings/hooks/use-settings-actions'
-import { toggledFavorite } from '@/features/settings/utils/favorites'
-import { useSettingValue } from '@/hooks/use-setting-value'
 
 export function ModelRow({
   canMoveDown,
@@ -23,8 +21,7 @@ export function ModelRow({
   displayed: readonly ModelRef[]
   row: ModelPreferenceRow
 }) {
-  const { moveModel, setModelHidden, setSetting } = useSettingsActions()
-  const favorites = useSettingValue('models.favorites')
+  const { moveModel, setModelFavorite, setModelHidden } = useSettingsActions()
   const favoriteLabel = row.favorite
     ? `Remove ${row.label} from favorites`
     : `Add ${row.label} to favorites`
@@ -50,9 +47,7 @@ export function ModelRow({
               <Button
                 aria-label={favoriteLabel}
                 aria-pressed={row.favorite}
-                onClick={() =>
-                  setSetting('models.favorites', toggledFavorite(favorites, row.ref, !row.favorite))
-                }
+                onClick={() => setModelFavorite(row.ref, !row.favorite)}
                 size='icon-sm'
                 variant='ghost'
               >

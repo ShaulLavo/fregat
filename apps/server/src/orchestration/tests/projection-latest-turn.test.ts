@@ -316,7 +316,6 @@ describe('projection latest turn snapshots', () => {
     expect(turn).toEqual({
       assistantMessageId: null,
       completedAt: null,
-      endReason: null,
       requestedAt: turn?.requestedAt,
       startedAt: null,
       state: 'running',

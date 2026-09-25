@@ -132,6 +132,7 @@ function operationSettingIds(value: unknown): SettingId[] {
     return ['keybindings.overrides']
   }
   if (value.kind === 'model.setHidden') return ['models.hidden']
+  if (value.kind === 'model.setFavorite') return ['models.favorites']
   if (value.kind === 'model.setOrder') return ['models.order']
   if (value.kind === 'provider.setEnabled') return ['providers.instances']
 
@@ -144,7 +145,9 @@ function operationAffectedDomainIds(value: unknown): string[] {
     const command = safeDomainPart(value.command)
     return command ? [`command:${command}`] : []
   }
-  if (value.kind === 'model.setHidden') return modelDomainIds([value.ref])
+  if (value.kind === 'model.setHidden' || value.kind === 'model.setFavorite') {
+    return modelDomainIds([value.ref])
+  }
   if (value.kind === 'model.setOrder' && Array.isArray(value.order)) {
     return modelDomainIds(value.order)
   }

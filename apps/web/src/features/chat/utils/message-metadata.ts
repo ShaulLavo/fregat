@@ -3,7 +3,7 @@ import type { OrchestrationLatestTurn, OrchestrationMessage, TurnId } from '@wor
 import type { OptimisticChatMessage } from '@/features/chat/state/chat-message-intents'
 import { chatActiveResponseTurnIds } from '@/features/chat/utils/active-response'
 import { formatChatElapsed } from '@/features/chat/utils/formatters'
-import { turnStoppedShort } from '@/features/chat/utils/turn-end-label'
+import { stoppedTurnLabel, turnStoppedShort } from '@/features/chat/utils/turn-end-label'
 
 export type ChatTimelineMessage = OrchestrationMessage | OptimisticChatMessage
 
@@ -231,8 +231,6 @@ function formatCompletionSummary(turn: OrchestrationLatestTurn) {
   if (!turn.completedAt) return null
   const elapsed = formatChatElapsed(turn.startedAt ?? turn.requestedAt, turn.completedAt)
   if (!elapsed) return null
-  if (turn.state === 'interrupted') return `You stopped after ${elapsed}`
-  if (turn.state === 'error') return `Failed after ${elapsed}`
 
-  return `Worked for ${elapsed}`
+  return stoppedTurnLabel(turn, elapsed) ?? `Worked for ${elapsed}`
 }

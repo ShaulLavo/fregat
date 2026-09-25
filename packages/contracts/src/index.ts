@@ -523,6 +523,7 @@ export {
   type ScalarSettingOperation,
   type SetKeybindingOperation,
   type SetModelHiddenOperation,
+  type SetModelFavoriteOperation,
   type SetModelOrderOperation,
   type SetProviderEnabledOperation,
   type SettingsEvent,
