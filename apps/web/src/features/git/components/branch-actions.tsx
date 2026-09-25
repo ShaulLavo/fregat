@@ -11,12 +11,13 @@ import { usePullRequestState } from '@/features/git/hooks/use-pull-request-state
 import { usePushRemoteMutation } from '../hooks/use-push-remote-mutation'
 import { Button, buttonVariants } from '@workspace/ui/components/button'
 import { cn } from '@workspace/ui/lib/utils'
+import { changeRequestLabel } from '@/features/git/utils/forge-terms'
 
 /**
  * Publish, push and open-a-pull-request, in the header where the branch already
  * is. Everything here is conditional on what the branch actually needs: a branch
  * with nothing to push shows no push button, and Create is offered only when we
- * were able to ask GitHub and it said there is none.
+ * were able to ask the forge and it said there is none.
  */
 export function BranchActions({
   pullRequestTitle,
@@ -28,7 +29,7 @@ export function BranchActions({
 }) {
   const { data: state } = useBranchRemoteState(rootPath)
   // Its own query, and never awaited by the rest: reading a pull request shells
-  // out to `gh`, and Publish must not wait on GitHub to appear.
+  // out to the forge CLI, and Publish must not wait on the network to appear.
   const { data: pullRequestState } = usePullRequestState(rootPath)
   const push = usePushRemoteMutation(rootPath)
   const createPullRequest = useCreatePullRequestMutation(rootPath)
@@ -77,7 +78,7 @@ export function BranchActions({
           onClick={() => createPullRequest.mutate({ title: pullRequestTitle })}
         >
           <GitPullRequestIcon className='size-(--icon-size-sm)' />
-          Pull request
+          {changeRequestLabel(pullRequestState?.forge)}
         </Button>
       ) : null}
     </span>
@@ -96,7 +97,7 @@ function pushLabel(state: GitBranchRemoteState) {
 }
 
 /**
- * Only when GitHub actually answered. `support` short of `ready` means we could
+ * Only when the forge actually answered. `support` short of `ready` means we could
  * not ask, and offering Create then is how someone ends up trying to open a
  * second pull request for a branch that already has one.
  */

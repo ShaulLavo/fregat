@@ -120,3 +120,36 @@ manual settle, including unpin and unsnooze, so provider release follows unchang
 - `scenario session-auto-settle` (fake forge reports the worktree's pull request merged): the rail
   moves the session to Settled, settled at its creation time:
   `/work/tmp/fregat-evidence/20260925T120806Z-scenario-session-auto-settle/`.
+
+## EXT-01: five forges
+
+`apps/server/src/git/forges/` holds one provider per upstream forge behind `ForgeProvider`
+(support, newest pull request per branch, create), and a registry that picks the forge for a
+checkout the way upstream does: `origin` first, then the first remote with a known host, then the
+first remote. Host detection is upstream's precedence (Forgejo labels and codeberg.org, GitHub,
+GitLab, Azure DevOps, Bitbucket). An unknown host is a self-hosted GitLab when `glab auth status
+--hostname` accepts it, or a Forgejo when a `tea` login names it. The pull request state now
+carries `forge`, and "no forge" replaces "no GitHub remote".
+
+| Forge           | Boundary                                         | Lookup                                                          | Create                                            |
+| --------------- | ------------------------------------------------ | --------------------------------------------------------------- | ------------------------------------------------- |
+| GitHub          | `gh` (`--hostname` / `GH_HOST` when self-hosted) | `pr list` for the header, one GraphQL request for many branches | `pr create` (draft)                               |
+| GitLab          | `glab`                                           | `mr list --source-branch` per branch                            | `mr create --yes` (target, draft)                 |
+| Forgejo / Gitea | `tea` login for the host + `tea api`             | recent pulls, filtered by head branch                           | `POST pulls`, base defaulting to the repository's |
+| Azure DevOps    | `az repos` with `--detect true`                  | `pr list --source-branch` per branch                            | `pr create` (target, draft)                       |
+| Bitbucket Cloud | REST 2.0                                         | `pullrequests?q=source.branch.name` per branch                  | `POST pullrequests` (destination, draft)          |
+
+Differences from upstream, each a local rule: Bitbucket authenticates with the credential git
+already stores for bitbucket.org (`git credential fill`, never prompting) instead of new
+environment variables, because a token may not live in an env var or in settings here. Forgejo
+goes through `tea` (upstream's fallback) and not `fj`. Bitbucket Data Center has a different API and
+reads as no forge. The web labels GitLab's button "Merge request".
+
+- `apps/server/src/git/tests/forges.test.ts` (34 cases): detection per host and precedence; GitHub
+  absence, existing, create after absence, seven failure kinds with no create, missing vs signed-out
+  CLI, batched GraphQL, self-hosted host; GitLab list/create and self-hosted recognition; Forgejo
+  login matching, filtering and create body; Azure list/URL and signed-out; Bitbucket credential,
+  query and refusal; unknown host.
+- `scenario git-merge-request` (fake `glab` on the server's PATH): the header offers Merge request
+  on a gitlab.com checkout, and creating it shows `#5`:
+  `/work/tmp/fregat-evidence/20260925T130215Z-scenario-git-merge-request/`.

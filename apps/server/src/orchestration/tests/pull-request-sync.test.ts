@@ -112,13 +112,13 @@ test('a merged pull request is final and an unsupported forge says so', async ()
   expect(await pullRequestOf(fixture)).toMatchObject({ status: 'found', state: 'merged' })
 
   const offline = await worktreeLifecycleFixture({
-    pullRequestLookup: async () => ({ kind: 'unsupported', support: 'no-github-remote' }),
+    pullRequestLookup: async () => ({ kind: 'unsupported', support: 'no-forge' }),
   })
   fixtures.push(offline)
   await offline.create()
   await offline.engine.syncPullRequests()
   expect(await pullRequestOf(offline)).toEqual({
     status: 'unsupported',
-    support: 'no-github-remote',
+    support: 'no-forge',
   })
 })

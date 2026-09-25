@@ -256,6 +256,19 @@ export type GitPullRequestState = {
   branch: string | null
   pullRequest: GitPullRequest | null
   support: GitPullRequestSupport
+  /** The hosting service the remote points at; null when no remote names a known one. */
+  forge: GitForge | null
+}
+
+/** Hosting services with pull (merge) requests, as upstream T3 Code registers them. */
+export const GIT_FORGE_KINDS = ['github', 'gitlab', 'forgejo', 'azure-devops', 'bitbucket'] as const
+export type GitForgeKind = (typeof GIT_FORGE_KINDS)[number]
+
+export type GitForge = {
+  kind: GitForgeKind
+  /** "GitHub", "GitLab Self-Hosted", … */
+  name: string
+  host: string
 }
 
 /**
@@ -264,12 +277,12 @@ export type GitPullRequestState = {
  */
 export type GitPullRequestSupport =
   | 'ready'
-  /** `gh` is not on PATH. */
+  /** The forge's CLI (`gh`, `glab`, `tea`, `az`) is not on PATH. */
   | 'cli-missing'
-  /** `gh` is installed but nobody has signed in. */
+  /** The CLI is installed, or the API reachable, but nobody has signed in. */
   | 'unauthenticated'
-  /** No GitHub remote, so there is nothing for `gh` to talk to. */
-  | 'no-github-remote'
+  /** No remote points at a known forge, so there is nothing to ask. */
+  | 'no-forge'
 
 export type GitPullRequest = {
   /** Merge or close time, when the lookup asked for it. */

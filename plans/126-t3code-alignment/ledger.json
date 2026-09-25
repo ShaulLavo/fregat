@@ -515,10 +515,14 @@
       "title": "Match source-control provider capabilities",
       "report": "adjacent.md",
       "wave": "5",
-      "status": "open",
-      "evidence_level": "source-reviewed",
+      "status": "verified",
+      "evidence_level": "implementation; boundary-tests-for-every-forge and browser-verified (GitLab)",
       "acceptance": "adjacent.md, EXT-01, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "repository-delivery.md",
+        "apps/server/src/git/tests/forges.test.ts",
+        "/work/tmp/fregat-evidence/20260925T130215Z-scenario-git-merge-request/"
+      ]
     },
     {
       "id": "EXT-02",
