@@ -270,6 +270,12 @@ export {
   type ProviderUpdateResult,
 } from './provider'
 export {
+  providerResetCreditOutcomeSchema,
+  providerResetCreditBodySchema,
+  providerResetCreditResultSchema,
+  type ProviderResetCreditOutcome,
+  type ProviderResetCreditBody,
+  type ProviderResetCreditResult,
   USAGE_HISTORY_DAYS,
   providerAccountUsageSchema,
   providerUsageHistoryQuerySchema,

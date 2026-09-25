@@ -23,6 +23,7 @@ export const CODEX_CLIENT_REQUEST_METHODS = {
   'config/mcpServer/reload': 'config/mcpServer/reload',
   'mcpServerStatus/list': 'mcpServerStatus/list',
   'account/rateLimits/read': 'account/rateLimits/read',
+  'account/rateLimitResetCredit/consume': 'account/rateLimitResetCredit/consume',
   'account/read': 'account/read',
 } as const
 
@@ -107,6 +108,7 @@ export interface CodexClientRequestParamsByMethod {
   readonly 'config/mcpServer/reload': CodexSchema.V2NoParams
   readonly 'mcpServerStatus/list': CodexSchema.V2ListMcpServerStatusParams
   readonly 'account/rateLimits/read': CodexSchema.V2NullableGetAccountRateLimitsParams | undefined
+  readonly 'account/rateLimitResetCredit/consume': CodexSchema.V2ConsumeAccountRateLimitResetCreditParams
   readonly 'account/read': CodexSchema.V2GetAccountParams
 }
 
@@ -129,6 +131,7 @@ export interface CodexClientRequestResultByMethod {
   readonly 'config/mcpServer/reload': CodexSchema.V2McpServerRefreshResponse
   readonly 'mcpServerStatus/list': CodexSchema.V2ListMcpServerStatusResponse
   readonly 'account/rateLimits/read': CodexSchema.V2GetAccountRateLimitsResponse
+  readonly 'account/rateLimitResetCredit/consume': CodexSchema.V2ConsumeAccountRateLimitResetCreditResponse
   readonly 'account/read': CodexSchema.V2GetAccountResponse
 }
 
@@ -210,6 +213,8 @@ export const CODEX_CLIENT_REQUEST_PARAMS = {
   'config/mcpServer/reload': CodexSchema.CodexNoParamsSchema,
   'mcpServerStatus/list': CodexSchema.CodexListMcpServerStatusParamsSchema,
   'account/rateLimits/read': v.optional(CodexSchema.CodexNullableGetAccountRateLimitsParamsSchema),
+  'account/rateLimitResetCredit/consume':
+    CodexSchema.CodexConsumeAccountRateLimitResetCreditParamsSchema,
   'account/read': CodexSchema.CodexGetAccountParamsSchema,
 } as const
 
@@ -232,6 +237,8 @@ export const CODEX_CLIENT_REQUEST_RESULTS = {
   'config/mcpServer/reload': CodexSchema.CodexMcpServerRefreshResponseSchema,
   'mcpServerStatus/list': CodexSchema.CodexListMcpServerStatusResponseSchema,
   'account/rateLimits/read': CodexSchema.CodexGetAccountRateLimitsResponseSchema,
+  'account/rateLimitResetCredit/consume':
+    CodexSchema.CodexConsumeAccountRateLimitResetCreditResponseSchema,
   'account/read': CodexSchema.CodexGetAccountResponseSchema,
 } as const
 

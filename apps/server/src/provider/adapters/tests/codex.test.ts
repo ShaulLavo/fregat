@@ -314,7 +314,21 @@ function handle(message) {
     return;
   }
   if (message.method === 'account/read') {
-    send({ id: message.id, result: { account: { type: 'apiKey' }, requiresOpenaiAuth: false } });
+    const account = mode?.startsWith('reset-credit') ? { type: 'chatgpt', email: 'fixture@example.test', planType: 'pro' } : { type: 'apiKey' };
+    send({ id: message.id, result: { account, requiresOpenaiAuth: false } });
+    return;
+  }
+  if (message.method === 'account/rateLimits/read') {
+    send({ id: message.id, result: {
+      accountId: mode === 'reset-credit-other-account' ? 'fixture-account-b' : 'fixture-account-a',
+      rateLimits: { planType: 'pro' },
+      rateLimitResetCredits: { availableCount: 1, credits: [{ id: 'fixture-credit', resetType: 'codexRateLimits', status: 'available', grantedAt: 0 }] },
+    } });
+    return;
+  }
+  if (message.method === 'account/rateLimitResetCredit/consume') {
+    record({ event: message.method, params: message.params });
+    send({ id: message.id, result: { outcome: 'alreadyRedeemed' } });
     return;
   }
   if (message.method === 'model/list') {
@@ -809,6 +823,7 @@ type FakeCodexLogEntry = {
   readonly params?: Record<string, unknown>
   readonly cwds?: readonly string[] | null
   readonly event:
+    | 'account/rateLimitResetCredit/consume'
     | 'skills/list'
     | 'spawn'
     | 'turn/start'
@@ -837,6 +852,76 @@ type EchoedModeParams = {
 }
 
 describe('CodexProviderAdapter', () => {
+  it('passes the stable reset-credit key through the native boundary fixture', async () => {
+    await withFakeCodex(
+      async ({ spawnLogPath }) => {
+        const adapter = new CodexProviderAdapter()
+        const usage = await adapter.readUsage()
+        assert(usage.kind === 'reading' && usage.resetCredits)
+        expect(
+          await adapter.consumeResetCredit({
+            idempotencyKey: 'fixture-reset-key',
+            accountKey: usage.resetCredits.accountKey,
+            creditId: 'fixture-credit',
+          }),
+        ).toBe('alreadyRedeemed')
+        expect(
+          (await readFakeCodexLog(spawnLogPath)).filter(
+            (entry) => entry.event === 'account/rateLimitResetCredit/consume',
+          ),
+        ).toEqual([
+          {
+            event: 'account/rateLimitResetCredit/consume',
+            params: { idempotencyKey: 'fixture-reset-key', creditId: 'fixture-credit' },
+          },
+        ])
+      },
+      { mode: 'reset-credit' },
+    )
+  })
+
+  it('refuses a native account switch before reset credit consumption', async () => {
+    await withFakeCodex(
+      async ({ spawnLogPath }) => {
+        const adapter = new CodexProviderAdapter()
+        const before = await adapter.readUsage()
+        assert(before.kind === 'reading' && before.resetCredits)
+        process.env.PLATFORM_FAKE_CODEX_MODE = 'reset-credit-other-account'
+        await expect(
+          adapter.consumeResetCredit({
+            idempotencyKey: 'fixture-reset-key',
+            accountKey: before.resetCredits.accountKey,
+            creditId: 'fixture-credit',
+          }),
+        ).rejects.toThrow('account changed')
+        expect(
+          (await readFakeCodexLog(spawnLogPath)).filter(
+            (entry) => entry.event === 'account/rateLimitResetCredit/consume',
+          ),
+        ).toEqual([])
+      },
+      { mode: 'reset-credit' },
+    )
+  })
+
+  it('does not consume reset credits for an API-key account', async () => {
+    await withFakeCodex(async ({ spawnLogPath }) => {
+      const adapter = new CodexProviderAdapter()
+      await expect(
+        adapter.consumeResetCredit({
+          idempotencyKey: 'fixture-reset-key',
+          accountKey: 'unavailable',
+          creditId: 'fixture-credit',
+        }),
+      ).rejects.toThrow('signed-in Codex account')
+      expect(
+        (await readFakeCodexLog(spawnLogPath)).filter(
+          (entry) => entry.event === 'account/rateLimitResetCredit/consume',
+        ),
+      ).toEqual([])
+    })
+  })
+
   it('rejects malformed imported conversation text', () => {
     expect(
       v.safeParse(codexHistoryResponseSchema, {

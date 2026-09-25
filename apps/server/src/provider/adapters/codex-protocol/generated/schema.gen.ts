@@ -298,6 +298,39 @@ export type CodexConfigWarningNotification = v.InferOutput<
 
 export type V2ConfigWarningNotification = v.InferOutput<typeof CodexConfigWarningNotificationSchema>
 
+export const CodexConsumeAccountRateLimitResetCreditParamsSchema = v.looseObject({
+  creditId: v.optional(v.union([v.string(), v.null()])),
+  idempotencyKey: v.string(),
+})
+export type CodexConsumeAccountRateLimitResetCreditParams = v.InferOutput<
+  typeof CodexConsumeAccountRateLimitResetCreditParamsSchema
+>
+
+export type V2ConsumeAccountRateLimitResetCreditParams = v.InferOutput<
+  typeof CodexConsumeAccountRateLimitResetCreditParamsSchema
+>
+
+export const CodexConsumeAccountRateLimitResetCreditOutcomeSchema = openEnum([
+  'reset',
+  'nothingToReset',
+  'noCredit',
+  'alreadyRedeemed',
+])
+export type CodexConsumeAccountRateLimitResetCreditOutcome = v.InferOutput<
+  typeof CodexConsumeAccountRateLimitResetCreditOutcomeSchema
+>
+
+export const CodexConsumeAccountRateLimitResetCreditResponseSchema = v.looseObject({
+  outcome: CodexConsumeAccountRateLimitResetCreditOutcomeSchema,
+})
+export type CodexConsumeAccountRateLimitResetCreditResponse = v.InferOutput<
+  typeof CodexConsumeAccountRateLimitResetCreditResponseSchema
+>
+
+export type V2ConsumeAccountRateLimitResetCreditResponse = v.InferOutput<
+  typeof CodexConsumeAccountRateLimitResetCreditResponseSchema
+>
+
 export const CodexContextCompactedNotificationSchema = v.looseObject({
   threadId: v.string(),
   turnId: v.string(),

@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto'
+import { providerResetCreditOutcomeSchema } from '@workspace/contracts'
 import path from 'node:path'
 import { defaultAttachmentsDir } from '../../attachments/store'
 import { resolveCodexAttachments } from './utils/codex-attachments'
@@ -282,6 +284,31 @@ export class CodexProviderAdapter
       if (normalizeWorkspaceCwd(thread.cwd) !== normalizeWorkspaceCwd(request.cwd)) return []
 
       return codexRolloutUsage(await readJsonLines(thread.path, isCodexUsageLine))
+    })
+  }
+
+  async consumeResetCredit(input: {
+    idempotencyKey: string
+    accountKey: string
+    creditId: string
+  }) {
+    return inspectCodexHistory(this.env, async (client) => {
+      const { account } = await client.request('account/read', {}, PROVIDER_PROBE_TIMEOUT_MS)
+      if (account?.type !== 'chatgpt')
+        throw createInternalError('Reset credits require a signed-in Codex account.')
+      const usage = await client.request(
+        'account/rateLimits/read',
+        undefined,
+        CODEX_USAGE_TIMEOUT_MS,
+      )
+      if (!usage.accountId || codexResetAccountKey(usage.accountId) !== input.accountKey)
+        throw createInternalError('The signed-in Codex account changed before the reset.')
+      const response = await client.request(
+        'account/rateLimitResetCredit/consume',
+        { idempotencyKey: input.idempotencyKey, creditId: input.creditId },
+        CODEX_USAGE_TIMEOUT_MS,
+      )
+      return v.parse(providerResetCreditOutcomeSchema, response.outcome)
     })
   }
 
@@ -2536,7 +2563,11 @@ async function readCodexUsage(client: CodexAppServerRpcClient): Promise<Provider
   )
   const snapshot = response.rateLimitsByLimitId?.codex ?? response.rateLimits
 
-  return { kind: 'reading', update: codexUsageUpdate(snapshot) }
+  return {
+    kind: 'reading',
+    update: codexUsageUpdate(snapshot),
+    resetCredits: codexResetCredits(response),
+  }
 }
 
 async function inspectCodexHistory<T>(
@@ -3505,5 +3536,21 @@ function realtimePayload(method: string, params: unknown) {
       return { reason: stringField(record, 'reason') ?? undefined }
     default:
       return { message: stringField(record, 'message') ?? 'Realtime error' }
+  }
+}
+
+function codexResetAccountKey(accountId: string) {
+  return createHash('sha256').update(`codex-reset\0${accountId}`).digest('hex')
+}
+
+function codexResetCredits(response: CodexClientRequestResultByMethod['account/rateLimits/read']) {
+  const credit = response.rateLimitResetCredits?.credits?.find(
+    (entry) => entry.status === 'available',
+  )
+  if (!response.accountId) return null
+  return {
+    accountKey: codexResetAccountKey(response.accountId),
+    creditId: credit?.id ?? null,
+    available: Math.max(0, response.rateLimitResetCredits?.availableCount ?? 0),
   }
 }

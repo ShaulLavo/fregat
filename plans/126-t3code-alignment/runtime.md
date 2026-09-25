@@ -135,15 +135,15 @@ Upstream paths shortened to `provider/…` or `orchestration/…` in tables mean
 ### RUNTIME-08 — Publish account usage limits and wire reset-credit redemption
 
 - Decided 2026-09-25: owner — build with boundary fixtures only. Nothing is spent until the owner does one live redemption.
-- **Status / priority / confidence:** Confirmed partial implementation; P2; HIGH.
-- **Evidence:** Upstream `apps/server/src/provider/Drivers/CodexDriver.ts:285-328` serializes redemption per account with an idempotency key and refresh verification; `apps/server/src/ws.ts:2390-2411` exposes it with enabled-instance/capability checks; `apps/web/src/components/usage/UsageLimits.tsx:209` invokes it. Local `apps/server/src/provider/adapters/codex.ts:1355` and `claude.ts:844` emit rate-limit events, but `packages/contracts/src/provider.ts:105-131` has no usage-window/reset-credit snapshot or action. `apps/web/src/features/chat/utils/activity-visibility.ts:9` hides the raw rate event.
-- **Impact:** Native rate telemetry does not provide upstream account-level usage windows or a usable reset-credit action.
+- **Status / priority / confidence:** Fixture implementation complete; owner live redemption pending; P2; HIGH.
+- **Evidence:** `provider/reset-credits.ts` persists account-scoped attempts in migration 38; `provider/adapters/codex.ts` rechecks native account identity and consumes the selected credit with the durable key. `features/chat/components/reset-credit-action.tsx` confirms the action and the mutation settles the usage cache.
+- **Impact:** Codex account usage now includes a confirmed reset-credit action; ambiguous outcomes remain retryable with the same native attempt.
 - **Effort / risk:** L; HIGH for a command that spends an account resource.
 - **Implementation boundary:** Provider usage snapshot/refresh and account-keyed redemption service → contracts/route/mutation → interaction usage UI. Preserve account identity distinct from instance ID: instances sharing a credential home must share redemption serialization and pending idempotency. Do not put credentials into snapshots or logs.
 - **Dependencies:** Interaction usage surfaces; provider instance identity already exists.
 - **Acceptance / tests:** Account windows update after provider events and explicit refresh. Two instances for one account cannot consume twice concurrently; retry reuses the unresolved idempotency key. Disabled/unsupported instance cannot redeem. Refresh failure does not claim confirmed new limits. Use third-party/native boundary fixtures; no real credit consumption during automated verification.
 - **Related plan:** Plan 141 (usage and rate limits) implements the quota surfaces and the usage page (EXT-17). This group keeps the upstream acceptance cases.
-- **Bounded search:** `usageLimits`, `consumeResetCredit`, `rateLimitReset`, `rateLimits` across local provider/contracts/chat-mode/client-core; only event emission/normalization exists, not the action/snapshot workflow.
+- **Verification:** Boundary fixtures cover account switches, cross-home concurrency, timeout/restart, persisted credit selection, malformed timestamps and equivalent-instant replay. The HTTP route and confirmation UI are exercised without live credit consumption.
 
 ### RUNTIME-09 — Match response delivery modes and paragraph default
 

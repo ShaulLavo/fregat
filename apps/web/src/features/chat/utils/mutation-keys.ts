@@ -1,6 +1,7 @@
 import type { ProviderInstanceId } from '@workspace/contracts'
 
 export const chatMutationKeys = {
+  resetCredit: (accountKey: string) => ['chat', 'reset-credit', accountKey] as const,
   composer: (environmentId: string, sessionId: string | null) =>
     ['chat', 'composer', environmentId, sessionId] as const,
   stop: (environmentId: string, sessionId: string | null) =>

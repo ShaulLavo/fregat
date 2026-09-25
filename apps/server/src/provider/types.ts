@@ -587,6 +587,11 @@ export type ProviderAdapter = {
    * One full read of the account's plan windows, outside any turn. Throws when the
    * provider could not answer; the usage store keeps what it had.
    */
+  consumeResetCredit?: (input: {
+    idempotencyKey: string
+    accountKey: string
+    creditId: string
+  }) => Promise<import('@workspace/contracts').ProviderResetCreditOutcome>
   readUsage?: () => Promise<ProviderUsageProbe>
   hasRuntime: (input: { sessionId: SessionId }) => Promise<boolean>
   interruptTurn: (input: ProviderTurnControlInput) => Promise<void>

@@ -35,6 +35,7 @@ const CLIENT_REQUEST_METHODS = [
   'initialize',
   'account/read',
   'account/rateLimits/read',
+  'account/rateLimitResetCredit/consume',
   'model/list',
   'thread/start',
   'thread/resume',

@@ -264,7 +264,7 @@ Scenario `claude-usage-import` imports a fixture instance's transcript and reads
 2 turns and $0.0070 on the usage page. Gaps: Codex child-agent rollouts are separate files and
 are not read, and a session imported before this build gets its usage when its history next changes.
 
-### Phase 5: Reset credits (gated)
+### Phase 5: Reset credits (fixture implementation; owner live check pending)
 
 The RUNTIME-08 action: account-keyed serialization and an idempotency key, as a TanStack mutation
 with a `scope`. Automated tests use boundary fixtures; nothing consumes a real credit.
@@ -272,6 +272,18 @@ with a `scope`. Automated tests use boundary fixtures; nothing consumes a real c
 Decided 2026-09-25: owner — build it with boundary fixtures only, behind a confirm step. Nothing is
 spent until the owner does the one live redemption by hand; that live run is the owner's check, not
 an agent's. Same decision for Plan 126 RUNTIME-08.
+
+Implemented for Codex: the usage meter opens an explicit confirmation, then a scoped TanStack
+mutation settles the usage cache with the refreshed result. The server serializes by a hash of
+Codex's native account ID, checks that identity again at the native boundary, and persists the
+selected credit ID plus native idempotency key in migration 38. An ambiguous timeout retains both
+across restart and across credential homes. Malformed confirmation timestamps are rejected;
+equivalent timezone representations replay the settled result. Unsupported providers expose no action.
+
+Boundary fixtures cover concurrency, account switches, timeout/restart, different credential homes,
+changed advertised credits, refresh failure, and confirmation replay. The real HTTP route is covered
+through the confirmation UI; Chromium covers cancel, confirm, and pending state. Automated checks
+never call a real credit endpoint. The owner live redemption remains pending.
 
 ## Verification
 

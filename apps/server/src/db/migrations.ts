@@ -34,6 +34,7 @@ export const platformMigrations: readonly Migration[] = [
   { version: 31, name: 'session_fork_and_agent', up: applySessionForkAndAgent },
   { version: 32, name: 'provider_usage_source', up: applyProviderUsageSource },
   { version: 36, name: 'provider_usage_import_requests', up: applyProviderUsageImportRequests },
+  { version: 38, name: 'provider_reset_credit_attempts', up: applyProviderResetCreditAttempts },
 ]
 
 function applyProviderUsageImportRequests(database: PlatformDatabase) {
@@ -599,3 +600,15 @@ const WORKTREE_LIFECYCLE_SCHEMA = [
   `CREATE TABLE projection_terminal_leases (terminal_lease_id TEXT PRIMARY KEY NOT NULL, worktree_id TEXT NOT NULL REFERENCES projection_worktrees(worktree_id), runtime_epoch TEXT NOT NULL, state TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)`,
   `CREATE INDEX projection_terminal_leases_worktree_idx ON projection_terminal_leases(worktree_id)`,
 ]
+
+function applyProviderResetCreditAttempts(database: PlatformDatabase) {
+  database.run(sql`CREATE TABLE provider_reset_credit_attempts (
+    account_key TEXT PRIMARY KEY NOT NULL,
+    credit_id TEXT NOT NULL,
+    idempotency_key TEXT NOT NULL,
+    confirmed_at TEXT NOT NULL,
+    outcome TEXT CHECK (outcome IN ('reset', 'nothingToReset', 'noCredit', 'alreadyRedeemed')),
+    settled_at TEXT,
+    CHECK ((outcome IS NULL) = (settled_at IS NULL))
+  )`)
+}

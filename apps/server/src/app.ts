@@ -74,6 +74,7 @@ import { ProviderPriceCatalog } from './provider/price-catalog'
 import { ProviderMaintenance } from './provider/provider-maintenance'
 import { ProviderUsageRecorder } from './provider/usage-recorder'
 import { ProviderUsageStore } from './provider/usage-store'
+import { ProviderResetCredits } from './provider/reset-credits'
 import { MachineService, type MachineServiceOptions } from './machines/service'
 import { machineRoutes } from './machines/routes'
 import type { TailnetStatusCommand } from './machines/tailnet-hosts'
@@ -239,6 +240,11 @@ export function createApp(options: AppOptions) {
     sessionDirectory: new ProviderSessionDirectory(database),
   })
   const providerUsage = new ProviderUsageStore(providerAdapterRegistry)
+  const providerResetCredits = new ProviderResetCredits(
+    database,
+    providerAdapterRegistry,
+    providerUsage,
+  )
   const providerPrices = new ProviderPriceCatalog(database)
   const providerUsageRecorder = new ProviderUsageRecorder(
     database,
@@ -327,6 +333,7 @@ export function createApp(options: AppOptions) {
     machines,
     providerPrices,
     providerMaintenance,
+    providerResetCredits,
   )
 
   const app = new Elysia({ name: 'platform' })
@@ -413,6 +420,7 @@ export function createApp(options: AppOptions) {
         providerUsage,
         providerUsageHistory,
         providerMaintenance,
+        providerResetCredits,
       ),
     )
     .use(sessionControlRoutes(providerService))
@@ -486,6 +494,7 @@ function appCleanup(
   machines: MachineService,
   providerPrices: ProviderPriceCatalog,
   providerMaintenance: ProviderMaintenance,
+  providerResetCredits: ProviderResetCredits,
 ) {
   let closed = false
 
@@ -506,6 +515,7 @@ function appCleanup(
     await providerService.shutdown()
     providerPrices.close()
     providerMaintenance.close()
+    providerResetCredits.close()
     await fs.close()
     await flushObservability()
   }

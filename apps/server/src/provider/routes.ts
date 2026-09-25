@@ -10,6 +10,8 @@ import {
   providerUsageHistoryQuerySchema,
   providerUsageHistorySchema,
   providerUsageResultSchema,
+  providerResetCreditBodySchema,
+  providerResetCreditResultSchema,
   providerUsageSessionTotalSchema,
   providerUpdateAdvisorySchema,
   providerUpdateResultSchema,
@@ -25,12 +27,13 @@ import {
   recordChatPipelineInfo,
   recordChatPipelineWarning,
 } from '../orchestration/orchestration-logging'
-import { providerErrors } from '../observability/structured-errors'
+import { createInternalError, providerErrors } from '../observability/structured-errors'
 import type { ProviderAdapterRegistry } from './provider-adapter-registry'
 import type { ProviderMaintenance } from './provider-maintenance'
 import type { ProviderAdapter } from './types'
 import type { ProviderUsageHistoryReader } from './usage-history'
 import type { ProviderUsageStore } from './usage-store'
+import type { ProviderResetCredits } from './reset-credits'
 
 /** Every method the provider CLI accepts; the client renders one choice per entry. */
 const SIGN_IN_METHODS = providerSignInMethodSchema.options
@@ -54,12 +57,27 @@ export function providerRoutes(
   usage: ProviderUsageStore,
   history: ProviderUsageHistoryReader,
   maintenance: ProviderMaintenance,
+  resetCredits?: ProviderResetCredits,
 ) {
   return new Elysia({ name: 'provider-routes' })
     .get('/providers', () => adapterRegistry.listProviders(), {
       response: providerListResultSchema,
     })
-    .get('/providers/usage', () => usage.read(), { response: providerUsageResultSchema })
+    .get('/providers/usage', async () => (resetCredits ? resetCredits.readUsage() : usage.read()), {
+      response: providerUsageResultSchema,
+    })
+    .post(
+      '/providers/:providerInstanceId/reset-credit',
+      async ({ params, body }) => {
+        if (!resetCredits) throw createInternalError('Reset credits are unavailable.')
+        return resetCredits.redeem(params.providerInstanceId, body)
+      },
+      {
+        params: instanceParamsSchema,
+        body: providerResetCreditBodySchema,
+        response: providerResetCreditResultSchema,
+      },
+    )
     .get('/providers/usage/history', ({ query }) => history.read(query), {
       query: providerUsageHistoryQuerySchema,
       response: providerUsageHistorySchema,

@@ -636,3 +636,12 @@ export type ProjectionSessionRuntimeRow = typeof projectionSessionRuntime.$infer
 export type ProjectionSessionProposedPlanRow = typeof projectionSessionProposedPlans.$inferSelect
 export type ProjectionSessionCheckpointRow = typeof projectionSessionCheckpoints.$inferSelect
 export type ProviderSessionRuntimeRow = typeof providerSessionRuntime.$inferSelect
+
+export const providerResetCreditAttempts = sqliteTable('provider_reset_credit_attempts', {
+  accountKey: text('account_key').primaryKey(),
+  creditId: text('credit_id').notNull(),
+  idempotencyKey: text('idempotency_key').notNull(),
+  confirmedAt: text('confirmed_at').notNull(),
+  outcome: text('outcome', { enum: ['reset', 'nothingToReset', 'noCredit', 'alreadyRedeemed'] }),
+  settledAt: text('settled_at'),
+})

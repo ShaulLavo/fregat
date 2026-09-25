@@ -36,6 +36,16 @@ export const providerAccountUsageSchema = v.object({
   windows: v.array(providerUsageWindowSchema),
   /** When a reading last confirmed these windows; the client tells old from current by it. */
   checkedAt: isoDateTimeSchema,
+  resetCredits: v.optional(
+    v.nullable(
+      v.object({
+        available: v.pipe(v.number(), v.integer(), v.minValue(0)),
+        accountKey: trimmedNonEmptyStringSchema,
+        creditId: v.nullable(trimmedNonEmptyStringSchema),
+      }),
+    ),
+  ),
+  resetPending: v.optional(v.boolean()),
 })
 
 export const providerUsageResultSchema = v.object({
@@ -170,3 +180,24 @@ export function usageTokenCount(row: {
 }) {
   return row.inputTokens + row.outputTokens + row.cacheReadTokens + row.cacheWriteTokens
 }
+
+export const providerResetCreditOutcomeSchema = v.picklist([
+  'reset',
+  'nothingToReset',
+  'noCredit',
+  'alreadyRedeemed',
+])
+export const providerResetCreditBodySchema = v.object({
+  accountKey: trimmedNonEmptyStringSchema,
+  creditId: trimmedNonEmptyStringSchema,
+  checkedAt: v.pipe(v.string(), v.isoTimestamp()),
+  confirmed: v.literal(true),
+})
+export const providerResetCreditResultSchema = v.object({
+  outcome: providerResetCreditOutcomeSchema,
+  refresh: v.picklist(['confirmed', 'unconfirmed']),
+  usage: providerUsageResultSchema,
+})
+export type ProviderResetCreditOutcome = v.InferOutput<typeof providerResetCreditOutcomeSchema>
+export type ProviderResetCreditBody = v.InferOutput<typeof providerResetCreditBodySchema>
+export type ProviderResetCreditResult = v.InferOutput<typeof providerResetCreditResultSchema>
