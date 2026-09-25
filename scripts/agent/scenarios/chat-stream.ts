@@ -6,7 +6,8 @@ import { isolatedNativeScenario } from './native-provider-verification'
 
 export const chatStream = isolatedNativeScenario({
   name: 'chat-stream',
-  description: 'Expand a running work-log group and stream reasoning beyond the detail height cap.',
+  description:
+    'Expand a running work-log group and stream command output beyond the detail height cap.',
   fixture: new URL('../fixtures/native-codex.mjs', import.meta.url),
   async drive(page, { step, root }) {
     await selectors.chatMessage(page).fill('Stream the work-log fixture.')

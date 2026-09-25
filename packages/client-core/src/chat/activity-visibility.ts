@@ -1,4 +1,8 @@
-import { APPROVAL_ANSWER_SUBMITTED_KIND, TURN_ENDED_ACTIVITY_KIND, type OrchestrationSessionActivity } from '@workspace/contracts'
+import {
+  APPROVAL_ANSWER_SUBMITTED_KIND,
+  TURN_ENDED_ACTIVITY_KIND,
+  type OrchestrationSessionActivity,
+} from '@workspace/contracts'
 import { isRecord } from '@workspace/utils/objects'
 
 const QUIET_ACTIVITY_KINDS = new Set([

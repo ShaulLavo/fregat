@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { nodeErrorCode } from '@workspace/contracts/error-fields'
 import { chmodSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { chmod, open, rename, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -66,14 +67,16 @@ export async function stageAtomicWrite(
   options: StageOptions,
 ) {
   const driver = options.driver ?? nodeDriver
-  let staged = false
+  let created = false
   try {
     await driver.writeFile(temporary, data, { flag: 'wx', mode: options.mode })
+    created = true
     if (options.mode !== undefined) await driver.chmod(temporary, options.mode)
     if (options.durability !== 'rename') await fsyncVia(driver.open, temporary)
-    staged = true
-  } finally {
-    if (!staged) await removeTemporary(driver, temporary)
+  } catch (error) {
+    // An exclusive-create collision belongs to another writer.
+    if (created || nodeErrorCode(error) !== 'EEXIST') await removeTemporary(driver, temporary)
+    throw error
   }
 }
 
@@ -93,15 +96,16 @@ export function writeFileAtomicSync(
   options: Omit<StageOptions, 'driver'>,
 ) {
   const temporary = atomicTemporaryPath(target)
-  let renamed = false
+  let created = false
   try {
     writeFileSync(temporary, data, { flag: 'wx', mode: options.mode })
+    created = true
     if (options.mode !== undefined) chmodSync(temporary, options.mode)
     if (options.durability !== 'rename') fsyncPathSync(temporary)
     renameSync(temporary, target)
-    renamed = true
-  } finally {
-    if (!renamed) rmSync(temporary, { force: true })
+  } catch (error) {
+    if (created || nodeErrorCode(error) !== 'EEXIST') rmSync(temporary, { force: true })
+    throw error
   }
   if (options.durability === 'fsync-all') fsyncPathSync(path.dirname(target))
 }

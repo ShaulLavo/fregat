@@ -19,8 +19,6 @@ export {
   isDirectoryEntry,
   isFileEntry,
   type ServerInfo,
-  type WorkspaceIndexReadiness,
-  type WorkspaceIndexStatus,
 } from '@workspace/contracts'
 
 export type FileResult = Omit<WireFileResult, 'path'> & { readonly path: FilesystemPath }

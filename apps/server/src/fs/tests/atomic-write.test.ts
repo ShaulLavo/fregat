@@ -86,6 +86,40 @@ describe('atomic write', () => {
     expect(await readdir(directory)).toEqual(['occupied'])
   })
 
+  it.each(['stage', 'write'] as const)(
+    '%s preserves a staging path it did not create',
+    async (kind) => {
+      const target = path.join(await temporaryDirectory(), 'file.json')
+      const temporary = atomicTemporaryPath(target)
+      await writeFile(target, 'previous target')
+      await writeFile(temporary, 'another pending write')
+
+      const pending =
+        kind === 'stage'
+          ? stageAtomicWrite(temporary, 'next', { durability: 'fsync-all' })
+          : writeFileAtomic(target, 'next', { durability: 'fsync-all', temporary })
+      await expect(pending).rejects.toMatchObject({ code: 'EEXIST' })
+      expect(await readFile(temporary, 'utf8')).toBe('another pending write')
+      expect(await readFile(target, 'utf8')).toBe('previous target')
+    },
+  )
+
+  it('removes its partial staging file when writing fails', async () => {
+    const target = path.join(await temporaryDirectory(), 'file.json')
+    const temporary = atomicTemporaryPath(target)
+    const failure = Object.assign(new Error('Fixture disk failure'), { code: 'EIO' })
+    const { driver } = recordingDriver(target)
+    driver.writeFile = async (file, _data, options) => {
+      await writeFile(file, 'partial bytes', options)
+      throw failure
+    }
+
+    await expect(
+      stageAtomicWrite(temporary, 'next', { driver, durability: 'fsync-all' }),
+    ).rejects.toBe(failure)
+    expect(await readdir(path.dirname(target))).toEqual([])
+  })
+
   it('leaves the target untouched between stage and commit', async () => {
     const target = path.join(await temporaryDirectory(), 'file.json')
     await writeFile(target, 'previous')

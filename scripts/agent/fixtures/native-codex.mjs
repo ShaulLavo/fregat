@@ -184,10 +184,11 @@ function streamWorkLog(message) {
       exitCode: 0,
       aggregatedOutput: `setup ${index}\n`,
     })
-  const item = { id: 'stream-reasoning', type: 'reasoning' }
+  const item = { id: 'stream-command', type: 'commandExecution', command: 'echo STREAM_START' }
+  emitItem('started', { ...item, status: 'inProgress' })
   send({
-    method: 'item/reasoning/summaryTextDelta',
-    params: { threadId, turnId, itemId: item.id, summaryIndex: 0, delta: 'STREAM_START\n\n' },
+    method: 'item/commandExecution/outputDelta',
+    params: { threadId, turnId, itemId: item.id, delta: 'STREAM_START\n\n' },
   })
   let count = 0
   let output = 'STREAM_START\n\n'
@@ -198,12 +199,12 @@ function streamWorkLog(message) {
     const delta = `stream line ${count} output\n\n`
     output += delta
     send({
-      method: 'item/reasoning/summaryTextDelta',
-      params: { threadId, turnId, itemId: item.id, summaryIndex: 0, delta },
+      method: 'item/commandExecution/outputDelta',
+      params: { threadId, turnId, itemId: item.id, delta },
     })
     if (count <= 100) return
     clearInterval(timer)
-    emitItem('completed', { ...item, summary: [output], content: [] })
+    emitItem('completed', { ...item, status: 'completed', exitCode: 0, aggregatedOutput: output })
     emitItem('completed', {
       id: 'stream-answer',
       type: 'agentMessage',

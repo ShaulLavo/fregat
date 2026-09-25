@@ -30,6 +30,7 @@ import {
   type WorktreeId,
   type OrchestrationWorktreeShell,
   type SessionId,
+  type TurnId,
 } from '@workspace/contracts'
 import { replaceEqualDeep } from '@tanstack/query-core'
 

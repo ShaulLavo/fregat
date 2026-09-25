@@ -126,6 +126,7 @@ test('every whole-tree gate runs in the commit hook, in verify and in CI', () =>
     'bun run design:census',
     'bun run compiler:census',
     'bun run errors:census',
+    'bun run query:check',
   ])
   expect(hook).toContain('bun run gates')
   for (const gate of gates) {
