@@ -12,6 +12,7 @@ import { TerminalModes } from './modes'
 import * as v from 'valibot'
 import {
   terminalOpenInputSchema,
+  TERMINAL_MAX_COLS,
   type TerminalKillInput,
   type TerminalClearInput,
   type TerminalRestartInput,
@@ -73,6 +74,8 @@ async function rejectConnection(connection: TerminalConnection, error: unknown) 
 const DEFAULT_COLS = 80
 const DEFAULT_ROWS = 24
 const TERMINAL_PROCESS_POLL_MS = 1000
+const REPAINT_RESTORE_DELAY_MS = 50
+const REPAINT_COLUMN_DELTA = 1
 const GAP_MESSAGE = new TextEncoder().encode('\r\nOutput lost while the server was down.\r\n')
 
 export class TerminalService {
@@ -90,6 +93,7 @@ export class TerminalService {
   private readonly persistentSessions = new Map<string, TerminalSession>()
   private readonly ptyFactory: TerminalPtyFactory
   private readonly host: TerminalHostClient | null
+  private recovery: Promise<void> | null = null
   private disposed = false
 
   constructor({
@@ -119,6 +123,10 @@ export class TerminalService {
     this.ptyFactory = pty.factory
   }
 
+  hostInfo() {
+    return this.host?.info() ?? null
+  }
+
   /** All sessions currently tracked by the host; null when this process has no host client. */
   listHostSessions(): Promise<readonly HostSessionInfo[] | null> {
     if (!this.host) return Promise.resolve(null)
@@ -133,7 +141,12 @@ export class TerminalService {
    * down. Each host session is either reattached (a matching worktree and adopted lease exist)
    * or killed as an orphan; either way it is handled once.
    */
-  async reattach() {
+  reattach() {
+    this.recovery ??= this.recoverHostSessions()
+    return this.recovery
+  }
+
+  private async recoverHostSessions() {
     if (!this.host) return
     const infos = await this.listHostSessions()
     if (!infos) return
@@ -178,10 +191,14 @@ export class TerminalService {
   }
 
   private async orphan(info: HostSessionInfo, reason: string) {
-    await this.host?.killSession(info.session).catch(() => {})
+    await this.host?.killSession(info.session)
     recordProcessWarning('terminal.host.orphan_killed', {
       area: 'terminal',
       operation: 'reattach',
+      hostPid: this.host?.info()?.pid,
+      cgroup: this.host?.info()?.cgroup,
+      protocol: this.host?.info()?.version,
+      keyCount: 1,
       reason,
       pid: info.pid,
       key: info.key,
@@ -300,8 +317,9 @@ export class TerminalService {
   }
 
   private runExclusive(key: string, operation: () => Promise<void>) {
-    const next = Promise.resolve(this.starts.get(key))
-      .catch(() => {})
+    const previous = this.starts.get(key)
+    const next = Promise.resolve(this.recovery)
+      .then(() => previous?.catch(() => {}))
       .then(operation)
     this.starts.set(key, next)
     return next.finally(() => {
@@ -320,7 +338,7 @@ export class TerminalService {
   /** Detaches every session so its shell keeps running in the host; a user close still kills it. */
   async dispose() {
     this.disposed = true
-    await Promise.allSettled(this.starts.values())
+    await Promise.allSettled([this.recovery, ...this.starts.values()])
     for (const session of this.persistentSessions.values()) session.detachFromHost()
     this.persistentSessions.clear()
     this.host?.close()
@@ -953,9 +971,10 @@ export class TerminalSession {
     if (!this.pty) return
     this.cancelRepaint()
     // Restore after output so a fullscreen program observes both sizes instead of coalescing SIGWINCH.
-    this.repaintTimer = setTimeout(() => this.finishRepaint(), 50)
+    this.repaintTimer = setTimeout(() => this.finishRepaint(), REPAINT_RESTORE_DELAY_MS)
     this.repaintTimer.unref?.()
-    this.resizeForRepaint(this.cols === 500 ? this.cols - 1 : this.cols + 1, this.rows)
+    const delta = this.cols >= TERMINAL_MAX_COLS ? -REPAINT_COLUMN_DELTA : REPAINT_COLUMN_DELTA
+    this.resizeForRepaint(this.cols + delta, this.rows)
   }
 
   private finishRepaint() {

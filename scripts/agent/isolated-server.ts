@@ -1,6 +1,8 @@
 import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import path from 'node:path'
 
+import { stopTerminalHost } from '../../apps/server/src/terminal-host/identity'
+
 import { allowedOriginsForWebPort, isPortAvailable, selectAvailablePort } from '../runtime-network'
 import { linkWallpaperLibrary, productionStateHome } from '../state-home'
 import { createScriptError } from '../structured-errors'
@@ -43,6 +45,7 @@ export async function startIsolatedServer(webOrigin: URL): Promise<IsolatedServe
   const env: Record<string, string | undefined> = {
     ...process.env,
     FS_HOST: '127.0.0.1',
+    FS_METADATA_DB: path.join(home, 'fs-metadata.sqlite'),
     OBSERVABILITY_DIR: logs,
     // Offers the mock provider driver, so a scenario can script a whole turn.
     PLATFORM_AGENT_HARNESS: '1',
@@ -55,7 +58,6 @@ export async function startIsolatedServer(webOrigin: URL): Promise<IsolatedServe
       Number(webOrigin.port),
     ),
   }
-  delete env.FS_METADATA_DB
   const child = Bun.spawn({
     cmd: [process.execPath, 'src/index.ts'],
     cwd: SERVER_ROOT,
@@ -65,7 +67,11 @@ export async function startIsolatedServer(webOrigin: URL): Promise<IsolatedServe
   })
   const origin = `http://localhost:${port}`
   let stopping: Promise<void> | undefined
-  const stop = () => (stopping ??= stopServer(child, directory))
+  const stop = () => {
+    process.off('SIGINT', onSignal)
+    process.off('SIGTERM', onSignal)
+    return (stopping ??= stopServer(child, directory))
+  }
   const onSignal = (signal: NodeJS.Signals) => {
     void stop().finally(() => process.kill(process.pid, signal))
   }
@@ -117,5 +123,6 @@ async function stopServer(child: Bun.Subprocess, directory: string) {
     if (!stopped) child.kill('SIGKILL')
     await child.exited
   }
+  await stopTerminalHost(path.join(directory, 'home'))
   rmSync(directory, { force: true, recursive: true })
 }

@@ -170,6 +170,11 @@ export const hostControlSchema = v.variant('type', [
     pid: v.number(),
     cgroup: v.nullable(v.string()),
     startedAt: v.string(),
+    build: v.object({
+      release: v.nullable(v.string()),
+      commit: v.nullable(v.string()),
+      dirtyFiles: v.nullable(v.number()),
+    }),
   }),
   v.object({
     type: v.literal('refused'),
@@ -185,6 +190,8 @@ export const hostControlSchema = v.variant('type', [
   }),
   v.object({
     type: v.literal('attached'),
+    replayedBytes: offsetSchema,
+    gapBytes: offsetSchema,
     request: requestSchema,
     key: v.string(),
     session: sessionSchema,

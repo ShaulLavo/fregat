@@ -21,6 +21,8 @@ import {
   type HostPaths,
 } from './protocol'
 import { HostSession, type SessionSubscriber } from './session'
+import { processStart } from './identity'
+import { readReleaseInfoSync, releaseFileFor } from '../web/release'
 
 const DEFAULT_IDLE_MS = 30_000
 const SHUTDOWN_GRACE_MS = 2_000
@@ -35,6 +37,7 @@ class TerminalHost {
   private readonly clients = new Set<HostConnection>()
   private readonly startedAt = new Date().toISOString()
   private readonly cgroup = readCgroup()
+  private readonly build = readReleaseInfoSync(releaseFileFor(import.meta.dirname))
   private readonly paths: HostPaths
   private readonly token: Buffer
   private readonly idleMs: number
@@ -79,6 +82,7 @@ class TerminalHost {
       pid: process.pid,
       cgroup: this.cgroup,
       startedAt: this.startedAt,
+      build: this.build,
     }
   }
 
@@ -125,6 +129,7 @@ class TerminalHost {
     }
     connection.send({
       type: 'attached',
+      ...session.replayStats(control.from),
       request: control.request,
       key: session.key,
       session: session.id,
@@ -202,9 +207,13 @@ class TerminalHost {
     const live = [...this.sessions.values()].filter((session) => !session.exit)
     const entries = live.map(({ key, pid, startedAt }) => ({ key, pid, startedAt }))
     const staging = `${this.paths.manifest}.${process.pid}`
-    writeFileSync(staging, `${JSON.stringify({ hostPid: process.pid, sessions: entries })}\n`, {
-      mode: 0o600,
-    })
+    writeFileSync(
+      staging,
+      `${JSON.stringify({ hostPid: process.pid, processStart: processStart(process.pid), sessions: entries })}\n`,
+      {
+        mode: 0o600,
+      },
+    )
     renameSync(staging, this.paths.manifest)
   }
 

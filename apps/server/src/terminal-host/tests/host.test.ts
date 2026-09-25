@@ -1,4 +1,4 @@
-import { writeFileSync } from 'node:fs'
+import { readFileSync, writeFileSync } from 'node:fs'
 import { afterEach, expect, it } from 'vitest'
 
 import { createTestTerminalHost } from '../../../test/factories/terminal-host'
@@ -83,4 +83,36 @@ it('refuses a client that holds a different token', async () => {
   writeFileSync(host.paths.token, 'not-the-host-token')
 
   await expect(host.connect().host()).rejects.toMatchObject({ code: 'terminal.HOST_REFUSED' })
+})
+
+it('refuses adoption when the manifest identifies a reused pid', async () => {
+  const host = await testHost()
+  const hello = await host.client.host()
+  host.client.close()
+  const original = readFileSync(host.paths.manifest, 'utf8')
+  writeFileSync(host.paths.manifest, JSON.stringify({ hostPid: hello.pid, processStart: 'stale' }))
+  try {
+    await expect(host.connect().host()).rejects.toMatchObject({
+      code: 'terminal.HOST_UNREACHABLE',
+      internal: { reason: 'host-identity-mismatch' },
+    })
+    expect(host.hosts[0]?.exitCode).toBeNull()
+  } finally {
+    writeFileSync(host.paths.manifest, original)
+  }
+})
+
+it('exits after its last client leaves when there are no live sessions', async () => {
+  const host = await createTestTerminalHost({ idleMs: 50 })
+  hosts.push(host)
+  await host.client.host()
+  host.client.close()
+  await expect.poll(() => host.hosts[0]?.exitCode).toBe(0)
+})
+
+it('concurrent clients adopt one host for the same state root', async () => {
+  const host = await testHost()
+  const [first, second] = await Promise.all([host.client.host(), host.connect().host()])
+  expect(second.pid).toBe(first.pid)
+  expect((await host.client.host()).pid).toBe(first.pid)
 })

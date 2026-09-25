@@ -58,6 +58,15 @@ export class HostSession {
     return this.end
   }
 
+  replayStats(from: number) {
+    const start = this.chunks[0]?.offset ?? this.end
+    const replayFrom = Math.min(from, this.end)
+    return {
+      replayedBytes: this.end - Math.max(start, replayFrom),
+      gapBytes: Math.max(0, start - replayFrom),
+    }
+  }
+
   get subscriberCount() {
     return this.subscribers.size
   }

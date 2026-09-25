@@ -989,31 +989,35 @@ describe('terminal service', () => {
     expect(sessions.filter((session) => !session.exited)).toHaveLength(1)
   })
 
-  it('reattaches a live host session after a restart, continuing the same pid and history', async () => {
-    const root = await fixtureRoot()
-    const host = await nativeHost()
-    const env = { HOME: root, PATH: process.env.PATH, SHELL: '/bin/sh' }
-    const serviceA = testService(root, { env, hostClient: host.client })
-    const routesA = serviceA.routes(auth())
-    const socketA = fakeSocket(root, '', 'reattach-term')
-    await routesA.open(socketA)
-    routesA.message(socketA, Buffer.from('printf "PID:%s\\n" "$$"\n'))
-    await waitForTerminalOutput(socketA.messages, 'PID:')
-    const pid = terminalOutputText(socketA.messages).match(/PID:(\d+)/)?.[1]
-    if (!pid) throw new TypeError('Missing pid marker in the first shell output')
+  it.each(['after recovery', 'during recovery'] as const)(
+    'preserves the shell when a browser reconnects %s',
+    async (timing) => {
+      const root = await fixtureRoot()
+      const host = await nativeHost()
+      const env = { HOME: root, PATH: process.env.PATH, SHELL: '/bin/sh' }
+      const serviceA = testService(root, { env, hostClient: host.client })
+      const routesA = serviceA.routes(auth())
+      const socketA = fakeSocket(root, '', 'reattach-term')
+      await routesA.open(socketA)
+      routesA.message(socketA, Buffer.from('printf "PID:%s\\n" "$$"\n'))
+      await waitForTerminalOutput(socketA.messages, 'PID:')
+      const pid = terminalOutputText(socketA.messages).match(/PID:(\d+)/)?.[1]
+      if (!pid) throw new TypeError('Missing pid marker in the first shell output')
 
-    await serviceA.dispose()
+      await serviceA.dispose()
 
-    const serviceB = testService(root, { env, hostClient: host.connect() })
-    await serviceB.reattach()
-    const routesB = serviceB.routes(auth())
-    const socketB = fakeSocket(root, '', 'reattach-term')
-    await routesB.open(socketB)
-    // Replayed from the persisted history, not from a fresh spawn.
-    await waitForTerminalOutput(socketB.messages, `PID:${pid}`)
-    routesB.message(socketB, Buffer.from('printf "PID2:%s\\n" "$$"\n'))
-    await waitForTerminalOutput(socketB.messages, `PID2:${pid}`)
-  })
+      const serviceB = testService(root, { env, hostClient: host.connect() })
+      const recovering = serviceB.reattach()
+      if (timing === 'after recovery') await recovering
+      const routesB = serviceB.routes(auth())
+      const socketB = fakeSocket(root, '', 'reattach-term')
+      await Promise.all([recovering, routesB.open(socketB)])
+      // Replayed from the persisted history, not from a fresh spawn.
+      await waitForTerminalOutput(socketB.messages, `PID:${pid}`)
+      routesB.message(socketB, Buffer.from('printf "PID2:%s\\n" "$$"\n'))
+      await waitForTerminalOutput(socketB.messages, `PID2:${pid}`)
+    },
+  )
 })
 
 // Shells run in a real terminal host in a throwaway state root.

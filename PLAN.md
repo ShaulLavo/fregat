@@ -521,7 +521,7 @@ of the plans, both logs and the service journal named what stands in the way. Th
 | 146 (done)                                     | Dev and prod stop sharing `~/.platform`; each `agent:browser` run gets its own server and state |
 | [147](plans/147-log-hygiene-and-noise-gate.md) | Producer fixes, level rules, the reaper give-up, ACK timeout vs overflow, a `logs:census` gate  |
 | 148 (done)                                     | `deploy --server` stages; the app shows "Update available" and restarts on a click              |
-| [149](plans/149-terminal-host.md)              | A PTY host that survives server restarts                                                        |
+| [Terminal host](docs/terminal-host.md)         | Implemented: shells survive server restarts; desktop quit ends its host                         |
 | [150](plans/150-remote-server-version.md)      | Remote servers are checked for protocol and updated                                             |
 | [151](plans/151-remote-server-releases.md)     | Production ships its built server release to remote machines; Update/Install server button      |
 | [152](plans/152-remote-dev-builds.md)          | Dev primary builds this working tree and ships it through Plan 151, in its own remote channel   |
@@ -533,7 +533,7 @@ Suggested order:
 2. Plan 147, after 146 removes the pollution it would otherwise re-level.
 3. ~~Plan 148~~ — implemented 2026-09-25 (lane L4, PR #32). A `--server` deploy stages; the app
    restarts on a click.
-4. Plan 149, so terminals and dev servers survive the same restart.
+4. Terminal persistence is implemented. See [terminal host](docs/terminal-host.md).
 5. Plan 150 Phase 1, then Plan 151, whenever the Mac is needed. Plan 152 after 151. `129fdea6`
    already keeps the catalog why and fix on stored machine errors; the protocol check is left.
 6. Then Claude rewind and fork ([Plan 145 fork](plans/145-harness-controls/fork.md), Plan 126

@@ -41,6 +41,7 @@ import {
   observabilityRoutes,
   recordClientInstance,
   recordProcessInfo,
+  recordProcessWarning,
   recordRequestContext,
   recordRequestError,
   runDetached,
@@ -372,7 +373,7 @@ export function createApp(options: AppOptions) {
     // origin is known. Mounted before every parent hook: an Elysia plugin
     // mounted after one parent `onBeforeHandle` inherits the parent's later
     // hooks too, which would put the auth guard in front of index.html.
-    .use(webRoutes(options.web ?? {}, update))
+    .use(webRoutes(options.web ?? {}, update, terminal))
     .onBeforeHandle(({ request }) => {
       recordClientInstance(request)
     })
@@ -452,7 +453,11 @@ export function createApp(options: AppOptions) {
     .onStart(() => {
       void providerPrices.refresh()
       // Waits on `orchestration.ready` internally, so lease adoption lands first.
-      void terminal.reattach()
+      void terminal
+        .reattach()
+        .catch((error: unknown) =>
+          recordProcessWarning('terminal.host.recovery_failed', { area: 'terminal', error }),
+        )
     })
     .onStop(cleanup)
   appCleanups.set(configured, cleanup)

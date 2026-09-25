@@ -23,11 +23,13 @@ import {
   type HostSessionInfo,
 } from '../terminal-host/protocol'
 import type { TerminalPtyFactory, TerminalPtyOptions } from './service'
+import { hostIdentityMatches, processStart, readHostIdentity } from '../terminal-host/identity'
+import { launchHost } from '../terminal-host/launch'
 
 const CONNECT_TIMEOUT_MS = 5_000
 const CONNECT_RETRY_MS = 25
 
-export type HostLauncher = (argv: readonly string[], env: NodeJS.ProcessEnv) => void
+export type HostLauncher = (argv: readonly string[], env: NodeJS.ProcessEnv) => void | Promise<void>
 
 export type TerminalHostClientOptions = {
   /** The state root whose host this client talks to (`PLATFORM_HOME`). */
@@ -63,17 +65,23 @@ export class TerminalHostClient {
   private readonly launch: HostLauncher
   private connecting: Promise<Connected> | null = null
   private generation = 0
+  private description: HostHello | null = null
 
   constructor({
     stateRoot,
     env = process.env,
     idleMs,
-    launch = launchDetached,
+    launch = launchHost,
   }: TerminalHostClientOptions) {
     this.stateRoot = stateRoot
     this.env = env
     this.idleMs = idleMs
     this.launch = launch
+  }
+
+  /** Last authenticated host, without starting one for a release probe. */
+  info() {
+    return this.description
   }
 
   /** The host's hello: its pid, cgroup and protocol. */
@@ -104,7 +112,8 @@ export class TerminalHostClient {
 
   /** Ends every shell and the host itself. */
   async shutdown() {
-    const { connection } = await this.connection()
+    if (!this.connecting) return
+    const { connection } = await this.connecting
     connection.send({ type: 'shutdown' })
     this.close()
   }
@@ -113,6 +122,7 @@ export class TerminalHostClient {
   close() {
     const connecting = this.connecting
     this.connecting = null
+    this.description = null
     this.generation += 1
     void connecting?.then(
       ({ connection }) => connection.close(),
@@ -139,11 +149,33 @@ export class TerminalHostClient {
       const socket = await connectSocket(paths.socket)
       if (socket) {
         const connected = await HostConnection.handshake(socket, token, () => {
-          if (this.generation === generation) this.connecting = null
+          if (this.generation !== generation) return
+          this.connecting = null
+          this.description = null
         })
-        recordProcessInfo('terminal.host.connect', {
+        const identity = readHostIdentity(paths.manifest)
+        if (
+          !identity ||
+          identity.hostPid !== connected.hello.pid ||
+          !hostIdentityMatches(identity)
+        ) {
+          connected.connection.close()
+          throw terminalHostErrors.HOST_UNREACHABLE({
+            internal: {
+              reason: 'host-identity-mismatch',
+              hostPid: connected.hello.pid,
+              recordedIdentity: identity,
+              processStart: processStart(connected.hello.pid),
+            },
+          })
+        }
+        this.description = connected.hello
+        const sessions = await connected.connection.list()
+        recordProcessInfo(launched ? 'terminal.host.launch' : 'terminal.host.adopt', {
           area: 'terminal',
           attempts,
+          keyCount: sessions.length,
+          build: connected.hello.build,
           cgroup: connected.hello.cgroup,
           durationMs: elapsedMs(startedAt),
           hostPid: connected.hello.pid,
@@ -152,7 +184,7 @@ export class TerminalHostClient {
         })
         return connected
       }
-      if (!launched) this.launch(this.hostArgv(), this.env)
+      if (!launched) await this.launch(this.hostArgv(), this.env)
       launched = true
       if (elapsedMs(startedAt) > CONNECT_TIMEOUT_MS)
         throw terminalHostErrors.HOST_UNREACHABLE({
@@ -194,8 +226,21 @@ class HostConnection {
   static async handshake(socket: net.Socket, token: string, onClose: () => void) {
     const connection = new HostConnection(socket, onClose)
     connection.send({ type: 'hello', version: PROTOCOL_VERSION, token, capabilities: [] })
-    const hello = await connection.greeting.promise
-    return { connection, hello }
+    const timeout = setTimeout(
+      () =>
+        connection.fail(
+          terminalHostErrors.HOST_UNREACHABLE({
+            internal: { reason: 'hello-timeout' },
+          }),
+        ),
+      CONNECT_TIMEOUT_MS,
+    )
+    try {
+      const hello = await connection.greeting.promise
+      return { connection, hello }
+    } finally {
+      clearTimeout(timeout)
+    }
   }
 
   send(control: ClientControl) {
@@ -234,7 +279,10 @@ class HostConnection {
     return this.request<HostPty>(
       'attach',
       (request) => ({ type: 'attach', request, key, from }),
-      (reply) => this.adopt(reply, { onData, onGap }, from),
+      (reply) => {
+        if (reply.type === 'attached') this.recordAttach(reply)
+        return this.adopt(reply, { onData, onGap }, from)
+      },
     )
   }
 
@@ -246,6 +294,21 @@ class HostConnection {
         if (reply.type !== 'list') throw protocolError(reply.type, 'list')
         return reply.sessions
       },
+    )
+  }
+
+  private recordAttach(reply: Extract<HostControl, { type: 'attached' }>) {
+    void this.greeting.promise.then((hello) =>
+      recordProcessInfo('terminal.host.attach', {
+        area: 'terminal',
+        key: reply.key,
+        keyCount: 1,
+        replayedBytes: reply.replayedBytes,
+        gapBytes: reply.gapBytes,
+        hostPid: hello.pid,
+        cgroup: hello.cgroup,
+        protocol: hello.version,
+      }),
     )
   }
 
@@ -448,15 +511,6 @@ function hostEntry() {
   const bundled = path.join(import.meta.dirname, 'pty-host.js')
   if (existsSync(bundled)) return bundled
   return path.join(import.meta.dirname, '../terminal-host/main.ts')
-}
-
-function launchDetached(argv: readonly string[], env: NodeJS.ProcessEnv) {
-  const child = Bun.spawn([...argv], {
-    env,
-    detached: true,
-    stdio: ['ignore', 'ignore', 'ignore'],
-  })
-  child.unref()
 }
 
 function connectSocket(socketPath: string) {

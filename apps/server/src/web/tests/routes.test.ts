@@ -90,6 +90,7 @@ describe('web routes', () => {
       commit: 'abc',
       dirtyFiles: 1,
       server: { release: null, commit: null, dirtyFiles: null },
+      terminalHost: null,
       phase: 'serving',
       pending: null,
       liveCheck: null,

@@ -116,7 +116,8 @@ Status 2026-09-25 (lane L4):
 - Item 6: not done. `vibrancy.m` resolves the window by title because Electrobun's `createWindow`
   pointer type is not a public contract, and messaging a non-Objective-C pointer would crash the
   app. The change can only be verified on the Mac: owner check.
-- Item 8: waits for Plan 149 Phase 2, which is changing `terminal/service.ts`.
+- Item 8: done. Repaint uses named delay and column-delta constants and the shared terminal
+  column limit. The terminal service tests cover redraw and maximum-width behavior.
 - Item 11: deferred. The capture prefix is also how `chat-queue`, `terminal-history` and product
   captures find and kill their own terminals, and a page URL parameter does not survive the app's
   own URL rewriting across the reloads those scenarios do. Since Plan 146 a default run has its own

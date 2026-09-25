@@ -86,7 +86,7 @@ test('LSP frames use real route buffering and client close releases the acquired
   expect(socket.closeCalls).toBe(1)
 })
 
-test('app shutdown disposes terminal and LSP process owners and closes their clients', async ({
+test('app shutdown detaches terminals, disposes LSP owners and closes their clients', async ({
   socketServer,
   pty,
   lsp,
@@ -99,8 +99,7 @@ test('app shutdown disposes terminal and LSP process owners and closes their cli
   const language = new Socket('ws://platform-tui.test/lsp?root=&path=main.ts&server=typescript')
   await Promise.all([terminal.opening, language.opening])
   await closeApp(socketServer.app)
-  expect(pty.processes[0]?.killed).toBe(true)
-  await expect(pty.processes[0]?.exited).resolves.toMatchObject({ signal: 'SIGHUP' })
+  expect(pty.processes[0]?.killed).toBe(false)
   expect(lsp.clients[0]?.disposed).toBe(true)
   expect(terminal.readyState).toBe(3)
   expect(language.readyState).toBe(3)
