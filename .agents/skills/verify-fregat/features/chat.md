@@ -110,3 +110,5 @@ Each surface lists the states it must survive and the scenario that drives each 
 - `approval-turn-ended`, `approval-two-tabs`, `approval-reconnect`: see Hostile states above.
 - `stopped-turn-reasons`, `stream-ambiguous-tail`, `stream-code-colour`: see Hostile states above. The stream scenarios set `chat.responseStreamingMode` to `token` and restore it.
 - `chat-screenshot`: the composer attach menu's Screenshot… item with the page's `getDisplayMedia` stubbed by a painted canvas stream; removes its draft image.
+- `chat-model-favorites`: stars an offered model and a retired one through `model.setFavorite`, opens the picker's Favorites rail entry, and restores `models.favorites`.
+- `chat-background-start`: three Ctrl+Enter starts from a new draft set to New worktree on `release`; each gets its own worktree and the user stays on an empty draft. Deletes its sessions and releases their worktrees.

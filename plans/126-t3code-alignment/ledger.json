@@ -695,7 +695,8 @@
       "evidence_level": "source-reviewed",
       "acceptance": "interaction.md, INTERACTION-14, Acceptance / verification",
       "execution_evidence": [
-        "2026-09-25 lane L2: models.favorites with model.setFavorite; Settings › Models star, picker Favorites rail and favorites-first ordering; unavailable favorites kept (model-order.test.ts, settings-mutations.test.ts)"
+        "2026-09-25 lane L2: models.favorites with model.setFavorite; Settings › Models star, picker Favorites rail and favorites-first ordering; unavailable favorites kept (model-order.test.ts, settings-mutations.test.ts)",
+        "2026-09-25 lane L2: scenario chat-model-favorites (Favorites rail lists an offered favorite and a retired one as No longer offered)"
       ]
     },
     {
