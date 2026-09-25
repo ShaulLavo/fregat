@@ -92,6 +92,7 @@ import { gitOpenAllDiffsSpam } from './git-open-all-diffs-spam'
 import { gitStageSettles } from './git-stage-settles'
 import { gitChangesScroll } from './git-changes-scroll'
 import { gitDiscardConfirm } from './git-discard-confirm'
+import { baseComponents } from './base-components'
 import { commandPaletteTypeBurst } from './command-palette-type-burst'
 import { paletteScriptsPending } from './palette-scripts-pending'
 import { settingsModelsPending } from './settings-models-pending'
@@ -312,6 +313,7 @@ export const scenarios: readonly Scenario[] = [
   gitStageSettles,
   gitChangesScroll,
   gitDiscardConfirm,
+  baseComponents,
   commandPaletteTypeBurst,
   paletteScriptsPending,
   settingsModelsPending,

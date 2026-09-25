@@ -5,6 +5,7 @@ import { useSessionRailStore } from '@/features/chat-mode/state/session-rail-sto
 import { useSessionSelectionStore } from '@/features/chat-mode/state/session-selection-store'
 import { createRailHarness, renderRailHarness } from '../../../../../test/factories/rail-harness'
 import { expect, test } from '../../../../../test/fixtures'
+import { holdToConfirm } from '../../../../../test/hold'
 
 test('project menu scopes and collapses the repository group', async ({ client, server }) => {
   const h = await createRailHarness(client, server)
@@ -79,6 +80,6 @@ test('project deletion retains its scoped confirmation and deletes after confirm
   })
   await userEvent.click(await screen.findByRole('menuitem', { name: 'Delete Project' }))
   expect((await h.refresh()).projects).toHaveLength(1)
-  await userEvent.click(screen.getByRole('button', { name: 'Delete' }))
+  holdToConfirm(screen.getByRole('button', { name: 'Delete' }))
   await waitFor(async () => expect((await h.refresh()).projects).toHaveLength(0))
 })

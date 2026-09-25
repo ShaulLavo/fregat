@@ -109,6 +109,9 @@
   --duration-color: var(--duration-exit);
   /* A live status mark's full breath, slow enough to read as calm. */
   --duration-breathe: 2.6s;
+  /* How long an irreversible confirm must be held, and how fast an early release springs back. */
+  --duration-hold: 1200ms;
+  --duration-hold-release: 180ms;
   /* Tailwind reads both of these for every bare `transition-*` utility, so a call
      site that does not name a duration or a curve still gets the system rather
      than Tailwind's 150ms cubic-bezier(0.4,0,0.2,1). Never hand-write either. */
@@ -656,6 +659,32 @@
   }
 }
 
+/* Hold to confirm. The fill sweeps linearly (it is progress, not decoration) and springs back
+   on release. The button trembles harder as the fill closes in; reduced motion drops only that. */
+@property --hold-shake {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+
+@utility hold-button {
+  &[data-holding] {
+    animation:
+      app-hold-shake 260ms linear infinite,
+      app-hold-shake-grow var(--duration-hold) cubic-bezier(0.8, 0, 1, 1) forwards;
+  }
+}
+
+@utility hold-button-fill {
+  clip-path: inset(0 100% 0 0);
+  transition: clip-path var(--duration-hold-release) var(--ease-out-strong);
+
+  [data-holding] > & {
+    clip-path: inset(0 0 0 0);
+    transition: clip-path var(--duration-hold) linear;
+  }
+}
+
 /* A live status mark breathes in opacity only; a glow would be a shadow outside
    the three elevations. */
 @utility status-breathe {
@@ -702,7 +731,8 @@
 /* Reduced motion keeps both readable and stops the travel: the skeleton falls
    back to its flat tint, the label back to its own color. */
 @media (prefers-reduced-motion: reduce) {
-  .status-breathe {
+  .status-breathe,
+  .hold-button[data-holding] {
     animation: none;
   }
 
@@ -938,6 +968,28 @@
 
   to {
     --scroll-fade-bottom: 0px;
+  }
+}
+
+@keyframes app-hold-shake-grow {
+  to {
+    --hold-shake: 0.75px;
+  }
+}
+
+@keyframes app-hold-shake {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  25% {
+    translate: calc(var(--hold-shake) * -1) calc(var(--hold-shake) * 0.4);
+  }
+  50% {
+    translate: var(--hold-shake) calc(var(--hold-shake) * -0.3);
+  }
+  75% {
+    translate: calc(var(--hold-shake) * -0.7) calc(var(--hold-shake) * -0.5);
   }
 }
 

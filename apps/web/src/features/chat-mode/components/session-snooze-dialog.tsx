@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useIsMutating } from '@tanstack/react-query'
 import { Button } from '@workspace/ui/components/button'
+import { Tabs, TabsList, TabsTab } from '@workspace/ui/components/tabs'
 import { Input } from '@workspace/ui/components/input'
 import { Spinner } from '@workspace/ui/components/spinner'
 import {
@@ -64,22 +65,21 @@ export function SessionSnoozeDialog() {
             </Button>
           ))}
         </div>
-        <div className='flex gap-1'>
-          <Button
-            variant='ghost'
-            aria-pressed={input.mode === 'date'}
-            onClick={() => setInput({ mode: 'date', date: '', time: '' })}
-          >
-            Date and time
-          </Button>
-          <Button
-            variant='ghost'
-            aria-pressed={input.mode === 'duration'}
-            onClick={() => setInput({ mode: 'duration', amount: '', unit: 'minutes' })}
-          >
-            Duration
-          </Button>
-        </div>
+        <Tabs
+          value={input.mode}
+          onValueChange={(mode: CustomSnoozeInput['mode']) =>
+            setInput(
+              mode === 'date'
+                ? { mode, date: '', time: '' }
+                : { mode, amount: '', unit: 'minutes' },
+            )
+          }
+        >
+          <TabsList aria-label='Snooze until' variant='segmented'>
+            <TabsTab value='date'>Date and time</TabsTab>
+            <TabsTab value='duration'>Duration</TabsTab>
+          </TabsList>
+        </Tabs>
         {input.mode === 'date' ? (
           <div className='flex gap-2'>
             <div className='flex min-w-0 flex-1 flex-col gap-1'>
@@ -117,18 +117,18 @@ export function SessionSnoozeDialog() {
               value={input.amount}
               onChange={(event) => setInput({ ...input, amount: event.target.value })}
             />
-            <div className='flex gap-1'>
-              {(['minutes', 'hours', 'days'] as const).map((unit) => (
-                <Button
-                  key={unit}
-                  variant='ghost'
-                  aria-pressed={input.unit === unit}
-                  onClick={() => setInput({ ...input, unit })}
-                >
-                  {unit}
-                </Button>
-              ))}
-            </div>
+            <Tabs
+              value={input.unit}
+              onValueChange={(unit: typeof input.unit) => setInput({ ...input, unit })}
+            >
+              <TabsList aria-label='Duration unit' variant='segmented'>
+                {(['minutes', 'hours', 'days'] as const).map((unit) => (
+                  <TabsTab key={unit} value={unit}>
+                    {unit}
+                  </TabsTab>
+                ))}
+              </TabsList>
+            </Tabs>
           </div>
         )}
         <DialogFooter>

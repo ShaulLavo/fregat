@@ -1,7 +1,7 @@
 import { ToolPane as PaneShell } from '@workspace/ui/patterns/tool-pane'
 import type { GitFileStatus } from '@workspace/contracts'
 import { filesystemPath } from '@/lib/documents/utils/identity'
-import { Button } from '@workspace/ui/components/button'
+import { Tabs, TabsList, TabsTab } from '@workspace/ui/components/tabs'
 import { PaneBar } from '@workspace/ui/components/pane-bar'
 
 import { SearchPane } from '@/features/workspace/components/search-pane'
@@ -139,23 +139,22 @@ function gitToolPane(rootPath: string, diffScope: SessionDiffScopeState) {
       scroll={false}
       header={<GitPaneHeader rootPath={rootPath} />}
       subheader={
-        <PaneBar aria-label='Diff scope' role='group'>
-          {scopeButton({
-            active: scope.kind === 'working-tree',
-            label: 'Working tree',
-            onSelect: selectWorkingTreeScope,
-          })}
-          {scopeButton({
-            active: scope.kind === 'turn',
-            // A session that has not produced a checkpoint has no turn to show, and
-            // an inert button is worse than one that says so.
-            disabled: !latestTurnId,
-            label: 'Turn',
-            onSelect: () => {
-              if (!latestTurnId) return
-              selectTurnScope(latestTurnId)
-            },
-          })}
+        <PaneBar>
+          <Tabs
+            value={scope.kind}
+            onValueChange={(next: typeof scope.kind) => {
+              if (next === 'working-tree') return selectWorkingTreeScope()
+              if (latestTurnId) selectTurnScope(latestTurnId)
+            }}
+          >
+            <TabsList aria-label='Diff scope' variant='segmented'>
+              <TabsTab value='working-tree'>Working tree</TabsTab>
+              {/* A session with no checkpoint has no turn to show; an inert tab says so. */}
+              <TabsTab disabled={!latestTurnId} value='turn'>
+                Turn
+              </TabsTab>
+            </TabsList>
+          </Tabs>
         </PaneBar>
       }
     >
@@ -165,32 +164,6 @@ function gitToolPane(rootPath: string, diffScope: SessionDiffScopeState) {
         <GitPanel rootPath={filesystemPath(rootPath)} />
       )}
     </PaneShell>
-  )
-}
-
-function scopeButton({
-  active,
-  disabled = false,
-  label,
-  onSelect,
-}: {
-  readonly active: boolean
-  readonly disabled?: boolean
-  readonly label: string
-  readonly onSelect: () => void
-}) {
-  return (
-    <Button
-      aria-pressed={active}
-      className='text-muted-foreground hover:text-foreground aria-pressed:bg-accent aria-pressed:text-accent-foreground'
-      disabled={disabled}
-      size='xs'
-      type='button'
-      variant='ghost'
-      onClick={onSelect}
-    >
-      {label}
-    </Button>
   )
 }
 

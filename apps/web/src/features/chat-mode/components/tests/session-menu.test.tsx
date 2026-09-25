@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event'
 import { useSessionSelectionStore } from '@/features/chat-mode/state/session-selection-store'
 import { createRailHarness, renderRailHarness } from '../../../../../test/factories/rail-harness'
 import { expect, test } from '../../../../../test/fixtures'
+import { holdToConfirm } from '../../../../../test/hold'
 
 test('renames through the real owning server', async ({ client, server }) => {
   const h = await createRailHarness(client, server)
@@ -69,7 +70,7 @@ test('confirmed delete removes the session through its owner', async ({ client, 
   renderRailHarness(h)
   await userEvent.pointer({ keys: '[MouseRight]', target: screen.getByTitle('First') })
   await userEvent.click(await screen.findByRole('menuitem', { name: 'Delete' }))
-  await userEvent.click(screen.getByRole('button', { name: 'Delete' }))
+  holdToConfirm(screen.getByRole('button', { name: 'Delete' }))
   await waitFor(async () =>
     expect((await h.refresh()).sessions.some((session) => session.id === h.sessionIds[0])).toBe(
       false,

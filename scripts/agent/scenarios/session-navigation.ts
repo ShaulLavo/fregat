@@ -1,6 +1,6 @@
 import { ok, strictEqual } from 'node:assert/strict'
 import type { Scenario } from './index'
-import { selectors } from '../selectors'
+import { holdToConfirm, selectors } from '../selectors'
 import { dispatch, openChatShell, readShell } from './chat-verification'
 
 export const sessionNavigation: Scenario = {
@@ -58,9 +58,10 @@ export const sessionNavigation: Scenario = {
       await selectors.sessionByTitle(page, titles[1]!).waitFor()
       await selectors.sessionByTitle(page, titles[0]!).click({ button: 'right' })
       await selectors.deleteSession(page).click()
+      const landed = () => page.waitForURL((url) => decodeURIComponent(url.href).includes(ids[1]!))
       if (await selectors.confirmSessionDelete(page).isVisible())
-        await selectors.confirmSessionDelete(page).click()
-      await page.waitForURL((url) => decodeURIComponent(url.href).includes(ids[1]!))
+        await holdToConfirm(page, selectors.confirmSessionDelete(page), landed)
+      await landed()
       await step('delete-opens-first-surviving-project-session')
       ok(
         !(await readShell(page, base)).sessions.some((session) => session.id === ids[0]),

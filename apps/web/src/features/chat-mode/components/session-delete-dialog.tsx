@@ -69,6 +69,7 @@ export function SessionDeleteDialog() {
           </Button>
         ) : null}
         <DeleteDialogFooter
+          hold
           onCancel={() => actions.cancelDelete()}
           onConfirm={() => request && actions.confirmDelete(request)}
           pending={pending}

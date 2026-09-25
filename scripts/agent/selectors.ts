@@ -56,7 +56,7 @@ export const selectors = {
   sessionInShelf: (page: Page, title: string, shelf: string) =>
     page.getByRole('region', { name: shelf, exact: true }).getByTitle(title, { exact: true }),
   snoozePreset: (page: Page) => page.getByRole('button', { name: /In 1 hour/ }),
-  snoozeDurationMode: (page: Page) => page.getByRole('button', { name: 'Duration', exact: true }),
+  snoozeDurationMode: (page: Page) => page.getByRole('tab', { name: 'Duration', exact: true }),
   snoozeAmount: (page: Page) => page.getByRole('spinbutton', { name: 'Duration', exact: true }),
   snoozeCustomSubmit: (page: Page) =>
     page.getByRole('button', { name: 'Snooze until chosen time', exact: true }),
@@ -423,8 +423,7 @@ export const selectors = {
     page.getByRole('combobox', { name: 'Interface density', exact: true }),
   settingsDensityOption: (page: Page, density: 'compact' | 'cozy') =>
     page.getByRole('option', { name: density, exact: true }),
-  settingsJsonView: (page: Page) =>
-    page.getByRole('button', { name: 'settings.json', exact: true }),
+  settingsJsonView: (page: Page) => page.getByRole('tab', { name: 'settings.json', exact: true }),
   settingsScopeTab: (page: Page, name: 'User' | 'Workspace' | 'Defaults') =>
     page.getByRole('tab', { name, exact: true }),
   settingsDefaultsBanner: (page: Page) => page.getByText('Defaults are read-only', { exact: true }),
@@ -733,19 +732,23 @@ export const selectors = {
       .locator('[data-git-file]')
       .filter({ has: page.getByText(name, { exact: true }) })
       .getByRole('button', { name: label, exact: true }),
+  holdButton: (scope: Locator, name: string) =>
+    scope.locator('[data-slot="hold-button"]').filter({ hasText: name }),
+  tabsIndicator: (page: Page, list: string) =>
+    page.getByRole('tablist', { name: list, exact: true }).locator('[data-slot="tabs-indicator"]'),
   gitDiscardDialog: (page: Page, title: string) =>
     page.getByRole('alertdialog', { name: title, exact: true }),
   unexpectedError: (page: Page) => page.getByText('Something unexpected went wrong.'),
   focusGitCommand: (page: Page) => page.getByRole('option', { name: /Focus Git/ }),
-  graphButton: (page: Page) => page.getByRole('button', { name: 'Graph', exact: true }),
+  graphButton: (page: Page) => page.getByRole('tab', { name: 'Graph', exact: true }),
   // The Changes tab's accessible name carries its live file count.
   gitChangesTab: (page: Page) =>
-    page.getByRole('region', { name: 'Git panel' }).getByRole('button', { name: /^Changes\b/ }),
+    page.getByRole('region', { name: 'Git panel' }).getByRole('tab', { name: /^Changes\b/ }),
   changesToggle: (page: Page) => page.getByRole('button', { name: 'Changes', exact: true }),
   gitDiffScope: (page: Page, scope: 'Working tree' | 'Turn') =>
     page
-      .getByRole('group', { name: 'Diff scope' })
-      .getByRole('button', { name: scope, exact: true }),
+      .getByRole('tablist', { name: 'Diff scope' })
+      .getByRole('tab', { name: scope, exact: true }),
   turnFiles: (page: Page) => page.getByRole('listbox', { name: 'Turn changed files' }),
   worktreeFiles: (page: Page) => page.locator('[data-git-file]:not([data-history-file])'),
   historyList: (page: Page) => page.getByRole('listbox', { name: 'Commit history' }),
@@ -803,6 +806,17 @@ export async function openGitPanel(page: Page) {
   await input.fill('>Focus Git')
   await selectors.focusGitCommand(page).first().click()
   await selectors.gitPanel(page).waitFor({ timeout: 15_000 })
+}
+
+/** Holds a hold-to-confirm button until `done` resolves, the way a user keeps the mouse down. */
+export async function holdToConfirm(page: Page, button: Locator, done: () => Promise<unknown>) {
+  await button.hover()
+  await page.mouse.down()
+  try {
+    await done()
+  } finally {
+    await page.mouse.up()
+  }
 }
 
 export async function focusEditor(page: Page) {

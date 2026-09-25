@@ -1,6 +1,7 @@
 import { useContext, useEffect, useState } from 'react'
 import type { ColorMode, ThemeDocument } from '@workspace/contracts'
 import { Button } from '@workspace/ui/components/button'
+import { Tabs, TabsList, TabsTab } from '@workspace/ui/components/tabs'
 import { Input } from '@workspace/ui/components/input'
 import { Spinner } from '@workspace/ui/components/spinner'
 import {
@@ -53,19 +54,15 @@ export function ThemeEditor({
           maxLength={80}
           onChange={(event) => setDocument({ ...document, name: event.target.value })}
         />
-        <div className='flex gap-2' aria-label='Edit theme variant'>
-          {(['light', 'dark'] as const).map((variant) => (
-            <Button
-              key={variant}
-              variant='outline'
-              aria-pressed={mode === variant}
-              className='aria-pressed:bg-accent'
-              onClick={() => setMode(variant)}
-            >
-              {variant === 'light' ? 'Light version' : 'Dark version'}
-            </Button>
-          ))}
-        </div>
+        <Tabs value={mode} onValueChange={(variant: typeof mode) => setMode(variant)}>
+          <TabsList aria-label='Edit theme variant' variant='segmented'>
+            {(['light', 'dark'] as const).map((variant) => (
+              <TabsTab key={variant} value={variant}>
+                {variant === 'light' ? 'Light version' : 'Dark version'}
+              </TabsTab>
+            ))}
+          </TabsList>
+        </Tabs>
         <ThemeVariantEditor
           mode={mode}
           value={document.variants[mode]}
