@@ -499,7 +499,7 @@ Suggested order:
 
 1. ~~Plan 138~~ — implemented 2026-09-24.
 2. Quick wins: ~~Plan 141 Phases 1–3~~ (meter, per-turn recording, usage page; 2026-09-25), the
-   small Plan 145 plans (~~approval-rules~~, merged in `89c58188`), and the small new Plan 126 rows.
+   small Plan 145 plans (~~approval-rules~~, merged in `89c58188`; ~~the rest~~, lane L3), and the small new Plan 126 rows.
 3. Plan 142 after its spike. It needs only a minimal web app manifest, not Plan 143.
 4. The research phases of Plans 139 and 140. Plan 140's diagnostics work waits on Plans 087 and
    088; its editor-to-chat work does not.
@@ -548,7 +548,7 @@ surfaces, the file picker and the site. The owner is taking it one topic at a ti
 | [159](plans/159-file-picker.md)              | File and folder picker rewrite: columns, real previews, thumbnails, history keys                            |
 | 160 (done, lane L2)                          | Reasoning fold, turn receipts, live tail, model marker, tool details, plan steps, subagents, ultra sparkle  |
 | 161 (done, lane L2)                          | Approval lifecycle, stopped turns, streaming holds, folding rules, hostile-state scenarios                  |
-| [162](plans/162-context-and-cost.md)         | Context breakdown, usable-window fullness, session totals, usage-page honesty (after Plan 141)              |
+| ~~162~~                                      | Done 2026-09-25 (lane L3): context breakdown, usable window, session total, usage-page honesty              |
 | 163 (done, lane L2)                          | Screenshot attachment in the composer (export shipped with Plan 145)                                        |
 | [164](plans/164-what-feels-right-in-neon.md) | First pass shipped (Inter, one mono, `section-label`, radius); a metadata font sweep is left                |
 | [165](plans/165-font-catalog.md)             | Nerd Fonts + Fontsource on demand; interface-font setting; curated autocomplete picker                      |

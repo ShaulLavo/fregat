@@ -65,6 +65,67 @@ describe('provider usage history', () => {
     expect(history.totals.unpricedTokens).toBe(150)
   })
 
+  it('carries one set of recorded rates per model and splits each day by model', () => {
+    const fixture = historyFixture()
+    const price = (input: number) => ({
+      cacheRead: 0.5,
+      cacheWrite: null,
+      fetchedAt: '2026-09-25T00:00:00.000Z',
+      input,
+      model: 'gpt-5.5',
+      output: 10,
+      provider: 'openai',
+    })
+    fixture.insert({
+      costUsd: 1,
+      driverKind: 'codex',
+      model: 'gpt-5.5',
+      priceSnapshot: price(2),
+      turnId: 'a',
+    })
+    fixture.insert({
+      costUsd: 1,
+      driverKind: 'codex',
+      model: 'gpt-5.5',
+      priceSnapshot: price(2),
+      turnId: 'b',
+    })
+    fixture.insert({
+      costUsd: 1,
+      driverKind: 'codex',
+      model: 'gpt-4',
+      priceSnapshot: price(2),
+      turnId: 'c',
+    })
+    fixture.insert({
+      costUsd: 1,
+      driverKind: 'codex',
+      model: 'gpt-4',
+      priceSnapshot: price(3),
+      turnId: 'd',
+    })
+    fixture.insert({ costUsd: null, driverKind: 'codex', model: 'gpt-mystery', turnId: 'e' })
+
+    const history = fixture.read(7)
+
+    expect(history.models.find((row) => row.model === 'gpt-5.5')?.rates).toEqual({
+      cacheRead: 0.5,
+      cacheWrite: null,
+      input: 2,
+      output: 10,
+    })
+    expect(history.models.find((row) => row.model === 'gpt-4')?.rates).toBeNull()
+    expect(history.daily).toEqual([
+      expect.objectContaining({
+        models: expect.arrayContaining([
+          expect.objectContaining({ model: 'gpt-mystery', costUsd: null, tokens: 150 }),
+          expect.objectContaining({ model: 'gpt-5.5', costUsd: 2, tokens: 300 }),
+        ]),
+        unpricedTokens: 150,
+      }),
+    ])
+  })
+
   it("totals one session's priced turns and names its unpriced tokens apart", () => {
     const fixture = historyFixture()
     fixture.insert({ costUsd: 0.3, model: 'claude-opus-5-5', turnId: 'chat' })

@@ -2,7 +2,7 @@ import type { ContextSegment } from '@workspace/client-core/chat/context-usage'
 import { formatContextTokens } from '@workspace/client-core/chat/context-usage'
 import { cn } from '@workspace/ui/lib/utils'
 
-import { contextSegmentFill } from '@/features/chat/utils/context-segments'
+import { chartFill } from '@/lib/chart-fills'
 
 /**
  * What fills the window, as one bar split by category, then a legend row each.
@@ -35,7 +35,7 @@ export function ContextSegmentsMeter({
       >
         {used.map((segment, index) => (
           <span
-            className={cn('h-full', contextSegmentFill(index))}
+            className={cn('h-full', chartFill(index))}
             key={segment.name}
             style={{ width: `${(segment.tokens / span) * 100}%` }}
           />
@@ -53,7 +53,7 @@ export function ContextSegmentsMeter({
           key={segment.name}
           title={`${segment.name} · ${segment.tokens.toLocaleString()} tokens`}
         >
-          <span className={cn('size-2 shrink-0 rounded-full', contextSegmentFill(index))} />
+          <span className={cn('size-2 shrink-0 rounded-full', chartFill(index))} />
           <span className='text-muted-foreground min-w-0 flex-1 truncate'>{segment.name}</span>
           <span className='tabular-nums'>{formatContextTokens(segment.tokens)}</span>
         </div>

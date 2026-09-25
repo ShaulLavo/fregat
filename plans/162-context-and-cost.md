@@ -2,7 +2,7 @@
 
 ## Status and authorization
 
-- Status: Steps 1–4 DONE 2026-09-25 (lane L3); step 5 (usage page) next. Previously PROPOSED — the owner approved the direction on 2026-09-25 ("some good ideas, plan
+- Status: DONE 2026-09-25 (lane L3). Previously PROPOSED — the owner approved the direction on 2026-09-25 ("some good ideas, plan
   that, but we like our ticker"). D1–D3 accepted as recommended the same day.
 - Priority: P2 in the UI refresh lane.
 - Effort: M. One adapter mapping, a wider context payload, a session filter on the usage read,
@@ -183,6 +183,15 @@ chart stays. Neon's charts are recharts, which we are not adding.
   reserve; this session's tokens and cost (`GET /providers/usage/sessions/:id`, refreshed by the
   meter's settle invalidation) on `TickerNumber` with decimals. `formatUsd` moved to `lib/usd.ts`
   with real sub-cent digits. Scenario `claude-context-popover`.
+
+Step 5 (usage page): the headline reads "Estimated cost"; a catalog-priced row's title spells out
+quantity × rate from the rates recorded with its turns (or says they changed in the range), a
+Claude row says "Claude's estimate"; a footer states when a turn is counted; the top five models
+show and the rest fold into "N more · $X"; a totals row closes the list; a day with only unpriced
+usage draws a baseline marker; a share bar dims the other models on hover, and pressing a model
+row takes it out of the bar and the day chart (the last one stays); each row has a data bar.
+Day rows carry a per-model split and `unpricedTokens`, model rows `rates`. Scenario
+`settings-usage` covers the fold, the marker and a sub-cent row.
 
 ## Decisions
 

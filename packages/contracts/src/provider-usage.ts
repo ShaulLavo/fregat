@@ -81,6 +81,14 @@ const usageTokensEntries = {
  */
 const providerUsageCostSourceSchema = v.picklist(['provider', 'catalog', 'none'])
 
+/** Dollars per million tokens, as recorded with the turns. */
+const providerUsageRatesSchema = v.object({
+  input: v.number(),
+  output: v.number(),
+  cacheRead: v.nullable(v.number()),
+  cacheWrite: v.nullable(v.number()),
+})
+
 const providerUsageModelRowSchema = v.object({
   model: trimmedNonEmptyStringSchema,
   driverKind: trimmedNonEmptyStringSchema,
@@ -88,6 +96,15 @@ const providerUsageModelRowSchema = v.object({
   ...usageTokensEntries,
   costUsd: v.nullable(v.number()),
   costSource: providerUsageCostSourceSchema,
+  /** The standard rates behind a catalog price; null when none, or when they changed in the range. */
+  rates: v.nullable(providerUsageRatesSchema),
+})
+
+const providerUsageDayModelSchema = v.object({
+  model: trimmedNonEmptyStringSchema,
+  driverKind: trimmedNonEmptyStringSchema,
+  tokens: tokenCountSchema,
+  costUsd: v.nullable(v.number()),
 })
 
 const providerUsageDayRowSchema = v.object({
@@ -95,6 +112,9 @@ const providerUsageDayRowSchema = v.object({
   day: v.pipe(v.string(), v.isoDate()),
   tokens: tokenCountSchema,
   costUsd: v.nullable(v.number()),
+  /** Tokens that day with no price, so a day with only unpriced usage never reads as quiet. */
+  unpricedTokens: tokenCountSchema,
+  models: v.array(providerUsageDayModelSchema),
 })
 
 const providerUsagePurposeRowSchema = v.object({
@@ -136,6 +156,8 @@ export type ProviderUsageHistoryQuery = v.InferOutput<typeof providerUsageHistor
 export type ProviderUsageCostSource = v.InferOutput<typeof providerUsageCostSourceSchema>
 export type ProviderUsageModelRow = v.InferOutput<typeof providerUsageModelRowSchema>
 export type ProviderUsageDayRow = v.InferOutput<typeof providerUsageDayRowSchema>
+export type ProviderUsageDayModel = v.InferOutput<typeof providerUsageDayModelSchema>
+export type ProviderUsageRates = v.InferOutput<typeof providerUsageRatesSchema>
 export type ProviderUsagePurposeRow = v.InferOutput<typeof providerUsagePurposeRowSchema>
 export type ProviderUsageHistory = v.InferOutput<typeof providerUsageHistorySchema>
 
