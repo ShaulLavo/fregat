@@ -38,12 +38,14 @@ export function useSaveProjectScript() {
     if (project.scripts[0]?.command === script.command) return
 
     const remaining = project.scripts.filter((saved) => saved.command !== script.command)
+    // A re-run moves the saved entry, setup flags included; the caller only knows name and command.
+    const existing = project.scripts.find((saved) => saved.command === script.command)
 
     void dispatchChatCommand({
       action: 'chat.project.scripts.set',
       command: createProjectScriptsCommand({
         projectId: project.id,
-        scripts: [script, ...remaining],
+        scripts: [existing ?? script, ...remaining],
       }),
       dispatchCommand: transport.dispatchCommand,
       onFailed: (error) => notifyChatCommandError(error, 'Could not save the project script'),
