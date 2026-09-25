@@ -1,15 +1,17 @@
-import { defaultEditorKeyBindings, vscodeEditorKeyBindings } from '@singapore-editor/core/keymap'
+import {
+  defaultEditorKeyBindings,
+  vscodeEditorKeyBindings,
+  type EditorKeyBinding,
+} from '@singapore-editor/core/keymap'
 import { detectPlatform } from '@tanstack/hotkeys'
 
 import { chordKeys } from '@workspace/client-core/commands/chord'
 
 import { editorCommands } from '@/keymap/editor-commands'
 import { commandHotkeyMeta } from '@/keymap/command-registry'
-import type { CommandKeyDefault } from '@workspace/client-core/commands/metadata'
+import type { CommandKeyDefault, KeybindingPreset } from '@workspace/client-core/commands/metadata'
 import { platformCommands, type CommandEntry } from '@/keymap/table'
 import type { KeyChord, PlatformCommandId, PlatformKeyBinding } from '@/keymap/types'
-
-export type KeybindingPreset = 'default' | 'vscode'
 
 export type UnmappedKeyBinding = {
   readonly command: string
@@ -41,10 +43,9 @@ export function presetPlatformKeyBindings(
   platform: PlatformName = detectPlatform(),
   preset: KeybindingPreset = 'default',
 ) {
-  const pack =
-    preset === 'vscode' ? vscodeEditorKeyBindings(platform) : defaultEditorKeyBindings(platform)
+  const pack = editorPack(platform, preset)
   const bindings: PlatformKeyBinding[] = platformCommands.flatMap((command) =>
-    commandBindings(command, platform),
+    commandBindings(command, platform, preset),
   )
   const unmapped: UnmappedKeyBinding[] = []
   for (const row of pack) {
@@ -93,21 +94,50 @@ export function presetPlatformKeyBindings(
   return { bindings, omitted, unmapped }
 }
 
+/**
+ * Both modes edit with the VS Code pack. On macOS VS Code folds with Cmd+Option+[ and ],
+ * which Platform mode gives to previous and next item, so folding keeps the native chords.
+ */
+function editorPack(platform: PlatformName, preset: KeybindingPreset): readonly EditorKeyBinding[] {
+  const pack = vscodeEditorKeyBindings(platform)
+  if (preset === 'vscode' || platform !== 'mac') return pack
+
+  const folding = new Map(
+    defaultEditorKeyBindings(platform)
+      .filter((row) => platformFoldingCommands.has(row.command))
+      .map((row) => [row.command, row.chord]),
+  )
+  return pack.map((row) => {
+    const chord = folding.get(row.command)
+    return chord ? { ...row, chord } : row
+  })
+}
+
+const platformFoldingCommands: ReadonlySet<string> = new Set([
+  'editor.fold',
+  'editor.unfold',
+  'editor.foldRecursively',
+  'editor.unfoldRecursively',
+])
+
 function commandBindings(
   command: CommandEntry,
   platform: PlatformName,
+  preset: KeybindingPreset,
 ): readonly PlatformKeyBinding[] {
   if (!command.keys) return []
 
-  return command.keys.flatMap((key) => keyBinding(key, command.id, platform))
+  return command.keys.flatMap((key) => keyBinding(key, command.id, platform, preset))
 }
 
 function keyBinding(
   key: CommandKeyDefault,
   command: PlatformCommandId,
   platform: PlatformName,
+  preset: KeybindingPreset,
 ): readonly PlatformKeyBinding[] {
   if (!matchesPlatform(key.platforms, platform)) return []
+  if (key.presets && !key.presets.includes(preset)) return []
 
   return [
     {

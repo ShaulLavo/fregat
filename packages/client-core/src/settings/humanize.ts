@@ -6,6 +6,7 @@ export function settingRowTitle(id: SettingId): string {
 }
 
 export function settingOptionTitle(id: SettingId, value: string): string {
+  if (id === 'keybindings.preset') return value === 'vscode' ? 'VS Code' : 'Platform'
   if (id !== 'workbench.colorTheme') return value
 
   return value.charAt(0).toUpperCase() + value.slice(1)

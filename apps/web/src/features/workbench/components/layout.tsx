@@ -62,9 +62,17 @@ export function WorkbenchLayout({
       data-workbench=''
       role='application'
     >
-      <PaneHostProvider kind='workbench-sidebar'>
-        <RailTabs className={cn('relative z-10', surface.panel)} label='Sidebar tabs' side='left' />
-      </PaneHostProvider>
+      {panels.sidebarOpen ? (
+        <div className='contents' data-screen-sidebar=''>
+          <PaneHostProvider kind='workbench-sidebar'>
+            <RailTabs
+              className={cn('relative z-10', surface.panel)}
+              label='Sidebar tabs'
+              side='left'
+            />
+          </PaneHostProvider>
+        </div>
+      ) : null}
       <ResizablePanelGroup
         className='relative z-10 min-h-0 min-w-0 flex-1'
         defaultLayout={layout.outerLayout}

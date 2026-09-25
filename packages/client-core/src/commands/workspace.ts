@@ -372,7 +372,7 @@ export const workspaceCommandMetadata = {
   }),
   'workspace.toggleSidebarVisibility': defineMetadata({
     category: 'Workspace',
-    description: 'Show or hide the Files pane.',
+    description: 'Show or hide the workbench sidebar, or the session list in chat.',
     id: 'workspace.toggleSidebarVisibility',
     keys: [
       {
@@ -385,7 +385,7 @@ export const workspaceCommandMetadata = {
     target: 'workspace',
     undoCategory: 'view-only',
     when: ['workspaceOpen'],
-    title: 'Toggle Files pane',
+    title: 'Toggle sidebar',
     vscodeCommandIds: ['workbench.action.toggleSidebarVisibility'],
   }),
   'workspace.togglePanel': defineMetadata({

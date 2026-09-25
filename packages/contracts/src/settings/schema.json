@@ -412,7 +412,7 @@
     },
     "keybindings.preset": {
       "default": "default",
-      "description": "Editor shortcuts to use before applying your overrides. Default uses the native editor pack; vscode uses the VS Code pack.",
+      "description": "Shortcuts your overrides apply on top of. VS Code keeps VS Code bindings. Platform starts from them and adds its own keys for tabs, chats and sidebar panels.",
       "enum": ["default", "vscode"],
       "type": "string"
     },

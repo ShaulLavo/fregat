@@ -30,7 +30,7 @@ test('the search box narrows the list', async ({ client }) => {
   await userEvent.type(screen.getByLabelText('Search keyboard shortcuts'), 'sidebar')
 
   expect(screen.queryByRole('button', { name: SAVE_RECORDER })).toBeNull()
-  expect(screen.getByText('Toggle Files pane')).toBeDefined()
+  expect(screen.getByText('Toggle sidebar')).toBeDefined()
 })
 
 test('records and resets a command omitted by the default preset', async ({ client }) => {

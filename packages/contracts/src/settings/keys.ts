@@ -991,9 +991,9 @@ export const SETTINGS_REGISTRY = {
     scope: 'application',
     widget: 'enum',
     category: 'Keyboard shortcuts',
-    title: 'Keyboard preset',
+    title: 'Keyboard mode',
     description:
-      'Editor shortcuts to use before applying your overrides. Default uses the native editor pack; vscode uses the VS Code pack.',
+      'Shortcuts your overrides apply on top of. VS Code keeps VS Code bindings. Platform starts from them and adds its own keys for tabs, chats and sidebar panels.',
     keywords: ['keybinding', 'shortcut', 'preset', 'vscode', 'keymap'],
   }),
   'keybindings.overrides': defineSetting({

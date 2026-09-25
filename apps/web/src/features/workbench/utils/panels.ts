@@ -277,6 +277,16 @@ export function setWorkbenchBottomTab(
   return { ...panels, activeBottomTab }
 }
 
+/** Shows or hides the whole sidebar and keeps its selected tab. */
+export function setWorkbenchSidebarOpen(
+  panels: WorkbenchPanels,
+  sidebarOpen: boolean,
+): WorkbenchPanels {
+  if (panels.sidebarOpen === sidebarOpen) return panels
+
+  return { ...panels, sidebarOpen }
+}
+
 /**
  * The visibility half of the pane commands: pressing the shortcut for the tab
  * already showing hides the pane, anything else reveals that tab.

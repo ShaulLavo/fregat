@@ -799,7 +799,7 @@ it('reports invalid spelling independently from unknown commands', () => {
 })
 
 it.each(defaultBindingPlatforms)(
-  'imports both complete and distinct Editor presets on %s',
+  'imports the complete Editor pack in both modes on %s',
   (platform) => {
     const native = presetPlatformKeyBindings(platform, 'default')
     const vscode = presetPlatformKeyBindings(platform, 'vscode')
@@ -809,7 +809,6 @@ it.each(defaultBindingPlatforms)(
       ),
     ).toBe(true)
     expect(vscode.unmapped).toEqual(native.unmapped)
-    expect(native.bindings).not.toEqual(vscode.bindings)
     for (const preset of [native, vscode]) {
       expect(preset.bindings).toContainEqual(
         expect.objectContaining({ command: 'editor.editor.action.toggleTabFocusMode' }),
@@ -821,6 +820,37 @@ it.each(defaultBindingPlatforms)(
         expect.objectContaining({ command: 'editor.editor.foldAll' }),
       )
     }
+  },
+)
+
+it.each(defaultBindingPlatforms)(
+  'edits with the VS Code pack in Platform mode on %s, except folding on macOS',
+  (platform) => {
+    const editorRows = (preset: 'default' | 'vscode') =>
+      defaultPlatformKeyBindings(platform, preset)
+        .filter((row) => row.pane === 'editor' && row.command?.startsWith('editor.'))
+        .map((row) => `${row.keys} ${row.command}`)
+    const platformRows = editorRows('default')
+    const vscodeRows = editorRows('vscode')
+    const onlyPlatform = platformRows.filter((row) => !vscodeRows.includes(row))
+    const onlyVscode = vscodeRows.filter((row) => !platformRows.includes(row))
+    if (platform !== 'mac') {
+      expect(onlyPlatform).toEqual([])
+      expect(onlyVscode).toEqual([])
+      return
+    }
+    expect(onlyPlatform.toSorted()).toEqual([
+      'Mod+K Mod+Shift+[ editor.editor.foldRecursively',
+      'Mod+K Mod+Shift+] editor.editor.unfoldRecursively',
+      'Mod+K Mod+[ editor.editor.fold',
+      'Mod+K Mod+] editor.editor.unfold',
+    ])
+    expect(onlyVscode.toSorted()).toEqual([
+      'Mod+Alt+[ editor.editor.fold',
+      'Mod+Alt+] editor.editor.unfold',
+      'Mod+K Mod+[ editor.editor.foldRecursively',
+      'Mod+K Mod+] editor.editor.unfoldRecursively',
+    ])
   },
 )
 

@@ -220,6 +220,7 @@ export function SessionRail() {
   return (
     <aside
       className='flex h-full min-h-0 min-w-0 flex-col overflow-hidden'
+      data-screen-sidebar=''
       onKeyDown={handleKeyDown}
     >
       <div className='flex shrink-0 items-center gap-1 px-2 pt-(--density-section-gap)'>

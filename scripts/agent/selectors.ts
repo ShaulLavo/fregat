@@ -497,6 +497,11 @@ export const selectors = {
   /** Its title is the open workspace's root path. */
   projectSwitcher: (page: Page) =>
     page.getByRole('button', { name: 'Switch project', exact: true }),
+  sidebarToggle: (page: Page, mode: 'Workbench' | 'Chat') =>
+    page.getByRole('button', {
+      name: mode === 'Workbench' ? 'Toggle sidebar' : 'Toggle sessions',
+      exact: true,
+    }),
   workspaceMode: (page: Page, mode: 'Workbench' | 'Chat') =>
     page.getByRole('button', { name: `${mode} mode`, exact: true }),
   workspaceRail: (page: Page, mode: 'Workbench' | 'Chat') =>
@@ -790,6 +795,7 @@ export const selectors = {
 export const chords = {
   commandPalette: 'Control+Shift+P',
   togglePanel: 'Control+J',
+  toggleSidebar: 'Control+B',
 }
 
 export async function waitForApp(page: Page, timeoutMs = 45_000) {

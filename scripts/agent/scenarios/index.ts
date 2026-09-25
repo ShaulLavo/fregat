@@ -88,6 +88,7 @@ import { machineConnectError } from './machine-connect-error'
 import { wallpaperIconHints } from './wallpaper-icon-hints'
 import { terminalBackground } from './terminal-background'
 import { bottomPanelPersistence } from './bottom-panel-persistence'
+import { sidebarToggle } from './sidebar-toggle'
 import { gitOpenAllDiffsSpam } from './git-open-all-diffs-spam'
 import { gitStageSettles } from './git-stage-settles'
 import { gitChangesScroll } from './git-changes-scroll'
@@ -308,6 +309,7 @@ export const scenarios: readonly Scenario[] = [
   editorOfflineResync,
   terminalBackground,
   bottomPanelPersistence,
+  sidebarToggle,
   gitOpenAllDiffsSpam,
   gitStageSettles,
   gitChangesScroll,

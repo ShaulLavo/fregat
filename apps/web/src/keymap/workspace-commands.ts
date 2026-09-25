@@ -70,14 +70,15 @@ import type { DocumentRef, TabId } from '@/lib/documents/utils/types'
 import type { EditorDocumentStoreApi } from '@/features/editor/state/document-state'
 import { nextEditorDiffViewMode } from '@/features/editor/utils/diff-view-mode'
 import { commitMessageFilePath } from '@/keymap/utils/commit-message-file'
+import { focusInsideSidebar } from '@/keymap/utils/sidebar-focus'
 import {
   activeEditorTabForWorkbenchPanels,
   openTerminalTabInWorkbenchPanels,
   selectAdjacentTerminalTabInWorkbenchPanels,
   showWorkbenchBottomTab,
+  setWorkbenchSidebarOpen,
   showWorkbenchSidebarTab,
   toggleWorkbenchBottomTab,
-  toggleWorkbenchSidebarTab,
   type TerminalTabDirection,
   type WorkbenchPanels,
 } from '@/features/workbench/utils/panels'
@@ -474,6 +475,33 @@ function chatFocusStart(
   return focusIdInLayoutStart(runtime, { key: rootPath, kind: 'chat-composer' }, layout)
 }
 
+// Visibility only: the selected panel and outside focus stay as they were.
+function toggleWorkbenchSidebar({ runtime, snapshot }: WorkspaceCommandHandlerContext) {
+  if (!snapshot.rootPath) return declined
+
+  const panels = setWorkbenchSidebarOpen(
+    snapshot.workbenchPanels,
+    !snapshot.workbenchPanels.sidebarOpen,
+  )
+  const stranded = !panels.sidebarOpen && focusInsideSidebar()
+  return afterNavigation(
+    getNavigation().setWorkbenchPanels(panels, runtime.workspace, 'workbench'),
+    () => (stranded ? focusActiveSurfaceOrShell(runtime) : handled),
+  )
+}
+
+function toggleSessionRail({ runtime, snapshot }: WorkspaceCommandHandlerContext) {
+  const open = !snapshot.chatModePanels.sessionRailOpen
+  const stranded = !open && focusInsideSidebar()
+  return afterNavigation(
+    getNavigation().setChatModePanels(
+      setChatModeSessionRailOpen(snapshot.chatModePanels, open),
+      runtime.workspace,
+    ),
+    () => (stranded ? chatFocusStart(runtime, snapshot.rootPath, 'chat') : handled),
+  )
+}
+
 /**
  * The nine jump slots are one shape, so they are written once. They are hidden
  * from the palette for the same reason as their four named siblings: they are
@@ -781,26 +809,10 @@ export const workspaceCommands = [
   defineCommand({
     ...workspaceCommandMetadata['workspace.toggleSidebarVisibility'],
     icon: SidebarSimpleIcon,
-    run: ({ runtime, snapshot }) => {
-      const rootPath = snapshot.rootPath
-      if (!rootPath) return declined
-
-      const workspace = runtime.workspace.getState()
-      // Arriving from chat mode reveals the pane rather than toggling it: the
-      // workbench panels the user is about to see were never on screen, so
-      // hiding one would answer a keystroke they could not have aimed.
-      const revealing = workspace.uiMode !== 'workbench'
-      const panels = revealing
-        ? showWorkbenchSidebarTab(snapshot.workbenchPanels, 'files')
-        : toggleWorkbenchSidebarTab(snapshot.workbenchPanels, 'files')
-      return afterNavigation(
-        getNavigation().setWorkbenchPanels(panels, runtime.workspace, 'workbench'),
-        () => {
-          if (!panels.sidebarOpen) return handled
-          return focusIdInLayoutStart(runtime, { kind: 'file-tree', rootPath }, 'workbench')
-        },
-      )
-    },
+    run: (context) =>
+      context.snapshot.uiMode === 'chat'
+        ? toggleSessionRail(context)
+        : toggleWorkbenchSidebar(context),
   }),
   defineCommand({
     ...workspaceCommandMetadata['workspace.togglePanel'],
@@ -1148,8 +1160,6 @@ export const workspaceCommands = [
       )
     },
   }),
-  // Chat sessions all sit under Mod+Alt: the plain Mod digits are reserved for the
-  // editor groups VS Code puts there, and Mod+B already toggles the Files pane.
   defineCommand({
     ...workspaceCommandMetadata['workspace.newSession'],
     run: (context) => runSessionCommand(context, startScopedSessionDraft),
@@ -1166,15 +1176,7 @@ export const workspaceCommands = [
     ...workspaceCommandMetadata['workspace.toggleSessionRail'],
     run: (context) => {
       if (context.snapshot.uiMode !== 'chat') return declined
-      return navigationStart(
-        getNavigation().setChatModePanels(
-          setChatModeSessionRailOpen(
-            context.snapshot.chatModePanels,
-            !context.snapshot.chatModePanels.sessionRailOpen,
-          ),
-          context.runtime.workspace,
-        ),
-      )
+      return toggleSessionRail(context)
     },
   }),
   ...sessionJumpCommands(),
