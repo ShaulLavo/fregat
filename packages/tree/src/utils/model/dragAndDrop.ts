@@ -1,4 +1,4 @@
-import { isCanonicalDirectoryPath } from './pathHelpers'
+import { getAncestorDirectoryPaths, isCanonicalDirectoryPath } from './pathHelpers'
 import type {
   FileTreeBatchOperation,
   FileTreeDropContext,
@@ -41,20 +41,7 @@ function normalizeDraggedPaths(paths: readonly FileTreePublicId[]): readonly Fil
 
     return left.localeCompare(right)
   })) {
-    const trimmedPath = path.endsWith('/') ? path.slice(0, -1) : path
-    const segments = trimmedPath.split('/')
-    let hasSelectedAncestor = false
-    for (let index = 0; index < segments.length - 1; index += 1) {
-      const ancestorPath = `${segments.slice(0, index + 1).join('/')}/`
-      if (!keptPaths.has(ancestorPath)) {
-        continue
-      }
-
-      hasSelectedAncestor = true
-      break
-    }
-
-    if (hasSelectedAncestor) {
+    if (getAncestorDirectoryPaths(path).some((ancestor) => keptPaths.has(ancestor))) {
       continue
     }
 

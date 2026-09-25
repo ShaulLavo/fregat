@@ -1,7 +1,9 @@
+import { normalizeWorkspaceRoot } from './path'
+
 export type PickerPathParseResult = { error: null; path: string } | { error: string; path: null }
 
 export function absolutePickerPath(currentPath: string, workspaceRoot: string) {
-  const root = withoutTrailingSlash(workspaceRoot)
+  const root = normalizeWorkspaceRoot(workspaceRoot)
   if (!currentPath) return root || '/'
   if (!root) return `/${currentPath}`
 
@@ -33,7 +35,7 @@ function expandHomePath(input: string, homePath: string) {
 export function relativePickerPath(input: string, workspaceRoot: string) {
   if (!input.startsWith('/')) return input
 
-  const root = withoutTrailingSlash(workspaceRoot)
+  const root = normalizeWorkspaceRoot(workspaceRoot)
   if (!root) return input.slice(1)
   if (input === root) return ''
   if (!input.startsWith(`${root}/`)) return null
@@ -60,10 +62,4 @@ function normalizeRelativePath(input: string): PickerPathParseResult {
 
 function invalidPath(error: string): PickerPathParseResult {
   return { error, path: null }
-}
-
-function withoutTrailingSlash(path: string) {
-  if (path === '/') return ''
-
-  return path.replace(/\/+$/, '')
 }

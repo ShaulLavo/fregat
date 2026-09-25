@@ -1,3 +1,4 @@
+import { compareValues } from '@workspace/utils/compare'
 import {
   contiguousMatch,
   matchToken,
@@ -77,11 +78,11 @@ export function compareFuzzyRankedTargets(
 function compareFuzzyRanks(left: FuzzyRank, right: FuzzyRank) {
   return (
     compareBooleans(left.exact, right.exact) ||
-    compareNumbers(right.score, left.score) ||
+    compareValues(right.score, left.score) ||
     compareBooleans(left.labelMatched, right.labelMatched) ||
-    compareNumbers(left.span, right.span) ||
-    compareNumbers(left.labelLength, right.labelLength) ||
-    compareNumbers(left.pathLength, right.pathLength) ||
+    compareValues(left.span, right.span) ||
+    compareValues(left.labelLength, right.labelLength) ||
+    compareValues(left.pathLength, right.pathLength) ||
     left.tieBreaker.localeCompare(right.tieBreaker)
   )
 }
@@ -227,10 +228,10 @@ function emptyRank(target: FuzzyRankTarget): FuzzyRank {
 
 function compareFieldRanks(left: FieldRank, right: FieldRank) {
   return (
-    compareNumbers(right.score, left.score) ||
+    compareValues(right.score, left.score) ||
     compareBooleans(left.exact, right.exact) ||
-    compareNumbers(left.span, right.span) ||
-    compareNumbers(left.firstIndex, right.firstIndex)
+    compareValues(left.span, right.span) ||
+    compareValues(left.firstIndex, right.firstIndex)
   )
 }
 
@@ -239,10 +240,6 @@ function compareRankTargets(left: FuzzyRankTarget, right: FuzzyRankTarget) {
     left.label.localeCompare(right.label) ||
     (left.path ?? left.label).localeCompare(right.path ?? right.label)
   )
-}
-
-function compareNumbers(left: number, right: number) {
-  return left === right ? 0 : left < right ? -1 : 1
 }
 
 function compareBooleans(left: boolean, right: boolean) {

@@ -15,16 +15,17 @@ export function arePathSetsEqual(
   return true
 }
 
-// Expanding a nested directory should make that directory visible, so this
-// helper walks its ancestor chain in canonical path form.
+// Ancestors in canonical directory form, nearest last. One indexOf walk: the
+// split-and-rejoin form is quadratic in segment count.
 export function getAncestorDirectoryPaths(path: string): readonly string[] {
   const normalizedPath = path.endsWith('/') ? path.slice(0, -1) : path
-  if (normalizedPath.length === 0) {
-    return []
+  const ancestors: string[] = []
+  let slashIndex = normalizedPath.indexOf('/')
+  while (slashIndex !== -1) {
+    ancestors.push(normalizedPath.slice(0, slashIndex + 1))
+    slashIndex = normalizedPath.indexOf('/', slashIndex + 1)
   }
-
-  const segments = normalizedPath.split('/')
-  return segments.slice(0, -1).map((_, index) => `${segments.slice(0, index + 1).join('/')}/`)
+  return ancestors
 }
 
 export function getImmediateParentPath(path: string): string | null {

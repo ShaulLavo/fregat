@@ -1,6 +1,7 @@
 import type { GitStatus, GitStatusEntry } from '../publicTypes'
 import { getGitStatusSignature } from '../getGitStatusSignature'
 import { normalizeInputPath } from '../normalizeInputPath'
+import { getAncestorDirectoryPaths } from './pathHelpers'
 import type { FileTreeGitStatusPatch } from './publicTypes'
 
 export interface FileTreeGitStatusState {
@@ -9,28 +10,6 @@ export interface FileTreeGitStatusState {
   readonly ignoredDirectoryPaths: ReadonlySet<string>
   readonly signature: string
   readonly statusByPath: ReadonlyMap<string, GitStatus>
-}
-
-// Git status is keyed by canonical paths in the file tree so runtime tree
-// mutations can reuse the same decoration state without rebuilding ID maps.
-function getAncestorDirectoryPaths(path: string): readonly string[] {
-  const normalizedPath = path.endsWith('/') ? path.slice(0, -1) : path
-  if (normalizedPath.length === 0) {
-    return []
-  }
-
-  const ancestors: string[] = []
-  let searchIndex = 0
-  for (;;) {
-    const slashIndex = normalizedPath.indexOf('/', searchIndex)
-    if (slashIndex === -1) {
-      break
-    }
-
-    ancestors.push(normalizedPath.slice(0, slashIndex + 1))
-    searchIndex = slashIndex + 1
-  }
-  return ancestors
 }
 
 function getCanonicalGitStatusPath(path: string, isDirectory: boolean): string {
