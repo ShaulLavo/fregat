@@ -171,6 +171,18 @@ test('a reference that names no pull request starts nothing', async () => {
   expect((await fixture.engine.readModelSnapshot()).sessions.size).toBe(0)
 })
 
+test('a pull request URL from another repository starts nothing', async () => {
+  const { fixture } = await withPullRequest()
+  await expect(
+    fixture.engine.startPullRequestSession({
+      worktreeId: fixture.registration.worktreeId,
+      reference: 'https://github.com/other/lib/pull/7',
+      modelSelection: MODEL,
+    }),
+  ).rejects.toThrow('That pull request belongs to other/lib')
+  expect((await fixture.engine.readModelSnapshot()).sessions.size).toBe(0)
+})
+
 test('push and open reports a pushed branch and a refused pull request as two outcomes', async () => {
   const { fixture } = await withPullRequest()
   await executeGit(fixture.root, 'checkout', '-q', '-b', 'feature/new')

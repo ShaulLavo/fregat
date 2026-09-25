@@ -48,6 +48,13 @@ export const sessionDomainErrors = defineErrorCatalog('orchestration', {
     why: 'A pull request is named by its URL, its number (#123), or a forge checkout command.',
     fix: 'Paste the pull request URL or its number.',
   },
+  PULL_REQUEST_OTHER_REPOSITORY: {
+    status: 400,
+    message: ({ repository }: { repository: string }) =>
+      `That pull request belongs to ${repository}, which this checkout does not track.`,
+    why: 'A pull request session starts from a checkout of the repository the pull request is in.',
+    fix: 'Open that repository as a project and start the session there.',
+  },
   PULL_REQUEST_WORKTREE_FAILED: {
     status: 409,
     message: ({ number }: { number: number }) =>
