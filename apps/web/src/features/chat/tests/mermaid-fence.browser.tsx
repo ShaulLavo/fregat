@@ -35,13 +35,13 @@ afterEach(() => {
   setMermaidLoader(null)
 })
 
-function renderDiagram(streaming: boolean) {
+function renderDiagram(streaming: boolean, text = DIAGRAM) {
   flushSync(() => {
     root?.render(
       <AppProviders queryClient={queryClient}>
         <TestEditorStateProvider>
           <ChatWorkspaceRootContext value={null}>
-            <AssistantMarkdown streaming={streaming} text={DIAGRAM} />
+            <AssistantMarkdown streaming={streaming} text={text} />
           </ChatWorkspaceRootContext>
         </TestEditorStateProvider>
       </AppProviders>,
@@ -58,6 +58,19 @@ function mermaidDiagram() {
 }
 
 describe('mermaid fences', () => {
+  it('renders a diagram, math, raw HTML, and highlighted code together', async () => {
+    const text = `${DIAGRAM}\n<kbd>Ctrl</kbd>\n\n$$\nx^2\n$$\n\n\`\`\`typescript\nconst value = 1\n\`\`\`\n`
+    renderDiagram(false, text)
+    await vi.waitFor(() => expect(mermaidDiagram()).not.toBeNull(), { timeout: 15_000 })
+    await vi.waitFor(() => expect(document.querySelector('kbd')?.textContent).toBe('Ctrl'))
+    await vi.waitFor(() => expect(document.querySelector('.katex')).not.toBeNull())
+    await vi.waitFor(() =>
+      expect(
+        document.querySelector('[data-language="typescript"] [style*="--shiki-dark"]'),
+      ).not.toBeNull(),
+    )
+  }, 30_000)
+
   it('stays a code block while streaming, then renders once the message settles', async () => {
     renderDiagram(true)
 

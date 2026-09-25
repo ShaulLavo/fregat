@@ -1,15 +1,13 @@
+import { QueryClient } from '@tanstack/query-core'
 import type { Pluggable } from 'unified'
-
 import type { HastExtensions } from '../utils/hast'
+import { markdownResourceKeys } from './query-keys'
 
 export type MarkdownExtensionName = keyof HastExtensions
 
 type ExtensionLoader = () => Promise<{ readonly default: Pluggable }>
-
 type ExtensionLoaders = Readonly<Record<MarkdownExtensionName, ExtensionLoader>>
 
-// Raw HTML costs an HTML parser and math costs KaTeX. Neither is on the boot
-// path; each loads the first time a document actually contains it.
 const defaultLoaders: ExtensionLoaders = {
   math: () =>
     import('rehype-katex').then((module) => ({ default: [module.default, { output: 'mathml' }] })),
@@ -17,40 +15,40 @@ const defaultLoaders: ExtensionLoaders = {
 }
 
 const NONE: HastExtensions = Object.freeze({ math: null, raw: null })
-
+const resources = new QueryClient()
 let loaders: ExtensionLoaders = defaultLoaders
-let loaded: HastExtensions = NONE
-const pending = new Map<MarkdownExtensionName, Promise<HastExtensions>>()
+let snapshot: HastExtensions = NONE
 
-/** One frozen object per loaded state, so it can key render caches by identity. */
+// A stable derived snapshot keys the synchronous parser/render caches.
 export function loadedMarkdownExtensions(): HastExtensions {
-  return loaded
+  const raw = resources.getQueryData<Pluggable>(markdownResourceKeys.extension('raw')) ?? null
+  const math = resources.getQueryData<Pluggable>(markdownResourceKeys.extension('math')) ?? null
+  if (snapshot.raw === raw && snapshot.math === math) return snapshot
+  snapshot = raw || math ? Object.freeze({ raw, math }) : NONE
+  return snapshot
+}
+
+export function subscribeMarkdownExtensions(listener: () => void) {
+  return resources.getQueryCache().subscribe(listener)
 }
 
 export function loadMarkdownExtension(name: MarkdownExtensionName): Promise<HastExtensions> {
-  const inFlight = pending.get(name)
-  if (inFlight) return inFlight
-
-  const promise = loaders[name]().then(
-    (module) => {
-      loaded = Object.freeze({ ...loaded, [name]: module.default })
-      return loaded
-    },
-    // A failed load leaves the stage off for the session; the next document
-    // that needs it retries.
-    () => {
-      pending.delete(name)
-      return loaded
-    },
-  )
-  pending.set(name, promise)
-
-  return promise
+  return resources
+    .query({
+      queryKey: markdownResourceKeys.extension(name),
+      queryFn: async () => (await loaders[name]()).default,
+      staleTime: 'static',
+      gcTime: Infinity,
+      networkMode: 'always',
+      structuralSharing: false,
+      retry: false,
+    })
+    .then(loadedMarkdownExtensions)
+    .catch(loadedMarkdownExtensions)
 }
 
-/** Test seam: swap the dynamic imports for loaders that fail or resolve on cue. */
 export function setMarkdownExtensionLoaders(next: Partial<ExtensionLoaders> | null): void {
   loaders = { ...defaultLoaders, ...next }
-  loaded = NONE
-  pending.clear()
+  resources.clear()
+  snapshot = NONE
 }
