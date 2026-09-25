@@ -168,6 +168,8 @@ LIFE-01/02 implementation shipped on 2026-09-20; [delivery evidence](archive-del
 - **Acceptance:** Copy values match owner paths/IDs; project settings targets owner; leave a draft containing text or attachments and recover it from rail after reload; deleting last managed-worktree session offers correct cleanup, but surviving/archived references prevent removal. Shared worktree shells remain alive; truly session-owned terminal/process state is released and cleanup failure is visible.
 - **Verification:** Extend menu tests, draft persistence tests, and `components/tests/worktree-cleanup-eligibility.test.tsx`; add deletion/draft browser scenario. Real in-process cleanup test must assert filesystem and provider state, not only dispatched action names.
 
+- **Owner question (completion wave, 2026-09-25):** where the owner-scoped Project settings destination lives. The plan gives no recommendation, so it is not built. Session-owned terminal cleanup landed (lane L5).
+
 ### LIFE-13 — P2: Offer Undo for settle, snooze, archive and unpin, with a mod+z binding
 
 > **Owner correction (2026-09-25):** replace the single "latest undo" slot with an **undo/redo stack**: Mod+Z steps back through

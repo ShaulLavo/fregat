@@ -206,7 +206,7 @@ export class OrchestrationEngine {
         this.createPullRequestSync(options)
         this.createSettlement(options)
         this.createWorktreeCleanup(options)
-        this.createDeletionReactor()
+        this.createDeletionReactor(options.terminalService)
         this.createDiscoveryReconciler()
       },
       recover: () => this.recover(),
@@ -709,8 +709,9 @@ export class OrchestrationEngine {
     })
   }
 
-  private createDeletionReactor() {
+  private createDeletionReactor(terminals: TerminalService | undefined) {
     const reactor = new SessionDeletionReactor({
+      terminals: terminals ?? null,
       attachmentsDir: this.attachmentsDir,
       database: this.database,
       providerService: this.providerService,

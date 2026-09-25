@@ -275,7 +275,8 @@
         "/work/tmp/fregat-evidence/20260920T161205Z-scenario-draft-recovery/summary.md records completed distinct-draft reload, uploaded-file and worktree-target recovery, and safe discard",
         "/work/tmp/fregat-evidence/20260920T152347Z-scenario-session-navigation/summary.md records completed owner path, branch and session-ID clipboard checks",
         "scripts/agent/scenarios/worktree-cleanup-on-delete.ts: deleting the last session offers worktree removal; surviving and archived references keep it (repository-delivery.md, EXT-12)",
-        "Remaining: owner-scoped project settings, session-owned terminal deletion and full upstream runtime comparison"
+        "Session-owned terminals (completion wave, lane L5): deleting a session removes its agent terminals' saved history and ends any it still owns; worktree shells stay; boot recovery sweeps deleted sessions; a live agent terminal still refuses deletion with SESSION_IN_TERMINAL. Test apps/server/src/terminal/tests/session-terminal-cleanup.test.ts",
+        "Remaining: owner-scoped project settings (owner question: no written recommendation for its destination) and full upstream runtime comparison"
       ]
     },
     {
