@@ -124,9 +124,10 @@ agent is `application` or `machine`, never `window`.
    bounded excerpt with unsaved text, stale-range refusal `DIAGNOSTIC_CHANGED`, keyed mutation
    `diagnosticAiMutationKeys.fix`; `state/diagnostic-fix.ts` behind `DiagnosticFixProvider`) and
    the Problems list entry (a per-row button, and `Mod+.` on the active problem so the tree keeps
-   one Tab stop). Scenario `problems-panel-rows` covers it. **Left:** the keyboard diagnostic
-   popup (`features/editor/components/diagnostic-peek.tsx` has to carry the range and version, a
-   lane L7 file) and the hover action (a generic per-note action in the Editor repo, lane L7).
+   one Tab stop), and the keyboard diagnostic popup (`DiagnosticPeekFixButton`, reading the
+   tracked range against the text as it is now). Scenario `problems-panel-rows` covers both.
+   **Left:** the hover action, which needs a generic per-note action in the Editor repo; handed
+   to lane L7.
 4. Diagnostics feedback, by the route D2 picks.
 5. Symbol-tool steering hooks, after plan 088.
 

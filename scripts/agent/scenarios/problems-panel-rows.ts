@@ -5,7 +5,7 @@ import type { Page } from 'playwright'
 
 import type { Scenario } from './index'
 import { openFixtureWorkspace, releaseFixture } from '../fixture-workspace'
-import { openFileFromTree, selectors } from '../selectors'
+import { focusEditor, openFileFromTree, selectors } from '../selectors'
 
 /** Two files that fail type checking as written, so nothing has to be typed into them. */
 async function createFixture() {
@@ -30,7 +30,7 @@ async function activeRowText(page: Page) {
 export const problemsPanelRows: Scenario = {
   name: 'problems-panel-rows',
   description:
-    'Two files with type errors in a disposable workspace: Problems is one tree with one tab stop, the arrows walk from the first file into the second, clicking a problem moves the cursor to it, and Mod+. hands the active problem to a new chat draft.',
+    'Two files with type errors in a disposable workspace: Problems is one tree with one tab stop, the arrows walk from the first file into the second, clicking a problem moves the cursor to it, and Mod+. or Fix with AI in the F8 popup hands the problem to a new chat draft.',
   async run(page, { step }) {
     const fixture = await createFixture()
     try {
@@ -104,6 +104,26 @@ export const problemsPanelRows: Scenario = {
       const prompt = (await composer.textContent()) ?? ''
       ok(/beta\.ts/.test(prompt), `The prompt names the problem's file: "${prompt.slice(0, 120)}"`)
       await step('fix-with-ai-draft')
+
+      // The keyboard diagnostic popup offers the same hand-off.
+      await composer.click()
+      await page.keyboard.press('Control+A')
+      await page.keyboard.press('Delete')
+      await selectors.editorTabNamed(page, /beta\.ts/).click()
+      await focusEditor(page)
+      await page.keyboard.press('Control+Home')
+      await page.keyboard.press('F8')
+      const peek = page.locator('[data-diagnostic-peek]')
+      await peek.waitFor({ timeout: 10_000 })
+      await step('diagnostic-popup')
+      await peek.getByRole('button', { name: 'Fix with AI', exact: true }).click()
+      await peek.waitFor({ state: 'detached', timeout: 10_000 })
+      await page.waitForFunction(
+        (element) => (element?.textContent ?? '').includes('Investigate and fix the cause'),
+        await composer.elementHandle(),
+        { timeout: 10_000 },
+      )
+      await step('popup-fix-with-ai-draft')
     } finally {
       await releaseFixture(fixture)
     }
