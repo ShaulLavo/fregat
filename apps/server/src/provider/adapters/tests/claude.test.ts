@@ -6,6 +6,7 @@ import { afterAll, assert, beforeAll, describe, expect, it, vi } from 'vitest'
 import type {
   CanUseTool,
   Options,
+  PermissionUpdate,
   Query,
   SDKMessage,
   SDKRateLimitInfo,
@@ -428,16 +429,18 @@ describe('ClaudeProviderAdapter', () => {
       },
       sessionId,
     })
+    // No suggestions from the SDK: nothing to remember, so only one-off answers.
+    expect(approvalDecisions(opened)).toEqual(['cancel', 'decline', 'accept'])
 
     const requestId = opened.requestId
     assert(requestId, 'request.opened carried no requestId')
     await expect(
       harness.adapter.respondApproval({
-        decision: 'acceptAlways',
+        decision: 'acceptForSession',
         requestId: v.parse(approvalRequestIdSchema, requestId),
         sessionId,
       }),
-    ).rejects.toThrow('does not offer permanent access')
+    ).rejects.toThrow('does not offer acceptForSession')
     await harness.adapter.respondApproval({
       decision: 'accept',
       requestId: v.parse(approvalRequestIdSchema, requestId),
@@ -460,6 +463,54 @@ describe('ClaudeProviderAdapter', () => {
         sessionId,
       }),
     ).rejects.toThrow('Unknown pending approval request: claude:missing')
+    await harness.adapter.stopAll()
+  })
+
+  it('remembers an approval through the SDK suggestions at the chosen destination', async () => {
+    const harness = claudeHarness()
+    const sessionId = v.parse(sessionIdSchema, '3f9b8a51-2f0e-5c43-9d6e-7c1a4b2e8f10')
+    await harness.adapter.startRuntime(
+      sessionStartInput({ runtimeMode: 'approval-required', sessionId }),
+    )
+    const canUseTool = latestOptions(harness).canUseTool
+    assert(canUseTool, 'canUseTool was not passed to the SDK')
+    const options = { ...canUseToolOptions(), suggestions: BASH_SUGGESTIONS }
+
+    const forSession = canUseTool('Bash', { command: 'ls -la' }, options)
+    const sessionRequest = await waitForEvent(harness, 'request.opened')
+    expect(approvalDecisions(sessionRequest)).toEqual([
+      'cancel',
+      'decline',
+      'acceptForSession',
+      'acceptAlwaysInProject',
+      'acceptAlways',
+      'accept',
+    ])
+    await harness.adapter.respondApproval({
+      decision: 'acceptForSession',
+      requestId: v.parse(approvalRequestIdSchema, sessionRequest.requestId),
+      sessionId,
+    })
+    await expect(forSession).resolves.toMatchObject({
+      updatedPermissions: [
+        { destination: 'session', rules: [{ ruleContent: 'ls -la', toolName: 'Bash' }] },
+        { destination: 'session', rules: [{ ruleContent: '//tmp/**', toolName: 'Read' }] },
+      ],
+    })
+
+    const inProject = canUseTool('Bash', { command: 'ls -la' }, options)
+    await waitFor(() => openedRequests(harness).length === 2, 'second approval was not opened')
+    const projectRequest = openedRequests(harness)[1]
+    assert(projectRequest?.requestId, 'second request.opened carried no requestId')
+    await harness.adapter.respondApproval({
+      decision: 'acceptAlwaysInProject',
+      requestId: v.parse(approvalRequestIdSchema, projectRequest.requestId),
+      sessionId,
+    })
+    await expect(inProject).resolves.toMatchObject({
+      behavior: 'allow',
+      updatedPermissions: [{ destination: 'localSettings' }, { destination: 'session' }],
+    })
     await harness.adapter.stopAll()
   })
 
@@ -1191,6 +1242,27 @@ async function waitFor(predicate: () => boolean, label: string) {
   }
 
   assert(predicate(), label)
+}
+
+/** The shape the CLI proposes for a Bash call: a persistent rule plus a session read grant. */
+const BASH_SUGGESTIONS: PermissionUpdate[] = [
+  {
+    behavior: 'allow',
+    destination: 'localSettings',
+    rules: [{ ruleContent: 'ls -la', toolName: 'Bash' }],
+    type: 'addRules',
+  },
+  {
+    behavior: 'allow',
+    destination: 'session',
+    rules: [{ ruleContent: '//tmp/**', toolName: 'Read' }],
+    type: 'addRules',
+  },
+]
+
+function approvalDecisions(event: ProviderRuntimeEvent) {
+  assert(event.type === 'request.opened', `expected request.opened, got ${event.type}`)
+  return event.payload.options?.map((option) => option.decision)
 }
 
 function canUseToolOptions(): Parameters<CanUseTool>[2] {

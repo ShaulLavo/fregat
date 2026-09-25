@@ -19,19 +19,24 @@ export async function dispatch(page: Page, base: string, command: Record<string,
   ok(response.ok(), `Verification command failed: ${await response.text()}`)
 }
 
+/** Switches the page to chat mode and returns the orchestration HTTP base its socket connected to. */
+export async function openChat(page: Page) {
+  const connected = page.waitForEvent('websocket', {
+    predicate: (socket) => socket.url().endsWith('/orchestration/rpc'),
+  })
+  await page.goto(page.url().replace(/\/workbench(?:\?.*)?$/, '/chat'))
+  return (await connected)
+    .url()
+    .replace(/^ws/, 'http')
+    .replace(/\/rpc$/, '')
+}
+
 /**
  * Opens chat mode on the connected owner and returns the shell every session scenario drives:
  * the orchestration base URL, the platform worktree and the project that owns it.
  */
 export async function openChatShell(page: Page) {
-  const connected = page.waitForEvent('websocket', {
-    predicate: (socket) => socket.url().endsWith('/orchestration/rpc'),
-  })
-  await page.goto(page.url().replace(/\/workbench(?:\?.*)?$/, '/chat'))
-  const base = (await connected)
-    .url()
-    .replace(/^ws/, 'http')
-    .replace(/\/rpc$/, '')
+  const base = await openChat(page)
   const snapshot = await readShell(page, base)
   const worktree = snapshot.worktrees.find((item) => item.path.endsWith('/projects/platform'))
   ok(worktree, 'Platform worktree must be registered')

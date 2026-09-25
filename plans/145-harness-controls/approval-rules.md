@@ -1,6 +1,7 @@
 # 145 · Approval rules
 
-- Status: PROPOSED.
+- Status: CLAUDE HALF IMPLEMENTED 2026-09-24 (steps 1, 2, 4, 5; D1 and D2 as recommended). Step 3
+  (Codex) waits for the Codex schema refresh.
 - Planned at: Platform `c2af88b4`, 2026-09-24. Origin: the 2026-09-24 reference survey.
 - Work in the current checkout; no branches, worktrees, commits, pushes or PRs unless separately
   requested.
@@ -57,6 +58,29 @@ rule store, not in a Platform copy.
 4. The request's options come from the adapter, so the panel shows only decisions that provider
    can honour. Delete the `acceptAlways` throw paths that become reachable-by-design.
 5. Add the chosen destination and rule count to the approval wide event. Do not log tool input.
+
+## Progress
+
+- Step 1, measured 2026-09-24 against `claude` 2.1.281 through the SDK: answering
+  `{ behavior: 'allow' }` asked twice for the same Bash call in one session. Returning the
+  suggestions rewritten to `session` asked once. The old "Allow for this session" did not hold.
+- The CLI's suggestions mix destinations. A Bash call proposes its rule at `localSettings`, plus a
+  `session`-scoped Read or `addDirectories` grant for the paths it touches. "Always" moves only the
+  non-session entries (`localSettings` for the project, `userSettings` for everywhere) and leaves
+  the harness's session grants alone. A command that reads outside the working directory is
+  therefore asked about again in a new session, which is also what the CLI does.
+- Real run: "Always allow in this project" wrote `Bash(touch marker-145.txt)` to
+  `.claude/settings.local.json`, and a new session ran the command without asking.
+- The new decision is `acceptAlwaysInProject`; `acceptAlways` means everywhere (Claude
+  `userSettings`, Codex elicitation `always`). Claude offers "for this session" only when suggestions
+  exist, and the always pair only when one is not session-scoped and `suppressAlwaysAllowRule` is
+  unset. `respondApproval` rejects any decision the request did not offer.
+- Wide event: `chat.pipeline.claude_session.approval.resolved` carries decision, destinations and
+  rule count, never the rules.
+- UI: scenario `claude-approval-rules` drives the real CLI (Haiku) through the panel on a
+  disposable repository. It asserts the six options, the rule in `settings.local.json`, and a second
+  session that is not asked. It passed on an isolated dev pair 2026-09-25.
+- Open: step 3 (Codex).
 
 ## Verification
 

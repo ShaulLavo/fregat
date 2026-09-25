@@ -35,6 +35,7 @@ The chat mode button in the window toolbar, or an address URL with `/chat/`.
 Commands dispatch over the orchestration socket when it is live and over HTTP otherwise. The HTTP path refetches the shell snapshot itself.
 
 - `mcp-approval`: isolated fake native Codex provider, advertised app-access choices after reload, permanent approval wire reply, and session/provider cleanup. No external app access.
+- `claude-approval-rules`: real Claude CLI (Haiku) in approval-required mode on a disposable repository; the command approval offers session and always rules, "Always allow in this project" writes `.claude/settings.local.json`, and a second session runs the same command unasked. Spends two short Haiku turns.
 
 `scenario session-unread` uses two disposable sessions and one short provider turn to verify completion while away, return-to-read, manual unread across reload, and a timer wake that survives visits until acknowledged. Both sessions are deleted. Background-tab suppression and monotonic scoped visits also have focused hook/store tests.
 

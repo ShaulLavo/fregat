@@ -3199,8 +3199,8 @@ function codexApprovalResponse(
     if (!response) throw createInternalError('This approval does not offer the selected decision.')
     return response
   }
-  if (decision === 'acceptAlways')
-    throw createInternalError('This approval does not offer permanent access.')
+  if (decision === 'acceptAlways' || decision === 'acceptAlwaysInProject')
+    throw createInternalError(`This approval does not offer ${decision}.`)
   if (pending.method !== 'item/permissions/requestApproval') return { decision }
   const permissions =
     decision === 'accept' || decision === 'acceptForSession' ? pending.permissions : {}

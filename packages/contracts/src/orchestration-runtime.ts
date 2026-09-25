@@ -29,6 +29,7 @@ export const providerUserInputAnswersSchema = v.record(v.string(), v.unknown())
 export const providerApprovalDecisionSchema = v.picklist([
   'accept',
   'acceptForSession',
+  'acceptAlwaysInProject',
   'acceptAlways',
   'decline',
   'cancel',
