@@ -3,6 +3,10 @@ import path from 'node:path'
 import { serverPort, serverUnit } from './systemd/promote'
 
 export const checkoutRoot = path.resolve(import.meta.dirname, '../..')
+// Layout: releases/<stamp>-<commit>-<slug>/ holds web/, server/, build-config.json and live-check.json.
+// current -> the served release. pending -> a release `deploy --server` staged; the unit's
+// ExecStartPre (bin/promote.ts, installed from systemd/promote.ts) renames it over current on the
+// next start, which only a Restart click, a crash or `systemctl start` causes. Both are symlinks.
 export const productionRoot = '/work/platform-production'
 export const releasesRoot = path.join(productionRoot, 'releases')
 export const currentLink = path.join(productionRoot, 'current')
