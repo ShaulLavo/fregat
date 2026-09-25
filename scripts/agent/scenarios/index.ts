@@ -126,9 +126,7 @@ import { editorOfflineResync } from './editor-offline-resync'
 import { editorThemePreview } from './editor-theme-preview'
 import { editorNativeCoverage } from './editor-native-coverage'
 import { editorSyntaxBenchmark } from './editor-syntax-benchmark'
-import { themeBundles } from './theme-bundles'
 import { bundleWallpapers } from './bundle-wallpapers'
-import { themeGallery } from './theme-gallery'
 import { colorModePreview } from './color-mode-preview'
 import { wallpaperModeToggle } from './wallpaper-mode-toggle'
 import { editorAutoClose } from './editor-auto-close'
@@ -337,10 +335,8 @@ export const scenarios: readonly Scenario[] = [
   editorNativeCoverage('dark'),
   editorSyntaxBenchmark('shiki'),
   editorSyntaxBenchmark('shiki', true),
-  themeGallery,
   colorModePreview,
   pageLifecycle,
-  themeBundles,
   bundleWallpapers,
   editorAutoClose,
   editorFormatChord,

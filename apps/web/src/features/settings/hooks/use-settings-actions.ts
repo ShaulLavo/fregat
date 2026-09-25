@@ -31,7 +31,7 @@ import {
   type ThemeVariantPatch,
 } from '@workspace/contracts'
 import { useMutation, useMutationState, type QueryClient } from '@tanstack/react-query'
-import { useSettingsOwner } from '@/features/settings/hooks/use-settings-owner'
+import { useSettingsOwner } from '@/lib/settings-owner/hooks/use-settings-owner'
 
 import type { PlatformCommandId } from '@/keymap/types'
 import {
@@ -62,7 +62,7 @@ import {
 import { elapsedMs } from '@workspace/utils/timing'
 import { durationBetweenMs } from '@workspace/utils/timing'
 import { dismissSaveError, notifySaveError } from '@/features/settings/utils/notify-save-error'
-import { providerEnabledOperation } from '@/features/settings/utils/operations'
+import { providerEnabledOperation, themeCustomization } from '@/features/settings/utils/operations'
 import { admitSettingsMutationResult } from '@/features/settings/state/snapshot-admission'
 import { annotateClientError, clientErrorMetadata } from '@/lib/client-error-context'
 import { log } from '@/lib/client-logging'
@@ -207,11 +207,7 @@ export function useSettingsActions() {
         'user',
         [
           { kind: 'set', key: 'workbench.theme', value: theme },
-          { kind: 'theme.reset', id: theme.id },
-          ...(['light', 'dark'] as const).flatMap((mode) => {
-            const patch = patches[mode]
-            return patch ? [{ kind: 'theme.customize' as const, id: theme.id, mode, patch }] : []
-          }),
+          { kind: 'theme.reset', id: theme.id, to: themeCustomization(patches) },
         ],
         initiator,
       ),

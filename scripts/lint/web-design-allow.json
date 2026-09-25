@@ -40,12 +40,7 @@
     "reason": "A tab inside a bar: square, full bar height, lifted to the well colour when active. The Button primitive owns a radius, a fixed height and its own hover fill, none of which a bar tab may have; it shares its classes with the editor tab, which is allow-listed for the same shape."
   },
   {
-    "file": "apps/web/src/features/settings/components/widgets/palette-card.tsx",
-    "class": "<button>",
-    "reason": "A gallery card with role='radio': a multi-line region holding a name, badges and two swatch strips. The Button primitive is a fixed-height, centred control with its own hover fill and radius; a card is none of those. ListRow owns a single line at row height, so this gallery card retains its multiline radio control."
-  },
-  {
-    "file": "apps/web/src/features/settings/components/widgets/color-field.tsx",
+    "file": "apps/web/src/features/theme-studio/components/color-field.tsx",
     "class": "<input>",
     "reason": "type='color' is the native picker inside an InputGroup addon; the Input primitive is a text control and would restyle the swatch."
   },
@@ -160,7 +155,7 @@
     "reason": "Search excerpt: the complete value is an entire source line, sometimes thousands of characters, which a native tooltip is the wrong container for. The row's purpose is to open the file."
   },
   {
-    "file": "apps/web/src/features/settings/components/widgets/color-field.tsx",
+    "file": "apps/web/src/features/theme-studio/components/color-field.tsx",
     "class": "truncate",
     "reason": "D3: a field label."
   },

@@ -1,8 +1,8 @@
+import { paletteLibraryQueryKey } from '@/lib/theme-library/utils/keys'
 import { useQuery } from '@tanstack/react-query'
 import { parsePalette, type Palette } from '@workspace/contracts'
 
-import { useSettingsOwner } from '@/features/settings/hooks/use-settings-owner'
-import { paletteLibraryQueryKey } from '@/features/settings/utils/query-keys'
+import { useSettingsOwner } from '@/lib/settings-owner/hooks/use-settings-owner'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 
 /** The user's palettes on the primary server; empty until the list arrives. */

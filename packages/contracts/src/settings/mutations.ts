@@ -657,6 +657,8 @@ function applyThemeOperation(
   const customizations = parsed.success ? { ...parsed.output } : {}
   if (operation.kind === 'theme.reset') {
     delete customizations[operation.id]
+    if (operation.to && Object.keys(operation.to).length > 0)
+      customizations[operation.id] = operation.to
     return replaceSetting(raw, 'workbench.theme.customizations', customizations)
   }
   const theme = customizations[operation.id] ?? {}

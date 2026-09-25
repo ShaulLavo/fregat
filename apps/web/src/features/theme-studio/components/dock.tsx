@@ -6,12 +6,21 @@ import { useEditorColorTheme } from '@/lib/editor-theme/hooks/use-editor-color-t
 import { useStudioStore } from '@/lib/theme-studio/state/studio-store'
 import { DockHeader } from '@/features/theme-studio/components/dock-header'
 import { CodeTab } from '@/features/theme-studio/components/code-tab'
+import { ColorsTab } from '@/features/theme-studio/components/colors-tab'
+import { WallpaperTab } from '@/features/theme-studio/components/wallpaper-tab'
+import { useDraftPalette } from '@/features/theme-studio/hooks/use-draft-palette'
+import { usePaletteActions } from '@/lib/theme-library/hooks/use-palette-actions'
+import { useSettingsOwner } from '@/lib/settings-owner/hooks/use-settings-owner'
+import { wallpaperColorsOptions } from '@/lib/wallpapers/state/queries'
+import { paletteFromWallpaperColors } from '@workspace/client-core/themes/wallpaper-palette'
+import { errorMessage } from '@/lib/error-message'
+import { toastError } from '@/lib/toast-error'
 import { SurfacesTab } from '@/features/theme-studio/components/surfaces-tab'
 import { ThemesTab } from '@/features/theme-studio/components/themes-tab'
 import { useStudioDraft } from '@/features/theme-studio/hooks/use-studio-draft'
 import { useStudioPreview } from '@/features/theme-studio/hooks/use-studio-preview'
 import { editVariant, previewBundle, variantPatch } from '@/features/theme-studio/utils/draft'
-import type { ThemeVariantPatch } from '@workspace/contracts'
+import type { AssetId, ThemeVariantPatch } from '@workspace/contracts'
 
 /**
  * The theme studio: a strip along the bottom of a workbench that stays live and full size above
@@ -23,16 +32,30 @@ export function Dock() {
   const { colorMode } = useEditorColorTheme()
   const bundles = useBundles()
   const mode: ColorMode = store.mode ?? colorMode
+  const editsPending = dirty || Object.keys(store.paletteEdits).length > 0
   const ref = useRef<HTMLElement>(null)
   useStudioPreview(draft, store.mode)
+  const draftPalette = useDraftPalette(draft, mode)
+  const palettes = usePaletteActions()
+  const owner = useSettingsOwner()
 
   // Opening moves focus into the dock once; after that keys belong to whatever holds focus.
   useEffect(() => {
     ref.current?.querySelector<HTMLElement>('[data-studio-themes]')?.focus()
   }, [])
 
-  function apply() {
-    if (!draft || !dirty) return
+  async function apply() {
+    if (!draft || !editsPending) return
+    try {
+      // A palette the draft forked has to exist in the library before the theme names it.
+      for (const palette of Object.values(store.paletteEdits))
+        await palettes.create.mutateAsync(palette)
+    } catch (error) {
+      toastError('The colors could not be saved', {
+        description: errorMessage(error, 'The palette library did not accept them.'),
+      })
+      return
+    }
     bundles.apply(
       draft.theme,
       {
@@ -44,12 +67,24 @@ export function Dock() {
     store.closeStudio()
   }
 
+  async function colorsFromImage(asset: AssetId) {
+    if (!draftPalette.colors) return
+    try {
+      const colors = await owner.fetchQuery(wallpaperColorsOptions(asset))
+      draftPalette.setColors(paletteFromWallpaperColors(colors, mode, draftPalette.colors))
+    } catch (error) {
+      toastError('Could not read this image’s colors', {
+        description: errorMessage(error, 'Try another wallpaper.'),
+      })
+    }
+  }
+
   function edit(patch: ThemeVariantPatch) {
     if (draft) store.setDraft(editVariant(draft, mode, patch))
   }
 
   function leave() {
-    if (dirty && !store.confirmingDiscard) return store.setConfirmingDiscard(true)
+    if (editsPending && !store.confirmingDiscard) return store.setConfirmingDiscard(true)
     store.closeStudio()
   }
 
@@ -76,11 +111,11 @@ export function Dock() {
       <DockHeader
         collapsed={store.collapsed}
         confirmingDiscard={store.confirmingDiscard}
-        dirty={dirty}
+        dirty={editsPending}
         mode={mode}
         name={draft?.theme.name ?? 'Theme'}
         tab={store.tab}
-        onApply={apply}
+        onApply={() => void apply()}
         onClose={leave}
         onMode={store.setMode}
         onRevert={store.revert}
@@ -88,14 +123,31 @@ export function Dock() {
         onToggleCollapsed={() => store.setCollapsed(!store.collapsed)}
       />
       {store.collapsed ? null : (
-        <div className='h-40 min-h-0'>
+        <div className='h-48 min-h-0'>
           {store.tab === 'themes' ? (
             <ThemesTab
               customizations={customizations}
               draft={draft}
               mode={mode}
-              onApply={apply}
-              onChoose={store.setDraft}
+              onApply={() => void apply()}
+              onChoose={store.chooseTheme}
+            />
+          ) : null}
+          {store.tab === 'colors' && draft ? (
+            <ColorsTab
+              colors={draftPalette.colors}
+              mode={mode}
+              palette={draftPalette.palette}
+              onChoose={draftPalette.choose}
+              onColors={draftPalette.setColors}
+            />
+          ) : null}
+          {store.tab === 'wallpaper' && draft ? (
+            <WallpaperTab
+              colors={draftPalette.colors}
+              value={draft.variants[mode].wallpaper}
+              onChange={(wallpaper) => edit({ wallpaper })}
+              onColorsFromImage={(asset) => void colorsFromImage(asset)}
             />
           ) : null}
           {store.tab === 'code' && draft ? (

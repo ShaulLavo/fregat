@@ -9,7 +9,7 @@ import {
 } from '@workspace/ui/components/dropdown-menu'
 import { Spinner } from '@workspace/ui/components/spinner'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
-import { WallpaperChoice } from '@/features/settings/components/widgets/wallpaper-choice'
+import { WallpaperChoice } from '@/features/theme-studio/components/wallpaper-choice'
 import { libraryImageUrl } from '@/lib/wallpapers/state/queries'
 import { wallpaperDisplayName, wallpaperTitle } from '@/lib/wallpapers/utils/groups'
 

@@ -121,14 +121,6 @@ export const selectors = {
     page.getByRole('button', { name: 'Conversation history', exact: true }),
   hint: (page: Page, label: string) =>
     page.locator('[data-slot="tooltip-content"]').filter({ hasText: label }),
-  paletteCardActions: (page: Page) =>
-    page
-      .getByRole('radiogroup', { name: 'App colors', exact: true })
-      .getByRole('button', { name: / actions$/ }),
-  wallpaperClose: (page: Page) =>
-    page
-      .getByRole('dialog', { name: 'Wallpaper', exact: true })
-      .getByRole('button', { name: 'Close', exact: true }),
   popupMenu: (page: Page) => page.getByRole('menu'),
   modelPickerTrigger: (page: Page) =>
     page.getByRole('button', { name: 'Provider and model', exact: true }),
@@ -238,9 +230,16 @@ export const selectors = {
       .filter({ hasText: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`) }),
   pickerPreview: (page: Page) => page.locator('[data-file-preview]'),
   themeStudio: (page: Page) => page.getByRole('region', { name: 'Theme studio', exact: true }),
+  themeStudioTab: (page: Page, name: string) =>
+    page
+      .getByRole('region', { name: 'Theme studio', exact: true })
+      .getByRole('tab', { name, exact: true }),
+  themeStudioCard: (page: Page, id: string) =>
+    page.locator(`[data-studio-themes] [role="option"][data-theme-id="${id}"]`),
+  themeStudioOpen: (page: Page) => page.getByRole('button', { name: 'Open studio', exact: true }),
   quickOpenPreview: (page: Page) => page.getByRole('region', { name: 'File preview', exact: true }),
   pickerColumn: (page: Page, index: number) => page.locator(`[data-picker-column="${index}"]`),
-  pickerView: (page: Page, view: 'Columns' | 'List') =>
+  pickerView: (page: Page, view: 'Columns' | 'List' | 'Icons') =>
     page
       .getByRole('tablist', { name: 'View', exact: true })
       .getByRole('tab', { name: view, exact: true }),
@@ -385,17 +384,6 @@ export const selectors = {
   codeThemeOption: (page: Page, id: string) => page.locator(`[data-value="color-theme:${id}"]`),
   wallpaperAsset: (page: Page, id: string) =>
     page.locator(`${wallpaperStillSelector}[src*="${id}"]`),
-  themeGallery: (page: Page) => page.getByLabel('Theme bundles', { exact: true }),
-  themeCard: (page: Page, id: string) =>
-    page.locator(`[data-theme-bundle="${id}"]`).getByRole('button'),
-  paletteActions: (page: Page, name: string) =>
-    page.getByRole('button', { name: `${name} actions`, exact: true }),
-  paletteMenuAction: (page: Page, name: string) =>
-    page.getByRole('menuitem', { name, exact: true }),
-  themeAction: (page: Page, name: string) => page.getByRole('button', { name, exact: true }),
-  themeEditor: (page: Page) => page.getByRole('dialog', { name: 'Create a theme bundle' }),
-  themeName: (page: Page) => page.getByRole('textbox', { name: 'Name', exact: true }),
-  themeEditorPalette: (page: Page, mode: string) => page.locator(`#theme-palette-${mode}`),
   themeRoot: (page: Page) => page.locator('html'),
 
   editorHover: (page: Page) => page.locator('.editor-plugin-hover:not([hidden])'),
@@ -451,17 +439,10 @@ export const selectors = {
     page.getByRole('button', { name: `Copy ${label}`, exact: true }),
   copiedButton: (page: Page, label: string) =>
     page.getByRole('button', { name: `Copied ${label}`, exact: true }),
-  wallpaperTile: (page: Page) =>
-    page.getByRole('button', { name: 'Choose wallpaper', exact: true }),
-  wallpaperPicker: (page: Page) => page.getByRole('dialog', { name: 'Wallpaper', exact: true }),
   wallpaperCards: (page: Page) =>
     page.getByRole('button', { name: /^Select .+/ }).filter({ has: page.locator('img') }),
   wallpaperCard: (page: Page, name: string) =>
     page.getByRole('button', { name: `Select ${name}`, exact: true }),
-  wallpaperSelectedChoice: (page: Page) =>
-    page.getByRole('dialog').locator('section button[aria-pressed="true"]'),
-  wallpaperChoice: (page: Page, label: string) =>
-    page.getByRole('dialog').locator('section').getByRole('button', { name: label, exact: true }),
   wallpaperFilter: (page: Page) => page.getByRole('textbox', { name: 'Filter wallpapers' }),
   wallpaperUploadInput: (page: Page) => page.getByLabel('Upload wallpapers', { exact: true }),
   wallpaperActions: (page: Page, name: string) =>

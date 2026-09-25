@@ -8,7 +8,7 @@ import { useSettingValue } from '@/hooks/use-setting-value'
 import { EmptyRow } from './empty-row'
 import { ModelLoading } from './model-loading'
 import { ModelRow } from './model-row'
-import { useSettingsOwner } from '@/features/settings/hooks/use-settings-owner'
+import { useSettingsOwner } from '@/lib/settings-owner/hooks/use-settings-owner'
 
 /**
  * The model list, as the single control over both `models.hidden` and `models.order`.

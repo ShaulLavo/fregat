@@ -1,9 +1,8 @@
-import { settingsMutationKeys } from '@/features/settings/utils/mutation-keys'
+import { paletteLibraryQueryKey, paletteMutationKeys } from '@/lib/theme-library/utils/keys'
 import { useMutation } from '@tanstack/react-query'
 import { serializePalette, type Palette, type PaletteId } from '@workspace/contracts'
 
-import { useSettingsOwner } from '@/features/settings/hooks/use-settings-owner'
-import { paletteLibraryQueryKey } from '@/features/settings/utils/query-keys'
+import { useSettingsOwner } from '@/lib/settings-owner/hooks/use-settings-owner'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import { createRpcError } from '@/lib/structured-errors'
 
@@ -15,7 +14,7 @@ export function usePaletteActions() {
 
   const create = useMutation(
     {
-      mutationKey: settingsMutationKeys.palettes.create,
+      mutationKey: paletteMutationKeys.create,
       mutationFn: async (palette: Palette) => {
         const response = await client().themes.palettes.post(serializePalette(palette))
         if (response.error) throw createRpcError(response.error)
@@ -29,7 +28,7 @@ export function usePaletteActions() {
   )
   const update = useMutation(
     {
-      mutationKey: settingsMutationKeys.palettes.update,
+      mutationKey: paletteMutationKeys.update,
       mutationFn: async (palette: Palette) => {
         const response = await client()
           .themes.palettes({ id: palette.id })
@@ -45,7 +44,7 @@ export function usePaletteActions() {
   )
   const remove = useMutation(
     {
-      mutationKey: settingsMutationKeys.palettes.delete,
+      mutationKey: paletteMutationKeys.delete,
       mutationFn: async (id: PaletteId) => {
         const response = await client().themes.palettes({ id }).delete.post()
         if (response.error) throw createRpcError(response.error)

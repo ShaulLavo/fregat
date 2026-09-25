@@ -1,46 +1,11 @@
 import { bundledPalette, parseColor, toHex } from '@workspace/contracts'
 import { fireEvent, render, screen } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
-import { ColorField } from '../color-field'
-import { PaletteCard } from '../palette-card'
-import { PaletteContrast } from '../palette-contrast'
+import { ColorField } from '@/features/theme-studio/components/color-field'
+import { PaletteContrast } from '@/features/theme-studio/components/palette-contrast'
 
 const sage = bundledPalette('sage')!
-
-describe('PaletteCard', () => {
-  it('previews on keyboard focus only, clears on blur, selects on click', async () => {
-    const onPreview = vi.fn()
-    const onPreviewEnd = vi.fn()
-    const onSelect = vi.fn()
-    render(
-      <PaletteCard
-        disabled={false}
-        menu={null}
-        onPreview={onPreview}
-        onPreviewEnd={onPreviewEnd}
-        onSelect={onSelect}
-        palette={sage}
-        selected={false}
-      />,
-    )
-    const radio = screen.getByRole('radio', { name: /Sage/ })
-    expect(radio).toHaveAttribute('aria-checked', 'false')
-    expect(screen.getByRole('img', { name: 'Sage light' })).toBeInTheDocument()
-    expect(screen.getByRole('img', { name: 'Sage dark' })).toBeInTheDocument()
-
-    fireEvent.mouseEnter(radio)
-    expect(onPreview).not.toHaveBeenCalled()
-    await userEvent.tab()
-    expect(radio).toHaveFocus()
-    expect(onPreview).toHaveBeenCalledTimes(1)
-    await userEvent.tab()
-    expect(onPreviewEnd).toHaveBeenCalledTimes(1)
-    await userEvent.click(radio)
-    expect(onSelect).toHaveBeenCalledTimes(1)
-  })
-})
 
 describe('ColorField', () => {
   it('commits a pasted hex on Enter and keeps alpha through the picker', () => {

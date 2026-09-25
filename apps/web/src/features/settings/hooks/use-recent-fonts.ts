@@ -1,6 +1,6 @@
 import { useMutationState } from '@tanstack/react-query'
 
-import { useSettingsOwner } from '@/features/settings/hooks/use-settings-owner'
+import { useSettingsOwner } from '@/lib/settings-owner/hooks/use-settings-owner'
 import type { FontSettingId } from '@/features/settings/providers/font-preview-context'
 import { SETTINGS_MUTATION_KEY } from '@/features/settings/utils/mutation-keys'
 import { recentFonts, writtenFont } from '@/features/settings/utils/recent-fonts'

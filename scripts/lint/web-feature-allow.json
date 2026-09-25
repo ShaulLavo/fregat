@@ -237,7 +237,7 @@
     "from": "chat-mode",
     "to": "command-palette",
     "module": "features/command-palette/utils/query.ts",
-    "reason": "shared \u2192 lib: sessionProjectRowTitle is reused by chat-mode outside command-palette; move this shared behavior with its consumers."
+    "reason": "shared → lib: sessionProjectRowTitle is reused by chat-mode outside command-palette; move this shared behavior with its consumers."
   },
   {
     "from": "chat-mode",
@@ -267,7 +267,7 @@
     "from": "chat-mode",
     "to": "git",
     "module": "features/git/hooks/use-status.ts",
-    "reason": "shared \u2192 lib: useStatus is reused by chat-mode outside git; move this shared behavior with its consumers."
+    "reason": "shared → lib: useStatus is reused by chat-mode outside git; move this shared behavior with its consumers."
   },
   {
     "from": "chat-mode",
@@ -315,7 +315,7 @@
     "from": "chat-mode",
     "to": "workbench",
     "module": "features/workbench/utils/panels.ts",
-    "reason": "shared \u2192 lib: WorkbenchPanels is reused by chat-mode outside workbench; move this shared behavior with its consumers."
+    "reason": "shared → lib: WorkbenchPanels is reused by chat-mode outside workbench; move this shared behavior with its consumers."
   },
   {
     "from": "chat-mode",
@@ -339,13 +339,13 @@
     "from": "chat-mode",
     "to": "workspace",
     "module": "features/workspace/utils/tab-model.ts",
-    "reason": "shared \u2192 lib: EMPTY_GIT_FILES is reused by chat-mode outside workspace; move this shared behavior with its consumers."
+    "reason": "shared → lib: EMPTY_GIT_FILES is reused by chat-mode outside workspace; move this shared behavior with its consumers."
   },
   {
     "from": "chat-mode",
     "to": "workspace",
     "module": "features/workspace/utils/tab-types.ts",
-    "reason": "shared \u2192 lib: EditorTabConflictMap is reused by chat-mode outside workspace; move this shared behavior with its consumers."
+    "reason": "shared → lib: EditorTabConflictMap is reused by chat-mode outside workspace; move this shared behavior with its consumers."
   },
   {
     "from": "chat",
@@ -357,7 +357,7 @@
     "from": "chat",
     "to": "editor",
     "module": "features/editor/hooks/use-editor-commands.ts",
-    "reason": "shared \u2192 lib: useEditorCommands is reused by chat outside editor; move this shared behavior with its consumers."
+    "reason": "shared → lib: useEditorCommands is reused by chat outside editor; move this shared behavior with its consumers."
   },
   {
     "from": "chat",
@@ -458,12 +458,6 @@
   {
     "from": "command-palette",
     "to": "settings",
-    "module": "features/settings/hooks/use-settings-owner.ts",
-    "reason": "owner: The palette assembles commands and search results across features; this module supplies useSettingsOwner."
-  },
-  {
-    "from": "command-palette",
-    "to": "settings",
     "module": "features/settings/hooks/use-theme.ts",
     "reason": "owner: The palette assembles commands and search results across features; this module supplies useTheme."
   },
@@ -495,7 +489,7 @@
     "from": "editor",
     "to": "chat-mode",
     "module": "features/chat-mode/utils/panels.ts",
-    "reason": "shared \u2192 lib: ChatModePanels is reused by editor outside chat-mode; move this shared behavior with its consumers."
+    "reason": "shared → lib: ChatModePanels is reused by editor outside chat-mode; move this shared behavior with its consumers."
   },
   {
     "from": "editor",
@@ -519,43 +513,43 @@
     "from": "editor",
     "to": "search",
     "module": "features/search/utils/sort.ts",
-    "reason": "shared \u2192 lib: compareSearchPaths is reused by editor outside search; move this shared behavior with its consumers."
+    "reason": "shared → lib: compareSearchPaths is reused by editor outside search; move this shared behavior with its consumers."
   },
   {
     "from": "editor",
     "to": "settings",
     "module": "features/settings/hooks/use-settings-actions.ts",
-    "reason": "shared \u2192 lib: useSettingsActions exposes application settings outside the settings UI and belongs in the shared settings layer."
+    "reason": "shared → lib: useSettingsActions exposes application settings outside the settings UI and belongs in the shared settings layer."
   },
   {
     "from": "editor",
     "to": "settings",
     "module": "features/settings/hooks/use-theme.ts",
-    "reason": "shared \u2192 lib: useTheme exposes application settings outside the settings UI and belongs in the shared settings layer."
+    "reason": "shared → lib: useTheme exposes application settings outside the settings UI and belongs in the shared settings layer."
   },
   {
     "from": "editor",
     "to": "settings",
     "module": "features/settings/state/sync-service.ts",
-    "reason": "shared \u2192 lib: SettingsSyncService exposes application settings outside the settings UI and belongs in the shared settings layer."
+    "reason": "shared → lib: SettingsSyncService exposes application settings outside the settings UI and belongs in the shared settings layer."
   },
   {
     "from": "editor",
     "to": "workbench",
     "module": "features/workbench/utils/layout.ts",
-    "reason": "shared \u2192 lib: WorkbenchLayout is reused by editor outside workbench; move this shared behavior with its consumers."
+    "reason": "shared → lib: WorkbenchLayout is reused by editor outside workbench; move this shared behavior with its consumers."
   },
   {
     "from": "editor",
     "to": "workbench",
     "module": "features/workbench/utils/panels.ts",
-    "reason": "shared \u2192 lib: activeEditorTabForWorkbenchPanels, editorContentCountsForWorkbenchPanels, editorTabRecordsForWorkbenchPanels, type WorkbenchPanels is reused by editor outside workbench; move this shared behavior with its consumers."
+    "reason": "shared → lib: activeEditorTabForWorkbenchPanels, editorContentCountsForWorkbenchPanels, editorTabRecordsForWorkbenchPanels, type WorkbenchPanels is reused by editor outside workbench; move this shared behavior with its consumers."
   },
   {
     "from": "editor",
     "to": "workspace",
     "module": "features/workspace/hooks/use-selected-file.ts",
-    "reason": "shared \u2192 lib: useSelectedFile is reused by editor outside workspace; move this shared behavior with its consumers."
+    "reason": "shared → lib: useSelectedFile is reused by editor outside workspace; move this shared behavior with its consumers."
   },
   {
     "from": "editor",
@@ -567,67 +561,67 @@
     "from": "editor",
     "to": "workspace",
     "module": "features/workspace/utils/conflict-resolution-mutation.ts",
-    "reason": "shared \u2192 lib: ConflictResolutionSource is reused by editor outside workspace; move this shared behavior with its consumers."
+    "reason": "shared → lib: ConflictResolutionSource is reused by editor outside workspace; move this shared behavior with its consumers."
   },
   {
     "from": "editor",
     "to": "workspace",
     "module": "features/workspace/utils/location.ts",
-    "reason": "shared \u2192 lib: workspaceLocationId is reused by editor outside workspace; move this shared behavior with its consumers."
+    "reason": "shared → lib: workspaceLocationId is reused by editor outside workspace; move this shared behavior with its consumers."
   },
   {
     "from": "editor",
     "to": "workspace",
     "module": "features/workspace/utils/mutation-keys.ts",
-    "reason": "shared \u2192 lib: workspaceMutationKeys is reused by editor outside workspace; move this shared behavior with its consumers."
+    "reason": "shared → lib: workspaceMutationKeys is reused by editor outside workspace; move this shared behavior with its consumers."
   },
   {
     "from": "git",
     "to": "chat",
     "module": "features/chat/hooks/use-attach-to-composer.ts",
-    "reason": "shared \u2192 lib: useAttachToComposer is reused by git outside chat; move this shared behavior with its consumers."
+    "reason": "shared → lib: useAttachToComposer is reused by git outside chat; move this shared behavior with its consumers."
   },
   {
     "from": "git",
     "to": "chat",
     "module": "features/chat/utils/checkpoint-diff-query.ts",
-    "reason": "shared \u2192 lib: checkpointDiffRetry, checkpointDiffRetryDelay, fetchCheckpointDiff is reused by git outside chat; move this shared behavior with its consumers."
+    "reason": "shared → lib: checkpointDiffRetry, checkpointDiffRetryDelay, fetchCheckpointDiff is reused by git outside chat; move this shared behavior with its consumers."
   },
   {
     "from": "git",
     "to": "editor",
     "module": "features/editor/components/diff-editor.tsx",
-    "reason": "shared \u2192 lib: DiffEditor is rendered by both git and editor; extract the shared presentation from its feature owner."
+    "reason": "shared → lib: DiffEditor is rendered by both git and editor; extract the shared presentation from its feature owner."
   },
   {
     "from": "git",
     "to": "editor",
     "module": "features/editor/components/tab-placeholder.tsx",
-    "reason": "shared \u2192 lib: EditorTabPlaceholder is rendered by both git and editor; extract the shared presentation from its feature owner."
+    "reason": "shared → lib: EditorTabPlaceholder is rendered by both git and editor; extract the shared presentation from its feature owner."
   },
   {
     "from": "git",
     "to": "editor",
     "module": "features/editor/hooks/use-diff-language-context.ts",
-    "reason": "shared \u2192 lib: useDiffLanguageContext is reused by git outside editor; move this shared behavior with its consumers."
+    "reason": "shared → lib: useDiffLanguageContext is reused by git outside editor; move this shared behavior with its consumers."
   },
   {
     "from": "git",
     "to": "editor",
     "module": "features/editor/hooks/use-editor-commands.ts",
-    "reason": "shared \u2192 lib: useEditorCommands is reused by git outside editor; move this shared behavior with its consumers."
+    "reason": "shared → lib: useEditorCommands is reused by git outside editor; move this shared behavior with its consumers."
   },
   {
     "from": "git",
     "to": "editor",
     "module": "features/editor/hooks/use-runtime.ts",
-    "reason": "shared \u2192 lib: useEditorRuntime is reused by git outside editor; move this shared behavior with its consumers."
+    "reason": "shared → lib: useEditorRuntime is reused by git outside editor; move this shared behavior with its consumers."
   },
   {
     "from": "git",
     "to": "editor",
     "module": "features/editor/hooks/use-tab-presentation.ts",
-    "reason": "shared \u2192 lib: useTabPresentation is reused by git outside editor; move this shared behavior with its consumers."
+    "reason": "shared → lib: useTabPresentation is reused by git outside editor; move this shared behavior with its consumers."
   },
   {
     "from": "git",
@@ -639,13 +633,13 @@
     "from": "git",
     "to": "editor",
     "module": "features/editor/utils/diff-language-context.ts",
-    "reason": "shared \u2192 lib: DiffLanguageHost is reused by git outside editor; move this shared behavior with its consumers."
+    "reason": "shared → lib: DiffLanguageHost is reused by git outside editor; move this shared behavior with its consumers."
   },
   {
     "from": "git",
     "to": "editor",
     "module": "features/editor/utils/file-path.ts",
-    "reason": "shared \u2192 lib: languageIdForFilePath is reused by git outside editor; move this shared behavior with its consumers."
+    "reason": "shared → lib: languageIdForFilePath is reused by git outside editor; move this shared behavior with its consumers."
   },
   {
     "from": "search",
@@ -669,19 +663,19 @@
     "from": "search",
     "to": "editor",
     "module": "features/editor/utils/file-path.ts",
-    "reason": "shared \u2192 lib: languageIdForFilePath is reused by search outside editor; move this shared behavior with its consumers."
+    "reason": "shared → lib: languageIdForFilePath is reused by search outside editor; move this shared behavior with its consumers."
   },
   {
     "from": "search",
     "to": "editor",
     "module": "features/editor/utils/plugins.ts",
-    "reason": "shared \u2192 lib: createPlatformSearchResultEditorLoggingPlugin is reused by search outside editor; move this shared behavior with its consumers."
+    "reason": "shared → lib: createPlatformSearchResultEditorLoggingPlugin is reused by search outside editor; move this shared behavior with its consumers."
   },
   {
     "from": "search",
     "to": "editor",
     "module": "features/editor/utils/text-snapshot.ts",
-    "reason": "shared \u2192 lib: textSnapshotLineRange is reused by search outside editor; move this shared behavior with its consumers."
+    "reason": "shared → lib: textSnapshotLineRange is reused by search outside editor; move this shared behavior with its consumers."
   },
   {
     "from": "search",
@@ -699,7 +693,7 @@
     "from": "settings",
     "to": "editor",
     "module": "features/editor/components/editor.tsx",
-    "reason": "shared \u2192 lib: Editor is rendered by both settings and editor; extract the shared presentation from its feature owner."
+    "reason": "shared → lib: Editor is rendered by both settings and editor; extract the shared presentation from its feature owner."
   },
   {
     "from": "settings",
@@ -717,31 +711,31 @@
     "from": "settings",
     "to": "editor",
     "module": "features/editor/utils/language-server-plugin.ts",
-    "reason": "shared \u2192 lib: LanguageServerDocumentTarget is reused by settings outside editor; move this shared behavior with its consumers."
+    "reason": "shared → lib: LanguageServerDocumentTarget is reused by settings outside editor; move this shared behavior with its consumers."
   },
   {
     "from": "settings",
     "to": "editor",
     "module": "features/editor/utils/render-document.ts",
-    "reason": "shared \u2192 lib: EditorRenderDocument is reused by settings outside editor; move this shared behavior with its consumers."
+    "reason": "shared → lib: EditorRenderDocument is reused by settings outside editor; move this shared behavior with its consumers."
   },
   {
     "from": "terminal",
     "to": "chat",
     "module": "features/chat/hooks/use-attach-to-composer.ts",
-    "reason": "shared \u2192 lib: useAttachToComposer is reused by terminal outside chat; move this shared behavior with its consumers."
+    "reason": "shared → lib: useAttachToComposer is reused by terminal outside chat; move this shared behavior with its consumers."
   },
   {
     "from": "terminal",
     "to": "chat",
     "module": "features/chat/hooks/use-open-file-reference.ts",
-    "reason": "shared \u2192 lib: useOpenFileReference is reused by terminal outside chat; move this shared behavior with its consumers."
+    "reason": "shared → lib: useOpenFileReference is reused by terminal outside chat; move this shared behavior with its consumers."
   },
   {
     "from": "terminal",
     "to": "chat",
     "module": "features/chat/utils/markdown-file-links.ts",
-    "reason": "shared \u2192 lib: resolveInlineCodeFileReference, type MarkdownFileReference is reused by terminal outside chat; move this shared behavior with its consumers."
+    "reason": "shared → lib: resolveInlineCodeFileReference, type MarkdownFileReference is reused by terminal outside chat; move this shared behavior with its consumers."
   },
   {
     "from": "workbench",
@@ -1041,37 +1035,37 @@
     "from": "workspace",
     "to": "chat-mode",
     "module": "features/chat-mode/utils/active-session.ts",
-    "reason": "shared \u2192 lib: SessionSelection is reused by workspace outside chat-mode; move this shared behavior with its consumers."
+    "reason": "shared → lib: SessionSelection is reused by workspace outside chat-mode; move this shared behavior with its consumers."
   },
   {
     "from": "workspace",
     "to": "chat-mode",
     "module": "features/chat-mode/utils/panels.ts",
-    "reason": "shared \u2192 lib: createDefaultChatModePanels, isChatModeToolTab, type ChatModePanels, type ChatModeToolTab is reused by workspace outside chat-mode; move this shared behavior with its consumers."
+    "reason": "shared → lib: createDefaultChatModePanels, isChatModeToolTab, type ChatModePanels, type ChatModeToolTab is reused by workspace outside chat-mode; move this shared behavior with its consumers."
   },
   {
     "from": "workspace",
     "to": "editor",
     "module": "features/editor/components/filesystem-conflict-toast.tsx",
-    "reason": "shared \u2192 lib: FilesystemConflictToast is rendered by both workspace and editor; extract the shared presentation from its feature owner."
+    "reason": "shared → lib: FilesystemConflictToast is rendered by both workspace and editor; extract the shared presentation from its feature owner."
   },
   {
     "from": "workspace",
     "to": "editor",
     "module": "features/editor/hooks/use-editor-commands.ts",
-    "reason": "shared \u2192 lib: useEditorCommands is reused by workspace outside editor; move this shared behavior with its consumers."
+    "reason": "shared → lib: useEditorCommands is reused by workspace outside editor; move this shared behavior with its consumers."
   },
   {
     "from": "workspace",
     "to": "editor",
     "module": "features/editor/hooks/use-runtime.ts",
-    "reason": "shared \u2192 lib: useEditorRuntime is reused by workspace outside editor; move this shared behavior with its consumers."
+    "reason": "shared → lib: useEditorRuntime is reused by workspace outside editor; move this shared behavior with its consumers."
   },
   {
     "from": "workspace",
     "to": "editor",
     "module": "features/editor/hooks/use-workspace-mutation-allowed.ts",
-    "reason": "shared \u2192 lib: useWorkspaceMutationAllowed is reused by workspace outside editor; move this shared behavior with its consumers."
+    "reason": "shared → lib: useWorkspaceMutationAllowed is reused by workspace outside editor; move this shared behavior with its consumers."
   },
   {
     "from": "workspace",
@@ -1125,37 +1119,37 @@
     "from": "workspace",
     "to": "editor",
     "module": "features/editor/utils/mutation-keys.ts",
-    "reason": "shared \u2192 lib: editorMutationKeys is reused by workspace outside editor; move this shared behavior with its consumers."
+    "reason": "shared → lib: editorMutationKeys is reused by workspace outside editor; move this shared behavior with its consumers."
   },
   {
     "from": "workspace",
     "to": "editor",
     "module": "features/editor/utils/render-document.ts",
-    "reason": "shared \u2192 lib: EditorRenderDocument is reused by workspace outside editor; move this shared behavior with its consumers."
+    "reason": "shared → lib: EditorRenderDocument is reused by workspace outside editor; move this shared behavior with its consumers."
   },
   {
     "from": "workspace",
     "to": "git",
     "module": "features/git/hooks/use-status.ts",
-    "reason": "shared \u2192 lib: useStatus is reused by workspace outside git; move this shared behavior with its consumers."
+    "reason": "shared → lib: useStatus is reused by workspace outside git; move this shared behavior with its consumers."
   },
   {
     "from": "workspace",
     "to": "git",
     "module": "features/git/hooks/use-discard-paths-mutation.ts",
-    "reason": "shared \u2192 lib: useDiscardPathsMutation is reused by workspace outside git; move this shared behavior with its consumers."
+    "reason": "shared → lib: useDiscardPathsMutation is reused by workspace outside git; move this shared behavior with its consumers."
   },
   {
     "from": "workspace",
     "to": "git",
     "module": "features/git/hooks/use-stage-paths-mutation.ts",
-    "reason": "shared \u2192 lib: useStagePathsMutation is reused by workspace outside git; move this shared behavior with its consumers."
+    "reason": "shared → lib: useStagePathsMutation is reused by workspace outside git; move this shared behavior with its consumers."
   },
   {
     "from": "workspace",
     "to": "git",
     "module": "features/git/hooks/use-unstage-paths-mutation.ts",
-    "reason": "shared \u2192 lib: useUnstagePathsMutation is reused by workspace outside git; move this shared behavior with its consumers."
+    "reason": "shared → lib: useUnstagePathsMutation is reused by workspace outside git; move this shared behavior with its consumers."
   },
   {
     "from": "workspace",
@@ -1167,7 +1161,7 @@
     "from": "workspace",
     "to": "git",
     "module": "features/git/utils/status-entries-for-tree.ts",
-    "reason": "shared \u2192 lib: statusEntriesForTree is reused by workspace outside git; move this shared behavior with its consumers."
+    "reason": "shared → lib: statusEntriesForTree is reused by workspace outside git; move this shared behavior with its consumers."
   },
   {
     "from": "workspace",
@@ -1287,18 +1281,18 @@
     "from": "workspace",
     "to": "workbench",
     "module": "features/workbench/components/editor-surface-layout-view.tsx",
-    "reason": "shared \u2192 lib: EditorSurfaceLayoutView is rendered by both workspace and workbench; extract the shared presentation from its feature owner."
+    "reason": "shared → lib: EditorSurfaceLayoutView is rendered by both workspace and workbench; extract the shared presentation from its feature owner."
   },
   {
     "from": "workspace",
     "to": "workbench",
     "module": "features/workbench/utils/layout.ts",
-    "reason": "shared \u2192 lib: createDefaultWorkbenchLayout, normalizeWorkbenchLayout, type WorkbenchLayout is reused by workspace outside workbench; move this shared behavior with its consumers."
+    "reason": "shared → lib: createDefaultWorkbenchLayout, normalizeWorkbenchLayout, type WorkbenchLayout is reused by workspace outside workbench; move this shared behavior with its consumers."
   },
   {
     "from": "workspace",
     "to": "workbench",
     "module": "features/workbench/utils/panels.ts",
-    "reason": "shared \u2192 lib: createDefaultWorkbenchPanels, normalizeWorkbenchPanels, type WorkbenchPanels is reused by workspace outside workbench; move this shared behavior with its consumers."
+    "reason": "shared → lib: createDefaultWorkbenchPanels, normalizeWorkbenchPanels, type WorkbenchPanels is reused by workspace outside workbench; move this shared behavior with its consumers."
   }
 ]

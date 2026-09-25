@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import type { QueryClient } from '@tanstack/react-query'
 
-import { SettingsOwnerContext } from '@/features/settings/providers/owner-context'
+import { SettingsOwnerContext } from '@/lib/settings-owner/providers/owner-context'
 
 export function SettingsOwnerProvider({
   children,

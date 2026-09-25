@@ -15,28 +15,29 @@ const UPLOAD = {
   ),
 }
 
-async function openPicker(page: Page) {
-  await selectors.wallpaperTile(page).click()
-  await selectors.wallpaperPicker(page).waitFor()
+async function openWallpaperTab(page: Page) {
+  await selectors.themeStudioOpen(page).click()
+  await selectors.themeStudio(page).waitFor()
+  await selectors.themeStudioTab(page, 'Wallpaper').click()
 }
 
 export const wallpaperLibrary: Scenario = {
   name: 'wallpaper-library',
   description:
-    'Open the wallpaper picker from the settings row, upload and delete an image, filter, select from the keyboard, and advance with Next wallpaper. Restores the previous selection.',
+    'Open the theme studio from the settings Theme row, upload and delete an image on the Wallpaper tab, filter, select from the keyboard, Apply, and advance with Next wallpaper. Restores the previous selection.',
   async run(page, { step }) {
     const restore = await preserveAppearance(page)
     await page.keyboard.press('Control+,')
-    await selectors.settingsSearch(page).fill('wallpaper')
-    await selectors.wallpaperTile(page).waitFor()
+    await selectors.settingsSearch(page).fill('theme')
+    await selectors.themeStudioOpen(page).waitFor()
     await step('settings-row')
-    await openPicker(page)
+    await openWallpaperTab(page)
     const cards = selectors.wallpaperCards(page)
     await cards.first().waitFor({ timeout: 20_000 })
     if ((await cards.count()) < 2)
       throw createScriptError('Import at least two library wallpapers before this scenario.')
     try {
-      await step('picker')
+      await step('wallpaper-tab')
       const ownsUpload = (await selectors.wallpaperCard(page, UPLOAD_NAME).count()) === 0
       if (ownsUpload) {
         await selectors.wallpaperUploadInput(page).setInputFiles(UPLOAD)
@@ -60,8 +61,8 @@ export const wallpaperLibrary: Scenario = {
         await selectors.wallpaperCard(page, UPLOAD_NAME).waitFor({ state: 'detached' })
         await step('upload-deleted')
       }
-      await page.keyboard.press('Escape')
-      await step('settings-row-after')
+      await selectors.themeStudio(page).getByRole('button', { name: 'Apply', exact: true }).click()
+      await selectors.themeStudio(page).waitFor({ state: 'detached' })
       await page.keyboard.press('Escape')
       await selectors.wallpaperStill(page).waitFor()
       await step('workbench-wallpaper')

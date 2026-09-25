@@ -38,10 +38,8 @@ test.beforeEach(() => {
   selectSettingsCategory(null)
 })
 
-// The wallpaper row is a summary; its choices live in the picker it opens.
-async function openDarkWallpaperPicker() {
-  await userEvent.click(await screen.findByRole('button', { name: 'Choose wallpaper' }))
-  return screen.findByRole('button', { name: 'None' })
+function planModeSwitch() {
+  return screen.findByRole('switch', { name: 'Plan mode controls' })
 }
 
 test(
@@ -50,16 +48,16 @@ test(
     expect(client).toBeDefined()
     renderWithProviders(<SettingsPage />)
 
-    const wallpaper = await openDarkWallpaperPicker()
-    expect(wallpaper).toHaveAttribute('aria-pressed', 'false')
+    const planMode = await planModeSwitch()
+    expect(planMode).not.toBeChecked()
 
-    await userEvent.click(wallpaper)
+    await userEvent.click(planMode)
 
     // Asserted against the server, not the control: the point is that the click
     // reached the settings file, not that a switch flipped locally.
     await waitFor(async () => {
       const snapshot = await fetchSettings(undefined, getClient())
-      expect(snapshot.values['workbench.wallpaper'].enabled).toBe(false)
+      expect(snapshot.values['chat.planModeEnabled']).toBe(true)
     })
   },
   SLOW_RENDER_TIMEOUT_MS,
@@ -71,11 +69,10 @@ test(
     expect(client).toBeDefined()
     renderWithProviders(<SettingsPage />)
 
-    await userEvent.click(await openDarkWallpaperPicker())
-    await userEvent.click(screen.getByRole('button', { name: 'Close' }))
+    await userEvent.click(await planModeSwitch())
 
     await userEvent.click(
-      await screen.findByRole('button', { name: 'Actions for workbench.wallpaper' }),
+      await screen.findByRole('button', { name: 'Actions for chat.planModeEnabled' }),
     )
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Reset setting' }))
 
@@ -83,9 +80,9 @@ test(
     // is what keeps the default coming from the running build.
     await waitFor(async () => {
       const snapshot = await fetchSettings(undefined, getClient())
-      expect(snapshot.values['workbench.wallpaper'].source.kind).toBe('desktop')
+      expect(snapshot.values['chat.planModeEnabled']).toBe(false)
       expect(snapshot.layers.find((layer) => layer.id === 'user')?.raw).not.toHaveProperty(
-        'workbench.wallpaper',
+        'chat.planModeEnabled',
       )
     })
   },
@@ -310,7 +307,7 @@ test('every registered widget resolves a real control, not the JSON escape hatch
   renderWithProviders(<SettingsPage />)
 
   // A row has to be on screen before the absence of the hint means anything.
-  await screen.findByRole('button', { name: 'Choose wallpaper' })
+  await planModeSwitch()
 
   // The hint is the dispatch's fallback for `list`, `complex` and a value whose
   // shape does not match its widget — none of which any registered key
@@ -322,9 +319,9 @@ test('Escape from a row returns focus to the search box', async ({ client }) => 
   expect(client).toBeDefined()
   renderWithProviders(<SettingsPage />)
 
-  const wallpaper = await screen.findByRole('button', { name: 'Choose wallpaper' })
-  wallpaper.focus()
-  expect(document.activeElement).toBe(wallpaper)
+  const planMode = await planModeSwitch()
+  planMode.focus()
+  expect(document.activeElement).toBe(planMode)
 
   await userEvent.keyboard('{Escape}')
 
@@ -337,18 +334,15 @@ test('every visible row is reachable and operable from the keyboard', async ({ c
   expect(client).toBeDefined()
   renderWithProviders(<SettingsPage />)
 
-  await userEvent.type(await screen.findByLabelText('Search settings'), 'wallpaper')
-  const tile = await screen.findByRole('button', { name: 'Choose wallpaper' })
-  tile.focus()
-  await userEvent.keyboard(' ')
-  const wallpaper = await screen.findByRole('button', { name: 'None' })
+  await userEvent.type(await screen.findByLabelText('Search settings'), 'plan mode')
+  const planMode = await planModeSwitch()
 
-  wallpaper.focus()
+  planMode.focus()
   await userEvent.keyboard(' ')
 
   await waitFor(async () => {
     const snapshot = await fetchSettings(undefined, getClient())
-    expect(snapshot.values['workbench.wallpaper'].enabled).toBe(false)
+    expect(snapshot.values['chat.planModeEnabled']).toBe(true)
   })
 })
 

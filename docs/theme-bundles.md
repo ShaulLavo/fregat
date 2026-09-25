@@ -79,11 +79,8 @@ wallpaper and private-palette portability, and reference protection. It also che
 variants against the contrast readout. Existing appearance preview and optimistic handoff tests
 cover the reused provider. TUI renderer tests cover explicit terminal-host color selection.
 
-`bun run agent:browser scenario theme-gallery` inspects the gallery and both editors.
-`bun run agent:browser scenario theme-bundles` drives distinct wallpapers, mode-local customization,
-reload, system changes, wallpaper re-enabling, preview cancellation, UI creation and export/import,
-then restores settings and removes
-its own fixtures.
+The gallery and editors now live in the theme studio; `bun run agent:browser scenario theme-studio`
+drives it, and `scenario bundle-wallpapers` previews every bundled theme's paired wallpapers.
 
 Verified on the mesh on 2026-09-19, release
 `20260919T122244Z-e78c4c44-plan117-theme-bundles`. The 12-step browser run passed at

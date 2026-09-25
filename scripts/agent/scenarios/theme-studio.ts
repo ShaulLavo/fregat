@@ -18,9 +18,26 @@ function themeId(settings: UserSettings) {
   return (settings['workbench.theme'] as { id?: string } | undefined)?.id ?? null
 }
 
+function cssToken(page: Page, name: string) {
+  return page.evaluate(
+    (token) => getComputedStyle(document.documentElement).getPropertyValue(token).trim(),
+    name,
+  )
+}
+
 function background(page: Page) {
-  return page.evaluate(() =>
-    getComputedStyle(document.documentElement).getPropertyValue('--background').trim(),
+  return cssToken(page, '--background')
+}
+
+// An accent no bundled palette uses, so the repaint is unambiguous.
+async function setAccent(page: Page, from: string) {
+  const accent = selectors.themeStudio(page).getByRole('textbox', { name: 'Accent', exact: true })
+  await accent.fill('#d33682')
+  await accent.press('Enter')
+  await page.waitForFunction(
+    (before) =>
+      getComputedStyle(document.documentElement).getPropertyValue('--primary').trim() !== before,
+    from,
   )
 }
 
@@ -35,7 +52,7 @@ async function repainted(page: Page, from: string) {
 export const themeStudio: Scenario = {
   name: 'theme-studio',
   description:
-    'Open the theme studio, arrow through themes with the app repainting and nothing written, flip light and dark, discard with Escape twice, then choose again and Apply in one write.',
+    'Open the theme studio, arrow through themes with the app repainting and nothing written, flip light and dark, edit the accent, sort wallpapers by match and take colors from one, discard with Escape twice, then choose again, edit, and Apply.',
   async run(page, { step }) {
     const before = await userSettings(page)
     const saved = await background(page)
@@ -68,6 +85,24 @@ export const themeStudio: Scenario = {
     await dock.getByRole('button', { name: 'Solid', exact: true }).click()
     await step('surfaces-tab')
 
+    const beforeAccent = await cssToken(page, '--primary')
+    await selectors.themeStudioTab(page, 'Colors').click()
+    await setAccent(page, beforeAccent)
+    await step('colors-forked')
+    strictEqual(themeId(await userSettings(page)), themeId(before), 'Editing colors writes nothing')
+
+    await selectors.themeStudioTab(page, 'Wallpaper').click()
+    await dock.getByRole('tab', { name: 'Matches', exact: true }).click()
+    await dock.getByText('Closest to these colors').waitFor()
+    const closest = dock.getByRole('button', { name: /^Select .+/ }).first()
+    await closest.waitFor({ timeout: 20_000 })
+    await step('wallpaper-matches')
+    await closest.click()
+    const beforeImage = await background(page)
+    await dock.getByRole('button', { name: 'Colors from this image', exact: true }).click()
+    await repainted(page, beforeImage)
+    await step('colors-from-image')
+
     await dock.getByRole('listbox', { name: 'Code colors' }).or(dock).first().focus()
     await page.keyboard.press('Escape')
     await dock.getByText('Press Escape again to discard').waitFor()
@@ -86,6 +121,8 @@ export const themeStudio: Scenario = {
     await dock.waitFor()
     await page.keyboard.press('ArrowRight')
     await repainted(page, saved)
+    await selectors.themeStudioTab(page, 'Colors').click()
+    await setAccent(page, await cssToken(page, '--primary'))
     await dock.getByRole('button', { name: 'Apply', exact: true }).click()
     await dock.waitFor({ state: 'detached' })
     await page.waitForFunction(async () => true)
@@ -96,6 +133,15 @@ export const themeStudio: Scenario = {
     }
     notStrictEqual(applied, themeId(before), 'Apply writes the chosen theme')
     ok((await background(page)) !== saved, 'The applied theme stays on screen')
+    const customization = (
+      (await userSettings(page))['workbench.theme.customizations'] as
+        | Record<string, Record<string, { palette?: string }>>
+        | undefined
+    )?.[applied ?? '']
+    ok(
+      Object.values(customization ?? {}).some((half) => half.palette),
+      'Apply saves the edited colors as a palette and points the theme at it',
+    )
     await step('applied')
   },
 }

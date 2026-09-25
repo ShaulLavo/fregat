@@ -9,7 +9,7 @@ import { providerSettingRows } from '../utils/provider-rows'
 import { EmptyRow } from './empty-row'
 import { ProviderLoading } from './provider-loading'
 import { ProviderRow } from './provider-row'
-import { useSettingsOwner } from '@/features/settings/hooks/use-settings-owner'
+import { useSettingsOwner } from '@/lib/settings-owner/hooks/use-settings-owner'
 
 /**
  * The provider list, as the control for `providers.instances`.

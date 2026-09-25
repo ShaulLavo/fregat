@@ -1,11 +1,11 @@
+import { wallpaperMutationKeys } from '@/lib/theme-library/utils/keys'
 import { useMutation } from '@tanstack/react-query'
 import type { AssetId } from '@workspace/contracts'
-import { useSettingsOwner } from '@/features/settings/hooks/use-settings-owner'
-import { refreshConfirmedSettings } from '@/features/settings/state/snapshot-admission'
+import { useSettingsOwner } from '@/lib/settings-owner/hooks/use-settings-owner'
+import { settingsKeys } from '@workspace/client-core/settings/query-keys'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import { createRpcError } from '@/lib/structured-errors'
 import { wallpaperLibraryKey } from '@/lib/wallpapers/state/queries'
-import { wallpaperMutationKeys } from '@/features/settings/utils/mutation-keys'
 
 export function useWallpaperActions() {
   const owner = useSettingsOwner()
@@ -34,7 +34,7 @@ export function useWallpaperActions() {
       mutationFn: async (id: AssetId) => {
         const response = await client.themes.wallpapers({ id }).delete.post()
         if (response.error) throw createRpcError(response.error)
-        await refreshConfirmedSettings(owner)
+        await owner.invalidateQueries({ queryKey: settingsKeys.document() })
         return response.data
       },
     },

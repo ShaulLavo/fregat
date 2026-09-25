@@ -1117,7 +1117,7 @@
         }
       ],
       "default": null,
-      "description": "A light and dark version of your app colors, code colors, wallpaper and material."
+      "description": "App colors, code colors, wallpaper and surfaces, in a light and a dark version. Try them in the theme studio."
     },
     "workbench.theme.customizations": {
       "additionalProperties": {

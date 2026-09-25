@@ -1,10 +1,10 @@
 import type { ColorMode, ThemeVariantPatch } from '@workspace/contracts'
 import { ListRow } from '@workspace/ui/patterns/list-row'
-import { useListbox } from '@workspace/ui/patterns/use-listbox'
-import { VirtualList, type VirtualListHandle } from '@workspace/ui/patterns/virtual-list'
-import { useRef, type ReactNode } from 'react'
+import { VirtualList } from '@workspace/ui/patterns/virtual-list'
+import type { ReactNode } from 'react'
 
 import { editorThemeOptions } from '@/lib/code-theme/utils/catalog'
+import { useStudioList } from '@/features/theme-studio/hooks/use-studio-list'
 
 /**
  * The code colors for the half on screen. The editor behind the dock is the preview, and chat
@@ -23,18 +23,10 @@ export function CodeTab({
   onEdit: (patch: ThemeVariantPatch) => void
 }) {
   const options = editorThemeOptions(mode)
-  const containerRef = useRef<HTMLDivElement>(null)
-  const virtualRef = useRef<VirtualListHandle>(null)
-  const list = useListbox({
-    role: 'listbox',
-    containerRef,
+  const { containerRef, virtualRef, list } = useStudioList({
     items: options.map((option) => ({ id: option.id, label: option.label })),
     activeId: codeTheme,
     onActiveChange: (id) => onEdit({ codeTheme: id }),
-    onCommit: () => {},
-    onSelect() {},
-    typeahead: true,
-    scrollToIndex: (index) => virtualRef.current?.scrollToIndex(index, { align: 'auto' }),
   })
 
   return (

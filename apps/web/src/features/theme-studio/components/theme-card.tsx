@@ -32,6 +32,7 @@ export function ThemeCard({
     <ListRow
       {...rowProps}
       className='flex h-auto w-44 shrink-0 cursor-default flex-col gap-1.5 rounded-md p-1.5'
+      data-theme-id={theme.id}
       role='option'
       selected={selected}
       title={theme.name}

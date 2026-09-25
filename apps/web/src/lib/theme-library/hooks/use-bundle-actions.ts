@@ -1,10 +1,13 @@
+import {
+  paletteLibraryQueryKey,
+  bundleQueryKey,
+  bundleMutationKeys,
+} from '@/lib/theme-library/utils/keys'
 import { wallpaperLibraryKey } from '@/lib/wallpapers/state/queries'
 import { useMutation } from '@tanstack/react-query'
 import type { ThemeDocument, ThemeId } from '@workspace/contracts'
-import { refreshConfirmedSettings } from '@/features/settings/state/snapshot-admission'
-import { useSettingsOwner } from '@/features/settings/hooks/use-settings-owner'
-import { bundleMutationKeys } from '@/features/settings/utils/mutation-keys'
-import { bundleQueryKey, paletteLibraryQueryKey } from '@/features/settings/utils/query-keys'
+import { settingsKeys } from '@workspace/client-core/settings/query-keys'
+import { useSettingsOwner } from '@/lib/settings-owner/hooks/use-settings-owner'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import { createRpcError } from '@/lib/structured-errors'
 
@@ -63,7 +66,7 @@ export function useBundleActions() {
       mutationFn: async (id: ThemeId) => {
         const response = await client.themes.bundles({ id }).delete.post()
         if (response.error) throw createRpcError(response.error)
-        await refreshConfirmedSettings(owner)
+        await owner.invalidateQueries({ queryKey: settingsKeys.document() })
         return response.data
       },
       onSuccess: settle,

@@ -225,10 +225,10 @@ export const SETTINGS_REGISTRY = {
     scope: 'application',
     widget: 'theme',
     category: 'Appearance',
-    title: 'Theme bundles',
+    title: 'Theme',
     description:
-      'A light and dark version of your app colors, code colors, wallpaper and material.',
-    keywords: ['theme', 'bundle', 'light', 'dark', 'wallpaper'],
+      'App colors, code colors, wallpaper and surfaces, in a light and a dark version. Try them in the theme studio.',
+    keywords: ['theme', 'studio', 'light', 'dark', 'wallpaper', 'colors', 'palette'],
   }),
   'workbench.theme.customizations': defineSetting({
     schema: themeCustomizationsSchema,
@@ -257,6 +257,8 @@ export const SETTINGS_REGISTRY = {
     scope: 'application',
     widget: 'palette',
     category: 'Appearance',
+    // Chosen in the theme studio, which writes it as part of the theme.
+    visibility: 'internal',
     title: 'App colors',
     description:
       'Colors for app backgrounds, text, borders, accents and the terminal. Pick a palette or make your own.',
@@ -278,6 +280,8 @@ export const SETTINGS_REGISTRY = {
     scope: 'window',
     widget: 'code-theme',
     category: 'Appearance',
+    // Chosen in the theme studio, which writes it as part of the theme.
+    visibility: 'internal',
     title: 'Code theme in dark mode',
     description: 'Colors for code in editors and chat code blocks when the app uses dark mode.',
     keywords: ['syntax', 'highlighting', 'theme', 'native', 'vscode', 'colour'],
@@ -288,6 +292,8 @@ export const SETTINGS_REGISTRY = {
     scope: 'window',
     widget: 'code-theme',
     category: 'Appearance',
+    // Chosen in the theme studio, which writes it as part of the theme.
+    visibility: 'internal',
     title: 'Code theme in light mode',
     description: 'Colors for code in editors and chat code blocks when the app uses light mode.',
     keywords: ['syntax', 'highlighting', 'theme', 'native', 'vscode', 'colour'],
@@ -328,6 +334,8 @@ export const SETTINGS_REGISTRY = {
     scope: 'window',
     widget: 'number',
     category: 'Appearance',
+    // Chosen in the theme studio, which writes it as part of the theme.
+    visibility: 'internal',
     description:
       'How opaque panels and sidebars are over the wallpaper. 100 turns the glass material off.',
     keywords: ['transparency', 'opacity', 'glass', 'material', 'blur'],
@@ -338,6 +346,8 @@ export const SETTINGS_REGISTRY = {
     scope: 'window',
     widget: 'number',
     category: 'Appearance',
+    // Chosen in the theme studio, which writes it as part of the theme.
+    visibility: 'internal',
     // Drives --content-opacity: the well is a second layer over a panel that
     // already painted one, so 50 over 80 composites to 90.
     description:
@@ -352,6 +362,8 @@ export const SETTINGS_REGISTRY = {
     scope: 'window',
     widget: 'number',
     category: 'Appearance',
+    // Chosen in the theme studio, which writes it as part of the theme.
+    visibility: 'internal',
     description: 'Backdrop blur radius, in pixels, behind translucent surfaces.',
     keywords: ['blur', 'glass', 'material', 'vibrancy'],
   }),
@@ -362,7 +374,8 @@ export const SETTINGS_REGISTRY = {
     widget: 'number',
     category: 'Appearance',
     description: 'Backdrop saturation, as a percentage, behind translucent surfaces.',
-    visibility: 'advanced',
+    // Chosen in the theme studio, which writes it as part of the theme.
+    visibility: 'internal',
     keywords: ['saturation', 'glass', 'material', 'vibrancy'],
   }),
   'workbench.surface.continuousSeams': defineSetting({
@@ -385,6 +398,8 @@ export const SETTINGS_REGISTRY = {
     scope: 'application',
     widget: 'wallpaper',
     category: 'Appearance',
+    // Chosen in the theme studio, which writes it as part of the theme.
+    visibility: 'internal',
     description: 'Choose a wallpaper and turn it on or off without losing the selection.',
     keywords: ['wallpaper', 'background', 'desktop'],
   }),

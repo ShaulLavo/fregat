@@ -1,7 +1,7 @@
 import type { WallpaperAsset } from '@workspace/contracts'
 import { toast } from 'sonner'
-import { useWallpaperActions } from '@/features/settings/hooks/use-wallpaper-actions'
-import { ACCEPTED_WALLPAPER_TYPES } from '@/features/settings/utils/wallpaper-upload'
+import { useWallpaperActions } from '@/lib/theme-library/hooks/use-wallpaper-actions'
+import { ACCEPTED_WALLPAPER_TYPES } from '@/lib/theme-library/utils/wallpaper-upload'
 import { errorMessage } from '@/lib/error-message'
 import { toastError } from '@/lib/toast-error'
 
