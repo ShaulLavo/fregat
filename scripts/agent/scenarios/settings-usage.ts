@@ -1,3 +1,7 @@
+import type {
+  ProviderUsageHistory,
+  ProviderUsageModelRow,
+} from '../../../packages/contracts/src/index'
 import { strictEqual } from 'node:assert/strict'
 import { selectors, settleAnimations } from '../selectors'
 import type { Scenario } from './index'
@@ -17,14 +21,16 @@ function rangeStart(days: number) {
 const localDay = new Intl.DateTimeFormat('en-CA').format
 
 /** A month of mixed spend: Claude priced by its CLI, one Codex model with no price. */
-function historyFixture() {
+function historyFixture(): ProviderUsageHistory {
   const since = rangeStart(30)
   const daily = [2, 5, 6, 12, 20, 21, 27, 29].map((offset, index) => ({
     costUsd: 0.4 + index * 0.35,
     day: localDay(new Date(since.getTime() + offset * DAY_MS + DAY_MS / 2)),
     tokens: 120_000 + index * 40_000,
   }))
-  const model = (fields: Record<string, unknown>) => ({
+  const model = (
+    fields: Pick<ProviderUsageModelRow, 'costSource' | 'costUsd' | 'driverKind' | 'model'>,
+  ): ProviderUsageModelRow => ({
     cacheReadTokens: 800_000,
     cacheWriteTokens: 40_000,
     inputTokens: 90_000,
@@ -50,7 +56,8 @@ function historyFixture() {
         driverKind: 'claude',
         model: 'claude-haiku-4-5',
       }),
-      model({ costSource: 'none', costUsd: null, driverKind: 'codex', model: 'gpt-6-astra' }),
+      model({ costSource: 'catalog', costUsd: 1.82, driverKind: 'codex', model: 'gpt-6-astra' }),
+      model({ costSource: 'none', costUsd: null, driverKind: 'codex', model: 'unknown-model' }),
     ],
     purposes: [
       { costUsd: 10.02, purpose: 'turn', tokens: 2_700_000, turns: 38 },
@@ -58,20 +65,20 @@ function historyFixture() {
       { costUsd: 0.04, purpose: 'commit-message', tokens: 30_000, turns: 3 },
     ],
     since: since.toISOString(),
-    totals: { costUsd: 10.18, tokens: 2_970_000, turns: 50, unpricedTokens: 990_000 },
+    totals: { costUsd: 12.0, tokens: 3_960_000, turns: 50, unpricedTokens: 990_000 },
   }
 }
 
 async function openUsageSettings(page: Parameters<Scenario['run']>[0]) {
   await selectors.windowToolbar(page).waitFor({ timeout: 45_000 })
   await page.keyboard.press('Control+,')
-  await selectors.settingsSearch(page).fill('usage.modelPrices')
+  await selectors.settingsSearch(page).fill('usage')
 }
 
 export const settingsUsage: Scenario = {
   name: 'settings-usage',
   description:
-    'Settings › Usage: the real history read answers, then a fixed month drives the headline, day chart, model and purpose rows and the price editor. Writes no prices.',
+    'Settings › Usage: the real history read answers, then a fixed month drives the headline, day chart, model and purpose rows with automatic estimates and unknown costs.',
   async run(page, { step }) {
     const realRead = page.waitForResponse(historyRoute, { timeout: 45_000 })
     await page.reload()
@@ -81,16 +88,33 @@ export const settingsUsage: Scenario = {
     await selectors.usageSection(page).waitFor({ timeout: 20_000 })
     await step('real-read')
 
+    let unpricedOnly = false
     await page.route(historyRoute, (route) =>
-      route.fulfill({ contentType: 'application/json', json: historyFixture() }),
+      route.fulfill({
+        contentType: 'application/json',
+        json: unpricedOnly ? unpricedHistoryFixture() : historyFixture(),
+      }),
     )
     try {
       await page.reload()
       await openUsageSettings(page)
       await selectors.usageSummary(page).waitFor({ timeout: 20_000 })
       strictEqual(await selectors.usageChartBars(page).count(), 30, 'one bar slot per day')
-      strictEqual(await selectors.usageModelRows(page).count(), 3, 'one row per model')
-      strictEqual(await selectors.usagePriceRows(page).count(), 1, 'only the unpriced model')
+      strictEqual(await selectors.usageModelRows(page).count(), 4, 'one row per model')
+      strictEqual(
+        await selectors.usageSection(page).getByRole('spinbutton').count(),
+        0,
+        'no manual price fields',
+      )
+      strictEqual(
+        await selectors.usageSection(page).getByText('Price unavailable', { exact: true }).count(),
+        1,
+        'unknown model stays unpriced',
+      )
+      strictEqual(
+        await selectors.usageSummary(page).getByText('Estimated API cost', { exact: true }).count(),
+        1,
+      )
       await page.mouse.move(0, 0)
       await step('month')
 
@@ -101,10 +125,32 @@ export const settingsUsage: Scenario = {
       await step('bar-hover')
 
       await page.mouse.move(0, 0)
-      await selectors.usagePriceRows(page).first().scrollIntoViewIfNeeded()
-      await step('prices')
+      await selectors.usageModelRows(page).last().scrollIntoViewIfNeeded()
+      await step('automatic-pricing')
+
+      unpricedOnly = true
+      await page.reload()
+      await openUsageSettings(page)
+      await selectors.usageSummary(page).getByText('Price unavailable', { exact: true }).waitFor()
+      strictEqual(
+        await selectors.usageSection(page).getByText('$0.00', { exact: true }).count(),
+        0,
+        'unknown usage never looks free',
+      )
+      await step('unknown-prices')
     } finally {
       await page.unroute(historyRoute)
     }
   },
+}
+
+function unpricedHistoryFixture() {
+  const history = historyFixture()
+  return {
+    ...history,
+    daily: history.daily.map((day) => ({ ...day, costUsd: null })),
+    models: history.models.filter((row) => row.costSource === 'none'),
+    purposes: [{ costUsd: null, purpose: 'turn', tokens: 990_000, turns: 14 }],
+    totals: { costUsd: null, tokens: 990_000, turns: 14, unpricedTokens: 990_000 },
+  }
 }

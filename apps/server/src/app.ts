@@ -69,6 +69,7 @@ import { webRoutes, type WebOptions } from './web/routes'
 import { ProviderSessionDirectory } from './provider/provider-session-directory'
 import { ProviderService } from './provider/provider-service'
 import { ProviderUsageHistoryReader } from './provider/usage-history'
+import { ProviderPriceCatalog } from './provider/price-catalog'
 import { ProviderUsageRecorder } from './provider/usage-recorder'
 import { ProviderUsageStore } from './provider/usage-store'
 import { MachineService, type MachineServiceOptions } from './machines/service'
@@ -236,11 +237,13 @@ export function createApp(options: AppOptions) {
     sessionDirectory: new ProviderSessionDirectory(database),
   })
   const providerUsage = new ProviderUsageStore(providerAdapterRegistry)
-  const providerUsageRecorder = new ProviderUsageRecorder(database, providerAdapterRegistry)
-  const providerUsageHistory = new ProviderUsageHistoryReader(
+  const providerPrices = new ProviderPriceCatalog(database)
+  const providerUsageRecorder = new ProviderUsageRecorder(
     database,
-    () => settings.snapshot().values['usage.modelPrices'],
+    providerAdapterRegistry,
+    providerPrices,
   )
+  const providerUsageHistory = new ProviderUsageHistoryReader(database)
   providerService.subscribeRuntimeEvents((event) => providerUsage.accept(event))
   providerService.subscribeUsage((event, purpose) => providerUsageRecorder.accept(event, purpose))
   const orchestration = new OrchestrationEngine(database, {
@@ -316,6 +319,7 @@ export function createApp(options: AppOptions) {
     providerService,
     orchestration,
     machines,
+    providerPrices,
   )
 
   const app = new Elysia({ name: 'platform' })
@@ -417,6 +421,9 @@ export function createApp(options: AppOptions) {
       }),
     )
     .use(fsRoutes(fs))
+    .onStart(() => {
+      void providerPrices.refresh()
+    })
     .onStop(cleanup)
   appCleanups.set(configured, cleanup)
   appOrchestration.set(configured, orchestration)
@@ -462,6 +469,7 @@ function appCleanup(
   providerService: ProviderService,
   orchestration: OrchestrationEngine,
   machines: MachineService,
+  providerPrices: ProviderPriceCatalog,
 ) {
   let closed = false
 
@@ -480,6 +488,7 @@ function appCleanup(
     settings.close()
     await orchestration.close()
     await providerService.shutdown()
+    providerPrices.close()
     await fs.close()
     await flushObservability()
   }

@@ -164,12 +164,6 @@ stays safe to read, share and export.
 | `terminal.integrated.scrollback`     | `10000` | window | How many lines of output the terminal keeps.            |
 | `terminal.integrated.cursorBlinking` | `true`  | window | Blink the terminal cursor while the terminal has focus. |
 
-## Usage
-
-| Setting             | Default | Scope       | What it does                                                                                                                             |
-| ------------------- | ------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `usage.modelPrices` | `{}`    | application | What each model cost over time. Claude reports its own cost; a model that reports none is priced here, in US dollars per million tokens. |
-
 ## Window
 
 | Setting               | Default        | Scope   | What it does                                                                                                                                                                   |

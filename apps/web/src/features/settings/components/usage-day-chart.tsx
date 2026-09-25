@@ -1,7 +1,7 @@
 import type { ProviderUsageHistory } from '@workspace/contracts'
 import { formatContextTokens } from '@workspace/client-core/chat/context-usage'
 
-import { formatUsageDay, formatUsd, usageDays } from '@/features/settings/utils/usage'
+import { formatUsageDay, formatModelCost, usageDays } from '@/features/settings/utils/usage'
 
 /**
  * Spend per day, one series. Bars measure cost when any is known and tokens otherwise,
@@ -9,8 +9,8 @@ import { formatUsageDay, formatUsd, usageDays } from '@/features/settings/utils/
  */
 export function UsageDayChart({ history }: { readonly history: ProviderUsageHistory }) {
   const days = usageDays(history)
-  const byCost = history.totals.costUsd > 0
-  const measure = (day: (typeof days)[number]) => (byCost ? day.costUsd : day.tokens)
+  const byCost = (history.totals.costUsd ?? 0) > 0
+  const measure = (day: (typeof days)[number]) => (byCost ? (day.costUsd ?? 0) : day.tokens)
   const peak = Math.max(...days.map(measure), 0)
   const first = days[0]
   const last = days.at(-1)
@@ -18,11 +18,11 @@ export function UsageDayChart({ history }: { readonly history: ProviderUsageHist
   return (
     <figure className='flex flex-col gap-1' data-usage-chart>
       <figcaption className='text-muted-foreground text-2xs'>
-        {byCost ? 'Cost per day' : 'Tokens per day'}
+        {byCost ? 'Estimated API cost per day' : 'Tokens per day'}
       </figcaption>
       <div className='flex h-20 items-end gap-0.5' role='list'>
         {days.map((day) => {
-          const label = `${formatUsageDay(day.day)}: ${formatUsd(day.costUsd)}, ${formatContextTokens(day.tokens)} tokens`
+          const label = `${formatUsageDay(day.day)}: ${byCost ? `${formatModelCost(day)} estimated, ` : ''}${formatContextTokens(day.tokens)} tokens`
           const share = peak > 0 ? measure(day) / peak : 0
 
           return (

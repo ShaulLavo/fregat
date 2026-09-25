@@ -634,7 +634,6 @@ export const selectors = {
   usageSection: (page: Page) => page.locator('[data-usage-section]'),
   usageSummary: (page: Page) => page.locator('[data-usage-section] [data-usage-summary]'),
   usageModelRows: (page: Page) => page.locator('[data-usage-section] [data-usage-model]'),
-  usagePriceRows: (page: Page) => page.locator('[data-usage-section] [data-usage-price]'),
   usageChartBars: (page: Page) => page.locator('[data-usage-chart] [role="listitem"]'),
   askAgentAboutLines: (page: Page) =>
     page.getByRole('button', { name: 'Ask the agent about these lines', exact: true }),

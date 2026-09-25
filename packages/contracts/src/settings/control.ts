@@ -1,7 +1,6 @@
 import { wallpaperSelectionSchema, type WallpaperSelection } from '../themes/wallpaper'
 import * as v from 'valibot'
 import { isRecord } from '@workspace/utils/objects'
-import { modelPricesSchema, type ModelPrices } from '../provider-usage'
 import { providerInstanceConfigsSchema, type ProviderInstanceConfig } from '../settings'
 import { descriptorFor, type SettingId, type SettingValue } from './keys'
 
@@ -44,7 +43,6 @@ export type SettingControl =
   | { readonly widget: 'providers'; readonly value: readonly ProviderInstanceConfig[] }
   | { readonly widget: 'models' }
   | { readonly widget: 'machines' }
-  | { readonly widget: 'usage'; readonly value: ModelPrices }
   | { readonly widget: 'unsupported' }
 
 export function settingControl(id: SettingId, value: SettingValue<SettingId>): SettingControl {
@@ -88,11 +86,6 @@ export function settingControl(id: SettingId, value: SettingValue<SettingId>): S
   // its own rows and the stored value tells it nothing.
   if (widget === 'models') return { widget }
   if (widget === 'machines') return { widget }
-  if (widget === 'usage') {
-    const parsed = v.safeParse(modelPricesSchema, value)
-
-    return parsed.success ? { widget, value: parsed.output } : { widget: 'unsupported' }
-  }
 
   return { widget: 'unsupported' }
 }

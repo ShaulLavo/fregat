@@ -1,3 +1,4 @@
+import type { RecordedModelPrice } from '../provider/utils/model-prices'
 import {
   providerUsagePurposeSchema,
   sessionRuntimeStatusSchema,
@@ -40,7 +41,7 @@ export const terminalHistoryChunks = sqliteTable(
 /**
  * Tokens and cost per turn and model. Not a projection of the event log and not tied
  * to the session row: what a turn cost stays spent after its session is deleted.
- * `cost_usd` is the provider's own estimate, null when it reports none.
+ * `price_snapshot` pins catalog estimates to the rates used when recording.
  */
 export const providerUsageTurns = sqliteTable(
   'provider_usage_turns',
@@ -60,12 +61,18 @@ export const providerUsageTurns = sqliteTable(
     cacheWriteTokens: integer('cache_write_tokens').notNull(),
     reasoningTokens: integer('reasoning_tokens').notNull(),
     costUsd: real('cost_usd'),
+    priceSnapshot: text('price_snapshot', { mode: 'json' }).$type<RecordedModelPrice>(),
   },
   (table) => [
     primaryKey({ columns: [table.sessionId, table.turnId, table.model] }),
     index('provider_usage_turns_recorded_idx').on(table.recordedAt),
   ],
 )
+
+export const providerPriceCatalog = sqliteTable('provider_price_catalog', {
+  id: integer('id').primaryKey(),
+  snapshotJson: text('snapshot_json').notNull(),
+})
 
 /** The last running totals seen per session, provider conversation and model. */
 export const providerUsageBaselines = sqliteTable(

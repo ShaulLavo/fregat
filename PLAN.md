@@ -87,14 +87,14 @@ The deleted plans remain in git history.
 
 ## Ordered Platform editor lane
 
-Editor E006 is in progress as of 2026-09-23.
-[Automatic text reclamation](../Editor/docs/storage/e006-text-reclamation.md) now runs in live
-buffers, including unused portions of append chunks and original text, with unchanged snapshot
-identity and retained undo history. Measurement caches and worker descriptors follow physical
-text ownership. Mounted multi-view heap checks and linked Platform WorkspaceEdit tests cover
-the change. String-storage gates now pass; untouched spans keep their owners and small undo
-slices no longer pin whole strings. Position-metadata bounds remain open. This does not reorder
-the other lanes.
+Editor E006 is complete as of 2026-09-25.
+[Automatic text reclamation](../Editor/docs/storage/e006-text-reclamation.md) releases deleted
+text in live buffers, and [tombstone compaction](../Editor/docs/storage/e006-tombstone-compaction.md)
+replaces runs of tombstones with stand-ins that resolve every deleted anchor exactly as before.
+An insert now lands after the last visible piece ending at its offset. After 20,000 paragraph
+replacements the current tree holds 4 pieces instead of 20,002, and about 9 bytes per insertion
+remain in the index. Snapshot identity is unchanged, so Platform's leases and receipts need
+nothing. This does not reorder the other lanes.
 
 Editor E002 is complete as of 2026-09-07. Correlated input diagnostics, bounded source-range
 indexing, and stale secondary-work guards are live. Three fresh controls calibrated the

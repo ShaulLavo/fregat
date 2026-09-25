@@ -16,7 +16,6 @@ import { KeybindingSection } from '@/features/settings/components/keybinding-sec
 import { ModelSection } from '@/features/settings/components/model-section'
 import { MachinesSection } from '@/features/settings/components/machines-section'
 import { ProviderSection } from '@/features/settings/components/provider-section'
-import { UsageSection } from '@/features/settings/components/usage-section'
 import { RowActions } from '@/features/settings/components/row-actions'
 import { BooleanWidget } from '@/features/settings/components/widgets/boolean-widget'
 import { CodeThemeWidget } from '@/features/settings/components/widgets/code-theme-widget'
@@ -53,7 +52,7 @@ export function SettingRow({ id, snapshot }: { id: SettingId; snapshot: Settings
     <div
       className={cn(
         'flex flex-col gap-(--density-control-gap) py-(--density-section-padding) @3xl/settings:items-start @3xl/settings:justify-between @3xl/settings:gap-6',
-        descriptor.widget !== 'theme' && descriptor.widget !== 'usage' && '@3xl/settings:flex-row',
+        descriptor.widget !== 'theme' && '@3xl/settings:flex-row',
       )}
     >
       <div className='flex min-w-0 flex-col gap-1 @max-3xl/settings:wrap-anywhere'>
@@ -163,10 +162,6 @@ function SettingControl({
 
   if (control.widget === 'machines') {
     return <MachinesSection disabled={disabled} />
-  }
-
-  if (control.widget === 'usage') {
-    return <UsageSection disabled={disabled} onChange={onChange} prices={control.value} />
   }
 
   // Every bindable command by name. The generic record editor this replaces

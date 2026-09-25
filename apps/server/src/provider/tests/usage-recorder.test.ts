@@ -14,6 +14,8 @@ import * as schema from '../../db/schema'
 import type { ProviderRuntimeEvent } from '../types'
 
 type UsageTotalsEvent = Extract<ProviderRuntimeEvent, { type: 'usage.totals' }>
+import type { ProviderPriceCatalog } from '../price-catalog'
+import { ProviderUsageHistoryReader } from '../usage-history'
 import { ProviderUsageRecorder } from '../usage-recorder'
 import type { ProviderUsageTotals } from '../utils/usage-totals'
 
@@ -85,6 +87,98 @@ describe('provider usage recorder', () => {
   })
 })
 
+it('freezes each turn rate across catalog updates, repeated completions and recorder restarts', () => {
+  let input = 2
+  const fixture = recorderFixture((driver, model) => {
+    expect(driver).toBe('codex')
+    return {
+      input,
+      output: 10,
+      cacheRead: 0.5,
+      cacheWrite: null,
+      provider: 'openai',
+      model,
+      fetchedAt: '2026-09-25T00:00:00.000Z',
+    }
+  }, 'codex')
+  const usage = { costUsd: null, model: 'gpt-test', inputTokens: 1_000_000 }
+  fixture.recorder.accept(totalsEvent('first', [totals(usage)]), 'turn')
+  input = 4
+  fixture.recorder.accept(
+    totalsEvent('second', [totals({ ...usage, inputTokens: 2_000_000 })]),
+    'turn',
+  )
+  fixture
+    .restart()
+    .accept(totalsEvent('first', [totals({ ...usage, inputTokens: 3_000_000 })]), 'turn')
+  fixture
+    .restart()
+    .accept(totalsEvent('first', [totals({ ...usage, inputTokens: 3_000_000 })]), 'turn')
+  expect(fixture.rows()).toEqual([
+    expect.objectContaining({
+      turnId: 'first',
+      costUsd: 4,
+      priceSnapshot: expect.objectContaining({ input: 2 }),
+    }),
+    expect.objectContaining({
+      turnId: 'second',
+      costUsd: 4,
+      priceSnapshot: expect.objectContaining({ input: 4 }),
+    }),
+  ])
+  input = 100
+  expect(fixture.history().totals.costUsd).toBe(8)
+  expect(fixture.history().models[0]?.costSource).toBe('catalog')
+})
+
+it('prefers a provider estimate without fetching rates, including an explicit zero', () => {
+  let lookups = 0
+  const fixture = recorderFixture(() => {
+    lookups += 1
+    return null
+  })
+  fixture.recorder.accept(totalsEvent('free', [totals({ inputTokens: 1, costUsd: 0 })]), 'turn')
+  fixture.recorder.accept(totalsEvent('paid', [totals({ inputTokens: 2, costUsd: 0.25 })]), 'turn')
+  expect(lookups).toBe(0)
+  expect(fixture.rows().map((row) => [row.costUsd, row.priceSnapshot])).toEqual([
+    [0, null],
+    [0.25, null],
+  ])
+})
+
+it('keeps a turn unknown when prices arrive after its first completion', () => {
+  let known = false
+  const fixture = recorderFixture(
+    (_driver, model) =>
+      known
+        ? {
+            input: 2,
+            output: 10,
+            cacheRead: 0,
+            cacheWrite: 0,
+            provider: 'openai',
+            model,
+            fetchedAt: '2026-09-25T00:00:00.000Z',
+          }
+        : null,
+    'codex',
+  )
+  fixture.recorder.accept(
+    totalsEvent('first', [totals({ costUsd: null, inputTokens: 10 })]),
+    'turn',
+  )
+  known = true
+  fixture.recorder.accept(
+    totalsEvent('first', [totals({ costUsd: null, inputTokens: 20 })]),
+    'turn',
+  )
+  expect(fixture.rows()[0]?.costUsd).toBeNull()
+  const history = fixture.history()
+  expect(history.totals).toMatchObject({ costUsd: null, unpricedTokens: 20 })
+  expect(history.daily[0]?.costUsd).toBeNull()
+  expect(history.purposes[0]?.costUsd).toBeNull()
+})
+
 it('labels what the spend was for', () => {
   const { recorder, rows } = recorderFixture()
   recorder.accept(totalsEvent('title-turn', [totals({ costUsd: 0.01, outputTokens: 12 })]), 'title')
@@ -92,21 +186,29 @@ it('labels what the spend was for', () => {
   expect(rows()).toEqual([expect.objectContaining({ costUsd: 0.01, purpose: 'title' })])
 })
 
-function recorderFixture() {
+function recorderFixture(
+  lookup: ProviderPriceCatalog['lookup'] = () => null,
+  driverKind: 'claude' | 'codex' = 'claude',
+) {
   const sqlite = new Database(':memory:', { create: true })
   const database = drizzle({ client: sqlite, schema })
   migratePlatformDatabase(database)
   closers.push(() => sqlite.close())
   const accounts = {
-    usageAccount: (providerInstanceId: ProviderInstanceId) => ({
+    usageAccount: (_providerInstanceId: ProviderInstanceId) => ({
       accountKey: 'account-1',
-      driverKind: v.parse(providerDriverKindSchema, providerInstanceId),
+      driverKind: v.parse(providerDriverKindSchema, driverKind),
       enabled: true,
     }),
   }
 
   return {
-    recorder: new ProviderUsageRecorder(database, accounts),
+    recorder: new ProviderUsageRecorder(database, accounts, { lookup }),
+    restart: () => new ProviderUsageRecorder(database, accounts, { lookup }),
+    history: () =>
+      new ProviderUsageHistoryReader(database, {
+        now: () => Date.parse('2026-09-25T12:00:00.000Z'),
+      }).read({ days: 7, utcOffsetMinutes: 0 }),
     rows: () => database.select().from(schema.providerUsageTurns).all(),
   }
 }

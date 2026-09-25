@@ -821,33 +821,6 @@
       "enum": ["terminal", "theme"],
       "type": "string"
     },
-    "usage.modelPrices": {
-      "additionalProperties": {
-        "properties": {
-          "cachedInput": {
-            "minimum": 0,
-            "type": "number"
-          },
-          "input": {
-            "minimum": 0,
-            "type": "number"
-          },
-          "output": {
-            "minimum": 0,
-            "type": "number"
-          }
-        },
-        "required": ["cachedInput", "input", "output"],
-        "type": "object"
-      },
-      "default": {},
-      "description": "What each model cost over time. Claude reports its own cost; a model that reports none is priced here, in US dollars per million tokens.",
-      "propertyNames": {
-        "minLength": 1,
-        "type": "string"
-      },
-      "type": "object"
-    },
     "window.transparency": {
       "default": "compositor",
       "description": "Where the see-through comes from: the window manager blending an opaque window, or a per-pixel transparent window (which costs a full-surface CPU copy per frame).",

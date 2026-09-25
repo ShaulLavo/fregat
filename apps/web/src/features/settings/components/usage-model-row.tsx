@@ -15,7 +15,7 @@ export function UsageModelRow({ row }: { readonly row: ProviderUsageModelRow }) 
       </span>
       <span
         className={cn(
-          'w-16 shrink-0 text-right tabular-nums',
+          'min-w-16 shrink-0 text-right tabular-nums',
           row.costSource === 'none' && 'text-muted-foreground',
         )}
       >

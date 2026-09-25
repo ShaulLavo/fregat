@@ -20,6 +20,8 @@ import { PageHeader } from '@/features/settings/components/page-header'
 import { PageLoading } from '@/features/settings/components/page-loading'
 import { ScopeTabs } from '@/features/settings/components/scope-tabs'
 import { SettingsJsonView } from '@/features/settings/components/json-view'
+import { UsageSection } from '@/features/settings/components/usage-section'
+import { matchesUsageSearch } from '@/features/settings/utils/usage'
 import { SettingRow } from '@/features/settings/components/setting-row'
 import { StatusMessage } from '@/components/status-message'
 import { ViewToggle } from '@/features/settings/components/view-toggle'
@@ -110,12 +112,15 @@ export function SettingsPage({
       isSettingAvailable(id, environment),
   )
   const categories = groupByCategory(visible)
+  if (matchesUsageSearch(query)) categories.set('Usage', [])
   const selectedFile = document.data.layers.find((layer) => layer.id === scope)?.file ?? null
   // An address can narrow the page to one category. Unknown or absent means all of
   // them, so a stale link degrades to the full page rather than to nothing.
   const shown = selectedCategory
     ? [...categories].filter(([category]) => category === selectedCategory)
     : [...categories]
+
+  const onlyUsage = visible.length === 0 && shown.some(([category]) => category === 'Usage')
 
   return (
     <ToolPane
@@ -164,8 +169,13 @@ export function SettingsPage({
                 {/* `visible` is already query-filtered, so "of N" only says something while a
               category narrows the list further; otherwise it printed the same number twice. */}
                 <p className='text-muted-foreground text-xs tabular-nums'>
-                  {selectedCategory ? `${shownCount(shown)} of ` : ''}
-                  {visible.length} {visible.length === 1 ? 'setting' : 'settings'}
+                  {onlyUsage ? 'Usage report' : null}
+                  {!onlyUsage && (
+                    <>
+                      {selectedCategory ? `${shownCount(shown)} of ` : ''}
+                      {visible.length} {visible.length === 1 ? 'setting' : 'settings'}
+                    </>
+                  )}
                 </p>
                 {isSaving ? (
                   <span className='text-muted-foreground flex items-center gap-1 text-xs'>
@@ -236,6 +246,7 @@ export function SettingsPage({
               shown.map(([category, ids]) => (
                 <section className='mb-6' key={category}>
                   <h2 className='text-foreground mb-1 text-sm font-semibold'>{category}</h2>
+                  {category === 'Usage' ? <UsageSection /> : null}
                   {ids.includes('chat.keepImportedSessionsUpdated') ? <ImportSection /> : null}
                   {ids.map((id) => (
                     <SettingRow id={id} key={id} snapshot={projection} />

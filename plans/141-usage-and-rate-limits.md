@@ -80,10 +80,10 @@ Platform already receives.
 - **D2 — Key the state by account, not instance.** Recommended, as RUNTIME-08 already requires:
   two instances sharing a credential home share one meter. The instance-to-account mapping comes
   from the snapshot's account probe; never log or send credentials.
-- **D3 — Cost source.** Recommended: the CLI's own estimate where it exists (Claude
-  `modelUsage[].costUSD`), a user-editable price only for models with no estimate (Codex). Prices
-  are one settings-registry entry, `application` scope, registered in the same pass as the page
-  that reads it.
+- **D3 — Cost source.** The CLI's own estimate wins. Otherwise standard API rates come from
+  models.dev, refreshed in the background with a persisted cache and bundled fallback. Each
+  turn saves its cost and rate snapshot. Unknown prices stay null. The manual price setting
+  and editor were removed; Usage is a report in Settings, not a registry entry.
 - **D4 — History source.** Recommended: record from ingestion going forward. Scanning provider
   transcripts to backfill is a research question, not a default.
 
@@ -262,3 +262,20 @@ with a `scope`. Automated tests use boundary fixtures; nothing consumes a real c
 - T3's third-party usage proxy (`apps/server/src/usage/cliproxyApi.ts`).
 - A hosted price feed. Prices come from the CLI or the user.
 - Per-tool statistics (Serena's dashboard); revisit after Phase 3.
+
+### Automatic pricing (2026-09-25)
+
+Replaces the manual pricing implementation described in Phase 3. `ProviderPriceCatalog` reads
+models.dev through TanStack Query, retains the last good catalog in SQLite, and falls back to
+`provider/model-prices.json` offline. Refresh the bundled snapshot with
+`bun apps/server/scripts/update-model-prices.ts`. Model lookup uses provider and exact model ID.
+
+The recorder pins standard API rates and their retrieval time to each turn. Repeated completion
+events keep the original rate, and changing the catalog never reprices recorded history. The
+provider's own estimate takes precedence. Context-dependent and service-tier billing cannot be
+derived from cumulative turn tokens, so catalog amounts are labelled Estimated API cost. Older
+turns without a recorded cost remain unknown; no price is invented for historical usage.
+
+Settings retains the searchable Usage report without a dummy registry key. Unknown-only totals,
+days and purposes stay null, while mixed totals disclose excluded tokens. The browser scenario
+checks provider, catalog and unknown rows and the removal of price inputs.

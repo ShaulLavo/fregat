@@ -1,6 +1,4 @@
 import type {
-  ModelPrice,
-  ModelPrices,
   ProviderUsageCostSource,
   ProviderUsageDayRow,
   ProviderUsageHistory,
@@ -15,7 +13,11 @@ import type { PlatformDatabase } from '../db/client'
 import { providerUsageTurns as turns } from '../db/schema'
 
 const DAY_MS = 24 * 60 * 60_000
-const COST_SOURCE_RANK: Record<ProviderUsageCostSource, number> = { provider: 0, price: 1, none: 2 }
+const COST_SOURCE_RANK: Record<ProviderUsageCostSource, number> = {
+  provider: 0,
+  catalog: 1,
+  none: 2,
+}
 
 type UsageGroup = {
   day: string
@@ -32,30 +34,19 @@ type UsageGroup = {
   costSource: ProviderUsageCostSource
 }
 
-/**
- * The usage page's one read. A Codex row carries no cost, so it is priced here from the
- * user's per-model price: a corrected price corrects history, and no price means the
- * cost is unknown rather than zero.
- */
+/** Aggregates recorded costs without repricing history from the current catalog. */
 export class ProviderUsageHistoryReader {
   private readonly database: PlatformDatabase
-  private readonly prices: () => ModelPrices
   private readonly now: () => number
 
-  constructor(
-    database: PlatformDatabase,
-    prices: () => ModelPrices,
-    options: { now?: () => number } = {},
-  ) {
+  constructor(database: PlatformDatabase, options: { now?: () => number } = {}) {
     this.database = database
-    this.prices = prices
     this.now = options.now ?? Date.now
   }
 
   read(query: ProviderUsageHistoryQuery): ProviderUsageHistory {
     const since = rangeStart(this.now(), query)
-    const prices = this.prices()
-    const groups = this.groups(query, since).map((group) => priced(group, prices))
+    const groups = this.groups(query, since)
 
     return {
       daily: dailyRows(groups),
@@ -78,7 +69,7 @@ export class ProviderUsageHistoryReader {
   /** One row per viewer-local day, model, purpose and whether the provider priced it. */
   private groups(query: ProviderUsageHistoryQuery, since: string) {
     const day = sql<string>`date(${turns.recordedAt}, ${offsetModifier(query.utcOffsetMinutes)})`
-    const unpriced = sql<number>`${turns.costUsd} IS NULL`
+    const costSource = sql<ProviderUsageCostSource>`CASE WHEN ${turns.costUsd} IS NULL THEN 'none' WHEN ${turns.priceSnapshot} IS NULL THEN 'provider' ELSE 'catalog' END`
 
     return this.database
       .select({
@@ -93,11 +84,11 @@ export class ProviderUsageHistoryReader {
         purpose: turns.purpose,
         reasoningTokens: sql<number>`sum(${turns.reasoningTokens})`,
         turns: sql<number>`count(*)`,
-        unpriced,
+        costSource,
       })
       .from(turns)
       .where(gte(turns.recordedAt, since))
-      .groupBy(day, turns.model, turns.driverKind, turns.purpose, unpriced)
+      .groupBy(day, turns.model, turns.driverKind, turns.purpose, costSource)
       .all()
   }
 
@@ -144,29 +135,6 @@ function rangeStart(nowMs: number, query: ProviderUsageHistoryQuery) {
 
 function offsetModifier(utcOffsetMinutes: number) {
   return `${utcOffsetMinutes >= 0 ? '+' : ''}${utcOffsetMinutes} minutes`
-}
-
-function priced(
-  group: Omit<UsageGroup, 'costSource'> & { unpriced: number },
-  prices: ModelPrices,
-): UsageGroup {
-  const { unpriced, ...rest } = group
-  if (!unpriced) return { ...rest, costSource: 'provider' }
-
-  const price = prices[group.model]
-  if (!price) return { ...rest, costSource: 'none', costUsd: null }
-
-  return { ...rest, costSource: 'price', costUsd: priceCost(group, price) }
-}
-
-// Cache writes are billed as input where a provider has no separate rate for them.
-function priceCost(group: Omit<UsageGroup, 'costSource'>, price: ModelPrice) {
-  const microDollars =
-    (group.inputTokens + group.cacheWriteTokens) * price.input +
-    group.cacheReadTokens * price.cachedInput +
-    group.outputTokens * price.output
-
-  return microDollars / 1_000_000
 }
 
 function modelRows(groups: readonly UsageGroup[]): ProviderUsageModelRow[] {
@@ -221,10 +189,10 @@ function addModelGroup(row: ProviderUsageModelRow, group: UsageGroup): ProviderU
 function dailyRows(groups: readonly UsageGroup[]): ProviderUsageDayRow[] {
   const byDay = new Map<string, ProviderUsageDayRow>()
   for (const group of groups) {
-    const row = byDay.get(group.day) ?? { costUsd: 0, day: group.day, tokens: 0 }
+    const row = byDay.get(group.day) ?? { costUsd: null, day: group.day, tokens: 0 }
     byDay.set(group.day, {
       ...row,
-      costUsd: row.costUsd + (group.costUsd ?? 0),
+      costUsd: addCost(row.costUsd, group.costUsd),
       tokens: row.tokens + usageTokenCount(group),
     })
   }
@@ -240,6 +208,7 @@ function addCost(left: number | null, right: number | null) {
 }
 
 function sumKnownCost(groups: readonly UsageGroup[]) {
+  if (groups.length > 0 && groups.every((group) => group.costUsd === null)) return null
   return groups.reduce((total, group) => total + (group.costUsd ?? 0), 0)
 }
 

@@ -4,7 +4,6 @@ import { themeBundleSchema, themeCustomizationsSchema } from '../themes/bundle'
 import { wallpaperSelectionSchema } from '../themes/wallpaper'
 import * as v from 'valibot'
 import { machinesSchema } from '../machines'
-import { modelPricesSchema } from '../provider-usage'
 import {
   keybindingOverridesSchema,
   lspLanguageServerListsSchema,
@@ -966,18 +965,6 @@ export const SETTINGS_REGISTRY = {
     description:
       'Explicit leading order for the picker. Models named by neither list stay visible after these, in provider order.',
     keywords: ['model', 'order', 'sort', 'picker'],
-  }),
-  'usage.modelPrices': defineSetting({
-    schema: modelPricesSchema,
-    default: {},
-    // Only arithmetic on the usage page reads it; a price belongs to the account, not a repository.
-    scope: 'application',
-    widget: 'usage',
-    category: 'Usage',
-    title: 'Usage and prices',
-    description:
-      'What each model cost over time. Claude reports its own cost; a model that reports none is priced here, in US dollars per million tokens.',
-    keywords: ['usage', 'cost', 'price', 'spend', 'tokens', 'billing', 'codex'],
   }),
   'keybindings.preset': defineSetting({
     schema: v.picklist(['default', 'vscode'] as const),

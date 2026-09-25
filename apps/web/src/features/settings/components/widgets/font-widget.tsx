@@ -24,6 +24,7 @@ import {
 import {
   fontOption,
   fontPickerGroups,
+  savedFontStyle,
   type FontOption,
   type FontOptionGroup,
 } from '@/features/settings/utils/font-options'
@@ -103,7 +104,7 @@ export function FontWidget({
           text={current.label}
         />
       </ComboboxTrigger>
-      <ComboboxContent className='max-h-96 w-80'>
+      <ComboboxContent className='max-h-96 w-80' style={savedFontStyle(role, value)}>
         <ComboboxInput
           aria-label={`Search ${label.toLowerCase()}s`}
           placeholder={role === 'ui' ? 'Search fonts…' : 'Search code fonts…'}

@@ -25,7 +25,7 @@ import {
 } from '@workspace/contracts'
 import { paletteStylesheet, resolvePalette } from '@workspace/client-core/themes/palette'
 
-import { useQueries } from '@tanstack/react-query'
+import { useQueries, useQuery } from '@tanstack/react-query'
 import { fontQueryOptions } from '@/lib/fonts/state/queries'
 import { fontsInUse } from '@/lib/fonts/utils/stack'
 import { BundleContext } from '@/lib/appearance/providers/bundle-context'
@@ -45,6 +45,8 @@ import {
 import type { SettingsSubmission } from '@workspace/client-core/settings/intent-store'
 import { applyAppearance, resolveColorTheme } from '@/features/settings/utils/apply-appearance'
 import { readSettingsMirror, writeBootMirror } from '@/lib/settings-boot-mirror'
+
+type FontPreview = { readonly key: FontSettingId; readonly ref: string }
 
 type Preview<T> = {
   readonly value: T
@@ -70,7 +72,16 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
   }> | null>(null)
   const [modePreview, setModePreview] = useState<Preview<Theme> | null>(null)
   const [palettePreview, setPalettePreview] = useState<Preview<Palette> | null>(null)
-  const [fontPreview, setFontPreview] = useState<{ key: FontSettingId; ref: string } | null>(null)
+  const [fontPreview, setFontPreview] = useState<FontPreview | null>(null)
+  const [shownFontPreview, setShownFontPreview] = useState<FontPreview | null>(null)
+  const previewFace = useQuery({
+    ...fontQueryOptions(fontPreview?.ref ?? ''),
+    enabled: fontPreview !== null,
+  })
+  // A hovered font shows once its face is ready; until then the last one stays on screen,
+  // because showing it early draws the fallback face and then jumps.
+  const nextShownFont = fontPreview && previewFace.isPending ? shownFontPreview : fontPreview
+  if (nextShownFont !== shownFontPreview) setShownFontPreview(nextShownFont)
   const projectedValues = projection?.values
   const baseValues = projectedValues ?? { ...DEFAULT_SETTING_VALUES, ...bootValues }
   const committedTheme = baseValues['workbench.colorTheme']
@@ -84,7 +95,7 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
   const appearanceValues = resolveThemeSettings(
     {
       ...baseValues,
-      ...(fontPreview ? { [fontPreview.key]: fontPreview.ref } : {}),
+      ...(shownFontPreview ? { [shownFontPreview.key]: shownFontPreview.ref } : {}),
       'workbench.colorTheme': resolvedMode,
       'workbench.theme': bundlePreview?.theme ?? baseValues['workbench.theme'],
     },
@@ -139,7 +150,6 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
     applyPaletteStylesheet(globalThis.document, paletteStylesheet(renderedPalette))
   }, [renderedPalette])
 
-  // Rendered values, so a hovered font starts loading the moment the picker previews it.
   useQueries({ queries: fontsInUse(appearanceValues).map((ref) => fontQueryOptions(ref)) })
 
   const confirmedValues = confirmedQuery.data?.values

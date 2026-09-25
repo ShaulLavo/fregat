@@ -27,7 +27,15 @@ export const platformMigrations: readonly Migration[] = [
   { version: 20, name: 'terminal_history', up: applyTerminalHistory },
   { version: 21, name: 'provider_usage', up: applyProviderUsage },
   { version: 22, name: 'provider_usage_purpose', up: applyProviderUsagePurpose },
+  { version: 23, name: 'provider_usage_prices', up: applyProviderUsagePrices },
 ]
+
+function applyProviderUsagePrices(database: PlatformDatabase) {
+  database.run(sql`ALTER TABLE provider_usage_turns ADD COLUMN price_snapshot TEXT`)
+  database.run(
+    sql`CREATE TABLE provider_price_catalog (id INTEGER PRIMARY KEY, snapshot_json TEXT NOT NULL)`,
+  )
+}
 
 function applyProviderUsagePurpose(database: PlatformDatabase) {
   database.run(

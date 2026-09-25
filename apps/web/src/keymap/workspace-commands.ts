@@ -603,10 +603,7 @@ export const workspaceCommands = [
     icon: GaugeIcon,
     run: ({ invocation, runtime }) =>
       transitionStart(
-        runtime.shell.showSettings(
-          invocation.origin as FocusTargetToken | null,
-          'usage.modelPrices',
-        ),
+        runtime.shell.showSettings(invocation.origin as FocusTargetToken | null, 'usage'),
       ),
   }),
   defineCommand({

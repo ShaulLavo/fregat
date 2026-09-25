@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
-import type { ModelPrices, ProviderUsagePurpose } from '@workspace/contracts'
+import type { ProviderUsagePurpose } from '@workspace/contracts'
 import { afterEach, describe, expect, it } from 'vitest'
 import { migratePlatformDatabase } from '../../db/migrations'
 import * as schema from '../../db/schema'
@@ -17,7 +17,7 @@ afterEach(() => {
 
 describe('provider usage history', () => {
   it('groups by the viewer’s calendar day and starts the range at their midnight', () => {
-    const fixture = historyFixture({})
+    const fixture = historyFixture()
     // 23:30 UTC on the 23rd is 02:30 on the 24th in UTC+3.
     fixture.insert({ recordedAt: '2026-09-23T23:30:00.000Z', turnId: 'late' })
     fixture.insert({ recordedAt: '2026-09-25T06:00:00.000Z', turnId: 'today' })
@@ -31,12 +31,21 @@ describe('provider usage history', () => {
     expect(history.totals.turns).toBe(2)
   })
 
-  it('keeps the provider’s cost, prices a model that has none, and flags one with no price', () => {
-    const fixture = historyFixture({ 'gpt-5.5': { cachedInput: 0.5, input: 2, output: 10 } })
+  it('reads recorded provider and catalog costs, and flags unknown costs', () => {
+    const fixture = historyFixture()
     fixture.insert({ costUsd: 0.42, model: 'claude-opus-5-5', turnId: 'claude' })
     fixture.insert({
       cacheReadTokens: 1_000_000,
-      costUsd: null,
+      costUsd: 3.5,
+      priceSnapshot: {
+        provider: 'openai',
+        model: 'gpt-5.5',
+        fetchedAt: '2026-09-25T00:00:00.000Z',
+        input: 2,
+        output: 10,
+        cacheRead: 0.5,
+        cacheWrite: null,
+      },
       driverKind: 'codex',
       inputTokens: 1_000_000,
       model: 'gpt-5.5',
@@ -48,7 +57,7 @@ describe('provider usage history', () => {
     const history = fixture.read(30)
 
     expect(history.models).toEqual([
-      expect.objectContaining({ costSource: 'price', costUsd: 3.5, model: 'gpt-5.5' }),
+      expect.objectContaining({ costSource: 'catalog', costUsd: 3.5, model: 'gpt-5.5' }),
       expect.objectContaining({ costSource: 'provider', costUsd: 0.42, model: 'claude-opus-5-5' }),
       expect.objectContaining({ costSource: 'none', costUsd: null, model: 'gpt-mystery' }),
     ])
@@ -57,7 +66,7 @@ describe('provider usage history', () => {
   })
 
   it('splits spend by purpose and counts a two-model turn once', () => {
-    const fixture = historyFixture({})
+    const fixture = historyFixture()
     fixture.insert({ costUsd: 0.3, model: 'claude-opus-5-5', turnId: 'chat' })
     fixture.insert({ costUsd: 0.1, model: 'claude-haiku-4-5', turnId: 'chat' })
     fixture.insert({ costUsd: 0.01, purpose: 'title', turnId: 'title' })
@@ -76,6 +85,7 @@ describe('provider usage history', () => {
 })
 
 type TurnRow = {
+  priceSnapshot?: typeof schema.providerUsageTurns.$inferInsert.priceSnapshot
   cacheReadTokens?: number
   costUsd?: number | null
   driverKind?: string
@@ -87,12 +97,12 @@ type TurnRow = {
   turnId: string
 }
 
-function historyFixture(prices: ModelPrices) {
+function historyFixture() {
   const sqlite = new Database(':memory:', { create: true })
   const database = drizzle({ client: sqlite, schema })
   migratePlatformDatabase(database)
   closers.push(() => sqlite.close())
-  const reader = new ProviderUsageHistoryReader(database, () => prices, { now: () => NOW })
+  const reader = new ProviderUsageHistoryReader(database, { now: () => NOW })
 
   return {
     insert: (row: TurnRow) =>
@@ -100,6 +110,7 @@ function historyFixture(prices: ModelPrices) {
         .insert(schema.providerUsageTurns)
         .values({
           accountKey: null,
+          priceSnapshot: row.priceSnapshot,
           cacheReadTokens: row.cacheReadTokens ?? 0,
           cacheWriteTokens: 0,
           costUsd: row.costUsd === undefined ? 0 : row.costUsd,

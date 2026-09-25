@@ -20,6 +20,8 @@ The settings command, the gear button at the bottom of the sidebar rail, or an a
 
 `scenario font-picker` drives both font pickers: Suggested before typing, a hovered search result previewing the whole app (`--font-ui`), Escape restoring it, a chosen Fontsource font surviving reload with its stylesheet loaded at the first frame, an installed font found by search, and a Nerd Font for code with editor clicks landing on the right column. The server's installed-font list comes from `fc-list` on the machine running the API.
 
+`scenario font-picker-hover` hovers three suggested interface fonts and fails on any frame whose `--font-ui` names a face that has not loaded (a hover must keep the last font until the next is ready), or if a row sample moves when the app behind the popup changes font.
+
 `scenario settings-save-rejected` fulfils the settings write with a 400 structured envelope and checks the toast shows the server's own message _and_ its `fix`. The envelope carries `why` and `fix` (`responseErrorPayload` in `apps/server/src/app.ts`); `createRpcError` and `clientErrorDescription` are the two places that used to drop them.
 
 `scenario settings-responsive` checks 40px touch controls and 16px search text in narrow Settings, with search below the scope tabs, then verifies both return to a shared bar in a wide pane.
@@ -43,3 +45,5 @@ Scope is a security boundary: a window-scoped value never reaches execution. Sec
 `scenario wallpaper-boot-handoff` reloads as a macOS tab with a theme-less boot mirror whose wallpaper is the desktop. Linux composites over the real desktop, and a theme's own wallpaper wins, so neither preloads. The boot script's preload must report `ready` on `window.platformBootWallpaper`, the record the app reads instead of the link's attributes.
 
 `scenario settings-stale-diagnostics` plants an unknown key in the user `settings.json` of the server under test (`platformHomePath('settings.json')`, which the CLI points at the run's state home) and checks that the User JSON view marks it. It then types a space after the opening brace, which hides the marks while the text differs from the file, and undoes to bring them back. The original bytes are restored even if the run fails. A highlight holds only mounted rows, so the edit stays on a row near the marked one.
+
+`scenario settings-usage` checks the real history route, then a fixed month with provider estimates, catalog estimates and unknown prices. It verifies the Estimated API cost label, daily bars and model rows, with no manual price inputs.

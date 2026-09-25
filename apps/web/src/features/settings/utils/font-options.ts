@@ -9,6 +9,7 @@ import {
   type FontRole,
 } from '@workspace/contracts'
 
+import { fontStack } from '@/lib/fonts/utils/stack'
 import type { FontSettingId } from '@/features/settings/providers/font-preview-context'
 
 export type FontOption = {
@@ -37,6 +38,17 @@ const SAMPLE_TEXT: Readonly<Record<FontRole, string>> = {
 
 export function fontSampleText(role: FontRole): string {
   return SAMPLE_TEXT[role]
+}
+
+/**
+ * Pins the picker's own text to the saved font: a hover previews the app behind it, and a list
+ * restyled by every hover moves its rows and redraws pending samples in the hovered face.
+ */
+export function savedFontStyle(role: FontRole, value: string): Record<string, string> {
+  const stack = fontStack(value, role)
+  if (role === 'code') return { '--font-code': stack }
+
+  return { '--font-ui': stack, fontFamily: 'var(--font-ui)' }
 }
 
 /** Shipped in the bundle, so a search finds them next to the downloadable families. */

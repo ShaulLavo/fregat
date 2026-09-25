@@ -52,6 +52,7 @@ import { sessionActionsSurfaces } from './session-actions-surfaces'
 import { searchFileActions } from './search-file-actions'
 import { settingsStaleDiagnostics } from './settings-stale-diagnostics'
 import { fontPicker } from './font-picker'
+import { fontPickerHover } from './font-picker-hover'
 import { settingsSaveRejected } from './settings-save-rejected'
 import { settingsResponsive } from './settings-responsive'
 import { filePickerNavigation, gitHistoryScroll } from './list-regressions'
@@ -334,6 +335,7 @@ export const scenarios: readonly Scenario[] = [
   projectMenu,
   sidebarSettingsButton,
   fontPicker,
+  fontPickerHover,
   demoWorkspace,
   demoAgentGit,
   demoReset,

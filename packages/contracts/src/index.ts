@@ -245,7 +245,6 @@ export {
 } from './provider'
 export {
   USAGE_HISTORY_DAYS,
-  modelPricesSchema,
   providerAccountUsageSchema,
   providerUsageHistoryQuerySchema,
   providerUsageHistorySchema,
@@ -253,8 +252,6 @@ export {
   providerUsageResultSchema,
   providerUsageWindowSchema,
   usageTokenCount,
-  type ModelPrice,
-  type ModelPrices,
   type ProviderUsageCostSource,
   type ProviderUsageDayRow,
   type ProviderUsageHistory,

@@ -1,6 +1,4 @@
 import type {
-  ModelPrice,
-  ModelPrices,
   ProviderUsageDayRow,
   ProviderUsageHistory,
   ProviderUsageModelRow,
@@ -37,7 +35,7 @@ export function formatUsd(value: number) {
 
 /** `null` is an unknown cost, never zero. */
 export function formatModelCost(row: Pick<ProviderUsageModelRow, 'costUsd'>) {
-  return row.costUsd === null ? 'No price' : formatUsd(row.costUsd)
+  return row.costUsd === null ? 'Price unavailable' : formatUsd(row.costUsd)
 }
 
 /**
@@ -73,26 +71,12 @@ export function formatUsageDay(day: string) {
   })
 }
 
-/**
- * Models the price editor offers: any that reports no cost of its own, plus any that
- * already has a price, so a price outlives the range that showed its model.
- */
-export function pricedModelNames(history: ProviderUsageHistory | undefined, prices: ModelPrices) {
-  const names = new Set(Object.keys(prices))
-  for (const row of history?.models ?? []) {
-    if (row.costSource !== 'provider') names.add(row.model)
-  }
-
-  return [...names].toSorted((left, right) => left.localeCompare(right))
-}
-
-/** The price list with one model set, or removed when `price` is null. */
-export function withModelPrice(prices: ModelPrices, model: string, price: ModelPrice | null) {
-  const next: Record<string, ModelPrice> = {}
-  for (const [name, existing] of Object.entries(prices)) {
-    if (name !== model) next[name] = existing
-  }
-  if (price) next[model] = price
-
-  return next
+/** Usage is a report, so it is searchable without registering a pretend setting. */
+export function matchesUsageSearch(query: string) {
+  const words = 'usage cost price spend tokens billing codex claude'
+  return query
+    .trim()
+    .toLowerCase()
+    .split(/\s+/)
+    .every((word) => words.includes(word))
 }

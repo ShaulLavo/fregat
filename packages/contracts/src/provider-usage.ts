@@ -76,10 +76,10 @@ const usageTokensEntries = {
 }
 
 /**
- * `provider`: the CLI's own estimate. `price`: the user's per-model price applied at
- * read time. `none`: no estimate and no price, so the cost is unknown, not zero.
+ * `provider`: the CLI's estimate. `catalog`: standard API rates saved with the turn.
+ * `none`: cost is unknown, never zero.
  */
-const providerUsageCostSourceSchema = v.picklist(['provider', 'price', 'none'])
+const providerUsageCostSourceSchema = v.picklist(['provider', 'catalog', 'none'])
 
 const providerUsageModelRowSchema = v.object({
   model: trimmedNonEmptyStringSchema,
@@ -94,14 +94,14 @@ const providerUsageDayRowSchema = v.object({
   /** `YYYY-MM-DD` in the viewer's time zone. */
   day: v.pipe(v.string(), v.isoDate()),
   tokens: tokenCountSchema,
-  costUsd: v.number(),
+  costUsd: v.nullable(v.number()),
 })
 
 const providerUsagePurposeRowSchema = v.object({
   purpose: providerUsagePurposeSchema,
   turns: tokenCountSchema,
   tokens: tokenCountSchema,
-  costUsd: v.number(),
+  costUsd: v.nullable(v.number()),
 })
 
 /**
@@ -112,7 +112,7 @@ export const providerUsageHistorySchema = v.object({
   days: v.picklist(USAGE_HISTORY_DAYS),
   since: isoDateTimeSchema,
   totals: v.object({
-    costUsd: v.number(),
+    costUsd: v.nullable(v.number()),
     tokens: tokenCountSchema,
     turns: tokenCountSchema,
     unpricedTokens: tokenCountSchema,
@@ -122,15 +122,6 @@ export const providerUsageHistorySchema = v.object({
   purposes: v.array(providerUsagePurposeRowSchema),
 })
 
-/** US dollars per million tokens, for models whose provider reports no cost. */
-const modelPriceSchema = v.object({
-  input: v.pipe(v.number(), v.minValue(0)),
-  cachedInput: v.pipe(v.number(), v.minValue(0)),
-  output: v.pipe(v.number(), v.minValue(0)),
-})
-
-export const modelPricesSchema = v.record(trimmedNonEmptyStringSchema, modelPriceSchema)
-
 export type ProviderUsagePurpose = v.InferOutput<typeof providerUsagePurposeSchema>
 export type ProviderUsageHistoryQuery = v.InferOutput<typeof providerUsageHistoryQuerySchema>
 export type ProviderUsageCostSource = v.InferOutput<typeof providerUsageCostSourceSchema>
@@ -138,8 +129,6 @@ export type ProviderUsageModelRow = v.InferOutput<typeof providerUsageModelRowSc
 export type ProviderUsageDayRow = v.InferOutput<typeof providerUsageDayRowSchema>
 export type ProviderUsagePurposeRow = v.InferOutput<typeof providerUsagePurposeRowSchema>
 export type ProviderUsageHistory = v.InferOutput<typeof providerUsageHistorySchema>
-export type ModelPrice = v.InferOutput<typeof modelPriceSchema>
-export type ModelPrices = v.InferOutput<typeof modelPricesSchema>
 
 /** Tokens a row processed. Reasoning is already inside the output and is not added again. */
 export function usageTokenCount(row: {

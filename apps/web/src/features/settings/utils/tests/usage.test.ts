@@ -1,12 +1,7 @@
 import type { ProviderUsageHistory } from '@workspace/contracts'
 
 import { expect, test } from '../../../../../test/fixtures'
-import {
-  formatUsd,
-  pricedModelNames,
-  usageDays,
-  withModelPrice,
-} from '@/features/settings/utils/usage'
+import { formatUsd, usageDays } from '@/features/settings/utils/usage'
 
 function history(overrides: Partial<ProviderUsageHistory>): ProviderUsageHistory {
   return {
@@ -41,35 +36,4 @@ test('a sub-cent amount says so instead of rounding to zero', () => {
   expect(formatUsd(0.004)).toBe('<$0.01')
   expect(formatUsd(3.456)).toBe('$3.46')
   expect(formatUsd(1234.5)).toBe('$1,235')
-})
-
-test('the price editor offers unpriced models and keeps priced ones past their range', () => {
-  const row = {
-    cacheReadTokens: 0,
-    cacheWriteTokens: 0,
-    driverKind: 'codex',
-    inputTokens: 1,
-    outputTokens: 1,
-    reasoningTokens: 0,
-    turns: 1,
-  }
-  const names = pricedModelNames(
-    history({
-      models: [
-        { ...row, costSource: 'none', costUsd: null, model: 'gpt-5.5' },
-        { ...row, costSource: 'provider', costUsd: 1, driverKind: 'claude', model: 'claude' },
-      ],
-    }),
-    { 'gpt-4.1': { cachedInput: 0, input: 1, output: 1 } },
-  )
-
-  expect(names).toEqual(['gpt-4.1', 'gpt-5.5'])
-})
-
-test('setting and clearing one price leaves the others alone', () => {
-  const price = { cachedInput: 0.5, input: 2, output: 10 }
-  const both = withModelPrice({ a: price }, 'b', price)
-
-  expect(both).toEqual({ a: price, b: price })
-  expect(withModelPrice(both, 'a', null)).toEqual({ b: price })
 })
