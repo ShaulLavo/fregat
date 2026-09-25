@@ -99,6 +99,9 @@ import { connectionFrame } from './connection-frame'
 import { settingsValueGrids } from './settings-value-grids'
 import { tailFollow } from './tail-follow'
 import { checkpointRestore } from './checkpoint-restore'
+import { themeStudioAsync } from './theme-studio-async'
+import { themeStudioPreview } from './theme-studio-preview'
+import { filePickerSelection } from './file-picker-selection'
 import { filePickerBrowse } from './file-picker-browse'
 import { quickOpenPreview } from './quick-open-preview'
 import { themeStudio } from './theme-studio'
@@ -329,6 +332,9 @@ export const scenarios: readonly Scenario[] = [
   tailFollow,
   checkpointRestore,
   filePickerBrowse,
+  filePickerSelection,
+  themeStudioPreview,
+  themeStudioAsync,
   quickOpenPreview,
   themeStudio,
   themeStudioLibrary,

@@ -40,6 +40,7 @@ export type FocusTargetId =
       readonly rootPath: string
       readonly surface: 'editor' | 'sidebar'
     }
+  | { readonly kind: 'theme-studio' }
   | { readonly kind: 'settings-dialog' }
   | { readonly kind: 'settings-page'; readonly tabId: string }
   | {

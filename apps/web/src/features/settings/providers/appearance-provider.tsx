@@ -29,12 +29,16 @@ import { paletteStylesheet, resolvePalette } from '@workspace/client-core/themes
 import { useQueries, useQuery } from '@tanstack/react-query'
 import { fontQueryOptions } from '@/lib/fonts/state/queries'
 import { fontsInUse } from '@/lib/fonts/utils/stack'
+import {
+  DraftPreviewContext,
+  type DraftPreview,
+} from '@/lib/appearance/providers/draft-preview-context'
 import { BundleContext } from '@/lib/appearance/providers/bundle-context'
 import { PaletteContext } from '@/lib/appearance/providers/palette-context'
 import { applyPaletteStylesheet, writePaletteBootCache } from '@/lib/appearance/utils/palette-style'
 
-import { useBundleLibrary } from '@/lib/theme-library/hooks/use-bundle-library'
-import { usePaletteCatalog } from '@/lib/theme-library/hooks/use-palette-catalog'
+import { useBundleLibrary } from '@/features/settings/hooks/use-bundle-library'
+import { usePaletteCatalog } from '@/features/settings/hooks/use-palette-catalog'
 import { useSettingsActions } from '@/features/settings/hooks/use-settings-actions'
 import { useSettingsDocument } from '@/features/settings/hooks/use-settings-document'
 import { useSettingsProjection } from '@/features/settings/hooks/use-settings-projection'
@@ -71,6 +75,7 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
     theme: ThemeBundle
     mode?: ColorMode
   }> | null>(null)
+  const [draftPreview, setDraftPreview] = useState<DraftPreview | null>(null)
   const [modePreview, setModePreview] = useState<Preview<Theme> | null>(null)
   const [palettePreview, setPalettePreview] = useState<Preview<Palette> | null>(null)
   const [fontPreview, setFontPreview] = useState<FontPreview | null>(null)
@@ -87,11 +92,15 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
   const baseValues = projectedValues ?? { ...DEFAULT_SETTING_VALUES, ...bootValues }
   const committedTheme = baseValues['workbench.colorTheme']
   const bundleHandoffObserved = projectionObservesHandoff(projection, bundleState?.handingOffTo)
-  const bundlePreview = bundleState && !bundleHandoffObserved ? bundleState.value : null
+  const commandBundlePreview = bundleState && !bundleHandoffObserved ? bundleState.value : null
+  const bundlePreview =
+    commandBundlePreview ?? (draftPreview ? { theme: draftPreview.bundle } : null)
   const modeHandoffObserved = projectionObservesHandoff(projection, modePreview?.handingOffTo)
   const requestedMode =
-    bundlePreview?.mode ??
-    (modePreview && !modeHandoffObserved ? modePreview.value : committedTheme)
+    commandBundlePreview?.mode ??
+    (modePreview && !modeHandoffObserved
+      ? modePreview.value
+      : (draftPreview?.mode ?? committedTheme))
   const resolvedMode = useTransitionedColorMode(resolveColorTheme(requestedMode, prefersDark))
   const appearanceValues = resolveThemeSettings(
     {
@@ -108,8 +117,11 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
   const paletteHandoffObserved = projectionObservesHandoff(projection, palettePreview?.handingOffTo)
   // Undefined while a user palette is still being looked up: the boot
   // stylesheet stays on screen rather than flashing Graphite in between.
+  const draftPalette = commandBundlePreview ? null : draftPreview?.palette
   const renderedPalette =
-    palettePreview && !paletteHandoffObserved ? palettePreview.value : committedPalette
+    palettePreview && !paletteHandoffObserved
+      ? palettePreview.value
+      : (draftPalette ?? committedPalette)
 
   useEffect(() => {
     if (!modeHandoffObserved || !modePreview?.handingOffTo) return
@@ -280,50 +292,52 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <BundleContext
-      value={{
-        apply: applyDraft,
-        bundleId: baseValues['workbench.theme']?.id ?? null,
-        catalog: bundles,
-        preview: previewBundle,
-        clear: clearBundlePreview,
-        select: chooseBundle,
-      }}
-    >
-      <AppearancePreviewContext value={renderedValues}>
-        <FontPreviewContext value={{ previewFont, clearFontPreview }}>
-          <ThemeContext
-            value={{
-              clearThemePreview,
-              previewTheme,
-              resolvedTheme: resolvedMode,
-              setTheme,
-              theme: committedTheme,
-            }}
-          >
-            <PaletteContext
+    <DraftPreviewContext value={setDraftPreview}>
+      <BundleContext
+        value={{
+          apply: applyDraft,
+          bundleId: baseValues['workbench.theme']?.id ?? null,
+          catalog: bundles,
+          preview: previewBundle,
+          clear: clearBundlePreview,
+          select: chooseBundle,
+        }}
+      >
+        <AppearancePreviewContext value={renderedValues}>
+          <FontPreviewContext value={{ previewFont, clearFontPreview }}>
+            <ThemeContext
               value={{
-                paletteId: committedPaletteId,
-                catalog,
-                resolved: resolvePalette(renderedPalette ?? GRAPHITE, resolvedMode),
-                previewPalette,
-                clearPalettePreview,
-                selectPalette,
+                clearThemePreview,
+                previewTheme,
+                resolvedTheme: resolvedMode,
+                setTheme,
+                theme: committedTheme,
               }}
             >
-              <ViewTransition
-                default='none'
-                update={{ 'color-mode': 'color-mode', default: 'none' }}
+              <PaletteContext
+                value={{
+                  paletteId: committedPaletteId,
+                  catalog,
+                  resolved: resolvePalette(renderedPalette ?? GRAPHITE, resolvedMode),
+                  previewPalette,
+                  clearPalettePreview,
+                  selectPalette,
+                }}
               >
-                <div className='size-full' data-color-mode={resolvedMode}>
-                  {children}
-                </div>
-              </ViewTransition>
-            </PaletteContext>
-          </ThemeContext>
-        </FontPreviewContext>
-      </AppearancePreviewContext>
-    </BundleContext>
+                <ViewTransition
+                  default='none'
+                  update={{ 'color-mode': 'color-mode', default: 'none' }}
+                >
+                  <div className='size-full' data-color-mode={resolvedMode}>
+                    {children}
+                  </div>
+                </ViewTransition>
+              </PaletteContext>
+            </ThemeContext>
+          </FontPreviewContext>
+        </AppearancePreviewContext>
+      </BundleContext>
+    </DraftPreviewContext>
   )
 }
 

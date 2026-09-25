@@ -1,3 +1,6 @@
+import { Button } from '@workspace/ui/components/button'
+import { EmptyState } from '@workspace/ui/components/empty-state'
+import { IconsLoading } from '@/features/file-picker/components/icons-loading'
 import { useListbox } from '@workspace/ui/patterns/use-listbox'
 import { VirtualList, type VirtualListHandle } from '@workspace/ui/patterns/virtual-list'
 import { useRef, type KeyboardEvent, type RefObject } from 'react'
@@ -9,6 +12,8 @@ import { useFilePickerSessionActions } from '@/features/file-picker/hooks/use-fi
 import { TILE_ROW_PX, tileColumns, tileRows } from '@/features/file-picker/utils/tiles'
 import {
   listLabel,
+  pickerCopy,
+  type EntriesLoadState,
   type FilePickerIconMode,
   type FilePickerMode,
 } from '@/features/file-picker/utils/model'
@@ -22,21 +27,25 @@ export function IconsView({
   iconMode,
   isBusy,
   listRef,
+  loadState,
   mode,
   selectedPath,
   onCommitEntry,
   onEntryDoubleClick,
   onGoParent,
+  onRetry,
 }: {
   entries: readonly FsEntry[]
   iconMode: FilePickerIconMode
   isBusy: boolean
   listRef: RefObject<HTMLDivElement | null>
+  loadState: EntriesLoadState
   mode: FilePickerMode
   selectedPath: string | null
   onCommitEntry: (entry: FsEntry) => void
   onEntryDoubleClick: (entry: FsEntry) => void
   onGoParent: () => void
+  onRetry: () => void
 }) {
   const [measureRef, width] = useElementWidth<HTMLDivElement>()
   const virtualRef = useRef<VirtualListHandle>(null)
@@ -78,6 +87,7 @@ export function IconsView({
         {...list.containerProps}
         activeIndex={list.activeIndex < 0 ? undefined : Math.floor(list.activeIndex / columns)}
         aria-label={listLabel(mode)}
+        aria-busy={isBusy || loadState.status === 'loading'}
         className='focus-ring-inset absolute inset-0 outline-none'
         estimateSize={() => TILE_ROW_PX}
         getKey={(row) => row[0]?.path ?? ''}
@@ -101,6 +111,29 @@ export function IconsView({
         scrollRef={listRef}
         onKeyDown={handleKeyDown}
       />
+      {loadState.status === 'loading' && entries.length === 0 ? (
+        <IconsLoading columns={columns} />
+      ) : null}
+      {loadState.status === 'error' ? (
+        <EmptyState
+          action={
+            <Button onClick={onRetry} size='sm' type='button' variant='outline'>
+              Retry
+            </Button>
+          }
+          className='absolute inset-0'
+          description={loadState.message}
+          title='Could not load this folder'
+          tone='error'
+        />
+      ) : null}
+      {loadState.status === 'ready' && entries.length === 0 ? (
+        <EmptyState
+          className='absolute inset-0'
+          description={pickerCopy(mode).emptyDescription}
+          title='Nothing here'
+        />
+      ) : null}
     </div>
   )
 }

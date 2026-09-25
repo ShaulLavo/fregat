@@ -400,6 +400,7 @@ export class OrchestrationProjectionPipeline {
     const row = {
       ...event.payload,
       ...lifecycleFields({ state: 'ready' }),
+      baseBranch: null,
       operationId: null,
       retiredAt: null,
       removedAt: null,

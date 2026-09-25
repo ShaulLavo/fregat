@@ -6,7 +6,7 @@ import { useRef } from 'react'
 import {
   ACCEPTED_WALLPAPER_TYPES,
   WALLPAPER_LIMITS_HINT,
-} from '@/lib/theme-library/utils/wallpaper-upload'
+} from '@/features/theme-studio/utils/wallpaper-upload'
 
 export function WallpaperUploadTile({
   disabled,

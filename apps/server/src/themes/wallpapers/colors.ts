@@ -1,4 +1,5 @@
-import { readFile, writeFile } from 'node:fs/promises'
+import { randomUUID } from 'node:crypto'
+import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import sharp from 'sharp'
 import * as v from 'valibot'
@@ -19,7 +20,6 @@ const CLUSTERS = 8
 type Lab = readonly [number, number, number]
 
 /**
- * The wallpaper's dominant colors, quantized once from its display rendition and cached beside it.
  * Median cut in OKLab, so a split follows how different two colors look.
  */
 export async function wallpaperColors(
@@ -28,20 +28,35 @@ export async function wallpaperColors(
 ): Promise<WallpaperColors> {
   await library.read(id)
   const directory = await library.assetDirectory(id)
-  const cache = path.join(directory, `${id}.colors.json`)
-  const cached = await readFile(cache, 'utf8').then(
-    (text) => v.safeParse(wallpaperColorsSchema, JSON.parse(text)),
-    () => null,
-  )
-  if (cached?.success) return cached.output
+  const cache = path.join(library.directory, `${id}.colors.json`)
+  const cached = await readColors(cache)
+  if (cached) return cached
   const { data, info } = await sharp(path.join(directory, displayName(id)))
     .resize(SAMPLE_WIDTH, SAMPLE_HEIGHT, { fit: 'cover' })
     .removeAlpha()
     .raw()
     .toBuffer({ resolveWithObject: true })
   const colors = quantize(labPixels(data, info.channels), CLUSTERS)
-  await writeFile(cache, `${JSON.stringify(colors)}\n`)
+  await mkdir(library.directory, { recursive: true })
+  const staging = `${cache}.${randomUUID()}.tmp`
+  try {
+    await writeFile(staging, `${JSON.stringify(colors)}\n`)
+    await rename(staging, cache)
+  } finally {
+    await rm(staging, { force: true })
+  }
   return colors
+}
+
+async function readColors(cache: string): Promise<WallpaperColors | null> {
+  try {
+    const parsed = v.safeParse(wallpaperColorsSchema, JSON.parse(await readFile(cache, 'utf8')))
+    return parsed.success ? parsed.output : null
+  } catch (error) {
+    if (error instanceof SyntaxError) return null
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return null
+    throw error
+  }
 }
 
 function labPixels(data: Uint8Array, channels: number): Lab[] {

@@ -58,7 +58,7 @@ import { setChatModeSessionRailOpen, showChatModeToolTab } from '@/features/chat
 import { documentKey } from '@/lib/documents/utils/identity'
 import { runMutation } from '@/lib/mutations/run'
 import { copyTextToClipboard } from '@/lib/clipboard'
-import { focusThemeStudio, useStudioStore } from '@/lib/theme-studio/state/studio-store'
+import { useStudioStore } from '@/lib/theme-studio/state/studio-store'
 import { historyRestoreMutationOptions } from '@/features/editor/state/history-mutations'
 import { adjacentHistoryState } from '@/features/editor/utils/history-navigation'
 import {
@@ -548,11 +548,10 @@ export const workspaceCommands = [
   defineCommand({
     ...workspaceCommandMetadata['workspace.openThemeStudio'],
     icon: PaletteIcon,
-    run: () => {
+    run: ({ runtime }) => {
       const studio = useStudioStore.getState()
-      if (studio.open) focusThemeStudio()
       studio.openStudio()
-      return handled
+      return focusIdStart(runtime, { kind: 'theme-studio' })
     },
   }),
   defineCommand({

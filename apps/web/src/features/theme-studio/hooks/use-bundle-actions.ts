@@ -1,8 +1,5 @@
-import {
-  paletteLibraryQueryKey,
-  bundleQueryKey,
-  bundleMutationKeys,
-} from '@/lib/theme-library/utils/keys'
+import { paletteLibraryQueryKey, bundleQueryKey } from '@/lib/theme-library/utils/query-keys'
+import { bundleMutationKeys } from '@/features/theme-studio/utils/mutation-keys'
 import { wallpaperLibraryKey } from '@/lib/wallpapers/state/queries'
 import { useMutation } from '@tanstack/react-query'
 import type { ThemeDocument, ThemeId } from '@workspace/contracts'

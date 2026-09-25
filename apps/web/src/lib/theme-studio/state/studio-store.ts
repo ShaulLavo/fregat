@@ -10,6 +10,7 @@ export type StudioDraft = {
 }
 
 type StudioState = {
+  readonly generation: number
   readonly open: boolean
   readonly collapsed: boolean
   readonly tab: StudioTab
@@ -45,16 +46,20 @@ const CLOSED = {
   confirmingDiscard: false,
 } as const
 
-/** The command that opened the studio refocuses it when it is already open. */
-export function focusThemeStudio() {
-  document.querySelector<HTMLElement>('[data-studio-themes]')?.focus()
-}
-
 /** Transient by design: nothing about an unapplied draft survives a reload. */
 export const useStudioStore = create<StudioState>((set) => ({
   ...CLOSED,
-  openStudio: () => set((state) => (state.open ? state : { ...CLOSED, open: true })),
-  closeStudio: () => set(CLOSED),
+  generation: 0,
+  openStudio: () =>
+    set((state) => {
+      if (state.open) return { collapsed: false, tab: 'themes' }
+      return {
+        ...CLOSED,
+        open: true,
+        generation: state.generation + 1,
+      }
+    }),
+  closeStudio: () => set((state) => ({ ...CLOSED, generation: state.generation + 1 })),
   setDraft: (draft) => set({ draft, confirmingDiscard: false }),
   setPaletteEdit: (mode, palette) =>
     set((state) => {
@@ -64,8 +69,20 @@ export const useStudioStore = create<StudioState>((set) => ({
         confirmingDiscard: false,
       }
     }),
-  chooseTheme: (draft) => set({ draft, paletteEdits: {}, confirmingDiscard: false }),
-  revert: () => set({ draft: null, paletteEdits: {}, confirmingDiscard: false }),
+  chooseTheme: (draft) =>
+    set((state) => ({
+      draft,
+      paletteEdits: {},
+      confirmingDiscard: false,
+      generation: state.generation + 1,
+    })),
+  revert: () =>
+    set((state) => ({
+      draft: null,
+      paletteEdits: {},
+      confirmingDiscard: false,
+      generation: state.generation + 1,
+    })),
   setTab: (tab) => set({ tab }),
   setMode: (mode) => set({ mode }),
   setCollapsed: (collapsed) => set({ collapsed }),

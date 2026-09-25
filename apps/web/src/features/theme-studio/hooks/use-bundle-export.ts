@@ -1,4 +1,4 @@
-import { bundleExportQueryKey } from '@/lib/theme-library/utils/keys'
+import { bundleExportQueryKey } from '@/features/theme-studio/utils/query-keys'
 import { queryOptions } from '@tanstack/react-query'
 import type { ThemeId } from '@workspace/contracts'
 import { useSettingsOwner } from '@/lib/settings-owner/hooks/use-settings-owner'

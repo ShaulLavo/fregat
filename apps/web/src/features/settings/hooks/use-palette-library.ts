@@ -1,4 +1,4 @@
-import { paletteLibraryQueryKey } from '@/lib/theme-library/utils/keys'
+import { paletteLibraryQueryKey } from '@/lib/theme-library/utils/query-keys'
 import { useQuery } from '@tanstack/react-query'
 import { parsePalette, type Palette } from '@workspace/contracts'
 

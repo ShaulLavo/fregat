@@ -15,7 +15,7 @@ import {
 import { useState } from 'react'
 
 import { usePalette } from '@/lib/appearance/hooks/use-palette'
-import { usePaletteActions } from '@/lib/theme-library/hooks/use-palette-actions'
+import { usePaletteActions } from '@/features/theme-studio/hooks/use-palette-actions'
 import { ColorField } from '@/features/theme-studio/components/color-field'
 import { PaletteContrast } from '@/features/theme-studio/components/palette-contrast'
 import { PaletteImportDialog } from '@/features/theme-studio/components/palette-import-dialog'

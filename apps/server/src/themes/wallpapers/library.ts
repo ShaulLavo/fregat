@@ -153,8 +153,8 @@ export class WallpaperLibrary {
       this.#listing = null
       await rm(path.join(this.directory, `${id}.json`))
       await Promise.all(
-        [`${id}.${asset.extension}`, `${id}.thumb.webp`, displayName(id)].map((name) =>
-          rm(path.join(this.directory, name), { force: true }),
+        [`${id}.${asset.extension}`, `${id}.thumb.webp`, displayName(id), `${id}.colors.json`].map(
+          (name) => rm(path.join(this.directory, name), { force: true }),
         ),
       )
       return { deleted: id, settings: this.#settings.snapshot() }

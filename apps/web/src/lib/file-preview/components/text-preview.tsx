@@ -1,4 +1,4 @@
-import { keepPreviousData, useQuery } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { HighlightedCode } from '@workspace/markdown/components/highlighted-code'
 import { CodeHighlighterContext } from '@workspace/markdown/providers/code-highlighter-context'
 
@@ -8,7 +8,7 @@ import type { ReactNode } from 'react'
 import { previewExtension } from '@/lib/file-preview/utils/preview'
 import { previewQueryOptions } from '@/lib/file-preview/utils/preview-query'
 
-/** The first lines of a file in the code theme's colours; the previous file stays while the next loads. */
+/** The first lines of a file in the code theme's colours. */
 export function TextPreview({
   fallback,
   name,
@@ -19,7 +19,7 @@ export function TextPreview({
   name: string
   path: string
 }) {
-  const query = useQuery({ ...previewQueryOptions(path), placeholderData: keepPreviousData })
+  const query = useQuery(previewQueryOptions(path))
   const highlighter = useCodeHighlighter()
 
   if (query.isError)

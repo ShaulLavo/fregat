@@ -794,7 +794,7 @@ export const workspaceCommandMetadata = {
     category: 'Appearance',
     description: 'Try themes, colors and wallpapers on the live app, then apply them.',
     id: 'workspace.openThemeStudio',
-    execution: 'sync',
+    execution: 'async',
     target: 'workspace',
     undoCategory: 'view-only',
     when: [],

@@ -3,6 +3,7 @@ import { afterEach, expect, test } from 'vitest'
 import { closeTestApps } from '../../../test/server'
 import { executeGit } from '../../../test/factories/orchestration'
 import {
+  lifecycleSessionId,
   lifecycleWorktreeId,
   worktreeLifecycleFixture,
 } from '../../../test/factories/worktree-lifecycle'
@@ -25,7 +26,6 @@ test.each(['release', undefined])(
     await expectBaseBranch(fixture, baseBranch ?? 'active-source')
 
     await executeGit(fixture.root, 'checkout', '-b', 'later-source')
-    await executeGit(created.canonicalPath, 'branch', '-m', 'renamed-child')
     await fixture.engine.refreshWorktreeMetadata(created.path)
     await fixture.restart()
     await expectBaseBranch(fixture, baseBranch ?? 'active-source')
@@ -65,6 +65,44 @@ test('registered external worktrees never acquire an inferred parent', async () 
       expect.objectContaining({ absolutePath: fixture.root, baseBranch: null }),
     ]),
   )
+})
+
+test('a different branch in a managed checkout never inherits its creation parent', async () => {
+  const fixture = await worktreeLifecycleFixture()
+  fixtures.push(fixture)
+  const created = await fixture.create()
+  await expectBaseBranch(fixture, 'main')
+
+  await executeGit(created.canonicalPath, 'switch', '-c', 'feature')
+  await fixture.engine.refreshWorktreeMetadata(created.path)
+  await fixture.restart()
+  expect(await listedWorktrees(fixture)).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        worktreeId: lifecycleWorktreeId,
+        branch: 'feature',
+        baseBranch: null,
+      }),
+    ]),
+  )
+
+  await executeGit(created.canonicalPath, 'switch', `worktree/${lifecycleWorktreeId}`)
+  await expectBaseBranch(fixture, 'main')
+})
+
+test('released worktrees have no parent before or after reload', async () => {
+  const fixture = await worktreeLifecycleFixture()
+  fixtures.push(fixture)
+  await fixture.create()
+  await expectBaseBranch(fixture, 'main')
+  await fixture.command({ type: 'session.delete', sessionId: lifecycleSessionId })
+  await fixture.engine.providerRuntimeIdle()
+
+  await fixture.command({ type: 'worktree.release', worktreeId: lifecycleWorktreeId })
+
+  await expectBaseBranch(fixture, null)
+  await fixture.restart()
+  await expectBaseBranch(fixture, null)
 })
 
 async function expectBaseBranch(

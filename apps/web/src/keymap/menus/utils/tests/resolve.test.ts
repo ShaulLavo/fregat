@@ -171,3 +171,11 @@ function handledTicket() {
     completion: Promise.resolve({ status: 'handled' as const }),
   }
 }
+
+test('commands that take focus run after the menu closes', () => {
+  const menu = [
+    section('appearance', [commandItem('workspace.openThemeStudio', { takesFocus: true })]),
+  ]
+  const [group] = resolveMenu(menu, context())
+  expect(group.items[0]).toMatchObject({ command: 'workspace.openThemeStudio', takesFocus: true })
+})

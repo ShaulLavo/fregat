@@ -229,6 +229,14 @@ export const selectors = {
       .getByRole('dialog', { name: 'Choose folder', exact: true })
       .getByRole('option')
       .filter({ hasText: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`) }),
+  pickerHiddenToggle: (page: Page, shown: boolean) =>
+    page.getByRole('button', {
+      name: shown ? 'Hide hidden files' : 'Show hidden files',
+      exact: true,
+    }),
+  pickerPreviewPath: (page: Page, path: string) => page.locator(`[data-file-preview="${path}"]`),
+  paletteImportText: (page: Page) =>
+    page.getByRole('textbox', { name: 'Palette JSON', exact: true }),
   pickerPreview: (page: Page) => page.locator('[data-file-preview]'),
   themeStudio: (page: Page) => page.getByRole('region', { name: 'Theme studio', exact: true }),
   themeStudioTab: (page: Page, name: string) =>

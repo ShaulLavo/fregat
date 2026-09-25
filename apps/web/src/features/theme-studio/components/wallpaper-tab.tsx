@@ -16,13 +16,13 @@ import { useState, type ClipboardEvent, type DragEvent } from 'react'
 
 import { errorMessage } from '@/lib/error-message'
 import { useSettingsOwner } from '@/lib/settings-owner/hooks/use-settings-owner'
-import { useWallpaperActions } from '@/lib/theme-library/hooks/use-wallpaper-actions'
-import { useWallpaperUpload } from '@/lib/theme-library/hooks/use-wallpaper-upload'
-import { wallpaperMutationKeys } from '@/lib/theme-library/utils/keys'
+import { useWallpaperActions } from '@/features/theme-studio/hooks/use-wallpaper-actions'
+import { useWallpaperUpload } from '@/features/theme-studio/hooks/use-wallpaper-upload'
+import { wallpaperMutationKeys } from '@/features/theme-studio/utils/mutation-keys'
 import { toastError } from '@/lib/toast-error'
 import { wallpaperColorsOptions, wallpaperLibraryOptions } from '@/lib/wallpapers/state/queries'
 import { wallpaperSections } from '@/lib/wallpapers/utils/groups'
-import { selectWallpaper, visibleWallpaper } from '@/lib/wallpapers/utils/selection'
+import { visibleWallpaper } from '@/lib/wallpapers/utils/selection'
 import { WallpaperCard } from '@/features/theme-studio/components/wallpaper-card'
 import { WallpaperSection } from '@/features/theme-studio/components/wallpaper-section'
 import { WallpaperSourceCard } from '@/features/theme-studio/components/wallpaper-source-card'
@@ -44,7 +44,7 @@ export function WallpaperTab({
 }: {
   colors: PaletteColors | null
   value: WallpaperSelection
-  onChange: (value: WallpaperSelection) => void
+  onChange: (source: WallpaperSource) => void
   onColorsFromImage: (asset: AssetId) => void
 }) {
   const owner = useSettingsOwner()
@@ -55,7 +55,7 @@ export function WallpaperTab({
   const [order, setOrder] = useState<Order>('library')
   const [dragging, setDragging] = useState(false)
   const selection = visibleWallpaper(value)
-  const select = (source: WallpaperSource) => onChange(selectWallpaper(value, source))
+  const select = onChange
   const uploadFiles = useWallpaperUpload((asset) => select({ kind: 'library', asset: asset.id }))
   const assets = library.data?.assets ?? []
   const matching = order === 'matches' && colors !== null

@@ -1,4 +1,4 @@
-import { mkdtemp, readdir, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import sharp from 'sharp'
 import { afterEach, expect, it } from 'vitest'
@@ -38,7 +38,7 @@ async function twoColorImage() {
     .toBuffer()
 }
 
-it('finds a wallpaper’s colors with their shares, and caches them beside the renditions', async () => {
+async function fixture() {
   const root = await mkdtemp(path.join(process.env.TMPDIR ?? '/tmp', 'wallpaper-colors-'))
   roots.push(root)
   const settings = new SettingsStore({
@@ -49,6 +49,12 @@ it('finds a wallpaper’s colors with their shares, and caches them beside the r
   stores.push(settings)
   const library = new WallpaperLibrary({ directory: path.join(root, 'wallpapers'), settings })
   const asset = await library.upload(new File([await twoColorImage()], 'split.png'))
+
+  return { root, library, asset }
+}
+
+it('finds a wallpaper’s colors with their shares, and caches them beside the renditions', async () => {
+  const { library, asset } = await fixture()
 
   const colors = await wallpaperColors(library, asset.id)
   const [heaviest] = colors.clusters
@@ -66,4 +72,45 @@ it('finds a wallpaper’s colors with their shares, and caches them beside the r
 it('never splits a box of one pixel and returns nothing for an empty image', () => {
   expect(quantize([], 8)).toEqual({ clusters: [] })
   expect(quantize([[0.5, 0, 0]], 8).clusters).toHaveLength(1)
+})
+
+it.each(['', '{"clusters":', '{"clusters":false}'])(
+  'recomputes an invalid colors cache %j',
+  async (text) => {
+    const { library, asset } = await fixture()
+    const cache = path.join(library.directory, `${asset.id}.colors.json`)
+    await writeFile(cache, text)
+
+    const colors = await wallpaperColors(library, asset.id)
+
+    expect(colors.clusters.length).toBeGreaterThan(0)
+    expect(JSON.parse(await readFile(cache, 'utf8'))).toEqual(colors)
+  },
+)
+
+it('deletes the cached colors with an uploaded wallpaper', async () => {
+  const { library, asset } = await fixture()
+  await wallpaperColors(library, asset.id)
+
+  await library.delete(asset.id)
+
+  expect(await readdir(library.directory)).toEqual([])
+})
+
+it('keeps imported bundles unchanged when caching wallpaper colors', async () => {
+  const { root, library, asset } = await fixture()
+  const bundle = path.join(root, 'imported')
+  const wallpapers = path.join(bundle, 'wallpapers')
+  await mkdir(bundle)
+  await rename(library.directory, wallpapers)
+  library.archiveDirectories = async () => [bundle]
+  const files = await readdir(wallpapers)
+
+  const colors = await wallpaperColors(library, asset.id)
+
+  expect(await readdir(wallpapers)).toEqual(files)
+  expect(await library.list()).toEqual([asset])
+  expect(
+    JSON.parse(await readFile(path.join(library.directory, `${asset.id}.colors.json`), 'utf8')),
+  ).toEqual(colors)
 })

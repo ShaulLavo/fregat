@@ -1,4 +1,5 @@
-import { paletteLibraryQueryKey, paletteMutationKeys } from '@/lib/theme-library/utils/keys'
+import { paletteLibraryQueryKey } from '@/lib/theme-library/utils/query-keys'
+import { paletteMutationKeys } from '@/features/theme-studio/utils/mutation-keys'
 import { useMutation } from '@tanstack/react-query'
 import { serializePalette, type Palette, type PaletteId } from '@workspace/contracts'
 

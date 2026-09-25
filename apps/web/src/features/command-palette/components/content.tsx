@@ -182,7 +182,7 @@ export function CommandPaletteContent() {
     },
   })
 
-  // The studio previews through the same slots; the palette clears only what it put there.
+  // Release only this palette’s previews when switching commands or closing.
   const previewed = useRef(new Set<PreviewScope>())
   const release = useEffectEvent((scope: PreviewScope) => {
     if (!previewed.current.delete(scope)) return

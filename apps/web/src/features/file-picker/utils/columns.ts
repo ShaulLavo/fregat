@@ -54,3 +54,10 @@ export function columnFolders(currentPath: string, trail: ColumnTrail): readonly
 export function selectInColumn(trail: ColumnTrail, column: number, entry: FsEntry): ColumnTrail {
   return [...trail.slice(0, column), entry]
 }
+
+/** A hidden selection ends the trail, including the descendants it opened. */
+export function visibleTrail(trail: ColumnTrail, showHidden: boolean): ColumnTrail {
+  if (showHidden) return trail
+  const hidden = trail.findIndex((entry) => entry.name.startsWith('.'))
+  return hidden === -1 ? trail : trail.slice(0, hidden)
+}

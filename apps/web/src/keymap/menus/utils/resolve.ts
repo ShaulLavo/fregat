@@ -165,7 +165,7 @@ function resolveCommandItem(
     kind: 'run',
     label: item.label ?? spec?.title ?? item.command,
     run: () => context.dispatch(item.command),
-    takesFocus: false,
+    takesFocus: Boolean(item.takesFocus),
     shortcut:
       item.unavailable || inspection.status === 'disabled'
         ? null

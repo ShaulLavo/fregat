@@ -89,7 +89,11 @@ export function gitRoutes(
           ])
           return entries.map((worktree) => ({
             ...worktree,
-            baseBranch: baseBranches?.get(worktree.absolutePath) ?? null,
+            // Managed branches are created as worktree/<id>; the path can later hold another branch.
+            baseBranch:
+              worktree.branch === `worktree/${worktree.worktreeId}`
+                ? (baseBranches?.get(worktree.absolutePath) ?? null)
+                : null,
           }))
         },
         { query: gitPathQuerySchema },

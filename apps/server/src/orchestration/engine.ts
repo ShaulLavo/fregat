@@ -1102,7 +1102,7 @@ export class OrchestrationEngine {
     await this.ready
     const branches = new Map<string, string | null>()
     for (const worktree of this.readModel.worktrees.values()) {
-      if (worktree.retiredAt) continue
+      if (worktree.retiredAt || worktree.ownership !== 'platform') continue
       branches.set(worktree.canonicalPath, worktree.baseBranch ?? null)
     }
     return branches

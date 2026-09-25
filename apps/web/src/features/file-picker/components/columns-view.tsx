@@ -44,15 +44,17 @@ export function ColumnsView({
   const deferredTrail = useDeferredValue(trail)
   const folders = columnFolders(currentPath, deferredTrail)
   const [activeColumn, setActiveColumn] = useState(0)
-  const [entering, setEntering] = useState<number | null>(null)
-  const [focusRequest, setFocusRequest] = useState<number | null>(null)
+  const [entering, setEntering] = useState<string | null>(null)
+  const [focusRequest, setFocusRequest] = useState<string | null>(null)
 
   // Focus follows ← and →, once the target column has mounted.
   useEffect(() => {
-    if (focusRequest === null || focusRequest >= folders.length) return
-    stripRef.current?.querySelector<HTMLElement>(`[data-picker-column="${focusRequest}"]`)?.focus()
+    if (focusRequest === null) return
+    const column = folders.indexOf(focusRequest)
+    if (column === -1) return
+    stripRef.current?.querySelector<HTMLElement>(`[data-picker-column="${column}"]`)?.focus()
     setFocusRequest(null)
-  }, [focusRequest, folders.length])
+  }, [focusRequest, folders])
 
   // The deepest column stays in view as the path grows.
   useEffect(() => {
@@ -61,20 +63,24 @@ export function ColumnsView({
   }, [folders.length])
 
   function select(column: number, entry: FsEntry) {
-    if (entering === column) setEntering(null)
+    setEntering(null)
+    setFocusRequest(null)
     onTrailChange(selectInColumn(trail, column, entry))
   }
 
   function enter(column: number) {
-    setEntering(column + 1)
+    const target = trail[column]
+    if (!target) return
+    setEntering(target.path)
     setActiveColumn(column + 1)
-    setFocusRequest(column + 1)
+    setFocusRequest(target.path)
   }
 
   function leave(column: number) {
+    setEntering(null)
+    setFocusRequest(folders[column - 1] ?? null)
     if (column === 0) return onGoParent()
     setActiveColumn(column - 1)
-    setFocusRequest(column - 1)
   }
 
   return (
@@ -94,7 +100,7 @@ export function ColumnsView({
           key={path}
           mode={mode}
           path={path}
-          selectFirst={entering === column}
+          selectFirst={entering === path}
           selectedPath={trail[column]?.path ?? null}
           showHidden={showHidden}
           onActivate={setActiveColumn}

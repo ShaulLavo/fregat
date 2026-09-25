@@ -38,6 +38,7 @@ import {
   initialTrail,
   pickerView,
   shownPickerView,
+  visibleTrail,
   type ColumnTrail,
   type PickerView,
 } from '@/features/file-picker/utils/columns'
@@ -199,10 +200,12 @@ export function FilePickerDialog({
   const [middleRef, middleWidth] = useElementWidth<HTMLDivElement>()
   const view = shownPickerView(chosenView, isSearching, middleWidth)
   const [trailState, setTrailState] = useState<{ path: string; trail: ColumnTrail } | null>(null)
-  const trail =
+  const heldTrail =
     trailState?.path === session.currentPath
       ? trailState.trail
       : initialTrail(session.currentPath, selectedEntry)
+  const trail = visibleTrail(heldTrail, showHidden)
+  if (trail !== heldTrail) setTrailState({ path: session.currentPath, trail })
   // In columns the selection that counts is the deepest one; in the list, the list's.
   const focusedEntry = view === 'columns' ? (trail.at(-1) ?? null) : selectedEntry
   const isSearchPending = session.query.trim() !== session.effectiveQuery.trim()
@@ -660,6 +663,8 @@ export function FilePickerDialog({
                   iconMode={displayedIconMode}
                   isBusy={listInteractionPending}
                   listRef={listRef}
+                  loadState={loadState}
+                  onRetry={refresh}
                   mode={mode}
                   selectedPath={selectedEntry?.path ?? null}
                   onCommitEntry={commitEntry}

@@ -1,4 +1,4 @@
-import { bundleQueryKey } from '@/lib/theme-library/utils/keys'
+import { bundleQueryKey } from '@/lib/theme-library/utils/query-keys'
 import { useQuery } from '@tanstack/react-query'
 import { BUNDLED_THEMES } from '@workspace/contracts'
 import { useSettingsOwner } from '@/lib/settings-owner/hooks/use-settings-owner'

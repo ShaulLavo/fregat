@@ -19,6 +19,8 @@ type MenuItemShared = {
  */
 export type MenuCommandItem = MenuItemShared & {
   readonly kind: 'command'
+  /** Dispatch after closing when the command moves focus out of the menu. */
+  readonly takesFocus?: boolean
   readonly command: PlatformCommandId
   /** Overrides the registry title. Menus say "Close", the palette says "Close current tab". */
   readonly label?: string
