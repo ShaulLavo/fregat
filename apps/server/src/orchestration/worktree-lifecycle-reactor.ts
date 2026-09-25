@@ -10,6 +10,7 @@ import {
   type OrchestrationEvent,
   type WorktreeId,
   type OrchestrationWorktree,
+  type WorktreeSubmoduleMode,
 } from '@workspace/contracts'
 import { outsideGitRepositoryLane } from '../git/repository-lane'
 import { GitWorktreeService } from '../git/worktrees'
@@ -23,6 +24,7 @@ import { worktreeRuntimeErrors } from './worktree-runtime-errors'
 import type { WorktreeExecutionGate } from './worktree-execution-gate'
 
 type Cleanup = Extract<OrchestrationWorktree['lifecycle'], { state: 'cleanup-requested' }>
+type Provisioning = Extract<OrchestrationWorktree['lifecycle'], { state: 'provisioning' }>
 
 type WorktreeLifecycleReactorOptions = {
   paths: WorkspacePaths
@@ -30,6 +32,7 @@ type WorktreeLifecycleReactorOptions = {
   gate: WorktreeExecutionGate
   provider: () => ProviderService | null
   terminal: TerminalService | undefined
+  submodules: (projectId: string) => WorktreeSubmoduleMode
   dispatch: (command: OrchestrationCommand) => Promise<unknown>
   getReadModel: () => OrchestrationReadModel
 }
@@ -204,13 +207,18 @@ export class WorktreeLifecycleReactor {
     const worktree = requireWorktree(this.options.getReadModel(), worktreeId)
     const startedAt = performance.now()
     try {
-      await this.options.git.withRepositoryLane(await this.repositoryPath(worktree), async () => {
-        const current = requireWorktree(this.options.getReadModel(), worktreeId)
-        const state = current.lifecycle
-        if (!('operationId' in state) || state.operationId !== operationId) return
-        if (state.state === 'provisioning') await this.provision(current, state)
-        if (state.state === 'cleanup-requested') await this.cleanup(current, state)
-      })
+      const created = await this.options.git.withRepositoryLane(
+        await this.repositoryPath(worktree),
+        async () => {
+          const current = requireWorktree(this.options.getReadModel(), worktreeId)
+          const state = current.lifecycle
+          if (!('operationId' in state) || state.operationId !== operationId) return null
+          if (state.state === 'provisioning') return this.provision(current, state)
+          if (state.state === 'cleanup-requested') await this.cleanup(current, state)
+          return null
+        },
+      )
+      if (created) await this.completeCreation(created.worktree, created.state)
     } catch (error) {
       await this.operationFailure(worktreeId, operationId, error)
     }
@@ -243,10 +251,7 @@ export class WorktreeLifecycleReactor {
     })
   }
 
-  private async provision(
-    worktree: OrchestrationWorktree,
-    state: Extract<OrchestrationWorktree['lifecycle'], { state: 'provisioning' }>,
-  ) {
+  private async provision(worktree: OrchestrationWorktree, state: Provisioning) {
     try {
       const result = await this.options.git.create({
         path: await this.repositoryPath(worktree),
@@ -263,8 +268,14 @@ export class WorktreeLifecycleReactor {
         errorCode: errorCode(error),
         commandId: commandKey('creation-failed', worktree.id, state.operationId),
       })
-      return
+      return null
     }
+    return { worktree, state }
+  }
+
+  /** Submodules populate before the first turn runs, but outside the repository lane. */
+  private async completeCreation(worktree: OrchestrationWorktree, state: Provisioning) {
+    await this.initializeSubmodules(worktree)
     await this.options.dispatch({
       type: 'worktree.create.complete',
       worktreeId: worktree.id,
@@ -273,6 +284,30 @@ export class WorktreeLifecycleReactor {
       commandId: commandKey('created', worktree.id, state.operationId),
     })
     if (!this.recovering) await this.releaseBlocked(worktree.id, state.operationId)
+  }
+
+  // Failure leaves the worktree usable: git status reports the empty submodules and offers a retry.
+  private async initializeSubmodules(worktree: OrchestrationWorktree) {
+    const mode = this.options.submodules(worktree.projectId)
+    const startedAt = performance.now()
+    try {
+      const ran = await this.options.git.updateSubmodules(worktree.canonicalPath, mode)
+      if (ran)
+        recordProcessInfo('worktree.submodules.initialized', {
+          area: 'worktree',
+          worktreeId: worktree.id,
+          mode,
+          durationMs: Math.round(performance.now() - startedAt),
+        })
+    } catch (error) {
+      recordProcessWarning('worktree.submodules.failed', {
+        area: 'worktree',
+        worktreeId: worktree.id,
+        mode,
+        durationMs: Math.round(performance.now() - startedAt),
+        error,
+      })
+    }
   }
 
   private async cleanup(worktree: OrchestrationWorktree, state: Cleanup) {

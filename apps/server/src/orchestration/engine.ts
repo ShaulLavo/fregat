@@ -37,6 +37,7 @@ import {
   errorStringField,
   type ClientOrchestrationCommand,
   type OrchestrationCommandReceipt,
+  type WorktreeSubmoduleMode,
 } from '@workspace/contracts'
 import * as v from 'valibot'
 
@@ -102,6 +103,7 @@ export type OrchestrationEngineOptions = {
     | import('./response-delivery').ResponseStreamingMode
     | Promise<import('./response-delivery').ResponseStreamingMode>
   titleModel?: (projectId: string) => Promise<ModelSelection>
+  worktreeSubmodules?: (projectId: string) => WorktreeSubmoduleMode
 
   keepImportedSessionsUpdated?: () => boolean
   providerService?: ProviderService
@@ -818,6 +820,7 @@ export class OrchestrationEngine {
       gate: this.worktreeExecutionGate,
       provider: () => this.providerService,
       terminal: options.terminalService,
+      submodules: options.worktreeSubmodules ?? (() => 'recursive'),
       dispatch: (command) => this.enqueue(command),
       getReadModel: () => this.readModel,
     })
@@ -1079,23 +1082,28 @@ export class OrchestrationEngine {
   }
 
   async refreshWorktreeMetadata(checkoutPath: string) {
-    await this.ready
-    if (!this.registration) return
-    const canonicalPath = await realpath(this.registration.paths.resolve(checkoutPath).absolutePath)
-    const worktree = [...this.readModel.worktrees.values()].find(
-      (row) => row.canonicalPath === canonicalPath && !row.retiredAt,
-    )
+    const worktree = await this.liveWorktreeAt(checkoutPath)
     if (worktree) await this.worktreeReactor?.refresh(worktree.id)
   }
 
+  async worktreeProjectId(checkoutPath: string) {
+    return (await this.liveWorktreeAt(checkoutPath))?.projectId ?? null
+  }
+
   async worktreeBaseCommit(checkoutPath: string) {
+    const worktree = await this.liveWorktreeAt(checkoutPath)
+    return worktree?.ownership === 'platform' ? worktree.baseCommit : null
+  }
+
+  private async liveWorktreeAt(checkoutPath: string) {
     await this.ready
     if (!this.registration) return null
     const canonicalPath = await realpath(this.registration.paths.resolve(checkoutPath).absolutePath)
-    const worktree = [...this.readModel.worktrees.values()].find(
-      (row) => row.canonicalPath === canonicalPath && !row.retiredAt,
+    return (
+      [...this.readModel.worktrees.values()].find(
+        (row) => row.canonicalPath === canonicalPath && !row.retiredAt,
+      ) ?? null
     )
-    return worktree?.ownership === 'platform' ? worktree.baseCommit : null
   }
 
   async worktreeCleanupPreview(worktreeId: WorktreeId) {

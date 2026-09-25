@@ -12,6 +12,7 @@ import type {
   GitPullRequestCreateResult,
   GitPullRequestState,
   GitPushResult,
+  WorktreeSubmoduleMode,
 } from '@workspace/contracts'
 import { withGitRepositoryLane, withGitRepositoryLaneStream } from './repository-lane'
 import { parseBranches } from './branches'
@@ -38,6 +39,12 @@ import { gitCwdForPath, lexicalRepositoryRoot } from './repository'
 import { parseNumstat, untrackedLineStats, withLineStats } from './numstat'
 import { parseRepositoryInfo, parseStatus, statusMatchesPathspec } from './status'
 import { UpstreamFetchScheduler } from './upstream-fetch'
+import {
+  hasSubmodules,
+  SUBMODULE_UPDATE_OPTIONS,
+  submoduleUpdateArgs,
+  uninitializedSubmoduleCount,
+} from './submodules'
 import { BoundedTtlCache } from './utils/bounded-cache'
 import { gitPullRequestErrors } from './utils/pull-request-errors'
 import { conflictSummary, pullFailureReason } from './utils/pull-failure'
@@ -239,7 +246,7 @@ export class GitService {
   async status(input = '', fresh = false): Promise<GitStatusResult> {
     recordGitServiceOperation('status', input)
     const repository = await this.resolveRepositoryLocation(input, fresh)
-    if (!repository) return { repository: null, files: [] }
+    if (!repository) return { repository: null, files: [], uninitializedSubmodules: 0 }
 
     if (fresh) this.invalidateStatus(repository.rootAbsolutePath)
     const cacheKey = statusCacheKey(repository)
@@ -606,6 +613,28 @@ export class GitService {
     return { output: commandOutput(result), repository: repository.info }
   }
 
+  async initializeSubmodules(input: string, mode: WorktreeSubmoduleMode) {
+    recordGitServiceOperation('submodules_init', input, { mode })
+    const repository = await this.requiredRepositoryLocation(input)
+    await this.updateSubmodules(repository.rootAbsolutePath, mode)
+    return this.status(repository.rootPath)
+  }
+
+  /**
+   * Outside the repository lane on purpose: each worktree clones its submodules
+   * over the network into its own admin directory, and holding the lane for that
+   * would block every commit in every checkout of the repository.
+   */
+  async updateSubmodules(root: string, mode: WorktreeSubmoduleMode) {
+    if (mode === 'none' || !(await hasSubmodules(root))) return false
+    try {
+      await this.runGit(root, submoduleUpdateArgs(mode), SUBMODULE_UPDATE_OPTIONS)
+    } finally {
+      await this.notifyMutation(root)
+    }
+    return true
+  }
+
   async pull(input = '') {
     recordGitServiceOperation('pull', input)
     const repository = await this.requiredRepository(input)
@@ -795,10 +824,17 @@ export class GitService {
     ])
     void this.upstreamFetch.schedule(repository.rootAbsolutePath, result.stdout)
     const files = parseStatus(result.stdout, repository.rootPath)
+    const [withLines, uninitializedSubmodules] = await Promise.all([
+      files.length > 0 ? this.withLineStats(repository, files) : files,
+      uninitializedSubmoduleCount(repository.rootAbsolutePath, (args, options) =>
+        this.git(repository.rootAbsolutePath, args, options),
+      ),
+    ])
 
     return {
       repository: parseRepositoryInfo(result.stdout, repository.rootPath),
-      files: files.length > 0 ? await this.withLineStats(repository, files) : files,
+      files: withLines,
+      uninitializedSubmodules,
     }
   }
 
@@ -1478,6 +1514,7 @@ function isReadOnlyGit(args: readonly string[]) {
   const action = gitAction(args)
   if (READ_ONLY_GIT_ACTIONS.has(action)) return true
   const actionIndex = args.indexOf(action)
+  if (action === 'config') return args.includes('--get-regexp')
   return action === 'worktree' && args[actionIndex + 1] === 'list'
 }
 

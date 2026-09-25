@@ -57,3 +57,5 @@ Graph roots exclude `refs/platform/*`. A browsing session pins tips and ref labe
 `scenario chat-git-tab-switch` opens a file, enters chat mode and clicks Graph then Changes in the Git tool. The Git panel must stay: a panel change records the selected document in the address but must not set `tool: editor`, which only opening a document does.
 
 `scenario chat-git-turn-rows` opens the chat Git tool and screenshots the Working tree and Turn scopes. Both draw `GitFileRow`: icon, name, directory, `+/-` counts and the status letter. It needs a selected session with a checkpointed turn.
+
+`scenario git-submodules-init` declares a submodule in a fixture repository and deinitializes it, which is what `git worktree add` leaves. The Git panel must say `1 submodule is not initialized`; Initialize must check it out on disk and the notice must go. New session worktrees initialize submodules on their own per `git.worktreeSubmodules` (recursive by default, project override in `git.projectWorktreeSubmodules`); a failed clone keeps the worktree and leaves this notice as the retry.

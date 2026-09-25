@@ -10,6 +10,7 @@ const OPERATION_LABELS: Readonly<Record<string, string>> = {
   'create-branch': 'Create branch',
   'create-pull-request': 'Create pull request',
   'discard-staged': 'Discard staged',
+  'init-submodules': 'Initialize submodules',
   'stage-many': 'Stage',
   'unstage-many': 'Unstage',
 }

@@ -651,6 +651,13 @@ export const selectors = {
       .getByRole('alert')
       .filter({ hasText: / failed/ })
       .getByRole('button', { name: 'Fix with AI', exact: true }),
+  submodulesNotice: (page: Page) =>
+    page.getByRole('alert').filter({ hasText: /submodules? (is|are) not initialized/ }),
+  initializeSubmodules: (page: Page) =>
+    page
+      .getByRole('alert')
+      .filter({ hasText: /not initialized/ })
+      .getByRole('button', { name: 'Initialize', exact: true }),
   folderTree: (page: Page) => page.getByLabel('Folder tree', { exact: true }),
   focusedTreeRow: (page: Page) =>
     page.getByLabel('Folder tree', { exact: true }).locator('[role="treeitem"][tabindex="0"]'),

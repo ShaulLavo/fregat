@@ -99,6 +99,13 @@ stays safe to read, share and export.
 | `files.autoSaveDelay` | `1000`  | window | Milliseconds of quiet before an automatic save, when saving after a delay. |
 | `files.showHidden`    | `false` | window | Show dot-prefixed files and folders in file pickers.                       |
 
+## Git
+
+| Setting                         | Default       | Scope   | What it does                                                                                                          |
+| ------------------------------- | ------------- | ------- | --------------------------------------------------------------------------------------------------------------------- |
+| `git.worktreeSubmodules`        | `"recursive"` | machine | Initialize every nested submodule, only the ones this repository declares, or none when a session creates a worktree. |
+| `git.projectWorktreeSubmodules` | `{}`          | machine | Submodule modes for new worktrees keyed by project UUID on this machine.                                              |
+
 ## Keyboard shortcuts
 
 | Setting                 | Default     | Scope       | What it does                                                                                                                                  |

@@ -54,7 +54,9 @@ export type {
   GitWorktree,
   GitWorktreeCreateResult,
   GitWorktreeRemoveResult,
+  WorktreeSubmoduleMode,
 } from './git'
+export { WORKTREE_SUBMODULE_MODES } from './git'
 export type { WatchClientMessage, WatchServerMessage } from './watch-events'
 export {
   parseTerminalClientMessage,

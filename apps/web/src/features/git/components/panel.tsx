@@ -20,6 +20,7 @@ import { changeRows } from '@/features/git/utils/change-rows'
 import { ChangesList } from '@/features/git/components/changes-list'
 import { ToolPane } from '@workspace/ui/patterns/tool-pane'
 import { CommitControls } from '@/features/git/components/commit-controls'
+import { SubmodulesNotice } from '@/features/git/components/submodules-notice'
 import { DiscardDialog } from '@/features/git/components/discard-dialog'
 import { PanelLoading } from '@/features/git/components/panel-loading'
 import { diffDocumentQueryKey } from '@/features/git/utils/diff-document-query'
@@ -136,6 +137,7 @@ export function Panel({ className, rootPath }: ComponentProps<'section'> & { roo
               rootPath={rootPath}
             />
           ) : null}
+          <SubmodulesNotice rootPath={rootPath} />
           <ChangesList
             rootPath={rootPath}
             staged={rows.staged}

@@ -380,6 +380,24 @@
       "description": "Show dot-prefixed files and folders in file pickers.",
       "type": "boolean"
     },
+    "git.projectWorktreeSubmodules": {
+      "additionalProperties": {
+        "enum": ["none", "recursive", "top-level"],
+        "type": "string"
+      },
+      "default": {},
+      "description": "Submodule modes for new worktrees keyed by project UUID on this machine.",
+      "propertyNames": {
+        "type": "string"
+      },
+      "type": "object"
+    },
+    "git.worktreeSubmodules": {
+      "default": "recursive",
+      "description": "Initialize every nested submodule, only the ones this repository declares, or none when a session creates a worktree.",
+      "enum": ["none", "recursive", "top-level"],
+      "type": "string"
+    },
     "keybindings.overrides": {
       "additionalProperties": {
         "anyOf": [

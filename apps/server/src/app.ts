@@ -63,6 +63,7 @@ import { themeRoutes } from './themes/routes'
 import { DEFAULT_PROVIDER_INSTANCES } from './provider/drivers/built-in'
 import { mergeProviderInstanceConfigs } from './provider/utils/instance-config-merge'
 import { SettingsStore, type SettingsStoreOptions } from './settings/store'
+import { worktreeSubmoduleMode } from './git/submodules'
 import { TerminalService, type TerminalPtyFactory } from './terminal/service'
 import { wallpaperRoutes } from './wallpaper/routes'
 import { webRoutes, type WebOptions } from './web/routes'
@@ -263,6 +264,7 @@ export function createApp(options: AppOptions) {
     },
     keepImportedSessionsUpdated: () =>
       settings.snapshot().values['chat.keepImportedSessionsUpdated'],
+    worktreeSubmodules: (projectId) => worktreeSubmoduleMode(settings, projectId),
     providerService,
     terminalService: terminal,
     attachmentsDir: options.orchestration?.attachmentsDir,
@@ -418,6 +420,8 @@ export function createApp(options: AppOptions) {
       gitRoutes(git, commitMessages, {
         resolveBaseCommit: (checkoutPath) => orchestration.worktreeBaseCommit(checkoutPath),
         refreshMetadata: (checkoutPath) => orchestration.refreshWorktreeMetadata(checkoutPath),
+        submoduleMode: async (checkoutPath) =>
+          worktreeSubmoduleMode(settings, await orchestration.worktreeProjectId(checkoutPath)),
       }),
     )
     .use(fsRoutes(fs))

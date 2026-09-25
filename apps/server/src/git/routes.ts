@@ -1,4 +1,5 @@
 import { Elysia } from 'elysia'
+import type { WorktreeSubmoduleMode } from '@workspace/contracts'
 import {
   gitApplyPatchBodySchema,
   gitBlobDiffQuerySchema,
@@ -29,6 +30,7 @@ export function gitRoutes(
   options: {
     resolveBaseCommit?: (path: string) => Promise<string | null>
     refreshMetadata?: (path: string) => Promise<void>
+    submoduleMode?: (path: string) => Promise<WorktreeSubmoduleMode>
   } = {},
 ) {
   const worktrees = new GitWorktreeService(git)
@@ -130,6 +132,15 @@ export function gitRoutes(
       .post('/fetch', ({ body }) => git.fetch(body.path), {
         body: gitPathBodySchema,
       })
+      // An explicit request: `none` only stops automatic initialization.
+      .post(
+        '/submodules/init',
+        async ({ body }) => {
+          const mode = (await options.submoduleMode?.(body.path)) ?? 'recursive'
+          return git.initializeSubmodules(body.path, mode === 'none' ? 'top-level' : mode)
+        },
+        { body: gitPathBodySchema },
+      )
       .post('/pull', ({ body }) => git.pull(body.path), {
         body: gitPathBodySchema,
       })
