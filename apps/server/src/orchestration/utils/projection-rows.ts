@@ -42,6 +42,7 @@ export function worktreeFromRow(row: ProjectionWorktreeRow) {
     worktreeCreationCapability: parseJson(row.creationCapabilityJson),
     cleanupEligibility: parseJson(row.cleanupEligibilityJson),
     pullRequest: parseJson(row.pullRequestJson),
+    setup: parseJson(row.setupJson),
   })
 }
 

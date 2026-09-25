@@ -83,6 +83,9 @@ export function decideOrchestrationCommand(
     case 'worktree.mark-missing':
     case 'worktree.metadata.refresh':
     case 'worktree.pull-request.sync':
+    case 'worktree.setup.update':
+    case 'worktree.setup.run':
+    case 'worktree.setup.cancel':
     case 'worktree.orphan.register':
     case 'session.worktree.release':
     case 'terminal.lease.request':

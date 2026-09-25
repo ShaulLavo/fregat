@@ -194,6 +194,7 @@ import { sessionPullRequestSync } from './session-pull-request-sync'
 import { sessionAutoSettle } from './session-auto-settle'
 import { gitMergeRequest } from './git-merge-request'
 import { gitClonePublish } from './git-clone-publish'
+import { worktreeSetupImport } from './worktree-setup-import'
 import { gitHistory } from './git-history'
 import { editorCaretBurst } from './editor-caret-burst'
 import { editorFocusClicks } from './editor-focus-clicks'
@@ -395,6 +396,7 @@ export const scenarios: readonly Scenario[] = [
   sessionAutoSettle,
   gitMergeRequest,
   gitClonePublish,
+  worktreeSetupImport,
   editorCaretBurst,
   editorFocusClicks,
   editorProportionalFont,

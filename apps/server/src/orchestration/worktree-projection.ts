@@ -105,6 +105,12 @@ export function applyWorktreeEvent(database: PlatformDatabase, event: Orchestrat
         .where(eq(projectionWorktrees.worktreeId, event.payload.worktreeId))
         .run()
       return true
+    case 'worktree.setup-updated':
+      update(database, event.payload.worktreeId, {
+        setupJson: JSON.stringify(event.payload.setup),
+        updatedAt: event.payload.updatedAt,
+      })
+      return true
     case 'worktree.pull-request-synced':
       update(database, event.payload.worktreeId, {
         pullRequestJson: JSON.stringify(event.payload.pullRequest),

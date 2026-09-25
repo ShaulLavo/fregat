@@ -450,6 +450,7 @@ export class OrchestrationEngine {
     await this.pullRequestSync?.close()
     await this.settlement?.close()
     this.unsubscribeGitMutations?.()
+    await this.worktreeReactor?.closeSetups()
     await this.worktreeReactor?.drain()
     await this.queue
   }

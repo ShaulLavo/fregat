@@ -386,6 +386,12 @@
   {
     "from": "command-palette",
     "to": "chat-mode",
+    "module": "features/chat-mode/hooks/use-import-project-scripts.ts",
+    "reason": "owner: The palette assembles commands and search results across features; this module supplies useImportProjectScripts."
+  },
+  {
+    "from": "command-palette",
+    "to": "chat-mode",
     "module": "features/chat-mode/state/session-commands.ts",
     "reason": "owner: The palette assembles commands and search results across features; this module supplies openSessionRow, startSessionDraft."
   },

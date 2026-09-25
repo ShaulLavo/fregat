@@ -30,7 +30,12 @@ export const platformMigrations: readonly Migration[] = [
   { version: 23, name: 'provider_usage_prices', up: applyProviderUsagePrices },
   { version: 24, name: 'provider_usage_contributions', up: applyProviderUsageContributions },
   { version: 25, name: 'worktree_pull_requests', up: applyWorktreePullRequests },
+  { version: 26, name: 'worktree_setup', up: applyWorktreeSetup },
 ]
+
+function applyWorktreeSetup(database: PlatformDatabase) {
+  database.run(sql`ALTER TABLE projection_worktrees ADD COLUMN setup_json TEXT`)
+}
 
 function applyWorktreePullRequests(database: PlatformDatabase) {
   database.run(sql`ALTER TABLE projection_worktrees ADD COLUMN pull_request_json TEXT`)
