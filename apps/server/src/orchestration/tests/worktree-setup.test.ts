@@ -1,9 +1,13 @@
+import * as v from 'valibot'
+import { orchestrationCommandSchema } from '@workspace/contracts'
+import { SetupRunner } from '../setup-runner'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { afterEach, expect, test } from 'vitest'
 import { closeTestApps } from '../../../test/server'
 import {
   lifecycleWorktreeId,
+  stopLifecycleEffects,
   worktreeLifecycleFixture,
 } from '../../../test/factories/worktree-lifecycle'
 
@@ -132,4 +136,59 @@ test('cancellation kills a setup process group that ignores TERM', async () => {
       /* Already reaped. */
     }
   }
+})
+
+test.each(['queued', 'running', 'cancelling'] as const)(
+  'restart settles an interrupted %s setup and permits retry',
+  async (state) => {
+    const fixture = await withSetup('echo ready', false)
+    await fixture.create()
+    await settled(fixture)
+    const stopped = await stopLifecycleEffects(fixture)
+    await stopped.engine.dispatch(
+      v.parse(orchestrationCommandSchema, {
+        type: 'worktree.setup.update',
+        commandId: 'interrupted-setup',
+        worktreeId: lifecycleWorktreeId,
+        setup: {
+          name: 'Install',
+          foreground: false,
+          state,
+          output: ['partial'],
+          exitCode: null,
+          updatedAt: new Date().toISOString(),
+        },
+      }),
+    )
+    await stopped.engine.close()
+    await fixture.restart()
+    expect((await worktree(fixture))?.setup?.state).toBe(
+      state === 'cancelling' ? 'cancelled' : 'failed',
+    )
+    await fixture.command({ type: 'worktree.setup.run', worktreeId: lifecycleWorktreeId })
+    expect((await settled(fixture))?.setup).toMatchObject({ state: 'done', output: ['ready'] })
+  },
+)
+
+test('cancellation owns the setup before the running report completes', async () => {
+  const fixture = await worktreeLifecycleFixture()
+  fixtures.push(fixture)
+  const runner = new SetupRunner()
+  const barrier = Promise.withResolvers<void>()
+  const running = runner.run(
+    lifecycleWorktreeId,
+    {
+      command: 'echo ran > cancelled-setup',
+      worktreePath: fixture.root,
+      projectRoot: fixture.root,
+    },
+    () => barrier.promise,
+  )
+  await Bun.sleep(30)
+  const cancelling = runner.cancel(lifecycleWorktreeId)
+  barrier.resolve()
+  await cancelling
+  expect((await running).state).toBe('cancelled')
+  await expect(readFile(path.join(fixture.root, 'cancelled-setup'))).rejects.toThrow()
+  await runner.close()
 })

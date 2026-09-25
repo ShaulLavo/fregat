@@ -20,6 +20,7 @@ export const sessionWorktreeTargetSchema = v.variant('kind', [
     baseWorktreeId: worktreeIdSchema,
     /** A local branch to start from; absent means the base worktree's HEAD. */
     baseBranch: v.optional(text),
+    skipSetup: v.optional(v.boolean()),
   }),
 ])
 
@@ -130,7 +131,7 @@ export const worktreePullRequestSchema = v.variant('status', [
 export const worktreeSetupSchema = v.object({
   name: text,
   foreground: v.boolean(),
-  state: v.picklist(['queued', 'running', 'cancelling', 'done', 'failed', 'cancelled']),
+  state: v.picklist(['queued', 'running', 'cancelling', 'done', 'failed', 'cancelled', 'skipped']),
   exitCode: v.nullable(v.number()),
   /** The last lines it printed, ANSI stripped. */
   output: v.array(v.string()),
@@ -315,6 +316,7 @@ export const terminalLeaseCommandSchemas = [
 const changed = { worktreeId: worktreeIdSchema, updatedAt: text }
 export const WORKTREE_EVENT_PAYLOADS = {
   'worktree.create-requested': v.object({
+    setup: v.optional(worktreeSetupSchema),
     ...worktreeProvisioningSchema.entries,
     ...operation,
     createdAt: text,

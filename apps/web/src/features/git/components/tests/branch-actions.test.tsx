@@ -1,13 +1,15 @@
+import { PublishRepositoryDialog } from '@/features/git/components/publish-repository-dialog'
+import { mutationKeys } from '@/features/git/utils/mutation-keys'
 import { execFileSync } from 'node:child_process'
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
-import { screen, waitFor } from '@testing-library/react'
+import { act, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 import { BranchActions } from '@/features/git/components/branch-actions'
 import { expect, test } from '../../../../../test/fixtures'
-import { renderWithProviders } from '../../../../../test/render'
+import { createTestQueryClient, renderWithProviders } from '../../../../../test/render'
 
 // Real git and the real route. These fixtures' origin is a local directory, so
 // no forge is detected and the component must not offer Create.
@@ -44,7 +46,7 @@ test('never offers a pull request when no forge could be asked', async ({ client
 
   // The push button proves the state actually arrived, so the missing Create
   // button below is a decision rather than a component still loading.
-  expect(await screen.findByRole('button', { name: 'Push 1' })).toBeVisible()
+  expect(await screen.findByRole('button', { name: /Push 1$/ })).toBeVisible()
   expect(screen.queryByRole('button', { name: 'Pull request' })).toBeNull()
 })
 
@@ -70,3 +72,62 @@ async function clonedRepo(root: string) {
 function git(cwd: string, ...args: string[]) {
   return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: 'pipe' })
 }
+
+test('a push-and-open mutation disables Push in every branch header', async ({
+  client,
+  server,
+}) => {
+  void client
+  const { repo } = await clonedRepo(server.root)
+  await writeFile(path.join(repo, 'readme.md'), 'two\n')
+  git(repo, 'commit', '-am', 'edit')
+  const queryClient = createTestQueryClient()
+  const barrier = Promise.withResolvers<void>()
+  const operation = queryClient.getMutationCache().build(queryClient, {
+    mutationKey: mutationKeys.pushAndOpenPullRequest('repo'),
+    mutationFn: () => barrier.promise,
+  })
+  const executing = operation.execute(undefined)
+  const rendered = renderWithProviders(<BranchActions pullRequestTitle='Edit' rootPath='repo' />, {
+    queryClient,
+  })
+  try {
+    expect(await screen.findByRole('button', { name: /Push 1$/ })).toBeDisabled()
+    await act(async () => {
+      barrier.resolve()
+      await executing
+    })
+    await waitFor(() => expect(screen.getByRole('button', { name: /Push 1$/ })).toBeEnabled())
+  } finally {
+    barrier.resolve()
+    await executing
+    rendered.unmount()
+  }
+})
+
+test('a second publish dialog observes the checkout publish already in flight', async () => {
+  const queryClient = createTestQueryClient()
+  const barrier = Promise.withResolvers<void>()
+  const operation = queryClient.getMutationCache().build(queryClient, {
+    mutationKey: mutationKeys.publish('repo'),
+    mutationFn: () => barrier.promise,
+  })
+  const executing = operation.execute(undefined)
+  const rendered = renderWithProviders(
+    <PublishRepositoryDialog open rootPath='repo' onOpenChange={() => {}} />,
+    { queryClient },
+  )
+  try {
+    await userEvent.type(await screen.findByRole('textbox', { name: 'Repository' }), 'acme/repo')
+    expect(screen.getByRole('button', { name: /Publish$/ })).toBeDisabled()
+    await act(async () => {
+      barrier.resolve()
+      await executing
+    })
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Publish' })).toBeEnabled())
+  } finally {
+    barrier.resolve()
+    await executing
+    rendered.unmount()
+  }
+})

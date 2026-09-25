@@ -1,6 +1,18 @@
 import { defineErrorCatalog } from 'evlog'
 
 export const gitPullRequestErrors = defineErrorCatalog('git', {
+  FORGE_HOST_INVALID: {
+    status: 400,
+    message: 'The host does not match the selected forge',
+    why: 'Publishing needs a hostname supported by the selected forge.',
+    fix: 'Enter a hostname for that forge. Bitbucket Cloud uses bitbucket.org.',
+  },
+  PULL_REQUEST_LOOKUP_LIMIT: {
+    status: 502,
+    message: 'The pull request history exceeded the lookup limit',
+    why: 'The forge returned more history than a branch lookup can scan.',
+    fix: 'Open the pull request by its number or URL.',
+  },
   PULL_REQUEST_HEAD_CHANGED: {
     status: 409,
     message: 'The pull request head changed',

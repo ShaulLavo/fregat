@@ -13,6 +13,7 @@ import type { ForgeContext, ForgeProvider } from './types'
 
 /** Recently updated pull requests read per lookup; the branch filter runs on them. */
 const PAGE_SIZE = 50
+const MAX_PAGES = 5
 
 const loginSchema = v.array(v.object({ name: v.string(), url: v.string() }))
 
@@ -63,6 +64,10 @@ export const forgejo: ForgeProvider = {
         branches.every((branch) => pulls.some((pull) => pull.head.ref === branch))
       )
         break
+      if (page >= MAX_PAGES)
+        throw gitPullRequestErrors.PULL_REQUEST_LOOKUP_LIMIT({
+          internal: { repository: context.repository, branches: branches.length, pages: page },
+        })
     }
     // Newest first, so the first match per branch is its latest pull request.
     return new Map(

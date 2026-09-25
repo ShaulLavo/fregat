@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import * as v from 'valibot'
 import { modelSelectionSchema } from '@workspace/contracts'
-import { afterEach, expect, test } from 'vitest'
+import { afterEach, expect, test, vi } from 'vitest'
 import { closeTestApps } from '../../../test/server'
 import { executeGit, FIXTURE_MODEL } from '../../../test/factories/orchestration'
 import { worktreeLifecycleFixture } from '../../../test/factories/worktree-lifecycle'
@@ -248,3 +248,71 @@ test.for([false, true])(
     expect(await readFile(path.join(checkout, 'greeting.txt'), 'utf8')).toBe('fork head\n')
   },
 )
+
+test.each([false, true])('fork PR skips automatic setup, foreground: %s', async (foreground) => {
+  const { fixture } = await withPullRequest({ crossRepository: true })
+  await fixture.command({
+    type: 'project.meta.update',
+    projectId: fixture.registration.projectId,
+    scripts: [
+      {
+        name: 'Install',
+        command: 'echo executed > setup-ran',
+        runOnWorktreeCreate: true,
+        waitForSetup: foreground,
+      },
+    ],
+  })
+  const started = await fixture.engine.startPullRequestSession({
+    worktreeId: fixture.registration.worktreeId,
+    reference: '#7',
+    modelSelection: MODEL,
+  })
+  await fixture.engine.providerRuntimeIdle()
+  const created = (await fixture.engine.readModelSnapshot()).worktrees.get(started.worktreeId)
+  await expect(readFile(path.join(created?.canonicalPath ?? '', 'setup-ran'))).rejects.toThrow()
+  expect(created?.setup?.state).toBe('skipped')
+  await fixture.restart()
+  await expect(readFile(path.join(created?.canonicalPath ?? '', 'setup-ran'))).rejects.toThrow()
+  await fixture.command({ type: 'worktree.setup.run', worktreeId: started.worktreeId })
+  await expect
+    .poll(() => readFile(path.join(created?.canonicalPath ?? '', 'setup-ran'), 'utf8'))
+    .toBe('executed\n')
+})
+
+test('PR association survives a foreground setup longer than ten minutes of polling', async () => {
+  const { fixture } = await withPullRequest()
+  const release = path.join(fixture.root, 'release-setup')
+  await fixture.command({
+    type: 'project.meta.update',
+    projectId: fixture.registration.projectId,
+    scripts: [
+      {
+        name: 'Install',
+        command: 'while [ ! -f "$PLATFORM_PROJECT_ROOT/release-setup" ]; do sleep 0.01; done',
+        runOnWorktreeCreate: true,
+        waitForSetup: true,
+      },
+    ],
+  })
+  const sleep = Bun.sleep
+  let polls = 0
+  const accelerated = vi.spyOn(Bun, 'sleep').mockImplementation(async () => {
+    polls += 1
+    if (polls === 6001) await writeFile(release, '')
+    await sleep(1)
+  })
+  try {
+    const started = await fixture.engine.startPullRequestSession({
+      worktreeId: fixture.registration.worktreeId,
+      reference: '#7',
+      modelSelection: MODEL,
+    })
+    const created = (await fixture.engine.readModelSnapshot()).worktrees.get(started.worktreeId)
+    expect(created?.pullRequest).toMatchObject({ status: 'found', number: 7 })
+    expect(polls).toBeGreaterThan(6000)
+  } finally {
+    accelerated.mockRestore()
+    await writeFile(release, '')
+  }
+}, 20_000)

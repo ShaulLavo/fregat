@@ -25,6 +25,7 @@ export function projectWorktreeEvent(
       )
     return {
       ...base,
+      setup: payload.setup ?? base.setup,
       operationId: payload.operationId,
       baseCommit: payload.baseCommit,
       baseWorktreeId: payload.baseWorktreeId,

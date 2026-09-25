@@ -102,6 +102,20 @@ export function creationTargetEvents(
   }
   return one(command, at, 'worktree.create-requested', {
     ...provisioning,
+    ...(target.skipSetup
+      ? {
+          setup: {
+            name: setupScript(project.scripts)?.name ?? 'Setup',
+            state: 'skipped' as const,
+            foreground: false,
+            exitCode: null,
+            output: [
+              'Automatic setup skipped for a fork pull request. Run setup after reviewing the checkout.',
+            ],
+            updatedAt: at,
+          },
+        }
+      : {}),
     operationId: command.commandId,
     createdAt: at,
     updatedAt: at,
@@ -177,7 +191,8 @@ export function decideWorktreeLifecycle(
       })
     }
     case 'worktree.setup.update': {
-      requireWorktree(model, command.worktreeId)
+      const worktree = requireWorktree(model, command.worktreeId)
+      if (worktree.setup?.state === 'cancelling' && command.setup.state === 'running') return []
       return setupUpdated(command, command.setup, at)
     }
     case 'worktree.setup.run':

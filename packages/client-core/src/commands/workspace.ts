@@ -167,7 +167,7 @@ export const workspaceCommandMetadata = {
     execution: 'sync',
     target: 'workspace',
     undoCategory: 'view-only',
-    when: ['workspaceOpen'],
+    when: [],
     title: 'Start session from pull request…',
   }),
   'workspace.showUsage': defineMetadata({

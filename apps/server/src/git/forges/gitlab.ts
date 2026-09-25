@@ -28,7 +28,7 @@ const projectSchema = v.object({
   ssh_url_to_repo: v.string(),
 })
 
-/** `glab`, which picks the GitLab host from the checkout's remote on its own. */
+/** `glab`, bound to the selected repository on every request. */
 export const gitlab: ForgeProvider = {
   kind: 'gitlab',
   async support(context) {
@@ -41,6 +41,8 @@ export const gitlab: ForgeProvider = {
     const result = await glab(context, [
       'mr',
       'create',
+      '--repo',
+      context.remoteUrl,
       '--source-branch',
       input.branch,
       '--title',
@@ -123,6 +125,8 @@ async function newestMergeRequest(context: ForgeContext, branch: string, state: 
     await glab(context, [
       'mr',
       'list',
+      '--repo',
+      context.remoteUrl,
       '--source-branch',
       branch,
       ...(state === 'all' ? ['--all'] : []),

@@ -77,7 +77,7 @@ export function projectScriptSuggestions({
 
   return [
     ...saved.map((script) => ({ ...script, saved: true, origin: 'saved' as const })),
-    ...unsaved(projectFile, 't3.json'),
+    ...unsaved(importableScripts(projectFile, saved), 't3.json'),
     ...unsaved(discovered, 'package.json'),
   ]
 }

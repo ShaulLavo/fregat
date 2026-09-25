@@ -41,7 +41,6 @@ export const github: ForgeProvider = {
     return cliSupport(await gh(context, ['auth', 'status', ...hostname(context)]))
   },
   async pullRequests(context, { branches, state }) {
-    // One open branch is the header's question; `pr list` answers it without a repository name.
     const [only] = branches
     if (state === 'open' && branches.length === 1 && only !== undefined)
       return new Map([[only, await openPullRequest(context, only)]])
@@ -51,6 +50,8 @@ export const github: ForgeProvider = {
     const result = await gh(context, [
       'pr',
       'create',
+      '--repo',
+      context.remoteUrl,
       '--head',
       input.branch,
       '--title',
@@ -116,6 +117,8 @@ async function openPullRequest(context: ForgeContext, branch: string) {
     await gh(context, [
       'pr',
       'list',
+      '--repo',
+      context.remoteUrl,
       '--head',
       branch,
       '--state',

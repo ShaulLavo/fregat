@@ -1,3 +1,4 @@
+import { Spinner } from '@workspace/ui/components/spinner'
 import {
   ArrowSquareOutIcon,
   CloudArrowUpIcon,
@@ -77,7 +78,7 @@ export function BranchActions({
           variant='ghost'
           onClick={() => push.mutate()}
         >
-          <UploadSimpleIcon className='size-(--icon-size-sm)' />
+          {push.isPending ? <Spinner /> : <UploadSimpleIcon className='size-(--icon-size-sm)' />}
           {pushLabel(state)}
         </Button>
       ) : null}
@@ -90,7 +91,7 @@ export function BranchActions({
           variant='ghost'
           onClick={() => ship.mutate({ title: pullRequestTitle })}
         >
-          <GitPullRequestIcon className='size-(--icon-size-sm)' />
+          {ship.isPending ? <Spinner /> : <GitPullRequestIcon className='size-(--icon-size-sm)' />}
           Push and open {requestLabel.toLowerCase()}
         </Button>
       ) : null}

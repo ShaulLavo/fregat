@@ -1,3 +1,4 @@
+import { SETUP_TIMEOUT_MS } from './setup-runner'
 import { commandUploadClaim } from './command-attachments'
 import { withAttachmentLanes } from '../attachments/lanes'
 import { createAttachmentOwnership, type AttachmentOwnership } from '../attachments/ownership'
@@ -1249,7 +1250,13 @@ export class OrchestrationEngine {
       commandId: `pull-request-${crypto.randomUUID()}`,
       sessionId,
       title: `#${number} ${detail.title}`.slice(0, 200),
-      worktreeTarget: { kind: 'new', worktreeId, baseWorktreeId: base.id, baseBranch: branch },
+      worktreeTarget: {
+        kind: 'new',
+        worktreeId,
+        baseWorktreeId: base.id,
+        baseBranch: branch,
+        skipSetup: detail.crossRepository,
+      },
       modelSelection: input.modelSelection,
     })
     const worktree = await this.readyWorktree(worktreeId, number)
@@ -1277,8 +1284,9 @@ export class OrchestrationEngine {
   }
 
   private async readyWorktree(worktreeId: string, number: number) {
-    // Long enough for a foreground setup script; a failure ends the wait at once.
-    for (let attempt = 0; attempt < 6_000; attempt += 1) {
+    // Include the runner's full setup deadline and a minute for checkout creation.
+    const attempts = (SETUP_TIMEOUT_MS + 60_000) / 100
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
       const worktree = this.readModel.worktrees.get(worktreeId)
       if (worktree?.lifecycle.state === 'ready') return worktree
       if (worktree?.lifecycle.state === 'creation-failed')

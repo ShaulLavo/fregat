@@ -149,9 +149,25 @@ export class PullRequestSyncReactor {
       ({ worktree }) => worktree.pullRequest?.status === 'found' && worktree.pullRequest.identity,
     )
     let pinnedChanged = 0
-    for (const candidate of pinned) pinnedChanged += await this.syncIdentity(projectId, candidate)
+    const identities = new Map<string, Candidate[]>()
+    for (const candidate of pinned) {
+      const known = candidate.worktree.pullRequest
+      if (known?.status !== 'found') continue
+      const key = JSON.stringify(known.identity)
+      const group = identities.get(key) ?? []
+      group.push(candidate)
+      identities.set(key, group)
+    }
+    for (const group of identities.values()) {
+      const result = await this.syncIdentity(projectId, group)
+      pinnedChanged += result.changed
+      if (result.failed) return { changed: pinnedChanged, failed: true }
+    }
     candidates = candidates.filter((candidate) => !pinned.includes(candidate))
-    if (candidates.length === 0) return { changed: pinnedChanged, failed: false }
+    if (candidates.length === 0) {
+      this.backoff.delete(projectId)
+      return { changed: pinnedChanged, failed: false }
+    }
     const heads = await Promise.all(candidates.map((candidate) => this.headOf(candidate)))
     let answer: BranchPullRequests
     try {
@@ -173,15 +189,17 @@ export class PullRequestSyncReactor {
     return { changed: changed + pinnedChanged, failed: false }
   }
 
-  private async syncIdentity(projectId: string, candidate: Candidate) {
-    const known = candidate.worktree.pullRequest
-    if (known?.status !== 'found' || !known.identity || !this.options.lookupIdentity) return 0
+  private async syncIdentity(projectId: string, candidates: readonly Candidate[]) {
+    const candidate = candidates[0]
+    const known = candidate?.worktree.pullRequest
+    if (!candidate || known?.status !== 'found' || !known.identity || !this.options.lookupIdentity)
+      return { changed: 0, failed: false }
     try {
       const answer = await this.options.lookupIdentity(candidate.worktree, known.identity)
-      return await this.apply([candidate], () => answer)
+      return { changed: await this.apply(candidates, () => answer), failed: false }
     } catch (error) {
       this.recordFailure(projectId, error)
-      return 0
+      return { changed: 0, failed: true }
     }
   }
 

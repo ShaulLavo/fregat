@@ -85,3 +85,17 @@ test('offers only scripts not saved by command or by name', () => {
   ]
   expect(importableScripts(file, saved)).toEqual([{ name: 'Build', command: 'bun run build' }])
 })
+
+test('t3.json suggestions offer exactly the scripts that Import can save', () => {
+  const saved = [{ name: 'Test', command: 'bun test' }]
+  const file = [
+    { name: 'test', command: 'bun run test:all' },
+    { name: 'Build', command: 'bun run build' },
+  ]
+  const suggestions = projectScriptSuggestions({ saved, projectFile: file, discovered: [] })
+  expect(
+    suggestions
+      .filter((script) => script.origin === 't3.json')
+      .map(({ name, command }) => ({ name, command })),
+  ).toEqual(importableScripts(file, saved))
+})

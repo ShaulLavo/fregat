@@ -28,13 +28,15 @@ export function StartPullRequestSessionDialog({
 }: {
   readonly onOpenChange: (open: boolean) => void
   readonly open: boolean
-  readonly rootPath: string
+  readonly rootPath: string | null
 }) {
   const id = useId()
   const environmentId = useEnvironmentId()
   const start = useStartPullRequestSessionMutation()
   const [reference, setReference] = useState('')
-  const worktree = useActiveChatProjection((slice) => selectWorktreeAtPath(slice, rootPath))
+  const worktree = useActiveChatProjection((slice) =>
+    rootPath === null ? undefined : selectWorktreeAtPath(slice, rootPath),
+  )
   const project = useActiveChatProjection((slice) =>
     worktree ? slice.projectById[worktree.projectId] : undefined,
   )
@@ -47,8 +49,15 @@ export function StartPullRequestSessionDialog({
   const number = parsePullRequestReference(reference)
   let problem: string | null = null
   if (!checkout) problem = 'Open a project checkout to start from its pull requests.'
-  else if (!modelSelection) problem = 'No provider is ready to run the session.'
-  const ready = number !== null && problem === null && !start.isPending
+  else if (providers.isError) problem = 'Could not load providers.'
+  else if (!providers.isPending && !modelSelection)
+    problem = 'No provider is ready to run the session.'
+  const ready =
+    number !== null &&
+    modelSelection !== null &&
+    problem === null &&
+    !providers.isPending &&
+    !start.isPending
 
   function submit() {
     if (!checkout || !modelSelection) return
@@ -93,6 +102,11 @@ export function StartPullRequestSessionDialog({
               onChange={(event) => setReference(event.currentTarget.value)}
             />
           </div>
+          {checkout && providers.isPending ? (
+            <p className='text-muted-foreground flex items-center gap-1.5 text-xs'>
+              <Spinner size='xs' /> Checking providers…
+            </p>
+          ) : null}
           {problem ? <p className='text-muted-foreground text-xs'>{problem}</p> : null}
           <DialogFooter>
             <Button type='button' variant='outline' onClick={() => onOpenChange(false)}>

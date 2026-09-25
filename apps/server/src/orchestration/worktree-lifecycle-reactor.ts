@@ -293,7 +293,7 @@ export class WorktreeLifecycleReactor {
   /** Submodules and a foreground setup finish before the first turn runs, outside the repository lane. */
   private async completeCreation(worktree: OrchestrationWorktree, state: Provisioning) {
     await this.initializeSubmodules(worktree)
-    const script = this.setupScriptFor(worktree)
+    const script = worktree.setup?.state === 'skipped' ? null : this.setupScriptFor(worktree)
     if (script?.waitForSetup) {
       const outcome = await this.runSetup(worktree, script, true)
       if (outcome !== 'done') {
@@ -346,12 +346,15 @@ export class WorktreeLifecycleReactor {
         setup: { name: script.name, foreground, updatedAt: new Date().toISOString(), ...setup },
         commandId: commandKey('setup', worktree.id, crypto.randomUUID()),
       })
-    await report({ state: 'running', exitCode: null, output: [] })
-    const outcome = await this.setups.run(worktree.id, {
-      command: script.command,
-      worktreePath: worktree.canonicalPath,
-      projectRoot: this.projectRoot(worktree),
-    })
+    const outcome = await this.setups.run(
+      worktree.id,
+      {
+        command: script.command,
+        worktreePath: worktree.canonicalPath,
+        projectRoot: this.projectRoot(worktree),
+      },
+      () => report({ state: 'running', exitCode: null, output: [] }),
+    )
     await report(outcome)
     recordProcessInfo('worktree.setup.completed', {
       area: 'worktree',
@@ -530,6 +533,7 @@ export class WorktreeLifecycleReactor {
     this.recoveryCreations = new Map()
     this.recovering = true
     try {
+      await this.recoverSetups()
       await this.recoverStage('provisioning')
       await this.recoverStage('ready')
       await this.recoverOrphans()
@@ -559,6 +563,39 @@ export class WorktreeLifecycleReactor {
       durationMs: Math.round(performance.now() - startedAt),
     })
     this.recoveryCreations = null
+  }
+
+  private async recoverSetups() {
+    for (const worktree of this.options.getReadModel().worktrees.values()) {
+      const setup = worktree.setup
+      if (
+        worktree.retiredAt ||
+        !setup ||
+        !['queued', 'running', 'cancelling'].includes(setup.state)
+      )
+        continue
+      const state = setup.state === 'cancelling' ? 'cancelled' : 'failed'
+      await this.options.dispatch({
+        type: 'worktree.setup.update',
+        worktreeId: worktree.id,
+        setup: {
+          ...setup,
+          state,
+          exitCode: null,
+          output: [...setup.output, 'Setup interrupted by a server restart.'],
+          updatedAt: new Date().toISOString(),
+        },
+        commandId: commandKey('setup-recovery', worktree.id, crypto.randomUUID()),
+      })
+      if (worktree.lifecycle.state !== 'provisioning') continue
+      await this.options.dispatch({
+        type: 'worktree.create.fail',
+        worktreeId: worktree.id,
+        operationId: worktree.lifecycle.operationId,
+        errorCode: state === 'cancelled' ? SETUP_CANCELLED : SETUP_FAILED,
+        commandId: commandKey('setup-recovery-failed', worktree.id, worktree.lifecycle.operationId),
+      })
+    }
   }
 
   private async recoverStage(state: 'provisioning' | 'ready' | 'cleanup-requested') {
