@@ -13,7 +13,8 @@
         "scripts/workspace-search-benchmark.ts",
         "test/openssh-scenario.ts",
         "test/service-openssh-scenario.ts",
-        "src/fs/tests/contracts.test-d.ts"
+        "src/fs/tests/contracts.test-d.ts",
+        "src/lsp/typescript/worker-discovery-process.ts"
       ],
       "ignoreDependencies": ["eslint", "vscode-langservers-extracted"]
     },

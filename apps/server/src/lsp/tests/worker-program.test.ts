@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mkdtempSync, rmSync, writeFileSync, truncateSync } from 'node:fs'
 import path from 'node:path'
+import { tmpdir } from 'node:os'
 import ts from 'typescript-language-service'
 import { createWorkspacePaths } from '../../fs/path'
 import { workerCompilerOptions, workerSupportFiles } from '../typescript/worker-program'
@@ -11,7 +12,7 @@ afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
 })
 function fixture() {
-  const root = mkdtempSync('/work/tmp/l7-worker-boundary-')
+  const root = mkdtempSync(path.join(tmpdir(), 'l7-worker-boundary-'))
   roots.push(root)
   return root
 }

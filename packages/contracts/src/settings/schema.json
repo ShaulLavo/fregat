@@ -652,6 +652,26 @@
       },
       "type": "object"
     },
+    "lsp.typescript.backend": {
+      "default": "server",
+      "description": "Run TypeScript language features on the server or in a browser worker.",
+      "enum": ["server", "worker"],
+      "type": "string"
+    },
+    "lsp.typescript.workerMaxBytes": {
+      "default": 67108864,
+      "description": "Maximum source bytes loaded by a TypeScript browser worker. Runtime memory is higher.",
+      "maximum": 268435456,
+      "minimum": 1024,
+      "type": "integer"
+    },
+    "lsp.typescript.workerMaxFiles": {
+      "default": 12000,
+      "description": "Maximum program files loaded by a TypeScript browser worker.",
+      "maximum": 50000,
+      "minimum": 1,
+      "type": "integer"
+    },
     "models.favorites": {
       "default": [],
       "description": "Models starred as favorites. The picker lists them first and gathers them under Favorites.",

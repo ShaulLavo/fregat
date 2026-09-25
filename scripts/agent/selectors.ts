@@ -920,19 +920,6 @@ export async function hoverTokenColor(page: Page, word: string): Promise<boolean
   return /(^|;)\s*color:/.test(style ?? '')
 }
 
-/** The text under every range of the CSS highlight whose name ends with `suffix`. */
-export async function highlightTexts(page: Page, suffix: string): Promise<string[]> {
-  // A string: this package types without the DOM, and the callback runs in the page.
-  return (await page.evaluate(`((suffix) => {
-    const texts = []
-    for (const [name, highlight] of CSS.highlights) {
-      if (!name.endsWith(suffix)) continue
-      for (const range of highlight) texts.push(range.toString())
-    }
-    return texts
-  })(${JSON.stringify(suffix)})`)) as string[]
-}
-
 /** Rests the pointer on the first on-screen occurrence of the word, under `within`, until the hover shows. */
 /**
  * The centre of `part` where it first appears inside `context` on screen, under `within`. The

@@ -108,7 +108,7 @@ export function typescriptWorkerFilesQuery(
   }
 }
 
-export async function readWorkerFiles(
+async function readWorkerFiles(
   client: QueryClient,
   paths: readonly string[],
   signal: AbortSignal,
