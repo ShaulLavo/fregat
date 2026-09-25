@@ -82,6 +82,7 @@ import { chatModelPicker } from './chat-model-picker'
 import { chatUsageMeter } from './chat-usage-meter'
 import { chatComposerNarrow } from './chat-composer-narrow'
 import { settingsUsage } from './settings-usage'
+import { pushSubscribe } from './push-subscribe'
 import { chatClaudeCatalog } from './chat-claude-catalog'
 import { chatDraftContextStrip } from './chat-draft-context-strip'
 import { machineConnectError } from './machine-connect-error'
@@ -167,6 +168,8 @@ export type Scenario = {
   readonly surface?: 'site' | 'demo'
   /** Only reads, so it may run against production (`--url …/platform/`). */
   readonly readOnly?: boolean
+  /** Runs full Chromium with notification permission granted; the headless shell denies it. */
+  readonly notifications?: boolean
   readonly name: string
   readonly description: string
   readonly run: (page: Page, context: ScenarioContext) => Promise<void>
@@ -277,6 +280,7 @@ export const scenarios: readonly Scenario[] = [
   chatUsageMeter,
   chatComposerNarrow,
   settingsUsage,
+  pushSubscribe,
   chatClaudeCatalog,
   chatDraftContextStrip,
   machineConnectError,

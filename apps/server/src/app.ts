@@ -81,6 +81,9 @@ import { MachineService, type MachineServiceOptions } from './machines/service'
 import { machineRoutes } from './machines/routes'
 import type { TailnetStatusCommand } from './machines/tailnet-hosts'
 import { createMachineProxyRoutes } from './machines/proxy'
+import type { PushFetcher } from './push/delivery'
+import { pushRoutes } from './push/routes'
+import { PushService } from './push/service'
 
 import type { LogReaderService } from './observability/log-reader'
 
@@ -127,6 +130,7 @@ export type AppOptions = FileSystemServiceOptions & {
   /** The origin forwarded to remote machines as this app's web origin. */
   webOrigin?: string
   web?: WebOptions
+  push?: { fetcher?: PushFetcher }
 }
 
 const appOrchestration = new WeakMap<object, OrchestrationEngine>()
@@ -309,6 +313,7 @@ export function createApp(options: AppOptions) {
   const checkpointDiff = new OrchestrationCheckpointDiffQuery(database, git)
   const sessionSearch = new OrchestrationSessionSearchQuery(database)
   const auth = createAuthConfig(options.auth)
+  const push = new PushService({ database, settings, fetcher: options.push?.fetcher })
   const machines = new MachineService({
     ...options.machines,
     environmentId: identity.id,
@@ -443,6 +448,7 @@ export function createApp(options: AppOptions) {
     .use(fontRoutes(fonts))
     .use(wallpaperRoutes())
     .use(settingsRoutes(settings))
+    .use(pushRoutes(push))
     .use(themeRoutes(palettes))
     .use(bundleRoutes(bundles))
     .use(wallpaperLibraryRoutes(wallpapers))

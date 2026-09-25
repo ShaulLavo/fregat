@@ -443,6 +443,23 @@ export const selectors = {
   settingsDefaultsBanner: (page: Page) => page.getByText('Defaults are read-only', { exact: true }),
   settingsRowActions: (page: Page, id: string) =>
     page.getByRole('button', { name: `Actions for ${id}`, exact: true }),
+  pushSection: (page: Page) =>
+    page.getByRole('region', { name: 'Push notifications', exact: true }),
+  pushTurnOn: (page: Page) =>
+    page.getByRole('button', { name: 'Turn on for this device', exact: true }),
+  /** A drawn skeleton bar, which appears once LoadingState's delay has passed. */
+  pushLoadingBar: (page: Page) =>
+    page
+      .getByRole('status', { name: 'Loading push devices', exact: true })
+      .locator('.skeleton-sweep')
+      .first(),
+  pushThisDeviceOn: (page: Page) => page.getByText('This device receives push notifications.'),
+  pushNoDevices: (page: Page) => page.getByText('No devices registered', { exact: true }),
+  pushDeviceRow: (page: Page, id: string) => page.locator(`[data-push-device="${id}"]`),
+  pushDeviceAction: (page: Page, id: string, name: 'Send test' | 'Remove') =>
+    page.locator(`[data-push-device="${id}"]`).getByRole('button', { name, exact: true }),
+  pushDeviceSent: (page: Page, id: string) =>
+    page.locator(`[data-push-device="${id}"]`).getByRole('status').filter({ hasText: 'Sent' }),
   toolPaneHeader: (page: Page, title: string) =>
     page.locator('[data-workbench-tool-pane-header]').filter({ hasText: title }).first(),
   bottomPanelTabs: (page: Page) =>
