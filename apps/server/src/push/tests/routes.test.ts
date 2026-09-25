@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, stat } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { pushDeviceId, type PushDevices } from '@workspace/contracts'
@@ -39,6 +39,19 @@ describe('push routes', () => {
     expect(Object.keys(secrets)).toEqual(['push.vapid.privateKey'])
     expect(JSON.stringify(first)).not.toContain(secrets['push.vapid.privateKey'])
     expect((await stat(secretsFile)).mode & 0o777).toBe(0o600)
+  })
+
+  it('drops every device when a lost VAPID key is generated again', async () => {
+    const root = await tempRoot()
+    const { app } = pushApp(root)
+    await register(app, createPushSubscriber(ENDPOINT), 'Chrome on Linux')
+    const before = await readDevices(app)
+    expect(before.devices).toHaveLength(1)
+    await writeFile(path.join(root, '.platform-test', 'secrets.json'), '{}')
+
+    const after = await readDevices(app)
+    expect(after.publicKey).not.toBe(before.publicKey)
+    expect(after.devices).toEqual([])
   })
 
   it('registers a device once per endpoint, keeps its first date, and removes it', async () => {

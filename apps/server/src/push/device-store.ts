@@ -48,6 +48,10 @@ export class PushDeviceStore {
       .run()
   }
 
+  clear(): void {
+    this.database.delete(pushDevices).run()
+  }
+
   remove(id: string): boolean {
     return (
       this.database.delete(pushDevices).where(eq(pushDevices.id, id)).returning().all().length > 0
