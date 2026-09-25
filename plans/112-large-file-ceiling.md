@@ -1,6 +1,6 @@
 # The large-file ceiling: what we can actually open, and who gets to decide
 
-Status: **research done 2026-09-25; phases proposed, two owner questions open.** Requested
+Status: **research done 2026-09-25; owner decided, phases proposed.** Requested
 2026-09-13. Measurements: [docs/large-file-ceiling/](../docs/large-file-ceiling/README.md).
 
 Decided 2026-09-25: owner — this plan and Editor
@@ -238,16 +238,15 @@ In the order a user meets them:
   bounded parse. VS Code turns tokenization and folding off above 20 MB or 300K lines and stops
   syncing models to extensions above 50 MB (`textModel.ts:188–191`).
 
-### Owner questions
+### Owner decisions (2026-09-25)
 
-1. **At the ceiling, refuse or degrade?** (a) Refuse above one limit, as now. (b) Tiers: all
-   features up to a measured size, then a large-file mode with syntax, folding, minimap and
-   language-server sync off, then refusal. (c) Tiers plus E015's paged read-only view above the
-   memory ceiling. **Recommendation: (b)**, with thresholds from the benchmark: today about
-   10 MiB for syntax and language server, 50 MiB for the rest.
-2. **The default open limit.** (a) Keep 200 MiB and land the save fix first. (b) Drop to 128 MiB
-   until the write path changes. **Recommendation: (a)**; until the fix lands, 128–200 MiB files
-   open and cannot be saved.
+1. **Tiers, and the tier thresholds go up.** All features up to a size, then a large-file mode
+   with syntax, folding, minimap and language-server sync off, then refusal. The measured
+   thresholds (about 10 MiB for syntax and language server, 50 MiB for the rest) are today's
+   floor, not the target. Like the RSC payload problem, the cost comes from moving and
+   re-deriving whole documents, and it gets fixed: every phase below aims to raise a threshold,
+   and `bench:large-file` shows whether it moved.
+2. **The default open limit stays at 200 MiB**, and saving at that size gets fixed (Phase 1).
 
 ### Proposed phases
 
@@ -257,6 +256,11 @@ In the order a user meets them:
    `bench:large-file` with a 150 MiB save case.
 2. **Raw-bytes transport** for read and write: shared decoder with the decoded-length check,
    byte-hash `version`, metadata in headers.
-3. **Large-file mode**, after owner question 1: per-feature thresholds from the benchmark; the
-   minimap fold projection fix goes to Editor.
-4. **E015 paged read-only view**, only if the owner wants files past about 300 MiB.
+3. **Raise the thresholds.** Remove per-edit whole-document work, starting with the minimap
+   fold projection (Editor), and attribute the heap beyond the textbuffer per worker (E015
+   step 1, E016 step 1). Measured targets: typing p95 under one frame at 200 MiB plain text, and
+   syntax plus language server usable well past 10 MiB. Re-run `bench:large-file` after each fix.
+4. **Tiers.** Per-feature thresholds taken from the Phase 3 re-measurement, not from today's
+   numbers.
+5. **E015 paged read-only view**, for files past the resident-memory ceiling (about 300 MiB
+   today).
