@@ -778,6 +778,8 @@ export const selectors = {
   paletteScriptsLoading: (page: Page) => page.getByRole('status', { name: 'Loading scripts' }),
   paletteNoScripts: (page: Page) => page.getByText('No scripts in this project.'),
   paletteDialog: (page: Page) => page.getByRole('dialog', { name: 'Command Palette', exact: true }),
+  machineLiveStatus: (page: Page, label: string) =>
+    page.getByRole('status', { name: `${label} live`, exact: true }),
   bootstrapRetry: (page: Page) =>
     page.getByRole('button', { name: 'Retry connection', exact: true }),
   bootstrapFailure: (page: Page) =>

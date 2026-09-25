@@ -73,6 +73,7 @@ export const cachedProtocolStartup: Scenario = {
         )
       }, currentProtocol)
       await selectors.windowToolbar(page).waitFor()
+      await selectors.machineLiveStatus(page, descriptor.label).waitFor()
       strictEqual(await selectors.bootstrapFailure(page).count(), 0)
       await step(
         `Fresh protocol ${currentProtocol} replaces cached ${previousProtocol} and reconnects`,
@@ -91,6 +92,7 @@ export const cachedProtocolStartup: Scenario = {
       await page.unroute(healthUrl)
       await selectors.bootstrapRetry(page).click()
       await selectors.windowToolbar(page).waitFor()
+      await selectors.machineLiveStatus(page, descriptor.label).waitFor()
       strictEqual(await selectors.bootstrapFailure(page).count(), 0)
       await step('Retry reconnects after the server protocol becomes compatible')
     } finally {
