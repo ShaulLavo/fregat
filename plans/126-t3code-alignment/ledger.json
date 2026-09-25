@@ -441,7 +441,9 @@
       "status": "open",
       "evidence_level": "source-reviewed",
       "acceptance": "runtime.md, RUNTIME-02, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "Decided 2026-09-25: owner — build all four drivers (Cursor, Grok, OpenCode, Antigravity). Smoke-test each where an account exists; otherwise ship it marked \"untested\". Missing accounts no longer block the row."
+      ]
     },
     {
       "id": "RUNTIME-05",
