@@ -5,6 +5,7 @@ import {
   createFolderBodySchema,
   deleteBodySchema,
   eventsQuerySchema,
+  lookupWorkspaceAddressesBodySchema,
   openWorkspaceRootBodySchema,
   pathQuerySchema,
   readQuerySchema,
@@ -81,6 +82,7 @@ export function fsRoutes(fs: FileSystemService) {
           query: eventsQuerySchema,
         },
       )
+      // Recents that are gone are skipped and pruned from the store.
       .get('/recents', ({ query }) => fs.recents(query), {
         query: recentsQuerySchema,
       })
@@ -92,6 +94,11 @@ export function fsRoutes(fs: FileSystemService) {
       })
       .post('/workspace-address', ({ body }) => fs.registerWorkspaceAddress(body.path), {
         body: registerWorkspaceAddressBodySchema,
+      })
+      // A read in POST form. A path that cannot be a root answers null; one that is gone is
+      // also pruned from the recents.
+      .post('/workspace-addresses', ({ body }) => fs.lookupWorkspaceAddresses(body.paths), {
+        body: lookupWorkspaceAddressesBodySchema,
       })
       .get('/workspace-address/:id', ({ params }) => fs.resolveWorkspaceAddress(params.id), {
         params: workspaceAddressParamsSchema,

@@ -217,56 +217,64 @@ async function subscriptionMessage(socket: FakeOrchestrationSocket) {
   return message
 }
 
-test('ACK follows consumption and overflow resumes from the last consumed cursor', async () => {
-  const fixture = rpcClientFixture()
-  const controller = new AbortController()
-  const iterator = fixture.client.shellStream({ signal: controller.signal })[Symbol.asyncIterator]()
-  const first = iterator.next()
-  fixture.socket.open()
-  const subscription = await subscriptionMessage(fixture.socket)
-  fixture.socket.deliver({
-    kind: 'subscription.next',
-    deliveryId: 11,
-    subscriptionId: subscription.subscriptionId,
-    item: {
-      kind: 'snapshot',
-      snapshot: {
-        projects: [],
-        worktrees: [],
-        sessions: [],
-        snapshotSequence: 7,
-        updatedAt: '2026-09-05T00:00:00.000Z',
+test.each(['orchestration.LIVE_STREAM_OVERFLOW', 'orchestration.LIVE_STREAM_ACK_TIMEOUT'])(
+  'ACK follows consumption and %s resumes from the last consumed cursor',
+  async (code) => {
+    const fixture = rpcClientFixture()
+    const controller = new AbortController()
+    const iterator = fixture.client
+      .shellStream({ signal: controller.signal })
+      [Symbol.asyncIterator]()
+    const first = iterator.next()
+    fixture.socket.open()
+    const subscription = await subscriptionMessage(fixture.socket)
+    fixture.socket.deliver({
+      kind: 'subscription.next',
+      deliveryId: 11,
+      subscriptionId: subscription.subscriptionId,
+      item: {
+        kind: 'snapshot',
+        snapshot: {
+          projects: [],
+          worktrees: [],
+          sessions: [],
+          snapshotSequence: 7,
+          updatedAt: '2026-09-05T00:00:00.000Z',
+        },
       },
-    },
-  })
-  await first
-  expect(
-    sentMessages(fixture.socket).filter((message) => message.kind === 'subscription.ack'),
-  ).toEqual([])
-  fixture.socket.deliver({
-    kind: 'subscription.error',
-    subscriptionId: subscription.subscriptionId,
-    error: { code: 'orchestration.LIVE_STREAM_OVERFLOW', message: 'full', status: 409 },
-  })
-  const next = iterator.next()
-  await vi.waitFor(() =>
+    })
+    await first
     expect(
-      sentMessages(fixture.socket).filter((message) => message.kind === 'subscribe'),
-    ).toHaveLength(2),
-  )
-  const subscriptions = sentMessages(fixture.socket).filter(
-    (message) => message.kind === 'subscribe',
-  )
-  expect(subscriptions[1]).toMatchObject({ afterSequence: 7 })
-  expect(subscriptions[1]!.subscriptionId).not.toBe(subscription.subscriptionId)
-  expect(sentMessages(fixture.socket)).toContainEqual({
-    kind: 'subscription.ack',
-    subscriptionId: subscription.subscriptionId,
-    deliveryId: 11,
-  })
-  controller.abort()
-  await next
-})
+      sentMessages(fixture.socket).filter((message) => message.kind === 'subscription.ack'),
+    ).toEqual([])
+    fixture.socket.deliver({
+      kind: 'subscription.error',
+      subscriptionId: subscription.subscriptionId,
+      error: { code, message: 'dropped', status: 409 },
+    })
+    const next = iterator.next()
+    await vi.waitFor(() =>
+      expect(
+        sentMessages(fixture.socket).filter((message) => message.kind === 'subscribe'),
+      ).toHaveLength(2),
+    )
+    const subscriptions = sentMessages(fixture.socket).filter(
+      (message) => message.kind === 'subscribe',
+    )
+    expect(subscriptions[1]).toMatchObject({ afterSequence: 7 })
+    expect(subscriptions[1]!.subscriptionId).not.toBe(subscription.subscriptionId)
+    expect(sentMessages(fixture.socket)).toContainEqual({
+      kind: 'subscription.ack',
+      subscriptionId: subscription.subscriptionId,
+      deliveryId: 11,
+    })
+    expect(
+      fixture.events.find((event) => event.action === 'orchestration.ws.subscription.summary'),
+    ).toMatchObject({ failure: { code }, level: 'info' })
+    controller.abort()
+    await next
+  },
+)
 
 test('abort unsubscribes immediately even while the consumer holds a yielded frame', async () => {
   const fixture = rpcClientFixture()

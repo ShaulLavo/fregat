@@ -86,7 +86,7 @@ test('the connection summary names the proxied endpoint a remote machine opens',
   }
 })
 
-test('owner closure stays informational while a transport failure remains an error', async () => {
+test('owner closure and a dropped socket keep subscription summaries at info', async () => {
   const events: WideEvent[] = []
   vi.stubEnv('OBSERVABILITY_ENABLED', 'true')
   initLogger({
@@ -127,10 +127,18 @@ test('owner closure stays informational while a transport failure remains an err
     )
     expect(summaries[0]).toMatchObject({ aborted: true, explicitlyClosed: true, level: 'info' })
     expect(summaries[0]?.error).toBeUndefined()
-    expect(summaries[1]).toMatchObject({ aborted: true, explicitlyClosed: false, level: 'error' })
-    expect(summaries[1]?.error).toMatchObject({
-      message: 'The orchestration WebSocket closed before the request completed.',
+    // The dropped socket warns once, on its connection summary.
+    expect(summaries[1]).toMatchObject({
+      aborted: true,
+      explicitlyClosed: false,
+      failure: { code: 'ORCHESTRATION_WS_CLOSED', status: 502 },
+      level: 'info',
     })
+    expect(summaries[1]?.error).toBeUndefined()
+    const connections = events.filter(
+      (event) => event.action === 'orchestration.ws.connection.summary' && !event.checkpoint,
+    )
+    expect(connections.map((event) => event.level)).toEqual(['info', 'warn'])
   } finally {
     vi.unstubAllEnvs()
     initLogger({ enabled: false, silent: true, _suppressDrainWarning: true })

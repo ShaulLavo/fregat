@@ -46,7 +46,7 @@ function webFile(root: string, request: Request) {
   const page = isDocumentNavigation(request) ? documentFor(root, pathname) : null
   if (page) return document(page)
 
-  throw new FsError('NOT_FOUND', 'Route not found')
+  throw new FsError('ROUTE_NOT_FOUND')
 }
 
 function document(index: string) {

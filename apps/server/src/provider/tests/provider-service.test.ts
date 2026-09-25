@@ -2,7 +2,20 @@ import { mkdtemp, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { Database } from 'bun:sqlite'
+import type { WideEvent } from 'evlog'
+import { readFsLogs } from 'evlog/fs'
 import { describe, expect, it, vi } from 'vitest'
+import {
+  createOrchestrationFixture,
+  FIXTURE_SESSION_ID,
+  mockRuntime,
+  sessionFrom,
+} from '../../../test/factories/orchestration'
+import {
+  flushObservability,
+  initializeObservability,
+  resetObservabilityForTests,
+} from '../../observability/runtime'
 import { OrchestrationProjectionPipeline } from '../../orchestration/projection-pipeline'
 import {
   domainBootstrap,
@@ -39,45 +52,8 @@ describe('ProviderService', () => {
       adapterRegistry: new ProviderAdapterRegistry([adapter]),
       sessionDirectory: new ProviderSessionDirectory(fixture.database),
     })
-    const input = {
-      ...providerTurnInput(),
-      sessionId: v.parse(sessionIdSchema, DOMAIN_IDS.session),
-    }
     try {
-      const pipeline = new OrchestrationProjectionPipeline(fixture.database)
-      pipeline.applyEvents(domainBootstrap())
-      await service.ensureRuntime({
-        providerInstanceId: input.providerInstanceId,
-        runtimeMode: input.runtimeMode,
-        runtimePayload: providerSessionPayload(input),
-        runtimeEpoch: input.runtimeEpoch,
-        sessionId: input.sessionId,
-      })
-      await service.drainRuntimeEvents()
-      pipeline.applyEvents([
-        domainEvent(
-          'session.runtime-set',
-          {
-            sessionId: input.sessionId,
-            runtime: {
-              sessionId: input.sessionId,
-              status: 'ready',
-              providerName: 'codex',
-              providerInstanceId: input.providerInstanceId,
-              runtimeMode: input.runtimeMode,
-              runtimeEpoch: input.runtimeEpoch,
-              providerBindingHandle: null,
-              providerConversationMarker: null,
-              providerResumeCursor: null,
-              activeTurnId: null,
-              lastError: null,
-              updatedAt: new Date().toISOString(),
-            },
-            updatedAt: new Date().toISOString(),
-          },
-          4,
-        ),
-      ])
+      const input = await startReadyRuntime(service, fixture.database)
       await vi.advanceTimersByTimeAsync(30 * 60 * 1000)
       expect(await adapter.hasRuntime({ sessionId: input.sessionId })).toBe(true)
       await vi.advanceTimersByTimeAsync(5 * 60 * 1000)
@@ -744,6 +720,75 @@ describe('ProviderService', () => {
   })
 })
 
+/** A launched runtime the projection reports `ready`, so the reaper may take it once it goes quiet. */
+async function startReadyRuntime(
+  service: ProviderService,
+  database: ReturnType<typeof createFixture>['database'],
+) {
+  const input = { ...providerTurnInput(), sessionId: v.parse(sessionIdSchema, DOMAIN_IDS.session) }
+  const pipeline = new OrchestrationProjectionPipeline(database)
+  pipeline.applyEvents(domainBootstrap())
+  await service.ensureRuntime({
+    providerInstanceId: input.providerInstanceId,
+    runtimeMode: input.runtimeMode,
+    runtimePayload: providerSessionPayload(input),
+    runtimeEpoch: input.runtimeEpoch,
+    sessionId: input.sessionId,
+  })
+  await service.drainRuntimeEvents()
+  pipeline.applyEvents([
+    domainEvent(
+      'session.runtime-set',
+      {
+        sessionId: input.sessionId,
+        runtime: {
+          sessionId: input.sessionId,
+          status: 'ready',
+          providerName: 'codex',
+          providerInstanceId: input.providerInstanceId,
+          runtimeMode: input.runtimeMode,
+          runtimeEpoch: input.runtimeEpoch,
+          providerBindingHandle: null,
+          providerConversationMarker: null,
+          providerResumeCursor: null,
+          activeTurnId: null,
+          lastError: null,
+          updatedAt: new Date().toISOString(),
+        },
+        updatedAt: new Date().toISOString(),
+      },
+      4,
+    ),
+  ])
+  return input
+}
+
+/** Server log lines written from here on, read back from a real file drain. */
+async function captureLogs() {
+  const dir = await mkdtemp(path.join(tmpdir(), 'provider-service-logs-'))
+  initializeObservability({
+    OBSERVABILITY_CONSOLE: 'false',
+    OBSERVABILITY_DIR: dir,
+    OBSERVABILITY_ENABLED: 'true',
+    OBSERVABILITY_INFO_SAMPLE_RATE: '100',
+    NODE_ENV: 'production',
+  })
+  return {
+    read: async (actionPrefix: string) => {
+      await flushObservability()
+      const events: WideEvent[] = []
+      for await (const event of readFsLogs({ dir })) {
+        if (String(event.action).startsWith(actionPrefix)) events.push(event)
+      }
+      return events
+    },
+    close: async () => {
+      await resetObservabilityForTests()
+      await rm(dir, { force: true, recursive: true })
+    },
+  }
+}
+
 function providerTurnInput(): ProviderTurnInput {
   const sessionId = v.parse(sessionIdSchema, 'ee84050b-1b17-5fe8-9f71-0983f1fceccc')
   const turnId = v.parse(turnIdSchema, 'turn-1')
@@ -810,6 +855,188 @@ function createFixture() {
     database,
   }
 }
+
+describe('ProviderService reaper give-up', () => {
+  const SWEEP_MS = 5 * 60 * 1000
+  const IDLE_MS = 30 * 60 * 1000
+
+  it('stops a binding whose provider instance was removed once, then leaves it alone', async () => {
+    vi.useFakeTimers()
+    const logs = await captureLogs()
+    const fixture = createFixture()
+    const adapter = new MockProviderAdapter()
+    const registry = new ProviderAdapterRegistry([adapter])
+    const service = new ProviderService({
+      adapterRegistry: registry,
+      sessionDirectory: new ProviderSessionDirectory(fixture.database),
+    })
+    const exits: ProviderRuntimeEvent[] = []
+    service.subscribeRuntimeEvents((event) => {
+      if (event.type === 'runtime.exited') exits.push(event)
+    })
+    try {
+      const input = await startReadyRuntime(service, fixture.database)
+      registry.unregister(input.providerInstanceId)
+      await vi.advanceTimersByTimeAsync(IDLE_MS + SWEEP_MS * 4)
+      vi.useRealTimers()
+      await service.drainRuntimeEvents()
+
+      expect(await service.hasRuntime({ sessionId: input.sessionId })).toBe(false)
+      // The exit projects the runtime `stopped`, which is what keeps it quiet across restarts.
+      expect(exits).toEqual([
+        expect.objectContaining({
+          providerInstanceId: input.providerInstanceId,
+          runtimeEpoch: input.runtimeEpoch,
+          sessionId: input.sessionId,
+        }),
+      ])
+      // Kept for its resume cursor, in case the instance comes back under the same id.
+      expect(service.bindingForSession(input.sessionId)).not.toBeNull()
+      const events = await logs.read('chat.pipeline.provider_s')
+      expect(events.filter((event) => event.level !== 'info')).toEqual([
+        expect.objectContaining({
+          action: 'chat.pipeline.provider_service.stop.instance_missing',
+          level: 'warn',
+          providerInstanceId: input.providerInstanceId,
+          sessionId: input.sessionId,
+        }),
+      ])
+      const sweeps = events.filter(
+        (event) => event.action === 'chat.pipeline.provider_session_reaper.sweep',
+      )
+      expect(sweeps).toEqual([expect.objectContaining({ sessionIds: [input.sessionId] })])
+    } finally {
+      vi.useRealTimers()
+      await service.shutdown()
+      await logs.close()
+      fixture.close()
+    }
+  })
+
+  it('orphans a binding after two identical stop failures and retries it only once touched', async () => {
+    vi.useFakeTimers()
+    const logs = await captureLogs()
+    const fixture = createFixture()
+    const adapter = new MockProviderAdapter({ stopError: 'process still alive' })
+    const service = new ProviderService({
+      adapterRegistry: new ProviderAdapterRegistry([adapter]),
+      sessionDirectory: new ProviderSessionDirectory(fixture.database),
+    })
+    try {
+      const input = await startReadyRuntime(service, fixture.database)
+      await vi.advanceTimersByTimeAsync(IDLE_MS + SWEEP_MS * 4)
+      const orphaned = await logs.read('chat.pipeline.provider_session_reaper.')
+      // Four sweeps past the deadline: two attempts, then nothing, not even a sweep line.
+      expect(orphaned.map((event) => [event.action, event.level, event.failures])).toEqual([
+        ['chat.pipeline.provider_session_reaper.stop_failed', 'info', 1],
+        ['chat.pipeline.provider_session_reaper.sweep', 'info', undefined],
+        ['chat.pipeline.provider_session_reaper.orphaned', 'warn', 2],
+        ['chat.pipeline.provider_session_reaper.sweep', 'info', undefined],
+      ])
+      expect(await adapter.hasRuntime({ sessionId: input.sessionId })).toBe(true)
+
+      service.markRuntimeSeen(input.sessionId)
+      await vi.advanceTimersByTimeAsync(IDLE_MS + SWEEP_MS)
+      const retried = await logs.read('chat.pipeline.provider_session_reaper.')
+      expect(retried.slice(orphaned.length).map((event) => [event.action, event.failures])).toEqual(
+        [
+          ['chat.pipeline.provider_session_reaper.stop_failed', 1],
+          ['chat.pipeline.provider_session_reaper.sweep', undefined],
+        ],
+      )
+    } finally {
+      vi.useRealTimers()
+      await service.shutdown()
+      await logs.close()
+      fixture.close()
+    }
+  })
+
+  it('projects a runtime whose instance is gone as stopped, so no later reaper lists it', async () => {
+    const fixture = await createOrchestrationFixture()
+    const registry = new ProviderAdapterRegistry([new MockProviderAdapter()])
+    const service = new ProviderService({
+      adapterRegistry: registry,
+      sessionDirectory: new ProviderSessionDirectory(fixture.database),
+    })
+    try {
+      const registration = await fixture.register()
+      if (!registration.result) throw new TypeError('Missing registration')
+      await fixture.createSession(registration.result.worktreeId)
+      await fixture.restart({ adapterRegistry: registry, providerService: service })
+      await fixture.startTurn()
+      await fixture.engine.providerRuntimeIdle()
+      const sessionId = v.parse(sessionIdSchema, FIXTURE_SESSION_ID)
+      const directory = new ProviderSessionDirectory(fixture.database)
+      const later = new Date(Date.now() + IDLE_MS).toISOString()
+      expect((await sessionFrom(fixture)).runtime?.status).toBe('ready')
+      expect(directory.listIdleSince(later, 'ready').map((binding) => binding.sessionId)).toEqual([
+        sessionId,
+      ])
+
+      const providerInstanceId = directory.getBinding(sessionId)?.providerInstanceId
+      if (!providerInstanceId) throw new TypeError('Missing binding')
+      registry.unregister(providerInstanceId)
+      await service.stopRuntime({ sessionId, idleBefore: later })
+      await fixture.engine.providerRuntimeIdle()
+
+      expect((await sessionFrom(fixture)).runtime?.status).toBe('stopped')
+      // The reaper's only input, read the way a fresh one after a restart would.
+      expect(directory.listIdleSince(later, 'ready')).toEqual([])
+      expect(directory.getBinding(sessionId)).not.toBeNull()
+    } finally {
+      await service.shutdown()
+      await fixture.close()
+    }
+  })
+
+  it('names steering unsupported when the instance is present but cannot steer', async () => {
+    const fixture = createFixture()
+    const service = new ProviderService({
+      adapterRegistry: new ProviderAdapterRegistry([new MockProviderAdapter()]),
+      sessionDirectory: new ProviderSessionDirectory(fixture.database),
+    })
+    try {
+      const input = await startReadyRuntime(service, fixture.database)
+      expect(() => service.requireSteeringAvailable(input.sessionId)).toThrow(
+        expect.objectContaining({
+          code: 'provider.STEERING_UNAVAILABLE',
+          internal: expect.objectContaining({ route: 'unsupported' }),
+        }),
+      )
+    } finally {
+      await service.shutdown()
+      fixture.close()
+    }
+  })
+
+  it('removes the binding of a deleted session once its runtime is released', async () => {
+    const fixture = await createOrchestrationFixture()
+    try {
+      const registration = await fixture.register()
+      if (!registration.result) throw new TypeError('Missing registration')
+      await fixture.createSession(registration.result.worktreeId)
+      await fixture.restart(mockRuntime(new MockProviderAdapter()))
+      await fixture.startTurn()
+      await fixture.engine.providerRuntimeIdle()
+      const directory = new ProviderSessionDirectory(fixture.database)
+      const sessionId = v.parse(sessionIdSchema, FIXTURE_SESSION_ID)
+      expect(directory.getBinding(sessionId)).not.toBeNull()
+
+      await fixture.command({
+        type: 'session.delete',
+        commandId: 'delete-session',
+        sessionId: FIXTURE_SESSION_ID,
+      })
+      await fixture.engine.providerRuntimeIdle()
+
+      expect((await sessionFrom(fixture)).deletion).toMatchObject({ providerStop: 'completed' })
+      expect(directory.getBinding(sessionId)).toBeNull()
+    } finally {
+      await fixture.close()
+    }
+  })
+})
 
 describe('ProviderService adapter streams', () => {
   it('follows an instance whose adapter is replaced in place', async () => {

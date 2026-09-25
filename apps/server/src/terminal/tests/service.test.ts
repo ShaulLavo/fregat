@@ -3,6 +3,8 @@ import { mkdir, realpath, rm, symlink } from 'node:fs/promises'
 import path from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ElysiaWS } from 'elysia/ws'
+import type { WideEvent } from 'evlog'
+import { readFsLogs } from 'evlog/fs'
 import {
   TERMINAL_MAX_COLS,
   TERMINAL_MIN_ROWS,
@@ -21,6 +23,11 @@ import { requireWorktree } from '../../orchestration/read-model'
 import { projectionTerminalLeases } from '../../db/schema'
 import { createAuthConfig } from '../../auth'
 import { createWorkspacePaths, type WorkspacePaths } from '../../fs/path'
+import {
+  flushObservability,
+  initializeObservability,
+  resetObservabilityForTests,
+} from '../../observability/runtime'
 import { TerminalService, type TerminalPtyFactory } from '../service'
 
 const TRUSTED_ORIGIN = 'http://localhost:5173'
@@ -480,6 +487,51 @@ describe('terminal service', () => {
     expect(pty.ptys[0]?.killed).toBe(true)
 
     await service.dispose()
+  })
+
+  it('logs the signal exit of a shell it killed as closed at info', async () => {
+    const root = await fixtureRoot()
+    const logDir = observedLogDir(root)
+    const pty = createFakePtyFactory({ holdUntilExit: true })
+    const service = testService(root, { ptyFactory: pty.factory })
+    const routes = service.routes(auth())
+    const ws = fakeSocket(root, '', 'terminal-1')
+    const worktreeId = v.parse(worktreeIdSchema, registrations.get(root))
+
+    try {
+      await routes.open(ws)
+      const killing = service.kill({ terminalId: 'terminal-1', worktreeId })
+      await vi.waitFor(() => expect(pty.ptys[0]?.killed).toBe(true))
+      pty.ptys[0]?.exit(129, 'SIGHUP')
+
+      expect(await killing).toEqual({ killed: true })
+      expect(await terminalSessionEvents(logDir)).toEqual([
+        expect.objectContaining({ exitCode: 129, level: 'info', outcome: 'closed' }),
+      ])
+    } finally {
+      await resetObservabilityForTests()
+    }
+  })
+
+  it('warns when a shell exits non-zero without being asked to', async () => {
+    const root = await fixtureRoot()
+    const logDir = observedLogDir(root)
+    const pty = createFakePtyFactory({ holdUntilExit: true })
+    const service = testService(root, { ptyFactory: pty.factory })
+    const ws = fakeSocket(root, '', 'terminal-1')
+
+    try {
+      await service.routes(auth()).open(ws)
+      pty.ptys[0]?.exit(137, 'SIGKILL')
+      await vi.waitFor(() => expect(ws.closed).toBe(true))
+
+      expect(pty.ptys[0]?.killed).toBe(false)
+      expect(await terminalSessionEvents(logDir)).toEqual([
+        expect.objectContaining({ exitCode: 137, level: 'warn', outcome: 'failed' }),
+      ])
+    } finally {
+      await resetObservabilityForTests()
+    }
   })
 
   it('persists request and claim before the PTY factory can spawn', async () => {
@@ -1045,6 +1097,27 @@ async function waitForTerminalOutput(messages: readonly TerminalServerMessage[],
   }
 
   throw new TypeError(`Timed out waiting for terminal output: ${text}`)
+}
+
+function observedLogDir(root: string) {
+  const logDir = path.join(requiredFixture(root).root, 'logs')
+  initializeObservability({
+    OBSERVABILITY_CONSOLE: 'false',
+    OBSERVABILITY_DIR: logDir,
+    OBSERVABILITY_ENABLED: 'true',
+    OBSERVABILITY_INFO_SAMPLE_RATE: '100',
+    NODE_ENV: 'production',
+  })
+  return logDir
+}
+
+async function terminalSessionEvents(logDir: string) {
+  await flushObservability()
+  const events: WideEvent[] = []
+  for await (const event of readFsLogs({ dir: logDir })) {
+    if (event.action === 'terminal.session') events.push(event)
+  }
+  return events
 }
 
 function requiredFixture(root: string) {

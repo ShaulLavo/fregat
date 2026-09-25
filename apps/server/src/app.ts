@@ -51,7 +51,12 @@ import { OrchestrationCheckpointDiffQuery } from './orchestration/checkpoint-dif
 import type { OrchestrationDatabase } from './orchestration/event-store'
 import { orchestrationRoutes } from './orchestration/routes'
 import { OrchestrationSessionSearchQuery } from './orchestration/session-search-query'
-import { orchestrationWsRoutes, orchestrationWsServerConfig } from './orchestration/ws-rpc'
+import {
+  createOrchestrationSockets,
+  orchestrationWsRoutes,
+  orchestrationWsServerConfig,
+  type OrchestrationSockets,
+} from './orchestration/ws-rpc'
 import {
   createDefaultProviderAdapterRegistry,
   type ProviderAdapterRegistry,
@@ -311,7 +316,9 @@ export function createApp(options: AppOptions) {
       () => settings.snapshot().values['lsp.semanticTokens.delta'],
       treeWatchSource(fs.changes, fs.paths),
     )
+  const orchestrationSockets = createOrchestrationSockets()
   const cleanup = appCleanup(
+    orchestrationSockets,
     terminal,
     fs,
     settings,
@@ -350,7 +357,7 @@ export function createApp(options: AppOptions) {
       recordClientInstance(request)
     })
     // Auth runs after the WS upgrade so the browser receives the explicit 1008 refusal.
-    .use(orchestrationWsRoutes(orchestration, auth, identity))
+    .use(orchestrationWsRoutes(orchestration, auth, identity, orchestrationSockets))
     .onBeforeHandle(authGuard(auth))
     .use(
       machineRoutes(
@@ -462,6 +469,7 @@ function providerInstancesEqual(
 }
 
 function appCleanup(
+  orchestrationSockets: OrchestrationSockets,
   terminal: TerminalService,
   fs: FileSystemService,
   settings: SettingsStore,
@@ -477,6 +485,7 @@ function appCleanup(
     if (closed) return
 
     closed = true
+    orchestrationSockets.closeAll()
     await machines.close()
     await terminal.dispose()
     // Language servers are child processes. Without this, jdtls, gopls and
@@ -519,7 +528,7 @@ function appErrorPayload(
 function errorForResponse(code: unknown, error: unknown) {
   if (isFsError(error)) return error
   if (isEvlogError(error)) return error
-  if (code === 'NOT_FOUND') return new FsError('NOT_FOUND', 'Route not found')
+  if (code === 'NOT_FOUND') return new FsError('ROUTE_NOT_FOUND')
   if (code === 'VALIDATION') return new FsError('INVALID_PATH', errorMessage(error))
 
   return new FsError('OPERATION_FAILED', undefined, error)

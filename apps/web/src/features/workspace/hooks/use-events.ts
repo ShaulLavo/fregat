@@ -262,6 +262,7 @@ function endWorkspaceEventsScope(eventsScope: WideEventScope) {
 }
 
 function workspaceEventsScopeHasWork(eventsScope: WideEventScope) {
+  if (eventsScope.count('warningCount') > 0) return true
   if (eventsScope.count('events.eventCount') > 0) return true
   if (eventsScope.count('subscription.readyCount') > 0) return true
   if (eventsScope.count('subscription.errorCount') > 0) return true

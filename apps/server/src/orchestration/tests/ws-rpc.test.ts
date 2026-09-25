@@ -196,6 +196,8 @@ it('detaches overflowed live delivery while ACK is stalled and resumes canonical
     expect(socket.messages.find((message) => message.kind === 'subscription.error')).toMatchObject({
       error: { code: 'orchestration.LIVE_STREAM_OVERFLOW' },
     })
+    // A cap breach ends one subscription; the socket stays open for the resume.
+    expect(socket.closes).toEqual([])
     expect(socket.messages.filter((message) => message.kind === 'subscription.next')).toHaveLength(
       1,
     )

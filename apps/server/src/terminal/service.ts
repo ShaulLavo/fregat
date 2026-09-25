@@ -484,6 +484,8 @@ export class TerminalSession {
   private errorMessage: string | null = null
   private exitCode: number | null = null
   private exitSignal: NodeJS.Signals | null = null
+  // Our own teardown signal exits 129 (SIGHUP) or 137 (SIGKILL); that exit is a close.
+  private closeRequested = false
   private inputBytes = 0
   private inputMessageCount = 0
   private openedAt = performance.now()
@@ -723,7 +725,10 @@ export class TerminalSession {
     this.disposal = this.lease
       .terminate()
       .then(() => {
-        if (this.exitCode === null) this.pty?.kill()
+        if (this.exitCode === null) {
+          this.closeRequested = true
+          this.pty?.kill()
+        }
         return this.completion
       })
       .catch((error: unknown) => {
@@ -914,7 +919,7 @@ export class TerminalSession {
   }
 
   private recordSession() {
-    const outcome = terminalOutcome(this.exitCode, this.errorMessage)
+    const outcome = terminalOutcome(this.exitCode, this.errorMessage, this.closeRequested)
     const context = {
       area: 'terminal',
       durationMs: elapsedMs(this.openedAt),
@@ -1039,8 +1044,13 @@ function terminalSpawnErrorMessage(error: unknown) {
   return 'failed to start terminal'
 }
 
-function terminalOutcome(exitCode: number | null, errorMessage: string | null) {
+function terminalOutcome(
+  exitCode: number | null,
+  errorMessage: string | null,
+  closeRequested: boolean,
+) {
   if (errorMessage) return 'error'
+  if (closeRequested) return 'closed'
   if (exitCode === 0) return 'exited'
   if (typeof exitCode === 'number') return 'failed'
 

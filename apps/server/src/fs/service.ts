@@ -29,13 +29,18 @@ import {
   recordProcessWarning,
   recordRequestContext,
   recordRequestError,
+  recordRequestWarning,
   recordStreamSummary,
 } from '../observability'
 import { findInWorkspaceStream, type FindOptions, type SearchStreamEvent } from './search'
-import { FsError } from './errors'
+import { FsError, isFsError } from './errors'
 import type { MetadataDatabaseHandle } from '../db/client'
 import { FsMetadataStore } from './metadata'
-import { registerWorkspaceAddress, resolveWorkspaceAddress } from './workspace-address'
+import {
+  lookupWorkspaceAddresses,
+  registerWorkspaceAddress,
+  resolveWorkspaceAddress,
+} from './workspace-address'
 import {
   WorkspaceIndex,
   inactiveWorkspaceIndexStatus,
@@ -236,6 +241,23 @@ export class FileSystemService {
         (await registerWorkspaceAddress(this.paths, this.metadata, input)).workspaceAddress,
       (result) => ({ canonicalPath: result.path, workspaceAddressId: result.id }),
     )
+  }
+
+  async lookupWorkspaceAddresses(inputs: readonly string[]) {
+    const { entries, failures } = await observeRequestOperation(
+      { area: 'fs', operation: 'lookup_workspace_addresses', pathCount: inputs.length },
+      () => lookupWorkspaceAddresses(this.paths, this.metadata, inputs),
+      (result) => ({ failureCount: result.failures.length, prunedCount: result.prunedCount }),
+    )
+    // A missing folder is an answer; a candidate the server could not read is degraded.
+    const unreadable = failures.filter((failure) => failure.status >= 500)
+    if (unreadable.length > 0) {
+      recordRequestWarning('workspace address lookup could not read some candidates', {
+        failureCodes: [...new Set(unreadable.map((failure) => failure.code))],
+        unreadableCount: unreadable.length,
+      })
+    }
+    return { entries }
   }
 
   resolveWorkspaceAddress(id: WorkspaceAddressId) {
@@ -500,7 +522,7 @@ export class FileSystemService {
   }
 
   async recents(query: RecentsQuery) {
-    return observeRequestOperation(
+    const { entries } = await observeRequestOperation(
       {
         area: 'fs',
         limit: query.limit,
@@ -509,12 +531,14 @@ export class FileSystemService {
         showHidden: query.showHidden,
       },
       () => this.recentsObserved(query),
-      (result) => ({ entryCount: result.entries.length }),
+      (result) => ({ entryCount: result.entries.length, prunedCount: result.prunedCount }),
     )
+    return { entries }
   }
 
   private async recentsObserved(query: RecentsQuery) {
     const entries: TreeEntry[] = []
+    const missing: string[] = []
     let offset = 0
 
     while (entries.length < query.limit) {
@@ -525,7 +549,9 @@ export class FileSystemService {
       if (rows.length === 0) break
 
       offset += rows.length
-      const candidates = await Promise.all(rows.map((row) => this.refreshMetadataEntry(row.path)))
+      const candidates = await Promise.all(
+        rows.map((row) => this.refreshMetadataEntry(row.path, missing)),
+      )
       for (const candidate of candidates) {
         if (!candidate) continue
         if (!matchesRecentQuery(candidate, query)) continue
@@ -537,7 +563,8 @@ export class FileSystemService {
       if (rows.length < RECENT_CANDIDATE_BATCH_SIZE) break
     }
 
-    return { entries }
+    // Pruned after the scan: deleting mid-scan would shift the offset past unread rows.
+    return { entries, prunedCount: this.metadata.forgetPicked(missing) }
   }
 
   async recordRecent(path: string) {
@@ -695,12 +722,13 @@ export class FileSystemService {
     this.retiringWorkspaceIndexScopes.add(retirement)
   }
 
-  private async refreshMetadataEntry(input: string) {
+  private async refreshMetadataEntry(input: string, missing: string[]) {
     try {
       const refreshed = await this.statEntry(input)
       if (!isPickableEntry(refreshed)) return null
       return refreshed
-    } catch {
+    } catch (error) {
+      if (isFsError(error) && error.code === 'NOT_FOUND') missing.push(input)
       return null
     }
   }

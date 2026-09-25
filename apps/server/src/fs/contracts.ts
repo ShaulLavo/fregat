@@ -184,6 +184,9 @@ export const openWorkspaceRootBodySchema = v.object({
 })
 
 export const registerWorkspaceAddressBodySchema = v.object({ path: pathSchema })
+export const lookupWorkspaceAddressesBodySchema = v.object({
+  paths: v.pipe(v.array(pathSchema), v.maxLength(1024), v.readonly()),
+})
 export const workspaceAddressParamsSchema = v.object({ id: workspaceAddressIdSchema })
 
 export const writeBodySchema = v.object({

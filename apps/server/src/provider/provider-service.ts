@@ -36,6 +36,7 @@ import {
   type ProviderRuntimeBindingWithMetadata,
 } from './provider-session-directory'
 import { ProviderSessionReaper } from './provider-session-reaper'
+import { runtimeEventId } from './adapters/utils/runtime-ids'
 import { SerialWorker } from '../orchestration/serial-worker'
 import {
   providerBindingSummary,
@@ -106,7 +107,8 @@ type AdapterSubscription = {
 }
 
 type ProviderRuntimeEventTask = {
-  adapter: ReturnType<ProviderAdapterRegistry['getByInstance']>
+  /** Null for the exit the service publishes itself for a binding whose instance is gone. */
+  adapter: ReturnType<ProviderAdapterRegistry['getByInstance']> | null
   event: ProviderRuntimeEvent
   providerInstanceId: ProviderInstanceId
 }
@@ -355,11 +357,11 @@ export class ProviderService {
     this.requireSdkOwnership(sessionId)
     this.requireRunning()
     const routed = this.routeSession(sessionId)
-    if (!routed?.adapter.steerTurn)
+    if (!routed?.adapter?.steerTurn)
       throw sessionIdentityErrors.STEERING_UNAVAILABLE({
-        internal: { sessionId, routed: Boolean(routed), at: 'require-steering' },
+        internal: { sessionId, route: routeState(routed), at: 'require-steering' },
       })
-    return routed
+    return { adapter: routed.adapter, binding: routed.binding }
   }
 
   async steerTurn(input: ProviderTurnSteerInput) {
@@ -496,9 +498,10 @@ export class ProviderService {
       ...providerTurnControlSummary(input),
     })
     const routed = this.routeSession(input.sessionId)
-    if (!routed) {
+    if (!routed?.adapter) {
       recordChatPipelineWarning('chat.pipeline.provider_service.interrupt.missing_binding', {
         ...providerTurnControlSummary(input),
+        route: routeState(routed),
       })
       return null
     }
@@ -532,6 +535,7 @@ export class ProviderService {
       if (retained) await this.stopAndRelease(retained.adapter, input.sessionId)
       return null
     }
+    if (!routed.adapter) return this.releaseUnroutedBinding(routed.binding)
 
     await this.stopAndRelease(routed.adapter, input.sessionId)
     this.sessionDirectory.markSeen(input.sessionId)
@@ -549,9 +553,10 @@ export class ProviderService {
       sessionId: input.sessionId,
     })
     const routed = this.routeSession(input.sessionId)
-    if (!routed) {
+    if (!routed?.adapter) {
       recordChatPipelineWarning('chat.pipeline.provider_service.approval.missing_binding', {
         requestId: input.requestId,
+        route: routeState(routed),
         sessionId: input.sessionId,
       })
       return false
@@ -571,9 +576,10 @@ export class ProviderService {
       sessionId: input.sessionId,
     })
     const routed = this.routeSession(input.sessionId)
-    if (!routed) {
+    if (!routed?.adapter) {
       recordChatPipelineWarning('chat.pipeline.provider_service.user_input.missing_binding', {
         requestId: input.requestId,
+        route: routeState(routed),
         sessionId: input.sessionId,
       })
       return false
@@ -677,23 +683,24 @@ export class ProviderService {
   private async assertConversationRollbackSupported(sessionId: SessionId) {
     this.requireSdkOwnership(sessionId)
     const routed = this.routeSession(sessionId)
-    if (!routed)
+    if (!routed?.adapter)
       throw sessionIdentityErrors.ROLLBACK_RUNTIME_UNAVAILABLE({
-        internal: { sessionId, reason: 'unrouted' },
+        internal: { sessionId, reason: routeState(routed) },
       })
-    if (!routed.adapter.capabilities.conversationRollback)
+    const { adapter, binding } = routed
+    if (!adapter.capabilities.conversationRollback)
       throw sessionIdentityErrors.ROLLBACK_UNSUPPORTED({
-        internal: { sessionId, providerInstanceId: routed.binding.providerInstanceId },
+        internal: { sessionId, providerInstanceId: binding.providerInstanceId },
       })
-    if (!(await boundedProviderOperation(routed.adapter, routed.adapter.hasRuntime({ sessionId }))))
+    if (!(await boundedProviderOperation(adapter, adapter.hasRuntime({ sessionId }))))
       throw sessionIdentityErrors.ROLLBACK_RUNTIME_UNAVAILABLE({
         internal: {
           sessionId,
           reason: 'no-runtime',
-          providerInstanceId: routed.binding.providerInstanceId,
+          providerInstanceId: binding.providerInstanceId,
         },
       })
-    return routed
+    return { adapter, binding }
   }
 
   async prepareConversationRollback(input: { numTurns: number; sessionId: SessionId }) {
@@ -791,6 +798,11 @@ export class ProviderService {
     return this.sessionDirectory.getBinding(sessionId)
   }
 
+  /** For a deleted session, once its runtime is released. */
+  deleteBinding(sessionId: SessionId) {
+    this.sessionDirectory.delete(sessionId)
+  }
+
   private turnWithResumeCursor(
     input: ProviderTurnInput,
     adapter: ReturnType<ProviderAdapterRegistry['getByInstance']>,
@@ -805,13 +817,36 @@ export class ProviderService {
     return { ...input, providerResumeCursor: continuation.providerResumeCursor }
   }
 
+  /** `adapter` is null when the binding's instance has left the registry. */
   private routeSession(sessionId: SessionId) {
     const binding = this.sessionDirectory.getBinding(sessionId)
     if (!binding) return null
 
-    const adapter = this.adapterRegistry.getByInstance(binding.providerInstanceId)
+    return { adapter: this.adapterRegistry.adapter(binding.providerInstanceId), binding }
+  }
 
-    return { adapter, binding }
+  /**
+   * Disposing an instance kills its processes, so a binding to a missing instance has nothing
+   * left to stop. The binding stays: its resume cursor is still good if the instance comes back.
+   */
+  private releaseUnroutedBinding(binding: ProviderRuntimeBindingWithMetadata) {
+    this.backgroundTasks.clear(binding.sessionId)
+    this.releaseWorktree(binding.sessionId)
+    recordChatPipelineWarning(
+      'chat.pipeline.provider_service.stop.instance_missing',
+      providerBindingSummary(binding),
+    )
+    // Queued, not awaited: a stop can run inside the engine queue this exit's projection needs.
+    const { providerInstanceId, sessionId } = binding
+    const event = instanceMissingExit(binding)
+    void this.runtimeEvents.enqueue({ adapter: null, event, providerInstanceId }).catch((error) => {
+      recordChatPipelineWarning('chat.pipeline.provider_service.runtime_stream.failed', {
+        error,
+        providerInstanceId,
+        sessionId,
+      })
+    })
+    return binding
   }
 
   private trackLaunch<T>(
@@ -1023,6 +1058,7 @@ export class ProviderService {
    */
   private async handleRuntimeEvent(task: ProviderRuntimeEventTask) {
     if (this.shuttingDown) return
+    if (!task.adapter) return this.publishUnroutedExit(task)
     // The adapter too, not just the id: an event queued by an adapter the registry has since
     // replaced belongs to a stream nothing is listening to any more.
     if (this.adapterSubscriptions.get(task.providerInstanceId)?.adapter !== task.adapter) return
@@ -1047,6 +1083,15 @@ export class ProviderService {
     this.recordRuntimeEvent(task.event, task.adapter)
     this.publishUsage(task.event, 'turn')
     await this.emitRuntimeEvent(task.event)
+  }
+
+  /** Dropped when the binding moved on while the exit was queued: a relaunch owns it now. */
+  private async publishUnroutedExit({ event, providerInstanceId }: ProviderRuntimeEventTask) {
+    const binding = this.sessionDirectory.getBinding(event.sessionId)
+    if (binding?.runtimeEpoch !== event.runtimeEpoch) return
+    if (binding.providerInstanceId !== providerInstanceId) return
+
+    await this.emitRuntimeEvent(event)
   }
 
   private async stopReplacedBinding(
@@ -1219,6 +1264,29 @@ function modelSelectionsEqual(left: ModelSelection | undefined, right: ModelSele
   if (left.model !== right.model) return false
 
   return jsonEqual(left.options ?? null, right.options ?? null)
+}
+
+/** Why a routed call cannot proceed: no binding, a binding to a gone instance, or a missing capability. */
+function routeState(routed: { adapter: unknown } | null) {
+  if (!routed) return 'no-binding'
+  if (!routed.adapter) return 'instance-missing'
+  return 'unsupported'
+}
+
+/** Projects the runtime `stopped`, which takes the binding off the reaper's `ready` list for good. */
+function instanceMissingExit(binding: ProviderRuntimeBindingWithMetadata): ProviderRuntimeEvent {
+  return {
+    createdAt: new Date().toISOString(),
+    eventId: runtimeEventId('provider-instance-missing'),
+    payload: { reason: 'instance-missing', recoverable: true },
+    provider: binding.providerDriverKind,
+    providerBindingHandle: binding.providerBindingHandle,
+    providerInstanceId: binding.providerInstanceId,
+    runtimeEpoch: binding.runtimeEpoch,
+    runtimeMode: binding.runtimeMode,
+    sessionId: binding.sessionId,
+    type: 'runtime.exited',
+  }
 }
 
 function noop() {}

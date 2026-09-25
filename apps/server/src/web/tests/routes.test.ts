@@ -58,7 +58,7 @@ describe('web routes', () => {
     for (const pathname of ['/assets/missing.js', '/worker.js', '/fs/nope', '/~x/app.js']) {
       const response = await app.handle(new Request(`http://local${pathname}`))
       expect(response.status, pathname).toBe(404)
-      expect((await response.json()).error.code).toBe('NOT_FOUND')
+      expect((await response.json()).error.code).toBe('ROUTE_NOT_FOUND')
     }
     const documentMiss = await app.handle(navigation('/nowhere'))
     expect(documentMiss.status).toBe(404)

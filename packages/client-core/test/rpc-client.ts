@@ -31,16 +31,24 @@ export function rpcClientFixture(options: Partial<OrchestrationRpcClientOptions>
   return { client, socket, environments, origin, events }
 }
 
+/** Records each ended scope with the level the web logger would give it. */
 function recordScope(base: RpcEvent, events: Array<Record<string, unknown>>): RpcEventScope {
   const event: Record<string, unknown> = { ...base }
+  let level = 'info'
   return {
     set: (context) => Object.assign(event, context),
     increment(path, by = 1) {
       const previous = event[path]
       event[path] = (typeof previous === 'number' ? previous : 0) + by
     },
-    warn: (message, context) => Object.assign(event, { warning: message }, context),
-    error: (error, context) => Object.assign(event, { error }, context),
-    end: (overrides) => events.push({ ...event, ...overrides }),
+    warn(message, context) {
+      if (level === 'info') level = 'warn'
+      Object.assign(event, { warning: message }, context)
+    },
+    error(error, context) {
+      level = 'error'
+      Object.assign(event, { error }, context)
+    },
+    end: (overrides) => events.push({ ...event, ...overrides, level }),
   }
 }
