@@ -35,7 +35,8 @@ async function driveComposer(
   await page.keyboard.press('Escape')
 
   const chooser = page.waitForEvent('filechooser')
-  await selectors.iconHintControl(page, 'Attach files').click()
+  await selectors.iconHintControl(page, 'Attach').click()
+  await selectors.chatAttachMenuItem(page, 'Attach files…').click()
   await (await chooser).setFiles(image)
   const attachment = selectors.iconHintControl(page, `Open ${image.name}`)
   await captureHint(page, attachment, `Open ${image.name}`, step, 'attachment-hint')
@@ -53,7 +54,11 @@ async function driveComposer(
   const stash = selectors.iconHintControl(page, 'Stashed prompts: 1')
   await captureHint(page, stash, 'Stashed prompts: 1', step, 'stash-hint')
   await stash.click()
-  await selectors.iconHintControl(page, `Delete stashed prompt: ${PROMPT}`).click()
+  const remove = selectors.iconHintControl(page, `Delete stashed prompt: ${PROMPT}`)
+  await settleAnimations(page.locator('[data-slot="popover-content"]'))
+  await step('stash-open')
+  await captureHint(page, remove, `Delete stashed prompt: ${PROMPT}`, step, 'stash-delete-hint')
+  await remove.click()
   await stash.waitFor({ state: 'detached' })
   await page.keyboard.press('Escape')
 }

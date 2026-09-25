@@ -56,6 +56,11 @@ function appendOperationMetadata(
     appendUnique(affectedIds, modelRefKey(operation.ref))
     return
   }
+  if (operation.kind === 'model.setFavorite') {
+    appendUnique(settingIds, 'models.favorites')
+    appendUnique(affectedIds, modelRefKey(operation.ref))
+    return
+  }
   if (operation.kind === 'model.setOrder') {
     appendUnique(settingIds, 'models.order')
     for (const ref of operation.order) appendUnique(affectedIds, modelRefKey(ref))

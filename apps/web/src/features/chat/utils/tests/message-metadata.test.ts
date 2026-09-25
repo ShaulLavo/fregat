@@ -51,3 +51,17 @@ test('restores earlier response metadata after a user starts another response', 
     }),
   ).toMatchObject({ copyVisible: true, metaVisible: true })
 })
+
+test('Carry on preserves the previous answer incomplete marker after a new turn starts', () => {
+  const latestTurn = v.parse(orchestrationLatestTurnSchema, sessionShell().latestTurn)
+  const previous = {
+    ...latestTurn,
+    turnId: v.parse(turnIdSchema, 'stopped-turn'),
+    state: 'interrupted' as const,
+    endReason: 'user-stop' as const,
+    completedAt: '2026-05-28T00:00:01.000Z',
+  }
+  const answer = chatMessage({ turnId: previous.turnId, streaming: false })
+  const input = { messages: [answer], latestTurn, turns: { [previous.turnId]: previous } }
+  expect(chatMessageTimelineMetadata(input).get(answer.id)?.incomplete).toBe(true)
+})

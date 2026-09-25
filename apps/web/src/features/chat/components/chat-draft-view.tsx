@@ -1,3 +1,4 @@
+import { advanceBackgroundDraft } from '@/features/chat/state/advance-background-draft'
 import {
   type ModelSelection,
   type OrchestrationProjectShell,
@@ -6,7 +7,7 @@ import {
   type SessionWorktreeTarget,
 } from '@workspace/contracts'
 import { useQuery } from '@tanstack/react-query'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { notifyChatCommandError } from '@/features/chat/notify-command-error'
 import type { ChatTransport } from '@/features/chat/transport/chat-transport'
@@ -27,6 +28,9 @@ import { ChatWelcomeView } from './chat-welcome-view'
 import { DraftContextStrip } from '@/features/chat/components/draft-context-strip'
 import type { DraftMachine } from '@/features/chat/utils/draft-workspace'
 import { useSettingValue } from '@/hooks/use-setting-value'
+import { fanOutWorktreeTarget } from '@/features/chat/utils/worktree-target'
+import { backgroundModelError, draftSendTargets } from '@/features/chat/utils/multiple-models'
+import { draftSubmissionKey } from '@/features/chat/utils/draft-submission-key'
 import { useNavigation } from '@/hooks/use-navigation'
 
 export function ChatDraftView({
@@ -50,6 +54,10 @@ export function ChatDraftView({
   machines?: readonly DraftMachine[] | null
 }) {
   const navigation = useNavigation()
+  // Submissions whose dispatch did not come back ok, kept so a retry resends the same command.
+  const unsettledSubmissions = useRef(
+    new Map<string, ReturnType<typeof createDraftSessionSubmission>>(),
+  )
   const [sendError, setSendError] = useState<string | null>(null)
   // The same target ChatInput builds for itself, so a mode pick lands on the
   // draft the send path reads. Stable identity: it feeds the modes context value.
@@ -115,45 +123,46 @@ export function ChatDraftView({
       onFailed: (error) => notifyChatCommandError(error, 'Could not save the default model'),
     })
   }
-  async function handleSend({
-    attachments,
-    interactionMode,
-    modelSelection,
-    runtimeMode,
-    terminalContexts,
-    text,
-  }: ChatInputSubmitPayload): Promise<ChatInputSubmitResult> {
-    if (!project || !worktree || !target || !targetReady) {
-      setSendError('Workspace chat is still preparing.')
-      return 'rejected'
-    }
-    const operation = navigation.getSnapshot()
-
-    // Declared, not created. The server makes the worktree while the turn is
-    // held at the gate, so a client that dies here cannot orphan a directory
-    // no session owns.
-    const submission = createDraftSessionSubmission({
-      attachments,
-      createdAt: new Date().toISOString(),
-      interactionMode,
-      modelSelection,
-      worktreeTarget: target,
-      runtimeMode,
-      terminalContexts,
-      text,
+  /** `background` (Ctrl/Cmd+Enter) starts the session and keeps the user on a fresh draft. */
+  /**
+   * Declared, not created: the server makes the worktree while the turn is held at the
+   * gate, so a client that dies here cannot orphan a directory no session owns. A retried
+   * target reuses its submission, so a lost acknowledgment never starts a duplicate.
+   */
+  async function startSession(
+    payload: ChatInputSubmitPayload,
+    worktreeTarget: SessionWorktreeTarget,
+    context: Record<string, unknown>,
+    fanOut = false,
+  ) {
+    const retryKey = draftSubmissionKey({
+      payload,
+      environmentId: transport.environmentId,
+      worktreeTarget,
+      fanOut,
     })
+    const submission =
+      unsettledSubmissions.current.get(retryKey) ??
+      createDraftSessionSubmission({
+        ...payload,
+        createdAt: new Date().toISOString(),
+        worktreeTarget:
+          fanOut && worktree ? fanOutWorktreeTarget(worktreeTarget, worktree.id) : worktreeTarget,
+      })
+    unsettledSubmissions.current.set(retryKey, submission)
     const outcome = await placeChatMessage({
       action: 'chat.draft.dispatch.summary',
       command: submission.command,
       context: {
-        attachmentCount: attachments.length,
-        interactionMode,
-        model: modelSelection.model,
-        projectId: project.id,
-        providerInstanceId: modelSelection.providerInstanceId,
-        runtimeMode,
-        terminalContextCount: terminalContexts.length,
-        textLength: text.length,
+        ...context,
+        attachmentCount: payload.attachments.length,
+        interactionMode: payload.interactionMode,
+        model: payload.modelSelection.model,
+        projectId: project?.id,
+        providerInstanceId: payload.modelSelection.providerInstanceId,
+        runtimeMode: payload.runtimeMode,
+        terminalContextCount: payload.terminalContexts.length,
+        textLength: payload.text.length,
       },
       dispatchCommand: transport.dispatchCommand,
       onAccepted: (result) =>
@@ -168,14 +177,94 @@ export function ChatDraftView({
         message: submission.optimisticMessage,
       },
     })
+    if (outcome.ok) unsettledSubmissions.current.delete(retryKey)
+
+    return { ...outcome, sessionId: submission.command.sessionId }
+  }
+
+  /** `background` (Ctrl/Cmd+Enter) starts the session and keeps the user on a fresh draft. */
+  async function handleSend(
+    payload: ChatInputSubmitPayload,
+    background = false,
+  ): Promise<ChatInputSubmitResult> {
+    if (!project || !worktree || !target || !targetReady) {
+      setSendError('Workspace chat is still preparing.')
+      return 'rejected'
+    }
+    const operation = navigation.getSnapshot()
+    const additional = useChatInputDraftStore
+      .getState()
+      .getDraft(draftTarget).additionalModelSelections
+    const models = draftSendTargets(payload.modelSelection, additional)
+    const backgroundError = backgroundModelError(models, background)
+    if (backgroundError) {
+      setSendError(backgroundError)
+      return 'rejected'
+    }
+    if (models.length > 1 && !background) return sendToModels(payload, models, operation)
+
+    const outcome = await startSession(payload, target, { background })
     if (!outcome.ok) {
       setSendError(outcome.message)
       return 'rejected'
     }
 
-    useChatInputDraftStore.getState().setIdentity(draftTarget, null)
     setSendError(null)
-    if (navigation.getSnapshot() === operation) onSessionCreated(submission.command.sessionId)
+    // The next draft keeps this one's workspace mode and base branch; each start
+    // in new-worktree mode declares its own worktree.
+    if (background && identity) {
+      advanceBackgroundDraft(draftTarget, identity)
+      return 'started'
+    }
+
+    useChatInputDraftStore.getState().setIdentity(draftTarget, null)
+    if (navigation.getSnapshot() === operation) onSessionCreated(outcome.sessionId)
+
+    return 'sent'
+  }
+
+  /**
+   * One session per model, each on its own new worktree from the draft's base and branch.
+   * Models that failed stay on the draft, with its text, for a retry; the rest are done.
+   */
+  async function sendToModels(
+    payload: ChatInputSubmitPayload,
+    models: readonly ModelSelection[],
+    operation: unknown,
+  ): Promise<ChatInputSubmitResult> {
+    if (!worktree || !target) return 'rejected'
+    const started: SessionId[] = []
+    const failed: { model: ModelSelection; message: string }[] = []
+    for (const model of models) {
+      const outcome = await startSession(
+        { ...payload, modelSelection: model },
+        target,
+        { modelCount: models.length },
+        true,
+      )
+      if (outcome.ok) started.push(outcome.sessionId)
+      else failed.push({ model, message: outcome.message })
+    }
+
+    const drafts = useChatInputDraftStore.getState()
+    const [firstFailure, ...otherFailures] = failed
+    if (firstFailure) {
+      drafts.setModelSelection(draftTarget, firstFailure.model)
+      drafts.setAdditionalModelSelections(
+        draftTarget,
+        otherFailures.map((entry) => entry.model),
+      )
+      setSendError(
+        `Started ${started.length} of ${models.length} sessions. ${firstFailure.message}`,
+      )
+      return 'rejected'
+    }
+
+    setSendError(null)
+    // Every model has its session, so nothing of this draft is left to recover.
+    drafts.clearDraft(draftTarget)
+    const [first] = started
+    if (first && navigation.getSnapshot() === operation) onSessionCreated(first)
 
     return 'sent'
   }

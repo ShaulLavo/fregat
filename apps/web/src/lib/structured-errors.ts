@@ -11,6 +11,12 @@ export const clientErrors = defineErrorCatalog('client', {
     why: 'A client-side invariant failed while handling application state.',
     fix: 'Inspect the client state and fix the invariant at the throwing call site.',
   },
+  SCREEN_CAPTURE_FAILED: {
+    status: 500,
+    message: 'The screenshot could not be taken.',
+    why: 'The browser refused screen capture or never delivered a frame.',
+    fix: 'Your browser did not allow screen capture. Attach the image as a file instead.',
+  },
   CONTEXT_MISSING: {
     status: 500,
     message: ({ message }: { message: string }) => message,

@@ -57,14 +57,33 @@ describe('resolveClaudeExecutable', () => {
     expect(executable).toEqual(BUNDLED)
   })
 
-  it('always runs a configured binary, whatever its version', async () => {
+  it('reports not installed when there is neither an installed nor a bundled CLI', async () => {
+    await expect(
+      resolveClaudeExecutable({ env: {}, probe: probe({ bundled: null, installed: null }) }),
+    ).rejects.toMatchObject({ code: 'provider.NOT_INSTALLED' })
+  })
+
+  it('runs a configured binary at or above the bundled version', async () => {
     const executable = await resolveClaudeExecutable({
       binaryPath: '/present/claude',
       env: {},
-      probe: probe({ versions: { '/present/claude': '1.0.0' } }),
+      probe: probe({ versions: { '/present/claude': '2.1.12' } }),
     })
 
-    expect(executable).toEqual({ path: '/present/claude', source: 'configured', version: '1.0.0' })
+    expect(executable).toEqual({ path: '/present/claude', source: 'configured', version: '2.1.12' })
+  })
+
+  it('reports a configured binary older than the bundled one as unsupported', async () => {
+    await expect(
+      resolveClaudeExecutable({
+        binaryPath: '/present/claude',
+        env: {},
+        probe: probe({ versions: { '/present/claude': '1.0.0' } }),
+      }),
+    ).rejects.toMatchObject({
+      code: 'provider.CLAUDE_CLI_TOO_OLD',
+      message: 'Claude Code 1.0.0 is older than the minimum 2.1.10',
+    })
   })
 
   it('fails on a configured binary that does not exist', async () => {

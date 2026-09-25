@@ -32,6 +32,7 @@ import { ProviderRuntimeIngestion } from '../provider-runtime-ingestion'
 import { OrchestrationSnapshotQuery } from '../snapshot-query'
 import { MockProviderAdapter } from '../../provider/adapters/mock'
 import { ProviderAdapterRegistry } from '../../provider/provider-adapter-registry'
+import { requestGone } from '../../provider/structured-errors'
 import { checkpointRefForSessionTurn } from '../checkpoint-refs'
 
 import { testSettingsOptions } from '../../settings/testing'
@@ -807,6 +808,7 @@ describe('orchestration engine', () => {
 
     await dispatchFirstSession(engine)
     await engine.providerRuntimeIdle()
+    await appendApprovalRequest(engine)
     await engine.dispatch(
       command({
         commandId: 'cmd-approval-respond',
@@ -845,8 +847,8 @@ describe('orchestration engine', () => {
   it('projects stale approval and user-input responses as recoverable activities', async () => {
     const fixture = createFixture()
     const adapter = new MockProviderAdapter({
-      approvalError: 'unknown pending approval request: approval-1',
-      userInputError: 'unknown pending user-input request: user-input-1',
+      approvalError: requestGone('approval', 'approval-1'),
+      userInputError: requestGone('user-input', 'user-input-1'),
     })
     const engine = createRuntimeEngine(fixture, adapter)
     const sessionId = v.parse(sessionIdSchema, '00000000-0000-4000-8000-000000000001')
@@ -855,6 +857,7 @@ describe('orchestration engine', () => {
 
     await dispatchFirstSession(engine)
     await engine.providerRuntimeIdle()
+    await appendApprovalRequest(engine)
     await engine.dispatch(
       command({
         commandId: 'cmd-stale-approval-respond',
@@ -881,23 +884,51 @@ describe('orchestration engine', () => {
       .session.activities
     expect(activities).toContainEqual(
       expect.objectContaining({
-        kind: 'provider.approval.respond.failed',
+        kind: 'approval.resolved',
         payload: expect.objectContaining({
-          detail: expect.stringContaining('Stale pending approval request: approval-1'),
+          decision: 'accept',
+          requestId: 'approval-1',
+          resolution: 'stale',
         }),
+        summary: 'Answer not used',
+        tone: 'info',
       }),
     )
     expect(activities).toContainEqual(
       expect.objectContaining({
         kind: 'provider.user-input.respond.failed',
         payload: expect.objectContaining({
-          detail: expect.stringContaining('Stale pending user-input request: user-input-1'),
+          code: 'provider.REQUEST_GONE',
+          detail: expect.stringContaining('Restart the turn to continue.'),
+          requestId: 'user-input-1',
         }),
       }),
     )
     fixture.close()
   })
 })
+
+async function appendApprovalRequest(engine: OrchestrationEngine) {
+  const sessionId = '00000000-0000-4000-8000-000000000001'
+  await engine.dispatch(
+    command({
+      type: 'session.activity.append',
+      commandId: 'cmd-approval-request',
+      createdAt: assistantCompleted,
+      sessionId,
+      activity: {
+        id: 'approval-request',
+        sessionId,
+        createdAt: assistantCompleted,
+        kind: 'approval.requested',
+        summary: 'Approval requested',
+        tone: 'approval',
+        turnId: null,
+        payload: { requestId: 'approval-1' },
+      },
+    }),
+  )
+}
 
 async function dispatchFirstSession(engine: OrchestrationEngine) {
   await engine.dispatch(projectCreateCommand())

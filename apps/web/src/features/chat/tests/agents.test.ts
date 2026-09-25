@@ -9,6 +9,9 @@ import {
   chatAgentGroups,
   chatAgentGroupsEqual,
   chatAgentGroupLabel,
+  chatAgentTree,
+  type ChatAgentGroup,
+  type ChatAgentNode,
 } from '@/features/chat/utils/agents'
 
 test('keeps child tool history and identity under the original parent turn', () => {
@@ -73,7 +76,7 @@ test('keeps child tool history and identity under the original parent turn', () 
     outcome: 'failed',
     turnId: oldTurn,
   })
-  expect(chatAgentGroupLabel(groups[0]!)).toBe('1 agent finished')
+  expect(chatAgentGroupLabel(groups[0]!)).toBe('1 done')
 })
 
 test('does not merge agents or tool calls that share provider item ids', () => {
@@ -99,7 +102,7 @@ test('does not merge agents or tool calls that share provider item ids', () => {
     'cat first-child.md',
     'cat second-child.md',
   ])
-  expect(chatAgentGroupLabel(group)).toBe('2 agents working')
+  expect(chatAgentGroupLabel(group)).toBe('2 running')
   expect(chatAgentGroupsEqual(group, chatAgentGroups(activities)[0]!)).toBe(true)
 })
 
@@ -295,4 +298,47 @@ test('keeps elapsed work anchored to the original prompt after a same-turn corre
     (item) => item.type === 'working',
   )
   expect(working).toMatchObject({ startedAt: snapshot.messages[0]!.createdAt })
+})
+
+function agentGroup(
+  agents: readonly { threadId: string; parentThreadId?: string; status: string }[],
+): ChatAgentGroup {
+  return chatAgentGroups(
+    agents.map(({ threadId, parentThreadId, status }, index) =>
+      sessionActivity({
+        id: v.parse(eventIdSchema, `agent-${threadId}`),
+        kind: 'task.started',
+        sequence: index,
+        payload: { agent: { threadId, status, ...(parentThreadId ? { parentThreadId } : {}) } },
+      }),
+    ),
+  )[0]!
+}
+
+test('the tally counts running, done and failed agents and leaves out zero parts', () => {
+  const group = agentGroup([
+    { threadId: 'a', status: 'running' },
+    { threadId: 'b', status: 'waiting' },
+    { threadId: 'c', status: 'idle' },
+    { threadId: 'd', status: 'closed' },
+    { threadId: 'e', status: 'failed' },
+  ])
+
+  expect(chatAgentGroupLabel(group)).toBe('2 running · 2 done · 1 failed')
+})
+
+test('agents nest under the agent that spawned them', () => {
+  const group = agentGroup([
+    { threadId: 'lead', status: 'running' },
+    { threadId: 'helper', parentThreadId: 'lead', status: 'running' },
+    { threadId: 'grandchild', parentThreadId: 'helper', status: 'idle' },
+    { threadId: 'stray', parentThreadId: 'missing', status: 'idle' },
+  ])
+  const shape = (nodes: readonly ChatAgentNode[]): unknown =>
+    nodes.map((node) => [node.entry.agent.threadId, shape(node.children)])
+
+  expect(shape(chatAgentTree(group.agents))).toEqual([
+    ['lead', [['helper', [['grandchild', []]]]]],
+    ['stray', []],
+  ])
 })

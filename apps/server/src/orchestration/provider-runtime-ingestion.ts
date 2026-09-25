@@ -19,6 +19,8 @@ import {
   type UserInputQuestionOption,
 } from '@workspace/contracts'
 import * as v from 'valibot'
+import { TURN_ENDED_ACTIVITY_KIND } from '@workspace/contracts'
+import { endedApprovalActivityId } from './approval-admission'
 import type { ProviderRuntimeEvent } from '../provider/types'
 import { checkpointFilesFromUnifiedDiff } from './checkpoint-files'
 import { checkpointRefForSessionTurn } from './checkpoint-refs'
@@ -647,6 +649,8 @@ export class ProviderRuntimeIngestion {
         summary: text,
         streamKind: state.event.payload.streamKind,
         taskId: state.messageId,
+        // Every chunk shares the first delta's createdAt, so the reasoning's end lives here.
+        updatedAt: 'createdAt' in event ? event.createdAt : new Date(this.now()).toISOString(),
       },
     )
     await this.dispatch(
@@ -877,6 +881,8 @@ function activitiesForRuntimeEvent(
       return [taskCompletedActivity(event, taskTitle)]
     case 'turn.plan.updated':
       return [turnPlanUpdatedActivity(event)]
+    case 'turn.completed':
+      return turnEndedActivity(event)
     case 'auth.status':
       return authStatusActivity(event)
     case 'mcp.status.updated':
@@ -900,6 +906,16 @@ function activitiesForRuntimeEvent(
     default:
       return []
   }
+}
+
+function turnEndedActivity(event: Extract<ProviderRuntimeEvent, { type: 'turn.completed' }>) {
+  if (!event.payload.endReason) return []
+
+  return [
+    baseActivity(event, 'info', TURN_ENDED_ACTIVITY_KIND, 'Turn ended', {
+      endReason: event.payload.endReason,
+    }),
+  ]
 }
 
 function activityFromLegacyEvent(
@@ -945,6 +961,7 @@ function requestOpenedActivity(event: Extract<ProviderRuntimeEvent, { type: 'req
       : approvalRequestSummary(requestKind)
   return [
     baseActivity(event, 'approval', 'approval.requested', summary, {
+      args: approvalArgs(event.payload.args),
       options: event.payload.options,
       defaultToNo: event.payload.defaultToNo,
       detail: event.payload.detail,
@@ -955,19 +972,60 @@ function requestOpenedActivity(event: Extract<ProviderRuntimeEvent, { type: 'req
   ]
 }
 
+const APPROVAL_ARG_KEYS = ['command', 'cwd', 'path', 'file_path', 'url', 'pattern', 'reason']
+const APPROVAL_ARG_MAX_LENGTH = 500
+
+/** The few arguments a person decides on, as text; file contents and ids stay out. */
+function approvalArgs(args: unknown) {
+  if (!isPlainRecord(args)) return undefined
+  const entries = APPROVAL_ARG_KEYS.flatMap((key) => {
+    const text = approvalArgText(args[key])
+    return text ? [[key, text.slice(0, APPROVAL_ARG_MAX_LENGTH)] as const] : []
+  })
+
+  return entries.length > 0 ? Object.fromEntries(entries) : undefined
+}
+
+function approvalArgText(value: unknown) {
+  if (typeof value === 'string') return value.trim()
+  if (Array.isArray(value) && value.every((part) => typeof part === 'string')) {
+    return value.join(' ').trim()
+  }
+
+  return null
+}
+
 function requestResolvedActivity(
   event: Extract<ProviderRuntimeEvent, { type: 'request.resolved' }>,
 ) {
   if (event.payload.requestType === 'tool_user_input') return []
+  const requestKind = requestKindFromRequestType(event.payload.requestType)
+  if (!event.payload.decision) return [endedApprovalActivity(event, requestKind)]
 
   return [
     baseActivity(event, 'approval', 'approval.resolved', 'Approval resolved', {
       decision: event.payload.decision,
       requestId: event.requestId,
-      requestKind: requestKindFromRequestType(event.payload.requestType),
+      requestKind,
       requestType: event.payload.requestType,
     }),
   ]
+}
+
+/** A resolution with no decision is the harness giving up on the request; it shares the decider's row. */
+function endedApprovalActivity(
+  event: Extract<ProviderRuntimeEvent, { type: 'request.resolved' }>,
+  requestKind: ReturnType<typeof requestKindFromRequestType>,
+): OrchestrationSessionActivity {
+  const activity = baseActivity(event, 'info', 'approval.resolved', 'Approval ended', {
+    requestId: event.requestId,
+    requestKind,
+    requestType: event.payload.requestType,
+    resolution: 'ended',
+  })
+  if (!event.requestId) return activity
+
+  return { ...activity, id: v.parse(eventIdSchema, endedApprovalActivityId(event.requestId)) }
 }
 
 function userInputRequestedActivity(

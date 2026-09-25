@@ -1,7 +1,12 @@
 import type { LexicalEditor } from 'lexical'
 import { useEffect, useEffectEvent, type RefObject } from 'react'
 
-import { insertChatInputText, readChatInputText } from '@/features/chat/utils/input-editor-actions'
+import { appendOnce } from '@/features/chat/utils/append-once'
+import {
+  insertChatInputText,
+  readChatInputText,
+  setChatInputEditorText,
+} from '@/features/chat/utils/input-editor-actions'
 import { useChatInputDraftStore, type ChatInputDraftTarget } from '../state/chat-input-draft-store'
 import { useComposerInboxStore, type ComposerInboxEntry } from '../state/composer-inbox-store'
 
@@ -27,7 +32,9 @@ export function useComposerInbox(
   const drain = useEffectEvent((ready: boolean) => {
     // Chips need only the draft; text needs somewhere to splice. Taking just
     // what can be honoured leaves the rest queued for the render that can.
-    const entries = useComposerInboxStore.getState().take((entry) => entry.kind !== 'text' || ready)
+    const entries = useComposerInboxStore
+      .getState()
+      .take((entry) => entry.kind === 'terminal-context' || ready)
     if (entries.length === 0) return
 
     applyComposerInboxEntries(entries, draftTarget, editorRef.current)
@@ -51,13 +58,25 @@ function applyComposerInboxEntries(
   )
   if (contexts.length > 0) drafts.addTerminalContexts(draftTarget, contexts)
 
-  const textEntries = entries.filter((entry) => entry.kind === 'text')
-  if (textEntries.length === 0 || !editor) return
-
-  const text = textEntries.map((entry) => entry.text).join('\n\n')
-  if (!insertChatInputText(editor, `${text} `, { focus: true })) return
-
+  if (!editor) return
+  insertTextEntries(entries, editor)
+  appendTextEntries(entries, editor)
   // The editor is the source of truth for what was spliced, so the draft is
   // written from it rather than from what we asked for.
-  drafts.setPrompt(draftTarget, readChatInputText(editor))
+  if (entries.some((entry) => entry.kind !== 'terminal-context')) {
+    drafts.setPrompt(draftTarget, readChatInputText(editor))
+  }
+}
+
+function insertTextEntries(entries: readonly ComposerInboxEntry[], editor: LexicalEditor) {
+  const text = entries.flatMap((entry) => (entry.kind === 'text' ? [entry.text] : [])).join('\n\n')
+  if (text) insertChatInputText(editor, `${text} `, { focus: true })
+}
+
+function appendTextEntries(entries: readonly ComposerInboxEntry[], editor: LexicalEditor) {
+  const appends = entries.flatMap((entry) => (entry.kind === 'append' ? [entry.text] : []))
+  if (appends.length === 0) return
+
+  const next = appends.reduce(appendOnce, readChatInputText(editor))
+  setChatInputEditorText(editor, next)
 }

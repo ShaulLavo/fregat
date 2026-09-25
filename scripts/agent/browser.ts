@@ -268,9 +268,9 @@ async function runScenario(scenario: Scenario, options: Options) {
     }
     if (options.productWallpaper) await alignProductWallpaper(page, evidence)
     const steps: string[] = []
-    const step = async (label: string) => {
+    const step = async (label: string, target: Page = page) => {
       const file = `${String(steps.length + 1).padStart(2, '0')}-${label}.png`
-      await page.screenshot({ path: evidence.file(file) })
+      await target.screenshot({ path: evidence.file(file) })
       if (scenario.inspect)
         await evidence.json(file.replace('.png', '.json'), await scenario.inspect(page))
       steps.push(file)

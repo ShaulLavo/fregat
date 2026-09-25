@@ -52,6 +52,53 @@ export async function writeSettings(page: Page, base: string, operations: readon
   ok(response.ok(), `Write isolated provider settings returned ${response.status()}`)
 }
 
+/** Runs `body` with one user setting written, then puts the user layer back as it was. */
+export async function withUserSetting(
+  page: Page,
+  orchestration: string,
+  setting: { readonly key: string; readonly value: unknown },
+  body: () => Promise<void>,
+) {
+  const base = orchestration.replace(/\/orchestration$/, '')
+  const before = await settingsSnapshot(page, base)
+  await writeSettings(page, base, [{ kind: 'set', key: setting.key, value: setting.value }])
+  try {
+    await body()
+  } finally {
+    await restoreUserSettings(page, base, before, [setting.key])
+  }
+}
+
+/**
+ * A second window on the same session and throwaway server. Its own browser context:
+ * tabs of one context share six HTTP/1.1 connections, and each tab holds four streams.
+ */
+export async function openSecondWindow(page: Page, orchestration: string) {
+  const browser = page.context().browser()
+  ok(browser, 'The scenario browser is unavailable')
+  const context = await browser.newContext({ viewport: page.viewportSize() })
+  const origin = orchestration.replace(/\/orchestration$/, '')
+  await context.addInitScript(`window.platformDevServerUrl = ${JSON.stringify(origin)}`)
+  const second = await context.newPage()
+  await second.goto(page.url())
+  await selectors.chatMessage(second).waitFor({ timeout: 30_000 })
+  return { page: second, close: () => context.close() }
+}
+
+export async function sendPrompt(page: Page, prompt: string) {
+  await selectors.chatMessage(page).fill(prompt)
+  await selectors.chatSend(page).click()
+}
+
+/** The native Codex fixture opens an app-access approval on every turn it starts. */
+export async function requestAppApproval(
+  page: Page,
+  prompt = 'Request the isolated app approval.',
+) {
+  await sendPrompt(page, prompt)
+  await selectors.appApproval(page).waitFor({ timeout: 30_000 })
+}
+
 export async function nativeLog(root: string) {
   const text = await readFile(join(root, 'native.jsonl'), 'utf8').catch(() => '')
   return text
@@ -107,6 +154,16 @@ async function readyWorktree(page: Page, orchestration: string, worktreeId: stri
   ok(false, `The new worktree ${worktreeId} must become ready`)
 }
 
+/** A cold server can reject the page's first workspace open; the page retries it. */
+async function firstWorktree(page: Page, orchestration: string) {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const worktree = (await readShell(page, orchestration)).worktrees[0]
+    if (worktree) return worktree
+    await Bun.sleep(100)
+  }
+  return undefined
+}
+
 export function isolatedNativeScenario(options: {
   name: string
   description: string
@@ -119,7 +176,7 @@ export function isolatedNativeScenario(options: {
   drive: (
     page: Page,
     context: {
-      step: (name: string) => Promise<void>
+      step: (name: string, target?: Page) => Promise<void>
       root: string
       orchestration: string
       sessionId: string
@@ -171,7 +228,7 @@ export function isolatedNativeScenario(options: {
         ])
         const worktree = prepared
           ? await registerFixtureProject(page, orchestration, prepared.path)
-          : (await readShell(page, orchestration)).worktrees[0]
+          : await firstWorktree(page, orchestration)
         ok(worktree, 'A worktree exists')
         if (prepared) fixtureProjectId = worktree.projectId
         await dispatch(page, orchestration, {
@@ -213,6 +270,8 @@ export function isolatedNativeScenario(options: {
           worktreePath: sessionWorktree.canonicalPath,
         })
       } catch (error) {
+        // Printed here: a cleanup failure below would otherwise replace this error.
+        console.error(`${options.name} drive failed: ${String(error)}`)
         await step('failed-before-cleanup')
         throw error
       } finally {

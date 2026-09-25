@@ -161,14 +161,54 @@ export function chatAgentStatus(agent: ChatAgent) {
   return 'Closed'
 }
 
+/** "2 running · 5 done · 1 failed", leaving out every part that is zero. */
 export function chatAgentGroupLabel(group: ChatAgentGroup) {
-  const count = group.agents.length
-  const workingCount = group.agents.filter((entry) => chatAgentIsWorking(entry.agent)).length
-  if (workingCount === count) return `${count} ${count === 1 ? 'agent' : 'agents'} working`
-  if (workingCount > 0) return `${workingCount} of ${count} agents working`
-  const failedCount = group.agents.filter((entry) => entry.agent.status === 'failed').length
-  if (failedCount > 0) return `${count} ${count === 1 ? 'agent' : 'agents'} · ${failedCount} failed`
-  return `${count} ${count === 1 ? 'agent' : 'agents'} finished`
+  const counts = { running: 0, done: 0, stopped: 0, failed: 0 }
+  for (const { agent } of group.agents) counts[agentTallyPart(agent)] += 1
+
+  return Object.entries(counts)
+    .filter(([, count]) => count > 0)
+    .map(([part, count]) => `${count} ${part}`)
+    .join(' · ')
+}
+
+function agentTallyPart(agent: ChatAgent) {
+  if (chatAgentIsWorking(agent)) return 'running'
+  if (agent.status === 'failed') return 'failed'
+  if (agent.status === 'interrupted') return 'stopped'
+
+  return 'done'
+}
+
+export type ChatAgentNode = { children: readonly ChatAgentNode[]; entry: ChatAgentEntry }
+
+/** Agents nested under the agent that spawned them; an unknown parent makes a root. */
+export function chatAgentTree(agents: readonly ChatAgentEntry[]): ChatAgentNode[] {
+  const agentsById = new Map(agents.map((entry) => [entry.agent.threadId, entry]))
+  const childrenOf = new Map<string, ChatAgentEntry[]>()
+  const roots: ChatAgentEntry[] = []
+  for (const entry of agents) {
+    const parent = entry.agent.parentThreadId
+    if (!parent || parent === entry.agent.threadId || !agentsById.has(parent)) {
+      roots.push(entry)
+      continue
+    }
+    childrenOf.set(parent, [...(childrenOf.get(parent) ?? []), entry])
+  }
+
+  const placed = new Set<string>()
+  const node = (entry: ChatAgentEntry): ChatAgentNode => {
+    placed.add(entry.agent.threadId)
+    const children = (childrenOf.get(entry.agent.threadId) ?? []).filter(
+      (child) => !placed.has(child.agent.threadId),
+    )
+    return { children: children.map(node), entry }
+  }
+  const tree = roots.map(node)
+  // A parent cycle has no root; its members still show, flat.
+  const orphans = agents.filter((entry) => !placed.has(entry.agent.threadId))
+
+  return [...tree, ...orphans.map(node)]
 }
 
 export function chatAgentElapsed(entry: ChatAgentEntry) {

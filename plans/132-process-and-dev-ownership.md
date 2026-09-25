@@ -23,7 +23,7 @@ now names the native backend. Session discovery started one `claude-discovery-wo
 per page every minute (168 roots, 13.4 s per scan); it is now one call with every root, one
 worker (or one Codex app-server) per scan, 185 ms for the same 106 sessions. Inspected
 at Platform `d1ca6472`. Covers `apps/desktop`, `apps/tui`, `apps/server` outside the provider
-adapters ([plan 131](131-provider-codes-not-prose.md)), `apps/web/vite.config.ts` and `scripts/`.
+adapters (plan 131, done), `apps/web/vite.config.ts` and `scripts/`.
 
 These are the places where one process guesses about another: who holds a port, which window is
 ours, whether a binary is a shim, whether a save came from the app. The guess is a name, a path

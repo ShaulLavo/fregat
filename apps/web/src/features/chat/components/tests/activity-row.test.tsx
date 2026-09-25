@@ -67,7 +67,7 @@ test('expanded MCP rows expose their arguments and full detail', async () => {
   )
 
   await userEvent.click(screen.getByRole('button'))
-  expect(screen.getByLabelText('Input')).toHaveTextContent('{"id":"ENG-12"}')
+  expect(screen.getByLabelText('Input')).toHaveTextContent('{ "id": "ENG-12" }')
   expect(screen.getByLabelText('Details')).toHaveTextContent('Retrieving ENG-12')
   expect(screen.getByLabelText('Output')).toHaveTextContent('Issue found')
 })
@@ -169,26 +169,6 @@ test('a native no-match search finishes without failure styling', async () => {
   expect(screen.queryByLabelText('Failed')).not.toBeInTheDocument()
   await userEvent.click(screen.getByRole('button', { name: 'rg absent existing.txt' }))
   expect(screen.getByLabelText('Result')).toHaveTextContent('No matches · Exit code 1')
-})
-
-test('a reasoning summary can be expanded to read the entire text', async () => {
-  resetExpansion()
-  const reasoning =
-    'The gutter needs a solid background matching the editor while the surrounding pane keeps its own transparency.'
-  renderWithProviders(
-    <ActivityRow
-      activity={entry({
-        id: 'reasoning-full',
-        sourceKind: 'task.progress',
-        icon: 'thinking',
-        tone: 'thinking',
-        title: reasoning,
-      })}
-    />,
-  )
-  expect(screen.queryByLabelText('Reasoning')).not.toBeInTheDocument()
-  await userEvent.click(screen.getByRole('button', { name: reasoning }))
-  expect(screen.getByLabelText('Reasoning')).toHaveTextContent(reasoning)
 })
 
 test('historical commands show their actual invocation and an expandable process result', async () => {

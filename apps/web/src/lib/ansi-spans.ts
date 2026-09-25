@@ -104,3 +104,18 @@ function indexedColor(index: number): AnsiColor {
     b: CUBE_LEVELS[cube % 6] ?? 0,
   }
 }
+
+/** The line with every escape sequence removed. */
+export function ansiPlainText(line: string) {
+  return line.replace(ESCAPE, '')
+}
+
+/** A span's colour as CSS, read from the theme's ANSI table for palette slots. */
+export function ansiColorStyle(color: AnsiColor | undefined, ansi: readonly AnsiRgb[]) {
+  if (color === undefined) return undefined
+
+  const rgb = typeof color === 'number' ? ansi[color] : color
+  if (!rgb) return undefined
+
+  return { color: `rgb(${rgb.r} ${rgb.g} ${rgb.b})` }
+}

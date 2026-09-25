@@ -107,7 +107,11 @@ export function ChatInputActions({
             draftTarget={draftTarget}
             narrow={narrow}
           />
-          <ChatInputAttachButton disabled={disabled} onSelectFiles={onSelectImageFiles} />
+          <ChatInputAttachButton
+            captureScope={`${draftTarget.environmentId}:${draftTarget.draftKey}`}
+            disabled={disabled}
+            onSelectFiles={onSelectImageFiles}
+          />
           {contextMeterEnabled && contextUsage && !tiny ? (
             <ContextUsageRing compact={compact} usage={contextUsage} />
           ) : null}

@@ -197,6 +197,7 @@ export function PendingUserInputCard({ pending }: { readonly pending: PendingUse
               onRetry={(id) => attachments.retry(question.id, id)}
             />
             <ChatInputAttachButton
+              captureScope={`question:${pending.requestId}:${question.id}`}
               disabled={responding || attachments.preparing}
               onSelectFiles={(files) => attachments.prepare(question.id, files)}
             />

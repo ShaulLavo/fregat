@@ -8,7 +8,6 @@ import {
 } from '@workspace/contracts'
 import * as v from 'valibot'
 
-import { workRowSections } from '@/features/chat/utils/work-row'
 import { chatActiveWorkLogPlan, chatWorkLogEntries } from '@/features/chat/utils/work-log'
 
 describe('chat work log entries', () => {
@@ -30,63 +29,42 @@ describe('chat work log entries', () => {
       ),
     })
     expect(entries).toHaveLength(1)
-    expect(entries[0]?.title).toBe(chunks.join(''))
-    expect(
-      workRowSections(entries[0]!).find((section) => section.label === 'Reasoning')?.value,
-    ).toBe(chunks.join(''))
+    expect(entries[0]).toMatchObject({ reasoning: true, title: chunks.join('') })
   })
 
-  it('hides persisted Rust stderr diagnostics while preserving protocol retries and failures', () => {
-    const diagnostic =
-      '2026-09-07T05:01:30.819533Z ERROR codex_models_manager::manager: failed to refresh available models: timeout waiting for child process to exit'
-    const fatal =
-      '2026-09-07T05:01:30.819533Z ERROR codex_core::client: failed to connect to websocket'
+  it('advances lastActivityAt through a merge while createdAt holds', () => {
+    const chunk = (id: string, updatedAt: string) =>
+      activity(id, {
+        createdAt: timestamp(1),
+        kind: 'task.progress',
+        tone: 'thinking',
+        payload: { taskId: 'segment', streamKind: 'reasoning_text', summary: id, updatedAt },
+      })
+    const entries = chatWorkLogEntries({
+      activities: [chunk('one', timestamp(3)), chunk('two', timestamp(9))],
+    })
+
+    expect(entries).toHaveLength(1)
+    expect(entries[0]).toMatchObject({ createdAt: timestamp(1), lastActivityAt: timestamp(9) })
+  })
+
+  it('carries a tool call end time from its completion', () => {
     const entries = chatWorkLogEntries({
       activities: [
-        activity('diagnostic', {
-          kind: 'runtime.warning',
-          tone: 'info',
-          summary: 'Runtime warning',
-          payload: { message: diagnostic, detail: { message: diagnostic } },
+        activity('start', {
+          createdAt: timestamp(1),
+          kind: 'tool.started',
+          payload: { toolCallId: 'call', itemType: 'command_execution', status: 'inProgress' },
         }),
-        activity('retry', {
-          kind: 'runtime.warning',
-          tone: 'info',
-          payload: { message: diagnostic, detail: { message: diagnostic, willRetry: true } },
-        }),
-        activity('runtime-failure', {
-          kind: 'runtime.error',
-          tone: 'error',
-          payload: { message: diagnostic, detail: { message: diagnostic } },
-        }),
-        activity('websocket-failure', {
-          kind: 'runtime.warning',
-          tone: 'info',
-          payload: { message: fatal, detail: { message: fatal } },
-        }),
-        activity('explicit-warning', {
-          kind: 'runtime.warning',
-          tone: 'info',
-          payload: { message: diagnostic, detail: { error: { message: diagnostic } } },
-        }),
-        activity('unstructured-warning', {
-          kind: 'runtime.warning',
-          tone: 'info',
-          payload: {
-            message: 'Authentication required',
-            detail: { message: 'Authentication required' },
-          },
+        activity('done', {
+          createdAt: timestamp(5),
+          kind: 'tool.completed',
+          payload: { toolCallId: 'call', itemType: 'command_execution', status: 'completed' },
         }),
       ],
     })
 
-    expect(entries.map((entry) => entry.id)).toEqual([
-      'retry',
-      'runtime-failure',
-      'websocket-failure',
-      'explicit-warning',
-      'unstructured-warning',
-    ])
+    expect(entries[0]).toMatchObject({ createdAt: timestamp(1), lastActivityAt: timestamp(5) })
   })
 
   it('hides persisted protocol notices but retains actionable failures and approvals', () => {
@@ -505,6 +483,36 @@ describe('chat work log entries', () => {
     expect(chatActiveWorkLogPlan(entries, null)).toBeNull()
   })
 
+  it('keeps a step a later plan update removed, marked dropped and out of the count', () => {
+    const entries = chatWorkLogEntries({
+      activities: [
+        planActivity('plan-1', timestamp(1), [
+          { status: 'completed', step: 'Read the code' },
+          { status: 'inProgress', step: 'Patch the gutter' },
+          { status: 'pending', step: 'Write a migration' },
+          { status: 'pending', step: 'Run the tests' },
+        ]),
+        planActivity('plan-2', timestamp(2), [
+          { status: 'completed', step: 'Read the code' },
+          { status: 'completed', step: 'Patch the gutter' },
+          { status: 'inProgress', step: 'Run the tests' },
+        ]),
+      ],
+    })
+
+    expect(chatActiveWorkLogPlan(entries, v.parse(turnIdSchema, 'turn-1'))).toEqual({
+      completedCount: 2,
+      currentStep: 'Run the tests',
+      liveCount: 3,
+      steps: [
+        { status: 'completed', step: 'Read the code' },
+        { status: 'completed', step: 'Patch the gutter' },
+        { status: 'dropped', step: 'Write a migration' },
+        { status: 'inProgress', step: 'Run the tests' },
+      ],
+    })
+  })
+
   it('drops generic reasoning markers while preserving substantive streamed reasoning', () => {
     const entries = chatWorkLogEntries({
       activities: [
@@ -578,6 +586,119 @@ describe('chat work log entries', () => {
     ])
   })
 
+  describe('folding rules', () => {
+    it('appends a retry as its own row and leaves the failed call untouched', () => {
+      const entries = chatWorkLogEntries({
+        activities: [
+          commandCall('first-start', 'call-1', 'tool.started', { status: 'inProgress' }),
+          commandCall('first-end', 'call-1', 'tool.completed', {
+            status: 'completed',
+            exitCode: 1,
+            aggregatedOutput: 'error: 2 failed',
+          }),
+          commandCall('retry-start', 'call-2', 'tool.started', { status: 'inProgress' }),
+          commandCall('retry-end', 'call-2', 'tool.completed', {
+            status: 'completed',
+            exitCode: 0,
+            aggregatedOutput: '12 passed',
+          }),
+        ],
+      })
+
+      expect(entries).toMatchObject([
+        { id: 'first-start', lifecycle: 'failed', outcome: 'failed', output: 'error: 2 failed' },
+        { id: 'retry-start', lifecycle: 'completed', outcome: 'succeeded', output: '12 passed' },
+      ])
+    })
+
+    it('never folds a retry into a failed call that reported its failure on an update', () => {
+      const entries = chatWorkLogEntries({
+        activities: [
+          commandCall('first', 'call-1', 'tool.updated', { status: 'failed' }),
+          commandCall('retry-update', 'call-2', 'tool.updated', { status: 'inProgress' }),
+          commandCall('retry-end', 'call-2', 'tool.completed', { status: 'completed' }),
+        ],
+      })
+
+      expect(entries).toMatchObject([
+        { id: 'first', lifecycle: 'failed', status: 'Failed' },
+        { id: 'retry-update', lifecycle: 'completed', outcome: 'succeeded' },
+      ])
+    })
+
+    it('keeps two running calls of the same command as two rows', () => {
+      const entries = chatWorkLogEntries({
+        activities: [
+          commandCall('one', 'call-1', 'tool.updated', { status: 'inProgress' }),
+          commandCall('two', 'call-2', 'tool.updated', { status: 'inProgress' }),
+          commandCall('two-end', 'call-2', 'tool.completed', { status: 'completed' }),
+        ],
+      })
+
+      expect(entries).toMatchObject([
+        { id: 'one', lifecycle: 'running' },
+        { id: 'two', lifecycle: 'completed' },
+      ])
+    })
+
+    it('keeps a failed call failed when the same call later reports completion', () => {
+      const entries = chatWorkLogEntries({
+        activities: [
+          commandCall('start', 'call-1', 'tool.started', { status: 'inProgress' }),
+          commandCall('failed', 'call-1', 'tool.updated', { status: 'failed' }),
+          commandCall('end', 'call-1', 'tool.completed', { status: 'completed' }),
+          commandCall('output', 'call-1', 'tool.updated', { aggregatedOutput: 'done' }),
+        ],
+      })
+
+      expect(entries).toMatchObject([{ id: 'start', lifecycle: 'failed', outcome: 'failed' }])
+    })
+
+    it('keeps a failed row failed when an unkeyed neighbour with the same text completes', () => {
+      const entries = chatWorkLogEntries({
+        activities: [
+          activity('failed', {
+            kind: 'tool.updated',
+            payload: { detail: 'bun test', itemType: 'command_execution', status: 'failed' },
+            summary: 'Bash',
+          }),
+          activity('completed', {
+            kind: 'tool.completed',
+            payload: { detail: 'bun test', itemType: 'command_execution', status: 'completed' },
+            summary: 'Bash',
+          }),
+        ],
+      })
+
+      expect(entries).toMatchObject([{ id: 'failed', lifecycle: 'failed', outcome: 'failed' }])
+    })
+
+    it('never folds a request into the tool call it interrupts', () => {
+      const entries = chatWorkLogEntries({
+        activities: [
+          commandCall('start', 'call-1', 'tool.started', { status: 'inProgress' }),
+          activity('approval', {
+            kind: 'approval.requested',
+            tone: 'approval',
+            payload: { requestId: 'approval-1', toolCallId: 'call-1' },
+          }),
+          activity('question', {
+            kind: 'user-input.requested',
+            tone: 'info',
+            payload: { requestId: 'question-1', toolCallId: 'call-1' },
+          }),
+          commandCall('end', 'call-1', 'tool.completed', { status: 'completed' }),
+        ],
+      })
+
+      expect(entries.map((entry) => [entry.id, entry.sourceKind])).toEqual([
+        ['start', 'tool.completed'],
+        ['approval', 'approval.requested'],
+        ['question', 'user-input.requested'],
+      ])
+    })
+  })
+
   it("keeps the caller's order when createdAt disagrees with sequence", () => {
     const entries = chatWorkLogEntries({
       // Store order: `(sequence, createdAt, id)`. Here the first row has the
@@ -618,6 +739,25 @@ function planActivity(
     summary: 'Plan updated',
     tone: 'thinking',
     turnId,
+  })
+}
+
+function commandCall(
+  id: string,
+  toolCallId: string,
+  kind: 'tool.started' | 'tool.updated' | 'tool.completed',
+  data: Record<string, unknown>,
+) {
+  const { status, ...rest } = data
+  return activity(id, {
+    kind,
+    payload: {
+      data: { command: 'bun test', id: toolCallId, ...rest },
+      detail: 'bun test',
+      itemType: 'command_execution',
+      ...(status ? { status } : {}),
+    },
+    summary: 'Command run',
   })
 }
 

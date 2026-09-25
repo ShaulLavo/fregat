@@ -1781,7 +1781,7 @@ describe('CodexProviderAdapter', () => {
             await adapter.respondApproval({ sessionId: input.sessionId, requestId, decision })
             await expect(
               adapter.respondApproval({ sessionId: input.sessionId, requestId, decision }),
-            ).rejects.toThrow('Unknown pending approval')
+            ).rejects.toMatchObject({ code: 'provider.REQUEST_GONE' })
           }
           await waitForFakeCodexEvent(spawnLogPath, 'server-response', 2)
           await adapter.stopAll()
@@ -1810,9 +1810,8 @@ describe('CodexProviderAdapter', () => {
           expect(
             activities.filter((activity) => activity.kind === 'approval.requested'),
           ).toHaveLength(2)
-          expect(
-            activities.filter((activity) => activity.kind === 'approval.resolved'),
-          ).toHaveLength(2)
+          // The fake completes its turn before the answers, which also ends both requests.
+          expect(activities.filter(isDecidedApproval)).toHaveLength(2)
         },
         { mode: 'permission-response' },
       )
@@ -1879,7 +1878,7 @@ describe('CodexProviderAdapter', () => {
             await adapter.respondApproval({ sessionId: input.sessionId, requestId, decision })
             await expect(
               adapter.respondApproval({ sessionId: input.sessionId, requestId, decision }),
-            ).rejects.toThrow('Unknown pending approval')
+            ).rejects.toMatchObject({ code: 'provider.REQUEST_GONE' })
           }
           await waitForFakeCodexEvent(spawnLogPath, 'server-response', 2)
           await adapter.stopAll()
@@ -1906,9 +1905,8 @@ describe('CodexProviderAdapter', () => {
                 { decision: 'accept' },
               ],
             })
-          expect(
-            activities.filter((activity) => activity.kind === 'approval.resolved'),
-          ).toHaveLength(2)
+          // The fake completes its turn before the answers, which also ends both requests.
+          expect(activities.filter(isDecidedApproval)).toHaveLength(2)
         },
         { mode: 'mcp-response' },
       )
@@ -2220,6 +2218,7 @@ describe('CodexProviderAdapter', () => {
         expect(events).toContainEqual(
           expect.objectContaining({
             payload: {
+              endReason: 'provider-error',
               errorMessage: expect.stringMatching(
                 /^Codex usage limit reached\. The session limit resets in (2h|1h 5\dm)\. Send the message again once the limit resets\.$/,
               ),
@@ -2233,7 +2232,7 @@ describe('CodexProviderAdapter', () => {
     )
   })
 
-  it('logs background Codex diagnostics without chat rows and preserves actionable stderr', async ({
+  it('keeps stderr as opaque diagnostics on the exit event, never as chat rows', async ({
     onTestFinished,
   }) => {
     const logDir = await mkdtemp(path.join(tmpdir(), 'platform-codex-stderr-'))
@@ -2258,22 +2257,14 @@ describe('CodexProviderAdapter', () => {
         await settleRuntimeEvents()
         await adapter.stopAll()
 
-        const warnings = events.flatMap((event) =>
-          event.type === 'runtime.warning' ? [event.payload.message] : [],
-        )
-        expect(warnings).toEqual(
-          expect.arrayContaining([
+        expect(events.filter((event) => event.type === 'runtime.warning')).toEqual([])
+        expect(
+          await codexPipelineWarningEvent(logDir, 'chat.pipeline.codex_process.exited'),
+        ).toMatchObject({
+          stderrTail: expect.arrayContaining([
             '2026-09-07T05:01:31Z ERROR codex_api::transport: failed to connect to websocket',
             'Authentication required: sign in again',
           ]),
-        )
-        expect(warnings.some((warning) => warning.includes('codex_models_manager'))).toBe(false)
-        expect(
-          await codexPipelineWarningEvent(logDir, 'chat.pipeline.codex_process.stderr'),
-        ).toMatchObject({
-          diagnostic:
-            '2026-09-07T05:01:30.819533Z ERROR codex_models_manager::manager: failed to refresh available models: timeout waiting for child process to exit',
-          processId: expect.any(Number),
         })
       },
       { mode: 'stderr-diagnostics' },
@@ -2674,4 +2665,10 @@ function restoreFakeCodexMode(previousMode: string | undefined) {
   }
 
   process.env.PLATFORM_FAKE_CODEX_MODE = previousMode
+}
+
+function isDecidedApproval(activity: { kind: string; payload: unknown }) {
+  if (activity.kind !== 'approval.resolved') return false
+
+  return typeof (activity.payload as { decision?: unknown }).decision === 'string'
 }

@@ -1,7 +1,12 @@
 import { strictEqual } from 'node:assert/strict'
 import type { Scenario } from './index'
 import { selectors, settleAnimations } from '../selectors'
-import { dispatch, openChatShell, readShell } from './chat-verification'
+import {
+  dispatch,
+  openChatShell,
+  openModelPickerInNewSession,
+  readShell,
+} from './chat-verification'
 
 /**
  * The Claude list comes from the running CLI: current models first, retired ones
@@ -15,12 +20,8 @@ export const chatClaudeCatalog: Scenario = {
   async run(page, { step }) {
     const shell = await openChatShell(page)
     try {
-      await selectors.chatNewSession(page).click()
+      const panel = await openModelPickerInNewSession(page)
       const trigger = selectors.modelPickerTrigger(page)
-      await trigger.waitFor({ timeout: 20_000 })
-      await trigger.click()
-      const panel = selectors.modelPickerPanel(page)
-      await panel.waitFor({ timeout: 10_000 })
       await selectors.modelPickerProvider(page, 'Claude Code').click()
       await selectors.modelPickerOption(page, 'Opus 5.5').waitFor({ timeout: 20_000 })
       await selectors.modelPickerLegacy(page).waitFor()

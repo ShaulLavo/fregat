@@ -230,6 +230,8 @@ export function useSettingsActions() {
       submit(targetFor('keybindings.overrides'), [{ command, keys, kind: 'keybinding.set' }]),
     setModelHidden: (ref: ModelRef, hidden: boolean) =>
       submit(targetFor('models.hidden'), [{ hidden, kind: 'model.setHidden', ref }]),
+    setModelFavorite: (ref: ModelRef, favorite: boolean) =>
+      submit(targetFor('models.favorites'), [{ favorite, kind: 'model.setFavorite', ref }]),
     setProviderEnabled: (instance: ProviderInstanceConfig, enabled: boolean) =>
       submit(targetFor('providers.instances'), [providerEnabledOperation(instance, enabled)]),
     setSetting,

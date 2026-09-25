@@ -14,6 +14,7 @@ import {
 } from '@/features/chat/utils/timeline-scroll-anchoring'
 import { TimelineRow } from '@/features/chat/components/timeline-row'
 import { TimelineViewport } from '@/features/chat/components/timeline-viewport'
+import { useReasoningAutoFold } from '@/features/chat/hooks/use-reasoning-auto-fold'
 
 export function MessagesTimeline({
   checkpointRevertPending = false,
@@ -29,6 +30,7 @@ export function MessagesTimeline({
   const items = chatTimelineItems({
     activities: session.activities,
     latestTurn: session.latestTurn,
+    turns: session.turns,
     messages: session.messages,
     optimisticMessages,
     proposedPlans: session.proposedPlans,
@@ -43,6 +45,7 @@ export function MessagesTimeline({
     timelineScrollReducer,
     initialView?.scrollState ?? initialTimelineScrollState,
   )
+  useReasoningAutoFold(items, scrollState.followMode !== 'free-scrolling')
 
   return (
     <VirtualList

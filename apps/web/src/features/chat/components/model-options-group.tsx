@@ -6,6 +6,9 @@ import {
   DropdownMenuSeparator,
 } from '@workspace/ui/components/dropdown-menu'
 
+import { EffortSparkle } from '@/features/chat/components/effort-sparkle'
+import { effortSparkleLevel } from '@/features/chat/utils/effort-sparkle'
+
 type SelectDescriptor = Extract<ProviderOptionDescriptor, { type: 'select' }>
 
 export function ModelOptionsGroup({
@@ -45,6 +48,7 @@ export function ModelOptionsGroup({
           value={choice.id}
           onClick={() => onSelect(choice.id)}
         >
+          <EffortSparkle level={effortSparkleLevel(choice.id)} />
           {choice.label}
           {choice.isDefault ? (
             <span className='text-muted-foreground text-2xs ml-auto'>Default</span>

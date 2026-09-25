@@ -576,9 +576,11 @@ export const selectors = {
   rewindDialog: (page: Page) => page.getByRole('alertdialog'),
   chatComposerFileInput: (page: Page) =>
     page
-      .getByRole('button', { name: 'Attach files', exact: true })
+      .getByRole('button', { name: 'Attach', exact: true })
       .locator('..')
       .locator('input[type=file]'),
+  chatAttachMenuItem: (page: Page, name: 'Attach files…' | 'Screenshot…') =>
+    page.getByRole('menuitem', { name, exact: true }),
   chatStagedFile: (page: Page, name: string) =>
     page.getByLabel('Attachments', { exact: true }).getByText(name, { exact: true }),
   chatStagedImage: (page: Page, name: string) =>
@@ -599,6 +601,10 @@ export const selectors = {
     page.getByRole('button', { name: 'Send correction', exact: true }),
   chatStop: (page: Page) => page.getByRole('button', { name: 'Stop current turn', exact: true }),
   chatSend: (page: Page) => page.getByRole('button', { name: 'Send message', exact: true }),
+  turnCarryOn: (page: Page) => page.getByRole('button', { name: 'Carry on', exact: true }),
+  turnTryAgain: (page: Page) => page.getByRole('button', { name: 'Try again', exact: true }),
+  incompleteAnswer: (page: Page) =>
+    page.getByRole('group', { name: 'Incomplete answer', exact: true }),
   chatQueue: (page: Page) => page.getByRole('button', { name: 'Queue message', exact: true }),
   chatQueuedMessages: (page: Page) =>
     page.getByRole('region', { name: 'Queued messages', exact: true }),
@@ -630,6 +636,24 @@ export const selectors = {
     page
       .getByRole('log', { name: 'Messages', exact: true })
       .locator(`[data-index] > [data-timeline-row-id="${id}"]`),
+  reasoningRows: (page: Page) => page.locator('[data-reasoning-row]'),
+  reasoningRow: (page: Page, entryId: string) =>
+    page.locator(`[data-reasoning-row][data-work-log-entry-id="${entryId}"]`),
+  liveActivityRow: (page: Page) =>
+    page.locator('[data-index]:has(> [data-timeline-row-type="live-activity"])'),
+  liveTail: (page: Page) => page.getByRole('list', { name: 'Latest tool calls', exact: true }),
+  stackFrame: (page: Page, frame: string) => page.locator(`[data-stack-frame="${frame}"]`).first(),
+  activePlanTrigger: (page: Page) =>
+    page.getByRole('button').filter({ has: page.getByLabel('Plan progress', { exact: true }) }),
+  planSteps: (page: Page) =>
+    page.getByRole('list', { name: 'Plan steps', exact: true }).locator('li'),
+  agentsRow: (page: Page) =>
+    page.locator('[data-timeline-row-type="agent-group"]').getByRole('button').first(),
+  agentTreeChild: (page: Page, threadId: string) =>
+    page.locator(`[data-agent-tree-level="child"] [data-agent-thread-id="${threadId}"]`),
+  modelSwitch: (page: Page) => page.locator('[data-model-switch]').first(),
+  jumpToLatest: (page: Page) =>
+    page.getByRole('button', { name: 'Scroll to latest message', exact: true }),
   composerActions: (page: Page) => page.locator('[data-composer-actions]'),
   usageMeter: (page: Page) => page.locator('[data-composer-actions] [data-usage-meter]'),
   usagePopover: (page: Page) => page.locator('[data-usage-popover]'),
@@ -747,6 +771,9 @@ export const selectors = {
   historyList: (page: Page) => page.getByRole('listbox', { name: 'Commit history' }),
   historyRowSelector: '[data-history-commit]',
   logRowSelector: '[data-log-row-summary]',
+  /** Every rendered assistant answer in the chat timeline, for page-side frame samplers. */
+  chatMarkdownSelector: '[role="log"][aria-label="Messages"] [data-chat-markdown]',
+  chatCodeBlockSelector: '[data-markdown="code-block"]',
   logCopyButtons: (page: Page) => page.getByRole('button', { name: 'Copy log event', exact: true }),
   logCleared: (page: Page) => page.getByText('Visible logs cleared.', { exact: true }),
   logRows: (page: Page) => page.locator('[data-log-row-summary]'),

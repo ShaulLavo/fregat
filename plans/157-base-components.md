@@ -119,7 +119,7 @@ Plan 136), and session and project deletes if they are recoverable. Check each b
 - `workbench/components/tab-trailing-slot.tsx:57` (dirty tab)
 - `lib/environments/components/phase.tsx:24`
 - not `chat/components/composer-active-plan.tsx:54`: that plan-step dot becomes a step mark in
-  [Plan 160](160-chat-turn-anatomy.md), so it is left alone here
+  Plan 160 (done on lane L2), so it is left alone here
 
 `logs/components/list-loading.tsx:14` is a skeleton of the dot, and it follows the same primitive.
 

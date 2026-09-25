@@ -29,6 +29,7 @@ export async function stageChatInputFiles(input: {
     count += 1
     await uploadStagedAttachment({ ...input, attachment, blob: prepared.blob })
   }
+  return count - input.existingCount
 }
 export async function uploadStagedAttachment(input: {
   draftTarget: ChatInputDraftTarget

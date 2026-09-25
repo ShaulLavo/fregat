@@ -1,7 +1,11 @@
 import { ok } from 'node:assert/strict'
-import { orchestrationShellSnapshotSchema } from '../../../packages/contracts/src/index'
+import {
+  orchestrationSessionDetailSnapshotSchema,
+  orchestrationShellSnapshotSchema,
+} from '../../../packages/contracts/src/index'
 import * as v from 'valibot'
 import type { Page } from 'playwright'
+import { selectors } from '../selectors'
 
 export async function readShell(page: Page, base: string) {
   const response = await page.request.get(`${base}/shell-snapshot`, {
@@ -9,6 +13,16 @@ export async function readShell(page: Page, base: string) {
   })
   ok(response.ok(), 'Shell snapshot is reachable')
   return v.parse(orchestrationShellSnapshotSchema, await response.json())
+}
+
+/** The session's projected detail over HTTP, as the page's own snapshot read gets it. */
+export async function readSessionDetail(page: Page, base: string, sessionId: string) {
+  const response = await page.request.get(`${base}/session-detail`, {
+    headers: { Origin: new URL(page.url()).origin },
+    params: { sessionId },
+  })
+  ok(response.ok(), 'Session detail is reachable')
+  return v.parse(orchestrationSessionDetailSnapshotSchema, await response.json()).session
 }
 
 export async function dispatch(page: Page, base: string, command: Record<string, unknown>) {
@@ -79,4 +93,15 @@ export function collectOrchestrationBases(page: Page) {
       )
   })
   return bases
+}
+
+/** A new session's composer with the model picker open; returns the picker panel. */
+export async function openModelPickerInNewSession(page: Page) {
+  await selectors.chatNewSession(page).click()
+  const trigger = selectors.modelPickerTrigger(page)
+  await trigger.waitFor({ timeout: 20_000 })
+  await trigger.click()
+  const panel = selectors.modelPickerPanel(page)
+  await panel.waitFor({ timeout: 10_000 })
+  return panel
 }

@@ -1,3 +1,8 @@
+import {
+  APPROVAL_ACTIVITY_KINDS,
+  applyApprovalActivity,
+  type ApprovalRequests,
+} from './approval-requests'
 import { pendingMessageQuestions, retainMessageQuestions } from './message-questions'
 import { terminalLeaseSchema } from '@workspace/contracts'
 import { worktreesAffectedByEvent, referencingSessionIds } from './worktree-projection'
@@ -26,6 +31,7 @@ import {
   projectionProjects,
   projectionWorktrees,
   projectionTerminalLeases,
+  projectionTurns,
   projectionState,
   projectionSessionActivities,
   projectionSessionCheckpoints,
@@ -123,6 +129,7 @@ export class OrchestrationSnapshotQuery {
         latestUserMessageAt: row.latestUserMessageAt,
         pendingRewindCommandId: row.pendingRewindCommandId,
         pendingRewindRestoreFiles: row.pendingRewindRestoreFiles,
+        approvalRequests: this.sessionApprovalRequests(row.sessionId),
         pendingApprovalCount: row.pendingApprovalCount,
         pendingUserInputCount: row.pendingUserInputCount,
       })
@@ -259,6 +266,14 @@ export class OrchestrationSnapshotQuery {
           this.activitiesBefore(sessionId, null, ORCHESTRATION_SESSION_DETAIL_PAGE_SIZE).rows,
           this.sessionRuntime(sessionId),
         ),
+        turns: Object.fromEntries(
+          this.database
+            .select()
+            .from(projectionTurns)
+            .where(eq(projectionTurns.sessionId, sessionId))
+            .all()
+            .map((turn) => [turn.turnId, turn]),
+        ),
         pendingMessageQuestions: pendingMessageQuestions(
           this.recentSessionActivities(sessionId).map(activityFromRow),
         ),
@@ -378,6 +393,26 @@ export class OrchestrationSnapshotQuery {
     return [...retained, ...recent]
   }
 
+  private sessionApprovalRequests(sessionId: string): ApprovalRequests {
+    const rows = this.database
+      .select()
+      .from(projectionSessionActivities)
+      .where(
+        and(
+          eq(projectionSessionActivities.sessionId, sessionId),
+          inArray(projectionSessionActivities.kind, APPROVAL_ACTIVITY_KINDS),
+        ),
+      )
+      .orderBy(
+        asc(projectionSessionActivities.sequence),
+        asc(projectionSessionActivities.createdAt),
+      )
+      .all()
+    const requests: ApprovalRequests = new Map()
+    for (const row of rows) applyApprovalActivity(requests, activityFromRow(row))
+    return requests
+  }
+
   private sessionRuntime(sessionId: string) {
     return this.database
       .select()
@@ -458,13 +493,15 @@ export class OrchestrationSnapshotQuery {
       messages: held?.messages ?? this.recentSessionMessages(sessionId).map(messageFromRow),
       pendingRewindCommandId: row.pendingRewindCommandId,
       pendingRewindRestoreFiles: row.pendingRewindRestoreFiles,
+      approvalRequests: held?.approvalRequests ?? this.sessionApprovalRequests(sessionId),
       pendingApprovalCount: row.pendingApprovalCount,
       pendingUserInputCount: row.pendingUserInputCount,
     })
   }
 
   private refreshSessionStreams(model: OrchestrationReadModel, event: OrchestrationEvent) {
-    if (event.type === 'session.message-sent') {
+    // A turn start stamps its model selection on the message that asked for it.
+    if (event.type === 'session.message-sent' || event.type === 'session.turn-start-requested') {
       this.refreshMessage(model, event.payload.sessionId, event.payload.messageId)
       return
     }
@@ -508,6 +545,7 @@ export class OrchestrationSnapshotQuery {
       .get()
     if (!row) return
 
+    applyApprovalActivity(session.approvalRequests, activityFromRow(row))
     upsertById(session.activities, activityFromRow(row), Number.POSITIVE_INFINITY)
     session.activities = retainMessageQuestions(session.activities, MAX_SESSION_ACTIVITIES)
   }

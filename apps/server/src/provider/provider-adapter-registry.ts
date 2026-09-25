@@ -24,7 +24,7 @@ import {
 } from '../orchestration/orchestration-logging'
 import { ProviderCredentialWatch } from './credential-watch'
 import type { AnyProviderDriver, ProviderInstanceConfig } from './driver'
-import { BUILT_IN_PROVIDER_DRIVERS, DEFAULT_PROVIDER_INSTANCES } from './drivers/built-in'
+import { DEFAULT_PROVIDER_INSTANCES, productProviderDrivers } from './drivers/built-in'
 import { defaultProviderStatusCacheDir, ProviderStatusCache } from './status-cache'
 import type { ProviderAdapter } from './types'
 import { mergeProviderInstanceConfigs } from './utils/instance-config-merge'
@@ -629,7 +629,7 @@ export function createDefaultProviderAdapterRegistry(
   } = {},
 ) {
   const registry = new ProviderAdapterRegistry({
-    drivers: BUILT_IN_PROVIDER_DRIVERS,
+    drivers: productProviderDrivers(),
     hasLiveSessions: options.hasLiveSessions,
     statusCache: new ProviderStatusCache({ directory: defaultProviderStatusCacheDir() }),
   })

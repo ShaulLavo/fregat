@@ -5,6 +5,7 @@ import {
   eventIdSchema,
   messageIdSchema,
   proposedPlanIdSchema,
+  providerInstanceIdSchema,
   sessionIdSchema,
   turnIdSchema,
   type OrchestrationLatestTurn,
@@ -16,9 +17,37 @@ import * as v from 'valibot'
 
 import type { OptimisticChatMessage } from '@/features/chat/state/chat-message-intents'
 import type { ChatTurnDiffSummary } from '@workspace/client-core/chat/types'
-import { chatTimelineItems, type ChatTimelineItem } from '@/features/chat/utils/timeline-items'
+import { isPinnedWorkLogEntry } from '@/features/chat/utils/activity-visibility'
+import {
+  chatTimelineItemEstimate,
+  chatTimelineItems,
+  type ChatTimelineItem,
+} from '@/features/chat/utils/timeline-items'
 
 describe('chat timeline items', () => {
+  it('keeps the stopped fold label after Carry on starts another turn', () => {
+    const sessionId = parseSessionId('bc3e1c41-73bd-5eb7-824f-b1fd01bf336d')
+    const turnId = parseTurnId('previous-turn')
+    const previous = {
+      ...settledTurn(turnId, 'interrupted', timestamp(5)),
+      endReason: 'user-stop' as const,
+    }
+    const items = chatTimelineItems({
+      activities: [activity('previous-tool', sessionId, timestamp(3), turnId)],
+      latestTurn: runningTurn(parseTurnId('next-turn'), timestamp(6)),
+      turns: { [turnId]: previous },
+      messages: [
+        message('previous-question', sessionId, timestamp(1), 'user'),
+        message('carry-on', sessionId, timestamp(6), 'user'),
+      ],
+      optimisticMessages: [],
+      proposedPlans: [],
+    })
+    expect(items.find((item) => item.type === 'turn-fold')).toMatchObject({
+      label: expect.stringContaining('You stopped it'),
+    })
+  })
+
   it.each(['completed', 'interrupted', 'error'] as const)(
     'removes the live activity when a turn is %s',
     (state) => {
@@ -473,7 +502,12 @@ describe('chat timeline items', () => {
     expect(items.some((item) => item.type === 'turn-fold')).toBe(false)
   })
 
-  it('names an interrupted turn after the user who stopped it', () => {
+  it.for([
+    { endReason: 'user-stop', label: 'You stopped it after 2.0s' },
+    { endReason: 'server-restart', label: 'Interrupted by a server restart after 2.0s' },
+    { endReason: 'runtime-stopped', label: 'The session was stopped after 2.0s' },
+    { endReason: null, label: 'Stopped after 2.0s' },
+  ] as const)('names an interrupted turn by why it stopped: $label', ({ endReason, label }) => {
     const sessionId = v.parse(sessionIdSchema, 'affd3ce8-92e1-5ee7-b089-edd598c2c35a')
     const turnId = v.parse(turnIdSchema, 'turn-1')
     const items = chatTimelineItems({
@@ -485,6 +519,7 @@ describe('chat timeline items', () => {
         runtimeEpoch: 'test-epoch',
         assistantMessageId: null,
         completedAt: timestamp(4),
+        endReason,
         requestedAt: timestamp(1),
         startedAt: timestamp(2),
         state: 'interrupted',
@@ -495,8 +530,111 @@ describe('chat timeline items', () => {
       proposedPlans: [],
     })
 
-    expect(items.find((item) => item.type === 'turn-fold')).toMatchObject({
-      label: 'You stopped after 2.0s',
+    expect(items.find((item) => item.type === 'turn-fold')).toMatchObject({ label })
+  })
+
+  describe('folds never hide a failure, a wait or a running call', () => {
+    it('keeps a failed call outside the settled turn fold', () => {
+      const sessionId = parseSessionId('bc3e1c41-73bd-5eb7-824f-b1fd01bf336d')
+      const turnId = parseTurnId('turn-1')
+      const items = chatTimelineItems({
+        activities: [
+          activity('tool-ok', sessionId, timestamp(3), turnId),
+          activity('tool-failed', sessionId, timestamp(4), turnId, 'tool.completed', 'error', {
+            toolCallId: 'call-2',
+            status: 'failed',
+          }),
+        ],
+        latestTurn: settledTurn(turnId, 'completed', timestamp(5)),
+        messages: [
+          message('message-1', sessionId, timestamp(1), 'user'),
+          message('message-2', sessionId, timestamp(2), 'assistant', { text: 'Looking', turnId }),
+          message('message-3', sessionId, timestamp(5), 'assistant', { text: 'Done', turnId }),
+        ],
+        optimisticMessages: [],
+        proposedPlans: [],
+      })
+
+      expect(items.map((item) => item.id)).toEqual([
+        'message:message-1',
+        'turn-fold:turn-1',
+        'activity-group:tool-failed',
+        'message:message-3',
+      ])
+      expect(foldedItemIds(items[1])).toEqual(['message:message-2', 'activity-group:tool-ok'])
+    })
+
+    it('never folds a turn that is waiting on the user or running a tool', () => {
+      const sessionId = parseSessionId('28a4dd88-b175-59c8-a28b-4df609078204')
+      const settledTurnId = parseTurnId('turn-1')
+      const turnId = parseTurnId('turn-2')
+      const items = chatTimelineItems({
+        activities: [
+          activity('old-tool', sessionId, timestamp(2), settledTurnId),
+          activity('running-tool', sessionId, timestamp(5), turnId, 'tool.started', 'tool', {
+            toolCallId: 'call-1',
+            status: 'inProgress',
+          }),
+          activity('approval', sessionId, timestamp(6), turnId, 'approval.requested', 'approval', {
+            requestId: 'approval-1',
+          }),
+        ],
+        latestTurn: runningTurn(turnId, timestamp(4)),
+        messages: [
+          message('message-1', sessionId, timestamp(1), 'user'),
+          message('message-2', sessionId, timestamp(3), 'assistant', {
+            text: 'Done',
+            turnId: settledTurnId,
+          }),
+          message('message-3', sessionId, timestamp(4), 'user'),
+        ],
+        optimisticMessages: [],
+        proposedPlans: [],
+      })
+
+      const folds = items.filter((item) => item.type === 'turn-fold')
+      expect(folds.map((fold) => fold.id)).toEqual(['turn-fold:turn-1'])
+      expect(folds.flatMap(foldedActivityIds)).toEqual(['old-tool'])
+      expect(items.find((item) => item.type === 'live-activity')).toMatchObject({
+        activity: { entry: { id: 'approval' }, label: 'Waiting for approval' },
+      })
+    })
+
+    it('keeps a running call visible when its group collapses', () => {
+      const sessionId = parseSessionId('ad686244-5b2e-59be-805f-ef86eac80feb')
+      const turnId = parseTurnId('turn-1')
+      const items = chatTimelineItems({
+        activities: [
+          activity('running', sessionId, timestamp(2), turnId, 'tool.started', 'tool', {
+            toolCallId: 'call-1',
+            status: 'inProgress',
+          }),
+          activity('done', sessionId, timestamp(3), turnId, 'tool.completed', 'tool', {
+            toolCallId: 'call-2',
+            status: 'completed',
+          }),
+          activity('failed', sessionId, timestamp(4), turnId, 'tool.completed', 'error', {
+            toolCallId: 'call-3',
+            status: 'failed',
+          }),
+          activity('thinking', sessionId, timestamp(5), turnId, 'task.progress', 'thinking', {
+            summary: 'Reading the failure',
+          }),
+        ],
+        latestTurn: runningTurn(turnId, timestamp(1)),
+        messages: [message('message-1', sessionId, timestamp(1), 'user')],
+        optimisticMessages: [],
+        proposedPlans: [],
+      })
+
+      const activities = items.flatMap((item) =>
+        item.type === 'activity-group' ? item.activities : [],
+      )
+      expect(activities.map((entry) => entry.id)).toEqual(['running', 'done', 'failed'])
+      expect(activities.filter(isPinnedWorkLogEntry).map((entry) => entry.id)).toEqual([
+        'running',
+        'failed',
+      ])
     })
   })
 
@@ -542,6 +680,84 @@ describe('chat timeline items', () => {
     // memo — and every effect keyed on it — sees no change at all.
     expect(render(chunk)).toBe(after)
   })
+
+  it('marks a turn whose model or effort differs from the turn before, never the first', () => {
+    const sessionId = parseSessionId('ad686244-5b2e-59be-805f-ef86eac80feb')
+    const selection = (model: string, effort: string) => ({
+      model,
+      options: { reasoningEffort: effort },
+      providerInstanceId: v.parse(providerInstanceIdSchema, 'codex'),
+    })
+    const user = (id: string, index: number, modelSelection: ReturnType<typeof selection>) => ({
+      ...message(id, sessionId, timestamp(index), 'user'),
+      modelSelection,
+    })
+    const items = chatTimelineItems({
+      activities: [],
+      latestTurn: null,
+      messages: [
+        user('first', 1, selection('gpt-5.5', 'high')),
+        user('same', 2, selection('gpt-5.5', 'high')),
+        user('effort', 3, selection('gpt-5.5', 'xhigh')),
+        user('model', 4, selection('gpt-5.2', 'xhigh')),
+      ],
+      optimisticMessages: [],
+      proposedPlans: [],
+    })
+
+    expect(items.map((item) => item.id)).toEqual([
+      'message:first',
+      'message:same',
+      'model-switch:effort',
+      'message:effort',
+      'model-switch:model',
+      'message:model',
+    ])
+    expect(chatTimelineItemEstimate(items[2])).toBe(24)
+  })
+
+  it('gives reasoning its own row that streams while it is the newest work of a running turn', () => {
+    const sessionId = parseSessionId('ad686244-5b2e-59be-805f-ef86eac80feb')
+    const turnId = parseTurnId('reasoning-turn')
+    const thinking = activity(
+      'think',
+      sessionId,
+      timestamp(2),
+      turnId,
+      'task.progress',
+      'thinking',
+      {
+        streamKind: 'reasoning_text',
+        summary: 'Reading the gutter code',
+        taskId: 'reasoning-1',
+      },
+    )
+    const tool = activity('tool', sessionId, timestamp(3), turnId, 'tool.completed', 'tool', {
+      itemType: 'command_execution',
+      status: 'completed',
+    })
+    const base = {
+      latestTurn: runningTurn(turnId, timestamp(1)),
+      messages: [message('user', sessionId, timestamp(1), 'user')],
+      optimisticMessages: [],
+      proposedPlans: [],
+    }
+
+    const streaming = chatTimelineItems({ ...base, activities: [thinking] })
+    const settled = chatTimelineItems({ ...base, activities: [thinking, tool] })
+
+    expect(streaming.find((item) => item.type === 'reasoning')).toMatchObject({
+      id: 'reasoning:think',
+      streaming: true,
+    })
+    expect(settled.map((item) => item.id)).toEqual([
+      'message:user',
+      'working:reasoning-turn',
+      'reasoning:think',
+      'live-activity:user',
+    ])
+    expect(settled.find((item) => item.type === 'reasoning')).toMatchObject({ streaming: false })
+  })
 })
 
 function runningTurn(
@@ -560,6 +776,24 @@ function runningTurn(
     state: 'running',
     turnId,
   }
+}
+
+function settledTurn(
+  turnId: ReturnType<typeof parseTurnId>,
+  state: OrchestrationLatestTurn['state'],
+  completedAt: string,
+): OrchestrationLatestTurn {
+  return {
+    ...runningTurn(turnId, timestamp(1)),
+    completedAt,
+    state,
+  }
+}
+
+function foldedActivityIds(item: ChatTimelineItem) {
+  return flattenTimelineItems([item]).flatMap((folded) =>
+    folded.type === 'activity-group' ? folded.activities.map((entry) => entry.id) : [],
+  )
 }
 
 function flattenTimelineItems(items: readonly ChatTimelineItem[]): ChatTimelineItem[] {

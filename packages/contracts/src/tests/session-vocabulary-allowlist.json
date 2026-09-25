@@ -263,11 +263,10 @@
   "apps/server/src/provider/adapters/codex.ts": {
     "agentThreadId": 1,
     "CodexThreadTokenUsageUpdatedNotificationSchema": 3,
-    "find_thread_path_by_id_str_in_subdir": 1,
     "notificationThreadId": 11,
     "providerThreadId": 19,
     "rootThreadId": 1,
-    "thread": 10,
+    "thread": 9,
     "thread.cwd": 1,
     "thread.id": 2,
     "thread/compacted": 2,
@@ -350,6 +349,9 @@
     "threadStartCount": 3,
     "threadStarts": 3
   },
+  "apps/server/src/provider/adapters/tests/mock-turn-anatomy.test.ts": {
+    "threadId": 1
+  },
   "apps/server/src/provider/adapters/utils/codex-child-notifications.ts": {
     "agentThreadId": 1,
     "notificationThreadId": 1,
@@ -392,6 +394,10 @@
   "apps/server/src/provider/adapters/utils/codex-session.ts": {
     "thread": 1
   },
+  "apps/server/src/provider/adapters/utils/mock-turn-anatomy.ts": {
+    "parentThreadId": 1,
+    "threadId": 3
+  },
   "apps/server/src/provider/adapters/utils/tests/codex-elicitation.test.ts": {
     "thread": 1,
     "threadId": 1
@@ -408,16 +414,17 @@
     "thread": 1,
     "threadId": 2
   },
-  "apps/web/src/features/chat/components/agents-panel.tsx": {
+  "apps/web/src/features/chat/components/agent-tree-list.tsx": {
     "threadId": 1
   },
   "apps/web/src/features/chat/tests/agents.test.ts": {
+    "parentThreadId": 7,
     "thread": 1,
-    "threadId": 17
+    "threadId": 31
   },
   "apps/web/src/features/chat/utils/agents.ts": {
-    "parentThreadId": 1,
-    "threadId": 8
+    "parentThreadId": 2,
+    "threadId": 14
   },
   "packages/contracts/src/chat-agent.ts": {
     "parentThreadId": 1,

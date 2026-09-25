@@ -5,6 +5,7 @@ import { orchestrationCommandSchema } from '@workspace/contracts'
 
 const assistantStartedAt = '2026-05-24T00:02:00.000Z'
 const assistantCompletedAt = '2026-05-24T00:03:00.000Z'
+import { DOMAIN_MODEL } from './factories/session-domain'
 import {
   createDomainEngine,
   fixtureWorktreeId,
@@ -36,9 +37,11 @@ describe('projection latest turn snapshots', () => {
       assistantMessageId: 'message-2',
       // Provider-runtime commands still carry their own event time.
       completedAt: assistantCompletedAt,
+      endReason: null,
       requestedAt: turn?.requestedAt,
       sourceProposedPlan,
-      startedAt: assistantStartedAt,
+      // This fixture has no runtime start event, so the request starts the turn.
+      startedAt: turn?.requestedAt,
       state: 'completed',
       providerStartState: 'settled',
       providerStartGeneration: 1,
@@ -92,6 +95,7 @@ describe('projection latest turn snapshots', () => {
     expect(turn).toEqual({
       assistantMessageId: null,
       completedAt: turn?.completedAt,
+      endReason: 'user-stop',
       requestedAt: turn?.requestedAt,
       startedAt: null,
       state: 'interrupted',
@@ -104,6 +108,43 @@ describe('projection latest turn snapshots', () => {
     expectServerStamped(turn?.requestedAt, before)
     // The interrupt is a client command, so the server clock closes the turn.
     expectServerStamped(turn?.completedAt, turn?.requestedAt)
+  })
+
+  it('records a stopped session and a harness-reported limit as end reasons', async () => {
+    const engine = createEngine()
+    await dispatchProjectSession(engine)
+    await engine.dispatch(startTurnCommand())
+
+    await engine.dispatch(
+      command({
+        commandId: 'cmd-runtime-stop',
+        sessionId: 'd2b3ea2b-7e36-4549-b0d4-043c00904574',
+        type: 'session.runtime.stop',
+      }),
+    )
+
+    expect((await latestTurn(engine))?.endReason).toBe('runtime-stopped')
+  })
+
+  it('keeps the first cause when the harness reports its own reason later', async () => {
+    const engine = createEngine()
+    await dispatchProjectSession(engine)
+    await engine.dispatch(startTurnCommand())
+    await engine.dispatch(interruptTurnCommand())
+
+    await engine.dispatch(turnEndedCommand('turn-limit'))
+
+    expect((await latestTurn(engine))?.endReason).toBe('user-stop')
+  })
+
+  it('takes a harness-reported reason when nothing of ours ended the turn', async () => {
+    const engine = createEngine()
+    await dispatchProjectSession(engine)
+    await engine.dispatch(startTurnCommand())
+
+    await engine.dispatch(turnEndedCommand('output-limit'))
+
+    expect((await latestTurn(engine))?.endReason).toBe('output-limit')
   })
 
   it('rejects a nonexistent plan ID even when its session has a plan ready', async () => {
@@ -290,6 +331,31 @@ describe('projection latest turn snapshots', () => {
   })
 })
 
+describe('turn model selection on the user message', () => {
+  it('stamps the session selection, or the turn own one, on the message that started it', async () => {
+    const engine = createEngine()
+    await dispatchProjectSession(engine)
+    await engine.dispatch(startTurnCommand())
+    await engine.dispatch(interruptTurnCommand())
+    const chosen = { ...DOMAIN_MODEL, options: { reasoningEffort: 'xhigh' } }
+    await engine.dispatch(
+      startTurnCommand({
+        commandId: 'cmd-turn-2',
+        messageId: 'message-3',
+        modelSelection: chosen,
+        turnId: 'turn-2',
+      }),
+    )
+
+    const messages = (await engine.sessionDetailSnapshot('d2b3ea2b-7e36-4549-b0d4-043c00904574'))
+      .session.messages
+    expect(messages.find((message) => message.id === 'message-1')?.modelSelection).toEqual(
+      DOMAIN_MODEL,
+    )
+    expect(messages.find((message) => message.id === 'message-3')?.modelSelection).toEqual(chosen)
+  })
+})
+
 function expectServerStamped(value: string | null | undefined, notBefore: string | undefined) {
   expect(typeof value).toBe('string')
   expect(Number.isNaN(Date.parse(value ?? ''))).toBe(false)
@@ -326,6 +392,7 @@ function startTurnCommand(input: Partial<StartTurnInput> = {}) {
   return command({
     commandId: input.commandId ?? 'cmd-turn-start',
     interactionMode: 'default',
+    ...(input.modelSelection ? { modelSelection: input.modelSelection } : {}),
     message: {
       attachments: [],
       messageId: input.messageId ?? 'message-1',
@@ -343,6 +410,7 @@ function startTurnCommand(input: Partial<StartTurnInput> = {}) {
 type StartTurnInput = {
   commandId: string
   messageId: string
+  modelSelection: typeof DOMAIN_MODEL & { options?: Record<string, string> }
   sourceProposedPlan: { planId: string; sessionId: string }
   text: string
   turnId: string
@@ -383,6 +451,25 @@ function interruptTurnCommand() {
     sessionId: 'd2b3ea2b-7e36-4549-b0d4-043c00904574',
     turnId: 'turn-1',
     type: 'session.turn.interrupt',
+  })
+}
+
+function turnEndedCommand(endReason: string) {
+  return command({
+    activity: {
+      createdAt: '2026-05-24T00:04:00.000Z',
+      id: `turn-ended-${endReason}`,
+      kind: 'turn.ended',
+      payload: { endReason },
+      sessionId: 'd2b3ea2b-7e36-4549-b0d4-043c00904574',
+      summary: 'Turn ended',
+      tone: 'info',
+      turnId: 'turn-1',
+    },
+    commandId: `cmd-turn-ended-${endReason}`,
+    createdAt: '2026-05-24T00:04:00.000Z',
+    sessionId: 'd2b3ea2b-7e36-4549-b0d4-043c00904574',
+    type: 'session.activity.append',
   })
 }
 

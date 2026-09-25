@@ -33,7 +33,7 @@ test('a single-select question renders its options and submits the chosen value'
     requestId: REQUEST_ID,
     type: 'session.user-input.respond',
   })
-  expect(screen.getByText('Response sent. Waiting for agent…')).toBeVisible()
+  expect(await screen.findByText('Response sent. Waiting for agent…')).toBeVisible()
 })
 
 test('submit stays disabled until every question is answered', async () => {
@@ -168,22 +168,23 @@ function renderPanel(
       sessions: [seeded],
     }),
   )
-  useChatProjectionStore
-    .getState()
-    // The store's ChatSession drops `deletedAt`; the wire snapshot still carries it.
-    .syncSessionDetailSnapshot(FIXTURE_ENVIRONMENT_ID, {
-      checkpoints: [],
-      proposedPlans: [],
-      snapshotSequence: 1,
-      session: { deletion: null, ...seeded, deletedAt: null },
-    })
+  const snapshot = {
+    checkpoints: [],
+    proposedPlans: [],
+    snapshotSequence: 1,
+    session: { deletion: null, ...seeded, deletedAt: null },
+  }
+  useChatProjectionStore.getState().syncSessionDetailSnapshot(FIXTURE_ENVIRONMENT_ID, snapshot)
 
   const dispatched: ClientOrchestrationCommand[] = []
 
   renderWithProviders(
     <ChatPendingRequestsProvider
       transport={{
-        ...unsupportedChatTransport(),
+        ...unsupportedChatTransport({
+          replayEvents: async () => ({ events: [] }),
+          sessionDetailSnapshot: async () => snapshot,
+        }),
         dispatchCommand: async (command) => {
           dispatched.push(command)
           if (dispatch) return dispatch()

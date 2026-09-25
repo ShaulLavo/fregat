@@ -22,7 +22,7 @@ export function ModelPickerTrigger({
   readonly busy: boolean
   readonly disabled: boolean
 }) {
-  const { modelSelection, provider } = useModelPicker()
+  const { additionalModels, modelSelection, provider } = useModelPicker()
   // No ready provider offers a model yet. Stay openable — the rows carry the
   // sign-in and not-installed affordances the user needs to fix it.
   const modelLabel = modelSelection
@@ -57,6 +57,11 @@ export function ModelPickerTrigger({
               />
             ) : null}
             <span className='min-w-0 truncate'>{modelLabel}</span>
+            {additionalModels.length > 0 ? (
+              <span className='text-muted-foreground text-2xs shrink-0 font-mono tabular-nums'>
+                +{additionalModels.length}
+              </span>
+            ) : null}
             <CaretDownIcon className='size-(--icon-size-sm) shrink-0' />
             <span
               aria-label={statusLabel}

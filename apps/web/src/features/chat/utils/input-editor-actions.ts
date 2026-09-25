@@ -75,6 +75,11 @@ export function insertChatInputText(
   return inserted
 }
 
+/** Replaces the whole prompt, caret at the end, and focuses the composer. */
+export function setChatInputEditorText(editor: LexicalEditor, text: string) {
+  editor.update(() => $setChatInputText(text), { onUpdate: () => editor.focus() })
+}
+
 /** Inserts one mention, plus the blank that separates it from what follows. */
 export function insertChatInputMention(
   editor: LexicalEditor,
@@ -413,4 +418,14 @@ function lexicalNodeTextSize(node: LexicalNode): number {
   if (!$isElementNode(node)) return 0
 
   return node.getChildren().reduce((size, child) => size + lexicalNodeTextSize(child), 0)
+}
+
+export async function foldChatInputPaste(
+  editor: LexicalEditor,
+  text: string,
+  name: string,
+  admit: (files: readonly File[]) => Promise<boolean>,
+) {
+  const accepted = await admit([new File([text], name, { type: 'text/plain' })]).catch(() => false)
+  if (!accepted) insertChatInputText(editor, text)
 }

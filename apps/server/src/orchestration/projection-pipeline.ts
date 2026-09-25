@@ -1,4 +1,9 @@
-import { isProviderTurnFailureActivity } from '@workspace/contracts'
+import {
+  isProviderTurnFailureActivity,
+  TURN_ENDED_ACTIVITY_KIND,
+  turnEndedPayloadSchema,
+  type TurnEndReason,
+} from '@workspace/contracts'
 import {
   applyWorktreeEvent,
   lifecycleFields,
@@ -351,6 +356,8 @@ export class OrchestrationProjectionPipeline {
           event.payload.turnId,
           'interrupted',
           event.payload.createdAt,
+          undefined,
+          'user-stop',
         )
         return
       case 'session.turn-diff-completed':
@@ -358,7 +365,12 @@ export class OrchestrationProjectionPipeline {
         return
       case 'session.runtime-stop-requested':
         this.updateSessionStatus(event.payload.sessionId, 'stopped', event.payload.createdAt)
-        this.settleRunningTurns(event.payload.sessionId, 'stopped', event.payload.createdAt)
+        this.settleRunningTurns(
+          event.payload.sessionId,
+          'stopped',
+          event.payload.createdAt,
+          'runtime-stopped',
+        )
         return
       case 'session.proposed-plan-implemented':
         this.markProposedPlanImplemented(event)
@@ -487,6 +499,7 @@ export class OrchestrationProjectionPipeline {
         providerStartState: 'interrupted',
         providerStartSequence: event.sequence,
         completedAt: event.payload.createdAt,
+        ...firstEndReason('server-restart'),
       })
       .where(
         and(
@@ -751,19 +764,39 @@ export class OrchestrationProjectionPipeline {
     const completedAt = settlesTurn
       ? (turn?.completedAt ?? event.payload.updatedAt)
       : (turn?.completedAt ?? null)
-    const startedAt = turn?.startedAt ?? event.payload.createdAt
+    const startedAt = turn?.startedAt ?? turn?.requestedAt ?? event.payload.createdAt
     const requestedAt = turn?.requestedAt ?? event.payload.createdAt
 
     this.upsertAssistantTurn(event, { completedAt, requestedAt, startedAt, state })
     this.updateSessionLatestTurnForAssistantMessage(event)
   }
 
+  /** A turn with no selection of its own runs on the session's, as it stood before this start. */
+  private stampTurnModelSelection(
+    event: Extract<OrchestrationEvent, { type: 'session.turn-start-requested' }>,
+    sessionModelSelectionJson: string | null,
+  ) {
+    const modelSelectionJson =
+      jsonOrUndefined(event.payload.modelSelection) ?? sessionModelSelectionJson
+    if (!modelSelectionJson) return
+
+    this.database
+      .update(projectionSessionMessages)
+      .set({ modelSelectionJson })
+      .where(eq(projectionSessionMessages.messageId, event.payload.messageId))
+      .run()
+  }
+
   private upsertTurn(event: Extract<OrchestrationEvent, { type: 'session.turn-start-requested' }>) {
     const session = this.database
-      .select({ worktreeId: projectionSessions.worktreeId })
+      .select({
+        modelSelectionJson: projectionSessions.modelSelectionJson,
+        worktreeId: projectionSessions.worktreeId,
+      })
       .from(projectionSessions)
       .where(eq(projectionSessions.sessionId, event.payload.sessionId))
       .get()
+    this.stampTurnModelSelection(event, session?.modelSelectionJson ?? null)
     const worktree = session
       ? this.database
           .select()
@@ -1002,6 +1035,28 @@ export class OrchestrationProjectionPipeline {
       .values({ ...runtime, sessionId: event.payload.sessionId })
       .onConflictDoUpdate({ target: projectionSessionRuntime.sessionId, set: runtime })
       .run()
+    this.recordTurnStart(event)
+  }
+
+  private recordTurnStart(event: Extract<OrchestrationEvent, { type: 'session.runtime-set' }>) {
+    const { sessionId, runtime } = event.payload
+    if (!runtime.activeTurnId || (runtime.status !== 'running' && runtime.status !== 'waiting'))
+      return
+
+    const result = this.database
+      .update(projectionTurns)
+      .set({ startedAt: runtime.updatedAt })
+      .where(
+        and(
+          eq(projectionTurns.sessionId, sessionId),
+          eq(projectionTurns.turnId, runtime.activeTurnId),
+          eq(projectionTurns.state, 'running'),
+          isNull(projectionTurns.startedAt),
+        ),
+      )
+      .returning({ turnId: projectionTurns.turnId })
+      .get()
+    if (result) this.refreshLatestTurn(sessionId, runtime.updatedAt)
   }
 
   /**
@@ -1073,6 +1128,10 @@ export class OrchestrationProjectionPipeline {
   private updateTurnForActivity(
     event: Extract<OrchestrationEvent, { type: 'session.activity-appended' }>,
   ) {
+    if (event.payload.activity.kind === TURN_ENDED_ACTIVITY_KIND) {
+      this.recordHarnessEndReason(event)
+      return
+    }
     if (!isProviderTurnFailureActivity(event.payload.activity.kind)) return
     if (!event.payload.activity.turnId) return
 
@@ -1082,6 +1141,23 @@ export class OrchestrationProjectionPipeline {
       'error',
       event.payload.activity.createdAt,
     )
+  }
+
+  private recordHarnessEndReason(
+    event: Extract<OrchestrationEvent, { type: 'session.activity-appended' }>,
+  ) {
+    const { activity, sessionId } = event.payload
+    const parsed = v.safeParse(turnEndedPayloadSchema, activity.payload)
+    if (!parsed.success || !activity.turnId) return
+
+    this.database
+      .update(projectionTurns)
+      .set(firstEndReason(parsed.output.endReason))
+      .where(
+        and(eq(projectionTurns.sessionId, sessionId), eq(projectionTurns.turnId, activity.turnId)),
+      )
+      .run()
+    this.refreshLatestTurn(sessionId, activity.createdAt)
   }
 
   /**
@@ -1207,6 +1283,7 @@ export class OrchestrationProjectionPipeline {
     state: 'completed' | 'interrupted' | 'error',
     completedAt: string,
     assistantMessageId?: string | null,
+    endReason?: TurnEndReason,
   ) {
     if (!turnId) return
 
@@ -1221,6 +1298,7 @@ export class OrchestrationProjectionPipeline {
         completedAt,
         state,
         providerStartState: state === 'interrupted' ? 'interrupted' : 'settled',
+        ...firstEndReason(endReason),
       })
       .where(and(eq(projectionTurns.sessionId, sessionId), eq(projectionTurns.turnId, turnId)))
       .run()
@@ -1232,7 +1310,12 @@ export class OrchestrationProjectionPipeline {
    * turn that ended with no assistant message — or whose session errored
    * mid-turn — stays `running` in SQL forever and the session spins.
    */
-  private settleRunningTurns(sessionId: string, status: SessionRuntimeStatus, settledAt: string) {
+  private settleRunningTurns(
+    sessionId: string,
+    status: SessionRuntimeStatus,
+    settledAt: string,
+    endReason?: TurnEndReason,
+  ) {
     const state = settledTurnStateForSessionStatus(status)
     if (!state) return
 
@@ -1259,6 +1342,7 @@ export class OrchestrationProjectionPipeline {
         completedAt: settledAt,
         state,
         providerStartState: state === 'interrupted' ? 'interrupted' : 'settled',
+        ...firstEndReason(endReason),
       })
       .where(
         and(
@@ -1581,10 +1665,18 @@ function latestProjectionTurn(turns: Array<typeof projectionTurns.$inferSelect>)
     .at(-1)
 }
 
+/** The first cause recorded wins: a user stop stays a user stop when the harness reports its abort. */
+function firstEndReason(endReason: TurnEndReason | undefined) {
+  if (!endReason) return {}
+
+  return { endReason: sql<TurnEndReason>`coalesce(${projectionTurns.endReason}, ${endReason})` }
+}
+
 function latestTurnJson(turn: typeof projectionTurns.$inferSelect) {
   return {
     assistantMessageId: turn.assistantMessageId,
     completedAt: turn.completedAt,
+    endReason: turn.endReason,
     requestedAt: turn.requestedAt,
     sourceProposedPlan: parseJsonOrUndefined(turn.sourceProposedPlanJson),
     startedAt: turn.startedAt,

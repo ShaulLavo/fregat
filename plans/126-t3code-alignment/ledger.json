@@ -359,10 +359,12 @@
       "title": "Render and reuse artifact templates",
       "report": "interaction.md",
       "wave": "3",
-      "status": "open",
-      "evidence_level": "source-reviewed",
+      "status": "verified",
+      "evidence_level": "scenario-verified",
       "acceptance": "interaction.md, INTERACTION-10, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "scripts/agent/scenarios/chat-artifact-template.ts passed 2026-09-25 on lane L2: the directive renders one card between its paragraphs and Use appends the template prompt once; malformed, fenced and partial directives stay literal or held (artifact-templates.test.ts). Ported from t3code (MIT)."
+      ]
     },
     {
       "id": "INTERACTION-11",
@@ -376,7 +378,9 @@
         "composer-defaults-delivery.md",
         "Historical release 20260920T155743Z-b915d3e0-plan126-final-batch; /work/tmp/fregat-evidence/20260920T160544Z-scenario-composer-defaults/summary.md records completed default-hidden controls, opt-in occupancy, retained preference and effective native default-mode submission",
         "Recorded comparison executes the pinned interaction-mode resolver over 20 flag/provider/mode combinations",
-        "Remaining: rich composition, send shortcut preferences, large-paste folding and full upstream runtime comparison"
+        "Remaining: rich composition and mobile plain-Enter newline. Completion-wave verification uses our agent:browser scenarios; the paired upstream run is no longer required.",
+        "2026-09-25 lane L2: chat.sendShortcut (enter, mod-enter-multiline, mod-enter) and large-paste folding at 32 KB with Ctrl/Cmd+Shift+V inline; scripts/agent/scenarios/chat-composer-editing.ts passed. Open: mobile plain-Enter newline. Rich composition and Lexical removal are parked by the latest owner ruling.",
+        "2026-09-25 owner ruling supersedes the earlier deletion instruction: retain Lexical until Editor completes a full Markdown/composer support plan. L2/L7 audit found no such plan in Editor plans/*.md, plans/backlog.json, plans/README.md or TODO.md. packages/markdown/README.md documents live preview only; ordered lists, block quotes, escapes and fenced code blocks remain source text. composerRichTextEnabled waits for a working consumer. No new Editor Markdown plan is part of this wave."
       ]
     },
     {
@@ -404,10 +408,12 @@
       "title": "Support one draft sent to multiple selected models",
       "report": "interaction.md",
       "wave": "4",
-      "status": "open",
+      "status": "in-progress",
       "evidence_level": "source-reviewed",
       "acceptance": "interaction.md, INTERACTION-08, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "2026-09-25 lane L2: Shift+select extra models in a new draft; one session per model on its own new worktree from the draft base and branch; failed models stay on the draft with the text; a retried target reuses its command so receipts dedupe a lost acknowledgment. scripts/agent/scenarios/chat-multiple-models.ts passed (two models, two worktrees). Not yet driven: the partial-failure and lost-acknowledgment paths."
+      ]
     },
     {
       "id": "INTERACTION-12",
@@ -679,20 +685,24 @@
       "title": "Start a session in the background from a new draft",
       "report": "interaction.md",
       "wave": "3",
-      "status": "open",
-      "evidence_level": "source-reviewed",
+      "status": "verified",
+      "evidence_level": "scenario-verified",
       "acceptance": "interaction.md, INTERACTION-13, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "scripts/agent/scenarios/chat-background-start.ts passed 2026-09-25 on lane L2: three Ctrl+Enter starts from a New worktree draft on release gave three sessions on three worktrees; the user stayed on an empty draft with the same mode and branch."
+      ]
     },
     {
       "id": "INTERACTION-14",
       "title": "Pin favorite models in the model picker",
       "report": "interaction.md",
       "wave": "4",
-      "status": "open",
-      "evidence_level": "source-reviewed",
+      "status": "verified",
+      "evidence_level": "scenario-verified",
       "acceptance": "interaction.md, INTERACTION-14, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "scripts/agent/scenarios/chat-model-favorites.ts passed 2026-09-25 on lane L2: an offered favorite and a retired one (No longer offered) under the picker Favorites rail; hidden models never shown (model-order.test.ts)."
+      ]
     },
     {
       "id": "EXT-14",

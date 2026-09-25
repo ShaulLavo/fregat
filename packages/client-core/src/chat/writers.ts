@@ -604,6 +604,7 @@ function sessionFromShell(
     createdAt: session.createdAt,
     detailSynced: previous?.detailSynced ?? false,
     pendingMessageQuestions: previous?.pendingMessageQuestions,
+    turns: retainedTurns(previous, latestTurn),
     hasActionableProposedPlan: session.hasActionableProposedPlan,
     id: session.id,
     interactionMode: session.interactionMode,
@@ -795,6 +796,7 @@ function applySessionTurnStartRequestedEvent(
         : 'queued',
     assistantMessageId: null,
     completedAt: null,
+    endReason: null,
     requestedAt: event.payload.createdAt,
     sourceProposedPlan: event.payload.sourceProposedPlan,
     startedAt: null,
@@ -802,7 +804,8 @@ function applySessionTurnStartRequestedEvent(
     turnId: event.payload.turnId,
   }
 
-  const nextState = patchSession(state, event.payload.sessionId, {
+  const stamped = stampTurnModelSelection(state, event)
+  const nextState = patchSession(stamped, event.payload.sessionId, {
     interactionMode: event.payload.interactionMode,
     modelSelection: event.payload.modelSelection,
     runtimeMode: event.payload.runtimeMode,
@@ -813,6 +816,27 @@ function applySessionTurnStartRequestedEvent(
     liveTurn: latestTurn,
     pendingSourceProposedPlan: event.payload.sourceProposedPlan,
   })
+}
+
+/** The user message records the selection its turn ran with; absent, the session's. */
+function stampTurnModelSelection(
+  state: ChatProjectionSlice,
+  event: Extract<OrchestrationEvent, { type: 'session.turn-start-requested' }>,
+): ChatProjectionSlice {
+  const { messageId, sessionId } = event.payload
+  const messages = state.messageBySessionId[sessionId]
+  const message = messages?.[messageId]
+  const modelSelection =
+    event.payload.modelSelection ?? state.sessionById[sessionId]?.modelSelection
+  if (!messages || !message || !modelSelection) return state
+
+  return {
+    ...state,
+    messageBySessionId: {
+      ...state.messageBySessionId,
+      [sessionId]: { ...messages, [messageId]: { ...message, modelSelection } },
+    },
+  }
 }
 
 function applySessionTurnInterruptRequestedEvent(
@@ -827,6 +851,7 @@ function applySessionTurnInterruptRequestedEvent(
     liveTurn: {
       ...session.liveTurn,
       completedAt: session.liveTurn.completedAt ?? event.payload.createdAt,
+      endReason: session.liveTurn.endReason ?? 'user-stop',
       startedAt: session.liveTurn.startedAt ?? event.payload.createdAt,
       state: 'interrupted',
       providerStartState: 'interrupted',
@@ -861,6 +886,7 @@ function applySessionRuntimeSetEvent(
       assistantMessageId:
         currentTurn?.turnId === activeTurnId ? currentTurn.assistantMessageId : null,
       completedAt: null,
+      endReason: null,
       requestedAt:
         currentTurn?.turnId === activeTurnId
           ? currentTurn.requestedAt
@@ -1088,6 +1114,7 @@ function applySessionTurnDiffCompletedEvent(
       completedAt: event.payload.completedAt,
       requestedAt: state.sessionById[sessionId]?.liveTurn?.requestedAt ?? event.payload.completedAt,
       startedAt: state.sessionById[sessionId]?.liveTurn?.startedAt ?? event.payload.completedAt,
+      endReason: sameTurnEndReason(state.sessionById[sessionId]?.liveTurn, event.payload.turnId),
       state: checkpointStatusToLatestTurnState(event.payload.status),
       turnId: event.payload.turnId,
     },
@@ -1117,7 +1144,14 @@ function applySessionRevertedEvent(
 
   return writeSessionTurn(
     {
-      ...patchSession(state, sessionId, { updatedAt: event.payload.revertedAt }),
+      ...patchSession(state, sessionId, {
+        updatedAt: event.payload.revertedAt,
+        turns: Object.fromEntries(
+          Object.entries(state.sessionById[sessionId]?.turns ?? {}).filter(([id]) =>
+            retainedTurnIds.has(id as TurnId),
+          ),
+        ),
+      }),
       activityBySessionId: {
         ...state.activityBySessionId,
         [sessionId]: recordById(activities, (entry) => entry.id),
@@ -1165,6 +1199,7 @@ function latestTurnFromSummary(summary: ChatTurnDiffSummary): OrchestrationLates
     providerStartState: 'settled',
     assistantMessageId: summary.assistantMessageId,
     completedAt: summary.completedAt,
+    endReason: null,
     requestedAt: summary.completedAt,
     startedAt: summary.completedAt,
     state: checkpointStatusToLatestTurnState(summary.status),
@@ -1216,6 +1251,15 @@ type SessionTurnWrite = {
   pendingSourceProposedPlan: OrchestrationLatestTurn['sourceProposedPlan'] | undefined
 }
 
+function retainedTurns(
+  session: ProjectionSession | undefined,
+  latest: OrchestrationLatestTurn | null,
+) {
+  const turns = { ...session?.turns }
+  if (latest) turns[latest.turnId] = latest
+  return turns
+}
+
 function writeSessionTurn(
   state: ChatProjectionSlice,
   sessionId: SessionId,
@@ -1228,7 +1272,7 @@ function writeSessionTurn(
     ...state,
     sessionById: {
       ...state.sessionById,
-      [sessionId]: { ...session, ...turn },
+      [sessionId]: { ...session, ...turn, turns: retainedTurns(session, turn.liveTurn) },
     },
   }
 }
@@ -1275,6 +1319,7 @@ function writeAssistantMessageTurnState(
       completedAt: event.payload.streaming
         ? (latestTurn?.completedAt ?? null)
         : (latestTurn?.completedAt ?? event.payload.updatedAt),
+      endReason: sameTurnEndReason(latestTurn, event.payload.turnId),
       requestedAt: latestTurn?.requestedAt ?? event.payload.createdAt,
       sourceProposedPlan: latestTurn?.sourceProposedPlan,
       startedAt: latestTurn?.startedAt ?? event.payload.createdAt,
@@ -1359,6 +1404,7 @@ function sessionFromDetail(
     return {
       ...previous,
       pendingMessageQuestions: session.pendingMessageQuestions,
+      turns: session.turns,
       detailSynced: true,
       liveTurn: session.latestTurn,
       pendingSourceProposedPlan: carriedPendingSourcePlan(previous, session.latestTurn),
@@ -1668,6 +1714,13 @@ function applySessionProposedPlanImplemented(
       },
     },
   }
+}
+
+/** The server decides end reasons; the client only keeps one it already has for the same turn. */
+function sameTurnEndReason(turn: OrchestrationLatestTurn | null | undefined, turnId: TurnId) {
+  if (turn?.turnId !== turnId) return null
+
+  return turn.endReason ?? null
 }
 
 function turnRuntimeMetadata(

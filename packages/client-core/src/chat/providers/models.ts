@@ -1,10 +1,12 @@
-import type {
-  ModelSelection,
-  ProviderDriverKind,
-  ProviderInstanceId,
-  ProviderOptionDescriptor,
-  ProviderSnapshot,
-  ProviderStatus,
+import {
+  modelRefKey,
+  type ModelRef,
+  type ModelSelection,
+  type ProviderDriverKind,
+  type ProviderInstanceId,
+  type ProviderOptionDescriptor,
+  type ProviderSnapshot,
+  type ProviderStatus,
 } from '@workspace/contracts'
 
 import {
@@ -114,6 +116,59 @@ export function providerModelOptions(
   preferences?: ModelPreferences,
 ) {
   return providerModelOptionGroups(providers, preferences).flatMap((group) => group.options)
+}
+
+/**
+ * Every favorite across providers, in starred order. A favorite whose model left
+ * its provider's list stays, as unavailable; a hidden one does not show.
+ */
+export function favoriteModelOptions(
+  providers: readonly ProviderSnapshot[] | undefined,
+  preferences: ModelPreferences,
+): ProviderModelOption[] {
+  const favorites = preferences.favorites ?? []
+  if (!providers || favorites.length === 0) return []
+  const hidden = new Set(preferences.hidden.map(modelRefKey))
+  const catalogue = new Map(
+    providers
+      .flatMap(providerOptions)
+      .map((option) => [modelRefKey(option.modelSelection), option]),
+  )
+
+  return favorites.flatMap((ref) => {
+    const key = modelRefKey(ref)
+    if (hidden.has(key)) return []
+    const option = catalogue.get(key)
+    if (option) return [option]
+    const provider = providers.find((entry) => entry.providerInstanceId === ref.providerInstanceId)
+
+    return provider ? [missingFavoriteOption(provider, ref)] : []
+  })
+}
+
+function missingFavoriteOption(provider: ProviderSnapshot, ref: ModelRef): ProviderModelOption {
+  return {
+    defaultEffort: null,
+    disabledReason: reason(
+      'unavailable',
+      'No longer offered',
+      `${provider.displayLabel} no longer lists ${ref.model}.`,
+    ),
+    driverKind: provider.driverKind,
+    effortLevels: [],
+    isCustom: false,
+    key: providerModelSelectionKey(ref),
+    label: ref.model,
+    legacy: false,
+    modelSelection: { model: ref.model, providerInstanceId: ref.providerInstanceId },
+    optionDescriptors: [],
+    name: ref.model,
+    providerInstanceId: ref.providerInstanceId,
+    providerLabel: provider.displayLabel,
+    shortName: null,
+    statusLabel: 'Unavailable',
+    supportsThinking: false,
+  }
 }
 
 function providerOptions(provider: ProviderSnapshot): ProviderModelOption[] {

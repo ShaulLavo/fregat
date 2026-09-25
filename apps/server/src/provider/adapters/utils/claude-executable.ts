@@ -44,8 +44,9 @@ export async function resolveClaudeExecutable(input: {
 
   const bundled = probe.bundled()
   const installedPath = probe.which('claude', input.env)
-  // Neither exists: the spawn fails and the snapshot reports "not installed".
-  if (!installedPath) return bundled ?? { path: 'claude', source: 'installed', version: null }
+  if (!installedPath && bundled) return bundled
+  if (!installedPath)
+    throw sessionIdentityErrors.NOT_INSTALLED({ internal: { provider: 'claude' } })
 
   const installed: ClaudeExecutable = {
     path: installedPath,
@@ -91,8 +92,18 @@ async function configuredExecutable(
       internal: { binaryPathKind: binaryPath.includes(path.sep) ? 'path' : 'command' },
     })
   }
+  const version = await probe.version(resolved, env)
+  requireSupportedVersion(version, probe.bundled()?.version ?? null)
 
-  return { path: resolved, source: 'configured', version: await probe.version(resolved, env) }
+  return { path: resolved, source: 'configured', version }
+}
+
+/** The bundled CLI is the floor: an older one under this SDK is protocol skew. An unread version passes. */
+function requireSupportedVersion(version: string | null, minimum: string | null) {
+  if (!version || !minimum) return
+  if (Bun.semver.order(version, minimum) >= 0) return
+
+  throw sessionIdentityErrors.CLAUDE_CLI_TOO_OLD({ minimum, version })
 }
 
 /** An unreadable installed version cannot prove it is new enough, so the bundled CLI runs. */

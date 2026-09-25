@@ -1,4 +1,5 @@
 import { questionAnswerHistory } from './question-answer-history'
+import { approvalResponseEvents, endedApprovalEvents } from './approval-admission'
 import { decideSessionTitle, titleMetadata } from './title-decider'
 import { createInternalError } from '../observability/structured-errors'
 import {
@@ -62,7 +63,16 @@ export function decideOrchestrationCommand(
 ): PendingOrchestrationEvent[] {
   requireNoRewindConflict(command, model)
   const at = new Date().toISOString()
+  const events = decideCommandEvents(command, model, at)
 
+  return [...events, ...endedApprovalEvents(command, events, model, at)]
+}
+
+function decideCommandEvents(
+  command: OrchestrationCommand,
+  model: OrchestrationReadModel,
+  at: string,
+): PendingOrchestrationEvent[] {
   switch (command.type) {
     case 'session.title.generate.complete':
     case 'session.title.refine':
@@ -203,22 +213,7 @@ export function decideOrchestrationCommand(
         sessionId: command.sessionId,
       })
     case 'session.approval.respond':
-      requireSessionNotDeleted(model, command.sessionId)
-
-      return one(
-        command,
-        at,
-        'session.approval-response-requested',
-        {
-          createdAt: at,
-          decision: command.decision,
-          requestId: command.requestId,
-          sessionId: command.sessionId,
-        },
-        // The envelope carries the requestId too, so a log scan can correlate
-        // the response with the request without unpacking the payload.
-        { metadata: { requestId: command.requestId } },
-      )
+      return approvalResponseEvents(command, model, at)
     case 'session.user-input.respond':
       return userInputResponse(command, model, at)
     case 'session.user-input.dismiss': {

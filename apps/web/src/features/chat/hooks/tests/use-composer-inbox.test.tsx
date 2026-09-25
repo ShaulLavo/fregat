@@ -85,3 +85,11 @@ test('an empty inbox never touches the draft', () => {
 
   expect(useChatInputDraftStore.getState().getDraft(TARGET).terminalContexts).toHaveLength(0)
 })
+
+test('an append waits for a caret like text does', () => {
+  useComposerInboxStore.getState().queueAppend('Create a document using this $skill about…')
+
+  renderHook(() => useComposerInbox(TARGET, noEditor(), false))
+
+  expect(useComposerInboxStore.getState().pending.map((entry) => entry.kind)).toEqual(['append'])
+})

@@ -31,7 +31,17 @@ export const platformMigrations: readonly Migration[] = [
   { version: 24, name: 'provider_usage_contributions', up: applyProviderUsageContributions },
   { version: 25, name: 'worktree_pull_requests', up: applyWorktreePullRequests },
   { version: 26, name: 'worktree_setup', up: applyWorktreeSetup },
+  { version: 29, name: 'turn_end_reason', up: applyTurnEndReason },
+  { version: 30, name: 'message_model_selection', up: applyMessageModelSelection },
 ]
+
+function applyMessageModelSelection(database: PlatformDatabase) {
+  database.run(sql`ALTER TABLE projection_session_messages ADD COLUMN model_selection_json TEXT`)
+}
+
+function applyTurnEndReason(database: PlatformDatabase) {
+  database.run(sql`ALTER TABLE projection_turns ADD COLUMN end_reason TEXT`)
+}
 
 function applyWorktreeSetup(database: PlatformDatabase) {
   database.run(sql`ALTER TABLE projection_worktrees ADD COLUMN setup_json TEXT`)

@@ -23,6 +23,163 @@ afterEach(() => {
   commandCounter = 0
 })
 
+describe('approval admission', () => {
+  const sessionId = '00000000-0000-4000-8000-000000000001'
+
+  function respond(decision: string) {
+    return command({
+      decision,
+      requestId: 'request-1',
+      sessionId,
+      type: 'session.approval.respond',
+    })
+  }
+
+  async function engineWithOpenApproval() {
+    const fixture = await createEngineWithSession()
+    const turn = turnStartCommand()
+    await fixture.engine.dispatch(turn)
+    const turnId = (turn as { turnId: string }).turnId
+    await fixture.engine.dispatch(
+      activityCommand('approval.requested', 'approval', { requestId: 'request-1' }, turnId),
+    )
+    return { ...fixture, turnId }
+  }
+
+  async function activityKinds(engine: OrchestrationEngine) {
+    const snapshot = await engine.sessionDetailSnapshot(sessionId)
+    return snapshot.session.activities.map((activity) => activity.kind)
+  }
+
+  it('closes evicted approvals on stop and rejects late answers after rebuilding', async () => {
+    const { database, engine, turnId } = await engineWithOpenApproval()
+    for (let index = 0; index < 501; index += 1) {
+      await engine.dispatch(activityCommand('tool.completed', 'info', { index }, turnId))
+    }
+    expect(
+      (await engine.readModelSnapshot()).sessions.get(sessionId)?.activities,
+    ).not.toContainEqual(expect.objectContaining({ kind: 'approval.requested' }))
+    const restarted = new OrchestrationEngine(database)
+    await restarted.dispatch(command({ sessionId, turnId, type: 'session.turn.interrupt' }))
+    expect(sessionRow(database).pendingApprovalCount).toBe(0)
+    await expect(restarted.dispatch(respond('accept'))).rejects.toMatchObject({
+      code: 'orchestration.APPROVAL_REQUEST_ENDED',
+    })
+  })
+
+  it('rejects unknown approval requests', async () => {
+    const { engine } = await createEngineWithSession()
+    await expect(engine.dispatch(respond('accept'))).rejects.toMatchObject({
+      code: 'orchestration.APPROVAL_REQUEST_UNKNOWN',
+    })
+  })
+
+  it('turns a repeated identical answer into a no-op', async () => {
+    const { engine } = await engineWithOpenApproval()
+
+    await engine.dispatch(respond('accept'))
+    await engine.dispatch(respond('accept'))
+
+    const kinds = await activityKinds(engine)
+    expect(kinds.filter((kind) => kind === 'approval.answer-submitted')).toHaveLength(1)
+  })
+
+  it('refuses a different answer once one was admitted', async () => {
+    const { engine } = await engineWithOpenApproval()
+    await engine.dispatch(respond('accept'))
+
+    await expect(engine.dispatch(respond('decline'))).rejects.toMatchObject({
+      code: 'orchestration.APPROVAL_ALREADY_DECIDED',
+    })
+  })
+
+  it('refuses a different answer after the agent resolved the request', async () => {
+    const { engine } = await engineWithOpenApproval()
+    await engine.dispatch(
+      activityCommand('approval.resolved', 'approval', {
+        decision: 'accept',
+        requestId: 'request-1',
+      }),
+    )
+
+    await expect(engine.dispatch(respond('decline'))).rejects.toMatchObject({
+      code: 'orchestration.APPROVAL_ALREADY_DECIDED',
+    })
+  })
+
+  it('lets the user answer again after a transient respond failure', async () => {
+    const { engine } = await engineWithOpenApproval()
+    await engine.dispatch(respond('accept'))
+    await engine.dispatch(
+      activityCommand('provider.approval.respond.failed', 'error', {
+        detail: 'Provider socket hung up',
+        requestId: 'request-1',
+      }),
+    )
+
+    await engine.dispatch(respond('decline'))
+
+    const kinds = await activityKinds(engine)
+    expect(kinds.filter((kind) => kind === 'approval.answer-submitted')).toHaveLength(2)
+  })
+
+  it('closes an open approval when its turn is interrupted and refuses a later answer', async () => {
+    const { engine, turnId } = await engineWithOpenApproval()
+
+    await engine.dispatch(command({ sessionId, turnId, type: 'session.turn.interrupt' }))
+
+    const snapshot = await engine.sessionDetailSnapshot(sessionId)
+    expect(snapshot.session.activities).toContainEqual(
+      expect.objectContaining({
+        kind: 'approval.resolved',
+        payload: expect.objectContaining({ requestId: 'request-1', resolution: 'ended' }),
+        turnId,
+      }),
+    )
+    await expect(engine.dispatch(respond('accept'))).rejects.toMatchObject({
+      code: 'orchestration.APPROVAL_REQUEST_ENDED',
+    })
+  })
+
+  it('closes an open approval when the runtime leaves running', async () => {
+    const { database, engine } = await engineWithOpenApproval()
+
+    await engine.dispatch(sessionSetCommand('interrupted'))
+
+    const kinds = await activityKinds(engine)
+    expect(kinds.filter((kind) => kind === 'approval.resolved')).toHaveLength(1)
+    await engine.dispatch(settleCommand())
+    expect(sessionRow(database).settledOverride).toBe('settled')
+  })
+
+  it('leaves an approval of another turn open when one turn is interrupted', async () => {
+    const { engine } = await engineWithOpenApproval()
+
+    await engine.dispatch(
+      command({ sessionId, turnId: 'turn-other', type: 'session.turn.interrupt' }),
+    )
+
+    expect(await activityKinds(engine)).not.toContain('approval.resolved')
+  })
+})
+
+it('publishes persisted turn reasons after another turn starts', async () => {
+  const { database, engine } = await createEngineWithSession()
+  const turn = turnStartCommand()
+  await engine.dispatch(turn)
+  const sessionId = '00000000-0000-4000-8000-000000000001'
+  const first = (await engine.sessionDetailSnapshot(sessionId)).session.latestTurn!
+  await engine.dispatch(
+    command({ type: 'session.turn.interrupt', sessionId, turnId: first.turnId }),
+  )
+  await engine.dispatch(turnStartCommand())
+  const restarted = new OrchestrationEngine(database)
+  const snapshot = await restarted.sessionDetailSnapshot(sessionId)
+  expect(snapshot.session).toMatchObject({
+    turns: { [first.turnId]: { state: 'interrupted', endReason: 'user-stop' } },
+  })
+})
+
 describe('settle guards', () => {
   it.each(['queued', 'claimed', 'runtime-live'] as const)(
     'archives a session with %s work without stopping it',
@@ -104,7 +261,8 @@ describe('settle guards', () => {
     await engine.dispatch(activityCommand('user-input.requested', 'info'))
     await engine.dispatch(
       activityCommand('provider.user-input.respond.failed', 'error', {
-        detail: 'Stale pending user-input request: request-1. Restart the turn to continue.',
+        code: 'provider.REQUEST_GONE',
+        detail: 'The agent no longer holds this request. Restart the turn to continue.',
         requestId: 'request-1',
       }),
     )
@@ -893,6 +1051,7 @@ function activityCommand(
   kind: string,
   tone: string,
   payload: unknown = { requestId: 'request-1' },
+  turnId: string | null = null,
 ) {
   return command({
     activity: {
@@ -903,7 +1062,7 @@ function activityCommand(
       summary: kind,
       sessionId: '00000000-0000-4000-8000-000000000001',
       tone,
-      turnId: null,
+      turnId,
     },
     createdAt: '2026-06-01T00:00:00.000Z',
     sessionId: '00000000-0000-4000-8000-000000000001',

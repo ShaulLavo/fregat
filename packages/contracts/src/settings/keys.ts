@@ -58,6 +58,18 @@ export const SETTINGS_REGISTRY = {
     description:
       'Queue messages during a running turn or send them immediately as corrections. Ctrl/Cmd+Enter uses the other behavior.',
   }),
+  'chat.sendShortcut': defineSetting({
+    schema: v.picklist(['enter', 'mod-enter-multiline', 'mod-enter']),
+    default: 'enter',
+    // Binds a key, so it never comes from a workspace file.
+    scope: 'application',
+    widget: 'enum',
+    category: 'Chat',
+    title: 'Send shortcut',
+    description:
+      'Which key sends a message. enter: Enter sends and Shift+Enter adds a line. mod-enter-multiline: like enter until the message has a second line, then Ctrl/Cmd+Enter sends. mod-enter: Ctrl/Cmd+Enter sends and Enter adds a line. Where Ctrl/Cmd+Enter sends, Shift+Ctrl/Cmd+Enter takes the other follow-up behavior.',
+    keywords: ['send', 'enter', 'submit', 'newline', 'shortcut', 'keyboard'],
+  }),
   'chat.planModeEnabled': defineSetting({
     schema: v.boolean(),
     default: false,
@@ -1070,6 +1082,18 @@ export const SETTINGS_REGISTRY = {
     description:
       'Explicit leading order for the picker. Models named by neither list stay visible after these, in provider order.',
     keywords: ['model', 'order', 'sort', 'picker'],
+  }),
+  'models.favorites': defineSetting({
+    schema: modelRefListSchema,
+    default: [],
+    scope: 'application',
+    widget: 'models',
+    category: 'Models',
+    // Starred on the same row that hides and orders a model.
+    rowOwner: 'models.hidden',
+    description:
+      'Models starred as favorites. The picker lists them first and gathers them under Favorites.',
+    keywords: ['model', 'favorite', 'star', 'pin', 'picker'],
   }),
   'keybindings.preset': defineSetting({
     schema: v.picklist(['default', 'vscode'] as const),
