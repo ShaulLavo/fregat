@@ -4,8 +4,6 @@ import {
   turnEndedPayloadSchema,
   type TurnEndReason,
 } from '@workspace/contracts'
-import { sessionDomainErrors } from './structured-errors'
-import { changesLifecycleRevision } from './lifecycle-restore'
 import {
   applyWorktreeEvent,
   lifecycleFields,
@@ -130,33 +128,12 @@ export class OrchestrationProjectionPipeline {
     this.database.transaction(() => {
       if (event.sequence <= this.lastAppliedSequence()) return
       this.applyEvent(event)
-      if (changesLifecycleRevision(event))
-        this.updateSession(event.aggregateId, { lifecycleRevision: event.sequence })
       preserveDiscoveredOwnership(this.database, event)
       for (const id of worktreesAffectedByEvent(this.database, event))
         refreshWorktreePolicy(this.database, id)
       this.refreshAttentionForEvent(event)
       this.markApplied(event.sequence)
     })
-  }
-
-  private restoreLifecycle(
-    event: Extract<OrchestrationEvent, { type: 'session.lifecycle-restored' }>,
-  ) {
-    const { sessionId, expectedRevision, state, updatedAt } = event.payload
-    const result = this.database
-      .update(projectionSessions)
-      .set({ ...state, updatedAt })
-      .where(
-        and(
-          eq(projectionSessions.sessionId, sessionId),
-          eq(projectionSessions.lifecycleRevision, expectedRevision),
-        ),
-      )
-      .returning({ sessionId: projectionSessions.sessionId })
-      .get()
-    if (result) return
-    throw sessionDomainErrors.LIFECYCLE_CONFLICT({ internal: { sessionId, expectedRevision } })
   }
 
   private applyEvent(event: OrchestrationEvent) {
@@ -282,9 +259,6 @@ export class OrchestrationProjectionPipeline {
           deletedAt: event.payload.deletedAt,
           updatedAt: event.payload.deletedAt,
         })
-        return
-      case 'session.lifecycle-restored':
-        this.restoreLifecycle(event)
         return
       case 'session.archived':
         this.updateSession(event.payload.sessionId, {

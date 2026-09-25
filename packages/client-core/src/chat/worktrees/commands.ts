@@ -13,8 +13,6 @@ export type WorktreeAction =
   | 'worktree.retain'
   | 'worktree.adopt'
   | 'worktree.release'
-  | 'worktree.setup.run'
-  | 'worktree.setup.cancel'
 export type WorktreeConfirmation =
   | { readonly kind: 'force'; readonly preview: WorktreeCleanupPreview }
   | { readonly kind: 'missing'; readonly preview: WorktreeMissingPreview }

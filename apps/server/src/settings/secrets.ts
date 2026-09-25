@@ -1,31 +1,13 @@
 import { REDACTED_SETTINGS_VALUE } from '@workspace/contracts'
 import { isRecord } from '@workspace/utils/objects'
-import {
-  discardStagedSettingsFile,
-  parseSettingsDocument,
-  readSettingsFile,
-  readSettingsFileSync,
-  stageSettingsFile,
-  tryCommitStagedSettingsFile,
-} from './json-document'
-import { SECRET_FILE_MODE } from './transaction'
+import { parseSettingsDocument, readSettingsFile, readSettingsFileSync } from './json-document'
 
 /**
- * Identifies one provider secret. Deliberately the same pair `restoreRedactedSecrets`
+ * Identifies one secret. Deliberately the same pair `restoreRedactedSecrets`
  * already matches on — instance id and variable name, never position — so the
  * wire protocol needs no change; only its backing storage moves.
  */
-type ProviderSecretRef = `provider.${string}.env.${string}`
-
-/** The Web Push signing key (VAPID, P-256), base64url. The server creates it; no client reads it. */
-export const VAPID_PRIVATE_KEY_REF = 'push.vapid.privateKey'
-
-/** A secret the server generates for itself and never hands to a client. */
-export type ServerSecretRef = typeof VAPID_PRIVATE_KEY_REF
-
-export type SecretRef = ProviderSecretRef | ServerSecretRef
-
-export type SecretWriteOutcome = 'committed' | 'unchanged' | 'revision-mismatch'
+export type SecretRef = `provider.${string}.env.${string}`
 
 export function providerEnvSecretRef(instanceId: string, variableName: string): SecretRef {
   return `provider.${instanceId}.env.${variableName}`
@@ -94,23 +76,6 @@ export class SecretStore {
       expectedRevision: source.revision,
       text: serializeSecrets(next),
     }
-  }
-
-  /**
-   * Writes edits with no settings change beside them. The caller holds the
-   * settings write coordinator for this file, so a revision mismatch here is
-   * another process writing the file.
-   */
-  async write(edits: ReadonlyMap<SecretRef, string | null>): Promise<SecretWriteOutcome> {
-    const prepared = await this.prepare(edits)
-    if (!prepared.changed) return 'unchanged'
-
-    const staged = await stageSettingsFile(this.filePath, prepared.text, SECRET_FILE_MODE)
-    const outcome = await tryCommitStagedSettingsFile(staged, prepared.expectedRevision)
-    if (outcome.kind === 'committed') return 'committed'
-
-    await discardStagedSettingsFile(staged)
-    return 'revision-mismatch'
   }
 }
 

@@ -1,13 +1,12 @@
 import { queryOptions, type QueryClient } from '@tanstack/react-query'
+import type { EnvironmentId, ScopedSessionRef } from '@workspace/contracts'
+import { scopedSessionKey } from '@workspace/contracts'
 import {
   hasNativeNotifications,
   hasNotificationSound,
-  scopedSessionKey,
-  type EnvironmentId,
   type NotificationMode,
-  type ScopedSessionRef,
   type SessionNotice,
-} from '@workspace/contracts'
+} from '@workspace/client-core/chat/notifications'
 import { toast } from 'sonner'
 import { readSettingsMirror } from '@/lib/settings-boot-mirror'
 import { chatNotificationQueryKeys } from '@/features/chat-mode/utils/query-keys'

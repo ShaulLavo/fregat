@@ -16,10 +16,6 @@ import path from 'node:path'
 import { checkoutRoot, currentLink, releasesRoot, webBase } from './config'
 import { log, output, run } from './run'
 import { createScriptError } from '../structured-errors'
-import {
-  missingReleaseFiles,
-  writeRuntimeManifest,
-} from '../../apps/server/src/installation/release-files'
 
 export type Checkout = {
   commit: string
@@ -61,29 +57,16 @@ export async function readCheckout(): Promise<Checkout> {
   const commit = await output(['git', 'rev-parse', 'HEAD'], checkoutRoot)
   if (!commit) throw createScriptError(`${checkoutRoot} is not a git checkout.`)
 
-  const status = await run(['git', 'status', '--porcelain', '-z'], { cwd: checkoutRoot })
+  const status = await output(['git', 'status', '--porcelain'], checkoutRoot)
   const editor = path.join(checkoutRoot, '../Editor')
   return {
     commit,
     branch: await output(['git', 'branch', '--show-current'], checkoutRoot),
-    dirtyFiles: status.code === 0 ? porcelainPaths(status.stdout) : [],
+    dirtyFiles: status ? status.split('\n').map((line) => line.slice(3)) : [],
     editorCommit: existsSync(editor)
       ? (await output(['git', 'rev-parse', 'HEAD'], editor)) || null
       : null,
   }
-}
-
-/** Paths from `git status --porcelain -z`; a rename or copy entry is followed by its source path. */
-export function porcelainPaths(status: string) {
-  const entries = status.split('\0')
-  const paths: string[] = []
-  for (let index = 0; index < entries.length; index += 1) {
-    const entry = entries[index]!
-    if (entry.length < 4) continue
-    paths.push(entry.slice(3))
-    if (/[RC]/.test(entry.slice(0, 2))) index += 1
-  }
-  return paths
 }
 
 export function createRelease(checkout: Checkout, slug: string): Release {
@@ -129,11 +112,9 @@ export async function buildServer(release: Release) {
     path.join(release.directory, 'server-build.log'),
   )
   cpSync(path.join(serverPackage, 'dist'), release.server, { recursive: true })
-  await writeRuntimeManifest(release.server, path.join(checkoutRoot, 'bun.lock'))
   linkServerDependencies(release)
 }
 
-// The copy keeps the runtime manifest written when that server was built, which matches its bundle.
 export function copyServer(release: Release, from: string) {
   log('server', `reusing ${path.basename(from)}`)
   cpSync(path.join(from, 'server'), release.server, { recursive: true, verbatimSymlinks: true })
@@ -162,7 +143,7 @@ export function readBuildConfig(directory: string): BuildConfig | null {
   return JSON.parse(readFileSync(file, 'utf8')) as BuildConfig
 }
 
-export async function verifyCandidateFiles(release: Release) {
+export function verifyCandidateFiles(release: Release) {
   const html = readFileSync(path.join(release.web, 'index.html'), 'utf8')
   const problems = [
     !html.includes(`src="${webBase}assets/`) &&
@@ -174,9 +155,6 @@ export async function verifyCandidateFiles(release: Release) {
     !readdirSync(path.join(release.web, 'assets')).some((file) => file.endsWith('.wasm')) &&
       'no wasm artifact in web/assets',
     !existsSync(path.join(release.server, 'index.js')) && 'server/index.js is missing',
-    ...(await missingReleaseFiles(release.server)).map(
-      (file) => `server/${file} is missing; deploy with --server to rebuild the server`,
-    ),
   ].filter((problem): problem is string => typeof problem === 'string')
   if (problems.length === 0) return
 

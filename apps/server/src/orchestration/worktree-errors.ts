@@ -1,25 +1,6 @@
 import { defineErrorCatalog } from 'evlog'
 
 export const worktreeLifecycleErrors = defineErrorCatalog('worktree', {
-  SETUP_RUNNING: {
-    status: 409,
-    message: ({ worktreeId }: { worktreeId: string }) => `Setup is already running: ${worktreeId}`,
-    why: 'One setup run per worktree at a time; a second would race the first over the same files.',
-    fix: 'Wait for it to finish or stop it, then run it again.',
-  },
-  SETUP_NOT_RUNNING: {
-    status: 409,
-    message: ({ worktreeId }: { worktreeId: string }) => `No setup is running: ${worktreeId}`,
-    why: 'The setup already finished or was never started.',
-    fix: 'Nothing to stop.',
-  },
-  SETUP_NOT_CONFIGURED: {
-    status: 409,
-    message: ({ worktreeId }: { worktreeId: string }) =>
-      `The project has no setup script: ${worktreeId}`,
-    why: 'No saved project script is marked to run when a worktree is created.',
-    fix: 'Import the project scripts from t3.json, or save a script that runs on worktree creation.',
-  },
   NOT_READY: {
     status: 409,
     message: ({ worktreeId }: { worktreeId: string }) => `Worktree is not ready: ${worktreeId}`,

@@ -1,11 +1,9 @@
 import type {
-  WorktreeSetup,
   OrchestrationCommand,
   SessionWorktreeTarget,
   WorktreeProvisioning,
   WorktreeLifecycle,
 } from '@workspace/contracts'
-import { jsonEqual } from '@workspace/contracts'
 import { event, one } from './event-factory'
 import {
   requireProject,
@@ -16,7 +14,6 @@ import {
 import { worktreeLifecycleErrors } from './worktree-errors'
 import { worktreeFacts } from './utils/decider-facts'
 import { worktreeCleanupEligibility } from './utils/worktree-policy'
-import { setupScript } from './utils/setup-script'
 
 type Command = Extract<
   OrchestrationCommand,
@@ -176,88 +173,11 @@ export function decideWorktreeLifecycle(
         updatedAt: at,
       })
     }
-    case 'worktree.setup.update': {
-      requireWorktree(model, command.worktreeId)
-      return setupUpdated(command, command.setup, at)
-    }
-    case 'worktree.setup.run':
-      return setupRequested(command, model, at)
-    case 'worktree.setup.cancel': {
-      const worktree = requireWorktree(model, command.worktreeId)
-      const setup = worktree.setup
-      if (setup?.state !== 'running' && setup?.state !== 'queued')
-        throw worktreeLifecycleErrors.SETUP_NOT_RUNNING({
-          worktreeId: command.worktreeId,
-          internal: { setupState: setup?.state ?? null },
-        })
-      return setupUpdated(command, { ...setup, state: 'cancelling', updatedAt: at }, at)
-    }
-    case 'worktree.pull-request.sync': {
-      const worktree = requireWorktree(model, command.worktreeId)
-      // The lookup ran for a branch the worktree may have left since.
-      if (worktree.branch !== command.branch)
-        throw worktreeLifecycleErrors.STALE_RESULT({
-          worktreeId: command.worktreeId,
-          internal: { syncedBranch: command.branch, ...worktreeFacts(command, worktree) },
-        })
-      if (jsonEqual(worktree.pullRequest, command.pullRequest)) return []
-      return one(command, at, 'worktree.pull-request-synced', {
-        worktreeId: command.worktreeId,
-        branch: command.branch,
-        pullRequest: command.pullRequest,
-        updatedAt: at,
-      })
-    }
     default: {
       const exhaustive: never = command
       return exhaustive
     }
   }
-}
-
-function setupUpdated(
-  command: Extract<LifecycleCommand, { type: `worktree.setup.${string}` }>,
-  setup: WorktreeSetup,
-  at: string,
-) {
-  return one(command, at, 'worktree.setup-updated', {
-    worktreeId: command.worktreeId,
-    setup,
-    updatedAt: at,
-  })
-}
-
-/** A rerun never holds a turn: the session is already past its first one. */
-function setupRequested(
-  command: Extract<LifecycleCommand, { type: 'worktree.setup.run' }>,
-  model: OrchestrationReadModel,
-  at: string,
-) {
-  const worktree = requireReadyWorktree(model, command.worktreeId)
-  const state = worktree.setup?.state
-  if (state === 'queued' || state === 'running' || state === 'cancelling')
-    throw worktreeLifecycleErrors.SETUP_RUNNING({
-      worktreeId: command.worktreeId,
-      internal: { setupState: state },
-    })
-  const script = setupScript(requireProject(model, worktree.projectId).scripts)
-  if (!script)
-    throw worktreeLifecycleErrors.SETUP_NOT_CONFIGURED({
-      worktreeId: command.worktreeId,
-      internal: { projectId: worktree.projectId },
-    })
-  return setupUpdated(
-    command,
-    {
-      name: script.name,
-      foreground: false,
-      state: 'queued',
-      exitCode: null,
-      output: [],
-      updatedAt: at,
-    },
-    at,
-  )
 }
 
 function retryCreation(

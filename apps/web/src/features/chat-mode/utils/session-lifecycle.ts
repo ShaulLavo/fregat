@@ -55,3 +55,14 @@ export function canApplyLifecycle(
       return policy.pinning
   }
 }
+
+export function lifecycleVerb(type: SessionLifecycleChange['type']) {
+  return {
+    settle: 'settled',
+    unsettle: 'moved to active',
+    snooze: 'snoozed',
+    unsnooze: 'unsnoozed',
+    pin: 'pinned',
+    unpin: 'unpinned',
+  }[type]
+}

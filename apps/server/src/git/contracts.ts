@@ -1,5 +1,5 @@
 import * as v from 'valibot'
-import { GIT_FORGE_KINDS, modelSelectionSchema, worktreeIdSchema } from '@workspace/contracts'
+import { modelSelectionSchema, worktreeIdSchema } from '@workspace/contracts'
 import { booleanQueryValueSchema, pathSchema } from '../fs/contracts'
 
 export const gitPathQuerySchema = v.object({
@@ -13,34 +13,6 @@ export const gitStatusQuerySchema = v.object({
 
 export const gitPathBodySchema = v.object({
   path: v.optional(pathSchema, ''),
-})
-
-export const gitCloneBodySchema = v.object({
-  /** A clone URL, or `owner/repo` for GitHub. */
-  source: v.pipe(
-    v.string(),
-    v.trim(),
-    v.minLength(1),
-    v.maxLength(2048),
-    // An option-shaped source would reach git's argument parser.
-    v.check((value) => !value.startsWith('-') && !/[\s\p{Cc}]/u.test(value)),
-  ),
-  destination: pathSchema,
-})
-
-export const gitPublishBodySchema = v.object({
-  path: v.optional(pathSchema, ''),
-  forge: v.picklist(GIT_FORGE_KINDS),
-  host: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(253), v.regex(/^[a-z0-9.-]*$/i))),
-  repository: v.pipe(
-    v.string(),
-    v.trim(),
-    v.minLength(1),
-    v.maxLength(512),
-    v.regex(/^[\w.-]+(?:\/[\w.-]+){0,4}$/),
-  ),
-  visibility: v.picklist(['private', 'public']),
-  protocol: v.picklist(['ssh', 'https']),
 })
 
 export const gitDiffQuerySchema = v.object({

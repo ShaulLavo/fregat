@@ -43,15 +43,6 @@ export function machineRoutes(
       },
       { response: machineConnectionStateSchema },
     )
-    .post(
-      '/machines/:name/update',
-      ({ params, request, server }) => {
-        server?.timeout(request, 0)
-        recordRequestContext({ area: 'machines', operation: 'update', machine: params.name })
-        return machines.update(params.name, clientId(request))
-      },
-      { response: machineConnectionStateSchema },
-    )
     .post('/machines/:name/disconnect', async ({ params, request, server }) => {
       server?.timeout(request, 0)
       recordRequestContext({ area: 'machines', operation: 'disconnect', machine: params.name })

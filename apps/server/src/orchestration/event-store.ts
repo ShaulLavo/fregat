@@ -142,42 +142,6 @@ export class OrchestrationEventStore {
    * payloads included — into one array. Callers that want the rest page by
    * passing the last returned sequence back as `afterSequence`.
    */
-  /** Whether the session has any event after `afterSequence`; no replay logging. */
-  hasSessionEventAfter(sessionId: string, afterSequence: number) {
-    const row = this.database
-      .select({ sequence: orchestrationEvents.sequence })
-      .from(orchestrationEvents)
-      .where(
-        and(
-          gt(orchestrationEvents.sequence, afterSequence),
-          eq(orchestrationEvents.aggregateKind, 'session'),
-          eq(orchestrationEvents.aggregateId, sessionId),
-        ),
-      )
-      .limit(1)
-      .get()
-    return row !== undefined
-  }
-
-  /** Whether the deletion at `sequence` asked for its worktree to go too. */
-  deletionRemovesWorktree(sequence: number) {
-    const row = this.database
-      .select({
-        removeWorktree: sql<
-          number | null
-        >`json_extract(${orchestrationEvents.payloadJson}, '$.removeWorktree')`,
-      })
-      .from(orchestrationEvents)
-      .where(
-        and(
-          eq(orchestrationEvents.sequence, sequence),
-          eq(orchestrationEvents.eventType, 'session.deleted'),
-        ),
-      )
-      .get()
-    return row?.removeWorktree === 1
-  }
-
   readAfter(input: OrchestrationReplayEventsQuery) {
     const limit = replayLimit(input.limit)
     recordChatPipelineInfo('chat.pipeline.event_store.replay_start', {

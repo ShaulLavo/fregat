@@ -54,7 +54,6 @@ type ProviderIntentEvent = Extract<
       | 'session.turn-interrupt-requested'
       | 'session.runtime-stop-requested'
       | 'session.settled'
-      | 'session.lifecycle-restored'
       | 'session.checkpoint-revert-requested'
       | 'session.approval-response-requested'
       | 'session.user-input-response-requested'
@@ -194,7 +193,6 @@ export class ProviderCommandReactor {
       case 'session.turn-interrupt-requested':
         await this.interruptTurn(event)
         return
-      case 'session.lifecycle-restored':
       case 'session.settled':
         await this.releaseSettledRuntime(event)
         return
@@ -487,7 +485,7 @@ export class ProviderCommandReactor {
   }
 
   private async releaseSettledRuntime(
-    event: Extract<ProviderIntentEvent, { type: 'session.settled' | 'session.lifecycle-restored' }>,
+    event: Extract<ProviderIntentEvent, { type: 'session.settled' }>,
   ) {
     const session = this.getReadModel().sessions.get(event.payload.sessionId)
     if (!this.dispatch || !session?.runtime || session.settledOverride !== 'settled') return
@@ -979,7 +977,6 @@ function isProviderIntentEvent(event: OrchestrationEvent): event is ProviderInte
     case 'session.turn-steer-requested':
     case 'session.turn-interrupt-requested':
     case 'session.runtime-stop-requested':
-    case 'session.lifecycle-restored':
     case 'session.settled':
     case 'session.checkpoint-revert-requested':
     case 'session.approval-response-requested':

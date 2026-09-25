@@ -13,7 +13,7 @@ import {
   resetChatInputDraftStore,
   useChatInputDraftStore,
 } from '../../state/chat-input-draft-store'
-import { providerListQueryOptions } from '@/lib/provider-query'
+import { providerListQueryOptions } from '../../utils/provider-query'
 import {
   providerModel,
   providerSnapshot,

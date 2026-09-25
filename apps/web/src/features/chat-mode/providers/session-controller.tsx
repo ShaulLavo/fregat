@@ -5,7 +5,6 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useChatTransport } from '@/features/chat/hooks/use-chat-transport'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
 import { originForQueryClient } from '@/lib/environments/state/query-clients'
-import { clientErrorDescription } from '@/lib/client-error-taxonomy'
 import { useWorkspaceChatProject } from '@/features/chat/hooks/use-workspace-chat-project'
 import { selectChatSessionsForProject } from '@workspace/client-core/chat/selectors'
 import { useEditorWorkspaceState } from '@/features/editor/state/workspace-state'
@@ -33,8 +32,7 @@ export function ChatModeSessionController({
 }) {
   const transport = useChatTransport()
   const origin = originForQueryClient(useQueryClient())
-  const shellFailure = useEnvironmentsStore((state) => state.entries[origin]?.lastError ?? null)
-  const shellError = shellFailure ? clientErrorDescription(shellFailure) : null
+  const shellError = useEnvironmentsStore((state) => state.entries[origin]?.lastError ?? null)
   const activeWorkspaceRoot = useActiveProjectStore((state) => state.workspaceRoot)
   const rootPath = activeWorkspaceRoot ?? editorRootPath
   const projectState = useWorkspaceChatProject({ transport, rootPath })

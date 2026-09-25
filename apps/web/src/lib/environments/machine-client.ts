@@ -31,13 +31,6 @@ export async function connectSshMachine(name: string, signal: AbortSignal) {
   return { ...state, origin: `${primaryServerOrigin()}${state.origin}` }
 }
 
-/** Installs the primary's server release on the machine, restarts it and connects again. */
-export async function updateSshServer(name: string) {
-  const client = environmentClientFor(primaryServerOrigin())
-  const response = await client.machines({ name }).update.post({}, requestOptions())
-  return v.parse(machineConnectionStateSchema, requireEdenData(response))
-}
-
 export async function disconnectSshMachine(name: string) {
   const client = environmentClientFor(primaryServerOrigin())
   requireEdenData(await client.machines({ name }).disconnect.post({}, requestOptions()))

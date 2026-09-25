@@ -1,7 +1,6 @@
-import { Database, SQLiteError } from 'bun:sqlite'
+import { Database } from 'bun:sqlite'
 import { chmod, mkdir, open } from 'node:fs/promises'
 import path from 'node:path'
-import { setTimeout } from 'node:timers/promises'
 import { environmentIdSchema, type EnvironmentId } from '@workspace/contracts'
 import * as v from 'valibot'
 
@@ -19,7 +18,7 @@ export async function openFileStorage(directory: string, environmentId: Environm
     await prepareFile(filename)
     await chmod(filename, 0o600)
     database = new Database(filename, { strict: true })
-    await initialize(database)
+    initialize(database)
     return createStorage(database, id)
   } catch (error) {
     database?.close()
@@ -47,24 +46,9 @@ async function prepareFile(filename: string) {
   }
 }
 
-async function enableWal(database: Database) {
-  const deadline = Date.now() + 1000
-  // Journal-mode lock upgrades can bypass SQLite's busy handler during concurrent opens.
-  for (;;) {
-    try {
-      database.exec('PRAGMA journal_mode = WAL')
-      return
-    } catch (error) {
-      if (!(error instanceof SQLiteError) || error.code !== 'SQLITE_BUSY') throw error
-      if (Date.now() >= deadline) throw error
-    }
-    await setTimeout(10)
-  }
-}
-
-async function initialize(database: Database) {
-  await enableWal(database)
+function initialize(database: Database) {
   database.exec('PRAGMA busy_timeout = 1000')
+  database.exec('PRAGMA journal_mode = WAL')
   // Viewer convenience state is checkpointed on flush; key presses need not wait for fsync.
   database.exec('PRAGMA synchronous = NORMAL')
   database.exec(

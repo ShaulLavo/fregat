@@ -386,12 +386,6 @@
   {
     "from": "command-palette",
     "to": "chat-mode",
-    "module": "features/chat-mode/hooks/use-import-project-scripts.ts",
-    "reason": "owner: The palette assembles commands and search results across features; this module supplies useImportProjectScripts."
-  },
-  {
-    "from": "command-palette",
-    "to": "chat-mode",
     "module": "features/chat-mode/state/session-commands.ts",
     "reason": "owner: The palette assembles commands and search results across features; this module supplies openSessionRow, startSessionDraft."
   },
@@ -694,6 +688,12 @@
     "to": "workspace",
     "module": "features/workspace/state/cache.ts",
     "reason": "couple: search and workspace coordinate the same document or session state through CachedSearchBufferState; separate that ownership before draining this edge."
+  },
+  {
+    "from": "settings",
+    "to": "chat",
+    "module": "features/chat/utils/provider-query.ts",
+    "reason": "shared \u2192 lib: providerListQueryOptions is reused by settings outside chat; move this shared behavior with its consumers."
   },
   {
     "from": "settings",

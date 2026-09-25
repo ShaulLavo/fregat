@@ -1,7 +1,6 @@
 import { errorStringField, type MachineDefinition } from '@workspace/contracts'
 import { Button } from '@workspace/ui/components/button'
 import { MachineErrorDetails } from '@/components/machine-error-details'
-import { ServerUpdateButton } from '@/components/server-update-button'
 import { connectionNoticeSummary } from '@/lib/environments/utils/connection-notice'
 import { Phase } from '@/lib/environments/components/phase'
 import { useState } from 'react'
@@ -116,12 +115,6 @@ export function MachineRow({
             Retry now
           </Button>
         ) : null}
-        <ServerUpdateButton
-          name={name}
-          label={machine.label ?? name}
-          error={state?.lastError ?? null}
-          size='sm'
-        />
         <Button
           size='sm'
           variant='ghost'

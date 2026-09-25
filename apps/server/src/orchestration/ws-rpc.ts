@@ -30,7 +30,6 @@ import {
   recordChatPipelineWarning,
 } from './orchestration-logging'
 import { orchestrationReplaySummary } from '@workspace/contracts'
-import type { ClientPresence } from './client-presence'
 import type { OrchestrationEngine } from './engine'
 
 /**
@@ -88,7 +87,6 @@ export function orchestrationWsRoutes(
   engine: OrchestrationEngine,
   auth: AuthConfig,
   identity: EnvironmentIdentity,
-  presence: ClientPresence,
 ) {
   const states = new WeakMap<object, OrchestrationRpcConnectionState>()
   const config = orchestrationWsServerConfig(identity)
@@ -132,10 +130,6 @@ export function orchestrationWsRoutes(
       const state = states.get(socket.key)
       if (!state) return
 
-      if (message.kind === 'presence') {
-        presence.report(socket.key, message.focused)
-        return
-      }
       handleOrchestrationRpcMessage(engine, socket, state, message, config)
     },
     close(ws, code, reason) {
@@ -147,7 +141,6 @@ export function orchestrationWsRoutes(
       if (state) closeOrchestrationRpcState(state)
 
       states.delete(socket.key)
-      presence.forget(socket.key)
       const record = isAbnormalWebSocketClose(code)
         ? recordChatPipelineWarning
         : recordChatPipelineInfo
@@ -165,7 +158,7 @@ function handleOrchestrationRpcMessage(
   engine: OrchestrationEngine,
   socket: OrchestrationRpcWebSocket,
   state: OrchestrationRpcConnectionState,
-  message: Exclude<OrchestrationWsClientMessage, { kind: 'presence' }>,
+  message: OrchestrationWsClientMessage,
   config: OrchestrationWsServerConfig,
 ) {
   if (message.kind === 'subscription.ack') {

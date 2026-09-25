@@ -4,7 +4,6 @@ import { useSettingValue } from '@/hooks/use-setting-value'
 import { useSettingsActions } from '@/features/settings/hooks/use-settings-actions'
 import { useEnvironmentConnections } from '@/hooks/use-environment-connections'
 import { errorMessage } from '@/lib/error-message'
-import { clientErrorDescription } from '@/lib/client-error-taxonomy'
 import { createWideEventScope } from '@/lib/wide-event-scope'
 import {
   machineDraft,
@@ -86,13 +85,11 @@ export function useMachineForm({
       setError('Connection canceled.')
       return false
     }
-    const failure = connections.store
+    const connected = connections.store
       .getState()
-      .machines.find((entry) => entry.name === machineName)?.lastError
+      .machines.find((entry) => entry.name === machineName)
     setError(
-      failure
-        ? clientErrorDescription(failure)
-        : `Cannot connect to ${machineName}. Check the address and try again.`,
+      connected?.lastError || `Cannot connect to ${machineName}. Check the address and try again.`,
     )
     return false
   }

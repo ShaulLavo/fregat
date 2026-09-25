@@ -9,8 +9,9 @@ import { BranchActions } from '@/features/git/components/branch-actions'
 import { expect, test } from '../../../../../test/fixtures'
 import { renderWithProviders } from '../../../../../test/render'
 
-// Real git and the real route. These fixtures' origin is a local directory, so
-// no forge is detected and the component must not offer Create.
+// Real git and the real route. `gh` is whatever the machine has, which is the
+// point of the second test: these fixtures have no GitHub remote, so the
+// component has to reach the same conclusion as a user whose `gh` cannot answer.
 
 test('offers to publish a branch that has no upstream, and pushes it', async ({
   client,
@@ -34,7 +35,7 @@ test('offers to publish a branch that has no upstream, and pushes it', async ({
   )
 })
 
-test('never offers a pull request when no forge could be asked', async ({ client, server }) => {
+test('never offers a pull request when GitHub could not be asked', async ({ client, server }) => {
   void client
   const { repo } = await clonedRepo(server.root)
   await writeFile(path.join(repo, 'readme.md'), 'two\n')

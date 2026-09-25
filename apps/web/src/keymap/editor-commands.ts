@@ -179,8 +179,6 @@ export const editorCommands = [
   { ...editorCommandMetadata['selectDocumentStart'] },
   { ...editorCommandMetadata['selectDocumentEnd'] },
 
-  { ...editorCommandMetadata['jumpBack'] },
-  { ...editorCommandMetadata['jumpForward'] },
   { ...editorCommandMetadata['cursorUndo'] },
   { ...editorCommandMetadata['cursorRedo'] },
   { ...editorCommandMetadata['editor.action.goToDefinition'] },

@@ -2,7 +2,7 @@ import { getClient } from '@/lib/client'
 import { DEFAULT_PROVIDER_INSTANCE_ID } from '@workspace/contracts'
 import { providerSnapshot } from '../../../../../test/factories/chat'
 import { ChatModelPickerProvider } from '@/features/chat/providers/model-picker-provider'
-import { providerListQueryOptions } from '@/lib/provider-query'
+import { providerListQueryOptions } from '@/features/chat/utils/provider-query'
 import { TEST_ENVIRONMENT_ID as FIXTURE_ENVIRONMENT_ID } from '../../../../../test/factories/chat'
 import {
   sessionIdSchema,

@@ -11,12 +11,6 @@ export async function fixtureGit(project: string, args: readonly string[]) {
     throw createScriptError(`Fixture git failed: ${await new Response(process.stderr).text()}`)
 }
 
-/** A git command's trimmed stdout, empty when it fails. */
-export async function fixtureGitOutput(root: string, args: readonly string[]) {
-  const child = Bun.spawn(['git', '-C', root, ...args], { stdout: 'pipe', stderr: 'ignore' })
-  return (await new Response(child.stdout).text()).trim()
-}
-
 /**
  * A temp repository with an identity and `a.txt` staged, ready to commit. The identity is set even
  * for fixtures that never commit: it costs nothing and a missing one fails far from its cause.
@@ -26,13 +20,6 @@ export async function createGitFixture(slug: string) {
     await writeFile(path.join(fixture, 'a.txt'), 'one\n')
     await fixtureGit(fixture, ['add', 'a.txt'])
   })
-}
-
-/** A temp repository with one commit, as `isolatedNativeScenario({ prepareWorktree })` wants it. */
-export async function committedFixture(slug: string) {
-  const fixture = await createGitFixture(slug)
-  await fixtureGit(fixture, ['commit', '--quiet', '-m', 'fixture'])
-  return { path: fixture, release: () => releaseFixture(fixture) }
 }
 
 /** A temp repository where `file` was committed as `before` and now reads `after`, uncommitted. */

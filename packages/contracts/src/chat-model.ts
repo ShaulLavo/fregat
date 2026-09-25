@@ -1,9 +1,5 @@
 import { sessionTitleEntries } from './session-titles'
-import {
-  worktreeLifecycleEntries,
-  worktreePullRequestSchema,
-  worktreeSetupSchema,
-} from './worktree-lifecycle'
+import { worktreeLifecycleEntries } from './worktree-lifecycle'
 import * as v from 'valibot'
 import {
   eventIdSchema,
@@ -185,10 +181,6 @@ export const orderKeySchema = v.pipe(
 export const orchestrationProjectScriptSchema = v.object({
   command: trimmedNonEmptyStringSchema,
   name: trimmedNonEmptyStringSchema,
-  /** Runs in every new session worktree; the first such script is the setup script. */
-  runOnWorktreeCreate: v.optional(v.boolean()),
-  /** Holds the first turn until setup finishes; a failed setup fails the worktree. */
-  waitForSetup: v.optional(v.boolean()),
 })
 
 export const repositoryIdentitySchema = v.variant('source', [
@@ -215,9 +207,6 @@ export const orchestrationWorktreeSchema = v.object({
   kind: v.picklist(['current', 'linked']),
   ownership: v.picklist(['protected', 'external', 'platform', 'unclaimed']),
   ...worktreeLifecycleEntries,
-  /** Tracked for dedicated platform worktrees only; null everywhere else. */
-  pullRequest: v.optional(v.nullable(worktreePullRequestSchema), null),
-  setup: v.optional(v.nullable(worktreeSetupSchema), null),
   createdAt: isoDateTimeSchema,
   updatedAt: isoDateTimeSchema,
   retiredAt: v.nullable(isoDateTimeSchema),
@@ -240,8 +229,6 @@ export const worktreeRegistrationEntries = {
     'removedAt',
     'worktreeCreationCapability',
     'cleanupEligibility',
-    'pullRequest',
-    'setup',
   ]).entries,
   worktreeId: worktreeIdSchema,
 } as const

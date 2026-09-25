@@ -1,4 +1,7 @@
-import { createSessionNotificationTracker, type NotificationMode } from '@workspace/contracts'
+import {
+  createSessionNotificationTracker,
+  type NotificationMode,
+} from '@workspace/client-core/chat/notifications'
 import type { SessionRailEnvironment } from '@workspace/client-core/chat/rail/model'
 import { createNotificationHost } from '@/features/chat-mode/state/notification-host'
 import { useChatProjectionStore } from '@/features/chat/state/chat-projection-store'

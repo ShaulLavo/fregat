@@ -620,18 +620,6 @@ export const editorCommandMetadata = {
     title: 'Select to document end',
     vscodeCommandIds: ['cursorBottomSelect'],
   }),
-  jumpBack: defineEditorMetadata({
-    id: 'jumpBack',
-    undoCategory: 'view-only',
-    title: 'Go back',
-    vscodeCommandIds: ['workbench.action.navigateBack'],
-  }),
-  jumpForward: defineEditorMetadata({
-    id: 'jumpForward',
-    undoCategory: 'view-only',
-    title: 'Go forward',
-    vscodeCommandIds: ['workbench.action.navigateForward'],
-  }),
   cursorUndo: defineEditorMetadata({
     id: 'cursorUndo',
     undoCategory: 'view-only',

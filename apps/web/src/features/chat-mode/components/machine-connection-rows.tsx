@@ -23,7 +23,6 @@ export function MachineConnectionRows() {
     )
     .map((machine) => ({
       name: `machine:${machine.name}`,
-      machine: machine.name as string | null,
       label: machine.config.label ?? machine.name,
       phase: machine.phase,
       lastError: machine.lastError,
@@ -32,7 +31,6 @@ export function MachineConnectionRows() {
   if (primary && hasConnectionNotice(primary))
     machines.unshift({
       name: 'primary',
-      machine: null,
       label: primary.label ?? primary.name,
       phase: primary.phase,
       lastError: primary.lastError,
@@ -45,7 +43,6 @@ export function MachineConnectionRows() {
         <MachineConnectionNotice
           key={machine.name}
           id={machine.name}
-          machine={machine.machine}
           label={machine.label}
           phase={machine.phase}
           error={machine.lastError}

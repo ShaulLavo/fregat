@@ -33,31 +33,7 @@ export type GitRepositoryInfo = {
 export type GitStatusResult = {
   repository: GitRepositoryInfo | null
   files: GitFileStatus[]
-  /** Submodules this repository declares that have no checkout yet. */
-  uninitializedSubmodules: number
-  /** Null when automatic pull is off for this checkout. */
-  autoPull: GitAutoPullState | null
 }
-
-export type GitAutoPullSkipReason =
-  | 'changes'
-  | 'ahead'
-  | 'diverged'
-  | 'detached'
-  | 'no-upstream'
-  | 'no-default-branch'
-  | 'other-branch'
-
-/** Whether a checkout can fast-forward to its upstream on its own, and why not. */
-export type GitAutoPullState =
-  | { state: 'current' }
-  | { state: 'pulling' }
-  | { state: 'skipped'; reason: GitAutoPullSkipReason; defaultBranch: string | null }
-  | { state: 'failed'; message: string }
-
-/** How a new worktree populates submodules: every nested level, declared ones only, or none. */
-export const WORKTREE_SUBMODULE_MODES = ['recursive', 'top-level', 'none'] as const
-export type WorktreeSubmoduleMode = (typeof WORKTREE_SUBMODULE_MODES)[number]
 
 export type GitLineChange = {
   type: 'added' | 'deleted' | 'context'
@@ -242,8 +218,6 @@ export type GitBranchRemoteState = {
   branch: string | null
   /** False on a fresh branch, which is what makes a push need `--set-upstream`. */
   hasUpstream: boolean
-  /** False when the repository has no remote at all: there is nowhere to push until one is published. */
-  hasRemote: boolean
 }
 
 /**
@@ -258,19 +232,6 @@ export type GitPullRequestState = {
   branch: string | null
   pullRequest: GitPullRequest | null
   support: GitPullRequestSupport
-  /** The hosting service the remote points at; null when no remote names a known one. */
-  forge: GitForge | null
-}
-
-/** Hosting services with pull (merge) requests, as upstream T3 Code registers them. */
-export const GIT_FORGE_KINDS = ['github', 'gitlab', 'forgejo', 'azure-devops', 'bitbucket'] as const
-export type GitForgeKind = (typeof GIT_FORGE_KINDS)[number]
-
-export type GitForge = {
-  kind: GitForgeKind
-  /** "GitHub", "GitLab Self-Hosted", … */
-  name: string
-  host: string
 }
 
 /**
@@ -279,16 +240,14 @@ export type GitForge = {
  */
 export type GitPullRequestSupport =
   | 'ready'
-  /** The forge's CLI (`gh`, `glab`, `tea`, `az`) is not on PATH. */
+  /** `gh` is not on PATH. */
   | 'cli-missing'
-  /** The CLI is installed, or the API reachable, but nobody has signed in. */
+  /** `gh` is installed but nobody has signed in. */
   | 'unauthenticated'
-  /** No remote points at a known forge, so there is nothing to ask. */
-  | 'no-forge'
+  /** No GitHub remote, so there is nothing for `gh` to talk to. */
+  | 'no-github-remote'
 
 export type GitPullRequest = {
-  /** Merge or close time, when the lookup asked for it. */
-  closedAt?: string | null
   draft: boolean
   number: number
   state: 'closed' | 'merged' | 'open'
@@ -309,43 +268,3 @@ export type GitPullRequestCreateResult =
   /** A branch can only have one open pull request, so a second attempt is a no-op. */
   | { kind: 'exists'; pullRequest: GitPullRequest }
   | { kind: 'unsupported'; support: GitPullRequestSupport }
-
-/** Where a `git clone` is, from its progress lines. */
-export type GitCloneStage = 'connecting' | 'counting' | 'receiving' | 'resolving' | 'checkout'
-
-export type GitCloneProgressEvent =
-  | { kind: 'progress'; stage: GitCloneStage; percent: number | null }
-  /** The checkout is complete and registered as a project. */
-  | { kind: 'result'; path: string; projectId: string | null }
-  | { kind: 'failed'; message: string }
-
-export type GitRepositoryVisibility = 'private' | 'public'
-
-/** Create a repository on a forge for a checkout that has no remote, then push to it. */
-export type GitPublishRequest = {
-  path: string
-  forge: GitForgeKind
-  /** Defaults to the forge's public host. */
-  host?: string
-  /** `owner/name`; Azure DevOps takes `organization/project/name`. */
-  repository: string
-  visibility: GitRepositoryVisibility
-  protocol: 'ssh' | 'https'
-}
-
-export type GitPublishResult = {
-  url: string
-  remoteName: string
-  remoteUrl: string
-  branch: string | null
-  /** `remote-added`: nothing to push yet. `push-failed`: the repository exists, the push did not land. */
-  status: 'pushed' | 'remote-added' | 'push-failed'
-  pushError: string | null
-}
-
-/** Push, then open a pull request: each step says what it did, so a partial result never reads as success. */
-export type GitShipResult = {
-  push: { ok: true; result: GitPushResult } | { ok: false; message: string }
-  /** Null when the push failed and nothing was asked of the forge. */
-  pullRequest: GitPullRequestCreateResult | { kind: 'failed'; message: string } | null
-}

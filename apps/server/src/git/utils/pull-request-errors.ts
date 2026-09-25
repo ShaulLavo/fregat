@@ -1,29 +1,23 @@
 import { defineErrorCatalog } from 'evlog'
 
 export const gitPullRequestErrors = defineErrorCatalog('git', {
-  PULL_REQUEST_HEAD_CHANGED: {
-    status: 409,
-    message: 'The pull request head changed',
-    why: 'The fetched commit differs from the commit reported by the forge.',
-    fix: 'Refresh the pull request and open it again.',
-  },
   PULL_REQUEST_LOOKUP_FAILED: {
     status: 502,
-    message: ({ forge }: { forge: string }) => `${forge} could not list pull requests`,
-    why: 'The request failed before the forge confirmed whether a pull request exists.',
-    fix: "Check the network and the forge CLI's sign-in (`gh auth status`, `glab auth status`, `tea login list`, `az account show`), resolve any rate limit, then retry.",
+    message: 'The GitHub CLI could not read pull requests',
+    why: 'The request failed before GitHub confirmed whether an open pull request exists.',
+    fix: 'Check the network and `gh auth status`, resolve any GitHub rate limit, then retry.',
   },
   PULL_REQUEST_LOOKUP_TIMED_OUT: {
     status: 504,
-    message: ({ forge }: { forge: string }) => `The ${forge} pull request lookup timed out`,
-    why: 'The forge CLI exceeded the lookup time limit without a complete response.',
+    message: 'The GitHub pull request lookup timed out',
+    why: 'The GitHub CLI exceeded the lookup time limit without a complete response.',
     fix: 'Check the network and retry the lookup before creating a pull request.',
   },
   PULL_REQUEST_RESPONSE_INVALID: {
     status: 502,
-    message: ({ forge }: { forge: string }) => `${forge} returned an invalid pull request response`,
-    why: 'The response could not establish whether a pull request exists.',
-    fix: 'Check the installed forge CLI version and retry the lookup.',
+    message: 'The GitHub CLI returned an invalid pull request response',
+    why: 'The response could not establish whether an open pull request exists.',
+    fix: 'Check the installed GitHub CLI and retry the lookup.',
   },
   PUSH_DETACHED_HEAD: {
     status: 409,
@@ -51,30 +45,9 @@ export const gitPullRequestErrors = defineErrorCatalog('git', {
   },
   PULL_REQUEST_CREATE_FAILED: {
     status: 502,
-    message: ({ branch, forge }: { branch: string; forge: string }) =>
-      `${forge} could not open a pull request for ${branch}`,
-    why: 'The forge refused the request: the branch may have no commits the base does not already have, may not be pushed yet, or the account may lack write access to the repository.',
-    fix: "Push the branch, confirm it is ahead of its base, and check that the forge CLI's sign-in has access to this repository.",
-  },
-  REPOSITORY_CREATE_FAILED: {
-    status: 502,
-    message: ({ forge, repository }: { forge: string; repository: string }) =>
-      `${forge} could not create ${repository}`,
-    why: 'The forge refused the new repository: the name may be taken, the namespace may not exist, or the account may not be allowed to create repositories there.',
-    fix: "Check the name and the forge CLI's sign-in, then publish again.",
-  },
-  FORGE_NOT_READY: {
-    status: 409,
-    message: ({ forge, reason }: { forge: string; reason: string }) =>
-      `${forge} is not ready: ${reason}`,
-    why: 'Publishing creates the repository through the forge CLI or API, which is not installed or not signed in on the machine that owns this checkout.',
-    fix: 'Install the forge CLI and sign in on that machine (`gh auth login`, `glab auth login`, `tea login add`, `az login`), or store bitbucket.org credentials in git, then publish again.',
-  },
-  REPOSITORY_NAME_INVALID: {
-    status: 400,
-    message: ({ forge, expected }: { forge: string; expected: string }) =>
-      `${forge} needs the repository as ${expected}`,
-    why: 'The repository name does not have the parts this forge addresses repositories by.',
-    fix: 'Enter the repository in that form and publish again.',
+    message: ({ branch }: { branch: string }) =>
+      `The GitHub CLI could not open a pull request for ${branch}`,
+    why: 'gh refused the request: the branch may have no commits the base does not already have, may not be pushed yet, or the account may lack write access to the repository.',
+    fix: 'Push the branch, confirm it is ahead of its base, and check that `gh auth status` reports an account with access to this repository.',
   },
 })

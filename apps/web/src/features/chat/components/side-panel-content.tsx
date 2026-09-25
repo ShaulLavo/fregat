@@ -12,7 +12,6 @@ import { useActiveChatSessionId } from '../hooks/use-active-chat-session-id'
 import { useChatShellSubscription } from '../hooks/use-chat-shell-subscription'
 import { useWorkspaceChatProject } from '../hooks/use-workspace-chat-project'
 import { compareChatSidebarSessions } from '@/features/chat/utils/formatters'
-import { clientErrorDescription } from '@/lib/client-error-taxonomy'
 import { useChatTransport } from '@/features/chat/hooks/use-chat-transport'
 import { selectChatSidebarSessionsForProject } from '@workspace/client-core/chat/selectors'
 import { ChatPanelHeader } from './chat-panel-header'
@@ -125,7 +124,7 @@ export const ChatSidePanelContent = memo(({ rootPath }: { rootPath: string }) =>
       <ChatPanelStatus
         createError={null}
         projectError={projectState.error}
-        shellError={shell.error ? clientErrorDescription(shell.error) : null}
+        shellError={shell.error}
       />
     </div>
   )

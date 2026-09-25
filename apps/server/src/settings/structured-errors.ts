@@ -54,12 +54,6 @@ export const settingsErrors = defineErrorCatalog('settings', {
     why: 'Another process repeatedly replaced the settings document while this update was being staged.',
     fix: 'Stop the competing writer, then retry the same settings action.',
   },
-  SERVER_SECRET_CONTENDED: {
-    status: 503,
-    message: 'The secrets file changed while this server was creating a key',
-    why: 'Another process wrote the secrets file while this server created its push signing key.',
-    fix: 'Try again. If it repeats, stop the other process that edits the secrets file.',
-  },
   ID_COLLISION: {
     status: 409,
     message: () => 'A settings write id was reused for different content',
