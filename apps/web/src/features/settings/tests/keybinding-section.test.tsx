@@ -37,33 +37,33 @@ test('records and resets a command omitted by the default preset', async ({ clie
   expect(client).toBeDefined()
   renderWithProviders(<KeybindingSection />)
   await screen.findByRole('button', { name: SAVE_RECORDER })
-  await userEvent.type(screen.getByLabelText('Search keyboard shortcuts'), 'Find references')
+  await userEvent.type(screen.getByLabelText('Search keyboard shortcuts'), 'Sort lines ascending')
 
-  const recorderName = 'Record a shortcut for editor.editor.action.goToReferences'
+  const recorderName = 'Record a shortcut for editor.editor.action.sortLinesAscending'
   const recorder = screen.getByRole('button', { name: recorderName })
-  expect(screen.getByRole('button', { name: 'Unbind Find references' })).toHaveAttribute(
+  expect(screen.getByRole('button', { name: 'Unbind Sort lines ascending' })).toHaveAttribute(
     'aria-disabled',
     'true',
   )
   await userEvent.click(recorder)
-  fireEvent.keyDown(recorder, { key: 'F12', shiftKey: true })
+  fireEvent.keyDown(recorder, { key: 'F9' })
 
   await waitFor(async () => {
     const snapshot = await fetchSettings(undefined, getClient())
-    expect(snapshot.values['keybindings.overrides']['editor.editor.action.goToReferences']).toBe(
-      'Shift+F12',
-    )
+    expect(
+      snapshot.values['keybindings.overrides']['editor.editor.action.sortLinesAscending'],
+    ).toBe('F9')
   })
-  await userEvent.click(screen.getByRole('button', { name: 'Reset Find references' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Reset Sort lines ascending' }))
 
   await waitFor(async () => {
     const snapshot = await fetchSettings(undefined, getClient())
     expect(snapshot.values['keybindings.overrides']).not.toHaveProperty(
-      'editor.editor.action.goToReferences',
+      'editor.editor.action.sortLinesAscending',
     )
   })
   expect(screen.getByRole('button', { name: recorderName })).toBeDefined()
-  expect(screen.getByRole('button', { name: 'Unbind Find references' })).toHaveAttribute(
+  expect(screen.getByRole('button', { name: 'Unbind Sort lines ascending' })).toHaveAttribute(
     'aria-disabled',
     'true',
   )
