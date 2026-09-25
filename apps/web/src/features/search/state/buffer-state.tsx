@@ -5,14 +5,13 @@ import type {
   WorkspaceSearchQuery,
   WorkspaceSearchWarningEvent,
 } from '@workspace/contracts'
-import { createContext, use } from 'react'
-import { useStore } from 'zustand'
 import { subscribeWithSelector } from 'zustand/middleware'
 import { createStore, type Mutate, type StoreApi } from 'zustand/vanilla'
 
 import type { CachedSearchBufferState } from '@/features/workspace/state/cache'
 import { basename, toTreePath } from '@/lib/path-formatters'
 import { clientErrors } from '@/lib/structured-errors'
+import { createStoreContext } from '@/lib/store-context'
 import { documentKey, filesystemPath } from '@/lib/documents/utils/identity'
 import type { DocumentKey } from '@/lib/documents/utils/types'
 import { compareSearchPaths } from '@/features/search/utils/sort'
@@ -152,22 +151,13 @@ export type SearchBufferStoreApi = Mutate<
 
 const EMPTY_SEARCH_GROUPS: readonly WorkspaceSearchFileGroup[] = []
 
-export const SearchBufferStateContext = createContext<SearchBufferStoreApi | null>(null)
-
-export function useSearchBufferStoreApi() {
-  const store = use(SearchBufferStateContext)
-  if (!store) {
-    throw clientErrors.CONTEXT_MISSING({
-      message: 'useSearchBufferStoreApi must be used within SearchBufferStateContext',
-    })
-  }
-
-  return store
-}
-
-export function useSearchBufferState<T>(selector: (state: SearchBufferStore) => T): T {
-  return useStore(useSearchBufferStoreApi(), selector)
-}
+export const {
+  Context: SearchBufferStateContext,
+  useStoreApi: useSearchBufferStoreApi,
+  useSelector: useSearchBufferState,
+} = createStoreContext<SearchBufferStoreApi>(
+  'useSearchBufferStoreApi must be used within SearchBufferStateContext',
+)
 
 export function createSearchBufferStore({
   cachedByRootPath = {},

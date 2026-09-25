@@ -1,15 +1,10 @@
 import { use } from 'react'
 
 import { ChatPlanFollowUpContext } from '@/features/chat/providers/plan-follow-up-context'
-import { clientErrors } from '@/lib/structured-errors'
+import { requireContext } from '@/lib/require-context'
 
 export function usePlanFollowUp() {
   const followUp = use(ChatPlanFollowUpContext)
-  if (!followUp) {
-    throw clientErrors.CONTEXT_MISSING({
-      message: 'usePlanFollowUp must be used within ChatPlanFollowUpProvider',
-    })
-  }
-
+  requireContext(followUp, 'usePlanFollowUp must be used within ChatPlanFollowUpProvider')
   return followUp
 }

@@ -369,7 +369,6 @@
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
         "cmdk": "^1.1.1",
-        "evlog": "catalog:",
         "react-error-boundary": "^6.1.5",
         "react-resizable-panels": "^4.12.4",
         "sonner": "^2.0.8",

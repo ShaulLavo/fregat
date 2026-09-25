@@ -4,7 +4,7 @@ import { use, type MouseEvent } from 'react'
 
 import type { MarkdownFileReference } from '@/features/chat/utils/markdown-file-links'
 import { MarkdownFileLinkContext } from '@/features/chat/providers/markdown-file-link-context'
-import { clientErrors } from '@/lib/structured-errors'
+import { requireContext } from '@/lib/require-context'
 
 /**
  * The transcript's bridge into the editor: a file reference is a real target,
@@ -22,13 +22,9 @@ export function AssistantMarkdownFileLink({
   readonly label: string
   readonly reference: MarkdownFileReference
 }) {
-  const actions = use(MarkdownFileLinkContext)
-  if (!actions) {
-    throw clientErrors.CONTEXT_MISSING({
-      message: 'AssistantMarkdownFileLink must be used within MarkdownFileLinkContext',
-    })
-  }
-  const { openFileReference } = actions
+  const link = use(MarkdownFileLinkContext)
+  requireContext(link, 'AssistantMarkdownFileLink must be used within MarkdownFileLinkContext')
+  const { openFileReference } = link
 
   function handleClick(event: MouseEvent<HTMLAnchorElement>) {
     event.preventDefault()

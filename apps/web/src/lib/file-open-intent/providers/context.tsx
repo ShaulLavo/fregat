@@ -1,6 +1,6 @@
 import { createContext, use, type ReactNode } from 'react'
 
-import { clientErrors } from '@/lib/structured-errors'
+import { requireContext } from '@/lib/require-context'
 import type { FileOpenIntentService } from '@/lib/file-open-intent/state/service'
 
 export type FileOpenIntentContextValue = {
@@ -21,10 +21,6 @@ export function FileOpenIntentProvider({
 
 export function useFileOpenIntent() {
   const value = use(FileOpenIntentContext)
-  if (!value) {
-    throw clientErrors.CONTEXT_MISSING({
-      message: 'useFileOpenIntent must be used within FileOpenIntentProvider',
-    })
-  }
+  requireContext(value, 'useFileOpenIntent must be used within FileOpenIntentProvider')
   return value
 }

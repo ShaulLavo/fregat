@@ -1,13 +1,10 @@
 import { use } from 'react'
 
 import { BundleContext } from '@/lib/appearance/providers/bundle-context'
-import { clientErrors } from '@/lib/structured-errors'
+import { requireContext } from '@/lib/require-context'
 
 export function useBundles() {
   const context = use(BundleContext)
-  if (context) return context
-
-  throw clientErrors.CONTEXT_MISSING({
-    message: 'useBundles must be used within AppearanceProvider',
-  })
+  requireContext(context, 'useBundles must be used within AppearanceProvider')
+  return context
 }
