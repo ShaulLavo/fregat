@@ -390,6 +390,7 @@ export const projectionSessions = sqliteTable(
      */
     planProgressJson: text('plan_progress_json'),
     forkedFromJson: text('forked_from_json'),
+    agent: text('agent'),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull(),
     archivedAt: text('archived_at'),

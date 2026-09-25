@@ -1269,6 +1269,7 @@ function providerRuntimeStartInput(
   reusableBinding?: ProviderRuntimeBindingWithMetadata | null,
 ): ProviderRuntimeStartInput {
   return {
+    ...(payload.agent ? { agent: payload.agent } : {}),
     cwd: payload.cwd,
     interactionMode: payload.interactionMode,
     modelSelection: payload.modelSelection,

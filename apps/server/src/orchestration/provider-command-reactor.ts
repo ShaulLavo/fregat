@@ -1012,6 +1012,7 @@ function runtimePayloadFromSessionContext(
   context: ProviderSessionContext,
 ): ProviderRuntimeStartPayload {
   return {
+    ...(context.session.agent ? { agent: context.session.agent } : {}),
     cwd: context.worktree.canonicalPath,
     interactionMode: context.interactionMode,
     modelSelection: context.modelSelection,

@@ -104,6 +104,9 @@ export function ChatDraftView({
     if (identity)
       useChatInputDraftStore.getState().setIdentity(draftTarget, { ...identity, worktreeTarget })
   }
+  function chooseAgent(agent: string | null) {
+    if (identity) useChatInputDraftStore.getState().setIdentity(draftTarget, { ...identity, agent })
+  }
   const providersQuery = useQuery(providerListQueryOptions())
   const modelSelection = resolveChatModelSelection(
     providersQuery.data?.providers,
@@ -145,6 +148,7 @@ export function ChatDraftView({
       unsettledSubmissions.current.get(retryKey) ??
       createDraftSessionSubmission({
         ...payload,
+        agent: identity?.agent,
         createdAt: new Date().toISOString(),
         worktreeTarget:
           fanOut && worktree ? fanOutWorktreeTarget(worktreeTarget, worktree.id) : worktreeTarget,
@@ -286,7 +290,10 @@ export function ChatDraftView({
           footer={
             project && worktree && target ? (
               <DraftContextStrip
+                agent={identity?.agent ?? null}
                 base={worktree}
+                providerInstanceId={modelSelection?.providerInstanceId ?? null}
+                onAgent={chooseAgent}
                 draftTarget={draftTarget}
                 machines={machines}
                 project={project}

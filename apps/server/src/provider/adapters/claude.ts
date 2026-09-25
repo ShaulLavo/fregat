@@ -13,6 +13,7 @@ import {
   type SDKMessage,
   type SDKRateLimitEvent,
   type SDKUserMessage,
+  type AgentInfo,
   type SlashCommand,
 } from '@anthropic-ai/claude-agent-sdk'
 import {
@@ -25,6 +26,7 @@ import {
   type ProviderApprovalOption,
   type ProviderInstanceId,
   type ProviderInstanceSettings,
+  type ProviderAgent,
   type ProviderSkill,
   type ProviderSlashCommand,
   type ProviderMcpServer,
@@ -326,7 +328,12 @@ export class ClaudeProviderAdapter
    * control request on the already-running CLI. No turn is spent either way.
    */
   async listCommands({ cwd }: ProviderCommandCatalogInput) {
-    return probeClaudeCommandCatalog(this.createQuery, this.env, await this.executablePath(), cwd)
+    return probeClaudeCommandCatalog(
+      this.createQuery,
+      this.env,
+      await this.executablePath(),
+      cwd ? normalizeWorkspaceCwd(cwd) : undefined,
+    )
   }
 
   async readUsage(): Promise<ProviderUsageProbe> {
@@ -573,6 +580,8 @@ export class ClaudeProviderAdapter
     }
 
     recordChatPipelineInfo('chat.pipeline.claude_adapter.session.start', {
+      agent: input.agent,
+      forked: Boolean(input.fork),
       interactionMode,
       model,
       providerInstanceId: input.providerInstanceId,
@@ -583,6 +592,7 @@ export class ClaudeProviderAdapter
     })
     const fork = input.fork ? await this.claudeFork(input.fork, cwd) : undefined
     const session = await ClaudeAgentSession.start({
+      ...(input.agent ? { agent: input.agent } : {}),
       fork,
       onCreated: (session) => this.sessions.set(input.sessionId, session),
       attachmentsDir: this.attachmentsDir,
@@ -666,6 +676,7 @@ class ClaudeAgentSession extends SessionContext {
 
   // Streaming input withholds init until the first prompt; adopt the caller's UUID before it.
   static async start(input: {
+    agent?: string
     fork?: ClaudeForkOptions
     onCreated: (session: ClaudeAgentSession) => void
     attachmentsDir: string
@@ -706,6 +717,7 @@ class ClaudeAgentSession extends SessionContext {
       cwd: input.cwd,
       env: input.env,
       executablePath: input.executablePath,
+      ...(input.agent ? { agent: input.agent } : {}),
       fork: input.fork,
       persistSession: input.ephemeral ? false : undefined,
       interactionMode: input.interactionMode,
@@ -2373,6 +2385,7 @@ async function probeClaudeCommandCatalog(
     )
 
     return {
+      agents: claudeAgents(initialization.agents),
       commands: claudeSlashCommands(initialization.commands),
       skills: await claudeSkills(query),
     }
@@ -2391,6 +2404,16 @@ async function claudeSkills(query: Query): Promise<ProviderSkill[]> {
   )
 
   return namedClaudeEntries(reloaded.skills).map(claudeSkill)
+}
+
+function claudeAgents(agents: readonly AgentInfo[] | undefined): ProviderAgent[] {
+  return (agents ?? [])
+    .filter((agent) => agent.name.trim().length > 0)
+    .map((agent) => ({
+      description: agent.description.trim(),
+      model: agent.model?.trim() || null,
+      name: agent.name.trim(),
+    }))
 }
 
 function claudeSlashCommands(commands: readonly SlashCommand[] | undefined) {

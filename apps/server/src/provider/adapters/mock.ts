@@ -75,6 +75,7 @@ export const MOCK_ADAPTER_CAPABILITIES = {
 const MOCK_TURN_INPUT_TOKENS = 10
 
 const MOCK_COMMAND_CATALOG: ProviderCommandCatalogResult = {
+  agents: [{ description: 'Reviews a diff before it lands', model: null, name: 'reviewer' }],
   commands: [
     { description: 'Summarize the conversation so far', name: 'summarize' },
     { argumentHint: '<path>', description: 'Review a file', name: 'review' },

@@ -93,3 +93,18 @@ test('a running turn and an unknown turn cannot be forked', () => {
     'That turn is not in the session any more.',
   )
 })
+
+test('a session keeps the agent it started as, and its fork runs as the same agent', () => {
+  const { fixture, model } = setup()
+  const created = decideOrchestrationCommand(fork('turn-1'), {
+    ...model,
+    sessions: new Map([
+      ...model.sessions,
+      [SESSION_ID, { ...model.sessions.get(SESSION_ID)!, agent: 'reviewer' }],
+    ]),
+  })
+  expect(created[0]?.payload).toMatchObject({ agent: 'reviewer' })
+
+  fixture.pipeline.applyEvents(fixture.append(created))
+  expect(fixture.snapshots.sessionDetailSnapshot(FORK_ID).session.agent).toBe('reviewer')
+})

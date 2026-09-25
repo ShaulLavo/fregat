@@ -26,16 +26,16 @@ provider and the other provider shows a disabled reason; it is never faked.
 
 ## Sub-plans
 
-| Plan                                                   | Outcome                                                         | Claude                                             | Codex                                                  | Size | Status            | Depends on                               |
-| ------------------------------------------------------ | --------------------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------ | ---- | ----------------- | ---------------------------------------- |
-| approval-rules                                         | "Always allow" writes a real rule; "for this session" holds     | `updatedPermissions` from `canUseTool` suggestions | `acceptWithExecpolicyAmendment` (not in pinned schema) | M    | DONE (`89c58188`) | none (server requests are not generated) |
-| fork                                                   | Fork a session from any turn into a new session                 | `resume` + `forkSession` + `resumeSessionAt`       | `thread/fork`                                          | M    | DONE (lane L3)    | Codex schema refresh                     |
-| mcp-status                                             | See each MCP server's state; reconnect or sign in               | `mcpServerStatus()`, `reconnectMcpServer()`        | `mcpServerStatus/list`, `mcpServer/oauth/login`        | M    | DONE (lane L3)    | Codex schema refresh                     |
-| background-tasks                                       | List a session's background tasks and stop one                  | `background_tasks_changed`, `stopTask(taskId)`     | `thread/backgroundTerminals/*` (experimental API only) | S–M  | DONE (lane L3)    | none                                     |
-| hooks                                                  | See which hooks ran in a turn and what they returned            | `includeHookEvents`, `hook_*` messages             | `hooks/list`, `hook/started`, `hook/completed`         | S    | DONE (lane L3)    | Codex schema refresh for `hooks/list`    |
-| [custom-agents](145-harness-controls/custom-agents.md) | Browse a project's agent definitions and start a session as one | `supportedAgents()`, `agent` option                | to verify                                              | S–M  | PROPOSED          | none                                     |
-| [compact](145-harness-controls/compact.md)             | Manual compaction (owned by Plan 126)                           | `/compact` path to verify                          | `thread/compact/start`                                 | —    | POINTER           | Plan 126 RUNTIME-05, INTERACTION-06      |
-| export                                                 | Export a transcript as Markdown or JSON                         | n/a (Platform projection)                          | n/a (Platform projection)                              | S    | DONE (lane L3)    | none                                     |
+| Plan                                       | Outcome                                                         | Claude                                             | Codex                                                  | Size | Status            | Depends on                               |
+| ------------------------------------------ | --------------------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------ | ---- | ----------------- | ---------------------------------------- |
+| approval-rules                             | "Always allow" writes a real rule; "for this session" holds     | `updatedPermissions` from `canUseTool` suggestions | `acceptWithExecpolicyAmendment` (not in pinned schema) | M    | DONE (`89c58188`) | none (server requests are not generated) |
+| fork                                       | Fork a session from any turn into a new session                 | `resume` + `forkSession` + `resumeSessionAt`       | `thread/fork`                                          | M    | DONE (lane L3)    | Codex schema refresh                     |
+| mcp-status                                 | See each MCP server's state; reconnect or sign in               | `mcpServerStatus()`, `reconnectMcpServer()`        | `mcpServerStatus/list`, `mcpServer/oauth/login`        | M    | DONE (lane L3)    | Codex schema refresh                     |
+| background-tasks                           | List a session's background tasks and stop one                  | `background_tasks_changed`, `stopTask(taskId)`     | `thread/backgroundTerminals/*` (experimental API only) | S–M  | DONE (lane L3)    | none                                     |
+| hooks                                      | See which hooks ran in a turn and what they returned            | `includeHookEvents`, `hook_*` messages             | `hooks/list`, `hook/started`, `hook/completed`         | S    | DONE (lane L3)    | Codex schema refresh for `hooks/list`    |
+| custom-agents                              | Browse a project's agent definitions and start a session as one | `supportedAgents()`, `agent` option                | to verify                                              | S–M  | DONE (lane L3)    | none                                     |
+| [compact](145-harness-controls/compact.md) | Manual compaction (owned by Plan 126)                           | `/compact` path to verify                          | `thread/compact/start`                                 | —    | POINTER           | Plan 126 RUNTIME-05, INTERACTION-06      |
+| export                                     | Export a transcript as Markdown or JSON                         | n/a (Platform projection)                          | n/a (Platform projection)                              | S    | DONE (lane L3)    | none                                     |
 
 ### Codex schema refresh
 
@@ -108,6 +108,18 @@ Codex `config/mcpServer/reload`, which reloads every server) and `POST …/mcp/:
 generator now gives `oneOf` members the fields their parent declares beside the union, which is
 what types `hooks/list` entries. Scenarios `claude-session-tools` (working and broken project
 servers) and `codex-session-tools`.
+
+### Custom agents (done)
+
+Done 2026-09-25 (lane L3). D1 and D2 decided 2026-09-25: recommendation (completion wave): the
+list comes from the command-catalog probe (`initializationResult().agents`, which matches
+`supportedAgents()`), and the agent is chosen per session at start. A session's `agent` rides
+`session.create` and the turn bootstrap, is stored on the projection (migration 25), and reaches
+Claude as `Options.agent`; a fork keeps its source's agent. The new-session strip has a Run as
+menu, and the header names the agent. Codex lists none: its app-server has no agent listing.
+Scenario `claude-custom-agent`. The picker probes the worktree's canonical path: the
+root-relative `path` resolves against the server's own cwd in `normalizeWorkspaceCwd`, which
+the composer's `/` menu (`rootPath`) may hit too.
 
 ## Suggested order
 

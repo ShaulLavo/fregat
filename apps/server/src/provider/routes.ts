@@ -159,6 +159,7 @@ async function readCommandCatalog(
   try {
     const catalog = await adapter.listCommands(cwd ? { cwd } : {})
     recordChatPipelineInfo('chat.pipeline.provider_commands.list', {
+      agentCount: catalog.agents?.length ?? 0,
       commandCount: catalog.commands.length,
       cwd,
       installed: true,
@@ -188,7 +189,7 @@ async function readCommandCatalog(
 }
 
 function emptyCommandCatalog(providerInstanceId: ProviderInstanceId): ProviderCommandCatalog {
-  return { commands: [], providerInstanceId, skills: [], supported: false }
+  return { agents: [], commands: [], providerInstanceId, skills: [], supported: false }
 }
 
 /**

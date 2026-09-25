@@ -8,6 +8,7 @@ import type {
   ModelSelection,
   ProviderApprovalDecision,
   ProviderApprovalOption,
+  ProviderAgent,
   ProviderAuth,
   ProviderBackgroundTask,
   ProviderDriverKind,
@@ -66,6 +67,8 @@ export type ProviderForkStart = {
 
 export type ProviderRuntimeStartInput = {
   runtimeEpoch: string
+  /** The harness agent definition the session runs as; set at the first start. */
+  agent?: string
   fork?: ProviderForkStart
   resumeExisting?: boolean
   cwd: string
@@ -508,6 +511,7 @@ export type ProviderCommandCatalogInput = {
 }
 
 export type ProviderCommandCatalogResult = {
+  agents: ProviderAgent[]
   commands: ProviderSlashCommand[]
   skills: ProviderSkill[]
 }

@@ -624,6 +624,7 @@ export class OrchestrationProjectionPipeline {
         pinOrderKey: null,
         planProgressJson: null,
         forkedFromJson: event.payload.forkedFrom ? JSON.stringify(event.payload.forkedFrom) : null,
+        agent: event.payload.agent ?? null,
         pinnedAt: null,
         worktreeId: event.payload.worktreeId,
         origin: event.payload.origin,

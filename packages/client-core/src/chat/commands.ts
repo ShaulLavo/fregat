@@ -183,6 +183,7 @@ export function createSteerSubmission({
 }
 
 export function createDraftSessionSubmission({
+  agent,
   attachments = [],
   createdAt,
   interactionMode = DEFAULT_INTERACTION_MODE,
@@ -194,6 +195,8 @@ export function createDraftSessionSubmission({
   text,
   title: titleOverride,
 }: {
+  /** The harness agent definition the new session runs as. */
+  agent?: string | null
   attachments?: ChatAttachmentUpload[]
   createdAt: string
   interactionMode?: InteractionMode
@@ -229,6 +232,7 @@ export function createDraftSessionSubmission({
       ...submission.command,
       bootstrap: {
         createSession: {
+          ...(agent ? { agent } : {}),
           interactionMode,
           modelSelection,
           worktreeTarget,

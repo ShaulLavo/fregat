@@ -454,6 +454,7 @@ function sessionCreated(
   return [
     ...creation,
     event(command, at, 'session.created', {
+      ...(command.agent ? { agent: command.agent } : {}),
       createdAt: at,
       interactionMode: command.interactionMode ?? DEFAULT_INTERACTION_MODE,
       modelSelection: command.modelSelection,
@@ -488,6 +489,7 @@ function sessionForked(
   return [
     event(command, at, 'session.created', {
       createdAt: at,
+      ...(source.agent ? { agent: source.agent } : {}),
       forkedFrom: {
         droppedPrompts: dropped.filter((message) => message.role === 'user').length,
         sessionId: command.sourceSessionId,
@@ -983,6 +985,7 @@ function bootstrapSessionCreated(
   return [
     ...creation,
     event(command, at, 'session.created', {
+      ...(createSession.agent ? { agent: createSession.agent } : {}),
       createdAt: at,
       interactionMode: createSession.interactionMode ?? DEFAULT_INTERACTION_MODE,
       modelSelection: createSession.modelSelection,

@@ -175,10 +175,18 @@ const providerSkillSchema = v.object({
   enabled: v.boolean(),
 })
 
+/** An agent definition the harness can run a session as: project, user or plugin. */
+export const providerAgentSchema = v.object({
+  name: trimmedNonEmptyStringSchema,
+  description: v.string(),
+  model: v.nullable(v.string()),
+})
+
 export const providerCommandCatalogSchema = v.object({
   providerInstanceId: providerInstanceIdSchema,
   commands: v.array(providerSlashCommandSchema),
   skills: v.array(providerSkillSchema),
+  agents: v.array(providerAgentSchema),
   /**
    * False when the provider cannot answer at all — no listing path, or the probe
    * failed. Discovery only feeds a menu, so the read degrades to an empty
@@ -249,6 +257,7 @@ export type ProviderSessionMcp = v.InferOutput<typeof providerSessionMcpSchema>
 export type ProviderMcpSignIn = v.InferOutput<typeof providerMcpSignInSchema>
 export type ProviderConfiguredHook = v.InferOutput<typeof providerConfiguredHookSchema>
 export type ProviderSessionHooks = v.InferOutput<typeof providerSessionHooksSchema>
+export type ProviderAgent = v.InferOutput<typeof providerAgentSchema>
 export type ProviderBackgroundTask = v.InferOutput<typeof providerBackgroundTaskSchema>
 export type ProviderBackgroundTasks = v.InferOutput<typeof providerBackgroundTasksSchema>
 export type ProviderSignInMethod = v.InferOutput<typeof providerSignInMethodSchema>

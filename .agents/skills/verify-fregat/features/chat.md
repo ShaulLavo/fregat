@@ -40,6 +40,8 @@ The chat mode button in the window toolbar, or an address URL with `/chat/`.
 
 `scenario claude-session-tools` gives real Claude (Haiku) a fixture with two project MCP servers, one working and one whose command does not exist; the header's MCP servers and hooks popover shows Connected, and Failed with the error, and Reconnect runs. `scenario codex-session-tools` reads the same popover for Codex: the user's servers and the fixture's `preToolUse` hook from `hooks/list`. Both need a turn first, since the lists come from the live provider process.
 
+`scenario claude-custom-agent` gives real Claude (Haiku) a fixture with `.claude/agents/reviewer.md`; the new-session strip's Run as menu lists it among the built-in agents, a session started as it opens its reply with the agent's marker line, and the header shows a `reviewer` chip. The shared Editor checkout reloading mid-edit blanks the page; rerun if the page errors name an Editor module.
+
 `scenario chat-diff-syntax --url <session-diff-address>` checks painted syntax colors in a session checkpoint diff.
 
 Commands dispatch over the orchestration socket when it is live and over HTTP otherwise. The HTTP path refetches the shell snapshot itself.

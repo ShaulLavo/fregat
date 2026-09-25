@@ -67,7 +67,10 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
  */
 const INITIALIZE_RESPONSE = {
   account: { email: 'dev@example.com', subscriptionType: 'max' },
-  agents: [],
+  agents: [
+    { description: ' Reviews a diff ', model: 'sonnet', name: 'reviewer' },
+    { description: 'Unnamed', name: ' ' },
+  ],
   available_output_styles: ['default'],
   commands: [],
   models: claudeModelRows(),
@@ -904,6 +907,16 @@ describe('ClaudeProviderAdapter', () => {
       taskId: 'sleep',
     })
     expect(query.stoppedTasks).toEqual(['sleep'])
+    await harness.adapter.stopAll()
+  })
+
+  it('lists the agent definitions the CLI can run a session as', async () => {
+    const harness = claudeHarness()
+    const catalog = await harness.adapter.listCommands({ cwd: '/tmp/workspace' })
+
+    expect(catalog.agents).toEqual([
+      { description: 'Reviews a diff', model: 'sonnet', name: 'reviewer' },
+    ])
     await harness.adapter.stopAll()
   })
 
@@ -1773,11 +1786,12 @@ const MESSAGE_MAPPINGS: ReadonlyArray<{
     }),
   },
   {
-    event: null,
+    event: 'tasks.roster',
     message: systemMessage({
       subtype: 'background_tasks_changed',
       tasks: [{ description: 'dev server', task_id: 'task-2', task_type: 'shell' }],
     }),
+    payload: { tasks: [{ description: 'dev server', taskId: 'task-2', taskType: 'shell' }] },
   },
   {
     event: null,

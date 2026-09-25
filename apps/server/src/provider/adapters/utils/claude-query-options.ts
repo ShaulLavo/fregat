@@ -42,6 +42,8 @@ export type ClaudeQueryOptionsInput = ClaudeRuntimeSelection & {
   reasoning?: ClaudeReasoning
   resumeExisting?: boolean
   sessionId: SessionId
+  /** The agent definition the main thread runs as (`--agent`). */
+  agent?: string
   /** A new session branching off `sourceSessionId`, cut after `resumeSessionAt` when set. */
   fork?: ClaudeForkOptions
 }
@@ -130,6 +132,7 @@ function claudeSessionOptions(input: {
 export function claudeQueryOptions(input: ClaudeQueryOptionsInput): Options {
   return {
     abortController: input.abortController,
+    ...(input.agent ? { agent: input.agent } : {}),
     cwd: input.cwd,
     // Without it only SessionStart and Setup hooks report, and a blocking
     // PreToolUse hook would leave no trace of why the agent stopped.

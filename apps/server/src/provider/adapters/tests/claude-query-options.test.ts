@@ -38,6 +38,7 @@ function modelSelection(overrides: Partial<ModelSelection> = {}): ModelSelection
 }
 
 function queryOptions(overrides: {
+  agent?: string
   fork?: { resumeSessionAt?: string; sourceSessionId: SessionId }
   interactionMode?: InteractionMode
   resumeExisting?: boolean
@@ -155,6 +156,11 @@ describe('claudeQueryOptions', () => {
     expect(resumed.resume).toBe(SESSION_ID)
     expect(resumed.sessionId).toBeUndefined()
     expect(claudeTerminalResumeArgv(SESSION_ID)).toEqual(['claude', '--resume', SESSION_ID])
+  })
+
+  it('runs the main thread as the chosen agent', () => {
+    expect(queryOptions({ agent: 'reviewer', runtimeMode: 'full-access' }).agent).toBe('reviewer')
+    expect('agent' in queryOptions({ runtimeMode: 'full-access' })).toBe(false)
   })
 
   it('forks the source into our minted id, cut at the kept entry', () => {

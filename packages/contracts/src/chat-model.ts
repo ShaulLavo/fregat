@@ -466,6 +466,12 @@ export const sessionOriginSchema = v.picklist(['platform', 'discovered'])
  * prompts after the fork point: counting from the end stays exact when the
  * source's early history is outside the in-memory window.
  */
+/**
+ * The harness agent definition a session runs as (Claude's `--agent`). Chosen at
+ * start; it selects a system prompt and tools, so it never changes afterwards.
+ */
+export const sessionAgentSchema = v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(200))
+
 export const sessionForkSourceSchema = v.object({
   sessionId: sessionIdSchema,
   turnId: turnIdSchema,
@@ -506,6 +512,7 @@ export const orchestrationSessionSchema = v.object({
   worktreeId: worktreeIdSchema,
   origin: sessionOriginSchema,
   forkedFrom: v.optional(v.nullable(sessionForkSourceSchema)),
+  agent: v.optional(v.nullable(sessionAgentSchema)),
   ...sessionAttentionEntries,
   title: trimmedNonEmptyStringSchema,
   modelSelection: modelSelectionSchema,

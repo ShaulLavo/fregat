@@ -2558,7 +2558,12 @@ async function probeCodexCommandCatalog(
       PROVIDER_PROBE_TIMEOUT_MS,
     )
 
-    return { commands: [], skills: codexCatalogSkills(codexSkillCatalog(response), cwd) }
+    // Codex has no app-server method that lists or selects agent definitions.
+    return {
+      agents: [],
+      commands: [],
+      skills: codexCatalogSkills(codexSkillCatalog(response), cwd),
+    }
   } finally {
     await client.close()
   }

@@ -31,7 +31,7 @@ export const platformMigrations: readonly Migration[] = [
   { version: 24, name: 'provider_usage_contributions', up: applyProviderUsageContributions },
   { version: 29, name: 'turn_end_reason', up: applyTurnEndReason },
   { version: 30, name: 'message_model_selection', up: applyMessageModelSelection },
-  { version: 31, name: 'session_fork_source', up: applySessionForkSource },
+  { version: 31, name: 'session_fork_and_agent', up: applySessionForkAndAgent },
 ]
 
 function applyMessageModelSelection(database: PlatformDatabase) {
@@ -42,8 +42,9 @@ function applyTurnEndReason(database: PlatformDatabase) {
   database.run(sql`ALTER TABLE projection_turns ADD COLUMN end_reason TEXT`)
 }
 
-function applySessionForkSource(database: PlatformDatabase) {
+function applySessionForkAndAgent(database: PlatformDatabase) {
   database.run(sql`ALTER TABLE projection_sessions ADD COLUMN forked_from_json TEXT`)
+  database.run(sql`ALTER TABLE projection_sessions ADD COLUMN agent TEXT`)
 }
 
 function applyProviderUsageContributions(database: PlatformDatabase) {

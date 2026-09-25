@@ -37,6 +37,7 @@ import {
   orchestrationSessionActivitySchema,
   orderKeySchema,
   sourceProposedPlanReferenceSchema,
+  sessionAgentSchema,
   trimmedNonEmptyStringSchema,
 } from './chat-model'
 import {
@@ -115,6 +116,7 @@ export const sessionCreateCommandSchema = v.object({
   modelSelection: modelSelectionSchema,
   runtimeMode: v.optional(runtimeModeSchema, DEFAULT_RUNTIME_MODE),
   interactionMode: v.optional(interactionModeSchema, DEFAULT_INTERACTION_MODE),
+  agent: v.optional(sessionAgentSchema),
 })
 
 export const sessionTurnBootstrapCreateSessionSchema = v.object({
@@ -123,6 +125,7 @@ export const sessionTurnBootstrapCreateSessionSchema = v.object({
   modelSelection: modelSelectionSchema,
   runtimeMode: v.optional(runtimeModeSchema, DEFAULT_RUNTIME_MODE),
   interactionMode: v.optional(interactionModeSchema, DEFAULT_INTERACTION_MODE),
+  agent: v.optional(sessionAgentSchema),
 })
 
 export const sessionTurnBootstrapSchema = v.object({

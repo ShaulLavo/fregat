@@ -64,6 +64,7 @@ import { sessionActionsSurfaces } from './session-actions-surfaces'
 import { exportTranscript } from './export-transcript'
 import { claudeHookRows } from './hook-rows'
 import { claudeBackgroundTasks } from './background-tasks'
+import { claudeCustomAgent } from './custom-agent'
 import { claudeSessionTools, codexSessionTools } from './session-tools'
 import { claudeSessionFork, codexSessionFork } from './session-fork'
 import { searchFileActions } from './search-file-actions'
@@ -294,6 +295,7 @@ export const scenarios: readonly Scenario[] = [
   exportTranscript,
   claudeHookRows,
   claudeBackgroundTasks,
+  claudeCustomAgent,
   claudeSessionTools,
   codexSessionTools,
   claudeSessionFork,
