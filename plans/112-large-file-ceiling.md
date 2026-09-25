@@ -2,6 +2,11 @@
 
 Status: **research — no implementation scope yet.** Requested 2026-09-13.
 
+Decided 2026-09-25: owner — this plan and Editor
+[E015 massive file loading](../../Editor/plans/e015-massive-file-loading.md) run as one lane, 112
+first. The benchmark here (1–200 MiB) sets the ceiling that E015's scope and exit are written
+against.
+
 `DEFAULT_MAX_TEXT_FILE_BYTES` is 200 MiB and `MAX_TEXT_FILE_BYTES_UPPER_BOUND` is 2 GiB
 ([`apps/server/src/fs/limits.ts`](../apps/server/src/fs/limits.ts)). Neither number came from a
 measurement. The upper bound is above what a V8 string can even hold, so raising
