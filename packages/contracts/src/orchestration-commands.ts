@@ -162,6 +162,18 @@ export const sessionSettleCommandSchema = v.object({
   sessionId: sessionIdSchema,
 })
 
+/**
+ * Issued by the owner server only. `snapshotSequence` is the read the decision was made from:
+ * any later event on the session makes the decision stale, whatever else moved the sequence.
+ */
+const sessionAutoSettleCommandSchema = v.object({
+  ...commandBaseSchema,
+  type: v.literal('session.auto-settle'),
+  sessionId: sessionIdSchema,
+  settledAt: isoDateTimeSchema,
+  snapshotSequence: nonNegativeIntegerSchema,
+})
+
 export const sessionUnsettleCommandSchema = v.object({
   ...commandBaseSchema,
   type: v.literal('session.unsettle'),
@@ -577,6 +589,7 @@ export const internalOrchestrationCommandSchema = v.variant('type', [
   sessionProposedPlanUpsertCommandSchema,
   sessionTurnDiffCompleteCommandSchema,
   sessionRevertCompleteCommandSchema,
+  sessionAutoSettleCommandSchema,
 ])
 
 export const orchestrationCommandSchema = v.variant('type', [

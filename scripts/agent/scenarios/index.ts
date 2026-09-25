@@ -191,6 +191,7 @@ import { gitSubmodulesInit } from './git-submodules-init'
 import { gitAutoPull } from './git-auto-pull'
 import { sessionBranchDrift } from './session-branch-drift'
 import { sessionPullRequestSync } from './session-pull-request-sync'
+import { sessionAutoSettle } from './session-auto-settle'
 import { gitHistory } from './git-history'
 import { editorCaretBurst } from './editor-caret-burst'
 import { editorFocusClicks } from './editor-focus-clicks'
@@ -389,6 +390,7 @@ export const scenarios: readonly Scenario[] = [
   gitAutoPull,
   sessionBranchDrift,
   sessionPullRequestSync,
+  sessionAutoSettle,
   editorCaretBurst,
   editorFocusClicks,
   editorProportionalFont,

@@ -587,10 +587,14 @@
       "title": "P1: Add server-owned automatic settlement",
       "report": "lifecycle.md",
       "wave": "5",
-      "status": "open",
-      "evidence_level": "source-reviewed",
+      "status": "verified",
+      "evidence_level": "implementation; server-tests-and-browser-verified",
       "acceptance": "lifecycle.md, LIFE-06, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "repository-delivery.md",
+        "apps/server/src/orchestration/tests/session-auto-settle.test.ts",
+        "/work/tmp/fregat-evidence/20260925T120806Z-scenario-session-auto-settle/"
+      ]
     },
     {
       "id": "EXT-07",

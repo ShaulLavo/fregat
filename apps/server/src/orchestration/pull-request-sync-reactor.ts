@@ -10,6 +10,7 @@ import type { BranchPullRequests } from '../git/pull-request'
 import { recordProcessInfo, recordProcessWarning } from '../observability'
 import type { OrchestrationProjectedWorktree, OrchestrationReadModel } from './read-model'
 import { internalCommandKey } from './utils/repository-ids'
+import { SweepScheduler } from './sweep-scheduler'
 
 export type BranchPullRequestLookup = (input: {
   cwd: string
@@ -43,21 +44,21 @@ export class PullRequestSyncReactor {
   private readonly now: () => number
   private readonly lastSyncedAt = new Map<string, number>()
   private readonly backoff = new Map<string, { failures: number; until: number }>()
-  private interval: ReturnType<typeof setInterval> | null = null
-  private running: Promise<void> | null = null
-  private rerun = false
-  private closed = false
+  private readonly sweeps: SweepScheduler
 
   constructor(options: Options) {
     this.options = options
     this.now = options.now ?? Date.now
+    this.sweeps = new SweepScheduler({
+      sweep: () => this.sweep(),
+      failureEvent: 'git.pull_request_sync.failed',
+      area: 'git',
+      intervalMs: options.intervalMs ?? SWEEP_INTERVAL_MS,
+    })
   }
 
   start() {
-    if (this.closed || this.interval) return
-    this.interval = setInterval(() => this.schedule(), this.options.intervalMs ?? SWEEP_INTERVAL_MS)
-    this.interval.unref()
-    this.schedule()
+    this.sweeps.start()
   }
 
   // A new or renamed branch is looked up at once instead of on the next minute.
@@ -74,32 +75,15 @@ export class PullRequestSyncReactor {
   }
 
   schedule() {
-    if (this.closed) return
-    if (this.running) {
-      this.rerun = true
-      return
-    }
-    this.running = this.sweep()
-      .catch((error: unknown) =>
-        recordProcessWarning('git.pull_request_sync.failed', { area: 'git', error }),
-      )
-      .finally(() => {
-        this.running = null
-        if (!this.rerun) return
-        this.rerun = false
-        this.schedule()
-      })
+    this.sweeps.schedule()
   }
 
-  async drain() {
-    while (this.running) await this.running
+  drain() {
+    return this.sweeps.drain()
   }
 
-  async close() {
-    this.closed = true
-    if (this.interval) clearInterval(this.interval)
-    this.interval = null
-    await this.drain()
+  close() {
+    return this.sweeps.close()
   }
 
   private async sweep() {
@@ -242,5 +226,5 @@ function pullRequestFor(answer: BranchPullRequests, branch: string): WorktreePul
   if (answer.kind === 'unsupported') return { status: 'unsupported', support: answer.support }
   const pullRequest = answer.pullRequests.get(branch)
   if (!pullRequest) return { status: 'none' }
-  return { status: 'found', ...pullRequest }
+  return { status: 'found', ...pullRequest, closedAt: pullRequest.closedAt ?? null }
 }

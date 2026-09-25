@@ -8,7 +8,7 @@ type Run = (
   options?: { allowFailure?: boolean },
 ) => Promise<{ exitCode: number; stdout: string }>
 
-export const DECLARED_SUBMODULE_PATHS_ARGS = [
+const DECLARED_SUBMODULE_PATHS_ARGS = [
   'config',
   '--file',
   '.gitmodules',
@@ -48,7 +48,7 @@ export async function uninitializedSubmoduleCount(root: string, run: Run) {
 }
 
 /** `--null` output: `key\nvalue\0` per entry. */
-export function declaredSubmodulePaths(output: string) {
+function declaredSubmodulePaths(output: string) {
   return output
     .split('\0')
     .map((entry) => entry.slice(entry.indexOf('\n') + 1))

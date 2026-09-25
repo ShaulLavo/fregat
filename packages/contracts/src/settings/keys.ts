@@ -175,6 +175,45 @@ export const SETTINGS_REGISTRY = {
     description:
       'Group projects by repository, repository-relative path, or owning machine. Git projects currently register at the repository root, so both repository modes are equivalent.',
   }),
+  'chat.autoSettleAfterDays': defineSetting({
+    schema: v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(365)),
+    default: 3,
+    scope: 'application',
+    widget: 'number',
+    category: 'Chat',
+    title: 'Settle inactive sessions after days',
+    description:
+      'Move a session to Settled once it has had no activity for this many days. 0 turns it off.',
+    keywords: ['settle', 'inactive', 'days', 'automatic'],
+  }),
+  'chat.autoSettleOnMerge': defineSetting({
+    schema: v.boolean(),
+    default: true,
+    scope: 'application',
+    widget: 'boolean',
+    category: 'Chat',
+    title: 'Settle sessions when their pull request merges',
+    description:
+      "Move a session to Settled when its worktree's pull request is merged. A closed pull request settles it whenever automatic settlement is on.",
+    keywords: ['settle', 'merge', 'pull request', 'automatic'],
+  }),
+  'chat.projectAutoSettle': defineSetting({
+    schema: v.record(
+      v.string(),
+      v.object({
+        afterDays: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(365))),
+        onMerge: v.optional(v.boolean()),
+      }),
+    ),
+    default: {},
+    merge: 'record',
+    scope: 'application',
+    widget: 'complex',
+    visibility: 'internal',
+    category: 'Chat',
+    title: 'Project automatic settlement',
+    description: 'Automatic settlement overrides keyed by project UUID on this machine.',
+  }),
   'chat.projectGroupingOverrides': defineSetting({
     schema: v.record(v.string(), v.picklist(['repository', 'repository_path', 'separate'])),
     default: {},

@@ -115,6 +115,8 @@ export const worktreePullRequestSchema = v.variant('status', [
     url: text,
     state: v.picklist(['open', 'closed', 'merged']),
     draft: v.boolean(),
+    /** When it was merged or closed; settlement compares it with the session's last request. */
+    closedAt: v.optional(v.nullable(v.string()), null),
   }),
 ])
 

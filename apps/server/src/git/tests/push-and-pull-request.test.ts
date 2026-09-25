@@ -291,6 +291,7 @@ function cliBoundary(lookup: GitProcessResult, created = '[]') {
 
 describe('batched pull request lookup', () => {
   const node = (number: number, state: string) => ({
+    closedAt: state === 'MERGED' ? '2026-09-25T10:00:00Z' : null,
     number,
     title: `PR ${number}`,
     url: `https://github.com/acme/repo/pull/${number}`,
@@ -331,7 +332,11 @@ describe('batched pull request lookup', () => {
     )
     expect(result.kind).toBe('ready')
     if (result.kind !== 'ready') return
-    expect(result.pullRequests.get('feature/a')).toMatchObject({ number: 7, state: 'merged' })
+    expect(result.pullRequests.get('feature/a')).toMatchObject({
+      number: 7,
+      state: 'merged',
+      closedAt: '2026-09-25T10:00:00Z',
+    })
     expect(result.pullRequests.get('feature/b"}')).toBeNull()
     expect(result.pullRequests.get('feature/c')).toMatchObject({ number: 8, draft: true })
     const graphql = run.calls.filter((argv) => argv[1] === 'api')

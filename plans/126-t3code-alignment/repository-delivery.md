@@ -92,3 +92,31 @@ The row badge is lane L5's (LIFE-14 badge); this delivers the field it reads.
   (the new `Scenario.prepareServer` hook); a new-worktree session's draft PR reaches the shell and
   the shared checkout is not looked up:
   `/work/tmp/fregat-evidence/20260925T115511Z-scenario-session-pull-request-sync/`.
+
+## LIFE-06: server-owned automatic settlement
+
+Settings: `chat.autoSettleAfterDays` (3; 0 turns it off), `chat.autoSettleOnMerge` (on), and
+per-project overrides in `chat.projectAutoSettle` whose fields each win on their own. Upstream's
+null "never" is 0 here so the row can be a number field.
+
+`SessionSettlementReactor` sweeps every five minutes, after any settings change, and when a
+worktree's pull request sync lands. The policy (`utils/auto-settlement.ts`) is ported from upstream
+`ThreadSettlementPolicy`: the candidate is not archived, has no settle override (explicit keep-active
+counts), no pending approval or input, no queued or running turn, no live background work, and no
+effective snooze. An open or `unknown` pull request blocks it. A merged (with the setting on) or
+closed pull request whose `closedAt` is not before the last request settles it. Otherwise
+inactivity past the configured days settles it. The settled time is the last activity. The sync
+now reads `closedAt` for that comparison.
+
+`session.auto-settle` carries the sequence the decision read. On the dispatch queue the engine
+refuses it when the session has any later event or live background work, and the decider refuses a
+session with a settle override or a blocker. Accepted, it emits the same `session.settled` as a
+manual settle, including unpin and unsnooze, so provider release follows unchanged.
+
+- `apps/server/src/orchestration/tests/session-auto-settle.test.ts`: a merge after the request
+  settles at the last activity; a merge before the request, or with merge settlement off, does not;
+  a decision read before a rename is refused and a current one settles at its time; policy cases
+  for days, keep-active, snooze, background work, pending requests, open and unknown pull requests.
+- `scenario session-auto-settle` (fake forge reports the worktree's pull request merged): the rail
+  moves the session to Settled, settled at its creation time:
+  `/work/tmp/fregat-evidence/20260925T120806Z-scenario-session-auto-settle/`.

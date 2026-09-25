@@ -21,6 +21,7 @@ const openPullRequest: GitPullRequest = {
   url: 'https://github.com/acme/repo/pull/12',
   state: 'open',
   draft: false,
+  closedAt: null,
 }
 
 /** A forge that answers from a table the test edits, and records every request. */
