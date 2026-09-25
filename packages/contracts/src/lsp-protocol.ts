@@ -27,17 +27,8 @@ export const LSP_SEMANTIC_TOKENS_REFRESH = 'workspace/semanticTokens/refresh'
 export const LSP_DIAGNOSTIC_REFRESH = 'workspace/diagnostic/refresh'
 
 /**
- * Why the socket is about to close.
- *
- * Broadcast immediately before the proxy closes a client socket, because a bare
- * close is indistinguishable from a healthy idle one: the browser transport
- * clears its handlers and reports nothing, so a language server that died left
- * the status indicator saying `'ready'`. `$/`-prefixed because it is
- * implementation-defined, which the protocol permits and requires a client to
- * tolerate.
- *
- * The same method `@singapore-editor/lsp` names, so the editor's connection
- * reports the close that follows as an `LspServerExitedError` carrying these params.
+ * Why the socket is about to close; a bare close reads like a healthy idle one. The method
+ * `@singapore-editor/lsp` names, so the editor reports the close as `LspServerExitedError`.
  */
 export const LSP_SERVER_EXITED = '$/serverExited'
 

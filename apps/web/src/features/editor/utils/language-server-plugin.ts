@@ -21,12 +21,12 @@ import type {
 } from '@singapore-editor/lsp-plugin'
 import { createLanguageServerSetPlugin } from '@singapore-editor/lsp-plugin/websocket'
 import {
+  errorMessage,
   LSP_FEATURE_IDS,
   LSP_SEMANTIC_TOKENS_REFRESH,
   type LspFeatureId,
   type LspMatch,
 } from '@workspace/contracts'
-import { LspServerExitedError } from '@singapore-editor/lsp'
 
 import { languageServerConnectionProvider } from '@/features/editor/state/language-server-connection-pool'
 import type { EditorLanguageServerStatusSource } from '@/features/editor/state/language-server-status-source'
@@ -40,6 +40,7 @@ import {
 } from '@/lib/language-server-capabilities'
 import { languageServerWebSocketConstructor } from '@/lib/server-sockets'
 import { notifyServerExit } from '@/features/editor/utils/notify-server-exit'
+import { serverExitFields } from '@/features/editor/utils/server-exit-fields'
 import { environmentClientFor } from '@/lib/client'
 import { environmentActivitySignal } from '@/lib/environments/state/activity'
 import { markerStore } from '@/lib/markers/store'
@@ -272,11 +273,12 @@ function liveLanguageServerLane({
         serverId: match.serverId,
       })
     },
-    // The connection restarts a server that exited; this runs only once that gave up.
+    // Runs when reconnecting gave up, or when the lane's ready notifications failed.
     onError: (error) => {
       log.warn({
-        action: 'lsp.reconnect_gave_up',
+        action: 'lsp.lane_failed',
         area: 'lsp',
+        error: errorMessage(error),
         serverId: match.serverId,
         ...serverExitFields(error),
       })
@@ -284,13 +286,6 @@ function liveLanguageServerLane({
       statusSource.setServerStatus(match.serverId, 'error')
     },
   }
-}
-
-function serverExitFields(error: unknown) {
-  if (!(error instanceof LspServerExitedError)) return { serverFailed: false }
-
-  const { exitCode, exitSignal, outcome } = error.params
-  return { exitCode, exitSignal, outcome, serverFailed: error.params.error !== undefined }
 }
 
 export function languageServerLaneOptions({

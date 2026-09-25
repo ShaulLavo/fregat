@@ -2,6 +2,7 @@ import { errorMessage } from '@workspace/contracts'
 import { LspTransportClosedError } from '@singapore-editor/lsp'
 import { LspConnectionPool, type LspConnectionPoolEvent } from '@singapore-editor/lsp-plugin'
 
+import { serverExitFields } from '@/features/editor/utils/server-exit-fields'
 import { log } from '@/lib/client-logging'
 
 /** Separates the two halves of a pool key without colliding with either. */
@@ -69,7 +70,8 @@ function report(event: LspConnectionPoolEvent): void {
     log.warn(fields)
     return
   }
-  if (event.kind === 'ready' || event.kind === 'closed') {
+  // `reconnecting` is the client's only record of a server that died and came back.
+  if (event.kind === 'ready' || event.kind === 'closed' || event.kind === 'reconnecting') {
     log.info(fields)
     return
   }
@@ -77,9 +79,9 @@ function report(event: LspConnectionPoolEvent): void {
   log.debug(fields)
 }
 
-/** The same fields the server's `lsp.socket.close` records, from this end of the socket. */
+/** The server's `lsp.socket.close` fields from this end, or what the exit notice before it said. */
 function closeFields(error: unknown) {
-  if (!(error instanceof LspTransportClosedError)) return {}
+  if (!(error instanceof LspTransportClosedError)) return serverExitFields(error)
 
   return {
     code: error.code,

@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expectTypeOf, vi } from 'vitest'
 import { activeDocumentForSnapshot } from '@singapore-editor/lsp-plugin/document-sync'
 
 import { createEditorLanguageServerStatusSource } from '@/features/editor/state/language-server-status-source'
+import { log } from '@/lib/client-logging'
 import {
   fileDocument,
   fileResource,
@@ -304,10 +305,11 @@ describe('server exit', () => {
 
   test('shows the catalog guidance once when reconnecting gives up on a server that died', () => {
     const shown = vi.spyOn(toast, 'error').mockImplementation(() => 'toast')
+    const warned = vi.spyOn(log, 'warn')
     const lane = typescriptLane()
 
-    lane?.onStatusChange?.('error')
-    lane?.onError?.(
+    lane.onStatusChange('error')
+    lane.onError(
       new LspServerExitedError({
         outcome: 'process_exit',
         serverId: 'typescript',
@@ -331,14 +333,24 @@ describe('server exit', () => {
           'Run the language server from a terminal to see why it exits, then reopen the file.',
       }),
     )
+    expect(warned).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'lsp.lane_failed',
+        exitCode: null,
+        exitOutcome: 'process_exit',
+        exitSignal: 'SIGKILL',
+        serverFailed: true,
+        serverId: 'typescript',
+      }),
+    )
   })
 
   test('stays quiet for a server this app closed and for a lost socket', () => {
     const shown = vi.spyOn(toast, 'error').mockImplementation(() => 'toast')
     const lane = typescriptLane()
 
-    lane?.onError?.(new LspServerExitedError({ outcome: 'idle_timeout', serverId: 'typescript' }))
-    lane?.onError?.(new Error('LSP transport closed'))
+    lane.onError(new LspServerExitedError({ outcome: 'idle_timeout', serverId: 'typescript' }))
+    lane.onError(new Error('LSP transport closed'))
 
     expect(shown).not.toHaveBeenCalled()
   })
@@ -415,7 +427,9 @@ function typescriptLane() {
     target: { matchPath: 'src/a.ts' },
     onApplyWorkspaceEdit,
   }).activate({} as never)
-  return createdServerSets[0]?.lanes[0]
+  const lane = createdServerSets[0]?.lanes[0]
+  if (!lane?.onError || !lane.onStatusChange) throw new TypeError('Expected the typescript lane')
+  return { onError: lane.onError, onStatusChange: lane.onStatusChange }
 }
 
 function match(serverId: string, root: string, semanticRank: number) {

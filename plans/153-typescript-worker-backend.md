@@ -69,19 +69,28 @@ catalog guidance once.
 - `LSP_SERVER_EXITED` in `packages/contracts` is `$/serverExited`, and `LspServerExitedParams` gained
   the optional `error` (code, message, why, fix) in the Editor's shape. Both proxy send sites
   (`proxy-session.ts` `closeConnections`, `routes.ts` `closeWithReason`) are typed against it.
-- The web lane no longer registers an exit handler. `onError` logs `lsp.reconnect_gave_up` with the
-  exit's outcome, code and signal, and `notifyServerExit` toasts only an `LspServerExitedError` that
-  carries catalog guidance. The per-lane `exit.params` record and the client `lsp.server_exit` event
-  are gone.
+- The web lane no longer registers an exit handler. `notifyServerExit` toasts only an
+  `LspServerExitedError` that carries catalog guidance. The per-lane `exit.params` record and the
+  client `lsp.server_exit` event are gone.
+- An announced close now reaches the pool as `LspServerExitedError`, not the transport's close
+  error, so the client events carry `exitOutcome`, `exitCode`, `exitSignal` and `serverFailed`
+  (`utils/server-exit-fields.ts`) in place of the close code and message counts; the server's
+  `lsp.socket.close` still records those. `lsp.connection.reconnecting` logs at info, so a server
+  that died and came back leaves a client record. The lane's `onError` also runs when its ready
+  notifications fail, so its event is `lsp.lane_failed`, with the error and the same exit fields.
 - The per-lane record covered a final attempt whose server "died before it said anything". The
   proxy joins a socket to its backend in the same task that `acquire` resolves, and a process exit
-  arrives as a later task. Every kill in the scenario log reached an attached socket
-  (`activeConnectionCount=1`), so the last attempt carries the guidance itself.
+  arrives as a later task. Under the new code the scenario's toast shows the last attempt carried
+  the guidance itself; the run's log copy ends before that final server session.
+- Known gap: a crash streak whose last attempt fails another way (an initialize timeout, a refused
+  socket, or `spawn_failed`, which carries no guidance on any attempt) gives up with no toast.
 - Evidence: `proxy-session.test.ts` exit tests now expect `$/serverExited`. New tests in
   `language-server-plugin.test.ts` pin the method and params shape against `@singapore-editor/lsp`,
-  show the guidance once on give-up, and stay quiet for a clean close or a lost socket. Scenario
-  `editor-lsp-server-exit` now asserts one toast and one copy of the fix on the page
-  (`/work/tmp/fregat-evidence/20260925T113810Z-scenario-editor-lsp-server-exit/`).
+  show the guidance once on give-up with the `lsp.lane_failed` fields, and stay quiet for a clean
+  close or a lost socket; `language-server-connection-pool.test.ts` pins the exit fields on
+  `lsp.connection.reconnecting`. Scenario `editor-lsp-server-exit` asserts one toast and one copy of
+  the fix on the page (`/work/tmp/fregat-evidence/20260925T115545Z-scenario-editor-lsp-server-exit/`,
+  whose log has one `lsp.connection.reconnecting` per restart with `exitSignal: SIGKILL`).
 
 ### Phase 2: A program's files from the server
 

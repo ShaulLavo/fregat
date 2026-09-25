@@ -1592,16 +1592,7 @@ class PooledLspProxySession {
     this.closeConnections(outcome)
   }
 
-  /**
-   * Says why, then closes.
-   *
-   * A bare close is what made a dead backend invisible: the browser's transport
-   * clears its handlers and `LspConnection` has no close callback, so the status
-   * indicator stays `'ready'` over a server that exited — confident colour plus a
-   * green light reads as working software. The exit is broadcast as a
-   * notification first, on the socket that is about to close, because that is the
-   * one channel this proxy shares with a browser that has no other way to hear it.
-   */
+  /** Says why, then closes; the editor reports the close as `LspServerExitedError`. */
   private closeConnections(outcome: string): void {
     const exit = JSON.stringify({
       jsonrpc: '2.0',
