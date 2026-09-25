@@ -19,6 +19,7 @@ a bare root `bun run verify`.
 
 | Plan                                                                                    | State                                                                |
 | --------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| [170 — language census for grammar and theme prefetch](170-language-census.md)          | **PROPOSED — SPLIT FROM 110 Q7**                                     |
 | [168 — flat file view under a chosen root](168-flat-file-view.md)                       | **PARKED — MOVED FROM EDITOR E030**                                  |
 | [167 — settings defaults, setting details, and copy](167-settings-and-copy.md)          | **PROPOSED — READY; D1–D4 DECIDED**                                  |
 | [166 — keyboard shortcuts, redone](166-shortcuts-editor.md)                             | **PROPOSED — RESEARCH FIRST; D1–D6 DECIDED**                         |

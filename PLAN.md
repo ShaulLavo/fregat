@@ -394,6 +394,8 @@ Two research plans feed the lane and are not executable as written:
 [Plan 110](plans/110-workspace-indexing.md) asks what belongs in a workspace index beyond the file
 index that already exists, with Shiki grammar prefetch, Plan 088's semantic retrieval, Plan 108's
 document graph and search as its waiting consumers.
+Its smallest consumer, the language census for grammar and theme prefetch, is split out as
+[Plan 170](plans/170-language-census.md) (decided 2026-09-25: owner).
 [Plan 111](plans/111-editor-decorations.md) compares `@singapore-editor`'s inline-replacement layer against
 CodeMirror 6 decorations and Lexical's decorator nodes, and gates Plan 108 Phase 2, any later
 Obsidian mode, and the question of whether the chat composer still needs Lexical.
