@@ -1,4 +1,5 @@
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { randomUUID } from 'node:crypto'
+import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import {
   providerSnapshotSchema,
@@ -112,13 +113,8 @@ export class ProviderStatusCache {
     const filePath = this.filePath(snapshot.providerInstanceId)
     if (!filePath) return
 
-    // Written through a temp file: a half-flushed snapshot read on the next
-    // boot would show the wrong account as signed in.
-    const temporaryPath = `${filePath}.${process.pid}.tmp`
     try {
-      mkdirSync(path.dirname(filePath), { recursive: true })
-      writeFileSync(temporaryPath, `${JSON.stringify(snapshot)}\n`)
-      renameSync(temporaryPath, filePath)
+      writeSnapshotFile(filePath, snapshot)
     } catch (error) {
       recordChatPipelineWarning('chat.pipeline.provider_status_cache.write.failed', {
         error,
@@ -132,6 +128,21 @@ export class ProviderStatusCache {
     if (!this.directory) return null
 
     return path.join(this.directory, `${instanceId}.json`)
+  }
+}
+
+// Written through a temp file: a half-flushed snapshot read on the next
+// boot would show the wrong account as signed in.
+function writeSnapshotFile(filePath: string, snapshot: ProviderSnapshot) {
+  const directory = path.dirname(filePath)
+  mkdirSync(directory, { recursive: true })
+  const temporaryPath = path.join(directory, `.${path.basename(filePath)}.${randomUUID()}.tmp`)
+  try {
+    writeFileSync(temporaryPath, `${JSON.stringify(snapshot)}\n`)
+    renameSync(temporaryPath, filePath)
+  } catch (error) {
+    rmSync(temporaryPath, { force: true })
+    throw error
   }
 }
 

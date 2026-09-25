@@ -280,8 +280,9 @@ export class ProviderAdapterRegistry {
     }
   }
 
-  streamChanges(): AsyncIterable<ProviderAdapterRegistryChange> {
-    return providerAdapterRegistryChangeStream(this)
+  /** Ends when `signal` aborts, which also releases a consumer parked in `next()`. */
+  streamChanges(signal: AbortSignal): AsyncIterable<ProviderAdapterRegistryChange> {
+    return providerAdapterRegistryChangeStream(this, signal)
   }
 
   adapter(providerInstanceId: ProviderInstanceId) {
@@ -724,18 +725,27 @@ function compareProviderSnapshots(left: ProviderSnapshot, right: ProviderSnapsho
   )
 }
 
-function providerAdapterRegistryChangeStream(adapterRegistry: ProviderAdapterRegistry) {
+function providerAdapterRegistryChangeStream(
+  adapterRegistry: ProviderAdapterRegistry,
+  signal: AbortSignal,
+) {
   return {
     async *[Symbol.asyncIterator]() {
+      if (signal.aborted) return
+
       const queue: ProviderAdapterRegistryChange[] = []
       const waiters: Array<() => void> = []
+      const wakeAll = () => {
+        for (const wake of waiters.splice(0)) wake()
+      }
       const unsubscribe = adapterRegistry.subscribeChanges((change) => {
         queue.push(change)
         waiters.shift()?.()
       })
+      signal.addEventListener('abort', wakeAll, { once: true })
 
       try {
-        for (;;) {
+        while (!signal.aborted) {
           const change = queue.shift()
           if (change) {
             yield change
@@ -747,8 +757,9 @@ function providerAdapterRegistryChangeStream(adapterRegistry: ProviderAdapterReg
           })
         }
       } finally {
+        signal.removeEventListener('abort', wakeAll)
         unsubscribe()
-        waiters.splice(0)
+        wakeAll()
       }
     },
   }

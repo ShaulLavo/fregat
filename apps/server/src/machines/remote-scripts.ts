@@ -35,6 +35,8 @@ export function stopCommand(
   return bunCommand(options.installation, stopScript(options.clientId, record))
 }
 
+// `writeRecord` keeps `<file>.<pid>.tmp`, which two writers in one process would share. This runs
+// under `bun -e` in the remote host's checkout, whose version can differ, so it cannot share a helper.
 const prelude = `
 import { mkdir, readFile, readdir, rename, unlink } from 'node:fs/promises';
 import { openSync, closeSync } from 'node:fs';

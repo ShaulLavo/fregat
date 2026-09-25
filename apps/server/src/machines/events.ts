@@ -33,11 +33,15 @@ export class MachineEvents {
     try {
       while (!this.closed && !signal.aborted) {
         const event = queue.shift()
-        if (event) yield event
-        else
-          await new Promise<void>((resolve) => {
-            wake = resolve
-          })
+        if (event) {
+          yield event
+          continue
+        }
+
+        await new Promise<void>((resolve) => {
+          wake = resolve
+        })
+        wake = null
       }
     } finally {
       this.listeners.delete(listener)

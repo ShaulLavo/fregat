@@ -1,4 +1,5 @@
 import { archivePartFiles, readArchivePart } from './archive-parts'
+import { randomUUID } from 'node:crypto'
 import { mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import {
@@ -162,10 +163,15 @@ export class PaletteLibrary {
 
   async #writeFile(document: PaletteDocument): Promise<void> {
     await mkdir(this.#directory, { recursive: true })
-    const target = path.join(this.#directory, this.#fileName(document.id))
-    const staging = `${target}.${process.pid}.tmp`
-    await writeFile(staging, `${JSON.stringify(document, null, 2)}\n`)
-    await rename(staging, target)
+    const name = this.#fileName(document.id)
+    const staging = path.join(this.#directory, `.${name}.${randomUUID()}.tmp`)
+    try {
+      await writeFile(staging, `${JSON.stringify(document, null, 2)}\n`)
+      await rename(staging, path.join(this.#directory, name))
+    } catch (error) {
+      await rm(staging, { force: true }).catch(() => {})
+      throw error
+    }
   }
 
   #fileName(id: PaletteId): string {

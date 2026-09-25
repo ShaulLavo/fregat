@@ -1,4 +1,5 @@
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { randomUUID } from 'node:crypto'
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { platformHomePath } from '../home'
 
@@ -124,10 +125,16 @@ function cappedLedger(ledger: AppSaveLedger): AppSaveLedger {
 }
 
 function writeLedger(markerPath: string, ledger: AppSaveLedger): void {
-  mkdirSync(path.dirname(markerPath), { recursive: true })
-  const temporaryPath = `${markerPath}.${process.pid}.${Date.now()}.tmp`
-  writeFileSync(temporaryPath, JSON.stringify(ledger), 'utf8')
-  renameSync(temporaryPath, markerPath)
+  const directory = path.dirname(markerPath)
+  mkdirSync(directory, { recursive: true })
+  const temporaryPath = path.join(directory, `.${path.basename(markerPath)}.${randomUUID()}.tmp`)
+  try {
+    writeFileSync(temporaryPath, JSON.stringify(ledger), 'utf8')
+    renameSync(temporaryPath, markerPath)
+  } catch (error) {
+    rmSync(temporaryPath, { force: true })
+    throw error
+  }
 }
 
 function normalizeMarkerPath(input: string): string {

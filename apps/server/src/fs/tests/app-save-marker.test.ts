@@ -1,4 +1,4 @@
-import { mkdtemp } from 'node:fs/promises'
+import { mkdtemp, readdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -13,6 +13,7 @@ describe('app save markers', () => {
     expect(recordAppSave(savedPath, { markerPath, now: 1_000 })).toBe(true)
     expect(consumeAppSave(savedPath, { markerPath, now: 1_001 })).toBe(true)
     expect(consumeAppSave(savedPath, { markerPath, now: 1_002 })).toBe(false)
+    expect(await readdir(path.dirname(markerPath))).toEqual(['markers.json'])
   })
 
   it('expires stale markers', async () => {
