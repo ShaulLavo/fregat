@@ -25,7 +25,8 @@ export function useProviderUpdate(providerInstanceId: ProviderInstanceId, label:
         owner.setQueryData(settingsQueryKeys.providerUpdate(providerInstanceId), result.advisory)
         void owner.invalidateQueries({ queryKey: providerQueryKeys.list() })
         const version = result.advisory.installedVersion
-        if (result.outcome === 'updated') toast.success(`Updated ${label} to ${version}`)
+        if (result.outcome !== 'updated') return
+        toast.success(version ? `Updated ${label} to ${version}` : `Updated ${label}`)
       },
       onError: (error) => {
         void owner.invalidateQueries({

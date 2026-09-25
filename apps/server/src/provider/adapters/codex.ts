@@ -76,7 +76,7 @@ import {
   type CodexSkillMetadata,
 } from './codex-protocol'
 import { errorMessage as providerErrorMessage } from '@workspace/contracts'
-import { prepareCodexRewind } from './utils/codex-rewind'
+import { codexTurnExists, prepareCodexRewind } from './utils/codex-rewind'
 import { activeProviderTurn, type ActiveProviderTurn } from './utils/active-turn'
 import { codexDeveloperInstructions } from './utils/codex-instructions'
 import { modelOptionValue, type ModelOptions } from './utils/model-options'
@@ -267,6 +267,18 @@ export class CodexProviderAdapter
   }
 
   async prepareFork(input: ProviderForkInput): Promise<ProviderForkStart> {
+    const exists = await inspectCodexHistory(this.env, (client) =>
+      codexTurnExists({
+        threadId: input.conversationId,
+        turnId: input.providerTurnId,
+        request: (method, params) =>
+          client.requestRaw(method, params, REQUEST_TIMEOUT_MS, (response) => response),
+      }),
+    )
+    if (!exists)
+      throw sessionIdentityErrors.FORK_POINT_UNAVAILABLE({
+        internal: { conversationId: input.conversationId, turnId: input.providerTurnId },
+      })
     return { boundaryId: input.providerTurnId, conversationId: input.conversationId }
   }
 
@@ -295,19 +307,28 @@ export class CodexProviderAdapter
     return inspectCodexHistory(this.env, async (client) => {
       const { account } = await client.request('account/read', {}, PROVIDER_PROBE_TIMEOUT_MS)
       if (account?.type !== 'chatgpt')
-        throw createInternalError('Reset credits require a signed-in Codex account.')
+        throw sessionIdentityErrors.RESET_CREDIT_REJECTED({ internal: { reason: 'signed-out' } })
       const usage = await client.request(
         'account/rateLimits/read',
         undefined,
         CODEX_USAGE_TIMEOUT_MS,
       )
       if (!usage.accountId || codexResetAccountKey(usage.accountId) !== input.accountKey)
-        throw createInternalError('The signed-in Codex account changed before the reset.')
-      const response = await client.request(
-        'account/rateLimitResetCredit/consume',
-        { idempotencyKey: input.idempotencyKey, creditId: input.creditId },
-        CODEX_USAGE_TIMEOUT_MS,
-      )
+        throw sessionIdentityErrors.RESET_CREDIT_REJECTED({
+          internal: { reason: 'account-changed' },
+        })
+      const response = await client
+        .request(
+          'account/rateLimitResetCredit/consume',
+          { idempotencyKey: input.idempotencyKey, creditId: input.creditId },
+          CODEX_USAGE_TIMEOUT_MS,
+        )
+        .catch((error: unknown) => {
+          if (!(error instanceof Error) || !answeredRpcErrors.has(error)) throw error
+          throw sessionIdentityErrors.RESET_CREDIT_REJECTED({
+            internal: { reason: 'provider-error', detail: error.message },
+          })
+        })
       return v.parse(providerResetCreditOutcomeSchema, response.outcome)
     })
   }
@@ -2476,7 +2497,9 @@ class CodexAppServerRpcClient {
     clearTimeout(pending.timer)
     this.pending.delete(id)
     if (message.error) {
-      pending.reject(createInternalError(jsonRpcErrorMessage(message.error)))
+      const error = createInternalError(jsonRpcErrorMessage(message.error))
+      answeredRpcErrors.add(error)
+      pending.reject(error)
       return
     }
 
@@ -3149,6 +3172,9 @@ function parseJsonRpcMessage(line: string): JsonRpcMessage {
 function isJsonRpcResponse(message: JsonRpcMessage) {
   return message.id !== undefined && !message.method
 }
+
+/** Errors the app-server answered itself, as opposed to timeouts and dropped connections. */
+const answeredRpcErrors = new WeakSet<Error>()
 
 function jsonRpcErrorMessage(error: unknown) {
   const errorRecord = asRecord(error)

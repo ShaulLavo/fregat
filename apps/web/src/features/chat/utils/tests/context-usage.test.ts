@@ -1,6 +1,7 @@
 import {
   eventIdSchema,
   sessionIdSchema,
+  turnIdSchema,
   type OrchestrationSessionActivity,
 } from '@workspace/contracts'
 import * as v from 'valibot'
@@ -117,6 +118,16 @@ test("combines Claude's two snapshots: token kinds from the turn, window and seg
   })
 })
 
+test("keeps an older turn's segments off the newest count", () => {
+  const segments = [{ kind: 'used', name: 'Messages', tokens: 3_000 }]
+  const usage = contextUsageForActivities([
+    activity(1, { maxTokens: 187_000, segments, usedTokens: 12_000 }, 'turn-1'),
+    activity(2, { inputTokens: 10, usedTokens: 40_000 }, 'turn-2'),
+  ])
+
+  expect(usage).toMatchObject({ maxTokens: 187_000, segments: null, usedTokens: 40_000 })
+})
+
 test('rejects a segment kind the adapters never forward', () => {
   expect(
     contextUsageForPayload({
@@ -133,7 +144,11 @@ test('abbreviates token counts for a gauge that has no room', () => {
   expect(formatContextTokens(1_250_000)).toBe('1.3M')
 })
 
-function activity(index: number, payload: unknown): OrchestrationSessionActivity {
+function activity(
+  index: number,
+  payload: unknown,
+  turnId: string | null = null,
+): OrchestrationSessionActivity {
   return {
     createdAt: `2026-05-28T00:00:0${index}.000Z`,
     id: v.parse(eventIdSchema, `event-${index}`),
@@ -142,6 +157,6 @@ function activity(index: number, payload: unknown): OrchestrationSessionActivity
     summary: 'Context window updated',
     sessionId: v.parse(sessionIdSchema, 'ad686244-5b2e-59be-805f-ef86eac80feb'),
     tone: 'info',
-    turnId: null,
+    turnId: turnId === null ? null : v.parse(turnIdSchema, turnId),
   }
 }

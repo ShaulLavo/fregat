@@ -159,6 +159,12 @@ export const sessionIdentityErrors = defineErrorCatalog('provider', {
     why: 'The configured provider has no local history reader.',
     fix: 'Choose a provider listed in the conversation import settings.',
   },
+  RESET_CREDIT_REJECTED: {
+    status: 409,
+    message: 'The provider declined this reset credit.',
+    why: 'The provider answered the request, so no credit was spent.',
+    fix: 'Refresh usage, then confirm a reset again.',
+  },
 })
 
 /** The provider has no callback for this request any more; the caller branches on the code. */
@@ -168,4 +174,9 @@ export function requestGone(requestKind: 'approval' | 'user-input', requestId: s
 
 export function isNotInstalledError(error: unknown) {
   return errorStringField(error, 'code') === sessionIdentityErrors.NOT_INSTALLED.code
+}
+
+/** Only a definite answer from the provider clears a reset attempt; anything else may have spent it. */
+export function isResetCreditRejected(error: unknown) {
+  return errorStringField(error, 'code') === sessionIdentityErrors.RESET_CREDIT_REJECTED.code
 }

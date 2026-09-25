@@ -45,6 +45,36 @@ async function codexTurnAtIndex({
   return null
 }
 
+/** Whether the native thread still holds a turn; a revert removes turns a fork may name. */
+export async function codexTurnExists({
+  threadId,
+  turnId,
+  request,
+}: {
+  readonly threadId: string
+  readonly turnId: string
+  readonly request: CodexRequest
+}) {
+  let cursor: string | null = null
+  const seen = new Set<string>()
+  for (;;) {
+    const page: v.InferOutput<typeof turnPageSchema> = v.parse(
+      turnPageSchema,
+      await request('thread/turns/list', {
+        threadId,
+        sortDirection: 'desc',
+        itemsView: 'notLoaded',
+        limit: 100,
+        ...(cursor ? { cursor } : {}),
+      }),
+    )
+    if (page.data.some((turn) => turn.id === turnId)) return true
+    if (page.data.length === 0 || !page.nextCursor || seen.has(page.nextCursor)) return false
+    seen.add(page.nextCursor)
+    cursor = page.nextCursor
+  }
+}
+
 export async function prepareCodexRewind({
   threadId,
   numTurns,
