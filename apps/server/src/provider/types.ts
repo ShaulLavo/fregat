@@ -21,6 +21,7 @@ import type {
   ProviderSkill,
   ProviderSlashCommand,
   SessionRuntimeStatus,
+  SessionTurnKind,
   ProviderSnapshot,
   ProviderUserInputAnswers,
   RuntimeMode,
@@ -38,6 +39,8 @@ export type ProviderTurnInput = {
   ephemeral?: boolean
   resumeExisting?: boolean
   interactionMode: InteractionMode
+  /** `compact` compacts the conversation instead of answering `messageText`. */
+  kind?: SessionTurnKind
   messageText: string
   modelSelection: ModelSelection
   sessionId: SessionId

@@ -108,3 +108,31 @@ test('a session keeps the agent it started as, and its fork runs as the same age
   fixture.pipeline.applyEvents(fixture.append(created))
   expect(fixture.snapshots.sessionDetailSnapshot(FORK_ID).session.agent).toBe('reviewer')
 })
+
+test('a compaction turn needs an idle conversation and records its kind', () => {
+  const { fixture: idle, model } = setup()
+  const compact = (sessionId: string) =>
+    v.parse(orchestrationCommandSchema, {
+      commandId: crypto.randomUUID(),
+      interactionMode: 'default',
+      kind: 'compact',
+      message: { messageId: crypto.randomUUID(), role: 'user', text: '/compact' },
+      runtimeMode: 'full-access',
+      sessionId,
+      turnId: 'turn-compact',
+      type: 'session.turn.start',
+    })
+
+  const events = decideOrchestrationCommand(compact(SESSION_ID), model)
+  expect(
+    events.find((event) => event.type === 'session.turn-start-requested')?.payload,
+  ).toMatchObject({
+    kind: 'compact',
+  })
+  expect(() => decideOrchestrationCommand(compact(FORK_ID), model)).toThrow(
+    'There is no conversation to compact yet.',
+  )
+  idle.close()
+  const busy = setup({ runningTurn: 'turn-4' }).model
+  expect(() => decideOrchestrationCommand(compact(SESSION_ID), busy)).toThrow()
+})

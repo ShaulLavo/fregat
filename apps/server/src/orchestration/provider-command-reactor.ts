@@ -398,6 +398,7 @@ export class ProviderCommandReactor {
         cwd: context.worktree.canonicalPath,
         interactionMode: context.interactionMode,
         messageText: context.message.text,
+        ...(event.payload.kind ? { kind: event.payload.kind } : {}),
         modelSelection: context.modelSelection,
         providerInstanceId: context.modelSelection.providerInstanceId,
         runtimeMode: context.runtimeMode,

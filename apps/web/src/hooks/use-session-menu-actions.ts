@@ -21,6 +21,8 @@ import {
   copySessionTranscript,
   downloadSessionTranscript,
 } from '@/features/chat/state/transcript-export'
+import { useCompactSession } from '@/features/chat/hooks/use-compact-session'
+import { chatMutationKeys } from '@/features/chat/utils/mutation-keys'
 import { copyTextToClipboard } from '@/lib/clipboard'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
 import {
@@ -64,12 +66,34 @@ export function useSessionMenuActions(
     }),
   )
   const wokeAt = useSessionWake(session.ref)
+  const compact = useCompactSession(session.ref)
+  const compacting =
+    useIsMutating({ mutationKey: chatMutationKeys.compact(session.environmentId, session.id) }) > 0
+  const compactModes = useChatProjectionStore(
+    useShallow((state) => {
+      const summary = selectChatProjectionSlice(state, session.environmentId).sessionById[
+        session.id
+      ]
+      return {
+        interactionMode: summary?.interactionMode ?? null,
+        running: summary?.latestTurn?.state === 'running',
+        runtimeMode: summary?.runtimeMode ?? null,
+      }
+    }),
+  )
   const hasMessages = useChatProjectionStore((state) =>
     Boolean(
       selectChatProjectionSlice(state, session.environmentId).sessionById[session.id]
         ?.latestUserMessageAt,
     ),
   )
+  const { interactionMode, runtimeMode } = compactModes
+  // Nothing to compact before the first prompt, and never over a running turn.
+  const compactable =
+    hasMessages && !compactModes.running && interactionMode && runtimeMode
+      ? { interactionMode, runtimeMode }
+      : null
+
   const completedAt = useChatProjectionStore(
     (state) =>
       selectChatProjectionSlice(state, session.environmentId).sessionById[session.id]?.latestTurn
@@ -108,6 +132,8 @@ export function useSessionMenuActions(
     hasMessages,
     copyTranscript: () => void copySessionTranscript(session.ref),
     exportTranscript: (format) => void downloadSessionTranscript(session.ref, format),
+    compact: compactable ? () => compact.mutate(compactable) : null,
+    compactPending: compacting,
     canMarkUnread: Boolean(completedAt) && !session.unread,
     woke: wokeAt !== null,
     markUnread: () => actions.markUnread(session.ref),

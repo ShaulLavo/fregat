@@ -846,12 +846,20 @@ function activityEnvelopeMetadata(
   return { requestId: v.parse(approvalRequestIdSchema, requestId) }
 }
 
+/** There is nothing to compact before the conversation has a prompt. */
+function requireCompactable(session: OrchestrationProjectedSession | undefined) {
+  if (session?.messages.some((message) => message.role === 'user')) return
+
+  throw sessionDomainErrors.COMPACT_EMPTY({ internal: { sessionId: session?.id ?? null } })
+}
+
 function turnStartRequested(
   command: Extract<OrchestrationCommand, { type: 'session.turn.start' }>,
   model: OrchestrationReadModel,
   at: string,
 ) {
   const bootstrapEvent = bootstrapSessionCreated(command, model, at)
+  if (command.kind === 'compact') requireCompactable(model.sessions.get(command.sessionId))
   if (!bootstrapEvent) {
     const session = requireSessionNotArchived(model, command.sessionId, command.type)
     requireProviderInstance(session, command.modelSelection)
@@ -902,6 +910,7 @@ function turnStartRequested(
         sessionId: command.sessionId,
         titleSeed: command.titleSeed,
         turnId: command.turnId,
+        ...(command.kind ? { kind: command.kind } : {}),
       },
       { causationEventId: messageEvent.eventId },
     ),

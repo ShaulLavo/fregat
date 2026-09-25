@@ -96,6 +96,14 @@ Upstream paths shortened to `provider/…` or `orchestration/…` in tables mean
     SDK compacts: `compact_boundary` (`trigger: 'manual'`, pre/post tokens), a summary user
     message, `<local-command-stdout>Compacted </local-command-stdout>`, then a `result` with
     subtype `success` and empty text (about 20 s). It is a turn with a result like any other.
+- **Delivered 2026-09-25 (lane L3):** `session.turn.start` takes `kind: 'compact'`. The decider
+  rejects it on a session with no prompt (`COMPACT_EMPTY`) and, like any start, over a running turn
+  (`START_STATE_CONFLICT`). Codex sends `thread/compact/start` and settles on the native turn it
+  starts; its `contextCompaction` item becomes the timeline's "Context compacted". Claude sends
+  `/compact` as the prompt. Because compaction is a turn, follow-ups queue behind it, Stop and
+  failure settle it like a turn, and boot recovery marks it "Turn interrupted" without replaying.
+  Tests: `orchestration/tests/session-fork.test.ts`, `provider/adapters/tests/codex.test.ts`.
+  Scenarios `claude-manual-compaction` and `codex-manual-compaction` pass.
 
 ### RUNTIME-06 — Preserve advertised model option descriptors and service tiers
 

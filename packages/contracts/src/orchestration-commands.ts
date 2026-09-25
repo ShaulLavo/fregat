@@ -38,6 +38,7 @@ import {
   orderKeySchema,
   sourceProposedPlanReferenceSchema,
   sessionAgentSchema,
+  sessionTurnKindSchema,
   trimmedNonEmptyStringSchema,
 } from './chat-model'
 import {
@@ -265,6 +266,8 @@ export const sessionTurnStartCommandSchema = v.object({
   interactionMode: v.optional(interactionModeSchema, DEFAULT_INTERACTION_MODE),
   sourceProposedPlan: v.optional(sourceProposedPlanReferenceSchema),
   bootstrap: v.optional(sessionTurnBootstrapSchema),
+  /** `compact` asks the harness to compact the conversation instead of answering the text. */
+  kind: v.optional(sessionTurnKindSchema),
 })
 
 export const sessionTurnInterruptCommandSchema = v.object({

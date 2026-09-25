@@ -27,6 +27,7 @@ import {
   repositoryIdentitySchema,
   repositoryKindSchema,
   sessionAgentSchema,
+  sessionTurnKindSchema,
   sessionForkSourceSchema,
   sessionOriginSchema,
   sessionDeletionStateSchema,
@@ -223,6 +224,7 @@ export const sessionTurnStartRequestedPayloadSchema = v.object({
   runtimeMode: v.optional(runtimeModeSchema, DEFAULT_RUNTIME_MODE),
   interactionMode: v.optional(interactionModeSchema, DEFAULT_INTERACTION_MODE),
   sourceProposedPlan: v.optional(sourceProposedPlanReferenceSchema),
+  kind: v.optional(sessionTurnKindSchema),
   createdAt: isoDateTimeSchema,
 })
 

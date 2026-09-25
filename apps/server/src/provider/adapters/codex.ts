@@ -756,6 +756,15 @@ class CodexAppServerSession extends SessionContext {
         sessionId: this.sessionId,
         turnId: input.turnId,
       })
+      if (input.kind === 'compact') {
+        // Compaction runs as a native turn; its id arrives on `turn/started`, which
+        // attaches the pending turn.
+        await this.client.request('thread/compact/start', {
+          threadId: this.providerConversationMarker,
+        })
+        await activeTurn.promise
+        return
+      }
       const response = await this.client.request('turn/start', turnStartParams(this, input))
       const providerTurnId = readTurnIdFromTurnResponse(response)
       recordChatPipelineInfo('chat.pipeline.codex_session.turn_start_response', {
@@ -1670,6 +1679,10 @@ class CodexAppServerSession extends SessionContext {
 
   private async handleItemCompletedNotification(params: unknown) {
     const item = notificationItem(params)
+    // Codex reports compaction as an item now; `thread/compacted` is deprecated upstream.
+    if (stringField(asRecord(item), 'type') === 'contextCompaction') {
+      return this.handleSessionCompactedNotification(params)
+    }
     if (!isReasoningItem(item)) {
       const handled = await this.handleAssistantMessageItemCompleted(params, item)
       if (handled) return true

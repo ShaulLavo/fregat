@@ -66,6 +66,7 @@ import { claudeHookRows } from './hook-rows'
 import { claudeBackgroundTasks } from './background-tasks'
 import { claudeCustomAgent } from './custom-agent'
 import { claudeContextPopover } from './context-popover'
+import { claudeManualCompaction, codexManualCompaction } from './manual-compaction'
 import { claudeSessionTools, codexSessionTools } from './session-tools'
 import { claudeSessionFork, codexSessionFork } from './session-fork'
 import { searchFileActions } from './search-file-actions'
@@ -298,6 +299,8 @@ export const scenarios: readonly Scenario[] = [
   claudeBackgroundTasks,
   claudeCustomAgent,
   claudeContextPopover,
+  claudeManualCompaction,
+  codexManualCompaction,
   claudeSessionTools,
   codexSessionTools,
   claudeSessionFork,

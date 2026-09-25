@@ -141,6 +141,8 @@ function menuContext({
     copyBranch: null,
     copySessionId: () => record.push('copySessionId'),
     hasMessages: true,
+    compact: null,
+    compactPending: false,
     copyTranscript: () => record.push('copyTranscript'),
     exportTranscript: (format) => record.push(`exportTranscript:${format}`),
     canMarkUnread: false,

@@ -316,6 +316,31 @@ export function createSessionArchiveCommand({
   }
 }
 
+/**
+ * A turn that compacts the conversation. The session's own modes ride along so the
+ * turn never changes them; the text is the harness's own command.
+ */
+export function createSessionCompactCommand({
+  interactionMode,
+  runtimeMode,
+  sessionId,
+}: {
+  interactionMode: InteractionMode
+  runtimeMode: RuntimeMode
+  sessionId: SessionId
+}): SessionTurnStartCommand {
+  return {
+    commandId: createCommandId(),
+    interactionMode,
+    kind: 'compact',
+    message: { attachments: [], messageId: createMessageId(), role: 'user', text: '/compact' },
+    runtimeMode,
+    sessionId,
+    turnId: createTurnId(),
+    type: 'session.turn.start',
+  }
+}
+
 /** The new session's id is minted here, so the caller can open it once the fork lands. */
 export function createSessionForkCommand({
   sourceSessionId,

@@ -353,6 +353,16 @@ function handle(message) {
     ] }] } });
     return;
   }
+  if (message.method === 'thread/compact/start') {
+    record({ event: message.method, params: message.params });
+    send({ id: message.id, result: {} });
+    const turn = { id: 'compact-turn-1', status: 'inProgress', items: [] };
+    send({ method: 'turn/started', params: { threadId: message.params.threadId, turn } });
+    send({ method: 'item/started', params: { threadId: message.params.threadId, turnId: turn.id, item: { id: 'compaction-1', type: 'contextCompaction' } } });
+    send({ method: 'item/completed', params: { threadId: message.params.threadId, turnId: turn.id, item: { id: 'compaction-1', type: 'contextCompaction' } } });
+    send({ method: 'turn/completed', params: { threadId: message.params.threadId, turn: { ...turn, status: 'completed' } } });
+    return;
+  }
   if (mode === 'fork' && message.method === 'thread/turns/list') {
     record({ event: 'thread/turns/list', params: message.params });
     const turns = ['source-turn-3', 'source-turn-2', 'source-turn-1'].map((id) => ({ id }));
@@ -2520,6 +2530,29 @@ describe('CodexProviderAdapter', () => {
       },
       { mode: 'malformed-thread-start' },
     )
+  })
+
+  it('compacts through thread/compact/start and settles on the native turn it starts', async () => {
+    await withFakeCodex(async ({ spawnLogPath }) => {
+      const adapter = new CodexProviderAdapter()
+      const events: ProviderRuntimeEvent[] = []
+      collectAdapterEvents(adapter, events)
+      try {
+        await adapter.sendTurn({ ...providerTurnInput(), kind: 'compact', messageText: '/compact' })
+        await settleRuntimeEvents()
+        const records = await readFakeCodexLog(spawnLogPath)
+        expect(records.map((record) => record.event)).toContain('thread/compact/start')
+        expect(records.map((record) => record.event)).not.toContain('turn/start')
+        expect(events.filter((event) => event.type === 'turn.completed')).toMatchObject([
+          { turnId: providerTurnInput().turnId },
+        ])
+        expect(events.filter((event) => event.type === 'conversation.state.changed')).toMatchObject(
+          [{ payload: { state: 'compacted' }, turnId: providerTurnInput().turnId }],
+        )
+      } finally {
+        await adapter.stopAll()
+      }
+    })
   })
 
   it('reads MCP server states and configured hooks from the live app-server', async () => {

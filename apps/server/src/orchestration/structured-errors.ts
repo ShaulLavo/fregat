@@ -60,6 +60,12 @@ export const sessionDomainErrors = defineErrorCatalog('orchestration', {
     why: 'The turn that asked finished, was stopped, or the server restarted, so the agent stopped waiting.',
     fix: 'Send a new message if the agent should try again.',
   },
+  COMPACT_EMPTY: {
+    status: 409,
+    message: 'There is no conversation to compact yet.',
+    why: 'Compaction summarises earlier turns, and this session has none.',
+    fix: 'Send a message first.',
+  },
   FORK_TURN_RUNNING: {
     status: 409,
     message: 'A turn still running cannot be forked.',

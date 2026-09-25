@@ -36,6 +36,8 @@ The chat mode button in the window toolbar, or an address URL with `/chat/`.
 
 `scenario claude-session-fork` and `scenario codex-session-fork` run real providers: three turns each name a fruit, Fork from Here on the second answer opens a `(fork)` session beside the source whose timeline stops at turn 2, and asked for the fruits it answers mango and kiwi, never papaya. The harness fork happens on the fork's first turn.
 
+`scenario claude-manual-compaction` and `scenario codex-manual-compaction` run one real turn, type a draft, and pick Compact Conversation from the session menu. The compaction runs as its own turn (`/compact` for Claude, `thread/compact/start` for Codex), the timeline shows one "Context compacted" row, and the draft is still in the composer. Each takes 15–30 s.
+
 `scenario claude-background-tasks` has real Claude (Haiku) start `sleep 600` and `sleep 700` in the background; the header's Background tasks popover lists both, and stopping one leaves the other. The list polls every 3 s only while the popover is open, since the roster lives in the provider process.
 
 `scenario claude-session-tools` gives real Claude (Haiku) a fixture with two project MCP servers, one working and one whose command does not exist; the header's MCP servers and hooks popover shows Connected, and Failed with the error, and Reconnect runs. `scenario codex-session-tools` reads the same popover for Codex: the user's servers and the fixture's `preToolUse` hook from `hooks/list`. Both need a turn first, since the lists come from the live provider process.

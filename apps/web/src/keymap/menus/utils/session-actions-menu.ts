@@ -1,4 +1,5 @@
 import {
+  ArrowsInIcon,
   BracketsCurlyIcon,
   CopyIcon,
   DownloadSimpleIcon,
@@ -81,6 +82,9 @@ export type SessionActionsMenuContext = {
   readonly exportTranscript: (format: 'markdown' | 'json') => void
   readonly archived: boolean
   readonly canStopAgent: boolean
+  /** Null when there is nothing to compact yet or a turn is running. */
+  readonly compact: (() => void) | null
+  readonly compactPending: boolean
   readonly archive: () => void
   readonly deleteSession: () => void
   readonly rename: () => void
@@ -232,6 +236,14 @@ export function sessionActionsMenu(
     ]),
     ...(contributions.project ? [contributions.project] : []),
     section('agent', [
+      context.compact &&
+        actionItem({
+          disabled: context.compactPending,
+          icon: ArrowsInIcon,
+          id: 'compact',
+          label: 'Compact Conversation',
+          run: context.compact,
+        }),
       context.canStopAgent &&
         actionItem({
           icon: StopCircleIcon,

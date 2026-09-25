@@ -472,12 +472,16 @@ export const sessionOriginSchema = v.picklist(['platform', 'discovered'])
  */
 export const sessionAgentSchema = v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(200))
 
+/** A turn that compacts the conversation rather than answering a prompt. */
+export const sessionTurnKindSchema = v.picklist(['compact'])
+
 export const sessionForkSourceSchema = v.object({
   sessionId: sessionIdSchema,
   turnId: turnIdSchema,
   droppedPrompts: nonNegativeIntegerSchema,
 })
 export type SessionForkSource = v.InferOutput<typeof sessionForkSourceSchema>
+export type SessionTurnKind = v.InferOutput<typeof sessionTurnKindSchema>
 export const sessionAttentionStateSchema = v.picklist(['needs-input', 'working', 'settled'])
 export const sessionAttentionReasonSchema = v.nullable(
   v.picklist(['approval', 'user-input', 'interruption', 'worktree', 'failure', 'plan', 'active']),
