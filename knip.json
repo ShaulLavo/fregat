@@ -21,6 +21,7 @@
       "entry": [
         "boot.css",
         "src/demo-entry.ts",
+        "src/dev-entry.tsx",
         "src/features/address/tests/navigation.types.ts",
         "scripts/chat-parity-proof.mjs",
         "scripts/diff-reload-proof.mjs",
