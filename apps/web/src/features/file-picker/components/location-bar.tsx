@@ -51,7 +51,7 @@ export function LocationBar({
     return (
       <div className='bg-background flex min-w-0 items-center gap-1 rounded-md px-1 py-0.5'>
         <Breadcrumbs currentPath={currentPath} />
-        <IconTooltip label='Go to folder (⌘⇧G)'>
+        <IconTooltip label='Go to folder' shortcut='Mod+Shift+G'>
           <Button
             aria-label='Go to folder'
             className='shrink-0'

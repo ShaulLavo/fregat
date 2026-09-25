@@ -231,6 +231,14 @@ export const selectors = {
   pickerSearch: (page: Page) =>
     page.getByRole('textbox', { name: 'Search files and folders', exact: true }),
   pickerEmpty: (page: Page) => page.getByText('Nothing here', { exact: true }),
+  pickerRow: (page: Page, name: string) =>
+    page
+      .getByRole('listbox', { name: 'Folders and files', exact: true })
+      .getByRole('option')
+      .filter({ hasText: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`) }),
+  pickerPreview: (page: Page) => page.locator('[data-file-preview]'),
+  pickerStatus: (page: Page) =>
+    page.getByRole('dialog', { name: 'Choose folder', exact: true }).getByRole('status').last(),
   pickerCurrentFolderHeading: (page: Page) =>
     page
       .getByRole('listbox', { name: 'Folders and files', exact: true })

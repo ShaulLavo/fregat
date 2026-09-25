@@ -4,6 +4,7 @@ import {
   type MarkdownProps,
 } from '@workspace/markdown/components/markdown'
 import { CodeHighlighterContext } from '@workspace/markdown/providers/code-highlighter-context'
+import { useCodeHighlighter } from '@/lib/code-highlight/hooks/use-code-highlighter'
 import { cn } from '@workspace/ui/lib/utils'
 import { useQueryClient } from '@tanstack/react-query'
 import { Fragment, type ClipboardEvent } from 'react'
@@ -17,7 +18,6 @@ import { useOpenFileReference } from '../hooks/use-open-file-reference'
 import { MarkdownDiagramContext } from '../providers/markdown-diagram-context'
 import { MarkdownFileLinkContext } from '../providers/markdown-file-link-context'
 import { normalizeAgentMarkdown } from '@/features/chat/utils/agent-markdown'
-import { useChatCodeHighlighter } from '@/features/chat/hooks/use-chat-code-highlighter'
 import { chatMarkdownClipboardPayload } from '@/features/chat/utils/markdown-clipboard'
 import { remarkFileLinkChips } from '@/features/chat/utils/markdown-file-link-chips'
 import { remarkWorkspaceImages } from '@/features/chat/utils/markdown-images'
@@ -53,7 +53,7 @@ export function AssistantMarkdown({
   const owner = originForQueryClient(useQueryClient())
   const environment = useEnvironmentsStore((state) => state.entries[owner])
   const origin = serverEndpoint(environment?.origin ?? owner)
-  const highlighter = useChatCodeHighlighter()
+  const highlighter = useCodeHighlighter()
   const renderedText = normalizeAgentMarkdown(text)
   const mermaid = useMermaid(renderedText, streaming)
   const fileLinkActions = { openFileReference, rootPath }

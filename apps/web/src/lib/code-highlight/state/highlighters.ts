@@ -5,7 +5,7 @@ import type { ThemeRegistrationAny } from 'shiki/core'
 import {
   createEditorCodeHighlighter,
   type CodeHighlighterColorMode,
-} from '@/features/chat/utils/code-highlighter-theme'
+} from '@/lib/code-highlight/utils/theme'
 
 // One highlighter per palette, shared by every message: a highlighter owns
 // its loaded grammars, so one per message would compile TypeScript once per

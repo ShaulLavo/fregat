@@ -2,7 +2,7 @@
 
 ## Status and authorization
 
-- Status: PROPOSED — ready; D1–D4 accepted as recommended on 2026-09-25. The owner wants this ("100000%").
+- Status: P2, P3 and P4 done 2026-09-25 (lane L1); P1, P5 and P6 next. D1–D4 accepted as recommended on 2026-09-25. The owner wants this ("100000%").
 - Priority: P1 in the UI refresh lane. It runs after Plan 157 (done), whose
   segmented control, scroll fades and typeahead refine it uses.
 - Effort: L. A second view with its own keyboard model, a content preview with two data paths, a

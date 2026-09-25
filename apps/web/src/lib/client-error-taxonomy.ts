@@ -202,7 +202,7 @@ function isAbortError(input: unknown): boolean {
   return false
 }
 
-function extractFsErrorCode(input: unknown): FsErrorCode | null {
+export function extractFsErrorCode(input: unknown): FsErrorCode | null {
   if (!input || typeof input !== 'object') return null
 
   if ('value' in input) {

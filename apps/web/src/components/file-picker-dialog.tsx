@@ -47,7 +47,8 @@ import { NewFolderPopover } from '@/features/file-picker/components/new-folder-p
 import { LocationBar } from '@/features/file-picker/components/location-bar'
 import { MobileLocations } from '@/features/file-picker/components/mobile-locations'
 import { PlacesSidebar } from '@/features/file-picker/components/places-sidebar'
-import { PreviewPane, SelectedSummary } from '@/features/file-picker/components/preview'
+import { PreviewPane } from '@/features/file-picker/components/preview'
+import { SelectedSummary } from '@/features/file-picker/components/selected-summary'
 import {
   FilePickerSessionActionsContext,
   type FilePickerSessionActions,
@@ -58,9 +59,13 @@ import { useRecentEntries } from '@/features/file-picker/hooks/use-recent-entrie
 import { useRecordRecentMutation } from '@/features/file-picker/hooks/use-record-recent-mutation'
 import { useServerInfoForOpen } from '@/features/file-picker/hooks/use-server-info-for-open'
 import {
+  isBackShortcut,
+  isForwardShortcut,
   isGoToFolderShortcut,
   isGoUpShortcut,
+  isOpenShortcut,
   isToggleHiddenShortcut,
+  listCountLabel,
 } from '@/features/file-picker/utils/keyboard'
 import {
   sortFilePickerEntries,
@@ -322,7 +327,28 @@ export function FilePickerDialog({
     if (event.key === 'ArrowUp') return focusListFromSearch(event, -1)
   }
 
+  function openSelected() {
+    if (!selectedEntry || listInteractionPending) return
+    if (isDirectoryEntry(selectedEntry)) return navigateTo(selectedEntry.path)
+    const picked = toPickedEntry(selectedEntry, mode, accept)
+    if (picked) commitPick(picked)
+  }
+
+  function historyChord(event: KeyboardEvent<HTMLDivElement>) {
+    if (isBackShortcut(event)) return goBack
+    if (isForwardShortcut(event)) return goForward
+    if (isOpenShortcut(event)) return openSelected
+    return null
+  }
+
   function handleDialogKeyDownCapture(event: KeyboardEvent<HTMLDivElement>) {
+    const chord = historyChord(event)
+    if (chord) {
+      event.preventDefault()
+      event.stopPropagation()
+      chord()
+      return
+    }
     if (isGoToFolderShortcut(event)) {
       event.preventDefault()
       event.stopPropagation()
@@ -397,8 +423,9 @@ export function FilePickerDialog({
               className='flex shrink-0 items-center gap-0.5'
               role='group'
             >
-              <IconTooltip label='Back'>
+              <IconTooltip label='Back' shortcut='Mod+['>
                 <Button
+                  aria-keyshortcuts='Meta+['
                   aria-label='Back'
                   disabled={!session.canGoBack}
                   focusableWhenDisabled
@@ -410,8 +437,9 @@ export function FilePickerDialog({
                   <ArrowLeftIcon />
                 </Button>
               </IconTooltip>
-              <IconTooltip label='Forward'>
+              <IconTooltip label='Forward' shortcut='Mod+]'>
                 <Button
+                  aria-keyshortcuts='Meta+]'
                   aria-label='Forward'
                   disabled={!session.canGoForward}
                   focusableWhenDisabled
@@ -423,7 +451,7 @@ export function FilePickerDialog({
                   <ArrowRightIcon />
                 </Button>
               </IconTooltip>
-              <IconTooltip label='Up one folder (⌘↑)'>
+              <IconTooltip label='Up one folder' shortcut='Mod+ArrowUp'>
                 <Button
                   aria-keyshortcuts='Meta+ArrowUp'
                   aria-label='Up one folder'
@@ -489,7 +517,8 @@ export function FilePickerDialog({
               </IconTooltip>
               <NewFolderPopover currentPath={session.currentPath} onCreated={handleFolderCreated} />
               <IconTooltip
-                label={showHidden ? 'Hide hidden files (⌘⇧.)' : 'Show hidden files (⌘⇧.)'}
+                label={showHidden ? 'Hide hidden files' : 'Show hidden files'}
+                shortcut='Mod+Shift+.'
               >
                 <Button
                   aria-keyshortcuts='Meta+Shift+.'
@@ -561,11 +590,18 @@ export function FilePickerDialog({
               iconMode={displayedIconMode}
               isSearching={isSearching}
               mode={mode}
+              showHidden={showHidden}
             />
           </div>
 
           <DialogFooter className='flex h-(--bar-height) shrink-0 flex-row items-center justify-between gap-(--density-control-gap) px-(--bar-padding-x) sm:justify-between'>
             <SelectedSummary entry={selectedPickable} iconMode={displayedIconMode} mode={mode} />
+            <span
+              className='text-muted-foreground text-2xs ml-auto shrink-0 font-mono tabular-nums'
+              role='status'
+            >
+              {loadState.status === 'loading' ? null : listCountLabel(entries.length, isSearching)}
+            </span>
             <div className='flex shrink-0 gap-1.5'>
               <Button onClick={() => onOpenChange(false)} size='sm' type='button' variant='ghost'>
                 Cancel
