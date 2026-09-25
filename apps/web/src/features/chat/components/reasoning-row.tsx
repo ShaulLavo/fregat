@@ -18,7 +18,7 @@ export function ReasoningRow({
   const expanded = useChatWorkLogExpansionStore(
     (state) => state.userExpandedRowIds[entry.id] ?? state.autoExpandedRowIds[entry.id] ?? false,
   )
-  const setUserRowExpanded = useChatWorkLogExpansionStore((state) => state.setUserRowExpanded)
+  const toggleUserRowExpanded = useChatWorkLogExpansionStore((state) => state.toggleUserRowExpanded)
   const label = reasoningLabel(entry, streaming)
 
   return (
@@ -28,7 +28,7 @@ export function ReasoningRow({
         className='text-muted-foreground h-auto max-w-full justify-start gap-2 px-1 py-1 text-xs font-normal tabular-nums'
         data-scroll-anchor-ignore
         variant='ghost'
-        onClick={() => setUserRowExpanded(entry.id, !expanded)}
+        onClick={() => toggleUserRowExpanded(entry.id)}
       >
         {streaming ? (
           <Spinner size='xs' aria-hidden='true' />

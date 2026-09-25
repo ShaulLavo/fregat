@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react'
+import { act, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 import { ReasoningRow } from '@/features/chat/components/reasoning-row'
@@ -65,4 +65,20 @@ test('the reader toggle outranks the automation', async () => {
     'aria-expanded',
     'false',
   )
+})
+
+test('two reader clicks in one render keep the reasoning open after automation settles', () => {
+  resetExpansion()
+  useChatWorkLogExpansionStore.setState({ autoExpandedRowIds: { 'reasoning-full': true } })
+  renderRow(true)
+  const toggle = screen.getByRole('button', { name: 'Thinking' })
+
+  act(() => {
+    toggle.click()
+    toggle.click()
+  })
+  act(() => useChatWorkLogExpansionStore.getState().setAutoRowsExpanded(['reasoning-full'], false))
+
+  expect(toggle).toHaveAttribute('aria-expanded', 'true')
+  expect(screen.getByRole('region', { name: 'Reasoning' })).toBeInTheDocument()
 })

@@ -13,7 +13,7 @@ type ChatWorkLogExpansionStore = {
   /** Written only by the reader's own toggles, so automation can never undo one. */
   userExpandedRowIds: Record<string, boolean>
   setAutoRowsExpanded: (rowIds: readonly string[], expanded: boolean) => void
-  setUserRowExpanded: (rowId: string, expanded: boolean) => void
+  toggleUserRowExpanded: (rowId: string) => void
   toggleGroupExpanded: (groupId: string) => void
   toggleRowExpanded: (rowId: string) => void
 }
@@ -32,9 +32,12 @@ export const useChatWorkLogExpansionStore = create<ChatWorkLogExpansionStore>((s
       for (const rowId of changed) next[rowId] = expanded
       return { autoExpandedRowIds: next }
     }),
-  setUserRowExpanded: (rowId, expanded) =>
+  toggleUserRowExpanded: (rowId) =>
     set((state) => ({
-      userExpandedRowIds: { ...state.userExpandedRowIds, [rowId]: expanded },
+      userExpandedRowIds: {
+        ...state.userExpandedRowIds,
+        [rowId]: !(state.userExpandedRowIds[rowId] ?? state.autoExpandedRowIds[rowId] ?? false),
+      },
     })),
   toggleGroupExpanded: (groupId) =>
     set((state) => ({
