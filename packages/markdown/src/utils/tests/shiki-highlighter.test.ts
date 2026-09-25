@@ -87,10 +87,13 @@ test('separate palettes never share a mutable core, even with equal theme names'
 })
 
 test('disposal releases an initialization that completes late and suppresses its callback', async () => {
-  const gate = Promise.withResolvers<void>()
+  let release = () => {}
+  const gate = new Promise<void>((resolve) => {
+    release = resolve
+  })
   const cores: Awaited<ReturnType<typeof createHighlighterCore>>[] = []
   const createCore = async (...args: Parameters<typeof createHighlighterCore>) => {
-    await gate.promise
+    await gate
     const core = await createHighlighterCore(...args)
     vi.spyOn(core, 'dispose')
     cores.push(core)
@@ -105,7 +108,7 @@ test('disposal releases an initialization that completes late and suppresses its
   highlighter.highlight(input, accept)
   highlighter.dispose()
   highlighter.dispose()
-  gate.resolve()
+  release()
   await vi.waitFor(() => expect(cores[0]?.dispose).toHaveBeenCalledTimes(1))
   expect(accept).not.toHaveBeenCalled()
   expect(highlighter.highlight(input, accept)).toBeNull()

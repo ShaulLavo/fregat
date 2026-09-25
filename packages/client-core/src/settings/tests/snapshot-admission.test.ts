@@ -41,8 +41,16 @@ function fixture(
 
 const event = (value: SettingsSnapshot) => ({ changedSettingIds: [], snapshot: value })
 
+function deferredSnapshot() {
+  let resolve: (value: SettingsSnapshot) => void = () => {}
+  const promise = new Promise<SettingsSnapshot>((settle) => {
+    resolve = settle
+  })
+  return { promise, resolve }
+}
+
 test('concurrent unexpected epochs share recovery and successive changes read fresh evidence', async () => {
-  const gate = Promise.withResolvers<SettingsSnapshot>()
+  const gate = deferredSnapshot()
   const fetch = vi
     .fn<SettingsAdmissionHost['fetch']>()
     .mockImplementationOnce(() => gate.promise)
@@ -65,7 +73,7 @@ test('concurrent unexpected epochs share recovery and successive changes read fr
 })
 
 test('same-epoch delivery waits through recovery publication before acknowledging intent', async () => {
-  const gate = Promise.withResolvers<SettingsSnapshot>()
+  const gate = deferredSnapshot()
   let duringPublication: Promise<unknown> | undefined
   let publishHook = () => {}
   const { client, admission } = fixture(
@@ -108,7 +116,7 @@ test('same-epoch delivery waits through recovery publication before acknowledgin
 })
 
 test('reset rejects stale recovery and cannot acknowledge its old update in the new lifetime', async () => {
-  const gate = Promise.withResolvers<SettingsSnapshot>()
+  const gate = deferredSnapshot()
   const { client, admission } = fixture(() => gate.promise)
   const intent = submitSettingsIntent(client, 'user', [
     { kind: 'set', key: 'workbench.colorTheme', value: 'dark' },
