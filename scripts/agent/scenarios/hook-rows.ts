@@ -4,8 +4,8 @@ import type { Scenario } from './index'
 import { selectors } from '../selectors'
 import { createGitFixture, fixtureGit } from '../fixture-workspace'
 import {
-  dispatch,
   openChat,
+  openScenarioSession,
   removeScenarioSessions,
   typePrompt,
   waitForReply,
@@ -42,17 +42,12 @@ export const claudeHookRows: Scenario = {
       const worktree = await registerFixtureProject(page, orchestration, fixture)
       projectId = worktree.projectId
       const title = `Hook rows ${sessionId.slice(0, 8)}`
-      await dispatch(page, orchestration, {
-        type: 'session.create',
-        sessionId,
+      await openScenarioSession(page, orchestration, {
+        model: { providerInstanceId: 'claude', model: 'claude-haiku-4-5' },
+        sessionId: sessionId,
         title,
-        worktreeTarget: { kind: 'current', worktreeId: worktree.id },
-        modelSelection: { providerInstanceId: 'claude', model: 'claude-haiku-4-5' },
-        runtimeMode: 'full-access',
+        worktreeId: worktree.id,
       })
-      await selectors.sessionSearch(page).fill(title)
-      await selectors.sessionByTitle(page, title).click()
-      await page.waitForURL((url) => url.href.includes(sessionId))
       await typePrompt(
         page,
         `Use the Bash tool to run exactly \`ls\`, once. Do not retry. Then reply with exactly ${DONE}.`,

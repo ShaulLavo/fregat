@@ -9,6 +9,7 @@ import type {
   ProviderApprovalDecision,
   ProviderApprovalOption,
   ProviderAuth,
+  ProviderBackgroundTask,
   ProviderDriverKind,
   ProviderInstanceId,
   ProviderLoginAttempt,
@@ -390,6 +391,11 @@ export type ProviderRuntimeEventPayload =
       payload: { unifiedDiff: string }
     })
   | (ProviderRuntimeBaseEvent & {
+      /** Every live, non-ambient background task; replaces the previous set. */
+      type: 'tasks.roster'
+      payload: { tasks: ProviderBackgroundTask[] }
+    })
+  | (ProviderRuntimeBaseEvent & {
       type: 'hook.started'
       payload: { hookEvent: string; hookId: string; hookName: string }
     })
@@ -570,6 +576,8 @@ export type ProviderAdapter = {
   listCommands?: (input: ProviderCommandCatalogInput) => Promise<ProviderCommandCatalogResult>
   respondApproval: (input: ProviderApprovalResponseInput) => Promise<void>
   respondUserInput: (input: ProviderUserInputResponseInput) => Promise<void>
+  /** Stops one background task without stopping the agent. */
+  stopBackgroundTask?: (input: { sessionId: SessionId; taskId: string }) => Promise<void>
   prepareRollbackSession: (input: {
     numTurns: number
     sessionId: SessionId

@@ -23,8 +23,8 @@ export default function Document() {
   return (
     <html>
       <head>
-        <script src="https://example.com/analytics.js" />
-        <script src="/scripts/utils.js" />
+        <script src='https://example.com/analytics.js' />
+        <script src='/scripts/utils.js' />
       </head>
       <body>{/* content */}</body>
     </html>
@@ -40,9 +40,9 @@ export default function Document() {
     <html>
       <head>
         {/* Independent script - use async */}
-        <script src="https://example.com/analytics.js" async />
+        <script src='https://example.com/analytics.js' async />
         {/* DOM-dependent script - use defer */}
-        <script src="/scripts/utils.js" defer />
+        <script src='/scripts/utils.js' defer />
       </head>
       <body>{/* content */}</body>
     </html>
@@ -58,8 +58,8 @@ import Script from 'next/script'
 export default function Page() {
   return (
     <>
-      <Script src="https://example.com/analytics.js" strategy="afterInteractive" />
-      <Script src="/scripts/utils.js" strategy="beforeInteractive" />
+      <Script src='https://example.com/analytics.js' strategy='afterInteractive' />
+      <Script src='/scripts/utils.js' strategy='beforeInteractive' />
     </>
   )
 }

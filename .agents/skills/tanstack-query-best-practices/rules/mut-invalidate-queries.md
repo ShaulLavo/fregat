@@ -76,9 +76,9 @@ const assignTodoToUser = useMutation({
 const mutation = useMutation({
   mutationFn: updatePost,
   onSuccess: (
-    data,      // Server response
+    data, // Server response
     variables, // What you passed to mutate()
-    context    // What onMutate returned
+    context, // What onMutate returned
   ) => {
     // Use variables to know which queries to invalidate
     queryClient.invalidateQueries({ queryKey: ['posts', variables.id] })

@@ -463,6 +463,14 @@ export class ClaudeProviderAdapter
     await this.sessions.get(sessionId)?.interruptTurn(turnId)
   }
 
+  async stopBackgroundTask({ sessionId, taskId }: { sessionId: SessionId; taskId: string }) {
+    recordChatPipelineInfo('chat.pipeline.claude_adapter.stop_task', { sessionId, taskId })
+    const session = this.sessions.get(sessionId)
+    if (!session) throw sessionIdentityErrors.TASK_RUNTIME_UNAVAILABLE({ internal: { sessionId } })
+
+    await session.stopBackgroundTask(taskId)
+  }
+
   async stopRuntime({ sessionId }: { sessionId: SessionId }) {
     recordChatPipelineInfo('chat.pipeline.claude_adapter.stop', { sessionId })
     const session = this.sessions.get(sessionId)
@@ -824,6 +832,15 @@ class ClaudeAgentSession extends SessionContext {
       sessionId: this.sessionId,
       turnId: input.turnId,
     })
+  }
+
+  async stopBackgroundTask(taskId: string) {
+    if (!this.query)
+      throw sessionIdentityErrors.TASK_RUNTIME_UNAVAILABLE({
+        internal: { sessionId: this.sessionId },
+      })
+
+    await this.query.stopTask(taskId)
   }
 
   async interruptTurn(turnId: TurnId | undefined) {
@@ -1211,7 +1228,20 @@ class ClaudeAgentSession extends SessionContext {
         this.dropMessage(message, 'thinking estimates are not session token usage')
         return
       case 'background_tasks_changed':
-        this.dropMessage(message, 'roster snapshot; task.* events carry per-task truth')
+        // Ambient tasks are watchers the SDK says to keep out of activity indicators.
+        this.emitRuntimeNotification(
+          'tasks.roster',
+          {
+            tasks: message.tasks
+              .filter((task) => !task.ambient)
+              .map((task) => ({
+                description: task.description,
+                taskId: task.task_id,
+                taskType: task.task_type,
+              })),
+          },
+          message,
+        )
         return
       case 'commands_changed':
         this.dropMessage(message, 'no slash-command surface')

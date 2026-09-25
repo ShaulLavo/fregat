@@ -147,3 +147,27 @@ export async function removeScenarioSessions(
     })
   await releaseFixture(input.fixture)
 }
+
+/** Creates a full-access session on a fixture worktree and opens it in the rail. */
+export async function openScenarioSession(
+  page: Page,
+  orchestration: string,
+  input: {
+    model: { providerInstanceId: string; model: string }
+    sessionId: string
+    title: string
+    worktreeId: string
+  },
+) {
+  await dispatch(page, orchestration, {
+    type: 'session.create',
+    sessionId: input.sessionId,
+    title: input.title,
+    worktreeTarget: { kind: 'current', worktreeId: input.worktreeId },
+    modelSelection: input.model,
+    runtimeMode: 'full-access',
+  })
+  await selectors.sessionSearch(page).fill(input.title)
+  await selectors.sessionByTitle(page, input.title).click()
+  await page.waitForURL((url) => url.href.includes(input.sessionId))
+}

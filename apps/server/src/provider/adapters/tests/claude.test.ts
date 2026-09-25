@@ -106,6 +106,10 @@ type FakeWaiter = {
  */
 class FakeClaudeQuery implements AsyncIterable<SDKMessage> {
   readonly setModelCalls: Array<string | undefined> = []
+  readonly stoppedTasks: string[] = []
+  readonly stopTask = async (taskId: string) => {
+    this.stoppedTasks.push(taskId)
+  }
   acknowledgeClose = true
   closeCalls = 0
   interruptCalls = 0
@@ -866,6 +870,32 @@ describe('ClaudeProviderAdapter', () => {
       payload: { exitCode: 0, hookId: 'hook-1', outcome: 'success', stdout: 'ok' },
     })
     expect(runtimeWarnings(harness)).toEqual([])
+    await harness.adapter.stopAll()
+  })
+
+  it('reports the non-ambient background roster and stops one task by id', async () => {
+    const harness = claudeHarness()
+    await harness.adapter.startRuntime(sessionStartInput({}))
+    const query = latestQuery(harness)
+    await waitForEvent(harness, 'conversation.started')
+
+    query.emit(
+      systemMessage({
+        subtype: 'background_tasks_changed',
+        tasks: [
+          { task_id: 'sleep', task_type: 'local_bash', description: 'sleep 600' },
+          { task_id: 'watch', task_type: 'monitor', description: 'Watcher', ambient: true },
+        ],
+      }),
+    )
+    expect(await waitForEvent(harness, 'tasks.roster')).toMatchObject({
+      payload: { tasks: [{ description: 'sleep 600', taskId: 'sleep', taskType: 'local_bash' }] },
+    })
+    await harness.adapter.stopBackgroundTask({
+      sessionId: v.parse(sessionIdSchema, SESSION_ID),
+      taskId: 'sleep',
+    })
+    expect(query.stoppedTasks).toEqual(['sleep'])
     await harness.adapter.stopAll()
   })
 

@@ -36,6 +36,8 @@ The chat mode button in the window toolbar, or an address URL with `/chat/`.
 
 `scenario claude-session-fork` and `scenario codex-session-fork` run real providers: three turns each name a fruit, Fork from Here on the second answer opens a `(fork)` session beside the source whose timeline stops at turn 2, and asked for the fruits it answers mango and kiwi, never papaya. The harness fork happens on the fork's first turn.
 
+`scenario claude-background-tasks` has real Claude (Haiku) start `sleep 600` and `sleep 700` in the background; the header's Background tasks popover lists both, and stopping one leaves the other. The list polls every 3 s only while the popover is open, since the roster lives in the provider process.
+
 `scenario chat-diff-syntax --url <session-diff-address>` checks painted syntax colors in a session checkpoint diff.
 
 Commands dispatch over the orchestration socket when it is live and over HTTP otherwise. The HTTP path refetches the shell snapshot itself.

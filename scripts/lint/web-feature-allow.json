@@ -152,6 +152,12 @@
   {
     "from": "chat-mode",
     "to": "chat",
+    "module": "features/chat/components/background-tasks-button.tsx",
+    "reason": "couple: the stage header shows the chat session's background tasks, like ContextUsageRing; merge their ownership in a later pass."
+  },
+  {
+    "from": "chat-mode",
+    "to": "chat",
     "module": "features/chat/hooks/use-active-projection.ts",
     "reason": "couple: Chat mode and chat share one session lifecycle through useActiveChatProjection; merge their ownership in a later pass."
   },

@@ -34,3 +34,8 @@ export const sessionTranscriptKeys = {
   transcript: (environmentId: EnvironmentId, sessionId: SessionId) =>
     ['chat', 'session-transcript', environmentId, sessionId] as const,
 }
+
+export const backgroundTaskKeys = {
+  roster: (environmentId: EnvironmentId, sessionId: SessionId) =>
+    ['chat', 'background-tasks', environmentId, sessionId] as const,
+}

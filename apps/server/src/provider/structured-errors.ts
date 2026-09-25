@@ -14,6 +14,18 @@ export const sessionIdentityErrors = defineErrorCatalog('provider', {
     why: 'Rewind requires an active binding to the same native conversation.',
     fix: 'Resume the provider session before rewinding. No files were restored.',
   },
+  TASK_RUNTIME_UNAVAILABLE: {
+    status: 409,
+    message: 'The session is not running, so it has no background task to stop.',
+    why: 'Stopping a background task needs the live provider process that started it.',
+    fix: 'Reload the session; a stopped session has no background tasks left.',
+  },
+  TASK_STOP_UNSUPPORTED: {
+    status: 409,
+    message: "This provider's background tasks cannot be stopped from here.",
+    why: 'The session runs on a provider with no stop-task control.',
+    fix: 'Stop the whole agent session instead.',
+  },
   STEERING_UNAVAILABLE: {
     status: 409,
     message: 'This provider cannot accept a correction while running.',

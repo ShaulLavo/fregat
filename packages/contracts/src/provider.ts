@@ -187,6 +187,21 @@ export const providerCommandCatalogSchema = v.object({
   supported: v.boolean(),
 })
 
+/** One live background task: a background shell, a monitor or a backgrounded subagent. */
+export const providerBackgroundTaskSchema = v.object({
+  taskId: trimmedNonEmptyStringSchema,
+  taskType: v.string(),
+  description: v.string(),
+})
+
+/** `supported` is false when the session's provider cannot list or stop background tasks. */
+export const providerBackgroundTasksSchema = v.object({
+  supported: v.boolean(),
+  tasks: v.array(providerBackgroundTaskSchema),
+})
+
+export type ProviderBackgroundTask = v.InferOutput<typeof providerBackgroundTaskSchema>
+export type ProviderBackgroundTasks = v.InferOutput<typeof providerBackgroundTasksSchema>
 export type ProviderSignInMethod = v.InferOutput<typeof providerSignInMethodSchema>
 export type ProviderLoginState = v.InferOutput<typeof providerLoginStateSchema>
 export type ProviderLoginAttempt = v.InferOutput<typeof providerLoginAttemptSchema>

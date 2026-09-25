@@ -34,9 +34,7 @@ const mutation = useMutation({
 
     // 3. Optimistically update the cache
     queryClient.setQueryData(['todos'], (old: Todo[]) =>
-      old.map((todo) =>
-        todo.id === todoId ? { ...todo, completed: !todo.completed } : todo
-      )
+      old.map((todo) => (todo.id === todoId ? { ...todo, completed: !todo.completed } : todo)),
     )
 
     // 4. Return context for rollback
@@ -67,20 +65,18 @@ function TodoItem({ todo }: { todo: Todo }) {
 
   // Show optimistic state while pending
   const displayCompleted = mutation.isPending
-    ? !todo.completed  // Optimistic: show toggled state
-    : todo.completed   // Settled: show actual state
+    ? !todo.completed // Optimistic: show toggled state
+    : todo.completed // Settled: show actual state
 
   return (
     <div>
       <input
-        type="checkbox"
+        type='checkbox'
         checked={displayCompleted}
         disabled={mutation.isPending}
         onChange={() => mutation.mutate(todo.id)}
       />
-      <span style={{ opacity: mutation.isPending ? 0.5 : 1 }}>
-        {todo.title}
-      </span>
+      <span style={{ opacity: mutation.isPending ? 0.5 : 1 }}>{todo.title}</span>
     </div>
   )
 }
@@ -113,9 +109,7 @@ const createTodo = useMutation({
   onSuccess: (data, variables, context) => {
     // Replace temp todo with real one
     queryClient.setQueryData(['todos'], (old: Todo[]) =>
-      old.map((todo) =>
-        todo.id === context?.optimisticTodo.id ? data : todo
-      )
+      old.map((todo) => (todo.id === context?.optimisticTodo.id ? data : todo)),
     )
   },
 })
@@ -123,10 +117,10 @@ const createTodo = useMutation({
 
 ## When to Use Each Approach
 
-| Approach | Use When |
-|----------|----------|
-| Cache Manipulation | Update appears in multiple places, complex data structures |
-| UI Variables | Update only visible in one component, simpler implementation |
+| Approach           | Use When                                                     |
+| ------------------ | ------------------------------------------------------------ |
+| Cache Manipulation | Update appears in multiple places, complex data structures   |
+| UI Variables       | Update only visible in one component, simpler implementation |
 
 ## Context
 

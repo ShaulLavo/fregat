@@ -20,6 +20,8 @@ export const chatMutationKeys = {
     ['chat', 'rewind', environmentId, sessionId] as const,
   pendingRequestResponse: (environmentId: string, sessionId: string) =>
     ['chat', 'pending-request-response', environmentId, sessionId] as const,
+  stopBackgroundTask: (environmentId: string, sessionId: string) =>
+    ['chat', 'stop-background-task', environmentId, sessionId] as const,
   fork: (environmentId: string, sessionId: string) =>
     ['chat', 'fork', environmentId, sessionId] as const,
   message: (id: string) => ['chat', 'message', id] as const,

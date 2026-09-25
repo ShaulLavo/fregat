@@ -4,7 +4,7 @@ import type { Scenario } from './index'
 import { selectors } from '../selectors'
 import { createGitFixture, fixtureGit } from '../fixture-workspace'
 import {
-  dispatch,
+  openScenarioSession,
   openChat,
   readShell,
   removeScenarioSessions,
@@ -42,17 +42,12 @@ function sessionForkScenario(provider: ForkProvider): Scenario {
         const worktree = await registerFixtureProject(page, orchestration, fixture)
         projectId = worktree.projectId
         const title = `Fork source ${sourceId.slice(0, 8)}`
-        await dispatch(page, orchestration, {
-          type: 'session.create',
+        await openScenarioSession(page, orchestration, {
+          model: provider.model,
           sessionId: sourceId,
           title,
-          worktreeTarget: { kind: 'current', worktreeId: worktree.id },
-          modelSelection: provider.model,
-          runtimeMode: 'full-access',
+          worktreeId: worktree.id,
         })
-        await selectors.sessionSearch(page).fill(title)
-        await selectors.sessionByTitle(page, title).click()
-        await page.waitForURL((url) => url.href.includes(sourceId))
         for (const [index, word] of WORDS.entries()) {
           const reply = `STORED_${index + 1}`
           await typePrompt(

@@ -10,6 +10,8 @@ import { sessionIdentityErrors } from './structured-errors'
 
 import type {
   ModelSelection,
+  ProviderBackgroundTask,
+  ProviderBackgroundTasks,
   ProviderInstanceId,
   ProviderSnapshot,
   RuntimeMode,
@@ -127,6 +129,7 @@ export class ProviderService {
   private readonly externalSessions = new Map<SessionId, 'terminal' | 'history' | 'unknown'>()
   private readonly pendingLaunches = new Map<SessionId, PendingProviderLaunch>()
   private readonly backgroundTasks = new BackgroundTaskRegistry()
+  private readonly taskRosters = new Map<SessionId, ProviderBackgroundTask[]>()
   private readonly reaperTimer: ReturnType<typeof setInterval>
   private readonly reaper: ProviderSessionReaper
   private readonly runtimeEventListeners = new Set<ProviderRuntimeEventListener>()
@@ -792,6 +795,26 @@ export class ProviderService {
     }
   }
 
+  /** Live background tasks of one session, as the provider last reported them. */
+  backgroundTaskRoster(sessionId: SessionId): ProviderBackgroundTasks {
+    const routed = this.routeSession(sessionId)
+    return {
+      supported: Boolean(routed?.adapter.stopBackgroundTask),
+      tasks: this.taskRosters.get(sessionId) ?? [],
+    }
+  }
+
+  async stopBackgroundTask(input: { sessionId: SessionId; taskId: string }) {
+    this.requireRunning()
+    const routed = this.routeSession(input.sessionId)
+    const stop = routed?.adapter.stopBackgroundTask
+    if (!stop)
+      throw sessionIdentityErrors.TASK_STOP_UNSUPPORTED({
+        internal: { routed: Boolean(routed), sessionId: input.sessionId },
+      })
+    await stop.call(routed.adapter, input)
+  }
+
   bindingForSession(sessionId: SessionId) {
     return this.sessionDirectory.getBinding(sessionId)
   }
@@ -926,6 +949,7 @@ export class ProviderService {
       throw createInternalError('The provider still owns its runtime after stopping.')
     }
     this.backgroundTasks.clear(sessionId)
+    this.taskRosters.delete(sessionId)
     this.releaseWorktree(sessionId)
   }
 
@@ -1062,9 +1086,20 @@ export class ProviderService {
     if (binding && binding.runtimeEpoch !== task.event.runtimeEpoch) return
 
     this.backgroundTasks.accept(task.event)
+    this.acceptTaskRoster(task.event)
     this.recordRuntimeEvent(task.event, task.adapter)
     this.publishUsage(task.event, 'turn')
     await this.emitRuntimeEvent(task.event)
+  }
+
+  private acceptTaskRoster(event: ProviderRuntimeEvent) {
+    if (event.type === 'tasks.roster') {
+      this.taskRosters.set(event.sessionId, event.payload.tasks)
+      return
+    }
+    // A restarted or exited CLI takes its tasks with it; a new roster follows.
+    if (event.type === 'runtime.started' || event.type === 'runtime.exited')
+      this.taskRosters.delete(event.sessionId)
   }
 
   private async stopReplacedBinding(

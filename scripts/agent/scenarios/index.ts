@@ -63,6 +63,7 @@ import { checkpointStates } from './checkpoint-states'
 import { sessionActionsSurfaces } from './session-actions-surfaces'
 import { exportTranscript } from './export-transcript'
 import { claudeHookRows } from './hook-rows'
+import { claudeBackgroundTasks } from './background-tasks'
 import { claudeSessionFork, codexSessionFork } from './session-fork'
 import { searchFileActions } from './search-file-actions'
 import { settingsStaleDiagnostics } from './settings-stale-diagnostics'
@@ -291,6 +292,7 @@ export const scenarios: readonly Scenario[] = [
   sessionActionsSurfaces,
   exportTranscript,
   claudeHookRows,
+  claudeBackgroundTasks,
   claudeSessionFork,
   codexSessionFork,
   searchFileActions,
