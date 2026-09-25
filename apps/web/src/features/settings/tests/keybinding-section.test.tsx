@@ -37,31 +37,33 @@ test('records and resets a command omitted by the default preset', async ({ clie
   expect(client).toBeDefined()
   renderWithProviders(<KeybindingSection />)
   await screen.findByRole('button', { name: SAVE_RECORDER })
-  await userEvent.type(screen.getByLabelText('Search keyboard shortcuts'), 'Rename symbol')
+  await userEvent.type(screen.getByLabelText('Search keyboard shortcuts'), 'Find references')
 
-  const recorderName = 'Record a shortcut for editor.editor.action.rename'
+  const recorderName = 'Record a shortcut for editor.editor.action.goToReferences'
   const recorder = screen.getByRole('button', { name: recorderName })
-  expect(screen.getByRole('button', { name: 'Unbind Rename symbol' })).toHaveAttribute(
+  expect(screen.getByRole('button', { name: 'Unbind Find references' })).toHaveAttribute(
     'aria-disabled',
     'true',
   )
   await userEvent.click(recorder)
-  fireEvent.keyDown(recorder, { key: 'F2' })
+  fireEvent.keyDown(recorder, { key: 'F12', shiftKey: true })
 
   await waitFor(async () => {
     const snapshot = await fetchSettings(undefined, getClient())
-    expect(snapshot.values['keybindings.overrides']['editor.editor.action.rename']).toBe('F2')
+    expect(snapshot.values['keybindings.overrides']['editor.editor.action.goToReferences']).toBe(
+      'Shift+F12',
+    )
   })
-  await userEvent.click(screen.getByRole('button', { name: 'Reset Rename symbol' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Reset Find references' }))
 
   await waitFor(async () => {
     const snapshot = await fetchSettings(undefined, getClient())
     expect(snapshot.values['keybindings.overrides']).not.toHaveProperty(
-      'editor.editor.action.rename',
+      'editor.editor.action.goToReferences',
     )
   })
   expect(screen.getByRole('button', { name: recorderName })).toBeDefined()
-  expect(screen.getByRole('button', { name: 'Unbind Rename symbol' })).toHaveAttribute(
+  expect(screen.getByRole('button', { name: 'Unbind Find references' })).toHaveAttribute(
     'aria-disabled',
     'true',
   )
