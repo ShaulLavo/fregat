@@ -55,7 +55,12 @@ export async function startIsolatedServer(
   }
   delete env.FS_METADATA_DB
   const child = Bun.spawn({
-    cmd: [process.execPath, 'src/index.ts'],
+    cmd: [
+      process.execPath,
+      '--preload',
+      new URL('./push-boundary.ts', import.meta.url).pathname,
+      'src/index.ts',
+    ],
     cwd: SERVER_ROOT,
     env,
     stderr: Bun.file(path.join(directory, 'server.stderr')),

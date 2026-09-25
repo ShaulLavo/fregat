@@ -1,4 +1,4 @@
-import { asc, eq } from 'drizzle-orm'
+import { and, asc, eq } from 'drizzle-orm'
 import type { PlatformDatabase } from '../db/client'
 import { pushDevices } from '../db/schema'
 
@@ -27,6 +27,7 @@ export class PushDeviceStore {
       .onConflictDoUpdate({
         target: pushDevices.id,
         set: {
+          revision: row.revision,
           endpoint: row.endpoint,
           p256dh: row.p256dh,
           auth: row.auth,
@@ -38,6 +39,13 @@ export class PushDeviceStore {
       })
       .returning()
       .get()
+  }
+
+  removeRevision(row: PushDeviceRow): void {
+    this.database
+      .delete(pushDevices)
+      .where(and(eq(pushDevices.id, row.id), eq(pushDevices.revision, row.revision)))
+      .run()
   }
 
   remove(id: string): boolean {

@@ -6,7 +6,7 @@ import type { VapidKeys } from './vapid'
 /** The push-service boundary. Production passes `fetch`; tests answer as the push service. */
 export type PushFetcher = (url: string, init: RequestInit) => Promise<Response>
 
-type PushOutcome = 'sent' | 'expired' | 'rejected' | 'unreachable'
+type PushOutcome = 'sent' | 'expired' | 'rejected' | 'unreachable' | 'removed'
 
 export type PushDelivery = {
   readonly outcome: PushOutcome
@@ -56,6 +56,7 @@ async function post(fetcher: PushFetcher, request: RequestDetails) {
   try {
     const response = await fetcher(request.endpoint, {
       method: request.method,
+      redirect: 'error',
       headers: requestHeaders(request.headers),
       body: request.body ? new Uint8Array(request.body) : null,
       signal: AbortSignal.timeout(SEND_TIMEOUT_MS),

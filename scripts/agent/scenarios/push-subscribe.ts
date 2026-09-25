@@ -94,7 +94,12 @@ export const pushSubscribe: Scenario = {
       },
     })
     try {
-      await drive(page, step, `http://127.0.0.1:${pushService.port}/push/scenario-device`, pushed)
+      await drive(
+        page,
+        step,
+        `https://fcm.googleapis.com/platform-agent/${pushService.port}/push/scenario-device`,
+        pushed,
+      )
     } finally {
       await pushService.stop(true)
     }

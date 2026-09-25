@@ -108,6 +108,7 @@ export const attachmentUploadOwners = sqliteTable(
  * browser that registers again replaces its own row. Device records, never settings.
  */
 export const pushDevices = sqliteTable('push_devices', {
+  revision: text('revision').notNull(),
   id: text('id').primaryKey(),
   endpoint: text('endpoint').notNull(),
   p256dh: text('p256dh').notNull(),

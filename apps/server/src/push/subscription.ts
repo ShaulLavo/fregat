@@ -7,8 +7,6 @@ import {
 import * as v from 'valibot'
 import { pushErrors } from './structured-errors'
 
-const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]'])
-
 type ParsedSubscription = {
   readonly endpoint: string
   readonly p256dh: string
@@ -52,11 +50,10 @@ function parseSubscription(input: PushSubscriptionInput): ParsedSubscription {
   }
 }
 
-// Every push service is https. A loopback http endpoint is a local stand-in, as the agent scenario runs.
 function acceptedEndpoint(endpoint: URL) {
-  if (endpoint.protocol === 'https:') return true
-
-  return endpoint.protocol === 'http:' && LOOPBACK_HOSTS.has(endpoint.hostname)
+  if (endpoint.protocol !== 'https:' || endpoint.port || endpoint.username || endpoint.password)
+    return false
+  return pushServiceFor(endpoint.hostname) !== 'other'
 }
 
 function isP256Point(bytes: Buffer) {
@@ -84,8 +81,12 @@ function invalid(field: string, facts: Record<string, unknown>): never {
 
 function pushServiceFor(hostname: string): PushService {
   if (hostname.endsWith('.push.apple.com')) return 'apple'
-  if (hostname.endsWith('.googleapis.com')) return 'google'
-  if (hostname.endsWith('.mozilla.com')) return 'mozilla'
+  if (hostname === 'fcm.googleapis.com') return 'google'
+  if (
+    hostname === 'updates.push.services.mozilla.com' ||
+    hostname === 'updates-autopush.stage.mozaws.net'
+  )
+    return 'mozilla'
   if (hostname.endsWith('.notify.windows.com')) return 'microsoft'
 
   return 'other'

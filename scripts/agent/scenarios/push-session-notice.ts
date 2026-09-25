@@ -41,7 +41,7 @@ const scenario = isolatedNativeScenario({
     })
     const base = orchestration.replace(/\/orchestration$/, '')
     const before = await settingsSnapshot(page, base)
-    const endpoint = `http://127.0.0.1:${pushService.port}/push/session-notice`
+    const endpoint = `https://fcm.googleapis.com/platform-agent/${pushService.port}/push/session-notice`
     try {
       await drive(page, {
         step,

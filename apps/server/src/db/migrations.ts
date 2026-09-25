@@ -55,6 +55,7 @@ function applyWorktreePullRequests(database: PlatformDatabase) {
 function applyPushDevices(database: PlatformDatabase) {
   database.run(sql`
     CREATE TABLE push_devices (
+      revision TEXT NOT NULL,
       id TEXT PRIMARY KEY NOT NULL,
       endpoint TEXT NOT NULL,
       p256dh TEXT NOT NULL,

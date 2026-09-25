@@ -55,7 +55,7 @@ describe('push routes', () => {
     expect((await readDevices(app)).devices).toEqual([])
   })
 
-  it('refuses bad keys and http beyond loopback, and accepts a loopback stand-in', async () => {
+  it('refuses bad keys and destinations outside approved push services', async () => {
     const { app } = pushApp(await tempRoot())
     const subscriber = createPushSubscriber(ENDPOINT)
     const offCurve = Buffer.alloc(65, 7)
@@ -86,13 +86,19 @@ describe('push routes', () => {
     }
     expect((await readDevices(app)).devices).toEqual([])
 
-    const loopback = await register(
-      app,
-      createPushSubscriber('http://127.0.0.1:9/push/x'),
-      'Local stand-in',
-    )
-    expect(loopback.service).toBe('other')
-    expect((await readDevices(app)).devices).toEqual([loopback])
+    for (const endpoint of [
+      'http://127.0.0.1:9/push/x',
+      'https://localhost/push',
+      'https://10.0.0.1/push',
+      'https://untrusted.example/push',
+      'https://fcm.googleapis.com.evil.test/push',
+    ]) {
+      const response = await post(app, '/push/devices', {
+        label: 'Unsafe destination',
+        subscription: createPushSubscriber(endpoint).subscription,
+      })
+      expect(response.status).toBe(400)
+    }
   })
 
   it('refuses a malformed registration with the push catalog and echoes no key', async () => {
@@ -127,6 +133,7 @@ describe('push routes', () => {
   it('sends a test push signed with the VAPID key and encrypted for the device', async () => {
     const pushed: PushedRequest[] = []
     const { app } = pushApp(await tempRoot(), async (url, init) => {
+      expect(init.redirect).toBe('error')
       pushed.push(await capture(url, init))
       return new Response(null, { status: 201 })
     })

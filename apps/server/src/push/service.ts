@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import {
   pushDeviceId,
   type PushDevice,
@@ -62,6 +63,7 @@ export class PushService {
     const now = new Date().toISOString()
     const row = this.devices.upsert({
       ...subscription,
+      revision: randomUUID(),
       id: await pushDeviceId(subscription.endpoint),
       label,
       origin: pageOrigin(origin),
@@ -119,8 +121,10 @@ export class PushService {
     notice: PushNotice,
     options: PushMessageOptions,
   ) {
+    if (this.devices.get(device.id)?.revision !== device.revision)
+      return { outcome: 'removed' as const, service: device.service, status: null, failure: null }
     const delivery = await deliverPush(this.fetcher, device, keys, notice, options)
-    if (delivery.outcome === 'expired') this.devices.remove(device.id)
+    if (delivery.outcome === 'expired') this.devices.removeRevision(device)
     return delivery
   }
 }
@@ -128,6 +132,8 @@ export class PushService {
 /** A 404 or 410 reaches the caller as an expired device, whose row is already gone. */
 function settledStatus(delivery: PushDelivery): number {
   const { failure, service, status } = delivery
+  if (delivery.outcome === 'removed')
+    throw pushErrors.DEVICE_NOT_FOUND({ internal: { reason: 'registration-changed' } })
   if (status === null) throw pushErrors.PUSH_SERVICE_UNREACHABLE({ internal: { failure, service } })
   if (delivery.outcome === 'expired')
     throw pushErrors.SUBSCRIPTION_EXPIRED({ internal: { service, status } })
