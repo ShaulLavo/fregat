@@ -404,6 +404,10 @@ export class OrchestrationEngine {
     await this.ready
     return this.snapshotQuery.sessionDetailPage(input)
   }
+  async sessionTranscript(sessionId: string) {
+    await this.ready
+    return this.snapshotQuery.sessionTranscript(sessionId)
+  }
   async replay(input: Parameters<OrchestrationEventStore['readAfter']>[0]) {
     await this.ready
     return { events: this.eventStore.readAfter(input) }

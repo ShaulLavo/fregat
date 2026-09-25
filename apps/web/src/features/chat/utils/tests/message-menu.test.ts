@@ -34,8 +34,30 @@ test('Copy runs the plain-text copy and Copy as Markdown runs the source copy', 
   expect(ran).toEqual(['text', 'markdown'])
 })
 
+test('every message offers the whole conversation as Markdown', () => {
+  const ran: string[] = []
+  const items = sectionItems(
+    menuContext({
+      copyConversation: () => ran.push('copy'),
+      exportConversation: () => ran.push('export'),
+    }),
+    'conversation',
+  )
+  for (const item of items) item.run()
+
+  expect(items.map((item) => item.label)).toEqual([
+    'Copy Conversation as Markdown',
+    'Export Conversation as Markdown…',
+  ])
+  expect(ran).toEqual(['copy', 'export'])
+})
+
 test('omits the checkpoint section when the message anchors neither action', () => {
-  expect(chatMessageMenu(menuContext()).map((entry) => entry.id)).toEqual(['copy', 'checkpoint'])
+  expect(chatMessageMenu(menuContext()).map((entry) => entry.id)).toEqual([
+    'copy',
+    'conversation',
+    'checkpoint',
+  ])
   expect(itemLabels(menuContext(), 'checkpoint')).toEqual([])
 })
 
@@ -100,7 +122,9 @@ function menuContext(overrides: Partial<ChatMessageMenuContext> = {}): ChatMessa
   return {
     canRevertCheckpoint: false,
     canViewChangedFiles: false,
+    copyConversation: noop,
     copyMarkdown: noop,
+    exportConversation: noop,
     copyText: noop,
     hasText: true,
     isAssistant: false,

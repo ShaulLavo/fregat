@@ -24,6 +24,7 @@
     "./test/orchestration-socket": "./test/orchestration-socket.ts",
     "./test/orchestration-server-config": "./test/orchestration-server-config.ts",
     "./commands/catalog": "./src/commands/catalog.ts",
+    "./commands/chat": "./src/commands/chat.ts",
     "./commands/metadata": "./src/commands/metadata.ts",
     "./commands/workspace": "./src/commands/workspace.ts",
     "./commands/workbench": "./src/commands/workbench.ts",

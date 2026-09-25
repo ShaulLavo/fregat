@@ -1,6 +1,7 @@
 import {
   ArrowCounterClockwiseIcon,
   CopyIcon,
+  DownloadSimpleIcon,
   GitDiffIcon,
   MarkdownLogoIcon,
 } from '@phosphor-icons/react'
@@ -26,7 +27,9 @@ export type ChatMessageMenuContext = {
   readonly canRevertCheckpoint: boolean
   /** True only for an assistant message whose turn produced a readable diff. */
   readonly canViewChangedFiles: boolean
+  readonly copyConversation: () => void
   readonly copyMarkdown: () => void
+  readonly exportConversation: () => void
   readonly copyText: () => void
   readonly hasText: boolean
   /** User text is never rendered as markdown, so it has no markdown to copy. */
@@ -54,6 +57,20 @@ export function chatMessageMenu(context: ChatMessageMenuContext): Menu {
           label: 'Copy as Markdown',
           run: context.copyMarkdown,
         }),
+    ]),
+    section('conversation', [
+      actionItem({
+        icon: MarkdownLogoIcon,
+        id: 'copyConversation',
+        label: 'Copy Conversation as Markdown',
+        run: context.copyConversation,
+      }),
+      actionItem({
+        icon: DownloadSimpleIcon,
+        id: 'exportConversation',
+        label: 'Export Conversation as Markdown…',
+        run: context.exportConversation,
+      }),
     ]),
     // Both items are omitted rather than disabled when they do not apply: the
     // two live on opposite message roles, so a disabled twin would only ever

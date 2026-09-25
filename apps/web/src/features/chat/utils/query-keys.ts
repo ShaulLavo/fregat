@@ -1,4 +1,4 @@
-import type { ProviderInstanceId } from '@workspace/contracts'
+import type { EnvironmentId, ProviderInstanceId, SessionId } from '@workspace/contracts'
 
 export const attachmentQueryKeys = {
   text: (url: string) => ['chat-attachment-text', url] as const,
@@ -28,4 +28,9 @@ export const projectEntryQueryKeys = {
   all: ['chat-project-entries'] as const,
   search: (rootPath: string, query: string, limit: number) =>
     [...projectEntryQueryKeys.all, rootPath, query, limit] as const,
+}
+
+export const sessionTranscriptKeys = {
+  transcript: (environmentId: EnvironmentId, sessionId: SessionId) =>
+    ['chat', 'session-transcript', environmentId, sessionId] as const,
 }

@@ -135,6 +135,17 @@ describe('session detail pagination', () => {
     expect(page.hasEarlier).toBe(true)
   })
 
+  it('reads the whole session for a transcript, oldest first', () => {
+    const transcript = snapshots.sessionTranscript(SESSION_ID)
+
+    expect(transcript.session.messages).toHaveLength(MESSAGE_COUNT)
+    expect(transcript.session.messages[0]?.id).toBe(messageId(0))
+    expect(transcript.session.messages.at(-1)?.id).toBe(messageId(MESSAGE_COUNT - 1))
+    expect(transcript.session.activities).toHaveLength(ACTIVITY_COUNT)
+    expect(transcript.session.activities[0]?.id).toBe(activityId(0))
+    expect(() => snapshots.sessionTranscript('missing-session')).toThrow()
+  })
+
   it('rejects a page read for a session that does not exist', () => {
     expect(() =>
       snapshots.sessionDetailPage({ sessionId: '00000000-0000-4000-8000-000000999999' }),

@@ -134,6 +134,15 @@ export const orchestrationSessionDetailPageInputSchema = v.object({
   ),
 })
 
+/**
+ * The whole session for an export, oldest first and never windowed. Read only on
+ * request: its size grows with the session.
+ */
+export const orchestrationSessionTranscriptSchema = v.object({
+  session: orchestrationSessionSchema,
+  proposedPlans: v.array(orchestrationProposedPlanSchema),
+})
+
 /** Rows are oldest-first, so a caller prepends the page as it arrives. */
 export const orchestrationSessionDetailPageSchema = v.object({
   sessionId: sessionIdSchema,
@@ -292,6 +301,9 @@ export type OrchestrationSessionDetailPageInput = v.InferInput<
 >
 export type OrchestrationSessionDetailPage = v.InferOutput<
   typeof orchestrationSessionDetailPageSchema
+>
+export type OrchestrationSessionTranscript = v.InferOutput<
+  typeof orchestrationSessionTranscriptSchema
 >
 export type OrchestrationProjectShell = v.InferOutput<typeof orchestrationProjectShellSchema>
 export type OrchestrationWorktreeShell = v.InferOutput<typeof orchestrationWorktreeShellSchema>

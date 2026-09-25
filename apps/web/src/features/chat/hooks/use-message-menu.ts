@@ -1,6 +1,11 @@
 import type { OrchestrationMessage } from '@workspace/contracts'
 
 import { useChatTimelineActions } from '@/features/chat/hooks/use-chat-timeline-actions'
+import { useChatTransport } from '@/features/chat/hooks/use-chat-transport'
+import {
+  copySessionTranscript,
+  downloadSessionTranscript,
+} from '@/features/chat/state/transcript-export'
 import { checkpointAvailability } from '@/lib/checkpoint-availability'
 import type { OptimisticChatMessage } from '@/features/chat/state/chat-message-intents'
 import type { ChatTurnDiffSummary } from '@workspace/client-core/chat/types'
@@ -24,6 +29,8 @@ export function useMessageMenu({
   readonly turnDiffSummary: ChatTurnDiffSummary | null
 }) {
   const { openCheckpointDiff, revertToCheckpoint } = useChatTimelineActions()
+  const { environmentId } = useChatTransport()
+  const sessionRef = { environmentId, sessionId: message.sessionId }
   const assistant = message.role === 'assistant'
   // Copy hands over what the bubble shows. For a user message that is the
   // prompt without the attached `<terminal_context>` block.
@@ -52,6 +59,8 @@ export function useMessageMenu({
   return chatMessageMenu({
     canRevertCheckpoint: typeof revertTurnCount === 'number',
     canViewChangedFiles: checkpointAvailability(turnDiffSummary).kind === 'available',
+    copyConversation: () => void copySessionTranscript(sessionRef),
+    exportConversation: () => void downloadSessionTranscript(sessionRef, 'markdown'),
     copyMarkdown: () => void copyTextToClipboard(text, 'message markdown'),
     copyText: () =>
       void copyTextToClipboard(assistant ? markdownToPlainText(text) : text, 'message'),

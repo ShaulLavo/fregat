@@ -13,10 +13,12 @@ import {
   ORCHESTRATION_SESSION_DETAIL_PAGE_SIZE,
   orchestrationSessionDetailPageInputSchema,
   orchestrationSessionDetailPageSchema,
+  orchestrationSessionTranscriptSchema,
   type OrchestrationCheckpointFile,
   type OrchestrationSessionDetailAnchor,
   type OrchestrationSessionDetailPage,
   type OrchestrationSessionDetailPageInput,
+  type OrchestrationSessionTranscript,
 } from '@workspace/contracts'
 import { orchestrationErrors } from '../observability'
 import {
@@ -304,6 +306,36 @@ export class OrchestrationSnapshotQuery {
       messages: messages.rows.map(messageFromRow),
       snapshotSequence: this.currentSequence(),
       sessionId: query.sessionId,
+    })
+  }
+
+  sessionTranscript(sessionId: string): OrchestrationSessionTranscript {
+    const row = this.database
+      .select()
+      .from(projectionSessions)
+      .where(eq(projectionSessions.sessionId, sessionId))
+      .get()
+    if (!row) throw orchestrationErrors.SESSION_NOT_FOUND({ sessionId })
+
+    const messages = this.database
+      .select()
+      .from(projectionSessionMessages)
+      .where(eq(projectionSessionMessages.sessionId, sessionId))
+      .orderBy(asc(projectionSessionMessages.createdAt), asc(projectionSessionMessages.messageId))
+      .all()
+    const activities = this.database
+      .select()
+      .from(projectionSessionActivities)
+      .where(eq(projectionSessionActivities.sessionId, sessionId))
+      .orderBy(
+        asc(projectionSessionActivities.createdAt),
+        asc(projectionSessionActivities.activityId),
+      )
+      .all()
+
+    return v.parse(orchestrationSessionTranscriptSchema, {
+      proposedPlans: this.sessionProposedPlans(sessionId).map(proposedPlanFromRow),
+      session: sessionFromRow(row, messages, activities, this.sessionRuntime(sessionId)),
     })
   }
 

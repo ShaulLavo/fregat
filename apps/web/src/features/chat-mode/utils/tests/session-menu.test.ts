@@ -12,7 +12,7 @@ test('offers open and a new session in the same project first', () => {
 })
 
 test('groups rename, archive, and delete after the open section', () => {
-  expect(sectionIds(menuContext())).toEqual(['open', 'edit', 'copy', 'project', 'agent'])
+  expect(sectionIds(menuContext())).toEqual(['open', 'edit', 'copy', 'export', 'project', 'agent'])
   expect(itemLabels(menuContext(), 'edit')).toEqual(['Rename', 'Archive', 'Delete'])
 })
 
@@ -64,6 +64,9 @@ test('every item runs its own callback', () => {
     'deleteSession',
     'copyPath',
     'copySessionId',
+    'copyTranscript',
+    'exportTranscript:markdown',
+    'exportTranscript:json',
     'scopeToProject',
     'stopAgent',
   ])
@@ -137,6 +140,9 @@ function menuContext({
     copyPath: () => record.push('copyPath'),
     copyBranch: null,
     copySessionId: () => record.push('copySessionId'),
+    hasMessages: true,
+    copyTranscript: () => record.push('copyTranscript'),
+    exportTranscript: (format) => record.push(`exportTranscript:${format}`),
     canMarkUnread: false,
     woke: false,
     markUnread: () => record.push('markUnread'),

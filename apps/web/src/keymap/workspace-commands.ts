@@ -1,4 +1,5 @@
 import { clientForQueryClient, originForQueryClient } from '@/lib/environments/state/query-clients'
+import { chatCommandMetadata } from '@workspace/client-core/commands/chat'
 import { workbenchCommandMetadata } from '@workspace/client-core/commands/workbench'
 import {
   workspaceCommandMetadata,
@@ -19,6 +20,7 @@ import {
   CommandIcon,
   CrosshairIcon,
   DesktopIcon,
+  DownloadSimpleIcon,
   FileMagnifyingGlassIcon,
   FloppyDiskBackIcon,
   FloppyDiskIcon,
@@ -54,7 +56,9 @@ import {
   startSidebarSessionDraft,
   type SessionTraversalDirection,
 } from '@/features/chat-mode/state/session-commands'
+import { useSessionSelectionStore } from '@/features/chat-mode/state/session-selection-store'
 import { setChatModeSessionRailOpen, showChatModeToolTab } from '@/features/chat-mode/utils/panels'
+import { downloadSessionTranscript } from '@/features/chat/state/transcript-export'
 import { documentKey } from '@/lib/documents/utils/identity'
 import { runMutation } from '@/lib/mutations/run'
 import { copyTextToClipboard } from '@/lib/clipboard'
@@ -130,6 +134,13 @@ function runSessionCommand(
   const result = run()
   if (result instanceof Promise) return operationStart(result)
   return dispositionFor(result)
+}
+
+function exportSelectedSessionTranscript() {
+  const { selection } = useSessionSelectionStore.getState()
+  if (selection.kind !== 'session') return false
+
+  return downloadSessionTranscript(selection, 'markdown').then(() => true)
 }
 
 function sessionTraversalHandler(direction: SessionTraversalDirection) {
@@ -1153,6 +1164,11 @@ export const workspaceCommands = [
   defineCommand({
     ...workspaceCommandMetadata['workspace.newSession'],
     run: (context) => runSessionCommand(context, startScopedSessionDraft),
+  }),
+  defineCommand({
+    ...chatCommandMetadata['chat.exportTranscript'],
+    icon: DownloadSimpleIcon,
+    run: (context) => runSessionCommand(context, exportSelectedSessionTranscript),
   }),
   defineCommand({
     ...workspaceCommandMetadata['workspace.nextSession'],

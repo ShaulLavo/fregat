@@ -549,7 +549,7 @@ surfaces, the file picker and the site. The owner is taking it one topic at a ti
 | 160 (done, lane L2)                          | Reasoning fold, turn receipts, live tail, model marker, tool details, plan steps, subagents, ultra sparkle  |
 | 161 (done, lane L2)                          | Approval lifecycle, stopped turns, streaming holds, folding rules, hostile-state scenarios                  |
 | [162](plans/162-context-and-cost.md)         | Context breakdown, usable-window fullness, session totals, usage-page honesty (after Plan 141)              |
-| 163 (done, lane L2)                          | Screenshot attachment in the composer (export lives in Plan 145's export plan)                              |
+| 163 (done, lane L2)                          | Screenshot attachment in the composer (export shipped with Plan 145)                                        |
 | [164](plans/164-what-feels-right-in-neon.md) | First pass shipped (Inter, one mono, `section-label`, radius); a metadata font sweep is left                |
 | [165](plans/165-font-catalog.md)             | Nerd Fonts + Fontsource on demand; interface-font setting; curated autocomplete picker                      |
 | [166](plans/166-shortcuts-editor.md)         | Keyboard shortcuts page rebuilt from VS Code research: full-width list, save on Enter, several per command  |

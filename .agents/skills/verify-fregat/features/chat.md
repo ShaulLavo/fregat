@@ -30,6 +30,8 @@ The chat mode button in the window toolbar, or an address URL with `/chat/`.
 
 `scenario session-actions-surfaces` creates one metadata-only session (no provider turn) and drives the shared session actions from every surface: Rename from the rail row, Pin/Unpin and Rename from the chat stage header, then Rename, Snooze/Unsnooze, a cancelled Delete and Archive from the editor sidebar chat header. Each result is read back from the server's shell snapshot; the session is deleted at the end. Rename runs only after its menu has closed — an open popup pulls focus back and the field would blur shut.
 
+`scenario export-transcript` exports one disposable session four ways — Export as Markdown and as JSON from the rail menu, Export Conversation as Markdown from the message menu, and the palette's Export transcript — and reads each download. The session's provider instance does not exist, so its turn fails at once and spends no tokens. The transcript comes from `GET /orchestration/session-transcript`, which is unwindowed: the web itself holds only the latest 200 rows.
+
 `scenario chat-diff-syntax --url <session-diff-address>` checks painted syntax colors in a session checkpoint diff.
 
 Commands dispatch over the orchestration socket when it is live and over HTTP otherwise. The HTTP path refetches the shell snapshot itself.

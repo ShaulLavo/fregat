@@ -61,6 +61,7 @@ import { copyFeedback } from './copy-feedback'
 import { fileLabelCohesion } from './file-label-cohesion'
 import { checkpointStates } from './checkpoint-states'
 import { sessionActionsSurfaces } from './session-actions-surfaces'
+import { exportTranscript } from './export-transcript'
 import { searchFileActions } from './search-file-actions'
 import { settingsStaleDiagnostics } from './settings-stale-diagnostics'
 import { fontPicker } from './font-picker'
@@ -286,6 +287,7 @@ export const scenarios: readonly Scenario[] = [
   fileLabelCohesion,
   checkpointStates,
   sessionActionsSurfaces,
+  exportTranscript,
   searchFileActions,
   chatFollowUp,
   chatDiffSyntax,

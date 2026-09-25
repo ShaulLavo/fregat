@@ -17,6 +17,10 @@ import {
   selectChatProjectionSlice,
   useChatProjectionStore,
 } from '@/features/chat/state/chat-projection-store'
+import {
+  copySessionTranscript,
+  downloadSessionTranscript,
+} from '@/features/chat/state/transcript-export'
 import { copyTextToClipboard } from '@/lib/clipboard'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
 import {
@@ -60,6 +64,12 @@ export function useSessionMenuActions(
     }),
   )
   const wokeAt = useSessionWake(session.ref)
+  const hasMessages = useChatProjectionStore((state) =>
+    Boolean(
+      selectChatProjectionSlice(state, session.environmentId).sessionById[session.id]
+        ?.latestUserMessageAt,
+    ),
+  )
   const completedAt = useChatProjectionStore(
     (state) =>
       selectChatProjectionSlice(state, session.environmentId).sessionById[session.id]?.latestTurn
@@ -95,6 +105,9 @@ export function useSessionMenuActions(
     copyPath: () => void copyTextToClipboard(session.worktreePath, 'path'),
     copyBranch: branch ? () => void copyTextToClipboard(branch, 'branch') : null,
     copySessionId: () => void copyTextToClipboard(session.id, 'session ID'),
+    hasMessages,
+    copyTranscript: () => void copySessionTranscript(session.ref),
+    exportTranscript: (format) => void downloadSessionTranscript(session.ref, format),
     canMarkUnread: Boolean(completedAt) && !session.unread,
     woke: wokeAt !== null,
     markUnread: () => actions.markUnread(session.ref),
