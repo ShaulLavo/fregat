@@ -1,12 +1,12 @@
 import { isRecord } from '@workspace/utils/objects'
 
-import type { EdenServerSocket } from '@/lib/server-sockets'
+import type { ServerSocket } from '@workspace/client-core/transport/socket'
 
 export function createLanguageServerSocket() {
   const events = new EventTarget()
   const sent: Record<string, unknown>[] = []
   let closed = false
-  const socket: EdenServerSocket = {
+  const socket: ServerSocket = {
     send(message) {
       if (typeof message !== 'string') return
       const value: unknown = JSON.parse(message)

@@ -1,8 +1,9 @@
+import type { ServerSocket } from '@workspace/client-core/transport/socket'
 import { type LspTransportHandler } from '@singapore-editor/lsp/types'
 import { LspClient, composeWorkspaceEditClientCapabilities } from '@singapore-editor/lsp'
 import { fileUriForPath, type LspMatch } from '@workspace/contracts'
 
-import { connectLanguageServerSocket, type EdenServerSocket } from '@/lib/server-sockets'
+import { connectLanguageServerSocket } from '@/lib/server-sockets'
 import { clientErrors } from '@/lib/structured-errors'
 import type { Client } from '@/lib/client'
 import { log } from '@/lib/client-logging'
@@ -153,7 +154,7 @@ function dispatchSocketMessage(handlers: ReadonlySet<LspTransportHandler>, event
 
 async function readConnectedSymbols(
   languageClient: LspClient,
-  socket: EdenServerSocket,
+  socket: ServerSocket,
   handlers: Set<LspTransportHandler>,
   { path, text, signal }: Pick<DocumentSymbolsRequest, 'path' | 'text' | 'signal'>,
 ) {
@@ -177,7 +178,7 @@ async function readConnectedSymbols(
   )
 }
 
-function sendOpenDocument(socket: EdenServerSocket, path: string, text: string | null | undefined) {
+function sendOpenDocument(socket: ServerSocket, path: string, text: string | null | undefined) {
   if (text === null || text === undefined) return
 
   socket.send(

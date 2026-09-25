@@ -4,7 +4,7 @@ import type { HostActions } from '@/host/providers/actions-context'
 import { createTuiError } from '@/host/utils/structured-errors'
 import { createControlledInProcessTransport } from '../client'
 import type { TestServer } from '../server'
-import type { ServiceSocket } from '@/connection/utils/service-socket'
+import type { ServerSocket } from '@workspace/client-core/transport/socket'
 import { renderTui } from '../render'
 import { createTestSettingsSession } from './session'
 
@@ -21,7 +21,7 @@ export async function createWorkbenchFrame(
     readonly width?: number
     readonly height?: number
     readonly onEditText?: HostActions['editText']
-    readonly createServiceSocket?: (url: string) => ServiceSocket
+    readonly createServiceSocket?: (url: string) => ServerSocket
   },
 ) {
   const transport = createControlledInProcessTransport(server)

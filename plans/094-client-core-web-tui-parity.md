@@ -360,6 +360,12 @@ Reconcile before merging:
 
 ## Unify the chat attachment policy
 
+Decided 2026-09-25: recommendation (completion wave). Both clients measure the complete
+data URL; web keeps compression and TUI keeps byte sniffing. MIME aliases and parameters normalize
+in contracts. Both replacement engines share native capture expansion plus newline/tab/backslash
+escapes and the standalone `$0` alias. Mention parsing uses the contracts grammar. Socket adapters
+keep their transport setup; the common socket interface retains optional browser state fields.
+
 Two layers. (1) `packages/contracts/src/chat-model.ts`: export `CHAT_ATTACHMENT_MIME_TYPES` and a
 `normalizeChatAttachmentMimeType` folding in the `image/jpg` alias and the `;parameters` strip, beside
 the documented allowlist at `:107-112`. (2) `packages/client-core/src/chat/attachments.ts`: the

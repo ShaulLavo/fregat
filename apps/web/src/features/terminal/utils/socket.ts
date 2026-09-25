@@ -1,6 +1,5 @@
+import type { ServerSocket } from '@workspace/client-core/transport/socket'
 import type { TerminalClientMessage } from '@workspace/contracts'
-
-import type { EdenServerSocket } from '@/lib/server-sockets'
 
 const WEB_SOCKET_OPEN = 1
 
@@ -9,7 +8,7 @@ export function encodeTerminalClientMessage(message: TerminalClientMessage) {
 }
 
 export function sendTerminalClientMessage(
-  socket: EdenServerSocket | null,
+  socket: ServerSocket | null,
   message: TerminalClientMessage,
 ) {
   if (!socket || socket.readyState !== WEB_SOCKET_OPEN) return false

@@ -158,6 +158,8 @@ export {
 } from './chat-ids'
 export {
   CHAT_ATTACHMENT_FILE_EXTENSIONS,
+  CHAT_ATTACHMENT_MIME_TYPES,
+  normalizeChatAttachmentMimeType,
   CHAT_ATTACHMENT_URL_PREFIX,
   chatAttachmentExtension,
   chatAttachmentSchema,

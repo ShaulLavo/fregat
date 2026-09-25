@@ -1,10 +1,10 @@
+import {
+  MAX_CHAT_ATTACHMENT_ENCODED_BYTES,
+  CHAT_ATTACHMENT_SIZE_LABEL,
+} from '@workspace/client-core/chat/attachments'
 import { readFile, stat } from 'node:fs/promises'
 import path from 'node:path'
-import {
-  MAX_CHAT_ATTACHMENT_BYTES,
-  MAX_CHAT_ATTACHMENTS,
-  type ChatAttachmentUpload,
-} from '@workspace/contracts'
+import { MAX_CHAT_ATTACHMENTS, type ChatAttachmentUpload } from '@workspace/contracts'
 import { createTuiError } from '@/host/utils/structured-errors'
 
 export async function readAttachment(filename: string, current: readonly ChatAttachmentUpload[]) {
@@ -15,9 +15,9 @@ export async function readAttachment(filename: string, current: readonly ChatAtt
     )
   const resolved = path.resolve(filename.trim())
   const metadata = await stat(resolved)
-  if (!metadata.isFile() || metadata.size > MAX_CHAT_ATTACHMENT_BYTES)
+  if (!metadata.isFile() || metadata.size > MAX_CHAT_ATTACHMENT_ENCODED_BYTES)
     throw createTuiError(
-      'The image must be a file smaller than 10 MiB.',
+      `The image must be a file of at most ${CHAT_ATTACHMENT_SIZE_LABEL}.`,
       'Choose a supported image within the attachment limit.',
     )
   const bytes = await readFile(resolved)
@@ -34,9 +34,9 @@ export function attachmentFromBytes(
       `A prompt supports ${MAX_CHAT_ATTACHMENTS} images.`,
       'Remove an attachment before adding another.',
     )
-  if (bytes.byteLength > MAX_CHAT_ATTACHMENT_BYTES)
+  if (bytes.byteLength > MAX_CHAT_ATTACHMENT_ENCODED_BYTES)
     throw createTuiError(
-      'The image must be smaller than 10 MiB.',
+      `The image must contain at most ${CHAT_ATTACHMENT_SIZE_LABEL}.`,
       'Choose a supported image within the attachment limit.',
     )
   const buffer = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength)

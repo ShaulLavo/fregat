@@ -134,13 +134,23 @@ export const CHAT_ATTACHMENT_FILE_EXTENSIONS = {
   'image/webp': '.webp',
 } as const
 
-export type ChatAttachmentMimeType = keyof typeof CHAT_ATTACHMENT_FILE_EXTENSIONS
+export const CHAT_ATTACHMENT_MIME_TYPES = [
+  'image/gif',
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+] as const
+export type ChatAttachmentMimeType = (typeof CHAT_ATTACHMENT_MIME_TYPES)[number]
+
+export function normalizeChatAttachmentMimeType(raw: string): ChatAttachmentMimeType | null {
+  const mimeType = raw.split(';')[0]?.trim().toLowerCase() ?? ''
+  if (mimeType === 'image/jpg') return 'image/jpeg'
+  return CHAT_ATTACHMENT_MIME_TYPES.find((allowed) => allowed === mimeType) ?? null
+}
 
 export function chatAttachmentExtension(mimeType: string): string | null {
-  const normalized = mimeType.trim().toLowerCase()
-  if (!Object.hasOwn(CHAT_ATTACHMENT_FILE_EXTENSIONS, normalized)) return null
-
-  return CHAT_ATTACHMENT_FILE_EXTENSIONS[normalized as ChatAttachmentMimeType]
+  const normalized = normalizeChatAttachmentMimeType(mimeType)
+  return normalized ? CHAT_ATTACHMENT_FILE_EXTENSIONS[normalized] : null
 }
 
 /**

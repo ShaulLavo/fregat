@@ -1,21 +1,6 @@
+import type { ServerSocket } from '@workspace/client-core/transport/socket'
 import type { TerminalOpenInput } from '@workspace/contracts'
 import type { Client } from '@/lib/client'
-
-export type EdenServerSocket = {
-  readonly readyState?: number
-  send(message: string | Uint8Array): void
-  close(code?: number, reason?: string): void
-  addEventListener(
-    type: keyof WebSocketEventMap,
-    handler: EventListener,
-    options?: boolean | AddEventListenerOptions,
-  ): void
-  removeEventListener(
-    type: keyof WebSocketEventMap,
-    handler: EventListener,
-    options?: boolean | EventListenerOptions,
-  ): void
-}
 
 type EdenSocket = {
   ws: WebSocket
@@ -32,7 +17,7 @@ export function connectTerminalSocket(
   input: TerminalOpenInput,
   client: Client,
   signal: AbortSignal,
-): EdenServerSocket {
+): ServerSocket {
   signal.throwIfAborted()
   const socket = client.terminal.subscribe({ query: input })
   socket.ws.binaryType = 'arraybuffer'
@@ -43,7 +28,7 @@ export function connectLanguageServerSocket(
   { path, rootPath, serverId }: LanguageServerSocketOptions,
   client: Client,
   signal: AbortSignal,
-): EdenServerSocket {
+): ServerSocket {
   signal.throwIfAborted()
   return adaptEdenSocket(
     client.lsp.subscribe({
@@ -53,8 +38,8 @@ export function connectLanguageServerSocket(
   )
 }
 
-class EdenLanguageServerWebSocket implements EdenServerSocket {
-  readonly #socket: EdenServerSocket
+class EdenLanguageServerWebSocket implements ServerSocket {
+  readonly #socket: ServerSocket
 
   constructor(
     url: string | URL,
@@ -78,17 +63,17 @@ class EdenLanguageServerWebSocket implements EdenServerSocket {
     this.#socket.close(code, reason)
   }
 
-  addEventListener(
-    type: keyof WebSocketEventMap,
-    handler: EventListener,
+  addEventListener<K extends keyof WebSocketEventMap>(
+    type: K,
+    handler: (event: WebSocketEventMap[K]) => void,
     options?: boolean | AddEventListenerOptions,
   ) {
     this.#socket.addEventListener(type, handler, options)
   }
 
-  removeEventListener(
-    type: keyof WebSocketEventMap,
-    handler: EventListener,
+  removeEventListener<K extends keyof WebSocketEventMap>(
+    type: K,
+    handler: (event: WebSocketEventMap[K]) => void,
     options?: boolean | EventListenerOptions,
   ) {
     this.#socket.removeEventListener(type, handler, options)
@@ -103,7 +88,7 @@ export function languageServerWebSocketConstructor(client: Client, signal: Abort
   }
 }
 
-function adaptEdenSocket(socket: EdenSocket, signal: AbortSignal): EdenServerSocket {
+function adaptEdenSocket(socket: EdenSocket, signal: AbortSignal): ServerSocket {
   const close = () => socket.ws.close(1000, 'environment switched')
   signal.addEventListener('abort', close, { once: true })
   socket.ws.addEventListener('close', () => signal.removeEventListener('abort', close), {

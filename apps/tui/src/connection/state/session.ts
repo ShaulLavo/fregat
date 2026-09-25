@@ -12,7 +12,7 @@ import type { HealthDescriptor, SettingsSnapshot } from '@workspace/contracts'
 
 import { connectionFailure, type ConnectionFailure } from '@/connection/utils/failure'
 import { openFileStorage, type FileStorage } from '@/storage/files'
-import type { ServiceSocket } from '@/connection/utils/service-socket'
+import type { ServerSocket } from '@workspace/client-core/transport/socket'
 import { ensureWorktree } from '@/connection/state/worktree'
 import { createTuiError } from '@/host/utils/structured-errors'
 
@@ -37,7 +37,7 @@ type SessionOptions = Pick<OrchestrationRpcClientOptions, 'createSocket' | 'obse
   readonly client: Client
   readonly storageDirectory: string
   readonly record?: (event: Record<string, unknown>) => void
-  readonly createServiceSocket?: (url: string) => ServiceSocket
+  readonly createServiceSocket?: (url: string) => ServerSocket
 }
 
 export type SettingsSession = ReturnType<typeof createSettingsSession>

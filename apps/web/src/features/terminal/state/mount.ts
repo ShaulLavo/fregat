@@ -1,3 +1,4 @@
+import type { ServerSocket } from '@workspace/client-core/transport/socket'
 import { createReplayGate } from '@/features/terminal/state/replay'
 import { errorMessage } from '@/lib/error-message'
 import { fetchTerminalCheckout } from '@/features/terminal/state/register-checkout'
@@ -19,7 +20,7 @@ import {
   type TerminalScrollbar,
 } from 'ghostty-webgpu'
 import { addLifecycleFlush } from '@/lib/lifecycle-flush'
-import { connectTerminalSocket, type EdenServerSocket } from '@/lib/server-sockets'
+import { connectTerminalSocket } from '@/lib/server-sockets'
 import { sendTerminalClientMessage } from '@/features/terminal/utils/socket'
 import { reportError, toClientError } from '@/lib/client-error-taxonomy'
 import { fontStack } from '@/lib/fonts/utils/stack'
@@ -70,7 +71,7 @@ export function mountTerminal({
   let resizeDisposable: GhosttyWebGpuTerminalSubscription | null = null
   let scrollDisposable: GhosttyWebGpuTerminalSubscription | null = null
   let titleDisposable: GhosttyWebGpuTerminalSubscription | null = null
-  let socket: EdenServerSocket | null = null
+  let socket: ServerSocket | null = null
   let disposeSocket: (() => void) | undefined
   let terminal: Terminal | null = null
   let terminalDimensions: TerminalDimensions | null = null
@@ -327,10 +328,7 @@ function openTerminalUri(uri: string) {
   window.open(uri, '_blank', 'noopener,noreferrer')
 }
 
-function sendTerminalResize(
-  socket: EdenServerSocket | null,
-  dimensions: TerminalDimensions | null,
-) {
+function sendTerminalResize(socket: ServerSocket | null, dimensions: TerminalDimensions | null) {
   if (!dimensions) return false
 
   return sendTerminalClientMessage(socket, {
@@ -340,7 +338,7 @@ function sendTerminalResize(
   })
 }
 
-function closeTerminalSocket(socket: EdenServerSocket | null) {
+function closeTerminalSocket(socket: ServerSocket | null) {
   if (!socket) return
   if (socket.readyState === 3) return
   if (socket.readyState === 2) return

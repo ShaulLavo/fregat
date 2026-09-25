@@ -111,7 +111,10 @@
     "./logs/api": "./src/logs/api.ts",
     "./logs/filters": "./src/logs/filters.ts",
     "./logs/formatters": "./src/logs/formatters.ts",
-    "./logs/live-cache": "./src/logs/live-cache.ts"
+    "./logs/live-cache": "./src/logs/live-cache.ts",
+    "./chat/attachments": "./src/chat/attachments.ts",
+    "./files/search-replace": "./src/files/search-replace.ts",
+    "./transport/socket": "./src/transport/socket.ts"
   },
   "scripts": {
     "build": "tsgo --noEmit",

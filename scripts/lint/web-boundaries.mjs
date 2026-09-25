@@ -23,6 +23,7 @@ const RESERVED_PREFIXES = [
 const PUBLIC_SCHEMAS = new Set([
   'sessionIdSchema',
   'GIT_FILE_STATUSES',
+  'normalizeChatAttachmentMimeType',
   'LOG_TIME_RANGES',
   'LOG_DASHBOARD_LEVELS',
 ])

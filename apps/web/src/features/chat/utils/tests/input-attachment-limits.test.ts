@@ -2,10 +2,10 @@ import { expect, test } from '../../../../../test/fixtures'
 
 import { MAX_CHAT_ATTACHMENT_BYTES, MAX_CHAT_ATTACHMENTS } from '@workspace/contracts'
 
+import { MAX_CHAT_ATTACHMENT_ENCODED_BYTES } from '@workspace/client-core/chat/attachments'
+import { chatAttachmentDataUrlLength } from '@workspace/client-core/chat/attachments'
 import {
-  chatAttachmentDataUrlLength,
   classifyChatImageFile,
-  MAX_CHAT_ATTACHMENT_ENCODED_BYTES,
   MAX_COMPRESSIBLE_SOURCE_BYTES,
 } from '@/features/chat/utils/input-attachment-limits'
 

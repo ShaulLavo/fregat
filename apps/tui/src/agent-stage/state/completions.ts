@@ -1,7 +1,11 @@
 import path from 'node:path'
 import { parsePickerPathInput } from '@workspace/client-core/files/path-input'
 import { readServerPaths, readDirectory } from '@workspace/client-core/files/read'
-import type { ModelSelection } from '@workspace/contracts'
+import {
+  activeComposerMention,
+  serializeComposerMention,
+  type ModelSelection,
+} from '@workspace/contracts'
 import type { SettingsSession } from '@/connection/state/session'
 import { createTuiError } from '@/host/utils/structured-errors'
 
@@ -23,12 +27,20 @@ export async function readCompletions({
   readonly selection: ModelSelection | null
   readonly signal: AbortSignal
 }): Promise<readonly Completion[]> {
-  const match = /(?:^|\s)([@/$])([^\s]*)$/.exec(text)
+  const mention = activeComposerMention(text, text.length)
+  if (mention)
+    return fileCompletions({
+      session,
+      cwd,
+      query: mention.query,
+      prefix: text.slice(0, mention.start),
+      signal,
+    })
+  const match = /(?:^|\s)([/$])([^\s]*)$/.exec(text)
   if (!match) return []
   const trigger = match[1]
   const query = match[2] ?? ''
   const prefix = text.slice(0, text.length - query.length - 1)
-  if (trigger === '@') return fileCompletions({ session, cwd, query, prefix, signal })
   if (!selection) return []
   const response = await session.client
     .providers({ providerInstanceId: selection.providerInstanceId })
@@ -72,6 +84,6 @@ async function fileCompletions({
     .map((entry) => ({
       label: `@${parent}${entry.name}`,
       description: entry.type,
-      text: `${prefix}@${parent}${entry.name} `,
+      text: `${prefix}${serializeComposerMention(`${parent}${entry.name}`)} `,
     }))
 }

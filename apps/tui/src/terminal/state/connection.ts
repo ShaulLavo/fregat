@@ -5,7 +5,7 @@ import {
   type TerminalOpenInput,
 } from '@workspace/contracts'
 import type { SettingsSession } from '@/connection/state/session'
-import type { ServiceSocket } from '@/connection/utils/service-socket'
+import type { ServerSocket } from '@workspace/client-core/transport/socket'
 
 export type TerminalState =
   | { readonly kind: 'connecting' }
@@ -31,7 +31,7 @@ export function openTerminalConnection(
   if (input.agentSessionId) url.searchParams.set('agentSessionId', input.agentSessionId)
   url.searchParams.set('cols', String(dimensions.cols))
   url.searchParams.set('rows', String(dimensions.rows))
-  const socket: ServiceSocket = session.createServiceSocket(url.href)
+  const socket: ServerSocket = session.createServiceSocket(url.href)
   socket.binaryType = 'arraybuffer'
   const listeners = new Set<() => void>()
   const outputs = new Set<(data: Uint8Array) => void>()
