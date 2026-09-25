@@ -189,7 +189,25 @@ strictEqual(pinned.length, 5)
 for (const model of pinned) {
   const advertised = claude.models.find((candidate) => candidate.slug === model.slug)
   ok(advertised, `Pinned Claude model ${model.slug}`)
-  deepStrictEqual(model.capabilities, claude.profiles[advertised.profile]?.capabilities, model.slug)
+  deepStrictEqual(
+    comparableCapabilities(model.capabilities),
+    comparableCapabilities(claude.profiles[advertised.profile]?.capabilities),
+    model.slug,
+  )
+}
+
+// The option ids, types and defaults are the contract; label case and descriptions are our copy.
+function comparableCapabilities(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(comparableCapabilities)
+  if (!value || typeof value !== 'object') return value
+
+  return Object.fromEntries(
+    Object.entries(value).flatMap(([key, field]) => {
+      if (key === 'description') return []
+      if (key === 'label' && typeof field === 'string') return [[key, field.toLowerCase()]]
+      return [[key, comparableCapabilities(field)]]
+    }),
+  )
 }
 console.log(
   JSON.stringify({
