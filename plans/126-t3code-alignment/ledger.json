@@ -225,7 +225,8 @@
       "acceptance": "lifecycle.md, LIFE-09, Acceptance / verification",
       "execution_evidence": [
         "lifecycle-grouping-delivery.md",
-        "Live lifecycle evidence /work/tmp/fregat-evidence/20260920T140116Z-scenario-session-lifecycle; screenshots reviewed; multi-owner grouping live prerequisite unavailable; repository_path subproject registration remains open"
+        "Live lifecycle evidence /work/tmp/fregat-evidence/20260920T140116Z-scenario-session-lifecycle; screenshots reviewed; multi-owner grouping live prerequisite unavailable; repository_path subproject registration remains open",
+        "Two-owner live run 2026-09-25 (completion wave, lane L5): scripts/agent/scenarios/project-grouping.ts now starts a second throwaway server and connects it as a Remote URL machine (scripts/agent/second-owner.ts); /work/tmp/fregat-evidence/20260925T141833Z-scenario-project-grouping shows repository and repository_path merging both owners with a two-owner delete preview, and separate mode keeping them apart with a one-owner preview. repository_path for subprojects still needs a membership entity: owner question (126 D4, no written recommendation)"
       ]
     },
     {
