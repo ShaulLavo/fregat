@@ -1,12 +1,15 @@
 import {
   jsonEqual,
+  themeIdSchema,
   themeVariants,
   type ThemeBundle,
+  type ThemeDocument,
   type ThemeCustomizations,
   type ThemeId,
   type ThemeVariant,
   type ThemeVariantPatch,
 } from '@workspace/contracts'
+import * as v from 'valibot'
 
 import type { StudioDraft } from '@/lib/theme-studio/state/studio-store'
 
@@ -67,4 +70,14 @@ export function editVariant(
     material: { ...current.material, ...patch.material },
   }
   return { ...draft, variants: { ...draft.variants, [mode]: next } }
+}
+
+/** A new library theme with these variants; the id is fresh, so it never overwrites one. */
+export function newThemeDocument(name: string, variants: StudioDraft['variants']): ThemeDocument {
+  return {
+    schemaVersion: 1,
+    id: v.parse(themeIdSchema, `theme-${crypto.randomUUID()}`),
+    name,
+    variants,
+  }
 }

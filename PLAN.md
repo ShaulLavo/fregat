@@ -341,11 +341,14 @@ and the existing syntax registrations. CSS-in-JS was considered and rejected: cu
 runtime, and Tailwind keeps resolving to tokens. [The research](docs/theme-standardization-reference.md)
 records the Omarchy reuse strategy and the T3 Code and CodexThemes-App comparisons.
 
-[Plan 124](plans/124-theme-studio.md), requested 2026-09-19, replaces 117's surface without touching
-its data: the live workbench is the preview, a bottom dock over it holds one draft theme with
-Themes, Colors, Code, Wallpaper and Surfaces tabs, colors can be derived from a wallpaper, and the
-`theme ` palette scope switches whole themes. The settings row, creation dialog, variant editors and
-the separate palette, code-theme and wallpaper widgets are deleted in the same pass.
+The theme studio (Plan 124) replaced 117's surface without touching its data on 2026-09-25: the
+live workbench is the preview, and a bottom dock holds one draft theme with Themes, Colors, Code,
+Wallpaper and Surfaces tabs. Colors can be taken from a wallpaper; `theme ` in the palette switches
+whole themes and `code ` picks code colors. Settings keeps one Theme row that opens the studio.
+The Code tab's sample is the code-theme preview beside the list, because a folderless root cannot
+host editor tabs. Theme actions sit beside the strip and act on the chosen card. Import from Omarchy
+is gone from the UI because its four themes are bundled. Scenarios `theme-studio` and
+`theme-studio-library` prove it.
 
 The [design-token foundation](docs/web-design-language.md) is implemented. Coordinate `globals.css`
 edits with Plans 101–103; do not interleave edits to the same files. Plan 085 and Plan 115 share the

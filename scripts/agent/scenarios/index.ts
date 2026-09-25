@@ -100,6 +100,7 @@ import { checkpointRestore } from './checkpoint-restore'
 import { filePickerBrowse } from './file-picker-browse'
 import { quickOpenPreview } from './quick-open-preview'
 import { themeStudio } from './theme-studio'
+import { themeStudioLibrary } from './theme-studio-library'
 import { commandPaletteTypeBurst } from './command-palette-type-burst'
 import { paletteScriptsPending } from './palette-scripts-pending'
 import { settingsModelsPending } from './settings-models-pending'
@@ -326,6 +327,7 @@ export const scenarios: readonly Scenario[] = [
   filePickerBrowse,
   quickOpenPreview,
   themeStudio,
+  themeStudioLibrary,
   commandPaletteTypeBurst,
   paletteScriptsPending,
   settingsModelsPending,

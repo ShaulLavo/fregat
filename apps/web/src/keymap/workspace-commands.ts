@@ -542,7 +542,7 @@ export const workspaceCommands = [
     icon: SwatchesIcon,
     run: ({ invocation, runtime }) =>
       transitionStart(
-        runtime.shell.showCommandPalette('bundle ', invocation.origin as FocusTargetToken | null),
+        runtime.shell.showCommandPalette('theme ', invocation.origin as FocusTargetToken | null),
       ),
   }),
   defineCommand({
@@ -1119,7 +1119,7 @@ export const workspaceCommands = [
     icon: PaletteIcon,
     run: ({ invocation, runtime }) =>
       transitionStart(
-        runtime.shell.showCommandPalette('theme ', invocation.origin as FocusTargetToken | null),
+        runtime.shell.showCommandPalette('code ', invocation.origin as FocusTargetToken | null),
       ),
   }),
   defineCommand({

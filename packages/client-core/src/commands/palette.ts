@@ -155,11 +155,11 @@ function compareRankedCommandItems<Item extends PaletteRankItem>(
 
 export function quickAccessMode(search: string): QuickAccessMode {
   if (search.startsWith('colors ')) return 'appColors'
-  if (search.startsWith('bundle ')) return 'themeBundle'
+  if (search.startsWith('code ')) return 'colorTheme'
   if (search.startsWith('view ')) return 'views'
   if (search.startsWith('wallpaper ')) return 'wallpaper'
   if (search.startsWith('color ')) return 'colorMode'
-  if (search.startsWith('theme ')) return 'colorTheme'
+  if (search.startsWith('theme ')) return 'themeBundle'
   if (search.startsWith('edt ')) return 'editors'
   if (search.startsWith(SCRIPT_PREFIX)) return 'scripts'
   if (search.startsWith(SESSION_PREFIX)) return 'sessions'
@@ -170,7 +170,7 @@ export function quickAccessMode(search: string): QuickAccessMode {
 
 export function quickAccessQuery(search: string) {
   if (search.startsWith('colors ')) return search.slice(7).trimStart()
-  if (search.startsWith('bundle ')) return search.slice(7).trimStart()
+  if (search.startsWith('code ')) return search.slice(5).trimStart()
   if (search.startsWith('view ')) return search.slice(5).trimStart()
   if (search.startsWith('color ')) return search.slice(6).trimStart()
   if (search.startsWith('theme ')) return search.slice(6).trimStart()

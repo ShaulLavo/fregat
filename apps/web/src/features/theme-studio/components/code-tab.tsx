@@ -1,25 +1,22 @@
 import type { ColorMode, ThemeVariantPatch } from '@workspace/contracts'
 import { ListRow } from '@workspace/ui/patterns/list-row'
 import { VirtualList } from '@workspace/ui/patterns/virtual-list'
-import type { ReactNode } from 'react'
 
+import { CodeThemePreview } from '@/lib/code-theme/components/preview'
 import { editorThemeOptions } from '@/lib/code-theme/utils/catalog'
 import { useStudioList } from '@/features/theme-studio/hooks/use-studio-list'
 
 /**
- * The code colors for the half on screen. The editor behind the dock is the preview, and chat
- * code blocks follow it.
+ * The code colors for the half on screen. The editor behind the dock and chat code blocks follow
+ * them; the sample beside the list covers a root with nothing open.
  */
 export function CodeTab({
   codeTheme,
   mode,
-  sample,
   onEdit,
 }: {
   codeTheme: string
   mode: ColorMode
-  /** The action that opens a sample file when nothing else is open. */
-  sample?: ReactNode
   onEdit: (patch: ThemeVariantPatch) => void
 }) {
   const options = editorThemeOptions(mode)
@@ -52,10 +49,10 @@ export function CodeTab({
         )}
         scrollRef={containerRef}
       />
-      <div className='text-muted-foreground flex min-w-0 flex-1 flex-col gap-2 text-xs'>
-        <p>The editor and chat code blocks show the code colors as you move.</p>
-        {sample}
-      </div>
+      <CodeThemePreview
+        className='min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-md'
+        themeId={codeTheme}
+      />
     </div>
   )
 }

@@ -47,19 +47,6 @@ export function useBundleActions() {
     },
     owner,
   )
-  const importOmarchy = useMutation(
-    {
-      mutationKey: bundleMutationKeys.omarchy,
-      mutationFn: async (name: string) => {
-        const response = await client.themes.bundles.omarchy.post(name)
-        if (response.error) throw createRpcError(response.error)
-        return response.data
-      },
-      onSuccess: settle,
-      scope: { id: 'theme-library' },
-    },
-    owner,
-  )
   const remove = useMutation(
     {
       mutationKey: bundleMutationKeys.remove,
@@ -74,5 +61,5 @@ export function useBundleActions() {
     },
     owner,
   )
-  return { create, importArchive, importOmarchy, remove }
+  return { create, importArchive, remove }
 }

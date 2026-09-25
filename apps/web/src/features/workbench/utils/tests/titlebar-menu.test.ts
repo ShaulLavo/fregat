@@ -17,8 +17,9 @@ test('sections run project, view, settings, then copy', () => {
   ])
 })
 
-test('Settings stays offered with no workspace open', () => {
+test('Theme and Settings stay offered with no workspace open', () => {
   expect(labels(menuContext({ projects: [], workspacePath: null }), 'settings')).toEqual([
+    'Theme…',
     'Settings…',
   ])
 })

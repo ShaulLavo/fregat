@@ -9,7 +9,7 @@ import { CodeTab } from '@/features/theme-studio/components/code-tab'
 import { ColorsTab } from '@/features/theme-studio/components/colors-tab'
 import { WallpaperTab } from '@/features/theme-studio/components/wallpaper-tab'
 import { useDraftPalette } from '@/features/theme-studio/hooks/use-draft-palette'
-import { usePaletteActions } from '@/lib/theme-library/hooks/use-palette-actions'
+import { useSavePaletteEdits } from '@/features/theme-studio/hooks/use-save-palette-edits'
 import { useSettingsOwner } from '@/lib/settings-owner/hooks/use-settings-owner'
 import { wallpaperColorsOptions } from '@/lib/wallpapers/state/queries'
 import { paletteFromWallpaperColors } from '@workspace/client-core/themes/wallpaper-palette'
@@ -36,7 +36,7 @@ export function Dock() {
   const ref = useRef<HTMLElement>(null)
   useStudioPreview(draft, store.mode)
   const draftPalette = useDraftPalette(draft, mode)
-  const palettes = usePaletteActions()
+  const savePaletteEdits = useSavePaletteEdits()
   const owner = useSettingsOwner()
 
   // Opening moves focus into the dock once; after that keys belong to whatever holds focus.
@@ -46,16 +46,7 @@ export function Dock() {
 
   async function apply() {
     if (!draft || !editsPending) return
-    try {
-      // A palette the draft forked has to exist in the library before the theme names it.
-      for (const palette of Object.values(store.paletteEdits))
-        await palettes.create.mutateAsync(palette)
-    } catch (error) {
-      toastError('The colors could not be saved', {
-        description: errorMessage(error, 'The palette library did not accept them.'),
-      })
-      return
-    }
+    if (!(await savePaletteEdits())) return
     bundles.apply(
       draft.theme,
       {

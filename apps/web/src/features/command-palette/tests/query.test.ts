@@ -38,6 +38,7 @@ test('command groups rank strong command matches above earlier weak fuzzy groups
     'workspace.selectAppColors',
     'workspace.selectColorTheme',
     'workspace.openThemeStudio',
+    'workspace.selectThemeBundle',
     'workspace.selectColorMode',
   ])
   expect(groups.flatMap(([, groupItems]) => groupItems.map((item) => item.id))).not.toContain(
@@ -109,12 +110,14 @@ test('a matching recent leads the query results even when something else scores 
     'workspace.selectAppColors',
     'workspace.selectColorTheme',
     'workspace.openThemeStudio',
+    'workspace.selectThemeBundle',
     'workspace.selectColorMode',
   ])
   expect(ids(['workspace.selectColorTheme'])).toEqual([
     'workspace.selectColorTheme',
     'workspace.selectAppColors',
     'workspace.openThemeStudio',
+    'workspace.selectThemeBundle',
     'workspace.selectColorMode',
   ])
 })
@@ -164,8 +167,9 @@ test('quick access prefixes select the expected mode and query', () => {
   expect(quickAccessMode('view git')).toBe('views')
   expect(quickAccessQuery('view git')).toBe('git')
   expect(quickAccessMode('color dark')).toBe('colorMode')
-  expect(quickAccessMode('theme monokai')).toBe('colorTheme')
-  expect(quickAccessQuery('theme monokai')).toBe('monokai')
+  expect(quickAccessMode('code monokai')).toBe('colorTheme')
+  expect(quickAccessQuery('code monokai')).toBe('monokai')
+  expect(quickAccessMode('theme sage')).toBe('themeBundle')
   expect(quickAccessQuery('> save')).toBe('save')
   expect(quickAccessMode('@ Component')).toBe('symbols')
 })

@@ -9,7 +9,7 @@ export const paletteMutationKeys = {
 } as const
 
 export const bundleMutationKeys = {
-  omarchy: ['themes', 'bundles', 'omarchy'],
+  all: ['themes', 'bundles'],
   remove: ['themes', 'bundles', 'remove'],
   create: ['themes', 'bundles', 'create'],
   import: ['themes', 'bundles', 'import'],

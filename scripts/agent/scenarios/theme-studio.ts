@@ -1,6 +1,6 @@
 import { notStrictEqual, ok, strictEqual } from 'node:assert/strict'
 import type { Page } from 'playwright'
-import { runPaletteCommand, selectors } from '../selectors'
+import { openFileByName, runPaletteCommand, selectors, waitForApp } from '../selectors'
 import { serverApi } from '../server-api'
 import type { Scenario } from './index'
 
@@ -63,6 +63,12 @@ export const themeStudio: Scenario = {
     await repainted(page, saved)
     await step('previewing-next-theme')
     strictEqual(themeId(await userSettings(page)), themeId(before), 'Browsing writes nothing')
+    const previewing = await background(page)
+    await openFileByName(page, 'README.md')
+    await dock.waitFor()
+    strictEqual(await background(page), previewing, 'The draft stays on screen while working')
+    await step('working-under-the-draft')
+    await dock.locator('[data-studio-themes]').focus()
 
     const dark = await page.evaluate(() => document.documentElement.classList.contains('dark'))
     await page.keyboard.press('\\')
@@ -125,7 +131,6 @@ export const themeStudio: Scenario = {
     await setAccent(page, await cssToken(page, '--primary'))
     await dock.getByRole('button', { name: 'Apply', exact: true }).click()
     await dock.waitFor({ state: 'detached' })
-    await page.waitForFunction(async () => true)
     let applied = themeId(await userSettings(page))
     for (let attempt = 0; attempt < 20 && applied === themeId(before); attempt += 1) {
       await page.waitForTimeout(100)
@@ -143,5 +148,20 @@ export const themeStudio: Scenario = {
       'Apply saves the edited colors as a palette and points the theme at it',
     )
     await step('applied')
+
+    const appliedLook = {
+      background: await background(page),
+      primary: await cssToken(page, '--primary'),
+    }
+    await page.reload()
+    await waitForApp(page)
+    await page.waitForFunction(
+      (look) =>
+        getComputedStyle(document.documentElement).getPropertyValue('--primary').trim() ===
+        look.primary,
+      appliedLook,
+    )
+    strictEqual(await background(page), appliedLook.background, 'Reload lands on the applied theme')
+    await step('reloaded')
   },
 }

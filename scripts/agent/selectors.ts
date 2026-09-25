@@ -236,6 +236,7 @@ export const selectors = {
       .getByRole('tab', { name, exact: true }),
   themeStudioCard: (page: Page, id: string) =>
     page.locator(`[data-studio-themes] [role="option"][data-theme-id="${id}"]`),
+  titlebar: (page: Page) => page.locator('header[data-native-window-drag-region]').first(),
   themeStudioOpen: (page: Page) => page.getByRole('button', { name: 'Open studio', exact: true }),
   quickOpenPreview: (page: Page) => page.getByRole('region', { name: 'File preview', exact: true }),
   pickerColumn: (page: Page, index: number) => page.locator(`[data-picker-column="${index}"]`),

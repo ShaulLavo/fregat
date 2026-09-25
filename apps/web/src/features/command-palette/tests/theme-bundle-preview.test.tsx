@@ -18,7 +18,7 @@ test('theme preview cancels without saving and selection writes the bundle', asy
   queryClient.setQueryData(settingsKeys.document(), before)
   const options = {
     application: createTestApplicationRuntime(),
-    command: { paletteOpen: true, paletteSearch: 'bundle sage' },
+    command: { paletteOpen: true, paletteSearch: 'theme sage' },
     queryClient,
   }
   const first = renderWithProviders(

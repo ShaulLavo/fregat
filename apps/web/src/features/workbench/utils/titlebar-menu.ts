@@ -8,6 +8,7 @@ import {
   GearSixIcon,
   type Icon,
   MoonIcon,
+  PaintBrushIcon,
   PaletteIcon,
   SquaresFourIcon,
   SunIcon,
@@ -84,6 +85,7 @@ export function titlebarMenu(context: TitlebarMenuContext): Menu {
       }),
     ]),
     section('settings', [
+      commandItem('workspace.openThemeStudio', { icon: PaintBrushIcon, label: 'Theme…' }),
       commandItem('workspace.showSettings', { icon: GearSixIcon, label: 'Settings…' }),
     ]),
     section('copy', [
