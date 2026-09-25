@@ -32,7 +32,11 @@ own status lines are often stale.
   without restoring it byte for byte.
 - A decision the plan has no recommendation for.
 
-## Worktree protocol (every lane)
+## Lane protocol (L1–L9)
+
+Every lane works in its own worktree and branch and delivers **one pull request**. Lanes never
+push to `main` and never deploy. The owner merges the PRs, then deploys from the main checkout.
+All lanes start at once; nobody waits for another lane or for Plan 165.
 
 **Setup**
 
@@ -47,47 +51,45 @@ bun install
 `/work/worktrees/platform/Editor -> /work/projects/Editor` already exists. The
 `packages/editor-*` symlinks resolve through it. Never delete it.
 
+After the first commit, open a draft PR and keep pushing to it:
+
+```bash
+git push -u origin lane/<lane>
+gh pr create --draft --base main --title "Lane <lane>: <short name>" --body "<queue, progress checklist>"
+```
+
 **Working**
 
 - Run your own Vite on your lane's port: `cd apps/web && WEB_PORT=<port> bun ../../scripts/run-with-env.ts vite --port <port> --strictPort`.
   Drive it with `WEB_PORT=<port> bun run agent:browser …`, which spawns a throwaway API server
   from your worktree. The shared dev server on 5173 serves `main`'s code, not yours. Never use
-  `--shared-dev` from a lane.
+  `--shared-dev` or `--url …/platform/` from a lane.
 - Run tests with `TMPDIR=/work/tmp`, because `/tmp` is tmpfs and the LSP tests fail there.
 - Commit with `LEFTHOOK_EXCLUDE="typecheck repo"`, because that job deadlocks in a fresh
   worktree. Typecheck `apps/server` and `apps/web` by hand before committing.
-- Land small and often, one plan phase per landing. The longer a lane sits unlanded, the worse
-  its rebase gets.
-
-**Landing**
+- One commit or more per plan phase, pushed as soon as it passes. After each plan, rebase so
+  the final merge stays small:
 
 ```bash
 git fetch origin && git rebase origin/main
-# generated files: regenerate, never hand-merge
-bun run settings:schema && bun run settings:reference
-bun run gates    # plus the narrow tests and typecheck your change could break
-git push origin HEAD:main    # rejected? fetch, rebase, re-run gates, push again
+bun run settings:schema && bun run settings:reference   # regenerate, never hand-merge
+bun run gates                                           # plus your narrow tests and typecheck
+git push --force-with-lease
 ```
 
-**Deploying**: always from the main checkout, never from a worktree. A release's
-`server/node_modules` is a symlink into the checkout that built it, so a release deployed from
-a worktree breaks when that worktree is removed. The lock serializes deploys and Editor builds:
+- Keep the PR body's checklist current: done, skipped (why), owner questions, owner checks.
+  Keep CI green (`gh pr checks`).
 
-```bash
-flock /work/tmp/platform-deploy.lock sh -c '
-  cd /work/projects/platform && git pull --rebase --autostash &&
-  bun run deploy --slug=<lane>-<plan> [--server]'
-```
+**Shared files.** In `plans/README.md` and `PLAN.md`, edit only your own plans' rows. Delete a
+plan file in the same commit as its last phase. If you add a database migration, say so in
+the PR body; whoever merges second renumbers it. L6's 132 P4 removes migrations altogether,
+and its PR body says which other lanes' migrations it must absorb.
 
-If the autostash conflicts, stop and report; another session's uncommitted work is in the way.
-Then check `GET /platform/release`, and run `look` or a read-only scenario against the mesh.
+**Plan 165 (fonts)** is being implemented, uncommitted, in the main checkout by another session.
+Stay out of `apps/server/src/fonts/`, `lib/fonts`, `boot-appearance.ts` and `apply-appearance.ts`
+until it is on `main`. The settings registry is fine to add keys to; regenerate on rebase.
 
-**Shared files.** In `plans/README.md` and `PLAN.md`, edit only your own plans' rows, and
-re-read the file right before you commit. Delete a plan file in the same landing as its last
-phase. Database migrations: `git pull` before adding one, and renumber on rebase until L6 lands
-132 P4 (after that there are no migrations).
-
-**Editor** (lane L7 only). This is the only lane that edits `/work/projects/Editor`:
+**Editor** (lane L7 only). This is the only lane that edits the Editor repo:
 
 ```bash
 git -C /work/projects/Editor worktree add /work/worktrees/Editor/L7 -b lane/L7 origin/main
@@ -96,43 +98,46 @@ cd /work/worktrees/Editor/L7 && bun install && bun run build
 
 - Test inside the Editor worktree: `test`, `bench:check`, `health`, `check:full-text`, and
   `format:check` with `packages/*/node_modules/.bin/oxfmt`.
-- Never `bun link` from a worktree. It repoints every session's links. To try a change in
-  Platform, repoint only L7's Platform worktree `node_modules/@singapore-editor/*` links
-  (`bun install` restores them).
-- Land the Editor change additively first: push `lane/L7:main`, then under the deploy lock
-  `cd /work/projects/Editor && git pull --rebase --autostash && bun run build`. Then land the
-  Platform half, and last any removals. Platform CI builds Editor `main`, so an API break
-  without its Platform half turns CI red.
+- Never `bun link` from a worktree. It repoints every session's links. For the Platform half,
+  point only L7's Platform worktree `node_modules/@singapore-editor/*` links at the Editor
+  worktree (`bun install` restores them).
+- L7 opens two PRs, one per repo. The Platform PR body says the Editor PR merges first,
+  followed by `bun run build` in `/work/projects/Editor`, because Platform CI builds Editor
+  `main`.
 
-**Finish.** When the queue is empty: `git worktree remove /work/worktrees/platform/<lane>`, then
-`git branch -d lane/<lane>`.
+**Finish.** When the queue is empty: final rebase, gates, push, `gh pr ready`, then
+`git worktree remove /work/worktrees/platform/<lane>` (the branch stays for the PR).
+
+**After merging** (owner, or a session asked to): from `/work/projects/platform`, `git pull`,
+then `bun run deploy --server --slug=<lane>`, then `GET /platform/release`.
 
 ## Every run of a lane
 
 A lane may run under `/loop`, so every run starts by finding its place:
 
 1. Check that your worktree `/work/worktrees/platform/<lane>` exists; create it per the protocol
-   if not. Read `git log origin/main` for what your lane already landed, and your plans' status.
+   if not. Read your branch's `git log` and your PR's checklist (`gh pr view`) for what is done.
 2. Take the next unfinished item in your queue. Read the plan and its audit report, then
    reconcile the plan against current source.
 3. Implement, then verify: narrow tests with `TMPDIR=/work/tmp`, `bun run gates`, and
    `agent:browser` on your port for anything visible (read the screenshot back).
-4. Land (rebase, push `HEAD:main`), deploy from the main checkout under the lock, and update or
-   delete the plan file in the same landing.
+4. Commit, push to your PR, tick the checklist, and update or delete the plan file.
 5. Open decision with a recommendation: apply it and write
    `Decided 2026-09-25: recommendation (completion wave)` in the plan. Hard stop: write the
-   question under "Owner questions" in the plan, skip the item, and continue.
-6. Queue empty: remove your worktree and report what landed, what was skipped and why, and the
-   pending owner checks. Then end the loop.
+   question under "Owner questions" in the plan and the PR body, skip the item, and continue.
+6. Queue empty: finish per the protocol, report the PR link, what was done, what was skipped
+   and why, and the pending owner checks. Then end the loop.
 
 ## Lanes
 
 Port = the lane's `WEB_PORT`. "Owns" lists the files the lane may change freely. Anything else,
-touch only in small, quickly landed commits.
+touch only in small commits and say so in the PR body.
 
-### W0 — bookkeeping (runs first, alone, short)
+### W0 — bookkeeping (main checkout, no worktree, no PR)
 
-Other lanes rebase onto it, so it lands before they touch `plans/README.md`.
+Works directly in `/work/projects/platform` and `/work/projects/Editor` and pushes to `main`.
+Other sessions have uncommitted work there: commit only your own paths with
+`git commit -- <paths>`, never `git add -A`, stash or reset. Lanes pick W0 up on their next rebase.
 
 - Delete completed plan files: 101, 103, 106, 107, 113, 115, 116, 118, 119, 123, 127, 133, 136,
   137, 138, 146, and `145-harness-controls/approval-rules.md`. Close 125 (move its three
@@ -147,9 +152,7 @@ Other lanes rebase onto it, so it lands before they touch `plans/README.md`.
 
 ### L0 — font catalog (already running in the main checkout)
 
-Plan 165 is being implemented, uncommitted, by another session in `/work/projects/platform`.
-Until it lands, no lane touches `apps/server/src/fonts/`, `lib/fonts`, `boot-appearance.ts`,
-`apply-appearance.ts`, or the settings registry, except through a rebase.
+Plan 165, by another session. See the protocol's Plan 165 note.
 
 ### L1 — UI base and polish · port 5211
 
@@ -162,7 +165,7 @@ Owns `packages/ui/**`, `globals.css`, `virtual-list.tsx`, the design census, `fe
    restore (these two need 157's dot).
 4. **164** close-out: metadata font sweep, then delete the plan.
 5. **159** file picker, P1–P6 in order (P3 and P4 may go early).
-6. **124** theme studio, after L0 lands. Fold the `bundle ` scope into `theme ` (D12).
+6. **124** theme studio, once Plan 165 is on `main` (otherwise skip it and note it in the PR). Fold the `bundle ` scope into `theme ` (D12).
 7. **154** physical mode last (take the D6 recommendation). P7 haptics is parked with 143.
 
 ### L2 — honest chat states · port 5212
@@ -183,8 +186,8 @@ Owns `apps/server/src/orchestration/{decider,provider-command-reactor,pending-re
 
 Owns `apps/server/src/provider/adapters/codex-protocol/**`, `provider/usage-*`, `features/chat`
 message and session menus, `agents-panel`, Settings › Usage. It shares `claude.ts` and
-`codex.ts` with L2: L2 owns approval and turn-end paths, L3 everything else. Land each change
-in small commits.
+`codex.ts` with L2: L2 owns approval and turn-end paths, L3 everything else. Keep your edits
+there small and list them in the PR body.
 
 1. **145** Codex schema refresh (once, first), then export, fork, background-tasks, hooks,
    mcp-status and custom-agents, each with its recommendation.
@@ -270,8 +273,8 @@ Owns `apps/server/src/git/**`, the worktree lifecycle, `features/git/**` (except
 
 EXT-15 submodules, EXT-14 fast-forward pull, EXT-18 branch drift, LIFE-14 (server side), EXT-01
 forges, EXT-03 clone/publish, EXT-04 setup scripts (trust model as recommended), EXT-02 PR
-workspace (after L8's 139 research), LIFE-06 auto-settle, EXT-12 with the LIFE-12 cleanup,
-INTERACTION-13 worktree prep (hand it to L2 once it lands). Each row closes with its scenario.
+workspace (only if 139's research is on `main`; otherwise skip it and note it in the PR), LIFE-06 auto-settle, EXT-12 with the LIFE-12 cleanup,
+INTERACTION-13 worktree prep. Each row closes with its scenario.
 
 ## Parked (not in this wave)
 
@@ -291,5 +294,6 @@ INTERACTION-13 worktree prep (hand it to L2 once it lands). Each row closes with
 
 ## Running it
 
-Start W0 and let it push. Then start L2, L3, L5, L6, L7 and L9. Start L1, L4 and L8 once Plan
-165 has landed on main. Each lane's prompt names its lane and queue and points back here.
+Start W0 and L1–L9 together, one session each, all in `/work/projects/platform`. Each lane's
+prompt names its lane and points back here. Merge order suggestion: W0 is already on `main`;
+then L6 (helpers and 132 P4), L7 Editor PR then its Platform PR, then the rest in any order.
