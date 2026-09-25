@@ -55,7 +55,8 @@ async function enableWal(database: Database) {
       database.exec('PRAGMA journal_mode = WAL')
       return
     } catch (error) {
-      if (!(error instanceof SQLiteError) || error.code !== 'SQLITE_BUSY') throw error
+      // The low byte is SQLITE_BUSY for recovery and timeout variants too.
+      if (!(error instanceof SQLiteError) || (error.errno & 0xff) !== 5) throw error
       if (Date.now() >= deadline) throw error
     }
     await setTimeout(10)

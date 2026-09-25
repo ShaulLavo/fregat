@@ -1,7 +1,8 @@
 import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { environmentIdSchema, healthDescriptorSchema } from '@workspace/contracts'
 import * as v from 'valibot'
-import { Database } from 'bun:sqlite'
+import { Database, SQLiteError } from 'bun:sqlite'
+import { vi } from 'vitest'
 
 import { openFileStorage, type FileStorage } from '@/storage/files'
 import { recentCommands, RECENT_COMMANDS } from '@/storage/recent-commands-policy'
@@ -12,33 +13,61 @@ import { startStorageWriter } from '../../../test/factories/storage-writer'
 const firstEnvironment = v.parse(environmentIdSchema, '11111111-1111-4111-8111-111111111111')
 const secondEnvironment = v.parse(environmentIdSchema, '22222222-2222-4222-8222-222222222222')
 
-test('initialization waits for a reader to release the journal-mode lock', async ({ server }) => {
-  const directory = `${server.root}/cache`
-  await mkdir(directory)
-  const database = new Database(`${directory}/${firstEnvironment}.sqlite`)
-  database.exec('CREATE TABLE state (key TEXT PRIMARY KEY, value TEXT NOT NULL) STRICT')
-  database.query('INSERT INTO state VALUES (?, ?)').run('saved', 'preserved')
-  database.exec('BEGIN')
-  database.query('SELECT * FROM state').all()
-  const release = setTimeout(() => database.exec('COMMIT'), 100)
-  try {
-    const storage = await openFileStorage(directory, firstEnvironment)
+test.for(['primary', 'recovery'])(
+  'initialization waits for a reader to release the journal-mode lock (%s)',
+  async (variant, { server }) => {
+    const directory = `${server.root}/cache`
+    await mkdir(directory)
+    const database = new Database(`${directory}/${firstEnvironment}.sqlite`)
+    database.exec('CREATE TABLE state (key TEXT PRIMARY KEY, value TEXT NOT NULL) STRICT')
+    database.query('INSERT INTO state VALUES (?, ?)').run('saved', 'preserved')
+    database.exec('BEGIN')
+    database.query('SELECT * FROM state').all()
+    const recovery = variant === 'recovery' ? reportRecoveryBusy() : undefined
+    const release = setTimeout(() => database.exec('COMMIT'), 100)
     try {
-      expect(storage.getItem('saved')).toBe('preserved')
-      storage.setItem('new', 'writable')
-      expect(storage.getItem('new')).toBe('writable')
-      expect(database.query('SELECT value FROM state WHERE key = ?').get('new')).toEqual({
-        value: 'writable',
-      })
-      expect(database.query('PRAGMA journal_mode').get()).toEqual({ journal_mode: 'wal' })
+      const storage = await openFileStorage(directory, firstEnvironment)
+      try {
+        expect(storage.getItem('saved')).toBe('preserved')
+        storage.setItem('new', 'writable')
+        expect(storage.getItem('new')).toBe('writable')
+        expect(database.query('SELECT value FROM state WHERE key = ?').get('new')).toEqual({
+          value: 'writable',
+        })
+        expect(database.query('PRAGMA journal_mode').get()).toEqual({ journal_mode: 'wal' })
+      } finally {
+        storage.close()
+      }
     } finally {
-      storage.close()
+      clearTimeout(release)
+      recovery?.mockRestore()
+      database.close()
     }
-  } finally {
-    clearTimeout(release)
-    database.close()
-  }
-})
+  },
+)
+
+function reportRecoveryBusy() {
+  const exec = Database.prototype.exec
+  return vi.spyOn(Database.prototype, 'exec').mockImplementation(function (
+    this: Database,
+    ...args
+  ) {
+    try {
+      return exec.apply(this, args)
+    } catch (error) {
+      throw recoveryBusy(error)
+    }
+  })
+}
+
+function recoveryBusy(error: unknown): unknown {
+  if (!(error instanceof SQLiteError) || error.code !== 'SQLITE_BUSY') return error
+  // Translate the real lock failure to the recovery variant captured in CI.
+  return Object.create(error, {
+    code: { value: 'SQLITE_BUSY_RECOVERY' },
+    errno: { value: 261 },
+  })
+}
 
 test('initialization reports a persistent database lock without changing saved values', async ({
   server,
