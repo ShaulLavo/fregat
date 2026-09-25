@@ -12,6 +12,7 @@ export function ScriptRow({
 }) {
   return (
     <CommandItem
+      disabled={script.origin === 't3.json' && !script.saved}
       keywords={[script.command]}
       title={script.command}
       value={script.command}

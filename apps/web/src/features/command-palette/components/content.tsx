@@ -326,6 +326,7 @@ export function CommandPaletteContent() {
         closePalette(false)
       },
       selectScript: async (script) => {
+        if (script.origin === 't3.json' && !script.saved) return
         // Running a file's script saves what it runs, never its setup flags: that takes an import.
         saveProjectScript({ name: script.name, command: script.command })
         queueTerminalCommand(script.command)

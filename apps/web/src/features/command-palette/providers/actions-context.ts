@@ -1,3 +1,4 @@
+import type { ProjectScriptSuggestion } from '@/features/chat-mode/utils/project-scripts'
 import type { FilesystemPath, TabContent } from '@/lib/documents/utils/types'
 import { createContext } from 'react'
 import type { OrchestrationProjectScript, ScopedProjectRef } from '@workspace/contracts'
@@ -16,7 +17,7 @@ export type CommandPaletteActions = {
   readonly selectGotoLine: (target: GotoLineTarget) => Promise<void>
   readonly selectPlatformCommand: (command: PlatformCommandId) => Promise<void>
   /** Runs a project script in the terminal, revealing one if none is open. */
-  readonly selectScript: (script: OrchestrationProjectScript) => Promise<void>
+  readonly selectScript: (script: ProjectScriptSuggestion) => Promise<void>
   /** Saves a project file's scripts, with their setup flags, as the project's own. */
   readonly importScripts: (scripts: readonly OrchestrationProjectScript[]) => void
   /** Reveals chat mode, activates the owning project, and puts the session on the stage. */

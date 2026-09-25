@@ -43,6 +43,18 @@ test('hands the picked script to the runner, command and all', async () => {
   )
 })
 
+test('previews file scripts until the user imports them', async () => {
+  const actions = renderScripts([
+    { command: 'echo setup', name: 'Setup project', saved: false, origin: 't3.json' },
+  ])
+  await userEvent.click(screen.getByText('Setup project'))
+  expect(actions.selectScript).not.toHaveBeenCalled()
+  await userEvent.click(screen.getByText('Import scripts from t3.json'))
+  expect(actions.importScripts).toHaveBeenCalledWith([
+    expect.objectContaining({ command: 'echo setup' }),
+  ])
+})
+
 test('says a project has no scripts instead of showing an empty list', () => {
   renderScripts([])
 

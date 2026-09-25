@@ -1,3 +1,4 @@
+import { strictEqual } from 'node:assert/strict'
 import { readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
@@ -42,6 +43,8 @@ export const worktreeSetupImport: Scenario = {
       await runPaletteCommand(page, 'Run project script')
       const importRow = page.getByRole('option', { name: 'Import scripts from t3.json' })
       await importRow.waitFor({ timeout: 15_000 })
+      const preview = selectors.paletteOptions(page).filter({ hasText: 'Install' })
+      strictEqual(await preview.getAttribute('aria-disabled'), 'true')
       await step('import-offered')
       await importRow.click()
       await selectors.toast(page, 'Imported 1 script').waitFor({ timeout: 15_000 })
