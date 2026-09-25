@@ -75,6 +75,24 @@ structured error.
 
 ## Phase 2 — dev plumbing (items 3, 9, 10, 12)
 
+Landed 2026-09-25 (lane L4):
+
+- Item 3: the server keeps the content version of each app write in memory (`fs/app-writes.ts`) and
+  answers `GET /fs/app-write?path&version`. The Vite plugin (`apps/web/scripts/app-save-hmr-plugin.ts`)
+  asks with the version it read, so an outside edit after an app save still hot-updates.
+  `app-save-marker.ts` and its `~/.platform` file are deleted; `vite.config.ts` no longer imports
+  `apps/server/src`.
+- Item 9: already true in effect. `scripts/dev.ts` and the desktop app compute
+  `SERVER_ALLOWED_ORIGINS` from `runtime-network.ts` for the port they chose; the server's
+  hardcoded list is only the fallback for a bare `bun src/index.ts`. `serverUrlFromEnv` is now the
+  one place that derives the API URL (Vite plugin, TUI launcher).
+- Item 10, partly: the freshness walk no longer gives up silently; an overrun names the unverified
+  directories. Serving every typecheck from the generated source-mapped tsconfig is not done: it
+  typechecks the Editor's source under Platform's settings, which lane L7 owns.
+- Item 12: the forced reload stays, with a comment naming the missing `import.meta.hot.dispose` in
+  `@singapore-editor/react`'s controller and ghostty-webgpu's `Terminal`; both fixes live in those
+  repos.
+
 Save notifications over the server channel. Origins come from `SERVER_ALLOWED_ORIGINS` or options
 only, computed once in `runtime-network.ts`. One generated tsconfig, the one `dev-sources.ts` already
 writes, serves every typecheck path. HMR disposal in the editor and terminal packages, then delete

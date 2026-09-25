@@ -1,5 +1,6 @@
 import { Elysia } from 'elysia'
 import {
+  appWriteQuerySchema,
   copyBodySchema,
   createFileBodySchema,
   createFolderBodySchema,
@@ -39,6 +40,10 @@ export function fsRoutes(fs: FileSystemService) {
       })
       .get('/tree', ({ query }) => fs.tree(query.path, query.depth, query.entryType), {
         query: treeQuerySchema,
+      })
+      // The dev server asks whether a change it saw is the app's own save.
+      .get('/app-write', ({ query }) => fs.isAppWrite(query.path, query.version), {
+        query: appWriteQuerySchema,
       })
       .get('/read', ({ query }) => fs.read(query.path, query.acceptTextOnly), {
         query: readQuerySchema,

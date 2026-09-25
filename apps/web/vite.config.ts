@@ -2,14 +2,14 @@ import path from 'node:path'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig, type Plugin } from 'vite'
-import { portFromEnv } from '../../scripts/runtime-network'
+import { portFromEnv, runtimeUrl, serverUrlFromEnv } from '../../scripts/runtime-network'
 import {
   readDevSources,
   reportDevSources,
   resolveDevSource,
   type DevPackage,
 } from '../../scripts/dev-sources'
-import { consumeAppSave } from '../server/src/fs/app-save-marker'
+import { appSaveHmrPlugin } from './scripts/app-save-hmr-plugin'
 import { bundleStatsPlugin } from './scripts/bundle-stats-plugin'
 import { demoPreviewPlugin } from './scripts/demo-preview-plugin'
 import { devPagePlugin } from './scripts/dev-page-plugin'
@@ -51,7 +51,10 @@ export default defineConfig(({ command, isPreview, mode }) => {
       demoPreviewPlugin(__dirname),
       devPagePlugin(),
       devSourcePlugin(packages),
-      platformSelfSaveHmrPlugin(),
+      appSaveHmrPlugin({
+        url: serverUrlFromEnv(process.env),
+        origin: runtimeUrl(devServerHost, devServerPort),
+      }),
       react({
         // Vitest configs keep `compiler: true`: the flag would reprint every diagnostic per run.
         compiler: { logDiagnostics: true },
@@ -117,27 +120,13 @@ function devSourcePlugin(packages: readonly DevPackage[]): Plugin {
       }
       return null
     },
-    // Mounted editor and terminal instances retain old implementations after Fast Refresh.
+    // Mounted editors and terminals keep the old implementation after Fast Refresh: neither
+    // @singapore-editor/react's controller nor ghostty-webgpu's Terminal has `import.meta.hot.dispose`.
     hotUpdate: {
       order: 'pre',
       handler({ file }) {
         if (!roots.some((root) => file.startsWith(`${root}${path.sep}`))) return
         this.environment.hot.send({ type: 'full-reload' })
-        return []
-      },
-    },
-  }
-}
-
-function platformSelfSaveHmrPlugin(): Plugin {
-  return {
-    name: 'platform-self-save-hmr',
-    apply: 'serve',
-    hotUpdate: {
-      order: 'pre',
-      handler({ file }) {
-        if (!consumeAppSave(file)) return
-
         return []
       },
     },

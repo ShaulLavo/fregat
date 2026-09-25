@@ -13,7 +13,7 @@ import { readTree } from './tree'
 import { getBlobFile, readTextFile } from './read'
 import { writeTextFile } from './write'
 import { textFileVersion } from './version'
-import { forgetAppSave, recordAppSave } from './app-save-marker'
+import { AppWrites } from './app-writes'
 import { createFile, createFolder } from './create'
 import { renamePath } from './rename'
 import { deletePath } from './delete'
@@ -130,6 +130,7 @@ export class FileSystemService {
   readonly systemRoot
   readonly defaultPath
   readonly metadata
+  private readonly appWrites = new AppWrites()
   private readonly maxSearchContentBytes
   private readonly maxTextFileBytes
   private readonly workspaceEditJournalRoot
@@ -316,12 +317,13 @@ export class FileSystemService {
   }
 
   private async writeObserved(target: MutationTarget<'content'>, body: WriteBody) {
+    const version = textFileVersion(body.content)
+    await this.appWrites.record(target.absolutePath, version)
     const write = this.beginWriteEvents(target, body)
-    recordAppSave(target.absolutePath)
     try {
       return await this.publishWrittenFile(target, body, write)
     } catch (error) {
-      forgetAppSave(target.absolutePath)
+      await this.appWrites.forget(target.absolutePath, version)
       throw error
     } finally {
       if (write) this.changes.finishWrite(write)
@@ -581,6 +583,14 @@ export class FileSystemService {
 
     this.metadata.recordPicked(entry)
     return entry
+  }
+
+  isAppWrite(absolutePath: string, version: string) {
+    return observeRequestOperation(
+      { area: 'fs', operation: 'app_write', path: absolutePath },
+      async () => ({ appWrite: await this.appWrites.matches(absolutePath, version) }),
+      (result) => result,
+    )
   }
 
   async *events(

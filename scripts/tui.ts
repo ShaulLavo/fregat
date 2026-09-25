@@ -1,7 +1,7 @@
 import path from 'node:path'
 
 import { observabilityEnvFromFile } from '../packages/observability/src/env-file'
-import { portFromEnv, runtimeUrl } from './runtime-network'
+import { serverUrlFromEnv } from './runtime-network'
 
 const root = path.resolve(import.meta.dirname, '..')
 
@@ -20,10 +20,7 @@ export async function launchTui({
       arg === '--help' ||
       arg === '-h',
   )
-  env.VITE_SERVER_URL ??= runtimeUrl(
-    env.FS_HOST ?? env.HOST ?? '127.0.0.1',
-    portFromEnv(env, 'PORT', 3001),
-  )
+  env.VITE_SERVER_URL = serverUrlFromEnv(env)
   const child = Bun.spawn({
     cmd: [process.execPath, ...(watch ? ['--watch'] : []), entrypoint, ...args],
     cwd: path.join(root, 'apps/tui'),

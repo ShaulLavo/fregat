@@ -46,6 +46,11 @@ export const pathQuerySchema = v.object({
   path: v.optional(pathSchema, ''),
 })
 
+export const appWriteQuerySchema = v.object({
+  path: pathSchema,
+  version: v.pipe(v.string(), v.maxLength(128)),
+})
+
 export const readQuerySchema = v.object({
   path: v.optional(pathSchema, ''),
   acceptTextOnly: v.optional(booleanQueryValueSchema),
