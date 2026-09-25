@@ -32,7 +32,7 @@ type StubSubscription = {
  * the server checks the point before storing it.
  */
 export async function installPushPlatform(options: PushPlatformOptions = {}) {
-  const endpoint = options.endpoint ?? 'https://push.example.test/device-one'
+  const endpoint = options.endpoint ?? 'https://fcm.googleapis.com/device-one'
   const keys = await subscriberKeys()
   let subscription: StubSubscription | null = null
   const forget = () => {

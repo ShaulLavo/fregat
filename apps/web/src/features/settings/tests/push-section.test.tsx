@@ -34,7 +34,7 @@ test('asks permission from the button, subscribes, and marks this device', async
   const platform = await installPushPlatform({ permission: 'default', holdSubscribe: true })
   const pushed: string[] = []
   msw.use(
-    http.post('https://push.example.test/*', ({ request }) => {
+    http.post('https://fcm.googleapis.com/*', ({ request }) => {
       pushed.push(request.headers.get('content-encoding') ?? '')
       return new HttpResponse(null, { status: 201 })
     }),
@@ -77,7 +77,7 @@ test('asks permission from the button, subscribes, and marks this device', async
 test('drops an expired device from the list and says so', async ({ client }) => {
   void client
   const platform = await installPushPlatform({ permission: 'granted' })
-  msw.use(http.post('https://push.example.test/*', () => new HttpResponse(null, { status: 410 })))
+  msw.use(http.post('https://fcm.googleapis.com/*', () => new HttpResponse(null, { status: 410 })))
   const rendered = renderWithProviders(
     <>
       <Section />
@@ -211,7 +211,7 @@ test('shows why the browser could not subscribe', async ({ client }) => {
 })
 
 test('reuses a subscription made with the server’s key', async ({ client }) => {
-  const endpoint = 'https://push.example.test/kept'
+  const endpoint = 'https://fcm.googleapis.com/kept'
   const platform = await installPushPlatform({
     permission: 'granted',
     existing: { endpoint, applicationServerKey: await serverKey(client) },
@@ -232,8 +232,8 @@ test('reuses a subscription made with the server’s key', async ({ client }) =>
 
 test('replaces a subscription made with an older server key', async ({ client }) => {
   void client
-  const old = 'https://push.example.test/old'
-  const fresh = 'https://push.example.test/fresh'
+  const old = 'https://fcm.googleapis.com/old'
+  const fresh = 'https://fcm.googleapis.com/fresh'
   const olderKey = new Uint8Array(65).fill(9)
   const platform = await installPushPlatform({
     permission: 'granted',

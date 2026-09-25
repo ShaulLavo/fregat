@@ -532,7 +532,7 @@ describe('observability runtime', () => {
     const root = await fixtureRoot()
     const logDir = await fixtureRoot()
     initializeObservability(testObservabilityEnv(logDir))
-    const endpoint = 'https://push.example.test/PUSH_ENDPOINT_MARKER'
+    const endpoint = 'https://fcm.googleapis.com/PUSH_ENDPOINT_MARKER'
     let answer: (url: string) => Promise<Response> = async () => new Response(null, { status: 201 })
     const app = createTestApp({
       auth: { allowedOrigins: [TRUSTED_ORIGIN] },
@@ -591,7 +591,7 @@ describe('observability runtime', () => {
       failure: null,
       kind: 'test',
       outcome: 'sent',
-      service: 'other',
+      service: 'google',
       status: 201,
     })
     expect(pushContext(410)).toEqual({
@@ -599,7 +599,7 @@ describe('observability runtime', () => {
       failure: null,
       kind: 'test',
       outcome: 'expired',
-      service: 'other',
+      service: 'google',
       status: 410,
     })
     expect(pushContext(502)).toEqual({
@@ -607,7 +607,7 @@ describe('observability runtime', () => {
       failure: 'TypeError',
       kind: 'test',
       outcome: 'unreachable',
-      service: 'other',
+      service: 'google',
       status: null,
     })
     const serialized = JSON.stringify(events)
