@@ -47,6 +47,11 @@ export async function resolveForgeContext(input: {
   return context
 }
 
+/** Drops a checkout's cached forge after this server changes its remotes. */
+export function forgetForgeContext(cwd: string) {
+  contexts.delete(cwd)
+}
+
 async function selectContext(input: {
   cwd: string
   remoteUrl?: string

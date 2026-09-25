@@ -32,6 +32,7 @@ import type {
   GitPathsBody,
 } from './contracts'
 import { parseDiff, rewriteBlobPatchPaths } from './diff'
+import { forgetForgeContext } from './forges/registry'
 import {
   createForgeRepository,
   createPullRequest,
@@ -731,6 +732,7 @@ export class GitService {
     let name = 'origin'
     for (let suffix = 1; remotes.has(name); suffix += 1) name = `origin-${suffix}`
     await this.git(root, ['remote', 'add', name, url])
+    forgetForgeContext(root)
     return name
   }
 
