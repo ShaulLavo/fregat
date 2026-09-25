@@ -138,7 +138,11 @@ async function namespaceIdOf(context: ForgeContext, namespace: string) {
 }
 
 function glab(context: ForgeContext, args: readonly string[]) {
-  return forgeCommand(context, ['glab', ...args])
+  return forgeCommand(context, [
+    'glab',
+    ...args,
+    ...(args[0] === 'api' ? ['--hostname', context.forge.host] : []),
+  ])
 }
 
 function toPullRequest(request: v.InferOutput<typeof mergeRequestSchema>): GitPullRequest {

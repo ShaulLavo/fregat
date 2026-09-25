@@ -44,12 +44,26 @@ export const forgejo: ForgeProvider = {
   async pullRequests(context, { branches, state }) {
     const login = await requireLogin(context)
     const query = `state=${state === 'open' ? 'open' : 'all'}&sort=recentupdate&limit=${PAGE_SIZE}`
-    const result = requireSuccess(
-      context,
-      await tea(context, ['api', '--login', login.name, apiUrl(login, context, `pulls?${query}`)]),
-      'pulls',
-    )
-    const pulls = parseForgeJson(context, v.array(pullSchema), result.stdout, 'pulls')
+    const pulls: v.InferOutput<typeof pullSchema>[] = []
+    for (let page = 1; ; page += 1) {
+      const result = requireSuccess(
+        context,
+        await tea(context, [
+          'api',
+          '--login',
+          login.name,
+          apiUrl(login, context, `pulls?${query}&page=${page}`),
+        ]),
+        'pulls',
+      )
+      const entries = parseForgeJson(context, v.array(pullSchema), result.stdout, 'pulls')
+      pulls.push(...entries)
+      if (
+        entries.length < PAGE_SIZE ||
+        branches.every((branch) => pulls.some((pull) => pull.head.ref === branch))
+      )
+        break
+    }
     // Newest first, so the first match per branch is its latest pull request.
     return new Map(
       [...new Set(branches)].map((branch) => {

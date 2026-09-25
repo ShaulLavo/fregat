@@ -369,8 +369,34 @@ describe('Forgejo', () => {
       'api',
       '--login',
       'codeberg',
-      'https://codeberg.org/api/v1/repos/owner/repo/pulls?state=all&sort=recentupdate&limit=50',
+      'https://codeberg.org/api/v1/repos/owner/repo/pulls?state=all&sort=recentupdate&limit=50&page=1',
     ])
+  })
+
+  it('finds a branch beyond the first full page', async () => {
+    const forge = boundary(remote, (argv) => {
+      if (argv[1] === 'login') return json(logins)
+      const page = new URL(argv.at(-1) ?? '').searchParams.get('page')
+      const pull = (number: number, branch: string) => ({
+        number,
+        title: branch,
+        html_url: `https://codeberg.org/owner/repo/pulls/${number}`,
+        state: 'open',
+        head: { ref: branch },
+      })
+      return json(
+        page === '2'
+          ? [pull(51, 'old-open')]
+          : Array.from({ length: 50 }, (_, i) => pull(i + 1, `other-${i}`)),
+      )
+    })
+    const result = await readBranchPullRequests(
+      { cwd: await checkout(), branches: ['old-open'] },
+      forge,
+    )
+    expect(result.kind === 'ready' && result.pullRequests.get('old-open')).toMatchObject({
+      number: 51,
+    })
   })
 
   it('is signed out when no login matches the host', async () => {
@@ -577,6 +603,31 @@ describe('repository creation', () => {
     expect(forge.calls.find((call) => call.argv.includes('projects'))?.argv).toEqual(
       expect.arrayContaining(['path=app', 'visibility=public', 'namespace_id=42']),
     )
+  })
+
+  it('binds remote-free GitLab publishing to the selected authenticated host', async () => {
+    const host = 'gitlab.internal'
+    const forge = boundary('', (argv) => {
+      const selected = argv[argv.indexOf('--hostname') + 1]
+      const authenticated = new Set(['gitlab.com', host])
+      const targetHost = authenticated.has(selected ?? '') ? selected : 'gitlab.com'
+      if (argv[1] === 'auth') return ok()
+      if (argv.includes('namespaces/team')) return json({ id: 12 })
+      return json({
+        web_url: `https://${targetHost}/team/app`,
+        http_url_to_repo: `https://${targetHost}/team/app.git`,
+        ssh_url_to_repo: `git@${targetHost}:team/app.git`,
+      })
+    })
+    const result = await createForgeRepository(
+      { ...create('gitlab', 'team/app'), host },
+      await checkout(),
+      forge,
+    )
+    expect(result.url).toBe(`https://${host}/team/app`)
+    for (const call of forge.commands('glab').filter((call) => call.argv[1] === 'api')) {
+      expect(call.argv).toEqual(expect.arrayContaining(['--hostname', host]))
+    }
   })
 
   it('Forgejo creates under the user or an organization', async () => {
