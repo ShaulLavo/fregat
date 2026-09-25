@@ -19,6 +19,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, expect, test } from 'vitest'
 import { ForesightManager } from 'js.foresight'
 import { createBrowserWorkspace } from '../../../../test/factories/browser-workspace'
+import { holdWallClock } from '../../../../test/factories/wall-clock'
 
 import { TestEditorStateProvider as EditorStateProvider } from '../../../../test/factories/editor-state-provider'
 import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
@@ -124,6 +125,7 @@ test(
 
     performance.clearMarks('editor.file_open.file_read')
     performance.clearMarks('editor.worker.request')
+    holdWallClock()
     await triggerForesightElement(row)
     await expect
       .poll(() => performance.getEntriesByName('editor.file_open.file_read').length)

@@ -1485,7 +1485,9 @@ describe('workspace disk search provider', () => {
       useWorkspaceIndex: false,
     }
 
-    const earlyEvents = await collectEvents(findInWorkspaceStream(paths, options))
+    const earlyEvents = await withSortedFd(() =>
+      collectEvents(findInWorkspaceStream(paths, options)),
+    )
     const earlyDone = doneEvent(earlyEvents)
     if (!earlyDone?.measurement?.providerSources.includes('fd')) return
 
@@ -1566,6 +1568,26 @@ async function fixtureRoot() {
   const root = await mkdtemp(path.join(tmpdir(), 'platform-search-'))
   roots.push(root)
   return root
+}
+
+/**
+ * fd sorts what it finds within its first 100 ms and streams in directory order after that, so a
+ * loaded runner changes which names an early batch sees. Buffer the whole run so fd sorts all of it.
+ */
+async function withSortedFd<T>(run: () => Promise<T>) {
+  const fd = Bun.which('fd')
+  if (!fd) return run()
+  const bin = await fixtureRoot()
+  // Options before "$@": the server passes `--` ahead of the pattern.
+  await writeFile(path.join(bin, 'fd'), `#!/bin/sh\nexec '${fd}' --max-buffer-time 60000 "$@"\n`)
+  await chmod(path.join(bin, 'fd'), 0o755)
+  const previous = process.env.PATH
+  process.env.PATH = `${bin}${path.delimiter}${previous}`
+  try {
+    return await run()
+  } finally {
+    process.env.PATH = previous
+  }
 }
 
 async function writeWeakFuzzyNameMatches(root: string) {
