@@ -3,7 +3,8 @@
 ## Status and authorization
 
 - Status: RESEARCH PLAN — the research phase decides what Platform builds; no implementation
-  scope yet.
+  scope yet. Q1–Q3 decided 2026-09-25. The research phase runs after PRs #32 (Plan 148) and #35
+  (Plan 145) merge.
 - Priority: P2. High value for how the owner already works; depends on answers below.
 - Effort: research M; implementation unknown until the capability matrix exists.
 - Risk: MED. Building what a harness already does creates two schedulers and two agent trees.
@@ -86,15 +87,21 @@ that duplicates a harness feature.
   - C: cloud routines.
   - Recommendation: A first. B only for what must outlive a harness process or span Claude and
     Codex.
+  - Decided 2026-09-25: owner — A first, as recommended.
 - **Q2 — Cross-harness agent control.** Should a Claude session be able to start and wait on a
   Codex session (and back) through Platform's own MCP tools once Plan 087 lands?
   Recommendation: yes, as the one clearly Platform-only capability; decide the tool list in the
   research phase.
+  Decided 2026-09-25: owner — yes, as recommended; it waits on Plan 087, whose M1+ the owner
+  discusses first.
 - **Q3 — Unattended permissions.** Unattended runs need either full access or saved approval
   rules ([Plan 145](145-harness-controls.md) covers saved rules). Recommendation: opt-in full access per
   unattended session, never a new default.
+  Decided 2026-09-25: owner — opt-in full access per unattended session, as recommended.
 
 ## Research phase
+
+Runs after PRs #32 and #35 merge (decided 2026-09-25: owner). It uses real provider sessions.
 
 Questions:
 

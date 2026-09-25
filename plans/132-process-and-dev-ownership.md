@@ -2,7 +2,8 @@
 
 Status: **PHASE 1 IMPLEMENTED AND DEPLOYED 2026-09-23** (release
 `20260923T083633Z-51995766-plan-131-132-phase1`); Phases 2–4 proposed; D4 decided
-2026-09-21: delete the migrations. Requested 2026-09-21. Phase 1 outcome:
+2026-09-21: delete the migrations. Phase 4's backup and reset of the dev and prod databases
+approved 2026-09-25, after all lanes merge. Requested 2026-09-21. Phase 1 outcome:
 item 1 — each desktop child is spawned `detached` (its own process group, so one signal also reaches
 Vite's node child) and recorded with its `ps lstart` in `~/.platform/desktop/<hash of root>.json`;
 launch stops only live leased groups, then a held port is `desktop.PORT_IN_USE` in a native dialog
@@ -104,6 +105,13 @@ number.
 
 Landing this means deleting the dev and mesh databases once. Sessions, chat history and terminal
 history in them are lost; say so in the deploy reason.
+
+Decided 2026-09-25: owner — approved: back up, then reset, the dev database
+(`/work/platform-dev/home/fs-metadata.sqlite`) and the production database
+(`~/.platform/fs-metadata.sqlite`), after all completion-wave lanes have merged. Phase 4 lands
+last, against the final migration chain. Constraint: production already has migrations applied up
+to version 30, so the one schema must cover everything through the final merged chain, and the
+backup is taken from that version-30 database.
 
 ## Verification
 

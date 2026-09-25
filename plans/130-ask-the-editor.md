@@ -10,7 +10,7 @@ pane class, re-running the diff projection to index into it, and relying on a ru
 An audit the same day found the pattern again, in nine places on the Platform side of the
 Editor boundary. This plan removes them. Its Editor counterparts are
 [E047](../../Editor/docs/display/e047-point-queries.md) and
-[E050](../../Editor/plans/e050-host-obligations-into-api.md).
+[E050](../../Editor/docs/architecture/e050-host-obligations.md).
 
 ## What is on the table
 

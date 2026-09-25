@@ -98,6 +98,7 @@ LIFE-01/02 implementation shipped on 2026-09-20; [delivery evidence](archive-del
 
 ### LIFE-07 — P1: Match unread defaults, manual unread, and wake state
 
+- **Closed 2026-09-25.** Decided 2026-09-25: owner — close on the existing `session-unread` scenario; native and mobile controls carry on under EXT-09.
 - **Status/confidence:** Confirmed mismatch, HIGH.
 - **Evidence:** Upstream `Sidebar.logic.ts:635–643` treats never-visited history as read; invalid stored visit as unread. Local `packages/client-core/src/chat/rail/unread.ts:25–29` treats absent seen stamp as unread. Upstream `uiStateStore.ts:250–295` makes visits monotonic and supports mark-unread by a stamp before completion; `threadActionMenu.logic.ts:122` and `Sidebar.tsx:3984–3989` expose single/bulk actions. Local `session-read-store.ts:24–49` only marks seen and permits an older stamp to replace a newer one; `use-mark-session-seen.ts:12–19` never records a visit before the first completion. Upstream `Sidebar.tsx:1112–1128` distinguishes unread and woke, including persistent timer-wake prominence.
 - **Impact:** Importing/opening the app lights historical sessions as unread; users cannot deliberately mark one unread; seeing a session before its first completion is not represented as a visit; snooze wake acknowledgment cannot be expressed.

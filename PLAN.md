@@ -122,11 +122,13 @@ the delivered shared runtime and has not started.
 ## Document contribution refactor
 
 [Plan 099](plans/099-document-contributions.md) is proposed; implementation has not started.
+Decided 2026-09-25: owner — units 0–1 are approved to start; units 2–7 stay gated as the plan says.
 It extends Editor's existing buffer owner with one committed-revision publication path and a
 document contribution runtime. Tree-sitter, Shiki, minimap, and language-service adapters share
 source synchronization while retaining typed APIs, independent queues, and domain-specific data.
 Text delivery uses ordinary strings/chunks and incremental edits in the existing separate workers.
 The syntax migration removes SAB text transport while preserving atomic cancellation and packed results.
+Decided 2026-09-25: owner — the SAB transport is deleted ahead of 099 as Editor E057, a small task.
 
 Its internal order is calibrated baseline and consumer inventory, canonical publication, shared
 runtime with all syntax callers, minimap, local/external LSP, remaining ownership checks, a
@@ -135,9 +137,10 @@ can proceed independently. Public backend cutover follows completed Plan 098 the
 it does not bypass their required order. Preserve WorkspaceEdit segment publication and
 compensation, prepared adoption, and the existing input latency limits.
 
-This proposal does not reorder other lanes. Editor E009 supplies transport measurement scope and
-evidence for the strings decision. E014 parallel search must reuse this runtime if implemented.
-Shared text storage and worker consolidation are outside the refactor; E013 remains deferred research.
+This proposal does not reorder other lanes. Editor E009 supplied transport measurement scope and
+evidence for the strings decision; it is folded into 099 unit 6 (2026-09-25). E014 parallel search
+must reuse this runtime if implemented. Shared text storage and worker consolidation are outside the
+refactor; E010, E012 and E013 were closed as no-go on 2026-09-25.
 
 ## Instant workspace reload (completed 2026-09-21)
 
@@ -231,6 +234,8 @@ platform guard permits Linux and macOS only.
 
 Requested 2026-09-11. [Plan 087](plans/087-stateless-mcp.md) precedes
 [Plan 088](plans/088-native-code-intelligence.md). Both are proposed; implementation has not started.
+Decided 2026-09-25: owner — approve 087 milestone M0 only; M1+ is discussed with the owner before
+anything else in 087 or 088 starts.
 
 Plan 087 delivers managed external MCP servers and an authenticated native tool endpoint. The
 required wire revision is stateless MCP `2026-07-28`, implemented with explicitly configured SDK v2.
@@ -308,7 +313,8 @@ The completed plan file is deleted; the implementation reference owns the contra
 
 Three independent follow-ups remain proposed:
 Plan 101 recovers the values truncation hides,
-Plan 102 settled scrollbars, nested-scroll containment and keyboard chips (done 2026-09-25, lane L1), and
+[Plan 102](plans/102-scroll-and-keyboard-affordance.md) settles scrollbars, nested-scroll
+containment and keyboard chips, and
 Plan 103 finishes the loading, empty and error states
 `CLAUDE.md` already decided (closed 2026-09-20, implemented and deployed). Each names the decisions that need confirmation before implementation.
 They preserve the implemented design tokens and extend the existing census and browser verifier.
@@ -341,14 +347,11 @@ and the existing syntax registrations. CSS-in-JS was considered and rejected: cu
 runtime, and Tailwind keeps resolving to tokens. [The research](docs/theme-standardization-reference.md)
 records the Omarchy reuse strategy and the T3 Code and CodexThemes-App comparisons.
 
-The theme studio (Plan 124) replaced 117's surface without touching its data on 2026-09-25: the
-live workbench is the preview, and a bottom dock holds one draft theme with Themes, Colors, Code,
-Wallpaper and Surfaces tabs. Colors can be taken from a wallpaper; `theme ` in the palette switches
-whole themes and `code ` picks code colors. Settings keeps one Theme row that opens the studio.
-The Code tab's sample is the code-theme preview beside the list, because a folderless root cannot
-host editor tabs. Theme actions sit beside the strip and act on the chosen card. Import from Omarchy
-is gone from the UI because its four themes are bundled. Scenarios `theme-studio` and
-`theme-studio-library` prove it.
+[Plan 124](plans/124-theme-studio.md), requested 2026-09-19, replaces 117's surface without touching
+its data: the live workbench is the preview, a bottom dock over it holds one draft theme with
+Themes, Colors, Code, Wallpaper and Surfaces tabs, colors can be derived from a wallpaper, and the
+`theme ` palette scope switches whole themes. The settings row, creation dialog, variant editors and
+the separate palette, code-theme and wallpaper widgets are deleted in the same pass.
 
 The [design-token foundation](docs/web-design-language.md) is implemented. Coordinate `globals.css`
 edits with Plans 101–103; do not interleave edits to the same files. Plan 085 and Plan 115 share the
@@ -396,9 +399,13 @@ Two research plans feed the lane and are not executable as written:
 [Plan 110](plans/110-workspace-indexing.md) asks what belongs in a workspace index beyond the file
 index that already exists, with Shiki grammar prefetch, Plan 088's semantic retrieval, Plan 108's
 document graph and search as its waiting consumers.
+Its smallest consumer, the language census for grammar and theme prefetch, is split out as
+[Plan 170](plans/170-language-census.md) (decided 2026-09-25: owner).
 [Plan 111](plans/111-editor-decorations.md) compares `@singapore-editor`'s inline-replacement layer against
 CodeMirror 6 decorations and Lexical's decorator nodes, and gates Plan 108 Phase 2, any later
 Obsidian mode, and the question of whether the chat composer still needs Lexical.
+Decided 2026-09-25: owner — 111's research is authorized with the composer as its first consumer,
+and runs before the next wave.
 
 Coordinate shared editor and chat surfaces with Plans 101–103 and 115; do not interleave edits to the same
 files. Plan 085 owns first paint and restoration, which this lane measures but does not change.
@@ -455,7 +462,7 @@ Suggested order (steps 1–4 done by 2026-09-23; step 5 is in progress):
    and the row-layout fast path has no equivalence test. Done: Editor `2f801f7` and `7a37f10`.
 4. [E049](../Editor/docs/architecture/e049-no-silent-misses.md), Plan 133. Done: E049 in Editor
    `f715d11`; Plan 133's four phases 2026-09-23, D1 moved to Plan 134 and closed there.
-5. [E050](../Editor/plans/e050-host-obligations-into-api.md) row by row, each unlocking its Plan 130
+5. [E050](../Editor/docs/architecture/e050-host-obligations.md) row by row, each unlocking its Plan 130
    Phase 5 item. In progress: rows re-checked 2026-09-24; row 1 (`setText` with tokens), row 5 (press
    participants), row 6 (plugin keymap context keys) and typography options (2026-09-25) done.
    Rows 8 (`onDidScroll`) and 4 (theme keys) unlock Plan 130 Phase 5 items 8 and 10; the rest are
@@ -490,7 +497,7 @@ phases or splits them into executable plans; not all research happens up front.
 | [140](plans/140-editor-agent-advantage.md) | research                 | Editor context into chat, fix with AI, diagnostics fed back to the agent                                                    |
 | [141](plans/141-usage-and-rate-limits.md)  | executable               | Rate-limit meter, usage page with cost, usage history                                                                       |
 | [142](plans/142-web-push.md)               | executable after a spike | Web Push from the mesh server                                                                                               |
-| [143](plans/143-phone-layout.md)           | discussion               | What the phone is for; web layout versus the later companion app                                                            |
+| [143](plans/143-phone-layout.md)           | direction approved       | What the phone is for; web layout versus the later companion app                                                            |
 | [144](plans/144-unattended-agent-work.md)  | research                 | Scheduled, looping and multi-agent work: surface what the harnesses already do, build only the rest                         |
 | [145](plans/145-harness-controls.md)       | small executable plans   | Fork, approval rules, MCP status, background tasks, hooks, custom agents, compact, export                                   |
 
@@ -506,8 +513,7 @@ Suggested order:
 4. The research phases of Plans 139 and 140. Plan 140's diagnostics work waits on Plans 087 and
    088; its editor-to-chat work does not.
 5. Plan 144's capability inventory. It decides how much of that lane is built rather than surfaced.
-6. Plan 143 is a conversation with the owner first. Nothing is implemented until its direction is
-   approved.
+6. Plan 143: direction approved 2026-09-25 (two lazy shells behind one URL; Tailscale now, pairing URL, relay later). Research phase next.
 
 ## Daily-driver lane
 
@@ -550,21 +556,21 @@ surfaces, the file picker and the site. The owner is taking it one topic at a ti
 | 161 (done, lane L2)                         | Approval lifecycle, stopped turns, streaming holds, folding rules, hostile-state scenarios                 |
 | [162](plans/162-context-and-cost.md)        | Context breakdown, usable-window fullness, session totals, usage-page honesty (after Plan 141)             |
 | 163 (done, lane L2)                         | Screenshot attachment in the composer (export lives in Plan 145's export plan)                             |
-| [165](plans/165-font-catalog.md)            | Nerd Fonts + Fontsource on demand; interface-font setting; curated autocomplete picker                     |
+| 165 (done)                                  | Nerd Fonts + Fontsource on demand; interface-font setting; curated autocomplete picker                     |
 | [166](plans/166-shortcuts-editor.md)        | Keyboard shortcuts page rebuilt from VS Code research: full-width list, save on Enter, several per command |
 | [155](plans/155-site-demo-replica.md)       | Placeholder: the site hero becomes an animated replica of the app, like cursor.com                         |
 | [156](plans/156-documents-in-the-editor.md) | Placeholder, far future: PDF, DOCX, XLSX, PPTX and CSV as editor documents agents can edit                 |
 
 Suggested order:
 
-1. Plan 157, the base components, is done (lane L1, 2026-09-25): `Tabs`, `HoldButton`, `StatusDot`,
-   scroll fades, typeahead refine.
-2. Plans 160–163 in any order once their decisions are answered. Plan 158 is complete with recorded branch parents, tail following and
+1. Plan 157, the base components. Queued next by the owner.
+2. Plans 158–163 in any order once their decisions are answered. 158 builds on 157's status dot and
    scroll utilities; 160 and 161 touch the same timeline rows, so land them one after the other.
-3. Plan 164 is done: the first pass (`03f241fc`, `e8156148`), square status dots (Plan 157) and the
-   metadata font sweep (lane L1, 2026-09-25).
+3. Plan 164's first pass shipped (`03f241fc`, `e8156148`); what is left is a metadata font sweep. The
+   square status dots belong to Plan 157.
 4. Plan 165, the font catalog, is done (`d9c6069e`, review `7ad4c866`, 2026-09-25).
-5. Plan 154 is implemented: [physical feel](docs/physical-feel.md). The owner’s device check is pending; phone haptics stay parked with 143.
+5. Plan 154 near the end. Phases 1–3 may land earlier; Phases 4–6 wait for the base components so
+   every new primitive is wired and audited once. D6 (settings semantics) comes first.
 6. Plans 155 and 156 are placeholders; their research phases run when the site or documents matter.
 7. Plan 166 any time; its research phase runs first, and it takes 102 P3, 157 and 080 from `main` as
    they land.
@@ -575,8 +581,9 @@ Not in the [completion wave](docs/completion-wave.md), each for the reason given
 
 - [Plan 114](plans/114-polaron-shell.md), a desktop shell we own (tao, wry, Bun as a child). It
   needs an explicit go/no-go, and it collides with the desktop work in Plans 132 and 149.
-- [Plan 168](plans/168-flat-file-view.md), a flat file view under a chosen root. It was Editor
-  E030; all of its work is in Platform. Quick open covers most of the need.
+- Plan 168, a flat file view under a chosen root (ex-Editor E030): dropped 2026-09-25 by owner:
+  tree search covers it. Decided 2026-09-25: owner — drop it; the file tree's existing search
+  already covers the need. Its plan file is deleted; git history keeps it.
 - Plan 105 Phase 4, dropping the `/platform` route prefix. It needs service-level names in mesh,
   which no mesh task covers. The rest of Plan 105 is done and its file is deleted; the hashed-asset
   carry-forward between releases moved to Plan 109.
