@@ -1,7 +1,8 @@
 # Processes, leases and dev plumbing each get an owner
 
 Status: **PHASE 1 IMPLEMENTED AND DEPLOYED 2026-09-23** (release
-`20260923T083633Z-51995766-plan-131-132-phase1`); Phases 2–4 proposed; D4 decided
+`20260923T083633Z-51995766-plan-131-132-phase1`); Phases 2–4 proposed; research question 1
+(Vite memory) answered 2026-09-25, see Research findings; D4 decided
 2026-09-21: delete the migrations. Phase 4's backup and reset of the dev and prod databases
 approved 2026-09-25, after all lanes merge. Requested 2026-09-21. Phase 1 outcome:
 item 1 — each desktop child is spawned `detached` (its own process group, so one signal also reaches
@@ -122,6 +123,116 @@ backup is taken from that version-30 database.
    graph. Measure with heap snapshots of the Vite process before and after a scenario run, and
    compare the retained module-graph and transform-cache sizes. The answer decides whether this
    joins Phase 2.
+
+## Research findings (2026-09-25)
+
+Research id `132mem`. The question came from the 2026-09-25 brief and landed on main while the
+work ran; the text above is the one answered. Measured on Vite 8.3.0, rolldown 1.2.8,
+`@vitejs/plugin-react` 6.1.1 (`oxc-transform-react` 0.145.0), Node 26.7.0, 28 cores, Platform at
+`9f343825`, Editor linked from `/work/projects/Editor` as every lane does.
+
+### How it was measured
+
+One Vite on port 5397 in a research worktree, launched as
+`node --inspect --heapsnapshot-signal=SIGUSR2 node_modules/vite/bin/vite.js` inside the heavy-slot
+wrapper. A throwaway config wrapped `apps/web/vite.config.ts` with a probe plugin that put the dev
+server on `globalThis`. After every step a CDP client forced two GCs and read
+`process.memoryUsage()`, the module graph (modules, `transformResult` code and map sizes) and
+transform counts, and the shell read RSS, swap and the `[anon:mimalloc]` mappings from
+`/proc/<pid>/smaps`. Pages came from `bun run agent:browser look` (its own API server per run).
+Editor churn was simulated by emitting watcher `change` events for Editor sources, which runs
+Vite's real invalidation and the `platform-dev-sources` reload hook without touching the shared
+checkout. Heap snapshots were taken after the first look and after three in-process restarts and
+summarised by a streaming parser. Scripts and raw logs: `/work/tmp/research/132mem/`.
+
+### Answer: neither suspect; the memory is native, from rolldown's dependency optimizer
+
+The JS heap never exceeded 150 MB outside restarts. RSS sits in mimalloc arenas owned by the
+rolldown binding (both it and `oxc-transform-react` link mimalloc; the growth follows optimizer
+runs, which are rolldown bundles).
+
+| Step (settled, after GC)                                 | RSS                                       | mimalloc      | JS heap            |
+| -------------------------------------------------------- | ----------------------------------------- | ------------- | ------------------ |
+| Warm optimizer cache, boot + first page                  | 662 MB                                    | 320 MB        | 148 MB             |
+| Same, after 10 `look` runs                               | 663 MB                                    | 320 MB        | 147 MB             |
+| Same, after 3 × 60 Editor files changed + look           | 684 MB                                    | 337 MB        | 148 MB             |
+| Same, after 3 × 391 Editor files changed + look          | 694 MB                                    | 346 MB        | 148 MB             |
+| Cold optimizer cache, boot + first look (two runs)       | 2500–2580 MB                              | 2136–2238 MB  | 147 MB             |
+| Warm, then 5 forced optimizer runs, no restart, no pages | 710 → 2152 → 2478 → 2709 → 2887 → 2914 MB | 353 → 2268 MB | 147 MB             |
+| Then 3 in-process `server.restart(true)` + look          | 2996 → 3502 → 3749 MB                     | 2821 MB       | 240 → 333 → 425 MB |
+
+- **Fresh pages are not it.** Ten fresh-browser looks moved RSS by 1 MB. The whole transform cache
+  is 2,775 modules holding 22.6 MB of code and 30.7 MB of source maps.
+- **Linked Editor re-transforms are not it.** Re-transforming all 391 Editor source files three
+  times added 30 MB and levelled off.
+- **A cold optimizer cache is.** The first scan and pre-bundle leave about 2.2 GB in mimalloc that is
+  never returned, so a lane Vite starting on a fresh worktree or after a lockfile or config change
+  reaches 2.5 GB before the first scenario finishes. That matches L4's 2.06 GB ten minutes after a
+  restart. Each later optimizer run adds less (+1155, +327, +231, +175, +27 MB) and it levels off
+  near 2.3 GB of mimalloc. Upstream calls this fragmentation across rolldown's long-lived tokio and
+  rayon threads, not live memory: rolldown#10985 (tracking allocator shows ~26 MB live while RSS
+  grows) and rolldown#9330 (Vite 8 dev ~7× Vite 7's footprint). This process runs 98 threads.
+- **In-process restarts leak for real.** Each `server.restart` kept the old server: the JS heap
+  grew 92 MB per restart and the snapshot holds 8 `EnvironmentModuleGraph` objects (4 servers ×
+  client and ssr) against 2 before, with 25,483 module nodes against 6,195. The retainer path is
+  `(Global handles) → closure onWarn → getEnv → envs → DevEnvironment → moduleGraph`: the callbacks
+  Vite passes to rolldown's native `vite:resolve-builtin` plugin are held as native handles that are
+  never released (`BindingCallableBuiltinPlugin` 11 → 41). That is rolldown#10887, open, reproduced
+  upstream on the same 1.2.8. Vite restarts in-process whenever a config dependency changes;
+  `vite.config.ts` pulls in `scripts/dev-sources.ts`, `scripts/runtime-network.ts`,
+  `apps/server/src/fs/app-save-marker.ts`, `apps/server/src/home.ts` and five plugins under
+  `apps/web/scripts/`; commits on main touched those files five times on 2026-09-25.
+- None of this is fixed in the newest releases (Vite 8.3.1, rolldown 1.2.11); their notes do not
+  mention it.
+
+Two mitigations were measured on a cold cache (settled after three looks, no change in look time,
+9–10 s each):
+
+| Environment                                  | RSS          | Threads |
+| -------------------------------------------- | ------------ | ------- |
+| defaults                                     | 2.50–2.58 GB | 98      |
+| `RAYON_NUM_THREADS=4`                        | 2.04 GB      | 50      |
+| `MIMALLOC_PURGE_DELAY=0`                     | 2.03 GB      | 98      |
+| `RAYON_NUM_THREADS=4 MIMALLOC_PURGE_DELAY=0` | 1.31–1.35 GB | 50      |
+| `RAYON_NUM_THREADS=1 MIMALLOC_PURGE_DELAY=0` | 1.19 GB      | 44      |
+
+`MIMALLOC_PURGE_DELAY=0` alone also cut the five-optimizer-run case from 2.91 GB to 1.68 GB.
+
+Two smaller findings on the same path:
+
+- The linked Editor packages are in `optimizeDeps.exclude`, so the scanner never reads their
+  imports. `diff`, `evlog/client` and `shiki/textmate` (imported from `packages/editor-core` and
+  `packages/editor-diff` sources) are discovered on the first page, which re-runs the whole
+  pre-bundle and reloads the page; in the first run, the pages after that added
+  `@shikijs/engine-oniguruma` and `remark-stringify` in a third bundle. Listing the linked sources
+  in `optimizeDeps.entries` made the scan find them: reloads 1 → 0, memory unchanged (2.60 GB).
+- `devSourcePlugin` watches whole package roots (11,916 watched paths) and sends `full-reload`
+  for any change under them, `dist/`, `bench/` and `.turbo/` included. 1,661 files under Editor
+  `dist/` changed on 2026-09-25, and one Editor `bun run build` rewrites them all, so every open
+  page reloads for files the dev graph never loads. This is item 12's hook.
+
+**Recommendation: yes, it joins Phase 2**, as three small changes:
+
+1. Launch Vite with `RAYON_NUM_THREADS=4 MIMALLOC_PURGE_DELAY=0`, in `apps/web`'s `dev:vite`
+   (`run-with-env.ts` already takes leading assignments). Halves a lane's steady state, measured.
+2. Add the linked sources to `optimizeDeps.entries` from `readDevSources`, excluding tests and
+   benches, so a cold start bundles once and the first page does not reload.
+3. Item 12's hook reloads only when `modules` is non-empty. D3 removing
+   `apps/server/src/**` from the config's imports also removes restart triggers, each of which
+   costs about 100 MB until the process exits.
+
+A lane that restarts its Vite process instead of relying on in-process restarts never pays the
+rolldown#10887 leak; nothing else is needed while that issue is open. Revisit the environment
+settings when rolldown#10985 or #10887 ships a fix.
+
+Not measured: heavy scenarios that start language servers inside the same memory scope (the
+`editor-type-burst` run was killed by systemd-oomd at 6.4 GB for the whole scope, Vite at
+~2.9 GB including swap), and the settings on a machine with fewer cores.
+
+### Owner questions
+
+None. The environment settings touch only the dev server and are measured; the rest is ordinary
+Phase 2 work.
 
 ## Verification
 
