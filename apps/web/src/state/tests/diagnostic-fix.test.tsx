@@ -115,6 +115,7 @@ test('captures the source machine before awaiting the diagnostic file read', asy
   const destinations: ComposerDestination[] = []
   const fix = createDiagnosticFix({
     attach: {
+      appendText: () => false,
       attachText: () => false,
       attachTerminalContext: () => false,
       attachTextToNewChat: async (_source, _text, destination) => {

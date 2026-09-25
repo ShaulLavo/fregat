@@ -106,9 +106,18 @@ test('an empty inbox never touches the draft', () => {
 })
 
 test('an append waits for a caret like text does', () => {
-  useComposerInboxStore.getState().queueAppend('Create a document using this $skill about…')
+  useComposerInboxStore.getState().queueAppend('Create a document using this $skill about…', HERE)
 
   renderHook(() => useComposerInbox(TARGET, noEditor(), false))
 
   expect(useComposerInboxStore.getState().pending.map((entry) => entry.kind)).toEqual(['append'])
+})
+
+test('append from a different workspace stays queued even after an editor is ready', () => {
+  const elsewhere = { ...HERE, rootPath: '/other' }
+  useComposerInboxStore.getState().queueAppend('Use template', elsewhere)
+  renderHook(() => useComposerInbox(TARGET, noEditor(), true))
+  expect(useComposerInboxStore.getState().pending).toEqual([
+    { kind: 'append', text: 'Use template', destination: elsewhere },
+  ])
 })

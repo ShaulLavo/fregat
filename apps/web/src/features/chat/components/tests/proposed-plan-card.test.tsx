@@ -131,6 +131,13 @@ function proposedPlan(
 test.each([
   { markdown: '# Plan\n\nRun tests\n\nRun tests', text: 'Run tests', occurrence: 1, line: 5 },
   { markdown: '# Plan\n\nUse **strict** mode', text: 'Use strict mode', occurrence: 0, line: 3 },
+  {
+    markdown:
+      '# Plan\n\nRun tests\n\n::artifact-template{artifact_kind="document" display_name="Design" skill_name="artifact-template-design" skill_directory="/skills/design"}\n\nRun tests',
+    text: 'Run tests',
+    occurrence: 1,
+    line: 7,
+  },
 ])(
   'anchors selected rendered text at its source location: $markdown',
   async ({ markdown, text, occurrence, line }) => {

@@ -13,6 +13,7 @@ export type ComposerDestination = {
  * over what they captured and where; chat decides which composer and draft it lands in.
  */
 export type ComposerAttach = {
+  readonly appendText: (source: string, text: string, destination: ComposerDestination) => boolean
   readonly attachText: (source: string, text: string, destination: ComposerDestination) => boolean
   readonly attachTerminalContext: (
     selection: TerminalContextSelection | null,

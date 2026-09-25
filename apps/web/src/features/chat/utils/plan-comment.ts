@@ -27,7 +27,10 @@ function boundaryLine(node: Node, offset: number, end: boolean): number | null {
   prefix.setEnd(node, offset)
   const text = end ? prefix.toString().trimEnd() : prefix.toString()
   const line = Number(source.dataset.sourceLine) + text.split('\n').length - 1
-  return Math.min(line, Number(source.dataset.sourceEndLine))
+  const lineOffset = Number(
+    source.closest<HTMLElement>('[data-source-line-offset]')?.dataset.sourceLineOffset ?? 0,
+  )
+  return lineOffset + Math.min(line, Number(source.dataset.sourceEndLine))
 }
 
 /** What the agent reads above the comment: the plan's own lines, quoted. */

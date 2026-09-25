@@ -63,6 +63,12 @@ export function createComposerAttach(bus: Pick<PlatformCommandBus, 'dispatch'>):
     return true
   }
 
+  const appendText = (source: string, text: string, destination: ComposerDestination) => {
+    if (!useComposerInboxStore.getState().queueAppend(text, destination)) return false
+    reveal(source, destination, { textLength: text.trim().length })
+    return true
+  }
+
   // Persist before navigation so replacing the mounted composer preserves the prompt.
   const attachTextToNewChat = async (
     source: string,
@@ -83,5 +89,5 @@ export function createComposerAttach(bus: Pick<PlatformCommandBus, 'dispatch'>):
     return opened
   }
 
-  return { attachTerminalContext, attachText, attachTextToNewChat }
+  return { appendText, attachTerminalContext, attachText, attachTextToNewChat }
 }

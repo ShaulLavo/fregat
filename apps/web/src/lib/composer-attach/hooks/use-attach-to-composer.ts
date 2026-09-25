@@ -18,6 +18,7 @@ export function useAttachToComposer(rootPath: string) {
   return useMemo(() => {
     const destination = { environmentId, rootPath }
     return {
+      appendText: (source: string, text: string) => attach.appendText(source, text, destination),
       attachText: (source: string, text: string) => attach.attachText(source, text, destination),
       attachTerminalContext: (selection: Parameters<typeof attach.attachTerminalContext>[0]) =>
         attach.attachTerminalContext(selection, destination),

@@ -82,7 +82,7 @@ export function AssistantMarkdown({
   const segments = splitArtifactTemplateMarkdown(renderedText, streaming)
   const onlyMarkdown =
     segments.length === 1 && segments[0]?.kind === 'markdown' ? segments[0].markdown : null
-  const renderMarkdown = (markdown: string, live: boolean) => (
+  const renderMarkdown = (markdown: string, live: boolean, lineOffset = 0) => (
     <Markdown
       caret={live}
       className={cn('max-w-full min-w-0 break-words whitespace-pre-wrap', className)}
@@ -91,6 +91,7 @@ export function AssistantMarkdown({
       remarkPlugins={remarkPlugins}
       streaming={live}
       text={markdown}
+      sourceLineOffset={lineOffset}
     />
   )
 
@@ -101,7 +102,9 @@ export function AssistantMarkdown({
     }
     const live = streaming && index === segments.length - 1
 
-    return <Fragment key={index}>{renderMarkdown(segment.markdown, live)}</Fragment>
+    return (
+      <Fragment key={index}>{renderMarkdown(segment.markdown, live, segment.lineOffset)}</Fragment>
+    )
   }
 
   return (
