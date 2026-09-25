@@ -32,6 +32,8 @@ The chat mode button in the window toolbar, or an address URL with `/chat/`.
 
 `scenario session-pull-request-sync` puts `scripts/agent/fixtures/fake-gh.mjs` first on the throwaway server's PATH through `Scenario.prepareServer`, with a draft pull request for any branch. A new-worktree session's worktree must carry `pullRequest.status: found` (#12, draft) on the shell without any request from the page, and the fake's `calls.jsonl` must show a GraphQL request that asked about one branch only: the shared checkout is never looked up.
 
+`scenario session-auto-settle` uses the same fake forge with a merged pull request closed after the session began. The server's settlement sweep, triggered by the pull request sync, must move the session to the Settled shelf with `settledAt` equal to its creation time (it never ran a turn). `createFakeForge` in `scripts/agent/fake-forge.ts` and `committedFixture` in `fixture-workspace.ts` are shared by the three session scenarios.
+
 `scenario session-actions-surfaces` creates one metadata-only session (no provider turn) and drives the shared session actions from every surface: Rename from the rail row, Pin/Unpin and Rename from the chat stage header, then Rename, Snooze/Unsnooze, a cancelled Delete and Archive from the editor sidebar chat header. Each result is read back from the server's shell snapshot; the session is deleted at the end. Rename runs only after its menu has closed — an open popup pulls focus back and the field would blur shut.
 
 `scenario chat-diff-syntax --url <session-diff-address>` checks painted syntax colors in a session checkpoint diff.

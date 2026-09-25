@@ -51,6 +51,7 @@ const branchPullRequestsSchema = v.object({
           v.object({
             ...pullRequestSchemaEntries(),
             state: v.picklist(['OPEN', 'CLOSED', 'MERGED']),
+            closedAt: v.nullable(v.string()),
           }),
         ),
       }),
@@ -139,7 +140,7 @@ async function queryBranchPullRequests(
   const fields = branches
     .map(
       (_, index) =>
-        `b${index}: pullRequests(headRefName: $h${index}, first: 1, orderBy: {field: CREATED_AT, direction: DESC}, states: [OPEN, CLOSED, MERGED]) { nodes { number title url state isDraft } }`,
+        `b${index}: pullRequests(headRefName: $h${index}, first: 1, orderBy: {field: CREATED_AT, direction: DESC}, states: [OPEN, CLOSED, MERGED]) { nodes { number title url state isDraft closedAt } }`,
     )
     .join(' ')
   const query = `query($owner: String!, $name: String!, ${variables}) { repository(owner: $owner, name: $name) { ${fields} } }`
@@ -327,8 +328,11 @@ function parsePullRequest(stdout: string): GitPullRequest | null {
   return pullRequest ? toPullRequest(pullRequest) : null
 }
 
-function toPullRequest(pullRequest: v.InferOutput<typeof pullRequestSchema>): GitPullRequest {
+function toPullRequest(
+  pullRequest: v.InferOutput<typeof pullRequestSchema> & { closedAt?: string | null },
+): GitPullRequest {
   return {
+    ...(pullRequest.closedAt === undefined ? {} : { closedAt: pullRequest.closedAt }),
     draft: pullRequest.isDraft,
     number: pullRequest.number,
     state: pullRequestState(pullRequest.state),

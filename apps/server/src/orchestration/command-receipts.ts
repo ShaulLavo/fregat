@@ -161,6 +161,7 @@ export function commandAggregate(command: ReceiptCommand) {
     case 'worktree.revive':
       return { id: command.worktreeId, kind: 'worktree' as const }
     case 'session.worktree.release':
+    case 'session.auto-settle':
     case 'session.activity.append':
     case 'session.approval.respond':
     case 'session.archive':

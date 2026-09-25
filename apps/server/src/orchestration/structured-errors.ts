@@ -42,6 +42,13 @@ export const checkpointErrors = defineErrorCatalog('checkpoint', {
 })
 
 export const sessionDomainErrors = defineErrorCatalog('orchestration', {
+  AUTO_SETTLE_STALE: {
+    status: 409,
+    message: ({ sessionId }: { sessionId: string }) =>
+      `Session ${sessionId} changed before automatic settlement`,
+    why: 'The session received activity, a lifecycle choice or live background work after the settlement decision was made.',
+    fix: 'Nothing to do; the next settlement sweep decides again from the current state.',
+  },
   STEER_TURN_NOT_ACTIVE: {
     status: 409,
     message: 'The turn has finished or is waiting for a response. Your message was not sent.',

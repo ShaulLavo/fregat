@@ -22,6 +22,13 @@ export async function createGitFixture(slug: string) {
   })
 }
 
+/** A temp repository with one commit, as `isolatedNativeScenario({ prepareWorktree })` wants it. */
+export async function committedFixture(slug: string) {
+  const fixture = await createGitFixture(slug)
+  await fixtureGit(fixture, ['commit', '--quiet', '-m', 'fixture'])
+  return { path: fixture, release: () => releaseFixture(fixture) }
+}
+
 /** A temp repository where `file` was committed as `before` and now reads `after`, uncommitted. */
 export async function createModifiedFileFixture(
   slug: string,

@@ -272,6 +272,8 @@ export type GitPullRequestSupport =
   | 'no-github-remote'
 
 export type GitPullRequest = {
+  /** Merge or close time, when the lookup asked for it. */
+  closedAt?: string | null
   draft: boolean
   number: number
   state: 'closed' | 'merged' | 'open'

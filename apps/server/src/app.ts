@@ -65,6 +65,7 @@ import { mergeProviderInstanceConfigs } from './provider/utils/instance-config-m
 import { SettingsStore, type SettingsStoreOptions } from './settings/store'
 import { worktreeSubmoduleMode } from './git/submodules'
 import { autoPullEnabled } from './git/auto-pull'
+import { autoSettleRules } from './orchestration/utils/auto-settle-settings'
 import { readBranchPullRequests } from './git/pull-request'
 import type { BranchPullRequestLookup } from './orchestration/pull-request-sync-reactor'
 import { TerminalService, type TerminalPtyFactory } from './terminal/service'
@@ -272,6 +273,7 @@ export function createApp(options: AppOptions) {
     keepImportedSessionsUpdated: () =>
       settings.snapshot().values['chat.keepImportedSessionsUpdated'],
     worktreeSubmodules: (projectId) => worktreeSubmoduleMode(settings, projectId),
+    autoSettleRules: (projectId) => autoSettleRules(settings, projectId),
     pullRequestLookup:
       options.orchestration?.pullRequestLookup === undefined
         ? (input) => readBranchPullRequests(input)
@@ -283,6 +285,9 @@ export function createApp(options: AppOptions) {
     providerRuntime: options.orchestration?.providerRuntime
       ? { checkpointGit: git, providerService }
       : false,
+  })
+  settings.onChange(() => {
+    runDetached(() => orchestration.settleSessions(), { area: 'chat', operation: 'auto_settle' })
   })
   const identity = readEnvironmentIdentity(database)
   const serverConfig = orchestrationWsServerConfig(identity)

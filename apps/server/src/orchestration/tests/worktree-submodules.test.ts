@@ -46,7 +46,7 @@ async function addSubmodule(root: string, url: string, name: string) {
 }
 
 /** Root → middle → leaf, so recursive and top-level produce different trees. */
-async function nestedFixture(settings?: Record<string, unknown>) {
+async function nestedFixture(settings?: (projectId: string) => Record<string, unknown>) {
   const leaf = await repository({ 'leaf.txt': 'leaf\n' })
   const middle = await repository({ 'middle.txt': 'middle\n' })
   await addSubmodule(middle, leaf, 'leaf')
@@ -54,7 +54,8 @@ async function nestedFixture(settings?: Record<string, unknown>) {
   fixtures.push(fixture)
   await addSubmodule(fixture.root, middle, 'middle')
   if (settings) {
-    await writeFile(path.join(fixture.root, '.git', 'settings.json'), JSON.stringify(settings))
+    const values = settings(fixture.registration.projectId)
+    await writeFile(path.join(fixture.root, '.git', 'settings.json'), JSON.stringify(values))
     await fixture.restart()
   }
   return fixture
@@ -88,21 +89,17 @@ test('a new worktree initializes nested submodules by default', async () => {
 })
 
 test('the project override wins over the machine default', async () => {
-  const probe = await worktreeLifecycleFixture()
-  const projectId = probe.registration.projectId
-  await probe.dispose()
-  const fixture = await nestedFixture({
+  const fixture = await nestedFixture((projectId) => ({
     'git.worktreeSubmodules': 'none',
     'git.projectWorktreeSubmodules': { [projectId]: 'top-level' },
-  })
-  expect(fixture.registration.projectId).toBe(projectId)
+  }))
   const worktree = await fixture.create()
   expect(await exists(path.join(worktree.canonicalPath, 'middle', 'middle.txt'))).toBe(true)
   expect(await exists(path.join(worktree.canonicalPath, 'middle', 'leaf', 'leaf.txt'))).toBe(false)
 })
 
 test('none leaves submodules empty, and status offers them for an explicit init', async () => {
-  const fixture = await nestedFixture({ 'git.worktreeSubmodules': 'none' })
+  const fixture = await nestedFixture(() => ({ 'git.worktreeSubmodules': 'none' }))
   const worktree = await fixture.create()
   expect(await exists(path.join(worktree.canonicalPath, 'middle', 'middle.txt'))).toBe(false)
   expect((await status(fixture, worktree.path)).uninitializedSubmodules).toBe(1)

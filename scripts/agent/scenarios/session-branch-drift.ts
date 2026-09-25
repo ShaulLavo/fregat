@@ -1,7 +1,7 @@
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
-import { createGitFixture, fixtureGit, releaseFixture } from '../fixture-workspace'
+import { committedFixture } from '../fixture-workspace'
 import { selectors } from '../selectors'
 import { readShell } from './chat-verification'
 import { isolatedNativeScenario } from './native-provider-verification'
@@ -9,18 +9,12 @@ import { createScriptError } from '../../structured-errors'
 
 const AGENT_BRANCH = 'agent/drift'
 
-async function prepareFixture() {
-  const fixture = await createGitFixture('branch-drift')
-  await fixtureGit(fixture, ['commit', '--quiet', '-m', 'fixture'])
-  return { path: fixture, release: () => releaseFixture(fixture) }
-}
-
 export const sessionBranchDrift = isolatedNativeScenario({
   name: 'session-branch-drift',
   description:
     "A session in its own worktree whose agent runs `git checkout -b`: the worktree's branch in the header follows it when the turn ends.",
   fixture: new URL('../fixtures/native-checkpoint.mjs', import.meta.url),
-  prepareWorktree: prepareFixture,
+  prepareWorktree: () => committedFixture('branch-drift'),
   newWorktree: true,
   async drive(page, { root, step, orchestration, worktreeId, worktreePath }) {
     await writeFile(

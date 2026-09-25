@@ -16,6 +16,8 @@ import { realpath } from 'node:fs/promises'
 import { WorktreeExecutionGate } from './worktree-execution-gate'
 import { WorktreeLifecycleReactor } from './worktree-lifecycle-reactor'
 import { PullRequestSyncReactor, type BranchPullRequestLookup } from './pull-request-sync-reactor'
+import { SessionSettlementReactor } from './session-settlement-reactor'
+import type { AutoSettleRules } from './utils/auto-settlement'
 import { WorktreeCommandPreparation } from './worktree-command-preparation'
 import { TerminalLeaseController } from './terminal-lease-controller'
 import { GitWorktreeService } from '../git/worktrees'
@@ -105,6 +107,8 @@ export type OrchestrationEngineOptions = {
     | Promise<import('./response-delivery').ResponseStreamingMode>
   titleModel?: (projectId: string) => Promise<ModelSelection>
   worktreeSubmodules?: (projectId: string) => WorktreeSubmoduleMode
+  /** Automatic settlement rules for a project; absent, nothing settles on its own. */
+  autoSettleRules?: (projectId: string) => AutoSettleRules
   /** Reads each dedicated worktree's pull request; absent, nothing is synced. */
   pullRequestLookup?: BranchPullRequestLookup
 
@@ -140,6 +144,7 @@ export class OrchestrationEngine {
   private deletionReactor: SessionDeletionReactor | null = null
   private discovery: SessionDiscoveryReconciler | null = null
   private pullRequestSync: PullRequestSyncReactor | null = null
+  private settlement: SessionSettlementReactor | null = null
   private titleReactor: SessionTitleReactor | null = null
   private readonly keepImportedSessionsUpdated: () => boolean
   private providerService: ProviderService | null = null
@@ -190,6 +195,7 @@ export class OrchestrationEngine {
         this.providerCommandReactor = this.createProviderCommandReactor(options)
         this.createWorktreeLifecycle(options)
         this.createPullRequestSync(options)
+        this.createSettlement(options)
         this.createDeletionReactor()
         this.createDiscoveryReconciler()
       },
@@ -198,9 +204,10 @@ export class OrchestrationEngine {
         this.reactorsStarted = true
         if (this.worktreeReactor) this.domainEvents.subscribe(this.worktreeReactor)
         if (this.deletionReactor) this.domainEvents.subscribe(this.deletionReactor)
-        if (this.pullRequestSync) {
-          this.domainEvents.subscribe(this.pullRequestSync)
-          this.pullRequestSync.start()
+        for (const reactor of [this.pullRequestSync, this.settlement]) {
+          if (!reactor) continue
+          this.domainEvents.subscribe(reactor)
+          reactor.start()
         }
         this.subscribeProviderCommandReactor()
         this.scheduleQueuedStarts()
@@ -440,6 +447,7 @@ export class OrchestrationEngine {
     await this.titleReactor?.close()
     await this.discovery?.close()
     await this.pullRequestSync?.close()
+    await this.settlement?.close()
     this.unsubscribeGitMutations?.()
     await this.worktreeReactor?.drain()
     await this.queue
@@ -525,6 +533,7 @@ export class OrchestrationEngine {
         throw sessionImportErrors.CONTINUED({ internal: { sessionId: command.sessionId } })
       }
       this.requireCommandRuntimeOwnership(command)
+      if (command.type === 'session.auto-settle') this.requireAutoSettleCurrent(command)
       if (command.type === 'session.turn.steer')
         this.providerService?.requireSteeringAvailable(command.sessionId)
       this.requireSourceProposedPlan(command)
@@ -542,6 +551,22 @@ export class OrchestrationEngine {
       this.recordDispatchFailure(command, summary, error, fingerprint)
       throw error
     }
+  }
+
+  // Checked on the dispatch queue, so nothing can land between this read and the decision.
+  private requireAutoSettleCurrent(
+    command: Extract<OrchestrationCommand, { type: 'session.auto-settle' }>,
+  ) {
+    const changed = this.eventStore.hasSessionEventAfter(
+      command.sessionId,
+      command.snapshotSequence,
+    )
+    const liveness = this.providerService?.backgroundLiveness(command.sessionId) ?? null
+    if (!changed && liveness === null) return
+    throw sessionDomainErrors.AUTO_SETTLE_STALE({
+      sessionId: command.sessionId,
+      internal: { changedAfter: command.snapshotSequence, changed, liveness },
+    })
   }
 
   private requireSourceProposedPlan(command: OrchestrationCommand | ClientOrchestrationCommand) {
@@ -805,6 +830,24 @@ export class OrchestrationEngine {
       dispatch: (command) => this.enqueue(command),
       getReadModel: () => this.readModel,
     })
+  }
+
+  private createSettlement(options: OrchestrationEngineOptions) {
+    const rules = options.autoSettleRules
+    if (!rules) return
+    this.settlement = new SessionSettlementReactor({
+      getReadModel: () => this.readModel,
+      dispatch: (command) => this.enqueue(command),
+      rules,
+      backgroundLive: (sessionId) => this.providerService?.backgroundLiveness(sessionId) != null,
+    })
+  }
+
+  /** Runs a settlement sweep now, as after a settings change, and waits for it. */
+  async settleSessions() {
+    await this.ready
+    this.settlement?.schedule()
+    await this.settlement?.drain()
   }
 
   /** Test seam: settle an in-flight pull request sweep, then run one more. */
