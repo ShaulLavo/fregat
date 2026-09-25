@@ -1,6 +1,7 @@
 import {
   cpSync,
   existsSync,
+  linkSync,
   lstatSync,
   mkdirSync,
   readdirSync,
@@ -9,6 +10,7 @@ import {
   realpathSync,
   renameSync,
   rmSync,
+  statSync,
   symlinkSync,
   writeFileSync,
 } from 'node:fs'
@@ -128,6 +130,30 @@ export async function buildWeb(release: Release) {
     webPackage,
     path.join(release.directory, 'web-build.log'),
   )
+}
+
+/** How long a hashed asset stays loadable after the release that built it is replaced. */
+export const CARRIED_ASSET_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
+
+/**
+ * A page loaded before a deploy still asks for the hashed chunks of the build it came from. The new
+ * release hardlinks the served release's assets it does not have, up to a week old, so those
+ * requests keep resolving; a hash names one content, so a carried file never shadows a new one.
+ */
+export function carryAssets(fromWeb: string, toWeb: string, now = Date.now()) {
+  const from = path.join(fromWeb, 'assets')
+  const to = path.join(toWeb, 'assets')
+  if (!existsSync(from) || !existsSync(to)) return 0
+  let carried = 0
+  for (const name of readdirSync(from)) {
+    if (existsSync(path.join(to, name))) continue
+    const source = path.join(from, name)
+    const stats = statSync(source)
+    if (!stats.isFile() || now - stats.mtimeMs > CARRIED_ASSET_MAX_AGE_MS) continue
+    linkSync(source, path.join(to, name))
+    carried += 1
+  }
+  return carried
 }
 
 export async function buildServer(release: Release) {

@@ -1,7 +1,9 @@
 # Boot boundaries and a first-load gate
 
-Status: Phases 1–4 done (Phases 2–3 deployed 2026-09-21; Phases 1 and 4 by lane L4 on
-2026-09-25). Left: carrying hashed assets forward between releases in the deploy script. See [Landed](#landed-2026-09-21) for the measured result. Requested
+Status: DONE. Phases 2–3 deployed 2026-09-21; Phases 1 and 4 and the hashed-asset carry-forward by
+lane L4 on 2026-09-25 (`carryAssets` in `scripts/deploy/release.ts`: each release hardlinks the
+served release's hashed assets it lacks, up to a week old, so a page open across a deploy keeps
+loading its lazy chunks). See [Landed](#landed-2026-09-21) for the measured result. Requested
 2026-09-13, revised 2026-09-20 against the first per-owner attribution of the entry chunk.
 
 This plan covers where loading boundaries belong in `apps/web` and the gate that pins the result.

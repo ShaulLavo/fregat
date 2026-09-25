@@ -16,6 +16,7 @@ import {
 } from './config'
 import {
   bootCandidate,
+  carryAssets,
   buildServer,
   buildWeb,
   copyServer,
@@ -108,6 +109,10 @@ async function deploy(options: DeployOptions) {
     log('release', `checkout is dirty (${checkout.dirtyFiles.length} files)`)
 
   await buildWeb(release)
+  if (release.previous) {
+    const carried = carryAssets(path.join(release.previous, 'web'), release.web)
+    log('web', `carried ${carried} hashed assets from ${path.basename(release.previous)}`)
+  }
   const serverSource = await provideServer(release, options.server, staged)
   writeBuildConfig(release, {
     ...checkout,
