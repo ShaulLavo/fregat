@@ -126,13 +126,17 @@ export class TerminalService {
   async closeSessionTerminals(sessionId: SessionId) {
     if (agentHistoryCleaned(this.database, sessionId)) return { closed: 0 }
     let closed = 0
-    for (const [key, session] of this.persistentSessions) {
-      if (!ownedByAgentSession(key, sessionId)) continue
-      await this.runExclusive(key, async () => {
-        await session.dispose({ kill: true, deleteHistory: true })
-        this.assertDisposed(key, session)
-      })
-      closed++
+    // Rescan until empty: an open may register while a disposal awaits. The last scan and the
+    // cleanup marker run without an await between them, and later opens refuse on the marker.
+    for (let owned = this.agentSessions(sessionId); owned.length > 0;) {
+      for (const [key, session] of owned) {
+        await this.runExclusive(key, async () => {
+          await session.dispose({ kill: true, deleteHistory: true })
+          this.assertDisposed(key, session)
+        })
+        closed++
+      }
+      owned = this.agentSessions(sessionId)
     }
     deleteAgentHistory(this.database, sessionId)
     return { closed }
@@ -233,6 +237,10 @@ export class TerminalService {
       await Promise.allSettled(connections.map((connection) => rejectConnection(connection, error)))
       throw error
     }
+  }
+
+  private agentSessions(sessionId: SessionId) {
+    return [...this.persistentSessions].filter(([key]) => ownedByAgentSession(key, sessionId))
   }
 
   private runExclusive(key: string, operation: () => Promise<void>) {
@@ -374,6 +382,12 @@ export class TerminalService {
     const lease = execution.lease
     if (this.disposed || !this.opening.has(socket.key)) {
       await lease.end()
+      return
+    }
+    const agentSessionId = socket.input?.agentSessionId
+    if (agentSessionId && agentHistoryCleaned(this.database, agentSessionId)) {
+      await lease.end()
+      socket.close(1008, 'session-deleted')
       return
     }
     const session = new TerminalSession({
