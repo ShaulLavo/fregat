@@ -1,12 +1,14 @@
 import { createEditorBufferSession } from '@singapore-editor/core/document'
-import { act, waitFor } from '@testing-library/react'
+import { act, renderHook, waitFor } from '@testing-library/react'
 import { vi } from 'vitest'
 
 import { createEditorDocumentStore } from '@/features/editor/state/document-state'
 import { useSymbolRevision } from '@/features/workbench/hooks/use-symbol-revision'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { expect, test } from '../../../../test/fixtures'
-import { renderHookWithProviders } from '../../../../test/render'
+
+// No providers: the hook reads none, and their queries settle on their own clock, adding the
+// timers and renders these tests count.
 
 const firstFile = {
   content: 'const value = 1\n',
@@ -21,7 +23,7 @@ test('a content burst publishes only its settled revision and latest buffer', as
   const document = store.getState().ensureLiveEditorDocument(firstFile)
   const session = createEditorBufferSession(document.buffer)
   let renders = 0
-  const rendered = renderHookWithProviders(() => {
+  const rendered = renderHook(() => {
     renders += 1
     return useSymbolRevision(store, document.key)
   })
@@ -61,7 +63,7 @@ test('switching documents cancels the old burst and unmounting cancels the new o
     .ensureLiveEditorDocument({ ...firstFile, path: filesystemPath('/repo/b.ts') })
   const firstSession = createEditorBufferSession(first.buffer)
   const secondSession = createEditorBufferSession(second.buffer)
-  const rendered = renderHookWithProviders(({ key }) => useSymbolRevision(store, key), {
+  const rendered = renderHook(({ key }) => useSymbolRevision(store, key), {
     initialProps: { key: first.key },
   })
   await waitFor(() =>
