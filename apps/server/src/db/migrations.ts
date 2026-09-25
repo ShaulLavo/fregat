@@ -67,7 +67,6 @@ function applyPushDevices(database: PlatformDatabase) {
       updated_at TEXT NOT NULL
     )
   `)
-
 }
 
 function applyProviderUsageContributions(database: PlatformDatabase) {
