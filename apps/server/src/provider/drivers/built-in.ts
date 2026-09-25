@@ -15,7 +15,7 @@ import { mockDriver } from './mock'
  * The mock driver is deliberately absent: it is registered explicitly by tests
  * and by the deterministic harness, never by the product default.
  */
-export const BUILT_IN_PROVIDER_DRIVERS: readonly AnyProviderDriver[] = [codexDriver, claudeDriver]
+const BUILT_IN_PROVIDER_DRIVERS: readonly AnyProviderDriver[] = [codexDriver, claudeDriver]
 
 /** The agent browser harness sets this on its throwaway server to reach the mock driver. */
 const HARNESS_ENV = 'PLATFORM_AGENT_HARNESS'

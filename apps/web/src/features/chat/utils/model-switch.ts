@@ -19,7 +19,7 @@ export type ModelSwitch = {
   timestamp: string
 }
 
-export const REROUTED_ACTIVITY_KIND = 'model.rerouted'
+const REROUTED_ACTIVITY_KIND = 'model.rerouted'
 
 export function sameModelSelection(left: ModelSelection, right: ModelSelection) {
   if (left.providerInstanceId !== right.providerInstanceId) return false
