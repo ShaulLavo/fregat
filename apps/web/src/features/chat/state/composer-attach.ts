@@ -3,9 +3,8 @@ import type { ComposerAttach, ComposerDestination } from '@/lib/composer-attach/
 import type { PlatformCommandBus } from '@/keymap/providers/command-context'
 
 import type { TerminalContextSelection } from '@workspace/client-core/chat/terminal-context'
-import { useChatInputDraftStore } from './chat-input-draft-store'
+import { getNavigation } from '@/state/navigation-binding'
 import { useComposerInboxStore } from './composer-inbox-store'
-import { useSidebarSelectionStore } from './sidebar-selection-store'
 
 /**
  * Chat's side of the attach seam: queue the capture for its workspace's composer and bring
@@ -64,12 +63,7 @@ export function createComposerAttach(bus: Pick<PlatformCommandBus, 'dispatch'>):
     return true
   }
 
-  /**
-   * Written to the draft's stored prompt rather than queued for an editor: the
-   * composer of a draft that is still settling is replaced once or twice, and
-   * text spliced into a replaced editor is lost. Every composer syncs from the
-   * store, so the prompt survives however it mounts.
-   */
+  // Persist before navigation so replacing the mounted composer preserves the prompt.
   const attachTextToNewChat = async (
     source: string,
     text: string,
@@ -77,44 +71,17 @@ export function createComposerAttach(bus: Pick<PlatformCommandBus, 'dispatch'>):
   ) => {
     if (text.trim().length === 0) return false
 
-    const before = sidebarDraftId()
-    const ticket = bus.dispatch('workspace.newChat', {
-      source: { caller: 'chat.attach-to-composer', kind: 'programmatic' },
+    const opened = await getNavigation().startComposerDraft(destination, text)
+    log.info({
+      action: 'chat.composer_attach',
+      area: 'chat',
+      source,
+      environmentId: destination.environmentId,
+      newChat: opened,
+      textLength: text.trim().length,
     })
-    const outcome = await ticket.completion
-    if (outcome.status !== 'handled') {
-      log.warn({ action: 'chat.composer_attach', area: 'chat', newChat: outcome.status, source })
-      return false
-    }
-
-    const selection = useSidebarSelectionStore.getState().selection
-    const draftId = sidebarDraftId()
-    // Chat mode selects its draft elsewhere, and a draft on another machine is not this
-    // capture's; the inbox still reaches the right composer.
-    if (
-      selection.kind !== 'draft' ||
-      !draftId ||
-      draftId === before ||
-      selection.environmentId !== destination.environmentId
-    )
-      return attachText(source, text, destination)
-
-    useChatInputDraftStore.getState().setPrompt(
-      {
-        draftKey: draftId,
-        environmentId: destination.environmentId,
-        rootPath: destination.rootPath,
-      },
-      text,
-    )
-    reveal(source, destination, { newChat: true, textLength: text.trim().length })
-    return true
+    return opened
   }
 
   return { attachTerminalContext, attachText, attachTextToNewChat }
-}
-
-function sidebarDraftId() {
-  const { selection } = useSidebarSelectionStore.getState()
-  return selection.kind === 'draft' ? (selection.draftId ?? null) : null
 }

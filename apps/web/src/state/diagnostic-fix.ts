@@ -12,8 +12,8 @@ import {
   type DiagnosticFixRequest,
 } from '@/lib/diagnostic-ai/utils/prompt'
 import { fileDocumentKey, filesystemPath } from '@/lib/documents/utils/identity'
-import { clientForQueryClient } from '@/lib/environments/state/query-clients'
-import { activeEnvironmentId } from '@/lib/environments/state/domain'
+import { clientForQueryClient, originForQueryClient } from '@/lib/environments/state/query-clients'
+import { confirmedEnvironmentId } from '@/lib/environments/state/domain'
 import { fetchFile } from '@/lib/file-server'
 import { toTreePath } from '@/lib/path-formatters'
 import { clientErrors } from '@/lib/structured-errors'
@@ -37,6 +37,7 @@ export function createDiagnosticFix({
     const rootPath = workspace.getState().rootFolder?.path
     if (!rootPath) return false
 
+    const environmentId = confirmedEnvironmentId(originForQueryClient(queryClient))
     const excerpt = await readExcerpt(request, documents, queryClient)
     if (!excerpt)
       throw clientErrors.DIAGNOSTIC_CHANGED({
@@ -44,7 +45,6 @@ export function createDiagnosticFix({
         internal: { surface: request.surface, startLine: request.range.start.line },
       })
 
-    const environmentId = activeEnvironmentId()
     const prompt = diagnosticFixPrompt(request, toTreePath(request.path, rootPath), excerpt)
     const opened = await attach.attachTextToNewChat('diagnostic-fix', prompt, {
       environmentId,
