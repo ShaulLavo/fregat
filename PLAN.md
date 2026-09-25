@@ -550,7 +550,7 @@ surfaces, the file picker and the site. The owner is taking it one topic at a ti
 | [162](plans/162-context-and-cost.md)         | Context breakdown, usable-window fullness, session totals, usage-page honesty (after Plan 141)              |
 | 163 (done, lane L2)                          | Screenshot attachment in the composer (export lives in Plan 145's export plan)                              |
 | [164](plans/164-what-feels-right-in-neon.md) | First pass shipped (Inter, one mono, `section-label`, radius); a metadata font sweep is left                |
-| [165](plans/165-font-catalog.md)             | Nerd Fonts + Fontsource on demand; interface-font setting; curated autocomplete picker                      |
+| 165 (done)                                   | Nerd Fonts + Fontsource on demand; interface-font setting; curated autocomplete picker                      |
 | [166](plans/166-shortcuts-editor.md)         | Keyboard shortcuts page rebuilt from VS Code research: full-width list, save on Enter, several per command  |
 | [154](plans/154-physical-mode.md)            | The seamui feel (springs, depth, motion in every primitive) and interface sounds                            |
 | [155](plans/155-site-demo-replica.md)        | Placeholder: the site hero becomes an animated replica of the app, like cursor.com                          |
