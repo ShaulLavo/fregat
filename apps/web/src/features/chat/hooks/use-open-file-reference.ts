@@ -1,5 +1,6 @@
-import { markdownWorkspaceFilePath } from '@/features/chat/utils/markdown-workspace-path'
+import { markdownServerFilePath } from '@/features/chat/utils/markdown-workspace-path'
 import { use } from 'react'
+import { toast } from 'sonner'
 import { ChatWorkspaceRootContext } from '@/features/chat/providers/workspace-root-context'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
@@ -20,16 +21,22 @@ export function useOpenFileReference() {
   const workspacePath = chatWorkspace?.path ?? editorRoot
 
   function openFileReference(source: MarkdownFileReference) {
-    const path = markdownWorkspaceFilePath(source.path, rootPath, workspacePath) ?? source.path
-    const reference = { ...source, path }
+    const path = markdownServerFilePath(source.path, rootPath, workspacePath)
     log.info({
       action: 'chat.markdown.open_file_reference',
       area: 'chat',
-      column: reference.column,
-      line: reference.line,
-      path: reference.path,
+      column: source.column,
+      line: source.line,
+      opened: path !== null,
+      path: path ?? source.path,
       rootPath,
     })
+    if (path === null) {
+      toast.warning('That file is outside the workspace', { description: source.path })
+      return
+    }
+
+    const reference = { ...source, path }
 
     if (reference.line === null) {
       openFileSurface(filesystemPath(reference.path))
