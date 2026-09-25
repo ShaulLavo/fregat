@@ -28,9 +28,7 @@ export function webRoutes(options: WebOptions) {
 
   assertWebRoot(root)
   const index = path.join(root, 'index.html')
-  return routes
-    .get('/', () => document(index))
-    .get('/*', ({ request }) => webFile(root, index, request))
+  return routes.get('/', () => document(index)).get('/*', ({ request }) => webFile(root, request))
 }
 
 async function releaseDescriptor(options: WebOptions) {
@@ -41,11 +39,12 @@ async function releaseDescriptor(options: WebOptions) {
   return { ...current, server }
 }
 
-function webFile(root: string, index: string, request: Request) {
+function webFile(root: string, request: Request) {
   const pathname = decodedPathname(request)
   const file = releaseFile(root, pathname)
   if (file) return staticFile(file, pathname)
-  if (isDocumentNavigation(request) && isFrontendRoute(pathname)) return document(index)
+  const page = isDocumentNavigation(request) ? documentFor(root, pathname) : null
+  if (page) return document(page)
 
   throw new FsError('NOT_FOUND', 'Route not found')
 }
@@ -88,9 +87,14 @@ function isDocumentNavigation(request: Request) {
   return request.headers.get('accept')?.includes('text/html') ?? false
 }
 
-// The frontend owns `/`, local workspaces under `/~` and remote ones under `/@`.
-function isFrontendRoute(pathname: string) {
-  return pathname === '/' || pathname.startsWith('/~') || pathname.startsWith('/@')
+// The frontend owns `/`, local workspaces under `/~` and remote ones under `/@`;
+// the dev gallery owns `/dev`, when the release carries it.
+function documentFor(root: string, pathname: string) {
+  if (pathname === '/' || pathname.startsWith('/~') || pathname.startsWith('/@'))
+    return path.join(root, 'index.html')
+  if (pathname === '/dev' || pathname.startsWith('/dev/')) return releaseFile(root, '/dev.html')
+
+  return null
 }
 
 function isFile(file: string) {

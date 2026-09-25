@@ -12,6 +12,7 @@ import {
 import { consumeAppSave } from '../server/src/fs/app-save-marker'
 import { bundleStatsPlugin } from './scripts/bundle-stats-plugin'
 import { demoPreviewPlugin } from './scripts/demo-preview-plugin'
+import { devPagePlugin } from './scripts/dev-page-plugin'
 import { bootAppearancePlugin } from './scripts/boot-appearance-plugin'
 import { phosphorWeightPlugin } from './scripts/phosphor-weight-plugin'
 
@@ -24,10 +25,17 @@ export default defineConfig(({ command, isPreview, mode }) => {
   // A build compiles the linked checkouts' pre-built `dist`; none of it is ours to memoize.
   const linkedDist = command === 'build' ? readDevSources(__dirname) : []
   return {
-    build:
-      mode === 'demo'
-        ? { rollupOptions: { input: path.resolve(__dirname, 'demo.html') } }
-        : undefined,
+    build: {
+      rollupOptions: {
+        input:
+          mode === 'demo'
+            ? path.resolve(__dirname, 'demo.html')
+            : {
+                index: path.resolve(__dirname, 'index.html'),
+                dev: path.resolve(__dirname, 'dev.html'),
+              },
+      },
+    },
     define: {
       ...(mode === 'demo' ? { 'import.meta.env.VITE_SERVER_URL': 'undefined' } : {}),
       'import.meta.env.OBSERVABILITY_ENABLED': JSON.stringify(
@@ -41,6 +49,7 @@ export default defineConfig(({ command, isPreview, mode }) => {
     plugins: [
       bootAppearancePlugin(__dirname),
       demoPreviewPlugin(__dirname),
+      devPagePlugin(),
       devSourcePlugin(packages),
       platformSelfSaveHmrPlugin(),
       react({

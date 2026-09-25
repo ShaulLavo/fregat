@@ -79,3 +79,4 @@ function Spinner({ size, label = 'Loading', className, ...props }: SpinnerProps)
 }
 
 export { Spinner }
+export type { SpinnerSize }

@@ -24,6 +24,19 @@ describe('web routes', () => {
     }
   })
 
+  it('serves the dev gallery under /dev only when the release carries it', async () => {
+    const app = await webApp()
+    for (const pathname of ['/dev', '/dev/loaders']) {
+      const response = await app.handle(navigation(pathname))
+      expect(response.status, pathname).toBe(200)
+      expect(await response.text()).toContain('<div id="dev">')
+    }
+    expect((await app.handle(navigation('/devtools'))).status).toBe(404)
+
+    const bare = await webApp({ devPage: false })
+    expect((await bare.handle(navigation('/dev/loaders'))).status).toBe(404)
+  })
+
   it('serves release files with content types and caching by location', async () => {
     const app = await webApp()
     const script = await app.handle(new Request('http://local/assets/index-abc.js'))
@@ -106,13 +119,15 @@ describe('web routes', () => {
   })
 })
 
-async function webApp() {
+async function webApp({ devPage = true } = {}) {
   const root = await fixtureRoot()
   const release = path.join(root, 'stamp-abc-slug')
   const web = path.join(release, 'web')
   await mkdir(path.join(web, 'assets'), { recursive: true })
   await mkdir(path.join(web, 'vscode-icons'), { recursive: true })
   await writeFile(path.join(web, 'index.html'), '<html><body><div id="root"></div></body></html>')
+  if (devPage)
+    await writeFile(path.join(web, 'dev.html'), '<html><body><div id="dev"></div></body></html>')
   await writeFile(path.join(web, 'assets', 'index-abc.js'), 'console.log(1)')
   await writeFile(path.join(web, 'assets', 'ghostty-vt.wasm'), new Uint8Array([0, 97, 115, 109]))
   await writeFile(path.join(web, 'vscode-icons', 'code.svg'), '<svg/>')

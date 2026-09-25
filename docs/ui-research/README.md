@@ -119,15 +119,17 @@ chips last.
 
 The ones that unblock the most work. Per-library questions are at the end of each file.
 
-1. **`motion`**: CSS-only as a hard line, or allowed somewhere? Every steal above was found to work without it.
-2. **Tooltips**: move icon-button tooltips onto the shared layer so the glide works everywhere (changes the
-   AGENTS.md rule)? Add a `--duration-move` token (~240 ms) for travel?
-3. **Physical mode**: go ahead with the sketch? Per-device feel needs a settings layer we do not have. Where
-   did `completion.mp3` / `input.mp3` come from, and under what license?
+1. ~~**`motion`**~~ — answered 2026-09-25: not a hard rule, but CSS is preferred. Reach for `motion` only
+   when CSS genuinely cannot do it, and say why.
+2. ~~**Tooltips**~~ — answered 2026-09-25: yes to the glide. Icon-button tooltips move onto the shared
+   `data-tooltip` layer, which changes the `AGENTS.md` rule that reserves that layer for virtualized rows.
+   The `--duration-move` token is still open.
+3. ~~**Physical mode**~~ — [Plan 154](../../plans/154-physical-mode.md). The mp3s are T3 Code's (MIT).
 4. **Status dots**: switch the vocabulary to Neon's square dots, or keep round?
 5. **Hold-to-confirm**: every destructive confirm, or only irreversible ones (discard all, delete worktree,
    force push)?
 6. **Reasoning fold**: auto-collapse when the turn moves on, or stay as the user left it?
-7. **Documents**: are PDF/DOCX/XLSX ever first-class? Decides the whole viewer half of extend-ui.
+7. ~~**Documents**~~ — answered 2026-09-25: yes, eventually. Placeholder
+   [Plan 156](../../plans/156-documents-in-the-editor.md).
 8. **Brand**: is the six-ring mark the app's brand too (the favicon is VS Code's today), and is a brand-only
    fifth loader acceptable?

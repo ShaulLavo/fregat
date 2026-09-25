@@ -70,7 +70,7 @@ The click scenario waits 750ms between clicks so debounced document highlights, 
 
 `scenario editor-lsp-deprecated --file main.tsx` inserts a `.substr()` call and checks the `-deprecated` CSS highlight covers exactly `substr`, then undoes it and checks the strike clears.
 
-`scenario editor-lsp-rename-key` puts the caret on a TypeScript identifier and presses F2, which the Editor's default keymap binds to rename (before E054 only its VS Code preset did), then checks the prompt opens on the identifier's name. Escapes and undoes the edit.
+`scenario editor-lsp-rename-key` puts the caret on a TypeScript identifier and presses F2, which the Editor's default keymap binds to rename (before E054 only its VS Code preset did), then checks the prompt opens on the identifier's name. Escape has to hand focus back to the editor: the undo that follows only reaches the file if it did, and the scenario fails unless the file reads as it did before.
 
 `scenario editor-lsp-signature-help` types `console.log(`, checks the signature surface names the call, then types `)` and checks it goes away. Both characters are read as keystrokes, not as edits: auto-close writes a typed `(` as `()`, and typing over the closer it inserted changes no text at all, so neither is visible in the document change. The surface and its Markdown renderer load on that first `(`, so this also covers the lazy chunk. Undoes the edit.
 

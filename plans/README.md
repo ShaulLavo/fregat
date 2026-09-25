@@ -19,7 +19,10 @@ a bare root `bun run verify`.
 
 | Plan                                                                                     | State                                                        |
 | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| [154 — physical mode](154-physical-mode.md)                                              | **PROPOSED — NEAR THE END OF THE UI REFRESH LANE; D1–D3**    |
+| [157 — base components](157-base-components.md)                                          | **PROPOSED — READY; QUEUED NEXT**                            |
+| [156 — documents in the editor](156-documents-in-the-editor.md)                          | **PLACEHOLDER — FAR FUTURE; RESEARCH FIRST**                 |
+| [155 — site demo becomes an animated replica](155-site-demo-replica.md)                  | **PLACEHOLDER — RESEARCH NOT STARTED**                       |
+| [154 — physical mode](154-physical-mode.md)                                              | **PROPOSED — D6 (SETTINGS SHAPE) FIRST**                     |
 | [153 — TypeScript can run in the browser worker](153-typescript-worker-backend.md)       | **PROPOSED — AFTER EDITOR E054; D1–D3 NEED THE OWNER**       |
 | [152 — dev primary ships its working tree](152-remote-dev-builds.md)                     | **PROPOSED — NICE TO HAVE; AFTER 151**                       |
 | [151 — remote machines run the primary's release](151-remote-server-releases.md)         | **PROPOSED — DEPENDS ON 150 PHASE 1; D2/D4 TO CONFIRM**      |

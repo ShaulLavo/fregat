@@ -522,15 +522,19 @@ Requested 2026-09-25. A survey of 14 component libraries
 ([docs/ui-research](docs/ui-research/README.md)) listed what to take for the base components, chat
 surfaces, the file picker and the site. The owner is taking it one topic at a time.
 
-| Plan                              | Owns                                                                 |
-| --------------------------------- | -------------------------------------------------------------------- |
-| [154](plans/154-physical-mode.md) | Physical press feel and interface sounds, wired into every primitive |
+| Plan                                        | Owns                                                                                       |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| [157](plans/157-base-components.md)         | Tabs, scroll fades, hold-to-confirm, status dots, typeahead refine; queued next            |
+| [154](plans/154-physical-mode.md)           | The seamui feel (springs, depth, motion in every primitive) and interface sounds           |
+| [155](plans/155-site-demo-replica.md)       | Placeholder: the site hero becomes an animated replica of the app, like cursor.com         |
+| [156](plans/156-documents-in-the-editor.md) | Placeholder, far future: PDF, DOCX, XLSX, PPTX and CSV as editor documents agents can edit |
 
 Suggested order:
 
-1. Base-component work from the survey (not yet planned).
-2. Plan 154 near the end. Phases 1–2 may land earlier; Phases 3–4 wait for the base components so
-   every new primitive is wired and audited once.
+1. Plan 157, the base components. Queued next by the owner.
+2. Plan 154 near the end. Phases 1–3 may land earlier; Phases 4–6 wait for the base components so
+   every new primitive is wired and audited once. D6 (settings semantics) comes first.
+3. Plan 155 is independent of both; its research phase runs whenever the site matters.
 
 ## Verification boundaries
 

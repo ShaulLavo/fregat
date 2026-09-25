@@ -628,12 +628,14 @@
   }
 }
 
-/* The spinner's palette: the theme's primary, then three steps 70° round the
-   hue wheel, each pulled a fifth toward muted-foreground so it never shouts.
-   Declared on the spinner, not :root, so it follows a scoped primary. A
-   hueless primary (Graphite) rotates to itself and the mark stays grey. */
+/* The spinner's palette: a source colour, then three steps 70° round the hue
+   wheel, each pulled a fifth toward the ground so it never shouts. Declared on
+   the spinner, not :root, so it follows a scoped primary. A hueless source
+   (Graphite) rotates to itself and the mark stays grey. */
 :where(.spinner-bands, .spinner-rings) {
-  --spinner-1: color-mix(in oklch, var(--primary) 80%, var(--muted-foreground));
+  --spinner-source: var(--primary);
+  --spinner-ground: var(--muted-foreground);
+  --spinner-1: color-mix(in oklch, var(--spinner-source) 80%, var(--spinner-ground));
   --spinner-2: var(--spinner-1);
   --spinner-3: var(--spinner-1);
   --spinner-4: var(--spinner-1);
@@ -641,20 +643,26 @@
   @supports (color: oklch(from red l c h)) {
     --spinner-2: color-mix(
       in oklch,
-      oklch(from var(--primary) l c calc(h + 70)) 80%,
-      var(--muted-foreground)
+      oklch(from var(--spinner-source) l c calc(h + 70)) 80%,
+      var(--spinner-ground)
     );
     --spinner-3: color-mix(
       in oklch,
-      oklch(from var(--primary) l c calc(h + 140)) 80%,
-      var(--muted-foreground)
+      oklch(from var(--spinner-source) l c calc(h + 140)) 80%,
+      var(--spinner-ground)
     );
     --spinner-4: color-mix(
       in oklch,
-      oklch(from var(--primary) l c calc(h + 210)) 80%,
-      var(--muted-foreground)
+      oklch(from var(--spinner-source) l c calc(h + 210)) 80%,
+      var(--spinner-ground)
     );
   }
+}
+
+/* On a primary fill, primary bands would vanish into the button. */
+:where([data-slot='button'][data-variant='default']) .spinner-bands {
+  --spinner-source: var(--primary-foreground);
+  --spinner-ground: var(--primary-foreground);
 }
 
 /* xs–md. Each band turns the opposite way to its neighbour at an unrelated
@@ -684,11 +692,13 @@
   }
 }
 
-/* The standalone size, at zero specificity: a control that sizes its own icons
-   wins, and so does a size- class at the call site. */
-:where(.spinner-bands) {
-  width: var(--icon-size);
-  height: var(--icon-size);
+/* The standalone size. In the base layer, because an unlayered rule beats every
+   utility: a size- class at the call site and a control's icon rule must win. */
+@layer base {
+  :where(.spinner-bands) {
+    width: var(--icon-size);
+    height: var(--icon-size);
+  }
 }
 
 /* lg. Four conic arcs, each masked to a thin annulus, under a slow breathing

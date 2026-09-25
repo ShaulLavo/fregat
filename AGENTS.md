@@ -267,6 +267,7 @@ Interaction treatments are utilities, not strings to copy:
 ## Dev Server
 
 - A dev server is always running; never start another by hand. `agent:browser` starts its own throwaway API server per run against the shared Vite and removes it afterwards.
+- `/dev` is a gallery page beside the app (`dev.html`, `features/dev`): the dev server and every release serve it, so the mesh has it at `/platform/dev`. Each tab is `/dev/<tab>`; add one for anything worth eyeballing outside the app, such as every loader in every bundled palette.
 - State is separated by `PLATFORM_HOME`: production keeps `~/.platform`, the dev server uses `/work/platform-dev/home` (seeded once from production by `scripts/dev.ts`), and each `agent:browser` run gets a temp home. Language-server and font downloads stay in `~/.platform` for all of them.
 
 ## Gates
