@@ -1,7 +1,14 @@
+import {
+  LSP_SERVER_EXITED as EDITOR_SERVER_EXITED,
+  LspServerExitedError,
+  type LspServerExitedParams as EditorServerExitedParams,
+} from '@singapore-editor/lsp'
 import { summarizeDiagnostics } from '@singapore-editor/lsp-plugin/diagnostics'
 import { LanguageServerDocumentSyncController } from '@singapore-editor/lsp-plugin/document-sync-controller'
 import { type LanguageServerSetPluginOptions } from '@singapore-editor/lsp-plugin/websocket'
-import { beforeEach, describe, vi } from 'vitest'
+import { LSP_SERVER_EXITED, type LspServerExitedParams } from '@workspace/contracts'
+import { toast } from 'sonner'
+import { afterEach, beforeEach, describe, expectTypeOf, vi } from 'vitest'
 import { activeDocumentForSnapshot } from '@singapore-editor/lsp-plugin/document-sync'
 
 import { createEditorLanguageServerStatusSource } from '@/features/editor/state/language-server-status-source'
@@ -285,6 +292,58 @@ describe('createMatchedLanguageServerPlugin', () => {
   })
 })
 
+describe('server exit', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  test('the proxy announces an exit in the shape the editor connection reads', () => {
+    expect(LSP_SERVER_EXITED).toBe(EDITOR_SERVER_EXITED)
+    expectTypeOf<LspServerExitedParams>().toExtend<EditorServerExitedParams>()
+  })
+
+  test('shows the catalog guidance once when reconnecting gives up on a server that died', () => {
+    const shown = vi.spyOn(toast, 'error').mockImplementation(() => 'toast')
+    const lane = typescriptLane()
+
+    lane?.onStatusChange?.('error')
+    lane?.onError?.(
+      new LspServerExitedError({
+        outcome: 'process_exit',
+        serverId: 'typescript',
+        exitCode: null,
+        exitSignal: 'SIGKILL',
+        error: {
+          code: 'lsp.SERVER_EXITED',
+          message: 'The typescript language server stopped',
+          why: 'The language server process exited or failed while the editor was connected to it.',
+          fix: 'Run the language server from a terminal to see why it exits, then reopen the file.',
+        },
+      }),
+    )
+
+    expect(shown).toHaveBeenCalledTimes(1)
+    expect(shown).toHaveBeenCalledWith(
+      'The typescript language server stopped',
+      expect.objectContaining({
+        id: 'language-server-exit:typescript',
+        description:
+          'Run the language server from a terminal to see why it exits, then reopen the file.',
+      }),
+    )
+  })
+
+  test('stays quiet for a server this app closed and for a lost socket', () => {
+    const shown = vi.spyOn(toast, 'error').mockImplementation(() => 'toast')
+    const lane = typescriptLane()
+
+    lane?.onError?.(new LspServerExitedError({ outcome: 'idle_timeout', serverId: 'typescript' }))
+    lane?.onError?.(new Error('LSP transport closed'))
+
+    expect(shown).not.toHaveBeenCalled()
+  })
+})
+
 describe('semantic token ownership', () => {
   test('creates layer options for the runtime-elected semantic owner', () => {
     createMatchedLanguageServerPlugin({
@@ -343,6 +402,21 @@ describe('languageServerMatches', () => {
     expect(languageServerMatches([{ root: 1, serverId: 'typescript', features: {} }])).toEqual([])
   })
 })
+
+function typescriptLane() {
+  createMatchedLanguageServerPlugin({
+    origin: 'http://localhost:3001',
+    document,
+    documentSyncController,
+    enabled: true,
+    matches: [match('typescript', '/repo', 0)],
+    rootPath: '/repo',
+    statusSource: createEditorLanguageServerStatusSource(),
+    target: { matchPath: 'src/a.ts' },
+    onApplyWorkspaceEdit,
+  }).activate({} as never)
+  return createdServerSets[0]?.lanes[0]
+}
 
 function match(serverId: string, root: string, semanticRank: number) {
   return {

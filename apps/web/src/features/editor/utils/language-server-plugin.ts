@@ -23,10 +23,10 @@ import { createLanguageServerSetPlugin } from '@singapore-editor/lsp-plugin/webs
 import {
   LSP_FEATURE_IDS,
   LSP_SEMANTIC_TOKENS_REFRESH,
-  LSP_SERVER_EXITED,
   type LspFeatureId,
   type LspMatch,
 } from '@workspace/contracts'
+import { LspServerExitedError } from '@singapore-editor/lsp'
 
 import { languageServerConnectionProvider } from '@/features/editor/state/language-server-connection-pool'
 import type { EditorLanguageServerStatusSource } from '@/features/editor/state/language-server-status-source'
@@ -39,7 +39,6 @@ import {
   clientCapabilitiesForServer,
 } from '@/lib/language-server-capabilities'
 import { languageServerWebSocketConstructor } from '@/lib/server-sockets'
-import { toClientError } from '@/lib/client-error-taxonomy'
 import { notifyServerExit } from '@/features/editor/utils/notify-server-exit'
 import { environmentClientFor } from '@/lib/client'
 import { environmentActivitySignal } from '@/lib/environments/state/activity'
@@ -236,7 +235,6 @@ function liveLanguageServerLane({
   statusSource: EditorLanguageServerStatusSource
   target: LanguageServerDocumentTarget
 }): LanguageServerLaneOptions {
-  const exit: ServerExit = { params: null }
   return {
     ...languageServerLaneOptions({
       origin,
@@ -250,23 +248,10 @@ function liveLanguageServerLane({
       rootPath,
       target,
     }),
-    notificationHandlers: laneNotificationHandlers(match.serverId, semanticControllers, exit),
+    notificationHandlers: laneNotificationHandlers(match.serverId, semanticControllers),
     onStatusChange: (status) => {
       // A server that stopped or failed keeps no claim on its markers.
       if (status !== 'ready') markerStore.removeOwner(match.serverId)
-      // The connection restarts a server that exited; the user hears only if that gave up.
-      if (status === 'error') {
-        log.warn({
-          action: 'lsp.reconnect_gave_up',
-          area: 'lsp',
-          serverId: match.serverId,
-          serverFailed: exit.params !== null,
-        })
-      }
-      if (status === 'error' && exit.params !== null) {
-        notifyServerExit(match.serverId, exit.params)
-        exit.params = null
-      }
       statusSource.setServerStatus(match.serverId, status)
     },
     onDiagnostics: (diagnostics) => {
@@ -287,8 +272,25 @@ function liveLanguageServerLane({
         serverId: match.serverId,
       })
     },
-    onError: () => statusSource.setServerStatus(match.serverId, 'error'),
+    // The connection restarts a server that exited; this runs only once that gave up.
+    onError: (error) => {
+      log.warn({
+        action: 'lsp.reconnect_gave_up',
+        area: 'lsp',
+        serverId: match.serverId,
+        ...serverExitFields(error),
+      })
+      notifyServerExit(match.serverId, error)
+      statusSource.setServerStatus(match.serverId, 'error')
+    },
   }
+}
+
+function serverExitFields(error: unknown) {
+  if (!(error instanceof LspServerExitedError)) return { serverFailed: false }
+
+  const { exitCode, exitSignal, outcome } = error.params
+  return { exitCode, exitSignal, outcome, serverFailed: error.params.error !== undefined }
 }
 
 export function languageServerLaneOptions({
@@ -327,28 +329,15 @@ export function languageServerLaneOptions({
   }
 }
 
-/**
- * The last exit that carried the server's own error, kept across restarts: the attempt that finally
- * fails can be one whose server died before it said anything.
- */
-type ServerExit = { params: unknown }
-
 function laneNotificationHandlers(
   serverId: string,
   semanticControllers: ReadonlyMap<string, Set<SemanticTokenController>>,
-  exit: ServerExit,
 ) {
   return {
     [LSP_SEMANTIC_TOKENS_REFRESH]: () => {
       const semanticTokens = semanticControllers.get(serverId) ?? null
       if (semanticTokens) for (const controller of semanticTokens) controller.handleRefresh()
       return (semanticTokens?.size ?? 0) > 0
-    },
-    [LSP_SERVER_EXITED]: (_client: unknown, params: unknown) => {
-      const failed = Boolean(toClientError(params).code)
-      log.info({ action: 'lsp.server_exit', area: 'lsp', serverId, failed })
-      if (failed) exit.params = params
-      return true
     },
   }
 }
