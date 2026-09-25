@@ -80,7 +80,7 @@ export function AgentRow({ entry, groupId }: { entry: ChatAgentEntry; groupId: s
           ) : null}
           {entry.agent.path ? (
             <p
-              className='text-muted-foreground text-2xs font-meta truncate'
+              className='text-muted-foreground text-2xs truncate font-mono'
               title={entry.agent.path}
             >
               {entry.agent.path}

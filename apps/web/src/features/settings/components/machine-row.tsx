@@ -67,7 +67,7 @@ export function MachineRow({
         <span className='min-w-0 flex-1 truncate text-sm font-medium'>{machine.label ?? name}</span>
         <span className='text-muted-foreground text-xs'>{phase}</span>
       </div>
-      <p className='text-muted-foreground font-meta truncate text-xs' title={detail}>
+      <p className='text-muted-foreground truncate font-mono text-xs' title={detail}>
         {detail}
       </p>
       {/* Always mounted: the reconnect loop clears and restores lastError on

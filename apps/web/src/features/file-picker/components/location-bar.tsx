@@ -78,7 +78,7 @@ export function LocationBar({
           autoCapitalize='off'
           autoComplete='off'
           autoCorrect='off'
-          className='font-meta'
+          className='font-mono'
           disabled={isPending}
           onChange={(event) => onChange(event.target.value)}
           onKeyDown={handleInputKeyDown}

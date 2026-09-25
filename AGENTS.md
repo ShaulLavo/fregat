@@ -127,6 +127,11 @@ entry without a real reason is itself a violation.
 - **Four type sizes.** `text-sm`, `text-xs`, `text-2xs` (11px), `text-3xs` (10px). An arbitrary
   `text-[Npx]` is banned. A bar title is `text-xs font-medium`; a pane section heading is
   `text-sm font-semibold`.
+- **Two type voices.** Words the app writes (titles, labels, prose) are Inter (`--font-ui`). Code
+  and short metadata are `font-mono`, the user's coding font: counts, timestamps, hashes, branch
+  names, setting ids, key chords, line numbers, diff stats. There is one mono, never a second.
+  A small uppercase group label is `section-label`, never a hand-rolled `uppercase tracking-*`
+  recipe.
 - **Fills and elevation.** Elevation is three levels: `shadow-xl` on a modal dialog, `shadow-md` on
   a menu or popover, nothing anywhere else. List rows use `bg-row-hover`, `bg-row-active` and
   `bg-row-selected`, never an opacity modifier on them — the alpha is the design. Toggled controls

@@ -53,7 +53,7 @@ export function ColorField({
           autoCapitalize='off'
           autoComplete='off'
           autoCorrect='off'
-          className='font-meta'
+          className='font-mono'
           disabled={disabled}
           id={id}
           onBlur={commitText}

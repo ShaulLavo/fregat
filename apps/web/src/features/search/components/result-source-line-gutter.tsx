@@ -18,7 +18,7 @@ export const SearchResultSourceLineGutter = memo(
     return (
       <div
         aria-hidden='true'
-        className='text-muted-foreground font-meta box-border grid shrink-0 overflow-hidden pr-2 text-right text-xs select-none'
+        className='text-muted-foreground box-border grid shrink-0 overflow-hidden pr-2 text-right font-mono text-xs select-none'
         style={searchResultSourceLineGutterStyle(lines.length, minDigits)}
       >
         {lines.map((line) => (

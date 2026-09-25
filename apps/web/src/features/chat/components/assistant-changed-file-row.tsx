@@ -59,12 +59,12 @@ export function AssistantChangedFileRow({
       ) : (
         <FolderGlyph className='text-muted-foreground size-(--icon-size-sm) shrink-0' />
       )}
-      <span className='font-meta min-w-0 truncate' data-changed-file-name>
+      <span className='min-w-0 truncate font-mono' data-changed-file-name>
         {node.name}
       </span>
       <span className='ml-auto flex shrink-0 items-center gap-1.5'>
         {node.stat && hasNonZeroChatTurnDiffStat(node.stat) ? (
-          <span className='text-muted-foreground text-2xs font-meta @max-2xs/changed-files:hidden'>
+          <span className='text-muted-foreground text-2xs font-mono @max-2xs/changed-files:hidden'>
             <DiffStatLabel additions={node.stat.additions} deletions={node.stat.deletions} />
           </span>
         ) : null}

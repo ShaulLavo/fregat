@@ -132,8 +132,8 @@ Plan 136), and session and project deletes if they are recoverable. Check each b
   Neon adds a `currentColor` glow; we drop it, because it is a shadow outside the three elevations.
   Reduced motion holds it steady at full opacity. Pure CSS, so it keeps the session rail's
   zero-render contract and replaces a per-row spinner for "working".
-- Size is `--status-dot-size` (the current `size-1.5`), with `rounded-full` inside the primitive.
-  Round, per the design language's circles rule; Neon's square dots are not adopted.
+- Size is `--status-dot-size` (the current `size-1.5`). **Square**, with no radius, as Neon draws
+  its status marks. The owner chose Neon's feel on 2026-09-25, so the mark is a square, not a circle.
 - Decorative (`aria-hidden`). The state is always in the text or the row's accessible name.
 
 **Migrate** the sites above in the same pass, fold each colour helper into a `tone` mapping in its

@@ -37,7 +37,7 @@ export function TickerNumber({
   value: number
 }) {
   return (
-    <span aria-label={value.toLocaleString()} className='font-meta' role='img'>
+    <span aria-label={value.toLocaleString()} className='font-mono' role='img'>
       <AnimatedCounter
         color='currentColor'
         containerStyles={CONTAINER_STYLES}

@@ -67,7 +67,7 @@ export function ChordRecorder({
       <div className='flex min-w-0 items-center gap-1 @max-3xl/settings:w-full'>
         <Button
           aria-label={recording ? `Recording a shortcut for ${id}` : `Record a shortcut for ${id}`}
-          className='font-meta w-52 justify-center text-xs whitespace-nowrap @max-3xl/settings:w-full @max-3xl/settings:min-w-0'
+          className='w-52 justify-center font-mono text-xs whitespace-nowrap @max-3xl/settings:w-full @max-3xl/settings:min-w-0'
           disabled={disabled}
           id={id}
           onBlur={() => setStrokes(null)}

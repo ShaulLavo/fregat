@@ -3,7 +3,6 @@
 @import './shadcn-tailwind.css';
 @import '@fontsource-variable/jetbrains-mono';
 @import '@fontsource-variable/inter';
-@import '@fontsource-variable/geist-mono';
 /* The bundled Graphite palette, generated from data; the app's <style> for the
    selected palette outranks it because that one is unlayered. */
 @import './palette.generated.css';
@@ -15,12 +14,10 @@
 @source '../../../markdown/src/**/*.{ts,tsx}';
 
 @theme inline {
-  /* UI and titles are Inter; short metadata is Geist Mono (`font-meta`). `--font-mono`
-     stays the user's coding font, for code and terminals only. */
+  /* Words are Inter. Code and short metadata share `--font-mono`, the user's coding font. */
   --font-ui: 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-sans: var(--font-ui);
   --font-heading: var(--font-ui);
-  --font-meta: 'Geist Mono Variable', ui-monospace, SFMono-Regular, monospace;
   --color-chart-5: var(--chart-5);
   --color-chart-4: var(--chart-4);
   --color-chart-3: var(--chart-3);
@@ -578,10 +575,10 @@
 
 /* Press feedback: the control takes a 1px step down under the pointer. Not when
    it owns a popup — the menu is anchored to the trigger and would travel with it. */
-/* A small uppercase label above a group: the mono metadata voice at the
-   quietest size. Colour stays at the call site. */
+/* A small uppercase label above a group, in the metadata mono at the quietest
+   size. Colour stays at the call site. */
 @utility section-label {
-  font-family: var(--font-meta);
+  font-family: var(--font-mono);
   font-size: var(--text-3xs);
   line-height: var(--text-3xs--line-height);
   font-weight: 400;
@@ -676,10 +673,13 @@
   }
 }
 
-/* On a primary fill, primary bands would vanish into the button. */
+/* On a primary fill the mark takes the button's ink, like the icon it replaces:
+   primary bands would vanish, and hue-turned foreground reads as mud. */
 :where([data-slot='button'][data-variant='default']) .spinner-bands {
-  --spinner-source: var(--primary-foreground);
-  --spinner-ground: var(--primary-foreground);
+  --spinner-1: var(--primary-foreground);
+  --spinner-2: var(--primary-foreground);
+  --spinner-3: var(--primary-foreground);
+  --spinner-4: var(--primary-foreground);
 }
 
 /* xs–md. Neighbouring rings turn opposite ways on kokonutui's shared 8s period.

@@ -73,7 +73,7 @@ export function SettingRow({ id, snapshot }: { id: SettingId; snapshot: Settings
               title is free to say "Models" only because the ids underneath it
               still say which lines of settings.json this row is editing. */}
           {settingRowIds(id).map((key) => (
-            <code className='text-muted-foreground text-xs' key={key}>
+            <code className='text-muted-foreground font-mono text-xs' key={key}>
               {key}
             </code>
           ))}

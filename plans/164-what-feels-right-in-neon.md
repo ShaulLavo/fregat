@@ -2,8 +2,10 @@
 
 ## Status and authorization
 
-- Status: RESEARCH — study first. The owner, 2026-09-25: "I don't want to copy their thing, but
-  something there feels really right and I want to use that."
+- Status: FIRST PASS ADOPTED 2026-09-25. Measured against ui.neon.com, then shipped: Inter as the
+  UI font, metadata in the one coding mono, the `section-label` utility, 6 px control corners, and
+  "Two type voices" in `AGENTS.md`. The owner rejected a second mono (Geist Mono) the same day.
+  Remaining: square status marks (Plan 157) and a sweep of metadata sites the first pass missed.
 - Priority: P2 in the UI refresh lane. It sharpens every other plan in the lane, so the study is
   worth doing before the bulk of 158–162 lands, but it blocks none of them.
 - Effort: research S–M, then one executable plan per accepted quality.
@@ -59,8 +61,8 @@ dev`) and our dev server. Capture matched surfaces with `agent:browser`: a chat 
    or token change that closes it.
 6. **Try before adopting.** For each candidate change, a dev-only token override (not a setting,
    not shipped) and a before/after `look` on the same surfaces. The owner picks from the pairs.
-7. **Write it up** as `docs/ui-research/neon-feel.md`: the qualities, the measurements, the pairs
-   and the owner's verdicts. Then this plan's research phase rewrites its own phases, or splits
+7. **Write it up** in this plan: the qualities, the measurements, the pairs and the owner's
+   verdicts. Then this plan's research phase rewrites its own phases, or splits
    into executable plans.
 
 ## What adoption looks like

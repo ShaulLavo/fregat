@@ -13,7 +13,7 @@ export function BranchChip({ rootPath }: { readonly rootPath: string }) {
 
   return (
     <span
-      className='bg-muted text-muted-foreground text-2xs font-meta flex h-(--density-chip-height) min-w-0 items-center gap-1.5 rounded-full px-2'
+      className='bg-muted text-muted-foreground text-2xs flex h-(--density-chip-height) min-w-0 items-center gap-1.5 rounded-full px-2 font-mono'
       title={`${branch}${commit}`}
     >
       <span className='text-foreground min-w-0 truncate'>{branch}</span>
