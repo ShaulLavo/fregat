@@ -480,8 +480,8 @@ phases or splits them into executable plans; not all research happens up front.
 Suggested order:
 
 1. ~~Plan 138~~ — implemented 2026-09-24.
-2. Quick wins, batched so one `--server` restart covers them: Plan 141 Phase 1, the small
-   Plan 145 plans, and the small new Plan 126 rows.
+2. Quick wins: ~~Plan 141 Phases 1–3~~ (meter, per-turn recording, usage page; 2026-09-25), the
+   small Plan 145 plans, and the small new Plan 126 rows.
 3. Plan 142 after its spike. It needs only a minimal web app manifest, not Plan 143.
 4. The research phases of Plans 139 and 140. Plan 140's diagnostics work waits on Plans 087 and
    088; its editor-to-chat work does not.

@@ -40,7 +40,8 @@ const DEFAULT_BATCH_INTERVAL_MS = 5_000
 const DEFAULT_BATCH_SIZE = 50
 const DEFAULT_LOG_DIR = 'logs'
 const DEFAULT_MAX_BUFFER_SIZE = 1_000
-const DEFAULT_MAX_FILES = 14
+// Counted in files, not days: at full info logging a busy day fills three.
+const DEFAULT_MAX_FILES = 60
 const DEFAULT_MAX_SIZE_PER_FILE = 10_485_760
 const DEFAULT_POSTHOG_EVENT_NAME = 'platform_log'
 const DEFAULT_POSTHOG_HOST = 'https://us.i.posthog.com'
@@ -71,7 +72,9 @@ export function observabilityConfigFromEnv(
     enabled,
     environment,
     filePretty: booleanFromEnv(observabilityEnv(env, 'FILE_PRETTY')) ?? false,
-    infoSampleRate: percentage(observabilityEnv(env, 'INFO_SAMPLE_RATE'), production ? 25 : 100),
+    // Info is kept whole: these logs are the debugging record of one machine, and a sampled
+    // wide event is a missing one.
+    infoSampleRate: percentage(observabilityEnv(env, 'INFO_SAMPLE_RATE'), 100),
     logDir: observabilityEnv(env, 'DIR')?.trim() || DEFAULT_LOG_DIR,
     maxBufferSize: positiveInteger(
       observabilityEnv(env, 'MAX_BUFFER_SIZE'),

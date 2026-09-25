@@ -2,7 +2,8 @@
 
 ## Status and authorization
 
-- Status: PROPOSED — Phase 1 (the meter) ready; Phases 2–4 start with a short research step.
+- Status: PHASES 1–3 IMPLEMENTED (meter 2026-09-24; per-turn recording and the usage page
+  2026-09-25). Phase 4 (backfill) and Phase 5 (reset credits, gated) open.
 - Priority: P1 for the meter, P2 for the usage page and history.
 - Effort: S for Phase 1, M overall. Reset-credit redemption (Phase 5) is L and gated.
 - Risk: LOW for display. HIGH only for Phase 5, which spends an account resource.
@@ -88,6 +89,19 @@ Platform already receives.
 
 ## Research phase (before Phase 2)
 
+Reference notes gathered 2026-09-25, for the row shape:
+
+- OpenCode stores `cost` and `tokens {input, output, reasoning, cache{read,write}}` on each assistant
+  message and each step, and rolls them onto the session row with signed SQL increments
+  (`packages/core/src/session/projector.ts`). Prices come from models.dev with a bundled fallback;
+  input is charged net of cache reads and writes.
+- Crush overwrites session token counts per step (they are context size, not totals) and only
+  sums cost; its stats queries count top-level sessions only.
+- Orca scans `~/.claude/projects/**/*.jsonl` and Codex rollouts incrementally (mtime, size, byte
+  offsets), dedupes Claude rows by `messageId:requestId`, and prices with hard-coded tables.
+- Claude's `total_cost_usd` is cumulative per `query()` and resets on `/clear`: read the latest,
+  never sum. `get_usage.session.model_usage` carries the same per-model totals on demand.
+
 - What each provider reports per turn and per session: Claude `result.usage`, `modelUsage`,
   `total_cost_usd` (cumulative per `query()`, resets on `/clear` and resume — read the latest,
   never sum); Codex token-usage notifications.
@@ -96,6 +110,37 @@ Platform already receives.
 - Whether imported sessions (`orchestration/session-discovery.ts`) carry usage worth backfilling.
 - Deliverable: a short section appended here with the row shape and store, then Phases 2–4
   refined.
+
+### Research outcome (2026-09-25)
+
+- **What arrives.** Claude's result carries `modelUsage` per model — covering subagents and
+  auxiliary calls, with the CLI's `costUSD` — cumulative per `query()`. Its `usage` field is the main
+  loop only, so it is not the source. Codex's `thread/tokenUsage/updated` carries `total` per thread
+  (root and each child agent), cumulative; Codex reports no cost. Both keep counting across a
+  resume: Claude continues "the total its transcript saved", Codex restores `token_info` from the
+  rollout (`codex-rs/core/src/session/mod.rs`, `last_token_info_from_rollout`).
+- **So a turn is a difference.** Adapters emit `usage.totals` at the end of each turn: the running
+  totals per model, each tagged with its scope (Claude conversation id, which `/clear` changes;
+  Codex thread id). The recorder subtracts a persisted baseline per session, scope and model.
+  A total below its baseline is a restart and counts in full; an all-zero reading (a crashed
+  query) is ignored; a resumed scope with no baseline seeds one and records nothing, so a
+  conversation older than the recorder never lands as one enormous turn.
+- **Row and store.** `provider_usage_turns` in the platform SQLite database, keyed by session,
+  turn and model: provider instance, driver, account key, `recorded_at`, input (excluding cache),
+  output (including reasoning), cache read, cache write, reasoning, and `cost_usd` (the provider's
+  estimate, null for Codex). Not a projection and not tied to the session row: spent money stays
+  spent after a session is deleted. One row is about 200 bytes; `provider_usage_baselines` holds
+  one small row per session, scope and model.
+- **Imported sessions.** Backfill is possible: Claude transcripts carry `message.usage` per
+  assistant row (deduplicate by `messageId:requestId`, as Orca does) and Codex rollouts carry
+  `token_count` events. Neither carries a cost for Codex. That stays Phase 4.
+- **Utility generations are recorded too** (2026-09-25). Title and commit-message generation run
+  as text-generation tasks that never reach runtime listeners, so `ProviderService.subscribeUsage`
+  carries usage from every turn it runs, each labelled `turn`, `title` or `commit-message`
+  (`purpose` column, migration 22). T3 counts Claude's only by accident — `claude -p` leaves a
+  transcript its scanner reads, unlabelled — and never Codex's, which runs `--ephemeral`.
+- **Known gaps.** A child agent's usage lands with the next root turn end. The first turn after resuming a pre-recorder conversation
+  is not recorded (its baseline is seeded instead).
 
 ## Phases
 
@@ -113,19 +158,90 @@ Platform already receives.
 4. Log: the snapshot update joins the existing wide event with window kinds and status, never
    account identifiers.
 
+Delivered 2026-09-24. `ProviderUsageWindow` and the per-account snapshot live in
+`packages/contracts/src/provider-usage.ts`. Each adapter maps its own payload at the edge
+(`apps/server/src/provider/utils/usage-windows.ts`), so `account.rate-limits.updated` carries typed
+windows and the `runtime_event` wide event names them as `id:status`. `ProviderUsageStore` folds
+them per account. The key is a hash of the driver and its credential paths, so instances that share
+a home share one meter. `GET /providers/usage` serves the store. A Codex session reads
+`account/rateLimits/read` when it opens; the generator now handles parameterless requests. The
+composer gauge sits beside the context ring, refetches when the drafting session's turn settles, and
+opens a popover with one row per window. Evidence: scenario `chat-usage-meter`, unit tests for both
+mappings, the merge, the store and the web helpers.
+
+Revised 2026-09-25 after comparing T3 Code, Orca and Codex's own TUI:
+
+- **Probes seed the store.** The SDK documents `rate_limit_event` as "emitted when rate limit info
+  changes", and T3's fixtures show rejections arriving without a utilization, so events alone leave
+  Claude's meter empty. Adapters now have `readUsage()`: Claude runs `get_usage`
+  (`usage_EXPERIMENTAL…`, `skipBehaviors`) on the never-yielding probe, Codex runs
+  `account/read` then `account/rateLimits/read`. `ProviderUsageStore.read()` probes an account at
+  most once per five minutes, only while something asks, and waits at most 6 s. A failed probe keeps
+  the known windows; an API key or signed-out home is `unsupported` and shows nothing. The Codex read
+  at session open is gone: the probe replaced it. Measured on the dev server: Claude 1.2 s (session,
+  weekly, Fable), Codex 2.8 s.
+- **A rejection is a stop only when nothing pays for it.** Claude overage (`overageStatus`,
+  `isUsingOverage`, `overageInUse`), Claude extra usage, and Codex credits turn a spent window into
+  `warning`. A rejection without a utilization updates only the status unless it stops the turn.
+- **The overage-included bucket is named by `get_usage`** (`model_scoped[].display_name`); the stream
+  event is dropped until a probe has named it.
+- **Expiry and staleness.** A window whose reset has passed leaves the answer, on the server and live
+  in the client. `checkedAt` replaces `updatedAt`; the popover says "Checked 4m ago" and, past
+  fifteen minutes (Codex's `/status` threshold), "may be out of date".
+- **Thresholds.** The provider's status wins; otherwise warning from 75% (Codex's floor), red at 100%.
+- **Long turns.** A running session refetches every 60 s, every 15 s once a window passes 90%
+  (Codex's TUI polls 60/30/15/5 s by band).
+- **The stop is explained.** A Codex turn failing with `usageLimitExceeded` says which limit and when
+  it resets, plus the next step for workspace credit or spend stops, instead of OpenAI's sentence.
+  A Claude rejection that parks the turn emits one runtime warning per window and reset.
+
+Not copied: Orca reads Claude's OAuth token from the keychain or `.credentials.json` and calls
+`api.anthropic.com/api/oauth/usage`, falling back to typing `/usage` into a hidden terminal. The SDK
+call reads the same data without touching credentials. T3's pooled hub accounts are out of scope.
+T3's pace marker (use ahead of or behind elapsed time) belongs to Phase 3.
+
 ### Phase 2: Record usage per turn
 
-Store the per-turn rows chosen in the research phase, from ingestion.
+Delivered 2026-09-25. `usage.totals` from both adapters (`utils/usage-totals.ts`),
+`ProviderUsageRecorder` (`provider/usage-recorder.ts`) subscribed beside the usage store, migration
+21 with both tables. Tests cover the delta rules (restart, zeroed reading, resumed scope, separate
+models, a repeated turn end adding) against a real in-memory database, and both adapters' emission.
+Each recording joins the `chat.pipeline.provider_usage.recorded` event with models, tokens and cost.
 
 ### Phase 3: Usage page
 
 A settings-style tab (a `ToolPane` with `bg-background` at the call site) with totals, per-model
 and per-day breakdowns, and the price editor from D3. Pending before empty; `LoadingState` for
-the first load.
+the first load. Reads `provider_usage_turns` through one aggregate query (range, group by day and
+model, local-day boundaries from the client's offset). Codex rows price from the D3 setting at read
+time, never stored, so a corrected price corrects history. Consider T3's pace marker on the
+plan-window rows. Record text-generation turns first if their cost should appear.
+
+Delivered 2026-09-25 as Settings › Usage rather than a new tab kind: a tab kind would have
+dragged document identity, codecs and the address grammar into something that is not a
+document, and the settings widget machinery already hosts whole sections (Machines,
+Providers). The `usage.modelPrices` key (application scope, widget `usage`) is the D3 price
+list; its row renders the page. `GET /providers/usage/history?days&utcOffsetMinutes` is one
+grouped read (`ProviderUsageHistoryReader`): viewer-local days, per-model rows with a
+`costSource` of `provider`, `price` or `none`, purposes, distinct turns, and `unpricedTokens`
+so a total never hides what it leaves out. The page: 7/30/90-day range, headline, a one-series
+day chart (cost, or tokens when nothing is priced) with a label per bar, model and purpose
+rows, and a price editor for every model with no cost of its own. `workspace.showUsage` and
+the meter popover's "View usage" open it. Scenario `settings-usage` asserts the real read is
+200, then drives a fixed month; `chat-usage-meter` follows "View usage". Windows now carry `windowMinutes` (Codex
+`windowDurationMins`; Claude's from its ids: `five_hour` 300, `seven_day…` 10080), so each
+gauge row shows T3's pace marker: a tick where even spending would stand, and "Ahead of
+pace · runs out in 2d 6h" when use outruns time (hidden once a window is spent). The
+composer's control row is one line at every width: the model name is the only element that
+shrinks (Button is `shrink-0` by default, so the picker says `shrink`), under 520px labels
+give way to icons in two steps, and under 300px the two read-only gauges hide so every action
+keeps its place. Scenario `chat-composer-narrow` drags the chat side panel from 600 to 200px
+and fails on any control that leaves the row or wraps.
 
 ### Phase 4: History across sessions
 
-Backfill from imported sessions only if the research found usable data.
+The research found usable data (see the outcome above). Backfill writes the same rows, with a
+source column so an imported turn is never counted twice when a session is later continued here.
 
 ### Phase 5: Reset credits (gated)
 
@@ -139,8 +255,7 @@ with a `scope`. Automated tests use boundary fixtures; nothing consumes a real c
   `bun run agent:browser look` on the composer with a warning-state window; add a scenario under
   `scripts/agent/scenarios/` and selectors in `scripts/agent/selectors.ts`.
 - `bun run logs` shows the snapshot event with window kinds.
-- Server changes deploy with `bun run deploy --server`, which drops live terminal and agent
-  sessions; say so first.
+- Server changes deploy with `bun run deploy --server`.
 
 ## Out of scope and not copied
 

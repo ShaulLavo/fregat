@@ -25,7 +25,48 @@ export const platformMigrations: readonly Migration[] = [
   { version: 18, name: 'session_titles', up: applySessionTitles },
   { version: 19, name: 'attachment_upload_owners', up: applyAttachmentUploadOwners },
   { version: 20, name: 'terminal_history', up: applyTerminalHistory },
+  { version: 21, name: 'provider_usage', up: applyProviderUsage },
+  { version: 22, name: 'provider_usage_purpose', up: applyProviderUsagePurpose },
 ]
+
+function applyProviderUsagePurpose(database: PlatformDatabase) {
+  database.run(
+    sql`ALTER TABLE provider_usage_turns ADD COLUMN purpose TEXT NOT NULL DEFAULT 'turn'`,
+  )
+}
+
+function applyProviderUsage(database: PlatformDatabase) {
+  database.run(sql`
+    CREATE TABLE provider_usage_turns (
+      session_id TEXT NOT NULL,
+      turn_id TEXT NOT NULL,
+      model TEXT NOT NULL,
+      provider_instance_id TEXT NOT NULL,
+      driver_kind TEXT NOT NULL,
+      account_key TEXT,
+      recorded_at TEXT NOT NULL,
+      input_tokens INTEGER NOT NULL,
+      output_tokens INTEGER NOT NULL,
+      cache_read_tokens INTEGER NOT NULL,
+      cache_write_tokens INTEGER NOT NULL,
+      reasoning_tokens INTEGER NOT NULL,
+      cost_usd REAL,
+      PRIMARY KEY (session_id, turn_id, model)
+    )
+  `)
+  database.run(
+    sql`CREATE INDEX provider_usage_turns_recorded_idx ON provider_usage_turns (recorded_at)`,
+  )
+  database.run(sql`
+    CREATE TABLE provider_usage_baselines (
+      session_id TEXT NOT NULL,
+      scope TEXT NOT NULL,
+      model TEXT NOT NULL,
+      totals_json TEXT NOT NULL,
+      PRIMARY KEY (session_id, scope, model)
+    )
+  `)
+}
 
 function applyTerminalHistory(database: PlatformDatabase) {
   database.run(

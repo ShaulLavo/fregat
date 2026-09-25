@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import type { SessionId } from '@workspace/contracts'
 import type { AgentTerminalProcess } from '../terminal/agent-launch'
 
@@ -209,6 +210,30 @@ export class ProviderAdapterRegistry {
 
   listInstances() {
     return Array.from(this.instances.keys())
+  }
+
+  /**
+   * Instances whose credentials live in the same files are one account, so they share one
+   * usage meter. Hashed: the key crosses the wire, and a home path is not the client's business.
+   */
+  usageAccount(providerInstanceId: ProviderInstanceId) {
+    const instance = this.instances.get(providerInstanceId)
+    if (!instance) return null
+
+    const credentials =
+      instance.credentialPaths.length > 0
+        ? instance.credentialPaths.toSorted().join('\0')
+        : `instance:${providerInstanceId}`
+    const accountKey = createHash('sha256')
+      .update(`${instance.config.driverKind}\0${credentials}`)
+      .digest('hex')
+      .slice(0, 16)
+
+    return {
+      accountKey,
+      driverKind: instance.config.driverKind,
+      enabled: instance.config.enabled !== false,
+    }
   }
 
   importSources() {

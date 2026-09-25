@@ -62,6 +62,9 @@ import { wallpaperBootHandoff } from './wallpaper-boot-handoff'
 import { chatGitTabSwitch } from './chat-git-tab-switch'
 import { chatGitTurnRows } from './chat-git-turn-rows'
 import { chatModelPicker } from './chat-model-picker'
+import { chatUsageMeter } from './chat-usage-meter'
+import { chatComposerNarrow } from './chat-composer-narrow'
+import { settingsUsage } from './settings-usage'
 import { chatClaudeCatalog } from './chat-claude-catalog'
 import { wallpaperIconHints } from './wallpaper-icon-hints'
 import { terminalBackground } from './terminal-background'
@@ -152,6 +155,7 @@ import { editorRowHeightAudit } from './editor-row-height-audit'
 import { editorLargePaste } from './editor-large-paste'
 import { editorFind } from './editor-find'
 import { problemsPanelRows } from './problems-panel-rows'
+import { problemsPanelWorkspace } from './problems-panel-workspace'
 import { editorTypeBurst } from './editor-type-burst'
 import { editorUndoBarrier } from './editor-undo-barrier'
 import { editorUndoBranch } from './editor-undo-branch'
@@ -216,6 +220,9 @@ export const scenarios: readonly Scenario[] = [
   iconHints,
   chatIconHints,
   chatModelPicker,
+  chatUsageMeter,
+  chatComposerNarrow,
+  settingsUsage,
   chatClaudeCatalog,
   wallpaperIconHints,
   gitChanges,
@@ -326,6 +333,7 @@ export const scenarios: readonly Scenario[] = [
   editorRowHeightAudit,
   editorFind,
   problemsPanelRows,
+  problemsPanelWorkspace,
   editorTypeBurst,
   editorUndoBarrier,
   editorUndoBranch,

@@ -37,6 +37,10 @@ one tree with no row Tab stops, no counter tile, a diagnostic row whose `title` 
 line, and ArrowDown crosses from the first file into the second with focus still on the tree;
 Left on the first file collapses it. It never types into the checkout.
 
+`scenario problems-panel-workspace --file <name>` opens a file in the real workspace without
+typing, waits for Problems to settle, and fails when any language server is not answering. Run it
+against the mesh after a `--server` deploy: LSP there once broke only in the real workspace.
+
 `scenario bottom-panel-persistence` steps through the empty state on its
 way between Terminal and Problems.
 
@@ -46,6 +50,8 @@ One file row per file, basename before the muted directory, then rows with a sev
 the left, the line on the right, and the message below. The tree fills the bottom panel's width. The tab badge
 matches the total across every section. Switching tabs must not drop another file's section.
 With nothing reported, `No problems reported` with `A file is checked once it is opened.`
+A server that failed while another answered is `Diagnostics unavailable` with `Not answering:
+<server ids>`, never a clean state; one still connecting keeps the panel pending.
 
 Pending is `DiagnosticsLoading` — one placeholder for the path line and one per row, mirroring
 the loaded view. A skeleton that shows four tiles is stale.

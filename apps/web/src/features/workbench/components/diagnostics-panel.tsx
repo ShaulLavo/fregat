@@ -35,7 +35,7 @@ export function DiagnosticsPanel() {
   const workspaceStore = useEditorWorkspaceStoreApi()
   // Status still comes from the active tab's servers: it answers "is anything checking",
   // which the marker store cannot — an empty store and a broken server look alike.
-  const { diagnostics, status } = useEditorLanguageServerStatus(
+  const { diagnostics, failedServerIds, pendingServerIds, status } = useEditorLanguageServerStatus(
     statusBarSource?.languageServerStatusSource ?? idleLanguageServerStatusSource,
   )
   const resources = useMarkerResources()
@@ -93,7 +93,11 @@ export function DiagnosticsPanel() {
         className='flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden'
       >
         {renderDiagnosticsState(
-          diagnosticsEmptyState(statusBarSource ? status : 'idle', diagnostics?.freshness),
+          diagnosticsEmptyState(statusBarSource ? status : 'idle', diagnostics?.freshness, {
+            failed: failedServerIds.length,
+            pending: pendingServerIds.length,
+          }),
+          failedServerIds,
         )}
       </FocusablePanel>
     )
@@ -133,11 +137,20 @@ export function DiagnosticsPanel() {
   )
 }
 
-function renderDiagnosticsState(state: DiagnosticsEmptyState) {
+function renderDiagnosticsState(state: DiagnosticsEmptyState, failedServerIds: readonly string[]) {
   if (state === 'loading') return <DiagnosticsLoading />
   // No retry: no restart handle is exposed here; reopening the file restarts its language server.
   if (state === 'unavailable') {
-    return <EmptyState className='min-h-0 flex-1' title='Diagnostics unavailable' tone='error' />
+    return (
+      <EmptyState
+        className='min-h-0 flex-1'
+        description={
+          failedServerIds.length > 0 ? `Not answering: ${failedServerIds.join(', ')}` : undefined
+        }
+        title='Diagnostics unavailable'
+        tone='error'
+      />
+    )
   }
   if (state === 'silent') {
     return (

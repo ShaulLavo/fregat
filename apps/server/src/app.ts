@@ -67,6 +67,9 @@ import { wallpaperRoutes } from './wallpaper/routes'
 import { webRoutes, type WebOptions } from './web/routes'
 import { ProviderSessionDirectory } from './provider/provider-session-directory'
 import { ProviderService } from './provider/provider-service'
+import { ProviderUsageHistoryReader } from './provider/usage-history'
+import { ProviderUsageRecorder } from './provider/usage-recorder'
+import { ProviderUsageStore } from './provider/usage-store'
 import { MachineService, type MachineServiceOptions } from './machines/service'
 import { machineRoutes } from './machines/routes'
 import type { TailnetStatusCommand } from './machines/tailnet-hosts'
@@ -228,6 +231,14 @@ export function createApp(options: AppOptions) {
     adapterRegistry: providerAdapterRegistry,
     sessionDirectory: new ProviderSessionDirectory(database),
   })
+  const providerUsage = new ProviderUsageStore(providerAdapterRegistry)
+  const providerUsageRecorder = new ProviderUsageRecorder(database, providerAdapterRegistry)
+  const providerUsageHistory = new ProviderUsageHistoryReader(
+    database,
+    () => settings.snapshot().values['usage.modelPrices'],
+  )
+  providerService.subscribeRuntimeEvents((event) => providerUsage.accept(event))
+  providerService.subscribeUsage((event, purpose) => providerUsageRecorder.accept(event, purpose))
   const orchestration = new OrchestrationEngine(database, {
     responseStreamingMode: (projectId) => {
       const values = settings.snapshot().values
@@ -381,7 +392,7 @@ export function createApp(options: AppOptions) {
     })
     .post('/terminal/clear', ({ body }) => terminal.clear(body), { body: terminalClearInputSchema })
     .post('/terminal/kill', ({ body }) => terminal.kill(body), { body: terminalKillInputSchema })
-    .use(providerRoutes(providerAdapterRegistry))
+    .use(providerRoutes(providerAdapterRegistry, providerUsage, providerUsageHistory))
     .use(orchestrationRoutes(orchestration, checkpointDiff, sessionSearch))
     .use(
       attachmentRoutes({

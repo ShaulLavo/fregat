@@ -1,3 +1,4 @@
+import type { ProviderUsagePurpose } from '@workspace/contracts'
 import { BackgroundTaskRegistry } from './background-liveness'
 import { elapsedMs } from '@workspace/utils/timing'
 import path from 'node:path'
@@ -91,6 +92,13 @@ export type ProviderWorktreeExecution = {
 
 export type ProviderRuntimeEventListener = (event: ProviderRuntimeEvent) => Promise<void> | void
 
+type ProviderUsageTotalsEvent = Extract<ProviderRuntimeEvent, { type: 'usage.totals' }>
+
+export type ProviderUsageListener = (
+  event: ProviderUsageTotalsEvent,
+  purpose: ProviderUsagePurpose,
+) => void
+
 /** The adapter a stream belongs to, kept beside its teardown so a replacement can be spotted. */
 type AdapterSubscription = {
   adapter: ReturnType<ProviderAdapterRegistry['getByInstance']>
@@ -122,7 +130,9 @@ export class ProviderService {
     this.handleRuntimeEvent(task),
   )
   private readonly sessionDirectory: ProviderSessionDirectory
-  private readonly suppressedTextGenerationSessions = new Set<SessionId>()
+  /** Ended text-generation sessions whose late events are dropped, by what they were for. */
+  private readonly suppressedTextGenerationSessions = new Map<SessionId, ProviderUsagePurpose>()
+  private readonly usageListeners = new Set<ProviderUsageListener>()
   private readonly textGenerationTasks = new Map<SessionId, ProviderTextGenerationTask>()
   private worktreeExecution: ProviderWorktreeExecution | null = null
   private readonly worktreeLeases = new Map<
@@ -393,6 +403,7 @@ export class ProviderService {
     const task = new ProviderTextGenerationTask({
       interrupt,
       providerInstanceId,
+      purpose: input.purpose,
       ...ids,
     })
     const abort = () => void task.interrupt()
@@ -474,7 +485,7 @@ export class ProviderService {
         })
       }
       await this.drainRuntimeEvents()
-      this.suppressCompletedTextGeneration(ids.sessionId)
+      this.suppressCompletedTextGeneration(ids.sessionId, input.purpose)
       this.textGenerationTasks.delete(ids.sessionId)
       adapterLease.release()
     }
@@ -689,6 +700,16 @@ export class ProviderService {
     const routed = await this.assertConversationRollbackSupported(input.sessionId)
     if (input.numTurns === 0) return async () => {}
     return routed.adapter.prepareRollbackSession(input)
+  }
+
+  /**
+   * Usage from every turn this service runs, chat or not. Text generation never reaches
+   * the runtime listeners, so its cost would go unrecorded without this channel.
+   */
+  subscribeUsage(listener: ProviderUsageListener) {
+    this.usageListeners.add(listener)
+
+    return () => this.usageListeners.delete(listener)
   }
 
   subscribeRuntimeEvents(listener: ProviderRuntimeEventListener) {
@@ -922,12 +943,18 @@ export class ProviderService {
     })
   }
 
-  private suppressCompletedTextGeneration(sessionId: SessionId) {
-    this.suppressedTextGenerationSessions.add(sessionId)
+  private suppressCompletedTextGeneration(sessionId: SessionId, purpose: ProviderUsagePurpose) {
+    this.suppressedTextGenerationSessions.set(sessionId, purpose)
     if (this.suppressedTextGenerationSessions.size <= 1_024) return
 
-    const oldest = this.suppressedTextGenerationSessions.values().next().value
+    const oldest = this.suppressedTextGenerationSessions.keys().next().value
     if (oldest) this.suppressedTextGenerationSessions.delete(oldest)
+  }
+
+  private publishUsage(event: ProviderRuntimeEvent, purpose: ProviderUsagePurpose) {
+    if (event.type !== 'usage.totals') return
+
+    for (const listener of this.usageListeners) listener(event, purpose)
   }
 
   private startAdapterEventStreams() {
@@ -998,16 +1025,23 @@ export class ProviderService {
 
     const textGeneration = this.textGenerationTasks.get(task.event.sessionId)
     if (textGeneration) {
+      this.publishUsage(task.event, textGeneration.purpose)
       if (textGeneration.accept(task.event)) await textGeneration.interrupt()
       return
     }
-    if (this.suppressedTextGenerationSessions.has(task.event.sessionId)) return
+    const suppressed = this.suppressedTextGenerationSessions.get(task.event.sessionId)
+    if (suppressed) {
+      // An interrupted generation can report its totals after the task is gone.
+      this.publishUsage(task.event, suppressed)
+      return
+    }
 
     const binding = this.sessionDirectory.getBinding(task.event.sessionId)
     if (binding && binding.runtimeEpoch !== task.event.runtimeEpoch) return
 
     this.backgroundTasks.accept(task.event)
     this.recordRuntimeEvent(task.event, task.adapter)
+    this.publishUsage(task.event, 'turn')
     await this.emitRuntimeEvent(task.event)
   }
 

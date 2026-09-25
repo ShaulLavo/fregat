@@ -60,6 +60,7 @@ export async function generateSessionTitle(
   const linkedContext = await resolveSessionTitleLinks(input)
   const result = await service.generateText({
     modelSelection: input.modelSelection,
+    purpose: 'title',
     signal: input.signal,
     attachments: input.attachments,
     attachmentsDir: input.attachmentsDir,

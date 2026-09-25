@@ -18,7 +18,23 @@ test('aggregates readiness and preserves diagnostics from healthy lanes', () => 
 
   source.setServerStatus('secondary', 'error')
   expect(source.getSnapshot().status).toBe('ready')
+  expect(source.getSnapshot().failedServerIds).toEqual(['secondary'])
   expect(messages(source)).toEqual(['primary'])
+})
+
+test('names lanes still connecting while another already answers', () => {
+  const source = createEditorLanguageServerStatusSource()
+  source.setServers(['fast', 'slow'])
+  source.setServerStatus('fast', 'ready')
+  source.setServerDiagnostics('fast', summary('fast'))
+
+  expect(source.getSnapshot()).toMatchObject({
+    failedServerIds: [],
+    pendingServerIds: ['slow'],
+    status: 'ready',
+  })
+  source.setServerStatus('slow', 'ready')
+  expect(source.getSnapshot().pendingServerIds).toEqual([])
 })
 
 test('reports error only after every eligible lane errors', () => {

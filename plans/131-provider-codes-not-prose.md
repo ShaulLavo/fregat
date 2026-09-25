@@ -14,8 +14,7 @@ t3code (`/once|accept|approve|allow/`), with the persistence words used only to 
 a form whose Approve cannot be filled is still declined unasked, as t3code does, now with a
 `chat.pipeline.codex_adapter.elicitation_declined` warning. Not yet observed: a live Codex
 approval in `bun run logs`.
-Inspected at Platform `d1ca6472`. Server-only; every phase needs `bun run deploy --server`, which
-drops live terminal and agent sessions, so batch the phases into as few deploys as possible.
+Inspected at Platform `d1ca6472`. Server-only; every phase needs `bun run deploy --server`.
 
 The provider adapters decide things by matching substrings of human-readable text: a permission's
 lifetime from an option label, "the request is gone" from an error sentence, "not installed" from

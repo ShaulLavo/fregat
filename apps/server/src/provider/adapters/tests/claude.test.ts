@@ -8,6 +8,7 @@ import type {
   Options,
   Query,
   SDKMessage,
+  SDKRateLimitInfo,
   SDKUserMessage,
 } from '@anthropic-ai/claude-agent-sdk'
 import {
@@ -72,6 +73,26 @@ const INITIALIZE_RESPONSE = {
   output_style: 'default',
 }
 
+/** `get_usage` as the CLI answers it for a Max account: 0–100 percentages, ISO resets. */
+const GET_USAGE_RESPONSE = {
+  behaviors: null,
+  rate_limits: {
+    five_hour: { resets_at: '2026-09-24T12:00:00Z', utilization: 54 },
+    model_scoped: [{ display_name: 'Fable', resets_at: null, utilization: 73 }],
+    seven_day: { resets_at: null, utilization: 18.4 },
+  },
+  rate_limits_available: true,
+  session: {
+    model_usage: {},
+    total_api_duration_ms: 0,
+    total_cost_usd: 0,
+    total_duration_ms: 0,
+    total_lines_added: 0,
+    total_lines_removed: 0,
+  },
+  subscription_type: 'max',
+}
+
 type FakeWaiter = {
   reject: (reason: unknown) => void
   resolve: (value: IteratorResult<SDKMessage>) => void
@@ -129,6 +150,9 @@ class FakeClaudeQuery implements AsyncIterable<SDKMessage> {
   }
 
   readonly initializationResult = async () => INITIALIZE_RESPONSE
+
+  readonly usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET = async () =>
+    GET_USAGE_RESPONSE
 
   readonly setModel = async (model?: string) => {
     this.setModelCalls.push(model)
@@ -246,6 +270,79 @@ describe('ClaudeProviderAdapter', () => {
 
     latestQuery(harness).emit(successResult())
     await pending
+    await harness.adapter.stopAll()
+  })
+
+  it('reads plan windows through get_usage and says once why a rejected turn waits', async () => {
+    const harness = claudeHarness()
+    expect(await harness.adapter.readUsage()).toMatchObject({
+      kind: 'reading',
+      update: {
+        planType: 'max',
+        windows: [{ id: 'five_hour' }, { id: 'seven_day' }, { id: 'seven_day_fable' }],
+      },
+    })
+
+    const pending = harness.adapter.sendTurn(providerTurnInput())
+    await waitForEvent(harness, 'turn.started')
+    const resetsAt = Math.floor(Date.now() / 1000) + 2 * 3600
+    const limited = rateLimitEvent({
+      rateLimitType: 'seven_day_overage_included',
+      resetsAt,
+      status: 'rejected',
+    })
+    latestQuery(harness).emit(limited)
+    latestQuery(harness).emit(limited)
+    await waitFor(() => runtimeWarnings(harness).length === 1, 'no limit warning')
+
+    expect((await waitForEvent(harness, 'account.rate-limits.updated')).payload.windows).toEqual([
+      expect.objectContaining({ id: 'seven_day_fable', status: 'rejected', usedPercent: 100 }),
+    ])
+    expect(runtimeWarnings(harness).map((event) => event.payload.message)).toEqual([
+      expect.stringMatching(/^Claude usage limit reached\. The weekly · Fable limit resets in 2h/),
+    ])
+
+    latestQuery(harness).emit(successResult())
+    await pending
+    await harness.adapter.stopAll()
+  })
+
+  it('reports the running per-model totals at each result, scoped by conversation', async () => {
+    const harness = claudeHarness()
+    const input = providerTurnInput()
+    const pending = harness.adapter.sendTurn(input)
+    await waitForEvent(harness, 'turn.started')
+    latestQuery(harness).emit({
+      ...successResult(),
+      modelUsage: {
+        'claude-opus-5-5': {
+          cacheCreationInputTokens: 30,
+          cacheReadInputTokens: 400,
+          contextWindow: 1_000_000,
+          costUSD: 0.42,
+          inputTokens: 12,
+          maxOutputTokens: 64_000,
+          outputTokens: 90,
+          thinkingTokens: 40,
+          webSearchRequests: 0,
+        },
+      },
+    } as SDKMessage)
+    await pending
+
+    expect((await waitForEvent(harness, 'usage.totals')).payload.totals).toEqual([
+      {
+        cacheReadTokens: 400,
+        cacheWriteTokens: 30,
+        continuesEarlierTurns: false,
+        costUsd: 0.42,
+        inputTokens: 12,
+        model: 'claude-opus-5-5',
+        outputTokens: 90,
+        reasoningTokens: 40,
+        scope: input.sessionId,
+      },
+    ])
     await harness.adapter.stopAll()
   })
 
@@ -1583,6 +1680,15 @@ function textDelta(text: string): SDKMessage {
     session_id: SESSION_ID,
     type: 'stream_event',
     uuid: '22222222-2222-4222-8222-222222222222',
+  }
+}
+
+function rateLimitEvent(info: SDKRateLimitInfo): SDKMessage {
+  return {
+    rate_limit_info: info,
+    session_id: SESSION_ID,
+    type: 'rate_limit_event',
+    uuid: SYSTEM_UUID,
   }
 }
 

@@ -90,6 +90,11 @@
     "reason": "D3: \"Worked for \u2026\" is app-authored."
   },
   {
+    "file": "apps/web/src/features/chat/components/composer-controls-menu.tsx",
+    "class": "truncate",
+    "reason": "D3: the runtime-mode label is app-authored (\"Full access\", \"Approval required\"), and the trigger's Tooltip names the complete mode, so a native title would duplicate it (D4)."
+  },
+  {
     "file": "apps/web/src/features/chat/components/model-options-menu.tsx",
     "class": "truncate",
     "reason": "Already recovered: the compact model-options control earns a Tooltip that includes the complete option summary. A native title would duplicate that tooltip (D4)."

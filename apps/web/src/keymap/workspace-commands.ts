@@ -23,6 +23,7 @@ import {
   FloppyDiskBackIcon,
   FloppyDiskIcon,
   FolderOpenIcon,
+  GaugeIcon,
   GearSixIcon,
   GitDiffIcon,
   ImageIcon,
@@ -595,6 +596,17 @@ export const workspaceCommands = [
     run: ({ invocation, runtime }) =>
       transitionStart(
         runtime.shell.showSettings(invocation.origin as FocusTargetToken | null, 'font'),
+      ),
+  }),
+  defineCommand({
+    ...workspaceCommandMetadata['workspace.showUsage'],
+    icon: GaugeIcon,
+    run: ({ invocation, runtime }) =>
+      transitionStart(
+        runtime.shell.showSettings(
+          invocation.origin as FocusTargetToken | null,
+          'usage.modelPrices',
+        ),
       ),
   }),
   defineCommand({

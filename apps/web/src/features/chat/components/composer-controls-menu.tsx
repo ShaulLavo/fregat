@@ -4,6 +4,7 @@ import { resolveComposerInteractionMode } from '@workspace/client-core/chat/comp
 import { CaretUpDownIcon, SlidersHorizontalIcon } from '@phosphor-icons/react'
 import type { InteractionMode, RuntimeMode } from '@workspace/contracts'
 import { Button } from '@workspace/ui/components/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -73,9 +74,12 @@ export function ComposerControlsMenu({
   disabled,
   draftTarget,
   interactionMode,
+  narrow = false,
   runtimeMode,
 }: {
   readonly disabled: boolean
+  /** Narrowest composer: the icon alone, no caret, with the mode named in the tooltip. */
+  readonly narrow?: boolean
   readonly draftTarget: ChatInputDraftTarget
   /** The session's committed mode — the fallback when the draft has no override. */
   readonly interactionMode: InteractionMode
@@ -101,34 +105,47 @@ export function ComposerControlsMenu({
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger
-        render={
-          <Button
-            aria-label='Agent access and mode'
-            className='text-muted-foreground hover:text-foreground min-w-0 text-xs font-normal'
-            disabled={disabled}
-            size='sm'
-            title={
-              planMode.enabled
-                ? triggerTitle(activeRuntimeMode, activeInteractionMode)
-                : optionLabel(RUNTIME_MODE_OPTIONS, activeRuntimeMode)
-            }
-            type='button'
-            variant='ghost'
-          >
-            <SlidersHorizontalIcon className='size-(--icon-size-sm) shrink-0 opacity-70' />
-            <span className='truncate'>{optionLabel(RUNTIME_MODE_OPTIONS, activeRuntimeMode)}</span>
-            {/* Plan mode changes what a send does, so it is called out on the
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <DropdownMenuTrigger
+              render={
+                <Button
+                  aria-label='Agent access and mode'
+                  className='text-muted-foreground hover:text-foreground min-w-0 text-xs font-normal'
+                  disabled={disabled}
+                  focusableWhenDisabled
+                  size='sm'
+                  type='button'
+                  variant='ghost'
+                >
+                  <SlidersHorizontalIcon className='size-(--icon-size-sm) shrink-0 opacity-70' />
+                  {narrow ? null : (
+                    <span className='truncate'>
+                      {optionLabel(RUNTIME_MODE_OPTIONS, activeRuntimeMode)}
+                    </span>
+                  )}
+                  {/* Plan mode changes what a send does, so it is called out on the
                 composer itself rather than only inside the menu. */}
-            {planActive ? (
-              <span className='bg-info/10 text-info text-3xs shrink-0 rounded-md px-1 leading-4 font-medium'>
-                Plan
-              </span>
-            ) : null}
-            <CaretUpDownIcon className='size-(--icon-size-sm) shrink-0 opacity-60' />
-          </Button>
-        }
-      />
+                  {planActive ? (
+                    <span className='bg-info/10 text-info text-3xs shrink-0 rounded-md px-1 leading-4 font-medium'>
+                      Plan
+                    </span>
+                  ) : null}
+                  {narrow ? null : (
+                    <CaretUpDownIcon className='size-(--icon-size-sm) shrink-0 opacity-60' />
+                  )}
+                </Button>
+              }
+            />
+          }
+        />
+        <TooltipContent>
+          {planMode.enabled
+            ? triggerTitle(activeRuntimeMode, activeInteractionMode)
+            : optionLabel(RUNTIME_MODE_OPTIONS, activeRuntimeMode)}
+        </TooltipContent>
+      </Tooltip>
       <DropdownMenuContent align='start' className='w-72 p-1' side='top'>
         <DropdownMenuRadioGroup value={activeRuntimeMode}>
           {/* Inside the group: base-ui resolves the label against its group context. */}

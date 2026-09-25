@@ -413,6 +413,13 @@ function handle(message) {
       send({ id: message.id, result: { turn: fakeTurn('inProgress') } });
       return;
     }
+    if (mode === 'usage-limit') {
+      send({ id: message.id, result: { turn: fakeTurn('inProgress') } });
+      const resetsAt = Math.floor(Date.now() / 1000) + 2 * 3600;
+      send({ method: 'account/rateLimits/updated', params: { rateLimits: { limitId: 'codex', primary: { usedPercent: 100, windowDurationMins: 300, resetsAt } } } });
+      send({ method: 'turn/completed', params: { threadId: 'provider-thread-1', turn: { ...fakeTurn('failed'), error: { message: "You've hit your usage limit. Buy more credits.", codexErrorInfo: 'usageLimitExceeded' } } } });
+      return;
+    }
     if (mode === 'echo-mode-params') {
       const collaborationMode = message.params.collaborationMode ?? null;
       sendAgentMessageItemCompleted(
@@ -2102,6 +2109,32 @@ describe('CodexProviderAdapter', () => {
     )
   })
 
+  it('names the spent window instead of the provider sentence when a turn stops on a usage limit', async () => {
+    await withFakeCodex(
+      async () => {
+        const adapter = new CodexProviderAdapter()
+        const events: ProviderRuntimeEvent[] = []
+        collectAdapterEvents(adapter, events)
+        await adapter.sendTurn(providerTurnInput()).catch(() => undefined)
+        await settleRuntimeEvents()
+        await adapter.stopAll()
+
+        expect(events).toContainEqual(
+          expect.objectContaining({
+            payload: {
+              errorMessage: expect.stringMatching(
+                /^Codex usage limit reached\. The session limit resets in (2h|1h 5\dm)\. Send the message again once the limit resets\.$/,
+              ),
+              state: 'failed',
+            },
+            type: 'turn.completed',
+          }),
+        )
+      },
+      { mode: 'usage-limit' },
+    )
+  })
+
   it('logs background Codex diagnostics without chat rows and preserves actionable stderr', async ({
     onTestFinished,
   }) => {
@@ -2180,6 +2213,27 @@ describe('CodexProviderAdapter', () => {
             },
             sessionId: input.sessionId,
             type: 'conversation.token-usage.updated',
+          }),
+        ])
+        // The thread's running total goes to the usage recorder when the turn ends.
+        expect(events.filter((event) => event.type === 'usage.totals')).toEqual([
+          expect.objectContaining({
+            payload: {
+              totals: [
+                {
+                  cacheReadTokens: 800,
+                  cacheWriteTokens: 0,
+                  continuesEarlierTurns: false,
+                  costUsd: null,
+                  inputTokens: 1600,
+                  model: 'codex',
+                  outputTokens: 600,
+                  reasoningTokens: 200,
+                  scope: 'provider-thread-1',
+                },
+              ],
+            },
+            turnId: input.turnId,
           }),
         ])
       },

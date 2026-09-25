@@ -1,6 +1,6 @@
 import { LiveStreamBudget } from './live-stream-budget'
 import { errorSummary as serializeOrchestrationRpcError } from '@workspace/contracts'
-import { adaptWebSocket } from '../utils/websocket'
+import { adaptWebSocket, isAbnormalWebSocketClose } from '../utils/websocket'
 import { elapsedMs } from '@workspace/utils/timing'
 import {
   ORCHESTRATION_REPLAY_MAX_EVENTS,
@@ -69,6 +69,7 @@ type OrchestrationRpcWebSocket = {
 
 type OrchestrationRpcConnectionState = {
   nextDeliveryId: number
+  openedAt: number
   subscriptions: Map<OrchestrationWsSubscriptionId, OrchestrationRpcSubscription>
 }
 
@@ -106,7 +107,11 @@ export function orchestrationWsRoutes(
         return
       }
 
-      states.set(socket.key, { nextDeliveryId: 1, subscriptions: new Map() })
+      states.set(socket.key, {
+        nextDeliveryId: 1,
+        openedAt: performance.now(),
+        subscriptions: new Map(),
+      })
       // The handshake is pushed rather than requested so the client reaches an
       // honest `connected` phase — and can compare protocol versions — without
       // paying a round trip before it may subscribe.
@@ -127,7 +132,7 @@ export function orchestrationWsRoutes(
 
       handleOrchestrationRpcMessage(engine, socket, state, message, config)
     },
-    close(ws) {
+    close(ws, code, reason) {
       const socket = adaptWebSocket(ws)
       if (!socket) return
 
@@ -136,7 +141,13 @@ export function orchestrationWsRoutes(
       if (state) closeOrchestrationRpcState(state)
 
       states.delete(socket.key)
-      recordChatPipelineInfo('chat.pipeline.ws.close', {
+      const record = isAbnormalWebSocketClose(code)
+        ? recordChatPipelineWarning
+        : recordChatPipelineInfo
+      record('chat.pipeline.ws.close', {
+        code,
+        durationMs: state ? Math.round(performance.now() - state.openedAt) : null,
+        reason: reason || null,
         subscriptionCount,
       })
     },

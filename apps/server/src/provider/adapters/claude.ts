@@ -11,6 +11,7 @@ import {
   type PermissionResult,
   type Query,
   type SDKMessage,
+  type SDKRateLimitEvent,
   type SDKUserMessage,
   type SlashCommand,
 } from '@anthropic-ai/claude-agent-sdk'
@@ -75,6 +76,15 @@ import {
 } from './utils/claude-auth'
 import { resolveClaudeExecutable, type ClaudeExecutable } from './utils/claude-executable'
 import { claudeCatalog, type ClaudeCatalog } from './utils/claude-models'
+import { claudeUsageTotals } from '../utils/usage-totals'
+import {
+  claudeBlocksTurn,
+  claudeEventWindow,
+  claudeUsageProbe,
+  claudeUsageUpdate,
+  usageLimitMessage,
+  type ProviderUsageProbe,
+} from '../utils/usage-windows'
 import { claudeModelId, claudeQueryOptions } from './utils/claude-query-options'
 import {
   claudePromptText,
@@ -103,6 +113,9 @@ import { normalizeWorkspaceCwd } from './utils/workspace-cwd'
  * error — hence the much longer budget. A healthy local CLI answers in ~0.5s.
  */
 const CLAUDE_INIT_TIMEOUT_MS = 25_000
+// The usage route waits on this probe, so it gives up well before the capability probe does.
+const CLAUDE_USAGE_INIT_TIMEOUT_MS = 10_000
+const CLAUDE_USAGE_TIMEOUT_MS = 4_000
 
 /** Placeholder payload for an attachment that is guaranteed to be dropped. */
 const EMPTY_ATTACHMENT_BYTES = new Uint8Array(0)
@@ -201,6 +214,8 @@ export class ClaudeProviderAdapter
   /** The newest non-empty catalog; sessions read capabilities from it. */
   private catalog: ClaudeCatalog | null = null
   private initializationProbe: Promise<ClaudeInitialization> | null = null
+  /** The overage-included bucket's model, learned from `get_usage`; the stream never names it. */
+  private scopedUsageModel: string | null = null
 
   /**
    * `createQuery` is the seam every test depends on: without it each test spawns
@@ -302,6 +317,14 @@ export class ClaudeProviderAdapter
    */
   async listCommands({ cwd }: ProviderCommandCatalogInput) {
     return probeClaudeCommandCatalog(this.createQuery, this.env, await this.executablePath(), cwd)
+  }
+
+  async readUsage(): Promise<ProviderUsageProbe> {
+    const response = await probeClaudeUsage(this.createQuery, this.env, await this.executablePath())
+    const { probe, scopedModel } = claudeUsageProbe(response)
+    if (probe.kind === 'reading') this.scopedUsageModel = scopedModel
+
+    return probe
   }
 
   async signIn(input: ProviderSignInInput) {
@@ -530,6 +553,7 @@ export class ClaudeProviderAdapter
       resumeExisting: input.resumeExisting,
       runtimeMode: input.runtimeMode,
       runtimeEpoch: input.runtimeEpoch,
+      scopedUsageModel: () => this.scopedUsageModel,
       sessionId: input.sessionId,
     })
     this.sessions.set(input.sessionId, session)
@@ -565,6 +589,10 @@ class ClaudeAgentSession extends SessionContext {
   private streamEnded = true
   private readonly processes: ProviderProcessLifetime[] = []
   private status: ProviderAdapterRuntime['status'] = 'starting'
+  /** `type:resetsAt` of the limit stops this turn has already announced. */
+  private readonly announcedLimitStops = new Set<string>()
+  private readonly scopedUsageModel: () => string | null
+  private readonly resumed: boolean
 
   private constructor(input: {
     attachmentsDir: string
@@ -576,11 +604,15 @@ class ClaudeAgentSession extends SessionContext {
     providerInstanceId: ProviderTurnInput['providerInstanceId']
     reasoning: ClaudeReasoning
     runtimeMode: RuntimeMode
+    resumeExisting?: boolean
     runtimeEpoch: string
+    scopedUsageModel: () => string | null
     sessionId: SessionId
   }) {
     super(input)
+    this.resumed = input.resumeExisting === true
     this.attachmentsDir = input.attachmentsDir
+    this.scopedUsageModel = input.scopedUsageModel
     this.interactionMode = input.interactionMode
     this.reasoning = input.reasoning
     this.reasoningKey = claudeReasoningKey(input.reasoning)
@@ -603,6 +635,7 @@ class ClaudeAgentSession extends SessionContext {
     resumeExisting?: boolean
     runtimeMode: RuntimeMode
     runtimeEpoch: string
+    scopedUsageModel: () => string | null
     sessionId: SessionId
   }) {
     recordChatPipelineInfo('chat.pipeline.claude_session.start', {
@@ -738,6 +771,7 @@ class ClaudeAgentSession extends SessionContext {
     const providerTurnId = `claude-turn:${crypto.randomUUID()}`
     this.activeTurn = turn
     this.activeProviderTurnId = providerTurnId
+    this.announcedLimitStops.clear()
     void turn.promise.catch(noop)
     this.ingestSession('running', input.turnId)
 
@@ -927,11 +961,7 @@ class ClaudeAgentSession extends SessionContext {
         )
         return
       case 'rate_limit_event':
-        this.emitRuntimeNotification(
-          'account.rate-limits.updated',
-          { rateLimits: message.rate_limit_info },
-          message,
-        )
+        this.handleRateLimitEvent(message)
         return
       // `/clear`: the CLI opened a fresh conversation inside the same session,
       // so the provider session id changes under us — codex's `session/started`.
@@ -1486,6 +1516,19 @@ class ClaudeAgentSession extends SessionContext {
       { usage: claudeTokenUsage(message.usage) },
       message,
     )
+    // Totals reset on `/clear`, which opens a new conversation id, so that id scopes them.
+    this.emitRuntimeNotification(
+      'usage.totals',
+      {
+        totals: claudeUsageTotals(
+          this.providerConversationMarker ?? this.sessionId,
+          // A resumed conversation carries its saved totals until `/clear` opens a new one.
+          this.resumed && this.providerConversationMarker === null,
+          message.modelUsage ?? {},
+        ),
+      },
+      message,
+    )
     void this.emitContextUsage(message)
 
     const turn = this.activeTurn
@@ -2020,6 +2063,31 @@ class ClaudeAgentSession extends SessionContext {
     }
   }
 
+  private handleRateLimitEvent(message: SDKRateLimitEvent) {
+    const info = message.rate_limit_info
+    const scopedModel = this.scopedUsageModel()
+    this.emitRuntimeNotification(
+      'account.rate-limits.updated',
+      claudeUsageUpdate(info, scopedModel),
+      message,
+    )
+    if (!claudeBlocksTurn(info) || !this.activeTurn) return
+
+    // The SDK parks a rejected turn without a word; say why, once per window and reset.
+    const key = `${info.rateLimitType ?? 'unknown'}:${info.resetsAt ?? ''}`
+    if (this.announcedLimitStops.has(key)) return
+
+    this.announcedLimitStops.add(key)
+    const window = claudeEventWindow(info.rateLimitType, scopedModel)
+    const resetsAt = typeof info.resetsAt === 'number' ? new Date(info.resetsAt * 1000) : null
+    const text = usageLimitMessage({
+      atMs: Date.now(),
+      provider: 'Claude',
+      window: window ? { label: window.label, resetsAt: resetsAt?.toISOString() ?? null } : null,
+    })
+    this.emitRuntimeNotification('runtime.warning', { detail: info, message: text }, message)
+  }
+
   private emitRuntimeNotification<Type extends ProviderRuntimeEvent['type']>(
     type: Type,
     payload: ClaudeRuntimeEventPayload<Type>,
@@ -2118,6 +2186,39 @@ async function probeClaudeInitialization(
     )
 
     return { account: initialization.account, models: initialization.models ?? [] }
+  } finally {
+    abortController.abort()
+  }
+}
+
+/**
+ * `get_usage` on the same never-yielding probe: the CLI reads the plan windows from
+ * claude.ai with its own credentials, so no turn is spent and no token leaves the CLI.
+ * `skipBehaviors` skips the local transcript scan the `/usage` dialog also runs.
+ */
+async function probeClaudeUsage(
+  createQuery: ClaudeCreateQuery,
+  env: NodeJS.ProcessEnv,
+  executablePath: string,
+) {
+  const abortController = new AbortController()
+  const query = createQuery({
+    options: claudeProbeOptions(abortController, env, executablePath),
+    prompt: neverYieldingPrompt(abortController.signal),
+  })
+
+  try {
+    await withClaudeTimeout(
+      query.initializationResult(),
+      CLAUDE_USAGE_INIT_TIMEOUT_MS,
+      'Claude usage probe timed out starting.',
+    )
+
+    return await withClaudeTimeout(
+      query.usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET({ skipBehaviors: true }),
+      CLAUDE_USAGE_TIMEOUT_MS,
+      'Claude usage read timed out.',
+    )
   } finally {
     abortController.abort()
   }

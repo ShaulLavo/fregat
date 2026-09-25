@@ -486,9 +486,10 @@ describe('ProviderService', () => {
     expect(fanOutEvents.map((event) => event.type)).toContain('assistant.delta')
     expect(fanOutEvents.map((event) => event.type)).toContain('assistant.complete')
     expect(fanOutEvents.map((event) => event.type)).toContain('turn.completed')
-    expect(fanOutEvents.map((event) => event.type).slice(-3)).toEqual([
+    expect(fanOutEvents.map((event) => event.type).slice(-4)).toEqual([
       'assistant.delta',
       'assistant.complete',
+      'usage.totals',
       'turn.completed',
     ])
     expect(activeSessions).toContainEqual(expect.objectContaining({ sessionId: input.sessionId }))
@@ -595,6 +596,7 @@ describe('ProviderService', () => {
     const input = providerTurnInput()
     await expect(
       service.generateText({
+        purpose: 'title',
         messageText: 'Describe this diff',
         modelSelection: input.modelSelection,
       }),
@@ -616,6 +618,7 @@ describe('ProviderService', () => {
     })
     const input = providerTurnInput()
     await service.generateText({
+      purpose: 'title',
       messageText: 'Describe this diff',
       modelSelection: input.modelSelection,
     })
@@ -639,13 +642,25 @@ describe('ProviderService', () => {
       sessionDirectory: directory,
     })
     const input = providerTurnInput()
+    const usage: Array<{ purpose: string; runtimeListenerSawIt: boolean }> = []
+    const runtimeEventTypes: string[] = []
+    service.subscribeRuntimeEvents((event) => {
+      runtimeEventTypes.push(event.type)
+    })
+    service.subscribeUsage((_event, purpose) =>
+      usage.push({ purpose, runtimeListenerSawIt: runtimeEventTypes.includes('usage.totals') }),
+    )
 
     const result = await service.generateText({
+      purpose: 'title',
       messageText: 'Describe this diff',
       modelSelection: input.modelSelection,
     })
 
     expect(result).toEqual({ text: 'Generated title' })
+    // The generation stays out of chat, but what it cost is still reported, labelled.
+    expect(usage).toEqual([{ purpose: 'title', runtimeListenerSawIt: false }])
+    expect(runtimeEventTypes).toEqual([])
     expect(adapter.startedSessions).toHaveLength(1)
     expect(path.dirname(adapter.startedSessions[0]!.cwd)).toBe(tmpdir())
     expect(path.basename(adapter.startedSessions[0]!.cwd)).toMatch(/^platform-provider-text-/)
@@ -677,6 +692,7 @@ describe('ProviderService', () => {
     const input = providerTurnInput()
     const controller = new AbortController()
     const generation = service.generateText({
+      purpose: 'title',
       messageText: 'Describe this diff',
       modelSelection: input.modelSelection,
       signal: controller.signal,
@@ -708,6 +724,7 @@ describe('ProviderService', () => {
     })
     const input = providerTurnInput()
     const generation = service.generateText({
+      purpose: 'title',
       messageText: 'Describe this diff',
       modelSelection: input.modelSelection,
     })

@@ -130,6 +130,7 @@ export class CommitMessageGenerator {
       const result = await this.providerService.generateText({
         messageText: commitMessagePrompt(context),
         modelSelection: selected.modelSelection,
+        purpose: 'commit-message',
         signal,
       })
       return result.text

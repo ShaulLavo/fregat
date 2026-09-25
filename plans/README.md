@@ -23,7 +23,7 @@ a bare root `bun run verify`.
 | [144 — unattended agent work](144-unattended-agent-work.md)                             | **RESEARCH — HARNESS INVENTORY FIRST**                       |
 | [143 — phone layout](143-phone-layout.md)                                               | **DISCUSSION — OWNER DIRECTION FIRST**                       |
 | [142 — web push](142-web-push.md)                                                       | **PROPOSED — SPIKE FIRST**                                   |
-| [141 — usage and rate limits](141-usage-and-rate-limits.md)                             | **PROPOSED — PHASE 1 READY**                                 |
+| [141 — usage and rate limits](141-usage-and-rate-limits.md)                             | **PHASES 1–2 IMPLEMENTED 2026-09-25; PHASE 3 NEXT**          |
 | [140 — the editor as the agent's advantage](140-editor-agent-advantage.md)              | **RESEARCH — RESEARCH PHASE FIRST**                          |
 | [139 — acting on agent diffs](139-acting-on-agent-diffs.md)                             | **RESEARCH — RESEARCH PHASE FIRST**                          |
 | [138 — Claude models from the CLI](138-claude-model-discovery.md)                       | **IMPLEMENTED 2026-09-24 — ALL FOUR PHASES**                 |

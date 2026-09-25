@@ -34,6 +34,7 @@ const OPEN_ENUM_HELPER_SOURCE = `function openEnum<const TOptions extends readon
 const CLIENT_REQUEST_METHODS = [
   'initialize',
   'account/read',
+  'account/rateLimits/read',
   'model/list',
   'thread/start',
   'thread/resume',
@@ -45,6 +46,15 @@ const CLIENT_REQUEST_METHODS = [
   'thread/rollback',
   'skills/list',
 ] as const
+
+/**
+ * Requests whose method map entry names no params type. Their response type is
+ * not derivable from the method name, so it is named here.
+ */
+const PARAMETERLESS_REQUEST_RESPONSES: Partial<Record<ClientRequestMethod, string>> = {
+  'account/rateLimits/read': 'GetAccountRateLimitsResponse',
+}
+const NO_PARAMS_SCHEMA_NAME = 'NoParams'
 
 const SERVER_NOTIFICATION_METHODS = [
   'thread/started',
@@ -240,7 +250,8 @@ function schemaFilesForMethodMaps(methodMaps: {
 }) {
   const files = new Map<string, ProtocolSchemaFile>()
   for (const entry of methodMaps.clientRequests) {
-    addSchemaFile(files, schemaFileForMethodType(entry.method, requiredType(entry)))
+    if (!isParameterless(entry))
+      addSchemaFile(files, schemaFileForMethodType(entry.method, requiredType(entry)))
     addSchemaFile(files, schemaFileForMethodType(entry.method, responseTypeName(entry)))
   }
   for (const entry of methodMaps.serverNotifications) {
@@ -298,7 +309,25 @@ function parseNotificationEntries(fileContents: string): readonly MethodEntry[] 
   return entries
 }
 
+function isParameterless(entry: MethodEntry) {
+  return !entry.paramsType || entry.paramsType === 'undefined'
+}
+
+function requestParamsType(entry: MethodEntry) {
+  return isParameterless(entry) ? NO_PARAMS_SCHEMA_NAME : requiredType(entry)
+}
+
 function responseTypeName(entry: MethodEntry) {
+  if (isParameterless(entry)) {
+    const responseType = isClientRequestMethod(entry.method)
+      ? PARAMETERLESS_REQUEST_RESPONSES[entry.method]
+      : undefined
+    if (responseType) return responseType
+
+    throw createInternalError(
+      `Codex protocol entry has no params and no named response: ${entry.method}`,
+    )
+  }
   const paramsType = requiredType(entry)
   if (paramsType.endsWith('Params')) return `${paramsType.slice(0, -'Params'.length)}Response`
 
@@ -344,6 +373,18 @@ export function renderSchemaModule(
     const canonical = renderSchemaFile(file, document, { registry, sections, names, objects })
     schemaNames.set(file.typeName, canonical)
   }
+  const noParams = schemaFileForMethodType('', NO_PARAMS_SCHEMA_NAME)
+  const noParamsCanonical = internSchema(NO_PARAMS_SCHEMA_NAME, 'v.undefined()', {
+    registry,
+    sections,
+    names,
+    objects,
+  })
+  sections.push(
+    `export type ${noParams.typeName} = v.InferOutput<typeof ${schemaConstName(noParamsCanonical)}>`,
+    '',
+  )
+  schemaNames.set(noParams.typeName, noParamsCanonical)
   const text = [
     ...generatedPrelude(),
     "import * as v from 'valibot'",
@@ -682,7 +723,7 @@ function renderMetaModule(
     renderMethodTypeInterface(
       'CodexClientRequestParamsByMethod',
       methodMaps.clientRequests,
-      (entry) => schemaFileForMethodType(entry.method, requiredType(entry)).typeName,
+      (entry) => schemaFileForMethodType(entry.method, requestParamsType(entry)).typeName,
     ),
     renderMethodTypeInterface(
       'CodexClientRequestResultByMethod',
@@ -697,7 +738,7 @@ function renderMetaModule(
     renderSchemaMap(
       'CODEX_CLIENT_REQUEST_PARAMS',
       methodMaps.clientRequests,
-      (entry) => schemaFileForMethodType(entry.method, requiredType(entry)).typeName,
+      (entry) => schemaFileForMethodType(entry.method, requestParamsType(entry)).typeName,
       schemaNames,
     ),
     renderSchemaMap(

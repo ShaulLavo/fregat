@@ -76,6 +76,7 @@
     "terminal.integrated.fontSize",
     "terminal.integrated.scrollback",
     "tui.theme.colors",
+    "usage.modelPrices",
     "window.defaultHeight",
     "window.defaultWidth",
     "window.nativeVibrancy",

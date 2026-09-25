@@ -1,4 +1,4 @@
-import { adaptWebSocket } from '../utils/websocket'
+import { adaptWebSocket, isAbnormalWebSocketClose } from '../utils/websocket'
 import { LSP_SERVER_EXITED, type LspNegotiatedSemanticTokens } from '@workspace/contracts'
 import { isRecord } from '@workspace/utils/objects'
 import * as v from 'valibot'
@@ -15,7 +15,7 @@ import {
   type LspSettings,
 } from './registry'
 import type { LspProxyClientSession, LspSessionSource } from './proxy-session'
-import { recordProcessWarning } from '../observability'
+import { recordProcessInfo, recordProcessWarning } from '../observability'
 
 type LspRouteFileSystem = {
   readonly paths: WorkspacePaths
@@ -155,7 +155,11 @@ export function lspRoutes(fs: LspRouteFileSystem, auth: AuthConfig, deps: LspRou
         return
       }
 
-      const session = await deps.pool.acquire(socket, match, fs.paths.toRelative(match.root))
+      const session = await deps.pool.acquire(
+        countedSocket(socket, pending),
+        match,
+        fs.paths.toRelative(match.root),
+      )
       if (!session) {
         rejectPendingLspSession(sessions, socket, pending)
         recordProcessWarning('lsp.session.rejected', {
@@ -182,12 +186,27 @@ export function lspRoutes(fs: LspRouteFileSystem, auth: AuthConfig, deps: LspRou
 
       queueLspClientMessage(session, encoded)
     },
-    close(ws: unknown) {
+    close(ws: unknown, code?: number, reason?: string) {
       const socket = websocketObject(ws)
       if (!socket) return
 
-      sessions.get(socket.key)?.dispose()
+      const pending = sessions.get(socket.key)
       sessions.delete(socket.key)
+      // A refused socket was already reported by the refusal and is no longer in the map.
+      if (!pending) return
+
+      pending.dispose()
+      const record = isAbnormalWebSocketClose(code) ? recordProcessWarning : recordProcessInfo
+      record('lsp.socket.close', {
+        area: 'lsp',
+        receivedCount: pending.receivedCount,
+        code: code ?? null,
+        durationMs: Math.round(performance.now() - pending.openedAt),
+        reason: reason || null,
+        rootPath: socket.root,
+        sentCount: pending.sentCount,
+        serverId: socket.serverId,
+      })
     },
   }
 }
@@ -208,15 +227,32 @@ type LspClientMessage = string | ArrayBuffer | Uint8Array
 
 type PendingLspSession = {
   readonly messages: LspClientMessage[]
+  readonly openedAt: number
+  receivedCount: number
+  sentCount: number
   closed: boolean
   flushing: boolean
   session: LspProxyClientSession | null
   dispose(): void
 }
 
+/** Counts what the proxy sends, so the close event reports traffic in both directions. */
+function countedSocket(socket: LspWebSocket, pending: PendingLspSession): LspWebSocket {
+  return {
+    ...socket,
+    send: (message) => {
+      pending.sentCount += 1
+      return socket.send(message)
+    },
+  }
+}
+
 function createPendingLspSession(): PendingLspSession {
   const pending: PendingLspSession = {
     messages: [],
+    openedAt: performance.now(),
+    receivedCount: 0,
+    sentCount: 0,
     closed: false,
     flushing: false,
     session: null,
@@ -253,6 +289,7 @@ function attachPendingLspSession(pending: PendingLspSession, session: LspProxyCl
 function queueLspClientMessage(pending: PendingLspSession, message: LspClientMessage) {
   if (pending.closed) return
 
+  pending.receivedCount += 1
   pending.messages.push(message)
   flushPendingLspSession(pending)
 }

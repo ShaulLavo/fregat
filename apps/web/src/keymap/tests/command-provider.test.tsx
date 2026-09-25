@@ -53,6 +53,7 @@ test.afterEach(() => {
 test.each([
   ['workspace.showUnicodeSettings', 'unicode'],
   ['workspace.showFontSettings', 'font'],
+  ['workspace.showUsage', 'usage.modelPrices'],
   ['workspace.showTransparencySettings', 'workbench.surface'],
 ] as const)('%s opens the settings controls matching its search', async (command, query) => {
   const queryClient = createTestQueryClient()

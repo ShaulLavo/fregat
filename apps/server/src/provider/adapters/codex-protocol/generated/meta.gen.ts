@@ -15,6 +15,7 @@ export const CODEX_CLIENT_REQUEST_METHODS = {
   'turn/steer': 'turn/steer',
   'turn/interrupt': 'turn/interrupt',
   'model/list': 'model/list',
+  'account/rateLimits/read': 'account/rateLimits/read',
   'account/read': 'account/read',
 } as const
 
@@ -91,6 +92,7 @@ export interface CodexClientRequestParamsByMethod {
   readonly 'turn/steer': CodexSchema.V2TurnSteerParams
   readonly 'turn/interrupt': CodexSchema.V2TurnInterruptParams
   readonly 'model/list': CodexSchema.V2ModelListParams
+  readonly 'account/rateLimits/read': CodexSchema.V2NoParams
   readonly 'account/read': CodexSchema.V2GetAccountParams
 }
 
@@ -106,6 +108,7 @@ export interface CodexClientRequestResultByMethod {
   readonly 'turn/steer': CodexSchema.V2TurnSteerResponse
   readonly 'turn/interrupt': CodexSchema.V2TurnInterruptResponse
   readonly 'model/list': CodexSchema.V2ModelListResponse
+  readonly 'account/rateLimits/read': CodexSchema.V2GetAccountRateLimitsResponse
   readonly 'account/read': CodexSchema.V2GetAccountResponse
 }
 
@@ -179,6 +182,7 @@ export const CODEX_CLIENT_REQUEST_PARAMS = {
   'turn/steer': CodexSchema.CodexTurnSteerParamsSchema,
   'turn/interrupt': CodexSchema.CodexContextCompactedNotificationSchema,
   'model/list': CodexSchema.CodexModelListParamsSchema,
+  'account/rateLimits/read': CodexSchema.CodexNoParamsSchema,
   'account/read': CodexSchema.CodexGetAccountParamsSchema,
 } as const
 
@@ -194,6 +198,7 @@ export const CODEX_CLIENT_REQUEST_RESULTS = {
   'turn/steer': CodexSchema.CodexTurnSteerResponseSchema,
   'turn/interrupt': CodexSchema.CodexExternalAgentConfigImportCompletedNotificationSchema,
   'model/list': CodexSchema.CodexModelListResponseSchema,
+  'account/rateLimits/read': CodexSchema.CodexGetAccountRateLimitsResponseSchema,
   'account/read': CodexSchema.CodexGetAccountResponseSchema,
 } as const
 

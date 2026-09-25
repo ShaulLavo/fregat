@@ -433,6 +433,20 @@ export type CodexGetAccountParams = v.InferOutput<typeof CodexGetAccountParamsSc
 
 export type V2GetAccountParams = v.InferOutput<typeof CodexGetAccountParamsSchema>
 
+export const CodexGetAccountRateLimitsResponseSchema = v.looseObject({
+  rateLimits: CodexRateLimitSnapshotSchema,
+  rateLimitsByLimitId: v.optional(
+    v.union([v.record(v.string(), CodexRateLimitSnapshotSchema), v.null()]),
+  ),
+})
+export type CodexGetAccountRateLimitsResponse = v.InferOutput<
+  typeof CodexGetAccountRateLimitsResponseSchema
+>
+
+export type V2GetAccountRateLimitsResponse = v.InferOutput<
+  typeof CodexGetAccountRateLimitsResponseSchema
+>
+
 export const CodexApiKeyAccountSchema = v.looseObject({ type: v.literal('apiKey') })
 export type CodexApiKeyAccount = v.InferOutput<typeof CodexApiKeyAccountSchema>
 
@@ -2468,3 +2482,8 @@ export type CodexWindowsWorldWritableWarningNotification = v.InferOutput<
 export type V2WindowsWorldWritableWarningNotification = v.InferOutput<
   typeof CodexWindowsWorldWritableWarningNotificationSchema
 >
+
+export const CodexNoParamsSchema = v.undefined()
+export type CodexNoParams = v.InferOutput<typeof CodexNoParamsSchema>
+
+export type V2NoParams = v.InferOutput<typeof CodexNoParamsSchema>

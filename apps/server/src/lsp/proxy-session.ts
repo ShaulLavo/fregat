@@ -176,7 +176,11 @@ export type LspSessionSource = {
  * `createApp` and torn down by `appCleanup`.
  */
 export class LspSessionPool implements LspSessionSource {
-  private readonly sessions = new Map<string, PooledLspProxySession>()
+  /**
+   * Backends per match. Usually one; a client whose initialize params differ from the running
+   * backend's (a tab left open across a deploy) gets a sibling instead of being refused.
+   */
+  private readonly sessions = new Map<string, PooledLspProxySession[]>()
   private readonly starting = new Map<string, Promise<PooledLspProxySession | null>>()
   private disposed = false
   /**
@@ -208,7 +212,9 @@ export class LspSessionPool implements LspSessionSource {
 
   /** Live pooled backends. Read by teardown assertions. */
   get size(): number {
-    return this.sessions.size
+    let size = 0
+    for (const group of this.sessions.values()) size += group.length
+    return size
   }
 
   async acquire(
@@ -227,6 +233,30 @@ export class LspSessionPool implements LspSessionSource {
   }
 
   /**
+   * The backend whose initialize contract is `contract`, spawning one when none has it.
+   * Called by a backend that refused a client's contract, before that client sees a reply.
+   */
+  async sessionForContract(
+    match: LspServerMatch,
+    rootPath: string,
+    contract: InitializeContract,
+  ): Promise<PooledLspProxySession | null> {
+    if (this.disposed) return null
+
+    const key = lspProxySessionKey(match)
+    const existing = this.liveSessions(key).find((session) => session.hasContract(contract))
+    if (existing) return existing
+
+    const startingKey = `${key}\u0000${contract.fingerprint}`
+    const starting = this.starting.get(startingKey)
+    if (starting) return starting
+
+    const created = this.startSession(startingKey, key, match, rootPath, contract)
+    this.starting.set(startingKey, created)
+    return created
+  }
+
+  /**
    * Kills every backend and closes every client socket.
    *
    * Idempotent on purpose: Elysia's `.onStop` and an explicit `closeApp()` can
@@ -237,15 +267,19 @@ export class LspSessionPool implements LspSessionSource {
     if (this.disposed) return
 
     this.disposed = true
-    // Array copy: `dispose` calls back into `remove` and mutates the map.
-    for (const session of Array.from(this.sessions.values())) session.dispose('app_shutdown')
+    // Copied first: `dispose` calls back into `remove` and mutates the map.
+    const sessions = Array.from(this.sessions.values()).flat()
+    for (const session of sessions) session.dispose('app_shutdown')
     this.sessions.clear()
   }
 
   remove(session: PooledLspProxySession): void {
-    if (this.sessions.get(session.key) !== session) return
+    const group = this.sessions.get(session.key)
+    if (!group?.includes(session)) return
 
-    this.sessions.delete(session.key)
+    const rest = group.filter((candidate) => candidate !== session)
+    if (rest.length > 0) this.sessions.set(session.key, rest)
+    else this.sessions.delete(session.key)
   }
 
   /**
@@ -256,26 +290,38 @@ export class LspSessionPool implements LspSessionSource {
    * spawning a language server to answer a diagnostic question would not be.
    */
   negotiatedSemanticTokens(match: LspServerMatch): LspNegotiatedSemanticTokens | null {
-    const session = this.sessions.get(lspProxySessionKey(match))
-    if (!session || session.isDisposed) return null
+    for (const session of this.liveSessions(lspProxySessionKey(match))) {
+      const negotiated = session.negotiatedSemanticTokens
+      if (negotiated) return negotiated
+    }
+    return null
+  }
 
-    return session.negotiatedSemanticTokens
+  private liveSessions(key: string): readonly PooledLspProxySession[] {
+    return (this.sessions.get(key) ?? []).filter((session) => !session.isDisposed)
   }
 
   private async pooledSession(match: LspServerMatch, rootPath: string) {
     const key = lspProxySessionKey(match)
-    const existing = this.sessions.get(key)
-    if (existing && !existing.isDisposed) return existing
-    if (existing) this.sessions.delete(key)
+    const existing = this.liveSessions(key)[0]
+    if (existing) return existing
 
     const starting = this.starting.get(key)
     if (starting) return starting
 
-    return this.startSession(key, match, rootPath)
+    const created = this.startSession(key, key, match, rootPath)
+    this.starting.set(key, created)
+    return created
   }
 
-  private startSession(key: string, match: LspServerMatch, rootPath: string) {
-    const created = PooledLspProxySession.spawn(
+  private startSession(
+    startingKey: string,
+    key: string,
+    match: LspServerMatch,
+    rootPath: string,
+    contract?: InitializeContract,
+  ) {
+    return PooledLspProxySession.spawn(
       key,
       match,
       rootPath,
@@ -284,10 +330,11 @@ export class LspSessionPool implements LspSessionSource {
       this.deltaEnabled,
       this.watchSource,
     )
-      .then((session) => this.adoptSession(key, session))
-      .finally(() => this.starting.delete(key))
-    this.starting.set(key, created)
-    return created
+      .then((session) => {
+        if (contract) session?.claimContract(contract)
+        return this.adoptSession(key, session)
+      })
+      .finally(() => this.starting.delete(startingKey))
   }
 
   /**
@@ -301,7 +348,7 @@ export class LspSessionPool implements LspSessionSource {
       return null
     }
 
-    this.sessions.set(key, session)
+    this.sessions.set(key, [...(this.sessions.get(key) ?? []), session])
     return session
   }
 }
@@ -333,7 +380,7 @@ class PooledLspProxySession {
   private exitCode: number | null = null
   private exitSignal: NodeJS.Signals | null = null
   private idleTimer: ReturnType<typeof setTimeout> | null = null
-  private initializeContract: unknown | undefined
+  private initializeContract: InitializeContract | undefined
   private initializePromise: Promise<JsonRpcResponse> | null = null
   private initializeResult: JsonRpcResponse | null = null
   private initializeSent = false
@@ -408,11 +455,24 @@ class PooledLspProxySession {
   }
 
   connect(socket: LspProxySocket): LspProxyClientSession {
-    this.clearIdleTimer()
     const connection = new LspProxyConnection(socket, this)
+    this.adopt(connection)
+    return connection
+  }
+
+  adopt(connection: LspProxyConnection): void {
+    this.clearIdleTimer()
     this.connections.add(connection)
     this.connectionCount += 1
-    return connection
+  }
+
+  hasContract(contract: InitializeContract): boolean {
+    return this.initializeContract?.fingerprint === contract.fingerprint
+  }
+
+  /** Reserves a fresh backend for the contract it was spawned for, before any client initializes it. */
+  claimContract(contract: InitializeContract): void {
+    this.initializeContract ??= contract
   }
 
   async handleClientMessage(
@@ -462,7 +522,7 @@ class PooledLspProxySession {
     connection: LspProxyConnection,
     message: JsonRpcRequest,
   ): Promise<void> {
-    if (message.method === 'initialize') return this.handleInitializeRequest(connection, message)
+    if (message.method === 'initialize') return this.initializeConnection(connection, message)
     if (message.method === 'shutdown') {
       connection.send(jsonRpcResult(message.id, null))
       return
@@ -721,22 +781,17 @@ class PooledLspProxySession {
     return true
   }
 
-  private async handleInitializeRequest(
+  async initializeConnection(
     connection: LspProxyConnection,
     message: JsonRpcRequest,
   ): Promise<void> {
     try {
       const prepared = await this.initializeRequest(message)
       if (this.disposed || connection.isClosed) return
-      if (!this.acceptInitializeContract(prepared.params)) {
-        connection.send(
-          jsonRpcError(
-            message.id,
-            -32602,
-            'Initialize params do not match the pooled backend contract',
-          ),
-        )
-        connection.closeForProtocolError()
+      const contract = initializeContractOf(prepared.params)
+      const mismatch = this.initializeContractMismatch(contract)
+      if (mismatch !== null) {
+        await this.moveToContractSession(connection, message, contract, mismatch)
         return
       }
 
@@ -747,14 +802,46 @@ class PooledLspProxySession {
     }
   }
 
-  private acceptInitializeContract(params: unknown): boolean {
-    const candidate = immutableProtocolValue(params)
+  /** The first path where `contract` departs from this backend's, or `null` when it matches. */
+  private initializeContractMismatch(contract: InitializeContract): string | null {
     if (this.initializeContract === undefined) {
-      this.initializeContract = candidate
-      return true
+      this.initializeContract = contract
+      return null
+    }
+    if (this.hasContract(contract)) return null
+
+    return (
+      protocolValueDifference(this.initializeContract.value, contract.value, 'params') ?? 'params'
+    )
+  }
+
+  /**
+   * A backend is initialized once, so a client asking for different capabilities (a tab from an
+   * older build) is served by a sibling backend rather than refused while this one lives.
+   */
+  private async moveToContractSession(
+    connection: LspProxyConnection,
+    message: JsonRpcRequest,
+    contract: InitializeContract,
+    mismatchPath: string,
+  ): Promise<void> {
+    const target = await this.pool.sessionForContract(this.match, this.rootPath, contract)
+    recordProcessInfo('lsp.initialize_contract_split', {
+      area: 'lsp',
+      mismatchPath,
+      outcome: target ? 'moved' : 'spawn_failed',
+      rootPath: this.rootPath,
+      serverId: this.match.server.id,
+    })
+    if (connection.isClosed) return
+    if (!target || target.isDisposed) {
+      connection.send(jsonRpcError(message.id, -32000, 'Language server failed to start'))
+      connection.closeForProtocolError()
+      return
     }
 
-    return protocolValuesEqual(this.initializeContract, candidate)
+    connection.moveTo(target)
+    await target.initializeConnection(connection, message)
   }
 
   private ensureInitialized(message: JsonRpcRequest): Promise<JsonRpcResponse> {
@@ -1603,7 +1690,7 @@ class PooledLspProxySession {
 class LspProxyConnection implements LspProxyClientSession {
   private readonly documents = new Set<string>()
   private readonly requestIds = new Map<JsonRpcId, JsonRpcId>()
-  private readonly session: PooledLspProxySession
+  private session: PooledLspProxySession
   private readonly socket: LspProxySocket
   private closed = false
 
@@ -1633,6 +1720,13 @@ class LspProxyConnection implements LspProxyClientSession {
     if (this.closed) return
 
     this.socket.send(message)
+  }
+
+  /** Only before `initialize` is answered: nothing is registered with the old backend yet. */
+  moveTo(session: PooledLspProxySession): void {
+    this.session.releaseConnection(this)
+    this.session = session
+    session.adopt(this)
   }
 
   closeSocket(): void {
@@ -2020,6 +2114,27 @@ function safeSum(left: number, right: number): number | null {
   return result
 }
 
+type InitializeContract = {
+  readonly value: unknown
+  /** Canonical JSON: equal params in any key order share one backend. */
+  readonly fingerprint: string
+}
+
+/** `processId` is the backend's own pid, so it differs between siblings and is left out. */
+function initializeContractOf(params: unknown): InitializeContract {
+  const { processId: _processId, ...rest } = isRecord(params) ? params : {}
+  const value = immutableProtocolValue(rest)
+  return { value, fingerprint: JSON.stringify(value, canonicalJsonKeys) }
+}
+
+function canonicalJsonKeys(_key: string, value: unknown): unknown {
+  if (!isRecord(value)) return value
+
+  return Object.fromEntries(
+    Object.entries(value).sort(([left], [right]) => (left < right ? -1 : 1)),
+  )
+}
+
 function immutableProtocolValue(value: unknown): unknown {
   return freezeProtocolValue(structuredClone(value))
 }
@@ -2035,37 +2150,37 @@ function freezeProtocolValue(value: unknown): unknown {
   return Object.freeze(value)
 }
 
-function protocolValuesEqual(left: unknown, right: unknown): boolean {
-  if (Object.is(left, right)) return true
-  if (Array.isArray(left) || Array.isArray(right)) return protocolArraysEqual(left, right)
-  if (!isRecord(left) || !isRecord(right)) return false
+/** Where two protocol values first differ, as a dotted path, or `null` when they are equal. */
+function protocolValueDifference(left: unknown, right: unknown, path: string): string | null {
+  if (Object.is(left, right)) return null
+  if (Array.isArray(left) || Array.isArray(right)) return protocolArrayDifference(left, right, path)
+  if (!isRecord(left) || !isRecord(right)) return path
 
-  return protocolRecordsEqual(left, right)
+  return protocolRecordDifference(left, right, path)
 }
 
-function protocolArraysEqual(left: unknown, right: unknown): boolean {
-  if (!Array.isArray(left) || !Array.isArray(right)) return false
-  if (left.length !== right.length) return false
+function protocolArrayDifference(left: unknown, right: unknown, path: string): string | null {
+  if (!Array.isArray(left) || !Array.isArray(right)) return path
+  if (left.length !== right.length) return `${path}.length`
 
   for (let index = 0; index < left.length; index += 1) {
-    if (!protocolValuesEqual(left[index], right[index])) return false
+    const difference = protocolValueDifference(left[index], right[index], `${path}[${index}]`)
+    if (difference !== null) return difference
   }
-  return true
+  return null
 }
 
-function protocolRecordsEqual(
+function protocolRecordDifference(
   left: Readonly<Record<string, unknown>>,
   right: Readonly<Record<string, unknown>>,
-): boolean {
-  const leftKeys = Object.keys(left)
-  const rightKeys = Object.keys(right)
-  if (leftKeys.length !== rightKeys.length) return false
-
-  for (const key of leftKeys) {
-    if (!Object.hasOwn(right, key)) return false
-    if (!protocolValuesEqual(left[key], right[key])) return false
+  path: string,
+): string | null {
+  for (const key of new Set([...Object.keys(left), ...Object.keys(right)])) {
+    if (!Object.hasOwn(left, key) || !Object.hasOwn(right, key)) return `${path}.${key}`
+    const difference = protocolValueDifference(left[key], right[key], `${path}.${key}`)
+    if (difference !== null) return difference
   }
-  return true
+  return null
 }
 
 function lspProxySessionKey(match: LspServerMatch): string {

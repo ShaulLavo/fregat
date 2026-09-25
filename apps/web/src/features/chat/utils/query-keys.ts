@@ -14,6 +14,10 @@ export const providerAuthKeys = {
     [...providerAuthKeys.all, providerInstanceId] as const,
 }
 
+export const providerUsageKeys = {
+  all: ['providers', 'usage'] as const,
+}
+
 export const providerCommandCatalogKeys = {
   all: ['providers', 'commands'] as const,
   catalog: (providerInstanceId: ProviderInstanceId, cwd: string | null) =>

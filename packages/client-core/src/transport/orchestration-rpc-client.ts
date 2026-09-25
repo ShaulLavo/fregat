@@ -473,16 +473,21 @@ export class OrchestrationRpcClient {
         if (this.socket !== socket) return
         this.handleSocketMessage(socket, event)
       })
+      let transportError = false
       socket.addEventListener('error', (event) => {
         if (this.socket !== socket) return
+        transportError = true
         this.socketScope?.warn('Orchestration WebSocket transport error.', {
           eventType: event.type,
         })
-        this.teardownSocket(socket, createOrchestrationRpcSocketError(), { transportError: true })
+        // Teardown waits for the `close` that always follows: it carries the code and `wasClean`.
         socket.close()
       })
       socket.addEventListener('close', (event) => {
-        this.handleSocketClose(socket, event, createOrchestrationRpcCloseError(event))
+        const error = transportError
+          ? createOrchestrationRpcSocketError()
+          : createOrchestrationRpcCloseError(event)
+        this.handleSocketClose(socket, event, error, transportError)
       })
     })
   }
@@ -628,10 +633,12 @@ export class OrchestrationRpcClient {
     socket: OrchestrationSocket,
     event: OrchestrationSocketEvents['close'],
     error: unknown,
+    transportError: boolean,
   ) {
     this.teardownSocket(socket, error, {
       code: event.code,
       reason: event.reason,
+      transportError,
       wasClean: event.wasClean,
     })
   }

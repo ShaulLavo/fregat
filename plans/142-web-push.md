@@ -119,8 +119,7 @@ into Platform.
   the device appears and a test push arrives in the service worker. Selectors in
   `scripts/agent/selectors.ts`.
 - The iOS path is manual on the owner's phone; say so in the report.
-- Server changes deploy with `bun run deploy --server`, which drops live terminal and agent
-  sessions; say so first.
+- Server changes deploy with `bun run deploy --server`.
 
 ## Out of scope and not copied
 

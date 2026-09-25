@@ -22,6 +22,8 @@ import type {
   TurnId,
   UserInputQuestions,
 } from '@workspace/contracts'
+import type { ProviderUsageTotals } from './utils/usage-totals'
+import type { ProviderUsageProbe, ProviderUsageUpdate } from './utils/usage-windows'
 
 export type ProviderTurnInput = {
   attachments: readonly ChatAttachment[]
@@ -410,7 +412,12 @@ export type ProviderRuntimeEventPayload =
     })
   | (ProviderRuntimeBaseEvent & {
       type: 'account.rate-limits.updated'
-      payload: { rateLimits: unknown }
+      payload: ProviderUsageUpdate
+    })
+  | (ProviderRuntimeBaseEvent & {
+      /** Running totals at the end of a turn; the usage recorder turns them into per-turn rows. */
+      type: 'usage.totals'
+      payload: { totals: ProviderUsageTotals[] }
     })
   | (ProviderRuntimeBaseEvent & {
       type: 'mcp.status.updated'
@@ -528,6 +535,11 @@ export type ProviderAdapter = {
   /** The CLI this instance spawns. Present on drivers whose sessions resume in a terminal. */
   executablePath?: () => Promise<string>
   readSessionHistory?: (input: ProviderSessionHistoryInput) => Promise<ProviderHistoryMessage[]>
+  /**
+   * One full read of the account's plan windows, outside any turn. Throws when the
+   * provider could not answer; the usage store keeps what it had.
+   */
+  readUsage?: () => Promise<ProviderUsageProbe>
   hasRuntime: (input: { sessionId: SessionId }) => Promise<boolean>
   interruptTurn: (input: ProviderTurnControlInput) => Promise<void>
   /**

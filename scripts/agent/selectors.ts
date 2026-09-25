@@ -604,6 +604,18 @@ export const selectors = {
       .getByRole('log', { name: 'Messages', exact: true })
       .locator(`[data-index] > [data-timeline-row-id="${id}"]`),
   composerActions: (page: Page) => page.locator('[data-composer-actions]'),
+  usageMeter: (page: Page) => page.locator('[data-composer-actions] [data-usage-meter]'),
+  usagePopover: (page: Page) => page.locator('[data-usage-popover]'),
+  usageWindowRows: (page: Page) => page.locator('[data-usage-popover] [data-usage-window]'),
+  usageChecked: (page: Page) => page.locator('[data-usage-popover] [data-usage-checked]'),
+  usagePaceMarkers: (page: Page) => page.locator('[data-usage-popover] [data-usage-pace-marker]'),
+  usageMeterViewUsage: (page: Page) =>
+    page.locator('[data-usage-popover]').getByRole('button', { name: 'View usage', exact: true }),
+  usageSection: (page: Page) => page.locator('[data-usage-section]'),
+  usageSummary: (page: Page) => page.locator('[data-usage-section] [data-usage-summary]'),
+  usageModelRows: (page: Page) => page.locator('[data-usage-section] [data-usage-model]'),
+  usagePriceRows: (page: Page) => page.locator('[data-usage-section] [data-usage-price]'),
+  usageChartBars: (page: Page) => page.locator('[data-usage-chart] [role="listitem"]'),
   askAgentAboutLines: (page: Page) =>
     page.getByRole('button', { name: 'Ask the agent about these lines', exact: true }),
   stageChanges: (page: Page) =>
@@ -621,6 +633,9 @@ export const selectors = {
     page.getByLabel('Folder tree', { exact: true }).locator('[role="treeitem"][tabindex="0"]'),
   editorInput: (page: Page) => page.getByRole('textbox', { name: 'Editor input' }),
   problemsTree: (page: Page) => page.getByRole('tree', { name: 'Problems', exact: true }),
+  problemsSettled: (page: Page) =>
+    page.getByText(/^(No problems reported|No diagnostics received|Diagnostics unavailable)$/),
+  problemsFailedServers: (page: Page) => page.getByText(/^Not answering: /),
   problemsFiles: (page: Page) =>
     page
       .getByRole('tree', { name: 'Problems', exact: true })

@@ -1,8 +1,13 @@
 import { act, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { summarizeDiagnostics } from '@singapore-editor/lsp-plugin/diagnostics'
 import type { LanguageServerDiagnosticSummary } from '@singapore-editor/lsp-plugin/websocket'
+import type { ReactEditorController } from '@singapore-editor/react'
+import { useEffect } from 'react'
 import { afterEach } from 'vitest'
 
+import { createEditorLanguageServerStatusSource } from '@/features/editor/state/language-server-status-source'
+import { useEditorUiStoreApi } from '@/features/editor/state/ui-state'
 import { DiagnosticsPanel } from '@/features/workbench/components/diagnostics-panel'
 import { markerStore } from '@/lib/markers/store'
 import { TestEditorStateProvider } from '../../../../../test/factories/editor-state-provider'
@@ -87,4 +92,36 @@ test('removing the active diagnostic moves to the row in its place', async () =>
   const active = tree.getAttribute('aria-activedescendant')
   expect(active && document.getElementById(active)).toBeTruthy()
   expect(activeText(tree)).toContain('b.ts')
+})
+
+test('a clean answer from one server does not hide another that failed', () => {
+  const status = createEditorLanguageServerStatusSource()
+  status.setServers(['typescript', 'oxlint'])
+  status.setServerStatus('oxlint', 'ready')
+  status.setServerDiagnostics('oxlint', summarizeDiagnostics('file:///src/a.ts', 1, [], 'current'))
+  status.setServerStatus('typescript', 'error')
+
+  function ActiveEditor() {
+    const uiStore = useEditorUiStoreApi()
+    useEffect(() => {
+      uiStore.getState().setStatusBarSource({
+        // The panel reads only the status source; no editor is mounted here.
+        controller: {} as ReactEditorController,
+        filePath: 'src/a.ts',
+        languageServerStatusSource: status,
+      })
+    }, [uiStore])
+    return null
+  }
+
+  renderWithProviders(
+    <TestEditorStateProvider>
+      <ActiveEditor />
+      <DiagnosticsPanel />
+    </TestEditorStateProvider>,
+  )
+
+  expect(screen.getByText('Diagnostics unavailable')).toBeInTheDocument()
+  expect(screen.getByText('Not answering: typescript')).toBeInTheDocument()
+  expect(screen.queryByText('No problems reported')).not.toBeInTheDocument()
 })

@@ -60,6 +60,8 @@ export const MOCK_ADAPTER_CAPABILITIES = {
  * consumer that assumes provider order is already ranked, or that every listed
  * skill is runnable, breaks against this.
  */
+const MOCK_TURN_INPUT_TOKENS = 10
+
 const MOCK_COMMAND_CATALOG: ProviderCommandCatalogResult = {
   commands: [
     { description: 'Summarize the conversation so far', name: 'summarize' },
@@ -106,6 +108,7 @@ export class MockProviderAdapter implements ProviderAdapter {
   private readonly interruptError: string | null
   private readonly modelsOverride: readonly ProviderModel[] | null
   private readonly responseText: string
+  private readonly completedTurns = new Map<SessionId, number>()
   private readonly shouldFail: boolean
   private readonly stopError: string | null
   private readonly userInputError: string | null
@@ -260,6 +263,7 @@ export class MockProviderAdapter implements ProviderAdapter {
       turnId: input.turnId,
       type: 'assistant.complete',
     })
+    this.publishUsageTotals(input)
     this.events.publish({
       createdAt: new Date().toISOString(),
       eventId: `mock-turn-completed:${input.turnId}`,
@@ -272,6 +276,37 @@ export class MockProviderAdapter implements ProviderAdapter {
       sessionId: input.sessionId,
       turnId: input.turnId,
       type: 'turn.completed',
+    })
+  }
+
+  /** Deterministic running totals, as a real provider reports them: they only grow. */
+  private publishUsageTotals(input: ProviderTurnInput) {
+    const turns = (this.completedTurns.get(input.sessionId) ?? 0) + 1
+    this.completedTurns.set(input.sessionId, turns)
+    this.events.publish({
+      createdAt: new Date().toISOString(),
+      eventId: `mock-usage-totals:${input.turnId}`,
+      payload: {
+        totals: [
+          {
+            cacheReadTokens: 0,
+            cacheWriteTokens: 0,
+            continuesEarlierTurns: false,
+            costUsd: null,
+            inputTokens: turns * MOCK_TURN_INPUT_TOKENS,
+            model: input.modelSelection.model,
+            outputTokens: turns * this.responseText.length,
+            reasoningTokens: 0,
+            scope: input.sessionId,
+          },
+        ],
+      },
+      provider: this.driverKind,
+      providerInstanceId: input.providerInstanceId,
+      runtimeEpoch: input.runtimeEpoch,
+      sessionId: input.sessionId,
+      turnId: input.turnId,
+      type: 'usage.totals',
     })
   }
 

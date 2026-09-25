@@ -124,6 +124,14 @@ export function providerRuntimeEventSummary(event: ProviderRuntimeEvent) {
     summary.activityKind = event.kind
     summary.tone = event.tone
   }
+  if (event.type === 'account.rate-limits.updated') {
+    summary.usageWindows = event.payload.windows.map(
+      (window) => `${window.id}:${window.status ?? 'unknown'}`,
+    )
+  }
+  if (event.type === 'usage.totals') {
+    summary.usageModels = event.payload.totals.map((totals) => totals.model)
+  }
   if (event.type === 'proposed-plan.upsert') {
     summary.planId = event.planId
     summary.planLength = event.planMarkdown.length

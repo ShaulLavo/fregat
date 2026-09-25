@@ -50,6 +50,13 @@ export class FakeOrchestrationSocket implements OrchestrationSocket {
     this.emit('message', { data: JSON.stringify(message) })
   }
 
+  /** A browser reports a failed connection as `error`, then `close` with 1006. */
+  transportFailure() {
+    this.readyState = 3
+    this.emit('error', { type: 'error' })
+    this.emit('close', { code: 1006, reason: '', wasClean: false })
+  }
+
   serverClose({ code, wasClean }: { code: number; wasClean: boolean }) {
     this.readyState = 3
     this.emit('close', { code, reason: '', wasClean })

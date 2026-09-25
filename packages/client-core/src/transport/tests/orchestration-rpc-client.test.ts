@@ -45,6 +45,26 @@ test('disconnect is reported once, preserves generation, and isolates a throwing
   })
 })
 
+test('a transport error keeps the close code in the connection summary', async () => {
+  const fixture = rpcClientFixture()
+  const ready = fixture.client.ready()
+  fixture.socket.open()
+  await ready
+  fixture.socket.transportFailure()
+
+  expect(fixture.events).toContainEqual(
+    expect.objectContaining({
+      action: 'orchestration.ws.connection.summary',
+      code: 1006,
+      transportError: true,
+      wasClean: false,
+    }),
+  )
+  expect(selectServerConnection(fixture.environments.getState(), fixture.origin)).toMatchObject({
+    phase: 'disconnected',
+  })
+})
+
 test('owner closure rejects readiness without reporting an unexpected disconnect', async () => {
   const disconnect = vi.fn()
   const fixture = rpcClientFixture({ onDisconnect: disconnect })

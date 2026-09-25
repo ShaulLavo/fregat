@@ -7,6 +7,9 @@ import {
   providerLoginAttemptSchema,
   providerSignInBodySchema,
   providerSignInMethodSchema,
+  providerUsageHistoryQuerySchema,
+  providerUsageHistorySchema,
+  providerUsageResultSchema,
   trimmedNonEmptyStringSchema,
   type ProviderAuth,
   type ProviderCommandCatalog,
@@ -21,6 +24,8 @@ import {
 import { providerErrors } from '../observability/structured-errors'
 import type { ProviderAdapterRegistry } from './provider-adapter-registry'
 import type { ProviderAdapter } from './types'
+import type { ProviderUsageHistoryReader } from './usage-history'
+import type { ProviderUsageStore } from './usage-store'
 
 /** Every method the provider CLI accepts; the client renders one choice per entry. */
 const SIGN_IN_METHODS = providerSignInMethodSchema.options
@@ -39,10 +44,19 @@ const commandCatalogQuerySchema = v.object({
   cwd: v.optional(trimmedNonEmptyStringSchema),
 })
 
-export function providerRoutes(adapterRegistry: ProviderAdapterRegistry) {
+export function providerRoutes(
+  adapterRegistry: ProviderAdapterRegistry,
+  usage: ProviderUsageStore,
+  history: ProviderUsageHistoryReader,
+) {
   return new Elysia({ name: 'provider-routes' })
     .get('/providers', () => adapterRegistry.listProviders(), {
       response: providerListResultSchema,
+    })
+    .get('/providers/usage', () => usage.read(), { response: providerUsageResultSchema })
+    .get('/providers/usage/history', ({ query }) => history.read(query), {
+      query: providerUsageHistoryQuerySchema,
+      response: providerUsageHistorySchema,
     })
     .get(
       '/providers/:providerInstanceId/commands',

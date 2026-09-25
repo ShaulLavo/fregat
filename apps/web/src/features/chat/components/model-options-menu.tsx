@@ -36,11 +36,14 @@ import {
 
 export function ModelOptionsMenu({
   compact,
+  narrow = false,
   disabled,
   draftTarget,
 }: {
   /** Narrow composer: the icon carries the control and the summary is dropped. */
   readonly compact: boolean
+  /** Narrowest composer: the icon alone; the tooltip still names the options. */
+  readonly narrow?: boolean
   readonly disabled: boolean
   readonly draftTarget: ChatInputDraftTarget
 }) {
@@ -90,7 +93,9 @@ export function ModelOptionsMenu({
                 >
                   <BrainIcon className='size-(--icon-size-sm) shrink-0 opacity-70' />
                   {compact ? null : <span className='truncate'>{summary}</span>}
-                  <CaretUpDownIcon className='size-(--icon-size-sm) shrink-0 opacity-60' />
+                  {narrow ? null : (
+                    <CaretUpDownIcon className='size-(--icon-size-sm) shrink-0 opacity-60' />
+                  )}
                 </Button>
               }
             />

@@ -20,6 +20,7 @@ import {
   type ProviderInstanceSettings,
   type ProviderSkill,
   type ProviderSnapshot,
+  type ProviderUsageWindow,
   type RuntimeMode,
   type SessionId,
   type TurnId,
@@ -48,6 +49,7 @@ import {
 } from '../../orchestration/orchestration-logging'
 import {
   CODEX_CLIENT_REQUEST_METHODS,
+  CodexAccountRateLimitsUpdatedNotificationSchema,
   CodexThreadTokenUsageUpdatedNotificationSchema,
   parseCodexServerNotification,
   parseCodexClientRequestParams,
@@ -73,6 +75,15 @@ import { canonicalTurnId } from './utils/turn-ids'
 import { CodexChildAgents } from './state/codex-child-agents'
 import { codexUserInputAnswers } from './utils/codex-user-input'
 import { canonicalItemType } from './utils/codex-item-type'
+import { codexUsageTotals, type ProviderUsageTotals } from '../utils/usage-totals'
+import {
+  codexLimitNextStep,
+  codexUsageUpdate,
+  mergeUsageWindows,
+  stoppingUsageWindow,
+  usageLimitMessage,
+  type ProviderUsageProbe,
+} from '../utils/usage-windows'
 import { notificationThreadId, notificationTurnId } from './utils/codex-child-notifications'
 import {
   codexDiscoveredSession,
@@ -87,6 +98,7 @@ const DEFAULT_CODEX_BINARY = 'codex'
 const DEFAULT_CODEX_MODEL = 'gpt-5.5'
 const REQUEST_TIMEOUT_MS = 30_000
 const PROVIDER_PROBE_TIMEOUT_MS = 8_000
+const CODEX_USAGE_TIMEOUT_MS = 3_000
 const CODEX_DISCOVERY_PAGE_SIZE = 50
 const ANSI_ESCAPE_CHAR = String.fromCharCode(27)
 const ANSI_ESCAPE_REGEX = new RegExp(`${ANSI_ESCAPE_CHAR}\\[[0-9;]*m`, 'g')
@@ -258,6 +270,10 @@ export class CodexProviderAdapter
         )
       return codexHistoryMessages(thread)
     })
+  }
+
+  async readUsage(): Promise<ProviderUsageProbe> {
+    return inspectCodexHistory(this.env, readCodexUsage)
   }
 
   async snapshot(): Promise<ProviderSnapshot> {
@@ -487,6 +503,12 @@ class CodexAppServerSession extends SessionContext {
   private interactionMode: InteractionMode
   private pendingTurn: ActiveProviderTurn | null = null
   private status: ProviderAdapterRuntime['status'] = 'ready'
+  /** Latest running token totals per thread, recorded as usage when a root turn ends. */
+  private readonly conversationUsage = new Map<string, ProviderUsageTotals>()
+  private readonly resumedConversationMarker: string | null
+  /** This session's view of the plan windows, read back when a turn stops on one. */
+  private usageWindows: ProviderUsageWindow[] = []
+  private rateLimitReachedType: string | null = null
 
   private constructor(input: {
     client: CodexAppServerRpcClient
@@ -498,12 +520,14 @@ class CodexAppServerSession extends SessionContext {
     providerInstanceId: ProviderTurnInput['providerInstanceId']
     providerConversationMarker: string
     providerResumeCursor: unknown | null
+    resumedConversationMarker: string | null
     runtimeMode: RuntimeMode
     runtimeEpoch: string
     sessionId: SessionId
   }) {
     super(input)
     this.client = input.client
+    this.resumedConversationMarker = input.resumedConversationMarker
     this.interactionMode = input.interactionMode
     this.providerBindingHandle = `codex:${input.providerConversationMarker}`
     this.providerConversationMarker = input.providerConversationMarker
@@ -584,6 +608,8 @@ class CodexAppServerSession extends SessionContext {
         providerInstanceId: input.providerInstanceId,
         providerConversationMarker,
         providerResumeCursor: providerConversationMarker,
+        resumedConversationMarker:
+          typeof input.providerResumeCursor === 'string' ? providerConversationMarker : null,
         runtimeMode: input.runtimeMode,
         runtimeEpoch: input.runtimeEpoch,
         sessionId: input.sessionId,
@@ -1191,6 +1217,7 @@ class CodexAppServerSession extends SessionContext {
   }
 
   private handleSessionTokenUsageUpdatedNotification(params: unknown) {
+    this.rememberConversationUsage(params)
     this.emitRuntimeNotification(
       'conversation.token-usage.updated',
       { usage: tokenUsageSnapshot(params) },
@@ -1198,6 +1225,36 @@ class CodexAppServerSession extends SessionContext {
       params,
     )
     return true
+  }
+
+  /** Each thread (the root and every child agent) counts its own running total. */
+  private rememberConversationUsage(params: unknown) {
+    const parsed = v.safeParse(CodexThreadTokenUsageUpdatedNotificationSchema, params)
+    if (!parsed.success) return
+
+    const scope = parsed.output.threadId
+    const model = this.childAgents.owner(params).agent?.model ?? this.model
+    // A resumed conversation restores its totals from the rollout; child agents start at zero.
+    const continues = scope === this.resumedConversationMarker
+    const totals = codexUsageTotals(scope, model, continues, parsed.output.tokenUsage.total)
+    this.conversationUsage.set(scope, totals)
+  }
+
+  private emitUsageTotals(turn: ActiveProviderTurn) {
+    if (this.conversationUsage.size === 0) return
+
+    this.emit({
+      createdAt: new Date().toISOString(),
+      eventId: runtimeEventId('codex-usage-totals'),
+      payload: { totals: [...this.conversationUsage.values()] },
+      provider: DEFAULT_CODEX_PROVIDER_SETTINGS.driverKind,
+      providerInstanceId: this.providerInstanceId,
+      providerBindingHandle: this.providerBindingHandle,
+      runtimeMode: this.runtimeMode,
+      sessionId: this.sessionId,
+      turnId: turn.canonicalTurnId,
+      type: 'usage.totals',
+    })
   }
 
   private handleTurnDiffUpdatedNotification(params: unknown) {
@@ -1410,13 +1467,43 @@ class CodexAppServerSession extends SessionContext {
   }
 
   private handleAccountRateLimitsUpdatedNotification(params: unknown) {
+    const parsed = v.safeParse(CodexAccountRateLimitsUpdatedNotificationSchema, params)
+    if (!parsed.success) {
+      recordChatPipelineWarning('chat.pipeline.codex_session.rate_limits.unparsed', {
+        detail: v.summarize(parsed.issues),
+        sessionId: this.sessionId,
+      })
+      return true
+    }
+
+    const { rateLimits } = parsed.output
+    const update = codexUsageUpdate(rateLimits)
+    this.usageWindows = mergeUsageWindows(this.usageWindows, update.windows)
+    if (rateLimits.rateLimitReachedType !== undefined)
+      this.rateLimitReachedType = rateLimits.rateLimitReachedType
     this.emitRuntimeNotification(
       'account.rate-limits.updated',
-      { rateLimits: params },
+      update,
       'account/rateLimits/updated',
       params,
     )
     return true
+  }
+
+  /**
+   * OpenAI's sentence for a spent allowance blames credits even when a window simply
+   * ran out, so a usage stop says which limit and when it resets instead.
+   */
+  private failureMessage(error: unknown, fallback: string) {
+    if (asRecord(error).codexErrorInfo !== 'usageLimitExceeded') return fallback
+
+    const atMs = Date.now()
+    const stop = usageLimitMessage({
+      atMs,
+      provider: 'Codex',
+      window: stoppingUsageWindow(this.usageWindows, atMs),
+    })
+    return `${stop} ${codexLimitNextStep(this.rateLimitReachedType)}`
   }
 
   private handleModelReroutedNotification(params: unknown) {
@@ -1810,6 +1897,7 @@ class CodexAppServerSession extends SessionContext {
       turnId: activeTurn.canonicalTurnId,
     })
     await this.emitReasoningItemsFromTurn(params.turn, activeTurn)
+    this.emitUsageTotals(activeTurn)
     if (params.turn.status === 'completed') {
       await this.completeTurn(params.turn.id, activeTurn)
       return
@@ -1819,11 +1907,15 @@ class CodexAppServerSession extends SessionContext {
       return
     }
 
-    this.rejectTurn(params.turn.id, activeTurn, turnErrorMessage(params.turn))
+    this.rejectTurn(
+      params.turn.id,
+      activeTurn,
+      this.failureMessage(params.turn.error, turnErrorMessage(params.turn)),
+    )
   }
 
   private handleErrorNotification(params: CodexServerNotificationParamsByMethod['error']) {
-    const message = errorNotificationMessage(params.error)
+    const message = this.failureMessage(params.error, errorNotificationMessage(params.error))
     if (params.willRetry) {
       this.emitRuntimeNotification('runtime.warning', { detail: params, message }, 'error', params)
       return
@@ -2355,6 +2447,24 @@ async function probeCodexProvider(env: NodeJS.ProcessEnv) {
   } finally {
     await client.close()
   }
+}
+
+/**
+ * Plan windows belong to a ChatGPT sign-in; an API key or a signed-out home has none.
+ * The read goes to OpenAI on every call, so it runs on the store's schedule, not per turn.
+ */
+async function readCodexUsage(client: CodexAppServerRpcClient): Promise<ProviderUsageProbe> {
+  const { account } = await client.request('account/read', {}, PROVIDER_PROBE_TIMEOUT_MS)
+  if (account?.type !== 'chatgpt') return { kind: 'unsupported' }
+
+  const response = await client.request(
+    'account/rateLimits/read',
+    undefined,
+    CODEX_USAGE_TIMEOUT_MS,
+  )
+  const snapshot = response.rateLimitsByLimitId?.codex ?? response.rateLimits
+
+  return { kind: 'reading', update: codexUsageUpdate(snapshot) }
 }
 
 async function inspectCodexHistory<T>(

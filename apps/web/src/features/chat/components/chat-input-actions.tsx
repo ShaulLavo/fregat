@@ -1,6 +1,8 @@
 import { useSettingValue } from '@/hooks/use-setting-value'
 import { EMPTY_ACTIVITIES } from '@/lib/empty-activities'
 import { useActiveChatProjection } from '@/features/chat/hooks/use-active-projection'
+import { useModelPicker } from '@/features/chat/hooks/use-model-picker'
+import { useProviderUsage } from '@/features/chat/hooks/use-provider-usage'
 import type { InteractionMode, RuntimeMode, SessionId } from '@workspace/contracts'
 
 import { useElementWidth } from '@/hooks/use-element-width'
@@ -11,6 +13,7 @@ import { ChatInputAttachButton } from './chat-input-attach-button'
 import { ChatInputSubmitButton } from './chat-input-submit-button'
 import { ComposerControlsMenu } from './composer-controls-menu'
 import { ContextUsageRing } from './context-usage-ring'
+import { UsageLimitsMeter } from './usage-limits-meter'
 import { ModelOptionsMenu } from './model-options-menu'
 import { ModelPicker } from './model-picker'
 import { PromptStashBadge } from './prompt-stash-badge'
@@ -21,7 +24,14 @@ import type { ComposerPendingAction } from '@/features/chat/utils/composer-state
  * The composer lives in both a ~300px side panel and a full-width stage, so the
  * layout is decided by the measured row rather than by a viewport breakpoint.
  */
-const COMPACT_ACTIONS_WIDTH = 380
+const COMPACT_ACTIONS_WIDTH = 520
+/** Below this the access and options menus are icons alone. */
+const NARROW_ACTIONS_WIDTH = 420
+/**
+ * Below this the two read-only gauges go: the row is one line at every width, the model
+ * name is the only thing that shrinks, and past its limit only actions keep their place.
+ */
+const TINY_ACTIONS_WIDTH = 300
 
 export function ChatInputActions({
   busy,
@@ -57,6 +67,8 @@ export function ChatInputActions({
   // Only once measured: assuming compact before the first layout would flash the
   // whole row through its narrow arrangement on every mount.
   const compact = width !== null && width < COMPACT_ACTIONS_WIDTH
+  const narrow = width !== null && width < NARROW_ACTIONS_WIDTH
+  const tiny = width !== null && width < TINY_ACTIONS_WIDTH
   // The context-window snapshots live on the session detail, so the composer
   // reads them for the session it is drafting into. A draft key that is not a
   // session finds nothing, which is the correct answer: no session, no usage.
@@ -66,6 +78,11 @@ export function ChatInputActions({
       EMPTY_ACTIVITIES,
   )
   const contextUsage = contextUsageForActivities(activities)
+  const { modelSelection } = useModelPicker()
+  const accountUsage = useProviderUsage(
+    modelSelection?.providerInstanceId,
+    draftTarget.draftKey as SessionId | null,
+  )
 
   return (
     <div
@@ -81,12 +98,21 @@ export function ChatInputActions({
             disabled={disabled}
             draftTarget={draftTarget}
             interactionMode={interactionMode}
+            narrow={narrow}
             runtimeMode={runtimeMode}
           />
-          <ModelOptionsMenu compact={compact} disabled={disabled} draftTarget={draftTarget} />
+          <ModelOptionsMenu
+            compact={compact}
+            disabled={disabled}
+            draftTarget={draftTarget}
+            narrow={narrow}
+          />
           <ChatInputAttachButton disabled={disabled} onSelectFiles={onSelectImageFiles} />
-          {contextMeterEnabled && contextUsage ? (
+          {contextMeterEnabled && contextUsage && !tiny ? (
             <ContextUsageRing compact={compact} usage={contextUsage} />
+          ) : null}
+          {accountUsage && !tiny ? (
+            <UsageLimitsMeter account={accountUsage} compact={compact} />
           ) : null}
           {statusLabel && !compact ? (
             <span

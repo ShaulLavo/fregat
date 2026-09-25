@@ -150,6 +150,16 @@ export const workspaceCommandMetadata = {
     when: [],
     title: 'Open font settings',
   }),
+  'workspace.showUsage': defineMetadata({
+    category: 'Chat',
+    description: 'See what each model cost, by day, and set prices for models that report none.',
+    id: 'workspace.showUsage',
+    execution: 'async',
+    target: 'workspace',
+    undoCategory: 'view-only',
+    when: [],
+    title: 'Open usage',
+  }),
   'workspace.showTransparencySettings': defineMetadata({
     category: 'Appearance',
     description: 'Change pane transparency and backdrop appearance.',

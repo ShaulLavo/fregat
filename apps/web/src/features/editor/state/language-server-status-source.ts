@@ -9,6 +9,10 @@ import {
 
 export type EditorLanguageServerStatusSnapshot = {
   diagnostics: LanguageServerDiagnosticSummary | null
+  /** Servers that failed while another answers: `status` is `ready` as soon as any one is. */
+  failedServerIds: readonly string[]
+  /** Servers still connecting, whose answer the aggregate does not include yet. */
+  pendingServerIds: readonly string[]
   status: LanguageServerStatus
 }
 
@@ -31,6 +35,8 @@ type ServerState = {
 
 const idleLanguageServerStatusSnapshot: EditorLanguageServerStatusSnapshot = {
   diagnostics: null,
+  failedServerIds: [],
+  pendingServerIds: [],
   status: 'idle',
 }
 
@@ -117,13 +123,17 @@ function aggregateSnapshot(
     const state = servers.get(serverId)
     return state ? [state] : []
   })
-  const diagnostics = aggregateDiagnostics(states)
-  if (states.some((state) => state.connected && state.usable)) {
-    return { diagnostics, status: 'ready' }
+  const aggregate = {
+    diagnostics: aggregateDiagnostics(states),
+    failedServerIds: serverIds.filter((serverId) => servers.get(serverId)?.status === 'error'),
+    pendingServerIds: serverIds.filter((serverId) => servers.get(serverId)?.status === 'loading'),
   }
-  if (states.every((state) => state.status === 'error')) return { diagnostics, status: 'error' }
+  if (states.some((state) => state.connected && state.usable)) {
+    return { ...aggregate, status: 'ready' }
+  }
+  if (states.every((state) => state.status === 'error')) return { ...aggregate, status: 'error' }
 
-  return { diagnostics, status: 'loading' }
+  return { ...aggregate, status: 'loading' }
 }
 
 function aggregateDiagnostics(
@@ -145,5 +155,14 @@ function languageServerStatusSnapshotsEqual(
   current: EditorLanguageServerStatusSnapshot,
   next: EditorLanguageServerStatusSnapshot,
 ) {
-  return current.diagnostics === next.diagnostics && current.status === next.status
+  return (
+    current.diagnostics === next.diagnostics &&
+    current.status === next.status &&
+    sameIds(current.failedServerIds, next.failedServerIds) &&
+    sameIds(current.pendingServerIds, next.pendingServerIds)
+  )
+}
+
+function sameIds(current: readonly string[], next: readonly string[]) {
+  return current.length === next.length && current.every((id, index) => id === next[index])
 }

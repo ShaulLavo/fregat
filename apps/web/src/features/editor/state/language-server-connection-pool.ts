@@ -1,4 +1,5 @@
 import { errorMessage } from '@workspace/contracts'
+import { LspTransportClosedError } from '@singapore-editor/lsp'
 import { LspConnectionPool, type LspConnectionPoolEvent } from '@singapore-editor/lsp-plugin'
 
 import { log } from '@/lib/client-logging'
@@ -61,6 +62,7 @@ function report(event: LspConnectionPoolEvent): void {
     ...(event.reachedReady === undefined ? {} : { reachedReady: event.reachedReady }),
     ...(event.methods === undefined ? {} : { methods: event.methods }),
     ...(event.error === undefined ? {} : { error: errorMessage(event.error) }),
+    ...closeFields(event.error),
   }
 
   if (event.kind === 'error' || event.kind === 'handler_ignored') {
@@ -73,6 +75,19 @@ function report(event: LspConnectionPoolEvent): void {
   }
 
   log.debug(fields)
+}
+
+/** The same fields the server's `lsp.socket.close` records, from this end of the socket. */
+function closeFields(error: unknown) {
+  if (!(error instanceof LspTransportClosedError)) return {}
+
+  return {
+    code: error.code,
+    reason: error.reason || null,
+    receivedCount: error.receivedCount,
+    sentCount: error.sentCount,
+    wasClean: error.wasClean,
+  }
 }
 
 /** One question — did this switch cost a handshake — so they share an action and differ by outcome. */

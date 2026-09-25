@@ -95,6 +95,8 @@ This is a two-pass source audit and implementation plan. No app changes, tests, 
 
 ### [INTERACTION-07] Show provider quota limits separately from context occupancy
 
+- **Moved to Plan 141.** Closed by its Phase 1 (2026-09-24): the composer's plan-usage gauge. Reset credits stay with RUNTIME-08 → Plan 141 Phase 5.
+
 - **Priority/confidence:** P2 / HIGH.
 - **Evidence:** Upstream `apps/web/src/components/chat/ComposerUsageLimits.tsx:45` renders a `/usage-limits` result, account labels, windows and reset credits (`:98`); `ChatView.tsx:3158` only intercepts the command when a selected provider has quota data. Local `apps/web/src/features/chat/components/context-usage-ring.tsx:86` shows context tokens and processed-session tokens, not account quotas. Bounded search `rg -n 'usageLimit|usage.limit|rateLimit' apps/web/src/features packages/client-core/src packages/contracts/src/settings/keys.ts` found no reachable quota UI.
 - **Impact:** Local users cannot inspect provider time-window exhaustion/reset state or reset-credit actions from the composer and cannot distinguish those limits from context fullness.

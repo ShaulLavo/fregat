@@ -1,3 +1,4 @@
+import type { ProviderUsagePurpose } from '@workspace/contracts'
 import type {
   ChatAttachment,
   ModelSelection,
@@ -13,6 +14,8 @@ export type ProviderTextGenerationInput = {
   attachmentsDir?: string
   messageText: string
   modelSelection: ModelSelection
+  /** What the generation is for; its usage is recorded under this. */
+  purpose: Exclude<ProviderUsagePurpose, 'turn'>
   signal?: AbortSignal
 }
 
@@ -32,6 +35,7 @@ type InterruptTextGeneration = () => Promise<void>
 /** Collects one isolated provider turn without projecting it into a chat conversation. */
 export class ProviderTextGenerationTask {
   readonly providerInstanceId: ProviderInstanceId
+  readonly purpose: ProviderUsagePurpose
   readonly sessionId: SessionId
   readonly turnId: TurnId
   private canonicalText = ''
@@ -45,11 +49,13 @@ export class ProviderTextGenerationTask {
   constructor(input: {
     interrupt: InterruptTextGeneration
     providerInstanceId: ProviderInstanceId
+    purpose: ProviderUsagePurpose
     sessionId: SessionId
     turnId: TurnId
   }) {
     this.interruptTextGeneration = input.interrupt
     this.providerInstanceId = input.providerInstanceId
+    this.purpose = input.purpose
     this.sessionId = input.sessionId
     this.turnId = input.turnId
   }

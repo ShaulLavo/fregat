@@ -1,4 +1,8 @@
-import { sessionRuntimeStatusSchema, type WorkspaceAddressId } from '@workspace/contracts'
+import {
+  providerUsagePurposeSchema,
+  sessionRuntimeStatusSchema,
+  type WorkspaceAddressId,
+} from '@workspace/contracts'
 import { sql } from 'drizzle-orm'
 import {
   check,
@@ -6,6 +10,7 @@ import {
   index,
   integer,
   primaryKey,
+  real,
   sqliteTable,
   text,
   uniqueIndex,
@@ -30,6 +35,48 @@ export const terminalHistoryChunks = sqliteTable(
     data: blob('data', { mode: 'buffer' }).notNull(),
   },
   (table) => [primaryKey({ columns: [table.owner, table.sequence] })],
+)
+
+/**
+ * Tokens and cost per turn and model. Not a projection of the event log and not tied
+ * to the session row: what a turn cost stays spent after its session is deleted.
+ * `cost_usd` is the provider's own estimate, null when it reports none.
+ */
+export const providerUsageTurns = sqliteTable(
+  'provider_usage_turns',
+  {
+    sessionId: text('session_id').notNull(),
+    turnId: text('turn_id').notNull(),
+    model: text('model').notNull(),
+    providerInstanceId: text('provider_instance_id').notNull(),
+    driverKind: text('driver_kind').notNull(),
+    accountKey: text('account_key'),
+    /** `turn` for chat; `title` and `commit-message` for the app's own generations. */
+    purpose: text('purpose', { enum: providerUsagePurposeSchema.options }).notNull(),
+    recordedAt: text('recorded_at').notNull(),
+    inputTokens: integer('input_tokens').notNull(),
+    outputTokens: integer('output_tokens').notNull(),
+    cacheReadTokens: integer('cache_read_tokens').notNull(),
+    cacheWriteTokens: integer('cache_write_tokens').notNull(),
+    reasoningTokens: integer('reasoning_tokens').notNull(),
+    costUsd: real('cost_usd'),
+  },
+  (table) => [
+    primaryKey({ columns: [table.sessionId, table.turnId, table.model] }),
+    index('provider_usage_turns_recorded_idx').on(table.recordedAt),
+  ],
+)
+
+/** The last running totals seen per session, provider conversation and model. */
+export const providerUsageBaselines = sqliteTable(
+  'provider_usage_baselines',
+  {
+    sessionId: text('session_id').notNull(),
+    scope: text('scope').notNull(),
+    model: text('model').notNull(),
+    totalsJson: text('totals_json').notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.sessionId, table.scope, table.model] })],
 )
 
 export const attachmentUploadOwners = sqliteTable(

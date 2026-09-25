@@ -865,30 +865,28 @@ describe('LspSessionPool WorkspaceEdit provenance', () => {
     expect(fixture.secondSocket.sent.at(-1)).toMatchObject({ id: 36 })
   })
 
-  it('rejects a capability mismatch while first initialize is pending without forwarding it', async () => {
+  it('serves a capability mismatch from a sibling backend while the first initialize is pending', async () => {
     const fixture = await lspFixture()
     const first = await fixture.pool.acquire(fixture.firstSocket, fixture.match, '')
     const second = await fixture.pool.acquire(fixture.secondSocket, fixture.match, '')
     if (!first || !second) throw new Error('expected pooled LSP sessions')
+    const sibling = siblingBackend(fixture)
 
     const firstInitialize = first.handleClientMessage(
       json(initializeRequest(37, { capabilities: { workspace: { applyEdit: false } } })),
     )
     await fixture.waitForServerMessageCount(1)
-    await second.handleClientMessage(
+    const secondInitialize = second.handleClientMessage(
       json(initializeRequest(38, { capabilities: { workspace: { applyEdit: true } } })),
     )
+    await waitFor(() => sibling.messages.length === 1, 'expected the sibling to be initialized')
 
     expect(fixture.initializeMessages()).toHaveLength(1)
-    expect(fixture.secondSocket.sent.at(-1)).toEqual({
-      error: {
-        code: -32602,
-        message: 'Initialize params do not match the pooled backend contract',
-      },
-      id: 38,
-      jsonrpc: '2.0',
-    })
-    expect(fixture.secondSocket.closed).toBe(true)
+    expect(fixture.pool.size).toBe(2)
+    sibling.respond({ id: sibling.messages[0]?.id, jsonrpc: '2.0', result: initializeResult() })
+    await secondInitialize
+    expect(fixture.secondSocket.closed).toBe(false)
+    expect(fixture.secondSocket.sent.at(-1)).toMatchObject({ id: 38, result: initializeResult() })
 
     fixture.respond({
       id: fixture.initializeMessages()[0]?.id,
@@ -905,11 +903,12 @@ describe('LspSessionPool WorkspaceEdit provenance', () => {
     })
   })
 
-  it('rejects later initializationOptions mismatch with original client ID and closes only that owner', async () => {
+  it('routes later clients to the backend that shares their initialize params', async () => {
     const fixture = await lspFixture()
     const first = await fixture.pool.acquire(fixture.firstSocket, fixture.match, '')
     const second = await fixture.pool.acquire(fixture.secondSocket, fixture.match, '')
     if (!first || !second) throw new Error('expected pooled LSP sessions')
+    const sibling = siblingBackend(fixture)
 
     const initialized = first.handleClientMessage(
       json(initializeRequest(40, { initializationOptions: { mode: 'normal' } })),
@@ -922,24 +921,25 @@ describe('LspSessionPool WorkspaceEdit provenance', () => {
     })
     await initialized
 
-    await second.handleClientMessage(
+    const moved = second.handleClientMessage(
       json(initializeRequest(409, { initializationOptions: { mode: 'diff' } })),
     )
-    expect(fixture.secondSocket.sent.at(-1)).toMatchObject({
-      error: { code: -32602 },
-      id: 409,
-    })
-    expect(fixture.secondSocket.closed).toBe(true)
-    expect(fixture.firstSocket.closed).toBe(false)
-    expect(fixture.initializeMessages()).toHaveLength(1)
+    await waitFor(() => sibling.messages.length === 1, 'expected the sibling to be initialized')
+    sibling.respond({ id: sibling.messages[0]?.id, jsonrpc: '2.0', result: initializeResult() })
+    await moved
+    expect(fixture.secondSocket.sent.at(-1)).toMatchObject({ id: 409 })
 
-    await first.handleClientMessage(json(hoverRequest(41, URI)))
-    const hover = fixture.serverMessages
-      .filter((message) => message.method === 'textDocument/hover')
-      .at(-1)
-    if (!hover) throw new Error('expected hover request')
-    fixture.respond({ id: hover.id, jsonrpc: '2.0', result: hoverResult('first survives') })
-    expect(fixture.firstSocket.sent.at(-1)).toMatchObject({ id: 41 })
+    const thirdSocket = new FakeSocket()
+    const third = await fixture.pool.acquire(thirdSocket, fixture.match, '')
+    if (!third) throw new Error('expected a pooled LSP session')
+    await third.handleClientMessage(
+      json(initializeRequest(410, { initializationOptions: { mode: 'diff' } })),
+    )
+    expect(thirdSocket.sent.at(-1)).toMatchObject({ id: 410 })
+    expect(fixture.spawn).toHaveBeenCalledTimes(2)
+    expect(fixture.initializeMessages()).toHaveLength(1)
+    expect(sibling.messages).toHaveLength(1)
+    expect(fixture.firstSocket.closed).toBe(false)
   })
 
   it('does not create a pending initialize after the backend exits during normalization', async () => {
@@ -2122,6 +2122,27 @@ class FakeSocket {
 
   send(message: string): void {
     this.sent.push(JSON.parse(message) as Record<string, unknown>)
+  }
+}
+
+/** Makes the fixture's next spawn a second backend with its own stdio. */
+function siblingBackend(fixture: Awaited<ReturnType<typeof lspFixture>>) {
+  const process = fakeProcess()
+  const messages: Record<string, unknown>[] = []
+  const reader = new LspStdioMessageReader((message) => {
+    messages.push(JSON.parse(message) as Record<string, unknown>)
+  })
+  process.stdin.on('data', (chunk) => reader.push(chunk))
+  fixture.spawn.mockImplementationOnce(async () => ({
+    process: process.process,
+    initializationOptions: undefined,
+  }))
+
+  return {
+    messages,
+    respond: (message: unknown) => {
+      process.stdout.write(encodeLspStdioMessage(JSON.stringify(message)))
+    },
   }
 }
 

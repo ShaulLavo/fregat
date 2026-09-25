@@ -240,7 +240,7 @@ describe('provider runtime ingestion', () => {
         ...base,
         eventId: 'limits',
         type: 'account.rate-limits.updated',
-        payload: { rateLimits: {} },
+        payload: { planType: null, windows: [] },
       },
       { ...base, eventId: 'auth', type: 'auth.status', payload: { isAuthenticating: false } },
       {

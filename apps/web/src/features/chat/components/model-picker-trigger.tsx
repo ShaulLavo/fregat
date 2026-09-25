@@ -38,7 +38,9 @@ export function ModelPickerTrigger({
             render={
               <Button
                 aria-label='Provider and model'
-                className='text-muted-foreground max-w-44 min-w-0 truncate'
+                // The one control that gives way in a narrow composer: Button is
+                // shrink-0 by default, so only the model name truncates.
+                className='text-muted-foreground max-w-44 min-w-0 shrink truncate'
                 disabled={disabled}
                 focusableWhenDisabled
                 size='sm'
