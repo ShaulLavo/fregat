@@ -13,5 +13,14 @@ export type BootWallpaperPreload = {
 declare global {
   interface Window {
     platformBootWallpaper?: BootWallpaperPreload
+    /** Injected by `agent:browser` so a run drives its own throwaway API server. */
+    platformDevServerUrl?: string
   }
+}
+
+/** The API server a development page talks to; production uses the page's own base URL. */
+export function developmentServerUrl(): string {
+  // Node-environment tests import the client, and it resolves this at module load.
+  const injected = typeof window === 'undefined' ? undefined : window.platformDevServerUrl
+  return injected ?? 'http://localhost:3001'
 }

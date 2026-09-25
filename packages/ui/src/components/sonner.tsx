@@ -1,68 +1,74 @@
 import type { CSSProperties } from 'react'
+import {
+  CheckCircleIcon,
+  InfoIcon,
+  WarningCircleIcon,
+  WarningIcon,
+  XIcon,
+} from '@phosphor-icons/react'
 import { Toaster as Sonner, type ToasterProps } from 'sonner'
 
+import { buttonVariants } from './button-variants'
+import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
 import { cn } from '@workspace/ui/lib/utils'
 
-type ToastThemeStyle = CSSProperties & Record<`--${string}`, string>
+type ToasterStyle = CSSProperties & Record<`--${string}`, string>
 
-const toastThemeStyle = {
-  '--normal-bg': 'var(--popover-solid)',
-  '--normal-border': 'transparent',
-  '--normal-border-hover': 'transparent',
-  '--normal-bg-hover': 'var(--muted-solid)',
-  '--normal-text': 'var(--popover-foreground)',
-  // The lg step (D1: a toast is a floating surface). Spelled `--radius` because
-  // the radius scale is `@theme inline`, which emits no custom properties.
-  '--border-radius': 'var(--radius)',
-  // A description carries a server message and its fix; the 356px default
-  // leaves ~190px of text beside the action buttons, which shreds a setting key.
-  '--width': '440px',
-  // Oklab tints toward each status color without rotating the popover's hue.
-  '--error-bg': 'color-mix(in oklab, var(--destructive) 12%, var(--popover-solid))',
-  '--error-border': 'color-mix(in oklab, var(--destructive) 45%, transparent)',
-  '--error-text': 'color-mix(in oklab, var(--destructive) 70%, var(--popover-foreground))',
-  '--success-bg': 'color-mix(in oklab, var(--success) 12%, var(--popover-solid))',
-  '--success-border': 'color-mix(in oklab, var(--success) 45%, transparent)',
-  '--success-text': 'color-mix(in oklab, var(--success) 70%, var(--popover-foreground))',
-  '--warning-bg': 'color-mix(in oklab, var(--warning) 12%, var(--popover-solid))',
-  '--warning-border': 'color-mix(in oklab, var(--warning) 45%, transparent)',
-  '--warning-text': 'color-mix(in oklab, var(--warning) 70%, var(--popover-foreground))',
-  '--info-bg': 'color-mix(in oklab, var(--info) 12%, var(--popover-solid))',
-  '--info-border': 'color-mix(in oklab, var(--info) 45%, transparent)',
-  '--info-text': 'color-mix(in oklab, var(--info) 70%, var(--popover-foreground))',
-} satisfies ToastThemeStyle
+// The toast is `unstyled`: Sonner keeps position, stacking and swipe, and every
+// pixel of the surface below is ours. Status reads from the icon alone.
+const TOASTER_STYLE = { '--width': '380px' } satisfies ToasterStyle
 
-// Sonner appends an unlayered stylesheet at runtime, so a layered utility loses
-// to its built-in toast shadow; `!` is what makes the D6 step stick.
-const TOAST_SURFACE_CLASS = 'shadow-md!'
+const TOAST_ICONS = {
+  close: <XIcon />,
+  error: <WarningCircleIcon className='text-destructive' weight='fill' />,
+  info: <InfoIcon className='text-info' weight='fill' />,
+  loading: <OrbitLoader />,
+  success: <CheckCircleIcon className='text-success' weight='fill' />,
+  warning: <WarningIcon className='text-warning' weight='fill' />,
+}
 
-// Descriptions carry values the app did not author — a setting key, a path, a
-// branch. Sonner only sets `word-break`, which splits those mid-token.
-const TOAST_DESCRIPTION_CLASS = '[overflow-wrap:anywhere]'
+const TOAST_CLASS_NAMES = {
+  // Sonner's own stylesheet is unlayered, so its box-shadow beats a layered
+  // utility; `!` keeps the D6 step. The icon column is padding, not a grid
+  // column, so actions wrap under the text and custom toasts get the full width.
+  toast: cn(
+    'flex w-(--width) flex-wrap items-center justify-end gap-x-(--density-control-gap) gap-y-(--density-section-gap) rounded-lg bg-popover-solid p-(--density-section-padding) text-xs text-popover-foreground shadow-md! ring-1 ring-foreground/10',
+    'has-[>[data-icon]]:pl-[calc(var(--density-section-padding)+var(--icon-size)+0.5rem)]',
+    '[&:has(>[data-close-button])>[data-content]]:pr-7',
+    // Sonner only hides the text of stacked-behind toasts when it styles them.
+    'data-[expanded=false]:data-[front=false]:*:opacity-0',
+  ),
+  icon: 'absolute top-(--density-section-padding) left-(--density-section-padding) flex h-5 w-(--icon-size) items-center [&_svg]:size-(--icon-size)',
+  content: 'flex min-w-0 basis-full flex-col gap-0.5',
+  title: 'text-sm font-medium',
+  // Sonner's dark theme colours descriptions unlayered; the Toaster never sets it.
+  // Descriptions carry values the app did not author, which `word-break` splits mid-token.
+  description: 'text-xs/relaxed text-muted-foreground [overflow-wrap:anywhere]',
+  closeButton: cn(
+    buttonVariants({ size: 'icon-xs', variant: 'ghost' }),
+    'absolute top-[calc(var(--density-section-padding)-2px)] right-[calc(var(--density-section-padding)-4px)] text-muted-foreground',
+  ),
+  cancelButton: buttonVariants({ size: 'sm', variant: 'ghost' }),
+  actionButton: buttonVariants({ size: 'sm' }),
+}
 
 export function Toaster({
   className,
   closeButton = true,
-  richColors = true,
   style,
-  theme = 'system',
   toastOptions,
   ...props
-}: ToasterProps) {
+}: Omit<ToasterProps, 'richColors' | 'theme'>) {
   return (
     <Sonner
       closeButton={closeButton}
       className={cn('toaster group', className)}
-      richColors={richColors}
-      style={{ ...toastThemeStyle, ...style }}
-      theme={theme}
+      icons={TOAST_ICONS}
+      style={{ ...TOASTER_STYLE, ...style }}
       toastOptions={{
         ...toastOptions,
-        classNames: {
-          description: TOAST_DESCRIPTION_CLASS,
-          toast: TOAST_SURFACE_CLASS,
-          ...toastOptions?.classNames,
-        },
+        unstyled: true,
+        classNames: { ...TOAST_CLASS_NAMES, ...toastOptions?.classNames },
       }}
       {...props}
     />

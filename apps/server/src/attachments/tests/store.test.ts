@@ -1,10 +1,10 @@
 import { mkdtemp, rm, unlink } from 'node:fs/promises'
-import { homedir, tmpdir } from 'node:os'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
 import type { ChatAttachmentUpload } from '@workspace/contracts'
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { defaultAttachmentsDir, readAttachmentBytes, writeAttachmentFromDataUrl } from '../store'
+import { readAttachmentBytes, writeAttachmentFromDataUrl } from '../store'
 
 const roots: string[] = []
 
@@ -35,12 +35,6 @@ function pngUpload(overrides: Partial<ChatAttachmentUpload> = {}): ChatAttachmen
 
 afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
-})
-
-describe('defaultAttachmentsDir', () => {
-  it('sits under the one platform home directory', () => {
-    expect(defaultAttachmentsDir()).toBe(path.join(homedir(), '.platform', 'attachments'))
-  })
 })
 
 describe('writeAttachmentFromDataUrl', () => {

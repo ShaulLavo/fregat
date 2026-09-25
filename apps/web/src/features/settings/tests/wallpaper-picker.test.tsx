@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
-import { ThemeAwareToaster } from '@/components/theme-aware-toaster'
+import { Toaster } from '@workspace/ui/components/sonner'
 import { getClient } from '@/lib/client'
 import { fetchSettings } from '@/features/settings/utils/api'
 import { selectSettingsCategory } from '@/features/settings/state/category-store'
@@ -27,7 +27,7 @@ async function openPicker() {
   renderWithProviders(
     <>
       <SettingsPage />
-      <ThemeAwareToaster />
+      <Toaster />
     </>,
   )
   await userEvent.click(await screen.findByRole('button', { name: 'Choose wallpaper' }))

@@ -19,7 +19,6 @@ Read the screenshots and `inspection.json`. Every backend response should come f
 
 ```bash
 bun run agent:browser scenario editor-product --headed \
-  --url https://omarchy.mesh.shaulavo.dev/platform/ \
   --file plugins.ts --width 1360 --height 840 --scale 2 \
   --product-wallpaper apps/site/src/assets/eyes-wide.jpg
 ```

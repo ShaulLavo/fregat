@@ -90,6 +90,7 @@ export async function makeTestServer({
         providerAdapterRegistry: new ProviderAdapterRegistry([providerAdapter]),
       },
       settings: testSettingsOptions(root, { watch: settingsWatch }),
+      themes: { root: path.join(root, '.platform') },
       watch: filesystemWatch,
       workspaceEditClock,
       workspaceEditDriver,

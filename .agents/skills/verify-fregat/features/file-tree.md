@@ -30,7 +30,7 @@ Every create, rename, drag, duplicate and delete is a journaled `file-operation`
 
 ## File clicks during refresh
 
-`bun run agent:browser scenario tree-file-clicks` opens two files in a disposable nested folder, creates files in its ancestors, and deletes a sibling. The new entries must appear and the deleted entry must disappear while the nested folder stays expanded and both files remain clickable. Pass `--url` to run against the mesh build.
+`bun run agent:browser scenario tree-file-clicks` opens two files in a disposable nested folder, creates files in its ancestors, and deletes a sibling. The new entries must appear and the deleted entry must disappear while the nested folder stays expanded and both files remain clickable.
 
 ## Hover prefetch
 

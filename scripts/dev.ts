@@ -9,6 +9,7 @@ import {
   runtimeUrl,
   selectAvailablePort,
 } from './runtime-network'
+import { devStateHome, seedDevStateHome } from './state-home'
 
 const root = path.resolve(import.meta.dirname, '..')
 const env = observabilityEnvFromFile(path.join(root, '.env'), Bun.env)
@@ -31,6 +32,7 @@ async function runDev() {
     preferredPort: preferredWebPort,
   })
   configureRuntime(webHost, webPort)
+  configureStateHome()
 
   const args = Bun.argv.slice(2)
   const command = [turbo, 'dev', ...args]
@@ -56,4 +58,11 @@ function configureRuntime(webHost: string, webPort: number) {
     webHost,
     webPort,
   )
+}
+
+/** Dev never opens production's `~/.platform`; see `scripts/state-home.ts`. */
+function configureStateHome() {
+  env.PLATFORM_HOME ??= devStateHome
+  if (seedDevStateHome(env.PLATFORM_HOME)) console.log(`[dev] Seeded ${env.PLATFORM_HOME}`)
+  console.log(`[dev] State: ${env.PLATFORM_HOME}`)
 }

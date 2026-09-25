@@ -5,6 +5,7 @@ import path from 'node:path'
 import { closeApp, createApp } from './app'
 import { DEFAULT_ALLOWED_ORIGINS } from './auth'
 import { getDefaultPlatformDatabase } from './db/client'
+import { platformHomePath } from './home'
 import { readEnvironmentIdentity } from './db/environment-identity'
 import {
   errorSummary,
@@ -48,8 +49,8 @@ export const app = createApp({
   orchestration: { providerRuntime: true },
   settings: {
     policy: settingsPolicyFromEnv(Bun.env),
-    secretsFilePath: Bun.env.PLATFORM_SECRETS_FILE ?? defaultSecretsFilePath(),
-    userFilePath: Bun.env.PLATFORM_SETTINGS_FILE ?? defaultSettingsFilePath(),
+    secretsFilePath: defaultSecretsFilePath(),
+    userFilePath: defaultSettingsFilePath(),
     watch: Bun.env.FS_WATCH !== 'false',
   },
   systemRoot,
@@ -65,6 +66,7 @@ export const app = createApp({
     homeDirectory,
     hostname: server.hostname,
     port: server.port,
+    stateRoot: platformHomePath(),
     systemRoot,
     webRoot: webRoot ?? null,
     workspaceRoot,

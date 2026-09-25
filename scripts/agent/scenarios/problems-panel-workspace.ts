@@ -5,6 +5,7 @@ import { openFileByName, selectors } from '../selectors'
 
 export const problemsPanelWorkspace: Scenario = {
   name: 'problems-panel-workspace',
+  readOnly: true,
   description:
     'Open a file in the real workspace without typing and fail unless Problems settles on an answer from every language server.',
   async run(page, { file, step }) {

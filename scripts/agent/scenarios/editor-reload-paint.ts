@@ -62,6 +62,7 @@ let lastReport: Report | null = null
 
 export const editorReloadPaint: Scenario = {
   name: 'editor-reload-paint',
+  readOnly: true,
   description:
     'Open a file, reload the window, and check the first editor frame already shows highlighted text.',
   run: (page, context) => reloadAndSample(page, context, 0),

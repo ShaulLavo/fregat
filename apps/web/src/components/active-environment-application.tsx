@@ -3,7 +3,7 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { TooltipProvider } from '@workspace/ui/components/tooltip'
 import { TooltipLayer } from '@workspace/ui/patterns/tooltip-layer'
 
-import { ThemeAwareToaster } from '@/components/theme-aware-toaster'
+import { Toaster } from '@workspace/ui/components/sonner'
 import { ConnectionGate } from '@/features/environments/components/connection-gate'
 import { EditorColorThemeProvider } from '@/features/editor/providers/color-theme-provider'
 import { LanguageServerMatchProvider } from '@/features/editor/providers/language-server-match-provider'
@@ -25,7 +25,7 @@ export function ActiveEnvironmentApplication({ children }: { readonly children: 
               <EditorColorThemeProvider>
                 <TooltipProvider>
                   <EditorStateProvider runtime={active.editor}>{children}</EditorStateProvider>
-                  <ThemeAwareToaster />
+                  <Toaster />
                   <TooltipLayer />
                 </TooltipProvider>
               </EditorColorThemeProvider>

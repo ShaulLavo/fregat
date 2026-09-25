@@ -8,6 +8,7 @@ import {
 import { clientInstanceId, instanceHeaderName } from '@/lib/instance-id'
 import { latencyFetcher } from '@/lib/simulated-latency'
 import { applicationHost } from '@/lib/application-host'
+import { developmentServerUrl } from '@/lib/boot-keys'
 
 export type { Client }
 
@@ -22,7 +23,7 @@ const clientOrigins = new WeakMap<Client, string>()
 // Development runs Vite and the server on separate ports. Production is one
 // server that serves the page, so the API lives at the page's own base URL.
 function defaultServerUrl() {
-  if (import.meta.env.DEV) return 'http://localhost:3001'
+  if (import.meta.env.DEV) return developmentServerUrl()
 
   return new URL(import.meta.env.BASE_URL, window.location.href).href
 }

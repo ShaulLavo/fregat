@@ -8,7 +8,7 @@ import { toast } from 'sonner'
 import { createInProcessClient } from '../../../../test/client'
 import { expect, test } from '../../../../test/fixtures'
 import { AppProviders, createTestQueryClient } from '../../../../test/render'
-import { ThemeAwareToaster } from '@/components/theme-aware-toaster'
+import { Toaster } from '@workspace/ui/components/sonner'
 import { useSettingsActions } from '@/features/settings/hooks/use-settings-actions'
 import { useSettingsIntentStore } from '@/features/settings/state/intent-store'
 import {
@@ -441,7 +441,7 @@ function wrapper(queryClient: ReturnType<typeof createTestQueryClient>, withToas
   return ({ children }: { readonly children: ReactNode }) => (
     <AppProviders queryClient={queryClient}>
       {children}
-      {withToaster ? <ThemeAwareToaster /> : null}
+      {withToaster ? <Toaster /> : null}
     </AppProviders>
   )
 }

@@ -15,6 +15,7 @@ async function searchPalette(page: Parameters<Scenario['run']>[0], query: string
 /** `packages/editor-core` is a symlink out of the workspace, so the index never scans it. */
 export const quickOpenLinkedFile: Scenario = {
   name: 'quick-open-linked-file',
+  readOnly: true,
   description: 'Search by name for a file that sits behind a symlinked package folder.',
   async run(page, { step }) {
     const byName = await searchPalette(page, 'tokenStore')

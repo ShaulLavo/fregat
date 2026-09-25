@@ -147,6 +147,8 @@ type ScenarioContext = {
 
 export type Scenario = {
   readonly surface?: 'site' | 'demo'
+  /** Only reads, so it may run against production (`--url …/platform/`). */
+  readonly readOnly?: boolean
   readonly name: string
   readonly description: string
   readonly run: (page: Page, context: ScenarioContext) => Promise<void>

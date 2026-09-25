@@ -14,6 +14,7 @@ import {
   BOOT_MIRROR_KEY,
   PALETTE_BOOT_KEY,
   PALETTE_STYLE_ID,
+  developmentServerUrl,
   type BootWallpaperPreload,
 } from '@/lib/boot-keys'
 import { resolveBackdrop } from '@/lib/platform/backdrop'
@@ -95,7 +96,7 @@ function readStoredMirror(): StoredMirror {
 // Mirrors defaultServerUrl in src/lib/client.ts: an explicit development override, else the
 // page's own base URL, which is where one server serves both.
 function serverBase(): string {
-  const developmentServer = import.meta.env.DEV ? 'http://localhost:3001' : import.meta.env.BASE_URL
+  const developmentServer = import.meta.env.DEV ? developmentServerUrl() : import.meta.env.BASE_URL
   const server = new URL(import.meta.env.VITE_SERVER_URL ?? developmentServer, location.href)
   return `${server.origin}${server.pathname.replace(/\/+$/, '')}`
 }

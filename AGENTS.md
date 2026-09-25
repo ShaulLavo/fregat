@@ -267,7 +267,8 @@ Interaction treatments are utilities, not strings to copy:
 
 ## Dev Server
 
-- A dev server is always running. Never spin up your own server to test or verify changes — reuse the running one.
+- A dev server is always running; never start another by hand. `agent:browser` starts its own throwaway API server per run against the shared Vite and removes it afterwards.
+- State is separated by `PLATFORM_HOME`: production keeps `~/.platform`, the dev server uses `/work/platform-dev/home` (seeded once from production by `scripts/dev.ts`), and each `agent:browser` run gets a temp home. Language-server and font downloads stay in `~/.platform` for all of them.
 
 ## Gates
 

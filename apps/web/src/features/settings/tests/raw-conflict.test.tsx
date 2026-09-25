@@ -4,7 +4,7 @@ import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { SettingsSnapshot } from '@workspace/contracts'
 
-import { ThemeAwareToaster } from '@/components/theme-aware-toaster'
+import { Toaster } from '@workspace/ui/components/sonner'
 import {
   createEditorDocumentStore,
   EditorDocumentStateContext,
@@ -131,7 +131,7 @@ function RawConflictHarness({ documentStore }: { readonly documentStore: EditorD
   return (
     <EditorDocumentStateContext.Provider value={documentStore}>
       <RawConflictBanner documentKey={DOCUMENT_ID} />
-      <ThemeAwareToaster />
+      <Toaster />
     </EditorDocumentStateContext.Provider>
   )
 }

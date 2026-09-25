@@ -2,6 +2,7 @@ import { ok, strictEqual } from 'node:assert/strict'
 import type { Page } from 'playwright'
 import type { Scenario } from './index'
 import { selectors } from '../selectors'
+import { serverApi } from '../server-api'
 
 async function userSettings(page: Page, base: string) {
   const response = await page.request.get(`${base}settings`, {
@@ -44,10 +45,8 @@ export const wallpaperIconHints: Scenario = {
   description:
     'Create an unselected wallpaper fixture, hover its action and open its menu, then remove the fixture and verify settings are unchanged.',
   async run(page, { step }) {
-    const url = new URL(page.url())
-    const base = url.pathname.startsWith('/platform/')
-      ? `${url.origin}/platform/`
-      : 'http://localhost:3001/'
+    const { base: api, headers } = serverApi(page)
+    const base = `${api}/`
     const before = await userSettings(page, base)
     const fixture = await createWallpaperFixture(page, base)
     try {
@@ -75,7 +74,7 @@ export const wallpaperIconHints: Scenario = {
       await step('wallpaper-picker-closed')
     } finally {
       const response = await page.request.post(`${base}themes/wallpapers/${fixture.id}/delete`, {
-        headers: { Origin: url.origin },
+        headers,
       })
       ok(response.ok(), `Remove the verification wallpaper: ${await response.text()}`)
       strictEqual(

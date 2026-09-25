@@ -9,13 +9,13 @@ The app is a Vite web client (`apps/web`) over a Bun server (`apps/server`). One
 
 ## Launch
 
-Use the existing dev server: web on `http://localhost:5173/`, API on `http://localhost:3001/`. Do not start a duplicate. This project, including the mesh deployment called production, is under development. Restart the existing service when needed to complete an authorized fix. Persisted sessions survive restarts; active processes and connections may be interrupted.
+Use the existing Vite dev server on `http://localhost:5173/`. Against it, every run starts its own throwaway API server from the current source, with a temp state home and log directory under `/work/tmp/fregat-agent-*`, and removes it when the run ends; the summary names its port and directory, and its full log is copied into the evidence. So a run never touches the owner's sessions or settings, and never sees a stale server. `--shared-dev` drives the running dev API on `http://localhost:3001/` instead (state in `/work/platform-dev/home`). This project, including the mesh deployment called production, is under development. Restart the existing service when needed to complete an authorized fix. Persisted sessions survive restarts; active processes and connections may be interrupted.
 
 When web changes depend on a server protocol change, deploy both with `bun run deploy --server`. A web-only deployment reuses the old server. Verify `/release` and exercise the changed protocol in the browser before calling the deployment done.
 
 `--engine firefox` or `--engine webkit` runs `look`, `scenario`, `renders` or `caches` in another engine; `trace` needs Chromium. The desktop app is CEF, so other engines matter for the mesh (every iPhone browser is WebKit). Playwright's WebKit does not start on this Arch host (missing libicu74, libxml2, libflite).
 
-Any verb also accepts `--url` for a different target, including the mesh build at `https://omarchy.mesh.shaulavo.dev/platform/` and any address URL the user pastes. An address URL puts you in the user's exact state (workspace, tabs, selection).
+`look`, `trace`, `renders` and `caches` also accept `--url` for a different target, including the mesh build at `https://omarchy.mesh.shaulavo.dev/platform/` and any address URL the user pastes. An address URL puts you in the user's exact state (workspace, tabs, selection); one copied from the dev page needs `--shared-dev`, because a throwaway server has never seen that workspace. The mesh is the owner's real state, so `scenario`, `trace` and `renders` refuse a production URL unless the scenario declares `readOnly: true`.
 
 ## Doctor
 
@@ -59,7 +59,7 @@ Read both screenshots. `layout.json` records viewport, document width, image and
 
 Run `scenario demo-workspace` and `scenario demo-agent-git` against `/fregat/demo/index.html`, and `scenario demo-reset` against `/fregat/`. These use the actual app UI. `inspection.json` retains mock requests, unhandled operations and client log batches. The mock's logs are the relevant logs here; demo scenarios do not read the unrelated development server log window. `observed.json` includes service-worker responses, native socket connections and console source locations. Inspect failures as well as successful steps.
 
-For mesh verification, set `OBSERVABILITY_DIR=/work/platform-production/logs` on the browser or logs command so the captured log window comes from the process being driven.
+For a `--url` run against the mesh, set `OBSERVABILITY_DIR=/work/platform-production/logs` on the browser or logs command so the captured log window comes from the process being driven.
 
 The CLI launches Chrome without Playwright's default `--hide-scrollbars`, so scrollbars take the space they take for a user. Every run records its actual browser and GPU in `browser-renderer.json`. Use `--headed` for product assets and inspect that record; the headless shell can use software rendering.
 
@@ -77,7 +77,7 @@ Trace tables use `ProfileChunk` samples to name the deepest application function
 
 `renders` counts completed component renders, including scenario setup. Its timing is React `actualDuration` (subtree render duration), not exclusive self time. A component absent from `renders.json` rendered zero times in that measured window. `render-steps.json` holds cumulative counts at each scenario checkpoint, so subtract consecutive snapshots to isolate the action from setup. The screenshot is taken after measurement; use `scenario` when you need screenshots at each action.
 
-A `/themes/palettes` 404 can mean the dev process predates the route. Confirm the route and process start time, then restart the existing service if needed for the fix. WebGL "GPU stall" warnings can come from screenshot capture. TypeScript language-server exits are failures to investigate, not expected noise: inspect the exact log window printed by the command. CLI summaries can omit stderr fields; read the structured event or capture a standalone process replay when the retained tail omits the cause.
+A 404 on a new route under `--shared-dev` can mean the dev process predates it; a default run starts from current source. WebGL "GPU stall" warnings can come from screenshot capture. TypeScript language-server exits are failures to investigate, not expected noise: inspect the exact log window printed by the command. CLI summaries can omit stderr fields; read the structured event or capture a standalone process replay when the retained tail omits the cause.
 
 ## Cleanup
 

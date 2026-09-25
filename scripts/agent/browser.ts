@@ -1,5 +1,7 @@
 #!/usr/bin/env bun
+import { copyFile, readdir } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
+import path from 'node:path'
 import { parseArgs } from 'node:util'
 import type { Browser, Page } from 'playwright'
 
@@ -21,6 +23,8 @@ import { alignProductWallpaper, routeProductWallpaper } from './product-wallpape
 import { createScriptError } from '../structured-errors'
 import { isolateProductTerminals } from './product-terminal'
 import { captureBrowserRenderer } from './browser-renderer'
+import { startIsolatedServer, type IsolatedServer } from './isolated-server'
+import { devStateHome } from '../state-home'
 
 const PRODUCT_USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36'
@@ -53,7 +57,10 @@ Options
   --height     viewport height, 240–4096 CSS pixels (look/scenario)
   --scale      device pixel ratio, 1–3 (look/scenario)
   --product-wallpaper image override for a real product scenario capture
+  --shared-dev drive the running dev API server instead of a throwaway one
 
+Against the dev page, every run starts its own API server with temp state and removes it after.
+scenario, trace and renders refuse a production URL unless the scenario is declared readOnly.
 Evidence lands under /work/tmp/fregat-evidence/<stamp>-<verb>-<label>/.`
 
 type Options = CaptureSize & {
@@ -70,6 +77,7 @@ type Options = CaptureSize & {
   readonly selector: string | undefined
   readonly url: string
   readonly workspace: string
+  readonly server?: IsolatedServer
 }
 
 async function main() {
@@ -88,6 +96,7 @@ async function main() {
       engine: { type: 'string', default: 'chromium' },
       file: { type: 'string' },
       headed: { type: 'boolean', default: false },
+      'shared-dev': { type: 'boolean', default: false },
       selector: { type: 'string' },
       url: { type: 'string', default: DEFAULT_URL },
       workspace: { type: 'string', default: DEFAULT_WORKSPACE },
@@ -133,10 +142,36 @@ async function main() {
     url: values['static-dir'] ? STATIC_PREVIEW_URL : values.url,
     workspace: values.workspace,
   }
+  const scenario = name && verb !== 'look' && verb !== 'caches' ? scenarioNamed(name) : undefined
+  // trace and renders drive the scenario too, so the guard covers every verb that takes one.
+  if (scenario && !scenario.surface && !scenario.readOnly && isProduction(options.url))
+    throw createScriptError(
+      `Scenario ${scenario.name} writes state, so it does not run against production (${options.url}). Drop --url to run it against the dev page with a throwaway server.`,
+    )
+  if (!needsIsolatedServer(verb, scenario, options, values['shared-dev']))
+    return runVerb(verb, scenario, options, values['shared-dev'])
+  const server = await startIsolatedServer(new URL(options.url))
+  process.env.PORT = String(server.port)
+  process.env.OBSERVABILITY_DIR = server.logs
+  process.env.PLATFORM_HOME = server.home
+  try {
+    return await runVerb(verb, scenario, { ...options, server }, false)
+  } finally {
+    await server.stop()
+  }
+}
+
+function runVerb(
+  verb: string | undefined,
+  scenario: Scenario | undefined,
+  options: Options,
+  sharedDev: boolean,
+) {
+  if (sharedDev) process.env.PLATFORM_HOME ??= devStateHome
   if (verb === 'look') return look(options)
-  if (verb === 'scenario' && name) return runScenario(scenarioNamed(name), options)
-  if (verb === 'trace' && name) return traceScenario(scenarioNamed(name), options)
-  if (verb === 'renders' && name) return countRenders(scenarioNamed(name), options)
+  if (verb === 'scenario' && scenario) return runScenario(scenario, options)
+  if (verb === 'trace' && scenario) return traceScenario(scenario, options)
+  if (verb === 'renders' && scenario) return countRenders(scenario, options)
   if (verb === 'caches') return dumpCaches(options)
   if (verb === 'list') {
     for (const scenario of scenarios) console.log(`${scenario.name}\t${scenario.description}`)
@@ -144,6 +179,32 @@ async function main() {
   }
   console.log(HELP)
   return verb ? 1 : 0
+}
+
+const SERVER_VERBS = new Set(['look', 'scenario', 'trace', 'renders', 'caches'])
+
+// Only the dev page gets a throwaway server: production serves its own API, and a static or
+// site capture has none.
+function needsIsolatedServer(
+  verb: string | undefined,
+  scenario: Scenario | undefined,
+  options: Options,
+  sharedDev: boolean,
+) {
+  if (sharedDev || !verb || !SERVER_VERBS.has(verb)) return false
+  // Site and demo scenarios answer from a static preview or the demo's mock backend.
+  if (options.site || options.staticDir || scenario?.surface) return false
+  return isDevPage(options.url)
+}
+
+function isDevPage(url: string) {
+  const parsed = new URL(url)
+  return isLoopback(url) && parsed.port === (process.env.WEB_PORT ?? '5173')
+}
+
+// The mesh, or production's own port, which serves the page under /platform.
+function isProduction(url: string) {
+  return !isLoopback(url) || /^\/platform(\/|$)/.test(new URL(url).pathname)
 }
 
 async function look(options: Options) {
@@ -549,6 +610,10 @@ async function withPage(
     deviceScaleFactor: options.scale,
     ...(options.productWallpaper ? { userAgent: PRODUCT_USER_AGENT } : {}),
   })
+  if (options.server)
+    await context.addInitScript(
+      `window.platformDevServerUrl = ${JSON.stringify(options.server.origin)}`,
+    )
   const page = await context.newPage()
   const observed = attachObserver(page, apiBase(options.url), {
     consoleCapture: options.consoleCapture,
@@ -577,7 +642,7 @@ async function withPage(
       userAgentOverride: options.productWallpaper ? PRODUCT_USER_AGENT : null,
     })
     const code = await body(page, observed, browser)
-    if (!options.site) await appendLogs(evidence)
+    if (!options.site) await appendLogs(evidence, options.server)
     console.log(await Bun.file(evidence.file('summary.md')).text())
     return code
   } finally {
@@ -651,7 +716,7 @@ function apiBase(url: string) {
   return `${parsed.origin}${parsed.pathname.replace(/\/[^/]*$/, '/')}`
 }
 
-async function appendLogs(evidence: Evidence) {
+async function appendLogs(evidence: Evidence, server: IsolatedServer | undefined) {
   const events = await readLogs({ level: 'warn', since: evidence.startedAt })
   await evidence.write('logs.txt', events.map(formatLogEvent).join('\n'))
   const summary = evidence.file('summary.md')
@@ -660,9 +725,23 @@ async function appendLogs(evidence: Evidence) {
   const lines = [
     '',
     `logs (warn+, ${window}): ${events.length === 0 ? 'none' : `${events.length}, see logs.txt`}`,
-    `full window: bun run logs --since ${evidence.startedAt.toISOString()}`,
+    ...(server
+      ? await keepServerLogs(evidence, server)
+      : [`full window: bun run logs --since ${evidence.startedAt.toISOString()}`]),
   ]
   await Bun.write(summary, `${existing}${lines.join('\n')}\n`)
+}
+
+// The run's state directory is deleted when it ends, so its log moves into the evidence.
+async function keepServerLogs(evidence: Evidence, server: IsolatedServer) {
+  const files = (await readdir(server.logs).catch(() => [] as string[])).filter((name) =>
+    name.endsWith('.jsonl'),
+  )
+  for (const name of files) await copyFile(path.join(server.logs, name), evidence.file(name))
+  return [
+    `api server: ${server.origin}, throwaway state ${server.directory} (removed after the run)`,
+    `full log: ${files.map((name) => evidence.file(name)).join(', ') || 'none written'}`,
+  ]
 }
 
 async function writeSummary(evidence: Evidence, lines: readonly string[]) {

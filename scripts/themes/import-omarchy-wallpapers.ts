@@ -1,8 +1,8 @@
-import { homedir } from 'node:os'
 import path from 'node:path'
 import { parseArgs } from 'node:util'
 import { SettingsStore } from '../../apps/server/src/settings/store'
 import { defaultSettingsFilePath } from '../../apps/server/src/settings/paths'
+import { platformHomePath } from '../../apps/server/src/home'
 import {
   WallpaperLibrary,
   OMARCHY_THEMES_DIRECTORY,
@@ -16,12 +16,12 @@ const { values } = parseArgs({
   },
 })
 const settings = new SettingsStore({
-  userFilePath: Bun.env.PLATFORM_SETTINGS_FILE ?? defaultSettingsFilePath(),
+  userFilePath: defaultSettingsFilePath(),
   watch: false,
 })
 try {
   const library = new WallpaperLibrary({
-    directory: path.join(homedir(), '.platform/wallpapers'),
+    directory: platformHomePath('wallpapers'),
     settings,
   })
   const { themes: mapping, skipped } = await library.importDirectory(values.directory)

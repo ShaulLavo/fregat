@@ -16,10 +16,6 @@ type AppSaveMarkerOptions = {
   ttlMs?: number
 }
 
-function appSaveMarkerFilePath(env: NodeJS.ProcessEnv = process.env): string {
-  return env.PLATFORM_APP_SAVE_MARKER_FILE ?? platformHomePath('app-save-markers.json')
-}
-
 export function recordAppSave(absolutePath: string, options: AppSaveMarkerOptions = {}): boolean {
   try {
     const marker = markerPath(options)
@@ -72,7 +68,7 @@ export function forgetAppSave(absolutePath: string, options: AppSaveMarkerOption
 }
 
 function markerPath(options: AppSaveMarkerOptions): string {
-  return options.markerPath ?? appSaveMarkerFilePath()
+  return options.markerPath ?? platformHomePath('app-save-markers.json')
 }
 
 function ttlMs(options: AppSaveMarkerOptions): number {

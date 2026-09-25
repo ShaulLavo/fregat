@@ -39,11 +39,8 @@ export function FilesystemConflictToast({
   )
   const busy = pending !== undefined
   return (
-    <div
-      className='bg-popover-solid text-popover-foreground ring-foreground/10 w-[380px] max-w-[calc(100vw-2rem)] rounded-lg p-(--density-section-padding) shadow-md ring-1'
-      role='alertdialog'
-      aria-label={conflictTitle(conflict)}
-    >
+    // The Toaster paints the surface; Sonner renders custom toasts inside its title slot.
+    <div className='font-normal' role='alertdialog' aria-label={conflictTitle(conflict)}>
       <div className='flex items-start gap-(--density-control-gap)'>
         <WarningIcon className='text-warning mt-0.5 size-(--icon-size) shrink-0' weight='fill' />
         <div className='min-w-0 flex-1'>

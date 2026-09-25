@@ -1,15 +1,11 @@
 import { ok, strictEqual } from 'node:assert/strict'
 import { readFile, writeFile } from 'node:fs/promises'
-import { homedir } from 'node:os'
-import path from 'node:path'
 import type { Page } from 'playwright'
 
+import { platformHomePath } from '../../../apps/server/src/home'
 import { selectors } from '../selectors'
 import type { Scenario } from './index'
 
-// The user layer is the one a browser can reach: the workspace layer belongs to the server's root.
-const settingsFile =
-  process.env.PLATFORM_SETTINGS_FILE ?? path.join(homedir(), '.platform', 'settings.json')
 const PROBE_KEY = 'agent.probe.unknownKey'
 
 export const settingsStaleDiagnostics: Scenario = {
@@ -17,10 +13,17 @@ export const settingsStaleDiagnostics: Scenario = {
   description:
     'Plant an unknown key in user settings, see its warning, watch it hide while the text is edited and return on undo; the file is restored afterwards.',
   async run(page, { step }) {
-    const original = await readFile(settingsFile, 'utf8')
+    // The user layer is the one a browser can reach: the workspace layer belongs to the server's
+    // root. `agent:browser` points PLATFORM_HOME at the server under test.
+    const settingsFile = platformHomePath('settings.json')
+    const original = await readFile(settingsFile, 'utf8').catch(() => '{}\n')
     ok(original.trimStart().startsWith('{'), 'user settings must be a JSON object')
+    const planted =
+      original.trim() === '{}'
+        ? `{\n  "${PROBE_KEY}": true\n}\n`
+        : original.replace('{', `{\n  "${PROBE_KEY}": true,`)
     try {
-      await writeFile(settingsFile, original.replace('{', `{\n  "${PROBE_KEY}": true,`))
+      await writeFile(settingsFile, planted)
       await page.keyboard.press('Control+,')
       await selectors.settingsSearch(page).waitFor()
       await selectors.settingsScopeTab(page, 'User').click()

@@ -16,7 +16,7 @@ import {
   type PinnedLspRuntimeManifestEntry,
 } from './installer-manifest'
 import type { LspServerHandle } from './registry'
-import { platformHomePath } from '../home'
+import { platformCachePath } from '../home'
 
 type CommandOptions = {
   readonly cwd: string
@@ -46,7 +46,7 @@ type HashiCorpRelease = {
   readonly version?: string
 }
 
-const lspRoot = platformHomePath('lsp')
+const lspRoot = platformCachePath('lsp')
 const nodePackageRoot = path.join(lspRoot, 'node')
 const toolRoot = path.join(lspRoot, 'bin')
 const nodePackageBin = path.join(nodePackageRoot, 'node_modules', '.bin')

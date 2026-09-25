@@ -19,9 +19,12 @@ export type LogFilter = {
 }
 
 const LEVELS = ['debug', 'info', 'warn', 'error'] as const
-const LOGS_DIR = process.env.OBSERVABILITY_DIR
-  ? resolve(process.env.OBSERVABILITY_DIR)
-  : resolve(import.meta.dirname, '../../logs')
+// Per call: an `agent:browser` run points this at its own server's logs after import.
+function logsDirectory() {
+  return process.env.OBSERVABILITY_DIR
+    ? resolve(process.env.OBSERVABILITY_DIR)
+    : resolve(import.meta.dirname, '../../logs')
+}
 
 export async function readLogs(filter: LogFilter): Promise<LogEvent[]> {
   const until = filter.until ?? new Date()
@@ -73,13 +76,14 @@ async function logFilesBetween(since: Date, until: Date) {
     days.add(new Date(at).toISOString().slice(0, 10))
   }
   days.add(until.toISOString().slice(0, 10))
-  const names = (await readdir(LOGS_DIR).catch(() => [] as string[])).filter((name) =>
+  const directory = logsDirectory()
+  const names = (await readdir(directory).catch(() => [] as string[])).filter((name) =>
     name.endsWith('.jsonl'),
   )
   return names
     .filter((name) => days.has(name.slice(0, 10)))
     .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
-    .map((name) => join(LOGS_DIR, name))
+    .map((name) => join(directory, name))
 }
 
 function dayStart(date: Date) {

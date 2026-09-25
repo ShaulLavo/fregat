@@ -507,7 +507,8 @@ of the plans, both logs and the service journal named what stands in the way. Th
 
 Suggested order:
 
-1. Plan 146. It is the source of most production log noise and of scenario data in real state.
+1. ~~Plan 146~~ — implemented and deployed 2026-09-25. Prod keeps `~/.platform`, dev uses
+   `/work/platform-dev/home`, and every `agent:browser` run has its own throwaway server.
 2. Plan 147, after 146 removes the pollution it would otherwise re-level.
 3. Plan 148, so Platform can deploy itself without killing the deploying turn.
 4. Plan 149, so terminals and dev servers survive the same restart.

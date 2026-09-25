@@ -88,7 +88,7 @@ export const settingsErrors = defineErrorCatalog('settings', {
     status: 500,
     message: () => 'Settings file path was not configured',
     why: 'The settings store was constructed without a file path. Defaulting to the user’s home directory here would let a test run overwrite real settings.',
-    fix: 'Pass `settings.userFilePath` to createApp, or set PLATFORM_SETTINGS_FILE.',
+    fix: 'Pass `settings.userFilePath` to createApp, or set PLATFORM_HOME.',
   },
 })
 

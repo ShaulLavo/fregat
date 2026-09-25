@@ -2,7 +2,34 @@
 
 ## Status and authorization
 
-- Status: PROPOSED — Phase 1 ready; the Phase 4 cleanup needs the owner's OK before it runs.
+- Status: IMPLEMENTED 2026-09-25 — all four phases; deployed `--server` as
+  `20260925T065630Z-2ae87b59-plan-146-state-homes`. The owner approved the Phase 4 cleanup.
+
+## Delivery record
+
+- `platformHomePath()` reads `PLATFORM_HOME` per call; `platformCachePath()` keeps `lsp` and
+  `fonts` in `~/.platform`. `PLATFORM_SETTINGS_FILE`, `PLATFORM_SECRETS_FILE` and
+  `PLATFORM_APP_SAVE_MARKER_FILE` are deleted. `server.start` logs `stateRoot`.
+- Wallpapers, palettes and themes take `createApp({ themes: { root } })`, defaulting to the state
+  home. Test apps pass their temp root, so they never write the real library.
+- `scripts/state-home.ts` seeds `/work/platform-dev/home` once: settings, secrets, palettes and
+  theme bundles copied, wallpapers hard-linked. The palettes and bundles were added to D2 because
+  the seeded theme names them. The wallpapers are hard-linked rather than symlinked, so a delete
+  in dev cannot remove a file from production's library. The dev process holds only the dev database.
+- `agent:browser` starts `scripts/agent/isolated-server.ts` for the dev page. The run's home
+  hard-links the wallpaper library, because seeding bundled artwork into an empty home costs
+  6.4 s. The run's log is copied into the evidence before its directory is removed.
+  `--shared-dev` keeps the old target. `scenario`, `trace` and `renders` refuse a production URL
+  (not loopback, or under `/platform`) unless the scenario is `readOnly`. `editor-reload-paint`, `problems-panel-workspace` and
+  `quick-open-linked-file` are `readOnly`.
+- Verified: `chat-draft-context-strip` and `wallpaper-mode-toggle` ran on throwaway servers.
+  `~/.platform/settings.json` and the dev home were unchanged, and the run directories were gone.
+  A mesh `scenario` refused. `look --shared-dev` showed the seeded theme.
+- Cleanup: 370 fixture projects deleted through `project.delete`, plus 481 recents and 489
+  addresses in one transaction with prod stopped. 2 projects, 3 recents and 3 addresses remain.
+  Backup: `/work/tmp/plan146-backup-20260925T065544Z.sqlite`. One fixture project was in the
+  database but not in prod's memory, because the dev server had written it to the shared file. It
+  was deleted after the restart. Prod's `NOT_FOUND` rate fell from about 20 a minute to zero.
 - Priority: P1. It is the root cause of most production log noise and of scenario data in the
   owner's real session list.
 - Effort: M.

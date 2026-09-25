@@ -2,6 +2,7 @@ import { createAttachmentOwnership } from './attachments/ownership'
 import { selectTitleModel } from './orchestration/title-generation'
 import { errorMessage } from '@workspace/contracts'
 import { BundleLibrary } from './themes/bundle-library'
+import { platformHomePath } from './home'
 import { bundleRoutes } from './themes/bundle-routes'
 import { WallpaperLibrary } from './themes/wallpapers/library'
 import { wallpaperLibraryRoutes } from './themes/wallpapers/routes'
@@ -87,6 +88,8 @@ export type AppOptions = FileSystemServiceOptions & {
   }
   fonts?: FontService
   themes?: {
+    /** Holds `wallpapers/`, `palettes/` and `themes/`. Defaults to the state home. */
+    root?: string
     /** Populate the wallpaper picker from packaged artwork during startup. */
     seedWallpapers?: boolean
   }
@@ -163,16 +166,17 @@ export function createApp(options: AppOptions) {
   // app was given — in tests that is the in-memory database, which is what
   // keeps a test run from writing into the developer's real settings.
   const settings = new SettingsStore({ ...options.settings, workspaceRoot: fs.paths.workspaceRoot })
+  const themesRoot = options.themes?.root ?? platformHomePath()
   const wallpapers = new WallpaperLibrary({
-    directory: path.join(options.homeDirectory ?? homedir(), '.platform', 'wallpapers'),
+    directory: path.join(themesRoot, 'wallpapers'),
     settings,
   })
   const palettes = new PaletteLibrary({
-    directory: path.join(options.homeDirectory ?? homedir(), '.platform', 'palettes'),
+    directory: path.join(themesRoot, 'palettes'),
     settings,
   })
   const bundles = new BundleLibrary({
-    directory: path.join(options.homeDirectory ?? homedir(), '.platform', 'themes'),
+    directory: path.join(themesRoot, 'themes'),
     palettes,
     wallpapers,
     settings,

@@ -175,11 +175,9 @@ export async function bootCandidate(release: Release) {
     env: {
       ...productionEnv,
       FS_HOST: '127.0.0.1',
-      FS_METADATA_DB: path.join(scratch, 'metadata.sqlite'),
       FS_WATCH: 'false',
       OBSERVABILITY_DIR: path.join(scratch, 'logs'),
-      PLATFORM_SECRETS_FILE: path.join(scratch, 'secrets.json'),
-      PLATFORM_SETTINGS_FILE: path.join(scratch, 'settings.json'),
+      PLATFORM_HOME: path.join(scratch, 'home'),
       PORT: String(port),
       WEB_ROOT: release.web,
     },
