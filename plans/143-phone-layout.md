@@ -83,6 +83,8 @@ contracts. Out until approved: screens, components, breakpoints, a native app sc
   3. Relay (future): a hosted rendezvous for people without Tailscale, like T3 Connect (Cloudflare tunnels plus accounts).
      WebRTC was considered and rejected: it still needs signaling plus TURN relays, which Tailscale already provides.
 - **Q5, input.** Revisit Enter-on-touch with the phone shell; voice dictation gets its own plan.
+  Decided 2026-09-25: owner — Enter-on-touch ships now, ahead of the phone shell, as Plan 126
+  INTERACTION-11's mobile plain-Enter newline (upstream's coarse-pointer rule). Voice is unchanged.
 
 ## Questions for the owner (answered above)
 
