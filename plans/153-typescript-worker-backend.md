@@ -2,7 +2,7 @@
 
 ## Status and authorization
 
-- Status: PROPOSED — D1–D3 need the owner before Phase 1.
+- Status: IN PROGRESS — Phase 1 done 2026-09-25; D1–D3 decided (completion wave); Phase 2 next.
 - Priority: P3. The server path works; this is a second backend, useful where no server runs a
   language server (a remote machine without Node tooling, a read-only share) and as a fallback.
 - Effort: M.
@@ -30,8 +30,8 @@ server backend stays the default.
   (`apps/web/src/features/editor/utils/language-server-plugin.ts:243`, `webSocketRoute` at `:320`),
   which spawns tsgo or typescript-language-server (`apps/server/src/lsp/typescript/runtime.ts`,
   registered in `apps/server/src/lsp/registry.ts:583`).
-- Platform's exit notification is `$/platform/serverExited` (`packages/contracts/src/lsp-protocol.ts:39`),
-  handled in `language-server-plugin.ts:347` with its own bookkeeping.
+- Platform's proxy sends the same `$/serverExited` (`packages/contracts/src/lsp-protocol.ts`), and the
+  web lane reads the reason from `LspServerExitedError` in `onError` (Phase 1).
 - Reads go through `GET /fs/read` one file at a time (`apps/server/src/fs/routes.ts:42`).
 
 ## Measurements that shape it (E054 Step 4)
@@ -46,13 +46,14 @@ recorded from the program itself. The server can produce it the same way.
 
 - **D1 — setting and scope.** Proposed `lsp.typescript.backend: 'server' | 'worker'`, default
   `'server'`. It selects what runs, so it is `machine` scope, not `window`.
+  Decided 2026-09-25: recommendation (completion wave)
 - **D2 — memory ceiling.** The worker holds the whole program. Proposed: refuse the worker backend
   above a file-count or byte limit reported by Phase 2's list, and say why, rather than let a tab
-  take gigabytes.
+  take gigabytes. Decided 2026-09-25: recommendation (completion wave)
 - **D3 — where the file list comes from.** Proposed: a server route runs
   `tsgo -p <tsconfig> --listFilesOnly` for the file's project and returns paths and sizes. The
   alternative, resolving imports in the browser in rounds, needs no server TypeScript but costs a
-  program rebuild per round.
+  program rebuild per round. Decided 2026-09-25: recommendation (completion wave)
 
 ## Phases
 
@@ -62,6 +63,25 @@ Point `LSP_SERVER_EXITED` in `packages/contracts` at `$/serverExited` and let th
 reason from `LspServerExitedError` in `onError` instead of its own `exit.params`. Evidence: the
 existing proxy-session exit tests, and a server killed under `agent:browser` still shows its
 catalog guidance once.
+
+#### Phase 1 landed (2026-09-25)
+
+- `LSP_SERVER_EXITED` in `packages/contracts` is `$/serverExited`, and `LspServerExitedParams` gained
+  the optional `error` (code, message, why, fix) in the Editor's shape. Both proxy send sites
+  (`proxy-session.ts` `closeConnections`, `routes.ts` `closeWithReason`) are typed against it.
+- The web lane no longer registers an exit handler. `onError` logs `lsp.reconnect_gave_up` with the
+  exit's outcome, code and signal, and `notifyServerExit` toasts only an `LspServerExitedError` that
+  carries catalog guidance. The per-lane `exit.params` record and the client `lsp.server_exit` event
+  are gone.
+- The per-lane record covered a final attempt whose server "died before it said anything". The
+  proxy joins a socket to its backend in the same task that `acquire` resolves, and a process exit
+  arrives as a later task. Every kill in the scenario log reached an attached socket
+  (`activeConnectionCount=1`), so the last attempt carries the guidance itself.
+- Evidence: `proxy-session.test.ts` exit tests now expect `$/serverExited`. New tests in
+  `language-server-plugin.test.ts` pin the method and params shape against `@singapore-editor/lsp`,
+  show the guidance once on give-up, and stay quiet for a clean close or a lost socket. Scenario
+  `editor-lsp-server-exit` now asserts one toast and one copy of the fix on the page
+  (`/work/tmp/fregat-evidence/20260925T113810Z-scenario-editor-lsp-server-exit/`).
 
 ### Phase 2: A program's files from the server
 

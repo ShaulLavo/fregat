@@ -10,7 +10,7 @@ import { focusEditor, openFileFromTree, selectors, waitForLspErrorPaint } from '
 export const editorLspServerExit: Scenario = {
   name: 'editor-lsp-server-exit',
   description:
-    'Kill the language server behind an open TypeScript file: it restarts and diagnostics return with no toast. Keep killing it and the toast says it stopped and what to do.',
+    'Kill the language server behind an open TypeScript file: it restarts and diagnostics return with no toast. Keep killing it and one toast says it stopped and what to do.',
   async run(page, { step }) {
     const originalUrl = page.url()
     const fixture = await mkdtemp('/work/tmp/fregat-lsp-exit-')
@@ -35,10 +35,9 @@ export const editorLspServerExit: Scenario = {
       // A server that dies every time it starts runs out the reconnect attempts. The toast closes
       // on its own, so it is looked for between kills rather than after the last one.
       await killUntilToast(page, fixture)
-      ok(
-        /Run the language server from a terminal/.test(await toast(page).innerText()),
-        'names the fix',
-      )
+      ok(new RegExp(FIX).test(await toast(page).innerText()), 'names the fix')
+      strictEqual(await toast(page).count(), 1, 'one toast for the stopped server')
+      strictEqual(await selectors.textAnywhere(page, FIX).count(), 1, 'the fix is shown once')
       await step('server-exit-toast')
     } catch (error) {
       await step('failure-before-cleanup')
@@ -49,6 +48,8 @@ export const editorLspServerExit: Scenario = {
     }
   },
 }
+
+const FIX = 'Run the language server from a terminal'
 
 function toast(page: Page) {
   return selectors.toast(page, 'language server stopped')

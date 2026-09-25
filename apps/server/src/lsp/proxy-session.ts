@@ -9,6 +9,7 @@ import {
   LSP_SEMANTIC_TOKENS_REFRESH,
   LSP_SERVER_EXITED,
   type LspNegotiatedSemanticTokens,
+  type LspServerExitedParams,
 } from '@workspace/contracts'
 import { isRecord } from '@workspace/utils/objects'
 import type { ChildProcessWithoutNullStreams } from 'node:child_process'
@@ -1612,7 +1613,7 @@ class PooledLspProxySession {
         outcome,
         serverId: this.match.server.id,
         stderrTail: this.stderrTail || undefined,
-      },
+      } satisfies LspServerExitedParams,
     })
     for (const connection of this.connections) {
       connection.send(exit)
