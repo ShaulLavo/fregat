@@ -62,6 +62,12 @@ import { NewFolderPopover } from '@/features/file-picker/components/new-folder-p
 import { LocationBar } from '@/features/file-picker/components/location-bar'
 import { MobileLocations } from '@/features/file-picker/components/mobile-locations'
 import { PlacesSidebar } from '@/features/file-picker/components/places-sidebar'
+import { TypeFilter } from '@/features/file-picker/components/type-filter'
+import {
+  filterPickerEntries,
+  filterPickerTrail,
+  pickerAccept,
+} from '@/features/file-picker/utils/type-filter'
 import { PreviewPane } from '@/features/file-picker/components/preview'
 import { SelectedSummary } from '@/features/file-picker/components/selected-summary'
 import {
@@ -121,6 +127,9 @@ export function FilePickerDialog({
   const searchInputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
   const commitStartedRef = useRef(false)
+  const [typeFilter, setTypeFilter] = useState('')
+  const selectedType = accept?.includes(typeFilter) ? typeFilter : ''
+  const activeAccept = mode === 'file' ? pickerAccept(accept, selectedType) : undefined
   const [sort, setSort] = useState<FileListSort | null>(null)
   const {
     refresh: refreshServerInfo,
@@ -188,12 +197,12 @@ export function FilePickerDialog({
   const loadedEntries = loadStateEntries(loadState)
   const isSearching = session.query.trim().length > 0
   const effectiveSort = sort ?? (isSearching ? null : INITIAL_SORT)
-  // Manual keys: the compiler would key this on nine values including the selection and the
-  // query, re-sorting every virtual row for changes the sorted list cannot see.
-  const entries = useMemo(
+  // Compiler audit: needed; it leaves this sorted list unmemoized without these input keys.
+  const sortedEntries = useMemo(
     () => (effectiveSort ? sortFilePickerEntries(loadedEntries, effectiveSort) : loadedEntries),
     [effectiveSort, loadedEntries],
   )
+  const entries = filterPickerEntries(sortedEntries, mode, activeAccept)
   const selectedEntry = selectedVisibleEntry(entries, session.selectedEntry)
   const viewSetting = useSettingValue('files.picker.view')
   const chosenView = pickerView(viewSetting, mode)
@@ -204,7 +213,7 @@ export function FilePickerDialog({
     trailState?.path === session.currentPath
       ? trailState.trail
       : initialTrail(session.currentPath, selectedEntry)
-  const trail = visibleTrail(heldTrail, showHidden)
+  const trail = filterPickerTrail(visibleTrail(heldTrail, showHidden), activeAccept)
   if (trail !== heldTrail) setTrailState({ path: session.currentPath, trail })
   // In columns the selection that counts is the deepest one; in the list, the list's.
   const focusedEntry = view === 'columns' ? (trail.at(-1) ?? null) : selectedEntry
@@ -213,7 +222,7 @@ export function FilePickerDialog({
   const listInteractionPending = isSearchPending || isSearchLoading
   const previewEntry = focusedEntry ?? currentEntry
   const selectedPickable =
-    toPickedEntry(focusedEntry, mode, accept) ?? currentPickableEntry(currentEntry, mode)
+    toPickedEntry(focusedEntry, mode, activeAccept) ?? currentPickableEntry(currentEntry, mode)
   const homePath = serverInfo?.homePath ?? ROOT_PATH
   const settingsLayers = settings?.layers ?? []
   const hiddenWriteTarget = deriveWriteTarget('files.showHidden', settingsLayers)
@@ -315,7 +324,9 @@ export function FilePickerDialog({
       return
     }
 
-    const candidatePickable = candidate ? toPickedEntry(candidate, mode, accept) : selectedPickable
+    const candidatePickable = candidate
+      ? toPickedEntry(candidate, mode, activeAccept)
+      : selectedPickable
     if (!candidatePickable) return
 
     event.preventDefault()
@@ -344,7 +355,7 @@ export function FilePickerDialog({
       return
     }
 
-    const picked = toPickedEntry(entry, mode, accept)
+    const picked = toPickedEntry(entry, mode, activeAccept)
     if (!picked) return
 
     commitPick(picked)
@@ -365,7 +376,7 @@ export function FilePickerDialog({
   function openSelected() {
     if (!focusedEntry || listInteractionPending) return
     if (isDirectoryEntry(focusedEntry)) return navigateTo(focusedEntry.path)
-    const picked = toPickedEntry(focusedEntry, mode, accept)
+    const picked = toPickedEntry(focusedEntry, mode, activeAccept)
     if (picked) commitPick(picked)
   }
 
@@ -387,7 +398,7 @@ export function FilePickerDialog({
       navigateTo(entry.path)
       return
     }
-    const pickable = toPickedEntry(entry, mode, accept)
+    const pickable = toPickedEntry(entry, mode, activeAccept)
     if (pickable) commitPick(pickable)
   }
 
@@ -399,6 +410,7 @@ export function FilePickerDialog({
   }
 
   function handleDialogKeyDownCapture(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.target instanceof Node && !event.currentTarget.contains(event.target)) return
     const chord = historyChord(event)
     if (chord) {
       event.preventDefault()
@@ -642,7 +654,7 @@ export function FilePickerDialog({
             <div className='bg-background min-h-0' ref={middleRef}>
               {view === 'columns' ? (
                 <ColumnsView
-                  accept={accept}
+                  accept={activeAccept}
                   currentPath={session.currentPath}
                   iconMode={displayedIconMode}
                   isBusy={listInteractionPending}
@@ -683,7 +695,7 @@ export function FilePickerDialog({
                     sort={effectiveSort}
                   />
                   <FileList
-                    accept={accept}
+                    accept={activeAccept}
                     entries={entries}
                     iconMode={displayedIconMode}
                     isBusy={listInteractionPending}
@@ -712,6 +724,24 @@ export function FilePickerDialog({
             />
           </div>
 
+          {mode === 'file' && accept?.length ? (
+            <PaneBar className='shrink-0 justify-end'>
+              <span className='text-muted-foreground text-xs'>File type</span>
+              <TypeFilter
+                accept={accept}
+                value={selectedType}
+                onChange={(next) => {
+                  setTypeFilter(next)
+                  const chosen = session.selectedEntry
+                  if (
+                    chosen &&
+                    !filterPickerEntries([chosen], mode, pickerAccept(accept, next)).length
+                  )
+                    session.setSelectedEntry(null)
+                }}
+              />
+            </PaneBar>
+          ) : null}
           <DialogFooter className='flex h-(--bar-height) shrink-0 flex-row items-center justify-between gap-(--density-control-gap) px-(--bar-padding-x) sm:justify-between'>
             <SelectedSummary entry={selectedPickable} iconMode={displayedIconMode} mode={mode} />
             <span

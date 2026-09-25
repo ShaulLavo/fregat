@@ -10,6 +10,7 @@ import { ColumnLoading } from '@/features/file-picker/components/column-loading'
 import { ColumnRow } from '@/features/file-picker/components/column-row'
 import { directoryQueryOptions } from '@/features/file-picker/utils/directory-query'
 import type { FilePickerIconMode, FilePickerMode } from '@/features/file-picker/utils/model'
+import { filterPickerEntries } from '@/features/file-picker/utils/type-filter'
 import { sortFilePickerEntries } from '@/features/file-picker/utils/sort-entries'
 
 const BY_NAME = { direction: 'ascending', key: 'name' } as const
@@ -57,7 +58,10 @@ export function PickerColumn({
   onSelect: (column: number, entry: FsEntry) => void
 }) {
   const query = useQuery(directoryQueryOptions({ mode, path, query: '', showHidden }))
-  const entries = sortFilePickerEntries(query.data?.entries ?? [], BY_NAME)
+  const entries = sortFilePickerEntries(
+    filterPickerEntries(query.data?.entries ?? [], mode, accept),
+    BY_NAME,
+  )
   const containerRef = useRef<HTMLDivElement>(null)
   const virtualRef = useRef<VirtualListHandle>(null)
   const find = (id: string) => entries.find((entry) => entry.path === id)
