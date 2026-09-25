@@ -120,7 +120,7 @@ export function SettingsPage({
     ? [...categories].filter(([category]) => category === selectedCategory)
     : [...categories]
 
-  const onlyUsage = visible.length === 0 && shown.some(([category]) => category === 'Usage')
+  const onlyUsage = shown.length === 1 && shown[0]?.[0] === 'Usage'
 
   return (
     <ToolPane

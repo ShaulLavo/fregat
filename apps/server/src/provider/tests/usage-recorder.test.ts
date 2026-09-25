@@ -146,6 +146,33 @@ it('prefers a provider estimate without fetching rates, including an explicit ze
   ])
 })
 
+it.each([3, 0])(
+  'replaces a catalog estimate with a later provider total of $%s after restart',
+  (costUsd) => {
+    const fixture = recorderFixture((_driver, model) => ({
+      input: 2,
+      output: 10,
+      cacheRead: 0,
+      cacheWrite: 0,
+      provider: 'anthropic',
+      model,
+      fetchedAt: '2026-09-25T00:00:00.000Z',
+    }))
+    const usage = { inputTokens: 1_000_000, costUsd: null }
+    fixture.recorder.accept(totalsEvent('late', [totals(usage)]), 'turn')
+    expect(fixture.rows()[0]?.costUsd).toBe(2)
+    const restarted = fixture.restart()
+    restarted.accept(totalsEvent('late', [totals({ ...usage, costUsd })]), 'turn')
+    restarted.accept(totalsEvent('late', [totals({ ...usage, costUsd })]), 'turn')
+    expect(fixture.rows()[0]).toMatchObject({
+      costUsd,
+      priceSnapshot: null,
+      inputTokens: 1_000_000,
+    })
+    expect(fixture.history().models[0]).toMatchObject({ costUsd, costSource: 'provider' })
+  },
+)
+
 it('keeps a turn unknown when prices arrive after its first completion', () => {
   let known = false
   const fixture = recorderFixture(

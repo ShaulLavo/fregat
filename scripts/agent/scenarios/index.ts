@@ -169,6 +169,7 @@ import { editorUndoBarrier } from './editor-undo-barrier'
 import { editorUndoBranch } from './editor-undo-branch'
 import { editorTitleDiffToggle } from './editor-title-diff-toggle'
 import { editorUndoReopen } from './editor-undo-reopen'
+import { editorStorageMaintenance } from './editor-storage-maintenance'
 import { editorReloadPaint, editorReloadPaintSlowFont } from './editor-reload-paint'
 import { gitCommitHookColors } from './git-commit-hook-colors'
 import { gitDiffHoverTokens } from './git-diff-hover-tokens'
@@ -367,6 +368,7 @@ export const scenarios: readonly Scenario[] = [
   chatGitTabSwitch,
   chatGitTurnRows,
   editorUndoReopen,
+  editorStorageMaintenance,
   editorReloadPaint,
   editorReloadPaintSlowFont,
   gitCommitHookColors,

@@ -4,6 +4,7 @@ import { afterEach, expect, it } from 'vitest'
 import { migratePlatformDatabase } from '../../db/migrations'
 import * as schema from '../../db/schema'
 import { ProviderPriceCatalog } from '../price-catalog'
+import bundledPrices from '../model-prices.json'
 import { estimateUsageCost, modelPrice, parseModelPrices } from '../utils/model-prices'
 
 const closers: Array<() => void> = []
@@ -20,6 +21,25 @@ const catalogResponse = {
     },
   },
 }
+
+it('prefers newer bundled rates over an old cache on an offline upgrade', () => {
+  const db = database()
+  db.insert(schema.providerPriceCatalog)
+    .values({
+      id: 1,
+      snapshotJson: JSON.stringify({
+        fetchedAt: '2020-01-01T00:00:00.000Z',
+        prices: { 'openai/gpt-5.5': { input: 0.01, output: 0.01, cacheRead: 0, cacheWrite: null } },
+      }),
+    })
+    .run()
+  const catalog = new ProviderPriceCatalog(db, async () => new Response(null, { status: 503 }))
+  closers.push(() => catalog.close())
+  expect(catalog.lookup('codex', 'gpt-5.5')).toMatchObject({
+    ...bundledPrices.prices['openai/gpt-5.5'],
+    fetchedAt: bundledPrices.fetchedAt,
+  })
+})
 
 it('uses bundled prices on the first offline launch', async () => {
   const catalog = new ProviderPriceCatalog(

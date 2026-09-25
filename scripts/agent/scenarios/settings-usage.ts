@@ -77,6 +77,7 @@ async function openUsageSettings(page: Parameters<Scenario['run']>[0]) {
 
 export const settingsUsage: Scenario = {
   name: 'settings-usage',
+  readOnly: true,
   description:
     'Settings › Usage: the real history read answers, then a fixed month drives the headline, day chart, model and purpose rows with automatic estimates and unknown costs.',
   async run(page, { step }) {
