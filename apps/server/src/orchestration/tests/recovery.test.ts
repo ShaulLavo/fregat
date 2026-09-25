@@ -114,6 +114,12 @@ test.each(['claimed', 'adopted'] as const)(
       })
     const stale = (await sessionFrom(fixture)).latestTurn
     if (!stale) throw new TypeError('Missing turn')
+    expect(await fixture.engine.beginRestart(new Set([FIXTURE_SESSION_ID]))).toMatchObject({
+      restarting: true,
+      interrupted: [
+        { sessionId: FIXTURE_SESSION_ID, state: state === 'claimed' ? 'starting' : 'running' },
+      ],
+    })
     const adapter = new MockProviderAdapter()
     const engine = await fixture.restart(mockRuntime(adapter))
     const shell = await engine.shellSnapshot()

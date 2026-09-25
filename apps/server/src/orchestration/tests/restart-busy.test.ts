@@ -169,7 +169,10 @@ describe('the restart confirmation names every busy session', () => {
         createdAt: at,
       }),
     )
-    expect(await fixture.latestTurn(OTHER)).toMatchObject({ providerStartState: 'interrupted' })
+    expect(await fixture.latestTurn(OTHER)).toMatchObject({
+      providerStartState: 'interrupted',
+      endReason: 'server-restart',
+    })
 
     expect((await fixture.restart([])).result).toEqual(starting)
   })

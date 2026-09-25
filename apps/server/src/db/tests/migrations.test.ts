@@ -99,6 +99,8 @@ describe('platform migration ledger', () => {
     expect(applied.map(({ version, name }) => ({ version, name }))).toEqual([
       { version: 29, name: 'turn_end_reason' },
       { version: 30, name: 'message_model_selection' },
+      { version: 33, name: 'terminal_lease_key' },
+      { version: 34, name: 'terminal_session_offsets' },
     ])
     expect(columnNames(handle, 'projection_turns')).toContain('end_reason')
     expect(columnNames(handle, 'projection_session_messages')).toContain('model_selection_json')
