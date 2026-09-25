@@ -4,6 +4,7 @@ import { themeBundleSchema, themeCustomizationsSchema } from '../themes/bundle'
 import { wallpaperSelectionSchema } from '../themes/wallpaper'
 import * as v from 'valibot'
 import { machinesSchema } from '../machines'
+import { WORKTREE_SUBMODULE_MODES } from '../git'
 import {
   keybindingOverridesSchema,
   lspLanguageServerListsSchema,
@@ -174,6 +175,45 @@ export const SETTINGS_REGISTRY = {
     description:
       'Group projects by repository, repository-relative path, or owning machine. Git projects currently register at the repository root, so both repository modes are equivalent.',
   }),
+  'chat.autoSettleAfterDays': defineSetting({
+    schema: v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(365)),
+    default: 3,
+    scope: 'application',
+    widget: 'number',
+    category: 'Chat',
+    title: 'Settle inactive sessions after days',
+    description:
+      'Move a session to Settled once it has had no activity for this many days. 0 turns it off.',
+    keywords: ['settle', 'inactive', 'days', 'automatic'],
+  }),
+  'chat.autoSettleOnMerge': defineSetting({
+    schema: v.boolean(),
+    default: true,
+    scope: 'application',
+    widget: 'boolean',
+    category: 'Chat',
+    title: 'Settle sessions when their pull request merges',
+    description:
+      "Move a session to Settled when its worktree's pull request is merged. A closed pull request settles it whenever automatic settlement is on.",
+    keywords: ['settle', 'merge', 'pull request', 'automatic'],
+  }),
+  'chat.projectAutoSettle': defineSetting({
+    schema: v.record(
+      v.string(),
+      v.object({
+        afterDays: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(365))),
+        onMerge: v.optional(v.boolean()),
+      }),
+    ),
+    default: {},
+    merge: 'record',
+    scope: 'application',
+    widget: 'complex',
+    visibility: 'internal',
+    category: 'Chat',
+    title: 'Project automatic settlement',
+    description: 'Automatic settlement overrides keyed by project UUID on this machine.',
+  }),
   'chat.projectGroupingOverrides': defineSetting({
     schema: v.record(v.string(), v.picklist(['repository', 'repository_path', 'separate'])),
     default: {},
@@ -196,6 +236,76 @@ export const SETTINGS_REGISTRY = {
     description:
       'SSH targets and direct origins available to this client. The local machine is always available.',
     keywords: ['remote', 'ssh', 'environment', 'server', 'connect'],
+  }),
+  'git.autoPull': defineSetting({
+    schema: v.boolean(),
+    default: false,
+    // Machine scope: it writes to checkouts and reaches the network.
+    scope: 'machine',
+    widget: 'boolean',
+    category: 'Git',
+    title: 'Keep the default branch current',
+    description:
+      'Fast-forward a project checkout on its default branch when its upstream moves. A checkout with changes, local commits or another branch checked out is left alone.',
+    keywords: ['pull', 'fast-forward', 'fetch', 'default branch', 'main'],
+  }),
+  'git.projectAutoPull': defineSetting({
+    schema: v.record(v.string(), v.boolean()),
+    default: {},
+    merge: 'record',
+    scope: 'machine',
+    widget: 'complex',
+    visibility: 'internal',
+    category: 'Git',
+    title: 'Project default-branch pull',
+    description: 'Automatic default-branch pull keyed by project UUID on this machine.',
+  }),
+  'git.worktreeSubmodules': defineSetting({
+    schema: v.picklist(WORKTREE_SUBMODULE_MODES),
+    default: 'recursive',
+    // Machine scope: the value picks git flags and can reach the network.
+    scope: 'machine',
+    widget: 'enum',
+    category: 'Git',
+    title: 'Submodules in new worktrees',
+    description:
+      'Initialize every nested submodule, only the ones this repository declares, or none when a session creates a worktree.',
+    keywords: ['submodule', 'worktree', 'recursive'],
+  }),
+  'git.projectWorktreeSubmodules': defineSetting({
+    schema: v.record(v.string(), v.picklist(WORKTREE_SUBMODULE_MODES)),
+    default: {},
+    merge: 'record',
+    scope: 'machine',
+    widget: 'complex',
+    visibility: 'internal',
+    category: 'Git',
+    title: 'Project submodules in new worktrees',
+    description: 'Submodule modes for new worktrees keyed by project UUID on this machine.',
+  }),
+  'git.worktreeCleanupOnDelete': defineSetting({
+    schema: v.boolean(),
+    default: false,
+    // Machine scope: it deletes checkouts on this machine.
+    scope: 'machine',
+    widget: 'boolean',
+    category: 'Git',
+    title: 'Remove worktrees after their last session is deleted',
+    description:
+      'Remove a session worktree once every session using it is deleted and has stopped. A worktree with uncommitted changes, ignored files other than node_modules, or another branch checked out stays.',
+    keywords: ['worktree', 'cleanup', 'delete', 'remove', 'storage'],
+  }),
+  'git.projectWorktreeCleanupOnDelete': defineSetting({
+    schema: v.record(v.string(), v.boolean()),
+    default: {},
+    merge: 'record',
+    scope: 'machine',
+    widget: 'complex',
+    visibility: 'internal',
+    category: 'Git',
+    title: 'Project worktree removal after deletion',
+    description:
+      'Worktree removal after the last session is deleted, keyed by project UUID on this machine.',
   }),
   'workbench.colorTheme': defineSetting({
     schema: v.picklist(COLOR_THEME_MODES),

@@ -269,6 +269,8 @@ export const selectors = {
   deleteSession: (page: Page) => page.getByRole('menuitem', { name: 'Delete', exact: true }),
   confirmSessionDelete: (page: Page) =>
     page.getByRole('dialog').getByRole('button', { name: 'Delete', exact: true }),
+  removeWorktreeSwitch: (page: Page) =>
+    page.getByRole('dialog').getByRole('switch', { name: /^Also remove its worktree/ }),
   copySessionPath: (page: Page) => page.getByRole('menuitem', { name: 'Copy Path', exact: true }),
   copySessionBranch: (page: Page) =>
     page.getByRole('menuitem', { name: 'Copy Branch', exact: true }),
@@ -651,6 +653,24 @@ export const selectors = {
       .getByRole('alert')
       .filter({ hasText: / failed/ })
       .getByRole('button', { name: 'Fix with AI', exact: true }),
+  dialog: (page: Page) => page.getByRole('dialog').last(),
+  buttonNamed: (page: Page, label: string) =>
+    page.getByRole('button', { name: label, exact: true }).first(),
+  changeRequestLink: (page: Page, number: number) =>
+    page.getByRole('link').filter({ hasText: new RegExp(`^#${number}$`) }),
+  gitBranchChip: (page: Page, branch: string) =>
+    page.locator(`span[title="${branch}"], span[title^="${branch} @ "]`),
+  worktreeChip: (page: Page, worktreeId: string) =>
+    page.locator(`nav[aria-label="Session"] [data-worktree-id="${worktreeId}"]`),
+  autoPullStatus: (page: Page, text: string) =>
+    page.getByRole('region', { name: 'Git panel' }).getByText(text, { exact: true }),
+  submodulesNotice: (page: Page) =>
+    page.getByRole('alert').filter({ hasText: /submodules? (is|are) not initialized/ }),
+  initializeSubmodules: (page: Page) =>
+    page
+      .getByRole('alert')
+      .filter({ hasText: /not initialized/ })
+      .getByRole('button', { name: 'Initialize', exact: true }),
   folderTree: (page: Page) => page.getByLabel('Folder tree', { exact: true }),
   focusedTreeRow: (page: Page) =>
     page.getByLabel('Folder tree', { exact: true }).locator('[role="treeitem"][tabindex="0"]'),

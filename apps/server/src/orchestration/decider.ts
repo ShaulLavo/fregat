@@ -82,6 +82,10 @@ export function decideOrchestrationCommand(
     case 'worktree.cleanup.fail':
     case 'worktree.mark-missing':
     case 'worktree.metadata.refresh':
+    case 'worktree.pull-request.sync':
+    case 'worktree.setup.update':
+    case 'worktree.setup.run':
+    case 'worktree.setup.cancel':
     case 'worktree.orphan.register':
     case 'session.worktree.release':
     case 'terminal.lease.request':
@@ -124,6 +128,7 @@ export function decideOrchestrationCommand(
       return one(command, at, 'session.deleted', {
         deletedAt: at,
         sessionId: command.sessionId,
+        ...(command.removeWorktree ? { removeWorktree: true } : {}),
       })
     case 'session.archive':
       requireSessionNotArchived(model, command.sessionId, command.type)
@@ -140,6 +145,8 @@ export function decideOrchestrationCommand(
         sessionId: command.sessionId,
         updatedAt: at,
       })
+    case 'session.auto-settle':
+      return sessionAutoSettled(command, model, at)
     case 'session.settle':
       return sessionSettled(command, model, at)
     case 'session.unsettle':
@@ -558,7 +565,7 @@ function sessionSettled(
     sessionId: command.sessionId,
     updatedAt: settledAt ? session.updatedAt : at,
   })
-  const events = [
+  return [
     ...messageQuestionDismissalEvents(
       command,
       session.id,
@@ -566,7 +573,46 @@ function sessionSettled(
       at,
     ),
     settled,
+    ...settlementCompanions(command, session, at),
   ]
+}
+
+/**
+ * The server's own settle, from an inactivity or pull request decision. It never answers a
+ * question for the user, and it settles at the last activity rather than at sweep time.
+ */
+function sessionAutoSettled(
+  command: Extract<OrchestrationCommand, { type: 'session.auto-settle' }>,
+  model: OrchestrationReadModel,
+  at: string,
+) {
+  const session = requireSessionNotArchived(model, command.sessionId, command.type)
+  if (session.settledOverride != null)
+    throw sessionDomainErrors.AUTO_SETTLE_STALE({
+      sessionId: command.sessionId,
+      internal: { settledOverride: session.settledOverride },
+    })
+  requireSettleable(session, command.type, at)
+  return [
+    event(command, at, 'session.settled', {
+      settledAt: command.settledAt,
+      acknowledgedFailureThroughSequence: Math.max(
+        session.latestFailureSequence ?? 0,
+        session.latestInterruptionSequence ?? 0,
+      ),
+      sessionId: command.sessionId,
+      updatedAt: at,
+    }),
+    ...settlementCompanions(command, session, at),
+  ]
+}
+
+function settlementCompanions(
+  command: Extract<OrchestrationCommand, { type: 'session.settle' | 'session.auto-settle' }>,
+  session: OrchestrationProjectedSession,
+  at: string,
+) {
+  const events: PendingOrchestrationEvent[] = []
   if (session.pinnedAt)
     events.push(event(command, at, 'session.unpinned', { sessionId: session.id, updatedAt: at }))
   if (session.snoozedUntil != null)

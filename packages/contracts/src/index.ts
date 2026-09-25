@@ -54,7 +54,19 @@ export type {
   GitWorktree,
   GitWorktreeCreateResult,
   GitWorktreeRemoveResult,
+  WorktreeSubmoduleMode,
+  GitAutoPullSkipReason,
+  GitAutoPullState,
+  GitForge,
+  GitForgeKind,
+  GitCloneStage,
+  GitCloneProgressEvent,
+  GitPublishRequest,
+  GitPublishResult,
+  GitRepositoryVisibility,
+  GitShipResult,
 } from './git'
+export { GIT_FORGE_KINDS, WORKTREE_SUBMODULE_MODES } from './git'
 export type { WatchClientMessage, WatchServerMessage } from './watch-events'
 export {
   parseTerminalClientMessage,
@@ -907,3 +919,4 @@ export {
 export { fontRefSchema } from './fonts/schema'
 export { CURATED_FONTS, type CuratedFont } from './fonts/curated'
 export type { FontCatalogEntry } from './fonts/catalog'
+export { parsePullRequestReference } from './pull-request-reference'

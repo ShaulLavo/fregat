@@ -273,7 +273,8 @@
         "common-actions-delivery.md",
         "/work/tmp/fregat-evidence/20260920T161205Z-scenario-draft-recovery/summary.md records completed distinct-draft reload, uploaded-file and worktree-target recovery, and safe discard",
         "/work/tmp/fregat-evidence/20260920T152347Z-scenario-session-navigation/summary.md records completed owner path, branch and session-ID clipboard checks",
-        "Remaining: owner-scoped project settings, orphaned-worktree cleanup, session-owned terminal deletion and full upstream runtime comparison"
+        "scripts/agent/scenarios/worktree-cleanup-on-delete.ts: deleting the last session offers worktree removal; surviving and archived references keep it (repository-delivery.md, EXT-12)",
+        "Remaining: owner-scoped project settings, session-owned terminal deletion and full upstream runtime comparison"
       ]
     },
     {
@@ -515,40 +516,57 @@
       "title": "Match source-control provider capabilities",
       "report": "adjacent.md",
       "wave": "5",
-      "status": "open",
-      "evidence_level": "source-reviewed",
+      "status": "verified",
+      "evidence_level": "scenario-verified",
       "acceptance": "adjacent.md, EXT-01, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "scripts/agent/scenarios/git-merge-request.ts",
+        "repository-delivery.md",
+        "apps/server/src/git/tests/forges.test.ts",
+        "/work/tmp/fregat-evidence/20260925T130215Z-scenario-git-merge-request/"
+      ]
     },
     {
       "id": "EXT-02",
       "title": "Complete the pull-request workflow and session linkage",
       "report": "adjacent.md",
       "wave": "5",
-      "status": "open",
-      "evidence_level": "source-reviewed",
+      "status": "in-progress",
+      "evidence_level": "scenario-verified",
       "acceptance": "adjacent.md, EXT-02, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "scripts/agent/scenarios/session-pull-request-start.ts",
+        "scripts/agent/scenarios/git-merge-request.ts",
+        "repository-delivery.md",
+        "apps/server/src/orchestration/tests/pull-request-session.test.ts",
+        "packages/contracts/src/tests/pull-request-reference.test.ts"
+      ]
     },
     {
       "id": "EXT-03",
       "title": "Add clone and repository publication workflows",
       "report": "adjacent.md",
       "wave": "5",
-      "status": "open",
-      "evidence_level": "source-reviewed",
+      "status": "verified",
+      "evidence_level": "scenario-verified",
       "acceptance": "adjacent.md, EXT-03, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "scripts/agent/scenarios/git-clone-publish.ts",
+        "repository-delivery.md",
+        "apps/server/src/git/tests/clone.test.ts",
+        "apps/server/src/git/tests/publish.test.ts",
+        "/work/tmp/fregat-evidence/20260925T131311Z-scenario-git-clone-publish/"
+      ]
     },
     {
       "id": "EXT-04",
       "title": "Match project configuration and worktree setup scripts",
       "report": "adjacent.md",
       "wave": "5",
-      "status": "open",
-      "evidence_level": "source-reviewed",
+      "status": "verified",
+      "evidence_level": "scenario-verified",
       "acceptance": "adjacent.md, EXT-04, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": ["scripts/agent/scenarios/worktree-setup-import.ts"]
     },
     {
       "id": "EXT-05",
@@ -575,10 +593,14 @@
     {
       "id": "EXT-12",
       "wave": "5",
-      "status": "open",
-      "evidence_level": "source-reviewed",
+      "status": "in-progress",
+      "evidence_level": "scenario-verified",
       "acceptance": "adjacent.md, EXT-12, Acceptance / verification",
-      "execution_evidence": [],
+      "execution_evidence": [
+        "scripts/agent/scenarios/worktree-cleanup-on-delete.ts",
+        "repository-delivery.md",
+        "apps/server/src/orchestration/tests/worktree-cleanup.test.ts"
+      ],
       "report": "adjacent.md",
       "title": "Port automatic worktree and storage cleanup policy"
     },
@@ -587,10 +609,15 @@
       "title": "P1: Add server-owned automatic settlement",
       "report": "lifecycle.md",
       "wave": "5",
-      "status": "open",
-      "evidence_level": "source-reviewed",
+      "status": "verified",
+      "evidence_level": "scenario-verified",
       "acceptance": "lifecycle.md, LIFE-06, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "scripts/agent/scenarios/session-auto-settle.ts",
+        "repository-delivery.md",
+        "apps/server/src/orchestration/tests/session-auto-settle.test.ts",
+        "/work/tmp/fregat-evidence/20260925T120806Z-scenario-session-auto-settle/"
+      ]
     },
     {
       "id": "EXT-07",
@@ -637,10 +664,15 @@
       "title": "P2: Show linked pull-request state on sidebar rows with background sync",
       "report": "lifecycle.md",
       "wave": "2",
-      "status": "open",
-      "evidence_level": "source-reviewed",
+      "status": "in-progress",
+      "evidence_level": "server sync implemented and browser-verified; row badge UI pending (lane L5)",
       "acceptance": "lifecycle.md, LIFE-14, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "scripts/agent/scenarios/session-pull-request-sync.ts",
+        "repository-delivery.md",
+        "apps/server/src/orchestration/tests/pull-request-sync.test.ts",
+        "/work/tmp/fregat-evidence/20260925T115511Z-scenario-session-pull-request-sync/"
+      ]
     },
     {
       "id": "INTERACTION-13",
@@ -667,20 +699,30 @@
       "title": "Keep the default-branch checkout current by fast-forward pull",
       "report": "adjacent.md",
       "wave": "5",
-      "status": "open",
-      "evidence_level": "source-reviewed",
+      "status": "verified",
+      "evidence_level": "scenario-verified",
       "acceptance": "adjacent.md, EXT-14, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "scripts/agent/scenarios/git-auto-pull.ts",
+        "repository-delivery.md",
+        "apps/server/src/git/tests/auto-pull.test.ts",
+        "/work/tmp/fregat-evidence/20260925T113952Z-scenario-git-auto-pull/"
+      ]
     },
     {
       "id": "EXT-15",
       "title": "Choose how new worktrees initialize submodules",
       "report": "adjacent.md",
       "wave": "5",
-      "status": "open",
-      "evidence_level": "source-reviewed",
+      "status": "verified",
+      "evidence_level": "scenario-verified",
       "acceptance": "adjacent.md, EXT-15, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "scripts/agent/scenarios/git-submodules-init.ts",
+        "repository-delivery.md",
+        "apps/server/src/orchestration/tests/worktree-submodules.test.ts",
+        "/work/tmp/fregat-evidence/20260925T113220Z-scenario-git-submodules-init/"
+      ]
     },
     {
       "id": "EXT-16",
@@ -707,10 +749,15 @@
       "title": "Follow worktree branch drift so the session's branch stays true",
       "report": "adjacent.md",
       "wave": "5",
-      "status": "open",
-      "evidence_level": "source-reviewed",
+      "status": "verified",
+      "evidence_level": "scenario-verified",
       "acceptance": "adjacent.md, EXT-18, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "scripts/agent/scenarios/session-branch-drift.ts",
+        "repository-delivery.md",
+        "apps/server/src/orchestration/tests/worktree-branch-drift.test.ts",
+        "/work/tmp/fregat-evidence/20260925T114547Z-scenario-session-branch-drift/"
+      ]
     }
   ]
 }

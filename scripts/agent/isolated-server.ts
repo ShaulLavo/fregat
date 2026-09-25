@@ -23,7 +23,10 @@ export type IsolatedServer = {
  * directory under `/work/tmp`, all removed when the run ends. The shared Vite page reaches
  * it through `window.platformDevServerUrl`.
  */
-export async function startIsolatedServer(webOrigin: URL): Promise<IsolatedServer> {
+export async function startIsolatedServer(
+  webOrigin: URL,
+  pathPrefix?: string,
+): Promise<IsolatedServer> {
   const directory = mkdtempSync('/work/tmp/fregat-agent-')
   const home = path.join(directory, 'home')
   const logs = path.join(directory, 'logs')
@@ -39,6 +42,7 @@ export async function startIsolatedServer(webOrigin: URL): Promise<IsolatedServe
     ...process.env,
     FS_HOST: '127.0.0.1',
     OBSERVABILITY_DIR: logs,
+    PATH: pathPrefix ? `${pathPrefix}${path.delimiter}${process.env.PATH ?? ''}` : process.env.PATH,
     PLATFORM_HOME: home,
     PORT: String(port),
     SERVER_ALLOWED_ORIGINS: allowedOriginsForWebPort(

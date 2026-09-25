@@ -26,6 +26,7 @@ const COMMAND_PALETTE_ACTIONS: CommandPaletteActions = {
   selectGotoLine: () => Promise.resolve(),
   selectPlatformCommand: () => Promise.resolve(),
   selectScript: () => Promise.resolve(),
+  importScripts: () => undefined,
   selectSession: () => Promise.resolve(),
   selectSymbol: () => Promise.resolve(),
   startSessionDraft: () => Promise.resolve(),

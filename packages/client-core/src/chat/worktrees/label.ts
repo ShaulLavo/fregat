@@ -2,6 +2,7 @@ import type {
   OrchestrationProjectShell,
   OrchestrationWorktreeShell,
   WorktreeLifecycle,
+  WorktreeSetup,
 } from '@workspace/contracts'
 
 export function worktreeLabel(
@@ -49,5 +50,24 @@ function cleanupBlockerLabel(
       return 'Agent still running'
     case 'active-terminal':
       return 'Terminal still running'
+  }
+}
+
+/** Setup as the worktree chip and manager say it; null once it finished cleanly. */
+export function worktreeSetupLabel(setup: WorktreeSetup | null) {
+  switch (setup?.state) {
+    case 'queued':
+    case 'running':
+      return `Running ${setup.name}`
+    case 'cancelling':
+      return `Stopping ${setup.name}`
+    case 'failed':
+      return setup.exitCode === null
+        ? `${setup.name} failed`
+        : `${setup.name} exited ${setup.exitCode}`
+    case 'cancelled':
+      return `${setup.name} stopped`
+    default:
+      return null
   }
 }

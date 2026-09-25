@@ -156,7 +156,10 @@ export function useSessionActions() {
     const navigated = !accepted || !removal || (await reconcileRemoval(removal, 'archived'))
     return { accepted, navigationFailed: !navigated }
   }
-  async function confirmDelete(request: SessionDeleteRequest) {
+  async function confirmDelete(
+    request: SessionDeleteRequest,
+    options: { removeWorktree?: boolean } = {},
+  ) {
     dismissDelete()
     const succeeded: ScopedSessionRef[] = []
     let navigationFailures = 0
@@ -165,7 +168,10 @@ export function useSessionActions() {
       const accepted = await dispatch(
         ref,
         'chat.session.delete',
-        createSessionDeleteCommand({ sessionId: ref.sessionId }),
+        createSessionDeleteCommand({
+          sessionId: ref.sessionId,
+          removeWorktree: options.removeWorktree,
+        }),
       )
       if (!accepted) continue
       succeeded.push(ref)

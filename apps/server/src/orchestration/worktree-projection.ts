@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import * as v from 'valibot'
 import {
   worktreeLifecycleSchema,
@@ -92,10 +92,28 @@ export function applyWorktreeEvent(database: PlatformDatabase, event: Orchestrat
       })
       return true
     case 'worktree.metadata-refreshed':
+      database
+        .update(projectionWorktrees)
+        .set({
+          // A pull request belongs to a branch; a new branch has none known until the next sync.
+          pullRequestJson: sql`CASE WHEN ${projectionWorktrees.branch} IS ${event.payload.branch} THEN ${projectionWorktrees.pullRequestJson} ELSE NULL END`,
+          branch: event.payload.branch,
+          headCommit: event.payload.headCommit,
+          metadataVersion: event.payload.metadataVersion,
+          updatedAt: event.payload.updatedAt,
+        })
+        .where(eq(projectionWorktrees.worktreeId, event.payload.worktreeId))
+        .run()
+      return true
+    case 'worktree.setup-updated':
       update(database, event.payload.worktreeId, {
-        branch: event.payload.branch,
-        headCommit: event.payload.headCommit,
-        metadataVersion: event.payload.metadataVersion,
+        setupJson: JSON.stringify(event.payload.setup),
+        updatedAt: event.payload.updatedAt,
+      })
+      return true
+    case 'worktree.pull-request-synced':
+      update(database, event.payload.worktreeId, {
+        pullRequestJson: JSON.stringify(event.payload.pullRequest),
         updatedAt: event.payload.updatedAt,
       })
       return true
