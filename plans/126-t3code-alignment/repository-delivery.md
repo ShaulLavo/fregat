@@ -185,3 +185,33 @@ its own toast. `hasRemote` joins the branch remote state; listing remotes is a r
 - `apps/server/src/git/tests/forges.test.ts`: repository creation for GitLab, Forgejo, Azure DevOps
   (name shape refused) and Bitbucket.
 - `scenario git-clone-publish`: `/work/tmp/fregat-evidence/20260925T131311Z-scenario-git-clone-publish/`.
+
+## EXT-04: project scripts and worktree setup
+
+Trust model (D8, the plan's recommendation): a checked-out file never runs anything. The palette's
+script mode lists a repository's `t3.json` scripts under "From t3.json" with an `Import scripts from
+t3.json` row; importing copies them into the project's saved scripts, mapping upstream's fields
+(`runOnWorktreeCreate`, and `async: false` on such a script to `waitForSetup`). Scripts already
+saved by command or name are skipped. Only saved scripts run on worktree creation, so a later edit
+of the file changes nothing until it is imported again. Running a file script from the palette
+saves its name and command, never its setup flags.
+
+The first saved script with `runOnWorktreeCreate` is the setup script. When the lifecycle reactor
+creates a session worktree it runs it after submodules, as a process the server owns in the new
+worktree (`PLATFORM_WORKTREE_PATH`, `PLATFORM_PROJECT_ROOT`, and upstream's `T3CODE_*` names),
+in its own process group so a stop reaches everything it started. With `waitForSetup` it runs
+before the worktree is ready, so the first turn waits; a failure or stop fails the creation
+(`worktree.SETUP_FAILED` / `SETUP_CANCELLED`), which holds the turn and offers the existing Retry,
+and a retry reruns it once. Without it the worktree is ready at once and the setup runs beside the
+first turn. The worktree carries `setup` (name, foreground, state, exit code, last 40 lines); the
+worktree manager shows it with Stop setup and Run setup (`worktree.setup.cancel` / `.run`), and the
+chip names a running or failed setup. Removing a worktree stops its setup first; shutdown stops all.
+Migration 26 adds `projection_worktrees.setup_json`. The terminal service is lane L4's and Plan
+149 rewrites it, so setup runs as a supervised process; upstream runs it in a terminal.
+
+- `apps/server/src/orchestration/tests/worktree-setup.test.ts`: foreground runs in the worktree
+  before the first turn; failure holds the turn and retry runs it once more; background lets the
+  turn start and can be stopped and rerun; no setup script runs nothing and refuses a rerun.
+- `apps/web/src/features/chat-mode/utils/tests/project-scripts.test.ts`: t3.json mapping, skipping
+  malformed entries; import filter by command and name.
+- `scenario worktree-setup-import`: `/work/tmp/fregat-evidence/20260925T132239Z-scenario-worktree-setup-import/`.

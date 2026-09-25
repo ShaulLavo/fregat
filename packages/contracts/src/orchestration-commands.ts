@@ -8,6 +8,8 @@ import {
   worktreeCleanupCommandSchema,
   worktreeForceCleanupCommandSchema,
   worktreeReleaseCommandSchema,
+  worktreeSetupCancelCommandSchema,
+  worktreeSetupRunCommandSchema,
 } from './worktree-lifecycle'
 import * as v from 'valibot'
 import {
@@ -621,6 +623,8 @@ export const orchestrationCommandSchema = v.variant('type', [
   worktreeCleanupCommandSchema,
   worktreeForceCleanupCommandSchema,
   worktreeReleaseCommandSchema,
+  worktreeSetupRunCommandSchema,
+  worktreeSetupCancelCommandSchema,
   ...internalOrchestrationCommandSchema.options,
 ])
 

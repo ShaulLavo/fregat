@@ -150,6 +150,9 @@ export function commandAggregate(command: ReceiptCommand) {
     case 'worktree.mark-missing':
     case 'worktree.metadata.refresh':
     case 'worktree.pull-request.sync':
+    case 'worktree.setup.update':
+    case 'worktree.setup.run':
+    case 'worktree.setup.cancel':
     case 'worktree.orphan.register':
     case 'terminal.lease.request':
     case 'terminal.lease.claim':

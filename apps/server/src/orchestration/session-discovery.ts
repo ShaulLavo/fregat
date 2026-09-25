@@ -499,6 +499,7 @@ function externalCheckout(
     activeTerminalCount: 0,
     terminalOwnershipUnknown: false,
     pullRequest: null,
+    setup: null,
     externalDriverUnverified: previous?.externalDriverUnverified ?? false,
     removedAt: null,
     worktreeCreationCapability:

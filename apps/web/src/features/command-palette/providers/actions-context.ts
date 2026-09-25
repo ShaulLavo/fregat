@@ -17,6 +17,8 @@ export type CommandPaletteActions = {
   readonly selectPlatformCommand: (command: PlatformCommandId) => Promise<void>
   /** Runs a project script in the terminal, revealing one if none is open. */
   readonly selectScript: (script: OrchestrationProjectScript) => Promise<void>
+  /** Saves a project file's scripts, with their setup flags, as the project's own. */
+  readonly importScripts: (scripts: readonly OrchestrationProjectScript[]) => void
   /** Reveals chat mode, activates the owning project, and puts the session on the stage. */
   readonly selectSession: (session: SessionRailItem) => Promise<void>
   readonly selectSymbol: (symbol: FlatDocumentSymbol) => Promise<void>

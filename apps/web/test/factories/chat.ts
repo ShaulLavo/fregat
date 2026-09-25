@@ -226,6 +226,7 @@ export function chatWorktree(
     externalDriverUnverified: false,
     removedAt: null,
     pullRequest: null,
+    setup: null,
     worktreeCreationCapability: { allowed: true },
     cleanupEligibility: {
       reason: 'protected',
