@@ -92,7 +92,7 @@ Editor E006 is complete as of 2026-09-25.
 text in live buffers, and [tombstone compaction](../Editor/docs/storage/e006-tombstone-compaction.md)
 replaces runs of tombstones with stand-ins that resolve every deleted anchor exactly as before.
 An insert now lands after the last visible piece ending at its offset. After 20,000 paragraph
-replacements the current tree holds 4 pieces instead of 20,002, and about 9 bytes per insertion
+replacements the current tree holds 4 pieces instead of 20,002, and about 22 bytes per insertion
 remain in the index. Snapshot identity is unchanged, so Platform's leases and receipts need
 nothing. This does not reorder the other lanes.
 
