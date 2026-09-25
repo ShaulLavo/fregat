@@ -462,7 +462,7 @@ Suggested order (steps 1–4 done by 2026-09-23; step 5 is in progress):
    and the row-layout fast path has no equivalence test. Done: Editor `2f801f7` and `7a37f10`.
 4. [E049](../Editor/docs/architecture/e049-no-silent-misses.md), Plan 133. Done: E049 in Editor
    `f715d11`; Plan 133's four phases 2026-09-23, D1 moved to Plan 134 and closed there.
-5. [E050](../Editor/plans/e050-host-obligations-into-api.md) row by row, each unlocking its Plan 130
+5. [E050](../Editor/docs/architecture/e050-host-obligations.md) row by row, each unlocking its Plan 130
    Phase 5 item. In progress: rows re-checked 2026-09-24; row 1 (`setText` with tokens), row 5 (press
    participants), row 6 (plugin keymap context keys) and typography options (2026-09-25) done.
    Rows 8 (`onDidScroll`) and 4 (theme keys) unlock Plan 130 Phase 5 items 8 and 10; the rest are
