@@ -11,7 +11,6 @@ import { confirmedEnvironmentId, confirmedEnvironmentOrigin } from '@/lib/enviro
 import { unwrapEdenResponse } from '@/lib/eden-events'
 import type { EnvironmentId } from '@workspace/contracts'
 import type { ChatTransport } from '@/features/chat/transport/chat-transport'
-import { resetSessionEarlierPageStore } from '@/features/chat/state/session-earlier-page-store'
 
 const activeTransports = new Map<EnvironmentId, ChatTransport>()
 const subscriptions = createSubscriptions()
@@ -36,7 +35,6 @@ export function registerChatTransport(transport: ChatTransport) {
 export function closeChatTransports() {
   for (const transport of activeTransports.values()) transport.close()
   activeTransports.clear()
-  resetSessionEarlierPageStore()
   subscriptions.notify()
 }
 

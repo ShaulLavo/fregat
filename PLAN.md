@@ -412,6 +412,11 @@ now overlay the host. Tab strips and work-log groups observe Fragment children; 
 keeps mutation observation. Current rules are in `AGENTS.md`, with regressions, browser checks
 and before/after traces in [the verification record](docs/verification/2026-09-25-retained-panes.md).
 
+Plan 135 is complete and deleted. Query now owns browser and Markdown resource acquisition,
+IndexedDB connections, server lookups, settings recovery, and shared web/TUI history pages.
+The deprecated-API gate runs in `verify`, `gates`, and CI. The [verification record](docs/verification/2026-09-25-query-ownership.md)
+records cache lifetimes, route preparation, regressions, browser evidence and bundle measurements.
+
 ## Workaround removal lane
 
 Requested 2026-09-21, after the diff line-comment fix replaced a DOM read, a duplicated projection

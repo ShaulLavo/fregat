@@ -117,7 +117,12 @@ export function createSettingsSession(options: SessionOptions) {
         record: options.record,
       })
       currentOwner = owner
-      const chat = createChatOwner({ client: options.client, rpc, record: options.record })
+      const chat = createChatOwner({
+        client: options.client,
+        environmentId: descriptor.environmentId,
+        rpc,
+        record: options.record,
+      })
       currentChat = chat
       controller.signal.addEventListener('abort', () => chat.dispose(), { once: true })
       controller.signal.addEventListener('abort', () => owner.dispose(), { once: true })

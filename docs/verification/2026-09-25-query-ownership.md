@@ -1,6 +1,6 @@
 # Query ownership and route preparation
 
-Plan 135 is in progress on L6. Plans 091–095 and 128 precede this work. The installed Query core and React integration are 5.102.8. The implementation was checked against its `QueryClient.query` source and the official [prefetching guide](https://tanstack.com/query/latest/docs/framework/react/guides/prefetching) and [Router external-data guide](https://tanstack.com/router/latest/docs/guide/external-data-loading).
+Plan 135 implementation is complete on L6. Final integration checks follow the owner-directed main rollback. Plans 091–095 and 128 precede this work. The installed Query core and React integration are 5.102.8. The implementation was checked against its `QueryClient.query` source and the official [prefetching guide](https://tanstack.com/query/latest/docs/framework/react/guides/prefetching) and [Router external-data guide](https://tanstack.com/router/latest/docs/guide/external-data-loading).
 
 ## Imperative calls
 
@@ -50,7 +50,7 @@ The preview/commit/worker race failed against the old store with four registrati
 
 `editor-theme-preview` passed at `/work/tmp/fregat-evidence/20260925T161030Z-scenario-editor-theme-preview`, with no warning/error app logs. Its repeated previews and cancel preserve settings.
 
-The terminal mode-switch check passed at `/work/tmp/fregat-evidence/20260925T161253Z-scenario-terminal-background`, with the original canvas still connected and equal background layers. Its screenshot was read and it emitted no warning/error app logs. The scenario now uses the visible mode control; the prior palette-based run left the palette open over the destination. Web types and repository gates pass for P3. Bundle inspection follows the remaining resource migrations.
+The terminal mode-switch check passed at `/work/tmp/fregat-evidence/20260925T161253Z-scenario-terminal-background`, with the original canvas still connected and equal background layers. Its screenshot was read and it emitted no warning/error app logs. The scenario now uses the visible mode control; the prior palette-based run left the palette open over the destination. Web types and repository gates pass for P3. The Markdown section records production bundle inspection.
 
 ## Markdown resources
 
@@ -85,3 +85,15 @@ Settings recovery now uses a dedicated query on the existing settings owner clie
 Reset removes the lifetime's recovery query. The acquired signal is checked after transport completion so a transport that ignores cancellation cannot publish late evidence. Disposed admission work neither acknowledges intent nor invalidates the replacement owner's document. Epoch ordering, deferred acknowledgements, provider-evidence generation and the intent write queue remain in their existing owner.
 
 Four new core cases pass: concurrent/successive epoch recovery, same-epoch delivery before and during publication, reset while recovery is pending, and retry with deferred acknowledgement. The reset case fails against the old promise implementation by acknowledging the old intent after the owner was reset, then passes with query cancellation and disposed-owner checks. The logs are `settings-reset-before.log` and `settings-recovery-after.log` under `/work/tmp/l6-completion/`. The existing web projection/stream/actions/sync/environment cases pass, 36 tests in five files, as do 20 TUI settings/raw/connection cases in three files. Core, web and TUI types and repository gates pass.
+
+## Shared history pages
+
+Client-core now defines earlier-page queries and owns their QueryObservers. Keys include environment, reader lifetime, request generation, history replacement sequence, session and the exact message/activity boundaries captured when loading begins. Web supplies its environment QueryClient; each TUI chat owner owns a client for that connected environment and clears it on disposal. Transcript export uses the same query definition in an independent read lifetime. Reads retain network-aware behavior, zero freshness, zero unobserved retention and no automatic retry. Observers retain the current result while their transport lives; changing the boundary releases the previous page query.
+
+Query deduplicates concurrent reads. The web's promise map and Zustand pending/error store are deleted. Web reads its observer through `useSyncExternalStore`; TUI publishes the observer's pending status in its existing owner snapshot. Acquired pages merge through the existing canonical projection writer. A generation change, replacement snapshot or disposal prevents old pages and errors from publishing into a newer lifetime. No second writable transcript was introduced.
+
+The A→B→A TUI regression fails against the old owner in both response orders: a first-visit page is still accepted after returning to A. It passes with the generation boundary, including keeping the current request pending when the old response arrives first. Logs are `history-selection-before.log` and `history-selection-after.log` under `/work/tmp/l6-completion/`. The final TUI owner/reconciliation/connection run passes 21 cases. Four web page/subscription/projection/environment files pass 44 cases, including double-click deduplication, exhaustion, failure/retry, live append, reconnect replacement, disposal and separate environments with equal session IDs.
+
+Real scrollback exposed another issue: a full snapshot can collapse into a short work-log group, leaving earlier history unreachable while the timeline considers itself at the live edge. The earlier-page button now appears when that loaded window fits the viewport. Long transcripts keep their existing scroll-to-top behavior. The short-window test fails against the prior condition, then passes; all eighteen timeline component cases pass. Existing scroll-anchoring and navigation tests also pass.
+
+`chat-history-pages` passed at `/work/tmp/fregat-evidence/20260925T165329Z-scenario-chat-history-pages`. Its isolated native provider emits 230 activity items. A reload limits the snapshot, and clicking Load earlier restores the original prompt while preserving the last reply. The restored-prompt screenshot was read. The run reports no console errors or failed responses, one Git pull-request-state warning, and the socket/GPU warnings recorded in its evidence. The first run also encountered a Vite outdated-dependency response. An intermediate scenario incorrectly treated the button's pending-label change as completion; it now waits for Loading earlier to disappear. Core/web/TUI/scripts types, repository gates and feature boundaries pass.

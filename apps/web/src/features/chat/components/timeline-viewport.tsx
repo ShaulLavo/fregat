@@ -78,7 +78,8 @@ export function TimelineViewport({
   // Earlier history is offered only after the reader reaches the oldest loaded row.
   const canLoadEarlier =
     earlierPage.hasEarlier &&
-    scrollState.followMode === 'free-scrolling' &&
+    (scrollState.followMode === 'free-scrolling' ||
+      (viewportHeight > 0 && contentHeight <= viewportHeight)) &&
     virtualItems[0]?.index === 0
 
   useLayoutEffect(

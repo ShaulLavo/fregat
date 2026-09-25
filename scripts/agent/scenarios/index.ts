@@ -9,6 +9,7 @@ import { composerDefaults } from './composer-defaults'
 import { sessionNotifications } from './session-notifications'
 import { terminalHistory } from './terminal-history'
 import { chatStream } from './chat-stream'
+import { chatHistoryPages } from './chat-history-pages'
 import { chatStashContext } from './chat-stash-context'
 import { chatQueue } from './chat-queue'
 import { providerModelOptions } from './provider-model-options'
@@ -247,6 +248,7 @@ export const scenarios: readonly Scenario[] = [
   fileAttachments,
   chatStashContext,
   chatStream,
+  chatHistoryPages,
   chatQueue,
   providerModelOptions,
   draftRecovery,

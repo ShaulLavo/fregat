@@ -208,10 +208,16 @@ test('a reader who walks back to the top is offered the history behind it', () =
   expect(screen.getByRole('button', { name: 'Load earlier' })).toBeVisible()
 })
 
-test('a transcript pinned to the live edge offers nothing to load', () => {
-  // There is history behind it, but the reader is at the newest message and an
-  // affordance floating over a streaming answer is noise.
+test('a short loaded window offers earlier history while at the live edge', () => {
   const history = conversation(3)
+  seedSessionWindow(history, ORCHESTRATION_SESSION_DETAIL_PAGE_SIZE)
+  renderTimeline(history)
+
+  expect(screen.getByRole('button', { name: 'Load earlier' })).toBeVisible()
+})
+
+test('a scrollable transcript pinned to the live edge offers nothing to load', () => {
+  const history = conversation(13)
   seedSessionWindow(history, ORCHESTRATION_SESSION_DETAIL_PAGE_SIZE)
   renderTimeline(history)
 

@@ -120,7 +120,8 @@
     "./chat/activity-visibility": "./src/chat/activity-visibility.ts",
     "./commands/bindings": "./src/commands/bindings.ts",
     "./chat/worktrees/actions": "./src/chat/worktrees/actions.ts",
-    "./chat/worktrees/confirmation": "./src/chat/worktrees/confirmation.ts"
+    "./chat/worktrees/confirmation": "./src/chat/worktrees/confirmation.ts",
+    "./chat/earlier-pages": "./src/chat/earlier-pages.ts"
   },
   "scripts": {
     "build": "tsgo --noEmit",

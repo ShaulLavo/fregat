@@ -1,5 +1,6 @@
 import { confirmedEnvironmentId } from '@/lib/environments/state/domain'
 import { canonicalServerOrigin } from '@workspace/client-core/transport/client'
+import { queryClientFor } from '@/lib/environments/state/query-clients'
 import { environmentClientFor } from '@/lib/client'
 import { createSessionDetailSubscriptionCache } from '@/features/chat/state/session-detail-subscriptions'
 import { createSessionEarlierPageLoader } from '@/features/chat/state/session-earlier-pages'
@@ -21,7 +22,11 @@ export function createChatTransport(
   const rpc = createOrchestrationRpcClient({ ...options, origin })
   const lifetime = new AbortController()
   const cache = createSessionDetailSubscriptionCache({ transport: rpc, environmentId })
-  const pages = createSessionEarlierPageLoader({ transport: rpc, environmentId })
+  const pages = createSessionEarlierPageLoader({
+    transport: rpc,
+    environmentId,
+    queryClient: queryClientFor(origin),
+  })
 
   return {
     environmentId,
@@ -42,6 +47,7 @@ export function createChatTransport(
     sessionDetailStream: rpc.sessionDetailStream.bind(rpc),
     retainSessionDetail: cache.retain,
     loadEarlierPage: pages.load,
+    earlierPageObserver: pages.observer,
     async sessionDetailSnapshot(sessionId) {
       lifetime.signal.throwIfAborted()
       confirmedEnvironmentId(origin)

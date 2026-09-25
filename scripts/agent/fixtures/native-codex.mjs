@@ -216,7 +216,33 @@ function streamWorkLog(message) {
   }, 35)
 }
 
+function historyPages(message) {
+  const running = { id: turnId, status: 'inProgress', items: [] }
+  send({ id: message.id, result: { turn: running } })
+  send({ method: 'turn/started', params: { threadId, turn: running } })
+  for (let index = 0; index < 230; index += 1) {
+    send({
+      method: 'item/completed',
+      params: {
+        threadId,
+        turnId,
+        item: {
+          id: `history-${index}`,
+          type: 'agentMessage',
+          text: `HISTORY_ROW_${String(index).padStart(3, '0')}`,
+        },
+      },
+    })
+  }
+  send({
+    method: 'turn/completed',
+    params: { threadId, turn: { id: turnId, status: 'completed', items: [] } },
+  })
+}
+
 function handle(message) {
+  if (scenario === 'chat-history-pages' && message.method === 'turn/start')
+    return historyPages(message)
   if (scenario === 'chat-stream' && message.method === 'turn/start') return streamWorkLog(message)
   if (scenario === 'stopped-turn-reasons' && message.method === 'turn/start') {
     stoppedTurnReasons(message)

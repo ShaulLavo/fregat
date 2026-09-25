@@ -85,3 +85,32 @@ export function loseNextDispatchAcknowledgement(
     deliver(raw)
   }
 }
+
+export function holdSessionPageResponses(
+  transport: ReturnType<typeof createControlledInProcessTransport>,
+) {
+  const socket = transport.sockets.at(-1)
+  assert(socket)
+  const requests = new Set<string>()
+  const responses: Array<() => void> = []
+  const send = socket.send.bind(socket)
+  const deliver = socket.deliver.bind(socket)
+  socket.send = (raw) => {
+    const message = v.parse(orchestrationWsClientMessageSchema, JSON.parse(raw))
+    if (message.kind === 'request' && message.method === 'sessionDetailPage')
+      requests.add(message.requestId)
+    send(raw)
+  }
+  socket.deliver = (raw) => {
+    const message = v.parse(orchestrationWsServerMessageSchema, raw)
+    if (message.kind !== 'response' || !requests.delete(message.requestId)) return deliver(raw)
+    responses.push(() => deliver(raw))
+  }
+  return {
+    responses,
+    restore() {
+      socket.send = send
+      socket.deliver = deliver
+    },
+  }
+}
