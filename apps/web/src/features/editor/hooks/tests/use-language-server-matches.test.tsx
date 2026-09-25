@@ -124,7 +124,7 @@ test('keeps an HTTP match failure in the query error state instead of caching an
     generation: 1,
   })
 
-  await expect(queryClient.fetchQuery(options)).rejects.toBeDefined()
+  await expect(queryClient.query(options)).rejects.toBeDefined()
   expect(queryClient.getQueryState(options.queryKey)).toMatchObject({
     data: undefined,
     status: 'error',

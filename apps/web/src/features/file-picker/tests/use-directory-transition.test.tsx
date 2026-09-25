@@ -28,7 +28,7 @@ test('prefetch and load reuse the exact base-directory cache entry', async ({ cl
 
   expect(prefetch).toBeInstanceOf(Promise)
   await act(async () => {
-    await prefetch
+    await expect(prefetch).resolves.toBeUndefined()
   })
 
   expect(queryClient.getQueryData<DirectoryLoadData>(queryKey)).toMatchObject({
@@ -47,6 +47,27 @@ test('prefetch and load reuse the exact base-directory cache entry', async ({ cl
 
   expect(loaded).toBe(true)
   expect(dataUpdateCount(queryClient, queryKey)).toBe(updatesAfterPrefetch)
+  queryClient.clear()
+})
+
+test('an optional missing-directory warmup resolves void and leaves the error in Query', async () => {
+  const queryClient = createTestQueryClient()
+  const { result } = renderHook(
+    () =>
+      useDirectoryTransition({
+        currentPath: 'current',
+        enabled: true,
+        mode: 'file',
+        showHidden: false,
+      }),
+    { wrapper: queryClientWrapper(queryClient) },
+  )
+  await act(async () => {
+    await expect(result.current.preloadDirectory('missing')).resolves.toBeUndefined()
+  })
+  expect(
+    queryClient.getQueryState(filePickerKeys.directory('missing', '', 'file', false))?.status,
+  ).toBe('error')
   queryClient.clear()
 })
 

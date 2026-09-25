@@ -68,7 +68,7 @@ test('surrounding whitespace does not mint a second cache entry', ({ client }) =
 function runSearch(query: string) {
   // A throwaway client per call so a cached answer can never stand in for a
   // real round trip.
-  return createTestQueryClient().fetchQuery(sessionSearchQueryOptions({ query }))
+  return createTestQueryClient().query(sessionSearchQueryOptions({ query }))
 }
 
 async function seedSession(client: Client, rootPath: string, text: string) {

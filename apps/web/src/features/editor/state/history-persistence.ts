@@ -103,7 +103,7 @@ export class HistoryPersistenceService {
 
     const startedAt = performance.now()
     try {
-      const stored = await this.queryClient.fetchQuery(this.storedHistoryOptions(key))
+      const stored = await this.queryClient.query(this.storedHistoryOptions(key))
       if (!stored) return
 
       const outcome = this.adopt(document, stored.contentHash, stored.data)

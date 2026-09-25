@@ -19,7 +19,7 @@ export async function admitDiscard(owner: QueryClient, rootPath: string, paths: 
   admitGitWrite(owner)
   const expected = owner.getQueryData<GitStatusResult>(gitKeys.status(rootPath))
   await owner.cancelQueries({ queryKey: gitKeys.status(rootPath), exact: true })
-  const status = await owner.fetchQuery({
+  const status = await owner.query({
     queryKey: gitKeys.status(rootPath),
     queryFn: ({ signal }) => fetchStatus(rootPath, signal, clientForQueryClient(owner), true),
     staleTime: 0,

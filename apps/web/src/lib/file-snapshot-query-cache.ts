@@ -73,7 +73,7 @@ export function ensureFileSnapshotQuery(
   path: FilesystemPath,
   config: FileSnapshotQueryConfig = {},
 ) {
-  return queryClient.fetchQuery(fileSnapshotQueryOptions(path, config))
+  return queryClient.query(fileSnapshotQueryOptions(path, config))
 }
 
 export function installFileSnapshotQueryCachePolicy(queryClient: QueryClient) {

@@ -295,7 +295,7 @@ describe('file open intent service', () => {
     owner.service.prepare(intent(file.path))
     await vi.waitFor(() => expect(first.prepare).toHaveBeenCalledOnce())
     const refresh = deferred<FileResult>()
-    const refreshPromise = queryClient.fetchQuery({
+    const refreshPromise = queryClient.query({
       ...fileSnapshotQueryOptions(file.path),
       queryFn: () => refresh.promise,
       staleTime: 0,
@@ -418,7 +418,7 @@ describe('file open intent service', () => {
     const queryClient = new QueryClient()
     const first = deferred<FileResult>()
     const paths = ['/repo/a.ts', '/repo/b.ts', '/repo/c.ts'] as const
-    void queryClient.fetchQuery({
+    void queryClient.query({
       ...fileSnapshotQueryOptions(filesystemPath(paths[0])),
       queryFn: () => first.promise,
     })
@@ -1067,7 +1067,7 @@ describe('file open intent service', () => {
     const queryClient = new QueryClient()
     const file = fileResult('/repo/a.ts')
     const pending = deferred<FileResult>()
-    void queryClient.fetchQuery({
+    void queryClient.query({
       ...fileSnapshotQueryOptions(file.path),
       queryFn: () => pending.promise,
     })

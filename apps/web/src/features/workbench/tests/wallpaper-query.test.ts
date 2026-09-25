@@ -19,12 +19,12 @@ test('a remote workbench returns the bundled fallback without fetching remote wa
   const queryClient = new QueryClient()
   registerEnvironmentQueryClient(queryClient, 'http://localhost:39078', client)
   try {
-    await expect(
-      queryClient.fetchQuery(wallpaperInfoQueryOptions({ enabled: true })),
-    ).resolves.toBe('image')
+    await expect(queryClient.query(wallpaperInfoQueryOptions({ enabled: true }))).resolves.toBe(
+      'image',
+    )
     expect(wallpaperStillUrl('http://localhost:39078')).toBeNull()
     await expect(
-      queryClient.fetchQuery(wallpaperMediaQueryOptions({ enabled: true })),
+      queryClient.query(wallpaperMediaQueryOptions({ enabled: true })),
     ).resolves.toBeNull()
   } finally {
     queryClient.clear()

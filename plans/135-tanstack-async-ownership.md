@@ -1,6 +1,6 @@
 # Plan 135: Give TanStack ownership of async caches and route preparation
 
-Status: **PROPOSED. Research and skill corrections complete; source migration not started.**
+Status: **IN PROGRESS on L6. P0 complete. P1–P8 pending.**
 Priority: P2. Effort: L, split into independently verifiable phases. Risk: medium for
 resource caches, high for pagination and settings recovery.
 Planned against Platform `aeff92d7` plus the working tree on 2026-09-21.
@@ -187,6 +187,8 @@ Known behavior to reproduce before changing it:
 ## Implementation phases
 
 ### 0. Remove deprecated imperative APIs across the repository
+
+Completed 2026-09-25: 46 calls in 24 files migrated. None used ensure/infinite variants or selected option factories. Required failures propagate; optional warmups retain a non-rejecting void result. The AST gate fails on the prior source and passes after migration, including seven direct/optional/computed/alias/prose tests. Twelve owner test files pass with 110 cases; web types pass. `query:check` runs in verify, gates and CI. Repeat the sweep after the final rebase.
 
 This is a required first phase, independent of the resource-cache redesign. Scope all
 repository-owned TypeScript/JavaScript under `apps/`, `packages/`, and `scripts/`, including

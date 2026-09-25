@@ -646,7 +646,7 @@ async function applyRefreshOpenFileOperation({
 
   const cached = queryClient.getQueryData<FileResult>(fileSystemKeys.fileSnapshot(path))
   const file = await queryClient
-    .fetchQuery({
+    .query({
       ...fileSnapshotQueryOptions(filesystemPath(path), {
         fetcher: (path, signal) => {
           const client = clientForQueryClient(queryClient)

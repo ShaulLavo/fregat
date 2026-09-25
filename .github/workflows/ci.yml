@@ -33,6 +33,9 @@ jobs:
       - name: Lint
         run: bun run lint
 
+      - name: Query API
+        run: bun run query:check
+
       - name: Feature boundaries
         run: bun run boundaries:check
 

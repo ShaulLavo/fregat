@@ -481,7 +481,7 @@ async function renderFsActions(rootPath: string) {
     ...hook,
     fileOperations,
     history: () =>
-      queryClient.fetchQuery(fileOperationHistoryQuery(queryClient, filesystemPath(rootPath))),
+      queryClient.query(fileOperationHistoryQuery(queryClient, filesystemPath(rootPath))),
     model,
     queryClient,
     rootPath: filesystemPath(rootPath),

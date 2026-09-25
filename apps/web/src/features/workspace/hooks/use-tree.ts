@@ -84,7 +84,7 @@ export function useWorkspaceTreeForRootPath(rootPath: string | null) {
     })
 
     void queryClient
-      .fetchQuery({
+      .query({
         queryFn: ({ signal, client }) =>
           fetchTree(entry.path, signal, clientForQueryClient(client)),
         queryKey: directoryKey,
@@ -129,11 +129,15 @@ export function useWorkspaceTreeForRootPath(rootPath: string | null) {
     if (!isDirectoryEntry(entry)) return
     if (!shouldLoadDirectory(treeState.data, treePath)) return
 
-    void queryClient.prefetchQuery({
-      queryFn: ({ signal, client }) => fetchTree(entry.path, signal, clientForQueryClient(client)),
-      queryKey: treeDirectoryPrefetchKey(rootPath, treePath, entry),
-      staleTime: FILE_TREE_PREFETCH_STALE_MS,
-    })
+    void queryClient
+      .query({
+        queryFn: ({ signal, client }) =>
+          fetchTree(entry.path, signal, clientForQueryClient(client)),
+        queryKey: treeDirectoryPrefetchKey(rootPath, treePath, entry),
+        staleTime: FILE_TREE_PREFETCH_STALE_MS,
+      })
+      .then(() => undefined)
+      .catch(() => undefined)
   }
 
   return {

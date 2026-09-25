@@ -9,7 +9,7 @@ const NERD_FAMILY = 'JetBrainsMono Nerd Font'
 describe('fontQueryOptions', () => {
   it('registers one URL-sourced face for a Nerd Font and loads it', async () => {
     const state = fontState()
-    const family = await client().fetchQuery(fontQueryOptions('nerd:JetBrainsMono', state))
+    const family = await client().query(fontQueryOptions('nerd:JetBrainsMono', state))
 
     expect(family).toBe(NERD_FAMILY)
     expect(state.faces).toHaveLength(1)
@@ -21,8 +21,8 @@ describe('fontQueryOptions', () => {
     const state = fontState()
     const queries = client()
     await Promise.all([
-      queries.fetchQuery(fontQueryOptions('nerd:JetBrainsMono', state)),
-      queries.fetchQuery(fontQueryOptions('nerd:JetBrainsMono', state)),
+      queries.query(fontQueryOptions('nerd:JetBrainsMono', state)),
+      queries.query(fontQueryOptions('nerd:JetBrainsMono', state)),
     ])
 
     expect(state.created).toBe(1)
@@ -32,7 +32,7 @@ describe('fontQueryOptions', () => {
     const state = fontState()
     const started = state.startFace(`"${NERD_FAMILY}"`, 'url("boot")')
     state.faces.push(started)
-    await client().fetchQuery(fontQueryOptions('nerd:JetBrainsMono', state))
+    await client().query(fontQueryOptions('nerd:JetBrainsMono', state))
 
     expect(state.created).toBe(1)
     expect(started.status).toBe('loaded')
@@ -43,7 +43,7 @@ describe('fontQueryOptions', () => {
     const failed = state.startFace(NERD_FAMILY, 'url("http://gone.test/font")')
     failed.fail()
     state.faces.push(failed)
-    await client().fetchQuery(fontQueryOptions('nerd:JetBrainsMono', state))
+    await client().query(fontQueryOptions('nerd:JetBrainsMono', state))
 
     expect(state.faces).toHaveLength(1)
     expect(state.faces[0]).not.toBe(failed)
@@ -51,7 +51,7 @@ describe('fontQueryOptions', () => {
 
   it('links the Fontsource stylesheet once and waits for the family', async () => {
     const state = fontState()
-    const loading = client().fetchQuery(fontQueryOptions('fontsource:geist', state))
+    const loading = client().query(fontQueryOptions('fontsource:geist', state))
     await Promise.resolve()
     const link = state.links[0]
     link?.dispatchEvent(new Event('load'))
@@ -69,7 +69,7 @@ describe('fontQueryOptions', () => {
     link.dataset.state = 'loaded'
     state.links.push(link)
 
-    await client().fetchQuery(fontQueryOptions('fontsource:geist', state))
+    await client().query(fontQueryOptions('fontsource:geist', state))
 
     expect(state.links).toHaveLength(1)
   })
@@ -77,7 +77,7 @@ describe('fontQueryOptions', () => {
   it('needs no download for a bundled font', async () => {
     const state = fontState()
 
-    await expect(client().fetchQuery(fontQueryOptions('bundled:inter', state))).resolves.toBe(
+    await expect(client().query(fontQueryOptions('bundled:inter', state))).resolves.toBe(
       'Inter Variable',
     )
     expect(state.created).toBe(0)
@@ -86,7 +86,7 @@ describe('fontQueryOptions', () => {
 
   it('resolves an installed font the server lacks to the local family', async () => {
     const state = fontState({ faces: [] })
-    const loading = client().fetchQuery(fontQueryOptions('local:Berkeley Mono', state))
+    const loading = client().query(fontQueryOptions('local:Berkeley Mono', state))
     await Promise.resolve()
     state.links[0]?.dispatchEvent(new Event('load'))
 
@@ -97,7 +97,7 @@ describe('fontQueryOptions', () => {
   it('resolves to null when font loading is unsupported', async () => {
     const options = fontQueryOptions('nerd:JetBrainsMono', { FontFace: null, fonts: null })
 
-    expect(await client().fetchQuery(options)).toBeNull()
+    expect(await client().query(options)).toBeNull()
   })
 })
 

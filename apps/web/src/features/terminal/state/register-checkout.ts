@@ -20,7 +20,7 @@ export function terminalCheckoutQueryOptions(rootPath: string) {
 }
 
 export function fetchTerminalCheckout(queryClient: QueryClient, rootPath: string) {
-  return queryClient.fetchQuery(terminalCheckoutQueryOptions(rootPath))
+  return queryClient.query(terminalCheckoutQueryOptions(rootPath))
 }
 
 async function registerTerminalCheckout(

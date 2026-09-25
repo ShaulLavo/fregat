@@ -8,7 +8,7 @@ import { createRpcError } from '@/lib/structured-errors'
 export function useBundleExport() {
   const owner = useSettingsOwner()
   return async (id: ThemeId) => {
-    const archive = await owner.fetchQuery(
+    const archive = await owner.query(
       queryOptions({
         queryKey: settingsQueryKeys.bundleExport(id),
         staleTime: 0,

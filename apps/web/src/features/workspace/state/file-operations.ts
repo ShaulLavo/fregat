@@ -193,7 +193,7 @@ async function readHistory(runtime: FileOperationRuntime) {
   const query = fileOperationHistoryQuery(runtime.queryClient, runtime.rootPath)
   for (let attempt = 1; ; attempt += 1) {
     try {
-      return await runtime.queryClient.fetchQuery(query)
+      return await runtime.queryClient.query(query)
     } catch (error) {
       if (!isCancelledError(error) || attempt === 3) throw error
     }
