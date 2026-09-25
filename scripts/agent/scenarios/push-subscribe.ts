@@ -120,16 +120,19 @@ async function drive(
 
   await selectors.windowToolbar(page).waitFor({ timeout: 45_000 })
   // Holds the first device list long enough to photograph the skeleton it stands in for.
-  await page.route(DEVICE_LIST, async (route) => {
-    await Bun.sleep(1500)
-    await route.continue()
-  })
+  await page.route(
+    DEVICE_LIST,
+    async (route) => {
+      await Bun.sleep(1500)
+      await route.continue()
+    },
+    { times: 1 },
+  )
   await page.keyboard.press('Control+,')
   await selectors.settingsSearch(page).fill('push')
   await selectors.pushLoadingBar(page).waitFor({ timeout: 15_000 })
   await selectors.pushSection(page).scrollIntoViewIfNeeded()
   await step('loading')
-  await page.unroute(DEVICE_LIST)
   await selectors.pushTurnOn(page).waitFor({ timeout: 15_000 })
   await selectors.pushSection(page).scrollIntoViewIfNeeded()
   await step('ready')
