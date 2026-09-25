@@ -324,6 +324,8 @@ function createRuntime(
   const shell: WorkspaceCommandRuntime['shell'] = {
     showEnvironmentDialog: () => {},
     showMachines: () => {},
+    showCloneRepository: () => {},
+    showStartPullRequestSession: () => {},
     openPicker: () => workspace.getState().openPicker(),
     openWorkspaceRoot: (rootPath) => openTestWorkspaceRoot(rootPath, workspace),
     showCommandPalette: () => focus.request(focusTargetById({ kind: 'command-palette' })),

@@ -11,7 +11,7 @@ import * as v from 'valibot'
 import { afterEach, beforeEach } from 'vitest'
 
 import { ChatInputActions } from '@/features/chat/components/chat-input-actions'
-import { providerListQueryOptions } from '@/features/chat/utils/provider-query'
+import { providerListQueryOptions } from '@/lib/provider-query'
 import { ChatComposerModesProvider } from '@/features/chat/providers/composer-modes-provider'
 import { ChatModelPickerProvider } from '@/features/chat/providers/model-picker-provider'
 import { ChatProviderSignInProvider } from '@/features/chat/providers/provider-sign-in-provider'

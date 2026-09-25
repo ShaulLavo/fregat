@@ -150,7 +150,8 @@ async function main() {
     )
   if (!needsIsolatedServer(verb, scenario, options, values['shared-dev']))
     return runVerb(verb, scenario, options, values['shared-dev'])
-  const server = await startIsolatedServer(new URL(options.url))
+  const prepared = await scenario?.prepareServer?.()
+  const server = await startIsolatedServer(new URL(options.url), prepared?.pathPrefix)
   process.env.PORT = String(server.port)
   process.env.OBSERVABILITY_DIR = server.logs
   process.env.PLATFORM_HOME = server.home

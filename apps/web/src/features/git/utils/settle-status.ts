@@ -13,8 +13,8 @@ export function settleGitStatus(client: QueryClient, rootPath: string, status: G
   void client.invalidateQueries({ queryKey: gitKeys.diffs() })
 }
 
-/** Discard rewrites files on disk; stage and unstage never leave the index. */
-export function settleDiscardedGitStatus(
+/** Discard and submodule init rewrite files on disk; stage and unstage never leave the index. */
+export function settleDiskWriteGitStatus(
   client: QueryClient,
   rootPath: string,
   status: GitStatusResult,

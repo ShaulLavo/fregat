@@ -6,8 +6,6 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import { DEFAULT_MAX_TEXT_FILE_BYTES } from '../../fs/limits'
 import { createWorkspacePaths } from '../../fs/path'
-import { createPullRequest, readPullRequest } from '../pull-request'
-import type { GitProcessResult } from '../utils/process'
 import { GitService } from '../service'
 
 const roots: string[] = []
@@ -183,108 +181,4 @@ async function runGit(root: string, args: readonly string[]) {
   if (exitCode === 0) return stdout
 
   throw new Error(`${stderr}${stdout}`.trim())
-}
-
-describe('pull request lookup', () => {
-  const pullRequest = {
-    isDraft: false,
-    number: 42,
-    state: 'OPEN',
-    title: 'Fix',
-    url: 'https://github.com/acme/repo/pull/42',
-  }
-
-  it('returns a confirmed empty list as absence', async () => {
-    const cwd = await fixtureRoot('absent')
-    const run = cliBoundary({ exitCode: 0, stderr: '', stdout: '[]' })
-    await expect(readPullRequest({ branch: 'feature/login', cwd }, run.process)).resolves.toEqual({
-      pullRequest: null,
-      support: 'ready',
-    })
-    expect(run.calls.at(-1)).toEqual([
-      'gh',
-      'pr',
-      'list',
-      '--head',
-      'feature/login',
-      '--state',
-      'open',
-      '--limit',
-      '1',
-      '--json',
-      'isDraft,number,state,title,url',
-    ])
-  })
-
-  it('returns the existing pull request without creating another', async () => {
-    const cwd = await fixtureRoot('exists')
-    const run = cliBoundary({ exitCode: 0, stderr: '', stdout: JSON.stringify([pullRequest]) })
-    await expect(
-      createPullRequest({ branch: 'feature/login', cwd, title: 'Fix' }, run.process),
-    ).resolves.toMatchObject({ kind: 'exists', pullRequest: { number: 42 } })
-    expect(run.calls.some((args) => args[2] === 'create')).toBe(false)
-  })
-
-  it('creates only after confirmed absence, then reads the new request', async () => {
-    const cwd = await fixtureRoot('create')
-    const run = cliBoundary(
-      { exitCode: 0, stderr: '', stdout: '[]' },
-      JSON.stringify([pullRequest]),
-    )
-    await expect(
-      createPullRequest({ branch: 'feature/login', cwd, title: 'Fix' }, run.process),
-    ).resolves.toMatchObject({ kind: 'created', pullRequest: { number: 42 } })
-    expect(run.calls.filter((args) => args[2] === 'create')).toHaveLength(1)
-  })
-
-  it.each([
-    [
-      'expired auth',
-      { exitCode: 1, stderr: 'HTTP 401: Bad credentials', stdout: '' },
-      'could not read',
-    ],
-    [
-      'rate limit',
-      { exitCode: 1, stderr: 'HTTP 429: rate limit exceeded', stdout: '' },
-      'could not read',
-    ],
-    ['network', { exitCode: 1, stderr: 'network unreachable', stdout: '' }, 'could not read'],
-    [
-      'timeout',
-      { exitCode: 143, stderr: '', stdout: '', limit: { kind: 'timeout', timeoutMs: 20_000 } },
-      'timed out',
-    ],
-    ['malformed JSON', { exitCode: 0, stderr: '', stdout: '{' }, 'invalid pull request response'],
-    [
-      'malformed record',
-      { exitCode: 0, stderr: '', stdout: '[{"number":42}]' },
-      'invalid pull request response',
-    ],
-    ['wrong shape', { exitCode: 0, stderr: '', stdout: 'null' }, 'invalid pull request response'],
-  ] satisfies [string, GitProcessResult, string][])(
-    'rejects %s and performs no create',
-    async (_label, result, message) => {
-      const cwd = await fixtureRoot('failure')
-      const run = cliBoundary(result)
-      await expect(readPullRequest({ branch: 'feature/login', cwd }, run.process)).rejects.toThrow(
-        message,
-      )
-      await expect(
-        createPullRequest({ branch: 'feature/login', cwd, title: 'Fix' }, run.process),
-      ).rejects.toThrow(message)
-      expect(run.calls.some((args) => args[2] === 'create')).toBe(false)
-    },
-  )
-})
-
-function cliBoundary(lookup: GitProcessResult, created = '[]') {
-  const calls: (readonly string[])[] = []
-  let didCreate = false
-  const process: Parameters<typeof readPullRequest>[1] = async ({ argv }) => {
-    calls.push(argv)
-    if (argv[2] === 'list') return didCreate ? { exitCode: 0, stderr: '', stdout: created } : lookup
-    if (argv[2] === 'create') didCreate = true
-    return { exitCode: 0, stderr: '', stdout: '' }
-  }
-  return { calls, process }
 }

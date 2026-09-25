@@ -170,6 +170,11 @@ export type Scenario = {
   readonly description: string
   readonly run: (page: Page, context: ScenarioContext) => Promise<void>
   readonly inspect?: (page: Page) => Promise<unknown>
+  /**
+   * Runs before the throwaway server starts. A directory it returns goes first on the server's
+   * PATH, which is how a scenario stands in for an outside CLI such as `gh`.
+   */
+  readonly prepareServer?: () => Promise<{ readonly pathPrefix: string }>
 }
 
 import { editorDiagnosticsLifecycle } from './editor-diagnostics-lifecycle'
@@ -196,6 +201,16 @@ import { gitCommitMessageFile } from './git-commit-message-file'
 import { gitCommitMessagePersists } from './git-commit-message-persists'
 import { gitCommitSlowHook } from './git-commit-slow-hook'
 import { gitFixWithAgent } from './git-fix-with-agent'
+import { gitSubmodulesInit } from './git-submodules-init'
+import { gitAutoPull } from './git-auto-pull'
+import { sessionBranchDrift } from './session-branch-drift'
+import { sessionPullRequestStart } from './session-pull-request-start'
+import { worktreeCleanupOnDelete } from './worktree-cleanup-on-delete'
+import { sessionPullRequestSync } from './session-pull-request-sync'
+import { sessionAutoSettle } from './session-auto-settle'
+import { gitMergeRequest } from './git-merge-request'
+import { gitClonePublish } from './git-clone-publish'
+import { worktreeSetupImport } from './worktree-setup-import'
 import { gitHistory } from './git-history'
 import { editorCaretBurst } from './editor-caret-burst'
 import { editorFocusClicks } from './editor-focus-clicks'
@@ -403,6 +418,16 @@ export const scenarios: readonly Scenario[] = [
   gitCommitSlowHook,
   gitCommitMessagePersists,
   gitFixWithAgent,
+  gitSubmodulesInit,
+  gitAutoPull,
+  sessionBranchDrift,
+  sessionPullRequestStart,
+  worktreeCleanupOnDelete,
+  sessionPullRequestSync,
+  sessionAutoSettle,
+  gitMergeRequest,
+  gitClonePublish,
+  worktreeSetupImport,
   editorCaretBurst,
   editorFocusClicks,
   editorProportionalFont,
