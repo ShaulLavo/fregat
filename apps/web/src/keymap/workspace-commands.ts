@@ -72,6 +72,11 @@ import type { EditorDocumentStoreApi } from '@/features/editor/state/document-st
 import { nextEditorDiffViewMode } from '@/features/editor/utils/diff-view-mode'
 import { commitMessageFilePath } from '@/keymap/utils/commit-message-file'
 import { focusInsideSidebar } from '@/keymap/utils/sidebar-focus'
+import { selectionPrompt, type SelectedLines } from '@/keymap/utils/selection-prompt'
+import { activeEnvironmentId } from '@/lib/environments/state/domain'
+import { toTreePath } from '@/lib/path-formatters'
+import { resolveSelection } from '@singapore-editor/core/document'
+import { serializeComposerMention } from '@workspace/contracts'
 import {
   activeEditorTabForWorkbenchPanels,
   openTerminalTabInWorkbenchPanels,
@@ -114,6 +119,7 @@ import {
   defineCommand,
   type WorkspaceCommandHandlerContext,
   type WorkspaceCommandRuntime,
+  type WorkspaceCommandSnapshot,
 } from './define-command'
 import { ITEM_POSITIONS } from './types'
 
@@ -498,6 +504,56 @@ function toggleSessionRail({ runtime, snapshot }: WorkspaceCommandHandlerContext
     ),
     () => (stranded ? chatFocusStart(runtime, snapshot.rootPath, 'chat') : handled),
   )
+}
+
+function addSelectionToChat({ runtime, snapshot }: WorkspaceCommandHandlerContext) {
+  const target = chatAttachTarget(snapshot)
+  if (!target || !snapshot.activeTabId) return declined
+
+  const selections = selectedLines(runtime, snapshot.activeTabId)
+  if (selections.length === 0) return attachFileMention(runtime, target)
+  const text = selectionPrompt(target.path, selections)
+  return dispositionFor(runtime.composer.attachText('editor-selection', text, target.destination))
+}
+
+function attachFileMention(
+  runtime: WorkspaceCommandRuntime,
+  target: NonNullable<ReturnType<typeof chatAttachTarget>>,
+) {
+  const mention = serializeComposerMention(target.path)
+  return dispositionFor(runtime.composer.attachText('editor-file', mention, target.destination))
+}
+
+// The active file, workspace-relative, and the workspace whose composer should take it.
+function chatAttachTarget(snapshot: WorkspaceCommandSnapshot) {
+  const path = filesystemResource(snapshot.activeDocument)?.path
+  if (!path || !snapshot.rootPath) return null
+
+  return {
+    destination: { environmentId: activeEnvironmentId(), rootPath: snapshot.rootPath },
+    path: toTreePath(path, snapshot.rootPath),
+  }
+}
+
+function selectedLines(runtime: WorkspaceCommandRuntime, tabId: TabId): readonly SelectedLines[] {
+  const documents = runtime.documents.store.getState()
+  const view = documents.getEditorView(tabId)
+  const live = view ? documents.getLiveEditorDocument(view.documentKey) : null
+  if (!view || !live) return []
+
+  const pieces = live.buffer.getSnapshot()
+  const text = live.buffer.getTextSnapshot()
+  return view.view.getSelections().selections.flatMap((selection) => {
+    const { endOffset, startOffset } = resolveSelection(pieces, selection)
+    if (startOffset === endOffset) return []
+    return [
+      {
+        startLine: text.lineAt(startOffset) + 1,
+        endLine: text.lineAt(endOffset - 1) + 1,
+        text: text.readRange(startOffset, endOffset),
+      },
+    ]
+  })
 }
 
 /**
@@ -891,6 +947,19 @@ export const workspaceCommands = [
     icon: ArrowClockwiseIcon,
     run: ({ runtime }) => {
       return afterNavigation(runtime.editor.reopenClosedEditor(), () => focusActiveSurface(runtime))
+    },
+  }),
+  defineCommand({
+    ...workspaceCommandMetadata['workspace.addSelectionToChat'],
+    icon: ChatCircleIcon,
+    run: addSelectionToChat,
+  }),
+  defineCommand({
+    ...workspaceCommandMetadata['workspace.addFileToChat'],
+    icon: ChatCircleIcon,
+    run: ({ runtime, snapshot }) => {
+      const target = chatAttachTarget(snapshot)
+      return target ? attachFileMention(runtime, target) : declined
     },
   }),
   defineCommand({

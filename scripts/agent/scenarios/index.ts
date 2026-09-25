@@ -91,6 +91,7 @@ import { bottomPanelPersistence } from './bottom-panel-persistence'
 import { sidebarToggle } from './sidebar-toggle'
 import { itemNavigation } from './item-navigation'
 import { shortcutHints } from './shortcut-hints'
+import { editorAddToChat } from './editor-add-to-chat'
 import { gitOpenAllDiffsSpam } from './git-open-all-diffs-spam'
 import { gitStageSettles } from './git-stage-settles'
 import { gitChangesScroll } from './git-changes-scroll'
@@ -314,6 +315,7 @@ export const scenarios: readonly Scenario[] = [
   sidebarToggle,
   itemNavigation,
   shortcutHints,
+  editorAddToChat,
   gitOpenAllDiffsSpam,
   gitStageSettles,
   gitChangesScroll,

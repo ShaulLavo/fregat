@@ -34,6 +34,7 @@ import { useOpenWorkspaceRoot } from '@/features/workspace/hooks/use-open-root'
 import { resolvedPlatformKeyBindings } from '@/keymap/active-bindings'
 import { defaultPlatformKeyBindings } from '@/keymap/default-bindings'
 import { KeyBindingsContext } from '@/keymap/providers/bindings-context'
+import { createComposerAttach } from '@/features/chat/state/composer-attach'
 import { useAppKeymap } from '@/keymap/use-app-keymap'
 import type { WorkspaceCommandRuntime, WorkspaceCommandSnapshot } from '@/keymap/define-command'
 import { CommandContext, type CommandContextValue } from '@/keymap/providers/command-context'
@@ -203,7 +204,9 @@ export function CommandProvider({ children }: { readonly children: ReactNode }) 
     return paletteSearchRef.current
   }
 
+  const { binding, bus } = useBusBinding()
   const [runtime] = useState<WorkspaceCommandRuntime>(() => ({
+    composer: createComposerAttach(bus),
     documents: { queryClient, store: documentStore, save: editorRuntime.saveService },
     editor: {
       closeTab: (...args) => adaptersRef.current.editor.closeTab(...args),
@@ -316,7 +319,6 @@ export function CommandProvider({ children }: { readonly children: ReactNode }) 
     workspace,
     workspaceEdits,
   }))
-  const { binding, bus } = useBusBinding()
   useLayoutEffect(() => binding.bind(runtime), [binding, runtime])
   const defaults = defaultPlatformKeyBindings(undefined, preset)
   // Stable identity is required by the document listener and every shortcut-hint consumer.

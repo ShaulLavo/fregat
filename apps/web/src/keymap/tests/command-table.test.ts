@@ -184,6 +184,8 @@ const WORKSPACE_OPERATION_COMMAND_IDS = [
 ] as const satisfies readonly PlatformCommandId[]
 
 const FILE_BACKED_COMMAND_IDS = [
+  'workspace.addSelectionToChat',
+  'workspace.addFileToChat',
   'workspace.goToLine',
   'workspace.gotoSymbol',
   'workspace.compareWithSaved',

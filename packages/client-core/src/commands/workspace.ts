@@ -370,6 +370,28 @@ export const workspaceCommandMetadata = {
     title: 'Reopen closed editor',
     vscodeCommandIds: ['workbench.action.reopenClosedEditor'],
   }),
+  'workspace.addSelectionToChat': defineMetadata({
+    category: 'Chat',
+    description:
+      "Put the editor's selected lines in this workspace's chat composer, or the file when nothing is selected.",
+    id: 'workspace.addSelectionToChat',
+    keys: [{ chord: ['Mod+L'], pane: 'editor', preventDefault: true }],
+    execution: 'sync',
+    target: 'workspace',
+    undoCategory: 'view-only',
+    when: ['fileBackedTab'],
+    title: 'Add selection to chat',
+  }),
+  'workspace.addFileToChat': defineMetadata({
+    category: 'Chat',
+    description: "Mention the active file in this workspace's chat composer.",
+    id: 'workspace.addFileToChat',
+    execution: 'sync',
+    target: 'workspace',
+    undoCategory: 'view-only',
+    when: ['fileBackedTab'],
+    title: 'Add file to chat',
+  }),
   'workspace.toggleSidebarVisibility': defineMetadata({
     category: 'Workspace',
     description: 'Show or hide the workbench sidebar, or the session list in chat.',

@@ -1,3 +1,4 @@
+import type { ComposerAttach } from '@/lib/composer-attach/providers/context'
 import type {
   DocumentRef,
   FilesystemPath,
@@ -51,6 +52,8 @@ export type WorkspaceCommandSnapshot = {
 }
 
 export type WorkspaceCommandRuntime = {
+  /** Where commands hand captured text to chat, as the React attach surfaces do. */
+  readonly composer: ComposerAttach
   readonly documents: {
     readonly save: EditorSaveService
     readonly queryClient: QueryClient

@@ -1,3 +1,4 @@
+import { markdownFence } from '@/lib/markdown-fence'
 import { createStackedProjection, type DiffFile, type DiffRenderRow } from '@singapore-editor/diff'
 
 type DiffLineRange = { readonly start: number; readonly end: number }
@@ -99,7 +100,7 @@ export function diffLineSelectionText(
   rows: readonly DiffRenderRow[],
 ): string {
   const body = rows.map(markedLine)
-  const fence = fenceFor(body)
+  const fence = markdownFence(body)
 
   return [
     `About \`${path}\`, ${diffLineAddressLabel(address)}:`,
@@ -169,11 +170,4 @@ function markedLine(row: DiffRenderRow): string {
   if (row.type === 'deletion') return `-${row.text}`
 
   return ` ${row.text}`
-}
-
-/** A selected line may itself contain a fence; the block has to outrun it. */
-function fenceFor(lines: readonly string[]): string {
-  const runs = lines.flatMap((line) => [...line.matchAll(/`+/g)].map((match) => match[0].length))
-
-  return '`'.repeat(Math.max(3, Math.max(0, ...runs) + 1))
 }

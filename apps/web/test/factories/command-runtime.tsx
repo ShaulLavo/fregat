@@ -40,6 +40,7 @@ import {
   type PlatformCommandBus,
 } from '@/keymap/providers/command-context'
 import { createCommandBus } from '@/keymap/state/command-bus'
+import { createComposerAttach } from '@/features/chat/state/composer-attach'
 import type { PlatformKeyBinding } from '@/keymap/types'
 import { useAppKeymap } from '@/keymap/use-app-keymap'
 import {
@@ -103,7 +104,15 @@ export function createTestCommandRuntime({
   readonly options?: TestCommandRuntimeOptions
   readonly queryClient: QueryClient
 }): TestCommandRuntime {
-  const runtime = createRuntime(focus, queryClient, options, application, navigation)
+  // The runtime is built before its bus, so the composer dispatches through a late binding.
+  const late: { bus: PlatformCommandBus | null } = { bus: null }
+  const composer = createComposerAttach({
+    dispatch: (...args) => {
+      if (!late.bus) throw new Error('The test command bus is not built yet')
+      return late.bus.dispatch(...args)
+    },
+  })
+  const runtime = createRuntime(focus, queryClient, options, composer, application, navigation)
   const captureSnapshot = () => ({
     ...captureCommandSnapshot(runtime),
     ...snapshotPatch(options.snapshot),
@@ -119,6 +128,7 @@ export function createTestCommandRuntime({
     targetIsAvailable: (target) =>
       target.kind === 'workspace' || runtime.focus.isRegistered(target.token),
   })
+  late.bus = bus
 
   return {
     bindings: options.bindings ?? defaultPlatformKeyBindings(),
@@ -280,6 +290,7 @@ function createRuntime(
   focus: FocusService,
   queryClient: QueryClient,
   options: TestCommandRuntimeOptions,
+  composer: WorkspaceCommandRuntime['composer'],
   application?: ApplicationRuntime,
   navigation?: Navigation,
 ): WorkspaceCommandRuntime {
@@ -352,7 +363,19 @@ function createRuntime(
 
   const git = { setPendingMessageFile: () => undefined }
 
-  return { documents, editor, files, focus, git, settings, shell, tabs, workspace, workspaceEdits }
+  return {
+    composer,
+    documents,
+    editor,
+    files,
+    focus,
+    git,
+    settings,
+    shell,
+    tabs,
+    workspace,
+    workspaceEdits,
+  }
 }
 
 /** File operations need the real journal; command tests that run one override these. */
