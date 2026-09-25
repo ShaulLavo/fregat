@@ -1,4 +1,7 @@
-import { limitDiagnosticString as limitString } from '@workspace/observability/sanitize'
+import {
+  createRecordSanitizer,
+  limitDiagnosticString as limitString,
+} from '@workspace/observability/sanitize'
 import { createHash } from 'node:crypto'
 import { errorNumberField, errorStringField } from '@workspace/contracts'
 import { isRecord } from '@workspace/utils/objects'
@@ -19,31 +22,19 @@ const validLogLevels: ReadonlySet<LogLevel> = new Set(['debug', 'error', 'info',
 const maxInstanceIdLength = 64
 const maxRememberedClientEvents = 1_024
 const maxTimestampSkewMs = 24 * 60 * 60 * 1_000
-const maxArrayItems = 25
-const maxObjectKeys = 50
 const maxStringLength = 2_000
-const maxDepth = 5
-const redactedDiagnosticValue = '[redacted]'
-const sensitiveFields = new Set([
-  'absolutePath',
-  'authorization',
-  'body',
-  'content',
-  'cookie',
-  'cwd',
-  'dest',
-  'destination',
-  'fileName',
-  'filename',
-  'password',
-  'patch',
-  'secret',
-  'set-cookie',
-  'stack',
-  'text',
-  'token',
-  'x-api-key',
-])
+// Ingested payloads are untrusted, so they are bounded and never carry a stack trace.
+const sanitizeClientPayload = createRecordSanitizer({
+  formatString: limitString,
+  errorFields: (error) => ({
+    code: errorStringField(error, 'code', { maxLength: maxStringLength }),
+    fix: errorStringField(error, 'fix', { maxLength: maxStringLength }),
+    status: errorNumberField(error, 'statusCode') ?? errorNumberField(error, 'status'),
+    why: errorStringField(error, 'why', { maxLength: maxStringLength }),
+  }),
+  extraSensitiveFields: ['stack'],
+  limits: { maxArrayItems: 25, maxDepth: 5, maxObjectKeys: 50 },
+})
 const rememberedClientEvents = new Map<string, true>()
 
 export function recordClientLog(payload: unknown, request: Request): ClientLogIngestResult {
@@ -202,10 +193,6 @@ function timestampWithinRange(timestamp: number) {
   return timestamp >= minTimestamp && timestamp <= maxTimestamp
 }
 
-function sanitizeClientPayload(payload: Record<string, unknown>) {
-  return sanitizeRecord(payload, 0)
-}
-
 function clientFields(payload: Record<string, unknown>) {
   const fields = { ...payload }
 
@@ -218,65 +205,6 @@ function clientFields(payload: Record<string, unknown>) {
   delete fields.timestamp
 
   return fields
-}
-
-function sanitizeDiagnosticValue(
-  value: unknown,
-  depth: number,
-  seen = new WeakSet<object>(),
-): unknown {
-  if (value instanceof Error) return sanitizeError(value, depth, seen)
-  if (Array.isArray(value)) return sanitizeArray(value, depth, seen)
-  if (!isRecord(value)) return sanitizePrimitive(value)
-  if (seen.has(value)) return '[circular]'
-  if (depth >= maxDepth) return '[truncated]'
-
-  seen.add(value)
-  return sanitizeRecord(value, depth + 1, seen)
-}
-
-function sanitizeArray(values: unknown[], depth: number, seen: WeakSet<object>) {
-  if (depth >= maxDepth) return '[truncated]'
-
-  return values
-    .slice(0, maxArrayItems)
-    .map((value) => sanitizeDiagnosticValue(value, depth + 1, seen))
-}
-
-function sanitizeError(error: Error, depth: number, seen: WeakSet<object>) {
-  if (seen.has(error)) return '[circular]'
-
-  seen.add(error)
-  return {
-    cause: sanitizeDiagnosticValue(error.cause, depth + 1, seen),
-    code: errorStringField(error, 'code', { maxLength: maxStringLength }),
-    fix: errorStringField(error, 'fix', { maxLength: maxStringLength }),
-    message: limitString(error.message),
-    name: error.name,
-    status: errorNumberField(error, 'statusCode') ?? errorNumberField(error, 'status'),
-    why: errorStringField(error, 'why', { maxLength: maxStringLength }),
-  }
-}
-
-function sanitizeRecord(
-  record: Record<string, unknown>,
-  depth: number,
-  seen = new WeakSet<object>(),
-) {
-  const safe: Record<string, unknown> = {}
-  const entries = Object.entries(record).slice(0, maxObjectKeys)
-
-  for (const [key, value] of entries) {
-    safe[key] = sensitiveFields.has(key)
-      ? redactedDiagnosticValue
-      : sanitizeDiagnosticValue(value, depth, seen)
-  }
-
-  return safe
-}
-
-function sanitizePrimitive(value: unknown) {
-  return typeof value === 'string' ? limitString(value) : value
 }
 
 function stringField(value: unknown) {

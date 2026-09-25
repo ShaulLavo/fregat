@@ -1,5 +1,9 @@
 import { nodeErrorCode } from '@workspace/contracts'
-import { sanitizeErrorMessage as sanitizeCauseMessage } from '../observability/sanitize-message'
+import {
+  redactedDiagnosticValue,
+  sanitizeErrorMessage as sanitizeCauseMessage,
+  sensitiveErrorFields,
+} from '../observability/sanitize-message'
 import { isRecord } from '@workspace/utils/objects'
 import { EvlogError } from 'evlog'
 
@@ -29,17 +33,6 @@ export type FsErrorCode =
   | 'WORKSPACE_EDIT_TARGET_OCCUPIED'
   | 'WORKSPACE_EDIT_NOT_HEAD'
   | 'OPERATION_FAILED'
-
-const redactedDiagnosticValue = '[redacted]'
-const sensitiveCauseFields = new Set([
-  'absolutePath',
-  'cwd',
-  'dest',
-  'destination',
-  'fileName',
-  'filename',
-  'path',
-])
 
 const statusByCode: Record<FsErrorCode, number> = {
   UNAUTHORIZED: 401,
@@ -157,6 +150,7 @@ function errorInternal(cause: unknown, internal: Record<string, unknown> | undef
   return { ...internal, cause: sanitizeCause(cause) }
 }
 
+// Stays off the shared observability sanitizer, which keeps the quoted substrings this strips.
 function sanitizeCause(cause: unknown, seen = new WeakSet<object>()): unknown {
   if (cause === undefined) return undefined
   if (cause instanceof Error) return sanitizeCauseError(cause, seen)
@@ -185,7 +179,7 @@ function sanitizeCauseRecord(record: Record<string, unknown>, seen: WeakSet<obje
   const safe: Record<string, unknown> = {}
 
   for (const [key, value] of Object.entries(record)) {
-    safe[key] = sensitiveCauseFields.has(key) ? redactedDiagnosticValue : sanitizeCause(value, seen)
+    safe[key] = sensitiveErrorFields.has(key) ? redactedDiagnosticValue : sanitizeCause(value, seen)
   }
 
   return safe
@@ -193,7 +187,7 @@ function sanitizeCauseRecord(record: Record<string, unknown>, seen: WeakSet<obje
 
 function copyCauseFields(source: Error, target: Record<string, unknown>, seen: WeakSet<object>) {
   for (const [key, value] of Object.entries(source)) {
-    target[key] = sensitiveCauseFields.has(key)
+    target[key] = sensitiveErrorFields.has(key)
       ? redactedDiagnosticValue
       : sanitizeCause(value, seen)
   }

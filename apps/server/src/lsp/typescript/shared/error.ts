@@ -13,6 +13,7 @@ function isJsonRpcError(error: unknown): error is JsonRpcError {
   return typeof error.code === 'number' && typeof error.message === 'string'
 }
 
+// Keeps its own fallback: contracts' `errorMessage` would answer JSON-RPC with `[object Object]`.
 export function errorMessage(error: unknown): string {
   if (error instanceof Error) return error.message
   if (typeof error === 'string') return error

@@ -28,8 +28,12 @@ export const ptyErrors = defineErrorCatalog('pty', {
 })
 
 export function operationError(operation: string, cause: unknown) {
-  return ptyErrors.OPERATION_FAILED({
-    operation,
-    ...(cause instanceof Error ? { cause } : { internal: { cause } }),
-  })
+  return ptyErrors.OPERATION_FAILED({ operation, ...causeOptions(cause) })
+}
+
+function causeOptions(cause: unknown) {
+  if (cause === undefined) return {}
+  if (cause instanceof Error) return { cause }
+
+  return { internal: { cause } }
 }

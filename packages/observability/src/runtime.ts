@@ -277,6 +277,7 @@ function writeDiagnostic(message: string) {
   process.stderr.write(`${message}\n`)
 }
 
+// evlog's drain error may be absent; contracts' `errorMessage` would log `undefined`.
 function errorMessage(error: Error | undefined) {
   return error?.message ?? 'unknown drain failure'
 }

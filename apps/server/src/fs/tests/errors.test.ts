@@ -22,6 +22,30 @@ describe('FsError', () => {
     })
   })
 
+  it('redacts credential keys from the cause and its internal copy', () => {
+    const cause = Object.assign(new Error("request to 'https://example.test' failed"), {
+      authorization: 'Bearer secret-token',
+      request: { body: 'payload', headers: { cookie: 'a=b', 'x-api-key': 'key' }, method: 'PUT' },
+      token: 'secret-token',
+    })
+    const error = new FsError('OPERATION_FAILED', undefined, cause)
+    const expected = {
+      authorization: '[redacted]',
+      message: "request to '[redacted]' failed",
+      name: 'Error',
+      request: {
+        body: '[redacted]',
+        headers: { cookie: '[redacted]', 'x-api-key': '[redacted]' },
+        method: 'PUT',
+      },
+      token: '[redacted]',
+    }
+
+    expect(error.cause).toEqual(expected)
+    expect(error.internal?.cause).toEqual(expected)
+    expect(JSON.stringify([error.cause, error.internal])).not.toContain('secret-token')
+  })
+
   it('keeps public error payloads stable', () => {
     const error = new FsError('OPERATION_FAILED', 'failed internally', {
       detail: 'private',

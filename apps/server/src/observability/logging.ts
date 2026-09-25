@@ -1,4 +1,8 @@
-import { sanitizeErrorMessage } from './sanitize-message'
+import {
+  redactedDiagnosticValue,
+  sanitizeErrorMessage,
+  sensitiveErrorFields,
+} from './sanitize-message'
 import { elapsedMs, roundMs } from '@workspace/utils/timing'
 import { AsyncLocalStorage } from 'node:async_hooks'
 
@@ -29,30 +33,6 @@ type OperationSummary = OperationContext & {
 // captures it while the request context is still live and re-enters it here for
 // every step; see `sseResponse`.
 const streamRequestLogger = new AsyncLocalStorage<RequestLogger<Record<string, unknown>>>()
-
-const redactedDiagnosticValue = '[redacted]'
-// Error diagnostics redact quoted substrings and keep 500-character tails;
-// the shared sanitizer keeps 2000-character heads and preserves quoted text.
-const sensitiveErrorFields = new Set([
-  'absolutePath',
-  'authorization',
-  'body',
-  'content',
-  'cookie',
-  'cwd',
-  'dest',
-  'destination',
-  'fileName',
-  'filename',
-  'password',
-  'patch',
-  'path',
-  'secret',
-  'set-cookie',
-  'text',
-  'token',
-  'x-api-key',
-])
 
 export async function observeRequestOperation<T>(
   context: OperationContext,
@@ -237,6 +217,7 @@ function sanitizedErrorForLogger(error: Error) {
   return clone
 }
 
+// Stays off the shared observability sanitizer, which keeps the quoted substrings this strips.
 function sanitizeErrorCause(cause: unknown, seen = new WeakSet<object>()): unknown {
   if (cause instanceof Error) return sanitizeErrorObject(cause, seen)
   if (Array.isArray(cause)) return cause.map((value) => sanitizeErrorCause(value, seen))

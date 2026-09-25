@@ -137,3 +137,13 @@ test('a thrown message keeps the words of an Error and never stringifies an Eden
   expect(thrownErrorMessage(new Error('socket closed'))).toBe('socket closed')
   expect(thrownErrorMessage(new Error(''))).toBe('Something unexpected went wrong.')
 })
+
+test('fs codes read through the shared peel, then off a bare top-level code', () => {
+  expect(toClientError(new EdenFetchError(404, { error: { code: 'NOT_FOUND' } })).category).toBe(
+    'not_found',
+  )
+  expect(toClientError({ code: 'FILE_TOO_LARGE', value: 'Payload Too Large' }).category).toBe(
+    'too_large',
+  )
+  expect(toClientError({ error: { code: 7, message: 'numeric code' } }).category).toBe('unknown')
+})
