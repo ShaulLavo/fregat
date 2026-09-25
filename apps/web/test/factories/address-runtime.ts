@@ -30,6 +30,7 @@ export async function createAddressTestRuntime(client: Client) {
       appliedThemeId: null,
       selectedThemeId: 'dark',
       syntaxHighlightingEnabled: false,
+      tabSize: 4,
     },
   })
   onTestFinished(() => {

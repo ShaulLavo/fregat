@@ -10,6 +10,7 @@ import { SessionMissingState } from '@/features/chat-mode/components/session-mis
 import { StageEmptyState } from '@/features/chat-mode/components/stage-empty-state'
 import type { ChatModeSession } from '@/features/chat-mode/providers/session-context'
 import { activeSessionShowsComposer } from '@/features/chat-mode/utils/active-session'
+import { useDraftMachines } from '@/features/chat-mode/hooks/use-draft-machines'
 
 export function StageBody({
   activeSession,
@@ -25,6 +26,9 @@ export function StageBody({
 }) {
   const selection = useSessionSelectionStore((state) => state.selection)
   const navigation = useNavigation()
+  const machines = useDraftMachines(
+    project ? { environmentId: transport.environmentId, projectId: project.id } : null,
+  )
   const draftId =
     selection.kind === 'draft' &&
     selection.environmentId === transport.environmentId &&
@@ -68,6 +72,7 @@ export function StageBody({
         key={`${transport.environmentId}:${draftId}`}
         worktree={worktree}
         rootPath={rootPath}
+        machines={machines}
         onSessionCreated={onSessionCreated}
       />
     )

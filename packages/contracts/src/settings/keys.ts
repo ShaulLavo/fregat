@@ -412,10 +412,8 @@ export const SETTINGS_REGISTRY = {
     scope: 'window',
     widget: 'number',
     category: 'Editor',
-    // Nothing reads this yet. The editor detects each document's width and has no
-    // setter for the fallback it detects against; a `:root` variable never reached
-    // it, because the editor writes `--editor-tab-size` on its own element.
-    description: 'Rendered width of a tab character, in spaces.',
+    description:
+      'Width of a tab character, in spaces. Also the indentation width for a file whose own cannot be detected.',
     keywords: ['tab', 'indent', 'width', 'spaces'],
   }),
   'editor.history.retainedStates': defineSetting({

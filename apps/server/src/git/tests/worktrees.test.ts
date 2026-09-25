@@ -45,6 +45,30 @@ describe('worktree provisioning', () => {
       false,
     )
   })
+  it('starts from a named local branch instead of HEAD, and refuses one that does not exist', async () => {
+    const fixture = await fixtureRepo()
+    const start = await runGit(fixture.root, ['rev-parse', 'HEAD'])
+    await runGit(fixture.root, ['branch', 'release'])
+    await writeFile(path.join(fixture.root, 'tracked.txt'), 'later\n')
+    await runGit(fixture.root, ['commit', '-am', 'head moved'])
+    const prepared = await fixture.worktrees.prepareCreate({
+      path: fixture.root,
+      worktreeId: worktreeA,
+      baseBranch: 'release',
+    })
+    expect(prepared.baseCommit).toBe(start)
+    const created = await fixture.worktrees.create({ ...prepared, path: fixture.root })
+    expect(await readFile(path.join(created.worktree.absolutePath, 'tracked.txt'), 'utf8')).toBe(
+      'one\n',
+    )
+    await expect(
+      fixture.worktrees.prepareCreate({
+        path: fixture.root,
+        worktreeId: worktreeB,
+        baseBranch: 'absent',
+      }),
+    ).rejects.toMatchObject({ code: gitWorktreeErrors.WORKTREE_BASE_BRANCH_MISSING.code })
+  })
   it('recovers an expected branch and refuses a changed branch without moving it', async () => {
     const fixture = await fixtureRepo()
     const prepared = await fixture.worktrees.prepareCreate({

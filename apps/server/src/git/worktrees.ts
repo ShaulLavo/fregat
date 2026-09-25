@@ -82,7 +82,7 @@ export class GitWorktreeService {
         throw gitWorktreeErrors.WORKTREE_BRANCH_EXISTS({
           internal: { at: 'prepare', branch, worktreeId: body.worktreeId },
         })
-      const head = await runner.run(['rev-parse', '--verify', 'HEAD'])
+      const head = await this.baseCommit(runner, body)
       const absolutePath = await managedWorktreePath(runner, body.worktreeId)
       if (
         (await maybeStat(absolutePath)) ||
@@ -92,8 +92,27 @@ export class GitWorktreeService {
           internal: { at: 'prepare', reason: 'path-occupied', worktreeId: body.worktreeId },
         })
       }
-      return { worktreeId: body.worktreeId, absolutePath, branch, baseCommit: head.stdout.trim() }
+      return { worktreeId: body.worktreeId, absolutePath, branch, baseCommit: head }
     })
+  }
+
+  private async baseCommit(
+    runner: GitRepositoryRunner,
+    body: v.InferOutput<typeof gitWorktreePrepareBodySchema>,
+  ) {
+    if (!body.baseBranch) return (await runner.run(['rev-parse', '--verify', 'HEAD'])).stdout.trim()
+    const ref = `refs/heads/${body.baseBranch}`
+    await runner.run(['check-ref-format', ref])
+    const resolved = await runner.run(
+      ['rev-parse', '--verify', '--quiet', '--end-of-options', `${ref}^{commit}`],
+      { allowFailure: true },
+    )
+    if (resolved.exitCode !== 0)
+      throw gitWorktreeErrors.WORKTREE_BASE_BRANCH_MISSING({
+        branch: body.baseBranch,
+        internal: { at: 'prepare', worktreeId: body.worktreeId, exitCode: resolved.exitCode },
+      })
+    return resolved.stdout.trim()
   }
 
   async create(input: GitWorktreeCreateBody): Promise<GitWorktreeCreateResult> {

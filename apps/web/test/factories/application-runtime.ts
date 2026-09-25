@@ -12,6 +12,7 @@ export function createTestApplicationRuntime() {
       appliedThemeId: null,
       selectedThemeId: 'dark-plus',
       syntaxHighlightingEnabled: false,
+      tabSize: 4,
     },
   })
   onTestFinished(() => application.dispose())

@@ -120,19 +120,24 @@ export const gitCreateBranchBodySchema = v.object({
   startPoint: v.optional(gitRefNameSchema),
 })
 
-export const gitWorktreePrepareBodySchema = v.object({
+const gitWorktreeIdentityEntries = {
   path: v.optional(pathSchema, ''),
   worktreeId: worktreeIdSchema,
+}
+
+export const gitWorktreePrepareBodySchema = v.object({
+  ...gitWorktreeIdentityEntries,
+  baseBranch: v.optional(gitRefNameSchema),
 })
 
 export const gitWorktreeCreateBodySchema = v.object({
-  ...gitWorktreePrepareBodySchema.entries,
+  ...gitWorktreeIdentityEntries,
   baseCommit: gitObjectIdSchema,
   branch: gitRefNameSchema,
 })
 
 export const gitWorktreeTargetSchema = v.object({
-  ...gitWorktreePrepareBodySchema.entries,
+  ...gitWorktreeIdentityEntries,
   worktreePath: pathSchema,
   pathKind: v.optional(v.picklist(['id-derived', 'legacy'])),
 })

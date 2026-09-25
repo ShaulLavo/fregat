@@ -8,15 +8,11 @@ import type { EditorKeymapOptions } from '@singapore-editor/core/keymap'
  */
 
 /**
- * Explicit, because `adoptDocumentTabSize` otherwise guesses from the buffer on every `setText`,
- * and the buffer here is an interleaved projection full of placeholder rows and
- * `Show N unmodified lines` separators: tab width would flip per file *and* per expansion toggle.
- *
- * A constant rather than `editor.tabSize`: the option is read once in the `Editor` constructor and
- * has no setter, so binding it to a live setting would give a knob that silently stops tracking
- * after the first render. This matches that setting's default; a diff is not where you tune it.
+ * The buffer is an interleaved projection full of placeholder rows and `Show N unmodified lines`
+ * separators; guessing indentation from it would flip the width per file *and* per expansion
+ * toggle. The diff takes `editor.tabSize` as it is.
  */
-export const DIFF_TAB_SIZE = 4
+export const DIFF_DETECT_INDENTATION = false
 
 /**
  * `undefined` means *default* here, and the default is `rowBackground: true` — a cursor line

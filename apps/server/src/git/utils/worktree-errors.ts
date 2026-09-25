@@ -31,6 +31,12 @@ export const gitWorktreeErrors = defineErrorCatalog('git', {
     why: 'The missing checkout cannot be verified for an exact safe removal.',
     fix: 'Inspect this exact Git worktree manually; do not run a broad worktree prune.',
   },
+  WORKTREE_BASE_BRANCH_MISSING: {
+    status: 404,
+    message: ({ branch }: { branch: string }) => `The branch ${branch} does not exist`,
+    why: 'A new worktree was asked to start from a local branch the repository does not have.',
+    fix: 'Pick another branch for the new worktree, or create this branch first.',
+  },
   WORKTREE_BASE_UNRESOLVED: {
     status: 404,
     message: ({ headBranch }: { headBranch: string }) =>

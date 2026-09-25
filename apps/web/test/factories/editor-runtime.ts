@@ -26,6 +26,7 @@ export function createTestEditorRuntime(
       appliedThemeId: null,
       selectedThemeId: 'dark',
       syntaxHighlightingEnabled: readSettingsMirror()['editor.syntaxHighlighting.enabled'],
+      tabSize: readSettingsMirror()['editor.tabSize'],
     },
   })
 }

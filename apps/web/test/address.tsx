@@ -144,6 +144,7 @@ export async function renderAddressHarness({
       appliedThemeId: null,
       selectedThemeId: 'dark',
       syntaxHighlightingEnabled: false,
+      tabSize: 4,
     },
   })
   const navigation = suppliedNavigation ?? createTestNavigation({ initialEntries, initialIndex })

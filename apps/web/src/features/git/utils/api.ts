@@ -120,27 +120,6 @@ export async function generateCommitMessage(path: string, signal: AbortSignal, c
   )
 }
 
-export async function fetchBranches(path: string, signal: AbortSignal | undefined, client: Client) {
-  return observeGitOperation(
-    { ...clientLogContext(client), action: 'git.branches', path, signal },
-    async () => {
-      const response = await client.git.branches.get({
-        query: { path },
-        fetch: { signal },
-      })
-
-      return unwrapEdenResponse(response, {
-        requireData: true,
-        emptyMessage: 'git server returned an empty response',
-      })
-    },
-    (result) => ({
-      branchCount: result.branches.length,
-      hasRepository: result.repository !== null,
-    }),
-  )
-}
-
 export async function stagePath(path: string, client: Client) {
   return stagePaths([path], client)
 }

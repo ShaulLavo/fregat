@@ -24,13 +24,13 @@ import type {
   FileOpenIntentStructuralRange,
 } from '@/lib/file-open-intent/state/service'
 
-const DEFAULT_EDITOR_TAB_SIZE = 4
-
 export type EditorPreparedEnvironment = {
   readonly appliedThemeContentHash: string | null
   readonly appliedThemeId: string | null
   readonly selectedThemeId: string
   readonly syntaxHighlightingEnabled: boolean
+  /** Must equal the mounted editor's `tabSize`, or the editor declines the prepared document. */
+  readonly tabSize: number
 }
 
 export type EditorPreparedDocumentTags = {
@@ -84,7 +84,7 @@ export function createPlatformFileOpenPreparer(
 
 export function editorPreparedDocumentTags(
   path: string,
-  environment: EditorPreparedEnvironment,
+  environment: Omit<EditorPreparedEnvironment, 'tabSize'>,
   languageId = languageIdForFilePath(path),
 ): EditorPreparedDocumentTags {
   const source = environment.syntaxHighlightingEnabled
@@ -114,7 +114,7 @@ function prepareEditorDocument(
   const tags = editorPreparedDocumentTags(path, environment)
   return createEditorPreparedDocument({
     buffer,
-    configuredTabSize: DEFAULT_EDITOR_TAB_SIZE,
+    configuredTabSize: environment.tabSize,
     tabSizePolicy: 'detect-indentation',
     documentConfigurationTag: tags.documentConfigurationTag,
     documentId,

@@ -62,7 +62,7 @@ Click `.editor-virtualized-viewport`, not the hidden textarea; the viewport inte
 
 The click scenario waits 750ms between clicks so debounced document highlights, code actions and hover requests can finish. Faster clicks cancel those requests and can hide subscription bugs. Inspect `BottomPanel` (the Terminal/Problems container) separately from `TerminalPanel` and `TerminalTabs`; React Scan can outline the whole container when only that parent renders.
 
-`scenario editor-typography` changes `editor.fontSize`, `editor.lineHeight` and `editor.fontFamily` (restored afterwards) and checks the open editor re-measures within the frame: the row pitch equals the line height, the character width tracks the size, and a hover over the editor reads the same face.
+`scenario editor-typography` opens a fixture file with a tab-indented line, changes `editor.fontSize`, `editor.lineHeight` and `editor.tabSize` (restored afterwards) and checks the open editor at each step: the row pitch equals the line height, the caret stands before the glyph it precedes, a tab spans the tab size, and the size variable popups copy matches.
 
 `scenario editor-conflict-merge` opens a disposable file, types an unsaved edit, writes the file externally, chooses Compare in the conflict toast, and takes Accept Current Change from the merge lens. The resolved file on disk must keep the local edit and drop the incoming one, with no marker left, and the conflict toast must close. A clean external write goes first, so the file watch is live before the conflicting one.
 

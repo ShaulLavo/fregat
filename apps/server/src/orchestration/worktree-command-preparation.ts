@@ -75,6 +75,7 @@ export class WorktreeCommandPreparation {
       const prepared = await this.options.git.prepareCreate({
         path: base.canonicalPath,
         worktreeId: target.worktreeId,
+        baseBranch: target.baseBranch,
       })
       const worktreeProvisioning = {
         worktreeId: target.worktreeId,
