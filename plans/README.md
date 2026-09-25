@@ -8,7 +8,7 @@ Cross-project dependencies and execution order are authoritative in [`PLAN.md`](
 index lists executable plans only; it does not define a second roadmap.
 
 The separate [Editor backlog](../../Editor/plans/README.md) holds 55 entries covering all 28 Editor
-wishlist topics, 22 of them still executable plans, with their package/host ownership and
+wishlist topics, 15 of them still executable plans (2026-09-25), with their package/host ownership and
 dependencies. Plan 071 remains the existing syntax-retry proposal here.
 
 Before executing a plan, reconcile its drift check and line references against current source.
@@ -140,9 +140,9 @@ a bare root `bun run verify`.
 - Plan 099 owns canonical Editor buffer publication and shared document synchronization through
   contributions. Baseline/publication groundwork can proceed independently. Its public cutover follows
   the completed identity and source-ownership contracts from 098 then 097. It uses strings and
-  incremental edits in the existing separate workers, removing SAB text transport with the syntax
-  migration. Editor E009 supplies measurement evidence; E013 shared storage is deferred outside
-  this refactor. E014 parallel search must reuse the runtime if implemented.
+  incremental edits in the existing separate workers. Units 0–1 are approved (owner, 2026-09-25).
+  The SAB text transport is deleted ahead of it as Editor E057; Editor E009 is folded into its unit
+  6, and E010, E012 and E013 shared storage were closed as no-go. E014 parallel search must reuse the runtime if implemented.
 
 - The required **098 → 097** order is complete. The [document model](../docs/document-and-tab-domain.md)
   and [async operation ownership](../docs/async-operation-ownership.md) references describe the
