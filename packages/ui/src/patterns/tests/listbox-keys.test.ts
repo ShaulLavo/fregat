@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { listboxKeyAction, type ListboxKeyInput } from '@workspace/ui/patterns/listbox-keys'
+import {
+  listboxKeyAction,
+  typeaheadListboxIndex,
+  type ListboxKeyInput,
+} from '@workspace/ui/patterns/listbox-keys'
 
 const base: ListboxKeyInput = {
   key: 'ArrowDown',
@@ -71,5 +75,35 @@ describe('listbox keys', () => {
       kind: 'parent',
     })
     expect(listboxKeyAction({ ...base, key: 'ArrowRight' })).toEqual({ kind: 'none' })
+  })
+
+  describe('typeahead', () => {
+    const items = [
+      { id: 'a', label: 'about' },
+      { id: 'b', label: 'abc', disabled: true },
+      { id: 'c', label: 'abcd' },
+      { id: 'd', label: 'banana' },
+      { id: 'e', label: 'abstract' },
+    ]
+
+    it('refines in place while the active row still matches', () => {
+      expect(typeaheadListboxIndex(items, 0, 'abo')).toBe(0)
+      expect(typeaheadListboxIndex(items, 2, 'abc')).toBe(2)
+    })
+
+    it('cycles a single letter from the next row', () => {
+      expect(typeaheadListboxIndex(items, 1, 'a')).toBe(2)
+      expect(typeaheadListboxIndex(items, 3, 'a')).toBe(4)
+    })
+
+    it('skips disabled rows', () => {
+      expect(typeaheadListboxIndex(items, 1, 'abc')).toBe(2)
+    })
+
+    it('wraps past the end and reports a miss', () => {
+      expect(typeaheadListboxIndex(items, 5, 'ab')).toBe(0)
+      expect(typeaheadListboxIndex(items, 4, 'b')).toBe(3)
+      expect(typeaheadListboxIndex(items, 0, 'zz')).toBe(-1)
+    })
   })
 })

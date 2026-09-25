@@ -133,6 +133,23 @@ describe('useListbox', () => {
     expect(search.list.querySelector('[aria-selected="true"]')?.textContent).toContain('Delta')
   })
 
+  it('refines typeahead in place while the active row still matches', () => {
+    const { list } = renderListbox({
+      typeahead: true,
+      items: [
+        { id: 'a', label: 'Alpha' },
+        { id: 'd', label: 'Delta' },
+        { id: 'x', label: 'Dexter' },
+      ],
+    })
+    const active = () => list.querySelector('[aria-selected="true"]')?.textContent
+    press(list, 'd')
+    press(list, 'e')
+    expect(active()).toContain('Delta')
+    press(list, 'x')
+    expect(active()).toContain('Dexter')
+  })
+
   it.each(['aria-pressed', 'data-dragging'])(
     'leaves a picked-up row with %s to the drag sensor',
     (attribute) => {

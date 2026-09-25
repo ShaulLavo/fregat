@@ -70,16 +70,15 @@ export function enabledListboxIndex(
   return -1
 }
 
-export function typeaheadListboxIndex(
-  items: readonly ListboxItem[],
-  activeIndex: number,
-  query: string,
-) {
-  for (let offset = 1; offset <= items.length; offset += 1) {
-    const index = (Math.max(-1, activeIndex) + offset) % items.length
+// Searches from `from` inclusive, wrapping, so a longer buffer can stay on a row that still matches.
+export function typeaheadListboxIndex(items: readonly ListboxItem[], from: number, query: string) {
+  const start = Math.max(0, from)
+  const needle = query.toLocaleLowerCase()
+  for (let offset = 0; offset < items.length; offset += 1) {
+    const index = (start + offset) % items.length
     const item = items[index]
     if (item?.disabled || !item?.label) continue
-    if (item.label.toLocaleLowerCase().startsWith(query.toLocaleLowerCase())) return index
+    if (item.label.toLocaleLowerCase().startsWith(needle)) return index
   }
   return -1
 }

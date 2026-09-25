@@ -97,10 +97,10 @@ export function useListbox<Id extends string>({
     const previous = now - typed.current.timestamp > 700 ? '' : typed.current.query
     const query = previous + event.key
     typed.current = { query, timestamp: now }
-    let index = typeaheadListboxIndex(items, cursorIndex, query)
-    if (index < 0 && [...query].every((character) => character === event.key)) {
-      index = typeaheadListboxIndex(items, cursorIndex, event.key)
-    }
+    const repeated = [...query].every((character) => character === event.key)
+    const from = repeated ? cursorIndex + 1 : cursorIndex
+    let index = typeaheadListboxIndex(items, from, query)
+    if (index < 0 && repeated) index = typeaheadListboxIndex(items, cursorIndex + 1, event.key)
     if (index < 0) return
     event.preventDefault()
     moveTo(index)
