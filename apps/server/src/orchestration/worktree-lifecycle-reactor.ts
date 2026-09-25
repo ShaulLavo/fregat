@@ -87,7 +87,14 @@ export class WorktreeLifecycleReactor {
 
   private handleSetupRequest(worktreeId: WorktreeId, state: WorktreeSetup['state']) {
     if (state === 'queued') this.startSetup(worktreeId)
-    if (state === 'cancelling') void this.setups.cancel(worktreeId)
+    if (state === 'cancelling')
+      void this.setups.cancel(worktreeId).catch((error: unknown) =>
+        recordProcessWarning('worktree.setup.cancel-failed', {
+          area: 'worktree',
+          worktreeId,
+          error,
+        }),
+      )
   }
 
   private schedule(worktreeId: WorktreeId, operationId: CommandId) {

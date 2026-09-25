@@ -1,7 +1,8 @@
 import * as v from 'valibot'
 import { orchestrationCommandSchema } from '@workspace/contracts'
 import { SetupRunner } from '../setup-runner'
-import { readFile } from 'node:fs/promises'
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, expect, test } from 'vitest'
 import { closeTestApps } from '../../../test/server'
@@ -221,4 +222,32 @@ test('cancellation owns the setup before the running report completes', async ()
   expect((await running).state).toBe('cancelled')
   await expect(readFile(path.join(fixture.root, 'cancelled-setup'))).rejects.toThrow()
   await runner.close()
+})
+
+test('a setup whose directory is gone fails instead of staying running', async () => {
+  const runner = new SetupRunner()
+  const missing = path.join(tmpdir(), `platform-missing-${crypto.randomUUID()}`)
+  const outcome = await runner.run(
+    lifecycleWorktreeId,
+    { command: 'true', worktreePath: missing, projectRoot: missing },
+    async () => {},
+  )
+  expect(outcome).toMatchObject({ state: 'failed', exitCode: null })
+  expect(runner.isRunning(lifecycleWorktreeId)).toBe(false)
+  await runner.close()
+})
+
+test('a setup that leaves a process holding its output finishes when the script exits', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'platform-setup-'))
+  const runner = new SetupRunner()
+  const startedAt = performance.now()
+  const outcome = await runner.run(
+    lifecycleWorktreeId,
+    { command: 'sleep 20 & echo started', worktreePath: root, projectRoot: root },
+    async () => {},
+  )
+  expect(performance.now() - startedAt).toBeLessThan(5_000)
+  expect(outcome).toMatchObject({ state: 'done', exitCode: 0, output: ['started'] })
+  await runner.close()
+  await rm(root, { recursive: true, force: true })
 })
