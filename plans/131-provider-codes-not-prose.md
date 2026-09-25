@@ -1,7 +1,15 @@
 # Provider adapters branch on codes, not on prose
 
 Status: **PHASE 1 IMPLEMENTED AND DEPLOYED 2026-09-23** (release
-`20260923T083633Z-51995766-plan-131-132-phase1`); Phases 2 and 3 proposed. Requested 2026-09-21.
+`20260923T083633Z-51995766-plan-131-132-phase1`); **Phase 2 implemented 2026-09-25** on lane L2
+(completion wave), not yet deployed; Phase 3 proposed. Requested 2026-09-21.
+Phase 2 outcome: `provider.REQUEST_GONE` and `provider.NOT_INSTALLED` are catalog entries. Both
+adapters throw `REQUEST_GONE` for an unknown request id; the reactor copies the code onto the
+respond-failure activity (and sets it itself when no session is bound), and `pending-requests`
+closes a request on that code alone. The `'stale pending '` sentence and both string matchers are
+gone. `NOT_INSTALLED` comes from the Claude resolver when there is neither an installed nor a
+bundled CLI, and from the Codex probe when `Bun.which` cannot find the binary; the `enoent` /
+`exited with code 127` sniffing is gone.
 Phase 1 outcome: persistence comes only from `_meta.persist` with the exact values `session` and
 `always` that `codex-rs/protocol/src/mcp_approval_meta.rs` declares; a form option supplies the wire
 value only when its `const` is exactly `once`, `session` or `always`, and only for a persistence the

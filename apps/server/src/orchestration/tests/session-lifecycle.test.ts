@@ -104,7 +104,8 @@ describe('settle guards', () => {
     await engine.dispatch(activityCommand('user-input.requested', 'info'))
     await engine.dispatch(
       activityCommand('provider.user-input.respond.failed', 'error', {
-        detail: 'Stale pending user-input request: request-1. Restart the turn to continue.',
+        code: 'provider.REQUEST_GONE',
+        detail: 'The agent no longer holds this request. Restart the turn to continue.',
         requestId: 'request-1',
       }),
     )

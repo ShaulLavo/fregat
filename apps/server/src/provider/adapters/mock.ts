@@ -27,7 +27,8 @@ import { sessionInputFromTurn } from './utils/session-input'
 
 export type MockProviderAdapterOptions = {
   operationTimeoutMs?: number
-  approvalError?: string
+  /** Thrown as-is, so a test can raise a catalog error such as `REQUEST_GONE`. */
+  approvalError?: Error
   auth?: ProviderSnapshot['auth']
   beforeComplete?: () => Promise<void> | void
   /** Replaces the default catalog; `{ commands: [], skills: [] }` models a provider with nothing to offer. */
@@ -45,7 +46,7 @@ export type MockProviderAdapterOptions = {
   responseText?: string
   shouldFail?: boolean
   stopError?: string
-  userInputError?: string
+  userInputError?: Error
 }
 
 export const MOCK_ADAPTER_CAPABILITIES = {
@@ -101,7 +102,7 @@ export class MockProviderAdapter implements ProviderAdapter {
   private readonly events = new ProviderRuntimeEventStream()
   private readonly sessions = new Map<SessionId, ProviderRuntimeStartInput>()
   private readonly settings: ProviderInstanceSettings
-  private readonly approvalError: string | null
+  private readonly approvalError: Error | null
   private readonly authOverride: ProviderSnapshot['auth'] | null
   private readonly beforeComplete: (() => Promise<void> | void) | null
   private readonly commandCatalog: ProviderCommandCatalogResult
@@ -111,7 +112,7 @@ export class MockProviderAdapter implements ProviderAdapter {
   private readonly completedTurns = new Map<SessionId, number>()
   private readonly shouldFail: boolean
   private readonly stopError: string | null
-  private readonly userInputError: string | null
+  private readonly userInputError: Error | null
 
   constructor(options: MockProviderAdapterOptions = {}) {
     this.operationTimeoutMs = options.operationTimeoutMs ?? 30_000
@@ -352,7 +353,7 @@ export class MockProviderAdapter implements ProviderAdapter {
     requestId: ApprovalRequestId
     sessionId: SessionId
   }) {
-    if (this.approvalError) throw createInternalError(this.approvalError)
+    if (this.approvalError) throw this.approvalError
 
     this.approvalResponses.push(input)
   }
@@ -362,7 +363,7 @@ export class MockProviderAdapter implements ProviderAdapter {
     requestId: ApprovalRequestId
     sessionId: SessionId
   }) {
-    if (this.userInputError) throw createInternalError(this.userInputError)
+    if (this.userInputError) throw this.userInputError
 
     this.userInputResponses.push(input)
   }

@@ -46,7 +46,7 @@ import {
 } from '../../orchestration/orchestration-logging'
 import { RuntimeAdapter } from './state/runtime-adapter'
 import { SessionContext } from './state/session-context'
-import { sessionIdentityErrors } from '../structured-errors'
+import { isNotInstalledError, requestGone, sessionIdentityErrors } from '../structured-errors'
 import {
   discoverClaudeSessions,
   readClaudeSessionHistory,
@@ -280,8 +280,7 @@ export class ClaudeProviderAdapter
         ...(state.message ? { message: state.message } : {}),
       }
     } catch (error) {
-      if (isMissingClaudeBinaryError(error))
-        return unavailableClaudeSnapshot(checkedAt, this.settings)
+      if (isNotInstalledError(error)) return unavailableClaudeSnapshot(checkedAt, this.settings)
 
       recordChatPipelineWarning('chat.pipeline.claude_adapter.snapshot.failed', {
         error,
@@ -828,7 +827,7 @@ class ClaudeAgentSession extends SessionContext {
 
   async respondApproval(input: ProviderApprovalResponseInput) {
     const pending = this.pendingApprovals.get(input.requestId)
-    if (!pending) throw createInternalError(`Unknown pending approval request: ${input.requestId}`)
+    if (!pending) throw requestGone('approval', input.requestId)
 
     const result = offeredResponse(pending.offers, input.decision, input.requestId)
     this.pendingApprovals.delete(input.requestId)
@@ -1787,9 +1786,7 @@ class ClaudeAgentSession extends SessionContext {
 
   async respondUserInput(input: ProviderUserInputResponseInput) {
     const pending = this.pendingUserInputs.get(input.requestId)
-    if (!pending) {
-      throw createInternalError(`Unknown pending user-input request: ${input.requestId}`)
-    }
+    if (!pending) throw requestGone('user-input', input.requestId)
 
     this.pendingUserInputs.delete(input.requestId)
     // The SDK reads the answers off `updatedInput`, keyed by question text, and
@@ -2474,15 +2471,6 @@ function unavailableClaudeSnapshot(
     status: 'error',
     version: null,
   }
-}
-
-function isMissingClaudeBinaryError(error: unknown) {
-  if (typeof error !== 'object' || error === null) return false
-  if ('code' in error && error.code === 'ENOENT') return true
-
-  const message = providerErrorMessage(error).toLowerCase()
-  if (message.includes('executable not found')) return true
-  return message.includes('enoent') || message.includes('exited with code 127')
 }
 
 /** The snapshot has one line for the providers UI, so a catalog error brings its fix along. */

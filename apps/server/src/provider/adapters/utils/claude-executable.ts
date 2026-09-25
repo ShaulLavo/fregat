@@ -44,8 +44,9 @@ export async function resolveClaudeExecutable(input: {
 
   const bundled = probe.bundled()
   const installedPath = probe.which('claude', input.env)
-  // Neither exists: the spawn fails and the snapshot reports "not installed".
-  if (!installedPath) return bundled ?? { path: 'claude', source: 'installed', version: null }
+  if (!installedPath && bundled) return bundled
+  if (!installedPath)
+    throw sessionIdentityErrors.NOT_INSTALLED({ internal: { provider: 'claude' } })
 
   const installed: ClaudeExecutable = {
     path: installedPath,

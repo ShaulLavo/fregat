@@ -57,6 +57,12 @@ describe('resolveClaudeExecutable', () => {
     expect(executable).toEqual(BUNDLED)
   })
 
+  it('reports not installed when there is neither an installed nor a bundled CLI', async () => {
+    await expect(
+      resolveClaudeExecutable({ env: {}, probe: probe({ bundled: null, installed: null }) }),
+    ).rejects.toMatchObject({ code: 'provider.NOT_INSTALLED' })
+  })
+
   it('always runs a configured binary, whatever its version', async () => {
     const executable = await resolveClaudeExecutable({
       binaryPath: '/present/claude',

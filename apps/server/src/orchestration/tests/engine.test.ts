@@ -32,6 +32,7 @@ import { ProviderRuntimeIngestion } from '../provider-runtime-ingestion'
 import { OrchestrationSnapshotQuery } from '../snapshot-query'
 import { MockProviderAdapter } from '../../provider/adapters/mock'
 import { ProviderAdapterRegistry } from '../../provider/provider-adapter-registry'
+import { requestGone } from '../../provider/structured-errors'
 import { checkpointRefForSessionTurn } from '../checkpoint-refs'
 
 import { testSettingsOptions } from '../../settings/testing'
@@ -845,8 +846,8 @@ describe('orchestration engine', () => {
   it('projects stale approval and user-input responses as recoverable activities', async () => {
     const fixture = createFixture()
     const adapter = new MockProviderAdapter({
-      approvalError: 'unknown pending approval request: approval-1',
-      userInputError: 'unknown pending user-input request: user-input-1',
+      approvalError: requestGone('approval', 'approval-1'),
+      userInputError: requestGone('user-input', 'user-input-1'),
     })
     const engine = createRuntimeEngine(fixture, adapter)
     const sessionId = v.parse(sessionIdSchema, '00000000-0000-4000-8000-000000000001')
@@ -883,7 +884,9 @@ describe('orchestration engine', () => {
       expect.objectContaining({
         kind: 'provider.approval.respond.failed',
         payload: expect.objectContaining({
-          detail: expect.stringContaining('Stale pending approval request: approval-1'),
+          code: 'provider.REQUEST_GONE',
+          detail: expect.stringContaining('Restart the turn to continue.'),
+          requestId: 'approval-1',
         }),
       }),
     )
@@ -891,7 +894,8 @@ describe('orchestration engine', () => {
       expect.objectContaining({
         kind: 'provider.user-input.respond.failed',
         payload: expect.objectContaining({
-          detail: expect.stringContaining('Stale pending user-input request: user-input-1'),
+          code: 'provider.REQUEST_GONE',
+          requestId: 'user-input-1',
         }),
       }),
     )

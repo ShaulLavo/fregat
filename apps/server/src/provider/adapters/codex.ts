@@ -43,6 +43,7 @@ import type {
   ProviderSessionDiscoveryInput,
   ProviderSessionHistoryInput,
 } from '../types'
+import { isNotInstalledError, requestGone, sessionIdentityErrors } from '../structured-errors'
 import { RuntimeAdapter } from './state/runtime-adapter'
 import { SessionContext } from './state/session-context'
 import {
@@ -283,8 +284,7 @@ export class CodexProviderAdapter
         ...(probe.message ? { message: probe.message } : {}),
       }
     } catch (error) {
-      if (isMissingCodexBinaryError(error))
-        return unavailableCodexSnapshot(checkedAt, this.settings)
+      if (isNotInstalledError(error)) return unavailableCodexSnapshot(checkedAt, this.settings)
 
       recordChatPipelineWarning('chat.pipeline.codex_adapter.snapshot.failed', {
         error,
@@ -824,7 +824,7 @@ class CodexAppServerSession extends SessionContext {
 
   async respondApproval(input: ProviderApprovalResponseInput) {
     const pending = this.pendingApprovals.get(input.requestId)
-    if (!pending) throw createInternalError(`Unknown pending approval request: ${input.requestId}`)
+    if (!pending) throw requestGone('approval', input.requestId)
 
     const decision = v.parse(providerApprovalDecisionSchema, input.decision)
     const response = offeredResponse(pending.offers, decision, input.requestId)
@@ -856,8 +856,7 @@ class CodexAppServerSession extends SessionContext {
 
   async respondUserInput(input: ProviderUserInputResponseInput) {
     const pending = this.pendingUserInputs.get(input.requestId)
-    if (!pending)
-      throw createInternalError(`Unknown pending user-input request: ${input.requestId}`)
+    if (!pending) throw requestGone('user-input', input.requestId)
 
     const answers = codexUserInputAnswers(input.answers)
     this.pendingUserInputs.delete(input.requestId)
@@ -2405,6 +2404,9 @@ class CodexAppServerRpcClient {
 }
 
 async function probeCodexProvider(env: NodeJS.ProcessEnv) {
+  if (!Bun.which(codexBinary(env), { PATH: env.PATH ?? '' })) {
+    throw sessionIdentityErrors.NOT_INSTALLED({ internal: { provider: 'codex' } })
+  }
   const client = CodexAppServerRpcClient.start(env)
   try {
     const initialize = await initializeCodexClient(client, PROVIDER_PROBE_TIMEOUT_MS)
@@ -2979,12 +2981,6 @@ function codexVersionFromInitialize(response: CodexClientRequestResultByMethod['
   if (!userAgent) return null
 
   return userAgent.match(/\/([^\s]+)/)?.[1] ?? userAgent
-}
-
-function isMissingCodexBinaryError(error: unknown) {
-  if (typeof error !== 'object' || error === null) return false
-
-  return 'code' in error && error.code === 'ENOENT'
 }
 
 function unavailableCodexSnapshot(

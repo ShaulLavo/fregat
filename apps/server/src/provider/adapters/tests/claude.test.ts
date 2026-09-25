@@ -462,7 +462,7 @@ describe('ClaudeProviderAdapter', () => {
         requestId: v.parse(approvalRequestIdSchema, 'claude:missing'),
         sessionId,
       }),
-    ).rejects.toThrow('Unknown pending approval request: claude:missing')
+    ).rejects.toMatchObject({ code: 'provider.REQUEST_GONE' })
     await harness.adapter.stopAll()
   })
 
@@ -650,7 +650,7 @@ describe('ClaudeProviderAdapter', () => {
         requestId: v.parse(approvalRequestIdSchema, 'claude:missing'),
         sessionId: input.sessionId,
       }),
-    ).rejects.toThrow('Unknown pending user-input request: claude:missing')
+    ).rejects.toMatchObject({ code: 'provider.REQUEST_GONE' })
 
     latestQuery(harness).emit(successResult())
     await pending

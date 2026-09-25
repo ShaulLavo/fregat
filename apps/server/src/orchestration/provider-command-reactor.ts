@@ -3,10 +3,11 @@ import { defaultAttachmentsDir } from '../attachments/store'
 import { assertRewindIsolation } from './rewind-isolation'
 import { maxCheckpointTurnCount } from './checkpoint-turn-count'
 import { runtimeEventId } from '../provider/adapters/utils/runtime-ids'
-import { errorMessage as providerErrorMessage } from '@workspace/contracts'
+import { errorMessage as providerErrorMessage, errorStringField } from '@workspace/contracts'
 import { resolveSessionOwner } from './session-owner'
 import { internalCommandKey } from './utils/repository-ids'
 import { createInternalError } from '../observability/structured-errors'
+import { sessionIdentityErrors } from '../provider/structured-errors'
 
 import type {
   InteractionMode,
@@ -642,7 +643,7 @@ export class ProviderCommandReactor {
 
       await this.appendProviderFailureActivity({
         runtimeEpoch,
-        detail: noActiveSessionDetail(),
+        ...noActiveSessionFailure(),
         event,
         kind: 'provider.approval.respond.failed',
         requestId: event.payload.requestId,
@@ -651,7 +652,7 @@ export class ProviderCommandReactor {
     } catch (error) {
       await this.appendProviderFailureActivity({
         runtimeEpoch,
-        detail: approvalResponseFailureDetail(error, event.payload.requestId),
+        ...respondFailure(error),
         event,
         kind: 'provider.approval.respond.failed',
         requestId: event.payload.requestId,
@@ -678,7 +679,7 @@ export class ProviderCommandReactor {
 
       await this.appendProviderFailureActivity({
         runtimeEpoch,
-        detail: noActiveSessionDetail(),
+        ...noActiveSessionFailure(),
         event,
         kind: 'provider.user-input.respond.failed',
         requestId: event.payload.requestId,
@@ -687,7 +688,7 @@ export class ProviderCommandReactor {
     } catch (error) {
       await this.appendProviderFailureActivity({
         runtimeEpoch,
-        detail: userInputResponseFailureDetail(error, event.payload.requestId),
+        ...respondFailure(error),
         event,
         kind: 'provider.user-input.respond.failed',
         requestId: event.payload.requestId,
@@ -697,6 +698,7 @@ export class ProviderCommandReactor {
   }
 
   private async appendProviderFailureActivity(input: {
+    code?: string
     detail: string
     event: ProviderIntentEvent
     kind:
@@ -718,7 +720,7 @@ export class ProviderCommandReactor {
       runtimeEpoch: input.runtimeEpoch,
       kind: input.kind,
       payload: {
-        ...providerFailurePayload(input.detail, input.requestId),
+        ...providerFailurePayload(input),
         commandId: input.event.commandId,
       },
       summary: input.summary,
@@ -942,10 +944,12 @@ function isProviderIntentEvent(event: OrchestrationEvent): event is ProviderInte
   }
 }
 
-function providerFailurePayload(detail: string, requestId: string | undefined) {
-  if (!requestId) return { detail }
-
-  return { detail, requestId }
+function providerFailurePayload(input: { code?: string; detail: string; requestId?: string }) {
+  return {
+    detail: input.detail,
+    ...(input.code ? { code: input.code } : {}),
+    ...(input.requestId ? { requestId: input.requestId } : {}),
+  }
 }
 
 function providerFailureCreatedAt(event: ProviderIntentEvent) {
@@ -998,41 +1002,25 @@ function turnStartKeyForEvent(
   return `event:${event.eventId}`
 }
 
+/** The activity carries the code, so `pending-requests` can tell a dead request from a transient failure. */
+function noActiveSessionFailure() {
+  return {
+    code: sessionIdentityErrors.REQUEST_GONE.code,
+    detail: `${noActiveSessionDetail()} ${sessionIdentityErrors.REQUEST_GONE.fix}`,
+  }
+}
+
 function noActiveSessionDetail() {
   return 'No active provider session is bound to this session.'
 }
 
-function approvalResponseFailureDetail(error: unknown, requestId: string) {
-  const detail = providerErrorMessage(error)
-  if (isUnknownPendingApprovalRequestError(detail)) {
-    return stalePendingRequestDetail('approval', requestId)
-  }
+function respondFailure(error: unknown) {
+  const code = errorStringField(error, 'code')
+  if (code !== sessionIdentityErrors.REQUEST_GONE.code)
+    return { detail: providerErrorMessage(error) }
 
-  return detail
-}
-
-function userInputResponseFailureDetail(error: unknown, requestId: string) {
-  const detail = providerErrorMessage(error)
-  if (isUnknownPendingUserInputRequestError(detail)) {
-    return stalePendingRequestDetail('user-input', requestId)
-  }
-
-  return detail
-}
-
-function isUnknownPendingApprovalRequestError(detail: string) {
-  const normalized = detail.toLowerCase()
-  if (normalized.includes('unknown pending approval request')) return true
-
-  return normalized.includes('unknown pending permission request')
-}
-
-function isUnknownPendingUserInputRequestError(detail: string) {
-  return detail.toLowerCase().includes('unknown pending user-input request')
-}
-
-function stalePendingRequestDetail(requestKind: 'approval' | 'user-input', requestId: string) {
-  return `Stale pending ${requestKind} request: ${requestId}. Provider callback state does not survive app restarts or recovered sessions. Restart the turn to continue.`
+  const gone = sessionIdentityErrors.REQUEST_GONE
+  return { code, detail: `${gone.message}. ${gone.fix}` }
 }
 
 function providerDisplayName(providerInstanceId: ModelSelection['providerInstanceId']) {

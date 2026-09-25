@@ -1781,7 +1781,7 @@ describe('CodexProviderAdapter', () => {
             await adapter.respondApproval({ sessionId: input.sessionId, requestId, decision })
             await expect(
               adapter.respondApproval({ sessionId: input.sessionId, requestId, decision }),
-            ).rejects.toThrow('Unknown pending approval')
+            ).rejects.toMatchObject({ code: 'provider.REQUEST_GONE' })
           }
           await waitForFakeCodexEvent(spawnLogPath, 'server-response', 2)
           await adapter.stopAll()
@@ -1879,7 +1879,7 @@ describe('CodexProviderAdapter', () => {
             await adapter.respondApproval({ sessionId: input.sessionId, requestId, decision })
             await expect(
               adapter.respondApproval({ sessionId: input.sessionId, requestId, decision }),
-            ).rejects.toThrow('Unknown pending approval')
+            ).rejects.toMatchObject({ code: 'provider.REQUEST_GONE' })
           }
           await waitForFakeCodexEvent(spawnLogPath, 'server-response', 2)
           await adapter.stopAll()

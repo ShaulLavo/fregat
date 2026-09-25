@@ -1,3 +1,4 @@
+import { errorStringField } from '@workspace/contracts'
 import { defineErrorCatalog } from 'evlog'
 
 export const sessionIdentityErrors = defineErrorCatalog('provider', {
@@ -97,6 +98,18 @@ export const sessionIdentityErrors = defineErrorCatalog('provider', {
     why: 'The provider instance names a binary path that does not resolve to an executable.',
     fix: 'Correct the binary path in the provider settings, or clear it to use the installed `claude`.',
   },
+  REQUEST_GONE: {
+    status: 410,
+    message: 'The agent no longer holds this request',
+    why: 'The provider session that asked was restarted or recovered, and its pending requests do not survive that.',
+    fix: 'Restart the turn to continue.',
+  },
+  NOT_INSTALLED: {
+    status: 503,
+    message: 'The provider CLI is not installed',
+    why: 'No executable for this provider was found on the PATH the server runs with.',
+    fix: 'Install the CLI, or set its binary path in the provider settings.',
+  },
   HISTORY_UNSUPPORTED: {
     status: 400,
     message: 'This provider does not support conversation imports',
@@ -104,3 +117,12 @@ export const sessionIdentityErrors = defineErrorCatalog('provider', {
     fix: 'Choose a provider listed in the conversation import settings.',
   },
 })
+
+/** The provider has no callback for this request any more; the caller branches on the code. */
+export function requestGone(requestKind: 'approval' | 'user-input', requestId: string) {
+  return sessionIdentityErrors.REQUEST_GONE({ internal: { requestId, requestKind } })
+}
+
+export function isNotInstalledError(error: unknown) {
+  return errorStringField(error, 'code') === sessionIdentityErrors.NOT_INSTALLED.code
+}
