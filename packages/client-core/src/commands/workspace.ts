@@ -24,7 +24,7 @@ export const workspaceCommandMetadata = {
   }),
   'workspace.undoSessionAction': defineMetadata({
     category: 'Workspace',
-    description: 'Undo the settle, snooze, unpin or archive named in the notice.',
+    description: 'Undo the latest session lifecycle action.',
     id: 'workspace.undoSessionAction',
     execution: 'async',
     // Every pane without its own undo; the composer, editors, terminals and the file tree keep theirs.
@@ -44,6 +44,27 @@ export const workspaceCommandMetadata = {
     undoCategory: 'workspace-operation',
     when: ['sessionActionUndoable'],
     title: 'Undo session action',
+  }),
+  'workspace.redoSessionAction': defineMetadata({
+    category: 'Workspace',
+    description: 'Redo the session lifecycle action undone last.',
+    id: 'workspace.redoSessionAction',
+    execution: 'async',
+    keys: [
+      ...(['global', 'git', 'logs', 'problems', 'search', 'settings'] as const).map(
+        (pane): CommandKeyDefault => ({
+          chord: ['Mod+Shift+Z'],
+          pane,
+          preventDefault: true,
+          yieldsToTextEntry: true,
+        }),
+      ),
+      { chord: ['Shift+U'], pane: 'chat', platforms: ['tui'] },
+    ],
+    target: 'workspace',
+    undoCategory: 'workspace-operation',
+    when: ['sessionActionRedoable'],
+    title: 'Redo session action',
   }),
   'fileTree.undo': defineMetadata({
     category: 'Workspace',

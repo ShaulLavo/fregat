@@ -18,7 +18,11 @@ import {
 import { chatModeMutationKeys } from '@/features/chat-mode/utils/mutation-keys'
 import { primaryQueryClient } from '@/lib/environments/state/query-clients'
 import { useSessionMultiSelectStore } from '@/features/chat-mode/state/session-multi-select-store'
-import { useSessionUndoStore } from '@/features/chat-mode/state/session-undo'
+import {
+  useSessionUndoStore,
+  undoLatestSessionAction,
+  redoLatestSessionAction,
+} from '@/features/chat-mode/state/session-undo'
 import { useSessionActions } from '@/features/chat-mode/hooks/use-session-actions'
 import { reorderRailSession } from '@/features/chat-mode/state/rail-order-commands'
 import { railMarkerId } from '@workspace/client-core/chat/rail/drop'
@@ -41,12 +45,13 @@ async function undoButton(text: string) {
 }
 
 /** Mod+Z where the user's focus is; `Mod` is Command on macOS and Control elsewhere. */
-function pressUndo(target: EventTarget) {
+function pressUndo(target: EventTarget, redo = false) {
   const event = new KeyboardEvent('keydown', {
     bubbles: true,
     cancelable: true,
     code: 'KeyZ',
     key: 'z',
+    shiftKey: redo,
     ...(detectPlatform() === 'mac' ? { metaKey: true } : { ctrlKey: true }),
   })
   act(() => {
@@ -75,7 +80,7 @@ test('unpin Undo restores the pin key the row had', async ({ client, server }) =
   await waitFor(async () =>
     expect(await current()).toMatchObject({ pinOrderKey: 'm', pinnedAt: expect.any(String) }),
   )
-  expect(useSessionUndoStore.getState().slot).toBeNull()
+  expect(useSessionUndoStore.getState().undo.at(-1)).toBeUndefined()
 })
 
 test('settle Undo by Mod+Z restores the pin key, active slot and snooze that settling cleared', async ({
@@ -104,7 +109,7 @@ test('settle Undo by Mod+Z restores the pin key, active slot and snooze that set
   expect(pressUndo(neutral).defaultPrevented).toBe(true)
   await waitFor(async () =>
     expect(await current()).toMatchObject({
-      settledOverride: 'active',
+      settledOverride: null,
       pinOrderKey: 'm',
       pinnedAt: expect.any(String),
       activeOrderKey: 'c',
@@ -141,7 +146,7 @@ test('Mod+Z leaves text fields, the composer, editors, terminals and the file tr
     const registration = focus.register({ area, element, id, onIntent: () => false })
     act(() => element.focus())
     pressUndo(element)
-    expect(useSessionUndoStore.getState().slot, area).not.toBeNull()
+    expect(useSessionUndoStore.getState().undo.at(-1), area).not.toBeUndefined()
     registration.unregister()
     element.remove()
   }
@@ -154,7 +159,7 @@ test('Mod+Z leaves text fields, the composer, editors, terminals and the file tr
 
   const neutral = focusNeutral()
   expect(pressUndo(neutral).defaultPrevented).toBe(true)
-  await waitFor(async () => expect((await current()).settledOverride).toBe('active'))
+  await waitFor(async () => expect((await current()).settledOverride).toBeNull())
   neutral.remove()
 })
 
@@ -180,7 +185,7 @@ test('Mod+Z undoes from a pane without its own undo, such as the git pane', asyn
   })
   act(() => element.focus())
   expect(pressUndo(element).defaultPrevented).toBe(true)
-  await waitFor(async () => expect((await current()).settledOverride).toBe('active'))
+  await waitFor(async () => expect((await current()).settledOverride).toBeNull())
   registration.unregister()
   element.remove()
 })
@@ -217,7 +222,7 @@ test('bulk archive Undo restores only the rows that were archived', async ({ ser
   const client = createObservedInProcessClient(server, async (request) => {
     if (!request.url.endsWith('/orchestration/commands')) return
     const body = await request.clone().json()
-    if (body.type === 'session.unarchive') unarchived.push(body.sessionId)
+    if (body.type === 'session.lifecycle.restore') unarchived.push(body.sessionId)
     if (body.type !== 'session.archive' || body.sessionId !== failedId) return
     throw createClientError({
       code: 'TEST_NETWORK_FAILURE',
@@ -238,10 +243,12 @@ test('bulk archive Undo restores only the rows that were archived', async ({ ser
   await act(async () => {
     await hook.result.current.archiveSessions(refs)
   })
-  expect(useSessionUndoStore.getState().slot?.entries.map((entry) => entry.ref)).toEqual([
-    refs[0],
-    refs[2],
-  ])
+  expect(
+    useSessionUndoStore
+      .getState()
+      .undo.at(-1)
+      ?.entries.map((entry) => entry.ref),
+  ).toEqual([refs[0], refs[2]])
   const neutral = focusNeutral()
   pressUndo(neutral)
   await waitFor(async () =>
@@ -251,7 +258,7 @@ test('bulk archive Undo restores only the rows that were archived', async ({ ser
   neutral.remove()
 })
 
-test('consecutive settles share one Undo, and a manual change expires that row', async ({
+test('consecutive settles are separate, and a manual change discards only its row', async ({
   client,
   server,
 }) => {
@@ -262,15 +269,18 @@ test('consecutive settles share one Undo, and a manual change expires that row',
   const [first, second] = h.sessionIds as [SessionId, SessionId]
   await menu('Mark as settled', 'First')
   await menu('Mark as settled', 'Second')
-  await screen.findByText('2 settled')
+  await screen.findByText('1 settled')
   await menu('Move to active', 'First')
   await waitFor(() =>
     expect(
-      useSessionUndoStore.getState().slot?.entries.map((entry) => entry.ref.sessionId),
+      useSessionUndoStore
+        .getState()
+        .undo.at(-1)
+        ?.entries.map((entry) => entry.ref.sessionId),
     ).toEqual([second]),
   )
   await userEvent.click(await undoButton('1 settled'))
-  await waitFor(async () => expect((await session(second)).settledOverride).toBe('active'))
+  await waitFor(async () => expect((await session(second)).settledOverride).toBeNull())
   expect((await session(first)).settledOverride).toBe('active')
 })
 
@@ -283,7 +293,7 @@ test('dragging a pinned row to Settled offers the same Undo, which restores its 
   })
   const client = createObservedInProcessClient(server, async (request) => {
     if (!request.url.endsWith('/orchestration/commands')) return
-    if ((await request.clone().json()).type === 'session.unsettle') await held
+    if ((await request.clone().json()).type === 'session.lifecycle.restore') await held
   })
   const h = await createRailHarness(client, server)
   const first = h.sessionIds[0]!
@@ -306,7 +316,7 @@ test('dragging a pinned row to Settled offers the same Undo, which restores its 
   )
   release()
   await waitFor(async () =>
-    expect(await current()).toMatchObject({ settledOverride: 'active', pinOrderKey: 'm' }),
+    expect(await current()).toMatchObject({ settledOverride: null, pinOrderKey: 'm' }),
   )
 })
 
@@ -341,7 +351,7 @@ test('a bulk Undo restores every row it can and names the ones the server refuse
     if (!request.url.endsWith('/orchestration/commands')) return
     const body = await request.clone().json()
     dispatched.push(`${body.type}:${body.sessionId}`)
-    if (body.type !== 'session.unsettle' || body.sessionId !== failedId) return
+    if (body.type !== 'session.lifecycle.restore' || body.sessionId !== failedId) return
     throw createClientError({
       code: 'TEST_NETWORK_FAILURE',
       message: 'Injected unsettle failure',
@@ -358,16 +368,24 @@ test('a bulk Undo restores every row it can and names the ones the server refuse
   renderRailHarness(h)
   const session = async (id: string) =>
     (await h.refresh()).sessions.find((candidate) => candidate.id === id)!
-  await menu('Mark as settled', 'First')
-  await menu('Mark as settled', 'Second')
+  const hook = renderHookWithProviders(() => useSessionActions(), {
+    application: h.application,
+    queryClient: h.application.getSnapshot().queryClient,
+  })
+  await act(() =>
+    hook.result.current.applyLifecycleToSessions(
+      [first, second].map((sessionId) => ({ environmentId: h.environmentId, sessionId })),
+      { type: 'settle' },
+    ),
+  )
   const undo = await undoButton('2 settled')
   dispatched.length = 0
   await userEvent.click(undo)
-  await waitFor(async () => expect((await session(second)).settledOverride).toBe('active'))
+  await waitFor(async () => expect((await session(second)).settledOverride).toBeNull())
   expect(await session(first)).toMatchObject({ settledOverride: 'settled', pinnedAt: null })
   expect(dispatched).not.toContain(`session.pin:${first}`)
-  expect(await screen.findByText('Undo failed for 1 session')).toBeTruthy()
-  expect(useSessionUndoStore.getState().slot).toBeNull()
+  expect(await screen.findByText('Session restore failed')).toBeTruthy()
+  expect(useSessionUndoStore.getState().undo.at(-1)).toBeUndefined()
 })
 
 test('archiving the session open in the side chat reopens it there on Undo', async ({
@@ -428,3 +446,67 @@ function SideChatReconciler({
   useActiveChatSessionId({ sessionIds, environmentId, projectId })
   return null
 }
+
+test('two changes on one row undo and redo with Mod+Z and Mod+Shift+Z', async ({
+  client,
+  server,
+}) => {
+  const h = await createRailHarness(client, server)
+  const first = h.sessionIds[0]!
+  const ref = { environmentId: h.environmentId, sessionId: first }
+  renderRailHarness(h)
+  const hook = renderHookWithProviders(() => useSessionActions(), {
+    application: h.application,
+    queryClient: h.application.getSnapshot().queryClient,
+  })
+  const wake = async () =>
+    (await h.refresh()).sessions.find((item) => item.id === first)?.snoozedUntil
+  const earlier = '2099-01-01T00:00:00.000Z'
+  const later = '2099-01-02T00:00:00.000Z'
+  await act(() =>
+    hook.result.current.applyLifecycle(ref, { type: 'snooze', snoozedUntil: earlier }),
+  )
+  await act(() => hook.result.current.applyLifecycle(ref, { type: 'snooze', snoozedUntil: later }))
+  const neutral = focusNeutral()
+  expect(pressUndo(neutral).defaultPrevented).toBe(true)
+  await waitFor(async () => expect(await wake()).toBe(earlier))
+  expect(pressUndo(neutral).defaultPrevented).toBe(true)
+  await waitFor(async () => expect(await wake()).toBeNull())
+  expect(pressUndo(neutral, true).defaultPrevented).toBe(true)
+  await waitFor(async () => expect(await wake()).toBe(earlier))
+  expect(pressUndo(neutral, true).defaultPrevented).toBe(true)
+  await waitFor(async () => expect(await wake()).toBe(later))
+  neutral.remove()
+})
+
+test('another client changing the row blocks stale Undo and clears its redo history', async ({
+  client,
+  server,
+}) => {
+  const h = await createRailHarness(client, server)
+  const first = h.sessionIds[0]!
+  renderRailHarness(h)
+  const hook = renderHookWithProviders(() => useSessionActions(), {
+    application: h.application,
+    queryClient: h.application.getSnapshot().queryClient,
+  })
+  await act(() =>
+    hook.result.current.applyLifecycle(
+      { environmentId: h.environmentId, sessionId: first },
+      { type: 'snooze', snoozedUntil: '2099-01-01T00:00:00.000Z' },
+    ),
+  )
+  await h.dispatch(
+    createSessionLifecycleCommand(first, {
+      type: 'snooze',
+      snoozedUntil: '2099-01-02T00:00:00.000Z',
+    }),
+  )
+  await act(async () => {
+    expect(await undoLatestSessionAction()).toBe(false)
+  })
+  expect((await h.refresh()).sessions.find((item) => item.id === first)?.snoozedUntil).toBe(
+    '2099-01-02T00:00:00.000Z',
+  )
+  expect(await redoLatestSessionAction()).toBe(false)
+})

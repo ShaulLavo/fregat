@@ -32,9 +32,16 @@ export const platformMigrations: readonly Migration[] = [
   { version: 25, name: 'worktree_pull_requests', up: applyWorktreePullRequests },
   { version: 26, name: 'worktree_setup', up: applyWorktreeSetup },
   { version: 27, name: 'push_devices', up: applyPushDevices },
+  { version: 28, name: 'session_lifecycle_revision', up: applySessionLifecycleRevision },
   { version: 29, name: 'turn_end_reason', up: applyTurnEndReason },
   { version: 30, name: 'message_model_selection', up: applyMessageModelSelection },
 ]
+
+function applySessionLifecycleRevision(database: PlatformDatabase) {
+  database.run(
+    sql`ALTER TABLE projection_sessions ADD COLUMN lifecycle_revision INTEGER NOT NULL DEFAULT 0`,
+  )
+}
 
 function applyMessageModelSelection(database: PlatformDatabase) {
   database.run(sql`ALTER TABLE projection_session_messages ADD COLUMN model_selection_json TEXT`)

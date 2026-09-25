@@ -1,4 +1,5 @@
 export * from './worktree-lifecycle'
+export * from './session-lifecycle'
 export {
   effectiveEntryType,
   isDirectoryEntry,
@@ -292,6 +293,7 @@ export {
   type ProjectMetaUpdateCommand,
   type ProjectReorderCommand,
   type SessionArchiveCommand,
+  type SessionLifecycleRestoreCommand,
   type SessionApprovalRespondCommand,
   type SessionCheckpointRevertCommand,
   type SessionDeleteCommand,
@@ -318,6 +320,8 @@ export {
 export {
   ORCHESTRATION_SESSION_DETAIL_PAGE_SIZE,
   orchestrationCommandReceiptSchema,
+  orchestrationCommandResultSchema,
+  type OrchestrationCommandResult,
   orchestrationGetFullSessionDiffInputSchema,
   orchestrationGetTurnDiffInputSchema,
   orchestrationProjectShellSchema,
@@ -635,6 +639,7 @@ export {
   sessionMetaUpdateCommandSchema,
   sessionDeleteCommandSchema,
   sessionArchiveCommandSchema,
+  sessionLifecycleRestoreCommandSchema,
   sessionUnarchiveCommandSchema,
   sessionSettleCommandSchema,
   sessionUnsettleCommandSchema,

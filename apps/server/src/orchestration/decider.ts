@@ -1,3 +1,4 @@
+import { restoreLifecycle } from './lifecycle-restore'
 import { questionAnswerHistory } from './question-answer-history'
 import { approvalResponseEvents, endedApprovalEvents } from './approval-admission'
 import { decideSessionTitle, titleMetadata } from './title-decider'
@@ -20,6 +21,7 @@ import {
   DEFAULT_INTERACTION_MODE,
   DEFAULT_RUNTIME_MODE,
   type OrchestrationCommand,
+  type OrchestrationCommandReceipt,
   approvalRequestIdSchema,
   messageIdSchema,
   turnIdSchema,
@@ -60,6 +62,7 @@ import type { OrchestrationProjectedSession, OrchestrationReadModel } from './re
 export function decideOrchestrationCommand(
   command: OrchestrationCommand,
   model: OrchestrationReadModel,
+  restoreReceipt?: OrchestrationCommandReceipt | null,
 ): PendingOrchestrationEvent[] {
   requireNoRewindConflict(command, model)
   const at = new Date().toISOString()
@@ -140,6 +143,8 @@ function decideCommandEvents(
         sessionId: command.sessionId,
         ...(command.removeWorktree ? { removeWorktree: true } : {}),
       })
+    case 'session.lifecycle.restore':
+      return restoreLifecycle(command, model, at, restoreReceipt)
     case 'session.archive':
       requireSessionNotArchived(model, command.sessionId, command.type)
 

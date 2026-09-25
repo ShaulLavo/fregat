@@ -2,15 +2,14 @@ import { toast } from 'sonner'
 import { create } from 'zustand'
 import type { ProjectId, ScopedSessionRef } from '@workspace/contracts'
 import {
-  forgetSessionLifecycleUndo,
-  offerSessionLifecycleUndo,
+  createSessionLifecycleHistory,
+  sessionLifecycleUndoEntry,
   sessionLifecycleRestoreCommand,
-  sessionLifecycleRestoreSteps,
   sessionLifecycleVerb,
   type SessionLifecycleUndoEntry,
   type SessionLifecycleUndoKind,
-  type SessionLifecycleUndoSlot,
 } from '@workspace/client-core/chat/rail/lifecycle-undo'
+import type { HistoryDirection } from '@workspace/client-core/history/undo-stack'
 import { dispatchChatCommand } from '@/features/chat/utils/command-dispatch'
 import { dispatchCommandForEnvironment } from '@/features/chat/state/active-transports'
 import { notifyChatCommandError } from '@/features/chat/notify-command-error'
@@ -21,148 +20,105 @@ import { primaryQueryClient } from '@/lib/environments/state/query-clients'
 import { toastError } from '@/lib/toast-error'
 import { errorMessage } from '@/lib/error-message'
 import { getNavigation } from '@/state/navigation-binding'
-
-/** Where an archived session was open, so its Undo can open it there again. */
-type SessionReopen = {
-  readonly surface: 'main' | 'sidebar'
-  readonly projectId: ProjectId
-}
+import { sessionArchive } from '@/features/chat-mode/state/removal'
 
 export type SessionUndoEntry = SessionLifecycleUndoEntry & {
-  readonly reopen: SessionReopen | null
+  readonly reopen: { readonly surface: 'main' | 'sidebar'; readonly projectId: ProjectId } | null
 }
-
-export type SessionUndoSlot = SessionLifecycleUndoSlot<SessionUndoEntry>
-
-const UNDO_WINDOW_MS = 5_000
+const history = createSessionLifecycleHistory<SessionUndoEntry>()
 const UNDO_TOAST_ID = 'session-lifecycle-undo'
+export const useSessionUndoStore = create(() => history.getSnapshot())
+history.subscribe(() => useSessionUndoStore.setState(history.getSnapshot()))
 
-export const useSessionUndoStore = create<{ readonly slot: SessionUndoSlot | null }>()(() => ({
-  slot: null,
-}))
-
-let expiry: ReturnType<typeof setTimeout> | undefined
-let presentation: Pick<SessionUndoNotice, 'detail' | 'shortcut'> | null = null
-
-function publish(slot: SessionUndoSlot | null) {
-  useSessionUndoStore.setState({ slot })
-  if (slot) {
-    showNotice(slot)
-    return
-  }
-  clearTimeout(expiry)
-  presentation = null
-  toast.dismiss(UNDO_TOAST_ID)
+export function sessionUndoAvailable() {
+  return history.getSnapshot().undo.length > 0
+}
+export function sessionRedoAvailable() {
+  return history.getSnapshot().redo.length > 0
 }
 
-function showNotice(slot: SessionUndoSlot) {
-  if (!presentation) return
-  const { detail, shortcut } = presentation
-  toast(`${slot.entries.length} ${sessionLifecycleVerb(slot.kind)}${detail}`, {
+export function offerSessionUndo({
+  kind,
+  entries,
+  detail,
+  shortcut,
+}: {
+  readonly kind: SessionLifecycleUndoKind
+  readonly entries: readonly SessionUndoEntry[]
+  readonly detail: string
+  readonly shortcut: string | null
+}) {
+  if (!entries.length) return
+  history.record(kind, entries)
+  toast(`${entries.length} ${sessionLifecycleVerb(kind)}${detail}`, {
     id: UNDO_TOAST_ID,
-    // The slot's own timer ends the notice, so hovering cannot outlive the Undo.
-    duration: Number.POSITIVE_INFINITY,
+    duration: 5_000,
     ...(shortcut ? { description: `${shortcut} to undo` } : {}),
     action: { label: 'Undo', onClick: () => void undoLatestSessionAction() },
   })
 }
-
-export function sessionUndoAvailable() {
-  return useSessionUndoStore.getState().slot !== null
-}
-
-export type SessionUndoNotice = {
-  readonly kind: SessionLifecycleUndoKind
-  readonly entries: readonly SessionUndoEntry[]
-  /** Skipped and failed counts from the batch, appended to the notice. */
-  readonly detail: string
-  readonly shortcut: string | null
-}
-
-/** Records the undoable rows and shows one notice for the whole slot for five seconds. */
-export function offerSessionUndo({ kind, entries, ...notice }: SessionUndoNotice) {
-  const slot = offerSessionLifecycleUndo(useSessionUndoStore.getState().slot, kind, entries)
-  if (!slot || !entries.length) return
-  presentation = notice
-  publish(slot)
-  clearTimeout(expiry)
-  expiry = setTimeout(() => publish(null), UNDO_WINDOW_MS)
-}
-
-/** A later change to these sessions supersedes their Undo. */
 export function forgetSessionUndo(refs: readonly ScopedSessionRef[]) {
-  const current = useSessionUndoStore.getState().slot
-  const slot = forgetSessionLifecycleUndo(current, refs)
-  if (slot !== current) publish(slot)
+  const previous = history.getSnapshot().undo.at(-1)
+  history.forget(refs)
+  if (previous !== history.getSnapshot().undo.at(-1)) toast.dismiss(UNDO_TOAST_ID)
 }
-
 export function resetSessionUndo() {
-  publish(null)
+  history.clear()
+  toast.dismiss(UNDO_TOAST_ID)
+}
+export function undoLatestSessionAction() {
+  return stepSessionHistory('undo')
+}
+export function redoLatestSessionAction() {
+  return stepSessionHistory('redo')
 }
 
-/**
- * Runs the latest Undo once. The slot is taken before anything is awaited, so a
- * second click or shortcut finds nothing to restore.
- */
-export async function undoLatestSessionAction() {
-  const slot = useSessionUndoStore.getState().slot
-  if (!slot) return false
-  publish(null)
-  const result = await runMutation(primaryQueryClient(), sessionUndoMutationOptions(), slot)
-  return result.failed === 0
-}
-
-function sessionUndoMutationOptions() {
-  return {
-    mutationKey: chatModeMutationKeys.lifecycleUndo(),
-    scope: { id: CHAT_SESSION_SCOPE },
-    mutationFn: restoreSessions,
-    onSuccess: ({ failed, error }: Awaited<ReturnType<typeof restoreSessions>>) => {
-      if (!failed) return
-      notifyChatCommandError(error, `Undo failed for ${failed} session${failed === 1 ? '' : 's'}`)
+async function stepSessionHistory(direction: HistoryDirection) {
+  if (!history.getSnapshot()[direction].length) return false
+  return runMutation(
+    primaryQueryClient(),
+    {
+      mutationKey: chatModeMutationKeys.lifecycleUndo(),
+      scope: { id: CHAT_SESSION_SCOPE },
+      mutationFn: async () => {
+        toast.dismiss(UNDO_TOAST_ID)
+        const result = await history.step(direction, restoreSession)
+        return result.applied.length > 0 && result.failed === 0
+      },
     },
-  }
+    undefined,
+  )
 }
 
-async function restoreSessions(slot: SessionUndoSlot) {
-  const now = Date.now()
-  let failed = 0
-  let error: unknown = null
-  for (const entry of slot.entries) {
-    const outcome = await restoreSession(slot.kind, entry, now)
-    if (outcome.ok) continue
-    failed++
-    error = outcome.error
+async function restoreSession(entry: SessionUndoEntry): Promise<SessionUndoEntry | null> {
+  const removal = entry.before.archivedAt ? sessionArchive(entry.ref) : null
+  const outcome = await dispatchChatCommand({
+    action: 'chat.session.lifecycle.restore',
+    command: sessionLifecycleRestoreCommand(entry),
+    dispatchCommand: (command) => dispatchCommandForEnvironment(entry.ref.environmentId, command),
+  })
+  if (!outcome.ok) {
+    notifyChatCommandError(outcome.error, 'Session restore failed')
+    return null
   }
-  return { failed, error }
+  const inverse = sessionLifecycleUndoEntry(entry.ref, outcome.result)
+  if (!inverse) return null
+  if (!entry.before.snoozedUntil) updateSessionRead(entry.ref, 'wake')
+  await restoreNavigation(entry, removal)
+  return { ...inverse, reopen: entry.reopen }
 }
 
-async function restoreSession(
-  kind: SessionLifecycleUndoKind,
+async function restoreNavigation(
   entry: SessionUndoEntry,
-  now: number,
+  removal: ReturnType<typeof sessionArchive>,
 ) {
-  for (const step of sessionLifecycleRestoreSteps(kind, entry.before, now)) {
-    const outcome = await dispatchChatCommand({
-      action: `chat.session.undo.${kind}`,
-      command: sessionLifecycleRestoreCommand(entry.ref.sessionId, step),
-      dispatchCommand: (command) => dispatchCommandForEnvironment(entry.ref.environmentId, command),
-    })
-    if (!outcome.ok) return outcome
-    if (step.type === 'unsnooze') updateSessionRead(entry.ref, 'wake')
-  }
-  if (entry.reopen) await reopenSession(entry.ref, entry.reopen)
-  return { ok: true } as const
-}
-
-async function reopenSession(ref: ScopedSessionRef, reopen: SessionReopen) {
   try {
-    const result = await getNavigation().openChat({
-      environmentId: ref.environmentId,
-      sessionId: ref.sessionId,
-      projectId: reopen.projectId,
-      surface: reopen.surface,
-    })
+    if (removal) {
+      await getNavigation().reconcileSessions(removal)
+      return
+    }
+    if (!entry.reopen || entry.before.archivedAt) return
+    const result = await getNavigation().openChat({ ...entry.ref, ...entry.reopen })
     if (result.status !== 'unavailable') return
     toastError('Session restored, but navigation failed', { description: result.reason })
   } catch (error) {

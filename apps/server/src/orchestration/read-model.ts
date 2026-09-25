@@ -33,6 +33,7 @@ export type OrchestrationProjectedCheckpoint = {
 }
 
 export type OrchestrationProjectedSession = OrchestrationSession & {
+  lifecycleRevision: number
   latestFailureSequence: number | null
   latestInterruptionSequence: number | null
   runtimeSequence: number | null

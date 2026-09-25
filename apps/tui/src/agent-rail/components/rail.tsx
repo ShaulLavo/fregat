@@ -1,3 +1,4 @@
+import type { HistoryDirection } from '@workspace/client-core/history/undo-stack'
 import { compareSessionsByActivity } from '@workspace/client-core/chat/rail/session-order'
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { useTerminalDimensions } from '@opentui/react'
@@ -29,9 +30,7 @@ import {
 } from '@workspace/client-core/chat/commands'
 import { createAgentRailState, type RailUndoEntry } from '@/agent-rail/state/rail'
 import {
-  captureSessionLifecycle,
-  sessionLifecycleRestoreCommand,
-  sessionLifecycleRestoreSteps,
+  sessionLifecycleUndoEntry,
   sessionLifecycleVerb,
 } from '@workspace/client-core/chat/rail/lifecycle-undo'
 import { commandShortcut } from '@/commands/utils/bindings'
@@ -283,17 +282,18 @@ export function AgentRail({
         failures++
         continue
       }
-      const before = captureSessionLifecycle(session ?? {})
       const command = unarchive
         ? createSessionUnarchiveCommand({ sessionId: item.id })
         : createSessionArchiveCommand({ sessionId: item.id })
-      if (!(await store.execute([command], true))) {
+      const result = await store.execute([command], true)
+      if (!result) {
         failures++
         continue
       }
       completed++
       const selected = currentSession.current === item.id
-      changed.push({ ref: item.ref, before, selected })
+      const entry = sessionLifecycleUndoEntry(item.ref, result)
+      if (entry) changed.push({ ...entry, selected })
       if (!unarchive && selected) onSelectWorktree(item.worktree.id)
     }
     close()
@@ -304,23 +304,17 @@ export function AgentRail({
         `${completed} ${unarchive ? 'restored' : 'archived'}, ${failures} skipped or failed.`,
       )
   }
-  async function undoLatest() {
-    const slot = store.takeUndo()
-    if (!slot) return false
-    const now = Date.now()
-    let failures = 0
-    for (const entry of slot.entries) {
-      const commands = sessionLifecycleRestoreSteps(slot.kind, entry.before, now).map((step) =>
-        sessionLifecycleRestoreCommand(entry.ref.sessionId, step),
-      )
-      if (!(await store.execute(commands))) {
-        failures++
-        continue
+  async function stepHistory(direction: HistoryDirection) {
+    const result = await store.stepHistory(direction, (entry) => {
+      if (!entry.selected) return
+      if (!entry.before.archivedAt) {
+        onSelectSession(entry.ref.sessionId)
+        return
       }
-      if (entry.selected) onSelectSession(entry.ref.sessionId)
-    }
-    if (failures) store.setError(`Undo failed for ${failures} of ${slot.entries.length} sessions.`)
-    return true
+      const session = ready.chat.getSnapshot().projection.sessionById[entry.ref.sessionId]
+      if (session) onSelectWorktree(session.worktreeId)
+    })
+    return Boolean(result?.applied.length)
   }
   function remove(row = current) {
     if (row?.kind === 'project' && !state.marked.length) {
@@ -515,7 +509,13 @@ export function AgentRail({
         disabledReason: (context) =>
           railKeyTarget(context) ??
           (store.getSnapshot().undo ? null : 'No session action can be undone.'),
-        run: () => undoLatest(),
+        run: () => stepHistory('undo'),
+      },
+      'workspace.redoSessionAction': {
+        disabledReason: (context) =>
+          railKeyTarget(context) ??
+          (store.getSnapshot().canRedo ? null : 'No session action can be redone.'),
+        run: () => stepHistory('redo'),
       },
       'agent.delete': { run: () => remove() },
       'agent.toggleArchived': { run: store.toggleArchived },
@@ -536,9 +536,11 @@ export function AgentRail({
       'agent.openWorkbench': { run: () => workbench() },
       'agent.stopSession': {
         run: () =>
-          store.execute(
-            targets().map((item) => createSessionRuntimeStopCommand({ sessionId: item.id })),
-          ),
+          store
+            .execute(
+              targets().map((item) => createSessionRuntimeStopCommand({ sessionId: item.id })),
+            )
+            .then(Boolean),
       },
     },
     paneEnabled && modal.kind === 'closed' && !state.busy,

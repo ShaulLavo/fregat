@@ -355,6 +355,17 @@ test('archiving the open session offers one U Undo that restores it and opens it
     await expect.poll(() => chat.getSnapshot().selectedSessionId).toBe(alpha)
     await frame.renderOnce()
     expect(frame.captureCharFrame()).not.toContain('to undo')
+    await focusRailSession(frame, 'Alpha')
+    await runPaletteCommand(frame, 'Redo session action')
+    await expect
+      .poll(() => chat.getSnapshot().projection.sessionById[alpha]?.archivedAt)
+      .not.toBeNull()
+    await expect.poll(() => chat.getSnapshot().selectedSessionId).not.toBe(alpha)
+    await expect.poll(() => frame.renderer.currentFocusedRenderable?.id).toBe('agent-composer')
+    await focusRailSession(frame, 'Beta')
+    await runPaletteCommand(frame, 'Undo session action')
+    await expect.poll(() => chat.getSnapshot().projection.sessionById[alpha]?.archivedAt).toBeNull()
+    await expect.poll(() => chat.getSnapshot().selectedSessionId).toBe(alpha)
   } finally {
     await harness.cleanup()
   }

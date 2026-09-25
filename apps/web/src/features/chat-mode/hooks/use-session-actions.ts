@@ -11,7 +11,7 @@ import { useMutation } from '@tanstack/react-query'
 import { primaryQueryClient } from '@/lib/environments/state/query-clients'
 import { toast } from 'sonner'
 import {
-  captureSessionLifecycle,
+  sessionLifecycleUndoEntry,
   sessionLifecycleVerb,
 } from '@workspace/client-core/chat/rail/lifecycle-undo'
 import {
@@ -82,7 +82,6 @@ export function useSessionActions() {
             skipped++
             continue
           }
-          const before = captureSessionLifecycle(sessionSummary(ref) ?? {})
           const outcome = await dispatchChatCommand({
             action: `chat.session.${change.type}`,
             command: createSessionLifecycleCommand(ref.sessionId, change),
@@ -94,7 +93,8 @@ export function useSessionActions() {
           }
           if (change.type === 'settle' || change.type === 'unsnooze') updateSessionRead(ref, 'wake')
           succeeded.push(ref)
-          undo.push({ ref, before, reopen: null })
+          const entry = sessionLifecycleUndoEntry(ref, outcome.result)
+          if (entry) undo.push({ ...entry, reopen: null })
         }
         removeSuccessfulSelection(succeeded)
         return { succeeded, skipped, failed, undo }
@@ -148,8 +148,8 @@ export function useSessionActions() {
   })
   function dispatch(ref: ScopedSessionRef, action: string, command: ClientOrchestrationCommand) {
     return sessionCommand.mutateAsync({ action, command, ref }).then(
-      () => true,
-      () => false,
+      (result) => result,
+      () => null,
     )
   }
   async function reconcileRemoval(
@@ -176,7 +176,6 @@ export function useSessionActions() {
       return { undo: null, navigationFailed: false }
     }
     const removal = sessionArchive(ref)
-    const before = captureSessionLifecycle(session ?? {})
     const surface = viewedSessionSurface(navigation.currentAddress(), ref.sessionId)
     const accepted = await dispatch(
       ref,
@@ -189,7 +188,8 @@ export function useSessionActions() {
     const movedOff =
       surface !== null && !surfaceShowsSession(navigation.currentAddress(), surface, ref.sessionId)
     const reopen = movedOff && removal ? { surface, projectId: removal.projectId } : null
-    return { undo: { ref, before, reopen }, navigationFailed: navigated === 'failed' }
+    const entry = sessionLifecycleUndoEntry(ref, accepted)
+    return { undo: entry ? { ...entry, reopen } : null, navigationFailed: navigated === 'failed' }
   }
   function offerArchiveUndo(entries: readonly SessionUndoEntry[], detail: string) {
     offerSessionUndo({ kind: 'archive', entries, detail, shortcut })

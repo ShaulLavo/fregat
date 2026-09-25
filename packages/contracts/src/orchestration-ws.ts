@@ -1,4 +1,5 @@
 import * as v from 'valibot'
+import { sessionLifecycleResultSchema } from './session-lifecycle'
 import { environmentIdSchema, projectIdSchema, worktreeIdSchema, sessionIdSchema } from './chat-ids'
 import {
   isoDateTimeSchema,
@@ -275,17 +276,13 @@ export const orchestrationWsResponseMessageSchema = v.variant('ok', [
   }),
 ])
 
-/**
- * The wire form of what dispatching a command returns. `sequence` is the stream
- * position the command's events landed at; `deduped` says the command id had
- * already been accepted, so nothing new was appended and `sequence` is the
- * earlier attempt's. Both are what a caller needs to know where to resume its
- * projection from — nothing else about the command's receipt crosses the wire.
- */
+// Repeated command ids retain their committed sequence and receipt.
+// Lifecycle receipts carry the original state and identity used by guarded Undo/Redo.
 export const orchestrationDispatchResultSchema = v.object({
   deduped: v.boolean(),
   sequence: nonNegativeIntegerSchema,
   result: v.nullable(projectRegistrationResultSchema),
+  lifecycle: v.optional(sessionLifecycleResultSchema),
 })
 
 /**

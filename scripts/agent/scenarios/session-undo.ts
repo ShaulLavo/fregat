@@ -32,7 +32,7 @@ async function pinnedOrder(page: Page, titles: readonly string[]) {
 export const sessionUndo: Scenario = {
   name: 'session-undo',
   description:
-    'Unpin, settle, snooze and archive disposable sessions, then undo each by the notice button and by Mod+Z: pin keys and order return, the archived viewed session reopens, the composer keeps its own undo and an expired notice leaves Mod+Z alone.',
+    'Unpin, settle, snooze and archive disposable sessions, then undo each by the notice button and by Mod+Z: pin keys and order return, the archived viewed session reopens, the composer keeps its own undo and history outlives its notice and repeated Undo/Redo restores rows.',
   async run(page, { step }) {
     const base = await openChat(page)
     const shell = await readShell(page, base)
@@ -160,10 +160,28 @@ export const sessionUndo: Scenario = {
       await selectors.sessionInShelf(page, charlie, 'Settled').waitFor()
       await selectors.undoNotice(page, '1 settled').waitFor({ state: 'hidden', timeout: 8_000 })
       await undoByKey()
-      await page.waitForTimeout(1_000)
-      strictEqual((await session(charlieId))?.settledOverride, 'settled')
-      // The key returns to the browser, whose own undo may act on an earlier text edit.
-      await step('expired-notice-leaves-mod-z-to-the-browser')
+      await selectors.sessionInShelf(page, charlie, 'Active').waitFor()
+      await step('undo-after-notice-expires')
+
+      await act(alpha, 'Unpin')
+      await selectors.sessionInShelf(page, alpha, 'Active').waitFor()
+      await act(charlie, 'Archive')
+      await page.waitForURL((url) => decodeURIComponent(url.href).includes('t/new'))
+      await undoByKey()
+      await page.waitForURL((url) => url.href.includes(charlieId))
+      await undoByKey()
+      await selectors.sessionInShelf(page, alpha, 'Pinned').waitFor()
+      strictEqual((await session(alphaId))?.pinOrderKey, 'n')
+      await step('two-actions-undone')
+      await focusRail(page)
+      await page.keyboard.press('ControlOrMeta+Shift+z')
+      await selectors.sessionInShelf(page, alpha, 'Active').waitFor()
+      await page.keyboard.press('ControlOrMeta+Shift+z')
+      await page.waitForURL((url) => decodeURIComponent(url.href).includes('t/new'))
+      await step('two-actions-redone')
+      await undoByKey()
+      await page.waitForURL((url) => url.href.includes(charlieId))
+      await step('archive-reopened-again')
     } finally {
       for (const sessionId of ids) {
         if (!(await session(sessionId))) continue

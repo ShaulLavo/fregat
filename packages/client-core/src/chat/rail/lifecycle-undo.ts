@@ -1,51 +1,32 @@
+import * as v from 'valibot'
 import {
+  commandIdSchema,
   scopedSessionKey,
   type ClientOrchestrationCommand,
+  type CommandId,
+  type OrchestrationDispatchResult,
   type ScopedSessionRef,
-  type SessionId,
+  type SessionLifecycleState,
 } from '@workspace/contracts'
 import {
-  createSessionActiveReorderCommand,
-  createSessionLifecycleCommand,
-  createSessionUnarchiveCommand,
-  type SessionLifecycleChange,
-} from '../commands'
+  emptyUndoStack,
+  pushUndo,
+  takeHistory,
+  finishHistory,
+  type HistoryDirection,
+  type UndoStack,
+} from '../../history/undo-stack'
+import type { SessionLifecycleChange } from '../commands'
 
-/** The lifecycle actions that offer an Undo. */
 export type SessionLifecycleUndoKind = 'archive' | 'settle' | 'snooze' | 'unpin'
-
-type LifecycleSource = {
-  readonly archivedAt?: string | null
-  readonly settledOverride?: 'settled' | 'active' | null
-  readonly snoozedUntil?: string | null
-  readonly pinnedAt?: string | null
-  readonly pinOrderKey?: string | null
-  readonly activeOrderKey?: string | null
-}
-
-/** A session's lifecycle fields, read before an undoable action is dispatched. */
-export type SessionLifecycleSnapshot = {
-  readonly archived: boolean
-  readonly settled: boolean
-  readonly snoozedUntil: string | null
-  readonly pinned: boolean
-  readonly pinOrderKey: string | null
-  readonly activeOrderKey: string | null
-}
-
-export type SessionLifecycleRestoreStep =
-  | Extract<SessionLifecycleChange, { readonly type: 'pin' | 'snooze' }>
-  | { readonly type: 'unsettle' | 'unsnooze' }
-  | { readonly type: 'unarchive' }
-  | { readonly type: 'active.reorder'; readonly orderKey: string }
-
 export type SessionLifecycleUndoEntry = {
   readonly ref: ScopedSessionRef
-  readonly before: SessionLifecycleSnapshot
+  readonly before: SessionLifecycleState
+  readonly restoreCommandId: CommandId
+  readonly expectedRevision: number
+  readonly restoreRevision: number
 }
-
-/** The one latest-undo slot: consecutive actions of one kind share it. */
-export type SessionLifecycleUndoSlot<Entry extends SessionLifecycleUndoEntry> = {
+export type SessionLifecycleUndoBatch<Entry extends SessionLifecycleUndoEntry> = {
   readonly kind: SessionLifecycleUndoKind
   readonly entries: readonly Entry[]
 }
@@ -59,109 +40,107 @@ const LIFECYCLE_VERBS: Record<SessionLifecycleChange['type'] | 'archive', string
   pin: 'pinned',
   unpin: 'unpinned',
 }
-
-/** The past tense a notice counts sessions with, as in "2 archived". */
 export function sessionLifecycleVerb(type: SessionLifecycleChange['type'] | 'archive') {
   return LIFECYCLE_VERBS[type]
 }
 
-export function captureSessionLifecycle(session: LifecycleSource): SessionLifecycleSnapshot {
+export function sessionLifecycleUndoEntry(
+  ref: ScopedSessionRef,
+  result: OrchestrationDispatchResult,
+): SessionLifecycleUndoEntry | null {
+  if (!result.lifecycle || result.lifecycle.sessionId !== ref.sessionId) return null
   return {
-    archived: Boolean(session.archivedAt),
-    settled: session.settledOverride === 'settled',
-    snoozedUntil: session.snoozedUntil ?? null,
-    pinned: Boolean(session.pinnedAt),
-    pinOrderKey: session.pinnedAt ? (session.pinOrderKey ?? null) : null,
-    activeOrderKey: session.activeOrderKey ?? null,
+    ref,
+    before: result.lifecycle.before,
+    restoreCommandId: result.lifecycle.commandId,
+    expectedRevision: result.sequence,
+    restoreRevision: result.lifecycle.beforeRevision,
   }
-}
-
-/**
- * The commands that put `before` back after `kind` succeeded. Settling also
- * clears the pin, the snooze and the active slot server-side, and a pin spends
- * a snooze, so those return in this order.
- */
-export function sessionLifecycleRestoreSteps(
-  kind: SessionLifecycleUndoKind,
-  before: SessionLifecycleSnapshot,
-  now: number,
-): readonly SessionLifecycleRestoreStep[] {
-  switch (kind) {
-    case 'archive':
-      return before.archived ? [] : [{ type: 'unarchive' }]
-    case 'snooze':
-      return [restoredSnooze(before, now) ?? { type: 'unsnooze' }]
-    case 'unpin':
-      return before.pinned ? [restoredPin(before), ...snoozeSteps(before, now)] : []
-    case 'settle':
-      return settleRestoreSteps(before, now)
-  }
-}
-
-function settleRestoreSteps(before: SessionLifecycleSnapshot, now: number) {
-  if (before.settled) return snoozeSteps(before, now)
-  const steps: SessionLifecycleRestoreStep[] = [{ type: 'unsettle' }]
-  // The server refuses an active reorder on a pinned row, so the slot returns first.
-  if (before.activeOrderKey) steps.push({ type: 'active.reorder', orderKey: before.activeOrderKey })
-  if (before.pinned) steps.push(restoredPin(before))
-  steps.push(...snoozeSteps(before, now))
-  return steps
-}
-
-function restoredPin(before: SessionLifecycleSnapshot): SessionLifecycleRestoreStep {
-  return before.pinOrderKey ? { type: 'pin', orderKey: before.pinOrderKey } : { type: 'pin' }
-}
-
-function restoredSnooze(before: SessionLifecycleSnapshot, now: number) {
-  const until = before.snoozedUntil
-  if (!until || !(Date.parse(until) > now)) return null
-  return { type: 'snooze', snoozedUntil: until } as const
-}
-
-function snoozeSteps(before: SessionLifecycleSnapshot, now: number) {
-  const snooze = restoredSnooze(before, now)
-  return snooze ? [snooze] : []
 }
 
 export function sessionLifecycleRestoreCommand(
-  sessionId: SessionId,
-  step: SessionLifecycleRestoreStep,
+  entry: SessionLifecycleUndoEntry,
 ): ClientOrchestrationCommand {
-  if (step.type === 'unarchive') return createSessionUnarchiveCommand({ sessionId })
-  if (step.type === 'active.reorder')
-    return createSessionActiveReorderCommand({ sessionId, orderKey: step.orderKey })
-  return createSessionLifecycleCommand(sessionId, step)
-}
-
-/**
- * A later action of the same kind joins the slot and replaces an older entry for
- * the same session; any other kind takes the slot over.
- */
-export function offerSessionLifecycleUndo<Entry extends SessionLifecycleUndoEntry>(
-  slot: SessionLifecycleUndoSlot<Entry> | null,
-  kind: SessionLifecycleUndoKind,
-  entries: readonly Entry[],
-): SessionLifecycleUndoSlot<Entry> | null {
-  if (!entries.length) return slot
-  if (slot?.kind !== kind) return { kind, entries }
-  const offered = new Set(entries.map((entry) => scopedSessionKey(entry.ref)))
   return {
-    kind,
-    entries: [
-      ...slot.entries.filter((entry) => !offered.has(scopedSessionKey(entry.ref))),
-      ...entries,
-    ],
+    type: 'session.lifecycle.restore',
+    commandId: v.parse(commandIdSchema, crypto.randomUUID()),
+    sessionId: entry.ref.sessionId,
+    expectedRevision: entry.expectedRevision,
+    restoreCommandId: entry.restoreCommandId,
   }
 }
 
-/** Another change to a session expires its Undo; an emptied slot is gone. */
-export function forgetSessionLifecycleUndo<Entry extends SessionLifecycleUndoEntry>(
-  slot: SessionLifecycleUndoSlot<Entry> | null,
-  refs: readonly ScopedSessionRef[],
-): SessionLifecycleUndoSlot<Entry> | null {
-  if (!slot) return null
-  const forgotten = new Set(refs.map(scopedSessionKey))
-  const entries = slot.entries.filter((entry) => !forgotten.has(scopedSessionKey(entry.ref)))
-  if (entries.length === slot.entries.length) return slot
-  return entries.length ? { kind: slot.kind, entries } : null
+export function createSessionLifecycleHistory<Entry extends SessionLifecycleUndoEntry>() {
+  type Batch = SessionLifecycleUndoBatch<Entry>
+  let stack = emptyUndoStack<Batch>()
+  let branch = 0
+  const listeners = new Set<() => void>()
+  function publish(next: UndoStack<Batch>) {
+    stack = next
+    for (const listener of listeners) listener()
+  }
+  function forget(refs: readonly ScopedSessionRef[]) {
+    const keys = new Set(refs.map(scopedSessionKey))
+    const retain = (batches: readonly Batch[]) =>
+      batches
+        .map((batch) => {
+          const entries = batch.entries.filter((entry) => !keys.has(scopedSessionKey(entry.ref)))
+          return entries.length === batch.entries.length ? batch : { ...batch, entries }
+        })
+        .filter((batch) => batch.entries.length > 0)
+    publish({ undo: retain(stack.undo), redo: retain(stack.redo) })
+  }
+  function rebase(entry: Entry, revision: number) {
+    const update = (batch: Batch): Batch => ({
+      ...batch,
+      entries: batch.entries.map((older) =>
+        scopedSessionKey(older.ref) === scopedSessionKey(entry.ref) &&
+        older.expectedRevision === entry.restoreRevision
+          ? { ...older, expectedRevision: revision }
+          : older,
+      ),
+    })
+    publish({ undo: stack.undo.map(update), redo: stack.redo.map(update) })
+  }
+  return {
+    getSnapshot: () => stack,
+    subscribe(listener: () => void) {
+      listeners.add(listener)
+      return () => {
+        listeners.delete(listener)
+      }
+    },
+    clear: () => {
+      branch++
+      publish(emptyUndoStack<Batch>())
+    },
+    record(kind: SessionLifecycleUndoKind, entries: readonly Entry[]) {
+      if (!entries.length) return
+      branch++
+      publish(pushUndo(stack, { kind, entries }))
+    },
+    forget,
+    // Hosts serialize steps with lifecycle mutations; each successful row supplies its inverse receipt.
+    async step(direction: HistoryDirection, restore: (entry: Entry) => Promise<Entry | null>) {
+      const startedOnBranch = branch
+      const taken = takeHistory(stack, direction)
+      if (!taken.entry) return { applied: [], failed: 0 }
+      publish(taken.stack)
+      const applied: Entry[] = []
+      let failed = 0
+      for (const entry of [...taken.entry.entries].reverse()) {
+        const inverse = await restore(entry)
+        if (!inverse) {
+          forget([entry.ref])
+          failed++
+          continue
+        }
+        rebase(entry, inverse.expectedRevision)
+        applied.push(inverse)
+      }
+      if (applied.length && branch === startedOnBranch)
+        publish(finishHistory(stack, direction, { kind: taken.entry.kind, entries: applied }))
+      return { applied, failed }
+    },
+  }
 }

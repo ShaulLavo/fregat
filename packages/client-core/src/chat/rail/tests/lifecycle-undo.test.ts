@@ -1,197 +1,128 @@
-import { describe, expect, test } from 'vitest'
-import type { EnvironmentId, SessionId } from '@workspace/contracts'
+import { expect, test } from 'vitest'
+import * as v from 'valibot'
 import {
-  captureSessionLifecycle,
-  forgetSessionLifecycleUndo,
-  offerSessionLifecycleUndo,
+  commandIdSchema,
+  environmentIdSchema,
+  sessionIdSchema,
+  type SessionLifecycleState,
+} from '@workspace/contracts'
+import {
+  createSessionLifecycleHistory,
+  sessionLifecycleUndoEntry,
   sessionLifecycleRestoreCommand,
-  sessionLifecycleRestoreSteps,
-  sessionLifecycleVerb,
+  type SessionLifecycleUndoEntry,
 } from '../lifecycle-undo'
 
-const NOW = Date.parse('2026-09-25T12:00:00.000Z')
-const LATER = '2026-09-25T13:00:00.000Z'
-const EARLIER = '2026-09-25T11:00:00.000Z'
-
-function ref(sessionId: string, environmentId = 'env') {
-  return { environmentId: environmentId as EnvironmentId, sessionId: sessionId as SessionId }
+const before: SessionLifecycleState = {
+  archivedAt: null,
+  settledOverride: null,
+  settledAt: null,
+  unsettledAt: null,
+  snoozedUntil: null,
+  snoozedAt: null,
+  pinnedAt: null,
+  pinOrderKey: null,
+  activeOrderKey: null,
+  acknowledgedFailureThroughSequence: null,
+}
+function entry(id: string, revision: number, restoreRevision = 0): SessionLifecycleUndoEntry {
+  return {
+    ref: {
+      environmentId: v.parse(environmentIdSchema, '11111111-1111-4111-8111-111111111111'),
+      sessionId: v.parse(
+        sessionIdSchema,
+        `00000000-0000-4000-8000-${Array.from(id)
+          .reduce((hash, char) => (hash * 31 + char.charCodeAt(0)) >>> 0, 0)
+          .toString(16)
+          .padStart(12, '0')}`,
+      ),
+    },
+    before,
+    restoreCommandId: v.parse(commandIdSchema, `command-${revision}`),
+    expectedRevision: revision,
+    restoreRevision,
+  }
+}
+function inverse(item: SessionLifecycleUndoEntry, revision: number): SessionLifecycleUndoEntry {
+  return { ...item, expectedRevision: revision, restoreRevision: item.expectedRevision }
 }
 
-function entry(sessionId: string, environmentId = 'env') {
-  return { ref: ref(sessionId, environmentId), before: captureSessionLifecycle({}) }
-}
-
-describe('captured lifecycle', () => {
-  test('reads a pin key only while pinned and normalises absent fields', () => {
-    expect(captureSessionLifecycle({})).toEqual({
-      archived: false,
-      settled: false,
-      snoozedUntil: null,
-      pinned: false,
-      pinOrderKey: null,
-      activeOrderKey: null,
-    })
-    expect(
-      captureSessionLifecycle({ pinnedAt: null, pinOrderKey: 'm', settledOverride: 'active' }),
-    ).toMatchObject({ pinned: false, pinOrderKey: null, settled: false })
-    expect(
-      captureSessionLifecycle({
-        archivedAt: EARLIER,
-        pinnedAt: EARLIER,
-        pinOrderKey: 'm',
-        settledOverride: 'settled',
-        activeOrderKey: 'c',
-        snoozedUntil: LATER,
-      }),
-    ).toEqual({
-      archived: true,
-      settled: true,
-      snoozedUntil: LATER,
-      pinned: true,
-      pinOrderKey: 'm',
-      activeOrderKey: 'c',
-    })
-  })
+test('several actions on one row undo and redo using the revisions produced by each restore', async () => {
+  const history = createSessionLifecycleHistory()
+  history.record('snooze', [entry('session', 1)])
+  history.record('snooze', [entry('session', 2, 1)])
+  let revision = 2
+  const restore = async (item: SessionLifecycleUndoEntry) => {
+    expect(item.expectedRevision).toBe(revision)
+    return inverse(item, ++revision)
+  }
+  await history.step('undo', restore)
+  await history.step('undo', restore)
+  expect(history.getSnapshot().undo).toHaveLength(0)
+  expect(history.getSnapshot().redo).toHaveLength(2)
+  await history.step('redo', restore)
+  await history.step('redo', restore)
+  expect(revision).toBe(6)
+  expect(history.getSnapshot().undo).toHaveLength(2)
+  expect(history.getSnapshot().redo).toHaveLength(0)
 })
 
-describe('restore steps', () => {
-  test('settle Undo un-settles, then restores the active slot, the pin key and the snooze', () => {
-    const before = captureSessionLifecycle({
-      pinnedAt: EARLIER,
-      pinOrderKey: 'm',
-      activeOrderKey: 'c',
-      snoozedUntil: LATER,
-    })
-    expect(sessionLifecycleRestoreSteps('settle', before, NOW)).toEqual([
-      { type: 'unsettle' },
-      { type: 'active.reorder', orderKey: 'c' },
-      { type: 'pin', orderKey: 'm' },
-      { type: 'snooze', snoozedUntil: LATER },
-    ])
-  })
-
-  test('settle Undo of a plain active row only un-settles, and of a settled row only re-snoozes', () => {
-    expect(sessionLifecycleRestoreSteps('settle', captureSessionLifecycle({}), NOW)).toEqual([
-      { type: 'unsettle' },
-    ])
-    expect(
-      sessionLifecycleRestoreSteps(
-        'settle',
-        captureSessionLifecycle({ settledOverride: 'settled', snoozedUntil: LATER }),
-        NOW,
-      ),
-    ).toEqual([{ type: 'snooze', snoozedUntil: LATER }])
-  })
-
-  test('a keyless pin returns keyless so it keeps its creation-ordered place', () => {
-    const before = captureSessionLifecycle({ pinnedAt: EARLIER, pinOrderKey: null })
-    expect(sessionLifecycleRestoreSteps('unpin', before, NOW)).toEqual([{ type: 'pin' }])
-  })
-
-  test('unpin Undo re-snoozes after the pin, which spends a snooze', () => {
-    const before = captureSessionLifecycle({
-      pinnedAt: EARLIER,
-      pinOrderKey: 'm',
-      snoozedUntil: LATER,
-    })
-    expect(sessionLifecycleRestoreSteps('unpin', before, NOW)).toEqual([
-      { type: 'pin', orderKey: 'm' },
-      { type: 'snooze', snoozedUntil: LATER },
-    ])
-    expect(sessionLifecycleRestoreSteps('unpin', captureSessionLifecycle({}), NOW)).toEqual([])
-  })
-
-  test('snooze Undo returns to the earlier wake time while it is still ahead', () => {
-    expect(sessionLifecycleRestoreSteps('snooze', captureSessionLifecycle({}), NOW)).toEqual([
-      { type: 'unsnooze' },
-    ])
-    expect(
-      sessionLifecycleRestoreSteps('snooze', captureSessionLifecycle({ snoozedUntil: LATER }), NOW),
-    ).toEqual([{ type: 'snooze', snoozedUntil: LATER }])
-    expect(
-      sessionLifecycleRestoreSteps(
-        'snooze',
-        captureSessionLifecycle({ snoozedUntil: EARLIER }),
-        NOW,
-      ),
-    ).toEqual([{ type: 'unsnooze' }])
-  })
-
-  test('archive Undo unarchives only a row that was visible', () => {
-    expect(sessionLifecycleRestoreSteps('archive', captureSessionLifecycle({}), NOW)).toEqual([
-      { type: 'unarchive' },
-    ])
-    expect(
-      sessionLifecycleRestoreSteps(
-        'archive',
-        captureSessionLifecycle({ archivedAt: EARLIER }),
-        NOW,
-      ),
-    ).toEqual([])
-  })
-
-  test('each step becomes its orchestration command', () => {
-    const sessionId = 'session' as SessionId
-    expect(sessionLifecycleRestoreCommand(sessionId, { type: 'unarchive' })).toMatchObject({
-      type: 'session.unarchive',
-      sessionId,
-    })
-    expect(
-      sessionLifecycleRestoreCommand(sessionId, { type: 'active.reorder', orderKey: 'c' }),
-    ).toMatchObject({ type: 'session.active.reorder', sessionId, orderKey: 'c' })
-    expect(sessionLifecycleRestoreCommand(sessionId, { type: 'pin', orderKey: 'm' })).toMatchObject(
-      { type: 'session.pin', sessionId, orderKey: 'm' },
-    )
-    expect(sessionLifecycleRestoreCommand(sessionId, { type: 'pin' })).not.toHaveProperty(
-      'orderKey',
-    )
-    expect(sessionLifecycleRestoreCommand(sessionId, { type: 'unsettle' })).toMatchObject({
-      type: 'session.unsettle',
-      reason: 'user',
-    })
-  })
+test('new actions discard redo and history is bounded', async () => {
+  const history = createSessionLifecycleHistory()
+  for (let i = 1; i <= 60; i++) history.record('archive', [entry(`session-${i}`, i)])
+  expect(history.getSnapshot().undo).toHaveLength(50)
+  await history.step('undo', async (item) => inverse(item, 61))
+  history.record('settle', [entry('new', 62)])
+  expect(history.getSnapshot().redo).toHaveLength(0)
 })
 
-describe('latest-undo slot', () => {
-  test('same-kind actions join the slot and a repeated session keeps only its newer entry', () => {
-    const first = offerSessionLifecycleUndo(null, 'settle', [entry('a'), entry('b')])
-    const newer = { ...entry('a'), before: captureSessionLifecycle({ pinnedAt: EARLIER }) }
-    const joined = offerSessionLifecycleUndo(first, 'settle', [newer])
-    expect(joined?.kind).toBe('settle')
-    expect(joined?.entries.map((item) => item.ref.sessionId)).toEqual(['b', 'a'])
-    expect(joined?.entries[1]?.before.pinned).toBe(true)
-  })
-
-  test('another kind takes the slot over and an empty offer changes nothing', () => {
-    const settled = offerSessionLifecycleUndo(null, 'settle', [entry('a')])
-    expect(offerSessionLifecycleUndo(settled, 'archive', [])).toBe(settled)
-    expect(offerSessionLifecycleUndo(settled, 'archive', [entry('b')])).toEqual({
-      kind: 'archive',
-      entries: [entry('b')],
-    })
-  })
-
-  test('forgetting drops only the scoped session and empties to no slot', () => {
-    const slot = offerSessionLifecycleUndo(null, 'unpin', [entry('a'), entry('a', 'other')])
-    expect(forgetSessionLifecycleUndo(slot, [ref('b')])).toBe(slot)
-    expect(forgetSessionLifecycleUndo(slot, [ref('a')])?.entries).toEqual([entry('a', 'other')])
-    expect(forgetSessionLifecycleUndo(slot, [ref('a'), ref('a', 'other')])).toBeNull()
-    expect(forgetSessionLifecycleUndo(null, [ref('a')])).toBeNull()
-  })
-})
-
-test('one verb table names both the Undo notice and the plain lifecycle toast', () => {
-  expect(
-    (['archive', 'settle', 'unsettle', 'snooze', 'unsnooze', 'pin', 'unpin'] as const).map(
-      sessionLifecycleVerb,
-    ),
-  ).toEqual([
-    'archived',
-    'settled',
-    'moved to active',
-    'snoozed',
-    'unsnoozed',
-    'pinned',
-    'unpinned',
+test('partial bulk failure preserves successful rows and invalidates only the conflicting row', async () => {
+  const history = createSessionLifecycleHistory()
+  history.record('snooze', [entry('a', 1)])
+  history.record('settle', [entry('a', 2, 1), entry('b', 3)])
+  const result = await history.step('undo', async (item) =>
+    item.ref.sessionId === entry('a', 1).ref.sessionId ? null : inverse(item, 4),
+  )
+  expect(result.failed).toBe(1)
+  expect(history.getSnapshot().undo).toHaveLength(0)
+  expect(history.getSnapshot().redo[0]?.entries.map((item) => item.ref.sessionId)).toEqual([
+    entry('b', 3).ref.sessionId,
   ])
+})
+
+test('a restore uses the action receipt even when a projection has moved ahead', () => {
+  const item = entry('session', 42)
+  const captured = sessionLifecycleUndoEntry(item.ref, {
+    deduped: false,
+    sequence: 42,
+    result: null,
+    lifecycle: {
+      kind: 'session.lifecycle',
+      commandId: item.restoreCommandId,
+      sessionId: item.ref.sessionId,
+      beforeRevision: 19,
+      before,
+    },
+  })
+  expect(captured).toMatchObject({ expectedRevision: 42, restoreRevision: 19, before })
+  expect(sessionLifecycleRestoreCommand(captured!)).toMatchObject({
+    type: 'session.lifecycle.restore',
+    expectedRevision: 42,
+    restoreCommandId: item.restoreCommandId,
+  })
+})
+
+test('recording a new action while a restore settles keeps the new redo branch empty', async () => {
+  const history = createSessionLifecycleHistory()
+  history.record('archive', [entry('a', 1)])
+  let release = (_: SessionLifecycleUndoEntry | null) => {}
+  const waiting = new Promise<SessionLifecycleUndoEntry | null>((resolve) => {
+    release = resolve
+  })
+  const undo = history.step('undo', () => waiting)
+  history.record('snooze', [entry('b', 3)])
+  release(inverse(entry('a', 1), 2))
+  await undo
+  expect(history.getSnapshot().redo).toHaveLength(0)
+  expect(history.getSnapshot().undo.at(-1)?.kind).toBe('snooze')
 })

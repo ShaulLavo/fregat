@@ -42,6 +42,7 @@ const TEXT_MENU_EDITOR_COMMANDS = [
 
 const ASYNC_COMMAND_IDS = [
   'workspace.undoSessionAction',
+  'workspace.redoSessionAction',
   'fileTree.undo',
   'fileTree.redo',
   'workspace.splitEditorRight',
@@ -187,6 +188,7 @@ const FILE_OPERATION_COMMAND_IDS = [
 
 const WORKSPACE_OPERATION_COMMAND_IDS = [
   'workspace.undoSessionAction',
+  'workspace.redoSessionAction',
   'workspace.undoWorkspaceEdit',
   'workspace.redoWorkspaceEdit',
   'workspace.copyAddress',

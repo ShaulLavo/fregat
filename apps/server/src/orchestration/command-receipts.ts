@@ -5,7 +5,7 @@ import {
   type OrchestrationCommand,
   type OrchestrationCommandReceipt,
   orchestrationCommandReceiptSchema,
-  type ProjectRegistrationResult,
+  type OrchestrationCommandResult,
   type ClientOrchestrationCommand,
 } from '@workspace/contracts'
 
@@ -46,7 +46,7 @@ export class OrchestrationCommandReceipts {
   recordAccepted(
     command: OrchestrationCommand,
     sequence: number,
-    result: ProjectRegistrationResult | null,
+    result: OrchestrationCommandResult | null,
     intentFingerprint = commandFingerprint(command),
   ) {
     const receipt = {
@@ -201,6 +201,7 @@ export function commandAggregate(command: ReceiptCommand) {
     case 'session.turn.interrupt':
     case 'session.turn.start':
     case 'session.turn.steer':
+    case 'session.lifecycle.restore':
     case 'session.unarchive':
     case 'session.unpin':
     case 'session.unsettle':

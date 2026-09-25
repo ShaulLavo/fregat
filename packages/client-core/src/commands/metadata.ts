@@ -15,6 +15,7 @@ export type CommandWhen =
   | 'fileOperationUndoable'
   | 'saveableTab'
   | 'sessionActionUndoable'
+  | 'sessionActionRedoable'
   | 'tabOpen'
   | 'workspaceOpen'
   | 'workspaceEditRedoable'

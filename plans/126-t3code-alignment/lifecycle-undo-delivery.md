@@ -1,30 +1,36 @@
-# LIFE-13 lifecycle Undo delivery
+# LIFE-13 lifecycle Undo/Redo delivery
 
-Unpin, settle, snooze and archive each offer an Undo for five seconds, and `mod+z` runs the latest one from any pane without its own undo, outside text fields. Delivered 2026-09-25 in the completion wave (lane L5). Not yet deployed.
+PR #38 finding 4 and the owner correction at `ceaa27d4` are implemented on `wave/L5-undo`. No deployment or lane push was performed.
 
-Upstream reference: `9383f4ad` (`docs/user/thread-sidebar.md` 31–36, `docs/user/keybindings.md` 114–118, `apps/web/src/hooks/useThreadActions.ts`, `threadUndo.ts`, `showThreadUndoNotice.ts`, `SidebarThreadUndoNotice.tsx`, `useThreadActions.undo.test.ts`).
+## Behavior
 
-## What shipped
+Settle, snooze, unpin, and archive record separate history steps. A bulk action records its successful rows together. The notice lasts five seconds; the bounded 50-step history remains until reset. Mod+Z undoes and Mod+Shift+Z redoes outside text entry and panes with their own Undo. TUI rail uses U and Shift+U, with palette commands for both. Restoring a viewed archived session reopens it on its original surface; redoing archive reconciles navigation again.
 
-- **Capture and inverse, shared.** `packages/client-core/src/chat/rail/lifecycle-undo.ts` holds the one past-tense verb table both notices and the plain lifecycle toast use, and reads a row's lifecycle fields before dispatch (archive, settle override, snooze deadline, pin and pin order key, active order key) and turns them into the restore commands. Settle Undo un-settles, then restores the active slot, the pin key and a snooze still ahead, in that order, because the server refuses an active reorder on a pinned row and a pin spends a snooze. Unpin Undo re-pins with the same key, so a keyless pin keeps its creation-ordered place. Snooze Undo returns to the earlier wake time when there was one. Archive Undo unarchives. The same module holds the one latest-undo slot: another action of the same kind joins it, any other kind replaces it, and a later change to a row drops that row.
-- **Web.** `features/chat-mode/state/session-undo.ts` keeps the slot in a store, shows one sonner notice ("2 settled", "Ctrl+Z to undo", Undo) for five seconds after the latest action, and runs the Undo as a TanStack mutation keyed `chatModeMutationKeys.lifecycleUndo()` in the session scope. Every session mutation (lifecycle, archive and delete, title, Undo) and its pending readers use the primary QueryClient, so the scope serializes an Undo behind an in-flight lifecycle change however it was offered (menu, drag on another machine's row, `Mod+Z`). `use-session-actions.ts` captures before every lifecycle dispatch, archive and bulk archive; unarchive, delete and non-undoable lifecycle changes forget their rows. Bulk actions offer only the rows that succeeded. Archiving the session that is open records its surface, and Undo opens it there again when the reader ended up elsewhere (the side chat reconciles on its own, so this reads the address after the archive). Dragging a row to Settled or a pin out to Active offers the same Undo, as upstream's drag path does.
-- **`mod+z`.** Command `workspace.undoSessionAction` with `when: ['sessionActionUndoable']` and a `Mod+Z` binding in the `global`, `git`, `logs`, `problems`, `search` and `settings` focus panes that yields to text entry. The composer (`chat` pane), editors, terminals, the file tree (`fileTree.undo`, Plan 136) and dialogs keep their own undo, and once the notice expires the command is disabled, so the key goes back to the browser. Decided 2026-09-25: recommendation (completion wave), recorded under LIFE-13.
-- **TUI (Plan 094).** The TUI rail exposes archive only (no settle, snooze or pin). Archive now offers the same shared slot: a notice line "1 archived · U to undo" for five seconds, and `U` in the focused rail restores and reselects a session that was open. Unarchiving or deleting a session, or deleting its project, drops it from the slot. The terminal keeps `Control+Z` for suspend, so the TUI binding is `U`.
+`packages/client-core/src/history/undo-stack.ts` contains the generic stack. Both hosts use the same lifecycle history controller. Successful restores rebase the adjacent history entry to the new server revision, allowing repeated steps on the same session. New actions clear redo. Conflicting rows are removed from both directions while successful bulk rows remain redoable.
 
-## Verification
+## Server boundary
 
-- Scenario `session-undo`, evidence `/work/tmp/fregat-evidence/20260925T131547Z-scenario-session-undo/` (rerun after the review fixes; first run `20260925T120707Z`), screenshots read. It pins two rows with keys, then unpins, settles, snoozes and archives three disposable sessions and undoes each by the notice button and by `Mod+Z`. It asserts the pin keys and pinned order after each Undo, that archiving the open session opens a draft and Undo reopens it (button and key), that `Mod+Z` in the composer undoes the composer text and leaves the session settled, and that after the notice expires the key does nothing to the session. No warn or error log lines.
-- Web DOM tests over the real in-process server: `features/chat-mode/components/tests/session-undo.test.tsx` (11: exact pin key; settle Undo by `Mod+Z` restores pin key, active slot and snooze; `Mod+Z` in text fields and in registered composer, editor, terminal and file-tree targets is not taken; `Mod+Z` from a registered git-pane target undoes; archived open session reopens on the main surface and in the side chat with its own reconciler mounted; bulk archive restores only archived rows; a bulk Undo with one refused `session.unsettle` restores the other row, stops the refused row before its pin step and shows "Undo failed for 1 session" (a control with `break` fails it); same-kind actions share a slot and a manual change drops a row; drag-to-Settled Undo, pending on the primary client's `lifecycle()` key while held; drag-to-Active unpin Undo restores the pin key), `features/chat-mode/state/tests/session-undo.test.tsx` (3: five seconds after the latest action, then the command is disabled; kind replacement; a spent slot restores nothing). A control run with the binding in the `any` pane fails the focus test.
-- `keymap/tests/keymap.test.ts`: `Mod+Z` resolves to the session Undo in the `global`, `git`, `logs`, `problems`, `search` and `settings` panes, and never in `chat`, `editor`, `terminal`, `file-tree` or `dialog`. `features/chat-mode/utils/tests/session-undo.test.ts` covers `dropUndoKind` and the viewed-surface helpers. `command-table.test.ts` pins the new command and condition.
-- `packages/client-core/src/chat/rail/tests/lifecycle-undo.test.ts` (12) covers capture, restore order, the slot and the verb table.
-- TUI `agent-rail/tests/rail.test.tsx`: archiving the open session shows the notice, `U` restores and reselects it (it waits for the new draft's composer focus before refocusing the rail; six whole-file runs pass); deleting an archived session drops its notice and `U` then does nothing (a control without the forget fails it).
-- Existing chat-mode, keymap, command-palette and TUI rail suites, web/TUI/client-core typecheck, `bun run gates`, oxlint, `inventory.py` and `scripts/parity/check.py` pass.
+The accepted command receipt stores the authoritative prior lifecycle state, prior revision, session id, and command id. `session.lifecycle.restore` accepts only the original receipt id and expected revision. The server resolves the snapshot from that receipt, checks session ownership and lifecycle policy, and commits one `session.lifecycle-restored` event. The SQL update also compares the revision inside the command transaction. A stale decision cache cannot bypass it.
 
-## Limits
+Restoration covers archive, settle override and anchors, snooze, pin and ordering, and the acknowledged failure sequence. Expired snoozes remain awake. Lifecycle events and attention-changing activity advance the revision. The revision survives restart and projection replay. Restoring settlement runs the existing runtime-release reactor.
 
-- One slot, as the plan specifies. Upstream keeps older groups and shows the preceding one after an Undo; here another kind replaces the slot.
-- Settle Undo leaves the explicit keep-active override (`active`). Only the server can reset it to neutral, as upstream. A keyless active row re-enters at the unsettle time; a keyed active slot is restored exactly.
-- A drag into Active that unpins may have written active keys to neighbours; Undo restores the pin, not those keys.
-- After expiry the key returns to the browser, whose own undo can act on an earlier text edit (the scenario's last step shows it clearing the rail search).
-- The session scenarios that use `openChatShell` (`session-lifecycle`, `session-navigation`, `session-ordering`) stop at "Project must have a default model" on the throwaway server; `session-undo` sets a model itself because no turn runs.
-- Two-owner live run and deployment are pending.
+Migration **28 `session_lifecycle_revision`** adds exactly:
+
+```sql
+ALTER TABLE projection_sessions ADD COLUMN lifecycle_revision INTEGER NOT NULL DEFAULT 0;
+```
+
+The other L5 fix owner owns `push_devices` 25 → 27. This branch leaves that migration unchanged. L6 must include the new column in its final schema.
+
+## Evidence
+
+- Negative control `/work/tmp/L5-undo-race-before.log`: A snoozes, B changes the wake time, old Undo sends unconditional `session.unsnooze`. The assertion fails with `null` instead of B's `2099-01-02T00:00:00.000Z`.
+- Server lifecycle regressions cover the conflict, atomic state restoration, repeated receipt delivery, redo, persisted revision after restart, concurrent inverses, stale decision cache, expired snooze, pending work, foreign receipts, and rejection of client-provided snapshots.
+- Shared stack tests cover repeated actions on one row, bounds, branching, partial failures, and original receipt revision capture.
+- Web integration tests exercise real in-process commands, keyboard Undo/Redo, focus exclusions, bulk failures, drag actions, remote conflicts, and reopening on both main and side-chat surfaces.
+- TUI rail integration verifies archive Undo, Redo, and reopening, plus deletion invalidation. The demo implements the same receipt contract.
+- Browser evidence: `/work/tmp/fregat-evidence/20260925T151858Z-scenario-session-undo/`, 17 completed steps. Screenshots 15–17 show two Undo steps, two Redo steps, and reopening again. No failed HTTP responses, application errors, or warning/error server logs. Browser GPU and startup socket warnings remain. The first cold Vite run completed but reported outdated-dependency 504s; the warm run is the clean evidence.
+- Verified totals: 112 server tests in the broad run plus 65 lifecycle tests after the ordinary-tool case, 82 web tests, 13 TUI tests, 5 shared stack tests, and 35 contract tests; server/web/TUI/client-core typechecks and gates passed.
+- Verification logs: `/work/tmp/L5-undo-{server-final,web-final,tui-tests,types-final,gates}.log`.
+
+A drag into Active can also rearrange neighbouring active keys. Its history restores the dragged session's lifecycle. History is local to each client; remote writes are protected by server revision checks.
