@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -33,7 +33,7 @@ describe('FontsourceProvider', () => {
     })
     await expect(again.catalog()).resolves.toHaveLength(2)
 
-    now += DAY_MS + 1
+    now = await dayAfterCatalogWrite(root)
     const later = await fixture({ now: () => now, root })
     await expect(later.provider.catalog()).resolves.toHaveLength(2)
     expect(requests).toHaveLength(1)
@@ -46,7 +46,7 @@ describe('FontsourceProvider', () => {
     // A saved font has loaded once, so its metadata is cached; only the catalog is stale.
     await provider.stylesheet('lobster')
 
-    now += DAY_MS + 1
+    now = await dayAfterCatalogWrite(root)
     const hanging = new FontsourceProvider({
       ...options(root, () => new Promise<Response>(() => {})),
       now: () => now,
@@ -70,7 +70,7 @@ describe('FontsourceProvider', () => {
     const { provider, root } = await fixture({ now: () => now })
     await provider.catalog()
 
-    now += DAY_MS + 1
+    now = await dayAfterCatalogWrite(root)
     const broken = new FontsourceProvider({
       ...options(root, async () => Response.json({ fonts: [] })),
       now: () => now,
@@ -206,6 +206,12 @@ function abortableHang(_input: string | URL | Request, init?: RequestInit) {
 
 function options(cacheRoot: string, fetcher: ReturnType<typeof routedFetcher>['fetcher']) {
   return { cacheRoot, fetcher, subsetter: async () => Buffer.from('unused') }
+}
+
+/** A cached catalog is dated by its file's mtime, which is wall-clock time, not `now`. */
+async function dayAfterCatalogWrite(root: string) {
+  const { mtimeMs } = await stat(path.join(root, 'fontsource', 'catalog.json'))
+  return mtimeMs + DAY_MS
 }
 
 async function fixtureRoot() {
