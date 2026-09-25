@@ -30,9 +30,9 @@ import {
  *     the socket head-of-line-blocked every other frame for its duration. The
  *     subscriptions still push snapshot *frames*; only the requests are gone.
  * 4 — added the durable environment identity to the handshake.
- * 8 — added the `server.update` push (staged release, restart phase, live check).
+ * 9 — added the `server.update` push (staged release, restart phase, live check).
  */
-export const ORCHESTRATION_WS_PROTOCOL_VERSION = 8
+export const ORCHESTRATION_WS_PROTOCOL_VERSION = 9
 
 /**
  * Hard ceiling on one `replayEvents` page. `replayEvents` is client-reachable,
