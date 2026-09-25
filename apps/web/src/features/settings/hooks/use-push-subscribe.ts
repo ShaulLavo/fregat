@@ -18,8 +18,11 @@ export function usePushSubscribe() {
       mutationFn: async () => {
         // First, while the click still counts as a user gesture.
         await requestPushPermission()
-        const { publicKey } = await owner.ensureQueryData(pushDevicesQueryOptions())
-        const registration = await subscribeThisDevice(publicKey)
+        const { publicKey, devices } = await owner.ensureQueryData(pushDevicesQueryOptions())
+        const registration = await subscribeThisDevice(
+          publicKey,
+          devices.map((device) => device.id),
+        )
         return registerPushDevice(clientForQueryClient(owner), registration)
       },
       onSettled: () => settlePushQueries(owner),

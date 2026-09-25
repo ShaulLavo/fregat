@@ -8,6 +8,7 @@ import { Toaster } from '@workspace/ui/components/sonner'
 import { PushSection } from '@/features/settings/components/push-section'
 import { useSettingsProjection } from '@/features/settings/hooks/use-settings-projection'
 import { SettingsPage } from '@/features/settings/components/page'
+import { subscribeThisDevice } from '@/features/settings/utils/push-browser'
 import { pushErrors } from '@/features/settings/utils/push-errors'
 import { settingsQueryKeys } from '@/features/settings/utils/query-keys'
 import type { Client } from '@/lib/client'
@@ -95,6 +96,11 @@ test('drops an expired device from the list and says so', async ({ client }) => 
     expect(screen.getByText('Turn push notifications on again on that device.')).toBeVisible()
     expect(await screen.findByText('No devices registered')).toBeVisible()
     expect(document.querySelector(`[data-push-device="${id}"]`)).toBeNull()
+
+    // Turning it on again replaces the subscription the push service refused.
+    await userEvent.click(screen.getByRole('button', { name: 'Turn on for this device' }))
+    await findDeviceRow(id)
+    expect(platform.pushManager.subscribe).toHaveBeenCalledTimes(2)
   } finally {
     toast.dismiss()
     rendered.unmount()
@@ -210,8 +216,30 @@ test('shows why the browser could not subscribe', async ({ client }) => {
   }
 })
 
-test('reuses a subscription made with the server’s key', async ({ client }) => {
+test('reuses a subscription the server lists under its key', async ({ client }) => {
   const endpoint = 'https://fcm.googleapis.com/kept'
+  const platform = await installPushPlatform({
+    permission: 'granted',
+    existing: { endpoint, applicationServerKey: await serverKey(client) },
+  })
+  const registered = await client.push.devices.post({
+    label: 'Kept',
+    subscription:
+      platform.existing!.toJSON() as import('@workspace/contracts').PushSubscriptionInput,
+  })
+  expect(registered.error).toBeNull()
+  const listed = (await client.push.devices.get()).data!
+
+  await subscribeThisDevice(
+    listed.publicKey,
+    listed.devices.map((device) => device.id),
+  )
+  expect(platform.pushManager.subscribe).not.toHaveBeenCalled()
+  expect(platform.existing?.unsubscribe).not.toHaveBeenCalled()
+})
+
+test('replaces a subscription the server does not list', async ({ client }) => {
+  const endpoint = 'https://fcm.googleapis.com/unlisted'
   const platform = await installPushPlatform({
     permission: 'granted',
     existing: { endpoint, applicationServerKey: await serverKey(client) },
@@ -221,10 +249,10 @@ test('reuses a subscription made with the server’s key', async ({ client }) =>
   try {
     await userEvent.click(await screen.findByRole('button', { name: 'Turn on for this device' }))
 
-    const row = await findDeviceRow(await pushDeviceId(endpoint))
+    const row = await findDeviceRow(await pushDeviceId(platform.endpoint))
     expect(within(row).getByText(/This device/)).toBeVisible()
-    expect(platform.pushManager.subscribe).not.toHaveBeenCalled()
-    expect(platform.existing?.unsubscribe).not.toHaveBeenCalled()
+    expect(platform.existing?.unsubscribe).toHaveBeenCalledOnce()
+    expect(platform.pushManager.subscribe).toHaveBeenCalledOnce()
   } finally {
     rendered.unmount()
   }

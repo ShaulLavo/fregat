@@ -57,14 +57,24 @@ export async function requestPushPermission(): Promise<void> {
   throw pushErrors.PERMISSION_DISMISSED({ internal: { permission } })
 }
 
-/** Registers the worker and subscribes with the server's key, reusing a subscription made with it. */
-export async function subscribeThisDevice(publicKey: string): Promise<PushDeviceRegistration> {
+/**
+ * Registers the worker and subscribes with the server's key. A subscription is reused only while
+ * the server still lists it; one it dropped as expired would be refused again.
+ */
+export async function subscribeThisDevice(
+  publicKey: string,
+  registeredIds: readonly string[],
+): Promise<PushDeviceRegistration> {
   await navigator.serviceWorker.register(pushWorkerScript(), {
     scope: import.meta.env.BASE_URL,
     updateViaCache: 'none',
   })
   const registration = await navigator.serviceWorker.ready
-  const subscription = await subscribeWithKey(registration.pushManager, base64UrlBytes(publicKey))
+  const subscription = await subscribeWithKey(
+    registration.pushManager,
+    base64UrlBytes(publicKey),
+    registeredIds,
+  )
 
   return {
     subscription: subscription.toJSON() as PushSubscriptionInput,
@@ -85,9 +95,13 @@ async function currentSubscription() {
 }
 
 // A subscription is bound to one server key; an older key's subscription cannot receive this server's pushes.
-async function subscribeWithKey(manager: PushManager, key: Uint8Array<ArrayBuffer>) {
+async function subscribeWithKey(
+  manager: PushManager,
+  key: Uint8Array<ArrayBuffer>,
+  registeredIds: readonly string[],
+) {
   const existing = await manager.getSubscription()
-  if (existing && sameBytes(existing.options.applicationServerKey, key)) return existing
+  if (existing && (await reusable(existing, key, registeredIds))) return existing
 
   await existing?.unsubscribe()
   try {
@@ -97,6 +111,16 @@ async function subscribeWithKey(manager: PushManager, key: Uint8Array<ArrayBuffe
       throw pushErrors.SUBSCRIBE_FAILED({ internal: { errorType: typeof error } })
     throw pushErrors.SUBSCRIBE_FAILED({ cause: error, internal: { errorName: error.name } })
   }
+}
+
+async function reusable(
+  subscription: PushSubscription,
+  key: Uint8Array,
+  registeredIds: readonly string[],
+) {
+  if (!sameBytes(subscription.options.applicationServerKey, key)) return false
+
+  return registeredIds.includes(await pushDeviceId(subscription.endpoint))
 }
 
 function sameBytes(left: ArrayBuffer | readonly number[] | null, right: Uint8Array) {
