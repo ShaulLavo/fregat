@@ -144,7 +144,7 @@ async function secondTurn(page: Page, step: Step) {
 
 async function thirdTurn(page: Page, step: Step) {
   await selectors
-    .jumpToLatest(page)
+    .timelineJumpToLatest(page)
     .click({ timeout: 2_000 })
     .catch(() => undefined)
   await sendPrompt(page, 'Once more, while I read back.')
@@ -157,7 +157,7 @@ async function thirdTurn(page: Page, step: Step) {
   await expectExpanded(reasoning, 'true', 'Nothing folds while the reader has scrolled away')
   await step('scrolled-away-kept-open')
 
-  await selectors.jumpToLatest(page).click()
+  await selectors.timelineJumpToLatest(page).click()
   await expectExpanded(reasoning, 'false', 'Back at the tail, the fold settles')
   await step('back-at-tail-folded')
   await waitForTurnEnd(page)

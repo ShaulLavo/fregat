@@ -660,8 +660,6 @@ export const selectors = {
   agentTreeChild: (page: Page, threadId: string) =>
     page.locator(`[data-agent-tree-level="child"] [data-agent-thread-id="${threadId}"]`),
   modelSwitch: (page: Page) => page.locator('[data-model-switch]').first(),
-  jumpToLatest: (page: Page) =>
-    page.getByRole('button', { name: 'Scroll to latest message', exact: true }),
   composerActions: (page: Page) => page.locator('[data-composer-actions]'),
   usageMeter: (page: Page) => page.locator('[data-composer-actions] [data-usage-meter]'),
   usagePopover: (page: Page) => page.locator('[data-usage-popover]'),
