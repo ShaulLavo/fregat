@@ -127,3 +127,29 @@ function proposedPlan(
     ...overrides,
   } as OrchestrationProposedPlan
 }
+
+test.each([
+  { markdown: '# Plan\n\nRun tests\n\nRun tests', text: 'Run tests', occurrence: 1, line: 5 },
+  { markdown: '# Plan\n\nUse **strict** mode', text: 'Use strict mode', occurrence: 0, line: 3 },
+])(
+  'anchors selected rendered text at its source location: $markdown',
+  async ({ markdown, text, occurrence, line }) => {
+    resetReviewDraftStore()
+    renderCard(proposedPlan({ planMarkdown: markdown }))
+    const items = await screen.findAllByText(
+      (_, element) => element?.tagName === 'P' && element.textContent === text,
+    )
+    const item = items[occurrence]!
+    const range = document.createRange()
+    range.selectNodeContents(item)
+    document.getSelection()?.removeAllRanges()
+    document.getSelection()?.addRange(range)
+    fireEvent.mouseUp(item)
+    await userEvent.click(await screen.findByRole('button', { name: 'Comment on the selection' }))
+    await userEvent.type(screen.getByRole('textbox', { name: 'Review comment' }), 'Do this{Enter}')
+    expect(useReviewDraftStore.getState().comments[0]?.anchor).toMatchObject({
+      lines: { start: line, end: line },
+    })
+    resetReviewDraftStore()
+  },
+)

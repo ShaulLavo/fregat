@@ -4,7 +4,7 @@ import { use, useState } from 'react'
 
 import { ReviewCommentInput } from '@/components/review-comment-input'
 import { ChatWorkspaceRootContext } from '@/features/chat/providers/workspace-root-context'
-import { planCommentQuote, planSelectionLines } from '@/features/chat/utils/plan-comment'
+import { planCommentQuote, type PlanSelectionLines } from '@/features/chat/utils/plan-comment'
 import { useEnvironmentId } from '@/lib/environments/hooks/use-environment-id'
 import { addReviewComment } from '@/lib/review-draft/state/store'
 
@@ -17,13 +17,13 @@ export function PlanCommentBar({
 }: {
   readonly planId: string
   readonly planMarkdown: string
-  readonly selection: string
+  readonly selection: PlanSelectionLines
   readonly onDone: () => void
 }) {
   const root = use(ChatWorkspaceRootContext)
   const environmentId = useEnvironmentId()
   const [commenting, setCommenting] = useState(false)
-  const lines = planSelectionLines(planMarkdown, selection)
+  const lines = selection
   if (!lines || !root) return null
 
   function save(body: string) {
