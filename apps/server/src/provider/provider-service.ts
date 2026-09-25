@@ -750,7 +750,7 @@ export class ProviderService {
       })
   }
 
-  restoreTerminalOwnership(sessionId: SessionId, state: 'history' | 'unknown') {
+  restoreTerminalOwnership(sessionId: SessionId, state: 'terminal' | 'history' | 'unknown') {
     this.externalSessions.set(sessionId, state)
   }
 

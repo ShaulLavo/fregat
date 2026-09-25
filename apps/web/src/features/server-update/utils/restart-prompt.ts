@@ -6,7 +6,6 @@ const BUSY_STATE_LABELS: Record<BusySessionState, string> = {
   waiting: 'Waiting for your answer',
   rewinding: 'Rewinding',
   background: 'Running in the background',
-  terminal: 'Running in a terminal',
 }
 
 export function busyStateLabel(state: BusySessionState): string {
@@ -33,5 +32,5 @@ export function busySessionTitle(session: BusySession): string {
 }
 
 export function restartTooltip(release: string): string {
-  return `Restarts the server into ${release}. Terminals restart too.`
+  return `Restarts the server into ${release}.`
 }

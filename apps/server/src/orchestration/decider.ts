@@ -100,6 +100,7 @@ function decideCommandEvents(
     case 'terminal.lease.terminate':
     case 'terminal.lease.end':
     case 'terminal.lease.mark-unknown':
+    case 'terminal.lease.adopt':
       return decideWorktreeLifecycle(command, model, at)
     case 'project.create':
     case 'project.revive':

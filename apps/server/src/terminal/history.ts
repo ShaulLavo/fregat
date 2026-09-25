@@ -1,6 +1,6 @@
 import { and, asc, eq, lt } from 'drizzle-orm'
 import type { PlatformDatabase } from '../db/client'
-import { terminalHistoryChunks } from '../db/schema'
+import { terminalHistoryChunks, terminalSessionOffsets } from '../db/schema'
 
 const MAX_BYTES = 8 * 1024 * 1024
 const MAX_LINES = 5_000
@@ -11,6 +11,7 @@ type Chunk = { sequence: number; data: Buffer; lines: number }
 export class TerminalHistory {
   private chunks: Chunk[]
   private sequence: number
+  private cumulativeOffset: number
   private readonly database: PlatformDatabase
   private readonly owner: string
 
@@ -25,6 +26,17 @@ export class TerminalHistory {
       .all()
       .map(({ sequence, data }) => ({ sequence, data, lines: lineBreaks(data) }))
     this.sequence = this.chunks.at(-1)?.sequence ?? 0
+    this.cumulativeOffset =
+      database
+        .select({ offset: terminalSessionOffsets.offset })
+        .from(terminalSessionOffsets)
+        .where(eq(terminalSessionOffsets.owner, owner))
+        .get()?.offset ?? 0
+  }
+
+  /** Total bytes ever appended; where a host reattach resumes from. */
+  get offset() {
+    return this.cumulativeOffset
   }
 
   values(): readonly Uint8Array[] {
@@ -49,20 +61,29 @@ export class TerminalHistory {
       next.push({ sequence: ++sequence, data, lines: lineBreaks(data) })
     }
     const retained = trimHistory(next)
-    this.persist(retained)
+    const offset = this.cumulativeOffset + bytes.length
+    this.persist(retained, offset)
     this.chunks = retained
     this.sequence = sequence
+    this.cumulativeOffset = offset
   }
 
   clear() {
-    this.database
-      .delete(terminalHistoryChunks)
-      .where(eq(terminalHistoryChunks.owner, this.owner))
-      .run()
+    this.database.transaction((transaction) => {
+      transaction
+        .delete(terminalHistoryChunks)
+        .where(eq(terminalHistoryChunks.owner, this.owner))
+        .run()
+      transaction
+        .delete(terminalSessionOffsets)
+        .where(eq(terminalSessionOffsets.owner, this.owner))
+        .run()
+    })
     this.chunks = []
+    this.cumulativeOffset = 0
   }
 
-  private persist(next: Chunk[]) {
+  private persist(next: Chunk[], offset: number) {
     const previous = new Map(this.chunks.map((chunk) => [chunk.sequence, chunk]))
     this.database.transaction((transaction) => {
       transaction
@@ -89,6 +110,14 @@ export class TerminalHistory {
           })
           .run()
       }
+      transaction
+        .insert(terminalSessionOffsets)
+        .values({ owner: this.owner, offset })
+        .onConflictDoUpdate({
+          target: terminalSessionOffsets.owner,
+          set: { offset },
+        })
+        .run()
     })
   }
 }

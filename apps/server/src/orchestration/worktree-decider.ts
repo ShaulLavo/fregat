@@ -1,6 +1,8 @@
 import type {
   OrchestrationCommand,
   SessionWorktreeTarget,
+  TerminalLeaseId,
+  WorktreeId,
   WorktreeProvisioning,
   WorktreeLifecycle,
 } from '@workspace/contracts'
@@ -117,6 +119,7 @@ export function decideWorktreeLifecycle(
     case 'terminal.lease.terminate':
     case 'terminal.lease.end':
     case 'terminal.lease.mark-unknown':
+    case 'terminal.lease.adopt':
       return terminalLeaseChanged(command, model, at)
     case 'session.worktree.release':
       return releaseTurn(command, model, at)
@@ -504,6 +507,9 @@ function requireOperation(
     })
 }
 
+const ADOPTABLE_LEASE_STATES: ReadonlySet<import('@workspace/contracts').TerminalLease['state']> =
+  new Set(['claimed', 'active', 'termination-requested', 'ownership-unknown'])
+
 function terminalLeaseChanged(
   command: Extract<LifecycleCommand, { type: `terminal.lease.${string}` }>,
   model: OrchestrationReadModel,
@@ -514,6 +520,8 @@ function terminalLeaseChanged(
     terminalLeaseId: command.terminalLeaseId,
     worktreeId: command.worktreeId,
     runtimeEpoch: command.runtimeEpoch,
+    key:
+      previous?.key ?? (command.type === 'terminal.lease.request' ? (command.key ?? null) : null),
     createdAt: previous?.createdAt ?? at,
     updatedAt: at,
   }
@@ -526,6 +534,7 @@ function terminalLeaseChanged(
       })
     return one(command, at, 'terminal.lease-updated', { ...common, state: 'requested' })
   }
+  if (command.type === 'terminal.lease.adopt') return adoptLease(command, previous, common, at)
   if (
     !previous ||
     previous.worktreeId !== command.worktreeId ||
@@ -540,7 +549,7 @@ function terminalLeaseChanged(
         ...leaseFacts(command),
       },
     })
-  const state = terminalLeaseTransition(command.type, previous.state)
+  const state = terminalLeaseTransition(command, previous.state)
   if (!state)
     throw worktreeLifecycleErrors.STALE_RESULT({
       worktreeId: command.worktreeId,
@@ -549,19 +558,59 @@ function terminalLeaseChanged(
   return one(command, at, 'terminal.lease-updated', { ...common, state })
 }
 
+function adoptLease(
+  command: Extract<LifecycleCommand, { type: 'terminal.lease.adopt' }>,
+  previous: import('@workspace/contracts').TerminalLease | undefined,
+  common: {
+    terminalLeaseId: TerminalLeaseId
+    worktreeId: WorktreeId
+    runtimeEpoch: string
+    key: string | null
+    createdAt: string
+    updatedAt: string
+  },
+  at: string,
+) {
+  if (
+    !previous ||
+    previous.worktreeId !== command.worktreeId ||
+    previous.runtimeEpoch !== command.fromRuntimeEpoch
+  )
+    throw worktreeLifecycleErrors.STALE_RESULT({
+      worktreeId: command.worktreeId,
+      internal: {
+        observed: previous
+          ? { worktreeId: previous.worktreeId, runtimeEpoch: previous.runtimeEpoch }
+          : 'absent',
+        ...leaseFacts(command),
+      },
+    })
+  if (!ADOPTABLE_LEASE_STATES.has(previous.state))
+    throw worktreeLifecycleErrors.STALE_RESULT({
+      worktreeId: command.worktreeId,
+      internal: { refused: 'transition', leaseState: previous.state, ...leaseFacts(command) },
+    })
+  return one(command, at, 'terminal.lease-updated', { ...common, state: 'active' })
+}
+
 function terminalLeaseTransition(
-  type: Exclude<
-    Extract<LifecycleCommand, { type: `terminal.lease.${string}` }>['type'],
-    'terminal.lease.request'
+  command: Exclude<
+    Extract<LifecycleCommand, { type: `terminal.lease.${string}` }>,
+    { type: 'terminal.lease.request' | 'terminal.lease.adopt' }
   >,
   state: import('@workspace/contracts').TerminalLease['state'],
 ): import('@workspace/contracts').TerminalLease['state'] | null {
+  const type = command.type
   if (type === 'terminal.lease.claim' && state === 'requested') return 'claimed'
   if (type === 'terminal.lease.activate' && state === 'claimed') return 'active'
   if (type === 'terminal.lease.terminate' && ['claimed', 'active'].includes(state))
     return 'termination-requested'
-  if (type === 'terminal.lease.end' && state !== 'ownership-unknown' && state !== 'ended')
+  if (type === 'terminal.lease.end') {
+    if (state === 'ended') return null
+    // A lease of unknown ownership only ends once the host proves the process is gone.
+    if (state === 'ownership-unknown') return command.hostConfirmedGone ? 'ended' : null
     return 'ended'
+  }
   if (
     type === 'terminal.lease.mark-unknown' &&
     ['claimed', 'active', 'termination-requested'].includes(state)

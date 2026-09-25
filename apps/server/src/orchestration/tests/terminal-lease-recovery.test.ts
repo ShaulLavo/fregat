@@ -54,3 +54,198 @@ it('ends unclaimed requests and preserves unknown ownership for every claimed st
     requireWorktree(await fixture.engine.readModelSnapshot(), worktreeId).terminalOwnershipUnknown,
   ).toBe(true)
 })
+
+it('adopts a lease from claimed, active or termination-requested, moving it to the new epoch', async () => {
+  const fixture = await createOrchestrationFixture()
+  fixtures.push(fixture)
+  const result = (await fixture.register()).result
+  if (!result) throw new TypeError('Missing registered worktree')
+  const worktreeId = result.worktreeId
+  const states = ['claimed', 'active', 'termination-requested'] as const
+  for (const [index, state] of states.entries()) {
+    const terminalLeaseId = `30000000-0000-4000-8000-00000000000${index + 1}`
+    const shared = { worktreeId, terminalLeaseId, runtimeEpoch: 'stale-runtime' }
+    await fixture.command({
+      ...shared,
+      type: 'terminal.lease.request',
+      commandId: `request-${index}`,
+    })
+    await fixture.command({ ...shared, type: 'terminal.lease.claim', commandId: `claim-${index}` })
+    if (state === 'claimed') continue
+    await fixture.command({
+      ...shared,
+      type: 'terminal.lease.activate',
+      commandId: `active-${index}`,
+    })
+    if (state === 'active') continue
+    await fixture.command({
+      ...shared,
+      type: 'terminal.lease.terminate',
+      commandId: `terminate-${index}`,
+    })
+  }
+  for (const [index] of states.entries()) {
+    const terminalLeaseId = `30000000-0000-4000-8000-00000000000${index + 1}`
+    await fixture.command({
+      type: 'terminal.lease.adopt',
+      commandId: `adopt-${index}`,
+      worktreeId,
+      terminalLeaseId,
+      runtimeEpoch: 'new-runtime',
+      fromRuntimeEpoch: 'stale-runtime',
+    })
+  }
+  const model = await fixture.engine.readModelSnapshot()
+  for (const [index] of states.entries()) {
+    const terminalLeaseId = `30000000-0000-4000-8000-00000000000${index + 1}`
+    expect(model.terminalLeases.get(terminalLeaseId)).toMatchObject({
+      state: 'active',
+      runtimeEpoch: 'new-runtime',
+    })
+  }
+})
+
+it('adopts a lease already marked ownership-unknown', async () => {
+  const fixture = await createOrchestrationFixture()
+  fixtures.push(fixture)
+  const result = (await fixture.register()).result
+  if (!result) throw new TypeError('Missing registered worktree')
+  const worktreeId = result.worktreeId
+  const terminalLeaseId = '30000000-0000-4000-8000-000000000010'
+  const shared = { worktreeId, terminalLeaseId, runtimeEpoch: 'stale-runtime' }
+  await fixture.command({ ...shared, type: 'terminal.lease.request', commandId: 'request' })
+  await fixture.command({ ...shared, type: 'terminal.lease.claim', commandId: 'claim' })
+  await fixture.command({ ...shared, type: 'terminal.lease.activate', commandId: 'activate' })
+  await fixture.command({
+    ...shared,
+    type: 'terminal.lease.mark-unknown',
+    commandId: 'mark-unknown',
+  })
+  await fixture.command({
+    type: 'terminal.lease.adopt',
+    commandId: 'adopt',
+    worktreeId,
+    terminalLeaseId,
+    runtimeEpoch: 'new-runtime',
+    fromRuntimeEpoch: 'stale-runtime',
+  })
+  const model = await fixture.engine.readModelSnapshot()
+  expect(model.terminalLeases.get(terminalLeaseId)).toMatchObject({
+    state: 'active',
+    runtimeEpoch: 'new-runtime',
+  })
+})
+
+it('refuses to adopt a lease that is only requested, already ended, or from the wrong epoch', async () => {
+  const fixture = await createOrchestrationFixture()
+  fixtures.push(fixture)
+  const result = (await fixture.register()).result
+  if (!result) throw new TypeError('Missing registered worktree')
+  const worktreeId = result.worktreeId
+
+  const requestedId = '30000000-0000-4000-8000-000000000020'
+  await fixture.command({
+    type: 'terminal.lease.request',
+    commandId: 'req-requested',
+    worktreeId,
+    terminalLeaseId: requestedId,
+    runtimeEpoch: 'stale-runtime',
+  })
+  await expect(
+    fixture.command({
+      type: 'terminal.lease.adopt',
+      commandId: 'adopt-requested',
+      worktreeId,
+      terminalLeaseId: requestedId,
+      runtimeEpoch: 'new-runtime',
+      fromRuntimeEpoch: 'stale-runtime',
+    }),
+  ).rejects.toMatchObject({ code: 'worktree.STALE_RESULT' })
+
+  const endedId = '30000000-0000-4000-8000-000000000021'
+  await fixture.command({
+    type: 'terminal.lease.request',
+    commandId: 'req-ended',
+    worktreeId,
+    terminalLeaseId: endedId,
+    runtimeEpoch: 'stale-runtime',
+  })
+  await fixture.command({
+    type: 'terminal.lease.end',
+    commandId: 'end-ended',
+    worktreeId,
+    terminalLeaseId: endedId,
+    runtimeEpoch: 'stale-runtime',
+  })
+  await expect(
+    fixture.command({
+      type: 'terminal.lease.adopt',
+      commandId: 'adopt-ended',
+      worktreeId,
+      terminalLeaseId: endedId,
+      runtimeEpoch: 'new-runtime',
+      fromRuntimeEpoch: 'stale-runtime',
+    }),
+  ).rejects.toMatchObject({ code: 'worktree.STALE_RESULT' })
+
+  const wrongEpochId = '30000000-0000-4000-8000-000000000022'
+  await fixture.command({
+    type: 'terminal.lease.request',
+    commandId: 'req-wrong-epoch',
+    worktreeId,
+    terminalLeaseId: wrongEpochId,
+    runtimeEpoch: 'stale-runtime',
+  })
+  await fixture.command({
+    type: 'terminal.lease.claim',
+    commandId: 'claim-wrong-epoch',
+    worktreeId,
+    terminalLeaseId: wrongEpochId,
+    runtimeEpoch: 'stale-runtime',
+  })
+  await expect(
+    fixture.command({
+      type: 'terminal.lease.adopt',
+      commandId: 'adopt-wrong-epoch',
+      worktreeId,
+      terminalLeaseId: wrongEpochId,
+      runtimeEpoch: 'new-runtime',
+      fromRuntimeEpoch: 'a-different-stale-epoch',
+    }),
+  ).rejects.toMatchObject({ code: 'worktree.STALE_RESULT' })
+})
+
+it('ends an ownership-unknown lease only once the host proves the process is gone', async () => {
+  const fixture = await createOrchestrationFixture()
+  fixtures.push(fixture)
+  const result = (await fixture.register()).result
+  if (!result) throw new TypeError('Missing registered worktree')
+  const worktreeId = result.worktreeId
+  const terminalLeaseId = '30000000-0000-4000-8000-000000000030'
+  const shared = { worktreeId, terminalLeaseId, runtimeEpoch: 'stale-runtime' }
+  await fixture.command({ ...shared, type: 'terminal.lease.request', commandId: 'request' })
+  await fixture.command({ ...shared, type: 'terminal.lease.claim', commandId: 'claim' })
+  await fixture.command({ ...shared, type: 'terminal.lease.activate', commandId: 'activate' })
+  await fixture.command({
+    ...shared,
+    type: 'terminal.lease.mark-unknown',
+    commandId: 'mark-unknown',
+  })
+
+  await expect(
+    fixture.command({ ...shared, type: 'terminal.lease.end', commandId: 'end-unproven' }),
+  ).rejects.toMatchObject({ code: 'worktree.STALE_RESULT' })
+  expect(
+    (await fixture.engine.readModelSnapshot()).terminalLeases.get(terminalLeaseId)?.state,
+  ).toBe('ownership-unknown')
+
+  await fixture.command({
+    ...shared,
+    type: 'terminal.lease.end',
+    commandId: 'end-proven',
+    hostConfirmedGone: true,
+  })
+  expect(
+    (await fixture.engine.readModelSnapshot()).terminalLeases.get(terminalLeaseId)?.state,
+  ).toBe('ended')
+})

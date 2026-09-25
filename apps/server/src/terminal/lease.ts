@@ -9,5 +9,5 @@ export type TerminalExecutionLease = {
 }
 
 export type TerminalLeaseBoundary = {
-  begin: (worktreeId: WorktreeId) => Promise<TerminalExecutionLease>
+  begin: (worktreeId: WorktreeId, key?: string) => Promise<TerminalExecutionLease>
 }

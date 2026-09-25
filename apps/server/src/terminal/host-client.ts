@@ -96,6 +96,12 @@ export class TerminalHostClient {
     return connection.list()
   }
 
+  /** Kills a host session by its numeric id, without attaching to it first. */
+  async killSession(session: number, signal?: NodeJS.Signals) {
+    const { connection } = await this.connection()
+    connection.send({ type: 'kill', session, signal: signal ? hostSignal(signal) : undefined })
+  }
+
   /** Ends every shell and the host itself. */
   async shutdown() {
     const { connection } = await this.connection()

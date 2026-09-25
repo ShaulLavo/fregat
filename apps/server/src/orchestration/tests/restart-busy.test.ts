@@ -2,7 +2,6 @@ import { orchestrationCommandSchema, sessionIdSchema } from '@workspace/contract
 import * as v from 'valibot'
 import { afterEach, describe, expect, test } from 'vitest'
 
-import { createAgentTerminalFixture } from '../../../test/factories/agent-terminal'
 import {
   createOrchestrationFixture,
   FIXTURE_SESSION_ID,
@@ -201,34 +200,6 @@ describe('the restart confirmation names every busy session', () => {
           title: 'Monitoring session',
           projectTitle: 'Platform',
           state: 'background',
-        },
-      ],
-    })
-  })
-
-  test('an open agent terminal is terminal', async () => {
-    const fixture = await createAgentTerminalFixture()
-    cleanups.push(() => fixture.close())
-    const lease = await fixture.engine.beginTerminalLease(fixture.worktreeId)
-    const launch = await fixture.engine.beginAgentTerminal({
-      sessionId: fixture.sessionId,
-      worktreeId: fixture.worktreeId,
-      terminalLeaseId: lease.terminalLeaseId,
-      runtimeEpoch: lease.runtimeEpoch,
-    })
-    cleanups.push(async () => {
-      launch.release()
-      await lease.end()
-    })
-
-    expect(await fixture.engine.beginRestart(new Set())).toEqual({
-      restarting: false,
-      busy: [
-        {
-          sessionId: fixture.sessionId,
-          title: 'Terminal conversation',
-          projectTitle: 'Terminal fixture',
-          state: 'terminal',
         },
       ],
     })

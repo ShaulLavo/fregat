@@ -175,8 +175,9 @@ export function createApp(options: AppOptions) {
         throw createInternalError('Terminal requires a ready worktree')
       return worktree.canonicalPath
     },
-    lifecycle: { begin: (worktreeId) => orchestration.beginTerminalLease(worktreeId) },
+    lifecycle: { begin: (worktreeId, key) => orchestration.beginTerminalLease(worktreeId, key) },
     resolveAgentSession: (input) => orchestration.beginAgentTerminal(input),
+    resolveAdoptedLease: (key) => orchestration.adoptedLeaseForKey(key),
   })
   const fonts = options.fonts ?? new FontCatalogService()
 
@@ -450,6 +451,8 @@ export function createApp(options: AppOptions) {
     .use(fsRoutes(fs))
     .onStart(() => {
       void providerPrices.refresh()
+      // Waits on `orchestration.ready` internally, so lease adoption lands first.
+      void terminal.reattach()
     })
     .onStop(cleanup)
   appCleanups.set(configured, cleanup)

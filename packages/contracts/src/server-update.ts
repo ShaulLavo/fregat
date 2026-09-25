@@ -32,14 +32,13 @@ export const serverUpdateSchema = v.object({
   liveCheck: v.nullable(liveCheckVerdictSchema),
 })
 
-/** What a restart would interrupt in a session. `terminal` is an agent CLI running in a terminal. */
+/** What a restart would interrupt in a session. */
 export const busySessionStateSchema = v.picklist([
   'starting',
   'running',
   'waiting',
   'rewinding',
   'background',
-  'terminal',
 ])
 
 export const busySessionSchema = v.object({

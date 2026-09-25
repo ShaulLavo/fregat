@@ -73,6 +73,7 @@ const commands = {
   'terminal.lease.terminate': lease,
   'terminal.lease.end': lease,
   'terminal.lease.mark-unknown': lease,
+  'terminal.lease.adopt': { ...lease, fromRuntimeEpoch: 'stale-epoch' },
 } satisfies Record<LifecycleCommandType, object>
 
 test('every lifecycle command routes to an aggregate and produces events or a durable structured rejection', () => {

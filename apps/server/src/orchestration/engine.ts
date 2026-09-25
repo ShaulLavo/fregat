@@ -18,7 +18,8 @@ import { WorktreeLifecycleReactor } from './worktree-lifecycle-reactor'
 import { WorktreeCommandPreparation } from './worktree-command-preparation'
 import { TerminalLeaseController } from './terminal-lease-controller'
 import { GitWorktreeService } from '../git/worktrees'
-import type { TerminalService } from '../terminal/service'
+import { terminalSessionKey, type TerminalService } from '../terminal/service'
+import type { HostSessionInfo } from '../terminal-host/protocol'
 import { worktreeRuntimeErrors } from './worktree-runtime-errors'
 import {
   type ProviderInstanceId,
@@ -146,6 +147,7 @@ export class OrchestrationEngine {
   private titleReactor: SessionTitleReactor | null = null
   private readonly keepImportedSessionsUpdated: () => boolean
   private providerService: ProviderService | null = null
+  private readonly terminalService: TerminalService | null
   private readonly registration: RegistrationBoundary | undefined
   private readonly preparationLanes = new Map<string, Promise<OrchestrationDispatchResult>>()
   readonly ready: Promise<void>
@@ -168,10 +170,12 @@ export class OrchestrationEngine {
     this.registration = options.registration
     this.providerService = options.providerService ?? null
     this.terminalHandoffs = new TerminalHandoffs(database)
+    this.terminalService = options.terminalService ?? null
     this.terminalLeases = new TerminalLeaseController({
       gate: this.worktreeExecutionGate,
       dispatch: (command) => this.enqueue(command),
       getReadModel: () => this.readModel,
+      queryHostSessions: () => this.hostSessions(),
     })
     this.eventStore = new OrchestrationEventStore(database)
     this.receipts = new OrchestrationCommandReceipts(database)
@@ -465,16 +469,10 @@ export class OrchestrationEngine {
   }
 
   private busySessions() {
-    const handoffs = new Set(
-      this.terminalHandoffs
-        .pending()
-        .filter((handoff) => handoff.phase === 'active')
-        .map((handoff) => handoff.sessionId),
-    )
     const busy: BusySession[] = []
     for (const session of this.readModel.sessions.values()) {
       if (session.deletedAt) continue
-      const state = this.busyState(session, handoffs)
+      const state = this.busyState(session)
       if (!state) continue
       busy.push({
         sessionId: session.id,
@@ -489,10 +487,7 @@ export class OrchestrationEngine {
     )
   }
 
-  private busyState(
-    session: OrchestrationProjectedSession,
-    activeHandoffs: ReadonlySet<SessionId>,
-  ): BusySessionState | null {
+  private busyState(session: OrchestrationProjectedSession): BusySessionState | null {
     if (session.pendingRewindCommandId) return 'rewinding'
     const interruption = runtimeInterruptedByRestart(session)
     if (interruption?.activeStatus) return interruption.activeStatus
@@ -500,7 +495,6 @@ export class OrchestrationEngine {
     if (interruption || this.providerService?.isLaunching(session.id)) return 'starting'
     if (session.pendingApprovalCount + session.pendingUserInputCount > 0) return 'waiting'
     if (this.providerService?.backgroundLiveness(session.id)) return 'background'
-    if (activeHandoffs.has(session.id)) return 'terminal'
     return null
   }
 
@@ -1123,21 +1117,57 @@ export class OrchestrationEngine {
     })
   }
 
-  async beginTerminalLease(worktreeId: WorktreeId) {
+  async beginTerminalLease(worktreeId: WorktreeId, key?: string) {
     await this.ready
-    return this.terminalLeases.begin(worktreeId)
+    return this.terminalLeases.begin(worktreeId, key)
   }
 
+  /** A lease already adopted at boot, for the terminal reattaching its host session. */
+  async adoptedLeaseForKey(key: string) {
+    await this.ready
+    const lease = [...this.readModel.terminalLeases.values()].find(
+      (candidate) => candidate.key === key && candidate.state === 'active',
+    )
+    if (!lease) return null
+    return this.terminalLeases.attachAdopted(lease.worktreeId, lease.terminalLeaseId)
+  }
+
+  private hostSessions(): Promise<readonly HostSessionInfo[] | null> {
+    return this.terminalService?.listHostSessions() ?? Promise.resolve(null)
+  }
+
+  /**
+   * A pending agent-in-terminal handoff is adopted when the host still runs its shell, so the
+   * session resumes as an ordinary terminal instead of being blocked on unknown ownership.
+   */
   private async recoverTerminalHistory() {
     const provider = this.providerService
     if (!provider) return
     const pending = this.terminalHandoffs.pending()
-    for (const handoff of pending)
-      provider.restoreTerminalOwnership(
-        handoff.sessionId,
-        handoff.phase === 'history' ? 'history' : 'unknown',
-      )
+    const sessions = await this.hostSessions()
+    const live = sessions
+      ? new Set(sessions.filter((session) => !session.exited).map((session) => session.key))
+      : null
+    const adopted = new Set<SessionId>()
     for (const handoff of pending) {
+      if (handoff.phase === 'history') {
+        provider.restoreTerminalOwnership(handoff.sessionId, 'history')
+        continue
+      }
+      if (live?.has(terminalSessionKey(handoff.worktreeId, handoff.sessionId, handoff.sessionId))) {
+        provider.restoreTerminalOwnership(handoff.sessionId, 'terminal')
+        adopted.add(handoff.sessionId)
+        await this.terminalLeases.adopt(
+          handoff.worktreeId,
+          handoff.terminalLeaseId,
+          handoff.runtimeEpoch,
+        )
+        continue
+      }
+      provider.restoreTerminalOwnership(handoff.sessionId, 'unknown')
+    }
+    for (const handoff of pending) {
+      if (adopted.has(handoff.sessionId)) continue
       await this.retryTerminalHistory(handoff, provider).catch((error: unknown) =>
         this.recordTerminalHistoryFailure(handoff.sessionId, handoff.startedAt, error),
       )

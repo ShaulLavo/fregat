@@ -31,6 +31,8 @@ export const platformMigrations: readonly Migration[] = [
   { version: 24, name: 'provider_usage_contributions', up: applyProviderUsageContributions },
   { version: 29, name: 'turn_end_reason', up: applyTurnEndReason },
   { version: 30, name: 'message_model_selection', up: applyMessageModelSelection },
+  { version: 33, name: 'terminal_lease_key', up: applyTerminalLeaseKey },
+  { version: 34, name: 'terminal_session_offsets', up: applyTerminalSessionOffsets },
 ]
 
 function applyMessageModelSelection(database: PlatformDatabase) {
@@ -39,6 +41,16 @@ function applyMessageModelSelection(database: PlatformDatabase) {
 
 function applyTurnEndReason(database: PlatformDatabase) {
   database.run(sql`ALTER TABLE projection_turns ADD COLUMN end_reason TEXT`)
+}
+
+function applyTerminalLeaseKey(database: PlatformDatabase) {
+  database.run(sql`ALTER TABLE projection_terminal_leases ADD COLUMN key TEXT`)
+}
+
+function applyTerminalSessionOffsets(database: PlatformDatabase) {
+  database.run(
+    sql`CREATE TABLE terminal_session_offsets (owner TEXT PRIMARY KEY NOT NULL, offset INTEGER NOT NULL)`,
+  )
 }
 
 function applyProviderUsageContributions(database: PlatformDatabase) {
