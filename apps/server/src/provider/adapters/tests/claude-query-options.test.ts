@@ -158,7 +158,7 @@ describe('claudeQueryOptions', () => {
     expect(claudeTerminalResumeArgv(SESSION_ID)).toEqual(['claude', '--resume', SESSION_ID])
   })
 
-  it('runs the main thread as the chosen agent', () => {
+  it('runs the session as the chosen agent', () => {
     expect(queryOptions({ agent: 'reviewer', runtimeMode: 'full-access' }).agent).toBe('reviewer')
     expect('agent' in queryOptions({ runtimeMode: 'full-access' })).toBe(false)
   })
