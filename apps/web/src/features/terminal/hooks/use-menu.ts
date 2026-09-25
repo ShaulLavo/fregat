@@ -45,6 +45,7 @@ export function useTerminalMenu(target: TerminalMenuTarget) {
     hasSelection: target.selection.length > 0,
     paste: () => void pasteFromClipboard(target.terminal),
     pasteBlocked,
+    rendererBackend: target.rendererBackend,
     reset: () => resetTerminal(target.terminal),
     scrollToBottom: () => target.terminal.scrollToBottom(),
     scrollToTop: () => target.terminal.scrollToTop(),

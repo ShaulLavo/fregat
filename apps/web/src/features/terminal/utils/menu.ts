@@ -6,11 +6,16 @@ import {
   ChatCircleIcon,
   ClipboardTextIcon,
   CopyIcon,
+  GraphicsCardIcon,
   SelectionAllIcon,
 } from '@phosphor-icons/react'
 
 import { actionItem, section, type Menu } from '@/keymap/menus/utils/model'
 import { formatChord } from '@/keymap/utils/format-keys'
+import {
+  rendererBackendLabel,
+  type TerminalRendererBackend,
+} from '@/features/terminal/utils/renderer-backend'
 
 /**
  * Everything the menu needs to know about the terminal, read once when the
@@ -31,6 +36,7 @@ export type TerminalMenuContext = {
   readonly paste: () => void
   /** The browser refuses programmatic clipboard reads for this origin. */
   readonly pasteBlocked: boolean
+  readonly rendererBackend: TerminalRendererBackend
   readonly reset: () => void
   readonly restart: () => void
   readonly scrollToBottom: () => void
@@ -117,6 +123,16 @@ export function terminalMenu(context: TerminalMenuContext): Menu {
           label: 'Scroll to Bottom',
           run: context.scrollToBottom,
         }),
+    ]),
+    section('renderer', [
+      actionItem({
+        disabled: true,
+        icon: GraphicsCardIcon,
+        id: 'renderer',
+        label: rendererBackendLabel(context.rendererBackend),
+        mono: true,
+        run: () => {},
+      }),
     ]),
   ]
 }

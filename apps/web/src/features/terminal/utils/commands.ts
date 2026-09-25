@@ -4,6 +4,7 @@ import type { TerminalContextSelection } from '@workspace/client-core/chat/termi
 
 import { captureTerminalSelection } from './capture'
 import { readClipboardText } from './clipboard'
+import type { TerminalRendererBackend } from '@/features/terminal/utils/renderer-backend'
 
 /**
  * Ctrl+L. Sent to the PTY rather than handled locally: `Terminal.clear()` only
@@ -23,6 +24,7 @@ export type TerminalMenuTarget = {
   readonly restart: () => void
   readonly contextSelection: TerminalContextSelection | null
   readonly hasScrollback: boolean
+  readonly rendererBackend: TerminalRendererBackend
   readonly selection: string
   readonly terminal: Terminal
 }
@@ -37,6 +39,7 @@ export function readTerminalMenuTarget(
     ...actions,
     contextSelection: captureTerminalSelection(terminal, sessionId),
     hasScrollback,
+    rendererBackend: terminal.diagnostics.rendererBackend,
     selection: terminal.getSelection() ?? '',
     terminal,
   }

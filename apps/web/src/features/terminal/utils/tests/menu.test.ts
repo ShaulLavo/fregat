@@ -2,10 +2,10 @@ import type { MenuActionItem } from '@/keymap/menus/utils/model'
 import { terminalMenu, type TerminalMenuContext } from '@/features/terminal/utils/menu'
 import { expect, test } from '../../../../../test/fixtures'
 
-test('sections run agent, clipboard, screen, then scroll', () => {
+test('sections run agent, clipboard, screen, scroll, then renderer', () => {
   const ids = terminalMenu(menuContext({ hasScrollback: true })).map((entry) => entry.id)
 
-  expect(ids).toEqual(['agent', 'clipboard', 'screen', 'scroll'])
+  expect(ids).toEqual(['agent', 'clipboard', 'screen', 'scroll', 'renderer'])
 })
 
 test('Ask the Agent is disabled until the capture survives normalization', () => {
@@ -146,6 +146,7 @@ function menuContext({
     hasSelection,
     paste: () => {},
     pasteBlocked,
+    rendererBackend: 'webgpu',
     reset: () => {},
     scrollToBottom: () => {},
     scrollToTop: () => {},
