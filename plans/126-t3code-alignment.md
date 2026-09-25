@@ -3,8 +3,8 @@
 Status: **IN PROGRESS; FULL PARITY EXECUTION RESUMED 2026-09-23**. Two source-audit passes and independent
 cross-review completed on 2026-09-20. The audit found 48 implementation groups, and the 2026-09-24
 delta added nine: **57 groups**, including paired client/server work. This is not a count of
-independently reproduced bugs. On 2026-09-25, 23 groups were implemented and deployed, 8 partial and
-26 not started. In the completion wave a row closes when its `agent:browser` scenario proves the
+independently reproduced bugs. On 2026-09-25, 24 groups were done (23 implemented and deployed, plus
+LIFE-13 closed by its scenario in the completion wave), 8 partial and 25 not started. In the completion wave a row closes when its `agent:browser` scenario proves the
 behaviour; the paired run against upstream T3 Code is dropped
 ([owner decision](../docs/completion-wave.md#owner-decisions-for-this-wave-2026-09-25)).
 

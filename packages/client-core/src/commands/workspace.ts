@@ -1,4 +1,4 @@
-import { defineMetadata } from './metadata'
+import { defineMetadata, type CommandKeyDefault } from './metadata'
 import { sessionJumpCommandId, type SessionJumpPosition } from './session-jump'
 
 export const workspaceCommandMetadata = {
@@ -21,6 +21,29 @@ export const workspaceCommandMetadata = {
     undoCategory: 'workspace-operation',
     when: ['workspaceOpen', 'workspaceEditRedoable'],
     title: 'Redo workspace edit',
+  }),
+  'workspace.undoSessionAction': defineMetadata({
+    category: 'Workspace',
+    description: 'Undo the settle, snooze, unpin or archive named in the notice.',
+    id: 'workspace.undoSessionAction',
+    execution: 'async',
+    // Every pane without its own undo; the composer, editors, terminals and the file tree keep theirs.
+    // The terminal keeps Control+Z for suspend, so the TUI rail takes U.
+    keys: [
+      ...(['global', 'git', 'logs', 'problems', 'search', 'settings'] as const).map(
+        (pane): CommandKeyDefault => ({
+          chord: ['Mod+Z'],
+          pane,
+          preventDefault: true,
+          yieldsToTextEntry: true,
+        }),
+      ),
+      { chord: ['U'], pane: 'chat', platforms: ['tui'] },
+    ],
+    target: 'workspace',
+    undoCategory: 'workspace-operation',
+    when: ['sessionActionUndoable'],
+    title: 'Undo session action',
   }),
   'fileTree.undo': defineMetadata({
     category: 'Workspace',

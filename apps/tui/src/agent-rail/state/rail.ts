@@ -9,10 +9,18 @@ import {
   ORCHESTRATION_SESSION_SEARCH_MAX_QUERY_LENGTH,
   scopedSessionKey,
   type ClientOrchestrationCommand,
+  type ScopedSessionRef,
   type SessionId,
 } from '@workspace/contracts'
 import { sessionIdRange, toggledSessionIds } from '@workspace/client-core/chat/rail/multi-select'
 import type { SessionSearchMatches, SessionRailView } from '@workspace/client-core/chat/rail/model'
+import {
+  forgetSessionLifecycleUndo,
+  offerSessionLifecycleUndo,
+  type SessionLifecycleUndoEntry,
+  type SessionLifecycleUndoKind,
+  type SessionLifecycleUndoSlot,
+} from '@workspace/client-core/chat/rail/lifecycle-undo'
 import { readServerPaths } from '@workspace/client-core/files/read'
 import { absolutePickerPath } from '@workspace/client-core/files/path-input'
 import { requireEdenData } from '@workspace/client-core/transport/eden'
@@ -21,6 +29,13 @@ import { connectionFailure } from '@/connection/utils/failure'
 import { createTuiError } from '@/host/utils/structured-errors'
 import type { SettingsSession, SessionState } from '@/connection/state/session'
 import type { FileStorage } from '@/storage/files'
+
+const UNDO_WINDOW_MS = 5_000
+
+export type RailUndoEntry = SessionLifecycleUndoEntry & {
+  /** The session was open, so its Undo selects it again. */
+  readonly selected: boolean
+}
 
 type State = {
   readonly query: string
@@ -34,6 +49,7 @@ type State = {
   readonly seen: SessionSeenStamps
   readonly busy: boolean
   readonly error: string | null
+  readonly undo: SessionLifecycleUndoSlot<RailUndoEntry> | null
 }
 
 export function createAgentRailState(
@@ -44,6 +60,7 @@ export function createAgentRailState(
   const listeners = new Set<() => void>()
   let request = new AbortController()
   let timer: ReturnType<typeof setTimeout> | null = null
+  let undoExpiry: ReturnType<typeof setTimeout> | undefined
   let state: State = {
     query: '',
     view: 'active',
@@ -56,6 +73,7 @@ export function createAgentRailState(
     seen: readSeen(ready.storage),
     busy: false,
     error: null,
+    undo: null,
   }
   function publish(patch: Partial<State>) {
     if (lifetime.signal.aborted) return
@@ -154,6 +172,25 @@ export function createAgentRailState(
       publish({ seen })
     },
     setError: (error: string) => publish({ error }),
+    /** One latest-undo slot, available for five seconds after the latest action. */
+    offerUndo(kind: SessionLifecycleUndoKind, entries: readonly RailUndoEntry[]) {
+      const undo = offerSessionLifecycleUndo(state.undo, kind, entries)
+      if (undo === state.undo) return
+      publish({ undo })
+      clearTimeout(undoExpiry)
+      undoExpiry = setTimeout(() => publish({ undo: null }), UNDO_WINDOW_MS)
+    },
+    forgetUndo(refs: readonly ScopedSessionRef[]) {
+      const undo = forgetSessionLifecycleUndo(state.undo, refs)
+      if (undo !== state.undo) publish({ undo })
+    },
+    /** Spends the slot before anything is dispatched, so a repeated key restores nothing. */
+    takeUndo() {
+      const undo = state.undo
+      clearTimeout(undoExpiry)
+      if (undo) publish({ undo: null })
+      return undo
+    },
     async execute(commands: readonly ClientOrchestrationCommand[], clearCompletedMarks = false) {
       return (
         (await run(async () => {
@@ -184,6 +221,7 @@ export function createAgentRailState(
       lifetime.abort()
       request.abort()
       if (timer) clearTimeout(timer)
+      clearTimeout(undoExpiry)
       listeners.clear()
     },
   }

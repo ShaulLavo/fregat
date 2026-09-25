@@ -19,12 +19,14 @@ import {
 import { useSessionSnoozeRequestStore } from '@/features/chat-mode/state/session-snooze-request-store'
 import { useSessionActions } from '@/features/chat-mode/hooks/use-session-actions'
 import { chatModeMutationKeys } from '@/features/chat-mode/utils/mutation-keys'
+import { primaryQueryClient } from '@/lib/environments/state/query-clients'
 
 export function SessionSnoozeDialog() {
   const request = useSessionSnoozeRequestStore((state) => state.request)
   const dismiss = useSessionSnoozeRequestStore((state) => state.dismiss)
   const actions = useSessionActions()
-  const pending = useIsMutating({ mutationKey: chatModeMutationKeys.lifecycle() }) > 0
+  const pending =
+    useIsMutating({ mutationKey: chatModeMutationKeys.lifecycle() }, primaryQueryClient()) > 0
   const [input, setInput] = useState<CustomSnoozeInput>({ mode: 'date', date: '', time: '' })
   const now = new Date()
   const custom = customSnooze(input, now)

@@ -67,6 +67,10 @@ export const selectors = {
       .getByRole('button', { name: 'Actions', exact: true }),
   toastUndo: (page: Page) =>
     page.locator('[data-sonner-toast]').getByRole('button', { name: 'Undo', exact: true }).last(),
+  undoNotice: (page: Page, text: string) =>
+    page.locator('[data-sonner-toast]').filter({ hasText: text }),
+  shelfRowTitles: (page: Page, shelf: string) =>
+    page.getByRole('region', { name: shelf, exact: true }).locator('[title]'),
 
   projectGroups: (page: Page) => page.locator('[data-project-group]'),
   projectDeleteMenu: (page: Page) =>

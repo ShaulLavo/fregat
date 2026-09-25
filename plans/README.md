@@ -54,7 +54,7 @@ a bare root `bun run verify`.
 | [130 — ask the editor](130-ask-the-editor.md)                                           | **PHASES 1, 2, 4 AND 5 (ITEMS 5–7, 9) DONE; 3, ITEMS 8 AND 10 OPEN** |
 | [129 — dependency shape](129-dependency-shape.md)                                       | **PHASES 1–2 DEPLOYED; PHASE 3 Q2–Q4 OPEN**                          |
 | [128 — React 19 patterns](128-react-19-patterns.md)                                     | **NOT STARTED — PARTLY OBSOLETE; REWRITE SMALL FIRST**               |
-| [126 — T3 Code behavioral alignment](126-t3code-alignment.md)                           | **IN PROGRESS — 23 OF 57 GROUPS DONE, 8 PARTIAL, 26 OPEN**           |
+| [126 — T3 Code behavioral alignment](126-t3code-alignment.md)                           | **IN PROGRESS — 24 OF 57 GROUPS DONE, 8 PARTIAL, 25 OPEN**           |
 | [071 — syntax highlight retry](071-syntax-highlight-retry.md)                           | **PROPOSED — ROOT GO/NO-GO SCHEDULING**                              |
 | [080 — Platform and VS Code keybinding modes](080-platform-keybinding-modes.md)         | **PROPOSED — INTERACTION RULES CONFIRMED**                           |
 | [087 — stateless MCP support](087-stateless-mcp.md)                                     | **PROPOSED — IMPLEMENTATION NOT STARTED**                            |
@@ -112,9 +112,10 @@ a bare root `bun run verify`.
   cases, contract census and open finding ledger live beside the master plan. Reconcile shared
   client-core work with 094, keyboard behavior with 080, native capabilities with 087/088,
   verification tooling with 119 and background telemetry with 125. This is an execution plan.
-  As of 2026-09-25, 23 groups are implemented and deployed, 8 are partial and 26 are open; the
-  master plan holds the status line. A row closes when its
-  `agent:browser` scenario proves the behaviour. Root `PLAN.md` remains the roadmap owner.
+  As of 2026-09-25, 24 groups are done (23 implemented and deployed, plus LIFE-13 closed by its
+  scenario), 8 are partial and 25 are open; the master plan holds the status line. A row
+  closes when its `agent:browser` scenario proves the behaviour. Root `PLAN.md` remains the
+  roadmap owner.
 
 - Plan 125 is done and deleted. The [observability reference](../docs/observability-overhead.md)
   records admission and delivery; its open measurements are Plan 147 Phase 3 steps 5–8.

@@ -47,6 +47,7 @@ Commands dispatch over the orchestration socket when it is live and over HTTP ot
 - `async-questions`: isolated native asynchronous questions; running answer steers, idle answer starts a turn, pending state survives reload, message-only dismiss persists. Native message payloads captured; temporary provider/session/processes removed.
 
 - `session-lifecycle`: pin/settle/active menus, invalid custom snooze, timer-only shelf move, bulk snooze and Undo, provider-session snooze/unsnooze. Uses disposable sessions; bulk skipped/failed retention is covered by real-server DOM tests.
+- `session-undo`: unpin, settle, snooze and archive with the notice's Undo and with Mod+Z; pin keys and pinned order return, the archived open session reopens, Mod+Z in the composer stays the composer's undo, and an expired notice leaves the key to the browser. Three disposable sessions, deleted afterwards; runs on the throwaway server without a default model.
 - `background-liveness`: isolated native parent/child lifecycle; completed parent with live child remains Working, idle child becomes Ready, late metadata stays Ready across reload. Removes own provider/session/processes.
 - `spinner-palette`: isolated native turn left running under Sage dark then light; screenshots the rail, header and timeline `Spinner`s drawing from the theme primary. Run with `--scale 2` to read the bands. Restores appearance settings.
 

@@ -55,6 +55,7 @@ import {
   type SessionTraversalDirection,
 } from '@/features/chat-mode/state/session-commands'
 import { setChatModeSessionRailOpen, showChatModeToolTab } from '@/features/chat-mode/utils/panels'
+import { undoLatestSessionAction } from '@/features/chat-mode/state/session-undo'
 import { documentKey } from '@/lib/documents/utils/identity'
 import { runMutation } from '@/lib/mutations/run'
 import { copyTextToClipboard } from '@/lib/clipboard'
@@ -498,6 +499,11 @@ export const workspaceCommands = [
     ...workspaceCommandMetadata['workspace.redoWorkspaceEdit'],
     icon: ArrowClockwiseIcon,
     run: ({ runtime }) => operationStart(runtime.workspaceEdits.redo()),
+  }),
+  defineCommand({
+    ...workspaceCommandMetadata['workspace.undoSessionAction'],
+    icon: ArrowCounterClockwiseIcon,
+    run: () => operationStart(undoLatestSessionAction()),
   }),
   defineCommand({
     ...workspaceCommandMetadata['fileTree.undo'],
