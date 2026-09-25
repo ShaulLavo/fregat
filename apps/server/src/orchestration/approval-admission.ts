@@ -8,7 +8,6 @@ import {
   type TurnId,
 } from '@workspace/contracts'
 import {
-  approvalRequestState,
   openApprovalRequests,
   type ApprovalRequestState,
   type OpenApprovalRequest,
@@ -34,7 +33,12 @@ export function approvalResponseEvents(
   at: string,
 ): PendingOrchestrationEvent[] {
   const session = requireSession(model, command.sessionId)
-  const state = approvalRequestState(session.activities, command.requestId)
+  const state = session.approvalRequests.get(command.requestId)?.state ?? { kind: 'unknown' }
+  if (state.kind === 'unknown') {
+    throw sessionDomainErrors.APPROVAL_REQUEST_UNKNOWN({
+      internal: { requestId: command.requestId },
+    })
+  }
   if (state.kind === 'ended') {
     throw sessionDomainErrors.APPROVAL_REQUEST_ENDED({
       internal: { requestId: command.requestId },
@@ -76,8 +80,8 @@ export function endedApprovalEvents(
     const end = turnEnd(pending)
     if (end === null) continue
     const { sessionId, turns } = end
-    const activities = model.sessions.get(sessionId)?.activities ?? []
-    for (const request of openApprovalRequests(activities)) {
+    const requests = model.sessions.get(sessionId)?.approvalRequests ?? new Map()
+    for (const request of openApprovalRequests(requests)) {
       if (closed.has(request.requestId)) continue
       if (turns !== 'all' && request.turnId !== turns) continue
       closed.add(request.requestId)

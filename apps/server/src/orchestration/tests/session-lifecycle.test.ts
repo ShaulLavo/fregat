@@ -51,6 +51,29 @@ describe('approval admission', () => {
     return snapshot.session.activities.map((activity) => activity.kind)
   }
 
+  it('closes evicted approvals on stop and rejects late answers after rebuilding', async () => {
+    const { database, engine, turnId } = await engineWithOpenApproval()
+    for (let index = 0; index < 501; index += 1) {
+      await engine.dispatch(activityCommand('tool.completed', 'info', { index }, turnId))
+    }
+    expect(
+      (await engine.readModelSnapshot()).sessions.get(sessionId)?.activities,
+    ).not.toContainEqual(expect.objectContaining({ kind: 'approval.requested' }))
+    const restarted = new OrchestrationEngine(database)
+    await restarted.dispatch(command({ sessionId, turnId, type: 'session.turn.interrupt' }))
+    expect(sessionRow(database).pendingApprovalCount).toBe(0)
+    await expect(restarted.dispatch(respond('accept'))).rejects.toMatchObject({
+      code: 'orchestration.APPROVAL_REQUEST_ENDED',
+    })
+  })
+
+  it('rejects unknown approval requests', async () => {
+    const { engine } = await createEngineWithSession()
+    await expect(engine.dispatch(respond('accept'))).rejects.toMatchObject({
+      code: 'orchestration.APPROVAL_REQUEST_UNKNOWN',
+    })
+  })
+
   it('turns a repeated identical answer into a no-op', async () => {
     const { engine } = await engineWithOpenApproval()
 

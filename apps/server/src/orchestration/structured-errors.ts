@@ -62,6 +62,12 @@ export const sessionDomainErrors = defineErrorCatalog('orchestration', {
     why: 'The session received activity, a lifecycle choice or live background work after the settlement decision was made.',
     fix: 'Nothing to do; the next settlement sweep decides again from the current state.',
   },
+  APPROVAL_REQUEST_UNKNOWN: {
+    status: 404,
+    message: 'This approval request is unavailable.',
+    why: 'The session has no record of this request.',
+    fix: 'Refresh the session to see its current requests.',
+  },
   APPROVAL_ALREADY_DECIDED: {
     status: 409,
     message: 'This approval was already answered with a different choice.',

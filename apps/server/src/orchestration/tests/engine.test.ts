@@ -808,6 +808,7 @@ describe('orchestration engine', () => {
 
     await dispatchFirstSession(engine)
     await engine.providerRuntimeIdle()
+    await appendApprovalRequest(engine)
     await engine.dispatch(
       command({
         commandId: 'cmd-approval-respond',
@@ -856,6 +857,7 @@ describe('orchestration engine', () => {
 
     await dispatchFirstSession(engine)
     await engine.providerRuntimeIdle()
+    await appendApprovalRequest(engine)
     await engine.dispatch(
       command({
         commandId: 'cmd-stale-approval-respond',
@@ -905,6 +907,28 @@ describe('orchestration engine', () => {
     fixture.close()
   })
 })
+
+async function appendApprovalRequest(engine: OrchestrationEngine) {
+  const sessionId = '00000000-0000-4000-8000-000000000001'
+  await engine.dispatch(
+    command({
+      type: 'session.activity.append',
+      commandId: 'cmd-approval-request',
+      createdAt: assistantCompleted,
+      sessionId,
+      activity: {
+        id: 'approval-request',
+        sessionId,
+        createdAt: assistantCompleted,
+        kind: 'approval.requested',
+        summary: 'Approval requested',
+        tone: 'approval',
+        turnId: null,
+        payload: { requestId: 'approval-1' },
+      },
+    }),
+  )
+}
 
 async function dispatchFirstSession(engine: OrchestrationEngine) {
   await engine.dispatch(projectCreateCommand())

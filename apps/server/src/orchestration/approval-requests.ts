@@ -24,35 +24,40 @@ export type OpenApprovalRequest = {
   readonly turnId: TurnId | null
 }
 
-export function approvalRequestState(
-  activities: readonly OrchestrationSessionActivity[],
-  requestId: string,
-): ApprovalRequestState {
-  let state: ApprovalRequestState = { kind: 'unknown' }
-  for (const activity of activities) {
-    if (activityRequestId(activity.payload) !== requestId) continue
-    state = nextApprovalState(state, activity)
-  }
+export const APPROVAL_ACTIVITY_KINDS = [
+  'approval.requested',
+  APPROVAL_ANSWER_SUBMITTED_KIND,
+  'approval.resolved',
+  'provider.approval.respond.failed',
+]
 
-  return state
+export type ApprovalRequests = Map<
+  string,
+  {
+    state: ApprovalRequestState
+    request: OpenApprovalRequest
+  }
+>
+
+export function applyApprovalActivity(
+  requests: ApprovalRequests,
+  activity: OrchestrationSessionActivity,
+) {
+  if (!APPROVAL_ACTIVITY_KINDS.includes(activity.kind)) return
+  const requestId = activityRequestId(activity.payload)
+  if (requestId === null) return
+  const previous = requests.get(requestId)
+  requests.set(requestId, {
+    state: nextApprovalState(previous?.state ?? { kind: 'unknown' }, activity),
+    request: previous?.request ?? openRequest(requestId, activity),
+  })
 }
 
-/** Requests the agent may still be holding: open, or answered but not yet resolved. */
-export function openApprovalRequests(
-  activities: readonly OrchestrationSessionActivity[],
-): OpenApprovalRequest[] {
-  const open = new Map<string, OpenApprovalRequest>()
-  for (const activity of activities) {
-    const requestId = activityRequestId(activity.payload)
-    if (requestId === null) continue
-    if (activity.kind === 'approval.requested') {
-      open.set(requestId, openRequest(requestId, activity))
-      continue
-    }
-    if (closesApproval(activity)) open.delete(requestId)
-  }
-
-  return [...open.values()]
+/** Open and admitted answers both need closing when their turn ends. */
+export function openApprovalRequests(requests: ApprovalRequests): OpenApprovalRequest[] {
+  return [...requests.values()]
+    .filter(({ state }) => state.kind === 'open' || state.kind === 'answering')
+    .map(({ request }) => request)
 }
 
 function nextApprovalState(
@@ -78,13 +83,6 @@ function resolvedState(payload: Record<string, unknown>): ApprovalRequestState {
   if (payload.resolution === 'ended' || payload.resolution === 'stale') return { kind: 'ended' }
 
   return { kind: 'decided', decision: payload.decision }
-}
-
-function closesApproval(activity: OrchestrationSessionActivity) {
-  if (activity.kind === 'approval.resolved') return true
-  if (activity.kind !== 'provider.approval.respond.failed') return false
-
-  return payloadRecord(activity.payload).code === sessionIdentityErrors.REQUEST_GONE.code
 }
 
 function openRequest(requestId: string, activity: OrchestrationSessionActivity) {
