@@ -4,7 +4,7 @@ import {
   appRoleLabel,
   contrastFailures,
   TEXT_CONTRAST_MINIMUM,
-} from '@/features/settings/utils/palette-editing'
+} from '@workspace/client-core/themes/palette-editing'
 
 /** Text pairs under 4.5:1. Advisory: it never blocks Apply. */
 export function PaletteContrast({ colors }: { readonly colors: PaletteColors }) {

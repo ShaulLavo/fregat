@@ -1,5 +1,5 @@
 import { bundledPalette, paletteColorsFor } from '@workspace/contracts'
-import { contrastFailures } from '@/features/settings/utils/palette-editing'
+import { contrastFailures } from '@workspace/client-core/themes/palette-editing'
 import { readdir } from 'node:fs/promises'
 import path from 'node:path'
 import { themeDocument } from '../../../../test/factories/theme-bundle'

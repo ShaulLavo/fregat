@@ -37,7 +37,7 @@ import {
   setPaletteColor,
   TERMINAL_ROLE_LABELS,
   type ColorGroup,
-} from '@/features/settings/utils/palette-editing'
+} from '@workspace/client-core/themes/palette-editing'
 import { useTheme } from '@/features/settings/hooks/use-theme'
 import { usePalette } from '@/lib/appearance/hooks/use-palette'
 import { errorMessage } from '@/lib/error-message'

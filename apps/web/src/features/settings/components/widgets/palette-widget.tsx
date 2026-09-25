@@ -14,7 +14,7 @@ import {
 import { PaletteImportDialog } from '@/features/settings/components/widgets/palette-import-dialog'
 import { PaletteNameDialog } from '@/features/settings/components/widgets/palette-name-dialog'
 import { usePaletteActions } from '@/features/settings/hooks/use-palette-actions'
-import { duplicatePalette, paletteIdFromName } from '@/features/settings/utils/palette-editing'
+import { duplicatePalette, paletteIdFromName } from '@workspace/client-core/themes/palette-editing'
 import { usePalette } from '@/lib/appearance/hooks/use-palette'
 import { errorMessage } from '@/lib/error-message'
 import { toastError } from '@/lib/toast-error'

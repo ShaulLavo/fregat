@@ -4,7 +4,7 @@ import { cn } from '@workspace/ui/lib/utils'
 import type { ReactNode } from 'react'
 
 import { PaletteSwatches } from '@/features/settings/components/widgets/palette-swatches'
-import { editableModes } from '@/features/settings/utils/palette-editing'
+import { editableModes } from '@workspace/client-core/themes/palette-editing'
 
 /**
  * One gallery entry. Keyboard focus previews the whole app; a mouse never
