@@ -1,3 +1,4 @@
+import { createResourceQueryClient } from '@/lib/resources/state/query-client'
 import {
   testTabContents,
   testNullableTabContent,
@@ -52,6 +53,7 @@ test('startup resolves a remote environment after the initial intent was parsed 
   const workspace = await navigationWorkspace(federation.clientB, federation.serverB)
   const href = `/@${federation.descriptorB.environmentId}${workspace.base}/f/a.ts`
   const router = createApplicationRouter({
+    resources: createResourceQueryClient(),
     history: createMemoryHistory({ initialEntries: [href] }),
   })
   const initial = parseAddressIntent(href)

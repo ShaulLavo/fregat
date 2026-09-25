@@ -1,7 +1,8 @@
-import { createRootRoute, createRoute, stripSearchParams } from '@tanstack/react-router'
+import type { QueryClient } from '@tanstack/query-core'
+import { createRootRouteWithContext, createRoute, stripSearchParams } from '@tanstack/react-router'
 import { routeSearchSchema } from '@/features/address/utils/route-options'
 
-export const rootRoute = createRootRoute({
+export const rootRoute = createRootRouteWithContext<{ resources: QueryClient }>()({
   validateSearch: routeSearchSchema,
   search: {
     middlewares: [

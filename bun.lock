@@ -151,6 +151,7 @@
         "@singapore-editor/tree-sitter": "0.1.1",
         "@singapore-editor/tree-sitter-languages": "0.1.1",
         "@tanstack/hotkeys": "^0.8.0",
+        "@tanstack/query-core": "5.102.8",
         "@tanstack/react-hotkeys": "^0.10.0",
         "@tanstack/react-pacer": "^0.22.1",
         "@tanstack/react-query": "^5.102.8",

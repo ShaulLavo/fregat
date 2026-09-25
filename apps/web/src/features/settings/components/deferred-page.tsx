@@ -5,10 +5,10 @@ import { ModuleLoadError } from '@/components/module-load-error'
 import type { SettingsPage } from '@/features/settings/components/page'
 import { PageLoading } from '@/features/settings/components/page-loading'
 import { settingsPageQueryOptions } from '@/features/settings/utils/page-query'
-import { primaryQueryClient } from '@/lib/environments/state/query-clients'
+import { resourceQueryClient } from '@/lib/resources/state/query-client'
 
 export function DeferredSettingsPage(props: ComponentProps<typeof SettingsPage>) {
-  const query = useQuery(settingsPageQueryOptions, primaryQueryClient())
+  const query = useQuery(settingsPageQueryOptions, resourceQueryClient)
   if (query.isPending) return <PageLoading showJson={false} />
   if (query.isError)
     return <ModuleLoadError label='settings' onRetry={() => void query.refetch()} />

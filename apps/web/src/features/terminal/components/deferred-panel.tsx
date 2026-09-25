@@ -6,10 +6,10 @@ import type { TerminalPanel } from '@/features/terminal/components/panel'
 import { Spinner } from '@workspace/ui/components/spinner'
 import { cn } from '@workspace/ui/lib/utils'
 import { terminalPanelQueryOptions } from '@/features/terminal/utils/panel-query'
-import { primaryQueryClient } from '@/lib/environments/state/query-clients'
+import { resourceQueryClient } from '@/lib/resources/state/query-client'
 
 export function DeferredTerminalPanel(props: ComponentProps<typeof TerminalPanel>) {
-  const query = useQuery(terminalPanelQueryOptions, primaryQueryClient())
+  const query = useQuery(terminalPanelQueryOptions, resourceQueryClient)
   if (query.isPending)
     return (
       <div className={cn('relative flex items-center justify-center', props.className)}>

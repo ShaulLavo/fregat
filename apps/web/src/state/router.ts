@@ -1,3 +1,4 @@
+import type { QueryClient } from '@tanstack/query-core'
 import { createBrowserHistory, createRouter, type RouterHistory } from '@tanstack/react-router'
 import type { NavigationHistoryTarget } from '@/features/address/utils/history'
 import {
@@ -27,17 +28,24 @@ const routeTree = rootRoute.addChildren([
 ])
 
 export function createApplicationRouter({
+  resources,
   history = createBrowserHistory(),
   basepath = import.meta.env?.BASE_URL ?? '/',
-}: { history?: RouterHistory; basepath?: string } = {}) {
+}: {
+  resources: QueryClient
+  history?: RouterHistory
+  basepath?: string
+}) {
   return createRouter({
     routeTree,
+    context: { resources },
     history,
     basepath,
     parseSearch: parseRouteSearch,
     stringifySearch: stringifyRouteSearch,
     rewrite: addressPathRewrite,
     defaultPreload: false,
+    defaultPreloadStaleTime: 0,
     defaultPendingMs: 0,
     defaultPendingMinMs: 0,
     defaultOnCatch: () => {},

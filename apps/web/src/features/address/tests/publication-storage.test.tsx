@@ -1,3 +1,4 @@
+import { createResourceQueryClient } from '@/lib/resources/state/query-client'
 import { afterEach, vi } from 'vitest'
 import { createMemoryHistory } from '@tanstack/react-router'
 
@@ -83,7 +84,11 @@ test('reload preparation exposes the retained intent to application bootstrap', 
   }
   const entries = vi.spyOn(performance, 'getEntriesByType').mockReturnValue([entry])
   try {
-    const router = createApplicationRouter({ history, basepath: '/platform/' })
+    const router = createApplicationRouter({
+      resources: createResourceQueryClient(),
+      history,
+      basepath: '/platform/',
+    })
     const navigation = createNavigation(router, parseAddressIntent('/~-/workbench/s?s.q=old'))
     expect(navigation.initial.address.search?.q).toBe('latest')
     navigation.dispose()

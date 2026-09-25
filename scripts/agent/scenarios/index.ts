@@ -1,3 +1,5 @@
+import { settingsRoutePreparation } from './settings-route-preparation'
+import { settingsModuleFailure } from './settings-module-failure'
 import { editorLspTabSwitch } from './editor-lsp-tab-switch'
 import { editorLspServerExit } from './editor-lsp-server-exit'
 import { editorTypography } from './editor-typography'
@@ -363,6 +365,8 @@ export const scenarios: readonly Scenario[] = [
   themeBundlePalette,
   settingsDefaults,
   settingsColdLoad,
+  settingsRoutePreparation,
+  settingsModuleFailure,
   projectMenu,
   sidebarSettingsButton,
   fontPicker,

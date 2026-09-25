@@ -1,6 +1,6 @@
 # Plan 135: Give TanStack ownership of async caches and route preparation
 
-Status: **IN PROGRESS on L6. P0 complete. P1–P8 pending.**
+Status: **IN PROGRESS on L6. P0–P2 complete. P3–P8 pending.**
 Priority: P2. Effort: L, split into independently verifiable phases. Risk: medium for
 resource caches, high for pagination and settings recovery.
 Planned against Platform `aeff92d7` plus the working tree on 2026-09-21.
@@ -260,6 +260,8 @@ Recheck those examples after any Query upgrade.
 
 ### 1. Establish browser resource ownership
 
+Completed 2026-09-25. Shared browser resource client, module consumers/preloads, cache inspection, offline/prewarm/concurrency tests and browser loading evidence are recorded in [verification](../docs/verification/2026-09-25-query-ownership.md).
+
 Implement the resource client and migrate only the already-query-backed settings/terminal
 modules and startup reads first. Share exactly the same client and options at preload and
 render. Keep feature query keys in their current feature-owned files. Update resource cache
@@ -276,6 +278,8 @@ screenshots and the captured console/log window. The PORT override selects the e
 API rather than a production port inherited from the environment.
 
 ### 2. Add a safe Router preparation path
+
+Completed 2026-09-25. Explicit client context and optional settings loaders pass 330 tests across the address/resource suite. Direct URL, command, back/forward, both rails and real failed-module Reload recovery pass in Chromium. The trace pair establishes no latency benefit.
 
 Scope: `state/router.ts`, `state/routes/root.ts`, `state/routes/workbench.ts`, their direct
 construction callers, `main.tsx`, and `features/address/tests`.

@@ -1,3 +1,4 @@
+import { resourceQueryClient } from '@/lib/resources/state/query-client'
 import { beginReloadBudget, prepareWithinReloadBudget } from '@/lib/reload-budget'
 import { loadEditorThemeForSelection } from '@/features/editor/state/color-theme-store'
 import { createBootstrap } from '@/state/bootstrap'
@@ -81,7 +82,7 @@ const routerHistory = applicationHost()?.history ?? createBrowserHistory()
 const initialBrowserHref = browserAddressHref(initialHref)
 if (routerHistory.location.href !== initialBrowserHref) routerHistory.replace(initialBrowserHref)
 routerHistory.flush()
-const router = createApplicationRouter({ history: routerHistory })
+const router = createApplicationRouter({ history: routerHistory, resources: resourceQueryClient })
 const navigation = createNavigation(router, initialIntent, { canPlaceTab: canPlaceEditorTab })
 
 beginReloadBudget()
@@ -93,7 +94,7 @@ const restoredWorkspace = bootstrap
 const warmViews: Promise<unknown>[] = []
 if (restoredWorkspace?.selectedTabContent?.kind === 'settings')
   warmViews.push(
-    primaryQueryClient()
+    resourceQueryClient
       .query(settingsPageQueryOptions)
       .then(() => undefined)
       .catch(() => undefined),
@@ -103,7 +104,7 @@ if (
   restoredWorkspace.workbenchPanels.activeBottomTab === 'terminal'
 )
   warmViews.push(
-    primaryQueryClient()
+    resourceQueryClient
       .query(terminalPanelQueryOptions)
       .then(() => undefined)
       .catch(() => undefined),
@@ -142,11 +143,11 @@ createRoot(document.getElementById('root')!, {
 // After the first frame, so opening a terminal or settings never waits on the
 // network. A failed prefetch is silent: the query retries when the pane opens.
 const prefetchDeferredChunks = () => {
-  void primaryQueryClient()
+  void resourceQueryClient
     .query(terminalPanelQueryOptions)
     .then(() => undefined)
     .catch(() => undefined)
-  void primaryQueryClient()
+  void resourceQueryClient
     .query(settingsPageQueryOptions)
     .then(() => undefined)
     .catch(() => undefined)

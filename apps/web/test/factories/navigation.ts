@@ -1,3 +1,4 @@
+import { createResourceQueryClient } from '@/lib/resources/state/query-client'
 import { createMemoryHistory } from '@tanstack/react-router'
 import { formatAddress, emptyAddress } from '@workspace/client-core/address/grammar'
 import { parseAddressIntent } from '@/features/address/utils/intent'
@@ -25,5 +26,8 @@ export function createTestNavigation({
     history.location.href,
     addressEnvironments(useEnvironmentsStore.getState().entries),
   )
-  return createNavigation(createApplicationRouter({ history }), initial)
+  return createNavigation(
+    createApplicationRouter({ resources: createResourceQueryClient(), history }),
+    initial,
+  )
 }

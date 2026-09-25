@@ -1,3 +1,4 @@
+import { createResourceQueryClient } from '@/lib/resources/state/query-client'
 import { createMemoryHistory } from '@tanstack/react-router'
 import { environmentIdSchema, sessionIdSchema } from '@workspace/contracts'
 import { encodePath, encodeSegment } from '@workspace/client-core/address/path-token'
@@ -49,6 +50,7 @@ const families = [
 test.each(families)('matches concrete local and remote family %s', async (suffix) => {
   for (const prefix of [`/~${workspace}`, `/@${environmentId}/~${workspace}`]) {
     const router = createApplicationRouter({
+      resources: createResourceQueryClient(),
       history: createMemoryHistory({ initialEntries: [`${prefix}${suffix}`] }),
     })
     await router.load()
@@ -74,6 +76,7 @@ test.each([
   `/~${workspace}/workbench/k/${sessionId}/9..2/a.ts`,
 ])('rejects unavailable required destination %s', async (href) => {
   const router = createApplicationRouter({
+    resources: createResourceQueryClient(),
     history: createMemoryHistory({ initialEntries: [href] }),
   })
   await router.load()
@@ -82,6 +85,7 @@ test.each([
 
 test('resolves the static new chat before the session parameter', async () => {
   const router = createApplicationRouter({
+    resources: createResourceQueryClient(),
     history: createMemoryHistory({ initialEntries: [`/~${workspace}/chat/t/new`] }),
   })
   await router.load()
@@ -100,7 +104,10 @@ test('round-trips path tokens, ordered tabs, ref slashes, and rename metadata th
     `k/${sessionId}/0..2,s=renamed,r=${renamed},o=${oldObject},n=${newObject}/${encodePath(path)}`,
     `k/${sessionId}/0..2,o=${oldObject}!turn`,
   ]
-  const router = createApplicationRouter({ history: createMemoryHistory() })
+  const router = createApplicationRouter({
+    resources: createResourceQueryClient(),
+    history: createMemoryHistory(),
+  })
   await router.load()
   for (const document of tokens) {
     const address: Address = {
@@ -116,6 +123,7 @@ test('round-trips path tokens, ordered tabs, ref slashes, and rename metadata th
     expect(hasAvailableRoute(router)).toBe(true)
     expect(acceptedAddressIntent(router).address).toEqual(address)
     const reloaded = createApplicationRouter({
+      resources: createResourceQueryClient(),
       history: createMemoryHistory({ initialEntries: [location.publicHref] }),
     })
     await reloaded.load()
@@ -166,6 +174,7 @@ test.each(['workbench', 'chat'] as const)(
     expect(href.length).toBeLessThan(4000)
     expect(new URL(href, 'http://localhost').searchParams.get('tabs')).toBe(`${other}~@`)
     const router = createApplicationRouter({
+      resources: createResourceQueryClient(),
       history: createMemoryHistory({ initialEntries: [href] }),
     })
     await router.load()
@@ -184,6 +193,7 @@ test.each(['workbench', 'chat'] as const)(
 test('captures explicit defaults before supported search middleware omits them', async () => {
   const href = `/~${workspace}/workbench?side=files&bottom=terminal&tool=git&rail=active`
   const router = createApplicationRouter({
+    resources: createResourceQueryClient(),
     history: createMemoryHistory({ initialEntries: [href] }),
   })
   await router.load()
@@ -199,7 +209,10 @@ test('captures explicit defaults before supported search middleware omits them',
 })
 
 test('pushes destinations immediately and replaces filter edits in the current entry', async () => {
-  const router = createApplicationRouter({ history: createMemoryHistory() })
+  const router = createApplicationRouter({
+    resources: createResourceQueryClient(),
+    history: createMemoryHistory(),
+  })
   await router.load()
   const first: Address = { ...emptyAddress(), workspace, mode: 'workbench', document: 'f/a.ts' }
   const second: Address = { ...first, document: 'f/b.ts' }
@@ -228,6 +241,7 @@ test('keeps the deployment base path in public destinations and strips it for ad
   }
   const href = `/platform${formatAddress(address)}`
   const router = createApplicationRouter({
+    resources: createResourceQueryClient(),
     basepath: '/platform/',
     history: createMemoryHistory({ initialEntries: [href] }),
   })
