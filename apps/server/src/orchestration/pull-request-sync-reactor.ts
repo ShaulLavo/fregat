@@ -21,6 +21,8 @@ type Options = {
   lookup: BranchPullRequestLookup
   dispatch: (command: OrchestrationCommand) => Promise<unknown>
   getReadModel: () => OrchestrationReadModel
+  /** The branch name the forge knows a worktree by: its upstream's, else its own. */
+  headName?: (worktree: OrchestrationProjectedWorktree) => Promise<string>
   now?: () => number
   intervalMs?: number
 }
@@ -120,6 +122,12 @@ export class PullRequestSyncReactor {
     return groups
   }
 
+  private headOf(candidate: Candidate) {
+    return (
+      this.options.headName?.(candidate.worktree).catch(() => candidate.branch) ?? candidate.branch
+    )
+  }
+
   private isDue({ worktree, active }: Candidate) {
     const known = worktree.pullRequest
     if (!known || known.status === 'unknown') return true
@@ -133,11 +141,12 @@ export class PullRequestSyncReactor {
   private async syncProject(projectId: string, candidates: readonly Candidate[]) {
     const first = candidates[0]
     if (!first) return { changed: 0, failed: false }
+    const heads = await Promise.all(candidates.map((candidate) => this.headOf(candidate)))
     let answer: BranchPullRequests
     try {
       answer = await this.options.lookup({
         cwd: first.worktree.canonicalPath,
-        branches: candidates.map((candidate) => candidate.branch),
+        branches: heads,
       })
     } catch (error) {
       this.recordFailure(projectId, error)
@@ -146,7 +155,10 @@ export class PullRequestSyncReactor {
       return { changed, failed: true }
     }
     this.backoff.delete(projectId)
-    const changed = await this.apply(candidates, (branch) => pullRequestFor(answer, branch))
+    const byBranch = new Map(candidates.map((candidate, index) => [candidate.branch, heads[index]]))
+    const changed = await this.apply(candidates, (branch) =>
+      pullRequestFor(answer, byBranch.get(branch) ?? branch),
+    )
     return { changed, failed: false }
   }
 

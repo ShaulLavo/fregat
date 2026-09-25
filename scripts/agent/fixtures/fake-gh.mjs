@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 /**
  * A GitHub CLI stand-in for scenarios: signed in, one repository, and pull requests read from
  * `forge.json` beside it (`{ "branches": { "<head>": { number, title, url, state, isDraft } } }`,
- * where the head `*` answers for any branch).
+ * where the head `*` answers for any branch), and `gh pr view <n>` from its `pullRequests`.
  * Every invocation is appended to `calls.jsonl` so a scenario can count requests.
  */
 const root = dirname(fileURLToPath(import.meta.url))
@@ -34,6 +34,15 @@ if (args[0] === 'api' && args[1] === 'graphql') {
     repository[`b${match[1]}`] = { nodes: pullRequest ? [pullRequest] : [] }
   }
   out({ data: { repository } })
+  process.exit(0)
+}
+if (args[0] === 'pr' && args[1] === 'view') {
+  const pullRequest = forge().pullRequests?.[args[2]]
+  if (!pullRequest) {
+    process.stderr.write(`no pull requests found for ${args[2]}\n`)
+    process.exit(1)
+  }
+  out(pullRequest)
   process.exit(0)
 }
 if (args[0] === 'pr' && args[1] === 'list') {

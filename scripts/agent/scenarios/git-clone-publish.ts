@@ -7,6 +7,7 @@ import { createFakeForge } from '../fake-forge'
 import {
   createGitFixture,
   fixtureGit,
+  fixtureGitOutput,
   openFixtureWorkspace,
   releaseFixture,
 } from '../fixture-workspace'
@@ -14,11 +15,6 @@ import { openGitPanel, runPaletteCommand, selectors } from '../selectors'
 import { createScriptError } from '../../structured-errors'
 
 let forge: Awaited<ReturnType<typeof createFakeForge>> | null = null
-
-async function gitOutput(root: string, args: readonly string[]) {
-  const child = Bun.spawn(['git', '-C', root, ...args], { stdout: 'pipe', stderr: 'ignore' })
-  return (await new Response(child.stdout).text()).trim()
-}
 
 async function field(page: Page, label: string, value: string) {
   const input = selectors.dialog(page).getByLabel(label, { exact: true })
@@ -79,7 +75,7 @@ export const gitClonePublish: Scenario = {
       await step('publish-dialog')
       await selectors.dialog(page).getByRole('button', { name: 'Publish', exact: true }).click()
       await selectors.toast(page, 'Repository published').waitFor({ timeout: 30_000 })
-      if ((await gitOutput(bare, ['branch', '--format', '%(refname:short)'])) !== 'main')
+      if ((await fixtureGitOutput(bare, ['branch', '--format', '%(refname:short)'])) !== 'main')
         throw createScriptError('The published branch did not reach the remote')
       await page.getByRole('button', { name: 'Fetch', exact: true }).waitFor({ timeout: 15_000 })
       await step('published')

@@ -342,3 +342,10 @@ export type GitPublishResult = {
   status: 'pushed' | 'remote-added' | 'push-failed'
   pushError: string | null
 }
+
+/** Push, then open a pull request: each step says what it did, so a partial result never reads as success. */
+export type GitShipResult = {
+  push: { ok: true; result: GitPushResult } | { ok: false; message: string }
+  /** Null when the push failed and nothing was asked of the forge. */
+  pullRequest: GitPullRequestCreateResult | { kind: 'failed'; message: string } | null
+}

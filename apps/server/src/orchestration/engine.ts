@@ -16,6 +16,7 @@ import { realpath } from 'node:fs/promises'
 import path from 'node:path'
 import { WorktreeExecutionGate } from './worktree-execution-gate'
 import { WorktreeLifecycleReactor } from './worktree-lifecycle-reactor'
+import { requireReadyWorktree } from './worktree-decider'
 import { PullRequestSyncReactor, type BranchPullRequestLookup } from './pull-request-sync-reactor'
 import { SessionSettlementReactor } from './session-settlement-reactor'
 import type { AutoSettleRules } from './utils/auto-settlement'
@@ -42,6 +43,7 @@ import {
   type ClientOrchestrationCommand,
   type OrchestrationCommandReceipt,
   type WorktreeSubmoduleMode,
+  parsePullRequestReference,
 } from '@workspace/contracts'
 import * as v from 'valibot'
 
@@ -827,8 +829,13 @@ export class OrchestrationEngine {
 
   private createPullRequestSync(options: OrchestrationEngineOptions) {
     if (!this.registration || !options.pullRequestLookup) return
+    const git = this.registration.git
     this.pullRequestSync = new PullRequestSyncReactor({
       lookup: options.pullRequestLookup,
+      headName: async (worktree) =>
+        (await git.upstreamBranch(worktree.canonicalPath, worktree.branch ?? ''))?.branch ??
+        worktree.branch ??
+        '',
       dispatch: (command) => this.enqueue(command),
       getReadModel: () => this.readModel,
     })
@@ -1153,6 +1160,74 @@ export class OrchestrationEngine {
   async refreshWorktreeMetadata(checkoutPath: string) {
     const worktree = await this.liveWorktreeAt(checkoutPath)
     if (worktree) await this.worktreeReactor?.refresh(worktree.id)
+  }
+
+  /**
+   * A session in its own worktree at a pull request's head. The head is fetched to `pr/<n>`, the
+   * worktree starts from it, and for a pull request from this repository the worktree then
+   * tracks its branch, so pushes, the header and the pull request sync follow the request.
+   */
+  async startPullRequestSession(input: {
+    worktreeId: WorktreeId
+    reference: string
+    modelSelection: ModelSelection
+  }) {
+    await this.ready
+    const number = parsePullRequestReference(input.reference)
+    if (number === null)
+      throw sessionDomainErrors.PULL_REQUEST_REFERENCE_INVALID({
+        internal: { referenceLength: input.reference.length },
+      })
+    if (!this.registration)
+      throw worktreeRuntimeErrors.UNAVAILABLE({ internal: { at: 'pull-request-session' } })
+    const git = this.registration.git
+    const base = requireReadyWorktree(this.readModel, input.worktreeId)
+    const { detail, remoteName } = await git.resolvePullRequest(base.path, number)
+    const branch = `pr/${number}`
+    await git.fetchPullRequestHead({
+      path: base.path,
+      remote: remoteName,
+      ref: detail.headFetchRef,
+      branch,
+    })
+    const sessionId = crypto.randomUUID()
+    const worktreeId = crypto.randomUUID()
+    await this.dispatchClientCommand({
+      type: 'session.create',
+      commandId: `pull-request-${crypto.randomUUID()}`,
+      sessionId,
+      title: `#${number} ${detail.title}`.slice(0, 200),
+      worktreeTarget: { kind: 'new', worktreeId, baseWorktreeId: base.id, baseBranch: branch },
+      modelSelection: input.modelSelection,
+    })
+    const worktree = await this.readyWorktree(worktreeId, number)
+    if (!detail.crossRepository)
+      await git.trackRemoteBranch({
+        path: worktree.path,
+        remote: remoteName,
+        branch: detail.headRefName,
+      })
+    await this.worktreeReactor?.refresh(worktree.id)
+    this.pullRequestSync?.schedule()
+    return { sessionId, worktreeId, pullRequest: detail }
+  }
+
+  private async readyWorktree(worktreeId: string, number: number) {
+    // Long enough for a foreground setup script; a failure ends the wait at once.
+    for (let attempt = 0; attempt < 6_000; attempt += 1) {
+      const worktree = this.readModel.worktrees.get(worktreeId)
+      if (worktree?.lifecycle.state === 'ready') return worktree
+      if (worktree?.lifecycle.state === 'creation-failed')
+        throw sessionDomainErrors.PULL_REQUEST_WORKTREE_FAILED({
+          number,
+          internal: { worktreeId, errorCode: worktree.lifecycle.errorCode },
+        })
+      await Bun.sleep(100)
+    }
+    throw sessionDomainErrors.PULL_REQUEST_WORKTREE_FAILED({
+      number,
+      internal: { worktreeId, reason: 'timeout' },
+    })
   }
 
   /** Registers a checkout the server made itself, such as a finished clone, as a project. */

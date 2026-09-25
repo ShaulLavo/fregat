@@ -53,6 +53,32 @@ export const gitlab: ForgeProvider = {
     ])
     requireCreated(context, input.branch, result)
   },
+  async getPullRequest(context, number) {
+    const result = requireSuccess(
+      context,
+      await glab(context, ['mr', 'view', String(number), '--output', 'json']),
+      'mr-view',
+    )
+    const detail = parseForgeJson(
+      context,
+      v.object({
+        ...mergeRequestSchema.entries,
+        source_branch: v.string(),
+        target_branch: v.string(),
+        source_project_id: v.optional(v.number()),
+        target_project_id: v.optional(v.number()),
+      }),
+      result.stdout,
+      'mr-view',
+    )
+    return {
+      ...toPullRequest(detail),
+      headRefName: detail.source_branch,
+      baseRefName: detail.target_branch,
+      crossRepository: detail.source_project_id !== detail.target_project_id,
+      headFetchRef: `refs/merge-requests/${number}/head`,
+    }
+  },
   async createRepository(context, visibility) {
     const parts = (context.repository ?? '').split('/').filter(Boolean)
     const name = parts.at(-1) ?? ''

@@ -14,6 +14,7 @@ import type {
 import { useBranchRemoteState } from '@/features/git/hooks/use-branch-remote-state'
 import { useCreatePullRequestMutation } from '@/features/git/hooks/use-create-pull-request-mutation'
 import { usePullRequestState } from '@/features/git/hooks/use-pull-request-state'
+import { usePushAndOpenPullRequestMutation } from '@/features/git/hooks/use-push-and-open-pull-request-mutation'
 import { usePushRemoteMutation } from '../hooks/use-push-remote-mutation'
 import { Button, buttonVariants } from '@workspace/ui/components/button'
 import { cn } from '@workspace/ui/lib/utils'
@@ -40,6 +41,8 @@ export function BranchActions({
   const { data: pullRequestState } = usePullRequestState(rootPath)
   const push = usePushRemoteMutation(rootPath)
   const createPullRequest = useCreatePullRequestMutation(rootPath)
+  const requestLabel = changeRequestLabel(pullRequestState?.forge)
+  const ship = usePushAndOpenPullRequestMutation(rootPath, requestLabel)
   const [publishing, setPublishing] = useState(false)
   if (!state?.branch) return null
   if (!state.hasRemote)
@@ -78,6 +81,19 @@ export function BranchActions({
           {pushLabel(state)}
         </Button>
       ) : null}
+      {canShip(state, pullRequestState) ? (
+        <Button
+          className='text-2xs'
+          disabled={ship.isPending || push.isPending}
+          size='sm'
+          type='button'
+          variant='ghost'
+          onClick={() => ship.mutate({ title: pullRequestTitle })}
+        >
+          <GitPullRequestIcon className='size-(--icon-size-sm)' />
+          Push and open {requestLabel.toLowerCase()}
+        </Button>
+      ) : null}
       {pullRequestState?.pullRequest ? (
         // buttonVariants rather than <Button render={<a />}>: Base UI's Button stamps
         // type/role onto whatever it renders, which would cost this link its link semantics.
@@ -106,7 +122,7 @@ export function BranchActions({
           onClick={() => createPullRequest.mutate({ title: pullRequestTitle })}
         >
           <GitPullRequestIcon className='size-(--icon-size-sm)' />
-          {changeRequestLabel(pullRequestState?.forge)}
+          {requestLabel}
         </Button>
       ) : null}
     </span>
@@ -133,7 +149,15 @@ function canCreatePullRequest(
   branch: GitBranchRemoteState,
   pullRequest: GitPullRequestState | undefined,
 ) {
-  if (!branch.hasUpstream) return false
+  // Commits still to send make it Push and open's job.
+  if (!branch.hasUpstream || pushLabel(branch)) return false
+
+  return pullRequest?.support === 'ready' && !pullRequest.pullRequest
+}
+
+/** Commits to send and a forge that says there is no pull request yet: one click does both. */
+function canShip(branch: GitBranchRemoteState, pullRequest: GitPullRequestState | undefined) {
+  if (!pushLabel(branch)) return false
 
   return pullRequest?.support === 'ready' && !pullRequest.pullRequest
 }

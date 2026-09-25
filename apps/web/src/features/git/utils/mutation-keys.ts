@@ -23,6 +23,8 @@ export const mutationKeys = {
   publish: (rootPath: string) => ['git', 'mutation', rootPath, 'publish'] as const,
   pull: (rootPath: string) => ['git', 'mutation', rootPath, 'pull'] as const,
   push: (rootPath: string) => ['git', 'mutation', rootPath, 'push'] as const,
+  pushAndOpenPullRequest: (rootPath: string) =>
+    ['git', 'mutation', rootPath, 'push-and-open-pull-request'] as const,
   stage: (rootPath: string, path: string) => ['git', 'mutation', rootPath, 'stage', path] as const,
   stageMany: (rootPath: string, paths: readonly string[]) =>
     ['git', 'mutation', rootPath, 'stage-many', ...paths] as const,

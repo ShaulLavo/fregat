@@ -190,6 +190,7 @@ import { gitFixWithAgent } from './git-fix-with-agent'
 import { gitSubmodulesInit } from './git-submodules-init'
 import { gitAutoPull } from './git-auto-pull'
 import { sessionBranchDrift } from './session-branch-drift'
+import { sessionPullRequestStart } from './session-pull-request-start'
 import { sessionPullRequestSync } from './session-pull-request-sync'
 import { sessionAutoSettle } from './session-auto-settle'
 import { gitMergeRequest } from './git-merge-request'
@@ -392,6 +393,7 @@ export const scenarios: readonly Scenario[] = [
   gitSubmodulesInit,
   gitAutoPull,
   sessionBranchDrift,
+  sessionPullRequestStart,
   sessionPullRequestSync,
   sessionAutoSettle,
   gitMergeRequest,

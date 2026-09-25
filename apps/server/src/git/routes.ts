@@ -172,6 +172,9 @@ export function gitRoutes(
       })
       .post('/pull-request', ({ body }) => git.createPullRequest(body), {
         body: gitCreatePullRequestBodySchema,
+      })
+      .post('/push-and-pull-request', ({ body }) => git.pushAndOpenPullRequest(body), {
+        body: gitCreatePullRequestBodySchema,
       }),
   )
 }

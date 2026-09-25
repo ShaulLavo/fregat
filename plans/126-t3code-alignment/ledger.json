@@ -530,10 +530,16 @@
       "title": "Complete the pull-request workflow and session linkage",
       "report": "adjacent.md",
       "wave": "5",
-      "status": "open",
-      "evidence_level": "source-reviewed",
+      "status": "in-progress",
+      "evidence_level": "scenario-verified",
       "acceptance": "adjacent.md, EXT-02, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "scripts/agent/scenarios/session-pull-request-start.ts",
+        "scripts/agent/scenarios/git-merge-request.ts",
+        "repository-delivery.md",
+        "apps/server/src/orchestration/tests/pull-request-session.test.ts",
+        "packages/contracts/src/tests/pull-request-reference.test.ts"
+      ]
     },
     {
       "id": "EXT-03",

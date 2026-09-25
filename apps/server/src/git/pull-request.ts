@@ -153,6 +153,7 @@ export async function createForgeRepository(
     cwd,
     forge: { ...forge, kind: request.forge },
     remoteUrl: '',
+    remoteName: '',
     repository: request.repository.trim().replace(/^\/+|\/+$/g, ''),
     run: boundaries.run ?? runBoundedProcess,
     fetch: boundaries.fetch ?? fetch,
@@ -166,4 +167,26 @@ export async function createForgeRepository(
       internal: { support },
     })
   return provider.createRepository(context, request.visibility)
+}
+
+/** A pull request by reference, from the forge a checkout's remote names, with its remote. */
+export async function resolvePullRequest(
+  input: { cwd: string; number: number },
+  boundaries: Boundaries = {},
+) {
+  const supported = await supportedContext(input.cwd, boundaries)
+  if (!supported.context)
+    throw gitPullRequestErrors.FORGE_NOT_READY({
+      forge: supported.forge?.name ?? 'This repository',
+      reason:
+        supported.support === 'no-forge'
+          ? 'no remote points at a known forge'
+          : SUPPORT_REASONS[supported.support],
+      internal: { support: supported.support },
+    })
+  const detail = await forgeProvider(supported.forge.kind).getPullRequest(
+    supported.context,
+    input.number,
+  )
+  return { detail, forge: supported.forge, remoteName: supported.context.remoteName }
 }

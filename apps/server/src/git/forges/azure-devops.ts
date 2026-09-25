@@ -56,6 +56,41 @@ export const azureDevOps: ForgeProvider = {
     ])
     requireCreated(context, input.branch, result)
   },
+  async getPullRequest(context, number) {
+    const result = requireSuccess(
+      context,
+      await az(context, [
+        'repos',
+        'pr',
+        'show',
+        '--detect',
+        'true',
+        '--id',
+        String(number),
+        ...JSON_ARGS,
+      ]),
+      'pr-show',
+    )
+    const detail = parseForgeJson(
+      context,
+      v.object({
+        ...pullRequestSchema.entries,
+        sourceRefName: v.string(),
+        targetRefName: v.string(),
+      }),
+      result.stdout,
+      'pr-show',
+    )
+    const head = detail.sourceRefName.replace(/^refs\/heads\//, '')
+    return {
+      ...toPullRequest(detail),
+      headRefName: head,
+      baseRefName: detail.targetRefName.replace(/^refs\/heads\//, ''),
+      // Azure Repos pull requests come from branches of the same repository.
+      crossRepository: false,
+      headFetchRef: `refs/heads/${head}`,
+    }
+  },
   // Azure has no visibility per repository; the project's decides, as upstream notes.
   async createRepository(context) {
     const [organization, project, name] = repositoryParts(context, 3, 'organization/project/name')

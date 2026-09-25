@@ -215,3 +215,37 @@ Migration 26 adds `projection_worktrees.setup_json`. The terminal service is lan
 - `apps/web/src/features/chat-mode/utils/tests/project-scripts.test.ts`: t3.json mapping, skipping
   malformed entries; import filter by command and name.
 - `scenario worktree-setup-import`: `/work/tmp/fregat-evidence/20260925T132239Z-scenario-worktree-setup-import/`.
+
+## EXT-02: start from a pull request, composed push and open (partial)
+
+Builds on lane L8's Plan 139 research (94d04d71). **Reference.** `parsePullRequestReference` in
+contracts reads GitHub, GitLab, Forgejo, Azure DevOps and Bitbucket pull request URLs, `#123`, a
+bare number, and the `gh`/`glab`/`tea`/`az` checkout commands, like upstream's
+`pullRequestReference.ts`.
+
+**Start from a pull request.** The palette's `Start session from pull request…` takes a reference
+for the open checkout. `POST /orchestration/pull-request-session` resolves it on the checkout's
+forge (each provider's `getPullRequest`: head and base branch, fork or not, and the ref the forge
+publishes the head under: `refs/pull/N/head`, `refs/merge-requests/N/head`, or the source branch
+on Azure and Bitbucket), fetches that head into `pr/N`, and creates a session titled `#N title` in
+a new worktree based on it, through the ordinary lifecycle (submodules, setup). A same-repository
+pull request's worktree then tracks the remote head branch, so pushes land on the pull request and
+the sync reactor finds it by that branch name; a fork's head stays fetch-only. Upstream prepares a
+thread in local or worktree mode; here it is always a worktree, the session model's isolation.
+
+**Composed push and open.** A branch with commits to send and no pull request shows `Push and open
+pull request` (GitLab: merge request). `POST /git/push-and-pull-request` pushes, then creates or
+reuses the request, and reports each step: a failed push asks nothing of the forge, a pushed
+branch whose request failed says so, never full success. Pushes and request lookups use the
+upstream branch's name when a worktree tracks one.
+
+**Deferred:** forge comments, replies, viewed files and review submission build on L8's Plan 139
+P3 review draft (50cd8c20) and Plan 169's review mode, and land after L8 merges (L8 → L9 → L5).
+
+- `packages/contracts/src/tests/pull-request-reference.test.ts`: every URL shape, `#N`, checkout
+  commands, rejections.
+- `apps/server/src/orchestration/tests/pull-request-session.test.ts`: URL flow fetches the head,
+  tracks the branch and pushes to it; a fork does not track; an invalid reference; push-and-open
+  outcomes (push failed, pushed and created, pushed and existing).
+- `scenario session-pull-request-start`: `/work/tmp/fregat-evidence/20260925T134337Z-scenario-session-pull-request-start/`.
+- `scenario git-merge-request` (now drives Push and open): `/work/tmp/fregat-evidence/20260925T134315Z-scenario-git-merge-request/`.

@@ -42,6 +42,19 @@ export const checkpointErrors = defineErrorCatalog('checkpoint', {
 })
 
 export const sessionDomainErrors = defineErrorCatalog('orchestration', {
+  PULL_REQUEST_REFERENCE_INVALID: {
+    status: 400,
+    message: 'That does not name a pull request.',
+    why: 'A pull request is named by its URL, its number (#123), or a forge checkout command.',
+    fix: 'Paste the pull request URL or its number.',
+  },
+  PULL_REQUEST_WORKTREE_FAILED: {
+    status: 409,
+    message: ({ number }: { number: number }) =>
+      `The worktree for pull request #${number} could not be created.`,
+    why: 'The session was started, but its worktree failed to provision; the session shows why.',
+    fix: 'Open the session and retry its worktree.',
+  },
   AUTO_SETTLE_STALE: {
     status: 409,
     message: ({ sessionId }: { sessionId: string }) =>

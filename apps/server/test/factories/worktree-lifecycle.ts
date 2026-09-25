@@ -11,6 +11,7 @@ import { MockProviderAdapter } from '../../src/provider/adapters/mock'
 import { ProviderAdapterRegistry } from '../../src/provider/provider-adapter-registry'
 import { OrchestrationEngine } from '../../src/orchestration/engine'
 import type { BranchPullRequestLookup } from '../../src/orchestration/pull-request-sync-reactor'
+import type { ForgeBoundaries } from '../../src/git/pull-request'
 import { GitService } from '../../src/git/service'
 import { GitWorktreeService } from '../../src/git/worktrees'
 import { createWorkspacePaths } from '../../src/fs/path'
@@ -25,6 +26,7 @@ export async function worktreeLifecycleFixture(
   options: {
     adapter?: ConstructorParameters<typeof MockProviderAdapter>[0]
     pullRequestLookup?: BranchPullRequestLookup
+    forgeBoundaries?: ForgeBoundaries
   } = {},
 ) {
   const root = await mkdtemp(path.join(tmpdir(), 'platform-lifecycle-'))
@@ -49,6 +51,7 @@ export async function worktreeLifecycleFixture(
         attachmentsDir: path.join(root, '.git', 'attachments'),
         providerAdapterRegistry: new ProviderAdapterRegistry({ adapters: [adapter] }),
         pullRequestLookup: options.pullRequestLookup ?? null,
+        forgeBoundaries: options.forgeBoundaries,
       },
     })
   let app = build()

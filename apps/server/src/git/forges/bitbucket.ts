@@ -50,6 +50,33 @@ export const bitbucket: ForgeProvider = {
         internal: { status: response.status },
       })
   },
+  async getPullRequest(context, number) {
+    const authorization = await requireCredentials(context)
+    const response = await request(context, authorization, `pullrequests/${number}`)
+    if (!response.ok)
+      throw gitPullRequestErrors.PULL_REQUEST_LOOKUP_FAILED({
+        forge: context.forge.name,
+        internal: { at: 'pullrequest', status: response.status },
+      })
+    const side = v.object({
+      branch: v.object({ name: v.string() }),
+      repository: v.object({ full_name: v.string() }),
+    })
+    const detail = parseForgeJson(
+      context,
+      v.object({ ...pullRequestSchema.entries, source: side, destination: side }),
+      await response.text(),
+      'pullrequest',
+    )
+    return {
+      ...toPullRequest(detail),
+      headRefName: detail.source.branch.name,
+      baseRefName: detail.destination.branch.name,
+      crossRepository:
+        detail.source.repository.full_name !== detail.destination.repository.full_name,
+      headFetchRef: `refs/heads/${detail.source.branch.name}`,
+    }
+  },
   async createRepository(context, visibility) {
     repositoryParts(context, 2, 'workspace/name')
     const authorization = await requireCredentials(context)

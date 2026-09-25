@@ -25,6 +25,7 @@ import {
   FolderOpenIcon,
   GaugeIcon,
   GitForkIcon,
+  GitPullRequestIcon,
   GearSixIcon,
   GitDiffIcon,
   ImageIcon,
@@ -604,6 +605,14 @@ export const workspaceCommands = [
     icon: GitForkIcon,
     run: ({ runtime }) => {
       runtime.shell.showCloneRepository()
+      return { status: 'handled' }
+    },
+  }),
+  defineCommand({
+    ...workspaceCommandMetadata['workspace.startPullRequestSession'],
+    icon: GitPullRequestIcon,
+    run: ({ runtime }) => {
+      runtime.shell.showStartPullRequestSession()
       return { status: 'handled' }
     },
   }),

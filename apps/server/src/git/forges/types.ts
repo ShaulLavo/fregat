@@ -14,6 +14,8 @@ export type ForgeContext = {
   readonly cwd: string
   readonly forge: GitForge
   readonly remoteUrl: string
+  /** The remote the forge was found on; empty when publishing to a repository not yet added. */
+  readonly remoteName: string
   /** `owner/repo`, `group/sub/project` or `org/project/_git/repo`, from the remote. */
   readonly repository: string | null
   readonly run: RunProcess
@@ -43,6 +45,8 @@ export type ForgeProvider = {
     query: PullRequestQuery,
   ) => Promise<ReadonlyMap<string, GitPullRequest | null>>
   createPullRequest: (context: ForgeContext, input: CreatePullRequestInput) => Promise<void>
+  /** One request by number, with what a checkout of its head needs. */
+  getPullRequest: (context: ForgeContext, number: number) => Promise<PullRequestDetail>
   /** Creates `context.repository` on the forge and says where to reach it. */
   createRepository: (
     context: ForgeContext,
@@ -54,4 +58,13 @@ export type CreatedRepository = {
   readonly url: string
   readonly httpsUrl: string
   readonly sshUrl: string
+}
+
+type PullRequestDetail = GitPullRequest & {
+  readonly headRefName: string
+  readonly baseRefName: string
+  /** From a fork: its branch is not on this repository's remote. */
+  readonly crossRepository: boolean
+  /** The ref on this repository's remote that holds the head commit. */
+  readonly headFetchRef: string
 }

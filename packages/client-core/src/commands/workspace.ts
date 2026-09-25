@@ -160,6 +160,16 @@ export const workspaceCommandMetadata = {
     when: [],
     title: 'Clone repository…',
   }),
+  'workspace.startPullRequestSession': defineMetadata({
+    category: 'Git',
+    description: "Start a session in its own worktree at a pull request's head.",
+    id: 'workspace.startPullRequestSession',
+    execution: 'sync',
+    target: 'workspace',
+    undoCategory: 'view-only',
+    when: ['workspaceOpen'],
+    title: 'Start session from pull request…',
+  }),
   'workspace.showUsage': defineMetadata({
     category: 'Chat',
     description: 'See what each model cost, by day, and set prices for models that report none.',

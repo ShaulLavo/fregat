@@ -14,8 +14,10 @@ import type {
   GitPublishRequest,
   GitPublishResult,
   GitPushResult,
+  GitShipResult,
   WorktreeSubmoduleMode,
 } from '@workspace/contracts'
+import { errorMessage } from '@workspace/contracts'
 import { withGitRepositoryLane, withGitRepositoryLaneStream } from './repository-lane'
 import { parseBranches } from './branches'
 import { commandOutput, gitErrorMessage } from './command'
@@ -34,6 +36,7 @@ import {
   createForgeRepository,
   createPullRequest,
   readPullRequest,
+  resolvePullRequest,
   type ForgeBoundaries,
 } from './pull-request'
 import {
@@ -759,8 +762,12 @@ export class GitService {
     const branch = repository.info.branch
     if (!branch) throw gitPullRequestErrors.PUSH_DETACHED_HEAD({ path: repository.info.path })
 
-    const setUpstream = !(await this.upstreamRef(repository.rootAbsolutePath))
-    const args = setUpstream ? ['push', '--set-upstream', 'origin', branch] : ['push']
+    const upstream = await this.upstreamBranch(repository.rootAbsolutePath, branch)
+    const setUpstream = upstream === null
+    // To the upstream by name: a pull request's worktree tracks a branch named unlike its own.
+    const args = upstream
+      ? ['push', upstream.remote, `HEAD:refs/heads/${upstream.branch}`]
+      : ['push', '--set-upstream', 'origin', branch]
     const result = await this.git(repository.rootAbsolutePath, args)
 
     return { branch, output: commandOutput(result), repository: repository.info, setUpstream }
@@ -801,12 +808,32 @@ export class GitService {
     const branch = repository.info.branch
     if (!branch) return { branch: null, pullRequest: null, support: 'no-forge', forge: null }
 
+    const upstream = await this.upstreamBranch(repository.rootAbsolutePath, branch)
     const read = await readPullRequest(
-      { branch, cwd: repository.rootAbsolutePath },
+      { branch: upstream?.branch ?? branch, cwd: repository.rootAbsolutePath },
       this.forgeBoundaries,
     )
 
     return { branch, ...read }
+  }
+
+  /** Pushes the branch, then opens its pull request; a failed step stops what follows it. */
+  async pushAndOpenPullRequest(body: GitCreatePullRequestBody): Promise<GitShipResult> {
+    recordGitServiceOperation('push_and_open_pull_request', body.path)
+    let pushed: GitPushResult
+    try {
+      pushed = await this.push(body.path)
+    } catch (error) {
+      return { push: { ok: false, message: errorMessage(error) }, pullRequest: null }
+    }
+    try {
+      return { push: { ok: true, result: pushed }, pullRequest: await this.createPullRequest(body) }
+    } catch (error) {
+      return {
+        push: { ok: true, result: pushed },
+        pullRequest: { kind: 'failed', message: errorMessage(error) },
+      }
+    }
   }
 
   async createPullRequest(body: GitCreatePullRequestBody): Promise<GitPullRequestCreateResult> {
@@ -814,18 +841,58 @@ export class GitService {
     const repository = await this.requiredRepository(body.path)
     const branch = repository.info.branch
     if (!branch) throw gitPullRequestErrors.PUSH_DETACHED_HEAD({ path: repository.info.path })
+    // A worktree's local branch can track a differently named remote branch; the forge knows that one.
+    const upstream = await this.upstreamBranch(repository.rootAbsolutePath, branch)
 
     return createPullRequest(
       {
         base: body.base,
         body: body.body,
-        branch,
+        branch: upstream?.branch ?? branch,
         cwd: repository.rootAbsolutePath,
         draft: body.draft,
         title: body.title,
       },
       this.forgeBoundaries,
     )
+  }
+
+  /** The branch a local branch tracks, as its remote and the remote's branch name. */
+  async upstreamBranch(cwd: string, branch: string) {
+    const read = (key: string) =>
+      this.git(cwd, ['config', '--get', `branch.${branch}.${key}`], { allowFailure: true })
+    const [remote, merge] = await Promise.all([read('remote'), read('merge')])
+    const remoteName = remote.stdout.trim()
+    const mergeRef = merge.stdout.trim()
+    if (!remoteName || remoteName === '.' || !mergeRef.startsWith('refs/heads/')) return null
+    return { remote: remoteName, branch: mergeRef.slice('refs/heads/'.length) }
+  }
+
+  /** A pull request by number from the forge this checkout's remote names. */
+  async resolvePullRequest(path: string, number: number) {
+    const repository = await this.requiredRepositoryLocation(path)
+    return resolvePullRequest({ cwd: repository.rootAbsolutePath, number }, this.forgeBoundaries)
+  }
+
+  /** Fetches a pull request's head into a local branch, replacing an earlier fetch of it. */
+  async fetchPullRequestHead(input: { path: string; remote: string; ref: string; branch: string }) {
+    recordGitServiceOperation('fetch_pull_request_head', input.path)
+    const repository = await this.requiredRepositoryLocation(input.path)
+    await this.git(repository.rootAbsolutePath, [
+      'fetch',
+      '--',
+      input.remote,
+      `+${input.ref}:refs/heads/${input.branch}`,
+    ])
+  }
+
+  /** Makes the checked-out branch track `remote/branch`, so its pushes and pull request follow it. */
+  async trackRemoteBranch(input: { path: string; remote: string; branch: string }) {
+    recordGitServiceOperation('track_remote_branch', input.path)
+    const repository = await this.requiredRepositoryLocation(input.path)
+    const root = repository.rootAbsolutePath
+    await this.git(root, ['fetch', '--', input.remote, input.branch])
+    await this.git(root, ['branch', `--set-upstream-to=${input.remote}/${input.branch}`])
   }
 
   private async upstreamRef(cwd: string) {
@@ -1627,7 +1694,7 @@ function isReadOnlyGit(args: readonly string[]) {
   const action = gitAction(args)
   if (READ_ONLY_GIT_ACTIONS.has(action)) return true
   const actionIndex = args.indexOf(action)
-  if (action === 'config') return args.includes('--get-regexp')
+  if (action === 'config') return args.includes('--get-regexp') || args.includes('--get')
   // Listing remotes reads config; `remote add` and friends write it.
   if (action === 'remote') return [undefined, '-v', 'get-url'].includes(args[actionIndex + 1])
   return action === 'worktree' && args[actionIndex + 1] === 'list'

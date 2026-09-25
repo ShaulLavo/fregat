@@ -697,12 +697,6 @@
   },
   {
     "from": "settings",
-    "to": "chat",
-    "module": "features/chat/utils/provider-query.ts",
-    "reason": "shared \u2192 lib: providerListQueryOptions is reused by settings outside chat; move this shared behavior with its consumers."
-  },
-  {
-    "from": "settings",
     "to": "editor",
     "module": "features/editor/components/editor.tsx",
     "reason": "shared \u2192 lib: Editor is rendered by both settings and editor; extract the shared presentation from its feature owner."

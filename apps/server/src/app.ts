@@ -66,7 +66,7 @@ import { SettingsStore, type SettingsStoreOptions } from './settings/store'
 import { worktreeSubmoduleMode } from './git/submodules'
 import { autoPullEnabled } from './git/auto-pull'
 import { autoSettleRules } from './orchestration/utils/auto-settle-settings'
-import { readBranchPullRequests } from './git/pull-request'
+import { readBranchPullRequests, type ForgeBoundaries } from './git/pull-request'
 import type { BranchPullRequestLookup } from './orchestration/pull-request-sync-reactor'
 import { TerminalService, type TerminalPtyFactory } from './terminal/service'
 import { wallpaperRoutes } from './wallpaper/routes'
@@ -106,6 +106,8 @@ export type AppOptions = FileSystemServiceOptions & {
     providerRuntime?: boolean
     /** Null turns pull request sync off; tests never reach a forge. */
     pullRequestLookup?: BranchPullRequestLookup | null
+    /** Test seam: the forge CLIs and APIs the git service calls. */
+    forgeBoundaries?: ForgeBoundaries
   }
   lsp?: {
     /**
@@ -150,6 +152,7 @@ export function createApp(options: AppOptions) {
     autoPullPolicy: (root) =>
       autoPullEnabled(settings, () => orchestration.checkoutProjectId(root)),
     maxTextFileBytes: fs.info().maxTextFileBytes,
+    forgeBoundaries: options.orchestration?.forgeBoundaries,
   })
   const database = options.orchestration?.database ?? getDefaultPlatformDatabase()
   // The schema has to exist before anything below reads this handle: the

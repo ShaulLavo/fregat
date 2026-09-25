@@ -77,6 +77,32 @@ export const forgejo: ForgeProvider = {
     )
     requireCreated(context, input.branch, result)
   },
+  async getPullRequest(context, number) {
+    const login = await requireLogin(context)
+    const result = requireSuccess(
+      context,
+      await tea(context, ['api', '--login', login.name, apiUrl(login, context, `pulls/${number}`)]),
+      'pull',
+    )
+    const repo = v.object({ full_name: v.string() })
+    const pull = parseForgeJson(
+      context,
+      v.object({
+        ...pullSchema.entries,
+        head: v.object({ ref: v.string(), repo: v.nullable(repo) }),
+        base: v.object({ ref: v.string(), repo: v.nullable(repo) }),
+      }),
+      result.stdout,
+      'pull',
+    )
+    return {
+      ...toPullRequest(pull),
+      headRefName: pull.head.ref,
+      baseRefName: pull.base.ref,
+      crossRepository: pull.head.repo?.full_name !== pull.base.repo?.full_name,
+      headFetchRef: `refs/pull/${number}/head`,
+    }
+  },
   async createRepository(context, visibility) {
     const [owner, name] = repositoryParts(context, 2, 'owner/name')
     const login = await requireLogin(context)

@@ -4,6 +4,7 @@ export const chatModeMutationKeys = {
   notificationOpen: () => ['chat', 'notification', 'open'] as const,
   message: (messageId: string) => ['chat', 'message', messageId] as const,
   projectDelete: () => ['chat', 'project', 'delete'] as const,
+  pullRequestSession: () => ['chat', 'session', 'pull-request'] as const,
   projectRename: () => ['chat', 'project', 'rename'] as const,
   railOrder: (environmentId: EnvironmentId) => ['chat', 'rail-order', environmentId] as const,
   read: () => ['chat', 'session-read'] as const,

@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import type { ProviderInstanceConfig } from '@workspace/contracts'
 
-import { providerListQueryOptions } from '@/features/chat/utils/provider-query'
+import { providerListQueryOptions } from '@/lib/provider-query'
 
 import { providerSettingRows } from '../utils/provider-rows'
 import { EmptyRow } from './empty-row'

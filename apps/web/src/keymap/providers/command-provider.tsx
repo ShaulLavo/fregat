@@ -7,6 +7,7 @@ import { useEditorRuntime } from '@/features/editor/hooks/use-runtime'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { PickerDialog } from '@/features/environments/components/picker-dialog'
 import { CloneRepositoryDialog } from '@/features/git/components/clone-repository-dialog'
+import { StartPullRequestSessionDialog } from '@/features/chat-mode/components/start-pull-request-session-dialog'
 import { parentPath } from '@/lib/path-formatters'
 import { workspaceRoot } from '@/lib/documents/utils/identity'
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
@@ -117,6 +118,8 @@ export function CommandProvider({ children }: { readonly children: ReactNode }) 
   const [paletteOrigin, setPaletteOrigin] = useState<FocusTargetToken | null>(null)
   // The folder a clone lands beside; null while the dialog is closed.
   const [cloneParent, setCloneParent] = useState<string | null>(null)
+  // The checkout a pull request session forks from; null while that dialog is closed.
+  const [pullRequestRoot, setPullRequestRoot] = useState<string | null>(null)
   const [environmentDialog, setEnvironmentDialog] = useState<
     'switch' | 'connect' | 'disconnect' | null
   >(null)
@@ -277,6 +280,8 @@ export function CommandProvider({ children }: { readonly children: ReactNode }) 
     },
     shell: {
       showEnvironmentDialog: setEnvironmentDialog,
+      showStartPullRequestSession: () =>
+        setPullRequestRoot(workspace.getState().rootFolder?.path ?? null),
       showCloneRepository: () =>
         setCloneParent(parentPath(workspace.getState().rootFolder?.path ?? '')),
       showMachines: () => {
@@ -422,6 +427,15 @@ export function CommandProvider({ children }: { readonly children: ReactNode }) 
             if (!open) setCloneParent(null)
           }}
           onCloned={(path) => void adaptersRef.current.openWorkspaceRoot(workspaceRoot(path))}
+        />
+      ) : null}
+      {pullRequestRoot !== null ? (
+        <StartPullRequestSessionDialog
+          open
+          rootPath={pullRequestRoot}
+          onOpenChange={(open) => {
+            if (!open) setPullRequestRoot(null)
+          }}
         />
       ) : null}
       <AppKeymapController />

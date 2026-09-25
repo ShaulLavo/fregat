@@ -60,6 +60,7 @@ async function selectContext(input: { cwd: string; run: RunProcess; fetch: typeo
     cwd: input.cwd,
     forge,
     remoteUrl: chosen.url,
+    remoteName: chosen.name,
     repository: remoteRepositoryPath(chosen.url),
     run: input.run,
     fetch: input.fetch,

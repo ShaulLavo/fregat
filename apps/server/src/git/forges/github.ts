@@ -62,6 +62,37 @@ export const github: ForgeProvider = {
     ])
     requireCreated(context, input.branch, result)
   },
+  async getPullRequest(context, number) {
+    const result = requireSuccess(
+      context,
+      await gh(context, [
+        'pr',
+        'view',
+        String(number),
+        '--json',
+        `${PR_FIELDS},headRefName,baseRefName,isCrossRepository`,
+      ]),
+      'pr-view',
+    )
+    const detail = parseForgeJson(
+      context,
+      v.object({
+        ...pullRequestSchema.entries,
+        headRefName: v.string(),
+        baseRefName: v.string(),
+        isCrossRepository: v.boolean(),
+      }),
+      result.stdout,
+      'pr-view',
+    )
+    return {
+      ...toPullRequest(detail),
+      headRefName: detail.headRefName,
+      baseRefName: detail.baseRefName,
+      crossRepository: detail.isCrossRepository,
+      headFetchRef: `refs/pull/${number}/head`,
+    }
+  },
   async createRepository(context, visibility) {
     const [owner, name] = repositoryParts(context, 2, 'owner/name')
     requireRepositoryCreated(

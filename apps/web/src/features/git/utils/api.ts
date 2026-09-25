@@ -8,6 +8,7 @@ import type {
   GitCommitProgressEvent,
   GitCommitResult,
   GitPullRequestCreateResult,
+  GitShipResult,
   GitPullRequestState,
 } from '@workspace/contracts'
 
@@ -402,24 +403,25 @@ export async function fetchPullRequestState(
   )
 }
 
-export async function createPullRequest(
-  input: {
-    base?: string
-    body?: string
-    draft?: boolean
-    path: string
-    title: string
-  },
-  client: Client,
-) {
+type PullRequestInput = {
+  base?: string
+  body?: string
+  draft?: boolean
+  path: string
+  title: string
+}
+
+const pullRequestBody = (input: PullRequestInput) => ({
+  ...input,
+  body: input.body ?? '',
+  draft: input.draft ?? false,
+})
+
+export async function createPullRequest(input: PullRequestInput, client: Client) {
   return observeGitOperation(
     { ...clientLogContext(client), action: 'git.create_pull_request', path: input.path },
     async () => {
-      const response = await client.git['pull-request'].post({
-        ...input,
-        body: input.body ?? '',
-        draft: input.draft ?? false,
-      })
+      const response = await client.git['pull-request'].post(pullRequestBody(input))
 
       return unwrapEdenResponse<GitPullRequestCreateResult>(response, {
         requireData: true,
@@ -427,6 +429,22 @@ export async function createPullRequest(
       })
     },
     (result) => ({ kind: result.kind }),
+  )
+}
+
+/** Push, then open the pull request, as one request; each step reports its own outcome. */
+export async function pushAndOpenPullRequest(input: PullRequestInput, client: Client) {
+  return observeGitOperation(
+    { ...clientLogContext(client), action: 'git.push_and_open_pull_request', path: input.path },
+    async () => {
+      const response = await client.git['push-and-pull-request'].post(pullRequestBody(input))
+
+      return unwrapEdenResponse<GitShipResult>(response, {
+        requireData: true,
+        emptyMessage: 'git server returned an empty response',
+      })
+    },
+    (result) => ({ pushed: result.push.ok, pullRequest: result.pullRequest?.kind ?? null }),
   )
 }
 

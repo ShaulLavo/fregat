@@ -11,6 +11,12 @@ export async function fixtureGit(project: string, args: readonly string[]) {
     throw createScriptError(`Fixture git failed: ${await new Response(process.stderr).text()}`)
 }
 
+/** A git command's trimmed stdout, empty when it fails. */
+export async function fixtureGitOutput(root: string, args: readonly string[]) {
+  const child = Bun.spawn(['git', '-C', root, ...args], { stdout: 'pipe', stderr: 'ignore' })
+  return (await new Response(child.stdout).text()).trim()
+}
+
 /**
  * A temp repository with an identity and `a.txt` staged, ready to commit. The identity is set even
  * for fixtures that never commit: it costs nothing and a missing one fails far from its cause.
