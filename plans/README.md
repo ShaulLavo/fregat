@@ -23,7 +23,7 @@ a bare root `bun run verify`.
 | [167 — settings defaults, setting details, and copy](167-settings-and-copy.md)          | **PROPOSED — READY; D1–D4 DECIDED**                                      |
 | [166 — keyboard shortcuts, redone](166-shortcuts-editor.md)                             | **PROPOSED — RESEARCH FIRST; D1–D6 DECIDED**                             |
 | [162 — context and cost](162-context-and-cost.md)                                       | **PROPOSED — READY; DECISIONS ACCEPTED**                                 |
-| [159 — file and folder picker](159-file-picker.md)                                      | **DONE (L1) EXCEPT FILTER CHIPS (WAIT, D4)**                             |
+| [159 — file and folder picker](159-file-picker.md)                                      | **IMPLEMENTED (L1); OWNER-APPROVED PHASE 5 FILTERS REMAIN**              |
 | [156 — documents in the editor](156-documents-in-the-editor.md)                         | **PLACEHOLDER — FAR FUTURE; RESEARCH FIRST**                             |
 | [155 — site demo becomes an animated replica](155-site-demo-replica.md)                 | **PLACEHOLDER — RESEARCH NOT STARTED**                                   |
 | [153 — TypeScript can run in the browser worker](153-typescript-worker-backend.md)      | **PROPOSED — AFTER EDITOR E054; D1–D3 NEED THE OWNER**                   |

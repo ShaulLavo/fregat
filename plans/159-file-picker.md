@@ -2,7 +2,10 @@
 
 ## Status and authorization
 
-- Status: DONE 2026-09-25 (lane L1) except P5's filter chips, which wait under D4 until large folders show they are wanted. D1–D4 accepted as recommended on 2026-09-25. The owner wants this ("100000%").
+- Status: IMPLEMENTED 2026-09-25 (lane L1), except Phase 5 filters. The owner approved the follow-up below; it remains to be implemented after the current review fixes.
+- Decided 2026-09-25: owner — Phase 5 filters ship only in a form that fits the native picker feel. Native open/save dialogs
+  show accepted types as a file-type dropdown (macOS "Enable", GTK/Windows type filter), not chips: build the accept filter that
+  way. Kind/Modified chips come from Finder search, not the dialog; include them only if they still read as native in this picker.
 - Priority: P1 in the UI refresh lane. It runs after Plan 157 (done), whose
   segmented control, scroll fades and typeahead refine it uses.
 - Effort: L. A second view with its own keyboard model, a content preview with two data paths, a
