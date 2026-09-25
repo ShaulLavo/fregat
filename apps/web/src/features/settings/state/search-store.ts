@@ -1,23 +1,12 @@
-import { useSyncExternalStore } from 'react'
+import { useStore } from 'zustand'
+import { createStore } from 'zustand/vanilla'
 
-let search = ''
-const searchListeners = new Set<() => void>()
+const store = createStore<string>(() => '')
 
 export function selectSettingsSearch(next: string) {
-  if (next === search) return
-  search = next
-  for (const listener of searchListeners) listener()
+  store.setState(next, true)
 }
 
 export function useSettingsSearch() {
-  return useSyncExternalStore(
-    subscribeSearch,
-    () => search,
-    () => search,
-  )
-}
-
-function subscribeSearch(listener: () => void) {
-  searchListeners.add(listener)
-  return () => searchListeners.delete(listener)
+  return useStore(store)
 }

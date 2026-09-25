@@ -1,32 +1,22 @@
-import { createSubscriptions } from '@workspace/utils/subscriptions'
-import { useSyncExternalStore } from 'react'
+import { useStore } from 'zustand'
+import { createStore } from 'zustand/vanilla'
 
 export type SettingsView = 'form' | 'json'
 
 /**
- * Whether the settings tab is showing the form or the raw document.
- *
- * Module-level for the same reason as the scope selection next door: only the
- * active editor tab mounts, and a view that reset itself every time the user
- * looked at another file would feel broken. It is deliberately *not* a setting —
- * a knob whose own editor is the thing it configures is a trap when the document
- * is the broken one you opened the JSON view to fix.
+ * Whether the settings tab shows the form or the raw document; module-level so it survives a tab switch.
+ * Not a setting: the JSON view is how you fix a broken document, so it cannot depend on one.
  */
-let view: SettingsView = 'form'
-const subscriptions = createSubscriptions()
-const subscribe = subscriptions.subscribe
+const store = createStore<SettingsView>(() => 'form')
 
 export function settingsView(): SettingsView {
-  return view
+  return store.getState()
 }
 
 export function selectSettingsView(next: SettingsView) {
-  if (next === view) return
-
-  view = next
-  subscriptions.notify()
+  store.setState(next, true)
 }
 
 export function useSettingsView(): SettingsView {
-  return useSyncExternalStore(subscribe, settingsView, settingsView)
+  return useStore(store)
 }

@@ -34,6 +34,18 @@ describe('NumberWidget', () => {
     expect(onCommit).toHaveBeenCalledWith(42)
   })
 
+  it('snaps a blank field back without committing a zero', async () => {
+    const onCommit = vi.fn()
+    render(<NumberWidget id='x' onCommit={onCommit} value={80} />)
+
+    const field = screen.getByRole('spinbutton')
+    await userEvent.clear(field)
+    await userEvent.tab()
+
+    expect(onCommit).not.toHaveBeenCalled()
+    expect(field).toHaveValue(80)
+  })
+
   it('ignores an incoming value while the field has focus', async () => {
     const onCommit = vi.fn()
     const { rerender } = render(<NumberWidget id='x' onCommit={onCommit} value={80} />)
