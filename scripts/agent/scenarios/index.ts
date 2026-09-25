@@ -184,6 +184,7 @@ import { gitCommitSlowHook } from './git-commit-slow-hook'
 import { gitFixWithAgent } from './git-fix-with-agent'
 import { gitSubmodulesInit } from './git-submodules-init'
 import { gitAutoPull } from './git-auto-pull'
+import { sessionBranchDrift } from './session-branch-drift'
 import { gitHistory } from './git-history'
 import { editorCaretBurst } from './editor-caret-burst'
 import { editorFocusClicks } from './editor-focus-clicks'
@@ -380,6 +381,7 @@ export const scenarios: readonly Scenario[] = [
   gitFixWithAgent,
   gitSubmodulesInit,
   gitAutoPull,
+  sessionBranchDrift,
   editorCaretBurst,
   editorFocusClicks,
   editorProportionalFont,
