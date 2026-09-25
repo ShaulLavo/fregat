@@ -3,7 +3,9 @@
 ## Status and authorization
 
 - Status: PROPOSED — ready; D1–D4 accepted as recommended on 2026-09-25. The owner wants this ("100000%").
-- Decided 2026-09-25: owner — build Phase 5's filter chips (Kind, Modified, and the locked accept chip); don't wait for evidence under D4.
+- Decided 2026-09-25: owner — Phase 5 filters ship only in a form that fits the native picker feel. Native open/save dialogs
+  show accepted types as a file-type dropdown (macOS "Enable", GTK/Windows type filter), not chips: build the accept filter that
+  way. Kind/Modified chips come from Finder search, not the dialog; include them only if they still read as native in this picker.
 - Priority: P1 in the UI refresh lane. It runs after [Plan 157](157-base-components.md), whose
   segmented control, scroll fades and typeahead refine it uses.
 - Effort: L. A second view with its own keyboard model, a content preview with two data paths, a
