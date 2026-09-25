@@ -15,6 +15,8 @@ export function branchesQueryOptions(path: string) {
     queryKey: gitKeys.branches(path),
     queryFn: ({ client, signal }) => fetchBranches(path, signal, clientForQueryClient(client)),
     staleTime: BRANCHES_STALE_TIME_MS,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: false,
   })
 }
 
@@ -22,11 +24,19 @@ async function fetchBranches(path: string, signal: AbortSignal, client: Client) 
   return observeClientOperation(
     { ...clientLogContext(client), area: 'git', action: 'git.branches', path, signal },
     async () => {
-      const response = await client.git.branches.get({ query: { path }, fetch: { signal } })
-      return unwrapEdenResponse(response, {
+      const [response, worktreesResponse] = await Promise.all([
+        client.git.branches.get({ query: { path }, fetch: { signal } }),
+        client.git.worktrees.get({ query: { path }, fetch: { signal } }),
+      ])
+      const worktrees = unwrapEdenResponse(worktreesResponse, {
+        requireData: true,
+        emptyMessage: 'git server returned an empty worktree response',
+      })
+      const branches = unwrapEdenResponse(response, {
         requireData: true,
         emptyMessage: 'git server returned an empty response',
       })
+      return { ...branches, worktrees }
     },
     (result) => ({
       branchCount: result.branches.length,

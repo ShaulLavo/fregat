@@ -545,7 +545,6 @@ surfaces, the file picker and the site. The owner is taking it one topic at a ti
 
 | Plan                                         | Owns                                                                                                        |
 | -------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| [158](plans/158-app-polish.md)               | Tail following with "N new" in `VirtualList`, secrets display, checkpoint restore, branch lanes, boot frame |
 | [159](plans/159-file-picker.md)              | File and folder picker rewrite: columns, real previews, thumbnails, history keys                            |
 | 160 (done, lane L2)                          | Reasoning fold, turn receipts, live tail, model marker, tool details, plan steps, subagents, ultra sparkle  |
 | 161 (done, lane L2)                          | Approval lifecycle, stopped turns, streaming holds, folding rules, hostile-state scenarios                  |
@@ -560,7 +559,7 @@ Suggested order:
 
 1. Plan 157, the base components, is done (lane L1, 2026-09-25): `Tabs`, `HoldButton`, `StatusDot`,
    scroll fades, typeahead refine.
-2. Plans 158–163 in any order once their decisions are answered. 158 builds on 157's status dot and
+2. Plans 160–163 in any order once their decisions are answered. Plan 158 is complete with recorded branch parents, tail following and
    scroll utilities; 160 and 161 touch the same timeline rows, so land them one after the other.
 3. Plan 164 is done: the first pass (`03f241fc`, `e8156148`), square status dots (Plan 157) and the
    metadata font sweep (lane L1, 2026-09-25).

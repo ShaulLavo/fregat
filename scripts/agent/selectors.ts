@@ -138,6 +138,7 @@ export const selectors = {
     page
       .getByRole('group', { name: group, exact: true })
       .getByRole('menuitemradio', { name: choice, exact: true }),
+  branchLanes: (page: Page) => page.locator('[data-slot="branch-lane"]'),
   draftWorkspace: (page: Page) => page.getByRole('button', { name: 'Workspace', exact: true }),
   draftBaseBranch: (page: Page) =>
     page.getByRole('button', { name: 'Start from branch', exact: true }),

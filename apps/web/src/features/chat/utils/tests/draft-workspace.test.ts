@@ -25,7 +25,7 @@ describe('draft workspace', () => {
     ])
   })
 
-  test('base branches skip the branches app worktrees own and lead with the checked-out one', () => {
+  test('base branches include app-created branches and lead with the checked-out one', () => {
     const branch = (name: string, current = false) => ({
       name,
       current,
@@ -37,7 +37,7 @@ describe('draft workspace', () => {
       baseBranchChoices([branch('dev'), branch('worktree/1234'), branch('main', true)]).map(
         (choice) => choice.name,
       ),
-    ).toEqual(['main', 'dev'])
+    ).toEqual(['main', 'dev', 'worktree/1234'])
   })
 
   test('the trigger label follows the target before the base', () => {

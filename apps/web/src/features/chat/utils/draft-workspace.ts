@@ -53,14 +53,9 @@ export function workspaceChoiceLabel(
   return { kind: 'current', label: WORKSPACE_CHOICE.current } as const
 }
 
-/**
- * Branches a new worktree may start from. `worktree/…` branches belong to
- * worktrees the app made; those are offered as worktrees, not as bases.
- */
+/** Local branches a new worktree may start from, with the current branch first. */
 export function baseBranchChoices(branches: readonly GitBranch[]) {
-  return branches
-    .filter((branch) => !branch.name.startsWith('worktree/'))
-    .toSorted((left, right) => Number(right.current) - Number(left.current))
+  return branches.toSorted((left, right) => Number(right.current) - Number(left.current))
 }
 
 /** Attachments and terminal captures belong to the machine that made them. */
