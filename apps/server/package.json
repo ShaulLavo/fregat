@@ -16,7 +16,7 @@
     }
   },
   "scripts": {
-    "dev": "bun ../../scripts/run-with-env.ts --watch src/index.ts",
+    "dev": "bun ../../scripts/run-with-env.ts bun ../../scripts/restart-on-change.ts src/index.ts --watch src --watch ../../packages",
     "server": "bun --env-file=../../.env src/index.ts",
     "start": "NODE_ENV=production bun --env-file=../../.env dist/index.js",
     "build": "tsgo --noEmit && bun scripts/package-wallpapers.ts && bun build src/index.ts --target bun --outdir dist --external sharp --external @anthropic-ai/claude-agent-sdk && bun build src/provider/claude-discovery-worker.ts --target bun --outfile dist/claude-discovery-worker.ts --external @anthropic-ai/claude-agent-sdk && bun build src/terminal-host/main.ts --target bun --outfile dist/pty-host.js",
