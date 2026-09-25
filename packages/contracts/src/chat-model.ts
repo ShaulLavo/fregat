@@ -219,6 +219,7 @@ export const worktreeRegistrationEntries = {
     'lifecycle',
     'operationId',
     'baseWorktreeId',
+    'baseBranch',
     'baseCommit',
     'headCommit',
     'metadataVersion',

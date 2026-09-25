@@ -417,6 +417,7 @@ export function createApp(options: AppOptions) {
     .use(
       gitRoutes(git, commitMessages, {
         resolveBaseCommit: (checkoutPath) => orchestration.worktreeBaseCommit(checkoutPath),
+        worktreeBaseBranches: () => orchestration.worktreeBaseBranches(),
         refreshMetadata: (checkoutPath) => orchestration.refreshWorktreeMetadata(checkoutPath),
       }),
     )

@@ -208,6 +208,7 @@ function retryCreation(
     worktreeId: worktree.id,
     projectId: worktree.projectId,
     baseWorktreeId: worktree.baseWorktreeId,
+    baseBranch: worktree.baseBranch ?? null,
     baseCommit: worktree.baseCommit,
     branch: worktree.branch,
     path: worktree.path,

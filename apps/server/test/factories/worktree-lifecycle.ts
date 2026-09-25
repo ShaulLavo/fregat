@@ -20,7 +20,7 @@ export const lifecycleWorktreeId = v.parse(worktreeIdSchema, '11111111-1111-4111
 export const lifecycleSessionId = v.parse(sessionIdSchema, '22222222-2222-4222-8222-222222222269')
 export const sharedSessionId = v.parse(sessionIdSchema, '33333333-3333-4333-8333-333333333369')
 
-export async function worktreeLifecycleFixture() {
+export async function worktreeLifecycleFixture(options: { baseBranch?: string } = {}) {
   const root = await mkdtemp(path.join(tmpdir(), 'platform-lifecycle-'))
   await executeGit(root, 'init', '-b', 'main')
   await executeGit(root, 'config', 'user.name', 'Lifecycle Test')
@@ -87,6 +87,7 @@ export async function worktreeLifecycleFixture() {
               kind: 'new',
               worktreeId: lifecycleWorktreeId,
               baseWorktreeId: registration.worktreeId,
+              baseBranch: options.baseBranch,
             },
             title: 'Isolated session',
             modelSelection: FIXTURE_MODEL,

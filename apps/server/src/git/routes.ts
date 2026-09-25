@@ -28,6 +28,7 @@ export function gitRoutes(
   commitMessages: CommitMessageGenerator,
   options: {
     resolveBaseCommit?: (path: string) => Promise<string | null>
+    worktreeBaseBranches?: () => Promise<ReadonlyMap<string, string | null>>
     refreshMetadata?: (path: string) => Promise<void>
   } = {},
 ) {
@@ -79,9 +80,20 @@ export function gitRoutes(
           query: gitBranchDiffQuerySchema,
         },
       )
-      .get('/worktrees', ({ query }) => worktrees.list(query.path), {
-        query: gitPathQuerySchema,
-      })
+      .get(
+        '/worktrees',
+        async ({ query }) => {
+          const [entries, baseBranches] = await Promise.all([
+            worktrees.list(query.path),
+            options.worktreeBaseBranches?.(),
+          ])
+          return entries.map((worktree) => ({
+            ...worktree,
+            baseBranch: baseBranches?.get(worktree.absolutePath) ?? null,
+          }))
+        },
+        { query: gitPathQuerySchema },
+      )
       .post('/stage', ({ body }) => git.stage(body), {
         body: gitPathsBodySchema,
       })

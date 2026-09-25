@@ -31,7 +31,12 @@ export const platformMigrations: readonly Migration[] = [
   { version: 24, name: 'provider_usage_contributions', up: applyProviderUsageContributions },
   { version: 29, name: 'turn_end_reason', up: applyTurnEndReason },
   { version: 30, name: 'message_model_selection', up: applyMessageModelSelection },
+  { version: 35, name: 'worktree_base_branch', up: applyWorktreeBaseBranch },
 ]
+
+function applyWorktreeBaseBranch(database: PlatformDatabase) {
+  database.run(sql`ALTER TABLE projection_worktrees ADD COLUMN base_branch TEXT`)
+}
 
 function applyMessageModelSelection(database: PlatformDatabase) {
   database.run(sql`ALTER TABLE projection_session_messages ADD COLUMN model_selection_json TEXT`)

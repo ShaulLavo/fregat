@@ -1098,6 +1098,16 @@ export class OrchestrationEngine {
     return worktree?.ownership === 'platform' ? worktree.baseCommit : null
   }
 
+  async worktreeBaseBranches() {
+    await this.ready
+    const branches = new Map<string, string | null>()
+    for (const worktree of this.readModel.worktrees.values()) {
+      if (worktree.retiredAt) continue
+      branches.set(worktree.canonicalPath, worktree.baseBranch ?? null)
+    }
+    return branches
+  }
+
   async worktreeCleanupPreview(worktreeId: WorktreeId) {
     await this.ready
     if (!this.worktreePreparation)
