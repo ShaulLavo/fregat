@@ -20,7 +20,7 @@ export function ActivityDetailSection({
   const json = label === 'Input' ? prettyJsonInput(value) : null
   const output = label === 'Output' || label === 'Result'
   const className = cn(
-    'focus-ring-inset max-h-64 overflow-auto font-mono text-xs leading-relaxed break-words whitespace-pre-wrap outline-none',
+    'focus-ring-inset max-h-64 overflow-auto overscroll-contain font-mono text-xs leading-relaxed break-words whitespace-pre-wrap outline-none',
     failed && output
       ? 'bg-destructive/10 text-destructive rounded-md px-2 py-1'
       : 'text-muted-foreground',

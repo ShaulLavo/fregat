@@ -1,6 +1,6 @@
 # Make scrolling and shortcuts legible
 
-Status: Phase 2 done 2026-09-25 (lane L1, with Plan 157's scroll fades). Phases 1 and 3 remain. Requested 2026-09-12.
+Status: Phases 1 and 2 done 2026-09-25 (lane L1; Phase 2 with Plan 157's scroll fades). Phase 3 remains. Requested 2026-09-12.
 
 Two affordances in `apps/web` are inconsistent and one was designed and never built.
 
@@ -190,6 +190,11 @@ supplies the bindings. `features/command-palette/command-palette-utils.ts` alrea
 does `keymap/menus/utils/resolve.ts`. Only the render is missing.
 
 ## Phase 1 — a cap means contained
+
+**Done 2026-09-25 (lane L1).** The census measure is `uncontainedScroller` (a `max-h-*` element that
+scrolls without `overscroll-contain`), at 0. The six primitives and 32 call sites carry the class;
+`diagnostic-peek.browser.tsx` and `features/chat/tests/tool-group-overscroll.browser.tsx` assert the
+computed `overscroll-behavior-y`. The text below is the original plan.
 
 Cheapest and most mechanical. One class, 21 call sites plus 6 primitives, no new files.
 

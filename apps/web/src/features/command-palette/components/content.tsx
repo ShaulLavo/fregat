@@ -400,7 +400,7 @@ export function CommandPaletteContent() {
         className={
           mode === 'colorTheme'
             ? 'max-h-60 min-h-0 shrink overflow-y-auto py-1'
-            : 'max-h-[min(440px,calc(100vh-8rem))] py-1'
+            : 'max-h-[min(440px,calc(100vh-8rem))] overscroll-contain py-1'
         }
         ref={listRef}
       >

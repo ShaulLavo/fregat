@@ -58,7 +58,7 @@ a bare root `bun run verify`.
 | [092 — path and URI helpers](092-path-and-uri-helpers.md)                               | **PARTIAL — IDENTICAL HALVES MERGED (`becdf722`); REST OPEN**        |
 | [093 — web React and store ceremony](093-web-react-and-store-ceremony.md)               | **PARTIAL — 3 OF 14 DONE; GUARD SWEEP AFTER 091 ITEM 1.4**           |
 | [099 — document contribution runtime](099-document-contributions.md)                    | **PROPOSED — BASELINE AND PUBLICATION FIRST**                        |
-| [102 — scroll and keyboard affordance](102-scroll-and-keyboard-affordance.md)           | **PROPOSED — DECISIONS D2 AND D7 NEED CONFIRMATION**                 |
+| [102 — scroll and keyboard affordance](102-scroll-and-keyboard-affordance.md)           | **P1 AND P2 DONE (lane L1); P3 NEXT**                                |
 | [124 — the theme studio](124-theme-studio.md)                                           | **PROPOSED — REPLACES 117'S SURFACE; DATA STAYS**                    |
 | [122 - composable full-power plugins](122-composable-plugins.md)                        | **PROPOSED - RESEARCH AND PERFORMANCE GATES FIRST**                  |
 | [114 — Polaron, a desktop shell we own](114-polaron-shell.md)                           | **PARKED — NEEDS A GO/NO-GO**                                        |

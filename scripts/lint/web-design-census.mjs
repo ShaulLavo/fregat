@@ -74,6 +74,11 @@ export const TARGETS = {
   paletteLeaks: { title: 'raw palette colours', limit: 0, listed: true },
   statusDots: { title: 'hand-made status dots', limit: 0, listed: true },
   scrollIdiom: { title: 'hand-styled scrollbars', limit: 0, listed: true },
+  uncontainedScroller: {
+    title: 'capped scrollers without overscroll-contain',
+    limit: 0,
+    listed: true,
+  },
   truncationRecovery: {
     title: 'truncation with no title on the row',
     limit: 0,
@@ -129,6 +134,9 @@ const DOT_MARK = /^size-(?:1|1\.5|2|2\.5)$/
 // The base layer styles every bar; a class that restyles or hides one is an exception. Read
 // from the raw string, because an arbitrary property fails the class-string test.
 const SCROLLBAR_CLASS = /(?:^|\s)((?:\S*[[:]\S*scrollbar|no-scrollbar)\S*)/g
+// A capped scroller sits inside something else that scrolls, so it keeps the wheel to itself.
+const CAPPED = /^max-h-/
+const SCROLLS = /^overflow-(?:[xy]-)?(?:auto|scroll)$/
 const HEIGHT_TOKEN = /^h-(?:\d+(?:\.\d+)?|px|\[[^\]]*\]|\([^)]*\))$/
 const TRUNCATION = /^(?:truncate|line-clamp-\d+)$/
 const SOURCE_FILE = /\.tsx?$/
@@ -243,6 +251,7 @@ export function censusSource(file, source) {
   }
   recordBarHeights(census, groups)
   recordStatusDots(census, groups)
+  recordUncontainedScrollers(census, groups)
   return census
 }
 
@@ -545,7 +554,7 @@ function groupFor(groups, entry) {
   const key = entry.elementKey ?? `s${entry.start}`
   const existing = groups.get(key)
   if (existing) return existing
-  const created = { bases: new Set(), heights: [], round: null }
+  const created = { bases: new Set(), heights: [], round: null, cap: null }
   groups.set(key, created)
   return created
 }
@@ -570,6 +579,7 @@ function recordToken(census, file, entry, token, lineOf, group) {
 function recordBarShape(group, hit, base) {
   group.bases.add(base)
   if (base === 'rounded-full') group.round = hit
+  if (CAPPED.test(base)) group.cap = hit
   if (HEIGHT_TOKEN.test(base)) group.heights.push(hit)
 }
 
@@ -645,6 +655,14 @@ function recordStatusDots(census, groups) {
     if (group.round === null) continue
     if (![...group.bases].some((base) => DOT_MARK.test(base))) continue
     census.hits.statusDots.push(group.round)
+  }
+}
+
+function recordUncontainedScrollers(census, groups) {
+  for (const group of groups.values()) {
+    if (group.cap === null || group.bases.has('overscroll-contain')) continue
+    if (![...group.bases].some((base) => SCROLLS.test(base))) continue
+    census.hits.uncontainedScroller.push(group.cap)
   }
 }
 
@@ -760,6 +778,7 @@ export function evaluate(census, allowEntries = [], { checkStale = true } = {}) 
     paletteLeaks: gate('paletteLeaks', census.hits.paletteLeaks),
     statusDots: gate('statusDots', census.hits.statusDots),
     scrollIdiom: gate('scrollIdiom', census.hits.scrollIdiom),
+    uncontainedScroller: gate('uncontainedScroller', census.hits.uncontainedScroller),
     truncationRecovery: gate('truncationRecovery', census.hits.truncationRecovery),
   }
   const failures = Object.entries(offenders)

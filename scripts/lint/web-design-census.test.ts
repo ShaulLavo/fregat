@@ -639,3 +639,14 @@ test('flags a class that restyles or hides a scrollbar', () => {
     '[&::-webkit-scrollbar]:hidden',
   ])
 })
+
+test('flags a capped scroller that hands the wheel to the pane behind it', () => {
+  const subject = census(
+    "export const a = 'max-h-48 overflow-y-auto'",
+    "export const b = 'max-h-48 overflow-y-auto overscroll-contain'",
+    "export const c = 'h-full overflow-y-auto'",
+    "export const d = 'max-h-48 overflow-hidden'",
+  )
+
+  expect(locations(subject, 'uncontainedScroller')).toEqual(['probe.tsx:1 max-h-48'])
+})

@@ -37,7 +37,7 @@ export function ThemeEditor({
   useEffect(() => () => clear?.(), [clear])
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className='max-h-[90vh] overflow-y-auto sm:max-w-2xl'>
+      <DialogContent className='max-h-[90vh] overflow-y-auto overscroll-contain sm:max-w-2xl'>
         <DialogHeader>
           <DialogTitle>Create a theme bundle</DialogTitle>
           <DialogDescription>

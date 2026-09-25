@@ -47,7 +47,7 @@ export function CodeThemeWidget({
         <PopoverContent
           align='end'
           aria-label={`Choose a code theme for ${colorMode} mode`}
-          className='max-h-(--available-height) w-[46rem] max-w-[calc(100vw-2rem)] gap-0 overflow-y-auto p-0'
+          className='max-h-(--available-height) w-[46rem] max-w-[calc(100vw-2rem)] gap-0 overflow-y-auto overscroll-contain p-0'
           sideOffset={8}
         >
           <CodeThemePicker
