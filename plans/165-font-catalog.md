@@ -117,12 +117,16 @@ curated list, and typing searches everything. One component serves both settings
   data in `packages/contracts/src/fonts/curated.ts`:
   - Interface: Inter (bundled), Geist, Inter Tight, IBM Plex Sans, Google Sans Flex, Figtree,
     Manrope, Instrument Sans, Public Sans, System.
-  - Code: JetBrains Mono (bundled), Fira Code, Commit Mono, Iosevka, Cascadia Code, Source Code Pro,
-    Monaspace Neon, Victor Mono, Hack. A code font resolves to its Nerd Font build when one
-    exists, so terminal glyphs keep working.
+  - Code: JetBrains Mono (bundled), Geist Mono, Commit Mono, Martian Mono, IBM Plex Mono, Fira Code,
+    Iosevka, Cascadia Code, Monaspace, 0xProto, Zed Mono, Victor Mono. Every one has a Nerd Font
+    build (checked against the cached nerdfonts.com list, 2026-09-25), which the code role uses, so
+    terminal glyphs keep working. Commit Mono and Martian Mono are the nearest free fonts to
+    Berkeley Mono, which is commercial and reachable only as an installed font.
 - **Typing searches the whole catalog on the client.** `GET /fonts` is about 150 KB of metadata,
   fetched once (`staleTime: 'static'`) when a picker first opens. It is ranked with the existing
-  `fuzzyRank` (`packages/contracts/src/fuzzy-rank.ts`) and the top 30 are shown. The code role
+  `fuzzyRank` (`packages/contracts/src/fuzzy-rank.ts`), the palette's matcher, and the top 30 are
+  shown. The family is the label; category, source and id are keywords, so typing "mono" or
+  "serif" narrows the list the way the dropped filter chips would have. No `fuzzysort` dependency. The code role
   ranks monospace first but hides nothing. There is no request per keystroke.
 - **Previews:** at most about 40 rows exist at once, so every visible row fetches its server-subset
   preview woff2 (a few KB). A row whose preview fails shows its name in the fallback and stays
@@ -134,6 +138,10 @@ curated list, and typing searches everything. One component serves both settings
 - Loading: skeleton rows for Suggested until the catalog arrives, and `Shimmer` on a row whose
   preview is still loading. An empty search result is the "Use installed font" row, never a blank
   list.
+
+Later, not in this plan: uploading a font file (for example a purchased Berkeley Mono) to the
+server's font cache. It would then follow the user to every device the way downloaded fonts do,
+where an installed font exists only on the machine it was installed on.
 
 Dropped from the first design: the virtualized full list, the kind and source filter chips (the
 role and the search cover them), and the separate "Type a family name…" row.
