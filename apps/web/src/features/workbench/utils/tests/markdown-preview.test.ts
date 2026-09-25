@@ -7,6 +7,7 @@ import {
 import {
   lineForRenderedTop,
   renderedTopForLine,
+  risingAnchors,
   type SourceAnchor,
 } from '@/features/workbench/utils/markdown-scroll-positions'
 
@@ -53,3 +54,36 @@ test.each(['../../etc/hosts', '../../repo-other/file', '%2e%2e/%2e%2e/etc/hosts'
     expect(markdownPreviewTarget(href, 'repo/docs/a.md', 'repo')).toEqual({ kind: 'unavailable' })
   },
 )
+
+test('keeps absolute workspace paths absolute', () => {
+  expect(markdownPreviewTarget('../README.md', '/repo/docs/a.md', '/repo')).toEqual({
+    kind: 'file',
+    path: '/repo/README.md',
+  })
+  expect(markdownPreviewTarget('/plans/a.md', '/repo/docs/a.md', '/repo')).toEqual({
+    kind: 'file',
+    path: '/repo/plans/a.md',
+  })
+  expect(markdownPreviewImageSource('a.png', '/repo/docs/a.md', '/repo', 'http://x')).toBe(
+    'http://x/fs/blob?path=%2Frepo%2Fdocs%2Fa.png',
+  )
+})
+
+test.each([
+  ['../../../x.png', '/docs/a.md', '/'],
+  ['../../etc/hosts', '/repo/docs/a.md', '/repo'],
+  ['../other/a.md', '/repo/a.md', '/repo'],
+])('rejects an absolute-root escape: %s', (href, documentPath, rootPath) => {
+  expect(markdownPreviewTarget(href, documentPath, rootPath)).toEqual({ kind: 'unavailable' })
+})
+
+test('drops every anchor below the last kept line, not only the one before it', () => {
+  // Footnote definitions at lines 5 and 6 render after the paragraph at line 30.
+  const sorted = risingAnchors([
+    { line: 1, top: 0 },
+    { line: 30, top: 600 },
+    { line: 5, top: 700 },
+    { line: 6, top: 720 },
+  ])
+  expect(sorted.map((anchor) => anchor.line)).toEqual([1, 30])
+})

@@ -512,3 +512,26 @@ test.each([
   expect(event.defaultPrevented).toBe(true)
   expect(harness.calls).toEqual([false])
 })
+
+test.each([
+  ['Ctrl+Alt+]', ']', 'Digit9'],
+  ['Ctrl+Alt+[', '[', 'Digit8'],
+] as const)('leaves a character AltGraph typed to the text control: %s', (binding, key, code) => {
+  const harness = mountChordRuntime('workspace.toggleWallpaper', binding)
+  const event = new KeyboardEvent('keydown', {
+    bubbles: true,
+    cancelable: true,
+    ctrlKey: true,
+    altKey: true,
+    key,
+    code,
+  })
+  Object.defineProperty(event, 'getModifierState', {
+    value: (modifier: string) => modifier === 'AltGraph',
+  })
+  act(() => {
+    document.body.dispatchEvent(event)
+  })
+  expect(event.defaultPrevented).toBe(false)
+  expect(harness.calls).toEqual([])
+})

@@ -3,7 +3,12 @@ import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import * as v from 'valibot'
-import { commandIdSchema, messageIdSchema, turnIdSchema } from '@workspace/contracts'
+import {
+  commandIdSchema,
+  messageIdSchema,
+  sessionIdSchema,
+  turnIdSchema,
+} from '@workspace/contracts'
 
 import { OrchestrationCheckpointDiffQuery } from '../checkpoint-diff-query'
 import { OrchestrationCheckpointHunks } from '../checkpoint-hunks'
@@ -25,7 +30,7 @@ afterEach(async () => {
 const before = Array.from({ length: 20 }, (_, index) => `line ${index + 1}`)
 const after = before.map((line, index) => (index === 1 || index === 17 ? `${line} changed` : line))
 
-async function turnFixture(activeRuntimes = async () => [] as const) {
+async function turnFixture(activeRuntimes = async () => [] as const, renameTo?: string) {
   const { root, cleanup } = await checkpointRepository()
   cleanups.push(cleanup)
   const file = path.join(root, 'app.txt')
@@ -33,7 +38,9 @@ async function turnFixture(activeRuntimes = async () => [] as const) {
   await runGit(root, ['add', 'app.txt'])
   await runGit(root, ['commit', '-m', 'turn zero'])
   await runGit(root, ['update-ref', checkpointRefForSessionTurn(sessionId, 0), 'HEAD'])
-  await writeFile(file, `${after.join('\n')}\n`)
+  if (renameTo) await runGit(root, ['mv', 'app.txt', renameTo])
+  const turnFile = renameTo ? path.join(root, renameTo) : file
+  await writeFile(turnFile, `${after.join('\n')}\n`)
   await runGit(root, ['commit', '-am', 'turn one'])
   const turnOneRef = checkpointRefForSessionTurn(sessionId, 1)
   await runGit(root, ['update-ref', turnOneRef, 'HEAD'])
@@ -41,7 +48,7 @@ async function turnFixture(activeRuntimes = async () => [] as const) {
   const orchestration = checkpointOrchestration(root)
   cleanups.push(orchestration.close)
   await dispatchCheckpointSession(orchestration.engine, root, turnOneRef, [
-    { additions: 2, deletions: 2, path: 'app.txt' },
+    { additions: 2, deletions: 2, path: renameTo ?? 'app.txt' },
   ])
   const hunks = new OrchestrationCheckpointHunks({
     runWorkspaceOperation: (sessionId, operation) =>
@@ -51,7 +58,13 @@ async function turnFixture(activeRuntimes = async () => [] as const) {
     git: orchestration.git,
     readModel: () => orchestration.engine.readModelSnapshot(),
   })
-  return { engine: orchestration.engine, file, hunks, read: () => readFile(file, 'utf8') }
+  return {
+    engine: orchestration.engine,
+    file,
+    hunks,
+    read: () => readFile(file, 'utf8'),
+    readTurnFile: () => readFile(turnFile, 'utf8'),
+  }
 }
 
 describe('checkpoint hunks', () => {
@@ -101,6 +114,39 @@ describe('checkpoint hunks', () => {
 
     await hunks.revert({ hunkId: null, path: first!.path, sessionId, turnCount: 1 })
     expect(await read()).toBe(`${before.join('\n')}\n`)
+  })
+
+  it('reapplies a renamed file after undoing the whole file', async () => {
+    const { hunks, read, readTurnFile } = await turnFixture(undefined, 'moved.txt')
+    const [first] = await hunks.states({ sessionId, turnCount: 1 })
+
+    await hunks.revert({ hunkId: null, path: first!.path, sessionId, turnCount: 1 })
+    expect(await read()).toBe(`${before.join('\n')}\n`)
+    const undone = await hunks.states({ sessionId, turnCount: 1 })
+    expect(undone.map((hunk) => hunk.state)).toEqual(['reverted', 'reverted'])
+
+    await hunks.revert({ hunkId: null, path: first!.path, reapply: true, sessionId, turnCount: 1 })
+    expect(await readTurnFile()).toBe(`${after.join('\n')}\n`)
+    const reapplied = await hunks.states({ sessionId, turnCount: 1 })
+    expect(reapplied.map((hunk) => hunk.state)).toEqual(['applied', 'applied'])
+  })
+
+  it('says reapply, not undo, when a reapply no longer fits', async () => {
+    const { file, hunks } = await turnFixture()
+    const [first] = await hunks.states({ sessionId, turnCount: 1 })
+    await hunks.revert({ hunkId: first!.hunkId, path: first!.path, sessionId, turnCount: 1 })
+    const edited = before.map((line, index) => (index === 1 ? 'line 2 edited by hand' : line))
+    await writeFile(file, `${edited.join('\n')}\n`)
+
+    await expect(
+      hunks.revert({
+        hunkId: first!.hunkId,
+        path: first!.path,
+        reapply: true,
+        sessionId,
+        turnCount: 1,
+      }),
+    ).rejects.toThrow('cannot be reapplied on its own')
   })
 
   it('names a change that is not in the turn', async () => {
@@ -154,4 +200,39 @@ it('holds turn admission until checkpoint undo finishes applying its patch', asy
   }
   expect(await read()).toBe(`${before.join('\n')}\n`)
   await engine.dispatch(send)
+})
+
+it('refuses undo while another session in the checkout has a turn admitted', async () => {
+  const { engine, hunks } = await turnFixture()
+  const other = v.parse(sessionIdSchema, '00000000-0000-4000-8000-000000000002')
+  const session = () => engine.readModelSnapshot()
+  const worktreeId = (await session()).sessions.get(sessionId)!.worktreeId
+  await engine.dispatch({
+    worktreeTarget: { kind: 'current', worktreeId },
+    commandId: v.parse(commandIdSchema, 'cmd-other-session'),
+    interactionMode: 'default',
+    modelSelection: (await session()).sessions.get(sessionId)!.modelSelection,
+    runtimeMode: 'full-access',
+    sessionId: other,
+    title: 'Other',
+    type: 'session.create',
+  })
+  await engine.dispatch({
+    type: 'session.turn.start',
+    runtimeMode: 'full-access',
+    interactionMode: 'default',
+    commandId: v.parse(commandIdSchema, 'other-send'),
+    sessionId: other,
+    turnId: v.parse(turnIdSchema, 'other-turn'),
+    message: {
+      messageId: v.parse(messageIdSchema, 'other-prompt'),
+      role: 'user',
+      text: 'Start',
+      attachments: [],
+    },
+  })
+
+  await expect(
+    hunks.revert({ sessionId, turnCount: 1, path: 'app.txt', hunkId: null }),
+  ).rejects.toThrow('isolated worktree')
 })

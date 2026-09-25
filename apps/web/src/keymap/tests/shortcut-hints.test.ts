@@ -108,4 +108,19 @@ describe('heldModifiersAfter', () => {
     expect(heldModifiersAfter(ctrl, keyEvent('keydown', 'a'))).toEqual(NO_HELD_MODIFIERS)
     expect(heldModifiersAfter(ctrl, keyEvent('keydown', '1', { ctrlKey: true }))).toBe(ctrl)
   })
+
+  test('AltGr on Windows (Control then AltGraph) holds nothing while it types', () => {
+    const control = heldModifiersAfter(
+      NO_HELD_MODIFIERS,
+      keyEvent('keydown', 'Control', { ctrlKey: true }),
+    )
+    const altGraph = heldModifiersAfter(
+      control,
+      keyEvent('keydown', 'AltGraph', { altKey: true, ctrlKey: true }),
+    )
+    expect(altGraph).toBe(NO_HELD_MODIFIERS)
+    expect(
+      heldModifiersAfter(altGraph, keyEvent('keydown', '@', { altKey: true, ctrlKey: true })),
+    ).toBe(NO_HELD_MODIFIERS)
+  })
 })

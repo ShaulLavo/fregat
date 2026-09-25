@@ -21,8 +21,13 @@ export function markdownPreviewTarget(
     : documentPath.slice(0, documentPath.lastIndexOf('/'))
   const path = normalizePath(`${base}/${bare}`)
   const root = normalizePath(rootPath)
-  if (root && path !== root && !path.startsWith(`${root}/`)) return { kind: 'unavailable' }
+  if (path === null || root === null || !insideRoot(path, root)) return { kind: 'unavailable' }
   return { kind: 'file', path }
+}
+
+function insideRoot(path: string, root: string) {
+  if (path === root || root === '') return true
+  return path.startsWith(root.endsWith('/') ? root : `${root}/`)
 }
 
 function decodePath(path: string) {
@@ -33,17 +38,20 @@ function decodePath(path: string) {
   }
 }
 
+/** Keeps an absolute path absolute; `null` when `..` climbs above the start. */
 function normalizePath(path: string) {
   const parts: string[] = []
   for (const part of path.split('/')) {
     if (part === '' || part === '.') continue
-    if (part === '..') {
-      parts.pop()
+    if (part !== '..') {
+      parts.push(part)
       continue
     }
-    parts.push(part)
+    if (parts.length === 0) return null
+    parts.pop()
   }
-  return parts.join('/')
+  const joined = parts.join('/')
+  return path.startsWith('/') ? `/${joined}` : joined
 }
 
 /** The server URL for a workspace image, or the source untouched when it is already a URL. */

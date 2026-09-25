@@ -17,7 +17,7 @@ import type {
   RuntimeMode,
 } from '@workspace/contracts'
 import { $setSelection, type LexicalEditor } from 'lexical'
-import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from 'react'
+import { use, useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from 'react'
 import { cn } from '@workspace/ui/lib/utils'
 
 import {
@@ -43,6 +43,7 @@ import {
 import { useProjectEntrySearch } from '../hooks/use-project-entry-search'
 import { providerCommandCatalogQueryOptions } from '@/features/chat/utils/composer-skills'
 import { useComposerInbox } from '../hooks/use-composer-inbox'
+import { ComposerRootsContext } from '@/lib/composer-attach/providers/roots-context'
 import { useAttachmentPreparation } from '@/features/chat/hooks/use-attachment-preparation'
 import { useProvider } from '@/features/chat/hooks/use-provider'
 import { chatSubmissionValidation } from '@/features/chat/utils/submission-validation'
@@ -139,7 +140,8 @@ export function ChatInput({
   const images = useChatInputDraftStore(imagesSelector)
   const terminalContexts = useChatInputDraftStore(terminalContextsSelector)
   const activeFile = useActiveFileChip(rootPath)
-  const reviewComments = useReviewDraft({ environmentId, rootPath })
+  const aliasRoots = use(ComposerRootsContext)
+  const reviewComments = useReviewDraft({ environmentId, rootPaths: [rootPath, ...aliasRoots] })
   const persistenceError = useChatInputDraftStore((store) => store.persistenceError)
   const clearStoredDraft = useChatInputDraftStore((store) => store.clearDraft)
   const clearStoredDraftContent = useChatInputDraftStore((store) => store.clearDraftContent)
@@ -231,7 +233,7 @@ export function ChatInput({
   // Captures made outside chat wait in the inbox until a composer exists to
   // hold them — the terminal is often right-clicked while the sidebar is on
   // Files, so the reveal that follows is what mounts this component.
-  useComposerInbox(draftTarget, editorRef, editorReady)
+  useComposerInbox(draftTarget, editorRef, editorReady, aliasRoots)
 
   useEffect(() => {
     const activeItemStillPresent = commandMenuItems.some((item) => item.id === activeCommandItemId)

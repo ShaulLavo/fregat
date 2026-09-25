@@ -164,6 +164,7 @@ function candidateAvailable(
   event: KeyboardEvent,
 ) {
   if (context.altGraph) {
+    if (altGraphTypedCharacter(event)) return false
     const stroke = payload.binding.chord[context.strokeIndex]
     if (!stroke) return false
     const parsed =
@@ -195,4 +196,14 @@ function reportSequence(event: KeymapSequenceEvent<Candidate>, pane: FocusArea) 
     prefix: event.keys.split(' ')[0],
     strokeCount: event.strokeCount,
   })
+}
+
+/**
+ * Windows reports AltGr as Ctrl+Alt, so AltGr+9 typing `]` on a German layout looks like
+ * Ctrl+Alt+]. A printable key its physical key does not produce unmodified is text, never a chord.
+ */
+function altGraphTypedCharacter(event: KeyboardEvent) {
+  if ([...event.key].length !== 1) return false
+  const base = /^(?:Key|Digit)(.)$/u.exec(event.code)?.[1]
+  return base?.toLowerCase() !== event.key.toLowerCase()
 }

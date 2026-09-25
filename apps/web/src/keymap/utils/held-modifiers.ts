@@ -32,6 +32,8 @@ function sameHeldModifiers(left: HeldModifiers, right: HeldModifiers) {
  * which would pin hints on screen until the user taps Cmd.
  */
 export function heldModifiersAfter(current: HeldModifiers, event: ModifierEvent): HeldModifiers {
+  // Windows sends AltGr as Control then AltGraph; that Ctrl+Alt is typing, never a shortcut.
+  if (event.key === 'AltGraph') return NO_HELD_MODIFIERS
   const modifier = modifierForKey(event.key)
   const next = modifier
     ? { ...current, [modifier]: event.type === 'keydown' }
@@ -46,7 +48,7 @@ export function heldModifiersAfter(current: HeldModifiers, event: ModifierEvent)
 }
 
 function modifierForKey(key: string): keyof HeldModifiers | null {
-  if (key === 'Alt' || key === 'AltGraph') return 'alt'
+  if (key === 'Alt') return 'alt'
   if (key === 'Control') return 'ctrl'
   if (key === 'Meta' || key === 'OS') return 'meta'
   if (key === 'Shift') return 'shift'

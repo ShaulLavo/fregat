@@ -46,13 +46,22 @@ export class OrchestrationCheckpointHunks {
     const { files, workspacePath } = await this.turnFiles(query.sessionId, query.turnCount)
     const hunks: OrchestrationCheckpointHunk[] = []
     for (const file of files) {
+      const renameUndone = await this.renameUndone(workspacePath, file)
       for (const hunk of file.hunks) {
-        const patch = hunkPatch(file, hunk.patch)
-        const state = await this.hunkState(workspacePath, patch)
+        const state = renameUndone
+          ? 'reverted'
+          : await this.hunkState(workspacePath, hunkPatch(file, hunk.patch))
         hunks.push({ hunkId: hunk.id, path: file.path, state })
       }
     }
     return hunks
+  }
+
+  /** A whole-file undo takes a rename back too, so the per-change patches have no file left. */
+  private async renameUndone(workspacePath: string, file: GitFileDiff) {
+    if (!isRename(file)) return false
+    const { git } = this.dependencies
+    return git.patchApplies({ path: workspacePath, patch: file.patch, reverse: false })
   }
 
   /**
@@ -73,18 +82,27 @@ export class OrchestrationCheckpointHunks {
     requireSettleable(session, 'session.checkpoint.hunk-revert', new Date().toISOString())
     requireNoPendingRewind(session)
     const runtimes = await this.dependencies.activeRuntimes()
-    if (await otherRuntimeOverlaps(session.id, worktree.canonicalPath, runtimes))
+    if (await otherRuntimeOverlaps(session.id, worktree.canonicalPath, model, runtimes))
       throw checkpointErrors.WORKSPACE_NOT_ISOLATED({
         internal: { check: 'overlapping-runtime', operation: 'hunk-revert' },
       })
 
     const { files, workspacePath } = await this.turnFiles(command.sessionId, command.turnCount)
-    const patch = revertPatch(files, command)
+    const file = files.find((candidate) => candidate.path === command.path)
+    if (!file)
+      throw checkpointErrors.HUNK_NOT_FOUND({
+        path: command.path,
+        internal: { fileMissing: true, whole: command.hunkId === null },
+      })
+    // With the rename undone a single change has no file to land in, so the whole file returns.
+    const whole = command.hunkId === null || (await this.renameUndone(workspacePath, file))
+    const patch = whole ? file.patch : filePatch(file, command)
     const reverse = command.reapply !== true
     if (!(await this.dependencies.git.patchApplies({ path: workspacePath, patch, reverse })))
       throw checkpointErrors.HUNK_CONFLICT({
+        action: reverse ? 'undone' : 'reapplied',
         path: command.path,
-        internal: { reverse, whole: command.hunkId === null },
+        internal: { reverse, whole },
       })
 
     return this.dependencies.git.applyPatch({
@@ -118,16 +136,7 @@ export class OrchestrationCheckpointHunks {
   }
 }
 
-function revertPatch(
-  files: readonly GitFileDiff[],
-  command: OrchestrationRevertCheckpointHunkInput,
-) {
-  const file = files.find((candidate) => candidate.path === command.path)
-  if (!file)
-    throw checkpointErrors.HUNK_NOT_FOUND({ path: command.path, internal: { whole: true } })
-  // The whole file keeps git's own header, so a rename or a new file is taken back too.
-  if (command.hunkId === null) return file.patch
-
+function filePatch(file: GitFileDiff, command: OrchestrationRevertCheckpointHunkInput) {
   const hunk = file.hunks.find((candidate) => candidate.id === command.hunkId)
   if (!hunk)
     throw checkpointErrors.HUNK_NOT_FOUND({
@@ -135,6 +144,11 @@ function revertPatch(
       internal: { hunkCount: file.hunks.length },
     })
   return hunkPatch(file, hunk.patch)
+}
+
+function isRename(file: GitFileDiff) {
+  if (file.oldFileMissing || file.newFileMissing) return false
+  return Boolean(file.oldPath && file.oldPath !== file.path)
 }
 
 /**

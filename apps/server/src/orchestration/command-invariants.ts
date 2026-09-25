@@ -246,6 +246,17 @@ function hasOpenBlockingRequest(session: OrchestrationProjectedSession) {
   return session.pendingApprovalCount + session.pendingUserInputCount > 0
 }
 
+/** Whether the session's agent may be writing files now, or is about to start. */
+export function sessionMayWrite(session: OrchestrationProjectedSession) {
+  const status = session.runtime?.status
+  return (
+    hasQueuedTurnStart(session) ||
+    session.latestTurn?.state === 'running' ||
+    status === 'starting' ||
+    status === 'running'
+  )
+}
+
 function hasQueuedTurnStart(session: OrchestrationProjectedSession) {
   const state = session.latestTurn?.providerStartState
   return (

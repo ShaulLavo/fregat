@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-import type { ComposerDestination } from '@/lib/composer-attach/providers/context'
+import { composerAccepts, type ComposerTarget } from '@/lib/composer-attach/utils/target'
 import type { ReviewComment } from '@/lib/review-draft/utils/types'
 
 type ReviewDraftStore = {
@@ -41,9 +41,6 @@ export function resetReviewDraftStore() {
   useReviewDraftStore.setState({ comments: [] })
 }
 
-export function inDestination(comment: ReviewComment, destination: ComposerDestination) {
-  return (
-    comment.destination.environmentId === destination.environmentId &&
-    comment.destination.rootPath === destination.rootPath
-  )
+export function inDestination(comment: ReviewComment, target: ComposerTarget) {
+  return composerAccepts(target, comment.destination)
 }

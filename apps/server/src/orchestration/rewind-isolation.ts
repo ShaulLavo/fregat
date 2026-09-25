@@ -3,6 +3,7 @@ import path from 'node:path'
 import type { SessionId } from '@workspace/contracts'
 import type { GitService } from '../git/service'
 import type { ProviderRuntimeBindingWithMetadata } from '../provider/provider-session-directory'
+import { sessionMayWrite } from './command-invariants'
 import type { OrchestrationReadModel } from './read-model'
 import { resolveSessionOwner } from './session-owner'
 import { checkpointErrors } from './structured-errors'
@@ -57,15 +58,22 @@ export async function assertRewindIsolation({
 }
 
 /**
- * Whether another session's live runtime works inside or around `cwd`. A write there could
- * interleave with that agent's edits.
+ * Whether another session's agent works inside or around `cwd`: a live runtime, or a turn
+ * admitted whose runtime has not started yet. A write there could interleave with its edits.
  */
 export async function otherRuntimeOverlaps(
   sessionId: SessionId,
   cwd: string,
+  model: OrchestrationReadModel,
   activeRuntimes: readonly ProviderRuntimeBindingWithMetadata[],
 ) {
-  return overlapsAny(await realpath(cwd), otherRuntimeCwds(sessionId, activeRuntimes))
+  const candidates = otherRuntimeCwds(sessionId, activeRuntimes)
+  for (const other of model.sessions.values()) {
+    if (other.id === sessionId || other.deletedAt || !sessionMayWrite(other)) continue
+    const owner = model.worktrees.get(other.worktreeId)
+    if (owner) candidates.push(owner.canonicalPath)
+  }
+  return overlapsAny(await realpath(cwd), candidates)
 }
 
 function otherRuntimeCwds(

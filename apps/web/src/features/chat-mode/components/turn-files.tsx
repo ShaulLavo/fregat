@@ -49,7 +49,7 @@ export function TurnFiles({
   function toggle(row: TurnTreeRow) {
     if (busyReason) return false
     if (row.kind === 'file') {
-      const action = wholeFileHunkAction(row.diff, stateById)
+      const action = wholeFileHunkAction(row.diff, stateById, states.status)
       if (!row.diff || action.reason) return false
       revert.mutate({ hunkId: null, path: row.diff.path, reapply: action.reapply, turnCount })
       return true
@@ -112,10 +112,10 @@ export function TurnFiles({
             <GitFileRow
               actions={
                 <Button
-                  aria-label={`${wholeFileHunkAction(row.diff, stateById).reapply ? 'Reapply' : 'Undo'} every change to ${row.file.path}`}
+                  aria-label={`${wholeFileHunkAction(row.diff, stateById, states.status).reapply ? 'Reapply' : 'Undo'} every change to ${row.file.path}`}
                   disabled={
                     busyReason !== null ||
-                    wholeFileHunkAction(row.diff, stateById).reason !== null ||
+                    wholeFileHunkAction(row.diff, stateById, states.status).reason !== null ||
                     revert.isPending
                   }
                   focusableWhenDisabled
@@ -123,7 +123,7 @@ export function TurnFiles({
                   tabIndex={-1}
                   data-tooltip={
                     busyReason ??
-                    wholeFileHunkAction(row.diff, stateById).reason ??
+                    wholeFileHunkAction(row.diff, stateById, states.status).reason ??
                     'Toggle every change this turn made to the file'
                   }
                   type='button'

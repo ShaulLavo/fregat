@@ -17,11 +17,12 @@ import { ReviewCommentInput } from '@/components/review-comment-input'
 import {
   diffLineAddress,
   diffLineAddressLabel,
-  diffLineSelectionText,
   diffRowsForAddress,
+  selectedText,
   selectedDiffRows,
   stackedDiffRows,
   type DiffLineAddress,
+  type SelectedDiffText,
 } from '../utils/diff-line-selection'
 
 /**
@@ -45,6 +46,8 @@ export function DiffLineCommentAction({
   const { attachText } = useAttachToComposer(rootPath)
   const environmentId = useEnvironmentId()
   const [address, setAddress] = useState<DiffLineAddress | null>(null)
+  // Quoted at selection: a diff that refreshes while the user types must not shift the lines.
+  const [selected, setSelected] = useState<SelectedDiffText | null>(null)
   // A comment waits in the review draft and goes out with the next message.
   const [commenting, setCommenting] = useState(false)
   // Not state: re-rendering mid-drag on the anchor would only throw the drag away.
@@ -73,7 +76,9 @@ export function DiffLineCommentAction({
       const headRow = head?.side === start.side ? head.rowIndex : start.rowIndex
       const dragged = selectedDiffRows(start.rows, start.rowIndex, headRow)
       const stackedRows = stackedDiffRows(file, regions.getExpandedRegions())
-      setAddress(canonicalAddress(diffLineAddress(dragged), stackedRows))
+      const next = canonicalAddress(diffLineAddress(dragged), stackedRows)
+      setAddress(next)
+      setSelected(next ? selectedText(file, stackedRows, next) : null)
     }
 
     host.addEventListener('mousedown', onMouseDown, true)
@@ -87,36 +92,27 @@ export function DiffLineCommentAction({
 
   if (!address) return null
 
-  // Resolved against the stacked projection so the agent gets both sides of
-  // the change even when the range was dragged out in one split pane.
-  const quote = () => {
-    const rows = diffRowsForAddress(stackedDiffRows(file, regions.getExpandedRegions()), address)
-    return rows.length === 0 ? null : diffLineSelectionText(file.path, address, rows)
-  }
-
   const ask = () => {
-    const text = quote()
-    if (!text || !attachText('git-diff', text)) return
+    if (!selected || !attachText('git-diff', selected.text)) return
 
     setAddress(null)
   }
 
   const saveComment = (body: string) => {
-    const text = quote()
-    if (!text || !body.trim()) return
+    if (!selected || !body.trim()) return
     addReviewComment({
       anchor: {
         kind: 'diff',
-        newObjectId: file.newObjectId,
+        newObjectId: selected.newObjectId,
         newRange: address.newRange,
-        oldObjectId: file.oldObjectId,
+        oldObjectId: selected.oldObjectId,
         oldRange: address.oldRange,
         path: file.path,
       },
       author: 'user',
       body,
       destination: { environmentId, rootPath },
-      quote: text,
+      quote: selected.text,
     })
     setCommenting(false)
     setAddress(null)

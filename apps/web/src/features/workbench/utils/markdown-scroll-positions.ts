@@ -36,12 +36,22 @@ export function sourceAnchors(container: HTMLElement): SourceAnchor[] {
     const line = Number(element.dataset.sourceLine)
     if (!Number.isFinite(line)) continue
     const rect = element.getBoundingClientRect()
+    if (rect.width === 0 && rect.height === 0) continue
     anchors.push({ line, top: rect.top - origin })
     const end = Number(element.dataset.sourceEndLine)
     if (Number.isFinite(end) && end > line) anchors.push({ line: end, top: rect.bottom - origin })
   }
-  // Nested blocks (a list and its items) share tops; keep lines rising with the page.
-  return anchors
-    .toSorted((left, right) => left.top - right.top || left.line - right.line)
-    .filter((anchor, index, sorted) => index === 0 || anchor.line > sorted[index - 1]!.line)
+  return risingAnchors(anchors)
+}
+
+/** Nested blocks share tops and footnotes render out of order; keep lines rising with the page. */
+export function risingAnchors(anchors: readonly SourceAnchor[]): SourceAnchor[] {
+  const rising: SourceAnchor[] = []
+  const byTop = anchors.toSorted((left, right) => left.top - right.top || left.line - right.line)
+  for (const anchor of byTop) {
+    const last = rising.at(-1)
+    if (last && anchor.line <= last.line) continue
+    rising.push(anchor)
+  }
+  return rising
 }

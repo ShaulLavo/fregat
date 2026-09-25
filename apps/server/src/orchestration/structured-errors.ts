@@ -14,8 +14,8 @@ export const checkpointErrors = defineErrorCatalog('checkpoint', {
   },
   HUNK_CONFLICT: {
     status: 409,
-    message: ({ path }: { path: string }) =>
-      `The change to ${path} no longer matches the file, so it cannot be undone on its own`,
+    message: ({ action, path }: { action: 'undone' | 'reapplied'; path: string }) =>
+      `The change to ${path} no longer matches the file, so it cannot be ${action} on its own`,
     why: 'The lines this change touched were edited again after the turn, by the agent or by hand.',
     fix: 'Open the file and edit it directly, or rewind the whole turn.',
   },

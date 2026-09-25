@@ -160,6 +160,7 @@ export function Editor({
   // Plugin identity controls native registration lifetime; the host keeps this callback stable
   // per conflict, so it rebuilds the plugins only when the conflict behind the tab changes.
   const markdownView = useMarkdownView(key)
+  const markdownPreview = documentLanguageId === 'markdown' && markdownView === 'preview'
   const criticalEditorCorePlugins = useMemo(
     () =>
       createCriticalEditorCorePlugins(
@@ -168,13 +169,13 @@ export function Editor({
         minimapEnabled,
         {
           compareMergeConflict: onCompareMergeConflict,
-          markdownPreview: markdownView === 'preview',
+          markdownPreview,
         },
       ),
     [
       documentLanguageId,
       indentationGuidesEnabled,
-      markdownView,
+      markdownPreview,
       minimapEnabled,
       onCompareMergeConflict,
     ],

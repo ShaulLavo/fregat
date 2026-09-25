@@ -125,8 +125,11 @@ export function hunkStateLabel(state: OrchestrationCheckpointHunk['state'] | und
 export function wholeFileHunkAction(
   file: GitFileDiff | null,
   states: ReadonlyMap<string, OrchestrationCheckpointHunk['state']>,
+  statesStatus: 'pending' | 'error' | 'success',
 ) {
   if (!file?.hunks.length) return { reapply: false, reason: 'No changes available' }
+  if (statesStatus === 'pending') return { reapply: false, reason: 'Checking the file' }
+  if (statesStatus === 'error') return { reapply: false, reason: 'Could not check the file' }
   const values = file.hunks.map((hunk) => states.get(hunk.id))
   if (values.every((state) => state === 'applied')) return { reapply: false, reason: null }
   if (values.every((state) => state === 'reverted')) return { reapply: true, reason: null }

@@ -9,8 +9,7 @@ import {
 } from '@/features/chat/utils/input-editor-actions'
 import { useChatInputDraftStore, type ChatInputDraftTarget } from '../state/chat-input-draft-store'
 import { useComposerInboxStore, type ComposerInboxEntry } from '../state/composer-inbox-store'
-import { sameComposerDestination } from '@/features/chat/utils/composer-destination'
-import type { ComposerDestination } from '@/lib/composer-attach/providers/context'
+import { composerAccepts, type ComposerTarget } from '@/lib/composer-attach/utils/target'
 
 /**
  * Moves work waiting in the inbox onto this composer — chips onto the draft,
@@ -26,20 +25,24 @@ export function useComposerInbox(
   editorRef: RefObject<LexicalEditor | null>,
   /** The editor mounts a render after this component, and text needs a caret. */
   editorReady: boolean,
+  /** Other roots that name this composer, such as the workspace a linked worktree came from. */
+  aliasRoots: readonly string[] = [],
 ) {
   const pending = useComposerInboxStore((store) => store.pending)
 
   const { environmentId, rootPath } = draftTarget
+  // A joined key: callers build the alias list inline, and the effect re-runs only on content.
+  const aliasKey = aliasRoots.join('\0')
   // The draft key and editor ref are read, not depended on: a session switch inside one
   // workspace has nothing new to take.
-  const drain = useEffectEvent((ready: boolean, destination: ComposerDestination) => {
+  const drain = useEffectEvent((ready: boolean, target: ComposerTarget) => {
     // Chips need only the draft; text needs somewhere to splice. Taking just
     // what can be honoured leaves the rest queued for the render that can.
     const entries = useComposerInboxStore
       .getState()
       .take(
         (entry) =>
-          sameComposerDestination(entry.destination, destination) &&
+          composerAccepts(target, entry.destination) &&
           (entry.kind === 'terminal-context' || ready),
       )
     if (entries.length === 0) return
@@ -50,8 +53,9 @@ export function useComposerInbox(
   useEffect(() => {
     if (pending.length === 0) return
 
-    drain(editorReady, { environmentId, rootPath })
-  }, [editorReady, environmentId, pending, rootPath])
+    const rootPaths = [rootPath, ...(aliasKey ? aliasKey.split('\0') : [])]
+    drain(editorReady, { environmentId, rootPaths })
+  }, [aliasKey, editorReady, environmentId, pending, rootPath])
 }
 
 function applyComposerInboxEntries(

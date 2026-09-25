@@ -93,6 +93,31 @@ export function diffLineAddressLabel(address: DiffLineAddress): string {
   return sides.join(', ')
 }
 
+/** A selection as it was on screen: its quote and the objects the quote was read from. */
+export type SelectedDiffText = {
+  readonly text: string
+  readonly oldObjectId: DiffFile['oldObjectId']
+  readonly newObjectId: DiffFile['newObjectId']
+}
+
+/**
+ * Resolved against the stacked projection so the agent gets both sides of the change even
+ * when the range was dragged out in one split pane.
+ */
+export function selectedText(
+  file: DiffFile,
+  stackedRows: readonly DiffRenderRow[],
+  address: DiffLineAddress,
+): SelectedDiffText | null {
+  const rows = diffRowsForAddress(stackedRows, address)
+  if (rows.length === 0) return null
+  return {
+    newObjectId: file.newObjectId,
+    oldObjectId: file.oldObjectId,
+    text: diffLineSelectionText(file.path, address, rows),
+  }
+}
+
 /** What the agent receives: the file, the address, and the lines themselves. */
 export function diffLineSelectionText(
   path: string,
