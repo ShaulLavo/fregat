@@ -32,6 +32,8 @@ The chat mode button in the window toolbar, or an address URL with `/chat/`.
 
 `scenario chat-diff-syntax --url <session-diff-address>` checks painted syntax colors in a session checkpoint diff.
 
+`scenario checkpoint-diff-tokens` needs no tokens: the native checkpoint fixture edits lines 5 and 30 of two files, and the second file's checkpoint diff must colour every keyword row from its own source line. With `FS_DEV_MAX_TEXT_FILE_BYTES=500` the blob pair is over the text limit, so it asserts the partial notice and no parsed tokens instead.
+
 Commands dispatch over the orchestration socket when it is live and over HTTP otherwise. The HTTP path refetches the shell snapshot itself.
 
 - `mcp-approval`: isolated fake native Codex provider, advertised app-access choices after reload, permanent approval wire reply, and session/provider cleanup. No external app access.

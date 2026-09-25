@@ -1,6 +1,7 @@
 # Plan 099: Route document consumers through one contribution runtime
 
-Status: proposed; implementation has not started. Requested on 2026-09-12.
+Status: proposed; only the session diff source correction has landed (2026-09-25). Requested on
+2026-09-12.
 Owner: Editor and Platform. Priority P1, effort XL, change risk high.
 Inspected Platform: `2f9528ac1e147615cf81431ef8509f551af4b290`.
 Inspected Editor: `64926519bfdd39f4afcfae225019a932d3e27785`.
@@ -100,6 +101,28 @@ patches may still display changed lines, but cannot masquerade as complete synta
 binary, oversized, or unavailable blob prevents complete loading, expose that state and omit
 unsupported syntax. Do not silently invent empty source text. Keep this distinction in the typed
 contract so every contribution uses the same source semantics.
+
+#### Landed 2026-09-25: diff source correction (completion wave)
+
+The correction above landed in Platform on its own; the runtime stays parked.
+
+- Checkpoint file, turn and session diffs load the displayed entry's blob pair through
+  `fetchBlobDiff`, the snapshot path, and splice only its complete texts into that entry
+  (`withCheckpointSources`). The entry keeps its checkpoint patch, ids, paths and query adapter.
+  Summary requests stay patch-only; other listed files load nothing.
+- The a3737dd0 path replaced the list with the blob route's answer, whose hunks do not apply the
+  checkpoint's whitespace policy. `editorDiffFiles(…, 'patch')` now keeps the checkpoint's hunks
+  over the complete sources.
+- A side that exists but has no object id is never requested, so the blob route cannot supply
+  empty text for it. An entry lacking text for an existing side stays a partial `DiffFile`.
+- `DiffPane` turns diff syntax off for a partial file, and `DiffView` shows "Changed lines only.
+  Syntax colors need the whole file." That covers missing ids, an unavailable pair (its error
+  still shows) and a pair over the text limit, for snapshot diffs too.
+- Proof: `diff-view-syntax-source.test.tsx` failed on the partial cases before the fix, with
+  rows painted from another line's tokens. `client-core` `diff-files.test.ts` failed before on the
+  whitespace-policy and one-sided-text cases. `scenario checkpoint-diff-tokens` runs both states.
+- Unit 2 still owns moving the partial/complete distinction into Editor's `diffSyntax`, which
+  currently parses whatever lines it is given.
 
 ## Chosen architecture
 

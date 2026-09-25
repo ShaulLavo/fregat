@@ -12,15 +12,11 @@ import { useTabPresentation } from '@/features/editor/hooks/use-tab-presentation
 import type { DiffLanguageHost } from '@/features/editor/utils/diff-language-context'
 import type { FilesystemPath, GitComparison, TabId } from '@/lib/documents/utils/types'
 import { useDiffDocumentDiffs } from '../hooks/use-diff-document-diffs'
-import {
-  emptyDiffNotice,
-  unchangedFileNotice,
-  unrenderableDiffNotice,
-} from '../utils/diff-presentation'
+import { diffFileNotice, emptyDiffNotice, unrenderableDiffNotice } from '../utils/diff-presentation'
 import { editorDiffFiles, renderableDiffFile } from '@workspace/client-core/git/diff-files'
 import { DiffLineCommentAction } from './diff-line-comment-action'
 import { DiffNotice } from './diff-notice'
-import { UnchangedDiffBanner } from './unchanged-diff-banner'
+import { DiffBanner } from './diff-banner'
 import { useSettingValue } from '@/hooks/use-setting-value'
 
 /**
@@ -51,7 +47,12 @@ export function DiffView({
   const { regions } = presentation
   // Stable identity is required: this is pushed into the plugin, and a fresh
   // array each render would re-project the diff and throw away scroll position.
-  const files = useMemo(() => editorDiffFiles(diffs, languageIdForFilePath), [diffs])
+  // A checkpoint keeps its own hunks over the loaded sources; they carry its whitespace policy.
+  const hunkSource = comparison.kind === 'snapshot' ? 'text' : 'patch'
+  const files = useMemo(
+    () => editorDiffFiles(diffs, languageIdForFilePath, hunkSource),
+    [diffs, hunkSource],
+  )
   // A file with hunks wins; a hunkless one is drawn only when it carries whole-file text, which is
   // what a pure rename looks like once the server sends the blob. A binary entry has neither and
   // still falls through to a notice — "we got diffs" is not the same as "there is something to
@@ -92,7 +93,7 @@ export function DiffView({
     )
   }
 
-  const unchanged = file ? unchangedFileNotice(file, rootPath) : null
+  const notice = file ? diffFileNotice(file, rootPath) : null
 
   return (
     <div
@@ -104,7 +105,7 @@ export function DiffView({
           {failure}
         </Alert>
       ) : null}
-      {unchanged ? <UnchangedDiffBanner message={unchanged} /> : null}
+      {notice ? <DiffBanner notice={notice} /> : null}
       {/* The ref is on the panes and not on the wrapper the toolbar shares: the
           comment layer listens for `mousedown` in capture, and a press on its own
           "Ask" button would otherwise clear the selection before the click landed. */}

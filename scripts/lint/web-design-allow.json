@@ -140,7 +140,7 @@
     "reason": "D3: a section label (\"Staged Changes\")."
   },
   {
-    "file": "apps/web/src/features/git/components/unchanged-diff-banner.tsx",
+    "file": "apps/web/src/features/git/components/diff-banner.tsx",
     "class": "truncate",
     "reason": "D3: an app-authored notice."
   },

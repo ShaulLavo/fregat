@@ -120,7 +120,8 @@ the delivered shared runtime and has not started.
 
 ## Document contribution refactor
 
-[Plan 099](plans/099-document-contributions.md) is proposed; implementation has not started.
+[Plan 099](plans/099-document-contributions.md) is proposed; only its session diff source
+correction has landed (2026-09-25).
 It extends Editor's existing buffer owner with one committed-revision publication path and a
 document contribution runtime. Tree-sitter, Shiki, minimap, and language-service adapters share
 source synchronization while retaining typed APIs, independent queues, and domain-specific data.

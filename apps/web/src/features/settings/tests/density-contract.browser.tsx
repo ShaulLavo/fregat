@@ -38,7 +38,7 @@ import { TestEditorStateProvider as EditorStateProvider } from '../../../../test
 import { Breadcrumbs } from '@/features/file-picker/components/breadcrumbs'
 import { LocationBar } from '@/features/file-picker/components/location-bar'
 import { FilePickerSessionActionsContext } from '@/features/file-picker/providers/session-actions-context'
-import { UnchangedDiffBanner } from '@/features/git/components/unchanged-diff-banner'
+import { DiffBanner } from '@/features/git/components/diff-banner'
 import { LogsToolbar } from '@/features/logs/components/toolbar'
 import { SearchControls } from '@/features/workspace/components/search-controls'
 import { AppProviders, createTestQueryClient, seedBootMirrorTheme } from '../../../../test/render'
@@ -223,7 +223,7 @@ test('persistent app chrome changes compactly and leaves content text unchanged'
             />
           </section>
           <section data-testid='unchanged-banner'>
-            <UnchangedDiffBanner message='No textual changes' />
+            <DiffBanner notice={{ kind: 'unchanged', message: 'No textual changes' }} />
           </section>
         </EditorStateProvider>
       </AppProviders>

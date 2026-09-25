@@ -49,6 +49,7 @@ import { chatTimelinePattern } from './chat-timeline-pattern'
 import { copyFeedback } from './copy-feedback'
 import { fileLabelCohesion } from './file-label-cohesion'
 import { checkpointStates } from './checkpoint-states'
+import { checkpointDiffTokens } from './checkpoint-diff-tokens'
 import { sessionActionsSurfaces } from './session-actions-surfaces'
 import { searchFileActions } from './search-file-actions'
 import { settingsStaleDiagnostics } from './settings-stale-diagnostics'
@@ -261,6 +262,7 @@ export const scenarios: readonly Scenario[] = [
   copyFeedback,
   fileLabelCohesion,
   checkpointStates,
+  checkpointDiffTokens,
   sessionActionsSurfaces,
   searchFileActions,
   chatFollowUp,

@@ -59,6 +59,8 @@ export function DiffPane({
   onRegisterEditor?: (side: DiffGutterSide, editor: Editor | null) => void
   onScroll?: (side: DiffGutterSide, position: DiffScrollPosition) => void
 }) {
+  // Diff syntax reads row N's tokens from source line N; a patch holds only the lines git printed.
+  const highlight = syntaxHighlight && file?.isPartial !== true
   // Manual memo: `plugin` is a useLayoutEffect dependency, and the compiler's cache is a
   // cache, not an identity guarantee — when it recomputes, the useLayoutEffect re-runs.
   const plugin = useMemo(
@@ -68,9 +70,9 @@ export function DiffPane({
         regions,
         side,
         syntaxBackend,
-        syntaxHighlight,
+        syntaxHighlight: highlight,
       }),
-    [regions, side, syntaxBackend, syntaxHighlight],
+    [highlight, regions, side, syntaxBackend],
   )
   const { rows, text, tokensRevision } = useDiffRows(plugin, file)
   const diffLanguagePlugin = useDiffLanguage(file, rows, theme, languageServer)
@@ -161,13 +163,13 @@ export function DiffPane({
       languageId: file?.languageId,
       side,
       backend: syntaxBackend.kind,
-      enabled: syntaxHighlight,
+      enabled: highlight,
       tokenCount: tokens.length,
       oldLineCount: file?.oldLines.length,
       newLineCount: file?.newLines.length,
       partial: file?.isPartial,
     })
-  }, [controller, file, plugin, rows, side, syntaxBackend, syntaxHighlight, tokensRevision])
+  }, [controller, file, highlight, plugin, rows, side, syntaxBackend, tokensRevision])
 
   useLayoutEffect(() => {
     if (!onRegisterEditor) return
