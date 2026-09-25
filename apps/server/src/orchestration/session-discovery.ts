@@ -14,7 +14,7 @@ import { GitWorktreeService } from '../git/worktrees'
 import { DEFAULT_CLAUDE_MODEL } from '../provider/adapters/utils/claude-models'
 import type { ProviderService } from '../provider/provider-service'
 import type { ProviderDiscoveredSession, ProviderHistoryMessage } from '../provider/types'
-import { errorSummary } from '../observability/logging'
+import { operatorErrorSummary } from '../observability/logging'
 import { isEvlogError } from '../observability/structured-errors'
 import { recordChatPipelineInfo, recordChatPipelineWarning } from './orchestration-logging'
 import type { OrchestrationReadModel, OrchestrationProjectedWorktree } from './read-model'
@@ -440,9 +440,9 @@ function recordScanFailure(
 
 function discoveryErrorDetails(error: unknown) {
   return {
-    ...errorSummary(error),
+    ...operatorErrorSummary(error),
     ...(isEvlogError(error) ? { internal: error.internal } : {}),
-    ...(error instanceof Error && error.cause ? { cause: errorSummary(error.cause) } : {}),
+    ...(error instanceof Error && error.cause ? { cause: operatorErrorSummary(error.cause) } : {}),
   }
 }
 

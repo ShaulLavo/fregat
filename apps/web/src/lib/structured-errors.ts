@@ -65,12 +65,6 @@ export const clientErrors = defineErrorCatalog('client', {
     why: 'The document symbol socket reported a transport failure.',
     fix: 'Reconnect the language server socket and retry the request.',
   },
-  EDEN_STREAM_MISSING: {
-    status: 502,
-    message: ({ label }: { label: string }) => `${label} response did not include a stream.`,
-    why: 'The RPC call succeeded without the SSE body required by the caller.',
-    fix: 'Verify the server route returns an event stream for this request.',
-  },
   FONT_LOAD_FAILED: {
     status: 502,
     message: ({ ref }: { ref: string }) => `Font ${ref} did not load`,

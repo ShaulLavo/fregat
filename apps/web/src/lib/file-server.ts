@@ -18,7 +18,6 @@ import type {
   StatResult,
   TreeResult,
 } from '@/lib/file-system-types'
-import { clientErrorMessage } from '@/lib/client-error-taxonomy'
 import { annotateClientError } from '@/lib/client-error-context'
 import { clientLogEnabled, log, observeClientOperation } from '@/lib/client-logging'
 import { createCoalescedLogQueue } from '@/lib/coalesced-log'
@@ -37,6 +36,7 @@ import type {
   WorkspaceSearchMeasurement,
   WorkspaceRootEntry,
 } from '@workspace/contracts'
+import { errorSummary } from '@workspace/contracts'
 
 const FILE_LOG_DELAY_MS = 250
 const ownerLogQueues = new WeakMap<Client, ReturnType<typeof createOwnerLogQueues>>()
@@ -643,10 +643,6 @@ export async function recordRecentEntry(path: FilesystemPath, client: Client) {
   )
 }
 
-export function errorMessage(error: unknown) {
-  return clientErrorMessage(error)
-}
-
 function queueTreeSuccessLog(
   path: string,
   result: TreeResult,
@@ -700,7 +696,7 @@ function logReadError(
     action: 'fs.read',
     area: 'fs',
     durationMs: elapsedMs(startedAt),
-    error: operationErrorSummary(error),
+    error: errorSummary(error),
     outcome: 'error',
     path,
   })
@@ -721,7 +717,7 @@ function logTreeError(
     action: 'fs.tree',
     area: 'fs',
     durationMs: elapsedMs(startedAt),
-    error: operationErrorSummary(error),
+    error: errorSummary(error),
     outcome: 'error',
     path,
   })
@@ -762,20 +758,6 @@ function currentPathSample(event: Record<string, unknown>) {
 
   const path = stringField(event, 'path') ?? stringField(event, 'latestPath')
   return path ? [path] : []
-}
-
-function operationErrorSummary(error: unknown) {
-  if (error instanceof Error) {
-    return {
-      message: error.message,
-      name: error.name,
-    }
-  }
-
-  return {
-    message: String(error),
-    name: typeof error,
-  }
 }
 
 function totalDurationMs(event: Record<string, unknown>) {

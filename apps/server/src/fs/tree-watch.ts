@@ -1,4 +1,4 @@
-import { errorSummary } from '../observability'
+import { operatorErrorSummary } from '../observability'
 import type { WatchServerMessage } from './contracts'
 import type { WorkspacePaths } from './path'
 import type { FileChangeHub } from './watch'
@@ -49,7 +49,7 @@ export function treeWatchSource(changes: FileChangeHub, paths: WorkspacePaths): 
       ready.resolve()
     })().catch((error: unknown) => {
       ready.reject(error)
-      callbacks.error(errorSummary(error).message)
+      callbacks.error(operatorErrorSummary(error).message)
     })
     await ready.promise
     return async () => {

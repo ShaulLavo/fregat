@@ -144,3 +144,24 @@ describe('streamWorkspaceSearch', () => {
     expect(seen).toEqual(['match', 'done'])
   })
 })
+
+describe('search error codes', () => {
+  it('reports a missing stream under the shared transport code, not the search namespace', async () => {
+    const client = {
+      fs: { search: { events: { get: async () => ({ data: null, error: null, status: 200 }) } } },
+    } as unknown as Client
+
+    await expect(collectWorkspaceSearch(QUERY, undefined, client)).rejects.toMatchObject({
+      code: 'client.EDEN_STREAM_MISSING',
+      message: 'Search response did not include a stream.',
+    })
+  })
+
+  it('reports search failures under the search namespace', async () => {
+    const client = clientStreaming([match('src/a.ts')])
+
+    await expect(collectWorkspaceSearch(QUERY, undefined, client)).rejects.toMatchObject({
+      code: 'search.SEARCH_INCOMPLETE',
+    })
+  })
+})

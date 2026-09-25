@@ -26,7 +26,7 @@ import {
 } from '@workspace/contracts'
 import { isRecord } from '@workspace/utils/objects'
 import * as v from 'valibot'
-import { errorSummary, recordRequestContext, recordRequestWarning } from '../observability'
+import { operatorErrorSummary, recordRequestContext, recordRequestWarning } from '../observability'
 import {
   discardStagedSettingsFile,
   editSettingsText,
@@ -1016,7 +1016,7 @@ export class SettingsStore {
         area: 'settings',
         operation: 'invalidate',
         settings: { secretRefsStale: true },
-        error: errorSummary(error),
+        error: operatorErrorSummary(error),
       })
     }
   }

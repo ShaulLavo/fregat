@@ -11,8 +11,9 @@ import * as v from 'valibot'
 
 import type { Client } from '@/lib/client'
 import { parseEdenSseStream } from '@workspace/client-core/transport/eden'
+import { transportErrors } from '@workspace/client-core/transport/structured-errors'
 import { unwrapEdenResponse } from '@/lib/eden-events'
-import { clientErrors, createRpcError } from '@/lib/structured-errors'
+import { createRpcError } from '@/lib/structured-errors'
 import { logFilterQuery } from '@/features/logs/utils/filter-params'
 
 export async function fetchLogSummary(
@@ -55,7 +56,7 @@ export async function* subscribeLogEvents(
   })
   if (response.error) throw createRpcError(response.error)
   if (!response.data)
-    throw clientErrors.EDEN_STREAM_MISSING({
+    throw transportErrors.EDEN_STREAM_MISSING({
       label: 'Logs stream',
       internal: { filterKeys: Object.keys(logFilterQuery(filters)) },
     })

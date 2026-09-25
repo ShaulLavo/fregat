@@ -1,5 +1,6 @@
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
-import { errorMessage, statPath } from '@/lib/file-server'
+import { clientErrorMessage } from '@/lib/client-error-taxonomy'
+import { statPath } from '@/lib/file-server'
 import type { FileResult, StatResult } from '@/lib/file-system-types'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import type { FilesystemPath } from '@/lib/documents/utils/types'
@@ -71,7 +72,7 @@ export function fileLoadState(
   if (query.data?.path === selectedFilePath) {
     return { status: 'ready', data: query.data }
   }
-  if (query.isError) return { status: 'error', message: errorMessage(query.error) }
+  if (query.isError) return { status: 'error', message: clientErrorMessage(query.error) }
   if (query.data) return idleState
   if (query.isPending) return { status: 'loading' }
 

@@ -2,7 +2,7 @@ import { sanitizeErrorMessage } from './sanitize-message'
 import { elapsedMs, roundMs } from '@workspace/utils/timing'
 import { AsyncLocalStorage } from 'node:async_hooks'
 
-import { errorNumberField, errorStringField } from '@workspace/contracts'
+import { errorStringField, errorSummary, type ErrorSummaryOptions } from '@workspace/contracts'
 import { isRecord } from '@workspace/utils/objects'
 import type { RequestLogger } from 'evlog'
 import { useLogger as getRequestLogger } from 'evlog/elysia'
@@ -81,7 +81,7 @@ export async function observeRequestOperation<T>(
     recordOperationSummary({
       ...context,
       durationMs: elapsedMs(startedAt),
-      error: errorSummary(error),
+      error: operatorErrorSummary(error),
       status: 'error',
     })
     throw error
@@ -154,22 +154,15 @@ export function recordStreamSummary(context: OperationSummary) {
   recordOperationSummary(context)
 }
 
-export function errorSummary(error: unknown) {
-  if (error instanceof Error) {
-    return {
-      code: errorStringField(error, 'code'),
-      fix: errorStringField(error, 'fix', { maxLength: 500, preserve: 'end' }),
-      message: limitText(error.message, 500),
-      name: error.name,
-      status: errorNumberField(error, 'statusCode') ?? errorNumberField(error, 'status'),
-      why: errorStringField(error, 'why', { maxLength: 500, preserve: 'end' }),
-    }
-  }
+// A server message is most telling at its tail, where the underlying cause lands.
+const operatorSummaryOptions: ErrorSummaryOptions = {
+  guidance: true,
+  limit: { maxLength: 500, preserve: 'end' },
+}
 
-  return {
-    message: limitText(String(error), 500),
-    name: typeof error,
-  }
+/** Contracts' `errorSummary` for server logs: adds `fix` and `why`, and keeps each string's tail. */
+export function operatorErrorSummary(error: unknown) {
+  return errorSummary(error, operatorSummaryOptions)
 }
 
 export function limitText(value: string, maxLength: number) {

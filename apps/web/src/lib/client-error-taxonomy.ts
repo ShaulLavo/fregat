@@ -99,6 +99,18 @@ export function clientErrorMessage(input: unknown): string {
   return toClientError(input).message
 }
 
+/** An `Error`'s own words when it has some; anything else, an Eden rejection included, gets the taxonomy's. */
+export function thrownErrorMessage(input: unknown): string {
+  if (input instanceof Error && input.message && !carriesEdenBody(input)) return input.message
+
+  return clientErrorMessage(input)
+}
+
+// `EdenFetchError` sets `message` to `String(value)`, which reads `[object Object]` for a JSON body.
+function carriesEdenBody(error: Error): boolean {
+  return 'value' in error && isObject(error.value)
+}
+
 /**
  * What a toast should say: the failure, then the catalog's `fix`. The message
  * alone names what broke; `fix` is the half that tells the reader what to do,

@@ -5,7 +5,8 @@ import { filesystemPath } from '@/lib/documents/utils/identity'
 import type { Client } from '@/lib/client'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import type { PickedFsEntry } from '@/lib/file-system-types'
-import { errorMessage, fetchTree } from '@/lib/file-server'
+import { clientErrorMessage } from '@/lib/client-error-taxonomy'
+import { fetchTree } from '@/lib/file-server'
 import type { TreeEntry, TreeResult } from '@/lib/file-system-types'
 import { isDirectoryEntry } from '@/lib/file-system-types'
 import { useEditorWorkspaceStoreApi } from '@/features/editor/state/workspace-state'
@@ -105,7 +106,7 @@ export function useWorkspaceTreeForRootPath(rootPath: string | null) {
         }),
       )
       .catch((error: unknown) => {
-        const message = errorMessage(error)
+        const message = clientErrorMessage(error)
         log.warn({
           action: 'file-tree.directory.load.error',
           area: 'file-tree',
@@ -182,7 +183,7 @@ function useWorkspaceTreeQuery(rootPath: string | null) {
     rootTreeKey,
     treeState: {
       ...treeState,
-      refreshError: saved && !data && isError ? errorMessage(error) : null,
+      refreshError: saved && !data && isError ? clientErrorMessage(error) : null,
     },
   }
 }
@@ -263,7 +264,7 @@ function treeLoadState(query: {
   isPending: boolean
 }): LoadState<TreeModel> {
   if (query.data) return { status: 'ready', data: query.data }
-  if (query.isError) return { status: 'error', message: errorMessage(query.error) }
+  if (query.isError) return { status: 'error', message: clientErrorMessage(query.error) }
   if (query.isPending) return { status: 'loading' }
 
   return idleState

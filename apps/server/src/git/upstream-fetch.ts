@@ -1,6 +1,6 @@
 import { AsyncThrottler } from '@tanstack/pacer/async-throttler'
 
-import { errorSummary, recordProcessWarning } from '../observability'
+import { operatorErrorSummary, recordProcessWarning } from '../observability'
 
 const UPSTREAM_FETCH_INTERVAL_MS = 15_000
 const UPSTREAM_FETCH_FAILURE_COOLDOWN_MS = 5_000
@@ -57,7 +57,7 @@ export class UpstreamFetchScheduler {
       this.commonDirByRoot.delete(rootAbsolutePath)
       recordProcessWarning('git.upstream_fetch.common_dir_failed', {
         area: 'git',
-        error: errorSummary(error),
+        error: operatorErrorSummary(error),
         operation: 'upstream_fetch',
         root: rootAbsolutePath,
       })
@@ -80,7 +80,7 @@ export class UpstreamFetchScheduler {
         lastFetchFailed = true
         recordProcessWarning('git.upstream_fetch.failed', {
           area: 'git',
-          error: errorSummary(error),
+          error: operatorErrorSummary(error),
           operation: 'upstream_fetch',
           remote,
           root: rootAbsolutePath,

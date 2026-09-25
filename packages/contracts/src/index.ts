@@ -878,7 +878,7 @@ export { queryPieces } from './fuzzy-rank'
 
 export { orchestrationReplaySummary } from './orchestration-replay-summary'
 
-export { errorSummary } from './error-fields'
+export { errorSummary, type ErrorSummaryOptions } from './error-fields'
 
 export { planStepStatus } from './plan-step-status'
 

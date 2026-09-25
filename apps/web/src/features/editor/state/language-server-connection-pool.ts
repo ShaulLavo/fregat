@@ -1,7 +1,7 @@
-import { errorMessage } from '@workspace/contracts'
 import { LspTransportClosedError } from '@singapore-editor/lsp'
 import { LspConnectionPool, type LspConnectionPoolEvent } from '@singapore-editor/lsp-plugin'
 
+import { thrownErrorMessage } from '@/lib/client-error-taxonomy'
 import { log } from '@/lib/client-logging'
 
 /** Separates the two halves of a pool key without colliding with either. */
@@ -61,7 +61,7 @@ function report(event: LspConnectionPoolEvent): void {
     ...(event.durationMs === undefined ? {} : { durationMs: event.durationMs }),
     ...(event.reachedReady === undefined ? {} : { reachedReady: event.reachedReady }),
     ...(event.methods === undefined ? {} : { methods: event.methods }),
-    ...(event.error === undefined ? {} : { error: errorMessage(event.error) }),
+    ...(event.error === undefined ? {} : { error: thrownErrorMessage(event.error) }),
     ...closeFields(event.error),
   }
 

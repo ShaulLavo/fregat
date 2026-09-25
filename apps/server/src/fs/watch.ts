@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import { createReadStream, watch } from 'node:fs'
 import path from 'node:path'
 import {
-  errorSummary,
+  operatorErrorSummary,
   recordRequestContext,
   recordRequestWarning,
   runDetached,
@@ -476,7 +476,7 @@ export class FileChangeHub {
       recordRequestWarning('fs.watch.open_file_failed', {
         area: 'fs',
         path: file,
-        error: errorSummary(error),
+        error: operatorErrorSummary(error),
       })
       this.emit(watchError(error, file))
       return noop
@@ -796,7 +796,7 @@ async function withNativeContentVersion(
       area: 'fs',
       operation: 'watch_event',
       path: relativePath,
-      error: errorSummary(error),
+      error: operatorErrorSummary(error),
     })
     return entry
   }

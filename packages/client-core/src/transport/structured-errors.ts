@@ -1,4 +1,15 @@
+import { defineErrorCatalog } from 'evlog'
 import { createClientError } from '../errors'
+
+// Namespace `client`: search, file watching and the log stream all throw it, so no feature owns it.
+export const transportErrors = defineErrorCatalog('client', {
+  EDEN_STREAM_MISSING: {
+    status: 502,
+    message: ({ label }: { label: string }) => `${label} response did not include a stream.`,
+    why: 'The RPC call succeeded without the SSE body required by the caller.',
+    fix: 'Verify the server route returns an event stream for this request.',
+  },
+})
 
 export function createOrchestrationRpcClosedError() {
   return createClientError({

@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process'
 import { isIP } from 'node:net'
 import { promisify } from 'node:util'
 import * as v from 'valibot'
-import { errorSummary, recordRequestContext } from '../observability'
+import { operatorErrorSummary, recordRequestContext } from '../observability'
 
 const hostSchema = v.object({ target: v.string(), label: v.string(), online: v.boolean() })
 
@@ -78,7 +78,7 @@ export async function discoverTailnetHosts(
   } catch (error) {
     const code = errorCode(error)
     const reason = code === 'ENOENT' ? 'not-installed' : 'failed'
-    return unavailable(reason, startedAt, { errorCode: code, error: errorSummary(error) })
+    return unavailable(reason, startedAt, { errorCode: code, error: operatorErrorSummary(error) })
   }
 }
 

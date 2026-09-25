@@ -72,7 +72,7 @@ import {
   type WorkspaceFileSnapshot,
   type WorkspaceMutationProjectionReceipt,
 } from '@/features/editor/state/file-sync-service'
-import { toClientError } from '@/lib/client-error-taxonomy'
+import { thrownErrorMessage } from '@/lib/client-error-taxonomy'
 import { createClientError } from '@workspace/client-core/errors'
 import { isProvisionalWorkspaceEditState } from '@workspace/contracts'
 import { log } from '@/lib/client-logging'
@@ -1301,7 +1301,7 @@ export class WorkspaceEditService {
       if (!settled) this.ownOperationIds.delete(prepared.operationId)
       return {
         code: 'workspace-edit-rolled-back',
-        message: errorMessage(error),
+        message: thrownErrorMessage(error),
         status: 'rolled-back',
       }
     }
@@ -1312,7 +1312,7 @@ export class WorkspaceEditService {
     return {
       affectedPaths: recovery.affectedPaths,
       code: 'workspace-edit-recovery-required',
-      message: errorMessage(error),
+      message: thrownErrorMessage(error),
       status: 'recovery-required',
     }
   }
@@ -3268,7 +3268,7 @@ function resultForPreparationError(error: unknown, signal: AbortSignal): ApplyWo
 }
 
 function failureResult(error: unknown): ApplyWorkspaceEditResult {
-  return failedResult(errorCode(error), errorMessage(error))
+  return failedResult(errorCode(error), thrownErrorMessage(error))
 }
 
 function failedResult(code: string, message: string): ApplyWorkspaceEditResult {
@@ -3278,11 +3278,6 @@ function failedResult(code: string, message: string): ApplyWorkspaceEditResult {
 function errorCode(error: unknown): string {
   if (!error || typeof error !== 'object' || !('code' in error)) return 'workspace-edit-failed'
   return typeof error.code === 'string' ? error.code : 'workspace-edit-failed'
-}
-
-function errorMessage(error: unknown): string {
-  if (error instanceof Error && error.message) return error.message
-  return toClientError(error).message
 }
 
 function isAbortFailure(error: unknown): boolean {

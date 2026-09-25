@@ -20,7 +20,7 @@ import { useCommitDetails } from '@/features/git/hooks/use-commit-details'
 import { GitFileRow } from '@/components/git-file-row'
 import { gitStatusSymbol } from '@/lib/git-status-symbols'
 import { copyTextToClipboard } from '@/lib/clipboard'
-import { errorMessage } from '@/lib/file-server'
+import { clientErrorMessage } from '@/lib/client-error-taxonomy'
 import { historyMessageBody } from '@/features/git/utils/history-presentation'
 
 export function CommitDetails({
@@ -105,7 +105,7 @@ export function CommitDetails({
           <EmptyState
             tone='error'
             title='Could not load commit'
-            description={errorMessage(details.error)}
+            description={clientErrorMessage(details.error)}
           />
           <Button
             size='sm'

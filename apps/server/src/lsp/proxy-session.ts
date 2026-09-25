@@ -18,7 +18,12 @@ import { fileUriForPath } from './language'
 import { LspStdioMessageReader, writeLspStdioMessage } from './stdio-rpc'
 import { DID_CHANGE_WATCHED_FILES, LspWatchedFiles, type FileEvent } from './watched-files'
 import type { TreeWatchSource } from '../fs/tree-watch'
-import { errorSummary, limitText, recordProcessInfo, recordProcessWarning } from '../observability'
+import {
+  operatorErrorSummary,
+  limitText,
+  recordProcessInfo,
+  recordProcessWarning,
+} from '../observability'
 
 type JsonRpcId = number | string | null
 
@@ -1398,7 +1403,7 @@ class PooledLspProxySession {
     } catch (error) {
       recordProcessWarning('lsp.watched_files.register_failed', {
         area: 'lsp',
-        error: errorSummary(error),
+        error: operatorErrorSummary(error),
         registrationCount: registrations.length,
         rootPath: this.rootPath,
         serverId: this.match.server.id,
@@ -1546,7 +1551,7 @@ class PooledLspProxySession {
     } catch (error) {
       recordProcessWarning('lsp.framing_failed', {
         area: 'lsp',
-        error: errorSummary(error),
+        error: operatorErrorSummary(error),
         serverId: this.match.server.id,
         ...this.reader.stats,
       })

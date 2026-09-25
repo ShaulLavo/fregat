@@ -1,7 +1,13 @@
+import { EdenFetchError } from '@elysia/eden'
 import { vi } from 'vitest'
 
 import { expect, test } from '../../../test/fixtures'
-import { clientErrorText, reportError, toClientError } from '@/lib/client-error-taxonomy'
+import {
+  clientErrorText,
+  reportError,
+  thrownErrorMessage,
+  toClientError,
+} from '@/lib/client-error-taxonomy'
 import { createEnvironmentProtocolMismatchError } from '@workspace/client-core/environments/utils/structured-errors'
 import { log, observeClientOperation } from '@/lib/client-logging'
 import { sanitizeRecord } from '@workspace/observability/sanitize'
@@ -111,4 +117,23 @@ test('stored failure text keeps the catalog why and fix', () => {
     'The server at https://mac.example/platform uses an incompatible protocol version. This client requires protocol 7, but the server reported 6. Run matching client and server versions before reconnecting.',
   )
   expect(clientErrorText(new Error('plain'), 'fallback')).toBe('plain')
+})
+
+test('a thrown message keeps the words of an Error and never stringifies an Eden rejection', () => {
+  const structured = new EdenFetchError(502, {
+    error: { code: 'lsp.SESSION_FAILED', message: 'Language server did not start' },
+  })
+  const fsCoded = new EdenFetchError(404, { error: { code: 'NOT_FOUND' } })
+
+  expect(structured.message).toBe('[object Object]')
+  expect(thrownErrorMessage(structured)).toBe('Language server did not start')
+  expect(thrownErrorMessage(fsCoded)).toBe('The requested file or folder could not be found.')
+  expect(thrownErrorMessage(new EdenFetchError(500, { detail: 'x' }))).toBe(
+    'Something unexpected went wrong.',
+  )
+  expect(thrownErrorMessage(new EdenFetchError(500, 'Upstream timed out'))).toBe(
+    'Upstream timed out',
+  )
+  expect(thrownErrorMessage(new Error('socket closed'))).toBe('socket closed')
+  expect(thrownErrorMessage(new Error(''))).toBe('Something unexpected went wrong.')
 })

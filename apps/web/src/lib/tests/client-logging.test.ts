@@ -96,6 +96,20 @@ test('assigns stable event ids and retains structured failure fields', async () 
   })
 })
 
+test('a failure logs the server-side status precedence and the head of a long message', async () => {
+  const message = `${'a'.repeat(2_000)}tail`
+  const failure = Object.assign(new Error(message), { status: 409, statusCode: 503 })
+  await expect(
+    observeClientOperation({ action: 'fs.read', area: 'fs' }, async () => Promise.reject(failure)),
+  ).rejects.toBe(failure)
+
+  expect(emittedEvents.at(-1)?.event.error).toEqual({
+    message: 'a'.repeat(2_000),
+    name: 'Error',
+    status: 503,
+  })
+})
+
 test('emits mutation metadata without values and redacts raw or path diagnostics', () => {
   const context = settingsMutationLogContext(settingsIntentWithPrivateValues())
   log.warn({

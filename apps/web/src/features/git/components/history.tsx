@@ -24,7 +24,7 @@ import { historyCountLabel, historyRefLabels } from '@/features/git/utils/histor
 import { HistoryToolbar } from '@/features/git/components/history-toolbar'
 import { HistoryList } from '@/features/git/components/history-list'
 import { CommitDetails } from '@/features/git/components/commit-details'
-import { errorMessage } from '@/lib/file-server'
+import { clientErrorMessage } from '@/lib/client-error-taxonomy'
 
 export function History({ rootPath }: { rootPath: string }) {
   const { view, updateView } = useHistoryView()
@@ -121,7 +121,7 @@ export function History({ rootPath }: { rootPath: string }) {
               <EmptyState
                 title='Could not load history'
                 tone='error'
-                description={errorMessage(history.error)}
+                description={clientErrorMessage(history.error)}
               />
               <Button
                 size='sm'

@@ -24,7 +24,7 @@ import {
   type MutationTargetKind,
 } from './mutation-target'
 import {
-  errorSummary,
+  operatorErrorSummary,
   observeRequestOperation,
   recordProcessWarning,
   recordRequestContext,
@@ -867,7 +867,7 @@ async function* observedSearchEvents(
       recordRequestError(error, searchStreamSummary(options, startedAt, state, outcome))
       recordStreamSummary({
         ...searchStreamSummary(options, startedAt, state, outcome),
-        error: errorSummary(error),
+        error: operatorErrorSummary(error),
       })
       return
     }
@@ -917,7 +917,7 @@ async function* observedWatchEvents(
     recordRequestError(error, watchStreamSummary(paths, startedAt, state, 'error'))
     recordStreamSummary({
       ...watchStreamSummary(paths, startedAt, state, 'error'),
-      error: errorSummary(error),
+      error: operatorErrorSummary(error),
     })
     throw error
   }
