@@ -170,6 +170,22 @@ function handle(message) {
     send({ id: message.id, result: {} })
     return
   }
+  if (scenario === 'chat-artifact-template' && message.method === 'turn/start') {
+    const turn = startOwnTurn(message)
+    agentMessage(
+      turn,
+      `${turn}-answer`,
+      [
+        'I saved your document template.',
+        '',
+        '::artifact-template{artifact_kind="document" display_name="Weekly Report" skill_directory="/tmp/skills/artifact-template-weekly-report" skill_name="artifact-template-weekly-report"}',
+        '',
+        'Use it any time.',
+      ].join('\n'),
+    )
+    endTurn(turn, 'completed')
+    return
+  }
   if (scenario === 'stream-ambiguous-tail' && message.method === 'turn/start') {
     const turn = startOwnTurn(message)
     streamAnswer(turn, `${turn}-answer`, AMBIGUOUS_TAIL_CHUNKS, 250)

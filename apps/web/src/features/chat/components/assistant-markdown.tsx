@@ -6,7 +6,7 @@ import {
 import { CodeHighlighterContext } from '@workspace/markdown/providers/code-highlighter-context'
 import { cn } from '@workspace/ui/lib/utils'
 import { useQueryClient } from '@tanstack/react-query'
-import { type ClipboardEvent } from 'react'
+import { Fragment, type ClipboardEvent } from 'react'
 
 import { serverEndpoint } from '@/lib/client'
 import { originForQueryClient } from '@/lib/environments/state/query-clients'
@@ -22,7 +22,12 @@ import { chatMarkdownClipboardPayload } from '@/features/chat/utils/markdown-cli
 import { remarkFileLinkChips } from '@/features/chat/utils/markdown-file-link-chips'
 import { remarkWorkspaceImages } from '@/features/chat/utils/markdown-images'
 import { remarkNormalizeListItemIndentation } from '@/features/chat/utils/markdown-list-indentation'
+import { ArtifactTemplateCard } from './artifact-template-card'
 import { AssistantMarkdownCodeBlock } from './assistant-markdown-code-block'
+import {
+  splitArtifactTemplateMarkdown,
+  type ArtifactTemplateSegment,
+} from '@/features/chat/utils/artifact-templates'
 import { AssistantMarkdownImage } from './assistant-markdown-image'
 import { AssistantMarkdownInlineCode } from './assistant-markdown-inline-code'
 import { AssistantMarkdownLink } from './assistant-markdown-link'
@@ -74,20 +79,39 @@ export function AssistantMarkdown({
     event.clipboardData.setData('text/html', payload.html)
   }
 
+  const segments = splitArtifactTemplateMarkdown(renderedText, streaming)
+  const onlyMarkdown =
+    segments.length === 1 && segments[0]?.kind === 'markdown' ? segments[0].markdown : null
+  const renderMarkdown = (markdown: string, live: boolean) => (
+    <Markdown
+      caret={live}
+      className={cn('max-w-full min-w-0 break-words whitespace-pre-wrap', className)}
+      codeBlock={AssistantMarkdownCodeBlock}
+      components={markdownComponents}
+      remarkPlugins={remarkPlugins}
+      streaming={live}
+      text={markdown}
+    />
+  )
+
+  // A card splits the answer, so only the last Markdown part carries the live caret.
+  function renderSegment(segment: ArtifactTemplateSegment, index: number) {
+    if (segment.kind === 'artifact-template') {
+      return <ArtifactTemplateCard key={index} template={segment.template} />
+    }
+    const live = streaming && index === segments.length - 1
+
+    return <Fragment key={index}>{renderMarkdown(segment.markdown, live)}</Fragment>
+  }
+
   return (
     <div className='min-w-0' data-chat-markdown='true' onCopy={handleCopy}>
       <MarkdownFileLinkContext value={fileLinkActions}>
         <CodeHighlighterContext value={highlighter}>
           <MarkdownDiagramContext value={mermaid}>
-            <Markdown
-              caret={streaming}
-              className={cn('max-w-full min-w-0 break-words whitespace-pre-wrap', className)}
-              codeBlock={AssistantMarkdownCodeBlock}
-              components={markdownComponents}
-              remarkPlugins={remarkPlugins}
-              streaming={streaming}
-              text={renderedText}
-            />
+            {onlyMarkdown === null
+              ? segments.map(renderSegment)
+              : renderMarkdown(onlyMarkdown, streaming)}
           </MarkdownDiagramContext>
         </CodeHighlighterContext>
       </MarkdownFileLinkContext>

@@ -359,10 +359,12 @@
       "title": "Render and reuse artifact templates",
       "report": "interaction.md",
       "wave": "3",
-      "status": "open",
-      "evidence_level": "source-reviewed",
+      "status": "verified",
+      "evidence_level": "scenario-verified",
       "acceptance": "interaction.md, INTERACTION-10, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "scripts/agent/scenarios/chat-artifact-template.ts passed 2026-09-25 on lane L2: the directive renders one card between its paragraphs and Use appends the template prompt once; malformed, fenced and partial directives stay literal or held (artifact-templates.test.ts). Ported from t3code (MIT)."
+      ]
     },
     {
       "id": "INTERACTION-11",

@@ -62,6 +62,15 @@ export function useAttachToComposer() {
     return true
   }
 
+  /** Adds text at the end of the open prompt, once: a prompt already ending with it is kept. */
+  const appendText = (source: string, text: string) => {
+    if (!useComposerInboxStore.getState().queueAppend(text)) return false
+
+    reveal(source, { textLength: text.trim().length })
+
+    return true
+  }
+
   /**
    * For work that is its own conversation: the text goes to a fresh draft, not
    * into whichever session happens to be open.
@@ -97,7 +106,7 @@ export function useAttachToComposer() {
     return true
   }
 
-  return { attachTerminalContext, attachText, attachTextToNewChat }
+  return { appendText, attachTerminalContext, attachText, attachTextToNewChat }
 }
 
 function sidebarDraftId() {

@@ -75,6 +75,11 @@ export function insertChatInputText(
   return inserted
 }
 
+/** Replaces the whole prompt, caret at the end, and focuses the composer. */
+export function setChatInputEditorText(editor: LexicalEditor, text: string) {
+  editor.update(() => $setChatInputText(text), { onUpdate: () => editor.focus() })
+}
+
 /** Inserts one mention, plus the blank that separates it from what follows. */
 export function insertChatInputMention(
   editor: LexicalEditor,

@@ -1,5 +1,6 @@
 import { CopyButton } from '@/components/copy-button'
 import { codexFileCitationsMarkdown } from '@/features/chat/utils/codex-file-citations'
+import { artifactTemplateCopyText } from '@/features/chat/utils/artifact-templates'
 import type { ChatTimelineItem } from '@/features/chat/utils/timeline-items'
 import { useChatWorkLogExpansionStore } from '../state/chat-work-log-expansion-store'
 import { ActivityGroupRow } from './activity-group-row'
@@ -124,7 +125,7 @@ function renderAssistantCopyButton(text: string) {
     <CopyButton
       className='bg-background/35 text-muted-foreground text-2xs'
       label='response'
-      text={codexFileCitationsMarkdown(text)}
+      text={artifactTemplateCopyText(codexFileCitationsMarkdown(text))}
       variant='outline'
     />
   )

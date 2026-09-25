@@ -22,6 +22,7 @@ import { sessionSearch, sessionSearchEnvironments } from './session-search'
 import { sessionUnread } from './session-unread'
 import { mcpApproval } from './mcp-approval'
 import { chatScreenshot } from './chat-screenshot'
+import { chatArtifactTemplate } from './chat-artifact-template'
 import { chatModelFavorites } from './chat-model-favorites'
 import { chatBackgroundStart } from './chat-background-start'
 import { approvalTurnEnded } from './approval-turn-ended'
@@ -239,6 +240,7 @@ export const scenarios: readonly Scenario[] = [
   composerDefaults,
   mcpApproval,
   chatScreenshot,
+  chatArtifactTemplate,
   chatModelFavorites,
   chatBackgroundStart,
   approvalTurnEnded,
