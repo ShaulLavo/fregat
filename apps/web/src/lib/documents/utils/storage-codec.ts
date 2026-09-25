@@ -1,5 +1,5 @@
 import * as v from 'valibot'
-import { sessionIdSchema } from '@workspace/contracts'
+import { GIT_FILE_STATUSES, sessionIdSchema } from '@workspace/contracts'
 import { toWorkspaceAbsolute, toWorkspaceRelative } from '@workspace/client-core/files/path'
 import { durableTab } from '@/lib/documents/utils/capabilities'
 import {
@@ -18,16 +18,7 @@ const textSchema = v.pipe(
 const pathSchema = v.pipe(textSchema, v.transform(filesystemPath))
 const nonemptySchema = v.pipe(textSchema, v.minLength(1))
 const resourceSchema = v.strictObject({ path: pathSchema })
-const statusSchema = v.picklist([
-  'added',
-  'deleted',
-  'ignored',
-  'modified',
-  'renamed',
-  'untracked',
-  'unmodified',
-  'conflicted',
-])
+const statusSchema = v.picklist(GIT_FILE_STATUSES)
 const revisionEntries = {
   oldObjectId: v.optional(textSchema),
   newObjectId: v.optional(textSchema),

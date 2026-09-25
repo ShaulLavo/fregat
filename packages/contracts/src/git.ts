@@ -5,7 +5,28 @@ import type { WorktreeId } from './chat-ids'
  * maintaining parallel copies.
  */
 
-export type GitTreeStatus = 'added' | 'deleted' | 'ignored' | 'modified' | 'renamed' | 'untracked'
+/** Every status a file's `index` or `worktree` side can carry. Callers that hand-list these drift silently when a member is added. */
+export const GIT_FILE_STATUSES = [
+  'added',
+  'conflicted',
+  'deleted',
+  'ignored',
+  'modified',
+  'renamed',
+  'unmodified',
+  'untracked',
+] as const
+
+export type GitFileStatusValue = (typeof GIT_FILE_STATUSES)[number]
+
+export function isGitFileStatus(value: string): value is GitFileStatusValue {
+  return (GIT_FILE_STATUSES as readonly string[]).includes(value)
+}
+
+export type GitTreeStatus = Exclude<GitFileStatusValue, 'conflicted' | 'unmodified'>
+
+/** Git object ids run 40 hex (SHA-1) through 64 (SHA-256); a fixed-width-40 grammar would reject a SHA-256 repository's ids. */
+export const GIT_OBJECT_ID_PATTERN = /^[0-9a-f]{40,64}$/i
 
 export type GitLineStat = {
   additions: number
@@ -20,6 +41,15 @@ export type GitFileStatus = {
   status: GitTreeStatus | 'conflicted'
   /** Absent for a binary file, or a side with no change. */
   lines?: { staged?: GitLineStat; worktree?: GitLineStat }
+}
+
+/** An untracked file reports `index: 'untracked'` rather than `'unmodified'`. */
+export function isStagedStatus(status: GitFileStatus['index']) {
+  return status !== 'unmodified' && status !== 'untracked'
+}
+
+export function isWorktreeStatus(status: GitFileStatus['worktree']) {
+  return status !== 'unmodified'
 }
 
 export type GitRepositoryInfo = {
@@ -64,6 +94,11 @@ export type GitFileDiff = {
   staged: boolean
   patch: string
   hunks: GitDiffHunk[]
+}
+
+/** The marker must start a line: a text diff whose content happens to contain "Binary files " mid-line is not binary. */
+export function isBinaryGitDiff(diff: Pick<GitFileDiff, 'patch'>): boolean {
+  return diff.patch.includes('\nBinary files ') || diff.patch.includes('\nGIT binary patch')
 }
 
 export type GitBranch = {

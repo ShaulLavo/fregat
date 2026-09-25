@@ -41,6 +41,7 @@ export type {
   GitCommitFile,
   GitCommitDetails,
   GitFileStatus,
+  GitFileStatusValue,
   GitLineStat,
   GitLineChange,
   GitPullRequest,
@@ -54,6 +55,14 @@ export type {
   GitWorktree,
   GitWorktreeCreateResult,
   GitWorktreeRemoveResult,
+} from './git'
+export {
+  GIT_FILE_STATUSES,
+  GIT_OBJECT_ID_PATTERN,
+  isBinaryGitDiff,
+  isGitFileStatus,
+  isStagedStatus,
+  isWorktreeStatus,
 } from './git'
 export type { WatchClientMessage, WatchServerMessage } from './watch-events'
 export {

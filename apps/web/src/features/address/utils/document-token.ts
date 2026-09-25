@@ -7,7 +7,7 @@ import {
 import { SETTINGS_DOCUMENT_TOKEN } from '@workspace/client-core/address/grammar'
 import { editorReferenceForToken } from '@workspace/client-core/address/references'
 import { toWorkspaceAbsolute, toWorkspaceRelative } from '@workspace/client-core/files/path'
-import { sessionIdSchema } from '@workspace/contracts'
+import { GIT_OBJECT_ID_PATTERN, isGitFileStatus, sessionIdSchema } from '@workspace/contracts'
 import * as v from 'valibot'
 import {
   fileDocument,
@@ -29,9 +29,6 @@ export type ParsedDocumentToken =
   | { readonly kind: 'unavailable'; readonly reason: string }
   | { readonly kind: 'rejected'; readonly reason: string }
 
-// Git object ids run 40 hex (SHA-1) through 64 (SHA-256); the server validates exactly
-// that range. A fixed-width-40 grammar would reject every id from a SHA-256 repository.
-const OBJECT_ID = /^[0-9a-f]{40,64}$/i
 const MISSING_OBJECT_ID = '_'
 const TURN_SCOPE_SUFFIX = '!turn'
 
@@ -335,17 +332,6 @@ function parseExtras(extras: readonly string[]) {
   }
 }
 
-const gitStatusSchema = v.picklist([
-  'added',
-  'conflicted',
-  'deleted',
-  'ignored',
-  'modified',
-  'renamed',
-  'unmodified',
-  'untracked',
-])
-
 function sessionIdOrNull(sessionId: string | null) {
   const parsed = v.safeParse(sessionIdSchema, sessionId)
   return parsed.success ? parsed.output : null
@@ -353,12 +339,11 @@ function sessionIdOrNull(sessionId: string | null) {
 
 /** Validated, not cast: an arbitrary URL string must not become a typed git status. */
 function gitStatusOrUndefined(status: string | undefined): GitChangeStatus | undefined {
-  const parsed = v.safeParse(gitStatusSchema, status)
-  return parsed.success ? parsed.output : undefined
+  return status !== undefined && isGitFileStatus(status) ? status : undefined
 }
 
 function objectIdOrUndefined(value: string) {
-  return OBJECT_ID.test(value) ? value.toLowerCase() : undefined
+  return GIT_OBJECT_ID_PATTERN.test(value) ? value.toLowerCase() : undefined
 }
 
 function relativeOrNull(rootPath: string, path: string | undefined) {

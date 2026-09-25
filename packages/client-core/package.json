@@ -66,6 +66,7 @@
     "./transport/eden": "./src/transport/eden.ts",
     "./files/search-client": "./src/files/search-client.ts",
     "./git/diff-files": "./src/git/diff-files.ts",
+    "./git/status-rows": "./src/git/status-rows.ts",
     "./git/worktrees": "./src/git/worktrees.ts",
     "./files/write": "./src/files/write.ts",
     "./chat/writers": "./src/chat/writers.ts",

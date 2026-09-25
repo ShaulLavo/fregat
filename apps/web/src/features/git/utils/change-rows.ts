@@ -1,5 +1,4 @@
-import { isWorktreeStatus } from '@/lib/git-status'
-import { isStagedStatus } from '@/lib/git-status'
+import { gitStatusRows } from '@workspace/client-core/git/status-rows'
 import type { GitFileStatus } from '@workspace/contracts'
 import type { ChangeRow } from '@/features/git/utils/types'
 
@@ -8,35 +7,14 @@ import type { ChangeRow } from '@/features/git/utils/types'
  * shows up under both headings, which is what the panel renders.
  */
 export function changeRows(files: readonly GitFileStatus[]) {
-  const staged: ChangeRow[] = []
-  const worktree: ChangeRow[] = []
+  const { staged, worktree } = gitStatusRows(files)
 
-  for (const file of sortedStatusFiles(files)) {
-    if (isStagedStatus(file.index)) {
-      staged.push({ file, section: 'staged', status: file.index })
-    }
-    if (isWorktreeStatus(file.worktree)) {
-      worktree.push({ file, section: 'worktree', status: file.worktree })
-    }
+  return {
+    staged: staged.map((file): ChangeRow => ({ file, section: 'staged', status: file.index })),
+    worktree: worktree.map((file): ChangeRow => ({
+      file,
+      section: 'worktree',
+      status: file.worktree,
+    })),
   }
-
-  return { staged, worktree }
-}
-
-/**
- * An untracked file reports `index: 'untracked'` rather than `'unmodified'`,
- * so a bare inequality would count it as staged. Exported because the file
- * tree's row menu decides stage-vs-unstage from the same rule — two copies
- * would eventually disagree with the panel.
- */
-
-function sortedStatusFiles(files: readonly GitFileStatus[]) {
-  return files.toSorted(compareStatusPaths)
-}
-
-function compareStatusPaths(left: GitFileStatus, right: GitFileStatus) {
-  if (left.path < right.path) return -1
-  if (left.path > right.path) return 1
-
-  return 0
 }

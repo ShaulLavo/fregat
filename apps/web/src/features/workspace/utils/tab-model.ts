@@ -1,6 +1,4 @@
-import { isWorktreeStatus } from '@/lib/git-status'
-import { isStagedStatus } from '@/lib/git-status'
-import type { GitFileStatus } from '@workspace/contracts'
+import { isStagedStatus, isWorktreeStatus, type GitFileStatus } from '@workspace/contracts'
 import type {
   EditorTabConflictMap,
   EditorTabDiffSource,

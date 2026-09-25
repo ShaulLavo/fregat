@@ -1,4 +1,9 @@
-import { sessionIdSchema, type SessionId } from '@workspace/contracts'
+import {
+  GIT_OBJECT_ID_PATTERN,
+  isGitFileStatus,
+  sessionIdSchema,
+  type SessionId,
+} from '@workspace/contracts'
 import * as v from 'valibot'
 import { decodePath, decodeSegment, encodePath, encodeSegment } from './path-token'
 
@@ -28,18 +33,6 @@ export const draftAddressTokenSchema = v.pipe(
   v.regex(/^draft-[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i),
   v.brand('DraftAddressToken'),
 )
-
-const OBJECT_ID = /^[0-9a-f]{40,64}$/i
-const STATUS = v.picklist([
-  'added',
-  'conflicted',
-  'deleted',
-  'ignored',
-  'modified',
-  'renamed',
-  'unmodified',
-  'untracked',
-])
 
 export function chatReferenceForToken(token: string | null): ChatReference | null {
   if (token === 't/new') return { kind: 'draft' }
@@ -139,7 +132,7 @@ function validRevision(token: string) {
   const [range] = token.split(',')
   const objects = range?.split('..') ?? []
   if (objects.length !== 2 || objects.every((part) => part === '_')) return false
-  if (!objects.every((part) => part === '_' || OBJECT_ID.test(part))) return false
+  if (!objects.every((part) => part === '_' || GIT_OBJECT_ID_PATTERN.test(part))) return false
   return true
 }
 
@@ -175,8 +168,8 @@ function normalizedMetadata(token: string) {
 function validExtra(key: string, raw: string) {
   const value = decodeSegment(raw)
   if (!value) return false
-  if (key === 'o' || key === 'n') return OBJECT_ID.test(value)
-  if (key === 's') return v.safeParse(STATUS, value).success
+  if (key === 'o' || key === 'n') return GIT_OBJECT_ID_PATTERN.test(value)
+  if (key === 's') return isGitFileStatus(value)
   if (key === 'r') return decodePath('', [raw]) !== null
   return false
 }

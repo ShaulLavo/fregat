@@ -1,3 +1,4 @@
+import { gitStatusRows } from '@workspace/client-core/git/status-rows'
 import type { GitFileStatus } from '@workspace/contracts'
 import type { DiffRenderRow } from '@singapore-editor/diff'
 import type { Theme } from '@/theme/utils/theme'
@@ -8,15 +9,10 @@ export type GitRow = {
   value: { file: GitFileStatus; staged: boolean }
 }
 export function gitRows(files: readonly GitFileStatus[]): GitRow[] {
-  const staged = files.filter(
-    (file) => file.index !== 'unmodified' && file.index !== 'untracked' && file.index !== 'ignored',
-  )
-  const working = files.filter(
-    (file) => file.worktree !== 'unmodified' && file.worktree !== 'ignored',
-  )
+  const { staged, worktree } = gitStatusRows(files)
   return [
     ...staged.map((file) => gitRow(file, true)),
-    ...working.map((file) => gitRow(file, false)),
+    ...worktree.map((file) => gitRow(file, false)),
   ]
 }
 function gitRow(file: GitFileStatus, staged: boolean): GitRow {

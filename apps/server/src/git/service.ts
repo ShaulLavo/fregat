@@ -12,6 +12,7 @@ import type {
   GitPullRequestState,
   GitPushResult,
 } from '@workspace/contracts'
+import { isBinaryGitDiff } from '@workspace/contracts'
 import {
   gitCommonDirectory,
   withGitRepositoryLane,
@@ -924,7 +925,7 @@ export class GitService {
     repository: GitRepositoryLocation,
     diff: GitFileDiff,
   ): Promise<GitFileDiff> {
-    if (isBinaryDiff(diff)) return diff
+    if (isBinaryGitDiff(diff)) return diff
     if (await this.isDiffTooLarge(repository, diff)) return diff
 
     const [oldObjectId, newObjectId] = await Promise.all([
@@ -944,7 +945,7 @@ export class GitService {
     diff: GitFileDiff,
     query: GitBlobDiffQuery,
   ): Promise<GitFileDiff> {
-    if (isBinaryDiff(diff)) return this.withBlobObjectIds(diff, query)
+    if (isBinaryGitDiff(diff)) return this.withBlobObjectIds(diff, query)
     if (await this.isBlobDiffTooLarge(repository, query)) {
       return this.withBlobObjectIds(diff, query)
     }
@@ -1431,10 +1432,6 @@ function positiveInteger(value: number | undefined, fallback: number) {
  */
 function isBinaryText(text: string) {
   return text.includes('\u0000')
-}
-
-function isBinaryDiff(diff: GitFileDiff) {
-  return diff.patch.includes('\nBinary files ') || diff.patch.includes('\nGIT binary patch')
 }
 
 function isTooLarge(size: number | null, maxBytes: number) {
