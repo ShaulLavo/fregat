@@ -5,7 +5,12 @@ import { useSettingsActions } from '@/features/settings/hooks/use-settings-actio
 import { useEnvironmentConnections } from '@/hooks/use-environment-connections'
 import { errorMessage } from '@/lib/error-message'
 import { createWideEventScope } from '@/lib/wide-event-scope'
-import { machineDraft, parseMachineDraft, type MachineDraft } from '@/hooks/utils/machine-form'
+import {
+  machineDraft,
+  parseMachineDraft,
+  sameMachineAddress,
+  type MachineDraft,
+} from '@/hooks/utils/machine-form'
 
 export type MachineFormOptions = {
   readonly name?: string
@@ -115,9 +120,13 @@ export function useMachineForm({
     if (pending.current) return
     const parsed = parseMachineDraft(draft)
     if (parsed.kind === 'invalid') return setError(parsed.message)
-    if (!name && savedName !== parsed.name && Object.hasOwn(machines, parsed.name)) {
+    const saved = Object.hasOwn(machines, parsed.name) ? machines[parsed.name] : undefined
+    // A saved machine at the same address is this one again: connect it rather than refuse.
+    if (!name && savedName !== parsed.name && saved && !sameMachineAddress(saved, parsed.machine)) {
       setOptionsOpen(true)
-      return setError('That machine name is already in use. Choose another name under Options.')
+      return setError(
+        `A saved machine named ${parsed.name} points somewhere else. Choose another name under Options.`,
+      )
     }
     const abort = beginSave(parsed.name)
     setError(null)

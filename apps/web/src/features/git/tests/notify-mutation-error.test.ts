@@ -22,6 +22,7 @@ describe('notifyMutationError', () => {
     })
 
     expect(toastError).toHaveBeenCalledWith('Git command failed', {
+      action: expect.objectContaining({ label: 'Fix with AI' }),
       description: 'The file server could not complete the filesystem operation.',
     })
   })

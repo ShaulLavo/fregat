@@ -489,6 +489,30 @@ Suggested order:
 6. Plan 143 is a conversation with the owner first. Nothing is implemented until its direction is
    approved.
 
+## Daily-driver lane
+
+Requested 2026-09-25. The owner is moving to Platform as their main agentic coding tool; a review
+of the plans, both logs and the service journal named what stands in the way. The unit file's
+`SuccessExitStatus=143` was fixed on the spot.
+
+| Plan                                                | Owns                                                                                            |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| [146](plans/146-isolated-state-and-verification.md) | Dev and prod stop sharing `~/.platform`; each `agent:browser` run gets its own server and state |
+| [147](plans/147-log-hygiene-and-noise-gate.md)      | Producer fixes, level rules, the reaper give-up, ACK timeout vs overflow, a `logs:census` gate  |
+| [148](plans/148-restart-when-idle.md)               | `deploy --server` stages; the server restarts when no turn is running                           |
+| [149](plans/149-terminal-host.md)                   | A PTY host that survives server restarts                                                        |
+| [150](plans/150-remote-server-version.md)           | Remote servers are checked for protocol and updated                                             |
+
+Suggested order:
+
+1. Plan 146. It is the source of most production log noise and of scenario data in real state.
+2. Plan 147, after 146 removes the pollution it would otherwise re-level.
+3. Plan 148, so Platform can deploy itself without killing the deploying turn.
+4. Plan 149, so terminals and dev servers survive the same restart.
+5. Plan 150 Phase 1 whenever the Mac is needed; the manual fix is in the plan.
+6. Then Claude rewind and fork ([Plan 145 fork](plans/145-harness-controls/fork.md), Plan 126
+   RUNTIME-01) and the Plan 139 research phase.
+
 ## Verification boundaries
 
 - **Platform-only:** verify the narrow Platform tests/typechecks named by the active plan.

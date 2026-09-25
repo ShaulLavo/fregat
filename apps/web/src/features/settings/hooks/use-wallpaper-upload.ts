@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 import { useWallpaperActions } from '@/features/settings/hooks/use-wallpaper-actions'
 import { ACCEPTED_WALLPAPER_TYPES } from '@/features/settings/utils/wallpaper-upload'
 import { errorMessage } from '@/lib/error-message'
+import { toastError } from '@/lib/toast-error'
 
 // Files go up in order and the last one to land is reported, so a drop of five selects one.
 export function useWallpaperUpload(onUploaded: (asset: WallpaperAsset) => void) {
@@ -16,7 +17,7 @@ export function useWallpaperUpload(onUploaded: (asset: WallpaperAsset) => void) 
     try {
       return await upload.mutateAsync(file)
     } catch (error) {
-      toast.error(`${file.name} was not added`, { description: errorMessage(error, 'Try again.') })
+      toastError(`${file.name} was not added`, { description: errorMessage(error, 'Try again.') })
       return null
     }
   }

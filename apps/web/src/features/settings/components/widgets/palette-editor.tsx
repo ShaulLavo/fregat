@@ -23,7 +23,6 @@ import {
 import { Input } from '@workspace/ui/components/input'
 import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
 import { useEffect, useState } from 'react'
-import { toast } from 'sonner'
 
 import { ColorField } from '@/features/settings/components/widgets/color-field'
 import { PaletteContrast } from '@/features/settings/components/widgets/palette-contrast'
@@ -42,6 +41,7 @@ import {
 import { useTheme } from '@/features/settings/hooks/use-theme'
 import { usePalette } from '@/lib/appearance/hooks/use-palette'
 import { errorMessage } from '@/lib/error-message'
+import { toastError } from '@/lib/toast-error'
 
 export type PaletteEditorTarget = {
   readonly palette: Palette
@@ -105,7 +105,7 @@ function PaletteEditorBody({
       if (draft.id !== paletteId) selectPalette(draft.id, 'settings.palette-editor')
       onClose()
     } catch (error) {
-      toast.error('Could not save the palette', {
+      toastError('Could not save the palette', {
         description: errorMessage(error, 'The palette library did not accept it.'),
       })
     }

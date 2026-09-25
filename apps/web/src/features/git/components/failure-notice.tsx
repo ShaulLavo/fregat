@@ -1,4 +1,4 @@
-import { ChatCircleIcon, XIcon } from '@phosphor-icons/react'
+import { SparkleIcon, XIcon } from '@phosphor-icons/react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Button } from '@workspace/ui/components/button'
 import { useEffect, useState } from 'react'
@@ -61,8 +61,8 @@ export function FailureNotice({ rootPath }: { readonly rootPath: string }) {
         {current.message}
       </p>
       <Button className='mt-1' onClick={fixWithAgent} size='sm' variant='ghost'>
-        <ChatCircleIcon data-icon='inline-start' />
-        Fix with agent
+        <SparkleIcon data-icon='inline-start' />
+        Fix with AI
       </Button>
     </div>
   )

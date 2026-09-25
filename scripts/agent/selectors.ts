@@ -28,8 +28,6 @@ export const selectors = {
       .filter({ hasText: label }),
   discardDraft: (page: Page, label: string) =>
     page.getByRole('button', { name: `Discard draft: ${label}`, exact: true }),
-  newWorktreeChoice: (page: Page) =>
-    page.getByRole('button', { name: 'New worktree', exact: true }),
   composerAccess: (page: Page) => page.getByRole('menuitemradio', { name: /^Full access/ }),
   chatExactText: (page: Page, text: string) => page.getByText(text, { exact: true }),
   composerModes: (page: Page) =>
@@ -143,6 +141,12 @@ export const selectors = {
     page
       .getByRole('group', { name: group, exact: true })
       .getByRole('menuitemradio', { name: choice, exact: true }),
+  draftWorkspace: (page: Page) => page.getByRole('button', { name: 'Workspace', exact: true }),
+  draftBaseBranch: (page: Page) =>
+    page.getByRole('button', { name: 'Start from branch', exact: true }),
+  draftMachine: (page: Page) => page.getByRole('button', { name: 'Machine', exact: true }),
+  menuRadio: (page: Page, name: string) =>
+    page.getByRole('menu').getByRole('menuitemradio', { name, exact: true }),
   modelOptionSwitch: (page: Page, name: string) =>
     page.getByRole('menuitemcheckbox', { name, exact: true }),
   listTabStops: (list: Locator) =>
@@ -195,6 +199,11 @@ export const selectors = {
   expandChangedFiles: (page: Page) => page.getByRole('button', { name: /^Show all \d+ files$/ }),
   machineDialog: (page: Page) => page.getByRole('dialog', { name: 'Connect machine', exact: true }),
   machineAdd: (page: Page) => page.getByRole('button', { name: 'Add machine', exact: true }),
+  machineConnect: (page: Page) => page.getByRole('button', { name: 'Connect', exact: true }),
+  machinePickerRows: (page: Page) =>
+    page.getByRole('dialog', { name: 'Connect machine', exact: true }).locator('button[title]'),
+  fixWithAi: (scope: Page | Locator) =>
+    scope.getByRole('button', { name: 'Fix with AI', exact: true }),
   machineTarget: (page: Page) => page.getByRole('textbox', { name: 'SSH target', exact: true }),
   sshHostList: (page: Page) =>
     page.getByRole('listbox', { name: 'SSH hosts', exact: true }).first(),
@@ -628,8 +637,12 @@ export const selectors = {
   commitOutput: (page: Page) => page.getByRole('log', { name: 'Commit output', exact: true }),
   editorTitleAction: (page: Page, label: string) =>
     page.locator('[data-editor-tab-strip]').getByRole('button', { name: label, exact: true }),
+  // The failed step also toasts, and the toast carries its own Fix with AI.
   gitFixWithAgent: (page: Page) =>
-    page.getByRole('button', { name: 'Fix with agent', exact: true }),
+    page
+      .getByRole('alert')
+      .filter({ hasText: / failed/ })
+      .getByRole('button', { name: 'Fix with AI', exact: true }),
   folderTree: (page: Page) => page.getByLabel('Folder tree', { exact: true }),
   focusedTreeRow: (page: Page) =>
     page.getByLabel('Folder tree', { exact: true }).locator('[role="treeitem"][tabindex="0"]'),

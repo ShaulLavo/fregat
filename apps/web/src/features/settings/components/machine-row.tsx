@@ -9,6 +9,7 @@ import { MachineForm } from '@/components/machine-form'
 import { useSettingsActions } from '@/features/settings/hooks/use-settings-actions'
 import { useEnvironmentConnections } from '@/hooks/use-environment-connections'
 import { useWorkingMachines } from '@/lib/environments/hooks/use-working-machines'
+import { InlineError } from '@/components/inline-error'
 
 export function MachineRow({
   name,
@@ -82,9 +83,7 @@ export function MachineRow({
         ) : null}
       </div>
       {actionError ? (
-        <p role='alert' className='text-destructive text-xs'>
-          {actionError}
-        </p>
+        <InlineError message={actionError} title={`Machine ${machine.label ?? name}`} />
       ) : null}
       <div className='flex flex-wrap items-center gap-1'>
         {connected ? (

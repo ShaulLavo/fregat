@@ -9,6 +9,8 @@ import {
   attachmentTextOptions,
   canPreviewAttachmentText,
 } from '../utils/attachment-file'
+import { FixWithAgentButton } from '@/components/fix-with-agent-button'
+import { errorMessage } from '@/lib/error-message'
 
 export function ChatFilePreview({
   attachment,
@@ -43,6 +45,12 @@ export function ChatFilePreview({
             <Button size='xs' variant='ghost' onClick={() => void preview.refetch()}>
               Retry
             </Button>
+            <FixWithAgentButton
+              error={{
+                message: errorMessage(preview.error, 'Could not load this file.'),
+                title: `Preview of ${attachment.name}`,
+              }}
+            />
           </div>
         )}
         {previewable && preview.isSuccess && (

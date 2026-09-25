@@ -28,6 +28,7 @@ import {
 import { CHAT_SESSION_SCOPE, chatModeMutationKeys } from '@/features/chat-mode/utils/mutation-keys'
 import { useNavigation } from '@/hooks/use-navigation'
 import { hasRunningTurn } from '@/features/chat-mode/utils/running-turn'
+import { toastError } from '@/lib/toast-error'
 
 type SessionCommandVariables = {
   readonly action: string
@@ -130,9 +131,9 @@ export function useSessionActions() {
     try {
       const result = await navigation.reconcileSessions(removal)
       if (result.status !== 'unavailable') return true
-      toast.error(`Session ${action}, but navigation failed`, { description: result.reason })
+      toastError(`Session ${action}, but navigation failed`, { description: result.reason })
     } catch (error) {
-      toast.error(`Session ${action}, but navigation failed`, {
+      toastError(`Session ${action}, but navigation failed`, {
         description: errorMessage(error, 'The destination could not be opened.'),
       })
     }

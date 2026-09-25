@@ -14,6 +14,7 @@ import {
 import { ThemeVariantEditor } from '@/features/settings/components/widgets/theme-variant-editor'
 import { BundleContext } from '@/lib/appearance/providers/bundle-context'
 import { previewBundle } from '@/features/settings/utils/bundle-editing'
+import { InlineError } from '@/components/inline-error'
 
 export function ThemeEditor({
   initial,
@@ -73,11 +74,7 @@ export function ThemeEditor({
             setDocument({ ...document, variants: { ...document.variants, [mode]: variant } })
           }
         />
-        {error ? (
-          <p role='alert' className='text-destructive text-xs'>
-            {error}
-          </p>
-        ) : null}
+        {error ? <InlineError message={error} title='Theme editor' /> : null}
         <DialogFooter>
           <Button variant='outline' onClick={() => preview?.preview(previewBundle(document), mode)}>
             Preview

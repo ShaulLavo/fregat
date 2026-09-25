@@ -4,6 +4,7 @@ import { cn } from '@workspace/ui/lib/utils'
 import { useCodeThemePreview } from '@/lib/code-theme/hooks/use-preview'
 import { editorThemeColorMode } from '@/lib/code-theme/utils/catalog'
 import { previewTokenStyle } from '@/lib/code-theme/utils/preview'
+import { FixWithAgentButton } from '@/components/fix-with-agent-button'
 
 export function CodeThemePreview({
   themeId,
@@ -32,12 +33,18 @@ export function CodeThemePreview({
         </LoadingState>
       )}
       {preview.kind === 'error' && (
-        <p
-          className='text-muted-foreground flex h-51 items-center justify-center p-4 text-xs'
+        <div
+          className='text-muted-foreground flex h-51 flex-col items-center justify-center gap-(--density-gap-tight) p-4 text-xs'
           role='alert'
         >
-          Could not load this code theme preview.
-        </p>
+          <p>Could not load this code theme preview.</p>
+          <FixWithAgentButton
+            error={{
+              message: 'Could not load this code theme preview.',
+              title: 'Code theme preview',
+            }}
+          />
+        </div>
       )}
       {preview.kind === 'ready' && (
         <pre

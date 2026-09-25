@@ -10,7 +10,6 @@ import { jsonEqual, themeVariants, type ThemeDocument } from '@workspace/contrac
 import { Button } from '@workspace/ui/components/button'
 import { Input } from '@workspace/ui/components/input'
 import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
-import { toast } from 'sonner'
 import { ThemeCard } from '@/features/settings/components/widgets/theme-card'
 import { ThemeEditor } from '@/features/settings/components/widgets/theme-editor'
 import { useBundleLibrary } from '@/features/settings/hooks/use-bundle-library'
@@ -22,6 +21,8 @@ import { useSettingsActions } from '@/features/settings/hooks/use-settings-actio
 import { BundleContext } from '@/lib/appearance/providers/bundle-context'
 import { newThemeDocument } from '@/features/settings/utils/bundle-editing'
 import { errorMessage } from '@/lib/error-message'
+import { toastError } from '@/lib/toast-error'
+import { InlineError } from '@/components/inline-error'
 
 export function ThemeWidget({ disabled }: { disabled: boolean }) {
   const library = useBundleLibrary()
@@ -39,7 +40,7 @@ export function ThemeWidget({ disabled }: { disabled: boolean }) {
   const selected = values?.['workbench.theme']
   const customizations = values?.['workbench.theme.customizations'] ?? {}
   const fail = (error: unknown) =>
-    toast.error(errorMessage(error, 'The theme library could not complete this action.'))
+    toastError(errorMessage(error, 'The theme library could not complete this action.'))
   return (
     <div className='flex w-full min-w-0 flex-col gap-3' aria-label='Theme bundles'>
       <div className='text-muted-foreground flex h-(--bar-height) items-center gap-2 px-(--bar-padding-x) text-xs'>
@@ -47,9 +48,10 @@ export function ThemeWidget({ disabled }: { disabled: boolean }) {
         <span className='tabular-nums'>{library.catalog.length} bundles</span>
       </div>
       {library.error ? (
-        <p className='text-destructive text-xs' role='alert'>
-          {errorMessage(library.error, 'Could not load your theme library.')}
-        </p>
+        <InlineError
+          message={errorMessage(library.error, 'Could not load your theme library.')}
+          title='Theme library'
+        />
       ) : null}
       <div className='grid grid-cols-[repeat(auto-fit,minmax(15rem,1fr))] gap-3'>
         {library.catalog.map((theme) => {

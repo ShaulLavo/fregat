@@ -10,6 +10,8 @@ WorkingDirectory={{PRODUCTION_ROOT}}
 ExecStart={{BUN}} {{PRODUCTION_ROOT}}/current/server/index.js
 Restart=on-failure
 RestartSec=3
+# Bun exits 143 on SIGTERM; a normal stop or restart is not a failure.
+SuccessExitStatus=143
 Environment=NODE_ENV=production
 Environment=BUN_ENV=production
 Environment=FS_HOST=127.0.0.1

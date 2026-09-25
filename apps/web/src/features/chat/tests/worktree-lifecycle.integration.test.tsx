@@ -60,6 +60,9 @@ test('draft choices, shared chips and dirty worktree cleanup survive deletion an
   ).toBe(base.id)
   draft.unmount()
   created = null
+  const releaseCommit = await executeDomainGit(base.canonicalPath, 'rev-parse', 'HEAD')
+  await executeDomainGit(base.canonicalPath, 'branch', 'release')
+  await executeDomainGit(base.canonicalPath, 'commit', '--allow-empty', '-m', 'main moves on')
   drafts.setPrompt(draftTarget, 'Create a separate checkout')
   drafts.setModelSelection(draftTarget, {
     model: 'mock-model',
@@ -76,7 +79,13 @@ test('draft choices, shared chips and dirty worktree cleanup survive deletion an
       created = id
     },
   })
-  await userEvent.click(screen.getByRole('button', { name: 'New worktree' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Workspace' }))
+  await userEvent.click(await screen.findByRole('menuitemradio', { name: 'New worktree' }))
+  await userEvent.click(await screen.findByRole('button', { name: 'Start from branch' }))
+  await userEvent.click(await screen.findByRole('menuitemradio', { name: 'release' }))
+  expect(screen.getByRole('button', { name: 'Start from branch' })).toHaveTextContent(
+    'From release',
+  )
   expect(screen.getByRole('textbox', { name: 'Message' })).toHaveTextContent(
     'Create a separate checkout',
   )
@@ -90,6 +99,7 @@ test('draft choices, shared chips and dirty worktree cleanup survive deletion an
   let managed = await harness.worktree(managedId)
   expect(managed.lifecycle.state).toBe('ready')
   expect(managed.id).not.toBe(base.id)
+  expect(managed.baseCommit).toBe(releaseCommit)
   isolatedDraft.unmount()
   const sharedSession = await harness.create({ kind: 'current', worktreeId: managedId })
   const rail = renderRailHarness(harness)

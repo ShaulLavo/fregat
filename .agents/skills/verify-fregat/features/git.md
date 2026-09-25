@@ -30,7 +30,7 @@ Graph roots exclude `refs/platform/*`. A browsing session pins tips and ref labe
 
 `git-fix-with-agent` also resolves the failed hook with an external commit and requires the old output and failure notice to disappear. Editing the file before that commit must keep the output visible.
 
-`git-fix-with-agent` types something into the open chat, fails a commit on a rejecting hook, presses Fix with agent and requires the failed step and the hook's output in the composer of a new chat, without the text typed earlier. The notice reads the newest git mutation from the mutation cache, so any failing step (stage, push, pull, sync) raises it and a retry clears it.
+`git-fix-with-agent` types something into the open chat, fails a commit on a rejecting hook, presses Fix with AI and requires the failed step and the hook's output in the composer of a new chat, without the text typed earlier. The notice reads the newest git mutation from the mutation cache, so any failing step (stage, push, pull, sync) raises it and a retry clears it.
 
 `git-commit-message-file` opens `COMMIT_EDITMSG` from an empty-message commit twice: Discard commit message in the editor title must close it with HEAD unchanged, and Accept commit message must save, close and leave HEAD carrying the typed subject. Closing the tab by hand commits the same way; a file left with only comment lines aborts.
 

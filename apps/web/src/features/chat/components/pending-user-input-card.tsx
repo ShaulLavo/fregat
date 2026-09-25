@@ -23,6 +23,7 @@ import {
   type PendingUserInput,
   type UserInputAnswerDrafts,
 } from '@workspace/client-core/chat/pending-user-input'
+import { FixWithAgentButton } from '@/components/fix-with-agent-button'
 
 export function PendingUserInputCard({ pending }: { readonly pending: PendingUserInput }) {
   const { sessionId, disabledReason, responseState, respondToUserInput, dismissUserInput } =
@@ -215,6 +216,12 @@ export function PendingUserInputCard({ pending }: { readonly pending: PendingUse
                 >
                   Dismiss attachment error
                 </Button>
+                <FixWithAgentButton
+                  error={{
+                    message: attachments.errors[question.id]!,
+                    title: 'Question attachment',
+                  }}
+                />
               </div>
             ) : null}
           </>

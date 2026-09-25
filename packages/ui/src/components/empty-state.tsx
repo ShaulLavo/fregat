@@ -1,6 +1,7 @@
-import type { ReactNode } from 'react'
+import { use, type ReactNode } from 'react'
 
 import { cn } from '@workspace/ui/lib/utils'
+import { ErrorActionContext } from '@workspace/ui/patterns/error-action-context'
 
 /**
  * The one answer to "there is nothing here". Every panel's empty and error
@@ -29,6 +30,7 @@ function EmptyState({
   align = 'center',
   className,
   description,
+  errorMessage,
   hint,
   icon,
   iconPosition = 'stacked',
@@ -39,12 +41,18 @@ function EmptyState({
   align?: 'center' | 'start'
   className?: string
   description?: ReactNode
+  /** The error's plain text for the app's error action, when `description` is not a string. */
+  errorMessage?: string
   hint?: ReactNode
   icon?: ReactNode
   iconPosition?: 'stacked' | 'inline'
   title: string
   tone?: 'error' | 'muted' | 'warning'
 }) {
+  const errorAction = use(ErrorActionContext)
+  const message = errorMessage ?? (typeof description === 'string' ? description : undefined)
+  const extra = tone === 'error' && errorAction ? errorAction({ message, title }) : null
+
   return (
     <div
       className={cn(
@@ -86,7 +94,12 @@ function EmptyState({
         {hint ? (
           <span className='text-muted-foreground text-2xs flex items-center gap-2'>{hint}</span>
         ) : null}
-        {action ? <span className='mt-1'>{action}</span> : null}
+        {action || extra ? (
+          <span className='mt-1 flex flex-wrap items-center gap-(--density-gap-tight)'>
+            {action}
+            {extra}
+          </span>
+        ) : null}
       </div>
     </div>
   )

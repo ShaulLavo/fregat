@@ -16,6 +16,7 @@
     "./patterns/virtual-list": "./src/patterns/virtual-list.tsx",
     "./patterns/render-error-boundary": "./src/patterns/render-error-boundary.tsx",
     "./patterns/render-error-state": "./src/patterns/render-error-state.tsx",
+    "./patterns/error-action-context": "./src/patterns/error-action-context.ts",
     "./patterns/tooltip-layer": "./src/patterns/tooltip-layer.tsx",
     "./patterns/tooltip-parts": "./src/patterns/tooltip-parts.ts",
     "./patterns/tooltip-target": "./src/patterns/tooltip-target.ts",

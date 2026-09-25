@@ -8,6 +8,7 @@ import { useEnvironmentConnections } from '@/hooks/use-environment-connections'
 import { useWorkingMachines } from '@/lib/environments/hooks/use-working-machines'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
 import { errorMessage } from '@/lib/error-message'
+import { InlineError } from '@/components/inline-error'
 
 export function PickerDialog({
   mode,
@@ -71,7 +72,7 @@ export function PickerDialog({
         if (!open) onClose()
       }}
     >
-      <DialogContent className='max-h-[calc(100dvh-2rem)] overflow-y-auto'>
+      <DialogContent className='max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-md'>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
@@ -91,12 +92,13 @@ export function PickerDialog({
             key={machine.name}
             variant='ghost'
             className='justify-between'
+            title={machine.name}
             disabled={working.size > 0}
             onClick={() => void choose(machine.name)}
           >
-            <span>{machine.config.label ?? machine.name}</span>
+            <span className='min-w-0 truncate'>{machine.config.label ?? machine.name}</span>
             {working.has(machine.name) ? <OrbitLoader /> : null}
-            <span className='text-muted-foreground'>{machine.phase}</span>
+            <span className='text-muted-foreground shrink-0'>{machine.phase}</span>
           </Button>
         ))}
         {connecting ? (
@@ -107,11 +109,7 @@ export function PickerDialog({
         {mode === 'disconnect' && machines.length === 0 ? (
           <p className='text-muted-foreground text-sm'>No connected machines to disconnect.</p>
         ) : null}
-        {error ? (
-          <p role='alert' className='text-destructive text-sm'>
-            {error}
-          </p>
-        ) : null}
+        {error ? <InlineError message={error} onHandOff={onClose} title={title} /> : null}
       </DialogContent>
     </Dialog>
   )

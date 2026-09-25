@@ -4,7 +4,6 @@ import { PlusIcon, UploadSimpleIcon } from '@phosphor-icons/react'
 import { paletteSupportsMode, type Palette } from '@workspace/contracts'
 import { Button } from '@workspace/ui/components/button'
 import { useState } from 'react'
-import { toast } from 'sonner'
 
 import { PaletteCard } from '@/features/settings/components/widgets/palette-card'
 import { PaletteCardMenu } from '@/features/settings/components/widgets/palette-card-menu'
@@ -18,6 +17,7 @@ import { usePaletteActions } from '@/features/settings/hooks/use-palette-actions
 import { duplicatePalette, paletteIdFromName } from '@/features/settings/utils/palette-editing'
 import { usePalette } from '@/lib/appearance/hooks/use-palette'
 import { errorMessage } from '@/lib/error-message'
+import { toastError } from '@/lib/toast-error'
 
 /**
  * The gallery: every palette as a card, the current one marked. Keyboard
@@ -54,7 +54,7 @@ export function PaletteWidget({
   const deletePalette = (palette: Palette) => {
     remove.mutate(palette.id, {
       onError: (error) =>
-        toast.error(`Could not delete ${palette.name}`, {
+        toastError(`Could not delete ${palette.name}`, {
           description: errorMessage(error, 'The palette library did not accept it.'),
         }),
     })
@@ -63,7 +63,7 @@ export function PaletteWidget({
   const importPalette = (palette: Palette) => {
     create.mutate(palette, {
       onError: (error) =>
-        toast.error(`Could not import ${palette.name}`, {
+        toastError(`Could not import ${palette.name}`, {
           description: errorMessage(error, 'The palette library did not accept it.'),
         }),
       onSuccess: () => setImportOpen(false),

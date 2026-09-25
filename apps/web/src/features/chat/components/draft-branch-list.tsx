@@ -38,6 +38,7 @@ export function DraftBranchList({
       {branches.map((branch) => (
         <DropdownMenuRadioItem
           key={branch.name}
+          aria-label={branch.name}
           closeOnClick
           title={branch.upstream ? `${branch.name} · tracks ${branch.upstream}` : branch.name}
           value={branch.name}

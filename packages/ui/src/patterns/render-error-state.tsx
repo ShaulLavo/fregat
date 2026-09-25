@@ -27,6 +27,7 @@ export function RenderErrorState({
       align={align}
       className={align === 'center' ? 'h-full' : undefined}
       description={<span className='font-mono wrap-anywhere'>{renderErrorMessage(error)}</span>}
+      errorMessage={renderErrorMessage(error)}
       icon={<WarningCircleIcon weight='fill' />}
       title={`${label} hit a render error`}
       tone='error'

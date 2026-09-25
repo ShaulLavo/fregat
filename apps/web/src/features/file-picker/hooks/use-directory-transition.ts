@@ -2,9 +2,9 @@ import { directoryQueryOptions } from '@/features/file-picker/utils/directory-qu
 import { errorMessage } from '@/lib/error-message'
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useLayoutEffect, useRef } from 'react'
-import { toast } from 'sonner'
 
 import type { FilePickerMode } from '@/features/file-picker/utils/model'
+import { toastError } from '@/lib/toast-error'
 
 export function useDirectoryTransition({
   currentPath,
@@ -56,7 +56,7 @@ export function useDirectoryTransition({
     } catch (cause) {
       if (requestId !== requestIdRef.current) return false
 
-      toast.error('Could not open folder', {
+      toastError('Could not open folder', {
         description: errorMessage(cause, 'The folder could not be loaded.'),
       })
       return false

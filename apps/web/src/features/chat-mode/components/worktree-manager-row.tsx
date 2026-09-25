@@ -16,6 +16,7 @@ import {
   cleanupStatusLabel,
 } from '@workspace/client-core/chat/worktrees/cleanup'
 import { worktreeLabel } from '@workspace/client-core/chat/worktrees/label'
+import { InlineError } from '@/components/inline-error'
 
 export function WorktreeManagerRow({
   environmentId,
@@ -36,11 +37,7 @@ export function WorktreeManagerRow({
         {actions.pending ? <OrbitLoader /> : null}
       </div>
       <p className='text-muted-foreground text-xs tabular-nums'>{cleanupStatusLabel(worktree)}</p>
-      {actions.error ? (
-        <p className='text-destructive text-xs' role='alert'>
-          {actions.error}
-        </p>
-      ) : null}
+      {actions.error ? <InlineError message={actions.error} title='Worktree action' /> : null}
       <div className='flex flex-wrap gap-1'>
         {eligible && worktree.lifecycle.state === 'ready' ? (
           <Button

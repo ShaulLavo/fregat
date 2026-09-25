@@ -1,11 +1,11 @@
 import { isConnectivityError } from '@workspace/client-core/transport/connectivity-error'
 import { isObject } from '@workspace/utils/objects'
-import { toast } from 'sonner'
 import type { ErrorCategory } from '@workspace/contracts'
 import { agentErrorReport } from './agent-error-report'
 import { copyTextToClipboard } from './clipboard'
 import { clientErrorMetadata } from './client-error-context'
 import { reportClientError } from './client-error-reporting'
+import { toastError } from '@/lib/toast-error'
 
 export type { ErrorCategory }
 
@@ -133,10 +133,14 @@ export function reportError(error: ClientError): void {
 
   if (!shouldToastCategory(error.category)) return
 
-  toast.error(titleByCategory[error.category], {
-    action: { label: 'Copy', onClick: () => copyAgentReport(error) },
-    description: clientErrorDescription(error),
-  })
+  toastError(
+    titleByCategory[error.category],
+    {
+      cancel: { label: 'Copy', onClick: () => copyAgentReport(error) },
+      description: clientErrorDescription(error),
+    },
+    error,
+  )
 }
 
 const toastableCategories: ReadonlySet<ErrorCategory> = new Set<ErrorCategory>([

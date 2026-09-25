@@ -14,6 +14,8 @@ Run **Find references** while the caret is on a symbol. `scenario lsp-references
 
 Open the project menu and choose **Connect machine…**, then **Add machine** when saved machines exist. `scenario environments-dialog` opens discovery without connecting. It navigates existing SSH hosts when discovery returns any; an empty machine has only the discovery screenshot, so use the real-server SSH picker test for its seeded keyboard case.
 
+`scenario machine-connect-error` chooses the first saved machine in **Connect machine…**, requires its error to fit the dialog without sideways scroll, presses **Fix with AI** and requires the dialog to close and the error report to land in a new chat composer. It needs a saved machine that refuses; with none it stops after the picker screenshot. The same Fix with AI sits on every error toast, `EmptyState` in the error tone (so every `ToolPane` and render-error fallback), and the inline `InlineError` sites.
+
 ## Assistant changed files
 
 Expand a session's **Changed files** section. `scenario chat-changed-files` inspects up to eight existing sessions without sending a message. It navigates an available checkpoint tree and records `treeAvailable` in `inspection.json`; false means the environment has no existing checkpoint tree to exercise. The real-server assistant changed-files section tests cover empty and populated checkpoints independently.

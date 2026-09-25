@@ -20,7 +20,7 @@ const EXISTING_DRAFT = 'a question I was already writing'
 export const gitFixWithAgent: Scenario = {
   name: 'git-fix-with-agent',
   description:
-    'Fail a commit on a rejecting hook, press Fix with agent, and find the failure alone in a new chat.',
+    'Fail a commit on a rejecting hook, press Fix with AI, and find the failure alone in a new chat.',
   async run(page, { step }) {
     const fixture = await createGitFixture('fix-with-agent')
     try {
@@ -56,7 +56,7 @@ export const gitFixWithAgent: Scenario = {
       if (!text.includes('Git commit failed'))
         throw createScriptError('The composer did not name the failed step')
       if (text.includes(EXISTING_DRAFT))
-        throw createScriptError('Fix with agent reused the open chat instead of starting a new one')
+        throw createScriptError('Fix with AI reused the open chat instead of starting a new one')
       await composer.fill('')
 
       await openGitPanel(page)
@@ -68,7 +68,7 @@ export const gitFixWithAgent: Scenario = {
       await fixtureGit(fixture, ['commit', '--quiet', '-m', 'fixed externally'])
       await selectors.commitOutput(page).waitFor({ state: 'hidden', timeout: 15_000 })
       if (await selectors.gitFixWithAgent(page).isVisible())
-        throw createScriptError('The resolved commit still offers Fix with agent')
+        throw createScriptError('The resolved commit still offers Fix with AI')
       await step('external-commit-cleared-failure')
     } finally {
       await releaseFixture(fixture)
