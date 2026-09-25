@@ -65,18 +65,47 @@ test('response mutation stays pending until the delayed projection snapshot has 
   client.clear()
 })
 
-test('a response reports synchronization failure if neither transport read succeeds', async () => {
+test.each([false, true])(
+  'an accepted response succeeds when refresh is unavailable (closed=%s)',
+  async (closed) => {
+    const transport = unsupportedChatTransport({
+      closed,
+      dispatchCommand: async () => ({ deduped: false, sequence: 2, result: null }),
+      ...(closed
+        ? {
+            replayEvents: async () => ({ events: [] }),
+            sessionDetailSnapshot: async () => snapshot,
+          }
+        : {}),
+    })
+    const client = createTestQueryClient()
+    const observer = new MutationObserver(
+      client,
+      pendingRequestMutationOptions(transport, session.id),
+    )
+    await expect(observer.mutate(input)).resolves.toEqual({
+      deduped: false,
+      sequence: 2,
+      result: null,
+    })
+    expect(observer.getCurrentResult().status).toBe('success')
+    client.clear()
+  },
+)
+
+test('a rejected response remains a dispatch failure', async () => {
+  const error = new Error('Approval rejected')
   const transport = unsupportedChatTransport({
-    dispatchCommand: async () => ({ deduped: false, sequence: 2, result: null }),
+    dispatchCommand: async () => {
+      throw error
+    },
   })
   const client = createTestQueryClient()
   const observer = new MutationObserver(
     client,
     pendingRequestMutationOptions(transport, session.id),
   )
-  await expect(observer.mutate(input)).rejects.toMatchObject({
-    code: 'chat.PROJECTION_SYNC_FAILED',
-  })
+  await expect(observer.mutate(input)).rejects.toBe(error)
   expect(observer.getCurrentResult().status).toBe('error')
   client.clear()
 })

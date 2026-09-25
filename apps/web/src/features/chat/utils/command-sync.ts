@@ -1,4 +1,3 @@
-import { chatErrors } from './structured-errors'
 import { elapsedMs } from '@workspace/utils/timing'
 import type { EnvironmentId, SessionId } from '@workspace/contracts'
 
@@ -42,17 +41,11 @@ export async function syncSessionProjectionAfterDispatch({
     if (transport.closed || (replay.status === 'rejected' && snapshot.status === 'rejected')) {
       scope.warn('Session projection synchronization failed.', {
         sessionId,
+        transportClosed: transport.closed,
         replayStatus: replay.status,
         snapshotStatus: snapshot.status,
       })
-      throw chatErrors.PROJECTION_SYNC_FAILED({
-        internal: {
-          sessionId,
-          transportClosed: transport.closed,
-          replayStatus: replay.status,
-          snapshotStatus: snapshot.status,
-        },
-      })
+      return
     }
     const store = useChatProjectionStore.getState()
 
