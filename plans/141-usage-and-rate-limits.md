@@ -248,6 +248,10 @@ source column so an imported turn is never counted twice when a session is later
 The RUNTIME-08 action: account-keyed serialization and an idempotency key, as a TanStack mutation
 with a `scope`. Automated tests use boundary fixtures; nothing consumes a real credit.
 
+Decided 2026-09-25: owner — build it with boundary fixtures only, behind a confirm step. Nothing is
+spent until the owner does the one live redemption by hand; that live run is the owner's check, not
+an agent's. Same decision for Plan 126 RUNTIME-08.
+
 ## Verification
 
 - Pure mapping tests for both payload shapes with captured fixtures and synthetic values.
