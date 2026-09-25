@@ -163,6 +163,23 @@ describe('approval admission', () => {
   })
 })
 
+it('publishes persisted turn reasons after another turn starts', async () => {
+  const { database, engine } = await createEngineWithSession()
+  const turn = turnStartCommand()
+  await engine.dispatch(turn)
+  const sessionId = '00000000-0000-4000-8000-000000000001'
+  const first = (await engine.sessionDetailSnapshot(sessionId)).session.latestTurn!
+  await engine.dispatch(
+    command({ type: 'session.turn.interrupt', sessionId, turnId: first.turnId }),
+  )
+  await engine.dispatch(turnStartCommand())
+  const restarted = new OrchestrationEngine(database)
+  const snapshot = await restarted.sessionDetailSnapshot(sessionId)
+  expect(snapshot.session).toMatchObject({
+    turns: { [first.turnId]: { state: 'interrupted', endReason: 'user-stop' } },
+  })
+})
+
 describe('settle guards', () => {
   it.each(['queued', 'claimed', 'runtime-live'] as const)(
     'archives a session with %s work without stopping it',

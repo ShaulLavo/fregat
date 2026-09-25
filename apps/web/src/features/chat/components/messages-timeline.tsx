@@ -30,6 +30,7 @@ export function MessagesTimeline({
   const items = chatTimelineItems({
     activities: session.activities,
     latestTurn: session.latestTurn,
+    turns: session.turns,
     messages: session.messages,
     optimisticMessages,
     proposedPlans: session.proposedPlans,

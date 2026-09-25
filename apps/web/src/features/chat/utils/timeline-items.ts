@@ -213,6 +213,7 @@ const stableTimelineItemsBySession = new Map<string, StableTimelineItems>()
 export function chatTimelineItems({
   activities,
   latestTurn,
+  turns = {},
   messages,
   optimisticMessages,
   proposedPlans,
@@ -220,6 +221,7 @@ export function chatTimelineItems({
 }: {
   activities: readonly OrchestrationSessionActivity[]
   latestTurn: OrchestrationLatestTurn | null
+  turns?: Readonly<Record<string, OrchestrationLatestTurn>>
   messages: readonly OrchestrationMessage[]
   optimisticMessages: readonly OptimisticChatMessage[]
   proposedPlans: readonly OrchestrationProposedPlan[]
@@ -240,6 +242,7 @@ export function chatTimelineItems({
   const messageMetadata = chatMessageTimelineMetadata({
     activeResponseTurnIds,
     latestTurn,
+    turns,
     messages: timelineMessages,
     // The completion divider reports the latest turn's duration, so only that turn's
     // work decides whether there was anything to report.
@@ -309,7 +312,7 @@ export function chatTimelineItems({
   const chronological = items.toSorted(compareTimelineEntries)
   const timelineItems = arrangeTimelineItems(
     chronological,
-    deriveTurnFolds(chronological, latestTurn, activeResponseTurnIds),
+    deriveTurnFolds(chronological, latestTurn, activeResponseTurnIds, turns),
   )
   if (latestTurn?.state === 'running' && latestTurn.completedAt === null) {
     appendActiveResponse(timelineItems, latestTurn, workLogEntries, activeResponseTurnIds)
@@ -712,6 +715,7 @@ function deriveTurnFolds(
   entries: readonly ChronologicalTimelineItem[],
   latestTurn: OrchestrationLatestTurn | null,
   activeResponseTurnIds: ReadonlySet<TurnId>,
+  turns: Readonly<Record<string, OrchestrationLatestTurn>>,
 ) {
   const unsettledTurnId = deriveUnsettledTurnId(latestTurn)
   const folds = new Map<string, TurnFold>()
@@ -728,7 +732,11 @@ function deriveTurnFolds(
 
     folds.set(anchor.id, {
       entries: foldable,
-      label: turnFoldLabel(group, latestTurn, turnId),
+      label: turnFoldLabel(
+        group,
+        latestTurn?.turnId === turnId ? latestTurn : (turns[turnId] ?? null),
+        turnId,
+      ),
       turnId,
     })
   }

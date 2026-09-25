@@ -604,6 +604,7 @@ function sessionFromShell(
     createdAt: session.createdAt,
     detailSynced: previous?.detailSynced ?? false,
     pendingMessageQuestions: previous?.pendingMessageQuestions,
+    turns: retainedTurns(previous, latestTurn),
     hasActionableProposedPlan: session.hasActionableProposedPlan,
     id: session.id,
     interactionMode: session.interactionMode,
@@ -1143,7 +1144,14 @@ function applySessionRevertedEvent(
 
   return writeSessionTurn(
     {
-      ...patchSession(state, sessionId, { updatedAt: event.payload.revertedAt }),
+      ...patchSession(state, sessionId, {
+        updatedAt: event.payload.revertedAt,
+        turns: Object.fromEntries(
+          Object.entries(state.sessionById[sessionId]?.turns ?? {}).filter(([id]) =>
+            retainedTurnIds.has(id as TurnId),
+          ),
+        ),
+      }),
       activityBySessionId: {
         ...state.activityBySessionId,
         [sessionId]: recordById(activities, (entry) => entry.id),
@@ -1243,6 +1251,15 @@ type SessionTurnWrite = {
   pendingSourceProposedPlan: OrchestrationLatestTurn['sourceProposedPlan'] | undefined
 }
 
+function retainedTurns(
+  session: ProjectionSession | undefined,
+  latest: OrchestrationLatestTurn | null,
+) {
+  const turns = { ...session?.turns }
+  if (latest) turns[latest.turnId] = latest
+  return turns
+}
+
 function writeSessionTurn(
   state: ChatProjectionSlice,
   sessionId: SessionId,
@@ -1255,7 +1272,7 @@ function writeSessionTurn(
     ...state,
     sessionById: {
       ...state.sessionById,
-      [sessionId]: { ...session, ...turn },
+      [sessionId]: { ...session, ...turn, turns: retainedTurns(session, turn.liveTurn) },
     },
   }
 }
@@ -1387,6 +1404,7 @@ function sessionFromDetail(
     return {
       ...previous,
       pendingMessageQuestions: session.pendingMessageQuestions,
+      turns: session.turns,
       detailSynced: true,
       liveTurn: session.latestTurn,
       pendingSourceProposedPlan: carriedPendingSourcePlan(previous, session.latestTurn),

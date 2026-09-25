@@ -31,6 +31,7 @@ import {
   projectionProjects,
   projectionWorktrees,
   projectionTerminalLeases,
+  projectionTurns,
   projectionState,
   projectionSessionActivities,
   projectionSessionCheckpoints,
@@ -264,6 +265,14 @@ export class OrchestrationSnapshotQuery {
           this.messagesBefore(sessionId, null, ORCHESTRATION_SESSION_DETAIL_PAGE_SIZE).rows,
           this.activitiesBefore(sessionId, null, ORCHESTRATION_SESSION_DETAIL_PAGE_SIZE).rows,
           this.sessionRuntime(sessionId),
+        ),
+        turns: Object.fromEntries(
+          this.database
+            .select()
+            .from(projectionTurns)
+            .where(eq(projectionTurns.sessionId, sessionId))
+            .all()
+            .map((turn) => [turn.turnId, turn]),
         ),
         pendingMessageQuestions: pendingMessageQuestions(
           this.recentSessionActivities(sessionId).map(activityFromRow),

@@ -25,6 +25,29 @@ import {
 } from '@/features/chat/utils/timeline-items'
 
 describe('chat timeline items', () => {
+  it('keeps the stopped fold label after Carry on starts another turn', () => {
+    const sessionId = parseSessionId('bc3e1c41-73bd-5eb7-824f-b1fd01bf336d')
+    const turnId = parseTurnId('previous-turn')
+    const previous = {
+      ...settledTurn(turnId, 'interrupted', timestamp(5)),
+      endReason: 'user-stop' as const,
+    }
+    const items = chatTimelineItems({
+      activities: [activity('previous-tool', sessionId, timestamp(3), turnId)],
+      latestTurn: runningTurn(parseTurnId('next-turn'), timestamp(6)),
+      turns: { [turnId]: previous },
+      messages: [
+        message('previous-question', sessionId, timestamp(1), 'user'),
+        message('carry-on', sessionId, timestamp(6), 'user'),
+      ],
+      optimisticMessages: [],
+      proposedPlans: [],
+    })
+    expect(items.find((item) => item.type === 'turn-fold')).toMatchObject({
+      label: expect.stringContaining('You stopped it'),
+    })
+  })
+
   it.each(['completed', 'interrupted', 'error'] as const)(
     'removes the live activity when a turn is %s',
     (state) => {

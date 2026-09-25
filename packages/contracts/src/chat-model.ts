@@ -512,6 +512,7 @@ export const orchestrationSessionSchema = v.object({
   runtimeMode: v.optional(runtimeModeSchema, DEFAULT_RUNTIME_MODE),
   interactionMode: v.optional(interactionModeSchema, DEFAULT_INTERACTION_MODE),
   latestTurn: v.nullable(orchestrationLatestTurnSchema),
+  turns: v.optional(v.record(turnIdSchema, orchestrationLatestTurnSchema)),
   createdAt: isoDateTimeSchema,
   updatedAt: isoDateTimeSchema,
   archivedAt: v.nullable(isoDateTimeSchema),

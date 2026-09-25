@@ -11,6 +11,7 @@ import {
   type OrchestrationProposedPlan,
   type OrchestrationSessionActivity,
   type OrchestrationSessionShell,
+  type OrchestrationSession,
   type ProjectId,
   type ProposedPlanId,
   type SessionId,
@@ -18,6 +19,7 @@ import {
 } from '@workspace/contracts'
 
 export type ProjectionSession = OrchestrationSessionShell & {
+  turns?: OrchestrationSession['turns']
   pendingMessageQuestions?: readonly OrchestrationSessionActivity[]
   pinOrderKey: string | null
   detailSynced: boolean

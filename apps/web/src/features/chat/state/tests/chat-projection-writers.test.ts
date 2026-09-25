@@ -1003,3 +1003,31 @@ function parseProposedPlanId(value: string) {
 function timestamp(index: number) {
   return `2026-05-24T00:00:${String(index).padStart(2, '0')}.000Z`
 }
+
+test('retains historical stop reasons across detail reload and a newer shell turn', () => {
+  const session = makeSessionDetail()
+  const stopped = {
+    ...fixtureSessionShell().latestTurn!,
+    turnId: parseTurnId('stopped-history'),
+    state: 'interrupted' as const,
+    endReason: 'user-stop' as const,
+  }
+  let state = syncChatProjectionSessionDetailSnapshot(
+    createInitialChatProjectionSlice(),
+    makeDetailSnapshot({
+      snapshotSequence: 1,
+      session: { ...session, latestTurn: stopped, turns: { [stopped.turnId]: stopped } },
+    }),
+  )
+  state = syncChatProjectionShellSnapshot(state, {
+    worktrees: [fixtureWorktree()],
+    projects: [makeProject()],
+    snapshotSequence: 2,
+    sessions: [makeSessionShell({ id: session.id })],
+    updatedAt: timestamp(2),
+  })
+  expect(state.sessionById[session.id]?.turns?.[stopped.turnId]).toMatchObject({
+    state: 'interrupted',
+    endReason: 'user-stop',
+  })
+})

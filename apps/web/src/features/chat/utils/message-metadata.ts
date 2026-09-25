@@ -21,11 +21,13 @@ export type ChatMessageTimelineMetadata = {
 
 export function chatMessageTimelineMetadata({
   latestTurn,
+  turns = {},
   messages,
   showCompletionSummary = true,
   activeResponseTurnIds = chatActiveResponseTurnIds({ messages, entries: [], latestTurn }),
 }: {
   latestTurn: OrchestrationLatestTurn | null
+  turns?: Readonly<Record<string, OrchestrationLatestTurn>>
   messages: readonly ChatTimelineMessage[]
   showCompletionSummary?: boolean
   activeResponseTurnIds?: ReadonlySet<TurnId>
@@ -40,10 +42,11 @@ export function chatMessageTimelineMetadata({
   const completionDividerMessageId = completionSummary
     ? deriveCompletionDividerMessageId(orderedMessages, latestTurn)
     : null
-  const stoppedTurnId = turnStoppedShort(latestTurn) ? (latestTurn?.turnId ?? null) : null
   const metadataByMessageId = new Map<string, ChatMessageTimelineMetadata>()
 
   for (const message of messages) {
+    const turn =
+      message.turnId === latestTurn?.turnId ? latestTurn : (turns[message.turnId ?? ''] ?? null)
     const assistantTurnInProgress = isAssistantTurnInProgress(message, activeResponseTurnIds)
     metadataByMessageId.set(message.id, {
       assistantStreaming: isAssistantMessageStreaming(message, latestTurn),
@@ -51,10 +54,7 @@ export function chatMessageTimelineMetadata({
       completionSummary,
       durationEnd: durationEndForMessage(message, latestTurn, completionDividerMessageId),
       durationStart: durationStartByMessageId.get(message.id) ?? message.createdAt,
-      incomplete:
-        stoppedTurnId !== null &&
-        message.turnId === stoppedTurnId &&
-        terminalAssistantMessageIds.has(message.id),
+      incomplete: turnStoppedShort(turn) && terminalAssistantMessageIds.has(message.id),
       showAssistantCopyButton:
         message.role === 'assistant' && terminalAssistantMessageIds.has(message.id),
       showCompletionDivider:
