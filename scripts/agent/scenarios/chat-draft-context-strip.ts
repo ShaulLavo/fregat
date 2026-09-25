@@ -155,6 +155,7 @@ export const chatDraftContextStrip: Scenario = {
       )
       await step('recorded-parent-after-reload')
       await page.keyboard.press('Escape')
+      await selectors.popupMenu(page).waitFor({ state: 'hidden' })
 
       await workspace.click()
       await page.getByRole('menuitemradio', { name: new RegExp(`^${LINKED_BRANCH}`) }).click()
