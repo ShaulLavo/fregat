@@ -45,7 +45,7 @@ export function SearchFileGroupHeader({
         )}
       />
       <FileLabel className='flex-1' path={group.pathLabel} />
-      <span className='text-2xs text-muted-foreground shrink-0 tabular-nums'>
+      <span className='text-2xs text-muted-foreground shrink-0 font-mono tabular-nums'>
         {group.count.toLocaleString()}
       </span>
       {replaceVisible ? (

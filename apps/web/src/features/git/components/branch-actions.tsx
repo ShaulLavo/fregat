@@ -63,7 +63,7 @@ export function BranchActions({
           target='_blank'
         >
           <GitPullRequestIcon className='size-(--icon-size-sm)' />
-          <span className='tabular-nums'>#{pullRequestState.pullRequest.number}</span>
+          <span className='font-mono tabular-nums'>#{pullRequestState.pullRequest.number}</span>
           <ArrowSquareOutIcon className='size-(--icon-size-sm) opacity-60' />
         </a>
       ) : null}

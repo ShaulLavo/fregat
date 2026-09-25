@@ -33,7 +33,7 @@ export function TerminalContextChip({
     >
       <TerminalWindowIcon aria-hidden='true' className='size-(--icon-size-sm) shrink-0' />
       <span className='shrink-0'>{selection.source}</span>
-      <span className='text-muted-foreground shrink-0 tabular-nums'>
+      <span className='text-muted-foreground shrink-0 font-mono tabular-nums'>
         {formatTerminalContextRange(selection)}
       </span>
       {preview.length > 0 ? (

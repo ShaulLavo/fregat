@@ -119,7 +119,7 @@ export function DraftWorkspaceMenu({
                 <FoldersIcon className='size-(--icon-size-sm)' />
                 <span className='truncate'>{worktreeLabel(worktree, 'git')}</span>
                 {worktree.cleanupEligibility.nonDeletedSessionCount > 0 ? (
-                  <span className='text-muted-foreground text-2xs ml-auto tabular-nums'>
+                  <span className='text-muted-foreground text-2xs ml-auto font-mono tabular-nums'>
                     {worktree.cleanupEligibility.nonDeletedSessionCount}
                   </span>
                 ) : null}

@@ -46,7 +46,7 @@ export function ReferenceGroupRow({
           {group.pathLabel}
         </span>
       </span>
-      <span className='bg-muted/50 text-muted-foreground text-3xs rounded-md px-1 leading-4 tabular-nums'>
+      <span className='bg-muted/50 text-muted-foreground text-3xs rounded-md px-1 font-mono leading-4 tabular-nums'>
         {group.targets.length}
       </span>
     </ListRow>

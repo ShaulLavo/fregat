@@ -80,7 +80,9 @@ export const SearchMatchRow = memo(
             compact && 'grid-cols-[34px_minmax(0,1fr)] gap-1.5',
           )}
         >
-          <span className='text-muted-foreground text-2xs text-right tabular-nums'>{location}</span>
+          <span className='text-muted-foreground text-2xs text-right font-mono tabular-nums'>
+            {location}
+          </span>
           <span
             className={cn('flex min-w-0 items-center gap-2 overflow-hidden', compact && 'gap-1.5')}
           >

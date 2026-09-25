@@ -24,7 +24,7 @@ export function PaletteContrast({ colors }: { readonly colors: PaletteColors }) 
           <span>
             {appRoleLabel(failure.foreground)} on {appRoleLabel(failure.background)}
           </span>
-          <span className='tabular-nums'>{failure.ratio.toFixed(2)}:1</span>
+          <span className='font-mono tabular-nums'>{failure.ratio.toFixed(2)}:1</span>
         </li>
       ))}
     </ul>

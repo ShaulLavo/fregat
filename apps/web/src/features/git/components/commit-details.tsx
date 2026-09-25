@@ -132,7 +132,7 @@ export function CommitDetails({
               {details.data.author}{' '}
               <span title={details.data.authorEmail}>&lt;{details.data.authorEmail}&gt;</span>
             </p>
-            <p className='text-muted-foreground text-2xs tabular-nums'>
+            <p className='text-muted-foreground text-2xs font-mono tabular-nums'>
               {new Date(details.data.timestamp).toLocaleString()}
             </p>
             {details.data.message !== details.data.subject ? (
@@ -163,7 +163,7 @@ export function CommitDetails({
           </CollapsibleContent>
           <PaneBar>
             <span className='text-xs font-medium'>Changed files</span>
-            <span className='text-muted-foreground text-2xs tabular-nums'>
+            <span className='text-muted-foreground text-2xs font-mono tabular-nums'>
               {details.data.files.length}
             </span>
           </PaneBar>

@@ -548,7 +548,6 @@ surfaces, the file picker and the site. The owner is taking it one topic at a ti
 | 161 (done, lane L2)                          | Approval lifecycle, stopped turns, streaming holds, folding rules, hostile-state scenarios                  |
 | [162](plans/162-context-and-cost.md)         | Context breakdown, usable-window fullness, session totals, usage-page honesty (after Plan 141)              |
 | 163 (done, lane L2)                          | Screenshot attachment in the composer (export lives in Plan 145's export plan)                              |
-| [164](plans/164-what-feels-right-in-neon.md) | First pass shipped (Inter, one mono, `section-label`, radius); a metadata font sweep is left                |
 | [165](plans/165-font-catalog.md)             | Nerd Fonts + Fontsource on demand; interface-font setting; curated autocomplete picker                      |
 | [166](plans/166-shortcuts-editor.md)         | Keyboard shortcuts page rebuilt from VS Code research: full-width list, save on Enter, several per command  |
 | [154](plans/154-physical-mode.md)            | The seamui feel (springs, depth, motion in every primitive) and interface sounds                            |
@@ -561,8 +560,8 @@ Suggested order:
    scroll fades, typeahead refine.
 2. Plans 158–163 in any order once their decisions are answered. 158 builds on 157's status dot and
    scroll utilities; 160 and 161 touch the same timeline rows, so land them one after the other.
-3. Plan 164's first pass shipped (`03f241fc`, `e8156148`); what is left is a metadata font sweep. The
-   square status dots shipped with Plan 157.
+3. Plan 164 is done: the first pass (`03f241fc`, `e8156148`), square status dots (Plan 157) and the
+   metadata font sweep (lane L1, 2026-09-25).
 4. Plan 165, the font catalog, is done (`d9c6069e`, review `7ad4c866`, 2026-09-25).
 5. Plan 154 near the end. Phases 1–3 may land earlier; Phases 4–6 wait for the base components so
    every new primitive is wired and audited once. D6 (settings semantics) comes first.

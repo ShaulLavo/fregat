@@ -302,7 +302,7 @@ export function SessionRail() {
           />{' '}
           <TooltipContent>{`Archived sessions (${model.archivedCount})`}</TooltipContent>
         </Tooltip>
-        <span className='text-muted-foreground text-2xs shrink-0 tabular-nums'>
+        <span className='text-muted-foreground text-2xs shrink-0 font-mono tabular-nums'>
           {model.scopedCount}
         </span>
       </div>

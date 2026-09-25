@@ -101,7 +101,7 @@ export function SessionRow({ session }: { readonly session: SessionRailItem }) {
                 tone='info'
               />
             ) : null}
-            <span className='text-muted-foreground text-3xs shrink-0 tabular-nums'>
+            <span className='text-muted-foreground text-3xs shrink-0 font-mono tabular-nums'>
               {formatChatRelativeTime(session.activityAt, nowMs)}
             </span>
           </span>

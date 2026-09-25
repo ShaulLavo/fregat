@@ -6,7 +6,7 @@ export function ProblemCount() {
   const count = useMarkerTotal()
 
   return (
-    <span className='bg-muted text-muted-foreground text-3xs flex h-4 min-w-4 items-center justify-center rounded-full px-1 tabular-nums'>
+    <span className='bg-muted text-muted-foreground text-3xs flex h-4 min-w-4 items-center justify-center rounded-full px-1 font-mono tabular-nums'>
       <TickerNumber size='3xs' value={count} />
     </span>
   )

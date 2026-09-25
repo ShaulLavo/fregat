@@ -21,7 +21,7 @@ export function SessionProjectPaletteRow({ project }: { readonly project: Sessio
     >
       <PlusIcon className='text-muted-foreground' weight='bold' />
       <RowLabel label={project.title} description={project.workspaceRoot} />
-      <CommandShortcut className='tabular-nums'>{project.sessionCount}</CommandShortcut>
+      <CommandShortcut className='font-mono tabular-nums'>{project.sessionCount}</CommandShortcut>
     </CommandItem>
   )
 }

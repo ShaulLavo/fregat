@@ -69,7 +69,7 @@ export function SessionScopeMenu({
                   </span>
                 ) : null}
               </span>
-              <span className='text-muted-foreground text-2xs shrink-0 tabular-nums'>
+              <span className='text-muted-foreground text-2xs shrink-0 font-mono tabular-nums'>
                 {project.sessionCount}
               </span>
             </DropdownMenuRadioItem>
