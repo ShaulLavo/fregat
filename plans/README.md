@@ -53,7 +53,7 @@ a bare root `bun run verify`.
 | [126 — T3 Code behavioral alignment](126-t3code-alignment.md)                           | **IN PROGRESS — 26 OF 57 GROUPS DONE (8 VERIFIED), 9 PARTIAL, 22 OPEN** |
 | [071 — syntax highlight retry](071-syntax-highlight-retry.md)                           | **PROPOSED — ROOT GO/NO-GO SCHEDULING**                                 |
 | [080 — Platform and VS Code keybinding modes](080-platform-keybinding-modes.md)         | **PROPOSED — INTERACTION RULES CONFIRMED**                              |
-| [087 — stateless MCP support](087-stateless-mcp.md)                                     | **PROPOSED — IMPLEMENTATION NOT STARTED**                               |
+| [087 — stateless MCP support](087-stateless-mcp.md)                                     | **M0 APPROVED 2026-09-25; M1+ AWAITS THE OWNER**                        |
 | [088 — native code intelligence](088-native-code-intelligence.md)                       | **PROPOSED — DEPENDS ON 087**                                           |
 | [091 — error and timing helpers](091-error-and-timing-helpers.md)                       | **PARTIAL — IDENTICAL HALVES MERGED (`becdf722`); REST OPEN**           |
 | [092 — path and URI helpers](092-path-and-uri-helpers.md)                               | **PARTIAL — IDENTICAL HALVES MERGED (`becdf722`); REST OPEN**           |

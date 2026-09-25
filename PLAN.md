@@ -231,6 +231,8 @@ platform guard permits Linux and macOS only.
 
 Requested 2026-09-11. [Plan 087](plans/087-stateless-mcp.md) precedes
 [Plan 088](plans/088-native-code-intelligence.md). Both are proposed; implementation has not started.
+Decided 2026-09-25: owner — approve 087 milestone M0 only; M1+ is discussed with the owner before
+anything else in 087 or 088 starts.
 
 Plan 087 delivers managed external MCP servers and an authenticated native tool endpoint. The
 required wire revision is stateless MCP `2026-07-28`, implemented with explicitly configured SDK v2.
