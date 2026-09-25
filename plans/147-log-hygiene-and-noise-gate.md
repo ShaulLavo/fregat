@@ -154,6 +154,17 @@ There is no runtime log gate. `bun run gates` covers source only (`package.json:
    A group the previous release already had is reported as known and does not fail the deploy,
    matching the check's existing pre-existing handling (`live-check.mjs:2`, `:71-75`).
 
+Carried over from Plan 125, closed 2026-09-25 (its result is
+[observability admission and retention](../docs/observability-overhead.md)). Measure each before
+changing it, and ship a change only with the measured cost beside it:
+
+5. Server log filter and reader throughput: the file scan behind `bun run logs` and the log viewer.
+6. Gating the linked Editor packages' log producers before payload construction. The Editor half
+   lands in the Editor repo.
+7. Total-byte admission for the client's HTTP log queue, beside its existing count bound.
+8. The two evidence drives Plan 125 left: a development-server baseline for its scenarios, and a
+   live mock-provider streaming and reconnect drive with the admission changes in place.
+
 ## Verification
 
 - Server: narrow tests for `httpStatusLevel`, the reaper against a deleted instance (one warn, then
@@ -171,8 +182,7 @@ There is no runtime log gate. `bun run gates` covers source only (`package.json:
 
 - **Plan 146** (isolated state and verification) removes the fixture recents behind most of the
   `NOT_FOUND` volume. 146 removes the source; 147 fixes the levels. Either can land first.
-- **Plan 125** owns logging overhead and admission. This plan changes levels and producers, not
-  admission or delivery; reconcile any shared helper edit with it.
+- **Plan 125** (closed) built logging admission and delivery; its open items are Phase 3 steps 5–8.
 - **Plan 126 RUNTIME-04**: the seven 09-24 `LIVE_STREAM_OVERFLOW` events were ACK timeouts, not
   buffer overflows. They are not evidence for RUNTIME-04's overflow recovery.
 

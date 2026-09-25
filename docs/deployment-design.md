@@ -1,6 +1,6 @@
 # Desktop and one-command web deployment
 
-Status: proposed design, implementation not started. Based on Platform `548cebdf`, inspected on 2026-09-11. This document does not change execution order in `PLAN.md`. The "One server owns the application" section is promoted into [plan 105](../plans/105-one-server-mesh-deployment.md) together with the mesh deploy procedure; the npm and desktop packaging sections remain proposed here.
+Status: proposed design, implementation not started. Based on Platform `548cebdf`, inspected on 2026-09-11. This document does not change execution order in `PLAN.md`. The "One server owns the application" section is promoted into plan 105 together with the mesh deploy procedure; the npm and desktop packaging sections remain proposed here.
 
 ## The launch experience
 

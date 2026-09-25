@@ -11,7 +11,7 @@ Handoffs A and B) without an owner. This plan is that owner.
 
 It covers the Editor's inline worker blobs, the unreachable `@phosphor-icons/react` weights, and a
 costed look at what is left after both. It does not cover loading boundaries or the first-load gate
-([Plan 109](109-boot-boundaries.md)), the instrument ([Plan 106](106-boot-weight.md)), the markdown
+([Plan 109](109-boot-boundaries.md)), the instrument (Plan 106), the markdown
 stack ([Plan 108](108-markdown-modes.md)), or removing Lexical from the composer, which is
 [Plan 111](111-editor-decorations.md) question 7 and is not executable until 111 answers it.
 

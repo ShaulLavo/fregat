@@ -265,7 +265,10 @@ verification script passes across Platform and the linked Editor package. The re
 ## Duplication census lane
 
 Requested 2026-09-11. Plan 090 is implemented. Its [regression reference](docs/duplicate-defect-regressions.md)
-records the fixes, baseline corrections, and focused checks. Plan 096 is also complete. The remaining five plans are proposed.
+records the fixes, baseline corrections, and focused checks. Plan 096 is also complete. Commit `becdf722`
+(2026-09-20) then merged the byte-identical halves of 091–095, created `packages/utils` (timing,
+`isRecord`, subscriptions) and added the `dupes` / `dupes:functions` gates. What remains in those five
+plans is the divergent helpers, where a decision picks which behaviour wins; the gates cannot see them.
 
 [Plan 091](plans/091-error-and-timing-helpers.md), [Plan 092](plans/092-path-and-uri-helpers.md),
 [Plan 093](plans/093-web-react-and-store-ceremony.md), and
@@ -304,10 +307,10 @@ fixed Search and Settings loading shifts, file-tree row corners, and remaining s
 The completed plan file is deleted; the implementation reference owns the contracts and evidence.
 
 Three independent follow-ups remain proposed:
-[Plan 101](plans/101-truncation-recovery.md) recovers the values truncation hides,
+Plan 101 recovers the values truncation hides,
 [Plan 102](plans/102-scroll-and-keyboard-affordance.md) settles scrollbars, nested-scroll
 containment and keyboard chips, and
-[Plan 103](plans/103-loading-empty-error-states.md) finishes the loading, empty and error states
+Plan 103 finishes the loading, empty and error states
 `CLAUDE.md` already decided (closed 2026-09-20, implemented and deployed). Each names the decisions that need confirmation before implementation.
 They preserve the implemented design tokens and extend the existing census and browser verifier.
 
@@ -320,10 +323,10 @@ build on these patterns; 103's loading states mount inside the shared shell.
 ## Theme standardization
 
 Requested 2026-09-12, split 2026-09-14. Plan 104 is retired and replaced by three plans that build
-the pieces before the bundle. [Plan 115](plans/115-palettes-as-data.md) moves palettes out of CSS
+the pieces before the bundle. Plan 115 moves palettes out of CSS
 into data: OKLCH canonical with hex at every boundary, sRGB only, paired or single-mode, a closed
 token set that now includes the terminal colors, a server library for user palettes, and an editor
-whose live preview writes variables to the root. [Plan 116](plans/116-wallpaper-library.md) gives
+whose live preview writes variables to the root. Plan 116 gives
 wallpaper a content-addressed library, a per-mode source setting, explicit rendering in the
 compositor backdrop, and an importer seeded from `/usr/share/omarchy/themes`.
 [Plan 117](docs/theme-bundles.md) binds separate light and dark variants under one name, each with
@@ -332,7 +335,7 @@ variant; switching applies the destination wallpaper. It adds a portable archive
 Omarchy importer.
 
 Plans 115 and 116 are implemented and deployed as of 2026-09-14, and
-[Plan 123](plans/123-wallpaper-picker.md) replaced 116's picker on 2026-09-17: a dialog with uploads,
+Plan 123 replaced 116's picker on 2026-09-17: a dialog with uploads,
 theme sections and a previewing palette scope, plus a display rendition. 117 is implemented and deployed as of 2026-09-19, including paired bundle editing, scoped
 customization, portable archives, Omarchy import and shared web/TUI resolution. It reuses the picker
 and the existing syntax registrations. CSS-in-JS was considered and rejected: custom properties are the
@@ -352,18 +355,19 @@ readers migrate with each shared-settings cutover. Native Swift theme UI is outs
 
 ## First-load weight and markdown lane
 
-Requested 2026-09-13. Six plans from one review, and a seventh added 2026-09-20 of the production web build. The deployed release
-sends **2421 KB gzip of JavaScript before the first frame**, 2311 KB of it in a single chunk. The
+Requested 2026-09-13. Six plans from one review, and a seventh added 2026-09-20 of the production web build. At the review the
+deployed release sent 2421 KB gzip of JavaScript before the first frame, 2311 KB of it in a single chunk.
+Plans 106, 107, 109 (Phases 2–3) and 129 (Phases 1–2) brought it to 1,610,904 B gz by 2026-09-21. The
 cause is not bundler configuration — Rolldown is already in use and `apps/web/vite.config.ts` has no
 chunking options because the application declares almost no loading boundaries. Chunk boundaries
 come only from dynamic `import()` in source.
 
 Execution order is strict:
 
-1. [Plan 106](plans/106-boot-weight.md) builds the measurement instrument first, then defers Mermaid
+1. Plan 106 builds the measurement instrument first, then defers Mermaid
    off the boot path and replaces the full Phosphor icon font — imported by one line of
    `packages/editor-find/src/style.css` for eleven glyphs — with inline path data. No dependencies.
-2. [Plan 107](plans/107-workspace-markdown.md) replaces streamdown with `@workspace/markdown`,
+2. Plan 107 replaces streamdown with `@workspace/markdown`,
    built on `unified` with termination healing and T3's incremental prefix parse. This is what
    removes the second complete `shiki@3.23.0` installation that `@streamdown/code` hard-depends on,
    and with it 123 duplicated grammar and theme chunks.
@@ -396,18 +400,24 @@ Obsidian mode, and the question of whether the chat composer still needs Lexical
 
 Coordinate shared editor and chat surfaces with Plans 101–103 and 115; do not interleave edits to the same
 files. Plan 085 owns first paint and restoration, which this lane measures but does not change.
-Replacing React with a smaller reimplementation was considered and rejected: React is 60 KB of a
-2421 KB first load, so it is revisited only once it is the largest remaining line item.
+Replacing React with a smaller reimplementation was considered and rejected: React is 60 KB of the
+first load, so it is revisited only once it is the largest remaining line item.
+
+Plans 106 and 107 are done and deleted. What remains of the lane is 108 Phase 1, 109's gate
+(Phase 4) and its Phase 1 doc, and 129 Phase 3 (Q2–Q4).
 
 ## React compiler and pane lifetime lane
 
-Requested 2026-09-20. [Plan 127](plans/127-compiler-and-lifetime-repairs.md) precedes
-[Plan 128](plans/128-react-19-patterns.md). Plan 127 is implemented and deployed (2026-09-20).
-Plan 128 is proposed and not started.
+Requested 2026-09-20. Plan 127 precedes
+[Plan 128](plans/128-react-19-patterns.md). Plan 127 is done (`d5e7f213`, `e93ff779`) and deleted:
+the compiler census runs in `gates`, and `lib/keep-alive` keeps terminals mounted across layout
+changes. Plan 128 is not started and is partly obsolete. `2acc3b73` deleted the server's detach TTL,
+so no shell is killed ten minutes after an unmount, and keep-alive covers its first two terminal
+sites. The completion wave runs it rewritten small: A1.3, B2 and the `AGENTS.md` section.
 
 Plan 127 is the repair pass. It turns the React Compiler's diagnostics on, pins them with a census
 beside the design census, clears the `ref={focusTarget.ref}` bailouts, stops the bottom panel and its
-collapse from unmounting every terminal and arming the server's ten-minute kill, settles git stage,
+collapse from unmounting every terminal, settles git stage,
 unstage and discard from the response the server already computed, and takes one command-bus capture
 per palette keystroke instead of one per row. Plan 128 follows with the written rules and the two
 prerequisites the remaining pane work waits behind: `packages/tree` lifetime, and a `VirtualList`
@@ -428,24 +438,28 @@ day swept both repositories for the same shape and for workarounds generally. Th
 grouped by owner into four Platform plans and five Editor backlog entries. Items marked verified in
 each plan were confirmed in source; the rest are audit findings an implementer re-checks first.
 
-Suggested order (steps 1–3 done 2026-09-23; step 4 is next):
+Suggested order (steps 1–4 done by 2026-09-23; step 5 is in progress):
 
 1. [Plan 131](plans/131-provider-codes-not-prose.md) Phase 1 and
    [Plan 132](plans/132-process-and-dev-ownership.md) Phase 1. A tool permission's lifetime is
    decided by substring match, and the desktop app can kill a process it does not own. Both are
    small and both need a `--server` or desktop restart, so batch them.
-2. [E047](../Editor/plans/e047-point-and-row-queries.md), then
+2. [E047](../Editor/docs/display/e047-point-queries.md), then
    [Plan 130](plans/130-ask-the-editor.md) Phases 1 and 4. One point query in the Editor removes the
    search-result row arithmetic, the unicode hover's marker scan and the residue in `diffRowAtEvent`.
    Done: E047 landed in Editor `6656eb7`, and Plan 130 Phases 1, 2 and 4 are implemented and verified.
 3. [E048](../Editor/docs/display/e048-minimap-document-space.md) and
-   [E051](../Editor/plans/e051-fast-path-equivalence.md). The minimap repeats the display-row bug,
-   and the row-layout fast path has no equivalence test.
-4. [E049](../Editor/plans/e049-no-silent-misses.md), [Plan 133](plans/133-one-owner-per-fact.md).
-   Plan 133 is done 2026-09-23 (all four phases; D1 moved to Plan 134). E049 waits on E033.
+   [E051](../Editor/docs/display/e051-fast-path-equivalence.md). The minimap repeats the display-row bug,
+   and the row-layout fast path has no equivalence test. Done: Editor `2f801f7` and `7a37f10`.
+4. [E049](../Editor/docs/architecture/e049-no-silent-misses.md), Plan 133. Done: E049 in Editor
+   `f715d11`; Plan 133's four phases 2026-09-23, D1 moved to Plan 134 and closed there.
 5. [E050](../Editor/plans/e050-host-obligations-into-api.md) row by row, each unlocking its Plan 130
    Phase 5 item. In progress: rows re-checked 2026-09-24; row 1 (`setText` with tokens), row 5 (press
    participants), row 6 (plugin keymap context keys) and typography options (2026-09-25) done.
+   Rows 8 (`onDidScroll`) and 4 (theme keys) unlock Plan 130 Phase 5 items 8 and 10; the rest are
+   Editor-only. Plan 130 Phase 3 (`getStackedRows`) is a separate small Editor change.
+
+Left in the lane: Plan 131 Phases 2–3, Plan 132 Phases 2–4, the Plan 130 remainder and the E050 rows.
 
 The owner decided Plan 132 D4 on 2026-09-21: the server's migrations are deleted and the schema
 starts from scratch (Plan 132 Phase 4). External-change
@@ -469,7 +483,7 @@ phases or splits them into executable plans; not all research happens up front.
 
 | Plan                                       | Kind                     | Owns                                                                                                                        |
 | ------------------------------------------ | ------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
-| [138](plans/138-claude-model-discovery.md) | executable               | Claude models from the Claude CLI; chat runs the installed CLI                                                              |
+| 138 (done)                                 | executable               | Claude models from the Claude CLI; chat runs the installed CLI                                                              |
 | [139](plans/139-acting-on-agent-diffs.md)  | research                 | Keep or undo agent edits per hunk, batched diff comments to the agent, review mode, second-model review, plan line feedback |
 | [140](plans/140-editor-agent-advantage.md) | research                 | Editor context into chat, fix with AI, diagnostics fed back to the agent                                                    |
 | [141](plans/141-usage-and-rate-limits.md)  | executable               | Rate-limit meter, usage page with cost, usage history                                                                       |
@@ -485,7 +499,7 @@ Suggested order:
 
 1. ~~Plan 138~~ — implemented 2026-09-24.
 2. Quick wins: ~~Plan 141 Phases 1–3~~ (meter, per-turn recording, usage page; 2026-09-25), the
-   small Plan 145 plans, and the small new Plan 126 rows.
+   small Plan 145 plans (~~approval-rules~~, merged in `89c58188`), and the small new Plan 126 rows.
 3. Plan 142 after its spike. It needs only a minimal web app manifest, not Plan 143.
 4. The research phases of Plans 139 and 140. Plan 140's diagnostics work waits on Plans 087 and
    088; its editor-to-chat work does not.
@@ -499,15 +513,15 @@ Requested 2026-09-25. The owner is moving to Platform as their main agentic codi
 of the plans, both logs and the service journal named what stands in the way. The unit file's
 `SuccessExitStatus=143` was fixed on the spot.
 
-| Plan                                                | Owns                                                                                            |
-| --------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| [146](plans/146-isolated-state-and-verification.md) | Dev and prod stop sharing `~/.platform`; each `agent:browser` run gets its own server and state |
-| [147](plans/147-log-hygiene-and-noise-gate.md)      | Producer fixes, level rules, the reaper give-up, ACK timeout vs overflow, a `logs:census` gate  |
-| [148](plans/148-restart-when-idle.md)               | `deploy --server` stages; the server restarts when no turn is running                           |
-| [149](plans/149-terminal-host.md)                   | A PTY host that survives server restarts                                                        |
-| [150](plans/150-remote-server-version.md)           | Remote servers are checked for protocol and updated                                             |
-| [151](plans/151-remote-server-releases.md)          | Production ships its built server release to remote machines; Update/Install server button      |
-| [152](plans/152-remote-dev-builds.md)               | Dev primary builds this working tree and ships it through Plan 151, in its own remote channel   |
+| Plan                                           | Owns                                                                                            |
+| ---------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| 146 (done)                                     | Dev and prod stop sharing `~/.platform`; each `agent:browser` run gets its own server and state |
+| [147](plans/147-log-hygiene-and-noise-gate.md) | Producer fixes, level rules, the reaper give-up, ACK timeout vs overflow, a `logs:census` gate  |
+| [148](plans/148-restart-when-idle.md)          | `deploy --server` stages; the server restarts when no turn is running                           |
+| [149](plans/149-terminal-host.md)              | A PTY host that survives server restarts                                                        |
+| [150](plans/150-remote-server-version.md)      | Remote servers are checked for protocol and updated                                             |
+| [151](plans/151-remote-server-releases.md)     | Production ships its built server release to remote machines; Update/Install server button      |
+| [152](plans/152-remote-dev-builds.md)          | Dev primary builds this working tree and ships it through Plan 151, in its own remote channel   |
 
 Suggested order:
 
@@ -516,7 +530,8 @@ Suggested order:
 2. Plan 147, after 146 removes the pollution it would otherwise re-level.
 3. Plan 148, so Platform can deploy itself without killing the deploying turn.
 4. Plan 149, so terminals and dev servers survive the same restart.
-5. Plan 150 Phase 1, then Plan 151, whenever the Mac is needed. Plan 152 after 151.
+5. Plan 150 Phase 1, then Plan 151, whenever the Mac is needed. Plan 152 after 151. `129fdea6`
+   already keeps the catalog why and fix on stored machine errors; the protocol check is left.
 6. Then Claude rewind and fork ([Plan 145 fork](plans/145-harness-controls/fork.md), Plan 126
    RUNTIME-01) and the Plan 139 research phase.
 
@@ -535,7 +550,7 @@ surfaces, the file picker and the site. The owner is taking it one topic at a ti
 | [161](plans/161-honest-states.md)            | Approval lifecycle, stopped turns, streaming holds, folding rules, hostile-state scenarios                  |
 | [162](plans/162-context-and-cost.md)         | Context breakdown, usable-window fullness, session totals, usage-page honesty (after Plan 141)              |
 | [163](plans/163-chat-screenshot.md)          | Screenshot attachment in the composer (export lives in Plan 145's export plan)                              |
-| [164](plans/164-what-feels-right-in-neon.md) | Research: name what makes Neon feel right, restate it as our own rules and tokens                           |
+| [164](plans/164-what-feels-right-in-neon.md) | First pass shipped (Inter, one mono, `section-label`, radius); a metadata font sweep is left                |
 | [165](plans/165-font-catalog.md)             | Nerd Fonts + Fontsource on demand; interface-font setting; curated autocomplete picker                      |
 | [166](plans/166-shortcuts-editor.md)         | Keyboard shortcuts page rebuilt from VS Code research: full-width list, save on Enter, several per command  |
 | [154](plans/154-physical-mode.md)            | The seamui feel (springs, depth, motion in every primitive) and interface sounds                            |
@@ -547,12 +562,26 @@ Suggested order:
 1. Plan 157, the base components. Queued next by the owner.
 2. Plans 158–163 in any order once their decisions are answered. 158 builds on 157's status dot and
    scroll utilities; 160 and 161 touch the same timeline rows, so land them one after the other.
-3. Plan 164's study, ideally before most of 158–162 lands, so its rules shape them.
-4. Plan 154 near the end. Phases 1–3 may land earlier; Phases 4–6 wait for the base components so
+3. Plan 164's first pass shipped (`03f241fc`, `e8156148`); what is left is a metadata font sweep. The
+   square status dots belong to Plan 157.
+4. Plan 165, the font catalog, is done (`d9c6069e`, review `7ad4c866`, 2026-09-25).
+5. Plan 154 near the end. Phases 1–3 may land earlier; Phases 4–6 wait for the base components so
    every new primitive is wired and audited once. D6 (settings semantics) comes first.
-5. Plans 155 and 156 are placeholders; their research phases run when the site or documents matter.
-6. Plan 166 any time; its research phase runs first, and it takes 102 P3, 157 and 080 from `main` as
+6. Plans 155 and 156 are placeholders; their research phases run when the site or documents matter.
+7. Plan 166 any time; its research phase runs first, and it takes 102 P3, 157 and 080 from `main` as
    they land.
+
+## Parked plans
+
+Not in the [completion wave](docs/completion-wave.md), each for the reason given there:
+
+- [Plan 114](plans/114-polaron-shell.md), a desktop shell we own (tao, wry, Bun as a child). It
+  needs an explicit go/no-go, and it collides with the desktop work in Plans 132 and 149.
+- [Plan 168](plans/168-flat-file-view.md), a flat file view under a chosen root. It was Editor
+  E030; all of its work is in Platform. Quick open covers most of the need.
+- Plan 105 Phase 4, dropping the `/platform` route prefix. It needs service-level names in mesh,
+  which no mesh task covers. The rest of Plan 105 is done and its file is deleted; the hashed-asset
+  carry-forward between releases moved to Plan 109.
 
 ## Verification boundaries
 

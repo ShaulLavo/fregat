@@ -30,7 +30,7 @@ it there through Plan 151. The remote needs nothing beyond what Plan 151 needs: 
   deploy ships. It inlines `@singapore-editor/lsp` and `@singapore-editor/typescript-lsp`, which are
   the only Editor packages the server uses (`apps/server/package.json:34-35`). That leaves nothing
   for the remote to link or build.
-- Dev and prod state separation is [Plan 146](146-isolated-state-and-verification.md). The same
+- Dev and prod state separation is Plan 146. The same
   split applies to a remote that runs both a production and a development build.
 
 ## Decisions

@@ -8,9 +8,9 @@ This plan establishes three React patterns, applies each to a small proven set, 
 guidance that makes each one the default for the code written after it. It does not own the repairs
 it names: compiler bailouts, the two `ref={focusTarget.ref}` destructures, the stage/unstage
 settlement and the one-capture-per-palette-keystroke change belong to
-[Plan 127](127-compiler-and-lifetime-repairs.md); transferred bytes and loading boundaries belong to
-[Plan 109](109-boot-boundaries.md) and [Plan 106](106-boot-weight.md); async effect ownership is
-already settled by [Plan 118](118-async-effects-through-tanstack.md).
+Plan 127; transferred bytes and loading boundaries belong to
+[Plan 109](109-boot-boundaries.md) and Plan 106; async effect ownership is
+already settled by Plan 118.
 
 Root `PLAN.md` owns scheduling. This plan owns its internal execution order and does not reorder
 other work.
@@ -278,7 +278,7 @@ waits behind a prerequisite this plan scopes but does not spend.
 ## Phase A1 — the chat-mode surface stops killing the terminal
 
 The workbench bottom panel is not here. `bottom-panel.tsx:65` and `workbench/components/layout.tsx:96`
-are ranks 1 and 2 of [Plan 127](127-compiler-and-lifetime-repairs.md) Phase 3, which owns the repair
+are ranks 1 and 2 of Plan 127 Phase 3, which owns the repair
 and has already applied rank 1; this phase must not re-land either. What 127 leaves ranked and
 unrepaired is the chat-mode half of the same defect plus the unreachable-machine branch, and that is
 what this phase takes.
@@ -687,7 +687,7 @@ of the section.
 ### Nothing here can be gated by tooling
 
 The only automatable React-semantics measure in this area is the compiler census, and it belongs to
-[Plan 127](127-compiler-and-lifetime-repairs.md). Each of this plan's three patterns was checked for
+Plan 127. Each of this plan's three patterns was checked for
 a gate and each failed for its own reason:
 
 - **The resource rule.** The subtree is a component reference; the resource is three or four module
@@ -931,7 +931,7 @@ say so rather than substituting a unit test.
       instead of removing it, and the revealed host refits with a non-zero box.
 - [ ] `terminal/components/panel.tsx:296` renders the unreachable notice over a retained host.
 - [ ] The workbench bottom panel was not touched here: `bottom-panel.tsx:65` and
-      `workbench/components/layout.tsx:96` stayed with [Plan 127](127-compiler-and-lifetime-repairs.md)
+      `workbench/components/layout.tsx:96` stayed with Plan 127
       Phase 3.
 - [ ] Both `LogsPanel` call sites pass `active={tab === 'logs'}` inside an `<Activity>`, and the
       conflict comparison keeps both scroll positions across a hide.
@@ -956,7 +956,7 @@ say so rather than substituting a unit test.
 
 - **No repairs.** The compiler bailouts, the two `ref={focusTarget.ref}` destructures, settling git
   stage, unstage and discard from the response, and deleting `PlatformCommandBus.inspect` belong to
-  [Plan 127](127-compiler-and-lifetime-repairs.md). So do the workbench bottom panel's two unmount
+  Plan 127. So do the workbench bottom panel's two unmount
   sites, `bottom-panel.tsx:65` and `workbench/components/layout.tsx:96`, which are that plan's
   Phase 3 ranks 1 and 2.
 - **No touching `diff-pane.tsx:198` or `editor.tsx:320`.** Both spell `focusTarget.ref` into a prop,
@@ -971,7 +971,7 @@ say so rather than substituting a unit test.
   is edited.
 - **No `memo()` deletions.** The 24 are deliberate; they guard `VirtualList` rows the compiler cannot
   reach through the render prop.
-- **No bundle, chunking or dependency work.** That is [Plan 106](106-boot-weight.md) and
+- **No bundle, chunking or dependency work.** That is Plan 106 and
   [Plan 109](109-boot-boundaries.md).
 - **No conversion of `workspace/components/view.tsx:22`**, the sidebar tab strip, the chat session
   stage, or `packages/ui/src/patterns/tool-pane.tsx`. Each is blocked on a prerequisite this plan

@@ -753,7 +753,7 @@ and complete validation. Writing the plan does not schedule production execution
   backend cutover starts in unit 2 and follows completed 098 and 097 contracts. Refresh anchors and measurements
   at that cutover rather than implement against a competing draft identity or provenance model.
 - [E007](../../Editor/docs/performance/e007-consumer-copies.md) and
-  [E033](../../Editor/plans/e033-explicit-full-text-boundary.md) supply range/full-text constraints.
+  [E033](../../Editor/docs/performance/e033-full-text-boundary.md) supply range/full-text constraints.
   Reconcile overlapping consumer moves instead of implementing parallel abstractions.
 - [Completed E032](../../Editor/docs/performance/e032-edit-batches.md) supplies incremental batch
   behavior and measurements. Preserve its sparse-region requirements and canonical batch semantics.

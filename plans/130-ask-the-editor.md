@@ -9,7 +9,7 @@ pane class, re-running the diff projection to index into it, and relying on a ru
 (`documentModeViolations`) to warn when the assumption broke. `diffRowAtEvent` replaced all three.
 An audit the same day found the pattern again, in nine places on the Platform side of the
 Editor boundary. This plan removes them. Its Editor counterparts are
-[E047](../../Editor/plans/e047-point-and-row-queries.md) and
+[E047](../../Editor/docs/display/e047-point-queries.md) and
 [E050](../../Editor/plans/e050-host-obligations-into-api.md).
 
 ## What is on the table
@@ -117,5 +117,5 @@ Per phase, the scenario named above plus `look` on the changed surface, evidence
 ## What this plan does not do
 
 It does not touch Platform's own workbench DOM (`data-editor-tab-*`, `data-editor-group-*`), which
-Platform owns; that is [plan 133](133-one-owner-per-fact.md). It does not redesign the diff plugin's
+Platform owns; that is plan 133. It does not redesign the diff plugin's
 document ownership (E050 D1).

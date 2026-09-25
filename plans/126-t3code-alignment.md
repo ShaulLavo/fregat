@@ -339,7 +339,7 @@ implementation or a Platform-specific extension. Implement once, then close both
 
 | Plan                                                                 | Overlapping groups                     | Split                                                                |
 | -------------------------------------------------------------------- | -------------------------------------- | -------------------------------------------------------------------- |
-| [138 — Claude models from the CLI](138-claude-model-discovery.md)    | RUNTIME-06, RUNTIME-10, INTERACTION-14 | 138 owns the Claude catalog, binary and reported version             |
+| 138 — Claude models from the CLI                                     | RUNTIME-06, RUNTIME-10, INTERACTION-14 | 138 owns the Claude catalog, binary and reported version             |
 | [139 — acting on the agent's diff](139-acting-on-agent-diffs.md)     | INTERACTION-09, EXT-02                 | 139 owns hunk keep/undo and review; review sources stay here         |
 | [140 — the editor as agent advantage](140-editor-agent-advantage.md) | INTERACTION-09                         | 140 owns editor-to-agent context; assistant citation stays here      |
 | [141 — usage and rate limits](141-usage-and-rate-limits.md)          | RUNTIME-08, INTERACTION-07, EXT-17     | 141 implements quota surfaces and the usage page                     |

@@ -1,6 +1,6 @@
 # The theme studio
 
-Status: proposed, implementation not started. Requested 2026-09-19, the day [Plan 117](../docs/theme-bundles.md) shipped. Replaces 117's gallery, creation dialog and variant editors. Keeps 117's contracts, server library, archive and resolver, and [Plan 123](123-wallpaper-picker.md)'s wallpaper library, renditions and palette-scope preview.
+Status: proposed, implementation not started. Requested 2026-09-19, the day [Plan 117](../docs/theme-bundles.md) shipped. Replaces 117's gallery, creation dialog and variant editors. Keeps 117's contracts, server library, archive and resolver, and Plan 123's wallpaper library, renditions and palette-scope preview.
 
 Plan 117 built the right data: a theme is a light and a dark variant, each with app colors, code colors, a wallpaper and a material, customizable per variant, portable as one archive. It then put that data behind the wrong door. Choosing a theme is a settings row; the row lives in a settings page that opens as an editor tab, so the editor — the surface a theme changes most — is replaced by the page that is supposed to show the theme. Creating one is a modal whose backdrop blurs the app you are trying to see. The preview inside each card is nine lines of a fake file. Wallpaper, app colors and code colors each have a separate widget and a separate dialog for what is one decision.
 
