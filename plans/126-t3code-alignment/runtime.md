@@ -103,6 +103,7 @@ Upstream paths shortened to `provider/…` or `orchestration/…` in tables mean
 
 ### RUNTIME-07 — Make idle cleanup aware of background work and periodic
 
+- Decided 2026-09-25: owner — recheck against Codex 0.157 is approved.
 - **Status / priority / confidence:** Confirmed policy mismatch; P2; HIGH for missing guard/timer, MED for a particular silent-child termination scenario.
 - **Evidence:** Upstream `apps/server/src/provider/Layers/ProviderSessionReaper.ts:75-95` excludes active turns and background liveness, and `:130-144` runs every five minutes after a thirty-minute idle window. `apps/server/src/orchestration/ThreadBackgroundLiveness.ts:104-149` distinguishes live nested agents/monitors from idle/completed tasks. Local `apps/server/src/provider/provider-session-reaper.ts:13,89-100` considers only `ready`, timestamp and launch/exemption; `provider/provider-service.ts:223` triggers it on a new runtime. Local parent completion sets `ready` at `provider/adapters/codex.ts:1832`. Event liveness refresh exists but is not a persistent background-work guard.
 - **Impact:** Idle runtimes can remain indefinitely if no new runtime starts. A ready parent with background work producing no event for the idle interval can be reclaimed on the next launch, unlike upstream.
@@ -113,6 +114,7 @@ Upstream paths shortened to `provider/…` or `orchestration/…` in tables mean
 
 ### RUNTIME-08 — Publish account usage limits and wire reset-credit redemption
 
+- Decided 2026-09-25: owner — build with boundary fixtures only. Nothing is spent until the owner does one live redemption.
 - **Status / priority / confidence:** Confirmed partial implementation; P2; HIGH.
 - **Evidence:** Upstream `apps/server/src/provider/Drivers/CodexDriver.ts:285-328` serializes redemption per account with an idempotency key and refresh verification; `apps/server/src/ws.ts:2390-2411` exposes it with enabled-instance/capability checks; `apps/web/src/components/usage/UsageLimits.tsx:209` invokes it. Local `apps/server/src/provider/adapters/codex.ts:1355` and `claude.ts:844` emit rate-limit events, but `packages/contracts/src/provider.ts:105-131` has no usage-window/reset-credit snapshot or action. `apps/web/src/features/chat/utils/activity-visibility.ts:9` hides the raw rate event.
 - **Impact:** Native rate telemetry does not provide upstream account-level usage windows or a usable reset-credit action.

@@ -137,14 +137,15 @@
       "title": "Add input/completion notifications and sound behavior",
       "report": "adjacent.md",
       "wave": "2",
-      "status": "in-progress",
-      "evidence_level": "historical-local-and-browser-evidence; full-acceptance-pending",
+      "status": "verified",
+      "evidence_level": "scenario-verified",
       "acceptance": "adjacent.md, EXT-06, Acceptance / verification",
       "execution_evidence": [
         "notifications-delivery.md",
         "Historical release 20260920T153923Z-b915d3e0-plan126-stash-notices-history; /work/tmp/fregat-evidence/20260920T154618Z-scenario-session-notifications/summary.md records completed headed browser verification",
         "Recorded proof covers toast navigation, native Notification construction, favicon count, click/focus cleanup, silent reload and archive; pinned decision comparison covers 900 cases",
-        "Remaining: visible operating-system popup and audible output, desktop bridges and badges, cross-machine live navigation, and full upstream runtime comparison"
+        "Remaining: visible operating-system popup and audible output, desktop bridges and badges, cross-machine live navigation, and full upstream runtime comparison",
+        "Decided 2026-09-25: owner — close on the existing scenarios: scripts/agent/scenarios/session-notifications.ts passed at /work/tmp/fregat-evidence/20260920T154618Z-scenario-session-notifications, with the pinned decision comparison (900 cases). OS popup and sound, desktop bridges and badges carry on under EXT-09; push is Plan 142."
       ]
     },
     {
@@ -193,14 +194,15 @@
       "title": "P1: Match unread defaults, manual unread, and wake state",
       "report": "lifecycle.md",
       "wave": "2",
-      "status": "in-progress",
-      "evidence_level": "historical-local-and-browser-evidence; full-acceptance-pending",
+      "status": "verified",
+      "evidence_level": "scenario-verified",
       "acceptance": "lifecycle.md, LIFE-07, Acceptance / verification",
       "execution_evidence": [
         "unread-delivery.md",
         "Historical release 20260920T132650Z-b915d3e0-plan126-live-delivery; /work/tmp/fregat-evidence/20260920T132724Z-scenario-session-unread/summary.md records completed browser verification",
         "Recorded proof covers completion while away, visit acknowledgment, manual unread after reload, timer wake retention and explicit wake acknowledgment; pinned wake comparison covers 189 cases",
-        "Remaining: live background-tab visibility, native/mobile controls and full upstream runtime comparison"
+        "Remaining: live background-tab visibility, native/mobile controls and full upstream runtime comparison",
+        "Decided 2026-09-25: owner — close on the existing scenarios: scripts/agent/scenarios/session-unread.ts passed at /work/tmp/fregat-evidence/20260920T132724Z-scenario-session-unread, with the pinned wake comparison (189 cases). Native and mobile controls carry on under EXT-09."
       ]
     },
     {
@@ -382,7 +384,8 @@
         "Remaining: rich composition and mobile plain-Enter newline. Completion-wave verification uses our agent:browser scenarios; the paired upstream run is no longer required.",
         "2026-09-25 lane L2: chat.sendShortcut (enter, mod-enter-multiline, mod-enter) and large-paste folding at 32 KB with Ctrl/Cmd+Shift+V inline; scripts/agent/scenarios/chat-composer-editing.ts passed. Open: mobile plain-Enter newline. Rich composition and Lexical removal are parked by the latest owner ruling.",
         "2026-09-25 owner ruling supersedes the earlier deletion instruction: retain Lexical until Editor completes a full Markdown/composer support plan. L2/L7 audit found no such plan in Editor plans/*.md, plans/backlog.json, plans/README.md or TODO.md. packages/markdown/README.md documents live preview only; ordered lists, block quotes, escapes and fenced code blocks remain source text. composerRichTextEnabled waits for a working consumer. No new Editor Markdown plan is part of this wave.",
-        "2026-09-25 owner ruling, restated: the row's goal is to delete Lexical and support Markdown as you type; Lexical stays until the editor can carry the composer. That prerequisite is Plan 111 (authorized 2026-09-25 with the composer as its first consumer), replacing the 'no Editor Markdown plan exists' gap recorded above."
+        "2026-09-25 owner ruling, restated: the row's goal is to delete Lexical and support Markdown as you type; Lexical stays until the editor can carry the composer. That prerequisite is Plan 111 (authorized 2026-09-25 with the composer as its first consumer), replacing the 'no Editor Markdown plan exists' gap recorded above.",
+        "Decided 2026-09-25: owner — ship the mobile plain-Enter newline now, without waiting for the phone shell. Queued work."
       ]
     },
     {
@@ -484,7 +487,8 @@
         "background-delivery.md",
         "Actual pinned liveness720transitions, three negative controls; periodic reaper tests pass",
         "Native child live142923: completed parent working, child idle and late metadata/reload remains ready; screenshots inspected",
-        "Monitor-only native Codex wire and automatic settlement are not claimed"
+        "Monitor-only native Codex wire and automatic settlement are not claimed",
+        "Decided 2026-09-25: owner — recheck the monitor-only signal against Codex 0.157 (approved)."
       ]
     },
     {
@@ -495,7 +499,9 @@
       "status": "open",
       "evidence_level": "source-reviewed",
       "acceptance": "runtime.md, RUNTIME-08, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "Decided 2026-09-25: owner — build with boundary fixtures only; nothing is spent until the owner does one live redemption."
+      ]
     },
     {
       "id": "RUNTIME-09",
@@ -708,7 +714,9 @@
       "status": "open",
       "evidence_level": "source-reviewed",
       "acceptance": "adjacent.md, EXT-16, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "Decided 2026-09-25: owner — the balancing preferences use settings scope `application`: they pick where execution happens. No longer parked on 143/144."
+      ]
     },
     {
       "id": "EXT-17",
