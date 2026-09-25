@@ -514,15 +514,15 @@ Requested 2026-09-25. The owner is moving to Platform as their main agentic codi
 of the plans, both logs and the service journal named what stands in the way. The unit file's
 `SuccessExitStatus=143` was fixed on the spot.
 
-| Plan                                           | Owns                                                                                            |
-| ---------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| 146 (done)                                     | Dev and prod stop sharing `~/.platform`; each `agent:browser` run gets its own server and state |
-| [147](plans/147-log-hygiene-and-noise-gate.md) | Producer fixes, level rules, the reaper give-up, ACK timeout vs overflow, a `logs:census` gate  |
-| [148](plans/148-restart-when-idle.md)          | `deploy --server` stages; the server restarts when no turn is running                           |
-| [149](plans/149-terminal-host.md)              | A PTY host that survives server restarts                                                        |
-| 150 (done)                                     | Remote servers are checked for protocol; a stale one relaunches or reads "Server out of date"   |
-| [151](plans/151-remote-server-releases.md)     | Release ships its runtime manifest and a `release` install kind (P1–P2 done); SSH update next   |
-| [152](plans/152-remote-dev-builds.md)          | Dev primary builds this working tree and ships it through Plan 151, in its own remote channel   |
+| Plan                                           | Owns                                                                                                               |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| 146 (done)                                     | Dev and prod stop sharing `~/.platform`; each `agent:browser` run gets its own server and state                    |
+| [147](plans/147-log-hygiene-and-noise-gate.md) | Producer fixes, level rules, the reaper give-up, ACK timeout vs overflow, a `logs:census` gate                     |
+| [148](plans/148-restart-when-idle.md)          | `deploy --server` stages; the server restarts when no turn is running                                              |
+| [149](plans/149-terminal-host.md)              | A PTY host that survives server restarts                                                                           |
+| 150 (done)                                     | Remote servers are checked for protocol; a stale one relaunches or reads "Server out of date"                      |
+| 151 (done)                                     | Done: releases ship their runtime; Update server installs them over SSH ([record](docs/remote-server-releases.md)) |
+| [152](plans/152-remote-dev-builds.md)          | Dev primary builds this working tree and ships it through Plan 151, in its own remote channel                      |
 
 Suggested order:
 
@@ -532,8 +532,8 @@ Suggested order:
 3. Plan 148, so Platform can deploy itself without killing the deploying turn.
 4. Plan 149, so terminals and dev servers survive the same restart.
 5. ~~Plan 150~~ — done 2026-09-25 (completion wave): protocol check at both ends of the SSH
-   launch, stale relaunch, structured machine errors, "Server out of date". Then Plan 151 whenever
-   the Mac is needed: Phases 1–2 done 2026-09-25 (completion wave), Phase 3 next. Plan 152 after 151.
+   launch, stale relaunch, structured machine errors, "Server out of date". Plan 151 done 2026-09-25
+   (completion wave; live Mac update is an owner check). Plan 152 next.
 6. Then Claude rewind and fork ([Plan 145 fork](plans/145-harness-controls/fork.md), Plan 126
    RUNTIME-01) and the Plan 139 research phase.
 

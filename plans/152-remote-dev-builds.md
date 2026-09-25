@@ -2,7 +2,7 @@
 
 ## Status and authorization
 
-- Status: PROPOSED — nice to have, after [Plan 151](151-remote-server-releases.md). Decisions have
+- Status: PROPOSED — next in lane L5; Plan 151 is done (design record: [docs/remote-server-releases.md](../docs/remote-server-releases.md)). Decisions have
   recommended answers.
 - Priority: P2. The production path (Plan 151) is what unblocks the Mac; this plan is for
   developing Platform against a remote machine.

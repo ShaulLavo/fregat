@@ -201,3 +201,10 @@ health descriptors, database identity, and the drained client event stream:
 `/work/tmp/platform-closeout-20260912/ssh-lifecycle-2026-09-12T16-16-06.632Z/results.json`.
 The Mac source installation remains at `/Users/shaul/projects/platform-verification` because the
 active `shaul-mac` connection uses it. Its launcher and isolated database remain with it.
+
+A production primary now installs its own release on a machine through **Update server** (or
+**Install server** when none is installed): it copies `server/` over SSH into
+`~/.platform/server/releases/<name>`, installs the runtime packages once per manifest, swaps
+`current`, rewrites `~/.local/bin/platform-server` and restarts the managed server. The design is
+in [remote-server-releases.md](remote-server-releases.md). Owner check pending: the live update of
+`shaul-mac` from the mesh, which replaces the verification rig's launcher and leaves the rig on disk.

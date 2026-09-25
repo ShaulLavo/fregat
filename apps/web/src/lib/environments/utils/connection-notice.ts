@@ -10,6 +10,23 @@ const outdatedServerCodes: ReadonlySet<string> = new Set([
   'ENVIRONMENT_PROTOCOL_MISMATCH',
 ])
 
+/** Update failures the update button can retry once the fix is applied. */
+const retryableUpdateCodes: ReadonlySet<string> = new Set([
+  'machines.SSH_UPDATE_NO_BUN',
+  'machines.SSH_UPDATE_OLD_BUN',
+  'machines.SSH_UPDATE_TRANSFER',
+  'machines.SSH_UPDATE_INSTALL',
+])
+
+/** The update button's label for a machine whose server the primary can install or replace. */
+export function serverUpdateLabel(error: ConnectionError | null) {
+  if (!error) return null
+  if (error.code === 'machines.SSH_NOT_INSTALLED') return 'Install server'
+  if (error.code === 'machines.SSH_PROTOCOL' || retryableUpdateCodes.has(error.code))
+    return 'Update server'
+  return null
+}
+
 export function connectionPending(phase: EnvironmentPhase) {
   return phase === 'launching' || phase === 'connecting' || phase === 'reconnecting'
 }
@@ -21,6 +38,7 @@ export function connectionNoticeSummary(phase: EnvironmentPhase, error: Connecti
   if (phase === 'identity-drift') return 'Machine identity changed'
   if (error && outdatedServerCodes.has(error.code)) return 'Server out of date'
   if (error?.code === 'machines.SSH_NOT_INSTALLED') return 'Server setup needed'
+  if (error?.code.startsWith('machines.SSH_UPDATE_')) return 'Server update failed'
   if (phase === 'blocked') return 'Could not connect'
   return 'Disconnected'
 }

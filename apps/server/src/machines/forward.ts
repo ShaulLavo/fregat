@@ -7,7 +7,8 @@ export type SshChild = Pick<
   Bun.Subprocess<'ignore', 'pipe', 'pipe'>,
   'exited' | 'exitCode' | 'signalCode' | 'kill' | 'stdout' | 'stderr'
 >
-export type SshSpawner = (command: string[]) => SshChild
+/** `stdin` streams into the remote command; without it the child's stdin is closed. */
+export type SshSpawner = (command: string[], stdin?: ReadableStream<Uint8Array>) => SshChild
 
 export type ForwardOptions = {
   spawn: SshSpawner
@@ -21,10 +22,10 @@ export type SshForward = {
   close(): Promise<void>
 }
 
-export const spawnSsh: SshSpawner = (command) =>
+export const spawnSsh: SshSpawner = (command, stdin) =>
   Bun.spawn({
     cmd: command,
-    stdin: 'ignore',
+    stdin: stdin ?? 'ignore',
     stdout: 'pipe',
     stderr: 'pipe',
   })
@@ -43,18 +44,20 @@ function sshCommand(target: string, script: string) {
   return [...sshOptions, '--', target, 'sh', '-c', shellQuote(script)]
 }
 
-export async function runSshCommand(options: {
+type SshRun = {
   spawn: SshSpawner
   target: string
   script: string
-  step: SshCatalogStep
   signal?: AbortSignal
-  /** Replaces the step's catalog fix on a generic remote failure. */
-  fix?: string
-}) {
+  stdin?: ReadableStream<Uint8Array>
+  timeoutMs?: number
+}
+
+/** Runs `script` under the remote `sh` and reports how it ended; the caller decides what failed. */
+export async function runSsh(options: SshRun) {
   options.signal?.throwIfAborted()
-  const child = options.spawn(sshCommand(options.target, options.script))
-  const timeout = setTimeout(() => child.kill('SIGKILL'), 150_000)
+  const child = options.spawn(sshCommand(options.target, options.script), options.stdin)
+  const timeout = setTimeout(() => child.kill('SIGKILL'), options.timeoutMs ?? 150_000)
   const abort = () => child.kill('SIGKILL')
   options.signal?.addEventListener('abort', abort, { once: true })
   try {
@@ -64,12 +67,23 @@ export async function runSshCommand(options: {
       child.exited,
     ])
     options.signal?.throwIfAborted()
-    if (exitCode !== 0) throw remoteFailure(options.step, stderr, exitCode, options.fix)
-    return stdout
+    return { stdout, stderr, exitCode }
   } finally {
     clearTimeout(timeout)
     options.signal?.removeEventListener('abort', abort)
   }
+}
+
+export async function runSshCommand(
+  options: SshRun & {
+    step: SshCatalogStep
+    /** Replaces the step's catalog fix on a generic remote failure. */
+    fix?: string
+  },
+) {
+  const { stdout, stderr, exitCode } = await runSsh(options)
+  if (exitCode !== 0) throw remoteFailure(options.step, stderr, exitCode, options.fix)
+  return stdout
 }
 
 export async function reserveForwardPort(retainedPort?: number) {

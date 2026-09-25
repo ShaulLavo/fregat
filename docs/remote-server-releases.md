@@ -1,23 +1,24 @@
-# Plan 151: Remote machines run the primary's server release
+# Remote machines run the primary's server release
 
-## Status and authorization
+## Status
 
-- Status: IN PROGRESS — Phases 1 and 2 done 2026-09-25 (completion wave, lane L5); Phase 3 next.
-  D1–D5 decided as recommended (completion wave).
-- Priority: P1 while the Mac is a daily machine. `shaul-mac` cannot connect today.
-- Effort: M (roughly 500–700 lines: deploy, the remote scripts, one route, one web action).
-- Risk: MED. It writes to another machine's home directory and replaces its `platform-server`
-  launcher.
-- Planned at: Platform `e1d61502`, 2026-09-25. Origin: the owner, while connecting `shaul-mac`
-  from the UI: "the production builds … should probably be different and a lot easier. There's no
-  code, there is just whatever's built."
-- Builds on Plan 150 (done 2026-09-25, completion wave): the server-side protocol check and a
-  structured `{ code, message, why?, fix? }` error on the machine state. This plan replaces Plan
-  150's update phase for production primaries and inherits its
-  [security constraints](#security-constraints-from-plan-150).
-  [Plan 152](152-remote-dev-builds.md) is the development counterpart.
-- Work in the current checkout; no branches, worktrees, commits, pushes or PRs unless separately
-  requested. Deploy with `bun run deploy --server`.
+- Done 2026-09-25 (completion wave, lane L5): Phases 1–4 implemented. This file was Plan 151 and is
+  kept as the design record Plan 152 builds on.
+- Owner check pending: the live update of `shaul-mac` (open Connect machine on the mesh, press
+  Update server on the out-of-date Mac, and confirm it goes live and `GET /release` through its
+  proxy names the primary's release). Agent sandboxes cannot reach the Mac.
+
+## Shared with lane L4 (Plan 148 staged restarts)
+
+- A release is `releases/<name>/` with `server/` inside; `<name>` is
+  `<UTC stamp>-<commit>-<slug>`, which matches the release-name pattern `update.ts` accepts.
+- `current` and L4's `pending` are symlinks to a release directory. A bundled server's
+  `import.meta.dirname` resolves to `<release>/server` whichever link started it, so a staged but
+  unpromoted primary ships its own staged release.
+- Every release built by `deploy --server` carries `server/runtime/package.json` and
+  `server/remote-support.js`; the update refuses a release without them (`SSH_UPDATE_NOT_A_RELEASE`).
+- Locally `server/node_modules` links to the checkout's installed dependencies; the transfer
+  excludes it and the remote links `runtime/<manifest sha256>/node_modules` in its place.
 
 ## Outcome
 

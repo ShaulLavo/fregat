@@ -6,6 +6,7 @@ import type { ConnectionError } from '@workspace/contracts'
 import type { EnvironmentPhase } from '@workspace/client-core/environments/utils/connection'
 import { Button } from '@workspace/ui/components/button'
 import { MachineErrorDetails } from '@/components/machine-error-details'
+import { ServerUpdateButton } from '@/components/server-update-button'
 import { Phase } from '@/lib/environments/components/phase'
 import { useEnvironmentConnections } from '@/hooks/use-environment-connections'
 import {
@@ -17,12 +18,15 @@ import { toConnectionError } from '@/lib/client-error-taxonomy'
 
 export function MachineConnectionNotice({
   id,
+  machine,
   label,
   phase,
   error,
   retry,
 }: {
   id: string
+  /** The configured machine's name; the primary has none. */
+  machine: string | null
   label: string
   phase: EnvironmentPhase
   error: ConnectionError | null
@@ -57,6 +61,9 @@ export function MachineConnectionNotice({
         {label} · {connectionNoticeSummary(phase, details)}
       </span>
       {details ? <MachineErrorDetails label={label} error={details} /> : null}
+      {machine ? (
+        <ServerUpdateButton name={machine} label={label} error={details} size='xs' />
+      ) : null}
       <Button size='xs' variant='ghost' disabled={pending} onClick={() => void retryConnection()}>
         {phase === 'idle' ? 'Connect' : 'Retry'}
       </Button>

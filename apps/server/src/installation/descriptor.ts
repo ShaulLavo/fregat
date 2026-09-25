@@ -1,7 +1,7 @@
 import path from 'node:path'
 import * as v from 'valibot'
 
-const absolutePath = v.pipe(
+export const absolutePath = v.pipe(
   v.string(),
   v.startsWith('/'),
   v.check((value) => !value.includes('\0') && !value.includes('\r') && !value.includes('\n')),
@@ -10,24 +10,26 @@ const absolutePath = v.pipe(
 /** A release installation names the `current` link inside its server root (`~/.platform/server`). */
 const RELEASE_CURRENT_LINK = 'current'
 
+export const releaseInstallationSchema = v.object({
+  kind: v.literal('release'),
+  directory: v.pipe(
+    absolutePath,
+    v.check((value) => path.posix.basename(value) === RELEASE_CURRENT_LINK),
+  ),
+  executable: absolutePath,
+})
+
 export const installationSchema = v.variant('kind', [
   v.object({
     kind: v.literal('source'),
     directory: absolutePath,
     executable: absolutePath,
   }),
-  v.object({
-    kind: v.literal('release'),
-    directory: v.pipe(
-      absolutePath,
-      v.check((value) => path.posix.basename(value) === RELEASE_CURRENT_LINK),
-    ),
-    executable: absolutePath,
-  }),
+  releaseInstallationSchema,
 ])
 
 export type ServerInstallation = v.InferOutput<typeof installationSchema>
-export type ReleaseInstallation = Extract<ServerInstallation, { kind: 'release' }>
+export type ReleaseInstallation = v.InferOutput<typeof releaseInstallationSchema>
 
 /** Holds a release's lease records and logs, which must outlive every swap of `current`. */
 export function releaseServerRoot(installation: ReleaseInstallation) {

@@ -77,7 +77,7 @@ exec ${executable} --env-file=.env apps/server/src/index.ts "$@"
 }
 
 // State lives under the remote user's ~/.platform, so a release takes no .env.
-function releaseLauncherSource(installation: ReleaseInstallation) {
+export function releaseLauncherSource(installation: ReleaseInstallation) {
   const entry = shellQuote(releaseEntry(installation))
   const env = Object.entries(RELEASE_ENV)
     .map(([name, value]) => `${name}=${shellQuote(value)}`)

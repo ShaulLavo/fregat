@@ -14,7 +14,7 @@ export const RUNTIME_PACKAGES = [
   'typescript-language-server',
 ] as const
 
-const RUNTIME_MANIFEST = 'runtime/package.json'
+export const RUNTIME_MANIFEST = 'runtime/package.json'
 /** Built by the `build` script from `remote-support.ts`. */
 export const REMOTE_SUPPORT = 'remote-support.js'
 

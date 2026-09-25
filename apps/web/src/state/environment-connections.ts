@@ -29,6 +29,7 @@ import { useEnvironmentsStore } from '@/lib/environments/state/store'
 import { primaryQueryClient, queryClientFor } from '@/lib/environments/state/query-clients'
 import {
   environmentMutationKeys,
+  serverUpdateScope,
   type MachineMutationAction,
 } from '@/lib/environments/utils/mutation-keys'
 import { runMutation } from '@/lib/mutations/run'
@@ -43,6 +44,7 @@ import {
   answerMachineAuth,
   connectSshMachine,
   disconnectSshMachine,
+  updateSshServer,
 } from '@/lib/environments/machine-client'
 import { startMachineEvents } from '@/state/machine-events'
 import { createConnectionNotices } from '@/state/connection-notices'
@@ -419,6 +421,37 @@ export function createEnvironmentConnections({
       }
     })
   }
+  /** The server connects the machine once its release is installed; this client then attaches. */
+  async function updateServer(name: string): Promise<boolean> {
+    notices.reset(`machine:${name}`)
+    // Settlement reports the failure on the machine, where its fix and Fix with AI show.
+    const settled = await runMutation(
+      primaryQueryClient(),
+      {
+        mutationKey: environmentMutationKeys.machine('update', name),
+        scope: serverUpdateScope(name),
+        mutationFn: () => updateSshServer(name),
+        onSettled: (state, error) => settleServerUpdate(name, state, error),
+      },
+      undefined,
+    ).then(
+      () => true,
+      () => false,
+    )
+    return (
+      settled &&
+      store.getState().machines.some((entry) => entry.name === name && entry.phase === 'live')
+    )
+  }
+  async function settleServerUpdate(
+    name: string,
+    state: MachineConnectionState | undefined,
+    error: unknown,
+  ) {
+    if (state?.phase === 'live') return connectMachine(name)
+    if (state) return phase(name, state.phase, 'lastError' in state ? state.lastError : null)
+    phase(name, 'blocked', toConnectionError(error, `Could not update the server on ${name}.`))
+  }
   function cancelMachine(name: string) {
     const prompt = authStore.getState().prompt
     if (prompt?.name === name) return cancelAuthentication(prompt)
@@ -700,6 +733,7 @@ export function createEnvironmentConnections({
     configureMachines,
     connectMachine,
     disconnectMachine,
+    updateServer,
     cancelMachine,
     retryPrimary,
     retryMachine: async (name: string) => {
