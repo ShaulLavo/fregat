@@ -1,4 +1,5 @@
-import { DEFAULT_APPROVAL_OPTIONS } from '@workspace/contracts'
+import { DEFAULT_APPROVAL_OPTIONS, turnIdSchema } from '@workspace/contracts'
+import * as v from 'valibot'
 import type { OrchestrationSessionActivity } from '@workspace/contracts'
 
 import { derivePendingApprovals } from '@workspace/client-core/chat/pending-approvals'
@@ -150,11 +151,15 @@ test('a settled latest turn closes its approvals, a running one keeps them', () 
     }),
   ]
 
-  expect(derivePendingApprovals(activities, { state: 'running', turnId: 'turn-1' })).toHaveLength(1)
-  expect(derivePendingApprovals(activities, { state: 'interrupted', turnId: 'turn-1' })).toEqual([])
-  expect(derivePendingApprovals(activities, { state: 'completed', turnId: 'turn-2' })).toHaveLength(
-    1,
-  )
+  expect(
+    derivePendingApprovals(activities, { state: 'running', turnId: turnId('turn-1') }),
+  ).toHaveLength(1)
+  expect(
+    derivePendingApprovals(activities, { state: 'interrupted', turnId: turnId('turn-1') }),
+  ).toEqual([])
+  expect(
+    derivePendingApprovals(activities, { state: 'completed', turnId: turnId('turn-2') }),
+  ).toHaveLength(1)
 })
 
 test('MCP activities retain their advertised choices and app identity across derivation', () => {
@@ -282,4 +287,8 @@ function activity({
     tone: 'info',
     turnId,
   } as OrchestrationSessionActivity
+}
+
+function turnId(value: string) {
+  return v.parse(turnIdSchema, value)
 }

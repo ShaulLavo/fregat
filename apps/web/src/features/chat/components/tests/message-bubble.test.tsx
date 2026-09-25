@@ -210,6 +210,7 @@ function withProviders(children: ReactNode) {
     openCheckpointDiff: () => undefined,
     openSessionCheckpointDiff: () => undefined,
     revertToCheckpoint: () => undefined,
+    retry: { blocked: false, carryOn: () => undefined, tryAgain: null },
   }
 
   return (

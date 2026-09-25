@@ -78,7 +78,9 @@ export function ChatPendingRequestsProvider({
       const variables = entry.state.variables as PendingRequestDispatch | undefined
       return {
         commandId: variables?.command.commandId,
-        errorMessage: entry.state.error ? errorMessage(entry.state.error) : null,
+        errorMessage: entry.state.error
+          ? errorMessage(entry.state.error, 'The response was not sent.')
+          : null,
         requestId: variables?.requestId,
         status: entry.state.status,
       }

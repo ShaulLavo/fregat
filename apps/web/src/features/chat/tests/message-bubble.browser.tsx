@@ -319,6 +319,7 @@ function chatTimelineActions(overrides: Partial<ChatTimelineActions> = {}): Chat
   return {
     openCheckpointDiff: vi.fn(() => Promise.resolve()),
     openSessionCheckpointDiff: vi.fn(() => Promise.resolve()),
+    retry: { blocked: false, carryOn: vi.fn(), tryAgain: null },
     revertToCheckpoint: vi.fn(),
     ...overrides,
   }

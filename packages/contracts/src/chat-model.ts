@@ -397,7 +397,7 @@ export const orchestrationLatestTurnSchema = v.object({
   requestedAt: isoDateTimeSchema,
   startedAt: v.nullable(isoDateTimeSchema),
   completedAt: v.nullable(isoDateTimeSchema),
-  endReason: v.optional(v.nullable(turnEndReasonSchema), null),
+  endReason: v.optional(v.nullable(turnEndReasonSchema)),
   assistantMessageId: v.nullable(messageIdSchema),
   sourceProposedPlan: v.optional(sourceProposedPlanReferenceSchema),
   providerStartState: v.picklist([

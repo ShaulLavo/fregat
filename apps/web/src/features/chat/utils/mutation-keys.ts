@@ -21,6 +21,7 @@ export const chatMutationKeys = {
   pendingRequestResponse: (environmentId: string, sessionId: string) =>
     ['chat', 'pending-request-response', environmentId, sessionId] as const,
   message: (id: string) => ['chat', 'message', id] as const,
+  screenshot: (scope: string) => ['chat', 'screenshot', scope] as const,
   providerSignIn: (id: ProviderInstanceId) => ['chat', 'provider-sign-in', id] as const,
   providerCancelSignIn: (id: ProviderInstanceId) =>
     ['chat', 'provider-cancel-sign-in', id] as const,
