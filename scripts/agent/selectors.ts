@@ -581,6 +581,11 @@ export const selectors = {
       .locator('input[type=file]'),
   chatStagedFile: (page: Page, name: string) =>
     page.getByLabel('Attachments', { exact: true }).getByText(name, { exact: true }),
+  chatStagedImage: (page: Page, name: string) =>
+    page
+      .getByLabel('Attachments', { exact: true })
+      .getByRole('button', { name: `Open ${name}`, exact: true })
+      .locator('img'),
   chatTranscriptFile: (page: Page, name: string) =>
     page
       .getByRole('log', { name: 'Messages', exact: true })

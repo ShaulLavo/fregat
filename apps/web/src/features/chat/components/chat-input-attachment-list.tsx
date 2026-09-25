@@ -86,6 +86,7 @@ export function ChatInputAttachmentList({
                 <img
                   alt=''
                   className='size-full object-cover'
+                  crossOrigin='anonymous'
                   draggable={false}
                   src={attachment.previewUrl}
                 />

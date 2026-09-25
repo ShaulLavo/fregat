@@ -13,7 +13,7 @@ export const chatStashContext = isolatedNativeScenario({
       name: 'stash.png',
       mimeType: 'image/png',
       buffer: Buffer.from(
-        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a4gAAAABJRU5ErkJggg==',
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNQSFjwHwAD5AIge4YO3AAAAABJRU5ErkJggg==',
         'base64',
       ),
     })
@@ -39,6 +39,9 @@ export const chatStashContext = isolatedNativeScenario({
       'Read this complete stashed message.',
     )
     await step('complete-stash-restored-after-reload')
+    await selectors
+      .chatStagedImage(page, 'stash.png')
+      .evaluate((image: HTMLImageElement) => image.decode())
     await selectors.chatSend(page).click()
     await selectors
       .chatMessages(page)
