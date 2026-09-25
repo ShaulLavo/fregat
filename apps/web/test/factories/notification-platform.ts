@@ -32,6 +32,9 @@ export function installNotificationPlatform() {
       this.state = 'closed'
       return Promise.resolve()
     }
+    createGain() {
+      return { gain: { value: 0 }, connect() {} }
+    }
     createBufferSource() {
       return {
         buffer: null,

@@ -890,6 +890,28 @@
       "description": "Slow terminal loading indicators while keeping progress visible.",
       "type": "boolean"
     },
+    "workbench.sounds.errors": {
+      "default": false,
+      "description": "Play a short rattle when an error toast appears.",
+      "type": "boolean"
+    },
+    "workbench.sounds.git": {
+      "default": false,
+      "description": "Play two rising clicks when a commit is created, a push finishes or a pull request opens.",
+      "type": "boolean"
+    },
+    "workbench.sounds.terminalBell": {
+      "default": false,
+      "description": "Play a click when a terminal program rings the bell.",
+      "type": "boolean"
+    },
+    "workbench.sounds.volume": {
+      "default": 50,
+      "description": "Loudness of every sound, agent notifications included.",
+      "maximum": 100,
+      "minimum": 0,
+      "type": "integer"
+    },
     "workbench.surface.blur": {
       "default": 9,
       "description": "Backdrop blur radius, in pixels, behind translucent surfaces.",

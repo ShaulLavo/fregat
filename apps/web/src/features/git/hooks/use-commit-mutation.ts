@@ -11,6 +11,7 @@ import { notifyMutationError } from '@/features/git/utils/notify-mutation-error'
 import { commitProgressStoreFor } from '@/features/git/state/commit-progress-store'
 import { useGitStoreApi } from '@/features/git/state/store'
 import { useWorkspaceInvalidation } from './use-workspace-invalidation'
+import { playFeedback } from '@workspace/ui/patterns/feedback-layer'
 
 export function useCommitMutation(rootPath: string) {
   const invalidate = useWorkspaceInvalidation()
@@ -56,6 +57,7 @@ export function useCommitMutation(rootPath: string) {
       if (draft && draft.store.getState().commitMessageRevision === draft.revision)
         draft.store.getState().resetCommitMessage()
       toast.success('Committed changes')
+      playFeedback('success', 'git')
       // Only on success: a rejected commit's output is the explanation, and
       // clearing it would take away the only thing that says what to fix.
       commitProgressStoreFor(queryClient).getState().clearCommitProgress(rootPath)

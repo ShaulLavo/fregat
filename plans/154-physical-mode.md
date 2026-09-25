@@ -2,9 +2,11 @@
 
 ## Status and authorization
 
-- Status: PROPOSED — research done ([docs/ui-research/seamui.md](../docs/ui-research/seamui.md)).
-  D1–D5 decided 2026-09-25. D6 (settings semantics) is open and blocks every phase that registers
-  a setting, which is every phase.
+- Status: Phase 1 done 2026-09-25 (lane L1); Phases 2–6 next, Phase 7 parked with Plan 143.
+  D1–D5 decided 2026-09-25. D6: Decided 2026-09-25: recommendation (completion wave) — Feel is one
+  picker like Density; sounds are a `Sounds` category of per-event switches plus one volume.
+  Error sounds come from the error toast's icon (`ToastErrorIcon`), so the 7 direct `toast.error`
+  sites stay as they are.
 - Priority: P2. The owner is sure about it; nothing else depends on it.
 - Effort: L. One spring-token generator, one feedback engine (~150 lines), seven settings, a
   physical branch in `globals.css` for every primitive's motion, voice wiring in about ten

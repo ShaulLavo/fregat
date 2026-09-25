@@ -10,6 +10,7 @@ import { LanguageServerMatchProvider } from '@/features/editor/providers/languag
 import { EditorStateProvider } from '@/features/editor/providers/state-provider'
 import { AppearanceProvider } from '@/features/settings/providers/appearance-provider'
 import { useApplicationRuntime } from '@/hooks/use-application-runtime'
+import { FeedbackLayer } from '@/components/feedback-layer'
 import { ErrorActionProvider } from '@/providers/error-action-provider'
 
 export function ActiveEnvironmentApplication({ children }: { readonly children: ReactNode }) {
@@ -27,6 +28,7 @@ export function ActiveEnvironmentApplication({ children }: { readonly children: 
                   <EditorStateProvider runtime={active.editor}>{children}</EditorStateProvider>
                   <Toaster />
                   <TooltipLayer />
+                  <FeedbackLayer />
                 </TooltipProvider>
               </EditorColorThemeProvider>
             </AppearanceProvider>

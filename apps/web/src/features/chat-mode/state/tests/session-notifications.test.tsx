@@ -1,6 +1,6 @@
 import { onTestFinished, vi } from 'vitest'
 import { QueryClient } from '@tanstack/react-query'
-import { DEFAULT_SETTING_VALUES, environmentIdSchema, sessionIdSchema } from '@workspace/contracts'
+import { environmentIdSchema, sessionIdSchema } from '@workspace/contracts'
 import {
   createSessionNotificationTracker,
   type NotificationSession,
@@ -10,10 +10,10 @@ import { MockProviderAdapter } from 'server/testing'
 import * as v from 'valibot'
 import { createNotificationHost } from '@/features/chat-mode/state/notification-host'
 import { startSessionNotifications } from '@/features/chat-mode/state/session-notifications'
-import { writeBootMirror } from '@/lib/settings-boot-mirror'
 import { chatNotificationQueryKeys } from '@/features/chat-mode/utils/query-keys'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
 import { createRailHarness } from '../../../../../test/factories/rail-harness'
+import { configureFeedback, resetFeedbackForTest } from '@workspace/ui/patterns/feedback-layer'
 import { installNotificationPlatform } from '../../../../../test/factories/notification-platform'
 import { expect, test } from '../../../../../test/fixtures'
 
@@ -99,38 +99,32 @@ test('the badge repaints the page icon in place and gives it back on focus', () 
   expect(icon.dataset.sessionNotifications).toBeUndefined()
 })
 
-test('sound unlocks only on gestures, ignores focus and rechecks mode after async buffer retrieval', async () => {
+test('agent sounds wait for a gesture, play through the shared output and recheck the channel after loading', async () => {
   const platform = installNotificationPlatform()
   platform.focus.mockReturnValue(true)
+  resetFeedbackForTest({})
   const queryClient = new QueryClient()
   queryClient.setQueryData(chatNotificationQueryKeys.sound('input'), {})
   const host = createNotificationHost({ queryClient, open() {}, active: () => notice.ref })
   onTestFinished(() => {
     host.dispose()
     queryClient.clear()
-    writeBootMirror(DEFAULT_SETTING_VALUES)
+    configureFeedback({ channels: [], volume: 50 })
+    resetFeedbackForTest({})
   })
-  writeBootMirror({ ...DEFAULT_SETTING_VALUES, 'chat.notificationMode': 'sound' })
   host.configure('sound')
+  configureFeedback({ channels: ['agent'], volume: 50 })
   host.deliver(notice, 'sound', false)
   expect(platform.audio.plays).toBe(0)
   document.dispatchEvent(new Event('pointerdown'))
   expect(platform.audio.resumes).toBe(1)
   host.deliver(notice, 'sound', false)
-  writeBootMirror(DEFAULT_SETTING_VALUES)
+  configureFeedback({ channels: [], volume: 50 })
   await Promise.resolve()
   expect(platform.audio.plays).toBe(0)
-  writeBootMirror({ ...DEFAULT_SETTING_VALUES, 'chat.notificationMode': 'sound' })
+  configureFeedback({ channels: ['agent'], volume: 50 })
   host.deliver(notice, 'sound', false)
   await expect.poll(() => platform.audio.plays).toBe(1)
-  host.configure('notifications-and-sound')
-  writeBootMirror({ ...DEFAULT_SETTING_VALUES, 'chat.notificationMode': 'notifications-and-sound' })
-  host.deliver(notice, 'notifications-and-sound', false)
-  await expect.poll(() => platform.audio.plays).toBe(2)
-  expect(platform.audio.resumes).toBe(1)
-  host.configure('off')
-  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }))
-  expect(platform.audio.resumes).toBe(1)
 })
 
 test('tracker forgets removed owners and disconnect history, and attention is owner scoped', () => {

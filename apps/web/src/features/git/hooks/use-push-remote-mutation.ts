@@ -1,5 +1,6 @@
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import { useMutation } from '@tanstack/react-query'
+import { playFeedback } from '@workspace/ui/patterns/feedback-layer'
 
 import { pushRemote } from '@/features/git/utils/api'
 import { mutationKeys } from '@/features/git/utils/mutation-keys'
@@ -13,6 +14,9 @@ export function usePushRemoteMutation(rootPath: string) {
     mutationFn: (_variables, { client }) => pushRemote(rootPath, clientForQueryClient(client)),
     mutationKey: mutationKeys.push(rootPath),
     onError: notifyMutationError,
-    onSuccess: invalidate,
+    onSuccess: () => {
+      playFeedback('success', 'git')
+      return invalidate()
+    },
   })
 }
