@@ -55,7 +55,9 @@ test('reset credit confirmation and pending state work in Chromium', async () =>
       checkedAt: account.checkedAt,
       confirmed: true,
     })
-    expect(screen.getByRole('button', { name: 'Use reset credit…' })).toBeDisabled()
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /Use reset credit…/ })).toBeDisabled(),
+    )
     response.resolve(
       Response.json({ outcome: 'reset', refresh: 'confirmed', usage: { accounts: [] } }),
     )
