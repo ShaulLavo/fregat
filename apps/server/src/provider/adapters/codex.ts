@@ -20,6 +20,8 @@ import {
   type ApprovalRequestId,
   type ChatAgent,
   type InteractionMode,
+  type ProviderConfiguredHook,
+  type ProviderMcpServer,
   type ProviderModel,
   type ProviderInstanceId,
   type ProviderInstanceSettings,
@@ -65,7 +67,9 @@ import {
   type CodexClientRequestMethod,
   type CodexClientRequestParamsByMethod,
   type CodexClientRequestResultByMethod,
+  type CodexHookMetadata,
   type CodexHookRunSummary,
+  type CodexMcpServerStatus,
   type CodexServerNotificationParamsByMethod,
   type CodexSkillMetadata,
 } from './codex-protocol'
@@ -338,6 +342,28 @@ export class CodexProviderAdapter
     }
 
     return this.requireSession(sessionId, 'thread/revert').prepareRollbackSession(numTurns)
+  }
+
+  async mcpServers({ sessionId }: { sessionId: SessionId }) {
+    return (await this.activeSession(sessionId)?.mcpServers()) ?? null
+  }
+
+  /** Codex reloads every server from config; there is no per-server reconnect. */
+  async reconnectMcpServer({ sessionId }: { name: string; sessionId: SessionId }) {
+    await this.requireSession(sessionId, 'config/mcpServer/reload').reloadMcpServers()
+  }
+
+  async signInMcpServer({ name, sessionId }: { name: string; sessionId: SessionId }) {
+    return this.requireSession(sessionId, 'mcpServer/oauth/login').signInMcpServer(name)
+  }
+
+  async configuredHooks({ cwd, sessionId }: { cwd: string; sessionId: SessionId }) {
+    return (await this.activeSession(sessionId)?.configuredHooks(cwd)) ?? null
+  }
+
+  private activeSession(sessionId: SessionId) {
+    const session = this.sessions.get(sessionId)
+    return session?.isActive() ? session : null
   }
 
   async sendTurn(input: ProviderTurnInput) {
@@ -654,6 +680,45 @@ class CodexAppServerSession extends SessionContext {
       runtimeMode: this.runtimeMode,
       status: this.status,
       sessionId: this.sessionId,
+    }
+  }
+
+  async mcpServers(): Promise<ProviderMcpServer[]> {
+    const servers: ProviderMcpServer[] = []
+    let cursor: string | null = null
+    do {
+      const page: CodexClientRequestResultByMethod['mcpServerStatus/list'] =
+        await this.client.request('mcpServerStatus/list', {
+          threadId: this.providerConversationMarker,
+          ...(cursor ? { cursor } : {}),
+        })
+      servers.push(...page.data.map(codexMcpServer))
+      cursor = page.nextCursor ?? null
+    } while (cursor)
+    return servers
+  }
+
+  async reloadMcpServers() {
+    await this.client.request('config/mcpServer/reload', undefined)
+  }
+
+  async signInMcpServer(name: string) {
+    const response = await this.client.request('mcpServer/oauth/login', {
+      name,
+      threadId: this.providerConversationMarker,
+    })
+    return { authorizationUrl: response.authorizationUrl }
+  }
+
+  async configuredHooks(cwd: string) {
+    const response = await this.client.request('hooks/list', { cwds: [cwd] })
+    const entries = response.data.filter((entry) => entry.cwd === cwd)
+    return {
+      errors: entries.flatMap((entry) => [
+        ...entry.errors.map((error) => `${error.path}: ${error.message}`),
+        ...entry.warnings,
+      ]),
+      hooks: entries.flatMap((entry) => entry.hooks.map(codexConfiguredHook)),
     }
   }
 
@@ -2639,6 +2704,42 @@ async function openCodexSession(
     REQUEST_TIMEOUT_MS,
     (response) => v.parse(codexSessionResumeSchema, response),
   )
+}
+
+function codexMcpServer(server: CodexMcpServerStatus): ProviderMcpServer {
+  return {
+    error: server.toolsError ?? null,
+    name: server.name,
+    status: codexMcpStatus(server),
+  }
+}
+
+function codexMcpStatus(server: CodexMcpServerStatus): ProviderMcpServer['status'] {
+  const runtime = server.runtimeStatus
+  if (runtime === 'connected') return 'connected'
+  if (runtime === 'disabled') return 'disabled'
+  if (runtime === 'failed' || runtime === 'cancelled') return 'failed'
+  if (runtime === 'authenticationRequired' || server.authStatus === 'notLoggedIn')
+    return 'needs-auth'
+
+  return 'pending'
+}
+
+function codexConfiguredHook(hook: CodexHookMetadata): ProviderConfiguredHook {
+  return {
+    enabled: hook.enabled,
+    eventName: hook.eventName,
+    handler: codexHookHandler(hook),
+    matcher: hook.matcher ?? null,
+    sourcePath: hook.sourcePath,
+  }
+}
+
+function codexHookHandler(hook: CodexHookMetadata) {
+  if (hook.handlerType === 'command') return hook.command
+  if (hook.handlerType === 'mcpTool') return `${hook.server} · ${hook.tool}`
+
+  return hook.handlerType
 }
 
 /** A thread that never ran here was discovered, and a discovered session's id is its thread id. */

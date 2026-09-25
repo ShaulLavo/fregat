@@ -1,0 +1,27 @@
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import type { ScopedSessionRef } from '@workspace/contracts'
+
+import { signInMcpServer } from '@/features/chat/transport/session-tools'
+import { chatMutationKeys } from '@/features/chat/utils/mutation-keys'
+import { sessionToolKeys } from '@/features/chat/utils/query-keys'
+import { errorMessage } from '@/lib/error-message'
+import { toastError } from '@/lib/toast-error'
+
+/** Opens the provider's sign-in page; the server's state changes once the browser round trip ends. */
+export function useSignInMcpServer(ref: ScopedSessionRef) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationKey: chatMutationKeys.signInMcpServer(ref.environmentId, ref.sessionId),
+    mutationFn: (name: string) => signInMcpServer(ref, name),
+    onSuccess: ({ authorizationUrl }) => {
+      window.open(authorizationUrl, '_blank', 'noopener')
+      void queryClient.invalidateQueries({
+        queryKey: sessionToolKeys.mcp(ref.environmentId, ref.sessionId),
+      })
+    },
+    onError: (error) =>
+      toastError('Could not start the sign-in', {
+        description: errorMessage(error, 'The MCP server gave no sign-in address.'),
+      }),
+  })
+}

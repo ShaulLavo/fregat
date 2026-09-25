@@ -39,3 +39,10 @@ export const backgroundTaskKeys = {
   roster: (environmentId: EnvironmentId, sessionId: SessionId) =>
     ['chat', 'background-tasks', environmentId, sessionId] as const,
 }
+
+export const sessionToolKeys = {
+  mcp: (environmentId: EnvironmentId, sessionId: SessionId) =>
+    ['chat', 'session-mcp', environmentId, sessionId] as const,
+  hooks: (environmentId: EnvironmentId, sessionId: SessionId) =>
+    ['chat', 'session-hooks', environmentId, sessionId] as const,
+}

@@ -1,4 +1,4 @@
-import { sessionTaskRoutes } from './provider/session-task-routes'
+import { sessionControlRoutes } from './provider/session-control-routes'
 import { createAttachmentOwnership } from './attachments/ownership'
 import { selectTitleModel } from './orchestration/title-generation'
 import { errorMessage } from '@workspace/contracts'
@@ -402,7 +402,7 @@ export function createApp(options: AppOptions) {
     .post('/terminal/clear', ({ body }) => terminal.clear(body), { body: terminalClearInputSchema })
     .post('/terminal/kill', ({ body }) => terminal.kill(body), { body: terminalKillInputSchema })
     .use(providerRoutes(providerAdapterRegistry, providerUsage, providerUsageHistory))
-    .use(sessionTaskRoutes(providerService))
+    .use(sessionControlRoutes(providerService))
     .use(orchestrationRoutes(orchestration, checkpointDiff, sessionSearch))
     .use(
       attachmentRoutes({

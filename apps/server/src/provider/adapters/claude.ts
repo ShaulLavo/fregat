@@ -27,6 +27,7 @@ import {
   type ProviderInstanceSettings,
   type ProviderSkill,
   type ProviderSlashCommand,
+  type ProviderMcpServer,
   type ProviderSnapshot,
   type RuntimeMode,
   type SessionId,
@@ -463,10 +464,22 @@ export class ClaudeProviderAdapter
     await this.sessions.get(sessionId)?.interruptTurn(turnId)
   }
 
+  async mcpServers({ sessionId }: { sessionId: SessionId }) {
+    return (await this.sessions.get(sessionId)?.mcpServers()) ?? null
+  }
+
+  async reconnectMcpServer({ name, sessionId }: { name: string; sessionId: SessionId }) {
+    recordChatPipelineInfo('chat.pipeline.claude_adapter.mcp_reconnect', { name, sessionId })
+    const session = this.sessions.get(sessionId)
+    if (!session) throw sessionIdentityErrors.SESSION_NOT_RUNNING({ internal: { sessionId } })
+
+    await session.reconnectMcpServer(name)
+  }
+
   async stopBackgroundTask({ sessionId, taskId }: { sessionId: SessionId; taskId: string }) {
     recordChatPipelineInfo('chat.pipeline.claude_adapter.stop_task', { sessionId, taskId })
     const session = this.sessions.get(sessionId)
-    if (!session) throw sessionIdentityErrors.TASK_RUNTIME_UNAVAILABLE({ internal: { sessionId } })
+    if (!session) throw sessionIdentityErrors.SESSION_NOT_RUNNING({ internal: { sessionId } })
 
     await session.stopBackgroundTask(taskId)
   }
@@ -834,9 +847,26 @@ class ClaudeAgentSession extends SessionContext {
     })
   }
 
+  async mcpServers(): Promise<ProviderMcpServer[] | null> {
+    if (!this.query) return null
+
+    return (await this.query.mcpServerStatus()).map((server) => ({
+      error: server.error ?? null,
+      name: server.name,
+      status: server.status,
+    }))
+  }
+
+  async reconnectMcpServer(name: string) {
+    if (!this.query)
+      throw sessionIdentityErrors.SESSION_NOT_RUNNING({ internal: { sessionId: this.sessionId } })
+
+    await this.query.reconnectMcpServer(name)
+  }
+
   async stopBackgroundTask(taskId: string) {
     if (!this.query)
-      throw sessionIdentityErrors.TASK_RUNTIME_UNAVAILABLE({
+      throw sessionIdentityErrors.SESSION_NOT_RUNNING({
         internal: { sessionId: this.sessionId },
       })
 

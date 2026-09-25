@@ -13,6 +13,8 @@ import type {
   ProviderBackgroundTask,
   ProviderBackgroundTasks,
   ProviderInstanceId,
+  ProviderSessionHooks,
+  ProviderSessionMcp,
   ProviderSnapshot,
   RuntimeMode,
   SessionForkSource,
@@ -813,6 +815,55 @@ export class ProviderService {
         internal: { routed: Boolean(routed), sessionId: input.sessionId },
       })
     await stop.call(routed.adapter, input)
+  }
+
+  async sessionMcp(sessionId: SessionId): Promise<ProviderSessionMcp> {
+    const adapter = this.routeSession(sessionId)?.adapter
+    const servers = adapter?.mcpServers ? await adapter.mcpServers({ sessionId }) : null
+    return {
+      canReconnect: Boolean(adapter?.reconnectMcpServer),
+      canSignIn: Boolean(adapter?.signInMcpServer),
+      running: servers !== null,
+      servers: servers ?? [],
+    }
+  }
+
+  async reconnectMcpServer(input: { name: string; sessionId: SessionId }) {
+    const adapter = this.requireSessionControl(input.sessionId, 'reconnectMcpServer')
+    await adapter.reconnectMcpServer?.(input)
+    return this.sessionMcp(input.sessionId)
+  }
+
+  async signInMcpServer(input: { name: string; sessionId: SessionId }) {
+    const adapter = this.requireSessionControl(input.sessionId, 'signInMcpServer')
+    const signIn = adapter.signInMcpServer
+    if (!signIn) throw sessionIdentityErrors.SESSION_CONTROL_UNSUPPORTED({ internal: input })
+
+    return signIn.call(adapter, input)
+  }
+
+  async sessionHooks(sessionId: SessionId): Promise<ProviderSessionHooks> {
+    const routed = this.routeSession(sessionId)
+    const cwd = routed?.binding.runtimePayload?.cwd
+    const configured = routed?.adapter.configuredHooks
+    if (!configured || !cwd)
+      return { errors: [], hooks: [], running: Boolean(routed), supported: Boolean(configured) }
+
+    const hooks = await configured.call(routed.adapter, { cwd, sessionId })
+    return { errors: [], hooks: [], ...hooks, running: hooks !== null, supported: true }
+  }
+
+  private requireSessionControl(
+    sessionId: SessionId,
+    control: 'reconnectMcpServer' | 'signInMcpServer',
+  ) {
+    this.requireRunning()
+    const adapter = this.routeSession(sessionId)?.adapter
+    if (adapter?.[control]) return adapter
+
+    throw sessionIdentityErrors.SESSION_CONTROL_UNSUPPORTED({
+      internal: { control, routed: Boolean(adapter), sessionId },
+    })
   }
 
   bindingForSession(sessionId: SessionId) {

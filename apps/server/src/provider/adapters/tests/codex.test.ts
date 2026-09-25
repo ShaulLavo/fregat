@@ -324,6 +324,35 @@ function handle(message) {
     });
     return;
   }
+  if (message.method === 'mcpServerStatus/list') {
+    record({ event: message.method, params: message.params });
+    const base = { resourceTemplates: [], resources: [], tools: {} };
+    send({ id: message.id, result: { data: [
+      { ...base, name: 'linear', authStatus: 'oAuth', runtimeStatus: 'connected' },
+      { ...base, name: 'github', authStatus: 'notLoggedIn', runtimeStatus: 'authenticationRequired' },
+      { ...base, name: 'broken', authStatus: 'unsupported', runtimeStatus: 'failed', toolsError: 'spawn ENOENT' },
+    ], nextCursor: null } });
+    return;
+  }
+  if (message.method === 'config/mcpServer/reload') {
+    record({ event: message.method, params: message.params });
+    send({ id: message.id, result: {} });
+    return;
+  }
+  if (message.method === 'mcpServer/oauth/login') {
+    record({ event: message.method, params: message.params });
+    send({ id: message.id, result: { authorizationUrl: 'https://auth.example.test/login' } });
+    return;
+  }
+  if (message.method === 'hooks/list') {
+    record({ event: message.method, params: message.params });
+    const hook = { currentHash: 'h', displayOrder: 0, enabled: true, eventName: 'preToolUse', isManaged: false, key: 'k', source: 'project', sourcePath: '/repo/.codex/hooks.toml', timeoutSec: 30, trustStatus: 'trusted' };
+    send({ id: message.id, result: { data: [{ cwd: message.params.cwds[0], errors: [], warnings: ['one hook skipped'], hooks: [
+      { ...hook, handlerType: 'command', command: 'guard.sh', matcher: 'shell' },
+      { ...hook, key: 'k2', handlerType: 'mcpTool', server: 'linear', tool: 'check' },
+    ] }] } });
+    return;
+  }
   if (mode === 'fork' && message.method === 'thread/turns/list') {
     record({ event: 'thread/turns/list', params: message.params });
     const turns = ['source-turn-3', 'source-turn-2', 'source-turn-1'].map((id) => ({ id }));
@@ -2491,6 +2520,55 @@ describe('CodexProviderAdapter', () => {
       },
       { mode: 'malformed-thread-start' },
     )
+  })
+
+  it('reads MCP server states and configured hooks from the live app-server', async () => {
+    await withFakeCodex(async ({ spawnLogPath }) => {
+      const adapter = new CodexProviderAdapter()
+      const input = providerTurnInput()
+      try {
+        expect(await adapter.mcpServers({ sessionId: input.sessionId })).toBeNull()
+        await adapter.startRuntime(input)
+
+        expect(await adapter.mcpServers({ sessionId: input.sessionId })).toEqual([
+          { error: null, name: 'linear', status: 'connected' },
+          { error: null, name: 'github', status: 'needs-auth' },
+          { error: 'spawn ENOENT', name: 'broken', status: 'failed' },
+        ])
+        await adapter.reconnectMcpServer({ name: 'broken', sessionId: input.sessionId })
+        expect(
+          await adapter.signInMcpServer({ name: 'github', sessionId: input.sessionId }),
+        ).toEqual({ authorizationUrl: 'https://auth.example.test/login' })
+        expect(await adapter.configuredHooks({ cwd: '/repo', sessionId: input.sessionId })).toEqual(
+          {
+            errors: ['one hook skipped'],
+            hooks: [
+              {
+                enabled: true,
+                eventName: 'preToolUse',
+                handler: 'guard.sh',
+                matcher: 'shell',
+                sourcePath: '/repo/.codex/hooks.toml',
+              },
+              {
+                enabled: true,
+                eventName: 'preToolUse',
+                handler: 'linear · check',
+                matcher: null,
+                sourcePath: '/repo/.codex/hooks.toml',
+              },
+            ],
+          },
+        )
+        const records = await readFakeCodexLog(spawnLogPath)
+        expect(records).toContainEqual({
+          event: 'mcpServer/oauth/login',
+          params: { name: 'github', threadId: 'provider-thread-1' },
+        })
+      } finally {
+        await adapter.stopAll()
+      }
+    })
   })
 
   it('forks the source thread through the kept turn and binds the new thread', async () => {

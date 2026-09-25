@@ -735,6 +735,20 @@ export const CodexHookTrustStatusSchema = openEnum(['managed', 'untrusted', 'tru
 export type CodexHookTrustStatus = v.InferOutput<typeof CodexHookTrustStatusSchema>
 
 export const CodexAsyncCommandHandlerTypeObjectSchema = v.looseObject({
+  ...v.pick(CodexHookRunSummarySchema, ['displayOrder', 'eventName', 'sourcePath', 'statusMessage'])
+    .entries,
+  additionalContextLimit: v.optional(
+    v.union([v.pipe(v.number(), v.integer(), v.minValue(0)), v.null()]),
+  ),
+  currentHash: v.string(),
+  enabled: v.boolean(),
+  isManaged: v.boolean(),
+  key: v.string(),
+  matcher: v.optional(v.union([v.string(), v.null()])),
+  pluginId: v.optional(v.union([v.string(), v.null()])),
+  source: CodexHookSourceSchema,
+  timeoutSec: v.pipe(v.number(), v.integer(), v.minValue(0)),
+  trustStatus: CodexHookTrustStatusSchema,
   async: v.optional(v.boolean()),
   command: v.string(),
   handlerType: v.literal('command'),
@@ -744,6 +758,22 @@ export type CodexAsyncCommandHandlerTypeObject = v.InferOutput<
 >
 
 export const CodexHandlerTypeServerToolObjectSchema = v.looseObject({
+  ...v.pick(CodexAsyncCommandHandlerTypeObjectSchema, [
+    'additionalContextLimit',
+    'currentHash',
+    'displayOrder',
+    'enabled',
+    'eventName',
+    'isManaged',
+    'key',
+    'matcher',
+    'pluginId',
+    'source',
+    'sourcePath',
+    'statusMessage',
+    'timeoutSec',
+    'trustStatus',
+  ]).entries,
   handlerType: v.literal('mcpTool'),
   server: v.string(),
   tool: v.string(),
@@ -752,10 +782,46 @@ export type CodexHandlerTypeServerToolObject = v.InferOutput<
   typeof CodexHandlerTypeServerToolObjectSchema
 >
 
-export const CodexPromptHookMetadataSchema = v.looseObject({ handlerType: v.literal('prompt') })
+export const CodexPromptHookMetadataSchema = v.looseObject({
+  ...v.pick(CodexAsyncCommandHandlerTypeObjectSchema, [
+    'additionalContextLimit',
+    'currentHash',
+    'displayOrder',
+    'enabled',
+    'eventName',
+    'isManaged',
+    'key',
+    'matcher',
+    'pluginId',
+    'source',
+    'sourcePath',
+    'statusMessage',
+    'timeoutSec',
+    'trustStatus',
+  ]).entries,
+  handlerType: v.literal('prompt'),
+})
 export type CodexPromptHookMetadata = v.InferOutput<typeof CodexPromptHookMetadataSchema>
 
-export const CodexAgentHookMetadataSchema = v.looseObject({ handlerType: v.literal('agent') })
+export const CodexAgentHookMetadataSchema = v.looseObject({
+  ...v.pick(CodexAsyncCommandHandlerTypeObjectSchema, [
+    'additionalContextLimit',
+    'currentHash',
+    'displayOrder',
+    'enabled',
+    'eventName',
+    'isManaged',
+    'key',
+    'matcher',
+    'pluginId',
+    'source',
+    'sourcePath',
+    'statusMessage',
+    'timeoutSec',
+    'trustStatus',
+  ]).entries,
+  handlerType: v.literal('agent'),
+})
 export type CodexAgentHookMetadata = v.InferOutput<typeof CodexAgentHookMetadataSchema>
 
 export const CodexHookMetadataSchema = v.union([
@@ -939,13 +1005,19 @@ export type CodexInputTextFunctionCallOutputContentItem = v.InferOutput<
 >
 
 export const CodexImageUrlFunctionCallOutputContentItemSchema = v.looseObject({
+  detail: v.optional(v.union([CodexImageDetailSchema, v.null()])),
+  type: v.literal('input_image'),
   image_url: v.string(),
 })
 export type CodexImageUrlFunctionCallOutputContentItem = v.InferOutput<
   typeof CodexImageUrlFunctionCallOutputContentItemSchema
 >
 
-export const CodexFileIdFunctionCallOutputContentItemSchema = v.looseObject({ file_id: v.string() })
+export const CodexFileIdFunctionCallOutputContentItemSchema = v.looseObject({
+  detail: v.optional(v.union([CodexImageDetailSchema, v.null()])),
+  type: v.literal('input_image'),
+  file_id: v.string(),
+})
 export type CodexFileIdFunctionCallOutputContentItem = v.InferOutput<
   typeof CodexFileIdFunctionCallOutputContentItemSchema
 >
@@ -1063,10 +1135,18 @@ export const CodexTextUserInputSchema = v.looseObject({
 })
 export type CodexTextUserInput = v.InferOutput<typeof CodexTextUserInputSchema>
 
-export const CodexUrlUserInputSchema = v.looseObject({ url: v.string() })
+export const CodexUrlUserInputSchema = v.looseObject({
+  detail: v.optional(v.union([CodexImageDetailSchema, v.null()])),
+  type: v.literal('image'),
+  url: v.string(),
+})
 export type CodexUrlUserInput = v.InferOutput<typeof CodexUrlUserInputSchema>
 
-export const CodexFileIdUserInputSchema = v.looseObject({ fileId: v.string() })
+export const CodexFileIdUserInputSchema = v.looseObject({
+  detail: v.optional(v.union([CodexImageDetailSchema, v.null()])),
+  type: v.literal('image'),
+  fileId: v.string(),
+})
 export type CodexFileIdUserInput = v.InferOutput<typeof CodexFileIdUserInputSchema>
 
 export const CodexLocalImageUserInputSchema = v.looseObject({
@@ -1226,17 +1306,17 @@ export const CodexFileChangeThreadItemSchema = v.looseObject({
 export type CodexFileChangeThreadItem = v.InferOutput<typeof CodexFileChangeThreadItemSchema>
 
 export const CodexMcpToolCallThreadItemSchema = v.looseObject({
-  ...v.pick(CodexCommandExecutionThreadItemSchema, ['durationMs', 'id', 'pluginId']).entries,
+  ...v.pick(CodexHandlerTypeServerToolObjectSchema, ['pluginId', 'server', 'tool']).entries,
   appContext: v.optional(v.union([CodexMcpToolCallAppContextSchema, v.null()])),
   arguments: v.unknown(),
+  durationMs: v.optional(v.union([v.pipe(v.number(), v.integer()), v.null()])),
   error: v.optional(v.union([CodexMisalignmentSteerSchema, v.null()])),
+  id: v.string(),
   mcpAppResourceUri: v.optional(v.union([v.string(), v.null()])),
   mcpAppUi: v.optional(v.union([CodexMcpAppUiSchema, v.null()])),
   readOnlyHint: v.optional(v.union([v.boolean(), v.null()])),
   result: v.optional(v.union([CodexMcpToolCallResultSchema, v.null()])),
-  server: v.string(),
   status: CodexDynamicToolCallStatusSchema,
-  tool: v.string(),
   type: v.literal('mcpToolCall'),
 })
 export type CodexMcpToolCallThreadItem = v.InferOutput<typeof CodexMcpToolCallThreadItemSchema>

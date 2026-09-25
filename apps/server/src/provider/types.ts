@@ -11,6 +11,9 @@ import type {
   ProviderAuth,
   ProviderBackgroundTask,
   ProviderDriverKind,
+  ProviderMcpServer,
+  ProviderMcpSignIn,
+  ProviderSessionHooks,
   ProviderInstanceId,
   ProviderLoginAttempt,
   ProviderSignInMethod,
@@ -576,6 +579,15 @@ export type ProviderAdapter = {
   listCommands?: (input: ProviderCommandCatalogInput) => Promise<ProviderCommandCatalogResult>
   respondApproval: (input: ProviderApprovalResponseInput) => Promise<void>
   respondUserInput: (input: ProviderUserInputResponseInput) => Promise<void>
+  /** The session's MCP servers; null when it has no live provider process to ask. */
+  mcpServers?: (input: { sessionId: SessionId }) => Promise<ProviderMcpServer[] | null>
+  reconnectMcpServer?: (input: { name: string; sessionId: SessionId }) => Promise<void>
+  signInMcpServer?: (input: { name: string; sessionId: SessionId }) => Promise<ProviderMcpSignIn>
+  /** Hooks configured for the checkout; null when the session has no live provider process. */
+  configuredHooks?: (input: {
+    cwd: string
+    sessionId: SessionId
+  }) => Promise<Pick<ProviderSessionHooks, 'errors' | 'hooks'> | null>
   /** Stops one background task without stopping the agent. */
   stopBackgroundTask?: (input: { sessionId: SessionId; taskId: string }) => Promise<void>
   prepareRollbackSession: (input: {

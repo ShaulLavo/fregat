@@ -30,9 +30,9 @@ provider and the other provider shows a disabled reason; it is never faked.
 | ------------------------------------------------------ | --------------------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------ | ---- | ----------------- | ---------------------------------------- |
 | approval-rules                                         | "Always allow" writes a real rule; "for this session" holds     | `updatedPermissions` from `canUseTool` suggestions | `acceptWithExecpolicyAmendment` (not in pinned schema) | M    | DONE (`89c58188`) | none (server requests are not generated) |
 | fork                                                   | Fork a session from any turn into a new session                 | `resume` + `forkSession` + `resumeSessionAt`       | `thread/fork`                                          | M    | DONE (lane L3)    | Codex schema refresh                     |
-| [mcp-status](145-harness-controls/mcp-status.md)       | See each MCP server's state; reconnect or sign in               | `mcpServerStatus()`, `reconnectMcpServer()`        | `mcpServerStatus/list`, `mcpServer/oauth/login`        | M    | PROPOSED          | Codex schema refresh                     |
+| mcp-status                                             | See each MCP server's state; reconnect or sign in               | `mcpServerStatus()`, `reconnectMcpServer()`        | `mcpServerStatus/list`, `mcpServer/oauth/login`        | M    | DONE (lane L3)    | Codex schema refresh                     |
 | background-tasks                                       | List a session's background tasks and stop one                  | `background_tasks_changed`, `stopTask(taskId)`     | `thread/backgroundTerminals/*` (experimental API only) | S–M  | DONE (lane L3)    | none                                     |
-| [hooks](145-harness-controls/hooks.md)                 | See which hooks ran in a turn and what they returned            | `includeHookEvents`, `hook_*` messages             | `hooks/list`, `hook/started`, `hook/completed`         | S    | PROPOSED          | Codex schema refresh for `hooks/list`    |
+| hooks                                                  | See which hooks ran in a turn and what they returned            | `includeHookEvents`, `hook_*` messages             | `hooks/list`, `hook/started`, `hook/completed`         | S    | DONE (lane L3)    | Codex schema refresh for `hooks/list`    |
 | [custom-agents](145-harness-controls/custom-agents.md) | Browse a project's agent definitions and start a session as one | `supportedAgents()`, `agent` option                | to verify                                              | S–M  | PROPOSED          | none                                     |
 | [compact](145-harness-controls/compact.md)             | Manual compaction (owned by Plan 126)                           | `/compact` path to verify                          | `thread/compact/start`                                 | —    | POINTER           | Plan 126 RUNTIME-05, INTERACTION-06      |
 | export                                                 | Export a transcript as Markdown or JSON                         | n/a (Platform projection)                          | n/a (Platform projection)                              | S    | DONE (lane L3)    | none                                     |
@@ -87,6 +87,27 @@ so the control does not appear. The roster is live provider state kept in `Provi
 `POST …/:taskId/stop` calls `query.stopTask` and answers with the roster. The header shows a
 Background tasks popover while the session has background work. `BackgroundTaskRegistry` still
 drives liveness. Scenario `claude-background-tasks`.
+
+### Hooks (done)
+
+Done 2026-09-25 (lane L3). D1 and D2 decided 2026-09-25: recommendation (completion wave).
+Claude sessions set `includeHookEvents`; exit 2 is `blocked`. Codex hook notifications are parsed
+as the run summary they are in 0.157 (the old flat read paired nothing). Ingestion lists a hook
+that blocked, failed or produced output and counts silent ones into one `hook.summary` row per
+turn; the turn summary says "Ran N hooks". The configured-hook list is Codex `hooks/list` for the
+session's checkout, in the header's MCP servers and hooks popover; Claude says hooks live in its
+settings files. Scenarios `claude-hook-rows`, `codex-session-tools`.
+
+### MCP status (done)
+
+Done 2026-09-25 (lane L3). D1 and D2 decided 2026-09-25: recommendation (completion wave): a
+per-session popover from the header (MCP servers and hooks), reconnect and sign-in only.
+`GET /providers/sessions/:id/mcp`, `POST …/mcp/:name/reconnect` (Claude `reconnectMcpServer`,
+Codex `config/mcpServer/reload`, which reloads every server) and `POST …/mcp/:name/sign-in` (Codex
+`mcpServer/oauth/login`, opened in a new tab; Claude's `needs-auth` rows point at `/mcp`). The
+generator now gives `oneOf` members the fields their parent declares beside the union, which is
+what types `hooks/list` entries. Scenarios `claude-session-tools` (working and broken project
+servers) and `codex-session-tools`.
 
 ## Suggested order
 

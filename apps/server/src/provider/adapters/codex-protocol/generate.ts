@@ -540,12 +540,35 @@ function renderSchemaExpression(schema: JsonObject, context: RenderContext, name
   if (enumValues.length > 0) return renderEnum(enumValues)
 
   const oneOf = arrayField(schema, 'oneOf')
-  if (oneOf.length > 0) return renderUnion(oneOf, context)
+  if (oneOf.length > 0) return renderUnion(withSharedProperties(schema, oneOf), context)
 
   const anyOf = arrayField(schema, 'anyOf')
-  if (anyOf.length > 0) return renderUnion(anyOf, context)
+  if (anyOf.length > 0) return renderUnion(withSharedProperties(schema, anyOf), context)
 
   return renderSchemaByType(schema, context, name)
+}
+
+/**
+ * A schema can carry its own `properties` beside a `oneOf` (a tagged union whose
+ * members share fields). Each member gets those fields too, or the union would
+ * type only the tag.
+ */
+function withSharedProperties(schema: JsonObject, variants: readonly JsonValue[]) {
+  const properties = objectField(schema, 'properties')
+  if (Object.keys(properties).length === 0) return variants
+
+  const required = stringArrayField(schema, 'required')
+  return variants.map((variant) => {
+    if (!isJsonObject(variant) || variant.type !== 'object') return variant
+
+    // The member keeps the name its own fields give it.
+    return {
+      ...variant,
+      title: objectSchemaName(variant),
+      properties: { ...properties, ...objectField(variant, 'properties') },
+      required: [...required, ...stringArrayField(variant, 'required')],
+    }
+  })
 }
 
 function renderSchemaByType(schema: JsonObject, context: RenderContext, name?: string): string {

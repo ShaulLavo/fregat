@@ -107,6 +107,14 @@ type FakeWaiter = {
 class FakeClaudeQuery implements AsyncIterable<SDKMessage> {
   readonly setModelCalls: Array<string | undefined> = []
   readonly stoppedTasks: string[] = []
+  readonly reconnected: string[] = []
+  readonly mcpServerStatus = async () => [
+    { name: 'linear', status: 'connected' as const },
+    { error: 'spawn ENOENT', name: 'broken', status: 'failed' as const },
+  ]
+  readonly reconnectMcpServer = async (name: string) => {
+    this.reconnected.push(name)
+  }
   readonly stopTask = async (taskId: string) => {
     this.stoppedTasks.push(taskId)
   }
@@ -896,6 +904,21 @@ describe('ClaudeProviderAdapter', () => {
       taskId: 'sleep',
     })
     expect(query.stoppedTasks).toEqual(['sleep'])
+    await harness.adapter.stopAll()
+  })
+
+  it('reports MCP servers from the live query and reconnects one by name', async () => {
+    const harness = claudeHarness()
+    const sessionId = v.parse(sessionIdSchema, SESSION_ID)
+    expect(await harness.adapter.mcpServers({ sessionId })).toBeNull()
+    await harness.adapter.startRuntime(sessionStartInput({}))
+
+    expect(await harness.adapter.mcpServers({ sessionId })).toEqual([
+      { error: null, name: 'linear', status: 'connected' },
+      { error: 'spawn ENOENT', name: 'broken', status: 'failed' },
+    ])
+    await harness.adapter.reconnectMcpServer({ name: 'broken', sessionId })
+    expect(latestQuery(harness).reconnected).toEqual(['broken'])
     await harness.adapter.stopAll()
   })
 

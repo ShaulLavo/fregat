@@ -46,6 +46,29 @@ describe('Codex protocol generator', () => {
     expect(source).toContain('"type": v.literal("reasoning")')
   })
 
+  it('gives every oneOf member the fields its parent declares beside the union', () => {
+    const source = renderValibotExpressionForTest({
+      oneOf: [
+        {
+          properties: { command: { type: 'string' }, kind: { enum: ['command'], type: 'string' } },
+          required: ['command', 'kind'],
+          type: 'object',
+        },
+        {
+          properties: { kind: { enum: ['prompt'], type: 'string' } },
+          required: ['kind'],
+          type: 'object',
+        },
+      ],
+      properties: { eventName: { type: 'string' } },
+      required: ['eventName'],
+      type: 'object',
+    })
+
+    expect(source.match(/"eventName": v\.string\(\)/g)).toHaveLength(2)
+    expect(source).toContain('"command": v.string()')
+  })
+
   it('generates method maps for Platform-used Codex protocol methods', () => {
     expect(CODEX_CLIENT_REQUEST_PARAMS['thread/start']).toBe(CodexThreadStartParamsSchema)
     expect(CODEX_CLIENT_REQUEST_RESULTS['turn/start']).toBe(CodexTurnStartResponseSchema)

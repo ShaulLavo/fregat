@@ -200,6 +200,55 @@ export const providerBackgroundTasksSchema = v.object({
   tasks: v.array(providerBackgroundTaskSchema),
 })
 
+export const providerMcpServerStatusSchema = v.picklist([
+  'connected',
+  'failed',
+  'needs-auth',
+  'pending',
+  'disabled',
+])
+
+export const providerMcpServerSchema = v.object({
+  name: trimmedNonEmptyStringSchema,
+  status: providerMcpServerStatusSchema,
+  error: v.nullable(v.string()),
+})
+
+/**
+ * A session's MCP servers as its provider reports them. `running` is false when
+ * the session has no live provider process to ask; the lists are then empty.
+ */
+export const providerSessionMcpSchema = v.object({
+  running: v.boolean(),
+  canReconnect: v.boolean(),
+  canSignIn: v.boolean(),
+  servers: v.array(providerMcpServerSchema),
+})
+
+export const providerMcpSignInSchema = v.object({ authorizationUrl: v.string() })
+
+export const providerConfiguredHookSchema = v.object({
+  eventName: v.string(),
+  matcher: v.nullable(v.string()),
+  handler: v.string(),
+  sourcePath: v.string(),
+  enabled: v.boolean(),
+})
+
+/** Hooks configured for a session's checkout. Claude reads its own settings files and lists none. */
+export const providerSessionHooksSchema = v.object({
+  running: v.boolean(),
+  supported: v.boolean(),
+  hooks: v.array(providerConfiguredHookSchema),
+  errors: v.array(v.string()),
+})
+
+export type ProviderMcpServer = v.InferOutput<typeof providerMcpServerSchema>
+export type ProviderMcpServerStatus = v.InferOutput<typeof providerMcpServerStatusSchema>
+export type ProviderSessionMcp = v.InferOutput<typeof providerSessionMcpSchema>
+export type ProviderMcpSignIn = v.InferOutput<typeof providerMcpSignInSchema>
+export type ProviderConfiguredHook = v.InferOutput<typeof providerConfiguredHookSchema>
+export type ProviderSessionHooks = v.InferOutput<typeof providerSessionHooksSchema>
 export type ProviderBackgroundTask = v.InferOutput<typeof providerBackgroundTaskSchema>
 export type ProviderBackgroundTasks = v.InferOutput<typeof providerBackgroundTasksSchema>
 export type ProviderSignInMethod = v.InferOutput<typeof providerSignInMethodSchema>

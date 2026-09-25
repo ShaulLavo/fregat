@@ -38,6 +38,8 @@ The chat mode button in the window toolbar, or an address URL with `/chat/`.
 
 `scenario claude-background-tasks` has real Claude (Haiku) start `sleep 600` and `sleep 700` in the background; the header's Background tasks popover lists both, and stopping one leaves the other. The list polls every 3 s only while the popover is open, since the roster lives in the provider process.
 
+`scenario claude-session-tools` gives real Claude (Haiku) a fixture with two project MCP servers, one working and one whose command does not exist; the header's MCP servers and hooks popover shows Connected, and Failed with the error, and Reconnect runs. `scenario codex-session-tools` reads the same popover for Codex: the user's servers and the fixture's `preToolUse` hook from `hooks/list`. Both need a turn first, since the lists come from the live provider process.
+
 `scenario chat-diff-syntax --url <session-diff-address>` checks painted syntax colors in a session checkpoint diff.
 
 Commands dispatch over the orchestration socket when it is live and over HTTP otherwise. The HTTP path refetches the shell snapshot itself.

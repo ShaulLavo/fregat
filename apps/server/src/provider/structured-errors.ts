@@ -14,11 +14,17 @@ export const sessionIdentityErrors = defineErrorCatalog('provider', {
     why: 'Rewind requires an active binding to the same native conversation.',
     fix: 'Resume the provider session before rewinding. No files were restored.',
   },
-  TASK_RUNTIME_UNAVAILABLE: {
+  SESSION_NOT_RUNNING: {
     status: 409,
-    message: 'The session is not running, so it has no background task to stop.',
-    why: 'Stopping a background task needs the live provider process that started it.',
-    fix: 'Reload the session; a stopped session has no background tasks left.',
+    message: 'The session is not running.',
+    why: 'This control talks to the live provider process, and the session has none.',
+    fix: 'Send a message to start the session, then try again.',
+  },
+  SESSION_CONTROL_UNSUPPORTED: {
+    status: 409,
+    message: "This session's provider does not offer that control.",
+    why: 'The session runs on a provider without it, or has no provider binding yet.',
+    fix: 'Use the provider’s own settings or command line for this.',
   },
   TASK_STOP_UNSUPPORTED: {
     status: 409,

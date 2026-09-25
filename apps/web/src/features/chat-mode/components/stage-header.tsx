@@ -5,6 +5,7 @@ import { SessionAttentionIndicator } from '@/features/chat-mode/components/sessi
 import { CaretRightIcon } from '@phosphor-icons/react'
 
 import { BackgroundTasksButton } from '@/features/chat/components/background-tasks-button'
+import { SessionToolsButton } from '@/features/chat/components/session-tools-button'
 import { ContextUsageRing } from '@/features/chat/components/context-usage-ring'
 import type { ContextUsage } from '@workspace/client-core/chat/context-usage'
 import {
@@ -61,6 +62,7 @@ export function StageHeader({
           {session ? <SessionTitleStatus sessionRef={session.ref} /> : null}
           {contextMeterEnabled && contextUsage ? <ContextUsageRing usage={contextUsage} /> : null}
           {session ? <BackgroundTasksButton sessionRef={session.ref} /> : null}
+          {session ? <SessionToolsButton sessionRef={session.ref} /> : null}
           {session ? <SessionActionsButton session={session} surface='header' /> : null}
         </>
       }
