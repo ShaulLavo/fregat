@@ -269,6 +269,8 @@ export const selectors = {
   deleteSession: (page: Page) => page.getByRole('menuitem', { name: 'Delete', exact: true }),
   confirmSessionDelete: (page: Page) =>
     page.getByRole('dialog').getByRole('button', { name: 'Delete', exact: true }),
+  removeWorktreeSwitch: (page: Page) =>
+    page.getByRole('dialog').getByRole('switch', { name: /^Also remove its worktree/ }),
   copySessionPath: (page: Page) => page.getByRole('menuitem', { name: 'Copy Path', exact: true }),
   copySessionBranch: (page: Page) =>
     page.getByRole('menuitem', { name: 'Copy Branch', exact: true }),

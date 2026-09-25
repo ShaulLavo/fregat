@@ -144,6 +144,8 @@ export const sessionDeleteCommandSchema = v.object({
   ...commandBaseSchema,
   type: v.literal('session.delete'),
   sessionId: sessionIdSchema,
+  /** Remove the session's worktree too, once no other session uses it and this one has stopped. */
+  removeWorktree: v.optional(v.boolean()),
 })
 
 export const sessionArchiveCommandSchema = v.object({

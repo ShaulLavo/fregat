@@ -430,6 +430,17 @@
       },
       "type": "object"
     },
+    "git.projectWorktreeCleanupOnDelete": {
+      "additionalProperties": {
+        "type": "boolean"
+      },
+      "default": {},
+      "description": "Worktree removal after the last session is deleted, keyed by project UUID on this machine.",
+      "propertyNames": {
+        "type": "string"
+      },
+      "type": "object"
+    },
     "git.projectWorktreeSubmodules": {
       "additionalProperties": {
         "enum": ["none", "recursive", "top-level"],
@@ -441,6 +452,11 @@
         "type": "string"
       },
       "type": "object"
+    },
+    "git.worktreeCleanupOnDelete": {
+      "default": false,
+      "description": "Remove a session worktree once every session using it is deleted and has stopped. A worktree with uncommitted changes, ignored files other than node_modules, or another branch checked out stays.",
+      "type": "boolean"
     },
     "git.worktreeSubmodules": {
       "default": "recursive",

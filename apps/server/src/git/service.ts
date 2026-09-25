@@ -857,6 +857,31 @@ export class GitService {
     )
   }
 
+  /**
+   * What stops an unattended removal of a worktree checkout: changes, another branch checked out,
+   * or ignored files. Ignored files can hold secrets or local data; `node_modules` is reinstallable.
+   */
+  async removalObstacle(input: { path: string; branch: string | null }) {
+    const [status, head, ignored] = await Promise.all([
+      this.git(input.path, ['status', '--porcelain', '--untracked-files=normal'], {
+        allowFailure: true,
+      }),
+      this.git(input.path, ['rev-parse', '--abbrev-ref', 'HEAD'], { allowFailure: true }),
+      this.git(
+        input.path,
+        ['ls-files', '--others', '--ignored', '--exclude-standard', '--directory', '-z'],
+        { allowFailure: true },
+      ),
+    ])
+    if (status.exitCode !== 0 || ignored.exitCode !== 0) return 'unreadable' as const
+    if (status.stdout.trim()) return 'dirty' as const
+    if (head.stdout.trim() !== input.branch) return 'branch-moved' as const
+    const residue = ignored.stdout
+      .split('\0')
+      .some((entry) => entry !== '' && !/(^|\/)node_modules\/$/.test(entry))
+    return residue ? ('ignored-files' as const) : null
+  }
+
   /** The branch a local branch tracks, as its remote and the remote's branch name. */
   async upstreamBranch(cwd: string, branch: string) {
     const read = (key: string) =>

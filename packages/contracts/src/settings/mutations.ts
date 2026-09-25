@@ -46,6 +46,7 @@ const NON_SCALAR_SETTING_IDS = [
   'chat.projectAutoSettle',
   'git.projectAutoPull',
   'git.projectWorktreeSubmodules',
+  'git.projectWorktreeCleanupOnDelete',
   'workbench.theme.customizations',
 ] as const satisfies readonly SettingId[]
 

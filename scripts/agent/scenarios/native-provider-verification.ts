@@ -216,7 +216,9 @@ export function isolatedNativeScenario(options: {
         await step('failed-before-cleanup')
         throw error
       } finally {
-        if (created) {
+        // A drive may have deleted the session and removed its worktree itself.
+        const shell = created ? await readShell(page, orchestration) : null
+        if (shell?.sessions.some((session) => session.id === sessionId)) {
           await dispatch(page, orchestration, {
             type: 'session.runtime.stop',
             sessionId,
@@ -227,7 +229,8 @@ export function isolatedNativeScenario(options: {
           })
         }
         // The fixture directory goes with the project; the project goes only once nothing owns a checkout.
-        if (newWorktreeId && created)
+        const leftWorktree = shell?.worktrees.find((worktree) => worktree.id === newWorktreeId)
+        if (newWorktreeId && leftWorktree && leftWorktree.lifecycle.state !== 'removed')
           await dispatch(page, orchestration, {
             type: 'worktree.release',
             worktreeId: newWorktreeId,

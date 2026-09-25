@@ -249,3 +249,34 @@ P3 review draft (50cd8c20) and Plan 169's review mode, and land after L8 merges 
   outcomes (push failed, pushed and created, pushed and existing).
 - `scenario session-pull-request-start`: `/work/tmp/fregat-evidence/20260925T134337Z-scenario-session-pull-request-start/`.
 - `scenario git-merge-request` (now drives Push and open): `/work/tmp/fregat-evidence/20260925T134315Z-scenario-git-merge-request/`.
+
+## EXT-12 with the LIFE-12 cleanup: remove a worktree after its last session is deleted (partial)
+
+Decided 2026-09-25: recommendation (completion wave), through the owned removal lifecycle only.
+Deleting a session whose worktree nothing else uses offers **Also remove its worktree** in the
+delete dialog (LIFE-12's inline decision). `session.delete` carries `removeWorktree`, recorded on
+the `session.deleted` event. `git.worktreeCleanupOnDelete` (machine scope, off by default; per
+project in `git.projectWorktreeCleanupOnDelete`) does the same for every deletion, and the dialog
+then says so. A worktree another session still uses, archived included, says it stays.
+
+`WorktreeCleanupReactor` sweeps on deletion events, settings changes and hourly. A worktree
+qualifies when it is platform-owned and ready, every session that used it is deleted with its
+provider stopped, it has no active terminal, and the last deletion asked or the setting says so.
+Before asking, git must show no changes, the worktree's own branch checked out, and no ignored
+files other than `node_modules`; the read model and setting are read again after those git calls,
+so a new session or a switched-off setting keeps it. The reactor only dispatches
+`worktree.cleanup` with a key per deletion: the decider refuses a referenced worktree, and the
+lifecycle reactor's safe removal refuses a dirty one and stops a running setup. The branch stays.
+Safe removal now ignores ignored files under `node_modules`, upstream's one exception, for
+manual removal too.
+
+**Not done:** upstream's age, merge and unchanged rules remove the checkout of an idle thread and
+recreate it from the branch when the thread resumes. Here a live session's worktree cannot be
+removed, so those rules need a restore-on-resume lifecycle step first. Log retention has no
+owner (Plan 147 puts it out of scope), and browser artifact retention waits on EXT-07.
+
+- `apps/server/src/orchestration/tests/worktree-cleanup.test.ts`: the request removes it and keeps
+  the branch; no request and no setting keeps it; the project setting removes it; a changed file,
+  an ignored file or another branch keeps it; `node_modules` does not; an archived session on the
+  same worktree keeps it.
+- `scenario worktree-cleanup-on-delete`: `/work/tmp/fregat-evidence/20260925T135431Z-scenario-worktree-cleanup-on-delete/`.

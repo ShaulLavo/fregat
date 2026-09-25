@@ -273,7 +273,8 @@
         "common-actions-delivery.md",
         "/work/tmp/fregat-evidence/20260920T161205Z-scenario-draft-recovery/summary.md records completed distinct-draft reload, uploaded-file and worktree-target recovery, and safe discard",
         "/work/tmp/fregat-evidence/20260920T152347Z-scenario-session-navigation/summary.md records completed owner path, branch and session-ID clipboard checks",
-        "Remaining: owner-scoped project settings, orphaned-worktree cleanup, session-owned terminal deletion and full upstream runtime comparison"
+        "scripts/agent/scenarios/worktree-cleanup-on-delete.ts: deleting the last session offers worktree removal; surviving and archived references keep it (repository-delivery.md, EXT-12)",
+        "Remaining: owner-scoped project settings, session-owned terminal deletion and full upstream runtime comparison"
       ]
     },
     {
@@ -592,10 +593,14 @@
     {
       "id": "EXT-12",
       "wave": "5",
-      "status": "open",
-      "evidence_level": "source-reviewed",
+      "status": "in-progress",
+      "evidence_level": "scenario-verified",
       "acceptance": "adjacent.md, EXT-12, Acceptance / verification",
-      "execution_evidence": [],
+      "execution_evidence": [
+        "scripts/agent/scenarios/worktree-cleanup-on-delete.ts",
+        "repository-delivery.md",
+        "apps/server/src/orchestration/tests/worktree-cleanup.test.ts"
+      ],
       "report": "adjacent.md",
       "title": "Port automatic worktree and storage cleanup policy"
     },

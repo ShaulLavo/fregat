@@ -128,6 +128,7 @@ export function decideOrchestrationCommand(
       return one(command, at, 'session.deleted', {
         deletedAt: at,
         sessionId: command.sessionId,
+        ...(command.removeWorktree ? { removeWorktree: true } : {}),
       })
     case 'session.archive':
       requireSessionNotArchived(model, command.sessionId, command.type)

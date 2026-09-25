@@ -283,6 +283,30 @@ export const SETTINGS_REGISTRY = {
     title: 'Project submodules in new worktrees',
     description: 'Submodule modes for new worktrees keyed by project UUID on this machine.',
   }),
+  'git.worktreeCleanupOnDelete': defineSetting({
+    schema: v.boolean(),
+    default: false,
+    // Machine scope: it deletes checkouts on this machine.
+    scope: 'machine',
+    widget: 'boolean',
+    category: 'Git',
+    title: 'Remove worktrees after their last session is deleted',
+    description:
+      'Remove a session worktree once every session using it is deleted and has stopped. A worktree with uncommitted changes, ignored files other than node_modules, or another branch checked out stays.',
+    keywords: ['worktree', 'cleanup', 'delete', 'remove', 'storage'],
+  }),
+  'git.projectWorktreeCleanupOnDelete': defineSetting({
+    schema: v.record(v.string(), v.boolean()),
+    default: {},
+    merge: 'record',
+    scope: 'machine',
+    widget: 'complex',
+    visibility: 'internal',
+    category: 'Git',
+    title: 'Project worktree removal after deletion',
+    description:
+      'Worktree removal after the last session is deleted, keyed by project UUID on this machine.',
+  }),
   'workbench.colorTheme': defineSetting({
     schema: v.picklist(COLOR_THEME_MODES),
     default: DEFAULT_COLOR_THEME,

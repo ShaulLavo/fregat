@@ -19,6 +19,7 @@ import { WorktreeLifecycleReactor } from './worktree-lifecycle-reactor'
 import { requireReadyWorktree } from './worktree-decider'
 import { PullRequestSyncReactor, type BranchPullRequestLookup } from './pull-request-sync-reactor'
 import { SessionSettlementReactor } from './session-settlement-reactor'
+import { WorktreeCleanupReactor } from './worktree-cleanup-reactor'
 import type { AutoSettleRules } from './utils/auto-settlement'
 import { WorktreeCommandPreparation } from './worktree-command-preparation'
 import { TerminalLeaseController } from './terminal-lease-controller'
@@ -112,6 +113,8 @@ export type OrchestrationEngineOptions = {
   worktreeSubmodules?: (projectId: string) => WorktreeSubmoduleMode
   /** Automatic settlement rules for a project; absent, nothing settles on its own. */
   autoSettleRules?: (projectId: string) => AutoSettleRules
+  /** The project's setting: remove a worktree once its last session is deleted. */
+  worktreeCleanupOnDelete?: (projectId: string) => boolean
   /** Reads each dedicated worktree's pull request; absent, nothing is synced. */
   pullRequestLookup?: BranchPullRequestLookup
 
@@ -148,6 +151,7 @@ export class OrchestrationEngine {
   private discovery: SessionDiscoveryReconciler | null = null
   private pullRequestSync: PullRequestSyncReactor | null = null
   private settlement: SessionSettlementReactor | null = null
+  private worktreeCleanup: WorktreeCleanupReactor | null = null
   private titleReactor: SessionTitleReactor | null = null
   private readonly keepImportedSessionsUpdated: () => boolean
   private providerService: ProviderService | null = null
@@ -199,6 +203,7 @@ export class OrchestrationEngine {
         this.createWorktreeLifecycle(options)
         this.createPullRequestSync(options)
         this.createSettlement(options)
+        this.createWorktreeCleanup(options)
         this.createDeletionReactor()
         this.createDiscoveryReconciler()
       },
@@ -207,7 +212,7 @@ export class OrchestrationEngine {
         this.reactorsStarted = true
         if (this.worktreeReactor) this.domainEvents.subscribe(this.worktreeReactor)
         if (this.deletionReactor) this.domainEvents.subscribe(this.deletionReactor)
-        for (const reactor of [this.pullRequestSync, this.settlement]) {
+        for (const reactor of [this.pullRequestSync, this.settlement, this.worktreeCleanup]) {
           if (!reactor) continue
           this.domainEvents.subscribe(reactor)
           reactor.start()
@@ -451,6 +456,7 @@ export class OrchestrationEngine {
     await this.discovery?.close()
     await this.pullRequestSync?.close()
     await this.settlement?.close()
+    await this.worktreeCleanup?.close()
     this.unsubscribeGitMutations?.()
     await this.worktreeReactor?.closeSetups()
     await this.worktreeReactor?.drain()
@@ -850,6 +856,27 @@ export class OrchestrationEngine {
       rules,
       backgroundLive: (sessionId) => this.providerService?.backgroundLiveness(sessionId) != null,
     })
+  }
+
+  private createWorktreeCleanup(options: OrchestrationEngineOptions) {
+    if (!this.registration) return
+    const git = this.registration.git
+    const onDelete = options.worktreeCleanupOnDelete
+    this.worktreeCleanup = new WorktreeCleanupReactor({
+      getReadModel: () => this.readModel,
+      dispatch: (command) => this.enqueue(command),
+      cleanupOnDelete: (projectId) => onDelete?.(projectId) ?? false,
+      deletionRemovesWorktree: (sequence) => this.eventStore.deletionRemovesWorktree(sequence),
+      obstacle: (worktree) =>
+        git.removalObstacle({ path: worktree.canonicalPath, branch: worktree.branch }),
+    })
+  }
+
+  /** Runs a worktree cleanup sweep now, as after a settings change, and waits for it. */
+  async cleanupWorktrees() {
+    await this.ready
+    this.worktreeCleanup?.schedule()
+    await this.worktreeCleanup?.drain()
   }
 
   /** Runs a settlement sweep now, as after a settings change, and waits for it. */

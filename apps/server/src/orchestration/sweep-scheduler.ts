@@ -60,3 +60,30 @@ export class SweepScheduler {
     await this.drain()
   }
 }
+
+/** A reactor whose work is one sweep over the read model, run on a timer and on demand. */
+export abstract class SweepReactor {
+  private readonly sweeps: SweepScheduler
+
+  constructor(options: { failureEvent: string; area: string; intervalMs: number }) {
+    this.sweeps = new SweepScheduler({ ...options, sweep: () => this.sweep() })
+  }
+
+  protected abstract sweep(): Promise<void>
+
+  start() {
+    this.sweeps.start()
+  }
+
+  schedule() {
+    this.sweeps.schedule()
+  }
+
+  drain() {
+    return this.sweeps.drain()
+  }
+
+  close() {
+    return this.sweeps.close()
+  }
+}

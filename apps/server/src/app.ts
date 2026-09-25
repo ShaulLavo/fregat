@@ -277,6 +277,13 @@ export function createApp(options: AppOptions) {
       settings.snapshot().values['chat.keepImportedSessionsUpdated'],
     worktreeSubmodules: (projectId) => worktreeSubmoduleMode(settings, projectId),
     autoSettleRules: (projectId) => autoSettleRules(settings, projectId),
+    worktreeCleanupOnDelete: (projectId) => {
+      const values = settings.snapshot().values
+      return (
+        values['git.projectWorktreeCleanupOnDelete'][projectId] ??
+        values['git.worktreeCleanupOnDelete']
+      )
+    },
     pullRequestLookup:
       options.orchestration?.pullRequestLookup === undefined
         ? (input) => readBranchPullRequests(input)
@@ -291,6 +298,10 @@ export function createApp(options: AppOptions) {
   })
   settings.onChange(() => {
     runDetached(() => orchestration.settleSessions(), { area: 'chat', operation: 'auto_settle' })
+    runDetached(() => orchestration.cleanupWorktrees(), {
+      area: 'worktree',
+      operation: 'auto_cleanup',
+    })
   })
   const identity = readEnvironmentIdentity(database)
   const serverConfig = orchestrationWsServerConfig(identity)

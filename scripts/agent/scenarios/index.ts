@@ -191,6 +191,7 @@ import { gitSubmodulesInit } from './git-submodules-init'
 import { gitAutoPull } from './git-auto-pull'
 import { sessionBranchDrift } from './session-branch-drift'
 import { sessionPullRequestStart } from './session-pull-request-start'
+import { worktreeCleanupOnDelete } from './worktree-cleanup-on-delete'
 import { sessionPullRequestSync } from './session-pull-request-sync'
 import { sessionAutoSettle } from './session-auto-settle'
 import { gitMergeRequest } from './git-merge-request'
@@ -394,6 +395,7 @@ export const scenarios: readonly Scenario[] = [
   gitAutoPull,
   sessionBranchDrift,
   sessionPullRequestStart,
+  worktreeCleanupOnDelete,
   sessionPullRequestSync,
   sessionAutoSettle,
   gitMergeRequest,

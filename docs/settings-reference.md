@@ -104,12 +104,14 @@ stays safe to read, share and export.
 
 ## Git
 
-| Setting                         | Default       | Scope   | What it does                                                                                                                                                       |
-| ------------------------------- | ------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `git.autoPull`                  | `false`       | machine | Fast-forward a project checkout on its default branch when its upstream moves. A checkout with changes, local commits or another branch checked out is left alone. |
-| `git.projectAutoPull`           | `{}`          | machine | Automatic default-branch pull keyed by project UUID on this machine.                                                                                               |
-| `git.worktreeSubmodules`        | `"recursive"` | machine | Initialize every nested submodule, only the ones this repository declares, or none when a session creates a worktree.                                              |
-| `git.projectWorktreeSubmodules` | `{}`          | machine | Submodule modes for new worktrees keyed by project UUID on this machine.                                                                                           |
+| Setting                              | Default       | Scope   | What it does                                                                                                                                                                                       |
+| ------------------------------------ | ------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `git.autoPull`                       | `false`       | machine | Fast-forward a project checkout on its default branch when its upstream moves. A checkout with changes, local commits or another branch checked out is left alone.                                 |
+| `git.projectAutoPull`                | `{}`          | machine | Automatic default-branch pull keyed by project UUID on this machine.                                                                                                                               |
+| `git.worktreeSubmodules`             | `"recursive"` | machine | Initialize every nested submodule, only the ones this repository declares, or none when a session creates a worktree.                                                                              |
+| `git.projectWorktreeSubmodules`      | `{}`          | machine | Submodule modes for new worktrees keyed by project UUID on this machine.                                                                                                                           |
+| `git.worktreeCleanupOnDelete`        | `false`       | machine | Remove a session worktree once every session using it is deleted and has stopped. A worktree with uncommitted changes, ignored files other than node_modules, or another branch checked out stays. |
+| `git.projectWorktreeCleanupOnDelete` | `{}`          | machine | Worktree removal after the last session is deleted, keyed by project UUID on this machine.                                                                                                         |
 
 ## Keyboard shortcuts
 

@@ -9,7 +9,7 @@ import { recordProcessInfo, recordProcessWarning } from '../observability'
 import type { OrchestrationReadModel } from './read-model'
 import { autoSettlementAt, type AutoSettleRules } from './utils/auto-settlement'
 import { internalCommandKey } from './utils/repository-ids'
-import { SweepScheduler } from './sweep-scheduler'
+import { SweepReactor } from './sweep-scheduler'
 
 type Options = {
   getReadModel: () => OrchestrationReadModel
@@ -27,25 +27,19 @@ const SWEEP_INTERVAL_MS = 5 * 60_000
  * worktree's pull request merged or closed after the last request. Each decision carries the
  * sequence it read, and the engine refuses it if the session moved since.
  */
-export class SessionSettlementReactor {
+export class SessionSettlementReactor extends SweepReactor {
   readonly name = 'session-settlement-reactor'
   private readonly options: Options
   private readonly now: () => number
-  private readonly sweeps: SweepScheduler
 
   constructor(options: Options) {
-    this.options = options
-    this.now = options.now ?? Date.now
-    this.sweeps = new SweepScheduler({
-      sweep: () => this.sweep(),
+    super({
       failureEvent: 'chat.auto_settle.failed',
       area: 'chat',
       intervalMs: options.intervalMs ?? SWEEP_INTERVAL_MS,
     })
-  }
-
-  start() {
-    this.sweeps.start()
+    this.options = options
+    this.now = options.now ?? Date.now
   }
 
   // A merged or closed pull request settles now rather than on the next sweep.
@@ -53,19 +47,7 @@ export class SessionSettlementReactor {
     if (events.some((event) => event.type === 'worktree.pull-request-synced')) this.schedule()
   }
 
-  schedule() {
-    this.sweeps.schedule()
-  }
-
-  drain() {
-    return this.sweeps.drain()
-  }
-
-  close() {
-    return this.sweeps.close()
-  }
-
-  private async sweep() {
+  protected async sweep() {
     const model = this.options.getReadModel()
     const now = this.now()
     const decisions = []
