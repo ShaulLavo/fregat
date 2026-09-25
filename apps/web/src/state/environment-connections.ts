@@ -424,6 +424,7 @@ export function createEnvironmentConnections({
   /** The server connects the machine once its release is installed; this client then attaches. */
   async function updateServer(name: string): Promise<boolean> {
     notices.reset(`machine:${name}`)
+    let attached = false
     // Settlement reports the failure on the machine, where its fix and Fix with AI show.
     const settled = await runMutation(
       primaryQueryClient(),
@@ -431,17 +432,17 @@ export function createEnvironmentConnections({
         mutationKey: environmentMutationKeys.machine('update', name),
         scope: serverUpdateScope(name),
         mutationFn: () => updateSshServer(name),
-        onSettled: (state, error) => settleServerUpdate(name, state, error),
+        onSettled: async (state, error) => {
+          attached = (await settleServerUpdate(name, state, error)) === 'connected'
+        },
       },
       undefined,
     ).then(
       () => true,
       () => false,
     )
-    return (
-      settled &&
-      store.getState().machines.some((entry) => entry.name === name && entry.phase === 'live')
-    )
+    // The machine's phase turns live only once the shell stream delivers, after this resolves.
+    return settled && attached
   }
   async function settleServerUpdate(
     name: string,
