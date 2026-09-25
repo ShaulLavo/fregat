@@ -1,8 +1,11 @@
+import { sessionLifecycleUndoEntry } from '@workspace/client-core/chat/rail/lifecycle-undo'
 import assert from 'node:assert/strict'
 import * as v from 'valibot'
 import { sessionIdSchema, scopedSessionKey, scopedProjectKey } from '@workspace/contracts'
 import {
   createSessionArchiveCommand,
+  createSessionActiveReorderCommand,
+  createSessionLifecycleCommand,
   createSessionRenameCommand,
 } from '@workspace/client-core/chat/commands'
 import { createEnvironmentClient } from '@workspace/client-core/transport/client'
@@ -168,6 +171,42 @@ test('new transcript query clears and supersedes a delayed old search result', a
     expect(store.getSnapshot().searching).toBe(false)
   } finally {
     gate.release()
+    store.dispose()
+    session.dispose()
+  }
+})
+
+test('reordering clears stale Undo for every successfully changed session', async ({ server }) => {
+  const { session, chat } = await openTestChat(server)
+  const ready = session.getSnapshot()
+  assert(ready.kind === 'ready')
+  const store = createAgentRailState(session, ready)
+  try {
+    const project = await store.addProject('')
+    assert(project)
+    const first = await createRailSession(chat, project.worktreeId, 'First')
+    const second = await createRailSession(chat, project.worktreeId, 'Second')
+    for (const sessionId of [first, second]) {
+      await store.execute([
+        createSessionLifecycleCommand(sessionId, { type: 'pin', orderKey: 'm' }),
+      ])
+      const result = await store.execute([
+        createSessionLifecycleCommand(sessionId, { type: 'unpin' }),
+      ])
+      assert(result)
+      const entry = sessionLifecycleUndoEntry(
+        { environmentId: ready.descriptor.environmentId, sessionId },
+        result,
+      )!
+      store.offerUndo('unpin', [{ ...entry, selected: false }])
+    }
+    const moved = await store.execute([
+      createSessionActiveReorderCommand({ sessionId: first, orderKey: 'm' }),
+      createSessionActiveReorderCommand({ sessionId: second, orderKey: 'n' }),
+    ])
+    expect(moved).not.toBeNull()
+    expect(store.getSnapshot().undo).toBeNull()
+  } finally {
     store.dispose()
     session.dispose()
   }

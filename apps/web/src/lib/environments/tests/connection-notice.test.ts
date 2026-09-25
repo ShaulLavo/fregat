@@ -27,7 +27,7 @@ test('failed attempts, retries, and lost connections remain visible', () => {
 
 test('a failed update reads as such and can be tried again; a source primary’s refusal cannot', () => {
   const failed = (code: string) => ({ code, message: 'Update failed.' })
-  for (const code of ['NO_BUN', 'OLD_BUN', 'TRANSFER', 'INSTALL']) {
+  for (const code of ['NO_BUN', 'OLD_BUN', 'TRANSFER', 'INSTALL', 'IMMUTABLE']) {
     const error = failed(`machines.SSH_UPDATE_${code}`)
     expect(serverUpdateLabel(error)).toBe('Update server')
     expect(connectionNoticeSummary('blocked', error)).toBe('Server update failed')
@@ -35,4 +35,15 @@ test('a failed update reads as such and can be tried again; a source primary’s
   expect(serverUpdateLabel(failed('machines.SSH_UPDATE_NOT_A_RELEASE'))).toBeNull()
   expect(serverUpdateLabel(failed('ENVIRONMENT_PROTOCOL_MISMATCH'))).toBeNull()
   expect(serverUpdateLabel(null)).toBeNull()
+})
+
+test('describes either protocol direction without calling a newer server out of date', () => {
+  for (const message of [
+    'Server speaks protocol 7, this client needs 8.',
+    'Server speaks protocol 9, this client needs 8.',
+  ]) {
+    expect(
+      connectionNoticeSummary('blocked', { code: 'ENVIRONMENT_PROTOCOL_MISMATCH', message }),
+    ).toBe('Protocol mismatch')
+  }
 })

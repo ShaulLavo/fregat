@@ -1,3 +1,4 @@
+import { connectionRefusalRetention } from './connection-refusal-retention'
 import { cachedProtocolStartup } from './cached-protocol-startup'
 import { editorLspTabSwitch } from './editor-lsp-tab-switch'
 import { editorLspServerExit } from './editor-lsp-server-exit'
@@ -245,6 +246,7 @@ export const scenarios: readonly Scenario[] = [
   sessionLifecycle,
   sessionUndo,
   cachedProtocolStartup,
+  connectionRefusalRetention,
   sessionNavigation,
   sessionOrdering,
   sessionTitles,

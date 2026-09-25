@@ -8,6 +8,7 @@ import { PushThisDevice } from '@/features/settings/components/push-this-device'
 import { usePushDevices } from '@/features/settings/hooks/use-push-devices'
 import { usePushThisDevice } from '@/features/settings/hooks/use-push-this-device'
 import type { SettingsProjection } from '@/features/settings/hooks/use-settings-projection'
+import { deviceUsesPushKey } from '@/features/settings/utils/push-browser'
 import { pushErrors } from '@/features/settings/utils/push-errors'
 
 export function PushSection({ snapshot }: { readonly snapshot: SettingsProjection }) {
@@ -63,7 +64,10 @@ export function PushSection({ snapshot }: { readonly snapshot: SettingsProjectio
       {thisDevice.data && devices.data ? (
         <PushThisDevice
           device={thisDevice.data}
-          registered={devices.data.devices.some((device) => device.id === thisDevice.data.deviceId)}
+          registered={
+            deviceUsesPushKey(thisDevice.data, devices.data.publicKey) &&
+            devices.data.devices.some((device) => device.id === thisDevice.data.deviceId)
+          }
         />
       ) : null}
       {devices.data && devices.data.devices.length === 0 ? (

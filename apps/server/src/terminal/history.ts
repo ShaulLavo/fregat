@@ -1,7 +1,7 @@
 import type { SessionId } from '@workspace/contracts'
 import { and, asc, eq, like, lt } from 'drizzle-orm'
 import type { PlatformDatabase } from '../db/client'
-import { terminalHistoryChunks } from '../db/schema'
+import { terminalHistoryChunks, terminalSessionCleanup } from '../db/schema'
 
 const MAX_BYTES = 8 * 1024 * 1024
 const MAX_LINES = 5_000
@@ -162,8 +162,21 @@ function trimContinuation(chunks: Chunk[]) {
 export function deleteAgentHistory(database: PlatformDatabase, sessionId: SessionId) {
   // Owners are JSON `[worktree, kind, id]`; `%` and `_` cannot occur in a session id.
   const suffix = JSON.stringify(['agent', sessionId]).slice(1)
-  database
-    .delete(terminalHistoryChunks)
-    .where(like(terminalHistoryChunks.owner, `%,${suffix}`))
-    .run()
+  database.transaction((transaction) => {
+    transaction
+      .delete(terminalHistoryChunks)
+      .where(like(terminalHistoryChunks.owner, `%,${suffix}`))
+      .run()
+    transaction.insert(terminalSessionCleanup).values({ sessionId }).onConflictDoNothing().run()
+  })
+}
+
+export function agentHistoryCleaned(database: PlatformDatabase, sessionId: SessionId) {
+  return (
+    database
+      .select()
+      .from(terminalSessionCleanup)
+      .where(eq(terminalSessionCleanup.sessionId, sessionId))
+      .get() !== undefined
+  )
 }

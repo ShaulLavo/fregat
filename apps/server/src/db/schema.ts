@@ -31,6 +31,10 @@ export const schemaMigrations = sqliteTable('schema_migrations', {
   appliedAt: text('applied_at').notNull(),
 })
 
+export const terminalSessionCleanup = sqliteTable('terminal_session_cleanup', {
+  sessionId: text('session_id').primaryKey(),
+})
+
 export const terminalHistoryChunks = sqliteTable(
   'terminal_history_chunks',
   {

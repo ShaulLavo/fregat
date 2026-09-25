@@ -1,3 +1,6 @@
+import { offerSessionUndo, useSessionUndoStore } from '@/features/chat-mode/state/session-undo'
+import { sessionLifecycleUndoEntry } from '@workspace/client-core/chat/rail/lifecycle-undo'
+import { createObservedInProcessClient } from '../../../../../test/client'
 import { sessionDropPatch } from '@/features/chat-mode/utils/rail-drop'
 import {
   dropEntryAcknowledged,
@@ -260,4 +263,66 @@ test('lifecycle confirmation alone cannot retire a drop before its key, and a st
   railOrderIntents.fail(older.intent.intentId, railOrderErrors.DROP_CHANGED())
   expect(railOrderOverrides().sessionLifecycleByKey?.[row.key]?.activeOrderKey).toBe('z')
   railOrderIntents.discard(newer.intent.intentId)
+})
+
+test('a reorder forgets stale undo for every keyless neighbour it materializes', async ({
+  client,
+  server,
+}) => {
+  const h = await createRailHarness(client, server)
+  for (const sessionId of h.sessionIds) {
+    const result = await h.dispatch(createSessionLifecycleCommand(sessionId, { type: 'pin' }))
+    const entry = sessionLifecycleUndoEntry({ environmentId: h.environmentId, sessionId }, result)!
+    offerSessionUndo({
+      kind: 'unpin',
+      entries: [{ ...entry, reopen: null }],
+      detail: '',
+      shortcut: null,
+    })
+  }
+  await h.refresh()
+  renderRailHarness(h)
+  const outcome = await reorderRailSession({
+    activeId: scopedSessionKey({ environmentId: h.environmentId, sessionId: h.sessionIds[0]! }),
+    overId: scopedSessionKey({ environmentId: h.environmentId, sessionId: h.sessionIds[1]! }),
+  })
+  expect(outcome?.ok).toBe(true)
+  expect(useSessionUndoStore.getState().undo).toHaveLength(0)
+})
+
+test('an interleaved unpin drop forgets its older undo when it cannot offer a replacement', async ({
+  server,
+}) => {
+  let target: string | null = null
+  const client = createObservedInProcessClient(server, async (request) => {
+    if (!request.url.endsWith('/orchestration/commands')) return
+    const command = await request.clone().json()
+    if (command.type === 'session.active.reorder' && command.sessionId === target) {
+      target = null
+      await h.dispatch(createSessionLifecycleCommand(command.sessionId, { type: 'unsnooze' }))
+    }
+  })
+  const h = await createRailHarness(client, server)
+  const sessionId = h.sessionIds[0]!
+  const ref = { environmentId: h.environmentId, sessionId }
+  const result = await h.dispatch(
+    createSessionLifecycleCommand(sessionId, { type: 'pin', orderKey: 'm' }),
+  )
+  offerSessionUndo({
+    kind: 'unpin',
+    entries: [{ ...sessionLifecycleUndoEntry(ref, result)!, reopen: null }],
+    detail: '',
+    shortcut: null,
+  })
+  await h.refresh()
+  renderRailHarness(h)
+  target = sessionId
+  const outcome = await reorderRailSession({
+    activeId: scopedSessionKey(ref),
+    overId: scopedSessionKey({ environmentId: h.environmentId, sessionId: h.sessionIds[1]! }),
+  })
+  expect(outcome?.ok).toBe(true)
+  if (!outcome?.ok) throw new Error('Expected an accepted rail drop')
+  expect(outcome.result).toBeNull()
+  expect(useSessionUndoStore.getState().undo).toHaveLength(0)
 })

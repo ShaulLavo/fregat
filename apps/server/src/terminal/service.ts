@@ -1,7 +1,7 @@
 import type { SessionId } from '@workspace/contracts'
 import { createStructuredError } from '../observability/structured-errors'
 import type { PlatformDatabase } from '../db/client'
-import { deleteAgentHistory, TerminalHistory } from './history'
+import { agentHistoryCleaned, deleteAgentHistory, TerminalHistory } from './history'
 import { isNonEmptyString as isString } from '@workspace/utils/objects'
 import { adaptWebSocket } from '../utils/websocket'
 import { elapsedMs } from '@workspace/utils/timing'
@@ -113,14 +113,7 @@ export class TerminalService {
         return
       }
       await session.dispose({ kill: true, deleteHistory: true })
-      if (this.persistentSessions.get(key) === session)
-        throw createStructuredError({
-          code: 'terminal.CLEANUP_UNCONFIRMED',
-          status: 500,
-          message: 'Terminal cleanup could not be confirmed.',
-          why: 'The process, ownership lease or saved history could not be released.',
-          fix: 'Reconnect the terminal to retry cleanup, then close it again.',
-        })
+      this.assertDisposed(key, session)
       killed = true
     })
     return { killed }
@@ -131,14 +124,29 @@ export class TerminalService {
    * to the worktree and outlive any one session, so they stay.
    */
   async closeSessionTerminals(sessionId: SessionId) {
+    if (agentHistoryCleaned(this.database, sessionId)) return { closed: 0 }
     let closed = 0
     for (const [key, session] of this.persistentSessions) {
       if (!ownedByAgentSession(key, sessionId)) continue
-      await this.runExclusive(key, () => session.dispose({ kill: true, deleteHistory: true }))
+      await this.runExclusive(key, async () => {
+        await session.dispose({ kill: true, deleteHistory: true })
+        this.assertDisposed(key, session)
+      })
       closed++
     }
     deleteAgentHistory(this.database, sessionId)
     return { closed }
+  }
+
+  private assertDisposed(key: string, session: TerminalSession) {
+    if (this.persistentSessions.get(key) !== session) return
+    throw createStructuredError({
+      code: 'terminal.CLEANUP_UNCONFIRMED',
+      status: 500,
+      message: 'Terminal cleanup could not be confirmed.',
+      why: 'The process, ownership lease or saved history could not be released.',
+      fix: 'Reconnect the terminal to retry cleanup, then close it again.',
+    })
   }
 
   async clear({ worktreeId, terminalId }: TerminalClearInput) {

@@ -5,7 +5,7 @@ import {
 } from '@workspace/client-core/environments/utils/connection'
 
 /** The server-side SSH check and the browser's own check both name a server built for another protocol. */
-const outdatedServerCodes: ReadonlySet<string> = new Set([
+const protocolMismatchCodes: ReadonlySet<string> = new Set([
   'machines.SSH_PROTOCOL',
   'ENVIRONMENT_PROTOCOL_MISMATCH',
 ])
@@ -16,6 +16,7 @@ const retryableUpdateCodes: ReadonlySet<string> = new Set([
   'machines.SSH_UPDATE_OLD_BUN',
   'machines.SSH_UPDATE_TRANSFER',
   'machines.SSH_UPDATE_INSTALL',
+  'machines.SSH_UPDATE_IMMUTABLE',
 ])
 
 /** The update button's label for a machine whose server the primary can install or replace. */
@@ -36,7 +37,7 @@ export function connectionNoticeSummary(phase: EnvironmentPhase, error: Connecti
   if (phase === 'connecting') return 'Connecting…'
   if (phase === 'reconnecting') return 'Reconnecting…'
   if (phase === 'identity-drift') return 'Machine identity changed'
-  if (error && outdatedServerCodes.has(error.code)) return 'Server out of date'
+  if (error && protocolMismatchCodes.has(error.code)) return 'Protocol mismatch'
   if (error?.code === 'machines.SSH_NOT_INSTALLED') return 'Server setup needed'
   if (error?.code.startsWith('machines.SSH_UPDATE_')) return 'Server update failed'
   if (phase === 'blocked') return 'Could not connect'

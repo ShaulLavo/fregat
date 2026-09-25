@@ -591,11 +591,11 @@ export class OrchestrationRpcClient {
     }
   }
 
-  private reportPresence() {
+  private reportPresence(refresh = false) {
     const presence = this.options.presence
     if (!presence) return
     const focused = presence.focused()
-    if (focused === this.reportedPresence || !this.openSocket()) return
+    if ((!refresh && focused === this.reportedPresence) || !this.openSocket()) return
     try {
       this.sendClientMessageIfOpen({ kind: 'presence', focused })
       this.reportedPresence = focused
@@ -749,6 +749,7 @@ export class OrchestrationRpcClient {
     if (this.socket !== socket) return
     if (this.pendingPingRequestId !== null) return
 
+    this.reportPresence(true)
     const requestId = this.nextRequestId('ping')
     this.pendingPingRequestId = requestId
     this.pongTimeoutId = setTimeout(

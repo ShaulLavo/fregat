@@ -1,4 +1,9 @@
-import { act, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { vi } from 'vitest'
+import { createEnvironmentConnections } from '@/state/environment-connections'
+import { EnvironmentConnectionsContext } from '@/providers/environment-connections-context'
+import { orchestrationServerConfig } from '@workspace/client-core/test/orchestration-server-config'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import { QueryClientProvider } from '@tanstack/react-query'
 import * as v from 'valibot'
 import { healthDescriptorSchema } from '@workspace/contracts'
@@ -26,9 +31,11 @@ test('fresh protocol refusal takes precedence over a known cached workbench', as
   queryClient.setQueryData(environmentQueryKeys.descriptor, descriptor)
   const view = render(
     <QueryClientProvider client={queryClient}>
-      <ConnectionGate origin={origin}>
-        <div>Cached workbench</div>
-      </ConnectionGate>
+      <EnvironmentConnectionsContext value={createEnvironmentConnections()}>
+        <ConnectionGate origin={origin}>
+          <div>Cached workbench</div>
+        </ConnectionGate>
+      </EnvironmentConnectionsContext>
     </QueryClientProvider>,
   )
   try {
@@ -43,6 +50,94 @@ test('fresh protocol refusal takes precedence over a known cached workbench', as
     })
     expect(screen.queryByText('Cached workbench')).toBeNull()
     expect(screen.getByRole('button', { name: 'Retry connection' })).toBeVisible()
+  } finally {
+    view.unmount()
+    useEnvironmentsStore.setState(previous, true)
+  }
+})
+
+test.for(['protocol', 'identity'] as const)(
+  'retains an admitted workbench after a later %s refusal',
+  async (kind, { client }) => {
+    const descriptor = v.parse(healthDescriptorSchema, (await client.health.get()).data)
+    const origin = primaryServerOrigin()
+    const previous = useEnvironmentsStore.getState()
+    const queryClient = primaryQueryClient()
+    useEnvironmentsStore.setState({
+      entries: { [origin]: createEnvironmentEntry(origin, origin) },
+      connectionByOrigin: {},
+    })
+    useEnvironmentsStore.getState().recordDescriptor(origin, descriptor)
+    useEnvironmentsStore
+      .getState()
+      .recordHandshake(
+        origin,
+        orchestrationServerConfig({ environmentId: descriptor.environmentId }),
+      )
+    queryClient.setQueryData(environmentQueryKeys.descriptor, descriptor)
+    const view = render(
+      <QueryClientProvider client={queryClient}>
+        <EnvironmentConnectionsContext value={createEnvironmentConnections()}>
+          <ConnectionGate origin={origin}>
+            <input aria-label='Live terminal input' defaultValue='retained input' />
+          </ConnectionGate>
+        </EnvironmentConnectionsContext>
+      </QueryClientProvider>,
+    )
+    try {
+      const terminal = screen.getByRole('textbox', { name: 'Live terminal input' })
+      act(() => {
+        const next =
+          kind === 'protocol'
+            ? { ...descriptor, protocolVersion: descriptor.protocolVersion + 1 }
+            : {
+                ...descriptor,
+                environmentId: v.parse(healthDescriptorSchema, {
+                  ...descriptor,
+                  environmentId: crypto.randomUUID(),
+                }).environmentId,
+              }
+        expect(() => useEnvironmentsStore.getState().recordDescriptor(origin, next)).toThrow()
+      })
+      expect(screen.getByRole('textbox', { name: 'Live terminal input' })).toBe(terminal)
+      expect(terminal).toHaveValue('retained input')
+    } finally {
+      view.unmount()
+      useEnvironmentsStore.setState(previous, true)
+    }
+  },
+)
+
+test('gate Retry restarts the primary transport after a blocked startup', async ({ client }) => {
+  const descriptor = v.parse(healthDescriptorSchema, (await client.health.get()).data)
+  const origin = primaryServerOrigin()
+  const previous = useEnvironmentsStore.getState()
+  const queryClient = primaryQueryClient()
+  useEnvironmentsStore.setState({
+    entries: { [origin]: createEnvironmentEntry(origin, origin) },
+    connectionByOrigin: {},
+  })
+  useEnvironmentsStore.getState().restoreDescriptor(origin, descriptor)
+  expect(() =>
+    useEnvironmentsStore
+      .getState()
+      .recordDescriptor(origin, { ...descriptor, protocolVersion: descriptor.protocolVersion + 1 }),
+  ).toThrow()
+  queryClient.setQueryData(environmentQueryKeys.descriptor, descriptor)
+  const connections = createEnvironmentConnections()
+  const retry = vi.spyOn(connections, 'retryPrimary').mockResolvedValue()
+  const view = render(
+    <QueryClientProvider client={queryClient}>
+      <EnvironmentConnectionsContext value={connections}>
+        <ConnectionGate origin={origin}>
+          <div>Recovered</div>
+        </ConnectionGate>
+      </EnvironmentConnectionsContext>
+    </QueryClientProvider>,
+  )
+  try {
+    await userEvent.click(screen.getByRole('button', { name: 'Retry connection' }))
+    await waitFor(() => expect(retry).toHaveBeenCalledOnce())
   } finally {
     view.unmount()
     useEnvironmentsStore.setState(previous, true)

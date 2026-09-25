@@ -213,6 +213,10 @@ export function createAgentRailState(
         let result = null
         for (const command of commands) {
           result = await ready.chat.dispatch(command)
+          if (command.type === 'session.pin.reorder' || command.type === 'session.active.reorder')
+            history.forget([
+              { environmentId: ready.descriptor.environmentId, sessionId: command.sessionId },
+            ])
           if (clearCompletedMarks && 'sessionId' in command)
             publish({ marked: state.marked.filter((id) => id !== command.sessionId) })
         }

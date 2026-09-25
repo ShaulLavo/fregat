@@ -1,10 +1,12 @@
-/** The connected windows that report being visible and focused. A closed socket stops counting. */
+const FOCUS_TTL_MS = 45_000
+
+/** Focus expires when a suspended window stops refreshing its report. */
 export class ClientPresence {
-  private readonly focusedSockets = new Set<object>()
+  private readonly focusedSockets = new Map<object, number>()
 
   report(socket: object, focused: boolean) {
     if (focused) {
-      this.focusedSockets.add(socket)
+      this.focusedSockets.set(socket, Date.now() + FOCUS_TTL_MS)
       return
     }
     this.focusedSockets.delete(socket)
@@ -15,6 +17,10 @@ export class ClientPresence {
   }
 
   get focusedCount() {
+    const now = Date.now()
+    for (const [socket, expiresAt] of this.focusedSockets) {
+      if (expiresAt <= now) this.focusedSockets.delete(socket)
+    }
     return this.focusedSockets.size
   }
 }

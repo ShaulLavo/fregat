@@ -104,6 +104,12 @@ const machineErrors = defineErrorCatalog('machines', {
     why: 'Streaming the release over SSH into ~/.platform/server/releases failed.',
     fix: 'Check the SSH connection and the free disk space on that machine, then select Update server again.',
   },
+  SSH_UPDATE_IMMUTABLE: {
+    status: 409,
+    message: 'The active release cannot be replaced in place.',
+    why: 'The release has different contents and a server may still load files from it.',
+    fix: 'Build a new release, then select Update server again.',
+  },
   SSH_UPDATE_IN_USE: {
     status: 409,
     message: 'The previous server release is still in use.',
@@ -127,6 +133,7 @@ export const updateErrors = {
   transfer: machineErrors.SSH_UPDATE_TRANSFER,
   install: machineErrors.SSH_UPDATE_INSTALL,
   inUse: machineErrors.SSH_UPDATE_IN_USE,
+  immutable: machineErrors.SSH_UPDATE_IMMUTABLE,
 }
 
 const sshErrors = {

@@ -138,10 +138,7 @@ export function reorderRailSession({ activeId, overId, undoShortcut }: SessionDr
   const kind = dropUndoKind(plan)
   return performSessionDrop(patch).then((outcome) => {
     if (!outcome.ok) return outcome
-    if (!kind) {
-      forgetSessionUndo([active.ref])
-      return outcome
-    }
+    if (!kind) return outcome
     offerSessionUndo({
       kind,
       entries: outcome.result ? [{ ...outcome.result, reopen: null }] : [],
@@ -185,6 +182,7 @@ function performSessionDrop(patch: SessionDropPatch) {
                     dispatchCommandForEnvironment(step.ref.environmentId, command),
                 })
                 if (!outcome.ok) throw outcome.error
+                forgetSessionUndo([step.ref])
                 if (scopedSessionKey(step.ref) !== scopedSessionKey(patch.ref)) continue
                 const next = sessionLifecycleUndoEntry(step.ref, outcome.result)
                 if (!next) continue

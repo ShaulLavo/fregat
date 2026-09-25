@@ -4,7 +4,7 @@ import { cn } from '@workspace/ui/lib/utils'
 import type { MouseEvent, PointerEvent } from 'react'
 import { PULL_REQUEST_BADGE_LOOK } from '@/features/chat-mode/utils/pull-request-badge'
 
-// A span, not a link: the row is a button, and a link nested in it is invalid markup.
+// The session menu exposes the same action to keyboard and screen-reader users.
 export function SessionPullRequestBadge({
   pullRequest,
 }: {
@@ -33,7 +33,7 @@ export function SessionPullRequestBadge({
         url && 'cursor-pointer hover:underline',
       )}
       data-pull-request-state={badge.state}
-      role={url ? 'link' : 'img'}
+      role='img'
       title={badge.label}
       onClick={url ? open : undefined}
       onPointerDown={url ? keepFromRow : undefined}

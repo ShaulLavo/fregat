@@ -92,7 +92,8 @@ export function stopCommand(
 }
 
 const prelude = (layout: RemoteLayout) => `
-import { mkdir, readFile, readdir, rename, unlink } from 'node:fs/promises';
+import { mkdir, readFile, readdir, realpath, rename, unlink } from 'node:fs/promises';
+import path from 'node:path';
 import { openSync, closeSync } from 'node:fs';
 import net from 'node:net';
 import { Database } from 'bun:sqlite';
@@ -261,10 +262,12 @@ async function launch() {
   const port = await availablePort(config.remotePort ?? 0);
   managedGroup = previousRecord?.kind === 'managed' ? previousRecord : await dormantManagedRecord(port);
   const log = openSync('logs/ssh-launch.log', 'a', 0o600);
-  const child = Bun.spawn({ cmd: ['nohup', process.execPath, ...config.entry], env: { ...process.env, ...config.env, FS_HOST: '127.0.0.1', PORT: String(port), SERVER_ALLOWED_ORIGINS: config.webOrigin }, stdin: 'ignore', stdout: log, stderr: log });
+  const entry = config.installation === 'release' ? [await realpath(config.entry[0])] : config.entry;
+  const releaseDirectory = config.installation === 'release' ? path.dirname(path.dirname(entry[0])) : null;
+  const child = Bun.spawn({ cmd: ['nohup', process.execPath, ...entry], env: { ...process.env, ...config.env, FS_HOST: '127.0.0.1', PORT: String(port), SERVER_ALLOWED_ORIGINS: config.webOrigin }, stdin: 'ignore', stdout: log, stderr: log });
   closeSync(log);
   child.unref();
-  const record = { leaseId: previousRecord?.leaseId ?? crypto.randomUUID(), processId: managedGroup?.processId ?? crypto.randomUUID(), kind: 'managed', pid: child.pid, startedAt: processStart(child.pid), port, environmentId: previousRecord?.environmentId ?? managedGroup?.environmentId ?? null };
+  const record = { leaseId: previousRecord?.leaseId ?? crypto.randomUUID(), processId: managedGroup?.processId ?? crypto.randomUUID(), kind: 'managed', releaseDirectory, pid: child.pid, startedAt: processStart(child.pid), port, environmentId: previousRecord?.environmentId ?? managedGroup?.environmentId ?? null };
   try {
     if (!record.startedAt) fail('The launched process could not be identified.');
     await writeManagedProcess(record);

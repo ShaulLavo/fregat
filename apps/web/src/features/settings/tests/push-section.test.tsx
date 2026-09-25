@@ -255,6 +255,32 @@ test('replaces a subscription made with an older server key', async ({ client })
   }
 })
 
+test('offers registration again when a listed endpoint belongs to an older VAPID key', async ({
+  client,
+}) => {
+  const old = 'https://fcm.googleapis.com/retained-older-key'
+  const platform = await installPushPlatform({
+    permission: 'granted',
+    existing: { endpoint: old, applicationServerKey: new Uint8Array(65).fill(9) },
+  })
+  const registered = await client.push.devices.post({
+    label: 'Before key rotation',
+    subscription:
+      platform.existing!.toJSON() as import('@workspace/contracts').PushSubscriptionInput,
+  })
+  expect(registered.error).toBeNull()
+  const rendered = renderWithProviders(<Section />)
+  try {
+    expect(await screen.findByRole('button', { name: 'Turn on for this device' })).toBeVisible()
+    expect(screen.queryByText('This device receives push notifications.')).toBeNull()
+    await userEvent.click(screen.getByRole('button', { name: 'Turn on for this device' }))
+    expect(await screen.findByText('This device receives push notifications.')).toBeVisible()
+    expect(platform.existing!.unsubscribe).toHaveBeenCalledOnce()
+  } finally {
+    rendered.unmount()
+  }
+})
+
 test('settings search reaches the push section by its own words', async ({ client }) => {
   void client
   const rendered = renderWithProviders(<SettingsPage />)

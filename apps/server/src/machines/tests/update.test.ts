@@ -333,10 +333,11 @@ test('separate primaries serialize updates to the same remote installation', asy
   expect(await runtimeInstalls(home)).toBe(1)
 })
 
-test('a damaged cached release is retransmitted before reuse', async () => {
+test('a damaged inactive cached release is retransmitted before reuse', async () => {
   const { home, local, serverRoot } = await updateFixture()
   const supply = await shippableRelease(local, 'first')
   await install(home, supply)
+  await install(home, await shippableRelease(local, 'second'))
   await writeFile(path.join(serverRoot, 'releases/first/server/remote-support.js'), 'broken')
   const result = await install(home, supply)
   expect(result.event.bytesSent).toBeGreaterThan(0)
@@ -390,4 +391,147 @@ test('a candidate that crashes at startup is rejected before promotion', async (
     code: 'machines.SSH_UPDATE_INSTALL',
   })
   expect(await readlink(path.join(serverRoot, 'current'))).toBe('releases/first')
+})
+
+test('pruning preserves the release and runtime of another live primary', async () => {
+  const { home, local, serverRoot } = await updateFixture()
+  const first = await shippableRelease(local, 'first')
+  await install(home, first)
+  const launched = await runRemoteCommand(
+    launchCommand({
+      machine,
+      installation: releaseInstallation(serverRoot),
+      clientId,
+      webOrigin: 'http://127.0.0.1:5173',
+    }),
+  )
+  expect(launched.exitCode, launched.stderr).toBe(0)
+  const record = await parseRemoteRecord(launched.stdout)
+  stopLaunchedServer(record.pid!)
+  const runtime = await realpath(path.join(serverRoot, 'releases/first/server/node_modules'))
+  for (const name of ['second', 'third']) {
+    const supply = await shippableRelease(local, name)
+    const manifest = path.join(local, 'releases', name, 'server/runtime/package.json')
+    await writeFile(
+      manifest,
+      JSON.stringify({
+        ...JSON.parse(await readFile(manifest, 'utf8')),
+        description: 'new runtime',
+      }),
+    )
+    await install(home, supply)
+  }
+  expect(await readFile(path.join(serverRoot, 'releases/first/server/index.js'), 'utf8')).toContain(
+    'first',
+  )
+  expect((await lstat(runtime)).isDirectory()).toBe(true)
+})
+
+function failRemoteStep(home: string, fail: (command: string) => boolean) {
+  const ssh = localSsh({ home })
+  const spawn: import('../forward').SshSpawner = (command, stdin) => {
+    if (!fail(command.join(' '))) return ssh.spawn(command, stdin)
+    return Bun.spawn({
+      cmd: [
+        process.execPath,
+        '-e',
+        "process.stderr.write('injected SSH failure'); process.exit(255)",
+      ],
+      stdout: 'pipe',
+      stderr: 'pipe',
+    })
+  }
+  return { spawn, target: 'fixture', signal: AbortSignal.timeout(60000) }
+}
+
+test('failed rollback preserves the activation error and still attempts reconnection', async () => {
+  const { home, local } = await updateFixture()
+  await install(home, await shippableRelease(local, 'first'))
+  const source = await shippableRelease(local, 'second')
+  let restores = 0
+  let recovered = false
+  const remote = failRemoteStep(
+    home,
+    (script) => script.includes('const action = "restore"') && ++restores > 1,
+  )
+  const activation = new TypeError('activation failed first')
+  const event = newEvent()
+  await expect(
+    installRelease(
+      remote,
+      source,
+      event,
+      async () => {
+        throw activation
+      },
+      async () => {
+        recovered = true
+      },
+    ),
+  ).rejects.toBe(activation)
+  expect(recovered).toBe(true)
+  expect(event.rollbackError).toBeDefined()
+})
+
+test('prune failure leaves a committed active release and no stale recovery checkpoint', async () => {
+  const { home, local, serverRoot } = await updateFixture()
+  await install(home, await shippableRelease(local, 'first'))
+  const source = await shippableRelease(local, 'second')
+  const remote = failRemoteStep(home, (script) => script.includes('const pruned = []'))
+  const event = newEvent()
+  await installRelease(remote, source, event)
+  expect(await readlink(path.join(serverRoot, 'current'))).toBe('releases/second')
+  await expect(lstat(path.join(serverRoot, '.update-recovery.json'))).rejects.toMatchObject({
+    code: 'ENOENT',
+  })
+  expect(event.pruneError).toBeDefined()
+})
+
+test('checkpoint commit failure restores the prior release and reconnects', async () => {
+  const { home, local, serverRoot } = await updateFixture()
+  await install(home, await shippableRelease(local, 'first'))
+  const source = await shippableRelease(local, 'second')
+  const remote = failRemoteStep(home, (script) => script.includes('const action = "commit"'))
+  let recovered = false
+  await expect(
+    installRelease(
+      remote,
+      source,
+      newEvent(),
+      async () => {},
+      async () => {
+        recovered = true
+      },
+    ),
+  ).rejects.toMatchObject({ code: 'machines.SSH_UPDATE_INSTALL' })
+  expect(await readlink(path.join(serverRoot, 'current'))).toBe('releases/first')
+  expect(recovered).toBe(true)
+  await expect(lstat(path.join(serverRoot, '.update-recovery.json'))).rejects.toMatchObject({
+    code: 'ENOENT',
+  })
+})
+
+test('a damaged current release is never replaced before its runtime can be prepared', async () => {
+  const { home, local, serverRoot } = await updateFixture()
+  const source = await shippableRelease(local, 'first')
+  await install(home, source)
+  const modules = await realpath(path.join(serverRoot, 'releases/first/server/node_modules'))
+  const damaged = path.join(serverRoot, 'releases/first/server/remote-support.js')
+  await writeFile(damaged, 'broken')
+  await expect(install(home, source)).rejects.toMatchObject({
+    code: 'machines.SSH_UPDATE_IMMUTABLE',
+  })
+  expect(await realpath(path.join(serverRoot, 'releases/first/server/node_modules'))).toBe(modules)
+  expect(await readFile(damaged, 'utf8')).toBe('broken')
+})
+
+test('SSH verification failure stays a transport failure without attempting transfer', async () => {
+  const { home, local } = await updateFixture()
+  const source = await shippableRelease(local, 'first')
+  const event = newEvent()
+  const remote = failRemoteStep(home, (script) => script.includes('const files ='))
+  await expect(installRelease(remote, source, event)).rejects.toMatchObject({
+    code: 'machines.SSH_PROBE',
+  })
+  expect(event.steps.transfer).toBeUndefined()
 })

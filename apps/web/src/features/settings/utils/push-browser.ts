@@ -20,6 +20,7 @@ export type ThisDevice = {
   readonly permission: NotificationPermission | null
   /** `pushDeviceId` of this browser's subscription, when it holds one. */
   readonly deviceId: string | null
+  readonly applicationServerKey: readonly number[] | null
 }
 
 /** This browser's side of push: whether it can, whether it may, and which device it is. */
@@ -32,12 +33,19 @@ export function pushThisDeviceQueryOptions() {
 
 async function readThisDevice(): Promise<ThisDevice> {
   const support = pushSupport(readPushEnvironment())
-  if (support !== 'supported') return { support, permission: null, deviceId: null }
+  if (support !== 'supported')
+    return { support, permission: null, deviceId: null, applicationServerKey: null }
 
   const subscription = await currentSubscription()
   const deviceId = subscription ? await pushDeviceId(subscription.endpoint) : null
 
-  return { support, permission: Notification.permission, deviceId }
+  const key = subscription?.options.applicationServerKey
+  return {
+    support,
+    permission: Notification.permission,
+    deviceId,
+    applicationServerKey: key ? [...new Uint8Array(key)] : null,
+  }
 }
 
 /** Browsers show the prompt only during a user gesture, so call it first in a click's work. */
@@ -91,11 +99,15 @@ async function subscribeWithKey(manager: PushManager, key: Uint8Array<ArrayBuffe
   }
 }
 
-function sameBytes(left: ArrayBuffer | null, right: Uint8Array) {
-  if (!left || left.byteLength !== right.length) return false
-
-  const bytes = new Uint8Array(left)
+function sameBytes(left: ArrayBuffer | readonly number[] | null, right: Uint8Array) {
+  if (!left) return false
+  const bytes = left instanceof ArrayBuffer ? new Uint8Array(left) : left
+  if (bytes.length !== right.length) return false
   return bytes.every((byte, index) => byte === right[index])
+}
+
+export function deviceUsesPushKey(device: ThisDevice, publicKey: string) {
+  return sameBytes(device.applicationServerKey, base64UrlBytes(publicKey))
 }
 
 function base64UrlBytes(value: string) {

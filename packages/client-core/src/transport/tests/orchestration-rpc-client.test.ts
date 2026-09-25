@@ -335,3 +335,21 @@ test('reports window presence after the handshake and on each change until close
   ])
   expect(listeners.size).toBe(0)
 })
+
+test('refreshes unchanged focused presence with the heartbeat', async () => {
+  vi.useFakeTimers()
+  const fixture = rpcClientFixture({ presence: { focused: () => true, subscribe: () => () => {} } })
+  try {
+    const ready = fixture.client.ready()
+    fixture.socket.open()
+    await ready
+    vi.advanceTimersByTime(30_000)
+    expect(sentMessages(fixture.socket).filter((message) => message.kind === 'presence')).toEqual([
+      { kind: 'presence', focused: true },
+      { kind: 'presence', focused: true },
+    ])
+  } finally {
+    fixture.client.close()
+    vi.useRealTimers()
+  }
+})

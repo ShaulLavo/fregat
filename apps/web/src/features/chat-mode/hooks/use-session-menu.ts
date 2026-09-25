@@ -11,8 +11,18 @@ export function useSessionMenu(session: SessionRailItem) {
   const scope = useSessionRailStore((state) => state.scope)
   const setScope = useSessionRailStore((state) => state.setScope)
 
+  const pullRequest = session.worktree.pullRequest
   return sessionMenu({
     ...actions,
+    pullRequest:
+      pullRequest?.status === 'found'
+        ? {
+            number: pullRequest.number,
+            open: () => {
+              window.open(pullRequest.url, '_blank', 'noopener,noreferrer')
+            },
+          }
+        : undefined,
     newSession: () =>
       startSessionDraft(
         { environmentId: session.environmentId, projectId: session.projectId },

@@ -1,3 +1,4 @@
+import { OrchestrationCommandReceipts } from '../command-receipts'
 import archivePolicy from '../../../../../test/parity/t3code/archive.json'
 import { Database } from 'bun:sqlite'
 import { eq } from 'drizzle-orm'
@@ -1338,4 +1339,43 @@ it('keeps snooze Undo valid while ordinary tool activity continues', async () =>
     }),
   )
   expect(sessionRow(database).snoozedUntil).toBeNull()
+})
+
+it.each(['session.archive', 'session.settle', 'session.pin'] as const)(
+  'deduplicates historical %s receipts without rewriting stored data',
+  async (type) => {
+    const { database, engine } = await createEngineWithSession()
+    const action = command({
+      type,
+      sessionId: '00000000-0000-4000-8000-000000000001',
+      orderKey: 'm',
+    })
+    const accepted = await engine.dispatch(action)
+    database
+      .update(schema.orchestrationCommandReceipts)
+      .set({ resultJson: null })
+      .where(eq(schema.orchestrationCommandReceipts.commandId, action.commandId))
+      .run()
+    const restarted = new OrchestrationEngine(database)
+    const repeated = await restarted.dispatch(action)
+    expect(repeated).toEqual({ sequence: accepted.sequence, deduped: true, result: null })
+    const persisted = database
+      .select()
+      .from(schema.orchestrationCommandReceipts)
+      .where(eq(schema.orchestrationCommandReceipts.commandId, action.commandId))
+      .get()
+    expect(persisted?.resultJson).toBeNull()
+    expect(persisted?.resultSequence).toBe(accepted.sequence)
+  },
+)
+
+it('requires the durable lifecycle result before writing a new accepted receipt', async () => {
+  const { database } = await createEngineWithSession()
+  const action = command({
+    type: 'session.archive',
+    sessionId: '00000000-0000-4000-8000-000000000001',
+  })
+  const receipts = new OrchestrationCommandReceipts(database)
+  expect(() => receipts.recordAccepted(action, 99, null)).toThrow()
+  expect(receipts.find(action.commandId)).toBeNull()
 })

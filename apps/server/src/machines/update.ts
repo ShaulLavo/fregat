@@ -1,3 +1,5 @@
+import { errorMessage } from '@workspace/contracts'
+import { pruneScript, replaceableReleaseScript } from './update-prune'
 import { createHash, randomUUID } from 'node:crypto'
 import { readFile, readdir } from 'node:fs/promises'
 import path from 'node:path'
@@ -9,7 +11,7 @@ import { missingReleaseFiles, RUNTIME_MANIFEST, RUNTIME_LOCK } from '../installa
 import { shellQuote } from '../utils/shell'
 import { runSsh, type SshSpawner } from './forward'
 import { buildWorkingTree } from './dev-build'
-import { withUpdateLock } from './update-lock'
+import { withLaunchLock, withUpdateLock } from './update-lock'
 import { checkpoint, runUpdateScript, validateCandidate } from './update-activation'
 import { createSshError, updateErrors } from './structured-errors'
 
@@ -73,6 +75,9 @@ export type UpdateEvent = {
   bytesSent: number
   runtimeReused?: boolean
   pruned?: string[]
+  pruneError?: string
+  rollbackError?: string
+  recoveryError?: string
   step: UpdateStep
   steps: Partial<Record<UpdateStep, number>>
   outcome: 'pending' | 'success' | 'failed' | 'cancelled'
@@ -226,10 +231,20 @@ async function installLocked(
 ) {
   const files = await releaseFiles(path.join(source.directory, 'server'))
   const valid = await verifyRelease(remote, bun, probe.serverRoot, source.name, files)
-  if (!valid)
-    event.bytesSent = await timed(event, 'transfer', () =>
-      transfer(remote, source, probe.serverRoot),
-    )
+  if (!valid) {
+    await withLaunchLock(remote, probe.serverRoot, bun, async () => {
+      const admission = await runSsh({
+        ...remote,
+        script: bunCommand(bun, probe.serverRoot, replaceableReleaseScript(source.name)),
+      })
+      if (admission.exitCode === 6)
+        throw updateErrors.immutable({ internal: { release: source.name } })
+      if (admission.exitCode !== 0) throw createSshError('probe', admission.stderr)
+      event.bytesSent = await timed(event, 'transfer', () =>
+        transfer(remote, source, probe.serverRoot),
+      )
+    })
+  }
   if (!(await verifyRelease(remote, bun, probe.serverRoot, source.name, files)))
     throw updateErrors.transfer({ internal: { reason: 'content-mismatch', release: source.name } })
   event.runtimeReused = await timed(event, 'runtime', () =>
@@ -251,6 +266,7 @@ async function installLocked(
       }),
     )
     await activate(source)
+    await checkpoint(remote, bun, probe.serverRoot, launcher, 'commit')
   } catch (error) {
     await checkpoint(
       { ...remote, signal: AbortSignal.timeout(15000) },
@@ -258,19 +274,26 @@ async function installLocked(
       probe.serverRoot,
       launcher,
       'restore',
-    )
-    await recover()
+    ).catch((failure) => {
+      event.rollbackError = errorMessage(failure)
+    })
+    await recover().catch((failure) => {
+      event.recoveryError = errorMessage(failure)
+    })
     throw error
   }
-  const output = await runUpdateScript(
-    remote,
-    bun,
-    probe.serverRoot,
-    pruneScript(source.name, probe.currentRelease),
-    'prune',
-  )
-  event.pruned = v.parse(v.object({ pruned: v.array(v.string()) }), JSON.parse(output)).pruned
-  await checkpoint(remote, bun, probe.serverRoot, launcher, 'commit')
+  try {
+    const output = await runUpdateScript(
+      remote,
+      bun,
+      probe.serverRoot,
+      pruneScript(source.name, probe.currentRelease),
+      'prune',
+    )
+    event.pruned = v.parse(v.object({ pruned: v.array(v.string()) }), JSON.parse(output)).pruned
+  } catch (error) {
+    event.pruneError = errorMessage(error)
+  }
 }
 
 async function releaseFiles(directory: string): Promise<Record<string, string>> {
@@ -301,7 +324,9 @@ for (const [file, hash] of Object.entries(files)) {
   const data = await readFile(root + file).catch(() => null);
   if (!data || createHash('sha256').update(data).digest('hex') !== hash) process.exit(1);
 }`
-  return (await runSsh({ ...remote, script: bunCommand(bun, root, script) })).exitCode === 0
+  const result = await runSsh({ ...remote, script: bunCommand(bun, root, script) })
+  if (result.exitCode !== 0 && result.exitCode !== 1) throw createSshError('probe', result.stderr)
+  return result.exitCode === 0
 }
 
 const probeReportSchema = v.object({
@@ -527,31 +552,6 @@ await Bun.write(launcherStaging, config.launcherSource);
 await chmod(launcherStaging, 0o700);
 await rename(launcherStaging, config.launcher);
 process.stdout.write(JSON.stringify({ pruned: [] }) + '\\n');
-`
-}
-
-function pruneScript(name: string, previous: string | null) {
-  return `import { readdir, readlink, rm } from 'node:fs/promises';
-import path from 'node:path';
-const keep = new Set(${JSON.stringify([name, previous])});
-const pruned = [];
-for (const entry of await readdir('releases')) {
-  if (keep.has(entry)) continue;
-  await rm('releases/' + entry, { recursive: true, force: true });
-  pruned.push(entry);
-}
-const linked = new Set();
-for (const entry of keep) {
-  const target = await readlink('releases/' + entry + '/server/node_modules').catch(() => null);
-  if (target) linked.add(path.basename(path.dirname(target)));
-}
-for (const entry of await readdir('runtime').catch(() => [])) {
-  if (!linked.has(entry)) await rm('runtime/' + entry, { recursive: true, force: true });
-}
-for (const entry of await readdir('.')) {
-  if (/^current\\.[0-9]+\\.tmp$/.test(entry)) await rm(entry, { force: true });
-}
-process.stdout.write(JSON.stringify({ pruned }) + '\\n');
 `
 }
 

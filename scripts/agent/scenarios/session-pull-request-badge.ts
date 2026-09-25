@@ -195,6 +195,18 @@ export const sessionPullRequestBadge: Scenario = {
         'Opening the pull request leaves the row unselected',
       )
       await step('badge-opened')
+      const row = selectors.sessionRowForWorktree(page, open.worktreeId)
+      await row.focus()
+      await page.keyboard.press('Shift+F10')
+      const action = selectors.sessionPullRequestMenu(page, 31)
+      await action.waitFor()
+      await action.focus()
+      const keyboardPopup = page.context().waitForEvent('page')
+      await page.keyboard.press('Enter')
+      const keyboardOpened = await keyboardPopup
+      await keyboardOpened.waitForURL('https://github.com/fregat/fixture/pull/31')
+      await keyboardOpened.close()
+      await step('pull-request-opened-from-keyboard-menu')
     } finally {
       await page.context().unroute('https://github.com/**')
       for (const sessionId of sessions)

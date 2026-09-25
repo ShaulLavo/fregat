@@ -2,6 +2,8 @@ import { errorMessage } from '@workspace/contracts'
 import { eq } from 'drizzle-orm'
 import * as v from 'valibot'
 import {
+  isSessionLifecycleCommand,
+  sessionLifecycleResultSchema,
   type OrchestrationCommand,
   type OrchestrationCommandReceipt,
   orchestrationCommandReceiptSchema,
@@ -49,6 +51,7 @@ export class OrchestrationCommandReceipts {
     result: OrchestrationCommandResult | null,
     intentFingerprint = commandFingerprint(command),
   ) {
+    if (isSessionLifecycleCommand(command.type)) v.parse(sessionLifecycleResultSchema, result)
     const receipt = {
       ...receiptIdentity(command, intentFingerprint),
       error: null,

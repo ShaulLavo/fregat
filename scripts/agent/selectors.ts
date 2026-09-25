@@ -780,6 +780,13 @@ export const selectors = {
   paletteDialog: (page: Page) => page.getByRole('dialog', { name: 'Command Palette', exact: true }),
   machineLiveStatus: (page: Page, label: string) =>
     page.getByRole('status', { name: `${label} live`, exact: true }),
+  machineConnectionNotice: (page: Page, label: string, summary: string) =>
+    page
+      .getByRole('status')
+      .filter({ hasText: `${label} · ${summary}` })
+      .locator('..'),
+  sessionPullRequestMenu: (page: Page, number: number) =>
+    page.getByRole('menuitem', { name: `Open pull request #${number}`, exact: true }),
   bootstrapRetry: (page: Page) =>
     page.getByRole('button', { name: 'Retry connection', exact: true }),
   bootstrapFailure: (page: Page) =>

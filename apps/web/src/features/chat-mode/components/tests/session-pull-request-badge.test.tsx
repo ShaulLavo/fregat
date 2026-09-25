@@ -85,7 +85,7 @@ test('open, draft, merged and closed pull requests each show their own badge', a
 
   const opened = vi.spyOn(window, 'open').mockReturnValue(null)
   onTestFinished(() => opened.mockRestore())
-  await userEvent.click(within(rowOf(worktrees[1]!)).getByRole('link', { name: /#12/ }))
+  await userEvent.click(within(rowOf(worktrees[1]!)).getByRole('img', { name: /#12/ }))
   expect(opened).toHaveBeenCalledWith(
     'https://github.com/fregat/fixture/pull/12',
     '_blank',
@@ -117,4 +117,32 @@ test('a failed lookup shows unknown and no pull request shows nothing', async ({
   // A later answer replaces unknown on the same row.
   await harness.syncPullRequest(unknown, found(21, 'open'))
   await waitFor(() => expect(badgeOf(unknown)).toHaveAttribute('data-pull-request-state', 'open'))
+})
+
+test('opens the pull request through the keyboard-accessible session menu', async ({
+  client,
+  server,
+}) => {
+  const harness = await createWorktreeLifecycleHarness(client, server)
+  const worktreeId = await isolatedSession(harness)
+  await harness.syncPullRequest(worktreeId, found(42, 'open'))
+  renderRailHarness(harness)
+  const opened = vi.spyOn(window, 'open').mockReturnValue(null)
+  onTestFinished(() => opened.mockRestore())
+  const row = rowOf(worktreeId)
+  const list = screen.getByRole('listbox', { name: 'Sessions' })
+  list.focus()
+  await userEvent.keyboard('{Home}')
+  for (let index = 0; index < 20 && list.getAttribute('aria-activedescendant') !== row.id; index++)
+    await userEvent.keyboard('{ArrowDown}')
+  expect(list).toHaveAttribute('aria-activedescendant', row.id)
+  await userEvent.keyboard('{Shift>}{F10}{/Shift}')
+  const action = await screen.findByRole('menuitem', { name: 'Open pull request #42' })
+  action.focus()
+  await userEvent.keyboard('{Enter}')
+  expect(opened).toHaveBeenCalledWith(
+    'https://github.com/fregat/fixture/pull/42',
+    '_blank',
+    'noopener,noreferrer',
+  )
 })

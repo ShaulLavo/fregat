@@ -287,8 +287,9 @@ export const orchestrationCommandReceiptSchema = v.pipe(
     const isRegistration =
       receipt.commandType === 'project.create' || receipt.commandType === 'project.revive'
     if (isRegistration) return receipt.result !== null && 'projectId' in receipt.result
+    // Historical accepted receipts predate lifecycle results; new writes enforce them at insertion.
     if (isSessionLifecycleCommand(receipt.commandType))
-      return receipt.result !== null && 'kind' in receipt.result
+      return receipt.result === null || 'kind' in receipt.result
     return receipt.result === null
   }, 'Accepted commands require the result declared for their kind'),
 )
