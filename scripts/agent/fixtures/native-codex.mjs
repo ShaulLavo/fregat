@@ -160,7 +160,64 @@ function stoppedTurnReasons(message) {
     setTimeout(() => endTurn(turn, 'failed', { message: 'Verification provider failure.' }), 500)
 }
 
+function fixtureStepReady(name) {
+  try {
+    readFileSync(join(root, name))
+    return true
+  } catch {
+    return false
+  }
+}
+
+function streamWorkLog(message) {
+  const running = { id: turnId, status: 'inProgress', items: [] }
+  send({ id: message.id, result: { turn: running } })
+  send({ method: 'turn/started', params: { threadId, turn: running } })
+  const emitItem = (phase, item) =>
+    send({ method: `item/${phase}`, params: { threadId, turnId, item } })
+  for (let index = 0; index < 14; index += 1)
+    emitItem('completed', {
+      id: `setup-${index}`,
+      type: 'commandExecution',
+      command: `echo setup-${index}`,
+      status: 'completed',
+      exitCode: 0,
+      aggregatedOutput: `setup ${index}\n`,
+    })
+  const item = { id: 'stream-reasoning', type: 'reasoning' }
+  send({
+    method: 'item/reasoning/summaryTextDelta',
+    params: { threadId, turnId, itemId: item.id, summaryIndex: 0, delta: 'STREAM_START\n\n' },
+  })
+  let count = 0
+  let output = 'STREAM_START\n\n'
+  const timer = setInterval(() => {
+    if (!fixtureStepReady('stream-start')) return
+    if (count === 100 && !fixtureStepReady('stream-finish')) return
+    count += 1
+    const delta = `stream line ${count} output\n\n`
+    output += delta
+    send({
+      method: 'item/reasoning/summaryTextDelta',
+      params: { threadId, turnId, itemId: item.id, summaryIndex: 0, delta },
+    })
+    if (count <= 100) return
+    clearInterval(timer)
+    emitItem('completed', { ...item, summary: [output], content: [] })
+    emitItem('completed', {
+      id: 'stream-answer',
+      type: 'agentMessage',
+      text: 'WORK_LOG_STREAM_VERIFIED',
+    })
+    send({
+      method: 'turn/completed',
+      params: { threadId, turn: { id: turnId, status: 'completed', items: [] } },
+    })
+  }, 35)
+}
+
 function handle(message) {
+  if (scenario === 'chat-stream' && message.method === 'turn/start') return streamWorkLog(message)
   if (scenario === 'stopped-turn-reasons' && message.method === 'turn/start') {
     stoppedTurnReasons(message)
     return

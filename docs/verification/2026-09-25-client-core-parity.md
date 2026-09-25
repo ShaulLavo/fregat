@@ -28,4 +28,4 @@ Browser evidence, screenshots read:
 
 The draft-strip run logged four cancelled filesystem/Git requests during navigation and browser GPU diagnostics. The first release check used an external checkout, correctly exposed no release action, and was replaced with a managed dirty fixture. Fixture cleanup releases ownership before deleting its project. No real workspace or database was deleted.
 
-The attachment browser run exposed an authenticated image-loading failure. Main's separate fix `a8de3a1d` adds anonymous CORS loading and a valid PNG/decode fixture; this lane picks that fix up at rebase and rechecks the scenario.
+The attachment browser run exposed an authenticated image-loading failure. Main's fix `a8de3a1d` adds anonymous CORS loading and a valid PNG/decode fixture. After rebase, `chat-stash-context` passed at `/work/tmp/fregat-evidence/20260925T154717Z-scenario-chat-stash-context`; the decoded thumbnail and complete restored draft were inspected. Its single warning was a cancelled Git pull-request read during fixture navigation.

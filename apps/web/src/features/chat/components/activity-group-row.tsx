@@ -1,3 +1,4 @@
+import { Fragment } from 'react'
 import { CaretRightIcon } from '@phosphor-icons/react'
 import { Button } from '@workspace/ui/components/button'
 import { cn } from '@workspace/ui/lib/utils'
@@ -15,7 +16,7 @@ export function ActivityGroupRow({ activities }: { activities: readonly ChatWork
   const groupId = activities[0]?.id ?? ''
   const expanded = useChatWorkLogExpansionStore((state) => state.expandedGroupIds[groupId] ?? false)
   const toggle = useChatWorkLogExpansionStore((state) => state.toggleGroupExpanded)
-  const scrollRef = useWorkLogScroll(`group:${groupId}`, activities.length)
+  const { scrollRef, rowsRef } = useWorkLogScroll(`group:${groupId}`, activities.length, 'rows')
   const visible = expanded ? activities : activities.filter(isPinnedWorkLogEntry)
   const hiddenCount = activities.length - visible.length
   const summary = activityGroupSummary(activities)
@@ -50,9 +51,11 @@ export function ActivityGroupRow({ activities }: { activities: readonly ChatWork
         data-tool-group-scroll={expanded || undefined}
         ref={expanded ? scrollRef : undefined}
       >
-        {visible.map((activity) => (
-          <ActivityRow activity={activity} key={activity.id} />
-        ))}
+        <Fragment ref={rowsRef}>
+          {visible.map((activity) => (
+            <ActivityRow activity={activity} key={activity.id} />
+          ))}
+        </Fragment>
       </div>
     </section>
   )

@@ -346,15 +346,17 @@ export function TerminalPanel({
           }}
         />
       ) : null}
-      {!socketConnected && (savedPaint || hasLivePaint) ? (
+      {!socketConnected && (machineUnavailable || savedPaint || hasLivePaint) ? (
         <p
           role='status'
           className='text-warning bg-popover-solid absolute right-0 bottom-0 px-2 py-1 text-xs'
         >
-          Terminal connection pending. Saved output is read-only.
+          {unavailable
+            ? `${unavailable.label ?? unavailable.name} is unreachable. Reconnect to use this terminal.`
+            : 'Terminal connection pending. Saved output is read-only.'}
         </p>
       ) : null}
-      {terminalFailure?.identity === terminalMountIdentity ? (
+      {!machineUnavailable && terminalFailure?.identity === terminalMountIdentity ? (
         <div
           role='alert'
           className='absolute inset-0 flex flex-col items-center justify-center gap-(--density-gap-tight) p-4'
@@ -363,7 +365,10 @@ export function TerminalPanel({
           <FixWithAgentButton error={{ message: terminalFailure.message, title: 'Terminal' }} />
         </div>
       ) : null}
-      {!savedPaint && !hasLivePaint && terminalFailure?.identity !== terminalMountIdentity ? (
+      {!machineUnavailable &&
+      !savedPaint &&
+      !hasLivePaint &&
+      terminalFailure?.identity !== terminalMountIdentity ? (
         <div className='pointer-events-none absolute inset-0 flex items-center justify-center'>
           <Spinner size='md' label='Opening terminal' />
         </div>

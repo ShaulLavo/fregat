@@ -18,6 +18,9 @@ export const searchEditorGeometrySelectors = {
 
 // Stable handles the app already exposes. Add here, never inline a selector in a scenario.
 export const selectors = {
+  liveWorkLogToggle: (page: Page) =>
+    page.locator('[data-live-activity]').getByRole('button').first(),
+  workLogGroup: (page: Page) => page.getByRole('region', { name: 'Tool calls', exact: true }),
   manageWorktrees: (page: Page) =>
     page.getByRole('button', { name: 'Manage worktrees', exact: true }),
   worktreeManager: (page: Page) => page.getByRole('dialog', { name: 'Worktrees', exact: true }),

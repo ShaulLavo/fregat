@@ -6,6 +6,7 @@ import { draftRecovery } from './draft-recovery'
 import { composerDefaults } from './composer-defaults'
 import { sessionNotifications } from './session-notifications'
 import { terminalHistory } from './terminal-history'
+import { chatStream } from './chat-stream'
 import { chatStashContext } from './chat-stash-context'
 import { chatQueue } from './chat-queue'
 import { providerModelOptions } from './provider-model-options'
@@ -86,6 +87,7 @@ import { chatClaudeCatalog } from './chat-claude-catalog'
 import { chatDraftContextStrip } from './chat-draft-context-strip'
 import { machineConnectError } from './machine-connect-error'
 import { wallpaperIconHints } from './wallpaper-icon-hints'
+import { terminalOfflineHost } from './terminal-offline-host'
 import { terminalBackground } from './terminal-background'
 import { bottomPanelPersistence } from './bottom-panel-persistence'
 import { gitOpenAllDiffsSpam } from './git-open-all-diffs-spam'
@@ -242,6 +244,7 @@ export const scenarios: readonly Scenario[] = [
   codexApprovalRules,
   fileAttachments,
   chatStashContext,
+  chatStream,
   chatQueue,
   providerModelOptions,
   draftRecovery,
@@ -307,6 +310,7 @@ export const scenarios: readonly Scenario[] = [
   editorLinkedPackage,
   editorOfflineResync,
   terminalBackground,
+  terminalOfflineHost,
   bottomPanelPersistence,
   gitOpenAllDiffsSpam,
   gitStageSettles,

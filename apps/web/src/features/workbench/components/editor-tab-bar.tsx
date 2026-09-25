@@ -1,3 +1,4 @@
+import { Fragment } from 'react'
 import { useDroppable } from '@dnd-kit/core'
 import { isEditorTabDirty } from '@/features/workspace/utils/tab-dirty'
 import { horizontalListSortingStrategy, SortableContext } from '@dnd-kit/sortable'
@@ -28,7 +29,11 @@ export function EditorTabBar({
   const activeTab = tabs.find((tab) => tab.active) ?? null
   const { setNodeRef } = useDroppable({ id: `strip:${groupId}`, data: { kind: 'strip', groupId } })
   const tabIds = tabs.map((tab) => tab.id)
-  const setStripRef = useActiveTabStripScroll(activeTab?.id ?? null, tabIds, setNodeRef)
+  const { setStripRef, tabsRef } = useActiveTabStripScroll(
+    activeTab?.id ?? null,
+    tabIds,
+    setNodeRef,
+  )
 
   return (
     <SortableContext items={tabIds} strategy={horizontalListSortingStrategy}>
@@ -39,20 +44,22 @@ export function EditorTabBar({
         ref={setStripRef}
         role='tablist'
       >
-        {tabs.map((tab) => {
-          return (
-            <div className='relative flex shrink-0' key={tab.id}>
-              <EditorTabInsertion groupId={groupId} beforeTabId={tab.id} />
-              <SortableEditorTabButton
-                groupId={groupId}
-                closeTargets={closeTargets}
-                dirty={isEditorTabDirty(tab.content, dirtyDocumentKeys)}
-                loading={tab.id === loadingTabId}
-                tab={tab}
-              />
-            </div>
-          )
-        })}
+        <Fragment ref={tabsRef}>
+          {tabs.map((tab) => {
+            return (
+              <div className='relative flex shrink-0' key={tab.id}>
+                <EditorTabInsertion groupId={groupId} beforeTabId={tab.id} />
+                <SortableEditorTabButton
+                  groupId={groupId}
+                  closeTargets={closeTargets}
+                  dirty={isEditorTabDirty(tab.content, dirtyDocumentKeys)}
+                  loading={tab.id === loadingTabId}
+                  tab={tab}
+                />
+              </div>
+            )
+          })}
+        </Fragment>
         <div aria-hidden='true' className={cn(BAR_TAB_FILLER_CLASS, 'relative')}>
           <EditorTabInsertion groupId={groupId} beforeTabId={null} />
         </div>

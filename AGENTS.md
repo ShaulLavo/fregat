@@ -73,6 +73,13 @@
 - `bun run compiler:census` gates refusals in `verify` and CI: any refused component fails unless `scripts/lint/react-compiler-allow.json` excuses it with a reason. Lint cannot stand in for it, because its compiler rules miss components wrapped in `memo()`.
 - Refusals have known repairs. A lazily filled ref or an equal-value ref cache becomes lazy `useState`. A `try`/`finally` moves to a module-scope function or returns a result the caller settles. A suppressed `exhaustive-deps` becomes `useEffectEvent`, with the trigger passed in as an argument so the dependency is still read. Handlers are declared after the handlers they call. JSX, not `createElement`, carries a `ref`.
 
+## Retained Panes And Observation
+
+- Content that survives layout changes uses `lib/keep-alive`. Connection notices overlay the retained host, as in `features/terminal/components/panel.tsx`; hiding a pane does not extend a server resource's lifetime.
+- Observe rendered children with a Fragment ref and `observeUsing`, as in `editor-tab-bar.tsx` and the work-log groups. Keep wrappers that own layout. A position-only reorder still needs a layout read; `tab-strip-metrics.ts` schedules one when the tab order changes.
+- Text inside a height-capped `pre` can change its scroll boundary without resizing its box. `activity-detail-section.tsx` keeps text mutation observation for that case.
+- External-store subscriptions update synchronously. Wrapping a store setter in `startTransition` cannot change that priority. `use-transitioned-color-mode.ts` republishes the visual value into React state before transitioning it.
+
 ## Styling
 
 - Rows are `ListRow`: token height, square corners, `aria-selected` selection, `data-marked` inset ring, and immediate hover/press paint. Disabled rows keep title recovery and are skipped by navigation.

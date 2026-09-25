@@ -406,27 +406,11 @@ Plans 106 and 107 are done and deleted. What remains of the lane is 108 Phase 1,
 
 ## React compiler and pane lifetime lane
 
-Requested 2026-09-20. Plan 127 precedes
-[Plan 128](plans/128-react-19-patterns.md). Plan 127 is done (`d5e7f213`, `e93ff779`) and deleted:
-the compiler census runs in `gates`, and `lib/keep-alive` keeps terminals mounted across layout
-changes. Plan 128 is not started and is partly obsolete. `2acc3b73` deleted the server's detach TTL,
-so no shell is killed ten minutes after an unmount, and keep-alive covers its first two terminal
-sites. The completion wave runs it rewritten small: A1.3, B2 and the `AGENTS.md` section.
-
-Plan 127 is the repair pass. It turns the React Compiler's diagnostics on, pins them with a census
-beside the design census, clears the `ref={focusTarget.ref}` bailouts, stops the bottom panel and its
-collapse from unmounting every terminal, settles git stage,
-unstage and discard from the response the server already computed, and takes one command-bus capture
-per palette keystroke instead of one per row. Plan 128 follows with the written rules and the two
-prerequisites the remaining pane work waits behind: `packages/tree` lifetime, and a `VirtualList`
-contract for hiding and revealing a populated list. Its `AGENTS.md` sections are the deliverable,
-because none of its three patterns can be gated by tooling.
-
-Neither plan reorders another lane. The scoped error boundary and the `<Activity>` counter-example
-are shared with [Plan 109](plans/109-boot-boundaries.md); whichever lands first owns the
-implementation and the others consume it. Verification tooling reconciles with Plan 119 and mutation
-shape with Plan 118. No measurement has been taken for either plan: the dev server is down, only the
-mesh answers, and every `agent:browser` line in both is a prescription for the implementer.
+Plans 127 and 128 are done and deleted. The compiler census runs in `gates`, and
+`lib/keep-alive` retains terminal content across layout changes. Terminal connection notices
+now overlay the host. Tab strips and work-log groups observe Fragment children; capped text
+keeps mutation observation. Current rules are in `AGENTS.md`, with regressions, browser checks
+and before/after traces in [the verification record](docs/verification/2026-09-25-retained-panes.md).
 
 ## Workaround removal lane
 

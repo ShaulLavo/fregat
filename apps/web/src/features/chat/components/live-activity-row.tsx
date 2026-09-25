@@ -1,3 +1,4 @@
+import { Fragment } from 'react'
 import { CaretRightIcon, HandPalmIcon } from '@phosphor-icons/react'
 import { Button } from '@workspace/ui/components/button'
 import { Spinner } from '@workspace/ui/components/spinner'
@@ -22,7 +23,11 @@ export function LiveActivityRow({
   )
   const toggle = useChatWorkLogExpansionStore((state) => state.toggleGroupExpanded)
   const expandable = activity.activities.length > 0
-  const scrollRef = useWorkLogScroll(`group:${historyId}`, activity.activities.length)
+  const { scrollRef, rowsRef } = useWorkLogScroll(
+    `group:${historyId}`,
+    activity.activities.length,
+    'rows',
+  )
   const label = (
     <>
       {activity.active ? (
@@ -77,9 +82,11 @@ export function LiveActivityRow({
           data-tool-group-scroll
           ref={scrollRef}
         >
-          {activity.activities.map((entry) => (
-            <ActivityRow activity={entry} key={entry.id} />
-          ))}
+          <Fragment ref={rowsRef}>
+            {activity.activities.map((entry) => (
+              <ActivityRow activity={entry} key={entry.id} />
+            ))}
+          </Fragment>
         </div>
       ) : null}
     </section>
