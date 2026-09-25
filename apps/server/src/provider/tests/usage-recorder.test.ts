@@ -17,6 +17,7 @@ type UsageTotalsEvent = Extract<ProviderRuntimeEvent, { type: 'usage.totals' }>
 import type { ProviderPriceCatalog } from '../price-catalog'
 import { ProviderUsageHistoryReader } from '../usage-history'
 import { ProviderUsageRecorder } from '../usage-recorder'
+import { claudeTranscriptUsage, codexRolloutUsage } from '../utils/imported-usage'
 import type { ProviderUsageTotals } from '../utils/usage-totals'
 
 const INSTANCE = v.parse(providerInstanceIdSchema, 'claude')
@@ -334,9 +335,167 @@ it('labels what the spend was for', () => {
   expect(rows()).toEqual([expect.objectContaining({ costUsd: 0.01, purpose: 'title' })])
 })
 
+it.each(['claude', 'codex'] as const)(
+  'bills copied %s requests once across fork imports in either order and across restarts',
+  (driver) => {
+    const transcripts = importedForkUsage(driver)
+    for (const order of [
+      [0, 1],
+      [1, 0],
+    ]) {
+      const fixture = recorderFixture(() => null, driver)
+      for (const index of order) {
+        const transcript = transcripts[index]!
+        fixture
+          .restart()
+          .importTurns(
+            { providerInstanceId: INSTANCE, sessionId: transcript.sessionId },
+            transcript.usage,
+          )
+      }
+      for (const transcript of transcripts)
+        fixture
+          .restart()
+          .importTurns(
+            { providerInstanceId: INSTANCE, sessionId: transcript.sessionId },
+            transcript.usage,
+          )
+      expect(fixture.history().totals).toMatchObject({ tokens: 60, turns: 3 })
+    }
+  },
+)
+
+function importedForkUsage(driver: 'claude' | 'codex') {
+  const at = '2026-09-24T09:00:00.000Z'
+  function usage(turns: { id: string; tokens: number }[]) {
+    if (driver === 'claude')
+      return claudeTranscriptUsage(
+        turns.flatMap(({ id, tokens }) => [
+          { type: 'user', uuid: `prompt-${id}`, timestamp: at, message: { content: id } },
+          {
+            type: 'assistant',
+            timestamp: at,
+            message: { id, model: 'claude-opus-5-5', usage: { output_tokens: tokens } },
+          },
+        ]),
+        [],
+      )
+    let total = 0
+    return codexRolloutUsage(
+      turns.flatMap(({ id, tokens }) => {
+        total += tokens
+        return [
+          { type: 'turn_context', payload: { turn_id: id, model: 'gpt-5.5' } },
+          {
+            type: 'event_msg',
+            timestamp: at,
+            payload: { type: 'token_count', info: { total_token_usage: { output_tokens: total } } },
+          },
+        ]
+      }),
+    )
+  }
+  return [
+    {
+      sessionId: 'parent',
+      usage: usage([
+        { id: 'shared', tokens: 10 },
+        { id: 'parent-own', tokens: 20 },
+      ]),
+    },
+    {
+      sessionId: 'fork',
+      usage: usage([
+        { id: 'shared', tokens: 10 },
+        { id: 'fork-own', tokens: 30 },
+      ]),
+    },
+  ]
+}
+
+it.each([false, true])(
+  'keeps complete bills when fork requests share a prompt and arrive in reverse order: %s',
+  (reverse) => {
+    const fixture = estimatedFixture()
+    const shared = importedResponse('shared', 20)
+    const parent = { sessionId: 'parent', usage: [shared] }
+    const fork = { sessionId: 'fork', usage: [shared, importedResponse('child-only', 30)] }
+    const imports = reverse ? [fork, parent] : [parent, fork]
+    for (const transcript of imports)
+      fixture
+        .restart()
+        .importTurns(
+          { providerInstanceId: INSTANCE, sessionId: transcript.sessionId },
+          transcript.usage,
+        )
+    fixture
+      .restart()
+      .importTurns({ providerInstanceId: INSTANCE, sessionId: 'parent' }, [
+        importedResponse('shared', 2),
+      ])
+    expect(fixture.history().totals).toMatchObject({ tokens: 50, costUsd: 0.0005 })
+    expect(fixture.rows().reduce((total, row) => total + row.outputTokens, 0)).toBe(50)
+  },
+)
+
+it.each([null, 'shared-account'])(
+  'scopes native billing IDs by known account or provider instance: %s',
+  (accountKey) => {
+    const fixture = recorderFixture(
+      () => null,
+      'claude',
+      () => accountKey,
+    )
+    fixture.recorder.importTurns({ providerInstanceId: INSTANCE, sessionId: 'first' }, [
+      importedResponse('same-id', 20),
+    ])
+    fixture
+      .restart()
+      .importTurns(
+        { providerInstanceId: v.parse(providerInstanceIdSchema, 'other'), sessionId: 'second' },
+        [importedResponse('same-id', 20)],
+      )
+    expect(fixture.history().totals.tokens).toBe(accountKey ? 20 : 40)
+  },
+)
+
+it('keeps native billing IDs separate between accounts', () => {
+  const fixture = recorderFixture(
+    () => null,
+    'claude',
+    (instance) => instance,
+  )
+  fixture.recorder.importTurns({ providerInstanceId: INSTANCE, sessionId: 'first' }, [
+    importedResponse('same-id', 20),
+  ])
+  fixture
+    .restart()
+    .importTurns(
+      { providerInstanceId: v.parse(providerInstanceIdSchema, 'other'), sessionId: 'second' },
+      [importedResponse('same-id', 20)],
+    )
+  expect(fixture.history().totals.tokens).toBe(40)
+})
+
+function importedResponse(billingKey: string, outputTokens: number) {
+  return {
+    billingKey,
+    outputTokens,
+    turnKey: 'shared-prompt',
+    model: 'claude-opus-5-5',
+    recordedAt: '2026-09-24T09:00:00.000Z',
+    inputTokens: 0,
+    cacheReadTokens: 0,
+    cacheWriteTokens: 0,
+    reasoningTokens: 0,
+    costUsd: null,
+  }
+}
+
 it('imports transcript turns priced from the catalog, and a re-read replaces only its own rows', () => {
   const fixture = estimatedFixture()
   const imported = (outputTokens: number) => ({
+    billingKey: 'message-1',
     cacheReadTokens: 0,
     cacheWriteTokens: 0,
     costUsd: null,
@@ -376,17 +535,22 @@ it('imports transcript turns priced from the catalog, and a re-read replaces onl
 function recorderFixture(
   lookup: ProviderPriceCatalog['lookup'] = () => null,
   driverKind: 'claude' | 'codex' = 'claude',
+  accountKeyFor: (instance: ProviderInstanceId) => string | null = () => 'account-1',
 ) {
   const sqlite = new Database(':memory:', { create: true })
   const database = drizzle({ client: sqlite, schema })
   migratePlatformDatabase(database)
   closers.push(() => sqlite.close())
   const accounts = {
-    usageAccount: (_providerInstanceId: ProviderInstanceId) => ({
-      accountKey: 'account-1',
-      driverKind: v.parse(providerDriverKindSchema, driverKind),
-      enabled: true,
-    }),
+    usageAccount: (providerInstanceId: ProviderInstanceId) => {
+      const accountKey = accountKeyFor(providerInstanceId)
+      if (accountKey === null) return null
+      return {
+        accountKey,
+        driverKind: v.parse(providerDriverKindSchema, driverKind),
+        enabled: true,
+      }
+    },
   }
 
   return {

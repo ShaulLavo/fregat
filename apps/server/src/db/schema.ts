@@ -1,5 +1,6 @@
 import type { RecordedModelPrice } from '../provider/utils/model-prices'
 import type { UsageContribution } from '../provider/utils/usage-contributions'
+import type { ProviderUsageAmounts } from '../provider/utils/usage-totals'
 import {
   TURN_END_REASONS,
   providerUsagePurposeSchema,
@@ -83,6 +84,24 @@ export const providerPriceCatalog = sqliteTable('provider_price_catalog', {
   id: integer('id').primaryKey(),
   snapshotJson: text('snapshot_json').notNull(),
 })
+
+export const providerUsageImportRequests = sqliteTable(
+  'provider_usage_import_requests',
+  {
+    billingScope: text('billing_scope').notNull(),
+    billingKey: text('billing_key').notNull(),
+    model: text('model').notNull(),
+    sessionId: text('session_id').notNull(),
+    turnId: text('turn_id').notNull(),
+    providerInstanceId: text('provider_instance_id').notNull(),
+    recordedAt: text('recorded_at').notNull(),
+    amounts: text('amounts_json', { mode: 'json' }).$type<ProviderUsageAmounts>().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.billingScope, table.billingKey, table.model] }),
+    index('provider_usage_import_requests_turn_idx').on(table.sessionId, table.turnId, table.model),
+  ],
+)
 
 /** The last running totals seen per session, provider conversation and model. */
 export const providerUsageBaselines = sqliteTable(

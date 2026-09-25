@@ -544,6 +544,7 @@ export type ProviderHistoryMessage = {
 
 /** One turn's usage for one model, read back from a transcript of a session begun elsewhere. */
 export type ProviderImportedUsage = ProviderUsageAmounts & {
+  billingKey: string
   /** Stable across re-reads: the prompt that opened the turn. */
   turnKey: string
   model: string

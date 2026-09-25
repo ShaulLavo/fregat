@@ -33,7 +33,20 @@ export const platformMigrations: readonly Migration[] = [
   { version: 30, name: 'message_model_selection', up: applyMessageModelSelection },
   { version: 31, name: 'session_fork_and_agent', up: applySessionForkAndAgent },
   { version: 32, name: 'provider_usage_source', up: applyProviderUsageSource },
+  { version: 36, name: 'provider_usage_import_requests', up: applyProviderUsageImportRequests },
 ]
+
+function applyProviderUsageImportRequests(database: PlatformDatabase) {
+  database.run(sql`CREATE TABLE provider_usage_import_requests (
+    billing_scope TEXT NOT NULL, billing_key TEXT NOT NULL, model TEXT NOT NULL,
+    session_id TEXT NOT NULL, turn_id TEXT NOT NULL, provider_instance_id TEXT NOT NULL,
+    recorded_at TEXT NOT NULL, amounts_json TEXT NOT NULL,
+    PRIMARY KEY (billing_scope, billing_key, model)
+  )`)
+  database.run(
+    sql`CREATE INDEX provider_usage_import_requests_turn_idx ON provider_usage_import_requests (session_id, turn_id, model)`,
+  )
+}
 
 function applyMessageModelSelection(database: PlatformDatabase) {
   database.run(sql`ALTER TABLE projection_session_messages ADD COLUMN model_selection_json TEXT`)

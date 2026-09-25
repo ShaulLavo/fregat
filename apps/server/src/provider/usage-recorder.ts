@@ -16,6 +16,7 @@ import {
   updateUsageContributions,
 } from './utils/usage-contributions'
 import type { ProviderImportedUsage, ProviderRuntimeEvent } from './types'
+import { recordImportedUsage, type ImportedUsageTurn } from './usage-import-ledger'
 import {
   isEmptyUsage,
   usageDelta,
@@ -107,7 +108,8 @@ export class ProviderUsageRecorder {
     }
     try {
       this.database.transaction(() => {
-        for (const turn of usage) this.importTurn(base, turn)
+        for (const { owner, turn } of recordImportedUsage(this.database, base, usage))
+          this.importTurn(owner, turn)
       })
       recordChatPipelineInfo('chat.pipeline.provider_usage.imported', {
         models: [...new Set(usage.map((turn) => turn.model))],
@@ -127,7 +129,7 @@ export class ProviderUsageRecorder {
 
   private importTurn(
     base: Pick<RecordedTurn, 'accountKey' | 'driverKind' | 'providerInstanceId' | 'sessionId'>,
-    turn: ProviderImportedUsage,
+    turn: ImportedUsageTurn,
   ) {
     const { model, recordedAt, turnKey, ...amounts } = turn
     const contributions = [{ after: amounts, before: null, scope: 'import' }]

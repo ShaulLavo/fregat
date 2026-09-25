@@ -6,6 +6,7 @@ const PRELUDE_TURN = 'prelude'
 
 export const importedUsageListSchema = v.array(
   v.object({
+    billingKey: v.string(),
     turnKey: v.string(),
     model: v.string(),
     recordedAt: v.string(),
@@ -25,6 +26,7 @@ const claudeRowSchema = v.looseObject({
   uuid: v.optional(v.string()),
   timestamp: v.optional(v.string()),
   isMeta: v.optional(v.nullable(v.boolean())),
+  isCompactSummary: v.optional(v.boolean()),
   message: v.optional(
     v.looseObject({
       id: v.optional(v.string()),
@@ -48,20 +50,27 @@ type ClaudeRow = v.InferOutput<typeof claudeRowSchema>
 const codexRowSchema = v.looseObject({
   type: v.string(),
   timestamp: v.optional(v.string()),
-  payload: v.optional(v.looseObject({ type: v.optional(v.string()) })),
+  payload: v.optional(
+    v.looseObject({
+      type: v.optional(v.string()),
+      forked_from_id: v.optional(v.nullable(v.string())),
+    }),
+  ),
 })
 
 const codexTurnSchema = v.looseObject({ turn_id: v.string(), model: v.optional(v.string()) })
 
+const codexAmountsSchema = v.looseObject({
+  input_tokens: count,
+  cached_input_tokens: count,
+  cache_write_input_tokens: count,
+  output_tokens: count,
+  reasoning_output_tokens: count,
+})
 const codexTotalSchema = v.looseObject({
   info: v.looseObject({
-    total_token_usage: v.looseObject({
-      input_tokens: count,
-      cached_input_tokens: count,
-      cache_write_input_tokens: count,
-      output_tokens: count,
-      reasoning_output_tokens: count,
-    }),
+    total_token_usage: codexAmountsSchema,
+    last_token_usage: v.optional(codexAmountsSchema),
   }),
 })
 
@@ -75,7 +84,14 @@ class TurnUsage {
     const key = `${turnKey}\0${model}`
     const row = this.rows.get(key)
     if (!row) {
-      this.rows.set(key, { ...amounts, costUsd: null, model, recordedAt, turnKey })
+      this.rows.set(key, {
+        ...amounts,
+        billingKey: turnKey,
+        costUsd: null,
+        model,
+        recordedAt,
+        turnKey,
+      })
       return
     }
     row.inputTokens += amounts.inputTokens
@@ -99,8 +115,7 @@ export function claudeTranscriptUsage(
   main: readonly unknown[],
   subagents: readonly (readonly unknown[])[],
 ): ProviderImportedUsage[] {
-  const usage = new TurnUsage()
-  const billed = new Set<string>()
+  const billed = new Map<string, ProviderImportedUsage>()
   const prompts: { at: string; key: string }[] = []
   let turnKey = PRELUDE_TURN
   for (const row of parsedRows(claudeRowSchema, main)) {
@@ -109,38 +124,58 @@ export function claudeTranscriptUsage(
       if (row.timestamp) prompts.push({ at: row.timestamp, key: row.uuid })
       continue
     }
-    addClaudeResponse(usage, billed, row, turnKey)
+    addClaudeResponse(billed, row, turnKey)
   }
   for (const rows of subagents) {
     for (const row of parsedRows(claudeRowSchema, rows)) {
       const at = row.timestamp ?? ''
       const prompt = prompts.findLast((candidate) => candidate.at <= at)
-      addClaudeResponse(usage, billed, row, prompt?.key ?? PRELUDE_TURN)
+      addClaudeResponse(billed, row, prompt?.key ?? PRELUDE_TURN)
     }
   }
-  return usage.list()
+  return [...billed.values()]
 }
 
-function addClaudeResponse(usage: TurnUsage, billed: Set<string>, row: ClaudeRow, turnKey: string) {
+function addClaudeResponse(
+  billed: Map<string, ProviderImportedUsage>,
+  row: ClaudeRow,
+  turnKey: string,
+) {
   const message = row.message
   if (row.type !== 'assistant' || !message?.usage || !message.id || !row.timestamp) return
-  if (!message.model || message.model === '<synthetic>' || billed.has(message.id)) return
+  if (!message.model || message.model === '<synthetic>') return
 
-  billed.add(message.id)
-  usage.add(turnKey, message.model, row.timestamp, {
-    cacheReadTokens: message.usage.cache_read_input_tokens,
-    cacheWriteTokens: message.usage.cache_creation_input_tokens,
-    inputTokens: message.usage.input_tokens,
-    outputTokens: message.usage.output_tokens,
-    reasoningTokens: message.usage.output_tokens_details?.thinking_tokens ?? 0,
+  const previous = billed.get(message.id)
+  billed.set(message.id, {
+    billingKey: message.id,
+    turnKey: previous?.turnKey ?? turnKey,
+    model: message.model,
+    recordedAt:
+      previous && previous.recordedAt > row.timestamp ? previous.recordedAt : row.timestamp,
+    costUsd: null,
+    cacheReadTokens: Math.max(
+      previous?.cacheReadTokens ?? 0,
+      message.usage.cache_read_input_tokens,
+    ),
+    cacheWriteTokens: Math.max(
+      previous?.cacheWriteTokens ?? 0,
+      message.usage.cache_creation_input_tokens,
+    ),
+    inputTokens: Math.max(previous?.inputTokens ?? 0, message.usage.input_tokens),
+    outputTokens: Math.max(previous?.outputTokens ?? 0, message.usage.output_tokens),
+    reasoningTokens: Math.max(
+      previous?.reasoningTokens ?? 0,
+      message.usage.output_tokens_details?.thinking_tokens ?? 0,
+    ),
   })
 }
 
 /** The same rows history import turns into user messages: typed text, not tool results. */
 function isClaudePrompt(row: ClaudeRow) {
-  if (row.type !== 'user' || row.isMeta) return false
+  if (row.type !== 'user' || row.isMeta || row.isCompactSummary) return false
   const content = row.message?.content
-  if (typeof content === 'string') return content.trim().length > 0
+  if (typeof content === 'string')
+    return content.trim().length > 0 && !content.startsWith('[Request interrupted by user')
   if (!Array.isArray(content)) return false
   return content.some(
     (block) =>
@@ -158,6 +193,7 @@ function isClaudePrompt(row: ClaudeRow) {
 export function isCodexUsageLine(line: string) {
   return (
     line.includes('"token_count"') ||
+    line.includes('"session_meta"') ||
     line.includes('"task_started"') ||
     line.includes('"turn_context"')
   )
@@ -171,18 +207,28 @@ export function codexRolloutUsage(lines: readonly unknown[]): ProviderImportedUs
   const usage = new TurnUsage()
   let turn: { key: string; model: string | null } | null = null
   let previous: Totals | null = null
+  let forked: boolean | null = null
   for (const row of parsedRows(codexRowSchema, lines)) {
+    if (row.type === 'session_meta') {
+      forked ??= Boolean(row.payload?.forked_from_id)
+      continue
+    }
     const kind = row.type === 'event_msg' ? row.payload?.type : row.type
     if (kind === 'task_started' || kind === 'turn_context') {
       turn = codexTurn(row.payload, turn)
       continue
     }
-    if (kind !== 'token_count' || !turn?.model || !row.timestamp) continue
+    if (kind !== 'token_count') continue
     const total = codexTotal(row.payload)
     if (!total) continue
 
-    usage.add(turn.key, turn.model, row.timestamp, codexDelta(total, previous))
+    const delta =
+      !previous && forked
+        ? codexTotal(row.payload, 'last_token_usage')
+        : codexDelta(total, previous)
     previous = total
+    if (!turn?.model || !row.timestamp || !delta) continue
+    usage.add(turn.key, turn.model, row.timestamp, delta)
   }
   return usage.list()
 }
@@ -195,10 +241,14 @@ function codexTurn(payload: unknown, current: { key: string; model: string | nul
   return { key: parsed.output.turn_id, model }
 }
 
-function codexTotal(payload: unknown): Totals | null {
+function codexTotal(
+  payload: unknown,
+  field: 'total_token_usage' | 'last_token_usage' = 'total_token_usage',
+): Totals | null {
   const parsed = v.safeParse(codexTotalSchema, payload)
   if (!parsed.success) return null
-  const total = parsed.output.info.total_token_usage
+  const total = parsed.output.info[field]
+  if (!total) return null
   return {
     cacheReadTokens: total.cached_input_tokens,
     cacheWriteTokens: total.cache_write_input_tokens,

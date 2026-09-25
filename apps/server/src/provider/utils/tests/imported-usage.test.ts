@@ -15,7 +15,22 @@ function response(
 }
 
 describe('claudeTranscriptUsage', () => {
-  it('bills each response once, per prompt and model, with subagents in the prompt they ran under', () => {
+  it('keeps the largest counters for a response across streaming partials and copied blocks', () => {
+    const partials = [
+      prompt('p1', '2026-09-24T10:00:00.000Z'),
+      response('m1', '2026-09-24T10:00:01.000Z', { input_tokens: 10, output_tokens: 1 }),
+      response('m1', '2026-09-24T10:00:02.000Z', { input_tokens: 10, output_tokens: 20 }),
+      response('m1', '2026-09-24T10:00:01.000Z', { input_tokens: 10, output_tokens: 1 }),
+    ]
+    expect(claudeTranscriptUsage(partials, [])).toEqual([
+      expect.objectContaining({
+        inputTokens: 10,
+        outputTokens: 20,
+        recordedAt: '2026-09-24T10:00:02.000Z',
+      }),
+    ])
+  })
+  it('retains each response identity with subagents in the prompt they ran under', () => {
     const usage = { input_tokens: 10, output_tokens: 5, cache_read_input_tokens: 100 }
     const main = [
       prompt('p1', '2026-09-24T10:00:00.000Z'),
@@ -39,10 +54,21 @@ describe('claudeTranscriptUsage', () => {
 
     expect(claudeTranscriptUsage(main, [subagent])).toEqual([
       expect.objectContaining({
-        cacheReadTokens: 200,
-        inputTokens: 20,
+        billingKey: 'm1',
+        cacheReadTokens: 100,
+        inputTokens: 10,
         model: 'claude-opus-5-5',
-        outputTokens: 10,
+        outputTokens: 5,
+        reasoningTokens: 0,
+        recordedAt: '2026-09-24T10:00:02.000Z',
+        turnKey: 'p1',
+      }),
+      expect.objectContaining({
+        billingKey: 'm2',
+        cacheReadTokens: 100,
+        inputTokens: 10,
+        model: 'claude-opus-5-5',
+        outputTokens: 5,
         reasoningTokens: 2,
         recordedAt: '2026-09-24T10:00:03.000Z',
         turnKey: 'p1',
@@ -54,6 +80,27 @@ describe('claudeTranscriptUsage', () => {
 })
 
 describe('codexRolloutUsage', () => {
+  it.each([true, false])('excludes inherited totals with a preceding baseline: %s', (baseline) => {
+    const counts = (input: number, output: number) => ({
+      input_tokens: input,
+      output_tokens: output,
+    })
+    const tokenCount = (total: unknown, last: unknown) => ({
+      type: 'event_msg',
+      timestamp: '2026-09-24T10:00:00.000Z',
+      payload: { type: 'token_count', info: { total_token_usage: total, last_token_usage: last } },
+    })
+    const rows = [
+      { type: 'session_meta', payload: { forked_from_id: 'parent' } },
+      ...(baseline ? [tokenCount(counts(100, 20), counts(100, 20))] : []),
+      { type: 'turn_context', payload: { turn_id: 'child-turn', model: 'gpt-5.5' } },
+      tokenCount(counts(150, 30), counts(50, 10)),
+      tokenCount(counts(170, 35), counts(20, 5)),
+    ]
+    expect(codexRolloutUsage(rows)).toEqual([
+      expect.objectContaining({ turnKey: 'child-turn', inputTokens: 70, outputTokens: 15 }),
+    ])
+  })
   it('bills each turn the growth of the running totals, to the turn’s model', () => {
     const total = (input: number, cached: number, output: number) => ({
       type: 'event_msg',

@@ -101,6 +101,7 @@ describe('platform migration ledger', () => {
       { version: 30, name: 'message_model_selection' },
       { version: 31, name: 'session_fork_and_agent' },
       { version: 32, name: 'provider_usage_source' },
+      { version: 36, name: 'provider_usage_import_requests' },
     ])
     expect(columnNames(handle, 'projection_turns')).toContain('end_reason')
     expect(columnNames(handle, 'projection_session_messages')).toContain('model_selection_json')
@@ -125,7 +126,7 @@ describe('platform migration ledger', () => {
     expect(plan()).toEqual(expect.arrayContaining([expect.stringContaining('TEMP B-TREE')]))
 
     expect(migratePlatformDatabase(handle.db).map((migration) => migration.version)).toEqual([
-      15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 29, 30, 31, 32,
+      15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 29, 30, 31, 32, 36,
     ])
 
     expect(plan()).toEqual(
@@ -163,7 +164,7 @@ describe('platform migration ledger', () => {
     )
     seedVersion11Worktrees(handle.db)
     expect(migratePlatformDatabase(handle.db).map((migration) => migration.version)).toEqual([
-      12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 29, 30, 31, 32,
+      12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 29, 30, 31, 32, 36,
     ])
     const query = new OrchestrationSnapshotQuery(handle.db)
     const migrated = query.shellSnapshot()
