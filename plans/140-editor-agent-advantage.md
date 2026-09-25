@@ -71,10 +71,14 @@ symbol tools over grep once those tools exist.
   to audit.
 - **D2 — Route for diagnostics feedback.** Recommended: decide after research question 3. If the
   harnesses' own IDE integration can carry diagnostics, use it; otherwise wait for plans 087/088.
+  Research question 3 runs now (decided 2026-09-25: owner).
 - **D3 — Steering strength.** Recommended: add context to the tool call, never deny it. Serena's
   hard deny after N greps breaks legitimate text search.
 
 ## Research phase
+
+Decided 2026-09-25: owner — research questions 3–5 are approved to run now. They need no Plan 087;
+a yes on the `/ide` route in question 3 removes Phase 4's dependency on 087 (D2).
 
 1. Shared home for the attach action: `lib/` (two-consumer rule is met by git, terminal and
    editor) or the app composition layer, per the diagnostic plan's provider design.

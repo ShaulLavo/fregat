@@ -3,7 +3,7 @@
 ## Status and authorization
 
 - Status: PHASES 1–4 IMPLEMENTED (meter 2026-09-24; per-turn recording, the usage page and
-  backfill 2026-09-25). Phase 5 (reset credits) waits for the owner: it spends account credit.
+  backfill 2026-09-25). Phase 5 fixture implementation is approved; the owner performs the live redemption.
 - Priority: P1 for the meter, P2 for the usage page and history.
 - Effort: S for Phase 1, M overall. Reset-credit redemption (Phase 5) is L and gated.
 - Risk: LOW for display. HIGH only for Phase 5, which spends an account resource.
@@ -255,8 +255,9 @@ a session's history it calls `ProviderService.importSessionUsage`, which asks th
   parsed, and a turn is the growth of the thread's running totals. On a 228 MB rollout the turns
   summed exactly to the final total (443 ms).
 
-Rows are `source: 'import'` (migration 26), keyed `import:<prompt>`, and priced from the catalog.
-A re-read replaces only its own rows. A session continued here is never imported again, and its
+Rows are `source: 'import'` (migration 32), keyed `import:<prompt>`, and priced from the catalog.
+Migration 36 records native billing requests once across CLI forks, scoped to provider accounts.
+Repeated partial responses retain the largest counters; a re-read rebuilds only its owned totals. A session continued here is never imported again, and its
 first live totals only seed a baseline, so nothing is counted twice. Import now invalidates the
 usage report. Tests: `utils/tests/imported-usage.test.ts` and `tests/usage-recorder.test.ts`.
 Scenario `claude-usage-import` imports a fixture instance's transcript and reads 3k tokens,
@@ -267,6 +268,10 @@ are not read, and a session imported before this build gets its usage when its h
 
 The RUNTIME-08 action: account-keyed serialization and an idempotency key, as a TanStack mutation
 with a `scope`. Automated tests use boundary fixtures; nothing consumes a real credit.
+
+Decided 2026-09-25: owner — build it with boundary fixtures only, behind a confirm step. Nothing is
+spent until the owner does the one live redemption by hand; that live run is the owner's check, not
+an agent's. Same decision for Plan 126 RUNTIME-08.
 
 ## Verification
 

@@ -26,6 +26,8 @@ Upstream paths shortened to `provider/…` or `orchestration/…` in tables mean
 
 ### RUNTIME-01 — Validate rewind before touching files, and separate conversation rewind
 
+- **Closed 2026-09-25** on the `checkpoint-rewind` scenario; the paired upstream run is dropped. Claude rewind waits for Plan 145 fork. See the ledger.
+
 - **Status / priority / confidence:** Confirmed mismatch; P1; HIGH.
 - **Evidence:** Upstream `apps/server/src/orchestration/decider.ts:1798-1816` distinguishes conversation rewind with `restoreFiles:false`. `apps/server/src/orchestration/Layers/CheckpointReactor.ts:813-835` checks provider rollback support first and rejects file restore in a non-isolated workspace. Local `apps/server/src/orchestration/decider.ts:209-215` checks only that the session is not archived; `provider-command-reactor.ts:523-539` restores files before asking the provider to rewind. Local `apps/server/src/provider/adapters/claude.ts:332-333` explicitly rejects rollback. `provider/provider-service.ts:619-627` can also reject a missing binding after files were changed. Local context resolves the owning worktree but performs no isolation check at `provider-command-reactor.ts:785-824`.
 - **Impact:** A Claude or unavailable-runtime rewind can change files and then fail, leaving the transcript unchanged. A root/shared-checkout rewind can overwrite another session's changes. Users cannot rewind conversation alone.
@@ -67,10 +69,12 @@ Upstream paths shortened to `provider/…` or `orchestration/…` in tables mean
 
 ### RUNTIME-02 — Add the four missing production provider drivers
 
+- Decided 2026-09-25: owner — build all four drivers (Cursor, Grok, OpenCode, Antigravity). Smoke-test each where an account exists; otherwise ship it marked "untested". Missing accounts no longer block the row.
 - **Status / priority / confidence:** Confirmed feature gap; P1 under full-alignment mandate; HIGH.
 - **Evidence:** Upstream `apps/server/src/provider/builtInDrivers.ts:23-28,49-55` registers Codex, Claude, Cursor, Grok, OpenCode and Antigravity. Local `apps/server/src/provider/drivers/built-in.ts:17` registers Codex and Claude only. The local mock is test-only, and generic multi-instance types do not implement another runtime.
 - **Impact:** Users of the four other upstream providers cannot execute, resume or configure those providers here.
 - **Effort / risk:** L per driver; HIGH. This is four independently reviewable deliverables, not a single registry edit.
+- **Research step (before each driver):** a short protocol survey per CLI (Cursor, Grok, OpenCode, Antigravity): how it streams events, how approvals reach the client and get answered, how sessions start and resume, and what upstream's driver does with each (`apps/server/src/provider/Drivers/<Name>Driver.ts`, `Layers/<Name>Adapter.ts` and `Layers/<Name>Provider.ts` at the pinned commit). One short note per CLI in this directory, written before that driver's code.
 - **Implementation boundary:** Reuse local driver/instance registry. Port each pinned driver's supported auth, status/model discovery, invocation, normalized events, request replies, interruption, resume and lifecycle operations, including explicit unsupported outcomes. Do not require in-app auth or history import universally: upstream `packages/contracts/src/agentSessions.ts:6` and `apps/server/src/project/AgentSessionScanner.ts:1093` restrict external history scanning to Codex and Claude. Build adapter integration fixtures before UI exposure; then wire settings/model selection on each environment. Preserve provider instance identity through all events and storage.
 - **Dependencies:** Capability descriptors (RUNTIME-06), native request model (RUNTIME-11/03 as applicable), existing settings registry. Provider-specific maintenance/auth belongs with its driver.
 - **Acceptance / tests:** For each provider, configured enabled instance appears, starts a real in-process app turn using an injected external process boundary, streams completion/errors, resumes the same native conversation, and stops only its own runtime. Two same-driver accounts cannot share requests/cursors/credentials. Unsupported capabilities are unavailable in UI and rejected at server boundary. Real installed-provider smoke checks remain necessary before parity is claimed.
@@ -107,6 +111,8 @@ Upstream paths shortened to `provider/…` or `orchestration/…` in tables mean
 
 ### RUNTIME-06 — Preserve advertised model option descriptors and service tiers
 
+- **Closed 2026-09-25**: Plan 138 took the remaining Claude catalog work; `provider-model-options` scenario. See the ledger.
+
 - **Status / priority / confidence:** Confirmed narrowing; P2; HIGH.
 - **Evidence:** Upstream `apps/server/src/provider/Layers/CodexProvider.ts:176-211` exposes reasoning and service-tier select descriptors with provider IDs/defaults. Local `packages/contracts/src/provider.ts:73-77` represents reasoning/extended-thinking only; `apps/server/src/provider/adapters/codex.ts:2847-2859` discards other catalog capabilities and `codex.ts:2727-2733` reduces service tier to `fastMode === true ? 'fast' : undefined`.
 - **Impact:** Non-fast advertised tiers and defaults cannot round-trip; controls are hardcoded instead of reflecting the selected model's capabilities.
@@ -117,6 +123,7 @@ Upstream paths shortened to `provider/…` or `orchestration/…` in tables mean
 
 ### RUNTIME-07 — Make idle cleanup aware of background work and periodic
 
+- Decided 2026-09-25: owner — recheck against Codex 0.157 is approved.
 - **Status / priority / confidence:** Confirmed policy mismatch; P2; HIGH for missing guard/timer, MED for a particular silent-child termination scenario.
 - **Evidence:** Upstream `apps/server/src/provider/Layers/ProviderSessionReaper.ts:75-95` excludes active turns and background liveness, and `:130-144` runs every five minutes after a thirty-minute idle window. `apps/server/src/orchestration/ThreadBackgroundLiveness.ts:104-149` distinguishes live nested agents/monitors from idle/completed tasks. Local `apps/server/src/provider/provider-session-reaper.ts:13,89-100` considers only `ready`, timestamp and launch/exemption; `provider/provider-service.ts:223` triggers it on a new runtime. Local parent completion sets `ready` at `provider/adapters/codex.ts:1832`. Event liveness refresh exists but is not a persistent background-work guard.
 - **Impact:** Idle runtimes can remain indefinitely if no new runtime starts. A ready parent with background work producing no event for the idle interval can be reclaimed on the next launch, unlike upstream.
@@ -127,6 +134,7 @@ Upstream paths shortened to `provider/…` or `orchestration/…` in tables mean
 
 ### RUNTIME-08 — Publish account usage limits and wire reset-credit redemption
 
+- Decided 2026-09-25: owner — build with boundary fixtures only. Nothing is spent until the owner does one live redemption.
 - **Status / priority / confidence:** Confirmed partial implementation; P2; HIGH.
 - **Evidence:** Upstream `apps/server/src/provider/Drivers/CodexDriver.ts:285-328` serializes redemption per account with an idempotency key and refresh verification; `apps/server/src/ws.ts:2390-2411` exposes it with enabled-instance/capability checks; `apps/web/src/components/usage/UsageLimits.tsx:209` invokes it. Local `apps/server/src/provider/adapters/codex.ts:1355` and `claude.ts:844` emit rate-limit events, but `packages/contracts/src/provider.ts:105-131` has no usage-window/reset-credit snapshot or action. `apps/web/src/features/chat/utils/activity-visibility.ts:9` hides the raw rate event.
 - **Impact:** Native rate telemetry does not provide upstream account-level usage windows or a usable reset-credit action.
@@ -138,6 +146,8 @@ Upstream paths shortened to `provider/…` or `orchestration/…` in tables mean
 - **Bounded search:** `usageLimits`, `consumeResetCredit`, `rateLimitReset`, `rateLimits` across local provider/contracts/chat-mode/client-core; only event emission/normalization exists, not the action/snapshot workflow.
 
 ### RUNTIME-09 — Match response delivery modes and paragraph default
+
+- **Closed 2026-09-25** on the `response-delivery` scenario; the reasoning UX residue is Plan 160's reasoning fold (`chat-turn-anatomy`). See the ledger.
 
 - **Status / priority / confidence:** Confirmed behavior/default divergence; P2; HIGH.
 - **Evidence:** Upstream `packages/contracts/src/settings.ts:968,1061-1062` defines turn/paragraph/token with paragraph default. `apps/server/src/orchestration/Layers/ProviderRuntimeIngestion.ts:1992-2003,2042-2071` applies project settings and never sends reasoning token-by-token. Local `apps/server/src/orchestration/provider-runtime-ingestion.ts:38,76,292-303` supports only constructor-level streaming/buffered and defaults to immediate delta dispatch. Searching `assistantDeliveryMode` through non-test server code finds no configurable consumer.

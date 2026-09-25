@@ -1,6 +1,9 @@
 # Implement stateless MCP support
 
-Status: proposed, implementation not started. Requested 2026-09-11.
+Status: proposed, implementation not started. Requested 2026-09-11. **M0 approved; M1+ not approved.**
+
+Decided 2026-09-25: owner — approve milestone M0 only. The owner wants to discuss M1 onward before
+anything else in this plan starts; M0's exit result is the input to that conversation.
 
 This is the prerequisite for [native code intelligence](088-native-code-intelligence.md).
 [Root PLAN.md](../PLAN.md) owns execution order. The
@@ -157,6 +160,8 @@ reference, not a credential value fit for serialization into a settings document
 
 ### M0. Prove SDK and provider interoperability
 
+Decided 2026-09-25: owner — approved. Stop at M0's exit and bring the result to the owner.
+
 - Record exact SDK and installed provider versions. Check Claude SDK and Codex app-server schemas
   for per-process or per-session MCP endpoint/header configuration. Inspect local code first.
 - Build the narrow fetch integration and a real `workspace_info` read tool backed by existing
@@ -171,6 +176,8 @@ Exit: a no-Origin authenticated native request succeeds, direct calls need no ea
 and both providers produce an attributable real tool result.
 
 ### M1. Add scoped authentication and runtime binding
+
+Not approved yet: the owner discusses M1+ after M0 (2026-09-25).
 
 - Mount agent authentication separately from the browser guard. Preserve browser route protection.
   Validate loopback Host, exact permitted Origins when supplied, token audience, expiry, revocation,

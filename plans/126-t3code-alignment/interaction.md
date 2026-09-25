@@ -75,6 +75,8 @@ This is a two-pass source audit and implementation plan. No app changes, tests, 
 
 ### [INTERACTION-05] Restore the rewound user message into the composer
 
+- **Closed 2026-09-25** with RUNTIME-01 on the `checkpoint-rewind` scenario; the paired upstream run is dropped. See the ledger.
+
 - **Priority/confidence:** P1 / HIGH.
 - **Evidence:** Upstream `ChatView.tsx:6995` identifies the user message and requires rollback capability; `:7035` prepares its attachments before mutation; `:7058` appends its recallable prompt to the current draft and `:7083` restores attachments. Local `apps/web/src/features/chat/components/chat-view.tsx:364` dispatches only checkpoint turn count and resyncs; `providers/timeline-actions-provider.tsx:14` drops message identity from the action contract. `components/checkpoint-revert-dialog.tsx:29` only offers destructive Revert, no file-restore choice.
 - **Impact:** Revert removes history without returning the old prompt/images for editing. The upstream “rewind then adjust” workflow needs manual copying before local revert.
@@ -142,18 +144,22 @@ This is a two-pass source audit and implementation plan. No app changes, tests, 
 
 ### [INTERACTION-11] Match composition and keyboard preferences
 
-> **Owner correction (2026-09-25):** Lexical replacement is **PARKED** until Editor's complete Markdown support plan is implemented
-> and verified. Keep Lexical in the composer now. L7 found no full Markdown/composer plan in Editor's plans, backlog, index or TODO;
-> `packages/markdown/README.md` describes live preview and leaves ordered lists, block quotes, escapes and fenced code blocks as written.
-> No new Markdown implementation is in scope for this wave. Once the prerequisite is complete, replace Lexical with Markdown rich
-> editing and add `composerRichTextEnabled` for upstream parity. The send-shortcut and large-paste parts (lane L2) are done.
+> **Owner ruling (2026-09-25):** the goal of this row is to **delete Lexical** from the chat composer. The composer supports
+> Markdown as you type without Lexical, and the row is not done until Lexical is gone; then add `composerRichTextEnabled` for
+> upstream parity. The replacement is **our own editor** (Editor repo). Lexical stays until that editor supports everything
+> the composer uses Lexical for: mention and chip nodes, pasted images and attachments, Markdown as you type, IME
+> composition, undo/redo, placeholder, auto-growing multiline input and serialization to the message format. That prerequisite is
+> [Plan 111](../111-editor-decorations.md) (question 7: mentions as decorations over a plain buffer) and the plans it splits into.
+> The research is [Plan 171](../171-composer-on-our-editor.md): the inventory, the gaps and their order.
+> Decided 2026-09-25: owner — 111 research authorized with the composer as its first consumer, done before the next wave.
+> The send-shortcut and large-paste parts (lane L2) are done. Mobile plain-Enter newline: see the reopened case below.
 
 - **Priority/confidence:** P2 / HIGH.
 - **Evidence:** Upstream `packages/contracts/src/settings.ts:433` defaults rich text on and `:435` offers Enter, modifier+Enter multiline, and modifier+Enter send modes. `apps/web/src/components/chat/ChatComposer.tsx:6810` wires rich-text setting and `:5494` folds large pasted text with bypass support at `:5571`. Local `apps/web/src/features/chat/components/chat-input-editor.tsx:72` is always `PlainTextPlugin`; `:49` only special-cases images and serialized mentions on paste. `components/chat-input-submit-plugin.tsx:87` reserves Shift+Enter but otherwise sends on Enter without reading a send preference. Upstream `packages/contracts/src/settings.ts:426,429` defaults `planModeEnabled` and `contextWindowMeterEnabled` to false, consumed by `ChatComposer.tsx:2006–2010,4928,5056,6978–6979`. Local `components/composer-controls-menu.tsx:51–61,135–145` always offers Build/Plan and `components/chat-input-actions.tsx:88` renders context usage whenever available.
 - **Impact:** Formatting and keyboard behavior diverge even before sending; a user who expects modifier+Enter can submit prematurely, and large pasted content cannot become a compact attachment/context item.
 - **Effort/risk:** L / MED: editor selection, IME, undo, mentions, paste and serialization interactions.
 - **Fix scope/dependencies:** Register/wire rich-text, send, Plan-mode and context-meter preferences with upstream defaults. Gate the legacy Build/Plan toggle and built-in /plan and /default commands with the upstream interaction availability resolver, and hide context occupancy by default without hiding quota windows or deleting existing plan follow-up functions. Preserve stored pending interaction state deliberately. Preserve upstream serialization semantics using the existing editor or a justified editor change. Framework replacement alone is not the goal. Add large-paste folding and bypass on top of INTERACTION-02 context/attachments. Preserve local IME guards.
-- **Reopened case (2026-09-24):** Pinned `apps/web/src/composer-logic.ts:28,39` never sends on plain Enter in a mobile viewport; it inserts a newline. The earlier `composer-mobile-enter-newline` rejection (no mobile target) is stale now that the app is reached from phones over the mesh. The phone layout itself is Plan 143's discussion; this case only fixes the key.
+- **Reopened case (2026-09-24):** Pinned `apps/web/src/composer-logic.ts:28,39` never sends on plain Enter in a mobile viewport; it inserts a newline. The earlier `composer-mobile-enter-newline` rejection (no mobile target) is stale now that the app is reached from phones over the mesh. The phone layout itself is Plan 143's discussion; this case only fixes the key. Decided 2026-09-25: owner — ship mobile Enter now, without waiting for the phone shell; queued work.
 - **Acceptance:** Fresh settings hide the legacy Plan toggle/commands and context meter; opting in exposes working controls. Toggling settings follows upstream mode resolution and never silently changes a pending message’s intent; quota windows are independent. For each send mode test Enter/Shift+Enter/modifier+Enter, multiline content, open suggestion menu, and IME commit; none send accidentally. In a mobile viewport plain Enter inserts a newline in every mode. Toggle rich editing without changing submitted Markdown meaning. Large paste folds, bypass stays inline, undo restores one coherent operation. Mentions survive paste/undo/draft restore and retain caret behavior.
 - **Verification:** V9; add browser scenario `chat-composer-editing` at desktop and narrow widths, with real editor interaction.
 

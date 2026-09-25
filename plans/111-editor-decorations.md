@@ -1,6 +1,9 @@
 # Editor decorations: learn from CodeMirror and Lexical, then beat what we have
 
-Status: **research — no implementation scope yet.** Requested 2026-09-13.
+Status: **research — authorized 2026-09-25; no implementation scope yet.** Requested 2026-09-13.
+
+Decided 2026-09-25: owner — the research is authorized, with the chat composer as its first consumer
+(question 7; Plan 126 INTERACTION-11 deletes Lexical). The owner wants it done before the next wave.
 
 The editor already has a decoration primitive. `@singapore-editor/core` exposes `registerInlineReplacementProvider` and `InlineReplacementSpec`, and [`@singapore-editor/markdown`](../../Editor/packages/markdown/src/index.ts) uses it to hide fences, drop heading markers and collapse links while the buffer keeps holding source. That is the right shape. It is also inline-only, driven by generically-named Tree-sitter captures, and has never been compared against the two systems that solved this problem thoroughly.
 
@@ -34,7 +37,7 @@ Separately, the chat composer runs on Lexical for exactly one capability: `ChatI
 
 ## Research steps
 
-1. **Clone the references** into `/work/projects/references/` per the workspace layout rules: `codemirror/view` and `codemirror/state`, `facebook/lexical`, and the `obsidianmd/obsidian-api` typings. Read `Decoration`, `RangeSet`, `ViewPlugin`, `atomicRanges` and `blockWidget` in CM6, and `DecoratorNode`, `NodeKey` and the reconciler in Lexical.
+1. **Clone the references** into the repo's `references/` directory (gitignored; see AGENTS.md "Reference Clones"): `codemirror/view` and `codemirror/state`, `facebook/lexical`, and the `obsidianmd/obsidian-api` typings. Read `Decoration`, `RangeSet`, `ViewPlugin`, `atomicRanges` and `blockWidget` in CM6, and `DecoratorNode`, `NodeKey` and the reconciler in Lexical.
 2. **Survey real plugins, not just the APIs.** CodeMirror's own markdown live-preview examples, and two or three third-party decoration-heavy plugins. The APIs describe what is possible; the plugins show which parts are actually usable.
 3. **Write the gap table.** Each capability, whether `@singapore-editor` has it, what it would take, and which consumer wants it.
 4. **Answer the seven questions** in a decision table, including an honest verdict on question 5 with a measurement, not an estimate.
