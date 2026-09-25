@@ -35,7 +35,10 @@ export function sourceAnchors(container: HTMLElement): SourceAnchor[] {
   for (const element of container.querySelectorAll<HTMLElement>('[data-source-line]')) {
     const line = Number(element.dataset.sourceLine)
     if (!Number.isFinite(line)) continue
-    anchors.push({ line, top: element.getBoundingClientRect().top - origin })
+    const rect = element.getBoundingClientRect()
+    anchors.push({ line, top: rect.top - origin })
+    const end = Number(element.dataset.sourceEndLine)
+    if (Number.isFinite(end) && end > line) anchors.push({ line: end, top: rect.bottom - origin })
   }
   // Nested blocks (a list and its items) share tops; keep lines rising with the page.
   return anchors

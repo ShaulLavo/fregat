@@ -39,3 +39,10 @@ test('resolves links from the file folder, the workspace root, or outside', () =
     'http://x/fs/blob?path=repo%2Fdocs%2Fimg%2Fa+b.png',
   )
 })
+
+test('preserves malformed percent escapes as literal workspace paths', () => {
+  expect(markdownPreviewTarget('bad%ZZ.md', 'repo/docs/guide.md', 'repo')).toEqual({
+    kind: 'file',
+    path: 'repo/docs/bad%ZZ.md',
+  })
+})

@@ -14,11 +14,19 @@ export function markdownPreviewTarget(
 ): MarkdownPreviewTarget {
   if (href.startsWith('#')) return { kind: 'anchor', href }
   if (/^[a-z][a-z\d+.-]*:/iu.test(href) || href.startsWith('//')) return { kind: 'external', href }
-  const bare = decodeURIComponent(href.replace(/[?#].*$/u, ''))
+  const bare = decodePath(href.replace(/[?#].*$/u, ''))
   const base = bare.startsWith('/')
     ? rootPath
     : documentPath.slice(0, documentPath.lastIndexOf('/'))
   return { kind: 'file', path: normalizePath(`${base}/${bare}`) }
+}
+
+function decodePath(path: string) {
+  try {
+    return decodeURIComponent(path)
+  } catch {
+    return path
+  }
 }
 
 function normalizePath(path: string) {
