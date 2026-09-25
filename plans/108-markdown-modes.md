@@ -1,12 +1,11 @@
 # Two markdown modes: split view and live preview
 
-Status: Phase 1 in progress (completion wave, lane L8, 2026-09-25). Landed: the mode setting
+Status: Phase 1 done (completion wave, lane L8, 2026-09-25): the mode setting
 `editor.markdownView` (default live preview, the behaviour before this plan; source; split),
 Cycle markdown view (per-document, in the palette and the editor title), the rendered pane
 (`features/workbench/components/markdown-preview-pane.tsx`) with the chat renderer and the
 editor's fence theme (highlighters moved to `lib/code-highlight`), workspace links and images,
-and editor → preview scroll sync. **Open:** preview → editor scroll sync fails in scenario
-`markdown-split-view` (the editor stays at the top). Phase 2 stays parked on Plan 111.
+and scroll sync both ways. Scenario `markdown-split-view` drives all of it. Phase 2 stays parked on Plan 111.
 Default mode: live preview, the behaviour before this plan (no recommendation was written;
 Decided 2026-09-25 by keeping the existing behaviour).
 

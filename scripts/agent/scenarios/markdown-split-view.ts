@@ -26,8 +26,8 @@ function guide() {
     '',
     '## After the fence',
     '',
-    'The end.',
-    '',
+    // Enough tail that both panes can scroll the heading to their top.
+    ...Array.from({ length: 40 }, (_, index) => `Closing paragraph ${index + 1}.\n`),
   ].join('\n')
 }
 
@@ -81,7 +81,7 @@ export const markdownSplitView: Scenario = {
           heading.getBoundingClientRect().top - container.getBoundingClientRect().top
       })
       await page.waitForTimeout(400)
-      // "## After the fence" is source line 108: its row sits at the top, or the editor is at its end.
+      // "## After the fence" is source line 108: its row sits at the top.
       const editor = await selectors
         .editorSurface(page)
         .first()
@@ -89,9 +89,11 @@ export const markdownSplitView: Scenario = {
           const row = Number.parseFloat(
             getComputedStyle(element).getPropertyValue('--editor-row-height'),
           )
-          return { max: element.scrollHeight - element.clientHeight, row, top: element.scrollTop }
+          // The viewport is the tall inner layer; its `.editor-virtualized` parent scrolls.
+          const scroller = element.closest('.editor-virtualized')!
+          return { row, top: scroller.scrollTop }
         })
-      const expected = Math.min(107 * editor.row, editor.max)
+      const expected = 107 * editor.row
       ok(
         Math.abs(editor.top - expected) <= 2 * editor.row,
         `Preview scroll put the editor at ${editor.top}px, expected about ${expected}px`,
