@@ -41,6 +41,8 @@ export type WorkspaceCommandSnapshot = {
   readonly fileOperationRedoable: boolean
   readonly fileOperationUndoable: boolean
   readonly rootPath: WorkspaceRoot | null
+  readonly sessionActionUndoable: boolean
+  readonly sessionActionRedoable: boolean
   readonly uiMode: WorkspaceUiMode
   readonly wallpaperEnabled: boolean
   readonly workbenchPanels: WorkbenchPanels

@@ -19,7 +19,7 @@
     "dev": "bun ../../scripts/run-with-env.ts --watch src/index.ts",
     "server": "bun --env-file=../../.env src/index.ts",
     "start": "NODE_ENV=production bun --env-file=../../.env dist/index.js",
-    "build": "tsgo --noEmit && bun scripts/package-wallpapers.ts && bun build src/index.ts --target bun --outdir dist --external sharp --external @anthropic-ai/claude-agent-sdk && bun build src/provider/claude-discovery-worker.ts --target bun --outfile dist/claude-discovery-worker.ts --external @anthropic-ai/claude-agent-sdk",
+    "build": "tsgo --noEmit && bun scripts/package-wallpapers.ts && bun build src/index.ts --target bun --outdir dist --external sharp --external @anthropic-ai/claude-agent-sdk && bun build src/provider/claude-discovery-worker.ts --target bun --outfile dist/claude-discovery-worker.ts --external @anthropic-ai/claude-agent-sdk && bun build src/installation/remote-support.ts --target bun --outfile dist/remote-support.js",
     "prices:update": "bun scripts/update-model-prices.ts",
     "codex-protocol:check": "bun src/provider/adapters/codex-protocol/generate.ts --check",
     "codex-protocol:generate": "bun src/provider/adapters/codex-protocol/generate.ts",
@@ -54,13 +54,15 @@
     "typescript-language-server": "6.0.0",
     "typescript-language-service": "npm:typescript@6.0.3",
     "valibot": "^1.5.0",
-    "vscode-languageserver-protocol": "^3.18.3"
+    "vscode-languageserver-protocol": "^3.18.3",
+    "web-push": "3.6.7"
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "^0.116.0",
     "@types/bun": "1.3.14",
     "@types/node": "^25.9.6",
     "@types/subset-font": "^2.3.0",
+    "@types/web-push": "^3.6.4",
     "@typescript/native-preview": "7.0.0-dev.20260707.2",
     "eslint": "^10.10.0",
     "oxfmt": "0.64.0",

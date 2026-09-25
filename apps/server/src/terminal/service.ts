@@ -1,6 +1,7 @@
+import type { SessionId } from '@workspace/contracts'
 import { createStructuredError } from '../observability/structured-errors'
 import type { PlatformDatabase } from '../db/client'
-import { TerminalHistory } from './history'
+import { deleteAgentHistory, TerminalHistory } from './history'
 import { isNonEmptyString as isString } from '@workspace/utils/objects'
 import { adaptWebSocket } from '../utils/websocket'
 import { elapsedMs } from '@workspace/utils/timing'
@@ -123,6 +124,21 @@ export class TerminalService {
       killed = true
     })
     return { killed }
+  }
+
+  /**
+   * Ends a deleted session's own agent terminals and their saved history. Ordinary shells belong
+   * to the worktree and outlive any one session, so they stay.
+   */
+  async closeSessionTerminals(sessionId: SessionId) {
+    let closed = 0
+    for (const [key, session] of this.persistentSessions) {
+      if (!ownedByAgentSession(key, sessionId)) continue
+      await this.runExclusive(key, () => session.dispose({ kill: true, deleteHistory: true }))
+      closed++
+    }
+    deleteAgentHistory(this.database, sessionId)
+    return { closed }
   }
 
   async clear({ worktreeId, terminalId }: TerminalClearInput) {
@@ -992,6 +1008,11 @@ function queryValueFromWebSocketData(data: unknown, key: string) {
   } catch {
     return null
   }
+}
+
+function ownedByAgentSession(key: string, sessionId: SessionId) {
+  const [, kind, owner] = JSON.parse(key) as [string, string, string]
+  return kind === 'agent' && owner === sessionId
 }
 
 function terminalSessionKey(

@@ -17,6 +17,13 @@ export const searchEditorGeometrySelectors = {
 }
 
 // Stable handles the app already exposes. Add here, never inline a selector in a scenario.
+function sessionRowForWorktree(page: Page, worktreeId: string) {
+  return page
+    .getByRole('listbox', { name: 'Sessions', exact: true })
+    .getByRole('option')
+    .filter({ has: page.locator(`[data-worktree-id="${worktreeId}"]`) })
+}
+
 export const selectors = {
   completedWorkGroup: (page: Page) => page.getByRole('button', { name: /^Worked for / }),
   reasoningDeliveryRow: (page: Page) => page.getByRole('button', { name: /^REASONING_BEGIN / }),
@@ -67,6 +74,10 @@ export const selectors = {
       .getByRole('button', { name: 'Actions', exact: true }),
   toastUndo: (page: Page) =>
     page.locator('[data-sonner-toast]').getByRole('button', { name: 'Undo', exact: true }).last(),
+  undoNotice: (page: Page, text: string) =>
+    page.locator('[data-sonner-toast]').filter({ hasText: text }),
+  shelfRowTitles: (page: Page, shelf: string) =>
+    page.getByRole('region', { name: shelf, exact: true }).locator('[title]'),
 
   projectGroups: (page: Page) => page.locator('[data-project-group]'),
   projectDeleteMenu: (page: Page) =>
@@ -210,6 +221,17 @@ export const selectors = {
   fixWithAi: (scope: Page | Locator) =>
     scope.getByRole('button', { name: 'Fix with AI', exact: true }),
   machineTarget: (page: Page) => page.getByRole('textbox', { name: 'SSH target', exact: true }),
+  machineRemoteUrl: (page: Page) => page.getByRole('button', { name: /^Remote URL/ }),
+  machineServerUrl: (page: Page) => page.getByRole('textbox', { name: 'Server URL', exact: true }),
+  machineDetails: (scope: Page | Locator, label: string) =>
+    scope.getByRole('button', { name: `${label} connection details`, exact: true }),
+  machineDetailsPopover: (page: Page, label: string) =>
+    page.getByRole('dialog', { name: `${label} connection`, exact: true }),
+  machineFormCancel: (dialog: Locator) =>
+    dialog.getByRole('button', { name: 'Cancel', exact: true }),
+  machineDialogError: (dialog: Locator) => dialog.getByRole('alert'),
+  serverOutOfDate: (scope: Page | Locator) =>
+    scope.getByText('Server out of date', { exact: true }),
   sshHostList: (page: Page) =>
     page.getByRole('listbox', { name: 'SSH hosts', exact: true }).first(),
   patternRows: (list: Locator) => list.locator('[data-slot="list-row"]'),
@@ -282,6 +304,11 @@ export const selectors = {
   sessionDraggingRow: (page: Page) =>
     page.locator('aside [aria-roledescription="sortable session row"][data-dragging="true"]'),
   sessionRail: (page: Page) => page.getByRole('listbox', { name: 'Sessions', exact: true }),
+  sessionRowForWorktree,
+  sessionPullRequestBadge: (page: Page, worktreeId: string) =>
+    sessionRowForWorktree(page, worktreeId).locator('[data-pull-request-state]'),
+  sessionWorktreeChip: (page: Page, worktreeId: string) =>
+    sessionRowForWorktree(page, worktreeId).locator(`[data-worktree-id="${worktreeId}"]`),
   gitChangeTree: (page: Page) => page.getByRole('tree', { name: 'Git changes', exact: true }),
   logList: (page: Page) => page.getByRole('listbox', { name: 'Log events', exact: true }),
   workspaceReplaceAll: (page: Page) => page.getByRole('button', { name: 'All', exact: true }),
@@ -432,6 +459,25 @@ export const selectors = {
   settingsDefaultsBanner: (page: Page) => page.getByText('Defaults are read-only', { exact: true }),
   settingsRowActions: (page: Page, id: string) =>
     page.getByRole('button', { name: `Actions for ${id}`, exact: true }),
+  pushSection: (page: Page) =>
+    page.getByRole('region', { name: 'Push notifications', exact: true }),
+  pushTurnOn: (page: Page) =>
+    page.getByRole('button', { name: 'Turn on for this device', exact: true }),
+  /** A drawn skeleton bar, which appears once LoadingState's delay has passed. */
+  pushLoadingBar: (page: Page) =>
+    page
+      .getByRole('status', { name: 'Loading push devices', exact: true })
+      .locator('.skeleton-sweep')
+      .first(),
+  pushThisDeviceOn: (page: Page) => page.getByText('This device receives push notifications.'),
+  pushSessionSwitch: (page: Page) =>
+    page.getByRole('switch', { name: 'Push session notifications', exact: true }),
+  pushNoDevices: (page: Page) => page.getByText('No devices registered', { exact: true }),
+  pushDeviceRow: (page: Page, id: string) => page.locator(`[data-push-device="${id}"]`),
+  pushDeviceAction: (page: Page, id: string, name: 'Send test' | 'Remove') =>
+    page.locator(`[data-push-device="${id}"]`).getByRole('button', { name, exact: true }),
+  pushDeviceSent: (page: Page, id: string) =>
+    page.locator(`[data-push-device="${id}"]`).getByRole('status').filter({ hasText: 'Sent' }),
   toolPaneHeader: (page: Page, title: string) =>
     page.locator('[data-workbench-tool-pane-header]').filter({ hasText: title }).first(),
   bottomPanelTabs: (page: Page) =>

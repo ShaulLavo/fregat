@@ -154,6 +154,14 @@ export const sessionArchiveCommandSchema = v.object({
   sessionId: sessionIdSchema,
 })
 
+export const sessionLifecycleRestoreCommandSchema = v.strictObject({
+  ...commandBaseSchema,
+  type: v.literal('session.lifecycle.restore'),
+  sessionId: sessionIdSchema,
+  expectedRevision: nonNegativeIntegerSchema,
+  restoreCommandId: commandIdSchema,
+})
+
 export const sessionUnarchiveCommandSchema = v.object({
   ...commandBaseSchema,
   type: v.literal('session.unarchive'),
@@ -343,6 +351,7 @@ export const clientOrchestrationCommandSchema = v.variant('type', [
   sessionMetaUpdateCommandSchema,
   sessionDeleteCommandSchema,
   sessionArchiveCommandSchema,
+  sessionLifecycleRestoreCommandSchema,
   sessionUnarchiveCommandSchema,
   sessionSettleCommandSchema,
   sessionUnsettleCommandSchema,
@@ -603,6 +612,7 @@ export const orchestrationCommandSchema = v.variant('type', [
   sessionMetaUpdateCommandSchema,
   sessionDeleteCommandSchema,
   sessionArchiveCommandSchema,
+  sessionLifecycleRestoreCommandSchema,
   sessionUnarchiveCommandSchema,
   sessionSettleCommandSchema,
   sessionUnsettleCommandSchema,
@@ -660,6 +670,9 @@ export type SessionTurnBootstrapCreateSession = v.InferOutput<
 export type SessionTurnBootstrap = v.InferOutput<typeof sessionTurnBootstrapSchema>
 export type SessionMetaUpdateCommand = v.InferOutput<typeof sessionMetaUpdateCommandSchema>
 export type SessionDeleteCommand = v.InferOutput<typeof sessionDeleteCommandSchema>
+export type SessionLifecycleRestoreCommand = v.InferOutput<
+  typeof sessionLifecycleRestoreCommandSchema
+>
 export type SessionArchiveCommand = v.InferOutput<typeof sessionArchiveCommandSchema>
 export type SessionUnarchiveCommand = v.InferOutput<typeof sessionUnarchiveCommandSchema>
 export type SessionSettleCommand = v.InferOutput<typeof sessionSettleCommandSchema>

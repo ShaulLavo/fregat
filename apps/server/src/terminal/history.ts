@@ -1,4 +1,5 @@
-import { and, asc, eq, lt } from 'drizzle-orm'
+import type { SessionId } from '@workspace/contracts'
+import { and, asc, eq, like, lt } from 'drizzle-orm'
 import type { PlatformDatabase } from '../db/client'
 import { terminalHistoryChunks } from '../db/schema'
 
@@ -155,4 +156,14 @@ function trimContinuation(chunks: Chunk[]) {
     return chunks
   }
   return chunks
+}
+
+/** Deletes every saved chunk of the agent terminals one session owned, in any worktree. */
+export function deleteAgentHistory(database: PlatformDatabase, sessionId: SessionId) {
+  // Owners are JSON `[worktree, kind, id]`; `%` and `_` cannot occur in a session id.
+  const suffix = JSON.stringify(['agent', sessionId]).slice(1)
+  database
+    .delete(terminalHistoryChunks)
+    .where(like(terminalHistoryChunks.owner, `%,${suffix}`))
+    .run()
 }

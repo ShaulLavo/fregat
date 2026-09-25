@@ -26,6 +26,7 @@ import { useSessionActions } from '@/features/chat-mode/hooks/use-session-action
 import { clearSessionMultiSelect } from '@/features/chat-mode/state/session-commands'
 import { useSessionMultiSelectStore } from '@/features/chat-mode/state/session-multi-select-store'
 import { chatModeMutationKeys } from '@/features/chat-mode/utils/mutation-keys'
+import { primaryQueryClient } from '@/lib/environments/state/query-clients'
 
 export function SessionBulkBar() {
   const refs = useSessionMultiSelectStore((state) => state.refs)
@@ -33,7 +34,8 @@ export function SessionBulkBar() {
   const titles = useSessionTitleSelection(refs)
   const titleActions = useSessionTitleActions()
   const lifecycle = useSessionBulkLifecycle(refs)
-  const pending = useIsMutating({ mutationKey: chatModeMutationKeys.session() }) > 0
+  const pending =
+    useIsMutating({ mutationKey: chatModeMutationKeys.session() }, primaryQueryClient()) > 0
   return (
     <PaneBar aria-label='Selected sessions' role='toolbar'>
       <span className='text-muted-foreground text-2xs min-w-0 flex-1 truncate tabular-nums'>

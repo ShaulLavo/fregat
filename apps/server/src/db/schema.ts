@@ -3,6 +3,7 @@ import type { UsageContribution } from '../provider/utils/usage-contributions'
 import {
   TURN_END_REASONS,
   providerUsagePurposeSchema,
+  pushServiceSchema,
   sessionRuntimeStatusSchema,
   type WorkspaceAddressId,
 } from '@workspace/contracts'
@@ -101,6 +102,24 @@ export const attachmentUploadOwners = sqliteTable(
   },
   (table) => [index('attachment_upload_owners_session_idx').on(table.sessionId)],
 )
+
+/**
+ * Browsers subscribed to Web Push from this server. `id` is `pushDeviceId(endpoint)`, so a
+ * browser that registers again replaces its own row. Device records, never settings.
+ */
+export const pushDevices = sqliteTable('push_devices', {
+  revision: text('revision').notNull(),
+  id: text('id').primaryKey(),
+  endpoint: text('endpoint').notNull(),
+  p256dh: text('p256dh').notNull(),
+  auth: text('auth').notNull(),
+  label: text('label').notNull(),
+  service: text('service', { enum: pushServiceSchema.options }).notNull(),
+  /** The page origin that registered it; an https one becomes the VAPID subject. */
+  origin: text('origin'),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+})
 
 export const environmentIdentity = sqliteTable('environment_identity', {
   id: text('id').primaryKey(),
@@ -395,6 +414,7 @@ export const projectionSessions = sqliteTable(
     updatedAt: text('updated_at').notNull(),
     archivedAt: text('archived_at'),
     deletedAt: text('deleted_at'),
+    lifecycleRevision: integer('lifecycle_revision').notNull().default(0),
     /** null = classify on activity alone; the two values are explicit user intent. */
     settledOverride: text('settled_override', { enum: ['settled', 'active'] }),
     settledAt: text('settled_at'),
