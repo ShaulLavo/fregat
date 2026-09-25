@@ -1,4 +1,4 @@
-import { errorMessage } from '@workspace/contracts'
+import { errorMessage, ORCHESTRATION_WS_PROTOCOL_VERSION } from '@workspace/contracts'
 import type {
   EnvironmentId,
   HealthDescriptor,
@@ -7,7 +7,25 @@ import type {
   SshMachineDefinition,
 } from '@workspace/contracts'
 import { recordProcessError, recordProcessInfo } from '../observability/runtime'
-import { createSshError, type SshErrorStep } from './structured-errors'
+import { isEvlogError } from '../observability/structured-errors'
+import {
+  createSshError,
+  createSshProtocolError,
+  machineConnectionError,
+  releaseUpdateFix,
+  updateErrors,
+  sshProtocolCode,
+  type SshCatalogStep,
+  type SshErrorStep,
+} from './structured-errors'
+import {
+  installRelease,
+  releaseSource,
+  timed,
+  type ReleaseSupply,
+  type ReleaseSource,
+  type UpdateEvent,
+} from './update'
 import {
   openForward,
   probeDescriptor,
@@ -25,7 +43,7 @@ import {
   parseInstallation,
   type RemoteRecord,
 } from './records'
-import { launchCommand, probeCommand, stopCommand } from './remote-scripts'
+import { launchCommand, launchFailureFix, probeCommand, stopCommand } from './remote-scripts'
 import type { ServerInstallation } from '../installation/descriptor'
 
 type Connection = {
@@ -44,6 +62,8 @@ type ConnectEvent = {
   machine: string
   target?: string
   installationDirectory?: string
+  installationKind?: ServerInstallation['kind']
+  serverVersion?: string
   step: SshErrorStep
   steps: Partial<Record<SshErrorStep, number>>
   outcome: 'pending' | 'success' | 'failed' | 'cancelled'
@@ -53,6 +73,8 @@ type ConnectEvent = {
   remotePort?: number
   managed?: boolean
   error?: string
+  errorCode?: string
+  errorInternal?: Record<string, unknown>
   cleanupError?: string
 }
 
@@ -66,16 +88,20 @@ type LauncherOptions = {
   fetcher?: typeof fetch
   localPort?: (retainedPort?: number) => Promise<number>
   record?: (action: string, fields: Record<string, unknown>, failed: boolean) => void
+  /** What an update installs on the remote; defaults to this server's own release. */
+  releaseSource?: ReleaseSupply
 }
 
 export function createSshLauncher(options: LauncherOptions) {
   const connections = new Map<string, Connection>()
   const pending = new Map<string, Promise<MachineConnectionState>>()
   const disconnecting = new Map<string, Promise<void>>()
+  const updating = new Map<string, Promise<MachineConnectionState>>()
   const ports = new Map<string, number>()
   const identities = new Map<string, EnvironmentId>()
   const spawn = options.spawn ?? spawnSsh
   const writeLog = options.record ?? recordEvent
+  const supply = options.releaseSource ?? releaseSource()
   let closing = false
 
   function publish(connection: Connection, state: MachineConnectionState) {
@@ -87,11 +113,110 @@ export function createSshLauncher(options: LauncherOptions) {
     const name = await parseMachineName(input)
     if (closing) throw createSshError('settings', 'The backend is closing.')
     await disconnecting.get(name)
-    const running = pending.get(name)
+    const running = updating.get(name) ?? pending.get(name)
     if (running) return running
+    return trackConnect(name)
+  }
+
+  function trackConnect(name: string) {
     const operation = connect(name).finally(() => pending.delete(name))
     pending.set(name, operation)
     return operation
+  }
+
+  /** Installs this server's release on the machine, restarts its server and connects again. */
+  async function updateMachine(input: string): Promise<MachineConnectionState> {
+    const name = await parseMachineName(input)
+    if (closing) throw createSshError('settings', 'The backend is closing.')
+    await disconnecting.get(name)
+    const running = updating.get(name)
+    if (running) return running
+    const operation = update(name).finally(() => updating.delete(name))
+    updating.set(name, operation)
+    return operation
+  }
+
+  async function update(name: string): Promise<MachineConnectionState> {
+    await pending.get(name)
+    const event: UpdateEvent = {
+      machine: name,
+      step: 'source',
+      steps: {},
+      bytesSent: 0,
+      outcome: 'pending',
+    }
+    const startedAt = Date.now()
+    const machine = await resolveMachine(name)
+    const connection = connections.get(name) ?? idleConnection(name)
+    connections.set(name, connection)
+    event.target = machine.target
+    try {
+      const remote = { spawn, target: machine.target, signal: connection.controller.signal }
+      await installRelease(
+        remote,
+        supply,
+        event,
+        (source) => activateRelease(name, connection, event, source),
+        () => recoverRelease(name, connection),
+      )
+      event.outcome = 'success'
+      return connections.get(name)?.state ?? connection.state
+    } catch (error) {
+      return failedUpdate(connections.get(name) ?? connection, event, error)
+    } finally {
+      event.durationMs = Date.now() - startedAt
+      writeLog('machines.server.update', event, event.outcome === 'failed')
+    }
+  }
+
+  async function activateRelease(
+    name: string,
+    connection: Connection,
+    event: UpdateEvent,
+    source: ReleaseSource,
+  ) {
+    await timed(event, 'restart', () => cleanup(connection))
+    const state = await timed(event, 'connect', () => trackConnect(name))
+    if (state.phase !== 'live') throw updateErrors.install({ internal: { step: 'connect', state } })
+    if (state.descriptor.release !== source.name)
+      throw updateErrors.inUse({
+        internal: { requested: source.name, running: state.descriptor.release ?? null },
+      })
+  }
+
+  async function recoverRelease(name: string, connection: Connection) {
+    if (connection.controller.signal.aborted) return
+    const active = connections.get(name) ?? connection
+    await cleanup(active)
+    await trackConnect(name)
+  }
+
+  function failedUpdate(connection: Connection, event: UpdateEvent, error: unknown) {
+    event.outcome = connection.controller.signal.aborted ? 'cancelled' : 'failed'
+    event.error = errorMessage(error)
+    event.errorCode = isEvlogError(error) ? error.code : undefined
+    event.errorInternal = isEvlogError(error) ? error.internal : undefined
+    if (event.outcome === 'cancelled') return connection.state
+    const lastError = machineConnectionError(error, event.step === 'restart' ? 'stop' : 'probe')
+    publish(connection, {
+      name: connection.name,
+      phase: 'blocked',
+      lastError,
+      lastErrorAt: Date.now(),
+    })
+    return connection.state
+  }
+
+  function idleConnection(name: string): Connection {
+    return { ...newConnection(name), state: { name, phase: 'idle' } }
+  }
+
+  async function resolveMachine(name: string) {
+    const machines = await parseMachineSettings(await options.readMachines())
+    const machine = machines[name]
+    if (!machine || machine.kind !== 'ssh')
+      throw createSshError('settings', `No SSH machine named ${name} exists.`)
+    return machine
   }
 
   async function step<T>(event: ConnectEvent, name: SshErrorStep, action: () => Promise<T>) {
@@ -162,8 +287,11 @@ export function createSshLauncher(options: LauncherOptions) {
     if (!descriptor || connection.state.phase !== 'live' || !connection.forward) return false
     const child = connection.forward.child
     if (child.exitCode !== null || child.signalCode !== null) return false
+    event.serverVersion = descriptor.serverVersion
+    await step(event, 'protocol', async () => confirmProtocol(connection, descriptor))
     await step(event, 'identity', async () => confirmIdentity(connection, descriptor))
     event.target = connection.machine?.target
+    event.installationKind = connection.installation?.kind
     event.environmentId = descriptor.environmentId
     event.localPort = connection.state.localPort
     event.remotePort = connection.record?.port
@@ -173,12 +301,7 @@ export function createSshLauncher(options: LauncherOptions) {
   }
 
   async function establish(connection: Connection, event: ConnectEvent) {
-    const machines = await step(event, 'settings', async () =>
-      parseMachineSettings(await options.readMachines()),
-    )
-    const machine = machines[connection.name]
-    if (!machine || machine.kind !== 'ssh')
-      throw createSshError('settings', `No SSH machine named ${connection.name} exists.`)
+    const machine = await step(event, 'settings', () => resolveMachine(connection.name))
     if (connection.machine && changedRemote(connection.machine, machine)) {
       await cleanup(connection)
       connection.preserveRemoteOnFailure = false
@@ -186,7 +309,9 @@ export function createSshLauncher(options: LauncherOptions) {
     connection.machine = machine
     event.target = machine.target
     const installation = parseInstallation(
-      await step(event, 'probe', () => command(connection, machine, probeCommand(), 'probe')),
+      await step(event, 'probe', () =>
+        command(connection, machine, probeCommand(supply.channel), 'probe'),
+      ),
     )
     if (connection.installation && connection.installation.directory !== installation.directory) {
       await cleanup(connection)
@@ -194,6 +319,7 @@ export function createSshLauncher(options: LauncherOptions) {
     }
     connection.installation = installation
     event.installationDirectory = installation.directory
+    event.installationKind = installation.kind
     connection.remoteAttempted = true
     connection.record = null
     const output = await step(event, 'launch', () =>
@@ -207,6 +333,7 @@ export function createSshLauncher(options: LauncherOptions) {
           webOrigin: options.webOrigin,
         }),
         'launch',
+        launchFailureFix(installation),
       ),
     )
     connection.record = await parseRemoteRecord(output)
@@ -237,11 +364,27 @@ export function createSshLauncher(options: LauncherOptions) {
         fetcher: options.fetcher ?? fetch,
       }),
     )
+    event.serverVersion = descriptor.serverVersion
+    await step(event, 'protocol', async () => confirmProtocol(connection, descriptor))
     await step(event, 'identity', async () => confirmIdentity(connection, descriptor))
     connection.controller.signal.throwIfAborted()
     connection.preserveRemoteOnFailure = true
     publish(connection, { name: connection.name, phase: 'live', origin, localPort, descriptor })
     return descriptor
+  }
+
+  function confirmProtocol(connection: Connection, descriptor: HealthDescriptor) {
+    if (descriptor.protocolVersion === ORCHESTRATION_WS_PROTOCOL_VERSION) return
+    throw createSshProtocolError({
+      expected: ORCHESTRATION_WS_PROTOCOL_VERSION,
+      running: descriptor.protocolVersion,
+      installed: null,
+      installation: connection.installation?.kind ?? null,
+      kind: connection.record?.kind ?? null,
+      otherLeases: null,
+      port: connection.record?.port ?? null,
+      directory: connection.installation?.directory ?? null,
+    })
   }
 
   function confirmIdentity(connection: Connection, descriptor: HealthDescriptor) {
@@ -258,7 +401,8 @@ export function createSshLauncher(options: LauncherOptions) {
     connection: Connection,
     machine: SshMachineDefinition,
     script: string,
-    operation: SshErrorStep,
+    operation: SshCatalogStep,
+    fix?: string,
   ) {
     return runSshCommand({
       spawn,
@@ -266,16 +410,23 @@ export function createSshLauncher(options: LauncherOptions) {
       script,
       step: operation,
       signal: connection.controller.signal,
+      fix,
     })
   }
 
   async function failed(connection: Connection, event: ConnectEvent, error: unknown) {
     const cancelled = connection.controller.signal.aborted
+    const lastError = machineConnectionError(error, catalogStep(event.step))
     event.error = errorMessage(error)
-    if (error instanceof Error && 'code' in error && error.code === 'machines.SSH_IDENTITY')
-      event.step = 'identity'
+    event.errorCode = lastError.code
+    event.errorInternal = isEvlogError(error) ? error.internal : undefined
+    const updateFix = releaseUpdateFix(lastError.code, event.errorInternal, supply.channel)
+    if (updateFix && (await supply.available())) lastError.fix = updateFix
+    if (lastError.code === 'machines.SSH_IDENTITY') event.step = 'identity'
+    if (lastError.code === sshProtocolCode) event.step = 'protocol'
     event.outcome = cancelled ? 'cancelled' : 'failed'
     try {
+      // A failed first connection releases its lease, so a refused server it alone held stops here.
       await (connection.preserveRemoteOnFailure
         ? closeConnectionForward(connection)
         : cleanup(connection))
@@ -284,12 +435,7 @@ export function createSshLauncher(options: LauncherOptions) {
     }
     if (cancelled) return connection.state
     const phase = failurePhase(event.step)
-    publish(connection, {
-      name: connection.name,
-      phase,
-      lastError: actionableError(error),
-      lastErrorAt: Date.now(),
-    })
+    publish(connection, { name: connection.name, phase, lastError, lastErrorAt: Date.now() })
     return connection.state
   }
 
@@ -305,7 +451,8 @@ export function createSshLauncher(options: LauncherOptions) {
     if (connection.forward !== forward || connection.controller.signal.aborted) return
     connection.forward = null
     if (connection.state.phase !== 'live') return
-    const lastError = `SSH forward exited (${exitCode}). ${stderr.trim().slice(0, 1000)}`.trim()
+    const detail = `SSH forward exited (${exitCode}). ${stderr.trim().slice(0, 1000)}`.trim()
+    const lastError = machineConnectionError(createSshError('forward', detail), 'forward')
     publish(connection, {
       name: connection.name,
       phase: 'offline',
@@ -365,6 +512,7 @@ export function createSshLauncher(options: LauncherOptions) {
   }
 
   async function disconnect(name: string) {
+    await updating.get(name)
     await pending.get(name)
     const connection = connections.get(name)
     if (!connection) return
@@ -389,7 +537,7 @@ export function createSshLauncher(options: LauncherOptions) {
       publish(connection, {
         name,
         phase: 'offline',
-        lastError: actionableError(error),
+        lastError: machineConnectionError(error, 'stop'),
         lastErrorAt: Date.now(),
       })
       writeLog(
@@ -423,7 +571,7 @@ export function createSshLauncher(options: LauncherOptions) {
     return Array.from(connections.values(), (connection) => connection.state)
   }
 
-  return { connectMachine, disconnectMachine, stateFor, listStates, close }
+  return { connectMachine, updateMachine, disconnectMachine, stateFor, listStates, close }
 }
 
 function changedRemote(previous: SshMachineDefinition, next: SshMachineDefinition) {
@@ -432,20 +580,13 @@ function changedRemote(previous: SshMachineDefinition, next: SshMachineDefinitio
 
 function failurePhase(step: SshErrorStep) {
   if (step === 'identity') return 'identity-drift'
-  if (step === 'settings' || step === 'probe') return 'blocked'
+  if (step === 'settings' || step === 'probe' || step === 'protocol') return 'blocked'
   return 'offline'
 }
 
-function actionableError(error: unknown) {
-  const message = errorMessage(error)
-  if (
-    typeof error !== 'object' ||
-    error === null ||
-    !('fix' in error) ||
-    typeof error.fix !== 'string'
-  )
-    return message
-  return `${message} ${error.fix}`
+/** The catalog entry an uncoded failure falls back to; a protocol failure always arrives coded. */
+function catalogStep(step: SshErrorStep): SshCatalogStep {
+  return step === 'protocol' ? 'readiness' : step
 }
 
 function recordEvent(action: string, fields: Record<string, unknown>, failed: boolean) {

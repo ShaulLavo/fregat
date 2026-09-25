@@ -8,6 +8,7 @@ export const healthDescriptorSchema = v.looseObject({
   label: trimmedNonEmptyStringSchema,
   protocolVersion: nonNegativeIntegerSchema,
   serverVersion: trimmedNonEmptyStringSchema,
+  release: v.optional(v.nullable(trimmedNonEmptyStringSchema)),
   capabilities: v.optional(
     v.object({
       sessionSettlement: v.boolean(),

@@ -1,6 +1,7 @@
 import { useIsMutating } from '@tanstack/react-query'
 import { useState } from 'react'
 import { chatModeMutationKeys } from '@/features/chat-mode/utils/mutation-keys'
+import { primaryQueryClient } from '@/lib/environments/state/query-clients'
 import { Button } from '@workspace/ui/components/button'
 import {
   Dialog,
@@ -33,7 +34,8 @@ import { useSettingValue } from '@/hooks/use-setting-value'
 export function SessionDeleteDialog() {
   const request = useSessionDeleteRequestStore((state) => state.request)
   const actions = useSessionActions()
-  const pending = useIsMutating({ mutationKey: chatModeMutationKeys.session() }) > 0
+  const pending =
+    useIsMutating({ mutationKey: chatModeMutationKeys.session() }, primaryQueryClient()) > 0
   const count = request?.refs.length ?? 1
   const ref = count === 1 ? request?.refs[0] : undefined
   const projection = useChatProjectionStore((state) =>

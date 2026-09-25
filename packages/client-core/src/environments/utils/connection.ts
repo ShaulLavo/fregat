@@ -1,4 +1,8 @@
-import type { EnvironmentId, OrchestrationWsServerConfig } from '@workspace/contracts'
+import type {
+  ConnectionError,
+  EnvironmentId,
+  OrchestrationWsServerConfig,
+} from '@workspace/contracts'
 
 export type EnvironmentPhase =
   | 'idle'
@@ -17,7 +21,7 @@ export type EnvironmentEntry = {
   readonly kind: 'primary' | 'ssh' | 'origin'
   readonly name: string
   readonly phase: EnvironmentPhase
-  readonly lastError: string | null
+  readonly lastError: ConnectionError | null
   readonly lastErrorAt: number | null
   readonly connectedAt: number | null
   readonly descriptor: import('@workspace/contracts').HealthDescriptor | null
@@ -95,4 +99,10 @@ export function selectServerProtocolSkew(
   expected: number,
 ): boolean {
   return connection.protocolVersion !== null && connection.protocolVersion !== expected
+}
+
+/** Two reports of the same failure: a repeated attempt carries a fresh object with the same words. */
+export function sameConnectionError(left: ConnectionError | null, right: ConnectionError | null) {
+  if (left === null || right === null) return left === right
+  return left.code === right.code && left.message === right.message && left.fix === right.fix
 }

@@ -21,6 +21,8 @@ export type CommandWhenSnapshot = {
   readonly activeDocument: DocumentRef | null
   readonly activeTabId: TabId | null
   readonly chatMode: boolean
+  readonly sessionActionUndoable?: boolean
+  readonly sessionActionRedoable?: boolean
   readonly fileOperationRedoable?: boolean
   readonly fileOperationUndoable?: boolean
   readonly workspaceOpen: boolean
@@ -42,6 +44,8 @@ export const commandWhenDisabledReasons = {
   fileOperationRedoable: 'No file operation can be redone.',
   fileOperationUndoable: 'No file operation can be undone.',
   saveableTab: 'Nothing here can be saved.',
+  sessionActionUndoable: 'No session action can be undone.',
+  sessionActionRedoable: 'No session action can be redone.',
   tabOpen: 'No editor tab is open.',
   workspaceOpen: 'No workspace open.',
   workspaceEditRedoable: 'No workspace edit can be redone.',
@@ -93,6 +97,11 @@ function conditionDisabledReason(
     const savable =
       snapshot.activeDocument && saveCapability(snapshot.activeDocument).kind !== 'none'
     return savable && snapshot.activeDocumentSavable ? null : commandWhenDisabledReasons.saveableTab
+  }
+  if (condition === 'sessionActionRedoable')
+    return snapshot.sessionActionRedoable ? null : commandWhenDisabledReasons.sessionActionRedoable
+  if (condition === 'sessionActionUndoable') {
+    return snapshot.sessionActionUndoable ? null : commandWhenDisabledReasons.sessionActionUndoable
   }
   if (condition === 'tabOpen') {
     return snapshot.activeTabId !== null ? null : commandWhenDisabledReasons.tabOpen

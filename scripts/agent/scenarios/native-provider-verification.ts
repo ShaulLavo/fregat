@@ -44,6 +44,26 @@ export async function restoreUserSettings(
   )
 }
 
+/** Sets one key in the user's settings document, the path a map setting without its own operation takes. */
+export async function writeRawSetting(page: Page, base: string, key: string, value: unknown) {
+  const headers = { Origin: new URL(page.url()).origin }
+  const layer = await page.request.get(`${base}/settings/raw?target=user`, { headers })
+  ok(layer.ok(), `Read the user settings document returned ${layer.status()}`)
+  const { text, revision } = (await layer.json()) as { text: string; revision: string }
+  const document = text.trim() ? (JSON.parse(text) as Record<string, unknown>) : {}
+  document[key] = value
+  const response = await page.request.post(`${base}/settings/raw`, {
+    headers,
+    data: {
+      writeId: crypto.randomUUID(),
+      target: 'user',
+      text: `${JSON.stringify(document, null, 2)}\n`,
+      baseRevision: revision,
+    },
+  })
+  ok(response.ok(), `Write the user settings document returned ${response.status()}`)
+}
+
 export async function writeSettings(page: Page, base: string, operations: readonly unknown[]) {
   const response = await page.request.post(`${base}/settings/write`, {
     headers: { Origin: new URL(page.url()).origin },

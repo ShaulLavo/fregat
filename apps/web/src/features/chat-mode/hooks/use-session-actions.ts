@@ -3,12 +3,29 @@ import { errorMessage } from '@/lib/error-message'
 import { useSessionSnoozeRequestStore } from '@/features/chat-mode/state/session-snooze-request-store'
 import { removeSuccessfulSelection } from '@/features/chat-mode/state/session-multi-select-store'
 import { currentSessionLifecyclePolicy } from '@/features/chat-mode/state/session-lifecycle'
-import { canApplyLifecycle, lifecycleVerb } from '@/features/chat-mode/utils/session-lifecycle'
+import { canApplyLifecycle } from '@/features/chat-mode/utils/session-lifecycle'
 import { updateSessionRead } from '@/features/chat-mode/state/session-read-actions'
 import { sessionSummary, sessionArchive, sessionDeletion } from '@/features/chat-mode/state/removal'
 import type { ClientOrchestrationCommand, ScopedSessionRef } from '@workspace/contracts'
 import { useMutation } from '@tanstack/react-query'
+import { primaryQueryClient } from '@/lib/environments/state/query-clients'
 import { toast } from 'sonner'
+import {
+  sessionLifecycleUndoEntry,
+  sessionLifecycleVerb,
+} from '@workspace/client-core/chat/rail/lifecycle-undo'
+import {
+  forgetSessionUndo,
+  offerSessionUndo,
+  type SessionUndoEntry,
+} from '@/features/chat-mode/state/session-undo'
+import {
+  batchDetail,
+  lifecycleUndoKind,
+  surfaceShowsSession,
+  viewedSessionSurface,
+} from '@/features/chat-mode/utils/session-undo'
+import { useSessionUndoShortcut } from '@/features/chat-mode/hooks/use-session-undo-shortcut'
 import { dispatchChatCommand } from '@/features/chat/utils/command-dispatch'
 import { notifyChatCommandError } from '@/features/chat/notify-command-error'
 import { dispatchCommandForEnvironment } from '@/features/chat/state/active-transports'
@@ -30,6 +47,12 @@ import { useNavigation } from '@/hooks/use-navigation'
 import { hasRunningTurn } from '@/features/chat-mode/utils/running-turn'
 import { toastError } from '@/lib/toast-error'
 
+type ArchiveOutcome = {
+  /** Present once the server accepted the archive. */
+  readonly undo: SessionUndoEntry | null
+  readonly navigationFailed: boolean
+}
+
 type SessionCommandVariables = {
   readonly action: string
   readonly command: ClientOrchestrationCommand
@@ -38,74 +61,79 @@ type SessionCommandVariables = {
 
 export function useSessionActions() {
   const requestSnooze = useSessionSnoozeRequestStore((state) => state.requestSnooze)
-  const lifecycle = useMutation({
-    mutationKey: chatModeMutationKeys.lifecycle(),
-    scope: { id: CHAT_SESSION_SCOPE },
-    mutationFn: async ({
-      refs,
-      change,
-    }: {
-      readonly refs: readonly ScopedSessionRef[]
-      readonly change: SessionLifecycleChange
-    }) => {
-      const succeeded: ScopedSessionRef[] = []
-      let skipped = 0
-      let failed = 0
-      for (const ref of refs) {
-        if (!canApplyLifecycle(change, currentSessionLifecyclePolicy(ref))) {
-          skipped++
-          continue
+  const shortcut = useSessionUndoShortcut()
+  const lifecycle = useMutation(
+    {
+      mutationKey: chatModeMutationKeys.lifecycle(),
+      scope: { id: CHAT_SESSION_SCOPE },
+      mutationFn: async ({
+        refs,
+        change,
+      }: {
+        readonly refs: readonly ScopedSessionRef[]
+        readonly change: SessionLifecycleChange
+      }) => {
+        const succeeded: ScopedSessionRef[] = []
+        const undo: SessionUndoEntry[] = []
+        let skipped = 0
+        let failed = 0
+        for (const ref of refs) {
+          if (!canApplyLifecycle(change, currentSessionLifecyclePolicy(ref))) {
+            skipped++
+            continue
+          }
+          const outcome = await dispatchChatCommand({
+            action: `chat.session.${change.type}`,
+            command: createSessionLifecycleCommand(ref.sessionId, change),
+            dispatchCommand: (command) => dispatchCommandForEnvironment(ref.environmentId, command),
+          })
+          if (!outcome.ok) {
+            failed++
+            continue
+          }
+          if (change.type === 'settle' || change.type === 'unsnooze') updateSessionRead(ref, 'wake')
+          succeeded.push(ref)
+          const entry = sessionLifecycleUndoEntry(ref, outcome.result)
+          if (entry) undo.push({ ...entry, reopen: null })
         }
-        const outcome = await dispatchChatCommand({
-          action: `chat.session.${change.type}`,
-          command: createSessionLifecycleCommand(ref.sessionId, change),
-          dispatchCommand: (command) => dispatchCommandForEnvironment(ref.environmentId, command),
-        })
-        if (!outcome.ok) {
-          failed++
-          continue
+        removeSuccessfulSelection(succeeded)
+        return { succeeded, skipped, failed, undo }
+      },
+      onSuccess: (result, { change }) => {
+        const detail = batchDetail(result)
+        const kind = lifecycleUndoKind(change.type)
+        if (kind && result.undo.length) {
+          offerSessionUndo({ kind, entries: result.undo, detail, shortcut })
+          return
         }
-        if (change.type === 'settle' || change.type === 'unsnooze') updateSessionRead(ref, 'wake')
-        succeeded.push(ref)
-      }
-      removeSuccessfulSelection(succeeded)
-      return { succeeded, skipped, failed }
+        forgetSessionUndo(result.succeeded)
+        toast(`${result.succeeded.length} ${sessionLifecycleVerb(change.type)}${detail}`)
+      },
     },
-    onSuccess: (result, { change }) => {
-      const message = `${result.succeeded.length} ${lifecycleVerb(change.type)}${result.skipped ? `, ${result.skipped} skipped` : ''}${result.failed ? `, ${result.failed} failed` : ''}`
-      toast(
-        message,
-        change.type === 'snooze' && result.succeeded.length
-          ? {
-              action: {
-                label: 'Undo',
-                onClick: () =>
-                  lifecycle.mutate({ refs: result.succeeded, change: { type: 'unsnooze' } }),
-              },
-            }
-          : undefined,
-      )
-    },
-  })
+    primaryQueryClient(),
+  )
   const navigation = useNavigation()
   const confirmSessionDelete = useSettingValue('chat.confirmSessionDelete')
   const requestDelete = useSessionDeleteRequestStore((state) => state.requestDelete)
   const dismissDelete = useSessionDeleteRequestStore((state) => state.dismissDelete)
-  const sessionCommand = useMutation({
-    mutationFn: async ({ action, command, ref }: SessionCommandVariables) => {
-      const outcome = await dispatchChatCommand({
-        action,
-        command,
-        dispatchCommand: (command) => dispatchCommandForEnvironment(ref.environmentId, command),
-      })
-      if (!outcome.ok) throw outcome.error
-      if (command.type === 'session.archive') updateSessionRead(ref, 'wake')
-      return outcome.result
+  const sessionCommand = useMutation(
+    {
+      mutationFn: async ({ action, command, ref }: SessionCommandVariables) => {
+        const outcome = await dispatchChatCommand({
+          action,
+          command,
+          dispatchCommand: (command) => dispatchCommandForEnvironment(ref.environmentId, command),
+        })
+        if (!outcome.ok) throw outcome.error
+        if (command.type === 'session.archive') updateSessionRead(ref, 'wake')
+        return outcome.result
+      },
+      mutationKey: chatModeMutationKeys.session(),
+      onError: (error) => notifyChatCommandError(error, 'Session command failed'),
+      scope: { id: CHAT_SESSION_SCOPE },
     },
-    mutationKey: chatModeMutationKeys.session(),
-    onError: (error) => notifyChatCommandError(error, 'Session command failed'),
-    scope: { id: CHAT_SESSION_SCOPE },
-  })
+    primaryQueryClient(),
+  )
   const readCommand = useMutation({
     mutationKey: chatModeMutationKeys.read(),
     mutationFn: async ({
@@ -120,8 +148,8 @@ export function useSessionActions() {
   })
   function dispatch(ref: ScopedSessionRef, action: string, command: ClientOrchestrationCommand) {
     return sessionCommand.mutateAsync({ action, command, ref }).then(
-      () => true,
-      () => false,
+      (result) => result,
+      () => null,
     )
   }
   async function reconcileRemoval(
@@ -130,31 +158,41 @@ export function useSessionActions() {
   ) {
     try {
       const result = await navigation.reconcileSessions(removal)
-      if (result.status !== 'unavailable') return true
+      if (result.status !== 'unavailable') return result.status
       toastError(`Session ${action}, but navigation failed`, { description: result.reason })
     } catch (error) {
       toastError(`Session ${action}, but navigation failed`, {
         description: errorMessage(error, 'The destination could not be opened.'),
       })
     }
-    return false
+    return 'failed'
   }
-  async function archive(ref: ScopedSessionRef) {
+  async function archive(ref: ScopedSessionRef): Promise<ArchiveOutcome> {
     const session = sessionSummary(ref)
     if (hasRunningTurn(session)) {
       toast.error(`“${session?.title ?? 'This session'}” is still running`, {
         description: 'Stop the agent before archiving it.',
       })
-      return { accepted: false, navigationFailed: false }
+      return { undo: null, navigationFailed: false }
     }
     const removal = sessionArchive(ref)
+    const surface = viewedSessionSurface(navigation.currentAddress(), ref.sessionId)
     const accepted = await dispatch(
       ref,
       'chat.session.archive',
       createSessionArchiveCommand({ sessionId: ref.sessionId }),
     )
-    const navigated = !accepted || !removal || (await reconcileRemoval(removal, 'archived'))
-    return { accepted, navigationFailed: !navigated }
+    if (!accepted) return { undo: null, navigationFailed: false }
+    const navigated = removal ? await reconcileRemoval(removal, 'archived') : 'superseded'
+    // The side chat reconciles on its own, so read where the reader ended up.
+    const movedOff =
+      surface !== null && !surfaceShowsSession(navigation.currentAddress(), surface, ref.sessionId)
+    const reopen = movedOff && removal ? { surface, projectId: removal.projectId } : null
+    const entry = sessionLifecycleUndoEntry(ref, accepted)
+    return { undo: entry ? { ...entry, reopen } : null, navigationFailed: navigated === 'failed' }
+  }
+  function offerArchiveUndo(entries: readonly SessionUndoEntry[], detail: string) {
+    offerSessionUndo({ kind: 'archive', entries, detail, shortcut })
   }
   async function confirmDelete(
     request: SessionDeleteRequest,
@@ -175,12 +213,12 @@ export function useSessionActions() {
       )
       if (!accepted) continue
       succeeded.push(ref)
-      if (removal && !(await reconcileRemoval(removal, 'deleted'))) navigationFailures++
+      if (removal && (await reconcileRemoval(removal, 'deleted')) === 'failed') navigationFailures++
     }
     removeSuccessfulSelection(succeeded)
-    toast(
-      `${succeeded.length} deleted${succeeded.length < request.refs.length ? `, ${request.refs.length - succeeded.length} failed` : ''}${navigationFailures ? `, ${navigationFailures} navigation failure${navigationFailures === 1 ? '' : 's'}` : ''}`,
-    )
+    forgetSessionUndo(succeeded)
+    const failed = request.refs.length - succeeded.length
+    toast(`${succeeded.length} deleted${batchDetail({ failed, navigationFailures })}`)
   }
   function deleteSessions(request: SessionDeleteRequest) {
     if (confirmSessionDelete) {
@@ -191,7 +229,10 @@ export function useSessionActions() {
   }
   return {
     async archive(ref: ScopedSessionRef) {
-      return (await archive(ref)).accepted
+      const outcome = await archive(ref)
+      if (!outcome.undo) return false
+      offerArchiveUndo([outcome.undo], '')
+      return true
     },
     applyLifecycle(ref: ScopedSessionRef, change: SessionLifecycleChange) {
       return lifecycle.mutateAsync({ refs: [ref], change })
@@ -212,17 +253,20 @@ export function useSessionActions() {
       readCommand.mutate({ refs: [ref], action: 'wake' })
     },
     async archiveSessions(refs: readonly ScopedSessionRef[]) {
-      const succeeded: ScopedSessionRef[] = []
+      const undo: SessionUndoEntry[] = []
       let navigationFailures = 0
       for (const ref of refs) {
         const outcome = await archive(ref)
-        if (outcome.accepted) succeeded.push(ref)
+        if (outcome.undo) undo.push(outcome.undo)
         if (outcome.navigationFailed) navigationFailures++
       }
-      removeSuccessfulSelection(succeeded)
-      toast(
-        `${succeeded.length} archived${succeeded.length < refs.length ? `, ${refs.length - succeeded.length} skipped or failed` : ''}${navigationFailures ? `, ${navigationFailures} navigation failure${navigationFailures === 1 ? '' : 's'}` : ''}`,
-      )
+      removeSuccessfulSelection(undo.map((entry) => entry.ref))
+      const detail = batchDetail({ skippedOrFailed: refs.length - undo.length, navigationFailures })
+      if (undo.length) {
+        offerArchiveUndo(undo, detail)
+        return
+      }
+      toast(`0 archived${detail}`)
     },
     cancelDelete() {
       dismissDelete()
@@ -251,6 +295,7 @@ export function useSessionActions() {
       )
     },
     unarchive(ref: ScopedSessionRef) {
+      forgetSessionUndo([ref])
       void dispatch(
         ref,
         'chat.session.unarchive',

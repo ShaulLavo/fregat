@@ -1,4 +1,5 @@
-import { errorMessage } from '@/lib/error-message'
+import type { ConnectionError } from '@workspace/contracts'
+import { toConnectionError } from '@/lib/client-error-taxonomy'
 import type { ChatTransport } from '@/features/chat/transport/chat-transport'
 import {
   selectChatProjectionSlice,
@@ -22,13 +23,13 @@ type ChatShellConnectionPhase = 'blocked' | 'connecting' | 'live' | 'offline' | 
 export type ChatShellSubscriptionState = {
   /** Consecutive failed attempts; zero while live. */
   attempt: number
-  error: string | null
+  error: ConnectionError | null
   phase: ChatShellConnectionPhase
 }
 
 type ShellStreamOutcome = {
   blocked: boolean
-  error: string | null
+  error: ConnectionError | null
   /** True once the attempt delivered a frame, which proves the transport works. */
   established: boolean
 }
@@ -74,7 +75,7 @@ export function subscribeChatShell(
  */
 async function superviseShellSubscription(supervisor: ShellSupervisor) {
   let failureCount = 0
-  let lastError: string | null = null
+  let lastError: ConnectionError | null = null
 
   while (!supervisor.signal.aborted) {
     if (!isBrowserOnline()) {
@@ -144,7 +145,7 @@ async function runShellStream(supervisor: ShellSupervisor): Promise<ShellStreamO
 
     return {
       blocked: isBlockedStreamError(error),
-      error: errorMessage(error, SHELL_STREAM_FAILED),
+      error: toConnectionError(error, SHELL_STREAM_FAILED),
       established: live,
     }
   }
