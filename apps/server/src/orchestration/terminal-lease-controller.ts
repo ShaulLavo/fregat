@@ -103,13 +103,24 @@ export class TerminalLeaseController {
     const live = sessions
       ? new Set(sessions.filter((session) => !session.exited).map((session) => session.key))
       : null
-    for (const lease of this.options.getReadModel().terminalLeases.values()) {
-      if (lease.runtimeEpoch === this.runtimeEpoch || lease.state === 'ended') continue
+    const leases = [...this.options.getReadModel().terminalLeases.values()].sort(
+      (a, b) =>
+        Number(b.runtimeEpoch === this.runtimeEpoch) -
+          Number(a.runtimeEpoch === this.runtimeEpoch) ||
+        b.createdAt.localeCompare(a.createdAt) ||
+        b.terminalLeaseId.localeCompare(a.terminalLeaseId),
+    )
+    for (const lease of leases) {
+      if (lease.state === 'ended') continue
+      if (lease.runtimeEpoch === this.runtimeEpoch) {
+        if (lease.key) live?.delete(lease.key)
+        continue
+      }
       await this.recoverLease(lease, live)
     }
   }
 
-  private async recoverLease(lease: TerminalLease, live: ReadonlySet<string> | null) {
+  private async recoverLease(lease: TerminalLease, live: Set<string> | null) {
     if (lease.state === 'requested') {
       await this.send(
         'terminal.lease.end',
@@ -131,6 +142,8 @@ export class TerminalLeaseController {
     }
     if (live.has(lease.key)) {
       await this.adopt(lease.worktreeId, lease.terminalLeaseId, lease.runtimeEpoch)
+      // One host key has one owner; older leases for a replaced shell are finished below.
+      live.delete(lease.key)
       return
     }
     await this.send(

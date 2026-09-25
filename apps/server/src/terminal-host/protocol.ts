@@ -133,6 +133,7 @@ export const clientControlSchema = v.variant('type', [
     type: v.literal('attach'),
     request: requestSchema,
     key: v.string(),
+    session: v.optional(sessionSchema),
     from: offsetSchema,
   }),
   v.object({

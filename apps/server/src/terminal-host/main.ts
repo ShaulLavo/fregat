@@ -96,7 +96,9 @@ class TerminalHost {
 
   spawn(connection: HostConnection, control: SpawnControl): HostControl {
     // A key names one shell: a spawn for a key that still has one replaces it.
-    this.byKey.get(control.key)?.pty.kill()
+    const previous = this.byKey.get(control.key)
+    if (previous?.exit) this.forget(previous)
+    else previous?.pty.kill()
     const [program, ...args] = control.command
     if (program === undefined)
       return { type: 'error', request: control.request, code: 'invalid', message: 'No command.' }
@@ -126,7 +128,7 @@ class TerminalHost {
 
   attach(connection: HostConnection, control: AttachControl) {
     const session = this.byKey.get(control.key)
-    if (!session) {
+    if (!session || (control.session !== undefined && session.id !== control.session)) {
       connection.send({
         type: 'error',
         request: control.request,
@@ -149,6 +151,13 @@ class TerminalHost {
 
   session(id: number) {
     return this.sessions.get(id)
+  }
+
+  kill(id: number, signal?: NodeJS.Signals) {
+    const session = this.sessions.get(id)
+    if (!session) return
+    if (session.exit) return this.forget(session)
+    session.pty.kill(signal)
   }
 
   list() {
@@ -326,11 +335,11 @@ class HostConnection implements SessionSubscriber {
     if (control.type === 'list')
       return this.send({ type: 'list', request: control.request, sessions: this.host.list() })
     if (control.type === 'shutdown') return void this.host.shutdown()
+    if (control.type === 'kill') return this.host.kill(control.session, control.signal)
 
     const session = this.host.session(control.session)
     if (!session || session.exit) return
     if (control.type === 'resize') return session.pty.resize(control.cols, control.rows)
-    if (control.type === 'kill') return session.pty.kill(control.signal)
     process.kill(session.pid, control.signal)
   }
 }

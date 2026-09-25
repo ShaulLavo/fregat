@@ -3,6 +3,7 @@ import net from 'node:net'
 import path from 'node:path'
 import type { Pty, PtyExit } from '@workspace/pty'
 import { elapsedMs } from '@workspace/utils/timing'
+import { errorStringField } from '@workspace/contracts'
 import * as v from 'valibot'
 
 import { recordProcessInfo } from '../observability'
@@ -42,6 +43,7 @@ export type TerminalHostClientOptions = {
 
 export type HostAttachOptions = {
   readonly key: string
+  readonly session?: number
   readonly from: number
   readonly onData: (bytes: Uint8Array, offset: number) => void
   readonly onGap?: (from: number, to: number) => void
@@ -147,12 +149,10 @@ export class TerminalHostClient {
     for (;;) {
       attempts += 1
       const socket = await connectSocket(paths.socket)
-      if (socket) {
-        const connected = await HostConnection.handshake(socket, token, () => {
-          if (this.generation !== generation) return
-          this.connecting = null
-          this.description = null
-        })
+      const connected = socket
+        ? await this.handshake(socket, token, generation, CONNECT_TIMEOUT_MS - elapsedMs(startedAt))
+        : null
+      if (connected) {
         const identity = readHostIdentity(paths.manifest)
         if (
           !identity ||
@@ -184,13 +184,38 @@ export class TerminalHostClient {
         })
         return connected
       }
-      if (!launched) await this.launch(this.hostArgv(), this.env)
-      launched = true
+      if (!socket && !launched) {
+        await this.launch(this.hostArgv(), this.env)
+        launched = true
+      }
       if (elapsedMs(startedAt) > CONNECT_TIMEOUT_MS)
         throw terminalHostErrors.HOST_UNREACHABLE({
           internal: { attempts, elapsedMs: elapsedMs(startedAt), launched, socket: paths.socket },
         })
       await Bun.sleep(CONNECT_RETRY_MS)
+    }
+  }
+
+  private async handshake(
+    socket: net.Socket,
+    token: string,
+    generation: number,
+    timeoutMs: number,
+  ) {
+    try {
+      return await HostConnection.handshake(
+        socket,
+        token,
+        () => {
+          if (this.generation !== generation || !this.description) return
+          this.connecting = null
+          this.description = null
+        },
+        Math.max(1, timeoutMs),
+      )
+    } catch (error) {
+      if (errorStringField(error, 'code') !== terminalHostErrors.HOST_UNREACHABLE.code) throw error
+      return null
     }
   }
 
@@ -223,7 +248,12 @@ class HostConnection {
     socket.on('close', () => this.closed())
   }
 
-  static async handshake(socket: net.Socket, token: string, onClose: () => void) {
+  static async handshake(
+    socket: net.Socket,
+    token: string,
+    onClose: () => void,
+    timeoutMs: number,
+  ) {
     const connection = new HostConnection(socket, onClose)
     connection.send({ type: 'hello', version: PROTOCOL_VERSION, token, capabilities: [] })
     const timeout = setTimeout(
@@ -233,7 +263,7 @@ class HostConnection {
             internal: { reason: 'hello-timeout' },
           }),
         ),
-      CONNECT_TIMEOUT_MS,
+      timeoutMs,
     )
     try {
       const hello = await connection.greeting.promise
@@ -275,10 +305,10 @@ class HostConnection {
     )
   }
 
-  attach({ key, from, onData, onGap }: HostAttachOptions) {
+  attach({ key, session, from, onData, onGap }: HostAttachOptions) {
     return this.request<HostPty>(
       'attach',
-      (request) => ({ type: 'attach', request, key, from }),
+      (request) => ({ type: 'attach', request, key, session, from }),
       (reply) => {
         if (reply.type === 'attached') this.recordAttach(reply)
         return this.adopt(reply, { onData, onGap }, from)

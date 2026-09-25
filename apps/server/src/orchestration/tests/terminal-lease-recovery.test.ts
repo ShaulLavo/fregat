@@ -9,6 +9,66 @@ afterEach(async () => {
   await Promise.all(fixtures.splice(0).map((fixture) => fixture.close()))
 })
 
+it('adopts only the latest lease for a live key and releases every cleanup hold', async () => {
+  const fixture = await createOrchestrationFixture()
+  fixtures.push(fixture)
+  const { worktreeId } = (await fixture.register()).result!
+  for (const [index, epoch] of ['old', 'new'].entries()) {
+    const shared = {
+      worktreeId,
+      terminalLeaseId: `30000000-0000-4000-8000-00000000010${index}`,
+      runtimeEpoch: epoch,
+    }
+    await fixture.command({
+      ...shared,
+      type: 'terminal.lease.request',
+      commandId: `request-${epoch}`,
+      key: 'duplicate',
+    })
+    await fixture.command({ ...shared, type: 'terminal.lease.claim', commandId: `claim-${epoch}` })
+    await fixture.command({
+      ...shared,
+      type: 'terminal.lease.activate',
+      commandId: `active-${epoch}`,
+    })
+    if (epoch === 'old')
+      await fixture.command({
+        ...shared,
+        type: 'terminal.lease.mark-unknown',
+        commandId: 'unknown-old',
+      })
+  }
+  let model = await fixture.engine.readModelSnapshot()
+  const gate = new WorktreeExecutionGate()
+  const recovery = new TerminalLeaseController({
+    gate,
+    getReadModel: () => model,
+    queryHostSessions: async () => [
+      {
+        key: 'duplicate',
+        session: 1,
+        pid: 100,
+        startedAt: new Date().toISOString(),
+        offset: 0,
+        exited: false,
+      },
+    ],
+    dispatch: async (command) => {
+      await fixture.command(command)
+      model = await fixture.engine.readModelSnapshot()
+    },
+  })
+  await recovery.recover()
+  expect([...model.terminalLeases.values()].map((lease) => lease.state)).toEqual([
+    'ended',
+    'active',
+  ])
+  const active = [...model.terminalLeases.values()].find((lease) => lease.state === 'active')!
+  await recovery.attachAdopted(worktreeId, active.terminalLeaseId).end()
+  expect(requireWorktree(model, worktreeId).activeTerminalCount).toBe(0)
+  expect(gate.tryAcquireExclusive(worktreeId).acquired).toBe(true)
+})
+
 it('ends unclaimed requests and preserves unknown ownership for every claimed stale epoch', async () => {
   const fixture = await createOrchestrationFixture()
   fixtures.push(fixture)

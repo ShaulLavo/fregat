@@ -5,6 +5,9 @@ closes its connection. The next server adopts the leases and replays output from
 byte offset before admitting terminal operations. The host keeps a 1 MiB ring per shell;
 missing bytes produce one gap message. Closing or restarting a terminal ends that shell.
 Clearing scrollback preserves the live stream cursor; replacement shells start a new cursor.
+Lease adoption and stream recovery use one host snapshot. A failed attachment is logged per
+session while the remaining sessions recover. Each key retains one lease owner; exited host
+sessions are forgotten once their recovery evidence has been consumed.
 
 Linux uses a transient `platform-pty-<id>.scope` when the systemd user manager is reachable.
 Other systems use a detached process. The host reports its actual cgroup, build, and protocol

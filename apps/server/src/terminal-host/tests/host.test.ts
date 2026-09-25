@@ -1,4 +1,6 @@
-import { readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import net from 'node:net'
+import path from 'node:path'
 import { afterEach, expect, it } from 'vitest'
 
 import { createTestTerminalHost } from '../../../test/factories/terminal-host'
@@ -120,4 +122,43 @@ it('concurrent clients adopt one host for the same state root', async () => {
   expect(await Promise.all(competitors.map((child) => child.exited))).toEqual(
     competitors.map(() => 0),
   )
+})
+
+it('replacing an unseen exited shell leaves one session for its key', async () => {
+  const host = await testHost()
+  const exitFile = path.join(host.paths.directory, 'exit')
+  await host.client.spawn({
+    key: 'replace',
+    command: ['/bin/sh', '-c', 'while [ ! -f "$1" ]; do sleep 0.01; done', 'sh', exitFile],
+    onData: () => {},
+  })
+  host.client.close()
+  const client = host.connect()
+  await client.list()
+  writeFileSync(exitFile, '')
+  await expect.poll(async () => (await client.list())[0]?.exited).toBe(true)
+  const retired = (await client.list())[0]!
+  const live = await client.spawn({ key: 'replace', command: LOOP, onData: () => {} })
+  expect(await client.list()).toMatchObject([{ key: 'replace', pid: live.pid, exited: false }])
+  expect(await client.list()).toHaveLength(1)
+  await expect(
+    client.attach({ key: 'replace', session: retired.session, from: 0, onData: () => {} }),
+  ).rejects.toMatchObject({ code: 'terminal.HOST_REQUEST_FAILED' })
+})
+
+it('retries a socket closed during the shutdown handshake and launches the next host', async () => {
+  const host = await testHost()
+  mkdirSync(host.paths.directory, { recursive: true })
+  const stopping = net.createServer((socket) => {
+    socket.destroy()
+    stopping.close()
+  })
+  await new Promise<void>((resolve) => stopping.listen(host.paths.socket, resolve))
+  try {
+    const hello = await host.client.host()
+    expect(hello.pid).toBe(host.hosts[0]?.pid)
+    expect(await host.client.list()).toEqual([])
+  } finally {
+    stopping.close()
+  }
 })

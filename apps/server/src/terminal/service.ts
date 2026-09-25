@@ -97,6 +97,7 @@ export class TerminalService {
   private readonly ptyFactory: TerminalPtyFactory
   private readonly host: TerminalHostClient | null
   private recovery: Promise<void> | null = null
+  private recoverySnapshot: Promise<readonly HostSessionInfo[] | null> | null = null
   private disposed = false
 
   constructor({
@@ -130,13 +131,14 @@ export class TerminalService {
     return this.host?.info() ?? null
   }
 
-  /** All sessions currently tracked by the host; null when this process has no host client. */
+  /** Lease adoption and stream recovery share one boot snapshot, including an unreachable host. */
   listHostSessions(): Promise<readonly HostSessionInfo[] | null> {
     if (!this.host) return Promise.resolve(null)
-    return this.host.list().catch((error: unknown) => {
+    this.recoverySnapshot ??= this.host.list().catch((error: unknown) => {
       recordProcessWarning('terminal.host.list_failed', { area: 'terminal', error })
       return null
     })
+    return this.recoverySnapshot
   }
 
   /**
@@ -154,7 +156,14 @@ export class TerminalService {
     const infos = await this.listHostSessions()
     if (!infos) return
     for (const info of infos) {
-      await this.reattachSession(info)
+      await this.reattachSession(info).catch((error: unknown) => {
+        recordProcessWarning('terminal.host.recovery_failed', {
+          area: 'terminal',
+          key: info.key,
+          session: info.session,
+          error,
+        })
+      })
     }
   }
 
@@ -167,7 +176,7 @@ export class TerminalService {
     if (!root) return this.orphan(info, 'worktree-missing')
     const lease = (await this.resolveAdoptedLease?.(info.key)) ?? null
     if (!lease) {
-      if (info.exited) return
+      if (info.exited) return this.host?.killSession(info.session)
       return this.orphan(info, 'lease-missing')
     }
     const history = new TerminalHistory(this.database, info.key)
@@ -188,7 +197,7 @@ export class TerminalService {
       rootPath: root.relativePath,
       sessionId: decoded.sessionId,
     })
-    if (!(await session.reattach(this.host as TerminalHostClient, history.offset))) {
+    if (!(await session.reattach(this.host as TerminalHostClient, history.offset, info.session))) {
       await lease.end()
       return
     }
@@ -324,6 +333,7 @@ export class TerminalService {
   private runExclusive(key: string, operation: () => Promise<void>) {
     const previous = this.starts.get(key)
     const next = Promise.resolve(this.recovery)
+      .catch(() => {})
       .then(() => previous?.catch(() => {}))
       .then(operation)
     this.starts.set(key, next)
@@ -725,10 +735,11 @@ export class TerminalSession {
   }
 
   /** Resumes a shell the host kept running while the server was down; nobody is connected yet. */
-  async reattach(host: TerminalHostClient, from: number) {
+  async reattach(host: TerminalHostClient, from: number, session: number) {
     const pty = await host
       .attach({
         key: this.key,
+        session,
         from,
         onData: (data, offset) =>
           this.handleOutput(data, offset === undefined ? undefined : offset + data.byteLength),

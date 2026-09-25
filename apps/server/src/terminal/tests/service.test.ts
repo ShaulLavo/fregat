@@ -1,5 +1,5 @@
 import * as v from 'valibot'
-import { mkdir, realpath, rm, symlink } from 'node:fs/promises'
+import { mkdir, realpath, rm, symlink, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ElysiaWS } from 'elysia/ws'
@@ -29,7 +29,12 @@ import {
   initializeObservability,
   resetObservabilityForTests,
 } from '../../observability/runtime'
-import { TerminalService, type TerminalPtyFactory } from '../service'
+import {
+  TerminalService,
+  terminalSessionKey,
+  type TerminalPtyFactory,
+  type TerminalServiceOptions,
+} from '../service'
 
 const TRUSTED_ORIGIN = 'http://localhost:5173'
 const fixtures = new Map<string, Awaited<ReturnType<typeof createOrchestrationFixture>>>()
@@ -1028,6 +1033,76 @@ describe('terminal service', () => {
         expect(terminalOutputText(socketB.messages)).not.toContain(`PID:${pid}`)
     },
   )
+
+  it('continues recovery and admits terminal operations after one lease attachment fails', async () => {
+    const root = await fixtureRoot()
+    const host = await nativeHost()
+    const env = { HOME: root, PATH: process.env.PATH, SHELL: '/bin/sh' }
+    const first = testService(root, { env, hostClient: host.client })
+    await first.routes(auth()).open(fakeSocket(root, '', 'failed'))
+    await first.routes(auth()).open(fakeSocket(root, '', 'survived'))
+    await first.dispose()
+    const worktreeId = v.parse(worktreeIdSchema, registrations.get(root))
+    const next = testService(root, {
+      env,
+      hostClient: host.connect(),
+      resolveAdoptedLease: async (key) => {
+        if (key === terminalSessionKey(worktreeId, 'failed'))
+          throw new TypeError('Recovery fixture failure')
+        return fixtures.get(root)!.engine.adoptedLeaseForKey(key)
+      },
+    })
+    await expect(next.reattach()).resolves.toBeUndefined()
+    expect(next.hasWorktreeRuntime(worktreeId)).toBe(true)
+    await expect(next.clear({ worktreeId, terminalId: 'failed' })).resolves.toEqual({
+      cleared: true,
+    })
+    const socket = fakeSocket(root, '', 'new-terminal')
+    await next.routes(auth()).open(socket)
+    expect(socket.messages.some((message) => message.type === 'ready')).toBe(true)
+  })
+
+  it('keeps the same unreachable host snapshot for lease adoption and orphan recovery', async () => {
+    const root = await fixtureRoot()
+    const host = await nativeHost()
+    const worktreeId = v.parse(worktreeIdSchema, registrations.get(root))
+    const shell = await host.client.spawn({
+      key: terminalSessionKey(worktreeId, 'unknown'),
+      command: ['/bin/sh'],
+      onData: () => {},
+    })
+    host.client.close()
+    const token = await readFile(host.paths.token)
+    const service = testService(root, { hostClient: host.connect() })
+    await writeFile(host.paths.token, 'wrong-token')
+    expect(await service.listHostSessions()).toBeNull()
+    await writeFile(host.paths.token, token)
+    await service.reattach()
+    const observer = host.connect()
+    expect((await observer.list()).map((info) => info.pid)).toContain(shell.pid)
+    await Bun.sleep(50)
+    expect((await observer.list()).find((info) => info.pid === shell.pid)?.exited).toBe(false)
+  })
+
+  it('forgets an exited host session after recovery confirms it has no lease', async () => {
+    const root = await fixtureRoot()
+    const host = await nativeHost()
+    const worktreeId = v.parse(worktreeIdSchema, registrations.get(root))
+    const exitFile = path.join(host.paths.directory, 'exit')
+    await host.client.spawn({
+      key: terminalSessionKey(worktreeId, 'exited'),
+      command: ['/bin/sh', '-c', 'while [ ! -f "$1" ]; do sleep 0.01; done', 'sh', exitFile],
+      onData: () => {},
+    })
+    host.client.close()
+    const observer = host.connect()
+    await observer.list()
+    await writeFile(exitFile, '')
+    await expect.poll(async () => (await observer.list())[0]?.exited).toBe(true)
+    const service = testService(root, { hostClient: host.connect() })
+    await service.reattach()
+    await expect.poll(() => observer.list()).toEqual([])
+  })
 })
 
 // Shells run in a real terminal host in a throwaway state root.
@@ -1048,6 +1123,7 @@ function testService(
     ptyFactory?: TerminalPtyFactory
     lifecycle?: import('../lease').TerminalLeaseBoundary
     hostClient?: import('../host-client').TerminalHostClient
+    resolveAdoptedLease?: TerminalServiceOptions['resolveAdoptedLease']
   } = {},
 ) {
   const fixture = fixtures.get(root)
