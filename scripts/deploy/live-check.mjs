@@ -1,7 +1,8 @@
 // Headless check of the deployed page through the mesh. Run by scripts/deploy/mesh.ts;
 // exits non-zero on a failure the previous release's check did not already have.
+import { execFile } from 'node:child_process'
 import { readFile, writeFile } from 'node:fs/promises'
-import { parseArgs } from 'node:util'
+import { parseArgs, promisify } from 'node:util'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright'
@@ -16,6 +17,7 @@ const publicFaviconUrl =
 const { values } = parseArgs({
   options: {
     baseline: { type: 'string', default: '' },
+    logs: { type: 'string', default: '' },
     out: { type: 'string', default: fileURLToPath(new URL('.', import.meta.url)) },
     release: { type: 'string' },
     target: { type: 'string', default: base },
@@ -67,7 +69,9 @@ try {
   await browser.close()
 }
 
-report.preexisting = await baselineFailures(values.baseline)
+report.logNoise = await logNoise(values.logs)
+report.failures.push(...report.logNoise.failures)
+report.preexisting = await baselineFailures(values.baseline, report.logNoise.failures)
 const fresh = report.failures.filter((failure) => !report.preexisting.includes(failure))
 await writeFile(resolve(values.out, 'live-check.json'), `${JSON.stringify(report, null, 2)}\n`)
 for (const failure of report.failures) {
@@ -99,13 +103,39 @@ function failures({ served, rendered, publicFavicon, observed }) {
   return found
 }
 
-async function baselineFailures(file) {
+// A previous check without a log census has no noise baseline, so today's noise counts as known.
+async function baselineFailures(file, noise) {
   if (!file) return []
   try {
     const previous = JSON.parse(await readFile(file, 'utf8'))
-    return Array.isArray(previous.failures) ? previous.failures : []
+    const failures = Array.isArray(previous.failures) ? previous.failures : []
+    return previous.logNoise ? failures : [...failures, ...noise]
   } catch {
     return []
+  }
+}
+
+// The census over the last 24 hours of production logs (AGENTS.md "Logs").
+async function logNoise(directory) {
+  if (!directory) return { failures: [], groups: [] }
+  const census = fileURLToPath(new URL('../lint/log-noise-census.ts', import.meta.url))
+  try {
+    const { stdout } = await promisify(execFile)(
+      'bun',
+      [census, `--dir=${directory}`, '--since=24h', '--json'],
+      { maxBuffer: 64 * 1024 * 1024 },
+    )
+    const result = JSON.parse(stdout)
+    const groups = result.failures.map(({ key, count, reasons }) => ({ key, count, reasons }))
+    return {
+      failures: [
+        ...groups.map((group) => `log noise: ${group.key}`),
+        ...result.allowProblems.map((problem) => `log noise allow list: ${problem}`),
+      ],
+      groups,
+    }
+  } catch (error) {
+    return { failures: [`log census did not run: ${error.message}`], groups: [] }
   }
 }
 

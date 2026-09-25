@@ -267,6 +267,11 @@ Interaction treatments are utilities, not strings to copy:
 - Runtime facts go in `internal`, which evlog keeps out of every HTTP response and our logger writes to the wide event. Attach what the message cannot say: the observed value against the expected one, an exit code, a lifecycle state, which of several identical checks failed. `bun run errors:census` gates this — an error whose catalog `message` is a constant string carries nothing but a code, so throwing one bare is a failure. An entry with a templated message is exempt: it already names its own facts.
 - Never put a setting value, a file's contents or a secret in a message or in `internal`. Name the type and the constraint instead (`Expected number, received string`). `apps/server/src/observability/tests/runtime.test.ts` pins it, and the sanitizer redacts a known-sensitive key wherever it is nested.
 - Every log line carries `version` and `commitHash` from the running release, so a web build newer than the server is visible in the log rather than only in `GET /release`.
+- `error` means someone must act. `warn` means something degraded and the app recovered or gave up. A missing file the caller asked about is an answer: `info`, no stack.
+- A failure the code recovers from logs once at `warn` when the series starts and once at `info` with a count when it ends. Never one line per attempt.
+- Every retry loop, reaper and sweep has a give-up: after N identical failures the item enters a terminal state and logs once. A loop that can fail forever is a bug.
+- A client failure is one line. Checkpoints are for events that never finish.
+- `bun run logs:census` groups a day of warn and error lines (`--dir` for another log directory, such as production's) and fails on noise: a group over 50 lines, or one that repeats without a ten-minute gap for over an hour. `scripts/lint/log-noise-allow.json` excuses a group only with a reason. The deploy's live check runs it over production's last 24 hours.
 
 ## TypeScript Fixes
 

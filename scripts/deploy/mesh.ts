@@ -181,6 +181,7 @@ async function liveCheck(release: Release, restarted: boolean) {
       `--release=${release.name}`,
       `--out=${release.directory}`,
       `--baseline=${previousCheck}`,
+      `--logs=${path.join(productionRoot, 'logs')}`,
     ],
     { cwd: checkoutRoot, env: { ...Bun.env, PLAYWRIGHT_BROWSERS_PATH: playwrightBrowsers() } },
   )
