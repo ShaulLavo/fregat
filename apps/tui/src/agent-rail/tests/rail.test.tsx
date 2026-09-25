@@ -320,3 +320,80 @@ test('native active reorder materializes visible keyless neighbors without pinni
     await h.cleanup()
   }
 })
+
+test('archiving the open session offers one U Undo that restores it and opens it again', async ({
+  server,
+}) => {
+  const harness = await renderAgentStage(server)
+  const { frame, chat, worktreeId } = harness
+  try {
+    const alpha = await createRailSession(chat, worktreeId, 'Alpha')
+    await createRailSession(chat, worktreeId, 'Beta')
+    await focusRailSession(frame, 'Alpha')
+    await act(async () => {
+      frame.mockInput.pressEnter()
+    })
+    await expect.poll(() => chat.getSnapshot().selectedSessionId).toBe(alpha)
+    await runPaletteCommand(frame, 'Archive selected sessions')
+    await expect
+      .poll(() => chat.getSnapshot().projection.sessionById[alpha]?.archivedAt)
+      .not.toBeNull()
+    await expect.poll(() => chat.getSnapshot().selectedSessionId).not.toBe(alpha)
+    // The new draft focuses the composer on a timer; the rail refocus has to come after it.
+    await expect.poll(() => frame.renderer.currentFocusedRenderable?.id).toBe('agent-composer')
+    await focusRailSession(frame, 'Beta')
+    await frame.renderOnce()
+    expect(frame.captureCharFrame(), 'undo notice expired before U').toContain(
+      '1 archived · U to undo',
+    )
+    await act(async () => {
+      frame.mockInput.pressKey('u')
+    })
+    await expect.poll(() => chat.getSnapshot().projection.sessionById[alpha]?.archivedAt).toBeNull()
+    await expect.poll(() => chat.getSnapshot().selectedSessionId).toBe(alpha)
+    await frame.renderOnce()
+    expect(frame.captureCharFrame()).not.toContain('to undo')
+  } finally {
+    await harness.cleanup()
+  }
+})
+
+test('deleting an archived session drops it from the U Undo', async ({ server, client }) => {
+  expect(
+    (
+      await client.settings.write.post({
+        mutationId: crypto.randomUUID(),
+        target: 'user',
+        operations: [{ kind: 'set', key: 'chat.confirmSessionDelete', value: false }],
+      })
+    ).error,
+  ).toBeNull()
+  const h = await renderAgentStage(server)
+  try {
+    await createRailSession(h.chat, h.worktreeId, 'Kept open')
+    const gone = await createRailSession(h.chat, h.worktreeId, 'Archived then deleted')
+    await focusRailSession(h.frame, 'Archived then deleted')
+    await runPaletteCommand(h.frame, 'Archive selected sessions')
+    await expect
+      .poll(() => h.chat.getSnapshot().projection.sessionById[gone]?.archivedAt)
+      .not.toBeNull()
+    await runPaletteCommand(h.frame, 'Show archived sessions')
+    await focusRailSession(h.frame, 'Archived then deleted')
+    await h.frame.renderOnce()
+    expect(h.frame.captureCharFrame(), 'undo notice expired before delete').toContain(
+      '1 archived · U to undo',
+    )
+    await runPaletteCommand(h.frame, 'Delete selected item')
+    await expect.poll(() => h.chat.getSnapshot().projection.sessionById[gone]).toBeUndefined()
+    await h.frame.renderOnce()
+    expect(h.frame.captureCharFrame()).not.toContain('to undo')
+    await expect.poll(() => h.frame.renderer.currentFocusedRenderable?.id).toBe('agent-rail')
+    await act(async () => {
+      h.frame.mockInput.pressKey('u')
+    })
+    await h.frame.renderOnce()
+    expect(h.frame.captureCharFrame()).not.toContain('Undo failed')
+  } finally {
+    await h.cleanup()
+  }
+})

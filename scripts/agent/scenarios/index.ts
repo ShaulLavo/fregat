@@ -16,6 +16,7 @@ import { sessionOrdering } from './session-ordering'
 import { backgroundLiveness } from './background-liveness'
 import { spinnerPalette } from './spinner-palette'
 import { sessionLifecycle } from './session-lifecycle'
+import { sessionUndo } from './session-undo'
 import { asyncQuestions } from './async-questions'
 import { projectGrouping } from './project-grouping'
 import { sessionSearch, sessionSearchEnvironments } from './session-search'
@@ -239,6 +240,7 @@ export const scenarios: readonly Scenario[] = [
   sessionSearchEnvironments,
   projectGrouping,
   sessionLifecycle,
+  sessionUndo,
   sessionNavigation,
   sessionOrdering,
   sessionTitles,

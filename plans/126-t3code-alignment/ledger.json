@@ -660,10 +660,14 @@
       "title": "P2: Offer Undo for settle, snooze, archive and unpin, with a mod+z binding",
       "report": "lifecycle.md",
       "wave": "2",
-      "status": "open",
-      "evidence_level": "source-reviewed",
+      "status": "verified",
+      "evidence_level": "scenario-verified",
       "acceptance": "lifecycle.md, LIFE-13, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "scripts/agent/scenarios/session-undo.ts (evidence /work/tmp/fregat-evidence/20260925T132247Z-scenario-session-undo): unpin, settle, snooze and archive undone by the notice and by Mod+Z; pin keys and order restored; the archived open session reopens; composer Mod+Z stays the composer undo; an expired notice leaves Mod+Z to the browser",
+        "Real-server DOM tests: components/tests/session-undo.test.tsx (7), state/tests/session-undo.test.tsx (3); keymap pane test in keymap/tests/keymap.test.ts; client-core chat/rail/tests/lifecycle-undo.test.ts (11); TUI archive Undo in agent-rail/tests/rail.test.tsx",
+        "Remaining: two-owner live run; upstream reveals the preceding group after an Undo, the plan keeps one slot"
+      ]
     },
     {
       "id": "LIFE-14",

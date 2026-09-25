@@ -4,6 +4,7 @@ import { useTerminalDimensions } from '@opentui/react'
 import {
   scopedSessionKey,
   type ProjectId,
+  type ScopedSessionRef,
   type SessionId,
   type WorktreeId,
 } from '@workspace/contracts'
@@ -26,7 +27,14 @@ import {
   createSessionActiveReorderCommand,
   createSessionRuntimeStopCommand,
 } from '@workspace/client-core/chat/commands'
-import { createAgentRailState } from '@/agent-rail/state/rail'
+import { createAgentRailState, type RailUndoEntry } from '@/agent-rail/state/rail'
+import {
+  captureSessionLifecycle,
+  sessionLifecycleRestoreCommand,
+  sessionLifecycleRestoreSteps,
+  sessionLifecycleVerb,
+} from '@workspace/client-core/chat/rail/lifecycle-undo'
+import { commandShortcut } from '@/commands/utils/bindings'
 import { railRows, type RailRow } from '@/agent-rail/utils/rows'
 import { railKeyTarget } from '@/agent-rail/utils/command-target'
 import { RailPrompt } from '@/agent-rail/components/prompt'
@@ -261,6 +269,7 @@ export function AgentRail({
   async function archive(row = current) {
     const items = targets(row)
     const unarchive = items.length > 0 && items.every((item) => item.archived)
+    const changed: RailUndoEntry[] = []
     let failures = 0
     let completed = 0
     for (const item of items) {
@@ -274,6 +283,7 @@ export function AgentRail({
         failures++
         continue
       }
+      const before = captureSessionLifecycle(session ?? {})
       const command = unarchive
         ? createSessionUnarchiveCommand({ sessionId: item.id })
         : createSessionArchiveCommand({ sessionId: item.id })
@@ -282,13 +292,35 @@ export function AgentRail({
         continue
       }
       completed++
-      if (!unarchive && currentSession.current === item.id) onSelectWorktree(item.worktree.id)
+      const selected = currentSession.current === item.id
+      changed.push({ ref: item.ref, before, selected })
+      if (!unarchive && selected) onSelectWorktree(item.worktree.id)
     }
     close()
+    if (unarchive) store.forgetUndo(changed.map((entry) => entry.ref))
+    else store.offerUndo('archive', changed)
     if (failures)
       store.setError(
         `${completed} ${unarchive ? 'restored' : 'archived'}, ${failures} skipped or failed.`,
       )
+  }
+  async function undoLatest() {
+    const slot = store.takeUndo()
+    if (!slot) return false
+    const now = Date.now()
+    let failures = 0
+    for (const entry of slot.entries) {
+      const commands = sessionLifecycleRestoreSteps(slot.kind, entry.before, now).map((step) =>
+        sessionLifecycleRestoreCommand(entry.ref.sessionId, step),
+      )
+      if (!(await store.execute(commands))) {
+        failures++
+        continue
+      }
+      if (entry.selected) onSelectSession(entry.ref.sessionId)
+    }
+    if (failures) store.setError(`Undo failed for ${failures} of ${slot.entries.length} sessions.`)
+    return true
   }
   function remove(row = current) {
     if (row?.kind === 'project' && !state.marked.length) {
@@ -479,6 +511,12 @@ export function AgentRail({
         },
       },
       'agent.archive': { run: () => archive() },
+      'workspace.undoSessionAction': {
+        disabledReason: (context) =>
+          railKeyTarget(context) ??
+          (store.getSnapshot().undo ? null : 'No session action can be undone.'),
+        run: () => undoLatest(),
+      },
       'agent.delete': { run: () => remove() },
       'agent.toggleArchived': { run: store.toggleArchived },
       'agent.scopeProject': { run: () => store.setScope(rowProject()?.groupKey ?? null) },
@@ -535,8 +573,13 @@ export function AgentRail({
         )
       ) {
         close()
-        if (modal.row.project.members.some((member) => member.ref.projectId === projectId))
-          onSelectProject(null)
+        const members = modal.row.project.members
+        store.forgetUndo(
+          model.sessions
+            .filter((item) => members.some((member) => member.ref.projectId === item.projectId))
+            .map((item) => item.ref),
+        )
+        if (members.some((member) => member.ref.projectId === projectId)) onSelectProject(null)
       }
       return
     }
@@ -545,7 +588,7 @@ export function AgentRail({
   }
   async function deleteSessions(items: readonly SessionRailItem[]) {
     let failures = 0
-    let deleted = 0
+    const deletedRefs: ScopedSessionRef[] = []
     for (const item of items) {
       const accepted = await store.execute(
         [createSessionDeleteCommand({ sessionId: item.id })],
@@ -555,7 +598,7 @@ export function AgentRail({
         failures++
         continue
       }
-      deleted++
+      deletedRefs.push(item.ref)
       if (currentSession.current !== item.id) continue
       const snapshot = ready.chat.getSnapshot().projection
       const survivor = Object.values(snapshot.sessionById)
@@ -570,8 +613,11 @@ export function AgentRail({
       else onSelectWorktree(item.worktree.id)
     }
     close()
+    store.forgetUndo(deletedRefs)
     if (failures)
-      store.setError(`${deleted} deleted, ${failures} failed. Failed sessions remain selected.`)
+      store.setError(
+        `${deletedRefs.length} deleted, ${failures} failed. Failed sessions remain selected.`,
+      )
   }
   const prompt =
     modal.kind === 'add' ||
@@ -673,6 +719,11 @@ export function AgentRail({
       {state.searching && <LoadingState theme={theme} label='Searching transcripts…' />}
       {state.busy && <LoadingState theme={theme} label='Updating sessions…' />}
       {state.marked.length > 0 && <text fg={theme.info}>{state.marked.length} marked</text>}
+      {state.undo && (
+        <text fg={theme.mutedForeground}>
+          {`${state.undo.entries.length} ${sessionLifecycleVerb(state.undo.kind)} · ${commandShortcut(commands.bindings, 'workspace.undoSessionAction')} to undo`}
+        </text>
+      )}
       {(state.error || chat.error) && (
         <text fg={theme.destructive}>{state.error || chat.error}</text>
       )}
