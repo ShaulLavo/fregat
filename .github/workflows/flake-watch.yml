@@ -11,7 +11,7 @@ on:
 
 concurrency:
   group: flake-watch
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   repeat:
@@ -84,7 +84,9 @@ jobs:
         run: apps/web/node_modules/.bin/playwright install --with-deps chromium
 
       # Every run is kept, pass or fail; the summary step turns them into counts.
+      # Below the job's limit, so a hung run still leaves time to count the finished ones.
       - name: Run five times
+        timeout-minutes: 50
         working-directory: ${{ matrix.suite.dir }}
         env:
           RUN: ${{ matrix.suite.run }}
@@ -98,6 +100,7 @@ jobs:
           done
 
       - name: Summarize failures
+        if: ${{ !cancelled() }}
         run: >-
           bun scripts/flake-summary.ts "${{ matrix.suite.name }}"
           "$RUNNER_TEMP"/flake/run-1.json "$RUNNER_TEMP"/flake/run-2.json
