@@ -102,6 +102,10 @@ agent is `application` or `machine`, never `window`.
 1. Shared attach action with workspace identity (also unblocks plan 139 phase 1).
 2. Editor selection and file to chat; active-file chip.
 3. Fix with AI, per `docs/diagnostic-ai-fix-plan.md`.
+   **Hover done 2026-09-25, lane L7:** generic per-diagnostic Editor actions call L8's
+   shared draft mutation. The `editor-diagnostic-hover-fix` scenario proves the exact
+   diagnostic and unsaved source reach the draft through keyboard activation.
+   Owner approval and landing of the Editor APIs and lane L8 remain dependencies.
 4. Diagnostics feedback, by the route D2 picks.
 5. Symbol-tool steering hooks, after plan 088.
 

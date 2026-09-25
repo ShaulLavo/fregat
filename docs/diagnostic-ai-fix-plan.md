@@ -1,6 +1,6 @@
 # Fix diagnostics with AI
 
-Status: proposed, not implemented. Cover every error and warning in diagnostic hover messages, the keyboard diagnostic popup, and the Problems list.
+Status: the diagnostic hover entry is implemented in lane L7, using the shared draft handoff from lane L8. The Problems list and keyboard diagnostic popup are implemented in L8. Landing requires owner approval for Platform #33/#37 and Editor #34–#36.
 
 Clicking **Fix with AI** opens a chat draft containing the diagnostic and its source context. The user reviews and sends it through the existing agent workflow. Keep native language-server quick fixes alongside it. This action must work even when the server offers no code actions.
 
@@ -68,3 +68,12 @@ Platform also had a separate replay defect. The proxy suppresses duplicate `didO
 The regression test failed before the proxy fix. All 71 proxy tests and the server typecheck passed afterward. The proxy change is local and has not been deployed. It fixes missing diagnostics on reconnect, not TypeScript's declaration-rebuild invalidation.
 
 A durable fix for the declaration issue remains separate. Evaluate resolving workspace imports against source during development or changing Editor's build publication so consumers never observe JavaScript without its declarations. Prove the chosen change against the linked-package reproduction. Do not hide TS7016 or add an ambient declaration that erases the module's types.
+
+## Hover verification
+
+`editor-diagnostic-hover-fix` opens a real TypeScript error, edits the source without saving,
+then invokes its hover action with Enter. The resulting draft carries the exact diagnostic
+and the unsaved source excerpt. Browser evidence on 2026-09-25 is in
+`/work/tmp/fregat-evidence/20260925T192101Z-scenario-editor-diagnostic-hover-fix/`.
+Editor action tests also cover pointer/Space activation, pending and failed actions,
+progressive hover updates, Escape focus and stale diagnostic refusal.
