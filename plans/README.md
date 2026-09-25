@@ -19,6 +19,7 @@ a bare root `bun run verify`.
 
 | Plan                                                                                    | State                                                                    |
 | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| [174 — managed external MCP servers](174-external-mcp-servers.md)                       | **PLACEHOLDER — SPLIT FROM 087 M2/M3; UNSCHEDULED**                      |
 | [173 — two devices opening one workspace](173-two-devices-one-workspace.md)             | **RESEARCH — BEFORE PLAN 143'S PHONE SHELL**                             |
 | [172 — one shared undo/redo stack](172-shared-undo-stack.md)                            | **RESEARCH — LIFE-13 IS THE FIRST CONSUMER**                             |
 | [171 — the chat composer runs on our own editor](171-composer-on-our-editor.md)         | **RESEARCH — AFTER PLAN 111**                                            |
@@ -55,7 +56,7 @@ a bare root `bun run verify`.
 | [126 — T3 Code behavioral alignment](126-t3code-alignment.md)                           | **IN PROGRESS — 26 OF 57 GROUPS DONE (10 VERIFIED), 9 PARTIAL, 22 OPEN** |
 | [071 — syntax highlight retry](071-syntax-highlight-retry.md)                           | **PROPOSED — ROOT GO/NO-GO SCHEDULING**                                  |
 | [080 — Platform and VS Code keybinding modes](080-platform-keybinding-modes.md)         | **PROPOSED — INTERACTION RULES CONFIRMED**                               |
-| [087 — stateless MCP support](087-stateless-mcp.md)                                     | **M0 APPROVED 2026-09-25; M1+ AWAITS THE OWNER**                         |
+| [087 — stateless MCP support](087-stateless-mcp.md)                                     | **M0 APPROVED; M1 SCOPE DECIDED 2026-09-26; M2/M3 MOVED TO 174**         |
 | [088 — native code intelligence](088-native-code-intelligence.md)                       | **PROPOSED — DEPENDS ON 087**                                            |
 | [091 — error and timing helpers](091-error-and-timing-helpers.md)                       | **PARTIAL — IDENTICAL HALVES MERGED (`becdf722`); REST OPEN**            |
 | [092 — path and URI helpers](092-path-and-uri-helpers.md)                               | **PARTIAL — IDENTICAL HALVES MERGED (`becdf722`); REST OPEN**            |
@@ -151,7 +152,7 @@ a bare root `bun run verify`.
   and [async operation ownership](../docs/async-operation-ownership.md) references describe the
   implemented contracts. Plan 099 reuses the retained workspace-edit service and its issued sources.
 
-- Plan 087 delivers managed external MCP connections and the native Platform tool endpoint using
+- Plan 087 delivers the native Platform tool endpoint (external MCP management moved to Plan 174) using
   protocol revision `2026-07-28` and SDK v2, with explicit stateless operation, scoped authentication,
   and real provider integration. Plan 088 depends on its completion and implements the full native
   semantic retrieval, transactional editing, refactoring, project memory, and debugging program.
