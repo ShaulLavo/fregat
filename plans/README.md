@@ -213,7 +213,8 @@ a bare root `bun run verify`.
   accepted; direct remote deployment checks and pairing remain separate, on demand.
 - Plan 071 landed on 2026-09-25 with Editor E050 row 11 and its plan is deleted. A failed
   highlight refresh retries once, then once on a reloaded session, then settles as `error` with one
-  `editor.syntax.highlight_retries_exhausted` warning; the Editor
+  `editor.syntax.highlight_retries_exhausted` warning, and a retry that paints logs
+  `editor.syntax.highlight_recovered`; the Editor
   [first-paint reference](../../Editor/docs/performance/first-paint.md) describes it.
 - Plans 066 and 067 were dropped and deleted. The
   [decision](../PLAN.md#ghostty-appearance-integration-dropped) records the package's no-disk-read boundary.
