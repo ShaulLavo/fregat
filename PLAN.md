@@ -551,7 +551,6 @@ surfaces, the file picker and the site. The owner is taking it one topic at a ti
 
 | Plan                                        | Owns                                                                                                       |
 | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| [159](plans/159-file-picker.md)             | File and folder picker rewrite: columns, real previews, thumbnails, history keys                           |
 | 160 (done, lane L2)                         | Reasoning fold, turn receipts, live tail, model marker, tool details, plan steps, subagents, ultra sparkle |
 | 161 (done, lane L2)                         | Approval lifecycle, stopped turns, streaming holds, folding rules, hostile-state scenarios                 |
 | [162](plans/162-context-and-cost.md)        | Context breakdown, usable-window fullness, session totals, usage-page honesty (after Plan 141)             |

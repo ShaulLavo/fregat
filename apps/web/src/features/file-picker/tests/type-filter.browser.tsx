@@ -66,6 +66,14 @@ test('file type dropdown filters every view, clears hidden selection, and retain
   expect(screen.getByRole('dialog', { name: 'Choose file' })).toBeVisible()
   expect(onOpenChange).not.toHaveBeenCalled()
   await page.getByRole('combobox', { name: 'File type' }).click()
+  const combined = screen.getByRole('option', { name: 'Supported files (.ts, .md)' })
+  const textRange = document.createRange()
+  textRange.selectNodeContents(combined)
+  const popup = combined.closest('[data-slot=select-content]')
+  if (!popup) throw new Error('File type popup is missing')
+  expect(textRange.getBoundingClientRect().right).toBeLessThanOrEqual(
+    popup.getBoundingClientRect().right,
+  )
   await page.screenshot({ path: 'surface-file-picker-type-filter.png' })
   view.unmount()
   view.queryClient.clear()
