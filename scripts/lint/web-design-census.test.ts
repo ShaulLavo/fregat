@@ -650,3 +650,14 @@ test('flags a capped scroller that hands the wheel to the pane behind it', () =>
 
   expect(locations(subject, 'uncontainedScroller')).toEqual(['probe.tsx:1 max-h-48'])
 })
+
+test('a key is drawn by Kbd and nowhere else', () => {
+  const source = "export const Hint = () => <kbd className='font-mono'>⌘K</kbd>"
+
+  expect(values(censusFile('apps/web/src/components/hint.tsx', source), 'kbdSpelling')).toEqual([
+    '<kbd>',
+  ])
+  expect(values(censusFile('packages/ui/src/components/kbd.tsx', source), 'kbdSpelling')).toEqual(
+    [],
+  )
+})

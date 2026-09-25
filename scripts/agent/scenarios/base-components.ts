@@ -6,13 +6,13 @@ import {
   openFixtureWorkspace,
   releaseFixture,
 } from '../fixture-workspace'
-import { openGitPanel, selectors } from '../selectors'
+import { chords, openGitPanel, selectors } from '../selectors'
 import type { Scenario } from './index'
 
 export const baseComponents: Scenario = {
   name: 'base-components',
   description:
-    'Release a discard hold early and nothing happens, hold Space to confirm it, then switch settings scope tabs and sample the indicator mid-glide.',
+    'Release a discard hold early and nothing happens, hold Space to confirm it, then switch settings scope tabs and sample the indicator mid-glide, and show key chips in a tooltip and the palette.',
   async run(page, { step }) {
     // Never the dev workspace: confirming a discard there destroys real work.
     const fixture = await createModifiedFileFixture(
@@ -72,6 +72,19 @@ export const baseComponents: Scenario = {
       const between = frames.filter((value) => value !== before && value !== after)
       ok(between.length > 0, `The indicator must glide, saw ${frames.join(', ')}`)
       await step('scope-indicator-settled')
+
+      await selectors.sidebarSettingsButton(page).hover()
+      const hint = selectors.hint(page, 'Settings')
+      await hint.waitFor()
+      strictEqual(await hint.locator('kbd[data-slot="kbd"]').count(), 1, 'The hint names its key')
+      await step('tooltip-key-chip')
+
+      await page.keyboard.press(chords.commandPalette)
+      await selectors.paletteInput(page).waitFor()
+      await page.keyboard.type('toggle')
+      await page.locator('[data-slot="command-shortcut"] kbd').first().waitFor()
+      await step('palette-key-chips')
+      await page.keyboard.press('Escape')
     } finally {
       await releaseFixture(fixture)
     }

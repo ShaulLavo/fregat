@@ -10,7 +10,7 @@ test('fills label and shortcut for a command item from the registry', () => {
 
   expect(item.kind).toBe('run')
   expect(item).toMatchObject({ key: 'workspace.saveFile', label: 'Save' })
-  expect(item.kind === 'run' && item.trailing).toContain('S')
+  expect(item.kind === 'run' && item.shortcut).toContain('S')
 })
 
 test('an explicit label overrides the registry title', () => {
@@ -46,7 +46,8 @@ test('a command the registry reports unavailable resolves disabled with its exac
 
   expect(group.items[0]).toMatchObject({
     disabled: true,
-    trailing: 'Command is unavailable.',
+    reason: 'Command is unavailable.',
+    shortcut: null,
   })
 })
 
@@ -84,7 +85,7 @@ test('a command-backed radio option inspects and dispatches through the same con
   expect(dispatched).toEqual(['workspace.setDarkTheme'])
 })
 
-test('an unavailable item is disabled and states why in the trailing slot', () => {
+test('an unavailable item is disabled and states why in place of its shortcut', () => {
   const menu = [
     section('split', [
       actionItem({ id: 'splitRight', label: 'Split Right', run: noop, unavailable: 'soon' }),
@@ -92,7 +93,12 @@ test('an unavailable item is disabled and states why in the trailing slot', () =
   ]
   const [group] = resolveMenu(menu, context())
 
-  expect(group.items[0]).toMatchObject({ disabled: true, label: 'Split Right', trailing: 'soon' })
+  expect(group.items[0]).toMatchObject({
+    disabled: true,
+    label: 'Split Right',
+    reason: 'soon',
+    shortcut: null,
+  })
 })
 
 test('a local action return value is not mistaken for a command ticket', () => {

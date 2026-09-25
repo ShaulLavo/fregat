@@ -74,6 +74,7 @@ export const TARGETS = {
   paletteLeaks: { title: 'raw palette colours', limit: 0, listed: true },
   statusDots: { title: 'hand-made status dots', limit: 0, listed: true },
   scrollIdiom: { title: 'hand-styled scrollbars', limit: 0, listed: true },
+  kbdSpelling: { title: 'keys drawn outside Kbd', limit: 0, listed: true },
   uncontainedScroller: {
     title: 'capped scrollers without overscroll-contain',
     limit: 0,
@@ -137,6 +138,7 @@ const SCROLLBAR_CLASS = /(?:^|\s)((?:\S*[[:]\S*scrollbar|no-scrollbar)\S*)/g
 // A capped scroller sits inside something else that scrolls, so it keeps the wheel to itself.
 const CAPPED = /^max-h-/
 const SCROLLS = /^overflow-(?:[xy]-)?(?:auto|scroll)$/
+const KBD_PRIMITIVE = 'packages/ui/src/components/kbd.tsx'
 const HEIGHT_TOKEN = /^h-(?:\d+(?:\.\d+)?|px|\[[^\]]*\]|\([^)]*\))$/
 const TRUNCATION = /^(?:truncate|line-clamp-\d+)$/
 const SOURCE_FILE = /\.tsx?$/
@@ -439,6 +441,7 @@ const RAW_CONTROL_ELEMENTS = new Set(['button', 'input', 'select', 'textarea'])
 function recordElement(census, file, element, lineAt) {
   const hit = { file, line: lineAt(element.start), value: `<${element.name}>` }
   if (RAW_CONTROL_ELEMENTS.has(element.name)) census.hits.rawControls.push(hit)
+  if (element.name === 'kbd' && file !== KBD_PRIMITIVE) census.hits.kbdSpelling.push(hit)
   if (!isControl(element)) return
   const ownChildren = element.children.filter(isVisibleChild)
   const children =
@@ -779,6 +782,7 @@ export function evaluate(census, allowEntries = [], { checkStale = true } = {}) 
     statusDots: gate('statusDots', census.hits.statusDots),
     scrollIdiom: gate('scrollIdiom', census.hits.scrollIdiom),
     uncontainedScroller: gate('uncontainedScroller', census.hits.uncontainedScroller),
+    kbdSpelling: gate('kbdSpelling', census.hits.kbdSpelling),
     truncationRecovery: gate('truncationRecovery', census.hits.truncationRecovery),
   }
   const failures = Object.entries(offenders)

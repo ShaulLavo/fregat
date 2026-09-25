@@ -24,8 +24,10 @@ type ResolvedRunItem = {
   readonly key: string
   readonly label: string
   readonly icon?: Icon
-  /** Shortcut glyphs, or the reason the item is unavailable. */
-  readonly trailing: string | null
+  /** Shortcut glyphs; null when unbound or when the item cannot run. */
+  readonly shortcut: string | null
+  /** Why the item cannot run, shown where the shortcut would be. */
+  readonly reason: string | null
   readonly disabled: boolean
   readonly destructive: boolean
   readonly command: PlatformCommandId | null
@@ -142,7 +144,8 @@ function resolveItem(item: MenuItem, context: MenuResolveContext): ResolvedMenuI
       item.run()
     },
     takesFocus: Boolean(item.takesFocus),
-    trailing: item.unavailable ?? item.shortcut ?? null,
+    shortcut: item.unavailable ? null : (item.shortcut ?? null),
+    reason: item.unavailable ?? null,
   }
 }
 
@@ -163,11 +166,11 @@ function resolveCommandItem(
     label: item.label ?? spec?.title ?? item.command,
     run: () => context.dispatch(item.command),
     takesFocus: false,
-    trailing:
-      item.unavailable ??
-      (inspection.status === 'disabled'
-        ? inspection.reason
-        : commandShortcut(item.command, context.bindings)),
+    shortcut:
+      item.unavailable || inspection.status === 'disabled'
+        ? null
+        : commandShortcut(item.command, context.bindings),
+    reason: item.unavailable ?? (inspection.status === 'disabled' ? inspection.reason : null),
   }
 }
 

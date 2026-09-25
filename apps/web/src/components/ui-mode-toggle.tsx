@@ -1,5 +1,7 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { ToggleIconButton } from '@/components/toggle-icon-button'
+import { Kbd } from '@workspace/ui/components/kbd'
+import { useCommandShortcut } from '@/keymap/hooks/use-command-shortcut'
 import { useNavigation } from '@/hooks/use-navigation'
 import { ChatCircleIcon, SidebarSimpleIcon, SquaresFourIcon } from '@phosphor-icons/react'
 
@@ -14,6 +16,7 @@ export function UiModeToggle() {
   const navigation = useNavigation()
   const uiMode = useEditorWorkspaceState((state) => state.uiMode)
   const chatModePanels = useEditorWorkspaceState((state) => state.chatModePanels)
+  const railShortcut = useCommandShortcut('workspace.toggleSessionRail')
 
   function toggleSessionRail() {
     void navigation.setChatModePanels(
@@ -40,18 +43,23 @@ export function UiModeToggle() {
               </Button>
             }
           />{' '}
-          <TooltipContent>{'Toggle sessions'}</TooltipContent>
+          <TooltipContent>
+            Toggle sessions
+            {railShortcut ? <Kbd>{railShortcut}</Kbd> : null}
+          </TooltipContent>
         </Tooltip>
       ) : null}
       <div className='flex items-center gap-(--density-gap-tight)'>
         <ToggleIconButton
           active={uiMode === 'workbench'}
+          command='workspace.showWorkbenchMode'
           icon={<SquaresFourIcon className='size-(--icon-size-sm)' />}
           label={`${workspaceUiModeLabel('workbench')} mode`}
           onClick={() => void navigation.setMode('workbench')}
         />
         <ToggleIconButton
           active={uiMode === 'chat'}
+          command='workspace.showChatMode'
           icon={<ChatCircleIcon className='size-(--icon-size-sm)' />}
           label={`${workspaceUiModeLabel('chat')} mode`}
           onClick={() => void navigation.setMode('chat')}

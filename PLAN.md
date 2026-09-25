@@ -308,8 +308,7 @@ The completed plan file is deleted; the implementation reference owns the contra
 
 Three independent follow-ups remain proposed:
 Plan 101 recovers the values truncation hides,
-[Plan 102](plans/102-scroll-and-keyboard-affordance.md) settles scrollbars, nested-scroll
-containment and keyboard chips, and
+Plan 102 settled scrollbars, nested-scroll containment and keyboard chips (done 2026-09-25, lane L1), and
 Plan 103 finishes the loading, empty and error states
 `CLAUDE.md` already decided (closed 2026-09-20, implemented and deployed). Each names the decisions that need confirmation before implementation.
 They preserve the implemented design tokens and extend the existing census and browser verifier.

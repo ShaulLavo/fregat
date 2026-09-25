@@ -1,4 +1,5 @@
 import { CommandItem, CommandShortcut } from '@workspace/ui/components/command'
+import { Kbd } from '@workspace/ui/components/kbd'
 import { cn } from '@workspace/ui/lib/utils'
 
 import { PaletteIcon } from '@/features/command-palette/components/icon'
@@ -28,7 +29,11 @@ export function PaletteRow({ disabledReason, item }: PaletteRowProps) {
         description={disabledReason ?? item.description}
         descriptionClassName={cn(disabled && 'text-muted-foreground')}
       />
-      {item.shortcut && <CommandShortcut>{item.shortcut}</CommandShortcut>}
+      {item.shortcut && (
+        <CommandShortcut>
+          <Kbd>{item.shortcut}</Kbd>
+        </CommandShortcut>
+      )}
     </CommandItem>
   )
 }
