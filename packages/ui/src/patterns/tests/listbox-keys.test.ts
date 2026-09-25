@@ -106,4 +106,16 @@ describe('listbox keys', () => {
       expect(typeaheadListboxIndex(items, 0, 'zz')).toBe(-1)
     })
   })
+
+  it('moves by rows and tiles in a grid without wrapping', () => {
+    const grid = { ...base, count: 10, activeIndex: 5, columns: 4 }
+    expect(listboxKeyAction({ ...grid, key: 'ArrowDown' })).toEqual({ kind: 'move', index: 9 })
+    expect(listboxKeyAction({ ...grid, key: 'ArrowUp' })).toEqual({ kind: 'move', index: 1 })
+    expect(listboxKeyAction({ ...grid, key: 'ArrowRight' })).toEqual({ kind: 'move', index: 6 })
+    expect(listboxKeyAction({ ...grid, key: 'ArrowLeft' })).toEqual({ kind: 'move', index: 4 })
+    expect(listboxKeyAction({ ...grid, key: 'ArrowDown', activeIndex: 7 })).toEqual({
+      kind: 'move',
+      index: 7,
+    })
+  })
 })

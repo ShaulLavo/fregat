@@ -13,12 +13,18 @@ export type ListboxKeyInput = {
   pageSize: number
   canCollapse?: boolean
   isCollapsed?: boolean
+  /** Tiles per row in a grid: ↑↓ move a whole row and ←→ one tile. Absent for a plain list. */
+  columns?: number
 }
 
 export function listboxKeyAction(input: ListboxKeyInput): ListboxKeyAction {
   const { key, modifiers, role, count, activeIndex, pageSize, canCollapse, isCollapsed } = input
   if (modifiers && Object.values(modifiers).some(Boolean)) return { kind: 'none' }
   if (count === 0) return { kind: 'none' }
+  if (input.columns !== undefined) {
+    const grid = gridKeyAction(key, count, Math.max(0, activeIndex), input.columns)
+    if (grid) return grid
+  }
   const index = Math.max(0, activeIndex)
   const page = Math.max(1, pageSize)
 
@@ -81,4 +87,20 @@ export function typeaheadListboxIndex(items: readonly ListboxItem[], from: numbe
     if (item.label.toLocaleLowerCase().startsWith(needle)) return index
   }
   return -1
+}
+
+/** Grid moves; anything else falls through to the list's keys. Never wraps past either end. */
+function gridKeyAction(
+  key: string,
+  count: number,
+  index: number,
+  columns: number,
+): ListboxKeyAction | null {
+  const step = Math.max(1, columns)
+  if (key === 'ArrowDown')
+    return { kind: 'move', index: index + step < count ? index + step : index }
+  if (key === 'ArrowUp') return { kind: 'move', index: index - step >= 0 ? index - step : index }
+  if (key === 'ArrowRight') return { kind: 'move', index: Math.min(count - 1, index + 1) }
+  if (key === 'ArrowLeft') return { kind: 'move', index: Math.max(0, index - 1) }
+  return null
 }

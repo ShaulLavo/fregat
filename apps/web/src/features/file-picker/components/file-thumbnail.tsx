@@ -43,7 +43,7 @@ export function FileThumbnail({
       crossOrigin='anonymous'
       decoding='async'
       ref={(image) => {
-        if (image?.complete && image.naturalWidth > 0 && load.src !== src)
+        if (image?.complete && image.naturalWidth > 0 && state === 'loading')
           setLoad({ src, state: 'instant' })
       }}
       src={src}

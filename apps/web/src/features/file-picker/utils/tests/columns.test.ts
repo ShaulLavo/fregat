@@ -43,4 +43,6 @@ test('auto picks columns for folders and a list for files; search and a narrow d
   expect(shownPickerView('columns', true, 900)).toBe('list')
   expect(shownPickerView('columns', false, 300)).toBe('list')
   expect(shownPickerView('columns', false, 900)).toBe('columns')
+  expect(shownPickerView('icons', false, 300)).toBe('icons')
+  expect(shownPickerView('icons', true, 900)).toBe('list')
 })

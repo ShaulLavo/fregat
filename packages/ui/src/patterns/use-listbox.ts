@@ -33,6 +33,8 @@ export type UseListboxOptions<Id extends string> = {
   revealOnMount?: boolean
   containerRef?: RefObject<HTMLDivElement | null>
   onActiveKeyDown?: (event: KeyboardEvent<HTMLDivElement>, id: Id) => void
+  /** Tiles per row, for a grid of options. */
+  columns?: number
 }
 
 export function useListbox<Id extends string>({
@@ -50,6 +52,7 @@ export function useListbox<Id extends string>({
   revealOnMount = true,
   containerRef,
   onActiveKeyDown,
+  columns,
 }: UseListboxOptions<Id>) {
   const internalRef = useRef<HTMLDivElement>(null)
   const ref = containerRef ?? internalRef
@@ -125,6 +128,7 @@ export function useListbox<Id extends string>({
       pageSize: pageSize ?? visibleCount,
       canCollapse: cursor?.hasChildren ?? cursor?.expanded !== undefined,
       isCollapsed: !cursor?.expanded,
+      columns,
     })
     if (action.kind === 'none') return handleTypeahead(event)
     event.preventDefault()

@@ -7,6 +7,7 @@ import {
   ArrowRightIcon,
   ArrowUpIcon,
   ColumnsIcon,
+  GridFourIcon,
   ListIcon,
   EyeIcon,
   EyeSlashIcon,
@@ -32,6 +33,7 @@ import { useFilePickerPathInput } from '@/features/file-picker/hooks/use-path-in
 import { IconTooltip } from '@/features/file-picker/components/icon-tooltip'
 import { FileList } from '@/features/file-picker/components/list'
 import { ColumnsView } from '@/features/file-picker/components/columns-view'
+import { IconsView } from '@/features/file-picker/components/icons-view'
 import {
   initialTrail,
   pickerView,
@@ -570,6 +572,15 @@ export function FilePickerDialog({
                     <ListIcon />
                   </TabsTab>
                 </IconTooltip>
+                <IconTooltip label='Icons'>
+                  <TabsTab
+                    aria-label='Icons'
+                    className='w-(--density-control-height-sm) px-0'
+                    value='icons'
+                  >
+                    <GridFourIcon />
+                  </TabsTab>
+                </IconTooltip>
               </TabsList>
             </Tabs>
             <Separator className='h-4' orientation='vertical' />
@@ -642,6 +653,20 @@ export function FilePickerDialog({
                   }}
                   onOpen={handleEntryDoubleClick}
                   onTrailChange={changeTrail}
+                />
+              ) : view === 'icons' ? (
+                <IconsView
+                  entries={entries}
+                  iconMode={displayedIconMode}
+                  isBusy={listInteractionPending}
+                  listRef={listRef}
+                  mode={mode}
+                  selectedPath={selectedEntry?.path ?? null}
+                  onCommitEntry={commitEntry}
+                  onEntryDoubleClick={handleEntryDoubleClick}
+                  onGoParent={() => {
+                    if (session.canGoUp) navigateTo(pickerParentPath(session.currentPath))
+                  }}
                 />
               ) : (
                 <div className='grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)]'>

@@ -2,7 +2,7 @@
 
 ## Status and authorization
 
-- Status: P1–P4 done 2026-09-25 (lane L1); P5 and P6 next. D1–D4 accepted as recommended on 2026-09-25. The owner wants this ("100000%").
+- Status: P1–P5 done 2026-09-25 (lane L1), with P5's filter chips deferred under D4; P6 next. D1–D4 accepted as recommended on 2026-09-25. The owner wants this ("100000%").
 - Priority: P1 in the UI refresh lane. It runs after Plan 157 (done), whose
   segmented control, scroll fades and typeahead refine it uses.
 - Effort: L. A second view with its own keyboard model, a content preview with two data paths, a
@@ -165,6 +165,12 @@ restyled:
   list already opts in (`typeahead: true` in `list.tsx`), and each column opts in the same way.
 
 ## Phase 5 — Icons grid and filter chips (later)
+
+**Icons grid done 2026-09-25 (lane L1).** `useListbox` takes `columns` (grid moves in
+`listbox-keys.ts`), and `icons-view.tsx` windows a `VirtualList` over rows of `FileTile`s from
+`utils/tiles.ts`, so `VirtualList` itself did not change. **Filter chips not built:** D4's
+recommendation is that they wait until large folders show they are wanted, and nothing has shown
+it yet. The text below is the original plan.
 
 - **Icons view** for image and asset folders:
   - `useListbox` gains a grid mode: a `columns` count, ↑↓ step by `columns`, ←→ by one, no

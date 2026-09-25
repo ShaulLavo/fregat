@@ -33,7 +33,7 @@ async function goTo(page: Page, folder: string) {
 export const filePickerBrowse: Scenario = {
   name: 'file-picker-browse',
   description:
-    'Browse a fixture folder in the web picker: columns three deep with the keyboard, then in the list the code, image and folder previews, the item count, and the ⌘[ ⌘] ⌘↓ chords.',
+    'Browse a fixture folder in the web picker: columns three deep with the keyboard, then in the list the code, image and folder previews, the item count and the ⌘[ ⌘] ⌘↓ chords, then the icons grid.',
   async run(page, { step }) {
     const root = await createTree()
     try {
@@ -78,7 +78,12 @@ export const filePickerBrowse: Scenario = {
       await selectors.pickerRow(page, 'pixel.png').click()
       await page.waitForFunction(() => {
         const image = document.querySelector<HTMLImageElement>('[data-file-preview] img')
-        return image !== null && image.complete && image.naturalWidth > 0
+        return (
+          image !== null &&
+          image.complete &&
+          image.naturalWidth > 0 &&
+          getComputedStyle(image).opacity === '1'
+        )
       })
       await step('image-preview')
 
@@ -93,6 +98,26 @@ export const filePickerBrowse: Scenario = {
       await page.keyboard.press('ControlOrMeta+BracketRight')
       await selectors.pickerRow(page, 'inside.md').waitFor()
       await step('history-chords')
+
+      await page.keyboard.press('ControlOrMeta+BracketLeft')
+      await selectors.pickerView(page, 'Icons').click()
+      await selectors.pickerRow(page, 'pixel.png').waitFor()
+      await page.waitForFunction(() =>
+        [...document.querySelectorAll<HTMLImageElement>('[role="option"] img')].some(
+          (image) =>
+            image.complete && image.naturalWidth > 0 && getComputedStyle(image).opacity === '1',
+        ),
+      )
+      await selectors.pickerList(page).focus()
+      await page.keyboard.press('Home')
+      await page.keyboard.press('ArrowRight')
+      ok(
+        (await selectors.pickerList(page).getAttribute('aria-activedescendant'))?.endsWith(
+          'app.ts',
+        ),
+        '→ moves one tile in the grid',
+      )
+      await step('icons-grid')
       await page.keyboard.press('Escape')
     } finally {
       await rm(root, { recursive: true, force: true })

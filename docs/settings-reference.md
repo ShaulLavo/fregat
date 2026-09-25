@@ -94,12 +94,12 @@ stays safe to read, share and export.
 
 ## Files
 
-| Setting               | Default  | Scope       | What it does                                                                                                  |
-| --------------------- | -------- | ----------- | ------------------------------------------------------------------------------------------------------------- |
-| `files.autoSave`      | `"off"`  | window      | Save edited files automatically, and when.                                                                    |
-| `files.autoSaveDelay` | `1000`   | window      | Milliseconds of quiet before an automatic save, when saving after a delay.                                    |
-| `files.picker.view`   | `"auto"` | application | How the file picker shows a folder. Auto uses columns when choosing a folder and a list when choosing a file. |
-| `files.showHidden`    | `false`  | window      | Show dot-prefixed files and folders in file pickers.                                                          |
+| Setting               | Default  | Scope       | What it does                                                                                                                             |
+| --------------------- | -------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `files.autoSave`      | `"off"`  | window      | Save edited files automatically, and when.                                                                                               |
+| `files.autoSaveDelay` | `1000`   | window      | Milliseconds of quiet before an automatic save, when saving after a delay.                                                               |
+| `files.picker.view`   | `"auto"` | application | How the file picker shows a folder: columns, a list, or icons. Auto uses columns when choosing a folder and a list when choosing a file. |
+| `files.showHidden`    | `false`  | window      | Show dot-prefixed files and folders in file pickers.                                                                                     |
 
 ## Keyboard shortcuts
 

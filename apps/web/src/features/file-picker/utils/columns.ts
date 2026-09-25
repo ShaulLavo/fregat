@@ -5,8 +5,8 @@ import { pickerParentPath, type FilePickerMode } from '@/features/file-picker/ut
 /** The column narrower than this does not fit beside the places and the preview. */
 export const COLUMNS_MIN_WIDTH = 520
 
-export type PickerViewSetting = 'auto' | 'columns' | 'list'
-export type PickerView = 'columns' | 'list'
+export type PickerViewSetting = 'auto' | 'columns' | 'list' | 'icons'
+export type PickerView = 'columns' | 'list' | 'icons'
 
 /** Auto means columns when choosing a folder, where the whole path matters, and a list for files. */
 export function pickerView(setting: PickerViewSetting, mode: FilePickerMode): PickerView {
@@ -18,8 +18,13 @@ export function pickerView(setting: PickerViewSetting, mode: FilePickerMode): Pi
  * Search results are a flat set with no path to show, and a narrow dialog has no room for
  * columns; both fall back to the list.
  */
-export function shownPickerView(view: PickerView, searching: boolean, width: number | null) {
+export function shownPickerView(
+  view: PickerView,
+  searching: boolean,
+  width: number | null,
+): PickerView {
   if (view === 'list' || searching) return 'list'
+  if (view === 'icons') return 'icons'
   return width !== null && width < COLUMNS_MIN_WIDTH ? 'list' : 'columns'
 }
 
