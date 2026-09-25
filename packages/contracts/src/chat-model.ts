@@ -356,6 +356,9 @@ export const sessionRuntimeStateSchema = v.object({
   updatedAt: isoDateTimeSchema,
 })
 
+/** The decider's record of an admitted approval answer, before the agent resolves it. */
+export const APPROVAL_ANSWER_SUBMITTED_KIND = 'approval.answer-submitted'
+
 const orchestrationLatestTurnStateSchema = v.picklist([
   'running',
   'interrupted',

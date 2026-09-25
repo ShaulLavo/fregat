@@ -1,5 +1,6 @@
 import * as v from 'valibot'
 import {
+  APPROVAL_ANSWER_SUBMITTED_KIND,
   eventIdSchema,
   isProviderTurnFailureActivity,
   type OrchestrationCommand,
@@ -7,7 +8,6 @@ import {
   type TurnId,
 } from '@workspace/contracts'
 import {
-  APPROVAL_ANSWER_SUBMITTED_KIND,
   approvalRequestState,
   openApprovalRequests,
   type ApprovalRequestState,

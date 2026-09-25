@@ -100,13 +100,61 @@ test('the derived approval carries the fields the panel renders', () => {
   expect(approval).toEqual({
     options: DEFAULT_APPROVAL_OPTIONS,
     defaultToNo: false,
+    args: [],
     createdAt: at(1),
     detail: 'rm -rf build',
     requestId: 'req-1',
     requestKind: 'command',
     requestType: 'exec_command_approval',
+    submittedDecision: null,
     turnId: 'turn-1',
   })
+})
+
+test('the derived approval carries the arguments the harness asked about', () => {
+  const [approval] = derivePendingApprovals([
+    activity({
+      createdAt: at(1),
+      kind: 'approval.requested',
+      payload: { args: { command: 'ls', cwd: '/work' }, requestId: 'req-1' },
+    }),
+  ])
+
+  expect(approval?.args).toEqual([
+    ['command', 'ls'],
+    ['cwd', '/work'],
+  ])
+})
+
+test('an answer another window submitted marks the approval as sent', () => {
+  const [approval] = derivePendingApprovals([
+    requested('req-1', 1),
+    activity({
+      createdAt: at(2),
+      kind: 'approval.answer-submitted',
+      payload: { decision: 'accept', requestId: 'req-1' },
+      sequence: 2,
+    }),
+  ])
+
+  expect(approval?.submittedDecision).toBe('accept')
+})
+
+test('a settled latest turn closes its approvals, a running one keeps them', () => {
+  const activities = [
+    activity({
+      createdAt: at(1),
+      kind: 'approval.requested',
+      payload: { requestId: 'req-1' },
+      turnId: 'turn-1',
+    }),
+  ]
+
+  expect(derivePendingApprovals(activities, { state: 'running', turnId: 'turn-1' })).toHaveLength(1)
+  expect(derivePendingApprovals(activities, { state: 'interrupted', turnId: 'turn-1' })).toEqual([])
+  expect(derivePendingApprovals(activities, { state: 'completed', turnId: 'turn-2' })).toHaveLength(
+    1,
+  )
 })
 
 test('MCP activities retain their advertised choices and app identity across derivation', () => {

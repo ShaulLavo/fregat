@@ -18,6 +18,8 @@ export const chatMutationKeys = {
     ['chat', 'question-attachments', environmentId, sessionId, requestId] as const,
   rewind: (environmentId: string, sessionId: string | null) =>
     ['chat', 'rewind', environmentId, sessionId] as const,
+  pendingRequestResponse: (environmentId: string, sessionId: string) =>
+    ['chat', 'pending-request-response', environmentId, sessionId] as const,
   message: (id: string) => ['chat', 'message', id] as const,
   providerSignIn: (id: ProviderInstanceId) => ['chat', 'provider-sign-in', id] as const,
   providerCancelSignIn: (id: ProviderInstanceId) =>

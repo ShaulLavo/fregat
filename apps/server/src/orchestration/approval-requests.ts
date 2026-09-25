@@ -1,4 +1,8 @@
-import type { OrchestrationSessionActivity, TurnId } from '@workspace/contracts'
+import {
+  APPROVAL_ANSWER_SUBMITTED_KIND,
+  type OrchestrationSessionActivity,
+  type TurnId,
+} from '@workspace/contracts'
 import { sessionIdentityErrors } from '../provider/structured-errors'
 import { activityRequestId } from './pending-requests'
 
@@ -19,8 +23,6 @@ export type OpenApprovalRequest = {
   readonly requestType: unknown
   readonly turnId: TurnId | null
 }
-
-export const APPROVAL_ANSWER_SUBMITTED_KIND = 'approval.answer-submitted'
 
 export function approvalRequestState(
   activities: readonly OrchestrationSessionActivity[],

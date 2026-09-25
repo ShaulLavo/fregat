@@ -576,6 +576,7 @@ export {
 } from './chat-ids'
 
 export {
+  APPROVAL_ANSWER_SUBMITTED_KIND,
   isoDateTimeSchema,
   chatAttachmentUploadSchema,
   type ChatAttachmentMimeType,

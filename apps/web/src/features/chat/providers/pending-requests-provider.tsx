@@ -1,15 +1,15 @@
-import { useActiveChatProjection } from '@/features/chat/hooks/use-active-projection'
+import { useMutation, useMutationState } from '@tanstack/react-query'
 import type {
   ApprovalRequestId,
-  CommandId,
   OrchestrationSessionActivity,
   SessionApprovalRespondCommand,
   SessionId,
   SessionUserInputRespondCommand,
   SessionUserInputDismissCommand,
 } from '@workspace/contracts'
-import { useState, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 
+import { useActiveChatProjection } from '@/features/chat/hooks/use-active-projection'
 import type { ChatTransport } from '@/features/chat/transport/chat-transport'
 import {
   createApprovalRespondCommand,
@@ -21,24 +21,29 @@ import { scheduleSessionProjectionSyncAfterDispatch } from '@/features/chat/util
 import {
   ChatPendingRequestsContext,
   type ChatPendingRequests,
-  type PendingRequestResponse,
 } from '@/features/chat/providers/pending-requests-context'
 import { selectChatSessionById } from '@workspace/client-core/chat/selectors'
 import { derivePendingApprovals } from '@workspace/client-core/chat/pending-approvals'
 import { derivePendingUserInputs } from '@workspace/client-core/chat/pending-user-input'
-import { pendingRequestError } from '@/features/chat/utils/pending-request-error'
+import { chatMutationKeys } from '@/features/chat/utils/mutation-keys'
+import {
+  pendingRequestResponse,
+  type PendingRequestMutation,
+} from '@/features/chat/utils/pending-request-response'
+import { errorMessage } from '@/lib/error-message'
 
-type RequestResponses = ReadonlyMap<
-  ApprovalRequestId,
-  { commandId: CommandId; response: PendingRequestResponse }
->
-type SetResponses = (update: (current: RequestResponses) => RequestResponses) => void
+type PendingRequestDispatch = {
+  readonly command:
+    | SessionApprovalRespondCommand
+    | SessionUserInputRespondCommand
+    | SessionUserInputDismissCommand
+  readonly context: Record<string, unknown>
+  readonly requestId: ApprovalRequestId
+}
 
 const NO_ACTIVITIES: readonly OrchestrationSessionActivity[] = []
-const NO_RESPONSES: RequestResponses = new Map()
-const IDLE_RESPONSE: PendingRequestResponse = { kind: 'idle' }
 
-/** The activity stream owns open requests; local state tracks their response dispatch. */
+/** The activity stream owns open requests; response mutations own their dispatch. */
 export function ChatPendingRequestsProvider({
   children,
   disabledReason = null,
@@ -53,45 +58,66 @@ export function ChatPendingRequestsProvider({
   const activities = useActiveChatProjection(
     (state) => selectChatSessionById(state, sessionId)?.activities ?? NO_ACTIVITIES,
   )
+  const latestTurn = useActiveChatProjection(
+    (state) => selectChatSessionById(state, sessionId)?.latestTurn ?? null,
+  )
   const retainedQuestions = useActiveChatProjection(
     (state) => selectChatSessionById(state, sessionId)?.pendingMessageQuestions ?? NO_ACTIVITIES,
   )
-  const [responses, setResponses] = useState<RequestResponses>(NO_RESPONSES)
-  // Context value identity: these panels sit beside the composer, so a fresh
-  // object on every composer render would repaint them for nothing.
+  const mutationKey = chatMutationKeys.pendingRequestResponse(transport.environmentId, sessionId)
+  // One scope per session: a second click queues behind the first, and the
+  // server's admission then sees the request already answered.
+  const mutation = useMutation({
+    mutationKey,
+    scope: { id: `pending-request-response:${transport.environmentId}:${sessionId}` },
+    mutationFn: (input: PendingRequestDispatch) => dispatchResponse(input, transport),
+  })
+  const mutations = useMutationState<PendingRequestMutation>({
+    filters: { mutationKey },
+    select: (entry) => {
+      const variables = entry.state.variables as PendingRequestDispatch | undefined
+      return {
+        commandId: variables?.command.commandId,
+        errorMessage: entry.state.error ? errorMessage(entry.state.error) : null,
+        requestId: variables?.requestId,
+        status: entry.state.status,
+      }
+    },
+  })
+  const pendingApprovals = derivePendingApprovals(activities, latestTurn)
+  const respond = (input: PendingRequestDispatch) =>
+    mutation.mutateAsync(input).then(
+      () => true,
+      () => false,
+    )
   const value: ChatPendingRequests = {
     sessionId,
     disabledReason,
-    responseState: (requestId) => {
-      const pending = responses.get(requestId)
-      if (!pending) return IDLE_RESPONSE
-      const failure = pendingRequestError(activities, pending.commandId)
-      return failure ? { kind: 'failed', message: failure } : pending.response
-    },
-    pendingApprovals: derivePendingApprovals(activities),
+    responseState: (requestId) =>
+      pendingRequestResponse({
+        activities,
+        mutations,
+        requestId,
+        submittedElsewhere: pendingApprovals.some(
+          (approval) => approval.requestId === requestId && approval.submittedDecision !== null,
+        ),
+      }),
+    pendingApprovals,
     pendingUserInputs: derivePendingUserInputs(activities, retainedQuestions),
     dismissUserInput: (requestId) =>
-      dispatchPendingRequestResponse({
+      respond({
         command: createUserInputDismissCommand({ requestId, sessionId }),
         context: {},
         requestId,
-        setResponses,
-        transport,
       }),
     respondToApproval: (requestId, decision) =>
-      dispatchPendingRequestResponse({
-        command: createApprovalRespondCommand({
-          decision,
-          requestId,
-          sessionId,
-        }),
+      respond({
+        command: createApprovalRespondCommand({ decision, requestId, sessionId }),
         context: { decision },
         requestId,
-        setResponses,
-        transport,
       }),
     respondToUserInput: (requestId, answers, attachmentsByQuestionId) =>
-      dispatchPendingRequestResponse({
+      respond({
         command: createUserInputRespondCommand({
           answers,
           attachmentsByQuestionId,
@@ -101,62 +127,27 @@ export function ChatPendingRequestsProvider({
         // Count only: an answer can be a credential the provider asked for.
         context: { answerCount: Object.keys(answers).length },
         requestId,
-        setResponses,
-        transport,
       }),
   }
 
   return <ChatPendingRequestsContext value={value}>{children}</ChatPendingRequestsContext>
 }
 
-async function dispatchPendingRequestResponse({
-  command,
-  context,
-  requestId,
-  setResponses,
-  transport,
-}: {
-  command:
-    | SessionApprovalRespondCommand
-    | SessionUserInputRespondCommand
-    | SessionUserInputDismissCommand
-  context: Record<string, unknown>
-  requestId: ApprovalRequestId
-  setResponses: SetResponses
-  transport: ChatTransport
-}): Promise<boolean> {
-  setResponses((current) =>
-    withResponse(current, requestId, command.commandId, { kind: 'submitting' }),
-  )
+async function dispatchResponse(input: PendingRequestDispatch, transport: ChatTransport) {
   const outcome = await dispatchChatCommand({
     action: 'chat.pending_request.respond.summary',
-    command,
-    context: { ...context, requestId },
+    command: input.command,
+    context: { ...input.context, requestId: input.requestId },
     dispatchCommand: transport.dispatchCommand,
     onAccepted: (result) => {
       scheduleSessionProjectionSyncAfterDispatch({
         transport,
-        replayAfterSequence: replayAfterDispatch(command, result),
-        sessionId: command.sessionId,
+        replayAfterSequence: replayAfterDispatch(input.command, result),
+        sessionId: input.command.sessionId,
       })
     },
   })
-  const response: PendingRequestResponse = outcome.ok
-    ? { kind: 'accepted' }
-    : { kind: 'failed', message: outcome.message }
-  setResponses((current) => withResponse(current, requestId, command.commandId, response))
+  if (!outcome.ok) throw outcome.error
 
-  return outcome.ok
-}
-
-function withResponse(
-  current: RequestResponses,
-  requestId: ApprovalRequestId,
-  commandId: CommandId,
-  response: PendingRequestResponse,
-) {
-  const next = new Map(current)
-  next.set(requestId, { commandId, response })
-
-  return next
+  return outcome.result
 }

@@ -19,6 +19,11 @@ export function PendingApprovalActions({
   return (
     <div aria-busy={responding} className='flex flex-col gap-2'>
       <PendingRequestFeedback response={response} />
+      {disabledReason !== null && !responding ? (
+        <p className='text-muted-foreground text-2xs' role='status'>
+          {disabledReason} · It may already have been answered in another window.
+        </p>
+      ) : null}
       <div className='flex flex-wrap items-center justify-end gap-1.5'>
         {options.map((option) => (
           <Button

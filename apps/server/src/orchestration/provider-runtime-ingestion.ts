@@ -946,6 +946,7 @@ function requestOpenedActivity(event: Extract<ProviderRuntimeEvent, { type: 'req
       : approvalRequestSummary(requestKind)
   return [
     baseActivity(event, 'approval', 'approval.requested', summary, {
+      args: approvalArgs(event.payload.args),
       options: event.payload.options,
       defaultToNo: event.payload.defaultToNo,
       detail: event.payload.detail,
@@ -954,6 +955,29 @@ function requestOpenedActivity(event: Extract<ProviderRuntimeEvent, { type: 'req
       requestType: event.payload.requestType,
     }),
   ]
+}
+
+const APPROVAL_ARG_KEYS = ['command', 'cwd', 'path', 'file_path', 'url', 'pattern', 'reason']
+const APPROVAL_ARG_MAX_LENGTH = 500
+
+/** The few arguments a person decides on, as text; file contents and ids stay out. */
+function approvalArgs(args: unknown) {
+  if (!isPlainRecord(args)) return undefined
+  const entries = APPROVAL_ARG_KEYS.flatMap((key) => {
+    const text = approvalArgText(args[key])
+    return text ? [[key, text.slice(0, APPROVAL_ARG_MAX_LENGTH)] as const] : []
+  })
+
+  return entries.length > 0 ? Object.fromEntries(entries) : undefined
+}
+
+function approvalArgText(value: unknown) {
+  if (typeof value === 'string') return value.trim()
+  if (Array.isArray(value) && value.every((part) => typeof part === 'string')) {
+    return value.join(' ').trim()
+  }
+
+  return null
 }
 
 function requestResolvedActivity(

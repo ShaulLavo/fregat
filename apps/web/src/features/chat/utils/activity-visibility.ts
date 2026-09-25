@@ -1,4 +1,7 @@
-import type { OrchestrationSessionActivity } from '@workspace/contracts'
+import {
+  APPROVAL_ANSWER_SUBMITTED_KIND,
+  type OrchestrationSessionActivity,
+} from '@workspace/contracts'
 
 import { chatActivityHasFailure } from '@/features/chat/utils/activity-presentation'
 import type { ChatWorkLogEntry } from '@/features/chat/utils/work-log'
@@ -6,6 +9,7 @@ import { isWorkLogToolEntry } from '@/features/chat/utils/tool-label'
 import { isWorkLogFailure } from '@/features/chat/utils/work-row'
 
 const QUIET_ACTIVITY_KINDS = new Set([
+  APPROVAL_ANSWER_SUBMITTED_KIND,
   'account.updated',
   'account.rate-limits.updated',
   'auth.status',
