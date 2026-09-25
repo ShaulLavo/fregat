@@ -1,5 +1,4 @@
-import { createHighlighterCore, type HighlighterCore, type TokensResult } from 'shiki/core'
-import { createJavaScriptRegexEngine } from 'shiki/engine/javascript'
+import type { HighlighterCore, TokensResult } from 'shiki/core'
 
 import { CODE_THEME_PREVIEW_SAMPLE } from '@/lib/code-theme/utils/preview'
 import { loadPreviewRegistration } from '@/lib/code-theme/utils/preview-registration'
@@ -36,13 +35,22 @@ async function highlightPreview(themeId: string): Promise<TokensResult> {
 }
 
 function previewHighlighter(): Promise<HighlighterCore> {
-  highlighter ??= createHighlighterCore({
-    engine: createJavaScriptRegexEngine({ forgiving: true }),
-    langs: [import('@shikijs/langs/typescript')],
-    themes: [],
-  }).catch((error: unknown) => {
+  highlighter ??= createPreviewHighlighter().catch((error: unknown) => {
     highlighter = undefined
     throw error
   })
   return highlighter
+}
+
+// Shiki loads with the first preview; a static import would put it in the entry chunk.
+async function createPreviewHighlighter(): Promise<HighlighterCore> {
+  const [{ createHighlighterCore }, { createJavaScriptRegexEngine }] = await Promise.all([
+    import('shiki/core'),
+    import('shiki/engine/javascript'),
+  ])
+  return createHighlighterCore({
+    engine: createJavaScriptRegexEngine({ forgiving: true }),
+    langs: [import('@shikijs/langs/typescript')],
+    themes: [],
+  })
 }

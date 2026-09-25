@@ -74,7 +74,9 @@ export default defineConfig(({ command, isPreview, mode }) => {
       alias: {
         '@': path.resolve(__dirname, './src'),
       },
-      dedupe: ['react', 'react-dom'],
+      // evlog resolves as two peer variants of one version (the root pins an older vite), and both
+      // copies ship; one is enough because its config lives on globalThis.
+      dedupe: ['react', 'react-dom', 'evlog'],
     },
     server: {
       fs: {

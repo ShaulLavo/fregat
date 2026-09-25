@@ -227,6 +227,14 @@ Phase 2:
   10 s for as long as the tab stayed open (163 `/fs/events` + 119 client `fs.read` warns on
   2026-09-25).
 
+- The outside-workspace producer is fixed (`200a59d5`): chat links map through the server root, terminal
+  links open the path they statted, and a 4xx on the files stream is final for that file set.
+  Language servers are disposed before the first await at shutdown (`6d80564b`), because systemd
+  signals them with the server and their exits were logged as crashes.
+- Open leads: `/fs/events` answers HTTP 503 while its body carries the real 403, so SSE routes that
+  fail before their first event lose `why`/`fix`; `clientErrors.WATCH_FAILED` names its message
+  parameter `status`, an evlog override key, so its message never shows the status.
+
 Phase 3:
 
 - Steps 1–4: D1's rules are in `AGENTS.md`; `bun run logs:census`

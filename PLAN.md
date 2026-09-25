@@ -384,7 +384,7 @@ Execution order is strict:
    the terminal and settings load behind boundaries, first-load JS 1,722,976 → 1,610,904 gz. The
    written boot definition and the Phase 4 gate remain.
 
-5. [Plan 129](plans/129-dependency-shape.md) owns the bytes 109 measured and handed off because no
+5. Plan 129 (done) owned the bytes 109 measured and handed off because no
    loading boundary reaches them: the Editor's three inline worker blobs, 579 KB gz and 25.5% of
    first-load JavaScript, and the `thin` and `light` Phosphor weights no call site draws. It does
    not depend on 108 or 109 and is the largest available cut, so it may run first; 109's gate
@@ -404,7 +404,9 @@ Replacing React with a smaller reimplementation was considered and rejected: Rea
 first load, so it is revisited only once it is the largest remaining line item.
 
 Plans 106 and 107 are done and deleted. What remains of the lane is 108 Phase 1, 109's gate
-(Phase 4) and its Phase 1 doc, and 129 Phase 3 (Q2–Q4).
+(Phase 4) and its Phase 1 doc. Plan 129 is done (lane L4): Q2 moved Shiki behind its lazy
+promise (first load −45,874 gz), Q3 and Q4 were measured and dropped, and a duplicated evlog is
+deduped in `vite.config.ts`.
 
 ## React compiler and pane lifetime lane
 
@@ -517,7 +519,7 @@ of the plans, both logs and the service journal named what stands in the way. Th
 | ---------------------------------------------- | ----------------------------------------------------------------------------------------------- |
 | 146 (done)                                     | Dev and prod stop sharing `~/.platform`; each `agent:browser` run gets its own server and state |
 | [147](plans/147-log-hygiene-and-noise-gate.md) | Producer fixes, level rules, the reaper give-up, ACK timeout vs overflow, a `logs:census` gate  |
-| [148](plans/148-update-available.md)           | `deploy --server` stages; the app shows "Update available" and restarts on a click              |
+| 148 (done)                                     | `deploy --server` stages; the app shows "Update available" and restarts on a click              |
 | [149](plans/149-terminal-host.md)              | A PTY host that survives server restarts                                                        |
 | [150](plans/150-remote-server-version.md)      | Remote servers are checked for protocol and updated                                             |
 | [151](plans/151-remote-server-releases.md)     | Production ships its built server release to remote machines; Update/Install server button      |
@@ -528,7 +530,8 @@ Suggested order:
 1. ~~Plan 146~~ — implemented and deployed 2026-09-25. Prod keeps `~/.platform`, dev uses
    `/work/platform-dev/home`, and every `agent:browser` run has its own throwaway server.
 2. Plan 147, after 146 removes the pollution it would otherwise re-level.
-3. Plan 148, so Platform can deploy itself without killing the deploying turn.
+3. ~~Plan 148~~ — implemented 2026-09-25 (lane L4, PR #32). A `--server` deploy stages; the app
+   restarts on a click.
 4. Plan 149, so terminals and dev servers survive the same restart.
 5. Plan 150 Phase 1, then Plan 151, whenever the Mac is needed. Plan 152 after 151. `129fdea6`
    already keeps the catalog why and fix on stored machine errors; the protocol check is left.

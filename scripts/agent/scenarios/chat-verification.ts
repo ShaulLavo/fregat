@@ -35,14 +35,13 @@ export async function dispatch(page: Page, base: string, command: Record<string,
 
 /** Switches the page to chat mode and returns the orchestration HTTP base its socket connected to. */
 export async function openChat(page: Page) {
+  // The socket URL carries `?instance=`, so match on the path alone.
   const connected = page.waitForEvent('websocket', {
-    predicate: (socket) => socket.url().endsWith('/orchestration/rpc'),
+    predicate: (socket) => new URL(socket.url()).pathname.endsWith('/orchestration/rpc'),
   })
   await page.goto(page.url().replace(/\/workbench(?:\?.*)?$/, '/chat'))
-  return (await connected)
-    .url()
-    .replace(/^ws/, 'http')
-    .replace(/\/rpc$/, '')
+  const socket = new URL((await connected).url())
+  return `${socket.origin.replace(/^ws/, 'http')}${socket.pathname.replace(/\/rpc$/, '')}`
 }
 
 /**
@@ -84,13 +83,9 @@ export async function createSession(
 export function collectOrchestrationBases(page: Page) {
   const bases = new Set<string>()
   page.on('websocket', (socket) => {
-    if (socket.url().endsWith('/orchestration/rpc'))
-      bases.add(
-        socket
-          .url()
-          .replace(/^ws/, 'http')
-          .replace(/\/rpc$/, ''),
-      )
+    const url = new URL(socket.url())
+    if (!url.pathname.endsWith('/orchestration/rpc')) return
+    bases.add(`${url.origin.replace(/^ws/, 'http')}${url.pathname.replace(/\/rpc$/, '')}`)
   })
   return bases
 }
