@@ -11,7 +11,7 @@ import { useCommandFocus } from '@/commands/hooks/use-command-focus'
 import type { FocusToken } from '@/commands/state/focus'
 import { paletteModeRows } from '@/commands/utils/palette-mode'
 import { setThemePreference } from '@/commands/utils/theme'
-import { readRecentCommands } from '@/storage/recents'
+import { recentCommands } from '@/storage/recent-commands-policy'
 import type { FileStorage } from '@/storage/files'
 import { Dialog } from '@/components/dialog'
 import { Prompt } from '@/components/prompt'
@@ -69,7 +69,7 @@ export function CommandPalette({
   const paletteInput = {
     captured,
     bindings: commands.bindings,
-    recents: readRecentCommands(storage),
+    recents: recentCommands.read(storage),
     colorMode,
     palette,
     writable,

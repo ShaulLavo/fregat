@@ -1,6 +1,6 @@
 import { act } from 'react'
 import { rememberedWorkbench } from '@/workbench/utils/location'
-import { readRecentCommands } from '@/storage/recents'
+import { recentCommands } from '@/storage/recent-commands-policy'
 import { test, expect } from '../../../test/socket-fixtures'
 import { renderAgentNavigation } from '../../../test/factories/agent-navigation'
 import { runPaletteCommand } from '../../../test/actions'
@@ -27,7 +27,7 @@ for (const projectRoot of ['', 'nested/project']) {
         .toContain('inside-project.txt')
       if (rootPath) expect(frame.captureCharFrame()).not.toContain('outside-project.txt')
       expect(rememberedWorkbench(ready.storage)).toMatchObject({ rootPath, pane: 'files' })
-      expect(readRecentCommands(ready.storage)[0]).toBe('workspace.openWorkbench')
+      expect(recentCommands.read(ready.storage)[0]).toBe('workspace.openWorkbench')
       const stats = transport.requests
         .map((request) => new URL(request.url))
         .filter((url) => url.pathname === '/fs/stat')
@@ -53,12 +53,12 @@ for (const delayedPath of ['/health', '/fs/stat']) {
       await runPaletteCommand(frame, 'workspace.openWorkbench')
       await gate.reached
       await runPaletteCommand(frame, 'workspace.revealChat')
-      await expect.poll(() => readRecentCommands(ready.storage)[0]).toBe('workspace.revealChat')
+      await expect.poll(() => recentCommands.read(ready.storage)[0]).toBe('workspace.revealChat')
       await expect.poll(() => frame.renderer.currentFocusedRenderable?.id).toBe('agent-composer')
       await act(async () => {
         gate.release()
       })
-      await expect.poll(() => readRecentCommands(ready.storage)[0]).toBe('workspace.openWorkbench')
+      await expect.poll(() => recentCommands.read(ready.storage)[0]).toBe('workspace.openWorkbench')
       await act(async () => {
         await frame.renderOnce()
       })

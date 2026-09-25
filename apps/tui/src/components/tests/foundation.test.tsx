@@ -3,7 +3,7 @@ import { act } from 'react'
 import { createEnvironmentClient } from '@workspace/client-core/transport/client'
 
 import { Application } from '@/components/application'
-import { readRecentCommands } from '@/storage/recents'
+import { recentCommands } from '@/storage/recent-commands-policy'
 import { createControlledInProcessTransport } from '../../../test/client'
 import { createTestSettingsSession } from '../../../test/factories/session'
 import { test, expect } from '../../../test/fixtures'
@@ -40,7 +40,7 @@ test('palette commands restore input focus and persist successful command histor
     const state = session.getSnapshot()
     expect(state.kind).toBe('ready')
     if (state.kind !== 'ready') return
-    expect(readRecentCommands(state.storage)).toContain('workspace.showSettings')
+    expect(recentCommands.read(state.storage)).toContain('workspace.showSettings')
     await state.storage.flush()
   } finally {
     session.dispose()

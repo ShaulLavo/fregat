@@ -280,6 +280,11 @@ Reconcile before merging:
 
 ## Move the recent-commands ledger
 
+Implemented with explicit host policies, 2026-09-25. Web retains 30 entries and boosts recent
+commands while searching. TUI retains 50 and uses recency only for an empty search. Existing
+storage encodings stay unchanged; TUI updates and corrupt-read cleanup remain conditional SQLite
+operations. Owner policy choice remains open; extraction does not depend on it.
+
 Sequence after [Plan 090 regression record](../docs/duplicate-defect-regressions.md): its corrupt-storage fix lands in
 `apps/tui/src/storage/recents.ts`, the file this item then relocates.
 

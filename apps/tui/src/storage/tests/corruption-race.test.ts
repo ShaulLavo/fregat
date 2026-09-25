@@ -6,7 +6,7 @@ import { createAgentRailState } from '@/agent-rail/state/rail'
 import { readInbox } from '@/agent-stage/state/inbox'
 import type { SettingsSession } from '@/connection/state/session'
 import { openFileStorage, type FileStorage } from '@/storage/files'
-import { readRecentCommands, RECENT_COMMANDS } from '@/storage/recents'
+import { recentCommands, RECENT_COMMANDS } from '@/storage/recent-commands-policy'
 import { readTerminalTabs } from '@/terminal/utils/tabs'
 import { openTestChat } from '../../../test/factories/chat'
 import { interleaveStorageRead } from '../../../test/factories/storage-read'
@@ -83,7 +83,7 @@ test.for(readers)(
 )
 
 function readState(kind: Reader, storage: FileStorage, session: SettingsSession) {
-  if (kind === 'recents') return readRecentCommands(storage)
+  if (kind === 'recents') return recentCommands.read(storage)
   if (kind === 'inbox') return readInbox(storage, worktreeId)
   if (kind === 'tabs') return readTerminalTabs(storage, terminalRoot)
   const ready = session.getSnapshot()

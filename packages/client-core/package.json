@@ -115,7 +115,8 @@
     "./chat/attachments": "./src/chat/attachments.ts",
     "./files/search-replace": "./src/files/search-replace.ts",
     "./transport/socket": "./src/transport/socket.ts",
-    "./settings/operations": "./src/settings/operations.ts"
+    "./settings/operations": "./src/settings/operations.ts",
+    "./commands/recent-commands": "./src/commands/recent-commands.ts"
   },
   "scripts": {
     "build": "tsgo --noEmit",

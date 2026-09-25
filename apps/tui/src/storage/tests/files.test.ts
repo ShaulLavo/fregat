@@ -4,7 +4,7 @@ import * as v from 'valibot'
 import { Database } from 'bun:sqlite'
 
 import { openFileStorage, type FileStorage } from '@/storage/files'
-import { readRecentCommands, recordRecentCommand, RECENT_COMMANDS } from '@/storage/recents'
+import { recentCommands, RECENT_COMMANDS } from '@/storage/recent-commands-policy'
 import { createTestSettingsSession } from '../../../test/factories/session'
 import { test, expect } from '../../../test/fixtures'
 import { startStorageWriter } from '../../../test/factories/storage-writer'
@@ -67,20 +67,20 @@ test('two live instances preserve separate keys and both command histories', asy
   const first = await openFileStorage(directory, firstEnvironment)
   const second = await openFileStorage(directory, firstEnvironment)
   first.setItem('file-picker-directory', 'first/project')
-  recordRecentCommand(first, 'first.command')
+  recentCommands.record(first, 'first.command')
   await first.flush()
   second.setItem('another-key', 'second value')
-  recordRecentCommand(second, 'second.command')
+  recentCommands.record(second, 'second.command')
   await second.flush()
 
   const reopened = await openFileStorage(directory, firstEnvironment)
   expect(reopened.getItem('file-picker-directory')).toBe('first/project')
   expect(reopened.getItem('another-key')).toBe('second value')
-  expect(readRecentCommands(reopened)).toEqual(['second.command', 'first.command'])
+  expect(recentCommands.read(reopened)).toEqual(['second.command', 'first.command'])
   expect(first.getItem('another-key')).toBe('second value')
   first.removeItem('another-key')
   await first.flush()
-  recordRecentCommand(second, 'third.command')
+  recentCommands.record(second, 'third.command')
   await second.flush()
   expect(second.getItem('another-key')).toBeNull()
   first.close()
@@ -114,7 +114,7 @@ test('simultaneous processes preserve every key and atomically merge recent comm
 })
 
 function expectConcurrentValues(storage: FileStorage) {
-  const recents = readRecentCommands(storage)
+  const recents = recentCommands.read(storage)
   expect(recents).toHaveLength(30)
   for (let index = 0; index < 15; index += 1) {
     expect(storage.getItem(`first.${index}`)).toBe(String(index))
@@ -132,9 +132,9 @@ test('environment caches keep values and command history separate on disk', asyn
   second.setItem('file-picker-directory', 'second/project')
   first.setItem('discarded', 'temporary')
   first.removeItem('discarded')
-  for (let index = 0; index < 55; index += 1) recordRecentCommand(first, `command.${index}`)
-  recordRecentCommand(first, 'command.20')
-  recordRecentCommand(second, 'second.command')
+  for (let index = 0; index < 55; index += 1) recentCommands.record(first, `command.${index}`)
+  recentCommands.record(first, 'command.20')
+  recentCommands.record(second, 'second.command')
   await Promise.all([first.flush(), second.flush()])
 
   const reopenedFirst = await openFileStorage(directory, firstEnvironment)
@@ -142,14 +142,14 @@ test('environment caches keep values and command history separate on disk', asyn
   expect(reopenedFirst.getItem('file-picker-directory')).toBe('first/project')
   expect(reopenedSecond.getItem('file-picker-directory')).toBe('second/project')
   expect(reopenedFirst.getItem('discarded')).toBeNull()
-  expect(readRecentCommands(reopenedFirst)).toHaveLength(50)
-  expect(readRecentCommands(reopenedFirst).slice(0, 3)).toEqual([
+  expect(recentCommands.read(reopenedFirst)).toHaveLength(50)
+  expect(recentCommands.read(reopenedFirst).slice(0, 3)).toEqual([
     'command.20',
     'command.54',
     'command.53',
   ])
-  expect(readRecentCommands(reopenedFirst).filter((id) => id === 'command.20')).toHaveLength(1)
-  expect(readRecentCommands(reopenedSecond)).toEqual(['second.command'])
+  expect(recentCommands.read(reopenedFirst).filter((id) => id === 'command.20')).toHaveLength(1)
+  expect(recentCommands.read(reopenedSecond)).toEqual(['second.command'])
   expect((await stat(`${directory}/${firstEnvironment}.sqlite`)).mode & 0o777).toBe(0o600)
   first.close()
   second.close()
@@ -176,7 +176,7 @@ test.for(['{', '[3]', ''])(
   async (value, { server, storageWarnings }) => {
     const directory = `${server.root}/cache`
     const storage = await openFileStorage(directory, firstEnvironment)
-    recordRecentCommand(storage, 'original.command')
+    recentCommands.record(storage, 'original.command')
     storage.setItem('unrelated', 'preserve this')
     storage.close()
     const database = new Database(`${directory}/${firstEnvironment}.sqlite`)
@@ -184,10 +184,10 @@ test.for(['{', '[3]', ''])(
     database.close()
     const reopened = await openFileStorage(directory, firstEnvironment)
     try {
-      expect(readRecentCommands(reopened)).toEqual([])
+      expect(recentCommands.read(reopened)).toEqual([])
       expect(reopened.getItem(RECENT_COMMANDS)).toBeNull()
       expect(reopened.getItem('unrelated')).toBe('preserve this')
-      expect(readRecentCommands(reopened)).toEqual([])
+      expect(recentCommands.read(reopened)).toEqual([])
       expect(storageWarnings).toMatchObject([{ level: 'warn', storageKey: RECENT_COMMANDS }])
     } finally {
       reopened.close()
@@ -204,8 +204,8 @@ test.for(['{', '[3]', ''])(
     database.query('INSERT INTO state (key, value) VALUES (?, ?)').run(RECENT_COMMANDS, value)
     database.close()
     try {
-      recordRecentCommand(storage, 'new.command')
-      expect(readRecentCommands(storage)).toEqual(['new.command'])
+      recentCommands.record(storage, 'new.command')
+      expect(recentCommands.read(storage)).toEqual(['new.command'])
       expect(storageWarnings).toMatchObject([{ level: 'warn', storageKey: RECENT_COMMANDS }])
     } finally {
       storage.close()
@@ -217,7 +217,7 @@ test('absent recent commands return an empty history without warning', ({
   storage,
   storageWarnings,
 }) => {
-  expect(readRecentCommands(storage)).toEqual([])
+  expect(recentCommands.read(storage)).toEqual([])
   expect(storageWarnings).toEqual([])
 })
 
@@ -225,12 +225,12 @@ test('invalid recent-command writes are rejected before they can poison a runnin
   server,
 }) => {
   const storage = await openFileStorage(`${server.root}/cache`, firstEnvironment)
-  recordRecentCommand(storage, 'workspace.showSettings')
+  recentCommands.record(storage, 'workspace.showSettings')
   for (const invalid of ['{', '[3]', '']) {
     expect(() => storage.setItem(RECENT_COMMANDS, invalid)).toThrow()
     expect(() => storage.updateItem(RECENT_COMMANDS, () => invalid)).toThrow()
   }
-  expect(readRecentCommands(storage)).toEqual(['workspace.showSettings'])
+  expect(recentCommands.read(storage)).toEqual(['workspace.showSettings'])
   await storage.flush()
   storage.close()
 })

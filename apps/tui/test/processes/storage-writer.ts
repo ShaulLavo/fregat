@@ -2,7 +2,7 @@ import { environmentIdSchema } from '@workspace/contracts'
 import * as v from 'valibot'
 
 import { openFileStorage } from '@/storage/files'
-import { recordRecentCommand } from '@/storage/recents'
+import { recentCommands } from '@/storage/recent-commands-policy'
 
 const [directory, id, prefix] = process.argv.slice(2)
 const storage = await openFileStorage(directory, v.parse(environmentIdSchema, id))
@@ -12,7 +12,7 @@ try {
   await start
   for (let index = 0; index < 15; index += 1) {
     storage.setItem(`${prefix}.${index}`, String(index))
-    recordRecentCommand(storage, `${prefix}.command.${index}`)
+    recentCommands.record(storage, `${prefix}.command.${index}`)
   }
   await storage.flush()
 } finally {
