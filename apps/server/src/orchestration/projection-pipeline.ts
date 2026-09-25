@@ -764,7 +764,7 @@ export class OrchestrationProjectionPipeline {
     const completedAt = settlesTurn
       ? (turn?.completedAt ?? event.payload.updatedAt)
       : (turn?.completedAt ?? null)
-    const startedAt = turn?.startedAt ?? event.payload.createdAt
+    const startedAt = turn?.startedAt ?? turn?.requestedAt ?? event.payload.createdAt
     const requestedAt = turn?.requestedAt ?? event.payload.createdAt
 
     this.upsertAssistantTurn(event, { completedAt, requestedAt, startedAt, state })
@@ -1035,6 +1035,28 @@ export class OrchestrationProjectionPipeline {
       .values({ ...runtime, sessionId: event.payload.sessionId })
       .onConflictDoUpdate({ target: projectionSessionRuntime.sessionId, set: runtime })
       .run()
+    this.recordTurnStart(event)
+  }
+
+  private recordTurnStart(event: Extract<OrchestrationEvent, { type: 'session.runtime-set' }>) {
+    const { sessionId, runtime } = event.payload
+    if (!runtime.activeTurnId || (runtime.status !== 'running' && runtime.status !== 'waiting'))
+      return
+
+    const result = this.database
+      .update(projectionTurns)
+      .set({ startedAt: runtime.updatedAt })
+      .where(
+        and(
+          eq(projectionTurns.sessionId, sessionId),
+          eq(projectionTurns.turnId, runtime.activeTurnId),
+          eq(projectionTurns.state, 'running'),
+          isNull(projectionTurns.startedAt),
+        ),
+      )
+      .returning({ turnId: projectionTurns.turnId })
+      .get()
+    if (result) this.refreshLatestTurn(sessionId, runtime.updatedAt)
   }
 
   /**

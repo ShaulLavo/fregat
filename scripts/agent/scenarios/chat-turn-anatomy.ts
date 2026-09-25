@@ -3,7 +3,7 @@ import type { Locator, Page } from 'playwright'
 
 import type { Scenario } from './index'
 import { selectors } from '../selectors'
-import { dispatch, openChat, readShell } from './chat-verification'
+import { dispatch, openChat, readSessionDetail, readShell } from './chat-verification'
 import { sendPrompt, settingsSnapshot, writeSettings } from './native-provider-verification'
 
 const STEP_DELAY_MS = 1_200
@@ -26,9 +26,10 @@ export const chatTurnAnatomy: Scenario = {
   async run(page, { step }) {
     const evidence: Evidence = { liveRowHeights: [], reducedMotionCell: null, ultrathinkRanges: 0 }
     evidenceByPage.set(page, evidence)
-    const { base, cleanup } = await createScriptedSession(page, await openChat(page))
+    const { base, cleanup, sessionId } = await createScriptedSession(page, await openChat(page))
     try {
       await firstTurn(page, step, evidence)
+      await verifyTurnDuration(page, `${base}/orchestration`, sessionId)
       await effortSparkle(page, step, evidence)
       await secondTurn(page, step)
       await thirdTurn(page, step)
@@ -85,6 +86,17 @@ async function firstTurn(page: Page, step: Step, evidence: Evidence) {
   await page.waitForTimeout(500)
   await step('agent-tree')
   await page.keyboard.press('Escape')
+}
+
+async function verifyTurnDuration(page: Page, orchestration: string, sessionId: string) {
+  const session = await readSessionDetail(page, orchestration, sessionId)
+  const turn = session.latestTurn
+  ok(turn?.startedAt && turn.completedAt, 'The settled turn has a start and end')
+  const elapsed = Date.parse(turn.completedAt) - Date.parse(turn.startedAt)
+  ok(elapsed >= STEP_DELAY_MS * 3, `The duration includes the scripted work: ${elapsed}ms`)
+  const fold = selectors.completedWorkGroup(page).first()
+  await fold.waitFor()
+  ok(!/Worked for \d+ms/.test(await fold.innerText()), 'The fold reports seconds of work')
 }
 
 async function effortSparkle(page: Page, step: Step, evidence: Evidence) {
@@ -276,7 +288,7 @@ async function createScriptedSession(page: Page, orchestration: string) {
         : { kind: 'set', key: 'providers.instances', value: remaining },
     ])
   }
-  return { base, cleanup }
+  return { base, cleanup, sessionId }
 }
 
 async function firstWorktree(page: Page, base: string) {

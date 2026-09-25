@@ -40,7 +40,8 @@ describe('projection latest turn snapshots', () => {
       endReason: null,
       requestedAt: turn?.requestedAt,
       sourceProposedPlan,
-      startedAt: assistantStartedAt,
+      // This fixture has no runtime start event, so the request starts the turn.
+      startedAt: turn?.requestedAt,
       state: 'completed',
       providerStartState: 'settled',
       providerStartGeneration: 1,
