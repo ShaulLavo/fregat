@@ -10,6 +10,7 @@ import {
   type NodeGroup,
 } from './blocks'
 import { healMarkdown } from './heal'
+import { holdAmbiguousTail } from './hold'
 import { countLines, shiftPositions } from './positions'
 import { createRemarkProcessor, type RemarkProcessor } from './processor'
 
@@ -18,7 +19,7 @@ export type MarkdownSessionOptions = {
 }
 
 export type MarkdownUpdateOptions = {
-  /** Close unfinished syntax at the tail. On for a stream, off for a settled document. */
+  /** Hold or close unfinished syntax at the tail. On for a stream, off for a settled document. */
   readonly heal: boolean
 }
 
@@ -134,14 +135,15 @@ function wholeDocument(processor: RemarkProcessor, text: string, heal: boolean):
 }
 
 /**
- * Re-parses the tail with unfinished syntax closed. Text that stops inside a
- * fence is left alone: the only place a closer could go is inside the code.
+ * Re-parses the tail with an ambiguous trailing construct held back and
+ * unfinished syntax closed. Text that stops inside a fence is left alone: the
+ * only place a closer could go is inside the code.
  */
 function healedTail(processor: RemarkProcessor, tail: Tail, line: number): Tail {
   if (endsInUnclosedFence(tail.nodes, tail.fileValue)) return tail
 
   const source = tail.fileValue.slice(tail.start)
-  const healed = healMarkdown(source)
+  const healed = healMarkdown(holdAmbiguousTail(source, tail.nodes))
   if (healed === source) return tail
 
   const fileValue = tail.fileValue.slice(0, tail.start) + healed
