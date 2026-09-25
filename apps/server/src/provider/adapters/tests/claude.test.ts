@@ -27,6 +27,7 @@ import {
 import * as v from 'valibot'
 import { writeAttachmentFromDataUrl } from '../../../attachments/store'
 import { ClaudeProviderAdapter } from '../claude'
+import type { ClaudeHistoryRunner } from '../../claude-discovery'
 import { ClaudeAuthRunner } from '../utils/claude-auth'
 import { resolveClaudeExecutable } from '../utils/claude-executable'
 import {
@@ -233,6 +234,37 @@ afterAll(async () => {
 })
 
 describe('ClaudeProviderAdapter', () => {
+  it('pins the native fork entry before the source grows, including a fork of its latest turn', async () => {
+    let prompts = 2
+    const harness = claudeHarness(true, async () =>
+      Array.from({ length: prompts }, (_, index) => [
+        { role: 'user', sourceId: `user-${index}`, text: 'Prompt', createdAt: null },
+        { role: 'assistant', sourceId: `answer-${index}`, text: 'Answer', createdAt: null },
+      ]).flat(),
+    )
+    const input = sessionStartInput({})
+    const fork = await harness.adapter.prepareFork({
+      cwd: input.cwd,
+      sessionId: input.sessionId,
+      keptPrompts: 2,
+    })
+    prompts = 3
+    try {
+      await harness.adapter.startRuntime({
+        ...input,
+        sessionId: v.parse(sessionIdSchema, '00000000-0000-4000-8000-000000000123'),
+        fork,
+      })
+      expect(latestOptions(harness)).toMatchObject({
+        forkSession: true,
+        resume: input.sessionId,
+        resumeSessionAt: 'answer-1',
+      })
+    } finally {
+      await harness.adapter.stopAll()
+    }
+  })
+
   it('retains a failed-close handle until a later positive query exit', async () => {
     const harness = claudeHarness(false)
     const input = sessionStartInput({})
@@ -1327,7 +1359,7 @@ function signedInAuth() {
   })
 }
 
-function claudeHarness(acknowledgeStop = true): ClaudeHarness {
+function claudeHarness(acknowledgeStop = true, historyRunner?: ClaudeHistoryRunner): ClaudeHarness {
   const events: ProviderRuntimeEvent[] = []
   const options: Options[] = []
   const prompts: SDKUserMessage[] = []
@@ -1335,6 +1367,7 @@ function claudeHarness(acknowledgeStop = true): ClaudeHarness {
   const queries: FakeClaudeQuery[] = []
 
   const adapter = new ClaudeProviderAdapter({
+    historyRunner,
     attachmentsDir,
     auth: signedInAuth(),
     createQuery: (input) => {

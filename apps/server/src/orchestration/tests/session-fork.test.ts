@@ -52,6 +52,7 @@ function fork(throughTurnId: string) {
     sessionId: FORK_ID,
     sourceSessionId: SESSION_ID,
     throughTurnId,
+    native: { conversationId: SESSION_ID, boundaryId: throughTurnId },
     type: 'session.fork',
   })
 }
@@ -62,7 +63,11 @@ test('a fork carries the conversation through the chosen turn and counts what it
 
   expect(events.map((event) => event.type)).toEqual(['session.created', 'session.history-imported'])
   expect(events[0]?.payload).toMatchObject({
-    forkedFrom: { droppedPrompts: 1, sessionId: SESSION_ID, turnId: 'turn-2' },
+    forkedFrom: {
+      native: { conversationId: SESSION_ID, boundaryId: 'turn-2' },
+      sessionId: SESSION_ID,
+      turnId: 'turn-2',
+    },
     origin: 'platform',
     sessionId: FORK_ID,
     title: 'Projection (fork)',
@@ -71,7 +76,7 @@ test('a fork carries the conversation through the chosen turn and counts what it
   fixture.pipeline.applyEvents(fixture.append(events))
   const detail = fixture.snapshots.sessionDetailSnapshot(FORK_ID)
   expect(detail.session.forkedFrom).toEqual({
-    droppedPrompts: 1,
+    native: { conversationId: SESSION_ID, boundaryId: 'turn-2' },
     sessionId: SESSION_ID,
     turnId: 'turn-2',
   })

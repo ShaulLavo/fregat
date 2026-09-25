@@ -53,6 +53,55 @@ afterEach(async () => {
 })
 
 describe('orchestration engine', () => {
+  it('persists the native boundary at fork creation and starts there after the source advances', async () => {
+    const fixture = createFixture()
+    const adapter = new MockProviderAdapter()
+    const engine = createRuntimeEngine(fixture, adapter)
+    const sourceSessionId = '00000000-0000-4000-8000-000000000001'
+    const forkId = '00000000-0000-4000-8000-000000000002'
+    try {
+      await dispatchFirstSession(engine)
+      await engine.providerRuntimeIdle()
+      const command = {
+        type: 'session.fork',
+        commandId: 'fork-before-source-advances',
+        sessionId: forkId,
+        sourceSessionId,
+        throughTurnId: 'turn-1',
+      }
+      await engine.dispatchClientCommand(command)
+      const native = {
+        conversationId: `mock-conversation:${sourceSessionId}`,
+        boundaryId: 'turn-1',
+      }
+      expect((await engine.sessionTranscript(forkId)).session.forkedFrom?.native).toEqual(native)
+      await engine.dispatch(
+        sessionTurnStartCommand({
+          commandId: 'source-advances',
+          messageId: 'source-second',
+          turnId: 'turn-2',
+        }),
+      )
+      await engine.providerRuntimeIdle()
+      expect(await engine.dispatchClientCommand(command)).toMatchObject({ deduped: true })
+      await engine.dispatch(
+        sessionTurnStartCommand({
+          sessionId: forkId,
+          commandId: 'fork-starts',
+          messageId: 'fork-first',
+          turnId: 'fork-turn-1',
+        }),
+      )
+      await engine.providerRuntimeIdle()
+      expect(adapter.startedSessions.find((session) => session.sessionId === forkId)?.fork).toEqual(
+        native,
+      )
+    } finally {
+      await engine.close()
+      fixture.close()
+    }
+  })
+
   it('dedupes commands by command receipt', async () => {
     const fixture = createFixture()
     const engine = new OrchestrationEngine(fixture.database)

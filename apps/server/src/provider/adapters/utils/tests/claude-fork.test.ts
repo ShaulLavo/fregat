@@ -15,14 +15,15 @@ const history = [
 ]
 
 test.each([
-  [1, 'a2'],
-  [2, 'a1b'],
-])('dropping %i prompts keeps through %s', (droppedPrompts, entry) => {
-  expect(claudeForkPoint(history, { droppedPrompts, sourceSessionId })).toBe(entry)
+  [2, 'a2'],
+  [1, 'a1b'],
+  [3, 'a3'],
+])('keeping %i prompts ends at %s', (keptPrompts, entry) => {
+  expect(claudeForkPoint(history, { keptPrompts, sessionId: sourceSessionId })).toBe(entry)
 })
 
 test('a transcript with fewer prompts than the session shows has no fork point', () => {
-  expect(() => claudeForkPoint(history, { droppedPrompts: 3, sourceSessionId })).toThrow(
+  expect(() => claudeForkPoint(history, { keptPrompts: 4, sessionId: sourceSessionId })).toThrow(
     'The fork point is not in the source conversation',
   )
 })

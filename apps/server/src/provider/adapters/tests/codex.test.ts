@@ -71,6 +71,7 @@ function fakeSession(turns = []) {
     ephemeral: false,
     id: 'provider-thread-1',
     modelProvider: 'openai',
+    path: process.env.PLATFORM_FAKE_CODEX_MODE === 'resumed-token-usage' ? require('node:path').join(process.env.PLATFORM_FAKE_CODEX_PROJECT, 'rollout.jsonl') : null,
     preview: 'Say hello',
     projectId: null,
     sessionId: 'provider-session-1',
@@ -363,9 +364,11 @@ function handle(message) {
     send({ method: 'turn/completed', params: { threadId: message.params.threadId, turn: { ...turn, status: 'completed' } } });
     return;
   }
-  if (mode === 'fork' && message.method === 'thread/turns/list') {
+  if ((mode === 'fork' || mode === 'fork-advanced') && message.method === 'thread/turns/list') {
     record({ event: 'thread/turns/list', params: message.params });
     const turns = ['source-turn-3', 'source-turn-2', 'source-turn-1'].map((id) => ({ id }));
+    if (mode === 'fork-advanced') turns.unshift({ id: 'source-turn-4' });
+    if (message.params.sortDirection === 'asc') turns.reverse();
     send({ id: message.id, result: { data: turns.slice(0, message.params.limit), nextCursor: null } });
     return;
   }
@@ -547,7 +550,7 @@ function handle(message) {
         },
       });
     }
-    if (mode === 'token-usage') {
+    if (mode === 'token-usage' || mode === 'resumed-token-usage') {
       send({
         method: 'thread/tokenUsage/updated',
         params: {
@@ -2358,6 +2361,59 @@ describe('CodexProviderAdapter', () => {
     )
   })
 
+  it('captures native totals before billing the first resumed Codex turn', async () => {
+    await withFakeCodex(
+      async ({ projectPath }) => {
+        await writeFile(
+          path.join(projectPath, 'rollout.jsonl'),
+          JSON.stringify({
+            type: 'event_msg',
+            payload: {
+              type: 'token_count',
+              info: {
+                total_token_usage: {
+                  input_tokens: 2000,
+                  cached_input_tokens: 800,
+                  output_tokens: 500,
+                },
+              },
+            },
+          }) + '\n',
+        )
+        const adapter = new CodexProviderAdapter()
+        const events: ProviderRuntimeEvent[] = []
+        collectAdapterEvents(adapter, events)
+        try {
+          await adapter.sendTurn({
+            ...providerTurnInput(),
+            providerResumeCursor: 'provider-thread-1',
+          })
+          await settleRuntimeEvents()
+          const totals = events.flatMap((event) =>
+            event.type === 'usage.totals' ? event.payload.totals : [],
+          )
+          expect(totals).toMatchObject([
+            {
+              inputTokens: 1200,
+              outputTokens: 500,
+              scope: 'provider-thread-1',
+              continuesEarlierTurns: true,
+            },
+            {
+              inputTokens: 1600,
+              outputTokens: 600,
+              scope: 'provider-thread-1',
+              continuesEarlierTurns: true,
+            },
+          ])
+        } finally {
+          await adapter.stopAll()
+        }
+      },
+      { mode: 'resumed-token-usage' },
+    )
+  })
+
   it('reads token usage from the tokenUsage notification field', async () => {
     await withFakeCodex(
       async () => {
@@ -2604,36 +2660,42 @@ describe('CodexProviderAdapter', () => {
     })
   })
 
-  it('forks the source thread through the kept turn and binds the new thread', async () => {
-    await withFakeCodex(
-      async ({ spawnLogPath }) => {
-        const adapter = new CodexProviderAdapter()
-        try {
-          const runtime = await adapter.startRuntime({
-            ...providerTurnInput(),
-            fork: {
-              droppedPrompts: 1,
-              sourceResumeCursor: 'source-thread',
-              sourceSessionId: providerTurnInput().sessionId,
-            },
-          })
-          const records = await readFakeCodexLog(spawnLogPath)
-          expect(records).toContainEqual({
-            event: 'thread/fork',
-            params: expect.objectContaining({
-              excludeTurns: true,
-              lastTurnId: 'source-turn-2',
-              threadId: 'source-thread',
-            }),
-          })
-          expect(runtime.providerResumeCursor).toBe('forked-thread')
-        } finally {
-          await adapter.stopAll()
-        }
-      },
-      { mode: 'fork' },
-    )
-  })
+  it.each(['fork', 'fork-advanced'])(
+    'keeps the captured native fork boundary when the source is %s',
+    async (mode) => {
+      await withFakeCodex(
+        async ({ spawnLogPath }) => {
+          const adapter = new CodexProviderAdapter()
+          try {
+            const input = providerTurnInput()
+            const captured = await adapter.prepareFork({
+              cwd: input.cwd,
+              sessionId: input.sessionId,
+              providerResumeCursor: 'source-thread',
+              keptPrompts: 2,
+            })
+            const runtime = await adapter.startRuntime({
+              ...providerTurnInput(),
+              fork: captured,
+            })
+            const records = await readFakeCodexLog(spawnLogPath)
+            expect(records).toContainEqual({
+              event: 'thread/fork',
+              params: expect.objectContaining({
+                excludeTurns: true,
+                lastTurnId: 'source-turn-2',
+                threadId: 'source-thread',
+              }),
+            })
+            expect(runtime.providerResumeCursor).toBe('forked-thread')
+          } finally {
+            await adapter.stopAll()
+          }
+        },
+        { mode },
+      )
+    },
+  )
 
   it('resumes using metadata even when Codex returns unfamiliar historical items', async () => {
     await withFakeCodex(async ({ spawnLogPath }) => {

@@ -1,3 +1,4 @@
+import { forkMessages } from './utils/fork-messages'
 import { questionAnswerHistory } from './question-answer-history'
 import { approvalResponseEvents, endedApprovalEvents } from './approval-admission'
 import { decideSessionTitle, titleMetadata } from './title-decider'
@@ -476,22 +477,13 @@ function sessionForked(
   const source = requireSessionNotDeleted(model, command.sourceSessionId)
   requireWorktree(model, source.worktreeId)
   requireSessionAbsent(model, command.sessionId)
-  const internal = { sessionId: command.sourceSessionId, turnId: command.throughTurnId }
-  if (source.latestTurn?.turnId === command.throughTurnId && source.latestTurn.state === 'running')
-    throw sessionDomainErrors.FORK_TURN_RUNNING({ internal })
-  const lastIndex = source.messages.findLastIndex(
-    (message) => message.turnId === command.throughTurnId,
-  )
-  if (lastIndex < 0) throw sessionDomainErrors.FORK_TURN_NOT_FOUND({ internal })
-
-  const kept = source.messages.slice(0, lastIndex + 1)
-  const dropped = source.messages.slice(lastIndex + 1)
+  const kept = forkMessages(source, command.throughTurnId)
   return [
     event(command, at, 'session.created', {
       createdAt: at,
       ...(source.agent ? { agent: source.agent } : {}),
       forkedFrom: {
-        droppedPrompts: dropped.filter((message) => message.role === 'user').length,
+        native: command.native,
         sessionId: command.sourceSessionId,
         turnId: command.throughTurnId,
       },

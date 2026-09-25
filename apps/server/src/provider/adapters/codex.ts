@@ -74,7 +74,7 @@ import {
   type CodexSkillMetadata,
 } from './codex-protocol'
 import { errorMessage as providerErrorMessage } from '@workspace/contracts'
-import { codexTurnFromEnd, prepareCodexRewind } from './utils/codex-rewind'
+import { codexTurnAtIndex, prepareCodexRewind } from './utils/codex-rewind'
 import { activeProviderTurn, type ActiveProviderTurn } from './utils/active-turn'
 import { codexDeveloperInstructions } from './utils/codex-instructions'
 import { modelOptionValue, type ModelOptions } from './utils/model-options'
@@ -105,7 +105,7 @@ import {
   codexRolloutPathSchema,
 } from './utils/codex-history'
 import { discoveryInputSchema } from '../utils/discovery-metadata'
-import { codexSessionResumeSchema } from './utils/codex-session'
+import { codexSessionResumeSchema, readCodexUsageBaseline } from './utils/codex-session'
 import { sessionHistoryInputSchema } from '../utils/session-history'
 import { codexRolloutUsage, isCodexUsageLine } from '../utils/imported-usage'
 import { readJsonLines } from '../utils/json-lines'
@@ -261,6 +261,27 @@ export class CodexProviderAdapter
           'The Codex conversation belongs to a different working directory.',
         )
       return codexHistoryMessages(thread)
+    })
+  }
+
+  prepareFork(
+    input: ProviderSessionHistoryInput & { keptPrompts: number; providerResumeCursor?: unknown },
+  ): Promise<ProviderForkStart> {
+    const conversationId =
+      typeof input.providerResumeCursor === 'string' ? input.providerResumeCursor : input.sessionId
+    return inspectCodexHistory(this.env, async (client) => {
+      const boundaryId = await codexTurnAtIndex({
+        index: input.keptPrompts - 1,
+        sortDirection: 'asc',
+        threadId: conversationId,
+        request: (method, params) =>
+          client.requestRaw(method, params, REQUEST_TIMEOUT_MS, (response) => response),
+      })
+      if (!boundaryId)
+        throw sessionIdentityErrors.FORK_POINT_UNAVAILABLE({
+          internal: { sessionId: input.sessionId, keptPrompts: input.keptPrompts },
+        })
+      return { boundaryId, conversationId }
     })
   }
 
@@ -536,6 +557,7 @@ class CodexAppServerSession extends SessionContext {
   private status: ProviderAdapterRuntime['status'] = 'ready'
   /** Latest running token totals per thread, recorded as usage when a root turn ends. */
   private readonly conversationUsage = new Map<string, ProviderUsageTotals>()
+  private initialUsage: ProviderUsageTotals | null = null
   private readonly resumedConversationMarker: string | null
   /** This session's view of the plan windows, read back when a turn stops on one. */
   private usageWindows: ProviderUsageWindow[] = []
@@ -648,6 +670,11 @@ class CodexAppServerSession extends SessionContext {
       })
       session.emitSessionStarted(input.providerResumeCursor ?? null)
       session.emitConversationStarted()
+      session.initialUsage = await readCodexUsageBaseline({
+        model: input.model,
+        resumed: typeof input.providerResumeCursor === 'string',
+        thread: response.thread,
+      })
 
       return session
     } catch (error) {
@@ -775,6 +802,11 @@ class CodexAppServerSession extends SessionContext {
     void activeTurn.promise.catch(noop)
 
     this.ingestSession('running', input.turnId)
+    if (this.initialUsage) {
+      this.conversationUsage.set(this.initialUsage.scope, this.initialUsage)
+      this.emitUsageTotals(activeTurn)
+      this.initialUsage = null
+    }
     try {
       recordChatPipelineInfo('chat.pipeline.codex_session.turn_start_request', {
         providerConversationMarker: this.providerConversationMarker,
@@ -2790,25 +2822,11 @@ async function forkCodexConversation(
   client: CodexAppServerRpcClient,
   input: Parameters<typeof threadResumeParams>[0] & { fork: ProviderForkStart },
 ) {
-  const { fork } = input
-  const threadId =
-    typeof fork.sourceResumeCursor === 'string' ? fork.sourceResumeCursor : fork.sourceSessionId
-  const request = (method: string, params: Record<string, unknown>) =>
-    client.requestRaw(method, params, REQUEST_TIMEOUT_MS, (response) => response)
-  const lastTurnId =
-    fork.droppedPrompts === 0
-      ? null
-      : await codexTurnFromEnd({ index: fork.droppedPrompts, request, threadId })
-  if (fork.droppedPrompts > 0 && !lastTurnId)
-    throw sessionIdentityErrors.FORK_POINT_UNAVAILABLE({
-      internal: { droppedPrompts: fork.droppedPrompts, sourceSessionId: fork.sourceSessionId },
-    })
-
   return client.request('thread/fork', {
     ...threadResumeParams(input),
     excludeTurns: true,
-    lastTurnId,
-    threadId,
+    lastTurnId: input.fork.boundaryId,
+    threadId: input.fork.conversationId,
   })
 }
 

@@ -9,14 +9,16 @@ const turnPageSchema = v.object({
 })
 const revertedThreadSchema = v.object({ thread: v.object({ id: v.string() }) })
 
-/** The native turn `index` places back from the newest (0 is the newest), or null past the start. */
-export async function codexTurnFromEnd({
+/** Reads a native turn by its position in the requested order. */
+export async function codexTurnAtIndex({
   threadId,
   index,
+  sortDirection,
   request,
 }: {
   readonly threadId: string
   readonly index: number
+  readonly sortDirection: 'asc' | 'desc'
   readonly request: CodexRequest
 }) {
   let remaining = index + 1
@@ -27,7 +29,7 @@ export async function codexTurnFromEnd({
       turnPageSchema,
       await request('thread/turns/list', {
         threadId,
-        sortDirection: 'desc',
+        sortDirection,
         itemsView: 'notLoaded',
         limit: Math.min(remaining, 100),
         ...(cursor ? { cursor } : {}),
@@ -53,7 +55,12 @@ export async function prepareCodexRewind({
   readonly request: CodexRequest
 }) {
   if (numTurns < 1) throw createInternalError('Codex rewind requires at least one native turn.')
-  const beforeTurnId = await codexTurnFromEnd({ threadId, index: numTurns - 1, request })
+  const beforeTurnId = await codexTurnAtIndex({
+    threadId,
+    index: numTurns - 1,
+    sortDirection: 'desc',
+    request,
+  })
   if (!beforeTurnId)
     throw createInternalError('Codex rewind boundary is unavailable in the native history.')
 

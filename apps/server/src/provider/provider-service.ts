@@ -52,7 +52,6 @@ import {
 } from '../orchestration/orchestration-logging'
 import type {
   ProviderApprovalResponseInput,
-  ProviderForkStart,
   ProviderRuntimeEvent,
   ProviderRuntimeStartInput,
   ProviderTurnControlInput,
@@ -312,7 +311,7 @@ export class ProviderService {
     this.recordLaunch(input, adapter)
     const session = await adapter.startRuntime({
       ...providerRuntimeStartInput(input, input.runtimePayload, continuation),
-      ...(existing ? {} : this.forkStart(input.fork)),
+      ...(!existing && input.fork ? { fork: input.fork.native } : {}),
     })
     this.requireRunning()
     const binding = this.sessionDirectory.upsert({
@@ -897,17 +896,22 @@ export class ProviderService {
     return this.sessionDirectory.getBinding(sessionId)
   }
 
-  private forkStart(fork: SessionForkSource | null | undefined): { fork?: ProviderForkStart } {
-    if (!fork) return {}
-
-    const source = this.sessionDirectory.getBinding(fork.sessionId)
-    return {
-      fork: {
-        droppedPrompts: fork.droppedPrompts,
-        sourceResumeCursor: source?.providerResumeCursor ?? null,
-        sourceSessionId: fork.sessionId,
-      },
-    }
+  async prepareFork(
+    input: ProviderSessionHistoryInput & {
+      providerInstanceId: ProviderInstanceId
+      keptPrompts: number
+    },
+  ) {
+    const adapter = this.adapterRegistry.getByInstance(input.providerInstanceId)
+    if (!adapter.prepareFork)
+      throw sessionIdentityErrors.FORK_POINT_UNAVAILABLE({
+        internal: { sessionId: input.sessionId, providerInstanceId: input.providerInstanceId },
+      })
+    const binding = this.sessionDirectory.getBinding(input.sessionId)
+    return boundedProviderOperation(
+      adapter,
+      adapter.prepareFork({ ...input, providerResumeCursor: binding?.providerResumeCursor }),
+    )
   }
 
   private turnWithResumeCursor(

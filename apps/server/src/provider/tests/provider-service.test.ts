@@ -349,7 +349,7 @@ describe('ProviderService', () => {
     fixture.close()
   })
 
-  it('forks only on the first start, from the source binding cursor', async () => {
+  it('uses the captured native boundary only on the first start', async () => {
     const fixture = createFixture()
     const adapter = new MockProviderAdapter()
     const directory = new ProviderSessionDirectory(fixture.database)
@@ -370,7 +370,11 @@ describe('ProviderService', () => {
       sessionId: source,
       runtimeEpoch: 'source-epoch',
     })
-    const fork = { droppedPrompts: 2, sessionId: source, turnId: input.turnId }
+    const fork = {
+      native: { conversationId: 'captured-conversation', boundaryId: 'captured-turn' },
+      sessionId: source,
+      turnId: input.turnId,
+    }
     const ensure = (runtimeEpoch: string) =>
       service.ensureRuntime({
         fork,
@@ -385,7 +389,7 @@ describe('ProviderService', () => {
     await ensure('second-epoch')
 
     expect(adapter.startedSessions.map((session) => session.fork ?? null)).toEqual([
-      { droppedPrompts: 2, sourceResumeCursor: 'source-conversation', sourceSessionId: source },
+      fork.native,
       null,
     ])
     fixture.close()

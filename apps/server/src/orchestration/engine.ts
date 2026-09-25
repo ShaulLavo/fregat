@@ -55,7 +55,8 @@ import { decideOrchestrationCommand } from './decider'
 import { OrchestrationEventStore, type OrchestrationDatabase } from './event-store'
 import { OrchestrationProjectionPipeline } from './projection-pipeline'
 import { bootstrapOrchestration } from './bootstrap'
-import { createEmptyReadModel } from './read-model'
+import { createEmptyReadModel, requireSession, requireWorktree } from './read-model'
+import { forkMessages } from './utils/fork-messages'
 import { prepareProjectRegistration, type RegistrationBoundary } from './registration'
 import { registrationResult } from './registration-decider'
 import { commandFingerprint } from './utils/command-intent'
@@ -256,6 +257,7 @@ export class OrchestrationEngine {
     command: ClientOrchestrationCommand,
     fingerprint: string,
   ): Promise<OrchestrationCommand> {
+    if (command.type === 'session.fork') return this.prepareFork(command)
     if (command.type !== 'project.create') {
       if (this.worktreePreparation) return this.worktreePreparation.prepare(command, fingerprint)
       return v.parse(orchestrationCommandSchema, command)
@@ -273,6 +275,28 @@ export class OrchestrationEngine {
     )
     await this.requireNoLiveProviderForRevival(prepared.projectId, prepared.worktreeId)
     return prepared
+  }
+
+  private async prepareFork(
+    command: Extract<ClientOrchestrationCommand, { type: 'session.fork' }>,
+  ) {
+    const model = this.commandReadModel(command)
+    const source = requireSession(model, command.sourceSessionId)
+    const worktree = requireWorktree(model, source.worktreeId)
+    const keptPrompts = forkMessages(source, command.throughTurnId).filter(
+      (message) => message.role === 'user',
+    ).length
+    if (!this.providerService)
+      throw sessionIdentityErrors.FORK_POINT_UNAVAILABLE({
+        internal: { sessionId: source.id, keptPrompts },
+      })
+    const native = await this.providerService.prepareFork({
+      cwd: worktree.canonicalPath,
+      keptPrompts,
+      providerInstanceId: source.modelSelection.providerInstanceId,
+      sessionId: source.id,
+    })
+    return { ...command, native }
   }
 
   async dispatch(command: OrchestrationCommand, attachmentIngest?: CommandAttachmentIngest) {
@@ -536,7 +560,9 @@ export class OrchestrationEngine {
     }
   }
 
-  private commandReadModel(command: OrchestrationCommand): OrchestrationReadModel {
+  private commandReadModel(
+    command: OrchestrationCommand | ClientOrchestrationCommand,
+  ): OrchestrationReadModel {
     if (command.type !== 'session.fork') return this.readModel
     const source = this.readModel.sessions.get(command.sourceSessionId)
     if (!source) return this.readModel

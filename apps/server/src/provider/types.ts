@@ -26,6 +26,7 @@ import type {
   ProviderUserInputAnswers,
   RuntimeMode,
   SessionId,
+  SessionForkSource,
   TurnId,
   UserInputQuestions,
 } from '@workspace/contracts'
@@ -57,16 +58,8 @@ export type ProviderTurnInput = {
   turnId: TurnId
 }
 
-/**
- * A new session's first start, branching off another session's conversation.
- * `sourceResumeCursor` is the source binding's cursor (Codex's thread id); a
- * source that never ran here has none, and its session id is the harness id.
- */
-export type ProviderForkStart = {
-  droppedPrompts: number
-  sourceResumeCursor: unknown | null
-  sourceSessionId: SessionId
-}
+/** Captured when the fork is created, before the source can advance again. */
+export type ProviderForkStart = SessionForkSource['native']
 
 export type ProviderRuntimeStartInput = {
   runtimeEpoch: string
@@ -583,6 +576,9 @@ export type ProviderAdapter = {
   forgetExecutable?: () => void
   readSessionHistory?: (input: ProviderSessionHistoryInput) => Promise<ProviderHistoryMessage[]>
   readSessionUsage?: (input: ProviderSessionHistoryInput) => Promise<ProviderImportedUsage[]>
+  prepareFork?: (
+    input: ProviderSessionHistoryInput & { keptPrompts: number; providerResumeCursor?: unknown },
+  ) => Promise<ProviderForkStart>
   /**
    * One full read of the account's plan windows, outside any turn. Throws when the
    * provider could not answer; the usage store keeps what it had.

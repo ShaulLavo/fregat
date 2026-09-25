@@ -208,6 +208,15 @@ function codexTotal(payload: unknown): Totals | null {
   }
 }
 
+export function codexRolloutBaseline(lines: readonly unknown[]) {
+  let latest: Totals | null = null
+  for (const row of parsedRows(codexRowSchema, lines)) {
+    if (row.type !== 'event_msg' || row.payload?.type !== 'token_count') continue
+    latest = codexTotal(row.payload) ?? latest
+  }
+  return latest
+}
+
 /** A total below the previous one is a restarted counter, so all of it is new. */
 function codexDelta(total: Totals, previous: Totals | null): Totals {
   if (!previous || total.outputTokens < previous.outputTokens) return total

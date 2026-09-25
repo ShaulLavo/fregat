@@ -22,6 +22,7 @@ import {
   DEFAULT_INTERACTION_MODE,
   approvalRequestIdSchema,
   messageIdSchema,
+  sessionIdSchema,
   type ApprovalRequestId,
   type InteractionMode,
   type ProviderApprovalOption,
@@ -517,18 +518,11 @@ export class ClaudeProviderAdapter
     for (const sessionId of this.sessions.keys()) await this.stopRuntime({ sessionId })
   }
 
-  private async claudeFork(fork: ProviderForkStart, cwd: string): Promise<ClaudeForkOptions> {
-    if (fork.droppedPrompts === 0) return { sourceSessionId: fork.sourceSessionId }
-
-    const history = await readClaudeSessionHistory({
-      request: { cwd, sessionId: fork.sourceSessionId },
-      env: this.env,
-      runner: this.historyRunner,
-    })
-    return {
-      resumeSessionAt: claudeForkPoint(history, fork),
-      sourceSessionId: fork.sourceSessionId,
-    }
+  async prepareFork(
+    input: ProviderSessionHistoryInput & { keptPrompts: number },
+  ): Promise<ProviderForkStart> {
+    const history = await this.readSessionHistory(input)
+    return { boundaryId: claudeForkPoint(history, input), conversationId: input.sessionId }
   }
 
   protected async ensureRuntimeSession(input: ProviderRuntimeStartInput) {
@@ -600,7 +594,12 @@ export class ClaudeProviderAdapter
       runtimeEpoch: input.runtimeEpoch,
       sessionId: input.sessionId,
     })
-    const fork = input.fork ? await this.claudeFork(input.fork, cwd) : undefined
+    const fork = input.fork
+      ? {
+          resumeSessionAt: input.fork.boundaryId,
+          sourceSessionId: v.parse(sessionIdSchema, input.fork.conversationId),
+        }
+      : undefined
     const session = await ClaudeAgentSession.start({
       ...(input.agent ? { agent: input.agent } : {}),
       fork,

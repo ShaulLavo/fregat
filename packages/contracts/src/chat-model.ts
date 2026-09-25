@@ -462,11 +462,6 @@ export const orchestrationSessionLifecycleEntries = {
 export const sessionOriginSchema = v.picklist(['platform', 'discovered'])
 
 /**
- * Where a forked session branched off. `droppedPrompts` counts the source's user
- * prompts after the fork point: counting from the end stays exact when the
- * source's early history is outside the in-memory window.
- */
-/**
  * The harness agent definition a session runs as (Claude's `--agent`). Chosen at
  * start; it selects a system prompt and tools, so it never changes afterwards.
  */
@@ -478,7 +473,10 @@ export const sessionTurnKindSchema = v.picklist(['compact'])
 export const sessionForkSourceSchema = v.object({
   sessionId: sessionIdSchema,
   turnId: turnIdSchema,
-  droppedPrompts: nonNegativeIntegerSchema,
+  native: v.object({
+    conversationId: trimmedNonEmptyStringSchema,
+    boundaryId: trimmedNonEmptyStringSchema,
+  }),
 })
 export type SessionForkSource = v.InferOutput<typeof sessionForkSourceSchema>
 export type SessionTurnKind = v.InferOutput<typeof sessionTurnKindSchema>

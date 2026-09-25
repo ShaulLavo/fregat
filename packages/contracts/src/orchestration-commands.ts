@@ -39,6 +39,7 @@ import {
   sourceProposedPlanReferenceSchema,
   sessionAgentSchema,
   sessionTurnKindSchema,
+  sessionForkSourceSchema,
   trimmedNonEmptyStringSchema,
 } from './chat-model'
 import {
@@ -336,6 +337,11 @@ export const sessionForkCommandSchema = v.object({
   throughTurnId: turnIdSchema,
 })
 
+const preparedSessionForkCommandSchema = v.object({
+  ...sessionForkCommandSchema.entries,
+  native: sessionForkSourceSchema.entries.native,
+})
+
 export const clientOrchestrationCommandSchema = v.variant('type', [
   projectCreateCommandSchema,
   projectMetaUpdateCommandSchema,
@@ -623,7 +629,7 @@ export const orchestrationCommandSchema = v.variant('type', [
   sessionUserInputRespondCommandSchema,
   sessionUserInputDismissCommandSchema,
   sessionCheckpointRevertCommandSchema,
-  sessionForkCommandSchema,
+  preparedSessionForkCommandSchema,
   worktreeRetryCommandSchema,
   worktreeCleanupCommandSchema,
   worktreeForceCleanupCommandSchema,

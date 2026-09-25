@@ -28,6 +28,19 @@ afterEach(() => {
 })
 
 describe('provider usage recorder', () => {
+  it('counts the first resumed turn after receiving its pre-turn native baseline', () => {
+    const { recorder, rows } = recorderFixture()
+    const before = totalsEvent('resumed', [
+      totals({ continuesEarlierTurns: true, inputTokens: 1000 }),
+    ])
+    recorder.accept(before, 'turn')
+    recorder.accept(
+      totalsEvent('resumed', [totals({ continuesEarlierTurns: true, inputTokens: 1100 })]),
+      'turn',
+    )
+    expect(rows()).toEqual([expect.objectContaining({ inputTokens: 100, turnId: 'resumed' })])
+  })
+
   it('records what each turn added to the running totals, with the provider cost', () => {
     const { recorder, rows } = recorderFixture()
     recorder.accept(totalsEvent('turn-1', [totals({ costUsd: 0.5, inputTokens: 100 })]), 'turn')
