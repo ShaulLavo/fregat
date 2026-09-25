@@ -16,15 +16,16 @@ export function useActiveFileChip(rootPath: string) {
     const tab = activeEditorTab(state.workbenchPanels.editorGroups)
     return tab ? (tabFileResource(tab.content)?.path ?? null) : null
   })
-  const [removedPath, setRemovedPath] = useState<string | null>(null)
+  const [dismissal, setDismissal] = useState({ path: activePath, removed: false })
+  if (dismissal.path !== activePath) setDismissal({ path: activePath, removed: false })
   const shown =
     enabled &&
     activePath &&
-    activePath !== removedPath &&
+    !(dismissal.path === activePath && dismissal.removed) &&
     matchesWorkspaceRoot(activePath, rootPath)
 
   return {
     path: shown ? toTreePath(activePath, rootPath) : null,
-    remove: () => setRemovedPath(activePath),
+    remove: () => setDismissal({ path: activePath, removed: true }),
   }
 }
