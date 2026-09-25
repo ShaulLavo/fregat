@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { QueryClient } from '@tanstack/react-query'
-import { typescriptWorkerProgramQuery } from './typescript-worker-query'
+import { typescriptWorkerProgramQuery, typescriptWorkerFilesQuery } from './typescript-worker-query'
 
 const api = vi.hoisted(() => ({ list: vi.fn(), read: vi.fn() }))
 vi.mock('@/lib/environments/state/query-clients', () => ({
@@ -34,6 +34,30 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 describe('TypeScript worker preload', () => {
+  it('translates virtual worker paths and version keys at the filesystem boundary', async () => {
+    await client().fetchQuery(
+      typescriptWorkerFilesQuery(['/repo/a.ts'], 1000, { '/repo/a.ts': 'v1' }),
+    )
+    expect(api.read).toHaveBeenCalledWith(
+      { paths: ['repo/a.ts'], maxBytes: 1000, versions: { 'repo/a.ts': 'v1' } },
+      expect.anything(),
+    )
+  })
+  it('loads an established project by configuration after the creating owner disappears', async () => {
+    await client().fetchQuery(
+      typescriptWorkerProgramQuery('repo', 'repo/deleted.ts', 10, 1000, '/repo/tsconfig.json'),
+    )
+    expect(api.list).toHaveBeenCalledWith(
+      expect.objectContaining({
+        query: {
+          root: 'repo',
+          file: 'repo/deleted.ts',
+          tsconfig: 'repo/tsconfig.json',
+          worker: 'true',
+        },
+      }),
+    )
+  })
   it('refuses an oversized list before reading its files', async () => {
     await expect(
       client().fetchQuery(typescriptWorkerProgramQuery('/repo', '/repo/a.ts', 10, 0)),

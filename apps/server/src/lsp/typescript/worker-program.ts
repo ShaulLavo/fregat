@@ -5,21 +5,40 @@ import ts from 'typescript-language-service'
 import { isOutsideRoot, type WorkspacePaths } from '../../fs/path'
 import { lspErrors } from '../errors'
 
-export function prepareWorkerProject(paths: WorkspacePaths, root: string, documentPath: string) {
+export function prepareWorkerProject(
+  paths: WorkspacePaths,
+  root: string,
+  documentPath: string,
+  tsconfig?: string,
+) {
   const document = path.resolve(paths.workspaceRootReal, documentPath.replace(/^\/+/, ''))
-  const system = boundedSystem(paths.workspaceRootReal)
-  const config = ts.findConfigFile(path.dirname(document), system.fileExists)
+  const configFiles = new Set<string>()
+  const system = boundedSystem(paths.workspaceRootReal, (file) => configFiles.add(file))
+  const config = tsconfig
+    ? path.resolve(paths.workspaceRootReal, tsconfig)
+    : ts.findConfigFile(path.dirname(document), system.fileExists)
   if (!config || isOutsideRoot(path.relative(root, config))) {
     throw lspErrors.PROGRAM_LIST_FAILED({
       internal: { documentPath, rootPath: root, reason: 'No project configuration' },
     })
   }
-  const project = containingProject(config, document, new Set(), system)
+  const project = tsconfig
+    ? parseProject(config, system)
+    : containingProject(config, document, new Set(), system)
   if (!project)
     throw lspErrors.PROGRAM_LIST_FAILED({
       internal: { documentPath, config, reason: 'No containing project' },
     })
-  return project
+  return { ...project, configFiles: [...configFiles] }
+}
+
+function parseProject(config: string, system: ts.System) {
+  const parsed = ts.getParsedCommandLineOfConfigFile(
+    config,
+    {},
+    { ...system, onUnRecoverableConfigFileDiagnostic: () => undefined },
+  )
+  return parsed ? { config, parsed } : null
 }
 
 function containingProject(
@@ -30,12 +49,9 @@ function containingProject(
 ): { config: string; parsed: ts.ParsedCommandLine } | null {
   if (visited.has(config) || visited.size >= 32) return null
   visited.add(config)
-  const parsed = ts.getParsedCommandLineOfConfigFile(
-    config,
-    {},
-    { ...system, onUnRecoverableConfigFileDiagnostic: () => undefined },
-  )
-  if (!parsed) return null
+  const project = parseProject(config, system)
+  if (!project) return null
+  const { parsed } = project
   if (parsed.fileNames.includes(document)) return { config, parsed }
   for (const reference of parsed.projectReferences ?? []) {
     const referenced = containingProject(
@@ -121,7 +137,7 @@ export function workerCompilerOptions(paths: WorkspacePaths, options: ts.Compile
   return mapped
 }
 
-function boundedSystem(filesystemRoot: string): ts.System {
+function boundedSystem(filesystemRoot: string, onRead?: (file: string) => void): ts.System {
   const read = new Set<string>()
   let bytes = 0
   return {
@@ -138,6 +154,7 @@ function boundedSystem(filesystemRoot: string): ts.System {
       read.add(file)
       if (read.size > 50_000 || bytes > 268_435_456)
         throw lspErrors.PROGRAM_LIST_LIMIT({ internal: { files: read.size, bytes } })
+      onRead?.(real)
       return ts.sys.readFile(file)
     },
   }

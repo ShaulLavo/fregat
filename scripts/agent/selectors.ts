@@ -972,3 +972,32 @@ export function focusedEditorTextBeforeCaret(): string {
   if (!input || selection?.anchorNode !== input.firstChild) return ''
   return (input.textContent ?? '').slice(0, selection.anchorOffset)
 }
+
+/** Actual colored highlight ranges, including syntax twins and untokenized overlay ranges. */
+export async function diagnosticTagPaint(page: Page, kind: 'fade' | 'strike') {
+  return page.evaluate(`((kind) => {
+    const styles = new Map()
+    const visit = rules => {
+      for (const rule of rules) {
+        if (rule.cssRules) visit(rule.cssRules)
+        const name = rule.selectorText?.match(/::highlight\\(([^)]+)\\)/)?.[1]
+        if (name) styles.set(name, rule.style)
+      }
+    }
+    for (const sheet of document.styleSheets) visit(sheet.cssRules)
+    const painted = []
+    for (const [name, highlight] of CSS.highlights) {
+      const style = styles.get(name)
+      if (!style) continue
+      const matches = kind === 'strike' ? style.textDecoration.includes('line-through') : style.color.includes('color-mix') && style.color.includes('transparent')
+      if (!matches) continue
+      for (const range of highlight) {
+        const live = document.createRange()
+        live.setStart(range.startContainer, range.startOffset)
+        live.setEnd(range.endContainer, range.endOffset)
+        painted.push({ text: live.toString(), color: style.color, decoration: style.textDecoration })
+      }
+    }
+    return painted
+  })(${JSON.stringify(kind)})`) as Promise<{ text: string; color: string; decoration: string }[]>
+}

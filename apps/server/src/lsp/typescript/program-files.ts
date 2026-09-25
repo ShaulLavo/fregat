@@ -1,4 +1,4 @@
-import { discoverWorkerProject } from './worker-discovery'
+import { discoverWorkerProject, resolveWorkerProject } from './worker-discovery'
 import { stat } from 'node:fs/promises'
 import path from 'node:path'
 import * as v from 'valibot'
@@ -7,7 +7,9 @@ import { pathSchema } from '../../fs/contracts'
 import { FsError, mapNodeError } from '../../fs/errors'
 import type { FsMetadataStore } from '../../fs/metadata'
 import { isOutsideRoot, resolveExistingPath, type WorkspacePaths } from '../../fs/path'
-import { readTextFile } from '../../fs/read'
+import { getBlobFile, readTextFile } from '../../fs/read'
+import { fileVersion } from '../../fs/version'
+import { sourceDependencies } from './source-dependencies'
 import { runBoundedProcess } from '../../git/utils/process'
 import { observeRequestOperation } from '../../observability'
 import { lspErrors } from '../errors'
@@ -15,8 +17,39 @@ import { resolveTypeScriptCompiler, type TypeScriptRuntime } from './runtime'
 
 const LIST_TIMEOUT_MS = 60_000
 const LIST_MAX_OUTPUT_BYTES = 64 * 1024 * 1024
-const READ_CONCURRENCY = 32
+const DEFAULT_READ_BYTES = 64 * 1024 * 1024
+const MAX_READ_BYTES = 256 * 1024 * 1024
 const LIBRARY_FILE = /^lib(\.[\w.-]+)?\.d\.ts$/
+
+export const workerProjectQuerySchema = v.object({
+  root: pathSchema,
+  file: pathSchema,
+  tsconfig: v.optional(pathSchema),
+})
+
+export function resolveProgramProject(
+  fs: ProgramFileSystem,
+  query: v.InferOutput<typeof workerProjectQuerySchema>,
+) {
+  return observeRequestOperation(
+    {
+      area: 'lsp',
+      operation: 'typescript_project_resolve',
+      rootPath: query.root,
+      filePath: query.file,
+    },
+    async () => {
+      const root = await openWorkspaceRoot(fs, query.root)
+      return resolveWorkerProject(
+        root.absolutePath,
+        fs.paths.workspaceRootReal,
+        query.file,
+        query.tsconfig,
+      )
+    },
+    (result) => ({ configPath: result.config, fileCount: result.roots.length }),
+  )
+}
 
 export const programFilesQuerySchema = v.object({
   root: pathSchema,
@@ -27,6 +60,11 @@ export const programFilesQuerySchema = v.object({
 
 export const programFilesReadBodySchema = v.object({
   paths: v.pipe(v.array(pathSchema), v.maxLength(50_000)),
+  versions: v.optional(v.record(pathSchema, v.string())),
+  maxBytes: v.optional(
+    v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(MAX_READ_BYTES)),
+    DEFAULT_READ_BYTES,
+  ),
 })
 
 export type ProgramFileSystem = {
@@ -52,6 +90,8 @@ type ProgramFileText = {
   readonly content: string
   readonly size: number
   readonly version: string
+  readonly diskVersion: string
+  readonly dependencies: string
 }
 
 type ProgramFileFailure = { readonly path: string; readonly code: string }
@@ -59,6 +99,7 @@ type ProgramFileFailure = { readonly path: string; readonly code: string }
 type ProgramFileTexts = {
   readonly files: readonly ProgramFileText[]
   readonly failed: readonly ProgramFileFailure[]
+  readonly unchanged: readonly string[]
   readonly totals: { readonly files: number; readonly bytes: number }
 }
 
@@ -88,14 +129,20 @@ export function listProgramFiles(fs: ProgramFileSystem, query: ProgramFilesQuery
 }
 
 /** Each file goes through the same checks as `GET /fs/read`; a refusal fails that file only. */
-export function readProgramFiles(fs: ProgramFileSystem, paths: readonly string[]) {
+export function readProgramFiles(
+  fs: ProgramFileSystem,
+  paths: readonly string[],
+  maxBytes = DEFAULT_READ_BYTES,
+  versions: Readonly<Record<string, string>> = {},
+) {
   return observeRequestOperation(
     { area: 'lsp', operation: 'typescript_program_read', requestedCount: paths.length },
-    () => readObserved(fs, paths),
+    () => readObserved(fs, paths, maxBytes, versions),
     (result) => ({
       fileCount: result.totals.files,
       totalBytes: result.totals.bytes,
       failedCount: result.failed.length,
+      unchangedCount: result.unchanged.length,
       failedCodes: [...new Set(result.failed.map((failure) => failure.code))],
     }),
   )
@@ -105,7 +152,12 @@ async function listObserved(fs: ProgramFileSystem, query: ProgramFilesQuery) {
   const root = await openWorkspaceRoot(fs, query.root)
   const project =
     query.worker === 'true' && query.file
-      ? await discoverWorkerProject(root.absolutePath, fs.paths.workspaceRootReal, query.file)
+      ? await discoverWorkerProject(
+          root.absolutePath,
+          fs.paths.workspaceRootReal,
+          query.file,
+          query.tsconfig,
+        )
       : null
   const configPath = project ? fs.paths.toRealRelative(project.config) : query.tsconfig
   if (!configPath)
@@ -260,33 +312,77 @@ function workspaceRelative(paths: WorkspacePaths, absolutePath: string) {
   return null
 }
 
-async function readObserved(fs: ProgramFileSystem, paths: readonly string[]) {
+async function readObserved(
+  fs: ProgramFileSystem,
+  paths: readonly string[],
+  maxBytes: number,
+  versions: Readonly<Record<string, string>>,
+) {
   const files: ProgramFileText[] = []
   const failed: ProgramFileFailure[] = []
-  let next = 0
-  const worker = async () => {
-    for (let index = next++; index < paths.length; index = next++) {
-      const outcome = await readOne(fs, paths[index] ?? '')
-      if ('content' in outcome) files.push(outcome)
-      else failed.push(outcome)
+  const unchanged: string[] = []
+  let bytes = 0
+  let limited = false
+  for (const filePath of paths) {
+    if (limited) {
+      failed.push({ path: filePath, code: 'PROGRAM_READ_LIMIT' })
+      continue
     }
+    const outcome = await readOne(fs, filePath, maxBytes - bytes, versions[filePath])
+    if ('unchanged' in outcome) {
+      unchanged.push(filePath)
+      continue
+    }
+    if (!('content' in outcome)) {
+      failed.push(outcome)
+      limited = outcome.code === 'PROGRAM_READ_LIMIT'
+      continue
+    }
+    files.push(outcome)
+    bytes += Buffer.byteLength(outcome.content)
   }
-  await Promise.all(Array.from({ length: READ_CONCURRENCY }, worker))
-
-  const bytes = files.reduce((sum, file) => sum + file.size, 0)
-  return { files, failed, totals: { files: files.length, bytes } } satisfies ProgramFileTexts
+  return {
+    files,
+    failed,
+    unchanged,
+    totals: { files: files.length, bytes },
+  } satisfies ProgramFileTexts
 }
 
 async function readOne(
   fs: ProgramFileSystem,
   filePath: string,
-): Promise<ProgramFileText | ProgramFileFailure> {
+  remainingBytes: number,
+  expectedVersion: string | undefined,
+): Promise<ProgramFileText | ProgramFileFailure | { path: string; unchanged: true }> {
   try {
-    // The compiler already read these as source; a NUL inside a string literal is not a binary file.
-    const read = await readTextFile(fs.paths, filePath, fs.maxTextFileBytes)
-    return { path: filePath, content: read.content, size: read.size, version: read.version }
+    if (
+      expectedVersion !== undefined &&
+      (await getBlobFile(fs.paths, filePath)).version === expectedVersion
+    )
+      return { path: filePath, unchanged: true }
+    // Serial reads charge the response before the next file is allocated.
+    const read = await readTextFile(
+      fs.paths,
+      filePath,
+      Math.min(fs.maxTextFileBytes, remainingBytes),
+    )
+    if (Buffer.byteLength(read.content) > remainingBytes)
+      return { path: filePath, code: 'PROGRAM_READ_LIMIT' }
+    return {
+      path: filePath,
+      content: read.content,
+      size: read.size,
+      version: read.version,
+      diskVersion: fileVersion(read),
+      dependencies: sourceDependencies(filePath, read.content),
+    }
   } catch (error) {
-    if (error instanceof FsError) return { path: filePath, code: error.code }
-    throw error
+    const failure = error instanceof FsError ? error : mapNodeError(error)
+    const code =
+      failure.code === 'FILE_TOO_LARGE' && remainingBytes < fs.maxTextFileBytes
+        ? 'PROGRAM_READ_LIMIT'
+        : failure.code
+    return { path: filePath, code }
   }
 }

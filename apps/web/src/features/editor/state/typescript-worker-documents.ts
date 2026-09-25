@@ -14,16 +14,16 @@ export function synchronizeWorkerDocuments(
   connection: LanguageServerConnectionContext,
   options: {
     readonly store: EditorDocumentStoreApi
-    readonly ownerKey: string
+    readonly ownerKeys: ReadonlySet<string>
     readonly controller: LanguageServerDocumentSyncController
     readonly includes: (path: string) => boolean
   },
-): EditorDisposable {
+): EditorDisposable & { reconcile(): void } {
   const synced = new Map<string, { buffer: EditorTextBuffer; registration: EditorDisposable }>()
   const reconcile = () => {
     const retained = new Set<string>()
     for (const document of Object.values(options.store.getState().liveDocumentsByKey)) {
-      if (document.key === options.ownerKey || document.target.kind !== 'file') continue
+      if (options.ownerKeys.has(document.key) || document.target.kind !== 'file') continue
       const path = document.target.resource.path
       if (!options.includes(path) || !/\.[cm]?[jt]sx?$/.test(path)) continue
       const languageId = lspLanguageIdForPath(path) ?? languageIdForFilePath(path)
@@ -50,8 +50,11 @@ export function synchronizeWorkerDocuments(
   }
   // DocumentSync streams buffer revisions into the same LSP workspace and provenance ledger.
   reconcile()
-  const unsubscribe = options.store.subscribe(reconcile)
+  const unsubscribe = options.store.subscribe((state, previous) => {
+    if (state.liveDocumentsByKey !== previous.liveDocumentsByKey) reconcile()
+  })
   return {
+    reconcile,
     dispose() {
       unsubscribe()
       for (const item of synced.values()) item.registration.dispose()

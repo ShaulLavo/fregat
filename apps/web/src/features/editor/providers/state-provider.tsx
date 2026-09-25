@@ -1,3 +1,4 @@
+import { configureWorkerProjects } from '@/features/editor/state/typescript-worker-project'
 import { useEffect, useLayoutEffect, type ReactNode } from 'react'
 
 import { useEditorColorTheme } from '@/lib/editor-theme/hooks/use-editor-color-theme'
@@ -29,8 +30,15 @@ export function EditorStateProvider({
   const { appliedThemeContentHash, appliedThemeId, selectedThemeId } = useEditorColorTheme()
   const syntaxHighlightingEnabled = useSettingValue('editor.syntaxHighlighting.enabled')
   const tabSize = useSettingValue('editor.tabSize')
+  const backend = useSettingValue('lsp.typescript.backend')
+  const maxFiles = useSettingValue('lsp.typescript.workerMaxFiles')
+  const maxBytes = useSettingValue('lsp.typescript.workerMaxBytes')
   const languageServerMatchConfiguration = useLanguageServerMatchConfiguration()
   const { editorOpenBenchmarkControl, fileOpenIntentOwner, queryClient } = runtime
+
+  useEffect(() => {
+    configureWorkerProjects(queryClient, { backend, maxFiles, maxBytes })
+  }, [queryClient, backend, maxFiles, maxBytes])
 
   useEffect(
     () => registerEditorOpenBenchmarkControl(editorOpenBenchmarkControl),

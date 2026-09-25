@@ -39,6 +39,8 @@ import {
   programFilesQuerySchema,
   programFilesReadBodySchema,
   readProgramFiles,
+  resolveProgramProject,
+  workerProjectQuerySchema,
 } from './lsp/typescript/program-files'
 import {
   applyObservability,
@@ -402,9 +404,16 @@ export function createApp(options: AppOptions) {
     .get('/lsp/typescript/program-files', ({ query }) => listProgramFiles(fs, query), {
       query: programFilesQuerySchema,
     })
-    .post('/lsp/typescript/program-files/read', ({ body }) => readProgramFiles(fs, body.paths), {
-      body: programFilesReadBodySchema,
+    .get('/lsp/typescript/project', ({ query }) => resolveProgramProject(fs, query), {
+      query: workerProjectQuerySchema,
     })
+    .post(
+      '/lsp/typescript/program-files/read',
+      ({ body }) => readProgramFiles(fs, body.paths, body.maxBytes, body.versions),
+      {
+        body: programFilesReadBodySchema,
+      },
+    )
     .ws('/lsp', lspRoutes(fs, auth, { pool: lspPool, settings: lspSettings }))
     .ws('/terminal', terminal.routes(auth))
     .post('/terminal/restart', ({ body }) => terminal.restart(body), {

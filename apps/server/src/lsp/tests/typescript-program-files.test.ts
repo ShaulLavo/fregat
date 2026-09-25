@@ -1,4 +1,4 @@
-import { mkdir, readFile, symlink, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { expect } from 'vitest'
@@ -151,6 +151,8 @@ test('reads the listed files in one response, under the same rule as /fs/read', 
         content: single.content,
         size: single.size,
         version: single.version,
+        diskVersion: `stat:${single.mtimeMs}:${single.size}`,
+        dependencies: expect.any(String),
       },
       expect.objectContaining({ path: 'project/node_modules/dep/index.d.ts' }),
       expect.objectContaining({
@@ -232,4 +234,144 @@ test('prepares worker roots, inherited options and logical dependency paths', as
       },
     ],
   })
+})
+
+test('stops batch reads at the requested byte budget', async ({ workspace }) => {
+  await writeFile(path.join(workspace.root, 'first.ts'), 'éé')
+  await writeFile(path.join(workspace.root, 'second.ts'), 'abc')
+  await writeFile(path.join(workspace.root, 'third.ts'), 'z')
+  const response = await request(workspace.openApp(), '/lsp/typescript/program-files/read', {
+    paths: ['first.ts', 'second.ts', 'third.ts'],
+    maxBytes: 5,
+  })
+  expect(response.status).toBe(200)
+  const result = await response.json()
+  expect(result.files.map((file: { path: string }) => file.path)).toEqual(['first.ts'])
+  expect(result.totals.bytes).toBe(4)
+  expect(result.failed).toEqual([
+    { path: 'second.ts', code: 'PROGRAM_READ_LIMIT' },
+    { path: 'third.ts', code: 'PROGRAM_READ_LIMIT' },
+  ])
+})
+
+test('rejects read budgets above the server ceiling', async ({ workspace }) => {
+  const response = await request(workspace.openApp(), '/lsp/typescript/program-files/read', {
+    paths: [],
+    maxBytes: 256 * 1024 * 1024 + 1,
+  })
+  expect(response.status).toBe(400)
+})
+
+test('keeps project discovery context across the child process boundary', async ({ workspace }) => {
+  const { discoverWorkerProject } = await import('../typescript/worker-discovery')
+  await expect(
+    discoverWorkerProject(workspace.root, workspace.root, 'missing.ts'),
+  ).rejects.toMatchObject({
+    code: 'lsp.PROGRAM_LIST_FAILED',
+    internal: expect.objectContaining({
+      documentPath: 'missing.ts',
+      rootPath: workspace.root,
+      reason: 'No project configuration',
+    }),
+  })
+})
+
+test('resolves a shared project identity and include filters without running the compiler listing', async ({
+  workspace,
+}) => {
+  await writeProject(workspace, 'typescript')
+  const app = workspace.openApp()
+  await request(app, '/fs/workspace-address', { path: 'project' })
+  const query = new URLSearchParams({ root: 'project', file: 'project/src/a.ts' })
+  const response = await request(app, `/lsp/typescript/project?${query}`)
+  expect(response.status).toBe(200)
+  expect(await response.json()).toMatchObject({
+    config: '/project/tsconfig.json',
+    roots: expect.arrayContaining(['/project/src/a.ts', '/project/src/b.ts']),
+    watch: {
+      include: ['/project/src'],
+      configFiles: expect.arrayContaining(['/project/tsconfig.json']),
+    },
+  })
+})
+
+test('checks unchanged disk versions without retransmitting text and reports changed dependency sets', async ({
+  workspace,
+}) => {
+  const first = path.join(workspace.root, 'first.ts')
+  await writeFile(first, 'import { value } from "./other"; value')
+  const app = workspace.openApp()
+  const initial = await (
+    await request(app, '/lsp/typescript/program-files/read', { paths: ['first.ts'] })
+  ).json()
+  const loaded = initial.files[0]
+  const unchanged = await (
+    await request(app, '/lsp/typescript/program-files/read', {
+      paths: ['first.ts'],
+      versions: { 'first.ts': loaded.diskVersion },
+      maxBytes: 1,
+    })
+  ).json()
+  expect(unchanged.files).toEqual([])
+  expect(unchanged.unchanged).toEqual(['first.ts'])
+  await writeFile(first, 'import { value } from "./other"; value + 1')
+  const edited = await (
+    await request(app, '/lsp/typescript/program-files/read', { paths: ['first.ts'] })
+  ).json()
+  expect(edited.files[0].dependencies).toBe(loaded.dependencies)
+  await writeFile(first, 'import { value } from "./new"; value')
+  const imported = await (
+    await request(app, '/lsp/typescript/program-files/read', { paths: ['first.ts'] })
+  ).json()
+  expect(imported.files[0].dependencies).not.toBe(loaded.dependencies)
+})
+
+test('resolves an established config after its original editor file is deleted', async ({
+  workspace,
+}) => {
+  await writeProject(workspace, 'typescript')
+  const app = workspace.openApp()
+  await request(app, '/fs/workspace-address', { path: 'project' })
+  await rm(path.join(workspace.root, 'project/src/a.ts'))
+  const query = new URLSearchParams({
+    root: 'project',
+    file: 'project/src/a.ts',
+    tsconfig: 'project/tsconfig.json',
+  })
+  const response = await request(app, `/lsp/typescript/project?${query}`)
+  expect(response.status).toBe(200)
+  expect(await response.json()).toMatchObject({
+    roots: expect.arrayContaining(['/project/src/b.ts']),
+  })
+})
+
+test('project metadata changes when compiler options change with identical roots', async ({
+  workspace,
+}) => {
+  await writeProject(workspace, 'typescript')
+  const app = workspace.openApp()
+  await request(app, '/fs/workspace-address', { path: 'project' })
+  const query = new URLSearchParams({ root: 'project', file: 'project/src/a.ts' })
+  const before = await (await request(app, `/lsp/typescript/project?${query}`)).json()
+  const config = path.join(workspace.root, 'project/tsconfig.json')
+  const changed = JSON.parse(await readFile(config, 'utf8'))
+  changed.compilerOptions.strict = false
+  await writeFile(config, JSON.stringify(changed))
+  const after = await (await request(app, `/lsp/typescript/project?${query}`)).json()
+  expect(after.roots).toEqual(before.roots)
+  expect(after.optionsVersion).not.toBe(before.optionsVersion)
+})
+
+test('package entry changes invalidate the dependency signature', async ({ workspace }) => {
+  const manifest = path.join(workspace.root, 'package.json')
+  await writeFile(manifest, '{"types":"old.d.ts"}')
+  const app = workspace.openApp()
+  const before = await (
+    await request(app, '/lsp/typescript/program-files/read', { paths: ['package.json'] })
+  ).json()
+  await writeFile(manifest, '{"types":"new.d.ts"}')
+  const after = await (
+    await request(app, '/lsp/typescript/program-files/read', { paths: ['package.json'] })
+  ).json()
+  expect(after.files[0].dependencies).not.toBe(before.files[0].dependencies)
 })

@@ -122,6 +122,7 @@ import { fileTreeUndo } from './file-tree-undo'
 import { editorDefinitionCrlf } from './editor-definition-crlf'
 import { editorLspHover } from './editor-lsp-hover'
 import { editorLspDeprecated } from './editor-lsp-deprecated'
+import { editorLspUnnecessary } from './editor-lsp-unnecessary'
 import { editorLspRenameKey } from './editor-lsp-rename-key'
 import { editorLspSignatureHelp } from './editor-lsp-signature-help'
 import { editorMarkdownPunctuation } from './editor-markdown-punctuation'
@@ -311,6 +312,7 @@ export const scenarios: readonly Scenario[] = [
   editorLspCompletion,
   editorLspHover,
   editorLspDeprecated,
+  editorLspUnnecessary,
   editorLspTabSwitch,
   editorLspServerExit,
   editorTypeScriptWorker,
