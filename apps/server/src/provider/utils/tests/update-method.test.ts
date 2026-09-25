@@ -23,7 +23,7 @@ describe('providerUpdatePlan', () => {
     })
   })
 
-  it('updates a global npm or bun install under the prefix that holds it', () => {
+  it('updates a global npm install under the prefix that holds it', () => {
     expect(plan('codex', '/usr/local/lib/node_modules/@openai/codex/bin/codex.js')).toEqual({
       argv: ['npm', 'install', '--global', '--prefix', '/usr/local', '@openai/codex@latest'],
       command: 'npm install --global --prefix /usr/local @openai/codex@latest',
@@ -33,7 +33,8 @@ describe('providerUpdatePlan', () => {
     expect(
       plan('claude', `${HOME}/.bun/install/global/node_modules/@anthropic-ai/claude-code/cli.js`),
     ).toMatchObject({
-      argv: ['bun', 'add', '--global', '@anthropic-ai/claude-code@latest'],
+      argv: null,
+      command: 'bun add --global @anthropic-ai/claude-code@latest',
       method: 'bun',
     })
   })
@@ -52,5 +53,11 @@ describe('providerUpdatePlan', () => {
     const driverKind = realPath.includes('codex') ? 'codex' : 'claude'
 
     expect(plan(driverKind, realPath)).toMatchObject({ argv: null, command, method })
+  })
+
+  it('keeps a Bun install in another home manual so the server cannot update its own copy', () => {
+    expect(
+      plan('codex', '/home/other/.bun/install/global/node_modules/@openai/codex/bin/codex.js'),
+    ).toMatchObject({ argv: null, method: 'bun' })
   })
 })

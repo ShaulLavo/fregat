@@ -78,7 +78,7 @@ function packageManagerPlan(npm: string, realPath: string): ProviderUpdatePlan {
     return manualPlan('homebrew', `brew upgrade ${cask}${brew[2]}`, realPath)
   }
   if (realPath.includes(`/.bun/install/global/node_modules/${npm}/`)) {
-    return oneClickPlan('bun', ['bun', 'add', '--global', `${npm}@latest`], 'bun:global')
+    return manualPlan('bun', `bun add --global ${npm}@latest`, realPath)
   }
 
   const npmPrefix = realPath.split(`/lib/node_modules/${npm}/`)
