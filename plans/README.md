@@ -19,7 +19,7 @@ a bare root `bun run verify`.
 
 | Plan                                                                                     | State                                                        |
 | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| [166 — keyboard shortcuts, redone](166-shortcuts-editor.md)                              | **PROPOSED — RESEARCH FIRST; D1–D6 RECOMMENDED**             |
+| [166 — keyboard shortcuts, redone](166-shortcuts-editor.md)                              | **PROPOSED — RESEARCH FIRST; D1–D6 DECIDED**                 |
 | [165 — one font catalog, loaded on demand](165-font-catalog.md)                          | **PROPOSED — READY**                                         |
 | [164 — what feels right in Neon](164-what-feels-right-in-neon.md)                        | **FIRST PASS ADOPTED; SWEEP CONTINUES**                      |
 | [163 — screenshot in the composer](163-chat-screenshot.md)                               | **PROPOSED — READY; DECISIONS ACCEPTED**                     |

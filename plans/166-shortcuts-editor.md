@@ -2,14 +2,14 @@
 
 ## Status and authorization
 
-- Status: PROPOSED — research phase first. D1–D6 carry recommendations; the owner reviews the
-  Phase 0 write-up and mockups before Phase 2 starts.
+- Status: PROPOSED — research phase first. D1–D6 decided by the owner on 2026-09-25; the owner
+  reviews the Phase 0 write-up and mockups before Phase 2 starts.
 - Priority: P2 in the UI refresh lane. The owner asked for it on 2026-09-25: research how VS Code
   does it, make it work on a phone, and redo it.
-- Effort: M. One settings surface, its row model, a recording surface and a scenario. No server
-  or contract change unless D4 says otherwise.
-- Risk: LOW. The data model and the overrides schema stay; only the surface is rebuilt. Every
-  phase lands green on its own.
+- Effort: M. One settings surface, its row model, a recording surface and a scenario. Phase 7
+  (several shortcuts per command, D4) changes the overrides schema and the resolver.
+- Risk: LOW for Phases 1–6, which rebuild only the surface. Phase 7 touches contracts, the keymap
+  resolver and the TUI editor. Every phase lands green on its own.
 - Planned at: Platform `3347239f`, 2026-09-25. Before screenshots (1440, 820 and 390 wide, list,
   filtered list and the expanded resolution report) and the script that took them:
   `/work/tmp/fregat-evidence/20260925-keybindings-before/`.
@@ -24,8 +24,8 @@
 Keyboard shortcuts is a page you can read at a glance and edit without fighting it. On a desk it
 reads like VS Code's Keyboard Shortcuts editor: every command in one list with its keys drawn as
 keycaps, where it applies, and whether you changed it, with search by name or by pressing the keys.
-On a phone the same page is a single column of tappable rows; tapping one opens a sheet that edits
-it, and a chord builder stands in for a hardware keyboard.
+In a narrow pane or on a phone the same page is a single column of tappable rows that still looks
+deliberate, and a command can carry more than one shortcut, as in VS Code.
 
 ## Today
 
@@ -80,8 +80,8 @@ What the screenshots show:
 ## Phase 0 — Research
 
 Deliverable: `docs/ui-research/keyboard-shortcuts.md`, with screenshots under `docs/images/`, and a
-`/dev` tab (`/dev/shortcuts`) holding static mockups of the desktop row, the narrow row and the edit
-sheet on fixture rows. The owner looks at `/dev/shortcuts` on the mesh from a phone before Phase 2.
+`/dev` tab (`/dev/shortcuts`) holding static mockups of the desktop row, the narrow row and the
+recording popover on fixture rows. The owner looks at `/dev/shortcuts` on the mesh from a phone before Phase 2.
 
 **VS Code**, from `references/vscode` (`e81ea68fc02`, 2026-09-23):
 
@@ -112,16 +112,16 @@ how recording works, how conflicts are shown, what changes when the window is na
 
 **Mobile facts to settle, with sources:**
 
-- What a soft keyboard sends on keydown in iOS Safari and Android Chrome (no Ctrl/Cmd/Alt), and
-  whether a page can tell a hardware keyboard is attached. Candidates: the first keydown carrying a
-  modifier, `(hover: none) and (pointer: coarse)`. Check `navigator.keyboard` support in WebKit.
+- Whether a page can tell a hardware keyboard is attached, so the recorder can say it needs one
+  instead of waiting for keys an on-screen keyboard never sends. Candidates: the first keydown
+  carrying a modifier, `(hover: none) and (pointer: coarse)`. Check `navigator.keyboard` in WebKit.
 - Which chords iOS Safari and iPadOS keep for themselves (⌘Tab, ⌘Space, ⌘H, ⌘W, ⌘T, ⌘L…). Compare
   with the reservations `keyBindingResolution` already reports, so the recorder can say "Safari
   keeps ⌘W" instead of doing nothing.
 - Playwright's WebKit does not start on this host, so the iPhone check is the owner's, on the mesh.
 
-The doc ends with a proposed row anatomy for both widths and answers or updated recommendations for
-D1–D6.
+The doc ends with a proposed row anatomy for both widths and VS Code's model for several
+shortcuts per command (one row per binding, Add Keybinding, removal entries), which Phase 7 follows.
 
 ## Phase 1 — Row model
 
@@ -166,7 +166,7 @@ Unit tests beside the utils, one per rule.
 
 ## Phase 3 — Recording
 
-A popover anchored to the row on desktop, the edit sheet on narrow panes.
+A popover anchored to the row, at every width. VS Code's flow (D2).
 
 - Shows the chord live as `Kbd` chips while keys are pressed. Enter saves, Escape cancels,
   Backspace drops the last stroke. Two strokes are allowed without `isChordPrefix` (D2).
@@ -174,9 +174,8 @@ A popover anchored to the row on desktop, the edit sheet on narrow panes.
   reservation, so a conflict is visible before the write rather than after it.
 - `ChordRecorder` is rebuilt as this surface; its capture logic (`recordedStroke`,
   `recordingControl`, `normalizedChord` in `client-core`) stays.
-- **Chord builder** (D3): modifier toggles (Ctrl, Alt, Shift, ⌘) and a key picker, for a device
-  that sends no modifiers. Shown when no modifier keydown has been seen in the page, or when the
-  research picks a better signal.
+- No chord builder (D3). On a device with no hardware keyboard the popover says a keyboard is
+  needed to record; Remove and Reset still work by touch.
 
 ## Phase 4 — Narrow and phone
 
@@ -184,9 +183,9 @@ Below `@3xl/settings`:
 
 - A row is one line of title plus keys on the right, with where and source on a quiet second line.
   Row height at least 44 px. No inline buttons.
-- Tapping a row opens the edit sheet: title, command id, where, current keys, Change (recorder or
-  chord builder), Remove, Reset, and the conflict list with each conflicting command tappable.
-  The sheet is a new `side='bottom'` on `DialogContent` in `packages/ui` (D6).
+- Tapping a row opens the same row menu as desktop (Change, Remove, Reset, Copy command id, Show
+  conflicts). No bottom sheet and no new `packages/ui` primitive (D6); the bar is that it looks
+  deliberate at 390 px, not that it is a native phone surface.
 - The filter control scrolls sideways with Plan 157's scroll fade; the Record keys toggle hides
   when no hardware keyboard has been seen.
 - The toolbar stays sticky under the settings header. Search keeps 16 px text.
@@ -206,22 +205,40 @@ Below `@3xl/settings`:
   search, each filter, Record keys search, record Ctrl+Alt+K on a command with Enter, read the
   run's `settings.json` for the override, record a conflicting chord and check the warning shows
   before saving, reset, remove. Narrow: assert the list has no scroller of its own, row and control
-  heights ≥ 40 px, tap a row, build a chord with the builder, save, check `settings.json`.
+  heights ≥ 40 px, tap a row, Remove from its menu, check `settings.json`.
   Selectors in `scripts/agent/selectors.ts`. Add a line to
   `.agents/skills/verify-fregat/features/settings.md`.
 - Rewrite `keybinding-section.test.tsx` for the new structure; delete tests of removed behaviour.
 - `bun run gates`, the web typecheck, `compiler:memos` on the touched files.
 - `look` at 1440 and 390 on the mesh after `bun run deploy`, and read both screenshots back. The
   owner checks an iPhone.
-- The TUI's `apps/tui/src/settings/components/keybinding-editor.tsx` is out of scope.
+- The TUI's `apps/tui/src/settings/components/keybinding-editor.tsx` is out of scope until
+  Phase 7.
+
+## Phase 7 — Several shortcuts per command
+
+VS Code lets a command carry any number of keybindings (D4). After Phases 1–6 land, and after lane
+L8 merges `keymap/**`:
+
+- `keybindingOverridesSchema` (`packages/contracts/src/settings.ts:120`) becomes a record of
+  command id to a list of chords, `null` still meaning unbound. Greenfield: no shim for the
+  single-string form; update `settings-keys-released.json`, `schema.json` and the reference.
+- The resolver in `keymap/active-bindings.ts` applies every chord in the list, and
+  `CommandKeyBinding.keys` becomes a list.
+- The page shows one row per binding, as VS Code does, with Add shortcut in the row menu; Remove
+  and Change act on that one binding.
+- The TUI's keybinding editor writes the new shape.
+- The scenario adds a second shortcut to a command, checks both chords run it, then removes one.
 
 ## Decisions
 
-| #   | Question                                                         | Recommendation                                                                                                                                                                                             |
-| --- | ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| D1  | Where does the editor live?                                      | Full-width in the Keyboard shortcuts settings category, which holds only the preset and this list. A separate editor tab like VS Code's adds a second surface for the same data.                           |
-| D2  | Save on the first stroke, as today, or on Enter, as VS Code?     | Enter. It shows conflicts before the write and makes two-stroke chords unambiguous.                                                                                                                        |
-| D3  | How does a phone without a hardware keyboard edit a shortcut?    | Chord builder in the sheet. Overrides are application-scoped, so setting a desk shortcut from the phone is a real use. The alternative is read-only on touch.                                              |
-| D4  | Keep one shortcut per command, or allow several (VS Code's Add)? | Keep one. Several means changing the overrides schema and the resolver; list it as a follow-up if the research shows people need it.                                                                       |
-| D5  | Where does the raw resolution report go?                         | Off the page, behind Copy resolution report in the toolbar menu. Its useful facts are on the rows after Phase 5.                                                                                           |
-| D6  | What is the phone edit surface?                                  | A bottom sheet (`side='bottom'` on `DialogContent`). A centred dialog on a 390 px screen covers the list and sits away from the thumb. Plan 143 has not set a phone direction; this stays inside Settings. |
+Decided by the owner on 2026-09-25.
+
+| #   | Question                                 | Decision                                                                                                    |
+| --- | ---------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| D1  | Where does the editor live?              | Inside Settings, full-width in the Keyboard shortcuts category. Splitting Settings into tabs is later work. |
+| D2  | Save on the first stroke, or on Enter?   | Whatever VS Code does: Enter, with conflicts shown before the write.                                        |
+| D3  | Editing on a phone without a keyboard?   | No chord builder. Not worth the work; Remove and Reset work by touch.                                       |
+| D4  | One shortcut per command, or several?    | Several, because VS Code allows it. Phase 7, after the redesign lands.                                      |
+| D5  | Where does the raw resolution report go? | Behind Copy resolution report in the toolbar menu.                                                          |
+| D6  | Phone edit surface?                      | No bottom sheet. The narrow layout just has to look good; rows open the same menu as desktop.               |
