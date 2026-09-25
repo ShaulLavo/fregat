@@ -2,7 +2,7 @@
 
 ## Status and authorization
 
-- Status: DISCUSSION PLAN — nothing is designed or built until the owner approves a direction.
+- Status: DIRECTION APPROVED (owner, 2026-09-25); see "Direction" below. Research phase is next.
 - Priority: P2. Large product question; Plan 142 (Web Push) delivers the first away-from-desk
   value without it.
 - Effort: XL overall, unknown until the direction is set. The discussion itself is S.
@@ -55,7 +55,28 @@ surface for agents running on a desk machine.
 In: deciding what the phone does, the order of web layout versus native app, and how they share
 contracts. Out until approved: screens, components, breakpoints, a native app scaffold.
 
-## Questions for the owner
+## Direction (owner-approved 2026-09-25)
+
+- **Q1, scope.** Two clients with different jobs:
+  - Native app (later): chat UI plus light review (per-file diffs, a turn's checkpoints, commit and PR state).
+  - Phone web app (now): the same, plus viewing code. Editing is allowed but not optimized: the editor is the same component, so it
+    works, just not comfortably.
+- **Q2, order.** Responsive web now; the native app later, against the same server contracts.
+- **Q3, shell.** One URL, two shells. The app root picks a phone shell or the workbench at boot from one synchronous check
+  (viewport width plus `pointer: coarse`) and imports only that shell as a lazy chunk. The typed boot script in `index.html` adds a
+  `modulepreload` for the chosen chunk so the choice costs no extra round trip. The phone shell is its own composition, not a
+  collapsed workbench. It reuses the real features and stores (chat stage, session list, diff view, the editor as a leaf screen)
+  inside stack navigation: sessions → session → turn → diff or file. That navigation is also the spec for the native app.
+  Desktop panes get no narrow-width work. A lazy `/m` route is the fallback if the boot switch proves awkward.
+- **Q4, connecting.** Three ways, like T3 Code:
+  1. Direct over the local network or Tailscale (now). Add T3's pairing URL: the desktop shows a one-time link or QR code
+     that authorizes a new device.
+  2. SSH (exists as SSH machines): transport plus server bootstrap for desktop-to-remote-machine setups; not a phone path.
+  3. Relay (future): a hosted rendezvous for people without Tailscale, like T3 Connect (Cloudflare tunnels plus accounts).
+     WebRTC was considered and rejected: it still needs signaling plus TURN relays, which Tailscale already provides.
+- **Q5, input.** Revisit Enter-on-touch with the phone shell; voice dictation gets its own plan.
+
+## Questions for the owner (answered above)
 
 - **Q1 — What is the phone for?**
   - A: control surface — see session state, answer approvals and questions, read replies and
@@ -97,8 +118,7 @@ Questions:
 4. Which interactions are hover- or keyboard-only (tooltips, context menus, chords) and need a
    touch path?
 
-Deliverable: `docs/phone-direction.md` with the owner's answers to Q1–Q5, the surface list, and
-the navigation model. After the owner approves it, this plan is split into executable plans
+Deliverable: the surface list and navigation model, added to this plan (the direction is already above). After the owner approves it, this plan is split into executable plans
 (likely: phone shell, per-surface adaptations, touch input, and a later companion-app plan).
 
 ## Phases
