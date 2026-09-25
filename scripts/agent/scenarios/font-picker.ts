@@ -19,8 +19,10 @@ async function waitForRootFont(page: Page, name: '--font-ui' | '--font-code', fa
   )
 }
 
+// The rail button, not the chord: on a fresh workspace the terminal holds focus and eats it.
 async function openSettings(page: Page) {
-  await page.keyboard.press('Control+,')
+  await waitForApp(page)
+  await selectors.sidebarSettingsButton(page).click()
   await selectors.settingsSearch(page).fill('font')
 }
 
@@ -99,7 +101,8 @@ export const fontPicker: Scenario = {
     await waitForRootFont(page, '--font-code', 'FiraCode Nerd Font')
     await page.evaluate(() => document.fonts.load('1em "FiraCode Nerd Font"'))
     await step('code-firacode')
-    await page.keyboard.press('Escape')
+    // The popup must be gone, or the palette chord lands in its search field.
+    await selectors.fontPickerSearch(page).waitFor({ state: 'detached' })
 
     await openFileByName(page, file)
     await focusEditor(page)

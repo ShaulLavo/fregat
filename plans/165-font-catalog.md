@@ -220,6 +220,14 @@ Everything above, with these differences:
   a search waits for the catalog.
 - **Rows carry a source tag** (`installed`, `Fontsource`, `Nerd Font`, `bundled`), because the same
   family name can come from two sources.
+- **The installed-font row comes last, not only on no match.** Fuzzy matching over 2,000 families
+  and their keywords almost always finds something ("SF Mono" matches `sans-serif`), so a font
+  installed only on the viewing device would never be offered. The row is left out only when the
+  catalog has that exact family. The plan's search-picker section above predates this.
+- **Nothing upstream can hold the first paint.** The boot stylesheet is render-blocking, so the
+  Fontsource catalog is kept in memory. When it goes stale it is served at once and refreshed in
+  the background; a failed refresh waits five minutes before retrying. Every upstream fetch has a
+  timeout, and a 200 response that parses to nothing never replaces a good cached catalog.
 - **Font stylesheets are `crossorigin="anonymous"`.** A plain `<link>` sends no `Origin`, and the
   origin guard rejects it when the API is cross-origin (dev).
 

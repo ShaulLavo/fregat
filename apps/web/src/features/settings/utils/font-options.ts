@@ -100,7 +100,8 @@ export function fontOption(
   catalog: readonly FontCatalogEntry[] | undefined,
 ): FontOption {
   const entry = catalog?.find((candidate) => candidate.ref === ref)
-  if (entry) return entryOption(entry)
+  // A curated name wins, so a label does not change when the catalog arrives.
+  if (entry) return { ...entryOption(entry), label: curatedLabel(ref) ?? entry.family }
 
   const parsed = parseFontRef(ref)
   if (!parsed) return { ref, label: ref, source: 'unknown', detail: 'unknown', listed: false }
@@ -113,10 +114,11 @@ export function fontOption(
 function refLabel(ref: FontRef) {
   if (ref.source === 'bundled') return BUNDLED_FONTS[ref.id as BundledFontId].label
 
-  const curated = [...CURATED_FONTS.ui, ...CURATED_FONTS.code].find(
-    (font) => font.ref === `${ref.source}:${ref.id}`,
-  )
-  return curated?.label ?? ref.id
+  return curatedLabel(`${ref.source}:${ref.id}`) ?? ref.id
+}
+
+function curatedLabel(ref: string) {
+  return [...CURATED_FONTS.ui, ...CURATED_FONTS.code].find((font) => font.ref === ref)?.label
 }
 
 type RankedEntry = {
