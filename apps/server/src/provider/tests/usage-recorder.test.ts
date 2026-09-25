@@ -321,6 +321,45 @@ it('labels what the spend was for', () => {
   expect(rows()).toEqual([expect.objectContaining({ costUsd: 0.01, purpose: 'title' })])
 })
 
+it('imports transcript turns priced from the catalog, and a re-read replaces only its own rows', () => {
+  const fixture = estimatedFixture()
+  const imported = (outputTokens: number) => ({
+    cacheReadTokens: 0,
+    cacheWriteTokens: 0,
+    costUsd: null,
+    inputTokens: 1_000_000,
+    model: 'claude-opus-5-5',
+    outputTokens,
+    reasoningTokens: 0,
+    recordedAt: '2026-09-24T09:00:00.000Z',
+    turnKey: 'prompt-1',
+  })
+  fixture.recorder.importTurns({ providerInstanceId: INSTANCE, sessionId: SESSION }, [
+    imported(100_000),
+  ])
+  fixture.recorder.importTurns({ providerInstanceId: INSTANCE, sessionId: SESSION }, [
+    imported(200_000),
+  ])
+  expect(fixture.rows()).toEqual([
+    expect.objectContaining({
+      costUsd: 4,
+      outputTokens: 200_000,
+      recordedAt: '2026-09-24T09:00:00.000Z',
+      source: 'import',
+      turnId: 'import:prompt-1',
+    }),
+  ])
+
+  // Continued here: the resumed totals already hold the imported turn, so they only seed.
+  fixture.recorder.accept(
+    totalsEvent('turn-live', [
+      totals({ continuesEarlierTurns: true, inputTokens: 1_000_000, outputTokens: 200_000 }),
+    ]),
+    'turn',
+  )
+  expect(fixture.rows()).toHaveLength(1)
+})
+
 function recorderFixture(
   lookup: ProviderPriceCatalog['lookup'] = () => null,
   driverKind: 'claude' | 'codex' = 'claude',

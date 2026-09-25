@@ -102,10 +102,13 @@ import {
   codexDiscoveredSession,
   codexHistoryMessages,
   codexHistoryResponseSchema,
+  codexRolloutPathSchema,
 } from './utils/codex-history'
 import { discoveryInputSchema } from '../utils/discovery-metadata'
 import { codexSessionResumeSchema } from './utils/codex-session'
 import { sessionHistoryInputSchema } from '../utils/session-history'
+import { codexRolloutUsage, isCodexUsageLine } from '../utils/imported-usage'
+import { readJsonLines } from '../utils/json-lines'
 
 const DEFAULT_CODEX_BINARY = 'codex'
 const DEFAULT_CODEX_MODEL = 'gpt-5.5'
@@ -258,6 +261,23 @@ export class CodexProviderAdapter
           'The Codex conversation belongs to a different working directory.',
         )
       return codexHistoryMessages(thread)
+    })
+  }
+
+  /** Reads the rollout file itself: token counts never reach `thread/read`. */
+  readSessionUsage(input: ProviderSessionHistoryInput) {
+    const request = v.parse(sessionHistoryInputSchema, input)
+    return inspectCodexHistory(this.env, async (client) => {
+      const { thread } = await client.requestRaw(
+        'thread/read',
+        { threadId: request.sessionId, includeTurns: false },
+        REQUEST_TIMEOUT_MS,
+        (response) => v.parse(codexRolloutPathSchema, response),
+      )
+      if (thread.id !== request.sessionId || !thread.path) return []
+      if (normalizeWorkspaceCwd(thread.cwd) !== normalizeWorkspaceCwd(request.cwd)) return []
+
+      return codexRolloutUsage(await readJsonLines(thread.path, isCodexUsageLine))
     })
   }
 

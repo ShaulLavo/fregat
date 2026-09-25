@@ -2,8 +2,8 @@
 
 ## Status and authorization
 
-- Status: PHASES 1–3 IMPLEMENTED (meter 2026-09-24; per-turn recording and the usage page
-  2026-09-25). Phase 4 (backfill) and Phase 5 (reset credits, gated) open.
+- Status: PHASES 1–4 IMPLEMENTED (meter 2026-09-24; per-turn recording, the usage page and
+  backfill 2026-09-25). Phase 5 (reset credits) waits for the owner: it spends account credit.
 - Priority: P1 for the meter, P2 for the usage page and history.
 - Effort: S for Phase 1, M overall. Reset-credit redemption (Phase 5) is L and gated.
 - Risk: LOW for display. HIGH only for Phase 5, which spends an account resource.
@@ -242,6 +242,26 @@ and fails on any control that leaves the row or wraps.
 
 The research found usable data (see the outcome above). Backfill writes the same rows, with a
 source column so an imported turn is never counted twice when a session is later continued here.
+
+Delivered 2026-09-25 (lane L3). Import writes what an imported chat spent. After discovery imports
+a session's history it calls `ProviderService.importSessionUsage`, which asks the adapter's
+`readSessionUsage` and hands the turns to the recorder through `subscribeImportedUsage`.
+
+- Claude: the discovery worker reads the transcript files themselves, since the SDK's messages
+  carry no timestamps. It reads `<config>/projects/*/<session>.jsonl` and its `subagents/` files,
+  bills each API response once by message id, and gives subagent responses to the prompt that was
+  running.
+- Codex: the rollout path comes from `thread/read`. It is streamed, only the usage lines are
+  parsed, and a turn is the growth of the thread's running totals. On a 228 MB rollout the turns
+  summed exactly to the final total (443 ms).
+
+Rows are `source: 'import'` (migration 26), keyed `import:<prompt>`, and priced from the catalog.
+A re-read replaces only its own rows. A session continued here is never imported again, and its
+first live totals only seed a baseline, so nothing is counted twice. Import now invalidates the
+usage report. Tests: `utils/tests/imported-usage.test.ts` and `tests/usage-recorder.test.ts`.
+Scenario `claude-usage-import` imports a fixture instance's transcript and reads 3k tokens,
+2 turns and $0.0070 on the usage page. Gaps: Codex child-agent rollouts are separate files and
+are not read, and a session imported before this build gets its usage when its history next changes.
 
 ### Phase 5: Reset credits (gated)
 

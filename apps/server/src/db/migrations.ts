@@ -32,6 +32,7 @@ export const platformMigrations: readonly Migration[] = [
   { version: 29, name: 'turn_end_reason', up: applyTurnEndReason },
   { version: 30, name: 'message_model_selection', up: applyMessageModelSelection },
   { version: 31, name: 'session_fork_and_agent', up: applySessionForkAndAgent },
+  { version: 32, name: 'provider_usage_source', up: applyProviderUsageSource },
 ]
 
 function applyMessageModelSelection(database: PlatformDatabase) {
@@ -40,6 +41,10 @@ function applyMessageModelSelection(database: PlatformDatabase) {
 
 function applyTurnEndReason(database: PlatformDatabase) {
   database.run(sql`ALTER TABLE projection_turns ADD COLUMN end_reason TEXT`)
+}
+
+function applyProviderUsageSource(database: PlatformDatabase) {
+  database.run(sql`ALTER TABLE provider_usage_turns ADD COLUMN source TEXT NOT NULL DEFAULT 'live'`)
 }
 
 function applySessionForkAndAgent(database: PlatformDatabase) {

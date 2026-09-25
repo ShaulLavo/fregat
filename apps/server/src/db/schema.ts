@@ -56,6 +56,10 @@ export const providerUsageTurns = sqliteTable(
     accountKey: text('account_key'),
     /** `turn` for chat; `title` and `commit-message` for the app's own generations. */
     purpose: text('purpose', { enum: providerUsagePurposeSchema.options }).notNull(),
+    /** `import` for turns read back from a transcript of a session begun outside Platform. */
+    source: text('source', { enum: ['live', 'import'] })
+      .notNull()
+      .default('live'),
     recordedAt: text('recorded_at').notNull(),
     inputTokens: integer('input_tokens').notNull(),
     outputTokens: integer('output_tokens').notNull(),

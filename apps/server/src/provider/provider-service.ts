@@ -60,6 +60,7 @@ import type {
   ProviderTurnSteerInput,
   ProviderUserInputResponseInput,
   ProviderSessionDiscoveryInput,
+  ProviderImportedUsage,
   ProviderSessionHistoryInput,
 } from './types'
 import {
@@ -107,6 +108,11 @@ export type ProviderUsageListener = (
   purpose: ProviderUsagePurpose,
 ) => void
 
+export type ProviderImportedUsageListener = (
+  input: { providerInstanceId: ProviderInstanceId; sessionId: SessionId },
+  usage: readonly ProviderImportedUsage[],
+) => void
+
 /** The adapter a stream belongs to, kept beside its teardown so a replacement can be spotted. */
 type AdapterSubscription = {
   adapter: ReturnType<ProviderAdapterRegistry['getByInstance']>
@@ -142,6 +148,7 @@ export class ProviderService {
   /** Ended text-generation sessions whose late events are dropped, by what they were for. */
   private readonly suppressedTextGenerationSessions = new Map<SessionId, ProviderUsagePurpose>()
   private readonly usageListeners = new Set<ProviderUsageListener>()
+  private readonly importedUsageListeners = new Set<ProviderImportedUsageListener>()
   private readonly textGenerationTasks = new Map<SessionId, ProviderTextGenerationTask>()
   private worktreeExecution: ProviderWorktreeExecution | null = null
   private readonly worktreeLeases = new Map<
@@ -646,6 +653,26 @@ export class ProviderService {
         internal: { providerInstanceId: input.providerInstanceId },
       })
     return boundedProviderOperation(adapter, adapter.readSessionHistory(input))
+  }
+
+  /**
+   * Reads what an imported session already spent and hands it to the listeners. A
+   * provider that cannot read its transcripts' usage imports nothing.
+   */
+  async importSessionUsage(
+    input: ProviderSessionHistoryInput & { providerInstanceId: ProviderInstanceId },
+  ) {
+    const adapter = this.adapterRegistry.getByInstance(input.providerInstanceId)
+    if (!adapter.readSessionUsage) return 0
+    const usage = await boundedProviderOperation(adapter, adapter.readSessionUsage(input))
+    for (const listener of this.importedUsageListeners) listener(input, usage)
+    return usage.length
+  }
+
+  subscribeImportedUsage(listener: ProviderImportedUsageListener) {
+    this.importedUsageListeners.add(listener)
+
+    return () => this.importedUsageListeners.delete(listener)
   }
 
   discoverSessions(

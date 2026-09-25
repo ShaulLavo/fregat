@@ -249,6 +249,9 @@ export function createApp(options: AppOptions) {
   const providerMaintenance = new ProviderMaintenance(providerAdapterRegistry)
   providerService.subscribeRuntimeEvents((event) => providerUsage.accept(event))
   providerService.subscribeUsage((event, purpose) => providerUsageRecorder.accept(event, purpose))
+  providerService.subscribeImportedUsage((input, usage) =>
+    providerUsageRecorder.importTurns(input, usage),
+  )
   const orchestration = new OrchestrationEngine(database, {
     responseStreamingMode: (projectId) => {
       const values = settings.snapshot().values

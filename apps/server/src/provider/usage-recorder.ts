@@ -15,7 +15,7 @@ import {
   needsUsagePrice,
   updateUsageContributions,
 } from './utils/usage-contributions'
-import type { ProviderRuntimeEvent } from './types'
+import type { ProviderImportedUsage, ProviderRuntimeEvent } from './types'
 import {
   isEmptyUsage,
   usageDelta,
@@ -87,6 +87,82 @@ export class ProviderUsageRecorder {
         turnId: event.turnId,
       })
     }
+  }
+
+  /**
+   * Turns read back from a transcript. A re-read replaces the rows it wrote before,
+   * and never a live row: once a session continues here the recorder owns it.
+   */
+  importTurns(
+    input: { providerInstanceId: ProviderInstanceId; sessionId: string },
+    usage: readonly ProviderImportedUsage[],
+  ) {
+    if (usage.length === 0) return
+    const account = this.accounts.usageAccount(input.providerInstanceId)
+    const base = {
+      accountKey: account?.accountKey ?? null,
+      driverKind: account?.driverKind ?? 'unknown',
+      providerInstanceId: input.providerInstanceId,
+      sessionId: input.sessionId,
+    }
+    try {
+      this.database.transaction(() => {
+        for (const turn of usage) this.importTurn(base, turn)
+      })
+      recordChatPipelineInfo('chat.pipeline.provider_usage.imported', {
+        models: [...new Set(usage.map((turn) => turn.model))],
+        providerInstanceId: input.providerInstanceId,
+        rows: usage.length,
+        sessionId: input.sessionId,
+        tokens: usage.reduce((sum, turn) => sum + turn.inputTokens + turn.outputTokens, 0),
+      })
+    } catch (error) {
+      recordChatPipelineWarning('chat.pipeline.provider_usage.import_failed', {
+        error,
+        providerInstanceId: input.providerInstanceId,
+        sessionId: input.sessionId,
+      })
+    }
+  }
+
+  private importTurn(
+    base: Pick<RecordedTurn, 'accountKey' | 'driverKind' | 'providerInstanceId' | 'sessionId'>,
+    turn: ProviderImportedUsage,
+  ) {
+    const { model, recordedAt, turnKey, ...amounts } = turn
+    const contributions = [{ after: amounts, before: null, scope: 'import' }]
+    const priceSnapshot = this.prices.lookup(base.driverKind, model)
+    const costUsd = contributionCost(contributions, priceSnapshot)
+    this.database
+      .insert(providerUsageTurns)
+      .values({
+        ...base,
+        ...amounts,
+        contributions,
+        costUsd,
+        model,
+        priceSnapshot,
+        purpose: 'turn',
+        recordedAt,
+        source: 'import',
+        turnId: `import:${turnKey}`,
+      })
+      .onConflictDoUpdate({
+        set: {
+          cacheReadTokens: sql`excluded.cache_read_tokens`,
+          cacheWriteTokens: sql`excluded.cache_write_tokens`,
+          contributions: sql`excluded.contributions_json`,
+          costUsd: sql`excluded.cost_usd`,
+          inputTokens: sql`excluded.input_tokens`,
+          outputTokens: sql`excluded.output_tokens`,
+          priceSnapshot: sql`excluded.price_snapshot`,
+          reasoningTokens: sql`excluded.reasoning_tokens`,
+          recordedAt: sql`excluded.recorded_at`,
+        },
+        setWhere: eq(providerUsageTurns.source, 'import'),
+        target: [providerUsageTurns.sessionId, providerUsageTurns.turnId, providerUsageTurns.model],
+      })
+      .run()
   }
 
   private record(

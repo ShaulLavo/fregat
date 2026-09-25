@@ -104,6 +104,7 @@ import { commandPaletteTypeBurst } from './command-palette-type-burst'
 import { paletteScriptsPending } from './palette-scripts-pending'
 import { settingsModelsPending } from './settings-models-pending'
 import { settingsProviderUpdate } from './settings-provider-update'
+import { claudeUsageImport } from './claude-usage-import'
 import { chatFollowUp } from './chat-follow-up'
 import { chatDiffSyntax } from './chat-diff-syntax'
 import { editorSplitDrag } from './editor-split-drag'
@@ -336,6 +337,7 @@ export const scenarios: readonly Scenario[] = [
   paletteScriptsPending,
   settingsModelsPending,
   settingsProviderUpdate,
+  claudeUsageImport,
   editorThemePreview,
   editorSyntaxBenchmark('native'),
   editorNativeCoverage('light'),

@@ -5,9 +5,11 @@ import type {
   ProviderSessionDiscoveryInput,
   ProviderSessionHistoryInput,
   ProviderHistoryMessage,
+  ProviderImportedUsage,
 } from './types'
 import { sessionIdentityErrors } from './structured-errors'
 import { discoveredSessionsSchema, discoveryInputSchema } from './utils/discovery-metadata'
+import { importedUsageListSchema } from './utils/imported-usage'
 import { historyMessagesSchema, sessionHistoryInputSchema } from './utils/session-history'
 
 const DISCOVERY_TIMEOUT_MS = 8_000
@@ -19,9 +21,25 @@ export type ClaudeDiscoveryRunner = (input: {
 }) => Promise<unknown>
 
 export type ClaudeHistoryRunner = (input: {
-  request: ProviderSessionHistoryInput
+  request: ProviderSessionHistoryInput | ClaudeUsageRequest
   env: NodeJS.ProcessEnv
 }) => Promise<unknown>
+
+type ClaudeUsageRequest = ProviderSessionHistoryInput & { usage: true }
+
+/** Usage per turn from the transcript files, subagents included. */
+export async function readClaudeSessionUsage(input: {
+  request: ProviderSessionHistoryInput
+  env: NodeJS.ProcessEnv
+  runner?: ClaudeHistoryRunner
+}): Promise<ProviderImportedUsage[]> {
+  const request = v.parse(sessionHistoryInputSchema, input.request)
+  const rows = await (input.runner ?? runClaudeSessionWorker)({
+    request: { ...request, usage: true },
+    env: input.env,
+  })
+  return v.parse(importedUsageListSchema, rows)
+}
 
 export async function readClaudeSessionHistory(input: {
   request: ProviderSessionHistoryInput
@@ -64,7 +82,7 @@ export async function runClaudeDiscovery(
 
 async function runClaudeSessionWorker(
   input: {
-    request: ProviderSessionDiscoveryInput | ProviderSessionHistoryInput
+    request: ProviderSessionDiscoveryInput | ProviderSessionHistoryInput | ClaudeUsageRequest
     env: NodeJS.ProcessEnv
   },
   spawn = spawnClaudeDiscovery,

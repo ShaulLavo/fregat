@@ -55,6 +55,7 @@ import { isNotInstalledError, requestGone, sessionIdentityErrors } from '../stru
 import {
   discoverClaudeSessions,
   readClaudeSessionHistory,
+  readClaudeSessionUsage,
   type ClaudeDiscoveryRunner,
   type ClaudeHistoryRunner,
 } from '../claude-discovery'
@@ -447,6 +448,10 @@ export class ClaudeProviderAdapter
 
   readSessionHistory(request: ProviderSessionHistoryInput) {
     return readClaudeSessionHistory({ request, env: this.env, runner: this.historyRunner })
+  }
+
+  readSessionUsage(request: ProviderSessionHistoryInput) {
+    return readClaudeSessionUsage({ request, env: this.env, runner: this.historyRunner })
   }
 
   async hasRuntime({ sessionId }: { sessionId: SessionId }) {

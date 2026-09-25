@@ -29,7 +29,7 @@ import type {
   TurnId,
   UserInputQuestions,
 } from '@workspace/contracts'
-import type { ProviderUsageTotals } from './utils/usage-totals'
+import type { ProviderUsageAmounts, ProviderUsageTotals } from './utils/usage-totals'
 import type { ProviderUsageProbe, ProviderUsageUpdate } from './utils/usage-windows'
 
 export type ProviderTurnInput = {
@@ -544,6 +544,14 @@ export type ProviderHistoryMessage = {
   createdAt: string | null
 }
 
+/** One turn's usage for one model, read back from a transcript of a session begun elsewhere. */
+export type ProviderImportedUsage = ProviderUsageAmounts & {
+  /** Stable across re-reads: the prompt that opened the turn. */
+  turnKey: string
+  model: string
+  recordedAt: string
+}
+
 export type ProviderAdapterRuntime = {
   runtimeEpoch: string
   cwd: string
@@ -574,6 +582,7 @@ export type ProviderAdapter = {
   /** Drops a remembered executable and version, after the CLI on disk was replaced. */
   forgetExecutable?: () => void
   readSessionHistory?: (input: ProviderSessionHistoryInput) => Promise<ProviderHistoryMessage[]>
+  readSessionUsage?: (input: ProviderSessionHistoryInput) => Promise<ProviderImportedUsage[]>
   /**
    * One full read of the account's plan windows, outside any turn. Throws when the
    * provider could not answer; the usage store keeps what it had.

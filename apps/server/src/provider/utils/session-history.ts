@@ -8,6 +8,11 @@ export const sessionHistoryInputSchema = v.object({
   cwd: v.pipe(v.string(), v.minLength(1)),
 })
 
+export const sessionUsageInputSchema = v.object({
+  ...sessionHistoryInputSchema.entries,
+  usage: v.literal(true),
+})
+
 export const historyMessagesSchema = v.array(
   v.object({
     sourceId: v.pipe(v.string(), v.minLength(1)),

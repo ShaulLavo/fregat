@@ -49,7 +49,11 @@ export type DiscoveryScanResult = {
 type DiscoveryOptions = {
   providerService: Pick<
     ProviderService,
-    'discoveryInstances' | 'discoverSessions' | 'readSessionHistory' | 'importSources'
+    | 'discoveryInstances'
+    | 'discoverSessions'
+    | 'importSessionUsage'
+    | 'importSources'
+    | 'readSessionHistory'
   >
   registration: RegistrationBoundary
   dispatch: (command: OrchestrationCommand) => Promise<unknown>
@@ -307,9 +311,27 @@ export class SessionDiscoveryReconciler {
     })
     const changed = await this.options.importHistory(row.sessionId, history, row.sourceUpdatedAt)
     if (!changed) return
+    await this.importUsage(providerInstanceId, row.sessionId, match.worktree.canonicalPath)
     result.messages += history.length
     if (existing) result.refreshed += 1
     else result.imported += 1
+  }
+
+  /** Spent tokens follow the history; a transcript without them still imports its messages. */
+  private async importUsage(
+    providerInstanceId: ProviderInstanceId,
+    sessionId: SessionId,
+    cwd: string,
+  ) {
+    try {
+      await this.options.providerService.importSessionUsage({ cwd, providerInstanceId, sessionId })
+    } catch (error) {
+      recordChatPipelineWarning('chat.pipeline.session_discovery.usage_failed', {
+        error,
+        providerInstanceId,
+        sessionId,
+      })
+    }
   }
 
   private async resolveCheckout(
