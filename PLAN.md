@@ -357,7 +357,8 @@ readers migrate with each shared-settings cutover. Native Swift theme UI is outs
 
 Requested 2026-09-13. Six plans from one review, and a seventh added 2026-09-20 of the production web build. At the review the
 deployed release sent 2421 KB gzip of JavaScript before the first frame, 2311 KB of it in a single chunk.
-Plans 106, 107, 109 (Phases 2–3) and 129 (Phases 1–2) brought it to 1,610,904 B gz by 2026-09-21. The
+Plans 106, 107, 109 (Phases 2–3) and 129 brought it to 1,607,295 B gz ([disk], 2026-09-25), the number
+`bun run --cwd apps/web bundle:gate` pins per owner in `apps/web/scripts/first-load-pins.json`. The
 cause is not bundler configuration — Rolldown is already in use and `apps/web/vite.config.ts` has no
 chunking options because the application declares almost no loading boundaries. Chunk boundaries
 come only from dynamic `import()` in source.

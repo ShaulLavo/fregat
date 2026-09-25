@@ -8,6 +8,7 @@
     "apps/server": {
       "entry": [
         "src/provider/claude-discovery-worker.ts",
+        "src/terminal-host/main.ts",
         "scripts/pty-benchmark.ts",
         "scripts/pty-smoke.ts",
         "scripts/workspace-search-benchmark.ts",

@@ -91,7 +91,7 @@ export function ensureToken(paths: HostPaths) {
   return readFileSync(paths.token, 'utf8').trim()
 }
 
-export function isErrnoCode(error: unknown, code: string) {
+function isErrnoCode(error: unknown, code: string) {
   return error instanceof Error && 'code' in error && error.code === code
 }
 

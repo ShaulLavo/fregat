@@ -1,0 +1,45 @@
+{
+  "reading": "disk",
+  "scriptGzip": 1607295,
+  "owners": {
+    "node_modules": 477639,
+    "external": 325862,
+    "apps/web/src/features/chat": 134841,
+    "apps/web/src/features/editor": 88821,
+    "packages/tree": 73315,
+    "apps/web/src/lib": 52040,
+    "packages/client-core": 50778,
+    "apps/web/src/features/search": 43725,
+    "apps/web/src/features/chat-mode": 42405,
+    "apps/web/src/features/workspace": 36226,
+    "apps/web/src/features/workbench": 36210,
+    "packages/contracts": 32403,
+    "apps/web/src/features/git": 31720,
+    "packages/ui": 23478,
+    "apps/web/src/components": 23903,
+    "apps/web/src/keymap": 19552,
+    "apps/web/src/state": 16575,
+    "apps/web/src/features/file-picker": 16185,
+    "apps/web/src/features/command-palette": 15731,
+    "apps/web/src/features/settings": 12379,
+    "apps/web/src/features/logs": 10162,
+    "apps/web/src/features/address": 9803,
+    "apps/web/src/features/environments": 6284,
+    "packages/markdown": 5410,
+    "apps/web/src/hooks": 3685,
+    "apps/web/src/features/server-update": 2488,
+    "apps/web/src/providers": 1395,
+    "apps/web/src/features/terminal": 1197,
+    "packages/observability": 904,
+    "virtual": 1260,
+    "packages/utils": 701,
+    "apps/web/src": 729
+  },
+  "history": [
+    {
+      "at": "2026-09-25T14:03:53.815Z",
+      "scriptGzip": 1607295,
+      "reason": "First pin: after Plans 109 Phases 2-3, 129 Q2 (lazy Shiki) and the evlog dedupe"
+    }
+  ]
+}

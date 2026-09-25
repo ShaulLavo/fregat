@@ -70,11 +70,7 @@ export function allowedOriginsForWebPort(
 }
 
 // The origin guard is exact, so register both loopback spellings and the TUI origin.
-export function webOrigins(
-  configuredOrigins: string | undefined,
-  webHost: string,
-  webPort: number,
-) {
+function webOrigins(configuredOrigins: string | undefined, webHost: string, webPort: number) {
   return unique([
     ...browserOriginsForWebPort(webHost, webPort),
     TUI_CLIENT_ORIGIN,

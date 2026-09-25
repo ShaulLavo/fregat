@@ -7,6 +7,7 @@
     "dev": "bun run --parallel dev:vite dev:types",
     "build": "tsgo --build && bun --bun --env-file=../../.env vite build",
     "bundle:report": "bun scripts/bundle-report.ts",
+    "bundle:gate": "bun scripts/bundle-gate.ts",
     "proof:workspace-reload": "bun scripts/workspace-reload-proof.mjs --check",
     "bench:editor-open": "bun scripts/editor-open-benchmark.mjs",
     "bench:editor-open:calibrate": "bun scripts/calibrate-editor-open-benchmark.mjs",
