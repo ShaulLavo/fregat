@@ -16,10 +16,15 @@ const EFFORT_LABELS: Readonly<Record<string, string>> = {
   low: 'Low',
   medium: 'Medium',
   high: 'High',
-  xhigh: 'Extra High',
+  xhigh: 'Extra high',
   max: 'Max',
   ultracode: 'Ultracode',
   ultrathink: 'Ultrathink',
+}
+
+const EFFORT_DESCRIPTIONS: Readonly<Record<string, string>> = {
+  ultracode: 'Extra high effort plus multi-agent workflow orchestration',
+  ultrathink: 'Starts your prompt with “Ultrathink:”',
 }
 
 type ClaudeModelOverlay = {
@@ -179,7 +184,7 @@ function optionDescriptors(row: MergedRow, overlay: ClaudeModelOverlay) {
   const descriptors: ProviderOptionDescriptor[] = []
   if (row.effortLevels.length > 0) descriptors.push(effortDescriptor(row.effortLevels, overlay))
   if (overlay.thinking) descriptors.push({ id: 'thinking', label: 'Thinking', type: 'boolean' })
-  if (row.fastMode) descriptors.push({ id: 'fastMode', label: 'Fast Mode', type: 'boolean' })
+  if (row.fastMode) descriptors.push({ id: 'fastMode', label: 'Fast mode', type: 'boolean' })
   const contextWindow = row.oneMillion ? '1m' : overlay.defaultContextWindow
   if (contextWindow) descriptors.push(contextDescriptor(contextWindow))
 
@@ -200,9 +205,7 @@ function effortDescriptor(
       id,
       label: EFFORT_LABELS[id] ?? id,
       ...(id === overlay.defaultEffort ? { isDefault: true } : {}),
-      ...(id === 'ultracode'
-        ? { description: 'xhigh effort plus multi-agent workflow orchestration' }
-        : {}),
+      ...(EFFORT_DESCRIPTIONS[id] ? { description: EFFORT_DESCRIPTIONS[id] } : {}),
     })),
     promptInjectedValues: ['ultrathink'],
   }
@@ -211,7 +214,7 @@ function effortDescriptor(
 function contextDescriptor(defaultContext: string): ProviderOptionDescriptor {
   return {
     id: 'contextWindow',
-    label: 'Context Window',
+    label: 'Context window',
     type: 'select',
     options: ['200k', '1m'].map((id) => ({
       id,

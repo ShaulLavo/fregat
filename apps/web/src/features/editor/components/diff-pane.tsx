@@ -14,6 +14,7 @@ import { useLayoutEffect, useMemo, useRef } from 'react'
 
 import { useDiffLanguage } from '@/features/editor/hooks/use-diff-language'
 import { useDiffRows } from '@/features/editor/hooks/use-diff-rows'
+import { useEditorTypography } from '@/features/editor/hooks/use-editor-typography'
 import type { DiffLanguageServerContext } from '@/features/editor/utils/diff-language-context'
 import {
   DIFF_CURSOR_LINE_HIGHLIGHT,
@@ -91,6 +92,7 @@ export function DiffPane({
     diffLanguagePlugin,
     persistence?.plugin,
   ].filter((entry) => entry !== null && entry !== undefined)
+  const typography = useEditorTypography()
   const controller = useEditor({
     presentationReady: false,
     suspiciousCharacters: unicodeHighlights.options,
@@ -101,6 +103,7 @@ export function DiffPane({
     // one that carries the scroll position across, and it is what the package's own contract names.
     documentMode: 'static',
     editability: 'readonly',
+    ...typography,
     keymap: DIFF_KEYMAP,
     // Only the diff plugin: the critical core set would bring line and fold gutters, find, merge
     // conflicts, shiki and LSP, none of which a diff had — and a fold gutter would break the

@@ -6,9 +6,6 @@ import { fontStack } from '@/lib/default-nerd-font'
 export type AppearanceValues = Pick<
   SettingsValues,
   | 'editor.fontFamily'
-  | 'editor.fontSize'
-  | 'editor.lineHeight'
-  | 'editor.tabSize'
   | 'workbench.colorTheme'
   | 'workbench.density'
   | 'workbench.surface.blur'
@@ -56,19 +53,10 @@ export function applyAppearance(values: AppearanceValues, root: Root, prefersDar
   root.style.setProperty('--surface-saturation', `${values['workbench.surface.saturation']}%`)
   applyFileTreeIndentGuideVisibility(values['workbench.tree.indentGuides'], root)
 
-  // Editor typography rides CSS rather than editor options. The editor package
-  // already reads `--editor-tab-size` and `--editor-row-height` from its own
-  // stylesheet, and the app host rule owns font-family and font-size — so these
-  // are live with no remount, and without a commit in the separate editor repo.
-  //
-  // `--font-mono` is deliberately app-wide: the terminal reads the same stack,
-  // so one font setting covers both unless the terminal overrides it. The stack
-  // is set here so text reflows immediately; fetching and registering the face
-  // is a separate, slower job the font loader owns.
+  // The editor takes its typography as options. `--font-mono` is for the rest of
+  // the app: the terminal reads the same stack unless it overrides it. Fetching
+  // and registering the face is the font loader's job.
   root.style.setProperty('--font-mono', fontStack(values['editor.fontFamily']))
-  root.style.setProperty('--editor-font-size', `${values['editor.fontSize']}px`)
-  root.style.setProperty('--editor-row-height', `${values['editor.lineHeight']}px`)
-  root.style.setProperty('--editor-tab-size', String(values['editor.tabSize']))
 
   if (values['workbench.wallpaper'].enabled) {
     root.removeAttribute('data-wallpaper-hidden')

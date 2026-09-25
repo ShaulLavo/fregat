@@ -852,11 +852,6 @@
   --editor-gutter-background: var(--background) !important;
 
   flex: 1;
-  font-family: var(--font-mono);
-
-  /* Settings-driven, with the package's own default as the fallback so the
-     editor still renders correctly before the first snapshot lands. */
-  font-size: var(--editor-font-size, 13px);
   min-height: 0;
   min-width: 0;
   overflow-anchor: none;
@@ -912,16 +907,6 @@
   ) !important;
 }
 
-/* A diff pane deliberately does not carry `.app-editor-host`: that class forces
-   `--editor-background` and `--editor-gutter-background` with `!important` at the
-   same specificity as the diff package's own overrides of the same two variables,
-   so which one wins would come down to stylesheet order. Only the typography is
-   wanted here, and it collides with nothing. */
-.editor-diff-view .editor-virtualized {
-  font-family: var(--font-mono);
-  font-size: var(--editor-font-size, 13px);
-}
-
 [data-workbench] .app-editor-host .editor-minimap,
 [data-chat-mode] .app-editor-host .editor-minimap {
   -webkit-backdrop-filter: var(--workbench-editor-minimap-backdrop-filter);
@@ -947,10 +932,8 @@
   --editor-foreground: var(--foreground) !important;
   --editor-gutter-background: transparent !important;
   --editor-gutter-foreground: var(--muted-foreground) !important;
-  --editor-row-height: 22px;
 
   background: transparent !important;
-  font-size: 12px;
   overflow: hidden;
 }
 

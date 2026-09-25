@@ -63,7 +63,7 @@ async function checkedOption(page: Page, group: string, choice: string) {
 export const providerModelOptions = isolatedNativeScenario({
   name: 'provider-model-options',
   description:
-    'Advertised model choices reach native turn/start exactly; model changes reconcile unsupported choices and provider defaults remain optional.',
+    'Advertised model choices reach native turn/start exactly; untouched options are omitted and model changes reconcile unsupported choices.',
   fixture: new URL('../fixtures/native-model-options.mjs', import.meta.url),
   async drive(page, { step, root, orchestration, projectId, providerInstanceId }) {
     const before = (await readShell(page, orchestration)).projects.find(
@@ -72,10 +72,10 @@ export const providerModelOptions = isolatedNativeScenario({
     ok(before, 'Fixture owner project exists')
     try {
       await selectors.modelOptions(page).click()
-      await checkedOption(page, 'Reasoning', 'Provider default (Medium)')
-      await checkedOption(page, 'Service Tier', 'Provider default (Standard)')
+      await checkedOption(page, 'Reasoning', 'Medium')
+      await checkedOption(page, 'Service tier', 'Standard')
       for (const choice of ['Standard', 'Priority', 'Flexible'])
-        await selectors.modelOptionChoice(page, 'Service Tier', choice).waitFor()
+        await selectors.modelOptionChoice(page, 'Service tier', choice).waitFor()
       await selectors.modelOptionChoice(page, 'Reasoning', 'future-effort-v3').waitFor()
       await settleAnimations(selectors.popupMenu(page))
       await step('advertised-effort-and-all-service-tiers')
@@ -84,21 +84,21 @@ export const providerModelOptions = isolatedNativeScenario({
       await step('unselected-options-are-omitted')
 
       await chooseOption(page, 'Reasoning', 'future-effort-v3')
-      await chooseOption(page, 'Service Tier', 'Standard')
+      await chooseOption(page, 'Service tier', 'Standard')
       await sendWithOptions(page, root, 'OPTIONS_STANDARD', {
         model: 'gpt-5.5',
         effort: 'future-effort-v3',
         serviceTier: 'default',
       })
       await step('standard-and-future-effort-reach-native')
-      await chooseOption(page, 'Service Tier', 'Priority')
+      await chooseOption(page, 'Service tier', 'Priority')
       await sendWithOptions(page, root, 'OPTIONS_PRIORITY', {
         model: 'gpt-5.5',
         effort: 'future-effort-v3',
         serviceTier: 'priority',
       })
       await step('priority-id-reaches-native')
-      await chooseOption(page, 'Service Tier', 'Flexible')
+      await chooseOption(page, 'Service tier', 'Flexible')
       await sendWithOptions(page, root, 'OPTIONS_FLEX', {
         model: 'gpt-5.5',
         effort: 'future-effort-v3',
@@ -106,12 +106,6 @@ export const providerModelOptions = isolatedNativeScenario({
       })
       await step('flex-id-reaches-native')
 
-      await chooseOption(page, 'Reasoning', 'Provider default (Medium)')
-      await chooseOption(page, 'Service Tier', 'Provider default (Standard)')
-      await sendWithOptions(page, root, 'OPTIONS_RESET', { model: 'gpt-5.5' })
-      await step('provider-default-clears-explicit-options')
-      await chooseOption(page, 'Reasoning', 'future-effort-v3')
-      await chooseOption(page, 'Service Tier', 'Flexible')
       await selectors.modelPickerTrigger(page).click()
       await selectors.modelPickerOption(page, 'Options alternate').click()
       await selectors.modelPickerPanel(page).waitFor({ state: 'hidden' })
@@ -120,9 +114,9 @@ export const providerModelOptions = isolatedNativeScenario({
         await selectors.modelOptionChoice(page, 'Reasoning', 'future-effort-v3').count(),
         0,
       )
-      strictEqual(await selectors.modelOptionChoice(page, 'Service Tier', 'Flexible').count(), 0)
+      strictEqual(await selectors.modelOptionChoice(page, 'Service tier', 'Flexible').count(), 0)
       await checkedOption(page, 'Reasoning', 'Low')
-      await checkedOption(page, 'Service Tier', 'Economy v2')
+      await checkedOption(page, 'Service tier', 'Economy v2')
       await settleAnimations(selectors.popupMenu(page))
       await step('model-switch-adopts-supported-defaults')
       await page.keyboard.press('Escape')

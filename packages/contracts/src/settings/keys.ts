@@ -412,10 +412,9 @@ export const SETTINGS_REGISTRY = {
     scope: 'window',
     widget: 'number',
     category: 'Editor',
-    // Rendered width only. The editor package reads `--editor-tab-size` from CSS,
-    // which is what makes this live without a cross-repo setter; what it does
-    // *not* change is the indentation the editor inserts, which is captured in
-    // the Editor constructor and has no setter.
+    // Nothing reads this yet. The editor detects each document's width and has no
+    // setter for the fallback it detects against; a `:root` variable never reached
+    // it, because the editor writes `--editor-tab-size` on its own element.
     description: 'Rendered width of a tab character, in spaces.',
     keywords: ['tab', 'indent', 'width', 'spaces'],
   }),

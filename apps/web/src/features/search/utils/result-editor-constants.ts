@@ -1,6 +1,7 @@
 import type { BrowserTextMetrics } from '@singapore-editor/core'
 import type { CSSProperties } from 'react'
 
+export const EXCERPT_EDITOR_FONT_SIZE = 12
 export const EXCERPT_EDITOR_LINE_HEIGHT = 22
 const EXCERPT_EDITOR_CHARACTER_WIDTH = 8
 export const SEARCH_RESULT_FILE_EDITOR_ROW_GAP = 6

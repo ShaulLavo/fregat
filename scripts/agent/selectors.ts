@@ -143,6 +143,8 @@ export const selectors = {
     page
       .getByRole('group', { name: group, exact: true })
       .getByRole('menuitemradio', { name: choice, exact: true }),
+  modelOptionSwitch: (page: Page, name: string) =>
+    page.getByRole('menuitemcheckbox', { name, exact: true }),
   listTabStops: (list: Locator) =>
     list.locator(
       '[tabindex="0"], button:not([tabindex="-1"]), input:not([tabindex="-1"]), select:not([tabindex="-1"]), a[href]:not([tabindex="-1"])',

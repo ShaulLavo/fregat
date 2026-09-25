@@ -4,9 +4,18 @@ import {
   modelSelectionOptionValue,
 } from '@workspace/client-core/chat/providers/options'
 
-export const PROVIDER_DEFAULT_VALUE = ''
+/** Fast mode shows as a bolt on the trigger, never as text. */
+export const FAST_MODE_OPTION_ID = 'fastMode'
 
-/** What the trigger says: chosen values first, the model's own defaults after. */
+/** The stored choice, or the model's default when nothing is stored. */
+export function effectiveOptionValue(
+  descriptor: ProviderOptionDescriptor,
+  selection: ModelSelection,
+) {
+  return modelSelectionOptionValue(selection, descriptor) ?? modelOptionDefaultValue(descriptor)
+}
+
+/** What the trigger says: every select's value, then booleans that are on. */
 export function descriptorSummary(
   descriptors: readonly ProviderOptionDescriptor[],
   selection: ModelSelection,
@@ -19,40 +28,21 @@ export function descriptorSummary(
       return activeChoiceLabel(descriptor, selection)
     })
     .filter((label): label is string => label !== null)
-  if (labels.length === 0) return 'Options'
+  const fast = descriptors.some(
+    (descriptor) =>
+      descriptor.id === FAST_MODE_OPTION_ID && effectiveOptionValue(descriptor, selection) === true,
+  )
 
-  return labels.join(' · ')
+  return { fast, label: labels.join(' · ') || (fast ? 'Fast' : 'Options') }
 }
 
 function activeChoiceLabel(descriptor: ProviderOptionDescriptor, selection: ModelSelection) {
-  const value =
-    modelSelectionOptionValue(selection, descriptor) ?? modelOptionDefaultValue(descriptor)
-  if (value === null) return null
-
-  if (typeof value === 'boolean') return value ? 'On' : 'Off'
-  return descriptorChoices(descriptor).find((choice) => choice.id === value)?.label ?? null
-}
-
-export function defaultChoiceLabel(descriptor: ProviderOptionDescriptor) {
-  const value = modelOptionDefaultValue(descriptor)
-  if (typeof value === 'boolean') return `Provider default (${value ? 'On' : 'Off'})`
-  const fallback = descriptorChoices(descriptor).find((choice) => choice.id === value)
-  return fallback ? `Provider default (${fallback.label})` : 'Provider default'
-}
-
-export function radioValue(value: string | boolean | null) {
-  if (typeof value === 'boolean') return value ? 'on' : 'off'
-  return value ?? PROVIDER_DEFAULT_VALUE
-}
-
-export function descriptorChoices(
-  descriptor: ProviderOptionDescriptor,
-): readonly { id: string; label: string; description?: string }[] {
-  if (descriptor.type === 'select') return descriptor.options
-  return [
-    { id: 'on', label: 'On' },
-    { id: 'off', label: 'Off' },
-  ]
+  const value = effectiveOptionValue(descriptor, selection)
+  if (descriptor.type === 'boolean') {
+    if (value !== true || descriptor.id === FAST_MODE_OPTION_ID) return null
+    return descriptor.label
+  }
+  return descriptor.options.find((choice) => choice.id === value)?.label ?? null
 }
 
 export function promptEffortState(

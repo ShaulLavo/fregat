@@ -8,7 +8,8 @@ import {
   waitForApp,
 } from '../selectors'
 
-// An important root rule outlives the inline `--font-mono` the appearance layer writes at boot.
+// An important rule outlives the inline `--editor-font-family` the editor writes from its option,
+// so the face changes behind the editor's back and it has to notice by itself.
 const OVERRIDE_ID = 'agent-proportional-font'
 const PROPORTIONAL = "'Liberation Sans', 'Noto Sans', sans-serif"
 
@@ -74,7 +75,7 @@ export const editorProportionalFont: Scenario = {
         document.addEventListener('DOMContentLoaded', () => {
           const style = document.createElement('style')
           style.id = id
-          style.textContent = `:root { --font-mono: ${font} !important; }`
+          style.textContent = `.editor-virtualized { --editor-font-family: ${font} !important; }`
           document.head.append(style)
         })
       },
