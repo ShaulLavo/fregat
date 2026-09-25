@@ -81,6 +81,10 @@ export function derivePendingApprovals(
       markSubmitted(open, activity.payload)
       continue
     }
+    if (activity.kind === 'provider.approval.respond.failed') {
+      markFailed(open, activity.payload)
+      continue
+    }
     if (!isApprovalActivity(activity.kind)) continue
 
     const parsed = v.safeParse(approvalPayloadSchema, activity.payload)
@@ -95,6 +99,25 @@ export function derivePendingApprovals(
   }
 
   return [...open.values()].filter((approval) => !endedWithTurn(approval, latestTurn))
+}
+
+function markFailed(open: Map<ApprovalRequestId, PendingApproval>, payload: unknown) {
+  const parsed = v.safeParse(
+    v.object({
+      requestId: approvalRequestIdSchema,
+      code: v.optional(v.string()),
+    }),
+    payload,
+  )
+  if (!parsed.success) return
+  const { requestId, code } = parsed.output
+  const approval = open.get(requestId)
+  if (!approval) return
+  if (code === 'provider.REQUEST_GONE') {
+    open.delete(requestId)
+    return
+  }
+  open.set(requestId, { ...approval, submittedDecision: null })
 }
 
 function markSubmitted(open: Map<ApprovalRequestId, PendingApproval>, payload: unknown) {

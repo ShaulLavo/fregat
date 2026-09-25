@@ -292,3 +292,36 @@ function activity({
 function turnId(value: string) {
   return v.parse(turnIdSchema, value)
 }
+
+test('a remote transient failure clears the admitted answer for retry after reload', () => {
+  const activities = [
+    requested('req-1', 1),
+    activity({
+      createdAt: at(2),
+      sequence: 2,
+      kind: 'approval.answer-submitted',
+      payload: { requestId: 'req-1', decision: 'accept' },
+    }),
+    activity({
+      createdAt: at(3),
+      sequence: 3,
+      kind: 'provider.approval.respond.failed',
+      payload: { requestId: 'req-1', code: 'provider.UNAVAILABLE' },
+    }),
+  ]
+  expect(derivePendingApprovals(activities)[0]?.submittedDecision).toBeNull()
+  expect(derivePendingApprovals(structuredClone(activities))[0]?.submittedDecision).toBeNull()
+})
+
+test('a remote gone failure closes the approval', () => {
+  expect(
+    derivePendingApprovals([
+      requested('req-1', 1),
+      activity({
+        createdAt: at(2),
+        kind: 'provider.approval.respond.failed',
+        payload: { requestId: 'req-1', code: 'provider.REQUEST_GONE' },
+      }),
+    ]),
+  ).toEqual([])
+})
