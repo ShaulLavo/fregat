@@ -381,6 +381,12 @@
       "minimum": 100,
       "type": "integer"
     },
+    "files.picker.view": {
+      "default": "auto",
+      "description": "How the file picker shows a folder. Auto uses columns when choosing a folder and a list when choosing a file.",
+      "enum": ["auto", "columns", "list"],
+      "type": "string"
+    },
     "files.showHidden": {
       "default": false,
       "description": "Show dot-prefixed files and folders in file pickers.",

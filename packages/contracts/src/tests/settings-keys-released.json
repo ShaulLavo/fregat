@@ -51,6 +51,7 @@
     "environments.machines",
     "files.autoSave",
     "files.autoSaveDelay",
+    "files.picker.view",
     "files.showHidden",
     "keybindings.overrides",
     "keybindings.preset",

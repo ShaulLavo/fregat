@@ -6,6 +6,8 @@ import {
   ArrowLeftIcon,
   ArrowRightIcon,
   ArrowUpIcon,
+  ColumnsIcon,
+  ListIcon,
   EyeIcon,
   EyeSlashIcon,
   MagnifyingGlassIcon,
@@ -29,6 +31,16 @@ import { useDirectoryTransition } from '@/features/file-picker/hooks/use-directo
 import { useFilePickerPathInput } from '@/features/file-picker/hooks/use-path-input'
 import { IconTooltip } from '@/features/file-picker/components/icon-tooltip'
 import { FileList } from '@/features/file-picker/components/list'
+import { ColumnsView } from '@/features/file-picker/components/columns-view'
+import {
+  initialTrail,
+  pickerView,
+  shownPickerView,
+  type ColumnTrail,
+  type PickerView,
+} from '@/features/file-picker/utils/columns'
+import { useElementWidth } from '@/hooks/use-element-width'
+import { Tabs, TabsList, TabsTab } from '@workspace/ui/components/tabs'
 import { ListHeader } from '@/features/file-picker/components/list-header'
 import {
   ROOT_PATH,
@@ -180,12 +192,23 @@ export function FilePickerDialog({
     [effectiveSort, loadedEntries],
   )
   const selectedEntry = selectedVisibleEntry(entries, session.selectedEntry)
+  const viewSetting = useSettingValue('files.picker.view')
+  const chosenView = pickerView(viewSetting, mode)
+  const [middleRef, middleWidth] = useElementWidth<HTMLDivElement>()
+  const view = shownPickerView(chosenView, isSearching, middleWidth)
+  const [trailState, setTrailState] = useState<{ path: string; trail: ColumnTrail } | null>(null)
+  const trail =
+    trailState?.path === session.currentPath
+      ? trailState.trail
+      : initialTrail(session.currentPath, selectedEntry)
+  // In columns the selection that counts is the deepest one; in the list, the list's.
+  const focusedEntry = view === 'columns' ? (trail.at(-1) ?? null) : selectedEntry
   const isSearchPending = session.query.trim() !== session.effectiveQuery.trim()
   const isSearchLoading = isSearching && isDirectoryFetching
   const listInteractionPending = isSearchPending || isSearchLoading
-  const previewEntry = selectedEntry ?? currentEntry
+  const previewEntry = focusedEntry ?? currentEntry
   const selectedPickable =
-    toPickedEntry(selectedEntry, mode, accept) ?? currentPickableEntry(currentEntry, mode)
+    toPickedEntry(focusedEntry, mode, accept) ?? currentPickableEntry(currentEntry, mode)
   const homePath = serverInfo?.homePath ?? ROOT_PATH
   const settingsLayers = settings?.layers ?? []
   const hiddenWriteTarget = deriveWriteTarget('files.showHidden', settingsLayers)
@@ -207,10 +230,10 @@ export function FilePickerDialog({
   }, [open])
 
   useEffect(() => {
-    if (!selectedEntry || !isDirectoryEntry(selectedEntry)) return
+    if (!focusedEntry || !isDirectoryEntry(focusedEntry)) return
 
-    void preloadDirectory(selectedEntry.path)
-  }, [preloadDirectory, selectedEntry])
+    void preloadDirectory(focusedEntry.path)
+  }, [preloadDirectory, focusedEntry])
 
   function refresh() {
     void Promise.all([refreshDirectory(), refreshRecents(), refreshServerInfo()])
@@ -296,6 +319,13 @@ export function FilePickerDialog({
 
   function focusListFromSearch(event: KeyboardEvent<HTMLInputElement>, offset: number) {
     event.preventDefault()
+    if (view === 'columns') {
+      event.currentTarget
+        .closest('[data-slot="dialog-content"]')
+        ?.querySelector<HTMLElement>('[data-picker-column="0"]')
+        ?.focus()
+      return
+    }
     listRef.current?.focus()
     if (listInteractionPending) return
 
@@ -328,10 +358,32 @@ export function FilePickerDialog({
   }
 
   function openSelected() {
-    if (!selectedEntry || listInteractionPending) return
-    if (isDirectoryEntry(selectedEntry)) return navigateTo(selectedEntry.path)
-    const picked = toPickedEntry(selectedEntry, mode, accept)
+    if (!focusedEntry || listInteractionPending) return
+    if (isDirectoryEntry(focusedEntry)) return navigateTo(focusedEntry.path)
+    const picked = toPickedEntry(focusedEntry, mode, accept)
     if (picked) commitPick(picked)
+  }
+
+  function changeTrail(next: ColumnTrail) {
+    setTrailState({ path: session.currentPath, trail: next })
+    session.setSelectedEntry(next[0] ?? null)
+  }
+
+  function chooseView(next: PickerView) {
+    settingsActions.setSetting(
+      'files.picker.view',
+      next,
+      deriveWriteTarget('files.picker.view', settingsLayers),
+    )
+  }
+
+  function commitEntry(entry: FsEntry) {
+    if (isDirectoryEntry(entry) && mode === 'file') {
+      navigateTo(entry.path)
+      return
+    }
+    const pickable = toPickedEntry(entry, mode, accept)
+    if (pickable) commitPick(pickable)
   }
 
   function historyChord(event: KeyboardEvent<HTMLDivElement>) {
@@ -498,6 +550,28 @@ export function FilePickerDialog({
                 value={session.query}
               />
             </InputGroup>
+            <Tabs value={chosenView} onValueChange={(next: PickerView) => chooseView(next)}>
+              <TabsList aria-label='View' variant='segmented'>
+                <IconTooltip label='Columns'>
+                  <TabsTab
+                    aria-label='Columns'
+                    className='w-(--density-control-height-sm) px-0'
+                    value='columns'
+                  >
+                    <ColumnsIcon />
+                  </TabsTab>
+                </IconTooltip>
+                <IconTooltip label='List'>
+                  <TabsTab
+                    aria-label='List'
+                    className='w-(--density-control-height-sm) px-0'
+                    value='list'
+                  >
+                    <ListIcon />
+                  </TabsTab>
+                </IconTooltip>
+              </TabsList>
+            </Tabs>
             <Separator className='h-4' orientation='vertical' />
             <div
               aria-label='Folder display actions'
@@ -551,39 +625,53 @@ export function FilePickerDialog({
               homePath={homePath}
               recentState={recentState}
             />
-            <div className='bg-background grid min-h-0 grid-rows-[auto_minmax(0,1fr)]'>
-              <ListHeader
-                isLoading={loadState.status === 'loading' || listInteractionPending}
-                isSearching={isSearching}
-                mode={mode}
-                onSort={handleSort}
-                sort={effectiveSort}
-              />
-              <FileList
-                accept={accept}
-                entries={entries}
-                iconMode={displayedIconMode}
-                isBusy={listInteractionPending}
-                isSearching={isSearching}
-                listRef={listRef}
-                loadState={loadState}
-                mode={mode}
-                onDirectoryIntent={preloadDirectory}
-                onEntryDoubleClick={handleEntryDoubleClick}
-                onCommitEntry={(entry) => {
-                  if (isDirectoryEntry(entry) && mode === 'file') {
-                    navigateTo(entry.path)
-                    return
-                  }
-                  const pickable = toPickedEntry(entry, mode, accept)
-                  if (pickable) commitPick(pickable)
-                }}
-                onGoParent={() => {
-                  if (session.canGoUp) navigateTo(pickerParentPath(session.currentPath))
-                }}
-                onRetry={refresh}
-                selectedPath={selectedEntry?.path ?? null}
-              />
+            <div className='bg-background min-h-0' ref={middleRef}>
+              {view === 'columns' ? (
+                <ColumnsView
+                  accept={accept}
+                  currentPath={session.currentPath}
+                  iconMode={displayedIconMode}
+                  isBusy={listInteractionPending}
+                  mode={mode}
+                  showHidden={showHidden}
+                  trail={trail}
+                  onCommit={commitEntry}
+                  onDirectoryIntent={preloadDirectory}
+                  onGoParent={() => {
+                    if (session.canGoUp) navigateTo(pickerParentPath(session.currentPath))
+                  }}
+                  onOpen={handleEntryDoubleClick}
+                  onTrailChange={changeTrail}
+                />
+              ) : (
+                <div className='grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)]'>
+                  <ListHeader
+                    isLoading={loadState.status === 'loading' || listInteractionPending}
+                    isSearching={isSearching}
+                    mode={mode}
+                    onSort={handleSort}
+                    sort={effectiveSort}
+                  />
+                  <FileList
+                    accept={accept}
+                    entries={entries}
+                    iconMode={displayedIconMode}
+                    isBusy={listInteractionPending}
+                    isSearching={isSearching}
+                    listRef={listRef}
+                    loadState={loadState}
+                    mode={mode}
+                    onDirectoryIntent={preloadDirectory}
+                    onEntryDoubleClick={handleEntryDoubleClick}
+                    onCommitEntry={commitEntry}
+                    onGoParent={() => {
+                      if (session.canGoUp) navigateTo(pickerParentPath(session.currentPath))
+                    }}
+                    onRetry={refresh}
+                    selectedPath={selectedEntry?.path ?? null}
+                  />
+                </div>
+              )}
             </div>
             <PreviewPane
               entry={previewEntry}

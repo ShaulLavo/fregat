@@ -2,7 +2,7 @@
 
 ## Status and authorization
 
-- Status: P2, P3 and P4 done 2026-09-25 (lane L1); P1, P5 and P6 next. D1–D4 accepted as recommended on 2026-09-25. The owner wants this ("100000%").
+- Status: P1–P4 done 2026-09-25 (lane L1); P5 and P6 next. D1–D4 accepted as recommended on 2026-09-25. The owner wants this ("100000%").
 - Priority: P1 in the UI refresh lane. It runs after Plan 157 (done), whose
   segmented control, scroll fades and typeahead refine it uses.
 - Effort: L. A second view with its own keyboard model, a content preview with two data paths, a
@@ -76,6 +76,12 @@ share the same preview.
   `border-b` bars and `text-[10px]` are not ported.
 
 ## Phase 1 — Columns view
+
+**Done 2026-09-25 (lane L1).** `columns-view.tsx`, `picker-column.tsx`, `column-row.tsx`,
+`utils/columns.ts` (tested), setting `files.picker.view` (`auto | columns | list`; auto is D1).
+The existing right-hand preview stays as the view's last pane in both views. The strip scrolls
+sideways without a fade (`scroll-fade` is vertical only). A narrow dialog is measured with
+`useElementWidth`, not a breakpoint. The text below is the original plan.
 
 **Build** `features/file-picker/components/columns-view.tsx`:
 

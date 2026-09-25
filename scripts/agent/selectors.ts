@@ -233,10 +233,15 @@ export const selectors = {
   pickerEmpty: (page: Page) => page.getByText('Nothing here', { exact: true }),
   pickerRow: (page: Page, name: string) =>
     page
-      .getByRole('listbox', { name: 'Folders and files', exact: true })
+      .getByRole('dialog', { name: 'Choose folder', exact: true })
       .getByRole('option')
       .filter({ hasText: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`) }),
   pickerPreview: (page: Page) => page.locator('[data-file-preview]'),
+  pickerColumn: (page: Page, index: number) => page.locator(`[data-picker-column="${index}"]`),
+  pickerView: (page: Page, view: 'Columns' | 'List') =>
+    page
+      .getByRole('tablist', { name: 'View', exact: true })
+      .getByRole('tab', { name: view, exact: true }),
   pickerStatus: (page: Page) =>
     page.getByRole('dialog', { name: 'Choose folder', exact: true }).getByRole('status').last(),
   pickerCurrentFolderHeading: (page: Page) =>

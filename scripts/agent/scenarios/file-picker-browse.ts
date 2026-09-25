@@ -33,7 +33,7 @@ async function goTo(page: Page, folder: string) {
 export const filePickerBrowse: Scenario = {
   name: 'file-picker-browse',
   description:
-    'Browse a fixture folder in the web picker: code, image and folder previews, the item count, and the ⌘[ ⌘] ⌘↓ chords.',
+    'Browse a fixture folder in the web picker: columns three deep with the keyboard, then in the list the code, image and folder previews, the item count, and the ⌘[ ⌘] ⌘↓ chords.',
   async run(page, { step }) {
     const root = await createTree()
     try {
@@ -44,6 +44,28 @@ export const filePickerBrowse: Scenario = {
         /^\d+ items?$/.test(await selectors.pickerStatus(page).innerText()),
         'The footer counts the listing',
       )
+
+      // Columns are the default when choosing a folder.
+      await selectors.pickerRow(page, 'nested').click()
+      await selectors.pickerColumn(page, 1).getByText('inside.md', { exact: true }).waitFor()
+      await page.keyboard.press('ArrowRight')
+      await selectors.pickerColumn(page, 2).waitFor()
+      await page.keyboard.press('ArrowDown')
+      await selectors
+        .pickerPreview(page)
+        .locator('[data-file-preview-text]')
+        .getByText('Inside')
+        .waitFor()
+      await step('columns-path')
+      await page.keyboard.press('ArrowLeft')
+      ok(
+        await selectors
+          .pickerColumn(page, 0)
+          .evaluate((column) => column === document.activeElement),
+        '← returns to the parent column',
+      )
+      await selectors.pickerView(page, 'List').click()
+      await selectors.pickerList(page).waitFor()
 
       await selectors.pickerRow(page, 'app.ts').click()
       await selectors

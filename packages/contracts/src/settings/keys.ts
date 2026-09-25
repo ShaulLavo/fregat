@@ -791,6 +791,17 @@ export const SETTINGS_REGISTRY = {
     description: 'Milliseconds of quiet before an automatic save, when saving after a delay.',
     keywords: ['autosave', 'delay', 'debounce', 'files'],
   }),
+  'files.picker.view': defineSetting({
+    schema: v.picklist(['auto', 'columns', 'list'] as const),
+    default: 'auto',
+    scope: 'application',
+    widget: 'enum',
+    category: 'Files',
+    title: 'File picker view',
+    description:
+      'How the file picker shows a folder. Auto uses columns when choosing a folder and a list when choosing a file.',
+    keywords: ['files', 'folders', 'picker', 'columns', 'list', 'finder'],
+  }),
   'files.showHidden': defineSetting({
     schema: v.boolean(),
     default: false,
