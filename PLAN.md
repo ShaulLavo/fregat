@@ -375,7 +375,7 @@ Execution order is strict:
 3. [Plan 108](plans/108-markdown-modes.md) gives markdown a split view on that package and finishes
    the existing live-preview experiment rather than deleting it. Phase 1 needs 107; Phase 2 is
    blocked on 111.
-4. [Plan 109](plans/109-boot-boundaries.md) defines boot, decides where loading boundaries belong
+4. Plan 109 ([boot and first load](docs/boot-and-first-load.md)) defines boot, decides where loading boundaries belong
    from 106's attribution data, and pins a first-load gate. It runs last because 107 and 108 both
    move the number. Revised 2026-09-20: the per-owner attribution now exists, which unblocks its
    Phases 2 and 3 and refuted two of the three boundaries anyone had proposed. Two survive, worth
@@ -428,7 +428,7 @@ contract for hiding and revealing a populated list. Its `AGENTS.md` sections are
 because none of its three patterns can be gated by tooling.
 
 Neither plan reorders another lane. The scoped error boundary and the `<Activity>` counter-example
-are shared with [Plan 109](plans/109-boot-boundaries.md); whichever lands first owns the
+are shared with Plan 109 ([boot and first load](docs/boot-and-first-load.md)); whichever lands first owns the
 implementation and the others consume it. Verification tooling reconciles with Plan 119 and mutation
 shape with Plan 118. No measurement has been taken for either plan: the dev server is down, only the
 mesh answers, and every `agent:browser` line in both is a prescription for the implementer.
