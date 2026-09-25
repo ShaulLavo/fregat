@@ -70,7 +70,7 @@ Upstream paths shortened to `provider/…` or `orchestration/…` in tables mean
 ### RUNTIME-02 — Add the four missing production provider drivers
 
 - Decided 2026-09-25: owner — build all four drivers (Cursor, Grok, OpenCode, Antigravity). Smoke-test each where an account exists; otherwise ship it marked "untested". Missing accounts no longer block the row.
-- **Status / priority / confidence:** Confirmed feature gap; P1 under full-alignment mandate; HIGH.
+- **Status / priority / confidence:** Confirmed feature gap; P1 under full-alignment mandate; HIGH. Research done 2026-09-25: protocol surveys and build order below; smoke tests wait on owner question 1.
 - **Evidence:** Upstream `apps/server/src/provider/builtInDrivers.ts:23-28,49-55` registers Codex, Claude, Cursor, Grok, OpenCode and Antigravity. Local `apps/server/src/provider/drivers/built-in.ts:17` registers Codex and Claude only. The local mock is test-only, and generic multi-instance types do not implement another runtime.
 - **Impact:** Users of the four other upstream providers cannot execute, resume or configure those providers here.
 - **Effort / risk:** L per driver; HIGH. This is four independently reviewable deliverables, not a single registry edit.
@@ -79,6 +79,122 @@ Upstream paths shortened to `provider/…` or `orchestration/…` in tables mean
 - **Dependencies:** Capability descriptors (RUNTIME-06), native request model (RUNTIME-11/03 as applicable), existing settings registry. Provider-specific maintenance/auth belongs with its driver.
 - **Acceptance / tests:** For each provider, configured enabled instance appears, starts a real in-process app turn using an injected external process boundary, streams completion/errors, resumes the same native conversation, and stops only its own runtime. Two same-driver accounts cannot share requests/cursors/credentials. Unsupported capabilities are unavailable in UI and rejected at server boundary. Real installed-provider smoke checks remain necessary before parity is claimed.
 - **Bounded absence search:** Inspected `apps/server/src/provider/drivers`, `adapters`, production registry and provider contracts for `cursor`, `grok`, `opencode`, `antigravity`; no production driver registration/call path exists.
+
+#### Research findings (2026-09-25)
+
+Upstream read at T3 Code `7a12aff4` (2026-09-25, 14 commits past the pin); the per-CLI notes list what changed
+in each driver since `7445aa73`. Platform read at `e6d23459b`. Lane L3 (PR #35, `lane/L3`) carries RUNTIME-10's
+`ProviderMaintenance` update route, which is not on main yet; the update paths below assume it. Probe scripts
+and raw `initialize` responses are in `/work/tmp/research/runtime02/`. No CLI was logged in and no prompt was
+sent.
+
+Per-CLI protocol notes: [Cursor](protocol-cursor.md), [Grok](protocol-grok.md),
+[OpenCode](protocol-opencode.md), [Antigravity](protocol-antigravity.md).
+
+**Installed on this machine (measured).**
+
+| CLI         | Before this research                     | Now                                                    | Account                                          |
+| ----------- | ---------------------------------------- | ------------------------------------------------------ | ------------------------------------------------ |
+| Cursor      | absent                                   | absent; 2026.09.18 unpacked only under `/work/tmp`     | `status`: "Not logged in" (scratch home)         |
+| Grok        | Omarchy mise shim at `~/.local/bin/grok` | 1.0.41 installed by the shim on the first `--version`  | `grok models`: "You are not authenticated."      |
+| OpenCode    | Omarchy mise shim                        | 1.18.32 installed by the shim on the first `--version` | 0 credentials; free models available (see below) |
+| Antigravity | absent                                   | absent; not downloaded (334 MB zip)                    | none                                             |
+
+The shims run `mise use -g <tool>` before every call, so the first `--version` installed the tool and added it
+to `~/.config/mise/config.toml`. A status probe of a disabled driver would do the same on any Omarchy machine.
+
+**Protocols at a glance.** Details, commands and citations are in the per-CLI notes.
+
+| CLI         | Transport                             | Resume                         | Approvals                                               | Auth                                      | Idle RSS     |
+| ----------- | ------------------------------------- | ------------------------------ | ------------------------------------------------------- | ----------------------------------------- | ------------ |
+| Cursor      | ACP stdio, `cursor-agent acp`         | `session/load` only (replays)  | ACP permission; mode as launch flag                     | CLI login or `CURSOR_API_KEY`             | 206–212 MB   |
+| Grok        | ACP stdio, `grok agent stdio`         | `session/resume` and `load`    | ACP permission; `--permission-mode` flag                | CLI login (`grok.com`) or `XAI_API_KEY`   | 256–263 MB   |
+| OpenCode    | HTTP + SSE, `opencode serve` (SDK v2) | `session.get`, fork on new cwd | per-session permission ruleset + `permission.reply`     | per-provider `auth.json`; free Zen models | 309 MB       |
+| Antigravity | ACP stdio, `agy_acp_server.par`       | `session/resume`               | ACP permission; `session/set_mode`; edits via client fs | in-app Google OAuth, API key or Vertex    | not measured |
+
+RSS is VmRSS summed over the child tree 3 s after `initialize`, two runs; OpenCode is one run of `serve`, 3 s
+after `/global/health` answered.
+
+**How upstream builds them.** Cursor, Grok and Antigravity share one ACP runtime: `packages/effect-acp` (schemas
+generated from ACP schema release v0.11.3, 10,375 generated lines) under `provider/acp/AcpSessionRuntime.ts`
+(1354 lines: initialize, authenticate, new/load/resume, prompt, cancel, config options, agent-to-client requests)
+and `AcpRuntimeModel.ts` (887: `session/update` to runtime events). OpenCode uses `@opencode-ai/sdk/v2` against a
+spawned `opencode serve`. Each driver is a `Driver` value plus `<Name>Provider` (status, models),
+`<Name>Adapter`, text generation, maintenance, usage limits and skills. All four default to disabled
+(`packages/contracts/src/settings.ts`, `CursorSettings`…`AntigravitySettings`). Only OpenCode supports rollback
+(by fork); the other three refuse it. External session import stays Codex and Claude
+(`packages/contracts/src/agentSessions.ts:6` at `7a12aff4`); post-pin `e5a46d6c` reads token-usage history for
+Cursor, OpenCode and Antigravity, which is usage, not import.
+
+**What our layer already has.** The driver SPI (`apps/server/src/provider/driver.ts:69-89`) covers config
+parsing, per-instance environment, credential paths and `create`. Resume cursors are opaque (`types.ts:47`) and
+keyed per instance (`driver.ts:105-110`). `steerTurn`, `listCommands`, `readUsage` and the `signIn` members are
+optional (`types.ts:527-575`). `ProviderService` already refuses rollback on `capabilities.conversationRollback`
+(`provider-service.ts:684`). Driver kinds are an open slug (`packages/contracts/src/orchestration-runtime.ts:11`).
+Saved instances layer over built-in defaults (`provider/utils/instance-config-merge.ts:18-26`), and the settings
+row already has an enable switch (`features/settings/components/provider-row.tsx`), so a disabled default
+instance per new kind is enough to surface it. Title generation already orders all six kinds
+(`orchestration/title-generation.ts:16`).
+
+**What it takes (shared, built once).**
+
+1. ACP peer: NDJSON JSON-RPC over stdio in both directions (agent-to-client requests: `session/request_permission`,
+   `fs/*`, extension methods). `CodexAppServerRpcClient` (`adapters/codex.ts:2157-2440`) is typed to Codex; lift its
+   transport into a shared peer.
+2. ACP schemas: generate Valibot from the pinned ACP release `schema.json` the way `adapters/codex-protocol/generate.ts`
+   does for Codex, with a `--check` in `generated:check`. Current release is `schema-v1.23.0` (2026-09-18); all
+   three CLIs answered protocol version 1. `@agentclientprotocol/sdk` 1.5.0 is the alternative, but it needs a zod
+   peer.
+3. ACP session runtime and mapper: choose the auth method from the `authMethods` the agent returns (Grok 1.0.41
+   offers only `grok.com`, not upstream's `cached_token`); prefer `session/resume` when advertised and fall back to
+   `session/load` behind a replay gate; map `session/update` onto `assistant.delta`, reasoning `content.delta`,
+   `item.*`, `turn.plan.updated`, `request.*` and `turn.completed` from `stopReason`.
+4. `RuntimeEventRawSource` (`types.ts:104-111`) gains an ACP and an OpenCode source.
+5. Contracts: a disabled `DEFAULT_*_PROVIDER_SETTINGS` per kind with its runtime modes and traits
+   (`supportsUserInput` is true for Cursor, Grok and OpenCode), added to `DEFAULT_PROVIDER_INSTANCES`.
+6. Replace driver-kind checks with capabilities: steering is allowed only for `driverKind === 'codex'`
+   (`apps/web/src/features/chat/components/chat-input.tsx:165`) and all four steer upstream; terminal resume is
+   Claude-only (`provider-adapter-registry.ts:322`). Prices stay null for the new kinds
+   (`utils/model-prices.ts:74-77`), so their cost shows as unknown.
+7. Secrets: `XAI_API_KEY`, the Antigravity API key and the OpenCode server password go to the secret store and are
+   injected at spawn. `providers.instances.environment` is a settings value and must not carry them.
+8. Status probes run only for enabled instances, and never through a PATH shim on a disabled one.
+
+**Recommendation: transport per driver.** Cursor, Grok and Antigravity on the shared ACP layer, as upstream.
+OpenCode on its HTTP server, as upstream: ACP would drop the per-session permission ruleset, the `question`
+bridge, rollback by fork and `serverUrl` attach. Deviation: run one `opencode serve` per instance for every
+session (upstream spawns one per chat session, about 310 MB each; the server takes the directory per request).
+
+**Recommendation: build order.**
+
+0. Seam changes (items 4–8 above), small and shared.
+1. OpenCode. No ACP dependency, and the only driver whose acceptance can be shown live on this machine today:
+   with zero credentials `GET /provider` reported `connected: ["opencode"]` and seven zero-cost models
+   (`big-pickle` and six `*-free`). Also the only one with rollback, so it exercises that path.
+2. ACP core plus Grok. Grok is installed, advertises `session/resume` (no replay gate), and has the smallest
+   upstream driver. Test the ACP core against a fake-agent fixture, and live against `opencode acp` with a free
+   model, which needs no account.
+3. Cursor. Adds the `session/load` replay gate, three `cursor/*` extensions and parameterized model options.
+4. Antigravity. Managed install (or a required `binaryPath`), per-session temp directories (about 1 GB unpacked
+   per launch), a probe that never spawns, in-app Google OAuth and client-side file writes as approvals.
+
+With two lanes, OpenCode (1) and the ACP core (2) can run in parallel once step 0 lands.
+
+**Not built by this row.** Upstream's fourth runtime mode `auto` (Cursor `--auto-review`, Grok
+`--permission-mode auto`); usage-limit readers per provider (RUNTIME-08 and Plan 141 own usage); the per-thread
+T3 MCP server upstream injects into ACP and OpenCode sessions.
+
+**Owner questions.**
+
+1. Which accounts exist for smoke tests? Nothing is signed in here. (a) You sign in to each CLI in a terminal
+   (`cursor-agent login`, `grok login`, and Google in the Antigravity sign-in flow) after its driver lands and run
+   one turn; (b) the driver ships marked "untested". Recommendation: (a) for every account you have. OpenCode needs
+   none: its free models give a live smoke test with no account and no credit.
+2. How does Antigravity get installed? (a) Managed download, as upstream: 334 MB zip today, 2.0 GB unpacked for the
+   1.1.1 release upstream pins, plus about 1 GB of temp per running session; (b) the user installs it and
+   `binaryPath` or `PATH` finds it. Recommendation: (b) first, (a) as a follow-up phase. If (a), the release
+   directory should sit under a `/work` path on this machine, per the storage rules, so it needs a setting.
+3. Add the `auto` runtime mode? Recommendation: not in this row; it touches Codex and Claude too.
 
 ### RUNTIME-05 — Implement manual compaction with ordered follow-up handling
 
