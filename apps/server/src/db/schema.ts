@@ -269,6 +269,7 @@ export const projectionWorktrees = sqliteTable(
     cleanupEligibilityJson: text('cleanup_eligibility_json')
       .notNull()
       .default('{"reason":"not-ready","nonDeletedSessionCount":0,"canResolveMissing":false}'),
+    pullRequestJson: text('pull_request_json'),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull(),
     retiredAt: text('retired_at'),

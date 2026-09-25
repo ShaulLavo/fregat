@@ -62,6 +62,7 @@ const commands = {
     pathKind: 'legacy',
     reason: 'unprojected-managed-path',
   },
+  'worktree.pull-request.sync': { branch: 'main', pullRequest: { status: 'none' } },
   'session.worktree.release': {
     sessionId: DOMAIN_IDS.session,
     turnId: DOMAIN_IDS.turn,

@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import { DEFAULT_MAX_TEXT_FILE_BYTES } from '../../fs/limits'
 import { createWorkspacePaths } from '../../fs/path'
-import { createPullRequest, readPullRequest } from '../pull-request'
+import { createPullRequest, readBranchPullRequests, readPullRequest } from '../pull-request'
 import type { GitProcessResult } from '../utils/process'
 import { GitService } from '../service'
 
@@ -288,3 +288,67 @@ function cliBoundary(lookup: GitProcessResult, created = '[]') {
   }
   return { calls, process }
 }
+
+describe('batched pull request lookup', () => {
+  const node = (number: number, state: string) => ({
+    number,
+    title: `PR ${number}`,
+    url: `https://github.com/acme/repo/pull/${number}`,
+    state,
+    isDraft: number === 8,
+  })
+
+  function forge(graphql: GitProcessResult) {
+    const calls: (readonly string[])[] = []
+    const process: Parameters<typeof readBranchPullRequests>[1] = async ({ argv }) => {
+      calls.push(argv)
+      if (argv[1] === 'repo')
+        return { exitCode: 0, stderr: '', stdout: '{"owner":{"login":"acme"},"name":"repo"}' }
+      if (argv[1] === 'api') return graphql
+      return { exitCode: 0, stderr: '', stdout: '' }
+    }
+    return { calls, process }
+  }
+
+  it('asks once for every branch, passes names as variables and tells none from found', async () => {
+    const cwd = await fixtureRoot('batch')
+    const run = forge({
+      exitCode: 0,
+      stderr: '',
+      stdout: JSON.stringify({
+        data: {
+          repository: {
+            b0: { nodes: [node(7, 'MERGED')] },
+            b1: { nodes: [] },
+            b2: { nodes: [node(8, 'OPEN')] },
+          },
+        },
+      }),
+    })
+    const result = await readBranchPullRequests(
+      { cwd, branches: ['feature/a', 'feature/b"}', 'feature/c'] },
+      run.process,
+    )
+    expect(result.kind).toBe('ready')
+    if (result.kind !== 'ready') return
+    expect(result.pullRequests.get('feature/a')).toMatchObject({ number: 7, state: 'merged' })
+    expect(result.pullRequests.get('feature/b"}')).toBeNull()
+    expect(result.pullRequests.get('feature/c')).toMatchObject({ number: 8, draft: true })
+    const graphql = run.calls.filter((argv) => argv[1] === 'api')
+    expect(graphql).toHaveLength(1)
+    expect(graphql[0]).toContain('h1=feature/b"}')
+    expect(graphql[0]?.find((arg) => arg.startsWith('query='))).not.toContain('feature/b')
+  })
+
+  it.for([
+    ['a failed request', { exitCode: 1, stderr: 'API rate limit exceeded', stdout: '' }],
+    ['a malformed response', { exitCode: 0, stderr: '', stdout: '{"data":{}}' }],
+  ] as const)('throws on %s instead of reporting no pull request', async ([, answer]) => {
+    const cwd = await fixtureRoot('batch-failure')
+    await expect(
+      readBranchPullRequests({ cwd, branches: ['feature/a'] }, forge(answer).process),
+    ).rejects.toMatchObject({
+      code: expect.stringMatching(/PULL_REQUEST_(LOOKUP_FAILED|RESPONSE_INVALID)/),
+    })
+  })
+})

@@ -97,6 +97,27 @@ export const worktreeCleanupEligibilitySchema = v.object({
   canResolveMissing: v.boolean(),
 })
 
+/**
+ * The pull request for a dedicated worktree's branch, as the forge last answered. `unknown` is a
+ * failed lookup with nothing known before it; it never stands for "no pull request".
+ */
+export const worktreePullRequestSchema = v.variant('status', [
+  v.object({ status: v.literal('none') }),
+  v.object({ status: v.literal('unknown') }),
+  v.object({
+    status: v.literal('unsupported'),
+    support: v.picklist(['cli-missing', 'unauthenticated', 'no-github-remote']),
+  }),
+  v.object({
+    status: v.literal('found'),
+    number: v.pipe(v.number(), v.integer(), v.minValue(1)),
+    title: v.string(),
+    url: text,
+    state: v.picklist(['open', 'closed', 'merged']),
+    draft: v.boolean(),
+  }),
+])
+
 export const worktreeLifecycleEntries = {
   lifecycle: worktreeLifecycleSchema,
   operationId: v.nullable(commandIdSchema),
@@ -203,6 +224,12 @@ export const worktreeInternalCommandSchemas = [
   }),
   v.object({
     ...target,
+    type: v.literal('worktree.pull-request.sync'),
+    branch: text,
+    pullRequest: worktreePullRequestSchema,
+  }),
+  v.object({
+    ...target,
     type: v.literal('worktree.orphan.register'),
     projectId: projectIdSchema,
     canonicalPath: text,
@@ -292,6 +319,11 @@ export const WORKTREE_EVENT_PAYLOADS = {
   'worktree.adopted': v.object({ ...changed, branch: v.nullable(text), headCommit: text }),
   'worktree.missing': v.object(changed),
   'worktree.metadata-refreshed': v.object({ ...changed, ...metadata, metadataVersion: count }),
+  'worktree.pull-request-synced': v.object({
+    ...changed,
+    branch: text,
+    pullRequest: worktreePullRequestSchema,
+  }),
   'worktree.orphan-registered': v.object({
     ...changed,
     projectId: projectIdSchema,
@@ -324,4 +356,5 @@ export type WorktreeCreationCapability = v.InferOutput<typeof worktreeCreationCa
 export type WorktreeCleanupPreview = v.InferOutput<typeof worktreeCleanupPreviewSchema>
 export type WorktreeMissingPreview = v.InferOutput<typeof worktreeMissingPreviewSchema>
 export type TerminalLease = v.InferOutput<typeof terminalLeaseSchema>
+export type WorktreePullRequest = v.InferOutput<typeof worktreePullRequestSchema>
 export type TerminalLeaseId = v.InferOutput<typeof terminalLeaseIdSchema>

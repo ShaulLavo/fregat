@@ -15,6 +15,7 @@ import { sessionIdentityErrors } from '../provider/structured-errors'
 import { realpath } from 'node:fs/promises'
 import { WorktreeExecutionGate } from './worktree-execution-gate'
 import { WorktreeLifecycleReactor } from './worktree-lifecycle-reactor'
+import { PullRequestSyncReactor, type BranchPullRequestLookup } from './pull-request-sync-reactor'
 import { WorktreeCommandPreparation } from './worktree-command-preparation'
 import { TerminalLeaseController } from './terminal-lease-controller'
 import { GitWorktreeService } from '../git/worktrees'
@@ -104,6 +105,8 @@ export type OrchestrationEngineOptions = {
     | Promise<import('./response-delivery').ResponseStreamingMode>
   titleModel?: (projectId: string) => Promise<ModelSelection>
   worktreeSubmodules?: (projectId: string) => WorktreeSubmoduleMode
+  /** Reads each dedicated worktree's pull request; absent, nothing is synced. */
+  pullRequestLookup?: BranchPullRequestLookup
 
   keepImportedSessionsUpdated?: () => boolean
   providerService?: ProviderService
@@ -136,6 +139,7 @@ export class OrchestrationEngine {
   private checkpointReactor: CheckpointReactor | null = null
   private deletionReactor: SessionDeletionReactor | null = null
   private discovery: SessionDiscoveryReconciler | null = null
+  private pullRequestSync: PullRequestSyncReactor | null = null
   private titleReactor: SessionTitleReactor | null = null
   private readonly keepImportedSessionsUpdated: () => boolean
   private providerService: ProviderService | null = null
@@ -185,6 +189,7 @@ export class OrchestrationEngine {
         this.readModel = this.snapshotQuery.fullReadModel()
         this.providerCommandReactor = this.createProviderCommandReactor(options)
         this.createWorktreeLifecycle(options)
+        this.createPullRequestSync(options)
         this.createDeletionReactor()
         this.createDiscoveryReconciler()
       },
@@ -193,6 +198,10 @@ export class OrchestrationEngine {
         this.reactorsStarted = true
         if (this.worktreeReactor) this.domainEvents.subscribe(this.worktreeReactor)
         if (this.deletionReactor) this.domainEvents.subscribe(this.deletionReactor)
+        if (this.pullRequestSync) {
+          this.domainEvents.subscribe(this.pullRequestSync)
+          this.pullRequestSync.start()
+        }
         this.subscribeProviderCommandReactor()
         this.scheduleQueuedStarts()
         this.discovery?.start()
@@ -430,6 +439,7 @@ export class OrchestrationEngine {
     await this.ready
     await this.titleReactor?.close()
     await this.discovery?.close()
+    await this.pullRequestSync?.close()
     this.unsubscribeGitMutations?.()
     await this.worktreeReactor?.drain()
     await this.queue
@@ -786,6 +796,22 @@ export class OrchestrationEngine {
       if (!last) return null
       afterSequence = last.sequence
     }
+  }
+
+  private createPullRequestSync(options: OrchestrationEngineOptions) {
+    if (!this.registration || !options.pullRequestLookup) return
+    this.pullRequestSync = new PullRequestSyncReactor({
+      lookup: options.pullRequestLookup,
+      dispatch: (command) => this.enqueue(command),
+      getReadModel: () => this.readModel,
+    })
+  }
+
+  /** Test seam: settle an in-flight pull request sweep, then run one more. */
+  async syncPullRequests() {
+    await this.ready
+    this.pullRequestSync?.schedule()
+    await this.pullRequestSync?.drain()
   }
 
   private createWorktreeLifecycle(options: OrchestrationEngineOptions) {

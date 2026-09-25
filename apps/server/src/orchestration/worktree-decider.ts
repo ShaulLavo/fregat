@@ -4,6 +4,7 @@ import type {
   WorktreeProvisioning,
   WorktreeLifecycle,
 } from '@workspace/contracts'
+import { jsonEqual } from '@workspace/contracts'
 import { event, one } from './event-factory'
 import {
   requireProject,
@@ -170,6 +171,22 @@ export function decideWorktreeLifecycle(
         branch: command.branch,
         headCommit: command.headCommit,
         metadataVersion: command.expectedMetadataVersion + 1,
+        updatedAt: at,
+      })
+    }
+    case 'worktree.pull-request.sync': {
+      const worktree = requireWorktree(model, command.worktreeId)
+      // The lookup ran for a branch the worktree may have left since.
+      if (worktree.branch !== command.branch)
+        throw worktreeLifecycleErrors.STALE_RESULT({
+          worktreeId: command.worktreeId,
+          internal: { syncedBranch: command.branch, ...worktreeFacts(command, worktree) },
+        })
+      if (jsonEqual(worktree.pullRequest, command.pullRequest)) return []
+      return one(command, at, 'worktree.pull-request-synced', {
+        worktreeId: command.worktreeId,
+        branch: command.branch,
+        pullRequest: command.pullRequest,
         updatedAt: at,
       })
     }
