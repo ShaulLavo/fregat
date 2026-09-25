@@ -41,6 +41,18 @@ export async function resolveTypeScriptRuntime(root: string): Promise<TypeScript
   return runtimeForPackage(packagePath)
 }
 
+/** The command-line compiler of the same package the language server comes from. */
+export async function resolveTypeScriptCompiler(root: string) {
+  const runtime = await resolveTypeScriptRuntime(root)
+  if (runtime.kind === 'native') return { ...runtime, compiler: runtime.entrypoint }
+
+  const compiler = path.join(path.dirname(runtime.entrypoint), 'tsc.js')
+  if (!(await fileExists(compiler))) {
+    throw invalidRuntime(compiler, 'The TypeScript package has no command-line compiler.')
+  }
+  return { ...runtime, compiler }
+}
+
 async function workspacePackage(root: string, packageName: string): Promise<string | null> {
   const require = createRequire(path.join(path.resolve(root), 'package.json'))
   for (const directory of require.resolve.paths(packageName) ?? []) {

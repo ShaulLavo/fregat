@@ -2,7 +2,8 @@
 
 ## Status and authorization
 
-- Status: IN PROGRESS — Phase 1 done 2026-09-25; D1–D3 decided (completion wave); Phase 2 next.
+- Status: IN PROGRESS — Phases 1 and 2 done 2026-09-25; D1–D3 decided (completion wave); Phase 3
+  next.
 - Priority: P3. The server path works; this is a second backend, useful where no server runs a
   language server (a remote machine without Node tooling, a read-only share) and as a fallback.
 - Effort: M.
@@ -106,6 +107,53 @@ catalog guidance once.
 `GET /lsp/typescript/program-files?root=&tsconfig=` returns the list D3 settles on, and a batched
 read returns their text in one response. Evidence: a route test against a fixture project, and the
 `apps/web` list matching `tsgo --listFilesOnly`.
+
+#### Phase 2 landed (2026-09-25)
+
+- `GET /lsp/typescript/program-files?root=&tsconfig=` (`apps/server/src/lsp/typescript/program-files.ts`)
+  runs `<compiler> -p <tsconfig> --listFilesOnly` from `root` and returns
+  `{ root, tsconfig, runtime, files: [{ path, size }], totals: { files, bytes }, skipped }`.
+  Paths are workspace-relative, the form `GET /fs/read` takes. The compiler comes from
+  `resolveTypeScriptCompiler` in `runtime.ts`: the runtime the language server uses, with a legacy
+  package's `lib/tsc.js` beside its `tsserver.js`. The run is bounded at 60 s and 64 MB of output.
+- `POST /lsp/typescript/program-files/read` takes `{ paths }` (at most 50,000) and returns
+  `{ files: [{ path, content, size, version }], failed: [{ path, code }], totals }`, reading 32 at a
+  time. Each file goes through `readTextFile`, the function behind `GET /fs/read`, with the same
+  size limit; a refused or vanished file fails alone with its `FsError` code.
+- Security: `root` must resolve (real path) to a directory with a workspace address, which
+  `POST /fs/workspace-root` records when the app opens a folder. A tsconfig whose real path is
+  outside that root is refused. A listed file is kept only when `/fs/read`'s rule accepts it
+  (inside the server's filesystem root after `realpath`); the rest count as `skipped.outside`.
+- Standard library files are dropped and counted as `skipped.library`: a `lib*.d.ts` whose
+  directory holds `lib.es5.d.ts`. The worker loads its own by name from compilerOptions
+  (`libraryFiles: 'bundled'`, 113 files from TypeScript 6.0.3 in
+  `Editor/packages/typescript-lsp/src/worker/bundledLibraries.ts`).
+- The batched read decodes binary-looking files: `apps/web`'s
+  `features/terminal/state/session-registry.ts` has a NUL inside a template literal, and
+  `acceptTextOnly` refused it. The compiler already read every listed file as source.
+- Errors come from a new `lspErrors` catalog (`apps/server/src/lsp/errors.ts`):
+  `PROGRAM_ROOT_NOT_OPEN` (403), `PROGRAM_TSCONFIG_OUTSIDE_ROOT` (403), `PROGRAM_LIST_FAILED` (422,
+  with exit code and `TS` diagnostic codes in `internal`), `PROGRAM_LIST_LIMIT` (504). A config
+  error that still lists files is not a failure. No setting is registered; Phase 3 applies D2 to
+  `totals`.
+- Evidence: `apps/server/src/lsp/tests/typescript-program-files.test.ts` (6 tests) drives the real
+  app over a fixture project with the installed native TypeScript 7.0.2 and the legacy 6.0.3
+  package: exact files and sizes, one package linked from outside the server root counted as
+  `outside`, library counted, unopened root, tsconfig outside the root, a config that lists
+  nothing, and the batched read matching `/fs/read` for the same file, including a source file
+  with a NUL byte. Without the route wiring all 6 fail (404); with the registration check, the
+  tsconfig containment or the library skip removed, the matching test fails; with `acceptTextOnly`
+  back, the read test fails.
+- `apps/web` (`tsconfig.app.json`, TypeScript 7.0.2, server root `/`): `tsc --listFilesOnly`
+  printed 9,370 files, 65 of them standard library. The route returned 9,305 files, 45,344,297
+  bytes, the same path set as the other 9,305 lines, skipped 65 library, 0 outside, 0 missing, in
+  0.46 s. The batched read returned all 9,305 (45,344,297 bytes, 0 failed) in 0.43 s.
+- For Phase 3: the list is the compiler's, so it holds real paths. A package under
+  `node_modules/.bun/…` or a linked `@singapore-editor/*` package appears at its target, and the
+  list has no `package.json` or tsconfig `extends` files. The worker resolves modules against the
+  paths it holds, with `realpath` as the identity, so Phase 3 has to supply the files module
+  resolution reads, the tsconfig chain, and the link paths, or the Editor worker has to take a
+  realpath map. E054's 2.8 s preload recorded those reads from a host; this list does not.
 
 ### Phase 3: The worker lane
 

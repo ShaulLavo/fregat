@@ -126,7 +126,7 @@ export class FileSystemService {
   readonly defaultPath
   readonly metadata
   private readonly maxSearchContentBytes
-  private readonly maxTextFileBytes
+  readonly maxTextFileBytes
   private readonly workspaceEditJournalRoot
   private readonly workspaceEditReady
   private readonly workspaceEdits
