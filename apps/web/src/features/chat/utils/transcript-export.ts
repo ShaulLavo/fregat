@@ -5,6 +5,7 @@ import type {
 } from '@workspace/contracts'
 
 import { workLogEntryLabel } from '@/features/chat/utils/tool-label'
+import { messageMarkdown } from '@/features/chat/utils/message-markdown'
 import { chatWorkLogEntries, type ChatWorkLogEntry } from '@/features/chat/utils/work-log'
 
 export type TranscriptFormat = 'markdown' | 'json'
@@ -92,7 +93,7 @@ function partLines(part: Exclude<TranscriptPart, { kind: 'step' }>) {
   return [
     `## ${ROLE_HEADINGS[message.role]}`,
     '',
-    message.text.trim() || '_(no text)_',
+    messageMarkdown(message).trim() || '_(no text)_',
     ...(attachments.length > 0 ? ['', `Attachments: ${attachments.join(', ')}`] : []),
   ]
 }
@@ -100,7 +101,14 @@ function partLines(part: Exclude<TranscriptPart, { kind: 'step' }>) {
 function stepLine(entry: ChatWorkLogEntry) {
   const label = workLogEntryLabel(entry, false)
   const command = entry.command?.split('\n')[0]?.trim()
-  return command ? `- ${label}: \`${command}\`` : `- ${label}`
+  return command ? `- ${label}: ${inlineCode(command)}` : `- ${label}`
+}
+
+function inlineCode(value: string) {
+  const longestRun = Math.max(0, ...Array.from(value.matchAll(/`+/g), (match) => match[0].length))
+  const fence = '`'.repeat(longestRun + 1)
+  const padding = longestRun > 0 ? ' ' : ''
+  return `${fence}${padding}${value}${padding}${fence}`
 }
 
 function flushSteps(steps: readonly string[]) {

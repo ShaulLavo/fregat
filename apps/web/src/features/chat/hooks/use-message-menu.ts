@@ -16,12 +16,11 @@ import {
 import { checkpointAvailability } from '@/lib/checkpoint-availability'
 import type { OptimisticChatMessage } from '@/features/chat/state/chat-message-intents'
 import type { ChatTurnDiffSummary } from '@workspace/client-core/chat/types'
-import { extractTerminalContexts } from '@workspace/client-core/chat/terminal-context'
+import { messageMarkdown } from '@/features/chat/utils/message-markdown'
 import { chatMessageMenu } from '@/features/chat/utils/message-menu'
 import { markdownToPlainText } from '@/features/chat/utils/message-text'
 import { copyTextToClipboard } from '@/lib/clipboard'
 import { errorMessage } from '@/lib/error-message'
-import { codexFileCitationsMarkdown } from '@/features/chat/utils/codex-file-citations'
 import { toastError } from '@/lib/toast-error'
 
 export function useMessageMenu({
@@ -48,11 +47,7 @@ export function useMessageMenu({
   const turnId = message.turnId
   const turnRunning = latestTurn?.turnId === turnId && latestTurn?.state === 'running'
   const assistant = message.role === 'assistant'
-  // Copy hands over what the bubble shows. For a user message that is the
-  // prompt without the attached `<terminal_context>` block.
-  const text = assistant
-    ? codexFileCitationsMarkdown(message.text)
-    : extractTerminalContexts(message.text).text
+  const text = messageMarkdown(message)
 
   function handleRevertToCheckpoint() {
     if (typeof revertTurnCount !== 'number') return

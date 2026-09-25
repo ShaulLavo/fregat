@@ -1,5 +1,7 @@
 import { proposedPlanIdSchema, turnIdSchema } from '@workspace/contracts'
 import * as v from 'valibot'
+import { fromMarkdown } from 'mdast-util-from-markdown'
+import { appendTerminalContextsToPrompt } from '@workspace/client-core/chat/terminal-context'
 
 import {
   transcriptFilename,
@@ -22,7 +24,7 @@ const runtime = {
   turnId,
 }
 
-async function fixtureTranscript() {
+async function fixtureTranscript(command = 'git status') {
   const activities = await ingestProviderActivities([
     {
       ...runtime,
@@ -33,7 +35,7 @@ async function fixtureTranscript() {
         itemType: 'command_execution',
         title: 'Command run',
         status: 'inProgress',
-        data: { type: 'tool_use', id: 'call-1', name: 'Bash', input: { command: 'git status' } },
+        data: { type: 'tool_use', id: 'call-1', name: 'Bash', input: { command } },
       },
     },
     {
@@ -111,6 +113,43 @@ test('json carries the whole projection, tool output included', async () => {
   expect(parsed.session.activities).toHaveLength(transcript.session.activities.length)
   expect(JSON.stringify(parsed)).toContain('nothing to commit')
 })
+
+test('markdown exports the displayed prompt and citation links while JSON keeps the source', async () => {
+  const transcript = await fixtureTranscript()
+  const prompt = appendTerminalContextsToPrompt('Explain this error', [
+    { source: 'shell', lineStart: 1, lineEnd: 1, text: 'attached terminal output' },
+  ])
+  const answer = 'See :codex-file-citation{path="src/app.ts" line_range_start="12"}.'
+  transcript.session.messages = [
+    chatMessage({ role: 'user', text: prompt }),
+    chatMessage({ role: 'assistant', text: answer }),
+  ]
+
+  const markdown = transcriptMarkdown(transcript)
+  expect(markdown).toContain('## User\n\nExplain this error')
+  expect(markdown).toContain('See [app.ts](src/app.ts#L12).')
+  expect(markdown).not.toContain('<terminal_context>')
+  expect(markdown).not.toContain('attached terminal output')
+  expect(
+    JSON.parse(transcriptJson(transcript)).session.messages.map(
+      (message: { text: string }) => message.text,
+    ),
+  ).toEqual([prompt, answer])
+})
+
+test.each(['echo `pwd`', "printf '``%s``' hi"])(
+  'keeps the command %s in one Markdown code span',
+  async (command) => {
+    const nodes = fromMarkdown(transcriptMarkdown(await fixtureTranscript(command)))
+      .children.filter((node) => node.type === 'list')
+      .flatMap((list) => list.children)
+      .flatMap((item) => item.children)
+      .filter((node) => node.type === 'paragraph')
+      .flatMap((paragraph) => paragraph.children)
+
+    expect(nodes).toContainEqual(expect.objectContaining({ type: 'inlineCode', value: command }))
+  },
+)
 
 test.each([
   ['Fix the gutter: part 2', 'markdown', 'fix-the-gutter-part-2.md'],
