@@ -14,6 +14,7 @@ import {
 } from '@workspace/contracts'
 
 import { createOrchestrationFixture } from '../../../test/factories/orchestration'
+import { createTestTerminalHost } from '../../../test/factories/terminal-host'
 import {
   createFakePtyFactory,
   terminalOutputBytes,
@@ -35,8 +36,11 @@ const fixtures = new Map<string, Awaited<ReturnType<typeof createOrchestrationFi
 const registrations = new Map<string, string>()
 const services: TerminalService[] = []
 
+const hosts: Awaited<ReturnType<typeof createTestTerminalHost>>[] = []
+
 afterEach(async () => {
   await Promise.all(services.splice(0).map((service) => service.dispose()))
+  await Promise.all(hosts.splice(0).map((host) => host.close()))
   await Promise.all([...fixtures.values()].map((fixture) => fixture.close()))
   fixtures.clear()
   registrations.clear()
@@ -765,8 +769,10 @@ describe('terminal service', () => {
 
   it('reconnects to the same native shell after eleven detached minutes', async () => {
     const root = await fixtureRoot()
+    const host = await nativeHost()
     const service = testService(root, {
       env: { HOME: root, PATH: process.env.PATH, SHELL: '/bin/sh' },
+      ptyFactory: host.factory,
     })
     const routes = service.routes(auth())
     const first = fakeSocket(root, '', 'native-retained-job')
@@ -959,8 +965,10 @@ describe('terminal service', () => {
 
   it('replaces a real native shell without disconnecting its viewer', async () => {
     const root = await fixtureRoot()
+    const host = await nativeHost()
     const service = testService(root, {
       env: { HOME: root, PATH: process.env.PATH, SHELL: '/bin/sh' },
+      ptyFactory: host.factory,
     })
     const routes = service.routes(auth())
     const socket = fakeSocket(root, '', 'native-restart')
@@ -979,14 +987,16 @@ describe('terminal service', () => {
     await service.dispose()
   })
 
-  it('spawns a native shell directly beneath the server and streams its output', async () => {
+  it('spawns a native shell beneath the terminal host and streams its output', async () => {
     const root = await fixtureRoot()
+    const host = await nativeHost()
     const service = testService(root, {
       env: {
         HOME: root,
         PATH: process.env.PATH,
         SHELL: '/bin/sh',
       },
+      ptyFactory: host.factory,
     })
     const routes = service.routes(auth())
     const ws = fakeSocket(root, '')
@@ -997,13 +1007,21 @@ describe('terminal service', () => {
       new TextEncoder().encode('printf \'\\137\\137PTY_PARENT:%s\\137\\137\\n\' "$PPID"; exit\n'),
     )
 
-    await waitForTerminalOutput(ws.messages, `__PTY_PARENT:${process.pid}__`)
+    const hostPid = (await host.client.host()).pid
+    await waitForTerminalOutput(ws.messages, `__PTY_PARENT:${hostPid}__`)
     const worktreeId = v.parse(worktreeIdSchema, registrations.get(root))
     await expect.poll(() => service.hasWorktreeRuntime(worktreeId)).toBe(false)
     expect(ws.messages.at(-1)).toEqual({ type: 'exit', exitCode: 0 })
-    expect(terminalOutputText(ws.messages)).toContain(`__PTY_PARENT:${process.pid}__`)
+    expect(hostPid).not.toBe(process.pid)
   })
 })
+
+// Shells run in a real terminal host in a throwaway state root.
+async function nativeHost() {
+  const host = await createTestTerminalHost()
+  hosts.push(host)
+  return host
+}
 
 function testService(
   root: string,

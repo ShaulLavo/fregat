@@ -18,7 +18,7 @@ import {
   type WorktreeId,
 } from '@workspace/contracts'
 import { realpathSync } from 'node:fs'
-import { spawnPty, type Pty } from '@workspace/pty'
+import type { Pty, SpawnPtyOptions } from '@workspace/pty'
 import {
   parseTerminalClientMessage,
   type TerminalClientMessage,
@@ -31,8 +31,12 @@ import { FsError, isFsError } from '../fs/errors'
 import type { WorkspacePaths } from '../fs/path'
 import { limitText, recordProcessInfo, recordProcessWarning } from '../observability'
 import { readForegroundProcessName, type ForegroundProcessReader } from './foreground'
+import { hostPtyFactory, TerminalHostClient } from './host-client'
+import { isTestProcess, platformHomePath } from '../home'
 
-export type TerminalPtyFactory = typeof spawnPty
+/** `key` names the shell in the terminal host, which a later server attaches to. */
+export type TerminalPtyOptions = SpawnPtyOptions & { readonly key: string }
+export type TerminalPtyFactory = (options: TerminalPtyOptions) => Pty | Promise<Pty>
 
 export type TerminalServiceOptions = {
   database: PlatformDatabase
@@ -77,6 +81,7 @@ export class TerminalService {
   private readonly starts = new Map<string, Promise<void>>()
   private readonly persistentSessions = new Map<string, TerminalSession>()
   private readonly ptyFactory: TerminalPtyFactory
+  private readonly host: TerminalHostClient | null
   private disposed = false
 
   constructor({
@@ -88,7 +93,7 @@ export class TerminalService {
     resolveWorktree,
     lifecycle,
     resolveAgentSession,
-    ptyFactory = spawnPty,
+    ptyFactory,
   }: TerminalServiceOptions) {
     this.database = database
     this.env = env
@@ -98,7 +103,9 @@ export class TerminalService {
     this.resolveWorktree = resolveWorktree
     this.lifecycle = lifecycle
     this.resolveAgentSession = resolveAgentSession
-    this.ptyFactory = ptyFactory
+    const pty = terminalPtyFactory(ptyFactory)
+    this.host = pty.host
+    this.ptyFactory = pty.factory
   }
 
   /** Ends a shell no panel is attached to; a mounted panel sends `dispose` over its own socket. */
@@ -186,6 +193,7 @@ export class TerminalService {
         foregroundProcess: this.foregroundProcess,
         processPollMs: this.processPollMs,
         command: execution.command,
+        key,
         onDispose: () => this.persistentSessions.delete(key),
         ptyFactory: this.ptyFactory,
         rootPath: root.relativePath,
@@ -193,7 +201,7 @@ export class TerminalService {
       })
       this.persistentSessions.set(key, session)
       for (const connection of connections) socketSessions.set(connection.key, session)
-      if (!session.start(connections[0])) {
+      if (!(await session.start(connections[0]))) {
         await session.dispose({ kill: false })
         throw createStructuredError({
           code: 'terminal.RESTART_FAILED',
@@ -233,6 +241,7 @@ export class TerminalService {
     this.disposed = true
     await Promise.allSettled(this.starts.values())
     await Promise.all([...this.persistentSessions.values()].map((session) => session.dispose()))
+    this.host?.close()
   }
 
   hasWorktreeRuntime(worktreeId: WorktreeId) {
@@ -363,6 +372,7 @@ export class TerminalService {
       foregroundProcess: this.foregroundProcess,
       processPollMs: this.processPollMs,
       command: execution.command,
+      key: sessionKey,
       onDispose: () => this.persistentSessions.delete(sessionKey),
       ptyFactory: this.ptyFactory,
       rootPath: root.relativePath,
@@ -370,7 +380,7 @@ export class TerminalService {
     })
     this.persistentSessions.set(sessionKey, session)
     socketSessions.set(socket.key, session)
-    if (session.start(connection)) {
+    if (await session.start(connection)) {
       await this.activateSession(session, lease)
       return
     }
@@ -465,6 +475,7 @@ export class TerminalSession {
   private readonly foregroundProcess: ForegroundProcessReader
   private readonly processPollMs: number
   private readonly command: readonly [string, ...string[]] | undefined
+  private readonly key: string
   private readonly onDispose: (session: TerminalSession) => void
   private readonly ptyFactory: TerminalPtyFactory
   private readonly rootPath: string
@@ -492,6 +503,8 @@ export class TerminalSession {
   private outputBytes = 0
   private outputMessageCount = 0
   private pty: Pty | null = null
+  // Output that lands while the spawn is awaited waits until `ready` and the replay are sent.
+  private startupOutput: Uint8Array[] | null = null
   private resizeCount = 0
   private serverMessageCount = 0
   private shell: string | null = null
@@ -507,6 +520,7 @@ export class TerminalSession {
     foregroundProcess,
     processPollMs,
     command,
+    key,
     onDispose,
     ptyFactory,
     rootPath,
@@ -522,6 +536,7 @@ export class TerminalSession {
     foregroundProcess: ForegroundProcessReader
     processPollMs: number
     command?: readonly [string, ...string[]]
+    key: string
     onDispose: (session: TerminalSession) => void
     ptyFactory: TerminalPtyFactory
     rootPath: string
@@ -537,6 +552,7 @@ export class TerminalSession {
     this.foregroundProcess = foregroundProcess
     this.processPollMs = processPollMs
     this.command = command
+    this.key = key
     this.onDispose = onDispose
     this.ptyFactory = ptyFactory
     this.rootPath = rootPath
@@ -558,13 +574,20 @@ export class TerminalSession {
     return connections
   }
 
-  start(connection?: TerminalConnection) {
+  async start(connection?: TerminalConnection) {
     if (connection) this.setConnection(connection)
     const restoredHistory = this.history.values().length > 0
     if (connection)
       for (const data of this.history.values()) this.send(connection, { type: 'output', data })
-    const spawnResult = this.spawnPty()
+    this.startupOutput = []
+    const spawnResult = await this.spawnPty()
+    const startupOutput = this.startupOutput
+    this.startupOutput = null
     if (!spawnResult) return false
+    if (this.disposed || this.terminating) {
+      spawnResult.pty.kill()
+      return false
+    }
 
     this.pty = spawnResult.pty
     this.shell = spawnResult.shell
@@ -579,6 +602,7 @@ export class TerminalSession {
     )
     this.emitReady(restoredHistory)
     if (connection) this.send(connection, { type: 'replay-complete' })
+    for (const data of startupOutput) this.handleOutput(data)
     this.scheduleProcessPoll()
     return true
   }
@@ -768,6 +792,10 @@ export class TerminalSession {
   }
 
   private handleOutput(data: Uint8Array) {
+    if (this.startupOutput) {
+      this.startupOutput.push(data)
+      return
+    }
     this.modes.write(data)
     try {
       this.history.append(data)
@@ -828,14 +856,14 @@ export class TerminalSession {
     this.repaintTimer = null
   }
 
-  private spawnPty() {
+  private async spawnPty() {
     const candidates: readonly (readonly [string, ...string[]])[] = this.command
       ? [this.command]
       : terminalShellCandidates(this.env).map((shell) => [shell])
     let lastError: unknown = null
 
     for (const command of candidates) {
-      const result = this.trySpawnPty(command)
+      const result = await this.trySpawnPty(command)
       if (result.pty) return result
 
       lastError = result.error
@@ -848,11 +876,12 @@ export class TerminalSession {
     return null
   }
 
-  private trySpawnPty(command: readonly [string, ...string[]]) {
+  private async trySpawnPty(command: readonly [string, ...string[]]) {
     const shell = command[0]
     try {
       return {
-        pty: this.ptyFactory({
+        pty: await this.ptyFactory({
+          key: this.key,
           cols: this.cols,
           cwd: this.cwd,
           env: terminalEnv(this.env),
@@ -951,6 +980,25 @@ export class TerminalSession {
 }
 
 const socketSessions = new WeakMap<object, TerminalSession>()
+
+// Shells live in the state root's terminal host; tests inject a factory instead.
+function terminalPtyFactory(injected: TerminalPtyFactory | undefined) {
+  if (injected) return { host: null, factory: injected }
+  const host = new TerminalHostClient({ stateRoot: platformHomePath() })
+  const spawn = hostPtyFactory(host)
+  const factory: TerminalPtyFactory = (options) => {
+    if (isTestProcess() && !process.env.PLATFORM_HOME)
+      throw createStructuredError({
+        code: 'terminal.TEST_HOST_NOT_INJECTED',
+        status: 500,
+        message: 'A test process reached the default terminal host.',
+        why: "The default host serves the developer's real state home and would run test shells beside theirs.",
+        fix: 'Inject `ptyFactory` in the test, or point PLATFORM_HOME at a temporary directory.',
+      })
+    return spawn(options)
+  }
+  return { host, factory }
+}
 
 type TerminalWebSocket = {
   close(code?: number, reason?: string): unknown

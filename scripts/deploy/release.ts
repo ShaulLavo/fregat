@@ -181,6 +181,7 @@ export function verifyCandidateFiles(release: Release) {
     !readdirSync(path.join(release.web, 'assets')).some((file) => file.endsWith('.wasm')) &&
       'no wasm artifact in web/assets',
     !existsSync(path.join(release.server, 'index.js')) && 'server/index.js is missing',
+    !existsSync(path.join(release.server, 'pty-host.js')) && 'server/pty-host.js is missing',
   ].filter((problem): problem is string => typeof problem === 'string')
   if (problems.length === 0) return
 
