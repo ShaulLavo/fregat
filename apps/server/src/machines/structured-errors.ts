@@ -104,6 +104,12 @@ const machineErrors = defineErrorCatalog('machines', {
     why: 'Streaming the release over SSH into ~/.platform/server/releases failed.',
     fix: 'Check the SSH connection and the free disk space on that machine, then select Update server again.',
   },
+  SSH_UPDATE_IN_USE: {
+    status: 409,
+    message: 'The previous server release is still in use.',
+    why: 'Another connection holds the running server, so activation was deferred.',
+    fix: 'Disconnect the other connections to that machine, then select Update server again.',
+  },
   SSH_UPDATE_INSTALL: {
     status: 502,
     message: 'The server release could not be installed on that machine.',
@@ -120,6 +126,7 @@ export const updateErrors = {
   oldBun: machineErrors.SSH_UPDATE_OLD_BUN,
   transfer: machineErrors.SSH_UPDATE_TRANSFER,
   install: machineErrors.SSH_UPDATE_INSTALL,
+  inUse: machineErrors.SSH_UPDATE_IN_USE,
 }
 
 const sshErrors = {

@@ -220,7 +220,12 @@ function healthServerSource(
   protocolVersion: number,
   serverVersion = descriptorValue.serverVersion,
 ) {
-  const body = JSON.stringify({ ...descriptorValue, protocolVersion, serverVersion })
+  const body = JSON.stringify({
+    ...descriptorValue,
+    protocolVersion,
+    serverVersion,
+    release: serverVersion,
+  })
   return `Bun.serve({ hostname: '127.0.0.1', port: Number(process.env.PORT), fetch: () => Response.json(${body}) })`
 }
 

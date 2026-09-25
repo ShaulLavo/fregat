@@ -1,14 +1,16 @@
-import { createHash } from 'node:crypto'
-import { readFile } from 'node:fs/promises'
+import { createHash, randomUUID } from 'node:crypto'
+import { readFile, readdir } from 'node:fs/promises'
 import path from 'node:path'
 import * as v from 'valibot'
 import rootPackage from '../../../../package.json' with { type: 'json' }
 import { absolutePath, releaseInstallationSchema } from '../installation/descriptor'
 import { releaseLauncherSource } from '../installation/install'
-import { missingReleaseFiles, RUNTIME_MANIFEST } from '../installation/release-files'
+import { missingReleaseFiles, RUNTIME_MANIFEST, RUNTIME_LOCK } from '../installation/release-files'
 import { shellQuote } from '../utils/shell'
 import { runSsh, type SshSpawner } from './forward'
 import { buildWorkingTree } from './dev-build'
+import { withUpdateLock } from './update-lock'
+import { checkpoint, runUpdateScript, validateCandidate } from './update-activation'
 import { createSshError, updateErrors } from './structured-errors'
 
 /** The release to install: its local directory holds `server/`, and `name` is its directory. */
@@ -19,6 +21,7 @@ export type ReleaseSource = {
   origin: 'release' | 'dev-build'
   buildMs?: number
   bundleBytes?: number
+  dispose?(): Promise<void>
 }
 
 /** A production primary ships its release; a development primary builds and ships its tree. */
@@ -29,6 +32,7 @@ export type ReleaseSupply = {
   channel: UpdateChannel
   available(): Promise<boolean>
   prepare(): Promise<ReleaseSource>
+  release?(source: ReleaseSource): Promise<void>
 }
 
 /** Where a channel keeps its releases, launcher and state, relative to the remote home. */
@@ -49,6 +53,7 @@ export type UpdateStep =
   | 'probe'
   | 'transfer'
   | 'runtime'
+  | 'validate'
   | 'swap'
   | 'restart'
   | 'connect'
@@ -97,10 +102,11 @@ export function releaseSource(
       const { directory, missing } = await bundledRelease(serverDirectory)
       if (!directory) throw updateErrors.notARelease({ internal: { serverDirectory, missing } })
       const manifest = await readFile(path.join(directory, 'server', RUNTIME_MANIFEST))
+      const lockfile = await readFile(path.join(directory, 'server', RUNTIME_LOCK))
       return {
         directory,
         name: path.basename(directory),
-        manifestSha: createHash('sha256').update(manifest).digest('hex'),
+        manifestSha: createHash('sha256').update(manifest).update(lockfile).digest('hex'),
         origin: 'release',
       }
     },
@@ -108,18 +114,36 @@ export function releaseSource(
 }
 
 // Two updates at once share one build: both would otherwise write apps/server/dist.
+const buildSupplies = new WeakMap<() => Promise<ReleaseSource>, ReleaseSupply>()
+
 function devBuildSupply(build: () => Promise<ReleaseSource>): ReleaseSupply {
+  const existing = buildSupplies.get(build)
+  if (existing) return existing
   let running: Promise<ReleaseSource> | null = null
-  return {
+  const users = new Map<ReleaseSource, number>()
+  const supply: ReleaseSupply = {
     channel: 'dev',
     available: async () => true,
-    prepare() {
+    async prepare() {
       running ??= build().finally(() => {
         running = null
       })
-      return running
+      const source = await running
+      users.set(source, (users.get(source) ?? 0) + 1)
+      return source
+    },
+    async release(source) {
+      const remaining = (users.get(source) ?? 1) - 1
+      if (remaining > 0) {
+        users.set(source, remaining)
+        return
+      }
+      users.delete(source)
+      await source.dispose?.()
     },
   }
+  buildSupplies.set(build, supply)
+  return supply
 }
 
 async function bundledRelease(serverDirectory: string) {
@@ -141,10 +165,31 @@ export async function timed<T>(event: UpdateEvent, step: UpdateStep, action: () 
 }
 
 /** Puts the release on the remote, then points `current` and the launcher at it. */
-export async function installRelease(remote: Remote, supply: ReleaseSupply, event: UpdateEvent) {
+export async function installRelease(
+  remote: Remote,
+  supply: ReleaseSupply,
+  event: UpdateEvent,
+  activate: (source: ReleaseSource) => Promise<void> = async () => undefined,
+  recover: () => Promise<void> = async () => undefined,
+) {
   const channel = channels[supply.channel]
   event.channel = supply.channel
   const source = await timed(event, 'source', () => supply.prepare())
+  try {
+    await installSource(remote, source, channel, event, activate, recover)
+  } finally {
+    await supply.release?.(source)
+  }
+}
+
+async function installSource(
+  remote: Remote,
+  source: ReleaseSource,
+  channel: ChannelLayout,
+  event: UpdateEvent,
+  activate: (source: ReleaseSource) => Promise<void>,
+  recover: () => Promise<void>,
+) {
   event.toRelease = source.name
   event.source = source.origin
   event.buildMs = source.buildMs
@@ -155,22 +200,108 @@ export async function installRelease(remote: Remote, supply: ReleaseSupply, even
   event.bunVersion = probe.bunVersion
   event.fromRelease = probe.currentRelease
   const bun = requireBun(probe)
-  if (!probe.present)
+  await withUpdateLock(remote, probe.serverRoot, bun, async () => {
+    await checkpoint(
+      remote,
+      bun,
+      probe.serverRoot,
+      path.posix.join(probe.home, channel.launcher),
+      'restore',
+    )
+    const current = await probeRemote(remote, channel, source.name)
+    event.fromRelease = current.currentRelease
+    await installLocked(remote, source, current, channel, bun, event, activate, recover)
+  })
+}
+
+async function installLocked(
+  remote: Remote,
+  source: ReleaseSource,
+  probe: Probe,
+  channel: ChannelLayout,
+  bun: string,
+  event: UpdateEvent,
+  activate: (source: ReleaseSource) => Promise<void>,
+  recover: () => Promise<void>,
+) {
+  const files = await releaseFiles(path.join(source.directory, 'server'))
+  const valid = await verifyRelease(remote, bun, probe.serverRoot, source.name, files)
+  if (!valid)
     event.bytesSent = await timed(event, 'transfer', () =>
       transfer(remote, source, probe.serverRoot),
     )
+  if (!(await verifyRelease(remote, bun, probe.serverRoot, source.name, files)))
+    throw updateErrors.transfer({ internal: { reason: 'content-mismatch', release: source.name } })
   event.runtimeReused = await timed(event, 'runtime', () =>
     installRuntime(remote, { bun, serverRoot: probe.serverRoot, source }),
   )
-  event.pruned = await timed(event, 'swap', () =>
-    swap(remote, {
-      bun,
-      home: probe.home,
-      serverRoot: probe.serverRoot,
-      name: source.name,
-      channel,
-    }),
+  await timed(event, 'validate', () =>
+    validateCandidate(remote, bun, probe.serverRoot, source.name),
   )
+  const launcher = path.posix.join(probe.home, channel.launcher)
+  await checkpoint(remote, bun, probe.serverRoot, launcher, 'save')
+  try {
+    await timed(event, 'swap', () =>
+      swap(remote, {
+        bun,
+        home: probe.home,
+        serverRoot: probe.serverRoot,
+        name: source.name,
+        channel,
+      }),
+    )
+    await activate(source)
+  } catch (error) {
+    await checkpoint(
+      { ...remote, signal: AbortSignal.timeout(15000) },
+      bun,
+      probe.serverRoot,
+      launcher,
+      'restore',
+    )
+    await recover()
+    throw error
+  }
+  const output = await runUpdateScript(
+    remote,
+    bun,
+    probe.serverRoot,
+    pruneScript(source.name, probe.currentRelease),
+    'prune',
+  )
+  event.pruned = v.parse(v.object({ pruned: v.array(v.string()) }), JSON.parse(output)).pruned
+  await checkpoint(remote, bun, probe.serverRoot, launcher, 'commit')
+}
+
+async function releaseFiles(directory: string): Promise<Record<string, string>> {
+  const entries = await readdir(directory, { recursive: true, withFileTypes: true })
+  const files: Record<string, string> = {}
+  for (const entry of entries) {
+    const relative = path.relative(directory, path.join(entry.parentPath, entry.name))
+    if (!entry.isFile() || relative.split(path.sep).includes('node_modules')) continue
+    files[relative] = createHash('sha256')
+      .update(await readFile(path.join(directory, relative)))
+      .digest('hex')
+  }
+  return files
+}
+
+async function verifyRelease(
+  remote: Remote,
+  bun: string,
+  root: string,
+  name: string,
+  files: Record<string, string>,
+) {
+  const script = `import { createHash } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
+const files = ${JSON.stringify(files)};
+const root = ${JSON.stringify(`releases/${name}/server/`)};
+for (const [file, hash] of Object.entries(files)) {
+  const data = await readFile(root + file).catch(() => null);
+  if (!data || createHash('sha256').update(data).digest('hex') !== hash) process.exit(1);
+}`
+  return (await runSsh({ ...remote, script: bunCommand(bun, root, script) })).exitCode === 0
 }
 
 const probeReportSchema = v.object({
@@ -242,7 +373,7 @@ if test -f "$root/releases/"${shellQuote(name)}"/server/index.js"; then present=
 printf '%s\\n' "home=$home" "platform=$(uname -sm)" "bun=$bun" "bunVersion=$version" "current=$current" "present=$present"`
 }
 
-/** Streams `server/` into `releases/<name>.partial`, renamed only once it is whole. */
+/** Streams into a transaction-specific staging directory before replacing the release. */
 async function transfer(remote: Remote, source: ReleaseSource, serverRoot: string) {
   const archive = Bun.spawn({
     cmd: ['tar', '-cf', '-', '--exclude=server/node_modules', '-C', source.directory, 'server'],
@@ -281,7 +412,7 @@ async function transfer(remote: Remote, source: ReleaseSource, serverRoot: strin
 }
 
 function transferScript(serverRoot: string, name: string) {
-  const partial = shellQuote(`${name}.partial`)
+  const partial = shellQuote(`${name}.partial-${randomUUID()}`)
   return `set -e
 mkdir -p ${shellQuote(path.posix.join(serverRoot, 'releases'))}
 cd ${shellQuote(path.posix.join(serverRoot, 'releases'))}
@@ -316,7 +447,7 @@ type SwapOptions = {
   channel: ChannelLayout
 }
 
-/** Swaps `current` atomically, writes the release launcher, then prunes all but two releases. */
+/** Promotes the verified candidate; pruning waits for successful activation. */
 async function swap(remote: Remote, options: SwapOptions) {
   const installation = v.parse(releaseInstallationSchema, {
     kind: 'release',
@@ -344,11 +475,15 @@ function bunCommand(bun: string, serverRoot: string, script: string) {
   return `cd ${shellQuote(serverRoot)} && ${shellQuote(bun)} -e ${shellQuote(script)}`
 }
 
-export function runtimeScript(config: { name: string; sha: string }) {
-  return `import { copyFile, lstat, mkdir, rename, rm, symlink } from 'node:fs/promises';
+function runtimeScript(config: { name: string; sha: string }) {
+  return `import { createHash } from 'node:crypto';
+import { copyFile, readFile, lstat, mkdir, rename, rm, symlink } from 'node:fs/promises';
 const config = ${JSON.stringify(config)};
 const runtime = 'runtime/' + config.sha;
 const server = 'releases/' + config.name + '/server';
+const manifest = await readFile(server + '/${RUNTIME_MANIFEST}');
+const lockfile = await readFile(server + '/${RUNTIME_LOCK}');
+if (createHash('sha256').update(manifest).update(lockfile).digest('hex') !== config.sha) process.exit(4);
 const exists = (file) => lstat(file).then(() => true, () => false);
 const reused = await exists(runtime + '/node_modules');
 if (!reused) await install();
@@ -362,7 +497,8 @@ async function install() {
   await rm(partial, { recursive: true, force: true });
   await mkdir(partial, { recursive: true });
   await copyFile(server + '/${RUNTIME_MANIFEST}', partial + '/package.json');
-  const child = Bun.spawn({ cmd: [process.execPath, 'install', '--production'], cwd: partial, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' });
+  await copyFile(server + '/${RUNTIME_LOCK}', partial + '/bun.lock');
+  const child = Bun.spawn({ cmd: [process.execPath, 'install', '--production', '--frozen-lockfile'], cwd: partial, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' });
   const [exitCode, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()]);
   if (exitCode !== 0) {
     await rm(partial, { recursive: true, force: true });
@@ -378,10 +514,9 @@ async function install() {
 }
 
 export function swapScript(config: { name: string; launcher: string; launcherSource: string }) {
-  return `import { chmod, mkdir, readdir, readlink, rename, rm, symlink } from 'node:fs/promises';
+  return `import { chmod, mkdir, rename, rm, symlink } from 'node:fs/promises';
 import path from 'node:path';
 const config = ${JSON.stringify(config)};
-const previous = await readlink('current').then((target) => path.basename(target), () => null);
 const staging = 'current.' + process.pid + '.tmp';
 await rm(staging, { force: true });
 await symlink('releases/' + config.name, staging);
@@ -391,7 +526,14 @@ const launcherStaging = config.launcher + '.' + process.pid + '.tmp';
 await Bun.write(launcherStaging, config.launcherSource);
 await chmod(launcherStaging, 0o700);
 await rename(launcherStaging, config.launcher);
-const keep = new Set([config.name, previous]);
+process.stdout.write(JSON.stringify({ pruned: [] }) + '\\n');
+`
+}
+
+function pruneScript(name: string, previous: string | null) {
+  return `import { readdir, readlink, rm } from 'node:fs/promises';
+import path from 'node:path';
+const keep = new Set(${JSON.stringify([name, previous])});
 const pruned = [];
 for (const entry of await readdir('releases')) {
   if (keep.has(entry)) continue;

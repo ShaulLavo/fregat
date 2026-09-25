@@ -15,10 +15,10 @@
 - `current` and L4's `pending` are symlinks to a release directory. A bundled server's
   `import.meta.dirname` resolves to `<release>/server` whichever link started it, so a staged but
   unpromoted primary ships its own staged release.
-- Every release built by `deploy --server` carries `server/runtime/package.json` and
+- Every release built by `deploy --server` carries `server/runtime/package.json`, `server/runtime/bun.lock`, and
   `server/remote-support.js`; the update refuses a release without them (`SSH_UPDATE_NOT_A_RELEASE`).
 - Locally `server/node_modules` links to the checkout's installed dependencies; the transfer
-  excludes it and the remote links `runtime/<manifest sha256>/node_modules` in its place.
+  excludes it and the remote links `runtime/<manifest-and-lock sha256>/node_modules` in its place.
 
 ## Outcome
 
@@ -93,7 +93,7 @@ has none, so the only thing a remote needs is `bun` and SSH.
   during install.
 - **D3 — Remote layout.** Decided 2026-09-25: recommendation (completion wave). Recommended:
   `~/.platform/server/releases/<release>/` holds the release, and `current` is a symlink swapped
-  atomically. `runtime/<manifest sha256>/node_modules` is shared by every release with the same
+  atomically. `runtime/<manifest-and-lock sha256>/node_modules` is shared by every release with the same
   manifest, so a web-only redeploy never reinstalls. Keep the running release and the one before
   it; delete older ones after a successful swap.
 - **D4 — Which launcher (owner).** Decided 2026-09-25: recommendation (completion wave).
@@ -196,16 +196,16 @@ Done 2026-09-25 (completion wave). As built:
       version, the installed release name if any. Missing `bun` is a catalog error whose `fix` is the
       install one-liner. A `bun` older than `packageManager` is a catalog error whose `fix` is
       `bun upgrade`.
-   2. **transfer**: skip if `releases/<release>` already exists. Otherwise stream
-      `tar -c server/` over SSH into `releases/<release>.partial`, then rename it. `tar` needs nothing
-      on the remote that `rsync` would.
-   3. **runtime**: if `runtime/<sha>/node_modules` is missing, copy the manifest there and run
-      `bun install --production`. Link `releases/<release>/server/node_modules` to it.
-   4. **swap**: point `current` at the new release (write a temporary link, then rename), and write
-      the release launcher.
-   5. **restart**: stop the managed server through the existing `stopScript` path. Other leases
-      follow the replacement process, as they do today (`docs/federated-environments.md:110-115`).
-      Then run a normal `connect`.
+   2. Acquire the remote installation's SQLite transaction lock through activation and pruning.
+      **transfer** verifies each release file against the outgoing content hashes; a damaged cache
+      is retransmitted through a unique staging directory.
+   3. **runtime** verifies the manifest and lock hash, then installs with
+      `bun install --production --frozen-lockfile` and links the release to that runtime.
+   4. **validate** boots the candidate with a temporary data home. **swap** records the prior link
+      and launcher, then promotes the candidate atomically.
+   5. **restart** and **connect** must reach the requested release identity. Another client holding
+      the old process produces `SSH_UPDATE_IN_USE`. Activation failure restores the saved link and
+      launcher and reconnects the previous release. Pruning starts after successful activation.
 2. Refusals are `machines.*` catalog entries with a `fix` the user acts on: `SSH_UPDATE_NO_BUN`,
    `SSH_UPDATE_OLD_BUN`, `SSH_UPDATE_TRANSFER`, `SSH_UPDATE_INSTALL` (with the install log tail in
    `internal`), and `SSH_UPDATE_NOT_A_RELEASE` for a development primary.
@@ -274,16 +274,16 @@ and to Plan 152.
 
 A primary running from source (`bun dev`) has no release, so Update server builds one:
 `buildWorkingTree()` (`apps/server/src/machines/dev-build.ts`) runs the `apps/server` build, copies
-`dist` to `<PLATFORM_HOME>/outgoing/dev-<stamp>-<commit>[-dirty]/server`, writes the runtime
-manifest through the same module deploy uses, and keeps the newest two builds. Concurrent updates
-share one build. Decisions D1–D4 as recommended (completion wave):
+`dist` to a uniquely named outgoing directory, then writes the runtime manifest and lockfile.
+All machine suppliers share one build coordinator. The artifact stays alive until every consuming
+update finishes, then it is removed. Decisions D1–D4 as recommended (completion wave):
 
 - **Channel.** A development build installs beside production: `~/.platform/server/dev` with its own
   `releases/`, `current`, `runtime/` and lease state, and `~/.local/bin/platform-server-dev`. A
   development primary probes `platform-server-dev`, so the mesh and `bun dev` never overwrite each
   other's server; a machine with only production installed reads "not installed" to a dev primary.
 - **State.** The dev launcher and launch script set `PLATFORM_HOME=~/.platform-dev`.
-- **Name.** `dev-<stamp>-<commit>[-dirty]`, so `/release` through the machine's proxy names the tree.
+- **Name.** `dev-<stamp>-<commit>[-dirty]-<uuid>`, so `/release` through the machine's proxy names the tree.
 - The fix copy and the button's tooltip say the working tree is built. The wide event carries
   `channel`, `source: 'dev-build'`, `buildMs` and `bundleBytes`; a failed build is
   `machines.SSH_UPDATE_BUILD` with the build log tail in `internal`.

@@ -1,3 +1,4 @@
+import * as v from 'valibot'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -96,7 +97,11 @@ test('a runtime package missing from bun.lock fails the manifest', () => {
 test('a built server directory reports the release files it lacks', async () => {
   const server = await mkdtemp(path.join(tmpdir(), 'platform-release-files-'))
   try {
-    expect(await missingReleaseFiles(server)).toEqual(['runtime/package.json', REMOTE_SUPPORT])
+    expect(await missingReleaseFiles(server)).toEqual([
+      'runtime/package.json',
+      'runtime/bun.lock',
+      REMOTE_SUPPORT,
+    ])
     const lockfile = path.join(server, 'bun.lock')
     await writeFile(
       lockfile,
@@ -107,5 +112,34 @@ test('a built server directory reports the release files it lacks', async () => 
     expect(await missingReleaseFiles(server)).toEqual([])
   } finally {
     await rm(server, { force: true, recursive: true })
+  }
+})
+
+test('the standalone runtime lock preserves transitive resolutions and integrity', async () => {
+  const server = await mkdtemp(path.join(tmpdir(), 'platform-runtime-lock-'))
+  try {
+    const schema = v.object({
+      packages: v.record(v.string(), v.unknown()),
+      workspaces: v.record(v.string(), v.unknown()),
+    })
+    const original = v.parse(
+      schema,
+      Bun.JSONC.parse(await readFile(path.join(repositoryRoot, 'bun.lock'), 'utf8')),
+    )
+    await writeRuntimeManifest(server, path.join(repositoryRoot, 'bun.lock'))
+    const runtime = v.parse(
+      schema,
+      Bun.JSONC.parse(await readFile(path.join(server, 'runtime/bun.lock'), 'utf8')),
+    )
+    expect(runtime.packages['detect-libc']).toEqual(original.packages['detect-libc'])
+    expect(runtime.packages['detect-libc']).toEqual([
+      expect.any(String),
+      expect.any(String),
+      expect.any(Object),
+      expect.stringMatching(/^sha512-/),
+    ])
+    expect(Object.keys(runtime.workspaces)).toEqual([''])
+  } finally {
+    await rm(server, { recursive: true, force: true })
   }
 })

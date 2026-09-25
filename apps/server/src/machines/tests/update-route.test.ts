@@ -71,5 +71,5 @@ test('two clients updating one machine share a single update', async () => {
   const responses = await Promise.all([update(app, 'fixture'), update(app, 'fixture')])
   const states = await Promise.all(responses.map((response) => response.json()))
   expect(states.map((state) => state.phase)).toEqual(['live', 'live'])
-  expect(ssh.commands.filter((command) => command.includes('present=')).length).toBe(1)
+  expect(ssh.commands.filter((command) => command.includes('present=')).length).toBe(2)
 })

@@ -1,3 +1,5 @@
+import { readFile, readlink, writeFile } from 'node:fs/promises'
+import path from 'node:path'
 import { ORCHESTRATION_WS_PROTOCOL_VERSION } from '@workspace/contracts'
 import { expect, test } from 'vitest'
 import { installServerLauncher } from '../../installation/install'
@@ -116,7 +118,7 @@ test('concurrent updates and a connect during one join a single update', async (
   expect(first.phase).toBe('live')
   expect(second).toBe(first)
   expect(connect).toBe(first)
-  expect(probes(ssh.commands)).toBe(1)
+  expect(probes(ssh.commands)).toBe(2)
   expect(events.filter((event) => event.action === 'machines.server.update')).toHaveLength(1)
 })
 
@@ -165,4 +167,44 @@ test('an update resolves the machine from settings and rejects an unknown name',
   })
   expect(ssh.commands).toEqual([])
   expect(launcher.listStates()).toEqual([])
+})
+
+test('another client holding the previous release defers activation explicitly', async () => {
+  const { home, local } = await updateFixture()
+  const first = updateLauncher(localSsh({ home }), await shippableRelease(local, 'first'))
+  expect((await first.launcher.updateMachine('fixture')).phase).toBe('live')
+  const second = updateLauncher(
+    localSsh({ home }),
+    await shippableRelease(local, 'second'),
+    undefined,
+    '00000000-0000-4000-8000-000000000002',
+  )
+  const result = await second.launcher.updateMachine('fixture')
+  expect(result).toMatchObject({
+    phase: 'blocked',
+    lastError: { code: 'machines.SSH_UPDATE_IN_USE' },
+  })
+  expect(updateEvent(second.events)).toMatchObject({ outcome: 'failed' })
+})
+
+test('a candidate that fails only on activation restores a working connection to the prior release', async () => {
+  const { home, local, serverRoot } = await updateFixture()
+  const ssh = localSsh({ home })
+  const first = updateLauncher(ssh, await shippableRelease(local, 'first'))
+  expect((await first.launcher.updateMachine('fixture')).phase).toBe('live')
+  await first.launcher.close()
+  const candidate = await shippableRelease(local, 'second')
+  const entry = path.join(local, 'releases/second/server/index.js')
+  await writeFile(
+    entry,
+    `if (!process.env.PLATFORM_HOME?.includes('.candidate-')) process.exit(3);\n${await readFile(entry, 'utf8')}`,
+  )
+  const second = updateLauncher(ssh, candidate)
+  expect((await second.launcher.connectMachine('fixture')).phase).toBe('live')
+  expect((await second.launcher.updateMachine('fixture')).phase).toBe('blocked')
+  expect(await readlink(path.join(serverRoot, 'current'))).toBe('releases/first')
+  expect(await second.launcher.connectMachine('fixture')).toMatchObject({
+    phase: 'live',
+    descriptor: { release: 'first' },
+  })
 })

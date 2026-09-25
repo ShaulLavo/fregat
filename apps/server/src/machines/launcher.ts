@@ -13,6 +13,7 @@ import {
   createSshProtocolError,
   machineConnectionError,
   releaseUpdateFix,
+  updateErrors,
   sshProtocolCode,
   type SshCatalogStep,
   type SshErrorStep,
@@ -22,6 +23,7 @@ import {
   releaseSource,
   timed,
   type ReleaseSupply,
+  type ReleaseSource,
   type UpdateEvent,
 } from './update'
 import {
@@ -150,18 +152,43 @@ export function createSshLauncher(options: LauncherOptions) {
     event.target = machine.target
     try {
       const remote = { spawn, target: machine.target, signal: connection.controller.signal }
-      await installRelease(remote, supply, event)
-      await timed(event, 'restart', () => cleanup(connection))
-      const state = await timed(event, 'connect', () => trackConnect(name))
-      event.outcome = state.phase === 'live' ? 'success' : 'failed'
-      if (state.phase !== 'live' && 'lastError' in state) event.errorCode = state.lastError.code
-      return state
+      await installRelease(
+        remote,
+        supply,
+        event,
+        (source) => activateRelease(name, connection, event, source),
+        () => recoverRelease(name, connection),
+      )
+      event.outcome = 'success'
+      return connections.get(name)?.state ?? connection.state
     } catch (error) {
-      return failedUpdate(connection, event, error)
+      return failedUpdate(connections.get(name) ?? connection, event, error)
     } finally {
       event.durationMs = Date.now() - startedAt
       writeLog('machines.server.update', event, event.outcome === 'failed')
     }
+  }
+
+  async function activateRelease(
+    name: string,
+    connection: Connection,
+    event: UpdateEvent,
+    source: ReleaseSource,
+  ) {
+    await timed(event, 'restart', () => cleanup(connection))
+    const state = await timed(event, 'connect', () => trackConnect(name))
+    if (state.phase !== 'live') throw updateErrors.install({ internal: { step: 'connect', state } })
+    if (state.descriptor.release !== source.name)
+      throw updateErrors.inUse({
+        internal: { requested: source.name, running: state.descriptor.release ?? null },
+      })
+  }
+
+  async function recoverRelease(name: string, connection: Connection) {
+    if (connection.controller.signal.aborted) return
+    const active = connections.get(name) ?? connection
+    await cleanup(active)
+    await trackConnect(name)
   }
 
   function failedUpdate(connection: Connection, event: UpdateEvent, error: unknown) {

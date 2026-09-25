@@ -40,7 +40,7 @@ const sshOptions = [
   'ConnectTimeout=10',
 ]
 
-function sshCommand(target: string, script: string) {
+export function sshCommand(target: string, script: string) {
   return [...sshOptions, '--', target, 'sh', '-c', shellQuote(script)]
 }
 

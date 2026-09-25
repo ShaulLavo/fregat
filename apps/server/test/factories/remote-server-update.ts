@@ -1,4 +1,5 @@
-import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
+import * as v from 'valibot'
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { ORCHESTRATION_WS_PROTOCOL_VERSION, type Machines } from '@workspace/contracts'
@@ -35,8 +36,8 @@ export async function updateFixture() {
 
 /**
  * A release as deploy leaves it: `server/` with its runtime manifest and a `node_modules` link to
- * this machine's packages, which the transfer must leave behind. The manifest has no dependencies,
- * so `bun install` stays offline; its postinstall counts installs in the remote home.
+ * this machine's packages, which the transfer must leave behind. The one small runtime dependency
+ * is already in the checkout cache; postinstall counts installs in the remote home.
  */
 export async function shippableRelease(
   local: string,
@@ -46,13 +47,30 @@ export async function shippableRelease(
   await writeRelease(local, name, protocolVersion)
   const server = path.join(local, 'releases', name, 'server')
   await mkdir(path.join(server, 'runtime'), { recursive: true })
+  const lock = v.parse(
+    v.object({ packages: v.record(v.string(), v.unknown()) }),
+    Bun.JSONC.parse(
+      await readFile(path.resolve(import.meta.dirname, '../../../../bun.lock'), 'utf8'),
+    ),
+  )
+  const entry = v.parse(v.looseTuple([v.string()]), lock.packages['detect-libc'])
+  const dependencies = { 'detect-libc': entry[0].slice('detect-libc@'.length) }
   const manifest = {
     name: 'platform-server-runtime',
     private: true,
-    dependencies: {},
+    dependencies,
     scripts: { postinstall: 'echo installed >> "$HOME/runtime-installs.log"' },
   }
   await writeFile(path.join(server, 'runtime/package.json'), JSON.stringify(manifest))
+  await writeFile(
+    path.join(server, 'runtime/bun.lock'),
+    JSON.stringify({
+      lockfileVersion: 1,
+      configVersion: 1,
+      workspaces: { '': { name: manifest.name, dependencies } },
+      packages: { 'detect-libc': entry },
+    }),
+  )
   await symlink(
     path.resolve(import.meta.dirname, '../../node_modules'),
     path.join(server, 'node_modules'),
@@ -115,10 +133,11 @@ export function updateLauncher(
   ssh: ReturnType<typeof localSsh>,
   supply: ReturnType<typeof releaseSource>,
   machines: Machines = { fixture: machine },
+  clientId = '00000000-0000-4000-8000-000000000001',
 ) {
   const events: Array<{ action: string; fields: Record<string, unknown> }> = []
   const launcher = createSshLauncher({
-    clientId: '00000000-0000-4000-8000-000000000001',
+    clientId,
     webOrigin: 'http://127.0.0.1:5173',
     readMachines: async () => machines,
     publish: () => undefined,

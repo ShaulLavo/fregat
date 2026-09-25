@@ -74,7 +74,14 @@ test('a first install ships the release, installs its runtime and writes the rel
     pruned: [],
   })
   expect(event.bytesSent).toBeGreaterThan(0)
-  expect(Object.keys(event.steps)).toEqual(['source', 'probe', 'transfer', 'runtime', 'swap'])
+  expect(Object.keys(event.steps)).toEqual([
+    'source',
+    'probe',
+    'transfer',
+    'runtime',
+    'validate',
+    'swap',
+  ])
   expect(await readlink(path.join(serverRoot, 'current'))).toBe('releases/first')
   const nodeModules = path.join(serverRoot, 'releases/first/server/node_modules')
   expect((await lstat(nodeModules)).isSymbolicLink()).toBe(true)
@@ -269,7 +276,7 @@ test('a failing runtime install reports its log tail and keeps current', async (
   await writeFile(
     manifest,
     JSON.stringify({
-      name: 'broken',
+      ...JSON.parse(await readFile(manifest, 'utf8')),
       scripts: { postinstall: 'echo nope-from-install >&2; exit 7' },
     }),
   )
@@ -312,6 +319,75 @@ test('a release deployed before releases carried a runtime manifest cannot be sh
   expect(await source.available()).toBe(false)
   await expect(source.prepare()).rejects.toMatchObject({
     code: 'machines.SSH_UPDATE_NOT_A_RELEASE',
-    internal: { missing: ['runtime/package.json'] },
+    internal: { missing: ['runtime/package.json', 'runtime/bun.lock'] },
   })
+})
+
+test('separate primaries serialize updates to the same remote installation', async () => {
+  const { home, local, serverRoot } = await updateFixture()
+  const first = await shippableRelease(local, 'first')
+  const second = await shippableRelease(local, 'second')
+  const results = await Promise.all([install(home, first), install(home, second)])
+  expect(results.every((result) => result.event.bytesSent > 0)).toBe(true)
+  expect((await readdir(path.join(serverRoot, 'releases'))).sort()).toEqual(['first', 'second'])
+  expect(await runtimeInstalls(home)).toBe(1)
+})
+
+test('a damaged cached release is retransmitted before reuse', async () => {
+  const { home, local, serverRoot } = await updateFixture()
+  const supply = await shippableRelease(local, 'first')
+  await install(home, supply)
+  await writeFile(path.join(serverRoot, 'releases/first/server/remote-support.js'), 'broken')
+  const result = await install(home, supply)
+  expect(result.event.bytesSent).toBeGreaterThan(0)
+  expect(
+    await readFile(path.join(serverRoot, 'releases/first/server/remote-support.js'), 'utf8'),
+  ).toBe(await readFile(path.join(local, 'releases/first/server/remote-support.js'), 'utf8'))
+})
+
+test('two release suppliers share the same development build coordinator', async () => {
+  let builds = 0
+  const build = async () => {
+    builds++
+    await Bun.sleep(10)
+    return { directory: '/built', name: 'dev-x', manifestSha: 'sha', origin: 'dev-build' as const }
+  }
+  const first = releaseSource(import.meta.dirname, build)
+  const second = releaseSource(import.meta.dirname, build)
+  const results = await Promise.all([first.prepare(), second.prepare()])
+  expect(builds).toBe(1)
+  expect(results[0]).toBe(results[1])
+})
+
+test('activation failure after promotion restores the previous release and launcher', async () => {
+  const { home, local, serverRoot } = await updateFixture()
+  await install(home, await shippableRelease(local, 'first'))
+  const launcher = path.join(home, '.local/bin/platform-server')
+  const previousLauncher = await readFile(launcher, 'utf8')
+  const ssh = localSsh({ home })
+  const candidate = await shippableRelease(local, 'second')
+  await expect(
+    installRelease(
+      { spawn: ssh.spawn, target: 'fixture', signal: AbortSignal.timeout(60000) },
+      candidate,
+      newEvent(),
+      async () => {
+        expect(await readlink(path.join(serverRoot, 'current'))).toBe('releases/second')
+        throw new TypeError('activation failed')
+      },
+    ),
+  ).rejects.toThrow('activation failed')
+  expect(await readlink(path.join(serverRoot, 'current'))).toBe('releases/first')
+  expect(await readFile(launcher, 'utf8')).toBe(previousLauncher)
+})
+
+test('a candidate that crashes at startup is rejected before promotion', async () => {
+  const { home, local, serverRoot } = await updateFixture()
+  await install(home, await shippableRelease(local, 'first'))
+  const candidate = await shippableRelease(local, 'broken')
+  await writeFile(path.join(local, 'releases/broken/server/index.js'), 'process.exit(3)')
+  await expect(install(home, candidate)).rejects.toMatchObject({
+    code: 'machines.SSH_UPDATE_INSTALL',
+  })
+  expect(await readlink(path.join(serverRoot, 'current'))).toBe('releases/first')
 })

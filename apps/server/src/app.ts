@@ -424,6 +424,9 @@ export function createApp(options: AppOptions) {
           label: hostname(),
           protocolVersion: serverConfig.protocolVersion,
           serverVersion: serverConfig.serverVersion,
+          release: options.web?.serverReleaseFile
+            ? path.basename(path.dirname(options.web.serverReleaseFile))
+            : null,
           capabilities: {
             sessionSettlement: true,
             sessionSnooze: true,
