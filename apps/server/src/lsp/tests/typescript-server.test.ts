@@ -47,7 +47,9 @@ function watchedPool() {
   hubs.push(hub)
   const pool = new LspSessionPool(() => 120_000, undefined, treeWatchSource(hub, paths))
   pools.push(pool)
-  return pool
+  const registrations = vi.spyOn(LspWatchedFiles.prototype, 'register')
+  cleanups.push(async () => registrations.mockRestore())
+  return { pool, registrations: registrations.mock }
 }
 
 class RecordingSocket implements LspProxySocket {
@@ -92,7 +94,7 @@ describe('workspace TypeScript against real language servers', () => {
         workspaceRoot: root,
       })
       if (!match) throw createInternalError('TypeScript fixture did not match its language server')
-      const pool = watchedPool()
+      const { pool, registrations } = watchedPool()
       const socket = new RecordingSocket()
       const session = await pool.acquire(socket, match, root)
       if (!session)
@@ -103,6 +105,7 @@ describe('workspace TypeScript against real language servers', () => {
         textDocument: { languageId: 'typescript', text: source, uri, version: 1 },
       })
       await assertDiagnostics(session, socket, native, uri)
+      if (native) await expect.poll(() => registeredWatch(registrations, root)).toBe(true)
 
       const dependency = path.join(root, 'dependency.ts')
       const changes = [
@@ -154,9 +157,7 @@ describe('workspace TypeScript against real language servers', () => {
         workspaceRoot: root,
       })
       if (!match) throw createInternalError('TypeScript fixture did not match its language server')
-      const registrations = vi.spyOn(LspWatchedFiles.prototype, 'register')
-      cleanups.push(async () => registrations.mockRestore())
-      const pool = watchedPool()
+      const { pool, registrations } = watchedPool()
       const socket = new RecordingSocket()
       const session = await pool.acquire(socket, match, root)
       if (!session)
@@ -169,7 +170,7 @@ describe('workspace TypeScript against real language servers', () => {
       await assertDiagnostics(session, socket, native, uri)
       // tsgo registers the packages' watch after its first answer (tsserver watches on its own).
       // A write before that is lost, and a refresh for the `node_modules` alias pulls stale types.
-      const watched = () => [first, second].every((dir) => registeredWatch(registrations.mock, dir))
+      const watched = () => [first, second].every((dir) => registeredWatch(registrations, dir))
       if (native) await expect.poll(watched, { timeout: 20_000 }).toBe(true)
 
       const declarations = (target: string) => path.join(target, 'dist/index.d.ts')
@@ -309,7 +310,7 @@ describe('workspace TypeScript against real language servers', () => {
     })
     if (!match) throw createInternalError('TypeScript fixture did not match its language server')
 
-    const pool = watchedPool()
+    const { pool } = watchedPool()
     const socket = new RecordingSocket()
     const session = await pool.acquire(socket, match, root)
     if (!session) throw createInternalError('TypeScript fixture did not start its language server')
@@ -457,6 +458,7 @@ function publishedErrors(socket: RecordingSocket, uri: string) {
 
 type Probe = {
   readonly root: string
+  readonly registrations: MockInstance<LspWatchedFiles['register']>['mock']
   readonly session: LspProxyClientSession
   readonly socket: RecordingSocket
   readonly uri: string
@@ -485,14 +487,15 @@ async function openProbe(
   })
   if (!match) throw createInternalError('TypeScript fixture did not match its language server')
   const socket = new RecordingSocket()
-  const session = await watchedPool().acquire(socket, match, root)
+  const { pool, registrations } = watchedPool()
+  const session = await pool.acquire(socket, match, root)
   if (!session) throw createInternalError('TypeScript fixture did not start its language server')
   await request(session, socket, 1, 'initialize', initializeParams(root))
   await notify(session, 'initialized', {})
   await notify(session, 'textDocument/didOpen', {
     textDocument: { languageId: 'typescript', text: source, uri, version: 1 },
   })
-  return { root, session, socket, uri }
+  return { root, registrations, session, socket, uri }
 }
 
 /** The state the server settles on first; there is no refresh to wait for yet. */
@@ -509,6 +512,8 @@ async function expectCodes(probe: Probe, native: boolean, codes: readonly number
     textDocument: { uri: probe.uri },
   })
   expect(errorCodes(result, 'items')).toEqual(codes)
+  // tsgo can answer diagnostics before its dynamic watches have attached.
+  await expect.poll(() => registeredWatch(probe.registrations, probe.root)).toBe(true)
   probe.socket.sent.length = 0
 }
 
