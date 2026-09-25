@@ -33,6 +33,7 @@ import { readLiveSettingsProjection } from '@/features/settings/state/live-proje
 import { useOpenWorkspaceRoot } from '@/features/workspace/hooks/use-open-root'
 import { resolvedPlatformKeyBindings } from '@/keymap/active-bindings'
 import { defaultPlatformKeyBindings } from '@/keymap/default-bindings'
+import { KeyBindingsContext } from '@/keymap/providers/bindings-context'
 import { useAppKeymap } from '@/keymap/use-app-keymap'
 import type { WorkspaceCommandRuntime, WorkspaceCommandSnapshot } from '@/keymap/define-command'
 import { CommandContext, type CommandContextValue } from '@/keymap/providers/command-context'
@@ -403,7 +404,7 @@ export function CommandProvider({ children }: { readonly children: ReactNode }) 
 
   return (
     <CommandContext value={value}>
-      {children}
+      <KeyBindingsContext value={bindings}>{children}</KeyBindingsContext>
       {environmentDialog ? (
         <PickerDialog mode={environmentDialog} onClose={() => setEnvironmentDialog(null)} />
       ) : null}

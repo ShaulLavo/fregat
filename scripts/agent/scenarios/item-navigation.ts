@@ -1,7 +1,7 @@
 import { ok, strictEqual } from 'node:assert/strict'
 import type { Page } from 'playwright'
 import { openFileByName, selectors } from '../selectors'
-import { dispatch, openChatWorkspace } from './chat-verification'
+import { createIdleSessions, dispatch, openChatWorkspace } from './chat-verification'
 import type { Scenario } from './index'
 
 const FILES = ['AGENTS.md', 'PLAN.md', 'README.md'] as const
@@ -39,23 +39,10 @@ export const itemNavigation: Scenario = {
   description:
     'Platform keys: Mod+digit and Mod+Alt+[ ] move through editor tabs in the workbench and chats in chat mode; Mod+Alt+digit opens and closes sidebar panels.',
   async run(page, { step }) {
-    const { base, project, worktree } = await openChatWorkspace(page)
-    // No turn runs, so a throwaway server without providers still takes the session.
-    const modelSelection = project?.defaultModelSelection ?? {
-      providerInstanceId: 'claude',
-      model: 'claude-sonnet-5',
-    }
+    const workspace = await openChatWorkspace(page)
     const prefix = `Item navigation ${crypto.randomUUID().slice(0, 8)}`
-    const ids = [crypto.randomUUID(), crypto.randomUUID()]
+    const ids = await createIdleSessions(page, workspace, prefix, 2)
     try {
-      for (const [index, sessionId] of ids.entries())
-        await dispatch(page, base, {
-          type: 'session.create',
-          sessionId,
-          title: `${prefix} ${index + 1}`,
-          modelSelection,
-          worktreeTarget: { kind: 'current', worktreeId: worktree.id },
-        })
       await selectors.sessionSearch(page).fill(prefix)
       for (const [index] of ids.entries())
         await selectors.sessionByTitle(page, `${prefix} ${index + 1}`).waitFor()
@@ -84,7 +71,8 @@ export const itemNavigation: Scenario = {
       strictEqual(selectedSessionId(page), displayed[0], 'Panel keys never select chats')
       await step('adjacent-chats')
     } finally {
-      for (const sessionId of ids) await dispatch(page, base, { type: 'session.delete', sessionId })
+      for (const sessionId of ids)
+        await dispatch(page, workspace.base, { type: 'session.delete', sessionId })
     }
 
     await selectors.workspaceMode(page, 'Workbench').click()

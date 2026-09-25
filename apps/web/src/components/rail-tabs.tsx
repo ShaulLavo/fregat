@@ -1,6 +1,6 @@
-import { PanelTabIcon } from '@/components/panel-tab-icon'
-import { ToggleIconButton } from '@/components/toggle-icon-button'
+import { RailTab } from '@/components/rail-tab'
 import type { PanelTab } from '@/components/utils/panel-tabs'
+import { railTabCommand } from '@/components/utils/rail-tab-command'
 import { WorkspaceRail } from '@/components/workspace-rail'
 import { usePaneHost } from '@/hooks/use-pane-host'
 import type { PaneHostView } from '@/providers/pane-host-context'
@@ -23,12 +23,13 @@ export function RailTabs({
 
   return (
     <WorkspaceRail className={className} label={label} side={side}>
-      {views.map((view) => (
-        <ToggleIconButton
+      {views.map((view, index) => (
+        <RailTab
           active={host?.visible === true && host.activeView === view.value}
-          icon={<PanelTabIcon tab={view.value} />}
+          command={railTabCommand(host?.kind, index)}
           key={view.value}
           label={view.label}
+          tab={view.value}
           tooltipSide={side === 'left' ? 'right' : 'left'}
           onClick={view.toggle}
         />

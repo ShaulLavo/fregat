@@ -13,6 +13,7 @@ import {
 import type { EditorTabConflictMap } from '@/features/workspace/utils/tab-types'
 
 import { BottomPanel } from '@/features/workbench/components/bottom-panel'
+import { ClosedSidebarHints } from '@/features/workbench/components/closed-sidebar-hints'
 import { CodePanel } from '@/features/workbench/components/code-panel'
 import { SidebarPanel } from '@/features/workbench/components/sidebar-panel'
 import {
@@ -72,7 +73,9 @@ export function WorkbenchLayout({
             />
           </PaneHostProvider>
         </div>
-      ) : null}
+      ) : (
+        <ClosedSidebarHints />
+      )}
       <ResizablePanelGroup
         className='relative z-10 min-h-0 min-w-0 flex-1'
         defaultLayout={layout.outerLayout}
