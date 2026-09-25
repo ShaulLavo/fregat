@@ -376,6 +376,7 @@ a Bun process launcher and does not need Rust there.
 2. **The Chromium `--app` fallback** (the plan's question 2): (a) build it as a flag in Gate 2;
    (b) WebKitGTK or nothing. Recommendation: (a), because the NVIDIA stall shows a Linux webview
    can fail silently on one driver.
+   Decided 2026-09-26: owner — (a): build the Chromium `--app` fallback as a flag in Gate 2.
 3. **The screenshot attachment on WebKitGTK**: (a) require `gst-plugins-good` and verify capture
    works with it; (b) hide the feature where the engine cannot play a capture stream.
    Recommendation: (a), verified before Gate 1 ends, with (b) as the fallback.
