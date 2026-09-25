@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { mkdir, rename, rm, symlink, writeFile } from 'node:fs/promises'
 import {
   defaultClientCapabilities,
@@ -6,19 +7,20 @@ import {
   semanticTokensClientCapability,
 } from '@singapore-editor/lsp'
 import { isRecord } from '@workspace/utils/objects'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 
 import {
   installedTypeScriptRuntimeFixture,
   watchableTempDirectory,
 } from '../../../test/factories/typescript-runtime'
-import { createWorkspacePaths } from '../../fs/path'
+import { createWorkspacePaths, isOutsideRoot } from '../../fs/path'
 import { treeWatchSource } from '../../fs/tree-watch'
 import { FileChangeHub } from '../../fs/watch'
 import { createInternalError } from '../../observability/structured-errors'
 import { fileUriForPath } from '../language'
 import { LspSessionPool, type LspProxyClientSession, type LspProxySocket } from '../proxy-session'
 import { resolveLspServer } from '../registry'
+import { LspWatchedFiles } from '../watched-files'
 
 const IMPORT = 'import { helper } from "./nested/my-helper";'
 const SOURCE = `const count: number = "wrong";\ncount.toFixed();\n${IMPORT}\n`
@@ -152,6 +154,8 @@ describe('workspace TypeScript against real language servers', () => {
         workspaceRoot: root,
       })
       if (!match) throw createInternalError('TypeScript fixture did not match its language server')
+      const registrations = vi.spyOn(LspWatchedFiles.prototype, 'register')
+      cleanups.push(async () => registrations.mockRestore())
       const pool = watchedPool()
       const socket = new RecordingSocket()
       const session = await pool.acquire(socket, match, root)
@@ -163,6 +167,10 @@ describe('workspace TypeScript against real language servers', () => {
         textDocument: { languageId: 'typescript', text: source, uri, version: 1 },
       })
       await assertDiagnostics(session, socket, native, uri)
+      // tsgo registers the packages' watch after its first answer (tsserver watches on its own).
+      // A write before that is lost, and a refresh for the `node_modules` alias pulls stale types.
+      const watched = () => [first, second].every((dir) => registeredWatch(registrations.mock, dir))
+      if (native) await expect.poll(watched, { timeout: 20_000 }).toBe(true)
 
       const declarations = (target: string) => path.join(target, 'dist/index.d.ts')
       const changes = [
@@ -410,6 +418,25 @@ async function assertExternalDiagnostics(
     textDocument: { uri },
   })
   expect(errorCodes(result, 'items')).toEqual(codes)
+}
+
+/** Whether a watch registration that covers `target` has been attached. */
+function registeredWatch(mock: MockInstance<LspWatchedFiles['register']>['mock'], target: string) {
+  return mock.calls.some(
+    ([, options], index) =>
+      mock.settledResults[index]?.type === 'fulfilled' &&
+      watchBases(options).some((base) => !isOutsideRoot(path.relative(base, target))),
+  )
+}
+
+function watchBases(options: unknown): string[] {
+  const watchers = isRecord(options) && Array.isArray(options.watchers) ? options.watchers : []
+  return watchers.flatMap((watcher: unknown) => {
+    const glob = isRecord(watcher) ? watcher.globPattern : undefined
+    if (typeof glob === 'string') return [glob.split('*')[0] ?? glob]
+    if (isRecord(glob) && typeof glob.baseUri === 'string') return [fileURLToPath(glob.baseUri)]
+    return []
+  })
 }
 
 /** Error codes only: TypeScript also reports suggestions, such as an unused local, as hints. */
