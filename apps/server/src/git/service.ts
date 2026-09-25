@@ -155,6 +155,9 @@ const STATUS_CACHE_CAPACITY = 2_048
 const REPOSITORY_CACHE_TTL_MS = 60_000
 const REPOSITORY_CACHE_CAPACITY = 512
 
+/** Marks a branch whose pushes go to its differently named upstream: a pull request checkout. */
+const PUSH_TO_UPSTREAM_KEY = 'platformPushToUpstream'
+
 /**
  * Verbs that cannot change what `git status` reports. `hash-object -w` is in
  * here because it only adds a loose object; the index and the worktree are
@@ -768,9 +771,8 @@ export class GitService {
     const branch = repository.info.branch
     if (!branch) throw gitPullRequestErrors.PUSH_DETACHED_HEAD({ path: repository.info.path })
 
-    const upstream = await this.upstreamBranch(repository.rootAbsolutePath, branch)
+    const upstream = await this.pushTarget(repository.rootAbsolutePath, branch)
     const setUpstream = upstream === null
-    // To the upstream by name: a pull request's worktree tracks a branch named unlike its own.
     const args = upstream
       ? ['push', upstream.remote, `HEAD:refs/heads/${upstream.branch}`]
       : ['push', '--set-upstream', 'origin', branch]
@@ -814,7 +816,7 @@ export class GitService {
     const branch = repository.info.branch
     if (!branch) return { branch: null, pullRequest: null, support: 'no-forge', forge: null }
 
-    const upstream = await this.upstreamBranch(repository.rootAbsolutePath, branch)
+    const upstream = await this.pushTarget(repository.rootAbsolutePath, branch)
     const read = await readPullRequest(
       { branch: upstream?.branch ?? branch, cwd: repository.rootAbsolutePath },
       this.forgeBoundaries,
@@ -847,8 +849,7 @@ export class GitService {
     const repository = await this.requiredRepository(body.path)
     const branch = repository.info.branch
     if (!branch) throw gitPullRequestErrors.PUSH_DETACHED_HEAD({ path: repository.info.path })
-    // A worktree's local branch can track a differently named remote branch; the forge knows that one.
-    const upstream = await this.upstreamBranch(repository.rootAbsolutePath, branch)
+    const upstream = await this.pushTarget(repository.rootAbsolutePath, branch)
 
     return createPullRequest(
       {
@@ -899,6 +900,24 @@ export class GitService {
     return { remote: remoteName, branch: mergeRef.slice('refs/heads/'.length) }
   }
 
+  /**
+   * Where this branch's commits go. Only a branch `trackRemoteBranch` set up pushes under its
+   * upstream's name: `checkout -b feature origin/main` tracks `main` and must never push there.
+   */
+  async pushTarget(cwd: string, branch: string) {
+    const upstream = await this.upstreamBranch(cwd, branch)
+    if (!upstream || upstream.branch === branch) return upstream
+    const marker = await this.git(
+      cwd,
+      ['config', '--get', `branch.${branch}.${PUSH_TO_UPSTREAM_KEY}`],
+      {
+        allowFailure: true,
+      },
+    )
+    if (marker.stdout.trim() === 'true') return upstream
+    return { remote: upstream.remote, branch }
+  }
+
   /** A pull request by number from the forge this checkout's remote names. */
   async resolvePullRequest(path: string, number: number, remoteUrl?: string) {
     const repository = await this.requiredRepositoryLocation(path)
@@ -946,6 +965,8 @@ export class GitService {
     const root = repository.rootAbsolutePath
     await this.git(root, ['fetch', '--', input.remote, input.branch])
     await this.git(root, ['branch', `--set-upstream-to=${input.remote}/${input.branch}`])
+    const local = (await this.git(root, ['symbolic-ref', '--short', 'HEAD'])).stdout.trim()
+    await this.git(root, ['config', `branch.${local}.${PUSH_TO_UPSTREAM_KEY}`, 'true'])
   }
 
   private async upstreamRef(cwd: string) {

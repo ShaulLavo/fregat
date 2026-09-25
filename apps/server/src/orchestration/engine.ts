@@ -858,7 +858,7 @@ export class OrchestrationEngine {
       lookupIdentities: (worktree, remoteUrl, numbers) =>
         git.readPullRequestsByNumber(worktree.canonicalPath, remoteUrl, numbers),
       headName: async (worktree) =>
-        (await git.upstreamBranch(worktree.canonicalPath, worktree.branch ?? ''))?.branch ??
+        (await git.pushTarget(worktree.canonicalPath, worktree.branch ?? ''))?.branch ??
         worktree.branch ??
         '',
       dispatch: (command) => this.enqueue(command),
