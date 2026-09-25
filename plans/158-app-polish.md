@@ -2,7 +2,7 @@
 
 ## Status and authorization
 
-- Status: items 1, 2, 3 and 5 done 2026-09-25 (lane L1). Item 4 waits on an owner question (below).
+- Status: items 1, 2, 3 and 5 done 2026-09-25 (lane L1). Item 4 authorized 2026-09-25: persist creation parents and build truthful branch lanes.
 - Priority: P2 in the UI refresh lane, after Plan 157 (done). Items 1 and 3 use its
   `scroll-pinned` utility and its `StatusDot`.
 - Effort: M. One shared `packages/ui` pattern, two small primitives, and four surface changes.
@@ -162,7 +162,9 @@ differently and is not in scope.
 
 ## 4. Branch lanes in the branch picker
 
-**Skipped 2026-09-25 (lane L1): owner question.** D2's premise does not hold. `baseBranch` is only
+**Owner decided 2026-09-25: store actual creation parents and build branch lanes in this wave.** Backend persistence is being implemented in L1-parents; L1 owns the picker and integration.
+
+Previous finding: D2's premise does not hold. `baseBranch` is only
 an input to worktree creation (`sessionWorktreeTargetSchema`, `git/worktrees.ts`); no worktree
 record or shell stores it, so the client knows no branch's parent. The picker also filters out
 `worktree/…` branches (`baseBranchChoices`), which are the only branches the app could ever record
