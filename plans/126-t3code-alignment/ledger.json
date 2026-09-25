@@ -715,10 +715,14 @@
       "title": "Follow worktree branch drift so the session's branch stays true",
       "report": "adjacent.md",
       "wave": "5",
-      "status": "open",
-      "evidence_level": "source-reviewed",
+      "status": "verified",
+      "evidence_level": "implementation; server-tests-and-browser-verified",
       "acceptance": "adjacent.md, EXT-18, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "repository-delivery.md",
+        "apps/server/src/orchestration/tests/worktree-branch-drift.test.ts",
+        "/work/tmp/fregat-evidence/20260925T114547Z-scenario-session-branch-drift/"
+      ]
     }
   ]
 }

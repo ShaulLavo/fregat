@@ -651,6 +651,10 @@ export const selectors = {
       .getByRole('alert')
       .filter({ hasText: / failed/ })
       .getByRole('button', { name: 'Fix with AI', exact: true }),
+  gitBranchChip: (page: Page, branch: string) =>
+    page.locator(`span[title="${branch}"], span[title^="${branch} @ "]`),
+  worktreeChip: (page: Page, worktreeId: string) =>
+    page.locator(`nav[aria-label="Session"] [data-worktree-id="${worktreeId}"]`),
   autoPullStatus: (page: Page, text: string) =>
     page.getByRole('region', { name: 'Git panel' }).getByText(text, { exact: true }),
   submodulesNotice: (page: Page) =>

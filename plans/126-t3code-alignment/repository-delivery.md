@@ -43,3 +43,22 @@ every 500 ms, because the pull moves HEAD after its file writes already triggere
   ahead and diverged, detached / other branch / no upstream, failed pull with no partial merge and
   a cooldown, project override.
 - `scenario git-auto-pull`: `/work/tmp/fregat-evidence/20260925T113952Z-scenario-git-auto-pull/`.
+
+## EXT-18: follow worktree branch drift
+
+A session has no branch of its own here: it points at a worktree, and the worktree's `branch` and
+`headCommit` are metadata the server refreshes from the checkout. Turn-end checkpoint capture writes
+refs through `GitService`, whose mutation listener refreshes that worktree's metadata, so an agent's
+`git checkout -b` in its dedicated worktree becomes the worktree branch when the turn ends. The
+refresh command carries `expectedMetadataVersion`, so a stale drift update loses to a concurrent
+explicit change. A shared checkout's branch is checkout metadata too; PR association (LIFE-14) is
+what uses dedicated worktrees only.
+
+The gap was on the client: a `checkout -b` or a commit writes only under `.git`, which the file
+watcher never reports, so the Git pane kept the old branch. `useSessionCheckoutRefresh` invalidates
+git queries when the session worktree's branch or HEAD changes in place.
+
+- `apps/server/src/orchestration/tests/worktree-branch-drift.test.ts`: the agent's checkout during a
+  turn is the worktree branch at turn end; a shared checkout's switch is recorded as its metadata.
+- `scenario session-branch-drift` (native checkpoint fixture, new worktree, `git` edit op):
+  `/work/tmp/fregat-evidence/20260925T114547Z-scenario-session-branch-drift/`.
