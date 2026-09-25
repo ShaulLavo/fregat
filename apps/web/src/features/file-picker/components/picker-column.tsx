@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { EmptyState } from '@workspace/ui/components/empty-state'
 import { useListbox } from '@workspace/ui/patterns/use-listbox'
 import { VirtualList, type VirtualListHandle } from '@workspace/ui/patterns/virtual-list'
-import { useEffect, useEffectEvent, useRef } from 'react'
+import { useEffect, useEffectEvent, useRef, type KeyboardEvent } from 'react'
 
 import type { FsEntry } from '@/lib/file-system-types'
 import { isDirectoryEntry } from '@/lib/file-system-types'
@@ -80,17 +80,26 @@ export function PickerColumn({
     scrollToIndex: (index) => virtualRef.current?.scrollToIndex(index, { align: 'auto' }),
     onActiveKeyDown(event, id) {
       if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
-      if (event.key === 'ArrowLeft') {
-        event.preventDefault()
-        onLeave(column)
-        return
-      }
       const entry = find(id)
       if (event.key !== 'ArrowRight' || !entry || !isDirectoryEntry(entry)) return
       event.preventDefault()
       onEnter(column)
     },
   })
+  function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (
+      event.key === 'ArrowLeft' &&
+      !event.altKey &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      !event.shiftKey
+    ) {
+      event.preventDefault()
+      onLeave(column)
+      return
+    }
+    list.containerProps.onKeyDown(event)
+  }
   const first = entries[0]
 
   const selectFirstEntry = useEffectEvent((entry: FsEntry) => onSelect(column, entry))
@@ -135,6 +144,7 @@ export function PickerColumn({
         scrollRef={containerRef}
         tabIndex={active ? 0 : -1}
         onFocus={() => onActivate(column)}
+        onKeyDown={handleKeyDown}
       />
     </div>
   )

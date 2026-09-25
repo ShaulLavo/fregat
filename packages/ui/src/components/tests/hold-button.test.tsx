@@ -52,6 +52,26 @@ describe('HoldButton', () => {
     expect(button.hasAttribute('data-holding')).toBe(false)
   })
 
+  it('cancels a hold when disabled and stays cancelled after re-enabling', () => {
+    const onConfirm = vi.fn()
+    const mounted = mount(<HoldButton onConfirm={onConfirm}>Discard</HoldButton>)
+    cleanups.push(mounted.unmount)
+    const button = mounted.container.querySelector('button')!
+    const fill = button.querySelector('.hold-button-fill')!
+    pointer(button, 'pointerdown')
+    mounted.render(
+      <HoldButton disabled onConfirm={onConfirm}>
+        Discard
+      </HoldButton>,
+    )
+    land(fill)
+    expect(onConfirm).not.toHaveBeenCalled()
+    mounted.render(<HoldButton onConfirm={onConfirm}>Discard</HoldButton>)
+    land(fill)
+    expect(onConfirm).not.toHaveBeenCalled()
+    expect(button.hasAttribute('data-holding')).toBe(false)
+  })
+
   it('does not confirm when released early', () => {
     const { onConfirm, button, fill } = renderHold()
     pointer(button, 'pointerdown')

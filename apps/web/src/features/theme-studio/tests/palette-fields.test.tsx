@@ -8,6 +8,25 @@ import { PaletteContrast } from '@/features/theme-studio/components/palette-cont
 const sage = bundledPalette('sage')!
 
 describe('ColorField', () => {
+  it('consumes Escape when cancelling an edit before the studio handles it', () => {
+    const onStudioKey = vi.fn()
+    render(
+      <section onKeyDown={onStudioKey}>
+        <ColorField
+          id='escape-color'
+          label='Accent'
+          value={parseColor('#ff0000')!}
+          onChange={() => {}}
+        />
+      </section>,
+    )
+    const input = screen.getByRole('textbox', { name: 'Accent' })
+    fireEvent.change(input, { target: { value: '#00ff00' } })
+    fireEvent.keyDown(input, { key: 'Escape' })
+    expect(input).toHaveValue('#ff0000')
+    expect(onStudioKey).not.toHaveBeenCalled()
+  })
+
   it('commits a pasted hex on Enter and keeps alpha through the picker', () => {
     const onChange = vi.fn()
     const value = parseColor('#ff000080')!

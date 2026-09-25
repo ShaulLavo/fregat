@@ -60,7 +60,10 @@ export function ColorField({
           onChange={(event) => setDraft(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === 'Enter') commitText()
-            if (event.key === 'Escape') setDraft(null)
+            if (event.key !== 'Escape' || draft === null) return
+            event.preventDefault()
+            event.stopPropagation()
+            setDraft(null)
           }}
           spellCheck={false}
           value={draft ?? hex}

@@ -50,6 +50,21 @@ export const filePickerBrowse: Scenario = {
       await selectors.pickerColumn(page, 1).getByText('inside.md', { exact: true }).waitFor()
       await page.keyboard.press('ArrowRight')
       await selectors.pickerColumn(page, 2).waitFor()
+      await page.keyboard.press('ArrowRight')
+      ok(
+        await selectors
+          .pickerColumn(page, 2)
+          .evaluate((column) => column === document.activeElement),
+        '→ enters an empty folder',
+      )
+      await page.keyboard.press('ArrowLeft')
+      ok(
+        await selectors
+          .pickerColumn(page, 1)
+          .evaluate((column) => column === document.activeElement),
+        '← leaves an empty folder',
+      )
+      await step('empty-column-return')
       await page.keyboard.press('ArrowDown')
       await selectors
         .pickerPreview(page)

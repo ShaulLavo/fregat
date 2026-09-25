@@ -1,4 +1,5 @@
 import {
+  useEffect,
   useId,
   useState,
   type ComponentProps,
@@ -50,6 +51,10 @@ function HoldButton({
   const [cancelled, setCancelled] = useState(false)
   const hintId = useId()
 
+  useEffect(() => {
+    if (disabled) setHolding(false)
+  }, [disabled])
+
   function start() {
     setCancelled(false)
     if (!disabled) setHolding(true)
@@ -74,7 +79,7 @@ function HoldButton({
 
   function handleFillEnd(event: TransitionEvent<HTMLSpanElement>) {
     if (event.target !== event.currentTarget || event.propertyName !== 'clip-path') return
-    if (!holding) return
+    if (!holding || disabled) return
     setHolding(false)
     onConfirm()
   }
