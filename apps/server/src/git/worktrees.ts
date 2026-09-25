@@ -66,10 +66,14 @@ export class GitWorktreeService {
 
   async list(input = ''): Promise<GitWorktree[]> {
     recordWorktreeOperation('worktree_list', input)
-    const runner = await this.git.repositoryRunner(input)
-    const worktrees = await this.worktrees(runner)
+    const worktrees = await this.entries(input)
     recordRequestContext({ git: { worktreeCount: worktrees.length } })
     return worktrees
+  }
+
+  /** `list` without request logging: reactors call this inside other requests' wide events. */
+  async entries(input = ''): Promise<GitWorktree[]> {
+    return this.worktrees(await this.git.repositoryRunner(input))
   }
 
   async prepareCreate(input: GitWorktreePrepareBody) {

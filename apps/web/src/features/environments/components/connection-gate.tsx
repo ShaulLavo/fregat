@@ -2,8 +2,7 @@ import { environmentQueryKeys } from '@/features/environments/utils/query-keys'
 import { useQuery } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import { Button } from '@workspace/ui/components/button'
-import { RingLoader } from '@workspace/ui/components/ring-loader'
-import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
+import { Spinner } from '@workspace/ui/components/spinner'
 
 import { clientForQueryClient, originForQueryClient } from '@/lib/environments/state/query-clients'
 import { selectServerConnection } from '@workspace/client-core/environments/state/store'
@@ -45,7 +44,7 @@ export function ConnectionGate({
           title='Server connection'
         />
         <Button onClick={() => void query.refetch()} disabled={query.isFetching}>
-          {query.isFetching ? <OrbitLoader /> : null} Retry connection
+          {query.isFetching ? <Spinner /> : null} Retry connection
         </Button>
       </div>
     )
@@ -56,7 +55,7 @@ export function ConnectionGate({
         role='status'
         className='bg-background text-foreground grid min-h-svh place-content-center gap-3'
       >
-        <RingLoader className='mx-auto size-8' />
+        <Spinner size='lg' className='mx-auto' />
         <p className='text-sm'>Connecting to server…</p>
       </div>
     )

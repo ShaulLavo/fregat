@@ -1,6 +1,6 @@
 import { CaretRightIcon } from '@phosphor-icons/react'
 import { Button } from '@workspace/ui/components/button'
-import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
+import { Spinner } from '@workspace/ui/components/spinner'
 import { cn } from '@workspace/ui/lib/utils'
 
 import { ActivityRow } from '@/features/chat/components/activity-row'
@@ -54,7 +54,7 @@ export function AgentRow({ entry, groupId }: { entry: ChatAgentEntry; groupId: s
             >
               {chatAgentStatus(entry.agent)}
             </span>
-            {working ? <OrbitLoader aria-hidden='true' className='size-3 shrink-0' /> : null}
+            {working ? <Spinner size='xs' aria-hidden='true' /> : null}
           </span>
           <span className='text-muted-foreground truncate text-xs'>{summary}</span>
           <span className='text-muted-foreground text-2xs flex items-center gap-2 tabular-nums'>

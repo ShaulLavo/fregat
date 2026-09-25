@@ -3,11 +3,10 @@ import { useQuestionDigits } from '@/features/chat/hooks/use-question-digits'
 import { useQuestionAttachments } from '@/features/chat/hooks/use-question-attachments'
 import { ChatInputAttachButton } from '@/features/chat/components/chat-input-attach-button'
 import { ChatInputAttachmentList } from '@/features/chat/components/chat-input-attachment-list'
-import { RingLoader } from '@workspace/ui/components/ring-loader'
+import { Spinner } from '@workspace/ui/components/spinner'
 import { CheckIcon, QuestionIcon } from '@phosphor-icons/react'
 import { Button } from '@workspace/ui/components/button'
 import { Input } from '@workspace/ui/components/input'
-import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
 import { Textarea } from '@workspace/ui/components/textarea'
 import { useId, useState, useRef } from 'react'
 
@@ -204,7 +203,7 @@ export function PendingUserInputCard({ pending }: { readonly pending: PendingUse
               onSelectFiles={(files) => attachments.prepare(question.id, files)}
             />
             {attachments.preparing ? (
-              <RingLoader aria-label='Preparing question attachments' />
+              <Spinner size='sm' label='Preparing question attachments' />
             ) : null}
             {attachments.errors[question.id] ? (
               <div role='alert'>
@@ -274,9 +273,7 @@ export function PendingUserInputCard({ pending }: { readonly pending: PendingUse
             size='sm'
             type='button'
           >
-            {response.kind === 'submitting' ? (
-              <OrbitLoader aria-hidden='true' className='size-3.5' />
-            ) : null}
+            {response.kind === 'submitting' ? <Spinner size='xs' aria-hidden='true' /> : null}
             {response.kind === 'submitting' ? 'Submitting…' : 'Submit'}
           </Button>
         </div>

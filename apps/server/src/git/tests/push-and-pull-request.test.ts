@@ -52,6 +52,37 @@ describe('push', () => {
   })
 })
 
+describe('pull', () => {
+  it('names the conflicted file and the rebase it left behind', async () => {
+    const { seed, work } = await clonedRepo()
+    await divergeFromUpstream(seed, work)
+    await runGit(work, ['config', 'pull.rebase', 'true'])
+
+    const pull = gitService(work).pull(work)
+
+    await expect(pull).rejects.toThrow('Pull stopped on a conflict in tracked.txt')
+    await expect(pull).rejects.toMatchObject({ fix: expect.stringContaining('git rebase --abort') })
+  })
+
+  it('points a merge conflict at merge --abort, not rebase', async () => {
+    const { seed, work } = await clonedRepo()
+    await divergeFromUpstream(seed, work)
+    await runGit(work, ['config', 'pull.rebase', 'false'])
+
+    await expect(gitService(work).pull(work)).rejects.toMatchObject({
+      fix: expect.stringContaining('git merge --abort'),
+    })
+  })
+
+  it("carries git's own reason when the pull is refused without a conflict", async () => {
+    const { seed, work } = await clonedRepo()
+    await divergeFromUpstream(seed, work)
+    await runGit(work, ['config', 'pull.ff', 'only'])
+
+    await expect(gitService(work).pull(work)).rejects.toThrow('Not possible to fast-forward')
+  })
+})
+
 describe('branch remote state', () => {
   it('reports a fresh branch as having no upstream and nothing ahead', async () => {
     const { work } = await clonedRepo()
@@ -111,7 +142,13 @@ async function clonedRepo() {
   await runGit(work, ['clone', origin, '.'])
   await identify(work)
 
-  return { origin, work }
+  return { origin, seed, work }
+}
+
+async function divergeFromUpstream(seed: string, work: string) {
+  await commit(seed, 'upstream\n', 'upstream change')
+  await runGit(seed, ['push'])
+  await commit(work, 'local\n', 'local change')
 }
 
 async function identify(root: string) {

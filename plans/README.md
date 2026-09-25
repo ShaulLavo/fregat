@@ -19,6 +19,8 @@ a bare root `bun run verify`.
 
 | Plan                                                                                     | State                                                        |
 | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| [154 — physical mode](154-physical-mode.md)                                              | **PROPOSED — NEAR THE END OF THE UI REFRESH LANE; D1–D3**    |
+| [153 — TypeScript can run in the browser worker](153-typescript-worker-backend.md)       | **PROPOSED — AFTER EDITOR E054; D1–D3 NEED THE OWNER**       |
 | [152 — dev primary ships its working tree](152-remote-dev-builds.md)                     | **PROPOSED — NICE TO HAVE; AFTER 151**                       |
 | [151 — remote machines run the primary's release](151-remote-server-releases.md)         | **PROPOSED — DEPENDS ON 150 PHASE 1; D2/D4 TO CONFIRM**      |
 | [150 — remote machines run a server that matches](150-remote-server-version.md)          | **PROPOSED — PHASE 1 READY; PHASE 2 → PLANS 151/152**        |

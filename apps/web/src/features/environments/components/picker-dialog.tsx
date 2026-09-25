@@ -2,7 +2,7 @@ import { useNavigation } from '@/hooks/use-navigation'
 import { useState } from 'react'
 import { Button } from '@workspace/ui/components/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@workspace/ui/components/dialog'
-import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
+import { Spinner } from '@workspace/ui/components/spinner'
 import { FormDialog } from '@/features/environments/components/form-dialog'
 import { useEnvironmentConnections } from '@/hooks/use-environment-connections'
 import { useWorkingMachines } from '@/lib/environments/hooks/use-working-machines'
@@ -97,7 +97,7 @@ export function PickerDialog({
             onClick={() => void choose(machine.name)}
           >
             <span className='min-w-0 truncate'>{machine.config.label ?? machine.name}</span>
-            {working.has(machine.name) ? <OrbitLoader /> : null}
+            {working.has(machine.name) ? <Spinner /> : null}
             <span className='text-muted-foreground shrink-0'>{machine.phase}</span>
           </Button>
         ))}

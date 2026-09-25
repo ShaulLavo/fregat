@@ -767,6 +767,15 @@ export class ProviderCommandReactor {
   ) {
     const { session, modelSelection, runtimeMode, runtimeEpoch } = context
     const sessionId = session.id
+    // Shutdown rejects every in-flight turn. Recording that as an error would stop
+    // boot recovery from marking the turn interrupted by the restart.
+    if (this.providerService.isShuttingDown()) {
+      recordChatPipelineInfo('chat.pipeline.provider_reactor.turn_failure.left_for_recovery', {
+        sessionId,
+        turnId: event.payload.turnId,
+      })
+      return
+    }
     const detail = providerErrorMessage(error)
     await this.appendProviderFailureActivity({
       detail,

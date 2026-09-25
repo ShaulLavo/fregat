@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@workspace/ui/components/dropdown-menu'
-import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
+import { Spinner } from '@workspace/ui/components/spinner'
 
 import { worktreeLabel } from '@workspace/client-core/chat/worktrees/label'
 import { workspaceChoiceLabel } from '../utils/draft-workspace'
@@ -57,7 +57,7 @@ export function DraftWorkspaceMenu({
             variant='ghost'
           >
             {pending ? (
-              <OrbitLoader className='size-(--icon-size-sm) shrink-0' label='Moving draft' />
+              <Spinner size='xs' label='Moving draft' />
             ) : (
               <Icon className='size-(--icon-size-sm) shrink-0' />
             )}

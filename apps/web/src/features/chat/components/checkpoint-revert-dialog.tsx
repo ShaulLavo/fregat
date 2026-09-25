@@ -1,4 +1,4 @@
-import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
+import { Spinner } from '@workspace/ui/components/spinner'
 import { Button } from '@workspace/ui/components/button'
 import {
   Dialog,
@@ -57,7 +57,7 @@ export function CheckpointRevertDialog({
             </Button>
           ) : null}
           <Button type='button' disabled={disabled} onClick={() => onConfirm(false)}>
-            {pending ? <OrbitLoader aria-hidden /> : null}
+            {pending ? <Spinner aria-hidden /> : null}
             Rewind conversation only
           </Button>
         </DialogFooter>

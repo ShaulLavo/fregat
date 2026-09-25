@@ -1,5 +1,5 @@
 import { FileTypeIcon } from '@/components/file-type-icon'
-import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
+import { Spinner } from '@workspace/ui/components/spinner'
 import type { useListbox } from '@workspace/ui/patterns/use-listbox'
 
 import { BreadcrumbPickerRowList } from '@/features/workbench/components/breadcrumb-picker-row-list'
@@ -32,7 +32,7 @@ export function BreadcrumbFolderRows({
       )}
       renderTrailing={(row) => (
         <>
-          {row.pending ? <OrbitLoader label='Loading folder' /> : null}
+          {row.pending ? <Spinner label='Loading folder' /> : null}
           {row.failed ? (
             <span className='text-destructive text-2xs'>Could not read folder</span>
           ) : null}

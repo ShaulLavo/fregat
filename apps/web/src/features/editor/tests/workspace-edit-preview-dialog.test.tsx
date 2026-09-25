@@ -152,7 +152,7 @@ test('cancel restores focus and settles the producer as cancelled', async () => 
   }
 })
 
-test('apply uses OrbitLoader and disables cancel after commit begins', async () => {
+test('apply uses Spinner and disables cancel after commit begins', async () => {
   const user = userEvent.setup()
   const harness = new DialogServiceHarness(awaitingSnapshot())
   renderDialogs(harness)
@@ -163,7 +163,7 @@ test('apply uses OrbitLoader and disables cancel after commit begins', async () 
   expect(harness.confirmPreview).toHaveBeenCalledWith('10000000-0000-4000-8000-000000000063')
   expect(apply).toBeDisabled()
   expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled()
-  expect(apply.querySelector('[data-slot="orbit-loader"]')).not.toBeNull()
+  expect(apply.querySelector('[data-slot="spinner"]')).not.toBeNull()
   expect(screen.getByText('Applying atomic change…')).toBeInTheDocument()
 })
 

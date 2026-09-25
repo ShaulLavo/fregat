@@ -14,7 +14,7 @@ import {
 } from '@/features/terminal/state/reload'
 import { useTerminalActions } from '@/features/terminal/hooks/use-terminal-actions'
 import { ToolPane } from '@workspace/ui/patterns/tool-pane'
-import { RingLoader } from '@workspace/ui/components/ring-loader'
+import { Spinner } from '@workspace/ui/components/spinner'
 import { terminalSessionKey } from '@/features/terminal/state/session-registry'
 import { useQueryClient } from '@tanstack/react-query'
 import { clientForQueryClient, originForQueryClient } from '@/lib/environments/state/query-clients'
@@ -375,7 +375,7 @@ export function TerminalPanel({
       ) : null}
       {!savedPaint && !hasLivePaint && terminalFailure?.identity !== terminalMountIdentity ? (
         <div className='pointer-events-none absolute inset-0 flex items-center justify-center'>
-          <RingLoader label='Opening terminal' className='text-muted-foreground size-6' />
+          <Spinner size='md' label='Opening terminal' />
         </div>
       ) : null}
       {contextMenu.anchor && menuTarget ? (

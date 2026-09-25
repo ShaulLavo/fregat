@@ -1,6 +1,6 @@
 import { CaretRightIcon, HandPalmIcon } from '@phosphor-icons/react'
 import { Button } from '@workspace/ui/components/button'
-import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
+import { Spinner } from '@workspace/ui/components/spinner'
 import { cn } from '@workspace/ui/lib/utils'
 
 import { ActivityRow } from '@/features/chat/components/activity-row'
@@ -25,7 +25,7 @@ export function LiveActivityRow({
   const label = (
     <>
       {activity.active ? (
-        <OrbitLoader aria-hidden='true' className='size-3.5 shrink-0' />
+        <Spinner size='xs' aria-hidden='true' />
       ) : (
         <HandPalmIcon aria-hidden='true' className='size-(--icon-size-sm) shrink-0' />
       )}

@@ -21,7 +21,7 @@ import {
   DialogTitle,
 } from '@workspace/ui/components/dialog'
 import { Input } from '@workspace/ui/components/input'
-import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
+import { Spinner } from '@workspace/ui/components/spinner'
 import { useEffect, useState } from 'react'
 
 import { ColorField } from '@/features/settings/components/widgets/color-field'
@@ -188,7 +188,7 @@ function PaletteEditorBody({
           onClick={() => void apply()}
           type='button'
         >
-          {saving ? <OrbitLoader /> : null}
+          {saving ? <Spinner /> : null}
           Apply
         </Button>
       </DialogFooter>

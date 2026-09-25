@@ -7,8 +7,13 @@ import { providerInstanceIdSchema, sessionIdSchema } from '@workspace/contracts'
 import {
   createOrchestrationFixture,
   FIXTURE_SESSION_ID,
+  mockRuntime,
   sessionFrom,
 } from '../../../test/factories/orchestration'
+import { createInternalError } from '../../observability/structured-errors'
+import { ProviderAdapterRegistry } from '../../provider/provider-adapter-registry'
+import { ProviderService } from '../../provider/provider-service'
+import { ProviderSessionDirectory } from '../../provider/provider-session-directory'
 import { ProviderRuntimeIngestion } from '../provider-runtime-ingestion'
 
 const at = '2026-09-05T12:00:00.000Z'
@@ -242,4 +247,48 @@ test('archiving an adopted turn retains the completed answer and archive after r
   const reloaded = await sessionFrom(fixture)
   expect(reloaded.archivedAt).toBe(archivedAt)
   expect(reloaded.messages).toEqual(completed.messages)
+})
+
+test('a turn cut off by server shutdown is recovered as interrupted, not recorded as an error', async () => {
+  const started = Promise.withResolvers<void>()
+  const stopped = Promise.withResolvers<void>()
+  const adapter = new MockProviderAdapter({
+    beforeComplete: async () => {
+      started.resolve()
+      await stopped.promise
+      throw createInternalError('Claude session stopped.')
+    },
+  })
+  const adapterRegistry = new ProviderAdapterRegistry({ adapters: [adapter] })
+  const fixture = await createOrchestrationFixture()
+  onTestFinished(() => fixture.close())
+  const providerService = new ProviderService({
+    adapterRegistry,
+    sessionDirectory: new ProviderSessionDirectory(fixture.database),
+  })
+  const registration = await fixture.register()
+  if (!registration.result) throw new TypeError('Missing worktree registration')
+  await fixture.createSession(registration.result.worktreeId)
+  await fixture.restart({ adapterRegistry, providerService })
+  await fixture.startTurn()
+  await started.promise
+
+  const shutdown = providerService.shutdown()
+  stopped.resolve()
+  await shutdown
+  await fixture.engine.providerRuntimeIdle()
+  const cutOff = await sessionFrom(fixture)
+  expect(cutOff.runtime?.lastError ?? null).toBeNull()
+  expect(cutOff.activities.some((activity) => activity.kind === 'provider.turn.start.failed')).toBe(
+    false,
+  )
+
+  await fixture.restart(mockRuntime())
+  await fixture.engine.ready
+  const recovered = await sessionFrom(fixture)
+  expect(recovered.runtime).toMatchObject({
+    status: 'interrupted',
+    lastError: expect.stringContaining('The server restarted'),
+  })
+  expect(recovered.latestTurn?.state).toBe('interrupted')
 })

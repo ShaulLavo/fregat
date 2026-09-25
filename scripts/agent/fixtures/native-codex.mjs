@@ -134,6 +134,14 @@ function handle(message) {
     })
     return
   }
+  if (scenario === 'spinner-palette' && message.method === 'turn/start') {
+    send({ id: message.id, result: { turn: { id: turnId, status: 'inProgress', items: [] } } })
+    send({
+      method: 'turn/started',
+      params: { threadId, turn: { id: turnId, status: 'inProgress', items: [] } },
+    })
+    return
+  }
   if (scenario === 'background-liveness' && message.method === 'turn/start') {
     send({
       id: message.id,

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useIsMutating } from '@tanstack/react-query'
 import { Button } from '@workspace/ui/components/button'
 import { Input } from '@workspace/ui/components/input'
-import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
+import { Spinner } from '@workspace/ui/components/spinner'
 import {
   Dialog,
   DialogContent,
@@ -141,7 +141,7 @@ export function SessionSnoozeDialog() {
               if (custom) void snooze(custom)
             }}
           >
-            {pending ? <OrbitLoader /> : null}Snooze until chosen time
+            {pending ? <Spinner /> : null}Snooze until chosen time
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -8,7 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@workspace/ui/components/dialog'
-import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
+import { Spinner } from '@workspace/ui/components/spinner'
 
 import { useDiscardPathsMutation } from '@/features/git/hooks/use-discard-paths-mutation'
 import { useDiscardStagedPathsMutation } from '@/features/git/hooks/use-discard-staged-paths-mutation'
@@ -36,7 +36,7 @@ export function DiscardDialog({ rootPath }: { rootPath: string }) {
     : null
   let icon = <ArrowBendUpLeftIcon data-icon='inline-start' />
   if (prompt?.confirm === 'Delete') icon = <TrashIcon data-icon='inline-start' />
-  if (pending) icon = <OrbitLoader />
+  if (pending) icon = <Spinner />
 
   return (
     <Dialog

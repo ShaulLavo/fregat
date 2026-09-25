@@ -849,6 +849,10 @@ export class ProviderService {
     await boundedProviderOperation(launch.adapter, launch.completion)
   }
 
+  isShuttingDown() {
+    return this.shuttingDown
+  }
+
   private requireRunning() {
     if (this.shuttingDown)
       throw sessionIdentityErrors.SERVICE_CLOSED({ internal: { at: 'require-running' } })

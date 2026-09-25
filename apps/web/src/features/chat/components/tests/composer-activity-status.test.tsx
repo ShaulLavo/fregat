@@ -57,7 +57,7 @@ test('connection loss replaces thinking and its live timer with reconnect feedba
 
   expect(screen.getByText('Reconnecting chat…')).toBeVisible()
   expect(screen.queryByText('Thinking')).not.toBeInTheDocument()
-  expect(container.querySelectorAll('[data-slot="orbit-loader"]')).toHaveLength(1)
+  expect(container.querySelectorAll('[data-slot="spinner"]')).toHaveLength(1)
 })
 
 test('stopping takes precedence over the running activity', () => {

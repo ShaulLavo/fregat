@@ -1,5 +1,5 @@
 import { Button } from '@workspace/ui/components/button'
-import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
+import { Spinner } from '@workspace/ui/components/spinner'
 import { WarningIcon } from '@phosphor-icons/react'
 import { useMutationState, type QueryClient } from '@tanstack/react-query'
 
@@ -54,7 +54,7 @@ export function FilesystemConflictToast({
       </div>
       <div className='mt-(--density-section-gap) flex flex-wrap justify-end gap-(--density-control-gap)'>
         <Button disabled={busy} size='sm' type='button' variant='ghost' onClick={onOverrideRemote}>
-          {pending === 'remote' ? <OrbitLoader /> : null}
+          {pending === 'remote' ? <Spinner /> : null}
           Revert
         </Button>
         <Button
@@ -64,7 +64,7 @@ export function FilesystemConflictToast({
           variant='secondary'
           onClick={onOverrideLocal}
         >
-          {pending === 'local' ? <OrbitLoader /> : null}
+          {pending === 'local' ? <Spinner /> : null}
           Overwrite
         </Button>
         <Button size='sm' type='button' onClick={onOpenDiff}>

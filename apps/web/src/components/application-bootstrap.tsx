@@ -7,7 +7,7 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { HotkeysProvider } from '@tanstack/react-hotkeys'
 import { ActiveEnvironmentApplication } from '@/components/active-environment-application'
 import { EmptyState } from '@workspace/ui/components/empty-state'
-import { RingLoader } from '@workspace/ui/components/ring-loader'
+import { Spinner } from '@workspace/ui/components/spinner'
 import { Button } from '@workspace/ui/components/button'
 import { SettingsOwnerProvider } from '@/features/settings/providers/owner-provider'
 import { SimulatedLatencyBridge } from '@/features/settings/components/simulated-latency-bridge'
@@ -60,7 +60,7 @@ export function ApplicationBootstrap({
         className='bg-background text-foreground grid min-h-svh place-content-center gap-3'
         role='status'
       >
-        <RingLoader aria-hidden='true' className='mx-auto size-8' />
+        <Spinner size='lg' aria-hidden='true' className='mx-auto' />
         <p className='text-sm'>Connecting to local machine…</p>
       </div>
     )

@@ -1,5 +1,5 @@
 import { EmptyState } from '@workspace/ui/components/empty-state'
-import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
+import { Spinner } from '@workspace/ui/components/spinner'
 import type { SessionRailView } from '@workspace/client-core/chat/rail/model'
 
 export function SessionRailEmpty({
@@ -19,7 +19,7 @@ export function SessionRailEmpty({
     const label = searching ? 'Searching sessions…' : 'Connecting…'
     return (
       <div className='px-2 py-3'>
-        <OrbitLoader label={label} />
+        <Spinner label={label} />
       </div>
     )
   }

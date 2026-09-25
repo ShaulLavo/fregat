@@ -1,4 +1,4 @@
-import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
+import { Spinner } from '@workspace/ui/components/spinner'
 
 import type { PendingRequestResponse } from '@/features/chat/providers/pending-requests-context'
 import { InlineError } from '@/components/inline-error'
@@ -16,7 +16,7 @@ export function PendingRequestFeedback({ response }: { response: PendingRequestR
 
   return (
     <div className='text-muted-foreground text-2xs flex items-center gap-1.5' role='status'>
-      <OrbitLoader aria-hidden='true' className='size-3' />
+      <Spinner size='xs' aria-hidden='true' />
       {response.kind === 'submitting' ? 'Sending response…' : 'Response sent. Waiting for agent…'}
     </div>
   )

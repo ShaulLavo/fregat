@@ -1,6 +1,6 @@
 import { Button } from '@workspace/ui/components/button'
 import { Input } from '@workspace/ui/components/input'
-import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
+import { Spinner } from '@workspace/ui/components/spinner'
 import {
   Collapsible,
   CollapsibleContent,
@@ -142,7 +142,7 @@ export function MachineForm(props: MachineFormOptions) {
       {error ? <InlineError id={errorId} message={error} title='Machine connection' /> : null}
       <div className='flex flex-col gap-2'>
         <Button type='submit' variant='outline' className='w-full' disabled={saving}>
-          {saving ? <OrbitLoader /> : <PlugsConnectedIcon className='size-(--icon-size-sm)' />}
+          {saving ? <Spinner /> : <PlugsConnectedIcon className='size-(--icon-size-sm)' />}
           {submitLabel}
         </Button>
         <Button type='button' variant='ghost' onClick={cancel}>

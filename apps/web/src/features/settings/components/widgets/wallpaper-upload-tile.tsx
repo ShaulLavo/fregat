@@ -1,7 +1,7 @@
 import { UploadSimpleIcon } from '@phosphor-icons/react'
 import { Button } from '@workspace/ui/components/button'
 import { Input } from '@workspace/ui/components/input'
-import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
+import { Spinner } from '@workspace/ui/components/spinner'
 import { useRef } from 'react'
 import {
   ACCEPTED_WALLPAPER_TYPES,
@@ -31,7 +31,7 @@ export function WallpaperUploadTile({
         onClick={() => input.current?.click()}
       >
         {uploading ? (
-          <OrbitLoader />
+          <Spinner />
         ) : (
           <UploadSimpleIcon aria-hidden='true' className='size-(--icon-size)' />
         )}

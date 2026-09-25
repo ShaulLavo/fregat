@@ -25,6 +25,24 @@ export const gitPullRequestErrors = defineErrorCatalog('git', {
     why: 'HEAD is detached, so there is no branch name for the remote to publish under and no head for a pull request to point at.',
     fix: 'Check out or create a branch first, then push.',
   },
+  PULL_REBASE_CONFLICT: {
+    status: 409,
+    message: ({ files }: { files: string }) => `Pull stopped on a conflict in ${files}`,
+    why: 'The pull rebases local commits onto the upstream, and both sides changed the same lines. The repository is left mid-rebase.',
+    fix: 'Resolve the conflict markers, stage the files and run `git rebase --continue`, or run `git rebase --abort` to go back to before the pull.',
+  },
+  PULL_MERGE_CONFLICT: {
+    status: 409,
+    message: ({ files }: { files: string }) => `Pull stopped on a conflict in ${files}`,
+    why: 'The pull merges the upstream into the local branch, and both sides changed the same lines. The repository is left mid-merge.',
+    fix: 'Resolve the conflict markers, stage the files and commit, or run `git merge --abort` to go back to before the pull.',
+  },
+  PULL_FAILED: {
+    status: 502,
+    message: ({ reason }: { reason: string }) => `git pull failed: ${reason}`,
+    why: 'Git refused the pull or could not reach the remote.',
+    fix: 'Act on the reason git gave, then pull again.',
+  },
   PULL_REQUEST_CREATE_FAILED: {
     status: 502,
     message: ({ branch }: { branch: string }) =>

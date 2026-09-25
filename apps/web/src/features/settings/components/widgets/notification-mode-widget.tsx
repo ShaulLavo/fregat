@@ -1,6 +1,6 @@
 import { useMutation } from '@tanstack/react-query'
 import { Button } from '@workspace/ui/components/button'
-import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
+import { Spinner } from '@workspace/ui/components/spinner'
 import { EnumWidget } from '@/features/settings/components/widgets/enum-widget'
 import { settingsMutationKeys } from '@/features/settings/utils/mutation-keys'
 
@@ -38,7 +38,7 @@ export function NotificationModeWidget({
           disabled={disabled || request.isPending}
           onClick={() => request.mutate()}
         >
-          {request.isPending && <OrbitLoader />} Allow notifications
+          {request.isPending && <Spinner />} Allow notifications
         </Button>
       )}
       {native && supported && permission === 'denied' && (

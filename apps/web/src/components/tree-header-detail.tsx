@@ -1,5 +1,5 @@
 import { TickerNumber } from '@/components/ticker-number'
-import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
+import { Spinner } from '@workspace/ui/components/spinner'
 import type { LoadState } from '@/lib/load-state'
 import type { TreeModel } from '@/lib/tree-model'
 
@@ -14,7 +14,7 @@ export function TreeHeaderDetail({
   if (treeState.status === 'loading')
     return (
       <span className='flex items-center gap-1.5'>
-        <OrbitLoader className='size-(--icon-size-sm) shrink-0' label='Loading files' />
+        <Spinner size='xs' label='Loading files' />
         Loading…
       </span>
     )

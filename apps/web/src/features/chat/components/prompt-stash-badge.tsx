@@ -1,5 +1,5 @@
 import { TickerNumber } from '@/components/ticker-number'
-import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
+import { Spinner } from '@workspace/ui/components/spinner'
 import { BookmarkSimpleIcon } from '@phosphor-icons/react'
 import { Button } from '@workspace/ui/components/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@workspace/ui/components/popover'
@@ -42,7 +42,7 @@ export function PromptStashBadge({
                   variant='ghost'
                 >
                   {pending ? (
-                    <OrbitLoader />
+                    <Spinner />
                   ) : (
                     <BookmarkSimpleIcon className='size-(--icon-size-sm) shrink-0' />
                   )}

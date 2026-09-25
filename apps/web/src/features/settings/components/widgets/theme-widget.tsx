@@ -9,7 +9,7 @@ import { useContext, useEffect, useRef, useState } from 'react'
 import { jsonEqual, themeVariants, type ThemeDocument } from '@workspace/contracts'
 import { Button } from '@workspace/ui/components/button'
 import { Input } from '@workspace/ui/components/input'
-import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
+import { Spinner } from '@workspace/ui/components/spinner'
 import { ThemeCard } from '@/features/settings/components/widgets/theme-card'
 import { ThemeEditor } from '@/features/settings/components/widgets/theme-editor'
 import { useBundleLibrary } from '@/features/settings/hooks/use-bundle-library'
@@ -44,7 +44,7 @@ export function ThemeWidget({ disabled }: { disabled: boolean }) {
   return (
     <div className='flex w-full min-w-0 flex-col gap-3' aria-label='Theme bundles'>
       <div className='text-muted-foreground flex h-(--bar-height) items-center gap-2 px-(--bar-padding-x) text-xs'>
-        {library.isPending ? <OrbitLoader label='Loading your theme bundles' /> : null}
+        {library.isPending ? <Spinner label='Loading your theme bundles' /> : null}
         <span className='tabular-nums'>{library.catalog.length} bundles</span>
       </div>
       {library.error ? (
@@ -113,7 +113,7 @@ export function ThemeWidget({ disabled }: { disabled: boolean }) {
           disabled={disabled || actions.importArchive.isPending}
           onClick={() => input.current?.click()}
         >
-          {actions.importArchive.isPending ? <OrbitLoader /> : null}Import theme
+          {actions.importArchive.isPending ? <Spinner /> : null}Import theme
         </Button>
         {selected?.source === 'user' ? (
           <Button
@@ -122,7 +122,7 @@ export function ThemeWidget({ disabled }: { disabled: boolean }) {
             disabled={disabled || actions.remove.isPending}
             onClick={() => actions.remove.mutate(selected.id, { onError: fail })}
           >
-            {actions.remove.isPending ? <OrbitLoader /> : null}Delete theme
+            {actions.remove.isPending ? <Spinner /> : null}Delete theme
           </Button>
         ) : null}
         <Select
@@ -138,7 +138,7 @@ export function ThemeWidget({ disabled }: { disabled: boolean }) {
         >
           <SelectTrigger aria-label='Import Omarchy theme'>
             <SelectValue>
-              {actions.importOmarchy.isPending ? <OrbitLoader /> : 'Import from Omarchy'}
+              {actions.importOmarchy.isPending ? <Spinner /> : 'Import from Omarchy'}
             </SelectValue>
           </SelectTrigger>
           <SelectContent>

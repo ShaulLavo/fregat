@@ -8,7 +8,7 @@ import { CompareSavedView } from '@/features/editor/components/compare-saved-vie
 import { HistoryView } from '@/features/editor/components/history-view'
 import { Editor } from '@/features/editor/components/editor'
 import { useEditorColorTheme } from '@/lib/editor-theme/hooks/use-editor-color-theme'
-import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
+import { Spinner } from '@workspace/ui/components/spinner'
 import { LanguageServerReferencesPane } from '@/features/editor/components/language-server-references-pane'
 import type { EditorRenderDocument } from '@/features/editor/utils/render-document'
 import { DiffView } from '@/features/git/components/diff-view'
@@ -148,7 +148,7 @@ export function FileEditorBody({
         ) : null}
         {!editorDocument && fileState.status !== 'error' ? (
           <div className='bg-background text-muted-foreground absolute inset-x-0 bottom-0 flex items-center gap-2 px-3 py-2 text-xs'>
-            <OrbitLoader className='size-3' label='Loading file' />
+            <Spinner size='xs' label='Loading file' />
             Loading file…
           </div>
         ) : null}

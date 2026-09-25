@@ -149,6 +149,17 @@ function sessionErrorAlerts(
   provider: ProviderSnapshot | undefined,
 ): ChatRuntimeAlert[] {
   const lastError = session.runtime?.lastError
+  if (lastError && session.runtime?.status === 'interrupted') {
+    return [
+      alert({
+        detail: lastError,
+        dismissible: true,
+        id: 'session:interrupted',
+        title: 'Turn interrupted',
+        tone: 'warning',
+      }),
+    ]
+  }
   if (lastError) {
     return [
       alert({

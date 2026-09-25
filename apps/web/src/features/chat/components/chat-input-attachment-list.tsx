@@ -1,5 +1,5 @@
 import { XIcon, FileIcon } from '@phosphor-icons/react'
-import { RingLoader } from '@workspace/ui/components/ring-loader'
+import { Spinner } from '@workspace/ui/components/spinner'
 import { Button } from '@workspace/ui/components/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { useState } from 'react'
@@ -101,7 +101,7 @@ export function ChatInputAttachmentList({
             </span>
             {attachment.upload?.status === 'uploading' && (
               <span className='text-muted-foreground flex items-center gap-1'>
-                <RingLoader />
+                <Spinner size='xs' />
                 {Math.round(attachment.upload.progress * 100)}%
               </span>
             )}

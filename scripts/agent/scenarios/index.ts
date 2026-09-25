@@ -14,6 +14,7 @@ import { sessionTitles } from './session-titles'
 import { sessionNavigation } from './session-navigation'
 import { sessionOrdering } from './session-ordering'
 import { backgroundLiveness } from './background-liveness'
+import { spinnerPalette } from './spinner-palette'
 import { sessionLifecycle } from './session-lifecycle'
 import { asyncQuestions } from './async-questions'
 import { projectGrouping } from './project-grouping'
@@ -116,6 +117,7 @@ import { fileTreeUndo } from './file-tree-undo'
 import { editorDefinitionCrlf } from './editor-definition-crlf'
 import { editorLspHover } from './editor-lsp-hover'
 import { editorLspDeprecated } from './editor-lsp-deprecated'
+import { editorLspRenameKey } from './editor-lsp-rename-key'
 import { editorLspSignatureHelp } from './editor-lsp-signature-help'
 import { editorMarkdownPunctuation } from './editor-markdown-punctuation'
 import { wallpaperLibrary } from './wallpaper-library'
@@ -217,6 +219,7 @@ export const scenarios: readonly Scenario[] = [
   draftRecovery,
   asyncQuestions,
   backgroundLiveness,
+  spinnerPalette,
   checkpointRewind,
   workbenchListFocus,
   breadcrumbPicker,
@@ -306,6 +309,7 @@ export const scenarios: readonly Scenario[] = [
   editorDefinitionCrlf,
   editorExternalDeletion,
   fileTreeUndo,
+  editorLspRenameKey,
   editorLspSignatureHelp,
   editorMarkdownPunctuation,
   fileIcons,

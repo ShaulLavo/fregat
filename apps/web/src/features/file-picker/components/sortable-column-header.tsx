@@ -1,5 +1,5 @@
 import { Button } from '@workspace/ui/components/button'
-import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
+import { Spinner } from '@workspace/ui/components/spinner'
 import { cn } from '@workspace/ui/lib/utils'
 import { SortIndicator } from '@/features/file-picker/components/sort-indicator'
 import { sortButtonLabel } from '@/features/file-picker/utils/rows'
@@ -40,7 +40,7 @@ export function SortableColumnHeader({
       >
         <span className='truncate'>{label}</span>
         {isLoading ? (
-          <OrbitLoader className='size-3' label='Loading entries' />
+          <Spinner size='xs' label='Loading entries' />
         ) : (
           <SortIndicator direction={direction} />
         )}

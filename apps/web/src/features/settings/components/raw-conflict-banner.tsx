@@ -2,7 +2,7 @@ import type { DocumentKey } from '@/lib/documents/utils/types'
 import { WarningCircleIcon } from '@phosphor-icons/react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Button } from '@workspace/ui/components/button'
-import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
+import { Spinner } from '@workspace/ui/components/spinner'
 import { useState } from 'react'
 
 import {
@@ -86,7 +86,7 @@ export function RawConflictBanner({ documentKey }: { readonly documentKey: Docum
           variant='destructive'
         >
           {overwriting ? (
-            <OrbitLoader aria-hidden='true' data-icon='inline-start' role='presentation' />
+            <Spinner aria-hidden='true' data-icon='inline-start' role='presentation' />
           ) : null}
           Overwrite
         </Button>

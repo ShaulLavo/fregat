@@ -40,6 +40,7 @@ import { parseRepositoryInfo, parseStatus, statusMatchesPathspec } from './statu
 import { UpstreamFetchScheduler } from './upstream-fetch'
 import { BoundedTtlCache } from './utils/bounded-cache'
 import { gitPullRequestErrors } from './utils/pull-request-errors'
+import { conflictSummary, pullFailureReason } from './utils/pull-failure'
 import {
   MAX_OUTPUT_BYTES,
   processLimitError,
@@ -608,8 +609,27 @@ export class GitService {
   async pull(input = '') {
     recordGitServiceOperation('pull', input)
     const repository = await this.requiredRepository(input)
-    const result = await this.git(repository.rootAbsolutePath, ['pull'])
+    const result = await this.git(repository.rootAbsolutePath, ['pull'], { allowFailure: true })
+    if (result.exitCode !== 0) throw await this.pullError(repository.rootAbsolutePath, result)
     return { output: commandOutput(result), repository: repository.info }
+  }
+
+  /** A pull that stops on conflicts leaves the checkout mid-rebase or mid-merge; say which. */
+  private async pullError(root: string, result: GitCommandResult) {
+    const unmerged = await this.git(root, ['diff', '--name-only', '--diff-filter=U', '-z'], {
+      allowFailure: true,
+    })
+    const files = unmerged.stdout.split('\0').filter(Boolean)
+    const internal = { conflictCount: files.length, exitCode: result.exitCode }
+    if (files.length === 0)
+      return gitPullRequestErrors.PULL_FAILED({ internal, reason: pullFailureReason(result) })
+
+    const rebase = await this.git(root, ['rev-parse', '-q', '--verify', 'REBASE_HEAD'], {
+      allowFailure: true,
+    })
+    const conflict = { files: conflictSummary(files), internal }
+    if (rebase.exitCode === 0) return gitPullRequestErrors.PULL_REBASE_CONFLICT(conflict)
+    return gitPullRequestErrors.PULL_MERGE_CONFLICT(conflict)
   }
 
   /**

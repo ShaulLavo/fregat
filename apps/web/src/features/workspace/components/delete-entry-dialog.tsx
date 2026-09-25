@@ -4,7 +4,7 @@ import { Dialog } from '@workspace/ui/components/dialog'
 import { ActionDialogContent } from '@/components/action-dialog-content'
 
 import type { DeleteTarget } from '@/features/workspace/hooks/use-fs-actions'
-import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
+import { Spinner } from '@workspace/ui/components/spinner'
 
 /**
  * A delete is journaled, so Ctrl+Z in the tree brings it back. The one exception is a delete
@@ -44,7 +44,7 @@ export function DeleteEntryDialog({
           variant='destructive'
         >
           {deleting ? (
-            <OrbitLoader aria-hidden='true' data-icon='inline-start' role='presentation' />
+            <Spinner aria-hidden='true' data-icon='inline-start' role='presentation' />
           ) : (
             <TrashIcon data-icon='inline-start' />
           )}

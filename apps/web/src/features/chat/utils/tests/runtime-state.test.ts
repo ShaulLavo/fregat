@@ -101,6 +101,24 @@ describe('chat runtime state', () => {
     expect(sessionAlert.signIn).toBe(null)
   })
 
+  it('names a turn the server restart interrupted instead of calling it a session error', () => {
+    const lastError = 'The server restarted while this provider operation was in progress.'
+    const base = sessionWithError(lastError)
+    const [sessionAlert] = chatRuntimeAlerts({
+      commandFailure: null,
+      provider: provider(),
+      providerError: null,
+      session: { ...base, runtime: base.runtime && { ...base.runtime, status: 'interrupted' } },
+    })
+
+    expect(sessionAlert).toMatchObject({
+      detail: lastError,
+      id: 'session:interrupted',
+      title: 'Turn interrupted',
+      tone: 'warning',
+    })
+  })
+
   it('never offers sign-in for a provider the server cannot sign in', () => {
     const [sessionAlert] = chatRuntimeAlerts({
       commandFailure: null,

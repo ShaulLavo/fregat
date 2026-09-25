@@ -10,7 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@workspace/ui/components/dialog'
-import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
+import { Spinner } from '@workspace/ui/components/spinner'
 import { cn } from '@workspace/ui/lib/utils'
 import { useEffect } from 'react'
 
@@ -87,7 +87,7 @@ export function ProviderSignInDialog({
 
         {busy ? (
           <div className='bg-muted flex items-start gap-(--density-control-gap) px-(--density-control-padding-x) py-(--density-section-gap) text-xs'>
-            <OrbitLoader className='text-muted-foreground mt-0.5' />
+            <Spinner className='mt-0.5' />
             <div className='min-w-0 flex-1'>
               <p className='text-foreground font-medium'>
                 {providerAuthMethodLabel(signIn.method)}

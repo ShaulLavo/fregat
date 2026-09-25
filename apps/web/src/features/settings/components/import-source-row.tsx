@@ -1,6 +1,6 @@
 import { errorStringField } from '@workspace/contracts'
 import { Button } from '@workspace/ui/components/button'
-import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
+import { Spinner } from '@workspace/ui/components/spinner'
 import { useImportSessions } from '@/features/settings/hooks/use-import-sessions'
 import {
   importResultSummary,
@@ -23,7 +23,7 @@ export function ImportSourceRow({ source }: { source: ImportSource }) {
           size='sm'
           variant='outline'
         >
-          {mutation.isPending ? <OrbitLoader aria-label={`Importing from ${name}`} /> : null}
+          {mutation.isPending ? <Spinner label={`Importing from ${name}`} /> : null}
           Import from {name}
         </Button>
       </div>

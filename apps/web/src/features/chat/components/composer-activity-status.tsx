@@ -1,5 +1,5 @@
 import { WarningCircleIcon } from '@phosphor-icons/react'
-import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
+import { Spinner } from '@workspace/ui/components/spinner'
 import { cn } from '@workspace/ui/lib/utils'
 import type { ChatSession } from '@workspace/client-core/chat/types'
 
@@ -43,9 +43,7 @@ export function ComposerActivityStatus({
       <div className='bg-card mx-auto max-w-3xl overflow-hidden rounded-lg'>
         {label ? (
           <div className='flex min-w-0 items-center gap-2 px-2 py-1.5'>
-            {active ? (
-              <OrbitLoader aria-hidden='true' className='text-muted-foreground size-3.5 shrink-0' />
-            ) : null}
+            {active ? <Spinner size='xs' aria-hidden='true' /> : null}
             {disconnected || waiting ? (
               <WarningCircleIcon
                 aria-hidden='true'

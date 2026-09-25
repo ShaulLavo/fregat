@@ -7,7 +7,7 @@ import { useSettingsSearch, selectSettingsSearch } from '@/features/settings/sta
 import { descriptorFor, type SettingId } from '@workspace/contracts'
 import { Button } from '@workspace/ui/components/button'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@workspace/ui/components/input-group'
-import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
+import { Spinner } from '@workspace/ui/components/spinner'
 import { MagnifyingGlassIcon, XIcon } from '@phosphor-icons/react'
 import { useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
@@ -169,7 +169,7 @@ export function SettingsPage({
                 </p>
                 {isSaving ? (
                   <span className='text-muted-foreground flex items-center gap-1 text-xs'>
-                    <OrbitLoader className='size-3' label='Saving settings' />
+                    <Spinner size='xs' label='Saving settings' />
                     Saving
                   </span>
                 ) : null}

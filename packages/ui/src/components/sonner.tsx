@@ -9,7 +9,7 @@ import {
 import { Toaster as Sonner, type ToasterProps } from 'sonner'
 
 import { buttonVariants } from './button-variants'
-import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
+import { Spinner } from '@workspace/ui/components/spinner'
 import { cn } from '@workspace/ui/lib/utils'
 
 type ToasterStyle = CSSProperties & Record<`--${string}`, string>
@@ -22,7 +22,7 @@ const TOAST_ICONS = {
   close: <XIcon />,
   error: <WarningCircleIcon className='text-destructive' weight='fill' />,
   info: <InfoIcon className='text-info' weight='fill' />,
-  loading: <OrbitLoader />,
+  loading: <Spinner />,
   success: <CheckCircleIcon className='text-success' weight='fill' />,
   warning: <WarningIcon className='text-warning' weight='fill' />,
 }

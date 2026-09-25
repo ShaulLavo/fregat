@@ -18,8 +18,7 @@ import {
   DialogTitle,
 } from '@workspace/ui/components/dialog'
 import { EmptyState } from '@workspace/ui/components/empty-state'
-import { RingLoader } from '@workspace/ui/components/ring-loader'
-import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
+import { Spinner } from '@workspace/ui/components/spinner'
 import { useLayoutEffect, useRef } from 'react'
 
 import { useWorkspaceEditState } from '@/features/editor/hooks/use-workspace-edit-state'
@@ -173,7 +172,7 @@ export function WorkspaceEditPreviewDialog() {
 
         {processing ? (
           <div className='text-muted-foreground flex items-center gap-2 text-xs' role='status'>
-            <RingLoader aria-hidden='true' className='size-4' />
+            <Spinner size='sm' aria-hidden='true' />
             {state.phase === 'finalizing' ? 'Finalizing atomic change…' : 'Applying atomic change…'}
           </div>
         ) : null}
@@ -188,7 +187,7 @@ export function WorkspaceEditPreviewDialog() {
             type='button'
           >
             {processing ? (
-              <OrbitLoader aria-hidden='true' data-icon='inline-start' role='presentation' />
+              <Spinner aria-hidden='true' data-icon='inline-start' role='presentation' />
             ) : (
               <ArrowsClockwiseIcon data-icon='inline-start' />
             )}

@@ -628,20 +628,103 @@
   }
 }
 
-/* The ring loader. Two conic arcs turning opposite ways, each masked down to a
-   thin annulus, under a slow breathing scale. currentColor so it inherits the
-   weight of its context. -webkit-mask is not optional: without it Safari paints
-   the raw conic square. */
-@utility loader-ring {
-  animation: app-loader-breathe 4s var(--ease-in-out-strong) infinite;
+/* The spinner's palette: the theme's primary, then three steps 70° round the
+   hue wheel, each pulled a fifth toward muted-foreground so it never shouts.
+   Declared on the spinner, not :root, so it follows a scoped primary. A
+   hueless primary (Graphite) rotates to itself and the mark stays grey. */
+:where(.spinner-bands, .spinner-rings) {
+  --spinner-1: color-mix(in oklch, var(--primary) 80%, var(--muted-foreground));
+  --spinner-2: var(--spinner-1);
+  --spinner-3: var(--spinner-1);
+  --spinner-4: var(--spinner-1);
+
+  @supports (color: oklch(from red l c h)) {
+    --spinner-2: color-mix(
+      in oklch,
+      oklch(from var(--primary) l c calc(h + 70)) 80%,
+      var(--muted-foreground)
+    );
+    --spinner-3: color-mix(
+      in oklch,
+      oklch(from var(--primary) l c calc(h + 140)) 80%,
+      var(--muted-foreground)
+    );
+    --spinner-4: color-mix(
+      in oklch,
+      oklch(from var(--primary) l c calc(h + 210)) 80%,
+      var(--muted-foreground)
+    );
+  }
 }
 
-@utility loader-ring-outer {
+/* xs–md. Each band turns the opposite way to its neighbour at an unrelated
+   speed — a shared period would lock the three into one rigid shape. */
+@utility spinner-bands {
+  flex-shrink: 0;
+
+  & circle {
+    opacity: 0.95;
+    transform-box: view-box;
+    transform-origin: 8px 8px;
+  }
+
+  & circle:nth-child(1) {
+    stroke: var(--spinner-1);
+    animation: app-loader-spin 2.4s linear infinite;
+  }
+
+  & circle:nth-child(2) {
+    stroke: var(--spinner-2);
+    animation: app-loader-spin-reverse 3.1s linear infinite;
+  }
+
+  & circle:nth-child(3) {
+    stroke: var(--spinner-3);
+    animation: app-loader-spin 1.9s linear infinite;
+  }
+}
+
+/* The standalone size, at zero specificity: a control that sizes its own icons
+   wins, and so does a size- class at the call site. */
+:where(.spinner-bands) {
+  width: var(--icon-size);
+  height: var(--icon-size);
+}
+
+/* lg. Four conic arcs, each masked to a thin annulus, under a slow breathing
+   scale. Mask percentages are of the farthest-corner radius, so 64% still
+   sits inside the box. -webkit-mask is not optional: without it Safari paints
+   the raw conic square. */
+@utility spinner-rings {
+  flex-shrink: 0;
+  animation: app-loader-breathe 4s var(--ease-in-out-strong) infinite;
+
+  & > span {
+    position: absolute;
+    inset: 0;
+    border-radius: 9999px;
+  }
+}
+
+@utility spinner-ring-1 {
   background: conic-gradient(
     from 0deg,
     transparent 0deg,
-    currentColor 120deg,
-    color-mix(in oklch, currentColor, transparent 50%) 240deg,
+    var(--spinner-2) 90deg,
+    transparent 180deg
+  );
+  -webkit-mask: radial-gradient(circle, transparent 35%, black 37%, black 39%, transparent 41%);
+  mask: radial-gradient(circle, transparent 35%, black 37%, black 39%, transparent 41%);
+  opacity: 0.8;
+  animation: app-loader-spin 3s linear infinite;
+}
+
+@utility spinner-ring-2 {
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    var(--spinner-1) 120deg,
+    color-mix(in oklch, var(--spinner-1), transparent 50%) 240deg,
     transparent 360deg
   );
   -webkit-mask: radial-gradient(circle, transparent 42%, black 44%, black 48%, transparent 50%);
@@ -650,64 +733,45 @@
   animation: app-loader-spin 2.5s var(--ease-in-out-strong) infinite;
 }
 
-@utility loader-ring-inner {
+@utility spinner-ring-3 {
   background: conic-gradient(
     from 180deg,
     transparent 0deg,
-    color-mix(in oklch, currentColor, transparent 40%) 45deg,
+    var(--spinner-3) 45deg,
     transparent 90deg
   );
   -webkit-mask: radial-gradient(circle, transparent 52%, black 54%, black 56%, transparent 58%);
   mask: radial-gradient(circle, transparent 52%, black 54%, black 56%, transparent 58%);
-  opacity: 0.35;
+  opacity: 0.6;
   animation: app-loader-spin-reverse 4s var(--ease-in-out-strong) infinite;
 }
 
-/* The orbit loader. Each ring turns the opposite way to its neighbour at an
-   unrelated speed — shared timing, or a whole-number ratio between them, would
-   let the three lock into one rigid shape every few seconds. */
-@utility loader-orbit {
-  & circle {
-    transform-box: view-box;
-    transform-origin: 8px 8px;
-  }
-
-  & circle:nth-child(1) {
-    animation: app-loader-spin 1.4s linear infinite;
-  }
-
-  & circle:nth-child(2) {
-    animation: app-loader-spin-reverse 2s linear infinite;
-  }
-
-  & circle:nth-child(3) {
-    animation: app-loader-spin 1.1s linear infinite;
-  }
+@utility spinner-ring-4 {
+  background: conic-gradient(
+    from 270deg,
+    transparent 0deg,
+    var(--spinner-4) 20deg,
+    transparent 40deg
+  );
+  -webkit-mask: radial-gradient(circle, transparent 61%, black 62%, black 63%, transparent 64%);
+  mask: radial-gradient(circle, transparent 61%, black 62%, black 63%, transparent 64%);
+  opacity: 0.7;
+  animation: app-loader-spin 3.5s linear infinite;
 }
 
-/* The standalone size, at zero specificity: a control that sizes its own icons
-   wins, and so does a size- class at the call site. Without this a loader
-   outside both would fall back to the svg default box. */
-:where(.loader-orbit) {
-  width: var(--icon-size);
-  height: var(--icon-size);
-  flex-shrink: 0;
-}
-
-/* Both loaders slow down rather than stop. A frozen ring reads as a hung
-   process, which is the opposite of what it is there to say. */
+/* Slow down rather than stop. A frozen spinner reads as a hung process, which
+   is the opposite of what it is there to say. */
 @media (prefers-reduced-motion: reduce) {
-  .loader-ring {
+  .spinner-rings {
     animation: none;
   }
 
-  .loader-ring-outer,
-  .loader-ring-inner {
+  .spinner-rings > span {
     animation-duration: 8s;
     animation-timing-function: linear;
   }
 
-  .loader-orbit circle {
+  .spinner-bands circle {
     animation-duration: 12s;
   }
 }

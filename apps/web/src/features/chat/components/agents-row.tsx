@@ -1,6 +1,6 @@
 import { CaretRightIcon, UsersThreeIcon } from '@phosphor-icons/react'
 import { Button } from '@workspace/ui/components/button'
-import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
+import { Spinner } from '@workspace/ui/components/spinner'
 
 import { useAgentsStore } from '@/features/chat/state/agents-store'
 import {
@@ -20,7 +20,7 @@ export function AgentsRow({ group }: { group: ChatAgentGroup }) {
       onClick={() => open(group.id)}
     >
       {working ? (
-        <OrbitLoader aria-hidden='true' className='size-3.5 shrink-0' />
+        <Spinner size='xs' aria-hidden='true' />
       ) : (
         <UsersThreeIcon aria-hidden='true' className='size-(--icon-size-sm) shrink-0' />
       )}

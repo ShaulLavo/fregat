@@ -170,7 +170,7 @@ export class WorktreeLifecycleReactor {
     const worktree = this.options.getReadModel().worktrees.get(worktreeId)
     if (!worktree || worktree.retiredAt || worktree.lifecycle.state !== 'ready') return
     const repository = await this.repositoryPath(worktree)
-    const listed = await this.options.git.list(repository)
+    const listed = await this.options.git.entries(repository)
     if (!listed.some((entry) => entry.absolutePath === worktree.canonicalPath && !entry.prunable)) {
       await this.markMissing(worktree)
       return
@@ -469,7 +469,7 @@ export class WorktreeLifecycleReactor {
     const project = this.options.getReadModel().projects.get(worktree.projectId)
     const listed =
       project?.repositoryKind === 'git' && exists
-        ? (await this.options.git.list(await this.repositoryPath(worktree))).some(
+        ? (await this.options.git.entries(await this.repositoryPath(worktree))).some(
             (entry) => entry.absolutePath === worktree.canonicalPath,
           )
         : exists
@@ -521,7 +521,7 @@ export class WorktreeLifecycleReactor {
 
   private async registerOrphans(current: OrchestrationWorktree) {
     const root = await this.options.git.managedRoot(current.canonicalPath)
-    for (const entry of await this.options.git.list(current.canonicalPath)) {
+    for (const entry of await this.options.git.entries(current.canonicalPath)) {
       const relative = path.relative(root, entry.absolutePath)
       if (
         !relative ||

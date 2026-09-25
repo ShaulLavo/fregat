@@ -4,7 +4,7 @@ import type {
   OrchestrationWorktreeShell,
 } from '@workspace/contracts'
 import { Button } from '@workspace/ui/components/button'
-import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
+import { Spinner } from '@workspace/ui/components/spinner'
 import { WorktreeChip } from '@/features/chat-mode/components/worktree-chip'
 import { WorktreeCleanupDialog } from '@/features/chat-mode/components/worktree-cleanup-dialog'
 import { useWorktreeActions } from '@/features/chat-mode/hooks/use-worktree-actions'
@@ -34,7 +34,7 @@ export function WorktreeManagerRow({
     <li className='flex flex-col gap-2 py-3'>
       <div className='flex min-w-0 items-center gap-2'>
         <WorktreeChip worktree={worktree} repositoryKind={project.repositoryKind} />
-        {actions.pending ? <OrbitLoader /> : null}
+        {actions.pending ? <Spinner /> : null}
       </div>
       <p className='text-muted-foreground text-xs tabular-nums'>{cleanupStatusLabel(worktree)}</p>
       {actions.error ? <InlineError message={actions.error} title='Worktree action' /> : null}

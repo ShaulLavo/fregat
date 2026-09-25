@@ -11,7 +11,7 @@ import {
   InputGroupInput,
 } from '@workspace/ui/components/input-group'
 import { PaneBar } from '@workspace/ui/components/pane-bar'
-import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
+import { Spinner } from '@workspace/ui/components/spinner'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { useId, type ChangeEvent, type KeyboardEvent } from 'react'
 
@@ -98,7 +98,7 @@ export function CommitControls({
                     size='icon-xs'
                   >
                     {generation.isPending ? (
-                      <OrbitLoader aria-hidden='true' role='presentation' />
+                      <Spinner aria-hidden='true' role='presentation' />
                     ) : (
                       <SparkleIcon aria-hidden='true' />
                     )}
@@ -119,7 +119,7 @@ export function CommitControls({
             variant='default'
           >
             {syncChanges.isPending ? (
-              <OrbitLoader aria-hidden='true' role='presentation' />
+              <Spinner aria-hidden='true' role='presentation' />
             ) : (
               <ArrowsClockwiseIcon className='size-(--icon-size-sm)' />
             )}
@@ -136,7 +136,7 @@ export function CommitControls({
             variant='default'
           >
             {commit.isPending ? (
-              <OrbitLoader aria-hidden='true' />
+              <Spinner aria-hidden='true' />
             ) : (
               <CheckIcon className='size-(--icon-size-sm)' />
             )}

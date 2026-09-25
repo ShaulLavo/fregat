@@ -6,7 +6,7 @@ import { ActionDialogContent } from '@/components/action-dialog-content'
 import { filesystemResource } from '@/lib/documents/utils/capabilities'
 import type { TabContent } from '@/lib/documents/utils/types'
 import { tabLabel } from '@/lib/documents/utils/labels'
-import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
+import { Spinner } from '@workspace/ui/components/spinner'
 import type { UnsavedDialogTarget } from '@/features/editor/hooks/use-dirty-tab-close'
 import { useFocusTarget } from '@/lib/focus/hooks/use-target'
 
@@ -76,7 +76,7 @@ export function UnsavedChangesDialog({
         {canSave ? (
           <Button disabled={saving} onClick={onSave} type='button'>
             {saving ? (
-              <OrbitLoader aria-hidden='true' data-icon='inline-start' role='presentation' />
+              <Spinner aria-hidden='true' data-icon='inline-start' role='presentation' />
             ) : (
               <FloppyDiskIcon data-icon='inline-start' />
             )}

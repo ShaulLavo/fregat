@@ -1,7 +1,7 @@
 import { CaretDownIcon } from '@phosphor-icons/react'
 import type { EnvironmentId } from '@workspace/contracts'
 import { Button } from '@workspace/ui/components/button'
-import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
+import { Spinner } from '@workspace/ui/components/spinner'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -45,7 +45,7 @@ export function DraftMachineMenu({
             variant='ghost'
           >
             {pending ? (
-              <OrbitLoader className='size-3 shrink-0' label='Moving draft' />
+              <Spinner size='xs' label='Moving draft' />
             ) : (
               <Phase phase={current.phase} label={current.label} />
             )}

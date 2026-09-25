@@ -1,6 +1,6 @@
 import { ArrowUpIcon } from '@phosphor-icons/react'
 import { Button } from '@workspace/ui/components/button'
-import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
+import { Spinner } from '@workspace/ui/components/spinner'
 
 /**
  * Reaches the history the detail window left behind. An overlay rather than a
@@ -27,7 +27,7 @@ export function TimelineLoadEarlier({
         onClick={onLoad}
       >
         {pending ? (
-          <OrbitLoader className='size-3.5' />
+          <Spinner size='xs' />
         ) : (
           <ArrowUpIcon aria-hidden='true' className='size-(--icon-size-sm)' />
         )}

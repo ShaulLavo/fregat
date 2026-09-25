@@ -314,7 +314,7 @@ async function assertWorkState(page, kind) {
   const active = kind === 'running' || kind === 'next-tool'
   assert.equal(await live.count(), active ? 1 : 0, `${kind} must have the correct live row count.`)
   assert.equal(
-    await transcript.locator('[data-slot="orbit-loader"]').count(),
+    await transcript.locator('[data-slot="spinner"]').count(),
     active ? 1 : 0,
     `${kind} must have the correct live spinner count.`,
   )

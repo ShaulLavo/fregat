@@ -39,7 +39,7 @@ import { useComposerInbox } from '../hooks/use-composer-inbox'
 import { useAttachmentPreparation } from '@/features/chat/hooks/use-attachment-preparation'
 import { useProvider } from '@/features/chat/hooks/use-provider'
 import { chatSubmissionValidation } from '@/features/chat/utils/submission-validation'
-import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
+import { Spinner } from '@workspace/ui/components/spinner'
 import { ChatModelPickerProvider } from '../providers/model-picker-provider'
 import {
   readChatInputDraftPrompt,
@@ -456,7 +456,7 @@ export function ChatInput({
                   className='text-muted-foreground flex items-center gap-2 px-3 pb-2 text-xs'
                   role='status'
                 >
-                  <OrbitLoader className='size-3.5' />
+                  <Spinner size='xs' />
                   Preparing images…
                 </div>
               ) : null}

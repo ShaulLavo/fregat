@@ -545,7 +545,7 @@ test('screen-reader labels do not exempt icon controls from a visible tooltip', 
 
 test('icons include SVGs, image controls, loading states and conditional compact labels', () => {
   const subject = census(
-    `export const Controls = () => <><Button><svg /></Button><Button><img alt='' /></Button><Button>{pending ? <OrbitLoader /> : <CheckIcon />}</Button><Button><svg />{compact ? null : <span>{label}</span>}</Button><Button><OrbitLoader />Saving</Button><Button><svg />{label}</Button></>`,
+    `export const Controls = () => <><Button><svg /></Button><Button><img alt='' /></Button><Button>{pending ? <Spinner /> : <CheckIcon />}</Button><Button><svg />{compact ? null : <span>{label}</span>}</Button><Button><Spinner />Saving</Button><Button><svg />{label}</Button></>`,
   )
   expect(values(subject, 'iconOnlyHint')).toEqual([
     'missing Tooltip',

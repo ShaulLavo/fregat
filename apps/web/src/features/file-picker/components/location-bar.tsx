@@ -6,7 +6,7 @@ import {
   InputGroupButton,
   InputGroupInput,
 } from '@workspace/ui/components/input-group'
-import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
+import { Spinner } from '@workspace/ui/components/spinner'
 import type { FormEvent, KeyboardEvent, RefObject } from 'react'
 
 import { IconTooltip } from '@/features/file-picker/components/icon-tooltip'
@@ -102,7 +102,7 @@ export function LocationBar({
               variant='secondary'
             >
               {isPending ? (
-                <OrbitLoader aria-hidden='true' role='presentation' />
+                <Spinner aria-hidden='true' role='presentation' />
               ) : (
                 <ArrowRightIcon aria-hidden='true' />
               )}

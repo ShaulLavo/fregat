@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 
 import { Button } from '../components/button'
 import { DialogFooter } from '../components/dialog'
-import { OrbitLoader } from '../components/orbit-loader'
+import { Spinner } from '../components/spinner'
 
 /** Cancel beside a destructive Delete whose icon becomes the loader while the delete runs. */
 export function DeleteDialogFooter({
@@ -34,7 +34,7 @@ export function DeleteDialogFooter({
         type='button'
         variant='destructive'
       >
-        {pending ? <OrbitLoader /> : <TrashIcon data-icon='inline-start' />}
+        {pending ? <Spinner /> : <TrashIcon data-icon='inline-start' />}
         Delete
       </Button>
     </DialogFooter>

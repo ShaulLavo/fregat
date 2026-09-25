@@ -8,7 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@workspace/ui/components/dialog'
-import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
+import { Spinner } from '@workspace/ui/components/spinner'
 import { Textarea } from '@workspace/ui/components/textarea'
 import { useState } from 'react'
 import * as v from 'valibot'
@@ -63,7 +63,7 @@ export function PaletteImportDialog({
             }}
             type='button'
           >
-            {pending ? <OrbitLoader /> : null}
+            {pending ? <Spinner /> : null}
             Import
           </Button>
         </DialogFooter>

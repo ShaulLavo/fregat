@@ -1,6 +1,6 @@
 import { useShallow } from 'zustand/react/shallow'
 import type { ScopedSessionRef } from '@workspace/contracts'
-import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
+import { Spinner } from '@workspace/ui/components/spinner'
 import {
   selectChatProjectionSlice,
   useChatProjectionStore,
@@ -21,7 +21,7 @@ export function SessionTitleStatus({ sessionRef }: { readonly sessionRef: Scoped
   if (status.pending)
     return (
       <span className='text-muted-foreground text-2xs inline-flex shrink-0 items-center gap-(--density-gap-tight)'>
-        <OrbitLoader className='size-(--icon-size-sm)' label='Generating title' />
+        <Spinner size='xs' label='Generating title' />
         Generating title
       </span>
     )

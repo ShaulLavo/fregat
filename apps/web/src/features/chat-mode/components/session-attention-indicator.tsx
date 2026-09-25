@@ -1,5 +1,5 @@
 import type { SessionRailStatus } from '@workspace/client-core/chat/rail/status'
-import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
+import { Spinner } from '@workspace/ui/components/spinner'
 import { cn } from '@workspace/ui/lib/utils'
 import {
   sessionStatusDotClass,
@@ -8,8 +8,7 @@ import {
 
 export function SessionAttentionIndicator({ status }: { readonly status: SessionRailStatus }) {
   const label = sessionStatusLabel(status)
-  if (status === 'working')
-    return <OrbitLoader className='text-info size-3 shrink-0' label={label} />
+  if (status === 'working') return <Spinner size='xs' label={label} />
   return (
     <span
       aria-label={label}

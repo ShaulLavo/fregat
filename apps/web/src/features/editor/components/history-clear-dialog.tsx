@@ -10,7 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@workspace/ui/components/dialog'
-import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
+import { Spinner } from '@workspace/ui/components/spinner'
 
 export function HistoryClearDialog({
   documentKey,
@@ -48,7 +48,7 @@ export function HistoryClearDialog({
             Cancel
           </Button>
           <Button disabled={pending} onClick={onConfirm} type='button' variant='destructive'>
-            {pending ? <OrbitLoader /> : null}
+            {pending ? <Spinner /> : null}
             Clear history
           </Button>
         </DialogFooter>

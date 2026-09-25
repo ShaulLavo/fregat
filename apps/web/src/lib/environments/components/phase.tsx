@@ -1,5 +1,5 @@
 import type { EnvironmentPhase } from '@workspace/client-core/environments/utils/connection'
-import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
+import { Spinner } from '@workspace/ui/components/spinner'
 import { cn } from '@workspace/ui/lib/utils'
 
 export function Phase({
@@ -10,7 +10,7 @@ export function Phase({
   readonly label: string
 }) {
   if (phase === 'launching' || phase === 'connecting' || phase === 'reconnecting') {
-    return <OrbitLoader className='size-3 shrink-0' label={`${label} ${phase}`} />
+    return <Spinner size='xs' label={`${label} ${phase}`} />
   }
   // Same box as the loader, so swapping between them does not nudge the label.
   return (

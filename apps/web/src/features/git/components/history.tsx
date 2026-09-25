@@ -14,7 +14,7 @@ import {
 } from '@workspace/ui/components/dialog'
 import { EmptyState } from '@workspace/ui/components/empty-state'
 import { LoadingState } from '@workspace/ui/components/loading-state'
-import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
+import { Spinner } from '@workspace/ui/components/spinner'
 import { cn } from '@workspace/ui/lib/utils'
 import { useHistory } from '@/features/git/hooks/use-history'
 import { useOpenHistoricalDiff } from '@/features/git/hooks/use-open-historical-diff'
@@ -165,7 +165,7 @@ export function History({ rootPath }: { rootPath: string }) {
               {historyCountLabel(commits.length, history.shownSearch)}
               {!history.hasNextPage && commits.length > 0 ? ' · All results loaded' : ''}
             </span>
-            {history.isFetching ? <OrbitLoader className='size-3' /> : null}
+            {history.isFetching ? <Spinner size='xs' /> : null}
             {history.hasNextPage ? (
               <Button
                 size='sm'

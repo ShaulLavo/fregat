@@ -14,7 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@workspace/ui/components/dialog'
-import { RingLoader } from '@workspace/ui/components/ring-loader'
+import { Spinner } from '@workspace/ui/components/spinner'
 import { useState } from 'react'
 
 import { useWorkspaceEditState } from '@/features/editor/hooks/use-workspace-edit-state'
@@ -101,7 +101,7 @@ export function WorkspaceEditRecoveryDialog() {
 
           {busy ? (
             <div className='text-muted-foreground flex items-center gap-2 text-xs' role='status'>
-              <RingLoader aria-hidden='true' className='size-4' />
+              <Spinner size='sm' aria-hidden='true' />
               {state.phase === 'recovering'
                 ? 'Retrying exact recovery…'
                 : 'Releasing recovery data…'}

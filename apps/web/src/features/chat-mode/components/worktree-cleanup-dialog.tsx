@@ -7,7 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@workspace/ui/components/dialog'
-import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
+import { Spinner } from '@workspace/ui/components/spinner'
 import type { WorktreeConfirmation } from '@workspace/client-core/chat/worktrees/commands'
 import { InlineError } from '@/components/inline-error'
 
@@ -68,7 +68,7 @@ export function WorktreeCleanupDialog({
             variant={force ? 'destructive' : 'default'}
             onClick={onConfirm}
           >
-            {pending ? <OrbitLoader /> : null}
+            {pending ? <Spinner /> : null}
             {action}
           </Button>
         </DialogFooter>

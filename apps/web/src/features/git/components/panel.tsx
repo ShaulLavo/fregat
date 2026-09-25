@@ -1,5 +1,5 @@
 import { TickerNumber } from '@/components/ticker-number'
-import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
+import { Spinner } from '@workspace/ui/components/spinner'
 import { disabledDiffQueryKey } from '@/features/git/utils/query-keys'
 import type { GitFileStatus } from '@workspace/contracts'
 import { EmptyState } from '@workspace/ui/components/empty-state'
@@ -86,7 +86,7 @@ export function Panel({ className, rootPath }: ComponentProps<'section'> & { roo
                 size='sm'
                 variant='outline'
               >
-                {status.isFetching ? <OrbitLoader /> : null}Retry
+                {status.isFetching ? <Spinner /> : null}Retry
               </Button>
             }
             description={errorMessage(status.error)}

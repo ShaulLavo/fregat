@@ -12,7 +12,7 @@ import {
   PopoverTitle,
   PopoverTrigger,
 } from '@workspace/ui/components/popover'
-import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
+import { Spinner } from '@workspace/ui/components/spinner'
 import { useState, type FormEvent } from 'react'
 
 import { folderNameError } from '@/features/file-picker/utils/data-helpers'
@@ -121,7 +121,7 @@ export function NewFolderPopover({
               Cancel
             </Button>
             <Button disabled={mutation.isPending} size='sm' type='submit'>
-              {mutation.isPending ? <OrbitLoader data-icon='inline-start' /> : <FolderPlusIcon />}
+              {mutation.isPending ? <Spinner data-icon='inline-start' /> : <FolderPlusIcon />}
               Create
             </Button>
           </div>

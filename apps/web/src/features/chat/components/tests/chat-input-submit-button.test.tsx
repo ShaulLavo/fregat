@@ -79,7 +79,7 @@ test('sending replaces the arrow with a disabled progress control', () => {
 
   const button = screen.getByRole('button', { name: 'Sending…' })
   expect(button).toHaveAttribute('aria-disabled', 'true')
-  expect(button.querySelector('[data-slot="orbit-loader"]')).not.toBeNull()
+  expect(button.querySelector('[data-slot="spinner"]')).not.toBeNull()
 })
 
 test('a starting turn remains stoppable when the session is busy', async () => {

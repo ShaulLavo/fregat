@@ -48,6 +48,7 @@ Commands dispatch over the orchestration socket when it is live and over HTTP ot
 
 - `session-lifecycle`: pin/settle/active menus, invalid custom snooze, timer-only shelf move, bulk snooze and Undo, provider-session snooze/unsnooze. Uses disposable sessions; bulk skipped/failed retention is covered by real-server DOM tests.
 - `background-liveness`: isolated native parent/child lifecycle; completed parent with live child remains Working, idle child becomes Ready, late metadata stays Ready across reload. Removes own provider/session/processes.
+- `spinner-palette`: isolated native turn left running under Sage dark then light; screenshots the rail, header and timeline `Spinner`s drawing from the theme primary. Run with `--scale 2` to read the bands. Restores appearance settings.
 
 - `session-ordering`: pointer moves through empty pinned/settled shelves, active key persistence through reload, keyboard promotion to empty pinned shelf. Two-owner partial rejection uses real in-process server tests.
 

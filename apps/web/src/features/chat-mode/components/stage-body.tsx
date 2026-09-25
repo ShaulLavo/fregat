@@ -3,7 +3,7 @@ import { useNavigation } from '@/hooks/use-navigation'
 import { useSessionSelectionStore } from '@/features/chat-mode/state/session-selection-store'
 import type { SessionId } from '@workspace/contracts'
 import { LoadingState } from '@workspace/ui/components/loading-state'
-import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
+import { Spinner } from '@workspace/ui/components/spinner'
 import { ChatDraftView } from '@/features/chat/components/chat-draft-view'
 import { ChatView } from '@/features/chat/components/chat-view'
 import { SessionMissingState } from '@/features/chat-mode/components/session-missing-state'
@@ -54,7 +54,7 @@ export function StageBody({
   if (activeSession.status === 'resolving') {
     return (
       <div className='p-4'>
-        <OrbitLoader label='Opening session' />
+        <Spinner label='Opening session' />
       </div>
     )
   }

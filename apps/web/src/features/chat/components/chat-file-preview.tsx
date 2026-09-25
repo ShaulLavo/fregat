@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import type { ChatAttachment } from '@workspace/contracts'
 import { Button } from '@workspace/ui/components/button'
 import { Dialog, DialogContent, DialogTitle } from '@workspace/ui/components/dialog'
-import { RingLoader } from '@workspace/ui/components/ring-loader'
+import { Spinner } from '@workspace/ui/components/spinner'
 import { formatSize } from '@/lib/path-formatters'
 import {
   attachmentFileUrl,
@@ -38,7 +38,7 @@ export function ChatFilePreview({
         <p className='text-muted-foreground text-xs'>
           {attachment.mimeType} · {formatSize(attachment.sizeBytes)}
         </p>
-        {previewable && preview.isPending && <RingLoader aria-label='Loading file preview' />}
+        {previewable && preview.isPending && <Spinner size='lg' label='Loading file preview' />}
         {previewable && preview.isError && (
           <div className='text-destructive text-xs' role='alert'>
             Could not load this file.{' '}

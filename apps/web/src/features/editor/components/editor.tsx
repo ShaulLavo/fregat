@@ -4,7 +4,7 @@ import { useEditor } from '@singapore-editor/react'
 import type { LanguageServerDefinitionTarget } from '@singapore-editor/lsp-plugin/websocket'
 import type { LanguageServerReferencesResult } from '@singapore-editor/lsp-plugin'
 import { useEffect, useLayoutEffect, useMemo, useState } from 'react'
-import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
+import { Spinner } from '@workspace/ui/components/spinner'
 
 import { EditorFrame } from '@/features/editor/components/frame'
 import { DiagnosticPeek } from '@/features/editor/components/diagnostic-peek'
@@ -303,7 +303,7 @@ export function Editor({
     >
       {provisional && liveDocument ? (
         <div className='bg-background text-muted-foreground absolute inset-x-0 bottom-0 flex items-center gap-2 px-3 py-2 text-xs'>
-          <OrbitLoader className='size-3' label='Preparing editor' />
+          <Spinner size='xs' label='Preparing editor' />
           Preparing editor…
         </div>
       ) : null}

@@ -2,7 +2,7 @@ import type { ComponentProps, ReactNode } from 'react'
 
 import { EmptyState } from '@workspace/ui/components/empty-state'
 import { LoadingState } from '@workspace/ui/components/loading-state'
-import { RingLoader } from '@workspace/ui/components/ring-loader'
+import { Spinner } from '@workspace/ui/components/spinner'
 import { cn } from '@workspace/ui/lib/utils'
 import { RenderErrorBoundary } from '@workspace/ui/patterns/render-error-boundary'
 import { ToolPaneHeader } from '@workspace/ui/patterns/tool-pane-header'
@@ -44,7 +44,7 @@ export function ToolPane({
         label={`Loading ${title ?? 'content'}`}
         className='flex h-full items-center justify-center'
       >
-        <RingLoader />
+        <Spinner size='lg' />
       </LoadingState>
     )
   else if (state?.error)

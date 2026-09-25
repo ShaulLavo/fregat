@@ -1,7 +1,7 @@
 import { ArrowRightIcon, ArrowSquareOutIcon, PencilSimpleIcon } from '@phosphor-icons/react'
 import { Badge } from '@workspace/ui/components/badge'
 import { Button } from '@workspace/ui/components/button'
-import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
+import { Spinner } from '@workspace/ui/components/spinner'
 
 import { usePlanFollowUp } from '@/features/chat/hooks/use-plan-follow-up'
 import { proposedPlanTitle } from '@workspace/client-core/chat/proposed-plan'
@@ -74,11 +74,7 @@ export function PlanFollowUpBanner({
           type='button'
           onClick={() => void submitFollowUp()}
         >
-          {submitting ? (
-            <OrbitLoader className='size-3.5' />
-          ) : (
-            <ActionIcon className='size-(--icon-size-sm)' />
-          )}
+          {submitting ? <Spinner size='xs' /> : <ActionIcon className='size-(--icon-size-sm)' />}
           {refining ? 'Refine' : 'Implement'}
         </Button>
       </div>

@@ -1,6 +1,6 @@
 import type { OrchestrationProjectShell, OrchestrationWorktreeShell } from '@workspace/contracts'
 import { GitBranchIcon } from '@phosphor-icons/react'
-import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
+import { Spinner } from '@workspace/ui/components/spinner'
 import { cn } from '@workspace/ui/lib/utils'
 import { worktreeLabel, worktreeLifecycleLabel } from '@workspace/client-core/chat/worktrees/label'
 
@@ -29,7 +29,7 @@ export function WorktreeChip({
       )}
     >
       {pending ? (
-        <OrbitLoader label={lifecycle} />
+        <Spinner label={lifecycle} />
       ) : (
         <GitBranchIcon className='size-(--icon-size-sm) shrink-0' />
       )}

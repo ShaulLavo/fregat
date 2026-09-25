@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSyncExternalStore } from 'react'
 import { WarningCircleIcon } from '@phosphor-icons/react'
 import { Button } from '@workspace/ui/components/button'
-import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
+import { Spinner } from '@workspace/ui/components/spinner'
 import { useEditorRuntime } from '@/features/editor/hooks/use-runtime'
 import { createMissingFileOptions } from '@/features/workbench/utils/create-missing-file'
 import { toClientError, clientErrorMessage } from '@/lib/client-error-taxonomy'
@@ -48,7 +48,7 @@ export function FileLoadError({
           disabled={!canMutate || Boolean(unavailable) || create.isPending}
           onClick={() => create.mutate()}
         >
-          {create.isPending ? <OrbitLoader /> : null}
+          {create.isPending ? <Spinner /> : null}
           Create File
         </Button>
       ) : null}
@@ -58,7 +58,7 @@ export function FileLoadError({
         disabled={query.isFetching || create.isPending}
         onClick={() => void query.refetch()}
       >
-        {query.isFetching ? <OrbitLoader /> : null}
+        {query.isFetching ? <Spinner /> : null}
         Retry
       </Button>
     </div>
