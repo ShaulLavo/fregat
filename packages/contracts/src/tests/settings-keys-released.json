@@ -51,6 +51,8 @@
     "files.autoSave",
     "files.autoSaveDelay",
     "files.showHidden",
+    "git.autoPull",
+    "git.projectAutoPull",
     "git.projectWorktreeSubmodules",
     "git.worktreeSubmodules",
     "keybindings.overrides",

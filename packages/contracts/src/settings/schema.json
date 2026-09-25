@@ -380,6 +380,22 @@
       "description": "Show dot-prefixed files and folders in file pickers.",
       "type": "boolean"
     },
+    "git.autoPull": {
+      "default": false,
+      "description": "Fast-forward a project checkout on its default branch when its upstream moves. A checkout with changes, local commits or another branch checked out is left alone.",
+      "type": "boolean"
+    },
+    "git.projectAutoPull": {
+      "additionalProperties": {
+        "type": "boolean"
+      },
+      "default": {},
+      "description": "Automatic default-branch pull keyed by project UUID on this machine.",
+      "propertyNames": {
+        "type": "string"
+      },
+      "type": "object"
+    },
     "git.projectWorktreeSubmodules": {
       "additionalProperties": {
         "enum": ["none", "recursive", "top-level"],

@@ -198,6 +198,29 @@ export const SETTINGS_REGISTRY = {
       'SSH targets and direct origins available to this client. The local machine is always available.',
     keywords: ['remote', 'ssh', 'environment', 'server', 'connect'],
   }),
+  'git.autoPull': defineSetting({
+    schema: v.boolean(),
+    default: false,
+    // Machine scope: it writes to checkouts and reaches the network.
+    scope: 'machine',
+    widget: 'boolean',
+    category: 'Git',
+    title: 'Keep the default branch current',
+    description:
+      'Fast-forward a project checkout on its default branch when its upstream moves. A checkout with changes, local commits or another branch checked out is left alone.',
+    keywords: ['pull', 'fast-forward', 'fetch', 'default branch', 'main'],
+  }),
+  'git.projectAutoPull': defineSetting({
+    schema: v.record(v.string(), v.boolean()),
+    default: {},
+    merge: 'record',
+    scope: 'machine',
+    widget: 'complex',
+    visibility: 'internal',
+    category: 'Git',
+    title: 'Project default-branch pull',
+    description: 'Automatic default-branch pull keyed by project UUID on this machine.',
+  }),
   'git.worktreeSubmodules': defineSetting({
     schema: v.picklist(WORKTREE_SUBMODULE_MODES),
     default: 'recursive',
