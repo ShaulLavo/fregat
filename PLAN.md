@@ -5,6 +5,10 @@
 > contract below. Re-run each executable plan's drift check and capture its current HEAD plus full
 > dirty diff before editing.
 
+> **Active:** the [completion wave](docs/completion-wave.md) (2026-09-25) runs every executable
+> plan in parallel lanes, each lane in its own worktree. Its lane order overrides the lane
+> sections below until the wave ends.
+
 This file is the sole source of cross-project execution order. [`plans/README.md`](plans/README.md)
 is the Platform executable-plan inventory. Strategy documents under `docs/` describe product scope
 but do not authorize implementation. A completed executable plan is deleted after its checks pass;
