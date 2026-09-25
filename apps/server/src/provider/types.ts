@@ -141,6 +141,9 @@ type ProviderRuntimeTurnState = 'completed' | 'failed' | 'interrupted' | 'cancel
 
 type ProviderRuntimePlanStepStatus = 'pending' | 'inProgress' | 'completed'
 
+/** `blocked` is a hook that refused the action it guarded, which is not the same as failing. */
+export type ProviderHookOutcome = 'success' | 'blocked' | 'error' | 'cancelled'
+
 export type ProviderRuntimeEvent = ProviderRuntimeEventPayload & { runtimeEpoch: string }
 
 export type ProviderRuntimeEventPayload =
@@ -386,8 +389,10 @@ export type ProviderRuntimeEventPayload =
       type: 'hook.completed'
       payload: {
         exitCode?: number
+        hookEvent?: string
         hookId: string
-        outcome: 'success' | 'error' | 'cancelled'
+        hookName?: string
+        outcome: ProviderHookOutcome
         output?: string
         stderr?: string
         stdout?: string

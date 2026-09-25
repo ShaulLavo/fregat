@@ -32,6 +32,8 @@ The chat mode button in the window toolbar, or an address URL with `/chat/`.
 
 `scenario export-transcript` exports one disposable session four ways — Export as Markdown and as JSON from the rail menu, Export Conversation as Markdown from the message menu, and the palette's Export transcript — and reads each download. The session's provider instance does not exist, so its turn fails at once and spends no tokens. The transcript comes from `GET /orchestration/session-transcript`, which is unwindowed: the web itself holds only the latest 200 rows.
 
+`scenario claude-hook-rows` runs real Claude (Haiku) in a fixture repository whose project PreToolUse hook blocks every Bash call, and checks the work log lists `PreToolUse:Bash blocked` with the hook's message under it. Silent successful hooks never get a row; they are counted into one `hook.summary` row at turn end.
+
 `scenario chat-diff-syntax --url <session-diff-address>` checks painted syntax colors in a session checkpoint diff.
 
 Commands dispatch over the orchestration socket when it is live and over HTTP otherwise. The HTTP path refetches the shell snapshot itself.

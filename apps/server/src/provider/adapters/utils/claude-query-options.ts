@@ -112,6 +112,9 @@ export function claudeQueryOptions(input: ClaudeQueryOptionsInput): Options {
   return {
     abortController: input.abortController,
     cwd: input.cwd,
+    // Without it only SessionStart and Setup hooks report, and a blocking
+    // PreToolUse hook would leave no trace of why the agent stopped.
+    includeHookEvents: true,
     includePartialMessages: true,
     model: input.model,
     pathToClaudeCodeExecutable: input.executablePath,

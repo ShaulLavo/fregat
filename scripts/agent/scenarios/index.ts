@@ -62,6 +62,7 @@ import { fileLabelCohesion } from './file-label-cohesion'
 import { checkpointStates } from './checkpoint-states'
 import { sessionActionsSurfaces } from './session-actions-surfaces'
 import { exportTranscript } from './export-transcript'
+import { claudeHookRows } from './hook-rows'
 import { searchFileActions } from './search-file-actions'
 import { settingsStaleDiagnostics } from './settings-stale-diagnostics'
 import { fontPicker } from './font-picker'
@@ -288,6 +289,7 @@ export const scenarios: readonly Scenario[] = [
   checkpointStates,
   sessionActionsSurfaces,
   exportTranscript,
+  claudeHookRows,
   searchFileActions,
   chatFollowUp,
   chatDiffSyntax,

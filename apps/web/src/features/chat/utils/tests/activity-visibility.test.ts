@@ -66,4 +66,14 @@ describe('chat activity visibility', () => {
       'question',
     ])
   })
+
+  it('counts listed and silent hooks together', () => {
+    expect(
+      activityGroupSummary([
+        workLogEntry({ id: 'blocked', hookCount: 1, sourceKind: 'hook.completed', tone: 'error' }),
+        workLogEntry({ id: 'silent', hookCount: 4, sourceKind: 'hook.summary', tone: 'info' }),
+      ]),
+    ).toBe('Ran 5 hooks')
+
+  })
 })

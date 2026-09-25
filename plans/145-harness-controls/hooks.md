@@ -1,6 +1,6 @@
 # 145 · Hooks: what ran and what it returned
 
-- Status: PROPOSED.
+- Status: Steps 1–3 DONE 2026-09-25 (lane L3); step 4 ships with mcp-status's session section.
 - Planned at: Platform `c2af88b4`, 2026-09-24. Origin: the 2026-09-24 reference survey.
 - Work in the current checkout; no branches, worktrees, commits, pushes or PRs unless separately
   requested.
@@ -30,10 +30,10 @@ For Codex, the session can also list the hooks configured for its checkout.
 
 ## Decisions
 
-- **D1 — Which runs are shown.** Recommended: a hook that blocked, failed or produced output gets
+- **D1 — Which runs are shown.** Decided 2026-09-25: recommendation (completion wave). Recommended: a hook that blocked, failed or produced output gets
   a timeline row; a silent success is counted on the turn, not listed. PreToolUse hooks fire on
   every tool call, and one row each would bury the conversation.
-- **D2 — Configured-hook list.** Recommended: Codex only, from `hooks/list`. For Claude, say that
+- **D2 — Configured-hook list.** Decided 2026-09-25: recommendation (completion wave). Recommended: Codex only, from `hooks/list`. For Claude, say that
   hooks are configured in its settings files; do not parse those files ourselves.
 
 ## Steps
@@ -46,6 +46,18 @@ For Codex, the session can also list the hooks configured for its checkout.
    summary.
 4. Codex schema refresh (see the index) with `hooks/list`; a query for the session's checkout,
    shown in the session's details.
+
+## Landed (steps 1–3)
+
+- `includeHookEvents: true` in `claudeQueryOptions`. Claude reports a block as `outcome: 'error'`
+  with `exit_code: 2` and repeats stderr inside `output` (measured live); the adapter maps exit 2
+  to `blocked`, and ingestion collapses equal streams.
+- Codex hook notifications are `{ run: HookRunSummary }` in 0.157; the adapter used to read flat
+  fields, so every Codex hook was `unknown`/`Hook` with a random id. It now parses the generated
+  schema and names the hook after its source file.
+- Ingestion lists a hook that blocked, failed or produced output (`hook.completed`) and counts the
+  silent ones into one `hook.summary` row at turn end; the turn summary adds "Ran N hooks".
+- Scenario `claude-hook-rows` (real Haiku, a fixture PreToolUse hook that blocks Bash).
 
 ## Verification
 

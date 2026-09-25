@@ -1,3 +1,4 @@
+import path from 'node:path'
 import { defaultAttachmentsDir } from '../../attachments/store'
 import { resolveCodexAttachments } from './utils/codex-attachments'
 import { codexAsyncQuestions } from './utils/codex-async-questions'
@@ -35,6 +36,7 @@ import type {
   ProviderApprovalResponseInput,
   ProviderCommandCatalogInput,
   ProviderCommandCatalogResult,
+  ProviderHookOutcome,
   ProviderRuntimeEvent,
   ProviderRuntimeStartInput,
   ProviderTurnInput,
@@ -61,6 +63,7 @@ import {
   type CodexClientRequestMethod,
   type CodexClientRequestParamsByMethod,
   type CodexClientRequestResultByMethod,
+  type CodexHookRunSummary,
   type CodexServerNotificationParamsByMethod,
   type CodexSkillMetadata,
 } from './codex-protocol'
@@ -1341,31 +1344,20 @@ class CodexAppServerSession extends SessionContext {
   }
 
   private handleHookStartedNotification(params: unknown) {
-    const record = asRecord(params)
-    this.emitRuntimeNotification(
-      'hook.started',
-      {
-        hookEvent: stringField(record, 'hookEvent') ?? 'unknown',
-        hookId: stringField(record, 'hookId') ?? `hook:${crypto.randomUUID()}`,
-        hookName: stringField(record, 'hookName') ?? 'Hook',
-      },
-      'hook/started',
-      params,
-    )
+    const { run } = parseCodexServerNotification('hook/started', params)
+    this.emitRuntimeNotification('hook.started', codexHookIdentity(run), 'hook/started', params)
     return true
   }
 
   private handleHookCompletedNotification(params: unknown) {
-    const record = asRecord(params)
+    const { run } = parseCodexServerNotification('hook/completed', params)
+    const output = run.entries.map((entry) => entry.text).join('\n')
     this.emitRuntimeNotification(
       'hook.completed',
       {
-        exitCode: numberField(record, 'exitCode') ?? undefined,
-        hookId: stringField(record, 'hookId') ?? `hook:${crypto.randomUUID()}`,
-        outcome: hookOutcome(record),
-        output: stringField(record, 'output') ?? undefined,
-        stderr: stringField(record, 'stderr') ?? undefined,
-        stdout: stringField(record, 'stdout') ?? undefined,
+        ...codexHookIdentity(run),
+        outcome: codexHookOutcome(run.status),
+        ...(output ? { output } : {}),
       },
       'hook/completed',
       params,
@@ -3289,9 +3281,18 @@ function itemDetail(record: Record<string, unknown>) {
   return stringField(record, 'detail') ?? stringField(record, 'text') ?? undefined
 }
 
-function hookOutcome(record: Record<string, unknown>) {
-  const outcome = stringField(record, 'outcome') ?? stringField(record, 'status')
-  if (outcome === 'success' || outcome === 'error' || outcome === 'cancelled') return outcome
+function codexHookIdentity(run: CodexHookRunSummary) {
+  return {
+    hookEvent: run.eventName,
+    hookId: run.id,
+    hookName: path.basename(run.sourcePath) || run.handlerType,
+  }
+}
+
+function codexHookOutcome(status: CodexHookRunSummary['status']): ProviderHookOutcome {
+  if (status === 'blocked') return 'blocked'
+  if (status === 'failed') return 'error'
+  if (status === 'stopped') return 'cancelled'
 
   return 'success'
 }

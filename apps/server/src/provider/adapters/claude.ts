@@ -60,6 +60,7 @@ import type {
   ProviderApprovalResponseInput,
   ProviderCommandCatalogInput,
   ProviderCommandCatalogResult,
+  ProviderHookOutcome,
   ProviderRuntimeEvent,
   ProviderRuntimeStartInput,
   ProviderSessionDiscoveryInput,
@@ -1074,8 +1075,10 @@ class ClaudeAgentSession extends SessionContext {
           'hook.completed',
           {
             exitCode: message.exit_code,
+            hookEvent: message.hook_event,
             hookId: message.hook_id,
-            outcome: message.outcome,
+            hookName: message.hook_name,
+            outcome: claudeHookOutcome(message),
             output: message.output,
             stderr: message.stderr,
             stdout: message.stdout,
@@ -2658,4 +2661,11 @@ function claudeResultErrorMessage(message: Extract<SDKMessage, { type: 'result' 
   )
 
   return userFacing ?? `Claude turn failed (${message.subtype}).`
+}
+
+/** Exit code 2 is Claude Code's documented "block this action" signal. */
+function claudeHookOutcome(message: { exit_code?: number; outcome: ProviderHookOutcome }) {
+  if (message.outcome === 'error' && message.exit_code === 2) return 'blocked'
+
+  return message.outcome
 }

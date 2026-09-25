@@ -105,3 +105,25 @@ export async function openModelPickerInNewSession(page: Page) {
   await panel.waitFor({ timeout: 10_000 })
   return panel
 }
+
+/** Waits for the agent's reply marker. The prompt names it too, so the reply is the second match. */
+export async function waitForReply(page: Page, marker: string) {
+  const matches = selectors.chatMessages(page).getByText(marker)
+  const deadline = Date.now() + 120_000
+  while (Date.now() < deadline) {
+    if ((await matches.count()) >= 2) return
+    await Bun.sleep(250)
+  }
+  ok(false, `The agent never replied ${marker}`)
+}
+
+/** The composer re-mounts once the session loads, which drops text typed before it. */
+export async function typePrompt(page: Page, prompt: string) {
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    await selectors.chatMessage(page).fill(prompt)
+    await Bun.sleep(300)
+    if (await selectors.chatSend(page).isEnabled()) return
+  }
+  ok(false, 'The composer never accepted the prompt')
+
+}

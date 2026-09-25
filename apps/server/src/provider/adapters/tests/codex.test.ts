@@ -372,6 +372,11 @@ function handle(message) {
     if (mode !== 'echo-mode-params' && !assertTurnParams(message)) return;
     if (mode === 'hold-turn-start') return;
     process.stderr.write('2026-05-28T00:00:00Z INFO codex: harmless diagnostic\\n');
+    if (mode === 'hook-blocked') {
+      const run = { id: 'hook-run-1', displayOrder: 0, entries: [], eventName: 'preToolUse', executionMode: 'sync', handlerType: 'command', scope: 'turn', sourcePath: '/repo/.codex/hooks/guard.sh', startedAt: 1, status: 'running' };
+      send({ method: 'hook/started', params: { threadId: 'provider-thread-1', turnId: fakeTurn().id, run } });
+      send({ method: 'hook/completed', params: { threadId: 'provider-thread-1', turnId: fakeTurn().id, run: { ...run, status: 'blocked', entries: [{ kind: 'feedback', text: 'rm is not allowed here' }] } } });
+    }
     if (mode === 'stderr-diagnostics') {
       process.stderr.write('2026-09-07T05:01:31Z ERROR codex_api::transport: failed to connect to websocket\\n');
       process.stderr.write('Authentication required: sign in again\\n');
@@ -1055,6 +1060,31 @@ describe('CodexProviderAdapter', () => {
         }
       },
       { mode: 'local-image' },
+    )
+  })
+
+  it('maps a hook run summary to one paired, named hook with its outcome', async () => {
+    await withFakeCodex(
+      async () => {
+        const adapter = new CodexProviderAdapter()
+        const events: ProviderRuntimeEvent[] = []
+        collectAdapterEvents(adapter, events)
+        await adapter.sendTurn(providerTurnInput())
+        await settleRuntimeEvents()
+        await adapter.stopAll()
+
+        expect(events.filter((event) => event.type.startsWith('hook.'))).toMatchObject([
+          {
+            payload: { hookEvent: 'preToolUse', hookId: 'hook-run-1', hookName: 'guard.sh' },
+            type: 'hook.started',
+          },
+          {
+            payload: { hookId: 'hook-run-1', outcome: 'blocked', output: 'rm is not allowed here' },
+            type: 'hook.completed',
+          },
+        ])
+      },
+      { mode: 'hook-blocked' },
     )
   })
 

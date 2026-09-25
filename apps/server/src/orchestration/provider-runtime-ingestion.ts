@@ -68,6 +68,8 @@ export class ProviderRuntimeIngestion {
   private readonly getReadModel: (() => OrchestrationReadModel) | null
   private readonly onLiveness: ((sessionId: SessionId) => void) | null
   private readonly seenEventIds: BoundedTtlCache<string, true>
+  /** Hooks that succeeded without output, per `session:turn`: counted, never listed. */
+  private readonly silentHooks: BoundedTtlCache<string, number>
   private readonly worker: SerialWorker<ProviderRuntimeEvent>
 
   constructor(
@@ -102,6 +104,11 @@ export class ProviderRuntimeIngestion {
     this.seenEventIds = new BoundedTtlCache({
       capacity: SEEN_RUNTIME_EVENT_ID_MAX,
       now: options.now,
+      ttlMs: PROVIDER_RUNTIME_BUFFER_TTL_MS,
+    })
+    this.silentHooks = new BoundedTtlCache({
+      capacity: 10_000,
+      now: this.now,
       ttlMs: PROVIDER_RUNTIME_BUFFER_TTL_MS,
     })
     this.worker = new SerialWorker((event) => this.processEvent(event))
@@ -666,10 +673,15 @@ export class ProviderRuntimeIngestion {
   }
 
   private async dispatchActivityCommands(event: ProviderRuntimeEvent) {
+    if (this.countSilentHook(event)) return
+
     const activities = this.getReadModel?.().sessions.get(event.sessionId)?.activities ?? []
     const taskTitle =
       event.type === 'task.completed' ? taskTitleFromActivities(event, activities) : undefined
-    for (const activity of activitiesForRuntimeEvent(event, taskTitle)) {
+    for (const activity of [
+      ...activitiesForRuntimeEvent(event, taskTitle),
+      ...this.silentHookSummary(event),
+    ]) {
       await this.dispatch(
         {
           activity,
@@ -682,6 +694,70 @@ export class ProviderRuntimeIngestion {
       )
     }
   }
+
+  /** PreToolUse hooks fire on every tool call; one row each would bury the turn. */
+  private countSilentHook(event: ProviderRuntimeEvent) {
+    if (event.type !== 'hook.completed' || !isSilentHook(event.payload)) return false
+
+    const key = `${event.sessionId}:${event.turnId ?? ''}`
+    this.silentHooks.set(key, (this.silentHooks.get(key) ?? 0) + 1)
+    return true
+  }
+
+  private silentHookSummary(event: ProviderRuntimeEvent) {
+    if (event.type !== 'turn.completed') return []
+
+    const key = `${event.sessionId}:${event.turnId ?? ''}`
+    const count = this.silentHooks.get(key) ?? 0
+    this.silentHooks.delete(key)
+    if (count === 0) return []
+
+    return [
+      {
+        ...baseActivity(event, 'info', 'hook.summary', hookCountSummary(count), { count }),
+        id: v.parse(eventIdSchema, `${event.eventId}:hooks`),
+      },
+    ]
+  }
+}
+
+function isSilentHook(
+  payload: Extract<ProviderRuntimeEvent, { type: 'hook.completed' }>['payload'],
+) {
+  return payload.outcome === 'success' && !hookOutput(payload)
+}
+
+function hookOutput(payload: Extract<ProviderRuntimeEvent, { type: 'hook.completed' }>['payload']) {
+  // Claude repeats stderr inside `output`, so equal streams collapse to one.
+  const streams = [payload.output, payload.stderr, payload.stdout].map((text) => text?.trim() ?? '')
+  return [...new Set(streams)].filter(Boolean).join('\n')
+}
+
+function hookCountSummary(count: number) {
+  return count === 1 ? '1 hook ran' : `${count} hooks ran`
+}
+
+const HOOK_OUTCOME_VERBS = {
+  blocked: 'blocked',
+  cancelled: 'was cancelled',
+  error: 'failed',
+  success: 'ran',
+} as const
+
+function hookCompletedActivity(event: Extract<ProviderRuntimeEvent, { type: 'hook.completed' }>) {
+  const { payload } = event
+  const name = payload.hookName ?? 'Hook'
+  const tone = payload.outcome === 'success' ? 'info' : 'error'
+  return [
+    baseActivity(event, tone, 'hook.completed', `${name} ${HOOK_OUTCOME_VERBS[payload.outcome]}`, {
+      detail: truncateDetail(hookOutput(payload), 2_000),
+      exitCode: payload.exitCode,
+      hookEvent: payload.hookEvent,
+      hookId: payload.hookId,
+      hookName: name,
+      outcome: payload.outcome,
+    }),
+  ]
 }
 
 /**
@@ -903,6 +979,8 @@ function activitiesForRuntimeEvent(
       return contextCompactionActivity(event)
     case 'conversation.token-usage.updated':
       return tokenUsageActivity(event)
+    case 'hook.completed':
+      return hookCompletedActivity(event)
     default:
       return []
   }
