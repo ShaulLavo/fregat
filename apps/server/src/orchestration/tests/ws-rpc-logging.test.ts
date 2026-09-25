@@ -140,7 +140,11 @@ it('closes every socket with 1012 when the app shuts down, and logs it at info',
   tab.receive({ kind: 'subscribe', method: 'subscribeShell', subscriptionId, afterSequence: 0 })
   await expect.poll(() => deliveries(tab).length).toBe(1)
 
-  await closeApp(app)
+  const closing = closeApp(app)
+  const reconnect = createInProcessOrchestrationSocket(app, origin, { instance: 'tab-reconnect' })
+  expect(reconnect.messages).toEqual([])
+  expect(reconnect.closes).toEqual([{ code: 1012, reason: 'service restart' }])
+  await closing
 
   expect(tab.closes).toEqual([{ code: 1012, reason: 'service restart' }])
   const closes = eventsFor(await flushedEvents(logDir), 'chat.pipeline.ws.close')
@@ -150,6 +154,12 @@ it('closes every socket with 1012 when the app shuts down, and logs it at info',
       code: 1012,
       serverCloseReason: 'service restart',
       subscriptionCount: 1,
+    }),
+    expect.objectContaining({
+      level: 'info',
+      code: 1012,
+      serverCloseReason: 'service restart',
+      subscriptionCount: 0,
     }),
   ])
 })

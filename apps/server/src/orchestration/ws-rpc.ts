@@ -101,6 +101,7 @@ export type OrchestrationSockets = ReturnType<typeof createOrchestrationSockets>
 
 /** The open orchestration sockets, so a shutdown can announce itself before the listener stops. */
 export function createOrchestrationSockets() {
+  let closing = false
   const open = new Map<
     object,
     { socket: OrchestrationRpcWebSocket; state: OrchestrationRpcConnectionState }
@@ -108,19 +109,32 @@ export function createOrchestrationSockets() {
 
   return {
     add(socket: OrchestrationRpcWebSocket, state: OrchestrationRpcConnectionState) {
+      if (closing) {
+        closeForRestart(socket, state)
+        return false
+      }
       open.set(socket.key, { socket, state })
+      return true
     },
     delete(socket: OrchestrationRpcWebSocket) {
       open.delete(socket.key)
     },
     // 1012 is the registered "service restart"; a client logs the reconnect that follows at info.
     closeAll() {
+      closing = true
       for (const { socket, state } of [...open.values()]) {
-        state.serverCloseReason = SERVICE_RESTART_CLOSE_REASON
-        socket.close(SERVICE_RESTART_CLOSE_CODE, SERVICE_RESTART_CLOSE_REASON)
+        closeForRestart(socket, state)
       }
     },
   }
+}
+
+function closeForRestart(
+  socket: OrchestrationRpcWebSocket,
+  state: OrchestrationRpcConnectionState,
+) {
+  state.serverCloseReason = SERVICE_RESTART_CLOSE_REASON
+  socket.close(SERVICE_RESTART_CLOSE_CODE, SERVICE_RESTART_CLOSE_REASON)
 }
 
 export function orchestrationWsRoutes(
@@ -160,7 +174,7 @@ export function orchestrationWsRoutes(
         unsubscribeUpdate: noop,
       }
       states.set(socket.key, state)
-      sockets.add(socket, state)
+      if (!sockets.add(socket, state)) return
       // The handshake is pushed rather than requested so the client reaches an
       // honest `connected` phase — and can compare protocol versions — without
       // paying a round trip before it may subscribe.
