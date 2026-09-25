@@ -2,6 +2,7 @@ import { useIsMutating } from '@tanstack/react-query'
 import type { ConnectionError } from '@workspace/contracts'
 import { Button } from '@workspace/ui/components/button'
 import { Spinner } from '@workspace/ui/components/spinner'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { useEnvironmentConnections } from '@/hooks/use-environment-connections'
 import { primaryQueryClient } from '@/lib/environments/state/query-clients'
 import { serverUpdateLabel } from '@/lib/environments/utils/connection-notice'
@@ -36,16 +37,26 @@ export function ServerUpdateButton({
     if (await connections.updateServer(name)) onUpdated?.()
   }
 
-  return (
-    <Button
-      size={size}
-      variant='secondary'
-      disabled={updating}
-      aria-label={`${action} on ${label}`}
-      onClick={() => void update()}
-    >
+  const buttonProps = {
+    size,
+    variant: 'secondary',
+    disabled: updating,
+    'aria-label': `${action} on ${label}`,
+    onClick: () => void update(),
+  } as const
+  const content = (
+    <>
       {updating ? <Spinner /> : null}
       {action}
-    </Button>
+    </>
+  )
+  // A development primary builds its working tree before it installs anything.
+  if (!import.meta.env.DEV) return <Button {...buttonProps}>{content}</Button>
+
+  return (
+    <Tooltip>
+      <TooltipTrigger render={<Button {...buttonProps} />}>{content}</TooltipTrigger>
+      <TooltipContent>Builds this working tree and installs it on {label}</TooltipContent>
+    </Tooltip>
   )
 }

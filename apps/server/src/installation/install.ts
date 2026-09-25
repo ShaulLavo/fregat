@@ -6,7 +6,7 @@ import { createStructuredError } from '../observability/structured-errors'
 import { shellQuote } from '../utils/shell'
 import {
   installationSchema,
-  RELEASE_ENV,
+  releaseEnv,
   releaseEntry,
   releaseServerRoot,
   type ReleaseInstallation,
@@ -79,7 +79,7 @@ exec ${executable} --env-file=.env apps/server/src/index.ts "$@"
 // State lives under the remote user's ~/.platform, so a release takes no .env.
 export function releaseLauncherSource(installation: ReleaseInstallation) {
   const entry = shellQuote(releaseEntry(installation))
-  const env = Object.entries(RELEASE_ENV)
+  const env = Object.entries(releaseEnv(installation))
     .map(([name, value]) => `${name}=${shellQuote(value)}`)
     .join(' ')
   const executable = shellQuote(installation.executable)

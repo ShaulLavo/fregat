@@ -137,18 +137,20 @@ test('a refusal is published with its catalog code and the event records it', as
   })
 })
 
-test('a server running from source keeps the checkout fix and refuses to update', async () => {
+test('a server running from source looks for its own dev channel and offers to build its tree', async () => {
   const { home } = await outdatedMachine()
   const ssh = localSsh({ home })
-  const { launcher, events } = updateLauncher(ssh, releaseSource(import.meta.dirname))
+  const { launcher } = updateLauncher(ssh, releaseSource(import.meta.dirname))
   const blocked = await launcher.connectMachine('fixture')
-  expect(blocked).toMatchObject({ lastError: { code: 'machines.SSH_PROTOCOL' } })
-  expect('lastError' in blocked && blocked.lastError.fix).not.toBe(updateFix)
-  expect(await launcher.updateMachine('fixture')).toMatchObject({
-    lastError: { code: 'machines.SSH_UPDATE_NOT_A_RELEASE' },
+  expect(blocked).toMatchObject({
+    lastError: {
+      code: 'machines.SSH_NOT_INSTALLED',
+      fix: 'Select Install server to build this working tree and put it on that machine.',
+    },
   })
-  expect(probes(ssh.commands)).toBe(0)
-  expect(updateEvent(events)).toMatchObject({ step: 'source', outcome: 'failed' })
+  expect(ssh.commands.some((command) => command.includes('platform-server-dev --describe'))).toBe(
+    true,
+  )
 })
 
 test('an update resolves the machine from settings and rejects an unknown name', async () => {

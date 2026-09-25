@@ -8,6 +8,7 @@ import { reserveForwardPort } from '../src/machines/forward'
 import { shellQuote } from '../src/utils/shell'
 import { installServerLauncher } from '../src/installation/install'
 import { localOpenSsh, sshPassphrase, waitUntil } from './factories/openssh'
+import { releaseSource } from '../src/machines/update'
 
 const descriptor = {
   ok: true,
@@ -49,6 +50,7 @@ const service = new MachineService({
     fixture: { kind: 'ssh', target: 'fixture', remotePort: ssh.port },
   }),
   fetcher: Object.assign(async () => Response.json(descriptor), { preconnect: fetch.preconnect }),
+  releaseSource: releaseSource('/platform-test/no-release/server'),
 })
 const prompts = new Map<string, MachineAuthPrompt | null>()
 const secretPrompts: string[] = []

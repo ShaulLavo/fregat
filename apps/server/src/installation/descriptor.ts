@@ -17,6 +17,8 @@ export const releaseInstallationSchema = v.object({
     v.check((value) => path.posix.basename(value) === RELEASE_CURRENT_LINK),
   ),
   executable: absolutePath,
+  /** A development build's own state root; a production release uses the user's ~/.platform. */
+  stateHome: v.optional(absolutePath),
 })
 
 export const installationSchema = v.variant('kind', [
@@ -37,7 +39,12 @@ export function releaseServerRoot(installation: ReleaseInstallation) {
 }
 
 /** Every release starts this way, whether from `platform-server` or the SSH launch script. */
-export const RELEASE_ENV = { NODE_ENV: 'production', BUN_ENV: 'production' } as const
+const RELEASE_ENV = { NODE_ENV: 'production', BUN_ENV: 'production' } as const
+
+export function releaseEnv(installation: ReleaseInstallation): Readonly<Record<string, string>> {
+  if (!installation.stateHome) return RELEASE_ENV
+  return { ...RELEASE_ENV, PLATFORM_HOME: installation.stateHome }
+}
 
 export function releaseEntry(installation: ReleaseInstallation) {
   return path.posix.join(installation.directory, 'server', 'index.js')

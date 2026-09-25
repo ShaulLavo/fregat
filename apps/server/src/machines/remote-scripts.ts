@@ -2,13 +2,14 @@ import path from 'node:path'
 import { ORCHESTRATION_WS_PROTOCOL_VERSION, type SshMachineDefinition } from '@workspace/contracts'
 import type { RemoteRecord } from './records'
 import {
-  RELEASE_ENV,
+  releaseEnv,
   releaseEntry,
   releaseServerRoot,
   type ServerInstallation,
 } from '../installation/descriptor'
 import { REMOTE_SUPPORT } from '../installation/release-files'
 import { shellQuote } from '../utils/shell'
+import type { UpdateChannel } from './update'
 
 type LaunchOptions = {
   machine: SshMachineDefinition
@@ -28,12 +29,14 @@ type RemoteLayout = {
   protocolSource: string
 }
 
-export function probeCommand() {
-  return `if command -v platform-server >/dev/null 2>&1; then
-  exec platform-server --describe
+/** A development primary probes its own channel's launcher, so it never takes production's. */
+export function probeCommand(channel: UpdateChannel = 'prod') {
+  const launcher = channel === 'dev' ? 'platform-server-dev' : 'platform-server'
+  return `if command -v ${launcher} >/dev/null 2>&1; then
+  exec ${launcher} --describe
 fi
-if test -x "$HOME/.local/bin/platform-server"; then
-  exec "$HOME/.local/bin/platform-server" --describe
+if test -x "$HOME/.local/bin/${launcher}"; then
+  exec "$HOME/.local/bin/${launcher}" --describe
 fi
 printf '%s\\n' '{"code":"machines.SSH_NOT_INSTALLED","message":"Platform server is not installed for this SSH user."}' >&2
 exit 127`
@@ -62,7 +65,7 @@ import { healthDescriptorSchema } from './packages/contracts/src/health.ts';`,
     workingDirectory: releaseServerRoot(installation),
     imports: `import { createError, healthDescriptorSchema, ORCHESTRATION_WS_PROTOCOL_VERSION as releaseProtocol } from ${JSON.stringify(support)};`,
     entry: [releaseEntry(installation)],
-    env: RELEASE_ENV,
+    env: releaseEnv(installation),
     protocolSource: 'async function installedProtocol() { return releaseProtocol; }',
   }
 }

@@ -282,7 +282,9 @@ export function createSshLauncher(options: LauncherOptions) {
     connection.machine = machine
     event.target = machine.target
     const installation = parseInstallation(
-      await step(event, 'probe', () => command(connection, machine, probeCommand(), 'probe')),
+      await step(event, 'probe', () =>
+        command(connection, machine, probeCommand(supply.channel), 'probe'),
+      ),
     )
     if (connection.installation && connection.installation.directory !== installation.directory) {
       await cleanup(connection)
@@ -391,7 +393,7 @@ export function createSshLauncher(options: LauncherOptions) {
     event.error = errorMessage(error)
     event.errorCode = lastError.code
     event.errorInternal = isEvlogError(error) ? error.internal : undefined
-    const updateFix = releaseUpdateFix(lastError.code, event.errorInternal)
+    const updateFix = releaseUpdateFix(lastError.code, event.errorInternal, supply.channel)
     if (updateFix && (await supply.available())) lastError.fix = updateFix
     if (lastError.code === 'machines.SSH_IDENTITY') event.step = 'identity'
     if (lastError.code === sshProtocolCode) event.step = 'protocol'

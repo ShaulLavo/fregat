@@ -8,23 +8,40 @@ import { releaseLauncherSource } from '../installation/install'
 import { missingReleaseFiles, RUNTIME_MANIFEST } from '../installation/release-files'
 import { shellQuote } from '../utils/shell'
 import { runSsh, type SshSpawner } from './forward'
+import { buildWorkingTree } from './dev-build'
 import { createSshError, updateErrors } from './structured-errors'
 
 /** The release to install: its local directory holds `server/`, and `name` is its directory. */
-export type ReleaseSource = { directory: string; name: string; manifestSha: string }
+export type ReleaseSource = {
+  directory: string
+  name: string
+  manifestSha: string
+  origin: 'release' | 'dev-build'
+  buildMs?: number
+  bundleBytes?: number
+}
 
-/** Where an update's release comes from; the one seam a development build would replace. */
+/** A production primary ships its release; a development primary builds and ships its tree. */
+export type UpdateChannel = 'prod' | 'dev'
+
+/** Where an update's release comes from, and which channel on the remote it installs into. */
 export type ReleaseSupply = {
+  channel: UpdateChannel
   available(): Promise<boolean>
   prepare(): Promise<ReleaseSource>
 }
 
-/** Where a channel keeps its releases and launcher, relative to the remote home. */
-type UpdateChannel = { serverRoot: string; launcher: string }
+/** Where a channel keeps its releases, launcher and state, relative to the remote home. */
+type ChannelLayout = { serverRoot: string; launcher: string; stateHome?: string }
 
-const productionChannel: UpdateChannel = {
-  serverRoot: '.platform/server',
-  launcher: '.local/bin/platform-server',
+// A development build installs beside production, never over it, and keeps its own state.
+const channels: Record<UpdateChannel, ChannelLayout> = {
+  prod: { serverRoot: '.platform/server', launcher: '.local/bin/platform-server' },
+  dev: {
+    serverRoot: '.platform/server/dev',
+    launcher: '.local/bin/platform-server-dev',
+    stateHome: '.platform-dev',
+  },
 }
 
 export type UpdateStep =
@@ -42,6 +59,10 @@ export type UpdateEvent = {
   directory?: string
   fromRelease?: string | null
   toRelease?: string
+  channel?: UpdateChannel
+  source?: ReleaseSource['origin']
+  buildMs?: number
+  bundleBytes?: number
   platform?: string
   bunVersion?: string | null
   bytesSent: number
@@ -63,9 +84,14 @@ const requiredBun = rootPackage.packageManager.replace(/^bun@/, '')
 const longStepMs = 600_000
 
 // A bundled server's own directory is `<release>/server` (Bun resolves the `current` or `pending`
-// link it was started through); a source server's never is.
-export function releaseSource(serverDirectory: string = import.meta.dirname): ReleaseSupply {
+// link it was started through). A server running from source builds its working tree instead.
+export function releaseSource(
+  serverDirectory: string = import.meta.dirname,
+  build: () => Promise<ReleaseSource> = buildWorkingTree,
+): ReleaseSupply {
+  if (path.basename(serverDirectory) !== 'server') return devBuildSupply(build)
   return {
+    channel: 'prod',
     available: async () => (await bundledRelease(serverDirectory)).directory !== null,
     async prepare() {
       const { directory, missing } = await bundledRelease(serverDirectory)
@@ -75,13 +101,28 @@ export function releaseSource(serverDirectory: string = import.meta.dirname): Re
         directory,
         name: path.basename(directory),
         manifestSha: createHash('sha256').update(manifest).digest('hex'),
+        origin: 'release',
       }
     },
   }
 }
 
+// Two updates at once share one build: both would otherwise write apps/server/dist.
+function devBuildSupply(build: () => Promise<ReleaseSource>): ReleaseSupply {
+  let running: Promise<ReleaseSource> | null = null
+  return {
+    channel: 'dev',
+    available: async () => true,
+    prepare() {
+      running ??= build().finally(() => {
+        running = null
+      })
+      return running
+    },
+  }
+}
+
 async function bundledRelease(serverDirectory: string) {
-  if (path.basename(serverDirectory) !== 'server') return { directory: null, missing: null }
   const missing = await missingReleaseFiles(serverDirectory)
   const directory = path.dirname(serverDirectory)
   if (missing.length > 0 || !releaseNamePattern.test(path.basename(directory)))
@@ -101,9 +142,14 @@ export async function timed<T>(event: UpdateEvent, step: UpdateStep, action: () 
 
 /** Puts the release on the remote, then points `current` and the launcher at it. */
 export async function installRelease(remote: Remote, supply: ReleaseSupply, event: UpdateEvent) {
+  const channel = channels[supply.channel]
+  event.channel = supply.channel
   const source = await timed(event, 'source', () => supply.prepare())
   event.toRelease = source.name
-  const probe = await timed(event, 'probe', () => probeRemote(remote, source.name))
+  event.source = source.origin
+  event.buildMs = source.buildMs
+  event.bundleBytes = source.bundleBytes
+  const probe = await timed(event, 'probe', () => probeRemote(remote, channel, source.name))
   event.directory = probe.serverRoot
   event.platform = probe.platform
   event.bunVersion = probe.bunVersion
@@ -117,7 +163,13 @@ export async function installRelease(remote: Remote, supply: ReleaseSupply, even
     installRuntime(remote, { bun, serverRoot: probe.serverRoot, source }),
   )
   event.pruned = await timed(event, 'swap', () =>
-    swap(remote, { bun, home: probe.home, serverRoot: probe.serverRoot, name: source.name }),
+    swap(remote, {
+      bun,
+      home: probe.home,
+      serverRoot: probe.serverRoot,
+      name: source.name,
+      channel,
+    }),
   )
 }
 
@@ -132,8 +184,8 @@ const probeReportSchema = v.object({
 
 type Probe = Awaited<ReturnType<typeof probeRemote>>
 
-async function probeRemote(remote: Remote, name: string) {
-  const result = await runSsh({ ...remote, script: probeScript(productionChannel, name) })
+async function probeRemote(remote: Remote, channel: ChannelLayout, name: string) {
+  const result = await runSsh({ ...remote, script: probeScript(channel, name) })
   if (result.exitCode !== 0)
     throw createSshError('probe', result.stderr.trim().slice(0, 2000) || undefined)
   const report = v.safeParse(probeReportSchema, reportFields(result.stdout))
@@ -142,7 +194,7 @@ async function probeRemote(remote: Remote, name: string) {
   const { home, platform, bun, bunVersion, current, present } = report.output
   return {
     home,
-    serverRoot: path.posix.join(home, productionChannel.serverRoot),
+    serverRoot: path.posix.join(home, channel.serverRoot),
     platform,
     bun: bun || null,
     bunVersion: /^\d+\.\d+\.\d+/.exec(bunVersion)?.[0] ?? null,
@@ -174,7 +226,7 @@ function requireBun(probe: Probe) {
   return probe.bun
 }
 
-function probeScript(channel: UpdateChannel, name: string) {
+function probeScript(channel: ChannelLayout, name: string) {
   return `home=$HOME
 case "$home" in /*) ;; *) printf '%s\\n' 'HOME is not an absolute path.' >&2; exit 2 ;; esac
 root="$home"/${shellQuote(channel.serverRoot)}
@@ -256,7 +308,13 @@ async function installRuntime(remote: Remote, options: RuntimeOptions) {
   return v.parse(v.object({ reused: v.boolean() }), JSON.parse(result.stdout.trim())).reused
 }
 
-type SwapOptions = { bun: string; home: string; serverRoot: string; name: string }
+type SwapOptions = {
+  bun: string
+  home: string
+  serverRoot: string
+  name: string
+  channel: ChannelLayout
+}
 
 /** Swaps `current` atomically, writes the release launcher, then prunes all but two releases. */
 async function swap(remote: Remote, options: SwapOptions) {
@@ -264,10 +322,13 @@ async function swap(remote: Remote, options: SwapOptions) {
     kind: 'release',
     directory: path.posix.join(options.serverRoot, 'current'),
     executable: options.bun,
+    stateHome: options.channel.stateHome
+      ? path.posix.join(options.home, options.channel.stateHome)
+      : undefined,
   })
   const script = swapScript({
     name: options.name,
-    launcher: path.posix.join(options.home, productionChannel.launcher),
+    launcher: path.posix.join(options.home, options.channel.launcher),
     launcherSource: releaseLauncherSource(installation),
   })
   const result = await runSsh({

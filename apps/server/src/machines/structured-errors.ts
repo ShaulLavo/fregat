@@ -3,6 +3,7 @@ import { defineErrorCatalog } from 'evlog'
 import * as v from 'valibot'
 import { createStructuredError, isEvlogError } from '../observability/structured-errors'
 import type { ServerInstallation } from '../installation/descriptor'
+import type { UpdateChannel } from './update'
 
 const machineErrors = defineErrorCatalog('machines', {
   SSH_DISCOVERY: {
@@ -75,8 +76,14 @@ const machineErrors = defineErrorCatalog('machines', {
   SSH_UPDATE_NOT_A_RELEASE: {
     status: 409,
     message: 'This Platform server has no release to install on another machine.',
-    why: 'An update copies the running server’s own release with its runtime manifest. A server started from a checkout has none, and an older release lacks the manifest.',
-    fix: 'Deploy this server with bun run deploy --server and update from it, or update the Platform checkout on that machine by hand.',
+    why: 'An update copies the running server’s own release with its runtime manifest, and this release was built before releases carried one.',
+    fix: 'Deploy this server with bun run deploy --server, then press Update server again.',
+  },
+  SSH_UPDATE_BUILD: {
+    status: 500,
+    message: 'This working tree did not build.',
+    why: 'A development server builds apps/server from its working tree before it installs it on another machine, and that build failed.',
+    fix: 'Fix the error bun run --cwd apps/server build reports, then press Update server again.',
   },
   SSH_UPDATE_NO_BUN: {
     status: 412,
@@ -108,6 +115,7 @@ const machineErrors = defineErrorCatalog('machines', {
 /** The refusals and failures of an update; each carries what the remote reported in `internal`. */
 export const updateErrors = {
   notARelease: machineErrors.SSH_UPDATE_NOT_A_RELEASE,
+  build: machineErrors.SSH_UPDATE_BUILD,
   noBun: machineErrors.SSH_UPDATE_NO_BUN,
   oldBun: machineErrors.SSH_UPDATE_OLD_BUN,
   transfer: machineErrors.SSH_UPDATE_TRANSFER,
@@ -213,23 +221,36 @@ function externalFix(port: number, installation: ProtocolReport['installation'])
   return `Restart the Platform server on remote port ${port} from a checkout at this server’s version, then Retry.`
 }
 
-const installFix = 'Select Install server to put this server’s release on that machine.'
-const updateFix =
-  'Select Update server to install this server’s release on that machine and reconnect.'
+const updateFixes = {
+  prod: {
+    install: 'Select Install server to put this server’s release on that machine.',
+    update: 'Select Update server to install this server’s release on that machine and reconnect.',
+  },
+  dev: {
+    install: 'Select Install server to build this working tree and put it on that machine.',
+    update:
+      'Select Update server to build this working tree, install it on that machine and reconnect.',
+  },
+}
 
 /**
  * The fix that names the update button, when this server can ship a release and installing it
  * would clear `error`: never for an external server, a newer remote or one other leases hold.
  */
-export function releaseUpdateFix(code: string, internal: Record<string, unknown> | undefined) {
-  if (code === machineErrors.SSH_NOT_INSTALLED.code) return installFix
+export function releaseUpdateFix(
+  code: string,
+  internal: Record<string, unknown> | undefined,
+  channel: UpdateChannel,
+) {
+  const fixes = updateFixes[channel]
+  if (code === machineErrors.SSH_NOT_INSTALLED.code) return fixes.install
   if (code !== sshProtocolCode) return null
   const report = v.safeParse(protocolInternalSchema, internal)
   if (!report.success) return null
   const { expected, running, installed, kind, otherLeases } = report.output
   if (kind === 'external' || (otherLeases ?? 0) > 0) return null
   if ((installed ?? running) > expected) return null
-  return updateFix
+  return fixes.update
 }
 
 const protocolInternalSchema = v.object({

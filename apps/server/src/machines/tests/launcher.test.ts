@@ -5,6 +5,7 @@ import {
   descriptorValue,
   fakeSsh,
   machine,
+  noRelease,
   releaseInstallation,
   sourceInstallation,
   test,
@@ -122,6 +123,7 @@ test('releases a failed forwarding handle before publishing offline for a retry'
     spawn: fixture.spawn,
     fetcher: fixture.fetcher,
     localPort: fixture.localPort,
+    releaseSource: noRelease,
     publish: () => {},
     forward: async (options) => {
       const forward = await openForward(options)

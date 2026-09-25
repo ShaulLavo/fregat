@@ -8,11 +8,15 @@ import {
   type Machines,
 } from '@workspace/contracts'
 import { createSshLauncher } from '../../src/machines/launcher'
+import { releaseSource } from '../../src/machines/update'
 import { parseDescriptor, type RemoteRecord } from '../../src/machines/records'
 import { reserveForwardPort, type SshChild, type SshSpawner } from '../../src/machines/forward'
 import { MachineService } from '../../src/machines/service'
 import type { ReleaseInstallation, ServerInstallation } from '../../src/installation/descriptor'
 import { REMOTE_SUPPORT } from '../../src/installation/release-files'
+
+/** A production primary with no release to ship, as tests run the server from source. */
+export const noRelease = releaseSource('/platform-test/no-release/server')
 
 export const descriptorValue = {
   ok: true,
@@ -109,6 +113,7 @@ export async function fakeSsh(
       return previous ?? 51078
     },
     record: (action, fields) => events.push({ action, fields }),
+    releaseSource: noRelease,
   })
   cleanups.push(launcher.close)
   return {
@@ -140,6 +145,7 @@ export async function sshServiceFixture(options: Parameters<typeof fakeSsh>[0] =
     spawn: boundary.spawn,
     fetcher: boundary.fetcher,
     localPort: boundary.localPort,
+    releaseSource: noRelease,
   })
   cleanups.push(() => service.close())
   return {

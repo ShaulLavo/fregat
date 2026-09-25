@@ -269,3 +269,24 @@ and to Plan 152.
 - Shipping `bun` itself, Windows remotes, and automatic updates. Updating is always an explicit
   action.
 - The web build on the remote.
+
+## Development builds (was Plan 152, done 2026-09-25)
+
+A primary running from source (`bun dev`) has no release, so Update server builds one:
+`buildWorkingTree()` (`apps/server/src/machines/dev-build.ts`) runs the `apps/server` build, copies
+`dist` to `<PLATFORM_HOME>/outgoing/dev-<stamp>-<commit>[-dirty]/server`, writes the runtime
+manifest through the same module deploy uses, and keeps the newest two builds. Concurrent updates
+share one build. Decisions D1–D4 as recommended (completion wave):
+
+- **Channel.** A development build installs beside production: `~/.platform/server/dev` with its own
+  `releases/`, `current`, `runtime/` and lease state, and `~/.local/bin/platform-server-dev`. A
+  development primary probes `platform-server-dev`, so the mesh and `bun dev` never overwrite each
+  other's server; a machine with only production installed reads "not installed" to a dev primary.
+- **State.** The dev launcher and launch script set `PLATFORM_HOME=~/.platform-dev`.
+- **Name.** `dev-<stamp>-<commit>[-dirty]`, so `/release` through the machine's proxy names the tree.
+- The fix copy and the button's tooltip say the working tree is built. The wide event carries
+  `channel`, `source: 'dev-build'`, `buildMs` and `bundleBytes`; a failed build is
+  `machines.SSH_UPDATE_BUILD` with the build log tail in `internal`.
+
+Owner check pending: from `bun dev`, Update server on `shaul-mac` goes live and its `/release`
+names the `dev-…` build while the mesh's connection keeps its production release.

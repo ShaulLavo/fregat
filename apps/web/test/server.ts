@@ -10,6 +10,7 @@ import {
   migratePlatformDatabase,
   MockProviderAdapter,
   ProviderAdapterRegistry,
+  releaseSource,
   testSettingsOptions,
   type AppOptions,
   type MetadataDatabaseHandle,
@@ -100,7 +101,12 @@ export async function makeTestServer({
       workspaceEditDriver,
       workspaceEditJournalRoot,
       workspaceRoot: root,
-      machines: { tailnetStatusCommand: async () => '{"BackendState":"Stopped"}', ...machines },
+      machines: {
+        tailnetStatusCommand: async () => '{"BackendState":"Stopped"}',
+        // Tests run the server from source; they stand for a production primary with no release.
+        releaseSource: releaseSource('/platform-test/no-release/server'),
+        ...machines,
+      },
     })
 
   let app = buildApp()

@@ -218,15 +218,47 @@ test('a bun older than the repository’s is refused with bun upgrade', async ()
   })
 })
 
-test('a server running from source has no release to ship', async () => {
-  const { home } = await updateFixture()
-  const source = releaseSource(import.meta.dirname)
-  expect(await source.available()).toBe(false)
-  const attempt = install(home, source)
-  await expect(attempt).rejects.toMatchObject({
-    code: 'machines.SSH_UPDATE_NOT_A_RELEASE',
-    internal: { serverDirectory: import.meta.dirname },
+test('a server running from source ships a build of its tree on the dev channel', async () => {
+  let builds = 0
+  const supply = releaseSource(import.meta.dirname, async () => {
+    builds++
+    await Bun.sleep(10)
+    return { directory: '/built', name: 'dev-x', manifestSha: 'sha', origin: 'dev-build' }
   })
+  expect(supply.channel).toBe('dev')
+  expect(await supply.available()).toBe(true)
+  const [first, second] = await Promise.all([supply.prepare(), supply.prepare()])
+  expect(first).toBe(second)
+  expect(builds).toBe(1)
+})
+
+test('a dev build installs beside production with its own launcher and state', async () => {
+  const { home, local, serverRoot } = await updateFixture()
+  await install(home, await shippableRelease(local, 'first'))
+  const built = await shippableRelease(local, 'dev-20260925T000000Z-abcdef12-dirty')
+  const devSupply: ReleaseSupply = { ...built, channel: 'dev' }
+  const { event } = await install(home, devSupply)
+
+  const devRoot = path.join(serverRoot, 'dev')
+  expect(event).toMatchObject({ channel: 'dev', directory: devRoot, fromRelease: null })
+  expect(await readlink(path.join(devRoot, 'current'))).toBe(
+    'releases/dev-20260925T000000Z-abcdef12-dirty',
+  )
+  expect(await readlink(path.join(serverRoot, 'current'))).toBe('releases/first')
+  expect(await describeLauncher(home)).toMatchObject({
+    directory: path.join(serverRoot, 'current'),
+  })
+  const dev = await runRemoteCommand(
+    `HOME=${JSON.stringify(home)} ${JSON.stringify(path.join(home, '.local/bin/platform-server-dev'))} --describe`,
+  )
+  expect(JSON.parse(dev.stdout)).toEqual({
+    kind: 'release',
+    directory: path.join(devRoot, 'current'),
+    executable: process.execPath,
+    stateHome: path.join(home, '.platform-dev'),
+  })
+  const source = await readFile(path.join(home, '.local/bin/platform-server-dev'), 'utf8')
+  expect(source).toContain(`PLATFORM_HOME='${path.join(home, '.platform-dev')}'`)
 })
 
 test('a failing runtime install reports its log tail and keeps current', async () => {
