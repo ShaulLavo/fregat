@@ -1,7 +1,9 @@
-import { mkdir, readdir, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, realpath, rm, rmdir } from 'node:fs/promises'
 import path from 'node:path'
 import type { GitCloneProgressEvent, GitCloneStage } from '@workspace/contracts'
+import type { WorkspacePaths } from '../fs/path'
 import { recordRequestContext } from '../observability'
+import { renameExclusive } from './utils/rename-exclusive'
 import { maybeStat } from './utils/worktree-paths'
 
 /** A repository slow to transfer is healthy; one that never finishes is not. */
@@ -21,30 +23,58 @@ const STAGES: ReadonlyArray<[RegExp, GitCloneStage]> = [
  * so a half-cloned folder never becomes one. Ported from upstream `SourceControlRepositoryService`.
  */
 export async function* cloneRepository(input: {
+  paths: WorkspacePaths
+  signal?: AbortSignal
   source: string
   destination: string
   /** The destination as the client names it; the result carries this. */
   displayPath: string
   register: (absolutePath: string) => Promise<string | null>
 }): AsyncGenerator<GitCloneProgressEvent> {
+  const destination = await resolveCloneDestination(input.paths, input.destination)
+  const existing = await maybeStat(destination)
   const url = cloneUrl(input.source)
-  const refusal = await destinationRefusal(input.destination)
+  const refusal = await destinationRefusal(destination)
   if (refusal) {
     yield { kind: 'failed', message: refusal }
     return
   }
-  const existed = (await maybeStat(input.destination)) !== null
-  await mkdir(path.dirname(input.destination), { recursive: true })
+  await mkdir(path.dirname(destination), { recursive: true })
   yield { kind: 'progress', stage: 'connecting', percent: null }
-  const child = Bun.spawn(['git', 'clone', '--progress', '--', url, input.destination], {
-    cwd: path.dirname(input.destination),
+  if (input.signal?.aborted) return
+  const staging = await mkdtemp(path.join(path.dirname(destination), '.platform-clone-'))
+  try {
+    yield* cloneIntoOwnedDirectory(input, url, destination, staging, existing)
+  } finally {
+    await rm(staging, { recursive: true, force: true })
+  }
+}
+
+async function* cloneIntoOwnedDirectory(
+  input: Parameters<typeof cloneRepository>[0],
+  url: string,
+  destination: string,
+  staging: string,
+  existing: Awaited<ReturnType<typeof maybeStat>>,
+): AsyncGenerator<GitCloneProgressEvent> {
+  const child = Bun.spawn(['git', 'clone', '--progress', '--', url, staging], {
+    cwd: path.dirname(destination),
     env: { ...process.env, GIT_PROGRESS_DELAY: '0', GIT_TERMINAL_PROMPT: '0', LC_ALL: 'C' },
     stdin: 'ignore',
     stdout: 'ignore',
     stderr: 'pipe',
+    detached: true,
   })
-  const timer = setTimeout(() => child.kill(), CLONE_TIMEOUT_MS)
-  let finished = false
+  const abort = () => {
+    try {
+      process.kill(-child.pid, 'SIGKILL')
+    } catch {
+      child.kill('SIGKILL')
+    }
+  }
+  input.signal?.addEventListener('abort', abort, { once: true })
+  if (input.signal?.aborted) abort()
+  const timer = setTimeout(abort, CLONE_TIMEOUT_MS)
   const tail: string[] = []
   try {
     for await (const line of progressLines(child.stderr)) {
@@ -65,14 +95,18 @@ export async function* cloneRepository(input: {
       }
       return
     }
-    finished = true
+    if (input.signal?.aborted) return
   } finally {
     clearTimeout(timer)
-    if (child.exitCode === null) child.kill()
-    // Cancelled or failed: the folder goes back to how it was found.
-    if (!finished) await discard(input.destination, existed)
+    input.signal?.removeEventListener('abort', abort)
+    if (child.exitCode === null) abort()
+    await child.exited
   }
-  const projectId = await input.register(input.destination)
+  if (!(await publishClone(staging, destination, existing))) {
+    yield { kind: 'failed', message: 'That destination changed while cloning.' }
+    return
+  }
+  const projectId = await input.register(destination)
   yield { kind: 'result', path: input.displayPath, projectId }
 }
 
@@ -101,15 +135,35 @@ async function destinationRefusal(destination: string) {
   return null
 }
 
-async function discard(destination: string, existed: boolean) {
-  if (!existed) {
-    await rm(destination, { recursive: true, force: true })
-    return
+async function publishClone(
+  staging: string,
+  destination: string,
+  existing: Awaited<ReturnType<typeof maybeStat>>,
+) {
+  if (!existing) return renameExclusive(staging, destination)
+  const current = await maybeStat(destination)
+  if (!current || current.ino !== existing.ino || current.dev !== existing.dev) return false
+  try {
+    // rmdir refuses concurrent files; the exclusive rename refuses a replacement directory.
+    await rmdir(destination)
+  } catch {
+    return false
   }
-  // An empty folder the user chose stays; only what the clone wrote goes.
-  for (const entry of await readdir(destination).catch(() => [])) {
-    await rm(path.join(destination, entry), { recursive: true, force: true })
+  return renameExclusive(staging, destination)
+}
+
+async function resolveCloneDestination(
+  paths: WorkspacePaths,
+  destination: string,
+): Promise<string> {
+  const entry = await maybeStat(destination)
+  if (entry) {
+    const resolved = await realpath(destination)
+    paths.assertRealInside(resolved)
+    return resolved
   }
+  const parent = await resolveCloneDestination(paths, path.dirname(destination))
+  return path.join(parent, path.basename(destination))
 }
 
 /** Git separates progress updates with carriage returns and lines with newlines. */

@@ -1,4 +1,5 @@
-import { mkdir, mkdtemp, readdir, rm, stat, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, rm, stat, symlink, writeFile } from 'node:fs/promises'
+import { createServer, type Socket } from 'node:net'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import type { GitCloneProgressEvent } from '@workspace/contracts'
@@ -59,6 +60,20 @@ describe('clone', () => {
     expect(await exists(path.join(root, 'projects/copy/readme.md'))).toBe(true)
   })
 
+  it('publishes exactly one of two concurrent clones', async () => {
+    const { root, source, git } = await workspace()
+    const first = git.cloneProgress({ source, destination: 'race' }, async () => 'first')
+    const second = git.cloneProgress({ source, destination: 'race' }, async () => 'second')
+    await Promise.all([first.next(), second.next()])
+    const outcomes = await Promise.all([collect(first), collect(second)])
+    expect(outcomes.flat().filter((event) => event.kind === 'result')).toHaveLength(1)
+    expect(outcomes.flat().filter((event) => event.kind === 'failed')).toHaveLength(1)
+    expect(await runGit(path.join(root, 'race'), ['status', '--porcelain'])).toBe('')
+    expect((await readdir(root)).filter((entry) => entry.startsWith('.platform-clone-'))).toEqual(
+      [],
+    )
+  })
+
   it('refuses a folder with files and leaves it as it was', async () => {
     const { root, source, git } = await workspace()
     await mkdir(path.join(root, 'taken'))
@@ -82,6 +97,73 @@ describe('clone', () => {
     expect(events.at(-1)?.kind).toBe('failed')
     expect(registered).toBe(false)
     expect(await exists(path.join(root, 'broken'))).toBe(false)
+  })
+
+  it('preserves a destination populated after validation when cloning fails', async () => {
+    const { root, git } = await workspace()
+    const stream = git.cloneProgress(
+      { source: path.join(root, 'missing'), destination: 'raced' },
+      async () => null,
+    )
+    await stream.next()
+    await mkdir(path.join(root, 'raced'))
+    await writeFile(path.join(root, 'raced/keep.txt'), 'owned elsewhere')
+    await collect(stream)
+    expect(await readdir(path.join(root, 'raced'))).toEqual(['keep.txt'])
+  })
+
+  it('rejects destination ancestors that escape through a symlink', async () => {
+    const { root, source } = await workspace()
+    const outside = await workspace()
+    await symlink(outside.root, path.join(root, 'link'))
+    const git = new GitService(createWorkspacePaths(root), {
+      maxTextFileBytes: DEFAULT_MAX_TEXT_FILE_BYTES,
+    })
+    await expect(
+      collect(git.cloneProgress({ source, destination: 'link/new/copy' }, async () => null)),
+    ).rejects.toThrow()
+    expect(await exists(path.join(outside.root, 'new'))).toBe(false)
+  })
+
+  it('aborts a spawned git process while stderr is stalled', async () => {
+    const { root, git } = await workspace()
+    const connected = Promise.withResolvers<void>()
+    const disconnected = Promise.withResolvers<void>()
+    let connection: Socket | undefined
+    const server = createServer((socket) => {
+      connection = socket
+      socket.once('data', () => connected.resolve())
+      socket.once('end', () => socket.end())
+      socket.once('close', () => disconnected.resolve())
+    })
+    server.listen(0, '127.0.0.1')
+    await new Promise<void>((resolve) => server.once('listening', resolve))
+    const address = server.address()
+    expect(address).toBeTypeOf('object')
+    if (!address || typeof address === 'string') return
+    const abort = new AbortController()
+    const stream = git.cloneProgress(
+      { source: `git://127.0.0.1:${address.port}/stalled`, destination: 'cancelled' },
+      async () => 'never',
+      abort.signal,
+    )
+    try {
+      await stream.next()
+      const pending = stream.next()
+      await connected.promise
+      abort.abort()
+      await pending
+      await stream.return(undefined)
+      await disconnected.promise
+      expect(await exists(path.join(root, 'cancelled'))).toBe(false)
+      expect((await readdir(root)).filter((name) => name.startsWith('.platform-clone-'))).toEqual(
+        [],
+      )
+    } finally {
+      abort.abort()
+      connection?.destroy()
+      server.close()
+    }
   })
 
   it('a cancelled clone removes what it wrote and keeps an empty folder the user chose', async () => {

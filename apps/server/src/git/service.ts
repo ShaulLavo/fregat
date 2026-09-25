@@ -668,10 +668,13 @@ export class GitService {
   cloneProgress(
     body: { source: string; destination: string },
     register: (absolutePath: string) => Promise<string | null>,
+    signal?: AbortSignal,
   ) {
     recordGitServiceOperation('clone', body.destination)
     const destination = this.resolveServicePath(body.destination)
     return cloneRepository({
+      paths: this.paths,
+      signal,
       source: body.source,
       destination: destination.absolutePath,
       displayPath: destination.relativePath,

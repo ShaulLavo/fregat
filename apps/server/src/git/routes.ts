@@ -150,9 +150,12 @@ export function gitRoutes(
         '/clone-stream',
         ({ body, request }) =>
           sseResponse(
-            toSse(git.cloneProgress(body, options.registerClone ?? (async () => null)), {
-              event: (event) => event.kind,
-            }),
+            toSse(
+              git.cloneProgress(body, options.registerClone ?? (async () => null), request.signal),
+              {
+                event: (event) => event.kind,
+              },
+            ),
             request.signal,
           ),
         { body: gitCloneBodySchema },
