@@ -11,6 +11,8 @@ import {
   createPullRequest,
   readBranchPullRequests,
   readPullRequest,
+  resolvePullRequest,
+  readPullRequestsByNumber,
 } from '../pull-request'
 import type { GitProcessResult } from '../utils/process'
 
@@ -110,6 +112,8 @@ describe('GitHub', () => {
       'gh',
       'pr',
       'list',
+      '--repo',
+      remote,
       '--head',
       'feature/login',
       '--state',
@@ -138,6 +142,7 @@ describe('GitHub', () => {
     ).resolves.toMatchObject({ kind: 'created', pullRequest: { number: 42 } })
     const create = forge.calls.find((call) => call.argv[2] === 'create')
     expect(create?.argv).toContain('--draft')
+    expect(create?.argv).toEqual(expect.arrayContaining(['--repo', remote]))
   })
 
   it.each([
@@ -278,6 +283,8 @@ describe('GitLab', () => {
       'glab',
       'mr',
       'list',
+      '--repo',
+      remote,
       '--source-branch',
       'feature',
       '--all',
@@ -306,7 +313,15 @@ describe('GitLab', () => {
       ),
     ).resolves.toMatchObject({ kind: 'created', pullRequest: { number: 5, state: 'open' } })
     expect(forge.calls.find((call) => call.argv[2] === 'create')?.argv).toEqual(
-      expect.arrayContaining(['--source-branch', 'feature', '--target-branch', 'main', '--draft']),
+      expect.arrayContaining([
+        '--repo',
+        remote,
+        '--source-branch',
+        'feature',
+        '--target-branch',
+        'main',
+        '--draft',
+      ]),
     )
   })
 
@@ -709,4 +724,133 @@ describe('repository creation', () => {
       body: JSON.stringify({ scm: 'git', is_private: false }),
     })
   })
+})
+
+describe('owner review regressions', () => {
+  it.each([
+    ['bitbucket', 'github.com'],
+    ['bitbucket', 'bitbucket.internal'],
+    ['bitbucket', 'bitbucket.org\nhost=github.com'],
+    ['github', 'gitlab.com'],
+    ['github', 'github.com/path'],
+    ['gitlab', 'user@gitlab.com'],
+  ] satisfies [GitPublishRequest['forge'], string][])(
+    'rejects publishing %s on %s before asking for credentials',
+    async (kind, host) => {
+      const forge = boundary('', () => ok('username=me\npassword=secret\n'))
+      await expect(
+        createForgeRepository(
+          {
+            forge: kind,
+            host,
+            repository: 'owner/repo',
+            visibility: 'private',
+          },
+          await checkout(),
+          forge,
+        ),
+      ).rejects.toThrow('host')
+      expect(forge.calls).toEqual([])
+    },
+  )
+
+  it('probes the overridden forge even when the checkout forge is cached as ready', async () => {
+    const cwd = await checkout()
+    const forge = boundary('https://github.com/acme/repo.git', (argv) => {
+      if (argv[0] === 'glab') return 'missing'
+      if (argv[1] === 'auth') return ok()
+      if (argv[2] === 'list') return json([])
+      return undefined
+    })
+    await readPullRequest({ cwd, branch: 'feature' }, forge)
+    await expect(
+      resolvePullRequest({ cwd, number: 1, remoteUrl: 'https://gitlab.com/team/repo.git' }, forge),
+    ).rejects.toThrow('command-line tool is not installed')
+  })
+
+  it('bounds Forgejo history scans and preserves unknown absence', async () => {
+    let pages = 0
+    const forge = boundary('https://codeberg.org/owner/repo.git', (argv) => {
+      if (argv[1] === 'login') return json([{ name: 'codeberg', url: 'https://codeberg.org' }])
+      pages += 1
+      if (pages > 6) return json([])
+      return json(
+        Array.from({ length: 50 }, (_, index) => ({
+          number: pages * 50 + index,
+          title: 'Other',
+          state: 'closed',
+          html_url: `https://codeberg.org/owner/repo/pulls/${pages * 50 + index}`,
+          head: { ref: 'other' },
+        })),
+      )
+    })
+    await expect(
+      readBranchPullRequests({ cwd: await checkout(), branches: ['absent'] }, forge),
+    ).rejects.toThrow('lookup limit')
+    expect(pages).toBeLessThanOrEqual(5)
+  })
+
+  it('checks out an Azure fork from its source repository at the reported commit', async () => {
+    const source = 'https://dev.azure.com/org/project/_git/fork'
+    const commit = 'a'.repeat(40)
+    const forge = boundary('https://dev.azure.com/org/project/_git/repo', (argv) => {
+      if (argv[1] === 'account') return ok()
+      if (argv[3] !== 'show') return undefined
+      return json({
+        pullRequestId: 17,
+        title: 'Fork',
+        status: 'active',
+        repository: { webUrl: 'https://dev.azure.com/org/project/_git/repo' },
+        sourceRefName: 'refs/heads/feature',
+        targetRefName: 'refs/heads/main',
+        forkSource: {
+          name: 'refs/heads/feature',
+          objectId: commit,
+          repository: { remoteUrl: source },
+        },
+      })
+    })
+    const { detail } = await resolvePullRequest({ cwd: await checkout(), number: 17 }, forge)
+    expect(detail).toMatchObject({
+      crossRepository: true,
+      headFetchRef: 'refs/heads/feature',
+      headSource: { url: source, commit },
+    })
+  })
+})
+
+it('reads distinct pinned GitHub requests in one repository query', async () => {
+  const forge = boundary('https://github.com/acme/repo.git', (argv) => {
+    if (argv[1] === 'auth') return ok()
+    if (argv[1] !== 'api') return undefined
+    return json({
+      data: {
+        repository: {
+          p0: {
+            number: 12,
+            title: 'A',
+            url: 'https://github.com/acme/repo/pull/12',
+            state: 'OPEN',
+            isDraft: false,
+            closedAt: null,
+          },
+          p1: {
+            number: 13,
+            title: 'B',
+            url: 'https://github.com/acme/repo/pull/13',
+            state: 'MERGED',
+            isDraft: false,
+            closedAt: null,
+          },
+        },
+      },
+    })
+  })
+  const found = await readPullRequestsByNumber(
+    { cwd: await checkout(), remoteUrl: 'https://github.com/acme/repo.git', numbers: [12, 13, 12] },
+    forge,
+  )
+  expect([...found.keys()]).toEqual([12, 13])
+  expect(forge.calls.filter((call) => call.argv[1] === 'api')).toHaveLength(1)
+  expect(forge.calls.at(-1)?.argv).toEqual(expect.arrayContaining(['-F', 'n0=12', '-F', 'n1=13']))
 })

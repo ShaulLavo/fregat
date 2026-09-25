@@ -1,7 +1,7 @@
 import type { WorktreeId } from '@workspace/contracts'
 
 /** Dependency installs are slow and healthy; a setup that never exits is not. */
-const SETUP_TIMEOUT_MS = 30 * 60_000
+export const SETUP_TIMEOUT_MS = 30 * 60_000
 const OUTPUT_LINES = 40
 const LINE_LENGTH = 400
 const ANSI = new RegExp(String.raw`\u001b\[[0-9;?]*[ -/]*[@-~]`, 'g')
@@ -13,7 +13,7 @@ export type SetupOutcome = {
 }
 
 type Control = { cancelled: boolean; killTimer: ReturnType<typeof setTimeout> | null }
-type Running = { child: Bun.Subprocess; control: Control; finished: Promise<SetupOutcome> }
+type Running = { child: Bun.Subprocess | null; control: Control; finished: Promise<SetupOutcome> }
 
 /**
  * Runs a project's setup script in a worktree as a process this server owns: one at a time per
@@ -30,10 +30,27 @@ export class SetupRunner {
   run(
     worktreeId: WorktreeId,
     input: { command: string; worktreePath: string; projectRoot: string },
+    beforeSpawn: () => Promise<unknown>,
   ): Promise<SetupOutcome> {
     const existing = this.running.get(worktreeId)
     if (existing) return existing.finished
-    const child = Bun.spawn(['sh', '-c', input.command], {
+    const control: Control = { cancelled: false, killTimer: null }
+    const finished = Promise.resolve()
+      .then(async (): Promise<SetupOutcome> => {
+        await beforeSpawn()
+        if (control.cancelled) return { state: 'cancelled', exitCode: null, output: [] }
+        const child = this.spawn(input)
+        entry.child = child
+        return this.watch(child, control)
+      })
+      .finally(() => this.running.delete(worktreeId))
+    const entry: Running = { child: null, control, finished }
+    this.running.set(worktreeId, entry)
+    return entry.finished
+  }
+
+  private spawn(input: { command: string; worktreePath: string; projectRoot: string }) {
+    return Bun.spawn(['sh', '-c', input.command], {
       cwd: input.worktreePath,
       env: {
         ...process.env,
@@ -51,10 +68,6 @@ export class SetupRunner {
       // Its own process group, so a cancel reaches whatever the script started.
       detached: true,
     })
-    const control: Control = { cancelled: false, killTimer: null }
-    const finished = this.watch(worktreeId, child, control)
-    this.running.set(worktreeId, { child, control, finished })
-    return finished
   }
 
   /** Stops a running setup and waits for it to be gone. */
@@ -62,7 +75,7 @@ export class SetupRunner {
     const entry = this.running.get(worktreeId)
     if (!entry) return
     entry.control.cancelled = true
-    terminate(entry.child, entry.control)
+    if (entry.child) terminate(entry.child, entry.control)
     await entry.finished
   }
 
@@ -71,7 +84,6 @@ export class SetupRunner {
   }
 
   private async watch(
-    worktreeId: WorktreeId,
     child: Bun.Subprocess<'ignore', 'pipe', 'pipe'>,
     control: Control,
   ): Promise<SetupOutcome> {
@@ -85,7 +97,6 @@ export class SetupRunner {
     } finally {
       clearTimeout(timer)
       if (control.killTimer) clearTimeout(control.killTimer)
-      this.running.delete(worktreeId)
     }
   }
 }

@@ -5,6 +5,7 @@ import {
   type OrchestrationCommand,
   type OrchestrationEvent,
   type WorktreePullRequest,
+  type GitPullRequest,
 } from '@workspace/contracts'
 import type { BranchPullRequests } from '../git/pull-request'
 import { recordProcessInfo, recordProcessWarning } from '../observability'
@@ -18,10 +19,11 @@ export type BranchPullRequestLookup = (input: {
 }) => Promise<BranchPullRequests>
 
 type Options = {
-  lookupIdentity?: (
+  lookupIdentities?: (
     worktree: OrchestrationProjectedWorktree,
-    identity: { remoteUrl: string; number: number },
-  ) => Promise<WorktreePullRequest>
+    remoteUrl: string,
+    numbers: readonly number[],
+  ) => Promise<ReadonlyMap<number, GitPullRequest>>
   lookup: BranchPullRequestLookup
   dispatch: (command: OrchestrationCommand) => Promise<unknown>
   getReadModel: () => OrchestrationReadModel
@@ -149,9 +151,25 @@ export class PullRequestSyncReactor {
       ({ worktree }) => worktree.pullRequest?.status === 'found' && worktree.pullRequest.identity,
     )
     let pinnedChanged = 0
-    for (const candidate of pinned) pinnedChanged += await this.syncIdentity(projectId, candidate)
+    const identities = new Map<string, Candidate[]>()
+    for (const candidate of pinned) {
+      const known = candidate.worktree.pullRequest
+      if (known?.status !== 'found' || !known.identity) continue
+      const key = known.identity.remoteUrl
+      const group = identities.get(key) ?? []
+      group.push(candidate)
+      identities.set(key, group)
+    }
+    for (const group of identities.values()) {
+      const result = await this.syncIdentity(projectId, group)
+      pinnedChanged += result.changed
+      if (result.failed) return { changed: pinnedChanged, failed: true }
+    }
     candidates = candidates.filter((candidate) => !pinned.includes(candidate))
-    if (candidates.length === 0) return { changed: pinnedChanged, failed: false }
+    if (candidates.length === 0) {
+      this.backoff.delete(projectId)
+      return { changed: pinnedChanged, failed: false }
+    }
     const heads = await Promise.all(candidates.map((candidate) => this.headOf(candidate)))
     let answer: BranchPullRequests
     try {
@@ -167,21 +185,50 @@ export class PullRequestSyncReactor {
     }
     this.backoff.delete(projectId)
     const byBranch = new Map(candidates.map((candidate, index) => [candidate.branch, heads[index]]))
-    const changed = await this.apply(candidates, (branch) =>
+    const changed = await this.apply(candidates, ({ branch }) =>
       pullRequestFor(answer, byBranch.get(branch) ?? branch),
     )
     return { changed: changed + pinnedChanged, failed: false }
   }
 
-  private async syncIdentity(projectId: string, candidate: Candidate) {
-    const known = candidate.worktree.pullRequest
-    if (known?.status !== 'found' || !known.identity || !this.options.lookupIdentity) return 0
+  private async syncIdentity(projectId: string, candidates: readonly Candidate[]) {
+    const candidate = candidates[0]
+    const known = candidate?.worktree.pullRequest
+    if (
+      !candidate ||
+      known?.status !== 'found' ||
+      !known.identity ||
+      !this.options.lookupIdentities
+    )
+      return { changed: 0, failed: false }
     try {
-      const answer = await this.options.lookupIdentity(candidate.worktree, known.identity)
-      return await this.apply([candidate], () => answer)
+      const numbers = candidates.flatMap(({ worktree }) =>
+        worktree.pullRequest?.status === 'found' && worktree.pullRequest.identity
+          ? [worktree.pullRequest.identity.number]
+          : [],
+      )
+      const answers = await this.options.lookupIdentities(
+        candidate.worktree,
+        known.identity.remoteUrl,
+        [...new Set(numbers)],
+      )
+      const changed = await this.apply(candidates, ({ worktree }) => {
+        const held = worktree.pullRequest
+        if (held?.status !== 'found' || !held.identity) return { status: 'unknown' }
+        const answer = answers.get(held.identity.number)
+        return answer
+          ? {
+              status: 'found',
+              ...answer,
+              closedAt: answer.closedAt ?? null,
+              identity: held.identity,
+            }
+          : held
+      })
+      return { changed, failed: false }
     } catch (error) {
       this.recordFailure(projectId, error)
-      return 0
+      return { changed: 0, failed: true }
     }
   }
 
@@ -200,13 +247,14 @@ export class PullRequestSyncReactor {
 
   private async apply(
     candidates: readonly Candidate[],
-    answer: (branch: string) => WorktreePullRequest,
+    answer: (candidate: Candidate) => WorktreePullRequest,
   ) {
     let changed = 0
-    for (const { worktree, branch } of candidates) {
+    for (const candidate of candidates) {
+      const { worktree, branch } = candidate
       const current = this.options.getReadModel().worktrees.get(worktree.id)
       if (!jsonEqual(current?.pullRequest, worktree.pullRequest)) continue
-      const pullRequest = answer(branch)
+      const pullRequest = answer(candidate)
       this.lastSyncedAt.set(worktree.id, this.now())
       if (jsonEqual(worktree.pullRequest, pullRequest)) continue
       try {

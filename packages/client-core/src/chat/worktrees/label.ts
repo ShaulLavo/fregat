@@ -65,6 +65,8 @@ export function worktreeSetupLabel(setup: WorktreeSetup | null) {
       return setup.exitCode === null
         ? `${setup.name} failed`
         : `${setup.name} exited ${setup.exitCode}`
+    case 'skipped':
+      return `${setup.name} skipped`
     case 'cancelled':
       return `${setup.name} stopped`
     default:

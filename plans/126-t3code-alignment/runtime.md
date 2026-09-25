@@ -69,6 +69,7 @@ Upstream paths shortened to `provider/…` or `orchestration/…` in tables mean
 
 ### RUNTIME-02 — Add the four missing production provider drivers
 
+- Decided 2026-09-25: owner — build all four drivers (Cursor, Grok, OpenCode, Antigravity). Smoke-test each where an account exists; otherwise ship it marked "untested". Missing accounts no longer block the row.
 - **Status / priority / confidence:** Confirmed feature gap; P1 under full-alignment mandate; HIGH.
 - **Evidence:** Upstream `apps/server/src/provider/builtInDrivers.ts:23-28,49-55` registers Codex, Claude, Cursor, Grok, OpenCode and Antigravity. Local `apps/server/src/provider/drivers/built-in.ts:17` registers Codex and Claude only. The local mock is test-only, and generic multi-instance types do not implement another runtime.
 - **Impact:** Users of the four other upstream providers cannot execute, resume or configure those providers here.

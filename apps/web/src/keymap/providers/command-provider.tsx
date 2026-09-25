@@ -119,7 +119,9 @@ export function CommandProvider({ children }: { readonly children: ReactNode }) 
   // The folder a clone lands beside; null while the dialog is closed.
   const [cloneParent, setCloneParent] = useState<string | null>(null)
   // The checkout a pull request session forks from; null while that dialog is closed.
-  const [pullRequestRoot, setPullRequestRoot] = useState<string | null>(null)
+  const [pullRequestDialog, setPullRequestDialog] = useState<{ rootPath: string | null } | null>(
+    null,
+  )
   const [environmentDialog, setEnvironmentDialog] = useState<
     'switch' | 'connect' | 'disconnect' | null
   >(null)
@@ -281,7 +283,7 @@ export function CommandProvider({ children }: { readonly children: ReactNode }) 
     shell: {
       showEnvironmentDialog: setEnvironmentDialog,
       showStartPullRequestSession: () =>
-        setPullRequestRoot(workspace.getState().rootFolder?.path ?? null),
+        setPullRequestDialog({ rootPath: workspace.getState().rootFolder?.path ?? null }),
       showCloneRepository: () =>
         setCloneParent(parentPath(workspace.getState().rootFolder?.path ?? '')),
       showMachines: () => {
@@ -429,12 +431,12 @@ export function CommandProvider({ children }: { readonly children: ReactNode }) 
           onCloned={(path) => void adaptersRef.current.openWorkspaceRoot(workspaceRoot(path))}
         />
       ) : null}
-      {pullRequestRoot !== null ? (
+      {pullRequestDialog !== null ? (
         <StartPullRequestSessionDialog
           open
-          rootPath={pullRequestRoot}
+          rootPath={pullRequestDialog.rootPath}
           onOpenChange={(open) => {
-            if (!open) setPullRequestRoot(null)
+            if (!open) setPullRequestDialog(null)
           }}
         />
       ) : null}

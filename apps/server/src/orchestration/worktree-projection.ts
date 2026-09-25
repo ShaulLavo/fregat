@@ -140,6 +140,7 @@ function provision(
   const payload = event.payload
   const row = {
     ...payload,
+    ...(payload.setup ? { setupJson: JSON.stringify(payload.setup) } : {}),
     registrationGeneration: 0,
     kind: 'linked' as const,
     ownership: 'platform' as const,

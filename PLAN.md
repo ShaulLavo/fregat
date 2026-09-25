@@ -122,11 +122,13 @@ the delivered shared runtime and has not started.
 ## Document contribution refactor
 
 [Plan 099](plans/099-document-contributions.md) is proposed; implementation has not started.
+Decided 2026-09-25: owner — units 0–1 are approved to start; units 2–7 stay gated as the plan says.
 It extends Editor's existing buffer owner with one committed-revision publication path and a
 document contribution runtime. Tree-sitter, Shiki, minimap, and language-service adapters share
 source synchronization while retaining typed APIs, independent queues, and domain-specific data.
 Text delivery uses ordinary strings/chunks and incremental edits in the existing separate workers.
 The syntax migration removes SAB text transport while preserving atomic cancellation and packed results.
+Decided 2026-09-25: owner — the SAB transport is deleted ahead of 099 as Editor E057, a small task.
 
 Its internal order is calibrated baseline and consumer inventory, canonical publication, shared
 runtime with all syntax callers, minimap, local/external LSP, remaining ownership checks, a
@@ -135,9 +137,10 @@ can proceed independently. Public backend cutover follows completed Plan 098 the
 it does not bypass their required order. Preserve WorkspaceEdit segment publication and
 compensation, prepared adoption, and the existing input latency limits.
 
-This proposal does not reorder other lanes. Editor E009 supplies transport measurement scope and
-evidence for the strings decision. E014 parallel search must reuse this runtime if implemented.
-Shared text storage and worker consolidation are outside the refactor; E013 remains deferred research.
+This proposal does not reorder other lanes. Editor E009 supplied transport measurement scope and
+evidence for the strings decision; it is folded into 099 unit 6 (2026-09-25). E014 parallel search
+must reuse this runtime if implemented. Shared text storage and worker consolidation are outside the
+refactor; E010, E012 and E013 were closed as no-go on 2026-09-25.
 
 ## Instant workspace reload (completed 2026-09-21)
 
@@ -459,7 +462,7 @@ Suggested order (steps 1–4 done by 2026-09-23; step 5 is in progress):
    and the row-layout fast path has no equivalence test. Done: Editor `2f801f7` and `7a37f10`.
 4. [E049](../Editor/docs/architecture/e049-no-silent-misses.md), Plan 133. Done: E049 in Editor
    `f715d11`; Plan 133's four phases 2026-09-23, D1 moved to Plan 134 and closed there.
-5. [E050](../Editor/plans/e050-host-obligations-into-api.md) row by row, each unlocking its Plan 130
+5. [E050](../Editor/docs/architecture/e050-host-obligations.md) row by row, each unlocking its Plan 130
    Phase 5 item. In progress: rows re-checked 2026-09-24; row 1 (`setText` with tokens), row 5 (press
    participants), row 6 (plugin keymap context keys) and typography options (2026-09-25) done.
    Rows 8 (`onDidScroll`) and 4 (theme keys) unlock Plan 130 Phase 5 items 8 and 10; the rest are
@@ -584,8 +587,9 @@ Not in the [completion wave](docs/completion-wave.md), each for the reason given
 
 - [Plan 114](plans/114-polaron-shell.md), a desktop shell we own (tao, wry, Bun as a child). It
   needs an explicit go/no-go, and it collides with the desktop work in Plans 132 and 149.
-- [Plan 168](plans/168-flat-file-view.md), a flat file view under a chosen root. It was Editor
-  E030; all of its work is in Platform. Quick open covers most of the need.
+- Plan 168, a flat file view under a chosen root (ex-Editor E030): dropped 2026-09-25 by owner:
+  tree search covers it. Decided 2026-09-25: owner — drop it; the file tree's existing search
+  already covers the need. Its plan file is deleted; git history keeps it.
 - Plan 105 Phase 4, dropping the `/platform` route prefix. It needs service-level names in mesh,
   which no mesh task covers. The rest of Plan 105 is done and its file is deleted; the hashed-asset
   carry-forward between releases moved to Plan 109.

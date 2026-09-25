@@ -41,16 +41,27 @@ export const github: ForgeProvider = {
     return cliSupport(await gh(context, ['auth', 'status', ...hostname(context)]))
   },
   async pullRequests(context, { branches, state }) {
-    // One open branch is the header's question; `pr list` answers it without a repository name.
     const [only] = branches
     if (state === 'open' && branches.length === 1 && only !== undefined)
       return new Map([[only, await openPullRequest(context, only)]])
     return graphqlPullRequests(context, branches, state)
   },
+  async pullRequestsByNumber(context, numbers) {
+    const unique = [...new Set(numbers)]
+    const found = new Map<number, GitPullRequest>()
+    for (let start = 0; start < unique.length; start += BRANCHES_PER_QUERY) {
+      const chunk = unique.slice(start, start + BRANCHES_PER_QUERY)
+      const answers = await graphqlNumbers(context, chunk)
+      for (const answer of answers) found.set(answer.number, answer)
+    }
+    return found
+  },
   async createPullRequest(context, input) {
     const result = await gh(context, [
       'pr',
       'create',
+      '--repo',
+      context.remoteUrl,
       '--head',
       input.branch,
       '--title',
@@ -116,6 +127,8 @@ async function openPullRequest(context: ForgeContext, branch: string) {
     await gh(context, [
       'pr',
       'list',
+      '--repo',
+      context.remoteUrl,
       '--head',
       branch,
       '--state',
@@ -189,6 +202,42 @@ async function graphqlChunk(
     const node = parsed.data.repository[`b${index}`]?.nodes[0]
     return node ? toPullRequest(node) : null
   })
+}
+
+async function graphqlNumbers(context: ForgeContext, numbers: readonly number[]) {
+  const repository = ownerAndName(context)
+  const variables = numbers.map((_, index) => `$n${index}: Int!`).join(', ')
+  const fields = numbers
+    .map(
+      (_, index) =>
+        `p${index}: pullRequest(number: $n${index}) { number title url state isDraft closedAt }`,
+    )
+    .join(' ')
+  const result = requireSuccess(
+    context,
+    await gh(context, [
+      'api',
+      'graphql',
+      ...hostname(context),
+      '-f',
+      `query=query($owner: String!, $name: String!, ${variables}) { repository(owner: $owner, name: $name) { ${fields} } }`,
+      '-f',
+      `owner=${repository.owner}`,
+      '-f',
+      `name=${repository.name}`,
+      ...numbers.flatMap((number, index) => ['-F', `n${index}=${number}`]),
+    ]),
+    'graphql-numbers',
+  )
+  const parsed = parseForgeJson(
+    context,
+    v.object({
+      data: v.object({ repository: v.record(v.string(), pullRequestSchema) }),
+    }),
+    result.stdout,
+    'graphql-numbers',
+  )
+  return Object.values(parsed.data.repository).map(toPullRequest)
 }
 
 function ownerAndName(context: ForgeContext) {

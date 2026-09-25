@@ -34,3 +34,7 @@ export const mutationKeys = {
   unstageMany: (rootPath: string, paths: readonly string[]) =>
     ['git', 'mutation', rootPath, 'unstage-many', ...paths] as const,
 }
+
+export const gitRemoteMutationScope = (rootPath: string) => ({
+  id: JSON.stringify(['git', 'remote', rootPath]),
+})

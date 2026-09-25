@@ -8,7 +8,7 @@ Cross-project dependencies and execution order are authoritative in [`PLAN.md`](
 index lists executable plans only; it does not define a second roadmap.
 
 The separate [Editor backlog](../../Editor/plans/README.md) holds 55 entries covering all 28 Editor
-wishlist topics, 22 of them still executable plans, with their package/host ownership and
+wishlist topics, 15 of them still executable plans (2026-09-25), with their package/host ownership and
 dependencies. Plan 071 remains the existing syntax-retry proposal here.
 
 Before executing a plan, reconcile its drift check and line references against current source.
@@ -20,7 +20,6 @@ a bare root `bun run verify`.
 | Plan                                                                                    | State                                                                    |
 | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
 | [170 — language census for grammar and theme prefetch](170-language-census.md)          | **PROPOSED — SPLIT FROM 110 Q7**                                         |
-| [168 — flat file view under a chosen root](168-flat-file-view.md)                       | **PARKED — MOVED FROM EDITOR E030**                                      |
 | [167 — settings defaults, setting details, and copy](167-settings-and-copy.md)          | **PROPOSED — READY; D1–D4 DECIDED**                                      |
 | [166 — keyboard shortcuts, redone](166-shortcuts-editor.md)                             | **PROPOSED — RESEARCH FIRST; D1–D6 DECIDED**                             |
 | [164 — what feels right in Neon](164-what-feels-right-in-neon.md)                       | **FIRST PASS SHIPPED; METADATA SWEEP LEFT**                              |
@@ -58,7 +57,7 @@ a bare root `bun run verify`.
 | [091 — error and timing helpers](091-error-and-timing-helpers.md)                       | **PARTIAL — IDENTICAL HALVES MERGED (`becdf722`); REST OPEN**            |
 | [092 — path and URI helpers](092-path-and-uri-helpers.md)                               | **PARTIAL — IDENTICAL HALVES MERGED (`becdf722`); REST OPEN**            |
 | [093 — web React and store ceremony](093-web-react-and-store-ceremony.md)               | **PARTIAL — 3 OF 14 DONE; GUARD SWEEP AFTER 091 ITEM 1.4**               |
-| [099 — document contribution runtime](099-document-contributions.md)                    | **PROPOSED — BASELINE AND PUBLICATION FIRST**                            |
+| [099 — document contribution runtime](099-document-contributions.md)                    | **PROPOSED — UNITS 0–1 APPROVED 2026-09-25; 2–7 GATED**                  |
 | [102 — scroll and keyboard affordance](102-scroll-and-keyboard-affordance.md)           | **PROPOSED — DECISIONS D2 AND D7 NEED CONFIRMATION**                     |
 | [124 — the theme studio](124-theme-studio.md)                                           | **PROPOSED — REPLACES 117'S SURFACE; DATA STAYS**                        |
 | [122 - composable full-power plugins](122-composable-plugins.md)                        | **PROPOSED - RESEARCH AND PERFORMANCE GATES FIRST**                      |
@@ -141,9 +140,9 @@ a bare root `bun run verify`.
 - Plan 099 owns canonical Editor buffer publication and shared document synchronization through
   contributions. Baseline/publication groundwork can proceed independently. Its public cutover follows
   the completed identity and source-ownership contracts from 098 then 097. It uses strings and
-  incremental edits in the existing separate workers, removing SAB text transport with the syntax
-  migration. Editor E009 supplies measurement evidence; E013 shared storage is deferred outside
-  this refactor. E014 parallel search must reuse the runtime if implemented.
+  incremental edits in the existing separate workers. Units 0–1 are approved (owner, 2026-09-25).
+  The SAB text transport is deleted ahead of it as Editor E057; Editor E009 is folded into its unit
+  6, and E010, E012 and E013 shared storage were closed as no-go. E014 parallel search must reuse the runtime if implemented.
 
 - The required **098 → 097** order is complete. The [document model](../docs/document-and-tab-domain.md)
   and [async operation ownership](../docs/async-operation-ownership.md) references describe the

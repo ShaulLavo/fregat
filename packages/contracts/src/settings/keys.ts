@@ -205,7 +205,7 @@ export const SETTINGS_REGISTRY = {
     category: 'Chat',
     title: 'Settle inactive sessions after days',
     description:
-      'Move a session to Settled once it has had no activity for this many days. 0 turns it off.',
+      'Move a session to Settled once it has had no activity for this many days, including existing sessions. 0 turns it off.',
     keywords: ['settle', 'inactive', 'days', 'automatic'],
   }),
   'chat.autoSettleOnMerge': defineSetting({
@@ -314,7 +314,7 @@ export const SETTINGS_REGISTRY = {
     category: 'Git',
     title: 'Remove worktrees after their last session is deleted',
     description:
-      'Remove a session worktree once every session using it is deleted and has stopped. A worktree with uncommitted changes, ignored files other than node_modules, or another branch checked out stays.',
+      'Remove a session worktree once every session using it is deleted and has stopped, including earlier deletions. A worktree with uncommitted changes, ignored files other than node_modules, or another branch checked out stays.',
     keywords: ['worktree', 'cleanup', 'delete', 'remove', 'storage'],
   }),
   'git.projectWorktreeCleanupOnDelete': defineSetting({

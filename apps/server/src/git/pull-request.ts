@@ -20,7 +20,7 @@ import { runBoundedProcess } from './utils/process'
  */
 const SUPPORT_CACHE_TTL_MS = 60_000
 
-const supportByCwd = new Map<string, { at: number; support: GitPullRequestSupport }>()
+const supportByRemote = new Map<string, { at: number; support: GitPullRequestSupport }>()
 
 export type ForgeBoundaries = { run?: RunProcess; fetch?: typeof fetch }
 type Boundaries = ForgeBoundaries
@@ -126,10 +126,16 @@ async function supportedContext(
 }
 
 async function cachedSupport(context: ForgeContext) {
-  const cached = supportByCwd.get(context.cwd)
+  const key = JSON.stringify([
+    context.cwd,
+    context.forge.kind,
+    context.forge.host,
+    context.remoteUrl,
+  ])
+  const cached = supportByRemote.get(key)
   if (cached && Date.now() - cached.at < SUPPORT_CACHE_TTL_MS) return cached.support
   const support = await forgeProvider(context.forge.kind).support(context)
-  supportByCwd.set(context.cwd, { at: Date.now(), support })
+  supportByRemote.set(key, { at: Date.now(), support })
   return support
 }
 
@@ -153,10 +159,10 @@ export async function createForgeRepository(
   boundaries: Boundaries = {},
 ): Promise<CreatedRepository> {
   const host = request.host?.trim().toLowerCase() || PUBLIC_HOSTS[request.forge]
-  const forge = detectForge(`https://${host}/`) ?? { kind: request.forge, name: host, host }
+  const forge = publishForge(request.forge, host)
   const context: ForgeContext = {
     cwd,
-    forge: { ...forge, kind: request.forge },
+    forge,
     remoteUrl: '',
     remoteName: '',
     repository: request.repository.trim().replace(/^\/+|\/+$/g, ''),
@@ -199,4 +205,43 @@ export async function resolvePullRequest(
     remoteName: supported.context.remoteName,
     remoteUrl: supported.context.remoteUrl,
   }
+}
+
+function publishForge(kind: GitForgeKind, host: string): GitForge {
+  const detected = detectForge(`https://${host}/`)
+  const hostname = /^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/.test(host)
+  const mismatch = detected && detected.kind !== kind
+  const unsupported =
+    (kind === 'bitbucket' && host !== 'bitbucket.org') ||
+    (kind === 'azure-devops' && detected?.kind !== kind)
+  if (!hostname || mismatch || unsupported)
+    throw gitPullRequestErrors.FORGE_HOST_INVALID({ internal: { forge: kind } })
+  return detected ?? { kind, name: host, host }
+}
+
+export async function readPullRequestsByNumber(
+  input: { cwd: string; remoteUrl: string; numbers: readonly number[] },
+  boundaries: Boundaries = {},
+): Promise<ReadonlyMap<number, GitPullRequest>> {
+  const supported = await supportedContext(input.cwd, boundaries, input.remoteUrl)
+  if (!supported.context)
+    throw gitPullRequestErrors.FORGE_NOT_READY({
+      forge: supported.forge?.name ?? 'This repository',
+      reason: supported.support,
+      internal: { support: supported.support },
+    })
+  const context = supported.context
+  const provider = forgeProvider(context.forge.kind)
+  if (provider.pullRequestsByNumber) {
+    const found = await provider.pullRequestsByNumber(context, input.numbers)
+    if (input.numbers.every((number) => found.has(number))) return found
+    throw gitPullRequestErrors.PULL_REQUEST_RESPONSE_INVALID({
+      forge: context.forge.name,
+      internal: { at: 'missing-pinned-pull-request' },
+    })
+  }
+  const found = new Map<number, GitPullRequest>()
+  for (const number of new Set(input.numbers))
+    found.set(number, await provider.getPullRequest(context, number))
+  return found
 }

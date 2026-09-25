@@ -37,6 +37,7 @@ import {
   createPullRequest,
   readPullRequest,
   resolvePullRequest,
+  readPullRequestsByNumber,
   type ForgeBoundaries,
 } from './pull-request'
 import {
@@ -903,6 +904,14 @@ export class GitService {
     const repository = await this.requiredRepositoryLocation(path)
     return resolvePullRequest(
       { cwd: repository.rootAbsolutePath, number, remoteUrl },
+      this.forgeBoundaries,
+    )
+  }
+
+  async readPullRequestsByNumber(path: string, remoteUrl: string, numbers: readonly number[]) {
+    const repository = await this.requiredRepositoryLocation(path)
+    return readPullRequestsByNumber(
+      { cwd: repository.rootAbsolutePath, remoteUrl, numbers },
       this.forgeBoundaries,
     )
   }

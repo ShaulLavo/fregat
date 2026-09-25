@@ -77,6 +77,15 @@ export const azureDevOps: ForgeProvider = {
         ...pullRequestSchema.entries,
         sourceRefName: v.string(),
         targetRefName: v.string(),
+        forkSource: v.optional(
+          v.nullable(
+            v.object({
+              name: v.string(),
+              objectId: v.pipe(v.string(), v.regex(/^[0-9a-f]{40}$/i)),
+              repository: v.object({ remoteUrl: v.pipe(v.string(), v.url()) }),
+            }),
+          ),
+        ),
       }),
       result.stdout,
       'pr-show',
@@ -86,9 +95,16 @@ export const azureDevOps: ForgeProvider = {
       ...toPullRequest(detail),
       headRefName: head,
       baseRefName: detail.targetRefName.replace(/^refs\/heads\//, ''),
-      // Azure Repos pull requests come from branches of the same repository.
-      crossRepository: false,
-      headFetchRef: `refs/heads/${head}`,
+      crossRepository: detail.forkSource != null,
+      headFetchRef: detail.forkSource?.name ?? `refs/heads/${head}`,
+      ...(detail.forkSource
+        ? {
+            headSource: {
+              url: detail.forkSource.repository.remoteUrl,
+              commit: detail.forkSource.objectId,
+            },
+          }
+        : {}),
     }
   },
   // Azure has no visibility per repository; the project's decides, as upstream notes.
