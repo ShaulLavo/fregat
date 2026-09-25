@@ -17,6 +17,7 @@ import { onTestFinished, vi } from 'vitest'
 
 import { DiffView } from '@/features/git/components/diff-view'
 import { fetchDiff } from '@/features/git/utils/api'
+import { saveSettings } from '@/features/settings/utils/api'
 import { blobDiffQueryKey, fetchBlobDiff } from '@/features/git/utils/blob-diff-query'
 import { diffDocumentQueryKey } from '@/features/git/utils/diff-document-query'
 import {
@@ -126,6 +127,43 @@ test('an unavailable blob pair still shows the checkpoint patch, uncoloured', as
   await expectPatchOnly(view)
   expect(screen.getByRole('alert')).toBeInTheDocument()
 })
+
+test('split view colours a whitespace-only context line in the old pane from the text it draws', async ({
+  client,
+  server,
+}) => {
+  const repo = await initRepo(server.root)
+  // Line 3 is re-indented next to the line 5 edit; `git diff -w` prints it as context.
+  const edited = editedLines('second').map((text, index) => (index === 2 ? `    ${text}` : text))
+  await writeFile(path.join(repo, 'second.ts'), `${edited.join('\n')}\n`)
+  const [entry] = await fetchDiff('repo/second.ts', false, undefined, client)
+  const patch = git(repo, 'diff', '--ignore-all-space', '--', 'second.ts')
+  await writeFile(path.join(repo, 'second.ts'), 'unrelated working copy\n')
+  await useSplitView(client)
+  const view = await renderCheckpoint('checkpoint-file', [{ ...entry!, patch }])
+
+  await waitFor(() => expect(view.paintedText()).toContain(`    ${sourceLine('second', 3)}`))
+  await waitFor(() => expect(view.tokenCount()).toBeGreaterThan(0))
+  await settleSyntax()
+  expect(view.misplacedTokens()).toEqual([])
+})
+
+for (const change of ['added', 'deleted'] as const) {
+  test(`a checkpoint entry for a ${change} file parses only the side that exists`, async ({
+    client,
+    server,
+  }) => {
+    const repo = await initRepo(server.root)
+    const entry = await stagedEntry(repo, client, change)
+    const view = await renderCheckpoint('checkpoint-file', [entry])
+
+    await waitFor(() => expect(view.tokenCount()).toBeGreaterThan(0))
+    expect(view.misplacedTokens()).toEqual([])
+    // The missing side has no rows; diff syntax parses it as the empty file it is.
+    expect(view.parsedSources().filter(Boolean)).toEqual([`${lines(change).join('\n')}\n`])
+    expect(screen.queryByText(PARTIAL_NOTICE)).toBeNull()
+  })
+}
 
 async function expectPatchOnly(view: RenderedCheckpoint) {
   await waitFor(() => expect(view.paintedText()).toContain(editedLine(30)))
@@ -355,6 +393,31 @@ async function editBoth(repo: string, client: Client) {
   }
 
   return diffs
+}
+
+/** A staged add of `added.ts`, or a staged delete of `deleted.ts`, as a checkpoint entry. */
+async function stagedEntry(repo: string, client: Client, change: 'added' | 'deleted') {
+  const file = `${change}.ts`
+  await writeFile(path.join(repo, file), `${lines(change).join('\n')}\n`)
+  git(repo, 'add', file)
+  if (change === 'deleted') {
+    git(repo, 'commit', '-m', 'add deleted.ts')
+    git(repo, 'rm', '--cached', '--quiet', file)
+  }
+  const [entry] = await fetchDiff(`repo/${file}`, true, undefined, client)
+
+  return entry!
+}
+
+async function useSplitView(client: Client) {
+  await saveSettings(
+    {
+      mutationId: 'diff-syntax-split',
+      operations: [{ key: 'editor.diff.viewMode', kind: 'set', value: 'split' }],
+      target: 'user',
+    },
+    client,
+  )
 }
 
 async function initRepo(root: string) {

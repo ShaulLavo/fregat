@@ -24,6 +24,30 @@ const PATCH = [
   '',
 ].join('\n')
 
+const PATCH_ADDED = [
+  'diff --git a/a.ts b/a.ts',
+  'new file mode 100644',
+  'index 0000000..2222222',
+  '--- /dev/null',
+  '+++ b/a.ts',
+  '@@ -0,0 +1,2 @@',
+  '+one',
+  '+two',
+  '',
+].join('\n')
+
+const PATCH_DELETED = [
+  'diff --git a/a.ts b/a.ts',
+  'deleted file mode 100644',
+  'index 1111111..0000000',
+  '--- a/a.ts',
+  '+++ /dev/null',
+  '@@ -1,2 +0,0 @@',
+  '-one',
+  '-two',
+  '',
+].join('\n')
+
 const ENTRY: GitFileDiff = {
   hunks: [
     {
@@ -72,4 +96,68 @@ test('a missing side needs no text', () => {
 
   expect(file?.isPartial).toBe(false)
   expect(file?.oldLines).toEqual([])
+})
+
+test('patch hunks take the entry’s rooted paths, including a rename’s old path', () => {
+  const renamed = { ...ENTRY, oldPath: 'work/repo/old.ts', path: 'work/repo/a.ts' }
+  const [file] = editorDiffFiles([{ ...renamed, newText: NEW, oldText: OLD }], undefined, 'patch')
+  const [partial] = editorDiffFiles([renamed], undefined, 'patch')
+
+  for (const drawn of [file, partial]) {
+    expect(drawn?.path).toBe('work/repo/a.ts')
+    expect(drawn?.newPath).toBe('work/repo/a.ts')
+    expect(drawn?.oldPath).toBe('work/repo/old.ts')
+  }
+})
+
+test('a whitespace-only context line gives the old source the text the old pane draws', () => {
+  // `git diff -w` prints line 3's re-indent as context carrying its new text.
+  const reindented = OLD.replace('line 5\n', 'changed 5\n').replace('line 3\n', '    line 3\n')
+  const patch = PATCH.replace(' line 3\n', '     line 3\n')
+  const [file] = editorDiffFiles(
+    [{ ...ENTRY, newText: reindented, oldText: OLD, patch }],
+    undefined,
+    'patch',
+  )
+  const context = file?.hunks[0]?.lines.find((line) => line.oldLineNumber === 3)
+
+  expect(context?.text).toBe('    line 3')
+  expect(file?.oldLines[2]).toBe(context?.text)
+  expect(file?.oldLines[3]).toBe('line 4')
+})
+
+test('an added or deleted file keeps its patch hunks over the one side that exists', () => {
+  const [created] = editorDiffFiles(
+    [
+      {
+        ...ENTRY,
+        newText: 'one\ntwo\n',
+        oldFileMissing: true,
+        oldObjectId: undefined,
+        patch: PATCH_ADDED,
+      },
+    ],
+    undefined,
+    'patch',
+  )
+  const [deleted] = editorDiffFiles(
+    [
+      {
+        ...ENTRY,
+        newFileMissing: true,
+        newObjectId: undefined,
+        oldText: 'one\ntwo\n',
+        patch: PATCH_DELETED,
+      },
+    ],
+    undefined,
+    'patch',
+  )
+
+  expect(created?.isPartial).toBe(false)
+  expect(created?.oldLines).toEqual([])
+  expect(created?.newLines.slice(0, 2)).toEqual(['one', 'two'])
+  expect(deleted?.isPartial).toBe(false)
+  expect(deleted?.newLines).toEqual([])
+  expect(deleted?.oldLines.slice(0, 2)).toEqual(['one', 'two'])
 })

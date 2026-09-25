@@ -479,6 +479,7 @@ export const selectors = {
       .nth(index),
   historyRestore: (page: Page) => page.getByRole('button', { name: 'Restore', exact: true }),
   diffRows: (page: Page) => page.locator('.editor-diff-pane [data-editor-virtual-row]'),
+  diffPanes: (page: Page) => page.locator(diffPaneSelector),
   diffExpandRows: (page: Page) => page.locator('.editor-diff-pane .editor-diff-row-expandable'),
   diffPartialNotice: (page: Page) =>
     page.getByRole('status').filter({ hasText: 'Changed lines only.' }),

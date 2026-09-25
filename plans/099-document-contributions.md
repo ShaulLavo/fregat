@@ -121,8 +121,14 @@ The correction above landed in Platform on its own; the runtime stays parked.
 - Proof: `diff-view-syntax-source.test.tsx` failed on the partial cases before the fix, with
   rows painted from another line's tokens. `client-core` `diff-files.test.ts` failed before on the
   whitespace-policy and one-sided-text cases. `scenario checkpoint-diff-tokens` runs both states.
+- Review fixes: the drawn file takes the entry's rooted paths (the patch header holds
+  repo-relative ones), and a whitespace-only context line puts its drawn text in the old source,
+  because git `-w` prints it with its new text and the split view's old pane draws that text.
+  Tests cover added, deleted and renamed entries and a late blob answer for a previous entry;
+  the scenario also checks split view under tree-sitter and Shiki.
 - Unit 2 still owns moving the partial/complete distinction into Editor's `diffSyntax`, which
-  currently parses whatever lines it is given.
+  currently parses whatever lines it is given. A context line with a different text per side
+  also belongs there: `DiffHunkLine` carries one text.
 
 ## Chosen architecture
 

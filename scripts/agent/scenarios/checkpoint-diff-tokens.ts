@@ -5,10 +5,12 @@ import type { Page } from 'playwright'
 
 import { createGitFixture, fixtureGit, releaseFixture } from '../fixture-workspace'
 import { diffPaneSelector, selectors } from '../selectors'
-import { isolatedNativeScenario } from './native-provider-verification'
+import { isolatedNativeScenario, writeSettings } from './native-provider-verification'
 
 const FILES = ['first', 'second'] as const
 const EDITED = new Set([5, 30])
+// Re-indented next to the line 5 edit: the whitespace-ignoring turn diff prints it as context.
+const REINDENTED = 3
 
 // Neighbouring lines open with keywords of different lengths, so a token one line off is visible.
 function sourceLine(name: string, line: number) {
@@ -25,6 +27,7 @@ function fileText(name: string, edited: boolean) {
   const lines = Array.from({ length: 40 }, (_, index) => {
     const line = index + 1
     if (edited && EDITED.has(line)) return `let edited${line} = 'y'`
+    if (edited && line === REINDENTED) return `    ${sourceLine(name, line)}`
     return sourceLine(name, line)
   })
   return `${lines.join('\n')}\n`
@@ -44,10 +47,10 @@ type RowCheck = { readonly row: string; readonly covered: readonly string[] }
 export const checkpointDiffTokens = isolatedNativeScenario({
   name: 'checkpoint-diff-tokens',
   description:
-    'A turn edits lines 5 and 30 of two files; the checkpoint diff of the second file colours every row from its own source line from its complete blob pair. Run with FS_DEV_MAX_TEXT_FILE_BYTES=500 and the pair is over the text limit: the patch is drawn uncoloured under the partial notice.',
+    'A turn edits lines 5 and 30 of two files and re-indents line 3; the checkpoint diff of the second file colours every row from its own source line from its complete blob pair, stacked and then split under tree-sitter and Shiki. Run with FS_DEV_MAX_TEXT_FILE_BYTES=500 and the pair is over the text limit: the patch is drawn uncoloured under the partial notice.',
   fixture: new URL('../fixtures/native-checkpoint.mjs', import.meta.url),
   prepareWorktree: prepareFixture,
-  async drive(page, { root, step, worktreePath }) {
+  async drive(page, { orchestration, root, step, worktreePath }) {
     await writeFile(
       join(root, 'checkpoint-control.json'),
       JSON.stringify({
@@ -86,6 +89,27 @@ export const checkpointDiffTokens = isolatedNativeScenario({
     }
     await step('second-file')
     await assertAligned(page)
+    const base = orchestration.replace(/\/orchestration$/, '')
+    await writeSettings(page, base, [{ kind: 'set', key: 'editor.diff.viewMode', value: 'split' }])
+    await selectors.diffPanes(page).nth(1).waitFor({ timeout: 15_000 })
+    await waitForColouredRows(page)
+    await step('split-tree-sitter')
+    await assertAligned(page)
+    const lastStyle = await newestTokenStyle(page)
+    await writeSettings(page, base, [
+      { kind: 'set', key: 'editor.codeTheme.dark', value: 'github-dark' },
+      { kind: 'set', key: 'editor.codeTheme.light', value: 'github-light' },
+    ])
+    // Shiki paints with its own palette, and each new colour registers a newer token style.
+    await page.waitForFunction(
+      ({ last, source }) => (new Function(`return (${source})`)() as () => number)() > last,
+      { last: lastStyle, source: NEWEST_TOKEN_STYLE },
+      { timeout: 15_000 },
+    )
+    await page.waitForTimeout(500)
+    await waitForColouredRows(page)
+    await step('split-shiki')
+    await assertAligned(page)
   },
 })
 
@@ -108,6 +132,10 @@ async function assertAligned(page: Page) {
     rows.some((row) => row.row.includes('second')),
     'The diff shows the second file',
   )
+  ok(
+    rows.some((row) => row.row.startsWith('    ') && row.covered.length > 0),
+    'The re-indented context line is coloured',
+  )
   ok(misplaced.length === 0, `Rows coloured from another line: ${JSON.stringify(misplaced)}`)
 }
 
@@ -119,6 +147,18 @@ async function assertUncoloured(page: Page) {
   ok(rows.length > 4, `Expected keyword rows, found ${rows.length}`)
   ok(coloured.length === 0, `A partial patch was parsed: ${JSON.stringify(coloured)}`)
 }
+
+function newestTokenStyle(page: Page): Promise<number> {
+  return page.evaluate(
+    (source) => (new Function(`return (${source})`)() as () => number)(),
+    NEWEST_TOKEN_STYLE,
+  )
+}
+
+// Page-side source: the highest shared token style id; a new colour always gets a higher one.
+const NEWEST_TOKEN_STYLE = `() => Math.max(-1, ...[...CSS.highlights.keys()]
+  .filter((name) => name.startsWith('editor-shared-token-'))
+  .map((name) => Number(name.slice('editor-shared-token-'.length))))`
 
 function firstWord(row: string) {
   return /^\s*([A-Za-z]+)/.exec(row)?.[1] ?? ''
