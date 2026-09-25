@@ -35,7 +35,7 @@ async function withRemoteLock<T>(
   const writer = input.writable.getWriter()
   const script = `import { Database } from 'bun:sqlite';
 import { mkdir } from 'node:fs/promises';
-await mkdir(${JSON.stringify(directory)}, { recursive: true });
+await mkdir(${JSON.stringify(directory)}, { recursive: true, mode: 0o700 });
 const db = new Database(${JSON.stringify(`${directory}/${filename}`)});
 db.exec('PRAGMA busy_timeout = 600000; BEGIN IMMEDIATE');
 process.stdout.write('locked\\n');

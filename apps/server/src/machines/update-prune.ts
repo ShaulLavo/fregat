@@ -30,7 +30,7 @@ export function pruneScript(name: string, previous: string | null) {
 import path from 'node:path';
 import { Database } from 'bun:sqlite';
 ${releaseProtectionSource}
-await mkdir('.platform-ssh-launch', { recursive: true });
+await mkdir('.platform-ssh-launch', { recursive: true, mode: 0o700 });
 const lock = new Database('.platform-ssh-launch/lock.sqlite');
 lock.exec('PRAGMA busy_timeout = 10000; BEGIN IMMEDIATE');
 try { await prune(); } finally { lock.close(); }
