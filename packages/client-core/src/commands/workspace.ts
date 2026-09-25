@@ -382,6 +382,17 @@ export const workspaceCommandMetadata = {
     when: ['fileBackedTab'],
     title: 'Add selection to chat',
   }),
+  'workspace.cycleMarkdownView': defineMetadata({
+    category: 'Editor',
+    description:
+      'Show this markdown file as live preview, source beside a rendered view, or source, in turn.',
+    id: 'workspace.cycleMarkdownView',
+    execution: 'sync',
+    target: 'workspace',
+    undoCategory: 'view-only',
+    when: ['fileBackedTab'],
+    title: 'Cycle markdown view',
+  }),
   'workspace.addFileToChat': defineMetadata({
     category: 'Chat',
     description: "Mention the active file in this workspace's chat composer.",

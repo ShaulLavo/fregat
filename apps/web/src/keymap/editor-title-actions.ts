@@ -3,6 +3,7 @@ import { ColumnsIcon, RowsIcon, type Icon } from '@phosphor-icons/react'
 import type { EditorDiffViewMode } from '@/features/editor/utils/diff-view-mode'
 import type { EditorTabModel } from '@/features/workspace/utils/tab-types'
 import { commitMessageFilePath } from '@/keymap/utils/commit-message-file'
+import { isMarkdownPath } from '@/lib/markdown-mode/utils/mode'
 import { commandIcons, platformCommand } from './table'
 import type { PlatformCommandId } from './types'
 
@@ -36,6 +37,7 @@ const EDITOR_TITLE_ACTIONS: readonly EditorTitleAction[] = [
   { command: 'editor.merge-conflict.previous', when: ({ tab }) => tab.mergeConflicts },
   { command: 'editor.merge-conflict.next', when: ({ tab }) => tab.mergeConflicts },
   { command: 'workspace.toggleDiffViewMode', present: diffViewModeToggle, when: isDiffTab },
+  { command: 'workspace.cycleMarkdownView', when: isMarkdownFileTab },
 ]
 
 export function editorTitleActions(
@@ -71,6 +73,12 @@ function isDiffTab({ tab }: EditorTitleContext) {
 
   const { kind } = tab.content.document
   return kind === 'git-diff' || kind === 'compare-saved'
+}
+
+function isMarkdownFileTab({ tab }: EditorTitleContext) {
+  if (tab.content.kind !== 'document' || tab.content.document.kind !== 'file') return false
+
+  return isMarkdownPath(tab.content.document.resource.path)
 }
 
 function diffViewModeToggle({ diffViewMode }: EditorTitleContext): EditorTitlePresentation {

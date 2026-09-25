@@ -277,6 +277,12 @@
       "minimum": 8,
       "type": "integer"
     },
+    "editor.markdownView": {
+      "default": "preview",
+      "description": "How markdown files open: source text, source beside a rendered view, or rendered in place while you edit. Cycle markdown view changes one file.",
+      "enum": ["preview", "source", "split"],
+      "type": "string"
+    },
     "editor.minimap.enabled": {
       "default": true,
       "description": "Show the minimap beside the editor.",

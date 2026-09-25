@@ -7,6 +7,7 @@ export function settingRowTitle(id: SettingId): string {
 
 export function settingOptionTitle(id: SettingId, value: string): string {
   if (id === 'keybindings.preset') return value === 'vscode' ? 'VS Code' : 'Platform'
+  if (id === 'editor.markdownView') return markdownViewTitle(value)
   if (id !== 'workbench.colorTheme') return value
 
   return value.charAt(0).toUpperCase() + value.slice(1)
@@ -21,4 +22,10 @@ export function humanizeSettingId(id: string): string {
     .join(' ')
 
   return spaced.charAt(0).toUpperCase() + spaced.slice(1)
+}
+
+function markdownViewTitle(value: string) {
+  if (value === 'split') return 'Source and rendered'
+  if (value === 'source') return 'Source'
+  return 'Live preview'
 }

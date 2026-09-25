@@ -488,6 +488,17 @@ export const SETTINGS_REGISTRY = {
     visibility: 'advanced',
     keywords: ['undo', 'history', 'storage', 'budget', 'persist'],
   }),
+  'editor.markdownView': defineSetting({
+    schema: v.picklist(['source', 'split', 'preview'] as const),
+    default: 'preview',
+    scope: 'window',
+    widget: 'enum',
+    category: 'Editor',
+    title: 'Markdown view',
+    description:
+      'How markdown files open: source text, source beside a rendered view, or rendered in place while you edit. Cycle markdown view changes one file.',
+    keywords: ['markdown', 'preview', 'split', 'render'],
+  }),
   'editor.diff.viewMode': defineSetting({
     schema: v.picklist(['split', 'stacked'] as const),
     default: 'stacked',
