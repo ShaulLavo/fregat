@@ -457,8 +457,8 @@
       "type": "object"
     },
     "lsp.semanticTokens.delta": {
-      "default": false,
-      "description": "Let the proxy re-ask a delta-capable server for token deltas instead of whole files. Saves bandwidth and garbage per keystroke, not latency.",
+      "default": true,
+      "description": "Ask delta-capable language servers for only the tokens an edit changed. Saves bandwidth, parse time and garbage on every keystroke.",
       "type": "boolean"
     },
     "lsp.semanticTokens.enabled": {

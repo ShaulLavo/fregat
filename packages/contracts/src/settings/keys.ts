@@ -892,21 +892,16 @@ export const SETTINGS_REGISTRY = {
   }),
   'lsp.semanticTokens.delta': defineSetting({
     schema: v.boolean(),
-    // Off until a user has repeated the measurement on their own repository.
-    // Measured here on hashbrown 0.15.5 (`src/map.rs`, 197 KB, 11 978 tokens),
-    // twelve keystrokes 60 ms apart against rust-analyzer 1.88.0: whole-file
-    // answers cost 1.60 MB over the pipe, 14.1 ms of `JSON.parse` and 9.0 MB of
-    // heap churn; deltas cost 1.9 KB, 0.1 ms and 2.0 MB. Same latency either way
-    // — the server computes the full set and then diffs it — so this buys
-    // allocation pressure and main-thread parse time, not speed.
-    default: false,
+    // rust-analyzer on hashbrown's 197 KB map.rs, twelve keystrokes: whole files cost 1.60 MB,
+    // 14.1 ms of JSON.parse and 9.0 MB of heap; deltas cost 1.9 KB, 0.1 ms and 2.0 MB. Same latency.
+    default: true,
     // Machine scope: it governs how much a child process on this box is asked to
     // serialize, and how much garbage this box's proxy makes per keystroke.
     scope: 'machine',
     widget: 'boolean',
     category: 'Language servers',
     description:
-      'Let the proxy re-ask a delta-capable server for token deltas instead of whole files. Saves bandwidth and garbage per keystroke, not latency.',
+      'Ask delta-capable language servers for only the tokens an edit changed. Saves bandwidth, parse time and garbage on every keystroke.',
     visibility: 'advanced',
     keywords: ['lsp', 'semantic', 'tokens', 'delta', 'bandwidth', 'memory'],
   }),

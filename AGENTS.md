@@ -43,6 +43,12 @@
 - A comment earns its place by saying what the code cannot: a non-obvious constraint, the bug it prevents, why an obvious simplification is wrong. Everything else is noise.
 - No essays, no history lessons, no restating the next line in prose. If the explanation is long, the code or the name is wrong.
 
+## Copy
+
+- Copy says what a thing is and what it does, and stops there. Never write what it is not: no "…, not latency", no "rather than" or "instead of" contrast, no disclaimer clause. When the contrast holds a fact, state the fact ("same latency either way").
+- An absence that is the state itself is what the thing is: "No sessions", "Off", "Signed out".
+- Copy is every string the app shows: labels, setting descriptions, tooltips, toasts, empty states, and an error's `message`, `why` and `fix`.
+
 ## React Code
 
 - One component per file. Do not export multiple components from one component file.
