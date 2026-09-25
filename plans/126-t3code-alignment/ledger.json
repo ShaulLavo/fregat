@@ -516,9 +516,10 @@
       "report": "adjacent.md",
       "wave": "5",
       "status": "verified",
-      "evidence_level": "implementation; boundary-tests-for-every-forge and browser-verified (GitLab)",
+      "evidence_level": "scenario-verified",
       "acceptance": "adjacent.md, EXT-01, Acceptance / verification",
       "execution_evidence": [
+        "scripts/agent/scenarios/git-merge-request.ts",
         "repository-delivery.md",
         "apps/server/src/git/tests/forges.test.ts",
         "/work/tmp/fregat-evidence/20260925T130215Z-scenario-git-merge-request/"
@@ -540,9 +541,10 @@
       "report": "adjacent.md",
       "wave": "5",
       "status": "verified",
-      "evidence_level": "implementation; server-tests-and-browser-verified",
+      "evidence_level": "scenario-verified",
       "acceptance": "adjacent.md, EXT-03, Acceptance / verification",
       "execution_evidence": [
+        "scripts/agent/scenarios/git-clone-publish.ts",
         "repository-delivery.md",
         "apps/server/src/git/tests/clone.test.ts",
         "apps/server/src/git/tests/publish.test.ts",
@@ -554,10 +556,10 @@
       "title": "Match project configuration and worktree setup scripts",
       "report": "adjacent.md",
       "wave": "5",
-      "status": "open",
-      "evidence_level": "source-reviewed",
+      "status": "verified",
+      "evidence_level": "scenario-verified",
       "acceptance": "adjacent.md, EXT-04, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": ["scripts/agent/scenarios/worktree-setup-import.ts"]
     },
     {
       "id": "EXT-05",
@@ -597,9 +599,10 @@
       "report": "lifecycle.md",
       "wave": "5",
       "status": "verified",
-      "evidence_level": "implementation; server-tests-and-browser-verified",
+      "evidence_level": "scenario-verified",
       "acceptance": "lifecycle.md, LIFE-06, Acceptance / verification",
       "execution_evidence": [
+        "scripts/agent/scenarios/session-auto-settle.ts",
         "repository-delivery.md",
         "apps/server/src/orchestration/tests/session-auto-settle.test.ts",
         "/work/tmp/fregat-evidence/20260925T120806Z-scenario-session-auto-settle/"
@@ -654,6 +657,7 @@
       "evidence_level": "server sync implemented and browser-verified; row badge UI pending (lane L5)",
       "acceptance": "lifecycle.md, LIFE-14, Acceptance / verification",
       "execution_evidence": [
+        "scripts/agent/scenarios/session-pull-request-sync.ts",
         "repository-delivery.md",
         "apps/server/src/orchestration/tests/pull-request-sync.test.ts",
         "/work/tmp/fregat-evidence/20260925T115511Z-scenario-session-pull-request-sync/"
@@ -685,9 +689,10 @@
       "report": "adjacent.md",
       "wave": "5",
       "status": "verified",
-      "evidence_level": "implementation; server-tests-and-browser-verified",
+      "evidence_level": "scenario-verified",
       "acceptance": "adjacent.md, EXT-14, Acceptance / verification",
       "execution_evidence": [
+        "scripts/agent/scenarios/git-auto-pull.ts",
         "repository-delivery.md",
         "apps/server/src/git/tests/auto-pull.test.ts",
         "/work/tmp/fregat-evidence/20260925T113952Z-scenario-git-auto-pull/"
@@ -699,9 +704,10 @@
       "report": "adjacent.md",
       "wave": "5",
       "status": "verified",
-      "evidence_level": "implementation; server-tests-and-browser-verified",
+      "evidence_level": "scenario-verified",
       "acceptance": "adjacent.md, EXT-15, Acceptance / verification",
       "execution_evidence": [
+        "scripts/agent/scenarios/git-submodules-init.ts",
         "repository-delivery.md",
         "apps/server/src/orchestration/tests/worktree-submodules.test.ts",
         "/work/tmp/fregat-evidence/20260925T113220Z-scenario-git-submodules-init/"
@@ -733,9 +739,10 @@
       "report": "adjacent.md",
       "wave": "5",
       "status": "verified",
-      "evidence_level": "implementation; server-tests-and-browser-verified",
+      "evidence_level": "scenario-verified",
       "acceptance": "adjacent.md, EXT-18, Acceptance / verification",
       "execution_evidence": [
+        "scripts/agent/scenarios/session-branch-drift.ts",
         "repository-delivery.md",
         "apps/server/src/orchestration/tests/worktree-branch-drift.test.ts",
         "/work/tmp/fregat-evidence/20260925T114547Z-scenario-session-branch-drift/"
