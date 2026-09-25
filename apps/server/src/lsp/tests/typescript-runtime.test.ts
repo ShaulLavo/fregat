@@ -61,6 +61,19 @@ describe('workspace TypeScript runtime selection', () => {
     })
   })
 
+  it('skips a node_modules candidate that is a file', async () => {
+    const fixture = await typescriptRuntimeFixture({
+      ...runtimePackageFiles({ kind: 'legacy', version: '5.9.3' }),
+      'packages/app/package.json': '{}',
+      'packages/app/node_modules': '',
+    })
+    fixtures.push(fixture)
+
+    await expect(
+      resolveTypeScriptRuntime(path.join(fixture.root, 'packages/app')),
+    ).resolves.toMatchObject({ kind: 'legacy', version: '5.9.3' })
+  })
+
   it('prefers a nested package version over the hoisted version', async () => {
     const fixture = await typescriptRuntimeFixture({
       ...runtimePackageFiles({ kind: 'native', version: '7.0.2' }),
