@@ -6,8 +6,3 @@ export function fileExtension(filePath: string) {
 
   return path.extname(filePath)
 }
-
-export function fileUriForPath(filePath: string): string {
-  const normalized = filePath.replace(/^\/+/, '')
-  return `file:///${normalized.split('/').map(encodeURIComponent).join('/')}`
-}

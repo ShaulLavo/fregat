@@ -1,4 +1,5 @@
 import type { Address } from '@workspace/client-core/address/grammar'
+import { fileUriForPath } from '@workspace/contracts'
 
 export function definitionTargetFor(path: string, focus: NonNullable<Address['focus']>) {
   const line = focus.line - 1
@@ -10,6 +11,6 @@ export function definitionTargetFor(path: string, focus: NonNullable<Address['fo
       end: { character: focus.endLine ? 0 : character, line: endLine },
       start: { character, line },
     },
-    uri: `file:///${path.replace(/^\/+/, '').split('/').map(encodeURIComponent).join('/')}`,
+    uri: fileUriForPath(path),
   }
 }

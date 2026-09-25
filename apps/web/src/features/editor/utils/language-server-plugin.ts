@@ -3,7 +3,6 @@ import type { EditorTextBuffer } from '@singapore-editor/core/document'
 import { createLanguageServerDocument } from '@singapore-editor/lsp-plugin'
 import { createEditorLanguageServerStatusSource } from '@/features/editor/state/language-server-status-source'
 import type { LanguageServerDocuments } from '@/features/editor/state/language-server-documents'
-import { fileUriForPath } from '@/lib/file-uri'
 import type { LanguageServerDocumentSyncController } from '@singapore-editor/lsp-plugin/document-sync-controller'
 import type {
   LanguageServerDefinitionTarget,
@@ -21,6 +20,7 @@ import type {
 } from '@singapore-editor/lsp-plugin'
 import { createLanguageServerSetPlugin } from '@singapore-editor/lsp-plugin/websocket'
 import {
+  fileUriForPath,
   LSP_FEATURE_IDS,
   LSP_SEMANTIC_TOKENS_REFRESH,
   LSP_SERVER_EXITED,

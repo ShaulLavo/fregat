@@ -1,4 +1,4 @@
-import { documentUriToFileName, fileNameToDocumentUri } from '@singapore-editor/lsp-plugin/paths'
+import { documentUriToFileName } from '@singapore-editor/lsp-plugin/paths'
 import type {
   LanguageServerDefinitionTarget,
   LanguageServerDiagnosticSummary,
@@ -34,8 +34,4 @@ export function diagnosticTargetForUri(
   const path = documentUriToFileName(uri)?.replace(/^\/+/, '')
   if (!path) return null
   return { path, range, uri }
-}
-
-export function fileUriForPath(path: string): string {
-  return fileNameToDocumentUri(path)
 }

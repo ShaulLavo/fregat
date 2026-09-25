@@ -3,7 +3,8 @@ import type {
   LanguageServerDiagnosticSummary,
 } from '@singapore-editor/lsp-plugin/websocket'
 
-import { diagnosticMessageText, diagnosticTarget, fileUriForPath } from '@/lib/diagnostic'
+import { fileUriForPath } from '@workspace/contracts'
+import { diagnosticMessageText, diagnosticTarget } from '@/lib/diagnostic'
 import type { MarkerResource } from '@/lib/markers/store'
 
 type Diagnostic = LanguageServerDiagnosticSummary['diagnostics'][number]

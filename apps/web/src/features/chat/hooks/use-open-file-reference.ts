@@ -6,6 +6,7 @@ import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
 import { useEditorWorkspaceState } from '@/features/editor/state/workspace-state'
 import type { MarkdownFileReference } from '@/features/chat/utils/markdown-file-links'
 import { log } from '@/lib/client-logging'
+import { fileUriForPath } from '@workspace/contracts'
 
 /**
  * Opening a transcript file reference is an editor command, not a chat concern:
@@ -53,6 +54,6 @@ export function fileReferenceDefinitionTarget(reference: MarkdownFileReference) 
       end: { character: character + 1, line },
       start: { character, line },
     },
-    uri: `file:///${reference.path.replace(/^\/+/, '').split('/').map(encodeURIComponent).join('/')}`,
+    uri: fileUriForPath(reference.path),
   }
 }

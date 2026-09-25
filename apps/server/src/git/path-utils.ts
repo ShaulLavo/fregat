@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { workspaceSearchGlobPath } from '@workspace/contracts'
 import { FsError } from '../fs/errors'
 import { toPosix } from '../fs/path'
 import type { GitPathsBody } from './contracts'
@@ -39,13 +40,7 @@ export function joinPath(rootPath: string, childPath: string | undefined) {
 }
 
 export function repositoryRelativePath(rootPath: string, filePath: string) {
-  if (!rootPath) return filePath
-  if (filePath === rootPath) return ''
-
-  const prefix = `${rootPath}/`
-  if (!filePath.startsWith(prefix)) return filePath
-
-  return filePath.slice(prefix.length)
+  return workspaceSearchGlobPath(rootPath, filePath)
 }
 
 /**

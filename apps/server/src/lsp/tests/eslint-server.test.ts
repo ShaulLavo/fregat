@@ -4,7 +4,7 @@ import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { spawnCommand } from '../installers'
-import { fileUriForPath } from '../language'
+import { fileUriForPath } from '@workspace/contracts'
 import { LspSessionPool, type LspProxySocket } from '../proxy-session'
 import { lspServersFor, type LspServerMatch } from '../registry'
 

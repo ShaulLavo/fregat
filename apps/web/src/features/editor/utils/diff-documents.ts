@@ -1,4 +1,4 @@
-import { fileUriForPath as fileUri } from '@/lib/file-uri'
+import { fileUriForPath } from '@workspace/contracts'
 import type { DiffFile } from '@singapore-editor/diff'
 import { fnv1a32 } from '@workspace/client-core/address/path-hash'
 
@@ -58,7 +58,7 @@ export function diffLanguageDocuments({
   const newText = file.newLines.join('\n')
   const oldText = file.oldLines.join('\n')
 
-  const realUri = fileUri(documentPath)
+  const realUri = fileUriForPath(documentPath)
   const newUri = newSideUri(documentPath, newText, newSideIsWorkingTree, ownedText)
 
   return [
@@ -96,7 +96,7 @@ function newSideUri(
   ownedText: string | null,
 ): string {
   if (!newSideIsWorkingTree) return phantomUri(documentPath, 'new', newText)
-  if (ownedText === null || ownedText === newText) return fileUri(documentPath)
+  if (ownedText === null || ownedText === newText) return fileUriForPath(documentPath)
 
   return phantomUri(documentPath, 'new', newText)
 }
@@ -116,7 +116,7 @@ function phantomUri(documentPath: string, side: string, text: string): string {
   const stem = dot <= 0 ? name : name.slice(0, dot)
   const extension = dot <= 0 ? '' : name.slice(dot)
 
-  return fileUri(`${directory}${stem}.__diff-${side}-${textKey(text)}__${extension}`)
+  return fileUriForPath(`${directory}${stem}.__diff-${side}-${textKey(text)}__${extension}`)
 }
 
 /** FNV-1a. Not a checksum — just enough to keep two different texts from sharing a name. */

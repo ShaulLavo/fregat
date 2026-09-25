@@ -7,7 +7,7 @@ import type {
   WorkspaceSearchQuery,
   WorkspaceSearchWarningEvent,
 } from '@workspace/contracts'
-import { fuzzyRank, workspaceSearchPreview } from '@workspace/contracts'
+import { fuzzyRank, workspaceSearchGlobPath, workspaceSearchPreview } from '@workspace/contracts'
 
 import { isIgnoredPath, toPosix } from './path'
 import type { SearchMeasurementRecorder } from './search-measurement'
@@ -193,13 +193,7 @@ export function resultPath(rootRelativePath: string, output: string) {
 }
 
 export function globMatchPath(context: FindContext, relativePath: string) {
-  if (!context.root.relativePath) return relativePath
-  if (relativePath === context.root.relativePath) return ''
-
-  const prefix = `${context.root.relativePath}/`
-  if (!relativePath.startsWith(prefix)) return relativePath
-
-  return relativePath.slice(prefix.length)
+  return workspaceSearchGlobPath(context.root.relativePath, relativePath)
 }
 
 function searchContentLineText(line: string) {

@@ -7,7 +7,7 @@ import { isOutsideRoot } from '../fs/path'
 import { linkedDirectories, outermostTargets, type LinkedDirectory } from '../fs/linked-directories'
 import type { TreeWatch, TreeWatchChange, TreeWatchSource } from '../fs/tree-watch'
 import { lspErrors } from '../observability/structured-errors'
-import { fileUriForPath } from './language'
+import { fileUriForPath } from '@workspace/contracts'
 
 export const DID_CHANGE_WATCHED_FILES = 'workspace/didChangeWatchedFiles'
 

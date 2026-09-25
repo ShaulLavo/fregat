@@ -1,5 +1,5 @@
 import { lineStartOffset } from '@workspace/utils/strings'
-import { errorMessage } from '@workspace/contracts'
+import { errorMessage, fileUriForPath } from '@workspace/contracts'
 import { elapsedMs } from '@workspace/utils/timing'
 import { createInternalError, lspErrors } from '../observability/structured-errors'
 
@@ -14,7 +14,6 @@ import { isRecord } from '@workspace/utils/objects'
 import type { ChildProcessWithoutNullStreams } from 'node:child_process'
 
 import type { LspServerHandle, LspServerMatch } from './registry'
-import { fileUriForPath } from './language'
 import { LspStdioMessageReader, writeLspStdioMessage } from './stdio-rpc'
 import { DID_CHANGE_WATCHED_FILES, LspWatchedFiles, type FileEvent } from './watched-files'
 import type { TreeWatchSource } from '../fs/tree-watch'

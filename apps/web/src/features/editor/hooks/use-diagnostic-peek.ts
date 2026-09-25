@@ -2,7 +2,7 @@ import type { LanguageServerDiagnosticMarkerEvent } from '@singapore-editor/lsp-
 import { useEffect, useMemo, useRef, useSyncExternalStore } from 'react'
 
 import { createDiagnosticPeekSource } from '@/features/editor/state/diagnostic-peek-source'
-import { fileUriForPath } from '@/lib/diagnostic'
+import { fileUriForPath } from '@workspace/contracts'
 import { useFocusService } from '@/lib/focus/hooks/use-service'
 import { registeredFocusTarget, type FocusTargetToken } from '@/lib/focus/state/service'
 

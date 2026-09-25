@@ -34,7 +34,8 @@ import {
   spawnTy,
   spawnZls,
 } from './installers'
-import { fileExtension, fileUriForPath } from './language'
+import { fileExtension } from './language'
+import { fileUriForPath } from '@workspace/contracts'
 import { recordProcessInfo } from '../observability'
 import { spawnTypeScript } from './typescript/runtime'
 

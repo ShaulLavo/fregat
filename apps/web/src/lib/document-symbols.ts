@@ -1,7 +1,6 @@
-import { fileUriForPath } from '@/lib/file-uri'
 import { type LspTransportHandler } from '@singapore-editor/lsp/types'
 import { LspClient, composeWorkspaceEditClientCapabilities } from '@singapore-editor/lsp'
-import type { LspMatch } from '@workspace/contracts'
+import { fileUriForPath, type LspMatch } from '@workspace/contracts'
 
 import { connectLanguageServerSocket, type EdenServerSocket } from '@/lib/server-sockets'
 import { clientErrors } from '@/lib/structured-errors'

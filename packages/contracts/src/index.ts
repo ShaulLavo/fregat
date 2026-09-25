@@ -87,10 +87,13 @@ export {
 } from './workspace-search-preview'
 export {
   createWorkspaceSearchMatcher,
+  isWholeWordMatch,
+  workspaceSearchGlobPath,
   workspaceSearchGlobPatterns,
   type WorkspaceSearchMatcher,
   type WorkspaceSearchTextMatch,
 } from './workspace-search-match'
+export { fileUriForPath } from './file-uri'
 export {
   compareFuzzyRankedTargets,
   fuzzyRank,
@@ -871,8 +874,6 @@ export { errorMessage } from './error-fields'
 export { clampComposerCursor } from './composer-tokens'
 
 export { isProviderTurnFailureActivity } from './provider-activity'
-
-export { isWholeWordMatch } from './workspace-search-match'
 
 export { queryPieces } from './fuzzy-rank'
 

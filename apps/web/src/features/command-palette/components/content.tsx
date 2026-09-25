@@ -32,7 +32,7 @@ import {
   scopeLabelForMode,
   scopedPaletteFilter,
 } from '@/features/command-palette/utils/query'
-import { fileUriForPath } from '@/lib/file-uri'
+import { fileUriForPath } from '@workspace/contracts'
 import { ScopeChip } from '@/features/command-palette/components/scope-chip'
 import { HighlightReporter } from '@/features/command-palette/components/highlight-reporter'
 import { useRecentCommandIds } from '@/features/command-palette/hooks/use-recent-command-ids'
