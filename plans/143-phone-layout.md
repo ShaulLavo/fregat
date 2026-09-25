@@ -2,8 +2,8 @@
 
 ## Status and authorization
 
-- Status: DIRECTION APPROVED (owner, 2026-09-25); research done 2026-09-25 (see "Research
-  findings"). Next: owner answers the four questions there, then the split into executable plans.
+- Status: DIRECTION APPROVED (owner, 2026-09-25); research done and owner questions answered 2026-09-25
+  (see "Research findings"). Next: the split into executable plans.
   iPhone (WebKit) behaviour is unmeasured: Playwright WebKit does not start on this host.
 - Priority: P2. Large product question; Plan 142 (Web Push) delivers the first away-from-desk
   value without it.
@@ -191,8 +191,8 @@ not need a component rewrite.
 | File (leaf)          | the editor, read-mostly                                                                                                  | Usable: text, gutter and find work (`editor-find` passes); the find widget clips off the right edge        | Nothing beyond the frame, per the Direction                                                    |
 | Sheets               | command palette, quick open, session menu, settings dialog, toasts                                                       | Palette fits (`command-palette-type-burst` passes); settings is already full-height with safe-area padding | Palette reachable from a button, not only a chord                                              |
 
-Out of the first cut: the workbench panes, search, logs, problems, the file tree and the terminal
-(Owner question 2).
+Out of the first cut: the workbench panes, search, logs, problems and the file tree. The session
+terminal is in (Owner answer 2).
 
 **Found alongside the frame:**
 
@@ -366,9 +366,8 @@ The prerequisite is the M4 session model (§4; the earlier design is at
 `docs/environments-and-remote-plan.md@1325b003`). Once sessions exist, the origin check stops being
 the whole guard.
 
-Recommendation: pairing ships with the first client or path that does not already sit behind
-tailnet identity, meaning the native app or direct LAN. It does not ship with the phone web shell,
-which the mesh serves only to tailnet devices. See Owner question 3.
+Decided (Owner answer 3): pairing is required and is part of the phone work, after the M4
+session model.
 
 ### Q6: native app technology
 
@@ -386,24 +385,24 @@ and reuses every screen above.
 Recommendation, for the later decision: Expo / React Native if the native app gets its own
 screens, because the chat state it needs already exists as runtime-neutral TypeScript. Consider
 the Orca-style wrapper around the phone web shell first; if it covers push and pairing, the app
-may never need its own screens. Choose SwiftUI only if the app should share `EditorCore` for
-native code viewing, which the Direction leaves to the web app.
+may never need its own screens. With both iPhone and Android as targets (Owner answer 4),
+SwiftUI drops out.
 
-### Owner questions
+### Owner answers (2026-09-25)
 
-1. **First screen.** A: always the session list, with deep links opening a session directly (T3,
-   Orca). B: resume the last session (Paseo). Recommendation: A. The phone's job is triage, and a
-   notification tap already lands on the session.
-2. **Terminal on the phone web app.** The Direction names chat, light review and viewing code. A:
-   no terminal in the first cut. B: a read-only terminal as a level-3 screen. C: an interactive
-   terminal. Recommendation: A. `lib/keep-alive` still parks desktop terminals across a shell
-   switch, so nothing is lost.
-3. **When pairing ships.** A: with the phone web shell. B: with the first client or path outside
-   the tailnet (the native app or direct LAN). Recommendation: B. The mesh already admits only
-   tailnet devices; pairing needs the M4 session model and adds nothing there yet.
-4. **Which phones.** Is the target iPhone only, or Android too? This decides whether SwiftUI stays
-   a real option, and whether WebKit testing needs a device before the first phone plan lands.
-   Recommendation: say which phone you carry; it changes only the native decision.
+1. **First screen: the session list.** A notification tap or a shared link still opens its
+   session directly.
+2. **Terminal: yes, in the phone web app.** The session's terminal is a level-3 screen reached
+   from the session header. Terminals are already kept alive by `lib/keep-alive`, so the phone
+   shell shows the same PTY the desk has open. Still open: read-only or interactive. The touch
+   keyboard lacks Ctrl, Esc and arrows, so interactive needs an accessory key row (Orca has one).
+3. **Pairing: required.** It becomes part of the phone work, and the M4 session model
+   (`docs/environments-and-remote-plan.md` §4) becomes its prerequisite. A phone on the tailnet
+   still pairs once. That is what makes a device revocable, independent of Tailscale.
+4. **Phones: both iPhone and Android.** The phone web app covers both as it is. For the later
+   native app, SwiftUI drops out (iOS only), which leaves Expo / React Native or the Orca-style
+   wrapper. WebKit is the engine that cannot run on this host, so the iPhone device check stays
+   a phase of its own.
 
 ### Proposed phases
 
@@ -413,17 +412,22 @@ The split this plan promised:
    hysteresis, the viewport meta, safe areas, keyboard-aware bottom insets, and the address-driven
    stack with Back. Add a touch flag to `agent:browser` first, so every later phase can be proven
    at 390px with a coarse pointer.
-2. **Screens** (L). Sessions, session, turn/changes and diff/file, composed from the components in
-   the Q1 table; 16px fields and a phone density step.
+2. **Screens** (L). Sessions (the first screen), session, turn/changes, diff/file and the session
+   terminal, composed from the components in the Q1 table; 16px fields and a phone density step.
 3. **Touch paths** (M). Long-press in `useContextMenu`, hover-revealed controls shown at rest on
-   `(hover: none)`, tap-to-open explanatory tooltips, the rail drag sensor, and a palette button.
-   Parts of this help the desktop with a touchscreen too.
-4. **Haptics** (S, the follow-up item below) and a device check on the iPhone through the mesh.
-5. Later, each in its own plan: pairing (M4 sessions first), then the companion app.
+   `(hover: none)`, tap-to-open explanatory tooltips, the rail drag sensor, a palette button, and
+   a terminal key row if the terminal is interactive. Parts of this help the desktop with a
+   touchscreen too.
+4. **Sessions and pairing** (L). The M4 session model (revocable device sessions, `HttpOnly`
+   cookie, socket tickets), then the pairing link and QR code in Settings › Machines with a
+   paired-devices list, as in Q5. It can run in parallel with phases 1 to 3.
+5. **Haptics** (S, the follow-up item below) and device checks on an iPhone and an Android phone
+   through the mesh.
+6. Later, in its own plan: the companion app (Expo / React Native or a native wrapper).
 
 ## Phases
 
-See "Proposed phases" under Research findings. Executable plans follow the owner's answers.
+See "Proposed phases" under Research findings. The owner answered its questions on 2026-09-25.
 
 ## Follow-up items
 
