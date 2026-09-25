@@ -1,4 +1,4 @@
-import { act, screen, waitFor } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { onTestFinished } from 'vitest'
 import { createClientError } from '@workspace/client-core/errors'
@@ -169,8 +169,9 @@ test('explicit retry re-arms a dismissed incident and runs the real connection c
   await userEvent.click(screen.getByRole('button', { name: 'Dismiss shaul-mac connection notice' }))
   await act(() => fixture.connections.retryMachine('shaul-mac'))
   expect(requests).toBe(1)
-  expect(screen.getByRole('button', { name: 'Dismiss shaul-mac connection notice' })).toBeVisible()
-  await userEvent.click(screen.getByRole('button', { name: 'Retry' }))
+  const dismiss = screen.getByRole('button', { name: 'Dismiss shaul-mac connection notice' })
+  expect(dismiss).toBeVisible()
+  await userEvent.click(within(dismiss.parentElement!).getByRole('button', { name: 'Retry' }))
   await waitFor(() => expect(requests).toBe(2))
 })
 
