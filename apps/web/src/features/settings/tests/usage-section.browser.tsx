@@ -1,10 +1,14 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
+import { page } from 'vitest/browser'
+import '@workspace/ui/globals.css'
 import type { ProviderUsageHistory } from '@workspace/contracts'
 
 import { UsageSection } from '@/features/settings/components/usage-section'
 import { settingsQueryKeys } from '@/features/settings/utils/query-keys'
-import { expect, test } from '../../../../test/fixtures'
+import { afterEach, expect, test } from 'vitest'
+
+afterEach(cleanup)
 
 function history(models: string[], days: 7 | 30 = 30): ProviderUsageHistory {
   return {
@@ -42,20 +46,21 @@ test.each(['range', 'refetch'] as const)(
         <UsageSection />
       </QueryClientProvider>,
     )
-    fireEvent.click(screen.getByRole('button', { name: /^A / }))
-    fireEvent.click(screen.getByRole('button', { name: /^B / }))
+    await page.getByRole('button', { name: /^A / }).click()
+    await page.getByRole('button', { name: /^B / }).click()
     expect(screen.getByRole('button', { name: /^C / })).toHaveAttribute('aria-pressed', 'true')
 
-    if (change === 'range') fireEvent.click(screen.getByRole('button', { name: '7 days' }))
+    if (change === 'range') await page.getByRole('button', { name: '7 days' }).click()
     if (change === 'refetch') act(() => client.setQueryData(key(30), history(['A', 'B'])))
     await waitFor(() => expect(screen.queryByRole('button', { name: /^C / })).toBeNull())
 
     const a = screen.getByRole('button', { name: /^A / })
     const b = screen.getByRole('button', { name: /^B / })
     expect([a, b].some((row) => row.getAttribute('aria-pressed') === 'true')).toBe(true)
-    fireEvent.click(a)
-    fireEvent.click(b)
+    await page.getByRole('button', { name: /^A / }).click()
+    await page.getByRole('button', { name: /^B / }).click()
     expect([a, b].some((row) => row.getAttribute('aria-pressed') === 'true')).toBe(true)
+    await page.screenshot({ path: `usage-${change}.png` })
     view.unmount()
     client.clear()
   },

@@ -65,6 +65,7 @@ import { exportTranscript } from './export-transcript'
 import { claudeHookRows } from './hook-rows'
 import { claudeBackgroundTasks } from './background-tasks'
 import { claudeCustomAgent } from './custom-agent'
+import { customAgentProviderSwitch } from './custom-agent-switch'
 import { claudeContextPopover } from './context-popover'
 import { claudeManualCompaction, codexManualCompaction } from './manual-compaction'
 import { claudeSessionTools, codexSessionTools } from './session-tools'
@@ -300,6 +301,7 @@ export const scenarios: readonly Scenario[] = [
   claudeHookRows,
   claudeBackgroundTasks,
   claudeCustomAgent,
+  customAgentProviderSwitch,
   claudeContextPopover,
   claudeManualCompaction,
   codexManualCompaction,

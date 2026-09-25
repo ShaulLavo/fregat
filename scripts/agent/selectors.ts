@@ -130,6 +130,9 @@ export const selectors = {
       .getByRole('dialog', { name: 'Wallpaper', exact: true })
       .getByRole('button', { name: 'Close', exact: true }),
   popupMenu: (page: Page) => page.getByRole('menu'),
+  draftAgent: (page: Page) => page.getByRole('button', { name: 'Run the session as an agent' }),
+  draftAgentChoice: (page: Page, name: string) =>
+    page.getByRole('menuitemradio').filter({ hasText: name }),
   modelPickerTrigger: (page: Page) =>
     page.getByRole('button', { name: 'Provider and model', exact: true }),
   modelPickerPanel: (page: Page) =>
