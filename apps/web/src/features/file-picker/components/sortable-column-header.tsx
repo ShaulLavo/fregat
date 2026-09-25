@@ -29,7 +29,7 @@ export function SortableColumnHeader({
       <Button
         aria-label={sortButtonLabel(keyName, direction)}
         className={cn(
-          'text-muted-foreground min-w-0 px-1.5 text-2xs font-medium tracking-normal uppercase',
+          'text-muted-foreground min-w-0 px-1.5 section-label',
           align === 'start' && '-ml-1.5',
           align === 'end' && '-mr-1.5',
         )}

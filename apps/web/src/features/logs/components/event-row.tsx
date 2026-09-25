@@ -65,7 +65,7 @@ export const LogsEventRow = memo(function LogsEventRow({
         }}
         onPointerDown={handlePointerDown}
       >
-        <span className='text-muted-foreground text-3xs flex shrink-0 items-center gap-1.5 font-mono tabular-nums'>
+        <span className='text-muted-foreground text-3xs font-meta flex shrink-0 items-center gap-1.5'>
           <span className={cn('size-1.5 shrink-0 rounded-full', logLevelDotClass(event.level))} />
           {formatLogTime(event.timestamp)}
         </span>
@@ -75,13 +75,13 @@ export const LogsEventRow = memo(function LogsEventRow({
         </span>
         <span className='flex shrink-0 items-center gap-1.5'>
           {event.durationMs !== null ? (
-            <span className='text-muted-foreground text-2xs font-mono tabular-nums'>
+            <span className='text-muted-foreground text-2xs font-meta'>
               {formatDuration(event.durationMs)}
             </span>
           ) : null}
           <span
             className={cn(
-              'rounded-md px-1 font-mono text-3xs uppercase',
+              'rounded-md px-1 font-meta text-3xs uppercase',
               logLevelClass(event.level),
             )}
           >

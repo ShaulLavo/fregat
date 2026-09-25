@@ -49,7 +49,7 @@ export function ChangeGroupHeader({
         aria-expanded={group.expanded}
         className={listRowClassName({
           className:
-            'group/group text-muted-foreground text-2xs h-(--density-control-height-sm) w-full font-medium tracking-wider uppercase',
+            'group/group text-muted-foreground h-(--density-control-height-sm) w-full section-label',
         })}
         onClick={(event) => {
           rowProps?.onClick(event)

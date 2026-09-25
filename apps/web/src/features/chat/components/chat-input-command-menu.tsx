@@ -82,7 +82,7 @@ export function ChatInputCommandMenu({
               <div key={group.id}>
                 {groupIndex > 0 ? <div className='bg-border my-0.5 h-px' /> : null}
                 {group.label ? (
-                  <div className='text-muted-foreground text-2xs text-3xs px-(--density-command-heading-padding-x) pt-(--density-command-heading-padding-top) pb-1 font-semibold tracking-[0.08em] uppercase'>
+                  <div className='text-muted-foreground section-label px-(--density-command-heading-padding-x) pt-(--density-command-heading-padding-top) pb-1'>
                     {group.label}
                   </div>
                 ) : null}
@@ -117,9 +117,7 @@ export function ChatInputCommandMenu({
         ) : (
           <div className='px-(--density-command-item-padding-x) py-(--density-command-item-padding-y)'>
             {triggerKind === 'slash-command' ? (
-              <div className='text-muted-foreground text-2xs text-3xs pb-1 font-semibold tracking-[0.08em] uppercase'>
-                Built-in
-              </div>
+              <div className='text-muted-foreground section-label pb-1'>Built-in</div>
             ) : null}
             {isLoading ? (
               <CommandMenuLoading label={chatInputCommandMenuLoadingLabel(triggerKind)} />

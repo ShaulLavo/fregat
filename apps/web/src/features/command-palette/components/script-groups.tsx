@@ -67,7 +67,7 @@ function ScriptGroup({
         >
           <PlayIcon className='size-(--icon-size) shrink-0 opacity-60' />
           <span className='truncate'>{script.name}</span>
-          <span className='text-muted-foreground text-2xs ml-auto truncate pl-3 font-mono'>
+          <span className='text-muted-foreground text-2xs font-meta ml-auto truncate pl-3'>
             {script.command}
           </span>
         </CommandItem>

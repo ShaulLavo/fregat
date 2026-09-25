@@ -31,9 +31,9 @@ export function SshHostOption({
     >
       <TerminalIcon className='text-muted-foreground size-(--icon-size-sm) shrink-0' />
       <span className='flex min-w-0 flex-1 items-center gap-2 text-left'>
-        <span className='block truncate font-mono'>{label}</span>
+        <span className='font-meta block truncate'>{label}</span>
         {label !== target ? (
-          <span className='text-muted-foreground text-2xs truncate font-mono'>{target}</span>
+          <span className='text-muted-foreground text-2xs font-meta truncate'>{target}</span>
         ) : null}
       </span>
       {offline ? <span className='text-muted-foreground text-xs'>Offline</span> : null}

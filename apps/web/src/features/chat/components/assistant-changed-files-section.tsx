@@ -94,12 +94,12 @@ export function AssistantChangedFilesSection({ summary }: { summary: ChatTurnDif
               expanded && 'rotate-90',
             )}
           />
-          <span className='text-muted-foreground text-3xs truncate tracking-[0.12em] uppercase'>
+          <span className='text-muted-foreground section-label truncate'>
             <span className='tabular-nums'>{files.length}</span>
             {files.length === 1 ? ' changed file' : ' changed files'}
           </span>
           {hasNonZeroChatTurnDiffStat(summaryStat) ? (
-            <span className='text-3xs shrink-0 font-mono tabular-nums @max-2xs/changed-files:hidden'>
+            <span className='text-3xs font-meta shrink-0 @max-2xs/changed-files:hidden'>
               <DiffStatLabel
                 live
                 size='3xs'
@@ -165,7 +165,7 @@ export function AssistantChangedFilesSection({ summary }: { summary: ChatTurnDif
             {summarizeChangedFileScopes(files).map((scope, index) => (
               <span className='inline-flex items-center gap-1' key={scope.label}>
                 {index > 0 ? <span aria-hidden='true'>·</span> : null}
-                <span className='text-foreground font-mono'>{scope.label}</span>
+                <span className='text-foreground font-meta'>{scope.label}</span>
                 <span className='tabular-nums'>{scope.fileCount}</span>
                 <span>{scope.fileCount === 1 ? 'file' : 'files'}</span>
               </span>
@@ -174,7 +174,7 @@ export function AssistantChangedFilesSection({ summary }: { summary: ChatTurnDif
           <div className='mt-1.5 flex flex-wrap items-center gap-1.5'>
             {selectChangedFilePreview(files).map((file) => (
               <Button
-                className='text-muted-foreground text-3xs max-w-48 px-1.5 font-mono'
+                className='text-muted-foreground text-3xs font-meta max-w-48 px-1.5'
                 data-scroll-anchor-ignore
                 disabled={!diffAvailable}
                 key={file.path}

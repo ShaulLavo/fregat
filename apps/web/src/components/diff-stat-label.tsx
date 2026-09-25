@@ -24,7 +24,7 @@ export function DiffStatLabel({
       {/* The compact digits are decoration; the exact counts live in the name. */}
       <span
         aria-label={`${additions} additions, ${deletions} deletions`}
-        className='inline-flex items-center'
+        className='font-meta inline-flex items-center'
         role='group'
       >
         <span aria-hidden='true' className='text-diff-added inline-flex tabular-nums'>

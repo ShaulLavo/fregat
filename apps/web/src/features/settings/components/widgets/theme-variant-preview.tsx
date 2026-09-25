@@ -54,7 +54,7 @@ export function ThemeVariantPreview({
         <CodeThemePreview themeId={variant.codeTheme} />
       </div>
       <div
-        className='bg-card-solid text-muted-foreground text-3xs px-2 py-1 font-mono'
+        className='bg-card-solid text-muted-foreground text-3xs font-meta px-2 py-1'
         style={
           colors
             ? {

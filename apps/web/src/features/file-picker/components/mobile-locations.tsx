@@ -25,9 +25,7 @@ export function MobileLocations({
       </div>
       {recents.length > 0 && (
         <div className='flex items-center gap-1 overflow-x-auto pb-0.5'>
-          <span className='text-muted-foreground text-2xs shrink-0 px-1 font-medium uppercase'>
-            Recent
-          </span>
+          <span className='text-muted-foreground section-label shrink-0 px-1'>Recent</span>
           {recents.map((entry) => (
             <RecentPill currentPath={currentPath} entry={entry} key={entry.path} />
           ))}

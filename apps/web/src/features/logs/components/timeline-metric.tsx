@@ -12,7 +12,7 @@ export function LogsTimelineMetric({ label, tone, value }: LogsTimelineMetricPro
     <div className='bg-muted/20 min-w-0 px-1.5 py-1'>
       <div
         className={cn(
-          'truncate font-mono text-xs leading-4 text-foreground tabular-nums',
+          'truncate font-meta text-xs leading-4 text-foreground',
           tone === 'error' && 'text-destructive',
           tone === 'warn' && 'text-warning',
           tone === 'slow' && 'text-info',

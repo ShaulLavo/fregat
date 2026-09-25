@@ -2,6 +2,8 @@
 @import 'tw-animate-css';
 @import './shadcn-tailwind.css';
 @import '@fontsource-variable/jetbrains-mono';
+@import '@fontsource-variable/inter';
+@import '@fontsource-variable/geist-mono';
 /* The bundled Graphite palette, generated from data; the app's <style> for the
    selected palette outranks it because that one is unlayered. */
 @import './palette.generated.css';
@@ -13,8 +15,12 @@
 @source '../../../markdown/src/**/*.{ts,tsx}';
 
 @theme inline {
-  --font-heading: var(--font-mono);
-  --font-ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  /* UI and titles are Inter; short metadata is Geist Mono (`font-meta`). `--font-mono`
+     stays the user's coding font, for code and terminals only. */
+  --font-ui: 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-sans: var(--font-ui);
+  --font-heading: var(--font-ui);
+  --font-meta: 'Geist Mono Variable', ui-monospace, SFMono-Regular, monospace;
   --color-chart-5: var(--chart-5);
   --color-chart-4: var(--chart-4);
   --color-chart-3: var(--chart-3);
@@ -282,7 +288,7 @@
      on this same element (<html>), so this formula re-resolves against
      whichever one wins; a copied literal would drift. */
   --border-subtle: color-mix(in oklch, var(--border) 55%, transparent);
-  --radius: 0.625rem;
+  --radius: 0.5rem;
   --trees-file-icon-color-astro: #a631be;
   --trees-file-icon-color-babel: #d5a910;
   --trees-file-icon-color-bash: #199f43;
@@ -572,6 +578,17 @@
 
 /* Press feedback: the control takes a 1px step down under the pointer. Not when
    it owns a popup — the menu is anchored to the trigger and would travel with it. */
+/* A small uppercase label above a group: the mono metadata voice at the
+   quietest size. Colour stays at the call site. */
+@utility section-label {
+  font-family: var(--font-meta);
+  font-size: var(--text-3xs);
+  line-height: var(--text-3xs--line-height);
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 @utility pressable {
   @apply transition-[color,background-color,border-color,box-shadow] active:not-disabled:not-aria-disabled:not-aria-[haspopup]:translate-y-px;
   transition-duration: var(--duration-color);
@@ -665,11 +682,18 @@
   --spinner-ground: var(--primary-foreground);
 }
 
-/* xs–md. Neighbouring rings turn opposite ways on kokonutui's shared 8s period. */
+/* xs–md. Neighbouring rings turn opposite ways on kokonutui's shared 8s period.
+   md keeps kokonutui's 1.6px at 24px; smaller sizes need more ink to read. */
 @utility spinner-bands {
+  --spinner-stroke: 1.4;
   flex-shrink: 0;
 
+  &[data-size='md'] {
+    --spinner-stroke: 1.067;
+  }
+
   & circle {
+    stroke-width: var(--spinner-stroke);
     opacity: 0.95;
     transform-box: view-box;
     transform-origin: 8px 8px;
@@ -858,6 +882,7 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-ui);
   }
   /* Reduced motion means fewer and gentler animations, not zero. Opacity still
      carries the state change — what goes away is movement: the zoom, the slide,

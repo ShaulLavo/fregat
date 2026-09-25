@@ -60,7 +60,7 @@ export function HistoryRow({
           <span className='text-muted-foreground text-2xs w-20 shrink-0 text-right tabular-nums'>
             {new Date(row.commit.timestamp).toLocaleDateString()}
           </span>
-          <span className='text-muted-foreground text-2xs w-16 shrink-0 text-right font-mono'>
+          <span className='text-muted-foreground text-2xs font-meta w-16 shrink-0 text-right'>
             {row.commit.id.slice(0, 7)}
           </span>
         </>

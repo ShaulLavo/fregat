@@ -12,9 +12,9 @@ type SpinnerProps = {
 }
 
 /**
- * kokonutui's AI loader in a 16-unit box: its radii, its 1.6px-at-24px stroke
- * and its 31% dash duty. Dash counts are rounded to whole numbers per ring so
- * no ring shows a seam where the pattern restarts.
+ * kokonutui's AI loader in a 16-unit box: its radii and its 31% dash duty. Dash
+ * counts are rounded to whole numbers per ring so no ring shows a seam. Stroke
+ * width lives in CSS, because it changes with size.
  */
 const SPINNER_BANDS = [
   { dash: '2.86 6.36', radius: 7.333 },
@@ -59,6 +59,7 @@ function Spinner({ size, label = 'Loading', className, ...props }: SpinnerProps)
     <svg
       aria-label={label}
       className={cn('spinner-bands', size && RING_SIZE_CLASS[size], className)}
+      data-size={size}
       data-slot='spinner'
       fill='none'
       role='status'
@@ -66,14 +67,7 @@ function Spinner({ size, label = 'Loading', className, ...props }: SpinnerProps)
       {...props}
     >
       {SPINNER_BANDS.map((band) => (
-        <circle
-          cx='8'
-          cy='8'
-          key={band.radius}
-          r={band.radius}
-          strokeDasharray={band.dash}
-          strokeWidth='1.067'
-        />
+        <circle cx='8' cy='8' key={band.radius} r={band.radius} strokeDasharray={band.dash} />
       ))}
     </svg>
   )

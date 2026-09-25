@@ -23,7 +23,7 @@ export function ChatWelcomeView() {
 function WelcomeHint({ glyph, label }: { glyph: string; label: string }) {
   return (
     <span className='bg-muted/40 inline-flex items-center gap-1.5 rounded-md py-0.5 pr-2 pl-1.5'>
-      <kbd className='text-foreground bg-background text-3xs rounded-md px-1 font-mono leading-none'>
+      <kbd className='text-foreground bg-background text-3xs font-meta rounded-md px-1 leading-none'>
         {glyph}
       </kbd>
       {label}

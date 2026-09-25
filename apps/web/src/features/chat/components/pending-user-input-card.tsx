@@ -111,9 +111,7 @@ export function PendingUserInputCard({ pending }: { readonly pending: PendingUse
       <div className='bg-warning/10 mx-auto flex max-w-3xl flex-col gap-(--density-control-gap) rounded-lg p-(--density-section-padding)'>
         <div className='flex flex-wrap items-center gap-(--density-control-gap)'>
           <QuestionIcon aria-hidden='true' className='text-warning size-(--icon-size)' />
-          <span className='text-warning text-2xs font-semibold tracking-widest uppercase'>
-            {question.header ?? 'Input needed'}
-          </span>
+          <span className='text-warning section-label'>{question.header ?? 'Input needed'}</span>
           {questions.length > 1 ? (
             <span className='text-muted-foreground text-3xs tabular-nums'>
               {activeIndex + 1}/{questions.length}

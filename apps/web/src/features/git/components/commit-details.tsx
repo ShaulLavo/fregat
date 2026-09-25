@@ -72,7 +72,7 @@ export function CommitDetails({
       <PaneBar>
         <CollapsibleTrigger
           aria-label='Commit information'
-          className='focus-ring flex min-w-0 flex-1 items-center gap-1.5 text-left font-mono text-xs outline-none'
+          className='focus-ring font-meta flex min-w-0 flex-1 items-center gap-1.5 text-left text-xs outline-none'
           title={commit}
         >
           <CaretDownIcon
@@ -146,7 +146,7 @@ export function CommitDetails({
               </span>
               {details.data.parents.length === 0 ? <span>None · initial commit</span> : null}
               {details.data.parents.map((parent) => (
-                <span key={parent} title={parent} className='font-mono'>
+                <span key={parent} title={parent} className='font-meta'>
                   {parent.slice(0, 7)}
                 </span>
               ))}

@@ -20,9 +20,7 @@ export function PromptStashMenu({
 }) {
   return (
     <div className='flex min-w-0 flex-col gap-1'>
-      <p className='text-muted-foreground text-3xs px-1 font-medium tracking-wide uppercase'>
-        Stashed prompts
-      </p>
+      <p className='text-muted-foreground section-label px-1'>Stashed prompts</p>
       <ul className='flex max-h-72 min-w-0 flex-col gap-0.5 overflow-y-auto overscroll-contain'>
         {entries.map((entry) => (
           <li className='group/stash flex min-w-0 items-center gap-1' key={entry.id}>

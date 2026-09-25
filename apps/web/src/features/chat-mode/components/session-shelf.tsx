@@ -33,7 +33,7 @@ export function SessionShelf({
         ref={setNodeRef}
         data-rail-shelf-target={shelf}
         className={cn(
-          'text-muted-foreground text-2xs flex h-(--density-control-height-sm) items-center px-(--density-row-padding-x) font-medium tracking-wider uppercase',
+          'text-muted-foreground flex h-(--density-control-height-sm) items-center px-(--density-row-padding-x) section-label',
           isOver && 'bg-accent',
         )}
       >

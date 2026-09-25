@@ -120,7 +120,7 @@ export function FileList({
           row.kind === 'section' ? (
             <div
               aria-hidden='true'
-              className='text-muted-foreground text-2xs flex h-(--density-control-height-sm) items-center px-(--density-row-padding-x) font-medium tracking-wider uppercase'
+              className='text-muted-foreground section-label flex h-(--density-control-height-sm) items-center px-(--density-row-padding-x)'
             >
               {row.label}
             </div>
