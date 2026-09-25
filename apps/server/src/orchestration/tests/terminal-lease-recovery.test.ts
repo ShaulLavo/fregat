@@ -1,6 +1,8 @@
 import { afterEach, expect, it } from 'vitest'
 import { createOrchestrationFixture } from '../../../test/factories/orchestration'
 import { requireWorktree } from '../read-model'
+import { TerminalLeaseController } from '../terminal-lease-controller'
+import { WorktreeExecutionGate } from '../worktree-execution-gate'
 
 const fixtures: Awaited<ReturnType<typeof createOrchestrationFixture>>[] = []
 afterEach(async () => {
@@ -249,3 +251,51 @@ it('ends an ownership-unknown lease only once the host proves the process is gon
     (await fixture.engine.readModelSnapshot()).terminalLeases.get(terminalLeaseId)?.state,
   ).toBe('ended')
 })
+
+it.each(['alive', 'gone', 'unreachable'] as const)(
+  'rechecks unknown ownership when the host is %s',
+  async (host) => {
+    const fixture = await createOrchestrationFixture()
+    fixtures.push(fixture)
+    const registration = (await fixture.register()).result!
+    const shared = {
+      worktreeId: registration.worktreeId,
+      terminalLeaseId: '30000000-0000-4000-8000-000000000099',
+      runtimeEpoch: 'old',
+    }
+    await fixture.command({
+      ...shared,
+      type: 'terminal.lease.request',
+      commandId: 'request-unknown',
+      key: 'saved-shell',
+    })
+    await fixture.command({ ...shared, type: 'terminal.lease.claim', commandId: 'claim-unknown' })
+    await fixture.command({ ...shared, type: 'terminal.lease.mark-unknown', commandId: 'unknown' })
+    let model = await fixture.engine.readModelSnapshot()
+    const sessions =
+      host === 'alive'
+        ? [
+            {
+              key: 'saved-shell',
+              session: 1,
+              pid: 100,
+              startedAt: new Date().toISOString(),
+              offset: 0,
+              exited: false,
+            },
+          ]
+        : []
+    const recovery = new TerminalLeaseController({
+      gate: new WorktreeExecutionGate(),
+      getReadModel: () => model,
+      queryHostSessions: async () => (host === 'unreachable' ? null : sessions),
+      dispatch: async (command) => {
+        await fixture.command(command)
+        model = await fixture.engine.readModelSnapshot()
+      },
+    })
+    await recovery.recover()
+    const expected = { alive: 'active', gone: 'ended', unreachable: 'ownership-unknown' }
+    expect(model.terminalLeases.get(shared.terminalLeaseId)?.state).toBe(expected[host])
+  },
+)

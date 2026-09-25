@@ -112,7 +112,12 @@ it('exits after its last client leaves when there are no live sessions', async (
 
 it('concurrent clients adopt one host for the same state root', async () => {
   const host = await testHost()
-  const [first, second] = await Promise.all([host.client.host(), host.connect().host()])
-  expect(second.pid).toBe(first.pid)
-  expect((await host.client.host()).pid).toBe(first.pid)
+  const clients = [host.client, ...Array.from({ length: 9 }, () => host.connect())]
+  const greetings = await Promise.all(clients.map((client) => client.host()))
+  const pid = greetings[0]!.pid
+  expect(greetings.every((hello) => hello.pid === pid)).toBe(true)
+  const competitors = host.hosts.filter((child) => child.pid !== pid)
+  expect(await Promise.all(competitors.map((child) => child.exited))).toEqual(
+    competitors.map(() => 0),
+  )
 })

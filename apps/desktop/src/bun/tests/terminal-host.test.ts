@@ -4,6 +4,7 @@ import path from 'node:path'
 import { expect, test } from 'vitest'
 import { TerminalHostClient } from '../../../../server/src/terminal/host-client'
 import { stopTerminalHost } from '../../../../server/src/terminal-host/identity'
+import { hostPaths } from '../../../../server/src/terminal-host/protocol'
 import { DesktopTerminalHost } from '../terminal-host'
 
 test('desktop quit ends its leased host and shells after the server detaches', async () => {
@@ -32,6 +33,7 @@ test('desktop quit ends its leased host and shells after the server detaches', a
   } finally {
     server.close()
     await stopTerminalHost(home)
+    await rm(hostPaths(home).directory, { recursive: true, force: true })
     await rm(directory, { recursive: true, force: true })
   }
 })

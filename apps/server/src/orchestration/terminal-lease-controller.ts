@@ -104,12 +104,7 @@ export class TerminalLeaseController {
       ? new Set(sessions.filter((session) => !session.exited).map((session) => session.key))
       : null
     for (const lease of this.options.getReadModel().terminalLeases.values()) {
-      if (
-        lease.runtimeEpoch === this.runtimeEpoch ||
-        lease.state === 'ended' ||
-        lease.state === 'ownership-unknown'
-      )
-        continue
+      if (lease.runtimeEpoch === this.runtimeEpoch || lease.state === 'ended') continue
       await this.recoverLease(lease, live)
     }
   }
@@ -125,6 +120,7 @@ export class TerminalLeaseController {
       return
     }
     if (!live || !lease.key) {
+      if (lease.state === 'ownership-unknown') return
       await this.send(
         'terminal.lease.mark-unknown',
         lease.worktreeId,
@@ -151,7 +147,9 @@ export class TerminalLeaseController {
   async endRecovered(terminalLeaseId: TerminalLeaseId) {
     const lease = this.options.getReadModel().terminalLeases.get(terminalLeaseId)
     if (!lease || lease.state === 'ended') return
-    await this.send('terminal.lease.end', lease.worktreeId, terminalLeaseId, lease.runtimeEpoch)
+    await this.send('terminal.lease.end', lease.worktreeId, terminalLeaseId, lease.runtimeEpoch, {
+      hostConfirmedGone: true,
+    })
   }
 
   /** Moves a lease from `fromRuntimeEpoch` to this process's epoch; the host proved it alive. */

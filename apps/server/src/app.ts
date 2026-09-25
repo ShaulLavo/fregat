@@ -70,6 +70,7 @@ import { DEFAULT_PROVIDER_INSTANCES } from './provider/drivers/built-in'
 import { mergeProviderInstanceConfigs } from './provider/utils/instance-config-merge'
 import { SettingsStore, type SettingsStoreOptions } from './settings/store'
 import { TerminalService, type TerminalPtyFactory } from './terminal/service'
+import type { TerminalHostClient } from './terminal/host-client'
 import { wallpaperRoutes } from './wallpaper/routes'
 import { webRoutes, type WebOptions } from './web/routes'
 import { readReleaseInfoSync } from './web/release'
@@ -95,6 +96,7 @@ export type AppOptions = FileSystemServiceOptions & {
   terminal?: {
     env?: NodeJS.ProcessEnv
     ptyFactory?: TerminalPtyFactory
+    hostClient?: TerminalHostClient
   }
   fonts?: FontCatalogService
   themes?: {
@@ -452,14 +454,14 @@ export function createApp(options: AppOptions) {
     .use(fsRoutes(fs))
     .onStart(() => {
       void providerPrices.refresh()
-      // Waits on `orchestration.ready` internally, so lease adoption lands first.
-      void terminal
-        .reattach()
-        .catch((error: unknown) =>
-          recordProcessWarning('terminal.host.recovery_failed', { area: 'terminal', error }),
-        )
     })
     .onStop(cleanup)
+  // Recovery starts for in-process apps too; terminal opens wait until lease adoption finishes.
+  void terminal
+    .reattach()
+    .catch((error: unknown) =>
+      recordProcessWarning('terminal.host.recovery_failed', { area: 'terminal', error }),
+    )
   appCleanups.set(configured, cleanup)
   appOrchestration.set(configured, orchestration)
   appUpdates.set(configured, update)

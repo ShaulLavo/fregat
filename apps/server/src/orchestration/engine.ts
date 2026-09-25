@@ -1129,7 +1129,22 @@ export class OrchestrationEngine {
       (candidate) => candidate.key === key && candidate.state === 'active',
     )
     if (!lease) return null
-    return this.terminalLeases.attachAdopted(lease.worktreeId, lease.terminalLeaseId)
+    const owned = this.terminalLeases.attachAdopted(lease.worktreeId, lease.terminalLeaseId)
+    const provider = this.providerService
+    const handoff = this.terminalHandoffs
+      .pending()
+      .find((entry) => entry.terminalLeaseId === lease.terminalLeaseId)
+    if (!provider || !handoff) return owned
+    return {
+      ...owned,
+      end: async () => {
+        this.terminalHandoffs.exited(handoff.sessionId)
+        await this.appendTerminalHistory(provider, handoff)
+        await owned.end()
+        this.terminalHandoffs.complete(handoff.sessionId)
+        provider.releaseTerminalOwnership(handoff.sessionId)
+      },
+    }
   }
 
   private hostSessions(): Promise<readonly HostSessionInfo[] | null> {
@@ -1145,33 +1160,41 @@ export class OrchestrationEngine {
     if (!provider) return
     const pending = this.terminalHandoffs.pending()
     const sessions = await this.hostSessions()
-    const live = sessions
-      ? new Set(sessions.filter((session) => !session.exited).map((session) => session.key))
-      : null
-    const adopted = new Set<SessionId>()
+    const byKey = sessions ? new Map(sessions.map((session) => [session.key, session])) : null
     for (const handoff of pending) {
-      if (handoff.phase === 'history') {
-        provider.restoreTerminalOwnership(handoff.sessionId, 'history')
-        continue
-      }
-      if (live?.has(terminalSessionKey(handoff.worktreeId, handoff.sessionId, handoff.sessionId))) {
-        provider.restoreTerminalOwnership(handoff.sessionId, 'terminal')
-        adopted.add(handoff.sessionId)
+      await this.recoverTerminalHandoff(handoff, provider, byKey)
+    }
+  }
+
+  private async recoverTerminalHandoff(
+    handoff: TerminalHandoff,
+    provider: ProviderService,
+    sessions: ReadonlyMap<string, HostSessionInfo> | null,
+  ) {
+    const key = terminalSessionKey(handoff.worktreeId, handoff.sessionId, handoff.sessionId)
+    const live = sessions?.get(key)
+    if (handoff.phase === 'active' && live && !live.exited) {
+      const lease = this.readModel.terminalLeases.get(handoff.terminalLeaseId)
+      if (lease)
         await this.terminalLeases.adopt(
           handoff.worktreeId,
-          handoff.terminalLeaseId,
-          handoff.runtimeEpoch,
+          lease.terminalLeaseId,
+          lease.runtimeEpoch,
         )
-        continue
-      }
-      provider.restoreTerminalOwnership(handoff.sessionId, 'unknown')
+      provider.restoreTerminalOwnership(handoff.sessionId, 'terminal')
+      return
     }
-    for (const handoff of pending) {
-      if (adopted.has(handoff.sessionId)) continue
-      await this.retryTerminalHistory(handoff, provider).catch((error: unknown) =>
-        this.recordTerminalHistoryFailure(handoff.sessionId, handoff.startedAt, error),
-      )
+    if (handoff.phase === 'active' && sessions !== null) {
+      this.terminalHandoffs.exited(handoff.sessionId)
+      handoff = { ...handoff, phase: 'history' }
     }
+    provider.restoreTerminalOwnership(
+      handoff.sessionId,
+      handoff.phase === 'history' ? 'history' : 'unknown',
+    )
+    await this.retryTerminalHistory(handoff, provider).catch((error: unknown) =>
+      this.recordTerminalHistoryFailure(handoff.sessionId, handoff.startedAt, error),
+    )
   }
 
   private retryTerminalHistory(handoff: TerminalHandoff, provider: ProviderService) {

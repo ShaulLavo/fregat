@@ -1,5 +1,5 @@
 import { timingSafeEqual } from 'node:crypto'
-import { chmodSync, readFileSync, renameSync, rmdirSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import net from 'node:net'
 import { parseArgs } from 'node:util'
 import type { PtyExit } from '@workspace/pty'
@@ -22,6 +22,7 @@ import {
 } from './protocol'
 import { HostSession, type SessionSubscriber } from './session'
 import { processStart } from './identity'
+import { acquireHostLock } from './lock'
 import { readReleaseInfoSync, releaseFileFor } from '../web/release'
 
 const DEFAULT_IDLE_MS = 30_000
@@ -42,6 +43,7 @@ class TerminalHost {
   private readonly token: Buffer
   private readonly idleMs: number
   private server: net.Server | null = null
+  private lock: ReturnType<typeof acquireHostLock> = null
   private idleTimer: ReturnType<typeof setTimeout> | null = null
   private nextSession = 1
   private stopping = false
@@ -54,8 +56,15 @@ class TerminalHost {
 
   async listen() {
     ensureSocketDirectory(this.paths)
-    if (await socketAnswers(this.paths.socket)) return false
+    this.lock = acquireHostLock(this.paths.directory)
+    if (!this.lock) return false
+    if (await socketAnswers(this.paths.socket)) {
+      this.lock.close()
+      this.lock = null
+      return false
+    }
     rmSync(this.paths.socket, { force: true })
+    this.writeManifest()
     const server = net.createServer((socket) => this.accept(socket))
     await new Promise<void>((resolve, reject) => {
       server.once('error', reject)
@@ -63,7 +72,6 @@ class TerminalHost {
     })
     chmodSync(this.paths.socket, 0o600)
     this.server = server
-    this.writeManifest()
     this.checkIdle()
     return true
   }
@@ -220,11 +228,9 @@ class TerminalHost {
   private cleanup() {
     rmSync(this.paths.socket, { force: true })
     rmSync(this.paths.manifest, { force: true })
-    try {
-      rmdirSync(this.paths.directory)
-    } catch {
-      // Another version's socket may still live there.
-    }
+    // Keep the lock inode: an overlapping launcher may already have opened it.
+    this.lock?.close()
+    this.lock = null
   }
 }
 

@@ -34,7 +34,7 @@ export class TerminalHistory {
         .get()?.offset ?? 0
   }
 
-  /** Total bytes ever appended; where a host reattach resumes from. */
+  /** Next byte in the host stream, independent of saved scrollback length. */
   get offset() {
     return this.cumulativeOffset
   }
@@ -43,7 +43,7 @@ export class TerminalHistory {
     return this.chunks.map((chunk) => chunk.data)
   }
 
-  append(bytes: Uint8Array) {
+  append(bytes: Uint8Array, nextOffset = this.cumulativeOffset + bytes.length) {
     if (bytes.length === 0) return
     const next = [...this.chunks]
     let sequence = this.sequence
@@ -61,26 +61,32 @@ export class TerminalHistory {
       next.push({ sequence: ++sequence, data, lines: lineBreaks(data) })
     }
     const retained = trimHistory(next)
-    const offset = this.cumulativeOffset + bytes.length
+    const offset = nextOffset
     this.persist(retained, offset)
     this.chunks = retained
     this.sequence = sequence
     this.cumulativeOffset = offset
   }
 
-  clear() {
+  setOffset(offset: number) {
+    this.persist(this.chunks, offset)
+    this.cumulativeOffset = offset
+  }
+
+  clear({ keepOffset = false } = {}) {
     this.database.transaction((transaction) => {
       transaction
         .delete(terminalHistoryChunks)
         .where(eq(terminalHistoryChunks.owner, this.owner))
         .run()
+      if (keepOffset) return
       transaction
         .delete(terminalSessionOffsets)
         .where(eq(terminalSessionOffsets.owner, this.owner))
         .run()
     })
     this.chunks = []
-    this.cumulativeOffset = 0
+    if (!keepOffset) this.cumulativeOffset = 0
   }
 
   private persist(next: Chunk[], offset: number) {

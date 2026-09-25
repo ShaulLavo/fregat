@@ -989,7 +989,7 @@ describe('terminal service', () => {
     expect(sessions.filter((session) => !session.exited)).toHaveLength(1)
   })
 
-  it.each(['after recovery', 'during recovery'] as const)(
+  it.each(['after recovery', 'during recovery', 'after clearing history'] as const)(
     'preserves the shell when a browser reconnects %s',
     async (timing) => {
       const root = await fixtureRoot()
@@ -1004,6 +1004,12 @@ describe('terminal service', () => {
       const pid = terminalOutputText(socketA.messages).match(/PID:(\d+)/)?.[1]
       if (!pid) throw new TypeError('Missing pid marker in the first shell output')
 
+      if (timing === 'after clearing history') {
+        await serviceA.clear({
+          worktreeId: v.parse(worktreeIdSchema, registrations.get(root)),
+          terminalId: 'reattach-term',
+        })
+      }
       await serviceA.dispose()
 
       const serviceB = testService(root, { env, hostClient: host.connect() })
@@ -1013,9 +1019,12 @@ describe('terminal service', () => {
       const socketB = fakeSocket(root, '', 'reattach-term')
       await Promise.all([recovering, routesB.open(socketB)])
       // Replayed from the persisted history, not from a fresh spawn.
-      await waitForTerminalOutput(socketB.messages, `PID:${pid}`)
+      if (timing !== 'after clearing history')
+        await waitForTerminalOutput(socketB.messages, `PID:${pid}`)
       routesB.message(socketB, Buffer.from('printf "PID2:%s\\n" "$$"\n'))
       await waitForTerminalOutput(socketB.messages, `PID2:${pid}`)
+      if (timing === 'after clearing history')
+        expect(terminalOutputText(socketB.messages)).not.toContain(`PID:${pid}`)
     },
   )
 })

@@ -20,11 +20,14 @@ import { ProviderAdapterRegistry } from '../../src/provider/provider-adapter-reg
 import type { ProviderDriver } from '../../src/provider/driver'
 import { testSettingsOptions } from '../../src/settings/testing'
 import { createFakePtyFactory } from './terminal'
+import type { TerminalHostClient } from '../../src/terminal/host-client'
 import { createInProcessTerminalSocket } from '../terminal-socket'
 
 export async function createAgentTerminalFixture(
   options: {
     pty?: Parameters<typeof createFakePtyFactory>[0]
+    hostClient?: TerminalHostClient
+    binaryPath?: string
     driverKind?: 'claude' | 'codex'
     provider?: Pick<
       MockProviderAdapterOptions,
@@ -62,7 +65,7 @@ export async function createAgentTerminalFixture(
     {
       driverKind,
       providerInstanceId: instanceId,
-      binaryPath: '/configured/claude',
+      binaryPath: options.binaryPath ?? '/configured/claude',
       environment: [{ name: 'TERMINAL_ACCOUNT_MARKER', value: 'private-account' }],
     },
   ]
@@ -76,7 +79,9 @@ export async function createAgentTerminalFixture(
       metadataDatabase: handle,
       settings: testSettingsOptions(root),
       workspaceEditJournalRoot: path.join(root, 'journals'),
-      terminal: { ptyFactory: pty.factory },
+      terminal: options.hostClient
+        ? { hostClient: options.hostClient }
+        : { ptyFactory: pty.factory },
       orchestration: {
         database: handle.db,
         providerAdapterRegistry: registry,

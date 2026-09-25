@@ -4,6 +4,7 @@ Each state root has one authenticated Unix-socket host that owns its PTYs. A ser
 closes its connection. The next server adopts the leases and replays output from each saved
 byte offset before admitting terminal operations. The host keeps a 1 MiB ring per shell;
 missing bytes produce one gap message. Closing or restarting a terminal ends that shell.
+Clearing scrollback preserves the live stream cursor; replacement shells start a new cursor.
 
 Linux uses a transient `platform-pty-<id>.scope` when the systemd user manager is reachable.
 Other systems use a detached process. The host reports its actual cgroup, build, and protocol
@@ -15,6 +16,7 @@ server, waits for shell cleanup, and releases the lease. Shared-dev desktop wind
 shared server's host to its owner. Relaunch cleanup verifies the saved process identity.
 
 Socket adoption checks the authenticated PID against the manifest and process start identity.
+An exclusive SQLite transaction elects one host before it publishes its manifest and socket.
 The manifest lives beside the socket. Isolated browser runs stop their host before deleting
 their temporary home. Host launch, adoption, attach replay and orphan cleanup each log one
 structured event; command lines and terminal output stay out of those events.

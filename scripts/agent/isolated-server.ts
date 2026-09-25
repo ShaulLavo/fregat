@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import path from 'node:path'
 
 import { stopTerminalHost } from '../../apps/server/src/terminal-host/identity'
+import { hostPaths } from '../../apps/server/src/terminal-host/protocol'
 
 import { allowedOriginsForWebPort, isPortAvailable, selectAvailablePort } from '../runtime-network'
 import { linkWallpaperLibrary, productionStateHome } from '../state-home'
@@ -124,5 +125,6 @@ async function stopServer(child: Bun.Subprocess, directory: string) {
     await child.exited
   }
   await stopTerminalHost(path.join(directory, 'home'))
+  rmSync(hostPaths(path.join(directory, 'home')).directory, { force: true, recursive: true })
   rmSync(directory, { force: true, recursive: true })
 }

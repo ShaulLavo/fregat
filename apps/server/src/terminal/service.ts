@@ -38,7 +38,10 @@ import type { HostSessionInfo } from '../terminal-host/protocol'
 import { isTestProcess, platformHomePath } from '../home'
 
 /** `key` names the shell in the terminal host, which a later server attaches to. */
-export type TerminalPtyOptions = SpawnPtyOptions & { readonly key: string }
+export type TerminalPtyOptions = Omit<SpawnPtyOptions, 'onData'> & {
+  readonly key: string
+  readonly onData: (bytes: Uint8Array, offset?: number) => void
+}
 export type TerminalPtyFactory = (options: TerminalPtyOptions) => Pty | Promise<Pty>
 
 export type TerminalServiceOptions = {
@@ -151,7 +154,6 @@ export class TerminalService {
     const infos = await this.listHostSessions()
     if (!infos) return
     for (const info of infos) {
-      if (info.exited) continue
       await this.reattachSession(info)
     }
   }
@@ -164,7 +166,10 @@ export class TerminalService {
       .catch(() => null)
     if (!root) return this.orphan(info, 'worktree-missing')
     const lease = (await this.resolveAdoptedLease?.(info.key)) ?? null
-    if (!lease) return this.orphan(info, 'lease-missing')
+    if (!lease) {
+      if (info.exited) return
+      return this.orphan(info, 'lease-missing')
+    }
     const history = new TerminalHistory(this.database, info.key)
     const session = new TerminalSession({
       history,
@@ -611,7 +616,7 @@ export class TerminalSession {
   private outputMessageCount = 0
   private pty: Pty | null = null
   // Output that lands while the spawn is awaited waits until `ready` and the replay are sent.
-  private startupOutput: Uint8Array[] | null = null
+  private startupOutput: { data: Uint8Array; nextOffset: number | undefined }[] | null = null
   private resizeCount = 0
   private serverMessageCount = 0
   private shell: string | null = null
@@ -686,6 +691,7 @@ export class TerminalSession {
     const restoredHistory = this.history.values().length > 0
     if (connection)
       for (const data of this.history.values()) this.send(connection, { type: 'output', data })
+    this.history.setOffset(0)
     this.startupOutput = []
     const spawnResult = await this.spawnPty()
     const startupOutput = this.startupOutput
@@ -701,7 +707,7 @@ export class TerminalSession {
     this.completion = this.watchExit(this.pty)
     this.emitReady(restoredHistory)
     if (connection) this.send(connection, { type: 'replay-complete' })
-    for (const data of startupOutput) this.handleOutput(data)
+    for (const { data, nextOffset } of startupOutput) this.handleOutput(data, nextOffset)
     this.scheduleProcessPoll()
     return true
   }
@@ -724,7 +730,8 @@ export class TerminalSession {
       .attach({
         key: this.key,
         from,
-        onData: (data) => this.handleOutput(data),
+        onData: (data, offset) =>
+          this.handleOutput(data, offset === undefined ? undefined : offset + data.byteLength),
         onGap: (start, end) => this.handleGap(start, end),
       })
       .catch(() => null)
@@ -806,7 +813,7 @@ export class TerminalSession {
   }
 
   clearHistory() {
-    this.history.clear()
+    this.history.clear({ keepOffset: true })
     this.emit({ type: 'cleared' })
     if (!this.pty || this.disposed || this.terminating) return
     this.pty.write('\f')
@@ -927,14 +934,14 @@ export class TerminalSession {
     this.viewerCount = Math.max(this.viewerCount, this.connections.size)
   }
 
-  private handleOutput(data: Uint8Array) {
+  private handleOutput(data: Uint8Array, nextOffset?: number) {
     if (this.startupOutput) {
-      this.startupOutput.push(data)
+      this.startupOutput.push({ data, nextOffset })
       return
     }
     this.modes.write(data)
     try {
-      this.history.append(data)
+      this.history.append(data, nextOffset)
     } catch (error) {
       recordProcessWarning('terminal.session.history_failed', {
         area: 'terminal',
@@ -958,7 +965,7 @@ export class TerminalSession {
       to,
       bytesLost: to - from,
     })
-    this.handleOutput(GAP_MESSAGE)
+    this.handleOutput(GAP_MESSAGE, to)
   }
 
   private closeConnections() {
@@ -1037,7 +1044,8 @@ export class TerminalSession {
           env: terminalEnv(this.env),
           rows: this.rows,
           command,
-          onData: (data) => this.handleOutput(data),
+          onData: (data, offset) =>
+            this.handleOutput(data, offset === undefined ? undefined : offset + data.byteLength),
         }),
         shell,
       }
