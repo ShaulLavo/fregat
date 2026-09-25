@@ -57,7 +57,6 @@ export const LANGUAGE_BY_EXTENSION: Record<string, EditorSyntaxLanguageId> = {
   '.kts': 'kotlin',
   '.lhs': 'haskell',
   '.lintstagedrc': 'json',
-  '.lock': 'json',
   '.lua': 'lua',
   '.markdown': 'markdown',
   '.md': 'markdown',
@@ -107,8 +106,10 @@ export const LANGUAGE_BY_EXTENSION: Record<string, EditorSyntaxLanguageId> = {
   '.zsh': 'shellscript',
 }
 
-/** Basenames with no extension of their own. */
+/** Files whose format is determined by their full name. */
 export const LANGUAGE_BY_BASENAME: Record<string, EditorSyntaxLanguageId> = {
+  'bun.lock': 'jsonc',
+  'cargo.lock': 'toml',
   dockerfile: 'dockerfile',
   makefile: 'makefile',
 }

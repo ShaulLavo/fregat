@@ -14,6 +14,13 @@ describe('languageIdForFilePath', () => {
     expect(languageIdForFilePath('/repo/a.tsx')).toBe('tsx')
   })
 
+  it('recognizes lockfiles by their actual format', () => {
+    expect(languageIdForFilePath('/repo/Cargo.lock')).toBe('toml')
+    expect(languageIdForFilePath('/repo/yarn.lock')).toBeNull()
+    expect(languageIdForFilePath('/repo/bun.lock')).toBe('jsonc')
+    expect(languageIdForFilePath('/repo/unknown.lock')).toBeNull()
+  })
+
   it('returns null for what it cannot name, never a text fallback', () => {
     expect(languageIdForFilePath('/repo/unknown.xyz')).toBeNull()
     expect(languageIdForFilePath('/repo/no-extension-file')).toBeNull()

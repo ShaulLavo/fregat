@@ -1,4 +1,4 @@
-import { fileUriForPath } from '@workspace/contracts'
+import { fileUriForNativePath } from '../../language'
 import { lineStartOffset } from '@workspace/utils/strings'
 import { samePath } from '../../../utils/path'
 import { normalizeNativePath } from '../../../utils/path'
@@ -76,7 +76,10 @@ export function documentTextSnapshot(
   }
 }
 
-export function fileNameForUri(ctx: SessionContext, uri: lsp.DocumentUri): string | null {
+export function fileNameForUri(
+  ctx: Pick<SessionContext, 'root' | 'workspaceRoot'>,
+  uri: lsp.DocumentUri,
+): string | null {
   const fileName = documentUriToFileName(uri)
   if (fileName && isSameOrDescendant(ctx.root, fileName)) return fileName
 
@@ -86,12 +89,15 @@ export function fileNameForUri(ctx: SessionContext, uri: lsp.DocumentUri): strin
   return workspaceFileName
 }
 
-export function documentUriForFileName(ctx: SessionContext, fileName: string): lsp.DocumentUri {
+export function documentUriForFileName(
+  ctx: Pick<SessionContext, 'workspaceRoot'>,
+  fileName: string,
+): lsp.DocumentUri {
   const normalized = normalizeNativePath(fileName)
   if (!isSameOrDescendant(ctx.workspaceRoot, normalized)) return fileNameToDocumentUri(normalized)
 
   const relativePath = path.relative(ctx.workspaceRoot, normalized)
-  return fileUriForPath(relativePath)
+  return fileUriForNativePath(relativePath)
 }
 
 export function rangeFromTextSpan(text: string, span: ts.TextSpan): lsp.Range {
@@ -165,7 +171,7 @@ function documentUriToWorkspaceFileName(workspaceRoot: string, uri: string): str
   }
 }
 
-// A relative file name resolves against the process cwd; the shared `fileUriForPath` never resolves.
+// A relative file name resolves against the process cwd; the shared `fileUriForNativePath` never resolves.
 function fileNameToDocumentUri(fileName: string): lsp.DocumentUri {
   const normalized = normalizeNativePath(fileName)
   return `file://${normalized.split('/').map(encodePathPart).join('/')}`

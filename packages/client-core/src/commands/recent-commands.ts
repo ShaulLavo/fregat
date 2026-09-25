@@ -50,10 +50,14 @@ export function createRecentCommandsLedger(policy: RecentCommandsPolicy) {
   return {
     parse,
     read: (storage: ReadStorage) => readValue(storage, storage.getItem(policy.key)),
-    record(storage: WriteStorage, commandId: string): readonly string[] {
+    record(
+      storage: WriteStorage,
+      commandId: string,
+      knownIds?: readonly string[],
+    ): readonly string[] {
       let next: readonly string[] = []
       storage.updateItem(policy.key, (raw) => {
-        const current = readValue(storage, raw)
+        const current = knownIds ?? readValue(storage, raw)
         next = [commandId, ...current.filter((id) => id !== commandId)].slice(0, policy.limit)
         return JSON.stringify(policy.format === 'array' ? next : { commandIds: next, version: 1 })
       })

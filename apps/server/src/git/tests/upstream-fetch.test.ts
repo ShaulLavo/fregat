@@ -173,6 +173,39 @@ describe('UpstreamFetchScheduler', () => {
     expect(runFetch).toHaveBeenCalledTimes(1)
   })
 
+  it('fetches repositories with external Git metadata and rechecks their location', async () => {
+    const base = await mkdtemp(path.join(tmpdir(), 'platform-upstream-external-'))
+    const root = path.join(base, 'checkout')
+    const firstGit = path.join(base, 'first.git')
+    const secondGit = path.join(base, 'second.git')
+    try {
+      await mkdir(root)
+      await runGit(base, ['init', '--bare', firstGit])
+      await runGit(base, ['init', '--bare', secondGit])
+      await runGit(base, ['--git-dir', firstGit, 'config', 'core.worktree', root])
+      await runGit(base, ['--git-dir', secondGit, 'config', 'core.worktree', root])
+      let gitDir = firstGit
+      const resolveCommonDir = vi.fn((rootAbsolutePath: string) =>
+        gitCommonDirectory({
+          rootAbsolutePath,
+          run: async (args) => ({
+            stdout: (await runGit(root, ['--git-dir', gitDir, ...args])).stdout.trimEnd(),
+          }),
+        }),
+      )
+      const runFetch = vi.fn(async () => {})
+      const scheduler = new UpstreamFetchScheduler({ resolveCommonDir, runFetch })
+      await scheduler.schedule(root, STATUS_WITH_UPSTREAM)
+      expect(runFetch).toHaveBeenCalledTimes(1)
+      gitDir = secondGit
+      await scheduler.schedule(root, STATUS_WITH_UPSTREAM)
+      expect(resolveCommonDir).toHaveBeenCalledTimes(2)
+      expect(runFetch).toHaveBeenCalledTimes(2)
+    } finally {
+      await rm(base, { recursive: true, force: true })
+    }
+  })
+
   it('resolves a replacement repository at the same path without reusing the old lookup', async () => {
     const base = await mkdtemp(path.join(tmpdir(), 'platform-upstream-replaced-'))
     const root = path.join(base, 'repo')

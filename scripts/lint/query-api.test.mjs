@@ -5,6 +5,8 @@ test.each([
   'client.fetchQuery(options)',
   'client?.prefetchQuery?.(options)',
   'client["ensureQueryData"](options)',
+  'client[`fetchQuery`](options)',
+  'const { [`prefetchQuery`]: warm } = client; warm(options)',
   'const read = client.fetchInfiniteQuery.bind(client); read(options)',
   'const { prefetchInfiniteQuery: warm } = client; warm(options)',
   '({ ["ensureInfiniteQueryData"]: read } = client)',

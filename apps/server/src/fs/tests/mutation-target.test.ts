@@ -1,9 +1,17 @@
-import { lstat, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
+import { lstat, mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { lstatOptional, statOptional, statOptionalVia } from '../mutation-target'
+import { createWorkspacePaths } from '../path'
+import { writeTextFile } from '../write'
+import { textFileVersion } from '../version'
+import {
+  lstatOptional,
+  resolveMutationTarget,
+  statOptional,
+  statOptionalVia,
+} from '../mutation-target'
 
 const directories: string[] = []
 
@@ -20,14 +28,38 @@ describe('optional stat', () => {
     expect(await statOptionalVia(lstat, missing)).toBeNull()
   })
 
-  it('reads a path under a file (ENOTDIR) as missing', async () => {
+  it('preserves ENOTDIR for mutations while journal probes treat it as missing', async () => {
     const file = path.join(await temporaryDirectory(), 'file')
     await writeFile(file, '')
     const underFile = path.join(file, 'child')
 
-    expect(await statOptional(underFile)).toBeNull()
-    expect(await lstatOptional(underFile)).toBeNull()
+    await expect(statOptional(underFile)).rejects.toMatchObject({ code: 'ENOTDIR' })
+    await expect(lstatOptional(underFile)).rejects.toMatchObject({ code: 'ENOTDIR' })
     expect(await statOptionalVia(lstat, underFile)).toBeNull()
+  })
+
+  it('reports a replaced parent as NOT_A_DIRECTORY when saving with a base version', async () => {
+    const root = await temporaryDirectory()
+    const parent = path.join(root, 'parent')
+    await mkdir(parent)
+    await writeFile(path.join(parent, 'child'), 'original')
+    const target = await resolveMutationTarget(createWorkspacePaths(root), {
+      path: 'parent/child',
+      kind: 'content',
+    })
+    await rm(parent, { recursive: true })
+    await writeFile(parent, 'replacement')
+
+    await expect(
+      writeTextFile(
+        target,
+        {
+          content: 'changed',
+          baseVersion: textFileVersion('original'),
+        },
+        1024,
+      ),
+    ).rejects.toMatchObject({ code: 'NOT_A_DIRECTORY' })
   })
 
   it('still throws when the path exists but cannot be resolved', async () => {

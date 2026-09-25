@@ -16,6 +16,8 @@ const deprecated = new Set([
 
 function propertyName(node, computed) {
   if (node?.type === 'Literal') return node.value
+  if (node?.type === 'TemplateLiteral' && node.expressions.length === 0)
+    return node.quasis[0]?.value.cooked ?? null
   if (!computed && node?.type === 'Identifier') return node.name
   return null
 }

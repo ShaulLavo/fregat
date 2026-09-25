@@ -1,5 +1,6 @@
 import { AsyncThrottler } from '@tanstack/pacer/async-throttler'
 import { QueryClient } from '@tanstack/query-core'
+import { nodeErrorCode } from '@workspace/contracts'
 import { stat } from 'node:fs/promises'
 import path from 'node:path'
 
@@ -14,7 +15,7 @@ type UpstreamFetcher = (rootAbsolutePath: string, remote: string) => Promise<voi
 type UpstreamFetchSchedulerOptions = {
   failureCooldownMs?: number
   intervalMs?: number
-  repositoryIdentity?: (rootAbsolutePath: string) => Promise<readonly string[]>
+  repositoryIdentity?: (rootAbsolutePath: string) => Promise<readonly string[] | null>
   resolveCommonDir: (rootAbsolutePath: string) => Promise<string>
   runFetch: UpstreamFetcher
 }
@@ -33,7 +34,9 @@ export class UpstreamFetchScheduler {
   private readonly intervalMs: number
   private readonly resolveCommonDir: (rootAbsolutePath: string) => Promise<string>
   private readonly runFetch: UpstreamFetcher
-  private readonly repositoryIdentity: (rootAbsolutePath: string) => Promise<readonly string[]>
+  private readonly repositoryIdentity: (
+    rootAbsolutePath: string,
+  ) => Promise<readonly string[] | null>
 
   constructor(options: UpstreamFetchSchedulerOptions) {
     this.failureCooldownMs = options.failureCooldownMs ?? UPSTREAM_FETCH_FAILURE_COOLDOWN_MS
@@ -59,9 +62,9 @@ export class UpstreamFetchScheduler {
     try {
       const identity = await this.repositoryIdentity(rootAbsolutePath)
       return await this.lookups.query({
-        queryKey: ['git', 'common-directory', rootAbsolutePath, ...identity],
+        queryKey: ['git', 'common-directory', rootAbsolutePath, ...(identity ?? [])],
         queryFn: () => this.resolveCommonDir(rootAbsolutePath),
-        staleTime: 'static',
+        staleTime: identity === null ? 0 : 'static',
         gcTime: 60_000,
         networkMode: 'always',
         retry: false,
@@ -107,11 +110,16 @@ export class UpstreamFetchScheduler {
   }
 }
 
-async function repositoryIdentity(root: string): Promise<readonly string[]> {
+async function repositoryIdentity(root: string): Promise<readonly string[] | null> {
   const [directory, git] = await Promise.all([
     stat(root, { bigint: true }),
-    stat(path.join(root, '.git'), { bigint: true }),
+    stat(path.join(root, '.git'), { bigint: true }).catch((error: unknown) => {
+      if (nodeErrorCode(error) === 'ENOENT') return null
+      throw error
+    }),
   ])
+  // External GIT_DIR/core.worktree metadata has no local identity; ask Git on each status read.
+  if (git === null) return null
   return [
     `${directory.dev}:${directory.ino}:${directory.birthtimeNs}`,
     `${git.dev}:${git.ino}:${git.birthtimeNs}`,

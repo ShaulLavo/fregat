@@ -88,8 +88,9 @@ describe('mermaid fences', () => {
     expect(loadedMermaid()).not.toBeNull()
   }, 30_000)
 
-  it('keeps the code block when the plugin fails to load', async () => {
-    setMermaidLoader(() => Promise.reject(new Error('offline')))
+  it('keeps code blocks after a failed load across diagram remounts', async () => {
+    const load = vi.fn(() => Promise.reject(new Error('offline')))
+    setMermaidLoader(load)
 
     renderDiagram(false)
 
@@ -98,5 +99,12 @@ describe('mermaid fences', () => {
     expect(mermaidCodeBlock()).not.toBeNull()
     expect(mermaidDiagram()).toBeNull()
     expect(loadedMermaid()).toBeNull()
+    renderDiagram(false, '')
+    expect(mermaidCodeBlock()).toBeNull()
+    renderDiagram(false)
+    await vi.waitFor(() => expect(mermaidCodeBlock()).not.toBeNull())
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    expect(load).toHaveBeenCalledTimes(1)
+    expect(mermaidDiagram()).toBeNull()
   })
 })

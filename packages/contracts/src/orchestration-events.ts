@@ -91,7 +91,7 @@ export const projectDeletedPayloadSchema = v.object({
  */
 export const worktreeRegisteredPayloadSchema = v.object({
   ...worktreeRegistrationEntries,
-  retiredAt: v.nullable(isoDateTimeSchema),
+  retiredAt: v.optional(v.nullable(isoDateTimeSchema), null),
 })
 export const worktreeRetiredPayloadSchema = v.object({
   worktreeId: worktreeIdSchema,

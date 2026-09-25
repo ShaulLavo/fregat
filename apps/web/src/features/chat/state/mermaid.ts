@@ -30,6 +30,7 @@ export const mermaidQueryOptions = queryOptions({
   networkMode: 'always',
   structuralSharing: false,
   retry: false,
+  retryOnMount: false,
 })
 
 export function loadedMermaid(): MermaidRenderer | null {
@@ -71,6 +72,7 @@ function createRenderer(mermaid: MermaidModule): MermaidRenderer {
         resourceQueryClient,
         {
           mutationKey: chatMutationKeys.mermaidRender,
+          // Mermaid shares its configuration and render queue across all diagrams.
           scope: { id: 'mermaid-render' },
           networkMode: 'always',
           retry: false,

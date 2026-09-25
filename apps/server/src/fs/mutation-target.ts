@@ -83,11 +83,11 @@ async function destinationExists(absolutePath: string) {
 }
 
 export async function statOptional(absolutePath: string): Promise<Stats | null> {
-  return statOptionalVia(stat, absolutePath)
+  return statOptionalVia(stat, absolutePath, 'error')
 }
 
 export async function lstatOptional(absolutePath: string): Promise<Stats | null> {
-  return statOptionalVia(lstat, absolutePath)
+  return statOptionalVia(lstat, absolutePath, 'error')
 }
 
 export async function removeDestinationIfAllowed(absolutePath: string, overwrite?: boolean) {
@@ -97,16 +97,17 @@ export async function removeDestinationIfAllowed(absolutePath: string, overwrite
   await rm(absolutePath, { recursive: true, force: false })
 }
 
-/** `null` when missing. ENOTDIR counts: a file as a parent component means no entry. */
+/** Journal probes treat a non-directory parent as absent; direct mutations preserve its error. */
 export async function statOptionalVia(
   read: (target: string) => Promise<Stats>,
   target: string,
+  missingParent: 'absent' | 'error' = 'absent',
 ): Promise<Stats | null> {
   try {
     return await read(target)
   } catch (error) {
     const code = nodeErrorCode(error)
-    if (code === 'ENOENT' || code === 'ENOTDIR') return null
+    if (code === 'ENOENT' || (code === 'ENOTDIR' && missingParent === 'absent')) return null
     throw error
   }
 }

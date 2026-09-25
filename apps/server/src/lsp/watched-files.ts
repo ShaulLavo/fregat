@@ -7,7 +7,7 @@ import { isOutsideRoot, isSameOrDescendant } from '../fs/path'
 import { linkedDirectories, outermostTargets, type LinkedDirectory } from '../fs/linked-directories'
 import type { TreeWatch, TreeWatchChange, TreeWatchSource } from '../fs/tree-watch'
 import { lspErrors } from '../observability/structured-errors'
-import { fileUriForPath } from '@workspace/contracts'
+import { fileUriForNativePath } from './language'
 
 export const DID_CHANGE_WATCHED_FILES = 'workspace/didChangeWatchedFiles'
 
@@ -232,7 +232,7 @@ export class LspWatchedFiles {
     if (change.type !== 'deleted') this.reattachAppeared(change.path)
     for (const candidate of this.aliases(change)) {
       if (!this.matches(candidate)) continue
-      const uri = fileUriForPath(candidate.path)
+      const uri = fileUriForNativePath(candidate.path)
       const previous = this.pending.get(uri)
       this.pending.set(uri, {
         type: mergeChange(previous?.type, changeType(candidate.type)),

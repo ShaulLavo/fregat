@@ -1,4 +1,5 @@
 import { afterEach, vi } from 'vitest'
+import { QueryObserver } from '@tanstack/query-core'
 import { expect, test } from '../../../../../test/fixtures'
 import { loadedMermaid, mermaidQueryOptions, setMermaidLoader } from '@/features/chat/state/mermaid'
 import { resourceQueryClient } from '@/lib/resources/state/query-client'
@@ -47,4 +48,24 @@ test('renderer configuration remains owned by its diagram until rendering settle
   gate.resolve()
   expect(await first).toBe('first:dark')
   expect(await second).toBe('second:default')
+})
+
+test('remounting a diagram does not retry a failed library import', async () => {
+  const load = vi.fn(async () => {
+    throw new Error('fixture import failure')
+  })
+  setMermaidLoader(load)
+  await expect(resourceQueryClient.query(mermaidQueryOptions)).rejects.toThrow(
+    'fixture import failure',
+  )
+  const observer = new QueryObserver(resourceQueryClient, mermaidQueryOptions)
+  const unsubscribe = observer.subscribe(() => {})
+  try {
+    await vi.waitFor(() => expect(observer.getCurrentResult().fetchStatus).toBe('idle'))
+    expect(load).toHaveBeenCalledTimes(1)
+    expect(observer.getCurrentResult().status).toBe('error')
+  } finally {
+    unsubscribe()
+    observer.destroy()
+  }
 })

@@ -110,3 +110,31 @@ test('notifies subscribers, and not for a repeat of the current head', () => {
   recordCommandUse('workspace.toggleSidebarVisibility')
   expect(listener).toHaveBeenCalledTimes(1)
 })
+
+test('keeps multiple recent commands when browser storage is unavailable', () => {
+  Object.defineProperty(globalThis, 'localStorage', {
+    configurable: true,
+    get() {
+      throw new Error('Storage disabled')
+    },
+  })
+  recordCommandUse('workspace.toggleSidebarVisibility')
+  recordCommandUse('workspace.revealTerminal')
+  expect(recentCommandIds()).toEqual([
+    'workspace.revealTerminal',
+    'workspace.toggleSidebarVisibility',
+  ])
+})
+
+test('keeps the session history when later storage writes fail', () => {
+  recordCommandUse('workspace.toggleSidebarVisibility')
+  vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
+    throw new Error('Storage full')
+  })
+  recordCommandUse('workspace.revealTerminal')
+  recordCommandUse('workspace.toggleSidebarVisibility')
+  expect(recentCommandIds()).toEqual([
+    'workspace.toggleSidebarVisibility',
+    'workspace.revealTerminal',
+  ])
+})

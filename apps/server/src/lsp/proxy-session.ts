@@ -1,5 +1,6 @@
 import { lineStartOffset } from '@workspace/utils/strings'
-import { errorMessage, fileUriForPath } from '@workspace/contracts'
+import { errorMessage } from '@workspace/contracts'
+import { fileUriForNativePath } from './language'
 import { elapsedMs } from '@workspace/utils/timing'
 import { createInternalError, lspErrors } from '../observability/structured-errors'
 
@@ -921,11 +922,11 @@ class PooledLspProxySession {
 
   private async initializeRequest(message: JsonRpcRequest): Promise<JsonRpcRequest> {
     const params = isRecord(message.params) ? { ...message.params } : {}
-    params.rootUri = fileUriForPath(this.match.root)
+    params.rootUri = fileUriForNativePath(this.match.root)
     params.workspaceFolders = [
       {
         name: this.match.server.id,
-        uri: fileUriForPath(this.match.root),
+        uri: fileUriForNativePath(this.match.root),
       },
     ]
     params.processId = this.process.pid ?? null
@@ -1311,7 +1312,7 @@ class PooledLspProxySession {
       this.respondToServer(message.id, [
         {
           name: this.match.server.id,
-          uri: fileUriForPath(this.match.root),
+          uri: fileUriForNativePath(this.match.root),
         },
       ])
       return true

@@ -2,6 +2,7 @@ import { EventEmitter } from 'node:events'
 import { mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { PassThrough } from 'node:stream'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ChildProcessWithoutNullStreams } from 'node:child_process'
@@ -138,6 +139,37 @@ describe('LspSessionPool pooling', () => {
           (message) => message.method === 'textDocument/publishDiagnostics',
         ),
       ).toEqual([])
+    },
+  )
+
+  it.runIf(process.platform !== 'win32')(
+    'preserves native workspace URIs during initialization and server requests',
+    async () => {
+      const fixture = await lspFixture()
+      fixture.match.root = path.join(fixture.match.root, 'a\\b')
+      const uri = pathToFileURL(fixture.match.root).href
+      const session = await fixture.pool.acquire(fixture.firstSocket, fixture.match, '')
+      if (!session) throw new Error('expected pooled LSP session')
+      const initializing = session.handleClientMessage(json(initializeRequest(1)))
+      await fixture.waitForServerMessageCount(1)
+      expect.soft(fixture.initializeMessages()[0]).toMatchObject({
+        params: { rootUri: uri, workspaceFolders: [{ uri }] },
+      })
+      fixture.respond({
+        id: fixture.serverMessages[0].id,
+        jsonrpc: '2.0',
+        result: initializeResult(),
+      })
+      await initializing
+      fixture.respond({
+        id: 'folders',
+        jsonrpc: '2.0',
+        method: 'workspace/workspaceFolders',
+        params: {},
+      })
+      await expect
+        .poll(() => fixture.serverResponse('folders'))
+        .toMatchObject({ result: [{ uri }] })
     },
   )
 

@@ -134,3 +134,34 @@ test('disposal releases the loaded core once and prevents reacquisition', async 
   expect(highlighter.highlight(input, vi.fn())).toBeNull()
   expect(createCore).toHaveBeenCalledTimes(1)
 })
+
+test('a failed grammar publishes plain tokens and stays plain for later chunks', async () => {
+  const loadGrammar = vi.fn(async () => {
+    throw new Error('fixture grammar failure')
+  })
+  const highlighter = createShikiHighlighter({
+    themes: palette('#123456'),
+    themeKey: 'failed-grammar',
+    createCore: async (...args) => {
+      const core = await createHighlighterCore(...args)
+      vi.spyOn(core, 'loadLanguage').mockImplementation(loadGrammar)
+      return core
+    },
+  })
+  const accept = vi.fn()
+  try {
+    expect(highlighter.highlight(input, accept)).toBeNull()
+    await vi.waitFor(() => expect(accept).toHaveBeenCalledTimes(1))
+    const appended = { ...input, code: `${input.code};\nconst next = 2` }
+    const result = highlighter.highlight(appended, accept)
+    expect(
+      result?.tokens
+        .flat()
+        .map((token) => token.content)
+        .join('\n'),
+    ).toBe(appended.code)
+    expect(loadGrammar).toHaveBeenCalledTimes(1)
+  } finally {
+    highlighter.dispose()
+  }
+})

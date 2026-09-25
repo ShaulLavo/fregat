@@ -35,7 +35,7 @@ export function recordCommandUse(commandId: PlatformCommandId) {
   const current = recentCommandIds()
   if (current[0] === commandId) return
 
-  recentIds = ledger.record(storage, commandId)
+  recentIds = ledger.record(storage, commandId, current)
   subscriptions.notify()
 }
 

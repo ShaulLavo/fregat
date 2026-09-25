@@ -1,10 +1,11 @@
 import { mkdir, mkdtemp, realpath, rename, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { createWorkspacePaths } from '../../fs/path'
-import { treeWatchSource } from '../../fs/tree-watch'
+import { treeWatchSource, type TreeWatchSource } from '../../fs/tree-watch'
 import { FileChangeHub } from '../../fs/watch'
 import { fileUriForPath } from '@workspace/contracts'
 import {
@@ -70,6 +71,26 @@ describe('watched-file patterns', () => {
     expect(mergeChange(2, 3)).toBe(3)
   })
 })
+
+it.runIf(process.platform !== 'win32')(
+  'preserves native watch-source backslashes in changed-file URIs',
+  async () => {
+    const root = await directory()
+    const changes: FileEvent[] = []
+    let receiver: Parameters<TreeWatchSource>[1] | undefined
+    const source: TreeWatchSource = async (_watch, callbacks) => {
+      receiver = callbacks
+      return async () => {}
+    }
+    const watched = new LspWatchedFiles(root, source, (batch) => changes.push(...batch))
+    cleanups.push(() => watched.dispose())
+    await watched.register('all', { watchers: [{ globPattern: `${root}/**/*` }] })
+    if (!receiver) throw new Error('expected a registered native watch')
+    const file = path.join(root, 'a\\b.ts')
+    receiver.change({ path: file, type: 'changed' })
+    await expect.poll(() => changes).toContainEqual({ uri: pathToFileURL(file).href, type: 2 })
+  },
+)
 
 describe.runIf(process.platform === 'linux')('watched files on a real hub', () => {
   it('describes a replaced file as deleted then created', async () => {

@@ -246,6 +246,30 @@ describe('orchestration engine', () => {
     fixture.close()
   })
 
+  it.each(['worktree.registered', 'worktree.revived'] as const)(
+    'replays stored %s events that omit a retirement timestamp',
+    async (type) => {
+      const fixture = createFixture()
+      const engine = new OrchestrationEngine(fixture.database)
+      try {
+        await engine.dispatch(projectCreateCommand())
+        fixture.sqlite
+          .query(
+            "UPDATE orchestration_events SET event_type = ?, payload_json = json_remove(payload_json, '$.retiredAt') WHERE event_type = 'worktree.registered'",
+          )
+          .run(type)
+        const stored = fixture.database.select().from(schema.orchestrationEvents).all()
+        const replay = await engine.replay({ afterSequence: 0 })
+        expect(replay.events).toContainEqual(
+          expect.objectContaining({ type, payload: expect.objectContaining({ retiredAt: null }) }),
+        )
+        expect(fixture.database.select().from(schema.orchestrationEvents).all()).toEqual(stored)
+      } finally {
+        fixture.close()
+      }
+    },
+  )
+
   it('reports malformed persisted event JSON as a structured invariant error', () => {
     const fixture = createFixture()
     const store = new OrchestrationEventStore(fixture.database)

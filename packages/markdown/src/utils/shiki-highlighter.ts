@@ -73,7 +73,8 @@ export function createShikiHighlighter({
       queryFn: async () => {
         const highlighter = await resources.query(coreOptions)
         const grammar = bundledLanguages[language as keyof typeof bundledLanguages]
-        if (grammar) await highlighter.loadLanguage(grammar)
+        // A broken grammar stays plain for this highlighter lifetime, including streamed chunks.
+        if (grammar) await highlighter.loadLanguage(grammar).catch(() => undefined)
         return true
       },
       staleTime: 'static',

@@ -35,7 +35,7 @@ import {
   spawnZls,
 } from './installers'
 import { fileExtension } from './language'
-import { fileUriForPath } from '@workspace/contracts'
+import { fileUriForNativePath } from './language'
 import { recordProcessInfo } from '../observability'
 import { spawnTypeScript } from './typescript/runtime'
 
@@ -157,7 +157,7 @@ function eslintConfiguration(root: string): Readonly<Record<string, unknown>> {
     workingDirectory: { mode: 'location' },
     workspaceFolder: {
       name: path.basename(root) || root,
-      uri: fileUriForPath(root),
+      uri: fileUriForNativePath(root),
     },
   }
 }
