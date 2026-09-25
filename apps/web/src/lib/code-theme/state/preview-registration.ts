@@ -1,5 +1,6 @@
 import { editorThemeToShikiTheme, type VscodeThemeRegistration } from '@singapore-editor/core/shiki'
-import { loadVscodeThemeRegistration } from '@workspace/client-core/themes/registration'
+import { themeRegistrationQueryOptions } from '@/lib/code-theme/state/registration-query'
+import { resourceQueryClient } from '@/lib/resources/state/query-client'
 import { createClientError } from '@workspace/client-core/errors'
 import type { ThemeRegistration } from 'shiki/core'
 
@@ -22,7 +23,7 @@ export async function loadPreviewRegistration(themeId: string): Promise<ThemeReg
   const builtin = builtinEditorTheme(themeId)
   const registration = builtin
     ? editorThemeToShikiTheme(builtin.editorTheme, { name: themeId, type })
-    : await loadVscodeThemeRegistration(themeId)
+    : (await resourceQueryClient.query(themeRegistrationQueryOptions(themeId))).registration
 
   // Shiki normalizes registrations, so this boundary gives it owned mutable arrays.
   return {

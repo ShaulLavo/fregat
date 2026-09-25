@@ -29,3 +29,5 @@ export const projectEntryQueryKeys = {
   search: (rootPath: string, query: string, limit: number) =>
     [...projectEntryQueryKeys.all, rootPath, query, limit] as const,
 }
+
+export const mermaidQueryKeys = { library: ['chat', 'mermaid'] as const }

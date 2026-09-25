@@ -1,3 +1,5 @@
+import * as themeRegistration from '@workspace/client-core/themes/registration'
+import { loadCodeThemePreview } from '@/lib/code-theme/state/preview'
 import { afterEach, beforeEach, vi } from 'vitest'
 
 import { expect, test } from '../../../../../test/fixtures'
@@ -331,7 +333,8 @@ test('resolves the worker theme to the app-owned registration', async () => {
   expect(getLoadedVscodeThemeRegistration('github-dark')).toBe(registration)
 })
 
-test('a failed requested theme reports the actual fallback id', async () => {
+test('a failed requested theme reports the actual fallback id and can retry', async () => {
+  let fail = true
   vi.resetModules()
   vi.doMock('@workspace/client-core/themes/registration', async () => {
     const actual = await vi.importActual<
@@ -343,7 +346,7 @@ test('a failed requested theme reports the actual fallback id', async () => {
       loadVscodeThemeRegistration: (
         definition: Parameters<typeof actual.loadVscodeThemeRegistration>[0],
       ) => {
-        if (typeof definition !== 'string' && definition.id === 'monokai') {
+        if (fail && typeof definition !== 'string' && definition.id === 'monokai') {
           return Promise.reject(new DOMException('theme load failed'))
         }
 
@@ -362,8 +365,34 @@ test('a failed requested theme reports the actual fallback id', async () => {
     expect(loaded.definition?.id).toBe('dark-plus')
     expect(loaded.registration?.name).toBe('dark-plus')
     expect(loaded.resolvedThemeId).toBe('dark-plus')
+    const { resourceQueryClient } = await import('@/lib/resources/state/query-client')
+    const failed = resourceQueryClient.getQueryState(['editor', 'theme', 'monokai'])
+    expect(failed?.status).toBe('error')
+    expect(failed?.data).toBeUndefined()
+    fail = false
+    expect((await isolatedStore.loadEditorThemeForSelection('dark')).resolvedThemeId).toBe(
+      'monokai',
+    )
   } finally {
     vi.doUnmock('@workspace/client-core/themes/registration')
     vi.resetModules()
+  }
+})
+
+test('preview, commit and worker resolution share one registration read', async () => {
+  const read = vi.spyOn(themeRegistration, 'loadVscodeThemeRegistration')
+  try {
+    previewEditorTheme('dark', 'kanagawa-wave')
+    const preview = loadCodeThemePreview('kanagawa-wave')
+    syncEditorThemeSelection('dark', 'kanagawa-wave')
+    const [selected, worker] = await Promise.all([
+      loadEditorThemeForSelection('dark'),
+      resolveEditorShikiThemeRegistration('kanagawa-wave'),
+      preview,
+    ])
+    expect(selected.registration).toBe(worker)
+    expect(read).toHaveBeenCalledTimes(1)
+  } finally {
+    read.mockRestore()
   }
 })

@@ -1,3 +1,4 @@
+import { initializeGhostty } from '@/features/terminal/state/runtime'
 import type { ServerSocket } from '@workspace/client-core/transport/socket'
 import { createReplayGate } from '@/features/terminal/state/replay'
 import { errorMessage } from '@/lib/error-message'
@@ -14,8 +15,8 @@ import {
   type WorktreeId,
 } from '@workspace/contracts'
 import {
-  GhosttyRuntime,
   Terminal,
+  type GhosttyRuntime,
   type GhosttyWebGpuTerminalSubscription,
   type TerminalScrollbar,
 } from 'ghostty-webgpu'
@@ -29,7 +30,6 @@ import { UNFOCUSED_TERMINAL_CURSOR_STYLE } from '@/features/terminal/utils/appea
 
 export type TerminalInputSender = (data: string) => boolean
 type TerminalDimensions = { cols: number; rows: number }
-let ghosttyRuntimePromise: Promise<GhosttyRuntime> | null = null
 
 export function mountTerminal({
   origin,
@@ -311,17 +311,6 @@ function currentTerminalDimensions(terminal: Terminal) {
     cols: grid.columns,
     rows: grid.rows,
   }
-}
-
-function initializeGhostty() {
-  if (ghosttyRuntimePromise) return ghosttyRuntimePromise
-
-  const loading = GhosttyRuntime.create()
-  ghosttyRuntimePromise = loading
-  void loading.catch(() => {
-    if (ghosttyRuntimePromise === loading) ghosttyRuntimePromise = null
-  })
-  return loading
 }
 
 function openTerminalUri(uri: string) {

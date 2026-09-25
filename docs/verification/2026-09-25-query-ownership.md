@@ -30,3 +30,24 @@ The cold-load trace pair is `/work/tmp/fregat-evidence/20260925T155659Z-trace-se
 Direct URL, command navigation and back/forward passed at `/work/tmp/fregat-evidence/20260925T160148Z-scenario-settings-route-preparation`. The first scenario draft reused a restored settings address, so it created no history entry; opening a file before the settings command makes the history check meaningful.
 
 Failed-chunk recovery passed at `/work/tmp/fregat-evidence/20260925T160202Z-scenario-settings-module-failure`. After the request was allowed again, Retry retained the browser's failed-module result; Reload recovered the settings pane. Failure and recovered screenshots were read. The deliberately aborted module is the sole failed request/console error, with no warning/error app logs. Both module error panes offer Reload.
+
+## Browser renderer and theme resources
+
+Theme registrations, loaded editor themes, preview tokens/highlighter, Mermaid acquisition and Ghostty initialization now use the browser resource client. The preview hook and Mermaid hook read Query state. Selection and hover-preview state stay in the editor store; the provider retains the last successful visual theme while another is acquired.
+
+| Resource            | Identity          | Freshness / retention | Failure / lifetime                                                 |
+| ------------------- | ----------------- | --------------------- | ------------------------------------------------------------------ |
+| Theme registration  | catalog id        | static / infinite     | Failed acquisition stays an error; next request retries            |
+| Loaded editor theme | catalog id        | static / infinite     | Fallback is acquired under its own key                             |
+| Preview tokens      | catalog id        | static / infinite     | No fallback cached as the requested preview                        |
+| Preview highlighter | browser singleton | static / infinite     | Opaque browser-owned handle                                        |
+| Mermaid renderer    | browser singleton | static / infinite     | Failed import remains an error; a later fence can retry            |
+| Ghostty runtime     | browser singleton | static / infinite     | Failed initialization can retry; terminal/PTY lifetime is separate |
+
+All use always-on local acquisition and no structural sharing. The current theme catalog imports immutable Shiki registrations from the build. There is no mutable registration API; the acquired content hash is derived once and used for worker identity. A future mutable registration source must include its revision in identity. Preview normalization copies mutable registration arrays before Shiki receives them.
+
+The preview/commit/worker race failed against the old store with four registration reads, and passes with one shared read. The requested-theme failure test confirms its query retains an error with no fallback data, then retries to the requested theme. Existing theme-store, provider and preview-hook checks pass. Mermaid tests prove concurrent acquisition, retry after failure, and configuration ownership until each render settles. Rendering uses a serial mutation scope because Mermaid configuration is shared. Two real Chromium Mermaid fence tests pass. A Ghostty test joins two failed requests, retains the error, then joins two requests into one real WASM instance and reuses it afterward; the test disposes only its own instance.
+
+`editor-theme-preview` passed at `/work/tmp/fregat-evidence/20260925T161030Z-scenario-editor-theme-preview`, with no warning/error app logs. Its repeated previews and cancel preserve settings.
+
+The terminal mode-switch check passed at `/work/tmp/fregat-evidence/20260925T161253Z-scenario-terminal-background`, with the original canvas still connected and equal background layers. Its screenshot was read and it emitted no warning/error app logs. The scenario now uses the visible mode control; the prior palette-based run left the palette open over the destination. Web types and repository gates pass for P3. Bundle inspection follows the remaining resource migrations.

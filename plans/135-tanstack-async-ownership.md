@@ -1,6 +1,6 @@
 # Plan 135: Give TanStack ownership of async caches and route preparation
 
-Status: **IN PROGRESS on L6. P0–P2 complete. P3–P8 pending.**
+Status: **IN PROGRESS on L6. P0–P3 complete. P4–P8 pending.**
 Priority: P2. Effort: L, split into independently verifiable phases. Risk: medium for
 resource caches, high for pagination and settings recovery.
 Planned against Platform `aeff92d7` plus the working tree on 2026-09-21.
@@ -314,6 +314,8 @@ before/after; claim a latency benefit only if the trace demonstrates it. If load
 no earlier in a relevant path, keep that path's consumer query and omit its loader.
 
 ### 3. Migrate web resource caches
+
+Completed 2026-09-25. The named promise caches are removed. Shared theme acquisition has a four-reads-before/one-after regression; fallback/error/retry, preview races, real Mermaid rendering and real Ghostty initialization pass. Browser theme preview/cancel and terminal mode retention pass. [Evidence and cache contracts](../docs/verification/2026-09-25-query-ownership.md) record the immutable catalog and browser-owned handle lifetimes. Bundle inspection follows the remaining resource migrations.
 
 Migrate each inventory entry as one unit with its callers and obsolete state removed.
 Theme registrations should have one acquisition query reused by selection and previews.
