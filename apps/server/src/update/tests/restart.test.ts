@@ -100,6 +100,7 @@ describe('POST /server/restart', () => {
     expect(fixture.exits).toEqual([])
     expect(updateForApp(fixture.app).state().phase).toBe('serving')
 
+    expect(existsSync(path.join(fixture.production, 'restart-approved.json'))).toBe(false)
     expect((await fixture.restart([BUSY])).result).toEqual({ restarting: true })
     expect(fixture.exits).toEqual([
       expect.objectContaining({ interrupted: [{ sessionId: BUSY, state: 'running' }] }),
