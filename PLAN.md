@@ -517,7 +517,7 @@ of the plans, both logs and the service journal named what stands in the way. Th
 | ---------------------------------------------- | ----------------------------------------------------------------------------------------------- |
 | 146 (done)                                     | Dev and prod stop sharing `~/.platform`; each `agent:browser` run gets its own server and state |
 | [147](plans/147-log-hygiene-and-noise-gate.md) | Producer fixes, level rules, the reaper give-up, ACK timeout vs overflow, a `logs:census` gate  |
-| [148](plans/148-restart-when-idle.md)          | `deploy --server` stages; the server restarts when no turn is running                           |
+| [148](plans/148-update-available.md)           | `deploy --server` stages; the app shows "Update available" and restarts on a click              |
 | [149](plans/149-terminal-host.md)              | A PTY host that survives server restarts                                                        |
 | [150](plans/150-remote-server-version.md)      | Remote servers are checked for protocol and updated                                             |
 | [151](plans/151-remote-server-releases.md)     | Production ships its built server release to remote machines; Update/Install server button      |
