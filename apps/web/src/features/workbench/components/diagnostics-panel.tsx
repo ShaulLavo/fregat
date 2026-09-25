@@ -2,7 +2,7 @@ import type { LanguageServerDefinitionTarget } from '@singapore-editor/lsp-plugi
 import { EmptyState } from '@workspace/ui/components/empty-state'
 import { Shimmer } from '@workspace/ui/components/shimmer'
 import { useListbox } from '@workspace/ui/patterns/use-listbox'
-import { useState, type KeyboardEvent } from 'react'
+import { useState } from 'react'
 
 import { useEditorLanguageServerStatus } from '@/features/editor/hooks/use-editor-language-server-status'
 import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
@@ -23,7 +23,6 @@ import {
   type ActiveDiagnostic,
 } from '@/features/workbench/utils/diagnostic-rows'
 import { useDiagnosticFix } from '@/lib/diagnostic-ai/hooks/use-diagnostic-fix'
-import { isFixKey } from '@/features/workbench/utils/diagnostic-fix-key'
 import { toggledSet } from '@/lib/toggled-set'
 import {
   diagnosticsEmptyState,
@@ -81,11 +80,11 @@ export function DiagnosticsPanel() {
     if (row?.kind === 'group') toggle(row.uri)
   }
 
-  function fixActive(event: KeyboardEvent<HTMLDivElement>, id: string) {
-    const row = rows.find((candidate) => candidate.id === id)
-    if (!fix.available || row?.kind !== 'diagnostic' || !isFixKey(event)) return
-    event.preventDefault()
+  function fixActive() {
+    const row = rows.find((candidate) => candidate.id === activeId)
+    if (!fix.available || fix.mutation.isPending || row?.kind !== 'diagnostic') return false
     fix.mutation.mutate(diagnosticFixRequest(row))
+    return true
   }
 
   const list = useListbox({
@@ -93,7 +92,6 @@ export function DiagnosticsPanel() {
     items: rows,
     activeId,
     onActiveChange: moveTo,
-    onActiveKeyDown: fixActive,
     onCommit: commit,
     onCollapse: collapseOrExpand,
     onExpand: collapseOrExpand,
@@ -120,6 +118,7 @@ export function DiagnosticsPanel() {
   return (
     <FocusablePanel
       area='problems'
+      capabilities={{ fixDiagnostic: fix.available ? fixActive : undefined }}
       target={{ kind: 'problems' }}
       className='flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden'
     >

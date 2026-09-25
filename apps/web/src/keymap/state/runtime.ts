@@ -96,6 +96,18 @@ export function resolveCommandTarget(
   snapshot: WorkspaceCommandSnapshot,
 ): PlatformCommandTarget | null {
   if (targetKind === 'workspace') return { kind: 'workspace', logIdentity: 'workspace' }
+  if (targetKind !== 'editor') {
+    const action = targetKind === 'diagnostic' ? 'fixDiagnostic' : 'toggleCheckpointChange'
+    const target = runtime.focus.resolveTarget({
+      compatible: (candidate) => Boolean(candidate.capabilities[action]),
+      origin: (invocation.origin as FocusTargetToken | null | undefined) ?? null,
+      path: (invocation.event as FocusPathSource | null | undefined) ?? null,
+    })
+    const execute = target?.capabilities[action]
+    return execute && target
+      ? { kind: targetKind, execute, token: target.token, logIdentity: targetKind }
+      : null
+  }
 
   const focusTarget = runtime.focus.resolveTarget({
     compatible: editorTarget,

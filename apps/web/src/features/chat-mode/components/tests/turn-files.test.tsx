@@ -1,6 +1,6 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { screen, waitFor, within } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import {
   commandIdSchema,
@@ -68,7 +68,7 @@ test('undoes one change of a turn from its row and puts it back', async ({ clien
       }}
       onOpenFile={() => {}}
     />,
-    { application: h.application },
+    { application: h.application, command: { bindings: [] } },
   )
 
   const hunks = await screen.findAllByRole('treeitem', { name: /line 2|line 18/ })
@@ -76,6 +76,20 @@ test('undoes one change of a turn from its row and puts it back', async ({ clien
   const [first] = hunks
   const undo = within(first!).getByRole('button', { name: 'Undo' })
   await waitFor(() => expect(undo).toBeEnabled())
+  const tree = screen.getByRole('tree', { name: 'Turn changed files' })
+  tree.focus()
+  await userEvent.keyboard('{Home}{ArrowDown}')
+  const event = new KeyboardEvent('keydown', {
+    key: 'Backspace',
+    ctrlKey: true,
+    shiftKey: true,
+    bubbles: true,
+    cancelable: true,
+  })
+  act(() => {
+    tree.dispatchEvent(event)
+  })
+  expect(event.defaultPrevented).toBe(false)
   await userEvent.click(undo)
 
   await waitFor(async () => expect((await readFile(file, 'utf8')).split('\n')[1]).toBe('line 2'))

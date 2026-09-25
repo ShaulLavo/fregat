@@ -4,8 +4,9 @@ import { selectChatSessionById } from '@workspace/client-core/chat/selectors'
 import { isChatSessionBusy } from '@workspace/client-core/chat/session-busy'
 import { Button } from '@workspace/ui/components/button'
 import { useListbox } from '@workspace/ui/patterns/use-listbox'
-import { useState, type KeyboardEvent } from 'react'
+import { useState } from 'react'
 
+import { useFocusTarget } from '@/lib/focus/hooks/use-target'
 import { GitFileRow } from '@/components/git-file-row'
 import { TurnHunkRow } from '@/features/chat-mode/components/turn-hunk-row'
 import { turnTreeRows, type TurnTreeRow } from '@/features/chat-mode/utils/turn-tree'
@@ -61,13 +62,23 @@ export function TurnFiles({
     })
   }
 
-  function toggleActive(event: KeyboardEvent<HTMLDivElement>, id: string) {
-    if (event.key !== 'Backspace' || !(event.metaKey || event.ctrlKey)) return
-    const row = rows.find((candidate) => candidate.id === id)
-    if (!row) return
-    event.preventDefault()
+  function toggleActive() {
+    const row = rows.find((candidate) => candidate.id === activeId)
+    if (!row || busyReason || revert.isPending) return false
     toggle(row)
+    return true
   }
+
+  const { ref: focusRef } = useFocusTarget<HTMLDivElement>({
+    area: 'git',
+    id: { kind: 'turn-changes', key: `${sessionId}:${turnCount}` },
+    capabilities: { toggleCheckpointChange: busyReason ? undefined : toggleActive },
+    onIntent: (intent, element) => {
+      if (intent !== 'focus') return false
+      element.focus()
+      return true
+    },
+  })
 
   const list = useListbox({
     role: 'tree',
@@ -77,7 +88,6 @@ export function TurnFiles({
     })),
     activeId,
     onActiveChange: setActiveId,
-    onActiveKeyDown: toggleActive,
     onCommit: (id) => {
       const row = rows.find((candidate) => candidate.id === id)
       if (row) onOpenFile(row.kind === 'file' ? row.file.path : row.path)
@@ -86,7 +96,7 @@ export function TurnFiles({
   const pending = revert.isPending ? revert.variables : undefined
 
   return (
-    <div className='flex h-full min-h-0 flex-col'>
+    <div className='flex h-full min-h-0 flex-col' ref={focusRef}>
       <p className='text-muted-foreground text-2xs px-(--density-control-padding-x) py-(--density-gap-tight) tabular-nums'>
         Turn {turnCount} · {summary.files.length} files · {count} changes
       </p>

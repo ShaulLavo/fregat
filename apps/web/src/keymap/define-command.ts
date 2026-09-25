@@ -114,6 +114,12 @@ export type WorkspaceCommandRuntime = {
 
 export type PlatformCommandTarget =
   | {
+      readonly kind: 'diagnostic' | 'checkpoint-change'
+      readonly token: FocusTargetToken
+      readonly execute: () => boolean
+      readonly logIdentity: string
+    }
+  | {
       readonly keymapContext: EditorKeymapContext | null
       readonly inputElement: HTMLElement | null
       readonly focusTarget: ResolvedFocusTarget

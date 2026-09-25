@@ -2,7 +2,7 @@ import { SparkleIcon } from '@phosphor-icons/react'
 import { Button } from '@workspace/ui/components/button'
 import { Spinner } from '@workspace/ui/components/spinner'
 
-import { FIX_SHORTCUT } from '@/features/workbench/utils/diagnostic-fix-key'
+import { useKeyShortcuts } from '@/keymap/hooks/use-key-shortcuts'
 
 /**
  * Fix with AI beside one problem. Out of the Tab order so the list keeps one stop; the
@@ -17,7 +17,7 @@ export function FixDiagnosticButton({
 }) {
   return (
     <Button
-      aria-keyshortcuts={FIX_SHORTCUT}
+      aria-keyshortcuts={useKeyShortcuts('workspace.fixDiagnostic')}
       className='shrink-0'
       disabled={pending}
       size='xs'

@@ -170,6 +170,7 @@ const FILE_OPERATION_COMMAND_IDS = [
 ] as const satisfies readonly PlatformCommandId[]
 
 const WORKSPACE_OPERATION_COMMAND_IDS = [
+  'workspace.toggleCheckpointChange',
   'workspace.undoWorkspaceEdit',
   'workspace.redoWorkspaceEdit',
   'workspace.copyAddress',
@@ -184,6 +185,7 @@ const WORKSPACE_OPERATION_COMMAND_IDS = [
 ] as const satisfies readonly PlatformCommandId[]
 
 const FILE_BACKED_COMMAND_IDS = [
+  'workspace.cycleMarkdownView',
   'workspace.addSelectionToChat',
   'workspace.addFileToChat',
   'workspace.goToLine',
@@ -251,7 +253,7 @@ describe('command table', () => {
   it('has complete execution metadata on all rows', () => {
     for (const command of platformCommands) {
       expect(['async', 'sync']).toContain(command.execution)
-      expect(['editor', 'workspace']).toContain(command.target)
+      expect(['editor', 'workspace', 'diagnostic', 'checkpoint-change']).toContain(command.target)
       expect(['file-operation', 'text-edit', 'view-only', 'workspace-operation']).toContain(
         command.undoCategory,
       )

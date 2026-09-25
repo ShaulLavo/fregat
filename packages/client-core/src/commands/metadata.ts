@@ -4,7 +4,7 @@ import type { FocusArea } from './focus'
 
 type CommandPlatformName = 'linux' | 'mac' | 'windows' | 'tui'
 
-export type CommandTargetKind = 'editor' | 'workspace'
+export type CommandTargetKind = 'editor' | 'workspace' | 'diagnostic' | 'checkpoint-change'
 
 export type CommandWhen =
   | 'chatMode'

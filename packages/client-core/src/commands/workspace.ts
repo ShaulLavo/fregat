@@ -2,6 +2,26 @@ import { defineMetadata } from './metadata'
 import { selectItemCommandId, sidebarPanelCommandId, type ItemPosition } from './item-position'
 
 export const workspaceCommandMetadata = {
+  'workspace.fixDiagnostic': defineMetadata({
+    id: 'workspace.fixDiagnostic',
+    title: 'Fix diagnostic with AI',
+    category: 'Problems',
+    execution: 'sync',
+    target: 'diagnostic',
+    undoCategory: 'view-only',
+    when: [],
+    keys: [{ chord: ['Mod+.'], pane: 'problems' }],
+  }),
+  'workspace.toggleCheckpointChange': defineMetadata({
+    id: 'workspace.toggleCheckpointChange',
+    title: 'Undo or reapply turn change',
+    category: 'Chat',
+    execution: 'sync',
+    target: 'checkpoint-change',
+    undoCategory: 'workspace-operation',
+    when: [],
+    keys: [{ chord: ['Mod+Backspace'], pane: 'git' }],
+  }),
   'workspace.undoWorkspaceEdit': defineMetadata({
     category: 'Workspace',
     description: 'Undo the latest atomic multi-file workspace edit.',

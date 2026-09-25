@@ -5,6 +5,8 @@ import { Spinner } from '@workspace/ui/components/spinner'
 import { ListRow } from '@workspace/ui/patterns/list-row'
 import type { useListbox } from '@workspace/ui/patterns/use-listbox'
 
+import { useKeyShortcuts } from '@/keymap/hooks/use-key-shortcuts'
+
 import {
   hunkPreview,
   hunkStateLabel,
@@ -32,6 +34,7 @@ export function TurnHunkRow({
   readonly onOpen: () => void
   readonly onToggle: () => void
 }) {
+  const keyShortcuts = useKeyShortcuts('workspace.toggleCheckpointChange')
   const preview = hunkPreview(row.hunk)
   const reverted = state === 'reverted'
   const label = reverted ? 'Reapply' : 'Undo'
@@ -63,7 +66,7 @@ export function TurnHunkRow({
       </span>
       <span className='text-muted-foreground text-2xs'>{hunkStateLabel(state)}</span>
       <Button
-        aria-keyshortcuts='Control+Backspace Meta+Backspace'
+        aria-keyshortcuts={keyShortcuts}
         disabled={pending || unavailable !== null || state === undefined}
         size='xs'
         tabIndex={-1}

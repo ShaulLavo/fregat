@@ -665,6 +665,15 @@ function sidebarFocusTarget(
 
 export const workspaceCommands = [
   defineCommand({
+    ...workspaceCommandMetadata['workspace.fixDiagnostic'],
+    run: ({ target }) => (target.kind === 'diagnostic' && target.execute() ? handled : declined),
+  }),
+  defineCommand({
+    ...workspaceCommandMetadata['workspace.toggleCheckpointChange'],
+    run: ({ target }) =>
+      target.kind === 'checkpoint-change' && target.execute() ? handled : declined,
+  }),
+  defineCommand({
     ...workspaceCommandMetadata['workspace.undoWorkspaceEdit'],
     icon: ArrowCounterClockwiseIcon,
     run: ({ runtime }) => operationStart(runtime.workspaceEdits.undo()),

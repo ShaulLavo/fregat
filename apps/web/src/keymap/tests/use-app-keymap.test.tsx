@@ -455,3 +455,36 @@ test('leaves AltGraph character entry unclaimed even when its physical key match
   expect(harness.calls).toEqual([])
   input.remove()
 })
+
+test.each([
+  ['workspace.fixDiagnostic', 'fixDiagnostic'],
+  ['workspace.toggleCheckpointChange', 'toggleCheckpointChange'],
+] as const)(
+  'dispatches the rebound %s action to its registered target with exact modifiers',
+  (command, capability) => {
+    const harness = mountChordRuntime(command, 'Ctrl+U')
+    const element = document.createElement('div')
+    document.body.append(element)
+    let calls = 0
+    const registration = harness.focus.register({
+      area: 'problems',
+      id: { kind: 'problems' },
+      element,
+      capabilities: {
+        [capability]: () => {
+          calls++
+          return true
+        },
+      },
+      onIntent: () => false,
+    })
+    expect(pressKey(element, { key: 'u', ctrlKey: true, shiftKey: true }).defaultPrevented).toBe(
+      false,
+    )
+    expect(calls).toBe(0)
+    expect(pressKey(element, { key: 'u', ctrlKey: true }).defaultPrevented).toBe(true)
+    expect(calls).toBe(1)
+    registration.unregister()
+    element.remove()
+  },
+)
