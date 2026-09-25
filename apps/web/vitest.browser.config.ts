@@ -64,6 +64,7 @@ export default defineConfig({
       '@tanstack/react-hotkeys',
       '@workspace/ui > @base-ui/react/merge-props',
       '@workspace/ui > @base-ui/react/select',
+      '@workspace/ui > @base-ui/react/separator',
       '@workspace/ui > @base-ui/react/switch',
       '@workspace/ui > @base-ui/react/use-render',
       '@workspace/ui > cmdk',
