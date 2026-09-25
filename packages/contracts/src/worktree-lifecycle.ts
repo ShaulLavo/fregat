@@ -106,7 +106,7 @@ export const worktreePullRequestSchema = v.variant('status', [
   v.object({ status: v.literal('unknown') }),
   v.object({
     status: v.literal('unsupported'),
-    support: v.picklist(['cli-missing', 'unauthenticated', 'no-github-remote']),
+    support: v.picklist(['cli-missing', 'unauthenticated', 'no-forge']),
   }),
   v.object({
     status: v.literal('found'),

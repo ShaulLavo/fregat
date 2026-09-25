@@ -77,7 +77,12 @@ async function get(url: URL, workspace: DemoWorkspace): Promise<Response> {
     case '/git/branch-remote-state':
       return json({ branch: repository.branch, hasUpstream: false, ahead: 0, behind: 0 })
     case '/git/pull-request':
-      return json({ branch: repository.branch, pullRequest: null, support: 'no-github-remote' })
+      return json({
+        branch: repository.branch,
+        pullRequest: null,
+        support: 'no-forge',
+        forge: null,
+      })
     default:
       throw unsupported(url)
   }

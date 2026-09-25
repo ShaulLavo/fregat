@@ -718,7 +718,7 @@ export class GitService {
     recordGitServiceOperation('pull_request_state', input)
     const repository = await this.requiredRepository(input)
     const branch = repository.info.branch
-    if (!branch) return { branch: null, pullRequest: null, support: 'no-github-remote' }
+    if (!branch) return { branch: null, pullRequest: null, support: 'no-forge', forge: null }
 
     const read = await readPullRequest({ branch, cwd: repository.rootAbsolutePath })
 

@@ -16,10 +16,23 @@ export type FakePullRequest = {
  * it first on the throwaway server's PATH through `prepareServer`.
  */
 export async function createFakeForge(pullRequest: FakePullRequest) {
-  const directory = await mkdtemp('/work/tmp/fregat-fake-gh-')
-  await copyFile(new URL('./fixtures/fake-gh.mjs', import.meta.url), join(directory, 'gh'))
-  await chmod(join(directory, 'gh'), 0o755)
-  await writeFile(join(directory, 'forge.json'), JSON.stringify({ branches: { '*': pullRequest } }))
+  const cli = await fakeCli('gh', 'fake-gh.mjs')
+  await writeFile(
+    join(cli.directory, 'forge.json'),
+    JSON.stringify({ branches: { '*': pullRequest } }),
+  )
+  return cli
+}
+
+/** A directory holding a fake `glab` with no merge request until one is created. */
+export function createFakeGitLab() {
+  return fakeCli('glab', 'fake-glab.mjs')
+}
+
+async function fakeCli(binary: string, fixture: string) {
+  const directory = await mkdtemp(`/work/tmp/fregat-fake-${binary}-`)
+  await copyFile(new URL(`./fixtures/${fixture}`, import.meta.url), join(directory, binary))
+  await chmod(join(directory, binary), 0o755)
   return {
     directory,
     /** Every recorded invocation, one argv per entry. */

@@ -57,8 +57,10 @@ export type {
   WorktreeSubmoduleMode,
   GitAutoPullSkipReason,
   GitAutoPullState,
+  GitForge,
+  GitForgeKind,
 } from './git'
-export { WORKTREE_SUBMODULE_MODES } from './git'
+export { GIT_FORGE_KINDS, WORKTREE_SUBMODULE_MODES } from './git'
 export type { WatchClientMessage, WatchServerMessage } from './watch-events'
 export {
   parseTerminalClientMessage,
