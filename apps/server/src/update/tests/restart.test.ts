@@ -1,5 +1,7 @@
 import { sessionIdSchema } from '@workspace/contracts'
 import * as v from 'valibot'
+import { existsSync, readFileSync } from 'node:fs'
+import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { updateForApp } from '../../app'
@@ -35,6 +37,12 @@ describe('POST /server/restart', () => {
       expect.objectContaining({ trigger: 'route', to: 'staged-release', interrupted: [] }),
     ])
     expect(updateForApp(fixture.app).state().phase).toBe('restarting')
+    expect(
+      JSON.parse(readFileSync(path.join(fixture.production, 'restart-approved.json'), 'utf8')),
+    ).toEqual({
+      release: 'staged-release',
+      stagedAt: fixture.exits[0]!.stagedAt,
+    })
     await expect(
       fixture.engine.dispatchClientCommand({
         type: 'session.checkpoint.revert',
@@ -58,6 +66,7 @@ describe('POST /server/restart', () => {
     expect(answer.body).toMatchObject({ error: { code } })
     expect(fixture.exits).toEqual([])
     expect(updateForApp(fixture.app).state().phase).toBe('serving')
+    expect(existsSync(path.join(fixture.production, 'restart-approved.json'))).toBe(false)
   })
 
   it('answers NO_UPDATE_STAGED with a fix when nothing is staged', async () => {

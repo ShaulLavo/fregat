@@ -23,6 +23,7 @@ import {
   type SignalOutcome,
 } from './systemd/promote'
 import { createScriptError } from '../structured-errors'
+import { approveRestart, readStagedRelease } from '../../apps/server/src/update/staged-release'
 
 const unitDirectory = path.join(homedir(), '.config/systemd/user')
 const installedUnit = path.join(unitDirectory, serverUnit)
@@ -71,6 +72,7 @@ export type ServerControl = {
   systemctl: (...args: string[]) => Promise<void>
   releaseBody: () => Promise<ReleaseBody | null>
   signal: () => Promise<SignalOutcome>
+  approve: (name: string) => void
   launch: Launch
   now: () => number
   sleep: (ms: number) => Promise<void>
@@ -82,6 +84,12 @@ const liveControl: ServerControl = {
   systemctl,
   releaseBody: async () => (await probeRelease(serverPort)) as ReleaseBody | null,
   signal: () => signalServer(serverPort),
+  approve: (name) => {
+    const { staged } = readStagedRelease(productionRoot, null)
+    if (staged?.release !== name)
+      throw notAcknowledged(name, 'The staged release changed before startup')
+    approveRestart(productionRoot, staged)
+  },
   launch: spawnLauncher,
   now: Date.now,
   sleep: (ms) => Bun.sleep(ms),
@@ -102,6 +110,7 @@ export async function notifyServer(name: string, control = liveControl): Promise
 }
 
 async function startServer(name: string, state: string, control: ServerControl) {
+  control.approve(name)
   if (state === 'failed') await control.systemctl('reset-failed', serverUnit)
   log('systemd', `starting ${serverUnit}; its promotion step takes ${name}`)
   await control.systemctl('start', serverUnit)
@@ -111,6 +120,7 @@ async function startServer(name: string, state: string, control: ServerControl) 
 
 // The first deploy onto a server without the SIGUSR2 handler; after it, nothing restarts unasked.
 async function transitionRestart(name: string, control: ServerControl) {
+  control.approve(name)
   log('systemd', 'the running server predates staged releases; restarting it once')
   await restartServer(control)
   await waitForServerRelease(name, control)
@@ -133,7 +143,7 @@ async function signalStaged(name: string, control: ServerControl): Promise<Notif
 
 function notAcknowledged(name: string, reason: string) {
   return createScriptError(
-    `${reason}. ${name} is staged; it promotes on the next restart. ` +
+    `${reason}. ${name} is staged; confirm Restart in the app to apply it. ` +
       `Check: journalctl --user -u ${serverUnit} -n 50`,
   )
 }

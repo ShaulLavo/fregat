@@ -21,7 +21,7 @@ const values = {
   TUI_ORIGIN: 'platform-tui://local',
 }
 
-test('the unit promotes a staged release before every start and treats Restart as success', () => {
+test('the unit checks for approved promotion before startup and treats Restart as success', () => {
   const unit = renderUnit(values)
 
   expect(unit).not.toContain('{{')
@@ -58,6 +58,9 @@ function scripted({ state = 'active', signal = 'signalled', body }: Scripted) {
       calls.push(`launch ${argv.find((arg) => arg.startsWith('--unit=')) ?? ''}`)
       return true
     },
+    approve: (name) => {
+      calls.push(`approve ${name}`)
+    },
     now: () => time,
     sleep: async (ms) => {
       time += ms
@@ -79,7 +82,7 @@ test('a server without the pending key restarts once into the new release', asyn
   })
 
   await expect(notifyServer('B', server.control)).resolves.toBe('restarted')
-  expect(server.calls).toEqual([`restart ${unit}`])
+  expect(server.calls).toEqual(['approve B', `restart ${unit}`])
 })
 
 test('a server reporting pending: null is signalled and never restarted', async () => {
@@ -106,7 +109,7 @@ test('a stopped server is started so its promotion step takes the release', asyn
   })
 
   await expect(notifyServer('B', server.control)).resolves.toBe('started')
-  expect(server.calls).toEqual([`start ${unit}`])
+  expect(server.calls).toEqual(['approve B', `start ${unit}`])
 })
 
 test('a failed server is reset before it is started', async () => {
@@ -116,7 +119,7 @@ test('a failed server is reset before it is started', async () => {
   })
 
   await expect(notifyServer('B', server.control)).resolves.toBe('started')
-  expect(server.calls).toEqual([`reset-failed ${unit}`, `start ${unit}`])
+  expect(server.calls).toEqual(['approve B', `reset-failed ${unit}`, `start ${unit}`])
 })
 
 test('a signal the server never acknowledges fails after 15s without a restart', async () => {

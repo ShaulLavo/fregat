@@ -12,6 +12,8 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, expect, test } from 'vitest'
 
+import { approveRestart } from '../../../apps/server/src/update/staged-release'
+
 import { liveCheckCommand, promote, releaseProblem, signalServer } from './promote'
 
 let root = ''
@@ -52,6 +54,14 @@ function link(name: 'current' | 'pending', target: string) {
   symlinkSync(target, path.join(root, name))
 }
 
+function approve() {
+  const pending = path.join(root, 'pending')
+  approveRestart(root, {
+    release: path.basename(readlinkSync(pending)),
+    stagedAt: lstatSync(pending).mtime.toISOString(),
+  })
+}
+
 function current() {
   return readlinkSync(path.join(root, 'current'))
 }
@@ -73,11 +83,23 @@ test('nothing staged leaves current alone', () => {
   expect(launched).toEqual([])
 })
 
+test('ordinary service starts preserve a staged release until Restart approves it', () => {
+  const live = release('A')
+  link('current', live)
+  link('pending', release('B'))
+  expect(promote(root, launch)).toBe('none')
+  expect(promote(root, launch)).toBe('none')
+  expect(current()).toBe(live)
+  expect(hasPending()).toBe(true)
+  expect(launched).toEqual([])
+})
+
 test('a dangling pending link is removed and never promoted', () => {
   const live = release('A')
   link('current', live)
   link('pending', path.join(root, 'releases', 'gone'))
 
+  approve()
   expect(promote(root, launch)).toBe('rejected')
   expect(hasPending()).toBe(false)
   expect(current()).toBe(live)
@@ -92,6 +114,7 @@ test('a release whose node_modules link dangles is rejected', () => {
   link('pending', broken)
 
   expect(releaseProblem(broken)).toBe(`${broken} is missing server/node_modules`)
+  approve()
   expect(promote(root, launch)).toBe('rejected')
   expect(hasPending()).toBe(false)
   expect(current()).toBe(live)
@@ -103,6 +126,7 @@ test('a staged release that is already current is dropped', () => {
   link('current', live)
   link('pending', live)
 
+  approve()
   expect(promote(root, launch)).toBe('already-current')
   expect(hasPending()).toBe(false)
   expect(launched).toEqual([])
@@ -115,6 +139,7 @@ test('a valid release is promoted and its live check starts outside the service'
   link('current', live)
   link('pending', next)
 
+  approve()
   expect(promote(root, launch)).toBe('promoted')
   expect(current()).toBe(next)
   expect(hasPending()).toBe(false)
@@ -151,6 +176,7 @@ test('a release deployed with --skip-live-check is promoted without a check', ()
   link('current', live)
   link('pending', next)
 
+  approve()
   expect(promote(root, launch)).toBe('promoted')
   expect(current()).toBe(next)
   expect(launched).toEqual([])
@@ -196,4 +222,23 @@ test('the signal goes only to a server that answers with a pending key', async (
     await server.stop(true)
   }
   expect(await signalServer(server.port, kill)).toBe('unreachable')
+})
+
+test('an approval cannot promote a replacement stage or authorize a later start', () => {
+  const live = release('A')
+  link('current', live)
+  link('pending', release('B'))
+  approve()
+  rmSync(path.join(root, 'pending'))
+  const next = release('C')
+  link('pending', next)
+  expect(promote(root, launch)).toBe('none')
+  expect(current()).toBe(live)
+  expect(hasPending()).toBe(true)
+  expect(existsSync(path.join(root, 'restart-approved.json'))).toBe(false)
+  approve()
+  expect(promote(root, launch)).toBe('promoted')
+  link('pending', release('D'))
+  expect(promote(root, launch)).toBe('none')
+  expect(current()).toBe(next)
 })

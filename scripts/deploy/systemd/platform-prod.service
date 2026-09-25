@@ -7,7 +7,7 @@ Wants=network-online.target
 [Service]
 Type=simple
 WorkingDirectory={{PRODUCTION_ROOT}}
-# Swaps a staged release into current before every start; never fails the start.
+# Consumes an explicit restart approval before promoting; crashes keep the served release.
 ExecStartPre=-{{BUN}} {{PRODUCTION_ROOT}}/bin/promote.ts {{PRODUCTION_ROOT}}
 ExecStart={{BUN}} {{PRODUCTION_ROOT}}/current/server/index.js
 Restart=on-failure

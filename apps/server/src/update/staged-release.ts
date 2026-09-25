@@ -1,5 +1,5 @@
 import type { LiveCheckVerdict, ServerUpdateError, StagedRelease } from '@workspace/contracts'
-import { lstatSync, readFileSync, realpathSync } from 'node:fs'
+import { lstatSync, readFileSync, realpathSync, renameSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import * as v from 'valibot'
 
@@ -21,6 +21,14 @@ const buildConfigSchema = v.object({
   source: v.optional(v.nullable(v.string()), null),
   previousRelease: v.optional(v.nullable(v.string()), null),
 })
+
+/** Consumed once by the installed promotion step, and valid only for this staged release. */
+export function approveRestart(root: string, staged: StagedRelease) {
+  const destination = path.join(root, 'restart-approved.json')
+  const temporary = `${destination}.${process.pid}`
+  writeFileSync(temporary, JSON.stringify(staged), { mode: 0o600 })
+  renameSync(temporary, destination)
+}
 
 /** `<root>/pending`, the release `deploy --server` staged, unless the server already runs it. */
 export function readStagedRelease(

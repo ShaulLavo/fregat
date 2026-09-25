@@ -124,9 +124,15 @@ export async function signalServer(
 
 /** Swaps <root>/pending into <root>/current and starts the post-promotion live check. */
 export function promote(root: string, launch: Launch = spawnLauncher): PromoteOutcome {
+  const approval = takeApproval(root)
   const pending = path.join(root, 'pending')
   const current = path.join(root, 'current')
-  if (!isLink(pending)) return 'none'
+  if (!isLink(pending) || !approval) return 'none'
+  if (
+    approval.release !== linkTarget(pending) ||
+    approval.stagedAt !== lstatSync(pending).mtime.toISOString()
+  )
+    return 'none'
 
   const problem = releaseProblem(pending)
   if (problem)
@@ -146,6 +152,25 @@ export function promote(root: string, launch: Launch = spawnLauncher): PromoteOu
   log(`current → ${path.basename(next)} (was ${previous ? path.basename(previous) : 'nothing'})`)
   startLiveCheck(next, previous, root, launch)
   return 'promoted'
+}
+
+function takeApproval(root: string) {
+  const file = path.join(root, 'restart-approved.json')
+  try {
+    const value: unknown = JSON.parse(readFileSync(file, 'utf8'))
+    if (
+      typeof value !== 'object' ||
+      value === null ||
+      !('release' in value) ||
+      !('stagedAt' in value)
+    )
+      return null
+    return value
+  } catch {
+    return null
+  } finally {
+    rmSync(file, { force: true })
+  }
 }
 
 function startLiveCheck(directory: string, previous: string | null, root: string, launch: Launch) {

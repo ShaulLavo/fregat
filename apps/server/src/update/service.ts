@@ -10,7 +10,7 @@ import type {
 
 import { recordProcessInfo, recordRequestContext } from '../observability'
 import type { OrchestrationEngine } from '../orchestration/engine'
-import { readLiveCheck, readStagedRelease } from './staged-release'
+import { approveRestart, readLiveCheck, readStagedRelease } from './staged-release'
 import { updateErrors } from './structured-errors'
 
 /** What the process needs to exit into the staged release, and what `server.stop` logs. */
@@ -119,7 +119,8 @@ export class ServerUpdate {
 
     this.reread('restart')
     const staged = this.pending
-    if (!staged) {
+    const root = this.root
+    if (!staged || !root) {
       const { reason } = readStagedRelease(this.root, this.serverRelease)
       throw updateErrors.NO_UPDATE_STAGED({ internal: { root: this.root, reason } })
     }
@@ -130,6 +131,7 @@ export class ServerUpdate {
       return { restarting: false, busy: answer.busy }
     }
 
+    approveRestart(root, staged)
     const interrupted = answer.interrupted.map(({ sessionId, state }) => ({ sessionId, state }))
     recordRequestContext({
       update: {
