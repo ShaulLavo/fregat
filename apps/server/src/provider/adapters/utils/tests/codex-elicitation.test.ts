@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import type { ProviderApprovalDecision } from '@workspace/contracts'
 import { parseCodexElicitation } from '../codex-elicitation'
 
 // Codex's MCP tool-call approval, as `build_mcp_tool_approval_elicitation_request` emits it
@@ -44,8 +45,18 @@ const appAccessForm = {
   },
 }
 
+type Parsed = ReturnType<typeof parseCodexElicitation>
+
 function decisions(params: unknown) {
-  return parseCodexElicitation(params)?.options.map((option) => option.decision)
+  return options(parseCodexElicitation(params))?.map((option) => option.decision)
+}
+
+function options(parsed: Parsed) {
+  return parsed?.offers.map((offer) => offer.option)
+}
+
+function response(parsed: Parsed, decision: ProviderApprovalDecision) {
+  return parsed?.offers.find((offer) => offer.option.decision === decision)?.response
 }
 
 function withPersist(persist: unknown) {
@@ -56,20 +67,20 @@ describe('Codex MCP elicitation', () => {
   it('offers exactly the persistence Codex declares on a tool-call approval', () => {
     const parsed = parseCodexElicitation(toolApproval)
     expect(parsed?.detail).toBe('Calendar\nAllow Calendar to create an event?')
-    expect(parsed?.options).toEqual([
+    expect(options(parsed)).toEqual([
       { decision: 'cancel', label: 'Cancel' },
       { decision: 'decline', label: 'Decline' },
       { decision: 'acceptForSession', label: 'Always allow this session' },
       { decision: 'acceptAlways', label: 'Always allow' },
       { decision: 'accept', label: 'Approve' },
     ])
-    expect(parsed?.responses.get('accept')).toEqual({ action: 'accept', content: {} })
-    expect(parsed?.responses.get('acceptForSession')).toEqual({
+    expect(response(parsed, 'accept')).toEqual({ action: 'accept', content: {} })
+    expect(response(parsed, 'acceptForSession')).toEqual({
       action: 'accept',
       content: {},
       _meta: { persist: 'session' },
     })
-    expect(parsed?.responses.get('acceptAlways')).toEqual({
+    expect(response(parsed, 'acceptAlways')).toEqual({
       action: 'accept',
       content: {},
       _meta: { persist: 'always' },
@@ -115,23 +126,23 @@ describe('Codex MCP elicitation', () => {
 
   it('maps form options by their declared value, whatever their label says', () => {
     const parsed = parseCodexElicitation(appAccessForm)
-    expect(parsed?.options).toEqual([
+    expect(options(parsed)).toEqual([
       { decision: 'cancel', label: 'Cancel' },
       { decision: 'decline', label: 'Decline' },
       { decision: 'acceptForSession', label: 'Always allow Safari for this session' },
       { decision: 'acceptAlways', label: 'Always allow Safari' },
       { decision: 'accept', label: 'Approve' },
     ])
-    expect(parsed?.responses.get('accept')).toEqual({
+    expect(response(parsed, 'accept')).toEqual({
       action: 'accept',
       content: { approval: 'once' },
     })
-    expect(parsed?.responses.get('acceptForSession')).toEqual({
+    expect(response(parsed, 'acceptForSession')).toEqual({
       action: 'accept',
       content: { approval: 'session' },
       _meta: { persist: 'session' },
     })
-    expect(parsed?.responses.get('acceptAlways')).toEqual({
+    expect(response(parsed, 'acceptAlways')).toEqual({
       action: 'accept',
       content: { approval: 'always' },
       _meta: { persist: 'always' },
@@ -150,12 +161,12 @@ describe('Codex MCP elicitation', () => {
         required: ['approval'],
       },
     })
-    expect(parsed?.options.map((option) => option.decision)).toEqual([
+    expect(options(parsed)?.map((option) => option.decision)).toEqual([
       'cancel',
       'decline',
       'accept',
     ])
-    expect(parsed?.responses.get('accept')).toEqual({
+    expect(response(parsed, 'accept')).toEqual({
       action: 'accept',
       content: { approval: 'once' },
     })
@@ -169,7 +180,7 @@ describe('Codex MCP elicitation', () => {
         required: ['approval'],
       },
     })
-    expect(parsed?.options.map((option) => option.decision)).toEqual([
+    expect(options(parsed)?.map((option) => option.decision)).toEqual([
       'cancel',
       'decline',
       'accept',
@@ -197,8 +208,8 @@ describe('Codex MCP elicitation', () => {
 
   it('matches the pinned unknown-schema acceptance without content', () => {
     const parsed = parseCodexElicitation({ ...appAccessForm, requestedSchema: { properties: 123 } })
-    expect(parsed?.responses.get('accept')).toEqual({ action: 'accept' })
-    expect(parsed?.responses.get('acceptAlways')).toEqual({
+    expect(response(parsed, 'accept')).toEqual({ action: 'accept' })
+    expect(response(parsed, 'acceptAlways')).toEqual({
       action: 'accept',
       _meta: { persist: 'always' },
     })
@@ -213,11 +224,11 @@ describe('Codex MCP elicitation', () => {
         required: ['approval'],
       },
     })
-    expect(parsed?.responses.get('accept')).toEqual({
+    expect(response(parsed, 'accept')).toEqual({
       action: 'accept',
       content: { approval: 'accept' },
     })
-    expect(parsed?.responses.get('acceptAlways')).toEqual({
+    expect(response(parsed, 'acceptAlways')).toEqual({
       action: 'accept',
       content: { approval: 'always' },
       _meta: { persist: 'always' },

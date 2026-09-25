@@ -28,6 +28,9 @@ import { selectSettingsView } from '@/features/settings/state/view-store'
 import { FocusService } from '@/lib/focus/state/service'
 import { matchesActiveSurface } from '@/lib/focus/utils/active-surface'
 
+// The whole settings page renders here; a shared CI runner takes about 6x a workstation.
+const SLOW_RENDER_TIMEOUT_MS = 60_000
+
 test.beforeEach(() => {
   selectSettingsScope('user')
   selectSettingsView('form')
@@ -41,45 +44,53 @@ async function openDarkWallpaperPicker() {
   return screen.findByRole('button', { name: 'None' })
 }
 
-test('renders a row per user-visible setting and writes a toggle through', async ({ client }) => {
-  expect(client).toBeDefined()
-  renderWithProviders(<SettingsPage />)
+test(
+  'renders a row per user-visible setting and writes a toggle through',
+  async ({ client }) => {
+    expect(client).toBeDefined()
+    renderWithProviders(<SettingsPage />)
 
-  const wallpaper = await openDarkWallpaperPicker()
-  expect(wallpaper).toHaveAttribute('aria-pressed', 'false')
+    const wallpaper = await openDarkWallpaperPicker()
+    expect(wallpaper).toHaveAttribute('aria-pressed', 'false')
 
-  await userEvent.click(wallpaper)
+    await userEvent.click(wallpaper)
 
-  // Asserted against the server, not the control: the point is that the click
-  // reached the settings file, not that a switch flipped locally.
-  await waitFor(async () => {
-    const snapshot = await fetchSettings(undefined, getClient())
-    expect(snapshot.values['workbench.wallpaper'].enabled).toBe(false)
-  })
-})
+    // Asserted against the server, not the control: the point is that the click
+    // reached the settings file, not that a switch flipped locally.
+    await waitFor(async () => {
+      const snapshot = await fetchSettings(undefined, getClient())
+      expect(snapshot.values['workbench.wallpaper'].enabled).toBe(false)
+    })
+  },
+  SLOW_RENDER_TIMEOUT_MS,
+)
 
-test('offers a reset once a value differs from its default', async ({ client }) => {
-  expect(client).toBeDefined()
-  renderWithProviders(<SettingsPage />)
+test(
+  'offers a reset once a value differs from its default',
+  async ({ client }) => {
+    expect(client).toBeDefined()
+    renderWithProviders(<SettingsPage />)
 
-  await userEvent.click(await openDarkWallpaperPicker())
-  await userEvent.click(screen.getByRole('button', { name: 'Close' }))
+    await userEvent.click(await openDarkWallpaperPicker())
+    await userEvent.click(screen.getByRole('button', { name: 'Close' }))
 
-  await userEvent.click(
-    await screen.findByRole('button', { name: 'Actions for workbench.wallpaper' }),
-  )
-  await userEvent.click(await screen.findByRole('menuitem', { name: 'Reset setting' }))
-
-  // Reset removes the key rather than writing the default into the file, which
-  // is what keeps the default coming from the running build.
-  await waitFor(async () => {
-    const snapshot = await fetchSettings(undefined, getClient())
-    expect(snapshot.values['workbench.wallpaper'].source.kind).toBe('desktop')
-    expect(snapshot.layers.find((layer) => layer.id === 'user')?.raw).not.toHaveProperty(
-      'workbench.wallpaper',
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Actions for workbench.wallpaper' }),
     )
-  })
-})
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Reset setting' }))
+
+    // Reset removes the key rather than writing the default into the file, which
+    // is what keeps the default coming from the running build.
+    await waitFor(async () => {
+      const snapshot = await fetchSettings(undefined, getClient())
+      expect(snapshot.values['workbench.wallpaper'].source.kind).toBe('desktop')
+      expect(snapshot.layers.find((layer) => layer.id === 'user')?.raw).not.toHaveProperty(
+        'workbench.wallpaper',
+      )
+    })
+  },
+  SLOW_RENDER_TIMEOUT_MS,
+)
 
 test('filters by id, label, keyword and description', () => {
   expect(matchingSettingIds('surface.blur')).toEqual(['workbench.surface.blur'])
@@ -146,52 +157,63 @@ test('reset all clears every key from the layer in one write', async ({ client }
   })
 })
 
-test('refuses an application-scoped key from the workspace tab, and says why', async ({
-  client,
-}) => {
-  expect(client).toBeDefined()
-  // The Workspace tab is gated on a folder being open, so the page needs a
-  // workspace store with a root for the tab to be reachable at all.
-  const store = createEditorWorkspaceStore({
-    ...emptyWorkspaceState(),
-    rootFolder: {
-      birthtimeMs: 0,
-      mtimeMs: 0,
-      name: 'repo',
-      path: filesystemPath('/repo'),
-      size: 0,
-      type: 'directory',
-      version: '',
-    },
-  })
-  renderWithProviders(
-    <EditorWorkspaceStateContext.Provider value={store}>
-      <SettingsPage />
-    </EditorWorkspaceStateContext.Provider>,
-  )
+test(
+  'refuses an application-scoped key from the workspace tab, and says why',
+  async ({ client }) => {
+    expect(client).toBeDefined()
+    // The Workspace tab is gated on a folder being open, so the page needs a
+    // workspace store with a root for the tab to be reachable at all.
+    const store = createEditorWorkspaceStore({
+      ...emptyWorkspaceState(),
+      rootFolder: {
+        birthtimeMs: 0,
+        mtimeMs: 0,
+        name: 'repo',
+        path: filesystemPath('/repo'),
+        size: 0,
+        type: 'directory',
+        version: '',
+      },
+    })
+    renderWithProviders(
+      <EditorWorkspaceStateContext.Provider value={store}>
+        <SettingsPage />
+      </EditorWorkspaceStateContext.Provider>,
+    )
 
-  await userEvent.click(await screen.findByRole('tab', { name: 'Workspace' }))
-  await userEvent.type(await screen.findByLabelText('Search settings'), 'runtime')
-  // The scope rule surfaces where the user meets it rather than only as a
-  // server error after a failed save.
-  expect(
-    await screen.findByText(/^application settings can only be set in User settings$/),
-  ).toBeDefined()
-})
+    await userEvent.click(await screen.findByRole('tab', { name: 'Workspace' }))
+    await userEvent.type(await screen.findByLabelText('Search settings'), 'runtime')
+    // The scope rule surfaces where the user meets it rather than only as a
+    // server error after a failed save.
+    expect(
+      await screen.findByText(/^application settings can only be set in User settings$/),
+    ).toBeDefined()
+  },
+  SLOW_RENDER_TIMEOUT_MS,
+)
 
-test('renders a real providers editor rather than a JSON escape hatch', async ({ client }) => {
-  expect(client).toBeDefined()
-  renderWithProviders(<SettingsPage />)
+test(
+  'renders a real providers editor rather than a JSON escape hatch',
+  async ({ client }) => {
+    expect(client).toBeDefined()
+    renderWithProviders(<SettingsPage />)
 
-  await userEvent.type(await screen.findByLabelText('Search settings'), 'providers')
+    await userEvent.type(await screen.findByLabelText('Search settings'), 'providers')
 
-  // The built-in providers live in the registry as constants, not in the
-  // settings document, so the row has to source them from the running snapshots.
-  // Before this the page showed "Edit in settings.json" for the one screen whose
-  // whole job is configuring providers.
-  expect(screen.queryByText('Edit in settings.json')).toBeNull()
-  expect((await screen.findAllByRole('switch', { name: /Enable/ })).length).toBeGreaterThan(0)
-})
+    // The built-in providers live in the registry as constants, not in the
+    // settings document, so the row has to source them from the running snapshots.
+    // Before this the page showed "Edit in settings.json" for the one screen whose
+    // whole job is configuring providers.
+    expect(screen.queryByText('Edit in settings.json')).toBeNull()
+    const switches = await screen.findAllByRole(
+      'switch',
+      { name: /Enable/ },
+      { timeout: SLOW_RENDER_TIMEOUT_MS },
+    )
+    expect(switches.length).toBeGreaterThan(0)
+  },
+  SLOW_RENDER_TIMEOUT_MS,
+)
 
 test('lists the real model catalog, and hiding one keeps its row to bring it back', async ({
   client,

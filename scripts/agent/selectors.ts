@@ -106,6 +106,11 @@ export const selectors = {
     page
       .getByRole('region', { name: 'App access', exact: true })
       .getByRole('button', { name: label, exact: true }),
+  commandApproval: (page: Page) => page.getByRole('region', { name: 'Run a command', exact: true }),
+  commandApprovalDecision: (page: Page, label: string | RegExp) =>
+    page
+      .getByRole('region', { name: 'Run a command', exact: true })
+      .getByRole('button', { name: label, exact: true }),
   imageLightbox: (page: Page, name: string) => page.getByRole('dialog', { name, exact: true }),
   iconHintControl: (scope: Page | Locator, name: string) =>
     scope.getByRole('button', { name, exact: true }),

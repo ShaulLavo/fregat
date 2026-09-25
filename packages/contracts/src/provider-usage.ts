@@ -3,10 +3,10 @@ import { providerInstanceIdSchema } from './chat-ids'
 import { isoDateTimeSchema, trimmedNonEmptyStringSchema } from './chat-model'
 import { providerDriverKindSchema } from './orchestration-runtime'
 
-export const providerUsageWindowKindSchema = v.picklist(['session', 'weekly', 'monthly', 'other'])
+const providerUsageWindowKindSchema = v.picklist(['session', 'weekly', 'monthly', 'other'])
 
 /** `warning` is the provider's own early warning, not a threshold we picked. */
-export const providerUsageWindowStatusSchema = v.picklist(['allowed', 'warning', 'rejected'])
+const providerUsageWindowStatusSchema = v.picklist(['allowed', 'warning', 'rejected'])
 
 /**
  * One plan window of a provider account. `id` is stable per provider (`five_hour`,
@@ -79,9 +79,9 @@ const usageTokensEntries = {
  * `provider`: the CLI's own estimate. `price`: the user's per-model price applied at
  * read time. `none`: no estimate and no price, so the cost is unknown, not zero.
  */
-export const providerUsageCostSourceSchema = v.picklist(['provider', 'price', 'none'])
+const providerUsageCostSourceSchema = v.picklist(['provider', 'price', 'none'])
 
-export const providerUsageModelRowSchema = v.object({
+const providerUsageModelRowSchema = v.object({
   model: trimmedNonEmptyStringSchema,
   driverKind: trimmedNonEmptyStringSchema,
   turns: tokenCountSchema,
@@ -90,14 +90,14 @@ export const providerUsageModelRowSchema = v.object({
   costSource: providerUsageCostSourceSchema,
 })
 
-export const providerUsageDayRowSchema = v.object({
+const providerUsageDayRowSchema = v.object({
   /** `YYYY-MM-DD` in the viewer's time zone. */
   day: v.pipe(v.string(), v.isoDate()),
   tokens: tokenCountSchema,
   costUsd: v.number(),
 })
 
-export const providerUsagePurposeRowSchema = v.object({
+const providerUsagePurposeRowSchema = v.object({
   purpose: providerUsagePurposeSchema,
   turns: tokenCountSchema,
   tokens: tokenCountSchema,
@@ -123,7 +123,7 @@ export const providerUsageHistorySchema = v.object({
 })
 
 /** US dollars per million tokens, for models whose provider reports no cost. */
-export const modelPriceSchema = v.object({
+const modelPriceSchema = v.object({
   input: v.pipe(v.number(), v.minValue(0)),
   cachedInput: v.pipe(v.number(), v.minValue(0)),
   output: v.pipe(v.number(), v.minValue(0)),

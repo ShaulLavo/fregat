@@ -9,7 +9,7 @@ import {
 } from '../../../packages/contracts/src/index'
 import type { Scenario } from './index'
 import { selectors } from '../selectors'
-import { dispatch, readShell } from './chat-verification'
+import { dispatch, openChat, readShell } from './chat-verification'
 
 const nativeEntrySchema = v.looseObject({
   event: v.string(),
@@ -80,7 +80,7 @@ type PreparedWorktree = {
 }
 
 /** Registers `path` as its own project and resolves the exact worktree the server recorded. */
-async function registerFixtureProject(page: Page, orchestration: string, path: string) {
+export async function registerFixtureProject(page: Page, orchestration: string, path: string) {
   await dispatch(page, orchestration, {
     type: 'project.create',
     title: `Fixture ${path.split('/').at(-1)}`,
@@ -122,14 +122,7 @@ export function isolatedNativeScenario(options: {
     description: options.description,
     inspect: async (page) => evidence.get(page) ?? null,
     async run(page, { step }) {
-      const connected = page.waitForEvent('websocket', {
-        predicate: (socket) => socket.url().endsWith('/orchestration/rpc'),
-      })
-      await page.goto(page.url().replace(/\/workbench(?:\?.*)?$/, '/chat'))
-      const orchestration = (await connected)
-        .url()
-        .replace(/^ws/, 'http')
-        .replace(/\/rpc$/, '')
+      const orchestration = await openChat(page)
       const base = orchestration.replace(/\/orchestration$/, '')
       const before = await settingsSnapshot(page, base)
       const originallySet =

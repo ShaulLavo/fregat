@@ -24,7 +24,7 @@ a bare root `bun run verify`.
 | [148 — server deploys restart when idle](148-restart-when-idle.md)                       | **PROPOSED — D3 (MAX WAIT) NEEDS THE OWNER'S NUMBER**        |
 | [147 — log hygiene and a noise gate](147-log-hygiene-and-noise-gate.md)                  | **PROPOSED — RESEARCH DONE; PHASE 1 READY**                  |
 | [146 — separate state and isolated verification](146-isolated-state-and-verification.md) | **PROPOSED — PHASE 1 READY; PHASE 4 CLEANUP NEEDS OWNER OK** |
-| [145 — harness controls](145-harness-controls.md)                                        | **PROPOSED — EIGHT SMALL PLANS**                             |
+| [145 — harness controls](145-harness-controls.md)                                        | **APPROVAL-RULES IMPLEMENTED; SEVEN PROPOSED**               |
 | [144 — unattended agent work](144-unattended-agent-work.md)                              | **RESEARCH — HARNESS INVENTORY FIRST**                       |
 | [143 — phone layout](143-phone-layout.md)                                                | **DISCUSSION — OWNER DIRECTION FIRST**                       |
 | [142 — web push](142-web-push.md)                                                        | **PROPOSED — SPIKE FIRST**                                   |

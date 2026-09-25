@@ -14,6 +14,8 @@ export type PendingApprovalKind = 'command' | 'file-change' | 'file-read' | 'app
 
 export type PendingApproval = {
   readonly options: readonly ProviderApprovalOption[]
+  /** The harness marked this ask risky: no choice may be one keystroke away. */
+  readonly defaultToNo: boolean
   readonly createdAt: string
   readonly detail: string | null
   readonly requestId: ApprovalRequestId
@@ -44,6 +46,7 @@ const APPROVAL_KIND_BY_REQUEST_TYPE: Record<string, PendingApprovalKind> = {
  */
 const approvalPayloadSchema = v.object({
   options: v.optional(v.array(providerApprovalOptionSchema)),
+  defaultToNo: v.nullish(v.boolean()),
   detail: v.nullish(v.string()),
   requestId: approvalRequestIdSchema,
   requestKind: v.nullish(v.string()),
@@ -118,6 +121,7 @@ function pendingApproval(
 ): PendingApproval {
   return {
     options: payload.options ?? DEFAULT_APPROVAL_OPTIONS,
+    defaultToNo: payload.defaultToNo === true,
     createdAt: activity.createdAt,
     detail: nonEmptyText(payload.detail),
     requestId: payload.requestId,

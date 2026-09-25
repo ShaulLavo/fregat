@@ -17,7 +17,7 @@ export type TreeWatchChange = {
   readonly directory?: boolean
 }
 
-export type TreeWatchCallbacks = {
+type TreeWatchCallbacks = {
   readonly change: (change: TreeWatchChange) => void
   readonly error: (message: string) => void
 }

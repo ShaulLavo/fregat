@@ -7,6 +7,39 @@ import { makeTestServer } from '../../../test/server'
 import { appendAgentRequest, renderAgentStage } from '../../../test/factories/agent-stage'
 import { runPaletteCommand } from '../../../test/actions'
 
+// The SDK's defaultToNo: an ask it marked risky must not be one stray digit from approval.
+test('a risky approval takes no digit shortcut', async () => {
+  const server = await makeTestServer({ providerRuntime: true })
+  const app = await renderAgentStage(server, { conversation: true, width: 60 })
+  const { frame, submission } = app
+  assert(submission)
+  try {
+    await act(async () => {
+      await appendAgentRequest(server, {
+        sessionId: submission.command.sessionId,
+        turnId: submission.command.turnId,
+        kind: 'approval.requested',
+        payload: {
+          requestId: v.parse(approvalRequestIdSchema, 'approval-risky'),
+          requestKind: 'command',
+          detail: 'rm -rf build',
+          defaultToNo: true,
+        },
+      })
+    })
+    await expect.poll(() => frame.renderer.currentFocusedRenderable?.id).toBe('agent-approval')
+    await act(async () => {
+      frame.mockInput.pressKey('4')
+      await frame.renderOnce()
+    })
+    expect(frame.captureCharFrame()).not.toContain('4 Allow')
+    expect(server.providerAdapter.approvalResponses).toHaveLength(0)
+  } finally {
+    await app.cleanup()
+    await server.cleanup()
+  }
+})
+
 // Digits in queued composer input must never accept a newly arrived approval.
 test('an approval waits for typing to stop, preserves the draft, and sends only the intentional decision', async () => {
   const server = await makeTestServer({ providerRuntime: true })

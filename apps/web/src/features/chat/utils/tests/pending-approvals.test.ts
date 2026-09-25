@@ -99,6 +99,7 @@ test('the derived approval carries the fields the panel renders', () => {
 
   expect(approval).toEqual({
     options: DEFAULT_APPROVAL_OPTIONS,
+    defaultToNo: false,
     createdAt: at(1),
     detail: 'rm -rf build',
     requestId: 'req-1',

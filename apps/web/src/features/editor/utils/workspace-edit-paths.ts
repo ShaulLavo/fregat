@@ -37,7 +37,7 @@ export function workspaceDocumentPath(
   return filesystemPath(`${root}/${relativePath}`)
 }
 
-export function normalizeWorkspaceNamespacePath(path: FilesystemPath): FilesystemPath {
+function normalizeWorkspaceNamespacePath(path: FilesystemPath): FilesystemPath {
   if (path === '/') return path
   return filesystemPath(normalizeWorkspaceRoot(path))
 }

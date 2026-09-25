@@ -285,7 +285,7 @@
     },
     "editor.tabSize": {
       "default": 4,
-      "description": "Rendered width of a tab character, in spaces.",
+      "description": "Width of a tab character, in spaces. Also the indentation width for a file whose own cannot be detected.",
       "maximum": 16,
       "minimum": 1,
       "type": "integer"

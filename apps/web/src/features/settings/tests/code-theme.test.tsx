@@ -18,43 +18,48 @@ import { fetchSettings } from '@/features/settings/utils/api'
 import { readSettingsMirror } from '@/lib/settings-boot-mirror'
 import { dismissSaveError } from '@/features/settings/utils/notify-save-error'
 
-test('settings saves native code themes per mode and reset restores the editor default', async ({
-  client,
-}) => {
-  expect(client).toBeDefined()
-  renderWithProviders(<SettingsPage />)
+// The whole settings page renders here; a shared CI runner takes about 6x a workstation.
+const SLOW_RENDER_TIMEOUT_MS = 60_000
 
-  await userEvent.click(await screen.findByRole('button', { name: 'Code theme in dark mode' }))
-  expect(screen.queryByRole('option', { name: /^Native Light/ })).not.toBeInTheDocument()
-  await userEvent.click(await screen.findByRole('option', { name: /^Native Dark/ }))
+test(
+  'settings saves native code themes per mode and reset restores the editor default',
+  async ({ client }) => {
+    expect(client).toBeDefined()
+    renderWithProviders(<SettingsPage />)
 
-  await waitFor(async () => {
-    const snapshot = await fetchSettings(undefined, getClient())
-    expect(snapshot.values['editor.codeTheme.dark']).toBe('tree-sitter-dark')
-    expect(snapshot.values['editor.codeTheme.light']).toBe('light-plus')
-    expect(getCommittedEditorThemeId('dark')).toBe('tree-sitter-dark')
-  })
+    await userEvent.click(await screen.findByRole('button', { name: 'Code theme in dark mode' }))
+    expect(screen.queryByRole('option', { name: /^Native Light/ })).not.toBeInTheDocument()
+    await userEvent.click(await screen.findByRole('option', { name: /^Native Dark/ }))
 
-  await userEvent.click(screen.getByRole('button', { name: 'Code theme in light mode' }))
-  expect(screen.queryByRole('option', { name: /^Native Dark/ })).not.toBeInTheDocument()
-  await userEvent.click(await screen.findByRole('option', { name: /^Native Light/ }))
+    await waitFor(async () => {
+      const snapshot = await fetchSettings(undefined, getClient())
+      expect(snapshot.values['editor.codeTheme.dark']).toBe('tree-sitter-dark')
+      expect(snapshot.values['editor.codeTheme.light']).toBe('light-plus')
+      expect(getCommittedEditorThemeId('dark')).toBe('tree-sitter-dark')
+    })
 
-  await waitFor(async () => {
-    const snapshot = await fetchSettings(undefined, getClient())
-    expect(snapshot.values['editor.codeTheme.light']).toBe('tree-sitter-light')
-    expect(snapshot.values['editor.codeTheme.dark']).toBe('tree-sitter-dark')
-  })
+    await userEvent.click(screen.getByRole('button', { name: 'Code theme in light mode' }))
+    expect(screen.queryByRole('option', { name: /^Native Dark/ })).not.toBeInTheDocument()
+    await userEvent.click(await screen.findByRole('option', { name: /^Native Light/ }))
 
-  await userEvent.click(screen.getByRole('button', { name: 'Actions for editor.codeTheme.dark' }))
-  await userEvent.click(await screen.findByRole('menuitem', { name: 'Reset setting' }))
+    await waitFor(async () => {
+      const snapshot = await fetchSettings(undefined, getClient())
+      expect(snapshot.values['editor.codeTheme.light']).toBe('tree-sitter-light')
+      expect(snapshot.values['editor.codeTheme.dark']).toBe('tree-sitter-dark')
+    })
 
-  await waitFor(async () => {
-    const snapshot = await fetchSettings(undefined, getClient())
-    expect(snapshot.values['editor.codeTheme.dark']).toBe('dark-plus')
-    expect(snapshot.values['editor.codeTheme.light']).toBe('tree-sitter-light')
-    expect(getCommittedEditorThemeId('dark')).toBe('dark-plus')
-  })
-})
+    await userEvent.click(screen.getByRole('button', { name: 'Actions for editor.codeTheme.dark' }))
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Reset setting' }))
+
+    await waitFor(async () => {
+      const snapshot = await fetchSettings(undefined, getClient())
+      expect(snapshot.values['editor.codeTheme.dark']).toBe('dark-plus')
+      expect(snapshot.values['editor.codeTheme.light']).toBe('tree-sitter-light')
+      expect(getCommittedEditorThemeId('dark')).toBe('dark-plus')
+    })
+  },
+  SLOW_RENDER_TIMEOUT_MS,
+)
 
 test('browsing and filtering code themes can be canceled without saving either mode', async ({
   controlledClient,

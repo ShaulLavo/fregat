@@ -7,7 +7,7 @@ inputs:
     default: main
   ghostty-ref:
     description: Git ref of the ShaulLavo/ghostty-webgpu checkout the ghostty-webgpu link resolves to.
-    default: 94ab02a02799b6897ffa6c766aecc7977418a89d
+    default: 9fc9bde0eb9af938e8f944580847999c9bc97441
 
 runs:
   using: composite

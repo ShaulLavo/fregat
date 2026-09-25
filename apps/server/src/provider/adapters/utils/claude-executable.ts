@@ -6,7 +6,7 @@ import { sessionIdentityErrors } from '../../structured-errors'
 const SDK_ENTRY = '@anthropic-ai/claude-agent-sdk'
 const VERSION_TIMEOUT_MS = 5_000
 
-export type ClaudeExecutableSource = 'bundled' | 'configured' | 'installed'
+type ClaudeExecutableSource = 'bundled' | 'configured' | 'installed'
 
 export type ClaudeExecutable = {
   path: string
@@ -58,7 +58,7 @@ export async function resolveClaudeExecutable(input: {
 }
 
 /** The CLI the agent SDK ships in its platform package, or `null` where none is installed. */
-export function bundledClaudeExecutable(): ClaudeExecutable | null {
+function bundledClaudeExecutable(): ClaudeExecutable | null {
   try {
     const sdkEntry = createRequire(import.meta.url).resolve(SDK_ENTRY)
     const manifest = createRequire(sdkEntry).resolve(

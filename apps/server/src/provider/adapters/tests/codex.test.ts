@@ -1,7 +1,7 @@
 import { chmod, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { assert, describe, expect, it } from 'vitest'
 import {
   DEFAULT_INTERACTION_MODE,
   DEFAULT_PROVIDER_INSTANCE_ID,
@@ -386,6 +386,13 @@ function handle(message) {
       send({ id: 901, method: 'item/permissions/requestApproval', params: { threadId: 'provider-thread-1', turnId: fakeTurn().id, itemId: 'permission-invalid', permissions: null } });
     }
     if (mode?.startsWith('mcp-')) sendMcpRequests(mode);
+    if (mode === 'command-amendment') {
+      const owner = { threadId: 'provider-thread-1', turnId: fakeTurn().id };
+      send({ id: 951, method: 'item/commandExecution/requestApproval', params: { ...owner, itemId: 'amended', command: 'bun test apps', proposedExecpolicyAmendment: ['bun', 'test'] } });
+      send({ id: 952, method: 'item/commandExecution/requestApproval', params: { ...owner, itemId: 'plain', command: 'rm -rf build' } });
+      const network = { applyNetworkPolicyAmendment: { network_policy_amendment: { host: 'example.com', action: 'allow' } } };
+      send({ id: 953, method: 'item/commandExecution/requestApproval', params: { ...owner, itemId: 'network', command: 'curl example.com', availableDecisions: ['accept', 'acceptForSession', network, 'cancel'] } });
+    }
     if (mode === 'async-questions') {
       const parent = { threadId: 'provider-thread-1', turnId: fakeTurn().id };
       const child = { threadId: 'async-child', turnId: 'async-child-turn' };
@@ -1651,6 +1658,97 @@ describe('CodexProviderAdapter', () => {
     )
   })
 
+  it('offers only the rules Codex proposes and answers with the chosen amendment', async () => {
+    await withFakeCodex(
+      async ({ spawnLogPath }) => {
+        const adapter = new CodexProviderAdapter()
+        const events: ProviderRuntimeEvent[] = []
+        collectAdapterEvents(adapter, events)
+        const input = providerTurnInput()
+        await adapter.sendTurn(input)
+        const opened = events.filter((event) => event.type === 'request.opened')
+        expect(opened.map((event) => event.payload.options?.map((option) => option.label))).toEqual(
+          [
+            [
+              'Cancel',
+              'Deny',
+              'Allow for this session',
+              'Always allow commands starting with bun test',
+              'Allow',
+            ],
+            ['Cancel', 'Deny', 'Allow for this session', 'Allow'],
+            [
+              'Cancel',
+              'Allow for this session',
+              'Always allow network access to example.com',
+              'Allow',
+            ],
+          ],
+        )
+        const [amended, plain, network] = opened.map((event) =>
+          v.parse(approvalRequestIdSchema, event.requestId),
+        )
+        assert(amended && plain && network, 'every command approval must open')
+        await expect(
+          adapter.respondApproval({
+            sessionId: input.sessionId,
+            requestId: plain,
+            decision: 'acceptAlways',
+          }),
+        ).rejects.toThrow('does not offer that choice')
+        await expect(
+          adapter.respondApproval({
+            sessionId: input.sessionId,
+            requestId: network,
+            decision: 'decline',
+          }),
+        ).rejects.toThrow('does not offer that choice')
+        await adapter.respondApproval({
+          sessionId: input.sessionId,
+          requestId: amended,
+          decision: 'acceptAlways',
+        })
+        await adapter.respondApproval({
+          sessionId: input.sessionId,
+          requestId: plain,
+          decision: 'accept',
+        })
+        await adapter.respondApproval({
+          sessionId: input.sessionId,
+          requestId: network,
+          decision: 'acceptAlways',
+        })
+        await waitForFakeCodexEvent(spawnLogPath, 'server-response', 3)
+        await adapter.stopAll()
+        const entries = await readFakeCodexLog(spawnLogPath)
+        expect(entries.filter((entry) => entry.event === 'server-response')).toEqual([
+          {
+            event: 'server-response',
+            id: 951,
+            result: {
+              decision: {
+                acceptWithExecpolicyAmendment: { execpolicy_amendment: ['bun', 'test'] },
+              },
+            },
+          },
+          { event: 'server-response', id: 952, result: { decision: 'accept' } },
+          {
+            event: 'server-response',
+            id: 953,
+            result: {
+              decision: {
+                applyNetworkPolicyAmendment: {
+                  network_policy_amendment: { host: 'example.com', action: 'allow' },
+                },
+              },
+            },
+          },
+        ])
+      },
+      { mode: 'command-amendment' },
+    )
+  })
+
   it.for(['accept', 'acceptForSession', 'decline', 'cancel'] as const)(
     'answers native permission requests with the requested profile for %s',
     async (decision, { onTestFinished }) => {
@@ -2501,10 +2599,14 @@ async function readFakeCodexLog(spawnLogPath: string) {
     .map((line) => JSON.parse(line) as FakeCodexLogEntry)
 }
 
-async function waitForFakeCodexEvent(spawnLogPath: string, event: FakeCodexLogEntry['event']) {
+async function waitForFakeCodexEvent(
+  spawnLogPath: string,
+  event: FakeCodexLogEntry['event'],
+  count = 1,
+) {
   for (let attempt = 0; attempt < 500; attempt += 1) {
     const entries = await readFakeCodexLog(spawnLogPath)
-    if (entries.some((entry) => entry.event === event)) return
+    if (entries.filter((entry) => entry.event === event).length >= count) return
 
     await new Promise((resolve) => setTimeout(resolve, 2))
   }

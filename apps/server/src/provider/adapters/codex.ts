@@ -1,12 +1,15 @@
 import { defaultAttachmentsDir } from '../../attachments/store'
 import { resolveCodexAttachments } from './utils/codex-attachments'
 import { codexAsyncQuestions } from './utils/codex-async-questions'
-import { parseCodexElicitation, type CodexElicitation } from './utils/codex-elicitation'
+import { offeredOptions, offeredResponse, type ApprovalOffer } from './utils/approval-offers'
+import { codexCommandApprovalOffers } from './utils/codex-command-approval'
+import { parseCodexElicitation } from './utils/codex-elicitation'
 import { ProviderProcessLifetime } from './process-lifetime'
 import { createInternalError } from '../../observability/structured-errors'
 
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import {
+  DEFAULT_APPROVAL_OPTIONS,
   DEFAULT_CODEX_PROVIDER_SETTINGS,
   DEFAULT_INTERACTION_MODE,
   approvalRequestIdSchema,
@@ -125,36 +128,13 @@ type JsonRpcMessage = {
   result?: unknown
 }
 
-type PendingCodexApproval = {
+type PendingCodexApproval = CodexApprovalKind & {
   agent?: ChatAgent
   providerThreadId?: string
   providerTurnId?: string
   id: JsonRpcId
   turnId?: TurnId
-} & (
-  | {
-      method: 'mcpServer/elicitation/request'
-      requestType: 'mcp_elicitation_approval'
-      elicitation: CodexElicitation
-    }
-  | {
-      method: 'item/permissions/requestApproval'
-      requestType: 'permissions_approval'
-      permissions: Record<string, unknown>
-    }
-  | {
-      method:
-        | 'item/commandExecution/requestApproval'
-        | 'item/fileChange/requestApproval'
-        | 'applyPatchApproval'
-        | 'execCommandApproval'
-      requestType:
-        | 'apply_patch_approval'
-        | 'command_execution_approval'
-        | 'exec_command_approval'
-        | 'file_change_approval'
-    }
-)
+}
 
 type PendingCodexUserInput = {
   agent?: ChatAgent
@@ -847,7 +827,7 @@ class CodexAppServerSession extends SessionContext {
     if (!pending) throw createInternalError(`Unknown pending approval request: ${input.requestId}`)
 
     const decision = v.parse(providerApprovalDecisionSchema, input.decision)
-    const response = codexApprovalResponse(pending, decision)
+    const response = offeredResponse(pending.offers, decision, input.requestId)
     this.pendingApprovals.delete(input.requestId)
     this.client.respondSuccess(pending.id, response)
     this.emit({
@@ -976,14 +956,8 @@ class CodexAppServerSession extends SessionContext {
       itemId,
       payload: {
         args: message.params,
-        detail:
-          approval.method === 'mcpServer/elicitation/request'
-            ? approval.elicitation.detail
-            : approvalRequestDetail(requestType, params),
-        options:
-          approval.method === 'mcpServer/elicitation/request'
-            ? approval.elicitation.options
-            : undefined,
+        detail: approval.detail ?? approvalRequestDetail(requestType, params),
+        options: offeredOptions(approval.offers),
         requestType,
       },
       provider: DEFAULT_CODEX_PROVIDER_SETTINGS.driverKind,
@@ -3166,45 +3140,62 @@ function rawRequest(method: string, payload: unknown) {
   }
 }
 
-function pendingApprovalKind(method: string, params: unknown) {
+type CodexApprovalRequestType =
+  | 'mcp_elicitation_approval'
+  | 'permissions_approval'
+  | 'command_execution_approval'
+  | 'apply_patch_approval'
+  | 'exec_command_approval'
+  | 'file_change_approval'
+
+type CodexApprovalKind = {
+  requestType: CodexApprovalRequestType
+  offers: readonly ApprovalOffer<unknown>[]
+  /** Set when the request carries its own prompt text. */
+  detail?: string
+}
+
+const PLAIN_APPROVAL_TYPES = new Map<string, CodexApprovalRequestType>([
+  ['item/fileChange/requestApproval', 'file_change_approval'],
+  ['applyPatchApproval', 'apply_patch_approval'],
+  ['execCommandApproval', 'exec_command_approval'],
+])
+
+function pendingApprovalKind(method: string, params: unknown): CodexApprovalKind | null {
   if (method === 'mcpServer/elicitation/request') {
     const elicitation = parseCodexElicitation(params)
     if (!elicitation) return null
-    return { method, requestType: 'mcp_elicitation_approval', elicitation } as const
+    return {
+      requestType: 'mcp_elicitation_approval',
+      offers: elicitation.offers,
+      detail: elicitation.detail,
+    }
   }
   if (method === 'item/permissions/requestApproval') {
     const parsed = v.parse(v.object({ permissions: v.record(v.string(), v.unknown()) }), params)
-    return { method, requestType: 'permissions_approval', permissions: parsed.permissions } as const
+    return { requestType: 'permissions_approval', offers: permissionOffers(parsed.permissions) }
   }
-  switch (method) {
-    case 'item/commandExecution/requestApproval':
-      return { method, requestType: 'command_execution_approval' } as const
-    case 'item/fileChange/requestApproval':
-      return { method, requestType: 'file_change_approval' } as const
-    case 'applyPatchApproval':
-      return { method, requestType: 'apply_patch_approval' } as const
-    case 'execCommandApproval':
-      return { method, requestType: 'exec_command_approval' } as const
-    default:
-      return null
+  if (method === 'item/commandExecution/requestApproval')
+    return { requestType: 'command_execution_approval', offers: codexCommandApprovalOffers(params) }
+  const requestType = PLAIN_APPROVAL_TYPES.get(method)
+  if (!requestType) return null
+
+  return {
+    requestType,
+    offers: DEFAULT_APPROVAL_OPTIONS.map((option) => ({
+      option,
+      response: { decision: option.decision },
+    })),
   }
 }
 
-function codexApprovalResponse(
-  pending: PendingCodexApproval,
-  decision: ProviderApprovalResponseInput['decision'],
-) {
-  if (pending.method === 'mcpServer/elicitation/request') {
-    const response = pending.elicitation.responses.get(decision)
-    if (!response) throw createInternalError('This approval does not offer the selected decision.')
-    return response
-  }
-  if (decision === 'acceptAlways')
-    throw createInternalError('This approval does not offer permanent access.')
-  if (pending.method !== 'item/permissions/requestApproval') return { decision }
-  const permissions =
-    decision === 'accept' || decision === 'acceptForSession' ? pending.permissions : {}
-  return { permissions, ...(decision === 'acceptForSession' ? { scope: 'session' } : {}) }
+function permissionOffers(permissions: Record<string, unknown>) {
+  return DEFAULT_APPROVAL_OPTIONS.map((option) => {
+    if (option.decision === 'acceptForSession')
+      return { option, response: { permissions, scope: 'session' } }
+    if (option.decision === 'accept') return { option, response: { permissions } }
+    return { option, response: { permissions: {} } }
+  })
 }
 
 function approvalRequestDetail(

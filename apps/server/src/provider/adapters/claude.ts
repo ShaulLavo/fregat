@@ -22,7 +22,7 @@ import {
   messageIdSchema,
   type ApprovalRequestId,
   type InteractionMode,
-  type ProviderApprovalDecision,
+  type ProviderApprovalOption,
   type ProviderInstanceId,
   type ProviderInstanceSettings,
   type ProviderSkill,
@@ -85,6 +85,8 @@ import {
   usageLimitMessage,
   type ProviderUsageProbe,
 } from '../utils/usage-windows'
+import { offeredOptions, offeredResponse, type ApprovalOffer } from './utils/approval-offers'
+import { claudeApprovalOffers, claudePermissionUpdateCount } from './utils/claude-permissions'
 import { claudeModelId, claudeQueryOptions } from './utils/claude-query-options'
 import {
   claudePromptText,
@@ -163,8 +165,8 @@ type ClaudeInitialization = {
 }
 
 type PendingClaudeApproval = {
+  offers: readonly ApprovalOffer<PermissionResult>[]
   resolve: (result: PermissionResult) => void
-  toolInput: Record<string, unknown>
   toolName: string
 }
 
@@ -828,10 +830,18 @@ class ClaudeAgentSession extends SessionContext {
     const pending = this.pendingApprovals.get(input.requestId)
     if (!pending) throw createInternalError(`Unknown pending approval request: ${input.requestId}`)
 
-    if (input.decision === 'acceptAlways')
-      throw createInternalError('This approval does not offer permanent access.')
+    const result = offeredResponse(pending.offers, input.decision, input.requestId)
     this.pendingApprovals.delete(input.requestId)
-    pending.resolve(claudePermissionResult(input.decision, pending.toolInput))
+    const updates = result.behavior === 'allow' ? (result.updatedPermissions ?? []) : []
+    recordChatPipelineInfo('chat.pipeline.claude_session.approval.resolved', {
+      decision: input.decision,
+      destinations: [...new Set(updates.map((update) => update.destination))],
+      requestId: input.requestId,
+      ruleCount: claudePermissionUpdateCount(updates),
+      sessionId: this.sessionId,
+      toolName: pending.toolName,
+    })
+    pending.resolve(result)
     this.emit({
       createdAt: new Date().toISOString(),
       eventId: runtimeEventId('claude-request-resolved'),
@@ -1859,10 +1869,15 @@ class ClaudeAgentSession extends SessionContext {
   ): Promise<PermissionResult> {
     const requestId = v.parse(approvalRequestIdSchema, `claude:${crypto.randomUUID()}`)
 
+    const offers = claudeApprovalOffers(options, toolInput)
+
     return new Promise<PermissionResult>((resolve) => {
-      this.pendingApprovals.set(requestId, { resolve, toolInput, toolName })
+      this.pendingApprovals.set(requestId, { offers, resolve, toolName })
       options.signal.addEventListener('abort', () => this.abortApproval(requestId), { once: true })
-      this.emitApprovalOpened(requestId, toolName, toolInput)
+      this.emitApprovalOpened(requestId, toolName, toolInput, {
+        defaultToNo: options.defaultToNo === true,
+        options: offeredOptions(offers),
+      })
     })
   }
 
@@ -1878,6 +1893,7 @@ class ClaudeAgentSession extends SessionContext {
     requestId: ApprovalRequestId,
     toolName: string,
     toolInput: Record<string, unknown>,
+    choices: { defaultToNo: boolean; options: readonly ProviderApprovalOption[] },
   ) {
     this.emit({
       createdAt: new Date().toISOString(),
@@ -1885,6 +1901,7 @@ class ClaudeAgentSession extends SessionContext {
       payload: {
         args: toolInput,
         detail: claudeToolSummary(toolName, toolInput),
+        ...choices,
         requestType: claudeApprovalRequestType(toolName),
       },
       provider: DEFAULT_CLAUDE_PROVIDER_SETTINGS.driverKind,
@@ -2474,20 +2491,6 @@ function claudeSnapshotErrorMessage(error: unknown) {
   if (!isEvlogError(error) || !error.fix) return message
 
   return `${message}. ${error.fix}`
-}
-
-function claudePermissionResult(
-  decision: ProviderApprovalDecision,
-  toolInput: Record<string, unknown>,
-): PermissionResult {
-  if (decision === 'accept' || decision === 'acceptForSession') {
-    return { behavior: 'allow', updatedInput: toolInput }
-  }
-  if (decision === 'cancel') {
-    return { behavior: 'deny', message: 'Tool use cancelled by the user.' }
-  }
-
-  return { behavior: 'deny', message: 'Tool use denied by the user.' }
 }
 
 function isUnsupportedClaudeImage(mimeType: string, attachmentType: string) {

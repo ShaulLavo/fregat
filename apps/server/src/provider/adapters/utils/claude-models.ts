@@ -108,7 +108,7 @@ export function claudeModelCapabilities(
 }
 
 /** `claude-haiku-4-5-20251001[1m]` → `claude-haiku-4-5`: the id without its window or date. */
-export function claudeSlug(model: string) {
+function claudeSlug(model: string) {
   return model
     .trim()
     .replace(/\[1m\]$/i, '')

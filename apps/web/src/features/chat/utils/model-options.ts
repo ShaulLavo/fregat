@@ -5,7 +5,7 @@ import {
 } from '@workspace/client-core/chat/providers/options'
 
 /** Fast mode shows as a bolt on the trigger, never as text. */
-export const FAST_MODE_OPTION_ID = 'fastMode'
+const FAST_MODE_OPTION_ID = 'fastMode'
 
 /** The stored choice, or the model's default when nothing is stored. */
 export function effectiveOptionValue(

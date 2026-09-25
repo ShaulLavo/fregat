@@ -321,7 +321,7 @@ export const workspacePersistenceOperationSchema = v.variant('kind', [
   workspaceEditDeleteOperationSchema,
 ])
 
-export const workspaceEditCategorySchema = v.union([
+const workspaceEditCategorySchema = v.union([
   v.literal('file-operation'),
   v.literal('workspace-edit'),
 ])

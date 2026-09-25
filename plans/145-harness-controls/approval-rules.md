@@ -1,6 +1,6 @@
 # 145 · Approval rules
 
-- Status: PROPOSED.
+- Status: IMPLEMENTED 2026-09-25, all five steps; D1 and D2 as recommended. PR #29.
 - Planned at: Platform `c2af88b4`, 2026-09-24. Origin: the 2026-09-24 reference survey.
 - Work in the current checkout; no branches, worktrees, commits, pushes or PRs unless separately
   requested.
@@ -57,6 +57,46 @@ rule store, not in a Platform copy.
 4. The request's options come from the adapter, so the panel shows only decisions that provider
    can honour. Delete the `acceptAlways` throw paths that become reachable-by-design.
 5. Add the chosen destination and rule count to the approval wide event. Do not log tool input.
+
+## Progress
+
+- Step 1, measured 2026-09-24 against `claude` 2.1.281 through the SDK: answering
+  `{ behavior: 'allow' }` asked twice for the same Bash call in one session. Returning the
+  suggestions rewritten to `session` asked once. The old "Allow for this session" did not hold.
+- The CLI's suggestions mix destinations. A Bash call proposes its rule at `localSettings`, plus a
+  `session`-scoped Read or `addDirectories` grant for the paths it touches. "Always" moves only the
+  non-session entries (`localSettings` for the project, `userSettings` for everywhere) and leaves
+  the harness's session grants alone. A command that reads outside the working directory is
+  therefore asked about again in a new session, which is also what the CLI does.
+- Real run: "Always allow in this project" wrote `Bash(touch marker-145.txt)` to
+  `.claude/settings.local.json`, and a new session ran the command without asking.
+- The new decision is `acceptAlwaysInProject`; `acceptAlways` means everywhere (Claude
+  `userSettings`, Codex elicitation `always`). Only `addRules` (allow) and `addDirectories`
+  suggestions are ever applied; `setMode`, `replaceRules` and the removals are dropped. Claude offers
+  "for this session" only when such a grant exists and `suppressAlwaysAllowRule` is unset (the flag
+  suppresses session rules too), the project rule only when a grant is not session-scoped, and
+  "everywhere" only when every persistent grant is location-independent: path rules must be `//` or
+  `~/`, shell rules must not name `./` or `../`. `defaultToNo` reaches the approval, and the TUI
+  drops its digit shortcuts for it.
+- Each pending approval holds its offers (option plus harness response); `offeredResponse` refuses
+  any other decision with `APPROVAL_DECISION_NOT_OFFERED` before the harness sees it.
+- Wide event: `chat.pipeline.claude_session.approval.resolved` carries decision, destinations and
+  rule count, never the rules.
+- UI: scenario `claude-approval-rules` drives the real CLI (Haiku) through the panel on a
+  disposable repository. It asserts the six options, the rule in `settings.local.json`, and a second
+  session that is not asked. It passed on an isolated dev pair 2026-09-25.
+- Step 3 needed no schema refresh. The adapter does not generate Codex's server requests; it reads
+  approval params loosely, and the installed 0.156.1 sends `proposedExecpolicyAmendment` on
+  `item/commandExecution/requestApproval`, plus `availableDecisions` because the adapter opts into
+  `experimentalApi`. The options are exactly that list: for a plain command 0.156.1 lists accept,
+  the amendment and cancel, so there is no Deny or session choice. The amendment reads
+  `Always allow commands starting with <argv, shell-quoted>` (`acceptAlways`), answered
+  `{ acceptWithExecpolicyAmendment: { execpolicy_amendment } }`; Codex writes it to
+  `~/.codex/rules/default.rules`. An allow network amendment becomes
+  `Always allow network access to <host>`; a deny amendment is never shown as an allow. Without
+  `availableDecisions`, the proposed amendment and the default options stand.
+- Scenario `codex-approval-rules` drives real Codex the same way, restoring the rules file byte for
+  byte. Both scenarios passed on an isolated dev pair 2026-09-25.
 
 ## Verification
 
