@@ -41,8 +41,6 @@ export type WorkspaceCommandSnapshot = {
   readonly fileOperationRedoable: boolean
   readonly fileOperationUndoable: boolean
   readonly rootPath: WorkspaceRoot | null
-  readonly sessionActionUndoable: boolean
-  readonly sessionActionRedoable: boolean
   readonly uiMode: WorkspaceUiMode
   readonly wallpaperEnabled: boolean
   readonly workbenchPanels: WorkbenchPanels
@@ -84,8 +82,6 @@ export type WorkspaceCommandRuntime = {
     ) => Promise<'already-open' | 'failed' | 'opened' | 'superseded'>
     readonly showEnvironmentDialog: (mode: 'switch' | 'connect' | 'disconnect') => void
     readonly showMachines: () => void
-    readonly showCloneRepository: () => void
-    readonly showStartPullRequestSession: () => void
     readonly showCommandPalette: (
       initialSearch?: string,
       origin?: FocusTargetToken | null,

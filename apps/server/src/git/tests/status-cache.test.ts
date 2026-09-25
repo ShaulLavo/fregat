@@ -98,18 +98,8 @@ describe('git status cache', () => {
     expect((await service.status('')).repository).not.toBeNull()
     await rm(path.join(root, '.git'), { recursive: true, force: true })
     expect((await service.status('')).repository).not.toBeNull()
-    expect(await service.status('', true)).toEqual({
-      repository: null,
-      files: [],
-      uninitializedSubmodules: 0,
-      autoPull: null,
-    })
-    expect(await service.status('')).toEqual({
-      repository: null,
-      files: [],
-      uninitializedSubmodules: 0,
-      autoPull: null,
-    })
+    expect(await service.status('', true)).toEqual({ repository: null, files: [] })
+    expect(await service.status('')).toEqual({ repository: null, files: [] })
   })
 
   it('answers a non-repository path from the negative window without re-running git', async () => {
@@ -122,18 +112,8 @@ describe('git status cache', () => {
       repositoryCacheTtlMs: 60_000,
     })
 
-    expect(await service.status('')).toEqual({
-      repository: null,
-      files: [],
-      uninitializedSubmodules: 0,
-      autoPull: null,
-    })
-    expect(await service.status('')).toEqual({
-      repository: null,
-      files: [],
-      uninitializedSubmodules: 0,
-      autoPull: null,
-    })
+    expect(await service.status('')).toEqual({ repository: null, files: [] })
+    expect(await service.status('')).toEqual({ repository: null, files: [] })
   })
 })
 

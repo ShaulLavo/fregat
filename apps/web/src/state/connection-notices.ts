@@ -1,15 +1,12 @@
-import type { ConnectionError } from '@workspace/contracts'
 import { createStore } from 'zustand/vanilla'
 
 export function createConnectionNotices() {
-  const store = createStore<{
-    dismissed: Readonly<Record<string, ConnectionError | null>>
-  }>(() => ({
+  const store = createStore<{ dismissed: Readonly<Record<string, string | null>> }>(() => ({
     dismissed: {},
   }))
   return {
     store,
-    dismiss(id: string, error: ConnectionError | null) {
+    dismiss(id: string, error: string | null) {
       store.setState(({ dismissed }) => ({ dismissed: { ...dismissed, [id]: error } }))
     },
     reset(id: string) {

@@ -1,29 +1,15 @@
-import type { EnvironmentId, ScopedSessionRef, SessionId } from './chat-ids'
-import type { OrchestrationSessionShell } from './orchestration-snapshots'
-import type { SettingsValues } from './settings/keys'
-
-// One derivation for the tab's toasts and sounds and for the server's push notices.
-
-export type SessionRailStatus = 'approval' | 'input' | 'working' | 'monitoring' | 'failed' | 'ready'
-
-export function sessionRailStatus(
-  session: Pick<
-    OrchestrationSessionShell,
-    'pendingApprovalCount' | 'pendingUserInputCount' | 'runtime' | 'backgroundLiveness'
-  >,
-): SessionRailStatus {
-  if (session.pendingApprovalCount > 0) return 'approval'
-  if (session.pendingUserInputCount > 0) return 'input'
-  if (session.runtime?.status === 'running' || session.runtime?.status === 'starting')
-    return 'working'
-  if (session.backgroundLiveness) return session.backgroundLiveness
-  if (session.runtime?.status === 'error') return 'failed'
-  return 'ready'
-}
+import type {
+  EnvironmentId,
+  ScopedSessionRef,
+  SessionId,
+  SettingsValues,
+} from '@workspace/contracts'
+import { sessionRailStatus } from './rail/status'
+import type { ProjectionSession } from './types'
 
 export type NotificationMode = SettingsValues['chat.notificationMode']
 export type NotificationSession = Pick<
-  OrchestrationSessionShell,
+  ProjectionSession,
   | 'id'
   | 'title'
   | 'archivedAt'
@@ -33,7 +19,7 @@ export type NotificationSession = Pick<
   | 'backgroundLiveness'
 > & {
   latestTurn: Pick<
-    NonNullable<OrchestrationSessionShell['latestTurn']>,
+    NonNullable<ProjectionSession['latestTurn']>,
     'turnId' | 'state' | 'completedAt'
   > | null
 }
@@ -45,7 +31,6 @@ export type SessionNotice = {
   failed: boolean
 }
 export type NotificationCursor = { attention: string | null; completion: number | null }
-type NotificationTransition = ReturnType<typeof sessionNotificationTransition>
 
 export function hasNotificationSound(mode: NotificationMode) {
   return mode === 'sound' || mode === 'notifications-and-sound'
@@ -81,27 +66,14 @@ export function sessionNotificationTransition(
   return { cursor, kind, status }
 }
 
-function noticeTitle(kind: SessionNotice['kind'], status: SessionRailStatus) {
+export function noticeTitle(
+  kind: SessionNotice['kind'],
+  status: ReturnType<typeof sessionRailStatus>,
+) {
   if (kind === 'completion') return 'Session completed'
   if (status === 'approval') return 'Approval needed'
   if (status === 'failed') return 'Session failed'
   return 'Input needed'
-}
-
-/** The notice a transition announces, or null when it announces nothing. */
-export function sessionNotice(
-  environmentId: EnvironmentId,
-  session: NotificationSession,
-  transition: NotificationTransition,
-): SessionNotice | null {
-  if (!transition.kind) return null
-  return {
-    ref: { environmentId, sessionId: session.id },
-    kind: transition.kind,
-    title: noticeTitle(transition.kind, transition.status),
-    body: session.title,
-    failed: transition.status === 'failed',
-  }
 }
 
 export function createSessionNotificationTracker() {
@@ -125,8 +97,14 @@ export function createSessionNotificationTracker() {
       for (const session of sessions) {
         const transition = sessionNotificationTransition(session, previous?.get(session.id))
         next.set(session.id, transition.cursor)
-        const notice = sessionNotice(environmentId, session, transition)
-        if (notice) notices.push(notice)
+        if (!transition.kind) continue
+        notices.push({
+          ref: { environmentId, sessionId: session.id },
+          kind: transition.kind,
+          title: noticeTitle(transition.kind, transition.status),
+          body: session.title,
+          failed: transition.status === 'failed',
+        })
       }
       owners.set(environmentId, next)
       return notices

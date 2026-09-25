@@ -21,7 +21,7 @@ import {
   startProviderLogin,
 } from '@/features/chat/utils/provider-auth-query'
 import { providerAuthKeys } from '@/features/chat/utils/query-keys'
-import { providerListQueryOptions } from '@/lib/provider-query'
+import { providerListQueryOptions } from '@/features/chat/utils/provider-query'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import { errorMessage } from '@/lib/error-message'
 

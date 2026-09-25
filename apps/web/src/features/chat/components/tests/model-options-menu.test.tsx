@@ -8,7 +8,7 @@ import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 import { ModelOptionsMenu } from '@/features/chat/components/model-options-menu'
-import { providerListQueryOptions } from '@/lib/provider-query'
+import { providerListQueryOptions } from '@/features/chat/utils/provider-query'
 import { ChatModelPickerProvider } from '@/features/chat/providers/model-picker-provider'
 import {
   resetChatInputDraftStore,

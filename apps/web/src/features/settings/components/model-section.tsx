@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 
 import { modelPreferenceRows } from '@workspace/client-core/chat/providers/preferences'
 import { providerModelOptions } from '@workspace/client-core/chat/providers/models'
-import { providerListQueryOptions } from '@/lib/provider-query'
+import { providerListQueryOptions } from '@/features/chat/utils/provider-query'
 
 import { useSettingValue } from '@/hooks/use-setting-value'
 import { EmptyRow } from './empty-row'

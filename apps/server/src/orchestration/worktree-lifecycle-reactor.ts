@@ -9,10 +9,7 @@ import {
   type OrchestrationCommand,
   type OrchestrationEvent,
   type WorktreeId,
-  type OrchestrationProjectScript,
   type OrchestrationWorktree,
-  type WorktreeSetup,
-  type WorktreeSubmoduleMode,
 } from '@workspace/contracts'
 import { outsideGitRepositoryLane } from '../git/repository-lane'
 import { GitWorktreeService } from '../git/worktrees'
@@ -24,14 +21,8 @@ import { internalCommandKey } from './utils/repository-ids'
 import { requireWorktree, type OrchestrationReadModel } from './read-model'
 import { worktreeRuntimeErrors } from './worktree-runtime-errors'
 import type { WorktreeExecutionGate } from './worktree-execution-gate'
-import { SetupRunner } from './setup-runner'
-import { setupScript } from './utils/setup-script'
 
 type Cleanup = Extract<OrchestrationWorktree['lifecycle'], { state: 'cleanup-requested' }>
-type Provisioning = Extract<OrchestrationWorktree['lifecycle'], { state: 'provisioning' }>
-
-const SETUP_FAILED = 'worktree.SETUP_FAILED'
-const SETUP_CANCELLED = 'worktree.SETUP_CANCELLED'
 
 type WorktreeLifecycleReactorOptions = {
   paths: WorkspacePaths
@@ -39,7 +30,6 @@ type WorktreeLifecycleReactorOptions = {
   gate: WorktreeExecutionGate
   provider: () => ProviderService | null
   terminal: TerminalService | undefined
-  submodules: (projectId: string) => WorktreeSubmoduleMode
   dispatch: (command: OrchestrationCommand) => Promise<unknown>
   getReadModel: () => OrchestrationReadModel
 }
@@ -49,7 +39,6 @@ export class WorktreeLifecycleReactor {
   private recovering = false
   private recoveryCreations: Map<WorktreeId, 'created' | 'adopted'> | null = null
   private readonly pending = new Map<string, Promise<void>>()
-  private readonly setups = new SetupRunner()
 
   private readonly options: WorktreeLifecycleReactorOptions
 
@@ -59,10 +48,6 @@ export class WorktreeLifecycleReactor {
 
   handleEvents(events: OrchestrationEvent[]) {
     for (const event of events) {
-      if (event.type === 'worktree.setup-updated') {
-        this.handleSetupRequest(event.payload.worktreeId, event.payload.setup.state)
-        continue
-      }
       if (event.aggregateKind !== 'worktree') continue
       const worktree = this.options.getReadModel().worktrees.get(event.aggregateId)
       if (!worktree || worktree.retiredAt) continue
@@ -83,11 +68,6 @@ export class WorktreeLifecycleReactor {
         continue
       this.schedule(worktree.id, worktree.lifecycle.operationId)
     }
-  }
-
-  private handleSetupRequest(worktreeId: WorktreeId, state: WorktreeSetup['state']) {
-    if (state === 'queued') this.startSetup(worktreeId)
-    if (state === 'cancelling') void this.setups.cancel(worktreeId)
   }
 
   private schedule(worktreeId: WorktreeId, operationId: CommandId) {
@@ -224,18 +204,13 @@ export class WorktreeLifecycleReactor {
     const worktree = requireWorktree(this.options.getReadModel(), worktreeId)
     const startedAt = performance.now()
     try {
-      const created = await this.options.git.withRepositoryLane(
-        await this.repositoryPath(worktree),
-        async () => {
-          const current = requireWorktree(this.options.getReadModel(), worktreeId)
-          const state = current.lifecycle
-          if (!('operationId' in state) || state.operationId !== operationId) return null
-          if (state.state === 'provisioning') return this.provision(current, state)
-          if (state.state === 'cleanup-requested') await this.cleanup(current, state)
-          return null
-        },
-      )
-      if (created) await this.completeCreation(created.worktree, created.state)
+      await this.options.git.withRepositoryLane(await this.repositoryPath(worktree), async () => {
+        const current = requireWorktree(this.options.getReadModel(), worktreeId)
+        const state = current.lifecycle
+        if (!('operationId' in state) || state.operationId !== operationId) return
+        if (state.state === 'provisioning') await this.provision(current, state)
+        if (state.state === 'cleanup-requested') await this.cleanup(current, state)
+      })
     } catch (error) {
       await this.operationFailure(worktreeId, operationId, error)
     }
@@ -268,7 +243,10 @@ export class WorktreeLifecycleReactor {
     })
   }
 
-  private async provision(worktree: OrchestrationWorktree, state: Provisioning) {
+  private async provision(
+    worktree: OrchestrationWorktree,
+    state: Extract<OrchestrationWorktree['lifecycle'], { state: 'provisioning' }>,
+  ) {
     try {
       const result = await this.options.git.create({
         path: await this.repositoryPath(worktree),
@@ -285,27 +263,7 @@ export class WorktreeLifecycleReactor {
         errorCode: errorCode(error),
         commandId: commandKey('creation-failed', worktree.id, state.operationId),
       })
-      return null
-    }
-    return { worktree, state }
-  }
-
-  /** Submodules and a foreground setup finish before the first turn runs, outside the repository lane. */
-  private async completeCreation(worktree: OrchestrationWorktree, state: Provisioning) {
-    await this.initializeSubmodules(worktree)
-    const script = this.setupScriptFor(worktree)
-    if (script?.waitForSetup) {
-      const outcome = await this.runSetup(worktree, script, true)
-      if (outcome !== 'done') {
-        await this.options.dispatch({
-          type: 'worktree.create.fail',
-          worktreeId: worktree.id,
-          operationId: state.operationId,
-          errorCode: outcome === 'cancelled' ? SETUP_CANCELLED : SETUP_FAILED,
-          commandId: commandKey('setup-failed', worktree.id, state.operationId),
-        })
-        return
-      }
+      return
     }
     await this.options.dispatch({
       type: 'worktree.create.complete',
@@ -315,89 +273,6 @@ export class WorktreeLifecycleReactor {
       commandId: commandKey('created', worktree.id, state.operationId),
     })
     if (!this.recovering) await this.releaseBlocked(worktree.id, state.operationId)
-    if (script && !script.waitForSetup) this.startSetup(worktree.id)
-  }
-
-  private setupScriptFor(worktree: OrchestrationWorktree) {
-    const project = this.options.getReadModel().projects.get(worktree.projectId)
-    return setupScript(project?.scripts ?? [])
-  }
-
-  /** A background setup, from worktree creation or a rerun; never awaited by the lifecycle. */
-  private startSetup(worktreeId: WorktreeId) {
-    const worktree = this.options.getReadModel().worktrees.get(worktreeId)
-    const script = worktree ? this.setupScriptFor(worktree) : null
-    if (!worktree || !script || this.setups.isRunning(worktreeId)) return
-    void this.runSetup(worktree, script, false).catch((error: unknown) =>
-      recordProcessWarning('worktree.setup.failed', { area: 'worktree', worktreeId, error }),
-    )
-  }
-
-  private async runSetup(
-    worktree: OrchestrationWorktree,
-    script: OrchestrationProjectScript,
-    foreground: boolean,
-  ) {
-    const startedAt = performance.now()
-    const report = (setup: Omit<WorktreeSetup, 'name' | 'foreground' | 'updatedAt'>) =>
-      this.options.dispatch({
-        type: 'worktree.setup.update',
-        worktreeId: worktree.id,
-        setup: { name: script.name, foreground, updatedAt: new Date().toISOString(), ...setup },
-        commandId: commandKey('setup', worktree.id, crypto.randomUUID()),
-      })
-    await report({ state: 'running', exitCode: null, output: [] })
-    const outcome = await this.setups.run(worktree.id, {
-      command: script.command,
-      worktreePath: worktree.canonicalPath,
-      projectRoot: this.projectRoot(worktree),
-    })
-    await report(outcome)
-    recordProcessInfo('worktree.setup.completed', {
-      area: 'worktree',
-      worktreeId: worktree.id,
-      foreground,
-      state: outcome.state,
-      exitCode: outcome.exitCode,
-      durationMs: Math.round(performance.now() - startedAt),
-    })
-    return outcome.state
-  }
-
-  /** The project's main checkout, which setup scripts read as their source of shared files. */
-  private projectRoot(worktree: OrchestrationWorktree) {
-    const model = this.options.getReadModel()
-    const base = worktree.baseWorktreeId ? model.worktrees.get(worktree.baseWorktreeId) : null
-    return base?.canonicalPath ?? worktree.canonicalPath
-  }
-
-  /** Stops every running setup; the server is going away. */
-  closeSetups() {
-    return this.setups.close()
-  }
-
-  // Failure leaves the worktree usable: git status reports the empty submodules and offers a retry.
-  private async initializeSubmodules(worktree: OrchestrationWorktree) {
-    const mode = this.options.submodules(worktree.projectId)
-    const startedAt = performance.now()
-    try {
-      const ran = await this.options.git.updateSubmodules(worktree.canonicalPath, mode)
-      if (ran)
-        recordProcessInfo('worktree.submodules.initialized', {
-          area: 'worktree',
-          worktreeId: worktree.id,
-          mode,
-          durationMs: Math.round(performance.now() - startedAt),
-        })
-    } catch (error) {
-      recordProcessWarning('worktree.submodules.failed', {
-        area: 'worktree',
-        worktreeId: worktree.id,
-        mode,
-        durationMs: Math.round(performance.now() - startedAt),
-        error,
-      })
-    }
   }
 
   private async cleanup(worktree: OrchestrationWorktree, state: Cleanup) {
@@ -414,8 +289,6 @@ export class WorktreeLifecycleReactor {
   }
 
   private async removeWithLease(worktree: OrchestrationWorktree, state: Cleanup) {
-    // A setup still writing into the checkout would race its removal.
-    await this.setups.cancel(worktree.id)
     const blocker = await this.runtimeBlocker(worktree)
     if (blocker) return this.block(worktree, state, blocker)
     const target = {

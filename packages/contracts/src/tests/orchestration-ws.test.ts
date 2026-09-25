@@ -18,7 +18,7 @@ const config = {
 
 describe('environment identity contracts', () => {
   it('requires a nonempty environment identity in protocol 5 handshakes', () => {
-    expect(ORCHESTRATION_WS_PROTOCOL_VERSION).toBe(8)
+    expect(ORCHESTRATION_WS_PROTOCOL_VERSION).toBe(7)
     expect(
       v.parse(orchestrationWsConnectedMessageSchema, { kind: 'connected', config }).config,
     ).toEqual(config)

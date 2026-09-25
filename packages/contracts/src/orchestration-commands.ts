@@ -8,8 +8,6 @@ import {
   worktreeCleanupCommandSchema,
   worktreeForceCleanupCommandSchema,
   worktreeReleaseCommandSchema,
-  worktreeSetupCancelCommandSchema,
-  worktreeSetupRunCommandSchema,
 } from './worktree-lifecycle'
 import * as v from 'valibot'
 import {
@@ -144,22 +142,12 @@ export const sessionDeleteCommandSchema = v.object({
   ...commandBaseSchema,
   type: v.literal('session.delete'),
   sessionId: sessionIdSchema,
-  /** Remove the session's worktree too, once no other session uses it and this one has stopped. */
-  removeWorktree: v.optional(v.boolean()),
 })
 
 export const sessionArchiveCommandSchema = v.object({
   ...commandBaseSchema,
   type: v.literal('session.archive'),
   sessionId: sessionIdSchema,
-})
-
-export const sessionLifecycleRestoreCommandSchema = v.strictObject({
-  ...commandBaseSchema,
-  type: v.literal('session.lifecycle.restore'),
-  sessionId: sessionIdSchema,
-  expectedRevision: nonNegativeIntegerSchema,
-  restoreCommandId: commandIdSchema,
 })
 
 export const sessionUnarchiveCommandSchema = v.object({
@@ -172,18 +160,6 @@ export const sessionSettleCommandSchema = v.object({
   ...commandBaseSchema,
   type: v.literal('session.settle'),
   sessionId: sessionIdSchema,
-})
-
-/**
- * Issued by the owner server only. `snapshotSequence` is the read the decision was made from:
- * any later event on the session makes the decision stale, whatever else moved the sequence.
- */
-const sessionAutoSettleCommandSchema = v.object({
-  ...commandBaseSchema,
-  type: v.literal('session.auto-settle'),
-  sessionId: sessionIdSchema,
-  settledAt: isoDateTimeSchema,
-  snapshotSequence: nonNegativeIntegerSchema,
 })
 
 export const sessionUnsettleCommandSchema = v.object({
@@ -351,7 +327,6 @@ export const clientOrchestrationCommandSchema = v.variant('type', [
   sessionMetaUpdateCommandSchema,
   sessionDeleteCommandSchema,
   sessionArchiveCommandSchema,
-  sessionLifecycleRestoreCommandSchema,
   sessionUnarchiveCommandSchema,
   sessionSettleCommandSchema,
   sessionUnsettleCommandSchema,
@@ -602,7 +577,6 @@ export const internalOrchestrationCommandSchema = v.variant('type', [
   sessionProposedPlanUpsertCommandSchema,
   sessionTurnDiffCompleteCommandSchema,
   sessionRevertCompleteCommandSchema,
-  sessionAutoSettleCommandSchema,
 ])
 
 export const orchestrationCommandSchema = v.variant('type', [
@@ -612,7 +586,6 @@ export const orchestrationCommandSchema = v.variant('type', [
   sessionMetaUpdateCommandSchema,
   sessionDeleteCommandSchema,
   sessionArchiveCommandSchema,
-  sessionLifecycleRestoreCommandSchema,
   sessionUnarchiveCommandSchema,
   sessionSettleCommandSchema,
   sessionUnsettleCommandSchema,
@@ -635,8 +608,6 @@ export const orchestrationCommandSchema = v.variant('type', [
   worktreeCleanupCommandSchema,
   worktreeForceCleanupCommandSchema,
   worktreeReleaseCommandSchema,
-  worktreeSetupRunCommandSchema,
-  worktreeSetupCancelCommandSchema,
   ...internalOrchestrationCommandSchema.options,
 ])
 
@@ -670,9 +641,6 @@ export type SessionTurnBootstrapCreateSession = v.InferOutput<
 export type SessionTurnBootstrap = v.InferOutput<typeof sessionTurnBootstrapSchema>
 export type SessionMetaUpdateCommand = v.InferOutput<typeof sessionMetaUpdateCommandSchema>
 export type SessionDeleteCommand = v.InferOutput<typeof sessionDeleteCommandSchema>
-export type SessionLifecycleRestoreCommand = v.InferOutput<
-  typeof sessionLifecycleRestoreCommandSchema
->
 export type SessionArchiveCommand = v.InferOutput<typeof sessionArchiveCommandSchema>
 export type SessionUnarchiveCommand = v.InferOutput<typeof sessionUnarchiveCommandSchema>
 export type SessionSettleCommand = v.InferOutput<typeof sessionSettleCommandSchema>

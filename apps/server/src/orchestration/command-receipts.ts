@@ -5,7 +5,7 @@ import {
   type OrchestrationCommand,
   type OrchestrationCommandReceipt,
   orchestrationCommandReceiptSchema,
-  type OrchestrationCommandResult,
+  type ProjectRegistrationResult,
   type ClientOrchestrationCommand,
 } from '@workspace/contracts'
 
@@ -46,7 +46,7 @@ export class OrchestrationCommandReceipts {
   recordAccepted(
     command: OrchestrationCommand,
     sequence: number,
-    result: OrchestrationCommandResult | null,
+    result: ProjectRegistrationResult | null,
     intentFingerprint = commandFingerprint(command),
   ) {
     const receipt = {
@@ -149,10 +149,6 @@ export function commandAggregate(command: ReceiptCommand) {
     case 'worktree.cleanup.fail':
     case 'worktree.mark-missing':
     case 'worktree.metadata.refresh':
-    case 'worktree.pull-request.sync':
-    case 'worktree.setup.update':
-    case 'worktree.setup.run':
-    case 'worktree.setup.cancel':
     case 'worktree.orphan.register':
     case 'terminal.lease.request':
     case 'terminal.lease.claim':
@@ -164,7 +160,6 @@ export function commandAggregate(command: ReceiptCommand) {
     case 'worktree.revive':
       return { id: command.worktreeId, kind: 'worktree' as const }
     case 'session.worktree.release':
-    case 'session.auto-settle':
     case 'session.activity.append':
     case 'session.approval.respond':
     case 'session.archive':
@@ -201,7 +196,6 @@ export function commandAggregate(command: ReceiptCommand) {
     case 'session.turn.interrupt':
     case 'session.turn.start':
     case 'session.turn.steer':
-    case 'session.lifecycle.restore':
     case 'session.unarchive':
     case 'session.unpin':
     case 'session.unsettle':

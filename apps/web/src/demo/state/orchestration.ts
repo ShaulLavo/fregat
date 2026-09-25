@@ -1,9 +1,6 @@
 import * as v from 'valibot'
 import {
   orchestrationSessionShellSchema,
-  sessionLifecycleStateSchema,
-  isSessionLifecycleCommand,
-  type SessionLifecycleResult,
   orchestrationMessageSchema,
   sessionRuntimeStateSchema,
   messageIdSchema,
@@ -18,7 +15,6 @@ import { seedSession } from '../seed'
 import { DemoWorkspace, demoError } from './workspace'
 
 export class DemoOrchestration {
-  private readonly lifecycleRevisions = new Map<string, number>()
   private readonly receipts = new Map<string, OrchestrationDispatchResult>()
   private readonly timers = new Map<string, ReturnType<typeof setTimeout>>()
   constructor(readonly workspace: DemoWorkspace) {}
@@ -58,31 +54,11 @@ export class DemoOrchestration {
   dispatch(command: ClientOrchestrationCommand): OrchestrationDispatchResult {
     const existing = this.receipts.get(command.commandId)
     if (existing) return { ...existing, deduped: true }
-    const lifecycle = this.lifecycleResult(command)
     const result = this.apply(command)
     this.workspace.updated()
-    if ('sessionId' in command)
-      this.lifecycleRevisions.set(command.sessionId, this.workspace.sequence)
-    const receipt = {
-      deduped: false,
-      sequence: this.workspace.sequence,
-      result,
-      ...(lifecycle ? { lifecycle } : {}),
-    }
+    const receipt = { deduped: false, sequence: this.workspace.sequence, result }
     this.receipts.set(command.commandId, receipt)
     return receipt
-  }
-
-  private lifecycleResult(command: ClientOrchestrationCommand): SessionLifecycleResult | null {
-    if (!isSessionLifecycleCommand(command.type) || !('sessionId' in command)) return null
-    const session = this.detail(command.sessionId).session
-    return {
-      kind: 'session.lifecycle',
-      commandId: command.commandId,
-      sessionId: session.id,
-      beforeRevision: this.lifecycleRevisions.get(session.id) ?? 0,
-      before: v.parse(sessionLifecycleStateSchema, session),
-    }
   }
 
   stop() {
@@ -160,14 +136,6 @@ export class DemoOrchestration {
         return
       case 'session.interaction-mode.set':
         session.interactionMode = command.interactionMode
-        return
-      case 'session.lifecycle.restore':
-        if (command.expectedRevision !== (this.lifecycleRevisions.get(session.id) ?? 0))
-          throw demoError('The session changed after this action.')
-        const original = this.receipts.get(command.restoreCommandId)?.lifecycle
-        if (!original || original.sessionId !== session.id)
-          throw demoError('The original session action is unavailable.')
-        Object.assign(session, original.before)
         return
       case 'session.archive':
         session.archivedAt = now

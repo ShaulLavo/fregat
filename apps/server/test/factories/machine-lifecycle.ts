@@ -1,6 +1,6 @@
 import { onTestFinished } from 'vitest'
 import { MachineService } from '../../src/machines/service'
-import { fakeSsh, machine, noRelease } from './ssh'
+import { fakeSsh, machine } from './ssh'
 
 export async function lifecycleMachineFixture() {
   const boundary = await fakeSsh()
@@ -16,7 +16,6 @@ export async function lifecycleMachineFixture() {
     readMachines: () => ({ first: { ...machine, target: 'first-host' }, second: machine }),
     fetcher: boundary.fetcher,
     localPort: boundary.localPort,
-    releaseSource: noRelease,
     spawn(command) {
       if (
         heldStop ||

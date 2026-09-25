@@ -147,20 +147,6 @@ export function requireValidOrderKey(orderKey: string) {
   throw orderKeyErrors.ORDER_KEY_INVALID({ orderKey, internal: { length: orderKey.length } })
 }
 
-/** Why a session cannot be settled now, or null. The throwing guard and the sweep share it. */
-export function settleBlocker(
-  session: OrchestrationProjectedSession,
-  dismissMessageQuestions = false,
-) {
-  const optional = dismissMessageQuestions ? pendingMessageQuestions(session.activities).length : 0
-  if (session.pendingApprovalCount > 0 || session.pendingUserInputCount > optional)
-    return 'blocking-request' as const
-  if (hasQueuedTurnStart(session)) return 'queued-turn' as const
-  if (isSessionAlive(session) || session.latestTurn?.state === 'running')
-    return 'runtime-active' as const
-  return null
-}
-
 export function requireSettleable(
   session: OrchestrationProjectedSession,
   commandType: string,
@@ -168,26 +154,24 @@ export function requireSettleable(
   dismissMessageQuestions = false,
 ) {
   const sessionId = session.id
-  const blocker = settleBlocker(session, dismissMessageQuestions)
-  if (blocker === 'blocking-request')
+  const optional = dismissMessageQuestions ? pendingMessageQuestions(session.activities).length : 0
+  if (session.pendingApprovalCount > 0 || session.pendingUserInputCount > optional)
     throw sessionLifecycleErrors.SESSION_BLOCKING_REQUEST({
       commandType,
       sessionId,
       internal: {
         pendingApprovalCount: session.pendingApprovalCount,
         pendingUserInputCount: session.pendingUserInputCount,
-        dismissibleQuestions: dismissMessageQuestions
-          ? pendingMessageQuestions(session.activities).length
-          : 0,
+        dismissibleQuestions: optional,
       },
     })
-  if (blocker === 'queued-turn')
+  if (hasQueuedTurnStart(session))
     throw sessionLifecycleErrors.SESSION_QUEUED_TURN_START({
       commandType,
       sessionId,
       internal: { latestTurnState: session.latestTurn?.state ?? null },
     })
-  if (blocker === 'runtime-active')
+  if (isSessionAlive(session) || session.latestTurn?.state === 'running') {
     throw sessionLifecycleErrors.SESSION_RUNTIME_ACTIVE({
       commandType,
       sessionId,
@@ -197,6 +181,7 @@ export function requireSettleable(
         runtimeStatus: session.runtime?.status ?? null,
       },
     })
+  }
 }
 
 export function requireSnoozable(

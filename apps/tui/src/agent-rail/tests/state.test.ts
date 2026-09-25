@@ -102,17 +102,14 @@ test('project registration, durable collapse and read stamps, and partial bulk f
       ],
       true,
     )
-    expect(accepted).toBeNull()
+    expect(accepted).toBe(false)
     expect(store.getSnapshot().marked).toEqual([second])
     expect(store.getSnapshot().error).toBeTruthy()
     expect(chat.getSnapshot().projection.sessionById[first]?.archivedAt).not.toBeNull()
     expect(chat.getSnapshot().projection.sessionById[second]?.archivedAt).toBeNull()
-    expect(
-      await store.execute([createSessionArchiveCommand({ sessionId: second })], true),
-    ).toMatchObject({
-      deduped: false,
-      lifecycle: { kind: 'session.lifecycle', sessionId: second },
-    })
+    expect(await store.execute([createSessionArchiveCommand({ sessionId: second })], true)).toBe(
+      true,
+    )
     expect(store.getSnapshot().marked).toEqual([])
   } finally {
     store.dispose()

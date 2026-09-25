@@ -40,7 +40,7 @@ it('carries the same durable identity in health, the handshake, and serverConfig
   expect(socket.closes).toEqual([])
   expect(socket.messages[0]).toMatchObject({
     kind: 'connected',
-    config: { environmentId: descriptor.environmentId, protocolVersion: 8 },
+    config: { environmentId: descriptor.environmentId, protocolVersion: 7 },
   })
 
   socket.receive({ kind: 'request', method: 'serverConfig', requestId: 'config-request' })
@@ -49,7 +49,7 @@ it('carries the same durable identity in health, the handshake, and serverConfig
     kind: 'response',
     ok: true,
     requestId: 'config-request',
-    data: { environmentId: descriptor.environmentId, protocolVersion: 8 },
+    data: { environmentId: descriptor.environmentId, protocolVersion: 7 },
   })
 })
 

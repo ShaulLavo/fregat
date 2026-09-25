@@ -1,10 +1,9 @@
-import { mkdir, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises'
+import { readFile, rm } from 'node:fs/promises'
 import path from 'node:path'
 import { expect } from 'vitest'
 import { test } from '../../../test/factories/installation'
 import { installServerLauncher } from '../install'
-import { REMOTE_SUPPORT } from '../release-files'
-import { parseInstallation, remoteFailure } from '../../machines/records'
+import { parseInstallation } from '../../machines/records'
 import { probeCommand, stopCommand } from '../../machines/remote-scripts'
 
 test('installation is repeatable and discoverable with neither Bun nor the launcher on PATH', async ({
@@ -80,10 +79,7 @@ test('missing installation gives the install command instead of requesting a rep
     stderr: 'pipe',
   })
   expect(await probe.exited).toBe(127)
-  expect(remoteFailure('probe', await new Response(probe.stderr).text(), 127)).toMatchObject({
-    code: 'machines.SSH_NOT_INSTALLED',
-    fix: expect.stringContaining('bun run server:install'),
-  })
+  expect(await new Response(probe.stderr).text()).toContain('bun run server:install')
   expect(await new Response(probe.stdout).text()).toBe('')
 })
 
@@ -111,51 +107,3 @@ test.each(['not json', '{}', '{"kind":"source","directory":"relative","executabl
     expect(() => parseInstallation(output)).toThrow('invalid installation descriptor')
   },
 )
-
-test('a release launcher describes the release and starts its bundle from the server root', async ({
-  homeDirectory,
-}) => {
-  const serverRoot = path.join(homeDirectory, ".platform/server ' $(touch unwanted)")
-  const server = path.join(serverRoot, 'releases/first/server')
-  await mkdir(server, { recursive: true })
-  await writeFile(
-    path.join(server, 'index.js'),
-    'console.log(JSON.stringify({ cwd: process.cwd(), args: process.argv.slice(2), env: process.env.NODE_ENV }))',
-  )
-  await writeFile(path.join(server, REMOTE_SUPPORT), '')
-  await symlink('releases/first', path.join(serverRoot, 'current'))
-  const installation = {
-    kind: 'release',
-    directory: path.join(serverRoot, 'current'),
-    executable: process.execPath,
-  } as const
-  const launcher = await installServerLauncher({ homeDirectory, installation })
-
-  const probe = Bun.spawn(['/bin/sh', '-c', probeCommand()], {
-    env: { HOME: homeDirectory, PATH: '/usr/bin:/bin' },
-    stdout: 'pipe',
-    stderr: 'pipe',
-  })
-  const described = await new Response(probe.stdout).text()
-  expect(await probe.exited, await new Response(probe.stderr).text()).toBe(0)
-  expect(parseInstallation(described)).toEqual(installation)
-
-  const started = Bun.spawn([launcher, '--flag'], {
-    env: { PATH: '/usr/bin:/bin' },
-    stdout: 'pipe',
-  })
-  const output = await new Response(started.stdout).text()
-  expect(await started.exited).toBe(0)
-  expect(JSON.parse(output)).toEqual({
-    cwd: await realpath(serverRoot),
-    args: ['--flag'],
-    env: 'production',
-  })
-  expect(await Bun.file(path.join(homeDirectory, 'unwanted')).exists()).toBe(false)
-})
-
-test('refuses a release descriptor that names a release directory in place of current', () => {
-  const output =
-    '{"kind":"release","directory":"/home/u/.platform/server/releases/first","executable":"/bin/bun"}'
-  expect(() => parseInstallation(output)).toThrow('invalid installation descriptor')
-})

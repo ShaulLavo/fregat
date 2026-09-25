@@ -1,11 +1,4 @@
-import { pushSessionPath, sessionIdSchema } from '@workspace/contracts'
-import { tokenForChatReference } from '@workspace/client-core/address/references'
-import { workspaceToken } from '@workspace/client-core/address/workspace'
-import * as v from 'valibot'
-import {
-  testWorkspaceAddress,
-  testWorkspaceToken,
-} from '../../../../test/factories/workspace-address'
+import { testWorkspaceToken } from '../../../../test/factories/workspace-address'
 import { describe } from 'vitest'
 
 import { expect, test } from '../../../../test/fixtures'
@@ -490,23 +483,5 @@ describe('ordered tabs and explicit defaults', () => {
     })
     expect(fixedPoint(`${base}?side=chat&chat=t/new`)).toBe(`${base}?chat=t/new&side=chat`)
     expect(parseAddress(`${base}?chat=t/bogus`).chat).toBeNull()
-  })
-})
-
-test('writes a push notice session path the way the address grammar does', () => {
-  const sessionId = v.parse(sessionIdSchema, '99dc0669-0262-4f92-a8d2-85ff6baea075')
-  const workspace = testWorkspaceAddress('/srv/my ~repo')
-  const address: Address = {
-    ...emptyAddress(),
-    workspace: workspaceToken(workspace),
-    mode: 'chat',
-    document: tokenForChatReference({ kind: 'session', sessionId }),
-  }
-
-  expect(`/${pushSessionPath(workspace, sessionId)}`).toBe(formatAddress(address))
-  expect(parseAddress(`/${pushSessionPath(workspace, sessionId)}`)).toMatchObject({
-    workspace: workspaceToken(workspace),
-    mode: 'chat',
-    document: `t/${sessionId}`,
   })
 })

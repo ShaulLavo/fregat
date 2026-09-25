@@ -1,4 +1,4 @@
-import type { SessionRailStatus } from '@workspace/contracts'
+import type { SessionRailStatus } from '@workspace/client-core/chat/rail/status'
 
 export function sessionStatusLabel(status: SessionRailStatus) {
   if (status === 'approval') return 'Approval requested'

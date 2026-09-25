@@ -8,22 +8,11 @@ export function createEnvironmentProtocolMismatchError(
   return createClientError({
     code: 'ENVIRONMENT_PROTOCOL_MISMATCH',
     status: 403,
-    message: `The server at ${origin} speaks protocol ${received}, and this client needs protocol ${expected}.`,
-    ...protocolMismatchGuidance(origin, received < expected),
+    message: `The server at ${origin} uses an incompatible protocol version.`,
+    why: `This client requires protocol ${expected}, but the server reported ${received}.`,
+    fix: 'Run matching client and server versions before reconnecting.',
     internal: { origin, expected, received },
   })
-}
-
-function protocolMismatchGuidance(origin: string, serverOlder: boolean) {
-  if (serverOlder)
-    return {
-      why: 'That server runs an older Platform version than this client.',
-      fix: `Update the Platform server at ${origin} to this client’s version, then Retry.`,
-    }
-  return {
-    why: 'That server runs a newer Platform version than this client.',
-    fix: 'Reload this page; if the mismatch remains, update the Platform that serves it.',
-  }
 }
 
 export function createEnvironmentIdentityDriftError(

@@ -1,6 +1,5 @@
 import path from 'node:path'
 import * as v from 'valibot'
-import type { WorktreeSubmoduleMode } from '@workspace/contracts'
 import { recordRequestContext } from '../observability'
 import {
   gitWorktreeCreateBodySchema,
@@ -123,10 +122,6 @@ export class GitWorktreeService {
   async create(input: GitWorktreeCreateBody): Promise<GitWorktreeCreateResult> {
     const body = v.parse(gitWorktreeCreateBodySchema, input)
     return this.withRepositoryLane(body.path, () => this.createCheckout(body))
-  }
-
-  updateSubmodules(worktreePath: string, mode: WorktreeSubmoduleMode) {
-    return this.git.updateSubmodules(worktreePath, mode)
   }
 
   async previewRemoval(input: GitWorktreeTarget) {

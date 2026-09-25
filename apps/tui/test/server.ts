@@ -74,8 +74,6 @@ function createServerWithDatabase(
         database: database.db,
         providerAdapterRegistry: new ProviderAdapterRegistry([providerAdapter]),
         providerRuntime,
-        // The default lookup runs the real forge CLI; tests record pull requests themselves.
-        pullRequestLookup: null,
       },
       settings: testSettingsOptions(root),
       watch: false,

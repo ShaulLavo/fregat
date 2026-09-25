@@ -3,42 +3,32 @@ import * as v from 'valibot'
 import { settingsSnapshotSchema } from '../../../packages/contracts/src/index'
 import type { Scenario } from './index'
 import { selectors } from '../selectors'
-import { collectOrchestrationBases, dispatch } from './chat-verification'
-import { DEFAULT_PROVIDER_INSTANCE_ID } from '../../../packages/contracts/src/index'
-import { createGitFixture, fixtureGit, releaseFixture } from '../fixture-workspace'
-import { connectSecondOwner, type SecondOwner } from '../second-owner'
-import { registerFixtureProject, writeRawSetting } from './native-provider-verification'
+import { collectOrchestrationBases, dispatch, readShell } from './chat-verification'
 
 export const projectGrouping: Scenario = {
   name: 'project-grouping',
   description:
-    'Verify repository/separate grouping and scoped delete previews with two owners sharing a repository. Without a second connected owner, starts a throwaway server and connects it as a Remote URL machine. Never confirms deletion.',
+    'Verify repository/separate grouping and scoped delete previews with two already-connected owners sharing a repository. Never confirms deletion.',
   async run(page, { step }) {
     const bases = collectOrchestrationBases(page)
     await page.goto(page.url().replace(/\/workbench(?:\?.*)?$/, '/chat'))
     await selectors.sessionSearch(page).waitFor()
     await page.waitForTimeout(2_000)
-    let second: SecondOwner | null = null
-    if (bases.size < 2) second = await connectSecondOwner(page, bases)
     const owners = [...bases]
-    ok(owners.length >= 2, 'Grouping verification needs two live owners')
+    ok(
+      owners.length >= 2,
+      'Grouping verification requires two already-connected live owners; do not start a development server for this scenario',
+    )
     const primary = owners[0]!
     const secondary = owners[1]!
-    // Both owners register one checkout; project identity follows its remote, so they share it.
-    const shared = await createGitFixture('project-grouping')
-    await fixtureGit(shared, ['commit', '-m', 'fixture'])
-    await fixtureGit(shared, [
-      'remote',
-      'add',
-      'origin',
-      `https://github.com/fregat/grouping-${crypto.randomUUID().slice(0, 8)}.git`,
-    ])
-    const registered = [
-      await registerFixtureProject(page, primary, shared),
-      await registerFixtureProject(page, secondary, shared),
-    ]
-    const serverBase = primary.replace(/\/orchestration$/, '')
-    const settingsUrl = `${serverBase}/settings`
+    const snapshots = await Promise.all([readShell(page, primary), readShell(page, secondary)])
+    const project = snapshots[0]!.projects.find(
+      (candidate) =>
+        candidate.repositoryIdentity.source !== 'path' &&
+        snapshots[1]!.projects.some((other) => other.repositoryKey === candidate.repositoryKey),
+    )
+    ok(project, 'Both owners need the same registered Git repository')
+    const settingsUrl = primary.replace(/\/orchestration$/, '/settings')
     const headers = { Origin: new URL(page.url()).origin }
     const response = await page.request.get(settingsUrl, { headers })
     ok(response.ok(), 'Settings must be reachable')
@@ -59,21 +49,32 @@ export const projectGrouping: Scenario = {
     const created: string[] = []
     try {
       for (const [index, base] of [primary, secondary].entries()) {
+        const snapshot = snapshots[index]!
+        const owned = snapshot.projects.find(
+          (candidate) => candidate.repositoryKey === project.repositoryKey,
+        )!
+        const worktree = snapshot.worktrees.find(
+          (candidate) => candidate.projectId === owned.id && candidate.kind === 'current',
+        )
+        ok(
+          worktree && owned.defaultModelSelection,
+          'Each owner needs a current checkout and default model',
+        )
         await dispatch(page, base, {
           type: 'session.create',
           sessionId,
           title,
-          // No turn runs, so any model will do.
-          modelSelection: { providerInstanceId: DEFAULT_PROVIDER_INSTANCE_ID, model: 'gpt-5.5' },
-          worktreeTarget: { kind: 'current', worktreeId: registered[index]!.id },
+          modelSelection: owned.defaultModelSelection,
+          worktreeTarget: { kind: 'current', worktreeId: worktree.id },
         })
         created.push(base)
       }
       for (const mode of ['repository', 'repository_path', 'separate']) {
-        await write([{ kind: 'set', key: keys[0], value: mode }])
-        await writeRawSetting(page, serverBase, keys[1]!, {})
+        await write([
+          { kind: 'set', key: keys[0], value: mode },
+          { kind: 'set', key: keys[1], value: {} },
+        ])
         await page.reload()
-        await selectors.sessionSearch(page).waitFor({ timeout: 45_000 })
         await selectors.sessionSearch(page).fill(title)
         await selectors.projectGroups(page).first().waitFor()
         await page.waitForTimeout(250)
@@ -87,20 +88,14 @@ export const projectGrouping: Scenario = {
       }
     } finally {
       for (const base of created) await dispatch(page, base, { type: 'session.delete', sessionId })
-      for (const key of keys) {
-        if (!Object.hasOwn(saved, key)) await write([{ kind: 'reset', keys: [key] }])
-        else if (key === keys[0]) await write([{ kind: 'set', key, value: saved[key] }])
-        else await writeRawSetting(page, serverBase, key, saved[key])
-      }
-      for (const [index, base] of [primary, secondary].entries())
-        await dispatch(page, base, {
-          type: 'project.delete',
-          projectId: registered[index]!.projectId,
-          force: true,
-        })
-      await releaseFixture(shared)
+      await write(
+        keys.map((key) =>
+          Object.hasOwn(saved, key)
+            ? { kind: 'set', key, value: saved[key] }
+            : { kind: 'reset', keys: [key] },
+        ),
+      )
       await page.reload()
-      await second?.stop()
     }
   },
 }

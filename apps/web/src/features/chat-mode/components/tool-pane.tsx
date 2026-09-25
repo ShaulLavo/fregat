@@ -12,7 +12,6 @@ import { CheckpointState } from '@/features/chat-mode/components/checkpoint-stat
 import { checkpointAvailability } from '@/lib/checkpoint-availability'
 import { useSessionTerminalId } from '@/features/chat-mode/hooks/use-session-terminal-id'
 import { useSessionToolRoot } from '@/features/chat-mode/hooks/use-session-tool-root'
-import { useSessionCheckoutRefresh } from '@/features/chat-mode/hooks/use-session-checkout-refresh'
 import { useSessionDiffScope } from '@/features/chat/hooks/use-session-diff-scope'
 import { Panel as GitPanel } from '@/features/git/components/panel'
 
@@ -54,7 +53,6 @@ export function ToolPane({
   // checkout rather than the project root. Same value for a session with no
   // worktree; the difference only appears once one has its own.
   const toolRoot = useSessionToolRoot()
-  useSessionCheckoutRefresh()
   const terminalSessionId = useSessionTerminalId()
   if (tab !== 'terminal') {
     return toolBody({ conflicts, diffScope, gitFiles, rootPath, tab, toolRoot, workbenchPanels })

@@ -6,7 +6,7 @@ import { MachineEvents } from './events'
 import { createSshLauncher } from './launcher'
 import { MachinePrompts } from './prompts'
 import { parseMachineName } from './records'
-import { createSshError, sshAuthCancelled } from './structured-errors'
+import { createSshError } from './structured-errors'
 
 type Launcher = ReturnType<typeof createSshLauncher>
 type Authentication = Awaited<ReturnType<typeof createSshAuthentication>>
@@ -18,13 +18,12 @@ type Entry = {
   owners: Set<string>
   authenticationOwner: { client: string } | null
   connecting: Promise<MachineConnectionState> | null
-  updating: Promise<MachineConnectionState> | null
   cancelledAt: number | null
 }
 
 export type MachineServiceOptions = Pick<
   Parameters<typeof createSshLauncher>[0],
-  'spawn' | 'fetcher' | 'localPort' | 'releaseSource'
+  'spawn' | 'fetcher' | 'localPort'
 >
 
 type Options = MachineServiceOptions & {
@@ -74,19 +73,6 @@ export class MachineService {
     return connectionState(entry, state)
   }
 
-  /** Installs this server's release on the machine; the client then holds its connection. */
-  async update(input: string, client: string) {
-    const name = await parseMachineName(input)
-    this.assertOpen()
-    this.renewClient(client)
-    this.ownersFor(name).add(client)
-    const entry = await this.entry(name)
-    await this.disconnecting.get(name)
-    this.assertOpen()
-    const state = await this.updateEntry(name, entry, client)
-    return connectionState(entry, state)
-  }
-
   async disconnect(input: string, client: string) {
     const name = await parseMachineName(input)
     return this.disconnectKnown(name, client)
@@ -128,43 +114,16 @@ export class MachineService {
 
   private connectEntry(name: string, entry: Entry, client: string) {
     if (entry.connecting) return entry.connecting
-    const operation = this.authenticated(name, entry, client, () =>
-      entry.launcher.connectMachine(name),
-    ).finally(() => {
-      if (entry.connecting === operation) entry.connecting = null
-    })
-    entry.connecting = operation
-    return operation
-  }
-
-  // A connect during an update joins it; an update waits for a connect already running.
-  private updateEntry(name: string, entry: Entry, client: string) {
-    if (entry.updating) return entry.updating
-    const running = entry.connecting
-    const operation = this.authenticated(name, entry, client, async () => {
-      await running?.catch(() => undefined)
-      return entry.launcher.updateMachine(name)
-    }).finally(() => {
-      entry.updating = null
-      if (entry.connecting === operation) entry.connecting = null
-    })
-    entry.updating = operation
-    entry.connecting = operation
-    return operation
-  }
-
-  /** Routes the SSH prompts `operation` raises to `client`. */
-  private authenticated(
-    name: string,
-    entry: Entry,
-    client: string,
-    operation: () => Promise<MachineConnectionState>,
-  ) {
     entry.authentication?.begin()
     entry.cancelledAt = null
     const owner = { client }
     entry.authenticationOwner = owner
-    return operation().finally(() => this.finishAuthentication(name, entry, owner))
+    const operation = entry.launcher.connectMachine(name).finally(() => {
+      entry.connecting = null
+      this.finishAuthentication(name, entry, owner)
+    })
+    entry.connecting = operation
+    return operation
   }
 
   private finishAuthentication(name: string, entry: Entry, owner: Entry['authenticationOwner']) {
@@ -319,7 +278,6 @@ export class MachineService {
       owners: this.ownersFor(name),
       authenticationOwner: null,
       connecting: null,
-      updating: null,
       cancelledAt: null,
     }
     this.entries.set(name, entry)
@@ -396,7 +354,7 @@ function connectionState(entry: Entry, state: MachineConnectionState): MachineCo
     return {
       name: state.name,
       phase: 'blocked',
-      lastError: sshAuthCancelled(entry.cancelledAt),
+      lastError: 'SSH authentication was cancelled. Connect again to retry.',
       lastErrorAt: entry.cancelledAt,
     }
   if (state.phase !== 'live') return state

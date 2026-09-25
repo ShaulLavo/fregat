@@ -83,7 +83,7 @@ export async function createSshAuthentication(options: {
     throw error
   }
 
-  function spawnChild(command: string[], stdin: 'ignore' | 'pipe' | ReadableStream<Uint8Array>) {
+  function spawnChild(command: string[], stdin: 'ignore' | 'pipe') {
     if (controller.signal.aborted)
       throw createSshError('settings', 'SSH authentication is closing.')
     if (cancelled) throw createSshError('probe', 'SSH authentication was cancelled.')
@@ -126,7 +126,7 @@ export async function createSshAuthentication(options: {
     return child
   }
 
-  const spawn: SshSpawner = (command, stdin) => spawnChild(command, stdin ?? 'ignore')
+  const spawn: SshSpawner = (command) => spawnChild(command, 'ignore')
 
   async function openForward(options: ForwardOptions): Promise<SshForward> {
     // Open stdin keeps the mux session alive; its listener stays on the master until -O cancel.

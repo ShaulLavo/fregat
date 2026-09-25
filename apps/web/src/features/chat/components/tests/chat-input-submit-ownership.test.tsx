@@ -10,7 +10,7 @@ import {
 } from '../../state/chat-input-draft-store'
 import { initializePromptStashStore } from '../../state/prompt-stash-store'
 import { environmentScopedStorage } from '@/lib/environments/state/scoped-storage'
-import { providerListQueryOptions } from '@/lib/provider-query'
+import { providerListQueryOptions } from '../../utils/provider-query'
 import type { ChatInputSubmitResult } from '../../utils/composed-message'
 import { expect, test } from '../../../../../test/fixtures'
 import { renderWithProviders, createTestQueryClient } from '../../../../../test/render'

@@ -10,7 +10,6 @@ import {
   packageJsonScripts,
   packageScriptRunner,
   projectScriptSuggestions,
-  t3ProjectScripts,
   type ProjectScriptSuggestion,
 } from '@/features/chat-mode/utils/project-scripts'
 import { fetchFile, fetchTree } from '@/lib/file-server'
@@ -19,7 +18,7 @@ const NO_SCRIPTS: readonly ProjectScriptSuggestion[] = []
 
 /**
  * The scripts this workspace can run: whatever the project saved, plus whatever
- * its `t3.json` and `package.json` offer.
+ * its `package.json` offers.
  *
  * Discovery is a client read of two files the workspace already serves rather
  * than a server route of its own — there is nothing here a `fs.read` does not
@@ -44,7 +43,7 @@ export function useScripts({
   const { data: discovered, isLoading } = useQuery({
     enabled: enabled && rootPath !== null,
     queryFn: ({ signal, client }) =>
-      discoverScripts(rootPath ?? '', signal, clientForQueryClient(client)),
+      discoverPackageScripts(rootPath ?? '', signal, clientForQueryClient(client)),
     queryKey: paletteQueryKeys.scripts(rootPath ?? ''),
     // A project without a manifest answers the same way every time; retrying is
     // two more failed reads for the same empty list.
@@ -54,33 +53,23 @@ export function useScripts({
 
   return {
     isPending: isLoading,
-    scripts: projectScriptSuggestions({
-      discovered: discovered?.manifest ?? NO_SCRIPTS,
-      projectFile: discovered?.projectFile ?? NO_SCRIPTS,
-      saved,
-    }),
+    scripts: projectScriptSuggestions({ discovered: discovered ?? NO_SCRIPTS, saved }),
   }
 }
 
-const NO_DISCOVERY = { manifest: NO_SCRIPTS, projectFile: NO_SCRIPTS }
-
-async function discoverScripts(rootPath: string, signal: AbortSignal, client: Client) {
+async function discoverPackageScripts(rootPath: string, signal: AbortSignal, client: Client) {
   const tree = await fetchTree(filesystemPath(rootPath), signal, client).catch(() => null)
-  if (!tree) return NO_DISCOVERY
+  if (!tree) return NO_SCRIPTS
 
   const names = tree.entries.map((entry) => entry.name)
-  const read = (name: string) =>
-    names.includes(name)
-      ? fetchFile(filesystemPath(rootPath ? `${rootPath}/${name}` : name), signal, client).catch(
-          () => null,
-        )
-      : Promise.resolve(null)
-  const [manifest, projectFile] = await Promise.all([read('package.json'), read('t3.json')])
+  if (!names.includes('package.json')) return NO_SCRIPTS
 
-  return {
-    manifest: manifest
-      ? packageJsonScripts(manifest.content, packageScriptRunner(names))
-      : NO_SCRIPTS,
-    projectFile: projectFile ? t3ProjectScripts(projectFile.content) : NO_SCRIPTS,
-  }
+  const manifest = await fetchFile(
+    filesystemPath(rootPath ? `${rootPath}/package.json` : 'package.json'),
+    signal,
+    client,
+  ).catch(() => null)
+  if (!manifest) return NO_SCRIPTS
+
+  return packageJsonScripts(manifest.content, packageScriptRunner(names))
 }

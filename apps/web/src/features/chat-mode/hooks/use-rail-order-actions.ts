@@ -1,5 +1,4 @@
 import type { ChatRailOrder } from '@/features/chat-mode/providers/rail-order-context'
-import { useSessionUndoShortcut } from '@/features/chat-mode/hooks/use-session-undo-shortcut'
 import {
   reorderRailProject,
   reorderRailSession,
@@ -12,9 +11,8 @@ import {
  * which reads the same stores the rail renders from.
  */
 export function useRailOrderActions(): ChatRailOrder {
-  const undoShortcut = useSessionUndoShortcut()
   return {
     reorderProject: (activeId, overId) => reorderRailProject({ activeId, overId }),
-    reorderSession: (activeId, overId) => reorderRailSession({ activeId, overId, undoShortcut }),
+    reorderSession: (activeId, overId) => reorderRailSession({ activeId, overId }),
   }
 }

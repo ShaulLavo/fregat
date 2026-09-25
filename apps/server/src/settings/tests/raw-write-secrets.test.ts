@@ -1,10 +1,9 @@
 import { existsSync } from 'node:fs'
-import { mkdtemp, readFile, rm, stat } from 'node:fs/promises'
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import type { SettingsEvent } from '@workspace/contracts'
 import { afterEach, describe, expect, it } from 'vitest'
-import { VAPID_PRIVATE_KEY_REF } from '../secrets'
 import { SettingsStore } from '../store'
 
 const stores: SettingsStore[] = []
@@ -174,30 +173,5 @@ describe('raw settings writes', () => {
     expect(saved).toContain('// kept across the strip')
     expect(saved).toContain('"workbench.colorTheme": "light"')
     expect(saved).not.toContain(TYPED_BY_HAND)
-  })
-
-  it('creates a server secret once and keeps it through provider secret writes', async () => {
-    const { root, store } = await createSettings()
-    let created = 0
-    const create = () => {
-      created += 1
-      return `server-generated-${created}`
-    }
-
-    const [first, second] = await Promise.all([
-      store.ensureSecret(VAPID_PRIVATE_KEY_REF, create),
-      store.ensureSecret(VAPID_PRIVATE_KEY_REF, create),
-    ])
-    await writeRaw(store, documentWith(TYPED_BY_HAND))
-
-    expect(created).toBe(1)
-    expect(second).toBe(first)
-    const secretsFile = path.join(root, 'secrets.json')
-    expect(JSON.parse(await readFile(secretsFile, 'utf8'))).toMatchObject({
-      [VAPID_PRIVATE_KEY_REF]: first,
-    })
-    expect((await stat(secretsFile)).mode & 0o777).toBe(0o600)
-    expect(environmentValue(await store.providerInstancesForSpawn())).toBe(TYPED_BY_HAND)
-    expect(JSON.stringify(store.snapshot())).not.toContain(first)
   })
 })

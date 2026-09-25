@@ -1,9 +1,5 @@
 import { createEnvironmentEntry } from '@workspace/client-core/environments/utils/connection'
 import { hasConnectionNotice } from '@/lib/environments/utils/availability'
-import {
-  connectionNoticeSummary,
-  serverUpdateLabel,
-} from '@/lib/environments/utils/connection-notice'
 import { expect, test } from '../../../../test/fixtures'
 
 const origin = 'http://localhost:38078'
@@ -23,16 +19,4 @@ test('failed attempts, retries, and lost connections remain visible', () => {
   expect(hasConnectionNotice({ ...entry, phase: 'blocked' })).toBe(true)
   expect(hasConnectionNotice({ ...entry, phase: 'identity-drift' })).toBe(true)
   expect(hasConnectionNotice({ ...entry, phase: 'live', lastErrorAt: 1 })).toBe(false)
-})
-
-test('a failed update reads as such and can be tried again; a source primary’s refusal cannot', () => {
-  const failed = (code: string) => ({ code, message: 'Update failed.' })
-  for (const code of ['NO_BUN', 'OLD_BUN', 'TRANSFER', 'INSTALL']) {
-    const error = failed(`machines.SSH_UPDATE_${code}`)
-    expect(serverUpdateLabel(error)).toBe('Update server')
-    expect(connectionNoticeSummary('blocked', error)).toBe('Server update failed')
-  }
-  expect(serverUpdateLabel(failed('machines.SSH_UPDATE_NOT_A_RELEASE'))).toBeNull()
-  expect(serverUpdateLabel(failed('ENVIRONMENT_PROTOCOL_MISMATCH'))).toBeNull()
-  expect(serverUpdateLabel(null)).toBeNull()
 })

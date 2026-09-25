@@ -41,8 +41,6 @@ const TEXT_MENU_EDITOR_COMMANDS = [
 ] as const
 
 const ASYNC_COMMAND_IDS = [
-  'workspace.undoSessionAction',
-  'workspace.redoSessionAction',
   'fileTree.undo',
   'fileTree.redo',
   'workspace.splitEditorRight',
@@ -187,8 +185,6 @@ const FILE_OPERATION_COMMAND_IDS = [
 ] as const satisfies readonly PlatformCommandId[]
 
 const WORKSPACE_OPERATION_COMMAND_IDS = [
-  'workspace.undoSessionAction',
-  'workspace.redoSessionAction',
   'workspace.undoWorkspaceEdit',
   'workspace.redoWorkspaceEdit',
   'workspace.copyAddress',
@@ -322,7 +318,6 @@ describe('command table', () => {
     expect(commandIdsWithWhen('workspaceEditRedoable')).toEqual(['workspace.redoWorkspaceEdit'])
     expect(commandIdsWithWhen('fileOperationUndoable')).toEqual(['fileTree.undo'])
     expect(commandIdsWithWhen('fileOperationRedoable')).toEqual(['fileTree.redo'])
-    expect(commandIdsWithWhen('sessionActionUndoable')).toEqual(['workspace.undoSessionAction'])
   })
 
   it('registers the four hidden Editor commands exposed by the text menu', () => {

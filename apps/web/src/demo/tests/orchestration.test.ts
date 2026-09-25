@@ -124,38 +124,3 @@ test('a first message can bootstrap a new session and its command receipt is ide
     orchestration.stop()
   }
 })
-
-test('demo lifecycle receipts support guarded Undo and Redo', async () => {
-  const workspace = await DemoWorkspace.create()
-  const orchestration = new DemoOrchestration(workspace)
-  const sessionId = orchestration.shell().sessions[0]!.id
-  const dispatch = (value: unknown) =>
-    orchestration.dispatch(v.parse(clientOrchestrationCommandSchema, value))
-  const archived = dispatch({ type: 'session.archive', commandId: 'archive', sessionId })
-  expect(archived.lifecycle?.before.archivedAt).toBeNull()
-  const undone = dispatch({
-    type: 'session.lifecycle.restore',
-    commandId: 'undo',
-    sessionId,
-    expectedRevision: archived.sequence,
-    restoreCommandId: archived.lifecycle?.commandId,
-  })
-  expect(orchestration.detail(sessionId).session.archivedAt).toBeNull()
-  dispatch({
-    type: 'session.lifecycle.restore',
-    commandId: 'redo',
-    sessionId,
-    expectedRevision: undone.sequence,
-    restoreCommandId: undone.lifecycle?.commandId,
-  })
-  expect(orchestration.detail(sessionId).session.archivedAt).not.toBeNull()
-  expect(() =>
-    dispatch({
-      type: 'session.lifecycle.restore',
-      commandId: 'stale',
-      sessionId,
-      expectedRevision: archived.sequence,
-      restoreCommandId: archived.lifecycle?.commandId,
-    }),
-  ).toThrow('The session changed')
-})
