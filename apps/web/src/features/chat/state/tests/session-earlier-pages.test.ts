@@ -54,6 +54,23 @@ test('a page lands in front of the transcript and the boundary moves with it', a
   ).toBe('message-0')
 })
 
+test('a landed page is not kept in the query cache beside the transcript', async () => {
+  seedFullWindow()
+  const { loader } = createLoader([page([message(0), message(1)], true)])
+  loader.observer(SESSION_ID)
+
+  expect(await loader.load(SESSION_ID)).toBe(true)
+
+  await expect
+    .poll(() =>
+      queryClient
+        .getQueryCache()
+        .findAll({ queryKey: ['chat', 'earlier-page'] })
+        .filter((query) => query.state.data !== undefined),
+    )
+    .toHaveLength(0)
+})
+
 test('two clicks in the same frame cost one scan', async () => {
   seedFullWindow()
   const { loader, requests } = createLoader([page([message(0)], true)])

@@ -113,10 +113,12 @@ export function createSessionEarlierPages(host: EarlierPageHost) {
     if (!pending) active.setOptions({ ...options, enabled: false })
     try {
       await host.queryClient.query(options)
-      return current(identity)
     } catch {
       return false
     }
+    // The page now lives in the projection; parking the observer lets `gcTime: 0` drop the copy.
+    if (active.options.queryKey === options.queryKey) active.setOptions(idleOptions(sessionId))
+    return current(identity)
   }
 
   function reset() {
