@@ -12,10 +12,44 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  quality:
-    name: Format, lint, typecheck, test
+  # Three jobs and a test matrix instead of one runner doing everything in turn:
+  # each pays for setup once, and no suite shares four cores with another.
+  lint:
+    name: Format, lint, census
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup
+        uses: ./.github/actions/setup
+
+      # `format:check`, never `format` — a CI job that rewrites files and then
+      # passes is a job that reports on a tree nobody reviewed.
+      - name: Format
+        run: bun run format:check
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Feature boundaries
+        run: bun run boundaries:check
+
+      - name: Design language census
+        run: bun run design:census
+
+      # Lint cannot stand in for this: its compiler rules miss components wrapped in `memo()`.
+      - name: React Compiler census
+        run: bun run compiler:census
+
+      - name: Unused code
+        run: bun run unused:check
+
+  typecheck:
+    name: Parity, typecheck, generated
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -70,27 +104,6 @@ jobs:
           TURBO_TELEMETRY_DISABLED: '1'
         run: bun run dev:web -- --dry-run=json > /dev/null
 
-      # `format:check`, never `format` — a CI job that rewrites files and then
-      # passes is a job that reports on a tree nobody reviewed.
-      - name: Format
-        run: bun run format:check
-
-      - name: Lint
-        run: bun run lint
-
-      - name: Feature boundaries
-        run: bun run boundaries:check
-
-      - name: Design language census
-        run: bun run design:census
-
-      # Lint cannot stand in for this: its compiler rules miss components wrapped in `memo()`.
-      - name: React Compiler census
-        run: bun run compiler:census
-
-      - name: Unused code
-        run: bun run unused:check
-
       # Electrobun 2 ships its SDK as a Hutch devkit projected into
       # apps/desktop/.hutch, not through node_modules, so the desktop typecheck
       # and tests resolve nothing until it exists. Keyed on the pinned release;
@@ -122,11 +135,55 @@ jobs:
       - name: Benchmark gate (file tree prepared input)
         run: bun run --cwd apps/web bench:file-tree-prepared-input:gate
 
-      # Runs the scripts suite plus every workspace's own. The `test` scripts in
-      # `apps/web` and `packages/tree` are scoped to `--project node --project
-      # dom`; their browser projects are the separate job below.
+  test:
+    name: Test (${{ matrix.suite.name }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        suite:
+          # Web is most of the time, so it is sharded by file. The `test` scripts
+          # in `apps/web` and `packages/tree` are scoped to `--project node --project
+          # dom`; their browser projects are the separate job below.
+          - { name: web 1/4, run: 'bun run --cwd apps/web test --shard=1/4' }
+          - { name: web 2/4, run: 'bun run --cwd apps/web test --shard=2/4' }
+          - { name: web 3/4, run: 'bun run --cwd apps/web test --shard=3/4' }
+          - { name: web 4/4, run: 'bun run --cwd apps/web test --shard=4/4' }
+          - { name: server, run: 'bun run --cwd apps/server test' }
+          - { name: tui, run: 'bun run --cwd apps/tui test' }
+          - name: packages
+            devkit: true
+            run: bun run test:scripts && bun run --filter '@workspace/*' test && bun run --cwd apps/desktop test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup
+        uses: ./.github/actions/setup
+
+      - name: Checkout pinned alignment reference
+        uses: actions/checkout@v4
+        with:
+          repository: pingdotgg/t3code
+          ref: 7445aa733ada33e45289e5aa5055f79142556513
+          path: references/t3code
+          persist-credentials: false
+
+      - name: Cache Hutch store
+        if: ${{ matrix.suite.devkit }}
+        uses: actions/cache@v4
+        with:
+          path: ~/.hutch
+          key: ${{ runner.os }}-hutch-${{ hashFiles('apps/desktop/package.json') }}
+
+      - name: Prepare Electrobun devkit
+        if: ${{ matrix.suite.devkit }}
+        working-directory: apps/desktop
+        run: node_modules/.bin/electrobun prepare
+
       - name: Test
-        run: bun run test
+        run: ${{ matrix.suite.run }}
 
   browser:
     name: Browser tests
