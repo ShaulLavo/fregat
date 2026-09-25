@@ -1,3 +1,7 @@
+import { ReviewDraftBar } from '@/features/chat/components/review-draft-bar'
+import { useReviewDraft } from '@/lib/review-draft/hooks/use-review-draft'
+import { removeReviewComments } from '@/lib/review-draft/state/store'
+import { withReviewComments } from '@/lib/review-draft/utils/prompt'
 import { ActiveFileChip } from '@/features/chat/components/active-file-chip'
 import { useActiveFileChip } from '@/features/chat/hooks/use-active-file-chip'
 import { withActiveFileMention } from '@/features/chat/utils/active-file-mention'
@@ -135,6 +139,7 @@ export function ChatInput({
   const images = useChatInputDraftStore(imagesSelector)
   const terminalContexts = useChatInputDraftStore(terminalContextsSelector)
   const activeFile = useActiveFileChip(rootPath)
+  const reviewComments = useReviewDraft({ environmentId, rootPath })
   const persistenceError = useChatInputDraftStore((store) => store.persistenceError)
   const clearStoredDraft = useChatInputDraftStore((store) => store.clearDraft)
   const clearStoredDraftContent = useChatInputDraftStore((store) => store.clearDraftContent)
@@ -258,7 +263,8 @@ export function ChatInput({
     if (busy && !queuesFollowUp && steerDisabledReason !== null) return false
 
     const editor = editorRef.current
-    const text = editor ? readChatInputText(editor).trim() : ''
+    const typed = editor ? readChatInputText(editor).trim() : ''
+    const text = withReviewComments(typed, reviewComments)
     const draft = useChatInputDraftStore.getState().getDraft(draftTarget)
     const validation = chatSubmissionValidation(text, draft.terminalContexts)
     setValidationError(validation)
@@ -290,6 +296,7 @@ export function ChatInput({
         },
         alternate,
       )
+      if (result !== 'rejected') removeReviewComments(reviewComments.map((comment) => comment.id))
       if (
         sentDraftStillCurrent(
           result,
@@ -455,6 +462,7 @@ export function ChatInput({
                 onTriggerChange={setTrigger}
               />
               <ChatInputUltrathinkPlugin />
+              <ReviewDraftBar comments={reviewComments} disabled={composerDisabled} />
               {activeFile.path ? (
                 <ActiveFileChip
                   disabled={composerDisabled}

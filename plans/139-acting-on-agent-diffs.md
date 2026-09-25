@@ -205,6 +205,13 @@ hunk.patch)` (16 hex), scoped by session, turns and whitespace mode. A hunk is a
 3. **Review draft.** Many comments across files with the anchor from answer 4, resolve, one send
    (the prompt lists each comment under its path and lines). Replaces the single-range line
    comment. Findings from Plan 169 land in the same model, marked by author (D3).
+   **Done 2026-09-25 (lane L8), anchoring partly:** the diff selection bar gains Comment (the
+   single-range Ask stays beside it); comments live in `lib/review-draft` per workspace, show as a
+   Review bar in that workspace's composer with remove and discard, and go out with the next
+   message, numbered, each quote followed by its comment. Each comment stores the anchor from
+   answer 4 (path, old and new ranges, blob ids); re-finding a moved comment and marking it
+   outdated is **left** for when comments are drawn inline in the diff. Scenario
+   `git-diff-line-comment`.
 4. Review mode on Codex, then Claude: **moved to Plan 169**.
 5. Second-model review: **moved to Plan 169**.
 6. **Plan line comments.** Block-level comments on an expanded proposed plan, stored in the review
