@@ -679,11 +679,11 @@
       "title": "Start a session in the background from a new draft",
       "report": "interaction.md",
       "wave": "3",
-      "status": "in-progress",
-      "evidence_level": "source-reviewed",
+      "status": "verified",
+      "evidence_level": "scenario-verified",
       "acceptance": "interaction.md, INTERACTION-13, Acceptance / verification",
       "execution_evidence": [
-        "2026-09-25 lane L2: scenario chat-background-start (three Ctrl+Enter starts from a new-worktree draft on `release`: three sessions, three worktrees, the user stays on an empty draft with the same mode and branch); chat-input-submit-plugin and sent-draft tests"
+        "scripts/agent/scenarios/chat-background-start.ts passed 2026-09-25 on lane L2: three Ctrl+Enter starts from a New worktree draft on release gave three sessions on three worktrees; the user stayed on an empty draft with the same mode and branch."
       ]
     },
     {
@@ -691,12 +691,11 @@
       "title": "Pin favorite models in the model picker",
       "report": "interaction.md",
       "wave": "4",
-      "status": "in-progress",
-      "evidence_level": "source-reviewed",
+      "status": "verified",
+      "evidence_level": "scenario-verified",
       "acceptance": "interaction.md, INTERACTION-14, Acceptance / verification",
       "execution_evidence": [
-        "2026-09-25 lane L2: models.favorites with model.setFavorite; Settings › Models star, picker Favorites rail and favorites-first ordering; unavailable favorites kept (model-order.test.ts, settings-mutations.test.ts)",
-        "2026-09-25 lane L2: scenario chat-model-favorites (Favorites rail lists an offered favorite and a retired one as No longer offered)"
+        "scripts/agent/scenarios/chat-model-favorites.ts passed 2026-09-25 on lane L2: an offered favorite and a retired one (No longer offered) under the picker Favorites rail; hidden models never shown (model-order.test.ts)."
       ]
     },
     {
