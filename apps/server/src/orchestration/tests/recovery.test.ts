@@ -114,7 +114,8 @@ test.each(['claimed', 'adopted'] as const)(
       })
     const stale = (await sessionFrom(fixture)).latestTurn
     if (!stale) throw new TypeError('Missing turn')
-    expect(await fixture.engine.beginRestart(new Set([FIXTURE_SESSION_ID]))).toMatchObject({
+    const sessionId = (await sessionFrom(fixture)).id
+    expect(await fixture.engine.beginRestart(new Set([sessionId]))).toMatchObject({
       restarting: true,
       interrupted: [
         { sessionId: FIXTURE_SESSION_ID, state: state === 'claimed' ? 'starting' : 'running' },
