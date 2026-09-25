@@ -7,7 +7,9 @@ function Collapsible({ ...props }: CollapsiblePrimitive.Root.Props) {
 }
 
 function CollapsibleTrigger({ ...props }: CollapsiblePrimitive.Trigger.Props) {
-  return <CollapsiblePrimitive.Trigger data-slot='collapsible-trigger' {...props} />
+  return (
+    <CollapsiblePrimitive.Trigger data-slot='collapsible-trigger' data-press-depth {...props} />
+  )
 }
 
 function CollapsibleContent({ ...props }: CollapsiblePrimitive.Panel.Props) {

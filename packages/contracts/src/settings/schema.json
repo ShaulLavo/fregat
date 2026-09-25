@@ -872,6 +872,12 @@
       "enum": ["compact", "cozy"],
       "type": "string"
     },
+    "workbench.feel": {
+      "default": "flat",
+      "description": "Motion and control depth: Flat, Seam, Brisk, Relaxed or Playful.",
+      "enum": ["brisk", "flat", "playful", "relaxed", "seam"],
+      "type": "string"
+    },
     "workbench.fontFamily": {
       "default": "bundled:inter",
       "description": "Font for the words the app writes: titles, labels, menus and prose.",
@@ -888,6 +894,11 @@
     "workbench.reduceMotion": {
       "default": false,
       "description": "Slow terminal loading indicators while keeping progress visible.",
+      "type": "boolean"
+    },
+    "workbench.sounds.controls": {
+      "default": false,
+      "description": "Play clicks when pressing controls and changing values with the pointer.",
       "type": "boolean"
     },
     "workbench.sounds.errors": {

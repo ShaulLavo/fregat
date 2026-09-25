@@ -47,13 +47,16 @@ function HoldButton({
   ...props
 }: HoldButtonProps) {
   const [holding, setHolding] = useState(false)
+  const [cancelled, setCancelled] = useState(false)
   const hintId = useId()
 
   function start() {
+    setCancelled(false)
     if (!disabled) setHolding(true)
   }
 
   function cancel() {
+    if (holding) setCancelled(true)
     setHolding(false)
   }
 
@@ -82,6 +85,7 @@ function HoldButton({
         aria-describedby={hintId}
         className={cn('hold-button relative overflow-hidden select-none', className)}
         data-holding={holding ? '' : undefined}
+        data-cancelled={cancelled ? '' : undefined}
         data-slot='hold-button'
         disabled={disabled}
         type='button'

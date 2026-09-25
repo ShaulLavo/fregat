@@ -3,7 +3,7 @@ import { isDirectoryEntry } from '@/lib/file-system-types'
 import { pickerParentPath, type FilePickerMode } from '@/features/file-picker/utils/model'
 
 /** The column narrower than this does not fit beside the places and the preview. */
-export const COLUMNS_MIN_WIDTH = 520
+const COLUMNS_MIN_WIDTH = 520
 
 export type PickerViewSetting = 'auto' | 'columns' | 'list' | 'icons'
 export type PickerView = 'columns' | 'list' | 'icons'

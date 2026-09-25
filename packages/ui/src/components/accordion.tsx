@@ -1,7 +1,7 @@
 import { Accordion as AccordionPrimitive } from '@base-ui/react/accordion'
 
 import { cn } from '@workspace/ui/lib/utils'
-import { CaretDownIcon, CaretUpIcon } from '@phosphor-icons/react'
+import { CaretDownIcon } from '@phosphor-icons/react'
 
 function Accordion({ className, ...props }: AccordionPrimitive.Root.Props) {
   return (
@@ -22,6 +22,7 @@ function AccordionTrigger({ className, children, ...props }: AccordionPrimitive.
     <AccordionPrimitive.Header className='flex'>
       <AccordionPrimitive.Trigger
         data-slot='accordion-trigger'
+        data-press-depth
         className={cn(
           'focus-ring group/accordion-trigger relative flex flex-1 items-start justify-between border border-transparent py-(--density-accordion-padding-y) text-left text-xs font-medium outline-none hover:underline aria-disabled:pointer-events-none aria-disabled:opacity-50 **:data-[slot=accordion-trigger-icon]:ml-auto **:data-[slot=accordion-trigger-icon]:size-(--icon-size) **:data-[slot=accordion-trigger-icon]:text-muted-foreground',
           className,
@@ -31,11 +32,7 @@ function AccordionTrigger({ className, children, ...props }: AccordionPrimitive.
         {children}
         <CaretDownIcon
           data-slot='accordion-trigger-icon'
-          className='pointer-events-none shrink-0 group-aria-expanded/accordion-trigger:hidden'
-        />
-        <CaretUpIcon
-          data-slot='accordion-trigger-icon'
-          className='pointer-events-none hidden shrink-0 group-aria-expanded/accordion-trigger:inline'
+          className='pointer-events-none shrink-0 group-aria-expanded/accordion-trigger:rotate-180'
         />
       </AccordionPrimitive.Trigger>
     </AccordionPrimitive.Header>

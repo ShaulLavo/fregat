@@ -6,6 +6,21 @@ import { expect, test } from 'vitest'
 import { censusSource, evaluate, isTestFile, TARGETS } from './web-design-census.mjs'
 
 type Hit = { readonly file: string; readonly line: number; readonly value: string }
+
+test('physical depth tokens belong to primitives', () => {
+  const source = "export const depth = 'shadow-(--shadow-key) shadow-(--shadow-well)'"
+  expect(
+    gate(censusFile('packages/ui/src/components/button.tsx', source)).offenders.shadow,
+  ).toEqual([])
+  expect(
+    gate(censusFile('apps/web/src/components/button.tsx', source)).offenders.shadow,
+  ).toHaveLength(2)
+})
+
+test('a native role button also needs a primitive or an explicit exception', () => {
+  const subject = censusFile('apps/web/src/probe.tsx', '<div role="button" />')
+  expect(gate(subject).offenders.rawControls.map((hit) => hit.value)).toEqual(['role="button"'])
+})
 type Census = { readonly hits: Readonly<Record<string, readonly Hit[]>> }
 type Result = {
   readonly offenders: Readonly<Record<string, readonly Hit[]>>

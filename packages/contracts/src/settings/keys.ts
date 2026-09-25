@@ -23,6 +23,8 @@ import {
   DEFAULT_WALLPAPER_SELECTION,
   DEFAULT_WORKBENCH_DENSITY,
   WORKBENCH_DENSITIES,
+  DEFAULT_WORKBENCH_FEEL,
+  WORKBENCH_FEELS,
 } from './boot-defaults'
 import { defineSetting, type SettingDescriptor } from './registry'
 import { WORKSPACE_SEARCH_LIMIT_MAX } from '../workspace-search'
@@ -318,6 +320,16 @@ export const SETTINGS_REGISTRY = {
     description: 'Font for the words the app writes: titles, labels, menus and prose.',
     keywords: ['font', 'typeface', 'interface', 'ui', 'sans', 'appearance'],
   }),
+  'workbench.sounds.controls': defineSetting({
+    schema: v.boolean(),
+    default: false,
+    scope: 'application',
+    widget: 'boolean',
+    category: 'Sounds',
+    title: 'Controls',
+    description: 'Play clicks when pressing controls and changing values with the pointer.',
+    keywords: ['sound', 'audio', 'click', 'feedback'],
+  }),
   'workbench.sounds.errors': defineSetting({
     schema: v.boolean(),
     default: false,
@@ -358,6 +370,16 @@ export const SETTINGS_REGISTRY = {
     title: 'Volume',
     description: 'Loudness of every sound, agent notifications included.',
     keywords: ['sound', 'audio', 'volume', 'loudness'],
+  }),
+  'workbench.feel': defineSetting({
+    schema: v.picklist(WORKBENCH_FEELS),
+    default: DEFAULT_WORKBENCH_FEEL,
+    scope: 'window',
+    widget: 'enum',
+    category: 'Appearance',
+    title: 'Feel',
+    description: 'Motion and control depth: Flat, Seam, Brisk, Relaxed or Playful.',
+    keywords: ['motion', 'spring', 'physical', 'animation', 'depth'],
   }),
   'workbench.density': defineSetting({
     schema: v.picklist(WORKBENCH_DENSITIES),

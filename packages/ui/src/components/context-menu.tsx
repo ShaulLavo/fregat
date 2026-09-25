@@ -1,3 +1,4 @@
+import { playControlFeedback } from '@workspace/ui/patterns/feedback-layer'
 import * as React from 'react'
 import { ContextMenu as ContextMenuPrimitive } from '@base-ui/react/context-menu'
 
@@ -104,6 +105,7 @@ function ContextMenuItem({
   return (
     <ContextMenuPrimitive.Item
       data-slot='context-menu-item'
+      data-feedback='tap'
       data-inset={inset}
       data-variant={variant}
       className={cn(
@@ -176,9 +178,13 @@ function ContextMenuCheckboxItem({
       )}
       checked={checked}
       {...props}
+      onCheckedChange={(value, details) => {
+        props.onCheckedChange?.(value, details)
+        if (!details.isCanceled) playControlFeedback('tick', details.event)
+      }}
     >
       <span className='pointer-events-none absolute right-2'>
-        <ContextMenuPrimitive.CheckboxItemIndicator>
+        <ContextMenuPrimitive.CheckboxItemIndicator data-slot='check-indicator'>
           <CheckIcon />
         </ContextMenuPrimitive.CheckboxItemIndicator>
       </span>
@@ -188,7 +194,16 @@ function ContextMenuCheckboxItem({
 }
 
 function ContextMenuRadioGroup({ ...props }: ContextMenuPrimitive.RadioGroup.Props) {
-  return <ContextMenuPrimitive.RadioGroup data-slot='context-menu-radio-group' {...props} />
+  return (
+    <ContextMenuPrimitive.RadioGroup
+      data-slot='context-menu-radio-group'
+      {...props}
+      onValueChange={(value, details) => {
+        props.onValueChange?.(value, details)
+        if (!details.isCanceled) playControlFeedback('tick', details.event)
+      }}
+    />
+  )
 }
 
 function ContextMenuRadioItem({
@@ -210,7 +225,7 @@ function ContextMenuRadioItem({
       {...props}
     >
       <span className='pointer-events-none absolute right-2'>
-        <ContextMenuPrimitive.RadioItemIndicator>
+        <ContextMenuPrimitive.RadioItemIndicator data-slot='check-indicator'>
           <CheckIcon />
         </ContextMenuPrimitive.RadioItemIndicator>
       </span>

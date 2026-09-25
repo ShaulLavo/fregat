@@ -32,6 +32,7 @@ stays safe to read, share and export.
 | `editor.codeTheme.light`            | `"light-plus"`                                 | window      | Colors for code in editors and chat code blocks when the app uses light mode.                                                                     |
 | `workbench.reduceMotion`            | `false`                                        | window      | Slow terminal loading indicators while keeping progress visible.                                                                                  |
 | `workbench.fontFamily`              | `"bundled:inter"`                              | window      | Font for the words the app writes: titles, labels, menus and prose.                                                                               |
+| `workbench.feel`                    | `"flat"`                                       | window      | Motion and control depth: Flat, Seam, Brisk, Relaxed or Playful.                                                                                  |
 | `workbench.density`                 | `"compact"`                                    | window      | Use tighter compact spacing or roomier cozy spacing throughout the app.                                                                           |
 | `workbench.surface.opacity`         | `80`                                           | window      | How opaque panels and sidebars are over the wallpaper. 100 turns the glass material off.                                                          |
 | `workbench.surface.contentOpacity`  | `50`                                           | window      | How opaque the extra layer under the editor, terminal and settings is. It sits on top of the panel, so 0 leaves them as see-through as a sidebar. |
@@ -163,6 +164,7 @@ stays safe to read, share and export.
 
 | Setting                         | Default | Scope       | What it does                                                                              |
 | ------------------------------- | ------- | ----------- | ----------------------------------------------------------------------------------------- |
+| `workbench.sounds.controls`     | `false` | application | Play clicks when pressing controls and changing values with the pointer.                  |
 | `workbench.sounds.errors`       | `false` | application | Play a short rattle when an error toast appears.                                          |
 | `workbench.sounds.git`          | `false` | application | Play two rising clicks when a commit is created, a push finishes or a pull request opens. |
 | `workbench.sounds.terminalBell` | `false` | application | Play a click when a terminal program rings the bell.                                      |

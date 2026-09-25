@@ -93,6 +93,8 @@ import { gitStageSettles } from './git-stage-settles'
 import { gitChangesScroll } from './git-changes-scroll'
 import { gitDiscardConfirm } from './git-discard-confirm'
 import { baseComponents } from './base-components'
+import { physicalMode } from './physical-mode'
+import { physicalChat } from './physical-chat'
 import { connectionFrame } from './connection-frame'
 import { settingsValueGrids } from './settings-value-grids'
 import { tailFollow } from './tail-follow'
@@ -320,6 +322,8 @@ export const scenarios: readonly Scenario[] = [
   gitChangesScroll,
   gitDiscardConfirm,
   baseComponents,
+  physicalMode,
+  physicalChat,
   connectionFrame,
   settingsValueGrids,
   tailFollow,

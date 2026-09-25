@@ -102,6 +102,7 @@ function bottomTab({
 }) {
   return (
     <button
+      data-feedback='silent'
       aria-selected={active}
       className={barTabClassName(active, 'focus-ring-inset outline-none')}
       role='tab'

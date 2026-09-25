@@ -4,6 +4,7 @@ import {
   configureFeedback,
   feedbackOutput,
   playFeedback,
+  playControlFeedback,
   resetFeedbackForTest,
   unlockFeedback,
 } from '@workspace/ui/patterns/feedback-layer'
@@ -95,4 +96,14 @@ test('a hidden tab silences everything but agent notices', () => {
   playFeedback('error', 'errors')
   expect(starts).toBe(0)
   expect(feedbackOutput('agent')).not.toBeNull()
+})
+
+test('pointer commits sound, keyboard and programmatic commits stay silent', () => {
+  configureFeedback({ channels: ['controls'], volume: 50 })
+  unlockFeedback()
+  playControlFeedback('tick', new KeyboardEvent('keydown', { key: 'Enter' }))
+  playControlFeedback('tick', new MouseEvent('click', { detail: 0 }))
+  expect(starts).toBe(0)
+  playControlFeedback('tick', new MouseEvent('click', { detail: 1 }))
+  expect(starts).toBe(1)
 })

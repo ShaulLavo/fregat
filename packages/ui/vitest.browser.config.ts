@@ -13,7 +13,14 @@ export default defineConfig({
     dedupe: ['react', 'react-dom'],
   },
   // Discovered mid-run, Base UI makes Vite reload the page and load a second React.
-  optimizeDeps: { include: ['@base-ui/react/tooltip'] },
+  optimizeDeps: {
+    include: [
+      '@base-ui/react/tooltip',
+      '@base-ui/react/button',
+      '@base-ui/react/switch',
+      'class-variance-authority',
+    ],
+  },
   test: {
     name: 'browser',
     include: ['src/patterns/tests/*.browser.tsx'],

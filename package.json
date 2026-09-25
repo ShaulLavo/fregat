@@ -53,7 +53,7 @@
     "settings:schema:check": "bun scripts/generate-settings-schema.ts --check",
     "themes:palette-css": "bun scripts/themes/generate-palette-css.ts",
     "themes:palette-css:check": "bun scripts/themes/generate-palette-css.ts --check",
-    "test:scripts": "bun --bun vitest run scripts/agent/trace-summary.test.ts scripts/dev-sources.test.ts scripts/runtime-network.test.ts scripts/web-layering.test.ts scripts/lint/web-boundaries.test.ts scripts/lint/web-design-census.test.ts scripts/lint/react-compiler-census.test.ts scripts/lint/react-compiler-explain.test.ts scripts/lint/duplicate-functions.test.mjs apps/web/scripts/phosphor-weight-plugin.test.ts apps/web/scripts/bundle-owners.test.ts --environment node",
+    "test:scripts": "bun --bun vitest run scripts/agent/trace-summary.test.ts scripts/dev-sources.test.ts scripts/generate-spring-easings.test.ts scripts/runtime-network.test.ts scripts/web-layering.test.ts scripts/lint/web-boundaries.test.ts scripts/lint/web-design-census.test.ts scripts/lint/react-compiler-census.test.ts scripts/lint/react-compiler-explain.test.ts scripts/lint/duplicate-functions.test.mjs apps/web/scripts/phosphor-weight-plugin.test.ts apps/web/scripts/bundle-owners.test.ts --environment node",
     "verify": "bun run typecheck && bun run lint && bun run boundaries:check && bun run design:census && bun run compiler:census && bun run errors:census && bun run format:check && bun run generated:check && bun run unused:check && bun run test",
     "dupes": "jscpd apps packages scripts --threshold 0",
     "dupes:report": "jscpd apps packages scripts --reporters html,console --output ./jscpd-report",

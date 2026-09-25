@@ -6,10 +6,12 @@ import {
   DEFAULT_WALLPAPER_SELECTION,
   DEFAULT_UI_FONT,
   DEFAULT_WORKBENCH_DENSITY,
+  DEFAULT_WORKBENCH_FEEL,
   NERD_SYMBOLS_FONT,
   cssFamily,
   fontFamilyName,
   isWorkbenchDensity,
+  isWorkbenchFeel,
   parseFontRef,
   type SettingsValues,
   type WallpaperSelection,
@@ -33,6 +35,7 @@ type StoredMirror = { readonly [K in keyof SettingsValues]?: unknown }
 type BootAppearance = {
   mode: 'dark' | 'light'
   density: SettingsValues['workbench.density']
+  feel: SettingsValues['workbench.feel']
   palette: string
   wallpaper: WallpaperSelection
   uiFont: string
@@ -43,6 +46,7 @@ const appearance = readBootAppearance()
 const root = document.documentElement
 root.classList.add(appearance.mode)
 root.setAttribute('data-density', appearance.density)
+root.setAttribute('data-feel', appearance.feel)
 if (!appearance.wallpaper.enabled) root.setAttribute('data-wallpaper-hidden', '')
 if (appearance.wallpaper.enabled && appearance.wallpaper.source.kind === 'desktop') {
   preloadDesktopWallpaper()
@@ -56,12 +60,14 @@ function readBootAppearance(): BootAppearance {
   const mirror = readStoredMirror()
   const mode = colorMode(mirror['workbench.colorTheme'])
   const density = mirror['workbench.density']
+  const feel = mirror['workbench.feel']
   const uiFont = mirror['workbench.fontFamily']
   const codeFont = mirror['editor.fontFamily']
   const storedPalette = mirror['workbench.palette']
   const appearance: BootAppearance = {
     mode,
     density: isWorkbenchDensity(density) ? density : DEFAULT_WORKBENCH_DENSITY,
+    feel: isWorkbenchFeel(feel) ? feel : DEFAULT_WORKBENCH_FEEL,
     palette: typeof storedPalette === 'string' ? storedPalette : DEFAULT_PALETTE_ID,
     wallpaper: DEFAULT_WALLPAPER_SELECTION,
     uiFont: typeof uiFont === 'string' ? uiFont : DEFAULT_UI_FONT,

@@ -441,6 +441,9 @@ const RAW_CONTROL_ELEMENTS = new Set(['button', 'input', 'select', 'textarea'])
 function recordElement(census, file, element, lineAt) {
   const hit = { file, line: lineAt(element.start), value: `<${element.name}>` }
   if (RAW_CONTROL_ELEMENTS.has(element.name)) census.hits.rawControls.push(hit)
+  if (/^[a-z]/.test(element.name) && attributeValue(element.opening, 'role') === 'button') {
+    census.hits.rawControls.push({ ...hit, value: 'role="button"' })
+  }
   if (element.name === 'kbd' && file !== KBD_PRIMITIVE) census.hits.kbdSpelling.push(hit)
   if (!isControl(element)) return
   const ownChildren = element.children.filter(isVisibleChild)
@@ -746,6 +749,14 @@ function offTarget(hits, allowed) {
   return hits.filter((hit) => !allowed.includes(hit.value))
 }
 
+function offScaleShadows(census) {
+  return offTarget(census.hits.shadow, TARGETS.shadow.allowed).filter(
+    (hit) =>
+      !hit.file.startsWith(UI_PACKAGE) ||
+      !['shadow-(--shadow-key)', 'shadow-(--shadow-well)'].includes(hit.value),
+  )
+}
+
 /** An exception matching nothing is a claim about code that no longer exists. */
 function staleEntries(entries, census) {
   if (!Array.isArray(entries)) return []
@@ -772,7 +783,7 @@ export function evaluate(census, allowEntries = [], { checkStale = true } = {}) 
     barHeights: gate('barHeights', offTarget(census.hits.barHeights, TARGETS.barHeights.allowed)),
     hairlines: gate('hairlines', census.hits.hairlines),
     arbitraryText: gate('arbitraryText', census.hits.arbitraryText),
-    shadow: gate('shadow', offTarget(census.hits.shadow, TARGETS.shadow.allowed)),
+    shadow: gate('shadow', offScaleShadows(census)),
     rawControls: gate('rawControls', census.hits.rawControls),
     hoverFills: gate('hoverFills', rowFillOpacityHits(census)),
     iconSize: gate('iconSize', offTarget(census.hits.iconSize, TARGETS.iconSize.allowed)),

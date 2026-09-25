@@ -1,5 +1,5 @@
 /** A tile's width in px; it matches `--picker-tile-width` so the column count is exact. */
-export const TILE_WIDTH_PX = 112
+const TILE_WIDTH_PX = 112
 /** One row of tiles: the thumbnail, the name and the padding around them. */
 export const TILE_ROW_PX = 124
 const TILE_GAP_PX = 4

@@ -94,10 +94,18 @@ export function playFeedback(voice: FeedbackVoice, channel: FeedbackChannel) {
   const audio = feedbackOutput(channel)
   if (!audio || !admit(voice)) return
   try {
-    for (const click of VOICES[voice]) playClick(audio.context, audio.output, click)
+    scheduleFeedbackVoice(audio.context, audio.output, voice)
   } catch {
     // Feedback never throws into the UI.
   }
+}
+
+/** A committed pointer action sounds; keyboard and programmatic changes stay silent. */
+export function playControlFeedback(voice: FeedbackVoice, event: Event) {
+  const pointer =
+    typeof PointerEvent !== 'undefined' && event instanceof PointerEvent && event.pointerType !== ''
+  const mouse = typeof MouseEvent !== 'undefined' && event instanceof MouseEvent && event.detail > 0
+  if (pointer || mouse) playFeedback(voice, 'controls')
 }
 
 function admit(voice: FeedbackVoice) {
@@ -109,7 +117,15 @@ function admit(voice: FeedbackVoice) {
   return true
 }
 
-function playClick(context: AudioContext, output: AudioNode, click: Click) {
+export function scheduleFeedbackVoice(
+  context: BaseAudioContext,
+  output: AudioNode,
+  voice: FeedbackVoice,
+) {
+  for (const click of VOICES[voice]) playClick(context, output, click)
+}
+
+function playClick(context: BaseAudioContext, output: AudioNode, click: Click) {
   const length = Math.ceil(context.sampleRate * 0.004)
   const buffer = context.createBuffer(1, length, context.sampleRate)
   const samples = buffer.getChannelData(0)

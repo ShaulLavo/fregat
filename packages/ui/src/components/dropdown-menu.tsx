@@ -1,4 +1,5 @@
-'use client'
+import { playControlFeedback } from '@workspace/ui/patterns/feedback-layer'
+;('use client')
 
 import * as React from 'react'
 import { Menu as MenuPrimitive } from '@base-ui/react/menu'
@@ -85,6 +86,7 @@ function DropdownMenuItem({
   return (
     <MenuPrimitive.Item
       data-slot='dropdown-menu-item'
+      data-feedback='tap'
       data-inset={inset}
       data-variant={variant}
       className={cn(
@@ -167,12 +169,16 @@ function DropdownMenuCheckboxItem({
       )}
       checked={checked}
       {...props}
+      onCheckedChange={(value, details) => {
+        props.onCheckedChange?.(value, details)
+        if (!details.isCanceled) playControlFeedback('tick', details.event)
+      }}
     >
       <span
         className='pointer-events-none absolute right-2 flex items-center justify-center'
         data-slot='dropdown-menu-checkbox-item-indicator'
       >
-        <MenuPrimitive.CheckboxItemIndicator>
+        <MenuPrimitive.CheckboxItemIndicator data-slot='check-indicator'>
           <CheckIcon />
         </MenuPrimitive.CheckboxItemIndicator>
       </span>
@@ -195,6 +201,10 @@ function DropdownMenuSwitchItem({
         className,
       )}
       {...props}
+      onCheckedChange={(value, details) => {
+        props.onCheckedChange?.(value, details)
+        if (!details.isCanceled) playControlFeedback('tick', details.event)
+      }}
     >
       {children}
       <span
@@ -209,7 +219,16 @@ function DropdownMenuSwitchItem({
 }
 
 function DropdownMenuRadioGroup({ ...props }: MenuPrimitive.RadioGroup.Props) {
-  return <MenuPrimitive.RadioGroup data-slot='dropdown-menu-radio-group' {...props} />
+  return (
+    <MenuPrimitive.RadioGroup
+      data-slot='dropdown-menu-radio-group'
+      {...props}
+      onValueChange={(value, details) => {
+        props.onValueChange?.(value, details)
+        if (!details.isCanceled) playControlFeedback('tick', details.event)
+      }}
+    />
+  )
 }
 
 function DropdownMenuRadioItem({
@@ -234,7 +253,7 @@ function DropdownMenuRadioItem({
         className='pointer-events-none absolute right-2 flex items-center justify-center'
         data-slot='dropdown-menu-radio-item-indicator'
       >
-        <MenuPrimitive.RadioItemIndicator>
+        <MenuPrimitive.RadioItemIndicator data-slot='check-indicator'>
           <CheckIcon />
         </MenuPrimitive.RadioItemIndicator>
       </span>

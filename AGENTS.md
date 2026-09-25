@@ -141,10 +141,15 @@ entry without a real reason is itself a violation.
   A small uppercase group label is `section-label`, never a hand-rolled `uppercase tracking-*`
   recipe.
 - **Fills and elevation.** Elevation is three levels: `shadow-xl` on a modal dialog, `shadow-md` on
-  a menu or popover, nothing anywhere else. List rows use `bg-row-hover`, `bg-row-active` and
+  a menu or popover, nothing anywhere else. Physical feel adds `--shadow-key` and `--shadow-well` only inside `packages/ui`; both are `none` under Flat. List rows use `bg-row-hover`, `bg-row-active` and
   `bg-row-selected`, never an opacity modifier on them — the alpha is the design. Toggled controls
   use `bg-accent` with `aria-pressed` or `aria-selected`. A `Button` call site never re-declares
   hover; the primitive owns it.
+
+Physical motion, reduced motion and pointer sounds belong to the shared primitives. A new
+interactive primitive defines all three in the same change. Rows, bar tabs, editors and terminal
+input stay still and silent. Raw controls, including `role="button"`, need a reason in the design
+allow-list; an exempt raw control declares its `data-feedback` policy.
 
 Interaction treatments are utilities, not strings to copy:
 

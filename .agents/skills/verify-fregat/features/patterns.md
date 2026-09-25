@@ -59,3 +59,13 @@ Tabs and segmented rows (settings scope and view, git Changes/Graph, diff scope,
 ## Connection frames
 
 Booting, and connecting to a server, show one `StatusFrame`: a mark, a title, a detail line and an action row, each the same size pending and failed. `scenario connection-frame` clears the cached binding, holds then refuses `/health`, and requires zero blank frames and an unchanged frame box from pending to error, then presses Retry connection and requires the app.
+
+## Physical feel
+
+`scenario physical-mode` selects each Feel in Settings, verifies the choice survives navigation,
+and exercises the shared controls at `/dev/physical`: pointer and Space depth, switch stretch,
+menu and dialog surfaces, an invalid field, silent keyboard and row activation, and the control
+sound switch. It repeats with reduced motion. The gallery also gives the owner a device check.
+
+`physical-chat` uses the isolated native fixture to stream a response and scroll the transcript;
+recycled rows must never replay a live entrance. `PHYSICAL_BASELINE=1` selects Flat for trace comparisons.

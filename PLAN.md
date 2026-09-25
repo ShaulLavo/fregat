@@ -553,7 +553,6 @@ surfaces, the file picker and the site. The owner is taking it one topic at a ti
 | 163 (done, lane L2)                          | Screenshot attachment in the composer (export lives in Plan 145's export plan)                              |
 | [165](plans/165-font-catalog.md)             | Nerd Fonts + Fontsource on demand; interface-font setting; curated autocomplete picker                      |
 | [166](plans/166-shortcuts-editor.md)         | Keyboard shortcuts page rebuilt from VS Code research: full-width list, save on Enter, several per command  |
-| [154](plans/154-physical-mode.md)            | The seamui feel (springs, depth, motion in every primitive) and interface sounds                            |
 | [155](plans/155-site-demo-replica.md)        | Placeholder: the site hero becomes an animated replica of the app, like cursor.com                          |
 | [156](plans/156-documents-in-the-editor.md)  | Placeholder, far future: PDF, DOCX, XLSX, PPTX and CSV as editor documents agents can edit                  |
 
@@ -566,8 +565,7 @@ Suggested order:
 3. Plan 164 is done: the first pass (`03f241fc`, `e8156148`), square status dots (Plan 157) and the
    metadata font sweep (lane L1, 2026-09-25).
 4. Plan 165, the font catalog, is done (`d9c6069e`, review `7ad4c866`, 2026-09-25).
-5. Plan 154 near the end. Phases 1–3 may land earlier; Phases 4–6 wait for the base components so
-   every new primitive is wired and audited once. D6 (settings semantics) comes first.
+5. Plan 154 is implemented: [physical feel](docs/physical-feel.md). The owner’s device check is pending; phone haptics stay parked with 143.
 6. Plans 155 and 156 are placeholders; their research phases run when the site or documents matter.
 7. Plan 166 any time; its research phase runs first, and it takes 102 P3, 157 and 080 from `main` as
    they land.

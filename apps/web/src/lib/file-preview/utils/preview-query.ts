@@ -7,7 +7,7 @@ import { filesystemPath } from '@/lib/documents/utils/identity'
 import { filePreviewKeys } from '@/lib/query-keys'
 import { previewLines, type PreviewContent } from '@/lib/file-preview/utils/preview'
 
-export const PREVIEW_STALE_MS = 30_000
+const PREVIEW_STALE_MS = 30_000
 
 /** The head of a text file. Binary and oversized files are not an error: they have no text preview. */
 export function previewQueryOptions(path: string) {

@@ -419,6 +419,20 @@ export const selectors = {
   chooseFolder: (page: Page) => page.getByRole('button', { name: 'Choose folder', exact: true }),
   settingsDialog: (page: Page) => page.getByRole('dialog', { name: 'Settings', exact: true }),
   settingsSearch: (page: Page) => page.getByRole('textbox', { name: 'Search settings' }),
+  settingsFeel: (page: Page) => page.getByRole('combobox', { name: 'Feel', exact: true }),
+  feelOption: (page: Page, name: string) => page.getByRole('option', { name, exact: true }),
+  physicalGallery: (page: Page) => page.locator('[data-physical-gallery]'),
+  physicalButton: (page: Page, name: string) => page.getByRole('button', { name, exact: true }),
+  physicalSwitch: (page: Page, name: string) => page.getByRole('switch', { name, exact: true }),
+  physicalThumb: (page: Page) =>
+    page
+      .getByRole('switch', { name: 'Preview switch', exact: true })
+      .locator('[data-slot="switch-thumb"]'),
+  physicalField: (page: Page) => page.getByRole('textbox', { name: 'Preview field', exact: true }),
+  physicalMenu: (page: Page) => page.getByRole('menu'),
+  physicalDialog: (page: Page) =>
+    page.getByRole('dialog', { name: 'Physical dialog', exact: true }),
+  physicalRow: (page: Page) => page.getByRole('option', { name: 'Silent row', exact: true }),
   settingsHeader: (page: Page) => page.locator('[data-settings-header]'),
   settingsContinuousSeams: (page: Page) =>
     page.getByRole('switch', { name: 'Continuous panel background', exact: true }),

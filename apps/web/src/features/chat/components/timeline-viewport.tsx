@@ -10,6 +10,7 @@ import { cn } from '@workspace/ui/lib/utils'
 import { TailJumpButton } from '@workspace/ui/patterns/tail-jump-button'
 import { TickerNumber } from '@/components/ticker-number'
 import { useTimelineArrivals } from '@/features/chat/hooks/use-timeline-arrivals'
+import { useLiveEntrances } from '@/features/chat/hooks/use-live-entrances'
 import { useEffect, useLayoutEffect, useState, type Dispatch } from 'react'
 import type { VirtualListLayout } from '@workspace/ui/patterns/virtual-list'
 import type { ChatSession } from '@workspace/client-core/chat/types'
@@ -62,6 +63,7 @@ export function TimelineViewport({
   'use no memo' // Minimap and follow state read the virtualizer's mutable geometry.
   const { environmentId } = useChatTransport()
   const scrollElement = virtualizer.scrollElement
+  useLiveEntrances(scrollElement, items)
   // A disclosure keeps its row still until the row's new size has been measured.
   const [disclosureSettle, setDisclosureSettle] = useState<{
     disclosure: Element

@@ -6,6 +6,7 @@ import { useSettingValue } from '@/hooks/use-setting-value'
 
 /** Hands the sound settings to the feedback engine, which is the only place they are read. */
 export function useFeedbackSettings() {
+  const controls = useSettingValue('workbench.sounds.controls')
   const errors = useSettingValue('workbench.sounds.errors')
   const git = useSettingValue('workbench.sounds.git')
   const terminalBell = useSettingValue('workbench.sounds.terminalBell')
@@ -14,7 +15,7 @@ export function useFeedbackSettings() {
 
   useEffect(() => {
     const on: Record<FeedbackChannel, boolean> = {
-      controls: false,
+      controls,
       errors,
       git,
       terminalBell,
@@ -22,5 +23,5 @@ export function useFeedbackSettings() {
     }
     const channels = (Object.keys(on) as FeedbackChannel[]).filter((channel) => on[channel])
     configureFeedback({ channels, volume })
-  }, [errors, git, terminalBell, agent, volume])
+  }, [controls, errors, git, terminalBell, agent, volume])
 }

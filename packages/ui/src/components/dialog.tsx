@@ -1,4 +1,5 @@
-'use client'
+import { playControlFeedback } from '@workspace/ui/patterns/feedback-layer'
+;('use client')
 
 import * as React from 'react'
 import { Dialog as DialogPrimitive } from '@base-ui/react/dialog'
@@ -8,8 +9,17 @@ import { Button } from '@workspace/ui/components/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { XIcon } from '@phosphor-icons/react'
 
-function Dialog({ ...props }: DialogPrimitive.Root.Props) {
-  return <DialogPrimitive.Root data-slot='dialog' {...props} />
+function Dialog({ onOpenChange, ...props }: DialogPrimitive.Root.Props) {
+  return (
+    <DialogPrimitive.Root
+      data-slot='dialog'
+      {...props}
+      onOpenChange={(open, details) => {
+        onOpenChange?.(open, details)
+        if (open && !details.isCanceled) playControlFeedback('open', details.event)
+      }}
+    />
+  )
 }
 
 function DialogTrigger({ ...props }: DialogPrimitive.Trigger.Props) {
@@ -63,6 +73,7 @@ function DialogContent({
       <DialogOverlay className={overlayClassName} />
       <DialogPrimitive.Popup
         data-slot='dialog-content'
+        data-side={side}
         className={cn(
           'fixed z-50 grid w-full overscroll-contain gap-(--density-dialog-gap) p-(--density-dialog-padding) bg-popover-solid text-xs/relaxed text-popover-foreground shadow-xl ring-1 ring-foreground/10 ease-out-strong data-open:animation-duration-(--duration-enter) data-closed:animation-duration-(--duration-exit) outline-none data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0',
           sideClasses[side],

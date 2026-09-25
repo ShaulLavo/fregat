@@ -2,7 +2,7 @@
 export const PREVIEW_SETTLE_MS = 120
 
 /** Enough of a file to recognise it; a preview is not a reader. */
-export const PREVIEW_LINES = 40
+const PREVIEW_LINES = 40
 
 const IMAGE_EXTENSIONS = new Set([
   'apng',

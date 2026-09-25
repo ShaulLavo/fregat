@@ -1,10 +1,24 @@
+import { playControlFeedback } from '@workspace/ui/patterns/feedback-layer'
 import * as React from 'react'
 import { Select as SelectPrimitive } from '@base-ui/react/select'
 
 import { cn } from '@workspace/ui/lib/utils'
 import { CaretDownIcon, CheckIcon, CaretUpIcon } from '@phosphor-icons/react'
 
-const Select = SelectPrimitive.Root
+function Select<Value, Multiple extends boolean | undefined = false>({
+  onValueChange,
+  ...props
+}: SelectPrimitive.Root.Props<Value, Multiple>) {
+  return (
+    <SelectPrimitive.Root
+      {...props}
+      onValueChange={(value, details) => {
+        onValueChange?.(value, details)
+        if (!details.isCanceled) playControlFeedback('tick', details.event)
+      }}
+    />
+  )
+}
 
 function SelectGroup({ className, ...props }: SelectPrimitive.Group.Props) {
   return (

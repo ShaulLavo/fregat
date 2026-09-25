@@ -124,7 +124,7 @@ The ones that unblock the most work. Per-library questions are at the end of eac
 2. ~~**Tooltips**~~ — answered 2026-09-25: yes to the glide. Icon-button tooltips move onto the shared
    `data-tooltip` layer, which changes the `AGENTS.md` rule that reserves that layer for virtualized rows.
    The `--duration-move` token is still open.
-3. ~~**Physical mode**~~ — [Plan 154](../../plans/154-physical-mode.md). The mp3s are T3 Code's (MIT).
+3. ~~**Physical mode**~~ — [implemented](../physical-feel.md). The mp3s are T3 Code's (MIT).
 4. **Status dots**: switch the vocabulary to Neon's square dots, or keep round?
 5. **Hold-to-confirm**: every destructive confirm, or only irreversible ones (discard all, delete worktree,
    force push)?
