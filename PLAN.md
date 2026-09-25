@@ -445,7 +445,7 @@ Suggested order (steps 1–4 done by 2026-09-23; step 5 is in progress):
    decided by substring match, and the desktop app can kill a process it does not own. Both are
    small and both need a `--server` or desktop restart, so batch them.
 2. [E047](../Editor/docs/display/e047-point-queries.md), then
-   [Plan 130](plans/130-ask-the-editor.md) Phases 1 and 4. One point query in the Editor removes the
+   Plan 130 Phases 1 and 4. One point query in the Editor removes the
    search-result row arithmetic, the unicode hover's marker scan and the residue in `diffRowAtEvent`.
    Done: E047 landed in Editor `6656eb7`, and Plan 130 Phases 1, 2 and 4 are implemented and verified.
 3. [E048](../Editor/docs/display/e048-minimap-document-space.md) and
@@ -457,9 +457,9 @@ Suggested order (steps 1–4 done by 2026-09-23; step 5 is in progress):
    Phase 5 item. In progress: rows re-checked 2026-09-24; row 1 (`setText` with tokens), row 5 (press
    participants), row 6 (plugin keymap context keys) and typography options (2026-09-25) done;
    rows 2, 7, 8, 9, 11 and the rest of row 5 done 2026-09-25 (lane L7), row 8 closing Plan 130
-   item 8. Row 4 (theme keys) unlocks item 10; the rest are Editor-only. Plan 130 Phase 3 (`getStackedRows`) is a separate small Editor change.
+   item 8. Row 4 and `getStackedRows` close Plan 130 on 2026-09-25. The diff comment layer asks the mounted plugin, and theme colours flow through EditorTheme; light/dark browser proof passes.
 
-Left in the lane: Plan 131 Phases 2–3, Plan 132 Phases 2–4, the Plan 130 remainder and the E050 rows.
+Left in the lane: Plan 131 Phases 2–3, Plan 132 Phases 2–4, the remaining Editor-only E050 rows.
 
 The owner decided Plan 132 D4 on 2026-09-21: the server's migrations are deleted and the schema
 starts from scratch (Plan 132 Phase 4). External-change

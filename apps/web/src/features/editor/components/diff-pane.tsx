@@ -20,7 +20,10 @@ import type { DiffLanguageServerContext } from '@/features/editor/utils/diff-lan
 import { HOSTED_EDITOR_KEYMAP } from '@/keymap/editor-keymap'
 import { log } from '@/lib/client-logging'
 import { useEditorFocusTarget } from '@/lib/focus/hooks/use-editor-target'
-import { createDiffPresentationBinding } from '@/features/editor/state/diff-presentation'
+import {
+  bindDiffPlugin,
+  createDiffPresentationBinding,
+} from '@/features/editor/state/diff-presentation'
 import type {
   DiffPanePresentation,
   DiffScrollPosition,
@@ -73,6 +76,10 @@ export function DiffPane({
       }),
     [highlight, regions, side, syntaxBackend],
   )
+  useLayoutEffect(() => {
+    if (!presentation) return
+    return bindDiffPlugin(presentation, plugin)
+  }, [plugin, presentation])
   const { rows, text, tokensRevision } = useDiffRows(plugin, file)
   const diffLanguagePlugin = useDiffLanguage(file, rows, theme, languageServer)
   const unicodeHighlights = useUnicodeHighlights()

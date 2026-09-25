@@ -983,47 +983,11 @@
   background: transparent;
 }
 
-/* The diff view ships saturated literals (#5ecc71 / #ff6762) over a hard-coded
-   dark backdrop, and mixes its row tints at 22% — loud enough that the tint
-   competes with the syntax colours it sits under. Bind it to our tokens and mix
-   far weaker: the tint only has to say which side a line is on. */
-.editor-diff-view,
-.editor-diff-row,
-.editor-diff-gutter-row {
-  /* `!important` because the package's own stylesheet declares these on the
-     same selector and loads after this file — same specificity, later wins. */
-  --editor-diff-added: var(--diff-added) !important;
-  --editor-diff-deleted: var(--diff-removed) !important;
-  --editor-diff-modified: var(--info) !important;
-  /* The separator label and the hunk gutter lane. Left unbound it falls through to the
-     package literal `#9cdcfe`, which is around 1.5:1 on our light background. */
-  --editor-diff-hunk-foreground: var(--info) !important;
-  --editor-diff-background: transparent !important;
-  --editor-diff-foreground: var(--foreground) !important;
-  --editor-diff-border: var(--border) !important;
-  --editor-diff-muted: var(--muted-foreground) !important;
-  --editor-diff-split-handle: var(--border) !important;
-  --editor-diff-added-bg: color-mix(in oklch, var(--diff-added) 9%, transparent) !important;
-  --editor-diff-deleted-bg: color-mix(in oklch, var(--diff-removed) 9%, transparent) !important;
-  --editor-diff-hunk-bg: color-mix(in oklch, var(--info) 7%, transparent) !important;
-  --editor-diff-placeholder-bg: color-mix(
-    in oklch,
-    var(--muted-foreground) 5%,
-    transparent
-  ) !important;
-}
-
 [data-workbench] .app-editor-host .editor-minimap,
 [data-chat-mode] .app-editor-host .editor-minimap {
   -webkit-backdrop-filter: var(--workbench-editor-minimap-backdrop-filter);
   backdrop-filter: var(--workbench-editor-minimap-backdrop-filter);
   background: var(--workbench-editor-minimap-background);
-}
-
-/* Every floating editor surface (hover, completion, signature, rename) carries this attribute.
-   The plugin paints an inline background, so the solid popup color needs priority. */
-[data-editor-popup] {
-  background: var(--popover-solid) !important;
 }
 
 .search-result-excerpt-editor-host {
@@ -1062,7 +1026,7 @@
 }
 
 [data-editor-focus-active='false'] .app-editor-host .editor-virtualized-selection-range {
-  background-color: var(--editor-inactive-selection);
+  background-color: var(--editor-selection-inactive-background);
 }
 
 @keyframes app-accordion-down {

@@ -5,6 +5,7 @@ import {
   type DiffFile,
   type DiffGutterSide,
   type DiffRegionStore,
+  type DiffPlugin,
 } from '@singapore-editor/diff'
 import type { TabId } from '@/lib/documents/utils/types'
 import type { EditorScrollPosition } from '@singapore-editor/core/editor'
@@ -12,6 +13,7 @@ import type { EditorScrollPosition } from '@singapore-editor/core/editor'
 export type DiffScrollPosition = Required<EditorScrollPosition>
 
 export type DiffPanePresentation = {
+  plugin: DiffPlugin | null
   scroll: DiffScrollPosition | null
   selections: readonly EditorResolvedSelection[]
 }
@@ -25,9 +27,9 @@ export type HistoryPresentation = {
 export class TabPresentation {
   readonly regions: DiffRegionStore = createDiffRegionStore()
   readonly diffPanes: Readonly<Record<DiffGutterSide, DiffPanePresentation>> = {
-    old: { scroll: null, selections: [] },
-    new: { scroll: null, selections: [] },
-    stacked: { scroll: null, selections: [] },
+    old: { scroll: null, selections: [], plugin: null },
+    new: { scroll: null, selections: [], plugin: null },
+    stacked: { scroll: null, selections: [], plugin: null },
   }
   readonly history: HistoryPresentation = {
     focusedId: null,
@@ -104,7 +106,8 @@ export class TabPresentations {
     target.regions.setFile(source.diffFile)
     for (const key of source.regions.getExpandedRegions()) target.regions.toggleRegion(key)
     for (const side of ['old', 'new', 'stacked'] as const) {
-      Object.assign(target.diffPanes[side], source.diffPanes[side])
+      target.diffPanes[side].scroll = source.diffPanes[side].scroll
+      target.diffPanes[side].selections = source.diffPanes[side].selections
     }
     Object.assign(target.history, source.history)
     this.tabs.set(toTabId, target)

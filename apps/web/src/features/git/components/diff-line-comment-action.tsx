@@ -3,7 +3,6 @@ import { ChatCircleIcon, XIcon } from '@phosphor-icons/react'
 import {
   diffRowAtEvent,
   type DiffFile,
-  type DiffRegionStore,
   type DiffRenderRow,
   type DiffRowHit,
 } from '@singapore-editor/diff'
@@ -17,7 +16,6 @@ import {
   diffLineSelectionText,
   diffRowsForAddress,
   selectedDiffRows,
-  stackedDiffRows,
   type DiffLineAddress,
 } from '../utils/diff-line-selection'
 
@@ -31,11 +29,11 @@ import {
 export function DiffLineCommentAction({
   file,
   hostRef,
-  regions,
+  getStackedRows,
 }: {
   file: DiffFile
   hostRef: RefObject<HTMLElement | null>
-  regions: DiffRegionStore
+  getStackedRows: () => readonly DiffRenderRow[]
 }) {
   const { attachText } = useAttachToComposer()
   const [address, setAddress] = useState<DiffLineAddress | null>(null)
@@ -63,7 +61,7 @@ export function DiffLineCommentAction({
       const head = diffRowAtEvent(event)
       const headRow = head?.side === start.side ? head.rowIndex : start.rowIndex
       const dragged = selectedDiffRows(start.rows, start.rowIndex, headRow)
-      const stackedRows = stackedDiffRows(file, regions.getExpandedRegions())
+      const stackedRows = getStackedRows()
       setAddress(canonicalAddress(diffLineAddress(dragged), stackedRows))
     }
 
@@ -74,14 +72,14 @@ export function DiffLineCommentAction({
       host.removeEventListener('mousedown', onMouseDown, true)
       host.ownerDocument.removeEventListener('mouseup', onMouseUp)
     }
-  }, [file, hostRef, regions])
+  }, [getStackedRows, hostRef])
 
   if (!address) return null
 
   const ask = () => {
     // Resolved against the stacked projection so the agent gets both sides of
     // the change even when the range was dragged out in one split pane.
-    const rows = diffRowsForAddress(stackedDiffRows(file, regions.getExpandedRegions()), address)
+    const rows = diffRowsForAddress(getStackedRows(), address)
     if (rows.length === 0) return
     if (!attachText('git-diff', diffLineSelectionText(file.path, address, rows))) return
 

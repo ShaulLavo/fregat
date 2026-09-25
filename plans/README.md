@@ -51,7 +51,6 @@ a bare root `bun run verify`.
 | [135 — TanStack async ownership and route preparation](135-tanstack-async-ownership.md) | **PROPOSED — RESEARCH COMPLETE; IMPLEMENTATION NOT STARTED**      |
 | [132 — process and dev ownership](132-process-and-dev-ownership.md)                     | **PHASE 1 IMPLEMENTED (`4749fd05`); PHASES 2–4 OPEN**             |
 | [131 — provider codes, not prose](131-provider-codes-not-prose.md)                      | **PHASE 1 IMPLEMENTED (`4749fd05`); PHASES 2–3 OPEN**             |
-| [130 — ask the editor](130-ask-the-editor.md)                                           | **PHASES 1, 2, 4 AND 5 (ITEMS 5–9) DONE; 3 AND ITEM 10 OPEN**     |
 | [129 — dependency shape](129-dependency-shape.md)                                       | **PHASES 1–2 DEPLOYED; PHASE 3 Q2–Q4 OPEN**                       |
 | [128 — React 19 patterns](128-react-19-patterns.md)                                     | **NOT STARTED — PARTLY OBSOLETE; REWRITE SMALL FIRST**            |
 | [126 — T3 Code behavioral alignment](126-t3code-alignment.md)                           | **IN PROGRESS — 23 OF 57 GROUPS DONE, 8 PARTIAL, 26 OPEN**        |

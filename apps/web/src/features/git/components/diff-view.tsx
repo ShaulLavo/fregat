@@ -124,7 +124,12 @@ export function DiffView({
           file={file}
           hostRef={containerRef}
           key={file.path}
-          regions={regions}
+          getStackedRows={() => {
+            const panes = presentation.diffPanes
+            return (
+              (panes.stacked.plugin ?? panes.new.plugin ?? panes.old.plugin)?.getStackedRows() ?? []
+            )
+          }}
         />
       ) : null}
     </div>
