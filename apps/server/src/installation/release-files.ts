@@ -105,10 +105,65 @@ function runtimeLock(lockfile: string, manifest: string) {
         lockfileVersion: parsed.lockfileVersion,
         configVersion: parsed.configVersion,
         workspaces: { '': root },
-        packages,
+        packages: reachablePackages(packages, Object.keys(root.dependencies)),
       },
       null,
       2,
     ) + '\n'
   )
+}
+
+const lockMetaSchema = v.looseTuple([
+  v.string(),
+  v.string(),
+  v.optional(
+    v.looseObject({
+      dependencies: v.optional(v.record(v.string(), v.string())),
+      optionalDependencies: v.optional(v.record(v.string(), v.string())),
+      peerDependencies: v.optional(v.record(v.string(), v.string())),
+    }),
+  ),
+])
+
+// `bun install --frozen-lockfile` refuses a lock holding packages the manifest cannot reach.
+export function reachablePackages(packages: Record<string, unknown>, roots: readonly string[]) {
+  const kept = new Set<string>()
+  const queue = roots.map((name) => ({ parent: [] as string[], name }))
+  while (queue.length > 0) {
+    const { parent, name } = queue.pop()!
+    const key = lockKeyFor(packages, parent, name)
+    if (!key || kept.has(key)) continue
+    kept.add(key)
+    const meta = v.safeParse(lockMetaSchema, packages[key])
+    if (!meta.success) continue
+    const { dependencies, optionalDependencies, peerDependencies } = meta.output[2] ?? {}
+    const path = lockKeyPath(key)
+    for (const dependency of Object.keys({
+      ...dependencies,
+      ...optionalDependencies,
+      ...peerDependencies,
+    }))
+      queue.push({ parent: path, name: dependency })
+  }
+  return Object.fromEntries(Object.entries(packages).filter(([key]) => kept.has(key)))
+}
+
+// A nested resolution `a/b/dep` wins over `a/dep`, which wins over the hoisted `dep`.
+function lockKeyFor(packages: Record<string, unknown>, parent: readonly string[], name: string) {
+  for (let depth = parent.length; depth > 0; depth--) {
+    const key = [...parent.slice(0, depth), name].join('/')
+    if (key in packages) return key
+  }
+  return name in packages ? name : null
+}
+
+function lockKeyPath(key: string) {
+  const path: string[] = []
+  for (const segment of key.split('/')) {
+    const scope = path.at(-1)
+    if (scope?.startsWith('@') && !scope.includes('/'))
+      path[path.length - 1] = `${scope}/${segment}`
+    else path.push(segment)
+  }
+  return path
 }
