@@ -1,3 +1,5 @@
+import { useDiagnosticFix } from '@/lib/diagnostic-ai/hooks/use-diagnostic-fix'
+import { diagnosticHoverActions } from '@/features/editor/utils/diagnostic-hover-actions'
 import { useSettingValue } from '@/hooks/use-setting-value'
 import {
   withTypeScriptWorker,
@@ -65,6 +67,15 @@ export function useLanguageServerPlugin({
   const backend = useSettingValue('lsp.typescript.backend')
   const maxFiles = useSettingValue('lsp.typescript.workerMaxFiles')
   const maxBytes = useSettingValue('lsp.typescript.workerMaxBytes')
+  const {
+    available,
+    mutation: { mutateAsync },
+  } = useDiagnosticFix()
+  // The plugin memo depends on this callback; pending mutation updates preserve its identity.
+  const getDiagnosticActions = useMemo(
+    () => (available ? diagnosticHoverActions(mutateAsync) : undefined),
+    [available, mutateAsync],
+  )
   const worker = enabled && backend === 'worker' && /\.[cm]?[jt]sx?$/.test(filePath)
   const { service: fileOpenIntent } = useFileOpenIntent()
   // Manual memo: `languageServerStatusSource` is a useMemo dependency, and the compiler's cache is a
@@ -111,6 +122,7 @@ export function useLanguageServerPlugin({
       onOpenDefinition,
       onOpenReferences,
       onDidNavigateDiagnostic,
+      getDiagnosticActions,
     })
     if (!worker || documentKey === null || documentUri === null) return server
     return withTypeScriptWorker({
@@ -127,6 +139,7 @@ export function useLanguageServerPlugin({
       onApplyWorkspaceEdit,
       onOpenDefinition,
       onOpenReferences,
+      getDiagnosticActions,
     })
   }, [
     worker,
@@ -150,6 +163,7 @@ export function useLanguageServerPlugin({
     onOpenDefinition,
     onOpenReferences,
     onDidNavigateDiagnostic,
+    getDiagnosticActions,
     rootPath,
     // `target` is not rebuilt every render: the compiler keys it on filePath and
     // languageServerTarget. Verified with `bun run compiler:explain` on this file.
