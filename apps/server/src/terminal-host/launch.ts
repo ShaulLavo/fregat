@@ -18,7 +18,7 @@ export async function launchHost(argv: readonly string[], env: NodeJS.ProcessEnv
   child.unref()
 }
 
-export async function canUseSystemdScope(env: NodeJS.ProcessEnv) {
+async function canUseSystemdScope(env: NodeJS.ProcessEnv) {
   if (process.platform !== 'linux' || !existsSync('/run/systemd/system')) return false
   if (!(await probe(['systemd-run', '--version'], env))) return false
   return probe(['systemctl', '--user', 'show-environment'], env)

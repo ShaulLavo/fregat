@@ -1021,7 +1021,8 @@ describe('terminal service', () => {
       // Replayed from the persisted history, not from a fresh spawn.
       if (timing !== 'after clearing history')
         await waitForTerminalOutput(socketB.messages, `PID:${pid}`)
-      routesB.message(socketB, Buffer.from('printf "PID2:%s\\n" "$$"\n'))
+      // Shells without line editing leave Clear's form feed in the pending input.
+      routesB.message(socketB, Buffer.from('\u0015printf "PID2:%s\\n" "$$"\n'))
       await waitForTerminalOutput(socketB.messages, `PID2:${pid}`)
       if (timing === 'after clearing history')
         expect(terminalOutputText(socketB.messages)).not.toContain(`PID:${pid}`)
@@ -1129,7 +1130,9 @@ async function waitForTerminalOutput(messages: readonly TerminalServerMessage[],
     await Bun.sleep(25)
   }
 
-  throw new TypeError(`Timed out waiting for terminal output: ${text}`)
+  throw new TypeError(
+    `Timed out waiting for terminal output: ${text}; received ${JSON.stringify(terminalOutputText(messages))}`,
+  )
 }
 
 function observedLogDir(root: string) {
