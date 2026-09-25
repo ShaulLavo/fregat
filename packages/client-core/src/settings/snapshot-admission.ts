@@ -28,7 +28,7 @@ type AdmissionState = {
   latestCompletedReadGeneration: number
   latestInvalidatedProviderReadGeneration: number
   nextReadGeneration: number
-  recovery: Promise<ConfirmedSettingsRefresh> | null
+  readonly recoveryLifetime: string
   readonly retiredEpochs: Set<string>
 }
 
@@ -60,6 +60,10 @@ type AdmissionResult = {
   readonly confirmation?: Promise<AdmissionResult>
   readonly recoveryPending: boolean
   readonly snapshot: SettingsSnapshot | undefined
+}
+
+function inactiveAdmission(): AdmissionResult {
+  return { acknowledgedIntent: null, admitted: false, recoveryPending: false, snapshot: undefined }
 }
 
 export type SettingsAdmissionHost = {
@@ -160,6 +164,7 @@ export function createSettingsSnapshotAdmission(host: SettingsAdmissionHost) {
   ): Promise<ConfirmedSettingsRefresh> {
     const token = beginSettingsSnapshotRead(queryClient)
     const snapshot = await host.fetch(queryClient, signal)
+    signal?.throwIfAborted()
     const state = admissionState(queryClient)
     const previous = confirmedSnapshot(queryClient) ?? state.lastConfirmed
     const accepted = observeInitialSettingsSnapshot(queryClient, snapshot, token)
@@ -178,13 +183,12 @@ export function createSettingsSnapshotAdmission(host: SettingsAdmissionHost) {
     const state = stateByClient.get(queryClient)
     if (state) {
       state.disposed = true
+      queryClient.removeQueries({
+        queryKey: settingsKeys.recovery(state.recoveryLifetime),
+        exact: true,
+      })
       for (const deferred of state.deferred) {
-        deferred.resolve({
-          acknowledgedIntent: null,
-          admitted: false,
-          recoveryPending: false,
-          snapshot: undefined,
-        })
+        deferred.resolve(inactiveAdmission())
       }
       state.deferred.splice(0)
     }
@@ -198,9 +202,11 @@ export function createSettingsSnapshotAdmission(host: SettingsAdmissionHost) {
   ): Promise<AdmissionResult> {
     const state = admissionState(queryClient)
     let recoveredProviderChange = false
-    if (state.recovery) {
+    const recoveryState = queryClient.getQueryState(settingsKeys.recovery(state.recoveryLifetime))
+    if (recoveryState && recoveryState.fetchStatus !== 'idle') {
       try {
-        const recovery = await state.recovery
+        const recovery = await recoverUnexpectedEpoch(queryClient)
+        if (state.disposed) return inactiveAdmission()
         recoveredProviderChange = claimProviderChange(state, recovery)
       } catch {
         return deferredAdmission(queryClient, state, update, deferred)
@@ -215,10 +221,12 @@ export function createSettingsSnapshotAdmission(host: SettingsAdmissionHost) {
     if (!current || current.serverVersion.epoch !== update.snapshot.serverVersion.epoch) {
       try {
         const recovery = await recoverUnexpectedEpoch(queryClient)
+        if (state.disposed) return inactiveAdmission()
         current = recovery.snapshot
         const providerChange = claimProviderChange(state, recovery)
         recoveredProviderChange = providerChange || recoveredProviderChange
       } catch {
+        if (state.disposed) return inactiveAdmission()
         void queryClient.invalidateQueries({ queryKey: settingsKeys.document() })
         return deferredAdmission(queryClient, state, update, deferred)
       }
@@ -261,11 +269,13 @@ export function createSettingsSnapshotAdmission(host: SettingsAdmissionHost) {
 
   async function recoverUnexpectedEpoch(queryClient: QueryClient) {
     const state = admissionState(queryClient)
-    state.recovery ??= refreshConfirmedSettingsWithEvidence(queryClient).finally(() => {
-      state.recovery = null
+    return queryClient.query({
+      queryKey: settingsKeys.recovery(state.recoveryLifetime),
+      queryFn: ({ signal }) => refreshConfirmedSettingsWithEvidence(queryClient, signal),
+      staleTime: 0,
+      gcTime: 0,
+      retry: false,
     })
-
-    return state.recovery
   }
 
   function shouldAdmit(current: SettingsSnapshot | undefined, incoming: SettingsSnapshot): boolean {
@@ -344,6 +354,7 @@ export function createSettingsSnapshotAdmission(host: SettingsAdmissionHost) {
     update: SettingsUpdate,
     existing?: DeferredSettingsUpdate,
   ): AdmissionResult {
+    if (state.disposed) return inactiveAdmission()
     const deferred = existing ?? createDeferredUpdate(update)
     if (!state.deferred.includes(deferred)) state.deferred.push(deferred)
 
@@ -440,7 +451,7 @@ export function createSettingsSnapshotAdmission(host: SettingsAdmissionHost) {
       latestCompletedReadGeneration: 0,
       latestInvalidatedProviderReadGeneration: 0,
       nextReadGeneration: 0,
-      recovery: null,
+      recoveryLifetime: globalThis.crypto.randomUUID(),
       retiredEpochs: new Set(),
     }
     stateByClient.set(queryClient, state)

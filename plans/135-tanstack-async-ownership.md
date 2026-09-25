@@ -1,6 +1,6 @@
 # Plan 135: Give TanStack ownership of async caches and route preparation
 
-Status: **IN PROGRESS on L6. P0–P5 and P8 complete. P6–P7 pending.**
+Status: **IN PROGRESS on L6. P0–P5 and P7–P8 complete. P6 pending.**
 Priority: P2. Effort: L, split into independently verifiable phases. Risk: medium for
 resource caches, high for pagination and settings recovery.
 Planned against Platform `aeff92d7` plus the working tree on 2026-09-21.
