@@ -401,6 +401,8 @@ Its smallest consumer, the language census for grammar and theme prefetch, is sp
 [Plan 111](plans/111-editor-decorations.md) compares `@singapore-editor`'s inline-replacement layer against
 CodeMirror 6 decorations and Lexical's decorator nodes, and gates Plan 108 Phase 2, any later
 Obsidian mode, and the question of whether the chat composer still needs Lexical.
+Decided 2026-09-25: owner — 111's research is authorized with the composer as its first consumer,
+and runs before the next wave.
 
 Coordinate shared editor and chat surfaces with Plans 101–103 and 115; do not interleave edits to the same
 files. Plan 085 owns first paint and restoration, which this lane measures but does not change.

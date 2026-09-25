@@ -66,7 +66,7 @@ a bare root `bun run verify`.
 | [108 — two markdown modes](108-markdown-modes.md)                                       | **PROPOSED — PHASE 1 READY; PHASE 2 NEEDS 111**                         |
 | [109 — boot boundaries and gate](109-boot-boundaries.md)                                | **PHASES 2–3 IMPLEMENTED 2026-09-21; GATE NOT STARTED**                 |
 | [110 — workspace indexing](110-workspace-indexing.md)                                   | **RESEARCH — NO IMPLEMENTATION SCOPE YET**                              |
-| [111 — editor decorations](111-editor-decorations.md)                                   | **RESEARCH — NO IMPLEMENTATION SCOPE YET**                              |
+| [111 — editor decorations](111-editor-decorations.md)                                   | **RESEARCH — AUTHORIZED 2026-09-25; BEFORE THE NEXT WAVE**              |
 | [112 — the large-file ceiling](112-large-file-ceiling.md)                               | **RESEARCH — NO IMPLEMENTATION SCOPE YET**                              |
 | [094 — client-core web and TUI parity](094-client-core-web-tui-parity.md)               | **PARTIAL — 2 OF 23 DONE; 096 COMPLETE**                                |
 | [095 — server plumbing](095-server-plumbing.md)                                         | **PARTIAL — IDENTICAL HALVES MERGED; REGISTRY STREAM BUG OPEN**         |
