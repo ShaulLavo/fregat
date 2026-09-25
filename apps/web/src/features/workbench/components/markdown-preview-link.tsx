@@ -13,6 +13,7 @@ export function MarkdownPreviewLink({
   const preview = use(MarkdownPreviewContext)
   const target =
     preview && href ? markdownPreviewTarget(href, preview.documentPath, preview.rootPath) : null
+  if (target?.kind === 'unavailable') return <span>{children}</span>
   if (target?.kind === 'anchor' || !target)
     return (
       <a {...props} href={href}>

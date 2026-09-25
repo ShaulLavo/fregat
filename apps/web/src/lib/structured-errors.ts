@@ -29,6 +29,12 @@ export const clientErrors = defineErrorCatalog('client', {
     why: 'The file picker expected a directory entry for the active path.',
     fix: 'Select an existing folder path before opening directory contents.',
   },
+  CHAT_DRAFT_UNAVAILABLE: {
+    status: 409,
+    message: 'The chat draft could not be opened.',
+    why: 'The destination workspace became unavailable or navigation was superseded.',
+    fix: 'Open the workspace and try Fix with AI again.',
+  },
   DIAGNOSTIC_CHANGED: {
     status: 409,
     message: ({ path }: { path: string }) => `The problem in ${path} no longer matches the file`,

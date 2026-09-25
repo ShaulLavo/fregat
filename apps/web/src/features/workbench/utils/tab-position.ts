@@ -15,6 +15,8 @@ export function editorTabPosition(
   tabId: TabId,
 ): ItemPosition | null {
   if (uiMode !== 'workbench') return null
-  const index = activeEditorGroup(panels.editorGroups).tabs.findIndex((tab) => tab.id === tabId)
-  return ITEM_POSITIONS[index] ?? null
+  const tabs = activeEditorGroup(panels.editorGroups).tabs
+  const index = tabs.findIndex((tab) => tab.id === tabId)
+  if (index >= 8 && index === tabs.length - 1) return 9
+  return index < 8 ? (ITEM_POSITIONS[index] ?? null) : null
 }

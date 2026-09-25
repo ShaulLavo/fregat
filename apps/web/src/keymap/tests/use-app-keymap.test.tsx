@@ -488,3 +488,27 @@ test.each([
     element.remove()
   },
 )
+
+test.each([
+  ['Ctrl+Alt+2', '2', 'Digit2'],
+  ['Ctrl+Alt+B', 'b', 'KeyB'],
+  ['Ctrl+Alt+ArrowRight', 'ArrowRight', 'ArrowRight'],
+] as const)('keeps a logical AltGraph shortcut available: %s', (binding, key, code) => {
+  const harness = mountChordRuntime('workspace.toggleWallpaper', binding)
+  const event = new KeyboardEvent('keydown', {
+    bubbles: true,
+    cancelable: true,
+    ctrlKey: true,
+    altKey: true,
+    key,
+    code,
+  })
+  Object.defineProperty(event, 'getModifierState', {
+    value: (modifier: string) => modifier === 'AltGraph',
+  })
+  act(() => {
+    document.body.dispatchEvent(event)
+  })
+  expect(event.defaultPrevented).toBe(true)
+  expect(harness.calls).toEqual([false])
+})

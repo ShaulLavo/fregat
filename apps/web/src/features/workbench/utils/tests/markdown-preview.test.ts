@@ -46,3 +46,10 @@ test('preserves malformed percent escapes as literal workspace paths', () => {
     path: 'repo/docs/bad%ZZ.md',
   })
 })
+
+test.each(['../../etc/hosts', '../../repo-other/file', '%2e%2e/%2e%2e/etc/hosts'])(
+  'rejects a workspace escape: %s',
+  (href) => {
+    expect(markdownPreviewTarget(href, 'repo/docs/a.md', 'repo')).toEqual({ kind: 'unavailable' })
+  },
+)

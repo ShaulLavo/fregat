@@ -1,4 +1,5 @@
 export type MarkdownPreviewTarget =
+  | { readonly kind: 'unavailable' }
   | { readonly kind: 'anchor'; readonly href: string }
   | { readonly kind: 'external'; readonly href: string }
   | { readonly kind: 'file'; readonly path: string }
@@ -18,7 +19,10 @@ export function markdownPreviewTarget(
   const base = bare.startsWith('/')
     ? rootPath
     : documentPath.slice(0, documentPath.lastIndexOf('/'))
-  return { kind: 'file', path: normalizePath(`${base}/${bare}`) }
+  const path = normalizePath(`${base}/${bare}`)
+  const root = normalizePath(rootPath)
+  if (root && path !== root && !path.startsWith(`${root}/`)) return { kind: 'unavailable' }
+  return { kind: 'file', path }
 }
 
 function decodePath(path: string) {
@@ -50,6 +54,7 @@ export function markdownPreviewImageSource(
   origin: string,
 ) {
   const target = markdownPreviewTarget(source, documentPath, rootPath)
+  if (target.kind === 'unavailable') return undefined
   if (target.kind !== 'file') return source
   return `${origin.replace(/\/+$/u, '')}/fs/blob?${new URLSearchParams({ path: target.path })}`
 }

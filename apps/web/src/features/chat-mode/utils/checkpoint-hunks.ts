@@ -121,3 +121,17 @@ export function hunkStateLabel(state: OrchestrationCheckpointHunk['state'] | und
   if (state === 'changed') return 'Edited since'
   return ''
 }
+
+export function wholeFileHunkAction(
+  file: GitFileDiff | null,
+  states: ReadonlyMap<string, OrchestrationCheckpointHunk['state']>,
+) {
+  if (!file?.hunks.length) return { reapply: false, reason: 'No changes available' }
+  const values = file.hunks.map((hunk) => states.get(hunk.id))
+  if (values.every((state) => state === 'applied')) return { reapply: false, reason: null }
+  if (values.every((state) => state === 'reverted')) return { reapply: true, reason: null }
+  return {
+    reapply: false,
+    reason: 'Use the individual changes while this file has mixed or edited changes',
+  }
+}

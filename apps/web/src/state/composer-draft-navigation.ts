@@ -11,7 +11,7 @@ import type { createChatNavigation } from '@/state/navigation-chat'
 import type { createNavigationCoordinator } from '@/state/navigation-coordinator'
 
 export function createComposerDraftNavigation(
-  coordinator: ReturnType<typeof createNavigationCoordinator>,
+  coordinator: Pick<ReturnType<typeof createNavigationCoordinator>, 'getApplication'>,
   openChat: ReturnType<typeof createChatNavigation>,
 ) {
   return async (destination: ComposerDestination, text: string) => {
@@ -41,14 +41,23 @@ export function createComposerDraftNavigation(
       confirmedEnvironmentId(active.origin) === destination.environmentId &&
       workspace.rootFolder?.path === destination.rootPath &&
       workspace.uiMode === 'workbench'
-    const result = await openChat({
-      environmentId: destination.environmentId,
-      projectId: worktree.projectId,
-      worktreeId: worktree.id,
-      sessionId: null,
-      draftId,
-      surface: sidebar ? 'sidebar' : 'main',
-    })
-    return result.status === 'applied'
+    try {
+      const result = await openChat({
+        environmentId: destination.environmentId,
+        projectId: worktree.projectId,
+        worktreeId: worktree.id,
+        sessionId: null,
+        draftId,
+        surface: sidebar ? 'sidebar' : 'main',
+      })
+      if (result.status !== 'applied') {
+        useChatInputDraftStore.getState().clearDraft(target)
+        return false
+      }
+      return true
+    } catch (error) {
+      useChatInputDraftStore.getState().clearDraft(target)
+      throw error
+    }
   }
 }

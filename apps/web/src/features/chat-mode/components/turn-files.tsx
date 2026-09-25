@@ -16,6 +16,7 @@ import type { useSessionDiffScope } from '@/features/chat/hooks/use-session-diff
 import {
   checkpointHunkStatesQueryOptions,
   turnHunksQueryOptions,
+  wholeFileHunkAction,
 } from '@/features/chat-mode/utils/checkpoint-hunks'
 import { useEnvironmentId } from '@/lib/environments/hooks/use-environment-id'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
@@ -46,27 +47,28 @@ export function TurnFiles({
   const [activeId, setActiveId] = useState<string | null>(null)
 
   function toggle(row: TurnTreeRow) {
-    if (busyReason) return
+    if (busyReason) return false
     if (row.kind === 'file') {
-      if (!row.diff) return
-      revert.mutate({ hunkId: null, path: row.diff.path, turnCount })
-      return
+      const action = wholeFileHunkAction(row.diff, stateById)
+      if (!row.diff || action.reason) return false
+      revert.mutate({ hunkId: null, path: row.diff.path, reapply: action.reapply, turnCount })
+      return true
     }
     const state = stateById.get(row.hunk.id)
-    if (state === undefined || state === 'changed') return
+    if (state === undefined || state === 'changed') return false
     revert.mutate({
       hunkId: row.hunk.id,
       path: row.file.path,
       reapply: state === 'reverted',
       turnCount,
     })
+    return true
   }
 
   function toggleActive() {
     const row = rows.find((candidate) => candidate.id === activeId)
     if (!row || busyReason || revert.isPending) return false
-    toggle(row)
-    return true
+    return toggle(row)
   }
 
   const { ref: focusRef } = useFocusTarget<HTMLDivElement>({
@@ -110,12 +112,20 @@ export function TurnFiles({
             <GitFileRow
               actions={
                 <Button
-                  aria-label={`Undo every change to ${row.file.path}`}
-                  disabled={busyReason !== null || !row.diff || revert.isPending}
+                  aria-label={`${wholeFileHunkAction(row.diff, stateById).reapply ? 'Reapply' : 'Undo'} every change to ${row.file.path}`}
+                  disabled={
+                    busyReason !== null ||
+                    wholeFileHunkAction(row.diff, stateById).reason !== null ||
+                    revert.isPending
+                  }
                   focusableWhenDisabled
                   size='icon-xs'
                   tabIndex={-1}
-                  data-tooltip={busyReason ?? 'Undo every change this turn made to the file'}
+                  data-tooltip={
+                    busyReason ??
+                    wholeFileHunkAction(row.diff, stateById).reason ??
+                    'Toggle every change this turn made to the file'
+                  }
                   type='button'
                   variant='ghost'
                   onClick={(event) => {

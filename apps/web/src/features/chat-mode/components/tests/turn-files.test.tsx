@@ -95,6 +95,18 @@ test('undoes one change of a turn from its row and puts it back', async ({ clien
   await waitFor(async () => expect((await readFile(file, 'utf8')).split('\n')[1]).toBe('line 2'))
   const reapply = await within(first!).findByRole('button', { name: 'Reapply' })
   expect(within(first!).getByText('Undone')).toBeDefined()
+  expect(screen.getByRole('button', { name: 'Undo every change to app.txt' })).toHaveAttribute(
+    'aria-disabled',
+    'true',
+  )
   await userEvent.click(reapply)
+  await waitFor(async () => expect(await readFile(file, 'utf8')).toBe(`${after.join('\n')}\n`))
+  const whole = screen.getByRole('button', { name: 'Undo every change to app.txt' })
+  await waitFor(() => expect(whole).toBeEnabled())
+  await userEvent.click(whole)
+  await waitFor(async () => expect(await readFile(file, 'utf8')).toBe(`${before.join('\n')}\n`))
+  const reapplyFile = await screen.findByRole('button', { name: 'Reapply every change to app.txt' })
+  await waitFor(() => expect(reapplyFile).toBeEnabled())
+  await userEvent.click(reapplyFile)
   await waitFor(async () => expect(await readFile(file, 'utf8')).toBe(`${after.join('\n')}\n`))
 })

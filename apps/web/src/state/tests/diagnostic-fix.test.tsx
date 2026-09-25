@@ -1,6 +1,12 @@
+import { selectWorktreeAtPath } from '@workspace/client-core/chat/selectors'
+import {
+  selectChatProjectionSlice,
+  useChatProjectionStore,
+} from '@/features/chat/state/chat-projection-store'
 import { waitFor } from '@testing-library/react'
 import { onTestFinished } from 'vitest'
 
+import { createComposerDraftNavigation } from '@/state/composer-draft-navigation'
 import { createDiagnosticFix } from '@/state/diagnostic-fix'
 import { renderWithProviders } from '../../../test/render'
 import { registerEnvironmentQueryClient } from '@/lib/environments/state/query-clients'
@@ -142,3 +148,34 @@ test('captures the source machine before awaiting the diagnostic file read', asy
   await pending
   expect(destinations).toEqual([{ environmentId: h.descriptorA.environmentId, rootPath: 'repo' }])
 })
+
+for (const status of ['superseded', 'unavailable', 'throw'] as const) {
+  test(`failed draft navigation removes its new draft: ${status}`, async ({ server }) => {
+    const h = await createFederationHarness(server)
+    await registerFederatedProject(h.serverA, h.clientA, 'A')
+    await h.application.openEnvironmentWorkspaceRoot(h.descriptorA.environmentId, 'repo')
+    renderWithProviders(<div />, { application: h.application, connections: h.connections })
+    await waitFor(() =>
+      expect(
+        selectWorktreeAtPath(
+          selectChatProjectionSlice(useChatProjectionStore.getState(), h.descriptorA.environmentId),
+          'repo',
+        ),
+      ).toBeDefined(),
+    )
+    const draftsBefore = Object.keys(useChatInputDraftStore.getState().draftsByKey)
+    const start = createComposerDraftNavigation(
+      { getApplication: () => h.application },
+      async () => {
+        if (status === 'throw') throw new Error('Navigation failed')
+        return status === 'superseded' ? { status } : { status, reason: 'Workspace unavailable' }
+      },
+    )
+    const [result] = await Promise.allSettled([
+      start({ environmentId: h.descriptorA.environmentId, rootPath: 'repo' }, 'Fix this'),
+    ])
+    expect(Object.keys(useChatInputDraftStore.getState().draftsByKey)).toEqual(draftsBefore)
+    if (status === 'throw') expect(result?.status).toBe('rejected')
+    else expect(result).toEqual({ status: 'fulfilled', value: false })
+  })
+}

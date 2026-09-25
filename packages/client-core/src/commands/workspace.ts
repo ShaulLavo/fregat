@@ -980,7 +980,10 @@ export const workspaceCommandMetadata = {
 }
 // VS Code mode keeps VS Code's editor-index keys and the Mod+Alt digits the app bound first.
 export function selectItemMetadata(position: ItemPosition) {
-  const vscodeCommandId = `workbench.action.openEditorAtIndex${position}`
+  const vscodeCommandId =
+    position === 9
+      ? 'workbench.action.lastEditorInGroup'
+      : `workbench.action.openEditorAtIndex${position}`
   return defineMetadata({
     category: 'Workspace',
     description: `Select editor tab ${position}, or chat ${position} in chat mode.`,

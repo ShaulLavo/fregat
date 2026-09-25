@@ -572,7 +572,11 @@ function selectItemCommands() {
         if (context.snapshot.uiMode === 'chat')
           return runSessionCommand(context, () => jumpToSession(position))
         const group = activeEditorGroup(context.snapshot.workbenchPanels.editorGroups)
-        return selectEditorTab(context.runtime, group, group.tabs[position - 1])
+        return selectEditorTab(
+          context.runtime,
+          group,
+          position === 9 ? group.tabs.at(-1) : group.tabs[position - 1],
+        )
       },
     }),
   )

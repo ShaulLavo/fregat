@@ -20,12 +20,18 @@ export function useDiagnosticFix() {
   const requestFix = use(DiagnosticFixContext)
   const mutation = useMutation({
     mutationKey: diagnosticAiMutationKeys.fix(),
-    mutationFn: (request: DiagnosticFixRequest) => {
+    scope: { id: 'diagnostic-fix-navigation' },
+    mutationFn: async (request: DiagnosticFixRequest) => {
       if (!requestFix)
         throw clientErrors.CONTEXT_MISSING({
           message: 'Fix with AI ran outside DiagnosticFixProvider',
         })
-      return requestFix(request)
+      const opened = await requestFix(request)
+      if (!opened)
+        throw clientErrors.CHAT_DRAFT_UNAVAILABLE({
+          internal: { path: request.path, surface: request.surface },
+        })
+      return true
     },
     onError: notifyFixError,
   })

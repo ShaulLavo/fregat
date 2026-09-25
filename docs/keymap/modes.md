@@ -17,6 +17,9 @@ records what Plan 080 changed, per host, and what each mode does differently.
 | Focus editor group 1–3      | `Mod+1`–`3` reserved from the browser, no command        | unbound (`Mod+digit` selects tabs)                              | `Mod+1`–`3`                                                                       |
 | Editor pack                 | Platform: native pack. VS Code: VS Code pack             | VS Code pack, folding differs on macOS (below)                  | VS Code pack                                                                      |
 
+For editor tabs, slot 9 selects the last tab in the active group, including groups with fewer
+than nine tabs or more than nine tabs. Chat slot 9 selects the ninth chat.
+
 The numbered and adjacent commands are shared: `workspace.selectItem1`–`9`, `workspace.nextItem` and
 `workspace.previousItem`. One override moves the key for tabs and chats together. The captured
 screen decides the target: the active group's tab strip in the workbench (focus in the sidebar or
@@ -74,7 +77,7 @@ not inspected; the comparison is from source.
   about a real tab or the desktop app. Owner check pending on the Mac desktop app and a browser tab.
 - **macOS Option.** `Cmd+Option+digit` and `Cmd+Option+[` resolve through the matcher's physical-key
   fallback, as the Mod+Alt session keys did before. Owner check pending on the Mac.
-- **Windows AltGr.** Windows reports AltGr as Ctrl+Alt, and the matcher's physical-digit fallback
-  then reads AltGr+2 on a German layout (`²`) as `Mod+Alt+2`. Panels 1–5 are exposed; slots 6–9
-  decline and let the character through. Linux reports AltGr without Ctrl+Alt. A fix belongs in the
-  shared Editor matcher (skip the physical fallback when `AltGraph` is down).
+- **Windows AltGr.** Windows reports AltGr as Ctrl+Alt. Logical Ctrl+Alt shortcuts remain
+  available when the reported key matches the binding (digits, letters, and navigation keys).
+  The Platform dispatcher rejects physical-key fallback while AltGraph is down, so German
+  AltGr+2 (`²`) remains character input. Linux reports AltGr without Ctrl+Alt.

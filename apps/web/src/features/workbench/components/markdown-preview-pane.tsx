@@ -1,10 +1,6 @@
 import type { EditorTextBuffer } from '@singapore-editor/core/document'
 import { useQueryClient } from '@tanstack/react-query'
-import {
-  Markdown,
-  type MarkdownComponents,
-  type MarkdownProps,
-} from '@workspace/markdown/components/markdown'
+import { Markdown, type MarkdownComponents } from '@workspace/markdown/components/markdown'
 import { CodeHighlighterContext } from '@workspace/markdown/providers/code-highlighter-context'
 import { PaneBar } from '@workspace/ui/components/pane-bar'
 import {
@@ -23,7 +19,6 @@ import { MarkdownPreviewImage } from '@/features/workbench/components/markdown-p
 import { MarkdownPreviewLink } from '@/features/workbench/components/markdown-preview-link'
 import { MarkdownPreviewContext } from '@/features/workbench/providers/markdown-preview-context'
 import type { MarkdownScrollSync } from '@/features/workbench/state/markdown-scroll-sync'
-import { remarkPreviewImages } from '@/features/workbench/utils/markdown-preview-images'
 import {
   lineForRenderedTop,
   renderedTopForLine,
@@ -78,12 +73,8 @@ export function MarkdownPreviewPane({
   const commands = useEditorCommands()
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const quietUntil = useRef(0)
-  // Manual memo: the plugin list is the parser's identity; a new list rebuilds the parser.
-  const remarkPlugins: MarkdownProps['remarkPlugins'] = useMemo(
-    () => [[remarkPreviewImages, { documentPath, origin, rootPath }]],
-    [documentPath, origin, rootPath],
-  )
   const preview = {
+    origin,
     documentPath,
     rootPath,
     openFile: (path: string) => void commands.openFileSurface(filesystemPath(path)),
@@ -127,7 +118,6 @@ export function MarkdownPreviewPane({
             <Markdown
               codeBlock={MarkdownPreviewCodeBlock}
               components={PREVIEW_COMPONENTS}
-              remarkPlugins={remarkPlugins}
               text={text}
             />
           </CodeHighlighterContext>

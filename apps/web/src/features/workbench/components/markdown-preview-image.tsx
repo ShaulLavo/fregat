@@ -1,4 +1,6 @@
-import type { ComponentProps } from 'react'
+import { use, type ComponentProps } from 'react'
+import { MarkdownPreviewContext } from '@/features/workbench/providers/markdown-preview-context'
+import { markdownPreviewImageSource } from '@/features/workbench/utils/markdown-preview-paths'
 
 import { fsBlobCrossOrigin } from '@/lib/fs-blob-image'
 
@@ -9,7 +11,15 @@ export function MarkdownPreviewImage({
   src,
   ...props
 }: ComponentProps<'img'> & { readonly node?: unknown }) {
-  const source = typeof src === 'string' ? src : undefined
+  const preview = use(MarkdownPreviewContext)
+  let source = typeof src === 'string' ? src : undefined
+  if (source && preview)
+    source = markdownPreviewImageSource(
+      source,
+      preview.documentPath,
+      preview.rootPath,
+      preview.origin,
+    )
   return (
     <img
       {...props}
