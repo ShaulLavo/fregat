@@ -1572,13 +1572,14 @@ async function fixtureRoot() {
 
 /**
  * fd sorts what it finds within its first 100 ms and streams in directory order after that, so a
- * loaded runner changes which names an early batch sees. Pin the sorted order the fixture assumes.
+ * loaded runner changes which names an early batch sees. Buffer the whole run so fd sorts all of it.
  */
 async function withSortedFd<T>(run: () => Promise<T>) {
   const fd = Bun.which('fd')
   if (!fd) return run()
   const bin = await fixtureRoot()
-  await writeFile(path.join(bin, 'fd'), `#!/bin/sh\n'${fd}' "$@" | sort\n`)
+  // Options before "$@": the server passes `--` ahead of the pattern.
+  await writeFile(path.join(bin, 'fd'), `#!/bin/sh\nexec '${fd}' --max-buffer-time 60000 "$@"\n`)
   await chmod(path.join(bin, 'fd'), 0o755)
   const previous = process.env.PATH
   process.env.PATH = `${bin}${path.delimiter}${previous}`
