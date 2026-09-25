@@ -1,13 +1,13 @@
 import { use, useSyncExternalStore } from 'react'
 import { EnvironmentConnectionsContext } from '@/providers/environment-connections-context'
-import { createClientInvariantError } from '@/lib/structured-errors'
+import { clientErrors } from '@/lib/structured-errors'
 
 export function useAuth() {
   const connections = use(EnvironmentConnectionsContext)
   if (!connections)
-    throw createClientInvariantError(
-      'Machine authentication requires EnvironmentTransportsProvider.',
-    )
+    throw clientErrors.CONTEXT_MISSING({
+      message: 'Machine authentication requires EnvironmentTransportsProvider.',
+    })
   const state = useSyncExternalStore(
     connections.authStore.subscribe,
     connections.authStore.getState,

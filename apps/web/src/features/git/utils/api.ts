@@ -350,12 +350,15 @@ export async function createPullRequest(
 }
 
 export async function syncRemote(path: string, client: Client) {
-  return observeGitOperation({ action: 'git.sync_remote', path }, async () => {
-    const pull = await pullRemote(path, client)
-    const push = await pushRemote(path, client)
+  return observeGitOperation(
+    { ...clientLogContext(client), action: 'git.sync_remote', path },
+    async () => {
+      const pull = await pullRemote(path, client)
+      const push = await pushRemote(path, client)
 
-    return { pull, push }
-  })
+      return { pull, push }
+    },
+  )
 }
 
 function observeGitOperation<T>(

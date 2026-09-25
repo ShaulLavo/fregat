@@ -1,9 +1,10 @@
 import { use } from 'react'
 import { ApplicationRuntimeContext } from '@/providers/application-runtime-context'
-import { createClientInvariantError } from '@/lib/structured-errors'
+import { clientErrors } from '@/lib/structured-errors'
 
 export function useApplicationRuntime() {
   const application = use(ApplicationRuntimeContext)
-  if (!application) throw createClientInvariantError('ApplicationRuntimeProvider is missing')
+  if (!application)
+    throw clientErrors.CONTEXT_MISSING({ message: 'ApplicationRuntimeProvider is missing' })
   return application
 }

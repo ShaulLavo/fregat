@@ -1,9 +1,14 @@
-import { getClient } from '@/lib/client'
+import { activeServerOrigin, getClient, setActiveServerOrigin } from '@/lib/client'
+import { useEnvironmentsStore } from '@/lib/environments/state/store'
+import { createEnvironmentEntry } from '@workspace/client-core/environments/utils/connection'
+import { environmentIdSchema } from '@workspace/contracts'
 import { execFileSync } from 'node:child_process'
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import * as v from 'valibot'
 import { describe } from 'vitest'
 
+import { recordClientLog } from '../../../../test/factories/client-log'
 import { expect, test } from '../../../../test/fixtures'
 import * as api from '@/features/git/utils/api'
 
@@ -22,6 +27,13 @@ async function initRepo(root: string) {
   git('add', 'a.ts')
   git('commit', '-m', 'init')
   return repo
+}
+
+function addUpstream(root: string, repo: string) {
+  execFileSync('git', ['init', '--bare', '-b', 'main', 'remote.git'], { cwd: root, stdio: 'pipe' })
+  const git = (...args: string[]) => execFileSync('git', args, { cwd: repo, stdio: 'pipe' })
+  git('remote', 'add', 'origin', path.join(root, 'remote.git'))
+  git('push', '-u', 'origin', 'main')
 }
 
 describe('git api against the real server', () => {
@@ -44,5 +56,32 @@ describe('git api against the real server', () => {
 
     const changed = status.files.find((file) => file.path.endsWith('a.ts'))
     expect(changed?.worktree).toBe('modified')
+  })
+
+  test('attributes a sync to the machine its client targets', async ({ client, server }) => {
+    const repo = await initRepo(server.root)
+    addUpstream(server.root, repo)
+    const origin = activeServerOrigin()
+    const otherOrigin = 'http://localhost:39911'
+    const environmentId = v.parse(environmentIdSchema, '01900000-0000-4000-8000-000000000011')
+    const previous = useEnvironmentsStore.getState()
+    useEnvironmentsStore.setState({
+      entries: {
+        [origin]: { ...createEnvironmentEntry(origin, origin), name: 'target', environmentId },
+        [otherOrigin]: { ...createEnvironmentEntry(otherOrigin, origin), name: 'other' },
+      },
+    })
+    const info = recordClientLog('info')
+    try {
+      setActiveServerOrigin(otherOrigin)
+      await api.syncRemote('repo', client)
+    } finally {
+      setActiveServerOrigin(origin)
+      useEnvironmentsStore.setState(previous, true)
+    }
+
+    expect(info.events('git.sync_remote')).toEqual([
+      expect.objectContaining({ environmentId, machine: 'target', outcome: 'ok' }),
+    ])
   })
 })
