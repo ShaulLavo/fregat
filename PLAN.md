@@ -122,11 +122,13 @@ the delivered shared runtime and has not started.
 ## Document contribution refactor
 
 [Plan 099](plans/099-document-contributions.md) is proposed; implementation has not started.
+Decided 2026-09-25: owner — units 0–1 are approved to start; units 2–7 stay gated as the plan says.
 It extends Editor's existing buffer owner with one committed-revision publication path and a
 document contribution runtime. Tree-sitter, Shiki, minimap, and language-service adapters share
 source synchronization while retaining typed APIs, independent queues, and domain-specific data.
 Text delivery uses ordinary strings/chunks and incremental edits in the existing separate workers.
 The syntax migration removes SAB text transport while preserving atomic cancellation and packed results.
+Decided 2026-09-25: owner — the SAB transport is deleted ahead of 099 as Editor E057, a small task.
 
 Its internal order is calibrated baseline and consumer inventory, canonical publication, shared
 runtime with all syntax callers, minimap, local/external LSP, remaining ownership checks, a
@@ -135,9 +137,10 @@ can proceed independently. Public backend cutover follows completed Plan 098 the
 it does not bypass their required order. Preserve WorkspaceEdit segment publication and
 compensation, prepared adoption, and the existing input latency limits.
 
-This proposal does not reorder other lanes. Editor E009 supplies transport measurement scope and
-evidence for the strings decision. E014 parallel search must reuse this runtime if implemented.
-Shared text storage and worker consolidation are outside the refactor; E013 remains deferred research.
+This proposal does not reorder other lanes. Editor E009 supplied transport measurement scope and
+evidence for the strings decision; it is folded into 099 unit 6 (2026-09-25). E014 parallel search
+must reuse this runtime if implemented. Shared text storage and worker consolidation are outside the
+refactor; E010, E012 and E013 were closed as no-go on 2026-09-25.
 
 ## Instant workspace reload (completed 2026-09-21)
 
