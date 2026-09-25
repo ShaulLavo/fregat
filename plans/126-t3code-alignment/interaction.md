@@ -141,7 +141,9 @@ This is a two-pass source audit and implementation plan. No app changes, tests, 
 
 > **Owner ruling (2026-09-25):** the goal of this row is to **delete Lexical** from the chat composer. The composer supports
 > Markdown as you type without Lexical, and the row is not done until Lexical is gone; then add `composerRichTextEnabled` for
-> upstream parity. Lexical stays in the composer until the editor can carry it. That prerequisite is
+> upstream parity. The replacement is **our own editor** (Editor repo). Lexical stays until that editor supports everything
+> the composer uses Lexical for: mention and chip nodes, pasted images and attachments, Markdown as you type, IME
+> composition, undo/redo, placeholder, auto-growing multiline input and serialization to the message format. That prerequisite is
 > [Plan 111](../111-editor-decorations.md) (question 7: mentions as decorations over a plain buffer) and the plans it splits into.
 > Decided 2026-09-25: owner — 111 research authorized with the composer as its first consumer, done before the next wave.
 > The send-shortcut and large-paste parts (lane L2) are done. Mobile plain-Enter newline: see the reopened case below.
