@@ -35,7 +35,7 @@ export const platformMigrations: readonly Migration[] = [
   { version: 28, name: 'session_lifecycle_revision', up: applySessionLifecycleRevision },
   { version: 29, name: 'turn_end_reason', up: applyTurnEndReason },
   { version: 30, name: 'message_model_selection', up: applyMessageModelSelection },
-  { version: 31, name: 'terminal_session_cleanup', up: applyTerminalSessionCleanup },
+  { version: 37, name: 'terminal_session_cleanup', up: applyTerminalSessionCleanup },
 ]
 
 function applyTerminalSessionCleanup(database: PlatformDatabase) {
