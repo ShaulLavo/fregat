@@ -1,4 +1,4 @@
-import { descriptorFor, type SettingId } from '@workspace/contracts'
+import { descriptorFor, type SettingId, type SettingsDiagnostic } from '@workspace/contracts'
 
 // Registry titles describe the choice, which can invert the stored value for hidden models.
 export function settingRowTitle(id: SettingId): string {
@@ -20,4 +20,16 @@ export function humanizeSettingId(id: string): string {
     .join(' ')
 
   return spaced.charAt(0).toUpperCase() + spaced.slice(1)
+}
+
+const DIAGNOSTIC_LABELS: Record<SettingsDiagnostic['kind'], string> = {
+  'invalid-value': 'invalid value',
+  'scope-not-allowed': 'not allowed in this scope',
+  'unknown-key': 'unknown setting',
+  migrated: 'moved to a new setting',
+  'removed-key': 'no longer a setting',
+}
+
+export function settingsDiagnosticLabel(kind: SettingsDiagnostic['kind']) {
+  return DIAGNOSTIC_LABELS[kind]
 }

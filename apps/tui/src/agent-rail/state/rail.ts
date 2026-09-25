@@ -1,9 +1,11 @@
+import {
+  createProjectRegistrationCommand,
+  projectRegistrationResult,
+} from '@workspace/client-core/chat/registration'
 import type { SessionSeenStamps } from '@workspace/client-core/chat/rail/unread'
 import { recordObservabilityWarning } from '@workspace/observability'
 import * as v from 'valibot'
 import {
-  commandIdSchema,
-  projectRegistrationResultSchema,
   orchestrationSearchSessionsResultSchema,
   ORCHESTRATION_SESSION_SEARCH_MIN_QUERY_LENGTH,
   ORCHESTRATION_SESSION_SEARCH_MAX_QUERY_LENGTH,
@@ -170,14 +172,13 @@ export function createAgentRailState(
       return run(async () => {
         const paths = await readServerPaths({ client: session.client, signal: lifetime.signal })
         const absolute = absolutePickerPath(workspaceRoot, paths.workspaceRoot)
-        const result = await ready.chat.dispatch({
-          type: 'project.create',
-          commandId: v.parse(commandIdSchema, crypto.randomUUID()),
-          workspaceRoot: absolute,
-          title: absolute.split('/').filter(Boolean).at(-1) ?? 'Root',
-          defaultModelSelection: null,
-        })
-        return v.parse(projectRegistrationResultSchema, result.result)
+        const result = await ready.chat.dispatch(
+          createProjectRegistrationCommand({
+            workspaceRoot: absolute,
+            title: absolute.split('/').filter(Boolean).at(-1) ?? 'Root',
+          }),
+        )
+        return projectRegistrationResult(result)
       })
     },
     dispose() {

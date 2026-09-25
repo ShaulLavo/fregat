@@ -1,3 +1,4 @@
+import { settingsDiagnosticLabel } from '@workspace/client-core/settings/humanize'
 import type {
   SettingId,
   SettingsDiagnostic,
@@ -5,14 +6,6 @@ import type {
   SettingsWriteTarget,
 } from '@workspace/contracts'
 import type { SettingsDisplaySnapshot } from '@/settings/utils/rows'
-
-const labels: Readonly<Record<SettingsDiagnostic['kind'], string>> = {
-  'invalid-value': 'invalid value',
-  'scope-not-allowed': 'not allowed in this scope',
-  'unknown-key': 'unknown setting',
-  migrated: 'moved to a new setting',
-  'removed-key': 'no longer a setting',
-}
 
 export type SettingsIssue = {
   readonly key: string
@@ -37,7 +30,7 @@ export function settingsIssues(
       .map((diagnostic): SettingsIssue => ({
         key: `${diagnostic.layer}:${diagnostic.id}`,
         kind: 'entry',
-        title: `${diagnostic.id} · ${diagnostic.layer}: ${labels[diagnostic.kind]} (not applied)`,
+        title: `${diagnostic.id} · ${diagnostic.layer}: ${settingsDiagnosticLabel(diagnostic.kind)} (not applied)`,
         detail:
           diagnostic.detail ?? 'The effective value comes from another valid layer or the default.',
       })),

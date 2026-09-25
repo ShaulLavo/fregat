@@ -227,6 +227,11 @@ exactly one export, so every symbol needs an `index.ts` re-export.
 
 ## Share the settings and chat-context vocabulary
 
+Decided 2026-09-25: recommendation (completion wave). Use "this scope" across diagnostics,
+share the secret-stripping provider builder, and clamp terminal line bounds in the shared schema.
+Project registration uses prefixed command ids and the structured missing-identity failure;
+TUI preserves its Root title fallback.
+
 - **4.8 diagnostic labels.** One `SettingsDiagnosticKind` (`packages/contracts/src/settings/resolve.ts:60`)
   is mapped to English three times: `apps/tui/src/settings/utils/diagnostics.ts:9`,
   `apps/web/src/features/settings/utils/diagnostics.ts:13`, and

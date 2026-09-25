@@ -114,7 +114,8 @@
     "./logs/live-cache": "./src/logs/live-cache.ts",
     "./chat/attachments": "./src/chat/attachments.ts",
     "./files/search-replace": "./src/files/search-replace.ts",
-    "./transport/socket": "./src/transport/socket.ts"
+    "./transport/socket": "./src/transport/socket.ts",
+    "./settings/operations": "./src/settings/operations.ts"
   },
   "scripts": {
     "build": "tsgo --noEmit",

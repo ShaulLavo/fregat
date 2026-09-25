@@ -13,7 +13,8 @@ import {
 import type { FileStorage } from '@/storage/files'
 import type { StageTarget } from '@/agent/utils/target'
 import { createTuiError } from '@/host/utils/structured-errors'
-import { promptElementSchema, terminalContextSchema } from '@/agent-stage/utils/prompt'
+import { promptElementSchema } from '@/agent-stage/utils/prompt'
+import { terminalContextSchema } from '@workspace/client-core/chat/terminal-context'
 import { readInbox } from '@/agent-stage/state/inbox'
 
 const draftSchema = v.object({
