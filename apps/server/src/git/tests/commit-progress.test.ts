@@ -9,6 +9,7 @@ import { createWorkspacePaths } from '../../fs/path'
 import { GitService } from '../service'
 import type { GitCommitProgressEvent } from '@workspace/contracts'
 import { testSettingsOptions } from '../../settings/testing'
+import { runGit } from '../../testing/git'
 
 const TRUSTED_ORIGIN = 'http://localhost:5173'
 const roots: string[] = []
@@ -125,7 +126,9 @@ describe('streaming commit', () => {
     )
 
     expect(events.at(-1)).toMatchObject({ kind: 'result', result: { kind: 'committed' } })
-    expect(await runGit(root, ['log', '-1', '--pretty=%B'])).toBe('feat: from the file\n\n')
+    expect((await runGit(root, ['log', '-1', '--pretty=%B'])).stdout).toBe(
+      'feat: from the file\n\n',
+    )
   })
 
   it('aborts when the message file holds only comments', async () => {
@@ -205,30 +208,16 @@ async function stageChange(root: string, contents: string) {
 }
 
 async function headSubject(root: string) {
-  return (await runGit(root, ['log', '-1', '--pretty=%s'])).trim()
+  return (await runGit(root, ['log', '-1', '--pretty=%s'])).stdout.trim()
 }
 
 async function fixtureRepo() {
   const root = await mkdtemp(path.join(tmpdir(), 'platform-commit-progress-'))
   roots.push(root)
   await runGit(root, ['init', '-b', 'main'])
-  await runGit(root, ['config', 'user.email', 'test@example.com'])
-  await runGit(root, ['config', 'user.name', 'Test User'])
   await writeFile(path.join(root, 'tracked.txt'), 'one\n')
   await runGit(root, ['add', 'tracked.txt'])
   await runGit(root, ['commit', '-m', 'initial'])
 
   return root
-}
-
-async function runGit(root: string, args: readonly string[]) {
-  const child = Bun.spawn(['git', '-C', root].concat(args), { stderr: 'pipe', stdout: 'pipe' })
-  const [stdout, stderr, exitCode] = await Promise.all([
-    new Response(child.stdout).text(),
-    new Response(child.stderr).text(),
-    child.exited,
-  ])
-  if (exitCode === 0) return stdout
-
-  throw new Error(`${stderr}${stdout}`.trim())
 }

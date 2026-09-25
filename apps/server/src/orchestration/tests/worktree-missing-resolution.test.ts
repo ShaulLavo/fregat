@@ -3,7 +3,7 @@ import * as v from 'valibot'
 import { orchestrationCommandSchema } from '@workspace/contracts'
 import { afterEach, expect, test } from 'vitest'
 import { closeTestApps } from '../../../test/server'
-import { executeGit, FIXTURE_MODEL } from '../../../test/factories/orchestration'
+import { FIXTURE_MODEL } from '../../../test/factories/orchestration'
 import {
   interruptProvisioning,
   lifecycleSessionId,
@@ -11,6 +11,7 @@ import {
   sharedSessionId,
   worktreeLifecycleFixture,
 } from '../../../test/factories/worktree-lifecycle'
+import { runGit } from '../../testing/git'
 
 const fixtures: Awaited<ReturnType<typeof worktreeLifecycleFixture>>[] = []
 afterEach(async () => {
@@ -29,7 +30,7 @@ test('missing shared checkout fans attention to each session and confirmed absen
     title: 'Shared',
     modelSelection: FIXTURE_MODEL,
   })
-  await executeGit(fixture.root, 'worktree', 'remove', worktree.canonicalPath)
+  await runGit(fixture.root, ['worktree', 'remove', worktree.canonicalPath], { cwdMode: 'option' })
   await fixture.restart()
   expect((await fixture.engine.shellSnapshot()).sessions).toEqual(
     expect.arrayContaining([
@@ -65,9 +66,13 @@ test('missing shared checkout fans attention to each session and confirmed absen
     (await fixture.engine.readModelSnapshot()).worktrees.get(lifecycleWorktreeId)?.lifecycle.state,
   ).toBe('removed')
   await fixture.command({ type: 'project.delete', projectId: fixture.registration.projectId })
-  expect(await executeGit(fixture.root, 'rev-parse', `refs/heads/${worktree.branch}`)).toBe(
-    worktree.baseCommit,
-  )
+  expect(
+    (
+      await runGit(fixture.root, ['rev-parse', `refs/heads/${worktree.branch}`], {
+        cwdMode: 'option',
+      })
+    ).stdout.trim(),
+  ).toBe(worktree.baseCommit)
 })
 
 test('a failed creation with no remaining path has a confirmed no-delete resolution', async () => {
@@ -142,5 +147,9 @@ test('discovered driver history keeps safe and force cleanup blocked after its s
     }),
   ).rejects.toThrow()
   await fixture.command({ type: 'worktree.release', worktreeId: lifecycleWorktreeId })
-  expect(await executeGit(worktree.canonicalPath, 'rev-parse', 'HEAD')).toBe(worktree.baseCommit)
+  expect(
+    (
+      await runGit(worktree.canonicalPath, ['rev-parse', 'HEAD'], { cwdMode: 'option' })
+    ).stdout.trim(),
+  ).toBe(worktree.baseCommit)
 })

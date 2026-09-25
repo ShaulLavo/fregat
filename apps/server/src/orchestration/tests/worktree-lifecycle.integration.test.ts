@@ -2,13 +2,14 @@ import { readFile, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { afterEach, expect, test } from 'vitest'
 import { closeTestApps } from '../../../test/server'
-import { executeGit, FIXTURE_MODEL } from '../../../test/factories/orchestration'
+import { FIXTURE_MODEL } from '../../../test/factories/orchestration'
 import {
   lifecycleSessionId,
   lifecycleWorktreeId,
   sharedSessionId,
   worktreeLifecycleFixture,
 } from '../../../test/factories/worktree-lifecycle'
+import { runGit } from '../../testing/git'
 
 const fixtures: Awaited<ReturnType<typeof worktreeLifecycleFixture>>[] = []
 afterEach(async () => {
@@ -93,7 +94,11 @@ test('real app provisions one checkout, shares it, preserves dirty work across r
   ).toBe('removed')
   await expect(stat(worktree.canonicalPath)).rejects.toMatchObject({ code: 'ENOENT' })
   expect(
-    await executeGit(fixture.root, 'rev-parse', `refs/heads/worktree/${lifecycleWorktreeId}`),
+    (
+      await runGit(fixture.root, ['rev-parse', `refs/heads/worktree/${lifecycleWorktreeId}`], {
+        cwdMode: 'option',
+      })
+    ).stdout.trim(),
   ).toBe(worktree.baseCommit)
 })
 

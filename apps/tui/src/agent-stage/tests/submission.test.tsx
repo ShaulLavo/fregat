@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { act } from 'react'
-import { orchestrationForApp } from 'server/testing'
+import { orchestrationForApp, runGit } from 'server/testing'
 import { createEnvironmentClient } from '@workspace/client-core/transport/client'
 import {
   createSessionArchiveCommand,
@@ -15,12 +15,12 @@ import { makeTestServer } from '../../../test/server'
 import { loseNextDispatchAcknowledgement, conversationTurns } from '../../../test/factories/chat'
 import { runPaletteCommand } from '../../../test/actions'
 import { createDrafts, draftsForStorage } from '@/agent-stage/state/drafts'
-import { gitCommand, prepareGitWorkbench } from '../../../test/factories/git-workbench'
+import { prepareGitWorkbench } from '../../../test/factories/git-workbench'
 
 test('the first send creates the selected worktree and later turns keep that checkout', async () => {
   const server = await makeTestServer({ providerRuntime: true })
   await prepareGitWorkbench(server.root)
-  const baseCommit = (await gitCommand(server.root, 'rev-parse', 'HEAD')).trim()
+  const baseCommit = (await runGit(server.root, ['rev-parse', 'HEAD'])).stdout.trim()
   const app = await renderAgentStage(server)
   const { frame, session, chat, worktreeId } = app
   try {

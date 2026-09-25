@@ -1,4 +1,3 @@
-import { executeGit } from '../../../../test/factories/orchestration'
 import { mkdtemp, mkdir, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -13,6 +12,7 @@ import type { ProviderDiscoveredSession, ProviderHistoryMessage } from '../../..
 import { createWorkspacePaths } from '../../../fs/path'
 import { DEFAULT_MAX_TEXT_FILE_BYTES } from '../../../fs/limits'
 import { GitService } from '../../../git/service'
+import { runGit } from '../../../testing/git'
 import { OrchestrationEngine } from '../../engine'
 import { createProjectionFixture } from './projection'
 import { OrchestrationSessionSearchQuery } from '../../session-search-query'
@@ -127,25 +127,15 @@ export async function discoveryFixture() {
         title: 'Discovery fixture',
         workspaceRoot,
       }),
-    git: (...args: string[]) => executeGit(main, ...args),
+    git: (...args: string[]) => runGit(main, args, { cwdMode: 'option' }),
     initializeGit: async () => {
       await writeFile(path.join(main, 'README.md'), '# Fixture\n')
       for (const args of [
         ['init', '-b', 'main'],
         ['add', '.'],
-        [
-          '-c',
-          'user.name=Test',
-          '-c',
-          'user.email=test@example.invalid',
-          'commit',
-          '-m',
-          'initial',
-        ],
+        ['commit', '-m', 'initial'],
       ]) {
-        const child = Bun.spawn(['git', ...args], { cwd: main, stdout: 'ignore', stderr: 'pipe' })
-        const [stderr, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
-        if (code !== 0) throw new TypeError(`Git fixture failed: ${stderr}`)
+        await runGit(main, args, { cwdMode: 'option' })
       }
     },
     close: async () => {

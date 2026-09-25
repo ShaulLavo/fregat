@@ -1,13 +1,13 @@
 import { afterEach, expect, test } from 'vitest'
 import {
   createOrchestrationFixture,
-  executeGit,
   FIXTURE_SESSION_ID,
   mockRuntime,
   sessionFrom,
 } from '../../../test/factories/orchestration'
 import { MockProviderAdapter } from '../../provider/adapters/mock'
 import { createInternalError } from '../../observability/structured-errors'
+import { runGit } from '../../testing/git'
 
 const fixtures: Awaited<ReturnType<typeof createOrchestrationFixture>>[] = []
 afterEach(async () => {
@@ -19,18 +19,10 @@ test.each(['complete', 'fail'] as const)(
   async (outcome) => {
     const fixture = await createOrchestrationFixture()
     fixtures.push(fixture)
-    await executeGit(fixture.checkout, 'init')
-    await executeGit(
-      fixture.checkout,
-      '-c',
-      'user.name=Test',
-      '-c',
-      'user.email=test@example.com',
-      'commit',
-      '--allow-empty',
-      '-m',
-      'initial',
-    )
+    await runGit(fixture.checkout, ['init'], { cwdMode: 'option' })
+    await runGit(fixture.checkout, ['commit', '--allow-empty', '-m', 'initial'], {
+      cwdMode: 'option',
+    })
     const adapter = new MockProviderAdapter()
     const entered = Promise.withResolvers<void>()
     const release = Promise.withResolvers<void>()

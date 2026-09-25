@@ -21,6 +21,7 @@ import { fileUriForPath } from '@workspace/contracts'
 import { LspSessionPool, type LspProxyClientSession, type LspProxySocket } from '../proxy-session'
 import { resolveLspServer } from '../registry'
 import { LspWatchedFiles } from '../watched-files'
+import { runGit } from '../../testing/git'
 
 const IMPORT = 'import { helper } from "./nested/my-helper";'
 const SOURCE = `const count: number = "wrong";\ncount.toFixed();\n${IMPORT}\n`
@@ -255,38 +256,16 @@ describe('workspace TypeScript against real language servers', () => {
         'import { value } from "./dependency";\nexport const count: number = value;\n',
       )
       await expectCodes(probe, native, [])
-      const git = (...args: string[]) => {
-        const result = Bun.spawnSync(['git', '-C', probe.root, ...args], { stderr: 'pipe' })
-        if (result.exitCode !== 0) throw createInternalError(result.stderr.toString())
-      }
-      git('init', '--quiet', '--initial-branch=main')
-      git('-c', 'user.name=t', '-c', 'user.email=t@example.invalid', 'add', 'dependency.ts')
-      git(
-        '-c',
-        'user.name=t',
-        '-c',
-        'user.email=t@example.invalid',
-        'commit',
-        '--quiet',
-        '-m',
-        'main',
-      )
-      git('checkout', '--quiet', '-b', 'other')
+      await runGit(probe.root, ['init', '--quiet', '--initial-branch=main'])
+      await runGit(probe.root, ['add', 'dependency.ts'])
+      await runGit(probe.root, ['commit', '--quiet', '-m', 'main'])
+      await runGit(probe.root, ['checkout', '--quiet', '-b', 'other'])
       await writeFile(path.join(probe.root, 'dependency.ts'), 'export const value = "wrong";\n')
-      git(
-        '-c',
-        'user.name=t',
-        '-c',
-        'user.email=t@example.invalid',
-        'commit',
-        '--quiet',
-        '-am',
-        'other',
-      )
+      await runGit(probe.root, ['commit', '--quiet', '-am', 'other'])
       await assertExternalDiagnostics(probe.session, probe.socket, native, probe.uri, 20, [2322])
 
       probe.socket.sent.length = 0
-      git('checkout', '--quiet', 'main')
+      await runGit(probe.root, ['checkout', '--quiet', 'main'])
       await assertExternalDiagnostics(probe.session, probe.socket, native, probe.uri, 21, [])
     },
   )

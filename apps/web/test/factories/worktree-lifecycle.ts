@@ -1,14 +1,13 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { clientOrchestrationCommandSchema, type SessionWorktreeTarget } from '@workspace/contracts'
-import { orchestrationForApp } from 'server/testing'
+import { orchestrationForApp, runGit } from 'server/testing'
 import * as v from 'valibot'
 import { createDraftSessionSubmission } from '@workspace/client-core/chat/commands'
 import { createProjectRegistrationCommand } from '@workspace/client-core/chat/registration'
 import type { createInProcessClient } from '../client'
 import type { TestServer } from '../server'
 import { createRailHarness } from './rail-harness'
-import { executeDomainGit } from './session-domain'
 
 export async function createWorktreeLifecycleHarness(
   client: ReturnType<typeof createInProcessClient>,
@@ -17,20 +16,11 @@ export async function createWorktreeLifecycleHarness(
   const rail = await createRailHarness(client, server, [])
   const repository = path.join(server.root, 'lifecycle')
   await mkdir(repository)
-  await executeDomainGit(repository, 'init', '-b', 'main')
+  await runGit(repository, ['init', '-b', 'main'], { cwdMode: 'option' })
   await writeFile(path.join(repository, 'file.txt'), 'Initial content\n')
   await writeFile(path.join(repository, '.gitignore'), 'ignored.txt\n')
-  await executeDomainGit(repository, 'add', '.')
-  await executeDomainGit(
-    repository,
-    '-c',
-    'user.name=Test',
-    '-c',
-    'user.email=test@example.invalid',
-    'commit',
-    '-m',
-    'Initial',
-  )
+  await runGit(repository, ['add', '.'], { cwdMode: 'option' })
+  await runGit(repository, ['commit', '-m', 'Initial'], { cwdMode: 'option' })
   const registration = await rail.dispatch(
     createProjectRegistrationCommand({ workspaceRoot: 'lifecycle', title: 'Lifecycle project' }),
   )

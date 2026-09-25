@@ -1,5 +1,4 @@
 import { filesystemPath } from '@/lib/documents/utils/identity'
-import { execFileSync } from 'node:child_process'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { onTestFinished } from 'vitest'
@@ -16,6 +15,7 @@ import { createInProcessClient } from '../client'
 import { renderApplication } from '../render'
 import { makeTestServer, type TestServer } from '../server'
 import { createTestApplicationRuntime } from './application-runtime'
+import { runGit } from './git'
 
 export async function createGitCommitHarness(server: TestServer, caseId: number) {
   const second = await makeTestServer({ filesystemWatch: false })
@@ -51,11 +51,9 @@ export async function createGitCommitHarness(server: TestServer, caseId: number)
   })
   const cwd = join(server.root, 'repo')
   await mkdir(cwd)
-  execFileSync('git', ['init', '-b', 'main'], { cwd, stdio: 'pipe' })
-  execFileSync('git', ['config', 'user.name', 'Commit fixture'], { cwd })
-  execFileSync('git', ['config', 'user.email', 'commit@example.com'], { cwd })
+  runGit(cwd, ['init', '-b', 'main'], { cwdMode: 'option' })
   await writeFile(join(cwd, 'shared.txt'), 'A staged change\n')
-  execFileSync('git', ['add', 'shared.txt'], { cwd })
+  runGit(cwd, ['add', 'shared.txt'], { cwdMode: 'option' })
   const ownerA = application.getSnapshot().editor.gitStoreForRoot(filesystemPath('repo'))
   const view = renderApplication(
     <GitStoreProvider rootPath='repo'>

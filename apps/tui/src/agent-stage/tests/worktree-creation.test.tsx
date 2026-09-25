@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { unlink } from 'node:fs/promises'
 import { act } from 'react'
-import { orchestrationForApp } from 'server/testing'
+import { orchestrationForApp, runGit } from 'server/testing'
 import { createDraftSessionSubmission } from '@workspace/client-core/chat/commands'
 import { worktreeActionCommand } from '@workspace/client-core/chat/worktrees/commands'
 import { selectChatSessionById } from '@workspace/client-core/chat/selectors'
@@ -9,7 +9,7 @@ import { DEFAULT_PROVIDER_INSTANCE_ID } from '@workspace/contracts'
 import { test, expect } from '../../../test/fixtures'
 import { makeTestServer } from '../../../test/server'
 import { renderAgentStage } from '../../../test/factories/agent-stage'
-import { gitCommand, prepareGitWorkbench } from '../../../test/factories/git-workbench'
+import { prepareGitWorkbench } from '../../../test/factories/git-workbench'
 import { interruptWorktreeCreation } from '../../../test/factories/worktree-creation'
 import { conversationTurns } from '../../../test/factories/chat'
 import { draftsForStorage } from '@/agent-stage/state/drafts'
@@ -103,7 +103,7 @@ test('accepted creation failure retries the same session and turn from its saved
     expect(ready.storage.getItem(`agent.pending:${key}`)).toBeNull()
     stopInterrupting()
     await unlink(worktree.canonicalPath)
-    await gitCommand(server.root, 'commit', '-am', 'Move base after accepted creation')
+    await runGit(server.root, ['commit', '-am', 'Move base after accepted creation'])
     const retry = worktreeActionCommand('worktree.retry', worktree.id)
     expect(retry.commandId).not.toBe(worktree.lifecycle.operationId)
     await act(async () => {
@@ -118,7 +118,7 @@ test('accepted creation failure retries the same session and turn from its saved
       cwd: worktree.canonicalPath,
       messageText: 'Retry the accepted worktree',
     })
-    expect((await gitCommand(worktree.canonicalPath, 'rev-parse', 'HEAD')).trim()).toBe(
+    expect((await runGit(worktree.canonicalPath, ['rev-parse', 'HEAD'])).stdout.trim()).toBe(
       worktree.baseCommit,
     )
     expect(chat.getSnapshot().projection.worktreeById[worktree.id]?.lifecycle.state).toBe('ready')

@@ -36,6 +36,7 @@ import { requestGone } from '../../provider/structured-errors'
 import { checkpointRefForSessionTurn } from '../checkpoint-refs'
 
 import { testSettingsOptions } from '../../settings/testing'
+import { runGit } from '../../testing/git'
 
 const now = '2026-05-24T00:00:00.000Z'
 const later = '2026-05-24T00:01:00.000Z'
@@ -1189,8 +1190,6 @@ async function fixtureRoot() {
 
 async function initGitRepository(root: string) {
   await runGit(root, ['init'])
-  await runGit(root, ['config', 'user.email', 'test@example.com'])
-  await runGit(root, ['config', 'user.name', 'Test User'])
 }
 
 async function commitFile(root: string, content: string, message: string) {
@@ -1200,24 +1199,11 @@ async function commitFile(root: string, content: string, message: string) {
 }
 
 async function gitRefExists(root: string, ref: string) {
-  const result = await runGit(root, ['rev-parse', '--verify', '--quiet', `${ref}^{commit}`], true)
+  const result = await runGit(root, ['rev-parse', '--verify', '--quiet', `${ref}^{commit}`], {
+    allowFailure: true,
+  })
 
   return result.exitCode === 0
-}
-
-async function runGit(root: string, args: readonly string[], allowFailure = false) {
-  const process = Bun.spawn(['git', '-C', root].concat(args), {
-    stderr: 'pipe',
-    stdout: 'pipe',
-  })
-  const [stdout, stderr, exitCode] = await Promise.all([
-    new Response(process.stdout).text(),
-    new Response(process.stderr).text(),
-    process.exited,
-  ])
-  if (allowFailure || exitCode === 0) return { exitCode, stderr, stdout }
-
-  throw new TypeError(`${stderr}${stdout}`.trim())
 }
 
 async function postCommand(app: App, body: OrchestrationCommand) {

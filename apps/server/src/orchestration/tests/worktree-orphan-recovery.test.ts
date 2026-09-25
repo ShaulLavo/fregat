@@ -2,12 +2,12 @@ import { readFile, stat } from 'node:fs/promises'
 import path from 'node:path'
 import { afterEach, expect, test } from 'vitest'
 import { closeTestApps } from '../../../test/server'
-import { executeGit } from '../../../test/factories/orchestration'
 import {
   lifecycleWorktreeId,
   stopLifecycleEffects,
   worktreeLifecycleFixture,
 } from '../../../test/factories/worktree-lifecycle'
+import { runGit } from '../../testing/git'
 
 const fixtures: Awaited<ReturnType<typeof worktreeLifecycleFixture>>[] = []
 afterEach(async () => {
@@ -31,7 +31,9 @@ test.each(['id-derived', 'legacy'] as const)(
         ? path.join(path.dirname(prepared.absolutePath), 'legacy-checkout')
         : prepared.absolutePath
     if (pathKind === 'legacy')
-      await executeGit(fixture.root, 'worktree', 'move', prepared.absolutePath, target)
+      await runGit(fixture.root, ['worktree', 'move', prepared.absolutePath, target], {
+        cwdMode: 'option',
+      })
     await stopped.engine.close()
     await fixture.restart()
     const orphan = (await fixture.engine.shellSnapshot()).worktrees.find(
@@ -55,8 +57,12 @@ test.each(['id-derived', 'legacy'] as const)(
     await fixture.command({ type: 'worktree.cleanup', worktreeId: orphan.id })
     await fixture.engine.providerRuntimeIdle()
     await expect(stat(target)).rejects.toMatchObject({ code: 'ENOENT' })
-    expect(await executeGit(fixture.root, 'rev-parse', `refs/heads/${prepared.branch}`)).toBe(
-      prepared.baseCommit,
-    )
+    expect(
+      (
+        await runGit(fixture.root, ['rev-parse', `refs/heads/${prepared.branch}`], {
+          cwdMode: 'option',
+        })
+      ).stdout.trim(),
+    ).toBe(prepared.baseCommit)
   },
 )

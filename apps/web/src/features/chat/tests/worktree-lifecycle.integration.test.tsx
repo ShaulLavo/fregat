@@ -2,7 +2,7 @@ import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { orchestrationForApp } from 'server/testing'
+import { orchestrationForApp, runGit } from 'server/testing'
 import type { SessionId } from '@workspace/contracts'
 import { renderChatDraft } from '../../../../test/factories/chat-view'
 import { useChatInputDraftStore } from '@/features/chat/state/chat-input-draft-store'
@@ -12,7 +12,6 @@ import { useWorktreeManagerStore } from '@/features/chat-mode/state/worktree-man
 import { newWorktreeTarget } from '@/features/chat/utils/worktree-target'
 import { createWorktreeLifecycleHarness } from '../../../../test/factories/worktree-lifecycle'
 import { renderRailHarness } from '../../../../test/factories/rail-harness'
-import { executeDomainGit } from '../../../../test/factories/session-domain'
 import { expect, test } from '../../../../test/fixtures'
 import { renderWithProviders } from '../../../../test/render'
 
@@ -60,9 +59,13 @@ test('draft choices, shared chips and dirty worktree cleanup survive deletion an
   ).toBe(base.id)
   draft.unmount()
   created = null
-  const releaseCommit = await executeDomainGit(base.canonicalPath, 'rev-parse', 'HEAD')
-  await executeDomainGit(base.canonicalPath, 'branch', 'release')
-  await executeDomainGit(base.canonicalPath, 'commit', '--allow-empty', '-m', 'main moves on')
+  const releaseCommit = (
+    await runGit(base.canonicalPath, ['rev-parse', 'HEAD'], { cwdMode: 'option' })
+  ).stdout.trim()
+  await runGit(base.canonicalPath, ['branch', 'release'], { cwdMode: 'option' })
+  await runGit(base.canonicalPath, ['commit', '--allow-empty', '-m', 'main moves on'], {
+    cwdMode: 'option',
+  })
   drafts.setPrompt(draftTarget, 'Create a separate checkout')
   drafts.setModelSelection(draftTarget, {
     model: 'mock-model',
@@ -156,12 +159,11 @@ test('draft choices, shared chips and dirty worktree cleanup survive deletion an
     }),
   )
   expect(
-    await executeDomainGit(
-      harness.repository,
-      'show-ref',
-      '--verify',
-      `refs/heads/${managed.branch}`,
-    ),
+    (
+      await runGit(harness.repository, ['show-ref', '--verify', `refs/heads/${managed.branch}`], {
+        cwdMode: 'option',
+      })
+    ).stdout.trim(),
   ).toContain(managed.baseCommit)
   await act(async () => useWorktreeManagerStore.getState().closeManager())
   manager.unmount()
@@ -176,13 +178,10 @@ test('failed and missing zero-session checkouts remain actionable in the manager
   const sessionId = await harness.create(target)
   const managed = await harness.worktree(target.worktreeId)
   await harness.dispatch({ type: 'session.delete', commandId: 'delete-for-recovery', sessionId })
-  await executeDomainGit(
+  await runGit(
     harness.repository,
-    'worktree',
-    'lock',
-    '--reason',
-    'Test cleanup failure',
-    managed.canonicalPath,
+    ['worktree', 'lock', '--reason', 'Test cleanup failure', managed.canonicalPath],
+    { cwdMode: 'option' },
   )
   await harness.dispatch({
     type: 'worktree.cleanup',
@@ -196,13 +195,17 @@ test('failed and missing zero-session checkouts remain actionable in the manager
   useWorktreeManagerStore.getState().openManager(harness.projectRef)
   const manager = renderWithProviders(<WorktreeManager />)
   expect(await screen.findByText('Cleanup failed')).toBeInTheDocument()
-  await executeDomainGit(harness.repository, 'worktree', 'unlock', managed.canonicalPath)
+  await runGit(harness.repository, ['worktree', 'unlock', managed.canonicalPath], {
+    cwdMode: 'option',
+  })
   await userEvent.click(screen.getByRole('button', { name: 'Retain checkout' }))
   await waitFor(async () =>
     expect((await harness.worktree(managed.id)).lifecycle.state).toBe('ready'),
   )
   manager.unmount()
-  await executeDomainGit(harness.repository, 'worktree', 'remove', managed.canonicalPath)
+  await runGit(harness.repository, ['worktree', 'remove', managed.canonicalPath], {
+    cwdMode: 'option',
+  })
   await server.restart()
   useChatProjectionStore.getState().resetChatProjection()
   await harness.refresh()

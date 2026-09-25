@@ -18,8 +18,8 @@ import {
 } from '@/navigation/utils/address'
 import { test, expect } from '../../../test/fixtures'
 import { draftChatTurn } from '../../../test/factories/chat'
-import { gitCommand } from '../../../test/factories/git-workbench'
 import { openManagedTestChat } from '../../../test/factories/worktrees'
+import { runGit } from 'server/testing'
 
 const environmentId = v.parse(environmentIdSchema, '11111111-1111-4111-8111-111111111111')
 
@@ -43,7 +43,7 @@ test('chat addresses select the live checkout when a removed checkout path is re
     )
     await cleanupRequest()
     expect(chat.getSnapshot().projection.worktreeById[worktree.id]?.lifecycle.state).toBe('removed')
-    await gitCommand(repository, 'worktree', 'add', worktree.canonicalPath, worktree.branch)
+    await runGit(repository, ['worktree', 'add', worktree.canonicalPath, worktree.branch])
     const removedAddress = await resolveAddress(address, client, environmentId, session.signal)
     const liveId = await session.ensureWorktree(worktree.path)
     expect(liveId).not.toBe(worktree.id)

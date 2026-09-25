@@ -1,7 +1,6 @@
 import { getClient } from '@/lib/client'
 import { fileResource, filesystemPath } from '@/lib/documents/utils/identity'
 import type { GitComparison } from '@/lib/documents/utils/types'
-import { execFileSync } from 'node:child_process'
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
@@ -25,6 +24,7 @@ import {
   renderWithProviders,
 } from '../../../../../test/render'
 import { TEST_SESSION_ID } from '../../../../../test/factories/chat'
+import { runGit } from '../../../../../test/factories/git'
 
 // Real Git and routes verify historical text; the browser scenario checks painted syntax.
 
@@ -124,9 +124,9 @@ test('shows a comparison loader while the blob resolves', async ({ client, serve
 test('a rename with edits keeps both paths on the mapped file', async ({ client, server }) => {
   void client
   const repo = await initRepo(server.root)
-  git(repo, 'mv', 'lines.ts', 'renamed.ts')
+  runGit(repo, ['mv', 'lines.ts', 'renamed.ts'], { cwdMode: 'option' })
   await writeFile(path.join(repo, 'renamed.ts'), twoEditFile())
-  git(repo, 'add', '-A')
+  runGit(repo, ['add', '-A'], { cwdMode: 'option' })
   const diffs = await fetchDiff('repo/renamed.ts', true, undefined, getClient())
 
   const [file] = editorDiffFiles(diffs)
@@ -140,7 +140,7 @@ test('an added file maps with no old side', async ({ client, server }) => {
   void client
   const repo = await initRepo(server.root)
   await writeFile(path.join(repo, 'added.ts'), 'export const added = true\n')
-  git(repo, 'add', '-A')
+  runGit(repo, ['add', '-A'], { cwdMode: 'option' })
   const diffs = await fetchDiff('repo/added.ts', true, undefined, getClient())
 
   const [file] = editorDiffFiles(diffs)
@@ -155,8 +155,8 @@ test('a pure rename shows the file, with a line saying where it came from', asyn
 }) => {
   void client
   const repo = await initRepo(server.root)
-  git(repo, 'mv', 'lines.ts', 'renamed.ts')
-  git(repo, 'add', '-A')
+  runGit(repo, ['mv', 'lines.ts', 'renamed.ts'], { cwdMode: 'option' })
+  runGit(repo, ['add', '-A'], { cwdMode: 'option' })
   const diff = (await fetchDiff('repo/renamed.ts', true, undefined, getClient()))[0]!
 
   renderDiffView(
@@ -180,8 +180,8 @@ test('a pure rename carries the whole file, unchanged on both sides', async ({
 }) => {
   void client
   const repo = await initRepo(server.root)
-  git(repo, 'mv', 'lines.ts', 'renamed.ts')
-  git(repo, 'add', '-A')
+  runGit(repo, ['mv', 'lines.ts', 'renamed.ts'], { cwdMode: 'option' })
+  runGit(repo, ['add', '-A'], { cwdMode: 'option' })
   const diff = (await fetchDiff('repo/renamed.ts', true, undefined, getClient()))[0]!
 
   // What the pane itself fetches: the blob route, which is where an identical pair used to come
@@ -208,7 +208,9 @@ test('a binary file says so instead of rendering an empty pane', async ({ client
   void client
   const repo = await initRepo(server.root)
   await writeFile(path.join(repo, 'logo.png'), Buffer.from([0, 1, 2, 0, 3, 255, 0, 9]))
-  const objectId = git(repo, 'hash-object', '-w', 'logo.png').trim()
+  const objectId = runGit(repo, ['hash-object', '-w', 'logo.png'], {
+    cwdMode: 'option',
+  }).stdout.trim()
   const documentInfo = snapshotComparison({
     ...gitFileDiff({ path: 'repo/logo.png' }),
     newObjectId: objectId,
@@ -231,7 +233,7 @@ test('a document whose two sides are identical still shows the file', async ({
 }) => {
   void client
   const repo = await initRepo(server.root)
-  const objectId = git(repo, 'rev-parse', 'HEAD:lines.ts').trim()
+  const objectId = runGit(repo, ['rev-parse', 'HEAD:lines.ts'], { cwdMode: 'option' }).stdout.trim()
   const documentInfo = snapshotComparison({
     ...gitFileDiff({ oldObjectId: objectId, path: 'repo/lines.ts' }),
     newObjectId: objectId,
@@ -264,16 +266,10 @@ function twoEditFile() {
 async function initRepo(root: string) {
   const repo = path.join(root, 'repo')
   await mkdir(repo, { recursive: true })
-  git(repo, 'init', '-b', 'main')
-  git(repo, 'config', 'user.email', 'test@example.com')
-  git(repo, 'config', 'user.name', 'Test')
+  runGit(repo, ['init', '-b', 'main'], { cwdMode: 'option' })
   await writeFile(path.join(repo, 'lines.ts'), `${FORTY_LINES}\n`)
-  git(repo, 'add', 'lines.ts')
-  git(repo, 'commit', '-m', 'init')
+  runGit(repo, ['add', 'lines.ts'], { cwdMode: 'option' })
+  runGit(repo, ['commit', '-m', 'init'], { cwdMode: 'option' })
 
   return repo
-}
-
-function git(cwd: string, ...args: string[]) {
-  return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: 'pipe' })
 }

@@ -1,4 +1,5 @@
 import { defineConfig } from 'vitest/config'
+import { gitFixtureEnv } from './src/testing/git-identity'
 
 // Bun-native server: must run under the Bun runtime (`bun --bun vitest`) so
 // bun:sqlite and Bun.spawn resolve. Tests drive the real app via `app.handle`
@@ -6,6 +7,7 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   test: {
     include: ['src/**/*.test.ts'],
+    env: gitFixtureEnv,
     // The suite spawns real processes (git, PTYs, LSP servers); cold spawns
     // under parallel load blow Vitest's 5s default. Server project only —
     // web and packages keep the default. Raised from 15s after the read-model

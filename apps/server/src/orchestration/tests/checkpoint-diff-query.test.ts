@@ -23,6 +23,7 @@ import { GitService } from '../../git/service'
 import { OrchestrationEngine } from '../engine'
 import { OrchestrationCheckpointDiffQuery } from '../checkpoint-diff-query'
 import { checkpointRefForSessionTurn } from '../checkpoint-refs'
+import { runGit } from '../../testing/git'
 
 const now = '2026-05-29T00:00:00.000Z'
 const modelSelection = {
@@ -225,21 +226,4 @@ async function fixtureRoot() {
 
 async function initGitRepository(root: string) {
   await runGit(root, ['init'])
-  await runGit(root, ['config', 'user.email', 'test@example.com'])
-  await runGit(root, ['config', 'user.name', 'Test User'])
-}
-
-async function runGit(root: string, args: readonly string[]) {
-  const process = Bun.spawn(['git', '-C', root].concat(args), {
-    stderr: 'pipe',
-    stdout: 'pipe',
-  })
-  const [stdout, stderr, exitCode] = await Promise.all([
-    new Response(process.stdout).text(),
-    new Response(process.stderr).text(),
-    process.exited,
-  ])
-  if (exitCode === 0) return { stderr, stdout }
-
-  throw new TypeError(`${stderr}${stdout}`.trim())
 }

@@ -8,9 +8,9 @@ import {
   createDraftSessionSubmission,
   createSessionDeleteCommand,
 } from '@workspace/client-core/chat/commands'
-import { orchestrationForApp } from 'server/testing'
+import { orchestrationForApp, runGit } from 'server/testing'
 import { openTestChat } from './chat'
-import { prepareGitWorkbench, gitCommand } from './git-workbench'
+import { prepareGitWorkbench } from './git-workbench'
 import type { TestServer } from '../server'
 import type { renderTui } from '../render'
 
@@ -19,8 +19,8 @@ export async function openManagedTestChat(server: TestServer) {
   await mkdir(repository)
   await prepareGitWorkbench(repository)
   await writeFile(`${repository}/.gitignore`, 'ignored.txt\n')
-  await gitCommand(repository, 'add', '.gitignore')
-  await gitCommand(repository, 'commit', '-qm', 'Ignore generated files')
+  await runGit(repository, ['add', '.gitignore'])
+  await runGit(repository, ['commit', '-qm', 'Ignore generated files'])
   const { session, chat } = await openTestChat(server)
   const baseId = await session.ensureWorktree('main')
   const worktreeId = v.parse(worktreeIdSchema, crypto.randomUUID())

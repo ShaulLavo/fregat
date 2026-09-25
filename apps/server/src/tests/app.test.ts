@@ -13,6 +13,7 @@ import {
   nodeWorkspaceEditFileSystemDriver,
   type WorkspaceEditFileSystemDriver,
 } from '../fs/workspace-edit-journal'
+import { runGit } from '../testing/git'
 
 const TRUSTED_ORIGIN = 'http://localhost:5173'
 const roots: string[] = []
@@ -1617,23 +1618,6 @@ async function fixtureRoot() {
 
 async function initGitRepository(root: string) {
   await runGit(root, ['init'])
-  await runGit(root, ['config', 'user.email', 'test@example.com'])
-  await runGit(root, ['config', 'user.name', 'Test User'])
-}
-
-async function runGit(root: string, args: readonly string[]) {
-  const process = Bun.spawn(['git', '-C', root].concat(args), {
-    stderr: 'pipe',
-    stdout: 'pipe',
-  })
-  const [stdout, stderr, exitCode] = await Promise.all([
-    new Response(process.stdout).text(),
-    new Response(process.stderr).text(),
-    process.exited,
-  ])
-  if (exitCode === 0) return { stderr, stdout }
-
-  throw new Error(`${stderr}${stdout}`.trim())
 }
 
 function trustedOriginHeaders(headers: HeadersInit = {}) {

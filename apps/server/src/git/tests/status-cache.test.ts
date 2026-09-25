@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { DEFAULT_MAX_TEXT_FILE_BYTES } from '../../fs/limits'
 import { createWorkspacePaths } from '../../fs/path'
 import { GitService } from '../service'
+import { runGit } from '../../testing/git'
 
 const roots: string[] = []
 
@@ -121,24 +122,10 @@ async function fixtureRepo() {
   const root = await mkdtemp(path.join(tmpdir(), 'platform-git-cache-'))
   roots.push(root)
   await runGit(root, ['init', '-b', 'main'])
-  await runGit(root, ['config', 'user.email', 'test@example.com'])
-  await runGit(root, ['config', 'user.name', 'Test User'])
   await writeFile(path.join(root, 'tracked.txt'), 'one\n')
   await runGit(root, ['add', 'tracked.txt'])
   await runGit(root, ['commit', '-m', 'initial'])
   return root
-}
-
-async function runGit(root: string, args: readonly string[]) {
-  const child = Bun.spawn(['git', '-C', root].concat(args), { stderr: 'pipe', stdout: 'pipe' })
-  const [stdout, stderr, exitCode] = await Promise.all([
-    new Response(child.stdout).text(),
-    new Response(child.stderr).text(),
-    child.exited,
-  ])
-  if (exitCode === 0) return { stderr, stdout }
-
-  throw new Error(`${stderr}${stdout}`.trim())
 }
 
 function manualClock() {

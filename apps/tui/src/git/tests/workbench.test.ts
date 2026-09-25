@@ -1,5 +1,5 @@
 import { test, expect } from '../../../test/fixtures'
-import { prepareGitWorkbench, gitCommand } from '../../../test/factories/git-workbench'
+import { prepareGitWorkbench } from '../../../test/factories/git-workbench'
 import { createGitWorkbench } from '@/git/state/workbench'
 import {
   createSplitProjection,
@@ -9,6 +9,7 @@ import {
 import { gitRows } from '@/git/utils/rows'
 import { createControlledInProcessTransport } from '../../../test/client'
 import { createEnvironmentClient } from '@workspace/client-core/transport/client'
+import { runGit } from 'server/testing'
 
 test('status, expandable whole-file diff, stage, unstage, and streaming commit use the real repository', async ({
   server,
@@ -38,12 +39,14 @@ test('status, expandable whole-file diff, stage, unstage, and streaming commit u
     expect(expanded.leftRows.length).toBe(expanded.rightRows.length)
     expect(expanded.leftRows.some((row) => row.text === 'line 1')).toBe(true)
     expect(await store.stage('sample.txt')).toBe(true)
-    expect(await gitCommand(server.root, 'diff', '--cached', '--name-only')).toContain('sample.txt')
+    expect((await runGit(server.root, ['diff', '--cached', '--name-only'])).stdout).toContain(
+      'sample.txt',
+    )
     expect(await store.unstage('sample.txt')).toBe(true)
-    expect(await gitCommand(server.root, 'diff', '--cached', '--name-only')).toBe('')
+    expect((await runGit(server.root, ['diff', '--cached', '--name-only'])).stdout).toBe('')
     await store.stage('sample.txt')
     expect(await store.commit('TUI commit fixture')).toBe(true)
-    expect(await gitCommand(server.root, 'log', '-1', '--format=%s')).toContain(
+    expect((await runGit(server.root, ['log', '-1', '--format=%s'])).stdout).toContain(
       'TUI commit fixture',
     )
     expect(store.getSnapshot().message).toBe('Committed staged changes.')
@@ -95,7 +98,7 @@ test.for(['discard', 'refresh'])(
         listing: { kind: 'ready', data: { files: [] } },
         diff: { kind: 'empty' },
       })
-      expect(await gitCommand(server.root, 'diff', '--name-only')).toBe('')
+      expect((await runGit(server.root, ['diff', '--name-only'])).stdout).toBe('')
     } finally {
       gate.release()
       store.dispose()

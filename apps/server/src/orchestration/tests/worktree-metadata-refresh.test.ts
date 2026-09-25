@@ -2,11 +2,11 @@ import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { afterEach, expect, test } from 'vitest'
 import { closeTestApps } from '../../../test/server'
-import { executeGit } from '../../../test/factories/orchestration'
 import {
   lifecycleWorktreeId,
   worktreeLifecycleFixture,
 } from '../../../test/factories/worktree-lifecycle'
+import { runGit } from '../../testing/git'
 
 const fixtures: Awaited<ReturnType<typeof worktreeLifecycleFixture>>[] = []
 afterEach(async () => {
@@ -23,7 +23,7 @@ test('status records external A to B to A changes and Platform Git mutations ref
   let expectedVersion = worktree.metadataVersion
   for (const branch of branches) {
     if (!branch) throw new TypeError('Missing branch')
-    await executeGit(worktree.canonicalPath, 'branch', '-m', branch)
+    await runGit(worktree.canonicalPath, ['branch', '-m', branch], { cwdMode: 'option' })
     const response = await fixture.app.handle(
       new Request(`http://localhost/git/status?path=${encodeURIComponent(worktree.path)}`, {
         headers: { origin: 'http://localhost:5173' },
@@ -63,15 +63,14 @@ test('branch diff uses the accepted fork commit after the base advances and the 
   fixtures.push(fixture)
   const worktree = await fixture.create()
   await writeFile(path.join(fixture.root, 'tracked.txt'), 'base advanced\n')
-  await executeGit(fixture.root, 'commit', '-am', 'advance base')
+  await runGit(fixture.root, ['commit', '-am', 'advance base'], { cwdMode: 'option' })
   await writeFile(path.join(worktree.canonicalPath, 'tracked.txt'), 'isolated change\n')
-  await executeGit(worktree.canonicalPath, 'commit', '-am', 'isolated change')
-  await executeGit(worktree.canonicalPath, 'branch', '-m', 'renamed-worktree')
-  await executeGit(
+  await runGit(worktree.canonicalPath, ['commit', '-am', 'isolated change'], { cwdMode: 'option' })
+  await runGit(worktree.canonicalPath, ['branch', '-m', 'renamed-worktree'], { cwdMode: 'option' })
+  await runGit(
     worktree.canonicalPath,
-    'config',
-    'branch.renamed-worktree.platform-base',
-    'HEAD',
+    ['config', 'branch.renamed-worktree.platform-base', 'HEAD'],
+    { cwdMode: 'option' },
   )
   const response = await fixture.app.handle(
     new Request(

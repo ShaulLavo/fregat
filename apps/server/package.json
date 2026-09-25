@@ -13,6 +13,10 @@
     "./testing": {
       "types": "./src/testing.ts",
       "default": "./src/testing.ts"
+    },
+    "./testing/git-identity": {
+      "types": "./src/testing/git-identity.ts",
+      "default": "./src/testing/git-identity.ts"
     }
   },
   "scripts": {

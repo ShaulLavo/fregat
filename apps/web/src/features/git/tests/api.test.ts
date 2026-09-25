@@ -2,13 +2,13 @@ import { activeServerOrigin, getClient, setActiveServerOrigin } from '@/lib/clie
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
 import { createEnvironmentEntry } from '@workspace/client-core/environments/utils/connection'
 import { environmentIdSchema } from '@workspace/contracts'
-import { execFileSync } from 'node:child_process'
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import * as v from 'valibot'
 import { describe } from 'vitest'
 
 import { recordClientLog } from '../../../../test/factories/client-log'
+import { runGit } from '../../../../test/factories/git'
 import { expect, test } from '../../../../test/fixtures'
 import * as api from '@/features/git/utils/api'
 
@@ -19,21 +19,17 @@ import * as api from '@/features/git/utils/api'
 async function initRepo(root: string) {
   const repo = path.join(root, 'repo')
   await mkdir(repo, { recursive: true })
-  const git = (...args: string[]) => execFileSync('git', args, { cwd: repo, stdio: 'pipe' })
-  git('init', '-b', 'main')
-  git('config', 'user.email', 'test@example.com')
-  git('config', 'user.name', 'Test')
+  runGit(repo, ['init', '-b', 'main'], { cwdMode: 'option' })
   await writeFile(path.join(repo, 'a.ts'), 'export const a = 1\n')
-  git('add', 'a.ts')
-  git('commit', '-m', 'init')
+  runGit(repo, ['add', 'a.ts'], { cwdMode: 'option' })
+  runGit(repo, ['commit', '-m', 'init'], { cwdMode: 'option' })
   return repo
 }
 
 function addUpstream(root: string, repo: string) {
-  execFileSync('git', ['init', '--bare', '-b', 'main', 'remote.git'], { cwd: root, stdio: 'pipe' })
-  const git = (...args: string[]) => execFileSync('git', args, { cwd: repo, stdio: 'pipe' })
-  git('remote', 'add', 'origin', path.join(root, 'remote.git'))
-  git('push', '-u', 'origin', 'main')
+  runGit(root, ['init', '--bare', '-b', 'main', 'remote.git'], { cwdMode: 'option' })
+  runGit(repo, ['remote', 'add', 'origin', path.join(root, 'remote.git')], { cwdMode: 'option' })
+  runGit(repo, ['push', '-u', 'origin', 'main'], { cwdMode: 'option' })
 }
 
 describe('git api against the real server', () => {

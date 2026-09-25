@@ -18,6 +18,7 @@ export type { WorkspaceEditFileSystemDriver } from './fs/workspace-edit-journal'
 export type { MetadataDatabaseHandle, PlatformDatabase } from './db/client'
 
 export { testSettingsOptions, type TestSettingsOverrides } from './settings/testing'
+export { runGit, type GitRunOptions, type GitRunResult } from './testing/git'
 
 export { OrchestrationEventStore } from './orchestration/event-store'
 export { ProviderRuntimeIngestion } from './orchestration/provider-runtime-ingestion'

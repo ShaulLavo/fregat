@@ -1,10 +1,10 @@
 import { mkdir, writeFile } from 'node:fs/promises'
-import { execFileSync } from 'node:child_process'
 import path from 'node:path'
 import { workspaceToken } from '@workspace/client-core/address/workspace'
 import type { Client } from '@/lib/client'
 import type { TestServer } from '../server'
 import { registerTestWorkspaceAddress } from './workspace-address'
+import { runGit } from './git'
 
 export async function navigationWorkspace(client: Client, server: TestServer) {
   const rootPath = 'repo'
@@ -20,10 +20,8 @@ export async function navigationWorkspace(client: Client, server: TestServer) {
 
 export async function initializeNavigationGitWorkspace(server: TestServer) {
   const cwd = path.join(server.root, 'repo')
-  execFileSync('git', ['init', '-b', 'main'], { cwd, stdio: 'pipe' })
-  execFileSync('git', ['config', 'user.name', 'Navigation fixture'], { cwd })
-  execFileSync('git', ['config', 'user.email', 'navigation@example.com'], { cwd })
-  execFileSync('git', ['add', '.'], { cwd })
-  execFileSync('git', ['commit', '-m', 'Initial files'], { cwd, stdio: 'pipe' })
+  runGit(cwd, ['init', '-b', 'main'], { cwdMode: 'option' })
+  runGit(cwd, ['add', '.'], { cwdMode: 'option' })
+  runGit(cwd, ['commit', '-m', 'Initial files'], { cwdMode: 'option' })
   await writeFile(path.join(cwd, 'a.ts'), 'export const changed = true\n')
 }

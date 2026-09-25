@@ -1,3 +1,4 @@
+import { gitFixtureEnv } from 'server/testing/git-identity'
 import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
@@ -9,6 +10,7 @@ export default defineConfig({
     name: 'node',
     environment: 'node',
     include: ['src/**/*.test.{ts,tsx}'],
+    env: gitFixtureEnv,
     testTimeout: 15_000,
     // Real PTYs, sockets and spawned children; Vitest's 1s poll default is a CI flake.
     expect: { poll: { timeout: 10_000 } },

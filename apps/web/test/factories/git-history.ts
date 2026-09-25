@@ -1,16 +1,13 @@
-import { execFileSync } from 'node:child_process'
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { GitHistoryCommit } from '@workspace/contracts'
+import { runGit } from './git'
 
 export async function historyRepository(root: string) {
   const directory = path.join(root, 'history-repo')
   await mkdir(directory, { recursive: true })
-  const git = (...args: string[]) =>
-    execFileSync('git', args, { cwd: directory, encoding: 'utf8', stdio: 'pipe' }).trimEnd()
+  const git = (...args: string[]) => runGit(directory, args, { cwdMode: 'option' }).stdout.trimEnd()
   git('init', '-b', 'main')
-  git('config', 'user.email', 'history@example.com')
-  git('config', 'user.name', 'History Test')
   git('config', 'commit.gpgsign', 'false')
   git('config', 'core.hooksPath', '/dev/null')
   const write = async (name: string, content: string) => {

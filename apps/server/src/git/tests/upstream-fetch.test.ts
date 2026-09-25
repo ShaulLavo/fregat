@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { runGit } from '../../../test/factories/git-worktree'
+import { runGit } from '../../testing/git'
 import { FsError } from '../../fs/errors'
 import { gitCommonDirectory } from '../repository-lane'
 import { parseUpstreamRemote, UpstreamFetchScheduler } from '../upstream-fetch'
@@ -90,7 +90,9 @@ describe('UpstreamFetchScheduler', () => {
         resolveCommonDir: (rootAbsolutePath) =>
           gitCommonDirectory({
             rootAbsolutePath,
-            run: async (args) => ({ stdout: await runGit(rootAbsolutePath, args) }),
+            run: async (args) => ({
+              stdout: (await runGit(rootAbsolutePath, args)).stdout.trimEnd(),
+            }),
           }),
         runFetch: async (fetchRoot) => {
           fetches.push(fetchRoot)

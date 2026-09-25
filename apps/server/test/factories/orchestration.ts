@@ -97,17 +97,6 @@ export function mockRuntime(adapter = new MockProviderAdapter()) {
   return { adapterRegistry: new ProviderAdapterRegistry({ adapters: [adapter] }) }
 }
 
-export async function executeGit(cwd: string, ...args: string[]) {
-  const child = Bun.spawn(['git', ...args], { cwd, stdout: 'pipe', stderr: 'pipe' })
-  const [stdout, stderr, code] = await Promise.all([
-    new Response(child.stdout).text(),
-    new Response(child.stderr).text(),
-    child.exited,
-  ])
-  if (code !== 0) throw new TypeError(`Git fixture failed: ${stderr}`)
-  return stdout.trim()
-}
-
 export async function sessionFrom(
   fixture: Awaited<ReturnType<typeof createOrchestrationFixture>>,
   sessionId: string = FIXTURE_SESSION_ID,

@@ -11,7 +11,7 @@ import {
   chooseWorktreeOption,
   readWorktreeDescription,
 } from '../../../test/factories/worktrees'
-import { gitCommand } from '../../../test/factories/git-workbench'
+import { runGit } from 'server/testing'
 
 test('compact worktree dialogs keep selected actions visible and their full safety details readable', async ({
   server,
@@ -166,7 +166,7 @@ test('worktree manager survives the last session and confirms safe and dirty cle
       .toBe('removed')
     await expect(access(worktree.canonicalPath)).rejects.toThrow()
     expect(
-      await gitCommand(repository, 'show-ref', '--verify', `refs/heads/${worktree.branch}`),
+      (await runGit(repository, ['show-ref', '--verify', `refs/heads/${worktree.branch}`])).stdout,
     ).toContain(worktree.baseCommit)
     await frame.renderOnce()
     expect(frame.captureCharFrame()).toContain('Checkout removed')
@@ -202,7 +202,7 @@ test('an async checkout opening failure stays visible in the worktree manager', 
     await expect.poll(() => frame.renderer.currentFocusedRenderable?.id).toBe('agent-composer')
     await runPaletteCommand(frame, 'chat.manageWorktrees')
     await chooseWorktreeOption(frame, worktree.branch ?? worktree.id)
-    await gitCommand(repository, 'worktree', 'remove', worktree.canonicalPath)
+    await runGit(repository, ['worktree', 'remove', worktree.canonicalPath])
     await chooseWorktreeOption(frame, 'Open checkout')
     await expect
       .poll(async () => {

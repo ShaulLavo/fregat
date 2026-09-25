@@ -25,9 +25,9 @@ import {
   DOMAIN_TIME,
   TERMINAL_SESSION,
   MetadataProviderAdapter,
-  executeDomainGit,
   makeSessionDomainFixture,
 } from '../../../../test/factories/session-domain'
+import { runGit } from 'server/testing'
 
 test('registration receipts survive reconstruction, including a no-event registration with an unavailable path', async () => {
   const fixture = await makeSessionDomainFixture()
@@ -176,14 +176,10 @@ test('restart catches up before readiness, imports terminal history, and converg
     expect(new Set(recoveries.map((event) => event.commandId)).size).toBe(2)
 
     const clone = path.join(second.root, 'clone')
-    await executeDomainGit(second.root, 'clone', fixture.main, clone)
-    await executeDomainGit(
-      clone,
-      'remote',
-      'set-url',
-      'origin',
-      'https://github.com/OpenAI/Platform.git',
-    )
+    await runGit(second.root, ['clone', fixture.main, clone], { cwdMode: 'option' })
+    await runGit(clone, ['remote', 'set-url', 'origin', 'https://github.com/OpenAI/Platform.git'], {
+      cwdMode: 'option',
+    })
     const clientB = createInProcessClient(second)
     const response = await clientB.orchestration.commands.post({
       type: 'project.create',

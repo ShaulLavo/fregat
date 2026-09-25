@@ -1,4 +1,3 @@
-import { execFileSync } from 'node:child_process'
 import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
@@ -16,6 +15,7 @@ import { createInProcessClient } from '../../../../../test/client'
 import { expect, test } from '../../../../../test/fixtures'
 import { createTestQueryClient, renderHookWithProviders } from '../../../../../test/render'
 import { makeTestServer } from '../../../../../test/server'
+import { runGit } from '../../../../../test/factories/git'
 
 test('a queued Git mutation resumes on its owning server after the active server switches', async ({
   client,
@@ -25,7 +25,7 @@ test('a queued Git mutation resumes on its owning server after the active server
   const secondServer = await makeTestServer({ filesystemWatch: false })
   const secondClient = createInProcessClient(secondServer)
   for (const root of [server.root, secondServer.root]) {
-    execFileSync('git', ['init', '-b', 'main'], { cwd: root, stdio: 'pipe' })
+    runGit(root, ['init', '-b', 'main'], { cwdMode: 'option' })
     await writeFile(path.join(root, 'shared.txt'), 'belongs to this checkout\n')
   }
 
@@ -48,16 +48,12 @@ test('a queued Git mutation resumes on its owning server after the active server
     })
 
     expect(
-      execFileSync('git', ['diff', '--cached', '--name-only'], {
-        cwd: server.root,
-        encoding: 'utf8',
-      }).trim(),
+      runGit(server.root, ['diff', '--cached', '--name-only'], { cwdMode: 'option' }).stdout.trim(),
     ).toBe('shared.txt')
     expect(
-      execFileSync('git', ['diff', '--cached', '--name-only'], {
-        cwd: secondServer.root,
-        encoding: 'utf8',
-      }).trim(),
+      runGit(secondServer.root, ['diff', '--cached', '--name-only'], {
+        cwdMode: 'option',
+      }).stdout.trim(),
     ).toBe('')
   } finally {
     unmount()

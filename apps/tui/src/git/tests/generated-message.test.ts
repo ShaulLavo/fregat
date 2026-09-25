@@ -1,8 +1,8 @@
-import { MockProviderAdapter } from 'server/testing'
+import { MockProviderAdapter, runGit } from 'server/testing'
 import { test, expect } from '../../../test/fixtures'
 import { makeTestServer } from '../../../test/server'
 import { createInProcessClient } from '../../../test/client'
-import { prepareGitWorkbench, gitCommand } from '../../../test/factories/git-workbench'
+import { prepareGitWorkbench } from '../../../test/factories/git-workbench'
 import { createGitWorkbench } from '@/git/state/workbench'
 
 test('generated commit message uses the provider route and leaves changes uncommitted', async () => {
@@ -26,7 +26,9 @@ test('generated commit message uses the provider route and leaves changes uncomm
     expect(await store.generateMessage(), store.getSnapshot().message).toBe(
       'Describe the fixture change',
     )
-    expect(await gitCommand(server.root, 'log', '-1', '--format=%s')).toContain('Initial fixture')
+    expect((await runGit(server.root, ['log', '-1', '--format=%s'])).stdout).toContain(
+      'Initial fixture',
+    )
     expect(store.getSnapshot().busy).toBe(false)
   } finally {
     store.dispose()

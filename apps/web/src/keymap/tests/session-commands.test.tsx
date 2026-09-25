@@ -13,7 +13,6 @@ import {
 } from '@/keymap/types'
 import { createRailHarness } from '../../../test/factories/rail-harness'
 import { createWorktreeLifecycleHarness } from '../../../test/factories/worktree-lifecycle'
-import { executeDomainGit } from '../../../test/factories/session-domain'
 import { newWorktreeTarget } from '@/features/chat/utils/worktree-target'
 import { createDraftSessionSubmission } from '@workspace/client-core/chat/commands'
 import { createProjectRegistrationCommand } from '@workspace/client-core/chat/registration'
@@ -24,6 +23,7 @@ import { getNavigation } from '@/state/navigation-binding'
 import { currentRailEnvironments } from '@/features/chat-mode/state/rail-environments'
 import { sessionRailModel } from '@workspace/client-core/chat/rail/model'
 import type { ProjectId } from '@workspace/contracts'
+import { runGit } from 'server/testing'
 test('every session command is reachable from the keyboard', () => {
   const bound = boundCommands()
 
@@ -153,7 +153,7 @@ test('an active-session draft preserves its missing checkout identity while open
   const target = newWorktreeTarget(h.worktreeId)
   const sessionId = await h.create(target)
   const worktree = await h.worktree(target.worktreeId)
-  await executeDomainGit(h.repository, 'worktree', 'remove', worktree.canonicalPath)
+  await runGit(h.repository, ['worktree', 'remove', worktree.canonicalPath], { cwdMode: 'option' })
   await server.restart()
   await h.refresh()
   expect((await h.worktree(target.worktreeId)).lifecycle.state).toBe('missing')

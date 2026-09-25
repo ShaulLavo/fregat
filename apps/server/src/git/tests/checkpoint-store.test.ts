@@ -6,6 +6,7 @@ import { DEFAULT_MAX_TEXT_FILE_BYTES } from '../../fs/limits'
 import { createWorkspacePaths } from '../../fs/path'
 import { GitCheckpointStore } from '../checkpoint-store'
 import { GitService } from '../service'
+import { runGit } from '../../testing/git'
 
 const roots: string[] = []
 
@@ -238,8 +239,6 @@ async function emptyRepo() {
   const root = await mkdtemp(path.join(tmpdir(), 'platform-git-checkpoint-'))
   roots.push(root)
   await runGit(root, ['init', '-b', 'main'])
-  await runGit(root, ['config', 'user.email', 'test@example.com'])
-  await runGit(root, ['config', 'user.name', 'Test User'])
   return root
 }
 
@@ -250,16 +249,4 @@ async function fixtureRepo() {
   await runGit(root, ['add', '.'])
   await runGit(root, ['commit', '-m', 'initial'])
   return root
-}
-
-async function runGit(root: string, args: readonly string[]) {
-  const child = Bun.spawn(['git', '-C', root].concat(args), { stderr: 'pipe', stdout: 'pipe' })
-  const [stdout, stderr, exitCode] = await Promise.all([
-    new Response(child.stdout).text(),
-    new Response(child.stderr).text(),
-    child.exited,
-  ])
-  if (exitCode === 0) return { stderr, stdout }
-
-  throw new Error(`git ${args.join(' ')} failed: ${stderr}${stdout}`.trim())
 }

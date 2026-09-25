@@ -7,6 +7,7 @@ import { useProjectMenuEntries } from '@/features/workbench/hooks/use-project-me
 import { ensureFolderPath } from '@/lib/file-server'
 import { expect, test } from '../../../../test/fixtures'
 import { renderHookWithProviders } from '../../../../test/render'
+import { runGit } from '../../../../test/factories/git'
 
 test('merges chat-only aliases with recent folders using their canonical roots', async ({
   client,
@@ -73,11 +74,11 @@ test('nests a linked worktree under its repository with its branch', async ({ cl
   void client
   await ensureFolderPath(filesystemPath('projects/platform'), getClient())
   const repo = path.join(server.root, 'projects/platform')
-  const git = (...args: string[]) =>
-    Bun.spawn(['git', '-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { cwd: repo }).exited
-  await git('init', '-b', 'main')
-  await git('commit', '--allow-empty', '-m', 'init')
-  await git('worktree', 'add', path.join(server.root, 'worktrees/t07'), '-b', 'task/t07')
+  runGit(repo, ['init', '-b', 'main'], { cwdMode: 'option' })
+  runGit(repo, ['commit', '--allow-empty', '-m', 'init'], { cwdMode: 'option' })
+  runGit(repo, ['worktree', 'add', path.join(server.root, 'worktrees/t07'), '-b', 'task/t07'], {
+    cwdMode: 'option',
+  })
 
   const { result } = renderHookWithProviders(() =>
     useProjectMenuEntries({

@@ -1,4 +1,3 @@
-import { execFileSync } from 'node:child_process'
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
@@ -8,6 +7,7 @@ import userEvent from '@testing-library/user-event'
 import { BranchActions } from '@/features/git/components/branch-actions'
 import { expect, test } from '../../../../../test/fixtures'
 import { renderWithProviders } from '../../../../../test/render'
+import { runGit } from '../../../../../test/factories/git'
 
 // Real git and the real route. `gh` is whatever the machine has, which is the
 // point of the second test: these fixtures have no GitHub remote, so the
@@ -19,7 +19,7 @@ test('offers to publish a branch that has no upstream, and pushes it', async ({
 }) => {
   void client
   const { origin, repo } = await clonedRepo(server.root)
-  git(repo, 'checkout', '-b', 'feature/login')
+  runGit(repo, ['checkout', '-b', 'feature/login'], { cwdMode: 'option' })
 
   renderWithProviders(<BranchActions pullRequestTitle='Add login' rootPath='repo' />)
 
@@ -29,7 +29,9 @@ test('offers to publish a branch that has no upstream, and pushes it', async ({
 
   await waitFor(
     () => {
-      expect(git(origin, 'branch', '--format', '%(refname:short)')).toContain('feature/login')
+      expect(
+        runGit(origin, ['branch', '--format', '%(refname:short)'], { cwdMode: 'option' }).stdout,
+      ).toContain('feature/login')
     },
     { timeout: 10_000 },
   )
@@ -39,7 +41,7 @@ test('never offers a pull request when GitHub could not be asked', async ({ clie
   void client
   const { repo } = await clonedRepo(server.root)
   await writeFile(path.join(repo, 'readme.md'), 'two\n')
-  git(repo, 'commit', '-am', 'edit')
+  runGit(repo, ['commit', '-am', 'edit'], { cwdMode: 'option' })
 
   renderWithProviders(<BranchActions pullRequestTitle='Add login' rootPath='repo' />)
 
@@ -52,22 +54,16 @@ test('never offers a pull request when GitHub could not be asked', async ({ clie
 async function clonedRepo(root: string) {
   const origin = path.join(root, 'origin.git')
   await mkdir(origin, { recursive: true })
-  git(origin, 'init', '--bare', '-b', 'main')
+  runGit(origin, ['init', '--bare', '-b', 'main'], { cwdMode: 'option' })
 
   const repo = path.join(root, 'repo')
   await mkdir(repo, { recursive: true })
-  git(repo, 'init', '-b', 'main')
-  git(repo, 'config', 'user.email', 'test@example.com')
-  git(repo, 'config', 'user.name', 'Test')
+  runGit(repo, ['init', '-b', 'main'], { cwdMode: 'option' })
   await writeFile(path.join(repo, 'readme.md'), 'one\n')
-  git(repo, 'add', 'readme.md')
-  git(repo, 'commit', '-m', 'init')
-  git(repo, 'remote', 'add', 'origin', origin)
-  git(repo, 'push', '-u', 'origin', 'main')
+  runGit(repo, ['add', 'readme.md'], { cwdMode: 'option' })
+  runGit(repo, ['commit', '-m', 'init'], { cwdMode: 'option' })
+  runGit(repo, ['remote', 'add', 'origin', origin], { cwdMode: 'option' })
+  runGit(repo, ['push', '-u', 'origin', 'main'], { cwdMode: 'option' })
 
   return { origin, repo }
-}
-
-function git(cwd: string, ...args: string[]) {
-  return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: 'pipe' })
 }

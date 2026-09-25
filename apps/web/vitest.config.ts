@@ -1,5 +1,6 @@
 import path from 'node:path'
 import react from '@vitejs/plugin-react'
+import { gitFixtureEnv } from 'server/testing/git-identity'
 import { defineConfig } from 'vitest/config'
 
 // Shared resolution so every project reads the same `@/` paths as the app.
@@ -14,6 +15,7 @@ const reactPlugin = () => react({ compiler: true })
 // `VITE_SERVER_URL` rewrite the server URL for these projects too.
 export default defineConfig({
   test: {
+    env: gitFixtureEnv,
     projects: [
       {
         // Pure logic + anything that talks to the in-process server. No DOM.

@@ -18,6 +18,7 @@ import {
   MockProviderAdapter,
   OrchestrationEventStore,
   orchestrationForApp,
+  runGit,
   type ProviderDiscoveredSession,
   type ProviderSessionDiscoveryInput,
 } from 'server/testing'
@@ -74,21 +75,14 @@ export async function makeSessionDomainFixture(options: { providerRuntime?: bool
   const main = path.join(server.root, 'main')
   const linked = path.join(server.root, 'linked')
   await mkdir(main)
-  await executeDomainGit(main, 'init', '-b', 'main')
+  await runGit(main, ['init', '-b', 'main'], { cwdMode: 'option' })
   await writeFile(path.join(main, 'keep.txt'), 'developer file')
-  await executeDomainGit(main, 'add', 'keep.txt')
-  await executeDomainGit(
-    main,
-    '-c',
-    'user.name=Test',
-    '-c',
-    'user.email=test@example.invalid',
-    'commit',
-    '-m',
-    'Initial',
-  )
-  await executeDomainGit(main, 'remote', 'add', 'origin', 'https://github.com/OpenAI/Platform.git')
-  await executeDomainGit(main, 'worktree', 'add', '-b', 'feature', linked)
+  await runGit(main, ['add', 'keep.txt'], { cwdMode: 'option' })
+  await runGit(main, ['commit', '-m', 'Initial'], { cwdMode: 'option' })
+  await runGit(main, ['remote', 'add', 'origin', 'https://github.com/OpenAI/Platform.git'], {
+    cwdMode: 'option',
+  })
+  await runGit(main, ['worktree', 'add', '-b', 'feature', linked], { cwdMode: 'option' })
   const descriptor = v.parse(healthDescriptorSchema, (await client.health.get()).data)
   let nextCommand = 0
   const dispatch = async (input: unknown) => {
@@ -183,15 +177,4 @@ export async function makeSessionDomainFixture(options: { providerRuntime?: bool
     },
     blobPath: path.join(server.root, '.platform-test', 'attachments', 'domain-image.png'),
   }
-}
-
-export async function executeDomainGit(cwd: string, ...args: string[]) {
-  const child = Bun.spawn(['git', ...args], { cwd, stdout: 'pipe', stderr: 'pipe' })
-  const [code, output, error] = await Promise.all([
-    child.exited,
-    new Response(child.stdout).text(),
-    new Response(child.stderr).text(),
-  ])
-  if (code !== 0) throw new TypeError(`Git fixture failed: ${error}`)
-  return output.trim()
 }

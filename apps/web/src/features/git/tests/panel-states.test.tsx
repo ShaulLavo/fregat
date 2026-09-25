@@ -1,4 +1,3 @@
-import { execFileSync } from 'node:child_process'
 import { mkdir } from 'node:fs/promises'
 import path from 'node:path'
 
@@ -9,10 +8,7 @@ import { Panel } from '@/features/git/components/panel'
 import { GitStoreProvider } from '@/features/git/providers/store-provider'
 import { expect, test } from '../../../../test/fixtures'
 import { renderWithProviders } from '../../../../test/render'
-
-function git(cwd: string, ...args: string[]) {
-  return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: 'pipe' })
-}
+import { runGit } from '../../../../test/factories/git'
 
 // The machine-checkable form of "loading and empty are not the same picture".
 // Before plan 041 both rendered a <section> with a sentence in it, so nothing
@@ -21,9 +17,7 @@ test('the git panel loading state is not its empty state', async ({ client, serv
   void client
   const repo = path.join(server.root, 'repo')
   await mkdir(repo, { recursive: true })
-  git(repo, 'init', '-b', 'main')
-  git(repo, 'config', 'user.email', 'test@example.com')
-  git(repo, 'config', 'user.name', 'Test')
+  runGit(repo, ['init', '-b', 'main'], { cwdMode: 'option' })
 
   renderWithProviders(
     <EditorStateProvider>

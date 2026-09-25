@@ -9,6 +9,7 @@ import { createWorkspacePaths } from '../../fs/path'
 import { createPullRequest, readPullRequest } from '../pull-request'
 import type { GitProcessResult } from '../utils/process'
 import { GitService } from '../service'
+import { runGit } from '../../testing/git'
 
 const roots: string[] = []
 
@@ -45,7 +46,7 @@ describe('push', () => {
 
   it('refuses to push a detached head instead of pushing the wrong thing', async () => {
     const { work } = await clonedRepo()
-    const head = (await runGit(work, ['rev-parse', 'HEAD'])).trim()
+    const head = (await runGit(work, ['rev-parse', 'HEAD'])).stdout.trim()
     await runGit(work, ['checkout', head])
 
     await expect(gitService(work).push(work)).rejects.toThrow('no checked-out branch')
@@ -133,14 +134,12 @@ async function clonedRepo() {
   await runGit(origin, ['init', '--bare', '-b', 'main'])
   const seed = await fixtureRoot('seed')
   await runGit(seed, ['init', '-b', 'main'])
-  await identify(seed)
   await commit(seed, 'one\n', 'initial')
   await runGit(seed, ['remote', 'add', 'origin', origin])
   await runGit(seed, ['push', '-u', 'origin', 'main'])
 
   const work = await fixtureRoot('work')
   await runGit(work, ['clone', origin, '.'])
-  await identify(work)
 
   return { origin, seed, work }
 }
@@ -151,11 +150,6 @@ async function divergeFromUpstream(seed: string, work: string) {
   await commit(work, 'local\n', 'local change')
 }
 
-async function identify(root: string) {
-  await runGit(root, ['config', 'user.email', 'test@example.com'])
-  await runGit(root, ['config', 'user.name', 'Test User'])
-}
-
 async function commit(root: string, contents: string, message: string) {
   await writeFile(path.join(root, 'tracked.txt'), contents)
   await runGit(root, ['add', 'tracked.txt'])
@@ -163,7 +157,7 @@ async function commit(root: string, contents: string, message: string) {
 }
 
 async function remoteBranches(origin: string) {
-  return runGit(origin, ['branch', '--format', '%(refname:short)'])
+  return (await runGit(origin, ['branch', '--format', '%(refname:short)'])).stdout
 }
 
 async function fixtureRoot(label: string) {
@@ -172,19 +166,6 @@ async function fixtureRoot(label: string) {
 
   return root
 }
-
-async function runGit(root: string, args: readonly string[]) {
-  const child = Bun.spawn(['git', '-C', root].concat(args), { stderr: 'pipe', stdout: 'pipe' })
-  const [stdout, stderr, exitCode] = await Promise.all([
-    new Response(child.stdout).text(),
-    new Response(child.stderr).text(),
-    child.exited,
-  ])
-  if (exitCode === 0) return stdout
-
-  throw new Error(`${stderr}${stdout}`.trim())
-}
-
 describe('pull request lookup', () => {
   const pullRequest = {
     isDraft: false,
