@@ -79,6 +79,16 @@ export const SETTINGS_REGISTRY = {
     description:
       'Show the Plan mode picker and /plan and /default commands for providers that support them. Stored draft preferences are retained while hidden.',
   }),
+  'chat.activeFileContext': defineSetting({
+    schema: v.boolean(),
+    default: false,
+    scope: 'application',
+    widget: 'boolean',
+    category: 'Chat',
+    title: 'Active file in the composer',
+    description:
+      'Show the file open in the editor as a chip in the composer. While the chip is there, sending mentions that file. Remove the chip to send without it.',
+  }),
   'chat.contextWindowMeterEnabled': defineSetting({
     schema: v.boolean(),
     default: false,

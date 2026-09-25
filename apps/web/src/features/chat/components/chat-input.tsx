@@ -1,3 +1,6 @@
+import { ActiveFileChip } from '@/features/chat/components/active-file-chip'
+import { useActiveFileChip } from '@/features/chat/hooks/use-active-file-chip'
+import { withActiveFileMention } from '@/features/chat/utils/active-file-mention'
 import { useSettingValue } from '@/hooks/use-setting-value'
 import { resolveComposerInteractionMode } from '@workspace/client-core/chat/composer-interaction'
 import { useEnvironmentId } from '@/lib/environments/hooks/use-environment-id'
@@ -131,6 +134,7 @@ export function ChatInput({
   })
   const images = useChatInputDraftStore(imagesSelector)
   const terminalContexts = useChatInputDraftStore(terminalContextsSelector)
+  const activeFile = useActiveFileChip(rootPath)
   const persistenceError = useChatInputDraftStore((store) => store.persistenceError)
   const clearStoredDraft = useChatInputDraftStore((store) => store.clearDraft)
   const clearStoredDraftContent = useChatInputDraftStore((store) => store.clearDraftContent)
@@ -282,7 +286,7 @@ export function ChatInput({
           modelSelection: selected,
           runtimeMode: draft.runtimeMode ?? runtimeMode,
           terminalContexts: draft.terminalContexts,
-          text,
+          text: withActiveFileMention(text, activeFile.path),
         },
         alternate,
       )
@@ -451,6 +455,13 @@ export function ChatInput({
                 onTriggerChange={setTrigger}
               />
               <ChatInputUltrathinkPlugin />
+              {activeFile.path ? (
+                <ActiveFileChip
+                  disabled={composerDisabled}
+                  path={activeFile.path}
+                  onRemove={activeFile.remove}
+                />
+              ) : null}
               <ChatInputTerminalContextList
                 contexts={terminalContexts}
                 disabled={composerDisabled}

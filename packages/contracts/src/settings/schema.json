@@ -2,6 +2,11 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "additionalProperties": false,
   "properties": {
+    "chat.activeFileContext": {
+      "default": false,
+      "description": "Show the file open in the editor as a chip in the composer. While the chip is there, sending mentions that file. Remove the chip to send without it.",
+      "type": "boolean"
+    },
     "chat.confirmSessionDelete": {
       "default": true,
       "description": "Ask before permanently deleting one or more conversations.",
