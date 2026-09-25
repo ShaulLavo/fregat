@@ -7,16 +7,26 @@ import {
 import type { PlatformDatabase } from '../db/client'
 import { recordRequestContext } from '../observability'
 import type { SettingsStore } from '../settings/store'
-import { deliverPush, type PushDelivery, type PushFetcher } from './delivery'
+import {
+  deliverPush,
+  type PushDelivery,
+  type PushFetcher,
+  type PushMessageOptions,
+} from './delivery'
 import { PushDeviceStore, type PushDeviceRow } from './device-store'
 import { pushErrors } from './structured-errors'
 import { parseRegistration } from './subscription'
-import { loadVapidKeys } from './vapid'
+import { loadVapidKeys, type VapidKeys } from './vapid'
 
 export type PushServiceOptions = {
   readonly database: PlatformDatabase
   readonly settings: SettingsStore
   readonly fetcher?: PushFetcher
+}
+
+export type PushBroadcast = {
+  readonly deviceCount: number
+  readonly deliveries: readonly PushDelivery[]
 }
 
 const TEST_NOTICE: PushNotice = {
@@ -76,7 +86,7 @@ export class PushService {
       throw pushErrors.DEVICE_NOT_FOUND({ internal: { deviceCount: this.devices.list().length } })
 
     const keys = await loadVapidKeys(this.settings)
-    const delivery = await deliverPush(this.fetcher, device, keys, TEST_NOTICE, {
+    const delivery = await this.deliver(device, keys, TEST_NOTICE, {
       topic: 'push-test',
       ttlSeconds: 300,
       urgency: 'high',
@@ -85,9 +95,37 @@ export class PushService {
 
     return { status: settledStatus(delivery) }
   }
+
+  deviceCount(): number {
+    return this.devices.list().length
+  }
+
+  /** Sends `notice` to every registered device at once. */
+  async broadcast(notice: PushNotice, options: PushMessageOptions): Promise<PushBroadcast> {
+    const devices = this.devices.list()
+    if (devices.length === 0) return { deviceCount: 0, deliveries: [] }
+
+    const keys = await loadVapidKeys(this.settings)
+    const deliveries = await Promise.all(
+      devices.map((device) => this.deliver(device, keys, notice, options)),
+    )
+    return { deviceCount: devices.length, deliveries }
+  }
+
+  // The push service never takes an expired subscription back, so its row goes at once.
+  private async deliver(
+    device: PushDeviceRow,
+    keys: VapidKeys,
+    notice: PushNotice,
+    options: PushMessageOptions,
+  ) {
+    const delivery = await deliverPush(this.fetcher, device, keys, notice, options)
+    if (delivery.outcome === 'expired') this.devices.remove(device.id)
+    return delivery
+  }
 }
 
-/** A 404 or 410 reaches the caller as an expired device, and the row stays. */
+/** A 404 or 410 reaches the caller as an expired device, whose row is already gone. */
 function settledStatus(delivery: PushDelivery): number {
   const { failure, service, status } = delivery
   if (status === null) throw pushErrors.PUSH_SERVICE_UNREACHABLE({ internal: { failure, service } })

@@ -458,6 +458,8 @@ export const selectors = {
       .locator('.skeleton-sweep')
       .first(),
   pushThisDeviceOn: (page: Page) => page.getByText('This device receives push notifications.'),
+  pushSessionSwitch: (page: Page) =>
+    page.getByRole('switch', { name: 'Push session notifications', exact: true }),
   pushNoDevices: (page: Page) => page.getByText('No devices registered', { exact: true }),
   pushDeviceRow: (page: Page, id: string) => page.locator(`[data-push-device="${id}"]`),
   pushDeviceAction: (page: Page, id: string, name: 'Send test' | 'Remove') =>

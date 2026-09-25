@@ -84,6 +84,7 @@ import { chatUsageMeter } from './chat-usage-meter'
 import { chatComposerNarrow } from './chat-composer-narrow'
 import { settingsUsage } from './settings-usage'
 import { pushSubscribe } from './push-subscribe'
+import { pushSessionNotice } from './push-session-notice'
 import { chatClaudeCatalog } from './chat-claude-catalog'
 import { chatDraftContextStrip } from './chat-draft-context-strip'
 import { machineConnectError } from './machine-connect-error'
@@ -283,6 +284,7 @@ export const scenarios: readonly Scenario[] = [
   chatComposerNarrow,
   settingsUsage,
   pushSubscribe,
+  pushSessionNotice,
   chatClaudeCatalog,
   chatDraftContextStrip,
   machineConnectError,

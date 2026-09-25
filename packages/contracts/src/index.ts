@@ -931,6 +931,7 @@ export type { FontCatalogEntry } from './fonts/catalog'
 export { parsePullRequestReference } from './pull-request-reference'
 export {
   pushDeviceId,
+  pushSessionPath,
   pushDeviceRegistrationSchema,
   pushDeviceSchema,
   pushDevicesSchema,
@@ -944,3 +945,16 @@ export {
   type PushService,
   type PushSubscriptionInput,
 } from './push'
+export {
+  createSessionNotificationTracker,
+  hasNativeNotifications,
+  hasNotificationSound,
+  sessionNotice,
+  sessionNotificationTransition,
+  sessionRailStatus,
+  type NotificationCursor,
+  type NotificationMode,
+  type NotificationSession,
+  type SessionNotice,
+  type SessionRailStatus,
+} from './session-notices'

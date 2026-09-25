@@ -158,7 +158,7 @@ describe('push routes', () => {
     })
   })
 
-  it('reports an expired device when the push service answers 404 or 410, and keeps the row', async () => {
+  it('reports an expired device when the push service answers 404 or 410, and removes the row', async () => {
     for (const status of [404, 410]) {
       const { app } = pushApp(await tempRoot(), async () => new Response('gone', { status }))
       const device = await register(app, createPushSubscriber(ENDPOINT), 'Firefox on Linux')
@@ -168,8 +168,8 @@ describe('push routes', () => {
       expect(response.status).toBe(410)
       const { error } = await response.json()
       expect(error).toMatchObject({ code: 'push.SUBSCRIPTION_EXPIRED' })
-      expect(error.fix).toContain('Remove the device')
-      expect((await readDevices(app)).devices).toEqual([device])
+      expect(error.fix).toBe('Turn push notifications on again on that device.')
+      expect((await readDevices(app)).devices).toEqual([])
     }
   })
 
