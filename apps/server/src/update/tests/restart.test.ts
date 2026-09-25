@@ -1,13 +1,20 @@
 import { sessionIdSchema } from '@workspace/contracts'
 import * as v from 'valibot'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync } from 'node:fs'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, onTestFinished } from 'vitest'
 
 import { updateForApp } from '../../app'
 import { MockProviderAdapter } from '../../provider/adapters/mock'
 import { closeTestApps } from '../../../test/server'
-import { heldTurnAdapter, restartFixture } from '../../../test/factories/server-update'
+import {
+  heldTurnAdapter,
+  restartFixture,
+  stageRelease,
+} from '../../../test/factories/server-update'
+import { ServerUpdate } from '../service'
 
 const BUSY = v.parse(sessionIdSchema, '00000000-0000-4000-8000-00000000000a')
 const IDLE = v.parse(sessionIdSchema, '00000000-0000-4000-8000-00000000000b')
@@ -183,5 +190,51 @@ describe('POST /server/restart', () => {
     expect(adapter.startedTurns.map((turn) => turn.turnId)).toEqual(['first-turn'])
     // A refused claim is not an abandoned start, so the reusable runtime survives it.
     expect(await hasRuntime({ sessionId: BUSY })).toBe(true)
+  })
+
+  it('leaves turns startable when the approval cannot be written', async () => {
+    const adapter = new MockProviderAdapter()
+    const fixture = await restartFixture(adapter)
+    await fixture.createSession(await fixture.register(), IDLE, 'Idle session')
+    mkdirSync(path.join(fixture.production, 'restart-approved.json'))
+
+    expect((await fixture.restart([])).status).toBe(500)
+    expect(fixture.exits).toEqual([])
+    expect(updateForApp(fixture.app).state().phase).toBe('serving')
+
+    await fixture.send(IDLE, 'after-failed-restart')
+    await fixture.engine.providerRuntimeIdle()
+    expect(adapter.startedTurns.map((turn) => turn.turnId)).toEqual(['after-failed-restart'])
+  })
+})
+
+describe('ServerUpdate.requestRestart', () => {
+  it('refuses, without holding starts, when a deploy restages while the gate drains', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'platform-restage-'))
+    onTestFinished(() => rm(root, { force: true, recursive: true }))
+    await stageRelease(root, 'first-release')
+    let held = false
+    const update = new ServerUpdate({
+      root,
+      serverRelease: 'running-release',
+      restart: () => {
+        throw new TypeError('A refused restart must not exit')
+      },
+      gate: {
+        async beginRestart(_interrupt, commit = () => {}) {
+          await stageRelease(root, 'second-release')
+          commit()
+          held = true
+          return { restarting: true, interrupted: [] }
+        },
+      },
+    })
+
+    await expect(update.requestRestart([], null)).rejects.toMatchObject({
+      code: 'update.STAGED_RELEASE_CHANGED',
+    })
+    expect(held).toBe(false)
+    expect(existsSync(path.join(root, 'restart-approved.json'))).toBe(false)
+    expect(update.state().pending?.release).toBe('second-release')
   })
 })

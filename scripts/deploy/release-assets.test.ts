@@ -27,18 +27,17 @@ function webDir(root: string, name: string, files: Record<string, string>) {
   return web
 }
 
-test('carries the served build’s hashed assets the new build lacks, and nothing older than a week', () => {
+test('carries every asset the served build lacks, however long ago it was built', () => {
   const root = mkdtempSync(path.join(tmpdir(), 'carry-assets-'))
   roots.push(root)
   const previous = webDir(root, 'previous', {
     'panel-old.js': 'old panel',
     'shared-same.js': 'previous copy',
-    'grammar-stale.js': 'stale',
   })
   const next = webDir(root, 'next', { 'shared-same.js': 'new copy', 'panel-new.js': 'new panel' })
   const now = Date.now()
-  const stale = new Date(now - CARRIED_ASSET_MAX_AGE_MS - 60_000)
-  utimesSync(path.join(previous, 'assets', 'grammar-stale.js'), stale, stale)
+  const built = new Date(now - CARRIED_ASSET_MAX_AGE_MS - 60_000)
+  utimesSync(path.join(previous, 'assets', 'panel-old.js'), built, built)
 
   expect(carryAssets(previous, next, now)).toBe(1)
 
@@ -46,5 +45,20 @@ test('carries the served build’s hashed assets the new build lacks, and nothin
   expect(readFileSync(carried, 'utf8')).toBe('old panel')
   expect(statSync(carried).ino).toBe(statSync(path.join(previous, 'assets', 'panel-old.js')).ino)
   expect(readFileSync(path.join(next, 'assets', 'shared-same.js'), 'utf8')).toBe('new copy')
-  expect(() => statSync(path.join(next, 'assets', 'grammar-stale.js'))).toThrow()
+})
+
+test('drops a carried asset a week after its build stopped being served', () => {
+  const root = mkdtempSync(path.join(tmpdir(), 'carry-assets-'))
+  roots.push(root)
+  const first = webDir(root, 'first', { 'grammar-old.js': 'grammar' })
+  const second = webDir(root, 'second', { 'panel-second.js': 'second' })
+  const third = webDir(root, 'third', { 'panel-third.js': 'third' })
+  const fourth = webDir(root, 'fourth', {})
+  const retiredAt = Date.now() - CARRIED_ASSET_MAX_AGE_MS
+  expect(carryAssets(first, second, retiredAt)).toBe(1)
+
+  expect(carryAssets(second, third, retiredAt + 1_000)).toBe(2)
+  expect(carryAssets(third, fourth, retiredAt + CARRIED_ASSET_MAX_AGE_MS + 60_000)).toBe(1)
+  expect(() => statSync(path.join(fourth, 'assets', 'grammar-old.js'))).toThrow()
+  expect(readFileSync(path.join(fourth, 'assets', 'panel-third.js'), 'utf8')).toBe('third')
 })

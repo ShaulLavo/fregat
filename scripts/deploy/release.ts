@@ -137,23 +137,41 @@ export const CARRIED_ASSET_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
 
 /**
  * A page loaded before a deploy still asks for the hashed chunks of the build it came from. The new
- * release hardlinks the served release's assets it does not have, up to a week old, so those
- * requests keep resolving; a hash names one content, so a carried file never shadows a new one.
+ * release hardlinks the served release's assets it does not have, so those requests keep resolving;
+ * a hash names one content, so a carried file never shadows a new one. Each carried asset records
+ * when its build stopped being served, and ages out a week after that.
  */
 export function carryAssets(fromWeb: string, toWeb: string, now = Date.now()) {
   const from = path.join(fromWeb, 'assets')
   const to = path.join(toWeb, 'assets')
   if (!existsSync(from) || !existsSync(to)) return 0
-  let carried = 0
+  const inherited = readRetired(fromWeb)
+  const retired: Record<string, number> = {}
   for (const name of readdirSync(from)) {
     if (existsSync(path.join(to, name))) continue
     const source = path.join(from, name)
-    const stats = statSync(source)
-    if (!stats.isFile() || now - stats.mtimeMs > CARRIED_ASSET_MAX_AGE_MS) continue
+    // An asset the served release built itself is retired by this deploy.
+    const retiredAt = inherited[name] ?? now
+    if (!statSync(source).isFile() || now - retiredAt > CARRIED_ASSET_MAX_AGE_MS) continue
     linkSync(source, path.join(to, name))
-    carried += 1
+    retired[name] = retiredAt
   }
-  return carried
+  writeFileSync(retiredFile(toWeb), JSON.stringify(retired))
+  return Object.keys(retired).length
+}
+
+// Beside `web/`, so the record is never served.
+function retiredFile(web: string) {
+  return path.join(path.dirname(web), 'carried-assets.json')
+}
+
+function readRetired(web: string): Record<string, number> {
+  try {
+    const value: unknown = JSON.parse(readFileSync(retiredFile(web), 'utf8'))
+    return typeof value === 'object' && value !== null ? (value as Record<string, number>) : {}
+  } catch {
+    return {}
+  }
 }
 
 export async function buildServer(release: Release) {

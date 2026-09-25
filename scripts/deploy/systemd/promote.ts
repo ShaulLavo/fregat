@@ -128,30 +128,43 @@ export function promote(root: string, launch: Launch = spawnLauncher): PromoteOu
   const pending = path.join(root, 'pending')
   const current = path.join(root, 'current')
   if (!isLink(pending) || !approval) return 'none'
+  // Claimed first, so a deploy that restages now cannot swap what was checked for what is moved.
+  const claim = path.join(root, `pending.claim-${process.pid}`)
+  try {
+    renameSync(pending, claim)
+  } catch (error) {
+    log(`could not claim pending: ${messageOf(error)}`)
+    return 'failed'
+  }
   if (
-    approval.release !== linkTarget(pending) ||
-    approval.stagedAt !== lstatSync(pending).mtime.toISOString()
+    approval.release !== linkTarget(claim) ||
+    approval.stagedAt !== lstatSync(claim).mtime.toISOString()
   )
-    return 'none'
+    return unclaim(claim, pending, 'none')
 
-  const problem = releaseProblem(pending)
-  if (problem)
-    return drop(pending, 'rejected', `staged ${linkTarget(pending)} is unusable: ${problem}`)
-  const next = realpathSync(pending)
+  const problem = releaseProblem(claim)
+  if (problem) return drop(claim, 'rejected', `staged ${linkTarget(claim)} is unusable: ${problem}`)
+  const next = realpathSync(claim)
   const previous = realpathOrNull(current)
-  if (next === previous)
-    return drop(pending, 'already-current', `${path.basename(next)} is current`)
+  if (next === previous) return drop(claim, 'already-current', `${path.basename(next)} is current`)
 
   try {
     // Atomic: the rename replaces the current link in one step.
-    renameSync(pending, current)
+    renameSync(claim, current)
   } catch (error) {
     log(`could not promote ${path.basename(next)}: ${messageOf(error)}`)
-    return 'failed'
+    return unclaim(claim, pending, 'failed')
   }
   log(`current → ${path.basename(next)} (was ${previous ? path.basename(previous) : 'nothing'})`)
   startLiveCheck(next, previous, root, launch)
   return 'promoted'
+}
+
+// Puts an unpromoted claim back as pending, unless a newer deploy staged one meanwhile.
+function unclaim(claim: string, pending: string, outcome: PromoteOutcome): PromoteOutcome {
+  if (isLink(pending)) rmSync(claim, { force: true })
+  else renameSync(claim, pending)
+  return outcome
 }
 
 function takeApproval(root: string) {
@@ -183,9 +196,9 @@ function startLiveCheck(directory: string, previous: string | null, root: string
   log(unit ? `live check started in ${unit}` : 'live check did not start')
 }
 
-function drop(pending: string, outcome: PromoteOutcome, reason: string): PromoteOutcome {
+function drop(claim: string, outcome: PromoteOutcome, reason: string): PromoteOutcome {
   log(`${reason}; removing pending`)
-  rmSync(pending, { force: true })
+  rmSync(claim, { force: true })
   return outcome
 }
 
