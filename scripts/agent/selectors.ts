@@ -735,6 +735,10 @@ export const selectors = {
   statusFrame: (page: Page, tone: 'pending' | 'error') =>
     page.locator(`[data-slot="status-frame"][data-tone="${tone}"]`),
   statusFrameBody: (page: Page) => page.locator('[data-slot="status-frame"] > div'),
+  valueGridRow: (page: Page, label: string) =>
+    page
+      .locator('[data-slot="value-grid-row"]')
+      .filter({ has: page.getByRole('term').getByText(label, { exact: true }) }),
   holdButton: (scope: Locator, name: string) =>
     scope.locator('[data-slot="hold-button"]').filter({ hasText: name }),
   tabsIndicator: (page: Page, list: string) =>

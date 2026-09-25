@@ -35,13 +35,22 @@ export function draftWorktreeChoices(
 }
 
 /** What the workspace trigger says: where the session will run. */
+const WORKSPACE_CHOICE = {
+  new: 'New worktree',
+  linked: 'Worktree',
+  current: 'Current checkout',
+} as const
+
+/** Every label the workspace trigger can show, so it can hold the widest one's width. */
+export const WORKSPACE_CHOICE_LABELS: readonly string[] = Object.values(WORKSPACE_CHOICE)
+
 export function workspaceChoiceLabel(
   base: Pick<OrchestrationWorktreeShell, 'kind'>,
   target: Pick<SessionWorktreeTarget, 'kind'>,
 ) {
-  if (target.kind === 'new') return { kind: 'new', label: 'New worktree' } as const
-  if (base.kind === 'linked') return { kind: 'linked', label: 'Worktree' } as const
-  return { kind: 'current', label: 'Current checkout' } as const
+  if (target.kind === 'new') return { kind: 'new', label: WORKSPACE_CHOICE.new } as const
+  if (base.kind === 'linked') return { kind: 'linked', label: WORKSPACE_CHOICE.linked } as const
+  return { kind: 'current', label: WORKSPACE_CHOICE.current } as const
 }
 
 /**

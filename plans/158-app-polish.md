@@ -73,6 +73,13 @@
 
 ## 2. Secrets and connection strings
 
+**Done 2026-09-25 (lane L1).** `ValueGrid`/`ValueGridRow` and `WidestLabel` (+ `widestLabels`) in
+`packages/ui`; machine rows show name and target or URL on their own rows; provider rows show the
+binary and each variable as Set or Not set, with a Values / Agent view switch in the section when
+any provider has variables. The draft machine and workspace triggers hold their widest label.
+Scenario `settings-value-grids`; `features/settings/tests/provider-values.test.tsx` covers the
+secret rows (the settings API cannot seed provider variables). The text below is the original plan.
+
 **Today.**
 
 - Secrets never reach the client. The server sends `REDACTED_SETTINGS_VALUE` (`'••••••••'`,
