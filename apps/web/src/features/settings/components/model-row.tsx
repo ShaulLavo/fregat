@@ -51,7 +51,7 @@ export function ModelRow({
                 size='icon-sm'
                 variant='ghost'
               >
-                <StarIcon weight={row.favorite ? 'fill' : 'regular'} />
+                {row.favorite ? <StarIcon weight='fill' /> : <StarIcon />}
               </Button>
             }
           />

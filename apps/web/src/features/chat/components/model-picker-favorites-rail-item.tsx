@@ -23,7 +23,11 @@ export function ModelPickerFavoritesRailItem({
               variant='ghost'
               onClick={onSelect}
             >
-              <StarIcon className='size-(--icon-size)' weight={active ? 'fill' : 'regular'} />
+              {active ? (
+                <StarIcon className='size-(--icon-size)' weight='fill' />
+              ) : (
+                <StarIcon className='size-(--icon-size)' />
+              )}
             </Button>
           }
         />
