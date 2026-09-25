@@ -84,6 +84,27 @@ class RecordTests(unittest.TestCase):
         self.save_finding()
         self.assert_invalid("requires runtime-compared")
 
+    def test_scenario_verified_needs_a_named_scenario(self):
+        self.finding.update(status="verified", evidence_level="scenario-verified",
+                            execution_evidence=["checked by hand in the browser"])
+        self.save_finding()
+        self.assert_invalid("must name scripts/agent/scenarios")
+
+    def test_scenario_verified_needs_the_scenario_file(self):
+        self.finding.update(status="verified", evidence_level="scenario-verified",
+                            execution_evidence=["scripts/agent/scenarios/archive-idle.ts"])
+        self.save_finding()
+        self.assert_invalid("missing scenario scripts/agent/scenarios/archive-idle.ts")
+
+    def test_existing_scenario_verifies_finding(self):
+        scenarios = self.root / "scripts/agent/scenarios"
+        scenarios.mkdir(parents=True)
+        (scenarios / "archive-idle.ts").write_text("export {}\n")
+        self.finding.update(status="verified", evidence_level="scenario-verified",
+                            execution_evidence=["scenario scripts/agent/scenarios/archive-idle.ts passed"])
+        self.save_finding()
+        self.assertIn("0 unverified", checker.check(self.root))
+
     def test_runtime_label_alone_cannot_verify_finding(self):
         self.finding.update(status="verified", evidence_level="runtime-compared",
                             execution_evidence=["some-test.ts"])

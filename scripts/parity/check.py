@@ -24,11 +24,26 @@ def report_findings(directory):
     return findings
 
 
+SCENARIO = re.compile(r"scripts/agent/scenarios/[\w-]+\.ts")
+
+
+def check_scenario_verified(finding, root):
+    # The owner's definition of done: our agent:browser scenario proves the row; no paired upstream run.
+    identifier = finding["id"]
+    scenarios = [path for item in finding["execution_evidence"] for path in SCENARIO.findall(str(item))]
+    require(bool(scenarios), f"{identifier}: scenario-verified must name scripts/agent/scenarios/<name>.ts")
+    for path in scenarios:
+        require((root / path).is_file(), f"{identifier}: missing scenario {path}")
+
+
 def check_verified(finding, root, commit):
     identifier = finding["id"]
+    if finding["evidence_level"] == "scenario-verified":
+        check_scenario_verified(finding, root)
+        return
     require(
         finding["evidence_level"] == "runtime-compared",
-        f"{identifier}: verified requires runtime-compared evidence, not source review",
+        f"{identifier}: verified requires runtime-compared or scenario-verified evidence, not source review",
     )
     check_comparison(finding.get("runtime_comparison"), root, commit, identifier)
 
