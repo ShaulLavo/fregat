@@ -60,7 +60,7 @@ test.each(['range', 'refetch'] as const)(
     await page.getByRole('button', { name: /^A / }).click()
     await page.getByRole('button', { name: /^B / }).click()
     expect([a, b].some((row) => row.getAttribute('aria-pressed') === 'true')).toBe(true)
-    await page.screenshot({ path: `usage-${change}.png` })
+    await page.screenshot({ path: `surface-usage-${change}.png` })
     view.unmount()
     client.clear()
   },

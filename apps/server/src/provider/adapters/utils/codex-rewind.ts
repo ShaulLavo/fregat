@@ -10,7 +10,7 @@ const turnPageSchema = v.object({
 const revertedThreadSchema = v.object({ thread: v.object({ id: v.string() }) })
 
 /** Reads a native turn by its position in the requested order. */
-export async function codexTurnAtIndex({
+async function codexTurnAtIndex({
   threadId,
   index,
   sortDirection,
