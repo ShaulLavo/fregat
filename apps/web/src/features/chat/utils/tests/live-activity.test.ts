@@ -272,6 +272,7 @@ test('a response stopped before any text has an explicit final state', () => {
       type: 'turn-status',
       label: expect.stringMatching(/^Stopped after/),
     }),
+    expect.objectContaining({ type: 'turn-retry', turnId: latestTurn.turnId }),
   ])
 })
 

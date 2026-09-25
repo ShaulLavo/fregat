@@ -7,6 +7,7 @@ import { MessageBubble } from './message-bubble'
 import { MessageCompletionDivider } from './message-completion-divider'
 import { ProposedPlanCard } from './proposed-plan-card'
 import { WorkingRow } from './working-row'
+import { TurnRetryActions } from './turn-retry-actions'
 import { LiveActivityRow } from '@/features/chat/components/live-activity-row'
 import { timelineRowSpacing } from '@/features/chat/utils/timeline-items'
 import { cn } from '@workspace/ui/lib/utils'
@@ -107,6 +108,7 @@ function timelineRowContent({
     return <LiveActivityRow activity={item.activity} groupId={item.id} />
   if (item.type === 'turn-status')
     return <MessageCompletionDivider completionSummary={item.label} />
+  if (item.type === 'turn-retry') return <TurnRetryActions />
 
   return <WorkingRow latestTurn={item.latestTurn} startedAt={item.startedAt} />
 }

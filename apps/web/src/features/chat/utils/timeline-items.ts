@@ -18,7 +18,7 @@ import { chatActiveResponseTurnIds } from '@/features/chat/utils/active-response
 import { isWorkLogFailure } from '@/features/chat/utils/work-row'
 import { deriveChatLiveActivity, type ChatLiveActivity } from '@/features/chat/utils/live-activity'
 import { formatChatElapsed } from '@/features/chat/utils/formatters'
-import { stoppedTurnLabel } from '@/features/chat/utils/turn-end-label'
+import { stoppedTurnLabel, turnStoppedShort } from '@/features/chat/utils/turn-end-label'
 import {
   chatMessageTimelineMetadata,
   type ChatTimelineMessage,
@@ -86,6 +86,12 @@ export type ChatTimelineItem =
       startedAt: string
       timestamp: string
       type: 'working'
+    }
+  | {
+      id: string
+      timestamp: string
+      turnId: TurnId
+      type: 'turn-retry'
     }
   | {
       id: string
@@ -270,6 +276,7 @@ export function chatTimelineItems({
     appendActiveResponse(timelineItems, latestTurn, workLogEntries, activeResponseTurnIds)
   }
   appendEmptyTurnStatus(timelineItems, latestTurn)
+  appendTurnRetry(timelineItems, latestTurn)
 
   return shareTimelineItems(
     timelineCacheKey(messages, activities, proposedPlans, optimisticMessages),
@@ -376,6 +383,18 @@ function appendEmptyTurnStatus(
   })
 }
 
+/** Carry on and Try again sit under the latest turn once it stopped short. */
+function appendTurnRetry(items: ChatTimelineItem[], latestTurn: OrchestrationLatestTurn | null) {
+  if (!latestTurn?.completedAt || !turnStoppedShort(latestTurn)) return
+
+  items.push({
+    id: `turn-retry:${latestTurn.turnId}`,
+    timestamp: latestTurn.completedAt,
+    turnId: latestTurn.turnId,
+    type: 'turn-retry',
+  })
+}
+
 function foldableTurnEntries(group: TurnFoldGroup) {
   const terminalIndex = group.entries.findIndex((entry) => entry.id === group.terminalMessageId)
   const foldable = group.entries.filter((entry, index) => {
@@ -432,6 +451,7 @@ export function chatTimelineItemEstimate(item: ChatTimelineItem | undefined) {
   if (item.type === 'working') return 36
   if (item.type === 'live-activity') return 32
   if (item.type === 'turn-status') return 36
+  if (item.type === 'turn-retry') return 36
 
   const dividerHeight = item.showCompletionDivider ? 34 : 0
   const changedFilesHeight =
@@ -919,6 +939,7 @@ function timelineItemsEqual(left: ChatTimelineItem, right: ChatTimelineItem): bo
   if (left.type === 'agent-group' && right.type === 'agent-group')
     return chatAgentGroupsEqual(left.group, right.group)
   if (left.type === 'turn-status' && right.type === 'turn-status') return left.label === right.label
+  if (left.type === 'turn-retry' && right.type === 'turn-retry') return true
   if (left.type === 'live-activity' && right.type === 'live-activity') {
     return (
       left.activity.label === right.activity.label &&
