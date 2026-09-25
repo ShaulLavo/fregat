@@ -1,6 +1,5 @@
-import { randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
-import { mkdir, open, readFile, rename, rm, stat } from 'node:fs/promises'
+import { mkdir, readFile, rm, stat } from 'node:fs/promises'
 import path from 'node:path'
 import {
   applyEdits,
@@ -13,6 +12,7 @@ import {
   type ParseError,
 } from 'jsonc-parser'
 import { isRecord } from '@workspace/utils/objects'
+import { atomicTemporaryPath, commitAtomicWrite, stageAtomicWrite } from '../fs/atomic-write'
 import { textFileVersion } from '../fs/version'
 
 /**
@@ -163,21 +163,9 @@ export async function stageSettingsFile(
   text: string,
   mode?: number,
 ): Promise<StagedSettingsFile> {
-  const directory = path.dirname(filePath)
-  await mkdir(directory, { recursive: true })
-  const temporary = path.join(directory, `.${path.basename(filePath)}.${randomUUID()}.tmp`)
-  const handle = await open(temporary, 'wx', mode)
-
-  try {
-    await handle.writeFile(text, 'utf8')
-    await handle.sync()
-  } catch (error) {
-    await handle.close().catch(() => {})
-    await rm(temporary, { force: true }).catch(() => {})
-    throw error
-  }
-
-  await handle.close()
+  await mkdir(path.dirname(filePath), { recursive: true })
+  const temporary = atomicTemporaryPath(filePath)
+  await stageAtomicWrite(temporary, text, { durability: 'fsync-all', mode })
   return {
     destination: filePath,
     mode,
@@ -201,8 +189,7 @@ export async function tryCommitStagedSettingsFile(
     }
   }
 
-  await rename(staged.temporary, staged.destination)
-  await fsyncDirectory(path.dirname(staged.destination))
+  await commitAtomicWrite(staged.temporary, staged.destination, { durability: 'fsync-all' })
 
   return { kind: 'committed', revision: staged.revision }
 }
@@ -224,16 +211,6 @@ async function currentSettingsFileRevision(filePath: string): Promise<string | n
   } catch (error) {
     if (isMissingFile(error)) return null
     throw error
-  }
-}
-
-export async function fsyncDirectory(directory: string): Promise<void> {
-  const handle = await open(directory, 'r')
-
-  try {
-    await handle.sync()
-  } finally {
-    await handle.close()
   }
 }
 

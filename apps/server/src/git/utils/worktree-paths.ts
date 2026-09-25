@@ -1,6 +1,6 @@
 import { lstat, readFile, realpath, readdir } from 'node:fs/promises'
 import path from 'node:path'
-import { worktreeIdSchema } from '@workspace/contracts'
+import { nodeErrorCode, worktreeIdSchema } from '@workspace/contracts'
 import * as v from 'valibot'
 import { relativeInsideRoot } from '../path-utils'
 import { gitCommonDirectory } from '../repository-lane'
@@ -101,10 +101,13 @@ export async function verifyWorktreeAdministration(runner: GitRepositoryRunner, 
       },
     })
   }
-  const observed = await runner.run(['-C', checkout, 'rev-parse', '--git-common-dir'])
-  if ((await realpath(path.resolve(checkout, observed.stdout.trim()))) !== common) {
+  const observed = await gitCommonDirectory({
+    rootAbsolutePath: checkout,
+    run: (args) => runner.run(['-C', checkout, ...args]),
+  })
+  if (observed !== common) {
     throw gitWorktreeErrors.WORKTREE_IDENTITY_MISMATCH({
-      internal: { check: 'observed-common-dir', exitCode: observed.exitCode },
+      internal: { check: 'observed-common-dir' },
     })
   }
 }
@@ -144,7 +147,7 @@ export async function maybeStat(target: string) {
   try {
     return await lstat(target)
   } catch (error) {
-    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return null
+    if (nodeErrorCode(error) === 'ENOENT') return null
     throw error
   }
 }

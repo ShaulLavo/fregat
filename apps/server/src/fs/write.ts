@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto'
 import type { Stats } from 'node:fs'
-import { open, readFile, rm, rename, type FileHandle } from 'node:fs/promises'
+import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { FsError, mapNodeError } from './errors'
+import { writeFileAtomic } from './atomic-write'
 import { statOptional, type MutationTarget } from './mutation-target'
 import { assertFile } from './stat'
 import { decodeText, isByteExactText } from './text-encoding'
@@ -17,8 +18,6 @@ export async function writeTextFile(
   body: Omit<WriteBody, 'path'>,
   maxBytes: number,
 ) {
-  let tempPath: string | null = null
-
   try {
     const writePath = target.absolutePath
     const existing = await assertWritableTarget(writePath, {
@@ -26,28 +25,15 @@ export async function writeTextFile(
       expectedMtimeMs: body.expectedMtimeMs,
       maxBytes,
     })
-    const temporary = temporaryPath(writePath)
-    const handle = await open(temporary, 'wx')
-    tempPath = temporary
-    await writeTemporaryContent(handle, body.content, existing?.mode)
-    await rename(tempPath, writePath)
-    tempPath = null
-    await syncPath(path.dirname(writePath))
+    await writeFileAtomic(writePath, body.content, {
+      durability: 'fsync-all',
+      mode: existing?.mode,
+      temporary: temporaryPath(writePath),
+    })
     return target.relativePath
   } catch (error) {
-    await removeTempFile(tempPath)
     if (error instanceof FsError) throw error
     throw mapNodeError(error)
-  }
-}
-
-async function writeTemporaryContent(handle: FileHandle, content: string, mode?: number) {
-  try {
-    await handle.writeFile(content, 'utf8')
-    if (mode !== undefined) await handle.chmod(mode)
-    await handle.sync()
-  } finally {
-    await handle.close()
   }
 }
 
@@ -88,15 +74,6 @@ async function assertByteExactTarget(absolutePath: string, stats: Stats, maxByte
   return bytes
 }
 
-async function syncPath(target: string) {
-  const handle = await open(target, 'r')
-  try {
-    await handle.sync()
-  } finally {
-    await handle.close()
-  }
-}
-
 function targetVersion(bytes: Uint8Array, stats: Stats, baseVersion: string) {
   if (!baseVersion.startsWith('sha256:')) return fileVersion(stats)
 
@@ -121,14 +98,4 @@ export function isWriteTemporaryPath(input: string) {
     sequence <= issuedTemporaryFileCount &&
     name === `${temporaryFilePrefix}${sequence}.tmp`
   )
-}
-
-async function removeTempFile(tempPath: string | null) {
-  if (!tempPath) return
-
-  try {
-    await rm(tempPath, { force: true })
-  } catch {
-    return
-  }
 }

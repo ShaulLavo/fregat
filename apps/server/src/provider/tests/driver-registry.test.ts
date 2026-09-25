@@ -275,6 +275,18 @@ describe('provider registry change stream', () => {
 
     expect(await changes.next()).toEqual({ done: true, value: undefined })
   })
+
+  it('ends a parked consumer when the registry is disposed', async () => {
+    const registry = createRegistry()
+    const changes = registry.streamChanges(new AbortController().signal)[Symbol.asyncIterator]()
+    const parked = changes.next()
+
+    await registry.dispose()
+
+    expect(await parked).toEqual({ done: true, value: undefined })
+    const late = registry.streamChanges(new AbortController().signal)[Symbol.asyncIterator]()
+    expect(await late.next()).toEqual({ done: true, value: undefined })
+  })
 })
 
 function createRegistry(statusCache?: ProviderStatusCache) {

@@ -7,6 +7,7 @@ import {
   recordRequestWarning,
   runDetached,
 } from '../observability'
+import { AsyncQueue } from '../async-queue'
 import { OpenFileWatches } from './open-file-watches'
 import { FsError } from './errors'
 import {
@@ -27,9 +28,6 @@ type RenameWatchServerMessage = Extract<WatchServerMessage, { type: 'renamed' }>
 type WatcherEntry = {
   refCount: number
   release: Promise<WatchRelease>
-}
-type WakeSlot = {
-  current: (() => void) | null
 }
 type TransactionBarrier = {
   readonly internalPaths: Set<string>
@@ -424,24 +422,22 @@ export class FileChangeHub {
     files: Set<string>,
     options: WatchStreamOptions,
   ) {
-    const queue: WatchServerMessage[] = [{ type: 'ready', root: '' }]
-    const wake: WakeSlot = { current: null }
-
+    const queue = new AsyncQueue<WatchServerMessage>({
+      initial: [{ type: 'ready', root: '' }],
+      signal,
+    })
     const listener = (event: WatchServerMessage) => {
       const visible = streamEvent(event, files, options.includeIgnored ?? false)
       if (!visible || !deliverWatchEvent(visible, subscribed, files, options.onlyFiles)) return
 
       queue.push(visible)
-      wake.current?.()
     }
 
-    const abort = () => wake.current?.()
     let releases: WatchRelease[] = []
     const startedAt = performance.now()
     // A files stream owns a watch per file, so its `ready` never waits on a project crawl.
     const roots = options.onlyFiles ? new Set<string>() : subscribed
     listeners.add(listener)
-    signal?.addEventListener('abort', abort)
 
     try {
       for (const input of roots) {
@@ -461,11 +457,11 @@ export class FileChangeHub {
         },
       })
 
-      yield* drainWatchQueue(queue, signal, wake)
+      yield* queue
     } finally {
+      queue.close()
       await releaseWatchers(releases)
       listeners.delete(listener)
-      signal?.removeEventListener('abort', abort)
     }
   }
 
@@ -607,36 +603,6 @@ function renamedDeleteEvent(event: RenameWatchServerMessage): WatchServerMessage
     version: event.version,
     writeId: event.writeId,
   }
-}
-
-async function* drainWatchQueue(
-  queue: WatchServerMessage[],
-  signal: AbortSignal | undefined,
-  wake: WakeSlot,
-) {
-  while (!signal?.aborted) {
-    const event = queue.shift()
-    if (event) {
-      yield event
-      continue
-    }
-
-    await waitForWatchQueue(signal, wake)
-  }
-}
-
-function waitForWatchQueue(signal: AbortSignal | undefined, wake: WakeSlot) {
-  return new Promise<void>((resolve) => {
-    const finish = () => {
-      if (wake.current === finish) wake.current = null
-      signal?.removeEventListener('abort', finish)
-      resolve()
-    }
-
-    wake.current = finish
-    signal?.addEventListener('abort', finish, { once: true })
-    if (signal?.aborted) finish()
-  })
 }
 
 function shouldDeliver(event: WatchServerMessage, subscribed: Set<string>) {
@@ -817,6 +783,7 @@ function watchError(error: unknown, path: string): WatchServerMessage {
   }
 }
 
+// Keeps its own fallback: contracts' `errorMessage` would print `[object Object]` in the watch error.
 function errorMessage(error: unknown) {
   if (error instanceof Error) return error.message
 

@@ -1,5 +1,4 @@
-import { randomUUID } from 'node:crypto'
-import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import {
   providerSnapshotSchema,
@@ -8,6 +7,7 @@ import {
   type ProviderSnapshot,
 } from '@workspace/contracts'
 import * as v from 'valibot'
+import { writeFileAtomicSync } from '../fs/atomic-write'
 import { recordChatPipelineWarning } from '../orchestration/orchestration-logging'
 import { platformHomePath } from '../home'
 
@@ -134,16 +134,8 @@ export class ProviderStatusCache {
 // Written through a temp file: a half-flushed snapshot read on the next
 // boot would show the wrong account as signed in.
 function writeSnapshotFile(filePath: string, snapshot: ProviderSnapshot) {
-  const directory = path.dirname(filePath)
-  mkdirSync(directory, { recursive: true })
-  const temporaryPath = path.join(directory, `.${path.basename(filePath)}.${randomUUID()}.tmp`)
-  try {
-    writeFileSync(temporaryPath, `${JSON.stringify(snapshot)}\n`)
-    renameSync(temporaryPath, filePath)
-  } catch (error) {
-    rmSync(temporaryPath, { force: true })
-    throw error
-  }
+  mkdirSync(path.dirname(filePath), { recursive: true })
+  writeFileAtomicSync(filePath, `${JSON.stringify(snapshot)}\n`, { durability: 'rename' })
 }
 
 /**

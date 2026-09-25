@@ -3,6 +3,7 @@ import { rm } from 'node:fs/promises'
 import path from 'node:path'
 
 import { recordRequestContext } from '../observability'
+import { gitCommonDirectory } from './repository-lane'
 import type { GitFileDiff, GitRepositoryRunner, GitService } from './service'
 import { gitCheckpointErrors } from './utils/checkpoint-errors'
 
@@ -151,13 +152,7 @@ async function hasHeadCommit(runner: GitRepositoryRunner) {
  * object store (and therefore its common dir) with the main checkout.
  */
 async function temporaryIndexPath(runner: GitRepositoryRunner) {
-  const result = await runner.run(['rev-parse', '--git-common-dir'])
-  const commonDir = result.stdout.trim()
-  const absoluteCommonDir = path.isAbsolute(commonDir)
-    ? commonDir
-    : path.resolve(runner.rootAbsolutePath, commonDir)
-
-  return path.join(absoluteCommonDir, `checkpoint-index-${randomUUID()}`)
+  return path.join(await gitCommonDirectory(runner), `checkpoint-index-${randomUUID()}`)
 }
 
 function recordCheckpointOperation(

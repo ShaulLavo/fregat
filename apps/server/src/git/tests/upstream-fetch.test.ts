@@ -1,6 +1,11 @@
+import { mkdir, mkdtemp, rm, symlink } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { runGit } from '../../../test/factories/git-worktree'
 import { FsError } from '../../fs/errors'
+import { gitCommonDirectory } from '../repository-lane'
 import { parseUpstreamRemote, UpstreamFetchScheduler } from '../upstream-fetch'
 
 const STATUS_WITH_UPSTREAM = statusOutput('origin/main')
@@ -68,6 +73,36 @@ describe('UpstreamFetchScheduler', () => {
     await scheduler.schedule('/repo', STATUS_WITH_UPSTREAM)
     await scheduler.schedule('/worktree', STATUS_WITH_UPSTREAM)
     expect(fetches).toEqual(['/repo'])
+  })
+
+  // GitService schedules with `rev-parse --show-toplevel` roots, which are already real, so a
+  // symlinked root only reaches the scheduler directly.
+  it('shares one fetch budget between a symlinked root and its target', async () => {
+    const base = await mkdtemp(path.join(tmpdir(), 'platform-upstream-fetch-'))
+    try {
+      const root = path.join(base, 'repo')
+      const link = path.join(base, 'link')
+      await mkdir(root)
+      await runGit(root, ['init', '-b', 'main'])
+      await symlink(root, link)
+      const fetches: string[] = []
+      const scheduler = new UpstreamFetchScheduler({
+        resolveCommonDir: (rootAbsolutePath) =>
+          gitCommonDirectory({
+            rootAbsolutePath,
+            run: async (args) => ({ stdout: await runGit(rootAbsolutePath, args) }),
+          }),
+        runFetch: async (fetchRoot) => {
+          fetches.push(fetchRoot)
+        },
+      })
+
+      await scheduler.schedule(root, STATUS_WITH_UPSTREAM)
+      await scheduler.schedule(link, STATUS_WITH_UPSTREAM)
+      expect(fetches).toEqual([root])
+    } finally {
+      await rm(base, { recursive: true, force: true })
+    }
   })
 
   it('keeps separate budgets for distinct common dirs and remotes', async () => {

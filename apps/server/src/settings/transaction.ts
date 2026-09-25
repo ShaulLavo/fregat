@@ -12,8 +12,8 @@ import {
 import { link, mkdir, open, readFile, rename, rm, stat } from 'node:fs/promises'
 import path from 'node:path'
 import { isRecord } from '@workspace/utils/objects'
+import { fsyncPath } from '../fs/fsync'
 import { textFileVersion } from '../fs/version'
-import { fsyncDirectory } from './json-document'
 import { settingsErrors } from './structured-errors'
 import { withSettingsWriteCoordinator } from './write-coordinator'
 
@@ -123,7 +123,7 @@ export async function commitSettingsSecretTransactionOwned(
 
   await rename(journal.settings.stage, journal.settings.destination)
   await boundary(hooks, 'settings-renamed')
-  await fsyncDirectory(path.dirname(journal.settings.destination))
+  await fsyncPath(path.dirname(journal.settings.destination))
   await boundary(hooks, 'settings-directory-synced')
   const settingsCommitted = { ...journal, phase: 'settings-committed' as const }
   await replaceJournal(journalPath, settingsCommitted)
@@ -131,7 +131,7 @@ export async function commitSettingsSecretTransactionOwned(
 
   await rename(journal.secrets.stage, journal.secrets.destination)
   await boundary(hooks, 'secrets-renamed')
-  await fsyncDirectory(path.dirname(journal.secrets.destination))
+  await fsyncPath(path.dirname(journal.secrets.destination))
   await boundary(hooks, 'secrets-directory-synced')
   const secretsCommitted = { ...journal, phase: 'secrets-committed' as const }
   await replaceJournal(journalPath, secretsCommitted)
@@ -338,13 +338,13 @@ async function writeJournal(filePath: string, journal: TransactionJournal): Prom
   await fsyncAffectedDirectories(journal)
   await link(journal.journalStage, filePath)
   await rm(journal.journalStage)
-  await fsyncDirectory(path.dirname(filePath))
+  await fsyncPath(path.dirname(filePath))
 }
 
 async function replaceJournal(filePath: string, journal: TransactionJournal): Promise<void> {
   await writeDurableFile(journal.journalStage, journalText(journal), SECRET_FILE_MODE)
   await rename(journal.journalStage, filePath)
-  await fsyncDirectory(path.dirname(filePath))
+  await fsyncPath(path.dirname(filePath))
 }
 
 async function cleanupTransaction(filePath: string, journal: TransactionJournal): Promise<void> {
@@ -364,7 +364,7 @@ async function fsyncAffectedDirectories(journal: TransactionJournal): Promise<vo
     path.dirname(journal.settings.destination),
     path.dirname(journal.secrets.destination),
   ])
-  for (const directory of directories) await fsyncDirectory(directory)
+  for (const directory of directories) await fsyncPath(directory)
 }
 
 async function currentHash(filePath: string): Promise<string | null> {

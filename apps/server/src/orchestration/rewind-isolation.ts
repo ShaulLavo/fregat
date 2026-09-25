@@ -1,6 +1,7 @@
 import { realpath } from 'node:fs/promises'
 import path from 'node:path'
 import type { SessionId } from '@workspace/contracts'
+import { gitCommonDirectory } from '../git/repository-lane'
 import type { GitService } from '../git/service'
 import type { ProviderRuntimeBindingWithMetadata } from '../provider/provider-session-directory'
 import type { OrchestrationReadModel } from './read-model'
@@ -35,11 +36,7 @@ export async function assertRewindIsolation({
       internal: { check: 'repository-root', worktreeId: worktree.id },
     })
   const gitDir = await repository.run(['rev-parse', '--absolute-git-dir'])
-  const commonDir = await repository.run(['rev-parse', '--git-common-dir'])
-  if (
-    (await realpath(gitDir.stdout.trim())) ===
-    (await realpath(path.resolve(cwd, commonDir.stdout.trim())))
-  )
+  if ((await realpath(gitDir.stdout.trim())) === (await gitCommonDirectory(repository)))
     throw checkpointErrors.WORKSPACE_NOT_ISOLATED({
       internal: { check: 'shared-git-dir', worktreeId: worktree.id },
     })

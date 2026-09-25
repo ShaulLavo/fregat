@@ -1,6 +1,6 @@
 import { isString } from '@workspace/utils/objects'
 import { elapsedMs } from '@workspace/utils/timing'
-import { readFile, realpath, stat, writeFile } from 'node:fs/promises'
+import { readFile, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { FsError } from '../fs/errors'
 import type { WorkspacePath, WorkspacePaths } from '../fs/path'
@@ -13,7 +13,11 @@ import type {
   GitPullRequestState,
   GitPushResult,
 } from '@workspace/contracts'
-import { withGitRepositoryLane, withGitRepositoryLaneStream } from './repository-lane'
+import {
+  gitCommonDirectory,
+  withGitRepositoryLane,
+  withGitRepositoryLaneStream,
+} from './repository-lane'
 import { parseBranches } from './branches'
 import { commandOutput, gitErrorMessage } from './command'
 import { commitMessageTemplate, hasCommitMessageText } from './commit-message'
@@ -182,10 +186,7 @@ export class GitService {
       ttlMs: options.statusCacheTtlMs ?? STATUS_CACHE_TTL_MS,
     })
     this.upstreamFetch = new UpstreamFetchScheduler({
-      resolveCommonDir: async (rootAbsolutePath) => {
-        const result = await this.git(rootAbsolutePath, ['rev-parse', '--git-common-dir'])
-        return path.resolve(rootAbsolutePath, result.stdout.trim())
-      },
+      resolveCommonDir: (rootAbsolutePath) => this.commonDirectory(rootAbsolutePath),
       runFetch: async (rootAbsolutePath, remote) => {
         await this.git(rootAbsolutePath, ['fetch', remote])
       },
@@ -201,9 +202,8 @@ export class GitService {
     await Promise.all([...this.mutationListeners].map((listener) => listener(cwd)))
   }
 
-  private async commonDirectory(cwd: string) {
-    const result = await this.git(cwd, ['rev-parse', '--git-common-dir'])
-    return realpath(path.resolve(cwd, result.stdout.trim()))
+  private commonDirectory(cwd: string) {
+    return gitCommonDirectory({ rootAbsolutePath: cwd, run: (args) => this.git(cwd, args) })
   }
 
   async repo(input = '') {
@@ -508,7 +508,7 @@ export class GitService {
    */
   async *commitProgress(body: GitCommitBody): AsyncGenerator<GitCommitProgressEvent> {
     const runner = await this.repositoryRunner(body.path)
-    yield* withGitRepositoryLaneStream(await this.commonDirectory(runner.rootAbsolutePath), () =>
+    yield* withGitRepositoryLaneStream(await gitCommonDirectory(runner), () =>
       this.commitProgressInLane(body),
     )
   }

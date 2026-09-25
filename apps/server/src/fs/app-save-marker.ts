@@ -1,7 +1,7 @@
-import { randomUUID } from 'node:crypto'
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { platformHomePath } from '../home'
+import { writeFileAtomicSync } from './atomic-write'
 
 const DEFAULT_TTL_MS = 10_000
 const MAX_MARKERS = 512
@@ -125,16 +125,8 @@ function cappedLedger(ledger: AppSaveLedger): AppSaveLedger {
 }
 
 function writeLedger(markerPath: string, ledger: AppSaveLedger): void {
-  const directory = path.dirname(markerPath)
-  mkdirSync(directory, { recursive: true })
-  const temporaryPath = path.join(directory, `.${path.basename(markerPath)}.${randomUUID()}.tmp`)
-  try {
-    writeFileSync(temporaryPath, JSON.stringify(ledger), 'utf8')
-    renameSync(temporaryPath, markerPath)
-  } catch (error) {
-    rmSync(temporaryPath, { force: true })
-    throw error
-  }
+  mkdirSync(path.dirname(markerPath), { recursive: true })
+  writeFileAtomicSync(markerPath, JSON.stringify(ledger), { durability: 'rename' })
 }
 
 function normalizeMarkerPath(input: string): string {

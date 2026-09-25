@@ -83,11 +83,11 @@ async function destinationExists(absolutePath: string) {
 }
 
 export async function statOptional(absolutePath: string): Promise<Stats | null> {
-  return statSafely(() => stat(absolutePath))
+  return statOptionalVia(stat, absolutePath)
 }
 
-async function lstatOptional(absolutePath: string): Promise<Stats | null> {
-  return statSafely(() => lstat(absolutePath))
+export async function lstatOptional(absolutePath: string): Promise<Stats | null> {
+  return statOptionalVia(lstat, absolutePath)
 }
 
 export async function removeDestinationIfAllowed(absolutePath: string, overwrite?: boolean) {
@@ -97,11 +97,16 @@ export async function removeDestinationIfAllowed(absolutePath: string, overwrite
   await rm(absolutePath, { recursive: true, force: false })
 }
 
-async function statSafely(read: () => Promise<Stats>): Promise<Stats | null> {
+/** `null` when missing. ENOTDIR counts: a file as a parent component means no entry. */
+export async function statOptionalVia(
+  read: (target: string) => Promise<Stats>,
+  target: string,
+): Promise<Stats | null> {
   try {
-    return await read()
+    return await read(target)
   } catch (error) {
-    if (nodeErrorCode(error) === 'ENOENT') return null
+    const code = nodeErrorCode(error)
+    if (code === 'ENOENT' || code === 'ENOTDIR') return null
     throw error
   }
 }

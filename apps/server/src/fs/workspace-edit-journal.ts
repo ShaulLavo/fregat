@@ -1,5 +1,6 @@
-import { syncPath } from './sync-path'
-import { randomUUID } from 'node:crypto'
+import { atomicTemporaryPath, commitAtomicWrite, stageAtomicWrite } from './atomic-write'
+import { fsyncVia } from './fsync'
+import { statOptionalVia } from './mutation-target'
 import type { Dirent, Stats } from 'node:fs'
 import {
   chmod,
@@ -283,12 +284,12 @@ export class WorkspaceEditJournal {
   }
 
   async initialize() {
-    const existed = Boolean(await this.lstatOptional(this.root))
+    const existed = Boolean(await statOptionalVia(this.driver.lstat, this.root))
     await this.driver.mkdir(this.root, { mode: 0o700, recursive: true })
     await this.assertDirectory(this.root)
     await this.driver.chmod(this.root, 0o700)
-    await syncPath(this.driver, this.root)
-    if (!existed) await syncPath(this.driver, path.dirname(this.root))
+    await fsyncVia(this.driver.open, this.root)
+    if (!existed) await fsyncVia(this.driver.open, path.dirname(this.root))
   }
 
   async createOperation(operationId: string) {
@@ -296,12 +297,12 @@ export class WorkspaceEditJournal {
     await this.driver.mkdir(operationPath, { mode: 0o700, recursive: false })
     await this.assertDirectory(operationPath)
     await this.driver.chmod(operationPath, 0o700)
-    await syncPath(this.driver, this.root)
+    await fsyncVia(this.driver.open, this.root)
     const stagePath = path.join(operationPath, STAGE_DIRECTORY)
     await this.driver.mkdir(stagePath, { mode: 0o700, recursive: false })
     await this.assertDirectory(stagePath)
     await this.driver.chmod(stagePath, 0o700)
-    await syncPath(this.driver, operationPath)
+    await fsyncVia(this.driver.open, operationPath)
   }
 
   async writeStage(operationId: string, name: string, bytes: Uint8Array) {
@@ -310,8 +311,8 @@ export class WorkspaceEditJournal {
     await this.assertMissing(target)
     await this.driver.writeFile(target, bytes, { flag: 'wx', mode: 0o600 })
     await this.driver.chmod(target, 0o600)
-    await syncPath(this.driver, target)
-    await syncPath(this.driver, path.dirname(target))
+    await fsyncVia(this.driver.open, target)
+    await fsyncVia(this.driver.open, path.dirname(target))
     return relativePath
   }
 
@@ -337,23 +338,21 @@ export class WorkspaceEditJournal {
     const operationPath = this.operationPath(manifest.operationId)
     await this.assertDirectory(operationPath)
     const destination = path.join(operationPath, MANIFEST_FILE)
-    const temporary = path.join(operationPath, `.${MANIFEST_FILE}.${randomUUID()}.tmp`)
+    const temporary = atomicTemporaryPath(destination)
     const serialized = `${JSON.stringify(manifest)}\n`
+    const options = { driver: this.driver, durability: 'fsync-all', mode: 0o600 } as const
 
     await this.assertMissing(temporary)
-    await this.driver.writeFile(temporary, serialized, { flag: 'wx', mode: 0o600 })
-    await this.driver.chmod(temporary, 0o600)
-    await syncPath(this.driver, temporary)
+    await stageAtomicWrite(temporary, serialized, options)
     await this.assertReplaceableManifest(destination)
-    await this.driver.rename(temporary, destination)
-    await syncPath(this.driver, operationPath)
+    await commitAtomicWrite(temporary, destination, options)
   }
 
   async append(operationId: string, record: WorkspaceEditJournalRecord) {
     const operationPath = this.operationPath(operationId)
     await this.assertDirectory(operationPath)
     const target = path.join(operationPath, PROGRAM_FILE)
-    const existed = Boolean(await this.lstatOptional(target))
+    const existed = Boolean(await statOptionalVia(this.driver.lstat, target))
     await this.assertAppendTarget(target)
     const handle = await this.driver.open(target, 'a', 0o600)
 
@@ -364,7 +363,7 @@ export class WorkspaceEditJournal {
     } finally {
       await handle.close()
     }
-    if (!existed) await syncPath(this.driver, operationPath)
+    if (!existed) await fsyncVia(this.driver.open, operationPath)
   }
 
   async load(operationId: string) {
@@ -378,7 +377,7 @@ export class WorkspaceEditJournal {
 
   async records(operationId: string) {
     const target = this.operationChild(operationId, PROGRAM_FILE)
-    const stats = await this.lstatOptional(target)
+    const stats = await statOptionalVia(this.driver.lstat, target)
     if (!stats) return []
     if (!stats.isFile() || stats.isSymbolicLink()) throw new FsError('WORKSPACE_EDIT_INVALID')
 
@@ -422,12 +421,12 @@ export class WorkspaceEditJournal {
 
   async remove(operationId: string) {
     const operationPath = this.operationPath(operationId)
-    const stats = await this.lstatOptional(operationPath)
+    const stats = await statOptionalVia(this.driver.lstat, operationPath)
     if (!stats) return
     if (!stats.isDirectory() || stats.isSymbolicLink()) throw new FsError('WORKSPACE_EDIT_INVALID')
 
     await this.driver.rm(operationPath, { force: false, recursive: true })
-    await syncPath(this.driver, this.root)
+    await fsyncVia(this.driver.open, this.root)
   }
 
   async clearStaging(operationId: string) {
@@ -437,7 +436,7 @@ export class WorkspaceEditJournal {
     const programPath = path.join(operationPath, PROGRAM_FILE)
     await this.removeJournalChild(stagePath)
     await this.removeJournalChild(programPath)
-    await syncPath(this.driver, operationPath)
+    await fsyncVia(this.driver.open, operationPath)
   }
 
   operationPath(operationId: string) {
@@ -467,38 +466,29 @@ export class WorkspaceEditJournal {
   }
 
   private async assertMissing(target: string) {
-    if (!(await this.lstatOptional(target))) return
+    if (!(await statOptionalVia(this.driver.lstat, target))) return
 
     throw new FsError('WORKSPACE_EDIT_INVALID')
   }
 
   private async assertReplaceableManifest(target: string) {
-    const stats = await this.lstatOptional(target)
+    const stats = await statOptionalVia(this.driver.lstat, target)
     if (!stats) return
     if (stats.isSymbolicLink() || !stats.isFile()) throw new FsError('WORKSPACE_EDIT_INVALID')
   }
 
   private async assertAppendTarget(target: string) {
-    const stats = await this.lstatOptional(target)
+    const stats = await statOptionalVia(this.driver.lstat, target)
     if (!stats) return
     if (stats.isSymbolicLink() || !stats.isFile()) throw new FsError('WORKSPACE_EDIT_INVALID')
   }
 
   private async removeJournalChild(target: string) {
-    const stats = await this.lstatOptional(target)
+    const stats = await statOptionalVia(this.driver.lstat, target)
     if (!stats) return
     if (stats.isSymbolicLink()) throw new FsError('WORKSPACE_EDIT_INVALID')
 
     await this.driver.rm(target, { force: false, recursive: stats.isDirectory() })
-  }
-
-  private async lstatOptional(target: string) {
-    try {
-      return await this.driver.lstat(target)
-    } catch (error) {
-      if (nodeErrorCode(error) === 'ENOENT') return null
-      throw error
-    }
   }
 }
 

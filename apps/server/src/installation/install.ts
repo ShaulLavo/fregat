@@ -1,7 +1,8 @@
-import { access, mkdir, rename, rm, writeFile } from 'node:fs/promises'
+import { access, mkdir } from 'node:fs/promises'
 import { constants } from 'node:fs'
 import path from 'node:path'
 import * as v from 'valibot'
+import { writeFileAtomic } from '../fs/atomic-write'
 import { createStructuredError } from '../observability/structured-errors'
 import { shellQuote } from '../utils/shell'
 import { installationSchema, type ServerInstallation } from './descriptor'
@@ -18,10 +19,11 @@ export async function installServerLauncher(options: {
     Bun.resolveSync(dependency, path.join(installation.directory, 'apps/server'))
   const destination = path.join(options.homeDirectory, '.local/bin/platform-server')
   await mkdir(path.dirname(destination), { recursive: true })
-  const temporary = `${destination}.${crypto.randomUUID()}.tmp`
   try {
-    await writeFile(temporary, launcherSource(installation), { mode: 0o700 })
-    await rename(temporary, destination)
+    await writeFileAtomic(destination, launcherSource(installation), {
+      durability: 'rename',
+      mode: 0o700,
+    })
   } catch (cause) {
     throw createStructuredError({
       code: 'installation.WRITE_FAILED',
@@ -31,8 +33,6 @@ export async function installServerLauncher(options: {
       fix: `Check write permissions for ${path.dirname(destination)} and run server:install again.`,
       cause,
     })
-  } finally {
-    await rm(temporary, { force: true })
   }
   return destination
 }
