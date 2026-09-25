@@ -119,7 +119,11 @@ test.each(['claimed', 'adopted'] as const)(
     const shell = await engine.shellSnapshot()
     expect(shell.sessions[0]).toMatchObject({
       attentionState: 'needs-input',
-      latestTurn: { providerStartState: 'interrupted', state: 'interrupted' },
+      latestTurn: {
+        endReason: 'server-restart',
+        providerStartState: 'interrupted',
+        state: 'interrupted',
+      },
     })
     await engine.providerRuntimeIdle()
     expect(adapter.startedTurns).toHaveLength(0)

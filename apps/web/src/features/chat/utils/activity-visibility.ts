@@ -1,5 +1,6 @@
 import {
   APPROVAL_ANSWER_SUBMITTED_KIND,
+  TURN_ENDED_ACTIVITY_KIND,
   type OrchestrationSessionActivity,
 } from '@workspace/contracts'
 
@@ -10,6 +11,7 @@ import { isWorkLogFailure } from '@/features/chat/utils/work-row'
 
 const QUIET_ACTIVITY_KINDS = new Set([
   APPROVAL_ANSWER_SUBMITTED_KIND,
+  TURN_ENDED_ACTIVITY_KIND,
   'account.updated',
   'account.rate-limits.updated',
   'auth.status',

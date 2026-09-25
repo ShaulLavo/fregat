@@ -795,6 +795,7 @@ function applySessionTurnStartRequestedEvent(
         : 'queued',
     assistantMessageId: null,
     completedAt: null,
+    endReason: null,
     requestedAt: event.payload.createdAt,
     sourceProposedPlan: event.payload.sourceProposedPlan,
     startedAt: null,
@@ -827,6 +828,7 @@ function applySessionTurnInterruptRequestedEvent(
     liveTurn: {
       ...session.liveTurn,
       completedAt: session.liveTurn.completedAt ?? event.payload.createdAt,
+      endReason: session.liveTurn.endReason ?? 'user-stop',
       startedAt: session.liveTurn.startedAt ?? event.payload.createdAt,
       state: 'interrupted',
       providerStartState: 'interrupted',
@@ -861,6 +863,7 @@ function applySessionRuntimeSetEvent(
       assistantMessageId:
         currentTurn?.turnId === activeTurnId ? currentTurn.assistantMessageId : null,
       completedAt: null,
+      endReason: null,
       requestedAt:
         currentTurn?.turnId === activeTurnId
           ? currentTurn.requestedAt
@@ -1088,6 +1091,7 @@ function applySessionTurnDiffCompletedEvent(
       completedAt: event.payload.completedAt,
       requestedAt: state.sessionById[sessionId]?.liveTurn?.requestedAt ?? event.payload.completedAt,
       startedAt: state.sessionById[sessionId]?.liveTurn?.startedAt ?? event.payload.completedAt,
+      endReason: sameTurnEndReason(state.sessionById[sessionId]?.liveTurn, event.payload.turnId),
       state: checkpointStatusToLatestTurnState(event.payload.status),
       turnId: event.payload.turnId,
     },
@@ -1165,6 +1169,7 @@ function latestTurnFromSummary(summary: ChatTurnDiffSummary): OrchestrationLates
     providerStartState: 'settled',
     assistantMessageId: summary.assistantMessageId,
     completedAt: summary.completedAt,
+    endReason: null,
     requestedAt: summary.completedAt,
     startedAt: summary.completedAt,
     state: checkpointStatusToLatestTurnState(summary.status),
@@ -1275,6 +1280,7 @@ function writeAssistantMessageTurnState(
       completedAt: event.payload.streaming
         ? (latestTurn?.completedAt ?? null)
         : (latestTurn?.completedAt ?? event.payload.updatedAt),
+      endReason: sameTurnEndReason(latestTurn, event.payload.turnId),
       requestedAt: latestTurn?.requestedAt ?? event.payload.createdAt,
       sourceProposedPlan: latestTurn?.sourceProposedPlan,
       startedAt: latestTurn?.startedAt ?? event.payload.createdAt,
@@ -1668,6 +1674,13 @@ function applySessionProposedPlanImplemented(
       },
     },
   }
+}
+
+/** The server decides end reasons; the client only keeps one it already has for the same turn. */
+function sameTurnEndReason(turn: OrchestrationLatestTurn | null | undefined, turnId: TurnId) {
+  if (turn?.turnId !== turnId) return null
+
+  return turn.endReason ?? null
 }
 
 function turnRuntimeMetadata(

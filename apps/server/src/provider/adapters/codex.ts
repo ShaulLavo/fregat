@@ -2097,7 +2097,7 @@ class CodexAppServerSession extends SessionContext {
     this.emit({
       createdAt: new Date().toISOString(),
       eventId: runtimeEventId('codex-turn-failed'),
-      payload: { errorMessage: message, state: 'failed' },
+      payload: { endReason: 'provider-error', errorMessage: message, state: 'failed' },
       provider: DEFAULT_CODEX_PROVIDER_SETTINGS.driverKind,
       providerInstanceId: this.providerInstanceId,
       ...(providerTurnId !== undefined ? { providerRefs: { providerTurnId } } : {}),

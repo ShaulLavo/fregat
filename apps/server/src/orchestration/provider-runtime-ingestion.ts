@@ -19,6 +19,7 @@ import {
   type UserInputQuestionOption,
 } from '@workspace/contracts'
 import * as v from 'valibot'
+import { TURN_ENDED_ACTIVITY_KIND } from '@workspace/contracts'
 import { endedApprovalActivityId } from './approval-admission'
 import type { ProviderRuntimeEvent } from '../provider/types'
 import { checkpointFilesFromUnifiedDiff } from './checkpoint-files'
@@ -878,6 +879,8 @@ function activitiesForRuntimeEvent(
       return [taskCompletedActivity(event, taskTitle)]
     case 'turn.plan.updated':
       return [turnPlanUpdatedActivity(event)]
+    case 'turn.completed':
+      return turnEndedActivity(event)
     case 'auth.status':
       return authStatusActivity(event)
     case 'mcp.status.updated':
@@ -901,6 +904,16 @@ function activitiesForRuntimeEvent(
     default:
       return []
   }
+}
+
+function turnEndedActivity(event: Extract<ProviderRuntimeEvent, { type: 'turn.completed' }>) {
+  if (!event.payload.endReason) return []
+
+  return [
+    baseActivity(event, 'info', TURN_ENDED_ACTIVITY_KIND, 'Turn ended', {
+      endReason: event.payload.endReason,
+    }),
+  ]
 }
 
 function activityFromLegacyEvent(

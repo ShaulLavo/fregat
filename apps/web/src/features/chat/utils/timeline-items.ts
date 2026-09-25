@@ -18,6 +18,7 @@ import { chatActiveResponseTurnIds } from '@/features/chat/utils/active-response
 import { isWorkLogFailure } from '@/features/chat/utils/work-row'
 import { deriveChatLiveActivity, type ChatLiveActivity } from '@/features/chat/utils/live-activity'
 import { formatChatElapsed } from '@/features/chat/utils/formatters'
+import { stoppedTurnLabel } from '@/features/chat/utils/turn-end-label'
 import {
   chatMessageTimelineMetadata,
   type ChatTimelineMessage,
@@ -61,6 +62,7 @@ export type ChatTimelineItem =
       durationEnd: string
       durationStart: string
       id: string
+      incomplete: boolean
       message: OrchestrationMessage | OptimisticChatMessage
       revertTurnCount: number | null
       showAssistantCopyButton: boolean
@@ -114,6 +116,7 @@ type ChronologicalTimelineItem =
       durationEnd: string
       durationStart: string
       id: string
+      incomplete: boolean
       message: OrchestrationMessage | OptimisticChatMessage
       revertTurnCount: number | null
       showAssistantCopyButton: boolean
@@ -362,10 +365,9 @@ function appendEmptyTurnStatus(
     latestTurn.startedAt ?? latestTurn.requestedAt,
     latestTurn.completedAt,
   )
-  let label = elapsed ? `Worked for ${elapsed}` : 'Response completed'
-  if (latestTurn.state === 'error') label = elapsed ? `Failed after ${elapsed}` : 'Response failed'
-  if (latestTurn.state === 'interrupted')
-    label = elapsed ? `You stopped after ${elapsed}` : 'You stopped this response'
+  const label =
+    stoppedTurnLabel(latestTurn, elapsed) ??
+    (elapsed ? `Worked for ${elapsed}` : 'Response completed')
   items.push({
     id: `turn-status:${latestTurn.turnId}`,
     timestamp: latestTurn.completedAt,
@@ -458,6 +460,7 @@ function messageTimelineItem(
     durationEnd: metadata.durationEnd,
     durationStart: metadata.durationStart,
     id: `message:${message.id}`,
+    incomplete: metadata.incomplete,
     message,
     revertTurnCount,
     showAssistantCopyButton: metadata.showAssistantCopyButton,
@@ -589,6 +592,7 @@ function timelineItemFromEntry(
       durationEnd: item.durationEnd,
       durationStart: item.durationStart,
       id: item.id,
+      incomplete: item.incomplete,
       message: item.message,
       revertTurnCount: item.revertTurnCount,
       showAssistantCopyButton: item.showAssistantCopyButton,
@@ -724,12 +728,8 @@ function turnFoldLabel(
   turnId: TurnId,
 ) {
   const elapsed = turnFoldElapsed(group, latestTurn, turnId)
-  if (latestTurn?.turnId === turnId && latestTurn.state === 'error') {
-    return elapsed ? `Failed after ${elapsed}` : 'Response failed'
-  }
-  if (latestTurn?.turnId === turnId && latestTurn.state === 'interrupted') {
-    return elapsed ? `You stopped after ${elapsed}` : 'You stopped this response'
-  }
+  const stopped = latestTurn?.turnId === turnId ? stoppedTurnLabel(latestTurn, elapsed) : null
+  if (stopped) return stopped
 
   return elapsed ? `Worked for ${elapsed}` : 'Worked'
 }
@@ -955,6 +955,7 @@ function messageItemsEqual(
     left.completionSummary === right.completionSummary &&
     left.durationEnd === right.durationEnd &&
     left.durationStart === right.durationStart &&
+    left.incomplete === right.incomplete &&
     left.revertTurnCount === right.revertTurnCount &&
     left.showAssistantCopyButton === right.showAssistantCopyButton &&
     left.showCompletionDivider === right.showCompletionDivider

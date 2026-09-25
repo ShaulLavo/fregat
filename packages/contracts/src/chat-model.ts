@@ -359,6 +359,26 @@ export const sessionRuntimeStateSchema = v.object({
 /** The decider's record of an admitted approval answer, before the agent resolves it. */
 export const APPROVAL_ANSWER_SUBMITTED_KIND = 'approval.answer-submitted'
 
+/**
+ * Why a turn stopped short. The first three are our own causes; the rest are
+ * what a harness reported, and anything it reported that we cannot map is `provider-error`.
+ */
+export const TURN_END_REASONS = [
+  'user-stop',
+  'server-restart',
+  'runtime-stopped',
+  'output-limit',
+  'turn-limit',
+  'refusal',
+  'provider-error',
+] as const
+export const turnEndReasonSchema = v.picklist(TURN_END_REASONS)
+export type TurnEndReason = v.InferOutput<typeof turnEndReasonSchema>
+
+/** A harness-reported end reason, carried to the turn row as a quiet activity. */
+export const TURN_ENDED_ACTIVITY_KIND = 'turn.ended'
+export const turnEndedPayloadSchema = v.object({ endReason: turnEndReasonSchema })
+
 const orchestrationLatestTurnStateSchema = v.picklist([
   'running',
   'interrupted',
@@ -377,6 +397,7 @@ export const orchestrationLatestTurnSchema = v.object({
   requestedAt: isoDateTimeSchema,
   startedAt: v.nullable(isoDateTimeSchema),
   completedAt: v.nullable(isoDateTimeSchema),
+  endReason: v.optional(v.nullable(turnEndReasonSchema), null),
   assistantMessageId: v.nullable(messageIdSchema),
   sourceProposedPlan: v.optional(sourceProposedPlanReferenceSchema),
   providerStartState: v.picklist([

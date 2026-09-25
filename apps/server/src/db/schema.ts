@@ -1,6 +1,7 @@
 import type { RecordedModelPrice } from '../provider/utils/model-prices'
 import type { UsageContribution } from '../provider/utils/usage-contributions'
 import {
+  TURN_END_REASONS,
   providerUsagePurposeSchema,
   sessionRuntimeStatusSchema,
   type WorkspaceAddressId,
@@ -516,6 +517,7 @@ export const projectionTurns = sqliteTable(
     requestedAt: text('requested_at').notNull(),
     startedAt: text('started_at'),
     completedAt: text('completed_at'),
+    endReason: text('end_reason', { enum: TURN_END_REASONS }),
   },
   (table) => [
     uniqueIndex('projection_turns_session_turn_idx').on(table.sessionId, table.turnId),

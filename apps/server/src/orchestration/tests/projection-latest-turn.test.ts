@@ -36,6 +36,7 @@ describe('projection latest turn snapshots', () => {
       assistantMessageId: 'message-2',
       // Provider-runtime commands still carry their own event time.
       completedAt: assistantCompletedAt,
+      endReason: null,
       requestedAt: turn?.requestedAt,
       sourceProposedPlan,
       startedAt: assistantStartedAt,
@@ -92,6 +93,7 @@ describe('projection latest turn snapshots', () => {
     expect(turn).toEqual({
       assistantMessageId: null,
       completedAt: turn?.completedAt,
+      endReason: 'user-stop',
       requestedAt: turn?.requestedAt,
       startedAt: null,
       state: 'interrupted',
@@ -104,6 +106,43 @@ describe('projection latest turn snapshots', () => {
     expectServerStamped(turn?.requestedAt, before)
     // The interrupt is a client command, so the server clock closes the turn.
     expectServerStamped(turn?.completedAt, turn?.requestedAt)
+  })
+
+  it('records a stopped session and a harness-reported limit as end reasons', async () => {
+    const engine = createEngine()
+    await dispatchProjectSession(engine)
+    await engine.dispatch(startTurnCommand())
+
+    await engine.dispatch(
+      command({
+        commandId: 'cmd-runtime-stop',
+        sessionId: 'd2b3ea2b-7e36-4549-b0d4-043c00904574',
+        type: 'session.runtime.stop',
+      }),
+    )
+
+    expect((await latestTurn(engine))?.endReason).toBe('runtime-stopped')
+  })
+
+  it('keeps the first cause when the harness reports its own reason later', async () => {
+    const engine = createEngine()
+    await dispatchProjectSession(engine)
+    await engine.dispatch(startTurnCommand())
+    await engine.dispatch(interruptTurnCommand())
+
+    await engine.dispatch(turnEndedCommand('turn-limit'))
+
+    expect((await latestTurn(engine))?.endReason).toBe('user-stop')
+  })
+
+  it('takes a harness-reported reason when nothing of ours ended the turn', async () => {
+    const engine = createEngine()
+    await dispatchProjectSession(engine)
+    await engine.dispatch(startTurnCommand())
+
+    await engine.dispatch(turnEndedCommand('output-limit'))
+
+    expect((await latestTurn(engine))?.endReason).toBe('output-limit')
   })
 
   it('rejects a nonexistent plan ID even when its session has a plan ready', async () => {
@@ -277,6 +316,7 @@ describe('projection latest turn snapshots', () => {
     expect(turn).toEqual({
       assistantMessageId: null,
       completedAt: null,
+      endReason: null,
       requestedAt: turn?.requestedAt,
       startedAt: null,
       state: 'running',
@@ -383,6 +423,25 @@ function interruptTurnCommand() {
     sessionId: 'd2b3ea2b-7e36-4549-b0d4-043c00904574',
     turnId: 'turn-1',
     type: 'session.turn.interrupt',
+  })
+}
+
+function turnEndedCommand(endReason: string) {
+  return command({
+    activity: {
+      createdAt: '2026-05-24T00:04:00.000Z',
+      id: `turn-ended-${endReason}`,
+      kind: 'turn.ended',
+      payload: { endReason },
+      sessionId: 'd2b3ea2b-7e36-4549-b0d4-043c00904574',
+      summary: 'Turn ended',
+      tone: 'info',
+      turnId: 'turn-1',
+    },
+    commandId: `cmd-turn-ended-${endReason}`,
+    createdAt: '2026-05-24T00:04:00.000Z',
+    sessionId: 'd2b3ea2b-7e36-4549-b0d4-043c00904574',
+    type: 'session.activity.append',
   })
 }
 

@@ -588,6 +588,12 @@
   text-transform: uppercase;
 }
 
+/* Text that stops mid-thought: the last lines fade out instead of ending on a hard edge. */
+@utility fade-out-bottom {
+  --fade-out-height: 3lh;
+  mask-image: linear-gradient(to bottom, black calc(100% - var(--fade-out-height)), transparent);
+}
+
 @utility pressable {
   @apply transition-[color,background-color,border-color,box-shadow] active:not-disabled:not-aria-disabled:not-aria-[haspopup]:translate-y-px;
   transition-duration: var(--duration-color);

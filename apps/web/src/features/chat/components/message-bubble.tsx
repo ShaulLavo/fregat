@@ -30,6 +30,7 @@ export function MessageBubble({
   completionSummary = null,
   durationEnd,
   durationStart,
+  incomplete = false,
   message,
   renderAssistantCopyButton,
   revertTurnCount = null,
@@ -43,6 +44,7 @@ export function MessageBubble({
   completionSummary?: string | null
   durationEnd?: string
   durationStart?: string
+  incomplete?: boolean
   message: OrchestrationMessage | OptimisticChatMessage
   renderAssistantCopyButton?: (text: string) => ReactNode
   revertTurnCount?: number | null
@@ -79,6 +81,9 @@ export function MessageBubble({
     text: message.text,
   })
   const canRevertCheckpoint = user && typeof revertTurnCount === 'number'
+  const assistantMarkdown = (
+    <AssistantMarkdown text={assistantText} streaming={effectiveAssistantStreaming} />
+  )
 
   function handleRevertClick() {
     if (typeof revertTurnCount !== 'number') return
@@ -139,7 +144,13 @@ export function MessageBubble({
             </>
           ) : (
             <>
-              <AssistantMarkdown text={assistantText} streaming={effectiveAssistantStreaming} />
+              {incomplete ? (
+                <div aria-label='Incomplete answer' className='fade-out-bottom' role='group'>
+                  {assistantMarkdown}
+                </div>
+              ) : (
+                assistantMarkdown
+              )}
               {turnDiffSummary ? <AssistantChangedFilesSection summary={turnDiffSummary} /> : null}
               {attachmentList}
             </>

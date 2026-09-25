@@ -71,6 +71,7 @@ function timelineRowContent({
         message={item.message}
         renderAssistantCopyButton={renderAssistantCopyButton}
         revertTurnCount={item.revertTurnCount}
+        incomplete={item.incomplete}
         showAssistantCopyButton={item.showAssistantCopyButton}
         showCompletionDivider={item.showCompletionDivider}
         turnDiffSummary={item.turnDiffSummary}

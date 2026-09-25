@@ -2218,6 +2218,7 @@ describe('CodexProviderAdapter', () => {
         expect(events).toContainEqual(
           expect.objectContaining({
             payload: {
+              endReason: 'provider-error',
               errorMessage: expect.stringMatching(
                 /^Codex usage limit reached\. The session limit resets in (2h|1h 5\dm)\. Send the message again once the limit resets\.$/,
               ),

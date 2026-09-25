@@ -30,6 +30,7 @@ import {
   type ProviderSnapshot,
   type RuntimeMode,
   type SessionId,
+  type TurnEndReason,
   type TurnId,
   type UserInputQuestions,
 } from '@workspace/contracts'
@@ -1549,7 +1550,7 @@ class ClaudeAgentSession extends SessionContext {
       return
     }
     if (message.subtype === 'success') {
-      this.completeTurn(turn, message.usage)
+      this.completeTurn(turn, message.usage, claudeSuccessEndReason(message))
       return
     }
     // An interrupt is a user action, not a failure: it must RESOLVE the turn,
@@ -1559,17 +1560,21 @@ class ClaudeAgentSession extends SessionContext {
       return
     }
 
-    this.rejectTurn(turn, claudeResultErrorMessage(message))
+    this.rejectTurn(turn, claudeResultErrorMessage(message), claudeFailureEndReason(message))
   }
 
-  private completeTurn(turn: ActiveProviderTurn, usage: unknown) {
+  private completeTurn(turn: ActiveProviderTurn, usage: unknown, endReason?: TurnEndReason) {
     const completedAt = new Date().toISOString()
     recordChatPipelineInfo('chat.pipeline.claude_session.complete_turn', {
       messageId: turn.messageId,
       sessionId: this.sessionId,
       turnId: turn.canonicalTurnId,
     })
-    this.emitTurnCompleted(turn, completedAt, { state: 'completed', usage })
+    this.emitTurnCompleted(turn, completedAt, {
+      state: 'completed',
+      usage,
+      ...(endReason ? { endReason } : {}),
+    })
     this.emit({
       completedAt,
       eventId: runtimeEventId('claude-assistant-complete'),
@@ -1592,9 +1597,14 @@ class ClaudeAgentSession extends SessionContext {
     this.resolveTurn(turn)
   }
 
-  private rejectTurn(turn: ActiveProviderTurn, message: string) {
+  private rejectTurn(
+    turn: ActiveProviderTurn,
+    message: string,
+    endReason: TurnEndReason = 'provider-error',
+  ) {
     this.status = 'error'
     this.emitTurnCompleted(turn, new Date().toISOString(), {
+      endReason,
       errorMessage: message,
       state: 'failed',
     })
@@ -1992,6 +2002,7 @@ class ClaudeAgentSession extends SessionContext {
     turn: ActiveProviderTurn,
     createdAt: string,
     payload: {
+      endReason?: TurnEndReason
       errorMessage?: string
       state: 'completed' | 'failed' | 'interrupted'
       usage?: unknown
@@ -2648,6 +2659,25 @@ function isInterruptedClaudeResult(message: Extract<SDKMessage, { type: 'result'
   if (errors.includes('interrupt')) return true
 
   return errors.includes('request was aborted')
+}
+
+/** A turn that finished but was cut short: the answer is complete as far as it goes. */
+function claudeSuccessEndReason(
+  message: Extract<SDKMessage, { type: 'result' }>,
+): TurnEndReason | undefined {
+  if (message.is_error) return 'provider-error'
+  if (message.stop_reason === 'max_tokens') return 'output-limit'
+  if (message.stop_reason === 'refusal') return 'refusal'
+
+  return undefined
+}
+
+function claudeFailureEndReason(message: Extract<SDKMessage, { type: 'result' }>): TurnEndReason {
+  if (message.subtype === 'error_max_turns') return 'turn-limit'
+  if (message.terminal_reason === 'max_turns') return 'turn-limit'
+  if (message.stop_reason === 'refusal') return 'refusal'
+
+  return 'provider-error'
 }
 
 function claudeResultErrors(message: Extract<SDKMessage, { type: 'result' }>) {

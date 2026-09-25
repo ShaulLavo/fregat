@@ -270,7 +270,7 @@ test('a response stopped before any text has an explicit final state', () => {
   expect(items).toEqual([
     expect.objectContaining({
       type: 'turn-status',
-      label: expect.stringMatching(/^You stopped after/),
+      label: expect.stringMatching(/^Stopped after/),
     }),
   ])
 })

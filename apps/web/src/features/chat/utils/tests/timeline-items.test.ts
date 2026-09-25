@@ -474,7 +474,12 @@ describe('chat timeline items', () => {
     expect(items.some((item) => item.type === 'turn-fold')).toBe(false)
   })
 
-  it('names an interrupted turn after the user who stopped it', () => {
+  it.for([
+    { endReason: 'user-stop', label: 'You stopped it after 2.0s' },
+    { endReason: 'server-restart', label: 'Interrupted by a server restart after 2.0s' },
+    { endReason: 'runtime-stopped', label: 'The session was stopped after 2.0s' },
+    { endReason: null, label: 'Stopped after 2.0s' },
+  ] as const)('names an interrupted turn by why it stopped: $label', ({ endReason, label }) => {
     const sessionId = v.parse(sessionIdSchema, 'affd3ce8-92e1-5ee7-b089-edd598c2c35a')
     const turnId = v.parse(turnIdSchema, 'turn-1')
     const items = chatTimelineItems({
@@ -486,6 +491,7 @@ describe('chat timeline items', () => {
         runtimeEpoch: 'test-epoch',
         assistantMessageId: null,
         completedAt: timestamp(4),
+        endReason,
         requestedAt: timestamp(1),
         startedAt: timestamp(2),
         state: 'interrupted',
@@ -496,9 +502,7 @@ describe('chat timeline items', () => {
       proposedPlans: [],
     })
 
-    expect(items.find((item) => item.type === 'turn-fold')).toMatchObject({
-      label: 'You stopped after 2.0s',
-    })
+    expect(items.find((item) => item.type === 'turn-fold')).toMatchObject({ label })
   })
 
   describe('folds never hide a failure, a wait or a running call', () => {

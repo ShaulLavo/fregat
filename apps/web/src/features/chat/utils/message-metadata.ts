@@ -3,6 +3,7 @@ import type { OrchestrationLatestTurn, OrchestrationMessage, TurnId } from '@wor
 import type { OptimisticChatMessage } from '@/features/chat/state/chat-message-intents'
 import { chatActiveResponseTurnIds } from '@/features/chat/utils/active-response'
 import { formatChatElapsed } from '@/features/chat/utils/formatters'
+import { turnStoppedShort } from '@/features/chat/utils/turn-end-label'
 
 export type ChatTimelineMessage = OrchestrationMessage | OptimisticChatMessage
 
@@ -12,6 +13,8 @@ export type ChatMessageTimelineMetadata = {
   completionSummary: string | null
   durationEnd: string
   durationStart: string
+  /** The last answer of a turn that stopped short. */
+  incomplete: boolean
   showAssistantCopyButton: boolean
   showCompletionDivider: boolean
 }
@@ -37,6 +40,7 @@ export function chatMessageTimelineMetadata({
   const completionDividerMessageId = completionSummary
     ? deriveCompletionDividerMessageId(orderedMessages, latestTurn)
     : null
+  const stoppedTurnId = turnStoppedShort(latestTurn) ? (latestTurn?.turnId ?? null) : null
   const metadataByMessageId = new Map<string, ChatMessageTimelineMetadata>()
 
   for (const message of messages) {
@@ -47,6 +51,10 @@ export function chatMessageTimelineMetadata({
       completionSummary,
       durationEnd: durationEndForMessage(message, latestTurn, completionDividerMessageId),
       durationStart: durationStartByMessageId.get(message.id) ?? message.createdAt,
+      incomplete:
+        stoppedTurnId !== null &&
+        message.turnId === stoppedTurnId &&
+        terminalAssistantMessageIds.has(message.id),
       showAssistantCopyButton:
         message.role === 'assistant' && terminalAssistantMessageIds.has(message.id),
       showCompletionDivider:
@@ -66,6 +74,7 @@ export function fallbackChatMessageTimelineMetadata(
     completionSummary: null,
     durationEnd: message.updatedAt,
     durationStart: message.createdAt,
+    incomplete: false,
     showAssistantCopyButton: false,
     showCompletionDivider: false,
   }

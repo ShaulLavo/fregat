@@ -737,8 +737,30 @@ describe('ClaudeProviderAdapter', () => {
     expect(error.message).toBe('boom')
     expect(error).toMatchObject({ code: 'server.INTERNAL_ERROR', name: 'EvlogError', status: 500 })
     expect(await waitForEvent(harness, 'turn.completed')).toMatchObject({
-      payload: { errorMessage: 'boom', state: 'failed' },
+      payload: { endReason: 'provider-error', errorMessage: 'boom', state: 'failed' },
       turnId: input.turnId,
+    })
+    await harness.adapter.stopAll()
+  })
+
+  it.for([
+    { result: { stop_reason: 'max_tokens' }, endReason: 'output-limit' },
+    { result: { stop_reason: 'refusal' }, endReason: 'refusal' },
+    {
+      result: { errors: [], is_error: true, subtype: 'error_max_turns' },
+      endReason: 'turn-limit',
+    },
+  ] as const)('reports $endReason as the end reason the harness gave', async (fixture) => {
+    const harness = claudeHarness()
+    const input = providerTurnInput()
+
+    const settled = harness.adapter.sendTurn(input).catch(() => undefined)
+    await waitForEvent(harness, 'turn.started')
+    latestQuery(harness).emit({ ...successResult(), ...fixture.result } as SDKMessage)
+    await settled
+
+    expect(await waitForEvent(harness, 'turn.completed')).toMatchObject({
+      payload: { endReason: fixture.endReason },
     })
     await harness.adapter.stopAll()
   })
