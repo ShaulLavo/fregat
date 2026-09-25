@@ -2,6 +2,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/component
 import { XIcon } from '@phosphor-icons/react'
 
 import { Button } from '@workspace/ui/components/button'
+import { StatusDot } from '@workspace/ui/components/status-dot'
 import { cn } from '@workspace/ui/lib/utils'
 
 export function TabTrailingSlot({
@@ -51,13 +52,13 @@ export function TabTrailingSlot({
         <TooltipContent>{`Close ${title}`}</TooltipContent>
       </Tooltip>
       {dirty ? (
-        <span
-          aria-hidden='true'
+        <StatusDot
           className={cn(
-            'pointer-events-none absolute size-2 rounded-full bg-warning transition-opacity',
+            'pointer-events-none absolute transition-opacity',
             'opacity-100 group-focus-within/proof-tab:opacity-0 group-hover/proof-tab:opacity-0',
           )}
           data-workbench-tab-dirty-indicator=''
+          tone='warning'
         />
       ) : null}
     </span>

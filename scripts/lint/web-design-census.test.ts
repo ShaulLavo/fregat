@@ -609,3 +609,19 @@ test('fails an allow-list entry that matches nothing in the census', () => {
   expect(result.passed).toBe(false)
   expect(result.allowProblems[0]).toContain('stale')
 })
+
+test('flags a hand-made round status dot and leaves pills and bars alone', () => {
+  const subject = census(
+    "import { cn } from '@workspace/ui/lib/utils'",
+    'export const Dot = ({ tone }: { readonly tone: string }) => (',
+    '  <>',
+    "    <span className={cn('size-1.5 shrink-0 rounded-full', tone)} />",
+    "    <span className='bg-info h-3 w-0.5 rounded-full' />",
+    "    <span className='bg-muted h-1 flex-1 rounded-full' />",
+    '  </>',
+    ')',
+  )
+
+  expect(locations(subject, 'statusDots')).toEqual(['probe.tsx:4 rounded-full'])
+  expect(gate(subject).offenders.statusDots).toHaveLength(1)
+})

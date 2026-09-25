@@ -87,7 +87,7 @@
   {
     "file": "apps/web/src/features/chat/components/message-completion-divider.tsx",
     "class": "truncate",
-    "reason": "D3: \"Worked for \u2026\" is app-authored."
+    "reason": "D3: \"Worked for …\" is app-authored."
   },
   {
     "file": "apps/web/src/features/chat/components/composer-controls-menu.tsx",
@@ -183,5 +183,10 @@
     "file": "apps/web/src/features/chat/components/chat-input-attach-button.tsx",
     "class": "<input>",
     "reason": "A visually hidden type='file' input that only the Button beside it ever focuses or clicks. There is no primitive for a file picker, and the Input primitive would give a sr-only element a radius, a height and a focus ring."
+  },
+  {
+    "file": "apps/web/src/features/chat/components/composer-active-plan.tsx",
+    "class": "rounded-full",
+    "reason": "A plan-step marker, not a status. Plan 160 replaces it with a step mark, so StatusDot leaves it alone."
   }
 ]

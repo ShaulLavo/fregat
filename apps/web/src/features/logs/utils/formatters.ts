@@ -1,4 +1,5 @@
 import type { LogDashboardLevel, LogEventSummary } from '@workspace/contracts'
+import type { StatusDotTone } from '@workspace/ui/components/status-dot'
 
 export function formatLogTime(timestamp: string) {
   return new Intl.DateTimeFormat(undefined, {
@@ -43,10 +44,10 @@ export function logLevelClass(level: LogDashboardLevel) {
   return 'bg-success/10 text-success'
 }
 
-export function logLevelDotClass(level: LogDashboardLevel) {
-  if (level === 'error') return 'bg-destructive'
-  if (level === 'warn') return 'bg-warning'
-  if (level === 'debug') return 'bg-info'
+export function logLevelTone(level: LogDashboardLevel): StatusDotTone {
+  if (level === 'error') return 'destructive'
+  if (level === 'warn') return 'warning'
+  if (level === 'debug') return 'info'
 
-  return 'bg-success'
+  return 'success'
 }

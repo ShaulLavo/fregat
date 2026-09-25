@@ -107,6 +107,8 @@
   --duration-enter: 140ms;
   --duration-exit: 100ms;
   --duration-color: var(--duration-exit);
+  /* A live status mark's full breath, slow enough to read as calm. */
+  --duration-breathe: 2.6s;
   /* Tailwind reads both of these for every bare `transition-*` utility, so a call
      site that does not name a duration or a curve still gets the system rather
      than Tailwind's 150ms cubic-bezier(0.4,0,0.2,1). Never hand-write either. */
@@ -191,6 +193,7 @@
      pre-compaction typography through its shadow host. */
   --icon-size: 1rem;
   --icon-size-sm: 0.875rem;
+  --status-dot-size: 0.375rem;
   --density-control-height: 2rem;
   --density-control-height-sm: 1.75rem;
   --density-control-height-lg: 2.25rem;
@@ -575,8 +578,6 @@
   }
 }
 
-/* Press feedback: the control takes a 1px step down under the pointer. Not when
-   it owns a popup — the menu is anchored to the trigger and would travel with it. */
 /* A small uppercase label above a group, in the metadata mono at the quietest
    size. Colour stays at the call site. */
 @utility section-label {
@@ -599,9 +600,17 @@
   );
 }
 
+/* Press feedback: the control takes a 1px step down under the pointer. Not when
+   it owns a popup — the menu is anchored to the trigger and would travel with it. */
 @utility pressable {
   @apply transition-[color,background-color,border-color,box-shadow] active:not-disabled:not-aria-disabled:not-aria-[haspopup]:translate-y-px;
   transition-duration: var(--duration-color);
+}
+
+/* A live status mark breathes in opacity only; a glow would be a shadow outside
+   the three elevations. */
+@utility status-breathe {
+  animation: app-status-breathe var(--duration-breathe) ease-in-out infinite;
 }
 
 /* A skeleton bar. The tint is the floor; the sweep is what says "incoming".
@@ -644,6 +653,10 @@
 /* Reduced motion keeps both readable and stops the travel: the skeleton falls
    back to its flat tint, the label back to its own color. */
 @media (prefers-reduced-motion: reduce) {
+  .status-breathe {
+    animation: none;
+  }
+
   .skeleton-sweep,
   .text-shimmer {
     animation: none;
@@ -856,6 +869,17 @@
 
   50% {
     transform: scale(1.02);
+  }
+}
+
+@keyframes app-status-breathe {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+
+  50% {
+    opacity: 1;
   }
 }
 

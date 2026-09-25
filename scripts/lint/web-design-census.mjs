@@ -72,6 +72,7 @@ export const TARGETS = {
   textAlpha: { title: 'text alpha', limit: 0, listed: true },
   iconOnlyHint: { title: 'icon-only controls without a Tooltip', limit: 0, listed: true },
   paletteLeaks: { title: 'raw palette colours', limit: 0, listed: true },
+  statusDots: { title: 'hand-made status dots', limit: 0, listed: true },
   truncationRecovery: {
     title: 'truncation with no title on the row',
     limit: 0,
@@ -122,6 +123,8 @@ const ROW_FILL_OPACITY = /^(?:hover:)?bg-row-(?:hover|selected)\/\d+$/
 const HAIRLINE =
   /^(?:border(?:-(?:[trbl]|x|y|s|e))?(?:-(?:border|subtle)(?:\/\d+)?)?|divide-(?:x|y))$/
 const HAIRLINE_BASE = /\bborder-transparent\b/
+// A small round mark is a StatusDot drawn by hand; its colour often comes from a helper elsewhere.
+const DOT_MARK = /^size-(?:1|1\.5|2|2\.5)$/
 const HEIGHT_TOKEN = /^h-(?:\d+(?:\.\d+)?|px|\[[^\]]*\]|\([^)]*\))$/
 const TRUNCATION = /^(?:truncate|line-clamp-\d+)$/
 const SOURCE_FILE = /\.tsx?$/
@@ -235,6 +238,7 @@ export function censusSource(file, source) {
     recordString(census, file, entry, lineAt, groups)
   }
   recordBarHeights(census, groups)
+  recordStatusDots(census, groups)
   return census
 }
 
@@ -534,7 +538,7 @@ function groupFor(groups, entry) {
   const key = entry.elementKey ?? `s${entry.start}`
   const existing = groups.get(key)
   if (existing) return existing
-  const created = { bases: new Set(), heights: [] }
+  const created = { bases: new Set(), heights: [], round: null }
   groups.set(key, created)
   return created
 }
@@ -558,6 +562,7 @@ function recordToken(census, file, entry, token, lineOf, group) {
 
 function recordBarShape(group, hit, base) {
   group.bases.add(base)
+  if (base === 'rounded-full') group.round = hit
   if (HEIGHT_TOKEN.test(base)) group.heights.push(hit)
 }
 
@@ -625,6 +630,14 @@ function recordBarHeights(census, groups) {
       seen.add(`${hit.file}:${hit.line}:${hit.value}`)
       census.hits.barHeights.push(hit)
     }
+  }
+}
+
+function recordStatusDots(census, groups) {
+  for (const group of groups.values()) {
+    if (group.round === null) continue
+    if (![...group.bases].some((base) => DOT_MARK.test(base))) continue
+    census.hits.statusDots.push(group.round)
   }
 }
 
@@ -738,6 +751,7 @@ export function evaluate(census, allowEntries = [], { checkStale = true } = {}) 
     textAlpha: gate('textAlpha', census.hits.textAlpha),
     iconOnlyHint: gate('iconOnlyHint', census.hits.iconOnlyHint),
     paletteLeaks: gate('paletteLeaks', census.hits.paletteLeaks),
+    statusDots: gate('statusDots', census.hits.statusDots),
     truncationRecovery: gate('truncationRecovery', census.hits.truncationRecovery),
   }
   const failures = Object.entries(offenders)
