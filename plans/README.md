@@ -19,6 +19,7 @@ a bare root `bun run verify`.
 
 | Plan                                                                                    | State                                                                    |
 | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| [173 — two devices opening one workspace](173-two-devices-one-workspace.md)             | **RESEARCH — BEFORE PLAN 143'S PHONE SHELL**                             |
 | [172 — one shared undo/redo stack](172-shared-undo-stack.md)                            | **RESEARCH — LIFE-13 IS THE FIRST CONSUMER**                             |
 | [171 — the chat composer runs on our own editor](171-composer-on-our-editor.md)         | **RESEARCH — AFTER PLAN 111**                                            |
 | [170 — language census for grammar and theme prefetch](170-language-census.md)          | **PROPOSED — SPLIT FROM 110 Q7**                                         |
