@@ -39,14 +39,11 @@ provider and the other provider shows a disabled reason; it is never faked.
 
 ### Codex schema refresh
 
-Our Codex client is generated from a pinned upstream ref,
-`CODEX_PROTOCOL_UPSTREAM_REF = 'be75785504ff152fa6333e380a2d50642f42fba0'` in
-`apps/server/src/provider/adapters/codex-protocol/generate.ts`, and its `CLIENT_REQUEST_METHODS`
-list has none of the methods above. The installed `codex-cli 0.156.1` has all of them
-(`codex app-server generate-json-schema`), except `thread/backgroundTerminals/*`, which appears
-only with `--experimental`. The first Codex-facing plan to execute moves the pin, adds its
-methods to `CLIENT_REQUEST_METHODS`, runs `bun run codex-protocol:generate` in `apps/server`, and
-keeps `bun run codex-protocol:check` green. Later plans only add their methods.
+Done 2026-09-25 (lane L3). The pin is `rust-v0.157.0` (`00c972ed…`), matching the installed
+`codex-cli 0.157.0`. `CLIENT_REQUEST_METHODS` now carries `thread/revert` (upstream removed
+`thread/rollback`), `thread/fork`, `thread/compact/start`, `hooks/list`, `mcpServerStatus/list`,
+`mcpServer/oauth/login` and `config/mcpServer/reload`; the generator reads optional params
+(`params?: X | undefined`, published as `Nullable<X>`). Later plans only add their methods.
 
 ## Suggested order
 

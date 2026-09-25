@@ -7,7 +7,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-export const CODEX_PROTOCOL_UPSTREAM_REF = 'be75785504ff152fa6333e380a2d50642f42fba0'
+export const CODEX_PROTOCOL_UPSTREAM_REF = '00c972ed5d6ff6499317fd41b7f23605b8e6850d'
 
 const GITHUB_RAW_BASE = `https://raw.githubusercontent.com/openai/codex/${CODEX_PROTOCOL_UPSTREAM_REF}/codex-rs/app-server-protocol`
 const USER_AGENT = 'platform-codex-protocol-generator'
@@ -43,8 +43,14 @@ const CLIENT_REQUEST_METHODS = [
   'turn/interrupt',
   'thread/read',
   'thread/list',
-  'thread/rollback',
+  'thread/revert',
+  'thread/fork',
+  'thread/compact/start',
   'skills/list',
+  'hooks/list',
+  'mcpServerStatus/list',
+  'mcpServer/oauth/login',
+  'config/mcpServer/reload',
 ] as const
 
 /**
@@ -52,7 +58,7 @@ const CLIENT_REQUEST_METHODS = [
  * not derivable from the method name, so it is named here.
  */
 const PARAMETERLESS_REQUEST_RESPONSES: Partial<Record<ClientRequestMethod, string>> = {
-  'account/rateLimits/read': 'GetAccountRateLimitsResponse',
+  'config/mcpServer/reload': 'McpServerRefreshResponse',
 }
 const NO_PARAMS_SCHEMA_NAME = 'NoParams'
 
@@ -62,6 +68,7 @@ const SERVER_NOTIFICATION_METHODS = [
   'thread/archived',
   'thread/unarchived',
   'thread/closed',
+  'thread/reverted',
   'skills/changed',
   'thread/name/updated',
   'thread/tokenUsage/updated',
@@ -121,6 +128,8 @@ type ProtocolNamespace = 'v1' | 'v2'
 type MethodEntry = {
   readonly method: string
   readonly paramsType?: string
+  /** `params?: X | undefined` upstream: the request may omit its params. */
+  readonly paramsOptional?: boolean
 }
 
 type ProtocolSchemaFile = {
@@ -251,7 +260,7 @@ function schemaFilesForMethodMaps(methodMaps: {
   const files = new Map<string, ProtocolSchemaFile>()
   for (const entry of methodMaps.clientRequests) {
     if (!isParameterless(entry))
-      addSchemaFile(files, schemaFileForMethodType(entry.method, requiredType(entry)))
+      addSchemaFile(files, schemaFileForMethodType(entry.method, requestParamsType(entry)))
     addSchemaFile(files, schemaFileForMethodType(entry.method, responseTypeName(entry)))
   }
   for (const entry of methodMaps.serverNotifications) {
@@ -287,14 +296,21 @@ async function fetchText(url: string) {
 }
 
 function parseRequestEntries(fileContents: string): readonly MethodEntry[] {
-  const entryPattern = /\{\s*"method":\s*"([^"]+)",\s*id:\s*RequestId,\s*params:\s*([^,}]+)/g
+  const entryPattern = /\{\s*"method":\s*"([^"]+)",\s*id:\s*RequestId,\s*params(\?)?:\s*([^,}]+)/g
   const entries: MethodEntry[] = []
   let match: RegExpExecArray | null
   while ((match = entryPattern.exec(fileContents)) !== null) {
-    entries.push({ method: match[1] ?? '', paramsType: match[2]?.trim() })
+    entries.push(requestEntry(match[1] ?? '', match[3]?.trim() ?? '', match[2] === '?'))
   }
 
   return entries
+}
+
+function requestEntry(method: string, paramsType: string, optional: boolean): MethodEntry {
+  const type = paramsType.replace(/\s*\|\s*undefined$/, '')
+  if (!optional || type === 'undefined') return { method, paramsType: type }
+
+  return { method, paramsType: type, paramsOptional: true }
 }
 
 function parseNotificationEntries(fileContents: string): readonly MethodEntry[] {
@@ -314,7 +330,11 @@ function isParameterless(entry: MethodEntry) {
 }
 
 function requestParamsType(entry: MethodEntry) {
-  return isParameterless(entry) ? NO_PARAMS_SCHEMA_NAME : requiredType(entry)
+  if (isParameterless(entry)) return NO_PARAMS_SCHEMA_NAME
+  // Upstream publishes optional params as a `Nullable<Type>` schema file.
+  if (entry.paramsOptional) return `Nullable${requiredType(entry)}`
+
+  return requiredType(entry)
 }
 
 function responseTypeName(entry: MethodEntry) {
@@ -713,6 +733,7 @@ function renderMetaModule(
 ) {
   return [
     ...generatedPrelude(),
+    "import * as v from 'valibot'",
     "import * as CodexSchema from './schema.gen'",
     '',
     renderMethodConstants('CODEX_CLIENT_REQUEST_METHODS', methodMaps.clientRequests),
@@ -723,23 +744,27 @@ function renderMetaModule(
     renderMethodTypeInterface(
       'CodexClientRequestParamsByMethod',
       methodMaps.clientRequests,
-      (entry) => schemaFileForMethodType(entry.method, requestParamsType(entry)).typeName,
+      (entry) =>
+        `CodexSchema.${schemaFileForMethodType(entry.method, requestParamsType(entry)).typeName}${entry.paramsOptional ? ' | undefined' : ''}`,
     ),
     renderMethodTypeInterface(
       'CodexClientRequestResultByMethod',
       methodMaps.clientRequests,
-      (entry) => schemaFileForMethodType(entry.method, responseTypeName(entry)).typeName,
+      (entry) =>
+        `CodexSchema.${schemaFileForMethodType(entry.method, responseTypeName(entry)).typeName}`,
     ),
     renderMethodTypeInterface(
       'CodexServerNotificationParamsByMethod',
       methodMaps.serverNotifications,
-      (entry) => schemaFileForMethodType(entry.method, requiredType(entry)).typeName,
+      (entry) =>
+        `CodexSchema.${schemaFileForMethodType(entry.method, requiredType(entry)).typeName}`,
     ),
     renderSchemaMap(
       'CODEX_CLIENT_REQUEST_PARAMS',
       methodMaps.clientRequests,
       (entry) => schemaFileForMethodType(entry.method, requestParamsType(entry)).typeName,
       schemaNames,
+      (entry) => entry.paramsOptional === true,
     ),
     renderSchemaMap(
       'CODEX_CLIENT_REQUEST_RESULTS',
@@ -774,9 +799,7 @@ function renderMethodTypeInterface(
 ) {
   return [
     `export interface ${interfaceName} {`,
-    ...entries.map(
-      (entry) => `  readonly ${JSON.stringify(entry.method)}: CodexSchema.${typeName(entry)}`,
-    ),
+    ...entries.map((entry) => `  readonly ${JSON.stringify(entry.method)}: ${typeName(entry)}`),
     '}',
     '',
   ].join('\n')
@@ -787,13 +810,14 @@ function renderSchemaMap(
   entries: readonly MethodEntry[],
   typeName: (entry: MethodEntry) => string,
   schemaNames: ReadonlyMap<string, string>,
+  optional: (entry: MethodEntry) => boolean = () => false,
 ) {
   return [
     `export const ${constantName} = {`,
-    ...entries.map(
-      (entry) =>
-        `  ${JSON.stringify(entry.method)}: CodexSchema.${schemaConstName(requiredSchemaName(typeName(entry), schemaNames))},`,
-    ),
+    ...entries.map((entry) => {
+      const schema = `CodexSchema.${schemaConstName(requiredSchemaName(typeName(entry), schemaNames))}`
+      return `  ${JSON.stringify(entry.method)}: ${optional(entry) ? `v.optional(${schema})` : schema},`
+    }),
     '} as const',
     '',
   ].join('\n')

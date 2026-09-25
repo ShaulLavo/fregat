@@ -77,7 +77,7 @@ describe('shared protocol schemas', () => {
     const schemas = Object.values(generatedSchemas)
     expect(new Set(schemas).size).toBe(schemas.length)
     expect(CODEX_CLIENT_REQUEST_RESULTS['thread/start']).toBe(
-      CODEX_CLIENT_REQUEST_RESULTS['thread/resume'],
+      CODEX_CLIENT_REQUEST_RESULTS['thread/fork'],
     )
   })
 

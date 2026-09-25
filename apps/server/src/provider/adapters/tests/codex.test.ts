@@ -72,6 +72,8 @@ function fakeSession(turns = []) {
     id: 'provider-thread-1',
     modelProvider: 'openai',
     preview: 'Say hello',
+    projectId: null,
+    sessionId: 'provider-session-1',
     source: 'appServer',
     status: { type: 'idle' },
     turns,
