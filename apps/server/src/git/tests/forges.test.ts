@@ -768,6 +768,18 @@ describe('owner review regressions', () => {
     ).rejects.toThrow('command-line tool is not installed')
   })
 
+  it('names why a pinned pull request read cannot reach its forge', async () => {
+    const forge = boundary('https://gitlab.com/team/repo.git', (argv) =>
+      argv[0] === 'glab' ? 'missing' : undefined,
+    )
+    await expect(
+      readPullRequestsByNumber(
+        { cwd: await checkout(), remoteUrl: 'https://gitlab.com/team/repo.git', numbers: [1] },
+        forge,
+      ),
+    ).rejects.toThrow('GitLab is not ready: its command-line tool is not installed')
+  })
+
   it('bounds Forgejo history scans and preserves unknown absence', async () => {
     let pages = 0
     const forge = boundary('https://codeberg.org/owner/repo.git', (argv) => {

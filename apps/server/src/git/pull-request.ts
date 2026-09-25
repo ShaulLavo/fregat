@@ -195,15 +195,7 @@ export async function resolvePullRequest(
   boundaries: Boundaries = {},
 ) {
   const supported = await supportedContext(input.cwd, boundaries, input.remoteUrl)
-  if (!supported.context)
-    throw gitPullRequestErrors.FORGE_NOT_READY({
-      forge: supported.forge?.name ?? 'This repository',
-      reason:
-        supported.support === 'no-forge'
-          ? 'no remote points at a known forge'
-          : SUPPORT_REASONS[supported.support],
-      internal: { support: supported.support },
-    })
+  if (!supported.context) throw forgeNotReady(supported)
   const detail = await forgeProvider(supported.forge.kind).getPullRequest(
     supported.context,
     input.number,
@@ -214,6 +206,17 @@ export async function resolvePullRequest(
     remoteName: supported.context.remoteName,
     remoteUrl: supported.context.remoteUrl,
   }
+}
+
+function forgeNotReady(supported: Extract<Supported, { context: null }>) {
+  return gitPullRequestErrors.FORGE_NOT_READY({
+    forge: supported.forge?.name ?? 'This repository',
+    reason:
+      supported.support === 'no-forge'
+        ? 'no remote points at a known forge'
+        : SUPPORT_REASONS[supported.support],
+    internal: { support: supported.support },
+  })
 }
 
 function publishForge(kind: GitForgeKind, host: string): GitForge {
@@ -233,12 +236,7 @@ export async function readPullRequestsByNumber(
   boundaries: Boundaries = {},
 ): Promise<ReadonlyMap<number, GitPullRequest>> {
   const supported = await supportedContext(input.cwd, boundaries, input.remoteUrl)
-  if (!supported.context)
-    throw gitPullRequestErrors.FORGE_NOT_READY({
-      forge: supported.forge?.name ?? 'This repository',
-      reason: supported.support,
-      internal: { support: supported.support },
-    })
+  if (!supported.context) throw forgeNotReady(supported)
   const context = supported.context
   const provider = forgeProvider(context.forge.kind)
   if (provider.pullRequestsByNumber) {

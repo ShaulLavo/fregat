@@ -79,8 +79,8 @@ export const gitPullRequestErrors = defineErrorCatalog('git', {
     status: 409,
     message: ({ forge, reason }: { forge: string; reason: string }) =>
       `${forge} is not ready: ${reason}`,
-    why: 'Publishing creates the repository through the forge CLI or API, which is not installed or not signed in on the machine that owns this checkout.',
-    fix: 'Install the forge CLI and sign in on that machine (`gh auth login`, `glab auth login`, `tea login add`, `az login`), or store bitbucket.org credentials in git, then publish again.',
+    why: 'Forge actions go through the forge CLI or API, which is not installed or not signed in on the machine that owns this checkout.',
+    fix: 'Install the forge CLI and sign in on that machine (`gh auth login`, `glab auth login`, `tea login add`, `az login`), or store bitbucket.org credentials in git, then try again.',
   },
   REPOSITORY_NAME_INVALID: {
     status: 400,

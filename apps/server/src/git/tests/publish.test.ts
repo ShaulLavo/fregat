@@ -8,6 +8,8 @@ import { DEFAULT_MAX_TEXT_FILE_BYTES } from '../../fs/limits'
 import { createWorkspacePaths } from '../../fs/path'
 import type { RunProcess } from '../forges/types'
 import { GitService } from '../service'
+import { gitPublishBodySchema } from '../contracts'
+import * as v from 'valibot'
 
 const roots: string[] = []
 afterEach(async () => {
@@ -140,5 +142,15 @@ describe('publish', () => {
     await runGit(work, ['remote', 'add', 'origin', 'https://example.com/other.git'])
     const result = await service(root, github().run).publish({ ...request, protocol: 'https' })
     expect(result.remoteName).toBe('origin-1')
+  })
+})
+
+describe('publish body', () => {
+  it.each(['acme/app', 'acme/.github', 'group/sub/app'])('accepts %s', (repository) => {
+    expect(v.safeParse(gitPublishBodySchema, { ...request, repository }).success).toBe(true)
+  })
+
+  it.each(['-pX/Y', 'acme/-x', '../x', 'acme/..', 'acme/./app'])('refuses %s', (repository) => {
+    expect(v.safeParse(gitPublishBodySchema, { ...request, repository }).success).toBe(false)
   })
 })
