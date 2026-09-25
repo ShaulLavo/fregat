@@ -503,6 +503,7 @@ phases or splits them into executable plans; not all research happens up front.
 | [143](plans/143-phone-layout.md)           | direction approved       | What the phone is for; web layout versus the later companion app                                                            |
 | [144](plans/144-unattended-agent-work.md)  | research                 | Scheduled, looping and multi-agent work: surface what the harnesses already do, build only the rest                         |
 | [145](plans/145-harness-controls.md)       | small executable plans   | Fork, approval rules, MCP status, background tasks, hooks, custom agents, compact, export                                   |
+| [172](plans/172-shared-undo-stack.md)      | research                 | One undo/redo stack behind Mod+Z, extracted from the existing undo implementations; Plan 126 LIFE-13 first                  |
 
 [Plan 126](plans/126-t3code-alignment.md) also gained the T3 features shipped after its
 2026-09-19 audit, and four reopened non-parity decisions.
@@ -517,6 +518,8 @@ Suggested order:
    088; its editor-to-chat work does not.
 5. Plan 144's capability inventory. It decides how much of that lane is built rather than surfaced.
 6. Plan 143: direction approved 2026-09-25 (two lazy shells behind one URL; Tailscale now, pairing URL, relay later). Research phase next.
+7. Plan 172's research before Plan 126 LIFE-13 is rebuilt (decided 2026-09-25: owner — one shared
+   undo/redo stack replaces the latest-undo slot).
 
 ## Daily-driver lane
 
