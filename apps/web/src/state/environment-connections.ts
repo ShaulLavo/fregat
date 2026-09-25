@@ -696,16 +696,8 @@ export function createEnvironmentConnections({
       }
       authStore.setState({ prompt: event.prompt, pending: false, error: null })
     })
-    const primary = useEnvironmentsStore.getState().entries[primaryServerOrigin()]
-    if (primary?.descriptor && primary.phase !== 'offline') {
-      retain(primary.origin, primary.descriptor)
-      recordEnvironmentCacheBinding(environmentScopedStorage(primary.environmentId!), {
-        names: ['local'],
-        origin: primary.origin,
-        descriptor: primary.descriptor,
-      })
-    }
-    if (primary?.phase === 'offline') void retryPrimary()
+    // Cached identities prepare the workbench; only fresh health may open its transport.
+    void retryPrimary()
     for (const machine of store.getState().machines) {
       if (desired.has(machine.name)) void connectMachine(machine.name)
     }

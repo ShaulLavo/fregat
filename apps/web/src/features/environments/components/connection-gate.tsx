@@ -30,9 +30,8 @@ export function ConnectionGate({
       readEnvironmentDescriptor(originForQueryClient(client), signal, clientForQueryClient(client)),
     retry: false,
   })
-  if (known) return children
   const refused = connection.phase === 'identity-drift' || connection.phase === 'protocol-mismatch'
-  if (refused || (query.isError && !query.data)) {
+  if (refused || (query.isError && !query.data && !known)) {
     return (
       <div className='bg-background text-foreground grid min-h-svh place-content-center gap-4 p-8'>
         <InlineError
@@ -49,6 +48,7 @@ export function ConnectionGate({
       </div>
     )
   }
+  if (known) return children
   if (query.isPending) {
     return (
       <div

@@ -1,3 +1,4 @@
+import { cachedProtocolStartup } from './cached-protocol-startup'
 import { editorLspTabSwitch } from './editor-lsp-tab-switch'
 import { editorLspServerExit } from './editor-lsp-server-exit'
 import { editorTypography } from './editor-typography'
@@ -243,6 +244,7 @@ export const scenarios: readonly Scenario[] = [
   projectGrouping,
   sessionLifecycle,
   sessionUndo,
+  cachedProtocolStartup,
   sessionNavigation,
   sessionOrdering,
   sessionTitles,

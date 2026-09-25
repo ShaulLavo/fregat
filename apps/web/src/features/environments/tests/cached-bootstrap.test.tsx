@@ -105,9 +105,7 @@ test('cached bindings start primary and remote before sockets without painting s
     expect(() => createBootRuntime(descriptorB, parseAddressIntent('/'), true)).toThrow(
       'cached machine identity conflicts',
     )
-    expect(primaryQueryClient().getQueryData(environmentQueryKeys.descriptor)).toEqual(
-      oldDescriptor,
-    )
+    expect(primaryQueryClient().getQueryData(environmentQueryKeys.descriptor)).toBeUndefined()
     expect(useEnvironmentsStore.getState().entries[primary]?.environmentId).toBe(
       descriptorA.environmentId,
     )
