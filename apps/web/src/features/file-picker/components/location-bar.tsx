@@ -9,7 +9,7 @@ import {
 import { Spinner } from '@workspace/ui/components/spinner'
 import type { FormEvent, KeyboardEvent, RefObject } from 'react'
 
-import { IconTooltip } from '@/features/file-picker/components/icon-tooltip'
+import { IconTooltip } from '@/components/icon-tooltip'
 import { Breadcrumbs } from '@/features/file-picker/components/breadcrumbs'
 
 export function LocationBar({

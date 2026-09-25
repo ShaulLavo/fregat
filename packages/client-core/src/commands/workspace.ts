@@ -788,6 +788,17 @@ export const workspaceCommandMetadata = {
     title: 'Choose theme',
     keepsPaletteOpen: true,
   }),
+  'workspace.openThemeStudio': defineMetadata({
+    aliases: ['Theme', 'Appearance'],
+    category: 'Appearance',
+    description: 'Try themes, colors and wallpapers on the live app, then apply them.',
+    id: 'workspace.openThemeStudio',
+    execution: 'sync',
+    target: 'workspace',
+    undoCategory: 'view-only',
+    when: [],
+    title: 'Theme studio',
+  }),
   'workspace.selectWallpaper': defineMetadata({
     category: 'Appearance',
     description: 'Choose the wallpaper, previewing as you go.',

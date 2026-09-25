@@ -30,7 +30,7 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEv
 
 import { useDirectoryTransition } from '@/features/file-picker/hooks/use-directory-transition'
 import { useFilePickerPathInput } from '@/features/file-picker/hooks/use-path-input'
-import { IconTooltip } from '@/features/file-picker/components/icon-tooltip'
+import { IconTooltip } from '@/components/icon-tooltip'
 import { FileList } from '@/features/file-picker/components/list'
 import { ColumnsView } from '@/features/file-picker/components/columns-view'
 import { IconsView } from '@/features/file-picker/components/icons-view'

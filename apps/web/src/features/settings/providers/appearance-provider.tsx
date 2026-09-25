@@ -5,6 +5,7 @@ import {
   DEFAULT_SETTING_VALUES,
   resolveThemeSettings,
   type ThemeBundle,
+  type ThemeVariantPatch,
   type ColorMode,
 } from '@workspace/contracts'
 import { AppearancePreviewContext } from '@/features/settings/providers/appearance-preview-context'
@@ -61,7 +62,7 @@ const GRAPHITE = bundledPalette(DEFAULT_PALETTE_ID)!
 export function AppearanceProvider({ children }: { children: ReactNode }) {
   const confirmedQuery = useSettingsDocument()
   const projection = useSettingsProjection()
-  const { selectBundle, setColorTheme, setSetting } = useSettingsActions()
+  const { applyBundle, selectBundle, setColorTheme, setSetting } = useSettingsActions()
   const catalog = usePaletteCatalog()
   const bundles = useBundleLibrary().catalog
   const [bootValues] = useState(readSettingsMirror)
@@ -263,9 +264,25 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
     return submission
   }
 
+  const applyDraft = (
+    bundle: ThemeBundle,
+    patches: Readonly<Record<ColorMode, ThemeVariantPatch | null>>,
+    shown: ThemeBundle,
+  ): SettingsSubmission => {
+    const submission = applyBundle(bundle, patches)
+    if (submission.kind === 'noop') return submission
+
+    setBundlePreview({ handingOffTo: submission.mutationId, value: { theme: shown } })
+    void submission.settled.then(() =>
+      clearMatchingHandoff(setBundlePreview, submission.mutationId),
+    )
+    return submission
+  }
+
   return (
     <BundleContext
       value={{
+        apply: applyDraft,
         bundleId: baseValues['workbench.theme']?.id ?? null,
         catalog: bundles,
         preview: previewBundle,

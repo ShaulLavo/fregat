@@ -7,6 +7,7 @@ import type { PickedFsEntry } from '@/lib/file-system-types'
 import { KeepAliveProvider } from '@/lib/keep-alive/providers/keep-alive-provider'
 import { SessionDialogs } from '@/components/session-dialogs'
 
+import { ThemeStudioSlot } from '@/components/theme-studio-slot'
 type WorkspaceViewProps = {
   rootFolder: PickedFsEntry
 }
@@ -33,6 +34,7 @@ export function WorkspaceView({ rootFolder }: WorkspaceViewProps) {
                 thing to unmount once the answer is yes. */}
             <SessionDialogs />
           </div>
+          <ThemeStudioSlot />
         </div>
       </div>
     </GitStoreProvider>

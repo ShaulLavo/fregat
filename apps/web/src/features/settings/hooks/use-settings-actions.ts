@@ -27,6 +27,8 @@ import {
   type SettingsOperation,
   type SettingsValues,
   type SettingsWriteTarget,
+  type ColorMode,
+  type ThemeVariantPatch,
 } from '@workspace/contracts'
 import { useMutation, useMutationState, type QueryClient } from '@tanstack/react-query'
 import { useSettingsOwner } from '@/features/settings/hooks/use-settings-owner'
@@ -195,6 +197,24 @@ export function useSettingsActions() {
       submit('user', [{ kind: 'set', key: 'workbench.theme', value: theme }], initiator),
     resetBundle: (id: ThemeId) =>
       submit('user', [{ kind: 'theme.reset', id }], 'settings.theme.defaults'),
+    /** The theme and both halves as edited, in one write: what the theme studio's Apply does. */
+    applyBundle: (
+      theme: ThemeBundle,
+      patches: Readonly<Record<ColorMode, ThemeVariantPatch | null>>,
+      initiator = 'theme-studio.apply',
+    ) =>
+      submit(
+        'user',
+        [
+          { kind: 'set', key: 'workbench.theme', value: theme },
+          { kind: 'theme.reset', id: theme.id },
+          ...(['light', 'dark'] as const).flatMap((mode) => {
+            const patch = patches[mode]
+            return patch ? [{ kind: 'theme.customize' as const, id: theme.id, mode, patch }] : []
+          }),
+        ],
+        initiator,
+      ),
     setMachine: (name: string, machine: MachineDefinition) =>
       submit('user', [{ kind: 'machine.set', name, machine }]),
     removeMachine: (name: string) => submit('user', [{ kind: 'machine.remove', name }]),
