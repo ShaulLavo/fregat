@@ -133,6 +133,16 @@ Deliverable: the surface list and navigation model, added to this plan (the dire
 
 Written after the research phase.
 
+## Follow-up items
+
+Carried in from other plans. They wait for the phone shell and join its split plans.
+
+- **Phone haptics (from Plan 154 Phase 7).** Only if this plan keeps the phone web layout.
+  `navigator.vibrate` on Android with seamui's PWM patterns, and the iOS
+  `<input type="checkbox" switch>` taptic, behind `workbench.haptics`. Haptics follow device
+  capability, so a shared setting does nothing on a desktop. Size S. Plan 154 Decision D3 keeps
+  haptics as the only mobile difference in physical mode.
+
 ## Dependencies
 
 - Plan 142 (Web Push) needs a minimal web app manifest and must not wait on this plan.
