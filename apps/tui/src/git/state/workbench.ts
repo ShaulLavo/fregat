@@ -1,5 +1,6 @@
 import type { Client } from '@workspace/client-core/transport/client'
-import { requireEdenData, parseEdenSseStream } from '@workspace/client-core/transport/eden'
+import { requireEdenData } from '@workspace/client-core/transport/eden'
+import { readGitCommitStream } from '@workspace/client-core/git/commit-stream'
 import { pullRequestMessage } from '@/git/utils/actions'
 import { readDiffFiles } from '@/git/state/diff'
 import type { GitStatusResult } from '@workspace/contracts'
@@ -100,20 +101,16 @@ export function createGitWorkbench(client: Client, rootPath: string) {
           { fetch: { signal: lifetime.signal } },
         ),
       )
-      let complete = false
-      for await (const event of parseEdenSseStream(stream)) {
-        const data = event.data
-        if (!data || typeof data !== 'object' || !('kind' in data)) continue
-        if (data.kind === 'progress' && 'text' in data && typeof data.text === 'string')
-          publish({ ...state, progress: `${state.progress}${data.text}\n`.slice(-8000) })
-        if (data.kind === 'result') complete = true
-        if (data.kind === 'failed' && 'message' in data && typeof data.message === 'string')
-          throw createTuiError(
-            data.message,
-            'Read the hook output, correct the reported problem, and commit again.',
-          )
-      }
-      if (!complete)
+      const outcome = await readGitCommitStream(stream, (line) => {
+        // 8000 chars is a display budget for the progress pane, not a transport limit.
+        publish({ ...state, progress: `${state.progress}${line.text}\n`.slice(-8000) })
+      })
+      if (outcome.kind === 'failed')
+        throw createTuiError(
+          outcome.message,
+          'Read the hook output, correct the reported problem, and commit again.',
+        )
+      if (outcome.kind === 'ended-without-result')
         throw createTuiError(
           'Commit ended before reporting a result.',
           'Refresh Git status before retrying the commit.',

@@ -59,22 +59,8 @@ export async function fetchBlobDiff(
         },
       })
 
-      const diffs = unwrapGit<GitFileDiff[]>(response)
-
-      return diffs.map((diff) => withRequestedPaths(diff, query))
+      return unwrapGit<GitFileDiff[]>(response)
     },
     (diffs) => ({ diffCount: diffs.length }),
   )
-}
-
-/**
- * `/git/diff/blob` re-roots the paths it parses back out of the patch, so a
- * blob diff for `repo/a.ts` comes back as `repo/repo/a.ts`. The request already
- * names the exact pair being diffed — one blob against one blob — so take the
- * identity from the request and keep only the content from the response.
- */
-function withRequestedPaths(diff: GitFileDiff, query: BlobDiffRequest): GitFileDiff {
-  const renamed = Boolean(query.oldPath && query.oldPath !== query.path)
-
-  return { ...diff, oldPath: renamed ? query.oldPath : undefined, path: query.path }
 }

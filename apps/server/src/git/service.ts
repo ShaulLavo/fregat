@@ -284,11 +284,13 @@ export class GitService {
     const repository = await this.requiredRepositoryLocation(query.path || query.oldPath || '')
     const oldPath = query.oldPath ?? query.path
     const rawPatch = await this.blobPatch(repository, query)
+    // parseDiff below re-roots the patch's paths under repository.rootPath, so the
+    // paths written into it here must already be repo-root-relative, not workspace-relative.
     const patch = rewriteBlobPatchPaths(rawPatch, {
       newObjectId: query.newObjectId,
       oldObjectId: query.oldObjectId,
-      oldPath,
-      path: query.path,
+      oldPath: repositoryRelativePath(repository.rootPath, oldPath),
+      path: repositoryRelativePath(repository.rootPath, query.path),
     })
     const diffs = parseDiff(patch, repository.rootPath, false)
 

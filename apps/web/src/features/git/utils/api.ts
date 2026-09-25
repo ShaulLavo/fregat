@@ -2,7 +2,6 @@ import type { GitStatusResult } from '@workspace/contracts'
 import { clientLogContext } from '@/lib/environments/state/log-context'
 import type {
   GitBranchRemoteState,
-  GitCommitProgressEvent,
   GitCommitResult,
   GitPullRequestCreateResult,
   GitPullRequestState,
@@ -10,7 +9,7 @@ import type {
 
 import type { Client } from '@/lib/client'
 import { observeClientOperation } from '@/lib/client-logging'
-import { parseEdenSseStream } from '@workspace/client-core/transport/eden'
+import { readGitCommitStream } from '@workspace/client-core/git/commit-stream'
 import { unwrapEdenResponse } from '@/lib/eden-events'
 import { createClientError } from '@workspace/client-core/errors'
 
@@ -188,24 +187,12 @@ async function readCommitProgress(
   stream: unknown,
   onProgress: (line: { stream: 'stderr' | 'stdout'; text: string }) => void,
 ): Promise<GitCommitResult> {
-  let result: GitCommitResult | null = null
+  const outcome = await readGitCommitStream(stream, onProgress)
+  if (outcome.kind === 'failed') throw createGitCommitFailure(outcome.message)
+  if (outcome.kind === 'ended-without-result')
+    throw createGitCommitFailure('git commit ended without reporting a result')
 
-  for await (const event of parseEdenSseStream(stream)) {
-    // Sent through a hook's silences, such as a typecheck that prints nothing for a minute.
-    if (event.event === 'heartbeat') continue
-
-    const data = event.data as GitCommitProgressEvent
-    if (data.kind === 'progress') {
-      onProgress({ stream: data.stream, text: data.text })
-      continue
-    }
-    if (data.kind === 'failed') throw createGitCommitFailure(data.message)
-
-    result = data.result
-  }
-  if (!result) throw createGitCommitFailure('git commit ended without reporting a result')
-
-  return result
+  return outcome.result
 }
 
 export async function fetchRemote(path: string, client: Client) {

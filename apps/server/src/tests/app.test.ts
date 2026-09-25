@@ -1478,6 +1478,38 @@ describe('git rpc', () => {
       { newFileMissing: true, path: 'deleted.txt' },
     ])
   })
+
+  it('keeps the workspace-relative path when the repository is nested', async () => {
+    const root = await fixtureRoot()
+    const repoDir = path.join(root, 'repo')
+    await mkdir(repoDir)
+    await initGitRepository(repoDir)
+    await writeFile(path.join(repoDir, 'a.ts'), 'before\n')
+    await runGit(repoDir, ['add', 'a.ts'])
+    await runGit(repoDir, ['commit', '-m', 'initial'])
+    await writeFile(path.join(repoDir, 'a.ts'), 'after\n')
+    const app = testApp(root)
+
+    const live = await app.handle(
+      new Request('http://local/git/diff?path=repo/a.ts', {
+        headers: trustedOriginHeaders(),
+      }),
+    )
+    expect(live.status).toBe(200)
+    const [snapshot] = (await live.json()) as GitDiffTestPayload
+    await writeFile(path.join(repoDir, 'a.ts'), 'later\n')
+
+    const stale = await app.handle(
+      new Request(`http://local/git/diff/blob?${blobDiffParams(snapshot)}`, {
+        headers: trustedOriginHeaders(),
+      }),
+    )
+
+    expect(stale.status).toBe(200)
+    const [diff] = (await stale.json()) as GitDiffTestPayload
+    expect(diff.path).toBe('repo/a.ts')
+    expect(diff.oldPath).toBeUndefined()
+  })
 })
 
 type GitStatusTestPayload = {
