@@ -1,7 +1,7 @@
 import { tmpdir } from 'node:os'
-import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
+import { copyFile, mkdir, mkdtemp, rename, rm, symlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { afterEach, test as base } from 'vitest'
+import { afterAll, afterEach, test as base } from 'vitest'
 import {
   ORCHESTRATION_WS_PROTOCOL_VERSION,
   type MachineConnectionState,
@@ -11,6 +11,8 @@ import { createSshLauncher } from '../../src/machines/launcher'
 import { parseDescriptor, type RemoteRecord } from '../../src/machines/records'
 import { reserveForwardPort, type SshChild, type SshSpawner } from '../../src/machines/forward'
 import { MachineService } from '../../src/machines/service'
+import type { ReleaseInstallation, ServerInstallation } from '../../src/installation/descriptor'
+import { REMOTE_SUPPORT } from '../../src/installation/release-files'
 
 export const descriptorValue = {
   ok: true,
@@ -25,12 +27,16 @@ export const machine = {
   kind: 'ssh',
   target: 'fixture',
 } satisfies Machines[string]
-const installation = {
+const installation: ServerInstallation = {
   kind: 'source',
   directory: "/work/space ' $(touch unwanted)",
   executable: process.execPath,
-} as const
+}
 export const clientId = '00000000-0000-4000-8000-000000000001'
+
+export function sourceInstallation(directory: string): ServerInstallation {
+  return { kind: 'source', directory, executable: process.execPath }
+}
 const repositoryRoot = path.resolve(import.meta.dirname, '../../../..')
 
 const cleanups: Array<() => Promise<unknown>> = []
@@ -47,6 +53,7 @@ export async function fakeSsh(
     machines?: Machines
     descriptor?: typeof descriptorValue
     launchFailure?: Record<string, unknown>
+    installation?: ServerInstallation
   } = {},
 ) {
   const descriptor = await parseDescriptor(options.descriptor ?? descriptorValue)
@@ -203,8 +210,11 @@ function processStart(pid: number) {
     .trim()
 }
 
-function healthServerSource(protocolVersion: number) {
-  const body = JSON.stringify({ ...descriptorValue, protocolVersion })
+function healthServerSource(
+  protocolVersion: number,
+  serverVersion = descriptorValue.serverVersion,
+) {
+  const body = JSON.stringify({ ...descriptorValue, protocolVersion, serverVersion })
   return `Bun.serve({ hostname: '127.0.0.1', port: Number(process.env.PORT), fetch: () => Response.json(${body}) })`
 }
 
@@ -254,6 +264,88 @@ export function stopLaunchedServer(pid: number) {
   })
 }
 
+const cleanupsAfterFile: Array<() => Promise<unknown>> = []
+afterAll(async () => {
+  await Promise.allSettled(cleanupsAfterFile.map((cleanup) => cleanup()))
+})
+let remoteSupport: Promise<string> | null = null
+
+/** The real remote-support entry, bundled once per test file the way the server build bundles it. */
+function remoteSupportBundle() {
+  remoteSupport ??= (async () => {
+    const outdir = await mkdtemp(path.join(tmpdir(), 'platform-remote-support-'))
+    cleanupsAfterFile.push(() => rm(outdir, { recursive: true, force: true }))
+    const result = await Bun.build({
+      entrypoints: [path.join(repositoryRoot, 'apps/server/src/installation/remote-support.ts')],
+      target: 'bun',
+      outdir,
+      naming: REMOTE_SUPPORT,
+    })
+    if (!result.success) throw new AggregateError(result.logs, 'remote-support did not bundle')
+    return path.join(outdir, REMOTE_SUPPORT)
+  })()
+  return remoteSupport
+}
+
+/**
+ * `<serverRoot>/releases/<name>`: its server/index.js answers /health with `protocolVersion` and
+ * reports `name` as its serverVersion, beside the real remote-support.js. A `supportProtocol`
+ * other than this server's wraps that bundle so the release claims the older constant.
+ */
+export async function writeRelease(
+  serverRoot: string,
+  name: string,
+  protocolVersion: number,
+  supportProtocol: number = ORCHESTRATION_WS_PROTOCOL_VERSION,
+) {
+  const server = path.join(serverRoot, 'releases', name, 'server')
+  await mkdir(server, { recursive: true })
+  await writeFile(path.join(server, 'index.js'), healthServerSource(protocolVersion, name))
+  if (supportProtocol === ORCHESTRATION_WS_PROTOCOL_VERSION) {
+    await copyFile(await remoteSupportBundle(), path.join(server, REMOTE_SUPPORT))
+    return
+  }
+  await copyFile(await remoteSupportBundle(), path.join(server, 'remote-support.bundle.js'))
+  await writeFile(
+    path.join(server, REMOTE_SUPPORT),
+    `export { createError, healthDescriptorSchema } from './remote-support.bundle.js';\nexport const ORCHESTRATION_WS_PROTOCOL_VERSION = ${supportProtocol};\n`,
+  )
+}
+
+/** A release whose server/index.js exits at once, as a crashing server does. */
+export async function writeCrashingRelease(serverRoot: string, name: string) {
+  const server = path.join(serverRoot, 'releases', name, 'server')
+  await mkdir(server, { recursive: true })
+  await writeFile(path.join(server, 'index.js'), 'process.exit(3)')
+  await copyFile(await remoteSupportBundle(), path.join(server, REMOTE_SUPPORT))
+}
+
+/** Swaps `current` the way an update does: a new link renamed over the old one. */
+export async function pointCurrent(serverRoot: string, name: string) {
+  const staging = path.join(serverRoot, 'current.next')
+  await symlink(path.join('releases', name), staging)
+  await rename(staging, path.join(serverRoot, 'current'))
+}
+
+export function releaseInstallation(serverRoot: string): ReleaseInstallation {
+  return {
+    kind: 'release',
+    directory: path.join(serverRoot, 'current'),
+    executable: process.execPath,
+  }
+}
+
+/** Runs a launch or stop command the way SSH does: through `sh -c`. */
+export async function runRemoteCommand(command: string) {
+  const child = Bun.spawn(['sh', '-c', command], { stdout: 'pipe', stderr: 'pipe' })
+  const [exitCode, stdout, stderr] = await Promise.all([
+    child.exited,
+    new Response(child.stdout).text(),
+    new Response(child.stderr).text(),
+  ])
+  return { exitCode, stdout, stderr }
+}
+
 export async function writeRemoteRecord(remoteRoot: string, owner: string, record: RemoteRecord) {
   await mkdir(path.join(remoteRoot, '.platform-ssh-launch'), { recursive: true })
   await writeFile(
@@ -296,6 +388,7 @@ function fakeProcessScript(
     forwardFails?: boolean
     slowProbe?: boolean
     launchFailure?: Record<string, unknown>
+    installation?: ServerInstallation
   },
 ) {
   if (command.includes('-N'))
@@ -308,10 +401,15 @@ function fakeProcessScript(
   return `process.stdout.write(${JSON.stringify(JSON.stringify(record) + '\n')})`
 }
 
-function fakeProbe(options: { probeFails?: boolean; slowProbe?: boolean }) {
+function fakeProbe(options: {
+  probeFails?: boolean
+  slowProbe?: boolean
+  installation?: ServerInstallation
+}) {
   if (options.probeFails)
     return 'process.stderr.write("Permission denied (publickey)."); process.exit(255)'
-  const output = `process.stdout.write(${JSON.stringify(JSON.stringify(installation))})`
+  const described = options.installation ?? installation
+  const output = `process.stdout.write(${JSON.stringify(JSON.stringify(described))})`
   return options.slowProbe ? `await Bun.sleep(1000); ${output}` : output
 }
 

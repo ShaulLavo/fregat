@@ -33,7 +33,7 @@ import {
   parseInstallation,
   type RemoteRecord,
 } from './records'
-import { launchCommand, probeCommand, stopCommand } from './remote-scripts'
+import { launchCommand, launchFailureFix, probeCommand, stopCommand } from './remote-scripts'
 import type { ServerInstallation } from '../installation/descriptor'
 
 type Connection = {
@@ -52,6 +52,8 @@ type ConnectEvent = {
   machine: string
   target?: string
   installationDirectory?: string
+  installationKind?: ServerInstallation['kind']
+  serverVersion?: string
   step: SshErrorStep
   steps: Partial<Record<SshErrorStep, number>>
   outcome: 'pending' | 'success' | 'failed' | 'cancelled'
@@ -172,9 +174,11 @@ export function createSshLauncher(options: LauncherOptions) {
     if (!descriptor || connection.state.phase !== 'live' || !connection.forward) return false
     const child = connection.forward.child
     if (child.exitCode !== null || child.signalCode !== null) return false
+    event.serverVersion = descriptor.serverVersion
     await step(event, 'protocol', async () => confirmProtocol(connection, descriptor))
     await step(event, 'identity', async () => confirmIdentity(connection, descriptor))
     event.target = connection.machine?.target
+    event.installationKind = connection.installation?.kind
     event.environmentId = descriptor.environmentId
     event.localPort = connection.state.localPort
     event.remotePort = connection.record?.port
@@ -205,6 +209,7 @@ export function createSshLauncher(options: LauncherOptions) {
     }
     connection.installation = installation
     event.installationDirectory = installation.directory
+    event.installationKind = installation.kind
     connection.remoteAttempted = true
     connection.record = null
     const output = await step(event, 'launch', () =>
@@ -218,6 +223,7 @@ export function createSshLauncher(options: LauncherOptions) {
           webOrigin: options.webOrigin,
         }),
         'launch',
+        launchFailureFix(installation),
       ),
     )
     connection.record = await parseRemoteRecord(output)
@@ -248,6 +254,7 @@ export function createSshLauncher(options: LauncherOptions) {
         fetcher: options.fetcher ?? fetch,
       }),
     )
+    event.serverVersion = descriptor.serverVersion
     await step(event, 'protocol', async () => confirmProtocol(connection, descriptor))
     await step(event, 'identity', async () => confirmIdentity(connection, descriptor))
     connection.controller.signal.throwIfAborted()
@@ -261,7 +268,8 @@ export function createSshLauncher(options: LauncherOptions) {
     throw createSshProtocolError({
       expected: ORCHESTRATION_WS_PROTOCOL_VERSION,
       running: descriptor.protocolVersion,
-      checkout: null,
+      installed: null,
+      installation: connection.installation?.kind ?? null,
       kind: connection.record?.kind ?? null,
       otherLeases: null,
       port: connection.record?.port ?? null,
@@ -284,6 +292,7 @@ export function createSshLauncher(options: LauncherOptions) {
     machine: SshMachineDefinition,
     script: string,
     operation: SshCatalogStep,
+    fix?: string,
   ) {
     return runSshCommand({
       spawn,
@@ -291,6 +300,7 @@ export function createSshLauncher(options: LauncherOptions) {
       script,
       step: operation,
       signal: connection.controller.signal,
+      fix,
     })
   }
 

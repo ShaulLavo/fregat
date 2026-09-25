@@ -49,6 +49,8 @@ export async function runSshCommand(options: {
   script: string
   step: SshCatalogStep
   signal?: AbortSignal
+  /** Replaces the step's catalog fix on a generic remote failure. */
+  fix?: string
 }) {
   options.signal?.throwIfAborted()
   const child = options.spawn(sshCommand(options.target, options.script))
@@ -62,7 +64,7 @@ export async function runSshCommand(options: {
       child.exited,
     ])
     options.signal?.throwIfAborted()
-    if (exitCode !== 0) throw remoteFailure(options.step, stderr, exitCode)
+    if (exitCode !== 0) throw remoteFailure(options.step, stderr, exitCode, options.fix)
     return stdout
   } finally {
     clearTimeout(timeout)

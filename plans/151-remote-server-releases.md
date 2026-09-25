@@ -2,7 +2,8 @@
 
 ## Status and authorization
 
-- Status: PROPOSED — D1–D5 have recommended answers; D2 and D4 want the owner's confirmation.
+- Status: IN PROGRESS — Phases 1 and 2 done 2026-09-25 (completion wave, lane L5); Phase 3 next.
+  D1–D5 decided as recommended (completion wave).
 - Priority: P1 while the Mac is a daily machine. `shaul-mac` cannot connect today.
 - Effort: M (roughly 500–700 lines: deploy, the remote scripts, one route, one web action).
 - Risk: MED. It writes to another machine's home directory and replaces its `platform-server`
@@ -39,7 +40,10 @@ has none, so the only thing a remote needs is `bun` and SSH.
   - `typescript` and `typescript-language-server/lib/cli.mjs` via `import.meta.resolve`
     (`apps/server/src/lsp/typescript/runtime.ts:22-23`).
   - `pyright` and `vscode-langservers-extracted` through `resolvePackageBinary`
-    (`apps/server/src/lsp/installers.ts:84`).
+    (`apps/server/src/lsp/installers.ts:84`). Reconciled 2026-09-25: these do not resolve beside the
+    bundle. `resolvePackageBinary` looks in the LSP download root (`~/.platform/lsp/node`), then
+    `PATH`, then downloads on demand, so a release does not carry them. `pyright` is not in
+    `bun.lock` at all, and `vscode-langservers-extracted` is a dev dependency.
 - Deploy satisfies those with a symlink: `linkServerDependencies`
   (`scripts/deploy/release.ts:124-130`) points `server/node_modules` at this checkout's linux-x64
   `apps/server/node_modules`. That is the only thing that ties a release to this machine.
@@ -74,28 +78,30 @@ has none, so the only thing a remote needs is `bun` and SSH.
 
 ## Decisions
 
-- **D1 — What travels.** Recommended: the running server's own release directory, `server/` only.
+- **D1 — What travels.** Decided 2026-09-25: recommendation (completion wave). Recommended: the running server's own release directory, `server/` only.
   The web build stays on the primary (the remote serves the API; the browser loads the web from the
   primary). A production server finds its release from its own bundle path
   (`import.meta.dirname` is `<release>/server`). A development primary has no release. Its button
   says so and points to Plan 152.
-- **D2 — Runtime packages (owner).** Recommended: deploy writes `server/runtime/package.json` into
+- **D2 — Runtime packages (owner).** Decided 2026-09-25: recommendation (completion wave).
+  Recommended: deploy writes `server/runtime/package.json` into
   each release. It lists the runtime packages above at the exact versions in `bun.lock`; `sharp` and the Claude
   SDK bring their natives as optional per-platform packages. The remote runs `bun install --production` against it.
   The alternative is to ship a platform tarball per target from this machine. That needs a
   cross-platform `bun install --os/--cpu` here, and it breaks on packages that build natives
   during install.
-- **D3 — Remote layout.** Recommended:
+- **D3 — Remote layout.** Decided 2026-09-25: recommendation (completion wave). Recommended:
   `~/.platform/server/releases/<release>/` holds the release, and `current` is a symlink swapped
   atomically. `runtime/<manifest sha256>/node_modules` is shared by every release with the same
   manifest, so a web-only redeploy never reinstalls. Keep the running release and the one before
   it; delete older ones after a successful swap.
-- **D4 — Which launcher (owner).** Recommended: `~/.local/bin/platform-server` becomes the
+- **D4 — Which launcher (owner).** Decided 2026-09-25: recommendation (completion wave).
+  Recommended: `~/.local/bin/platform-server` becomes the
   release launcher (`kind: 'release'`). Development builds get their own channel and
   `~/.local/bin/platform-server-dev` (Plan 152 D2). A production primary probes `platform-server`.
   Replacing the Mac's current launcher leaves the old rig on disk untouched;
   `bun run server:install` from it restores it.
-- **D5 — State on the remote.** Recommended: no `.env` for a release. The server uses its defaults
+- **D5 — State on the remote.** Decided 2026-09-25: recommendation (completion wave). Recommended: no `.env` for a release. The server uses its defaults
   under the remote user's `~/.platform`, the same way the mesh unit runs here. Plan 146's
   separation of dev and prod state applies to the remote as it does locally: the dev server of
   Plan 152 channel gets its own state directory.
@@ -103,6 +109,29 @@ has none, so the only thing a remote needs is `bun` and SSH.
 ## Phases
 
 ### Phase 1: A release carries its runtime manifest
+
+Done 2026-09-25 (completion wave). As built:
+
+- `readCheckout` reads `git status --porcelain -z` untrimmed through `porcelainPaths`
+  (`scripts/deploy/release.ts`, test `scripts/deploy/release.test.ts`, in `test:scripts`).
+- The shared module is `apps/server/src/installation/release-files.ts` (Plan 152 D1):
+  `RUNTIME_PACKAGES`, `runtimeManifest(lock)`, `writeRuntimeManifest(serverDirectory, lockfile)` and
+  `missingReleaseFiles(serverDirectory)`. Deploy imports it. The list is the bundle's two
+  `--external`s plus the two `import.meta.resolve` targets; `pyright` and
+  `vscode-langservers-extracted` are out (see What exists today). A workspace resolution
+  (`server/<package>`) in `bun.lock` wins over the hoisted one. A missing package throws
+  `installation.RUNTIME_PACKAGE_MISSING`. Tests in `installation/tests/release-files.test.ts`
+  check the `--external`s, the `import.meta.resolve` targets and the real `bun.lock`.
+- `buildServer` writes the manifest. `copyServer` keeps the manifest of the release that built the
+  bundle, because the current `bun.lock` may have moved on. A server copied from a release built
+  before this change has neither file, and `verifyCandidateFiles` says to deploy with `--server`.
+- `remote-support.js` is built by `apps/server` `build` from `src/installation/remote-support.ts`:
+  `createError`, `healthDescriptorSchema` and `ORCHESTRATION_WS_PROTOCOL_VERSION`, about 100 KB,
+  self-contained.
+- A release server takes two steps: `apps/server` `build` (which also emits `remote-support.js`),
+  then `writeRuntimeManifest(serverDirectory, bun.lock)`; `missingReleaseFiles` must return `[]`
+  afterwards. Plan 152's dev build repeats this sequence, so its D1 "one shared module" is
+  `release-files.ts` plus the `build` script.
 
 1. Fix `readCheckout`'s porcelain parsing (use the untrimmed stdout, or `-z`).
 2. `scripts/deploy/release.ts`: `writeRuntimeManifest(release)` after `buildServer`/`copyServer`.
@@ -116,6 +145,33 @@ has none, so the only thing a remote needs is `bun` and SSH.
 4. `verifyCandidateFiles` checks both files exist.
 
 ### Phase 2: A `release` installation kind
+
+Done 2026-09-25 (completion wave). As built:
+
+- `installationSchema` is a `kind` variant. A release's `directory` must end in `current`, so its
+  parent is always the server root.
+- `install.ts` writes either launcher. The release launcher `cd`s to the server root and execs
+  `<executable> <directory>/server/index.js` with `NODE_ENV=production`. It still writes
+  `~/.local/bin/platform-server`; moving the source launcher to `platform-server-dev` is Plan 152.
+- `remoteLayout(installation)` in `remote-scripts.ts` returns
+  `{ workingDirectory, imports, entry, env, protocolSource }`. A release runs its launch and stop scripts in the server root
+  (`~/.platform/server`), so `.platform-ssh-launch/` and `logs/` survive every `current` swap. It
+  imports `current/server/remote-support.js` by absolute path and starts `current/server/index.js`.
+  `installedProtocol()` returns the release's own constant; a source checkout still reads
+  `orchestration-ws.ts`. `remote-scripts-release.test.ts` runs launch, reuse across a `current`
+  swap, stop, and a stale server replaced by the release `current` names.
+- The protocol report's `checkout` field is now `installed`, beside `installation` (the kind). A
+  release that cannot relaunch reads "Install this server’s release on that machine, then Retry."
+- `machines.ssh.connect` records `installationKind` and `serverVersion`.
+- `releaseEntry` and `RELEASE_ENV` in `installation/descriptor.ts` are how every release starts;
+  the release launcher and `remoteLayout` both read them.
+- A failed launch's fix names `<workingDirectory>/logs/ssh-launch.log` (`launchFailureFix`), so a
+  release points at the server root. An external server on a release machine is told to restart
+  it from this server's release.
+- Carry into Phase 3: `tar` must leave out the local `server/node_modules` link; Bun resolves the
+  `current` symlink for the running entry, so `import.meta.dirname` names the real release; the
+  Claude SDK's peers (`@anthropic-ai/sdk`, `@modelcontextprotocol/sdk`, `zod`) come from Bun's peer
+  auto-install unless the manifest lists them.
 
 1. `installationSchema` becomes a variant: `source` (unchanged) and
    `release { directory, executable }`, where `directory` is the `current` link.

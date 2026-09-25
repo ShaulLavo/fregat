@@ -520,7 +520,7 @@ of the plans, both logs and the service journal named what stands in the way. Th
 | [148](plans/148-restart-when-idle.md)          | `deploy --server` stages; the server restarts when no turn is running                           |
 | [149](plans/149-terminal-host.md)              | A PTY host that survives server restarts                                                        |
 | 150 (done)                                     | Remote servers are checked for protocol; a stale one relaunches or reads "Server out of date"   |
-| [151](plans/151-remote-server-releases.md)     | Production ships its built server release to remote machines; Update/Install server button      |
+| [151](plans/151-remote-server-releases.md)     | Release ships its runtime manifest and a `release` install kind (P1–P2 done); SSH update next   |
 | [152](plans/152-remote-dev-builds.md)          | Dev primary builds this working tree and ships it through Plan 151, in its own remote channel   |
 
 Suggested order:
@@ -532,7 +532,7 @@ Suggested order:
 4. Plan 149, so terminals and dev servers survive the same restart.
 5. ~~Plan 150~~ — done 2026-09-25 (completion wave): protocol check at both ends of the SSH
    launch, stale relaunch, structured machine errors, "Server out of date". Then Plan 151 whenever
-   the Mac is needed. Plan 152 after 151.
+   the Mac is needed: Phases 1–2 done 2026-09-25 (completion wave), Phase 3 next. Plan 152 after 151.
 6. Then Claude rewind and fork ([Plan 145 fork](plans/145-harness-controls/fork.md), Plan 126
    RUNTIME-01) and the Plan 139 research phase.
 

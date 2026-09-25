@@ -1,12 +1,31 @@
+import path from 'node:path'
 import { ORCHESTRATION_WS_PROTOCOL_VERSION, type SshMachineDefinition } from '@workspace/contracts'
 import type { RemoteRecord } from './records'
-import type { ServerInstallation } from '../installation/descriptor'
+import {
+  RELEASE_ENV,
+  releaseEntry,
+  releaseServerRoot,
+  type ServerInstallation,
+} from '../installation/descriptor'
+import { REMOTE_SUPPORT } from '../installation/release-files'
 import { shellQuote } from '../utils/shell'
 
 type LaunchOptions = {
   machine: SshMachineDefinition
+  installation: ServerInstallation
   clientId: string
   webOrigin: string
+}
+
+type RemoteLayout = {
+  /** The scripts' cwd: `.platform-ssh-launch/` and `logs/` live here. */
+  workingDirectory: string
+  imports: string
+  /** Arguments after the executable that start the server. */
+  entry: readonly string[]
+  env: Readonly<Record<string, string>>
+  /** Defines `installedProtocol()`: the protocol a fresh launch would speak. */
+  protocolSource: string
 }
 
 export function probeCommand() {
@@ -20,11 +39,45 @@ printf '%s\\n' '{"code":"machines.SSH_NOT_INSTALLED","message":"Platform server 
 exit 127`
 }
 
-function bunCommand(installation: ServerInstallation, script: string) {
-  return `cd ${shellQuote(installation.directory)} && ${shellQuote(installation.executable)} -e ${shellQuote(script)}`
+// A release's lease state stays in its server root: inside releases/<name> a `current` swap
+// would orphan the records, and an update could never find the server it has to stop.
+export function remoteLayout(installation: ServerInstallation): RemoteLayout {
+  if (installation.kind === 'source')
+    return {
+      workingDirectory: installation.directory,
+      imports: `import { createError } from 'evlog';
+import { healthDescriptorSchema } from './packages/contracts/src/health.ts';`,
+      entry: ['--env-file=.env', 'apps/server/src/index.ts'],
+      env: {},
+      protocolSource: `async function installedProtocol() {
+  try {
+    const source = await readFile('packages/contracts/src/orchestration-ws.ts', 'utf8');
+    const match = /ORCHESTRATION_WS_PROTOCOL_VERSION *= *([0-9]+)/.exec(source);
+    return match ? Number(match[1]) : null;
+  } catch { return null; }
+}`,
+    }
+  const support = path.posix.join(installation.directory, 'server', REMOTE_SUPPORT)
+  return {
+    workingDirectory: releaseServerRoot(installation),
+    imports: `import { createError, healthDescriptorSchema, ORCHESTRATION_WS_PROTOCOL_VERSION as releaseProtocol } from ${JSON.stringify(support)};`,
+    entry: [releaseEntry(installation)],
+    env: RELEASE_ENV,
+    protocolSource: 'async function installedProtocol() { return releaseProtocol; }',
+  }
 }
 
-export function launchCommand(options: LaunchOptions & { installation: ServerInstallation }) {
+/** Names the log a failed launch wrote, which a release keeps in its server root. */
+export function launchFailureFix(installation: ServerInstallation) {
+  const log = path.posix.join(remoteLayout(installation).workingDirectory, 'logs/ssh-launch.log')
+  return `Inspect ${log} on that machine and verify its dependencies are installed, then Retry.`
+}
+
+function bunCommand(installation: ServerInstallation, script: string) {
+  return `cd ${shellQuote(remoteLayout(installation).workingDirectory)} && ${shellQuote(installation.executable)} -e ${shellQuote(script)}`
+}
+
+export function launchCommand(options: LaunchOptions) {
   return bunCommand(options.installation, launchScript(options))
 }
 
@@ -32,17 +85,16 @@ export function stopCommand(
   options: { installation: ServerInstallation; clientId: string },
   record: RemoteRecord | null,
 ) {
-  return bunCommand(options.installation, stopScript(options.clientId, record))
+  return bunCommand(options.installation, stopScript(options, record))
 }
 
-const prelude = `
+const prelude = (layout: RemoteLayout) => `
 import { mkdir, readFile, readdir, rename, unlink } from 'node:fs/promises';
 import { openSync, closeSync } from 'node:fs';
 import net from 'node:net';
 import { Database } from 'bun:sqlite';
-import { createError } from 'evlog';
-import { healthDescriptorSchema } from './packages/contracts/src/health.ts';
-const fail = (message, code = 'machines.SSH_REMOTE', details = {}) => { throw Object.assign(createError({ code, status: 502, message, why: 'The remote launcher could not complete the requested lifecycle operation.', fix: 'Inspect logs/ssh-launch.log in this checkout.' }), { details }); };
+${layout.imports}
+const fail = (message, code = 'machines.SSH_REMOTE', details = {}) => { throw Object.assign(createError({ code, status: 502, message, why: 'The remote launcher could not complete the requested lifecycle operation.' }), { details }); };
 const alive = (pid) => { try { process.kill(pid, 0); return true; } catch { return false; } };
 function processStart(pid) {
   const result = Bun.spawnSync({ cmd: ['ps', '-p', String(pid), '-o', 'lstart='], stdout: 'pipe', stderr: 'ignore' });
@@ -131,9 +183,10 @@ async function health(port, webOrigin) {
 }
 `
 
-export function launchScript({ machine, clientId, webOrigin }: LaunchOptions) {
-  return `${prelude}
-const config = ${JSON.stringify({ clientId, webOrigin, remotePort: machine.remotePort ?? null, expectedProtocol: ORCHESTRATION_WS_PROTOCOL_VERSION })};
+export function launchScript({ machine, installation, clientId, webOrigin }: LaunchOptions) {
+  const layout = remoteLayout(installation)
+  return `${prelude(layout)}
+const config = ${JSON.stringify({ clientId, webOrigin, remotePort: machine.remotePort ?? null, expectedProtocol: ORCHESTRATION_WS_PROTOCOL_VERSION, installation: installation.kind, entry: layout.entry, env: layout.env })};
 const recordFile = '.platform-ssh-launch/' + config.clientId + '.json';
 let previousRecord = null;
 let managedGroup = null;
@@ -158,21 +211,15 @@ async function emit(record, descriptor) {
   await writeRecord(recordFile, confirmed);
   process.stdout.write(JSON.stringify({ ...confirmed, descriptor }) + '\\n');
 }
-async function checkoutProtocol() {
-  try {
-    const source = await readFile('packages/contracts/src/orchestration-ws.ts', 'utf8');
-    const match = /ORCHESTRATION_WS_PROTOCOL_VERSION *= *([0-9]+)/.exec(source);
-    return match ? Number(match[1]) : null;
-  } catch { return null; }
-}
-function protocolFail(record, descriptor, checkout, otherLeases) {
-  fail('The remote server speaks protocol ' + descriptor.protocolVersion + ', and this Platform needs protocol ' + config.expectedProtocol + '.', 'machines.SSH_PROTOCOL', { expected: config.expectedProtocol, running: descriptor.protocolVersion, checkout, kind: record.kind, otherLeases, port: record.port, directory: process.cwd() });
+${layout.protocolSource}
+function protocolFail(record, descriptor, installed, otherLeases) {
+  fail('The remote server speaks protocol ' + descriptor.protocolVersion + ', and this Platform needs protocol ' + config.expectedProtocol + '.', 'machines.SSH_PROTOCOL', { expected: config.expectedProtocol, running: descriptor.protocolVersion, installed, installation: config.installation, kind: record.kind, otherLeases, port: record.port, directory: process.cwd() });
 }
 async function replaceStale(record, descriptor) {
   if (descriptor.protocolVersion === config.expectedProtocol) return false;
-  const checkout = await checkoutProtocol();
+  const installed = await installedProtocol();
   const otherLeases = record.kind === 'managed' ? await otherLeaseCount(recordFile, record) : 0;
-  if (record.kind !== 'managed' || checkout !== config.expectedProtocol || otherLeases > 0) protocolFail(record, descriptor, checkout, otherLeases);
+  if (record.kind !== 'managed' || installed !== config.expectedProtocol || otherLeases > 0) protocolFail(record, descriptor, installed, otherLeases);
   await stopManagedProcess(record);
   return true;
 }
@@ -211,7 +258,7 @@ async function launch() {
   const port = await availablePort(config.remotePort ?? 0);
   managedGroup = previousRecord?.kind === 'managed' ? previousRecord : await dormantManagedRecord(port);
   const log = openSync('logs/ssh-launch.log', 'a', 0o600);
-  const child = Bun.spawn({ cmd: ['nohup', process.execPath, '--env-file=.env', 'apps/server/src/index.ts'], env: { ...process.env, FS_HOST: '127.0.0.1', PORT: String(port), SERVER_ALLOWED_ORIGINS: config.webOrigin }, stdin: 'ignore', stdout: log, stderr: log });
+  const child = Bun.spawn({ cmd: ['nohup', process.execPath, ...config.entry], env: { ...process.env, ...config.env, FS_HOST: '127.0.0.1', PORT: String(port), SERVER_ALLOWED_ORIGINS: config.webOrigin }, stdin: 'ignore', stdout: log, stderr: log });
   closeSync(log);
   child.unref();
   const record = { leaseId: previousRecord?.leaseId ?? crypto.randomUUID(), processId: managedGroup?.processId ?? crypto.randomUUID(), kind: 'managed', pid: child.pid, startedAt: processStart(child.pid), port, environmentId: previousRecord?.environmentId ?? managedGroup?.environmentId ?? null };
@@ -220,7 +267,7 @@ async function launch() {
     await writeManagedProcess(record);
     await writeRecord(recordFile, record);
     const descriptor = await managedHealth(child, port);
-    if (descriptor.protocolVersion !== config.expectedProtocol) protocolFail(record, descriptor, await checkoutProtocol(), 0);
+    if (descriptor.protocolVersion !== config.expectedProtocol) protocolFail(record, descriptor, await installedProtocol(), 0);
     return await emit(record, descriptor);
   } catch (error) {
     await stopFailedChild(child);
@@ -273,8 +320,11 @@ catch (error) { process.stderr.write(JSON.stringify({ ...error.details, code: er
 `
 }
 
-export function stopScript(clientId: string, expected: RemoteRecord | null) {
-  return `${prelude}
+export function stopScript(
+  { installation, clientId }: { installation: ServerInstallation; clientId: string },
+  expected: RemoteRecord | null,
+) {
+  return `${prelude(remoteLayout(installation))}
 const recordFile = '.platform-ssh-launch/' + ${JSON.stringify(clientId)} + '.json';
 const expected = ${JSON.stringify(expected)};
 async function stop() {

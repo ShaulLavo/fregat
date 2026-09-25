@@ -4,7 +4,7 @@ import { mkdir, readdir, readFile, realpath, unlink, writeFile } from 'node:fs/p
 import path from 'node:path'
 import { expect } from 'vitest'
 import { launchScript, stopCommand, stopScript } from '../remote-scripts'
-import { parseDescriptor, parseRemoteRecord, remoteFailure } from '../records'
+import { parseDescriptor, parseRemoteRecord, remoteFailure, type RemoteRecord } from '../records'
 import {
   clientId,
   descriptorValue,
@@ -15,11 +15,22 @@ import {
   runRemoteScript,
   remoteHealthResponse,
   servingRemoteProcess,
+  sourceInstallation,
   stopLaunchedServer,
   writeCheckoutProtocol,
   writeCheckoutServer,
   writeRemoteRecord,
 } from '../../../test/factories/ssh'
+
+type SourceLaunch = Omit<Parameters<typeof launchScript>[0], 'installation'>
+
+function sourceLaunch(remoteRoot: string, options: SourceLaunch) {
+  return launchScript({ ...options, installation: sourceInstallation(remoteRoot) })
+}
+
+function sourceStop(remoteRoot: string, owner: string, record: RemoteRecord | null) {
+  return stopScript({ installation: sourceInstallation(remoteRoot), clientId: owner }, record)
+}
 
 test('shell quoting preserves spaces, substitutions and single quotes literally', async ({
   remoteRoot,
@@ -32,7 +43,7 @@ test('shell quoting preserves spaces, substitutions and single quotes literally'
 })
 
 test('launch script keeps all caller values as data', async () => {
-  const source = launchScript({
+  const source = sourceLaunch('/remote', {
     machine: { ...machine, remotePort: 32001 },
     clientId,
     webOrigin: 'http://127.0.0.1:5173',
@@ -61,7 +72,7 @@ test('managed aliases retain the shared process until their final concurrent dis
       runRemoteScript(
         remoteRoot,
         remoteHealthResponse() +
-          launchScript({
+          sourceLaunch(remoteRoot, {
             machine: { ...machine, remotePort: record.port },
             clientId: owner,
             webOrigin: 'http://127.0.0.1:5173',
@@ -74,21 +85,21 @@ test('managed aliases retain the shared process until their final concurrent dis
     expect(JSON.parse(alias.stdout)).toMatchObject({ ...record, leaseId: expect.any(String) })
     expect(JSON.parse(alias.stdout).leaseId).not.toBe(record.leaseId)
   }
-  const first = await runRemoteScript(remoteRoot, stopScript('first', record))
+  const first = await runRemoteScript(remoteRoot, sourceStop(remoteRoot, 'first', record))
   expect(first.exitCode, first.stderr).toBe(0)
   expect(child.signalCode).toBeNull()
   const remaining = await Promise.all(
     ['second', 'third'].map(async (owner, index) =>
       runRemoteScript(
         remoteRoot,
-        stopScript(owner, await parseRemoteRecord(aliases[index]!.stdout)),
+        sourceStop(remoteRoot, owner, await parseRemoteRecord(aliases[index]!.stdout)),
       ),
     ),
   )
   for (const stopped of remaining) expect(stopped.exitCode, stopped.stderr).toBe(0)
   await child.exited
   expect(child.signalCode).not.toBeNull()
-  const repeated = await runRemoteScript(remoteRoot, stopScript('third', record))
+  const repeated = await runRemoteScript(remoteRoot, sourceStop(remoteRoot, 'third', record))
   expect(repeated.exitCode, repeated.stderr).toBe(0)
 })
 
@@ -103,7 +114,7 @@ test('alias leases follow a restarted managed process and disconnect with their 
   }
   const connected = await runRemoteScript(
     remoteRoot,
-    remoteHealthResponse() + launchScript(options),
+    remoteHealthResponse() + sourceLaunch(remoteRoot, options),
   )
   expect(connected.exitCode, connected.stderr).toBe(0)
   const retainedAlias = await parseRemoteRecord(connected.stdout)
@@ -116,15 +127,18 @@ test('alias leases follow a restarted managed process and disconnect with their 
   )
   const restarted = await runRemoteScript(
     remoteRoot,
-    remoteHealthResponse() + launchScript({ ...options, clientId: 'first' }),
+    remoteHealthResponse() + sourceLaunch(remoteRoot, { ...options, clientId: 'first' }),
   )
   expect(restarted.exitCode, restarted.stderr).toBe(0)
-  const first = await runRemoteScript(remoteRoot, stopScript('first', original.record))
+  const first = await runRemoteScript(remoteRoot, sourceStop(remoteRoot, 'first', original.record))
   expect(first.exitCode, first.stderr).toBe(0)
-  const other = await runRemoteScript(remoteRoot, stopScript('replacement', replacement.record))
+  const other = await runRemoteScript(
+    remoteRoot,
+    sourceStop(remoteRoot, 'replacement', replacement.record),
+  )
   expect(other.exitCode, other.stderr).toBe(0)
   expect(replacement.child.signalCode).toBeNull()
-  const final = await runRemoteScript(remoteRoot, stopScript('second', retainedAlias))
+  const final = await runRemoteScript(remoteRoot, sourceStop(remoteRoot, 'second', retainedAlias))
   expect(final.exitCode, final.stderr).toBe(0)
   await replacement.child.exited
   expect(replacement.child.signalCode).not.toBeNull()
@@ -137,7 +151,7 @@ test('an interrupted first lease publication leaves an adoptable managed process
   await unlink(path.join(remoteRoot, '.platform-ssh-launch/interrupted.json'))
   const source =
     remoteHealthResponse() +
-    launchScript({
+    sourceLaunch(remoteRoot, {
       machine: { ...machine },
       clientId: 'next',
       webOrigin: 'http://127.0.0.1:5173',
@@ -146,7 +160,7 @@ test('an interrupted first lease publication leaves an adoptable managed process
   expect(connected.exitCode, connected.stderr).toBe(0)
   const adopted = await parseRemoteRecord(connected.stdout)
   expect(adopted).toMatchObject({ kind: 'managed', pid: record.pid, processId: record.processId })
-  const stopped = await runRemoteScript(remoteRoot, stopScript('next', adopted))
+  const stopped = await runRemoteScript(remoteRoot, sourceStop(remoteRoot, 'next', adopted))
   expect(stopped.exitCode, stopped.stderr).toBe(0)
   await child.exited
   expect(child.signalCode).not.toBeNull()
@@ -181,7 +195,7 @@ async function checkStop(remoteRoot: string, kind: 'external' | 'managed') {
         '-c',
         stopCommand(
           {
-            installation: { kind: 'source', directory: remoteRoot, executable: process.execPath },
+            installation: sourceInstallation(remoteRoot),
             clientId,
           },
           record,
@@ -222,7 +236,7 @@ test('stop refuses a record replaced by another launch', async ({ remoteRoot }) 
       '-c',
       stopCommand(
         {
-          installation: { kind: 'source', directory: remoteRoot, executable: process.execPath },
+          installation: sourceInstallation(remoteRoot),
           clientId,
         },
         record,
@@ -259,7 +273,7 @@ test('a stale PID record cannot stop an unrelated live process', async ({ remote
         '-c',
         stopCommand(
           {
-            installation: { kind: 'source', directory: remoteRoot, executable: process.execPath },
+            installation: sourceInstallation(remoteRoot),
             clientId,
           },
           record,
@@ -300,7 +314,10 @@ test('a stale managed server is replaced when the checkout already matches', asy
   await linkCheckoutProtocol(remoteRoot)
   await writeCheckoutServer(remoteRoot, expected)
   const stale = await servingRemoteProcess(remoteRoot, clientId, expected - 1)
-  const launched = await runRemoteScript(remoteRoot, launchScript({ machine, clientId, webOrigin }))
+  const launched = await runRemoteScript(
+    remoteRoot,
+    sourceLaunch(remoteRoot, { machine, clientId, webOrigin }),
+  )
   expect(launched.exitCode, launched.stderr).toBe(0)
   const record = await parseRemoteRecord(launched.stdout)
   stopLaunchedServer(record.pid!)
@@ -308,7 +325,7 @@ test('a stale managed server is replaced when the checkout already matches', asy
   expect(record).toMatchObject({ kind: 'managed', processId: stale.record.processId })
   expect(record.pid).not.toBe(stale.record.pid)
   expect(JSON.parse(launched.stdout).descriptor.protocolVersion).toBe(expected)
-  const stopped = await runRemoteScript(remoteRoot, stopScript(clientId, record))
+  const stopped = await runRemoteScript(remoteRoot, sourceStop(remoteRoot, clientId, record))
   expect(stopped.exitCode, stopped.stderr).toBe(0)
 })
 
@@ -317,7 +334,10 @@ test('a stale managed server with an older checkout is refused by the launch scr
 }) => {
   await writeCheckoutProtocol(remoteRoot, expected - 1)
   const stale = await servingRemoteProcess(remoteRoot, clientId, expected - 1)
-  const launched = await runRemoteScript(remoteRoot, launchScript({ machine, clientId, webOrigin }))
+  const launched = await runRemoteScript(
+    remoteRoot,
+    sourceLaunch(remoteRoot, { machine, clientId, webOrigin }),
+  )
   const error = remoteFailure('launch', launched.stderr, launched.exitCode)
   expect(error).toMatchObject({
     code: 'machines.SSH_PROTOCOL',
@@ -327,7 +347,8 @@ test('a stale managed server with an older checkout is refused by the launch scr
   expect(error.internal).toEqual({
     expected,
     running: expected - 1,
-    checkout: expected - 1,
+    installed: expected - 1,
+    installation: 'source',
     kind: 'managed',
     otherLeases: 0,
   })
@@ -340,13 +361,16 @@ test('a stale managed server another lease holds is refused and left running', a
   await writeCheckoutProtocol(remoteRoot, expected)
   const stale = await servingRemoteProcess(remoteRoot, clientId, expected - 1)
   await writeRemoteRecord(remoteRoot, 'other', { ...stale.record, leaseId: crypto.randomUUID() })
-  const launched = await runRemoteScript(remoteRoot, launchScript({ machine, clientId, webOrigin }))
+  const launched = await runRemoteScript(
+    remoteRoot,
+    sourceLaunch(remoteRoot, { machine, clientId, webOrigin }),
+  )
   const error = remoteFailure('launch', launched.stderr, launched.exitCode)
   expect(error).toMatchObject({
     code: 'machines.SSH_PROTOCOL',
     fix: 'Disconnect the 1 other connection to that machine’s server, then Retry.',
   })
-  expect(error.internal).toMatchObject({ checkout: expected, otherLeases: 1 })
+  expect(error.internal).toMatchObject({ installed: expected, otherLeases: 1 })
   expect(stale.child.exitCode).toBeNull()
 })
 
@@ -359,7 +383,7 @@ test('a stale external server is refused and left running', async ({ remoteRoot 
   )
   const launched = await runRemoteScript(
     remoteRoot,
-    launchScript({
+    sourceLaunch(remoteRoot, {
       machine: { ...machine, remotePort: external.record.port },
       clientId,
       webOrigin,
@@ -379,13 +403,16 @@ test('a freshly launched server on another protocol is refused and stopped', asy
 }) => {
   await writeCheckoutProtocol(remoteRoot, expected)
   await writeCheckoutServer(remoteRoot, expected + 1)
-  const launched = await runRemoteScript(remoteRoot, launchScript({ machine, clientId, webOrigin }))
+  const launched = await runRemoteScript(
+    remoteRoot,
+    sourceLaunch(remoteRoot, { machine, clientId, webOrigin }),
+  )
   const error = remoteFailure('launch', launched.stderr, launched.exitCode)
   expect(error).toMatchObject({
     code: 'machines.SSH_PROTOCOL',
     fix: `Run bun install in ${await realpath(remoteRoot)} so the server’s dependencies match that checkout, then Retry.`,
   })
-  expect(error.internal).toMatchObject({ running: expected + 1, checkout: expected })
+  expect(error.internal).toMatchObject({ running: expected + 1, installed: expected })
   const launchDirectory = path.join(remoteRoot, '.platform-ssh-launch')
   expect(await Bun.file(path.join(launchDirectory, `${clientId}.json`)).exists()).toBe(false)
   const [processFile] = (await readdir(launchDirectory)).filter((name) => name.endsWith('.process'))
@@ -400,7 +427,10 @@ test('an orphaned stale managed server is stopped and replaced by a fresh launch
   await writeCheckoutServer(remoteRoot, expected)
   const stale = await servingRemoteProcess(remoteRoot, 'other', expected - 1)
   await unlink(path.join(remoteRoot, '.platform-ssh-launch/other.json'))
-  const launched = await runRemoteScript(remoteRoot, launchScript({ machine, clientId, webOrigin }))
+  const launched = await runRemoteScript(
+    remoteRoot,
+    sourceLaunch(remoteRoot, { machine, clientId, webOrigin }),
+  )
   expect(launched.exitCode, launched.stderr).toBe(0)
   const record = await parseRemoteRecord(launched.stdout)
   stopLaunchedServer(record.pid!)
@@ -410,7 +440,7 @@ test('an orphaned stale managed server is stopped and replaced by a fresh launch
   expect(JSON.parse(launched.stdout).descriptor.protocolVersion).toBe(expected)
   const staleFile = `.platform-ssh-launch/${stale.record.processId}.process`
   expect(await Bun.file(path.join(remoteRoot, staleFile)).exists()).toBe(false)
-  const stopped = await runRemoteScript(remoteRoot, stopScript(clientId, record))
+  const stopped = await runRemoteScript(remoteRoot, sourceStop(remoteRoot, clientId, record))
   expect(stopped.exitCode, stopped.stderr).toBe(0)
 })
 
@@ -419,13 +449,16 @@ test('a stale managed server only another client holds is refused and left runni
 }) => {
   await writeCheckoutProtocol(remoteRoot, expected)
   const stale = await servingRemoteProcess(remoteRoot, 'other', expected - 1)
-  const launched = await runRemoteScript(remoteRoot, launchScript({ machine, clientId, webOrigin }))
+  const launched = await runRemoteScript(
+    remoteRoot,
+    sourceLaunch(remoteRoot, { machine, clientId, webOrigin }),
+  )
   const error = remoteFailure('launch', launched.stderr, launched.exitCode)
   expect(error).toMatchObject({
     code: 'machines.SSH_PROTOCOL',
     fix: 'Disconnect the 1 other connection to that machine’s server, then Retry.',
   })
-  expect(error.internal).toMatchObject({ checkout: expected, otherLeases: 1, kind: 'managed' })
+  expect(error.internal).toMatchObject({ installed: expected, otherLeases: 1, kind: 'managed' })
   expect(stale.child.exitCode).toBeNull()
   const staleFile = `.platform-ssh-launch/${stale.record.processId}.process`
   expect(await Bun.file(path.join(remoteRoot, staleFile)).exists()).toBe(true)

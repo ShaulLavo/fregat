@@ -1,6 +1,7 @@
 import type { ConnectionError } from '@workspace/contracts'
 import { defineErrorCatalog } from 'evlog'
 import { createStructuredError, isEvlogError } from '../observability/structured-errors'
+import type { ServerInstallation } from '../installation/descriptor'
 
 const machineErrors = defineErrorCatalog('machines', {
   SSH_DISCOVERY: {
@@ -31,7 +32,7 @@ const machineErrors = defineErrorCatalog('machines', {
     status: 502,
     message: 'The remote server could not start.',
     why: 'The remote launcher could not reuse or start the configured server.',
-    fix: 'Inspect logs/ssh-launch.log in the remote checkout and verify its dependencies are installed.',
+    fix: 'Inspect logs/ssh-launch.log in the server’s working directory on that machine and verify its dependencies are installed, then Retry.',
   },
   SSH_PROTOCOL: {
     status: 409,
@@ -86,13 +87,19 @@ const sshErrors = {
 export type SshCatalogStep = keyof typeof sshErrors
 export type SshErrorStep = SshCatalogStep | 'protocol'
 
-export function createSshError(step: SshCatalogStep, detail?: string, cause?: unknown) {
+/** `fix` replaces the catalog's when the caller knows more, such as the launch log's path. */
+export function createSshError(
+  step: SshCatalogStep,
+  detail?: string,
+  cause?: unknown,
+  fix?: string,
+) {
   const definition = sshErrors[step]
   return createStructuredError({
     code: definition.code,
     status: definition.status,
     why: definition.why,
-    fix: definition.fix,
+    fix: fix ?? definition.fix,
     message: detail ? `${definition.message} ${detail}` : definition.message,
     cause,
   })
@@ -111,11 +118,15 @@ export function sshAuthCancelled(cancelledAt: number) {
 
 export const sshProtocolCode = machineErrors.SSH_PROTOCOL.code
 
-/** What each end of the launch saw: `checkout` and `otherLeases` are null when the check ran on this side. */
+/**
+ * What each end of the launch saw. `installed` is the protocol a fresh launch would speak;
+ * it and `otherLeases` are null when the check ran on this side.
+ */
 export type ProtocolReport = {
   expected: number
   running: number
-  checkout: number | null
+  installed: number | null
+  installation: ServerInstallation['kind'] | null
   kind: 'managed' | 'external' | null
   otherLeases: number | null
   port: number | null
@@ -130,7 +141,8 @@ export function createSshProtocolError(report: ProtocolReport) {
     internal: {
       expected: report.expected,
       running: report.running,
-      checkout: report.checkout,
+      installed: report.installed,
+      installation: report.installation,
       kind: report.kind,
       otherLeases: report.otherLeases,
     },
@@ -138,18 +150,26 @@ export function createSshProtocolError(report: ProtocolReport) {
 }
 
 function protocolFix(report: ProtocolReport) {
-  // The checkout is what a relaunch would start, so it decides which side is newer.
-  if ((report.checkout ?? report.running) > report.expected)
+  // The installation is what a relaunch would start, so it decides which side is newer.
+  if ((report.installed ?? report.running) > report.expected)
     return 'Update this Platform server to the version on that machine, then Retry.'
   if (report.kind === 'external' && report.port !== null)
-    return `Restart the Platform server on remote port ${report.port} from a checkout at this server’s version, then Retry.`
+    return externalFix(report.port, report.installation)
   const others = report.otherLeases ?? 0
-  if (report.checkout === report.expected && others > 0)
+  if (report.installed === report.expected && others > 0)
     return `Disconnect the ${others} other ${others === 1 ? 'connection' : 'connections'} to that machine’s server, then Retry.`
-  if (report.checkout === report.expected && report.directory)
+  if (report.installation === 'release')
+    return 'Install this server’s release on that machine, then Retry.'
+  if (report.installed === report.expected && report.directory)
     return `Run bun install in ${report.directory} so the server’s dependencies match that checkout, then Retry.`
   if (!report.directory) return machineErrors.SSH_PROTOCOL.fix
   return `Update the Platform checkout at ${report.directory} to this server’s version, run bun install there, then Retry.`
+}
+
+function externalFix(port: number, installation: ProtocolReport['installation']) {
+  if (installation === 'release')
+    return `Restart the Platform server on remote port ${port} from this server’s release, then Retry.`
+  return `Restart the Platform server on remote port ${port} from a checkout at this server’s version, then Retry.`
 }
 
 /** The failure a machine state carries: a catalog error keeps its code, anything else becomes the step's entry. */

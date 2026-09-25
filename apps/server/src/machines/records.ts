@@ -115,14 +115,20 @@ export async function parseRemoteRecord(output: string): Promise<RemoteRecord> {
 const protocolPayloadSchema = v.object({
   expected: v.pipe(v.number(), v.integer()),
   running: v.pipe(v.number(), v.integer()),
-  checkout: v.nullable(v.pipe(v.number(), v.integer())),
+  installed: v.nullable(v.pipe(v.number(), v.integer())),
+  installation: v.picklist(['source', 'release']),
   kind: v.picklist(['managed', 'external']),
   otherLeases: v.pipe(v.number(), v.integer(), v.minValue(0)),
   port: v.nullable(v.pipe(v.number(), v.integer())),
   directory: v.pipe(v.string(), v.minLength(1)),
 })
 
-export function remoteFailure(step: SshCatalogStep, stderr: string, exitCode: number) {
+export function remoteFailure(
+  step: SshCatalogStep,
+  stderr: string,
+  exitCode: number,
+  fix?: string,
+) {
   const reported = remoteErrorPayload(stderr)
   if (reported?.code === 'machines.SSH_IDENTITY') return createSshError('identity')
   if (reported?.code === 'machines.SSH_NOT_INSTALLED') return createSshNotInstalledError(exitCode)
@@ -130,8 +136,9 @@ export function remoteFailure(step: SshCatalogStep, stderr: string, exitCode: nu
     reported?.code === sshProtocolCode ? v.safeParse(protocolPayloadSchema, reported.input) : null
   if (protocol?.success) return createSshProtocolError(protocol.output)
   // The launch script's catalog error arrives as JSON; its message is the sentence, not the envelope.
-  if (reported?.message) return createSshError(step, reported.message)
-  return createSshError(step, stderr.trim().slice(0, 2000) || `SSH exited with status ${exitCode}.`)
+  if (reported?.message) return createSshError(step, reported.message, undefined, fix)
+  const detail = stderr.trim().slice(0, 2000) || `SSH exited with status ${exitCode}.`
+  return createSshError(step, detail, undefined, fix)
 }
 
 function remoteErrorPayload(stderr: string) {

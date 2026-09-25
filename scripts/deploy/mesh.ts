@@ -108,7 +108,7 @@ async function deploy(options: DeployOptions) {
   })
 
   log('verify', 'candidate files')
-  verifyCandidateFiles(release)
+  await verifyCandidateFiles(release)
   log('verify', 'booting the candidate server')
   await bootCandidate(release)
 

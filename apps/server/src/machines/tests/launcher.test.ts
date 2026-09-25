@@ -1,6 +1,14 @@
 import { ORCHESTRATION_WS_PROTOCOL_VERSION } from '@workspace/contracts'
 import { expect, onTestFinished } from 'vitest'
-import { clientId, descriptorValue, fakeSsh, machine, test } from '../../../test/factories/ssh'
+import {
+  clientId,
+  descriptorValue,
+  fakeSsh,
+  machine,
+  releaseInstallation,
+  sourceInstallation,
+  test,
+} from '../../../test/factories/ssh'
 import { createSshLauncher } from '../launcher'
 import { openForward } from '../forward'
 
@@ -251,18 +259,43 @@ const remoteDirectory = "/work/space ' $(touch unwanted)"
 test.for([
   {
     name: 'an older checkout',
-    report: { checkout: expectedProtocol - 1, kind: 'managed', otherLeases: 0 },
+    report: {
+      installation: 'source',
+      installed: expectedProtocol - 1,
+      kind: 'managed',
+      otherLeases: 0,
+    },
     fix: `Update the Platform checkout at ${remoteDirectory} to this server’s version, run bun install there, then Retry.`,
   },
   {
     name: 'another lease',
-    report: { checkout: expectedProtocol, kind: 'managed', otherLeases: 1 },
+    report: {
+      installation: 'source',
+      installed: expectedProtocol,
+      kind: 'managed',
+      otherLeases: 1,
+    },
     fix: 'Disconnect the 1 other connection to that machine’s server, then Retry.',
   },
   {
     name: 'an external server',
-    report: { checkout: expectedProtocol, kind: 'external', otherLeases: 0 },
+    report: {
+      installation: 'source',
+      installed: expectedProtocol,
+      kind: 'external',
+      otherLeases: 0,
+    },
     fix: 'Restart the Platform server on remote port 31001 from a checkout at this server’s version, then Retry.',
+  },
+  {
+    name: 'an external server on a release machine',
+    report: {
+      installation: 'release',
+      installed: expectedProtocol,
+      kind: 'external',
+      otherLeases: 0,
+    },
+    fix: 'Restart the Platform server on remote port 31001 from this server’s release, then Retry.',
   },
 ] as const)(
   'a launch script refusing $name blocks at the protocol step and releases the lease',
@@ -302,5 +335,73 @@ test.for([
     expect(remote[1]).toContain('await withLeaseLock(launch);')
     expect(remote[2]).toContain('await withLeaseLock(stop);')
     expect(fixture.forwardChildren).toHaveLength(0)
+  },
+)
+
+test('a release installation launches its own support bundle and the connect event names it', async () => {
+  const installation = releaseInstallation('/home/remote/.platform/server')
+  const fixture = await fakeSsh({ installation })
+  expect((await fixture.launcher.connectMachine('fixture')).phase).toBe('live')
+  const launch = fixture.commands[1]?.at(-1) ?? ''
+  expect(launch).toContain('/home/remote/.platform/server/current/server/remote-support.js')
+  expect(fixture.events[0]).toMatchObject({
+    action: 'machines.ssh.connect',
+    fields: {
+      outcome: 'success',
+      installationKind: 'release',
+      installationDirectory: installation.directory,
+      serverVersion: descriptorValue.serverVersion,
+    },
+  })
+})
+
+test('a release server on another protocol names the release fix', async () => {
+  const fixture = await fakeSsh({
+    installation: releaseInstallation('/home/remote/.platform/server'),
+    descriptor: { ...descriptorValue, protocolVersion: expectedProtocol - 1 },
+  })
+  const result = await fixture.launcher.connectMachine('fixture')
+  expect(result).toMatchObject({
+    phase: 'blocked',
+    lastError: {
+      code: 'machines.SSH_PROTOCOL',
+      fix: 'Install this server’s release on that machine, then Retry.',
+    },
+  })
+  expect(fixture.events.at(-1)?.fields).toMatchObject({
+    step: 'protocol',
+    installationKind: 'release',
+    errorInternal: { installation: 'release', installed: null },
+  })
+})
+
+test.for([
+  {
+    kind: 'source',
+    installation: sourceInstallation('/home/remote/platform'),
+    log: '/home/remote/platform/logs/ssh-launch.log',
+  },
+  {
+    kind: 'release',
+    installation: releaseInstallation('/home/remote/.platform/server'),
+    log: '/home/remote/.platform/server/logs/ssh-launch.log',
+  },
+] as const)(
+  'a failed $kind launch names the log the launch wrote',
+  async ({ installation, log }) => {
+    const fixture = await fakeSsh({
+      installation,
+      launchFailure: {
+        code: 'machines.SSH_REMOTE',
+        message: 'The remote server did not become ready within 30 seconds.',
+      },
+    })
+    const result = await fixture.launcher.connectMachine('fixture')
+    expect(result).toMatchObject({
+      lastError: {
+        code: 'machines.SSH_LAUNCH',
+        fix: `Inspect ${log} on that machine and verify its dependencies are installed, then Retry.`,
+      },
+    })
   },
 )
