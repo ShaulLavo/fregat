@@ -2,6 +2,7 @@ import { useUnicodeHighlights } from '@/features/editor/hooks/use-unicode-highli
 import type { TabId } from '@/lib/documents/utils/types'
 import type { EditorTheme } from '@singapore-editor/core/rendering'
 import {
+  createDiffEditorOptions,
   createDiffPlugin,
   type DiffFile,
   type DiffGutterSide,
@@ -17,14 +18,10 @@ import { useDiffRows } from '@/features/editor/hooks/use-diff-rows'
 import { useEditorTypography } from '@/features/editor/hooks/use-editor-typography'
 import type { DiffLanguageServerContext } from '@/features/editor/utils/diff-language-context'
 import {
-  DIFF_CURSOR_LINE_HIGHLIGHT,
-  DIFF_KEYMAP,
-  DIFF_DETECT_INDENTATION,
-} from '@/features/editor/utils/diff-options'
-import {
   createDiffScrollBridgePlugin,
   type DiffScrollPosition,
 } from '@/features/editor/utils/diff-scroll-bridge'
+import { HOSTED_EDITOR_KEYMAP } from '@/keymap/editor-keymap'
 import { log } from '@/lib/client-logging'
 import { useEditorFocusTarget } from '@/lib/focus/hooks/use-editor-target'
 import { createDiffPresentationBinding } from '@/features/editor/state/diff-presentation'
@@ -94,18 +91,15 @@ export function DiffPane({
   ].filter((entry) => entry !== null && entry !== undefined)
   const typography = useEditorTypography()
   const controller = useEditor({
+    ...createDiffEditorOptions(),
     presentationReady: false,
     suspiciousCharacters: unicodeHighlights.options,
-    cursorLineHighlight: DIFF_CURSOR_LINE_HIGHLIGHT,
     // No `document`: the React wrapper pushes text through `openDocument`, which takes no scroll
     // position from us and therefore lands back at the top — so every expansion toggle, and every
     // keystroke behind a compare-saved diff, would throw the reader's place away. `setText` is the
     // one that carries the scroll position across, and it is what the package's own contract names.
-    detectIndentation: DIFF_DETECT_INDENTATION,
-    documentMode: 'static',
-    editability: 'readonly',
     ...typography,
-    keymap: DIFF_KEYMAP,
+    keymap: HOSTED_EDITOR_KEYMAP,
     // Only the diff plugin: the critical core set would bring line and fold gutters, find, merge
     // conflicts, shiki and LSP, none of which a diff had — and a fold gutter would break the
     // row-index identity the comment layer reads line numbers off.
@@ -145,7 +139,7 @@ export function DiffPane({
       installedProjection.current?.editor !== editor ||
       installedProjection.current.text !== text
     ) {
-      editor.setText(text, { documentMode: 'static', languageId: null, tokens })
+      editor.setText(text, { tokens })
       installedProjection.current = { editor, text }
     } else {
       editor.setTokens(tokens)

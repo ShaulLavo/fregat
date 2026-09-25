@@ -52,6 +52,8 @@ Graph roots exclude `refs/platform/*`. A browsing session pins tips and ref labe
 
 `scenario git-diff-line-comment` presses the changed line of a diff and reads the selection bar: it must name that line, and still name it after unhiding the unmodified lines above has shifted every row.
 
+`scenario git-diff-fold` focuses a diff whose change sits in an indented block and presses Fold all (Ctrl+K Ctrl+0). The deleted and added rows must stay visible: the diff editor is built with `folding: false`, so the app keymap's fold commands find nothing to fold.
+
 `scenario git-diff-hover-tokens` hovers an identifier inside a diff pane and checks the hover's fenced code is painted with token colours: a diff lends its private syntax backend to the editor's snippet tokens, because the diff editor itself has no language.
 
 `scenario chat-git-tab-switch` opens a file, enters chat mode and clicks Graph then Changes in the Git tool. The Git panel must stay: a panel change records the selected document in the address but must not set `tool: editor`, which only opening a document does.

@@ -178,6 +178,7 @@ import { gitDiffExpandTokens } from './git-diff-expand-tokens'
 import { editorPressParticipants } from './editor-press-participants'
 import { editorWidgetKeys } from './editor-widget-keys'
 import { gitDiffLineComment } from './git-diff-line-comment'
+import { gitDiffFold } from './git-diff-fold'
 import { gitCommitMessageFile } from './git-commit-message-file'
 import { gitCommitMessagePersists } from './git-commit-message-persists'
 import { gitCommitSlowHook } from './git-commit-slow-hook'
@@ -360,6 +361,7 @@ export const scenarios: readonly Scenario[] = [
   editorPressParticipants,
   editorWidgetKeys,
   gitDiffLineComment,
+  gitDiffFold,
   chatCardNarrow,
   chatComposerInsert,
   chatDisclosureSettle,
