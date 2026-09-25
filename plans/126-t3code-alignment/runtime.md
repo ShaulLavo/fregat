@@ -86,6 +86,16 @@ Upstream paths shortened to `provider/…` or `orchestration/…` in tables mean
 - **Dependencies:** Interaction command menu path and existing queued-start recovery.
 - **Acceptance / tests:** Empty conversation rejects; idle Codex compacts once; second compact while busy rejects; two follow-ups execute in order after success; compaction failure/Stop marks queued follow-ups retryable without sending them; restart during compaction does not replay the command or lose ownership. Claude and new providers follow their pinned adapter's supported behavior.
 - **Bounded absence search:** `compactThread`, `compactSession`, `thread/compact`, `/compact`, `isCompact` in provider/orchestration/contracts/client-core/chat-mode; only notification handling, generated schema and test text, no callable manual path.
+- **Measured 2026-09-25 (lane L3, before building):**
+  - Codex 0.157 `thread/compact/start {threadId}` answers `{}` at once, then runs as an ordinary
+    native turn: `turn/started` → `contextCompaction` item → `thread/tokenUsage/updated` →
+    `turn/completed` (about 15 s on a one-turn thread). It sends no `thread/compacted`. So a
+    manual compaction can be a Platform turn whose provider turn attaches on `turn/started`, and
+    the existing busy/queue rules hold follow-ups behind it.
+  - Claude: `compact` is in the probed command catalog, and a `/compact` user prompt through the
+    SDK compacts: `compact_boundary` (`trigger: 'manual'`, pre/post tokens), a summary user
+    message, `<local-command-stdout>Compacted </local-command-stdout>`, then a `result` with
+    subtype `success` and empty text (about 20 s). It is a turn with a result like any other.
 
 ### RUNTIME-06 — Preserve advertised model option descriptors and service tiers
 
