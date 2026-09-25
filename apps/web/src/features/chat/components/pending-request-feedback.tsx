@@ -1,14 +1,16 @@
 import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
 
 import type { PendingRequestResponse } from '@/features/chat/providers/pending-requests-context'
+import { InlineError } from '@/components/inline-error'
 
 export function PendingRequestFeedback({ response }: { response: PendingRequestResponse }) {
   if (response.kind === 'idle') return null
   if (response.kind === 'failed') {
     return (
-      <p className='text-destructive text-xs' role='alert'>
-        Could not send your response. {response.message}
-      </p>
+      <InlineError
+        message={`Could not send your response. ${response.message}`}
+        title='Pending request response'
+      />
     )
   }
 

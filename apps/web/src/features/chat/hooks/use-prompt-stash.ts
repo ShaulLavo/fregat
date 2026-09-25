@@ -3,13 +3,13 @@ import { useStore } from 'zustand'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import { toast } from 'sonner'
 import { errorMessage } from '@/lib/error-message'
 import { $setChatInputText } from '../utils/input-editor-actions'
 import { useChatInputDraftStore, type ChatInputDraftTarget } from '../state/chat-input-draft-store'
 import { promptStashStoreFor, type PromptStashEntry } from '../state/prompt-stash-store'
 import { transferStash } from '../state/stash-transfer'
 import { chatMutationKeys } from '../utils/mutation-keys'
+import { toastError } from '@/lib/toast-error'
 
 export function usePromptStash(draftTarget: ChatInputDraftTarget) {
   const [editor] = useLexicalComposerContext()
@@ -48,7 +48,7 @@ export function usePromptStash(draftTarget: ChatInputDraftTarget) {
       if (action.kind === 'restore') editor.focus()
       setMenuOpen(false)
     },
-    onError: (error) => toast.error(errorMessage(error, 'Could not transfer the message stash.')),
+    onError: (error) => toastError(errorMessage(error, 'Could not transfer the message stash.')),
   })
   const { mutate } = mutation
   useEffect(() => {

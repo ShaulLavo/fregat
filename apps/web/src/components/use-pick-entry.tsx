@@ -17,7 +17,7 @@ import { basenameFromOsPath, clientPathFromOsPath } from '@/components/utils/pic
 import { createWideEventScope } from '@/lib/wide-event-scope'
 import type { WideEventScope } from '@workspace/observability/scope'
 import { useEffect } from 'react'
-import { toast } from 'sonner'
+import { toastError } from '@/lib/toast-error'
 
 type UsePickEntryOptions = {
   accept?: readonly string[]
@@ -144,7 +144,7 @@ async function handleNativePickResult(
     scope.increment('picker.errorCount')
     scope.warn('Native picker entry hydration failed.', { error })
     scope.set({ outcome: 'error' })
-    toast.error('Could not open selected path', {
+    toastError('Could not open selected path', {
       description: errorMessage(error),
     })
   } finally {

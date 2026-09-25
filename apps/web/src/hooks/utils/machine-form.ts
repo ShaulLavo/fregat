@@ -57,3 +57,11 @@ function suggestedMachineName(machine: MachineDefinition): string {
   if (name === 'local') return 'remote-local'
   return name || 'remote'
 }
+
+/** Same place to connect to; a label difference is an edit, not a second machine. */
+export function sameMachineAddress(a: MachineDefinition, b: MachineDefinition): boolean {
+  if (a.kind === 'ssh' && b.kind === 'ssh')
+    return a.target === b.target && a.remotePort === b.remotePort
+  if (a.kind === 'origin' && b.kind === 'origin') return a.url === b.url
+  return false
+}

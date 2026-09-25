@@ -12,6 +12,7 @@ import {
   DialogTitle,
 } from '@workspace/ui/components/dialog'
 import { useAuth } from '@/features/environments/hooks/use-auth'
+import { InlineError } from '@/components/inline-error'
 
 export function AuthForm({ prompt }: { readonly prompt: MachineAuthPrompt }) {
   const id = useId()
@@ -69,9 +70,7 @@ export function AuthForm({ prompt }: { readonly prompt: MachineAuthPrompt }) {
             </div>
           )}
           {error ? (
-            <p role='alert' id={errorId} className='text-destructive'>
-              {error}
-            </p>
+            <InlineError id={errorId} message={error} onHandOff={cancel} title='Machine sign-in' />
           ) : null}
           <DialogFooter>
             <Button type='button' variant='ghost' onClick={cancel}>

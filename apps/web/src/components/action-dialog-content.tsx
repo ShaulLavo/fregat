@@ -10,6 +10,7 @@ import {
 } from '@workspace/ui/components/dialog'
 import { cn } from '@workspace/ui/lib/utils'
 import type { ComponentProps, ReactNode } from 'react'
+import { FixWithAgentButton } from '@/components/fix-with-agent-button'
 
 type ActionDialogContentProps = Omit<ComponentProps<typeof DialogContent>, 'title'> & {
   title: ReactNode
@@ -52,7 +53,13 @@ export function ActionDialogContent({
       {error ? (
         <Alert variant='destructive'>
           <WarningCircleIcon />
-          <AlertDescription>{error}</AlertDescription>
+          <AlertDescription>
+            <p>{error}</p>
+            <FixWithAgentButton
+              error={{ message: error, title: typeof title === 'string' ? title : undefined }}
+              onHandOff={onCancel}
+            />
+          </AlertDescription>
         </Alert>
       ) : null}
       <DialogFooter>

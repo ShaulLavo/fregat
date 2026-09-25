@@ -7,6 +7,7 @@ import {
   importSourceName,
   type ImportSource,
 } from '@/features/settings/utils/session-import'
+import { InlineError } from '@/components/inline-error'
 
 export function ImportSourceRow({ source }: { source: ImportSource }) {
   const mutation = useImportSessions(source.providerInstanceId)
@@ -27,9 +28,10 @@ export function ImportSourceRow({ source }: { source: ImportSource }) {
         </Button>
       </div>
       {mutation.isError ? (
-        <p className='text-destructive text-xs' role='alert'>
-          {errorStringField(mutation.error, 'message') ?? 'Import failed. Try again.'}
-        </p>
+        <InlineError
+          message={errorStringField(mutation.error, 'message') ?? 'Import failed. Try again.'}
+          title={`Import from ${name}`}
+        />
       ) : null}
       {mutation.isSuccess ? (
         <div className='text-muted-foreground space-y-1 text-xs' role='status'>

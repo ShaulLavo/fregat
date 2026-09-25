@@ -1,5 +1,4 @@
 import type { OrchestrationMessage } from '@workspace/contracts'
-import { toast } from 'sonner'
 
 import { useChatTimelineActions } from '@/features/chat/hooks/use-chat-timeline-actions'
 import { checkpointAvailability } from '@/lib/checkpoint-availability'
@@ -11,6 +10,7 @@ import { markdownToPlainText } from '@/features/chat/utils/message-text'
 import { copyTextToClipboard } from '@/lib/clipboard'
 import { errorMessage } from '@/lib/error-message'
 import { codexFileCitationsMarkdown } from '@/features/chat/utils/codex-file-citations'
+import { toastError } from '@/lib/toast-error'
 
 export function useMessageMenu({
   checkpointRevertPending,
@@ -45,7 +45,7 @@ export function useMessageMenu({
     } catch (error) {
       // The inline changed-files card reports this in place; a dismissed menu
       // has nowhere to put it, so it surfaces as a toast instead.
-      toast.error(errorMessage(error, 'Checkpoint diff unavailable.'))
+      toastError(errorMessage(error, 'Checkpoint diff unavailable.'))
     }
   }
 

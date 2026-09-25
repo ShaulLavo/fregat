@@ -10,6 +10,7 @@ import { LanguageServerMatchProvider } from '@/features/editor/providers/languag
 import { EditorStateProvider } from '@/features/editor/providers/state-provider'
 import { AppearanceProvider } from '@/features/settings/providers/appearance-provider'
 import { useApplicationRuntime } from '@/hooks/use-application-runtime'
+import { ErrorActionProvider } from '@/providers/error-action-provider'
 
 export function ActiveEnvironmentApplication({ children }: { readonly children: ReactNode }) {
   const application = useApplicationRuntime()
@@ -17,19 +18,21 @@ export function ActiveEnvironmentApplication({ children }: { readonly children: 
 
   return (
     <QueryClientProvider key={active.origin} client={active.queryClient}>
-      <ConnectionGate origin={active.origin}>
-        <LanguageServerMatchProvider>
-          <AppearanceProvider>
-            <EditorColorThemeProvider>
-              <TooltipProvider>
-                <EditorStateProvider runtime={active.editor}>{children}</EditorStateProvider>
-                <ThemeAwareToaster />
-                <TooltipLayer />
-              </TooltipProvider>
-            </EditorColorThemeProvider>
-          </AppearanceProvider>
-        </LanguageServerMatchProvider>
-      </ConnectionGate>
+      <ErrorActionProvider>
+        <ConnectionGate origin={active.origin}>
+          <LanguageServerMatchProvider>
+            <AppearanceProvider>
+              <EditorColorThemeProvider>
+                <TooltipProvider>
+                  <EditorStateProvider runtime={active.editor}>{children}</EditorStateProvider>
+                  <ThemeAwareToaster />
+                  <TooltipLayer />
+                </TooltipProvider>
+              </EditorColorThemeProvider>
+            </AppearanceProvider>
+          </LanguageServerMatchProvider>
+        </ConnectionGate>
+      </ErrorActionProvider>
     </QueryClientProvider>
   )
 }

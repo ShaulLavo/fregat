@@ -12,6 +12,7 @@ import { SshHostPicker } from '@/features/environments/components/ssh-host-picke
 import { useId } from 'react'
 
 import { useMachineForm, type MachineFormOptions } from '@/hooks/use-machine-form'
+import { InlineError } from '@/components/inline-error'
 
 export function MachineForm(props: MachineFormOptions) {
   const id = useId()
@@ -138,11 +139,7 @@ export function MachineForm(props: MachineFormOptions) {
           </CollapsibleContent>
         </Collapsible>
       </fieldset>
-      {error ? (
-        <p role='alert' id={errorId} className='text-destructive text-xs'>
-          {error}
-        </p>
-      ) : null}
+      {error ? <InlineError id={errorId} message={error} title='Machine connection' /> : null}
       <div className='flex flex-col gap-2'>
         <Button type='submit' variant='outline' className='w-full' disabled={saving}>
           {saving ? <OrbitLoader /> : <PlugsConnectedIcon className='size-(--icon-size-sm)' />}

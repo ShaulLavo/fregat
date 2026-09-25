@@ -26,6 +26,7 @@ import {
   providerSignInPhaseCopy,
   PROVIDER_AUTH_METHODS,
 } from '@workspace/client-core/chat/providers/auth'
+import { FixWithAgentButton } from '@/components/fix-with-agent-button'
 
 const SUCCESS_CLOSE_DELAY_MS = 1_400
 
@@ -135,7 +136,12 @@ export function ProviderSignInDialog({
         {signIn.attemptError ? (
           <Alert variant='destructive'>
             <WarningCircleIcon />
-            <AlertDescription className='break-words'>{signIn.attemptError}</AlertDescription>
+            <AlertDescription className='break-words'>
+              <p>{signIn.attemptError}</p>
+              <FixWithAgentButton
+                error={{ message: signIn.attemptError, title: 'Provider sign-in' }}
+              />
+            </AlertDescription>
           </Alert>
         ) : null}
 

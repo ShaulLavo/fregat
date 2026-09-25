@@ -18,6 +18,7 @@ import { useProjectDeleteRequestStore } from '@/features/chat-mode/state/project
 import { chatModeMutationKeys } from '@/features/chat-mode/utils/mutation-keys'
 import { projectDeletePrompt } from '@/features/chat-mode/utils/project-delete-prompt'
 import { DeleteDialogFooter } from '@workspace/ui/patterns/delete-dialog-footer'
+import { InlineError } from '@/components/inline-error'
 
 /**
  * Deleting a project cascades onto every session it owns and there is no undo,
@@ -78,9 +79,11 @@ export function ProjectDeleteDialog() {
           </p>
         ) : null}
         {error ? (
-          <p className='text-destructive text-sm' role='alert'>
-            {error}
-          </p>
+          <InlineError
+            message={error}
+            onHandOff={() => actions.cancelDelete()}
+            title='Project delete'
+          />
         ) : null}
         <DeleteDialogFooter
           cancelDisabled={pending}

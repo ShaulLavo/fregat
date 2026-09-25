@@ -10,6 +10,7 @@ import { selectServerConnection } from '@workspace/client-core/environments/stat
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
 import { readEnvironmentDescriptor } from '@/lib/environments/utils/descriptor'
 import { toClientError } from '@/lib/client-error-taxonomy'
+import { InlineError } from '@/components/inline-error'
 
 export function ConnectionGate({
   origin,
@@ -35,11 +36,14 @@ export function ConnectionGate({
   if (refused || (query.isError && !query.data)) {
     return (
       <div className='bg-background text-foreground grid min-h-svh place-content-center gap-4 p-8'>
-        <p role='alert' className='text-destructive text-sm'>
-          {refused
-            ? 'This server’s identity or protocol has changed. Reconnect the original server.'
-            : toClientError(query.error).message}
-        </p>
+        <InlineError
+          message={
+            refused
+              ? 'This server’s identity or protocol has changed. Reconnect the original server.'
+              : toClientError(query.error).message
+          }
+          title='Server connection'
+        />
         <Button onClick={() => void query.refetch()} disabled={query.isFetching}>
           {query.isFetching ? <OrbitLoader /> : null} Retry connection
         </Button>

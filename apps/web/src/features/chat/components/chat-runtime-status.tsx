@@ -10,6 +10,7 @@ import { errorMessage } from '@/lib/error-message'
 import { useProviderSignInDialog } from '../hooks/use-provider-sign-in-dialog'
 import { providerListQueryOptions } from '@/features/chat/utils/provider-query'
 import type { ChatSession } from '@workspace/client-core/chat/types'
+import { FixWithAgentButton } from '@/components/fix-with-agent-button'
 
 // Keep the most urgent error visible; additional provider notices remain expandable.
 export function ChatRuntimeStatus({
@@ -101,6 +102,13 @@ function RuntimeAlert({
         <AlertDescription className='line-clamp-3 tabular-nums' title={alert.detail}>
           {alert.detail}
         </AlertDescription>
+      ) : null}
+      {alert.tone === 'error' ? (
+        <div className='col-start-2 mt-1'>
+          <FixWithAgentButton
+            error={{ message: alert.detail ?? alert.title, title: alert.title }}
+          />
+        </div>
       ) : null}
       {signIn || alert.dismissKey ? (
         <AlertAction className='flex items-center gap-1'>

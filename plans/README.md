@@ -17,61 +17,66 @@ a bare root `bun run verify`.
 
 ## Executable plan inventory
 
-| Plan                                                                                    | State                                                        |
-| --------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| [145 — harness controls](145-harness-controls.md)                                       | **APPROVAL-RULES IMPLEMENTED; SEVEN PROPOSED**               |
-| [144 — unattended agent work](144-unattended-agent-work.md)                             | **RESEARCH — HARNESS INVENTORY FIRST**                       |
-| [143 — phone layout](143-phone-layout.md)                                               | **DISCUSSION — OWNER DIRECTION FIRST**                       |
-| [142 — web push](142-web-push.md)                                                       | **PROPOSED — SPIKE FIRST**                                   |
-| [141 — usage and rate limits](141-usage-and-rate-limits.md)                             | **PHASES 1–2 IMPLEMENTED 2026-09-25; PHASE 3 NEXT**          |
-| [140 — the editor as the agent's advantage](140-editor-agent-advantage.md)              | **RESEARCH — RESEARCH PHASE FIRST**                          |
-| [139 — acting on agent diffs](139-acting-on-agent-diffs.md)                             | **RESEARCH — RESEARCH PHASE FIRST**                          |
-| [138 — Claude models from the CLI](138-claude-model-discovery.md)                       | **IMPLEMENTED 2026-09-24 — ALL FOUR PHASES**                 |
-| [137 — shared workspace interactions](137-shared-workspace-interactions.md)             | **IMPLEMENTED 2026-09-24 — ALL SEVEN PHASES DEPLOYED**       |
-| [136 — file tree undo and redo](136-file-tree-undo.md)                                  | **IMPLEMENTED — ALL THREE PHASES; SCENARIO GREEN**           |
-| [135 — TanStack async ownership and route preparation](135-tanstack-async-ownership.md) | **PROPOSED — RESEARCH COMPLETE; IMPLEMENTATION NOT STARTED** |
-| [133 — one owner per fact](133-one-owner-per-fact.md)                                   | **PROPOSED — PHASE 1 READY; D1 NEEDS AN ANSWER**             |
-| [132 — process and dev ownership](132-process-and-dev-ownership.md)                     | **PROPOSED — PHASE 1 FIRST; D4 DECIDED: DELETE**             |
-| [131 — provider codes, not prose](131-provider-codes-not-prose.md)                      | **PROPOSED — PHASE 1 IS A SECURITY FIX**                     |
-| [130 — ask the editor](130-ask-the-editor.md)                                           | **PHASES 1, 2, 4 IMPLEMENTED; 3 AND 5 NEED EDITOR APIs**     |
-| [129 — dependency shape](129-dependency-shape.md)                                       | **PHASE 1 DEPLOYED 2026-09-20; PHASES 2–3 PROPOSED**         |
-| [128 — React 19 patterns](128-react-19-patterns.md)                                     | **PROPOSED — IMPLEMENTATION NOT STARTED**                    |
-| [127 — compiler and lifetime repairs](127-compiler-and-lifetime-repairs.md)             | **IMPLEMENTED AND DEPLOYED 2026-09-20**                      |
-| [126 — T3 Code behavioral alignment](126-t3code-alignment.md)                           | **IN PROGRESS — ARCHIVE DELIVERY DEPLOYED**                  |
-| [125 — observability overhead](125-observability-overhead.md)                           | **IMPLEMENTED — DEV/STREAMING EVIDENCE PENDING**             |
-| [071 — syntax highlight retry](071-syntax-highlight-retry.md)                           | **PROPOSED — ROOT GO/NO-GO SCHEDULING**                      |
-| [080 — Platform and VS Code keybinding modes](080-platform-keybinding-modes.md)         | **PROPOSED — INTERACTION RULES CONFIRMED**                   |
-| [087 — stateless MCP support](087-stateless-mcp.md)                                     | **PROPOSED — IMPLEMENTATION NOT STARTED**                    |
-| [088 — native code intelligence](088-native-code-intelligence.md)                       | **PROPOSED — DEPENDS ON 087**                                |
-| [091 — error and timing helpers](091-error-and-timing-helpers.md)                       | **PROPOSED — DEFECT FIXES IMPLEMENTED**                      |
-| [092 — path and URI helpers](092-path-and-uri-helpers.md)                               | **PROPOSED — DEFECT FIXES IMPLEMENTED**                      |
-| [093 — web React and store ceremony](093-web-react-and-store-ceremony.md)               | **PROPOSED — DEPENDS ON 091**                                |
-| [099 — document contribution runtime](099-document-contributions.md)                    | **PROPOSED — BASELINE AND PUBLICATION FIRST**                |
-| [101 — truncation and value recovery](101-truncation-recovery.md)                       | **PROPOSED — DECISIONS D5 AND D7 NEED CONFIRMATION**         |
-| [102 — scroll and keyboard affordance](102-scroll-and-keyboard-affordance.md)           | **PROPOSED — DECISIONS D2 AND D7 NEED CONFIRMATION**         |
-| [103 — loading, empty and error states](103-loading-empty-error-states.md)              | **CLOSED 2026-09-20**                                        |
-| [115 — palettes as data](115-palettes-as-data.md)                                       | **IMPLEMENTED 2026-09-14**                                   |
-| [116 — wallpaper library and picker](116-wallpaper-library.md)                          | **IMPLEMENTED 2026-09-14**                                   |
-| [117 — themes as bundles](../docs/theme-bundles.md)                                     | **IMPLEMENTED — 2026-09-19**                                 |
-| [118 — async effects through TanStack](118-async-effects-through-tanstack.md)           | **IMPLEMENTED 2026-09-14**                                   |
-| [119 — agent verification tooling](119-agent-verification-tooling.md)                   | **IMPLEMENTED 2026-09-14**                                   |
-| [123 — a wallpaper picker worth using](123-wallpaper-picker.md)                         | **IMPLEMENTED 2026-09-17**                                   |
-| [124 — the theme studio](124-theme-studio.md)                                           | **PROPOSED — REPLACES 117'S SURFACE; DATA STAYS**            |
-| [122 - composable full-power plugins](122-composable-plugins.md)                        | **PROPOSED - RESEARCH AND PERFORMANCE GATES FIRST**          |
-| [105 — one server and mesh deployment](105-one-server-mesh-deployment.md)               | **IMPLEMENTED 2026-09-13; PHASE 4 OPEN**                     |
-| [106 — first-load weight](106-boot-weight.md)                                           | **IMPLEMENTED 2026-09-13**                                   |
-| [107 — a markdown package we own](107-workspace-markdown.md)                            | **IMPLEMENTED 2026-09-13**                                   |
-| [108 — two markdown modes](108-markdown-modes.md)                                       | **PROPOSED — PHASE 1 READY; PHASE 2 NEEDS 111**              |
-| [109 — boot boundaries and gate](109-boot-boundaries.md)                                | **PHASES 2–3 IMPLEMENTED 2026-09-21; GATE NOT STARTED**      |
-| [110 — workspace indexing](110-workspace-indexing.md)                                   | **RESEARCH — NO IMPLEMENTATION SCOPE YET**                   |
-| [111 — editor decorations](111-editor-decorations.md)                                   | **RESEARCH — NO IMPLEMENTATION SCOPE YET**                   |
-| [112 — the large-file ceiling](112-large-file-ceiling.md)                               | **RESEARCH — NO IMPLEMENTATION SCOPE YET**                   |
-| [113 — one optimistic primitive](113-optimistic-intents.md)                             | **PROPOSED — CORE AND RAIL MIGRATION IMPLEMENTED**           |
-| [094 — client-core web and TUI parity](094-client-core-web-tui-parity.md)               | **PROPOSED — DEPENDS ON 091; 096 COMPLETE**                  |
-| [095 — server plumbing](095-server-plumbing.md)                                         | **PROPOSED — IMPLEMENTATION NOT STARTED**                    |
-| [073 — Electrobun 2.x migration](073-electrobun-v2-migration.md)                        | **PROPOSED — ROOT GO/NO-GO SCHEDULING**                      |
-| [075 — terminal renderer fallbacks](075-terminal-renderer-fallbacks.md)                 | **PROPOSED — BLOCKED ON TIER DECISION**                      |
-| [076 — watch-reload child reaping](076-watch-reload-child-reaping.md)                   | **PROPOSED — ROOT GO/NO-GO SCHEDULING**                      |
+| Plan                                                                                     | State                                                        |
+| ---------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| [150 — remote machines run a server that matches](150-remote-server-version.md)          | **PROPOSED — PHASE 1 READY; D2 NEEDS THE OWNER**             |
+| [149 — terminals outlive the server](149-terminal-host.md)                               | **PROPOSED — D2 (DESKTOP-QUIT LIFETIME) NEEDS THE OWNER**    |
+| [148 — server deploys restart when idle](148-restart-when-idle.md)                       | **PROPOSED — D3 (MAX WAIT) NEEDS THE OWNER'S NUMBER**        |
+| [147 — log hygiene and a noise gate](147-log-hygiene-and-noise-gate.md)                  | **PROPOSED — RESEARCH DONE; PHASE 1 READY**                  |
+| [146 — separate state and isolated verification](146-isolated-state-and-verification.md) | **PROPOSED — PHASE 1 READY; PHASE 4 CLEANUP NEEDS OWNER OK** |
+| [145 — harness controls](145-harness-controls.md)                                        | **APPROVAL-RULES IMPLEMENTED; SEVEN PROPOSED**               |
+| [144 — unattended agent work](144-unattended-agent-work.md)                              | **RESEARCH — HARNESS INVENTORY FIRST**                       |
+| [143 — phone layout](143-phone-layout.md)                                                | **DISCUSSION — OWNER DIRECTION FIRST**                       |
+| [142 — web push](142-web-push.md)                                                        | **PROPOSED — SPIKE FIRST**                                   |
+| [141 — usage and rate limits](141-usage-and-rate-limits.md)                              | **PHASES 1–2 IMPLEMENTED 2026-09-25; PHASE 3 NEXT**          |
+| [140 — the editor as the agent's advantage](140-editor-agent-advantage.md)               | **RESEARCH — RESEARCH PHASE FIRST**                          |
+| [139 — acting on agent diffs](139-acting-on-agent-diffs.md)                              | **RESEARCH — RESEARCH PHASE FIRST**                          |
+| [138 — Claude models from the CLI](138-claude-model-discovery.md)                        | **IMPLEMENTED 2026-09-24 — ALL FOUR PHASES**                 |
+| [137 — shared workspace interactions](137-shared-workspace-interactions.md)              | **IMPLEMENTED 2026-09-24 — ALL SEVEN PHASES DEPLOYED**       |
+| [136 — file tree undo and redo](136-file-tree-undo.md)                                   | **IMPLEMENTED — ALL THREE PHASES; SCENARIO GREEN**           |
+| [135 — TanStack async ownership and route preparation](135-tanstack-async-ownership.md)  | **PROPOSED — RESEARCH COMPLETE; IMPLEMENTATION NOT STARTED** |
+| [133 — one owner per fact](133-one-owner-per-fact.md)                                    | **PROPOSED — PHASE 1 READY; D1 NEEDS AN ANSWER**             |
+| [132 — process and dev ownership](132-process-and-dev-ownership.md)                      | **PROPOSED — PHASE 1 FIRST; D4 DECIDED: DELETE**             |
+| [131 — provider codes, not prose](131-provider-codes-not-prose.md)                       | **PROPOSED — PHASE 1 IS A SECURITY FIX**                     |
+| [130 — ask the editor](130-ask-the-editor.md)                                            | **PHASES 1, 2, 4 IMPLEMENTED; 3 AND 5 NEED EDITOR APIs**     |
+| [129 — dependency shape](129-dependency-shape.md)                                        | **PHASE 1 DEPLOYED 2026-09-20; PHASES 2–3 PROPOSED**         |
+| [128 — React 19 patterns](128-react-19-patterns.md)                                      | **PROPOSED — IMPLEMENTATION NOT STARTED**                    |
+| [127 — compiler and lifetime repairs](127-compiler-and-lifetime-repairs.md)              | **IMPLEMENTED AND DEPLOYED 2026-09-20**                      |
+| [126 — T3 Code behavioral alignment](126-t3code-alignment.md)                            | **IN PROGRESS — ARCHIVE DELIVERY DEPLOYED**                  |
+| [125 — observability overhead](125-observability-overhead.md)                            | **IMPLEMENTED — DEV/STREAMING EVIDENCE PENDING**             |
+| [071 — syntax highlight retry](071-syntax-highlight-retry.md)                            | **PROPOSED — ROOT GO/NO-GO SCHEDULING**                      |
+| [080 — Platform and VS Code keybinding modes](080-platform-keybinding-modes.md)          | **PROPOSED — INTERACTION RULES CONFIRMED**                   |
+| [087 — stateless MCP support](087-stateless-mcp.md)                                      | **PROPOSED — IMPLEMENTATION NOT STARTED**                    |
+| [088 — native code intelligence](088-native-code-intelligence.md)                        | **PROPOSED — DEPENDS ON 087**                                |
+| [091 — error and timing helpers](091-error-and-timing-helpers.md)                        | **PROPOSED — DEFECT FIXES IMPLEMENTED**                      |
+| [092 — path and URI helpers](092-path-and-uri-helpers.md)                                | **PROPOSED — DEFECT FIXES IMPLEMENTED**                      |
+| [093 — web React and store ceremony](093-web-react-and-store-ceremony.md)                | **PROPOSED — DEPENDS ON 091**                                |
+| [099 — document contribution runtime](099-document-contributions.md)                     | **PROPOSED — BASELINE AND PUBLICATION FIRST**                |
+| [101 — truncation and value recovery](101-truncation-recovery.md)                        | **PROPOSED — DECISIONS D5 AND D7 NEED CONFIRMATION**         |
+| [102 — scroll and keyboard affordance](102-scroll-and-keyboard-affordance.md)            | **PROPOSED — DECISIONS D2 AND D7 NEED CONFIRMATION**         |
+| [103 — loading, empty and error states](103-loading-empty-error-states.md)               | **CLOSED 2026-09-20**                                        |
+| [115 — palettes as data](115-palettes-as-data.md)                                        | **IMPLEMENTED 2026-09-14**                                   |
+| [116 — wallpaper library and picker](116-wallpaper-library.md)                           | **IMPLEMENTED 2026-09-14**                                   |
+| [117 — themes as bundles](../docs/theme-bundles.md)                                      | **IMPLEMENTED — 2026-09-19**                                 |
+| [118 — async effects through TanStack](118-async-effects-through-tanstack.md)            | **IMPLEMENTED 2026-09-14**                                   |
+| [119 — agent verification tooling](119-agent-verification-tooling.md)                    | **IMPLEMENTED 2026-09-14**                                   |
+| [123 — a wallpaper picker worth using](123-wallpaper-picker.md)                          | **IMPLEMENTED 2026-09-17**                                   |
+| [124 — the theme studio](124-theme-studio.md)                                            | **PROPOSED — REPLACES 117'S SURFACE; DATA STAYS**            |
+| [122 - composable full-power plugins](122-composable-plugins.md)                         | **PROPOSED - RESEARCH AND PERFORMANCE GATES FIRST**          |
+| [105 — one server and mesh deployment](105-one-server-mesh-deployment.md)                | **IMPLEMENTED 2026-09-13; PHASE 4 OPEN**                     |
+| [106 — first-load weight](106-boot-weight.md)                                            | **IMPLEMENTED 2026-09-13**                                   |
+| [107 — a markdown package we own](107-workspace-markdown.md)                             | **IMPLEMENTED 2026-09-13**                                   |
+| [108 — two markdown modes](108-markdown-modes.md)                                        | **PROPOSED — PHASE 1 READY; PHASE 2 NEEDS 111**              |
+| [109 — boot boundaries and gate](109-boot-boundaries.md)                                 | **PHASES 2–3 IMPLEMENTED 2026-09-21; GATE NOT STARTED**      |
+| [110 — workspace indexing](110-workspace-indexing.md)                                    | **RESEARCH — NO IMPLEMENTATION SCOPE YET**                   |
+| [111 — editor decorations](111-editor-decorations.md)                                    | **RESEARCH — NO IMPLEMENTATION SCOPE YET**                   |
+| [112 — the large-file ceiling](112-large-file-ceiling.md)                                | **RESEARCH — NO IMPLEMENTATION SCOPE YET**                   |
+| [113 — one optimistic primitive](113-optimistic-intents.md)                              | **PROPOSED — CORE AND RAIL MIGRATION IMPLEMENTED**           |
+| [094 — client-core web and TUI parity](094-client-core-web-tui-parity.md)                | **PROPOSED — DEPENDS ON 091; 096 COMPLETE**                  |
+| [095 — server plumbing](095-server-plumbing.md)                                          | **PROPOSED — IMPLEMENTATION NOT STARTED**                    |
+| [073 — Electrobun 2.x migration](073-electrobun-v2-migration.md)                         | **PROPOSED — ROOT GO/NO-GO SCHEDULING**                      |
+| [075 — terminal renderer fallbacks](075-terminal-renderer-fallbacks.md)                  | **PROPOSED — BLOCKED ON TIER DECISION**                      |
+| [076 — watch-reload child reaping](076-watch-reload-child-reaping.md)                    | **PROPOSED — ROOT GO/NO-GO SCHEDULING**                      |
 
 ## Dependency notes
 

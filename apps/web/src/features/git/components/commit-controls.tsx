@@ -22,6 +22,7 @@ import { CommitProgress } from './commit-progress'
 import { FailureNotice } from './failure-notice'
 
 import { canSyncChanges, syncChangesLabel } from '../utils/repository'
+import { InlineError } from '@/components/inline-error'
 
 export function CommitControls({
   hasLocalChanges,
@@ -145,13 +146,13 @@ export function CommitControls({
         )}
       </PaneBar>
       {generation.error ? (
-        <p
-          className='text-destructive px-(--bar-padding-x) py-(--density-gap-tight) text-xs'
-          id={generationErrorId}
-          role='alert'
-        >
-          {generation.error}
-        </p>
+        <div className='px-(--bar-padding-x) py-(--density-gap-tight)'>
+          <InlineError
+            id={generationErrorId}
+            message={generation.error}
+            title='Commit message generation'
+          />
+        </div>
       ) : null}
       <CommitProgress rootPath={rootPath} />
       <FailureNotice rootPath={rootPath} />

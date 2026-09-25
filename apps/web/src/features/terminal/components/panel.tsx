@@ -45,6 +45,7 @@ import { readTerminalMenuTarget, type TerminalMenuTarget } from '@/features/term
 import { isFocusOutsideElement } from '@/features/terminal/utils/focus-target'
 import { useSettingValue } from '@/hooks/use-setting-value'
 import { useUnavailableEnvironment } from '@/lib/environments/hooks/use-unavailable-environment'
+import { FixWithAgentButton } from '@/components/fix-with-agent-button'
 
 export function TerminalPanel({
   active = true,
@@ -364,12 +365,13 @@ export function TerminalPanel({
         </p>
       ) : null}
       {terminalFailure?.identity === terminalMountIdentity ? (
-        <p
+        <div
           role='alert'
-          className='text-destructive absolute inset-0 flex items-center justify-center p-4 text-sm'
+          className='absolute inset-0 flex flex-col items-center justify-center gap-(--density-gap-tight) p-4'
         >
-          {terminalFailure.message}
-        </p>
+          <p className='text-destructive text-sm wrap-anywhere'>{terminalFailure.message}</p>
+          <FixWithAgentButton error={{ message: terminalFailure.message, title: 'Terminal' }} />
+        </div>
       ) : null}
       {!savedPaint && !hasLivePaint && terminalFailure?.identity !== terminalMountIdentity ? (
         <div className='pointer-events-none absolute inset-0 flex items-center justify-center'>

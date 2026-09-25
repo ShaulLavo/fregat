@@ -45,7 +45,8 @@ export const draftRecovery: Scenario = {
         buffer: Buffer.from('Recoverable draft bytes.\n'),
       })
       await selectors.chatSend(page).click({ trial: true })
-      await selectors.newWorktreeChoice(page).click()
+      await selectors.draftWorkspace(page).click()
+      await selectors.menuRadio(page, 'New worktree').click()
       const firstAddress = page.url()
       const firstComposer = await selectors.chatMessage(page).elementHandle()
       await step('first-draft-before-leaving')
@@ -60,7 +61,7 @@ export const draftRecovery: Scenario = {
       await selectors.recoverableDraft(page, first).click()
       await selectors.chatStagedFile(page, 'draft-notes.txt').waitFor()
       strictEqual(await selectors.chatMessage(page).textContent(), first)
-      strictEqual(await selectors.newWorktreeChoice(page).getAttribute('aria-pressed'), 'true')
+      strictEqual((await selectors.draftWorkspace(page).innerText()).trim(), 'New worktree')
       strictEqual(page.url(), firstAddress)
       await step('draft-file-and-target-recovered')
       await selectors.recoverableDraft(page, second).click()

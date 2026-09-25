@@ -68,6 +68,8 @@ import { chatUsageMeter } from './chat-usage-meter'
 import { chatComposerNarrow } from './chat-composer-narrow'
 import { settingsUsage } from './settings-usage'
 import { chatClaudeCatalog } from './chat-claude-catalog'
+import { chatDraftContextStrip } from './chat-draft-context-strip'
+import { machineConnectError } from './machine-connect-error'
 import { wallpaperIconHints } from './wallpaper-icon-hints'
 import { terminalBackground } from './terminal-background'
 import { bottomPanelPersistence } from './bottom-panel-persistence'
@@ -227,6 +229,8 @@ export const scenarios: readonly Scenario[] = [
   chatComposerNarrow,
   settingsUsage,
   chatClaudeCatalog,
+  chatDraftContextStrip,
+  machineConnectError,
   wallpaperIconHints,
   gitChanges,
   logsPanel,

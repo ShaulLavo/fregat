@@ -32,6 +32,7 @@ import { wallpaperLibraryOptions } from '@/lib/wallpapers/state/queries'
 import { wallpaperSections } from '@/lib/wallpapers/utils/groups'
 
 import { selectWallpaper, visibleWallpaper } from '@/lib/wallpapers/utils/selection'
+import { toastError } from '@/lib/toast-error'
 
 export function WallpaperPickerDialog({
   disabled,
@@ -81,7 +82,7 @@ export function WallpaperPickerDialog({
         })
       },
       onError: (error) =>
-        toast.error('Omarchy backgrounds could not be imported', {
+        toastError('Omarchy backgrounds could not be imported', {
           description: errorMessage(error, 'Try again.'),
         }),
     })
@@ -101,7 +102,7 @@ export function WallpaperPickerDialog({
             ? () =>
                 actions.remove.mutate(asset.id, {
                   onError: (error) =>
-                    toast.error(`${asset.name} could not be deleted`, {
+                    toastError(`${asset.name} could not be deleted`, {
                       description: errorMessage(error, 'Try again.'),
                     }),
                 })

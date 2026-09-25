@@ -7,7 +7,6 @@ import { ListRow } from '@workspace/ui/patterns/list-row'
 import { useListbox } from '@workspace/ui/patterns/use-listbox'
 import type { EnvironmentId } from '@workspace/contracts'
 import type { SessionRailProject } from '@workspace/client-core/chat/rail/model'
-import { toast } from 'sonner'
 import { useNavigation } from '@/hooks/use-navigation'
 import { errorMessage } from '@/lib/error-message'
 import { createClientInvariantError } from '@/lib/structured-errors'
@@ -22,6 +21,7 @@ import {
 } from '@/features/chat/utils/recoverable-drafts'
 import { releaseUnusedDraftAttachments } from '@/features/chat/state/stash-transfer'
 import { chatMutationKeys } from '@/features/chat/utils/mutation-keys'
+import { toastError } from '@/lib/toast-error'
 
 export function ChatDraftRail({
   projects,
@@ -105,7 +105,7 @@ export function ChatDraftRail({
       if (result.status === 'unavailable') throw createClientInvariantError(result.reason)
       return result
     },
-    onError: (error) => toast.error(errorMessage(error, 'Could not open this draft.')),
+    onError: (error) => toastError(errorMessage(error, 'Could not open this draft.')),
   })
   const discard = useMutation({
     mutationKey: chatMutationKeys.draftRecovery('discard'),
@@ -126,7 +126,7 @@ export function ChatDraftRail({
           row.identity.baseWorktreeId,
         )
     },
-    onError: (error) => toast.error(errorMessage(error, 'Could not discard this draft.')),
+    onError: (error) => toastError(errorMessage(error, 'Could not discard this draft.')),
   })
   const list = useListbox({
     role: 'listbox',

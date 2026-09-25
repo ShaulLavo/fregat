@@ -2,6 +2,7 @@ import { useSyncExternalStore } from 'react'
 import { Alert, AlertDescription } from '@workspace/ui/components/alert'
 import { LoadingState } from '@workspace/ui/components/loading-state'
 import { useNavigation } from '@/hooks/use-navigation'
+import { FixWithAgentButton } from '@/components/fix-with-agent-button'
 
 export function NavigationStatus() {
   const navigation = useNavigation()
@@ -10,7 +11,10 @@ export function NavigationStatus() {
   if (status.status === 'unavailable')
     return (
       <Alert variant='destructive'>
-        <AlertDescription>{status.reason}</AlertDescription>
+        <AlertDescription>
+          <p>{status.reason}</p>
+          <FixWithAgentButton error={{ message: status.reason, title: 'Navigation' }} />
+        </AlertDescription>
       </Alert>
     )
   return (

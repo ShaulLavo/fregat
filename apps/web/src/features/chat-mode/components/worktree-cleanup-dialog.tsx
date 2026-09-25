@@ -9,6 +9,7 @@ import {
 } from '@workspace/ui/components/dialog'
 import { OrbitLoader } from '@workspace/ui/components/orbit-loader'
 import type { WorktreeConfirmation } from '@workspace/client-core/chat/worktrees/commands'
+import { InlineError } from '@/components/inline-error'
 
 export function WorktreeCleanupDialog({
   confirmation,
@@ -56,9 +57,7 @@ export function WorktreeCleanupDialog({
           </p>
         ) : null}
         {error ? (
-          <p className='text-destructive text-sm' role='alert'>
-            {error}
-          </p>
+          <InlineError message={error} onHandOff={onCancel} title='Worktree cleanup' />
         ) : null}
         <DialogFooter>
           <Button disabled={pending} variant='outline' onClick={onCancel}>

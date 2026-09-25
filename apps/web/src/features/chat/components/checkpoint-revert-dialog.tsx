@@ -8,6 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@workspace/ui/components/dialog'
+import { InlineError } from '@/components/inline-error'
 
 export function CheckpointRevertDialog({
   turnCount,
@@ -39,9 +40,7 @@ export function CheckpointRevertDialog({
           </DialogDescription>
         </DialogHeader>
         {error ? (
-          <p className='text-destructive text-xs' role='alert'>
-            {error}
-          </p>
+          <InlineError message={error} onHandOff={onCancel} title='Checkpoint revert' />
         ) : null}
         <DialogFooter>
           <Button type='button' variant='outline' disabled={disabled} onClick={onCancel}>
