@@ -1810,9 +1810,8 @@ describe('CodexProviderAdapter', () => {
           expect(
             activities.filter((activity) => activity.kind === 'approval.requested'),
           ).toHaveLength(2)
-          expect(
-            activities.filter((activity) => activity.kind === 'approval.resolved'),
-          ).toHaveLength(2)
+          // The fake completes its turn before the answers, which also ends both requests.
+          expect(activities.filter(isDecidedApproval)).toHaveLength(2)
         },
         { mode: 'permission-response' },
       )
@@ -1906,9 +1905,8 @@ describe('CodexProviderAdapter', () => {
                 { decision: 'accept' },
               ],
             })
-          expect(
-            activities.filter((activity) => activity.kind === 'approval.resolved'),
-          ).toHaveLength(2)
+          // The fake completes its turn before the answers, which also ends both requests.
+          expect(activities.filter(isDecidedApproval)).toHaveLength(2)
         },
         { mode: 'mcp-response' },
       )
@@ -2674,4 +2672,10 @@ function restoreFakeCodexMode(previousMode: string | undefined) {
   }
 
   process.env.PLATFORM_FAKE_CODEX_MODE = previousMode
+}
+
+function isDecidedApproval(activity: { kind: string; payload: unknown }) {
+  if (activity.kind !== 'approval.resolved') return false
+
+  return typeof (activity.payload as { decision?: unknown }).decision === 'string'
 }

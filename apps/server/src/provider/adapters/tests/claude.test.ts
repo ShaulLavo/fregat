@@ -466,6 +466,39 @@ describe('ClaudeProviderAdapter', () => {
     await harness.adapter.stopAll()
   })
 
+  it('reports an approval the SDK aborted as ended, and forgets it', async () => {
+    const harness = claudeHarness()
+    const sessionId = v.parse(sessionIdSchema, '8d0c6924-9495-5fd9-a04a-08b1e925b65d')
+    await harness.adapter.startRuntime(
+      sessionStartInput({ runtimeMode: 'approval-required', sessionId }),
+    )
+    const canUseTool = latestOptions(harness).canUseTool
+    assert(canUseTool, 'canUseTool was not passed to the SDK')
+    const abort = new AbortController()
+    const permission = canUseTool(
+      'Bash',
+      { command: 'ls' },
+      {
+        ...canUseToolOptions(),
+        signal: abort.signal,
+      },
+    )
+    const opened = await waitForEvent(harness, 'request.opened')
+    const requestId = v.parse(approvalRequestIdSchema, opened.requestId)
+
+    abort.abort()
+
+    await expect(permission).resolves.toMatchObject({ behavior: 'deny' })
+    expect(await waitForEvent(harness, 'request.resolved')).toMatchObject({
+      payload: { resolution: 'ended' },
+      requestId,
+    })
+    await expect(
+      harness.adapter.respondApproval({ decision: 'accept', requestId, sessionId }),
+    ).rejects.toMatchObject({ code: 'provider.REQUEST_GONE' })
+    await harness.adapter.stopAll()
+  })
+
   it('remembers an approval through the SDK suggestions at the chosen destination', async () => {
     const harness = claudeHarness()
     const sessionId = v.parse(sessionIdSchema, '3f9b8a51-2f0e-5c43-9d6e-7c1a4b2e8f10')

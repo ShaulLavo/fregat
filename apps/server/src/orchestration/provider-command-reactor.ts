@@ -639,17 +639,20 @@ export class ProviderCommandReactor {
         requestId: event.payload.requestId,
         sessionId: event.payload.sessionId,
       })
-      if (handled) return
-
-      await this.appendProviderFailureActivity({
-        runtimeEpoch,
-        ...noActiveSessionFailure(),
-        event,
-        kind: 'provider.approval.respond.failed',
+      if (!handled) {
+        await this.appendStaleApproval(event, runtimeEpoch)
+        return
+      }
+      recordChatPipelineInfo('chat.pipeline.provider_reactor.approval.decided', {
+        outcome: 'decided',
         requestId: event.payload.requestId,
-        summary: 'Provider approval response failed',
+        sessionId: event.payload.sessionId,
       })
     } catch (error) {
+      if (errorStringField(error, 'code') === sessionIdentityErrors.REQUEST_GONE.code) {
+        await this.appendStaleApproval(event, runtimeEpoch)
+        return
+      }
       await this.appendProviderFailureActivity({
         runtimeEpoch,
         ...respondFailure(error),
@@ -659,6 +662,37 @@ export class ProviderCommandReactor {
         summary: 'Provider approval response failed',
       })
     }
+  }
+
+  /** The agent stopped waiting before the answer arrived: a receipt, never an error. */
+  private async appendStaleApproval(
+    event: Extract<ProviderIntentEvent, { type: 'session.approval-response-requested' }>,
+    runtimeEpoch: string,
+  ) {
+    recordChatPipelineInfo('chat.pipeline.provider_reactor.approval.stale', {
+      outcome: 'stale',
+      requestId: event.payload.requestId,
+      sessionId: event.payload.sessionId,
+    })
+    await this.ingestion.ingest({
+      createdAt: providerFailureCreatedAt(event),
+      detail: STALE_APPROVAL_DETAIL,
+      eventId: runtimeEventId('approval-stale'),
+      runtimeEpoch,
+      kind: 'approval.resolved',
+      payload: {
+        commandId: event.commandId,
+        decision: event.payload.decision,
+        detail: STALE_APPROVAL_DETAIL,
+        requestId: event.payload.requestId,
+        resolution: 'stale',
+      },
+      summary: 'Answer not used',
+      sessionId: event.payload.sessionId,
+      tone: 'info',
+      turnId: turnIdForProviderFailure(event),
+      type: 'activity.append',
+    })
   }
 
   private async respondUserInput(
@@ -1003,6 +1037,9 @@ function turnStartKeyForEvent(
 }
 
 /** The activity carries the code, so `pending-requests` can tell a dead request from a transient failure. */
+const STALE_APPROVAL_DETAIL =
+  'Your answer arrived after the agent stopped waiting. It was not used.'
+
 function noActiveSessionFailure() {
   return {
     code: sessionIdentityErrors.REQUEST_GONE.code,

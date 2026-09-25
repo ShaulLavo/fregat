@@ -1884,6 +1884,13 @@ class ClaudeAgentSession extends SessionContext {
 
     this.pendingApprovals.delete(requestId)
     pending.resolve({ behavior: 'deny', message: 'Claude tool approval was aborted.' })
+    this.emit({
+      createdAt: new Date().toISOString(),
+      eventId: runtimeEventId('claude-request-ended'),
+      payload: { requestType: claudeApprovalRequestType(pending.toolName), resolution: 'ended' },
+      ...this.requestResolutionContext(requestId),
+      type: 'request.resolved',
+    })
   }
 
   private emitApprovalOpened(

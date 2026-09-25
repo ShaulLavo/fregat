@@ -19,6 +19,7 @@ import {
   type UserInputQuestionOption,
 } from '@workspace/contracts'
 import * as v from 'valibot'
+import { endedApprovalActivityId } from './approval-admission'
 import type { ProviderRuntimeEvent } from '../provider/types'
 import { checkpointFilesFromUnifiedDiff } from './checkpoint-files'
 import { checkpointRefForSessionTurn } from './checkpoint-refs'
@@ -959,15 +960,33 @@ function requestResolvedActivity(
   event: Extract<ProviderRuntimeEvent, { type: 'request.resolved' }>,
 ) {
   if (event.payload.requestType === 'tool_user_input') return []
+  const requestKind = requestKindFromRequestType(event.payload.requestType)
+  if (!event.payload.decision) return [endedApprovalActivity(event, requestKind)]
 
   return [
     baseActivity(event, 'approval', 'approval.resolved', 'Approval resolved', {
       decision: event.payload.decision,
       requestId: event.requestId,
-      requestKind: requestKindFromRequestType(event.payload.requestType),
+      requestKind,
       requestType: event.payload.requestType,
     }),
   ]
+}
+
+/** A resolution with no decision is the harness giving up on the request; it shares the decider's row. */
+function endedApprovalActivity(
+  event: Extract<ProviderRuntimeEvent, { type: 'request.resolved' }>,
+  requestKind: ReturnType<typeof requestKindFromRequestType>,
+): OrchestrationSessionActivity {
+  const activity = baseActivity(event, 'info', 'approval.resolved', 'Approval ended', {
+    requestId: event.requestId,
+    requestKind,
+    requestType: event.payload.requestType,
+    resolution: 'ended',
+  })
+  if (!event.requestId) return activity
+
+  return { ...activity, id: v.parse(eventIdSchema, endedApprovalActivityId(event.requestId)) }
 }
 
 function userInputRequestedActivity(

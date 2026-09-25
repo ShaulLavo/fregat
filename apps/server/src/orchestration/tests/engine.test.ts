@@ -882,12 +882,14 @@ describe('orchestration engine', () => {
       .session.activities
     expect(activities).toContainEqual(
       expect.objectContaining({
-        kind: 'provider.approval.respond.failed',
+        kind: 'approval.resolved',
         payload: expect.objectContaining({
-          code: 'provider.REQUEST_GONE',
-          detail: expect.stringContaining('Restart the turn to continue.'),
+          decision: 'accept',
           requestId: 'approval-1',
+          resolution: 'stale',
         }),
+        summary: 'Answer not used',
+        tone: 'info',
       }),
     )
     expect(activities).toContainEqual(
@@ -895,6 +897,7 @@ describe('orchestration engine', () => {
         kind: 'provider.user-input.respond.failed',
         payload: expect.objectContaining({
           code: 'provider.REQUEST_GONE',
+          detail: expect.stringContaining('Restart the turn to continue.'),
           requestId: 'user-input-1',
         }),
       }),
