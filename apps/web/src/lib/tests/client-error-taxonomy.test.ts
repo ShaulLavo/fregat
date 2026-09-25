@@ -1,7 +1,8 @@
 import { vi } from 'vitest'
 
 import { expect, test } from '../../../test/fixtures'
-import { reportError, toClientError } from '@/lib/client-error-taxonomy'
+import { clientErrorText, reportError, toClientError } from '@/lib/client-error-taxonomy'
+import { createEnvironmentProtocolMismatchError } from '@workspace/client-core/environments/utils/structured-errors'
 import { log, observeClientOperation } from '@/lib/client-logging'
 import { sanitizeRecord } from '@workspace/observability/sanitize'
 
@@ -102,4 +103,12 @@ test('does not report aborted operations', () => {
     errorLog.mockRestore()
     warn.mockRestore()
   }
+})
+
+test('stored failure text keeps the catalog why and fix', () => {
+  const error = createEnvironmentProtocolMismatchError('https://mac.example/platform', 7, 6)
+  expect(clientErrorText(error, 'fallback')).toBe(
+    'The server at https://mac.example/platform uses an incompatible protocol version. This client requires protocol 7, but the server reported 6. Run matching client and server versions before reconnecting.',
+  )
+  expect(clientErrorText(new Error('plain'), 'fallback')).toBe('plain')
 })

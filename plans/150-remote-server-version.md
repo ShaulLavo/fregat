@@ -2,7 +2,9 @@
 
 ## Status and authorization
 
-- Status: PROPOSED — Phase 1 ready; D2 needs the owner.
+- Status: PROPOSED — Phase 1 ready. D2 answered 2026-09-25: Phase 2 is replaced by
+  [Plan 151](151-remote-server-releases.md) (production ships its built release) and
+  [Plan 152](152-remote-dev-builds.md) (development).
 - Priority: P1 while the Mac is a daily machine. It is blocked today.
 - Effort: S (Phase 1) + M (Phase 2).
 - Risk: MED. Phase 2 runs commands on another machine's checkout.
@@ -59,7 +61,28 @@ press Retry on the machine notice. The launcher starts a fresh server from the u
   The server does not see the failure, so it has no wide event on the launcher side. The
   production log carries 16 client lines for it on 2026-09-24/25.
 
-## Scope
+## Findings on the Mac (2026-09-25)
+
+The owner chose D2 "sync from here" over git pull. What the Mac actually runs makes a plain
+source sync + `bun install` insufficient:
+
+- `platform-server --describe` → `/Users/shaul/projects/platform-verification`, executable
+  `~/.bun/bin/bun` (1.4.0). It is **not a git checkout**, so option (c) cannot run there either.
+- It is a hand-built verification rig from 2026-09-12: `node_modules` is a symlink to
+  `~/projects/platform-verification-runtime/dependencies/node_modules`, a curated darwin install
+  (`.verification-preparation/installed.json`); `.verification-editor/packages/{lsp,typescript-lsp}`
+  holds copied editor packages; `.env` points settings, secrets and the workspace root at isolated paths.
+- The Mac's global `bun link` registry maps `@singapore-editor/*` to `~/Desktop/D/Editor`, a stale
+  Editor copy other Mac projects may use. A root `bun install` resolves the `link:` overrides through it.
+- The server bundle (`apps/server` `build`) externalises only `sharp` and
+  `@anthropic-ai/claude-agent-sdk`; everything else, including the editor LSP packages, is inlined.
+
+So "sync from here" needs one of: shipping the built bundle and running it against the Mac's darwin
+dependency store (a `bundle` installation kind beside `source`), or a one-time real install on the
+Mac that mirrors `.github/actions/setup` (sibling Editor clone, `bun link`, `bun install`), after
+which a source sync works. The owner split the two cases: production ships its built release
+([Plan 151](151-remote-server-releases.md)); development syncs this tree
+([Plan 152](152-remote-dev-builds.md)).
 
 - Server-side protocol check during connect, with a catalog error that names both versions.
 - Relaunch of a stale _managed_ server when the checkout on disk already matches.
@@ -113,7 +136,10 @@ press Retry on the machine notice. The launcher starts a fresh server from the u
    (`connection-notice.ts`), and `MachineErrorDetails` and the picker render `clientErrorDescription`
    (`apps/web/src/lib/client-error-taxonomy.ts:106`), so the fix is visible.
 
-### Phase 2: Update action (after D2)
+### Phase 2: Update action — superseded by Plans 151 and 152
+
+Kept for the security constraints below, which Plans 151 and 152 inherit. The git-pull design is
+not built: the Mac's installation is not a git checkout.
 
 1. Server: an `update` remote command beside `probeCommand`/`launchCommand` in
    `remote-scripts.ts`. It is fixed text: only the probed `installation.directory` and

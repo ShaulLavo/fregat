@@ -35,6 +35,7 @@ import { environmentScopedStorage } from '@/lib/environments/state/scoped-storag
 import { readEnvironmentDescriptor } from '@/lib/environments/utils/descriptor'
 import { createClientInvariantError } from '@/lib/structured-errors'
 import { errorMessage } from '@/lib/error-message'
+import { clientErrorText } from '@/lib/client-error-taxonomy'
 import { createEnvironmentRecovery } from '@/state/environment-recovery'
 import { initializeEnvironmentPersistence } from '@/state/environment-persistence'
 import { readConnectedMachines, writeConnectedMachines } from '@/state/connected-machines'
@@ -311,7 +312,7 @@ export function createEnvironmentConnections({
       if (drift) failurePhase = 'identity-drift'
       event.error(error)
       event.set({ outcome: failurePhase })
-      phase(name, failurePhase, errorMessage(error, `Cannot connect to ${name}.`))
+      phase(name, failurePhase, clientErrorText(error, `Cannot connect to ${name}.`))
       recovery?.schedule(name, blocked)
       return 'failed'
     } finally {
@@ -367,7 +368,7 @@ export function createEnvironmentConnections({
       return await performConnection(machine.name, begun, abort)
     } catch (error) {
       if (abort.signal.aborted) return 'cancelled'
-      phase(machine.name, 'offline', errorMessage(error, `Cannot reconnect ${machine.name}.`))
+      phase(machine.name, 'offline', clientErrorText(error, `Cannot reconnect ${machine.name}.`))
       recovery?.schedule(machine.name)
       return 'failed'
     } finally {

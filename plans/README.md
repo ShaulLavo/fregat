@@ -19,7 +19,9 @@ a bare root `bun run verify`.
 
 | Plan                                                                                     | State                                                        |
 | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| [150 — remote machines run a server that matches](150-remote-server-version.md)          | **PROPOSED — PHASE 1 READY; D2 NEEDS THE OWNER**             |
+| [152 — dev primary ships its working tree](152-remote-dev-builds.md)                     | **PROPOSED — NICE TO HAVE; AFTER 151**                       |
+| [151 — remote machines run the primary's release](151-remote-server-releases.md)         | **PROPOSED — DEPENDS ON 150 PHASE 1; D2/D4 TO CONFIRM**      |
+| [150 — remote machines run a server that matches](150-remote-server-version.md)          | **PROPOSED — PHASE 1 READY; PHASE 2 → PLANS 151/152**        |
 | [149 — terminals outlive the server](149-terminal-host.md)                               | **PROPOSED — D2 (DESKTOP-QUIT LIFETIME) NEEDS THE OWNER**    |
 | [148 — server deploys restart when idle](148-restart-when-idle.md)                       | **PROPOSED — D3 (MAX WAIT) NEEDS THE OWNER'S NUMBER**        |
 | [147 — log hygiene and a noise gate](147-log-hygiene-and-noise-gate.md)                  | **PROPOSED — RESEARCH DONE; PHASE 1 READY**                  |

@@ -3,6 +3,7 @@ import { isObject } from '@workspace/utils/objects'
 import type { ErrorCategory } from '@workspace/contracts'
 import { agentErrorReport } from './agent-error-report'
 import { copyTextToClipboard } from './clipboard'
+import { errorMessage } from './error-message'
 import { clientErrorMetadata } from './client-error-context'
 import { reportClientError } from './client-error-reporting'
 import { toastError } from '@/lib/toast-error'
@@ -110,6 +111,15 @@ export function clientErrorDescription(error: ClientError): string {
   // dashes the `fix` sentences use themselves.
   const message = /[.!?]$/.test(error.message) ? error.message : `${error.message}.`
   return `${message} ${error.fix}`
+}
+
+/** A failure kept as text: a catalog error keeps its why and fix, which name the cause and the remedy. */
+export function clientErrorText(input: unknown, fallback: string): string {
+  const error = toClientError(input)
+  if (!error.code) return errorMessage(input, fallback)
+
+  const parts = [error.message, error.why, error.fix].filter((part) => part !== undefined)
+  return parts.map((part) => (/[.!?]$/.test(part) ? part : `${part}.`)).join(' ')
 }
 
 /** Hands the failure to an agent: the catalog's answer plus how to find the log. */

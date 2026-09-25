@@ -7,6 +7,8 @@ import {
   PopoverTrigger,
 } from '@workspace/ui/components/popover'
 
+import { FixWithAgentButton } from '@/components/fix-with-agent-button'
+
 export function MachineErrorDetails({ label, error }: { label: string; error: string }) {
   return (
     <Popover>
@@ -24,6 +26,7 @@ export function MachineErrorDetails({ label, error }: { label: string; error: st
         <p className='text-muted-foreground text-xs'>
           Manage this connection in Settings → Machines.
         </p>
+        <FixWithAgentButton error={{ message: error, title: `${label} connection` }} />
       </PopoverContent>
     </Popover>
   )

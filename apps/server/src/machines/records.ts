@@ -107,17 +107,22 @@ export async function parseRemoteRecord(output: string): Promise<RemoteRecord> {
 }
 
 export function remoteFailure(step: SshErrorStep, stderr: string, exitCode: number) {
+  const reported = remoteErrorPayload(stderr)
+  if (reported?.code === 'machines.SSH_IDENTITY') return createSshError('identity')
+  // The launch script's catalog error arrives as JSON; its message is the sentence, not the envelope.
+  if (reported?.message) return createSshError(step, reported.message)
+  return createSshError(step, stderr.trim().slice(0, 2000) || `SSH exited with status ${exitCode}.`)
+}
+
+function remoteErrorPayload(stderr: string): { code?: unknown; message?: string } | null {
   try {
     const input: unknown = JSON.parse(stderr.trim().split('\n').at(-1) ?? '')
-    if (
-      typeof input === 'object' &&
-      input !== null &&
-      'code' in input &&
-      input.code === 'machines.SSH_IDENTITY'
-    )
-      return createSshError('identity')
+    if (typeof input !== 'object' || input === null) return null
+    const message =
+      'message' in input && typeof input.message === 'string' ? input.message : undefined
+    return { code: 'code' in input ? input.code : undefined, message }
   } catch {
     // OpenSSH failures are plain stderr; remote launch failures also carry a JSON error.
+    return null
   }
-  return createSshError(step, stderr.trim().slice(0, 2000) || `SSH exited with status ${exitCode}.`)
 }

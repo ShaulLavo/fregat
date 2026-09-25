@@ -3,7 +3,7 @@ import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { expect } from 'vitest'
 import { launchScript, stopCommand, stopScript } from '../remote-scripts'
-import { parseDescriptor, parseRemoteRecord } from '../records'
+import { parseDescriptor, parseRemoteRecord, remoteFailure } from '../records'
 import {
   clientId,
   descriptorValue,
@@ -269,4 +269,18 @@ test('a stale PID record cannot stop an unrelated live process', async ({ remote
     child.kill()
     await child.exited
   }
+})
+
+test('a remote catalog error reads as its sentence, not its JSON envelope', () => {
+  const stderr = `${JSON.stringify({
+    code: 'machines.SSH_REMOTE',
+    message: 'The recorded managed server is still running but its health endpoint is unavailable.',
+  })}\n`
+  const error = remoteFailure('launch', stderr, 1)
+  expect(error.message).toBe(
+    'The remote server could not start. The recorded managed server is still running but its health endpoint is unavailable.',
+  )
+  expect(remoteFailure('probe', 'ssh: connect to host mac port 22: timed out\n', 255).message).toBe(
+    'The SSH machine could not be reached. ssh: connect to host mac port 22: timed out',
+  )
 })
