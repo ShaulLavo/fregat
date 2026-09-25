@@ -17,7 +17,7 @@ type ModifierEvent = Pick<
   'altKey' | 'ctrlKey' | 'key' | 'metaKey' | 'shiftKey' | 'type'
 >
 
-export function sameHeldModifiers(left: HeldModifiers, right: HeldModifiers) {
+function sameHeldModifiers(left: HeldModifiers, right: HeldModifiers) {
   return (
     left.alt === right.alt &&
     left.ctrl === right.ctrl &&
