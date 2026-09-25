@@ -340,6 +340,7 @@ test('custom composer, picker, search, and references chrome follows density', a
           <section className='h-40' data-testid='model-rail'>
             <ModelPickerRail
               activeProviderInstanceId={'provider' as ProviderInstanceId}
+              favorites={null}
               groups={[]}
               onSelect={() => undefined}
             />

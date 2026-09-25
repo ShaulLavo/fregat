@@ -13,6 +13,7 @@ import { useProviderSignInDialog } from '@/features/chat/hooks/use-provider-sign
 import { rankModelPickerOptions } from '@/features/chat/utils/model-picker-search'
 import type { ProviderSignInTarget } from '@workspace/client-core/chat/providers/auth'
 import {
+  favoriteModelOptions,
   providerModelOptionGroups,
   providerModelSelectionKey,
   type ProviderModelOption,
@@ -81,25 +82,36 @@ export function ModelPicker({
   const [railProviderInstanceId, setRailProviderInstanceId] = useState<ProviderInstanceId | null>(
     null,
   )
+  const [favoritesSelected, setFavoritesSelected] = useState(false)
 
   // The picker is where hiding and ordering a model has to mean something.
   // Until now both lists were written and never read.
-  const availableGroups = providerModelOptionGroups(providersQuery.data?.providers, {
+  const preferences = {
+    favorites: useSettingValue('models.favorites'),
     hidden: useSettingValue('models.hidden'),
     order: useSettingValue('models.order'),
-  })
+  }
+  const availableGroups = providerModelOptionGroups(providersQuery.data?.providers, preferences)
   const groups =
     sessionProviderInstanceId === null
       ? availableGroups
       : availableGroups.filter((group) => group.providerInstanceId === sessionProviderInstanceId)
-  // The rail scopes the list to one provider. It appears the moment a second
-  // provider exists and always has a selection, so the list is never an
-  // unscoped pile of every provider's models.
+  const favorites = favoriteModelOptions(providersQuery.data?.providers, preferences).filter(
+    (option) =>
+      sessionProviderInstanceId === null || option.providerInstanceId === sessionProviderInstanceId,
+  )
+  // The rail scopes the list to one provider, or to favorites. It appears once a
+  // second provider or a favorite exists and always has a selection, so the list
+  // is never an unscoped pile of every provider's models.
   const activeGroup = railGroup(
     groups,
     railProviderInstanceId ?? modelSelection?.providerInstanceId ?? null,
+    favorites.length > 0,
   )
-  const list = pickerList(groups, activeGroup, query)
+  const showFavorites = favoritesSelected && favorites.length > 0
+  const list = showFavorites
+    ? favoritesList(favorites, groups, query)
+    : pickerList(groups, activeGroup, query)
   const selectedKey = modelSelection ? providerModelSelectionKey(modelSelection) : null
   const emptyLabel = pickerEmptyLabel(providersQuery.isPending, groups.length > 0)
 
@@ -140,9 +152,17 @@ export function ModelPicker({
       <PopoverContent align='start' className={PANEL_CLASS} side='top'>
         {activeGroup ? (
           <ModelPickerRail
-            activeProviderInstanceId={activeGroup.providerInstanceId}
+            activeProviderInstanceId={showFavorites ? null : activeGroup.providerInstanceId}
+            favorites={
+              favorites.length > 0
+                ? { active: showFavorites, onSelect: () => setFavoritesSelected(true) }
+                : null
+            }
             groups={groups}
-            onSelect={setRailProviderInstanceId}
+            onSelect={(providerInstanceId) => {
+              setFavoritesSelected(false)
+              setRailProviderInstanceId(providerInstanceId)
+            }}
           />
         ) : null}
         <Command className='min-w-0 flex-1' label='Models' shouldFilter={false}>
@@ -207,8 +227,9 @@ export function ModelPicker({
 function railGroup(
   groups: readonly ProviderModelOptionGroup[],
   providerInstanceId: ProviderInstanceId | null,
+  hasFavorites: boolean,
 ): ProviderModelOptionGroup | null {
-  if (groups.length < 2) return null
+  if (groups.length < 2 && !hasFavorites) return null
 
   const match = groups.find((group) => group.providerInstanceId === providerInstanceId)
 
@@ -241,6 +262,17 @@ function pickerList(
     options: group.options.filter((option) => !option.legacy),
     signInTarget: group.signInTarget,
   }
+}
+
+/** Favorites span providers, so a search over them ranks the whole catalogue as usual. */
+function favoritesList(
+  favorites: readonly ProviderModelOption[],
+  groups: readonly ProviderModelOptionGroup[],
+  query: string,
+): ModelPickerList {
+  if (query.trim()) return pickerList(groups, null, query)
+
+  return { legacyOptions: [], options: favorites, signInTarget: null }
 }
 
 function selectedIsLegacy(groups: readonly ProviderModelOptionGroup[], selectedKey: string | null) {

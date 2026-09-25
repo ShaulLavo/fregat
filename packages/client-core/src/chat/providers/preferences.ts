@@ -3,6 +3,8 @@ import { modelRefKey, type ModelRef } from '@workspace/contracts'
 import type { ProviderModelOption } from '@workspace/client-core/chat/providers/models'
 
 export type ModelPreferences = {
+  /** Starred models, listed first within their provider. */
+  readonly favorites?: readonly ModelRef[]
   readonly hidden: readonly ModelRef[]
   readonly order: readonly ModelRef[]
 }
@@ -21,9 +23,15 @@ export function applyModelPreferences(
 ): ProviderModelOption[] {
   const hidden = new Set(preferences.hidden.map(modelRefKey))
   const visible = options.filter((option) => !hidden.has(modelRefKey(option.modelSelection)))
-  if (preferences.order.length === 0) return visible
+  const favorites = preferences.favorites ?? []
+  const leading = [...favorites, ...preferences.order]
+  if (leading.length === 0) return visible
 
-  const rank = new Map(preferences.order.map((ref, index) => [modelRefKey(ref), index]))
+  // Favorites lead, then the explicit order; a model in both keeps its favorite rank.
+  const rank = new Map<string, number>()
+  for (const [index, ref] of leading.entries()) {
+    if (!rank.has(modelRefKey(ref))) rank.set(modelRefKey(ref), index)
+  }
 
   // A stable partition rather than a sort over the whole list: unranked models
   // must keep provider order exactly, and a comparator that invents a rank for
@@ -41,6 +49,7 @@ export function applyModelPreferences(
 }
 
 export type ModelPreferenceRow = {
+  readonly favorite: boolean
   readonly hidden: boolean
   readonly key: string
   readonly label: string
@@ -72,6 +81,7 @@ export function modelPreferenceRows(
   preferences: ModelPreferences,
 ): ModelPreferenceRow[] {
   const hidden = new Set(preferences.hidden.map(modelRefKey))
+  const favorites = new Set((preferences.favorites ?? []).map(modelRefKey))
   const catalogue = new Map(options.map((option) => [modelRefKey(option.modelSelection), option]))
   const rows = new Map<string, ModelPreferenceRow>()
 
@@ -81,6 +91,7 @@ export function modelPreferenceRows(
 
     const option = catalogue.get(key)
     rows.set(key, {
+      favorite: favorites.has(key),
       hidden: hidden.has(key),
       key,
       // A ref the catalogue no longer carries has no label to borrow, so the
@@ -97,6 +108,7 @@ export function modelPreferenceRows(
   for (const ref of preferences.order) addRow(ref)
   for (const option of options) addRow(option.modelSelection)
   for (const ref of preferences.hidden) addRow(ref)
+  for (const ref of preferences.favorites ?? []) addRow(ref)
 
   return Array.from(rows.values())
 }

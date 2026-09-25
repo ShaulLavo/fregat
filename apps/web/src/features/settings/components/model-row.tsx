@@ -1,5 +1,5 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
-import { CaretDownIcon, CaretUpIcon } from '@phosphor-icons/react'
+import { CaretDownIcon, CaretUpIcon, StarIcon } from '@phosphor-icons/react'
 import { Button } from '@workspace/ui/components/button'
 import { Switch } from '@workspace/ui/components/switch'
 
@@ -8,6 +8,8 @@ import type { ModelRef } from '@workspace/contracts'
 import type { ModelPreferenceRow } from '@workspace/client-core/chat/providers/preferences'
 
 import { useSettingsActions } from '@/features/settings/hooks/use-settings-actions'
+import { toggledFavorite } from '@/features/settings/utils/favorites'
+import { useSettingValue } from '@/hooks/use-setting-value'
 
 export function ModelRow({
   canMoveDown,
@@ -21,7 +23,11 @@ export function ModelRow({
   displayed: readonly ModelRef[]
   row: ModelPreferenceRow
 }) {
-  const { moveModel, setModelHidden } = useSettingsActions()
+  const { moveModel, setModelHidden, setSetting } = useSettingsActions()
+  const favorites = useSettingValue('models.favorites')
+  const favoriteLabel = row.favorite
+    ? `Remove ${row.label} from favorites`
+    : `Add ${row.label} to favorites`
 
   return (
     <div
@@ -38,6 +44,24 @@ export function ModelRow({
           containers is worse than two clicks — especially for a list where
           moving one model to the top is the whole use case. */}
       <div className='flex items-center'>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                aria-label={favoriteLabel}
+                aria-pressed={row.favorite}
+                onClick={() =>
+                  setSetting('models.favorites', toggledFavorite(favorites, row.ref, !row.favorite))
+                }
+                size='icon-sm'
+                variant='ghost'
+              >
+                <StarIcon weight={row.favorite ? 'fill' : 'regular'} />
+              </Button>
+            }
+          />
+          <TooltipContent>{favoriteLabel}</TooltipContent>
+        </Tooltip>
         <Tooltip>
           <TooltipTrigger
             render={

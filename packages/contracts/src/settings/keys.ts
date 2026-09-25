@@ -1071,6 +1071,18 @@ export const SETTINGS_REGISTRY = {
       'Explicit leading order for the picker. Models named by neither list stay visible after these, in provider order.',
     keywords: ['model', 'order', 'sort', 'picker'],
   }),
+  'models.favorites': defineSetting({
+    schema: modelRefListSchema,
+    default: [],
+    scope: 'application',
+    widget: 'models',
+    category: 'Models',
+    // Starred on the same row that hides and orders a model.
+    rowOwner: 'models.hidden',
+    description:
+      'Models starred as favorites. The picker lists them first and gathers them under Favorites.',
+    keywords: ['model', 'favorite', 'star', 'pin', 'picker'],
+  }),
   'keybindings.preset': defineSetting({
     schema: v.picklist(['default', 'vscode'] as const),
     default: 'default',

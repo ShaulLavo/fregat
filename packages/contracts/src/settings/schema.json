@@ -730,6 +730,27 @@
       },
       "type": "object"
     },
+    "models.favorites": {
+      "default": [],
+      "description": "Models starred as favorites. The picker lists them first and gathers them under Favorites.",
+      "items": {
+        "properties": {
+          "model": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "providerInstanceId": {
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[a-zA-Z][a-zA-Z0-9_-]*$",
+            "type": "string"
+          }
+        },
+        "required": ["model", "providerInstanceId"],
+        "type": "object"
+      },
+      "type": "array"
+    },
     "models.hidden": {
       "default": [],
       "description": "Which models the picker offers, and in what order. Turn one off to keep it out of the picker.",
