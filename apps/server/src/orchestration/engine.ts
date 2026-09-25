@@ -285,6 +285,11 @@ export class OrchestrationEngine {
     return this.enqueueProviderCommand(command, source)
   }
 
+  async runWorkspaceOperation<T>(operation: () => Promise<T>): Promise<T> {
+    await this.ready
+    return this.schedule(operation)
+  }
+
   private schedule<T>(operation: () => T | Promise<T>) {
     const task = this.queue.then(operation)
     this.queue = task.then(noop, noop)

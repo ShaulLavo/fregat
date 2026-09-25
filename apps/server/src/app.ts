@@ -277,6 +277,7 @@ export function createApp(options: AppOptions) {
   const commitMessages = new CommitMessageGenerator(git, providerAdapterRegistry, providerService)
   const checkpointDiff = new OrchestrationCheckpointDiffQuery(database, git)
   const checkpointHunks = new OrchestrationCheckpointHunks({
+    runWorkspaceOperation: (operation) => orchestration.runWorkspaceOperation(operation),
     activeRuntimes: () => providerService.listActiveRuntimes(),
     diffs: checkpointDiff,
     git,

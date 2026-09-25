@@ -19,6 +19,7 @@ import { resolveSessionOwner } from './session-owner'
 import { checkpointErrors } from './structured-errors'
 
 type CheckpointHunksDependencies = {
+  readonly runWorkspaceOperation: <T>(operation: () => Promise<T>) => Promise<T>
   readonly activeRuntimes: () => Promise<readonly ProviderRuntimeBindingWithMetadata[]>
   readonly diffs: Pick<OrchestrationCheckpointDiffQuery, 'turnDiff'>
   readonly git: Pick<GitService, 'applyPatch' | 'patchApplies'>
@@ -58,6 +59,10 @@ export class OrchestrationCheckpointHunks {
    */
   async revert(input: OrchestrationRevertCheckpointHunkInput) {
     const command = v.parse(orchestrationRevertCheckpointHunkInputSchema, input)
+    return this.dependencies.runWorkspaceOperation(() => this.revertReserved(command))
+  }
+
+  private async revertReserved(command: OrchestrationRevertCheckpointHunkInput) {
     const model = await this.dependencies.readModel()
     const { session, worktree } = resolveSessionOwner(model, command.sessionId)
     requireSettleable(session, 'session.checkpoint.hunk-revert', new Date().toISOString())

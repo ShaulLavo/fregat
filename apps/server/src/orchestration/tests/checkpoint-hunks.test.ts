@@ -2,6 +2,9 @@ import { readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 
+import * as v from 'valibot'
+import { commandIdSchema, messageIdSchema, turnIdSchema } from '@workspace/contracts'
+
 import { OrchestrationCheckpointDiffQuery } from '../checkpoint-diff-query'
 import { OrchestrationCheckpointHunks } from '../checkpoint-hunks'
 import { checkpointRefForSessionTurn } from '../checkpoint-refs'
@@ -22,7 +25,7 @@ afterEach(async () => {
 const before = Array.from({ length: 20 }, (_, index) => `line ${index + 1}`)
 const after = before.map((line, index) => (index === 1 || index === 17 ? `${line} changed` : line))
 
-async function turnFixture() {
+async function turnFixture(activeRuntimes = async () => [] as const) {
   const { root, cleanup } = await checkpointRepository()
   cleanups.push(cleanup)
   const file = path.join(root, 'app.txt')
@@ -41,12 +44,13 @@ async function turnFixture() {
     { additions: 2, deletions: 2, path: 'app.txt' },
   ])
   const hunks = new OrchestrationCheckpointHunks({
-    activeRuntimes: async () => [],
+    runWorkspaceOperation: (operation) => orchestration.engine.runWorkspaceOperation(operation),
+    activeRuntimes,
     diffs: new OrchestrationCheckpointDiffQuery(orchestration.database, orchestration.git),
     git: orchestration.git,
     readModel: () => orchestration.engine.readModelSnapshot(),
   })
-  return { file, hunks, read: () => readFile(file, 'utf8') }
+  return { engine: orchestration.engine, file, hunks, read: () => readFile(file, 'utf8') }
 }
 
 describe('checkpoint hunks', () => {
@@ -106,4 +110,42 @@ describe('checkpoint hunks', () => {
       hunks.revert({ hunkId: 'ffffffffffffffff', path: first!.path, sessionId, turnCount: 1 }),
     ).rejects.toThrow('is not in this turn')
   })
+})
+
+it('holds turn admission until checkpoint undo finishes applying its patch', async () => {
+  const entered = Promise.withResolvers<void>()
+  const release = Promise.withResolvers<void>()
+  const { engine, hunks, read } = await turnFixture(async () => {
+    entered.resolve()
+    await release.promise
+    return [] as const
+  })
+  const undo = hunks.revert({ sessionId, turnCount: 1, path: 'app.txt', hunkId: null })
+  await entered.promise
+  let admitted = false
+  const send = engine
+    .dispatch({
+      type: 'session.turn.start',
+      commandId: v.parse(commandIdSchema, 'send-during-undo'),
+      sessionId,
+      turnId: v.parse(turnIdSchema, 'turn-during-undo'),
+      message: {
+        messageId: v.parse(messageIdSchema, 'prompt-during-undo'),
+        role: 'user',
+        text: 'Continue',
+        attachments: [],
+      },
+    })
+    .then(() => {
+      admitted = true
+    })
+  try {
+    await new Promise((resolve) => setTimeout(resolve, 30))
+    expect(admitted).toBe(false)
+  } finally {
+    release.resolve()
+    await Promise.all([undo, send])
+  }
+  expect(await read()).toBe(`${before.join('\n')}\n`)
+  expect(admitted).toBe(true)
 })
