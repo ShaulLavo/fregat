@@ -5,10 +5,13 @@ import { useBundles } from '@/lib/appearance/hooks/use-bundles'
 import { useEditorColorTheme } from '@/lib/editor-theme/hooks/use-editor-color-theme'
 import { useStudioStore } from '@/lib/theme-studio/state/studio-store'
 import { DockHeader } from '@/features/theme-studio/components/dock-header'
+import { CodeTab } from '@/features/theme-studio/components/code-tab'
+import { SurfacesTab } from '@/features/theme-studio/components/surfaces-tab'
 import { ThemesTab } from '@/features/theme-studio/components/themes-tab'
 import { useStudioDraft } from '@/features/theme-studio/hooks/use-studio-draft'
 import { useStudioPreview } from '@/features/theme-studio/hooks/use-studio-preview'
-import { previewBundle, variantPatch } from '@/features/theme-studio/utils/draft'
+import { editVariant, previewBundle, variantPatch } from '@/features/theme-studio/utils/draft'
+import type { ThemeVariantPatch } from '@workspace/contracts'
 
 /**
  * The theme studio: a strip along the bottom of a workbench that stays live and full size above
@@ -39,6 +42,10 @@ export function Dock() {
       previewBundle(draft),
     )
     store.closeStudio()
+  }
+
+  function edit(patch: ThemeVariantPatch) {
+    if (draft) store.setDraft(editVariant(draft, mode, patch))
   }
 
   function leave() {
@@ -82,13 +89,21 @@ export function Dock() {
       />
       {store.collapsed ? null : (
         <div className='h-40 min-h-0'>
-          <ThemesTab
-            customizations={customizations}
-            draft={draft}
-            mode={mode}
-            onApply={apply}
-            onChoose={store.setDraft}
-          />
+          {store.tab === 'themes' ? (
+            <ThemesTab
+              customizations={customizations}
+              draft={draft}
+              mode={mode}
+              onApply={apply}
+              onChoose={store.setDraft}
+            />
+          ) : null}
+          {store.tab === 'code' && draft ? (
+            <CodeTab codeTheme={draft.variants[mode].codeTheme} mode={mode} onEdit={edit} />
+          ) : null}
+          {store.tab === 'surfaces' && draft ? (
+            <SurfacesTab material={draft.variants[mode].material} onEdit={edit} />
+          ) : null}
         </div>
       )}
     </section>

@@ -60,6 +60,15 @@ export const themeStudio: Scenario = {
       'Flipping halves writes nothing',
     )
 
+    await dock.getByRole('tab', { name: 'Code', exact: true }).click()
+    await dock.getByRole('listbox', { name: 'Code colors' }).focus()
+    await page.keyboard.press('ArrowDown')
+    await step('code-tab')
+    await dock.getByRole('tab', { name: 'Surfaces', exact: true }).click()
+    await dock.getByRole('button', { name: 'Solid', exact: true }).click()
+    await step('surfaces-tab')
+
+    await dock.getByRole('listbox', { name: 'Code colors' }).or(dock).first().focus()
     await page.keyboard.press('Escape')
     await dock.getByText('Press Escape again to discard').waitFor()
     await page.keyboard.press('Escape')
