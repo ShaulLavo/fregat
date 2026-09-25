@@ -7,7 +7,6 @@ import { codexCommandApprovalOffers } from './utils/codex-command-approval'
 import { parseCodexElicitation } from './utils/codex-elicitation'
 import { ProviderProcessLifetime } from './process-lifetime'
 import { createInternalError } from '../../observability/structured-errors'
-import { sessionIdentityErrors } from '../structured-errors'
 
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import {

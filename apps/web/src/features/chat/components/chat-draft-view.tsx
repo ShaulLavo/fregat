@@ -139,6 +139,7 @@ export function ChatDraftView({
     fanOut = false,
   ) {
     const retryKey = draftSubmissionKey({
+      agent: identity?.agent ?? null,
       payload,
       environmentId: transport.environmentId,
       worktreeTarget,

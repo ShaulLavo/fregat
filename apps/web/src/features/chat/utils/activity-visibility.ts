@@ -80,7 +80,6 @@ export function activityGroupSummary(activities: readonly ChatWorkLogEntry[]) {
   const duration = activityGroupDuration(activities)
   if (duration) parts.push(duration)
 
-
   return parts.join(' · ')
 }
 

@@ -126,7 +126,6 @@ export async function typePrompt(page: Page, prompt: string) {
     if (await selectors.chatSend(page).isEnabled()) return
   }
   ok(false, 'The composer never accepted the prompt')
-
 }
 
 /** Stops and deletes a real-provider scenario's sessions, then its project and fixture. */

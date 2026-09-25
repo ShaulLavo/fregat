@@ -73,7 +73,6 @@ describe('chat activity visibility', () => {
         workLogEntry({ id: 'blocked', hookCount: 1, sourceKind: 'hook.completed', tone: 'error' }),
         workLogEntry({ id: 'silent', hookCount: 4, sourceKind: 'hook.summary', tone: 'info' }),
       ]),
-    ).toBe('Ran 5 hooks')
-
+    ).toBe('Ran 5 hooks · 1 failed')
   })
 })
