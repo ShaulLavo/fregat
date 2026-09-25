@@ -455,9 +455,9 @@ Suggested order (steps 1–4 done by 2026-09-23; step 5 is in progress):
    `f715d11`; Plan 133's four phases 2026-09-23, D1 moved to Plan 134 and closed there.
 5. [E050](../Editor/plans/e050-host-obligations-into-api.md) row by row, each unlocking its Plan 130
    Phase 5 item. In progress: rows re-checked 2026-09-24; row 1 (`setText` with tokens), row 5 (press
-   participants), row 6 (plugin keymap context keys) and typography options (2026-09-25) done.
-   Rows 8 (`onDidScroll`) and 4 (theme keys) unlock Plan 130 Phase 5 items 8 and 10; the rest are
-   Editor-only. Plan 130 Phase 3 (`getStackedRows`) is a separate small Editor change.
+   participants), row 6 (plugin keymap context keys) and typography options (2026-09-25) done;
+   rows 2, 7, 8, 9, 11 and the rest of row 5 done 2026-09-25 (lane L7), row 8 closing Plan 130
+   item 8. Row 4 (theme keys) unlocks item 10; the rest are Editor-only. Plan 130 Phase 3 (`getStackedRows`) is a separate small Editor change.
 
 Left in the lane: Plan 131 Phases 2–3, Plan 132 Phases 2–4, the Plan 130 remainder and the E050 rows.
 

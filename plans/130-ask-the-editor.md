@@ -103,8 +103,11 @@ Tokens with `setText` (item 5; done 2026-09-24, `diff-pane.tsx` passes them with
 `git-diff-expand-tokens`), typography options and the audit's deletion (6, 7; done 2026-09-25,
 the editor, diff and search editors pass `fontSize`, `fontFamily` and `lineHeight`, `:root` carries
 only `--font-mono`, scenario `editor-typography`; `editor.lineHeight` had never reached the editor
-before), `onDidScroll`
-(8), the pointer participant (9; done 2026-09-24, `diff-language-plugin.ts` claims its
+before), `onDidScroll` (8; done 2026-09-25, `diff-pane.tsx` subscribes to `Editor.onDidScroll`
+and `diff-scroll-bridge.ts` is deleted; the mirror's own report arrives from inside
+`setScrollPosition`, so `use-diff-panes.ts` recognises it by a flag set around the write and the
+position-matched echo guess, Plan 133 item 17, is gone; browser test `diff-split-scroll` passes,
+including panes never seen at different offsets while a wheel turns), the pointer participant (9; done 2026-09-24, `diff-language-plugin.ts` claims its
 Ctrl+click through `registerPressParticipant`, scenario `editor-press-participants`), theme keys (10). Each lands when its Editor half does; none blocks
 another.
 

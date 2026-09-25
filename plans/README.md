@@ -17,64 +17,64 @@ a bare root `bun run verify`.
 
 ## Executable plan inventory
 
-| Plan                                                                                    | State                                                                |
-| --------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| [168 — flat file view under a chosen root](168-flat-file-view.md)                       | **PARKED — MOVED FROM EDITOR E030**                                  |
-| [167 — settings defaults, setting details, and copy](167-settings-and-copy.md)          | **PROPOSED — READY; D1–D4 DECIDED**                                  |
-| [166 — keyboard shortcuts, redone](166-shortcuts-editor.md)                             | **PROPOSED — RESEARCH FIRST; D1–D6 DECIDED**                         |
-| [165 — one font catalog, loaded on demand](165-font-catalog.md)                         | **IMPLEMENTED 2026-09-25 — ALL FIVE PHASES**                         |
-| [164 — what feels right in Neon](164-what-feels-right-in-neon.md)                       | **FIRST PASS SHIPPED; METADATA SWEEP LEFT**                          |
-| [163 — screenshot in the composer](163-chat-screenshot.md)                              | **PROPOSED — READY; DECISIONS ACCEPTED**                             |
-| [162 — context and cost](162-context-and-cost.md)                                       | **PROPOSED — READY; DECISIONS ACCEPTED**                             |
-| [161 — honest states](161-honest-states.md)                                             | **PROPOSED — READY; DECISIONS ACCEPTED**                             |
-| [160 — chat turn anatomy](160-chat-turn-anatomy.md)                                     | **PROPOSED — READY; DECISIONS ACCEPTED**                             |
-| [159 — file and folder picker](159-file-picker.md)                                      | **PROPOSED — READY; DECISIONS ACCEPTED**                             |
-| [158 — app polish from Neon](158-app-polish.md)                                         | **PROPOSED — READY; DECISIONS ACCEPTED**                             |
-| [157 — base components](157-base-components.md)                                         | **PROPOSED — READY; QUEUED NEXT**                                    |
-| [156 — documents in the editor](156-documents-in-the-editor.md)                         | **PLACEHOLDER — FAR FUTURE; RESEARCH FIRST**                         |
-| [155 — site demo becomes an animated replica](155-site-demo-replica.md)                 | **PLACEHOLDER — RESEARCH NOT STARTED**                               |
-| [154 — physical mode](154-physical-mode.md)                                             | **PROPOSED — D6 (SETTINGS SHAPE) FIRST**                             |
-| [153 — TypeScript can run in the browser worker](153-typescript-worker-backend.md)      | **IN PROGRESS — PHASES 1–2 DONE; D1–D3 DECIDED; PHASE 3 NEXT**       |
-| [152 — dev primary ships its working tree](152-remote-dev-builds.md)                    | **PROPOSED — NICE TO HAVE; AFTER 151**                               |
-| [151 — remote machines run the primary's release](151-remote-server-releases.md)        | **PROPOSED — DEPENDS ON 150 PHASE 1; D2/D4 TO CONFIRM**              |
-| [150 — remote machines run a server that matches](150-remote-server-version.md)         | **PHASE 1 PARTLY DONE (`129fdea6`); PHASE 2 → PLANS 151/152**        |
-| [149 — terminals outlive the server](149-terminal-host.md)                              | **PROPOSED — D2 (DESKTOP-QUIT LIFETIME) NEEDS THE OWNER**            |
-| [148 — server deploys restart when idle](148-restart-when-idle.md)                      | **PROPOSED — D3 REPLACED: RESTART ON CLICK (COMPLETION WAVE)**       |
-| [147 — log hygiene and a noise gate](147-log-hygiene-and-noise-gate.md)                 | **PROPOSED — PHASE 1 READY; PHASE 3 CARRIES PLAN 125'S REST**        |
-| [145 — harness controls](145-harness-controls.md)                                       | **APPROVAL-RULES MERGED (`89c58188`); SEVEN PROPOSED**               |
-| [144 — unattended agent work](144-unattended-agent-work.md)                             | **RESEARCH — HARNESS INVENTORY FIRST**                               |
-| [143 — phone layout](143-phone-layout.md)                                               | **DISCUSSION — OWNER DIRECTION FIRST**                               |
-| [142 — web push](142-web-push.md)                                                       | **PROPOSED — SPIKE FIRST**                                           |
-| [141 — usage and rate limits](141-usage-and-rate-limits.md)                             | **PHASES 1–3 IMPLEMENTED; PHASE 4 OPEN; PHASE 5 NEEDS THE OWNER**    |
-| [140 — the editor as the agent's advantage](140-editor-agent-advantage.md)              | **RESEARCH — RESEARCH PHASE FIRST**                                  |
-| [139 — acting on agent diffs](139-acting-on-agent-diffs.md)                             | **RESEARCH — RESEARCH PHASE FIRST**                                  |
-| [135 — TanStack async ownership and route preparation](135-tanstack-async-ownership.md) | **PROPOSED — RESEARCH COMPLETE; IMPLEMENTATION NOT STARTED**         |
-| [132 — process and dev ownership](132-process-and-dev-ownership.md)                     | **PHASE 1 IMPLEMENTED (`4749fd05`); PHASES 2–4 OPEN**                |
-| [131 — provider codes, not prose](131-provider-codes-not-prose.md)                      | **PHASE 1 IMPLEMENTED (`4749fd05`); PHASES 2–3 OPEN**                |
-| [130 — ask the editor](130-ask-the-editor.md)                                           | **PHASES 1, 2, 4 AND 5 (ITEMS 5–7, 9) DONE; 3, ITEMS 8 AND 10 OPEN** |
-| [129 — dependency shape](129-dependency-shape.md)                                       | **PHASES 1–2 DEPLOYED; PHASE 3 Q2–Q4 OPEN**                          |
-| [128 — React 19 patterns](128-react-19-patterns.md)                                     | **NOT STARTED — PARTLY OBSOLETE; REWRITE SMALL FIRST**               |
-| [126 — T3 Code behavioral alignment](126-t3code-alignment.md)                           | **IN PROGRESS — 23 OF 57 GROUPS DONE, 8 PARTIAL, 26 OPEN**           |
-| [080 — Platform and VS Code keybinding modes](080-platform-keybinding-modes.md)         | **PROPOSED — INTERACTION RULES CONFIRMED**                           |
-| [087 — stateless MCP support](087-stateless-mcp.md)                                     | **PROPOSED — IMPLEMENTATION NOT STARTED**                            |
-| [088 — native code intelligence](088-native-code-intelligence.md)                       | **PROPOSED — DEPENDS ON 087**                                        |
-| [091 — error and timing helpers](091-error-and-timing-helpers.md)                       | **PARTIAL — IDENTICAL HALVES MERGED (`becdf722`); REST OPEN**        |
-| [092 — path and URI helpers](092-path-and-uri-helpers.md)                               | **PARTIAL — IDENTICAL HALVES MERGED (`becdf722`); REST OPEN**        |
-| [093 — web React and store ceremony](093-web-react-and-store-ceremony.md)               | **PARTIAL — 3 OF 14 DONE; GUARD SWEEP AFTER 091 ITEM 1.4**           |
-| [099 — document contribution runtime](099-document-contributions.md)                    | **PROPOSED — BASELINE AND PUBLICATION FIRST**                        |
-| [102 — scroll and keyboard affordance](102-scroll-and-keyboard-affordance.md)           | **PROPOSED — DECISIONS D2 AND D7 NEED CONFIRMATION**                 |
-| [124 — the theme studio](124-theme-studio.md)                                           | **PROPOSED — REPLACES 117'S SURFACE; DATA STAYS**                    |
-| [122 - composable full-power plugins](122-composable-plugins.md)                        | **PROPOSED - RESEARCH AND PERFORMANCE GATES FIRST**                  |
-| [114 — Polaron, a desktop shell we own](114-polaron-shell.md)                           | **PARKED — NEEDS A GO/NO-GO**                                        |
-| [108 — two markdown modes](108-markdown-modes.md)                                       | **PROPOSED — PHASE 1 READY; PHASE 2 NEEDS 111**                      |
-| [109 — boot boundaries and gate](109-boot-boundaries.md)                                | **PHASES 2–3 IMPLEMENTED 2026-09-21; GATE NOT STARTED**              |
-| [110 — workspace indexing](110-workspace-indexing.md)                                   | **RESEARCH — NO IMPLEMENTATION SCOPE YET**                           |
-| [111 — editor decorations](111-editor-decorations.md)                                   | **RESEARCH — NO IMPLEMENTATION SCOPE YET**                           |
-| [112 — the large-file ceiling](112-large-file-ceiling.md)                               | **RESEARCH — NO IMPLEMENTATION SCOPE YET**                           |
-| [094 — client-core web and TUI parity](094-client-core-web-tui-parity.md)               | **PARTIAL — 2 OF 23 DONE; 096 COMPLETE**                             |
-| [095 — server plumbing](095-server-plumbing.md)                                         | **PARTIAL — IDENTICAL HALVES MERGED; REGISTRY STREAM BUG OPEN**      |
-| [075 — say which renderer the terminal is using](075-terminal-renderer-fallbacks.md)    | **REWRITTEN 2026-09-25 — LOG AND SHOW THE RENDERER TIER**            |
-| [076 — watch-reload child reaping](076-watch-reload-child-reaping.md)                   | **PROPOSED — ROOT GO/NO-GO SCHEDULING**                              |
+| Plan                                                                                    | State                                                             |
+| --------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| [168 — flat file view under a chosen root](168-flat-file-view.md)                       | **PARKED — MOVED FROM EDITOR E030**                               |
+| [167 — settings defaults, setting details, and copy](167-settings-and-copy.md)          | **PROPOSED — READY; D1–D4 DECIDED**                               |
+| [166 — keyboard shortcuts, redone](166-shortcuts-editor.md)                             | **PROPOSED — RESEARCH FIRST; D1–D6 DECIDED**                      |
+| [165 — one font catalog, loaded on demand](165-font-catalog.md)                         | **IMPLEMENTED 2026-09-25 — ALL FIVE PHASES**                      |
+| [164 — what feels right in Neon](164-what-feels-right-in-neon.md)                       | **FIRST PASS SHIPPED; METADATA SWEEP LEFT**                       |
+| [163 — screenshot in the composer](163-chat-screenshot.md)                              | **PROPOSED — READY; DECISIONS ACCEPTED**                          |
+| [162 — context and cost](162-context-and-cost.md)                                       | **PROPOSED — READY; DECISIONS ACCEPTED**                          |
+| [161 — honest states](161-honest-states.md)                                             | **PROPOSED — READY; DECISIONS ACCEPTED**                          |
+| [160 — chat turn anatomy](160-chat-turn-anatomy.md)                                     | **PROPOSED — READY; DECISIONS ACCEPTED**                          |
+| [159 — file and folder picker](159-file-picker.md)                                      | **PROPOSED — READY; DECISIONS ACCEPTED**                          |
+| [158 — app polish from Neon](158-app-polish.md)                                         | **PROPOSED — READY; DECISIONS ACCEPTED**                          |
+| [157 — base components](157-base-components.md)                                         | **PROPOSED — READY; QUEUED NEXT**                                 |
+| [156 — documents in the editor](156-documents-in-the-editor.md)                         | **PLACEHOLDER — FAR FUTURE; RESEARCH FIRST**                      |
+| [155 — site demo becomes an animated replica](155-site-demo-replica.md)                 | **PLACEHOLDER — RESEARCH NOT STARTED**                            |
+| [154 — physical mode](154-physical-mode.md)                                             | **PROPOSED — D6 (SETTINGS SHAPE) FIRST**                          |
+| [153 — TypeScript can run in the browser worker](153-typescript-worker-backend.md)      | **IN PROGRESS — PHASES 1–2 DONE; D1–D3 DECIDED; PHASE 3 NEXT**    |
+| [152 — dev primary ships its working tree](152-remote-dev-builds.md)                    | **PROPOSED — NICE TO HAVE; AFTER 151**                            |
+| [151 — remote machines run the primary's release](151-remote-server-releases.md)        | **PROPOSED — DEPENDS ON 150 PHASE 1; D2/D4 TO CONFIRM**           |
+| [150 — remote machines run a server that matches](150-remote-server-version.md)         | **PHASE 1 PARTLY DONE (`129fdea6`); PHASE 2 → PLANS 151/152**     |
+| [149 — terminals outlive the server](149-terminal-host.md)                              | **PROPOSED — D2 (DESKTOP-QUIT LIFETIME) NEEDS THE OWNER**         |
+| [148 — server deploys restart when idle](148-restart-when-idle.md)                      | **PROPOSED — D3 REPLACED: RESTART ON CLICK (COMPLETION WAVE)**    |
+| [147 — log hygiene and a noise gate](147-log-hygiene-and-noise-gate.md)                 | **PROPOSED — PHASE 1 READY; PHASE 3 CARRIES PLAN 125'S REST**     |
+| [145 — harness controls](145-harness-controls.md)                                       | **APPROVAL-RULES MERGED (`89c58188`); SEVEN PROPOSED**            |
+| [144 — unattended agent work](144-unattended-agent-work.md)                             | **RESEARCH — HARNESS INVENTORY FIRST**                            |
+| [143 — phone layout](143-phone-layout.md)                                               | **DISCUSSION — OWNER DIRECTION FIRST**                            |
+| [142 — web push](142-web-push.md)                                                       | **PROPOSED — SPIKE FIRST**                                        |
+| [141 — usage and rate limits](141-usage-and-rate-limits.md)                             | **PHASES 1–3 IMPLEMENTED; PHASE 4 OPEN; PHASE 5 NEEDS THE OWNER** |
+| [140 — the editor as the agent's advantage](140-editor-agent-advantage.md)              | **RESEARCH — RESEARCH PHASE FIRST**                               |
+| [139 — acting on agent diffs](139-acting-on-agent-diffs.md)                             | **RESEARCH — RESEARCH PHASE FIRST**                               |
+| [135 — TanStack async ownership and route preparation](135-tanstack-async-ownership.md) | **PROPOSED — RESEARCH COMPLETE; IMPLEMENTATION NOT STARTED**      |
+| [132 — process and dev ownership](132-process-and-dev-ownership.md)                     | **PHASE 1 IMPLEMENTED (`4749fd05`); PHASES 2–4 OPEN**             |
+| [131 — provider codes, not prose](131-provider-codes-not-prose.md)                      | **PHASE 1 IMPLEMENTED (`4749fd05`); PHASES 2–3 OPEN**             |
+| [130 — ask the editor](130-ask-the-editor.md)                                           | **PHASES 1, 2, 4 AND 5 (ITEMS 5–9) DONE; 3 AND ITEM 10 OPEN**     |
+| [129 — dependency shape](129-dependency-shape.md)                                       | **PHASES 1–2 DEPLOYED; PHASE 3 Q2–Q4 OPEN**                       |
+| [128 — React 19 patterns](128-react-19-patterns.md)                                     | **NOT STARTED — PARTLY OBSOLETE; REWRITE SMALL FIRST**            |
+| [126 — T3 Code behavioral alignment](126-t3code-alignment.md)                           | **IN PROGRESS — 23 OF 57 GROUPS DONE, 8 PARTIAL, 26 OPEN**        |
+| [080 — Platform and VS Code keybinding modes](080-platform-keybinding-modes.md)         | **PROPOSED — INTERACTION RULES CONFIRMED**                        |
+| [087 — stateless MCP support](087-stateless-mcp.md)                                     | **PROPOSED — IMPLEMENTATION NOT STARTED**                         |
+| [088 — native code intelligence](088-native-code-intelligence.md)                       | **PROPOSED — DEPENDS ON 087**                                     |
+| [091 — error and timing helpers](091-error-and-timing-helpers.md)                       | **PARTIAL — IDENTICAL HALVES MERGED (`becdf722`); REST OPEN**     |
+| [092 — path and URI helpers](092-path-and-uri-helpers.md)                               | **PARTIAL — IDENTICAL HALVES MERGED (`becdf722`); REST OPEN**     |
+| [093 — web React and store ceremony](093-web-react-and-store-ceremony.md)               | **PARTIAL — 3 OF 14 DONE; GUARD SWEEP AFTER 091 ITEM 1.4**        |
+| [099 — document contribution runtime](099-document-contributions.md)                    | **PROPOSED — BASELINE AND PUBLICATION FIRST**                     |
+| [102 — scroll and keyboard affordance](102-scroll-and-keyboard-affordance.md)           | **PROPOSED — DECISIONS D2 AND D7 NEED CONFIRMATION**              |
+| [124 — the theme studio](124-theme-studio.md)                                           | **PROPOSED — REPLACES 117'S SURFACE; DATA STAYS**                 |
+| [122 - composable full-power plugins](122-composable-plugins.md)                        | **PROPOSED - RESEARCH AND PERFORMANCE GATES FIRST**               |
+| [114 — Polaron, a desktop shell we own](114-polaron-shell.md)                           | **PARKED — NEEDS A GO/NO-GO**                                     |
+| [108 — two markdown modes](108-markdown-modes.md)                                       | **PROPOSED — PHASE 1 READY; PHASE 2 NEEDS 111**                   |
+| [109 — boot boundaries and gate](109-boot-boundaries.md)                                | **PHASES 2–3 IMPLEMENTED 2026-09-21; GATE NOT STARTED**           |
+| [110 — workspace indexing](110-workspace-indexing.md)                                   | **RESEARCH — NO IMPLEMENTATION SCOPE YET**                        |
+| [111 — editor decorations](111-editor-decorations.md)                                   | **RESEARCH — NO IMPLEMENTATION SCOPE YET**                        |
+| [112 — the large-file ceiling](112-large-file-ceiling.md)                               | **RESEARCH — NO IMPLEMENTATION SCOPE YET**                        |
+| [094 — client-core web and TUI parity](094-client-core-web-tui-parity.md)               | **PARTIAL — 2 OF 23 DONE; 096 COMPLETE**                          |
+| [095 — server plumbing](095-server-plumbing.md)                                         | **PARTIAL — IDENTICAL HALVES MERGED; REGISTRY STREAM BUG OPEN**   |
+| [075 — say which renderer the terminal is using](075-terminal-renderer-fallbacks.md)    | **REWRITTEN 2026-09-25 — LOG AND SHOW THE RENDERER TIER**         |
+| [076 — watch-reload child reaping](076-watch-reload-child-reaping.md)                   | **PROPOSED — ROOT GO/NO-GO SCHEDULING**                           |
 
 ## Dependency notes
 

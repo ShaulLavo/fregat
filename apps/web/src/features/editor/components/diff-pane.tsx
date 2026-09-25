@@ -17,15 +17,14 @@ import { useDiffLanguage } from '@/features/editor/hooks/use-diff-language'
 import { useDiffRows } from '@/features/editor/hooks/use-diff-rows'
 import { useEditorTypography } from '@/features/editor/hooks/use-editor-typography'
 import type { DiffLanguageServerContext } from '@/features/editor/utils/diff-language-context'
-import {
-  createDiffScrollBridgePlugin,
-  type DiffScrollPosition,
-} from '@/features/editor/utils/diff-scroll-bridge'
 import { HOSTED_EDITOR_KEYMAP } from '@/keymap/editor-keymap'
 import { log } from '@/lib/client-logging'
 import { useEditorFocusTarget } from '@/lib/focus/hooks/use-editor-target'
 import { createDiffPresentationBinding } from '@/features/editor/state/diff-presentation'
-import type { DiffPanePresentation } from '@/features/editor/state/tab-presentation'
+import type {
+  DiffPanePresentation,
+  DiffScrollPosition,
+} from '@/features/editor/state/tab-presentation'
 
 /**
  * One side of a diff: a real read-only `Editor` holding a synthetic buffer of the projected rows,
@@ -87,7 +86,6 @@ export function DiffPane({
   const plugins = [
     plugin,
     unicodeHighlights.plugin,
-    onScroll ? createDiffScrollBridgePlugin((position) => onScroll(side, position)) : null,
     diffLanguagePlugin,
     persistence?.plugin,
   ].filter((entry) => entry !== null && entry !== undefined)
@@ -170,6 +168,14 @@ export function DiffPane({
       partial: file?.isPartial,
     })
   }, [controller, file, highlight, plugin, rows, side, syntaxBackend, tokensRevision])
+
+  useLayoutEffect(() => {
+    const editor = controller.getEditor()
+    if (!editor || !onScroll) return
+
+    const subscription = editor.onDidScroll((position) => onScroll(side, position))
+    return () => subscription.dispose()
+  }, [controller, onScroll, side])
 
   useLayoutEffect(() => {
     if (!onRegisterEditor) return

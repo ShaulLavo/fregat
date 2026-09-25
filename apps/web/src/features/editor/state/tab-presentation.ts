@@ -7,7 +7,9 @@ import {
   type DiffRegionStore,
 } from '@singapore-editor/diff'
 import type { TabId } from '@/lib/documents/utils/types'
-import type { DiffScrollPosition } from '@/features/editor/utils/diff-scroll-bridge'
+import type { EditorScrollPosition } from '@singapore-editor/core/editor'
+
+export type DiffScrollPosition = Required<EditorScrollPosition>
 
 export type DiffPanePresentation = {
   scroll: DiffScrollPosition | null
