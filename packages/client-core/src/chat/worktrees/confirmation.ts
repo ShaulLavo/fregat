@@ -22,7 +22,7 @@ export function cleanupConfirmationText(
     case 'missing':
       return {
         title: 'Confirm checkout is absent',
-        description: `Resolve the absent checkout ${label}. No files will be deleted. Its branch and commits may still exist.`,
+        description: `Mark ${label} as absent. No files will be deleted. Its branch and commits may still exist.`,
         action: 'Confirm checkout is absent',
       }
     case 'release':
