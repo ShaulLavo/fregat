@@ -69,6 +69,23 @@ describe('NerdFontProvider', () => {
     expect(font?.toString()).toBe('regular-font')
   })
 
+  it('downloads one archive for concurrent asks of a cold font', async () => {
+    const root = await fixtureRoot()
+    const archive = await fontArchive()
+    let downloads = 0
+    const service = provider({
+      cacheRoot: root,
+      fetcher: async (input) => {
+        if (String(input).endsWith('.zip')) downloads += 1
+        return fontFetch(input, archive)
+      },
+    })
+
+    await Promise.all([service.font('JetBrainsMono'), service.font('JetBrainsMono')])
+
+    expect(downloads).toBe(1)
+  })
+
   it('rejects invalid font names before fetching', async () => {
     let fetchCount = 0
     const service = provider({

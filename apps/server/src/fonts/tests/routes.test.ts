@@ -110,6 +110,29 @@ describe('fontRoutes', () => {
     expect(await missing.text()).toBe('')
   })
 
+  it('revalidates an installed font file by ETag instead of sending it again', async () => {
+    const { app } = await testApp()
+    const url = 'http://local/fonts/local/Berkeley%20Mono/0'
+
+    const first = await app.handle(new Request(url))
+    const etag = first.headers.get('etag') ?? ''
+    const again = await app.handle(new Request(url, { headers: { 'if-none-match': etag } }))
+
+    expect(etag).not.toBe('')
+    expect(again.status).toBe(304)
+  })
+
+  it('still answers with installed fonts when both download sources are unreachable', async () => {
+    const { app } = await testApp({ fontsource: false, nerd: false })
+
+    const response = await app.handle(new Request('http://local/fonts'))
+
+    expect(response.status).toBe(200)
+    expect((await response.json()).map((font: { ref: string }) => font.ref)).toEqual([
+      'local:Berkeley Mono',
+    ])
+  })
+
   it('serves a Nerd Font as ttf', async () => {
     const { app } = await testApp()
 
@@ -157,14 +180,18 @@ describe('fontRoutes', () => {
 
 const FC_LIST = 'Berkeley Mono\t80\t0\t100\t/fonts/BerkeleyMono-Regular.otf\n'
 
-async function testApp({ fontsource = true } = {}) {
+async function testApp({ fontsource = true, nerd = true } = {}) {
   const root = await mkdtemp(path.join(tmpdir(), 'platform-font-routes-'))
   roots.push(root)
   const archive = await nerdArchive()
   const { fetcher } = routedFetcher({
-    'https://www.nerdfonts.com/font-downloads': () =>
-      new Response(`<a href="${NERD_ZIP}">Download</a>`),
-    [NERD_ZIP]: () => new Response(archive),
+    ...(nerd
+      ? {
+          'https://www.nerdfonts.com/font-downloads': () =>
+            new Response(`<a href="${NERD_ZIP}">Download</a>`),
+          [NERD_ZIP]: () => new Response(archive),
+        }
+      : {}),
     ...(fontsource ? fontsourceRoutes() : {}),
   })
   const fonts = new FontCatalogService({

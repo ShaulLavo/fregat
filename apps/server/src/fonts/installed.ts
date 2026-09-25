@@ -1,4 +1,5 @@
 import { parseFontRef } from '@workspace/contracts'
+import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 
@@ -49,6 +50,8 @@ const FC_WEIGHTS: Readonly<Record<number, number>> = {
   210: 900,
 }
 const SERVED_WEIGHTS = new Set([400, 500, 600, 700])
+// Picker rows re-ask for the same few samples; each costs a subset of a whole font file.
+const PREVIEW_CACHE_SIZE = 256
 
 /**
  * Fonts installed on the server's machine, from fontconfig. Serving their files is what lets a
@@ -60,6 +63,7 @@ export class InstalledFontProvider {
   private readonly subsetter: FontSubsetter
   private readonly now: () => number
   private cached: { at: number; fonts: Promise<readonly InstalledFont[]> } | null = null
+  private readonly previews = new Map<string, Promise<Buffer | null>>()
 
   constructor(options: InstalledFontProviderOptions) {
     this.list = options.list ?? listWithFontconfig
@@ -92,13 +96,31 @@ export class InstalledFontProvider {
     const face = (await this.font(family))?.faces[index]
     if (!face) return null
 
+    const data = await this.read(face.file)
     return {
-      data: await this.read(face.file),
+      data,
       contentType: CONTENT_TYPES[path.extname(face.file)] ?? 'application/octet-stream',
+      // Revalidated rather than cached for good: a font reinstalled in place changes its bytes.
+      etag: `"${createHash('sha1').update(data).digest('base64url')}"`,
     }
   }
 
-  async preview(family: string, text: string) {
+  preview(family: string, text: string): Promise<Buffer | null> {
+    const key = `${family}\u0000${text}`
+    const cached = this.previews.get(key)
+    if (cached) return cached
+
+    const subset = this.subsetPreview(family, text)
+    this.previews.set(key, subset)
+    subset.catch(() => this.previews.delete(key))
+    for (const oldest of this.previews.keys()) {
+      if (this.previews.size <= PREVIEW_CACHE_SIZE) break
+      this.previews.delete(oldest)
+    }
+    return subset
+  }
+
+  private async subsetPreview(family: string, text: string) {
     const faces = (await this.font(family))?.faces ?? []
     const face = faces.find((candidate) => candidate.style === 'normal') ?? faces[0]
     if (!face) return null

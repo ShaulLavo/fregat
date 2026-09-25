@@ -13,6 +13,7 @@ export function FontSample({
   fontRef,
   role,
   sampleText,
+  serverSample,
   text,
 }: {
   className?: string
@@ -20,9 +21,11 @@ export function FontSample({
   role: FontRole
   /** Every glyph the sample family must hold; defaults to `text`. */
   sampleText?: string
+  /** False when the server has nothing to sample, so typing costs no request per keystroke. */
+  serverSample?: boolean
   text: string
 }) {
-  const { family, pending } = useFontSample(fontRef, sampleText ?? text)
+  const { family, pending } = useFontSample(fontRef, sampleText ?? text, serverSample)
   const fallback = role === 'ui' ? 'var(--font-ui)' : 'var(--font-code)'
   const style = family ? { fontFamily: `${cssFamily(family)}, ${fallback}` } : undefined
 

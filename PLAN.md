@@ -537,6 +537,7 @@ surfaces, the file picker and the site. The owner is taking it one topic at a ti
 | [163](plans/163-chat-screenshot.md)          | Screenshot attachment in the composer (export lives in Plan 145's export plan)                              |
 | [164](plans/164-what-feels-right-in-neon.md) | Research: name what makes Neon feel right, restate it as our own rules and tokens                           |
 | [165](plans/165-font-catalog.md)             | Nerd Fonts + Fontsource on demand; interface-font setting; curated autocomplete picker                      |
+| [166](plans/166-shortcuts-editor.md)         | Keyboard shortcuts page rebuilt from VS Code research: full-width list, save on Enter, phone sheet          |
 | [154](plans/154-physical-mode.md)            | The seamui feel (springs, depth, motion in every primitive) and interface sounds                            |
 | [155](plans/155-site-demo-replica.md)        | Placeholder: the site hero becomes an animated replica of the app, like cursor.com                          |
 | [156](plans/156-documents-in-the-editor.md)  | Placeholder, far future: PDF, DOCX, XLSX, PPTX and CSV as editor documents agents can edit                  |
@@ -550,6 +551,8 @@ Suggested order:
 4. Plan 154 near the end. Phases 1–3 may land earlier; Phases 4–6 wait for the base components so
    every new primitive is wired and audited once. D6 (settings semantics) comes first.
 5. Plans 155 and 156 are placeholders; their research phases run when the site or documents matter.
+6. Plan 166 any time; its research phase runs first, and it takes 102 P3, 157 and 080 from `main` as
+   they land.
 
 ## Verification boundaries
 

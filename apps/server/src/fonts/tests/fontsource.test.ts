@@ -1,7 +1,7 @@
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { FontsourceProvider } from '../fontsource'
 import { CYRILLIC_RANGE, LATIN_RANGE, fontsourceRoutes, routedFetcher } from './fixtures'
@@ -22,7 +22,7 @@ describe('FontsourceProvider', () => {
     expect(ids).toEqual(['geist', 'lobster'])
   })
 
-  it('serves a cached catalog for a day, then refetches', async () => {
+  it('serves a cached catalog for a day, then refreshes it behind the request', async () => {
     let now = Date.now()
     const { provider, requests, root } = await fixture({ now: () => now })
     await provider.catalog()
@@ -35,9 +35,54 @@ describe('FontsourceProvider', () => {
 
     now += DAY_MS + 1
     const later = await fixture({ now: () => now, root })
-    await later.provider.catalog()
+    await expect(later.provider.catalog()).resolves.toHaveLength(2)
     expect(requests).toHaveLength(1)
-    expect(later.requests).toEqual(['https://api.fontsource.org/v1/fonts'])
+    await vi.waitFor(() => expect(later.requests).toEqual(['https://api.fontsource.org/v1/fonts']))
+  })
+
+  it('never lets a stale refresh hold a request, even when upstream hangs', async () => {
+    let now = Date.now()
+    const { provider, root } = await fixture({ now: () => now })
+    // A saved font has loaded once, so its metadata is cached; only the catalog is stale.
+    await provider.stylesheet('lobster')
+
+    now += DAY_MS + 1
+    const hanging = new FontsourceProvider({
+      ...options(root, () => new Promise<Response>(() => {})),
+      now: () => now,
+    })
+
+    await expect(hanging.stylesheet('lobster')).resolves.toContain('lobster Fontsource')
+  })
+
+  it('gives up on an upstream request that never answers', async () => {
+    const { root } = await fixture()
+    const hanging = new FontsourceProvider({
+      ...options(root, abortableHang),
+      upstreamTimeoutMs: 20,
+    })
+
+    await expect(hanging.catalog()).rejects.toMatchObject({ code: 'OPERATION_FAILED' })
+  })
+
+  it('keeps the good catalog when upstream answers 200 with something else', async () => {
+    let now = Date.now()
+    const { provider, root } = await fixture({ now: () => now })
+    await provider.catalog()
+
+    now += DAY_MS + 1
+    const broken = new FontsourceProvider({
+      ...options(root, async () => Response.json({ fonts: [] })),
+      now: () => now,
+    })
+    await broken.catalog()
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    const reread = new FontsourceProvider({
+      ...options(root, routedFetcher({}).fetcher),
+      now: () => now,
+    })
+
+    await expect(reread.catalog()).resolves.toHaveLength(2)
   })
 
   it('serves a stale catalog when the network is gone', async () => {
@@ -150,6 +195,13 @@ async function fixture(overrides: FixtureOptions = {}) {
     now: overrides.now,
   })
   return { provider, requests, root }
+}
+
+/** Never answers, but honours the abort signal the way fetch does. */
+function abortableHang(_input: string | URL | Request, init?: RequestInit) {
+  return new Promise<Response>((_resolve, reject) => {
+    init?.signal?.addEventListener('abort', () => reject(init.signal?.reason))
+  })
 }
 
 function options(cacheRoot: string, fetcher: ReturnType<typeof routedFetcher>['fetcher']) {

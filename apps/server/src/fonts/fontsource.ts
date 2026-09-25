@@ -5,6 +5,7 @@ import path from 'node:path'
 import { FsError } from '../fs/errors'
 import { fontOperationFailed, readBinaryFile, readJsonFile } from './cache-files'
 import type { Fetcher, FontSubsetter } from './fetcher'
+import { Inflight } from './inflight'
 
 export type FontsourceFont = {
   readonly id: string
@@ -23,6 +24,12 @@ type FontsourceMeta = {
   readonly weightAxis: { readonly min: number; readonly max: number } | null
 }
 
+type LoadedCatalog = {
+  readonly fetchedAt: number
+  readonly fonts: readonly FontsourceFont[]
+  readonly byId: ReadonlyMap<string, FontsourceFont>
+}
+
 type Face = { readonly style: string; readonly weight: number | 'wght'; readonly cssWeight: string }
 
 type FontsourceProviderOptions = {
@@ -30,12 +37,17 @@ type FontsourceProviderOptions = {
   fetcher: Fetcher
   subsetter: FontSubsetter
   now?: () => number
+  upstreamTimeoutMs?: number
 }
 
 // The only hosts this provider reaches; a font id only ever selects a path under them.
 const API = 'https://api.fontsource.org/v1'
 const CDN = 'https://cdn.jsdelivr.net/fontsource/fonts'
 const CATALOG_MAX_AGE_MS = 24 * 60 * 60 * 1000
+// A failed refresh is not retried on every request while offline.
+const CATALOG_RETRY_MS = 5 * 60 * 1000
+// Boot's stylesheet is render-blocking, so no upstream wait may hang it.
+const UPSTREAM_TIMEOUT_MS = 10_000
 // The app sets text in these and nothing else, so a static family costs four files per subset.
 const STATIC_WEIGHTS = [400, 500, 600, 700]
 const FILE_NAME = /^([a-z0-9-]+)-(wght|\d{3})-(normal|italic)\.woff2$/u
@@ -49,7 +61,10 @@ export class FontsourceProvider {
   private readonly fetcher: Fetcher
   private readonly subsetter: FontSubsetter
   private readonly now: () => number
-  private readonly inflight = new Map<string, Promise<unknown>>()
+  private readonly inflight = new Inflight()
+  private loaded: LoadedCatalog | null = null
+  private refreshFailedAt = Number.NEGATIVE_INFINITY
+  private readonly upstreamTimeoutMs: number
 
   constructor(options: FontsourceProviderOptions) {
     this.root = path.join(options.cacheRoot, 'fontsource')
@@ -57,10 +72,11 @@ export class FontsourceProvider {
     this.fetcher = options.fetcher
     this.subsetter = options.subsetter
     this.now = options.now ?? Date.now
+    this.upstreamTimeoutMs = options.upstreamTimeoutMs ?? UPSTREAM_TIMEOUT_MS
   }
 
-  catalog(): Promise<readonly FontsourceFont[]> {
-    return this.once('catalog', () => this.readCatalog())
+  async catalog(): Promise<readonly FontsourceFont[]> {
+    return (await this.loadedCatalog()).fonts
   }
 
   async stylesheet(id: string) {
@@ -111,34 +127,64 @@ export class FontsourceProvider {
   }
 
   private async font(id: string) {
-    const catalog = await this.catalog()
-    return catalog.find((font) => font.id === id) ?? null
+    return (await this.loadedCatalog()).byId.get(id) ?? null
   }
 
-  private async readCatalog() {
-    await mkdir(this.root, { recursive: true })
-    const cached = await readJsonFile<FontsourceFont[]>(this.catalogFile)
-    if (cached && (await this.catalogIsFresh())) return cached
+  /**
+   * Parsed once and kept. A stale catalog is served at once and refreshed behind the request:
+   * yesterday's list still names every font we can serve, and nothing waits on the network.
+   */
+  private async loadedCatalog(): Promise<LoadedCatalog> {
+    const current =
+      this.loaded ?? (await this.inflight.join('catalog:disk', () => this.readCachedCatalog()))
+    if (!current) return this.inflight.join('catalog:fetch', () => this.fetchCatalog(null))
+    if (!this.catalogDue(current)) return current
 
-    const response = await this.fetcher(`${API}/fonts`).catch((error: unknown) => error)
-    if (response instanceof Response && response.ok) {
-      const fonts = catalogFonts(await response.json())
+    this.inflight.join('catalog:fetch', () => this.fetchCatalog(current)).catch(() => {})
+    return current
+  }
+
+  private catalogDue(current: LoadedCatalog) {
+    const now = this.now()
+    return (
+      now - current.fetchedAt >= CATALOG_MAX_AGE_MS &&
+      now - this.refreshFailedAt >= CATALOG_RETRY_MS
+    )
+  }
+
+  private async readCachedCatalog() {
+    const fonts = await readJsonFile<FontsourceFont[]>(this.catalogFile)
+    if (!fonts || fonts.length === 0) return null
+
+    const { mtimeMs } = await stat(this.catalogFile)
+    return this.remember(fonts, mtimeMs)
+  }
+
+  private async fetchCatalog(previous: LoadedCatalog | null) {
+    const response = await this.fetcher(`${API}/fonts`, this.upstreamInit()).catch(
+      (error: unknown) => error,
+    )
+    const fonts = response instanceof Response && response.ok ? await catalogBody(response) : []
+    // A shape change or an error page served as 200 must not replace a good catalog.
+    if (fonts.length > 0) {
+      await mkdir(this.root, { recursive: true })
       await writeFile(this.catalogFile, JSON.stringify(fonts))
-      return fonts
+      return this.remember(fonts, this.now())
     }
-    // Offline or upstream down: yesterday's catalog still names every font we can serve.
-    if (cached) return cached
+
+    this.refreshFailedAt = this.now()
+    if (previous) return previous
 
     throw catalogUnavailable(response)
   }
 
-  private async catalogIsFresh() {
-    const { mtimeMs } = await stat(this.catalogFile)
-    return this.now() - mtimeMs < CATALOG_MAX_AGE_MS
+  private remember(fonts: readonly FontsourceFont[], fetchedAt: number): LoadedCatalog {
+    this.loaded = { fetchedAt, fonts, byId: new Map(fonts.map((font) => [font.id, font])) }
+    return this.loaded
   }
 
   private meta(font: FontsourceFont): Promise<FontsourceMeta> {
-    return this.once(`meta:${font.id}`, async () => {
+    return this.inflight.join(`meta:${font.id}`, async () => {
       const metaPath = path.join(this.root, font.id, 'meta.json')
       const cached = await readJsonFile<FontsourceMeta>(metaPath)
       if (cached) return cached
@@ -158,12 +204,12 @@ export class FontsourceProvider {
   }
 
   private cachedFile(id: string, name: string): Promise<Buffer> {
-    return this.once(`file:${id}/${name}`, async () => {
+    return this.inflight.join(`file:${id}/${name}`, async () => {
       const filePath = path.join(this.root, id, 'files', name)
       const cached = await readBinaryFile(filePath)
       if (cached) return cached
 
-      const response = await this.fetcher(upstreamFileUrl(id, name))
+      const response = await this.fetcher(upstreamFileUrl(id, name), this.upstreamInit())
       if (!response.ok) throw fontOperationFailed('failed to download a Fontsource file', response)
 
       const data = Buffer.from(await response.arrayBuffer())
@@ -173,22 +219,21 @@ export class FontsourceProvider {
     })
   }
 
+  private upstreamInit(): RequestInit {
+    return { signal: AbortSignal.timeout(this.upstreamTimeoutMs) }
+  }
+
   private async fetchJson(url: string, what: string): Promise<unknown> {
-    const response = await this.fetcher(url)
+    const response = await this.fetcher(url, this.upstreamInit())
     if (!response.ok) throw fontOperationFailed(`failed to fetch Fontsource ${what}`, response)
 
     return response.json()
   }
+}
 
-  // Two rows asking for one file share one download instead of racing to write it.
-  private once<T>(key: string, run: () => Promise<T>): Promise<T> {
-    const pending = this.inflight.get(key)
-    if (pending) return pending as Promise<T>
-
-    const started = run().finally(() => this.inflight.delete(key))
-    this.inflight.set(key, started)
-    return started
-  }
+async function catalogBody(response: Response) {
+  const payload: unknown = await response.json().catch(() => null)
+  return catalogFonts(payload)
 }
 
 function catalogUnavailable(result: unknown) {

@@ -94,7 +94,7 @@ describe('semantic write coordination', () => {
         value: { enabled: false, source: { kind: 'desktop' } },
       },
       { key: 'workbench.tree.indentGuides', kind: 'set', value: 'always' },
-      { key: 'editor.fontFamily', kind: 'set', value: 'FiraCode' },
+      { key: 'editor.fontFamily', kind: 'set', value: 'nerd:FiraCode' },
       { key: 'editor.fontSize', kind: 'set', value: 18 },
       { key: 'editor.lineHeight', kind: 'set', value: 28 },
       { key: 'editor.tabSize', kind: 'set', value: 2 },

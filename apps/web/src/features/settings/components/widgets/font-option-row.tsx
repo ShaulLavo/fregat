@@ -17,6 +17,7 @@ export function FontOptionRow({ option, role }: { option: FontOption; role: Font
         fontRef={option.ref}
         role={role}
         sampleText={glyphs}
+        serverSample={option.listed}
         text={option.label}
       />
       <FontSample
@@ -24,6 +25,7 @@ export function FontOptionRow({ option, role }: { option: FontOption; role: Font
         fontRef={option.ref}
         role={role}
         sampleText={glyphs}
+        serverSample={option.listed}
         text={sample}
       />
       <span className='text-muted-foreground text-3xs shrink-0'>{option.source}</span>

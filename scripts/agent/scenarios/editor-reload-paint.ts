@@ -100,7 +100,7 @@ async function reloadAndSample(
   await step('before-reload')
 
   if (fontDelayMs > 0) {
-    await page.route('**/fonts/*', async (route) => {
+    await page.route('**/fonts/**', async (route) => {
       await new Promise((resolve) => setTimeout(resolve, fontDelayMs))
       await route.continue()
     })

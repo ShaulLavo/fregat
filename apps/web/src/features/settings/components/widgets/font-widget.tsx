@@ -96,7 +96,12 @@ export function FontWidget({
         id={id}
         title={`${current.label} (${value})`}
       >
-        <FontSample fontRef={value} role={role} text={current.label} />
+        <FontSample
+          fontRef={value}
+          role={role}
+          serverSample={current.listed}
+          text={current.label}
+        />
       </ComboboxTrigger>
       <ComboboxContent className='max-h-96 w-80'>
         <ComboboxInput

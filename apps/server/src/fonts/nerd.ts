@@ -6,6 +6,7 @@ import path from 'node:path'
 import { fontOperationFailed, readBinaryFile, readJsonFile } from './cache-files'
 import { isValidFontName } from './contracts'
 import type { Fetcher, FontSubsetter } from './fetcher'
+import { Inflight } from './inflight'
 
 export type FontLinks = Record<string, string>
 
@@ -26,6 +27,9 @@ type NerdFontProviderOptions = {
 const nerdFontsDownloadUrl = 'https://www.nerdfonts.com/font-downloads'
 // The scraped links point at release assets; nothing else may be fetched from them.
 const archiveHosts = new Set(['github.com'])
+// The links page is small; a release archive can be tens of MB.
+const LINKS_TIMEOUT_MS = 10_000
+const ARCHIVE_TIMEOUT_MS = 120_000
 const require = createRequire(import.meta.url)
 const JSZip = require('jszip') as JSZipModule
 
@@ -36,6 +40,7 @@ export class NerdFontProvider {
   private readonly linksFile: string
   private readonly previewDirectory: string
   private readonly subsetter: FontSubsetter
+  private readonly inflight = new Inflight()
 
   constructor(options: NerdFontProviderOptions) {
     this.fetcher = options.fetcher
@@ -45,13 +50,19 @@ export class NerdFontProvider {
     this.subsetter = options.subsetter
   }
 
-  async links() {
+  links(): Promise<FontLinks> {
+    return this.inflight.join('links', () => this.readLinks())
+  }
+
+  private async readLinks() {
     await this.ensureCacheDirectories()
 
     const cached = await readJsonFile<FontLinks>(this.linksFile)
     if (cached) return cached
 
-    const response = await this.fetcher(nerdFontsDownloadUrl)
+    const response = await this.fetcher(nerdFontsDownloadUrl, {
+      signal: AbortSignal.timeout(LINKS_TIMEOUT_MS),
+    })
     if (!response.ok) throw fontOperationFailed('failed to fetch Nerd Fonts links', response)
 
     const html = await response.text()
@@ -61,9 +72,14 @@ export class NerdFontProvider {
     return links
   }
 
-  async font(fontName: string) {
-    if (!isValidFontName(fontName)) return null
+  font(fontName: string): Promise<Buffer | null> {
+    if (!isValidFontName(fontName)) return Promise.resolve(null)
 
+    // The picker's samples and the face itself can all ask for one cold archive at once.
+    return this.inflight.join(`font:${fontName}`, () => this.readFont(fontName))
+  }
+
+  private async readFont(fontName: string) {
     await this.ensureCacheDirectories()
 
     const cachedFontPath = path.join(this.fontDirectory, `${fontName}.ttf`)
@@ -106,7 +122,7 @@ export class NerdFontProvider {
     // The links file is a cache on disk; it never widens where the server fetches from.
     if (!archiveHosts.has(new URL(zipUrl).hostname)) return null
 
-    const response = await this.fetcher(zipUrl)
+    const response = await this.fetcher(zipUrl, { signal: AbortSignal.timeout(ARCHIVE_TIMEOUT_MS) })
     if (!response.ok) throw fontOperationFailed('failed to download font archive', response)
 
     return Buffer.from(await response.arrayBuffer())

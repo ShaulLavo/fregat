@@ -18,6 +18,8 @@ export type FontOption = {
   readonly source: string
   /** Source and category, for the row's title. */
   readonly detail: string
+  /** Whether the server can sample it: false for a local family its catalog does not list. */
+  readonly listed: boolean
 }
 
 export type FontOptionGroup = { readonly value: string; readonly items: readonly FontOption[] }
@@ -62,7 +64,8 @@ function suggestedFontGroups(
 /**
  * The whole catalog ranked against `query`. The family is the label, and category, source and
  * id are keywords, so "mono" or "serif" narrows the list. The code role ranks monospace first
- * but hides nothing; an exact family outranks both. No match offers the installed font.
+ * but hides nothing; an exact family outranks both. The installed font the query names comes
+ * last, or alone when nothing matches.
  */
 export function searchFontOptions(
   query: string,
@@ -72,10 +75,10 @@ export function searchFontOptions(
   const ranked = [...BUNDLED_ENTRIES, ...catalog].flatMap((entry) => rankedEntry(entry, query))
   ranked.sort((left, right) => compareRanked(left, right, role))
   const results = ranked.slice(0, SEARCH_LIMIT).map(({ entry }) => entryOption(entry))
-  if (results.length > 0) return results
-
-  const installed = installedFontOption(query)
-  return installed ? [installed] : []
+  // Fuzzy matching almost always finds something, and a font installed only on this device
+  // is never in the catalog; offer it unless the catalog already has that exact family.
+  const installed = ranked[0]?.exact ? null : installedFontOption(query)
+  return installed ? [...results, installed] : results
 }
 
 function installedFontOption(query: string): FontOption | null {
@@ -87,6 +90,7 @@ function installedFontOption(query: string): FontOption | null {
     label: `Use installed font '${query.trim()}'`,
     source: SOURCE_LABELS.local,
     detail: SOURCE_LABELS.local,
+    listed: false,
   }
 }
 
@@ -99,10 +103,11 @@ export function fontOption(
   if (entry) return entryOption(entry)
 
   const parsed = parseFontRef(ref)
-  if (!parsed) return { ref, label: ref, source: 'unknown', detail: 'unknown' }
+  if (!parsed) return { ref, label: ref, source: 'unknown', detail: 'unknown', listed: false }
 
   const source = SOURCE_LABELS[parsed.source]
-  return { ref, label: refLabel(parsed), source, detail: source }
+  // Not in the catalog: a local family (system-ui, or one typed) exists only on this device.
+  return { ref, label: refLabel(parsed), source, detail: source, listed: parsed.source !== 'local' }
 }
 
 function refLabel(ref: FontRef) {
@@ -152,6 +157,7 @@ function entryOption(entry: FontCatalogEntry): FontOption {
     label: entry.family,
     source: SOURCE_LABELS[entry.source],
     detail: `${SOURCE_LABELS[entry.source]} · ${entry.category}`,
+    listed: true,
   }
 }
 

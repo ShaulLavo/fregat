@@ -1,7 +1,11 @@
 import type { FontCatalogEntry } from '@workspace/contracts'
 import { describe, expect, it } from 'vitest'
 
-import { fontPickerGroups, searchFontOptions } from '@/features/settings/utils/font-options'
+import {
+  fontPickerGroups,
+  searchFontOptions,
+  type FontOption,
+} from '@/features/settings/utils/font-options'
 import { recentFonts, writtenFont } from '@/features/settings/utils/recent-fonts'
 
 const catalog: FontCatalogEntry[] = [
@@ -20,7 +24,7 @@ describe('searchFontOptions', () => {
   })
 
   it('ranks monospace first for code but hides nothing', () => {
-    const refs = searchFontOptions('robo', 'code', catalog).map((option) => option.ref)
+    const refs = listed(searchFontOptions('robo', 'code', catalog))
 
     expect(refs).toEqual(['fontsource:roboto-mono', 'fontsource:roboto'])
   })
@@ -33,9 +37,19 @@ describe('searchFontOptions', () => {
   })
 
   it('finds the bundled faces alongside the catalog', () => {
-    const refs = searchFontOptions('jetbrains', 'code', catalog).map((option) => option.ref)
+    const refs = listed(searchFontOptions('jetbrains', 'code', catalog))
 
     expect(refs).toEqual(['bundled:jetbrains-mono'])
+  })
+
+  it('offers a font installed on this device after fuzzy matches, but not over an exact one', () => {
+    const options = searchFontOptions('SF Mono', 'code', catalog)
+
+    expect(options.at(-1)?.ref).toBe('local:SF Mono')
+    expect(options.length).toBeGreaterThan(1)
+    expect(searchFontOptions('Lora', 'ui', catalog).map((option) => option.ref)).not.toContain(
+      'local:Lora',
+    )
   })
 
   it('offers the installed font when nothing matches', () => {
@@ -45,6 +59,7 @@ describe('searchFontOptions', () => {
         label: "Use installed font 'Zzyzx'",
         source: 'installed',
         detail: 'installed',
+        listed: false,
       },
     ])
   })
@@ -72,6 +87,11 @@ describe('recent fonts', () => {
     expect(recentFonts('nerd:Iosevka', written)).toEqual(['nerd:Iosevka', 'nerd:FiraCode'])
   })
 })
+
+/** The catalog's matches, without the trailing installed-font row. */
+function listed(options: readonly FontOption[]) {
+  return options.filter((option) => option.listed).map((option) => option.ref)
+}
 
 function intent(key: string, value: string) {
   return { patch: { request: { operations: [{ kind: 'set', key, value }] } } }

@@ -75,11 +75,16 @@ export function fontRoutes(fonts = new FontCatalogService()) {
       )
       .get(
         '/local/:id/:face',
-        async ({ params, set }) => {
+        async ({ params, request, set }) => {
           const file = await fonts.installed.file(params.id, Number(params.face))
           if (!file) return fontNotFound(set)
+          if (request.headers.get('if-none-match') === file.etag) {
+            return new Response(null, { status: 304, headers: { etag: file.etag } })
+          }
 
-          return fontResponse(file.data, file.contentType, 'no-cache')
+          const response = fontResponse(file.data, file.contentType, 'no-cache')
+          response.headers.set('etag', file.etag)
+          return response
         },
         { params: localFileParamsSchema },
       ),
