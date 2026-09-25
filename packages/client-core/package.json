@@ -94,6 +94,7 @@
     "./chat/rail/snooze": "./src/chat/rail/snooze.ts",
     "./chat/rail/unread": "./src/chat/rail/unread.ts",
     "./chat/rail/multi-select": "./src/chat/rail/multi-select.ts",
+    "./chat/rail/lifecycle-undo": "./src/chat/rail/lifecycle-undo.ts",
     "./chat/providers/models": "./src/chat/providers/models.ts",
     "./chat/providers/auth": "./src/chat/providers/auth.ts",
     "./chat/providers/options": "./src/chat/providers/options.ts",

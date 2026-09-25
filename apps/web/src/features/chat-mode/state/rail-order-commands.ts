@@ -38,8 +38,16 @@ import { confirmedEnvironmentOrigin } from '@/lib/environments/state/domain'
 import { queryClientFor } from '@/lib/environments/state/query-clients'
 import { runMutation } from '@/lib/mutations/run'
 import { chatModeMutationKeys } from '@/features/chat-mode/utils/mutation-keys'
+import { captureSessionLifecycle } from '@workspace/client-core/chat/rail/lifecycle-undo'
+import { forgetSessionUndo, offerSessionUndo } from '@/features/chat-mode/state/session-undo'
+import { dropUndoKind } from '@/features/chat-mode/utils/session-undo'
+import { sessionSummary } from '@/features/chat-mode/state/removal'
 
 type Drop = { readonly activeId: string; readonly overId: string | null }
+type SessionDrop = Drop & {
+  /** The Undo key named on the notice a settling or unpinning drop offers. */
+  readonly undoShortcut?: string | null
+}
 
 export function reorderRailProject({ activeId, overId }: Drop) {
   const model = railOrderModel()
@@ -63,7 +71,7 @@ export function reorderRailProject({ activeId, overId }: Drop) {
   )
 }
 
-export function reorderRailSession({ activeId, overId }: Drop) {
+export function reorderRailSession({ activeId, overId, undoShortcut }: SessionDrop) {
   if (!overId) return
   const environments = currentRailEnvironments()
   const model = railOrderModel()
@@ -125,7 +133,22 @@ export function reorderRailSession({ activeId, overId }: Drop) {
     new Date().toISOString(),
   )
   if (!patch || !patch.commands.length) return
-  return performSessionDrop(patch)
+  const before = captureSessionLifecycle(sessionSummary(active.ref) ?? {})
+  const kind = dropUndoKind(plan)
+  return performSessionDrop(patch).then((outcome) => {
+    if (!outcome.ok) return outcome
+    if (!kind) {
+      forgetSessionUndo([active.ref])
+      return outcome
+    }
+    offerSessionUndo({
+      kind,
+      entries: [{ ref: active.ref, before, reopen: null }],
+      detail: '',
+      shortcut: undoShortcut ?? null,
+    })
+    return outcome
+  })
 }
 
 function performSessionDrop(patch: SessionDropPatch) {
