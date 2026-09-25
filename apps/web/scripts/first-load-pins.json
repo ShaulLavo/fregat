@@ -3,7 +3,7 @@
   "scriptGzip": 1622077,
   "owners": {
     "node_modules": 480419,
-    "external": 327354,
+    "Editor": 327354,
     "apps/web/src/features/chat": 135077,
     "apps/web/src/features/editor": 89013,
     "packages/tree": 73558,
@@ -45,6 +45,11 @@
       "at": "2026-09-25T15:27:11.706Z",
       "scriptGzip": 1622077,
       "reason": "Rebase onto main a8de3a1d: merged L9 pull-request sessions, worktree setup, clone and publish UI; Editor main 6b969e2"
+    },
+    {
+      "at": "2026-09-25T15:37:16.350Z",
+      "scriptGzip": 1622077,
+      "reason": "Attribute resolved Editor symlinks consistently in worktrees and CI; total bytes unchanged"
     }
   ]
 }
