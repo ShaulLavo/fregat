@@ -23,9 +23,13 @@ import {
   stripDisplayedPlanMarkdown,
 } from '@workspace/client-core/chat/proposed-plan'
 import { AssistantMarkdown } from './assistant-markdown'
+import { PlanCommentBar } from './plan-comment-bar'
+import { selectedTextWithin } from '@/features/chat/utils/selected-text'
 
 export function ProposedPlanCard({ plan }: { plan: OrchestrationProposedPlan }) {
   const [expanded, setExpanded] = useState(false)
+  // Text selected in the rendered plan, which a line comment can quote.
+  const [selection, setSelection] = useState<string | null>(null)
   const canCollapse = canCollapseProposedPlan(plan.planMarkdown)
   const markdown =
     canCollapse && !expanded
@@ -94,12 +98,22 @@ export function ProposedPlanCard({ plan }: { plan: OrchestrationProposedPlan }) 
       <div className='mt-4'>
         <div
           className={cn('relative', canCollapse && !expanded && 'max-h-[26rem] overflow-hidden')}
+          onKeyUp={(event) => setSelection(selectedTextWithin(event.currentTarget))}
+          onMouseUp={(event) => setSelection(selectedTextWithin(event.currentTarget))}
         >
           <AssistantMarkdown className='text-xs leading-5' text={markdown} />
           {canCollapse && !expanded ? (
             <div className='from-card/95 via-card/80 pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-linear-to-t to-transparent' />
           ) : null}
         </div>
+        {selection && (expanded || !canCollapse) ? (
+          <PlanCommentBar
+            planId={plan.id}
+            planMarkdown={plan.planMarkdown}
+            selection={selection}
+            onDone={() => setSelection(null)}
+          />
+        ) : null}
         {canCollapse ? (
           <div className='mt-4 flex justify-center'>
             <Button

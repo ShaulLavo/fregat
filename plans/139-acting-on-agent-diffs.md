@@ -2,8 +2,9 @@
 
 ## Status and authorization
 
-- Status: RESEARCHED 2026-09-25 (completion wave, lane L8). Phases rewritten below; review mode
-  and second-model review split into Plan 169. Phase 1 done.
+- Status: DONE except as noted, 2026-09-25 (completion wave, lane L8): phases 1, 2, 3 and 6
+  landed; review mode and second-model review moved to Plan 169; comment re-anchoring is left
+  (Phase 3 note). Delete this plan once the owner checks pass.
 - Priority: P1. `docs/product-vision.md` makes the diff the reviewable artifact under every
   harness, and today it ends in a view the user cannot act on.
 - Effort: L overall. Risk: MED — per-hunk undo writes to a worktree an agent may still be
@@ -216,6 +217,12 @@ hunk.patch)` (16 hex), scoped by session, turns and whitespace mode. A hunk is a
 5. Second-model review: **moved to Plan 169**.
 6. **Plan line comments.** Block-level comments on an expanded proposed plan, stored in the review
    draft with `target: { kind: 'plan', planId, planHash }`, sent with "refine".
+   **Done 2026-09-25 (lane L8)** by selection rather than per block: selecting text in an
+   expanded plan offers "Comment on the selection"; the selection is matched back to the plan's
+   own lines (`features/chat/utils/plan-comment.ts`), quoted, and joins the same review draft
+   (anchor `{ kind: 'plan', planId, lines }`), going out with the next message. DOM test in
+   `proposed-plan-card.test.tsx`. A plan needs a provider turn, so the in-app look is an
+   **owner check**.
 
 ## Verification
 
