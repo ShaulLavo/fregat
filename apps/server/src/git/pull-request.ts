@@ -108,9 +108,14 @@ export async function createPullRequest(
   return { kind: 'created', pullRequest: created.pullRequest }
 }
 
-async function supportedContext(cwd: string, boundaries: Boundaries): Promise<Supported> {
+async function supportedContext(
+  cwd: string,
+  boundaries: Boundaries,
+  remoteUrl?: string,
+): Promise<Supported> {
   const context = await resolveForgeContext({
     cwd,
+    remoteUrl,
     run: boundaries.run ?? runBoundedProcess,
     fetch: boundaries.fetch ?? fetch,
   })
@@ -171,10 +176,10 @@ export async function createForgeRepository(
 
 /** A pull request by reference, from the forge a checkout's remote names, with its remote. */
 export async function resolvePullRequest(
-  input: { cwd: string; number: number },
+  input: { cwd: string; number: number; remoteUrl?: string },
   boundaries: Boundaries = {},
 ) {
-  const supported = await supportedContext(input.cwd, boundaries)
+  const supported = await supportedContext(input.cwd, boundaries, input.remoteUrl)
   if (!supported.context)
     throw gitPullRequestErrors.FORGE_NOT_READY({
       forge: supported.forge?.name ?? 'This repository',
@@ -188,5 +193,10 @@ export async function resolvePullRequest(
     supported.context,
     input.number,
   )
-  return { detail, forge: supported.forge, remoteName: supported.context.remoteName }
+  return {
+    detail,
+    forge: supported.forge,
+    remoteName: supported.context.remoteName,
+    remoteUrl: supported.context.remoteUrl,
+  }
 }

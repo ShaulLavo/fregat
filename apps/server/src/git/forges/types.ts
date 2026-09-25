@@ -66,5 +66,6 @@ type PullRequestDetail = GitPullRequest & {
   /** From a fork: its branch is not on this repository's remote. */
   readonly crossRepository: boolean
   /** The ref on this repository's remote that holds the head commit. */
+  readonly headSource?: { readonly url: string; readonly commit: string }
   readonly headFetchRef: string
 }

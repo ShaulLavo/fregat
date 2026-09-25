@@ -899,21 +899,35 @@ export class GitService {
   }
 
   /** A pull request by number from the forge this checkout's remote names. */
-  async resolvePullRequest(path: string, number: number) {
+  async resolvePullRequest(path: string, number: number, remoteUrl?: string) {
     const repository = await this.requiredRepositoryLocation(path)
-    return resolvePullRequest({ cwd: repository.rootAbsolutePath, number }, this.forgeBoundaries)
+    return resolvePullRequest(
+      { cwd: repository.rootAbsolutePath, number, remoteUrl },
+      this.forgeBoundaries,
+    )
   }
 
   /** Fetches a pull request's head into a local branch, replacing an earlier fetch of it. */
-  async fetchPullRequestHead(input: { path: string; remote: string; ref: string; branch: string }) {
+  async fetchPullRequestHead(input: {
+    path: string
+    remote: string
+    ref: string
+    branch: string
+    expectedCommit?: string
+  }) {
     recordGitServiceOperation('fetch_pull_request_head', input.path)
     const repository = await this.requiredRepositoryLocation(input.path)
-    await this.git(repository.rootAbsolutePath, [
-      'fetch',
-      '--',
-      input.remote,
-      `+${input.ref}:refs/heads/${input.branch}`,
-    ])
+    const root = repository.rootAbsolutePath
+    await withGitRepositoryLane(await this.commonDirectory(root), async () => {
+      await this.git(root, ['fetch', '--', input.remote, input.ref])
+      const head = await this.git(root, ['rev-parse', 'FETCH_HEAD^{commit}'])
+      if (input.expectedCommit && head.stdout.trim() !== input.expectedCommit) {
+        throw gitPullRequestErrors.PULL_REQUEST_HEAD_CHANGED({
+          internal: { expectedCommit: input.expectedCommit, actualCommit: head.stdout.trim() },
+        })
+      }
+      await this.git(root, ['branch', '-f', '--', input.branch, head.stdout.trim()])
+    })
   }
 
   /** Makes the checked-out branch track `remote/branch`, so its pushes and pull request follow it. */

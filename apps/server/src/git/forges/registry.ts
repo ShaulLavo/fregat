@@ -35,9 +35,11 @@ export function forgeProvider(kind: GitForgeKind) {
  */
 export async function resolveForgeContext(input: {
   cwd: string
+  remoteUrl?: string
   run: RunProcess
   fetch: typeof fetch
 }): Promise<ForgeContext | null> {
+  if (input.remoteUrl) return selectContext(input)
   const cached = contexts.get(input.cwd)
   if (cached && Date.now() - cached.at < CONTEXT_CACHE_TTL_MS) return cached.context
   const context = await selectContext(input)
@@ -45,8 +47,13 @@ export async function resolveForgeContext(input: {
   return context
 }
 
-async function selectContext(input: { cwd: string; run: RunProcess; fetch: typeof fetch }) {
-  const remotes = await listRemotes(input)
+async function selectContext(input: {
+  cwd: string
+  remoteUrl?: string
+  run: RunProcess
+  fetch: typeof fetch
+}) {
+  const remotes = input.remoteUrl ? [{ name: '', url: input.remoteUrl }] : await listRemotes(input)
   const candidates = remotes.map((remote) => ({ ...remote, forge: detectForge(remote.url) }))
   const chosen =
     candidates.find((remote) => remote.name === 'origin') ??

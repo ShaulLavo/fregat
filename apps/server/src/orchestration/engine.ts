@@ -854,6 +854,14 @@ export class OrchestrationEngine {
     const git = this.registration.git
     this.pullRequestSync = new PullRequestSyncReactor({
       lookup: options.pullRequestLookup,
+      lookupIdentity: async (worktree, identity) => {
+        const { detail } = await git.resolvePullRequest(
+          worktree.canonicalPath,
+          identity.number,
+          identity.remoteUrl,
+        )
+        return { status: 'found', ...detail, closedAt: detail.closedAt ?? null, identity }
+      },
       headName: async (worktree) =>
         (await git.upstreamBranch(worktree.canonicalPath, worktree.branch ?? ''))?.branch ??
         worktree.branch ??
@@ -1225,11 +1233,12 @@ export class OrchestrationEngine {
       throw worktreeRuntimeErrors.UNAVAILABLE({ internal: { at: 'pull-request-session' } })
     const git = this.registration.git
     const base = requireReadyWorktree(this.readModel, input.worktreeId)
-    const { detail, remoteName } = await git.resolvePullRequest(base.path, number)
+    const { detail, remoteName, remoteUrl } = await git.resolvePullRequest(base.path, number)
     const branch = `pr/${number}`
     await git.fetchPullRequestHead({
       path: base.path,
-      remote: remoteName,
+      remote: detail.headSource?.url ?? remoteName,
+      expectedCommit: detail.headSource?.commit,
       ref: detail.headFetchRef,
       branch,
     })
@@ -1251,6 +1260,18 @@ export class OrchestrationEngine {
         branch: detail.headRefName,
       })
     await this.worktreeReactor?.refresh(worktree.id)
+    await this.enqueue({
+      type: 'worktree.pull-request.sync',
+      commandId: v.parse(commandIdSchema, `pr-association-${crypto.randomUUID()}`),
+      worktreeId: worktree.id,
+      branch: worktree.branch ?? '',
+      pullRequest: {
+        status: 'found',
+        ...detail,
+        closedAt: detail.closedAt ?? null,
+        identity: { remoteUrl, number },
+      },
+    })
     this.pullRequestSync?.schedule()
     return { sessionId, worktreeId, pullRequest: detail }
   }

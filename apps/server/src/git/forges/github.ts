@@ -69,6 +69,8 @@ export const github: ForgeProvider = {
         'pr',
         'view',
         String(number),
+        '--repo',
+        context.remoteUrl,
         '--json',
         `${PR_FIELDS},headRefName,baseRefName,isCrossRepository`,
       ]),

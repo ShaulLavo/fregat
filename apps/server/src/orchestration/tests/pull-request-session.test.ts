@@ -7,6 +7,7 @@ import { afterEach, expect, test } from 'vitest'
 import { closeTestApps } from '../../../test/server'
 import { executeGit, FIXTURE_MODEL } from '../../../test/factories/orchestration'
 import { worktreeLifecycleFixture } from '../../../test/factories/worktree-lifecycle'
+import type { ForgeBoundaries } from '../../git/pull-request'
 import type { RunProcess } from '../../git/forges/types'
 import type { BranchPullRequestLookup } from '../pull-request-sync-reactor'
 
@@ -22,7 +23,7 @@ const REMOTE = 'https://github.com/acme/app.git'
 const MODEL = v.parse(modelSelectionSchema, FIXTURE_MODEL)
 
 /** Signed-in `gh` that knows one pull request: #7 from `feature/pr`, same repository or a fork. */
-function github(crossRepository = false): RunProcess {
+function github(crossRepository = false, state: () => string = () => 'OPEN'): RunProcess {
   return async ({ argv }) => {
     if (argv[0] === 'git') return { exitCode: 0, stderr: '', stdout: `origin\t${REMOTE} (fetch)\n` }
     if (argv[1] === 'auth') return { exitCode: 0, stderr: '', stdout: '' }
@@ -34,7 +35,7 @@ function github(crossRepository = false): RunProcess {
           number: 7,
           title: 'Add greeting',
           url: 'https://github.com/acme/app/pull/7',
-          state: 'OPEN',
+          state: state(),
           isDraft: false,
           closedAt: null,
           headRefName: 'feature/pr',
@@ -48,10 +49,17 @@ function github(crossRepository = false): RunProcess {
 
 /** The fixture's origin is a GitHub address that git rewrites to a local bare repository holding the pull request. */
 async function withPullRequest(
-  options: { crossRepository?: boolean; lookup?: BranchPullRequestLookup } = {},
+  options: {
+    crossRepository?: boolean
+    lookup?: BranchPullRequestLookup
+    remote?: string
+    boundaries?: ForgeBoundaries
+    state?: () => string
+  } = {},
 ) {
+  const remote = options.remote ?? REMOTE
   const fixture = await worktreeLifecycleFixture({
-    forgeBoundaries: { run: github(options.crossRepository) },
+    forgeBoundaries: options.boundaries ?? { run: github(options.crossRepository, options.state) },
     ...(options.lookup ? { pullRequestLookup: options.lookup } : {}),
   })
   fixtures.push(fixture)
@@ -59,8 +67,8 @@ async function withPullRequest(
   scratch.push(base)
   const bare = path.join(base, 'app.git')
   await executeGit(base, 'init', '--bare', '-b', 'main', bare)
-  await executeGit(fixture.root, 'remote', 'add', 'origin', REMOTE)
-  await executeGit(fixture.root, 'config', `url.${bare}.insteadOf`, REMOTE)
+  await executeGit(fixture.root, 'remote', 'add', 'origin', remote)
+  await executeGit(fixture.root, 'config', `url.${bare}.insteadOf`, remote)
   await executeGit(fixture.root, 'push', '-q', 'origin', 'main')
   await executeGit(fixture.root, 'checkout', '-q', '-b', 'feature/pr')
   await writeFile(path.join(fixture.root, 'greeting.txt'), 'hello from the pull request\n')
@@ -109,11 +117,21 @@ test('a pull request URL opens a session in its own worktree at the head, tracki
   expect(await executeGit(bare, 'show', 'feature/pr:greeting.txt')).toBe('reviewed')
 
   await fixture.engine.syncPullRequests()
-  expect(asked).toContain('feature/pr')
+  expect(
+    (await fixture.engine.readModelSnapshot()).worktrees.get(started.worktreeId)?.pullRequest,
+  ).toMatchObject({ status: 'found', number: 7 })
 })
 
 test('a fork pull request starts at its head without tracking a branch this remote lacks', async () => {
-  const { fixture } = await withPullRequest({ crossRepository: true })
+  let state = 'OPEN'
+  const { fixture } = await withPullRequest({
+    crossRepository: true,
+    state: () => state,
+    lookup: async ({ branches }) => ({
+      kind: 'ready',
+      pullRequests: new Map(branches.map((branch) => [branch, null])),
+    }),
+  })
   const started = await fixture.engine.startPullRequestSession({
     worktreeId: fixture.registration.worktreeId,
     reference: '#7',
@@ -126,6 +144,12 @@ test('a fork pull request starts at its head without tracking a branch this remo
     'hello from the pull request\n',
   )
   await expect(executeGit(checkout, 'rev-parse', '--abbrev-ref', '@{u}')).rejects.toThrow()
+  state = 'MERGED'
+  await fixture.restart()
+  await fixture.engine.syncPullRequests()
+  expect(
+    (await fixture.engine.readModelSnapshot()).worktrees.get(started.worktreeId)?.pullRequest,
+  ).toMatchObject({ status: 'found', number: 7, state: 'merged' })
 })
 
 test('a reference that names no pull request starts nothing', async () => {
@@ -161,3 +185,66 @@ test('push and open reports a pushed branch and a refused pull request as two ou
   expect(result.push.ok).toBe(true)
   expect(result.pullRequest?.kind).toBe('failed')
 })
+
+test.for([false, true])(
+  'Bitbucket fetches and verifies fork heads, changed commit: %s',
+  async (changed) => {
+    const remote = 'https://bitbucket.org/acme/app.git'
+    let commit = ''
+    const { fixture, bare } = await withPullRequest({
+      remote,
+      boundaries: {
+        run: async ({ argv }) => ({
+          exitCode: 0,
+          stderr: '',
+          stdout: argv.includes('remote')
+            ? `origin\t${remote} (fetch)\n`
+            : 'username=test\npassword=token\n',
+        }),
+        fetch: (async (_input: string | URL | Request, _init?: RequestInit) =>
+          Response.json({
+            id: 7,
+            title: 'Fork',
+            state: 'OPEN',
+            links: { html: { href: 'https://bitbucket.org/acme/app/pull-requests/7' } },
+            source: {
+              branch: { name: 'feature/pr' },
+              commit: { hash: commit },
+              repository: { full_name: 'contributor/app' },
+            },
+            destination: { branch: { name: 'main' }, repository: { full_name: 'acme/app' } },
+          })) as typeof fetch,
+      },
+    })
+    const fork = path.join(path.dirname(bare), 'fork')
+    await executeGit(path.dirname(bare), 'clone', bare, fork)
+    await executeGit(fork, 'config', 'user.name', 'Fork')
+    await executeGit(fork, 'config', 'user.email', 'fork@example.invalid')
+    await executeGit(fork, 'checkout', 'feature/pr')
+    await writeFile(path.join(fork, 'greeting.txt'), 'fork head\n')
+    await executeGit(fork, 'commit', '-am', 'fork head')
+    commit = changed ? '0'.repeat(40) : await executeGit(fork, 'rev-parse', 'HEAD')
+    await executeGit(
+      fixture.root,
+      'config',
+      `url.${fork}.insteadOf`,
+      'https://bitbucket.org/contributor/app.git',
+    )
+    const starting = fixture.engine.startPullRequestSession({
+      worktreeId: fixture.registration.worktreeId,
+      reference: '#7',
+      modelSelection: MODEL,
+    })
+    if (changed) {
+      await expect(starting).rejects.toMatchObject({ code: 'git.PULL_REQUEST_HEAD_CHANGED' })
+      expect((await fixture.engine.readModelSnapshot()).sessions.size).toBe(0)
+      return
+    }
+    const started = await starting
+    const checkout =
+      (await fixture.engine.readModelSnapshot()).worktrees.get(started.worktreeId)?.canonicalPath ??
+      ''
+    expect(await executeGit(checkout, 'rev-parse', 'HEAD')).toBe(commit)
+    expect(await readFile(path.join(checkout, 'greeting.txt'), 'utf8')).toBe('fork head\n')
+  },
+)

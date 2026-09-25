@@ -18,6 +18,10 @@ export type BranchPullRequestLookup = (input: {
 }) => Promise<BranchPullRequests>
 
 type Options = {
+  lookupIdentity?: (
+    worktree: OrchestrationProjectedWorktree,
+    identity: { remoteUrl: string; number: number },
+  ) => Promise<WorktreePullRequest>
   lookup: BranchPullRequestLookup
   dispatch: (command: OrchestrationCommand) => Promise<unknown>
   getReadModel: () => OrchestrationReadModel
@@ -141,6 +145,13 @@ export class PullRequestSyncReactor {
   private async syncProject(projectId: string, candidates: readonly Candidate[]) {
     const first = candidates[0]
     if (!first) return { changed: 0, failed: false }
+    const pinned = candidates.filter(
+      ({ worktree }) => worktree.pullRequest?.status === 'found' && worktree.pullRequest.identity,
+    )
+    let pinnedChanged = 0
+    for (const candidate of pinned) pinnedChanged += await this.syncIdentity(projectId, candidate)
+    candidates = candidates.filter((candidate) => !pinned.includes(candidate))
+    if (candidates.length === 0) return { changed: pinnedChanged, failed: false }
     const heads = await Promise.all(candidates.map((candidate) => this.headOf(candidate)))
     let answer: BranchPullRequests
     try {
@@ -159,7 +170,19 @@ export class PullRequestSyncReactor {
     const changed = await this.apply(candidates, (branch) =>
       pullRequestFor(answer, byBranch.get(branch) ?? branch),
     )
-    return { changed, failed: false }
+    return { changed: changed + pinnedChanged, failed: false }
+  }
+
+  private async syncIdentity(projectId: string, candidate: Candidate) {
+    const known = candidate.worktree.pullRequest
+    if (known?.status !== 'found' || !known.identity || !this.options.lookupIdentity) return 0
+    try {
+      const answer = await this.options.lookupIdentity(candidate.worktree, known.identity)
+      return await this.apply([candidate], () => answer)
+    } catch (error) {
+      this.recordFailure(projectId, error)
+      return 0
+    }
   }
 
   private recordFailure(projectId: string, error: unknown) {
@@ -181,6 +204,8 @@ export class PullRequestSyncReactor {
   ) {
     let changed = 0
     for (const { worktree, branch } of candidates) {
+      const current = this.options.getReadModel().worktrees.get(worktree.id)
+      if (!jsonEqual(current?.pullRequest, worktree.pullRequest)) continue
       const pullRequest = answer(branch)
       this.lastSyncedAt.set(worktree.id, this.now())
       if (jsonEqual(worktree.pullRequest, pullRequest)) continue

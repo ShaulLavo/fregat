@@ -56,7 +56,15 @@ export const gitlab: ForgeProvider = {
   async getPullRequest(context, number) {
     const result = requireSuccess(
       context,
-      await glab(context, ['mr', 'view', String(number), '--output', 'json']),
+      await glab(context, [
+        'mr',
+        'view',
+        String(number),
+        '--repo',
+        context.remoteUrl,
+        '--output',
+        'json',
+      ]),
       'mr-view',
     )
     const detail = parseForgeJson(

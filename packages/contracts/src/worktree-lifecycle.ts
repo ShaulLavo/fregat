@@ -110,6 +110,9 @@ export const worktreePullRequestSchema = v.variant('status', [
   }),
   v.object({
     status: v.literal('found'),
+    identity: v.optional(
+      v.object({ remoteUrl: text, number: v.pipe(v.number(), v.integer(), v.minValue(1)) }),
+    ),
     number: v.pipe(v.number(), v.integer(), v.minValue(1)),
     title: v.string(),
     url: text,

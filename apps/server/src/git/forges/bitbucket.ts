@@ -64,7 +64,14 @@ export const bitbucket: ForgeProvider = {
     })
     const detail = parseForgeJson(
       context,
-      v.object({ ...pullRequestSchema.entries, source: side, destination: side }),
+      v.object({
+        ...pullRequestSchema.entries,
+        source: v.object({
+          ...side.entries,
+          commit: v.object({ hash: v.pipe(v.string(), v.regex(/^[a-f0-9]{40,64}$/)) }),
+        }),
+        destination: side,
+      }),
       await response.text(),
       'pullrequest',
     )
@@ -75,6 +82,10 @@ export const bitbucket: ForgeProvider = {
       crossRepository:
         detail.source.repository.full_name !== detail.destination.repository.full_name,
       headFetchRef: `refs/heads/${detail.source.branch.name}`,
+      headSource: {
+        url: `https://bitbucket.org/${detail.source.repository.full_name}.git`,
+        commit: detail.source.commit.hash,
+      },
     }
   },
   async createRepository(context, visibility) {

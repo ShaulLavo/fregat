@@ -1,6 +1,12 @@
 import { defineErrorCatalog } from 'evlog'
 
 export const gitPullRequestErrors = defineErrorCatalog('git', {
+  PULL_REQUEST_HEAD_CHANGED: {
+    status: 409,
+    message: 'The pull request head changed',
+    why: 'The fetched commit differs from the commit reported by the forge.',
+    fix: 'Refresh the pull request and open it again.',
+  },
   PULL_REQUEST_LOOKUP_FAILED: {
     status: 502,
     message: ({ forge }: { forge: string }) => `${forge} could not list pull requests`,
