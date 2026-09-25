@@ -246,7 +246,8 @@ describe('ClaudeProviderAdapter', () => {
     const fork = await harness.adapter.prepareFork({
       cwd: input.cwd,
       sessionId: input.sessionId,
-      keptPrompts: 2,
+      providerTurnId: 'user-1',
+      conversationId: input.sessionId,
     })
     prompts = 3
     try {

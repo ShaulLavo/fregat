@@ -1,5 +1,4 @@
 import { createInternalError } from '../../observability/structured-errors'
-import { sessionIdentityErrors } from '../structured-errors'
 
 import { existsSync, readFileSync } from 'node:fs'
 
@@ -22,7 +21,7 @@ import type {
   ProviderCommandCatalogResult,
   ProviderRuntimeEvent,
   ProviderRuntimeStartInput,
-  ProviderSessionHistoryInput,
+  ProviderForkInput,
   ProviderTurnInput,
 } from '../types'
 import { sessionInputFromTurn } from './utils/session-input'
@@ -195,22 +194,10 @@ export class MockProviderAdapter implements ProviderAdapter {
     return this.events.subscribe(subscriber)
   }
 
-  async prepareFork(
-    input: ProviderSessionHistoryInput & { keptPrompts: number; providerResumeCursor?: unknown },
-  ) {
-    const kept = this.startedTurns.filter((turn) => turn.sessionId === input.sessionId)[
-      input.keptPrompts - 1
-    ]
-    if (!kept)
-      throw sessionIdentityErrors.FORK_POINT_UNAVAILABLE({
-        internal: { sessionId: input.sessionId, keptPrompts: input.keptPrompts },
-      })
+  async prepareFork(input: ProviderForkInput) {
     return {
-      conversationId:
-        typeof input.providerResumeCursor === 'string'
-          ? input.providerResumeCursor
-          : input.sessionId,
-      boundaryId: kept.turnId,
+      conversationId: input.conversationId,
+      boundaryId: input.providerTurnId,
     }
   }
 
@@ -299,6 +286,7 @@ export class MockProviderAdapter implements ProviderAdapter {
     this.events.publish({
       createdAt: new Date().toISOString(),
       eventId: `mock-turn-started:${input.turnId}`,
+      providerRefs: { providerTurnId: input.turnId },
       payload: { model: input.modelSelection.model },
       provider: this.driverKind,
       providerInstanceId: input.providerInstanceId,

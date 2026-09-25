@@ -680,9 +680,12 @@ export class OrchestrationProjectionPipeline {
           text: message.text,
           createdAt: message.createdAt,
           updatedAt: message.createdAt,
-          attachmentsJson: '[]',
+          attachmentsJson: JSON.stringify(message.attachments),
           streaming: false,
-          turnId: null,
+          turnId: message.turnId,
+          modelSelectionJson: message.modelSelection
+            ? JSON.stringify(message.modelSelection)
+            : null,
         })
         .run()
     }

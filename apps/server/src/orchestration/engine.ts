@@ -1,4 +1,5 @@
 import { commandUploadClaim } from './command-attachments'
+import { copyForkAttachments, discardUnclaimedForkAttachments } from '../attachments/fork'
 import { withAttachmentLanes } from '../attachments/lanes'
 import { createAttachmentOwnership, type AttachmentOwnership } from '../attachments/ownership'
 import { sessionTitleMessages } from './title-messages'
@@ -249,8 +250,17 @@ export class OrchestrationEngine {
       this.attachmentsDir,
       this.attachmentOwnership,
     )
-    const result = await this.enqueue(ingested.command, ingested.attachmentIngest, fingerprint)
-    return result
+    try {
+      return await this.enqueue(ingested.command, ingested.attachmentIngest, fingerprint)
+    } catch (error) {
+      if (prepared.type === 'session.fork')
+        await discardUnclaimedForkAttachments(
+          this.attachmentsDir,
+          prepared.attachmentCopies,
+          this.attachmentOwnership,
+        )
+      throw error
+    }
   }
 
   private async prepare(
@@ -283,20 +293,36 @@ export class OrchestrationEngine {
     const model = this.commandReadModel(command)
     const source = requireSession(model, command.sourceSessionId)
     const worktree = requireWorktree(model, source.worktreeId)
-    const keptPrompts = forkMessages(source, command.throughTurnId).filter(
-      (message) => message.role === 'user',
-    ).length
-    if (!this.providerService)
+    const messages = forkMessages(source, command.throughTurnId)
+    const providerTurnId = this.forkProviderTurn(source.id, command.throughTurnId)
+    if (!this.providerService || !providerTurnId)
       throw sessionIdentityErrors.FORK_POINT_UNAVAILABLE({
-        internal: { sessionId: source.id, keptPrompts },
+        internal: { sessionId: source.id, turnId: command.throughTurnId },
       })
     const native = await this.providerService.prepareFork({
       cwd: worktree.canonicalPath,
-      keptPrompts,
+      providerTurnId,
+      conversationId: source.forkedFrom?.native.conversationId,
       providerInstanceId: source.modelSelection.providerInstanceId,
       sessionId: source.id,
     })
-    return { ...command, native }
+    const attachmentCopies = await copyForkAttachments(
+      this.attachmentsDir,
+      command.commandId,
+      messages,
+    )
+    return { ...command, native, attachmentCopies }
+  }
+
+  private forkProviderTurn(sessionId: SessionId, turnId: string): string | null {
+    let source = this.readModel.sessions.get(sessionId)
+    while (source) {
+      const native = this.eventStore.providerTurnId(source.id, turnId)
+      if (native) return native
+      if (!source.forkedFrom) return null
+      source = this.readModel.sessions.get(source.forkedFrom.sessionId)
+    }
+    return null
   }
 
   async dispatch(command: OrchestrationCommand, attachmentIngest?: CommandAttachmentIngest) {
@@ -329,7 +355,9 @@ export class OrchestrationEngine {
       this.attachmentsDir,
       claim.attachments.map((attachment) => attachment.id),
       async () => {
-        for (const attachment of claim.attachments)
+        for (const attachment of claim.attachments.filter((entry) =>
+          entry.id.startsWith('upload-'),
+        ))
           await validateAttachmentUpload(
             this.attachmentsDir,
             attachment,

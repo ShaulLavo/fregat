@@ -21,6 +21,7 @@ import {
 } from './chat-ids'
 import {
   chatAttachmentUploadsSchema,
+  chatAttachmentSchema,
   userInputAttachmentUploadsSchema,
   importedSessionMessageSchema,
   isoDateTimeSchema,
@@ -340,6 +341,7 @@ export const sessionForkCommandSchema = v.object({
 const preparedSessionForkCommandSchema = v.object({
   ...sessionForkCommandSchema.entries,
   native: sessionForkSourceSchema.entries.native,
+  attachmentCopies: v.optional(v.record(v.string(), chatAttachmentSchema), {}),
 })
 
 export const clientOrchestrationCommandSchema = v.variant('type', [
@@ -379,6 +381,7 @@ export const sessionRuntimeSetCommandSchema = v.object({
   type: v.literal('session.runtime.set'),
   sessionId: sessionIdSchema,
   runtime: sessionRuntimeStateSchema,
+  providerTurnId: v.optional(trimmedNonEmptyStringSchema),
   createdAt: isoDateTimeSchema,
 })
 

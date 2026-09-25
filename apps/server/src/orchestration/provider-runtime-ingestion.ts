@@ -203,6 +203,9 @@ export class ProviderRuntimeIngestion {
         commandId: providerCommandId(event.eventId, 'session-set'),
         createdAt: session.updatedAt,
         runtime: this.sessionForCurrentReadModel(event, session),
+        ...(event.type === 'turn.started' && event.providerRefs?.providerTurnId
+          ? { providerTurnId: event.providerRefs.providerTurnId }
+          : {}),
         sessionId: event.sessionId,
         type: 'session.runtime.set',
       },

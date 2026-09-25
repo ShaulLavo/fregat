@@ -906,7 +906,8 @@ export class ProviderService {
   async prepareFork(
     input: ProviderSessionHistoryInput & {
       providerInstanceId: ProviderInstanceId
-      keptPrompts: number
+      providerTurnId: string
+      conversationId?: string
     },
   ) {
     const adapter = this.adapterRegistry.getByInstance(input.providerInstanceId)
@@ -917,7 +918,13 @@ export class ProviderService {
     const binding = this.sessionDirectory.getBinding(input.sessionId)
     return boundedProviderOperation(
       adapter,
-      adapter.prepareFork({ ...input, providerResumeCursor: binding?.providerResumeCursor }),
+      adapter.prepareFork({
+        ...input,
+        conversationId:
+          typeof binding?.providerResumeCursor === 'string'
+            ? binding.providerResumeCursor
+            : (input.conversationId ?? input.sessionId),
+      }),
     )
   }
 

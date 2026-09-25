@@ -28,9 +28,13 @@ test('identical complete submissions reuse their command key', () => {
 })
 
 test('changing the custom agent gets a fresh command', () => {
-  expect(draftSubmissionKey({ ...input, agent: 'reviewer' })).not.toBe(draftSubmissionKey(input))
-  expect(draftSubmissionKey({ ...input, agent: 'reviewer' })).not.toBe(
-    draftSubmissionKey({ ...input, agent: 'builder' }),
+  const agent = {
+    name: 'reviewer',
+    providerInstanceId: input.payload.modelSelection.providerInstanceId,
+  }
+  expect(draftSubmissionKey({ ...input, agent })).not.toBe(draftSubmissionKey(input))
+  expect(draftSubmissionKey({ ...input, agent })).not.toBe(
+    draftSubmissionKey({ ...input, agent: { ...agent, name: 'builder' } }),
   )
 })
 

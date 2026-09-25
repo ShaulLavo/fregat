@@ -47,6 +47,7 @@ import type {
   ProviderUserInputResponseInput,
   ProviderSessionDiscoveryInput,
   ProviderSessionHistoryInput,
+  ProviderForkInput,
 } from '../types'
 import { isNotInstalledError, requestGone, sessionIdentityErrors } from '../structured-errors'
 import { RuntimeAdapter } from './state/runtime-adapter'
@@ -73,7 +74,7 @@ import {
   type CodexSkillMetadata,
 } from './codex-protocol'
 import { errorMessage as providerErrorMessage } from '@workspace/contracts'
-import { codexTurnAtIndex, prepareCodexRewind } from './utils/codex-rewind'
+import { prepareCodexRewind } from './utils/codex-rewind'
 import { activeProviderTurn, type ActiveProviderTurn } from './utils/active-turn'
 import { codexDeveloperInstructions } from './utils/codex-instructions'
 import { modelOptionValue, type ModelOptions } from './utils/model-options'
@@ -263,25 +264,8 @@ export class CodexProviderAdapter
     })
   }
 
-  prepareFork(
-    input: ProviderSessionHistoryInput & { keptPrompts: number; providerResumeCursor?: unknown },
-  ): Promise<ProviderForkStart> {
-    const conversationId =
-      typeof input.providerResumeCursor === 'string' ? input.providerResumeCursor : input.sessionId
-    return inspectCodexHistory(this.env, async (client) => {
-      const boundaryId = await codexTurnAtIndex({
-        index: input.keptPrompts - 1,
-        sortDirection: 'asc',
-        threadId: conversationId,
-        request: (method, params) =>
-          client.requestRaw(method, params, REQUEST_TIMEOUT_MS, (response) => response),
-      })
-      if (!boundaryId)
-        throw sessionIdentityErrors.FORK_POINT_UNAVAILABLE({
-          internal: { sessionId: input.sessionId, keptPrompts: input.keptPrompts },
-        })
-      return { boundaryId, conversationId }
-    })
+  async prepareFork(input: ProviderForkInput): Promise<ProviderForkStart> {
+    return { boundaryId: input.providerTurnId, conversationId: input.conversationId }
   }
 
   /** Reads the rollout file itself: token counts never reach `thread/read`. */

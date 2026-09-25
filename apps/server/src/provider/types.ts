@@ -530,6 +530,11 @@ export type ProviderSessionHistoryInput = {
   cwd: string
 }
 
+export type ProviderForkInput = ProviderSessionHistoryInput & {
+  conversationId: string
+  providerTurnId: string
+}
+
 export type ProviderHistoryMessage = {
   sourceId: string
   role: 'user' | 'assistant'
@@ -576,9 +581,7 @@ export type ProviderAdapter = {
   forgetExecutable?: () => void
   readSessionHistory?: (input: ProviderSessionHistoryInput) => Promise<ProviderHistoryMessage[]>
   readSessionUsage?: (input: ProviderSessionHistoryInput) => Promise<ProviderImportedUsage[]>
-  prepareFork?: (
-    input: ProviderSessionHistoryInput & { keptPrompts: number; providerResumeCursor?: unknown },
-  ) => Promise<ProviderForkStart>
+  prepareFork?: (input: ProviderForkInput) => Promise<ProviderForkStart>
   /**
    * One full read of the account's plan windows, outside any turn. Throws when the
    * provider could not answer; the usage store keeps what it had.

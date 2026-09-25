@@ -2671,8 +2671,8 @@ describe('CodexProviderAdapter', () => {
             const captured = await adapter.prepareFork({
               cwd: input.cwd,
               sessionId: input.sessionId,
-              providerResumeCursor: 'source-thread',
-              keptPrompts: 2,
+              conversationId: 'source-thread',
+              providerTurnId: 'source-turn-2',
             })
             const runtime = await adapter.startRuntime({
               ...providerTurnInput(),

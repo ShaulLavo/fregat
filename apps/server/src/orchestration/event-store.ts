@@ -99,6 +99,26 @@ export class OrchestrationEventStore {
     )
   }
 
+  providerTurnId(sessionId: string, turnId: string): string | null {
+    const row = this.database
+      .select({
+        providerTurnId: sql<string>`json_extract(${orchestrationEvents.metadataJson}, '$.providerTurnId')`,
+      })
+      .from(orchestrationEvents)
+      .where(
+        and(
+          eq(orchestrationEvents.aggregateId, sessionId),
+          eq(orchestrationEvents.eventType, 'session.runtime-set'),
+          sql`json_extract(${orchestrationEvents.payloadJson}, '$.runtime.activeTurnId') = ${turnId}`,
+          sql`json_extract(${orchestrationEvents.metadataJson}, '$.providerTurnId') IS NOT NULL`,
+        ),
+      )
+      .orderBy(desc(orchestrationEvents.sequence))
+      .limit(1)
+      .get()
+    return row?.providerTurnId ?? null
+  }
+
   historyImportState(sessionId: string) {
     const row = this.database
       .select({

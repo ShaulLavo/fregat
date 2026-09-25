@@ -215,6 +215,12 @@ export const providerAgentSchema = v.object({
   model: v.nullable(v.string()),
 })
 
+export const providerAgentSelectionSchema = v.object({
+  name: trimmedNonEmptyStringSchema,
+  providerInstanceId: providerInstanceIdSchema,
+})
+export type ProviderAgentSelection = v.InferOutput<typeof providerAgentSelectionSchema>
+
 export const providerCommandCatalogSchema = v.object({
   providerInstanceId: providerInstanceIdSchema,
   commands: v.array(providerSlashCommandSchema),

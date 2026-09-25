@@ -5,6 +5,7 @@ import {
   DEFAULT_PROVIDER_INSTANCE_ID,
   DEFAULT_RUNTIME_MODE,
   projectMetaUpdateCommandSchema,
+  providerInstanceIdSchema,
   sessionIdSchema,
   type ModelSelection,
 } from '@workspace/contracts'
@@ -29,6 +30,22 @@ const testModelSelection: ModelSelection = {
 }
 
 describe('chat command builders', () => {
+  it('sends a custom agent only to models on the provider instance that owns it', () => {
+    const owner = v.parse(providerInstanceIdSchema, 'claude-work')
+    const other = v.parse(providerInstanceIdSchema, 'claude-personal')
+    const agents = [owner, owner, other, DEFAULT_PROVIDER_INSTANCE_ID].map(
+      (providerInstanceId, index) =>
+        createDraftSessionSubmission({
+          agent: { name: 'reviewer', providerInstanceId: owner },
+          createdAt: '2026-09-25T12:00:00.000Z',
+          modelSelection: { model: `model-${index}`, providerInstanceId },
+          worktreeTarget: { kind: 'current', worktreeId: TEST_WORKTREE_ID },
+          text: 'Review this change',
+        }).command.bootstrap?.createSession?.agent,
+    )
+    expect(agents).toEqual(['reviewer', 'reviewer', undefined, undefined])
+  })
+
   it('registers a checkout without inventing authoritative identifiers', () => {
     const rootPath = '/Users/test/workspace/platform'
     const command = createWorkspaceProjectCommand({ rootPath })

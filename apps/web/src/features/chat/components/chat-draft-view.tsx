@@ -104,14 +104,19 @@ export function ChatDraftView({
     if (identity)
       useChatInputDraftStore.getState().setIdentity(draftTarget, { ...identity, worktreeTarget })
   }
-  function chooseAgent(agent: string | null) {
-    if (identity) useChatInputDraftStore.getState().setIdentity(draftTarget, { ...identity, agent })
-  }
   const providersQuery = useQuery(providerListQueryOptions())
   const modelSelection = resolveChatModelSelection(
     providersQuery.data?.providers,
     project?.defaultModelSelection ?? null,
   )
+  const selectedProvider = (draft.modelSelection ?? modelSelection)?.providerInstanceId ?? null
+  const selectedAgent =
+    identity?.agent?.providerInstanceId === selectedProvider ? identity.agent : null
+  function chooseAgent(name: string | null) {
+    if (!identity || !selectedProvider) return
+    const agent = name ? { name, providerInstanceId: selectedProvider } : null
+    useChatInputDraftStore.getState().setIdentity(draftTarget, { ...identity, agent })
+  }
   const handleStop = useCallback(() => undefined, [])
   const handlePersistModelSelection = (next: ModelSelection) => {
     if (!project) return
@@ -291,9 +296,9 @@ export function ChatDraftView({
           footer={
             project && worktree && target ? (
               <DraftContextStrip
-                agent={identity?.agent ?? null}
+                agent={selectedAgent?.name ?? null}
                 base={worktree}
-                providerInstanceId={modelSelection?.providerInstanceId ?? null}
+                providerInstanceId={selectedProvider}
                 onAgent={chooseAgent}
                 draftTarget={draftTarget}
                 machines={machines}

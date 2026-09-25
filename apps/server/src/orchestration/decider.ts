@@ -1,4 +1,4 @@
-import { forkMessages } from './utils/fork-messages'
+import { forkAttachment, forkMessages } from './utils/fork-messages'
 import { questionAnswerHistory } from './question-answer-history'
 import { approvalResponseEvents, endedApprovalEvents } from './approval-admission'
 import { decideSessionTitle, titleMetadata } from './title-decider'
@@ -506,6 +506,11 @@ function sessionForked(
                 id: v.parse(messageIdSchema, `fork:${command.sessionId}:${index}`),
                 role: message.role,
                 text: message.text,
+                turnId: message.turnId,
+                modelSelection: message.modelSelection,
+                attachments: message.attachments.map((attachment) =>
+                  forkAttachment(attachment, command.attachmentCopies),
+                ),
               },
             ],
       ),
@@ -787,10 +792,16 @@ function sessionSet(
   at: string,
 ) {
   const session = requireSessionNotDeleted(model, command.sessionId)
-  const sessionSetEvent = event(command, at, 'session.runtime-set', {
-    runtime: command.runtime,
-    sessionId: command.sessionId,
-  })
+  const sessionSetEvent = event(
+    command,
+    at,
+    'session.runtime-set',
+    {
+      runtime: command.runtime,
+      sessionId: command.sessionId,
+    },
+    { metadata: command.providerTurnId ? { providerTurnId: command.providerTurnId } : {} },
+  )
   const status = command.runtime.status
   const wakes = status === 'starting' || status === 'running'
   if (!wakes) return [sessionSetEvent]

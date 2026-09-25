@@ -1,4 +1,4 @@
-import type { ProviderHistoryMessage, ProviderSessionHistoryInput } from '../../types'
+import type { ProviderHistoryMessage, ProviderForkInput } from '../../types'
 import { sessionIdentityErrors } from '../../structured-errors'
 
 /**
@@ -7,17 +7,20 @@ import { sessionIdentityErrors } from '../../structured-errors'
  */
 export function claudeForkPoint(
   history: readonly ProviderHistoryMessage[],
-  fork: Pick<ProviderSessionHistoryInput, 'sessionId'> & { keptPrompts: number },
+  fork: Pick<ProviderForkInput, 'sessionId' | 'providerTurnId'>,
 ) {
-  const prompts = history.flatMap((message, index) => (message.role === 'user' ? [index] : []))
-  const firstDropped = prompts[fork.keptPrompts]
-  const kept = firstDropped === undefined ? history.at(-1) : history[firstDropped - 1]
-  if (kept && fork.keptPrompts > 0 && fork.keptPrompts <= prompts.length) return kept.sourceId
+  const prompt = history.findIndex(
+    (message) => message.sourceId === fork.providerTurnId && message.role === 'user',
+  )
+  const firstDropped = history.findIndex(
+    (message, index) => index > prompt && message.role === 'user',
+  )
+  const kept = firstDropped < 0 ? history.at(-1) : history[firstDropped - 1]
+  if (prompt >= 0 && kept) return kept.sourceId
 
   throw sessionIdentityErrors.FORK_POINT_UNAVAILABLE({
     internal: {
-      keptPrompts: fork.keptPrompts,
-      promptCount: prompts.length,
+      providerTurnId: fork.providerTurnId,
       sourceSessionId: fork.sessionId,
     },
   })

@@ -72,6 +72,7 @@ import type {
   ProviderRuntimeStartInput,
   ProviderSessionDiscoveryInput,
   ProviderSessionHistoryInput,
+  ProviderForkInput,
   ProviderSignInInput,
   ProviderTurnInput,
   ProviderUserInputResponseInput,
@@ -518,11 +519,12 @@ export class ClaudeProviderAdapter
     for (const sessionId of this.sessions.keys()) await this.stopRuntime({ sessionId })
   }
 
-  async prepareFork(
-    input: ProviderSessionHistoryInput & { keptPrompts: number },
-  ): Promise<ProviderForkStart> {
-    const history = await this.readSessionHistory(input)
-    return { boundaryId: claudeForkPoint(history, input), conversationId: input.sessionId }
+  async prepareFork(input: ProviderForkInput): Promise<ProviderForkStart> {
+    const history = await this.readSessionHistory({
+      ...input,
+      sessionId: v.parse(sessionIdSchema, input.conversationId),
+    })
+    return { boundaryId: claudeForkPoint(history, input), conversationId: input.conversationId }
   }
 
   protected async ensureRuntimeSession(input: ProviderRuntimeStartInput) {
@@ -837,7 +839,7 @@ class ClaudeAgentSession extends SessionContext {
     const turn = activeProviderTurn({ canonicalTurnId: input.turnId, messageId })
     // Minted locally — unlike Codex there is no provider-assigned turn id to
     // late-bind to, which is what deletes codex's whole pending-turn machinery.
-    const providerTurnId = `claude-turn:${crypto.randomUUID()}`
+    const providerTurnId = crypto.randomUUID()
     this.activeTurn = turn
     this.activeProviderTurnId = providerTurnId
     this.announcedLimitStops.clear()
@@ -849,7 +851,7 @@ class ClaudeAgentSession extends SessionContext {
       // `ultrathink` reaches the model here, in the text — it is a prompt
       // keyword, and `claudeReasoning` already kept it out of `Options.effort`.
       const messageText = claudePromptText(input.messageText, this.reasoning)
-      this.prompt.push(claudeUserMessage({ messageText, resolved }))
+      this.prompt.push({ ...claudeUserMessage({ messageText, resolved }), uuid: providerTurnId })
       this.emitTurnStarted(providerTurnId)
     } catch (error) {
       recordChatPipelineWarning('chat.pipeline.claude_session.send_turn.failed', {

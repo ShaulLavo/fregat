@@ -256,6 +256,9 @@ export const importedSessionMessageSchema = v.object({
   role: v.picklist(['user', 'assistant']),
   text: v.string(),
   createdAt: isoDateTimeSchema,
+  attachments: v.optional(chatAttachmentsSchema, []),
+  turnId: v.optional(v.nullable(turnIdSchema), null),
+  modelSelection: v.optional(modelSelectionSchema),
 })
 
 export const orchestrationMessageSchema = v.object({

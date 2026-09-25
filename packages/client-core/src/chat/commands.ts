@@ -21,6 +21,7 @@ import {
   type ProjectMetaUpdateCommand,
   type ProjectReorderCommand,
   type ProviderApprovalDecision,
+  type ProviderAgentSelection,
   type ProviderUserInputAnswers,
   type RuntimeMode,
   type SessionApprovalRespondCommand,
@@ -196,7 +197,7 @@ export function createDraftSessionSubmission({
   title: titleOverride,
 }: {
   /** The harness agent definition the new session runs as. */
-  agent?: string | null
+  agent?: ProviderAgentSelection | null
   attachments?: ChatAttachmentUpload[]
   createdAt: string
   interactionMode?: InteractionMode
@@ -232,7 +233,9 @@ export function createDraftSessionSubmission({
       ...submission.command,
       bootstrap: {
         createSession: {
-          ...(agent ? { agent } : {}),
+          ...(agent?.providerInstanceId === modelSelection.providerInstanceId
+            ? { agent: agent.name }
+            : {}),
           interactionMode,
           modelSelection,
           worktreeTarget,
