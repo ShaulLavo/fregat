@@ -1,5 +1,6 @@
 import { UiModeToggle } from '@/components/ui-mode-toggle'
 import { WorkspaceProjectMenu } from '@/components/workspace-project-menu'
+import { ServerUpdateStatus } from '@/features/server-update/components/status'
 import { useEditorWorkspaceState } from '@/features/editor/state/workspace-state'
 import { TitlebarMenu } from '@/features/workbench/components/titlebar-menu'
 import { titlebarModel } from '@/features/workbench/utils/titlebar-model'
@@ -37,7 +38,8 @@ export function AppTitlebar() {
         <WorkspaceProjectMenu workspaceTitle={model.workspaceTitle} />
       </div>
       {model.gridTemplateColumns.includes('%') ? <div aria-hidden='true' /> : null}
-      <div className='flex items-center px-(--bar-padding-x)'>
+      <div className='flex items-center gap-(--density-gap-tight) px-(--bar-padding-x)'>
+        <ServerUpdateStatus />
         <UiModeToggle />
       </div>
     </header>

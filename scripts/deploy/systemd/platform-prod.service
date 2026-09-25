@@ -7,16 +7,20 @@ Wants=network-online.target
 [Service]
 Type=simple
 WorkingDirectory={{PRODUCTION_ROOT}}
+# Swaps a staged release into current before every start; never fails the start.
+ExecStartPre=-{{BUN}} {{PRODUCTION_ROOT}}/bin/promote.ts {{PRODUCTION_ROOT}}
 ExecStart={{BUN}} {{PRODUCTION_ROOT}}/current/server/index.js
 Restart=on-failure
 RestartSec=3
-# Bun exits 143 on SIGTERM; a normal stop or restart is not a failure.
-SuccessExitStatus=143
+# 143: Bun's exit on SIGTERM. 75: the server's exit after Restart.
+SuccessExitStatus=143 75
+RestartForceExitStatus=75
 Environment=NODE_ENV=production
 Environment=BUN_ENV=production
 Environment=FS_HOST=127.0.0.1
 Environment=PORT={{PORT}}
 Environment=WEB_ROOT={{PRODUCTION_ROOT}}/current/web
+Environment=PLATFORM_PRODUCTION_ROOT={{PRODUCTION_ROOT}}
 Environment=SERVER_ALLOWED_ORIGINS={{MESH_ORIGIN}},{{TUI_ORIGIN}}
 Environment=OBSERVABILITY_DIR={{PRODUCTION_ROOT}}/logs
 Environment=PATH={{HOME}}/.local/share/mise/shims:{{HOME}}/.local/bin:/usr/local/bin:/usr/bin:/bin

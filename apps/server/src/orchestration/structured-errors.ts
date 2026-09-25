@@ -111,6 +111,12 @@ export const sessionDomainErrors = defineErrorCatalog('orchestration', {
     why: 'The observed turn generation or start sequence no longer matches the durable state.',
     fix: 'Read the current turn and retry its permitted transition.',
   },
+  SERVER_RESTARTING: {
+    status: 503,
+    message: 'The server is restarting.',
+    why: 'A restart into a new release is under way, and it admits no new provider starts or rewinds.',
+    fix: 'Wait for it to reconnect, then try again.',
+  },
   REGISTRATION_BUSY: {
     status: 409,
     message: ({ projectId }: { projectId: string }) =>

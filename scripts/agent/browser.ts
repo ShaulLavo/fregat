@@ -277,7 +277,7 @@ async function runScenario(scenario: Scenario, options: Options) {
     const started = performance.now()
     let failure: string | null = null
     try {
-      await scenario.run(page, { file: options.file, step })
+      await scenario.run(page, { file: options.file, server: options.server, step })
       if (scenario.inspect) await evidence.json('inspection.json', await scenario.inspect(page))
     } catch (error) {
       failure = error instanceof Error ? error.message : String(error)
@@ -333,6 +333,7 @@ async function traceScenario(scenario: Scenario, options: Options) {
     try {
       await scenario.run(page, {
         file: options.file,
+        server: options.server,
         step: async (label) => {
           await page.evaluate((name) => performance.mark(`fregat:step:${name}`), label)
         },
@@ -406,6 +407,7 @@ async function countRenders(scenario: Scenario, options: Options) {
     try {
       await scenario.run(page, {
         file: options.file,
+        server: options.server,
         step: async (label) => {
           const rows = await page.evaluate(
             () =>

@@ -310,3 +310,49 @@ test('abort unsubscribes immediately even while the consumer holds a yielded fra
 function sentMessages(socket: FakeOrchestrationSocket) {
   return socket.sent.map((raw) => v.parse(orchestrationWsClientMessageSchema, JSON.parse(raw)))
 }
+
+test('a server.update frame lands in the per-origin update state', async () => {
+  const fixture = rpcClientFixture()
+  const ready = fixture.client.ready()
+  fixture.socket.open()
+  await ready
+  const update = {
+    phase: 'serving',
+    pending: { release: '20260925T120000Z-abc-l4', stagedAt: '2026-09-25T12:00:00.000Z' },
+    liveCheck: null,
+  }
+  fixture.socket.deliver({ kind: 'server.update', update })
+
+  expect(fixture.environments.getState().updateByOrigin[fixture.origin]).toEqual(update)
+})
+
+test('an unknown message kind is dropped quietly while a malformed known kind still warns', async () => {
+  const fixture = rpcClientFixture()
+  const ready = fixture.client.ready()
+  fixture.socket.open()
+  await ready
+  fixture.socket.deliver({ kind: 'server.future-kind', payload: 1 })
+  fixture.client.close()
+
+  const quiet = connectionSummary(fixture.events)
+  expect(quiet).toMatchObject({ level: 'info', 'message.unknownKindCount': 1 })
+  expect(quiet).not.toHaveProperty('message.invalidCount')
+
+  const malformed = rpcClientFixture()
+  const malformedReady = malformed.client.ready()
+  malformed.socket.open()
+  await malformedReady
+  malformed.socket.deliver({ kind: 'server.update', update: { phase: 'sleeping' } })
+  malformed.client.close()
+
+  expect(connectionSummary(malformed.events)).toMatchObject({
+    level: 'warn',
+    'message.invalidCount': 1,
+    warning: 'Invalid orchestration WebSocket message.',
+  })
+  expect(malformed.environments.getState().updateByOrigin).toEqual({})
+})
+
+function connectionSummary(events: ReadonlyArray<Record<string, unknown>>) {
+  return events.find((event) => event.action === 'orchestration.ws.connection.summary')
+}

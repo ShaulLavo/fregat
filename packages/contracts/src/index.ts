@@ -765,6 +765,7 @@ export {
   orchestrationWsSubscriptionErrorMessageSchema,
   orchestrationWsSubscriptionCompleteMessageSchema,
   orchestrationWsPongMessageSchema,
+  orchestrationWsServerUpdateMessageSchema,
   type OrchestrationStreamSynchronizedItem,
   type OrchestrationSessionSearchSource,
   type OrchestrationWsConnectedMessage,
@@ -914,3 +915,23 @@ export {
 export { fontRefSchema } from './fonts/schema'
 export { CURATED_FONTS, type CuratedFont } from './fonts/curated'
 export type { FontCatalogEntry } from './fonts/catalog'
+export {
+  busySessionSchema,
+  busySessionStateSchema,
+  liveCheckVerdictSchema,
+  serverRestartInputSchema,
+  serverRestartResultSchema,
+  serverUpdateErrorSchema,
+  serverUpdatePhaseSchema,
+  serverUpdateSchema,
+  stagedReleaseSchema,
+  type BusySession,
+  type BusySessionState,
+  type LiveCheckVerdict,
+  type ServerRestartInput,
+  type ServerRestartResult,
+  type ServerUpdate,
+  type ServerUpdateError,
+  type ServerUpdatePhase,
+  type StagedRelease,
+} from './server-update'

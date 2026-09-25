@@ -71,6 +71,9 @@ import { SettingsStore, type SettingsStoreOptions } from './settings/store'
 import { TerminalService, type TerminalPtyFactory } from './terminal/service'
 import { wallpaperRoutes } from './wallpaper/routes'
 import { webRoutes, type WebOptions } from './web/routes'
+import { readReleaseInfoSync } from './web/release'
+import { serverUpdateRoutes } from './update/routes'
+import { ServerUpdate, type UpdateOptions } from './update/service'
 import { ProviderSessionDirectory } from './provider/provider-session-directory'
 import { ProviderService } from './provider/provider-service'
 import { ProviderUsageHistoryReader } from './provider/usage-history'
@@ -123,6 +126,8 @@ export type AppOptions = FileSystemServiceOptions & {
   /** The origin forwarded to remote machines as this app's web origin. */
   webOrigin?: string
   web?: WebOptions
+  /** Staged releases and Restart. Absent leaves both inert, as in dev and tests. */
+  update?: UpdateOptions
 }
 
 const appOrchestration = new WeakMap<object, OrchestrationEngine>()
@@ -138,6 +143,14 @@ export function orchestrationForApp(app: object) {
   const engine = appOrchestration.get(app)
   if (!engine) throw createInternalError('App has no orchestration engine')
   return engine
+}
+
+const appUpdates = new WeakMap<object, ServerUpdate>()
+
+export function updateForApp(app: object) {
+  const update = appUpdates.get(app)
+  if (!update) throw createInternalError('App has no server update')
+  return update
 }
 
 const appCleanups = new WeakMap<object, () => Promise<void>>()
@@ -328,6 +341,12 @@ export function createApp(options: AppOptions) {
     machines,
     providerPrices,
   )
+  const update = new ServerUpdate({
+    root: options.update?.root ?? null,
+    restart: options.update?.restart ?? noop,
+    serverRelease: readReleaseInfoSync(options.web?.serverReleaseFile).release,
+    gate: orchestration,
+  })
 
   const app = new Elysia({ name: 'platform' })
   applyObservability(app)
@@ -352,13 +371,14 @@ export function createApp(options: AppOptions) {
     // origin is known. Mounted before every parent hook: an Elysia plugin
     // mounted after one parent `onBeforeHandle` inherits the parent's later
     // hooks too, which would put the auth guard in front of index.html.
-    .use(webRoutes(options.web ?? {}))
+    .use(webRoutes(options.web ?? {}, update))
     .onBeforeHandle(({ request }) => {
       recordClientInstance(request)
     })
     // Auth runs after the WS upgrade so the browser receives the explicit 1008 refusal.
-    .use(orchestrationWsRoutes(orchestration, auth, identity, orchestrationSockets))
+    .use(orchestrationWsRoutes(orchestration, auth, identity, orchestrationSockets, update))
     .onBeforeHandle(authGuard(auth))
+    .use(serverUpdateRoutes(update))
     .use(
       machineRoutes(
         machines,
@@ -434,6 +454,7 @@ export function createApp(options: AppOptions) {
     .onStop(cleanup)
   appCleanups.set(configured, cleanup)
   appOrchestration.set(configured, orchestration)
+  appUpdates.set(configured, update)
   appMachines.set(configured, machines)
   return configured
 }
@@ -485,6 +506,8 @@ function appCleanup(
     if (closed) return
 
     closed = true
+    // A signal stop admits no provider start while the runtime shuts down.
+    orchestration.holdProviderStarts()
     orchestrationSockets.closeAll()
     // Kills the language servers, before any await: the service manager signals them with the
     // server, and an exit that lands before this is logged as a crash.
@@ -555,3 +578,5 @@ function responseErrorPayload(error: { code?: string; message: string; statusCod
 function definedOnly(values: Record<string, string | undefined>) {
   return Object.fromEntries(Object.entries(values).filter(([, value]) => value !== undefined))
 }
+
+function noop() {}

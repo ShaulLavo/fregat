@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -90,6 +90,53 @@ describe('web routes', () => {
       commit: 'abc',
       dirtyFiles: 1,
       server: { release: null, commit: null, dirtyFiles: null },
+      phase: 'serving',
+      pending: null,
+      liveCheck: null,
+    })
+  })
+
+  it('reports the staged release and a failed live check, re-read on every call', async () => {
+    const root = await fixtureRoot()
+    const production = path.join(root, 'production')
+    const current = await release(production, 'current-release', {
+      source: '/work/projects/platform',
+      previousRelease: path.join(production, 'releases', 'older-release'),
+    })
+    await symlink(current, path.join(production, 'current'))
+    await writeFile(
+      path.join(current, 'live-check.json'),
+      JSON.stringify({
+        release: 'current-release',
+        status: 'failed',
+        checkedAt: '2026-09-25T10:00:00.000Z',
+        fresh: ['no websocket received a frame'],
+      }),
+    )
+    const app = createTestApp({
+      settings: testSettingsOptions(root),
+      update: { root: production, restart: () => {} },
+      workspaceRoot: root,
+    })
+    const read = async () => (await app.handle(new Request('http://local/release'))).json()
+
+    expect(await read()).toMatchObject({ phase: 'serving', pending: null })
+    await symlink(await release(production, 'staged-release'), path.join(production, 'pending'))
+
+    expect(await read()).toMatchObject({
+      phase: 'serving',
+      pending: { release: 'staged-release', stagedAt: expect.any(String) },
+      liveCheck: {
+        release: 'current-release',
+        status: 'failed',
+        at: '2026-09-25T10:00:00.000Z',
+        error: {
+          code: 'update.LIVE_CHECK_FAILED',
+          message: 'current-release failed its live check',
+          why: 'no websocket received a frame',
+          fix: 'Run bun run deploy --rollback in /work/projects/platform to return to older-release.',
+        },
+      },
     })
   })
 
@@ -152,4 +199,14 @@ async function fixtureRoot() {
   const root = await mkdtemp(path.join(tmpdir(), 'platform-web-routes-'))
   roots.push(root)
   return root
+}
+
+async function release(production: string, name: string, config: Record<string, unknown> = {}) {
+  const directory = path.join(production, 'releases', name)
+  await mkdir(directory, { recursive: true })
+  await writeFile(
+    path.join(directory, 'build-config.json'),
+    JSON.stringify({ release: directory, ...config }),
+  )
+  return directory
 }

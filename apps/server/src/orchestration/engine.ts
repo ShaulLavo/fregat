@@ -37,6 +37,8 @@ import {
   errorStringField,
   type ClientOrchestrationCommand,
   type OrchestrationCommandReceipt,
+  type BusySession,
+  type BusySessionState,
 } from '@workspace/contracts'
 import * as v from 'valibot'
 
@@ -62,6 +64,7 @@ import { commandFingerprint } from './utils/command-intent'
 import { internalCommandKey } from './utils/repository-ids'
 import { verifyReceiptIntent } from './command-receipts'
 import { sessionDomainErrors } from './structured-errors'
+import { runtimeInterruptedByRestart } from './utils/restart-interruption'
 
 import { ProviderCommandReactor } from './provider-command-reactor'
 import { ProviderRuntimeIngestion, type ProviderRuntimeSource } from './provider-runtime-ingestion'
@@ -119,6 +122,10 @@ export type OrchestrationEngineOptions = {
 
 type OrchestrationCommandSummary = ReturnType<typeof orchestrationCommandSummary>
 
+export type RestartAnswer =
+  | { restarting: false; busy: BusySession[] }
+  | { restarting: true; interrupted: BusySession[] }
+
 export class OrchestrationEngine {
   readonly worktreeExecutionGate = new WorktreeExecutionGate()
   private worktreeReactor: WorktreeLifecycleReactor | null = null
@@ -128,6 +135,8 @@ export class OrchestrationEngine {
   private readonly terminalHistoryRecoveries = new Map<SessionId, Promise<void>>()
   private unsubscribeGitMutations: (() => void) | null = null
   private reactorsStarted = false
+  // Set once a restart is accepted and never cleared: the process exits after it.
+  private startsHeld = false
   private queue = Promise.resolve()
   private readonly attachmentOwnership: AttachmentOwnership
   private readonly attachmentsDir: string
@@ -430,7 +439,74 @@ export class OrchestrationEngine {
     await this.discovery?.close()
     this.unsubscribeGitMutations?.()
     await this.worktreeReactor?.drain()
+    // A turn that ended just before shutdown still gets its checkpoint.
+    await this.checkpointReactor?.drain()
     await this.queue
+  }
+
+  /** Best effort for a signal stop: no claim or rewind commits after this. */
+  holdProviderStarts() {
+    this.startsHeld = true
+  }
+
+  /**
+   * Accepts a restart when every busy session is in `interrupt`. Runs on the command queue, so
+   * each claim enqueued earlier has committed and none can commit after an accepted answer.
+   */
+  async beginRestart(interrupt: ReadonlySet<SessionId>): Promise<RestartAnswer> {
+    await this.ready
+    return this.schedule(() => {
+      const busy = this.busySessions()
+      if (busy.some((session) => !interrupt.has(session.sessionId)))
+        return { restarting: false, busy }
+      this.startsHeld = true
+      return { restarting: true, interrupted: busy }
+    })
+  }
+
+  private busySessions() {
+    const handoffs = new Set(
+      this.terminalHandoffs
+        .pending()
+        .filter((handoff) => handoff.phase === 'active')
+        .map((handoff) => handoff.sessionId),
+    )
+    const busy: BusySession[] = []
+    for (const session of this.readModel.sessions.values()) {
+      if (session.deletedAt) continue
+      const state = this.busyState(session, handoffs)
+      if (!state) continue
+      busy.push({
+        sessionId: session.id,
+        title: session.title,
+        projectTitle: this.projectTitle(session),
+        state,
+      })
+    }
+    return busy.sort(
+      (left, right) =>
+        left.title.localeCompare(right.title) || left.sessionId.localeCompare(right.sessionId),
+    )
+  }
+
+  private busyState(
+    session: OrchestrationProjectedSession,
+    activeHandoffs: ReadonlySet<SessionId>,
+  ): BusySessionState | null {
+    if (session.pendingRewindCommandId) return 'rewinding'
+    const interruption = runtimeInterruptedByRestart(session)
+    if (interruption?.activeStatus) return interruption.activeStatus
+    if (interruption?.claimedTurn?.providerStartState === 'adopted') return 'running'
+    if (interruption || this.providerService?.isLaunching(session.id)) return 'starting'
+    if (session.pendingApprovalCount + session.pendingUserInputCount > 0) return 'waiting'
+    if (this.providerService?.backgroundLiveness(session.id)) return 'background'
+    if (activeHandoffs.has(session.id)) return 'terminal'
+    return null
+  }
+
+  private projectTitle(session: OrchestrationProjectedSession) {
+    const worktree = this.readModel.worktrees.get(session.worktreeId)
+    return (worktree && this.readModel.projects.get(worktree.projectId)?.title) ?? null
   }
 
   private dispatchFromReceipt(
@@ -454,6 +530,7 @@ export class OrchestrationEngine {
 
     const existing = this.receipts.find(command.commandId)
     if (existing) return this.dispatchFromReceipt(existing, command.type, fingerprint)
+    this.requireStartsOpen(command)
 
     const committed = this.commitNewCommand(command, summary, fingerprint)
     recordChatPipelineInfo('chat.pipeline.command.complete', {
@@ -471,6 +548,19 @@ export class OrchestrationEngine {
       sequence: committed.sequence,
       result: committed.receipt.result,
     }
+  }
+
+  // A claim or rewind committed after an accepted restart would be interrupted unseen.
+  private requireStartsOpen(command: OrchestrationCommand) {
+    if (!this.startsHeld) return
+    if (
+      command.type !== 'session.provider-start.claim' &&
+      command.type !== 'session.checkpoint.revert'
+    )
+      return
+    throw sessionDomainErrors.SERVER_RESTARTING({
+      internal: { commandType: command.type, sessionId: command.sessionId },
+    })
   }
 
   private requireCommandRuntimeOwnership(command: OrchestrationCommand) {
@@ -724,14 +814,11 @@ export class OrchestrationEngine {
   }
 
   private async recoverRuntime(session: OrchestrationProjectedSession) {
-    const turn = session.latestTurn
-    const ambiguous =
-      turn?.providerStartState === 'claimed' || turn?.providerStartState === 'adopted'
-    const active =
-      session.runtime && ['starting', 'running', 'waiting'].includes(session.runtime.status)
-    if (!ambiguous && !active) return
-    const runtimeEpoch = ambiguous ? turn.runtimeEpoch : session.runtime?.runtimeEpoch
-    const observedSequence = ambiguous ? turn.providerStartSequence : session.runtimeSequence
+    const interruption = runtimeInterruptedByRestart(session)
+    if (!interruption) return
+    const turn = interruption.claimedTurn
+    const runtimeEpoch = turn ? turn.runtimeEpoch : session.runtime?.runtimeEpoch
+    const observedSequence = turn ? turn.providerStartSequence : session.runtimeSequence
     if (!runtimeEpoch || observedSequence === null) return
 
     let message =
@@ -746,7 +833,7 @@ export class OrchestrationEngine {
     await this.enqueue({
       type: 'session.runtime.recover',
       sessionId: session.id,
-      ...(ambiguous ? { turnId: turn.turnId } : {}),
+      ...(turn ? { turnId: turn.turnId } : {}),
       observedSequence,
       runtimeEpoch,
       message,

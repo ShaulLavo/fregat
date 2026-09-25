@@ -15,6 +15,9 @@ export type IsolatedServer = {
   readonly directory: string
   readonly home: string
   readonly logs: string
+  /** The server's `PLATFORM_PRODUCTION_ROOT`: stage a release by linking `pending` here. */
+  readonly productionRoot: string
+  signal(signal: NodeJS.Signals): void
   stop(): Promise<void>
 }
 
@@ -27,7 +30,9 @@ export async function startIsolatedServer(webOrigin: URL): Promise<IsolatedServe
   const directory = mkdtempSync('/work/tmp/fregat-agent-')
   const home = path.join(directory, 'home')
   const logs = path.join(directory, 'logs')
+  const productionRoot = path.join(directory, 'production')
   mkdirSync(home)
+  mkdirSync(productionRoot)
   if (existsSync(path.join(productionStateHome, 'wallpapers'))) linkWallpaperLibrary(home)
   const port = await selectAvailablePort({
     isAvailable: (candidate) => isPortAvailable('127.0.0.1', candidate),
@@ -42,6 +47,7 @@ export async function startIsolatedServer(webOrigin: URL): Promise<IsolatedServe
     // Offers the mock provider driver, so a scenario can script a whole turn.
     PLATFORM_AGENT_HARNESS: '1',
     PLATFORM_HOME: home,
+    PLATFORM_PRODUCTION_ROOT: productionRoot,
     PORT: String(port),
     SERVER_ALLOWED_ORIGINS: allowedOriginsForWebPort(
       undefined,
@@ -71,7 +77,10 @@ export async function startIsolatedServer(webOrigin: URL): Promise<IsolatedServe
     await stop()
     throw error
   }
-  return { port, origin, directory, home, logs, stop }
+  const signal = (name: NodeJS.Signals) => {
+    if (child.exitCode === null) child.kill(name)
+  }
+  return { port, origin, directory, home, logs, productionRoot, signal, stop }
 }
 
 async function waitForHealth(

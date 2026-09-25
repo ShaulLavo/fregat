@@ -1,9 +1,11 @@
 import {
   cpSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   readdirSync,
   readFileSync,
+  readlinkSync,
   realpathSync,
   renameSync,
   rmSync,
@@ -13,7 +15,7 @@ import {
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 
-import { checkoutRoot, currentLink, releasesRoot, webBase } from './config'
+import { checkoutRoot, currentLink, pendingLink, releasesRoot, webBase } from './config'
 import { log, output, run } from './run'
 import { createScriptError } from '../structured-errors'
 
@@ -42,6 +44,8 @@ export type BuildConfig = Checkout & {
   reason: string | null
   builtAt: string
   deployedAt?: string
+  /** False when deployed with --skip-live-check; the promotion step then skips it too. */
+  liveCheck?: boolean
 }
 
 const webPackage = path.join(checkoutRoot, 'apps/web')
@@ -87,6 +91,28 @@ export function currentRelease() {
   if (!existsSync(currentLink)) return null
 
   return realpathSync(currentLink)
+}
+
+/** The staged release, or null when nothing is staged or the link dangles. */
+export function pendingRelease() {
+  if (!existsSync(pendingLink)) return null
+
+  return realpathSync(pendingLink)
+}
+
+export function stagePending(release: Release) {
+  const replaced = pendingRelease()
+  replaceLink(pendingLink, release.directory)
+  const note = replaced ? `, replacing ${path.basename(replaced)}` : ''
+  log('stage', `${pendingLink} → ${release.name}${note}`)
+}
+
+/** Drops the staged release; returns its name, or null when nothing was staged. */
+export function removePending() {
+  if (!lstatSync(pendingLink, { throwIfNoEntry: false })?.isSymbolicLink()) return null
+  const name = path.basename(readlinkSync(pendingLink))
+  rmSync(pendingLink, { force: true })
+  return name
 }
 
 export async function buildWeb(release: Release) {
@@ -180,6 +206,8 @@ export async function bootCandidate(release: Release) {
       PLATFORM_HOME: path.join(scratch, 'home'),
       PORT: String(port),
       WEB_ROOT: release.web,
+      // The candidate must never read production's staged release.
+      PLATFORM_PRODUCTION_ROOT: undefined,
     },
     stderr: 'pipe',
     stdout: 'pipe',
@@ -225,8 +253,9 @@ export function pointCurrentAt(directory: string) {
 }
 
 // Swapped atomically: the link is written beside the target and renamed over it.
+// The staging name is per process, so concurrent deploys cannot delete each other's.
 function replaceLink(link: string, target: string) {
-  const staging = `${link}.next`
+  const staging = `${link}.next-${process.pid}`
   rmSync(staging, { force: true })
   symlinkSync(target, staging)
   renameSync(staging, link)

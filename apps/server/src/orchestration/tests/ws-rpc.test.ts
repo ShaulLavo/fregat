@@ -4,10 +4,10 @@ import {
   orchestrationWsClientMessageSchema,
   type OrchestrationWsClientMessage,
 } from '@workspace/contracts'
-import { orchestrationForApp } from '../../app'
+import { orchestrationForApp, updateForApp } from '../../app'
 import { createShellWorkspace } from './factories/shell-workspace'
 import { domainCommand } from './factories/engine'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { healthDescriptorSchema, sessionIdSchema } from '@workspace/contracts'
@@ -40,7 +40,7 @@ it('carries the same durable identity in health, the handshake, and serverConfig
   expect(socket.closes).toEqual([])
   expect(socket.messages[0]).toMatchObject({
     kind: 'connected',
-    config: { environmentId: descriptor.environmentId, protocolVersion: 7 },
+    config: { environmentId: descriptor.environmentId, protocolVersion: 8 },
   })
 
   socket.receive({ kind: 'request', method: 'serverConfig', requestId: 'config-request' })
@@ -49,8 +49,49 @@ it('carries the same durable identity in health, the handshake, and serverConfig
     kind: 'response',
     ok: true,
     requestId: 'config-request',
-    data: { environmentId: descriptor.environmentId, protocolVersion: 7 },
+    data: { environmentId: descriptor.environmentId, protocolVersion: 8 },
   })
+})
+
+it('pushes the update state after the handshake and on every change, until the socket closes', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'platform-ws-update-'))
+  roots.push(root)
+  const production = path.join(root, 'production')
+  const app = createTestApp({
+    workspaceRoot: root,
+    settings: testSettingsOptions(root),
+    update: { root: production, restart: () => {} },
+    watch: false,
+  })
+  const socket = createInProcessOrchestrationSocket(app, origin)
+
+  expect(socket.messages.map((message) => message.kind)).toEqual(['connected', 'server.update'])
+  expect(socket.messages[1]).toEqual({
+    kind: 'server.update',
+    update: { phase: 'serving', pending: null, liveCheck: null },
+  })
+
+  const staged = path.join(production, 'releases', 'staged-release')
+  await mkdir(staged, { recursive: true })
+  await symlink(staged, path.join(production, 'pending'))
+  updateForApp(app).reread('signal')
+  updateForApp(app).reread('signal')
+
+  expect(socket.messages.slice(2)).toEqual([
+    {
+      kind: 'server.update',
+      update: {
+        phase: 'serving',
+        pending: { release: 'staged-release', stagedAt: expect.any(String) },
+        liveCheck: null,
+      },
+    },
+  ])
+
+  socket.close()
+  await rm(path.join(production, 'pending'))
+  updateForApp(app).reread('signal')
+  expect(socket.messages).toHaveLength(3)
 })
 
 it('closes rejected upgrades with 1008 and forwards the unauthorized reason', async () => {

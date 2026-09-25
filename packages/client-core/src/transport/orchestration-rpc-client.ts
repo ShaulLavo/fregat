@@ -41,6 +41,16 @@ import type {
 } from './rpc-host'
 
 const serverError = Symbol('orchestration RPC server response')
+// A newer server may push kinds this client predates; those are dropped without a warning.
+const KNOWN_SERVER_MESSAGE_KINDS: Readonly<Record<OrchestrationWsServerMessage['kind'], true>> = {
+  connected: true,
+  response: true,
+  'subscription.next': true,
+  'subscription.error': true,
+  'subscription.complete': true,
+  pong: true,
+  'server.update': true,
+}
 
 export function isOrchestrationRpcServerError(error: unknown) {
   return error !== null && typeof error === 'object' && serverError in error
@@ -646,6 +656,11 @@ export class OrchestrationRpcClient {
       return
     }
 
+    if (message.kind === 'server.update') {
+      this.options.environments.getState().recordServerUpdate(this.options.origin, message.update)
+      return
+    }
+
     if (message.kind === 'subscription.complete') {
       this.subscriptions.get(message.subscriptionId)?.queue.close()
     }
@@ -845,7 +860,12 @@ export class OrchestrationRpcClient {
     }
 
     try {
-      return v.parse(orchestrationWsServerMessageSchema, JSON.parse(data))
+      const parsed: unknown = JSON.parse(data)
+      if (isUnknownMessageKind(parsed)) {
+        this.socketScope?.increment('message.unknownKindCount')
+        return null
+      }
+      return v.parse(orchestrationWsServerMessageSchema, parsed)
     } catch (error) {
       this.socketScope?.increment('message.invalidCount')
       this.socketScope?.warn('Invalid orchestration WebSocket message.', { error })
@@ -1139,4 +1159,11 @@ function advanceSubscriptionRetry(recovery: SubscriptionRecovery) {
   recovery.failedCursor = cursor
   recovery.attempt += 1
   return Math.min(100 * 2 ** Math.min(recovery.attempt - 1, 5), 2_000)
+}
+
+function isUnknownMessageKind(message: unknown): boolean {
+  if (message === null || typeof message !== 'object' || !('kind' in message)) return false
+  return (
+    typeof message.kind === 'string' && !Object.hasOwn(KNOWN_SERVER_MESSAGE_KINDS, message.kind)
+  )
 }

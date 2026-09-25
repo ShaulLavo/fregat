@@ -154,7 +154,7 @@ export class ProviderService {
     this.reaper = new ProviderSessionReaper({
       deadlineMs: options.idleSessionDeadlineMs,
       directory: this.sessionDirectory,
-      isLaunching: (sessionId) => this.pendingLaunches.has(sessionId),
+      isLaunching: (sessionId) => this.isLaunching(sessionId),
       hasBackgroundWork: (sessionId) => this.backgroundTasks.get(sessionId) !== null,
       stopRuntime: (input) => this.stopRuntime(input),
     })
@@ -178,6 +178,11 @@ export class ProviderService {
    */
   backgroundLiveness(sessionId: string) {
     return this.backgroundTasks.get(sessionId)
+  }
+
+  /** A provider launch between claim and adopt; a restart would interrupt it. */
+  isLaunching(sessionId: SessionId) {
+    return this.pendingLaunches.has(sessionId)
   }
 
   markRuntimeSeen(sessionId: SessionId) {

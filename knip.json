@@ -51,6 +51,7 @@
         "agent/logs.ts",
         "deploy/mesh.ts",
         "deploy/live-check.mjs",
+        "deploy/systemd/promote.ts",
         "desktop-dev.ts",
         "dev.ts",
         "generate-settings-reference.ts",

@@ -3,6 +3,7 @@ import path from 'node:path'
 import { Elysia } from 'elysia'
 
 import { FsError } from '../fs/errors'
+import type { ServerUpdate } from '../update/service'
 import { readReleaseInfo, releaseFileFor } from './release'
 import { webErrors } from './structured-errors'
 
@@ -19,9 +20,9 @@ const REVALIDATE = 'no-cache'
 // Public routes: the page and its files load before any origin is known, so
 // this plugin is mounted ahead of the auth guard and serves nothing but the
 // release directory.
-export function webRoutes(options: WebOptions) {
+export function webRoutes(options: WebOptions, update: Pick<ServerUpdate, 'reread'>) {
   const routes = new Elysia({ name: 'web-routes' }).get('/release', () =>
-    releaseDescriptor(options),
+    releaseDescriptor(options, update),
   )
   const root = options.root
   if (!root) return routes
@@ -31,12 +32,13 @@ export function webRoutes(options: WebOptions) {
   return routes.get('/', () => document(index)).get('/*', ({ request }) => webFile(root, request))
 }
 
-async function releaseDescriptor(options: WebOptions) {
+// Re-reads `pending` on every call, so a deploy's missed signal heals on the next poll.
+async function releaseDescriptor(options: WebOptions, update: Pick<ServerUpdate, 'reread'>) {
   const [current, server] = await Promise.all([
     readReleaseInfo(options.root ? releaseFileFor(options.root) : undefined),
     readReleaseInfo(options.serverReleaseFile),
   ])
-  return { ...current, server }
+  return { ...current, server, ...update.reread('release') }
 }
 
 function webFile(root: string, request: Request) {

@@ -32,6 +32,7 @@ import {
 } from './orchestration-logging'
 import { orchestrationReplaySummary } from '@workspace/contracts'
 import type { OrchestrationEngine } from './engine'
+import type { ServerUpdate } from '../update/service'
 
 /**
  * Identity of this server process. `serverInstanceId` changes on every restart,
@@ -80,6 +81,7 @@ type OrchestrationRpcConnectionState = {
   openedAt: number
   serverCloseReason: string | null
   subscriptions: Map<OrchestrationWsSubscriptionId, OrchestrationRpcSubscription>
+  unsubscribeUpdate: () => void
 }
 
 type OrchestrationRpcSubscription = {
@@ -125,7 +127,8 @@ export function orchestrationWsRoutes(
   engine: OrchestrationEngine,
   auth: AuthConfig,
   identity: EnvironmentIdentity,
-  sockets: OrchestrationSockets = createOrchestrationSockets(),
+  sockets: OrchestrationSockets,
+  update: Pick<ServerUpdate, 'enabled' | 'state' | 'subscribe'>,
 ) {
   const states = new WeakMap<object, OrchestrationRpcConnectionState>()
   const config = orchestrationWsServerConfig(identity)
@@ -154,6 +157,7 @@ export function orchestrationWsRoutes(
         openedAt: performance.now(),
         serverCloseReason: null,
         subscriptions: new Map(),
+        unsubscribeUpdate: noop,
       }
       states.set(socket.key, state)
       sockets.add(socket, state)
@@ -161,6 +165,7 @@ export function orchestrationWsRoutes(
       // honest `connected` phase — and can compare protocol versions — without
       // paying a round trip before it may subscribe.
       sendOrchestrationRpcMessage(socket, state, { config, kind: 'connected' })
+      publishServerUpdate(socket, state, update)
       recordChatPipelineInfo('chat.pipeline.ws.open', {
         ...log,
         environmentId: config.environmentId,
@@ -184,6 +189,7 @@ export function orchestrationWsRoutes(
 
       const state = states.get(socket.key)
       const subscriptionCount = state?.subscriptions.size ?? 0
+      state?.unsubscribeUpdate()
       if (state) closeOrchestrationRpcState(state)
 
       states.delete(socket.key)
@@ -472,6 +478,20 @@ function unsubscribeOrchestrationRpcState(
   })
 }
 
+// A server without a production root has no update to announce, so its clients hear nothing.
+function publishServerUpdate(
+  socket: OrchestrationRpcWebSocket,
+  state: OrchestrationRpcConnectionState,
+  update: Pick<ServerUpdate, 'enabled' | 'state' | 'subscribe'>,
+) {
+  if (!update.enabled) return
+
+  sendOrchestrationRpcMessage(socket, state, { kind: 'server.update', update: update.state() })
+  state.unsubscribeUpdate = update.subscribe((next) => {
+    sendOrchestrationRpcMessage(socket, state, { kind: 'server.update', update: next })
+  })
+}
+
 function closeOrchestrationRpcState(state: OrchestrationRpcConnectionState) {
   const subscriptions = [...state.subscriptions.keys()]
 
@@ -600,3 +620,5 @@ function clientInstanceId(data: unknown) {
 
   return value.trim().slice(0, 64) || null
 }
+
+function noop() {}
