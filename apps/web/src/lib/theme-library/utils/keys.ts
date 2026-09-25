@@ -3,6 +3,7 @@ export const bundleQueryKey = ['themes', 'bundles'] as const
 export const bundleExportQueryKey = (id: string) => ['themes', 'bundles', id, 'export'] as const
 
 export const paletteMutationKeys = {
+  all: ['themes', 'palettes'],
   create: ['themes', 'palettes', 'create'],
   update: ['themes', 'palettes', 'update'],
   delete: ['themes', 'palettes', 'delete'],

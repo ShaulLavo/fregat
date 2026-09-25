@@ -23,6 +23,7 @@ export function usePaletteActions() {
       },
       onSuccess: invalidate,
       retry: false,
+      scope: { id: 'theme-library' },
     },
     owner,
   )
@@ -39,6 +40,7 @@ export function usePaletteActions() {
       },
       onSuccess: invalidate,
       retry: false,
+      scope: { id: 'theme-library' },
     },
     owner,
   )
@@ -53,6 +55,7 @@ export function usePaletteActions() {
       },
       onSuccess: invalidate,
       retry: false,
+      scope: { id: 'theme-library' },
     },
     owner,
   )

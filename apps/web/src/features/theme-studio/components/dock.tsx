@@ -21,6 +21,8 @@ import { useStudioDraft } from '@/features/theme-studio/hooks/use-studio-draft'
 import { useStudioPreview } from '@/features/theme-studio/hooks/use-studio-preview'
 import { editVariant, previewBundle, variantPatch } from '@/features/theme-studio/utils/draft'
 import type { AssetId, ThemeVariantPatch } from '@workspace/contracts'
+import { useIsMutating } from '@tanstack/react-query'
+import { paletteMutationKeys } from '@/lib/theme-library/utils/keys'
 
 /**
  * The theme studio: a strip along the bottom of a workbench that stays live and full size above
@@ -38,6 +40,8 @@ export function Dock() {
   const draftPalette = useDraftPalette(draft, mode)
   const savePaletteEdits = useSavePaletteEdits()
   const owner = useSettingsOwner()
+  // Apply saves forked palettes first; a second click meanwhile would save them twice.
+  const saving = useIsMutating({ mutationKey: paletteMutationKeys.all }, owner) > 0
 
   // Opening moves focus into the dock once; after that keys belong to whatever holds focus.
   useEffect(() => {
@@ -45,7 +49,7 @@ export function Dock() {
   }, [])
 
   async function apply() {
-    if (!draft || !editsPending) return
+    if (!draft || !editsPending || saving) return
     if (!(await savePaletteEdits())) return
     bundles.apply(
       draft.theme,
@@ -102,7 +106,7 @@ export function Dock() {
       <DockHeader
         collapsed={store.collapsed}
         confirmingDiscard={store.confirmingDiscard}
-        dirty={editsPending}
+        dirty={editsPending && !saving}
         mode={mode}
         name={draft?.theme.name ?? 'Theme'}
         tab={store.tab}
