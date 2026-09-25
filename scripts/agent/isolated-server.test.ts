@@ -1,11 +1,12 @@
 import { existsSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { expect, it } from 'vitest'
 
 import { TerminalHostClient } from '../../apps/server/src/terminal/host-client'
 import { startIsolatedServer } from './isolated-server'
 
 it('ends the isolated host and its live shell before removing its home', async () => {
-  const server = await startIsolatedServer(new URL('http://localhost:5214'))
+  const server = await startIsolatedServer(new URL('http://localhost:5214'), tmpdir())
   const client = new TerminalHostClient({ stateRoot: server.home })
   const host = await client.host()
   const shell = await client.spawn({

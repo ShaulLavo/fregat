@@ -126,7 +126,7 @@ export async function buildWeb(release: Release) {
   )
   log('web', `vite build → ${release.web}`)
   await runOrFail(
-    ['bun', 'vite', 'build', '--base', webBase, '--outDir', release.web],
+    ['bun', '--bun', 'vite', 'build', '--base', webBase, '--outDir', release.web],
     webPackage,
     path.join(release.directory, 'web-build.log'),
   )

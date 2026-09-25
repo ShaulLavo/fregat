@@ -99,7 +99,7 @@ function parseOptions(args: readonly string[]): Options {
 }
 
 function runBuild(): void {
-  const result = Bun.spawnSync(['bun', '--env-file=../../.env', 'vite', 'build'], {
+  const result = Bun.spawnSync(['bun', '--bun', '--env-file=../../.env', 'vite', 'build'], {
     cwd: webRoot,
     stdout: 'inherit',
     stderr: 'inherit',
