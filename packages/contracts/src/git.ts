@@ -33,7 +33,13 @@ export type GitRepositoryInfo = {
 export type GitStatusResult = {
   repository: GitRepositoryInfo | null
   files: GitFileStatus[]
+  /** Submodules this repository declares that have no checkout yet. */
+  uninitializedSubmodules: number
 }
+
+/** How a new worktree populates submodules: every nested level, declared ones only, or none. */
+export const WORKTREE_SUBMODULE_MODES = ['recursive', 'top-level', 'none'] as const
+export type WorktreeSubmoduleMode = (typeof WORKTREE_SUBMODULE_MODES)[number]
 
 export type GitLineChange = {
   type: 'added' | 'deleted' | 'context'

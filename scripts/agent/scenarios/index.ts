@@ -182,6 +182,7 @@ import { gitCommitMessageFile } from './git-commit-message-file'
 import { gitCommitMessagePersists } from './git-commit-message-persists'
 import { gitCommitSlowHook } from './git-commit-slow-hook'
 import { gitFixWithAgent } from './git-fix-with-agent'
+import { gitSubmodulesInit } from './git-submodules-init'
 import { gitHistory } from './git-history'
 import { editorCaretBurst } from './editor-caret-burst'
 import { editorFocusClicks } from './editor-focus-clicks'
@@ -376,6 +377,7 @@ export const scenarios: readonly Scenario[] = [
   gitCommitSlowHook,
   gitCommitMessagePersists,
   gitFixWithAgent,
+  gitSubmodulesInit,
   editorCaretBurst,
   editorFocusClicks,
   editorProportionalFont,

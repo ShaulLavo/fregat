@@ -4,6 +4,7 @@ import { themeBundleSchema, themeCustomizationsSchema } from '../themes/bundle'
 import { wallpaperSelectionSchema } from '../themes/wallpaper'
 import * as v from 'valibot'
 import { machinesSchema } from '../machines'
+import { WORKTREE_SUBMODULE_MODES } from '../git'
 import {
   keybindingOverridesSchema,
   lspLanguageServerListsSchema,
@@ -196,6 +197,29 @@ export const SETTINGS_REGISTRY = {
     description:
       'SSH targets and direct origins available to this client. The local machine is always available.',
     keywords: ['remote', 'ssh', 'environment', 'server', 'connect'],
+  }),
+  'git.worktreeSubmodules': defineSetting({
+    schema: v.picklist(WORKTREE_SUBMODULE_MODES),
+    default: 'recursive',
+    // Machine scope: the value picks git flags and can reach the network.
+    scope: 'machine',
+    widget: 'enum',
+    category: 'Git',
+    title: 'Submodules in new worktrees',
+    description:
+      'Initialize every nested submodule, only the ones this repository declares, or none when a session creates a worktree.',
+    keywords: ['submodule', 'worktree', 'recursive'],
+  }),
+  'git.projectWorktreeSubmodules': defineSetting({
+    schema: v.record(v.string(), v.picklist(WORKTREE_SUBMODULE_MODES)),
+    default: {},
+    merge: 'record',
+    scope: 'machine',
+    widget: 'complex',
+    visibility: 'internal',
+    category: 'Git',
+    title: 'Project submodules in new worktrees',
+    description: 'Submodule modes for new worktrees keyed by project UUID on this machine.',
   }),
   'workbench.colorTheme': defineSetting({
     schema: v.picklist(COLOR_THEME_MODES),

@@ -262,6 +262,21 @@ export async function pullRemote(path: string, client: Client) {
   )
 }
 
+export async function initializeSubmodules(path: string, client: Client) {
+  return observeGitOperation(
+    { ...clientLogContext(client), action: 'git.init_submodules', path },
+    async (): Promise<GitStatusResult> => {
+      const response = await client.git.submodules.init.post({ path })
+
+      return unwrapEdenResponse(response, {
+        requireData: true,
+        emptyMessage: 'git server returned an empty response',
+      })
+    },
+    (status) => ({ uninitializedSubmodules: status.uninitializedSubmodules }),
+  )
+}
+
 export async function pushRemote(path: string, client: Client) {
   return observeGitOperation(
     { ...clientLogContext(client), action: 'git.push_remote', path },

@@ -677,10 +677,14 @@
       "title": "Choose how new worktrees initialize submodules",
       "report": "adjacent.md",
       "wave": "5",
-      "status": "open",
-      "evidence_level": "source-reviewed",
+      "status": "verified",
+      "evidence_level": "implementation; server-tests-and-browser-verified",
       "acceptance": "adjacent.md, EXT-15, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "repository-delivery.md",
+        "apps/server/src/orchestration/tests/worktree-submodules.test.ts",
+        "/work/tmp/fregat-evidence/20260925T113220Z-scenario-git-submodules-init/"
+      ]
     },
     {
       "id": "EXT-16",
