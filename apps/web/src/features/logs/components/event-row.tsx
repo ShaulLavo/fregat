@@ -11,12 +11,12 @@ import { cn } from '@workspace/ui/lib/utils'
 
 import {
   formatDuration,
-  formatLogPrimary,
   formatLogSecondary,
   formatLogTime,
   logLevelClass,
   logLevelDotClass,
 } from '@/features/logs/utils/formatters'
+import { formatLogPrimary } from '@workspace/client-core/logs/formatters'
 import {
   logRowPointerStart,
   shouldToggleLogRow,

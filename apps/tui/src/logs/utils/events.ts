@@ -1,34 +1,13 @@
-import type { LogDashboardSummary, LogEventsResult, LogLiveStreamItem } from '@workspace/contracts'
+import { formatLogPrimary } from '@workspace/client-core/logs/formatters'
+import type { LogDashboardSummary, LogEventsResult } from '@workspace/contracts'
 
-export function mergeLogEvent(result: LogEventsResult, item: LogLiveStreamItem): LogEventsResult {
-  if (result.detailsById[item.event.id]) return result
-  const events = [item.event, ...result.events]
-    .toSorted((left, right) => right.timestamp.localeCompare(left.timestamp))
-    .slice(0, 300)
-  const detailsById = Object.fromEntries(
-    events.flatMap((event) => {
-      const detail = event.id === item.event.id ? item.detail : result.detailsById[event.id]
-      return detail ? [[event.id, detail]] : []
-    }),
-  )
-  return { ...result, events, detailsById, total: result.total + 1 }
-}
-export function mergeLogSnapshot(
-  snapshot: LogEventsResult,
-  live: LogEventsResult,
-): LogEventsResult {
-  return live.events.reduce((result, event) => {
-    const detail = live.detailsById[event.id]
-    return detail ? mergeLogEvent(result, { kind: 'event', event, detail }) : result
-  }, snapshot)
-}
 export function logHistogram(summary: LogDashboardSummary) {
   const maximum = Math.max(1, ...summary.timeline.map((bucket) => bucket.total))
   const bars = ' ▁▂▃▄▅▆▇█'
   return summary.timeline.map((bucket) => bars[Math.ceil((bucket.total / maximum) * 8)]).join('')
 }
 export function logRow(event: LogEventsResult['events'][number]) {
-  return `${event.timestamp.slice(11, 23)} ${event.level.padEnd(5)} ${(event.source ?? '').padEnd(7)} ${event.action ?? event.message ?? event.path ?? event.operation ?? ''}`
+  return `${event.timestamp.slice(11, 23)} ${event.level.padEnd(5)} ${(event.source ?? '').padEnd(7)} ${formatLogPrimary(event)}`
 }
 
 export function addLogSummary(

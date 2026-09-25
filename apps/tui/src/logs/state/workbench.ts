@@ -1,17 +1,17 @@
-import * as v from 'valibot'
 import type { Client } from '@workspace/client-core/transport/client'
-import { requireEdenData, parseEdenSseStream } from '@workspace/client-core/transport/eden'
-import { normalizeEdenDates } from '@workspace/client-core/transport/normalize-dates'
 import {
-  logDashboardSummarySchema,
-  logEventsResultSchema,
-  logLiveStreamItemSchema,
-  type LogDashboardSummary,
-  type LogEventsResult,
-  type LogDashboardFilters,
+  fetchLogEvents,
+  fetchLogSummary,
+  subscribeLogEvents,
+} from '@workspace/client-core/logs/api'
+import { mergeLiveLogItems, mergeLiveLogEvents } from '@workspace/client-core/logs/live-cache'
+import type {
+  LogDashboardSummary,
+  LogEventsResult,
+  LogDashboardFilters,
 } from '@workspace/contracts'
 import { connectionFailure } from '@/connection/utils/failure'
-import { addLogSummary, mergeLogEvent, mergeLogSnapshot } from '@/logs/utils/events'
+import { addLogSummary } from '@/logs/utils/events'
 
 type State = {
   kind: 'loading' | 'ready' | 'failed'
@@ -38,20 +38,17 @@ export function createLogsWorkbench(client: Client) {
   }
   async function tail(filters: LogDashboardFilters, signal: AbortSignal) {
     try {
-      const stream = requireEdenData(
-        await client._log.dashboard.live.get({ query: filters, fetch: { signal } }),
-      )
-      if (!signal.aborted) publish({ ...state, live: true })
-      for await (const event of parseEdenSseStream(stream)) {
+      for await (const item of subscribeLogEvents(filters, signal, client, () => {
+        if (!signal.aborted) publish({ ...state, live: true })
+      })) {
         if (signal.aborted) return
-        if (event.event === 'heartbeat') continue
-        const item = v.parse(logLiveStreamItemSchema, event.data)
-        const duplicate = state.result.detailsById[item.event.id] !== undefined
+        const result = mergeLiveLogItems(state.result, [item])
+        const duplicate = result === state.result
         const summary =
           state.summary && !duplicate
             ? addLogSummary(state.summary, item.event, filters.slowMs ?? 500)
             : state.summary
-        publish({ ...state, result: mergeLogEvent(state.result, item), summary })
+        publish({ ...state, result, summary, live: true })
       }
       if (!signal.aborted)
         publish({ ...state, live: false, message: 'Live connection ended. Refresh to reconnect.' })
@@ -74,27 +71,24 @@ export function createLogsWorkbench(client: Client) {
     })
     if (!paused) void tail(filters, signal)
     try {
-      const [eventsResponse, summaryResponse] = await Promise.all([
-        client._log.dashboard.events.get({ query: { ...filters, limit: 300 }, fetch: { signal } }),
-        client._log.dashboard.summary.get({ query: filters, fetch: { signal } }),
+      const [result, snapshotSummary] = await Promise.all([
+        fetchLogEvents(filters, signal, client),
+        fetchLogSummary(filters, signal, client),
       ])
-      const result = v.parse(
-        logEventsResultSchema,
-        normalizeEdenDates(requireEdenData(eventsResponse)),
-      )
-      let summary = v.parse(
-        logDashboardSummarySchema,
-        normalizeEdenDates(requireEdenData(summaryResponse)),
-      )
+      if (signal.aborted) return
+      let summary = snapshotSummary
+      const snapshotIds = new Set(result.events.map((event) => event.id))
       for (const event of state.result.events) {
-        if (!result.detailsById[event.id])
+        if (!snapshotIds.has(event.id))
           summary = addLogSummary(summary, event, filters.slowMs ?? 500)
       }
       if (!signal.aborted)
         publish({
           ...state,
           kind: 'ready',
-          result: mergeLogSnapshot(result, state.result),
+          result: mergeLiveLogEvents(result, state.result.events, {
+            detailsById: state.result.detailsById,
+          }),
           summary,
         })
     } catch (error) {

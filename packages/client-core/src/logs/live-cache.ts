@@ -25,6 +25,16 @@ export function mergeLiveLogEvent(
 }
 
 export function mergeLiveLogItems(
+  current: LogEventsResult,
+  items: readonly LogLiveStreamItem[],
+  maxEvents?: number,
+): LogEventsResult
+export function mergeLiveLogItems(
+  current: LogEventsResult | undefined,
+  items: readonly LogLiveStreamItem[],
+  maxEvents?: number,
+): LogEventsResult | undefined
+export function mergeLiveLogItems(
   current: LogEventsResult | undefined,
   items: readonly LogLiveStreamItem[],
   maxEvents = 500,
@@ -39,6 +49,16 @@ export function mergeLiveLogItems(
   )
 }
 
+export function mergeLiveLogEvents(
+  current: LogEventsResult,
+  events: readonly LogEventSummary[],
+  options?: MergeLiveLogOptions,
+): LogEventsResult
+export function mergeLiveLogEvents(
+  current: LogEventsResult | undefined,
+  events: readonly LogEventSummary[],
+  options?: MergeLiveLogOptions,
+): LogEventsResult | undefined
 export function mergeLiveLogEvents(
   current: LogEventsResult | undefined,
   events: readonly LogEventSummary[],
@@ -58,7 +78,9 @@ export function mergeLiveLogEvents(
   }
   if (uniqueEvents.length === 0) return current
 
-  const mergedEvents = [...uniqueEvents.reverse(), ...current.events].slice(0, maxEvents)
+  const mergedEvents = [...uniqueEvents.reverse(), ...current.events]
+    .sort((left, right) => right.timestamp.localeCompare(left.timestamp))
+    .slice(0, maxEvents)
 
   return {
     ...current,

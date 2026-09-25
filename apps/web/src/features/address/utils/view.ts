@@ -21,7 +21,7 @@ import {
 } from '@/features/address/utils/search-params'
 import type { SessionDiffScope } from '@/features/chat/utils/session-diff-scope-storage'
 import { isChatModeToolTab, type ChatModeToolTab } from '@/features/chat-mode/utils/panels'
-import type { LogsFilterState } from '@/features/logs/utils/filter-params'
+import type { LogsFilterState } from '@workspace/client-core/logs/filters'
 
 export type WorkspaceView = {
   readonly mode: AddressMode

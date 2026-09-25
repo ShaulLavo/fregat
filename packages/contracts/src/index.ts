@@ -391,6 +391,9 @@ export {
 } from './machine-connections'
 export {
   logDashboardLevelSchema,
+  LOG_DASHBOARD_LEVELS,
+  LOG_TIME_RANGES,
+  type LogTimeRange,
   logDashboardSummarySchema,
   logDashboardTimelineBucketCount,
   logEventsResultSchema,

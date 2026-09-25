@@ -10,7 +10,8 @@ import { createSubscriptions } from '@workspace/utils/subscriptions'
  */
 import { useSyncExternalStore } from 'react'
 
-import { defaultLogsFilterState, type LogsFilterState } from '@/features/logs/utils/filter-params'
+import { defaultLogsFilterState } from '@/features/logs/utils/filter-params'
+import { type LogsFilterState } from '@workspace/client-core/logs/filters'
 
 /**
  * `null` means "nobody has touched the filters", which is NOT the same as a snapshot of

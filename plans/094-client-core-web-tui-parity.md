@@ -304,6 +304,10 @@ Reconcile before merging:
 
 ## Unify the log-dashboard client
 
+Decided 2026-09-25: recommendation (completion wave). Retain 500 events, dedupe by id,
+sort by descending timestamp, and use the web primary-field fallback. Keep rendering,
+settings defaults, subscriptions and TanStack hooks in their hosts.
+
 Land after the language map: both add new client-core subpath exports and both touch
 `apps/tui/src/logs/*`, and the language move removes cross-feature imports the web-side log edits
 would otherwise reintroduce.

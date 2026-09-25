@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { type Client, getClient, setClient } from '@/lib/client'
-import * as api from '@/features/logs/utils/api'
+import * as api from '@workspace/client-core/logs/api'
 
 // Eden can hand back live `Date` objects for timestamp fields; the api layer must
 // normalize them to ISO strings before valibot validation. A real server returns

@@ -1,16 +1,11 @@
-import type { LogDashboardFilters, SettingsValues } from '@workspace/contracts'
-const rangeMinutes = { '15m': 15, '1h': 60, '6h': 360, '24h': 1440 }
+import type { LogDashboardFilters, LogTimeRange } from '@workspace/contracts'
+import { logFilterQuery, sinceForRange } from '@workspace/client-core/logs/filters'
+
 export function logFilters(
   search: string,
-  range: SettingsValues['logs.defaultTimeRange'],
+  range: LogTimeRange,
   slowMs: number,
+  now = Date.now(),
 ): LogDashboardFilters {
-  return {
-    search,
-    slowMs,
-    since:
-      range === 'all'
-        ? undefined
-        : new Date(Date.now() - rangeMinutes[range] * 60000).toISOString(),
-  }
+  return logFilterQuery({ search, slowMs, since: sinceForRange(range, now) })
 }

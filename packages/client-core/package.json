@@ -107,7 +107,11 @@
     "./files/workspace-address": "./src/files/workspace-address.ts",
     "./chat/worktrees/label": "./src/chat/worktrees/label.ts",
     "./chat/worktrees/cleanup": "./src/chat/worktrees/cleanup.ts",
-    "./chat/worktrees/commands": "./src/chat/worktrees/commands.ts"
+    "./chat/worktrees/commands": "./src/chat/worktrees/commands.ts",
+    "./logs/api": "./src/logs/api.ts",
+    "./logs/filters": "./src/logs/filters.ts",
+    "./logs/formatters": "./src/logs/formatters.ts",
+    "./logs/live-cache": "./src/logs/live-cache.ts"
   },
   "scripts": {
     "build": "tsgo --noEmit",

@@ -1,11 +1,8 @@
 import { WarningCircleIcon } from '@phosphor-icons/react'
 import type { LogEventDetail, LogEventSummary } from '@workspace/contracts'
 
-import {
-  formatDuration,
-  formatLogDateTime,
-  formatLogPrimary,
-} from '@/features/logs/utils/formatters'
+import { formatDuration, formatLogDateTime } from '@/features/logs/utils/formatters'
+import { formatLogPrimary } from '@workspace/client-core/logs/formatters'
 import { LogsDetailField } from '@/features/logs/components/detail-field'
 
 type LogsEventInlineDetailProps = {

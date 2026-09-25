@@ -9,12 +9,12 @@ import {
 } from '@workspace/contracts'
 import * as v from 'valibot'
 
-import type { Client } from '@/lib/client'
-import { parseEdenSseStream } from '@workspace/client-core/transport/eden'
-import { transportErrors } from '@workspace/client-core/transport/structured-errors'
-import { unwrapEdenResponse } from '@/lib/eden-events'
-import { createRpcError } from '@/lib/structured-errors'
-import { logFilterQuery } from '@/features/logs/utils/filter-params'
+import type { Client } from '../transport/client'
+import { parseEdenSseStream, requireEdenData } from '../transport/eden'
+import { normalizeEdenDates } from '../transport/normalize-dates'
+import { transportErrors } from '../transport/structured-errors'
+import { createRpcError } from '../transport/rpc-error'
+import { logFilterQuery } from './filters'
 
 export async function fetchLogSummary(
   filters: LogDashboardFilters,
@@ -26,7 +26,7 @@ export async function fetchLogSummary(
     query: logFilterQuery(filters),
   })
 
-  return v.parse(logDashboardSummarySchema, unwrapEdenResponse(response, { normalizeDates: true }))
+  return v.parse(logDashboardSummarySchema, normalizeEdenDates(requireEdenData(response)))
 }
 
 export async function fetchLogEvents(
@@ -42,13 +42,14 @@ export async function fetchLogEvents(
     },
   })
 
-  return v.parse(logEventsResultSchema, unwrapEdenResponse(response, { normalizeDates: true }))
+  return v.parse(logEventsResultSchema, normalizeEdenDates(requireEdenData(response)))
 }
 
 export async function* subscribeLogEvents(
   filters: LogDashboardFilters,
   signal: AbortSignal | undefined,
   client: Client,
+  onConnected?: () => void,
 ): AsyncGenerator<LogLiveStreamItem> {
   const response = await client._log.dashboard.live.get({
     fetch: { signal },
@@ -61,6 +62,7 @@ export async function* subscribeLogEvents(
       internal: { filterKeys: Object.keys(logFilterQuery(filters)) },
     })
 
+  onConnected?.()
   for await (const event of parseEdenSseStream(response.data)) {
     if (event.event === 'heartbeat') continue
 
