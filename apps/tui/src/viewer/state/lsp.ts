@@ -63,14 +63,9 @@ export function createViewerLsp({
   })
   async function connect() {
     publish('loading')
-    // A `didOpen` carrying a language the proxy cannot name is forwarded raw and untracked,
-    // so the matching `didClose` is swallowed and the backend keeps the document forever.
-    const grammarId = languageIdForFilePath(filePath)
-    if (!grammarId) {
-      publish('unavailable', [], 'No language server is configured for this file.')
-      return
-    }
-    const languageId = lspLanguageIdForPath(filePath) ?? grammarId
+    // Same fallback as the web editor, so a server-matched override extension still connects.
+    const languageId =
+      lspLanguageIdForPath(filePath) ?? languageIdForFilePath(filePath) ?? 'plaintext'
     const [paths, matches] = await Promise.all([
       readServerPaths({ client: session.client, signal }),
       session.client.lsp.match.get({
