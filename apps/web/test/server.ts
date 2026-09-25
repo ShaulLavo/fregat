@@ -6,9 +6,9 @@ import {
   closeApp,
   createApp,
   createMetadataDatabase,
+  FontCatalogService,
   migratePlatformDatabase,
   MockProviderAdapter,
-  NerdFontService,
   ProviderAdapterRegistry,
   testSettingsOptions,
   type AppOptions,
@@ -78,7 +78,11 @@ export async function makeTestServer({
       systemRoot: root,
       // Keep the real parser/cache/route path, but pin its cache inside this
       // fixture. MSW supplies the external downloads page.
-      fonts: new NerdFontService({ cacheRoot: path.join(root, '.platform-test', 'fonts') }),
+      fonts: new FontCatalogService({
+        cacheRoot: path.join(root, '.platform-test', 'fonts'),
+        // The machine's installed fonts would make every catalog answer differ per checkout.
+        listInstalled: async () => '',
+      }),
       metadataDatabase: database,
       orchestration: {
         attachmentsDir: path.join(root, '.platform-test', 'attachments'),

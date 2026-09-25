@@ -23,7 +23,7 @@ import { getDefaultPlatformDatabase } from './db/client'
 import { migratePlatformDatabase } from './db/migrations'
 import { readEnvironmentIdentity } from './db/environment-identity'
 import { fontRoutes } from './fonts/routes'
-import { NerdFontService, type FontService } from './fonts/service'
+import { FontCatalogService } from './fonts/catalog'
 import { errorPayload, FsError, isFsError } from './fs/errors'
 import { fsRoutes } from './fs/routes'
 import { FileSystemService, type FileSystemServiceOptions } from './fs/service'
@@ -86,7 +86,7 @@ export type AppOptions = FileSystemServiceOptions & {
     env?: NodeJS.ProcessEnv
     ptyFactory?: TerminalPtyFactory
   }
-  fonts?: FontService
+  fonts?: FontCatalogService
   themes?: {
     /** Holds `wallpapers/`, `palettes/` and `themes/`. Defaults to the state home. */
     root?: string
@@ -159,7 +159,7 @@ export function createApp(options: AppOptions) {
     lifecycle: { begin: (worktreeId) => orchestration.beginTerminalLease(worktreeId) },
     resolveAgentSession: (input) => orchestration.beginAgentTerminal(input),
   })
-  const fonts = options.fonts ?? new NerdFontService()
+  const fonts = options.fonts ?? new FontCatalogService()
 
   // Before the registry, because the registry is built *from* it. One SQLite
   // file backs the whole platform, so settings ride on whichever handle this

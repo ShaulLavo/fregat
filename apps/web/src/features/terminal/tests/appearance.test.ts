@@ -12,14 +12,20 @@ describe('applyTerminalAppearance', () => {
 
     applyTerminalAppearance(terminal as never, {
       cursorBlink: false,
+      fontFamily: '"FiraCode Nerd Font", monospace',
       fontSize: 18,
     })
 
-    expect(terminal.setFont).toHaveBeenCalledWith({ size: 18 })
+    expect(terminal.setFont).toHaveBeenCalledWith({
+      family: '"FiraCode Nerd Font", monospace',
+      size: 18,
+    })
     expect(terminal.setCursor).toHaveBeenCalledWith({ blink: false })
   })
 
   it('does nothing before the terminal exists', () => {
-    expect(() => applyTerminalAppearance(null, { cursorBlink: true, fontSize: 12 })).not.toThrow()
+    expect(() =>
+      applyTerminalAppearance(null, { cursorBlink: true, fontFamily: 'monospace', fontSize: 12 }),
+    ).not.toThrow()
   })
 })

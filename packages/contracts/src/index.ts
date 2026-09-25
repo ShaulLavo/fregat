@@ -457,7 +457,8 @@ export { settingControl, type SettingControl } from './settings/control'
 export {
   COLOR_THEME_MODES,
   DEFAULT_COLOR_THEME,
-  DEFAULT_EDITOR_FONT_FAMILY,
+  DEFAULT_CODE_FONT,
+  DEFAULT_UI_FONT,
   DEFAULT_PALETTE_ID,
   DEFAULT_WALLPAPER_SELECTION,
   DEFAULT_WORKBENCH_DENSITY,
@@ -893,3 +894,19 @@ export {
   type AttachmentUploadInput,
   type AttachmentUploadTicket,
 } from './attachment-upload'
+export {
+  BUNDLED_FONTS,
+  FONT_SOURCES,
+  NERD_SYMBOLS_FONT,
+  cssFamily,
+  fontFamilyName,
+  formatFontRef,
+  parseFontRef,
+  type BundledFontId,
+  type FontRef,
+  type FontRole,
+  type FontSource,
+} from './fonts/ref'
+export { fontRefSchema } from './fonts/schema'
+export { CURATED_FONTS, type CuratedFont } from './fonts/curated'
+export type { FontCatalogEntry } from './fonts/catalog'

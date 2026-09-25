@@ -28,7 +28,13 @@ function fixture() {
   }
   const owner = new QueryClient()
   prepareTerminalReload(owner, storage, '/repo')
-  const target = { root: '/repo', sessionId: 'shell', fontSize: 14, paletteHash: 'dark' }
+  const target = {
+    root: '/repo',
+    sessionId: 'shell',
+    fontSize: 14,
+    fontFamily: 'monospace',
+    paletteHash: 'dark',
+  }
   return { owner, storage, entries, target }
 }
 
@@ -42,6 +48,7 @@ describe('terminal display cache', () => {
     expect(reloaded.getQueryCache().getAll()).toHaveLength(0)
     expect(savedTerminal(reloaded, { ...target, sessionId: 'other' })).toBeNull()
     expect(savedTerminal(reloaded, { ...target, fontSize: 16 })).toBeNull()
+    expect(savedTerminal(reloaded, { ...target, fontFamily: 'serif' })).toBeNull()
     expect(savedTerminal(reloaded, { ...target, paletteHash: 'light' })).toBeNull()
     prepareTerminalReload(reloaded, storage, '/different')
     expect(savedTerminal(reloaded, target)).toBeNull()

@@ -1,26 +1,39 @@
-import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
-import { CaretDownIcon } from '@phosphor-icons/react'
-import { Button } from '@workspace/ui/components/button'
+import { use, useState } from 'react'
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@workspace/ui/components/dropdown-menu'
+  Combobox,
+  ComboboxCollection,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxGroup,
+  ComboboxGroupLabel,
+  ComboboxInput,
+  ComboboxList,
+  ComboboxTrigger,
+} from '@workspace/ui/components/combobox'
+import { LoadingState } from '@workspace/ui/components/loading-state'
+import { listRowClassName } from '@workspace/ui/patterns/list-row-classes'
 
-import { useNerdFonts } from '@/features/settings/hooks/use-nerd-fonts'
-import { StringWidget } from '@/features/settings/components/widgets/string-widget'
-import { FontPreview } from '@/features/settings/components/widgets/font-preview'
+import { FontOptionRow } from '@/features/settings/components/widgets/font-option-row'
+import { FontSample } from '@/features/settings/components/widgets/font-sample'
+import { useFontCatalog } from '@/features/settings/hooks/use-font-catalog'
+import { useRecentFonts } from '@/features/settings/hooks/use-recent-fonts'
+import {
+  FontPreviewContext,
+  type FontSettingId,
+} from '@/features/settings/providers/font-preview-context'
+import {
+  fontOption,
+  fontPickerGroups,
+  type FontOption,
+  type FontOptionGroup,
+} from '@/features/settings/utils/font-options'
+
+const SKELETON_ROWS = 6
 
 /**
- * Pick a Nerd Font from a previewed list, or type any family name.
- *
- * Both, because both are real cases. The server can fetch, subset and cache any
- * of the ~70 Nerd Fonts on demand, so picking one means the user actually gets
- * it rather than hoping it is installed — but a font already on the machine
- * should not be unreachable just because it is not in that catalogue. The stack
- * this produces tries the Nerd Font family first and the bare family second, so
- * one value serves both without the widget having to know which it is.
+ * An autocomplete, not a catalog browser: it opens on recent and curated fonts, and typing
+ * searches every Nerd Font and Fontsource family. Hovering a row shows the whole app in it;
+ * Escape puts the saved font back and Enter writes the setting.
  */
 export function FontWidget({
   disabled,
@@ -29,51 +42,96 @@ export function FontWidget({
   value,
 }: {
   disabled?: boolean
-  id: string
+  id: FontSettingId
   onChange: (next: string) => void
   value: string
 }) {
-  const fonts = useNerdFonts()
-  return (
-    <div className='flex min-w-0 items-center gap-1 @max-3xl/settings:flex-1'>
-      <StringWidget
-        aria-label='Font family'
-        className='w-52'
-        disabled={disabled}
-        id={id}
-        onCommit={onChange}
-        value={value}
-      />
+  const role = id === 'workbench.fontFamily' ? 'ui' : 'code'
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const catalog = useFontCatalog(open)
+  const recent = useRecentFonts(id, value)
+  const preview = use(FontPreviewContext)
+  const groups = fontPickerGroups(query, role, recent, catalog.data)
+  const current = fontOption(value, catalog.data)
+  const searching = query.trim() !== ''
+  const label = role === 'ui' ? 'Interface font' : 'Code font'
 
-      <DropdownMenu>
-        <Tooltip>
-          <DropdownMenuTrigger
-            render={
-              <TooltipTrigger
-                render={
-                  <Button
-                    aria-label='Browse Nerd Fonts'
-                    disabled={disabled}
-                    focusableWhenDisabled
-                    size='icon-sm'
-                    variant='ghost'
-                  >
-                    <CaretDownIcon />
-                  </Button>
-                }
-              />
-            }
-          />
-          <TooltipContent>{'Browse Nerd Fonts'}</TooltipContent>
-        </Tooltip>
-        <DropdownMenuContent align='end' className='max-h-96 w-72 overflow-y-auto'>
-          {fonts.data?.map((font) => (
-            <DropdownMenuItem key={font} onClick={() => onChange(font)}>
-              <FontPreview fontId={font} />
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
+  const changeOpen = (next: boolean) => {
+    setOpen(next)
+    if (next) return
+
+    setQuery('')
+    preview?.clearFontPreview()
+  }
+  const choose = (option: FontOption | null) => {
+    if (option && option.ref !== value) onChange(option.ref)
+    preview?.clearFontPreview()
+  }
+  const highlight = (option: FontOption | undefined) => {
+    if (!option) return
+
+    preview?.previewFont(id, option.ref)
+  }
+
+  return (
+    <Combobox<FontOption>
+      disabled={disabled}
+      filter={null}
+      filteredItems={groups}
+      inputValue={query}
+      isItemEqualToValue={(item, selected) => item.ref === selected.ref}
+      itemToStringLabel={(option) => option.label}
+      items={groups}
+      onInputValueChange={setQuery}
+      onItemHighlighted={highlight}
+      onOpenChange={changeOpen}
+      onValueChange={choose}
+      open={open}
+      value={current}
+    >
+      <ComboboxTrigger
+        aria-label={label}
+        className='w-56 @max-3xl/settings:flex-1'
+        id={id}
+        title={`${current.label} (${value})`}
+      >
+        <FontSample fontRef={value} role={role} text={current.label} />
+      </ComboboxTrigger>
+      <ComboboxContent className='max-h-96 w-80'>
+        <ComboboxInput
+          aria-label={`Search ${label.toLowerCase()}s`}
+          placeholder={role === 'ui' ? 'Search fonts…' : 'Search code fonts…'}
+        />
+        {searching && catalog.isError ? (
+          <p className='text-muted-foreground text-2xs px-(--density-row-padding-x)'>
+            {'The font catalog is unavailable; showing bundled and installed fonts.'}
+          </p>
+        ) : null}
+        {searching && catalog.isPending ? (
+          <LoadingState label='Loading the font catalog'>
+            {Array.from({ length: SKELETON_ROWS }, (_, index) => (
+              <div className={listRowClassName({ interactive: false })} key={index}>
+                <span className='bg-muted h-2 w-32 rounded-md' />
+              </div>
+            ))}
+          </LoadingState>
+        ) : (
+          <ComboboxList>
+            {(group: FontOptionGroup) => (
+              <ComboboxGroup items={group.items} key={group.value || 'results'}>
+                {group.value ? <ComboboxGroupLabel>{group.value}</ComboboxGroupLabel> : null}
+                <ComboboxCollection>
+                  {(option: FontOption) => (
+                    <FontOptionRow key={option.ref} option={option} role={role} />
+                  )}
+                </ComboboxCollection>
+              </ComboboxGroup>
+            )}
+          </ComboboxList>
+        )}
+        <ComboboxEmpty>{'No font matches that name.'}</ComboboxEmpty>
+      </ComboboxContent>
+    </Combobox>
   )
 }

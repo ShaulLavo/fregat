@@ -32,7 +32,8 @@ import {
   bootPaletteStylesheet,
 } from '@/lib/appearance/utils/palette-style.ts'
 import { initializeClientLogging, log } from '@/lib/client-logging.ts'
-import { nerdFontQueryOptions } from '@/lib/default-nerd-font.ts'
+import { fontQueryOptions } from '@/lib/fonts/state/queries'
+import { fontsInUse } from '@/lib/fonts/utils/stack'
 import { isDesktop } from '@/lib/platform/bridge.ts'
 import { applyBackdrop, resolveBackdrop } from '@/lib/platform/backdrop.ts'
 import { installEditorPerformanceTraceFromUrl } from '@/features/editor/state/performance-trace.ts'
@@ -65,9 +66,9 @@ log.info({
   visualViewportHeight: visualViewport?.height ?? null,
   visualViewportWidth: visualViewport?.width ?? null,
 })
-// index.html already started this face from the boot mirror; the query adopts it, and is
-// the same one AppearanceProvider asks for once settings confirm.
-void primaryQueryClient().prefetchQuery(nerdFontQueryOptions(boot['editor.fontFamily']))
+// index.html already started these faces from the boot mirror; the queries adopt them, and are
+// the same ones AppearanceProvider asks for once settings confirm.
+for (const font of fontsInUse(boot)) void primaryQueryClient().prefetchQuery(fontQueryOptions(font))
 
 // Preserve explicit fields before Router normalizes defaults; boot merges them with the cache.
 const initialHref = applicationHost()?.initialAddress ?? selectInitialAddress(window.location.href)

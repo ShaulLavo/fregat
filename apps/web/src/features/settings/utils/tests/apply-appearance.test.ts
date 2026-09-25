@@ -29,6 +29,7 @@ const appearance = (overrides: Partial<AppearanceValues> = {}): AppearanceValues
   'editor.fontFamily': DEFAULT_SETTING_VALUES['editor.fontFamily'],
   'workbench.colorTheme': DEFAULT_SETTING_VALUES['workbench.colorTheme'],
   'workbench.density': DEFAULT_SETTING_VALUES['workbench.density'],
+  'workbench.fontFamily': DEFAULT_SETTING_VALUES['workbench.fontFamily'],
   'workbench.surface.blur': DEFAULT_SETTING_VALUES['workbench.surface.blur'],
   'workbench.surface.contentOpacity': DEFAULT_SETTING_VALUES['workbench.surface.contentOpacity'],
   'workbench.surface.opacity': DEFAULT_SETTING_VALUES['workbench.surface.opacity'],
@@ -55,6 +56,24 @@ describe('applyAppearance', () => {
     applyAppearance(appearance({ 'workbench.colorTheme': 'light' }), root, false)
 
     expect([...classes]).toEqual(['light'])
+  })
+
+  it('writes the interface and code font stacks', () => {
+    const { properties, root } = fakeRoot()
+
+    applyAppearance(
+      appearance({
+        'editor.fontFamily': 'nerd:FiraCode',
+        'workbench.fontFamily': 'fontsource:geist',
+      }),
+      root,
+      false,
+    )
+
+    expect(properties.get('--font-ui')).toMatch(/^"geist Fontsource", "Inter Variable"/u)
+    expect(properties.get('--font-code')).toMatch(
+      /^"FiraCode Nerd Font", "JetBrains Mono Variable"/u,
+    )
   })
 
   it('writes the four material knobs with their CSS units', () => {

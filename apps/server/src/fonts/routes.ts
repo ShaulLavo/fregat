@@ -1,53 +1,87 @@
 import { Elysia } from 'elysia'
 
 import { errorPayload, FsError } from '../fs/errors'
-import { fontBatchBodySchema, fontNameParamsSchema, fontPreviewQuerySchema } from './contracts'
-import { NerdFontService, type FontService } from './service'
+import { FontCatalogService } from './catalog'
+import {
+  fontPreviewQuerySchema,
+  fontsourceFileParamsSchema,
+  fontsourceStylesheetParamsSchema,
+  localFileParamsSchema,
+  localStylesheetParamsSchema,
+  nerdFontParamsSchema,
+} from './contracts'
 
-export function fontRoutes(fonts: FontService = new NerdFontService()) {
+const IMMUTABLE = 'public, max-age=31536000, immutable'
+
+export function fontRoutes(fonts = new FontCatalogService()) {
   return new Elysia({ name: 'font-routes' }).group('/fonts', (app) =>
     app
-      .get('', () => fonts.getNerdFontLinks())
+      .get('', () => fonts.catalog())
       .get(
-        '/:name/preview',
-        async ({ params, query, set }) => {
-          const subset = await fonts.getPreviewSubset(params.name, query.text)
+        '/preview',
+        async ({ query, set }) => {
+          const subset = await fonts.preview(query.ref, query.text)
           if (!subset) return fontNotFound(set)
 
           return fontResponse(subset, 'font/woff2', 'public, max-age=86400')
         },
-        {
-          params: fontNameParamsSchema,
-          query: fontPreviewQuerySchema,
-        },
+        { query: fontPreviewQuerySchema },
       )
       .get(
-        '/:name',
+        '/nerd/:name',
         async ({ params, set }) => {
-          const font = await fonts.getExtractedFont(params.name)
+          const font = await fonts.nerd.font(params.name)
           if (!font) return fontNotFound(set)
 
-          return fontResponse(font, 'font/ttf', 'public, max-age=31536000, immutable')
+          return fontResponse(font, 'font/ttf', IMMUTABLE)
         },
-        {
-          params: fontNameParamsSchema,
-        },
+        { params: nerdFontParamsSchema },
       )
-      .post(
-        '/batch',
-        async ({ body }) => {
-          const fontsByName = await fonts.getBatchFonts(body.names)
+      .get(
+        '/fontsource/:id',
+        async ({ params, set }) => {
+          const css = await fonts.fontsource.stylesheet(params.id.slice(0, -'.css'.length))
+          if (css === null) return fontNotFound(set)
 
-          return Object.fromEntries(
-            Object.entries(fontsByName).map(([name, data]) => [
-              name,
-              data ? Buffer.from(data).toString('base64') : null,
-            ]),
-          )
+          // Short-lived: the faces are immutable, but the served weights may change.
+          return new Response(css, {
+            headers: { 'cache-control': 'public, max-age=86400', 'content-type': 'text/css' },
+          })
         },
-        {
-          body: fontBatchBodySchema,
+        { params: fontsourceStylesheetParamsSchema },
+      )
+      .get(
+        '/fontsource/:id/:file',
+        async ({ params, set }) => {
+          const file = await fonts.fontsource.file(params.id, params.file)
+          if (!file) return fontNotFound(set)
+
+          return fontResponse(file, 'font/woff2', IMMUTABLE)
         },
+        { params: fontsourceFileParamsSchema },
+      )
+      .get(
+        '/local/:id',
+        async ({ params, set }) => {
+          const css = await fonts.installed.stylesheet(params.id.slice(0, -'.css'.length))
+          if (css === null) return fontNotFound(set)
+
+          // Never cached: installing or removing a font changes it.
+          return new Response(css, {
+            headers: { 'cache-control': 'no-cache', 'content-type': 'text/css' },
+          })
+        },
+        { params: localStylesheetParamsSchema },
+      )
+      .get(
+        '/local/:id/:face',
+        async ({ params, set }) => {
+          const file = await fonts.installed.file(params.id, Number(params.face))
+          if (!file) return fontNotFound(set)
+
+          return fontResponse(file.data, file.contentType, 'no-cache')
+        },
+        { params: localFileParamsSchema },
       ),
   )
 }

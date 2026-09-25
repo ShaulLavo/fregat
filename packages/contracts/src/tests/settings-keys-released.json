@@ -83,6 +83,7 @@
     "window.transparency",
     "workbench.colorTheme",
     "workbench.density",
+    "workbench.fontFamily",
     "workbench.palette",
     "workbench.reduceMotion",
     "workbench.surface.blur",

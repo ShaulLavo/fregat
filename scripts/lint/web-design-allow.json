@@ -170,6 +170,11 @@
     "reason": "D3: a field label."
   },
   {
+    "file": "apps/web/src/features/settings/components/widgets/font-sample.tsx",
+    "class": "truncate",
+    "reason": "A cell inside a row: FontOptionRow and the picker trigger carry the title with the full family and ref."
+  },
+  {
     "file": "apps/web/src/features/workbench/components/editor-tab-button.tsx",
     "class": "truncate",
     "reason": "Already recovered: editorTabTitle renders inside the tab <button>, which carries the enriched title (the plan's reference implementation)."

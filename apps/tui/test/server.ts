@@ -9,7 +9,7 @@ import {
   migratePlatformDatabase,
   MockProviderAdapter,
   LogReaderService,
-  NerdFontService,
+  FontCatalogService,
   ProviderAdapterRegistry,
   testSettingsOptions,
   type MetadataDatabaseHandle,
@@ -63,7 +63,10 @@ function createServerWithDatabase(
       ...appOptions,
       logs: new LogReaderService({ dir: path.join(root, 'logs') }),
       auth: { allowedOrigins: [TEST_CLIENT_ORIGIN] },
-      fonts: new NerdFontService({ cacheRoot: path.join(root, '.platform-test', 'fonts') }),
+      fonts: new FontCatalogService({
+        cacheRoot: path.join(root, '.platform-test', 'fonts'),
+        listInstalled: async () => '',
+      }),
       metadataDatabase: database,
       machines: { tailnetStatusCommand: async () => '{"BackendState":"Stopped"}' },
       orchestration: {

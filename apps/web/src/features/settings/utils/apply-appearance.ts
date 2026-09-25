@@ -1,6 +1,6 @@
 import type { SettingsValues } from '@workspace/contracts'
 
-import { fontStack } from '@/lib/default-nerd-font'
+import { fontStack } from '@/lib/fonts/utils/stack'
 
 /** The keys that change how the app looks the instant they resolve. */
 export type AppearanceValues = Pick<
@@ -8,6 +8,7 @@ export type AppearanceValues = Pick<
   | 'editor.fontFamily'
   | 'workbench.colorTheme'
   | 'workbench.density'
+  | 'workbench.fontFamily'
   | 'workbench.surface.blur'
   | 'workbench.surface.contentOpacity'
   | 'workbench.surface.opacity'
@@ -53,10 +54,10 @@ export function applyAppearance(values: AppearanceValues, root: Root, prefersDar
   root.style.setProperty('--surface-saturation', `${values['workbench.surface.saturation']}%`)
   applyFileTreeIndentGuideVisibility(values['workbench.tree.indentGuides'], root)
 
-  // The editor takes its typography as options. `--font-mono` is for the rest of
-  // the app: the terminal reads the same stack unless it overrides it. Fetching
-  // and registering the face is the font loader's job.
-  root.style.setProperty('--font-mono', fontStack(values['editor.fontFamily']))
+  // The editor and terminal take the code font as options; these are for the rest of the app.
+  // Fetching and registering the faces is the font loader's job.
+  root.style.setProperty('--font-ui', fontStack(values['workbench.fontFamily'], 'ui'))
+  root.style.setProperty('--font-code', fontStack(values['editor.fontFamily'], 'code'))
 
   if (values['workbench.wallpaper'].enabled) {
     root.removeAttribute('data-wallpaper-hidden')

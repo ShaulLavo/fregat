@@ -16,7 +16,7 @@ export const fileSystemKeys = {
 
 export const appearanceKeys = {
   all: ['appearance'] as const,
-  nerdFont: (fontId: string) => [...appearanceKeys.all, 'nerd-font', fontId] as const,
+  font: (ref: string) => [...appearanceKeys.all, 'font', ref] as const,
 }
 
 export const filePickerKeys = {

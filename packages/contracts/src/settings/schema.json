@@ -209,10 +209,10 @@
       "type": "string"
     },
     "editor.fontFamily": {
-      "default": "JetBrainsMono",
-      "description": "Font for the editor and, unless overridden, the terminal.",
-      "maxLength": 64,
-      "minLength": 1,
+      "default": "bundled:jetbrains-mono",
+      "description": "Font for the editor, the terminal, and code and metadata across the app.",
+      "maxLength": 160,
+      "minLength": 3,
       "type": "string"
     },
     "editor.fontSize": {
@@ -864,6 +864,13 @@
       "default": "compact",
       "description": "Use tighter compact spacing or roomier cozy spacing throughout the app.",
       "enum": ["compact", "cozy"],
+      "type": "string"
+    },
+    "workbench.fontFamily": {
+      "default": "bundled:inter",
+      "description": "Font for the words the app writes: titles, labels, menus and prose.",
+      "maxLength": 160,
+      "minLength": 3,
       "type": "string"
     },
     "workbench.palette": {

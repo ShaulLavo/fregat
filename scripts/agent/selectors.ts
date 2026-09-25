@@ -407,8 +407,12 @@ export const selectors = {
     page.locator('[data-editor-hidden-character="invisible"]'),
   fileIconElements: (page: Page) => page.locator(fileIconSelector),
   colorModeOption: (page: Page, mode: string) => page.locator(`[data-value="color-mode:${mode}"]`),
-  settingsFontFamily: (page: Page) =>
-    page.getByRole('textbox', { name: 'Font family', exact: true }),
+  settingsFontPicker: (page: Page, role: 'Interface font' | 'Code font') =>
+    page.getByRole('combobox', { name: role, exact: true }),
+  fontPickerSearch: (page: Page) => page.getByRole('combobox', { name: /^Search .* fonts$/u }),
+  fontPickerOption: (page: Page, name: RegExp) => page.getByRole('option', { name }),
+  fontPickerGroup: (page: Page, name: 'Recent' | 'Suggested') =>
+    page.locator('[data-slot="combobox-group-label"]', { hasText: name }),
   chooseFolder: (page: Page) => page.getByRole('button', { name: 'Choose folder', exact: true }),
   settingsDialog: (page: Page) => page.getByRole('dialog', { name: 'Settings', exact: true }),
   settingsSearch: (page: Page) => page.getByRole('textbox', { name: 'Search settings' }),

@@ -22,7 +22,8 @@ import { addLifecycleFlush } from '@/lib/lifecycle-flush'
 import { connectTerminalSocket, type EdenServerSocket } from '@/lib/server-sockets'
 import { sendTerminalClientMessage } from '@/features/terminal/utils/socket'
 import { reportError, toClientError } from '@/lib/client-error-taxonomy'
-import { DEFAULT_MONO_FONT_STACK } from '@/lib/default-nerd-font'
+import { fontStack } from '@/lib/fonts/utils/stack'
+import { DEFAULT_CODE_FONT } from '@workspace/contracts'
 import { UNFOCUSED_TERMINAL_CURSOR_STYLE } from '@/features/terminal/utils/appearance'
 
 export type TerminalInputSender = (data: string) => boolean
@@ -287,7 +288,7 @@ function createTerminal(runtime: GhosttyRuntime, scrollback: number) {
       cursor: { blink: false, style: UNFOCUSED_TERMINAL_CURSOR_STYLE },
       font: {
         boldWeight: 700,
-        family: DEFAULT_MONO_FONT_STACK,
+        family: fontStack(DEFAULT_CODE_FONT, 'code'),
         letterSpacing: 0,
         lineHeight: 1,
         size: DEFAULT_TERMINAL_FONT_SIZE,

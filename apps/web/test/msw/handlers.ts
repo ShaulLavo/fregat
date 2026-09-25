@@ -10,4 +10,26 @@ export const handlers: RequestHandler[] = [
       <a href="https://github.com/ryanoasis/nerd-fonts/releases/download/v3.4.0/JetBrainsMono.zip">Download</a>
     `),
   ),
+  http.get('https://api.fontsource.org/v1/fonts', () =>
+    HttpResponse.json([
+      fontsourceFont('geist', 'Geist', 'sans-serif'),
+      fontsourceFont('geist-mono', 'Geist Mono', 'monospace'),
+      fontsourceFont('lora', 'Lora', 'serif'),
+    ]),
+  ),
 ]
+
+function fontsourceFont(id: string, family: string, category: string) {
+  return {
+    id,
+    family,
+    subsets: ['latin'],
+    weights: [400, 700],
+    styles: ['normal'],
+    defSubset: 'latin',
+    variable: false,
+    category,
+    license: 'OFL-1.1',
+    type: 'google',
+  }
+}

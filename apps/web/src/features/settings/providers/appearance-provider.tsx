@@ -25,8 +25,9 @@ import {
 } from '@workspace/contracts'
 import { paletteStylesheet, resolvePalette } from '@workspace/client-core/themes/palette'
 
-import { useQuery } from '@tanstack/react-query'
-import { nerdFontQueryOptions } from '@/lib/default-nerd-font'
+import { useQueries } from '@tanstack/react-query'
+import { fontQueryOptions } from '@/lib/fonts/state/queries'
+import { fontsInUse } from '@/lib/fonts/utils/stack'
 import { BundleContext } from '@/lib/appearance/providers/bundle-context'
 import { PaletteContext } from '@/lib/appearance/providers/palette-context'
 import { applyPaletteStylesheet, writePaletteBootCache } from '@/lib/appearance/utils/palette-style'
@@ -37,6 +38,10 @@ import { useSettingsActions } from '@/features/settings/hooks/use-settings-actio
 import { useSettingsDocument } from '@/features/settings/hooks/use-settings-document'
 import { useSettingsProjection } from '@/features/settings/hooks/use-settings-projection'
 import { ThemeContext, type Theme } from '@/features/settings/providers/theme-context'
+import {
+  FontPreviewContext,
+  type FontSettingId,
+} from '@/features/settings/providers/font-preview-context'
 import type { SettingsSubmission } from '@workspace/client-core/settings/intent-store'
 import { applyAppearance, resolveColorTheme } from '@/features/settings/utils/apply-appearance'
 import { readSettingsMirror, writeBootMirror } from '@/lib/settings-boot-mirror'
@@ -65,6 +70,7 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
   }> | null>(null)
   const [modePreview, setModePreview] = useState<Preview<Theme> | null>(null)
   const [palettePreview, setPalettePreview] = useState<Preview<Palette> | null>(null)
+  const [fontPreview, setFontPreview] = useState<{ key: FontSettingId; ref: string } | null>(null)
   const projectedValues = projection?.values
   const baseValues = projectedValues ?? { ...DEFAULT_SETTING_VALUES, ...bootValues }
   const committedTheme = baseValues['workbench.colorTheme']
@@ -78,6 +84,7 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
   const appearanceValues = resolveThemeSettings(
     {
       ...baseValues,
+      ...(fontPreview ? { [fontPreview.key]: fontPreview.ref } : {}),
       'workbench.colorTheme': resolvedMode,
       'workbench.theme': bundlePreview?.theme ?? baseValues['workbench.theme'],
     },
@@ -132,12 +139,10 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
     applyPaletteStylesheet(globalThis.document, paletteStylesheet(renderedPalette))
   }, [renderedPalette])
 
+  // Rendered values, so a hovered font starts loading the moment the picker previews it.
+  useQueries({ queries: fontsInUse(appearanceValues).map((ref) => fontQueryOptions(ref)) })
+
   const confirmedValues = confirmedQuery.data?.values
-  const confirmedFontFamily = confirmedValues?.['editor.fontFamily']
-  useQuery({
-    ...nerdFontQueryOptions(confirmedFontFamily ?? ''),
-    enabled: Boolean(confirmedFontFamily),
-  })
 
   useEffect(() => {
     if (!confirmedValues) return
@@ -224,6 +229,9 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
     return submission
   }
 
+  const previewFont = (key: FontSettingId, ref: string) => setFontPreview({ key, ref })
+  const clearFontPreview = () => setFontPreview(null)
+
   // Cleanup uses stable identities so moving focus between cards cannot clear a newer preview.
   const previewBundle = useCallback((bundle: ThemeBundle, mode?: ColorMode) => {
     setBundlePreview((current) =>
@@ -256,32 +264,37 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
       }}
     >
       <AppearancePreviewContext value={renderedValues}>
-        <ThemeContext
-          value={{
-            clearThemePreview,
-            previewTheme,
-            resolvedTheme: resolvedMode,
-            setTheme,
-            theme: committedTheme,
-          }}
-        >
-          <PaletteContext
+        <FontPreviewContext value={{ previewFont, clearFontPreview }}>
+          <ThemeContext
             value={{
-              paletteId: committedPaletteId,
-              catalog,
-              resolved: resolvePalette(renderedPalette ?? GRAPHITE, resolvedMode),
-              previewPalette,
-              clearPalettePreview,
-              selectPalette,
+              clearThemePreview,
+              previewTheme,
+              resolvedTheme: resolvedMode,
+              setTheme,
+              theme: committedTheme,
             }}
           >
-            <ViewTransition default='none' update={{ 'color-mode': 'color-mode', default: 'none' }}>
-              <div className='size-full' data-color-mode={resolvedMode}>
-                {children}
-              </div>
-            </ViewTransition>
-          </PaletteContext>
-        </ThemeContext>
+            <PaletteContext
+              value={{
+                paletteId: committedPaletteId,
+                catalog,
+                resolved: resolvePalette(renderedPalette ?? GRAPHITE, resolvedMode),
+                previewPalette,
+                clearPalettePreview,
+                selectPalette,
+              }}
+            >
+              <ViewTransition
+                default='none'
+                update={{ 'color-mode': 'color-mode', default: 'none' }}
+              >
+                <div className='size-full' data-color-mode={resolvedMode}>
+                  {children}
+                </div>
+              </ViewTransition>
+            </PaletteContext>
+          </ThemeContext>
+        </FontPreviewContext>
       </AppearancePreviewContext>
     </BundleContext>
   )

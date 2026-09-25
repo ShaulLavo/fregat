@@ -14,10 +14,12 @@ import {
   semanticTokenServerOverridesSchema,
 } from '../settings'
 import { paletteIdSchema } from '../themes/palette'
+import { fontRefSchema } from '../fonts/schema'
 import {
   COLOR_THEME_MODES,
   DEFAULT_COLOR_THEME,
-  DEFAULT_EDITOR_FONT_FAMILY,
+  DEFAULT_CODE_FONT,
+  DEFAULT_UI_FONT,
   DEFAULT_PALETTE_ID,
   DEFAULT_WALLPAPER_SELECTION,
   DEFAULT_WORKBENCH_DENSITY,
@@ -289,6 +291,16 @@ export const SETTINGS_REGISTRY = {
     description: 'Slow terminal loading indicators while keeping progress visible.',
     keywords: ['tui', 'terminal', 'animation', 'accessibility', 'motion'],
   }),
+  'workbench.fontFamily': defineSetting({
+    schema: fontRefSchema,
+    default: DEFAULT_UI_FONT,
+    scope: 'window',
+    widget: 'font',
+    category: 'Appearance',
+    title: 'Interface font',
+    description: 'Font for the words the app writes: titles, labels, menus and prose.',
+    keywords: ['font', 'typeface', 'interface', 'ui', 'sans', 'appearance'],
+  }),
   'workbench.density': defineSetting({
     schema: v.picklist(WORKBENCH_DENSITIES),
     default: DEFAULT_WORKBENCH_DENSITY,
@@ -377,16 +389,14 @@ export const SETTINGS_REGISTRY = {
     keywords: ['tree', 'files', 'folders', 'indent', 'guides', 'colour'],
   }),
   'editor.fontFamily': defineSetting({
-    // A Nerd Font id, not a CSS stack. The server can fetch, subset and cache any
-    // of these on demand, so naming one is a font the user actually gets — where
-    // a free-text stack naming a font nobody has installed silently does nothing.
-    schema: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(64)),
-    default: DEFAULT_EDITOR_FONT_FAMILY,
+    schema: fontRefSchema,
+    default: DEFAULT_CODE_FONT,
     scope: 'window',
     widget: 'font',
     category: 'Editor',
-    description: 'Font for the editor and, unless overridden, the terminal.',
-    keywords: ['font', 'typeface', 'monospace', 'nerd font', 'editor'],
+    title: 'Code font',
+    description: 'Font for the editor, the terminal, and code and metadata across the app.',
+    keywords: ['font', 'typeface', 'monospace', 'nerd font', 'editor', 'terminal', 'code'],
   }),
   'editor.fontSize': defineSetting({
     schema: v.pipe(v.number(), v.integer(), v.minValue(6), v.maxValue(72)),

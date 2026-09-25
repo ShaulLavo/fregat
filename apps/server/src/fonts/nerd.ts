@@ -1,28 +1,14 @@
 import * as cheerio from 'cheerio'
-import { createHash } from 'node:crypto'
-import { readFile, mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import path from 'node:path'
 
-import { FsError } from '../fs/errors'
-import { defaultPreviewText, isValidFontName } from './contracts'
-import { platformCachePath } from '../home'
+import { fontOperationFailed, readBinaryFile, readJsonFile } from './cache-files'
+import { isValidFontName } from './contracts'
+import type { Fetcher, FontSubsetter } from './fetcher'
 
 export type FontLinks = Record<string, string>
 
-export type FontService = {
-  getBatchFonts(fontNames: readonly string[]): Promise<Record<string, Buffer | null>>
-  getExtractedFont(fontName: string): Promise<Buffer | null>
-  getNerdFontLinks(): Promise<FontLinks>
-  getPreviewSubset(fontName: string, previewText?: string): Promise<Buffer | null>
-}
-
-type Fetcher = (input: string | URL | Request, init?: RequestInit) => Promise<Response>
-type FontSubsetter = (
-  buffer: Buffer,
-  text: string,
-  options?: { targetFormat?: 'sfnt' | 'woff' | 'woff2' | 'truetype' },
-) => Promise<Buffer>
 type ZipArchive = {
   readonly files: Record<string, { readonly dir: boolean }>
   file(filename: string): { async(type: 'arraybuffer'): Promise<ArrayBuffer> } | null
@@ -31,36 +17,35 @@ type JSZipModule = {
   loadAsync(data: Buffer): Promise<ZipArchive>
 }
 
-type NerdFontServiceOptions = {
-  cacheRoot?: string
-  fetcher?: Fetcher
-  subsetter?: FontSubsetter
+type NerdFontProviderOptions = {
+  cacheRoot: string
+  fetcher: Fetcher
+  subsetter: FontSubsetter
 }
 
 const nerdFontsDownloadUrl = 'https://www.nerdfonts.com/font-downloads'
-const defaultCacheRoot = platformCachePath('fonts')
+// The scraped links point at release assets; nothing else may be fetched from them.
+const archiveHosts = new Set(['github.com'])
 const require = createRequire(import.meta.url)
 const JSZip = require('jszip') as JSZipModule
-const subsetFont = require('subset-font') as FontSubsetter
 
-export class NerdFontService implements FontService {
-  private readonly cacheRoot: string
+/** Nerd Fonts, scraped from the downloads page; each archive's Regular face is cached as ttf. */
+export class NerdFontProvider {
   private readonly fetcher: Fetcher
   private readonly fontDirectory: string
   private readonly linksFile: string
   private readonly previewDirectory: string
   private readonly subsetter: FontSubsetter
 
-  constructor(options: NerdFontServiceOptions = {}) {
-    this.cacheRoot = options.cacheRoot ?? defaultCacheRoot
-    this.fetcher = options.fetcher ?? fetch
-    this.fontDirectory = path.join(this.cacheRoot, 'files')
-    this.linksFile = path.join(this.cacheRoot, 'font-links.json')
-    this.previewDirectory = path.join(this.cacheRoot, 'previews')
-    this.subsetter = options.subsetter ?? subsetFont
+  constructor(options: NerdFontProviderOptions) {
+    this.fetcher = options.fetcher
+    this.fontDirectory = path.join(options.cacheRoot, 'files')
+    this.linksFile = path.join(options.cacheRoot, 'font-links.json')
+    this.previewDirectory = path.join(options.cacheRoot, 'previews')
+    this.subsetter = options.subsetter
   }
 
-  async getNerdFontLinks() {
+  async links() {
     await this.ensureCacheDirectories()
 
     const cached = await readJsonFile<FontLinks>(this.linksFile)
@@ -76,20 +61,22 @@ export class NerdFontService implements FontService {
     return links
   }
 
-  async getExtractedFont(fontName: string) {
+  async font(fontName: string) {
     if (!isValidFontName(fontName)) return null
 
     await this.ensureCacheDirectories()
 
-    const cachedFontPath = this.cachedFontPath(fontName)
+    const cachedFontPath = path.join(this.fontDirectory, `${fontName}.ttf`)
     const cachedFont = await readBinaryFile(cachedFontPath)
     if (cachedFont) return cachedFont
 
-    const links = await this.getNerdFontLinks()
+    const links = await this.links()
     const zipUrl = links[fontName]
     if (!zipUrl) return null
 
     const zipBuffer = await this.downloadFontZip(zipUrl)
+    if (!zipBuffer) return null
+
     const fontBuffer = await extractRegularFont(zipBuffer)
     if (!fontBuffer) return null
 
@@ -97,16 +84,16 @@ export class NerdFontService implements FontService {
     return fontBuffer
   }
 
-  async getPreviewSubset(fontName: string, previewText = defaultPreviewText) {
+  async preview(fontName: string, previewText: string, textHash: string) {
     if (!isValidFontName(fontName)) return null
 
     await this.ensureCacheDirectories()
 
-    const cachedPreviewPath = this.cachedPreviewPath(fontName, previewText)
+    const cachedPreviewPath = path.join(this.previewDirectory, `${fontName}-${textHash}.woff2`)
     const cachedPreview = await readBinaryFile(cachedPreviewPath)
     if (cachedPreview) return cachedPreview
 
-    const fullFont = await this.getExtractedFont(fontName)
+    const fullFont = await this.font(fontName)
     if (!fullFont) return null
 
     const subset = await this.subsetter(fullFont, previewText, { targetFormat: 'woff2' })
@@ -115,37 +102,14 @@ export class NerdFontService implements FontService {
     return subset
   }
 
-  async getBatchFonts(fontNames: readonly string[]) {
-    const results = initialFontBatch(fontNames)
-    const settled = await Promise.allSettled(
-      fontNames.map(async (name) => ({
-        data: await this.getExtractedFont(name),
-        name,
-      })),
-    )
-
-    for (const result of settled) {
-      if (result.status !== 'fulfilled') continue
-      results[result.value.name] = result.value.data
-    }
-
-    return results
-  }
-
   private async downloadFontZip(zipUrl: string) {
+    // The links file is a cache on disk; it never widens where the server fetches from.
+    if (!archiveHosts.has(new URL(zipUrl).hostname)) return null
+
     const response = await this.fetcher(zipUrl)
     if (!response.ok) throw fontOperationFailed('failed to download font archive', response)
 
     return Buffer.from(await response.arrayBuffer())
-  }
-
-  private cachedFontPath(fontName: string) {
-    return path.join(this.fontDirectory, `${fontName}.ttf`)
-  }
-
-  private cachedPreviewPath(fontName: string, previewText: string) {
-    const textHash = createHash('sha256').update(previewText).digest('hex').slice(0, 12)
-    return path.join(this.previewDirectory, `${fontName}-${textHash}.woff2`)
   }
 
   private async ensureCacheDirectories() {
@@ -206,53 +170,12 @@ function isRegularFontFile(filename: string) {
 function parsedFontLink(href: string | undefined) {
   if (!href) return null
 
-  const url = absoluteFontUrl(href)
-  const pathname = new URL(url).pathname
-  if (!pathname.endsWith('.zip')) return null
+  const url = new URL(href, nerdFontsDownloadUrl)
+  if (!archiveHosts.has(url.hostname)) return null
+  if (!url.pathname.endsWith('.zip')) return null
 
-  const name = path.basename(pathname, '.zip')
+  const name = path.basename(url.pathname, '.zip')
   if (!isValidFontName(name)) return null
 
-  return { name, url }
-}
-
-function absoluteFontUrl(href: string) {
-  return new URL(href, nerdFontsDownloadUrl).href
-}
-
-async function readJsonFile<T>(filename: string) {
-  try {
-    return JSON.parse(await readFile(filename, 'utf8')) as T
-  } catch (error) {
-    if (nodeErrorCode(error) === 'ENOENT') return null
-    throw error
-  }
-}
-
-async function readBinaryFile(filename: string) {
-  try {
-    return await readFile(filename)
-  } catch (error) {
-    if (nodeErrorCode(error) === 'ENOENT') return null
-    throw error
-  }
-}
-
-function initialFontBatch(fontNames: readonly string[]) {
-  return Object.fromEntries(fontNames.map((name) => [name, null])) as Record<string, Buffer | null>
-}
-
-function fontOperationFailed(message: string, response: Response) {
-  return new FsError('OPERATION_FAILED', message, {
-    status: response.status,
-    statusText: response.statusText,
-    url: response.url,
-  })
-}
-
-function nodeErrorCode(error: unknown) {
-  if (!error || typeof error !== 'object') return null
-  if (!('code' in error)) return null
-
-  return typeof error.code === 'string' ? error.code : null
+  return { name, url: url.href }
 }

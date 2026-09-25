@@ -38,7 +38,8 @@ test('round-trips semantic operations through the real server', async ({ client 
 
 test('preserves date-shaped setting strings exactly as saved', async ({ client }) => {
   expect(client).toBeDefined()
-  const values = ['2026-09-05', '2026-09-05T12:34:56+03:00']
+  // An installed family may be named anything, including a date.
+  const values = ['local:2026-09-05', 'local:2026-09-05T12:34:56+03:00']
 
   for (const [index, value] of values.entries()) {
     await saveSettings(

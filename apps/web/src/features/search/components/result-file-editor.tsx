@@ -49,7 +49,7 @@ import {
 } from '@/features/search/utils/result-view-model'
 import { useEditorFocusTarget } from '@/lib/focus/hooks/use-editor-target'
 import { useSettingValue } from '@/hooks/use-setting-value'
-import { fontStack } from '@/lib/default-nerd-font'
+import { fontStack } from '@/lib/fonts/utils/stack'
 
 type SearchResultFileEditorProps = {
   activeResultId: SearchResultId | null
@@ -82,7 +82,7 @@ export const SearchResultFileEditor = memo(
       [fileDocument, lineWindow],
     )
     const sourceLineDigits = fileBlockLineDigits(file)
-    const fontFamily = fontStack(useSettingValue('editor.fontFamily'))
+    const fontFamily = fontStack(useSettingValue('editor.fontFamily'), 'code')
     const tabSize = useSettingValue('editor.tabSize')
     const document = {
       documentId: searchResultFileDocumentId(file),

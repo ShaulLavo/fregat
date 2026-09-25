@@ -20,7 +20,7 @@ type Miss = { readonly column: number; readonly caretPrefix: string }
  * and reads where the caret landed from the hidden input: the text before its selection must end
  * with the row's text up to that column.
  */
-async function clickColumns(page: Page) {
+export async function clickColumns(page: Page) {
   const points = await page.evaluate((layers) => {
     for (const row of document.querySelectorAll<HTMLElement>(
       '.editor-virtualized-row:not([hidden])',

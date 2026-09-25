@@ -65,6 +65,12 @@ export const clientErrors = defineErrorCatalog('client', {
     why: 'The RPC call succeeded without the SSE body required by the caller.',
     fix: 'Verify the server route returns an event stream for this request.',
   },
+  FONT_LOAD_FAILED: {
+    status: 502,
+    message: ({ ref }: { ref: string }) => `Font ${ref} did not load`,
+    why: 'The server could not deliver the font, or the browser rejected the file.',
+    fix: 'Check the connection to the server or pick another font; text stays in the bundled face meanwhile.',
+  },
   INVALID_OPTION: {
     status: 500,
     message: ({ message }: { message: string }) => message,

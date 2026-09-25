@@ -10,6 +10,7 @@ const schema = v.object({
   root: v.string(),
   sessionId: v.string(),
   fontSize: v.number(),
+  fontFamily: v.string(),
   paletteHash: v.string(),
   paint: v.pipe(v.string(), v.maxLength(131072)),
 })
@@ -34,6 +35,7 @@ export function savedTerminal(owner: QueryClient, target: Omit<TerminalDisplay, 
     saved.root === target.root &&
     saved.sessionId === target.sessionId &&
     saved.fontSize === target.fontSize &&
+    saved.fontFamily === target.fontFamily &&
     saved.paletteHash === target.paletteHash
     ? saved.paint
     : null

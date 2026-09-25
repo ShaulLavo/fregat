@@ -43,8 +43,8 @@ describe('settings JSON Schema', () => {
       type: 'integer',
     })
     expect(SETTINGS_JSON_SCHEMA.properties['editor.fontFamily']).toMatchObject({
-      maxLength: 64,
-      minLength: 1,
+      maxLength: 160,
+      minLength: 3,
       type: 'string',
     })
   })

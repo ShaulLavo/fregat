@@ -2,8 +2,8 @@
 
 ## Status and authorization
 
-- Status: PROPOSED — research done; recommendations taken as decided unless the owner overrides
-  (standing instruction, 2026-09-25).
+- Status: DONE 2026-09-25 — all five phases, plus installed fonts (owner request during
+  implementation). See "What landed" at the end.
 - Priority: P2 in the UI refresh lane.
 - Effort: M–L. A second catalog provider on the server, a shared client font loader, one new
   setting, and a picker that replaces the Nerd Font dropdown.
@@ -190,3 +190,38 @@ role and the search cover them), and the separate "Type a family name…" row.
 - `caches` after choosing: one font query per ref, settled.
 - `look` on settings, chat and the editor in two picked fonts, both densities.
 - `bun run gates`, `bun run settings:reference`, then `bun run deploy --server`.
+
+## What landed (2026-09-25)
+
+Everything above, with these differences:
+
+- **Routes.** `GET /fonts` (merged catalog), `GET /fonts/preview?ref=&text=` for any ref,
+  `/fonts/nerd/:name`, `/fonts/fontsource/:id.css` with files beside it, and `/fonts/local/…` for
+  installed fonts. `POST /fonts/batch` had no caller and is gone.
+- **Family names come from the ref, not the catalog.** Boot has no catalog, so boot, the loader and
+  the server stylesheet all name a face with `fontFamilyName(ref)` in `packages/contracts`
+  (`geist Fontsource`, `FiraCode Nerd Font`).
+- **Nerd glyphs for every code font.** The default code font is `bundled:jetbrains-mono`, which has
+  no prompt icons. Any code font that isn't a Nerd Font falls back to `nerd:NerdFontsSymbolsOnly`,
+  started at boot, so the terminal keeps its glyphs.
+- **`--font-code`.** `font-mono` was compiled to a literal stack (`@theme inline`), so the old
+  `--font-mono` override never reached it. `--font-ui` and `--font-code` are now plain `:root`
+  variables that `applyAppearance` overrides.
+- **The terminal follows the code font.** It was hardcoded to JetBrains Mono Nerd Font. The saved
+  reload paint is keyed by family as well as size.
+- **Installed fonts.** The server lists its machine's fonts with `fc-list`, and search shows them as
+  `local:` refs tagged "installed". It serves their regular, bold and italic files through a
+  generated stylesheet, so a font installed here also works on the phone and the Mac over the
+  mesh. A machine without fontconfig (stock macOS) lists none. A family the server lacks gets an
+  empty stylesheet and renders from the viewer's own install.
+- **Recent** is this session's settings writes, from the mutation cache, plus the saved value. There
+  is no settings history to derive it from, so it does not survive a reload.
+- **Suggested renders immediately.** The curated list is local data. Skeleton rows show only while
+  a search waits for the catalog.
+- **Rows carry a source tag** (`installed`, `Fontsource`, `Nerd Font`, `bundled`), because the same
+  family name can come from two sources.
+- **Font stylesheets are `crossorigin="anonymous"`.** A plain `<link>` sends no `Origin`, and the
+  origin guard rejects it when the API is cross-origin (dev).
+
+Evidence: `/work/tmp/fregat-evidence/20260925T095311Z-scenario-font-picker/` (scenario
+`font-picker`) and `…095327Z-caches-run/` (one settled font query per ref).

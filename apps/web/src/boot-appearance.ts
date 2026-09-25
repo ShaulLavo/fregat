@@ -1,11 +1,16 @@
 import {
   COLOR_THEME_MODES,
+  DEFAULT_CODE_FONT,
   DEFAULT_COLOR_THEME,
-  DEFAULT_EDITOR_FONT_FAMILY,
   DEFAULT_PALETTE_ID,
   DEFAULT_WALLPAPER_SELECTION,
+  DEFAULT_UI_FONT,
   DEFAULT_WORKBENCH_DENSITY,
+  NERD_SYMBOLS_FONT,
+  cssFamily,
+  fontFamilyName,
   isWorkbenchDensity,
+  parseFontRef,
   type SettingsValues,
   type WallpaperSelection,
 } from '@workspace/contracts'
@@ -30,7 +35,8 @@ type BootAppearance = {
   density: SettingsValues['workbench.density']
   palette: string
   wallpaper: WallpaperSelection
-  fontId: string
+  uiFont: string
+  codeFont: string
 }
 
 const appearance = readBootAppearance()
@@ -41,21 +47,25 @@ if (!appearance.wallpaper.enabled) root.setAttribute('data-wallpaper-hidden', ''
 if (appearance.wallpaper.enabled && appearance.wallpaper.source.kind === 'desktop') {
   preloadDesktopWallpaper()
 }
-startEditorFont(appearance.fontId)
+startFont(appearance.uiFont)
+startFont(appearance.codeFont)
+if (parseFontRef(appearance.codeFont)?.source !== 'nerd') startFont(NERD_SYMBOLS_FONT)
 injectPaletteStylesheet(appearance.palette)
 
 function readBootAppearance(): BootAppearance {
   const mirror = readStoredMirror()
   const mode = colorMode(mirror['workbench.colorTheme'])
   const density = mirror['workbench.density']
-  const font = mirror['editor.fontFamily']
+  const uiFont = mirror['workbench.fontFamily']
+  const codeFont = mirror['editor.fontFamily']
   const storedPalette = mirror['workbench.palette']
   const appearance: BootAppearance = {
     mode,
     density: isWorkbenchDensity(density) ? density : DEFAULT_WORKBENCH_DENSITY,
     palette: typeof storedPalette === 'string' ? storedPalette : DEFAULT_PALETTE_ID,
     wallpaper: DEFAULT_WALLPAPER_SELECTION,
-    fontId: typeof font === 'string' ? font : DEFAULT_EDITOR_FONT_FAMILY,
+    uiFont: typeof uiFont === 'string' ? uiFont : DEFAULT_UI_FONT,
+    codeFont: typeof codeFont === 'string' ? codeFont : DEFAULT_CODE_FONT,
   }
   // The mirror is written from validated server snapshots, so its bundle shape is trusted here.
   const bundle = mirror['workbench.theme'] as SettingsValues['workbench.theme'] | undefined
@@ -101,20 +111,49 @@ function serverBase(): string {
   return `${server.origin}${server.pathname.replace(/\/+$/, '')}`
 }
 
-// The editor measures its cell width as it mounts, so the face has to be in flight before the
-// bundle is. The family name mirrors src/lib/default-nerd-font.ts, which adopts this face.
-function startEditorFont(fontId: string) {
+// The editor measures its cell width as it mounts and the first frame sets words, so each face
+// has to be in flight before the bundle is. src/lib/fonts/state/queries.ts adopts what starts here.
+function startFont(value: string) {
+  const ref = parseFontRef(value)
+  if (ref?.source === 'nerd') startNerdFont(ref.id, fontFamilyName(ref))
+  if (ref?.source === 'fontsource' || ref?.source === 'local') {
+    const href = `${serverBase()}/fonts/${ref.source}/${encodeURIComponent(ref.id)}.css`
+    startStylesheet(value, href, fontFamilyName(ref))
+  }
+}
+
+function startNerdFont(id: string, family: string) {
   if (typeof FontFace === 'undefined') return
 
-  const url = `${serverBase()}/fonts/${encodeURIComponent(fontId)}`
-  const face = new FontFace(`${fontId} Nerd Font`, `url(${JSON.stringify(url)})`, {
+  const url = `${serverBase()}/fonts/nerd/${encodeURIComponent(id)}`
+  const face = new FontFace(family, `url(${JSON.stringify(url)})`, {
     display: 'swap',
     style: 'normal',
     weight: '400',
   })
   document.fonts.add(face)
-  // A family the user typed is not on the server; the stack falls through to the local one.
+  // Offline and never cached: the stack falls through to the bundled face.
   face.load().catch(() => {})
+}
+
+// Render-blocking, so the first layout already knows the faces and fetches the subsets it sets.
+function startStylesheet(value: string, href: string, family: string) {
+  const link = document.createElement('link')
+  link.rel = 'stylesheet'
+  // CORS mode sends Origin, which the server's origin guard needs when the API is cross-origin.
+  link.crossOrigin = 'anonymous'
+  link.href = href
+  link.setAttribute('blocking', 'render')
+  link.dataset.fontRef = value
+  link.dataset.state = 'pending'
+  link.onload = () => {
+    link.dataset.state = 'loaded'
+    document.fonts.load(`1em ${cssFamily(family)}`).catch(() => {})
+  }
+  link.onerror = () => {
+    link.dataset.state = 'error'
+  }
+  document.head.append(link)
 }
 
 function preloadDesktopWallpaper() {

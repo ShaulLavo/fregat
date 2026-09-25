@@ -25,6 +25,7 @@ export function terminalCursorOptions(
 
 export type TerminalAppearance = {
   readonly cursorBlink: boolean
+  readonly fontFamily: string
   readonly fontSize: number
 }
 
@@ -32,7 +33,7 @@ export type TerminalAppearance = {
 export function applyTerminalAppearance(terminal: Terminal | null, appearance: TerminalAppearance) {
   if (!terminal) return
 
-  terminal.setFont({ size: appearance.fontSize })
+  terminal.setFont({ family: appearance.fontFamily, size: appearance.fontSize })
   terminal.setCursor({ blink: appearance.cursorBlink })
 }
 

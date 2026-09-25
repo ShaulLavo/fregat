@@ -158,7 +158,17 @@ async function get(
     case '/wallpaper/still':
       return fetch(bypass(assets.wallpaper))
     case '/fonts':
-      return json({ JetBrainsMono: assets.font })
+      return json([
+        {
+          ref: 'nerd:JetBrainsMono',
+          family: 'JetBrainsMono Nerd Font',
+          source: 'nerd',
+          category: 'monospace',
+          variable: false,
+          weights: [400],
+          license: null,
+        },
+      ])
     case '/fs/stat':
       return json(required(workspace.stat(path)))
     case '/fs/tree':
@@ -197,7 +207,8 @@ async function get(
       return json(null)
   }
   if (url.pathname.startsWith('/fs/workspace-address/')) return json(DEMO_ADDRESS)
-  if (url.pathname.startsWith('/fonts/')) return fetch(bypass(assets.font))
+  // The one bundled Nerd Font carries the symbols every other code font borrows.
+  if (url.pathname.startsWith('/fonts/nerd/')) return fetch(bypass(assets.font))
   if (/^\/providers\/[^/]+\/commands$/u.test(url.pathname))
     return json({
       providerInstanceId: url.pathname.split('/')[2],

@@ -16,7 +16,13 @@ test('geometry rejection runs once and releases the native viewport once on unmo
   })
   const onRejected = vi.fn()
   const view = render(
-    <SavedViewport paint='saved' fontSize={14} onAdmitted={vi.fn()} onRejected={onRejected} />,
+    <SavedViewport
+      paint='saved'
+      fontFamily='monospace'
+      fontSize={14}
+      onAdmitted={vi.fn()}
+      onRejected={onRejected}
+    />,
   )
   const host = view.getByRole('img')
   Object.defineProperty(host, 'clientWidth', { value: 100 })

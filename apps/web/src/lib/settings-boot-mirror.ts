@@ -76,6 +76,7 @@ const MIRRORED_KEYS = [
   'workbench.palette',
   'workbench.colorTheme',
   'workbench.density',
+  'workbench.fontFamily',
   'workbench.surface.blur',
   'workbench.surface.contentOpacity',
   'workbench.surface.opacity',

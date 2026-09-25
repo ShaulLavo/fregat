@@ -44,6 +44,7 @@ import { useTerminalLinks } from '@/features/terminal/hooks/use-links'
 import { readTerminalMenuTarget, type TerminalMenuTarget } from '@/features/terminal/utils/commands'
 import { isFocusOutsideElement } from '@/features/terminal/utils/focus-target'
 import { useSettingValue } from '@/hooks/use-setting-value'
+import { fontStack } from '@/lib/fonts/utils/stack'
 import { useUnavailableEnvironment } from '@/lib/environments/hooks/use-unavailable-environment'
 import { FixWithAgentButton } from '@/components/fix-with-agent-button'
 
@@ -75,6 +76,7 @@ export function TerminalPanel({
   // tempt someone into making it a dependency of the mount effect.
   const cursorBlink = useSettingValue('terminal.integrated.cursorBlinking')
   const fontSize = useSettingValue('terminal.integrated.fontSize')
+  const fontFamily = fontStack(useSettingValue('editor.fontFamily'), 'code')
   const scrollback = useSettingValue('terminal.integrated.scrollback')
   const contextMenu = useContextMenu()
   const terminalActions = useTerminalActions({ rootPath, terminalId: sessionId })
@@ -85,14 +87,10 @@ export function TerminalPanel({
     key: string
     paint: string | null
   } | null>(null)
-  const displayKey = `${origin}\u0000${rootPath}\u0000${sessionId}\u0000${fontSize}\u0000${paletteHash}`
+  const displayKey = `${origin}\u0000${rootPath}\u0000${sessionId}\u0000${fontSize}\u0000${fontFamily}\u0000${paletteHash}`
+  const display = { root: rootPath, sessionId, fontSize, fontFamily, paletteHash }
   const [rejectedPaint, setRejectedPaint] = useState<{ key: string; paint: string } | null>(null)
-  const initialPaint = savedTerminal(queryClient, {
-    root: rootPath,
-    sessionId,
-    fontSize,
-    paletteHash,
-  })
+  const initialPaint = savedTerminal(queryClient, display)
   const candidate = disconnectedPaint?.key === displayKey ? disconnectedPaint.paint : initialPaint
   const savedPaint =
     rejectedPaint?.key === displayKey && rejectedPaint.paint === candidate ? null : candidate
@@ -147,7 +145,7 @@ export function TerminalPanel({
       // At handover rather than at construction: ghostty resolves long after the
       // mount effect started, and this is an effect event, so it sees the
       // current settings rather than the ones the mount began with.
-      applyTerminalAppearance(terminal, { cursorBlink, fontSize })
+      applyTerminalAppearance(terminal, { cursorBlink, fontFamily, fontSize })
       applyTerminalCursorOptions(terminal, terminalCursorOptions(terminalFocused, cursorBlink))
       applyTerminalTheme(terminal, terminalColors)
       registerTerminalLinks(terminal)
@@ -164,7 +162,7 @@ export function TerminalPanel({
     }
     setDisconnectedPaint({
       key: displayKey,
-      paint: savedTerminal(queryClient, { root: rootPath, sessionId, fontSize, paletteHash }),
+      paint: savedTerminal(queryClient, display),
     })
     setMenuTarget(null)
   })
@@ -175,12 +173,7 @@ export function TerminalPanel({
       generation: ReturnType<typeof terminalReloadGeneration>,
     ) => {
       if (!active || identity !== terminalMountIdentity) return
-      captureTerminal(
-        queryClient,
-        { root: rootPath, sessionId, fontSize, paletteHash },
-        terminal.captureViewport(),
-        generation,
-      )
+      captureTerminal(queryClient, display, terminal.captureViewport(), generation)
     },
   )
   const readSavedScroll = useEffectEvent(() => {
@@ -235,8 +228,8 @@ export function TerminalPanel({
   }
 
   useEffect(() => {
-    applyTerminalAppearance(terminalRef.current, { cursorBlink, fontSize })
-  }, [cursorBlink, fontSize])
+    applyTerminalAppearance(terminalRef.current, { cursorBlink, fontFamily, fontSize })
+  }, [cursorBlink, fontFamily, fontSize])
 
   // Keyed on the content hash, not the mode: a dark-to-dark palette change repaints the ANSI
   // table without a remount, and the same colors arriving as a fresh object repaint nothing.
@@ -339,19 +332,16 @@ export function TerminalPanel({
       />
       {savedPaint && !hasLivePaint && active ? (
         <SavedViewport
-          key={`${terminalMountIdentity}:${paletteHash}:${fontSize}`}
+          key={`${terminalMountIdentity}:${paletteHash}:${fontSize}:${fontFamily}`}
           paint={savedPaint}
+          fontFamily={fontFamily}
           fontSize={fontSize}
           onAdmitted={(scrollbar) => {
             savedScrollRef.current = { paint: savedPaint, scrollbar }
           }}
           onRejected={() => {
             savedScrollRef.current = null
-            discardTerminal(
-              queryClient,
-              { root: rootPath, sessionId, fontSize, paletteHash },
-              savedPaint,
-            )
+            discardTerminal(queryClient, display, savedPaint)
             setRejectedPaint({ key: displayKey, paint: savedPaint })
           }}
         />

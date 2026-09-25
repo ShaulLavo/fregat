@@ -21,6 +21,7 @@ import { RowActions } from '@/features/settings/components/row-actions'
 import { BooleanWidget } from '@/features/settings/components/widgets/boolean-widget'
 import { CodeThemeWidget } from '@/features/settings/components/widgets/code-theme-widget'
 import { EnumWidget } from '@/features/settings/components/widgets/enum-widget'
+import { isFontSettingId } from '@/features/settings/utils/font-options'
 import { FontWidget } from '@/features/settings/components/widgets/font-widget'
 import { NumberWidget } from '@/features/settings/components/widgets/number-widget'
 import { PaletteWidget } from '@/features/settings/components/widgets/palette-widget'
@@ -174,7 +175,7 @@ function SettingControl({
     return <KeybindingSection />
   }
 
-  if (control.widget === 'font') {
+  if (control.widget === 'font' && isFontSettingId(id)) {
     return <FontWidget disabled={disabled} id={id} onChange={onChange} value={control.value} />
   }
 

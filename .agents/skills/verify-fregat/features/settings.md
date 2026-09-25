@@ -18,7 +18,7 @@ The settings command, the gear button at the bottom of the sidebar rail, or an a
 
 `scenario sidebar-settings-button` checks both workbench and chat rails retain their own tabs and have exactly one Settings action pinned to the bottom. It closes and reopens Search using the same icon in both modes, checking panel visibility and pressed state. It opens Settings in each mode, checks its tooltip, collapses chat's Editor tool, and opens Settings again from the remaining rail. Both rails compose the app-owned `RailTabs` and `WorkspaceRail`; see `docs/workspace-rails.md`.
 
-`scenario settings-font-input` types a font draft and cancels with Escape, checking that the shared string editor restores the saved font family.
+`scenario font-picker` drives both font pickers: Suggested before typing, a hovered search result previewing the whole app (`--font-ui`), Escape restoring it, a chosen Fontsource font surviving reload with its stylesheet loaded at the first frame, an installed font found by search, and a Nerd Font for code with editor clicks landing on the right column. The server's installed-font list comes from `fc-list` on the machine running the API.
 
 `scenario settings-save-rejected` fulfils the settings write with a 400 structured envelope and checks the toast shows the server's own message _and_ its `fix`. The envelope carries `why` and `fix` (`responseErrorPayload` in `apps/server/src/app.ts`); `createRpcError` and `clientErrorDescription` are the two places that used to drop them.
 

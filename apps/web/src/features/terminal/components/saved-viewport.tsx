@@ -1,14 +1,15 @@
 import { useEffectEvent, useLayoutEffect, useRef } from 'react'
 import { paintTerminalViewport, type TerminalScrollbar } from 'ghostty-webgpu'
-import { DEFAULT_MONO_FONT_STACK } from '@/lib/default-nerd-font'
 
 export function SavedViewport({
   paint,
+  fontFamily,
   fontSize,
   onAdmitted,
   onRejected,
 }: {
   paint: string
+  fontFamily: string
   fontSize: number
   onAdmitted: (scrollbar: Readonly<TerminalScrollbar>) => void
   onRejected: () => void
@@ -20,7 +21,7 @@ export function SavedViewport({
     const host = ref.current
     if (!host) return
     const view = paintTerminalViewport(host, paint, {
-      font: { family: DEFAULT_MONO_FONT_STACK, size: fontSize },
+      font: { family: fontFamily, size: fontSize },
     })
     if (!view) {
       rejected()
@@ -50,7 +51,7 @@ export function SavedViewport({
       window.removeEventListener('resize', checkGeometry)
       view.dispose()
     }
-  }, [paint, fontSize])
+  }, [paint, fontFamily, fontSize])
   return (
     <div
       ref={ref}

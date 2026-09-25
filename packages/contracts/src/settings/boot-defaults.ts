@@ -17,7 +17,9 @@ export const DEFAULT_COLOR_THEME: (typeof COLOR_THEME_MODES)[number] = 'system'
 
 export const DEFAULT_PALETTE_ID = 'graphite'
 
-export const DEFAULT_EDITOR_FONT_FAMILY = 'JetBrainsMono'
+export const DEFAULT_UI_FONT = 'bundled:inter'
+
+export const DEFAULT_CODE_FONT = 'bundled:jetbrains-mono'
 
 export const DEFAULT_WALLPAPER_SELECTION: WallpaperSelection = {
   enabled: true,

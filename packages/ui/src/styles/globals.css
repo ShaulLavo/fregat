@@ -14,8 +14,8 @@
 @source '../../../markdown/src/**/*.{ts,tsx}';
 
 @theme inline {
-  /* Words are Inter. Code and short metadata share `--font-mono`, the user's coding font. */
-  --font-ui: 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  /* Words take `--font-ui`; code and short metadata share `--font-code`, the user's coding font.
+     Both are runtime variables, because an inlined theme value would ignore the font settings. */
   --font-sans: var(--font-ui);
   --font-heading: var(--font-ui);
   --color-chart-5: var(--chart-5);
@@ -92,8 +92,7 @@
   --text-2xs--line-height: 1rem;
   --text-3xs: 0.625rem;
   --text-3xs--line-height: 0.875rem;
-  --font-mono:
-    'JetBrains Mono Nerd Font', 'JetBrains Mono Variable', ui-monospace, SFMono-Regular, monospace;
+  --font-mono: var(--font-code);
   --animate-accordion-down: app-accordion-down var(--duration-enter) var(--ease-out-strong);
   --animate-accordion-up: app-accordion-up var(--duration-exit) var(--ease-out-strong);
   /* Motion. Built-in CSS easings are too weak to read as intentional; these are
@@ -171,6 +170,9 @@
    `sage` branch overrides it wholesale further down. */
 :root {
   color-scheme: light;
+  /* The bundled defaults; applyAppearance writes the chosen fonts over them. */
+  --font-ui: 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-code: 'JetBrains Mono Variable', ui-monospace, SFMono-Regular, monospace;
   --git-graph-1: var(--info);
   --git-graph-2: var(--success);
   --git-graph-3: var(--warning);

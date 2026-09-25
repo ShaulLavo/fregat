@@ -51,7 +51,7 @@ import { checkpointStates } from './checkpoint-states'
 import { sessionActionsSurfaces } from './session-actions-surfaces'
 import { searchFileActions } from './search-file-actions'
 import { settingsStaleDiagnostics } from './settings-stale-diagnostics'
-import { settingsFontInput } from './settings-font-input'
+import { fontPicker } from './font-picker'
 import { settingsSaveRejected } from './settings-save-rejected'
 import { settingsResponsive } from './settings-responsive'
 import { filePickerNavigation, gitHistoryScroll } from './list-regressions'
@@ -333,7 +333,7 @@ export const scenarios: readonly Scenario[] = [
   settingsColdLoad,
   projectMenu,
   sidebarSettingsButton,
-  settingsFontInput,
+  fontPicker,
   demoWorkspace,
   demoAgentGit,
   demoReset,
