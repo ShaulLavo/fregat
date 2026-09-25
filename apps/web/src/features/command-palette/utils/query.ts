@@ -109,6 +109,11 @@ export function fileItemValue(item: FilePaletteItem) {
   return `file:${item.entry.path}`
 }
 
+/** The file row cmdk has highlighted, which the preview follows. */
+export function highlightedFileItem(items: readonly FilePaletteItem[], value: string | undefined) {
+  return items.find((item) => fileItemValue(item) === value) ?? null
+}
+
 export function editorPaletteItems(
   contents: readonly TabContent[],
   selected: TabContent | null,

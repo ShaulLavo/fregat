@@ -6,9 +6,10 @@ import type { FsEntry } from '@/lib/file-system-types'
 import { serverEndpoint } from '@/lib/client'
 import { originForQueryClient } from '@/lib/environments/state/query-clients'
 import { EntryPreviewTile } from '@/features/file-picker/components/entry-preview-tile'
-import { FileThumbnail } from '@/features/file-picker/components/file-thumbnail'
+import { FileThumbnail } from '@/lib/file-preview/components/file-thumbnail'
+import { previewImageUrl } from '@/lib/file-preview/utils/preview'
 import type { FilePickerIconMode } from '@/features/file-picker/utils/model'
-import { previewImageUrl, previewKind } from '@/features/file-picker/utils/preview'
+import { previewKind } from '@/features/file-picker/utils/preview'
 
 /** One entry in the icons grid: an image's own thumbnail, or the entry's icon tile. */
 export function FileTile({
@@ -44,8 +45,9 @@ export function FileTile({
         {previewKind(entry) === 'image' ? (
           <FileThumbnail
             className='h-20'
-            entry={entry}
-            iconMode={iconMode}
+            fallback={
+              <EntryPreviewTile entry={entry} iconMode={iconMode} selected={selected} size='lg' />
+            }
             src={previewImageUrl(origin, entry.path)}
           />
         ) : (

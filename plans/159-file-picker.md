@@ -2,7 +2,7 @@
 
 ## Status and authorization
 
-- Status: P1–P5 done 2026-09-25 (lane L1), with P5's filter chips deferred under D4; P6 next. D1–D4 accepted as recommended on 2026-09-25. The owner wants this ("100000%").
+- Status: DONE 2026-09-25 (lane L1) except P5's filter chips, which wait under D4 until large folders show they are wanted. D1–D4 accepted as recommended on 2026-09-25. The owner wants this ("100000%").
 - Priority: P1 in the UI refresh lane. It runs after Plan 157 (done), whose
   segmented control, scroll fades and typeahead refine it uses.
 - Effort: L. A second view with its own keyboard model, a content preview with two data paths, a
@@ -186,6 +186,12 @@ it yet. The text below is the original plan.
   chip instead of greying rows out silently. A filter that hides the selection clears it.
 
 ## Phase 6 — Quick open preview (if D2)
+
+**Done 2026-09-25 (lane L1).** The thumbnail, the text preview and the preview query moved to
+`lib/file-preview/` (two consumers), with the icon fallback passed in. Quick open shows
+`FilePreviewPanel` under the results, as the code-theme panel does; the palette is too narrow for a
+side panel. Scenario `quick-open-preview`; `quick-open-no-flicker` stays at zero blank frames. The
+text below is the original plan.
 
 `features/command-palette/components/content.tsx` feeds `HighlightReporter`'s value for file rows
 into a right-hand panel built from Phase 2's preview, laid out like `code-theme-preview-panel.tsx`.

@@ -1,33 +1,26 @@
-import type { FsEntry } from '@/lib/file-system-types'
 import { cn } from '@workspace/ui/lib/utils'
-import { useState } from 'react'
-
-import { EntryPreviewTile } from '@/features/file-picker/components/entry-preview-tile'
-import type { FilePickerIconMode } from '@/features/file-picker/utils/model'
+import { useState, type ReactNode } from 'react'
 
 type Load = { readonly src: string; readonly state: 'loading' | 'shown' | 'instant' | 'failed' }
 
 /**
  * An image that fades in on its first load only. A remount for an image the browser already
  * holds attaches to a complete `<img>`, so it shows at once with no module-level memory of URLs.
- * A failed load becomes the entry's icon tile.
+ * A failed load shows the caller's fallback, usually the entry's icon.
  */
 export function FileThumbnail({
   className,
-  entry,
-  iconMode,
+  fallback,
   src,
 }: {
   className?: string
-  entry: FsEntry
-  iconMode: FilePickerIconMode
+  fallback: ReactNode
   src: string
 }) {
   const [load, setLoad] = useState<Load>({ src, state: 'loading' })
   const state = load.src === src ? load.state : 'loading'
 
-  if (state === 'failed')
-    return <EntryPreviewTile entry={entry} iconMode={iconMode} selected={false} size='lg' />
+  if (state === 'failed') return fallback
 
   return (
     <img

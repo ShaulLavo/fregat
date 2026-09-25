@@ -98,6 +98,7 @@ import { settingsValueGrids } from './settings-value-grids'
 import { tailFollow } from './tail-follow'
 import { checkpointRestore } from './checkpoint-restore'
 import { filePickerBrowse } from './file-picker-browse'
+import { quickOpenPreview } from './quick-open-preview'
 import { commandPaletteTypeBurst } from './command-palette-type-burst'
 import { paletteScriptsPending } from './palette-scripts-pending'
 import { settingsModelsPending } from './settings-models-pending'
@@ -324,6 +325,7 @@ export const scenarios: readonly Scenario[] = [
   tailFollow,
   checkpointRestore,
   filePickerBrowse,
+  quickOpenPreview,
   commandPaletteTypeBurst,
   paletteScriptsPending,
   settingsModelsPending,

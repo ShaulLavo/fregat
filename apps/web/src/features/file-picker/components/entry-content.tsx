@@ -4,11 +4,12 @@ import type { FsEntry } from '@/lib/file-system-types'
 import { serverEndpoint } from '@/lib/client'
 import { originForQueryClient } from '@/lib/environments/state/query-clients'
 import { EntryPreviewTile } from '@/features/file-picker/components/entry-preview-tile'
-import { FileThumbnail } from '@/features/file-picker/components/file-thumbnail'
+import { FileThumbnail } from '@/lib/file-preview/components/file-thumbnail'
 import { FolderPreview } from '@/features/file-picker/components/folder-preview'
-import { TextPreview } from '@/features/file-picker/components/text-preview'
+import { TextPreview } from '@/lib/file-preview/components/text-preview'
+import { previewImageUrl } from '@/lib/file-preview/utils/preview'
 import type { FilePickerIconMode, FilePickerMode } from '@/features/file-picker/utils/model'
-import { previewImageUrl, previewKind } from '@/features/file-picker/utils/preview'
+import { previewKind } from '@/features/file-picker/utils/preview'
 
 /** What is in the entry: the image, the first lines, or the first children. */
 export function EntryContent({
@@ -24,12 +25,11 @@ export function EntryContent({
 }) {
   const origin = serverEndpoint(originForQueryClient(useQueryClient()))
   const kind = previewKind(entry)
+  const tile = <EntryPreviewTile entry={entry} iconMode={iconMode} selected={false} size='lg' />
   if (kind === 'image')
-    return (
-      <FileThumbnail entry={entry} iconMode={iconMode} src={previewImageUrl(origin, entry.path)} />
-    )
-  if (kind === 'text') return <TextPreview entry={entry} iconMode={iconMode} />
+    return <FileThumbnail fallback={tile} src={previewImageUrl(origin, entry.path)} />
+  if (kind === 'text') return <TextPreview fallback={tile} name={entry.name} path={entry.path} />
   if (kind === 'folder')
     return <FolderPreview entry={entry} iconMode={iconMode} mode={mode} showHidden={showHidden} />
-  return <EntryPreviewTile entry={entry} iconMode={iconMode} selected={false} size='lg' />
+  return tile
 }

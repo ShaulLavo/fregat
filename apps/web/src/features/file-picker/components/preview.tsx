@@ -4,12 +4,12 @@ import { Spinner } from '@workspace/ui/components/spinner'
 import { ToolPane } from '@workspace/ui/patterns/tool-pane'
 
 import type { FsEntry } from '@/lib/file-system-types'
-import { filePickerKeys } from '@/lib/query-keys'
+import { filePreviewKeys } from '@/lib/query-keys'
 import { EntryContent } from '@/features/file-picker/components/entry-content'
 import { EntryFacts } from '@/features/file-picker/components/entry-facts'
 import { NoPreview } from '@/features/file-picker/components/no-preview'
 import type { FilePickerIconMode, FilePickerMode } from '@/features/file-picker/utils/model'
-import { PREVIEW_SETTLE_MS } from '@/features/file-picker/utils/preview'
+import { PREVIEW_SETTLE_MS } from '@/lib/file-preview/utils/preview'
 
 /**
  * The selection's content and facts. It follows the selection only once it rests, so holding an
@@ -32,7 +32,7 @@ export function PreviewPane({
 }) {
   const [settled] = useDebouncedValue(entry, { wait: PREVIEW_SETTLE_MS })
   const shown = settled
-  const fetching = useIsFetching({ queryKey: filePickerKeys.preview(shown?.path ?? '') }) > 0
+  const fetching = useIsFetching({ queryKey: filePreviewKeys.preview(shown?.path ?? '') }) > 0
 
   return (
     <ToolPane

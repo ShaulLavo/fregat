@@ -237,6 +237,7 @@ export const selectors = {
       .getByRole('option')
       .filter({ hasText: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`) }),
   pickerPreview: (page: Page) => page.locator('[data-file-preview]'),
+  quickOpenPreview: (page: Page) => page.getByRole('region', { name: 'File preview', exact: true }),
   pickerColumn: (page: Page, index: number) => page.locator(`[data-picker-column="${index}"]`),
   pickerView: (page: Page, view: 'Columns' | 'List') =>
     page

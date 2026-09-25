@@ -28,7 +28,11 @@ export const filePickerKeys = {
   recents: () => [...filePickerKeys.all, 'recents'] as const,
   recentList: (mode: 'file' | 'folder', showHidden: boolean) =>
     [...filePickerKeys.recents(), 'list', { mode, showHidden }] as const,
-  preview: (path: string) => [...filePickerKeys.all, 'preview', path] as const,
+}
+
+export const filePreviewKeys = {
+  all: ['file-preview'] as const,
+  preview: (path: string) => [...filePreviewKeys.all, path] as const,
 }
 
 export const gitKeys = {

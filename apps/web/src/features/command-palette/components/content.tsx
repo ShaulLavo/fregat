@@ -1,4 +1,5 @@
 import { CodeThemePreviewPanel } from '@/features/command-palette/components/code-theme-preview-panel'
+import { FilePreviewPanel } from '@/features/command-palette/components/file-preview-panel'
 import {
   CommandDialog,
   CommandEmpty,
@@ -31,6 +32,7 @@ import {
   quickAccessQuery,
   scopeLabelForMode,
   scopedPaletteFilter,
+  highlightedFileItem,
 } from '@/features/command-palette/utils/query'
 import { fileUriForPath } from '@/lib/file-uri'
 import { ScopeChip } from '@/features/command-palette/components/scope-chip'
@@ -428,6 +430,9 @@ export function CommandPaletteContent() {
         </CommandPaletteActionsContext>
       </CommandList>
       {mode === 'colorTheme' && <CodeThemePreviewPanel query={query} />}
+      {mode === 'files' ? (
+        <FilePreviewPanel item={highlightedFileItem(visibleFileItems, selectedCommandValue)} />
+      ) : null}
     </CommandDialog>
   )
 }

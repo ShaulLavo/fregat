@@ -4,15 +4,15 @@ import { extractFsErrorCode } from '@/lib/client-error-taxonomy'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import { fetchFile } from '@/lib/file-server'
 import { filesystemPath } from '@/lib/documents/utils/identity'
-import { filePickerKeys } from '@/lib/query-keys'
-import { previewLines, type PreviewContent } from '@/features/file-picker/utils/preview'
+import { filePreviewKeys } from '@/lib/query-keys'
+import { previewLines, type PreviewContent } from '@/lib/file-preview/utils/preview'
 
 export const PREVIEW_STALE_MS = 30_000
 
 /** The head of a text file. Binary and oversized files are not an error: they have no text preview. */
 export function previewQueryOptions(path: string) {
   return queryOptions<PreviewContent>({
-    queryKey: filePickerKeys.preview(path),
+    queryKey: filePreviewKeys.preview(path),
     staleTime: PREVIEW_STALE_MS,
     queryFn: async ({ client, signal }) => {
       try {
