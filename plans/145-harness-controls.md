@@ -53,7 +53,7 @@ from the server: `GET /orchestration/session-transcript`, fetched as a TanStack 
 (`features/chat/state/transcript-export.ts`) and formatted by the pure
 `features/chat/utils/transcript-export.ts` (D2: Markdown gives each tool call one line, JSON
 carries everything). Surfaces: the session menu (header and rail), the message menu's
-conversation section, and the palette's `chat.exportTranscript`. Scenario `export-transcript`.
+conversation section, and the palette's `workspace.exportTranscript`. Scenario `export-transcript`.
 
 ## Suggested order
 

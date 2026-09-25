@@ -1,5 +1,4 @@
 import { clientForQueryClient, originForQueryClient } from '@/lib/environments/state/query-clients'
-import { chatCommandMetadata } from '@workspace/client-core/commands/chat'
 import { workbenchCommandMetadata } from '@workspace/client-core/commands/workbench'
 import {
   workspaceCommandMetadata,
@@ -1166,7 +1165,7 @@ export const workspaceCommands = [
     run: (context) => runSessionCommand(context, startScopedSessionDraft),
   }),
   defineCommand({
-    ...chatCommandMetadata['chat.exportTranscript'],
+    ...workspaceCommandMetadata['workspace.exportTranscript'],
     icon: DownloadSimpleIcon,
     run: (context) => runSessionCommand(context, exportSelectedSessionTranscript),
   }),

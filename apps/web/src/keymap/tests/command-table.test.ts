@@ -41,7 +41,7 @@ const TEXT_MENU_EDITOR_COMMANDS = [
 ] as const
 
 const ASYNC_COMMAND_IDS = [
-  'chat.exportTranscript',
+  'workspace.exportTranscript',
   'fileTree.undo',
   'fileTree.redo',
   'workspace.splitEditorRight',
@@ -186,7 +186,6 @@ const FILE_OPERATION_COMMAND_IDS = [
 ] as const satisfies readonly PlatformCommandId[]
 
 const WORKSPACE_OPERATION_COMMAND_IDS = [
-  'chat.exportTranscript',
   'workspace.undoWorkspaceEdit',
   'workspace.redoWorkspaceEdit',
   'workspace.copyAddress',
@@ -227,7 +226,7 @@ const TAB_OPEN_COMMAND_IDS = [
 ] as const satisfies readonly PlatformCommandId[]
 
 const CHAT_MODE_COMMAND_IDS = [
-  'chat.exportTranscript',
+  'workspace.exportTranscript',
   'workspace.newSession',
   'workspace.nextSession',
   'workspace.previousSession',

@@ -21,7 +21,7 @@ const MIME_TYPES: Record<TranscriptFormat, string> = {
   markdown: 'text/markdown',
 }
 
-export function sessionTranscriptQueryOptions(ref: ScopedSessionRef) {
+function sessionTranscriptQueryOptions(ref: ScopedSessionRef) {
   return queryOptions({
     queryKey: sessionTranscriptKeys.transcript(ref.environmentId, ref.sessionId),
     queryFn: ({ client, signal }) =>

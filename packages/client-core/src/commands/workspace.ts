@@ -160,6 +160,16 @@ export const workspaceCommandMetadata = {
     when: [],
     title: 'Open usage',
   }),
+  'workspace.exportTranscript': defineMetadata({
+    category: 'Chat',
+    description: 'Save the selected session as Markdown.',
+    id: 'workspace.exportTranscript',
+    execution: 'async',
+    target: 'workspace',
+    undoCategory: 'view-only',
+    when: ['chatMode'],
+    title: 'Export transcript',
+  }),
   'workspace.showTransparencySettings': defineMetadata({
     category: 'Appearance',
     description: 'Change pane transparency and backdrop appearance.',
