@@ -520,7 +520,7 @@ export class OrchestrationEngine {
       if (command.type === 'session.turn.steer')
         this.providerService?.requireSteeringAvailable(command.sessionId)
       this.requireSourceProposedPlan(command)
-      const pendingEvents = decideOrchestrationCommand(command, this.readModel)
+      const pendingEvents = decideOrchestrationCommand(command, this.commandReadModel(command))
       recordChatPipelineInfo('chat.pipeline.command.decided', {
         ...summary,
         eventCount: pendingEvents.length,
@@ -534,6 +534,16 @@ export class OrchestrationEngine {
       this.recordDispatchFailure(command, summary, error, fingerprint)
       throw error
     }
+  }
+
+  private commandReadModel(command: OrchestrationCommand): OrchestrationReadModel {
+    if (command.type !== 'session.fork') return this.readModel
+    const source = this.readModel.sessions.get(command.sourceSessionId)
+    if (!source) return this.readModel
+    const messages = this.snapshotQuery.sessionTranscript(source.id).session.messages
+    const sessions = new Map(this.readModel.sessions)
+    sessions.set(source.id, { ...source, messages })
+    return { ...this.readModel, sessions }
   }
 
   private requireSourceProposedPlan(command: OrchestrationCommand | ClientOrchestrationCommand) {

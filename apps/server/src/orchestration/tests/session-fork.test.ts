@@ -2,6 +2,7 @@ import { afterEach, expect, test } from 'vitest'
 import * as v from 'valibot'
 import { orchestrationCommandSchema } from '@workspace/contracts'
 import { decideOrchestrationCommand } from '../decider'
+import { OrchestrationEngine } from '../engine'
 import {
   applyIncrementally,
   createProjectionFixture,
@@ -93,6 +94,35 @@ test('a running turn and an unknown turn cannot be forked', () => {
     'That turn is not in the session any more.',
   )
 })
+
+test.each([
+  ['long-turn-1000', 2008],
+  ['turn-1', 2],
+] as const)(
+  'forks %s from the full durable conversation',
+  async (turnId, count) => {
+    const { fixture } = setup()
+    const messages = Array.from({ length: 2002 }, (_, index) =>
+      messageSentEvent({
+        createdAt: new Date(Date.UTC(2026, 5, 1, 0, 0, index)).toISOString(),
+        messageId: `long-${index}`,
+        turnId: `long-turn-${Math.floor(index / 2)}`,
+        role: index % 2 === 0 ? 'user' : 'assistant',
+        streaming: false,
+        text: `Long message ${index}`,
+      }),
+    )
+    fixture.pipeline.applyEvents(fixture.append(messages))
+    const engine = new OrchestrationEngine(fixture.database, { providerRuntime: false })
+    try {
+      await engine.dispatch(fork(turnId))
+      expect((await engine.sessionTranscript(FORK_ID)).session.messages).toHaveLength(count)
+    } finally {
+      await engine.close()
+    }
+  },
+  60_000,
+)
 
 test('a session keeps the agent it started as, and its fork runs as the same agent', () => {
   const { fixture, model } = setup()
