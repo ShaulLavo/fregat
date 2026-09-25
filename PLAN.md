@@ -270,11 +270,10 @@ records the fixes, baseline corrections, and focused checks. Plan 096 is also co
 `isRecord`, subscriptions) and added the `dupes` / `dupes:functions` gates. What remains in those five
 plans is the divergent helpers, where a decision picks which behaviour wins; the gates cannot see them.
 
-[Plan 091](plans/091-error-and-timing-helpers.md), [Plan 092](plans/092-path-and-uri-helpers.md),
-[Plan 093](plans/093-web-react-and-store-ceremony.md), and
-[Plan 094](plans/094-client-core-web-tui-parity.md) consolidate on top of those fixes.
-[Plan 095](plans/095-server-plumbing.md) can proceed independently of the middle plans,
-while preserving the same defect regressions. Plan 096 is complete; its
+The completion wave (lane L6, 2026-09-25) finished Plans 092 and 095 and deleted them, and finished
+[Plan 091](plans/091-error-and-timing-helpers.md) and
+[Plan 093](plans/093-web-react-and-store-ceremony.md) apart from one owner question each.
+[Plan 094](plans/094-client-core-web-tui-parity.md) is next in that lane. Plan 096 is complete; its
 [web layering reference](docs/web-layering.md) records the implementation and review.
 
 The middle plans consolidate onto the shared packages. Plan 091 widens the observability sanitizer,
