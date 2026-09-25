@@ -270,9 +270,8 @@ records the fixes, baseline corrections, and focused checks. Plan 096 is also co
 `isRecord`, subscriptions) and added the `dupes` / `dupes:functions` gates. What remains in those five
 plans is the divergent helpers, where a decision picks which behaviour wins; the gates cannot see them.
 
-The completion wave (lane L6, 2026-09-25) finished Plans 092 and 095 and deleted them, and finished
-[Plan 091](plans/091-error-and-timing-helpers.md) and
-[Plan 093](plans/093-web-react-and-store-ceremony.md) apart from one owner question each.
+The completion wave (lane L6, 2026-09-25) finished Plans 091, 092, 093 and 095 and deleted them;
+the owner decided 091 §9.3 (adopt the cause routing) and 093 §5.1 (the theme context keeps `undefined`).
 [Plan 094](plans/094-client-core-web-tui-parity.md) is next in that lane. Plan 096 is complete; its
 [web layering reference](docs/web-layering.md) records the implementation and review.
 
