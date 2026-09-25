@@ -160,6 +160,20 @@ describe('useListbox', () => {
     },
   )
 
+  it('does not scroll when rows arrive above a list with nothing active', () => {
+    const reveal = vi.fn()
+    const mounted = renderListbox({ scrollToIndex: reveal, activeId: null })
+    reveal.mockClear()
+    mounted.render(
+      <Listbox
+        scrollToIndex={reveal}
+        activeId={null}
+        items={[{ id: 'new', label: 'New' }, ...items]}
+      />,
+    )
+    expect(reveal).not.toHaveBeenCalled()
+  })
+
   it('does not reveal the cursor again when only the scroll callback changes', () => {
     const reveal = vi.fn()
     const mounted = renderListbox({ scrollToIndex: reveal })

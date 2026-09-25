@@ -1,10 +1,5 @@
 [
   {
-    "file": "apps/web/src/features/chat/components/timeline-viewport.tsx",
-    "class": "rounded-full",
-    "reason": "The jump-to-latest control is a circle, so it overrides the Button primitive's control radius."
-  },
-  {
     "file": "apps/web/src/features/workbench/components/editor-tab-button.tsx",
     "class": "<button>",
     "reason": "Spreads dnd-kit drag attributes and listeners onto the element and needs role='tab'. The Button primitive offers neither."
@@ -203,5 +198,10 @@
     "file": "apps/web/src/features/chat/components/model-picker-rail.tsx",
     "class": "no-scrollbar",
     "reason": "The provider rail is one icon wide; a bar's lane would take a third of it."
+  },
+  {
+    "file": "packages/ui/src/patterns/tail-jump-button.tsx",
+    "class": "rounded-full",
+    "reason": "The way back to a live edge is a pill floating over the list, so it overrides the Button primitive's control radius."
   }
 ]

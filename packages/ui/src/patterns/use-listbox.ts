@@ -81,9 +81,12 @@ export function useListbox<Id extends string>({
   useEffect(() => {
     const previous = previousCursor.current
     previousCursor.current = { index: cursorIndex, id: cursor?.id }
-    if (!revealOnMount && previous.index === cursorIndex && previous.id === cursor?.id) return
+    const moved = previous.index !== cursorIndex || previous.id !== cursor?.id
+    if (!moved && !revealOnMount) return
+    // With nothing active the cursor is only the first row; a row arriving above it is not a move.
+    if (moved && activeIndex < 0) return
     revealCurrentCursor()
-  }, [cursorIndex, cursor?.id, prefix, revealOnMount])
+  }, [activeIndex, cursorIndex, cursor?.id, prefix, revealOnMount])
 
   function moveTo(index: number) {
     const item = items[index]

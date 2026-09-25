@@ -31,6 +31,14 @@
 
 ## 1. Tail following and the "N new" count
 
+**Done 2026-09-25 (lane L1).** `tail-follow.ts` (pure, node tests), `use-tail-follow.ts`,
+`tail-jump-button.tsx`, and `VirtualList`'s `follow` prop; the logs list follows its top edge, and
+the chat's jump button became the pill with a count of new messages (`use-timeline-arrivals.ts`).
+The check came first and failed: a prepend while scrolled away jumped the logs to the top, because
+`useListbox` revealed its fallback cursor whenever the first row changed. That is fixed, and the
+hook shifts `scrollTop` by the prepended height. Scenario `tail-follow`. The text below is the
+original plan.
+
 **Today.**
 
 - The chat has a full follow model: `TimelineFollowMode` (`'anchoring-new-turn' | 'following-end' |
@@ -146,6 +154,14 @@ thread `checkpointRevertPending`). The editor's undo History tab (`history-view.
 differently and is not in scope.
 
 ## 4. Branch lanes in the branch picker
+
+**Skipped 2026-09-25 (lane L1): owner question.** D2's premise does not hold. `baseBranch` is only
+an input to worktree creation (`sessionWorktreeTargetSchema`, `git/worktrees.ts`); no worktree
+record or shell stores it, so the client knows no branch's parent. The picker also filters out
+`worktree/…` branches (`baseBranchChoices`), which are the only branches the app could ever record
+a parent for. Built as written, the list would render exactly as today. **Owner question:** record
+`baseBranch` on app-created worktrees and list those branches in the picker (server work in the
+worktree lifecycle, lane L9's area), or drop branch lanes. The text below is the original plan.
 
 **Today.** `features/chat/components/draft-branch-list.tsx` is a flat radio list inside a dropdown.
 `GitBranch` (`packages/contracts/src/git.ts:69-74`) has `name`, `current`, `upstream` and `commit`,

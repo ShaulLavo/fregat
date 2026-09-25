@@ -165,8 +165,7 @@ export const selectors = {
     page
       .getByRole('log', { name: 'Messages', exact: true })
       .locator('[data-index] > [data-timeline-row-id]'),
-  timelineJumpToLatest: (page: Page) =>
-    page.getByRole('button', { name: 'Scroll to latest message', exact: true }),
+  timelineJumpToLatest: (page: Page) => page.locator('[data-slot="tail-jump-button"]'),
   breadcrumbCrumb: (page: Page, label: string) =>
     page
       .getByRole('navigation', { name: 'Breadcrumbs', exact: true })
@@ -739,6 +738,7 @@ export const selectors = {
     page
       .locator('[data-slot="value-grid-row"]')
       .filter({ has: page.getByRole('term').getByText(label, { exact: true }) }),
+  tailJump: (page: Page) => page.locator('[data-slot="tail-jump-button"]'),
   holdButton: (scope: Locator, name: string) =>
     scope.locator('[data-slot="hold-button"]').filter({ hasText: name }),
   tabsIndicator: (page: Page, list: string) =>

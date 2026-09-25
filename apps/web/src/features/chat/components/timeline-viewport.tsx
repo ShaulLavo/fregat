@@ -6,10 +6,10 @@ import {
   readTimelineReload,
 } from '@/features/chat/state/timeline-reload'
 import { addLifecycleFlush } from '@/lib/lifecycle-flush'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
-import { Button } from '@workspace/ui/components/button'
 import { cn } from '@workspace/ui/lib/utils'
-import { ArrowDownIcon } from '@phosphor-icons/react'
+import { TailJumpButton } from '@workspace/ui/patterns/tail-jump-button'
+import { TickerNumber } from '@/components/ticker-number'
+import { useTimelineArrivals } from '@/features/chat/hooks/use-timeline-arrivals'
 import { useEffect, useLayoutEffect, useState, type Dispatch } from 'react'
 import type { VirtualListLayout } from '@workspace/ui/patterns/virtual-list'
 import type { ChatSession } from '@workspace/client-core/chat/types'
@@ -70,6 +70,8 @@ export function TimelineViewport({
   const unmeasuredDisclosure = disclosureSettle?.measured
     ? null
     : (disclosureSettle?.disclosure ?? null)
+  const freeScrolling = scrollState.followMode === 'free-scrolling'
+  const arrivals = useTimelineArrivals(items, freeScrolling)
   const virtualItems = virtualizer.getVirtualItems()
   const contentHeight = virtualizer.getTotalSize()
   const viewportHeight = virtualizer.scrollRect?.height ?? 0
@@ -278,27 +280,18 @@ export function TimelineViewport({
           onLoad={earlierPage.loadEarlier}
         />
       ) : null}
-      <Tooltip>
-        <TooltipTrigger
-          render={
-            <Button
-              aria-label='Scroll to latest message'
-              className={cn(
-                'bg-popover-solid absolute right-(--density-section-padding) bottom-(--density-section-padding) rounded-full shadow-md transition-opacity',
-                scrollState.followMode !== 'free-scrolling' && 'pointer-events-none opacity-0',
-              )}
-              size='icon'
-              tabIndex={scrollState.followMode === 'free-scrolling' ? 0 : -1}
-              type='button'
-              variant='outline'
-              onClick={() => dispatch({ type: 'jump-to-end' })}
-            >
-              <ArrowDownIcon aria-hidden='true' className='size-(--icon-size-sm)' />
-            </Button>
-          }
-        />{' '}
-        <TooltipContent>{'Scroll to latest message'}</TooltipContent>
-      </Tooltip>
+      <TailJumpButton
+        arrivals={arrivals}
+        className={cn(
+          'absolute right-(--density-section-padding) bottom-(--density-section-padding) transition-opacity',
+          !freeScrolling && 'pointer-events-none opacity-0',
+        )}
+        count={(value) => <TickerNumber value={value} />}
+        edge='end'
+        noun='message'
+        tabIndex={freeScrolling ? 0 : -1}
+        onJump={() => dispatch({ type: 'jump-to-end' })}
+      />
     </div>
   )
 }

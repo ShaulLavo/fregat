@@ -14,6 +14,14 @@ import { VirtualList, type VirtualListHandle } from '@workspace/ui/patterns/virt
 import { useListbox } from '@workspace/ui/patterns/use-listbox'
 
 import { LogsEventRow } from '@/features/logs/components/event-row'
+import { TickerNumber } from '@/components/ticker-number'
+
+// Logs are newest-first, so their live edge is the top.
+const LOG_FOLLOW = {
+  edge: 'start',
+  noun: 'line',
+  count: (value: number) => <TickerNumber value={value} />,
+} as const
 
 export function LogsEventList({
   detailsById,
@@ -79,6 +87,7 @@ export function LogsEventList({
           handleRef={virtualList}
           activeIndex={listbox.activeIndex}
           className='focus-ring-inset scroll-gutter min-h-0 flex-1 overflow-auto'
+          follow={LOG_FOLLOW}
           items={visibleEvents}
           getKey={(event) => event.id}
           layout='flow'
