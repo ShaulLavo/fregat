@@ -80,7 +80,6 @@ import {
   setWorkbenchSidebarOpen,
   showWorkbenchSidebarTab,
   toggleWorkbenchBottomTab,
-  toggleWorkbenchSidebarTab,
   WORKBENCH_SIDEBAR_TABS,
   type TerminalTabDirection,
   type WorkbenchPanels,
@@ -570,7 +569,11 @@ function toggleSidebarPanel(
   const rootPath = snapshot.rootPath
   if (!rootPath) return declined
 
-  const panels = toggleWorkbenchSidebarTab(snapshot.workbenchPanels, tab)
+  const current = snapshot.workbenchPanels
+  const showing = current.sidebarOpen && current.activeSidebarTab === tab
+  const panels = showing
+    ? setWorkbenchSidebarOpen(current, false)
+    : showWorkbenchSidebarTab(current, tab)
   const stranded = !panels.sidebarOpen && focusInsideSidebar()
   return afterNavigation(
     getNavigation().setWorkbenchPanels(panels, runtime.workspace, 'workbench'),

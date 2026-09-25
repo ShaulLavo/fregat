@@ -63,7 +63,7 @@ export function WorkbenchLayout({
       data-workbench=''
       role='application'
     >
-      {panels.sidebarOpen ? (
+      {panels.sidebarRailOpen ? (
         <div className='contents' data-screen-sidebar=''>
           <PaneHostProvider kind='workbench-sidebar'>
             <RailTabs

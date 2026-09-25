@@ -51,6 +51,18 @@ export const sidebarToggle: Scenario = {
     strictEqual(await selectors.sidebarTab(page, 'Files').getAttribute('aria-pressed'), 'true')
     await step('restored-by-titlebar')
 
+    await selectors.sidebarTab(page, 'Files').click()
+    await selectors.resizablePanel(page, 'sidebar').waitFor({ state: 'detached' })
+    strictEqual(
+      await selectors.workspaceRail(page, 'Workbench').count(),
+      1,
+      'A rail click keeps the rail',
+    )
+    await page.keyboard.press(chords.toggleSidebar)
+    await selectors.resizablePanel(page, 'sidebar').waitFor()
+    strictEqual(await selectors.sidebarTab(page, 'Files').getAttribute('aria-pressed'), 'true')
+    await step('rail-click-then-mod-b')
+
     await selectors.workspaceMode(page, 'Chat').click()
     await selectors.resizablePanel(page, 'sessions').waitFor()
     await page.keyboard.press(chords.toggleSidebar)
