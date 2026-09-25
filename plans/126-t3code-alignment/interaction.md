@@ -137,6 +137,10 @@ This is a two-pass source audit and implementation plan. No app changes, tests, 
 
 ### [INTERACTION-11] Match composition and keyboard preferences
 
+> **Owner correction (2026-09-25):** the goal of this row is to **delete Lexical** from the chat composer. The composer must support
+> Markdown as you type (rich editing) without Lexical, and the row is not done until Lexical is gone. Once that lands, add the
+> `composerRichTextEnabled` setting for upstream parity. The send-shortcut and large-paste parts (lane L2) are done; the rest stays open.
+
 - **Priority/confidence:** P2 / HIGH.
 - **Evidence:** Upstream `packages/contracts/src/settings.ts:433` defaults rich text on and `:435` offers Enter, modifier+Enter multiline, and modifier+Enter send modes. `apps/web/src/components/chat/ChatComposer.tsx:6810` wires rich-text setting and `:5494` folds large pasted text with bypass support at `:5571`. Local `apps/web/src/features/chat/components/chat-input-editor.tsx:72` is always `PlainTextPlugin`; `:49` only special-cases images and serialized mentions on paste. `components/chat-input-submit-plugin.tsx:87` reserves Shift+Enter but otherwise sends on Enter without reading a send preference. Upstream `packages/contracts/src/settings.ts:426,429` defaults `planModeEnabled` and `contextWindowMeterEnabled` to false, consumed by `ChatComposer.tsx:2006–2010,4928,5056,6978–6979`. Local `components/composer-controls-menu.tsx:51–61,135–145` always offers Build/Plan and `components/chat-input-actions.tsx:88` renders context usage whenever available.
 - **Impact:** Formatting and keyboard behavior diverge even before sending; a user who expects modifier+Enter can submit prematurely, and large pasted content cannot become a compact attachment/context item.
