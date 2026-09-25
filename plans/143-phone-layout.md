@@ -127,6 +127,16 @@ Questions:
    `docs/native-plan-of-plans.md` plan 3.
 4. Which interactions are hover- or keyboard-only (tooltips, context menus, chords) and need a
    touch path?
+5. **The pairing URL (Q4).** How does T3 Code authorize a new device? Read
+   `references/t3code/docs/internals/remote.md` (hosted pairing URL: secret in the fragment,
+   exchanged with the environment, stripped from history), `docs/internals/environment-auth.md`
+   (scoped sessions, pairing delegates scopes and cannot widen them) and the `vp run dev --share …
+pairingUrl` flow in its `AGENTS.md`. Record what we copy: the link or QR format, token lifetime
+   and scopes, and where the server stores paired devices.
+6. **The native app's technology.** SwiftUI (`apps/mac` is already a native Swift client) or
+   Expo / React Native (Paseo, Orca and T3 all use React Native). Decided later; recorded now
+   because it shapes which server contracts the phone shell settles first.
+7. Two clients opening one workspace at once: see [Plan 173](173-two-devices-one-workspace.md).
 
 Deliverable: the surface list and navigation model, added to this plan (the direction is already above). After the owner approves it, this plan is split into executable plans
 (likely: phone shell, per-surface adaptations, touch input, and a later companion-app plan).

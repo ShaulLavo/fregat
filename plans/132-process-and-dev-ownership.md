@@ -113,6 +113,16 @@ last, against the final migration chain. Constraint: production already has migr
 to version 30, so the one schema must cover everything through the final merged chain, and the
 backup is taken from that version-30 database.
 
+## Research questions
+
+1. **Vite dev server memory: leak or load?** On 2026-09-25 per-lane Vite dev servers grew to
+   2–3 GB within about ten minutes of scenario runs; lane L4's reached 2.06 GB ten minutes after a
+   restart. Suspects: linked Editor sources under `/@fs` re-transformed while the Editor checkout
+   changes (item 12's forced reload is the same path), and fresh pages loading the unbundled dev
+   graph. Measure with heap snapshots of the Vite process before and after a scenario run, and
+   compare the retained module-graph and transform-cache sizes. The answer decides whether this
+   joins Phase 2.
+
 ## Verification
 
 Phase 1: a desktop launch with an unrelated process holding the port, whose command line contains

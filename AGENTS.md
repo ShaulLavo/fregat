@@ -4,6 +4,7 @@
 
 - Upstream code we compare against (vscode, t3code, opencode, codex, …) is cloned under `references/` at the repo root, gitignored. Look there before cloning anything, and add new clones there — not in `/work/projects/references/`.
 - CI, the parity scripts and several tests resolve `references/t3code` by relative path, so the directory stays inside the repo.
+- When a clone you consult is behind upstream, pull it (`git -C references/<name> pull`). If a plan pins an upstream commit (Plan 126 does), note the new upstream head in that plan and anything relevant that changed. Clones refresh as they are used; there is no scheduled sweep.
 
 ## Code Organization
 
