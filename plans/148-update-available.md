@@ -24,41 +24,56 @@ start on the new server. Nothing restarts until someone clicks.
 
 ## What exists today
 
-- `deploy()` restarts unconditionally: `scripts/deploy/mesh.ts:115-122` installs the unit, swaps
-  `current`, then `restartServer()` (`scripts/deploy/systemd.ts:37-40`, `systemctl --user
-restart`) and `waitForServerRelease` (`systemd.ts:42`). The usage text says so
-  (`mesh.ts:39`: "drops live terminal and agent sessions"). `--rollback` does the same
-  (`mesh.ts:150-162`).
-- SIGTERM runs `closeApp` (`apps/server/src/index.ts:111-125`) → `appCleanup`
-  (`apps/server/src/app.ts:453-478`): `terminal.dispose()`, `orchestration.close()`, then
-  `providerService.shutdown()` (`apps/server/src/provider/provider-service.ts:190`), which disposes
+- `deploy()` restarts whenever `--server` is given or the unit changed
+  (`scripts/deploy/mesh.ts:117`, `const restart = options.server || unitChanged`): it installs the
+  unit, swaps `current`, then `restartServer()` (`scripts/deploy/systemd.ts:37-40`, `systemctl
+--user restart`) and `waitForServerRelease` (`systemd.ts:42-55`). The usage text says so
+  (`mesh.ts:39`: "drops live terminal and agent sessions"). `--rollback` restarts when the previous
+  release's server differs (`mesh.ts:150-172`, `:157`).
+- `waitForServerRelease` waits for the name of the release that _built_ the server
+  (`mesh.ts:120`, `:161`). A web-only release copies `server/index.js` into itself
+  (`release.ts:118-122`), so its server reports the web-only release's own name, and both waits
+  time out. A latent bug today; the redesign waits for the target release's own name.
+- SIGTERM runs `closeApp` (`apps/server/src/index.ts:105-111`, handlers `:113-125`, exit code from
+  `exitCodeForSignal` `:172-177`) → `appCleanup` (`apps/server/src/app.ts:464-495`):
+  `terminal.dispose()`, `orchestration.close()`, then `providerService.shutdown()`, which disposes
   every adapter and so kills each CLI (`adapters/process-lifetime.ts:24-28`, SIGTERM then SIGKILL).
 - The unit sets no `KillMode`, so systemd also signals the whole cgroup. A Claude or Codex CLI the
   server launched, and every Bash command that CLI runs — including `bun run deploy` — are in it.
   The deploying agent dies before `waitForServerRelease` and the live check run.
-- At boot, `recoverRuntime` (`apps/server/src/orchestration/engine.ts:726-758`) turns any runtime
+- At boot, `recoverRuntime` (`apps/server/src/orchestration/engine.ts:726-759`) turns any runtime
   that was `starting`, `running` or `waiting`, and any turn `claimed` or `adopted`, into
   `session.runtime-recovered`: "The server restarted while this provider operation was in
   progress. The prompt was not resent." The projection marks runtime and turn `interrupted`
   (`projection-pipeline.ts:470-495`). An unanswered approval is lost the same way.
-- Turns still `queued` survive: `scheduleQueuedStarts` (`engine.ts:761-768`, called from
+- Turns still `queued` survive: `scheduleQueuedStarts` (`engine.ts:761-769`, called from
   `startReactors` at `engine.ts:195`) starts them after boot.
 - Idle sessions already resume. The binding keeps its cursor; the next send goes through
-  `continuableBinding` (`provider-service.ts:292`, defined at `:1127`), which sets
-  `resumeExisting` when a handle exists (`:1172`). Claude gets `resume: <sessionId>`, Codex
+  `continuableBinding` (`provider-service.ts:292`), which sets `resumeExisting` when a handle
+  exists. Claude gets `resume: <sessionId>`, Codex
   `thread/resume`. The only cost is a cold spawn.
 - The one place a turn becomes a provider call is `claimTurn`
-  (`apps/server/src/orchestration/provider-command-reactor.ts:296-339`): it requires
-  `providerStartState === 'queued'` and dispatches `session.provider-start.claim`. That is the
-  admission gate this plan needs.
+  (`apps/server/src/orchestration/provider-command-reactor.ts:296-340`): it requires
+  `providerStartState === 'queued'`, awaits `reusableRuntimeEpoch`, then dispatches
+  `session.provider-start.claim`. A check at its top would race that await, so the gate refuses the
+  claim at commit time on the engine queue (`engine.ts` `dispatchNow`, `:446-470`).
+- A second send to a session whose latest turn is queued, claimed or adopted is refused with
+  `START_STATE_CONFLICT` (`decider.ts:806-819`); a queued send that survives a restart is one to
+  an idle session.
+- A tab already refetches everything when the server restarts:
+  `installServerRestartInvalidation` invalidates the per-origin cache when the handshake's
+  `serverInstanceId` changes (`apps/web/src/lib/environments/state/server-restart-invalidation.ts`).
 - The server serves `WEB_ROOT=/work/platform-production/current/web` through the symlink on every
-  request (`apps/server/src/web/routes.ts:22-34`), while its own code was loaded at boot. Bun
-  resolves the entry through the symlink, so `server.release` in `GET /release`
-  (`web/routes.ts:23`, `releaseDescriptor`) names the bundle actually running.
+  request (`apps/server/src/web/routes.ts:22-25`, `releaseDescriptor` `:34-40`), while its own code
+  was loaded at boot. Bun 1.4.0's `import.meta.dirname` is the realpath, so `server.release` names
+  the release directory the running bundle was loaded from. `/release` has no contract type.
 - The unit template now carries `SuccessExitStatus=143` (added 2026-09-25), with
   `Restart=on-failure` and `RestartSec=3`.
 - `SIGUSR2` has no handler, so its default action terminates the server. The deploy side and the
-  server's handler (D4) must therefore land in one commit.
+  server's handler (D4) must therefore land in one commit, and every sender first checks that
+  `GET /release` carries a `pending` key (a pre-148 bundle, such as a rollback target, has none).
+  `systemctl kill` defaults to `--kill-whom=all`, which would signal every CLI in the cgroup, so the
+  signal always names `--kill-whom=main`.
 
 ## What the references do
 
@@ -117,6 +132,39 @@ new turns back during the restart is the cheap half.
 
 `--rollback` keeps the immediate restart: it is the emergency path. It also deletes `pending`, so
 the next restart cannot promote a release the owner just backed away from.
+
+D1, D2, D4 and D5: Decided 2026-09-25: recommendation (completion wave).
+
+### Resolved while reconciling against source (2026-09-25)
+
+- **The server's production root** comes from `Environment=PLATFORM_PRODUCTION_ROOT` in the unit,
+  read once in `index.ts` and deleted from `process.env`, so a PTY or agent started by production
+  cannot inherit it (a dev server launched from a production terminal would otherwise read
+  production's `pending`). Deriving it from `WEB_ROOT` is wrong for that reason, and
+  `scripts/prod.ts` points `WEB_ROOT` elsewhere. Unset, the feature is inert (dev, tests).
+- **How tabs learn the state:** a `server.update` message on the orchestration socket, sent after
+  `connected` and on every change, stored per origin in the client-core environments store. An
+  older client drops an unknown kind, so the protocol version stays. `GET /release` also carries
+  `pending`, `liveCheck` and `phase` from Phase 1, and re-reads `pending` on each call, so a missed
+  signal heals.
+- **The gate** is `OrchestrationEngine.beginRestart(interrupt)`, run on the engine queue: every
+  claim enqueued earlier has committed, the busy set is computed synchronously, and the hold is set
+  only when the restart is accepted and never reopened. While held, `dispatchNow` refuses
+  `session.provider-start.claim` and `session.checkpoint.revert` with `SERVER_RESTARTING`, and
+  `claimTurn` maps that to `false`.
+- **Busy, beyond D2's list:** open approvals or questions (`pendingApprovalCount +
+pendingUserInputCount`) as waiting, a provider's background liveness, and an active
+  agent-terminal handoff. Title and commit-message generation are request-scoped and worktree
+  provisioning replays at boot, so none of them counts. `engine.close()` drains the checkpoint
+  reactor so a click right after a turn keeps its checkpoint.
+- **The transition restart** (the first `--server` deploy after this lands, onto a server without
+  the handler) is gated on `GET /release` lacking a `pending` key, not on the unit changing. After
+  it, a changed unit applies at the next Restart.
+- **Live check after promotion:** the promotion step launches `live-check.mjs --wait-for-server`
+  in a transient `systemd-run --user` unit. `live-check.json` gains `status`, `checkedAt` and
+  `fresh`, and the server turns a failed one into a `LIVE_CHECK_FAILED` catalog error whose `fix`
+  is the rollback command. The deploy waits for that check only when the command itself caused the
+  restart.
 
 ## Phases
 
