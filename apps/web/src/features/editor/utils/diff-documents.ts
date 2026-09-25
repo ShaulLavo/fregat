@@ -3,8 +3,8 @@ import type { DiffFile } from '@singapore-editor/diff'
 import { fnv1a32 } from '@workspace/client-core/address/path-hash'
 
 import type { DiffLanguageDocument } from '@/features/editor/state/diff-language-session'
-import { languageIdForFilePath } from '@/features/editor/utils/file-path'
-import { lspLanguageIdForPath } from '@/features/editor/utils/lsp-language-id'
+import { languageIdForFilePath } from '@/lib/file-language'
+import { lspLanguageIdForPath } from '@workspace/client-core/files/language'
 
 /**
  * The two documents a diff opens, and the names it opens them under.

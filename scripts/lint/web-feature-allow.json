@@ -636,12 +636,6 @@
     "reason": "shared \u2192 lib: DiffLanguageHost is reused by git outside editor; move this shared behavior with its consumers."
   },
   {
-    "from": "git",
-    "to": "editor",
-    "module": "features/editor/utils/file-path.ts",
-    "reason": "shared \u2192 lib: languageIdForFilePath is reused by git outside editor; move this shared behavior with its consumers."
-  },
-  {
     "from": "search",
     "to": "editor",
     "module": "features/editor/state/document-state.tsx",
@@ -658,12 +652,6 @@
     "to": "editor",
     "module": "features/editor/state/workspace-state.tsx",
     "reason": "couple: search and editor coordinate the same document or session state through useEditorWorkspaceStoreApi; separate that ownership before draining this edge."
-  },
-  {
-    "from": "search",
-    "to": "editor",
-    "module": "features/editor/utils/file-path.ts",
-    "reason": "shared \u2192 lib: languageIdForFilePath is reused by search outside editor; move this shared behavior with its consumers."
   },
   {
     "from": "search",

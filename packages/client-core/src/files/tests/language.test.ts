@@ -1,7 +1,24 @@
 import { describe, expect, it } from 'vitest'
 
-import { languageIdForFilePath } from '@/features/editor/utils/file-path'
-import { lspLanguageIdForPath } from '@/features/editor/utils/lsp-language-id'
+import { languageIdForFilePath, lspLanguageIdForPath } from '../language'
+
+describe('languageIdForFilePath', () => {
+  it('resolves extensionless basenames from the basename table', () => {
+    expect(languageIdForFilePath('/repo/Makefile')).toBe('makefile')
+    expect(languageIdForFilePath('/repo/Dockerfile')).toBe('dockerfile')
+  })
+
+  it('resolves ordinary extensions', () => {
+    expect(languageIdForFilePath('/repo/a.sh')).toBe('shellscript')
+    expect(languageIdForFilePath('/repo/a.ts')).toBe('typescript')
+    expect(languageIdForFilePath('/repo/a.tsx')).toBe('tsx')
+  })
+
+  it('returns null for what it cannot name, never a text fallback', () => {
+    expect(languageIdForFilePath('/repo/unknown.xyz')).toBeNull()
+    expect(languageIdForFilePath('/repo/no-extension-file')).toBeNull()
+  })
+})
 
 describe('lspLanguageIdForPath', () => {
   it('renames the JSX-bearing extensions the grammar table calls plain ts/js', () => {
@@ -10,11 +27,13 @@ describe('lspLanguageIdForPath', () => {
     expect(lspLanguageIdForPath('/a/b/Row.jsx')).toBe('javascriptreact')
   })
 
-  it('leaves everything else to the editor id', () => {
+  it('leaves everything else to the grammar id', () => {
     expect(lspLanguageIdForPath('/a/b/plugin.ts')).toBeUndefined()
     expect(lspLanguageIdForPath('/a/b/main.js')).toBeUndefined()
     expect(lspLanguageIdForPath('/a/b/README.md')).toBeUndefined()
     expect(lspLanguageIdForPath('/a/b/Makefile')).toBeUndefined()
+    expect(lspLanguageIdForPath('/repo/unknown.xyz')).toBeUndefined()
+    expect(lspLanguageIdForPath('/repo/no-extension-file')).toBeUndefined()
   })
 
   it('reads the last segment, so a dotted directory is not an extension', () => {
@@ -22,13 +41,14 @@ describe('lspLanguageIdForPath', () => {
     expect(lspLanguageIdForPath('file:///a/my.dir/Row.tsx')).toBe('typescriptreact')
   })
 
-  it('calls the comment-bearing config files jsonc, which is what legalises a comment', () => {
+  it('names the JSONC configs so tsserver does not choke on comments', () => {
+    expect(lspLanguageIdForPath('/repo/tsconfig.json')).toBe('jsonc')
+    expect(lspLanguageIdForPath('/repo/tsconfig.base.json')).toBe('jsonc')
     expect(lspLanguageIdForPath('/a/b/data.jsonc')).toBe('jsonc')
-    expect(lspLanguageIdForPath('/a/b/tsconfig.json')).toBe('jsonc')
     expect(lspLanguageIdForPath('/a/b/tsconfig.build.json')).toBe('jsonc')
     expect(lspLanguageIdForPath('/a/b/jsconfig.json')).toBe('jsonc')
     expect(lspLanguageIdForPath('file:///a/b/.eslintrc.json')).toBe('jsonc')
-    expect(lspLanguageIdForPath('/a/.vscode/settings.json')).toBe('jsonc')
+    expect(lspLanguageIdForPath('/repo/.vscode/settings.json')).toBe('jsonc')
     expect(lspLanguageIdForPath('/a/.platform/settings.json')).toBe('jsonc')
     expect(lspLanguageIdForPath('/a/.devcontainer/devcontainer.json')).toBe('jsonc')
   })

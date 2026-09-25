@@ -3,7 +3,7 @@ import { createBundledHighlighter } from 'shiki/core'
 import { bundledLanguages } from 'shiki/langs'
 import { bundledThemes } from 'shiki/themes'
 import { createOnigurumaEngine } from 'shiki/engine/oniguruma'
-import { languageForPath } from '@/viewer/utils/language'
+import { languageIdForFilePath } from '@workspace/client-core/files/language'
 
 export function createViewerSyntax() {
   const createHighlighter = createBundledHighlighter<string, string>({
@@ -16,7 +16,7 @@ export function createViewerSyntax() {
   return {
     async tokenize(path: string, content: string, appearance: 'dark' | 'light') {
       const engine = await highlighter
-      const language = languageForPath(path)
+      const language = languageIdForFilePath(path) ?? 'text'
       const registration = Object.entries(bundledLanguages).find(([name]) => name === language)?.[1]
       if (!registration || disposed) return content.split('\n').map((text) => [{ content: text }])
       await engine.loadLanguage(registration)

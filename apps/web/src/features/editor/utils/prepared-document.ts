@@ -10,7 +10,7 @@ import {
   type EditorPreparedTagValue,
 } from '@singapore-editor/core/editor'
 
-import { languageIdForFilePath } from '@/features/editor/utils/file-path'
+import { languageIdForFilePath } from '@/lib/file-language'
 import {
   editorShikiHighlighterProvider,
   editorSyntaxHighlightingSource,

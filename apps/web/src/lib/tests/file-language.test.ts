@@ -1,5 +1,5 @@
-import { expect, test } from '../../../../../test/fixtures'
-import { languageIdForFilePath } from '@/features/editor/utils/file-path'
+import { expect, test } from '../../../test/fixtures'
+import { languageIdForFilePath } from '@/lib/file-language'
 import {
   EDITOR_SHIKI_LANGUAGE_MAP,
   EDITOR_SHIKI_PRELOAD_LANGUAGES,

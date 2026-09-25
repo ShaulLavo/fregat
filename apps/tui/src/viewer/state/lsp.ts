@@ -9,7 +9,7 @@ import type { SettingsSession } from '@/connection/state/session'
 import type { ServiceSocket } from '@/connection/utils/service-socket'
 import { connectionFailure } from '@/connection/utils/failure'
 import { createTuiError } from '@/host/utils/structured-errors'
-import { lspLanguageForPath } from '@/viewer/utils/language'
+import { languageIdForFilePath, lspLanguageIdForPath } from '@workspace/client-core/files/language'
 import {
   diagnosticsSchema,
   definitionLocations,
@@ -63,6 +63,14 @@ export function createViewerLsp({
   })
   async function connect() {
     publish('loading')
+    // A `didOpen` carrying a language the proxy cannot name is forwarded raw and untracked,
+    // so the matching `didClose` is swallowed and the backend keeps the document forever.
+    const grammarId = languageIdForFilePath(filePath)
+    if (!grammarId) {
+      publish('unavailable', [], 'No language server is configured for this file.')
+      return
+    }
+    const languageId = lspLanguageIdForPath(filePath) ?? grammarId
     const [paths, matches] = await Promise.all([
       readServerPaths({ client: session.client, signal }),
       session.client.lsp.match.get({
@@ -101,7 +109,7 @@ export function createViewerLsp({
     signal.throwIfAborted()
     publish('ready')
     await client.notify('textDocument/didOpen', {
-      textDocument: { uri, languageId: lspLanguageForPath(filePath), version: 1, text: content },
+      textDocument: { uri, languageId, version: 1, text: content },
     })
     session.record({
       area: 'tui.viewer.lsp',

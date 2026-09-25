@@ -1,4 +1,4 @@
-import { languageIdForFilePath } from '@/features/editor/utils/file-path'
+import { languageIdForFilePath } from '@/lib/file-language'
 import type { EditorTextBuffer } from '@singapore-editor/core/document'
 import { createLanguageServerDocument } from '@singapore-editor/lsp-plugin'
 import { createEditorLanguageServerStatusSource } from '@/features/editor/state/language-server-status-source'
@@ -30,7 +30,7 @@ import {
 
 import { languageServerConnectionProvider } from '@/features/editor/state/language-server-connection-pool'
 import type { EditorLanguageServerStatusSource } from '@/features/editor/state/language-server-status-source'
-import { lspLanguageIdForPath } from '@/features/editor/utils/lsp-language-id'
+import { lspLanguageIdForPath } from '@workspace/client-core/files/language'
 import { SemanticTokenController } from '@/features/editor/state/semantic-token-controller'
 import {
   LANGUAGE_SERVER_CLIENT_INFO,
