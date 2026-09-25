@@ -1,4 +1,4 @@
-import { ok } from 'node:assert/strict'
+import { ok, strictEqual } from 'node:assert/strict'
 import type { Page } from 'playwright'
 import { selectors } from '../selectors'
 import { dispatch, readSessionDetail } from './chat-verification'
@@ -64,6 +64,14 @@ export const stoppedTurnReasons = isolatedNativeScenario({
       await dispatch(page, orchestration, { type: 'session.runtime.stop', sessionId })
       await expectLine(/^The session was stopped after \d/)
       await step('runtime-stopped')
+      const stopped = await readSessionDetail(page, orchestration, sessionId)
+      strictEqual(stopped.runtime?.lastError, null, 'A deliberate stop has no session error')
+      strictEqual(stopped.latestTurn?.state, 'interrupted')
+      const errors = stopped.activities.filter(
+        (activity) => activity.turnId === stopped.latestTurn?.turnId && activity.tone === 'error',
+      )
+      strictEqual(errors.length, 0, 'A deliberate stop has no provider failure rows')
+      strictEqual(await page.getByText('Codex session stopped.', { exact: true }).count(), 0)
     })
     ok(missing.length === 0, missing.join(' '))
   },

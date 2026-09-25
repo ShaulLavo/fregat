@@ -128,6 +128,27 @@ test('a provider callback accepted before a new claim cannot commit into the new
   }
 })
 
+test.each(['session.runtime.stop', 'session.turn.interrupt'] as const)(
+  '%s keeps a cancelled send failure out of the stopped session',
+  async (type) => {
+    const { fixture, failOldTurn } = await pendingProviderTurnFailure()
+    await fixture.command({ type, commandId: 'deliberate-stop', sessionId: FIXTURE_SESSION_ID })
+    failOldTurn()
+    await fixture.engine.providerRuntimeIdle()
+    const stopped = await sessionFrom(fixture)
+    expect(stopped.latestTurn).toMatchObject({
+      state: 'interrupted',
+      endReason: type === 'session.runtime.stop' ? 'runtime-stopped' : 'user-stop',
+    })
+    expect(stopped.runtime?.lastError).toBeNull()
+    expect(stopped.activities.filter((activity) => activity.tone === 'error')).toEqual([])
+    expect((await fixture.engine.shellSnapshot()).sessions[0]).toMatchObject({
+      hasError: false,
+      attentionState: 'settled',
+    })
+  },
+)
+
 test('a delayed failure from an interrupted send cannot stamp the next runtime with an error', async () => {
   const { fixture, adapter, failOldTurn } = await pendingProviderTurnFailure()
   const oldEpoch = (await sessionFrom(fixture)).latestTurn?.runtimeEpoch

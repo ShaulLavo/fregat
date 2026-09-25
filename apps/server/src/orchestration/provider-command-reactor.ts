@@ -812,6 +812,15 @@ export class ProviderCommandReactor {
       })
       return
     }
+    if (!this.ownsStart(event, context, 'claimed') && !this.ownsStart(event, context, 'adopted')) {
+      recordChatPipelineInfo('chat.pipeline.provider_reactor.turn_failure.discarded', {
+        sessionId,
+        turnId: event.payload.turnId,
+        runtimeEpoch,
+        reason: 'turn-ownership-ended',
+      })
+      return
+    }
     const detail = providerErrorMessage(error)
     await this.appendProviderFailureActivity({
       detail,
