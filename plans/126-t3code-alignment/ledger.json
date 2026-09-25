@@ -381,7 +381,8 @@
         "Recorded comparison executes the pinned interaction-mode resolver over 20 flag/provider/mode combinations",
         "Remaining: rich composition and mobile plain-Enter newline. Completion-wave verification uses our agent:browser scenarios; the paired upstream run is no longer required.",
         "2026-09-25 lane L2: chat.sendShortcut (enter, mod-enter-multiline, mod-enter) and large-paste folding at 32 KB with Ctrl/Cmd+Shift+V inline; scripts/agent/scenarios/chat-composer-editing.ts passed. Open: mobile plain-Enter newline. Rich composition and Lexical removal are parked by the latest owner ruling.",
-        "2026-09-25 owner ruling supersedes the earlier deletion instruction: retain Lexical until Editor completes a full Markdown/composer support plan. L2/L7 audit found no such plan in Editor plans/*.md, plans/backlog.json, plans/README.md or TODO.md. packages/markdown/README.md documents live preview only; ordered lists, block quotes, escapes and fenced code blocks remain source text. composerRichTextEnabled waits for a working consumer. No new Editor Markdown plan is part of this wave."
+        "2026-09-25 owner ruling supersedes the earlier deletion instruction: retain Lexical until Editor completes a full Markdown/composer support plan. L2/L7 audit found no such plan in Editor plans/*.md, plans/backlog.json, plans/README.md or TODO.md. packages/markdown/README.md documents live preview only; ordered lists, block quotes, escapes and fenced code blocks remain source text. composerRichTextEnabled waits for a working consumer. No new Editor Markdown plan is part of this wave.",
+        "2026-09-25 owner ruling, restated: the row's goal is to delete Lexical and support Markdown as you type; Lexical stays until the editor can carry the composer. That prerequisite is Plan 111 (authorized 2026-09-25 with the composer as its first consumer), replacing the 'no Editor Markdown plan exists' gap recorded above."
       ]
     },
     {
