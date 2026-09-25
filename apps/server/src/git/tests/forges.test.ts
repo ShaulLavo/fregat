@@ -784,10 +784,16 @@ describe('owner review regressions', () => {
         })),
       )
     })
-    await expect(
-      readBranchPullRequests({ cwd: await checkout(), branches: ['absent'] }, forge),
-    ).rejects.toThrow('lookup limit')
+    const cwd = await checkout()
+    const result = await readBranchPullRequests({ cwd, branches: ['absent', 'other'] }, forge)
     expect(pages).toBeLessThanOrEqual(5)
+    // One unmatched branch is unknown; it does not fail the branches the scan did answer.
+    expect(result.kind === 'ready' && result.pullRequests.has('absent')).toBe(false)
+    expect(result.kind === 'ready' && result.pullRequests.get('other')).toMatchObject({
+      number: 50,
+    })
+    pages = 0
+    await expect(readPullRequest({ cwd, branch: 'absent' }, forge)).rejects.toThrow('lookup limit')
   })
 
   it('checks out an Azure fork from its source repository at the reported commit', async () => {
