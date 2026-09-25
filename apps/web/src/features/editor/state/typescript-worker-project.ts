@@ -338,6 +338,7 @@ export class WorkerProject {
       exact: true,
       refetchType: 'none',
     })
+    if (this.disposed) return
     const [module, program] = await Promise.all([
       this.options.client.fetchQuery({
         queryKey: editorQueryKeys.typescriptWorkerModule(),
@@ -424,7 +425,9 @@ export class WorkerProject {
         exact: true,
         refetchType: 'none',
       })
+      if (this.disposed) return
       const metadata = await this.read(query)
+      if (this.disposed) return
       const changed = JSON.stringify(metadata) !== JSON.stringify(this.metadata)
       this.metadata = metadata
       this.roots = new Set(metadata.roots)

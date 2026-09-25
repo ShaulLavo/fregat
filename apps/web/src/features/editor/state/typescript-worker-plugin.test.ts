@@ -125,6 +125,39 @@ afterEach(() => {
   for (const dispose of cleanups.splice(0)) dispose()
 })
 describe('TypeScript worker lifecycle', () => {
+  it.each(['initial', 'rescan'])(
+    'does not start reads after retirement during %s invalidation',
+    async (phase) => {
+      const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+      const documents = createEditorDocumentStore()
+      let release!: () => void
+      const delay = () =>
+        new Promise<void>((resolve) => {
+          release = resolve
+        })
+      const invalidate = client.invalidateQueries.bind(client)
+      const invalidation = vi.spyOn(client, 'invalidateQueries')
+      const waitAfterInvalidation: typeof client.invalidateQueries = async (...args) => {
+        await invalidate(...args)
+        await delay()
+      }
+      if (phase === 'initial') invalidation.mockImplementation(waitAfterInvalidation)
+      const owner = mount(1000, { client, documents })
+      if (phase === 'rescan') {
+        await vi.waitFor(() => expect(worker.activate).toHaveBeenCalled())
+        invalidation.mockImplementation(waitAfterInvalidation)
+        publishFilesystemEvents(client, [{ type: 'rescan', path: '/repo' }])
+      }
+      await vi.waitFor(() => expect(release).toBeDefined())
+      worker.project.mockClear()
+      worker.program.mockClear()
+      owner.close()
+      release()
+      await new Promise((done) => setTimeout(done, 20))
+      expect(worker.project).not.toHaveBeenCalled()
+      expect(worker.program).not.toHaveBeenCalled()
+    },
+  )
   it('keeps shared metadata loading when one editor closes', async () => {
     let resolve!: (value: unknown) => void
     let signal!: AbortSignal
