@@ -1,4 +1,5 @@
 import { createClientInvariantError } from '@/lib/structured-errors'
+import { createDatabaseResource } from '@/lib/resources/state/database'
 
 const DATABASE = 'platform-editor-history'
 // Split so a budget or expiry pass reads a few numbers per file, never the histories.
@@ -20,21 +21,16 @@ type StoredHistoryMeta = {
   readonly size: number
 }
 
-let database: Promise<IDBDatabase> | undefined
-
-function openDatabase() {
-  database ??= new Promise<IDBDatabase>((resolve, reject) => {
-    const request = indexedDB.open(DATABASE, 1)
-    request.onupgradeneeded = () => {
-      request.result.createObjectStore(DATA)
-      request.result.createObjectStore(META, { keyPath: 'id' }).createIndex(SAVED_AT, SAVED_AT)
-    }
-    request.onsuccess = () => resolve(request.result)
-    request.onerror = () =>
-      reject(createClientInvariantError('Undo history storage is unavailable.', request.error))
-  })
-  return database
-}
+const database = createDatabaseResource({
+  name: DATABASE,
+  version: 1,
+  initialize(db) {
+    db.createObjectStore(DATA)
+    db.createObjectStore(META, { keyPath: 'id' }).createIndex(SAVED_AT, SAVED_AT)
+  },
+  errorMessage: 'Undo history storage is unavailable.',
+})
+if (import.meta.hot) import.meta.hot.dispose(database.close)
 
 function settled(transaction: IDBTransaction, message: string) {
   return new Promise<void>((resolve, reject) => {
@@ -45,7 +41,7 @@ function settled(transaction: IDBTransaction, message: string) {
 }
 
 export async function readStoredHistory(id: string): Promise<StoredHistory | null> {
-  const db = await openDatabase()
+  const db = await database.open()
   const transaction = db.transaction([META, DATA])
   const meta = transaction.objectStore(META).get(id)
   const data = transaction.objectStore(DATA).get(id)
@@ -68,7 +64,7 @@ export async function writeStoredHistory(
     return false
   }
 
-  const db = await openDatabase()
+  const db = await database.open()
   const transaction = db.transaction([META, DATA], 'readwrite')
   const meta: StoredHistoryMeta = {
     id,
@@ -84,7 +80,7 @@ export async function writeStoredHistory(
 }
 
 export async function deleteStoredHistory(id: string) {
-  const db = await openDatabase()
+  const db = await database.open()
   const transaction = db.transaction([META, DATA], 'readwrite')
   transaction.objectStore(META).delete(id)
   transaction.objectStore(DATA).delete(id)
@@ -95,7 +91,7 @@ export async function pruneStoredHistories(options: {
   readonly budget: number
   readonly expiredBefore: number
 }): Promise<number> {
-  const db = await openDatabase()
+  const db = await database.open()
   const transaction = db.transaction([META, DATA], 'readwrite')
   const removed = trim(transaction, options)
   await settled(transaction, 'Stored undo histories could not be pruned.')
