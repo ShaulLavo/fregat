@@ -7,7 +7,7 @@ import {
 } from '@workspace/contracts'
 import { recordProcessInfo, recordProcessWarning } from '../observability'
 import type { OrchestrationReadModel } from './read-model'
-import { autoSettlementAt, type AutoSettleRules } from './utils/auto-settlement'
+import { autoSettlementAt, pendingPullRequest, type AutoSettleRules } from './utils/auto-settlement'
 import { internalCommandKey } from './utils/repository-ids'
 import { SweepReactor } from './sweep-scheduler'
 
@@ -59,6 +59,7 @@ export class SessionSettlementReactor extends SweepReactor {
       const settledAt = autoSettlementAt({
         session,
         pullRequest: worktree.pullRequest,
+        pendingPullRequest: pendingPullRequest(worktree),
         backgroundLive: this.options.backgroundLive(session.id),
         now,
         rules,

@@ -10,6 +10,7 @@ import {
 import { closeTestApps } from '../../../test/server'
 import {
   lifecycleSessionId,
+  lifecycleWorktreeId,
   worktreeLifecycleFixture,
 } from '../../../test/factories/worktree-lifecycle'
 import type { BranchPullRequestLookup } from '../pull-request-sync-reactor'
@@ -84,6 +85,42 @@ describe('automatic settlement through the engine', () => {
     expect((await settledSession(off))?.settledOverride ?? null).toBeNull()
   })
 
+  test('a queued settlement is refused after the worktree PR reopens', async () => {
+    const fixture = await worktreeLifecycleFixture()
+    fixtures.push(fixture)
+    await fixture.create()
+    const model = await fixture.engine.readModelSnapshot()
+    const before = model.sequence
+    await fixture.engine.dispatch(
+      internal({
+        type: 'worktree.pull-request.sync',
+        commandId: 'reopened-pr',
+        worktreeId: lifecycleWorktreeId,
+        branch: model.worktrees.get(lifecycleWorktreeId)?.branch,
+        pullRequest: {
+          status: 'found',
+          number: 3,
+          title: 'Open',
+          url: 'https://github.com/acme/repo/pull/3',
+          state: 'open',
+          draft: false,
+          closedAt: null,
+        },
+      }),
+    )
+    await expect(
+      fixture.engine.dispatch(
+        internal({
+          type: 'session.auto-settle',
+          commandId: 'stale-pr',
+          sessionId: lifecycleSessionId,
+          snapshotSequence: before,
+          settledAt: new Date().toISOString(),
+        }),
+      ),
+    ).rejects.toMatchObject({ code: expect.stringContaining('AUTO_SETTLE_STALE') })
+  })
+
   test('a decision read before a later session event is refused', async () => {
     const fixture = await worktreeLifecycleFixture()
     fixtures.push(fixture)
@@ -106,20 +143,17 @@ describe('automatic settlement through the engine', () => {
       ),
     ).rejects.toMatchObject({ code: expect.stringContaining('AUTO_SETTLE_STALE') })
     const current = (await fixture.engine.readModelSnapshot()).sequence
-    await fixture.engine.dispatch(
-      internal({
-        type: 'session.auto-settle',
-        commandId: 'auto-settle-current',
-        sessionId: lifecycleSessionId,
-        settledAt: '2026-01-01T00:00:00.000Z',
-        snapshotSequence: current,
-      }),
-    )
-    const session = (await fixture.engine.readModelSnapshot()).sessions.get(lifecycleSessionId)
-    expect(session).toMatchObject({
-      settledOverride: 'settled',
-      settledAt: '2026-01-01T00:00:00.000Z',
-    })
+    await expect(
+      fixture.engine.dispatch(
+        internal({
+          type: 'session.auto-settle',
+          commandId: 'auto-settle-current',
+          sessionId: lifecycleSessionId,
+          settledAt: '2026-01-01T00:00:00.000Z',
+          snapshotSequence: current,
+        }),
+      ),
+    ).rejects.toMatchObject({ code: expect.stringContaining('AUTO_SETTLE_STALE') })
   })
 })
 
@@ -150,12 +184,17 @@ describe('automatic settlement policy', () => {
   const at = (
     session: Partial<OrchestrationProjectedSession>,
     pullRequest: WorktreePullRequest | null = null,
-    overrides: Partial<{ backgroundLive: boolean; afterDays: number }> = {},
+    overrides: Partial<{
+      backgroundLive: boolean
+      afterDays: number
+      pendingPullRequest: boolean
+    }> = {},
   ) =>
     autoSettlementAt({
       session: { ...base, ...session } as OrchestrationProjectedSession,
       pullRequest,
       backgroundLive: overrides.backgroundLive ?? false,
+      pendingPullRequest: overrides.pendingPullRequest ?? false,
       now,
       rules: { ...rules, afterDays: overrides.afterDays ?? rules.afterDays },
     })
@@ -164,6 +203,11 @@ describe('automatic settlement policy', () => {
     expect(at({})).toBe('2026-09-20T10:05:00.000Z')
     expect(at({ latestUserMessageAt: '2026-09-24T00:00:00.000Z' })).toBeNull()
     expect(at({}, null, { afterDays: 0 })).toBeNull()
+  })
+
+  test('pending PR discovery blocks inactivity settlement', () => {
+    expect(at({}, null, { pendingPullRequest: true })).toBeNull()
+    expect(at({}, { status: 'unsupported', support: 'no-forge' })).toBe('2026-09-20T10:05:00.000Z')
   })
 
   test('keep-active, snooze, background work and pending requests block it', () => {

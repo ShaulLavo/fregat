@@ -1,6 +1,6 @@
 import type { WorktreePullRequest } from '@workspace/contracts'
 import { settleBlocker } from '../command-invariants'
-import type { OrchestrationProjectedSession } from '../read-model'
+import type { OrchestrationProjectedSession, OrchestrationProjectedWorktree } from '../read-model'
 
 export type AutoSettleRules = {
   /** 0 turns inactivity settlement off. */
@@ -17,6 +17,7 @@ const DAY_MS = 24 * 60 * 60 * 1_000
 export function autoSettlementAt(input: {
   readonly session: OrchestrationProjectedSession
   readonly pullRequest: WorktreePullRequest | null
+  readonly pendingPullRequest: boolean
   readonly backgroundLive: boolean
   readonly now: number
   readonly rules: AutoSettleRules
@@ -24,7 +25,7 @@ export function autoSettlementAt(input: {
   const { session, pullRequest, rules } = input
   if (!isCandidate(session, input.backgroundLive, input.now)) return null
   // An open or unanswered pull request is unfinished work.
-  if (pullRequest?.status === 'unknown') return null
+  if (input.pendingPullRequest || pullRequest?.status === 'unknown') return null
   if (pullRequest?.status === 'found' && pullRequest.state === 'open') return null
   const activityAt = latest([
     session.latestUserMessageAt,
@@ -83,4 +84,14 @@ function latest(values: ReadonlyArray<string | null | undefined>) {
     if (found === null || Date.parse(value) > Date.parse(found)) found = value
   }
   return found
+}
+
+export function pendingPullRequest(worktree: OrchestrationProjectedWorktree) {
+  return (
+    worktree.pullRequest === null &&
+    worktree.ownership === 'platform' &&
+    worktree.kind === 'linked' &&
+    worktree.branch !== null &&
+    !worktree.retiredAt
+  )
 }

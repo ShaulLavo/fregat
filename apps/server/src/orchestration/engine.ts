@@ -20,7 +20,7 @@ import { requireReadyWorktree } from './worktree-decider'
 import { PullRequestSyncReactor, type BranchPullRequestLookup } from './pull-request-sync-reactor'
 import { SessionSettlementReactor } from './session-settlement-reactor'
 import { WorktreeCleanupReactor } from './worktree-cleanup-reactor'
-import type { AutoSettleRules } from './utils/auto-settlement'
+import { autoSettlementAt, pendingPullRequest, type AutoSettleRules } from './utils/auto-settlement'
 import { WorktreeCommandPreparation } from './worktree-command-preparation'
 import { TerminalLeaseController } from './terminal-lease-controller'
 import { GitWorktreeService } from '../git/worktrees'
@@ -150,6 +150,7 @@ export class OrchestrationEngine {
   private deletionReactor: SessionDeletionReactor | null = null
   private discovery: SessionDiscoveryReconciler | null = null
   private pullRequestSync: PullRequestSyncReactor | null = null
+  private autoSettleRules: OrchestrationEngineOptions['autoSettleRules']
   private settlement: SessionSettlementReactor | null = null
   private worktreeCleanup: WorktreeCleanupReactor | null = null
   private titleReactor: SessionTitleReactor | null = null
@@ -172,6 +173,7 @@ export class OrchestrationEngine {
   constructor(database: OrchestrationDatabase, options: OrchestrationEngineOptions = {}) {
     this.keepImportedSessionsUpdated = options.keepImportedSessionsUpdated ?? (() => false)
     this.attachmentsDir = options.attachmentsDir ?? defaultAttachmentsDir()
+    this.autoSettleRules = options.autoSettleRules
     this.database = database
     this.attachmentOwnership = createAttachmentOwnership(database)
     this.registration = options.registration
@@ -572,7 +574,21 @@ export class OrchestrationEngine {
       command.snapshotSequence,
     )
     const liveness = this.providerService?.backgroundLiveness(command.sessionId) ?? null
-    if (!changed && liveness === null) return
+    const session = this.readModel.sessions.get(command.sessionId)
+    const worktree = session && this.readModel.worktrees.get(session.worktreeId)
+    const rules = worktree && this.autoSettleRules?.(worktree.projectId)
+    const settledAt =
+      session && worktree && rules
+        ? autoSettlementAt({
+            session,
+            pullRequest: worktree.pullRequest,
+            pendingPullRequest: pendingPullRequest(worktree),
+            backgroundLive: liveness !== null,
+            now: Date.now(),
+            rules,
+          })
+        : null
+    if (!changed && settledAt === command.settledAt) return
     throw sessionDomainErrors.AUTO_SETTLE_STALE({
       sessionId: command.sessionId,
       internal: { changedAfter: command.snapshotSequence, changed, liveness },
