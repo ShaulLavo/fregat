@@ -30,6 +30,7 @@ type Configuration = {
 }
 
 type StrokeContext = {
+  readonly altGraph: boolean
   readonly commands: ReturnType<PlatformCommandBus['capture']>
   readonly targetsTextEntry: boolean
 }
@@ -46,7 +47,11 @@ export function createPlatformKeymapSession(initial: Configuration) {
     const commands = config.bus.capture({ event, source: { kind: 'keybinding' } })
     const target = commands.inspect('editor.selectAll').target
     const editorInput = target?.kind === 'editor' ? target.inputElement : null
-    return { commands, targetsTextEntry: eventTargetsTextEntry(event, editorInput) }
+    return {
+      altGraph: event.getModifierState('AltGraph'),
+      commands,
+      targetsTextEntry: eventTargetsTextEntry(event, editorInput),
+    }
   }
 
   function focusIdentity() {
@@ -143,6 +148,7 @@ function runtimeBindings(
 }
 
 function candidateAvailable({ payload }: KeymapBinding<Candidate>, context: StrokeContext) {
+  if (context.altGraph) return false
   const { binding, firesWhileTyping } = payload
   if (context.targetsTextEntry && !firesWhileTyping) return false
   if (!binding.command) return true

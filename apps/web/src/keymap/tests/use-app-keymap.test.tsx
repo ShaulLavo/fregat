@@ -434,3 +434,24 @@ test('hiding the document cancels the pending chord', () => {
   expect(harness.result.current.pendingChord).toBeNull()
   visibility.mockRestore()
 })
+
+test('leaves AltGraph character entry unclaimed even when its physical key matches a shortcut', () => {
+  const harness = mountChordRuntime('workspace.toggleWallpaper', 'Ctrl+Alt+2')
+  const input = document.createElement('input')
+  document.body.append(input)
+  const event = new KeyboardEvent('keydown', {
+    bubbles: true,
+    cancelable: true,
+    ctrlKey: true,
+    altKey: true,
+    code: 'Digit2',
+    key: '²',
+  })
+  Object.defineProperty(event, 'getModifierState', { value: (key: string) => key === 'AltGraph' })
+  act(() => {
+    input.dispatchEvent(event)
+  })
+  expect(event.defaultPrevented).toBe(false)
+  expect(harness.calls).toEqual([])
+  input.remove()
+})
