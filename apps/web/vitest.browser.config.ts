@@ -214,10 +214,9 @@ const workspaceOpenReleases = new Map<string, () => void>()
 
 async function acquireWorkspaceOpen({ sessionId }: { readonly sessionId: string }) {
   const previous = workspaceOpenQueue
-  const turn = Promise.withResolvers<void>()
-  workspaceOpenQueue = previous.then(() => turn.promise)
+  const turn = new Promise<void>((resolve) => workspaceOpenReleases.set(sessionId, resolve))
+  workspaceOpenQueue = previous.then(() => turn)
   await previous
-  workspaceOpenReleases.set(sessionId, turn.resolve)
 }
 
 function releaseWorkspaceOpen({ sessionId }: { readonly sessionId: string }) {
