@@ -385,8 +385,8 @@ and reuses every screen above.
 Recommendation, for the later decision: Expo / React Native if the native app gets its own
 screens, because the chat state it needs already exists as runtime-neutral TypeScript. Consider
 the Orca-style wrapper around the phone web shell first; if it covers push and pairing, the app
-may never need its own screens. With both iPhone and Android as targets (Owner answer 4),
-SwiftUI drops out.
+may never need its own screens. Superseded by Owner answer 4 (corrected): the native app is iOS only, so
+SwiftUI is back in: native feel, next to `apps/mac`, at the cost of rewriting the chat state layer in Swift.
 
 ### Owner answers (2026-09-25)
 
@@ -399,9 +399,9 @@ SwiftUI drops out.
 3. **Pairing: required.** It becomes part of the phone work, and the M4 session model
    (`docs/environments-and-remote-plan.md` §4) becomes its prerequisite. A phone on the tailnet
    still pairs once. That is what makes a device revocable, independent of Tailscale.
-4. **Phones: both iPhone and Android.** The phone web app covers both as it is. For the later
-   native app, SwiftUI drops out (iOS only), which leaves Expo / React Native or the Orca-style
-   wrapper. WebKit is the engine that cannot run on this host, so the iPhone device check stays
+4. **Phones (corrected 2026-09-25):** the phone **web app** supports both iPhone and Android. The later
+   **native app is iOS only**, so SwiftUI is a candidate again, alongside a WebKit wrapper around the phone web
+   shell (Orca-style) and Expo. Decide in the companion-app plan. WebKit is the engine that cannot run on this host, so the iPhone device check stays
    a phase of its own.
 
 ### Proposed phases
@@ -423,7 +423,7 @@ The split this plan promised:
    paired-devices list, as in Q5. It can run in parallel with phases 1 to 3.
 5. **Haptics** (S, the follow-up item below) and device checks on an iPhone and an Android phone
    through the mesh.
-6. Later, in its own plan: the companion app (Expo / React Native or a native wrapper).
+6. Later, in its own plan: the iOS companion app (SwiftUI, a native wrapper, or Expo).
 
 ## Phases
 
