@@ -65,6 +65,8 @@ import { mergeProviderInstanceConfigs } from './provider/utils/instance-config-m
 import { SettingsStore, type SettingsStoreOptions } from './settings/store'
 import { worktreeSubmoduleMode } from './git/submodules'
 import { autoPullEnabled } from './git/auto-pull'
+import { readBranchPullRequests } from './git/pull-request'
+import type { BranchPullRequestLookup } from './orchestration/pull-request-sync-reactor'
 import { TerminalService, type TerminalPtyFactory } from './terminal/service'
 import { wallpaperRoutes } from './wallpaper/routes'
 import { webRoutes, type WebOptions } from './web/routes'
@@ -101,6 +103,8 @@ export type AppOptions = FileSystemServiceOptions & {
     database?: OrchestrationDatabase
     providerAdapterRegistry?: ProviderAdapterRegistry
     providerRuntime?: boolean
+    /** Null turns pull request sync off; tests never reach a forge. */
+    pullRequestLookup?: BranchPullRequestLookup | null
   }
   lsp?: {
     /**
@@ -268,6 +272,10 @@ export function createApp(options: AppOptions) {
     keepImportedSessionsUpdated: () =>
       settings.snapshot().values['chat.keepImportedSessionsUpdated'],
     worktreeSubmodules: (projectId) => worktreeSubmoduleMode(settings, projectId),
+    pullRequestLookup:
+      options.orchestration?.pullRequestLookup === undefined
+        ? (input) => readBranchPullRequests(input)
+        : (options.orchestration.pullRequestLookup ?? undefined),
     providerService,
     terminalService: terminal,
     attachmentsDir: options.orchestration?.attachmentsDir,

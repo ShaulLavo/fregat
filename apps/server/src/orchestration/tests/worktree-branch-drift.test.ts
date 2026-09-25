@@ -14,11 +14,16 @@ afterEach(async () => {
 })
 
 test("an agent's branch checkout in its dedicated worktree becomes the worktree branch at turn end", async () => {
-  const fixture = await worktreeLifecycleFixture()
+  let worktreePath = ''
+  const fixture = await worktreeLifecycleFixture({
+    adapter: {
+      beforeComplete: async () => {
+        await executeGit(worktreePath, 'checkout', '-q', '-b', 'agent/feature')
+      },
+    },
+  })
   fixtures.push(fixture)
-  const worktreePath = path.join(fixture.root, '.git', 'platform-worktrees', lifecycleWorktreeId)
-  fixture.adapter.beforeComplete = () =>
-    executeGit(worktreePath, 'checkout', '-q', '-b', 'agent/feature')
+  worktreePath = path.join(fixture.root, '.git', 'platform-worktrees', lifecycleWorktreeId)
   const worktree = await fixture.create()
   await fixture.engine.providerRuntimeIdle()
   expect(

@@ -637,10 +637,14 @@
       "title": "P2: Show linked pull-request state on sidebar rows with background sync",
       "report": "lifecycle.md",
       "wave": "2",
-      "status": "open",
-      "evidence_level": "source-reviewed",
+      "status": "in-progress",
+      "evidence_level": "server sync implemented and browser-verified; row badge UI pending (lane L5)",
       "acceptance": "lifecycle.md, LIFE-14, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "repository-delivery.md",
+        "apps/server/src/orchestration/tests/pull-request-sync.test.ts",
+        "/work/tmp/fregat-evidence/20260925T115511Z-scenario-session-pull-request-sync/"
+      ]
     },
     {
       "id": "INTERACTION-13",

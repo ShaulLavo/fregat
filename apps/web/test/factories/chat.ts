@@ -225,6 +225,7 @@ export function chatWorktree(
     terminalOwnershipUnknown: false,
     externalDriverUnverified: false,
     removedAt: null,
+    pullRequest: null,
     worktreeCreationCapability: { allowed: true },
     cleanupEligibility: {
       reason: 'protected',

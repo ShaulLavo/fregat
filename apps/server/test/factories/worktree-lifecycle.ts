@@ -10,6 +10,7 @@ import { closeApp, orchestrationForApp } from '../../src/app'
 import { MockProviderAdapter } from '../../src/provider/adapters/mock'
 import { ProviderAdapterRegistry } from '../../src/provider/provider-adapter-registry'
 import { OrchestrationEngine } from '../../src/orchestration/engine'
+import type { BranchPullRequestLookup } from '../../src/orchestration/pull-request-sync-reactor'
 import { GitService } from '../../src/git/service'
 import { GitWorktreeService } from '../../src/git/worktrees'
 import { createWorkspacePaths } from '../../src/fs/path'
@@ -20,7 +21,12 @@ export const lifecycleWorktreeId = v.parse(worktreeIdSchema, '11111111-1111-4111
 export const lifecycleSessionId = v.parse(sessionIdSchema, '22222222-2222-4222-8222-222222222269')
 export const sharedSessionId = v.parse(sessionIdSchema, '33333333-3333-4333-8333-333333333369')
 
-export async function worktreeLifecycleFixture() {
+export async function worktreeLifecycleFixture(
+  options: {
+    adapter?: ConstructorParameters<typeof MockProviderAdapter>[0]
+    pullRequestLookup?: BranchPullRequestLookup
+  } = {},
+) {
   const root = await mkdtemp(path.join(tmpdir(), 'platform-lifecycle-'))
   await executeGit(root, 'init', '-b', 'main')
   await executeGit(root, 'config', 'user.name', 'Lifecycle Test')
@@ -31,7 +37,7 @@ export async function worktreeLifecycleFixture() {
   await executeGit(root, 'commit', '-m', 'initial')
   const database = createTestDatabase()
   migratePlatformDatabase(database.db)
-  let adapter = new MockProviderAdapter()
+  let adapter = new MockProviderAdapter(options.adapter)
   const build = () =>
     createTestApp({
       workspaceRoot: root,
@@ -42,6 +48,7 @@ export async function worktreeLifecycleFixture() {
         providerRuntime: true,
         attachmentsDir: path.join(root, '.git', 'attachments'),
         providerAdapterRegistry: new ProviderAdapterRegistry({ adapters: [adapter] }),
+        pullRequestLookup: options.pullRequestLookup ?? null,
       },
     })
   let app = build()
@@ -102,7 +109,7 @@ export async function worktreeLifecycleFixture() {
       engine.dispatchClientCommand({ commandId: `lifecycle-command-${++sequence}`, ...command }),
     restart: async () => {
       await closeApp(app)
-      adapter = new MockProviderAdapter()
+      adapter = new MockProviderAdapter(options.adapter)
       app = build()
       engine = orchestrationForApp(app)
       await engine.ready

@@ -156,6 +156,11 @@ export type Scenario = {
   readonly description: string
   readonly run: (page: Page, context: ScenarioContext) => Promise<void>
   readonly inspect?: (page: Page) => Promise<unknown>
+  /**
+   * Runs before the throwaway server starts. A directory it returns goes first on the server's
+   * PATH, which is how a scenario stands in for an outside CLI such as `gh`.
+   */
+  readonly prepareServer?: () => Promise<{ readonly pathPrefix: string }>
 }
 
 import { editorDiagnosticsLifecycle } from './editor-diagnostics-lifecycle'
@@ -185,6 +190,7 @@ import { gitFixWithAgent } from './git-fix-with-agent'
 import { gitSubmodulesInit } from './git-submodules-init'
 import { gitAutoPull } from './git-auto-pull'
 import { sessionBranchDrift } from './session-branch-drift'
+import { sessionPullRequestSync } from './session-pull-request-sync'
 import { gitHistory } from './git-history'
 import { editorCaretBurst } from './editor-caret-burst'
 import { editorFocusClicks } from './editor-focus-clicks'
@@ -382,6 +388,7 @@ export const scenarios: readonly Scenario[] = [
   gitSubmodulesInit,
   gitAutoPull,
   sessionBranchDrift,
+  sessionPullRequestSync,
   editorCaretBurst,
   editorFocusClicks,
   editorProportionalFont,

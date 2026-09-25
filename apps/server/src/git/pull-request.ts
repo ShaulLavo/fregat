@@ -27,14 +27,49 @@ const PR_FIELDS = 'isDraft,number,state,title,url'
  */
 const SUPPORT_CACHE_TTL_MS = 60_000
 
-const supportByCwd = new Map<string, { at: number; support: GitPullRequestSupport }>()
+type RepositoryName = { owner: string; name: string }
+
+const supportByCwd = new Map<
+  string,
+  { at: number; support: GitPullRequestSupport; repository: RepositoryName | null }
+>()
+
+/** Aliased connections per GraphQL request; a repository with more branches takes several. */
+const BRANCHES_PER_QUERY = 50
+
+const repositoryNameSchema = v.object({
+  owner: v.object({ login: v.pipe(v.string(), v.minLength(1)) }),
+  name: v.pipe(v.string(), v.minLength(1)),
+})
+
+const branchPullRequestsSchema = v.object({
+  data: v.object({
+    repository: v.record(
+      v.string(),
+      v.object({
+        nodes: v.array(
+          v.object({
+            ...pullRequestSchemaEntries(),
+            state: v.picklist(['OPEN', 'CLOSED', 'MERGED']),
+          }),
+        ),
+      }),
+    ),
+  }),
+})
+
+function pullRequestSchemaEntries() {
+  return {
+    isDraft: v.boolean(),
+    number: v.pipe(v.number(), v.integer(), v.minValue(1)),
+    title: v.string(),
+    url: v.pipe(v.string(), v.url()),
+  }
+}
 
 const pullRequestSchema = v.object({
-  isDraft: v.boolean(),
-  number: v.pipe(v.number(), v.integer(), v.minValue(1)),
+  ...pullRequestSchemaEntries(),
   state: v.picklist(['OPEN', 'CLOSED', 'MERGED']),
-  title: v.string(),
-  url: v.pipe(v.string(), v.url()),
 })
 
 type RunProcess = typeof runBoundedProcess
@@ -61,6 +96,87 @@ export async function readPullRequest(
   }
 
   return { pullRequest: parsePullRequest(result.stdout), support: 'ready' }
+}
+
+export type BranchPullRequests =
+  | { kind: 'unsupported'; support: Exclude<GitPullRequestSupport, 'ready'> }
+  /** Every requested branch has an entry: its newest pull request in any state, or null. */
+  | { kind: 'ready'; pullRequests: ReadonlyMap<string, GitPullRequest | null> }
+
+/**
+ * The newest pull request of each branch in one repository, in one GraphQL request per 50
+ * branches rather than one `gh` process per branch. Throws on any failed read: a lookup that
+ * did not complete never becomes "no pull request".
+ */
+export async function readBranchPullRequests(
+  input: { cwd: string; branches: readonly string[] },
+  runProcess: RunProcess = runBoundedProcess,
+): Promise<BranchPullRequests> {
+  const support = await pullRequestSupport(input.cwd, runProcess)
+  const repository = supportByCwd.get(input.cwd)?.repository
+  if (support !== 'ready') return { kind: 'unsupported', support }
+  if (!repository)
+    throw gitPullRequestErrors.PULL_REQUEST_LOOKUP_FAILED({ internal: { at: 'repository-name' } })
+
+  const pullRequests = new Map<string, GitPullRequest | null>()
+  const branches = [...new Set(input.branches)]
+  for (let start = 0; start < branches.length; start += BRANCHES_PER_QUERY) {
+    const chunk = branches.slice(start, start + BRANCHES_PER_QUERY)
+    const found = await queryBranchPullRequests(input.cwd, repository, chunk, runProcess)
+    chunk.forEach((branch, index) => pullRequests.set(branch, found[index] ?? null))
+  }
+  return { kind: 'ready', pullRequests }
+}
+
+async function queryBranchPullRequests(
+  cwd: string,
+  repository: RepositoryName,
+  branches: readonly string[],
+  runProcess: RunProcess,
+) {
+  // Branch names travel as variables, never inside the query text.
+  const variables = branches.map((_, index) => `$h${index}: String!`).join(', ')
+  const fields = branches
+    .map(
+      (_, index) =>
+        `b${index}: pullRequests(headRefName: $h${index}, first: 1, orderBy: {field: CREATED_AT, direction: DESC}, states: [OPEN, CLOSED, MERGED]) { nodes { number title url state isDraft } }`,
+    )
+    .join(' ')
+  const query = `query($owner: String!, $name: String!, ${variables}) { repository(owner: $owner, name: $name) { ${fields} } }`
+  const result = await gh(
+    cwd,
+    [
+      'api',
+      'graphql',
+      '-f',
+      `query=${query}`,
+      '-f',
+      `owner=${repository.owner}`,
+      '-f',
+      `name=${repository.name}`,
+      ...branches.flatMap((branch, index) => ['-f', `h${index}=${branch}`]),
+    ],
+    runProcess,
+  )
+  if (result.exitCode !== 0) {
+    throw gitPullRequestErrors.PULL_REQUEST_LOOKUP_FAILED({
+      internal: {
+        at: 'graphql',
+        exitCode: result.exitCode,
+        branchCount: branches.length,
+        rateLimited: /rate limit/i.test(result.stderr),
+      },
+    })
+  }
+  const parsed = v.safeParse(branchPullRequestsSchema, parseJsonOutput(result.stdout))
+  if (!parsed.success)
+    throw gitPullRequestErrors.PULL_REQUEST_RESPONSE_INVALID({
+      internal: { at: 'graphql-schema', summary: v.summarize(parsed.issues) },
+    })
+  return branches.map((_, index) => {
+    const node = parsed.output.data.repository[`b${index}`]?.nodes[0]
+    return node ? toPullRequest(node) : null
+  })
 }
 
 export async function createPullRequest(
@@ -123,26 +239,37 @@ async function pullRequestSupport(
   const cached = supportByCwd.get(cwd)
   if (cached && Date.now() - cached.at < SUPPORT_CACHE_TTL_MS) return cached.support
 
-  const support = await probePullRequestSupport(cwd, runProcess)
-  supportByCwd.set(cwd, { at: Date.now(), support })
+  const probe = await probePullRequestSupport(cwd, runProcess)
+  supportByCwd.set(cwd, { at: Date.now(), ...probe })
 
-  return support
+  return probe.support
 }
 
 async function probePullRequestSupport(
   cwd: string,
   runProcess: RunProcess,
-): Promise<GitPullRequestSupport> {
+): Promise<{ support: GitPullRequestSupport; repository: RepositoryName | null }> {
   const status = await gh(cwd, ['auth', 'status'], runProcess)
   // Bun reports a missing binary as a spawn failure, which surfaces here as a
   // non-zero exit with nothing on either pipe.
-  if (status.exitCode !== 0 && !status.stderr && !status.stdout) return 'cli-missing'
-  if (status.exitCode !== 0) return 'unauthenticated'
+  if (status.exitCode !== 0 && !status.stderr && !status.stdout)
+    return { support: 'cli-missing', repository: null }
+  if (status.exitCode !== 0) return { support: 'unauthenticated', repository: null }
 
-  const remote = await gh(cwd, ['repo', 'view', '--json', 'url'], runProcess)
-  if (remote.exitCode !== 0) return 'no-github-remote'
+  const remote = await gh(cwd, ['repo', 'view', '--json', 'owner,name'], runProcess)
+  if (remote.exitCode !== 0) return { support: 'no-github-remote', repository: null }
 
-  return 'ready'
+  return { support: 'ready', repository: repositoryName(remote.stdout) }
+}
+
+// Only the batched lookup needs the name; a single-branch read works without it.
+function repositoryName(stdout: string): RepositoryName | null {
+  try {
+    const parsed = v.safeParse(repositoryNameSchema, JSON.parse(stdout))
+    return parsed.success ? { owner: parsed.output.owner.login, name: parsed.output.name } : null
+  } catch {
+    return null
+  }
 }
 
 async function gh(cwd: string, args: readonly string[], runProcess: RunProcess) {
@@ -175,17 +302,19 @@ async function runGh(cwd: string, args: readonly string[], runProcess: RunProces
   }
 }
 
-function parsePullRequest(stdout: string): GitPullRequest | null {
-  let json: unknown
+function parseJsonOutput(stdout: string): unknown {
   try {
-    json = JSON.parse(stdout)
+    return JSON.parse(stdout)
   } catch (cause) {
     throw gitPullRequestErrors.PULL_REQUEST_RESPONSE_INVALID({
       cause: cause instanceof Error ? cause : undefined,
       internal: { at: 'json-parse', outputLength: stdout.length },
     })
   }
-  const parsed = v.safeParse(v.array(pullRequestSchema), json)
+}
+
+function parsePullRequest(stdout: string): GitPullRequest | null {
+  const parsed = v.safeParse(v.array(pullRequestSchema), parseJsonOutput(stdout))
   if (!parsed.success)
     throw gitPullRequestErrors.PULL_REQUEST_RESPONSE_INVALID({
       internal: {
@@ -195,8 +324,10 @@ function parsePullRequest(stdout: string): GitPullRequest | null {
       },
     })
   const pullRequest = parsed.output[0]
-  if (!pullRequest) return null
+  return pullRequest ? toPullRequest(pullRequest) : null
+}
 
+function toPullRequest(pullRequest: v.InferOutput<typeof pullRequestSchema>): GitPullRequest {
   return {
     draft: pullRequest.isDraft,
     number: pullRequest.number,

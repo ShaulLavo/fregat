@@ -115,6 +115,7 @@ export function isolatedNativeScenario(options: {
   prepareWorktree?: () => Promise<PreparedWorktree>
   /** Starts the session in a new worktree forked from that checkout. */
   newWorktree?: boolean
+  prepareServer?: Scenario['prepareServer']
   drive: (
     page: Page,
     context: {
@@ -133,6 +134,7 @@ export function isolatedNativeScenario(options: {
   return {
     name: options.name,
     description: options.description,
+    prepareServer: options.prepareServer,
     inspect: async (page) => evidence.get(page) ?? null,
     async run(page, { step }) {
       const orchestration = await openChat(page)

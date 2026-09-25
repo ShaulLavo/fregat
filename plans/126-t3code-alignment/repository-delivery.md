@@ -62,3 +62,33 @@ git queries when the session worktree's branch or HEAD changes in place.
   turn is the worktree branch at turn end; a shared checkout's switch is recorded as its metadata.
 - `scenario session-branch-drift` (native checkpoint fixture, new worktree, `git` edit op):
   `/work/tmp/fregat-evidence/20260925T114547Z-scenario-session-branch-drift/`.
+
+## LIFE-14 (server side): pull request state per session worktree
+
+The shell's worktree carries `pullRequest`: `null` when untracked, `none`, `unknown` (a failed
+lookup with nothing known before it, never "no pull request"), `unsupported` with the `gh` reason,
+or `found` with number, title, URL, state (`open`, `closed`, `merged`) and `draft`. Only dedicated
+worktrees are tracked (platform-owned, linked, with a visible session): a shared checkout's branch
+belongs to no one session, which is how upstream's strict branch matching maps here.
+
+`PullRequestSyncReactor` sweeps every minute, and at once when a worktree is created, adopted or
+changes branch. It groups due worktrees by project, so a repository costs one `gh api graphql`
+request for all its branches (50 aliases per request, branch names passed as variables). Due rules
+follow upstream: no answer or `unknown` every sweep; open or none while a session on it is
+unsettled every sweep; anything else every 15 minutes; merged never again. A failed lookup backs
+that repository off (1 minute doubling to 30) and keeps known answers. The event
+`worktree.pull-request-synced` is emitted only when the answer changes, and the decider rejects an
+answer for a branch the worktree has left. A branch change clears the answer in the projection.
+Migration 25 adds `projection_worktrees.pull_request_json`.
+
+The row badge is lane L5's (LIFE-14 badge); this delivers the field it reads.
+
+- `apps/server/src/orchestration/tests/pull-request-sync.test.ts`: none then found on the shell,
+  shared checkout never asked, branch change re-asks for the new branch; unknown on failure,
+  backoff, known answer kept; merged is final; unsupported forge.
+- `apps/server/src/git/tests/push-and-pull-request.test.ts` (batched lookup): one request for
+  three branches, names as variables, failures and malformed responses throw.
+- `scenario session-pull-request-sync`: the throwaway server runs with a fake `gh` first on PATH
+  (the new `Scenario.prepareServer` hook); a new-worktree session's draft PR reaches the shell and
+  the shared checkout is not looked up:
+  `/work/tmp/fregat-evidence/20260925T115511Z-scenario-session-pull-request-sync/`.

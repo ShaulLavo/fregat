@@ -1,5 +1,5 @@
 import { sessionTitleEntries } from './session-titles'
-import { worktreeLifecycleEntries } from './worktree-lifecycle'
+import { worktreeLifecycleEntries, worktreePullRequestSchema } from './worktree-lifecycle'
 import * as v from 'valibot'
 import {
   eventIdSchema,
@@ -207,6 +207,8 @@ export const orchestrationWorktreeSchema = v.object({
   kind: v.picklist(['current', 'linked']),
   ownership: v.picklist(['protected', 'external', 'platform', 'unclaimed']),
   ...worktreeLifecycleEntries,
+  /** Tracked for dedicated platform worktrees only; null everywhere else. */
+  pullRequest: v.optional(v.nullable(worktreePullRequestSchema), null),
   createdAt: isoDateTimeSchema,
   updatedAt: isoDateTimeSchema,
   retiredAt: v.nullable(isoDateTimeSchema),
@@ -229,6 +231,7 @@ export const worktreeRegistrationEntries = {
     'removedAt',
     'worktreeCreationCapability',
     'cleanupEligibility',
+    'pullRequest',
   ]).entries,
   worktreeId: worktreeIdSchema,
 } as const

@@ -30,6 +30,8 @@ The chat mode button in the window toolbar, or an address URL with `/chat/`.
 
 `scenario session-branch-drift` runs the same fixture in a new worktree forked from a disposable repository (`newWorktree` in `isolatedNativeScenario`). Turn 1 runs `git checkout -b agent/drift` through the fixture's `git` edit op. When the turn ends, the header worktree chip, the rail row and the Git pane's branch chip must all read `agent/drift`: the server follows the branch through checkpoint capture, and the client refetches git state because the file watcher never sees `.git`.
 
+`scenario session-pull-request-sync` puts `scripts/agent/fixtures/fake-gh.mjs` first on the throwaway server's PATH through `Scenario.prepareServer`, with a draft pull request for any branch. A new-worktree session's worktree must carry `pullRequest.status: found` (#12, draft) on the shell without any request from the page, and the fake's `calls.jsonl` must show a GraphQL request that asked about one branch only: the shared checkout is never looked up.
+
 `scenario session-actions-surfaces` creates one metadata-only session (no provider turn) and drives the shared session actions from every surface: Rename from the rail row, Pin/Unpin and Rename from the chat stage header, then Rename, Snooze/Unsnooze, a cancelled Delete and Archive from the editor sidebar chat header. Each result is read back from the server's shell snapshot; the session is deleted at the end. Rename runs only after its menu has closed — an open popup pulls focus back and the field would blur shut.
 
 `scenario chat-diff-syntax --url <session-diff-address>` checks painted syntax colors in a session checkpoint diff.
