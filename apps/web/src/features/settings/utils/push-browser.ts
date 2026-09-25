@@ -65,10 +65,14 @@ export async function subscribeThisDevice(
   publicKey: string,
   registeredIds: readonly string[],
 ): Promise<PushDeviceRegistration> {
-  await navigator.serviceWorker.register(pushWorkerScript(), {
-    scope: import.meta.env.BASE_URL,
-    updateViaCache: 'none',
-  })
+  const label = deviceLabel(readPushEnvironment())
+  await navigator.serviceWorker.register(
+    `${pushWorkerScript()}?${new URLSearchParams({ label })}`,
+    {
+      scope: import.meta.env.BASE_URL,
+      updateViaCache: 'none',
+    },
+  )
   const registration = await navigator.serviceWorker.ready
   const subscription = await subscribeWithKey(
     registration.pushManager,
@@ -78,7 +82,7 @@ export async function subscribeThisDevice(
 
   return {
     subscription: subscription.toJSON() as PushSubscriptionInput,
-    label: deviceLabel(readPushEnvironment()),
+    label,
   }
 }
 

@@ -19,6 +19,13 @@ export function pushWorkerScript(base = import.meta.env.BASE_URL) {
   return `${base}sw.js`
 }
 
+// The worker's query carries this device's label, which a renewed subscription registers under.
+function workerPath(scriptURL: string) {
+  const url = new URL(scriptURL)
+  url.search = ''
+  return url.href
+}
+
 export function readPushEnvironment(): PushEnvironment {
   return {
     secure: window.isSecureContext,
@@ -35,7 +42,10 @@ export function readPushEnvironment(): PushEnvironment {
 
 export function pushSupport(environment: PushEnvironment): PushSupport {
   // The demo's mock backend owns the scope; registering ours would replace it.
-  if (environment.controllerScript && environment.controllerScript !== environment.workerScript)
+  if (
+    environment.controllerScript &&
+    workerPath(environment.controllerScript) !== environment.workerScript
+  )
     return 'scope-taken'
   if (isAppleMobile(environment) && !environment.standalone) return 'needs-install'
   if (!environment.secure || !environment.serviceWorker) return 'unsupported'

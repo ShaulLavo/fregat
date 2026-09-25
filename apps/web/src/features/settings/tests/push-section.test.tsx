@@ -57,10 +57,13 @@ test('asks permission from the button, subscribes, and marks this device', async
     const row = await findDeviceRow(await pushDeviceId(platform.endpoint))
     expect(within(row).getByText(/This device/)).toBeVisible()
     expect(await screen.findByText('This device receives push notifications.')).toBeVisible()
-    expect(platform.serviceWorker.register).toHaveBeenCalledWith('/sw.js', {
-      scope: '/',
-      updateViaCache: 'none',
-    })
+    expect(platform.serviceWorker.register).toHaveBeenCalledWith(
+      expect.stringMatching(/^\/sw\.js\?label=/),
+      {
+        scope: '/',
+        updateViaCache: 'none',
+      },
+    )
 
     await userEvent.click(within(row).getByRole('button', { name: 'Send test' }))
     expect(await within(row).findByText('Sent')).toBeVisible()

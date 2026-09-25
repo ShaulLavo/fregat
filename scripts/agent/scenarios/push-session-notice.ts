@@ -226,7 +226,7 @@ async function clickNotice(page: Page, notice: Notice): Promise<ClickCall[]> {
   const worker = page
     .context()
     .serviceWorkers()
-    .find((candidate) => candidate.url().endsWith('/sw.js'))
+    .find((candidate) => new URL(candidate.url()).pathname.endsWith('/sw.js'))
   ok(worker, 'The push worker is running')
   const calls = await worker.evaluate(`(async () => {
     const calls = []
