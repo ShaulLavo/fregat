@@ -2,13 +2,13 @@
 
 ## Status and authorization
 
-- Status: PROPOSED. The owner asked for it on 2026-09-25, after reading the
-  `lsp.semanticTokens.delta` row.
+- Status: PROPOSED — READY; D1–D4 decided by the owner on 2026-09-25. The owner asked for it the
+  same day, after reading the `lsp.semanticTokens.delta` row.
 - Already landed with this plan: `lsp.semanticTokens.delta` defaults to on, its description is
   rewritten, and `AGENTS.md` has a **Copy** section (say what a thing is; never what it is not).
 - Effort: L. Three independent parts; each is its own phase and can ship alone.
 - Risk: LOW for parts B and C (text and one new optional descriptor field). Part A changes
-  behaviour for anyone on defaults, one row at a time, each row decided by the owner.
+  behaviour for anyone on defaults; only rows that are not sensible change (D4).
 - Planned at: Platform `a3274e1d`, 2026-09-25.
 - Server-read keys (`lsp.*`, `chat.keepImportedSessionsUpdated`, …) ship with
   `bun run deploy --server`; everything else with `bun run deploy`.
@@ -17,7 +17,8 @@
 
 - Every setting's default was chosen on purpose, and the reason is written down.
 - Every setting whose default rests on a measurement, a trade-off or a server quirk shows that
-  reasoning in a details tooltip on its row, and in `settings.json` hover.
+  reasoning in a details tooltip on its row, and in `settings.json` hover. A self-explanatory
+  setting has no icon.
 - No string the app shows describes a thing by what it is not, and a gate keeps it that way for
   the text the registry and the error catalogs own.
 
@@ -34,11 +35,11 @@ a commit about something else.
    commit, as `git show <sha>^:plans/<file>`).
 3. If the reason is a claim that can be measured (cost, latency, flicker), measure it on this
    machine and note the numbers. They become the row's details (Part B).
-4. Write a recommendation: keep, flip, or change the value, with one sentence of reason.
+4. Keep a sensible default as it is. Change one that stands out as not sensible, and name it in
+   the commit message and the report with one sentence of reason (D4).
 
-The output is a decision table in this plan (below the inventory) that the owner fills in. One
-pass then applies every accepted change and regenerates `schema.json` and
-`docs/settings-reference.md` (`bun run settings:schema && bun run settings:reference`).
+One commit applies every change and regenerates `schema.json` and `docs/settings-reference.md`
+(`bun run settings:schema && bun run settings:reference`).
 
 ### Inventory
 
@@ -134,10 +135,10 @@ is already known; an empty note means the row is still unread.
   changes nothing. Its comment gives the reason for off: a warm server answers before the
   highlighter, so identifier colour can land on otherwise unpainted text for up to 1.5 s. Check
   whether that is still true since the first-paint snapshot and E035's token store.
-- `chat.defaultRuntimeMode` is `full-access`. That fits the owner; say so in its details.
+- `chat.defaultRuntimeMode` is `full-access`. That fits the owner; its details say so.
 - `chat.contextWindowMeterEnabled` shipped in Plan 141 and is off.
 - `chat.textGenerationModel` points at Codex, which has no credit until 2026-09-26. The provider
-  fallback covers it; decide whether the default should be the model that usually answers.
+  fallback covers it; check whether the default should be the model that usually answers.
 
 ## Part B — details on every setting that has a story
 
@@ -158,11 +159,13 @@ is already known; an empty note means the row is still unread.
 
 1. Add `details?: string` to `SettingDescriptor`: short plain paragraphs, facts with their source
    (machine, server version, file measured). `registryProblems` rejects an empty string.
-2. Render it on the row as an info icon after the title, with a `Tooltip` (icon-only control, so
-   `Tooltip` per `AGENTS.md`). Icon size `size-(--icon-size-sm)`.
+2. Render it on the row as a small info icon after the title, with a `Tooltip` (icon-only
+   control, so `Tooltip` per `AGENTS.md`). Icon size `size-(--icon-size-sm)`. A row without
+   `details` renders no icon (D1).
 3. Emit it into `schema.json` as `markdownDescription` (`description` + blank line + `details`),
    so `settings.json` hover carries the same text, and into `docs/settings-reference.md`.
-4. Write details for every row Part A found a story for. Move user-relevant facts out of the
+4. Write details for every row Part A found a story for, and none for a self-explanatory row.
+   Move user-relevant facts out of the
    code comment into `details`; the comment keeps only what matters to someone editing code.
 5. Scenario `settings-row-details` under `scripts/agent/scenarios/`: hover the delta row's icon,
    screenshot the tooltip. `look` on the Language servers section.
@@ -179,18 +182,18 @@ the parts that can be gated.
 
 ### Size
 
-A rough `rg` for contrast phrasing (`, not `, `— not `, `rather than`, `instead of`, `does not`,
-`is not`, `won't`, …) inside string literals, tests and comments excluded:
+A rough `rg` for contrast phrasing (`, not `, `— not `, `; not `, `rather than`, `instead of`)
+inside string literals, tests and comments excluded:
 
 | Area              | Hits |
 | ----------------- | ---- |
-| `apps/web/src`    | 364  |
-| `apps/server/src` | 229  |
-| `packages`        | 69   |
-| `apps/tui/src`    | 16   |
+| `apps/web/src`    | 148  |
+| `apps/server/src` | 88   |
+| `packages`        | 22   |
+| `apps/tui/src`    | 2    |
 
-These are upper bounds. Many are log strings that no user reads, and many are negated facts such
-as "That path is not a folder" (D2). The settings registry has two: `lsp.semanticTokens.delta`
+These are upper bounds; many are log strings no user reads. Negated facts ("That path is not a
+folder", "does not register", a type error) are outside the sweep (D2). The settings registry has two: `lsp.semanticTokens.delta`
 (fixed) and `workbench.surface.continuousSeams` ("…, instead of showing the wallpaper in the gap").
 
 ### Steps
@@ -205,23 +208,21 @@ as "That path is not a folder" (D2). The settings registry has two: `lsp.semanti
    review reads cleanly.
 4. `look` on each surface whose visible text changed, per the verification rule.
 
-## Decisions for the owner
+## Decisions (owner, 2026-09-25)
 
-- **D1 — tooltip or disclosure.** A `Tooltip` opens on hover and focus; on the phone (the mesh
-  is reachable from the owner's devices) a tap on the icon is the only way in. Recommendation:
-  `Tooltip`, as asked, and check it on the phone in Phase 2. If tapping feels wrong there, switch
-  the icon to a `Popover`.
-- **D2 — negated facts.** "That path is not a folder" states what happened. Recommendation:
-  rewrite to the positive when one exists ("That path is a file"), keep a real absence ("No
-  sessions", "Signed out"), and always cut contrast clauses ("…, not latency").
-- **D3 — comments and docs.** Recommendation: out of scope. The rule covers what the app shows;
-  code comments and plans keep explaining trade-offs, which often means naming the rejected
-  option.
-- **D4 — per-row defaults.** Decided row by row in the Part A table.
+- **D1 — a small info icon with a `Tooltip`**, only on rows that have `details`. Self-explanatory
+  rows get neither.
+- **D2 — negated facts stay.** "That path is not a folder" and type errors state what happened;
+  the sweep leaves them alone. It cuts contrast clauses ("…, not latency", "rather than",
+  "instead of").
+- **D3 — comments and docs are out of the sweep.** Docs follow the Copy rule where it reads
+  naturally; nobody rewrites them for it.
+- **D4 — sensible defaults, decided in the audit.** No owner table. Rows that stand out as not
+  sensible change, and the report names each one.
 
 ## Phases
 
-1. Part A reading and recommendations for all 80 rows → owner decides → apply in one commit.
+1. Part A reading for all 80 rows; change the ones that are not sensible, in one commit.
 2. Part B field, row icon, schema and reference output, scenario; details for rows decided so far.
 3. Part C steps 1–2 (registry and catalog gates) with their fixes.
 4. Part C step 3, feature by feature.

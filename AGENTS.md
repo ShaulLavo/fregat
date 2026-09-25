@@ -46,7 +46,7 @@
 ## Copy
 
 - Copy says what a thing is and what it does, and stops there. Never write what it is not: no "…, not latency", no "rather than" or "instead of" contrast, no disclaimer clause. When the contrast holds a fact, state the fact ("same latency either way").
-- An absence that is the state itself is what the thing is: "No sessions", "Off", "Signed out".
+- A plain negative fact is fine: "No sessions", "Off", "That path is not a folder", a type error.
 - Copy is every string the app shows: labels, setting descriptions, tooltips, toasts, empty states, and an error's `message`, `why` and `fix`.
 
 ## React Code
