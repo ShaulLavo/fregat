@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it, vi } from 'vitest'
 import { migratePlatformDatabase } from '../../db/migrations'
 import * as schema from '../../db/schema'
 import { ProviderPriceCatalog } from '../price-catalog'
@@ -10,6 +10,7 @@ import { estimateUsageCost, modelPrice, parseModelPrices } from '../utils/model-
 const closers: Array<() => void> = []
 afterEach(() => {
   for (const close of closers.splice(0).reverse()) close()
+  vi.restoreAllMocks()
 })
 
 const catalogResponse = {
@@ -83,11 +84,13 @@ it('refreshes once, persists valid rates, and reads them after a restart without
 })
 
 it('keeps a stale local catalog after an invalid refresh and backs off subsequent attempts', async () => {
+  const cachedAt = new Date(Date.parse(bundledPrices.fetchedAt) + 86_400_000).toISOString()
+  vi.spyOn(Date, 'now').mockReturnValue(Date.parse(cachedAt) + 2 * 86_400_000)
   const db = database()
   db.insert(schema.providerPriceCatalog)
     .values({
       id: 1,
-      snapshotJson: JSON.stringify(parseModelPrices(catalogResponse, '2020-01-01T00:00:00.000Z')),
+      snapshotJson: JSON.stringify(parseModelPrices(catalogResponse, cachedAt)),
     })
     .run()
   let calls = 0
@@ -101,7 +104,7 @@ it('keeps a stale local catalog after an invalid refresh and backs off subsequen
   await catalog.refresh()
   expect(calls).toBe(2)
   expect(catalog.lookup('codex', 'catalog-test')?.input).toBe(2)
-  expect(db.select().from(schema.providerPriceCatalog).get()?.snapshotJson).toContain('2020-01-01')
+  expect(db.select().from(schema.providerPriceCatalog).get()?.snapshotJson).toContain(cachedAt)
 })
 
 it('prices cache reads separately, includes reasoning once, and never invents missing cache rates', () => {

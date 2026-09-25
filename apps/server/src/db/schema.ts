@@ -1,4 +1,5 @@
 import type { RecordedModelPrice } from '../provider/utils/model-prices'
+import type { UsageContribution } from '../provider/utils/usage-contributions'
 import {
   providerUsagePurposeSchema,
   sessionRuntimeStatusSchema,
@@ -62,6 +63,10 @@ export const providerUsageTurns = sqliteTable(
     reasoningTokens: integer('reasoning_tokens').notNull(),
     costUsd: real('cost_usd'),
     priceSnapshot: text('price_snapshot', { mode: 'json' }).$type<RecordedModelPrice>(),
+    contributions: text('contributions_json', { mode: 'json' })
+      .$type<UsageContribution[]>()
+      .notNull()
+      .default([]),
   },
   (table) => [
     primaryKey({ columns: [table.sessionId, table.turnId, table.model] }),

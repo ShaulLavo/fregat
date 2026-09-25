@@ -28,7 +28,14 @@ export const platformMigrations: readonly Migration[] = [
   { version: 21, name: 'provider_usage', up: applyProviderUsage },
   { version: 22, name: 'provider_usage_purpose', up: applyProviderUsagePurpose },
   { version: 23, name: 'provider_usage_prices', up: applyProviderUsagePrices },
+  { version: 24, name: 'provider_usage_contributions', up: applyProviderUsageContributions },
 ]
+
+function applyProviderUsageContributions(database: PlatformDatabase) {
+  database.run(
+    sql`ALTER TABLE provider_usage_turns ADD COLUMN contributions_json TEXT NOT NULL DEFAULT '[]'`,
+  )
+}
 
 function applyProviderUsagePrices(database: PlatformDatabase) {
   database.run(sql`ALTER TABLE provider_usage_turns ADD COLUMN price_snapshot TEXT`)

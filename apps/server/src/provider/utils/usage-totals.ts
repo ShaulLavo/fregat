@@ -92,8 +92,7 @@ export function usageDelta(
   current: ProviderUsageAmounts,
   baseline: ProviderUsageAmounts | null,
 ): ProviderUsageAmounts | null {
-  const restarted = !baseline || COUNT_FIELDS.some((field) => current[field] < baseline[field])
-  const from = restarted ? null : baseline
+  const from = usageBaseline(current, baseline)
   const delta: ProviderUsageAmounts = {
     cacheReadTokens: current.cacheReadTokens - (from?.cacheReadTokens ?? 0),
     cacheWriteTokens: current.cacheWriteTokens - (from?.cacheWriteTokens ?? 0),
@@ -102,9 +101,30 @@ export function usageDelta(
     outputTokens: current.outputTokens - (from?.outputTokens ?? 0),
     reasoningTokens: current.reasoningTokens - (from?.reasoningTokens ?? 0),
   }
-  if (isEmptyUsage(delta)) return null
+  // A late zero-dollar report still replaces an earlier catalog estimate.
+  if (isEmptyUsage(delta) && (current.costUsd === null || current.costUsd === from?.costUsd))
+    return null
 
   return delta
+}
+
+export function usageBaseline(
+  current: ProviderUsageAmounts,
+  baseline: ProviderUsageAmounts | null,
+) {
+  if (!baseline || COUNT_FIELDS.some((field) => current[field] < baseline[field])) return null
+  return baseline
+}
+
+export function usageAmounts(totals: ProviderUsageAmounts): ProviderUsageAmounts {
+  return {
+    cacheReadTokens: totals.cacheReadTokens,
+    cacheWriteTokens: totals.cacheWriteTokens,
+    costUsd: totals.costUsd,
+    inputTokens: totals.inputTokens,
+    outputTokens: totals.outputTokens,
+    reasoningTokens: totals.reasoningTokens,
+  }
 }
 
 /** A crashed or unstarted query reports all zeros; it is no reading, not a reset. */

@@ -173,6 +173,114 @@ it.each([3, 0])(
   },
 )
 
+it('corrects one conversation without replacing another conversation in the same turn', () => {
+  const fixture = estimatedFixture()
+  const root = { inputTokens: 1_000_000, costUsd: null }
+  fixture.recorder.accept(
+    totalsEvent('turn', [totals(root), totals({ scope: 'child', inputTokens: 100, costUsd: 4 })]),
+    'turn',
+  )
+  expect(fixture.rows()[0]?.costUsd).toBe(6)
+  fixture.restart().accept(totalsEvent('turn', [totals({ ...root, costUsd: 3 })]), 'turn')
+  expect(fixture.rows()[0]).toMatchObject({
+    costUsd: 7,
+    priceSnapshot: null,
+    inputTokens: 1_000_100,
+  })
+  expect(fixture.history().models[0]).toMatchObject({ costUsd: 7, costSource: 'provider' })
+})
+
+it('subtracts the cost before the turn when a cumulative provider total arrives late', () => {
+  const fixture = estimatedFixture()
+  fixture.recorder.accept(
+    totalsEvent('before', [totals({ inputTokens: 1_000_000, costUsd: 5 })]),
+    'turn',
+  )
+  fixture.recorder.accept(
+    totalsEvent('late', [totals({ inputTokens: 2_000_000, costUsd: null })]),
+    'turn',
+  )
+  fixture
+    .restart()
+    .accept(totalsEvent('late', [totals({ inputTokens: 2_000_000, costUsd: 8 })]), 'turn')
+  expect(fixture.rows().map((row) => [row.turnId, row.costUsd])).toEqual([
+    ['before', 5],
+    ['late', 3],
+  ])
+})
+
+it('does not assign earlier unreported costs to a later turn', () => {
+  const fixture = estimatedFixture()
+  fixture.recorder.accept(
+    totalsEvent('before', [totals({ inputTokens: 1_000_000, costUsd: null })]),
+    'turn',
+  )
+  fixture.recorder.accept(
+    totalsEvent('next', [totals({ inputTokens: 2_000_000, costUsd: 8 })]),
+    'turn',
+  )
+  fixture.recorder.accept(
+    totalsEvent('priced', [totals({ inputTokens: 3_000_000, costUsd: 10 })]),
+    'turn',
+  )
+  expect(fixture.rows().map((row) => [row.turnId, row.costUsd])).toEqual([
+    ['before', 2],
+    ['next', 2],
+    ['priced', 2],
+  ])
+})
+
+it('keeps a reported prefix when later tokens temporarily have no reported cost', () => {
+  const fixture = estimatedFixture()
+  fixture.recorder.accept(
+    totalsEvent('turn', [totals({ inputTokens: 1_000_000, costUsd: 3 })]),
+    'turn',
+  )
+  fixture.recorder.accept(
+    totalsEvent('turn', [totals({ inputTokens: 1_000_000, costUsd: null })]),
+    'turn',
+  )
+  fixture.recorder.accept(
+    totalsEvent('turn', [totals({ inputTokens: 2_000_000, costUsd: null })]),
+    'turn',
+  )
+  expect(fixture.rows()[0]?.costUsd).toBe(5)
+  fixture.recorder.accept(
+    totalsEvent('turn', [totals({ inputTokens: 2_000_000, costUsd: 7 })]),
+    'turn',
+  )
+  expect(fixture.rows()[0]).toMatchObject({ costUsd: 7, priceSnapshot: null })
+})
+
+it('keeps completed estimates when a conversation counter resets within the turn', () => {
+  const fixture = estimatedFixture()
+  fixture.recorder.accept(
+    totalsEvent('turn', [totals({ inputTokens: 1_000_000, costUsd: null })]),
+    'turn',
+  )
+  fixture.recorder.accept(
+    totalsEvent('turn', [totals({ inputTokens: 500_000, costUsd: null })]),
+    'turn',
+  )
+  fixture.recorder.accept(
+    totalsEvent('turn', [totals({ inputTokens: 500_000, costUsd: 1.5 })]),
+    'turn',
+  )
+  expect(fixture.rows()[0]).toMatchObject({ costUsd: 3.5, inputTokens: 1_500_000 })
+})
+
+function estimatedFixture() {
+  return recorderFixture((_driver, model) => ({
+    input: 2,
+    output: 10,
+    cacheRead: 0,
+    cacheWrite: 0,
+    provider: 'anthropic',
+    model,
+    fetchedAt: '2026-09-25T00:00:00.000Z',
+  }))
+}
+
 it('keeps a turn unknown when prices arrive after its first completion', () => {
   let known = false
   const fixture = recorderFixture(

@@ -10,11 +10,16 @@ import {
 } from '../orchestration/orchestration-logging'
 import type { ProviderAdapterRegistry } from './provider-adapter-registry'
 import type { ProviderPriceCatalog } from './price-catalog'
-import { estimateUsageCost } from './utils/model-prices'
+import {
+  contributionCost,
+  needsUsagePrice,
+  updateUsageContributions,
+} from './utils/usage-contributions'
 import type { ProviderRuntimeEvent } from './types'
 import {
   isEmptyUsage,
   usageDelta,
+  usageAmounts,
   type ProviderUsageAmounts,
   type ProviderUsageTotals,
 } from './utils/usage-totals'
@@ -119,16 +124,17 @@ export class ProviderUsageRecorder {
     // Unknown history: seed the baseline and let the next turn count, rather than
     // record a whole resumed conversation as one turn.
     const delta = !baseline && totals.continuesEarlierTurns ? null : usageDelta(totals, baseline)
+    if (!delta && baseline) return []
     this.database
       .insert(providerUsageBaselines)
       .values({
         model: totals.model,
         scope: totals.scope,
         sessionId: turn.sessionId,
-        totalsJson: JSON.stringify(amounts(totals)),
+        totalsJson: JSON.stringify(usageAmounts(totals)),
       })
       .onConflictDoUpdate({
-        set: { totalsJson: JSON.stringify(amounts(totals)) },
+        set: { totalsJson: JSON.stringify(usageAmounts(totals)) },
         target: [
           providerUsageBaselines.sessionId,
           providerUsageBaselines.scope,
@@ -138,12 +144,18 @@ export class ProviderUsageRecorder {
       .run()
     if (!delta) return []
 
-    const costUsd = this.addToTurn(turn, totals.model, delta)
+    const costUsd = this.addToTurn(turn, totals, baseline, delta)
     return [{ ...delta, costUsd, model: totals.model }]
   }
 
-  /** A turn that ends twice (a retried completion) adds, never overwrites. */
-  private addToTurn(turn: RecordedTurn, model: string, delta: ProviderUsageAmounts) {
+  /** Tokens add once; a late provider cost replaces only its own contribution. */
+  private addToTurn(
+    turn: RecordedTurn,
+    totals: ProviderUsageTotals,
+    baseline: ProviderUsageAmounts | null,
+    delta: ProviderUsageAmounts,
+  ) {
+    const { model } = totals
     const existing = this.database
       .select()
       .from(providerUsageTurns)
@@ -155,15 +167,14 @@ export class ProviderUsageRecorder {
         ),
       )
       .get()
-    // Repeated completions use the first rate, even if the catalog refreshed mid-turn.
-    const priceSnapshot = existing?.priceSnapshot ?? null
-    const firstPrice =
-      !existing && delta.costUsd === null
-        ? this.prices.lookup(turn.driverKind, model)
-        : priceSnapshot
-    const estimate = firstPrice ? estimateUsageCost(delta, firstPrice) : null
-    const costUsd = delta.costUsd ?? estimate
-    const cost = providerUsageTurns.costUsd
+    const previous = existing?.contributions ?? []
+    const contributions = updateUsageContributions(previous, totals, baseline)
+    let priceSnapshot = existing?.priceSnapshot ?? null
+    if (!needsUsagePrice(contributions)) priceSnapshot = null
+    if (needsUsagePrice(contributions) && !priceSnapshot && !needsUsagePrice(previous)) {
+      priceSnapshot = this.prices.lookup(turn.driverKind, model)
+    }
+    const costUsd = contributionCost(contributions, priceSnapshot)
     this.database
       .insert(providerUsageTurns)
       .values({
@@ -171,13 +182,16 @@ export class ProviderUsageRecorder {
         ...delta,
         model,
         costUsd,
-        priceSnapshot: delta.costUsd === null ? firstPrice : null,
+        priceSnapshot,
+        contributions,
       })
       .onConflictDoUpdate({
         set: {
           cacheReadTokens: sql`${providerUsageTurns.cacheReadTokens} + excluded.cache_read_tokens`,
           cacheWriteTokens: sql`${providerUsageTurns.cacheWriteTokens} + excluded.cache_write_tokens`,
-          costUsd: sql`CASE WHEN ${cost} IS NULL OR excluded.cost_usd IS NULL THEN NULL ELSE ${cost} + excluded.cost_usd END`,
+          costUsd: sql`excluded.cost_usd`,
+          priceSnapshot: sql`excluded.price_snapshot`,
+          contributions: sql`excluded.contributions_json`,
           inputTokens: sql`${providerUsageTurns.inputTokens} + excluded.input_tokens`,
           outputTokens: sql`${providerUsageTurns.outputTokens} + excluded.output_tokens`,
           reasoningTokens: sql`${providerUsageTurns.reasoningTokens} + excluded.reasoning_tokens`,
@@ -186,18 +200,7 @@ export class ProviderUsageRecorder {
         target: [providerUsageTurns.sessionId, providerUsageTurns.turnId, providerUsageTurns.model],
       })
       .run()
-    return costUsd
-  }
-}
-
-function amounts(totals: ProviderUsageTotals): ProviderUsageAmounts {
-  return {
-    cacheReadTokens: totals.cacheReadTokens,
-    cacheWriteTokens: totals.cacheWriteTokens,
-    costUsd: totals.costUsd,
-    inputTokens: totals.inputTokens,
-    outputTokens: totals.outputTokens,
-    reasoningTokens: totals.reasoningTokens,
+    return costUsd === null ? null : costUsd - (existing?.costUsd ?? 0)
   }
 }
 

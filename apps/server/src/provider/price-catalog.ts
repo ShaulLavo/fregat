@@ -35,9 +35,11 @@ export class ProviderPriceCatalog {
     this.database = database
     this.fetcher = fetcher
     const cached = this.readCached()
-    this.initial = cached ?? v.parse(priceSnapshotSchema, bundledPrices)
+    const bundled = v.parse(priceSnapshotSchema, bundledPrices)
+    this.initial =
+      cached && Date.parse(cached.fetchedAt) >= Date.parse(bundled.fetchedAt) ? cached : bundled
     this.client.setQueryData(QUERY_KEY, this.initial, {
-      updatedAt: cached ? Date.parse(cached.fetchedAt) : 0,
+      updatedAt: this.initial === cached ? Date.parse(cached.fetchedAt) : 0,
     })
   }
 
