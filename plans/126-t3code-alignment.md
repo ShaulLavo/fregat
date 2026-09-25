@@ -4,7 +4,7 @@ Status: **IN PROGRESS; FULL PARITY EXECUTION RESUMED 2026-09-23**. Two source-au
 cross-review completed on 2026-09-20. The audit found 48 implementation groups, and the 2026-09-24
 delta added nine: **57 groups**, including paired client/server work. This is not a count of
 independently reproduced bugs. On 2026-09-25 (`main` after lane L2), 26 groups are implemented and
-deployed, 9 partial and 22 not started; 8 of the 26 are closed as `verified` in the
+deployed, 9 partial and 22 not started; 10 of the 26 are closed as `verified` in the
 [ledger](126-t3code-alignment/ledger.json). LIFE-13 is additionally scenario-verified in PR #41.
 LIFE-03/04/05/08/10 close after PR #41 merges, when their scenarios move to its second-owner helper.
 In the completion wave a row closes when its `agent:browser` scenario proves the

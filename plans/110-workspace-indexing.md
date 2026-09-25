@@ -43,7 +43,7 @@ These are the reason this plan exists. Each one wants something the current inde
 ## Research steps
 
 1. Read the existing index end to end and write down its actual invariants, not its intended ones — especially what `stale` means to a consumer and when a rebuild is triggered.
-2. Survey prior art with the same discipline used for markdown in Plan 107: how VS Code's workspace symbol provider, ripgrep, and an Obsidian vault index each handle freshness and scale. Clone what is readable into `/work/projects/references/`.
+2. Survey prior art with the same discipline used for markdown in Plan 107: how VS Code's workspace symbol provider, ripgrep, and an Obsidian vault index each handle freshness and scale. Clone what is readable into the repo's `references/` directory (gitignored; see AGENTS.md "Reference Clones"); `references/vscode` is already there.
 3. **Read `file-type`, then decide what we want from it (question 8).** Treat it as source material first and a dependency second. It is `22.1.0`, MIT, ESM-only, `node >= 22`, 138 KB unpacked, four transitive dependencies (`strtok3`, `token-types`, `uint8array-extras`, `@tokenizer/inflate`), and server-side only — nothing here touches the first-load budget Plans 106–109 own.
 
    The detection is not a framework, which is what makes it minable: `source/index.js` is one linear `fromTokenizer` chain of `check([bytes], {offset})` calls against a peeked buffer that grows only as far as a format demands (3 bytes for gzip, 32 for the common set, more for the deep ones), and `source/supported.js` is a 370-line extension and MIME inventory. Signatures lift out one at a time under MIT with attribution.

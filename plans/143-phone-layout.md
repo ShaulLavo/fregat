@@ -83,6 +83,8 @@ contracts. Out until approved: screens, components, breakpoints, a native app sc
   3. Relay (future): a hosted rendezvous for people without Tailscale, like T3 Connect (Cloudflare tunnels plus accounts).
      WebRTC was considered and rejected: it still needs signaling plus TURN relays, which Tailscale already provides.
 - **Q5, input.** Revisit Enter-on-touch with the phone shell; voice dictation gets its own plan.
+  Decided 2026-09-25: owner — Enter-on-touch ships now, ahead of the phone shell, as Plan 126
+  INTERACTION-11's mobile plain-Enter newline (upstream's coarse-pointer rule). Voice is unchanged.
 
 ## Questions for the owner (answered above)
 
@@ -132,6 +134,16 @@ Deliverable: the surface list and navigation model, added to this plan (the dire
 ## Phases
 
 Written after the research phase.
+
+## Follow-up items
+
+Carried in from other plans. They wait for the phone shell and join its split plans.
+
+- **Phone haptics (from Plan 154 Phase 7).** Only if this plan keeps the phone web layout.
+  `navigator.vibrate` on Android with seamui's PWM patterns, and the iOS
+  `<input type="checkbox" switch>` taptic, behind `workbench.haptics`. Haptics follow device
+  capability, so a shared setting does nothing on a desktop. Size S. Plan 154 Decision D3 keeps
+  haptics as the only mobile difference in physical mode.
 
 ## Dependencies
 
