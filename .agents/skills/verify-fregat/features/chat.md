@@ -38,6 +38,8 @@ The chat mode button in the window toolbar, or an address URL with `/chat/`.
 
 `scenario session-auto-settle` uses the same fake forge with a merged pull request closed after the session began. The server's settlement sweep, triggered by the pull request sync, must move the session to the Settled shelf with `settledAt` equal to its creation time (it never ran a turn). `createFakeForge` in `scripts/agent/fake-forge.ts` and `committedFixture` in `fixture-workspace.ts` are shared by the three session scenarios.
 
+`scenario session-pull-request-badge` writes a fake gh's answers before the throwaway server starts (branches are `worktree/<id>`, so they are known in advance) and creates six metadata-only sessions, each in its own worktree: open, draft, merged, closed, none, and one in a second repository whose lookup fails. Each rail row's `[data-pull-request-state]` badge and its `title` must match; the none row has no badge; clicking the open badge opens its URL in a new page (routed to a stub). The rail's `scrollWidth` must not exceed its `clientWidth` with those long branch chips.
+
 `scenario session-actions-surfaces` creates one metadata-only session (no provider turn) and drives the shared session actions from every surface: Rename from the rail row, Pin/Unpin and Rename from the chat stage header, then Rename, Snooze/Unsnooze, a cancelled Delete and Archive from the editor sidebar chat header. Each result is read back from the server's shell snapshot; the session is deleted at the end. Rename runs only after its menu has closed — an open popup pulls focus back and the field would blur shut.
 
 `scenario chat-diff-syntax --url <session-diff-address>` checks painted syntax colors in a session checkpoint diff.

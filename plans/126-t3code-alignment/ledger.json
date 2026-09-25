@@ -679,14 +679,16 @@
       "title": "P2: Show linked pull-request state on sidebar rows with background sync",
       "report": "lifecycle.md",
       "wave": "2",
-      "status": "in-progress",
-      "evidence_level": "server sync implemented and browser-verified; row badge UI pending (lane L5)",
+      "status": "verified",
+      "evidence_level": "scenario-verified",
       "acceptance": "lifecycle.md, LIFE-14, Acceptance / verification",
       "execution_evidence": [
         "scripts/agent/scenarios/session-pull-request-sync.ts",
         "repository-delivery.md",
         "apps/server/src/orchestration/tests/pull-request-sync.test.ts",
-        "/work/tmp/fregat-evidence/20260925T115511Z-scenario-session-pull-request-sync/"
+        "/work/tmp/fregat-evidence/20260925T115511Z-scenario-session-pull-request-sync/",
+        "scripts/agent/scenarios/session-pull-request-badge.ts (evidence /work/tmp/fregat-evidence/20260925T140706Z-scenario-session-pull-request-badge): open, draft, merged, closed and unknown badges on rail rows, none shows nothing, click opens the pull request, long worktree branches never scroll the rail sideways",
+        "pull-request-badge-delivery.md"
       ]
     },
     {

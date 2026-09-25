@@ -213,6 +213,7 @@ import { sessionBranchDrift } from './session-branch-drift'
 import { sessionPullRequestStart } from './session-pull-request-start'
 import { worktreeCleanupOnDelete } from './worktree-cleanup-on-delete'
 import { sessionPullRequestSync } from './session-pull-request-sync'
+import { sessionPullRequestBadge } from './session-pull-request-badge'
 import { sessionAutoSettle } from './session-auto-settle'
 import { gitMergeRequest } from './git-merge-request'
 import { gitClonePublish } from './git-clone-publish'
@@ -434,6 +435,7 @@ export const scenarios: readonly Scenario[] = [
   sessionPullRequestStart,
   worktreeCleanupOnDelete,
   sessionPullRequestSync,
+  sessionPullRequestBadge,
   sessionAutoSettle,
   gitMergeRequest,
   gitClonePublish,
