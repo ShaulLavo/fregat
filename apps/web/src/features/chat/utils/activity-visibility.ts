@@ -3,6 +3,7 @@ import type { OrchestrationSessionActivity } from '@workspace/contracts'
 import { chatActivityHasFailure } from '@/features/chat/utils/activity-presentation'
 import type { ChatWorkLogEntry } from '@/features/chat/utils/work-log'
 import { isWorkLogToolEntry } from '@/features/chat/utils/tool-label'
+import { isWorkLogFailure } from '@/features/chat/utils/work-row'
 
 const QUIET_ACTIVITY_KINDS = new Set([
   'account.updated',
@@ -54,6 +55,14 @@ function isCodexDiagnosticActivity(activity: OrchestrationSessionActivity) {
   if (message.toLowerCase().includes('failed to connect to websocket')) return false
 
   return CODEX_DIAGNOSTIC_LINE.test(message)
+}
+
+/** A collapsed group still shows every failure, every request and every tool call still running. */
+export function isPinnedWorkLogEntry(entry: ChatWorkLogEntry) {
+  if (isWorkLogFailure(entry)) return true
+  if (entry.icon === 'approval' || entry.icon === 'user-input') return true
+
+  return isWorkLogToolEntry(entry) && entry.lifecycle === 'running'
 }
 
 export function activityGroupSummary(activities: readonly ChatWorkLogEntry[]) {

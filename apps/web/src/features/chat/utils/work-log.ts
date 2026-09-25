@@ -407,6 +407,9 @@ function shouldCollapseWorkLogEntries(
   if (!isCollapsibleToolLifecycleKind(next.activityKind)) return false
   if (previous.activityKind === 'tool.completed') return false
   if (!previous.collapseKey || !next.collapseKey) return false
+  // Two provider call ids are two calls: a retry or a parallel run must not rewrite the row.
+  if (previous.toolCallKey && next.toolCallKey && previous.toolCallKey !== next.toolCallKey)
+    return false
 
   return previous.collapseKey === next.collapseKey
 }
