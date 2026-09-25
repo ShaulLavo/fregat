@@ -15,3 +15,16 @@ export function nextWorktreeTarget(target: SessionWorktreeTarget): SessionWorktr
 
   return { ...target, worktreeId: v.parse(worktreeIdSchema, crypto.randomUUID()) }
 }
+
+/**
+ * A fan-out target: always a new worktree, from the draft's chosen base and branch, so
+ * each model works in its own checkout.
+ */
+export function fanOutWorktreeTarget(
+  target: SessionWorktreeTarget,
+  baseWorktreeId: WorktreeId,
+): SessionWorktreeTarget {
+  if (target.kind === 'new') return nextWorktreeTarget(target)
+
+  return newWorktreeTarget(baseWorktreeId)
+}

@@ -407,10 +407,12 @@
       "title": "Support one draft sent to multiple selected models",
       "report": "interaction.md",
       "wave": "4",
-      "status": "open",
+      "status": "in-progress",
       "evidence_level": "source-reviewed",
       "acceptance": "interaction.md, INTERACTION-08, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "2026-09-25 lane L2: Shift+select extra models in a new draft; one session per model on its own new worktree from the draft base and branch; failed models stay on the draft with the text; a retried target reuses its command so receipts dedupe a lost acknowledgment. scripts/agent/scenarios/chat-multiple-models.ts passed (two models, two worktrees). Not yet driven: the partial-failure and lost-acknowledgment paths."
+      ]
     },
     {
       "id": "INTERACTION-12",

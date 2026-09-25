@@ -170,6 +170,30 @@ function handle(message) {
     send({ id: message.id, result: {} })
     return
   }
+  if (scenario === 'chat-multiple-models' && message.method === 'turn/start') {
+    record({ event: 'turn/start', model: message.params.model, input: promptText(message) })
+    const turn = startOwnTurn(message)
+    agentMessage(turn, `${turn}-answer`, `MULTIPLE_MODELS ${message.params.model}`)
+    endTurn(turn, 'completed')
+    return
+  }
+  if (scenario === 'chat-multiple-models' && message.method === 'model/list') {
+    const entry = (id) => ({
+      id,
+      model: id,
+      displayName: id,
+      description: 'Isolated fan-out fixture',
+      hidden: false,
+      isDefault: id === 'gpt-5.5',
+      defaultReasoningEffort: 'medium',
+      supportedReasoningEfforts: [{ reasoningEffort: 'medium', description: 'Medium' }],
+    })
+    send({
+      id: message.id,
+      result: { data: [entry('gpt-5.5'), entry('gpt-5.5-mini')], nextCursor: null },
+    })
+    return
+  }
   if (scenario === 'chat-artifact-template' && message.method === 'turn/start') {
     const turn = startOwnTurn(message)
     agentMessage(

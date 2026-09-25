@@ -48,6 +48,8 @@ export type ChatInputDraft = {
   attachments: ChatInputAttachment[]
   interactionMode: InteractionMode | null
   modelSelection: ModelSelection | null
+  /** A new draft sent to several models: the ones besides `modelSelection`. */
+  additionalModelSelections: ModelSelection[]
   prompt: string
   runtimeMode: RuntimeMode | null
   terminalContexts: ChatInputTerminalContext[]
@@ -95,6 +97,7 @@ type ChatInputDraftActions = {
     interactionMode: InteractionMode | null,
   ) => void
   setModelSelection: (target: ChatInputDraftTarget, modelSelection: ModelSelection | null) => void
+  setAdditionalModelSelections: (target: ChatInputDraftTarget, selections: ModelSelection[]) => void
   setPrompt: (target: ChatInputDraftTarget, prompt: string) => void
   setRuntimeMode: (target: ChatInputDraftTarget, runtimeMode: RuntimeMode | null) => void
 }
@@ -108,6 +111,7 @@ const EMPTY_CHAT_INPUT_DRAFT: ChatInputDraft = {
   attachments: EMPTY_ATTACHMENTS,
   interactionMode: null,
   modelSelection: null,
+  additionalModelSelections: [],
   prompt: '',
   runtimeMode: null,
   terminalContexts: EMPTY_TERMINAL_CONTEXTS,
@@ -245,6 +249,14 @@ export const useChatInputDraftStore = create<ChatInputDraftStore>((set, get) => 
   setModelSelection: (target, modelSelection) => {
     set((state) =>
       updateDraftForTarget(state, target, (draft) => withDraftPatch(draft, { modelSelection })),
+    )
+    draftPersist.maybeExecute()
+  },
+  setAdditionalModelSelections: (target, additionalModelSelections) => {
+    set((state) =>
+      updateDraftForTarget(state, target, (draft) =>
+        withDraftPatch(draft, { additionalModelSelections }),
+      ),
     )
     draftPersist.maybeExecute()
   },
@@ -520,6 +532,7 @@ function isEmptyChatInputDraft(draft: ChatInputDraft) {
   if (draft.attachments.length > 0) return false
   if (draft.terminalContexts.length > 0) return false
   if (draft.modelSelection) return false
+  if (draft.additionalModelSelections.length > 0) return false
   if (draft.runtimeMode) return false
 
   return !draft.interactionMode
@@ -531,6 +544,7 @@ function draftsEqual(left: ChatInputDraft, right: ChatInputDraft) {
     left.attachments === right.attachments &&
     left.terminalContexts === right.terminalContexts &&
     left.modelSelection === right.modelSelection &&
+    left.additionalModelSelections === right.additionalModelSelections &&
     left.identity === right.identity &&
     left.runtimeMode === right.runtimeMode &&
     left.interactionMode === right.interactionMode
@@ -567,6 +581,7 @@ function hydrateDraft(draft: PersistedChatInputDraft): ChatInputDraft {
     })),
     interactionMode: draft.interactionMode,
     modelSelection: draft.modelSelection,
+    additionalModelSelections: draft.additionalModelSelections,
     prompt: draft.prompt,
     runtimeMode: draft.runtimeMode,
     terminalContexts: draft.terminalContexts,
@@ -602,6 +617,7 @@ function persistedDraft(draft: ChatInputDraft): PersistedChatInputDraft {
     ),
     interactionMode: draft.interactionMode,
     modelSelection: draft.modelSelection,
+    additionalModelSelections: draft.additionalModelSelections,
     prompt: draft.prompt,
     runtimeMode: draft.runtimeMode,
     terminalContexts: draft.terminalContexts,

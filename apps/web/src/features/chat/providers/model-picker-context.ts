@@ -11,6 +11,10 @@ export type ChatModelPicker = {
   readonly provider: ProviderSnapshot | undefined
   /** Takes the picker row, not a bare selection, so the level can be reconciled against the new model. */
   readonly selectModel: (option: ProviderModelOption) => void
+  /** Models a new draft also goes to; Shift+select toggles one. Empty where a session exists. */
+  readonly additionalModels: readonly ModelSelection[]
+  /** Null where there is no new draft to send to several models. */
+  readonly toggleAdditionalModel: ((option: ProviderModelOption) => void) | null
 }
 
 export const ChatModelPickerContext = createContext<ChatModelPicker | null>(null)

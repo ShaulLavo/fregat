@@ -5,7 +5,7 @@ import { useSettingValue } from '@/hooks/use-setting-value'
 import { Command, CommandEmpty, CommandInput, CommandList } from '@workspace/ui/components/command'
 import { Popover, PopoverContent } from '@workspace/ui/components/popover'
 import { cn } from '@workspace/ui/lib/utils'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 
 import { log } from '@/lib/client-logging'
 import { useModelPicker } from '@/features/chat/hooks/use-model-picker'
@@ -73,7 +73,15 @@ export function ModelPicker({
   readonly busy: boolean
   readonly disabled: boolean
 }) {
-  const { sessionProviderInstanceId, modelSelection, selectModel } = useModelPicker()
+  const {
+    additionalModels,
+    modelSelection,
+    selectModel,
+    sessionProviderInstanceId,
+    toggleAdditionalModel,
+  } = useModelPicker()
+  // cmdk's onSelect carries no event, so the Shift that makes a pick additive is read here.
+  const additivePick = useRef(false)
   const { openSignIn } = useProviderSignInDialog()
   const providersQuery = useQuery(providerListQueryOptions())
   const [open, setOpen] = useState(false)
@@ -113,6 +121,7 @@ export function ModelPicker({
     ? favoritesList(favorites, groups, query)
     : pickerList(groups, activeGroup, query)
   const selectedKey = modelSelection ? providerModelSelectionKey(modelSelection) : null
+  const additionalKeys = new Set(additionalModels.map(providerModelSelectionKey))
   const emptyLabel = pickerEmptyLabel(providersQuery.isPending, groups.length > 0)
 
   function handleOpenChange(nextOpen: boolean) {
@@ -135,6 +144,10 @@ export function ModelPicker({
   }
 
   function handleSelect(option: ProviderModelOption) {
+    if (additivePick.current && toggleAdditionalModel) {
+      toggleAdditionalModel(option)
+      return
+    }
     selectModel(option)
     setQuery('')
     setOpen(false)
@@ -165,7 +178,17 @@ export function ModelPicker({
             }}
           />
         ) : null}
-        <Command className='min-w-0 flex-1' label='Models' shouldFilter={false}>
+        <Command
+          className='min-w-0 flex-1'
+          label='Models'
+          shouldFilter={false}
+          onKeyDownCapture={(event) => {
+            additivePick.current = event.shiftKey
+          }}
+          onPointerDownCapture={(event) => {
+            additivePick.current = event.shiftKey
+          }}
+        >
           <div
             className={cn(
               'px-(--density-row-padding-x) pt-(--density-section-gap)',
@@ -194,7 +217,7 @@ export function ModelPicker({
                 <ModelPickerRow
                   key={option.key}
                   option={option}
-                  selected={option.key === selectedKey}
+                  selected={option.key === selectedKey || additionalKeys.has(option.key)}
                   onSelect={handleSelect}
                 />
               ))}
@@ -210,7 +233,7 @@ export function ModelPicker({
                     <ModelPickerRow
                       key={option.key}
                       option={option}
-                      selected={option.key === selectedKey}
+                      selected={option.key === selectedKey || additionalKeys.has(option.key)}
                       onSelect={handleSelect}
                     />
                   ))

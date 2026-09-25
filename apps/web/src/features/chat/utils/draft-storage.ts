@@ -56,6 +56,8 @@ const persistedChatInputDraftSchema = v.object({
   attachments: v.optional(v.array(persistedAttachmentDraftSchema), []),
   interactionMode: v.optional(v.nullable(interactionModeSchema), null),
   modelSelection: v.optional(v.nullable(modelSelectionSchema), null),
+  /** A new draft sent to several models: the ones besides `modelSelection`. */
+  additionalModelSelections: v.optional(v.array(modelSelectionSchema), []),
   prompt: v.optional(v.string(), ''),
   runtimeMode: v.optional(v.nullable(runtimeModeSchema), null),
   terminalContexts: v.optional(v.array(persistedTerminalContextSchema), []),
