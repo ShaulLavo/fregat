@@ -24,6 +24,13 @@ import type {
   ProviderTurnInput,
 } from '../types'
 import { sessionInputFromTurn } from './utils/session-input'
+import {
+  mockTurnAnatomyModel,
+  mockTurnAnatomySteps,
+  type MockTurnScript,
+} from './utils/mock-turn-anatomy'
+
+const DEFAULT_SCRIPT_STEP_DELAY_MS = 700
 
 export type MockProviderAdapterOptions = {
   operationTimeoutMs?: number
@@ -44,6 +51,10 @@ export type MockProviderAdapterOptions = {
   probeError?: string
   providerInstanceId?: ProviderInstanceId
   responseText?: string
+  /** A scripted turn in place of the one-line answer; see `mock-turn-anatomy.ts`. */
+  script?: MockTurnScript
+  /** Pause between scripted steps, so a reader can watch each one land. */
+  stepDelayMs?: number
   shouldFail?: boolean
   stopError?: string
   userInputError?: Error
@@ -109,6 +120,8 @@ export class MockProviderAdapter implements ProviderAdapter {
   private readonly interruptError: string | null
   private readonly modelsOverride: readonly ProviderModel[] | null
   private readonly responseText: string
+  private readonly script: MockTurnScript | null
+  private readonly stepDelayMs: number
   private readonly completedTurns = new Map<SessionId, number>()
   private readonly shouldFail: boolean
   private readonly stopError: string | null
@@ -135,6 +148,8 @@ export class MockProviderAdapter implements ProviderAdapter {
     this.modelsOverride = options.models ?? null
     this.probeError = options.probeError ?? null
     this.responseText = options.responseText ?? 'Mock response'
+    this.script = options.script ?? null
+    this.stepDelayMs = options.stepDelayMs ?? DEFAULT_SCRIPT_STEP_DELAY_MS
     this.shouldFail = options.shouldFail ?? false
     this.stopError = options.stopError ?? null
     this.userInputError = options.userInputError ?? null
@@ -159,7 +174,7 @@ export class MockProviderAdapter implements ProviderAdapter {
       auth: this.authOverride ?? mockAuth(this.env),
       checkedAt: new Date().toISOString(),
       installed: true,
-      models: this.modelsOverride ? this.modelsOverride.slice() : [mockModel()],
+      models: this.snapshotModels(),
       status: 'ready',
       version: 'mock',
     }
@@ -232,6 +247,31 @@ export class MockProviderAdapter implements ProviderAdapter {
     await Promise.resolve(this.beforeComplete?.())
 
     const messageId = `assistant:${input.turnId}`
+    this.publishTurnStarted(input)
+    if (this.script) {
+      void this.runScriptedTurn(input, messageId)
+      return
+    }
+    this.events.publish({
+      createdAt: new Date().toISOString(),
+      delta: this.responseText,
+      eventId: `mock-delta:${input.turnId}`,
+      messageId,
+      runtimeEpoch: input.runtimeEpoch,
+      sessionId: input.sessionId,
+      turnId: input.turnId,
+      type: 'assistant.delta',
+    })
+    this.publishAnswerEnd(input, messageId)
+  }
+
+  private snapshotModels() {
+    if (this.modelsOverride) return this.modelsOverride.slice()
+
+    return [this.script ? mockTurnAnatomyModel() : mockModel()]
+  }
+
+  private publishTurnStarted(input: ProviderTurnInput) {
     this.events.publish({
       createdAt: new Date().toISOString(),
       eventId: `mock-turn-started:${input.turnId}`,
@@ -245,16 +285,26 @@ export class MockProviderAdapter implements ProviderAdapter {
       turnId: input.turnId,
       type: 'turn.started',
     })
-    this.events.publish({
-      createdAt: new Date().toISOString(),
-      delta: this.responseText,
-      eventId: `mock-delta:${input.turnId}`,
-      messageId,
-      runtimeEpoch: input.runtimeEpoch,
-      sessionId: input.sessionId,
-      turnId: input.turnId,
-      type: 'assistant.delta',
-    })
+  }
+
+  /** Publishes each step after its delay; a stop ends the script where it stands. */
+  private async runScriptedTurn(input: ProviderTurnInput, messageId: string) {
+    const interruptsBefore = this.interruptedSessions.length
+    const stopped = () => this.interruptedSessions.slice(interruptsBefore).includes(input.sessionId)
+    for (const step of mockTurnAnatomySteps(input, this.stepDelayMs)) {
+      await Bun.sleep(step.delayMs)
+      if (stopped()) return this.publishTurnEnd(input, 'interrupted')
+
+      this.events.publish({
+        ...step.event,
+        createdAt: new Date().toISOString(),
+      } as ProviderRuntimeEvent)
+    }
+    this.publishAnswerEnd(input, messageId)
+  }
+
+  /** The answer's completion, usage totals and the turn's end, in the order providers send them. */
+  private publishAnswerEnd(input: ProviderTurnInput, messageId: string) {
     this.events.publish({
       completedAt: new Date().toISOString(),
       eventId: `mock-complete:${input.turnId}`,
@@ -265,10 +315,14 @@ export class MockProviderAdapter implements ProviderAdapter {
       type: 'assistant.complete',
     })
     this.publishUsageTotals(input)
+    this.publishTurnEnd(input, 'completed')
+  }
+
+  private publishTurnEnd(input: ProviderTurnInput, state: 'completed' | 'interrupted') {
     this.events.publish({
       createdAt: new Date().toISOString(),
       eventId: `mock-turn-completed:${input.turnId}`,
-      payload: { state: 'completed' },
+      payload: { state },
       provider: this.driverKind,
       providerInstanceId: input.providerInstanceId,
       providerBindingHandle: `mock:${input.sessionId}`,

@@ -3,7 +3,6 @@ import * as v from 'valibot'
 
 import { workLogEntryLabel } from '@/features/chat/utils/tool-label'
 import { chatWorkLogEntries } from '@/features/chat/utils/work-log'
-import { workRowSections } from '@/features/chat/utils/work-row'
 import { TEST_SESSION_ID } from '../../../../../test/factories/chat'
 import { ingestProviderActivities } from '../../../../../test/factories/provider-activities'
 import { expect, test } from '../../../../../test/fixtures'
@@ -123,9 +122,5 @@ test.each([
   const entries = chatWorkLogEntries({ activities })
 
   expect(entries).toHaveLength(1)
-  expect(entries[0]?.title).toBe(chunks.join(''))
-  expect(workRowSections(entries[0]!)).toContainEqual({
-    label: 'Reasoning',
-    value: chunks.join(''),
-  })
+  expect(entries[0]).toMatchObject({ reasoning: true, title: chunks.join('') })
 })

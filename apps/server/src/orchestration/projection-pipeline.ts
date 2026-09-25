@@ -771,12 +771,32 @@ export class OrchestrationProjectionPipeline {
     this.updateSessionLatestTurnForAssistantMessage(event)
   }
 
+  /** A turn with no selection of its own runs on the session's, as it stood before this start. */
+  private stampTurnModelSelection(
+    event: Extract<OrchestrationEvent, { type: 'session.turn-start-requested' }>,
+    sessionModelSelectionJson: string | null,
+  ) {
+    const modelSelectionJson =
+      jsonOrUndefined(event.payload.modelSelection) ?? sessionModelSelectionJson
+    if (!modelSelectionJson) return
+
+    this.database
+      .update(projectionSessionMessages)
+      .set({ modelSelectionJson })
+      .where(eq(projectionSessionMessages.messageId, event.payload.messageId))
+      .run()
+  }
+
   private upsertTurn(event: Extract<OrchestrationEvent, { type: 'session.turn-start-requested' }>) {
     const session = this.database
-      .select({ worktreeId: projectionSessions.worktreeId })
+      .select({
+        modelSelectionJson: projectionSessions.modelSelectionJson,
+        worktreeId: projectionSessions.worktreeId,
+      })
       .from(projectionSessions)
       .where(eq(projectionSessions.sessionId, event.payload.sessionId))
       .get()
+    this.stampTurnModelSelection(event, session?.modelSelectionJson ?? null)
     const worktree = session
       ? this.database
           .select()

@@ -649,6 +649,8 @@ export class ProviderRuntimeIngestion {
         summary: text,
         streamKind: state.event.payload.streamKind,
         taskId: state.messageId,
+        // Every chunk shares the first delta's createdAt, so the reasoning's end lives here.
+        updatedAt: 'createdAt' in event ? event.createdAt : new Date(this.now()).toISOString(),
       },
     )
     await this.dispatch(

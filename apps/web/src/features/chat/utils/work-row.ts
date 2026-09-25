@@ -1,9 +1,7 @@
 import type { ChatWorkLogEntry } from '@/features/chat/utils/work-log'
 
 export function workRowSections(entry: ChatWorkLogEntry) {
-  const reasoning = entry.tone === 'thinking' ? entry.title : null
   return [
-    { label: 'Reasoning', value: reasoning },
     { label: 'Details', value: entry.detail },
     { label: 'Input', value: entry.input },
     { label: 'Command', value: entry.command },
@@ -14,7 +12,7 @@ export function workRowSections(entry: ChatWorkLogEntry) {
     (section): section is { label: string; value: string } =>
       typeof section.value === 'string' &&
       section.value.length > 0 &&
-      (section.label === 'Reasoning' || section.value !== entry.title),
+      section.value !== entry.title,
   )
 }
 

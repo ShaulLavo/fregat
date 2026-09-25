@@ -432,6 +432,7 @@ export const projectionSessionMessages = sqliteTable(
     role: text('role', { enum: ['user', 'assistant', 'system'] }).notNull(),
     text: text('text').notNull(),
     attachmentsJson: text('attachments_json').notNull().default('[]'),
+    modelSelectionJson: text('model_selection_json'),
     streaming: integer('streaming', { mode: 'boolean' }).notNull(),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull(),

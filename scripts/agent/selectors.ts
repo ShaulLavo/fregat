@@ -636,6 +636,24 @@ export const selectors = {
     page
       .getByRole('log', { name: 'Messages', exact: true })
       .locator(`[data-index] > [data-timeline-row-id="${id}"]`),
+  reasoningRows: (page: Page) => page.locator('[data-reasoning-row]'),
+  reasoningRow: (page: Page, entryId: string) =>
+    page.locator(`[data-reasoning-row][data-work-log-entry-id="${entryId}"]`),
+  liveActivityRow: (page: Page) =>
+    page.locator('[data-index]:has(> [data-timeline-row-type="live-activity"])'),
+  liveTail: (page: Page) => page.getByRole('list', { name: 'Latest tool calls', exact: true }),
+  stackFrame: (page: Page, frame: string) => page.locator(`[data-stack-frame="${frame}"]`).first(),
+  activePlanTrigger: (page: Page) =>
+    page.getByRole('button').filter({ has: page.getByLabel('Plan progress', { exact: true }) }),
+  planSteps: (page: Page) =>
+    page.getByRole('list', { name: 'Plan steps', exact: true }).locator('li'),
+  agentsRow: (page: Page) =>
+    page.locator('[data-timeline-row-type="agent-group"]').getByRole('button').first(),
+  agentTreeChild: (page: Page, threadId: string) =>
+    page.locator(`[data-agent-tree-level="child"] [data-agent-thread-id="${threadId}"]`),
+  modelSwitch: (page: Page) => page.locator('[data-model-switch]').first(),
+  jumpToLatest: (page: Page) =>
+    page.getByRole('button', { name: 'Scroll to latest message', exact: true }),
   composerActions: (page: Page) => page.locator('[data-composer-actions]'),
   usageMeter: (page: Page) => page.locator('[data-composer-actions] [data-usage-meter]'),
   usagePopover: (page: Page) => page.locator('[data-usage-popover]'),

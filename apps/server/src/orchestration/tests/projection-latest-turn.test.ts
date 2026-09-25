@@ -5,6 +5,7 @@ import { orchestrationCommandSchema } from '@workspace/contracts'
 
 const assistantStartedAt = '2026-05-24T00:02:00.000Z'
 const assistantCompletedAt = '2026-05-24T00:03:00.000Z'
+import { DOMAIN_MODEL } from './factories/session-domain'
 import {
   createDomainEngine,
   fixtureWorktreeId,
@@ -329,6 +330,31 @@ describe('projection latest turn snapshots', () => {
   })
 })
 
+describe('turn model selection on the user message', () => {
+  it('stamps the session selection, or the turn own one, on the message that started it', async () => {
+    const engine = createEngine()
+    await dispatchProjectSession(engine)
+    await engine.dispatch(startTurnCommand())
+    await engine.dispatch(interruptTurnCommand())
+    const chosen = { ...DOMAIN_MODEL, options: { reasoningEffort: 'xhigh' } }
+    await engine.dispatch(
+      startTurnCommand({
+        commandId: 'cmd-turn-2',
+        messageId: 'message-3',
+        modelSelection: chosen,
+        turnId: 'turn-2',
+      }),
+    )
+
+    const messages = (await engine.sessionDetailSnapshot('d2b3ea2b-7e36-4549-b0d4-043c00904574'))
+      .session.messages
+    expect(messages.find((message) => message.id === 'message-1')?.modelSelection).toEqual(
+      DOMAIN_MODEL,
+    )
+    expect(messages.find((message) => message.id === 'message-3')?.modelSelection).toEqual(chosen)
+  })
+})
+
 function expectServerStamped(value: string | null | undefined, notBefore: string | undefined) {
   expect(typeof value).toBe('string')
   expect(Number.isNaN(Date.parse(value ?? ''))).toBe(false)
@@ -365,6 +391,7 @@ function startTurnCommand(input: Partial<StartTurnInput> = {}) {
   return command({
     commandId: input.commandId ?? 'cmd-turn-start',
     interactionMode: 'default',
+    ...(input.modelSelection ? { modelSelection: input.modelSelection } : {}),
     message: {
       attachments: [],
       messageId: input.messageId ?? 'message-1',
@@ -382,6 +409,7 @@ function startTurnCommand(input: Partial<StartTurnInput> = {}) {
 type StartTurnInput = {
   commandId: string
   messageId: string
+  modelSelection: typeof DOMAIN_MODEL & { options?: Record<string, string> }
   sourceProposedPlan: { planId: string; sessionId: string }
   text: string
   turnId: string

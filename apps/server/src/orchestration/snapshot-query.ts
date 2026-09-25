@@ -464,7 +464,8 @@ export class OrchestrationSnapshotQuery {
   }
 
   private refreshSessionStreams(model: OrchestrationReadModel, event: OrchestrationEvent) {
-    if (event.type === 'session.message-sent') {
+    // A turn start stamps its model selection on the message that asked for it.
+    if (event.type === 'session.message-sent' || event.type === 'session.turn-start-requested') {
       this.refreshMessage(model, event.payload.sessionId, event.payload.messageId)
       return
     }

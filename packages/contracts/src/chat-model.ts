@@ -279,6 +279,8 @@ export const orchestrationMessageSchema = v.object({
   attachments: v.optional(chatAttachmentsSchema, []),
   turnId: v.nullable(turnIdSchema),
   streaming: v.boolean(),
+  /** On a user message: the model and options the turn it started ran with. */
+  modelSelection: v.optional(modelSelectionSchema),
   createdAt: isoDateTimeSchema,
   updatedAt: isoDateTimeSchema,
 })

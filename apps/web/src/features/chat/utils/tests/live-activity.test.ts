@@ -1,7 +1,7 @@
 import { eventIdSchema, messageIdSchema } from '@workspace/contracts'
 import * as v from 'valibot'
 import { deriveChatLiveActivity } from '@/features/chat/utils/live-activity'
-import { chatTimelineItems } from '@/features/chat/utils/timeline-items'
+import { chatTimelineItemEstimate, chatTimelineItems } from '@/features/chat/utils/timeline-items'
 import { chatWorkLogEntries } from '@/features/chat/utils/work-log'
 import { chatMessage, session, sessionActivity } from '../../../../../test/factories/chat'
 import { expect, test } from '../../../../../test/fixtures'
@@ -365,4 +365,51 @@ test('resolving one approval does not hide another outstanding request', () => {
     active: false,
     entry: { requestId: 'a' },
   })
+})
+
+test('the tail holds the newest three calls of the response and leaves reasoning out', () => {
+  const call = (index: number) =>
+    sessionActivity({
+      id: v.parse(eventIdSchema, `call-${index}`),
+      createdAt: `2026-05-28T00:00:0${index}.000Z`,
+      kind: 'tool.completed',
+      tone: 'tool',
+      payload: {
+        toolCallId: `call-${index}`,
+        itemType: 'command_execution',
+        status: 'completed',
+        data: { command: `echo ${index}` },
+      },
+    })
+  const reasoning = sessionActivity({
+    id: v.parse(eventIdSchema, 'reasoning'),
+    createdAt: '2026-05-28T00:00:06.000Z',
+    kind: 'task.progress',
+    tone: 'thinking',
+    payload: { streamKind: 'reasoning_text', summary: 'Checking', taskId: 'r' },
+  })
+  const entries = chatWorkLogEntries({ activities: [1, 2, 3, 4].map(call).concat(reasoning) })
+  const live = deriveChatLiveActivity({ entries, trailingEntries: [], latestTurn })
+
+  expect(live?.tail.map((entry) => entry.id)).toEqual(['call-2', 'call-3', 'call-4'])
+})
+
+test('a live row reserves its tail in the estimate from the first call', () => {
+  const items = chatTimelineItems({
+    activities: [
+      sessionActivity({
+        kind: 'tool.started',
+        tone: 'tool',
+        payload: { toolCallId: 'one', itemType: 'command_execution', status: 'inProgress' },
+      }),
+    ],
+    latestTurn,
+    messages: [chatMessage({ id: v.parse(messageIdSchema, 'prompt'), role: 'user' })],
+    optimisticMessages: [],
+    proposedPlans: [],
+  })
+  const live = items.at(-1)
+
+  expect(live?.type).toBe('live-activity')
+  expect(chatTimelineItemEstimate(live)).toBe(96)
 })

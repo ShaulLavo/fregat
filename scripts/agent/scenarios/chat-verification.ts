@@ -5,6 +5,7 @@ import {
 } from '../../../packages/contracts/src/index'
 import * as v from 'valibot'
 import type { Page } from 'playwright'
+import { selectors } from '../selectors'
 
 export async function readShell(page: Page, base: string) {
   const response = await page.request.get(`${base}/shell-snapshot`, {
@@ -92,4 +93,15 @@ export function collectOrchestrationBases(page: Page) {
       )
   })
   return bases
+}
+
+/** A new session's composer with the model picker open; returns the picker panel. */
+export async function openModelPickerInNewSession(page: Page) {
+  await selectors.chatNewSession(page).click()
+  const trigger = selectors.modelPickerTrigger(page)
+  await trigger.waitFor({ timeout: 20_000 })
+  await trigger.click()
+  const panel = selectors.modelPickerPanel(page)
+  await panel.waitFor({ timeout: 10_000 })
+  return panel
 }

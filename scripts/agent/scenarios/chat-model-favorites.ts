@@ -2,8 +2,8 @@ import { ok } from 'node:assert/strict'
 import * as v from 'valibot'
 import { providerListResultSchema } from '../../../packages/contracts/src/index'
 import type { Scenario } from './index'
-import { selectors, settleAnimations } from '../selectors'
-import { openChat } from './chat-verification'
+import { settleAnimations } from '../selectors'
+import { openChat, openModelPickerInNewSession } from './chat-verification'
 import {
   restoreUserSettings,
   settingsSnapshot,
@@ -40,12 +40,7 @@ export const chatModelFavorites: Scenario = {
       { kind: 'model.setFavorite', ref: missing, favorite: true },
     ])
     try {
-      await selectors.chatNewSession(page).click()
-      const trigger = selectors.modelPickerTrigger(page)
-      await trigger.waitFor({ timeout: 20_000 })
-      await trigger.click()
-      const panel = selectors.modelPickerPanel(page)
-      await panel.waitFor({ timeout: 10_000 })
+      const panel = await openModelPickerInNewSession(page)
       await panel.getByRole('button', { name: 'Favorites', exact: true }).click()
       await panel.getByText('No longer offered', { exact: true }).waitFor()
       await panel.getByText(MISSING_MODEL, { exact: true }).waitFor()

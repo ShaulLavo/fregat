@@ -27,6 +27,8 @@ import {
   withUltrathinkPrefix,
   withoutUltrathinkPrefix,
 } from '../utils/model-options'
+import { EffortSparkle } from '@/features/chat/components/effort-sparkle'
+import { triggerSparkleLevel } from '@/features/chat/utils/effort-sparkle'
 import { ModelOptionsGroup } from './model-options-group'
 import { ModelOptionsTriggerIcon } from './model-options-trigger-icon'
 
@@ -53,6 +55,7 @@ export function ModelOptionsMenu({
   const selection = modelSelection
   const summary = descriptorSummary(descriptors, selection, prompt)
   const effort = promptEffortState(descriptors, prompt)
+  const sparkle = triggerSparkleLevel(descriptors, selection, prompt)
   const selects = descriptors.filter(
     (descriptor): descriptor is Extract<ProviderOptionDescriptor, { type: 'select' }> =>
       descriptor.type === 'select',
@@ -83,13 +86,14 @@ export function ModelOptionsMenu({
               render={
                 <Button
                   aria-label='Model options'
-                  className='text-muted-foreground min-w-0 gap-1 text-xs font-normal'
+                  className='text-muted-foreground relative min-w-0 gap-1 text-xs font-normal'
                   disabled={disabled}
                   focusableWhenDisabled
                   size='sm'
                   type='button'
                   variant='ghost'
                 >
+                  <EffortSparkle level={sparkle} />
                   <ModelOptionsTriggerIcon compact={compact} fast={summary.fast} />
                   {compact ? null : <span className='truncate'>{summary.label}</span>}
                   {narrow ? null : (

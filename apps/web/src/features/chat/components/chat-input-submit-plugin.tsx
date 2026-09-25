@@ -62,14 +62,7 @@ export function ChatInputSubmitPlugin({
       unregisterArrowDown()
       unregisterArrowUp()
     }
-  }, [
-    commandMenuOpen,
-    disabled,
-    editor,
-    onCommandMenuCommit,
-    onCommandMenuMove,
-    onSubmitRequest,
-  ])
+  }, [commandMenuOpen, disabled, editor, onCommandMenuCommit, onCommandMenuMove, onSubmitRequest])
 
   return null
 }

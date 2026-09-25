@@ -43,6 +43,8 @@ export async function startIsolatedServer(
     FS_HOST: '127.0.0.1',
     OBSERVABILITY_DIR: logs,
     PATH: pathPrefix ? `${pathPrefix}${path.delimiter}${process.env.PATH ?? ''}` : process.env.PATH,
+    // Offers the mock provider driver, so a scenario can script a whole turn.
+    PLATFORM_AGENT_HARNESS: '1',
     PLATFORM_HOME: home,
     PORT: String(port),
     SERVER_ALLOWED_ORIGINS: allowedOriginsForWebPort(

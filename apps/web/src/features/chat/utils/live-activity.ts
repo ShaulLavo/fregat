@@ -9,7 +9,12 @@ export type ChatLiveActivity = {
   label: string
   active: boolean
   activities: readonly ChatWorkLogEntry[]
+  /** The response's newest calls, oldest first; empty until its first one. */
+  tail: readonly ChatWorkLogEntry[]
 }
+
+/** Rows the live tail shows; its height is reserved for all of them from the first call. */
+export const LIVE_TAIL_ROWS = 3
 
 export function deriveChatLiveActivity({
   entries,
@@ -33,8 +38,24 @@ export function deriveChatLiveActivity({
         (entry.turnId !== null && activeResponseTurnIds?.has(entry.turnId))),
   )
   const activities = trailingEntries
+  const tail = responseEntries.filter((entry) => !entry.reasoning).slice(-LIVE_TAIL_ROWS)
+  const live = liveActivityState({ activities, assistantStreaming, latestTurn, responseEntries })
+  return { ...live, activities, tail }
+}
+
+function liveActivityState({
+  activities,
+  assistantStreaming,
+  latestTurn,
+  responseEntries,
+}: {
+  activities: readonly ChatWorkLogEntry[]
+  assistantStreaming: boolean
+  latestTurn: OrchestrationLatestTurn
+  responseEntries: readonly ChatWorkLogEntry[]
+}): Pick<ChatLiveActivity, 'active' | 'entry' | 'label'> {
   const waiting = pendingInteraction(responseEntries)
-  if (waiting) return { entry: waiting, label: waitingLabel(waiting), active: false, activities }
+  if (waiting) return { entry: waiting, label: waitingLabel(waiting), active: false }
 
   const running = responseEntries.findLast(
     (entry) =>
@@ -42,12 +63,10 @@ export function deriveChatLiveActivity({
       isWorkLogToolEntry(entry) &&
       entry.lifecycle === 'running',
   )
-  if (running) {
-    return { entry: running, label: workLogEntryLabel(running, true), active: true, activities }
-  }
-  if (assistantStreaming) {
-    return { entry: null, label: 'Responding', active: true, activities }
-  }
+  if (running) return { entry: running, label: workLogEntryLabel(running, true), active: true }
+  if (assistantStreaming) return { entry: null, label: 'Responding', active: true }
+  const newest = responseEntries.at(-1)
+  if (newest?.reasoning) return { entry: newest, label: 'Thinking', active: true }
 
   const latest = activities.at(-1)
   if (
@@ -56,14 +75,13 @@ export function deriveChatLiveActivity({
     latest.lifecycle === 'completed' &&
     !isWorkLogFailure(latest)
   ) {
-    return { entry: latest, label: workLogEntryLabel(latest, false), active: true, activities }
+    return { entry: latest, label: workLogEntryLabel(latest, false), active: true }
   }
-  if (latest?.tone === 'thinking') {
-    return { entry: latest, label: 'Thinking', active: true, activities }
-  }
+  if (latest?.tone === 'thinking') return { entry: latest, label: 'Thinking', active: true }
 
-  const label = latestTurn.startedAt ? 'Thinking' : 'Starting'
-  return { entry: null, label, active: true, activities }
+  // Work already on screen means the turn started, even before the provider says so.
+  const started = latestTurn.startedAt !== null || responseEntries.length > 0
+  return { entry: null, label: started ? 'Thinking' : 'Starting', active: true }
 }
 
 function pendingInteraction(entries: readonly ChatWorkLogEntry[]) {
@@ -87,4 +105,8 @@ function waitingLabel(entry: ChatWorkLogEntry) {
   return entry.sourceKind === 'approval.requested'
     ? 'Waiting for approval'
     : 'Waiting for your answer'
+}
+
+export function liveTailLabel(entry: ChatWorkLogEntry) {
+  return entry.command ?? workLogEntryLabel(entry, entry.lifecycle === 'running')
 }

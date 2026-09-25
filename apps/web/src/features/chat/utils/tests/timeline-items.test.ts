@@ -5,6 +5,7 @@ import {
   eventIdSchema,
   messageIdSchema,
   proposedPlanIdSchema,
+  providerInstanceIdSchema,
   sessionIdSchema,
   turnIdSchema,
   type OrchestrationLatestTurn,
@@ -17,7 +18,11 @@ import * as v from 'valibot'
 import type { OptimisticChatMessage } from '@/features/chat/state/chat-message-intents'
 import type { ChatTurnDiffSummary } from '@workspace/client-core/chat/types'
 import { isPinnedWorkLogEntry } from '@/features/chat/utils/activity-visibility'
-import { chatTimelineItems, type ChatTimelineItem } from '@/features/chat/utils/timeline-items'
+import {
+  chatTimelineItemEstimate,
+  chatTimelineItems,
+  type ChatTimelineItem,
+} from '@/features/chat/utils/timeline-items'
 
 describe('chat timeline items', () => {
   it.each(['completed', 'interrupted', 'error'] as const)(
@@ -651,6 +656,84 @@ describe('chat timeline items', () => {
     // A tick that changes nothing hands back the same array, so the consumer's
     // memo — and every effect keyed on it — sees no change at all.
     expect(render(chunk)).toBe(after)
+  })
+
+  it('marks a turn whose model or effort differs from the turn before, never the first', () => {
+    const sessionId = parseSessionId('ad686244-5b2e-59be-805f-ef86eac80feb')
+    const selection = (model: string, effort: string) => ({
+      model,
+      options: { reasoningEffort: effort },
+      providerInstanceId: v.parse(providerInstanceIdSchema, 'codex'),
+    })
+    const user = (id: string, index: number, modelSelection: ReturnType<typeof selection>) => ({
+      ...message(id, sessionId, timestamp(index), 'user'),
+      modelSelection,
+    })
+    const items = chatTimelineItems({
+      activities: [],
+      latestTurn: null,
+      messages: [
+        user('first', 1, selection('gpt-5.5', 'high')),
+        user('same', 2, selection('gpt-5.5', 'high')),
+        user('effort', 3, selection('gpt-5.5', 'xhigh')),
+        user('model', 4, selection('gpt-5.2', 'xhigh')),
+      ],
+      optimisticMessages: [],
+      proposedPlans: [],
+    })
+
+    expect(items.map((item) => item.id)).toEqual([
+      'message:first',
+      'message:same',
+      'model-switch:effort',
+      'message:effort',
+      'model-switch:model',
+      'message:model',
+    ])
+    expect(chatTimelineItemEstimate(items[2])).toBe(24)
+  })
+
+  it('gives reasoning its own row that streams while it is the newest work of a running turn', () => {
+    const sessionId = parseSessionId('ad686244-5b2e-59be-805f-ef86eac80feb')
+    const turnId = parseTurnId('reasoning-turn')
+    const thinking = activity(
+      'think',
+      sessionId,
+      timestamp(2),
+      turnId,
+      'task.progress',
+      'thinking',
+      {
+        streamKind: 'reasoning_text',
+        summary: 'Reading the gutter code',
+        taskId: 'reasoning-1',
+      },
+    )
+    const tool = activity('tool', sessionId, timestamp(3), turnId, 'tool.completed', 'tool', {
+      itemType: 'command_execution',
+      status: 'completed',
+    })
+    const base = {
+      latestTurn: runningTurn(turnId, timestamp(1)),
+      messages: [message('user', sessionId, timestamp(1), 'user')],
+      optimisticMessages: [],
+      proposedPlans: [],
+    }
+
+    const streaming = chatTimelineItems({ ...base, activities: [thinking] })
+    const settled = chatTimelineItems({ ...base, activities: [thinking, tool] })
+
+    expect(streaming.find((item) => item.type === 'reasoning')).toMatchObject({
+      id: 'reasoning:think',
+      streaming: true,
+    })
+    expect(settled.map((item) => item.id)).toEqual([
+      'message:user',
+      'working:reasoning-turn',
+      'reasoning:think',
+      'live-activity:user',
+    ])
+    expect(settled.find((item) => item.type === 'reasoning')).toMatchObject({ streaming: false })
   })
 })
 

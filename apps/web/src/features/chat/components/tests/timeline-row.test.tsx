@@ -27,7 +27,7 @@ test('a settled turn hides its work until the fold is opened', async () => {
 
   await userEvent.click(foldToggle())
   expect(screen.queryByText('Read file')).not.toBeInTheDocument()
-  await userEvent.click(screen.getByRole('button', { name: 'Ran 2 commands' }))
+  await userEvent.click(screen.getByRole('button', { name: /^Ran 2 commands/ }))
 
   expect(screen.getByText('Read file')).toBeInTheDocument()
   expect(screen.getByText('Run tests')).toBeInTheDocument()
@@ -49,7 +49,7 @@ test('an opened fold survives its row unmounting', async () => {
   const { unmount } = renderWithProviders(<TimelineRow item={item} />)
 
   await userEvent.click(foldToggle())
-  await userEvent.click(screen.getByRole('button', { name: 'Ran 2 commands' }))
+  await userEvent.click(screen.getByRole('button', { name: /^Ran 2 commands/ }))
   expect(screen.getByText('Read file')).toBeInTheDocument()
 
   unmount()

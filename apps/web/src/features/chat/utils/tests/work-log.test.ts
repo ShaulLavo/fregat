@@ -8,7 +8,6 @@ import {
 } from '@workspace/contracts'
 import * as v from 'valibot'
 
-import { workRowSections } from '@/features/chat/utils/work-row'
 import { chatActiveWorkLogPlan, chatWorkLogEntries } from '@/features/chat/utils/work-log'
 
 describe('chat work log entries', () => {
@@ -30,63 +29,42 @@ describe('chat work log entries', () => {
       ),
     })
     expect(entries).toHaveLength(1)
-    expect(entries[0]?.title).toBe(chunks.join(''))
-    expect(
-      workRowSections(entries[0]!).find((section) => section.label === 'Reasoning')?.value,
-    ).toBe(chunks.join(''))
+    expect(entries[0]).toMatchObject({ reasoning: true, title: chunks.join('') })
   })
 
-  it('hides persisted Rust stderr diagnostics while preserving protocol retries and failures', () => {
-    const diagnostic =
-      '2026-09-07T05:01:30.819533Z ERROR codex_models_manager::manager: failed to refresh available models: timeout waiting for child process to exit'
-    const fatal =
-      '2026-09-07T05:01:30.819533Z ERROR codex_core::client: failed to connect to websocket'
+  it('advances lastActivityAt through a merge while createdAt holds', () => {
+    const chunk = (id: string, updatedAt: string) =>
+      activity(id, {
+        createdAt: timestamp(1),
+        kind: 'task.progress',
+        tone: 'thinking',
+        payload: { taskId: 'segment', streamKind: 'reasoning_text', summary: id, updatedAt },
+      })
+    const entries = chatWorkLogEntries({
+      activities: [chunk('one', timestamp(3)), chunk('two', timestamp(9))],
+    })
+
+    expect(entries).toHaveLength(1)
+    expect(entries[0]).toMatchObject({ createdAt: timestamp(1), lastActivityAt: timestamp(9) })
+  })
+
+  it('carries a tool call end time from its completion', () => {
     const entries = chatWorkLogEntries({
       activities: [
-        activity('diagnostic', {
-          kind: 'runtime.warning',
-          tone: 'info',
-          summary: 'Runtime warning',
-          payload: { message: diagnostic, detail: { message: diagnostic } },
+        activity('start', {
+          createdAt: timestamp(1),
+          kind: 'tool.started',
+          payload: { toolCallId: 'call', itemType: 'command_execution', status: 'inProgress' },
         }),
-        activity('retry', {
-          kind: 'runtime.warning',
-          tone: 'info',
-          payload: { message: diagnostic, detail: { message: diagnostic, willRetry: true } },
-        }),
-        activity('runtime-failure', {
-          kind: 'runtime.error',
-          tone: 'error',
-          payload: { message: diagnostic, detail: { message: diagnostic } },
-        }),
-        activity('websocket-failure', {
-          kind: 'runtime.warning',
-          tone: 'info',
-          payload: { message: fatal, detail: { message: fatal } },
-        }),
-        activity('explicit-warning', {
-          kind: 'runtime.warning',
-          tone: 'info',
-          payload: { message: diagnostic, detail: { error: { message: diagnostic } } },
-        }),
-        activity('unstructured-warning', {
-          kind: 'runtime.warning',
-          tone: 'info',
-          payload: {
-            message: 'Authentication required',
-            detail: { message: 'Authentication required' },
-          },
+        activity('done', {
+          createdAt: timestamp(5),
+          kind: 'tool.completed',
+          payload: { toolCallId: 'call', itemType: 'command_execution', status: 'completed' },
         }),
       ],
     })
 
-    expect(entries.map((entry) => entry.id)).toEqual([
-      'retry',
-      'runtime-failure',
-      'websocket-failure',
-      'explicit-warning',
-      'unstructured-warning',
-    ])
+    expect(entries[0]).toMatchObject({ createdAt: timestamp(1), lastActivityAt: timestamp(5) })
   })
 
   it('hides persisted protocol notices but retains actionable failures and approvals', () => {
@@ -503,6 +481,36 @@ describe('chat work log entries', () => {
     })
     expect(chatActiveWorkLogPlan(entries, v.parse(turnIdSchema, 'turn-3'))).toBeNull()
     expect(chatActiveWorkLogPlan(entries, null)).toBeNull()
+  })
+
+  it('keeps a step a later plan update removed, marked dropped and out of the count', () => {
+    const entries = chatWorkLogEntries({
+      activities: [
+        planActivity('plan-1', timestamp(1), [
+          { status: 'completed', step: 'Read the code' },
+          { status: 'inProgress', step: 'Patch the gutter' },
+          { status: 'pending', step: 'Write a migration' },
+          { status: 'pending', step: 'Run the tests' },
+        ]),
+        planActivity('plan-2', timestamp(2), [
+          { status: 'completed', step: 'Read the code' },
+          { status: 'completed', step: 'Patch the gutter' },
+          { status: 'inProgress', step: 'Run the tests' },
+        ]),
+      ],
+    })
+
+    expect(chatActiveWorkLogPlan(entries, v.parse(turnIdSchema, 'turn-1'))).toEqual({
+      completedCount: 2,
+      currentStep: 'Run the tests',
+      liveCount: 3,
+      steps: [
+        { status: 'completed', step: 'Read the code' },
+        { status: 'completed', step: 'Patch the gutter' },
+        { status: 'dropped', step: 'Write a migration' },
+        { status: 'inProgress', step: 'Run the tests' },
+      ],
+    })
   })
 
   it('drops generic reasoning markers while preserving substantive streamed reasoning', () => {

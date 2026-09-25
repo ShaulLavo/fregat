@@ -13,6 +13,8 @@ import { timelineRowSpacing } from '@/features/chat/utils/timeline-items'
 import { cn } from '@workspace/ui/lib/utils'
 import { RenderErrorBoundary } from '@workspace/ui/patterns/render-error-boundary'
 import { AgentsRow } from '@/features/chat/components/agents-row'
+import { ReasoningRow } from '@/features/chat/components/reasoning-row'
+import { ModelSwitchRow } from '@/features/chat/components/model-switch-row'
 
 export function TimelineRow({
   checkpointRevertPending = false,
@@ -103,12 +105,16 @@ function timelineRowContent({
     )
   }
   if (item.type === 'activity-group') return <ActivityGroupRow activities={item.activities} />
+  if (item.type === 'reasoning')
+    return <ReasoningRow entry={item.entry} streaming={item.streaming} />
   if (item.type === 'proposed-plan') return <ProposedPlanCard plan={item.plan} />
   if (item.type === 'live-activity')
     return <LiveActivityRow activity={item.activity} groupId={item.id} />
   if (item.type === 'turn-status')
     return <MessageCompletionDivider completionSummary={item.label} />
   if (item.type === 'turn-retry') return <TurnRetryActions />
+  if (item.type === 'model-switch')
+    return <ModelSwitchRow kind={item.kind} selection={item.selection} />
 
   return <WorkingRow latestTurn={item.latestTurn} startedAt={item.startedAt} />
 }

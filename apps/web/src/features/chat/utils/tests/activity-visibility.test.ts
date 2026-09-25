@@ -19,6 +19,31 @@ describe('chat activity visibility', () => {
     ).toBe('Ran 1 command · Changed 2 files · Used 1 tool')
   })
 
+  it('adds failures and the time from first start to newest event', () => {
+    expect(
+      activityGroupSummary([
+        workLogEntry({ id: 'one', command: 'bun test', createdAt: '2026-05-28T00:00:00.000Z' }),
+        workLogEntry({
+          id: 'two',
+          command: 'bun run build',
+          createdAt: '2026-05-28T00:00:10.000Z',
+          lastActivityAt: '2026-05-28T00:01:12.000Z',
+          outcome: 'failed',
+        }),
+        workLogEntry({ id: 'edit', itemType: 'file_change', changedFiles: ['a.ts'] }),
+      ]),
+    ).toBe('Ran 2 commands · Changed 1 file · 1 failed · 1m 12s')
+  })
+
+  it('leaves out a duration under a second and keeps the steps fallback', () => {
+    expect(
+      activityGroupSummary([
+        workLogEntry({ id: 'one', icon: 'info', sourceKind: 'runtime.warning', tone: 'info' }),
+        workLogEntry({ id: 'two', icon: 'info', sourceKind: 'runtime.warning', tone: 'info' }),
+      ]),
+    ).toBe('2 steps')
+  })
+
   it('pins failures, requests and running tool calls in a collapsed group', () => {
     const entries = [
       workLogEntry({ id: 'done', lifecycle: 'completed', outcome: 'succeeded' }),

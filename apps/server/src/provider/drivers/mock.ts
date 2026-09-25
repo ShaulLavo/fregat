@@ -14,6 +14,8 @@ export const MOCK_DRIVER_KIND = v.parse(providerDriverKindSchema, 'mock')
 const mockConfigSchema = v.object({
   credentialsPath: v.optional(v.pipe(v.string(), v.trim(), v.minLength(1))),
   responseText: v.optional(v.pipe(v.string(), v.minLength(1))),
+  script: v.optional(v.picklist(['turn-anatomy'])),
+  stepDelayMs: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0))),
 })
 
 export type MockDriverConfig = v.InferOutput<typeof mockConfigSchema>
@@ -29,6 +31,8 @@ export const mockDriver: ProviderDriver<MockDriverConfig> = {
       env: input.env,
       providerInstanceId: input.providerInstanceId,
       ...(input.config.responseText ? { responseText: input.config.responseText } : {}),
+      ...(input.config.script ? { script: input.config.script } : {}),
+      ...(input.config.stepDelayMs === undefined ? {} : { stepDelayMs: input.config.stepDelayMs }),
     })
 
     return { adapter, dispose: () => adapter.stopAll() }

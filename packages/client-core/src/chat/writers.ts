@@ -803,7 +803,8 @@ function applySessionTurnStartRequestedEvent(
     turnId: event.payload.turnId,
   }
 
-  const nextState = patchSession(state, event.payload.sessionId, {
+  const stamped = stampTurnModelSelection(state, event)
+  const nextState = patchSession(stamped, event.payload.sessionId, {
     interactionMode: event.payload.interactionMode,
     modelSelection: event.payload.modelSelection,
     runtimeMode: event.payload.runtimeMode,
@@ -814,6 +815,27 @@ function applySessionTurnStartRequestedEvent(
     liveTurn: latestTurn,
     pendingSourceProposedPlan: event.payload.sourceProposedPlan,
   })
+}
+
+/** The user message records the selection its turn ran with; absent, the session's. */
+function stampTurnModelSelection(
+  state: ChatProjectionSlice,
+  event: Extract<OrchestrationEvent, { type: 'session.turn-start-requested' }>,
+): ChatProjectionSlice {
+  const { messageId, sessionId } = event.payload
+  const messages = state.messageBySessionId[sessionId]
+  const message = messages?.[messageId]
+  const modelSelection =
+    event.payload.modelSelection ?? state.sessionById[sessionId]?.modelSelection
+  if (!messages || !message || !modelSelection) return state
+
+  return {
+    ...state,
+    messageBySessionId: {
+      ...state.messageBySessionId,
+      [sessionId]: { ...messages, [messageId]: { ...message, modelSelection } },
+    },
+  }
 }
 
 function applySessionTurnInterruptRequestedEvent(

@@ -323,6 +323,30 @@ test('a cold detail snapshot paints the plans and checkpoints it carries', () =>
   })
 })
 
+test('a turn start stamps its model selection, or the session one, on the user message', () => {
+  const sessionId = parseSessionId('ad686244-5b2e-59be-805f-ef86eac80feb')
+  const turnId = parseTurnId('turn-1')
+  let state = createInitialChatProjectionSlice()
+  state = syncChatProjectionShellSnapshot(state, {
+    worktrees: [fixtureWorktree()],
+    projects: [makeProject()],
+    snapshotSequence: 1,
+    sessions: [makeSessionShell({ id: sessionId })],
+    updatedAt: timestamp(1),
+  })
+  state = applyChatProjectionEvent(state, userMessageEvent(sessionId))
+  const sessionSelection = state.sessionById[sessionId]?.modelSelection
+  state = applyChatProjectionEvent(state, {
+    ...turnStartRequestedEvent(sessionId, turnId, parseProposedPlanId('plan-1')),
+    sequence: 3,
+  })
+
+  expect(sessionSelection).toBeDefined()
+  expect(
+    state.messageBySessionId[sessionId]?.[parseMessageId('message-user')]?.modelSelection,
+  ).toEqual(sessionSelection)
+})
+
 // The detail cursor is retained across a shell resnapshot, so the turn-start event that
 // stamped this is never replayed: wiping it loses the plan banner until the next turn.
 test('a shell resnapshot preserves the pending source proposed plan', () => {

@@ -53,6 +53,7 @@ import { ChatInputAttachmentList } from './chat-input-attachment-list'
 import { ChatInputActions } from './chat-input-actions'
 import { ChatInputCommandMenu } from './chat-input-command-menu'
 import { ChatInputEditor } from './chat-input-editor'
+import { ChatInputUltrathinkPlugin } from './chat-input-ultrathink-plugin'
 import { ChatInputTerminalContextList } from './chat-input-terminal-context-list'
 import { CHAT_INPUT_EDITOR_NODES } from './chat-input-mention-node'
 import { useFocusTarget } from '@/lib/focus/hooks/use-target'
@@ -449,6 +450,7 @@ export function ChatInput({
                 onSubmitRequest={handleSubmit}
                 onTriggerChange={setTrigger}
               />
+              <ChatInputUltrathinkPlugin />
               <ChatInputTerminalContextList
                 contexts={terminalContexts}
                 disabled={composerDisabled}

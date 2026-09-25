@@ -7,9 +7,7 @@ import { CodeHighlighterContext } from '@workspace/markdown/providers/code-highl
 import { cn } from '@workspace/ui/lib/utils'
 import { useQueryClient } from '@tanstack/react-query'
 import { type ClipboardEvent } from 'react'
-import type { ThemeRegistrationAny } from 'shiki/core'
 
-import { useEditorColorTheme } from '@/lib/editor-theme/hooks/use-editor-color-theme'
 import { serverEndpoint } from '@/lib/client'
 import { originForQueryClient } from '@/lib/environments/state/query-clients'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
@@ -19,8 +17,7 @@ import { useOpenFileReference } from '../hooks/use-open-file-reference'
 import { MarkdownDiagramContext } from '../providers/markdown-diagram-context'
 import { MarkdownFileLinkContext } from '../providers/markdown-file-link-context'
 import { normalizeAgentMarkdown } from '@/features/chat/utils/agent-markdown'
-import { codeHighlighterForTheme } from '@/features/chat/state/code-highlighters'
-import { editorThemeHighlightKey } from '@/features/chat/utils/code-highlighter-theme'
+import { useChatCodeHighlighter } from '@/features/chat/hooks/use-chat-code-highlighter'
 import { chatMarkdownClipboardPayload } from '@/features/chat/utils/markdown-clipboard'
 import { remarkFileLinkChips } from '@/features/chat/utils/markdown-file-link-chips'
 import { remarkWorkspaceImages } from '@/features/chat/utils/markdown-images'
@@ -47,20 +44,11 @@ export function AssistantMarkdown({
   streaming?: boolean
   text: string
 }) {
-  const { colorMode, definition, editorTheme, registration } = useEditorColorTheme()
   const { openFileReference, rootPath, workspacePath } = useOpenFileReference()
   const owner = originForQueryClient(useQueryClient())
   const environment = useEnvironmentsStore((state) => state.entries[owner])
   const origin = serverEndpoint(environment?.origin ?? owner)
-  const themeKey = editorThemeHighlightKey(editorTheme, colorMode, definition?.shikiName)
-  const highlighter = registration
-    ? codeHighlighterForTheme({
-        colorMode,
-        editorTheme,
-        registration: registration as ThemeRegistrationAny,
-        themeKey,
-      })
-    : null
+  const highlighter = useChatCodeHighlighter()
   const renderedText = normalizeAgentMarkdown(text)
   const mermaid = useMermaid(renderedText, streaming)
   const fileLinkActions = { openFileReference, rootPath }

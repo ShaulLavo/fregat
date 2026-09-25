@@ -7,9 +7,9 @@ import {
   DialogTitle,
 } from '@workspace/ui/components/dialog'
 
-import { AgentRow } from '@/features/chat/components/agent-row'
+import { AgentTreeList } from '@/features/chat/components/agent-tree-list'
 import { useAgentsStore } from '@/features/chat/state/agents-store'
-import { chatAgentGroups, chatAgentGroupLabel } from '@/features/chat/utils/agents'
+import { chatAgentGroups, chatAgentGroupLabel, chatAgentTree } from '@/features/chat/utils/agents'
 
 export function AgentsPanel({
   activities,
@@ -32,14 +32,12 @@ export function AgentsPanel({
       <DialogContent className='flex flex-col gap-0' overlayClassName='hidden' side='right'>
         <DialogHeader className='pb-4'>
           <DialogTitle>Agents</DialogTitle>
-          <DialogDescription>
+          <DialogDescription className='tabular-nums'>
             {group ? chatAgentGroupLabel(group) : 'Agent activity'}
           </DialogDescription>
         </DialogHeader>
         <div className='min-h-0 flex-1 overflow-y-auto overscroll-y-contain pt-2'>
-          {group?.agents.map((entry) => (
-            <AgentRow entry={entry} groupId={group.id} key={entry.agent.threadId} />
-          ))}
+          {group ? <AgentTreeList groupId={group.id} nodes={chatAgentTree(group.agents)} /> : null}
         </div>
       </DialogContent>
     </Dialog>

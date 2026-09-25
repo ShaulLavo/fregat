@@ -1,5 +1,6 @@
 import { compareMessagesByCreatedAt } from '@/features/chat/utils/message-metadata'
 import type {
+  ModelSelection,
   OrchestrationLatestTurn,
   OrchestrationMessage,
   OrchestrationProposedPlan,
@@ -16,8 +17,18 @@ import {
 import type { ChatTurnDiffSummary } from '@workspace/client-core/chat/types'
 import { chatActiveResponseTurnIds } from '@/features/chat/utils/active-response'
 import { isWorkLogFailure } from '@/features/chat/utils/work-row'
-import { deriveChatLiveActivity, type ChatLiveActivity } from '@/features/chat/utils/live-activity'
+import {
+  deriveChatLiveActivity,
+  LIVE_TAIL_ROWS,
+  type ChatLiveActivity,
+} from '@/features/chat/utils/live-activity'
 import { formatChatElapsed } from '@/features/chat/utils/formatters'
+import {
+  modelSwitches,
+  sameModelSelection,
+  type ModelSwitch,
+  type ModelSwitchKind,
+} from '@/features/chat/utils/model-switch'
 import { stoppedTurnLabel, turnStoppedShort } from '@/features/chat/utils/turn-end-label'
 import {
   chatMessageTimelineMetadata,
@@ -54,6 +65,14 @@ export type ChatTimelineItem =
       id: string
       timestamp: string
       type: 'activity-group'
+    }
+  | {
+      entry: ChatWorkLogEntry
+      id: string
+      /** The newest thing in a running turn, so its text is still arriving. */
+      streaming: boolean
+      timestamp: string
+      type: 'reasoning'
     }
   | {
       assistantStreaming: boolean
@@ -99,6 +118,13 @@ export type ChatTimelineItem =
       timestamp: string
       type: 'proposed-plan'
     }
+  | {
+      id: string
+      kind: ModelSwitchKind
+      selection: ModelSelection
+      timestamp: string
+      type: 'model-switch'
+    }
 
 type ChronologicalTimelineItem =
   | {
@@ -139,6 +165,14 @@ type ChronologicalTimelineItem =
       timestamp: string
       type: 'proposed-plan'
     }
+  | {
+      id: string
+      kind: ModelSwitchKind
+      selection: ModelSelection
+      sourceOrder: number
+      timestamp: string
+      type: 'model-switch'
+    }
 
 type TurnFold = {
   entries: readonly ChronologicalTimelineItem[]
@@ -163,6 +197,8 @@ type StableTimelineItems = {
 }
 
 const NO_FOLDS: ReadonlyMap<string, TurnFold> = new Map()
+/** `--density-row-height` at the default compact density. */
+const ESTIMATED_ROW_HEIGHT = 20
 const EMPTY_STABLE_TIMELINE_ITEMS: StableTimelineItems = { byId: new Map(), result: [] }
 /** One entry per session the user has open; sessions are switched, not held. */
 const MAX_STABLE_TIMELINES = 8
@@ -256,6 +292,9 @@ export function chatTimelineItems({
     items.push(activityTimelineItem(activity, sourceOrder))
     sourceOrder += 1
   }
+  for (const modelSwitch of modelSwitches(messages, activities)) {
+    items.push(modelSwitchTimelineItem(modelSwitch))
+  }
   for (const group of agentGroups) {
     items.push({
       group,
@@ -329,6 +368,9 @@ function appendActiveResponse(
       items,
       trailing.activities.slice(0, trailing.activities.length - trailingActivities.length),
     )
+  }
+  if (trailing?.type === 'reasoning' && trailing.entry.turnId === latestTurn.turnId) {
+    items[items.length - 1] = reasoningTimelineItem(trailing.entry, true)
   }
   items.splice(userIndex + 1, 0, workingTimelineItem(latestTurn, startedAt))
   items.push({
@@ -427,8 +469,10 @@ function latestTurnWorkLogEntryCount(
 export function timelineRowSpacing(item: ChatTimelineItem) {
   if (item.type === 'turn-fold' || item.type === 'working' || item.type === 'turn-status')
     return 'pb-1.5'
+  if (item.type === 'model-switch') return 'pb-1'
   if (
     item.type === 'activity-group' ||
+    item.type === 'reasoning' ||
     item.type === 'live-activity' ||
     item.type === 'agent-group'
   )
@@ -446,12 +490,16 @@ export function chatTimelineItemEstimate(item: ChatTimelineItem | undefined) {
     const visibleFailures = item.activities.filter(isWorkLogFailure).length
     return 36 + visibleFailures * 28
   }
+  if (item.type === 'reasoning') return item.streaming ? 96 : 32
   if (item.type === 'proposed-plan') return 160
   if (item.type === 'turn-fold') return 34
   if (item.type === 'working') return 36
-  if (item.type === 'live-activity') return 32
+  if (item.type === 'live-activity') {
+    return item.activity.tail.length > 0 ? 36 + LIVE_TAIL_ROWS * ESTIMATED_ROW_HEIGHT : 36
+  }
   if (item.type === 'turn-status') return 36
   if (item.type === 'turn-retry') return 36
+  if (item.type === 'model-switch') return 24
 
   const dividerHeight = item.showCompletionDivider ? 34 : 0
   const changedFilesHeight =
@@ -518,6 +566,18 @@ function workingTimelineItem(
   }
 }
 
+/** Sorts just above its anchor: same timestamp, lower source order. */
+function modelSwitchTimelineItem(modelSwitch: ModelSwitch): ChronologicalTimelineItem {
+  return {
+    id: `model-switch:${modelSwitch.anchorId}`,
+    kind: modelSwitch.kind,
+    selection: modelSwitch.selection,
+    sourceOrder: -1,
+    timestamp: modelSwitch.timestamp,
+    type: 'model-switch',
+  }
+}
+
 function proposedPlanTimelineItem(
   plan: OrchestrationProposedPlan,
   sourceOrder: number,
@@ -559,6 +619,11 @@ function arrangeTimelineItems(
       arranged.push(turnFoldTimelineItem(fold))
     }
     if (hiddenEntryIds.has(entry.id)) continue
+    if (entry.type === 'activity' && entry.activity.reasoning) {
+      flushActivities()
+      arranged.push(reasoningTimelineItem(entry.activity, false))
+      continue
+    }
     if (entry.type === 'activity') {
       pendingActivities.push(entry.activity)
       continue
@@ -602,6 +667,10 @@ function timelineItemFromEntry(
 ): ChatTimelineItem {
   if (item.type === 'agent-group')
     return { group: item.group, id: item.id, timestamp: item.timestamp, type: item.type }
+  if (item.type === 'model-switch') {
+    const { sourceOrder: _sourceOrder, ...modelSwitch } = item
+    return modelSwitch
+  }
   if (item.type === 'message') {
     const turnId = entryTurnId(item)
 
@@ -850,6 +919,16 @@ function revertTurnCountAfterUserMessage(
   return null
 }
 
+function reasoningTimelineItem(entry: ChatWorkLogEntry, streaming: boolean): ChatTimelineItem {
+  return {
+    entry,
+    id: `reasoning:${entry.id}`,
+    streaming,
+    timestamp: entry.createdAt,
+    type: 'reasoning',
+  }
+}
+
 function appendActivityGroup(items: ChatTimelineItem[], activities: readonly ChatWorkLogEntry[]) {
   const firstActivity = activities[0]
   if (!firstActivity) return
@@ -940,15 +1019,22 @@ function timelineItemsEqual(left: ChatTimelineItem, right: ChatTimelineItem): bo
     return chatAgentGroupsEqual(left.group, right.group)
   if (left.type === 'turn-status' && right.type === 'turn-status') return left.label === right.label
   if (left.type === 'turn-retry' && right.type === 'turn-retry') return true
+  if (left.type === 'model-switch' && right.type === 'model-switch') {
+    return left.kind === right.kind && sameModelSelection(left.selection, right.selection)
+  }
   if (left.type === 'live-activity' && right.type === 'live-activity') {
     return (
       left.activity.label === right.activity.label &&
       left.activity.active === right.activity.active &&
       left.activity.entry?.id === right.activity.entry?.id &&
-      activityListsEqual(left.activity.activities, right.activity.activities)
+      activityListsEqual(left.activity.activities, right.activity.activities) &&
+      activityListsEqual(left.activity.tail, right.activity.tail)
     )
   }
   if (left.type === 'message' && right.type === 'message') return messageItemsEqual(left, right)
+  if (left.type === 'reasoning' && right.type === 'reasoning') {
+    return left.streaming === right.streaming && chatWorkLogEntryEquals(left.entry, right.entry)
+  }
   if (left.type === 'activity-group' && right.type === 'activity-group') {
     return activityListsEqual(left.activities, right.activities)
   }

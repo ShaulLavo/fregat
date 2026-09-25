@@ -70,6 +70,7 @@ import { chatIconHints } from './chat-icon-hints'
 import { chatCardNarrow } from './chat-card-narrow'
 import { chatComposerInsert } from './chat-composer-insert'
 import { chatDisclosureSettle } from './chat-disclosure-settle'
+import { chatTurnAnatomy } from './chat-turn-anatomy'
 import { fileTreeHoverPrefetch } from './file-tree-hover-prefetch'
 import { wallpaperBootHandoff } from './wallpaper-boot-handoff'
 import { chatGitTabSwitch } from './chat-git-tab-switch'
@@ -397,6 +398,7 @@ export const scenarios: readonly Scenario[] = [
   chatCardNarrow,
   chatComposerInsert,
   chatDisclosureSettle,
+  chatTurnAnatomy,
   fileTreeHoverPrefetch,
   wallpaperBootHandoff,
   chatGitTabSwitch,
