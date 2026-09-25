@@ -125,7 +125,8 @@ export function SettingsPage({
   return (
     <ToolPane
       className='@container/settings h-full min-w-0'
-      bodyClassName='flex flex-col overflow-hidden'
+      bodyClassName='flex flex-col'
+      scroll={false}
       ref={setRootRef}
       tabIndex={-1}
       header={

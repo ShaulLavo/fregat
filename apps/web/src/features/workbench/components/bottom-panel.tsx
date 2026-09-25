@@ -41,7 +41,8 @@ export function BottomPanel({
     <ToolPane
       className='h-full min-w-0 overflow-hidden'
       header={null}
-      bodyClassName='flex overflow-hidden'
+      bodyClassName='flex'
+      scroll={false}
       subheader={
         <PaneHeaderMenu
           title={workbenchBottomTabLabel(panels.activeBottomTab)}

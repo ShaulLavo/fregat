@@ -194,6 +194,10 @@
   --icon-size: 1rem;
   --icon-size-sm: 0.875rem;
   --status-dot-size: 0.375rem;
+  --scrollbar-track: 6px;
+  --scrollbar-thumb: color-mix(in oklch, var(--muted-foreground) 45%, transparent);
+  /* How deep a scroller's edge fades once content is past it. */
+  --scroll-fade-size: 1.5rem;
   --density-control-height: 2rem;
   --density-control-height-sm: 1.75rem;
   --density-control-height-lg: 2.25rem;
@@ -607,6 +611,51 @@
   transition-duration: var(--duration-color);
 }
 
+/* A scroller's edge fades only while content lies past it, so the list is crisp at rest.
+   A scroll timeline drives both depths, so there is no script and no scroll listener; an
+   engine without scroll timelines keeps both edges crisp. */
+@property --scroll-fade-top {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+
+@property --scroll-fade-bottom {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+
+@utility scroll-fade {
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 var(--scroll-fade-top),
+    #000 calc(100% - var(--scroll-fade-bottom)),
+    transparent 100%
+  );
+
+  @supports (animation-timeline: scroll()) {
+    animation:
+      app-scroll-fade-top linear both,
+      app-scroll-fade-bottom linear both;
+    animation-range:
+      0 calc(var(--scroll-fade-size) * 4),
+      calc(100% - var(--scroll-fade-size) * 4) 100%;
+    animation-timeline: scroll(self y), scroll(self y);
+  }
+}
+
+/* A view following its tail hides its thumb: it would report a position the reader is not
+   choosing, and slide on every new line. The lane stays, so the text does not reflow. */
+@utility scroll-pinned {
+  scrollbar-color: transparent transparent;
+
+  &::-webkit-scrollbar-thumb {
+    background-color: transparent;
+  }
+}
+
 /* A live status mark breathes in opacity only; a glow would be a shadow outside
    the three elevations. */
 @utility status-breathe {
@@ -872,6 +921,26 @@
   }
 }
 
+@keyframes app-scroll-fade-top {
+  from {
+    --scroll-fade-top: 0px;
+  }
+
+  to {
+    --scroll-fade-top: var(--scroll-fade-size);
+  }
+}
+
+@keyframes app-scroll-fade-bottom {
+  from {
+    --scroll-fade-bottom: var(--scroll-fade-size);
+  }
+
+  to {
+    --scroll-fade-bottom: 0px;
+  }
+}
+
 @keyframes app-status-breathe {
   0%,
   100% {
@@ -900,6 +969,34 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
+  }
+  /* Every scroller shares one bar: thin, invisible at rest, shown while the pointer or the
+     focus is inside it. Chromium and Firefox read the standard pair; WebKit reads the rest. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+  }
+  *:hover,
+  *:focus-within {
+    scrollbar-color: var(--scrollbar-thumb) transparent;
+  }
+  ::-webkit-scrollbar {
+    height: var(--scrollbar-track);
+    width: var(--scrollbar-track);
+  }
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background-color: transparent;
+    background-clip: content-box;
+    border: 1px solid transparent;
+    border-radius: calc(var(--scrollbar-track) / 2);
+  }
+  *:hover::-webkit-scrollbar-thumb,
+  *:focus-within::-webkit-scrollbar-thumb {
+    background-color: var(--scrollbar-thumb);
   }
   html {
     /* Solid floor: translucent surfaces must never composite against the UA
@@ -956,34 +1053,25 @@
   width: 100%;
 }
 
-.app-scrollbar-thin {
-  scrollbar-width: thin;
-  scrollbar-color: var(--muted-foreground) transparent;
-}
-
-.app-scrollbar-thin::-webkit-scrollbar,
+/* The editor keeps its own always-visible 6px track: the minimap lane measures it. */
 .app-editor-host .editor-virtualized::-webkit-scrollbar {
   height: 6px;
   width: 6px;
 }
 
-.app-scrollbar-thin::-webkit-scrollbar-track,
 .app-editor-host .editor-virtualized::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.app-scrollbar-thin::-webkit-scrollbar-thumb,
 .app-editor-host .editor-virtualized::-webkit-scrollbar-thumb {
   background-color: var(--muted-foreground);
   border-radius: 3px;
 }
 
-.app-scrollbar-thin::-webkit-scrollbar-thumb:hover,
 .app-editor-host .editor-virtualized::-webkit-scrollbar-thumb:hover {
   background-color: var(--foreground);
 }
 
-.app-scrollbar-thin::-webkit-scrollbar-corner,
 .app-editor-host .editor-virtualized::-webkit-scrollbar-corner {
   background: transparent;
 }

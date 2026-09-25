@@ -78,7 +78,7 @@ export function LogsEventList({
           scrollRef={scrollRef}
           handleRef={virtualList}
           activeIndex={listbox.activeIndex}
-          className='app-scrollbar-thin focus-ring-inset min-h-0 flex-1 overflow-auto'
+          className='focus-ring-inset scroll-gutter min-h-0 flex-1 overflow-auto'
           items={visibleEvents}
           getKey={(event) => event.id}
           layout='flow'

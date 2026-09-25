@@ -77,7 +77,7 @@ export function ChatInputCommandMenu({
         side='top'
       >
         {items.length > 0 ? (
-          <div ref={listRef} className='app-scrollbar-thin min-h-0 flex-1 overflow-y-auto py-1'>
+          <div ref={listRef} className='scroll-gutter min-h-0 flex-1 overflow-y-auto py-1'>
             {groups.map((group, groupIndex) => (
               <div key={group.id}>
                 {groupIndex > 0 ? <div className='bg-border my-0.5 h-px' /> : null}

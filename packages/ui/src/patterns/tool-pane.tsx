@@ -19,6 +19,8 @@ export type ToolPaneProps = Omit<ComponentProps<'div'>, 'title'> & {
   emptyState?: ReactNode
   bodyClassName?: string
   bodyProps?: ComponentProps<'div'>
+  /** False when the body hosts its own scroller or a surface such as a terminal: no overflow, no fade. */
+  scroll?: boolean
 }
 
 export function ToolPane({
@@ -33,6 +35,7 @@ export function ToolPane({
   emptyState,
   bodyClassName,
   bodyProps,
+  scroll = true,
   children,
   className,
   ...props
@@ -65,7 +68,8 @@ export function ToolPane({
         {...bodyProps}
         data-slot='tool-pane-body'
         className={cn(
-          'min-h-0 flex-1 overflow-auto focus-ring-inset',
+          'min-h-0 flex-1 focus-ring-inset',
+          scroll ? 'scroll-fade overflow-auto' : 'overflow-hidden',
           bodyClassName,
           bodyProps?.className,
         )}

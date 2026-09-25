@@ -248,7 +248,8 @@ export function TimelineViewport({
       <AgentsPanel activities={session.activities} />
       <div
         aria-label='Messages'
-        className='app-scrollbar-thin focus-ring-inset h-full overflow-x-hidden overflow-y-auto overscroll-y-contain px-3 outline-none [scrollbar-gutter:stable] sm:px-5'
+        className='focus-ring-inset scroll-fade scroll-gutter data-pinned:scroll-pinned h-full overflow-x-hidden overflow-y-auto overscroll-y-contain px-3 outline-none sm:px-5'
+        data-pinned={scrollState.followMode === 'following-end' ? '' : undefined}
         ref={scrollRef}
         role='log'
         tabIndex={0}

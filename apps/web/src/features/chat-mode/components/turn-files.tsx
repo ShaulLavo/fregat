@@ -28,7 +28,7 @@ export function TurnFiles({
       <div
         {...list.containerProps}
         aria-label='Turn changed files'
-        className='app-scrollbar-thin focus-ring-inset min-h-0 flex-1 overflow-auto'
+        className='focus-ring-inset min-h-0 flex-1 overflow-auto'
       >
         {summary.files.map((file) => (
           <GitFileRow

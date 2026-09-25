@@ -43,6 +43,8 @@ export type VirtualListProps<T> = Omit<ComponentProps<'div'>, 'children' | 'ref'
   scrollRef?: RefObject<HTMLDivElement | null>
   handleRef?: Ref<VirtualListHandle>
   contentClassName?: string
+  /** Fades the edge content lies past. Off for a list that draws its own edge. */
+  fade?: boolean
   onItemsRendered?: (range: { startIndex: number; endIndex: number }) => void
   renderLayout?: (layout: VirtualListLayout) => ReactNode
 }
@@ -65,6 +67,7 @@ export function VirtualList<T>({
   handleRef,
   className,
   contentClassName,
+  fade = true,
   onItemsRendered,
   renderLayout,
   ...props
@@ -185,7 +188,7 @@ export function VirtualList<T>({
       {...props}
       ref={ref}
       data-slot='virtual-list'
-      className={cn('relative min-h-0 overflow-auto', className)}
+      className={cn('relative min-h-0 overflow-auto', fade && 'scroll-fade', className)}
     >
       {content}
     </div>

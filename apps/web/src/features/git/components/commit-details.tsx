@@ -121,7 +121,7 @@ export function CommitDetails({
       {details.data ? (
         <div
           ref={scrollRef}
-          className='app-scrollbar-thin min-h-0 flex-1 overflow-auto'
+          className='min-h-0 flex-1 overflow-auto'
           onScrollEnd={(event) => {
             void updateView({ detailsScrollTop: event.currentTarget.scrollTop })
           }}

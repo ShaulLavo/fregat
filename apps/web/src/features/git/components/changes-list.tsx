@@ -22,8 +22,7 @@ import {
 import type { ChangeRow } from '@/features/git/utils/types'
 import { changeRowId } from '@/features/git/utils/change-row-id'
 
-const CONTAINER_CLASS =
-  'app-scrollbar-thin focus-ring-inset min-h-0 flex-1 overflow-auto py-(--density-gap-tight)'
+const CONTAINER_CLASS = 'focus-ring-inset min-h-0 flex-1 overflow-auto py-(--density-gap-tight)'
 
 export function ChangesList({
   rootPath,

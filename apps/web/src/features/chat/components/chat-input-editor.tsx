@@ -72,7 +72,7 @@ export function ChatInputEditor({
           <ContentEditable
             aria-label='Message'
             aria-placeholder={placeholder}
-            className='app-scrollbar-thin text-foreground block max-h-48 min-h-14 w-full overflow-y-auto bg-transparent text-sm leading-6 break-words whitespace-pre-wrap outline-none'
+            className='text-foreground scroll-gutter block max-h-48 min-h-14 w-full overflow-y-auto bg-transparent text-sm leading-6 break-words whitespace-pre-wrap outline-none'
             data-testid='chat-input-editor'
             placeholder={<span />}
             onPaste={handlePaste}

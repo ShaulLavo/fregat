@@ -625,3 +625,17 @@ test('flags a hand-made round status dot and leaves pills and bars alone', () =>
   expect(locations(subject, 'statusDots')).toEqual(['probe.tsx:4 rounded-full'])
   expect(gate(subject).offenders.statusDots).toHaveLength(1)
 })
+
+test('flags a class that restyles or hides a scrollbar', () => {
+  const subject = census(
+    "export const a = 'no-scrollbar overflow-x-auto'",
+    "export const b = 'overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'",
+    "export const c = 'scroll-gutter scroll-fade overflow-y-auto'",
+  )
+
+  expect(values(subject, 'scrollIdiom')).toEqual([
+    'no-scrollbar',
+    '[scrollbar-width:none]',
+    '[&::-webkit-scrollbar]:hidden',
+  ])
+})

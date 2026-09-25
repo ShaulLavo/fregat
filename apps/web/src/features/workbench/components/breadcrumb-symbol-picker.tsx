@@ -50,7 +50,7 @@ export function BreadcrumbSymbolPicker({
     <div
       {...list.containerProps}
       aria-label='Symbols'
-      className='app-scrollbar-thin focus-ring-inset max-h-[inherit] overflow-y-auto py-(--density-gap-tight)'
+      className='focus-ring-inset max-h-[inherit] overflow-y-auto py-(--density-gap-tight)'
     >
       <BreadcrumbSymbolRows
         rows={rows}

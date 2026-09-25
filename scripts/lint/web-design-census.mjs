@@ -73,6 +73,7 @@ export const TARGETS = {
   iconOnlyHint: { title: 'icon-only controls without a Tooltip', limit: 0, listed: true },
   paletteLeaks: { title: 'raw palette colours', limit: 0, listed: true },
   statusDots: { title: 'hand-made status dots', limit: 0, listed: true },
+  scrollIdiom: { title: 'hand-styled scrollbars', limit: 0, listed: true },
   truncationRecovery: {
     title: 'truncation with no title on the row',
     limit: 0,
@@ -125,6 +126,9 @@ const HAIRLINE =
 const HAIRLINE_BASE = /\bborder-transparent\b/
 // A small round mark is a StatusDot drawn by hand; its colour often comes from a helper elsewhere.
 const DOT_MARK = /^size-(?:1|1\.5|2|2\.5)$/
+// The base layer styles every bar; a class that restyles or hides one is an exception. Read
+// from the raw string, because an arbitrary property fails the class-string test.
+const SCROLLBAR_CLASS = /(?:^|\s)((?:\S*[[:]\S*scrollbar|no-scrollbar)\S*)/g
 const HEIGHT_TOKEN = /^h-(?:\d+(?:\.\d+)?|px|\[[^\]]*\]|\([^)]*\))$/
 const TRUNCATION = /^(?:truncate|line-clamp-\d+)$/
 const SOURCE_FILE = /\.tsx?$/
@@ -512,6 +516,9 @@ function lineOfEntry(entry, lineAt) {
 
 function recordString(census, file, entry, lineAt, groups) {
   const lineOf = lineOfEntry(entry, lineAt)
+  for (const match of entry.value.matchAll(SCROLLBAR_CLASS)) {
+    census.hits.scrollIdiom.push({ file, line: lineOf(match.index), value: match[1] })
+  }
   if (!looksLikeClassString(entry.value)) return
   recordDensityVars(census, file, entry, lineOf)
   const group = groupFor(groups, entry)
@@ -752,6 +759,7 @@ export function evaluate(census, allowEntries = [], { checkStale = true } = {}) 
     iconOnlyHint: gate('iconOnlyHint', census.hits.iconOnlyHint),
     paletteLeaks: gate('paletteLeaks', census.hits.paletteLeaks),
     statusDots: gate('statusDots', census.hits.statusDots),
+    scrollIdiom: gate('scrollIdiom', census.hits.scrollIdiom),
     truncationRecovery: gate('truncationRecovery', census.hits.truncationRecovery),
   }
   const failures = Object.entries(offenders)

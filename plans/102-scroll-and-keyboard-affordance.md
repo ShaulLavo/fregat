@@ -1,6 +1,6 @@
 # Make scrolling and shortcuts legible
 
-Status: proposed, implementation not started. Requested 2026-09-12.
+Status: Phase 2 done 2026-09-25 (lane L1, with Plan 157's scroll fades). Phases 1 and 3 remain. Requested 2026-09-12.
 
 Two affordances in `apps/web` are inconsistent and one was designed and never built.
 
@@ -40,7 +40,7 @@ utility in the same pass.
 | D8  | **Two placements, one component.** A menu shows the shortcut as a persistent trailing chip, because the action is already on screen and the chip teaches the key for next time. A tooltip shows it on hover, as a discovery hint for a trigger that carries no label. Same `Kbd`, two placements. Do not flatten this.                                                      | documented in `CLAUDE.md`                                 |
 | D9  | **The `*Shortcut` slots stay generic.** `CommandShortcut` / `ContextMenuShortcut` / `DropdownMenuShortcut` are a trailing-metadata slot, not a keyboard component: 8 of their 10 call sites render a session count, `active`, `Current`, or a disabled reason. They keep their span. `Kbd` goes _inside_ the two that carry a key.                                          | the three primitives, unchanged in shape                  |
 
-**D2 and D7 need the user's confirmation before their phase lands.** Both change what the product
+**D2: Decided 2026-09-25: recommendation (completion wave).** D7 needs the user's confirmation before its phase lands. Both change what the product
 looks like rather than removing noise.
 
 - D2 makes every thin scrollbar invisible at rest. That is the tree's behaviour today and it is
@@ -220,6 +220,14 @@ what catch the class being written but not reaching the element:
 Both are `browser` project, because happy-dom does not resolve Tailwind classes to computed styles.
 
 ## Phase 2 — one scrollbar
+
+**Done 2026-09-25 (lane L1), in a different shape.** The tree recipe is a base-layer rule on every
+element (`*`, `*:hover`, `*:focus-within`), not an `.app-scrollbar-thin` class on each scroller, so
+there is no per-site sweep and the class is gone. The editor keeps its own webkit block (D4).
+`scroll-gutter` exists and sits on the composer, command menu, commit progress, logs, search results
+and timeline. `no-scrollbar` survives on the two horizontal strips and the one-icon-wide model
+picker rail, each allow-listed. The census measure is `scrollIdiom`; the computed-style test is
+`packages/ui/src/patterns/tests/scroll-edges.browser.tsx`. The text below is the original plan.
 
 Files: `packages/ui/src/styles/globals.css`, `packages/ui/src/styles/shadcn-tailwind.css`, the six
 primitives from Phase 1, and the `apps/web` scrollers.

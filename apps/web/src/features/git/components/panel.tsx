@@ -68,7 +68,8 @@ export function Panel({ className, rootPath }: ComponentProps<'section'> & { roo
     >
       <StaleNotice />
       <ToolPane
-        bodyClassName='flex flex-col overflow-hidden'
+        bodyClassName='flex flex-col'
+        scroll={false}
         state={{
           pending: status.isPending,
           error: status.isError && !status.data,

@@ -188,5 +188,20 @@
     "file": "apps/web/src/features/chat/components/composer-active-plan.tsx",
     "class": "rounded-full",
     "reason": "A plan-step marker, not a status. Plan 160 replaces it with a step mark, so StatusDot leaves it alone."
+  },
+  {
+    "file": "packages/ui/src/patterns/bar-tabs.ts",
+    "class": "no-scrollbar",
+    "reason": "A horizontal tab strip at bar height: a bar under the tabs would eat the strip, and overflowing tabs are reached by scrolling the active one into view."
+  },
+  {
+    "file": "apps/web/src/features/workbench/components/breadcrumbs-bar.tsx",
+    "class": "no-scrollbar",
+    "reason": "A one-row horizontal breadcrumb strip; a bar would cover the crumbs, and the strip scrolls its current crumb into view."
+  },
+  {
+    "file": "apps/web/src/features/chat/components/model-picker-rail.tsx",
+    "class": "no-scrollbar",
+    "reason": "The provider rail is one icon wide; a bar's lane would take a third of it."
   }
 ]

@@ -34,7 +34,7 @@ export function CommitProgress({ rootPath }: { readonly rootPath: string }) {
     <div
       aria-label='Commit output'
       aria-live='polite'
-      className='bg-muted/30 app-scrollbar-thin text-2xs mt-2 max-h-32 overflow-y-auto rounded-lg p-2 font-mono leading-4'
+      className='bg-muted/30 text-2xs scroll-gutter mt-2 max-h-32 overflow-y-auto rounded-lg p-2 font-mono leading-4'
       role='log'
     >
       {lines.map((line, index) => (

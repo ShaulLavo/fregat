@@ -61,7 +61,8 @@ export function ToolPane({
   return (
     <PaneShell
       className='h-full min-w-0 overflow-hidden'
-      bodyClassName='bg-content-well overflow-hidden'
+      bodyClassName='bg-content-well'
+      scroll={false}
       header={<ToolPaneHeader tab='terminal' />}
     >
       {/* Kept, so another tool, a collapsed pane or another session never ends this shell. */}
@@ -116,7 +117,7 @@ function toolBody({
   return (
     <PaneShell
       className='h-full min-w-0 overflow-hidden'
-      bodyClassName='overflow-hidden'
+      scroll={false}
       header={<ToolPaneHeader tab='problems' />}
     >
       <DiagnosticsPanel />
@@ -135,7 +136,7 @@ function gitToolPane(rootPath: string, diffScope: SessionDiffScopeState) {
   return (
     <PaneShell
       className='h-full min-w-0 overflow-hidden'
-      bodyClassName='overflow-hidden'
+      scroll={false}
       header={<GitPaneHeader rootPath={rootPath} />}
       subheader={
         <PaneBar aria-label='Diff scope' role='group'>
