@@ -27,8 +27,11 @@ export type ComposerInboxEntry =
       readonly context: ChatInputTerminalContext
       readonly destination: ComposerDestination
     }
-  | { readonly kind: 'text' | 'append'; readonly text: string; readonly destination: ComposerDestination }
-
+  | {
+      readonly kind: 'text' | 'append'
+      readonly text: string
+      readonly destination: ComposerDestination
+    }
 
 type ComposerInboxState = {
   pending: readonly ComposerInboxEntry[]
@@ -50,7 +53,6 @@ type ComposerInboxActions = {
     selection: TerminalContextSelection,
     destination: ComposerDestination,
   ) => ChatInputTerminalContext | null
-
 }
 
 export type ComposerInboxStore = ComposerInboxState & ComposerInboxActions
@@ -82,7 +84,9 @@ export const useComposerInboxStore = create<ComposerInboxStore>((set, get) => ({
     const trimmed = text.trim()
     if (trimmed.length === 0) return false
 
-    set((state) => ({ pending: state.pending.concat({ destination, kind: 'append', text: trimmed }) }))
+    set((state) => ({
+      pending: state.pending.concat({ destination, kind: 'append', text: trimmed }),
+    }))
 
     return true
   },
