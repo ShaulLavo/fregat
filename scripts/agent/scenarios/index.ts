@@ -193,6 +193,7 @@ import { sessionBranchDrift } from './session-branch-drift'
 import { sessionPullRequestSync } from './session-pull-request-sync'
 import { sessionAutoSettle } from './session-auto-settle'
 import { gitMergeRequest } from './git-merge-request'
+import { gitClonePublish } from './git-clone-publish'
 import { gitHistory } from './git-history'
 import { editorCaretBurst } from './editor-caret-burst'
 import { editorFocusClicks } from './editor-focus-clicks'
@@ -393,6 +394,7 @@ export const scenarios: readonly Scenario[] = [
   sessionPullRequestSync,
   sessionAutoSettle,
   gitMergeRequest,
+  gitClonePublish,
   editorCaretBurst,
   editorFocusClicks,
   editorProportionalFont,

@@ -242,6 +242,8 @@ export type GitBranchRemoteState = {
   branch: string | null
   /** False on a fresh branch, which is what makes a push need `--set-upstream`. */
   hasUpstream: boolean
+  /** False when the repository has no remote at all: there is nowhere to push until one is published. */
+  hasRemote: boolean
 }
 
 /**
@@ -307,3 +309,36 @@ export type GitPullRequestCreateResult =
   /** A branch can only have one open pull request, so a second attempt is a no-op. */
   | { kind: 'exists'; pullRequest: GitPullRequest }
   | { kind: 'unsupported'; support: GitPullRequestSupport }
+
+/** Where a `git clone` is, from its progress lines. */
+export type GitCloneStage = 'connecting' | 'counting' | 'receiving' | 'resolving' | 'checkout'
+
+export type GitCloneProgressEvent =
+  | { kind: 'progress'; stage: GitCloneStage; percent: number | null }
+  /** The checkout is complete and registered as a project. */
+  | { kind: 'result'; path: string; projectId: string | null }
+  | { kind: 'failed'; message: string }
+
+export type GitRepositoryVisibility = 'private' | 'public'
+
+/** Create a repository on a forge for a checkout that has no remote, then push to it. */
+export type GitPublishRequest = {
+  path: string
+  forge: GitForgeKind
+  /** Defaults to the forge's public host. */
+  host?: string
+  /** `owner/name`; Azure DevOps takes `organization/project/name`. */
+  repository: string
+  visibility: GitRepositoryVisibility
+  protocol: 'ssh' | 'https'
+}
+
+export type GitPublishResult = {
+  url: string
+  remoteName: string
+  remoteUrl: string
+  branch: string | null
+  /** `remote-added`: nothing to push yet. `push-failed`: the repository exists, the push did not land. */
+  status: 'pushed' | 'remote-added' | 'push-failed'
+  pushError: string | null
+}

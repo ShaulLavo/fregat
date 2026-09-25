@@ -3,6 +3,7 @@ import type {
   GitForgeKind,
   GitPullRequest,
   GitPullRequestSupport,
+  GitRepositoryVisibility,
 } from '@workspace/contracts'
 import type { runBoundedProcess } from '../utils/process'
 
@@ -42,4 +43,15 @@ export type ForgeProvider = {
     query: PullRequestQuery,
   ) => Promise<ReadonlyMap<string, GitPullRequest | null>>
   createPullRequest: (context: ForgeContext, input: CreatePullRequestInput) => Promise<void>
+  /** Creates `context.repository` on the forge and says where to reach it. */
+  createRepository: (
+    context: ForgeContext,
+    visibility: GitRepositoryVisibility,
+  ) => Promise<CreatedRepository>
+}
+
+export type CreatedRepository = {
+  readonly url: string
+  readonly httpsUrl: string
+  readonly sshUrl: string
 }

@@ -13,6 +13,7 @@ import { TerminalHandoffs, type TerminalHandoff } from './terminal-handoffs'
 import type { AgentTerminalResolver, AgentTerminalProcess } from '../terminal/agent-launch'
 import { sessionIdentityErrors } from '../provider/structured-errors'
 import { realpath } from 'node:fs/promises'
+import path from 'node:path'
 import { WorktreeExecutionGate } from './worktree-execution-gate'
 import { WorktreeLifecycleReactor } from './worktree-lifecycle-reactor'
 import { PullRequestSyncReactor, type BranchPullRequestLookup } from './pull-request-sync-reactor'
@@ -1151,6 +1152,18 @@ export class OrchestrationEngine {
   async refreshWorktreeMetadata(checkoutPath: string) {
     const worktree = await this.liveWorktreeAt(checkoutPath)
     if (worktree) await this.worktreeReactor?.refresh(worktree.id)
+  }
+
+  /** Registers a checkout the server made itself, such as a finished clone, as a project. */
+  async registerCheckout(absolutePath: string) {
+    const receipt = await this.dispatchClientCommand({
+      type: 'project.create',
+      commandId: `register-${crypto.randomUUID()}`,
+      title: path.basename(absolutePath),
+      workspaceRoot: absolutePath,
+      defaultModelSelection: null,
+    })
+    return receipt.result?.projectId ?? null
   }
 
   async worktreeProjectId(checkoutPath: string) {

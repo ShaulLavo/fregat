@@ -150,6 +150,16 @@ export const workspaceCommandMetadata = {
     when: [],
     title: 'Open font settings',
   }),
+  'workspace.cloneRepository': defineMetadata({
+    category: 'Git',
+    description: 'Clone a repository into a new folder and open it as a project.',
+    id: 'workspace.cloneRepository',
+    execution: 'sync',
+    target: 'workspace',
+    undoCategory: 'view-only',
+    when: [],
+    title: 'Clone repository…',
+  }),
   'workspace.showUsage': defineMetadata({
     category: 'Chat',
     description: 'See what each model cost, by day, and set prices for models that report none.',

@@ -153,3 +153,35 @@ reads as no forge. The web labels GitLab's button "Merge request".
 - `scenario git-merge-request` (fake `glab` on the server's PATH): the header offers Merge request
   on a gitlab.com checkout, and creating it shows `#5`:
   `/work/tmp/fregat-evidence/20260925T130215Z-scenario-git-merge-request/`.
+
+## EXT-03: clone and repository publication
+
+**Clone.** The palette's `Clone repository…` opens a dialog: a URL or `owner/name` (GitHub
+shorthand, as upstream reads a pasted name) and a folder, which defaults to a sibling of the open
+workspace named after the repository. `POST /git/clone-stream` runs `git clone --progress` and
+streams upstream's stages (connecting, counting, receiving, resolving, checkout) with percentages;
+the dialog shows them. The destination must be new or an empty folder, and a folder with files is
+refused untouched. Closing the stream cancels: git is stopped and everything it wrote is removed,
+keeping an empty folder the user chose. A failed clone reports git's last lines, credentials
+redacted, and leaves nothing. Only a finished checkout is registered as a project, so a cancelled or
+failed clone never becomes a half-created one; the app then opens it. Retry is cloning again.
+Upstream registers the project before git runs and tracks clones server-side with toasts; here the
+dialog owns the stream, which gives the same cancel and no-half-project outcomes.
+
+**Publish.** A repository with no remote shows `Publish repository` in the Git pane and the session
+header. The dialog takes the forge, `owner/name` (Azure: `organization/project/name`), an optional
+host, visibility and SSH or HTTPS. The server checks the forge CLI is ready, creates the repository
+with the provider (`gh repo create`, GitLab `POST projects` with the namespace id, Forgejo `POST
+user/repos` or `orgs/{owner}/repos`, `az repos create`, Bitbucket `POST repositories`), adds it as
+`origin` (reusing a remote with the same URL, `origin-1` when the name is taken), and pushes the
+branch with upstream tracking when there is a commit. The outcome is `pushed`, `remote-added`
+(nothing to push yet) or `push-failed` (the repository exists and the push did not land), each with
+its own toast. `hasRemote` joins the branch remote state; listing remotes is a read-only git call.
+
+- `apps/server/src/git/tests/clone.test.ts`: success registers, non-empty folder refused and kept,
+  failure leaves nothing and registers nothing, cancel removes what was written.
+- `apps/server/src/git/tests/publish.test.ts`: pushed (branch reaches the remote, upstream set),
+  remote-added, push-failed keeping the remote, forge signed out creates nothing, `origin-1`.
+- `apps/server/src/git/tests/forges.test.ts`: repository creation for GitLab, Forgejo, Azure DevOps
+  (name shape refused) and Bitbucket.
+- `scenario git-clone-publish`: `/work/tmp/fregat-evidence/20260925T131311Z-scenario-git-clone-publish/`.

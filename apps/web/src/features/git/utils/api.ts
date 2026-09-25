@@ -2,6 +2,9 @@ import type { GitStatusResult } from '@workspace/contracts'
 import { clientLogContext } from '@/lib/environments/state/log-context'
 import type {
   GitBranchRemoteState,
+  GitCloneProgressEvent,
+  GitPublishRequest,
+  GitPublishResult,
   GitCommitProgressEvent,
   GitCommitResult,
   GitPullRequestCreateResult,
@@ -275,6 +278,69 @@ export async function initializeSubmodules(path: string, client: Client) {
     },
     (status) => ({ uninitializedSubmodules: status.uninitializedSubmodules }),
   )
+}
+
+export async function publishRepository(request: GitPublishRequest, client: Client) {
+  return observeGitOperation(
+    {
+      ...clientLogContext(client),
+      action: 'git.publish',
+      path: request.path,
+      forge: request.forge,
+    },
+    async (): Promise<GitPublishResult> => {
+      const response = await client.git.publish.post(request)
+
+      return unwrapEdenResponse(response, {
+        requireData: true,
+        emptyMessage: 'git server returned an empty response',
+      })
+    },
+    (result) => ({ status: result.status, remoteName: result.remoteName }),
+  )
+}
+
+export type CloneProgress = Extract<GitCloneProgressEvent, { kind: 'progress' }>
+
+/**
+ * Clones and reports progress as it runs. Aborting `signal` closes the stream, which stops git
+ * and removes what it wrote.
+ */
+export async function cloneRepositoryStreaming(
+  request: { source: string; destination: string },
+  onProgress: (progress: CloneProgress) => void,
+  signal: AbortSignal,
+  client: Client,
+) {
+  return observeGitOperation(
+    { ...clientLogContext(client), action: 'git.clone_stream', path: request.destination },
+    async () => {
+      const response = await client.git['clone-stream'].post(request, { fetch: { signal } })
+      const stream = unwrapEdenResponse(response, {
+        requireData: true,
+        emptyMessage: 'git server returned an empty response',
+      })
+      for await (const event of parseEdenSseStream(stream)) {
+        if (event.event === 'heartbeat') continue
+        const data = event.data as GitCloneProgressEvent
+        if (data.kind === 'progress') onProgress(data)
+        if (data.kind === 'failed') throw createGitCloneFailure(data.message)
+        if (data.kind === 'result') return data
+      }
+      throw createGitCloneFailure('git clone ended without reporting a result')
+    },
+    (result) => ({ registered: result.projectId !== null }),
+  )
+}
+
+function createGitCloneFailure(message: string) {
+  return createClientError({
+    code: 'GIT_CLONE_FAILED',
+    message,
+    status: 409,
+    why: 'git could not clone the repository into that folder.',
+    fix: 'Check the address and your access to it, pick an empty or new folder, and clone again.',
+  })
 }
 
 export async function pushRemote(path: string, client: Client) {

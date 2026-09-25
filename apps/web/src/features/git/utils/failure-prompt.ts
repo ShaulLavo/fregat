@@ -11,6 +11,7 @@ const OPERATION_LABELS: Readonly<Record<string, string>> = {
   'create-pull-request': 'Create pull request',
   'discard-staged': 'Discard staged',
   'init-submodules': 'Initialize submodules',
+  publish: 'Publish repository',
   'stage-many': 'Stage',
   'unstage-many': 'Unstage',
 }

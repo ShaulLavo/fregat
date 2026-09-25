@@ -1,7 +1,7 @@
 import type { GitPullRequest } from '@workspace/contracts'
 import * as v from 'valibot'
 import { gitPullRequestErrors } from '../utils/pull-request-errors'
-import { forgeCommand, parseForgeJson, perBranch } from './cli'
+import { forgeCommand, parseForgeJson, perBranch, repositoryParts } from './cli'
 import type { ForgeContext, ForgeProvider } from './types'
 
 const API_BASE = 'https://api.bitbucket.org/2.0'
@@ -50,6 +50,34 @@ export const bitbucket: ForgeProvider = {
         internal: { status: response.status },
       })
   },
+  async createRepository(context, visibility) {
+    repositoryParts(context, 2, 'workspace/name')
+    const authorization = await requireCredentials(context)
+    const response = await request(context, authorization, '', {
+      method: 'POST',
+      body: JSON.stringify({ scm: 'git', is_private: visibility === 'private' }),
+    })
+    if (!response.ok)
+      throw gitPullRequestErrors.REPOSITORY_CREATE_FAILED({
+        forge: context.forge.name,
+        repository: context.repository ?? '',
+        internal: { status: response.status },
+      })
+    const repository = parseForgeJson(
+      context,
+      v.object({
+        links: v.object({
+          html: v.object({ href: v.string() }),
+          clone: v.array(v.object({ name: v.string(), href: v.string() })),
+        }),
+      }),
+      await response.text(),
+      'create-repository',
+    )
+    const clone = (name: string) =>
+      repository.links.clone.find((link) => link.name === name)?.href ?? ''
+    return { url: repository.links.html.href, httpsUrl: clone('https'), sshUrl: clone('ssh') }
+  },
 }
 
 async function newestPullRequest(
@@ -91,7 +119,7 @@ async function request(
   init: { method?: string; body?: string } = {},
 ) {
   try {
-    return await context.fetch(`${API_BASE}/repositories/${context.repository ?? ''}/${path}`, {
+    return await context.fetch(repositoryUrl(context, path), {
       method: init.method ?? 'GET',
       headers: {
         accept: 'application/json',
@@ -158,4 +186,9 @@ function pullRequestState(state: string): GitPullRequest['state'] {
   if (state === 'MERGED') return 'merged'
   if (state === 'DECLINED' || state === 'SUPERSEDED') return 'closed'
   return 'open'
+}
+
+function repositoryUrl(context: ForgeContext, path: string) {
+  const base = `${API_BASE}/repositories/${context.repository ?? ''}`
+  return path ? `${base}/${path}` : base
 }

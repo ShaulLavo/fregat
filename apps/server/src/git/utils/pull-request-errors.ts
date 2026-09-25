@@ -50,4 +50,25 @@ export const gitPullRequestErrors = defineErrorCatalog('git', {
     why: 'The forge refused the request: the branch may have no commits the base does not already have, may not be pushed yet, or the account may lack write access to the repository.',
     fix: "Push the branch, confirm it is ahead of its base, and check that the forge CLI's sign-in has access to this repository.",
   },
+  REPOSITORY_CREATE_FAILED: {
+    status: 502,
+    message: ({ forge, repository }: { forge: string; repository: string }) =>
+      `${forge} could not create ${repository}`,
+    why: 'The forge refused the new repository: the name may be taken, the namespace may not exist, or the account may not be allowed to create repositories there.',
+    fix: "Check the name and the forge CLI's sign-in, then publish again.",
+  },
+  FORGE_NOT_READY: {
+    status: 409,
+    message: ({ forge, reason }: { forge: string; reason: string }) =>
+      `${forge} is not ready: ${reason}`,
+    why: 'Publishing creates the repository through the forge CLI or API, which is not installed or not signed in on the machine that owns this checkout.',
+    fix: 'Install the forge CLI and sign in on that machine (`gh auth login`, `glab auth login`, `tea login add`, `az login`), or store bitbucket.org credentials in git, then publish again.',
+  },
+  REPOSITORY_NAME_INVALID: {
+    status: 400,
+    message: ({ forge, expected }: { forge: string; expected: string }) =>
+      `${forge} needs the repository as ${expected}`,
+    why: 'The repository name does not have the parts this forge addresses repositories by.',
+    fix: 'Enter the repository in that form and publish again.',
+  },
 })

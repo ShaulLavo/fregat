@@ -5,6 +5,8 @@ import {
   gitBlobDiffQuerySchema,
   gitBranchDiffQuerySchema,
   gitCheckoutBodySchema,
+  gitCloneBodySchema,
+  gitPublishBodySchema,
   gitCommitBodySchema,
   gitCommitMessageResultSchema,
   gitCreateBranchBodySchema,
@@ -31,6 +33,8 @@ export function gitRoutes(
     resolveBaseCommit?: (path: string) => Promise<string | null>
     refreshMetadata?: (path: string) => Promise<void>
     submoduleMode?: (path: string) => Promise<WorktreeSubmoduleMode>
+    /** Registers a finished clone as a project; returns its id. */
+    registerClone?: (absolutePath: string) => Promise<string | null>
   } = {},
 ) {
   const worktrees = new GitWorktreeService(git)
@@ -141,6 +145,19 @@ export function gitRoutes(
         },
         { body: gitPathBodySchema },
       )
+      // Streamed, so a large transfer shows its progress; closing the stream cancels the clone.
+      .post(
+        '/clone-stream',
+        ({ body, request }) =>
+          sseResponse(
+            toSse(git.cloneProgress(body, options.registerClone ?? (async () => null)), {
+              event: (event) => event.kind,
+            }),
+            request.signal,
+          ),
+        { body: gitCloneBodySchema },
+      )
+      .post('/publish', ({ body }) => git.publish(body), { body: gitPublishBodySchema })
       .post('/pull', ({ body }) => git.pull(body.path), {
         body: gitPathBodySchema,
       })

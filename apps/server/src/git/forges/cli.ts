@@ -74,6 +74,34 @@ export function requireCreated(context: Named, branch: string, result: ForgeComm
   })
 }
 
+/** A repository the forge refused to create; the CLI's words stay in the log's internal fields. */
+export function requireRepositoryCreated(
+  context: Named & { readonly repository: string | null },
+  result: ForgeCommandResult,
+) {
+  if (result.exitCode === 0) return result
+  throw gitPullRequestErrors.REPOSITORY_CREATE_FAILED({
+    forge: context.forge.name,
+    repository: context.repository ?? '',
+    internal: { exitCode: result.exitCode },
+  })
+}
+
+/** The `/`-separated parts a forge addresses a repository by, or a named refusal. */
+export function repositoryParts(
+  context: Named & { readonly repository: string | null },
+  count: number,
+  expected: string,
+) {
+  const parts = (context.repository ?? '').split('/').filter(Boolean)
+  if (parts.length === count) return parts
+  throw gitPullRequestErrors.REPOSITORY_NAME_INVALID({
+    forge: context.forge.name,
+    expected,
+    internal: { segments: parts.length },
+  })
+}
+
 /** Missing binary, signed out, or ready, from a CLI's auth-status exit. */
 export function cliSupport(result: ForgeCommandResult) {
   if (result.exitCode !== 0 && !result.stderr && !result.stdout) return 'cli-missing' as const

@@ -5,7 +5,13 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import { detectForge, remoteRepositoryPath } from '../forges/detect'
 import type { RunProcess } from '../forges/types'
-import { createPullRequest, readBranchPullRequests, readPullRequest } from '../pull-request'
+import type { GitPublishRequest } from '@workspace/contracts'
+import {
+  createForgeRepository,
+  createPullRequest,
+  readBranchPullRequests,
+  readPullRequest,
+} from '../pull-request'
 import type { GitProcessResult } from '../utils/process'
 
 const roots: string[] = []
@@ -539,5 +545,117 @@ it('reports no forge for a remote on an unknown host', async () => {
     pullRequest: null,
     support: 'no-forge',
     forge: null,
+  })
+})
+
+describe('repository creation', () => {
+  const create = (forge: GitPublishRequest['forge'], repository: string) => ({
+    forge,
+    repository,
+    visibility: 'public' as const,
+  })
+
+  it('GitLab resolves the namespace and posts the project', async () => {
+    const forge = boundary('', (argv) => {
+      if (argv[1] === 'auth') return ok()
+      if (argv[2] === 'namespaces/group%2Fsub') return json({ id: 42 })
+      if (argv.includes('projects'))
+        return json({
+          web_url: 'https://gitlab.com/group/sub/app',
+          http_url_to_repo: 'https://gitlab.com/group/sub/app.git',
+          ssh_url_to_repo: 'git@gitlab.com:group/sub/app.git',
+        })
+      return undefined
+    })
+    await expect(
+      createForgeRepository(create('gitlab', 'group/sub/app'), await checkout(), forge),
+    ).resolves.toEqual({
+      url: 'https://gitlab.com/group/sub/app',
+      httpsUrl: 'https://gitlab.com/group/sub/app.git',
+      sshUrl: 'git@gitlab.com:group/sub/app.git',
+    })
+    expect(forge.calls.find((call) => call.argv.includes('projects'))?.argv).toEqual(
+      expect.arrayContaining(['path=app', 'visibility=public', 'namespace_id=42']),
+    )
+  })
+
+  it('Forgejo creates under the user or an organization', async () => {
+    const forge = boundary('', (argv) => {
+      if (argv[1] === 'login') return json([{ name: 'codeberg', url: 'https://codeberg.org' }])
+      if (argv.at(-1)?.endsWith('/user')) return json({ login: 'me' })
+      if (argv.includes('POST'))
+        return json({
+          html_url: 'https://codeberg.org/team/app',
+          clone_url: 'https://codeberg.org/team/app.git',
+          ssh_url: 'git@codeberg.org:team/app.git',
+        })
+      return undefined
+    })
+    await createForgeRepository(create('forgejo', 'team/app'), await checkout(), forge)
+    const post = forge.calls.find((call) => call.argv.includes('POST'))
+    expect(post?.argv.at(-1)).toBe('https://codeberg.org/api/v1/orgs/team/repos')
+    expect(JSON.parse(post?.input ?? '{}')).toEqual({
+      name: 'app',
+      private: false,
+      auto_init: false,
+    })
+  })
+
+  it('Azure DevOps needs organization/project/name', async () => {
+    const forge = boundary('', (argv) => {
+      if (argv[1] === 'account') return ok('me\n')
+      if (argv[2] === 'create')
+        return json({
+          webUrl: 'https://dev.azure.com/org/proj/_git/app',
+          remoteUrl: 'https://org@dev.azure.com/org/proj/_git/app',
+          sshUrl: 'git@ssh.dev.azure.com:v3/org/proj/app',
+        })
+      return undefined
+    })
+    await expect(
+      createForgeRepository(create('azure-devops', 'org/app'), await checkout(), forge),
+    ).rejects.toThrow('Azure DevOps needs the repository as organization/project/name')
+    await expect(
+      createForgeRepository(create('azure-devops', 'org/proj/app'), await checkout(), forge),
+    ).resolves.toMatchObject({ sshUrl: 'git@ssh.dev.azure.com:v3/org/proj/app' })
+    expect(forge.calls.find((call) => call.argv[2] === 'create')?.argv).toEqual(
+      expect.arrayContaining([
+        '--org',
+        'https://dev.azure.com/org',
+        '--project',
+        'proj',
+        '--name',
+        'app',
+      ]),
+    )
+  })
+
+  it('Bitbucket posts the repository with its privacy', async () => {
+    const requests: { url: string; body: string }[] = []
+    const fetcher = (async (input: string | URL | Request, init?: RequestInit) => {
+      requests.push({ url: String(input), body: String(init?.body ?? '') })
+      return Response.json({
+        links: {
+          html: { href: 'https://bitbucket.org/ws/app' },
+          clone: [
+            { name: 'https', href: 'https://bitbucket.org/ws/app.git' },
+            { name: 'ssh', href: 'git@bitbucket.org:ws/app.git' },
+          ],
+        },
+      })
+    }) as typeof fetch
+    const forge = boundary('', (argv) =>
+      argv.includes('credential') ? ok('username=me\npassword=secret\n') : undefined,
+    )
+    await expect(
+      createForgeRepository(create('bitbucket', 'ws/app'), await checkout(), {
+        run: forge.run,
+        fetch: fetcher,
+      }),
+    ).resolves.toMatchObject({ sshUrl: 'git@bitbucket.org:ws/app.git' })
+    expect(requests[0]).toEqual({
+      url: 'https://api.bitbucket.org/2.0/repositories/ws/app',
+      body: JSON.stringify({ scm: 'git', is_private: false }),
+    })
   })
 })

@@ -651,6 +651,7 @@ export const selectors = {
       .getByRole('alert')
       .filter({ hasText: / failed/ })
       .getByRole('button', { name: 'Fix with AI', exact: true }),
+  dialog: (page: Page) => page.getByRole('dialog').last(),
   changeRequestLink: (page: Page, number: number) =>
     page.getByRole('link').filter({ hasText: new RegExp(`^#${number}$`) }),
   gitBranchChip: (page: Page, branch: string) =>

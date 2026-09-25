@@ -3,7 +3,9 @@ import * as v from 'valibot'
 import {
   cliSupport,
   forgeCommand,
+  repositoryParts,
   requireCreated,
+  requireRepositoryCreated,
   parseForgeJson,
   perBranch,
   requireSuccess,
@@ -53,6 +55,31 @@ export const azureDevOps: ForgeProvider = {
       ...JSON_ARGS,
     ])
     requireCreated(context, input.branch, result)
+  },
+  // Azure has no visibility per repository; the project's decides, as upstream notes.
+  async createRepository(context) {
+    const [organization, project, name] = repositoryParts(context, 3, 'organization/project/name')
+    const result = requireRepositoryCreated(
+      context,
+      await az(context, [
+        'repos',
+        'create',
+        '--org',
+        `https://dev.azure.com/${organization}`,
+        '--project',
+        project ?? '',
+        '--name',
+        name ?? '',
+        ...JSON_ARGS,
+      ]),
+    )
+    const repository = parseForgeJson(
+      context,
+      v.object({ webUrl: v.string(), remoteUrl: v.string(), sshUrl: v.string() }),
+      result.stdout,
+      'create-repository',
+    )
+    return { url: repository.webUrl, httpsUrl: repository.remoteUrl, sshUrl: repository.sshUrl }
   },
 }
 

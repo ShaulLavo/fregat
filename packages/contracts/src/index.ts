@@ -59,6 +59,11 @@ export type {
   GitAutoPullState,
   GitForge,
   GitForgeKind,
+  GitCloneStage,
+  GitCloneProgressEvent,
+  GitPublishRequest,
+  GitPublishResult,
+  GitRepositoryVisibility,
 } from './git'
 export { GIT_FORGE_KINDS, WORKTREE_SUBMODULE_MODES } from './git'
 export type { WatchClientMessage, WatchServerMessage } from './watch-events'

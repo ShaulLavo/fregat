@@ -1,12 +1,15 @@
 import type {
   GitForge,
+  GitForgeKind,
+  GitPublishRequest,
   GitPullRequest,
   GitPullRequestCreateResult,
   GitPullRequestSupport,
 } from '@workspace/contracts'
 
+import { detectForge } from './forges/detect'
 import { forgeProvider, resolveForgeContext } from './forges/registry'
-import type { ForgeContext, RunProcess } from './forges/types'
+import type { CreatedRepository, ForgeContext, RunProcess } from './forges/types'
 import { gitPullRequestErrors } from './utils/pull-request-errors'
 import { runBoundedProcess } from './utils/process'
 
@@ -19,7 +22,8 @@ const SUPPORT_CACHE_TTL_MS = 60_000
 
 const supportByCwd = new Map<string, { at: number; support: GitPullRequestSupport }>()
 
-type Boundaries = { run?: RunProcess; fetch?: typeof fetch }
+export type ForgeBoundaries = { run?: RunProcess; fetch?: typeof fetch }
+type Boundaries = ForgeBoundaries
 
 type Supported =
   | { support: Exclude<GitPullRequestSupport, 'ready'>; forge: GitForge | null; context: null }
@@ -122,4 +126,44 @@ async function cachedSupport(context: ForgeContext) {
   const support = await forgeProvider(context.forge.kind).support(context)
   supportByCwd.set(context.cwd, { at: Date.now(), support })
   return support
+}
+
+const PUBLIC_HOSTS: Record<GitForgeKind, string> = {
+  github: 'github.com',
+  gitlab: 'gitlab.com',
+  forgejo: 'codeberg.org',
+  'azure-devops': 'dev.azure.com',
+  bitbucket: 'bitbucket.org',
+}
+
+const SUPPORT_REASONS = {
+  'cli-missing': 'its command-line tool is not installed',
+  unauthenticated: 'nobody is signed in',
+} as const
+
+/** Creates the repository a publish names, on the forge the user chose. */
+export async function createForgeRepository(
+  request: Pick<GitPublishRequest, 'forge' | 'host' | 'repository' | 'visibility'>,
+  cwd: string,
+  boundaries: Boundaries = {},
+): Promise<CreatedRepository> {
+  const host = request.host?.trim().toLowerCase() || PUBLIC_HOSTS[request.forge]
+  const forge = detectForge(`https://${host}/`) ?? { kind: request.forge, name: host, host }
+  const context: ForgeContext = {
+    cwd,
+    forge: { ...forge, kind: request.forge },
+    remoteUrl: '',
+    repository: request.repository.trim().replace(/^\/+|\/+$/g, ''),
+    run: boundaries.run ?? runBoundedProcess,
+    fetch: boundaries.fetch ?? fetch,
+  }
+  const provider = forgeProvider(request.forge)
+  const support = await provider.support(context)
+  if (support !== 'ready')
+    throw gitPullRequestErrors.FORGE_NOT_READY({
+      forge: context.forge.name,
+      reason: SUPPORT_REASONS[support],
+      internal: { support },
+    })
+  return provider.createRepository(context, request.visibility)
 }

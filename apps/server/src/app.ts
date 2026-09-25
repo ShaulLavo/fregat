@@ -436,6 +436,7 @@ export function createApp(options: AppOptions) {
       gitRoutes(git, commitMessages, {
         resolveBaseCommit: (checkoutPath) => orchestration.worktreeBaseCommit(checkoutPath),
         refreshMetadata: (checkoutPath) => orchestration.refreshWorktreeMetadata(checkoutPath),
+        registerClone: (absolutePath) => orchestration.registerCheckout(absolutePath),
         submoduleMode: async (checkoutPath) =>
           worktreeSubmoduleMode(settings, await orchestration.worktreeProjectId(checkoutPath)),
       }),
