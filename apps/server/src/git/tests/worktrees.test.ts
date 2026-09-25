@@ -26,11 +26,16 @@ describe('worktree provisioning', () => {
   it('records the local source branch when a tag has the same name', async () => {
     const fixture = await fixtureRepo()
     await runGit(fixture.root, ['tag', 'main'])
+    const mutations: string[] = []
+    fixture.git.subscribeMutations(async (root) => {
+      mutations.push(root)
+    })
     const prepared = await fixture.worktrees.prepareCreate({
       path: fixture.root,
       worktreeId: worktreeA,
     })
     expect(prepared.baseBranch).toBe('main')
+    expect(mutations).toEqual([])
     const created = await fixture.worktrees.create({ ...prepared, path: fixture.root })
     expect(created.worktree.commit).toBe(prepared.baseCommit)
   })

@@ -458,7 +458,9 @@ export class GitWorktreeService {
   }
 
   private async headBranch(runner: GitRepositoryRunner) {
-    const result = await runner.run(['symbolic-ref', '--quiet', 'HEAD'], { allowFailure: true })
+    const result = await runner.run(['rev-parse', '--symbolic-full-name', 'HEAD'], {
+      allowFailure: true,
+    })
     const ref = result.stdout.trim()
     if (result.exitCode !== 0 || !ref.startsWith('refs/heads/')) return null
 
