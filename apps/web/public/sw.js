@@ -12,7 +12,7 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
-  event.waitUntil(openApp(event.notification.data?.path ?? ''))
+  event.waitUntil(openNotice(event.notification.data?.path ?? ''))
 })
 
 function readNotice(data) {
@@ -35,11 +35,23 @@ function showNotice(notice) {
   })
 }
 
-async function openApp(path) {
+// A session notice focuses the window already showing that session, or opens it. A notice
+// without a session (the test) focuses any app window.
+async function openNotice(path) {
   const scope = self.registration.scope
+  const target = new URL(path, scope)
+  const session = sessionRoute(target.pathname)
   const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
-  const open = windows.find((client) => client.url.startsWith(scope))
-  if (open) return open.focus()
+  const app = windows.filter((client) => client.url.startsWith(scope))
+  const showing = session
+    ? app.find((client) => sessionRoute(new URL(client.url).pathname) === session)
+    : app[0]
+  if (showing) return showing.focus()
 
-  return self.clients.openWindow(new URL(path, scope).href)
+  return self.clients.openWindow(target.href)
+}
+
+// `chat/t/<id>` names the session whatever workspace token precedes it.
+function sessionRoute(pathname) {
+  return /\/chat\/t\/[^/]+$/.exec(pathname)?.[0] ?? null
 }

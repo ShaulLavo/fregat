@@ -123,6 +123,11 @@
       },
       "type": "object"
     },
+    "chat.pushNotifications": {
+      "default": false,
+      "description": "Push to every device registered below when a session needs attention or completes. Held back while a window of this server is visible and focused.",
+      "type": "boolean"
+    },
     "chat.responseStreamingMode": {
       "default": "paragraph",
       "description": "Publish assistant responses by paragraph, complete turn, or individual token.",

@@ -89,8 +89,6 @@
     "./chat/rail/drop": "./src/chat/rail/drop.ts",
     "./chat/rail/reorder": "./src/chat/rail/reorder.ts",
     "./chat/composer-interaction": "./src/chat/composer-interaction.ts",
-    "./chat/notifications": "./src/chat/notifications.ts",
-    "./chat/rail/status": "./src/chat/rail/status.ts",
     "./chat/rail/snooze": "./src/chat/rail/snooze.ts",
     "./chat/rail/unread": "./src/chat/rail/unread.ts",
     "./chat/rail/multi-select": "./src/chat/rail/multi-select.ts",

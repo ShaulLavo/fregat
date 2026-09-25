@@ -1,5 +1,7 @@
 import * as v from 'valibot'
+import type { SessionId } from './chat-ids'
 import { isoDateTimeSchema, trimmedNonEmptyStringSchema } from './chat-model'
+import type { WorkspaceAddress } from './workspace-address'
 
 const base64UrlKeySchema = v.pipe(v.string(), v.regex(/^[A-Za-z0-9_-]+={0,2}$/), v.maxLength(128))
 
@@ -39,6 +41,18 @@ export type PushNotice = {
   readonly tag?: string
   /** Opened relative to the app base when the notification is clicked. */
   readonly path: string
+}
+
+/**
+ * One session's route relative to the app base, spelled as the web address grammar writes it:
+ * `~<workspace token>/chat/t/<session id>`.
+ */
+export function pushSessionPath(
+  workspace: Pick<WorkspaceAddress, 'id' | 'name'>,
+  sessionId: SessionId,
+): string {
+  const token = encodeURIComponent(`${workspace.name}.${workspace.id}`).replaceAll('~', '%7E')
+  return `~${token}/chat/t/${sessionId}`
 }
 
 export type PushService = v.InferOutput<typeof pushServiceSchema>

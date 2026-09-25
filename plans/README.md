@@ -44,7 +44,6 @@ a bare root `bun run verify`.
 | [145 — harness controls](145-harness-controls.md)                                       | **APPROVAL-RULES MERGED (`89c58188`); SEVEN PROPOSED**               |
 | [144 — unattended agent work](144-unattended-agent-work.md)                             | **RESEARCH — HARNESS INVENTORY FIRST**                               |
 | [143 — phone layout](143-phone-layout.md)                                               | **DISCUSSION — OWNER DIRECTION FIRST**                               |
-| [142 — web push](142-web-push.md)                                                       | **SPIKE + PHASE 1 IMPLEMENTED; PHASE 2 NEXT; PHONE CHECKS PENDING**  |
 | [141 — usage and rate limits](141-usage-and-rate-limits.md)                             | **PHASES 1–3 IMPLEMENTED; PHASE 4 OPEN; PHASE 5 NEEDS THE OWNER**    |
 | [140 — the editor as the agent's advantage](140-editor-agent-advantage.md)              | **RESEARCH — RESEARCH PHASE FIRST**                                  |
 | [139 — acting on agent diffs](139-acting-on-agent-diffs.md)                             | **RESEARCH — RESEARCH PHASE FIRST**                                  |
@@ -79,6 +78,8 @@ a bare root `bun run verify`.
 
 ## Dependency notes
 
+- Plan 142 is done and deleted. Its design, spike results, owner checks and owner question are in
+  the [web push delivery record](../docs/web-push.md).
 - Plan 127 is done and deleted; Plan 128's terminal premise is obsolete since `2acc3b73` deleted
   the server's detach TTL. The history below is kept for 128's rewrite.
 - Plans 127 and 128 and the 2026-09-20 revision of Plan 109 come from one review of React behaviour

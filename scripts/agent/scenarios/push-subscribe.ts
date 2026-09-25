@@ -20,9 +20,14 @@ const EXPECTED_NOTICE = {
 
 /**
  * Stands in for the browser's push service: headless Chromium has none. `subscribe` hands
- * the app a subscription whose endpoint is the scenario's own HTTP server.
+ * the app a subscription whose endpoint is the scenario's own HTTP server. The key is kept in
+ * sessionStorage, so the subscription survives a reload the way a real one does.
  */
-function stubPushManager(input: { endpoint: string; keys: { p256dh: string; auth: string } }) {
+export function stubPushManager(input: {
+  endpoint: string
+  keys: { p256dh: string; auth: string }
+}) {
+  const storageKey = '__pushScenarioKey'
   const state: { applicationServerKey: string | null; subscription: unknown } = {
     applicationServerKey: null,
     subscription: null,
@@ -33,13 +38,12 @@ function stubPushManager(input: { endpoint: string; keys: { p256dh: string; auth
       .replace(/\+/g, '-')
       .replace(/\//g, '_')
       .replace(/=+$/, '')
-  PushManager.prototype.getSubscription = async () => state.subscription as PushSubscription
-  PushManager.prototype.subscribe = async (options?: PushSubscriptionOptionsInit) => {
-    const key = options?.applicationServerKey
-    const buffer = ArrayBuffer.isView(key)
-      ? new Uint8Array(key.buffer, key.byteOffset, key.byteLength).slice().buffer
-      : (key as ArrayBuffer)
+  const fromBase64Url = (text: string) =>
+    Uint8Array.from(atob(text.replace(/-/g, '+').replace(/_/g, '/')), (char) => char.charCodeAt(0))
+      .buffer
+  const subscribeWith = (buffer: ArrayBuffer) => {
     state.applicationServerKey = base64Url(buffer)
+    sessionStorage.setItem(storageKey, state.applicationServerKey)
     state.subscription = {
       endpoint: input.endpoint,
       expirationTime: null,
@@ -48,10 +52,21 @@ function stubPushManager(input: { endpoint: string; keys: { p256dh: string; auth
       toJSON: () => ({ endpoint: input.endpoint, expirationTime: null, keys: input.keys }),
       unsubscribe: async () => {
         state.subscription = null
+        sessionStorage.removeItem(storageKey)
         return true
       },
     }
     return state.subscription as PushSubscription
+  }
+  const saved = sessionStorage.getItem(storageKey)
+  if (saved) subscribeWith(fromBase64Url(saved))
+  PushManager.prototype.getSubscription = async () => state.subscription as PushSubscription
+  PushManager.prototype.subscribe = async (options?: PushSubscriptionOptionsInit) => {
+    const key = options?.applicationServerKey
+    const buffer = ArrayBuffer.isView(key)
+      ? new Uint8Array(key.buffer, key.byteOffset, key.byteLength).slice().buffer
+      : (key as ArrayBuffer)
+    return subscribeWith(buffer)
   }
 }
 
@@ -134,7 +149,7 @@ async function drive(
 
   const scope = new URL('/', page.url()).href
   await worker.deliver(scope, plaintext)
-  const shown = await waitForNotification(page, scope)
+  const shown = await waitForNotification(page, scope, 'push-test')
   assertNotice(shown)
   await step('delivered')
 
@@ -145,7 +160,7 @@ async function drive(
 }
 
 /** The worker's registration id comes from CDP, which also delivers the push. */
-async function watchWorkerRegistrations(page: Page) {
+export async function watchWorkerRegistrations(page: Page) {
   const cdp = await page.context().newCDPSession(page)
   const registrations = new Map<string, string>()
   cdp.on('ServiceWorker.workerRegistrationUpdated', ({ registrations: updated }) => {
@@ -168,18 +183,24 @@ async function watchWorkerRegistrations(page: Page) {
   }
 }
 
-async function waitForNotification(page: Page, scope: string) {
+export async function waitForNotification(page: Page, scope: string, tag: string) {
   return waitFor(() =>
-    page.evaluate(async (scope) => {
-      const registration = await navigator.serviceWorker.getRegistration(scope)
-      const [notification] = (await registration?.getNotifications({ tag: 'push-test' })) ?? []
-      if (!notification) return undefined
-      return { title: notification.title, body: notification.body, tag: notification.tag }
-    }, scope),
+    page.evaluate(
+      async ({ scope, tag }) => {
+        const registration = await navigator.serviceWorker.getRegistration(scope)
+        const [notification] = (await registration?.getNotifications({ tag })) ?? []
+        if (!notification) return undefined
+        return { title: notification.title, body: notification.body, tag: notification.tag }
+      },
+      { scope, tag },
+    ),
   )
 }
 
-async function waitFor<T>(read: () => T | undefined | Promise<T | undefined>, timeoutMs = 10_000) {
+export async function waitFor<T>(
+  read: () => T | undefined | Promise<T | undefined>,
+  timeoutMs = 10_000,
+) {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
     const value = await read()

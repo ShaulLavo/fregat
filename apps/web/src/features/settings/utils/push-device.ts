@@ -39,7 +39,7 @@ export function thisDeviceBlocker(device: ThisDevice) {
   return null
 }
 
-/** The push section has no setting of its own, so search reaches it by these words. */
+/** Search reaches the device list by these words as well as by its switch's title. */
 export function matchesPushSearch(query: string) {
   const words = 'push notifications devices phone mobile browser test'
   return query

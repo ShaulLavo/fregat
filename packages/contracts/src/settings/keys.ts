@@ -118,6 +118,16 @@ export const SETTINGS_REGISTRY = {
     description:
       'Show an Open session action when another session needs attention or completes while this window is focused.',
   }),
+  'chat.pushNotifications': defineSetting({
+    schema: v.boolean(),
+    default: false,
+    scope: 'application',
+    widget: 'boolean',
+    category: 'Chat',
+    title: 'Push session notifications',
+    description:
+      'Push to every device registered below when a session needs attention or completes. Held back while a window of this server is visible and focused.',
+  }),
   'chat.textGenerationModel': defineSetting({
     schema: modelSelectionSchema,
     default: {

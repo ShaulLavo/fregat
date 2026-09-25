@@ -16,8 +16,8 @@ export const pushErrors = defineErrorCatalog('push', {
   SUBSCRIPTION_EXPIRED: {
     status: 410,
     message: 'The push service no longer accepts this device',
-    why: 'The browser dropped or replaced its subscription, so its push service answered 404 or 410.',
-    fix: 'Remove the device, then turn push notifications on again on it.',
+    why: 'The browser dropped or replaced its subscription, so its push service answered 404 or 410. This server removed the device.',
+    fix: 'Turn push notifications on again on that device.',
   },
   PUSH_SERVICE_REJECTED: {
     status: 502,

@@ -142,6 +142,7 @@
         "notifications-delivery.md",
         "Historical release 20260920T153923Z-b915d3e0-plan126-stash-notices-history; /work/tmp/fregat-evidence/20260920T154618Z-scenario-session-notifications/summary.md records completed headed browser verification",
         "Recorded proof covers toast navigation, native Notification construction, favicon count, click/focus cleanup, silent reload and archive; pinned decision comparison covers 900 cases",
+        "Push delivery (Plan 142, docs/web-push.md): the server derives the same notices from the shell stream with the shared contracts derivation, skips history, replay, boot recovery and archived sessions, holds pushes while a window is focused, and opens the session on click; apps/server/src/push/tests/session-notices.test.ts and scenario push-session-notice (/work/tmp/fregat-evidence/20260925T134236Z-scenario-push-session-notice)",
         "Remaining: visible operating-system popup and audible output, desktop bridges and badges, cross-machine live navigation, and full upstream runtime comparison"
       ]
     },

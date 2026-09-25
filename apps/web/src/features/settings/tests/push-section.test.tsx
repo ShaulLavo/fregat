@@ -2,8 +2,11 @@ import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { pushDeviceId } from '@workspace/contracts'
 import { http, HttpResponse } from 'msw'
+import { toast } from 'sonner'
+import { Toaster } from '@workspace/ui/components/sonner'
 
 import { PushSection } from '@/features/settings/components/push-section'
+import { useSettingsProjection } from '@/features/settings/hooks/use-settings-projection'
 import { SettingsPage } from '@/features/settings/components/page'
 import { pushErrors } from '@/features/settings/utils/push-errors'
 import { settingsQueryKeys } from '@/features/settings/utils/query-keys'
@@ -15,7 +18,7 @@ import { renderWithProviders } from '../../../../test/render'
 
 test('says why a browser without push cannot turn it on', async ({ client }) => {
   void client
-  const rendered = renderWithProviders(<PushSection />)
+  const rendered = renderWithProviders(<Section />)
 
   try {
     expect(await screen.findByText('This browser cannot receive push notifications')).toBeVisible()
@@ -36,7 +39,7 @@ test('asks permission from the button, subscribes, and marks this device', async
       return new HttpResponse(null, { status: 201 })
     }),
   )
-  const rendered = renderWithProviders(<PushSection />)
+  const rendered = renderWithProviders(<Section />)
 
   try {
     const turnOn = await screen.findByRole('button', { name: 'Turn on for this device' })
@@ -71,22 +74,49 @@ test('asks permission from the button, subscribes, and marks this device', async
   }
 })
 
-test('shows the push service’s answer when a test cannot be delivered', async ({ client }) => {
+test('drops an expired device from the list and says so', async ({ client }) => {
   void client
   const platform = await installPushPlatform({ permission: 'granted' })
   msw.use(http.post('https://push.example.test/*', () => new HttpResponse(null, { status: 410 })))
-  const rendered = renderWithProviders(<PushSection />)
+  const rendered = renderWithProviders(
+    <>
+      <Section />
+      <Toaster />
+    </>,
+  )
 
   try {
     await userEvent.click(await screen.findByRole('button', { name: 'Turn on for this device' }))
-    const row = await findDeviceRow(await pushDeviceId(platform.endpoint))
+    const id = await pushDeviceId(platform.endpoint)
+    const row = await findDeviceRow(id)
     await userEvent.click(within(row).getByRole('button', { name: 'Send test' }))
 
-    const alert = await within(row).findByRole('alert')
-    expect(alert).toHaveTextContent('The push service no longer accepts this device.')
-    expect(alert).toHaveTextContent(
-      'Remove the device, then turn push notifications on again on it.',
-    )
+    expect(await screen.findByText('The push service no longer accepts this device')).toBeVisible()
+    expect(screen.getByText('Turn push notifications on again on that device.')).toBeVisible()
+    expect(await screen.findByText('No devices registered')).toBeVisible()
+    expect(document.querySelector(`[data-push-device="${id}"]`)).toBeNull()
+  } finally {
+    toast.dismiss()
+    rendered.unmount()
+  }
+})
+
+test('holds the session notice switch beside the devices it sends to', async ({ client }) => {
+  void client
+  const rendered = renderWithProviders(<Section />)
+
+  try {
+    const section = await screen.findByRole('region', { name: 'Push notifications' })
+    const toggle = await within(section).findByRole('switch', {
+      name: 'Push session notifications',
+    })
+    expect(toggle).not.toBeChecked()
+    await userEvent.click(toggle)
+    await waitFor(async () => {
+      const { data } = await client.settings.get()
+      expect(data?.values['chat.pushNotifications']).toBe(true)
+    })
+    expect(toggle).toBeChecked()
   } finally {
     rendered.unmount()
   }
@@ -95,7 +125,7 @@ test('shows the push service’s answer when a test cannot be delivered', async 
 test('names the site setting when notifications are blocked', async ({ client }) => {
   void client
   await installPushPlatform({ permission: 'denied' })
-  const rendered = renderWithProviders(<PushSection />)
+  const rendered = renderWithProviders(<Section />)
 
   try {
     expect(await screen.findByText('Notifications are blocked for this site')).toBeVisible()
@@ -111,7 +141,7 @@ test('leaves a page another service worker controls alone', async ({ client }) =
   const platform = await installPushPlatform({
     controllerScript: `${location.origin}/mockServiceWorker.js`,
   })
-  const rendered = renderWithProviders(<PushSection />)
+  const rendered = renderWithProviders(<Section />)
 
   try {
     expect(await screen.findAllByText(pushErrors.SCOPE_TAKEN.message)).toHaveLength(1)
@@ -131,7 +161,7 @@ test('leaves a page another service worker controls alone', async ({ client }) =
 test('says how to answer a prompt closed without an answer', async ({ client }) => {
   void client
   const platform = await installPushPlatform({ permission: 'default', answer: 'default' })
-  const rendered = renderWithProviders(<PushSection />)
+  const rendered = renderWithProviders(<Section />)
 
   try {
     await userEvent.click(await screen.findByRole('button', { name: 'Turn on for this device' }))
@@ -149,7 +179,7 @@ test('says how to answer a prompt closed without an answer', async ({ client }) 
 test('switches to the blocked state when the prompt is denied', async ({ client }) => {
   void client
   await installPushPlatform({ permission: 'default', answer: 'denied' })
-  const rendered = renderWithProviders(<PushSection />)
+  const rendered = renderWithProviders(<Section />)
 
   try {
     await userEvent.click(await screen.findByRole('button', { name: 'Turn on for this device' }))
@@ -166,7 +196,7 @@ test('switches to the blocked state when the prompt is denied', async ({ client 
 test('shows why the browser could not subscribe', async ({ client }) => {
   void client
   await installPushPlatform({ permission: 'granted', subscribeError: 'AbortError' })
-  const rendered = renderWithProviders(<PushSection />)
+  const rendered = renderWithProviders(<Section />)
 
   try {
     await userEvent.click(await screen.findByRole('button', { name: 'Turn on for this device' }))
@@ -186,7 +216,7 @@ test('reuses a subscription made with the server’s key', async ({ client }) =>
     permission: 'granted',
     existing: { endpoint, applicationServerKey: await serverKey(client) },
   })
-  const rendered = renderWithProviders(<PushSection />)
+  const rendered = renderWithProviders(<Section />)
 
   try {
     await userEvent.click(await screen.findByRole('button', { name: 'Turn on for this device' }))
@@ -210,7 +240,7 @@ test('replaces a subscription made with an older server key', async ({ client })
     endpoint: fresh,
     existing: { endpoint: old, applicationServerKey: olderKey },
   })
-  const rendered = renderWithProviders(<PushSection />)
+  const rendered = renderWithProviders(<Section />)
 
   try {
     await userEvent.click(await screen.findByRole('button', { name: 'Turn on for this device' }))
@@ -237,6 +267,25 @@ test('settings search reaches the push section by its own words', async ({ clien
   }
 })
 
+test('the page shows the push switch once, inside the push section', async ({ client }) => {
+  void client
+  const rendered = renderWithProviders(<SettingsPage />)
+
+  try {
+    const search = await screen.findByLabelText('Search settings')
+    // The search store outlives a render, so the previous test's query may still be there.
+    await userEvent.clear(search)
+    await userEvent.type(search, 'push session')
+    const section = await screen.findByRole('region', { name: 'Push notifications' })
+    expect(
+      await within(section).findByRole('switch', { name: 'Push session notifications' }),
+    ).toBeVisible()
+    expect(screen.getAllByRole('switch', { name: 'Push session notifications' })).toHaveLength(1)
+  } finally {
+    rendered.unmount()
+  }
+})
+
 async function findDeviceRow(id: string) {
   await waitFor(() => expect(document.querySelector(`[data-push-device="${id}"]`)).not.toBeNull())
   return document.querySelector<HTMLElement>(`[data-push-device="${id}"]`) as HTMLElement
@@ -246,4 +295,10 @@ async function serverKey(client: Client) {
   const { data } = await client.push.devices.get()
   expect(data?.publicKey).toBeTruthy()
   return new Uint8Array(Buffer.from(data?.publicKey ?? '', 'base64url'))
+}
+
+/** The section as the page renders it, over the page's settings projection. */
+function Section() {
+  const snapshot = useSettingsProjection()
+  return snapshot ? <PushSection snapshot={snapshot} /> : null
 }

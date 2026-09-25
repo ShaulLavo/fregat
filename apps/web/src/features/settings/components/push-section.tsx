@@ -2,13 +2,15 @@ import { Button } from '@workspace/ui/components/button'
 import { EmptyState } from '@workspace/ui/components/empty-state'
 
 import { PushDeviceRow } from '@/features/settings/components/push-device-row'
+import { SettingRow } from '@/features/settings/components/setting-row'
 import { PushLoading } from '@/features/settings/components/push-loading'
 import { PushThisDevice } from '@/features/settings/components/push-this-device'
 import { usePushDevices } from '@/features/settings/hooks/use-push-devices'
 import { usePushThisDevice } from '@/features/settings/hooks/use-push-this-device'
+import type { SettingsProjection } from '@/features/settings/hooks/use-settings-projection'
 import { pushErrors } from '@/features/settings/utils/push-errors'
 
-export function PushSection() {
+export function PushSection({ snapshot }: { readonly snapshot: SettingsProjection }) {
   const thisDevice = usePushThisDevice()
   const scopeTaken = thisDevice.data?.support === 'scope-taken'
   const listed = thisDevice.isSuccess && !scopeTaken
@@ -23,9 +25,12 @@ export function PushSection() {
       <div className='space-y-1'>
         <h3 className='text-foreground text-sm font-medium'>Push notifications</h3>
         <p className='text-muted-foreground text-xs'>
-          Devices registered here receive notifications from this server with every tab closed.
+          Each browser that should receive notices from this server turns push on for itself. Push
+          session notifications then sends session notices to every device listed here, with every
+          tab closed.
         </p>
       </div>
+      <SettingRow id='chat.pushNotifications' snapshot={snapshot} />
       {thisDevice.isPending || (listed && devices.isPending) ? <PushLoading /> : null}
       {thisDevice.isError ? (
         <EmptyState

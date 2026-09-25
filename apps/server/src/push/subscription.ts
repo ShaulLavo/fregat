@@ -9,7 +9,7 @@ import { pushErrors } from './structured-errors'
 
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]'])
 
-export type ParsedSubscription = {
+type ParsedSubscription = {
   readonly endpoint: string
   readonly p256dh: string
   readonly auth: string

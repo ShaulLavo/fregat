@@ -113,9 +113,13 @@ export function SettingsPage({
       (descriptorFor(id).visibility ?? 'user') !== 'internal' &&
       isSettingAvailable(id, environment),
   )
-  const categories = groupByCategory(visible)
+  // The push switch renders inside the push section, beside the devices it sends to.
+  const categories = groupByCategory(visible.filter((id) => id !== 'chat.pushNotifications'))
   if (matchesUsageSearch(query)) categories.set('Usage', [])
-  const showPush = matchesPushSearch(query) || visible.includes('chat.notificationMode')
+  const showPush =
+    matchesPushSearch(query) ||
+    visible.includes('chat.notificationMode') ||
+    visible.includes('chat.pushNotifications')
   if (showPush && !categories.has('Chat')) categories.set('Chat', [])
   const selectedFile = document.data.layers.find((layer) => layer.id === scope)?.file ?? null
   // An address can narrow the page to one category. Unknown or absent means all of
@@ -252,7 +256,7 @@ export function SettingsPage({
                   <h2 className='text-foreground mb-1 text-sm font-semibold'>{category}</h2>
                   {category === 'Usage' ? <UsageSection /> : null}
                   {ids.includes('chat.keepImportedSessionsUpdated') ? <ImportSection /> : null}
-                  {category === 'Chat' && showPush ? <PushSection /> : null}
+                  {category === 'Chat' && showPush ? <PushSection snapshot={projection} /> : null}
                   {ids.map((id) => (
                     <SettingRow id={id} key={id} snapshot={projection} />
                   ))}

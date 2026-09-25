@@ -29,8 +29,9 @@ import {
  *     the socket head-of-line-blocked every other frame for its duration. The
  *     subscriptions still push snapshot *frames*; only the requests are gone.
  * 4 — added the durable environment identity to the handshake.
+ * 8 — added the client `presence` message.
  */
-export const ORCHESTRATION_WS_PROTOCOL_VERSION = 7
+export const ORCHESTRATION_WS_PROTOCOL_VERSION = 8
 
 /**
  * Hard ceiling on one `replayEvents` page. `replayEvents` is client-reachable,
@@ -188,6 +189,12 @@ export const orchestrationWsPingSchema = v.object({
   requestId: orchestrationWsRequestIdSchema,
 })
 
+/** Whether the client's window is visible and focused. The server holds push notices while one is. */
+const orchestrationWsPresenceSchema = v.object({
+  kind: v.literal('presence'),
+  focused: v.boolean(),
+})
+
 const orchestrationWsSubscriptionAckSchema = v.object({
   kind: v.literal('subscription.ack'),
   subscriptionId: orchestrationWsSubscriptionIdSchema,
@@ -200,6 +207,7 @@ export const orchestrationWsClientMessageSchema = v.union([
   orchestrationWsSubscribeSchema,
   orchestrationWsUnsubscribeSchema,
   orchestrationWsPingSchema,
+  orchestrationWsPresenceSchema,
 ])
 
 /**

@@ -22,6 +22,7 @@
     "chat.projectGroupingOverrides",
     "chat.projectResponseStreamingModes",
     "chat.projectTextGenerationModels",
+    "chat.pushNotifications",
     "chat.responseStreamingMode",
     "chat.sessionSortOrder",
     "chat.textGenerationModel",
