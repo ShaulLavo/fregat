@@ -47,14 +47,17 @@ export class AutoPull {
   private readonly policy: AutoPullPolicy
   private readonly run: Run
   private readonly now: () => number
+  private readonly withLane: <T>(root: string, action: () => Promise<T>) => Promise<T>
   private readonly onSettled: (root: string) => void
 
   constructor(options: {
     policy: AutoPullPolicy
+    withLane: <T>(root: string, action: () => Promise<T>) => Promise<T>
     run: Run
     now?: () => number
     onSettled: (root: string) => void
   }) {
+    this.withLane = options.withLane
     this.policy = options.policy
     this.run = options.run
     this.now = options.now ?? Date.now
@@ -80,14 +83,15 @@ export class AutoPull {
     const defaultRef = await this.remoteDefault(root, remote)
     if (!defaultRef) return skip('no-default-branch')
     const defaultBranch = defaultRef.slice(remote.length + 1)
-    if (upstream !== defaultRef) return skip('other-branch', defaultBranch)
+    if (upstream !== defaultRef || info.branch !== defaultBranch)
+      return skip('other-branch', defaultBranch)
     if (info.ahead > 0 && info.behind > 0) return skip('diverged', defaultBranch)
     if (info.ahead > 0) return skip('ahead', defaultBranch)
     if (info.behind === 0) return { state: 'current' }
     if ((await changedFileCount()) > 0) return skip('changes', defaultBranch)
 
     this.pulling.add(root)
-    void this.pull(root, info.behind)
+    void this.pull(root, info.behind, info.branch, upstream)
     return { state: 'pulling' }
   }
 
@@ -99,11 +103,25 @@ export class AutoPull {
     return result.exitCode === 0 && ref.startsWith(`${remote}/`) ? ref : null
   }
 
+  private async pullCurrent(root: string, branch: string, upstream: string) {
+    if (!(await this.policy(root))) return null
+    const status = await this.run(root, ['status', '--porcelain=v2', '--branch', '-z'])
+    const info = parseRepositoryInfo(status.stdout, '')
+    if (info.branch !== branch || upstreamRef(status.stdout) !== upstream) return null
+    const remote = parseUpstreamRemote(status.stdout)
+    if (!remote || (await this.remoteDefault(root, remote)) !== upstream) return null
+    if (info.ahead > 0 || info.behind === 0) return null
+    if (status.stdout.split('\0').some((line) => line && !line.startsWith('#'))) return null
+    const target = await this.run(root, ['rev-parse', upstream])
+    return this.run(root, ['merge', '--ff-only', target.stdout.trim()], { allowFailure: true })
+  }
+
   // `--ff-only` either moves HEAD or changes nothing; it never leaves a merge in progress.
-  private async pull(root: string, behind: number) {
+  private async pull(root: string, behind: number, branch: string, upstream: string) {
     const startedAt = this.now()
     try {
-      const result = await this.run(root, ['merge', '--ff-only', '@{u}'], { allowFailure: true })
+      const result = await this.withLane(root, () => this.pullCurrent(root, branch, upstream))
+      if (!result) return
       if (result.exitCode !== 0) {
         const message = gitErrorMessage(result)
         this.failures.set(root, { at: this.now(), message })

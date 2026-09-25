@@ -218,6 +218,8 @@ export class GitService {
     this.autoPull = options.autoPullPolicy
       ? new AutoPull({
           policy: options.autoPullPolicy,
+          withLane: async (root, action) =>
+            withGitRepositoryLane(await this.commonDirectory(root), action),
           run: (root, args, runOptions) => this.git(root, args, runOptions),
           onSettled: (root) => this.invalidateStatus(root),
         })

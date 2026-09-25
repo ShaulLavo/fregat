@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { runGit } from '../../../test/factories/git-worktree'
 import { DEFAULT_MAX_TEXT_FILE_BYTES } from '../../fs/limits'
 import { createWorkspacePaths } from '../../fs/path'
+import { withGitRepositoryLane } from '../repository-lane'
 import { autoPullEnabled } from '../auto-pull'
 import { GitService } from '../service'
 
@@ -138,6 +139,39 @@ describe('automatic default-branch pull', () => {
     expect(await repo.read()).toEqual(skipped('other-branch'))
     await runGit(repo.checkout, ['checkout', '--quiet', '-b', 'loose'])
     expect(await repo.read()).toEqual(skipped('no-upstream', null))
+  })
+
+  it('rechecks the checkout after an earlier lane owner changes branches', async () => {
+    const repo = await fixture()
+    await repo.advance()
+    const before = await repo.head()
+    const entered = Promise.withResolvers<void>()
+    const release = Promise.withResolvers<void>()
+    const owner = withGitRepositoryLane(path.join(repo.checkout, '.git'), async () => {
+      entered.resolve()
+      await release.promise
+      await runGit(repo.checkout, ['checkout', '-b', 'feature'])
+      await runGit(repo.checkout, ['branch', '--set-upstream-to=origin/main'])
+    })
+    await entered.promise
+    try {
+      expect(await repo.read()).toEqual({ state: 'pulling' })
+    } finally {
+      release.resolve()
+    }
+    await owner
+    await repo.settle()
+    expect(await repo.head()).toBe(before)
+  })
+
+  it('leaves a feature branch tracking the default upstream alone', async () => {
+    const repo = await fixture()
+    await runGit(repo.checkout, ['checkout', '-b', 'feature'])
+    await runGit(repo.checkout, ['branch', '--set-upstream-to=origin/main'])
+    await repo.advance()
+    const before = await repo.head()
+    expect(await repo.read()).toEqual(skipped('other-branch'))
+    expect(await repo.head()).toBe(before)
   })
 
   it('reports a failed pull without a partial merge and does not retry every poll', async () => {
