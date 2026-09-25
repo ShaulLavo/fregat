@@ -741,6 +741,12 @@ export {
   type OrchestrationWorktreeShell,
   type ProjectRegistrationResult,
   type OrchestrationSessionPlanProgress,
+  orchestrationCheckpointHunksInputSchema,
+  orchestrationRevertCheckpointHunkInputSchema,
+  type OrchestrationCheckpointHunk,
+  type OrchestrationCheckpointHunksInput,
+  type OrchestrationCheckpointHunkState,
+  type OrchestrationRevertCheckpointHunkInput,
 } from './orchestration-snapshots'
 
 export {

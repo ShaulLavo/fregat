@@ -6,6 +6,19 @@ import { defineErrorCatalog } from 'evlog'
  * message — a rewording silently turned a permanent failure into a retry loop.
  */
 export const checkpointErrors = defineErrorCatalog('checkpoint', {
+  HUNK_CONFLICT: {
+    status: 409,
+    message: ({ path }: { path: string }) =>
+      `The change to ${path} no longer matches the file, so it cannot be undone on its own`,
+    why: 'The lines this change touched were edited again after the turn, by the agent or by hand.',
+    fix: 'Open the file and edit it directly, or rewind the whole turn.',
+  },
+  HUNK_NOT_FOUND: {
+    status: 404,
+    message: ({ path }: { path: string }) => `That change to ${path} is not in this turn`,
+    why: 'The turn diff no longer contains a change with this id; the page may be showing an older diff.',
+    fix: 'Reload the turn changes and pick the change again.',
+  },
   WORKSPACE_NOT_ISOLATED: {
     status: 409,
     message: 'File restore requires an isolated worktree.',

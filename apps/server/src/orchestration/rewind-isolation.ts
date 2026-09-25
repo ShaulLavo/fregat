@@ -49,17 +49,42 @@ export async function assertRewindIsolation({
     const owner = model.worktrees.get(other.worktreeId)
     if (owner) candidates.add(owner.canonicalPath)
   }
-  for (const runtime of activeRuntimes) {
-    if (runtime.sessionId === sessionId || !runtime.runtimePayload?.cwd) continue
-    candidates.add(runtime.runtimePayload.cwd)
-  }
+  for (const candidate of otherRuntimeCwds(sessionId, activeRuntimes)) candidates.add(candidate)
+  if (await overlapsAny(cwd, candidates))
+    throw checkpointErrors.WORKSPACE_NOT_ISOLATED({
+      internal: { check: 'overlapping-runtime', candidateCount: candidates.size },
+    })
+}
+
+/**
+ * Whether another session's live runtime works inside or around `cwd`. A write there could
+ * interleave with that agent's edits.
+ */
+export async function otherRuntimeOverlaps(
+  sessionId: SessionId,
+  cwd: string,
+  activeRuntimes: readonly ProviderRuntimeBindingWithMetadata[],
+) {
+  return overlapsAny(await realpath(cwd), otherRuntimeCwds(sessionId, activeRuntimes))
+}
+
+function otherRuntimeCwds(
+  sessionId: SessionId,
+  activeRuntimes: readonly ProviderRuntimeBindingWithMetadata[],
+) {
+  return activeRuntimes.flatMap((runtime) =>
+    runtime.sessionId === sessionId || !runtime.runtimePayload?.cwd
+      ? []
+      : [runtime.runtimePayload.cwd],
+  )
+}
+
+async function overlapsAny(cwd: string, candidates: Iterable<string>) {
   for (const candidate of candidates) {
     const other = await existingRealPath(candidate)
-    if (other && (isWithin(cwd, other) || isWithin(other, cwd)))
-      throw checkpointErrors.WORKSPACE_NOT_ISOLATED({
-        internal: { check: 'overlapping-runtime', candidateCount: candidates.size },
-      })
+    if (other && (isWithin(cwd, other) || isWithin(other, cwd))) return true
   }
+  return false
 }
 
 async function existingRealPath(candidate: string) {

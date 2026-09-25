@@ -47,6 +47,7 @@ import {
 } from './observability'
 import { OrchestrationEngine } from './orchestration/engine'
 import { requireWorktree } from './orchestration/read-model'
+import { OrchestrationCheckpointHunks } from './orchestration/checkpoint-hunks'
 import { OrchestrationCheckpointDiffQuery } from './orchestration/checkpoint-diff-query'
 import type { OrchestrationDatabase } from './orchestration/event-store'
 import { orchestrationRoutes } from './orchestration/routes'
@@ -275,6 +276,12 @@ export function createApp(options: AppOptions) {
   const serverConfig = orchestrationWsServerConfig(identity)
   const commitMessages = new CommitMessageGenerator(git, providerAdapterRegistry, providerService)
   const checkpointDiff = new OrchestrationCheckpointDiffQuery(database, git)
+  const checkpointHunks = new OrchestrationCheckpointHunks({
+    activeRuntimes: () => providerService.listActiveRuntimes(),
+    diffs: checkpointDiff,
+    git,
+    readModel: () => orchestration.readModelSnapshot(),
+  })
   const sessionSearch = new OrchestrationSessionSearchQuery(database)
   const auth = createAuthConfig(options.auth)
   const machines = new MachineService({
@@ -401,7 +408,7 @@ export function createApp(options: AppOptions) {
     .post('/terminal/clear', ({ body }) => terminal.clear(body), { body: terminalClearInputSchema })
     .post('/terminal/kill', ({ body }) => terminal.kill(body), { body: terminalKillInputSchema })
     .use(providerRoutes(providerAdapterRegistry, providerUsage, providerUsageHistory))
-    .use(orchestrationRoutes(orchestration, checkpointDiff, sessionSearch))
+    .use(orchestrationRoutes(orchestration, checkpointDiff, sessionSearch, checkpointHunks))
     .use(
       attachmentRoutes({
         attachmentsDir: options.orchestration?.attachmentsDir,
