@@ -1,6 +1,10 @@
 import { sortedDirents } from './dirents'
 import { joinRelative } from './search-shared'
-import { errorMessage } from '@workspace/contracts'
+import {
+  errorMessage,
+  type WorkspaceIndexReadiness,
+  type WorkspaceIndexStatus,
+} from '@workspace/contracts'
 import { elapsedMs } from '@workspace/utils/timing'
 import type { Stats } from 'node:fs'
 import { open, readdir } from 'node:fs/promises'
@@ -20,7 +24,6 @@ const SNIFF_BYTES = 512
 const DEFAULT_INDEX_UPDATE_COALESCE_MS = 25
 const DEFAULT_INDEX_REBUILD_EVENT_LIMIT = 500
 
-type WorkspaceIndexReadiness = 'cold' | 'building' | 'ready' | 'stale' | 'failed'
 type WorkspaceIndexContentKind = 'binary' | 'image' | 'text' | 'unknown'
 type WorkspaceIndexFileKind = 'binary' | 'config' | 'document' | 'image' | 'other' | 'source'
 type WorkspaceIndexSpecialKind = 'block-device' | 'character-device' | 'fifo' | 'socket' | 'unknown'
@@ -44,22 +47,6 @@ export type WorkspaceIndexEntry = {
   targetType?: EntryTypeFilter
   type: EntryTypeFilter
   version: string
-}
-
-export type WorkspaceIndexStatus = {
-  entryCount: number
-  errorMessage?: string
-  fileCount: number
-  lastFullScanAtMs?: number
-  lastFullScanDurationMs?: number
-  lastIncrementalUpdateAtMs?: number
-  pendingCreatedPathCount: number
-  readiness: WorkspaceIndexReadiness
-  rebuildReason?: string
-  scanWarningCount: number
-  scanRoot: string | null
-  skippedEntryCount: number
-  staleEntryCount: number
 }
 
 export type WorkspaceIndexBuildOptions = {

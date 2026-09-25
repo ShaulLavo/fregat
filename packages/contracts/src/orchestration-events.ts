@@ -85,7 +85,14 @@ export const projectDeletedPayloadSchema = v.object({
   deletedAt: isoDateTimeSchema,
 })
 
-export const worktreeRegisteredPayloadSchema = v.object(worktreeRegistrationEntries)
+/**
+ * `retiredAt` rides along even though a fresh registration is always null: a revival
+ * that races a later retirement must read the same lifecycle on client and server.
+ */
+export const worktreeRegisteredPayloadSchema = v.object({
+  ...worktreeRegistrationEntries,
+  retiredAt: v.nullable(isoDateTimeSchema),
+})
 export const worktreeRetiredPayloadSchema = v.object({
   worktreeId: worktreeIdSchema,
   retiredAt: isoDateTimeSchema,

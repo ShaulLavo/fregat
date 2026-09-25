@@ -77,6 +77,22 @@ export const worktreeCreationCapabilitySchema = v.variant('allowed', [
     reason: v.picklist(['not-git', 'base-not-ready', 'wrong-project']),
   }),
 ])
+type WorktreeCreationCapabilityInput = {
+  readonly lifecycle: WorktreeLifecycle
+  readonly retiredAt: string | null
+}
+
+/** A worktree can seed a new one only while it is ready, not retired, and backed by git. */
+export function worktreeCreationCapability(
+  worktree: WorktreeCreationCapabilityInput,
+  repositoryKind: 'git' | 'directory',
+): WorktreeCreationCapability {
+  if (worktree.retiredAt || worktree.lifecycle.state !== 'ready')
+    return { allowed: false, reason: 'base-not-ready' }
+  if (repositoryKind !== 'git') return { allowed: false, reason: 'not-git' }
+  return { allowed: true }
+}
+
 export const worktreeCleanupEligibilitySchema = v.object({
   reason: v.picklist([
     'eligible',

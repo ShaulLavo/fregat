@@ -13,7 +13,8 @@ import {
   projectionTerminalLeases,
   projectionWorktrees,
 } from '../db/schema'
-import { worktreeCleanupEligibility, worktreeCreationCapability } from './utils/worktree-policy'
+import { worktreeCreationCapability } from '@workspace/contracts'
+import { worktreeCleanupEligibility } from './utils/worktree-policy'
 
 export function applyWorktreeEvent(database: PlatformDatabase, event: OrchestrationEvent) {
   switch (event.type) {

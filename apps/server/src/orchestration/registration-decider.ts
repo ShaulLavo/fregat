@@ -65,6 +65,7 @@ export function decideRegistration(
       ownership: isCurrent ? 'protected' : 'external',
       createdAt: worktree?.createdAt ?? at,
       updatedAt: at,
+      retiredAt: null,
     }),
   )
   return events
@@ -97,6 +98,7 @@ export function decideWorktreeCommand(
     registrationGeneration: existing ? existing.registrationGeneration + 1 : 0,
     createdAt: existing?.createdAt ?? command.createdAt,
     updatedAt: command.updatedAt,
+    retiredAt: null,
   })
 }
 

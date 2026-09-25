@@ -1,5 +1,7 @@
 import {
+  assistantTurnState,
   isProviderTurnFailureActivity,
+  shouldRetainAfterRevert,
   TURN_ENDED_ACTIVITY_KIND,
   turnEndedPayloadSchema,
   type TurnEndReason,
@@ -1636,22 +1638,6 @@ function jsonOrUndefined(value: unknown) {
   if (value === undefined) return undefined
 
   return JSON.stringify(value)
-}
-
-function assistantTurnState(
-  current: 'running' | 'completed' | 'interrupted' | 'error' | undefined,
-  settlesTurn: boolean,
-) {
-  if (!settlesTurn) return current ?? 'running'
-  if (current === 'interrupted' || current === 'error') return current
-
-  return 'completed'
-}
-
-function shouldRetainAfterRevert(turnId: string | null, retainedTurnIds: Set<string>) {
-  if (!turnId) return true
-
-  return retainedTurnIds.has(turnId)
 }
 
 function latestProjectionTurn(turns: Array<typeof projectionTurns.$inferSelect>) {

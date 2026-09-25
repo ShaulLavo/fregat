@@ -3,6 +3,7 @@ export {
   effectiveEntryType,
   isDirectoryEntry,
   isFileEntry,
+  isPickableEntry,
   matchesEntryType,
   type EntryTypeCarrier,
   type EntryTypeFilter,
@@ -11,6 +12,7 @@ export {
   type FileTreeResult,
   type TreeEntry,
 } from './tree-entry'
+export type { ServerInfo, WorkspaceIndexReadiness, WorkspaceIndexStatus } from './fs-info'
 export { decodedAsText } from './file-result'
 export type { FileResult, TextDecodeMetadata, TextEncodingLabel } from './file-result'
 export {
@@ -883,6 +885,8 @@ export { errorMessage } from './error-fields'
 export { clampComposerCursor } from './composer-tokens'
 
 export { isProviderTurnFailureActivity } from './provider-activity'
+
+export { assistantTurnState, shouldRetainAfterRevert } from './orchestration-projection'
 
 export { queryPieces } from './fuzzy-rank'
 

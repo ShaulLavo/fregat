@@ -2,7 +2,12 @@ import { workspaceIndexForSearch } from './search-shared'
 import { elapsedMs } from '@workspace/utils/timing'
 import { homedir } from 'node:os'
 import path from 'node:path'
-import { effectiveEntryType, type WorkspaceAddressId } from '@workspace/contracts'
+import {
+  effectiveEntryType,
+  isPickableEntry,
+  type ServerInfo,
+  type WorkspaceAddressId,
+} from '@workspace/contracts'
 import { platformHomePath } from '../home'
 import { createWorkspacePaths } from './path'
 import { FileChangeHub } from './watch'
@@ -174,7 +179,7 @@ export class FileSystemService {
     return this.workspaceIndexScope?.index
   }
 
-  info() {
+  info(): ServerInfo {
     return {
       workspaceRoot: this.paths.workspaceRoot,
       systemRoot: this.systemRoot,
@@ -709,11 +714,6 @@ export class FileSystemService {
     const stat = await this.stat(input)
     return entryFromStat(stat)
   }
-}
-
-function isPickableEntry(entry: TreeEntry) {
-  const type = effectiveEntryType(entry)
-  return type === 'directory' || type === 'file'
 }
 
 function matchesRecentQuery(entry: TreeEntry, query: RecentsQuery) {

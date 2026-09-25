@@ -44,6 +44,7 @@ export function createShellWorkspace(sessionCount: number) {
       ownership: 'protected',
       createdAt: CREATED_AT,
       updatedAt: CREATED_AT,
+      retiredAt: null,
     }),
     ...sessionIds.map((sessionId) => sessionCreatedEvent(sessionId)),
     ...sessionIds.map((sessionId) => runtimeSetEvent(sessionId)),

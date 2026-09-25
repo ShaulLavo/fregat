@@ -115,7 +115,23 @@ function serverInfo(defaultPath: string): ServerInfo {
   return {
     defaultPath,
     homePath: defaultPath,
-    ok: true,
+    maxTextFileBytes: 0,
+    metadataDbPath: '',
+    nativeWatcherCount: 0,
+    openFileWatcherCount: 0,
+    shallowWatcherCount: 0,
+    systemRoot: '',
+    watchEnabled: false,
+    workspaceIndex: {
+      entryCount: 0,
+      fileCount: 0,
+      pendingCreatedPathCount: 0,
+      readiness: 'ready',
+      scanRoot: null,
+      scanWarningCount: 0,
+      skippedEntryCount: 0,
+      staleEntryCount: 0,
+    },
     workspaceRoot: '',
   }
 }
