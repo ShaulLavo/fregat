@@ -14,13 +14,13 @@ Separately, the chat composer runs on Lexical for exactly one capability: `ChatI
 
 ## What we have today
 
-| Piece               | Current state                                                                                                                                                                                                                                                                                       |
-| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Primitive           | `InlineReplacementSpec[]` returned from a registered provider. Inline ranges only.                                                                                                                                                                                                                  |
+| Piece               | Current state                                                                                                                                                                                                                                                                                               |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Primitive           | `InlineReplacementSpec[]` returned from a registered provider. Inline ranges only.                                                                                                                                                                                                                          |
 | Source of structure | Tree-sitter highlight captures. `@singapore-editor/markdown`'s own comment: the queries "name things generically — `punctuation.delimiter` covers both emphasis fences and link brackets", so constructs are recovered "by containment for emphasis and code spans, and by adjacency for links and images." |
-| Failure posture     | Anything not matching its expected shape is left as plain text, so malformed input renders as source rather than losing characters. A good default, and evidence the recovery is heuristic.                                                                                                         |
-| Missing             | Block-level replacement (a rendered table, image or fence). Widget lifecycle. Explicit atomic-range caret semantics. A composition story for two providers decorating overlapping ranges.                                                                                                           |
-| Consumers           | One: markdown preview.                                                                                                                                                                                                                                                                              |
+| Failure posture     | Anything not matching its expected shape is left as plain text, so malformed input renders as source rather than losing characters. A good default, and evidence the recovery is heuristic.                                                                                                                 |
+| Missing             | Block-level replacement (a rendered table, image or fence). Widget lifecycle. Explicit atomic-range caret semantics. A composition story for two providers decorating overlapping ranges.                                                                                                                   |
+| Consumers           | One: markdown preview.                                                                                                                                                                                                                                                                                      |
 
 ## Questions this plan must answer
 
@@ -34,7 +34,7 @@ Separately, the chat composer runs on Lexical for exactly one capability: `ChatI
 
 ## Research steps
 
-1. **Clone the references** into `/work/projects/references/` per the workspace layout rules: `codemirror/view` and `codemirror/state`, `facebook/lexical`, and the `obsidianmd/obsidian-api` typings. Read `Decoration`, `RangeSet`, `ViewPlugin`, `atomicRanges` and `blockWidget` in CM6, and `DecoratorNode`, `NodeKey` and the reconciler in Lexical.
+1. **Clone the references** into the repo's `references/` directory (gitignored; see AGENTS.md "Reference Clones"): `codemirror/view` and `codemirror/state`, `facebook/lexical`, and the `obsidianmd/obsidian-api` typings. Read `Decoration`, `RangeSet`, `ViewPlugin`, `atomicRanges` and `blockWidget` in CM6, and `DecoratorNode`, `NodeKey` and the reconciler in Lexical.
 2. **Survey real plugins, not just the APIs.** CodeMirror's own markdown live-preview examples, and two or three third-party decoration-heavy plugins. The APIs describe what is possible; the plugins show which parts are actually usable.
 3. **Write the gap table.** Each capability, whether `@singapore-editor` has it, what it would take, and which consumer wants it.
 4. **Answer the seven questions** in a decision table, including an honest verdict on question 5 with a measurement, not an estimate.
