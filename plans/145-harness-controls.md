@@ -29,7 +29,7 @@ provider and the other provider shows a disabled reason; it is never faked.
 | Plan                                                         | Outcome                                                         | Claude                                             | Codex                                                  | Size | Status            | Depends on                               |
 | ------------------------------------------------------------ | --------------------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------ | ---- | ----------------- | ---------------------------------------- |
 | approval-rules                                               | "Always allow" writes a real rule; "for this session" holds     | `updatedPermissions` from `canUseTool` suggestions | `acceptWithExecpolicyAmendment` (not in pinned schema) | M    | DONE (`89c58188`) | none (server requests are not generated) |
-| [fork](145-harness-controls/fork.md)                         | Fork a session from any turn into a new session                 | `forkSession(id, { upToMessageId })`               | `thread/fork`                                          | M    | PROPOSED          | Codex schema refresh                     |
+| fork                                                         | Fork a session from any turn into a new session                 | `resume` + `forkSession` + `resumeSessionAt`       | `thread/fork`                                          | M    | DONE (lane L3)    | Codex schema refresh                     |
 | [mcp-status](145-harness-controls/mcp-status.md)             | See each MCP server's state; reconnect or sign in               | `mcpServerStatus()`, `reconnectMcpServer()`        | `mcpServerStatus/list`, `mcpServer/oauth/login`        | M    | PROPOSED          | Codex schema refresh                     |
 | [background-tasks](145-harness-controls/background-tasks.md) | List a session's background tasks and stop one                  | `background_tasks_changed`, `stopTask(taskId)`     | `thread/backgroundTerminals/*` (experimental API only) | S–M  | PROPOSED          | none                                     |
 | [hooks](145-harness-controls/hooks.md)                       | See which hooks ran in a turn and what they returned            | `includeHookEvents`, `hook_*` messages             | `hooks/list`, `hook/started`, `hook/completed`         | S    | PROPOSED          | Codex schema refresh for `hooks/list`    |
@@ -54,6 +54,28 @@ from the server: `GET /orchestration/session-transcript`, fetched as a TanStack 
 `features/chat/utils/transcript-export.ts` (D2: Markdown gives each tool call one line, JSON
 carries everything). Surfaces: the session menu (header and rail), the message menu's
 conversation section, and the palette's `workspace.exportTranscript`. Scenario `export-transcript`.
+
+### Fork (done)
+
+Done 2026-09-25 (lane L3). D1–D3 decided 2026-09-25: recommendation (completion wave): completed
+turns only, inclusive; the fork shares the source's checkout and restores no files; Claude
+rewind stays out of scope (fork-then-archive is a candidate for a later plan).
+
+- `session.fork` (client command) emits `session.created` with `forkedFrom { sessionId, turnId,
+droppedPrompts }` and `session.history-imported` with the source's messages through the turn.
+  `droppedPrompts` counts the user prompts after the fork point, so it stays exact when the
+  source's early history is outside the in-memory window. Migration 25 adds
+  `projection_sessions.forked_from_json`.
+- The harness fork happens lazily, on the fork's first start (no binding yet): Claude resumes the
+  source with `forkSession: true`, our minted `sessionId` and `resumeSessionAt` at the last
+  transcript entry before the first dropped prompt (read through the history worker, so the
+  instance's `CLAUDE_CONFIG_DIR` holds); Codex calls `thread/fork` with `lastTurnId` found by
+  paging `thread/turns/list` from the end (shared with rewind).
+- Web: "Fork from Here" in the message menu for any message of a finished turn; the mutation opens
+  the new session. Scenarios `claude-session-fork` and `codex-session-fork` (real runs: the fork
+  recalls turns 1–2 and not 3; the source keeps its turns).
+- Known limits: attachments and tool rows are not copied into the fork's timeline (the harness
+  history has them); a steer inside a dropped Codex turn counts as an extra prompt.
 
 ## Suggested order
 

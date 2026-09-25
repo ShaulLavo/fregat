@@ -1,7 +1,14 @@
+import { useIsMutating } from '@tanstack/react-query'
 import type { OrchestrationMessage } from '@workspace/contracts'
 
 import { useChatTimelineActions } from '@/features/chat/hooks/use-chat-timeline-actions'
 import { useChatTransport } from '@/features/chat/hooks/use-chat-transport'
+import { useForkSession } from '@/features/chat/hooks/use-fork-session'
+import { chatMutationKeys } from '@/features/chat/utils/mutation-keys'
+import {
+  selectChatProjectionSlice,
+  useChatProjectionStore,
+} from '@/features/chat/state/chat-projection-store'
 import {
   copySessionTranscript,
   downloadSessionTranscript,
@@ -31,6 +38,15 @@ export function useMessageMenu({
   const { openCheckpointDiff, revertToCheckpoint } = useChatTimelineActions()
   const { environmentId } = useChatTransport()
   const sessionRef = { environmentId, sessionId: message.sessionId }
+  const fork = useForkSession(message.sessionId)
+  const forking =
+    useIsMutating({ mutationKey: chatMutationKeys.fork(environmentId, message.sessionId) }) > 0
+  const latestTurn = useChatProjectionStore(
+    (state) =>
+      selectChatProjectionSlice(state, environmentId).sessionById[message.sessionId]?.latestTurn,
+  )
+  const turnId = message.turnId
+  const turnRunning = latestTurn?.turnId === turnId && latestTurn?.state === 'running'
   const assistant = message.role === 'assistant'
   // Copy hands over what the bubble shows. For a user message that is the
   // prompt without the attached `<terminal_context>` block.
@@ -59,6 +75,11 @@ export function useMessageMenu({
   return chatMessageMenu({
     canRevertCheckpoint: typeof revertTurnCount === 'number',
     canViewChangedFiles: checkpointAvailability(turnDiffSummary).kind === 'available',
+    canFork: turnId !== null && !turnRunning,
+    fork: () => {
+      if (turnId) fork.mutate(turnId)
+    },
+    forkPending: forking,
     copyConversation: () => void copySessionTranscript(sessionRef),
     exportConversation: () => void downloadSessionTranscript(sessionRef, 'markdown'),
     copyMarkdown: () => void copyTextToClipboard(text, 'message markdown'),

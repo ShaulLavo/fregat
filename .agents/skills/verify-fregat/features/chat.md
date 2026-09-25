@@ -34,6 +34,8 @@ The chat mode button in the window toolbar, or an address URL with `/chat/`.
 
 `scenario claude-hook-rows` runs real Claude (Haiku) in a fixture repository whose project PreToolUse hook blocks every Bash call, and checks the work log lists `PreToolUse:Bash blocked` with the hook's message under it. Silent successful hooks never get a row; they are counted into one `hook.summary` row at turn end.
 
+`scenario claude-session-fork` and `scenario codex-session-fork` run real providers: three turns each name a fruit, Fork from Here on the second answer opens a `(fork)` session beside the source whose timeline stops at turn 2, and asked for the fruits it answers mango and kiwi, never papaya. The harness fork happens on the fork's first turn.
+
 `scenario chat-diff-syntax --url <session-diff-address>` checks painted syntax colors in a session checkpoint diff.
 
 Commands dispatch over the orchestration socket when it is live and over HTTP otherwise. The HTTP path refetches the shell snapshot itself.

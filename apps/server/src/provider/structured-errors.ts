@@ -86,6 +86,12 @@ export const sessionIdentityErrors = defineErrorCatalog('provider', {
     why: 'The isolated provider metadata process could not return valid session metadata.',
     fix: 'Inspect the provider instance configuration and retry the scan.',
   },
+  FORK_POINT_UNAVAILABLE: {
+    status: 409,
+    message: 'The fork point is not in the source conversation',
+    why: "The harness's own history holds fewer turns than the session shows, so the turn to branch after cannot be found.",
+    fix: 'Fork from a later turn, or start a new session.',
+  },
   HISTORY_FAILED: {
     status: 502,
     message: 'Claude conversation history could not be read',

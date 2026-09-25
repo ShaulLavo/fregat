@@ -42,9 +42,19 @@ export type ClaudeQueryOptionsInput = ClaudeRuntimeSelection & {
   reasoning?: ClaudeReasoning
   resumeExisting?: boolean
   sessionId: SessionId
+  /** A new session branching off `sourceSessionId`, cut after `resumeSessionAt` when set. */
+  fork?: ClaudeForkOptions
 }
 
-type ClaudeSessionOptions = Pick<Options, 'resume' | 'sessionId'>
+export type ClaudeForkOptions = {
+  resumeSessionAt?: string
+  sourceSessionId: SessionId
+}
+
+type ClaudeSessionOptions = Pick<
+  Options,
+  'forkSession' | 'resume' | 'resumeSessionAt' | 'sessionId'
+>
 
 export function claudePermissionMode(input: ClaudeRuntimeSelection): PermissionMode {
   if (input.interactionMode === 'plan') return 'plan'
@@ -94,15 +104,24 @@ export function claudeModelId(input: {
 }
 
 /**
- * `resume` and `sessionId` are mutually exclusive — the SDK rejects the pair
- * unless `forkSession` rides along, which we never want. Resuming keeps the id
- * the CLI already persisted; a fresh conversation adopts the id we minted, which
- * is what lets the caller know the session id before the CLI announces it.
+ * `resume` and `sessionId` are mutually exclusive unless `forkSession` rides
+ * along, which only a fork wants: it keeps our minted id as the Platform and SDK
+ * id of the branch. Resuming keeps the id the CLI already persisted; a fresh
+ * conversation adopts the id we minted, which is what lets the caller know the
+ * session id before the CLI announces it.
  */
 function claudeSessionOptions(input: {
+  fork?: ClaudeForkOptions
   resumeExisting?: boolean
   sessionId: SessionId
 }): ClaudeSessionOptions {
+  if (input.fork)
+    return {
+      forkSession: true,
+      resume: input.fork.sourceSessionId,
+      sessionId: input.sessionId,
+      ...(input.fork.resumeSessionAt ? { resumeSessionAt: input.fork.resumeSessionAt } : {}),
+    }
   if (input.resumeExisting) return { resume: input.sessionId }
 
   return { sessionId: input.sessionId }

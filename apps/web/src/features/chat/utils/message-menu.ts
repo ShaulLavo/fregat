@@ -3,6 +3,7 @@ import {
   CopyIcon,
   DownloadSimpleIcon,
   GitDiffIcon,
+  GitForkIcon,
   MarkdownLogoIcon,
 } from '@phosphor-icons/react'
 
@@ -30,6 +31,10 @@ export type ChatMessageMenuContext = {
   readonly copyConversation: () => void
   readonly copyMarkdown: () => void
   readonly exportConversation: () => void
+  /** A finished turn can be branched into a new session; a running or imported one cannot. */
+  readonly canFork: boolean
+  readonly fork: () => void
+  readonly forkPending: boolean
   readonly copyText: () => void
   readonly hasText: boolean
   /** User text is never rendered as markdown, so it has no markdown to copy. */
@@ -59,6 +64,14 @@ export function chatMessageMenu(context: ChatMessageMenuContext): Menu {
         }),
     ]),
     section('conversation', [
+      context.canFork &&
+        actionItem({
+          disabled: context.forkPending,
+          icon: GitForkIcon,
+          id: 'fork',
+          label: 'Fork from Here',
+          run: context.fork,
+        }),
       actionItem({
         icon: MarkdownLogoIcon,
         id: 'copyConversation',

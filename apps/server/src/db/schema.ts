@@ -389,6 +389,7 @@ export const projectionSessions = sqliteTable(
      * narrate".
      */
     planProgressJson: text('plan_progress_json'),
+    forkedFromJson: text('forked_from_json'),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull(),
     archivedAt: text('archived_at'),

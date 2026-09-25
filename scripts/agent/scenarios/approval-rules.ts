@@ -5,8 +5,14 @@ import path from 'node:path'
 import type { Page } from 'playwright'
 import type { Scenario } from './index'
 import { selectors } from '../selectors'
-import { createGitFixture, fixtureGit, releaseFixture } from '../fixture-workspace'
-import { dispatch, openChat, typePrompt, waitForReply } from './chat-verification'
+import { createGitFixture, fixtureGit } from '../fixture-workspace'
+import {
+  dispatch,
+  openChat,
+  removeScenarioSessions,
+  typePrompt,
+  waitForReply,
+} from './chat-verification'
 import { registerFixtureProject } from './native-provider-verification'
 
 const MARKER = 'marker-145.txt'
@@ -82,13 +88,7 @@ function approvalRulesScenario(provider: ApprovalRulesProvider): Scenario {
         await step('failed-before-cleanup')
         throw error
       } finally {
-        for (const sessionId of sessions) {
-          await dispatch(page, orchestration, { type: 'session.runtime.stop', sessionId })
-          await dispatch(page, orchestration, { type: 'session.delete', sessionId })
-        }
-        if (projectId)
-          await dispatch(page, orchestration, { type: 'project.delete', projectId, force: true })
-        await releaseFixture(fixture)
+        await removeScenarioSessions(page, orchestration, { fixture, projectId, sessions })
         await restore?.()
       }
     },

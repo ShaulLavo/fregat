@@ -7,6 +7,7 @@ import { codexCommandApprovalOffers } from './utils/codex-command-approval'
 import { parseCodexElicitation } from './utils/codex-elicitation'
 import { ProviderProcessLifetime } from './process-lifetime'
 import { createInternalError } from '../../observability/structured-errors'
+import { sessionIdentityErrors } from '../structured-errors'
 
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import {
@@ -36,6 +37,7 @@ import type {
   ProviderApprovalResponseInput,
   ProviderCommandCatalogInput,
   ProviderCommandCatalogResult,
+  ProviderForkStart,
   ProviderHookOutcome,
   ProviderRuntimeEvent,
   ProviderRuntimeStartInput,
@@ -68,7 +70,7 @@ import {
   type CodexSkillMetadata,
 } from './codex-protocol'
 import { errorMessage as providerErrorMessage } from '@workspace/contracts'
-import { prepareCodexRewind } from './utils/codex-rewind'
+import { codexTurnFromEnd, prepareCodexRewind } from './utils/codex-rewind'
 import { activeProviderTurn, type ActiveProviderTurn } from './utils/active-turn'
 import { codexDeveloperInstructions } from './utils/codex-instructions'
 import { modelOptionValue, type ModelOptions } from './utils/model-options'
@@ -452,6 +454,7 @@ export class CodexProviderAdapter
       runtimeMode: input.runtimeMode,
       runtimeEpoch: input.runtimeEpoch,
       sessionId: input.sessionId,
+      ...(input.fork ? { fork: input.fork } : {}),
     })
     this.sessions.set(input.sessionId, session)
     recordChatPipelineInfo('chat.pipeline.codex_adapter.session.started', {
@@ -541,6 +544,7 @@ class CodexAppServerSession extends SessionContext {
   }
 
   static async start(input: {
+    fork?: ProviderForkStart
     onClient: (client: CodexAppServerRpcClient) => void
     cwd: string
     emit: (event: ProviderRuntimeEvent) => void
@@ -2613,12 +2617,14 @@ async function openCodexSession(
   input: {
     cwd: string
     ephemeral: boolean
+    fork?: ProviderForkStart
     model: string
     modelOptions: CodexModelOptions
     providerResumeCursor?: unknown | null
     runtimeMode: RuntimeMode
   },
 ) {
+  if (input.fork) return forkCodexThread(client, { ...input, fork: input.fork })
   const resumeSessionId =
     typeof input.providerResumeCursor === 'string' ? input.providerResumeCursor : null
   if (!resumeSessionId) return client.request('thread/start', threadStartParams(input))
@@ -2633,6 +2639,33 @@ async function openCodexSession(
     REQUEST_TIMEOUT_MS,
     (response) => v.parse(codexSessionResumeSchema, response),
   )
+}
+
+/** A thread that never ran here was discovered, and a discovered session's id is its thread id. */
+async function forkCodexThread(
+  client: CodexAppServerRpcClient,
+  input: Parameters<typeof threadResumeParams>[0] & { fork: ProviderForkStart },
+) {
+  const { fork } = input
+  const threadId =
+    typeof fork.sourceResumeCursor === 'string' ? fork.sourceResumeCursor : fork.sourceSessionId
+  const request = (method: string, params: Record<string, unknown>) =>
+    client.requestRaw(method, params, REQUEST_TIMEOUT_MS, (response) => response)
+  const lastTurnId =
+    fork.droppedPrompts === 0
+      ? null
+      : await codexTurnFromEnd({ index: fork.droppedPrompts, request, threadId })
+  if (fork.droppedPrompts > 0 && !lastTurnId)
+    throw sessionIdentityErrors.FORK_POINT_UNAVAILABLE({
+      internal: { droppedPrompts: fork.droppedPrompts, sourceSessionId: fork.sourceSessionId },
+    })
+
+  return client.request('thread/fork', {
+    ...threadResumeParams(input),
+    excludeTurns: true,
+    lastTurnId,
+    threadId,
+  })
 }
 
 async function requestCodexModels(client: CodexAppServerRpcClient) {

@@ -5,6 +5,7 @@ import {
 } from '../../../packages/contracts/src/index'
 import * as v from 'valibot'
 import type { Page } from 'playwright'
+import { releaseFixture } from '../fixture-workspace'
 import { selectors } from '../selectors'
 
 export async function readShell(page: Page, base: string) {
@@ -126,4 +127,23 @@ export async function typePrompt(page: Page, prompt: string) {
   }
   ok(false, 'The composer never accepted the prompt')
 
+}
+
+/** Stops and deletes a real-provider scenario's sessions, then its project and fixture. */
+export async function removeScenarioSessions(
+  page: Page,
+  orchestration: string,
+  input: { fixture: string; projectId: string | null; sessions: readonly string[] },
+) {
+  for (const sessionId of input.sessions) {
+    await dispatch(page, orchestration, { type: 'session.runtime.stop', sessionId })
+    await dispatch(page, orchestration, { type: 'session.delete', sessionId })
+  }
+  if (input.projectId)
+    await dispatch(page, orchestration, {
+      type: 'project.delete',
+      projectId: input.projectId,
+      force: true,
+    })
+  await releaseFixture(input.fixture)
 }

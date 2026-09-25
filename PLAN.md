@@ -532,7 +532,7 @@ Suggested order:
 4. Plan 149, so terminals and dev servers survive the same restart.
 5. Plan 150 Phase 1, then Plan 151, whenever the Mac is needed. Plan 152 after 151. `129fdea6`
    already keeps the catalog why and fix on stored machine errors; the protocol check is left.
-6. Then Claude rewind and fork ([Plan 145 fork](plans/145-harness-controls/fork.md), Plan 126
+6. Then Claude rewind and fork ([Plan 145 fork](plans/145-harness-controls.md), done, Plan 126
    RUNTIME-01) and the Plan 139 research phase.
 
 ## UI refresh lane

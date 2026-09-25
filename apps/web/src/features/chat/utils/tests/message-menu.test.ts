@@ -52,6 +52,19 @@ test('every message offers the whole conversation as Markdown', () => {
   expect(ran).toEqual(['copy', 'export'])
 })
 
+test('a finished turn offers Fork from Here first in the conversation section', () => {
+  const ran: string[] = []
+  const [fork] = sectionItems(
+    menuContext({ canFork: true, fork: () => ran.push('fork') }),
+    'conversation',
+  )
+  fork?.run()
+
+  expect(fork?.label).toBe('Fork from Here')
+  expect(ran).toEqual(['fork'])
+  expect(itemLabels(menuContext(), 'conversation')).not.toContain('Fork from Here')
+})
+
 test('omits the checkpoint section when the message anchors neither action', () => {
   expect(chatMessageMenu(menuContext()).map((entry) => entry.id)).toEqual([
     'copy',
@@ -122,6 +135,9 @@ function menuContext(overrides: Partial<ChatMessageMenuContext> = {}): ChatMessa
   return {
     canRevertCheckpoint: false,
     canViewChangedFiles: false,
+    canFork: false,
+    fork: noop,
+    forkPending: false,
     copyConversation: noop,
     copyMarkdown: noop,
     exportConversation: noop,

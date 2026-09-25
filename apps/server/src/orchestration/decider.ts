@@ -116,6 +116,8 @@ function decideCommandEvents(
     case 'session.create':
     case 'session.discover':
       return sessionCreated(command, model, at)
+    case 'session.fork':
+      return sessionForked(command, model, at)
     case 'session.discovery-metadata.update':
       return discoveryMetadataUpdated(command, model, at)
     case 'session.provider-start.claim':
@@ -461,6 +463,60 @@ function sessionCreated(
       sessionId: command.sessionId,
       title: command.title,
       updatedAt: at,
+    }),
+  ]
+}
+
+function sessionForked(
+  command: Extract<OrchestrationCommand, { type: 'session.fork' }>,
+  model: OrchestrationReadModel,
+  at: string,
+) {
+  const source = requireSessionNotDeleted(model, command.sourceSessionId)
+  requireWorktree(model, source.worktreeId)
+  requireSessionAbsent(model, command.sessionId)
+  const internal = { sessionId: command.sourceSessionId, turnId: command.throughTurnId }
+  if (source.latestTurn?.turnId === command.throughTurnId && source.latestTurn.state === 'running')
+    throw sessionDomainErrors.FORK_TURN_RUNNING({ internal })
+  const lastIndex = source.messages.findLastIndex(
+    (message) => message.turnId === command.throughTurnId,
+  )
+  if (lastIndex < 0) throw sessionDomainErrors.FORK_TURN_NOT_FOUND({ internal })
+
+  const kept = source.messages.slice(0, lastIndex + 1)
+  const dropped = source.messages.slice(lastIndex + 1)
+  return [
+    event(command, at, 'session.created', {
+      createdAt: at,
+      forkedFrom: {
+        droppedPrompts: dropped.filter((message) => message.role === 'user').length,
+        sessionId: command.sourceSessionId,
+        turnId: command.throughTurnId,
+      },
+      interactionMode: source.interactionMode,
+      modelSelection: source.modelSelection,
+      origin: 'platform',
+      runtimeMode: source.runtimeMode,
+      sessionId: command.sessionId,
+      title: `${source.title} (fork)`,
+      updatedAt: at,
+      worktreeId: source.worktreeId,
+    }),
+    event(command, at, 'session.history-imported', {
+      messages: kept.flatMap((message, index) =>
+        message.role === 'system'
+          ? []
+          : [
+              {
+                createdAt: message.createdAt,
+                id: v.parse(messageIdSchema, `fork:${command.sessionId}:${index}`),
+                role: message.role,
+                text: message.text,
+              },
+            ],
+      ),
+      sessionId: command.sessionId,
+      sourceUpdatedAt: at,
     }),
   ]
 }

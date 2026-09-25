@@ -25,6 +25,7 @@ import {
   type RuntimeMode,
   type SessionApprovalRespondCommand,
   type SessionArchiveCommand,
+  type SessionForkCommand,
   type SessionCheckpointRevertCommand,
   type SessionDeleteCommand,
   type SessionId,
@@ -308,6 +309,23 @@ export function createSessionArchiveCommand({
     commandId: createCommandId(),
     sessionId,
     type: 'session.archive',
+  }
+}
+
+/** The new session's id is minted here, so the caller can open it once the fork lands. */
+export function createSessionForkCommand({
+  sourceSessionId,
+  throughTurnId,
+}: {
+  sourceSessionId: SessionId
+  throughTurnId: TurnId
+}): SessionForkCommand {
+  return {
+    commandId: createCommandId(),
+    sessionId: createSessionId(),
+    sourceSessionId,
+    throughTurnId,
+    type: 'session.fork',
   }
 }
 

@@ -63,6 +63,7 @@ import { checkpointStates } from './checkpoint-states'
 import { sessionActionsSurfaces } from './session-actions-surfaces'
 import { exportTranscript } from './export-transcript'
 import { claudeHookRows } from './hook-rows'
+import { claudeSessionFork, codexSessionFork } from './session-fork'
 import { searchFileActions } from './search-file-actions'
 import { settingsStaleDiagnostics } from './settings-stale-diagnostics'
 import { fontPicker } from './font-picker'
@@ -290,6 +291,8 @@ export const scenarios: readonly Scenario[] = [
   sessionActionsSurfaces,
   exportTranscript,
   claudeHookRows,
+  claudeSessionFork,
+  codexSessionFork,
   searchFileActions,
   chatFollowUp,
   chatDiffSyntax,

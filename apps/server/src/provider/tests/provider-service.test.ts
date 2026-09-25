@@ -349,6 +349,48 @@ describe('ProviderService', () => {
     fixture.close()
   })
 
+  it('forks only on the first start, from the source binding cursor', async () => {
+    const fixture = createFixture()
+    const adapter = new MockProviderAdapter()
+    const directory = new ProviderSessionDirectory(fixture.database)
+    const service = new ProviderService({
+      adapterRegistry: new ProviderAdapterRegistry([adapter]),
+      sessionDirectory: directory,
+    })
+    const input = providerTurnInput()
+    const source = v.parse(sessionIdSchema, '5b2b1c8e-4b5a-4d8a-9d0e-8a7c1a2b3c4d')
+    directory.upsert({
+      adapterKey: adapter.adapterKey,
+      providerDriverKind: adapter.driverKind,
+      providerInstanceId: input.providerInstanceId,
+      providerBindingHandle: `mock:${source}`,
+      providerResumeCursor: 'source-thread',
+      runtimeMode: input.runtimeMode,
+      runtimePayload: providerSessionPayload(input),
+      sessionId: source,
+      runtimeEpoch: 'source-epoch',
+    })
+    const fork = { droppedPrompts: 2, sessionId: source, turnId: input.turnId }
+    const ensure = (runtimeEpoch: string) =>
+      service.ensureRuntime({
+        fork,
+        providerInstanceId: input.providerInstanceId,
+        runtimeMode: input.runtimeMode,
+        runtimePayload: providerSessionPayload(input),
+        runtimeEpoch,
+        sessionId: input.sessionId,
+      })
+
+    await ensure(input.runtimeEpoch)
+    await ensure('second-epoch')
+
+    expect(adapter.startedSessions.map((session) => session.fork ?? null)).toEqual([
+      { droppedPrompts: 2, sourceResumeCursor: 'source-thread', sourceSessionId: source },
+      null,
+    ])
+    fixture.close()
+  })
+
   it('hands a turn the cursor of the conversation it continues', async () => {
     const fixture = createFixture()
     const adapter = new MockProviderAdapter()

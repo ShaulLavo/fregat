@@ -460,6 +460,18 @@ export const orchestrationSessionLifecycleEntries = {
 } as const
 
 export const sessionOriginSchema = v.picklist(['platform', 'discovered'])
+
+/**
+ * Where a forked session branched off. `droppedPrompts` counts the source's user
+ * prompts after the fork point: counting from the end stays exact when the
+ * source's early history is outside the in-memory window.
+ */
+export const sessionForkSourceSchema = v.object({
+  sessionId: sessionIdSchema,
+  turnId: turnIdSchema,
+  droppedPrompts: nonNegativeIntegerSchema,
+})
+export type SessionForkSource = v.InferOutput<typeof sessionForkSourceSchema>
 export const sessionAttentionStateSchema = v.picklist(['needs-input', 'working', 'settled'])
 export const sessionAttentionReasonSchema = v.nullable(
   v.picklist(['approval', 'user-input', 'interruption', 'worktree', 'failure', 'plan', 'active']),
@@ -493,6 +505,7 @@ export const orchestrationSessionSchema = v.object({
   id: sessionIdSchema,
   worktreeId: worktreeIdSchema,
   origin: sessionOriginSchema,
+  forkedFrom: v.optional(v.nullable(sessionForkSourceSchema)),
   ...sessionAttentionEntries,
   title: trimmedNonEmptyStringSchema,
   modelSelection: modelSelectionSchema,

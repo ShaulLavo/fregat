@@ -324,6 +324,22 @@ function handle(message) {
     });
     return;
   }
+  if (mode === 'fork' && message.method === 'thread/turns/list') {
+    record({ event: 'thread/turns/list', params: message.params });
+    const turns = ['source-turn-3', 'source-turn-2', 'source-turn-1'].map((id) => ({ id }));
+    send({ id: message.id, result: { data: turns.slice(0, message.params.limit), nextCursor: null } });
+    return;
+  }
+  if (message.method === 'thread/fork') {
+    record({ event: 'thread/fork', params: message.params });
+    send({ id: message.id, result: {
+      cwd: '/Users/shaul/Desktop/platform', model: 'gpt-5.5',
+      approvalPolicy: 'never', approvalsReviewer: 'user',
+      modelProvider: 'openai', sandbox: { type: 'dangerFullAccess' },
+      thread: { ...fakeSession(), id: 'forked-thread' },
+    } });
+    return;
+  }
   if (message.method === 'thread/resume') {
     record({ event: 'thread/resume', params: message.params });
     send({ id: message.id, result: {
@@ -2474,6 +2490,37 @@ describe('CodexProviderAdapter', () => {
         )
       },
       { mode: 'malformed-thread-start' },
+    )
+  })
+
+  it('forks the source thread through the kept turn and binds the new thread', async () => {
+    await withFakeCodex(
+      async ({ spawnLogPath }) => {
+        const adapter = new CodexProviderAdapter()
+        try {
+          const runtime = await adapter.startRuntime({
+            ...providerTurnInput(),
+            fork: {
+              droppedPrompts: 1,
+              sourceResumeCursor: 'source-thread',
+              sourceSessionId: providerTurnInput().sessionId,
+            },
+          })
+          const records = await readFakeCodexLog(spawnLogPath)
+          expect(records).toContainEqual({
+            event: 'thread/fork',
+            params: expect.objectContaining({
+              excludeTurns: true,
+              lastTurnId: 'source-turn-2',
+              threadId: 'source-thread',
+            }),
+          })
+          expect(runtime.providerResumeCursor).toBe('forked-thread')
+        } finally {
+          await adapter.stopAll()
+        }
+      },
+      { mode: 'fork' },
     )
   })
 

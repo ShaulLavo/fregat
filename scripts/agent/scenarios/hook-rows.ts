@@ -2,8 +2,14 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { Scenario } from './index'
 import { selectors } from '../selectors'
-import { createGitFixture, fixtureGit, releaseFixture } from '../fixture-workspace'
-import { dispatch, openChat, typePrompt, waitForReply } from './chat-verification'
+import { createGitFixture, fixtureGit } from '../fixture-workspace'
+import {
+  dispatch,
+  openChat,
+  removeScenarioSessions,
+  typePrompt,
+  waitForReply,
+} from './chat-verification'
 import { registerFixtureProject } from './native-provider-verification'
 
 const DONE = 'HOOK_ROW_DONE'
@@ -64,11 +70,11 @@ export const claudeHookRows: Scenario = {
       await step('failed-before-cleanup')
       throw error
     } finally {
-      await dispatch(page, orchestration, { type: 'session.runtime.stop', sessionId })
-      await dispatch(page, orchestration, { type: 'session.delete', sessionId })
-      if (projectId)
-        await dispatch(page, orchestration, { type: 'project.delete', projectId, force: true })
-      await releaseFixture(fixture)
+      await removeScenarioSessions(page, orchestration, {
+        fixture,
+        projectId,
+        sessions: [sessionId],
+      })
     }
   },
 }

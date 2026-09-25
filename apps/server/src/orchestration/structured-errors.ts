@@ -60,6 +60,18 @@ export const sessionDomainErrors = defineErrorCatalog('orchestration', {
     why: 'The turn that asked finished, was stopped, or the server restarted, so the agent stopped waiting.',
     fix: 'Send a new message if the agent should try again.',
   },
+  FORK_TURN_RUNNING: {
+    status: 409,
+    message: 'A turn still running cannot be forked.',
+    why: 'A fork carries the conversation through a finished turn; this one has not finished.',
+    fix: 'Wait for the turn to finish, or fork from an earlier turn.',
+  },
+  FORK_TURN_NOT_FOUND: {
+    status: 404,
+    message: 'That turn is not in the session any more.',
+    why: 'The fork point names a turn the session no longer holds, usually after a rewind.',
+    fix: 'Reload the session and fork from a turn the timeline shows.',
+  },
   STEER_TURN_NOT_ACTIVE: {
     status: 409,
     message: 'The turn has finished or is waiting for a response. Your message was not sent.',

@@ -38,6 +38,7 @@ function modelSelection(overrides: Partial<ModelSelection> = {}): ModelSelection
 }
 
 function queryOptions(overrides: {
+  fork?: { resumeSessionAt?: string; sourceSessionId: SessionId }
   interactionMode?: InteractionMode
   resumeExisting?: boolean
   runtimeMode: RuntimeMode
@@ -154,6 +155,24 @@ describe('claudeQueryOptions', () => {
     expect(resumed.resume).toBe(SESSION_ID)
     expect(resumed.sessionId).toBeUndefined()
     expect(claudeTerminalResumeArgv(SESSION_ID)).toEqual(['claude', '--resume', SESSION_ID])
+  })
+
+  it('forks the source into our minted id, cut at the kept entry', () => {
+    const source = v.parse(sessionIdSchema, '5b2b1c8e-4b5a-4d8a-9d0e-8a7c1a2b3c4d')
+    const cut = queryOptions({
+      fork: { resumeSessionAt: 'entry-uuid', sourceSessionId: source },
+      resumeExisting: true,
+      runtimeMode: 'full-access',
+    })
+    const whole = queryOptions({ fork: { sourceSessionId: source }, runtimeMode: 'full-access' })
+
+    expect(cut).toMatchObject({
+      forkSession: true,
+      resume: source,
+      resumeSessionAt: 'entry-uuid',
+      sessionId: SESSION_ID,
+    })
+    expect('resumeSessionAt' in whole).toBe(false)
   })
 
   it('forwards canUseTool when supplied', async () => {

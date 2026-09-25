@@ -13,6 +13,7 @@ import type {
   ProviderInstanceId,
   ProviderSnapshot,
   RuntimeMode,
+  SessionForkSource,
   SessionId,
   WorktreeId,
 } from '@workspace/contracts'
@@ -47,6 +48,7 @@ import {
 } from '../orchestration/orchestration-logging'
 import type {
   ProviderApprovalResponseInput,
+  ProviderForkStart,
   ProviderRuntimeEvent,
   ProviderRuntimeStartInput,
   ProviderTurnControlInput,
@@ -70,6 +72,8 @@ export type ProviderServiceOptions = {
 }
 
 export type ProviderEnsureRuntimeInput = {
+  /** Applies only to a session that has never had a binding: its first start forks. */
+  fork?: SessionForkSource | null
   providerInstanceId: ProviderInstanceId
   runtimeMode: RuntimeMode
   runtimePayload: ProviderRuntimeStartPayload
@@ -294,9 +298,10 @@ export class ProviderService {
     })
     this.requireSdkOwnership(input.sessionId)
     this.recordLaunch(input, adapter)
-    const session = await adapter.startRuntime(
-      providerRuntimeStartInput(input, input.runtimePayload, continuation),
-    )
+    const session = await adapter.startRuntime({
+      ...providerRuntimeStartInput(input, input.runtimePayload, continuation),
+      ...(existing ? {} : this.forkStart(input.fork)),
+    })
     this.requireRunning()
     const binding = this.sessionDirectory.upsert({
       adapterKey: adapter.adapterKey,
@@ -789,6 +794,19 @@ export class ProviderService {
 
   bindingForSession(sessionId: SessionId) {
     return this.sessionDirectory.getBinding(sessionId)
+  }
+
+  private forkStart(fork: SessionForkSource | null | undefined): { fork?: ProviderForkStart } {
+    if (!fork) return {}
+
+    const source = this.sessionDirectory.getBinding(fork.sessionId)
+    return {
+      fork: {
+        droppedPrompts: fork.droppedPrompts,
+        sourceResumeCursor: source?.providerResumeCursor ?? null,
+        sourceSessionId: fork.sessionId,
+      },
+    }
   }
 
   private turnWithResumeCursor(

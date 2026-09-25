@@ -318,12 +318,25 @@ export const sessionCheckpointRevertCommandSchema = v.object({
   restoreFiles: v.boolean(),
 })
 
+/**
+ * A new session carrying the source's conversation through one completed turn.
+ * It shares the source's checkout; files are never restored.
+ */
+export const sessionForkCommandSchema = v.object({
+  ...commandBaseSchema,
+  type: v.literal('session.fork'),
+  sessionId: sessionIdSchema,
+  sourceSessionId: sessionIdSchema,
+  throughTurnId: turnIdSchema,
+})
+
 export const clientOrchestrationCommandSchema = v.variant('type', [
   projectCreateCommandSchema,
   projectMetaUpdateCommandSchema,
   projectReorderCommandSchema,
   projectDeleteCommandSchema,
   sessionCreateCommandSchema,
+  sessionForkCommandSchema,
   sessionMetaUpdateCommandSchema,
   sessionDeleteCommandSchema,
   sessionArchiveCommandSchema,
@@ -604,6 +617,7 @@ export const orchestrationCommandSchema = v.variant('type', [
   sessionUserInputRespondCommandSchema,
   sessionUserInputDismissCommandSchema,
   sessionCheckpointRevertCommandSchema,
+  sessionForkCommandSchema,
   worktreeRetryCommandSchema,
   worktreeCleanupCommandSchema,
   worktreeForceCleanupCommandSchema,
@@ -635,6 +649,7 @@ export type ProjectMetaUpdateCommand = v.InferOutput<typeof projectMetaUpdateCom
 export type ProjectReorderCommand = v.InferOutput<typeof projectReorderCommandSchema>
 export type ProjectDeleteCommand = v.InferOutput<typeof projectDeleteCommandSchema>
 export type SessionCreateCommand = v.InferOutput<typeof sessionCreateCommandSchema>
+export type SessionForkCommand = v.InferOutput<typeof sessionForkCommandSchema>
 export type SessionTurnBootstrapCreateSession = v.InferOutput<
   typeof sessionTurnBootstrapCreateSessionSchema
 >

@@ -21,6 +21,7 @@ import {
   orchestrationSessionSchema,
   orchestrationSessionLifecycleEntries,
   sessionAttentionEntries,
+  sessionForkSourceSchema,
   sessionOriginSchema,
   trimmedNonEmptyStringSchema,
 } from './chat-model'
@@ -57,6 +58,7 @@ export const orchestrationSessionShellSchema = v.object({
   id: sessionIdSchema,
   worktreeId: worktreeIdSchema,
   origin: sessionOriginSchema,
+  forkedFrom: v.optional(v.nullable(sessionForkSourceSchema)),
   ...sessionAttentionEntries,
   ...orchestrationSessionLifecycleEntries,
   title: trimmedNonEmptyStringSchema,

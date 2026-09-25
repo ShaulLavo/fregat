@@ -378,6 +378,7 @@ export class ProviderCommandReactor {
 
   private ensureSessionForTurn(context: ProviderTurnContext) {
     return this.providerService.ensureRuntime({
+      fork: context.session.forkedFrom,
       providerInstanceId: context.modelSelection.providerInstanceId,
       runtimeMode: context.runtimeMode,
       runtimePayload: runtimePayloadFromSessionContext(context),

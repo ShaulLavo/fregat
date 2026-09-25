@@ -623,6 +623,7 @@ export class OrchestrationProjectionPipeline {
         pendingUserInputCount: 0,
         pinOrderKey: null,
         planProgressJson: null,
+        forkedFromJson: event.payload.forkedFrom ? JSON.stringify(event.payload.forkedFrom) : null,
         pinnedAt: null,
         worktreeId: event.payload.worktreeId,
         origin: event.payload.origin,

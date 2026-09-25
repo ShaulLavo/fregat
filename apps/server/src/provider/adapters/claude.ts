@@ -60,6 +60,7 @@ import type {
   ProviderApprovalResponseInput,
   ProviderCommandCatalogInput,
   ProviderCommandCatalogResult,
+  ProviderForkStart,
   ProviderHookOutcome,
   ProviderRuntimeEvent,
   ProviderRuntimeStartInput,
@@ -69,6 +70,7 @@ import type {
   ProviderTurnInput,
   ProviderUserInputResponseInput,
 } from '../types'
+import { claudeForkPoint } from './utils/claude-fork'
 import { activeProviderTurn, type ActiveProviderTurn } from './utils/active-turn'
 import { errorMessage as providerErrorMessage } from '@workspace/contracts'
 import {
@@ -89,7 +91,11 @@ import {
 } from '../utils/usage-windows'
 import { offeredOptions, offeredResponse, type ApprovalOffer } from './utils/approval-offers'
 import { claudeApprovalOffers, claudePermissionUpdateCount } from './utils/claude-permissions'
-import { claudeModelId, claudeQueryOptions } from './utils/claude-query-options'
+import {
+  claudeModelId,
+  claudeQueryOptions,
+  type ClaudeForkOptions,
+} from './utils/claude-query-options'
 import {
   claudePromptText,
   claudeReasoning,
@@ -473,6 +479,20 @@ export class ClaudeProviderAdapter
     for (const sessionId of this.sessions.keys()) await this.stopRuntime({ sessionId })
   }
 
+  private async claudeFork(fork: ProviderForkStart, cwd: string): Promise<ClaudeForkOptions> {
+    if (fork.droppedPrompts === 0) return { sourceSessionId: fork.sourceSessionId }
+
+    const history = await readClaudeSessionHistory({
+      request: { cwd, sessionId: fork.sourceSessionId },
+      env: this.env,
+      runner: this.historyRunner,
+    })
+    return {
+      resumeSessionAt: claudeForkPoint(history, fork),
+      sourceSessionId: fork.sourceSessionId,
+    }
+  }
+
   protected async ensureRuntimeSession(input: ProviderRuntimeStartInput) {
     const existing = this.sessions.get(input.sessionId)
     const cwd = normalizeWorkspaceCwd(input.cwd)
@@ -540,7 +560,9 @@ export class ClaudeProviderAdapter
       runtimeEpoch: input.runtimeEpoch,
       sessionId: input.sessionId,
     })
+    const fork = input.fork ? await this.claudeFork(input.fork, cwd) : undefined
     const session = await ClaudeAgentSession.start({
+      fork,
       onCreated: (session) => this.sessions.set(input.sessionId, session),
       attachmentsDir: this.attachmentsDir,
       createQuery: this.createQuery,
@@ -623,6 +645,7 @@ class ClaudeAgentSession extends SessionContext {
 
   // Streaming input withholds init until the first prompt; adopt the caller's UUID before it.
   static async start(input: {
+    fork?: ClaudeForkOptions
     onCreated: (session: ClaudeAgentSession) => void
     attachmentsDir: string
     createQuery: ClaudeCreateQuery
@@ -662,6 +685,7 @@ class ClaudeAgentSession extends SessionContext {
       cwd: input.cwd,
       env: input.env,
       executablePath: input.executablePath,
+      fork: input.fork,
       persistSession: input.ephemeral ? false : undefined,
       interactionMode: input.interactionMode,
       model: input.model,
