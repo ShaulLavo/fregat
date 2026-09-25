@@ -1,7 +1,15 @@
 import type { GitPullRequest } from '@workspace/contracts'
 import * as v from 'valibot'
 import { gitPullRequestErrors } from '../utils/pull-request-errors'
-import { cliSupport, forgeCommand, requireCreated, parseForgeJson, requireSuccess } from './cli'
+import {
+  cliSupport,
+  forgeCommand,
+  parseForgeJson,
+  repositoryParts,
+  requireCreated,
+  requireRepositoryCreated,
+  requireSuccess,
+} from './cli'
 import type { ForgeContext, ForgeProvider } from './types'
 
 const PR_FIELDS = 'isDraft,number,state,title,url,closedAt'
@@ -53,6 +61,19 @@ export const github: ForgeProvider = {
       ...(input.draft ? ['--draft'] : []),
     ])
     requireCreated(context, input.branch, result)
+  },
+  async createRepository(context, visibility) {
+    const [owner, name] = repositoryParts(context, 2, 'owner/name')
+    requireRepositoryCreated(
+      context,
+      await gh(context, ['repo', 'create', `${owner}/${name}`, `--${visibility}`]),
+    )
+    const origin = `https://${context.forge.host}`
+    return {
+      url: `${origin}/${owner}/${name}`,
+      httpsUrl: `${origin}/${owner}/${name}.git`,
+      sshUrl: `git@${context.forge.host}:${owner}/${name}.git`,
+    }
   },
 }
 

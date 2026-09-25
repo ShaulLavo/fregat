@@ -5,6 +5,9 @@
  */
 export const gitMutationScope = (rootPath: string) => ['git', 'mutation', rootPath] as const
 
+/** A clone has no repository yet, so it sits outside every repository's scope. */
+export const cloneMutationKey = ['git', 'clone'] as const
+
 export const mutationKeys = {
   checkout: (rootPath: string) => ['git', 'mutation', rootPath, 'checkout'] as const,
   commit: (rootPath: string) => ['git', 'mutation', rootPath, 'commit'] as const,
@@ -17,6 +20,7 @@ export const mutationKeys = {
     ['git', 'mutation', rootPath, 'discard-staged', ...paths] as const,
   fetch: (rootPath: string) => ['git', 'mutation', rootPath, 'fetch'] as const,
   initSubmodules: (rootPath: string) => ['git', 'mutation', rootPath, 'init-submodules'] as const,
+  publish: (rootPath: string) => ['git', 'mutation', rootPath, 'publish'] as const,
   pull: (rootPath: string) => ['git', 'mutation', rootPath, 'pull'] as const,
   push: (rootPath: string) => ['git', 'mutation', rootPath, 'push'] as const,
   stage: (rootPath: string, path: string) => ['git', 'mutation', rootPath, 'stage', path] as const,

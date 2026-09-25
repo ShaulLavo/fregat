@@ -15,11 +15,11 @@ export type FakePullRequest = {
  * A directory holding a fake `gh` that answers every branch with `pullRequest`. A scenario puts
  * it first on the throwaway server's PATH through `prepareServer`.
  */
-export async function createFakeForge(pullRequest: FakePullRequest) {
+export async function createFakeForge(pullRequest: FakePullRequest | null = null) {
   const cli = await fakeCli('gh', 'fake-gh.mjs')
   await writeFile(
     join(cli.directory, 'forge.json'),
-    JSON.stringify({ branches: { '*': pullRequest } }),
+    JSON.stringify({ branches: pullRequest ? { '*': pullRequest } : {} }),
   )
   return cli
 }

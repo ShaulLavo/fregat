@@ -4,6 +4,7 @@ import {
   cliSupport,
   forgeCommand,
   requireCreated,
+  requireRepositoryCreated,
   parseForgeJson,
   perBranch,
   requireSuccess,
@@ -19,6 +20,12 @@ const mergeRequestSchema = v.object({
   work_in_progress: v.optional(v.boolean()),
   closed_at: v.optional(v.nullable(v.string())),
   merged_at: v.optional(v.nullable(v.string())),
+})
+
+const projectSchema = v.object({
+  web_url: v.string(),
+  http_url_to_repo: v.string(),
+  ssh_url_to_repo: v.string(),
 })
 
 /** `glab`, which picks the GitLab host from the checkout's remote on its own. */
@@ -46,6 +53,34 @@ export const gitlab: ForgeProvider = {
     ])
     requireCreated(context, input.branch, result)
   },
+  async createRepository(context, visibility) {
+    const parts = (context.repository ?? '').split('/').filter(Boolean)
+    const name = parts.at(-1) ?? ''
+    const namespace = parts.slice(0, -1).join('/')
+    const namespaceId = namespace ? await namespaceIdOf(context, namespace) : null
+    const result = requireRepositoryCreated(
+      context,
+      await glab(context, [
+        'api',
+        '--method',
+        'POST',
+        'projects',
+        '--raw-field',
+        `path=${name}`,
+        '--raw-field',
+        `name=${name}`,
+        '--raw-field',
+        `visibility=${visibility}`,
+        ...(namespaceId === null ? [] : ['--raw-field', `namespace_id=${namespaceId}`]),
+      ]),
+    )
+    const project = parseForgeJson(context, projectSchema, result.stdout, 'create-project')
+    return {
+      url: project.web_url,
+      httpsUrl: project.http_url_to_repo,
+      sshUrl: project.ssh_url_to_repo,
+    }
+  },
 }
 
 async function newestMergeRequest(context: ForgeContext, branch: string, state: 'open' | 'all') {
@@ -66,6 +101,14 @@ async function newestMergeRequest(context: ForgeContext, branch: string, state: 
   )
   const [request] = parseForgeJson(context, v.array(mergeRequestSchema), result.stdout, 'mr-list')
   return request ? toPullRequest(request) : null
+}
+
+async function namespaceIdOf(context: ForgeContext, namespace: string) {
+  const result = requireRepositoryCreated(
+    context,
+    await glab(context, ['api', `namespaces/${encodeURIComponent(namespace)}`]),
+  )
+  return parseForgeJson(context, v.object({ id: v.number() }), result.stdout, 'namespace').id
 }
 
 function glab(context: ForgeContext, args: readonly string[]) {

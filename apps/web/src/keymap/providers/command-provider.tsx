@@ -6,6 +6,9 @@ import { selectSettingsScope } from '@/features/settings/state/scope-store'
 import { useEditorRuntime } from '@/features/editor/hooks/use-runtime'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { PickerDialog } from '@/features/environments/components/picker-dialog'
+import { CloneRepositoryDialog } from '@/features/git/components/clone-repository-dialog'
+import { parentPath } from '@/lib/path-formatters'
+import { workspaceRoot } from '@/lib/documents/utils/identity'
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { DEFAULT_SETTING_VALUES, type SettingsSnapshot } from '@workspace/contracts'
@@ -112,6 +115,8 @@ export function CommandProvider({ children }: { readonly children: ReactNode }) 
   const [paletteSearch, setPaletteSearchState] = useState('')
   const [paletteScope, setPaletteScopeState] = useState<PaletteScope | null>(null)
   const [paletteOrigin, setPaletteOrigin] = useState<FocusTargetToken | null>(null)
+  // The folder a clone lands beside; null while the dialog is closed.
+  const [cloneParent, setCloneParent] = useState<string | null>(null)
   const [environmentDialog, setEnvironmentDialog] = useState<
     'switch' | 'connect' | 'disconnect' | null
   >(null)
@@ -272,6 +277,8 @@ export function CommandProvider({ children }: { readonly children: ReactNode }) 
     },
     shell: {
       showEnvironmentDialog: setEnvironmentDialog,
+      showCloneRepository: () =>
+        setCloneParent(parentPath(workspace.getState().rootFolder?.path ?? '')),
       showMachines: () => {
         selectSettingsScope('user')
         void openWorkspaceSettings(focus, workspace, adaptersRef.current.editor, 'Machines')
@@ -406,6 +413,16 @@ export function CommandProvider({ children }: { readonly children: ReactNode }) 
       {children}
       {environmentDialog ? (
         <PickerDialog mode={environmentDialog} onClose={() => setEnvironmentDialog(null)} />
+      ) : null}
+      {cloneParent !== null ? (
+        <CloneRepositoryDialog
+          open
+          defaultParent={cloneParent}
+          onOpenChange={(open) => {
+            if (!open) setCloneParent(null)
+          }}
+          onCloned={(path) => void adaptersRef.current.openWorkspaceRoot(workspaceRoot(path))}
+        />
       ) : null}
       <AppKeymapController />
       <CommandPalette />

@@ -1,4 +1,10 @@
-import { ArrowSquareOutIcon, GitPullRequestIcon, UploadSimpleIcon } from '@phosphor-icons/react'
+import {
+  ArrowSquareOutIcon,
+  CloudArrowUpIcon,
+  GitPullRequestIcon,
+  UploadSimpleIcon,
+} from '@phosphor-icons/react'
+import { useState } from 'react'
 import type {
   GitBranchRemoteState,
   GitPullRequest,
@@ -12,6 +18,7 @@ import { usePushRemoteMutation } from '../hooks/use-push-remote-mutation'
 import { Button, buttonVariants } from '@workspace/ui/components/button'
 import { cn } from '@workspace/ui/lib/utils'
 import { changeRequestLabel } from '@/features/git/utils/forge-terms'
+import { PublishRepositoryDialog } from '@/features/git/components/publish-repository-dialog'
 
 /**
  * Publish, push and open-a-pull-request, in the header where the branch already
@@ -33,7 +40,28 @@ export function BranchActions({
   const { data: pullRequestState } = usePullRequestState(rootPath)
   const push = usePushRemoteMutation(rootPath)
   const createPullRequest = useCreatePullRequestMutation(rootPath)
+  const [publishing, setPublishing] = useState(false)
   if (!state?.branch) return null
+  if (!state.hasRemote)
+    return (
+      <>
+        <Button
+          className='text-2xs'
+          size='sm'
+          type='button'
+          variant='ghost'
+          onClick={() => setPublishing(true)}
+        >
+          <CloudArrowUpIcon className='size-(--icon-size-sm)' />
+          Publish repository
+        </Button>
+        <PublishRepositoryDialog
+          open={publishing}
+          onOpenChange={setPublishing}
+          rootPath={rootPath}
+        />
+      </>
+    )
 
   return (
     <span className='flex shrink-0 items-center gap-1'>

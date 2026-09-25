@@ -11,6 +11,8 @@ import type {
   GitCommitProgressEvent,
   GitPullRequestCreateResult,
   GitPullRequestState,
+  GitPublishRequest,
+  GitPublishResult,
   GitPushResult,
   WorktreeSubmoduleMode,
 } from '@workspace/contracts'
@@ -28,7 +30,12 @@ import type {
   GitPathsBody,
 } from './contracts'
 import { parseDiff, rewriteBlobPatchPaths } from './diff'
-import { createPullRequest, readPullRequest } from './pull-request'
+import {
+  createForgeRepository,
+  createPullRequest,
+  readPullRequest,
+  type ForgeBoundaries,
+} from './pull-request'
 import {
   mutationPaths,
   pathspecArgs,
@@ -40,6 +47,7 @@ import { parseNumstat, untrackedLineStats, withLineStats } from './numstat'
 import { parseRepositoryInfo, parseStatus, statusMatchesPathspec } from './status'
 import { UpstreamFetchScheduler } from './upstream-fetch'
 import { AutoPull, type AutoPullPolicy } from './auto-pull'
+import { cloneRepository } from './clone'
 import {
   hasSubmodules,
   SUBMODULE_UPDATE_OPTIONS,
@@ -86,6 +94,8 @@ type GitRepositoryRoot = {
 
 type GitServiceOptions = {
   autoPullPolicy?: AutoPullPolicy
+  /** The forge CLIs and HTTP APIs; tests replace them, production spawns and fetches. */
+  forgeBoundaries?: ForgeBoundaries
   diffConcurrency?: number
   maxCommandOutputBytes?: number
   maxTextFileBytes: number
@@ -175,6 +185,7 @@ export class GitService {
   private readonly statuses: BoundedTtlCache<GitStatusResult>
   private readonly upstreamFetch: UpstreamFetchScheduler
   private readonly autoPull: AutoPull | null
+  private readonly forgeBoundaries: ForgeBoundaries
 
   constructor(paths: WorkspacePaths, options: GitServiceOptions) {
     this.paths = paths
@@ -200,6 +211,7 @@ export class GitService {
         await this.git(rootAbsolutePath, ['fetch', remote])
       },
     })
+    this.forgeBoundaries = options.forgeBoundaries ?? {}
     this.autoPull = options.autoPullPolicy
       ? new AutoPull({
           policy: options.autoPullPolicy,
@@ -646,6 +658,70 @@ export class GitService {
     return true
   }
 
+  /**
+   * Clones into a folder inside the workspace. Not in the repository lane: there is no
+   * repository yet, and the new checkout is registered only once it is complete.
+   */
+  cloneProgress(
+    body: { source: string; destination: string },
+    register: (absolutePath: string) => Promise<string | null>,
+  ) {
+    recordGitServiceOperation('clone', body.destination)
+    const destination = this.resolveServicePath(body.destination)
+    return cloneRepository({
+      source: body.source,
+      destination: destination.absolutePath,
+      displayPath: destination.relativePath,
+      register,
+    })
+  }
+
+  /**
+   * Creates the repository on a forge, adds it as a remote (reusing one with the same URL), and
+   * pushes the current branch when there is a commit to push. A push that fails after the
+   * repository exists is reported as such, never as a failed publish.
+   */
+  async publish(body: GitPublishRequest): Promise<GitPublishResult> {
+    recordGitServiceOperation('publish', body.path, { forge: body.forge })
+    const repository = await this.requiredRepository(body.path)
+    const root = repository.rootAbsolutePath
+    const created = await createForgeRepository(body, root, this.forgeBoundaries)
+    const remoteUrl = body.protocol === 'ssh' ? created.sshUrl : created.httpsUrl
+    const remoteName = await this.ensureRemote(root, remoteUrl)
+    const branch = repository.info.branch
+    const head = await this.git(root, ['rev-parse', '--verify', '--quiet', 'HEAD'], {
+      allowFailure: true,
+    })
+    const result = { url: created.url, remoteName, remoteUrl, branch, pushError: null }
+    if (head.exitCode !== 0) return { ...result, status: 'remote-added' }
+    const target = branch ?? 'main'
+    const push = await this.git(
+      root,
+      ['push', '--set-upstream', remoteName, `HEAD:refs/heads/${target}`],
+      {
+        allowFailure: true,
+        env: { GIT_TERMINAL_PROMPT: '0' },
+      },
+    )
+    if (push.exitCode === 0) return { ...result, status: 'pushed' }
+    return { ...result, status: 'push-failed', pushError: gitErrorMessage(push) }
+  }
+
+  /** `origin` unless another remote already has that name for a different URL. */
+  private async ensureRemote(root: string, url: string) {
+    const listed = await this.git(root, ['remote', '-v'], { allowFailure: true })
+    const remotes = new Map<string, string>()
+    for (const line of listed.stdout.split('\n')) {
+      const [name, remoteUrl] = line.trim().split(/\s+/)
+      if (name && remoteUrl) remotes.set(name, remoteUrl)
+    }
+    for (const [name, remoteUrl] of remotes) if (remoteUrl === url) return name
+    let name = 'origin'
+    for (let suffix = 1; remotes.has(name); suffix += 1) name = `origin-${suffix}`
+    await this.git(root, ['remote', 'add', name, url])
+    return name
+  }
+
   async pull(input = '') {
     recordGitServiceOperation('pull', input)
     const repository = await this.requiredRepository(input)
@@ -706,11 +782,16 @@ export class GitService {
     const branch = repository.info.branch
     const upstream = branch ? await this.upstreamRef(repository.rootAbsolutePath) : null
 
+    const remotes = upstream
+      ? null
+      : await this.git(repository.rootAbsolutePath, ['remote'], { allowFailure: true })
+
     return {
       ahead: repository.info.ahead,
       behind: repository.info.behind,
       branch,
       hasUpstream: Boolean(upstream),
+      hasRemote: upstream !== null || Boolean(remotes?.stdout.trim()),
     }
   }
 
@@ -720,7 +801,10 @@ export class GitService {
     const branch = repository.info.branch
     if (!branch) return { branch: null, pullRequest: null, support: 'no-forge', forge: null }
 
-    const read = await readPullRequest({ branch, cwd: repository.rootAbsolutePath })
+    const read = await readPullRequest(
+      { branch, cwd: repository.rootAbsolutePath },
+      this.forgeBoundaries,
+    )
 
     return { branch, ...read }
   }
@@ -731,14 +815,17 @@ export class GitService {
     const branch = repository.info.branch
     if (!branch) throw gitPullRequestErrors.PUSH_DETACHED_HEAD({ path: repository.info.path })
 
-    return createPullRequest({
-      base: body.base,
-      body: body.body,
-      branch,
-      cwd: repository.rootAbsolutePath,
-      draft: body.draft,
-      title: body.title,
-    })
+    return createPullRequest(
+      {
+        base: body.base,
+        body: body.body,
+        branch,
+        cwd: repository.rootAbsolutePath,
+        draft: body.draft,
+        title: body.title,
+      },
+      this.forgeBoundaries,
+    )
   }
 
   private async upstreamRef(cwd: string) {
@@ -1541,6 +1628,8 @@ function isReadOnlyGit(args: readonly string[]) {
   if (READ_ONLY_GIT_ACTIONS.has(action)) return true
   const actionIndex = args.indexOf(action)
   if (action === 'config') return args.includes('--get-regexp')
+  // Listing remotes reads config; `remote add` and friends write it.
+  if (action === 'remote') return [undefined, '-v', 'get-url'].includes(args[actionIndex + 1])
   return action === 'worktree' && args[actionIndex + 1] === 'list'
 }
 

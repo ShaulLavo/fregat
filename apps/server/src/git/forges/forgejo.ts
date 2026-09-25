@@ -1,7 +1,14 @@
 import type { GitPullRequest } from '@workspace/contracts'
 import * as v from 'valibot'
 import { gitPullRequestErrors } from '../utils/pull-request-errors'
-import { forgeCommand, parseForgeJson, requireCreated, requireSuccess } from './cli'
+import {
+  forgeCommand,
+  parseForgeJson,
+  repositoryParts,
+  requireCreated,
+  requireRepositoryCreated,
+  requireSuccess,
+} from './cli'
 import type { ForgeContext, ForgeProvider } from './types'
 
 /** Recently updated pull requests read per lookup; the branch filter runs on them. */
@@ -69,6 +76,37 @@ export const forgejo: ForgeProvider = {
       JSON.stringify({ base, head: input.branch, title: input.title, body: input.body }),
     )
     requireCreated(context, input.branch, result)
+  },
+  async createRepository(context, visibility) {
+    const [owner, name] = repositoryParts(context, 2, 'owner/name')
+    const login = await requireLogin(context)
+    const base = `${login.url.replace(/\/+$/, '')}/api/v1`
+    const user = parseForgeJson(
+      context,
+      v.object({ login: v.string() }),
+      requireSuccess(
+        context,
+        await tea(context, ['api', '--login', login.name, `${base}/user`]),
+        'user',
+      ).stdout,
+      'user',
+    )
+    const target = user.login === owner ? `${base}/user/repos` : `${base}/orgs/${owner}/repos`
+    const result = requireRepositoryCreated(
+      context,
+      await tea(
+        context,
+        ['api', '--login', login.name, '--method', 'POST', '--data', '@-', target],
+        JSON.stringify({ name, private: visibility === 'private', auto_init: false }),
+      ),
+    )
+    const repository = parseForgeJson(
+      context,
+      v.object({ html_url: v.string(), clone_url: v.string(), ssh_url: v.string() }),
+      result.stdout,
+      'create-repository',
+    )
+    return { url: repository.html_url, httpsUrl: repository.clone_url, sshUrl: repository.ssh_url }
   },
 }
 

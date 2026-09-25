@@ -16,6 +16,10 @@ const forge = () => JSON.parse(readFileSync(join(root, 'forge.json'), 'utf8'))
 const out = (value) => process.stdout.write(`${JSON.stringify(value)}\n`)
 
 if (args[0] === 'auth' && args[1] === 'status') process.exit(0)
+if (args[0] === 'repo' && args[1] === 'create') {
+  process.stdout.write(`https://github.com/${args[2]}\n`)
+  process.exit(0)
+}
 if (args[0] === 'repo' && args[1] === 'view') {
   out({ owner: { login: 'fregat' }, name: 'fixture' })
   process.exit(0)
