@@ -667,10 +667,14 @@
       "title": "Keep the default-branch checkout current by fast-forward pull",
       "report": "adjacent.md",
       "wave": "5",
-      "status": "open",
-      "evidence_level": "source-reviewed",
+      "status": "verified",
+      "evidence_level": "implementation; server-tests-and-browser-verified",
       "acceptance": "adjacent.md, EXT-14, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "repository-delivery.md",
+        "apps/server/src/git/tests/auto-pull.test.ts",
+        "/work/tmp/fregat-evidence/20260925T113952Z-scenario-git-auto-pull/"
+      ]
     },
     {
       "id": "EXT-15",

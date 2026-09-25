@@ -55,6 +55,8 @@ export type {
   GitWorktreeCreateResult,
   GitWorktreeRemoveResult,
   WorktreeSubmoduleMode,
+  GitAutoPullSkipReason,
+  GitAutoPullState,
 } from './git'
 export { WORKTREE_SUBMODULE_MODES } from './git'
 export type { WatchClientMessage, WatchServerMessage } from './watch-events'

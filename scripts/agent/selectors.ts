@@ -651,6 +651,8 @@ export const selectors = {
       .getByRole('alert')
       .filter({ hasText: / failed/ })
       .getByRole('button', { name: 'Fix with AI', exact: true }),
+  autoPullStatus: (page: Page, text: string) =>
+    page.getByRole('region', { name: 'Git panel' }).getByText(text, { exact: true }),
   submodulesNotice: (page: Page) =>
     page.getByRole('alert').filter({ hasText: /submodules? (is|are) not initialized/ }),
   initializeSubmodules: (page: Page) =>

@@ -23,3 +23,23 @@ here; the project override lives in machine settings.
 - `apps/server/src/orchestration/tests/worktree-submodules.test.ts`: recursive default, project
   override over machine default, `none` plus explicit init, failed clone keeps the worktree.
 - `scenario git-submodules-init`: `/work/tmp/fregat-evidence/20260925T113220Z-scenario-git-submodules-init/`.
+
+## EXT-14: keep the default branch current
+
+`git.autoPull` (machine scope, off by default, as pinned) with a per-project override in
+`git.projectAutoPull`. Only registered project checkouts qualify. A status read evaluates the
+checkout after the background upstream fetch has moved its upstream ref; when the checkout is on the
+remote's default branch (`<remote>/HEAD`), tracks it, has no local commits and no changed or
+untracked files, and is behind, the server runs `git merge --ff-only @{u}` detached. A fast-forward
+either moves HEAD or changes nothing, so a failure never leaves a merge in progress; it is shown and
+not retried for a minute.
+
+Status carries `autoPull`: `null` when off, `current`, `pulling`, `skipped` with a reason (`changes`,
+`ahead`, `diverged`, `detached`, `no-upstream`, `no-default-branch`, `other-branch`) or `failed`. The
+Git panel prints one muted line for a skip or a failure. While `pulling`, the client polls status
+every 500 ms, because the pull moves HEAD after its file writes already triggered a refetch.
+
+- `apps/server/src/git/tests/auto-pull.test.ts`: fast-forward, policy off, modified and untracked,
+  ahead and diverged, detached / other branch / no upstream, failed pull with no partial merge and
+  a cooldown, project override.
+- `scenario git-auto-pull`: `/work/tmp/fregat-evidence/20260925T113952Z-scenario-git-auto-pull/`.

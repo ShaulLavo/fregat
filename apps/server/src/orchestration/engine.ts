@@ -827,9 +827,7 @@ export class OrchestrationEngine {
     this.worktreeReactor = reactor
     this.unsubscribeGitMutations = this.registration.git.subscribeMutations(
       async (checkoutPath) => {
-        const worktree = [...this.readModel.worktrees.values()].find(
-          (row) => row.canonicalPath === checkoutPath && !row.retiredAt,
-        )
+        const worktree = this.liveWorktreeAtCanonical(checkoutPath)
         if (worktree) await reactor.refresh(worktree.id)
       },
     )
@@ -1090,6 +1088,12 @@ export class OrchestrationEngine {
     return (await this.liveWorktreeAt(checkoutPath))?.projectId ?? null
   }
 
+  /** The project of a checkout git reported by its absolute root. */
+  async checkoutProjectId(rootAbsolutePath: string) {
+    await this.ready
+    return this.liveWorktreeAtCanonical(await realpath(rootAbsolutePath))?.projectId ?? null
+  }
+
   async worktreeBaseCommit(checkoutPath: string) {
     const worktree = await this.liveWorktreeAt(checkoutPath)
     return worktree?.ownership === 'platform' ? worktree.baseCommit : null
@@ -1098,7 +1102,12 @@ export class OrchestrationEngine {
   private async liveWorktreeAt(checkoutPath: string) {
     await this.ready
     if (!this.registration) return null
-    const canonicalPath = await realpath(this.registration.paths.resolve(checkoutPath).absolutePath)
+    return this.liveWorktreeAtCanonical(
+      await realpath(this.registration.paths.resolve(checkoutPath).absolutePath),
+    )
+  }
+
+  private liveWorktreeAtCanonical(canonicalPath: string) {
     return (
       [...this.readModel.worktrees.values()].find(
         (row) => row.canonicalPath === canonicalPath && !row.retiredAt,

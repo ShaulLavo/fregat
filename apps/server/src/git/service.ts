@@ -39,6 +39,7 @@ import { gitCwdForPath, lexicalRepositoryRoot } from './repository'
 import { parseNumstat, untrackedLineStats, withLineStats } from './numstat'
 import { parseRepositoryInfo, parseStatus, statusMatchesPathspec } from './status'
 import { UpstreamFetchScheduler } from './upstream-fetch'
+import { AutoPull, type AutoPullPolicy } from './auto-pull'
 import {
   hasSubmodules,
   SUBMODULE_UPDATE_OPTIONS,
@@ -84,6 +85,7 @@ type GitRepositoryRoot = {
 }
 
 type GitServiceOptions = {
+  autoPullPolicy?: AutoPullPolicy
   diffConcurrency?: number
   maxCommandOutputBytes?: number
   maxTextFileBytes: number
@@ -172,6 +174,7 @@ export class GitService {
   private readonly repositoryRoots: BoundedTtlCache<GitRepositoryRoot | null>
   private readonly statuses: BoundedTtlCache<GitStatusResult>
   private readonly upstreamFetch: UpstreamFetchScheduler
+  private readonly autoPull: AutoPull | null
 
   constructor(paths: WorkspacePaths, options: GitServiceOptions) {
     this.paths = paths
@@ -197,6 +200,13 @@ export class GitService {
         await this.git(rootAbsolutePath, ['fetch', remote])
       },
     })
+    this.autoPull = options.autoPullPolicy
+      ? new AutoPull({
+          policy: options.autoPullPolicy,
+          run: (root, args, runOptions) => this.git(root, args, runOptions),
+          onSettled: (root) => this.invalidateStatus(root),
+        })
+      : null
   }
 
   subscribeMutations(listener: (path: string) => Promise<void>) {
@@ -246,7 +256,8 @@ export class GitService {
   async status(input = '', fresh = false): Promise<GitStatusResult> {
     recordGitServiceOperation('status', input)
     const repository = await this.resolveRepositoryLocation(input, fresh)
-    if (!repository) return { repository: null, files: [], uninitializedSubmodules: 0 }
+    if (!repository)
+      return { repository: null, files: [], uninitializedSubmodules: 0, autoPull: null }
 
     if (fresh) this.invalidateStatus(repository.rootAbsolutePath)
     const cacheKey = statusCacheKey(repository)
@@ -824,18 +835,33 @@ export class GitService {
     ])
     void this.upstreamFetch.schedule(repository.rootAbsolutePath, result.stdout)
     const files = parseStatus(result.stdout, repository.rootPath)
-    const [withLines, uninitializedSubmodules] = await Promise.all([
+    const [withLines, uninitializedSubmodules, autoPull] = await Promise.all([
       files.length > 0 ? this.withLineStats(repository, files) : files,
       uninitializedSubmoduleCount(repository.rootAbsolutePath, (args, options) =>
         this.git(repository.rootAbsolutePath, args, options),
       ),
+      this.autoPull?.evaluate(repository.rootAbsolutePath, result.stdout, () =>
+        repository.pathspec ? this.changedFileCount(repository) : Promise.resolve(files.length),
+      ) ?? null,
     ])
 
     return {
       repository: parseRepositoryInfo(result.stdout, repository.rootPath),
       files: withLines,
       uninitializedSubmodules,
+      autoPull,
     }
+  }
+
+  /** The whole checkout's change count, for a status read that was limited to a folder. */
+  private async changedFileCount(repository: GitRepositoryLocation) {
+    const result = await this.git(repository.rootAbsolutePath, [
+      'status',
+      '--porcelain=v2',
+      '-z',
+      '--untracked-files=all',
+    ])
+    return parseStatus(result.stdout, repository.rootPath).length
   }
 
   private async withLineStats(repository: GitRepositoryLocation, files: GitFileStatus[]) {

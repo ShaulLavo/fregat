@@ -64,6 +64,7 @@ import { DEFAULT_PROVIDER_INSTANCES } from './provider/drivers/built-in'
 import { mergeProviderInstanceConfigs } from './provider/utils/instance-config-merge'
 import { SettingsStore, type SettingsStoreOptions } from './settings/store'
 import { worktreeSubmoduleMode } from './git/submodules'
+import { autoPullEnabled } from './git/auto-pull'
 import { TerminalService, type TerminalPtyFactory } from './terminal/service'
 import { wallpaperRoutes } from './wallpaper/routes'
 import { webRoutes, type WebOptions } from './web/routes'
@@ -141,6 +142,8 @@ const appCleanups = new WeakMap<object, () => Promise<void>>()
 export function createApp(options: AppOptions) {
   const fs = new FileSystemService(options)
   const git = new GitService(fs.paths, {
+    autoPullPolicy: (root) =>
+      autoPullEnabled(settings, () => orchestration.checkoutProjectId(root)),
     maxTextFileBytes: fs.info().maxTextFileBytes,
   })
   const database = options.orchestration?.database ?? getDefaultPlatformDatabase()

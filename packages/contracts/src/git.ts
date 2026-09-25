@@ -35,7 +35,25 @@ export type GitStatusResult = {
   files: GitFileStatus[]
   /** Submodules this repository declares that have no checkout yet. */
   uninitializedSubmodules: number
+  /** Null when automatic pull is off for this checkout. */
+  autoPull: GitAutoPullState | null
 }
+
+export type GitAutoPullSkipReason =
+  | 'changes'
+  | 'ahead'
+  | 'diverged'
+  | 'detached'
+  | 'no-upstream'
+  | 'no-default-branch'
+  | 'other-branch'
+
+/** Whether a checkout can fast-forward to its upstream on its own, and why not. */
+export type GitAutoPullState =
+  | { state: 'current' }
+  | { state: 'pulling' }
+  | { state: 'skipped'; reason: GitAutoPullSkipReason; defaultBranch: string | null }
+  | { state: 'failed'; message: string }
 
 /** How a new worktree populates submodules: every nested level, declared ones only, or none. */
 export const WORKTREE_SUBMODULE_MODES = ['recursive', 'top-level', 'none'] as const

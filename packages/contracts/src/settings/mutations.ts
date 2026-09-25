@@ -43,6 +43,7 @@ const NON_SCALAR_SETTING_IDS = [
   'chat.textGenerationModel',
   'chat.projectTextGenerationModels',
   'chat.projectGroupingOverrides',
+  'git.projectAutoPull',
   'git.projectWorktreeSubmodules',
   'workbench.theme.customizations',
 ] as const satisfies readonly SettingId[]
