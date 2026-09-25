@@ -19,7 +19,7 @@ a bare root `bun run verify`.
 
 | Plan                                                                                    | State                                                        |
 | --------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| [145 — harness controls](145-harness-controls.md)                                       | **PROPOSED — EIGHT SMALL PLANS**                             |
+| [145 — harness controls](145-harness-controls.md)                                       | **APPROVAL-RULES IMPLEMENTED; SEVEN PROPOSED**               |
 | [144 — unattended agent work](144-unattended-agent-work.md)                             | **RESEARCH — HARNESS INVENTORY FIRST**                       |
 | [143 — phone layout](143-phone-layout.md)                                               | **DISCUSSION — OWNER DIRECTION FIRST**                       |
 | [142 — web push](142-web-push.md)                                                       | **PROPOSED — SPIKE FIRST**                                   |

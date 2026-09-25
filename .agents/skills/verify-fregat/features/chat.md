@@ -36,6 +36,7 @@ Commands dispatch over the orchestration socket when it is live and over HTTP ot
 
 - `mcp-approval`: isolated fake native Codex provider, advertised app-access choices after reload, permanent approval wire reply, and session/provider cleanup. No external app access.
 - `claude-approval-rules`: real Claude CLI (Haiku) in approval-required mode on a disposable repository; the command approval offers session and always rules, "Always allow in this project" writes `.claude/settings.local.json`, and a second session runs the same command unasked. Spends two short Haiku turns.
+- `codex-approval-rules`: the same drive with real Codex (GPT-5.5): the approval offers the proposed execpolicy amendment, choosing it writes `~/.codex/rules/default.rules`, a second session runs unasked, and the rules file is restored byte for byte.
 
 `scenario session-unread` uses two disposable sessions and one short provider turn to verify completion while away, return-to-read, manual unread across reload, and a timer wake that survives visits until acknowledged. Both sessions are deleted. Background-tab suppression and monotonic scoped visits also have focused hook/store tests.
 

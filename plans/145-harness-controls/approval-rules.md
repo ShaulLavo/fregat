@@ -1,7 +1,6 @@
 # 145 · Approval rules
 
-- Status: CLAUDE HALF IMPLEMENTED 2026-09-24 (steps 1, 2, 4, 5; D1 and D2 as recommended). Step 3
-  (Codex) waits for the Codex schema refresh.
+- Status: IMPLEMENTED 2026-09-25, all five steps; D1 and D2 as recommended. PR #29.
 - Planned at: Platform `c2af88b4`, 2026-09-24. Origin: the 2026-09-24 reference survey.
 - Work in the current checkout; no branches, worktrees, commits, pushes or PRs unless separately
   requested.
@@ -80,7 +79,14 @@ rule store, not in a Platform copy.
 - UI: scenario `claude-approval-rules` drives the real CLI (Haiku) through the panel on a
   disposable repository. It asserts the six options, the rule in `settings.local.json`, and a second
   session that is not asked. It passed on an isolated dev pair 2026-09-25.
-- Open: step 3 (Codex).
+- Step 3 needed no schema refresh. The adapter does not generate Codex's server requests; it reads
+  approval params loosely, and the installed 0.156.1 sends `proposedExecpolicyAmendment` on
+  `item/commandExecution/requestApproval`. With one, the approval offers `Always allow "<prefix>"`
+  (`acceptAlways`), answered `{ acceptWithExecpolicyAmendment: { execpolicy_amendment } }`; Codex
+  writes it to `~/.codex/rules/default.rules`. Without one, the default options stand. Every Codex
+  approval now carries its options, and `respondApproval` refuses one it did not offer.
+- Scenario `codex-approval-rules` drives real Codex the same way, restoring the rules file byte for
+  byte. Both scenarios passed on an isolated dev pair 2026-09-25.
 
 ## Verification
 

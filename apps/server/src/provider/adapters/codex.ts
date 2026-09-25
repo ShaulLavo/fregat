@@ -1,12 +1,18 @@
 import { defaultAttachmentsDir } from '../../attachments/store'
 import { resolveCodexAttachments } from './utils/codex-attachments'
 import { codexAsyncQuestions } from './utils/codex-async-questions'
+import {
+  codexCommandApprovalDecision,
+  codexCommandApprovalOptions,
+  codexExecpolicyAmendment,
+} from './utils/codex-command-approval'
 import { parseCodexElicitation, type CodexElicitation } from './utils/codex-elicitation'
 import { ProviderProcessLifetime } from './process-lifetime'
 import { createInternalError } from '../../observability/structured-errors'
 
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import {
+  DEFAULT_APPROVAL_OPTIONS,
   DEFAULT_CODEX_PROVIDER_SETTINGS,
   DEFAULT_INTERACTION_MODE,
   approvalRequestIdSchema,
@@ -22,6 +28,7 @@ import {
   type ProviderSnapshot,
   type ProviderUsageWindow,
   type RuntimeMode,
+  type ProviderApprovalOption,
   type SessionId,
   type TurnId,
 } from '@workspace/contracts'
@@ -130,6 +137,8 @@ type PendingCodexApproval = {
   providerThreadId?: string
   providerTurnId?: string
   id: JsonRpcId
+  /** What the request offered; any other decision is refused before Codex sees it. */
+  options: readonly ProviderApprovalOption[]
   turnId?: TurnId
 } & (
   | {
@@ -143,16 +152,13 @@ type PendingCodexApproval = {
       permissions: Record<string, unknown>
     }
   | {
-      method:
-        | 'item/commandExecution/requestApproval'
-        | 'item/fileChange/requestApproval'
-        | 'applyPatchApproval'
-        | 'execCommandApproval'
-      requestType:
-        | 'apply_patch_approval'
-        | 'command_execution_approval'
-        | 'exec_command_approval'
-        | 'file_change_approval'
+      method: 'item/commandExecution/requestApproval'
+      requestType: 'command_execution_approval'
+      execpolicyAmendment: readonly string[] | null
+    }
+  | {
+      method: 'item/fileChange/requestApproval' | 'applyPatchApproval' | 'execCommandApproval'
+      requestType: 'apply_patch_approval' | 'exec_command_approval' | 'file_change_approval'
     }
 )
 
@@ -847,6 +853,8 @@ class CodexAppServerSession extends SessionContext {
     if (!pending) throw createInternalError(`Unknown pending approval request: ${input.requestId}`)
 
     const decision = v.parse(providerApprovalDecisionSchema, input.decision)
+    if (!pending.options.some((option) => option.decision === decision))
+      throw createInternalError(`This approval does not offer ${decision}.`)
     const response = codexApprovalResponse(pending, decision)
     this.pendingApprovals.delete(input.requestId)
     this.client.respondSuccess(pending.id, response)
@@ -980,10 +988,7 @@ class CodexAppServerSession extends SessionContext {
           approval.method === 'mcpServer/elicitation/request'
             ? approval.elicitation.detail
             : approvalRequestDetail(requestType, params),
-        options:
-          approval.method === 'mcpServer/elicitation/request'
-            ? approval.elicitation.options
-            : undefined,
+        options: approval.options,
         requestType,
       },
       provider: DEFAULT_CODEX_PROVIDER_SETTINGS.driverKind,
@@ -3170,21 +3175,50 @@ function pendingApprovalKind(method: string, params: unknown) {
   if (method === 'mcpServer/elicitation/request') {
     const elicitation = parseCodexElicitation(params)
     if (!elicitation) return null
-    return { method, requestType: 'mcp_elicitation_approval', elicitation } as const
+    return {
+      method,
+      requestType: 'mcp_elicitation_approval',
+      elicitation,
+      options: elicitation.options,
+    } as const
   }
   if (method === 'item/permissions/requestApproval') {
     const parsed = v.parse(v.object({ permissions: v.record(v.string(), v.unknown()) }), params)
-    return { method, requestType: 'permissions_approval', permissions: parsed.permissions } as const
+    return {
+      method,
+      requestType: 'permissions_approval',
+      permissions: parsed.permissions,
+      options: DEFAULT_APPROVAL_OPTIONS,
+    } as const
+  }
+  if (method === 'item/commandExecution/requestApproval') {
+    const execpolicyAmendment = codexExecpolicyAmendment(params)
+    return {
+      method,
+      requestType: 'command_execution_approval',
+      execpolicyAmendment,
+      options: codexCommandApprovalOptions(execpolicyAmendment),
+    } as const
   }
   switch (method) {
-    case 'item/commandExecution/requestApproval':
-      return { method, requestType: 'command_execution_approval' } as const
     case 'item/fileChange/requestApproval':
-      return { method, requestType: 'file_change_approval' } as const
+      return {
+        method,
+        requestType: 'file_change_approval',
+        options: DEFAULT_APPROVAL_OPTIONS,
+      } as const
     case 'applyPatchApproval':
-      return { method, requestType: 'apply_patch_approval' } as const
+      return {
+        method,
+        requestType: 'apply_patch_approval',
+        options: DEFAULT_APPROVAL_OPTIONS,
+      } as const
     case 'execCommandApproval':
-      return { method, requestType: 'exec_command_approval' } as const
+      return {
+        method,
+        requestType: 'exec_command_approval',
+        options: DEFAULT_APPROVAL_OPTIONS,
+      } as const
     default:
       return null
   }
@@ -3199,8 +3233,8 @@ function codexApprovalResponse(
     if (!response) throw createInternalError('This approval does not offer the selected decision.')
     return response
   }
-  if (decision === 'acceptAlways' || decision === 'acceptAlwaysInProject')
-    throw createInternalError(`This approval does not offer ${decision}.`)
+  if (pending.method === 'item/commandExecution/requestApproval')
+    return { decision: codexCommandApprovalDecision(decision, pending.execpolicyAmendment) }
   if (pending.method !== 'item/permissions/requestApproval') return { decision }
   const permissions =
     decision === 'accept' || decision === 'acceptForSession' ? pending.permissions : {}

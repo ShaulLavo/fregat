@@ -2,7 +2,7 @@
 
 ## Status and authorization
 
-- Status: PROPOSED — eight small plans, none started.
+- Status: PROPOSED — eight small plans; approval-rules implemented 2026-09-25 (PR #29).
 - Priority: P2 overall; approval rules and fork are P1 (see the table).
 - Effort: eight S–M plans. Each ships and deploys on its own.
 - Planned at: Platform `c2af88b4`, 2026-09-24. Origin: the 2026-09-24 reference survey.
@@ -26,16 +26,16 @@ provider and the other provider shows a disabled reason; it is never faked.
 
 ## Sub-plans
 
-| Plan                                                         | Outcome                                                         | Claude                                             | Codex                                                  | Size | Status                  | Depends on                            |
-| ------------------------------------------------------------ | --------------------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------ | ---- | ----------------------- | ------------------------------------- |
-| [approval-rules](145-harness-controls/approval-rules.md)     | "Always allow" writes a real rule; "for this session" holds     | `updatedPermissions` from `canUseTool` suggestions | `acceptWithExecpolicyAmendment` (not in pinned schema) | M    | CLAUDE DONE; CODEX OPEN | Codex schema refresh                  |
-| [fork](145-harness-controls/fork.md)                         | Fork a session from any turn into a new session                 | `forkSession(id, { upToMessageId })`               | `thread/fork`                                          | M    | PROPOSED                | Codex schema refresh                  |
-| [mcp-status](145-harness-controls/mcp-status.md)             | See each MCP server's state; reconnect or sign in               | `mcpServerStatus()`, `reconnectMcpServer()`        | `mcpServerStatus/list`, `mcpServer/oauth/login`        | M    | PROPOSED                | Codex schema refresh                  |
-| [background-tasks](145-harness-controls/background-tasks.md) | List a session's background tasks and stop one                  | `background_tasks_changed`, `stopTask(taskId)`     | `thread/backgroundTerminals/*` (experimental API only) | S–M  | PROPOSED                | none                                  |
-| [hooks](145-harness-controls/hooks.md)                       | See which hooks ran in a turn and what they returned            | `includeHookEvents`, `hook_*` messages             | `hooks/list`, `hook/started`, `hook/completed`         | S    | PROPOSED                | Codex schema refresh for `hooks/list` |
-| [custom-agents](145-harness-controls/custom-agents.md)       | Browse a project's agent definitions and start a session as one | `supportedAgents()`, `agent` option                | to verify                                              | S–M  | PROPOSED                | none                                  |
-| [compact](145-harness-controls/compact.md)                   | Manual compaction (owned by Plan 126)                           | `/compact` path to verify                          | `thread/compact/start`                                 | —    | POINTER                 | Plan 126 RUNTIME-05, INTERACTION-06   |
-| [export](145-harness-controls/export.md)                     | Export a transcript as Markdown or JSON                         | n/a (Platform projection)                          | n/a (Platform projection)                              | S    | PROPOSED                | none (web-only)                       |
+| Plan                                                         | Outcome                                                         | Claude                                             | Codex                                                  | Size | Status      | Depends on                               |
+| ------------------------------------------------------------ | --------------------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------ | ---- | ----------- | ---------------------------------------- |
+| [approval-rules](145-harness-controls/approval-rules.md)     | "Always allow" writes a real rule; "for this session" holds     | `updatedPermissions` from `canUseTool` suggestions | `acceptWithExecpolicyAmendment` (not in pinned schema) | M    | IMPLEMENTED | none (server requests are not generated) |
+| [fork](145-harness-controls/fork.md)                         | Fork a session from any turn into a new session                 | `forkSession(id, { upToMessageId })`               | `thread/fork`                                          | M    | PROPOSED    | Codex schema refresh                     |
+| [mcp-status](145-harness-controls/mcp-status.md)             | See each MCP server's state; reconnect or sign in               | `mcpServerStatus()`, `reconnectMcpServer()`        | `mcpServerStatus/list`, `mcpServer/oauth/login`        | M    | PROPOSED    | Codex schema refresh                     |
+| [background-tasks](145-harness-controls/background-tasks.md) | List a session's background tasks and stop one                  | `background_tasks_changed`, `stopTask(taskId)`     | `thread/backgroundTerminals/*` (experimental API only) | S–M  | PROPOSED    | none                                     |
+| [hooks](145-harness-controls/hooks.md)                       | See which hooks ran in a turn and what they returned            | `includeHookEvents`, `hook_*` messages             | `hooks/list`, `hook/started`, `hook/completed`         | S    | PROPOSED    | Codex schema refresh for `hooks/list`    |
+| [custom-agents](145-harness-controls/custom-agents.md)       | Browse a project's agent definitions and start a session as one | `supportedAgents()`, `agent` option                | to verify                                              | S–M  | PROPOSED    | none                                     |
+| [compact](145-harness-controls/compact.md)                   | Manual compaction (owned by Plan 126)                           | `/compact` path to verify                          | `thread/compact/start`                                 | —    | POINTER     | Plan 126 RUNTIME-05, INTERACTION-06      |
+| [export](145-harness-controls/export.md)                     | Export a transcript as Markdown or JSON                         | n/a (Platform projection)                          | n/a (Platform projection)                              | S    | PROPOSED    | none (web-only)                          |
 
 ### Codex schema refresh
 

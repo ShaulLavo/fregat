@@ -19,7 +19,7 @@ import { projectGrouping } from './project-grouping'
 import { sessionSearch, sessionSearchEnvironments } from './session-search'
 import { sessionUnread } from './session-unread'
 import { mcpApproval } from './mcp-approval'
-import { claudeApprovalRules } from './claude-approval-rules'
+import { claudeApprovalRules, codexApprovalRules } from './approval-rules'
 import { checkpointRewind } from './checkpoint-rewind'
 import { archiveLifecycle } from './archive-lifecycle'
 import {
@@ -205,6 +205,7 @@ export const scenarios: readonly Scenario[] = [
   composerDefaults,
   mcpApproval,
   claudeApprovalRules,
+  codexApprovalRules,
   fileAttachments,
   chatStashContext,
   chatQueue,
