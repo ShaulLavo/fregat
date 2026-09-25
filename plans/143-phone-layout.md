@@ -68,6 +68,14 @@ contracts. Out until approved: screens, components, breakpoints, a native app sc
   collapsed workbench. It reuses the real features and stores (chat stage, session list, diff view, the editor as a leaf screen)
   inside stack navigation: sessions → session → turn → diff or file. That navigation is also the spec for the native app.
   Desktop panes get no narrow-width work. A lazy `/m` route is the fallback if the boot switch proves awkward.
+- **Switching shells at runtime.** Listen for the breakpoint with `matchMedia`, not on every resize. The first time the
+  breakpoint is crossed, lazy-load the other shell's chunk and keep the current shell on screen until it's ready (no blank
+  frame). After that, both shells are cached and switching is instant. State lives above the shells (stores, the query cache,
+  `lib/keep-alive` for terminals), so a switch loses no drafts and parks terminals instead of detaching them.
+  The phone shell applies when the pointer is coarse or the viewport is narrow, so rotating a phone (~850px landscape) never flips
+  to the workbench. Use different widths for entering and leaving (hysteresis) so a window near the edge doesn't flap. A narrow
+  desktop window gets the phone shell, which is handy for testing. No speculative prefetch of the other shell: a phone must never
+  download the workbench.
 - **Q4, connecting.** Three ways, like T3 Code:
   1. Direct over the local network or Tailscale (now). Add T3's pairing URL: the desktop shows a one-time link or QR code
      that authorizes a new device.
