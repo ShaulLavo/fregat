@@ -1,3 +1,4 @@
+import type { ConnectionError } from '@workspace/contracts'
 import { Button } from '@workspace/ui/components/button'
 import {
   Popover,
@@ -9,7 +10,7 @@ import {
 
 import { FixWithAgentButton } from '@/components/fix-with-agent-button'
 
-export function MachineErrorDetails({ label, error }: { label: string; error: string }) {
+export function MachineErrorDetails({ label, error }: { label: string; error: ConnectionError }) {
   return (
     <Popover>
       <PopoverTrigger
@@ -21,12 +22,16 @@ export function MachineErrorDetails({ label, error }: { label: string; error: st
       <PopoverContent align='start' className='max-w-[calc(100vw-2rem)]'>
         <PopoverTitle>{label} connection</PopoverTitle>
         <PopoverDescription className='max-h-60 overflow-auto wrap-anywhere whitespace-pre-wrap'>
-          {error}
+          {error.message}
         </PopoverDescription>
+        {error.why ? (
+          <p className='text-muted-foreground text-xs wrap-anywhere'>{error.why}</p>
+        ) : null}
+        {error.fix ? <p className='text-xs wrap-anywhere'>{error.fix}</p> : null}
         <p className='text-muted-foreground text-xs'>
           Manage this connection in Settings → Machines.
         </p>
-        <FixWithAgentButton error={{ message: error, title: `${label} connection` }} />
+        <FixWithAgentButton error={{ ...error, title: `${label} connection` }} />
       </PopoverContent>
     </Popover>
   )

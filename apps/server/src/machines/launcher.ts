@@ -1,4 +1,4 @@
-import { errorMessage } from '@workspace/contracts'
+import { errorMessage, ORCHESTRATION_WS_PROTOCOL_VERSION } from '@workspace/contracts'
 import type {
   EnvironmentId,
   HealthDescriptor,
@@ -7,7 +7,15 @@ import type {
   SshMachineDefinition,
 } from '@workspace/contracts'
 import { recordProcessError, recordProcessInfo } from '../observability/runtime'
-import { createSshError, type SshErrorStep } from './structured-errors'
+import { isEvlogError } from '../observability/structured-errors'
+import {
+  createSshError,
+  createSshProtocolError,
+  machineConnectionError,
+  sshProtocolCode,
+  type SshCatalogStep,
+  type SshErrorStep,
+} from './structured-errors'
 import {
   openForward,
   probeDescriptor,
@@ -53,6 +61,8 @@ type ConnectEvent = {
   remotePort?: number
   managed?: boolean
   error?: string
+  errorCode?: string
+  errorInternal?: Record<string, unknown>
   cleanupError?: string
 }
 
@@ -162,6 +172,7 @@ export function createSshLauncher(options: LauncherOptions) {
     if (!descriptor || connection.state.phase !== 'live' || !connection.forward) return false
     const child = connection.forward.child
     if (child.exitCode !== null || child.signalCode !== null) return false
+    await step(event, 'protocol', async () => confirmProtocol(connection, descriptor))
     await step(event, 'identity', async () => confirmIdentity(connection, descriptor))
     event.target = connection.machine?.target
     event.environmentId = descriptor.environmentId
@@ -237,11 +248,25 @@ export function createSshLauncher(options: LauncherOptions) {
         fetcher: options.fetcher ?? fetch,
       }),
     )
+    await step(event, 'protocol', async () => confirmProtocol(connection, descriptor))
     await step(event, 'identity', async () => confirmIdentity(connection, descriptor))
     connection.controller.signal.throwIfAborted()
     connection.preserveRemoteOnFailure = true
     publish(connection, { name: connection.name, phase: 'live', origin, localPort, descriptor })
     return descriptor
+  }
+
+  function confirmProtocol(connection: Connection, descriptor: HealthDescriptor) {
+    if (descriptor.protocolVersion === ORCHESTRATION_WS_PROTOCOL_VERSION) return
+    throw createSshProtocolError({
+      expected: ORCHESTRATION_WS_PROTOCOL_VERSION,
+      running: descriptor.protocolVersion,
+      checkout: null,
+      kind: connection.record?.kind ?? null,
+      otherLeases: null,
+      port: connection.record?.port ?? null,
+      directory: connection.installation?.directory ?? null,
+    })
   }
 
   function confirmIdentity(connection: Connection, descriptor: HealthDescriptor) {
@@ -258,7 +283,7 @@ export function createSshLauncher(options: LauncherOptions) {
     connection: Connection,
     machine: SshMachineDefinition,
     script: string,
-    operation: SshErrorStep,
+    operation: SshCatalogStep,
   ) {
     return runSshCommand({
       spawn,
@@ -271,11 +296,15 @@ export function createSshLauncher(options: LauncherOptions) {
 
   async function failed(connection: Connection, event: ConnectEvent, error: unknown) {
     const cancelled = connection.controller.signal.aborted
+    const lastError = machineConnectionError(error, catalogStep(event.step))
     event.error = errorMessage(error)
-    if (error instanceof Error && 'code' in error && error.code === 'machines.SSH_IDENTITY')
-      event.step = 'identity'
+    event.errorCode = lastError.code
+    event.errorInternal = isEvlogError(error) ? error.internal : undefined
+    if (lastError.code === 'machines.SSH_IDENTITY') event.step = 'identity'
+    if (lastError.code === sshProtocolCode) event.step = 'protocol'
     event.outcome = cancelled ? 'cancelled' : 'failed'
     try {
+      // A failed first connection releases its lease, so a refused server it alone held stops here.
       await (connection.preserveRemoteOnFailure
         ? closeConnectionForward(connection)
         : cleanup(connection))
@@ -284,12 +313,7 @@ export function createSshLauncher(options: LauncherOptions) {
     }
     if (cancelled) return connection.state
     const phase = failurePhase(event.step)
-    publish(connection, {
-      name: connection.name,
-      phase,
-      lastError: actionableError(error),
-      lastErrorAt: Date.now(),
-    })
+    publish(connection, { name: connection.name, phase, lastError, lastErrorAt: Date.now() })
     return connection.state
   }
 
@@ -305,7 +329,8 @@ export function createSshLauncher(options: LauncherOptions) {
     if (connection.forward !== forward || connection.controller.signal.aborted) return
     connection.forward = null
     if (connection.state.phase !== 'live') return
-    const lastError = `SSH forward exited (${exitCode}). ${stderr.trim().slice(0, 1000)}`.trim()
+    const detail = `SSH forward exited (${exitCode}). ${stderr.trim().slice(0, 1000)}`.trim()
+    const lastError = machineConnectionError(createSshError('forward', detail), 'forward')
     publish(connection, {
       name: connection.name,
       phase: 'offline',
@@ -389,7 +414,7 @@ export function createSshLauncher(options: LauncherOptions) {
       publish(connection, {
         name,
         phase: 'offline',
-        lastError: actionableError(error),
+        lastError: machineConnectionError(error, 'stop'),
         lastErrorAt: Date.now(),
       })
       writeLog(
@@ -432,20 +457,13 @@ function changedRemote(previous: SshMachineDefinition, next: SshMachineDefinitio
 
 function failurePhase(step: SshErrorStep) {
   if (step === 'identity') return 'identity-drift'
-  if (step === 'settings' || step === 'probe') return 'blocked'
+  if (step === 'settings' || step === 'probe' || step === 'protocol') return 'blocked'
   return 'offline'
 }
 
-function actionableError(error: unknown) {
-  const message = errorMessage(error)
-  if (
-    typeof error !== 'object' ||
-    error === null ||
-    !('fix' in error) ||
-    typeof error.fix !== 'string'
-  )
-    return message
-  return `${message} ${error.fix}`
+/** The catalog entry an uncoded failure falls back to; a protocol failure always arrives coded. */
+function catalogStep(step: SshErrorStep): SshCatalogStep {
+  return step === 'protocol' ? 'readiness' : step
 }
 
 function recordEvent(action: string, fields: Record<string, unknown>, failed: boolean) {

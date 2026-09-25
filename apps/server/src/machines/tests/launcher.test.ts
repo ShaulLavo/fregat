@@ -1,3 +1,4 @@
+import { ORCHESTRATION_WS_PROTOCOL_VERSION } from '@workspace/contracts'
 import { expect, onTestFinished } from 'vitest'
 import { clientId, descriptorValue, fakeSsh, machine, test } from '../../../test/factories/ssh'
 import { createSshLauncher } from '../launcher'
@@ -78,7 +79,12 @@ test('reports SSH refusal without attempting a remote launch or cleanup', async 
   const result = await fixture.launcher.connectMachine('fixture')
   expect(result).toMatchObject({
     phase: 'blocked',
-    lastError: expect.stringContaining('Permission denied'),
+    lastError: {
+      code: 'machines.SSH_PROBE',
+      message: expect.stringContaining('Permission denied'),
+      why: expect.any(String),
+      fix: expect.any(String),
+    },
   })
   expect(fixture.commands).toHaveLength(1)
 })
@@ -196,3 +202,105 @@ test('machine aliases use separate stable launch records and clean up independen
   expect(stop).not.toContain(`${clientId}-alias`)
   expect(fixture.phases.filter((state) => state.name === 'alias').at(-1)?.phase).toBe('live')
 })
+
+test('a server on another protocol blocks the connection at the protocol step', async () => {
+  const running = ORCHESTRATION_WS_PROTOCOL_VERSION - 1
+  const fixture = await fakeSsh({ descriptor: { ...descriptorValue, protocolVersion: running } })
+  const result = await fixture.launcher.connectMachine('fixture')
+  expect(result).toMatchObject({
+    phase: 'blocked',
+    lastError: {
+      code: 'machines.SSH_PROTOCOL',
+      message: `The remote server speaks protocol ${running}, and this Platform needs protocol ${ORCHESTRATION_WS_PROTOCOL_VERSION}.`,
+      fix: expect.stringContaining("/work/space ' $(touch unwanted)"),
+    },
+  })
+  expect(fixture.events.at(-1)).toMatchObject({
+    action: 'machines.ssh.connect',
+    fields: {
+      step: 'protocol',
+      outcome: 'failed',
+      errorCode: 'machines.SSH_PROTOCOL',
+      errorInternal: { expected: ORCHESTRATION_WS_PROTOCOL_VERSION, running, kind: 'managed' },
+    },
+  })
+  expect(fixture.forwardChildren[0]?.signalCode).not.toBeNull()
+})
+
+test('a live connection whose server changes protocol is blocked on the next connect', async () => {
+  const fixture = await fakeSsh()
+  expect((await fixture.launcher.connectMachine('fixture')).phase).toBe('live')
+  fixture.changeHealth({
+    ...descriptorValue,
+    protocolVersion: ORCHESTRATION_WS_PROTOCOL_VERSION + 1,
+  })
+  const result = await fixture.launcher.connectMachine('fixture')
+  expect(result).toMatchObject({
+    phase: 'blocked',
+    lastError: {
+      code: 'machines.SSH_PROTOCOL',
+      fix: 'Update this Platform server to the version on that machine, then Retry.',
+    },
+  })
+  expect(fixture.events.at(-1)?.fields).toMatchObject({ step: 'protocol', outcome: 'failed' })
+})
+
+const expectedProtocol = ORCHESTRATION_WS_PROTOCOL_VERSION
+const remoteDirectory = "/work/space ' $(touch unwanted)"
+
+test.for([
+  {
+    name: 'an older checkout',
+    report: { checkout: expectedProtocol - 1, kind: 'managed', otherLeases: 0 },
+    fix: `Update the Platform checkout at ${remoteDirectory} to this server’s version, run bun install there, then Retry.`,
+  },
+  {
+    name: 'another lease',
+    report: { checkout: expectedProtocol, kind: 'managed', otherLeases: 1 },
+    fix: 'Disconnect the 1 other connection to that machine’s server, then Retry.',
+  },
+  {
+    name: 'an external server',
+    report: { checkout: expectedProtocol, kind: 'external', otherLeases: 0 },
+    fix: 'Restart the Platform server on remote port 31001 from a checkout at this server’s version, then Retry.',
+  },
+] as const)(
+  'a launch script refusing $name blocks at the protocol step and releases the lease',
+  async ({ report, fix }) => {
+    const running = expectedProtocol - 1
+    const fixture = await fakeSsh({
+      launchFailure: {
+        code: 'machines.SSH_PROTOCOL',
+        message: `The remote server speaks protocol ${running}, and this Platform needs protocol ${expectedProtocol}.`,
+        expected: expectedProtocol,
+        running,
+        port: 31001,
+        directory: remoteDirectory,
+        ...report,
+      },
+    })
+    const result = await fixture.launcher.connectMachine('fixture')
+    expect(result).toMatchObject({
+      phase: 'blocked',
+      lastError: {
+        code: 'machines.SSH_PROTOCOL',
+        message: `The remote server speaks protocol ${running}, and this Platform needs protocol ${expectedProtocol}.`,
+        fix,
+      },
+    })
+    expect(fixture.events.at(-1)).toMatchObject({
+      action: 'machines.ssh.connect',
+      fields: {
+        step: 'protocol',
+        outcome: 'failed',
+        errorCode: 'machines.SSH_PROTOCOL',
+        errorInternal: { expected: expectedProtocol, running, ...report },
+      },
+    })
+    const remote = fixture.commands.map((command) => command.at(-1) ?? '')
+    expect(remote).toHaveLength(3)
+    expect(remote[1]).toContain('await withLeaseLock(launch);')
+    expect(remote[2]).toContain('await withLeaseLock(stop);')
+    expect(fixture.forwardChildren).toHaveLength(0)
+  },
+)

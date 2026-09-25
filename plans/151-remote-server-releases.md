@@ -10,9 +10,11 @@
 - Planned at: Platform `e1d61502`, 2026-09-25. Origin: the owner, while connecting `shaul-mac`
   from the UI: "the production builds … should probably be different and a lot easier. There's no
   code, there is just whatever's built."
-- Depends on [Plan 150](150-remote-server-version.md) Phase 1 (server-side protocol check and a
-  structured error on the machine state). This plan replaces Plan 150 Phase 2 for production
-  primaries. [Plan 152](152-remote-dev-builds.md) is the development counterpart.
+- Builds on Plan 150 (done 2026-09-25, completion wave): the server-side protocol check and a
+  structured `{ code, message, why?, fix? }` error on the machine state. This plan replaces Plan
+  150's update phase for production primaries and inherits its
+  [security constraints](#security-constraints-from-plan-150).
+  [Plan 152](152-remote-dev-builds.md) is the development counterpart.
 - Work in the current checkout; no branches, worktrees, commits, pushes or PRs unless separately
   requested. Deploy with `bun run deploy --server`.
 
@@ -50,13 +52,21 @@ has none, so the only thing a remote needs is `bun` and SSH.
     (`apps/server/src/machines/remote-scripts.ts:38-45`). It spawns
     `apps/server/src/index.ts` itself (`:187`).
   - `probeCommand` finds `platform-server` on PATH or in `~/.local/bin` (`remote-scripts.ts:12-21`).
-    `establish` runs probe → launch → forward → readiness → identity
+    `establish` runs probe → launch → forward → readiness → protocol → identity
     (`apps/server/src/machines/launcher.ts:175-244`).
 - Nothing copies anything to a remote. Routes are connect, disconnect, auth and events
   (`apps/server/src/machines/routes.ts`).
-- The Mac today (`plans/150-remote-server-version.md`, Findings) runs a hand-built source rig that
-  is not a git checkout, with a curated darwin dependency folder. Its `bun` is `~/.bun/bin/bun`
-  1.4.0, the same version as `packageManager` here (`package.json:120`).
+- The Mac today runs a hand-built source rig at `/Users/shaul/projects/platform-verification`
+  that is not a git checkout (Plan 150's findings, 2026-09-25): `node_modules` links to a curated
+  darwin install, `.verification-editor/` holds copied editor packages, and `.env` points settings,
+  secrets and the workspace root at isolated paths. The Mac's global `bun link` registry maps
+  `@singapore-editor/*` to a stale Editor copy. Its `bun` is `~/.bun/bin/bun` 1.4.0, the same
+  version as `packageManager` here (`package.json:120`).
+- The launch script checks the protocol (Plan 150). A stale managed server is relaunched when the
+  checkout's own `ORCHESTRATION_WS_PROTOCOL_VERSION` matches and no other lease holds it; anything
+  else fails with `machines.SSH_PROTOCOL`, whose `internal` names the expected, running and
+  checkout protocols and the other-lease count. A missing installation is
+  `machines.SSH_NOT_INSTALLED` (`apps/server/src/machines/structured-errors.ts`).
 - Defect found while planning: `readCheckout` (`scripts/deploy/release.ts:60-64`) takes
   `git status --porcelain` through `output()`, which trims (`scripts/deploy/run.ts:39-42`). The first
   line loses its leading space and `line.slice(3)` cuts the path's first letter. Every
@@ -115,9 +125,11 @@ has none, so the only thing a remote needs is `bun` and SSH.
 3. `remote-scripts.ts`: the prelude imports `./server/remote-support.js` for a release and the
    checkout paths for source. `launch()` spawns `server/index.js` for a release (no `--env-file`).
    One helper chooses `{ importBase, entry }` by kind, so the two scripts do not fork.
-4. The Plan 150 protocol step compares the remote descriptor with this server's
-   `ORCHESTRATION_WS_PROTOCOL_VERSION`. A release also reports `serverVersion`. The launcher
-   records both in the connect wide event.
+4. The launcher's `protocol` step (`confirmProtocol` in `launcher.ts`) already compares the remote
+   descriptor with this server's `ORCHESTRATION_WS_PROTOCOL_VERSION`. A release also reports
+   `serverVersion`. The launcher records both in the connect wide event. The launch script reads a
+   release's protocol from the release itself, where it reads `orchestration-ws.ts` for a source
+   checkout.
 
 ### Phase 3: Install and update over SSH
 
@@ -153,12 +165,30 @@ has none, so the only thing a remote needs is `bun` and SSH.
    The mutation calls the route, has `scope: { id: 'machine-update:' + name }`, and invalidates
    the machine connection state on settle. Its pending state comes from `useIsMutating`, and the
    button shows `OrbitLoader`.
-2. It shows when the machine's structured error (Plan 150 Phase 1) is the protocol mismatch
-   ("Update server") or the probe's not-installed error ("Install server"), in:
+2. It shows when the machine's structured error is `machines.SSH_PROTOCOL` ("Update server") or
+   `machines.SSH_NOT_INSTALLED` ("Install server"), in:
    - the Connect machine picker,
    - the machine notice (`features/chat-mode/components/machine-connection-notice.tsx`),
    - Settings › Machines (`features/settings/components/machine-row.tsx`).
 3. A failure keeps Fix with AI beside it, as every machine error now does.
+
+## Security constraints (from Plan 150)
+
+Plan 150 closed 2026-09-25 with D1 (check at both ends of the launch), D3 (relaunch a stale server
+only when no other lease holds it) and D4 (never restart an external server) decided as recommended
+(completion wave). Its update phase was never built; these constraints carry over to Phase 3 here
+and to Plan 152.
+
+- The remote command is fixed text. Only the probed installation paths and this server's own
+  release directory reach execution, as validated absolute paths passed through `shellQuote`. No
+  setting value or client-supplied string becomes a flag, a path or a command.
+- The route takes a machine name and resolves it from the `application`-scope machine record, the
+  same way connect does.
+- An update never runs on its own. Each refusal is a `machines.*` catalog entry with a `fix` the
+  user acts on.
+- The update touches only the Platform installation the probe named. It never touches `mesh`
+  (which has its own update path on the Mac) or any other directory.
+- One wide event per update: machine, directory, from and to release, install duration, outcome.
 
 ## Verification
 

@@ -5,7 +5,13 @@ import {
   type EnvironmentId,
   type HealthDescriptor,
 } from '@workspace/contracts'
-import { createSshError, type SshErrorStep } from './structured-errors'
+import {
+  createSshError,
+  createSshNotInstalledError,
+  createSshProtocolError,
+  sshProtocolCode,
+  type SshCatalogStep,
+} from './structured-errors'
 import * as v from 'valibot'
 import { installationSchema } from '../installation/descriptor'
 
@@ -106,21 +112,35 @@ export async function parseRemoteRecord(output: string): Promise<RemoteRecord> {
   }
 }
 
-export function remoteFailure(step: SshErrorStep, stderr: string, exitCode: number) {
+const protocolPayloadSchema = v.object({
+  expected: v.pipe(v.number(), v.integer()),
+  running: v.pipe(v.number(), v.integer()),
+  checkout: v.nullable(v.pipe(v.number(), v.integer())),
+  kind: v.picklist(['managed', 'external']),
+  otherLeases: v.pipe(v.number(), v.integer(), v.minValue(0)),
+  port: v.nullable(v.pipe(v.number(), v.integer())),
+  directory: v.pipe(v.string(), v.minLength(1)),
+})
+
+export function remoteFailure(step: SshCatalogStep, stderr: string, exitCode: number) {
   const reported = remoteErrorPayload(stderr)
   if (reported?.code === 'machines.SSH_IDENTITY') return createSshError('identity')
+  if (reported?.code === 'machines.SSH_NOT_INSTALLED') return createSshNotInstalledError(exitCode)
+  const protocol =
+    reported?.code === sshProtocolCode ? v.safeParse(protocolPayloadSchema, reported.input) : null
+  if (protocol?.success) return createSshProtocolError(protocol.output)
   // The launch script's catalog error arrives as JSON; its message is the sentence, not the envelope.
   if (reported?.message) return createSshError(step, reported.message)
   return createSshError(step, stderr.trim().slice(0, 2000) || `SSH exited with status ${exitCode}.`)
 }
 
-function remoteErrorPayload(stderr: string): { code?: unknown; message?: string } | null {
+function remoteErrorPayload(stderr: string) {
   try {
     const input: unknown = JSON.parse(stderr.trim().split('\n').at(-1) ?? '')
     if (typeof input !== 'object' || input === null) return null
     const message =
       'message' in input && typeof input.message === 'string' ? input.message : undefined
-    return { code: 'code' in input ? input.code : undefined, message }
+    return { code: 'code' in input ? input.code : undefined, message, input }
   } catch {
     // OpenSSH failures are plain stderr; remote launch failures also carry a JSON error.
     return null

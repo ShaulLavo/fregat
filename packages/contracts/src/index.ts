@@ -379,10 +379,12 @@ export {
 } from './orchestration-ws'
 export { healthDescriptorSchema, type HealthDescriptor } from './health'
 export {
+  connectionErrorSchema,
   machineConnectionStateSchema,
   machineAuthPromptSchema,
   machineEventSchema,
   machineAuthResponseSchema,
+  type ConnectionError,
   type MachineConnectionState,
   type MachineAuthPrompt,
   type MachineEvent,

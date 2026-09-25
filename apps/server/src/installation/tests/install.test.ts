@@ -3,7 +3,7 @@ import path from 'node:path'
 import { expect } from 'vitest'
 import { test } from '../../../test/factories/installation'
 import { installServerLauncher } from '../install'
-import { parseInstallation } from '../../machines/records'
+import { parseInstallation, remoteFailure } from '../../machines/records'
 import { probeCommand, stopCommand } from '../../machines/remote-scripts'
 
 test('installation is repeatable and discoverable with neither Bun nor the launcher on PATH', async ({
@@ -79,7 +79,10 @@ test('missing installation gives the install command instead of requesting a rep
     stderr: 'pipe',
   })
   expect(await probe.exited).toBe(127)
-  expect(await new Response(probe.stderr).text()).toContain('bun run server:install')
+  expect(remoteFailure('probe', await new Response(probe.stderr).text(), 127)).toMatchObject({
+    code: 'machines.SSH_NOT_INSTALLED',
+    fix: expect.stringContaining('bun run server:install'),
+  })
   expect(await new Response(probe.stdout).text()).toBe('')
 })
 

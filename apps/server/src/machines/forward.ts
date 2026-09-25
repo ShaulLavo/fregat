@@ -1,5 +1,5 @@
 import net from 'node:net'
-import { createSshError, type SshErrorStep } from './structured-errors'
+import { createSshError, type SshCatalogStep } from './structured-errors'
 import { parseDescriptor, remoteFailure } from './records'
 import { shellQuote } from '../utils/shell'
 
@@ -47,7 +47,7 @@ export async function runSshCommand(options: {
   spawn: SshSpawner
   target: string
   script: string
-  step: SshErrorStep
+  step: SshCatalogStep
   signal?: AbortSignal
 }) {
   options.signal?.throwIfAborted()

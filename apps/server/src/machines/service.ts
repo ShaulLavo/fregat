@@ -6,7 +6,7 @@ import { MachineEvents } from './events'
 import { createSshLauncher } from './launcher'
 import { MachinePrompts } from './prompts'
 import { parseMachineName } from './records'
-import { createSshError } from './structured-errors'
+import { createSshError, sshAuthCancelled } from './structured-errors'
 
 type Launcher = ReturnType<typeof createSshLauncher>
 type Authentication = Awaited<ReturnType<typeof createSshAuthentication>>
@@ -354,7 +354,7 @@ function connectionState(entry: Entry, state: MachineConnectionState): MachineCo
     return {
       name: state.name,
       phase: 'blocked',
-      lastError: 'SSH authentication was cancelled. Connect again to retry.',
+      lastError: sshAuthCancelled(entry.cancelledAt),
       lastErrorAt: entry.cancelledAt,
     }
   if (state.phase !== 'live') return state

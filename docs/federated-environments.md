@@ -114,6 +114,18 @@ still matches. A checkout-local SQLite lock serializes launch and stop operation
 the shared process record, so existing leases follow the replacement process. External servers
 remain running. The launcher retains the local port for reconnection during its lifetime.
 
+Both ends of the launch check the orchestration protocol. The launch script compares a reused
+server's descriptor with the protocol it was sent. A stale managed server is stopped and relaunched
+when the checkout's own `ORCHESTRATION_WS_PROTOCOL_VERSION` already matches and no other lease holds
+it; otherwise the launch fails with `machines.SSH_PROTOCOL`. A server another lease holds, or an
+external server, keeps running; when this connection held the only lease, releasing it after the
+failure stops the server, the same as any failed first connection. External servers are never
+restarted. The fix names the side to update: this Platform server when the remote checkout is
+newer, the remote checkout when it is older. The launcher repeats the check between readiness and identity, so a
+server swapped behind a live forward is caught too. The machine state carries the catalog error as
+`{ code, message, why, fix }`, and the notice, the picker and Settings › Machines read it as
+"Server out of date" with the fix.
+
 Browser instances hold the shared connection independently. Disconnecting one instance releases
 its hold; the final release closes the forward and remote lease. Event-stream reconnections have
 a grace period before abandoned holds are released. Renewing a hold invalidates cleanup already

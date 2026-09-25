@@ -2,6 +2,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/component
 import { XIcon } from '@phosphor-icons/react'
 import { useState } from 'react'
 import { useStore } from 'zustand'
+import type { ConnectionError } from '@workspace/contracts'
 import type { EnvironmentPhase } from '@workspace/client-core/environments/utils/connection'
 import { Button } from '@workspace/ui/components/button'
 import { MachineErrorDetails } from '@/components/machine-error-details'
@@ -12,7 +13,7 @@ import {
   connectionNoticeSummary,
   connectionPending,
 } from '@/lib/environments/utils/connection-notice'
-import { errorMessage } from '@/lib/error-message'
+import { toConnectionError } from '@/lib/client-error-taxonomy'
 
 export function MachineConnectionNotice({
   id,
@@ -24,7 +25,7 @@ export function MachineConnectionNotice({
   id: string
   label: string
   phase: EnvironmentPhase
-  error: string | null
+  error: ConnectionError | null
   retry: () => Promise<unknown>
 }) {
   const { notices } = useEnvironmentConnections()
@@ -32,7 +33,7 @@ export function MachineConnectionNotice({
     connectionNoticeDismissed(state.dismissed, id, phase, error),
   )
   const [retrying, setRetrying] = useState(false)
-  const [retryError, setRetryError] = useState<string | null>(null)
+  const [retryError, setRetryError] = useState<ConnectionError | null>(null)
   if (dismissed) return null
   const pending = retrying || connectionPending(phase)
   const details = retryError ?? error
@@ -44,7 +45,7 @@ export function MachineConnectionNotice({
     try {
       await retry()
     } catch (error) {
-      setRetryError(errorMessage(error, `Could not reconnect ${label}.`))
+      setRetryError(toConnectionError(error, `Could not reconnect ${label}.`))
     }
     setRetrying(false)
   }

@@ -1,5 +1,6 @@
+import type { ConnectionError } from '@workspace/contracts'
 import { defineErrorCatalog } from 'evlog'
-import { createStructuredError } from '../observability/structured-errors'
+import { createStructuredError, isEvlogError } from '../observability/structured-errors'
 
 const machineErrors = defineErrorCatalog('machines', {
   SSH_DISCOVERY: {
@@ -17,14 +18,27 @@ const machineErrors = defineErrorCatalog('machines', {
   SSH_PROBE: {
     status: 502,
     message: 'The SSH machine could not be reached.',
-    why: 'SSH refused the connection, or the Platform server installation was unavailable.',
-    fix: 'Check the SSH connection. Install the server for that SSH user with bun run server:install from a prepared Platform checkout.',
+    why: 'SSH refused the connection, or the installed Platform server could not describe itself.',
+    fix: 'Check that the primary server’s user can reach that machine over SSH, then connect again.',
+  },
+  SSH_NOT_INSTALLED: {
+    status: 412,
+    message: 'Platform server is not installed for this SSH user.',
+    why: 'The probe found no platform-server on PATH or in ~/.local/bin.',
+    fix: 'Run bun run server:install from a prepared Platform checkout on that machine, then connect again.',
   },
   SSH_LAUNCH: {
     status: 502,
     message: 'The remote server could not start.',
     why: 'The remote launcher could not reuse or start the configured server.',
     fix: 'Inspect logs/ssh-launch.log in the remote checkout and verify its dependencies are installed.',
+  },
+  SSH_PROTOCOL: {
+    status: 409,
+    message: ({ running, expected }: { running: number; expected: number }) =>
+      `The remote server speaks protocol ${running}, and this Platform needs protocol ${expected}.`,
+    why: 'The server on that machine was started from a different Platform version.',
+    fix: 'Update the Platform checkout on that machine to this server’s version, run bun install there, then Retry.',
   },
   SSH_FORWARD: {
     status: 502,
@@ -44,6 +58,12 @@ const machineErrors = defineErrorCatalog('machines', {
     why: 'The forwarded server identity differs from the previously confirmed environment.',
     fix: 'Restore the machine’s original database before reconnecting.',
   },
+  SSH_AUTH_CANCELLED: {
+    status: 409,
+    message: 'SSH authentication was cancelled.',
+    why: 'The SSH prompt was dismissed before the connection finished.',
+    fix: 'Connect again to answer the SSH prompt.',
+  },
   SSH_STOP: {
     status: 502,
     message: 'The remote server could not be stopped.',
@@ -51,16 +71,6 @@ const machineErrors = defineErrorCatalog('machines', {
     fix: 'Reconnect the SSH host and disconnect again, or inspect its .platform-ssh-launch record.',
   },
 })
-
-export type SshErrorStep =
-  | 'discovery'
-  | 'settings'
-  | 'probe'
-  | 'launch'
-  | 'forward'
-  | 'readiness'
-  | 'identity'
-  | 'stop'
 
 const sshErrors = {
   discovery: machineErrors.SSH_DISCOVERY,
@@ -73,7 +83,10 @@ const sshErrors = {
   stop: machineErrors.SSH_STOP,
 }
 
-export function createSshError(step: SshErrorStep, detail?: string, cause?: unknown) {
+export type SshCatalogStep = keyof typeof sshErrors
+export type SshErrorStep = SshCatalogStep | 'protocol'
+
+export function createSshError(step: SshCatalogStep, detail?: string, cause?: unknown) {
   const definition = sshErrors[step]
   return createStructuredError({
     code: definition.code,
@@ -83,4 +96,72 @@ export function createSshError(step: SshErrorStep, detail?: string, cause?: unkn
     message: detail ? `${definition.message} ${detail}` : definition.message,
     cause,
   })
+}
+
+export function createSshNotInstalledError(exitCode: number) {
+  return machineErrors.SSH_NOT_INSTALLED({ internal: { exitCode } })
+}
+
+export function sshAuthCancelled(cancelledAt: number) {
+  return machineConnectionError(
+    machineErrors.SSH_AUTH_CANCELLED({ internal: { cancelledAt } }),
+    'probe',
+  )
+}
+
+export const sshProtocolCode = machineErrors.SSH_PROTOCOL.code
+
+/** What each end of the launch saw: `checkout` and `otherLeases` are null when the check ran on this side. */
+export type ProtocolReport = {
+  expected: number
+  running: number
+  checkout: number | null
+  kind: 'managed' | 'external' | null
+  otherLeases: number | null
+  port: number | null
+  directory: string | null
+}
+
+export function createSshProtocolError(report: ProtocolReport) {
+  return machineErrors.SSH_PROTOCOL({
+    running: report.running,
+    expected: report.expected,
+    fix: protocolFix(report),
+    internal: {
+      expected: report.expected,
+      running: report.running,
+      checkout: report.checkout,
+      kind: report.kind,
+      otherLeases: report.otherLeases,
+    },
+  })
+}
+
+function protocolFix(report: ProtocolReport) {
+  // The checkout is what a relaunch would start, so it decides which side is newer.
+  if ((report.checkout ?? report.running) > report.expected)
+    return 'Update this Platform server to the version on that machine, then Retry.'
+  if (report.kind === 'external' && report.port !== null)
+    return `Restart the Platform server on remote port ${report.port} from a checkout at this server’s version, then Retry.`
+  const others = report.otherLeases ?? 0
+  if (report.checkout === report.expected && others > 0)
+    return `Disconnect the ${others} other ${others === 1 ? 'connection' : 'connections'} to that machine’s server, then Retry.`
+  if (report.checkout === report.expected && report.directory)
+    return `Run bun install in ${report.directory} so the server’s dependencies match that checkout, then Retry.`
+  if (!report.directory) return machineErrors.SSH_PROTOCOL.fix
+  return `Update the Platform checkout at ${report.directory} to this server’s version, run bun install there, then Retry.`
+}
+
+/** The failure a machine state carries: a catalog error keeps its code, anything else becomes the step's entry. */
+export function machineConnectionError(error: unknown, step: SshCatalogStep): ConnectionError {
+  const failure =
+    isEvlogError(error) && error.code
+      ? error
+      : createSshError(step, error instanceof Error ? error.message : undefined)
+  return {
+    code: failure.code ?? sshErrors[step].code,
+    message: failure.message,
+    why: failure.why,
+    fix: failure.fix,
+  }
 }

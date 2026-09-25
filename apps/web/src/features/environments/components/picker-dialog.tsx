@@ -8,6 +8,8 @@ import { useEnvironmentConnections } from '@/hooks/use-environment-connections'
 import { useWorkingMachines } from '@/lib/environments/hooks/use-working-machines'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
 import { errorMessage } from '@/lib/error-message'
+import { clientErrorDescription } from '@/lib/client-error-taxonomy'
+import { connectionNoticeSummary } from '@/lib/environments/utils/connection-notice'
 import { InlineError } from '@/components/inline-error'
 
 export function PickerDialog({
@@ -41,8 +43,11 @@ export function PickerDialog({
         const result = await connections.connectMachine(name)
         if (result === 'cancelled') return
         if (result === 'failed') {
-          const machine = connections.store.getState().machines.find((entry) => entry.name === name)
-          return setError(machine?.lastError || `Cannot connect to ${name}. Retry the connection.`)
+          const failure = connections.store
+            .getState()
+            .machines.find((entry) => entry.name === name)?.lastError
+          if (failure) return setError(clientErrorDescription(failure))
+          return setError(`Cannot connect to ${name}. Retry the connection.`)
         }
       }
       if (mode === 'disconnect') await connections.disconnectMachine(name)
@@ -98,7 +103,11 @@ export function PickerDialog({
           >
             <span className='min-w-0 truncate'>{machine.config.label ?? machine.name}</span>
             {working.has(machine.name) ? <Spinner /> : null}
-            <span className='text-muted-foreground shrink-0'>{machine.phase}</span>
+            <span className='text-muted-foreground shrink-0'>
+              {machine.lastError
+                ? connectionNoticeSummary(machine.phase, machine.lastError)
+                : machine.phase}
+            </span>
           </Button>
         ))}
         {connecting ? (

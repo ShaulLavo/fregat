@@ -210,6 +210,17 @@ export const selectors = {
   fixWithAi: (scope: Page | Locator) =>
     scope.getByRole('button', { name: 'Fix with AI', exact: true }),
   machineTarget: (page: Page) => page.getByRole('textbox', { name: 'SSH target', exact: true }),
+  machineRemoteUrl: (page: Page) => page.getByRole('button', { name: /^Remote URL/ }),
+  machineServerUrl: (page: Page) => page.getByRole('textbox', { name: 'Server URL', exact: true }),
+  machineDetails: (scope: Page | Locator, label: string) =>
+    scope.getByRole('button', { name: `${label} connection details`, exact: true }),
+  machineDetailsPopover: (page: Page, label: string) =>
+    page.getByRole('dialog', { name: `${label} connection`, exact: true }),
+  machineFormCancel: (dialog: Locator) =>
+    dialog.getByRole('button', { name: 'Cancel', exact: true }),
+  machineDialogError: (dialog: Locator) => dialog.getByRole('alert'),
+  serverOutOfDate: (scope: Page | Locator) =>
+    scope.getByText('Server out of date', { exact: true }),
   sshHostList: (page: Page) =>
     page.getByRole('listbox', { name: 'SSH hosts', exact: true }).first(),
   patternRows: (list: Locator) => list.locator('[data-slot="list-row"]'),

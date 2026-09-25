@@ -519,7 +519,7 @@ of the plans, both logs and the service journal named what stands in the way. Th
 | [147](plans/147-log-hygiene-and-noise-gate.md) | Producer fixes, level rules, the reaper give-up, ACK timeout vs overflow, a `logs:census` gate  |
 | [148](plans/148-restart-when-idle.md)          | `deploy --server` stages; the server restarts when no turn is running                           |
 | [149](plans/149-terminal-host.md)              | A PTY host that survives server restarts                                                        |
-| [150](plans/150-remote-server-version.md)      | Remote servers are checked for protocol and updated                                             |
+| 150 (done)                                     | Remote servers are checked for protocol; a stale one relaunches or reads "Server out of date"   |
 | [151](plans/151-remote-server-releases.md)     | Production ships its built server release to remote machines; Update/Install server button      |
 | [152](plans/152-remote-dev-builds.md)          | Dev primary builds this working tree and ships it through Plan 151, in its own remote channel   |
 
@@ -530,8 +530,9 @@ Suggested order:
 2. Plan 147, after 146 removes the pollution it would otherwise re-level.
 3. Plan 148, so Platform can deploy itself without killing the deploying turn.
 4. Plan 149, so terminals and dev servers survive the same restart.
-5. Plan 150 Phase 1, then Plan 151, whenever the Mac is needed. Plan 152 after 151. `129fdea6`
-   already keeps the catalog why and fix on stored machine errors; the protocol check is left.
+5. ~~Plan 150~~ — done 2026-09-25 (completion wave): protocol check at both ends of the SSH
+   launch, stale relaunch, structured machine errors, "Server out of date". Then Plan 151 whenever
+   the Mac is needed. Plan 152 after 151.
 6. Then Claude rewind and fork ([Plan 145 fork](plans/145-harness-controls/fork.md), Plan 126
    RUNTIME-01) and the Plan 139 research phase.
 

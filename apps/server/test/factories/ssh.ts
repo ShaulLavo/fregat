@@ -2,17 +2,21 @@ import { tmpdir } from 'node:os'
 import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { afterEach, test as base } from 'vitest'
-import type { MachineConnectionState, Machines } from '@workspace/contracts'
+import {
+  ORCHESTRATION_WS_PROTOCOL_VERSION,
+  type MachineConnectionState,
+  type Machines,
+} from '@workspace/contracts'
 import { createSshLauncher } from '../../src/machines/launcher'
 import { parseDescriptor, type RemoteRecord } from '../../src/machines/records'
-import type { SshChild, SshSpawner } from '../../src/machines/forward'
+import { reserveForwardPort, type SshChild, type SshSpawner } from '../../src/machines/forward'
 import { MachineService } from '../../src/machines/service'
 
 export const descriptorValue = {
   ok: true,
   environmentId: '00000000-0000-4000-8000-000000000078',
   label: 'fixture',
-  protocolVersion: 1,
+  protocolVersion: ORCHESTRATION_WS_PROTOCOL_VERSION,
   serverVersion: 'test',
   platform: { os: 'linux', arch: 'x64' },
 }
@@ -27,6 +31,7 @@ const installation = {
   executable: process.execPath,
 } as const
 export const clientId = '00000000-0000-4000-8000-000000000001'
+const repositoryRoot = path.resolve(import.meta.dirname, '../../../..')
 
 const cleanups: Array<() => Promise<unknown>> = []
 afterEach(async () => {
@@ -41,6 +46,7 @@ export async function fakeSsh(
     slowProbe?: boolean
     machines?: Machines
     descriptor?: typeof descriptorValue
+    launchFailure?: Record<string, unknown>
   } = {},
 ) {
   const descriptor = await parseDescriptor(options.descriptor ?? descriptorValue)
@@ -147,6 +153,32 @@ export async function recordedRemoteProcess(
     stdout: 'ignore',
     stderr: 'ignore',
   })
+  return recordProcess(remoteRoot, owner, child, 31001, processId)
+}
+
+/** A managed server that answers /health with `protocolVersion`, recorded as `owner`'s lease. */
+export async function servingRemoteProcess(
+  remoteRoot: string,
+  owner: string,
+  protocolVersion: number,
+) {
+  const port = await reserveForwardPort()
+  const child = Bun.spawn([process.execPath, '-e', healthServerSource(protocolVersion)], {
+    env: { ...process.env, PORT: String(port) },
+    stdout: 'ignore',
+    stderr: 'ignore',
+  })
+  await waitForHealth(port)
+  return recordProcess(remoteRoot, owner, child, port, crypto.randomUUID())
+}
+
+async function recordProcess(
+  remoteRoot: string,
+  owner: string,
+  child: Bun.Subprocess,
+  port: number,
+  processId: string,
+) {
   cleanups.push(async () => {
     child.kill()
     await child.exited
@@ -157,14 +189,69 @@ export async function recordedRemoteProcess(
     processId,
     kind: 'managed',
     pid: child.pid,
-    port: 31001,
+    port,
     environmentId: descriptor.environmentId,
-    startedAt: Bun.spawnSync(['ps', '-p', String(child.pid), '-o', 'lstart='])
-      .stdout.toString()
-      .trim(),
+    startedAt: processStart(child.pid),
   }
   await writeRemoteRecord(remoteRoot, owner, record)
   return { child, record }
+}
+
+function processStart(pid: number) {
+  return Bun.spawnSync(['ps', '-p', String(pid), '-o', 'lstart='])
+    .stdout.toString()
+    .trim()
+}
+
+function healthServerSource(protocolVersion: number) {
+  const body = JSON.stringify({ ...descriptorValue, protocolVersion })
+  return `Bun.serve({ hostname: '127.0.0.1', port: Number(process.env.PORT), fetch: () => Response.json(${body}) })`
+}
+
+async function waitForHealth(port: number) {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const response = await fetch(`http://127.0.0.1:${port}/health`).catch(() => null)
+    if (response?.ok) return
+    await Bun.sleep(50)
+  }
+  throw new TypeError(`The fixture server on port ${port} never answered /health.`)
+}
+
+/** Links the real contracts declaration, so the launch script's parse of it is pinned. */
+export async function linkCheckoutProtocol(remoteRoot: string) {
+  await symlink(
+    path.join(repositoryRoot, 'packages/contracts/src/orchestration-ws.ts'),
+    path.join(remoteRoot, 'packages/contracts/src/orchestration-ws.ts'),
+  )
+}
+
+/** The checkout's own protocol constant, as the launch script reads it. */
+export async function writeCheckoutProtocol(remoteRoot: string, protocolVersion: number) {
+  await writeFile(
+    path.join(remoteRoot, 'packages/contracts/src/orchestration-ws.ts'),
+    `export const ORCHESTRATION_WS_PROTOCOL_VERSION = ${protocolVersion}\n`,
+  )
+}
+
+/** The checkout's server entry, which a fresh launch starts: it answers /health with `protocolVersion`. */
+export async function writeCheckoutServer(remoteRoot: string, protocolVersion: number) {
+  await mkdir(path.join(remoteRoot, 'apps/server/src'), { recursive: true })
+  await writeFile(
+    path.join(remoteRoot, 'apps/server/src/index.ts'),
+    healthServerSource(protocolVersion),
+  )
+  await writeFile(path.join(remoteRoot, '.env'), '')
+}
+
+/** Stops a server the launch script started detached, so a failed assertion cannot leak it. */
+export function stopLaunchedServer(pid: number) {
+  cleanups.push(async () => {
+    try {
+      process.kill(pid)
+    } catch {
+      // Already stopped by the test's own stop script.
+    }
+  })
 }
 
 export async function writeRemoteRecord(remoteRoot: string, owner: string, record: RemoteRecord) {
@@ -204,15 +291,21 @@ globalThis.fetch = async () => Response.json(${JSON.stringify(descriptorValue)})
 function fakeProcessScript(
   command: string[],
   record: unknown,
-  options: { probeFails?: boolean; forwardFails?: boolean; slowProbe?: boolean },
+  options: {
+    probeFails?: boolean
+    forwardFails?: boolean
+    slowProbe?: boolean
+    launchFailure?: Record<string, unknown>
+  },
 ) {
   if (command.includes('-N'))
     return options.forwardFails ? 'process.exit(42)' : 'setInterval(() => {}, 1000)'
   const remote = command.at(-1) ?? ''
   if (remote.includes('command -v platform-server')) return fakeProbe(options)
-  if (remote.includes('await withLeaseLock(launch);'))
-    return `process.stdout.write(${JSON.stringify(JSON.stringify(record) + '\n')})`
-  return ''
+  if (!remote.includes('await withLeaseLock(launch);')) return ''
+  if (options.launchFailure)
+    return `process.stderr.write(${JSON.stringify(JSON.stringify(options.launchFailure) + '\n')}); process.exit(1)`
+  return `process.stdout.write(${JSON.stringify(JSON.stringify(record) + '\n')})`
 }
 
 function fakeProbe(options: { probeFails?: boolean; slowProbe?: boolean }) {
@@ -226,13 +319,12 @@ export const test = base.extend<{ remoteRoot: string }>({
   remoteRoot: async ({ task }, provide) => {
     void task
     const directory = await mkdtemp(path.join(tmpdir(), 'platform-ssh-'))
-    const root = path.resolve(import.meta.dirname, '../../../..')
     await mkdir(path.join(directory, 'packages/contracts/src'), { recursive: true })
     await symlink(
-      path.join(root, 'packages/contracts/src/health.ts'),
+      path.join(repositoryRoot, 'packages/contracts/src/health.ts'),
       path.join(directory, 'packages/contracts/src/health.ts'),
     )
-    await symlink(path.join(root, 'node_modules'), path.join(directory, 'node_modules'))
+    await symlink(path.join(repositoryRoot, 'node_modules'), path.join(directory, 'node_modules'))
     try {
       await provide(directory)
     } finally {

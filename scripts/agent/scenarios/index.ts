@@ -85,6 +85,7 @@ import { settingsUsage } from './settings-usage'
 import { chatClaudeCatalog } from './chat-claude-catalog'
 import { chatDraftContextStrip } from './chat-draft-context-strip'
 import { machineConnectError } from './machine-connect-error'
+import { machineProtocolMismatch } from './machine-protocol-mismatch'
 import { wallpaperIconHints } from './wallpaper-icon-hints'
 import { terminalBackground } from './terminal-background'
 import { bottomPanelPersistence } from './bottom-panel-persistence'
@@ -279,6 +280,7 @@ export const scenarios: readonly Scenario[] = [
   chatClaudeCatalog,
   chatDraftContextStrip,
   machineConnectError,
+  machineProtocolMismatch,
   wallpaperIconHints,
   gitChanges,
   logsPanel,
