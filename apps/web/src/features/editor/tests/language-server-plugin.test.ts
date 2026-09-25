@@ -345,6 +345,27 @@ describe('server exit', () => {
     )
   })
 
+  test('shows guidance that carries no catalog code', () => {
+    const shown = vi.spyOn(toast, 'error').mockImplementation(() => 'toast')
+    const warned = vi.spyOn(log, 'warn')
+    const lane = typescriptLane()
+
+    lane.onError(
+      new LspServerExitedError({
+        outcome: 'crashed',
+        serverId: 'typescript',
+        error: { message: 'The typescript language server stopped', fix: 'Reopen the file.' },
+      }),
+    )
+
+    expect(shown).toHaveBeenCalledTimes(1)
+    expect(shown).toHaveBeenCalledWith(
+      'The typescript language server stopped',
+      expect.objectContaining({ description: 'Reopen the file.' }),
+    )
+    expect(warned).toHaveBeenCalledWith(expect.objectContaining({ serverFailed: true }))
+  })
+
   test('stays quiet for a server this app closed and for a lost socket', () => {
     const shown = vi.spyOn(toast, 'error').mockImplementation(() => 'toast')
     const lane = typescriptLane()

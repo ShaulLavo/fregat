@@ -27,7 +27,8 @@ server backend stays the default.
   `deleteWorkspaceFiles`, and reports a crash as `$/serverExited` (`LSP_SERVER_EXITED` in
   `@singapore-editor/lsp`), which `LspConnection` turns into `LspServerExitedError`.
 - Platform's TypeScript lane is a WebSocket to the server's proxy
-  (`apps/web/src/features/editor/utils/language-server-plugin.ts:243`, `webSocketRoute` at `:320`),
+  (`liveLanguageServerLane` and `languageServerLaneOptions` in
+  `apps/web/src/features/editor/utils/language-server-plugin.ts`),
   which spawns tsgo or typescript-language-server (`apps/server/src/lsp/typescript/runtime.ts`,
   registered in `apps/server/src/lsp/registry.ts:583`).
 - Platform's proxy sends the same `$/serverExited` (`packages/contracts/src/lsp-protocol.ts`), and the
@@ -80,17 +81,25 @@ catalog guidance once.
   notifications fail, so its event is `lsp.lane_failed`, with the error and the same exit fields.
 - The per-lane record covered a final attempt whose server "died before it said anything". The
   proxy joins a socket to its backend in the same task that `acquire` resolves, and a process exit
-  arrives as a later task. Under the new code the scenario's toast shows the last attempt carried
-  the guidance itself; the run's log copy ends before that final server session.
+  arrives as a later task. Under the new code the scenario's final `lsp.lane_failed` event carries
+  `serverFailed: true` and `exitSignal: SIGKILL`, so the last attempt brought the guidance itself.
 - Known gap: a crash streak whose last attempt fails another way (an initialize timeout, a refused
   socket, or `spawn_failed`, which carries no guidance on any attempt) gives up with no toast.
+  `LspConnection` clears its exit on every new transport, so the remedy is Editor-side: keep the
+  last announced exit across reconnect attempts and report it on give-up.
+- Editor follow-up: `docs/architecture/e054-worker-language-server-parity.md` still says Platform
+  sends `$/platform/serverExited`.
 - Evidence: `proxy-session.test.ts` exit tests now expect `$/serverExited`. New tests in
   `language-server-plugin.test.ts` pin the method and params shape against `@singapore-editor/lsp`,
   show the guidance once on give-up with the `lsp.lane_failed` fields, and stay quiet for a clean
   close or a lost socket; `language-server-connection-pool.test.ts` pins the exit fields on
   `lsp.connection.reconnecting`. Scenario `editor-lsp-server-exit` asserts one toast and one copy of
-  the fix on the page (`/work/tmp/fregat-evidence/20260925T115545Z-scenario-editor-lsp-server-exit/`,
-  whose log has one `lsp.connection.reconnecting` per restart with `exitSignal: SIGKILL`).
+  the fix on the page, then waits for the `lsp.lane_failed` log to reach the server
+  (`/work/tmp/fregat-evidence/20260925T130643Z-scenario-editor-lsp-server-exit/`, whose log has one
+  `lsp.connection.reconnecting` per restart and the `lsp.lane_failed` give-up). The throwaway
+  server batches its log every 200 ms, so a run's copy keeps its tail.
+- The toast reads the guidance straight from the exit params, the same field `serverFailed` reads,
+  so guidance without a catalog code still reaches the user.
 
 ### Phase 2: A program's files from the server
 

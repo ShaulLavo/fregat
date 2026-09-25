@@ -38,6 +38,8 @@ export async function startIsolatedServer(webOrigin: URL): Promise<IsolatedServe
   const env: Record<string, string | undefined> = {
     ...process.env,
     FS_HOST: '127.0.0.1',
+    // The run copies this log before the server stops, so a 5 s batch would drop the run's tail.
+    OBSERVABILITY_BATCH_INTERVAL_MS: '200',
     OBSERVABILITY_DIR: logs,
     PLATFORM_HOME: home,
     PORT: String(port),
