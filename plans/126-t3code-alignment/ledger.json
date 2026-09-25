@@ -378,8 +378,9 @@
         "composer-defaults-delivery.md",
         "Historical release 20260920T155743Z-b915d3e0-plan126-final-batch; /work/tmp/fregat-evidence/20260920T160544Z-scenario-composer-defaults/summary.md records completed default-hidden controls, opt-in occupancy, retained preference and effective native default-mode submission",
         "Recorded comparison executes the pinned interaction-mode resolver over 20 flag/provider/mode combinations",
-        "Remaining: rich composition, send shortcut preferences, large-paste folding and full upstream runtime comparison",
-        "2026-09-25 lane L2: chat.sendShortcut (enter, mod-enter-multiline, mod-enter) and large-paste folding at 32 KB with Ctrl/Cmd+Shift+V inline; scripts/agent/scenarios/chat-composer-editing.ts passed. Open: the rich composer (owner decision D10) and mobile plain-Enter newline (Plan 143)."
+        "Remaining: rich composition and mobile plain-Enter newline. Completion-wave verification uses our agent:browser scenarios; the paired upstream run is no longer required.",
+        "2026-09-25 lane L2: chat.sendShortcut (enter, mod-enter-multiline, mod-enter) and large-paste folding at 32 KB with Ctrl/Cmd+Shift+V inline; scripts/agent/scenarios/chat-composer-editing.ts passed. Open: mobile plain-Enter newline. Rich composition and Lexical removal are parked by the latest owner ruling.",
+        "2026-09-25 owner ruling supersedes the earlier deletion instruction: retain Lexical until Editor completes a full Markdown/composer support plan. L2/L7 audit found no such plan in Editor plans/*.md, plans/backlog.json, plans/README.md or TODO.md. packages/markdown/README.md documents live preview only; ordered lists, block quotes, escapes and fenced code blocks remain source text. composerRichTextEnabled waits for a working consumer. No new Editor Markdown plan is part of this wave."
       ]
     },
     {
