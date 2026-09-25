@@ -64,7 +64,7 @@ describe('platform migration ledger', () => {
     expect(ledgerRow(handle, 11)?.applied_at).toEqual(expect.any(String))
   })
 
-  it('preserves deployed extra schema and records while adding turn metadata at versions 29 and 30', () => {
+  it('preserves deployed extra schema and records while adding turn and parent metadata', () => {
     const handle = openTempDatabase()
     migratePlatformDatabase(
       handle.db,
@@ -99,12 +99,19 @@ describe('platform migration ledger', () => {
     expect(applied.map(({ version, name }) => ({ version, name }))).toEqual([
       { version: 29, name: 'turn_end_reason' },
       { version: 30, name: 'message_model_selection' },
+      { version: 35, name: 'worktree_base_branch' },
     ])
     expect(columnNames(handle, 'projection_turns')).toContain('end_reason')
     expect(columnNames(handle, 'projection_session_messages')).toContain('model_selection_json')
+    expect(columnNames(handle, 'projection_worktrees')).toContain('base_branch')
     expect(
-      rows(handle, sql`SELECT pull_request_json, setup_json FROM projection_worktrees`),
-    ).toEqual([{ pull_request_json: '{"number":31}', setup_json: '{"state":"ready"}' }])
+      rows(
+        handle,
+        sql`SELECT pull_request_json, setup_json, base_branch FROM projection_worktrees`,
+      ),
+    ).toEqual([
+      { pull_request_json: '{"number":31}', setup_json: '{"state":"ready"}', base_branch: null },
+    ])
     expect(tableNames(handle)).toContain('push_devices')
     expect(columnNames(handle, 'projection_sessions')).toContain('lifecycle_revision')
     expect(ledgerVersions(handle)).toEqual(

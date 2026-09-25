@@ -47,7 +47,12 @@ test('registered external worktrees never acquire an inferred parent', async () 
   fixtures.push(fixture)
   const external = path.join(fixture.root, 'external')
   await executeGit(fixture.root, 'worktree', 'add', '-b', 'external-child', external, 'main')
-  await fixture.engine.registerCheckout(external)
+  await fixture.command({
+    type: 'project.create',
+    title: 'External checkout',
+    workspaceRoot: external,
+    defaultModelSelection: null,
+  })
   await fixture.restart()
   expect((await fixture.engine.shellSnapshot()).worktrees).toEqual(
     expect.arrayContaining([
