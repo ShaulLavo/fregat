@@ -50,7 +50,7 @@ function requireOutdated(text: string, url: string, where: string) {
 export const machineProtocolMismatch: Scenario = {
   name: 'machine-protocol-mismatch',
   description:
-    'Serve /health one protocol behind this client, add it as a Remote URL machine in Connect machine, and require the form error to name both protocols with the fix, the picker row to read "Server out of date" and repeat the fix on retry, and Settings › Machines to read "Server out of date" with the fix under Details.',
+    'Serve /health one protocol behind this client, add it as a Remote URL machine in Connect machine, and require the form error to name both protocols with the fix, the picker row to read "Protocol mismatch" and repeat the fix on retry, and Settings › Machines to read "Protocol mismatch" with the fix under Details.',
   async run(page, { step }) {
     const server = outdatedServer()
     const url = `http://127.0.0.1:${server.port}`
@@ -75,7 +75,7 @@ export const machineProtocolMismatch: Scenario = {
       const name = await row.getAttribute('title')
       ok(name, 'The saved machine row names its machine')
       const rowText = await row.innerText()
-      ok(rowText.includes('Server out of date'), `The picker row reads: ${rowText}`)
+      ok(rowText.includes('Protocol mismatch'), `The picker row reads: ${rowText}`)
       await step('picker-row')
       await row.click()
       const pickerError = selectors.machineDialogError(dialog)

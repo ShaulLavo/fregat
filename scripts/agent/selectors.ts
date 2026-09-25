@@ -230,8 +230,7 @@ export const selectors = {
   machineFormCancel: (dialog: Locator) =>
     dialog.getByRole('button', { name: 'Cancel', exact: true }),
   machineDialogError: (dialog: Locator) => dialog.getByRole('alert'),
-  serverOutOfDate: (scope: Page | Locator) =>
-    scope.getByText('Server out of date', { exact: true }),
+  serverOutOfDate: (scope: Page | Locator) => scope.getByText('Protocol mismatch', { exact: true }),
   sshHostList: (page: Page) =>
     page.getByRole('listbox', { name: 'SSH hosts', exact: true }).first(),
   patternRows: (list: Locator) => list.locator('[data-slot="list-row"]'),

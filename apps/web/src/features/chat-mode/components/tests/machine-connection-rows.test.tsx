@@ -66,7 +66,7 @@ test('active notices are concise and dismissal survives repeat updates and remou
   expect(screen.getByText('shaul-mac · Machine identity changed')).toBeVisible()
 })
 
-test('a server on another protocol reads as out of date, and Details shows its fix', async () => {
+test('a server on another protocol names the protocol mismatch, and Details shows its fix', async () => {
   const fixture = await createConnectionNoticeFixture()
   onTestFinished(fixture.dispose)
   fixture.update({
@@ -75,7 +75,7 @@ test('a server on another protocol reads as out of date, and Details shows its f
   })
   fixture.selectRemote()
   const rail = renderWithProviders(<MachineConnectionRows />, { connections: fixture.connections })
-  expect(screen.getByText('shaul-mac · Server out of date')).toBeVisible()
+  expect(screen.getByText('shaul-mac · Protocol mismatch')).toBeVisible()
   await userEvent.click(screen.getByRole('button', { name: 'shaul-mac connection details' }))
   expect(screen.getByText(MACHINE_PROTOCOL_ERROR.message)).toBeVisible()
   expect(screen.getByText(MACHINE_PROTOCOL_ERROR.fix)).toBeVisible()
@@ -84,7 +84,7 @@ test('a server on another protocol reads as out of date, and Details shows its f
     <MachineRow name='shaul-mac' machine={{ kind: 'ssh', target: 'shaul-mac' }} disabled={false} />,
     { connections: fixture.connections },
   )
-  expect(screen.getByText('Server out of date')).toBeVisible()
+  expect(screen.getByText('Protocol mismatch')).toBeVisible()
 })
 
 test('a real SSH server on an older protocol ends blocked with its fix, and focus does not retry it', async () => {
@@ -127,7 +127,7 @@ test('a real SSH server on an older protocol ends blocked with its fix, and focu
   renderWithProviders(<MachineRow name='remote' machine={machine} disabled={false} />, {
     connections: h.connections,
   })
-  expect(screen.getByText('Server out of date')).toBeVisible()
+  expect(screen.getByText('Protocol mismatch')).toBeVisible()
   await userEvent.click(screen.getByRole('button', { name: 'remote connection details' }))
   expect(screen.getByText(remote()!.lastError!.fix!)).toBeVisible()
 })
