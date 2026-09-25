@@ -2,8 +2,7 @@
 
 ## Status and authorization
 
-- Status: PROPOSED — ready. The owner approved all five items and accepted D1–D2 as recommended on
-  2026-09-25.
+- Status: items 1, 2, 3 and 5 done 2026-09-25 (lane L1). Item 4 waits on an owner question (below).
 - Priority: P2 in the UI refresh lane, after Plan 157 (done). Items 1 and 3 use its
   `scroll-pinned` utility and its `StatusDot`.
 - Effort: M. One shared `packages/ui` pattern, two small primitives, and four surface changes.
@@ -129,6 +128,14 @@ secret rows (the settings API cannot seed provider variables). The text below is
   because its options are unbounded.
 
 ## 3. Checkpoint restore
+
+**Done 2026-09-25 (lane L1).** `useRestoringCheckpoint` reads the target message id from the
+rewind mutation's variables through `useMutationState`; `checkpointRestoreRoles` gives every row
+a role, so the target shows a live `StatusDot` and a `Shimmer` "Restoring…", later rows recede to
+`opacity-50`, and every other revert action is absent. The confirm dialog now closes on the held
+confirm (errors still reach the send-error banner), since the timeline is where the restore shows.
+Scenario `checkpoint-restore` on the native checkpoint fixture, which gained `thread/turns/list`
+and a delayable `thread/revert`. The text below is the original plan.
 
 **Today.**
 

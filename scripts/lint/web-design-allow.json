@@ -203,5 +203,10 @@
     "file": "packages/ui/src/patterns/tail-jump-button.tsx",
     "class": "rounded-full",
     "reason": "The way back to a live edge is a pill floating over the list, so it overrides the Button primitive's control radius."
+  },
+  {
+    "file": "apps/web/src/features/chat/components/timeline-row.tsx",
+    "class": "opacity-50",
+    "reason": "Turns a checkpoint restore is about to remove recede as whole rows while it runs, the treatment a disabled control gets; nothing can act on them until the timeline settles."
   }
 ]

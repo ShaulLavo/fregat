@@ -26,7 +26,7 @@ a bare root `bun run verify`.
 | [164 — what feels right in Neon](164-what-feels-right-in-neon.md)                       | **FIRST PASS SHIPPED; METADATA SWEEP LEFT**                          |
 | [162 — context and cost](162-context-and-cost.md)                                       | **PROPOSED — READY; DECISIONS ACCEPTED**                             |
 | [159 — file and folder picker](159-file-picker.md)                                      | **PROPOSED — READY; DECISIONS ACCEPTED**                             |
-| [158 — app polish from Neon](158-app-polish.md)                                         | **PROPOSED — READY; DECISIONS ACCEPTED**                             |
+| [158 — app polish from Neon](158-app-polish.md)                                         | **1, 2, 3, 5 DONE (L1); 4 AWAITS OWNER** |
 | [156 — documents in the editor](156-documents-in-the-editor.md)                         | **PLACEHOLDER — FAR FUTURE; RESEARCH FIRST**                         |
 | [155 — site demo becomes an animated replica](155-site-demo-replica.md)                 | **PLACEHOLDER — RESEARCH NOT STARTED**                               |
 | [154 — physical mode](154-physical-mode.md)                                             | **PROPOSED — D6 (SETTINGS SHAPE) FIRST**                             |

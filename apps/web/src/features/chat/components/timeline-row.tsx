@@ -16,13 +16,16 @@ import { RenderErrorBoundary } from '@workspace/ui/patterns/render-error-boundar
 import { AgentsRow } from '@/features/chat/components/agents-row'
 import { ReasoningRow } from '@/features/chat/components/reasoning-row'
 import { ModelSwitchRow } from '@/features/chat/components/model-switch-row'
+import type { CheckpointRestoreRole } from '@/features/chat/utils/checkpoint-restore'
 
 export function TimelineRow({
   checkpointRevertPending = false,
   item,
+  restoreRole,
 }: {
   checkpointRevertPending?: boolean
   item: ChatTimelineItem
+  restoreRole?: CheckpointRestoreRole
 }) {
   // The fold's own row is what unmounts when it scrolls out of overscan, so its open
   // state lives above the list, keyed by the id the derivation already guarantees.
@@ -34,7 +37,12 @@ export function TimelineRow({
 
   return (
     <div
-      className={cn('mx-auto w-full max-w-3xl min-w-0', timelineRowSpacing(item))}
+      className={cn(
+        'mx-auto w-full max-w-3xl min-w-0 transition-opacity',
+        timelineRowSpacing(item),
+        restoreRole === 'receding' && 'opacity-50',
+      )}
+      data-restore-role={restoreRole}
       data-timeline-row-id={item.id}
       data-timeline-row-type={item.type}
     >
@@ -44,6 +52,7 @@ export function TimelineRow({
           checkpointRevertPending,
           foldExpanded,
           item,
+          restoreRole,
           toggleFold: () => toggleGroupExpanded(foldId),
         })}
       </RenderErrorBoundary>
@@ -55,11 +64,13 @@ function timelineRowContent({
   checkpointRevertPending,
   foldExpanded,
   item,
+  restoreRole,
   toggleFold,
 }: {
   checkpointRevertPending: boolean
   foldExpanded: boolean
   item: ChatTimelineItem
+  restoreRole: CheckpointRestoreRole | undefined
   toggleFold: () => void
 }) {
   if (item.type === 'agent-group') return <AgentsRow group={item.group} />
@@ -74,6 +85,7 @@ function timelineRowContent({
         durationStart={item.durationStart}
         message={item.message}
         renderAssistantCopyButton={renderAssistantCopyButton}
+        restoreRole={restoreRole}
         revertTurnCount={item.revertTurnCount}
         incomplete={item.incomplete}
         showAssistantCopyButton={item.showAssistantCopyButton}

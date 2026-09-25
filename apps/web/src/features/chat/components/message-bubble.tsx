@@ -3,6 +3,9 @@ import type { OrchestrationMessage } from '@workspace/contracts'
 import { ArrowCounterClockwiseIcon } from '@phosphor-icons/react'
 import { Button } from '@workspace/ui/components/button'
 import { cn } from '@workspace/ui/lib/utils'
+import { Shimmer } from '@workspace/ui/components/shimmer'
+import { StatusDot } from '@workspace/ui/components/status-dot'
+import type { CheckpointRestoreRole } from '@/features/chat/utils/checkpoint-restore'
 import type { MouseEvent, ReactNode } from 'react'
 
 import { useContextMenu } from '@/keymap/menus/hooks/use-context-menu'
@@ -33,6 +36,7 @@ export function MessageBubble({
   incomplete = false,
   message,
   renderAssistantCopyButton,
+  restoreRole,
   revertTurnCount = null,
   showAssistantCopyButton = false,
   showCompletionDivider = false,
@@ -47,6 +51,7 @@ export function MessageBubble({
   incomplete?: boolean
   message: OrchestrationMessage | OptimisticChatMessage
   renderAssistantCopyButton?: (text: string) => ReactNode
+  restoreRole?: CheckpointRestoreRole
   revertTurnCount?: number | null
   showAssistantCopyButton?: boolean
   showCompletionDivider?: boolean
@@ -80,7 +85,10 @@ export function MessageBubble({
     streaming: effectiveAssistantStreaming || assistantTurnInProgress,
     text: message.text,
   })
-  const canRevertCheckpoint = user && typeof revertTurnCount === 'number'
+  // While one turn restores, every other revert action is absent rather than disabled.
+  const canRevertCheckpoint =
+    user && typeof revertTurnCount === 'number' && restoreRole === undefined
+  const restoring = restoreRole === 'target'
   const assistantMarkdown = (
     <AssistantMarkdown text={assistantText} streaming={effectiveAssistantStreaming} />
   )
@@ -157,10 +165,21 @@ export function MessageBubble({
           )}
           {user ? (
             <div
-              className='text-muted-foreground text-3xs mt-1 flex items-center justify-end gap-1.5 tabular-nums transition-opacity group-focus-within/message:pointer-events-auto group-focus-within/message:opacity-100 group-hover/message:pointer-events-auto group-hover/message:opacity-100 [@media(hover:hover)]:pointer-events-none [@media(hover:hover)]:opacity-0'
+              className={cn(
+                'text-muted-foreground text-3xs mt-1 flex items-center justify-end gap-1.5 tabular-nums transition-opacity',
+                restoring
+                  ? 'opacity-100'
+                  : 'group-focus-within/message:pointer-events-auto group-focus-within/message:opacity-100 group-hover/message:pointer-events-auto group-hover/message:opacity-100 [@media(hover:hover)]:pointer-events-none [@media(hover:hover)]:opacity-0',
+              )}
               data-user-message-meta='true'
             >
-              <span className='size-5 shrink-0'>
+              {restoring ? (
+                <span className='flex items-center gap-1.5' role='status'>
+                  <StatusDot live tone='info' />
+                  <Shimmer>Restoring…</Shimmer>
+                </span>
+              ) : null}
+              <span className='size-5 shrink-0 transition-transform group-focus-within/message:translate-x-0 group-hover/message:translate-x-0 [@media(hover:hover)]:-translate-x-2'>
                 {canRevertCheckpoint ? (
                   <Tooltip>
                     <TooltipTrigger
