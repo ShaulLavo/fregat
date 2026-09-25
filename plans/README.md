@@ -24,9 +24,7 @@ a bare root `bun run verify`.
 | [166 — keyboard shortcuts, redone](166-shortcuts-editor.md)                             | **PROPOSED — RESEARCH FIRST; D1–D6 DECIDED**                         |
 | [165 — one font catalog, loaded on demand](165-font-catalog.md)                         | **IMPLEMENTED 2026-09-25 — ALL FIVE PHASES**                         |
 | [164 — what feels right in Neon](164-what-feels-right-in-neon.md)                       | **FIRST PASS SHIPPED; METADATA SWEEP LEFT**                          |
-| [163 — screenshot in the composer](163-chat-screenshot.md)                              | **PROPOSED — READY; DECISIONS ACCEPTED**                             |
 | [162 — context and cost](162-context-and-cost.md)                                       | **PROPOSED — READY; DECISIONS ACCEPTED**                             |
-| [161 — honest states](161-honest-states.md)                                             | **PROPOSED — READY; DECISIONS ACCEPTED**                             |
 | [160 — chat turn anatomy](160-chat-turn-anatomy.md)                                     | **PROPOSED — READY; DECISIONS ACCEPTED**                             |
 | [159 — file and folder picker](159-file-picker.md)                                      | **PROPOSED — READY; DECISIONS ACCEPTED**                             |
 | [158 — app polish from Neon](158-app-polish.md)                                         | **PROPOSED — READY; DECISIONS ACCEPTED**                             |

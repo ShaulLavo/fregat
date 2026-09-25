@@ -576,9 +576,11 @@ export const selectors = {
   rewindDialog: (page: Page) => page.getByRole('alertdialog'),
   chatComposerFileInput: (page: Page) =>
     page
-      .getByRole('button', { name: 'Attach files', exact: true })
+      .getByRole('button', { name: 'Attach', exact: true })
       .locator('..')
       .locator('input[type=file]'),
+  chatAttachMenuItem: (page: Page, name: 'Attach files…' | 'Screenshot…') =>
+    page.getByRole('menuitem', { name, exact: true }),
   chatStagedFile: (page: Page, name: string) =>
     page.getByLabel('Attachments', { exact: true }).getByText(name, { exact: true }),
   chatStagedImage: (page: Page, name: string) =>
@@ -751,6 +753,9 @@ export const selectors = {
   historyList: (page: Page) => page.getByRole('listbox', { name: 'Commit history' }),
   historyRowSelector: '[data-history-commit]',
   logRowSelector: '[data-log-row-summary]',
+  /** Every rendered assistant answer in the chat timeline, for page-side frame samplers. */
+  chatMarkdownSelector: '[role="log"][aria-label="Messages"] [data-chat-markdown]',
+  chatCodeBlockSelector: '[data-markdown="code-block"]',
   logCopyButtons: (page: Page) => page.getByRole('button', { name: 'Copy log event', exact: true }),
   logCleared: (page: Page) => page.getByText('Visible logs cleared.', { exact: true }),
   logRows: (page: Page) => page.locator('[data-log-row-summary]'),

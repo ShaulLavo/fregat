@@ -21,7 +21,13 @@ import { projectGrouping } from './project-grouping'
 import { sessionSearch, sessionSearchEnvironments } from './session-search'
 import { sessionUnread } from './session-unread'
 import { mcpApproval } from './mcp-approval'
+import { chatScreenshot } from './chat-screenshot'
 import { approvalTurnEnded } from './approval-turn-ended'
+import { approvalTwoTabs } from './approval-two-tabs'
+import { approvalReconnect } from './approval-reconnect'
+import { stoppedTurnReasons } from './stopped-turn-reasons'
+import { streamAmbiguousTail } from './stream-ambiguous-tail'
+import { streamCodeColour } from './stream-code-colour'
 import { claudeApprovalRules, codexApprovalRules } from './approval-rules'
 import { checkpointRewind } from './checkpoint-rewind'
 import { archiveLifecycle } from './archive-lifecycle'
@@ -146,7 +152,8 @@ import type { Page } from 'playwright'
 
 type ScenarioContext = {
   readonly file: string
-  readonly step: (label: string) => Promise<void>
+  /** Screenshots `target`, the scenario's page unless a second window is named. */
+  readonly step: (label: string, target?: Page) => Promise<void>
 }
 
 export type Scenario = {
@@ -228,7 +235,13 @@ export const scenarios: readonly Scenario[] = [
   sessionNotifications,
   composerDefaults,
   mcpApproval,
+  chatScreenshot,
   approvalTurnEnded,
+  approvalTwoTabs,
+  approvalReconnect,
+  stoppedTurnReasons,
+  streamAmbiguousTail,
+  streamCodeColour,
   claudeApprovalRules,
   codexApprovalRules,
   fileAttachments,

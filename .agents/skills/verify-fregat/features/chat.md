@@ -89,3 +89,24 @@ Commands dispatch over the orchestration socket when it is live and over HTTP ot
 `scenario chat-card-narrow` drags the stage/tool split to its narrowest and checks the assistant changed-files card. The `+/-` counts are a ticker, which cannot shrink or ellipsize, so the header wraps its buttons to a second row rather than letting the counts paint over View diff.
 
 `scenario chat-disclosure-settle` opens and closes the first collapsed disclosure it finds in an existing transcript. The row holding it must not move, and rows must not overlap. `scenario chat-composer-insert` uses a fixture repo. It sends a diff line through "Ask the agent about these lines" and drops a tree path onto the composer. Both must land in the composer with focus. It also checks that `data-compact` on the action row matches the measured width, in the side panel and in the chat stage. The drop is a synthesized `DragEvent` with the tree's `text/plain` payload.
+
+## Hostile states
+
+Each surface lists the states it must survive and the scenario that drives each one. All run on the native Codex fixture and spend no provider tokens.
+
+- **Approval panel**
+  - The turn is stopped while the approval is open: the panel closes, the fold keeps an "Ended unanswered" receipt across reload, and no answer reaches the agent. `approval-turn-ended`
+  - Two windows answer at once, and one double-clicks: exactly one answer reaches the agent and the transcript holds one receipt. `approval-two-tabs`
+  - The chat socket drops while the approval is pending: the panel keeps the request, disables its buttons, says it may already have been answered in another window, and recovers on reconnect. `approval-reconnect`
+- **User-input panel**: a respond failure that says the request is gone closes it (server tests in `orchestration/tests/session-lifecycle.test.ts`); the async-question paths are `async-questions`.
+- **Timeline stream**
+  - The live tail pauses on `#`, `## `, an open backtick, a table header without its separator, or a bare list marker: no frame paints that syntax. `stream-ambiguous-tail`
+  - A code fence streams in chunks: the coloured token count never drops between frames (Plan 161 3.2 did not reproduce). `stream-code-colour`
+- **Stopped turn**: the Stop button, a runtime stop through the command API and a provider failure each read their own status line; the partial answer fades as incomplete; Try again resends the same message; a reader scrolled up keeps their place while the retry answers. `stopped-turn-reasons`. The server-restart line is covered by `orchestration/tests/recovery.test.ts`.
+- **Queue**: held follow-ups, Send now and Restore across a pending approval. `chat-queue`
+- **Composer**: a dismissed screenshot picker stages nothing and raises no toast; a frame stages one PNG. `chat-screenshot`
+- **Changed files**: empty, failed and pending lists. `checkpoint-states` plus component tests.
+
+- `approval-turn-ended`, `approval-two-tabs`, `approval-reconnect`: see Hostile states above.
+- `stopped-turn-reasons`, `stream-ambiguous-tail`, `stream-code-colour`: see Hostile states above. The stream scenarios set `chat.responseStreamingMode` to `token` and restore it.
+- `chat-screenshot`: the composer attach menu's Screenshot… item with the page's `getDisplayMedia` stubbed by a painted canvas stream; removes its draft image.

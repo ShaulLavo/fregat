@@ -35,7 +35,8 @@ async function driveComposer(
   await page.keyboard.press('Escape')
 
   const chooser = page.waitForEvent('filechooser')
-  await selectors.iconHintControl(page, 'Attach files').click()
+  await selectors.iconHintControl(page, 'Attach').click()
+  await selectors.chatAttachMenuItem(page, 'Attach files…').click()
   await (await chooser).setFiles(image)
   const attachment = selectors.iconHintControl(page, `Open ${image.name}`)
   await captureHint(page, attachment, `Open ${image.name}`, step, 'attachment-hint')

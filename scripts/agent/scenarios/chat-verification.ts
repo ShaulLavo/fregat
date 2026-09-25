@@ -1,5 +1,8 @@
 import { ok } from 'node:assert/strict'
-import { orchestrationShellSnapshotSchema } from '../../../packages/contracts/src/index'
+import {
+  orchestrationSessionDetailSnapshotSchema,
+  orchestrationShellSnapshotSchema,
+} from '../../../packages/contracts/src/index'
 import * as v from 'valibot'
 import type { Page } from 'playwright'
 
@@ -9,6 +12,16 @@ export async function readShell(page: Page, base: string) {
   })
   ok(response.ok(), 'Shell snapshot is reachable')
   return v.parse(orchestrationShellSnapshotSchema, await response.json())
+}
+
+/** The session's projected detail over HTTP, as the page's own snapshot read gets it. */
+export async function readSessionDetail(page: Page, base: string, sessionId: string) {
+  const response = await page.request.get(`${base}/session-detail`, {
+    headers: { Origin: new URL(page.url()).origin },
+    params: { sessionId },
+  })
+  ok(response.ok(), 'Session detail is reachable')
+  return v.parse(orchestrationSessionDetailSnapshotSchema, await response.json()).session
 }
 
 export async function dispatch(page: Page, base: string, command: Record<string, unknown>) {
