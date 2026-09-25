@@ -42,6 +42,7 @@ const lifecycle = {
     activate: () => Promise.resolve(),
     terminate: () => Promise.resolve(),
     end: () => Promise.resolve(),
+    markUnknown: () => Promise.resolve(),
   }),
 }
 

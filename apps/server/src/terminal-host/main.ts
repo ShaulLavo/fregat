@@ -15,6 +15,7 @@ import {
   HOST_CAPABILITIES,
   hostPaths,
   PROTOCOL_VERSION,
+  RING_BYTES,
   type ClientControl,
   type Frame,
   type HostControl,
@@ -27,6 +28,8 @@ import { readReleaseInfoSync, releaseFileFor } from '../web/release'
 
 const DEFAULT_IDLE_MS = 30_000
 const SHUTDOWN_GRACE_MS = 2_000
+/** Unsent bytes one connection may queue; a slower reader is dropped and resumes from its offset. */
+export const MAX_QUEUED_BYTES = 4 * RING_BYTES
 
 type SpawnControl = Extract<ClientControl, { type: 'spawn' }>
 type AttachControl = Extract<ClientControl, { type: 'attach' }>
@@ -95,13 +98,11 @@ class TerminalHost {
   }
 
   spawn(connection: HostConnection, control: SpawnControl): HostControl {
-    // A key names one shell: a spawn for a key that still has one replaces it.
-    const previous = this.byKey.get(control.key)
-    if (previous?.exit) this.forget(previous)
-    else previous?.pty.kill()
     const [program, ...args] = control.command
     if (program === undefined)
       return { type: 'error', request: control.request, code: 'invalid', message: 'No command.' }
+    const previous = this.byKey.get(control.key)
+    // Built first: a spawn that throws leaves the key's current shell running.
     const session = new HostSession({
       id: this.nextSession++,
       key: control.key,
@@ -112,6 +113,9 @@ class TerminalHost {
       rows: control.rows,
       onExit: (ended) => this.ended(ended),
     })
+    // A key names one shell: a spawn for a key that still has one replaces it.
+    if (previous?.exit) this.forget(previous)
+    else previous?.pty.kill()
     this.sessions.set(session.id, session)
     this.byKey.set(session.key, session)
     session.subscribe(connection)
@@ -243,7 +247,7 @@ class TerminalHost {
   }
 }
 
-class HostConnection implements SessionSubscriber {
+export class HostConnection implements SessionSubscriber {
   private readonly host: TerminalHost
   private readonly socket: net.Socket
   private readonly decoder = new FrameDecoder()
@@ -280,6 +284,8 @@ class HostConnection implements SessionSubscriber {
   private write(bytes: Uint8Array) {
     if (this.socket.destroyed) return
     this.socket.write(bytes)
+    // Closing unsubscribes this reader, so the output waits in the ring instead of in memory.
+    if (this.socket.writableLength > MAX_QUEUED_BYTES) this.socket.destroy()
   }
 
   private receive(chunk: Uint8Array | string) {

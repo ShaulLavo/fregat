@@ -29,6 +29,9 @@ import { launchHost } from '../terminal-host/launch'
 
 const CONNECT_TIMEOUT_MS = 5_000
 const CONNECT_RETRY_MS = 25
+const REQUEST_TIMEOUT_MS = 10_000
+// The host never reports an exit it did not see; this matches its own unknown-exit convention.
+const GONE_EXIT: PtyExit = { exitCode: 1, signal: null }
 
 export type HostLauncher = (argv: readonly string[], env: NodeJS.ProcessEnv) => void | Promise<void>
 
@@ -39,6 +42,8 @@ export type TerminalHostClientOptions = {
   readonly env?: NodeJS.ProcessEnv
   readonly idleMs?: number
   readonly launch?: HostLauncher
+  /** How long one request waits for its reply before the connection is dropped. */
+  readonly requestTimeoutMs?: number
 }
 
 export type HostAttachOptions = {
@@ -58,6 +63,7 @@ type Pending = {
   fail(error: unknown): void
 }
 type PtyHandlers = Pick<HostAttachOptions, 'onData' | 'onGap'>
+type Resumed = 'resumed' | 'gone' | 'failed'
 
 /** Connects to this state root's terminal host, launching it when nothing answers. */
 export class TerminalHostClient {
@@ -65,8 +71,10 @@ export class TerminalHostClient {
   private readonly env: NodeJS.ProcessEnv
   private readonly idleMs: number | undefined
   private readonly launch: HostLauncher
+  private readonly requestTimeoutMs: number
   private connecting: Promise<Connected> | null = null
   private generation = 0
+  private detaches = 0
   private description: HostHello | null = null
 
   constructor({
@@ -74,11 +82,13 @@ export class TerminalHostClient {
     env = process.env,
     idleMs,
     launch = launchHost,
+    requestTimeoutMs = REQUEST_TIMEOUT_MS,
   }: TerminalHostClientOptions) {
     this.stateRoot = stateRoot
     this.env = env
     this.idleMs = idleMs
     this.launch = launch
+    this.requestTimeoutMs = requestTimeoutMs
   }
 
   /** Last authenticated host, without starting one for a release probe. */
@@ -126,6 +136,7 @@ export class TerminalHostClient {
     this.connecting = null
     this.description = null
     this.generation += 1
+    this.detaches += 1
     void connecting?.then(
       ({ connection }) => connection.close(),
       () => {},
@@ -203,20 +214,81 @@ export class TerminalHostClient {
     timeoutMs: number,
   ) {
     try {
-      return await HostConnection.handshake(
-        socket,
-        token,
-        () => {
-          if (this.generation !== generation || !this.description) return
-          this.connecting = null
-          this.description = null
+      return await HostConnection.handshake(socket, token, {
+        onClose: (orphans) => {
+          if (this.generation === generation && this.description) {
+            this.connecting = null
+            this.description = null
+          }
+          if (orphans.length > 0) void this.recover(orphans)
         },
-        Math.max(1, timeoutMs),
-      )
+        timeoutMs: Math.max(1, timeoutMs),
+        requestTimeoutMs: this.requestTimeoutMs,
+      })
     } catch (error) {
       if (errorStringField(error, 'code') !== terminalHostErrors.HOST_UNREACHABLE.code) throw error
       return null
     }
+  }
+
+  /** A dropped connection hands over its shells: listed ones resume from their offset, the rest exited. */
+  private async recover(orphans: readonly HostPty[]) {
+    const detaches = this.detaches
+    const startedAt = performance.now()
+    try {
+      const { connection, hello } = await this.connection()
+      const sessions = await connection.list()
+      const results = await Promise.all(
+        orphans.map((pty) => this.resume(connection, pty, sessions, detaches)),
+      )
+      recordProcessInfo('terminal.host.reconnect', {
+        area: 'terminal',
+        durationMs: elapsedMs(startedAt),
+        hostPid: hello.pid,
+        keyCount: orphans.length,
+        resumed: results.filter((result) => result === 'resumed').length,
+        gone: results.filter((result) => result === 'gone').length,
+        failed: results.filter((result) => result === 'failed').length,
+      })
+    } catch (cause) {
+      for (const pty of orphans) this.lost(pty, cause, detaches)
+    }
+  }
+
+  private async resume(
+    connection: HostConnection,
+    pty: HostPty,
+    sessions: readonly HostSessionInfo[],
+    detaches: number,
+  ): Promise<Resumed> {
+    const listed = sessions.some((info) => info.key === pty.key && info.session === pty.session)
+    if (!listed) {
+      pty.finish(GONE_EXIT)
+      return 'gone'
+    }
+    try {
+      await connection.resume(pty)
+      return 'resumed'
+    } catch (cause) {
+      this.lost(pty, cause, detaches)
+      return 'failed'
+    }
+  }
+
+  // After `close()` the shell is detached on purpose and keeps its offset for a later attach.
+  private lost(pty: HostPty, cause: unknown, detaches: number) {
+    if (this.detaches !== detaches) return
+    pty.fail(
+      terminalHostErrors.HOST_UNREACHABLE({
+        ...(cause instanceof Error ? { cause } : {}),
+        internal: {
+          reason: 'reconnect-failed',
+          key: pty.key,
+          session: pty.session,
+          code: errorStringField(cause, 'code') ?? null,
+        },
+      }),
+    )
   }
 
   private hostArgv() {
@@ -230,31 +302,39 @@ export function hostPtyFactory(client: TerminalHostClient): TerminalPtyFactory {
   return (options) => client.spawn(options)
 }
 
+type ConnectionOptions = {
+  /** Gets the shells a connection lost without being asked to close; empty otherwise. */
+  readonly onClose: (orphans: readonly HostPty[]) => void
+  readonly timeoutMs: number
+  readonly requestTimeoutMs: number
+}
+
 class HostConnection {
   private readonly socket: net.Socket
   private readonly decoder = new FrameDecoder()
   private readonly requests = new Map<number, Pending>()
   private readonly ptys = new Map<number, HostPty>()
   private readonly greeting = Promise.withResolvers<HostHello>()
-  private readonly onClose: () => void
+  private readonly onClose: ConnectionOptions['onClose']
+  private readonly requestTimeoutMs: number
   private nextRequest = 1
   private closedByUs = false
+  private ended = false
 
-  private constructor(socket: net.Socket, onClose: () => void) {
+  private constructor(socket: net.Socket, options: ConnectionOptions) {
     this.socket = socket
-    this.onClose = onClose
+    this.onClose = options.onClose
+    this.requestTimeoutMs = options.requestTimeoutMs
     socket.on('data', (chunk) => this.receive(chunk))
     socket.on('error', () => socket.destroy())
+    // The host only ends a connection it is done with; waiting on the half-open side can stall.
+    socket.on('end', () => socket.destroy())
     socket.on('close', () => this.closed())
   }
 
-  static async handshake(
-    socket: net.Socket,
-    token: string,
-    onClose: () => void,
-    timeoutMs: number,
-  ) {
-    const connection = new HostConnection(socket, onClose)
+  static async handshake(socket: net.Socket, token: string, options: ConnectionOptions) {
+    const { timeoutMs } = options
+    const connection = new HostConnection(socket, options)
     connection.send({ type: 'hello', version: PROTOCOL_VERSION, token, capabilities: [] })
     const timeout = setTimeout(
       () =>
@@ -327,6 +407,26 @@ class HostConnection {
     )
   }
 
+  /** Moves a shell from a lost connection onto this one, replaying from the offset it reached. */
+  resume(pty: HostPty) {
+    return this.request<void>(
+      'attach',
+      (request) => ({
+        type: 'attach',
+        request,
+        key: pty.key,
+        session: pty.session,
+        from: pty.offset,
+      }),
+      (reply) => {
+        if (reply.type !== 'attached') throw protocolError(reply.type, 'attached')
+        this.recordAttach(reply)
+        this.ptys.set(reply.session, pty)
+        pty.rebind(this)
+      },
+    )
+  }
+
   private recordAttach(reply: Extract<HostControl, { type: 'attached' }>) {
     void this.greeting.promise.then((hello) =>
       recordProcessInfo('terminal.host.attach', {
@@ -349,20 +449,44 @@ class HostConnection {
   ) {
     const request = this.nextRequest++
     const { promise, resolve, reject } = Promise.withResolvers<T>()
+    const deadline = setTimeout(() => this.timedOut(request), this.requestTimeoutMs)
     this.requests.set(request, {
       operation,
       // Runs inside the frame loop, so a pty is registered before its first output frame.
       settle: (reply) => {
+        clearTimeout(deadline)
         try {
           resolve(accept(reply))
         } catch (error) {
           reject(error)
         }
       },
-      fail: reject,
+      fail: (error) => {
+        clearTimeout(deadline)
+        reject(error)
+      },
     })
     this.send(control(request))
     return promise
+  }
+
+  // A host that stops answering is dropped; its shells resume on the next connection.
+  private timedOut(request: number) {
+    const pending = this.requests.get(request)
+    if (!pending) return
+    this.requests.delete(request)
+    pending.fail(
+      terminalHostErrors.HOST_UNREACHABLE({
+        internal: {
+          reason: 'request-timeout',
+          operation: pending.operation,
+          timeoutMs: this.requestTimeoutMs,
+        },
+      }),
+    )
+    this.socket.destroy()
+    // Now, before the close event: the next request must not reach this dead socket.
+    this.closed()
   }
 
   private adopt(reply: Reply, handlers: PtyHandlers, from = 0) {
@@ -439,17 +563,23 @@ class HostConnection {
   }
 
   private closed() {
-    this.onClose()
-    if (this.closedByUs) return
-    this.fail(
-      terminalHostErrors.HOST_UNREACHABLE({
-        internal: {
-          reason: 'connection-closed',
-          pendingRequests: this.requests.size,
-          sessions: this.ptys.size,
-        },
-      }),
-    )
+    if (this.ended) return
+    this.ended = true
+    if (this.closedByUs) return this.onClose([])
+    const orphans = [...this.ptys.values()]
+    const error = terminalHostErrors.HOST_UNREACHABLE({
+      internal: {
+        reason: 'connection-closed',
+        pendingRequests: this.requests.size,
+        sessions: orphans.length,
+      },
+    })
+    this.greeting.reject(error)
+    for (const pending of this.requests.values()) pending.fail(error)
+    this.requests.clear()
+    this.ptys.clear()
+    this.closedByUs = true
+    this.onClose(orphans)
   }
 }
 
@@ -461,10 +591,12 @@ export class HostPty implements Pty {
   readonly exited: Promise<PtyExit>
   /** The end of the output this client has received; the next frame starts here. */
   offset: number
-  private readonly connection: HostConnection
+  private connection: HostConnection
   private readonly handlers: PtyHandlers
   private readonly completion = Promise.withResolvers<PtyExit>()
   private done = false
+  // Resent after a reconnect: a kill sent while the connection was down never arrived.
+  private killSignal: NodeJS.Signals | null = null
 
   constructor(
     connection: HostConnection,
@@ -493,7 +625,13 @@ export class HostPty implements Pty {
 
   kill(signal: NodeJS.Signals = 'SIGHUP') {
     if (this.done) return
+    this.killSignal = signal
     this.connection.send({ type: 'kill', session: this.session, signal: hostSignal(signal) })
+  }
+
+  rebind(connection: HostConnection) {
+    this.connection = connection
+    if (this.killSignal) this.kill(this.killSignal)
   }
 
   async [Symbol.asyncDispose]() {

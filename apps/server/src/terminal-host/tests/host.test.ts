@@ -162,3 +162,24 @@ it('retries a socket closed during the shutdown handshake and launches the next 
     stopping.close()
   }
 })
+
+it('keeps the running shell for a key when its replacement fails to spawn', async () => {
+  const host = await testHost()
+  const live = await host.client.spawn({ key: 'kept', command: LOOP, onData: () => {} })
+
+  await expect(
+    host.client.spawn({ key: 'kept', command: ['/nonexistent/shell'], onData: () => {} }),
+  ).rejects.toMatchObject({ code: 'terminal.HOST_REQUEST_FAILED' })
+
+  await Bun.sleep(100)
+  expect(await host.client.list()).toMatchObject([{ key: 'kept', pid: live.pid, exited: false }])
+})
+
+it('reports a shell as exited when its host dies and a fresh host no longer lists it', async () => {
+  const host = await testHost()
+  const pty = await host.client.spawn({ key: 'orphaned', command: LOOP, onData: () => {} })
+  host.hosts[0]?.kill('SIGKILL')
+
+  await expect(pty.exited).resolves.toEqual({ exitCode: 1, signal: null })
+  expect(host.hosts).toHaveLength(2)
+})
