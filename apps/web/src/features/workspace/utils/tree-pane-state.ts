@@ -10,6 +10,7 @@ import type { FileTreeModel } from '@workspace/tree'
 import type { TreeEntry } from '@/lib/file-system-types'
 import { isDirectoryEntry } from '@/lib/file-system-types'
 import { canonicalTreePath } from '@/lib/path-formatters'
+import { containerTreePath } from '@/features/workspace/utils/entry-paths'
 import {
   type DirectoryLoadOptions,
   shouldLoadDirectory,
@@ -174,21 +175,13 @@ function treeChildrenByParentPath(model: TreeModel) {
   const childrenByParent = new Map<string, TreeChild[]>()
 
   for (const [treePath, entry] of model.entriesByTreePath) {
-    const parentPath = parentTreePath(treePath)
+    const parentPath = containerTreePath(treePath, false)
     const children = childrenByParent.get(parentPath) ?? []
     children.push({ entry, treePath })
     childrenByParent.set(parentPath, children)
   }
 
   return childrenByParent
-}
-
-function parentTreePath(treePath: string) {
-  const path = canonicalTreePath(treePath)
-  const index = path.lastIndexOf('/')
-  if (index < 0) return ''
-
-  return path.slice(0, index)
 }
 
 function flattenedTerminalDirectoryPath(
@@ -362,7 +355,7 @@ function expandedDirectoryPaths(model: TreeModel, tree: FileTreeModel) {
 
     const terminalPath = flattenedTerminalDirectoryPath(treePath, childrenByParent, model)
     if (terminalPath === treePath) continue
-    if (parentTreePath(terminalPath) !== treePath) continue
+    if (containerTreePath(terminalPath, false) !== treePath) continue
 
     paths.push(`${terminalPath}/`)
   }
@@ -396,7 +389,7 @@ function expandNewFlattenedDirectoryTerminals(
   for (const expandedPath of expandedPathsBeforeSync) {
     const terminalPath = flattenedTerminalDirectoryPath(expandedPath, childrenByParent, model)
     if (terminalPath === expandedPath) continue
-    if (parentTreePath(terminalPath) !== expandedPath) continue
+    if (containerTreePath(terminalPath, false) !== expandedPath) continue
     if (!addedDirectoryPaths.has(terminalPath)) continue
 
     expandTreeDirectory(tree, terminalPath)

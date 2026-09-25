@@ -1,6 +1,7 @@
 import { atomicTemporaryPath, commitAtomicWrite, stageAtomicWrite } from './atomic-write'
 import { fsyncVia } from './fsync'
 import { statOptionalVia } from './mutation-target'
+import { isOutsideRoot } from './path'
 import type { Dirent, Stats } from 'node:fs'
 import {
   chmod,
@@ -448,9 +449,7 @@ export class WorkspaceEditJournal {
     const operationPath = this.operationPath(operationId)
     const target = path.resolve(operationPath, relativePath)
     const relative = path.relative(operationPath, target)
-    if (relative === '' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
-      throw new FsError('WORKSPACE_EDIT_INVALID')
-    }
+    if (relative === '' || isOutsideRoot(relative)) throw new FsError('WORKSPACE_EDIT_INVALID')
 
     return target
   }

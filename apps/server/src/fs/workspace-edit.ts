@@ -2,7 +2,7 @@ import { atomicTemporaryPath, writeFileAtomic } from './atomic-write'
 import { fsyncVia } from './fsync'
 import { statOptionalVia } from './mutation-target'
 import { sameItems as sameStrings } from '@workspace/utils/collections'
-import { toPosix as toPortablePath } from './path'
+import { isSameOrDescendant, toPosix } from './path'
 import { createHash, randomUUID } from 'node:crypto'
 import type { Stats } from 'node:fs'
 import path from 'node:path'
@@ -720,9 +720,7 @@ export class WorkspaceEditController {
   }
 
   private async historyLists(canonicalWorkspace: string, category: WorkspaceEditCategory) {
-    const workspace = toPortablePath(
-      path.relative(this.paths.workspaceRootReal, canonicalWorkspace),
-    )
+    const workspace = toPosix(path.relative(this.paths.workspaceRootReal, canonicalWorkspace))
     const entries = this.manifests()
       .filter((manifest) => manifest.category === category && manifest.workspace === workspace)
       .sort((left, right) => right.historySequence - left.historySequence)
@@ -1327,7 +1325,7 @@ export class WorkspaceEditController {
     if (stats.isSymbolicLink() || !stats.isDirectory()) throw new FsError('WORKSPACE_EDIT_INVALID')
     const canonical = await this.driver.realpath(target.absolutePath)
     this.paths.assertRealInside(canonical)
-    const expected = toPortablePath(path.relative(this.paths.workspaceRootReal, canonical))
+    const expected = toPosix(path.relative(this.paths.workspaceRootReal, canonical))
     if (expected !== target.relativePath) throw new FsError('WORKSPACE_EDIT_INVALID')
 
     return canonical
@@ -3059,7 +3057,7 @@ function occupiedError(relativePath: string) {
 
 function ancestorNotDirectoryError(workspaceAbsolute: string, ancestor: string) {
   return new FsError('WORKSPACE_EDIT_INVALID', undefined, undefined, {
-    internal: { ancestorNotDirectory: toPortablePath(path.relative(workspaceAbsolute, ancestor)) },
+    internal: { ancestorNotDirectory: toPosix(path.relative(workspaceAbsolute, ancestor)) },
   })
 }
 
@@ -3353,25 +3351,17 @@ function assertRelativeWorkspaceEditPath(input: string) {
 }
 
 function assertInside(root: string, target: string) {
-  const relative = path.relative(root, target)
-  if (relative === '') return
-  if (relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative))
-    return
+  if (isSameOrDescendant(root, target)) return
 
   throw new FsError('WORKSPACE_EDIT_INVALID')
-}
-
-export function isSameOrDescendant(root: string, target: string) {
-  const relative = path.relative(root, target)
-  if (relative === '') return true
-  if (relative === '..') return false
-  return !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative)
 }
 
 function pathsOverlap(left: string, right: string) {
   return isSameOrDescendant(left, right) || isSameOrDescendant(right, left)
 }
 
+// A plain template join: search-shared's normalises (`a/` + `b` → `a/b`), and nothing proves the
+// journal-loaded `manifest.workspace` prefix and relative halves are already normalised.
 function joinRelative(prefix: string, relativePath: string) {
   if (!prefix) return relativePath
   return `${prefix}/${relativePath}`

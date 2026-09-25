@@ -1,5 +1,5 @@
 import { realpath } from 'node:fs/promises'
-import path from 'node:path'
+import { isSameOrDescendant } from '../fs/path'
 import {
   commandIdSchema,
   type ModelSelection,
@@ -322,7 +322,8 @@ export class SessionDiscoveryReconciler {
     const model = this.options.getReadModel()
     const candidates = [...model.worktrees.values()]
       .filter(
-        (worktree) => !worktree.retiredAt && containsPath(worktree.canonicalPath, canonicalCwd),
+        (worktree) =>
+          !worktree.retiredAt && isSameOrDescendant(worktree.canonicalPath, canonicalCwd),
       )
       .sort((left, right) => right.canonicalPath.length - left.canonicalPath.length)
     const candidate = candidates[0]
@@ -448,14 +449,6 @@ function discoveryErrorDetails(error: unknown) {
 
 function commandId(kind: string, ...parts: readonly (string | number)[]) {
   return v.parse(commandIdSchema, internalCommandKey(kind, ...parts))
-}
-
-function containsPath(root: string, candidate: string) {
-  const relative = path.relative(root, candidate)
-  return (
-    relative === '' ||
-    (!relative.startsWith(`..${path.sep}`) && relative !== '..' && !path.isAbsolute(relative))
-  )
 }
 
 function discoveryModel(

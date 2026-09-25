@@ -1,5 +1,5 @@
 import { realpath } from 'node:fs/promises'
-import path from 'node:path'
+import { isSameOrDescendant } from '../fs/path'
 import type { SessionId } from '@workspace/contracts'
 import { gitCommonDirectory } from '../git/repository-lane'
 import type { GitService } from '../git/service'
@@ -52,7 +52,7 @@ export async function assertRewindIsolation({
   }
   for (const candidate of candidates) {
     const other = await existingRealPath(candidate)
-    if (other && (isWithin(cwd, other) || isWithin(other, cwd)))
+    if (other && (isSameOrDescendant(cwd, other) || isSameOrDescendant(other, cwd)))
       throw checkpointErrors.WORKSPACE_NOT_ISOLATED({
         internal: { check: 'overlapping-runtime', candidateCount: candidates.size },
       })
@@ -67,12 +67,4 @@ async function existingRealPath(candidate: string) {
       return null
     throw error
   }
-}
-
-function isWithin(parent: string, child: string) {
-  const relative = path.relative(parent, child)
-  return (
-    relative === '' ||
-    (!path.isAbsolute(relative) && relative !== '..' && !relative.startsWith(`..${path.sep}`))
-  )
 }

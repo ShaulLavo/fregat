@@ -34,9 +34,8 @@ export function composerDropMentionPath(
 }
 
 /**
- * Deliberately strict: only a path that is really inside the open workspace, on
- * one line, becomes a mention. A dragged sentence that happens to look
- * path-shaped stays text, which is what the editor would have done with it.
+ * Only a one-line path inside the open workspace becomes a mention. Unlike `workspaceRelativePath`,
+ * an empty root admits any absolute path and trailing slashes are dropped.
  */
 function droppedWorkspacePath(value: string, rootPath: string): string | null {
   const candidate = value.trim()

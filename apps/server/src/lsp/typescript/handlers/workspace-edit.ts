@@ -7,7 +7,7 @@ import {
   strictRangeFromTextSpan,
 } from '../shared/boundary'
 import { normalizeNativePath } from '../../../utils/path'
-import { isInsidePath } from '../../../utils/path'
+import { isSameOrDescendant } from '../../../fs/path'
 import type { SessionContext } from '../shared/context'
 
 type PreparedFileChange = {
@@ -60,7 +60,7 @@ function appendFileChange(
   if (change.isNewFile !== undefined && typeof change.isNewFile !== 'boolean') return false
 
   const fileName = normalizeNativePath(change.fileName)
-  if (!isInsidePath(ctx.root, fileName)) return false
+  if (!isSameOrDescendant(ctx.root, fileName)) return false
 
   const existing = prepared.get(fileName)
   const target = existing ?? prepareTarget(ctx, fileName, change.isNewFile === true)

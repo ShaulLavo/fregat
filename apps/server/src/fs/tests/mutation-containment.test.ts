@@ -9,9 +9,10 @@ import {
   writeFile,
 } from 'node:fs/promises'
 import path from 'node:path'
-import { createWorkspacePaths } from '../path'
+import { createWorkspacePaths, isSameOrDescendant } from '../path'
 import { FileChangeHub } from '../watch'
-import { isSameOrDescendant, WorkspaceEditController } from '../workspace-edit'
+import { WorkspaceEditController } from '../workspace-edit'
+import { WorkspaceEditJournal } from '../workspace-edit-journal'
 import { expect } from 'vitest'
 import { test, workspaceRequest as request } from '../../../test/factories/workspace-address'
 
@@ -110,12 +111,26 @@ for (const scenario of escapingMutations) {
   })
 }
 
-test('workspace edit directional containment excludes the immediate parent', () => {
+test('containment excludes the immediate parent and a sibling, and admits a ..foo child', () => {
   const root = path.resolve('/workspace/project')
 
+  expect(isSameOrDescendant(root, root)).toBe(true)
   expect(isSameOrDescendant(root, path.dirname(root))).toBe(false)
   expect(isSameOrDescendant(path.dirname(root), root)).toBe(true)
+  expect(isSameOrDescendant(root, path.resolve(root, '../sibling'))).toBe(false)
   expect(isSameOrDescendant(root, path.join(root, '..foo'))).toBe(true)
+})
+
+test('workspace edit journal rejects a stored path that resolves to the journal root', () => {
+  const journal = new WorkspaceEditJournal(path.resolve('/journal'))
+  const operationId = '00000000-0000-4000-8000-000000000000'
+
+  expect(() => journal.storedPath(operationId, '..')).toThrow(
+    expect.objectContaining({ code: 'WORKSPACE_EDIT_INVALID' }),
+  )
+  expect(journal.storedPath(operationId, '..foo')).toBe(
+    path.join(journal.operationPath(operationId), '..foo'),
+  )
 })
 
 test('workspace edit mutation gate rejects the workspace parent before calling the mutation', async ({

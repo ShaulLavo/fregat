@@ -1,14 +1,8 @@
 import path from 'node:path'
-export function isInsidePath(root: string, candidate: string) {
-  const relative = path.relative(root, candidate)
-  if (relative === '') return true
-  if (relative === '..' || relative.startsWith(`..${path.sep}`)) return false
-
-  return !path.isAbsolute(relative)
-}
+import { toPosix } from '../fs/path'
 
 export function normalizeNativePath(input: string): string {
-  return path.resolve(input).split(path.sep).join('/')
+  return toPosix(path.resolve(input))
 }
 
 export function samePath(left: string, right: string): boolean {

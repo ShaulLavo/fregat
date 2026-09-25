@@ -1,7 +1,7 @@
 import { virtualEnvironmentPaths } from './environment'
 import { exists } from './environment'
 import { firstExistingPath } from './environment'
-import { isInsidePath as isInsideOrEqual } from '../utils/path'
+import { isSameOrDescendant } from '../fs/path'
 import type {
   LspFeatureId,
   LspFeatureRanks,
@@ -822,7 +822,7 @@ async function findUp(start: string, stop: string, markers: readonly string[]) {
 
   let current = path.resolve(start)
   const root = path.resolve(stop)
-  while (isInsideOrEqual(root, current)) {
+  while (isSameOrDescendant(root, current)) {
     const match = await firstExistingMarker(current, markers)
     if (match) return match
     if (current === root) return null

@@ -148,7 +148,7 @@ function assertInside(root: string, candidate: string) {
   if (isOutsideRoot(relative)) throw new FsError('PATH_OUTSIDE_WORKSPACE')
 }
 
-function isSameOrDescendant(root: string, candidate: string) {
+export function isSameOrDescendant(root: string, candidate: string) {
   const relative = path.relative(root, candidate)
   if (relative === '') return true
   if (isOutsideRoot(relative)) return false

@@ -5,6 +5,7 @@ import { queryOptions } from '@tanstack/react-query'
 import type { Client } from '@/lib/client'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import { collectWorkspaceSearch } from '@workspace/client-core/files/search-client'
+import { lastPathSegment } from '@/lib/path-formatters'
 
 const PROJECT_ENTRY_QUERY_LIMIT = 40
 const PROJECT_ENTRY_QUERY_STALE_TIME_MS = 15_000
@@ -90,17 +91,11 @@ async function searchProjectEntries({
   }
 }
 
-function projectEntryItems(matches: readonly WorkspaceSearchMatch[]) {
+export function projectEntryItems(matches: readonly WorkspaceSearchMatch[]) {
   return matches.map((match) => ({
     id: `path:${match.path}`,
-    label: pathBasename(match.path),
+    label: lastPathSegment(match.path),
     path: match.path,
     type: match.type,
   }))
-}
-
-function pathBasename(input: string) {
-  const parts = input.split('/').filter(Boolean)
-
-  return parts.at(-1) ?? input
 }

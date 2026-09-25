@@ -2,7 +2,13 @@ import { describe } from 'vitest'
 import { expect, test } from '../../../test/fixtures'
 
 import { pickerParentPath as filePickerParentPath } from '@/features/file-picker/utils/model'
-import { parentPath, parentFilesystemPath } from '@/lib/path-formatters'
+import {
+  basename,
+  lastPathSegment,
+  parentPath,
+  parentFilesystemPath,
+  pathLeaf,
+} from '@/lib/path-formatters'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 
 describe('parentPath', () => {
@@ -44,4 +50,10 @@ test('picker navigation preserves its root-relative separator normalization', ()
   expect(filePickerParentPath('/a//b/')).toBe('a')
   expect(filePickerParentPath('/')).toBe('')
   expect(filePickerParentPath('README.md')).toBe('')
+})
+
+test('the three leaf helpers answer an empty and a trailing-slash path differently', () => {
+  expect(['', 'a/', '/'].map(basename)).toEqual(['Root', 'a', 'Root'])
+  expect(['', 'a/', '/'].map(pathLeaf)).toEqual(['', '', ''])
+  expect(['', 'a/', '/'].map(lastPathSegment)).toEqual(['', 'a', '/'])
 })

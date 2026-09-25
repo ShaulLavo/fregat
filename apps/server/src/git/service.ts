@@ -4,7 +4,6 @@ import { readFile, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { FsError } from '../fs/errors'
 import type { WorkspacePath, WorkspacePaths } from '../fs/path'
-import { toPosix } from '../fs/path'
 import { limitText, recordGitCommand, recordRequestContext } from '../observability'
 import type {
   GitBranchRemoteState,
@@ -859,13 +858,10 @@ export class GitService {
 
   private pathspecForRepository(rootAbsolutePath: string, input = '') {
     const absolutePath = this.resolveServicePath(input).absolutePath
-    const relative = path.relative(rootAbsolutePath, absolutePath)
-    if (relative === '') return null
-    if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
-      throw new FsError('GIT_REPOSITORY_NOT_FOUND')
-    }
+    const relative = relativeInsideRoot(rootAbsolutePath, absolutePath)
+    if (relative === null) throw new FsError('GIT_REPOSITORY_NOT_FOUND')
 
-    return toPosix(relative)
+    return relative || null
   }
 
   private resolveServicePath(input = '') {
