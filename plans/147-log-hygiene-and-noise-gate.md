@@ -3,7 +3,7 @@
 ## Status and authorization
 
 - Status: IN PROGRESS — lane L4 of the completion wave (`/work/worktrees/platform/L4`, PR #32).
-  Phases 1 and 2 and Phase 3 steps 1–7 are done; step 8 (the evidence drives) is open. See
+  Every phase and step is done; the plan closes after the post-deploy 24 h census (owner check). See
   "Landed" below.
 - Priority: P1. The production log is the first thing read when something breaks, and today a
   real failure is buried under thousands of lines a day that need no action.
@@ -254,6 +254,14 @@ Phase 3:
   built), `editor.command.dispatched` and the decoration-change events. Building one payload the
   way `Editor.log` does costs ~165 ns in Bun, about 0.001% of a 16.7 ms frame. No gating added; the
   Editor half needs no change.
+- Step 8, drives on the lane dev server (2026-09-25): typing baseline `trace editor-type-burst`
+  uploaded 65 events / 33,071 bytes in 10 requests
+  (`/work/tmp/fregat-evidence/20260925T141022Z-trace-editor-type-burst`), in line with Plan 125's
+  production 55 events / 28,727 bytes. Mock-provider streaming `scenario chat-queue` completed with
+  47 events / 27,742 bytes (the later run under `…scenario-chat-queue`). Reconnect
+  `scenario page-lifecycle` passes its retained-page restore and confirmed-reload reconnect steps;
+  its repeated-reload loop fails with Chromium `net::ERR_INSUFFICIENT_RESOURCES` loading ~2,000
+  unbundled dev modules, an environment limit (`…20260925T143124Z-scenario-page-lifecycle`).
 - Step 7, measured: client lines on 2026-09-25 are p50 746 B, p99 2.9 KB, max 9.3 KB, and the
   sanitizer caps strings and arrays, so the 1,000-event queue bound already caps the queue near
   9 MB. No byte bound added.
