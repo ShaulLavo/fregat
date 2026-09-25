@@ -3,6 +3,7 @@ import { getClient } from '@/lib/client'
 import { testDocumentKey, testTabContent } from '../../../../test/factories/document-targets'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { act, renderHook, waitFor } from '@testing-library/react'
+import { matchMutation } from '@tanstack/react-query'
 import { FileTreeModel } from '@workspace/tree'
 import { open } from 'node:fs/promises'
 import path from 'node:path'
@@ -38,6 +39,7 @@ import { expect, test } from '../../../../test/fixtures'
 import { AppProviders, createTestQueryClient } from '../../../../test/render'
 import { setFileSnapshotQueryData } from '@/lib/file-snapshot-query-cache'
 import { fileSystemKeys } from '@/lib/query-keys'
+import { workspaceMutationKeys } from '@/features/workspace/utils/mutation-keys'
 import { TestEditorStateProvider } from '../../../../test/factories/editor-state-provider'
 import { registerTestWorkspaceAddress } from '../../../../test/factories/workspace-address'
 
@@ -73,7 +75,7 @@ for (const { isFolder, dirty } of [
     if (dirty) act(() => createEditorBufferSession(view.buffer, view.view).applyText('unsaved\n'))
     const text = view.buffer.materializeFullText()
 
-    act(() =>
+    await runJournaled(harness, 1, () =>
       harness.result.current.completeRename({
         sourcePath: isFolder ? 'src' : 'src/a.ts',
         destinationPath: isFolder ? 'renamed' : 'src/b.ts',
@@ -81,9 +83,7 @@ for (const { isFolder, dirty } of [
       }),
     )
 
-    await waitFor(() =>
-      expect(workspaceStore.getState().selectedTabContent).toEqual(testTabContent(to)),
-    )
+    expect(workspaceStore.getState().selectedTabContent).toEqual(testTabContent(to))
     expect(workspaceStore.getState().openTabContents).toEqual(
       [isFolder ? 'repo/renamed/c.ts' : sibling, unrelated, to].map((path) => testTabContent(path)),
     )
@@ -139,7 +139,7 @@ test('journals create, rename, duplicate and delete as one undoable operation ea
   await createFileContent(filesystemPath('repo/delete.ts'), 'delete\n', getClient())
   const harness = await renderFsActions('repo')
 
-  act(() => {
+  await runJournaled(harness, 1, () => {
     harness.result.current.actions.createEntry('', false)
     harness.result.current.completeRename({
       destinationPath: 'created.ts',
@@ -147,17 +147,16 @@ test('journals create, rename, duplicate and delete as one undoable operation ea
       sourcePath: 'untitled',
     })
   })
-  await waitForHistory(harness, 1)
-  act(() => {
+  await runJournaled(harness, 2, () => {
     harness.result.current.completeRename({
       destinationPath: 'renamed.ts',
       isFolder: false,
       sourcePath: 'rename.ts',
     })
   })
-  await waitForHistory(harness, 2)
-  act(() => harness.result.current.actions.duplicateEntry('copy.ts', false))
-  await waitForHistory(harness, 3)
+  await runJournaled(harness, 3, () =>
+    harness.result.current.actions.duplicateEntry('copy.ts', false),
+  )
   act(() => {
     harness.result.current.actions.requestDelete({
       isDirectory: false,
@@ -166,8 +165,7 @@ test('journals create, rename, duplicate and delete as one undoable operation ea
     })
   })
   await waitFor(() => expect(harness.result.current.deleteDialog.target).not.toBeNull())
-  act(() => harness.result.current.deleteDialog.onConfirm())
-  await waitForHistory(harness, 4)
+  await runJournaled(harness, 4, () => harness.result.current.deleteDialog.onConfirm())
 
   const history = await harness.history()
   expect(history.undo.map((entry) => entry.label)).toEqual([
@@ -207,13 +205,12 @@ test('a dragged selection moves as one operation and a deleted folder comes back
   await createFileContent(filesystemPath('repo/two/nested.ts'), 'nested\n', getClient())
   const harness = await renderFsActions('repo')
 
-  act(() =>
+  await runJournaled(harness, 1, () =>
     harness.result.current.actions.moveEntries([
       { fromTreePath: 'one.ts', toTreePath: 'target/one.ts' },
       { fromTreePath: 'two', toTreePath: 'target/two' },
     ]),
   )
-  await waitForHistory(harness, 1)
   expect((await harness.history()).undo[0]).toMatchObject({
     label: 'Move 2 items into target',
     legs: [
@@ -230,8 +227,7 @@ test('a dragged selection moves as one operation and a deleted folder comes back
       path: filesystemPath('repo/target'),
     })
   })
-  act(() => harness.result.current.deleteDialog.onConfirm())
-  await waitForHistory(harness, 2)
+  await runJournaled(harness, 2, () => harness.result.current.deleteDialog.onConfirm())
   await expect(treePaths('repo')).resolves.not.toContain('repo/target')
 
   await act(async () => {
@@ -314,14 +310,13 @@ test('an undo survives a history refresh cancelling its read', async ({ client }
   await ensureFolderPath(filesystemPath('repo'), getClient())
   await createFileContent(filesystemPath('repo/old.ts'), 'old\n', getClient())
   const harness = await renderFsActions('repo')
-  act(() =>
+  await runJournaled(harness, 1, () =>
     harness.result.current.completeRename({
       destinationPath: 'new.ts',
       isFolder: false,
       sourcePath: 'old.ts',
     }),
   )
-  await waitForHistory(harness, 1)
   const historyKey = fileSystemKeys.fileOperationHistory('repo')
   // As after a reload: nothing cached, so a cancelled read has no older answer to fall back on.
   harness.queryClient.removeQueries({ queryKey: historyKey })
@@ -350,14 +345,13 @@ test('a window claims the events of its own transitions and no others', async ({
   await ensureFolderPath(filesystemPath('repo'), getClient())
   await createFileContent(filesystemPath('repo/old.ts'), 'old\n', getClient())
   const harness = await renderFsActions('repo')
-  act(() =>
+  await runJournaled(harness, 1, () =>
     harness.result.current.completeRename({
       destinationPath: 'new.ts',
       isFolder: false,
       sourcePath: 'old.ts',
     }),
   )
-  await waitForHistory(harness, 1)
   const [moved] = (await harness.history()).undo
   await act(async () => {
     expect(await reverseLatestFileOperation(harness.fileOperations(), 'undo')).toBe(true)
@@ -405,8 +399,7 @@ test('deleting an open file orphans its document here and undo brings it back', 
       path: filesystemPath('repo/dir'),
     })
   })
-  act(() => harness.result.current.deleteDialog.onConfirm())
-  await waitForHistory(harness, 1)
+  await runJournaled(harness, 1, () => harness.result.current.deleteDialog.onConfirm())
   await waitFor(() => expect(orphaned()).toBe(true))
 
   await act(async () => {
@@ -491,6 +484,7 @@ async function renderFsActions(rootPath: string) {
       queryClient.fetchQuery(fileOperationHistoryQuery(queryClient, filesystemPath(rootPath))),
     model,
     queryClient,
+    rootPath: filesystemPath(rootPath),
     cleanUp: () => {
       hook.unmount()
       queryClient.clear()
@@ -500,9 +494,38 @@ async function renderFsActions(rootPath: string) {
   }
 }
 
-async function waitForHistory(harness: Awaited<ReturnType<typeof renderFsActions>>, count: number) {
-  await waitFor(async () => expect((await harness.history()).undo).toHaveLength(count))
+/**
+ * Runs a tree action and waits for its journaled operation to settle. Polling the history on a
+ * deadline fails on a slow disk: the journal fsyncs every step.
+ */
+async function runJournaled(
+  harness: Awaited<ReturnType<typeof renderFsActions>>,
+  count: number,
+  action: () => void,
+) {
+  const mutations = harness.queryClient.getMutationCache()
+  const operation = { mutationKey: workspaceMutationKeys.fileOperation(harness.rootPath) }
+  const settled = Promise.withResolvers<void>()
+  let started = false
+  const unsubscribe = mutations.subscribe((event) => {
+    if (event.type === 'added' && matchMutation(treeIntent, event.mutation)) started = true
+    if (event.type !== 'updated' || !matchMutation(operation, event.mutation)) return
+    if (event.action.type === 'success' || event.action.type === 'error') settled.resolve()
+  })
+  try {
+    await act(async () => {
+      action()
+      // A tree action that mutations do not allow returns silently; fail here, not on a hang.
+      expect(started, 'the action started no tree intent').toBe(true)
+      await settled.promise
+    })
+  } finally {
+    unsubscribe()
+  }
+  expect((await harness.history()).undo).toHaveLength(count)
 }
+
+const treeIntent = { mutationKey: ['workspace', 'tree'] }
 
 async function readContent(path: string) {
   const result = await fetchFile(filesystemPath(path), signal(), getClient())

@@ -41,6 +41,8 @@ export async function startIsolatedServer(webOrigin: URL): Promise<IsolatedServe
     // The run copies this log before the server stops, so a 5 s batch would drop the run's tail.
     OBSERVABILITY_BATCH_INTERVAL_MS: '200',
     OBSERVABILITY_DIR: logs,
+    // Offers the mock provider driver, so a scenario can script a whole turn.
+    PLATFORM_AGENT_HARNESS: '1',
     PLATFORM_HOME: home,
     PORT: String(port),
     SERVER_ALLOWED_ORIGINS: allowedOriginsForWebPort(

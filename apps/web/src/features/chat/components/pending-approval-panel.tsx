@@ -1,6 +1,7 @@
 import { WarningCircleIcon } from '@phosphor-icons/react'
 
 import { PendingApprovalActions } from '@/features/chat/components/pending-approval-actions'
+import { PendingApprovalArgs } from '@/features/chat/components/pending-approval-args'
 import { usePendingRequests } from '@/features/chat/hooks/use-pending-requests'
 import { approvalTitle, detailLabel } from '@/features/chat/utils/approval-presentation'
 
@@ -33,13 +34,17 @@ export function PendingApprovalPanel() {
             </span>
           ) : null}
         </div>
-        <pre
-          aria-label={detailLabel(approval.requestKind)}
-          className='focus-ring text-foreground text-2xs max-h-20 overflow-auto rounded-md font-mono leading-relaxed whitespace-pre outline-none'
-          tabIndex={0}
-        >
-          {approval.detail || approvalTitle(approval.requestKind)}
-        </pre>
+        {approval.args.length > 0 ? (
+          <PendingApprovalArgs args={approval.args} label={detailLabel(approval.requestKind)} />
+        ) : (
+          <pre
+            aria-label={detailLabel(approval.requestKind)}
+            className='focus-ring text-foreground text-2xs max-h-20 overflow-auto rounded-md font-mono leading-relaxed whitespace-pre outline-none'
+            tabIndex={0}
+          >
+            {approval.detail || approvalTitle(approval.requestKind)}
+          </pre>
+        )}
         <PendingApprovalActions requestId={approval.requestId} options={approval.options} />
       </section>
     </div>

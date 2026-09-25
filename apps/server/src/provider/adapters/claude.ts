@@ -30,6 +30,7 @@ import {
   type ProviderSnapshot,
   type RuntimeMode,
   type SessionId,
+  type TurnEndReason,
   type TurnId,
   type UserInputQuestions,
 } from '@workspace/contracts'
@@ -46,7 +47,7 @@ import {
 } from '../../orchestration/orchestration-logging'
 import { RuntimeAdapter } from './state/runtime-adapter'
 import { SessionContext } from './state/session-context'
-import { sessionIdentityErrors } from '../structured-errors'
+import { isNotInstalledError, requestGone, sessionIdentityErrors } from '../structured-errors'
 import {
   discoverClaudeSessions,
   readClaudeSessionHistory,
@@ -280,8 +281,7 @@ export class ClaudeProviderAdapter
         ...(state.message ? { message: state.message } : {}),
       }
     } catch (error) {
-      if (isMissingClaudeBinaryError(error))
-        return unavailableClaudeSnapshot(checkedAt, this.settings)
+      if (isNotInstalledError(error)) return unavailableClaudeSnapshot(checkedAt, this.settings)
 
       recordChatPipelineWarning('chat.pipeline.claude_adapter.snapshot.failed', {
         error,
@@ -828,7 +828,7 @@ class ClaudeAgentSession extends SessionContext {
 
   async respondApproval(input: ProviderApprovalResponseInput) {
     const pending = this.pendingApprovals.get(input.requestId)
-    if (!pending) throw createInternalError(`Unknown pending approval request: ${input.requestId}`)
+    if (!pending) throw requestGone('approval', input.requestId)
 
     const result = offeredResponse(pending.offers, input.decision, input.requestId)
     this.pendingApprovals.delete(input.requestId)
@@ -1550,7 +1550,7 @@ class ClaudeAgentSession extends SessionContext {
       return
     }
     if (message.subtype === 'success') {
-      this.completeTurn(turn, message.usage)
+      this.completeTurn(turn, message.usage, claudeSuccessEndReason(message))
       return
     }
     // An interrupt is a user action, not a failure: it must RESOLVE the turn,
@@ -1560,17 +1560,21 @@ class ClaudeAgentSession extends SessionContext {
       return
     }
 
-    this.rejectTurn(turn, claudeResultErrorMessage(message))
+    this.rejectTurn(turn, claudeResultErrorMessage(message), claudeFailureEndReason(message))
   }
 
-  private completeTurn(turn: ActiveProviderTurn, usage: unknown) {
+  private completeTurn(turn: ActiveProviderTurn, usage: unknown, endReason?: TurnEndReason) {
     const completedAt = new Date().toISOString()
     recordChatPipelineInfo('chat.pipeline.claude_session.complete_turn', {
       messageId: turn.messageId,
       sessionId: this.sessionId,
       turnId: turn.canonicalTurnId,
     })
-    this.emitTurnCompleted(turn, completedAt, { state: 'completed', usage })
+    this.emitTurnCompleted(turn, completedAt, {
+      state: 'completed',
+      usage,
+      ...(endReason ? { endReason } : {}),
+    })
     this.emit({
       completedAt,
       eventId: runtimeEventId('claude-assistant-complete'),
@@ -1593,9 +1597,14 @@ class ClaudeAgentSession extends SessionContext {
     this.resolveTurn(turn)
   }
 
-  private rejectTurn(turn: ActiveProviderTurn, message: string) {
+  private rejectTurn(
+    turn: ActiveProviderTurn,
+    message: string,
+    endReason: TurnEndReason = 'provider-error',
+  ) {
     this.status = 'error'
     this.emitTurnCompleted(turn, new Date().toISOString(), {
+      endReason,
       errorMessage: message,
       state: 'failed',
     })
@@ -1787,9 +1796,7 @@ class ClaudeAgentSession extends SessionContext {
 
   async respondUserInput(input: ProviderUserInputResponseInput) {
     const pending = this.pendingUserInputs.get(input.requestId)
-    if (!pending) {
-      throw createInternalError(`Unknown pending user-input request: ${input.requestId}`)
-    }
+    if (!pending) throw requestGone('user-input', input.requestId)
 
     this.pendingUserInputs.delete(input.requestId)
     // The SDK reads the answers off `updatedInput`, keyed by question text, and
@@ -1887,6 +1894,13 @@ class ClaudeAgentSession extends SessionContext {
 
     this.pendingApprovals.delete(requestId)
     pending.resolve({ behavior: 'deny', message: 'Claude tool approval was aborted.' })
+    this.emit({
+      createdAt: new Date().toISOString(),
+      eventId: runtimeEventId('claude-request-ended'),
+      payload: { requestType: claudeApprovalRequestType(pending.toolName), resolution: 'ended' },
+      ...this.requestResolutionContext(requestId),
+      type: 'request.resolved',
+    })
   }
 
   private emitApprovalOpened(
@@ -1988,6 +2002,7 @@ class ClaudeAgentSession extends SessionContext {
     turn: ActiveProviderTurn,
     createdAt: string,
     payload: {
+      endReason?: TurnEndReason
       errorMessage?: string
       state: 'completed' | 'failed' | 'interrupted'
       usage?: unknown
@@ -2392,11 +2407,10 @@ type ClaudeProviderAuthState = Pick<ProviderSnapshot, 'auth' | 'message' | 'stat
 
 /**
  * `claude auth status --json` decides authenticated vs not; the SDK account is
- * only decoration on top of it. The account heuristic survives as the fallback
- * for `unknown` (CLI too old to answer, or the read failed).
+ * only decoration on top of it. A failed read stays `unknown`.
  */
 function claudeAuthState(cli: ClaudeAuthState, account: unknown): ClaudeProviderAuthState {
-  if (cli.status === 'unknown') return claudeAccountAuthState(account)
+  if (cli.status === 'unknown') return { auth: { status: 'unknown' }, status: 'ready' }
   if (cli.status === 'unauthenticated') return signedOutClaudeAuthState()
 
   const record = asRecord(account)
@@ -2417,36 +2431,6 @@ function claudeAccountType(cli: ClaudeAuthState, record: Record<string, unknown>
   if (cli.apiProvider && cli.apiProvider !== 'firstParty') return cli.apiProvider
 
   return stringField(record, 'subscriptionType') ?? cli.authMethod
-}
-
-function claudeAccountAuthState(account: unknown): ClaudeProviderAuthState {
-  const record = asRecord(account)
-  const apiProvider = stringField(record, 'apiProvider')
-  const email = stringField(record, 'email')
-  const subscriptionType = stringField(record, 'subscriptionType')
-
-  // `tokenSource` is the literal string 'none' when signed out, which is truthy.
-  // Treating it as a presence check reports a signed-out CLI as authenticated and
-  // defers the failure to mid-turn ("OAuth session expired"), where the user has
-  // no way to act on it.
-  const tokenSource = stringField(record, 'tokenSource')
-  const hasToken = Boolean(tokenSource) && tokenSource !== 'none'
-
-  if (apiProvider && apiProvider !== 'firstParty') {
-    return { auth: { status: 'authenticated', type: apiProvider }, status: 'ready' }
-  }
-  if (email || subscriptionType || hasToken) {
-    return {
-      auth: {
-        status: 'authenticated',
-        ...(email ? { email } : {}),
-        ...(subscriptionType ? { type: subscriptionType } : {}),
-      },
-      status: 'ready',
-    }
-  }
-
-  return signedOutClaudeAuthState()
 }
 
 function signedOutClaudeAuthState(): ClaudeProviderAuthState {
@@ -2476,15 +2460,6 @@ function unavailableClaudeSnapshot(
   }
 }
 
-function isMissingClaudeBinaryError(error: unknown) {
-  if (typeof error !== 'object' || error === null) return false
-  if ('code' in error && error.code === 'ENOENT') return true
-
-  const message = providerErrorMessage(error).toLowerCase()
-  if (message.includes('executable not found')) return true
-  return message.includes('enoent') || message.includes('exited with code 127')
-}
-
 /** The snapshot has one line for the providers UI, so a catalog error brings its fix along. */
 function claudeSnapshotErrorMessage(error: unknown) {
   const message = providerErrorMessage(error)
@@ -2503,20 +2478,25 @@ function claudeStreamKind(deltaType: string) {
   return deltaType.includes('thinking') ? ('reasoning_text' as const) : ('assistant_text' as const)
 }
 
-function claudeItemType(toolName: string) {
-  const normalized = toolName.toLowerCase()
-  if (normalized.startsWith('mcp__')) return 'mcp_tool_call'
-  if (normalized === 'bash' || normalized.includes('command') || normalized.includes('shell')) {
-    return 'command_execution'
-  }
-  if (normalized === 'edit' || normalized === 'write' || normalized === 'notebookedit') {
-    return 'file_change'
-  }
-  if (normalized.includes('websearch') || normalized.includes('webfetch')) return 'web_search'
-  if (normalized === 'read') return 'image_view'
-  if (isClaudeTaskTool(toolName)) return 'unknown'
+/** The SDK's native tool names. A user's MCP tool is `mcp__server__tool`, whatever its display name. */
+const CLAUDE_NATIVE_ITEM_TYPES: Readonly<Record<string, string>> = {
+  Agent: 'unknown',
+  Bash: 'command_execution',
+  Edit: 'file_change',
+  MultiEdit: 'file_change',
+  NotebookEdit: 'file_change',
+  PowerShell: 'command_execution',
+  Read: 'image_view',
+  Task: 'unknown',
+  WebFetch: 'web_search',
+  WebSearch: 'web_search',
+  Write: 'file_change',
+}
 
-  return 'dynamic_tool_call'
+function claudeItemType(toolName: string) {
+  if (toolName.startsWith('mcp__')) return 'mcp_tool_call'
+
+  return CLAUDE_NATIVE_ITEM_TYPES[toolName] ?? 'dynamic_tool_call'
 }
 
 function claudeToolTitle(itemType: string) {
@@ -2530,8 +2510,7 @@ function claudeToolTitle(itemType: string) {
 }
 
 function isClaudeTaskTool(toolName: string) {
-  const normalized = toolName.toLowerCase()
-  return normalized === 'task' || normalized === 'agent'
+  return toolName === 'Task' || toolName === 'Agent'
 }
 
 function claudeToolSummary(toolName: string, toolInput: Record<string, unknown>) {
@@ -2640,19 +2619,30 @@ function claudeTokenUsage(usage: unknown) {
   return { ...record, usedTokens }
 }
 
-/**
- * The CLI stamps user aborts explicitly: interrupting mid-tool-call yields
- * `aborted_tools`, mid-stream yields `aborted_streaming`. Older CLIs only leave
- * the word in `errors`, so both are checked.
- */
+/** The CLI stamps aborts: mid-tool-call is `aborted_tools`, mid-stream `aborted_streaming`. */
 function isInterruptedClaudeResult(message: Extract<SDKMessage, { type: 'result' }>) {
-  if (message.terminal_reason === 'aborted_tools') return true
-  if (message.terminal_reason === 'aborted_streaming') return true
+  return (
+    message.terminal_reason === 'aborted_tools' || message.terminal_reason === 'aborted_streaming'
+  )
+}
 
-  const errors = claudeResultErrors(message).join(' ').toLowerCase()
-  if (errors.includes('interrupt')) return true
+/** A turn that finished but was cut short: the answer is complete as far as it goes. */
+function claudeSuccessEndReason(
+  message: Extract<SDKMessage, { type: 'result' }>,
+): TurnEndReason | undefined {
+  if (message.is_error) return 'provider-error'
+  if (message.stop_reason === 'max_tokens') return 'output-limit'
+  if (message.stop_reason === 'refusal') return 'refusal'
 
-  return errors.includes('request was aborted')
+  return undefined
+}
+
+function claudeFailureEndReason(message: Extract<SDKMessage, { type: 'result' }>): TurnEndReason {
+  if (message.subtype === 'error_max_turns') return 'turn-limit'
+  if (message.terminal_reason === 'max_turns') return 'turn-limit'
+  if (message.stop_reason === 'refusal') return 'refusal'
+
+  return 'provider-error'
 }
 
 function claudeResultErrors(message: Extract<SDKMessage, { type: 'result' }>) {

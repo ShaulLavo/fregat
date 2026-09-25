@@ -3,10 +3,11 @@ import { defaultAttachmentsDir } from '../attachments/store'
 import { assertRewindIsolation } from './rewind-isolation'
 import { maxCheckpointTurnCount } from './checkpoint-turn-count'
 import { runtimeEventId } from '../provider/adapters/utils/runtime-ids'
-import { errorMessage as providerErrorMessage } from '@workspace/contracts'
+import { errorMessage as providerErrorMessage, errorStringField } from '@workspace/contracts'
 import { resolveSessionOwner } from './session-owner'
 import { internalCommandKey } from './utils/repository-ids'
 import { createInternalError } from '../observability/structured-errors'
+import { sessionIdentityErrors } from '../provider/structured-errors'
 
 import type {
   InteractionMode,
@@ -638,26 +639,60 @@ export class ProviderCommandReactor {
         requestId: event.payload.requestId,
         sessionId: event.payload.sessionId,
       })
-      if (handled) return
-
-      await this.appendProviderFailureActivity({
-        runtimeEpoch,
-        detail: noActiveSessionDetail(),
-        event,
-        kind: 'provider.approval.respond.failed',
+      if (!handled) {
+        await this.appendStaleApproval(event, runtimeEpoch)
+        return
+      }
+      recordChatPipelineInfo('chat.pipeline.provider_reactor.approval.decided', {
+        outcome: 'decided',
         requestId: event.payload.requestId,
-        summary: 'Provider approval response failed',
+        sessionId: event.payload.sessionId,
       })
     } catch (error) {
+      if (errorStringField(error, 'code') === sessionIdentityErrors.REQUEST_GONE.code) {
+        await this.appendStaleApproval(event, runtimeEpoch)
+        return
+      }
       await this.appendProviderFailureActivity({
         runtimeEpoch,
-        detail: approvalResponseFailureDetail(error, event.payload.requestId),
+        ...respondFailure(error),
         event,
         kind: 'provider.approval.respond.failed',
         requestId: event.payload.requestId,
         summary: 'Provider approval response failed',
       })
     }
+  }
+
+  /** The agent stopped waiting before the answer arrived: a receipt, never an error. */
+  private async appendStaleApproval(
+    event: Extract<ProviderIntentEvent, { type: 'session.approval-response-requested' }>,
+    runtimeEpoch: string,
+  ) {
+    recordChatPipelineInfo('chat.pipeline.provider_reactor.approval.stale', {
+      outcome: 'stale',
+      requestId: event.payload.requestId,
+      sessionId: event.payload.sessionId,
+    })
+    await this.ingestion.ingest({
+      createdAt: providerFailureCreatedAt(event),
+      detail: STALE_APPROVAL_DETAIL,
+      eventId: runtimeEventId('approval-stale'),
+      runtimeEpoch,
+      kind: 'approval.resolved',
+      payload: {
+        commandId: event.commandId,
+        decision: event.payload.decision,
+        detail: STALE_APPROVAL_DETAIL,
+        requestId: event.payload.requestId,
+        resolution: 'stale',
+      },
+      summary: 'Answer not used',
+      sessionId: event.payload.sessionId,
+      tone: 'info',
+      turnId: turnIdForProviderFailure(event),
+      type: 'activity.append',
+    })
   }
 
   private async respondUserInput(
@@ -678,7 +713,7 @@ export class ProviderCommandReactor {
 
       await this.appendProviderFailureActivity({
         runtimeEpoch,
-        detail: noActiveSessionDetail(),
+        ...noActiveSessionFailure(),
         event,
         kind: 'provider.user-input.respond.failed',
         requestId: event.payload.requestId,
@@ -687,7 +722,7 @@ export class ProviderCommandReactor {
     } catch (error) {
       await this.appendProviderFailureActivity({
         runtimeEpoch,
-        detail: userInputResponseFailureDetail(error, event.payload.requestId),
+        ...respondFailure(error),
         event,
         kind: 'provider.user-input.respond.failed',
         requestId: event.payload.requestId,
@@ -697,6 +732,7 @@ export class ProviderCommandReactor {
   }
 
   private async appendProviderFailureActivity(input: {
+    code?: string
     detail: string
     event: ProviderIntentEvent
     kind:
@@ -718,7 +754,7 @@ export class ProviderCommandReactor {
       runtimeEpoch: input.runtimeEpoch,
       kind: input.kind,
       payload: {
-        ...providerFailurePayload(input.detail, input.requestId),
+        ...providerFailurePayload(input),
         commandId: input.event.commandId,
       },
       summary: input.summary,
@@ -773,6 +809,15 @@ export class ProviderCommandReactor {
       recordChatPipelineInfo('chat.pipeline.provider_reactor.turn_failure.left_for_recovery', {
         sessionId,
         turnId: event.payload.turnId,
+      })
+      return
+    }
+    if (!this.ownsStart(event, context, 'claimed') && !this.ownsStart(event, context, 'adopted')) {
+      recordChatPipelineInfo('chat.pipeline.provider_reactor.turn_failure.discarded', {
+        sessionId,
+        turnId: event.payload.turnId,
+        runtimeEpoch,
+        reason: 'turn-ownership-ended',
       })
       return
     }
@@ -942,10 +987,12 @@ function isProviderIntentEvent(event: OrchestrationEvent): event is ProviderInte
   }
 }
 
-function providerFailurePayload(detail: string, requestId: string | undefined) {
-  if (!requestId) return { detail }
-
-  return { detail, requestId }
+function providerFailurePayload(input: { code?: string; detail: string; requestId?: string }) {
+  return {
+    detail: input.detail,
+    ...(input.code ? { code: input.code } : {}),
+    ...(input.requestId ? { requestId: input.requestId } : {}),
+  }
 }
 
 function providerFailureCreatedAt(event: ProviderIntentEvent) {
@@ -998,41 +1045,28 @@ function turnStartKeyForEvent(
   return `event:${event.eventId}`
 }
 
+/** The activity carries the code, so `pending-requests` can tell a dead request from a transient failure. */
+const STALE_APPROVAL_DETAIL =
+  'Your answer arrived after the agent stopped waiting. It was not used.'
+
+function noActiveSessionFailure() {
+  return {
+    code: sessionIdentityErrors.REQUEST_GONE.code,
+    detail: `${noActiveSessionDetail()} ${sessionIdentityErrors.REQUEST_GONE.fix}`,
+  }
+}
+
 function noActiveSessionDetail() {
   return 'No active provider session is bound to this session.'
 }
 
-function approvalResponseFailureDetail(error: unknown, requestId: string) {
-  const detail = providerErrorMessage(error)
-  if (isUnknownPendingApprovalRequestError(detail)) {
-    return stalePendingRequestDetail('approval', requestId)
-  }
+function respondFailure(error: unknown) {
+  const code = errorStringField(error, 'code')
+  if (code !== sessionIdentityErrors.REQUEST_GONE.code)
+    return { detail: providerErrorMessage(error) }
 
-  return detail
-}
-
-function userInputResponseFailureDetail(error: unknown, requestId: string) {
-  const detail = providerErrorMessage(error)
-  if (isUnknownPendingUserInputRequestError(detail)) {
-    return stalePendingRequestDetail('user-input', requestId)
-  }
-
-  return detail
-}
-
-function isUnknownPendingApprovalRequestError(detail: string) {
-  const normalized = detail.toLowerCase()
-  if (normalized.includes('unknown pending approval request')) return true
-
-  return normalized.includes('unknown pending permission request')
-}
-
-function isUnknownPendingUserInputRequestError(detail: string) {
-  return detail.toLowerCase().includes('unknown pending user-input request')
-}
-
-function stalePendingRequestDetail(requestKind: 'approval' | 'user-input', requestId: string) {
-  return `Stale pending ${requestKind} request: ${requestId}. Provider callback state does not survive app restarts or recovered sessions. Restart the turn to continue.`
+  const gone = sessionIdentityErrors.REQUEST_GONE
+  return { code, detail: `${gone.message}. ${gone.fix}` }
 }
 
 function providerDisplayName(providerInstanceId: ModelSelection['providerInstanceId']) {

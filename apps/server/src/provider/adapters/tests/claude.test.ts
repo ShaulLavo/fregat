@@ -462,7 +462,40 @@ describe('ClaudeProviderAdapter', () => {
         requestId: v.parse(approvalRequestIdSchema, 'claude:missing'),
         sessionId,
       }),
-    ).rejects.toThrow('Unknown pending approval request: claude:missing')
+    ).rejects.toMatchObject({ code: 'provider.REQUEST_GONE' })
+    await harness.adapter.stopAll()
+  })
+
+  it('reports an approval the SDK aborted as ended, and forgets it', async () => {
+    const harness = claudeHarness()
+    const sessionId = v.parse(sessionIdSchema, '8d0c6924-9495-5fd9-a04a-08b1e925b65d')
+    await harness.adapter.startRuntime(
+      sessionStartInput({ runtimeMode: 'approval-required', sessionId }),
+    )
+    const canUseTool = latestOptions(harness).canUseTool
+    assert(canUseTool, 'canUseTool was not passed to the SDK')
+    const abort = new AbortController()
+    const permission = canUseTool(
+      'Bash',
+      { command: 'ls' },
+      {
+        ...canUseToolOptions(),
+        signal: abort.signal,
+      },
+    )
+    const opened = await waitForEvent(harness, 'request.opened')
+    const requestId = v.parse(approvalRequestIdSchema, opened.requestId)
+
+    abort.abort()
+
+    await expect(permission).resolves.toMatchObject({ behavior: 'deny' })
+    expect(await waitForEvent(harness, 'request.resolved')).toMatchObject({
+      payload: { resolution: 'ended' },
+      requestId,
+    })
+    await expect(
+      harness.adapter.respondApproval({ decision: 'accept', requestId, sessionId }),
+    ).rejects.toMatchObject({ code: 'provider.REQUEST_GONE' })
     await harness.adapter.stopAll()
   })
 
@@ -527,11 +560,16 @@ describe('ClaudeProviderAdapter', () => {
     void canUseTool('mcp__linear__create_issue', { title: 'Bug' }, canUseToolOptions())
     void canUseTool('Read', { file_path: '/etc/hosts' }, canUseToolOptions())
     void canUseTool('SomeCustomTool', { description: 'do it' }, canUseToolOptions())
+    // Named like a shell, but only the SDK's own `Bash` runs a native command.
+    void canUseTool('mcp__tools__run_shell_command', { cmd: 'ls' }, canUseToolOptions())
+    void canUseTool('RunShellCommand', { cmd: 'ls' }, canUseToolOptions())
 
-    await waitFor(() => openedRequests(harness).length === 3, 'not every approval was opened')
+    await waitFor(() => openedRequests(harness).length === 5, 'not every approval was opened')
     expect(openedRequests(harness).map((event) => event.payload.requestType)).toEqual([
       'mcp_tool_call_approval',
       'file_read_approval',
+      'dynamic_tool_call_approval',
+      'mcp_tool_call_approval',
       'dynamic_tool_call_approval',
     ])
     expect(openedRequests(harness)[1]?.payload.detail).toBe('Read: /etc/hosts')
@@ -650,7 +688,7 @@ describe('ClaudeProviderAdapter', () => {
         requestId: v.parse(approvalRequestIdSchema, 'claude:missing'),
         sessionId: input.sessionId,
       }),
-    ).rejects.toThrow('Unknown pending user-input request: claude:missing')
+    ).rejects.toMatchObject({ code: 'provider.REQUEST_GONE' })
 
     latestQuery(harness).emit(successResult())
     await pending
@@ -704,8 +742,30 @@ describe('ClaudeProviderAdapter', () => {
     expect(error.message).toBe('boom')
     expect(error).toMatchObject({ code: 'server.INTERNAL_ERROR', name: 'EvlogError', status: 500 })
     expect(await waitForEvent(harness, 'turn.completed')).toMatchObject({
-      payload: { errorMessage: 'boom', state: 'failed' },
+      payload: { endReason: 'provider-error', errorMessage: 'boom', state: 'failed' },
       turnId: input.turnId,
+    })
+    await harness.adapter.stopAll()
+  })
+
+  it.for([
+    { result: { stop_reason: 'max_tokens' }, endReason: 'output-limit' },
+    { result: { stop_reason: 'refusal' }, endReason: 'refusal' },
+    {
+      result: { errors: [], is_error: true, subtype: 'error_max_turns' },
+      endReason: 'turn-limit',
+    },
+  ] as const)('reports $endReason as the end reason the harness gave', async (fixture) => {
+    const harness = claudeHarness()
+    const input = providerTurnInput()
+
+    const settled = harness.adapter.sendTurn(input).catch(() => undefined)
+    await waitForEvent(harness, 'turn.started')
+    latestQuery(harness).emit({ ...successResult(), ...fixture.result } as SDKMessage)
+    await settled
+
+    expect(await waitForEvent(harness, 'turn.completed')).toMatchObject({
+      payload: { endReason: fixture.endReason },
     })
     await harness.adapter.stopAll()
   })

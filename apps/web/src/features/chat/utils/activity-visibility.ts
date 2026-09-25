@@ -1,10 +1,18 @@
-import type { OrchestrationSessionActivity } from '@workspace/contracts'
+import {
+  APPROVAL_ANSWER_SUBMITTED_KIND,
+  TURN_ENDED_ACTIVITY_KIND,
+  type OrchestrationSessionActivity,
+} from '@workspace/contracts'
 
 import { chatActivityHasFailure } from '@/features/chat/utils/activity-presentation'
 import type { ChatWorkLogEntry } from '@/features/chat/utils/work-log'
 import { isWorkLogToolEntry } from '@/features/chat/utils/tool-label'
+import { formatChatElapsed } from '@/features/chat/utils/formatters'
+import { isWorkLogFailure } from '@/features/chat/utils/work-row'
 
 const QUIET_ACTIVITY_KINDS = new Set([
+  APPROVAL_ANSWER_SUBMITTED_KIND,
+  TURN_ENDED_ACTIVITY_KIND,
   'account.updated',
   'account.rate-limits.updated',
   'auth.status',
@@ -26,11 +34,7 @@ const QUIET_ACTIVITY_KINDS = new Set([
   'context-window.updated',
 ])
 
-const CODEX_DIAGNOSTIC_LINE =
-  /^\d{4}-\d{2}-\d{2}T\S+\s+(TRACE|DEBUG|INFO|WARN|ERROR)\s+[a-zA-Z0-9_]+(?:::[a-zA-Z0-9_]+)*:\s+/
-
 export function isVisibleChatActivity(activity: OrchestrationSessionActivity) {
-  if (isCodexDiagnosticActivity(activity)) return false
   if (
     activity.kind === 'runtime.warning' &&
     activity.summary.endsWith('(no displayable text content)')
@@ -42,18 +46,12 @@ export function isVisibleChatActivity(activity: OrchestrationSessionActivity) {
   return !QUIET_ACTIVITY_KINDS.has(activity.kind)
 }
 
-function isCodexDiagnosticActivity(activity: OrchestrationSessionActivity) {
-  if (activity.kind !== 'runtime.warning') return false
-  const payload = activity.payload
-  if (!payload || typeof payload !== 'object' || !('message' in payload) || !('detail' in payload))
-    return false
-  const { message, detail } = payload
-  if (typeof message !== 'string' || !detail || typeof detail !== 'object') return false
-  if (!('message' in detail) || detail.message !== message) return false
-  if ('willRetry' in detail || 'error' in detail) return false
-  if (message.toLowerCase().includes('failed to connect to websocket')) return false
+/** A collapsed group still shows every failure, every request and every tool call still running. */
+export function isPinnedWorkLogEntry(entry: ChatWorkLogEntry) {
+  if (isWorkLogFailure(entry)) return true
+  if (entry.icon === 'approval' || entry.icon === 'user-input') return true
 
-  return CODEX_DIAGNOSTIC_LINE.test(message)
+  return isWorkLogToolEntry(entry) && entry.lifecycle === 'running'
 }
 
 export function activityGroupSummary(activities: readonly ChatWorkLogEntry[]) {
@@ -74,7 +72,24 @@ export function activityGroupSummary(activities: readonly ChatWorkLogEntry[]) {
   if (reads > 0) parts.push(`Read ${reads} ${reads === 1 ? 'file' : 'files'}`)
   if (searches > 0) parts.push(`Searched ${searches} ${searches === 1 ? 'time' : 'times'}`)
   if (others > 0) parts.push(`Used ${others} ${others === 1 ? 'tool' : 'tools'}`)
-  if (parts.length === 0) return `${activities.length} steps`
+  if (parts.length === 0) parts.push(`${activities.length} steps`)
+  const failures = activities.filter(isWorkLogFailure).length
+  if (failures > 0) parts.push(`${failures} failed`)
+  const duration = activityGroupDuration(activities)
+  if (duration) parts.push(duration)
 
   return parts.join(' · ')
+}
+
+/** First start to newest event; a group quicker than a second has nothing worth saying. */
+function activityGroupDuration(activities: readonly ChatWorkLogEntry[]) {
+  const first = activities[0]
+  if (!first) return null
+  const end = activities.reduce(
+    (newest, entry) => (entry.lastActivityAt > newest ? entry.lastActivityAt : newest),
+    first.lastActivityAt,
+  )
+  if (Date.parse(end) - Date.parse(first.createdAt) < 1_000) return null
+
+  return formatChatElapsed(first.createdAt, end)
 }

@@ -3,6 +3,7 @@ import type { OrchestrationLatestTurn, OrchestrationMessage, TurnId } from '@wor
 import type { OptimisticChatMessage } from '@/features/chat/state/chat-message-intents'
 import { chatActiveResponseTurnIds } from '@/features/chat/utils/active-response'
 import { formatChatElapsed } from '@/features/chat/utils/formatters'
+import { stoppedTurnLabel, turnStoppedShort } from '@/features/chat/utils/turn-end-label'
 
 export type ChatTimelineMessage = OrchestrationMessage | OptimisticChatMessage
 
@@ -12,17 +13,21 @@ export type ChatMessageTimelineMetadata = {
   completionSummary: string | null
   durationEnd: string
   durationStart: string
+  /** The last answer of a turn that stopped short. */
+  incomplete: boolean
   showAssistantCopyButton: boolean
   showCompletionDivider: boolean
 }
 
 export function chatMessageTimelineMetadata({
   latestTurn,
+  turns = {},
   messages,
   showCompletionSummary = true,
   activeResponseTurnIds = chatActiveResponseTurnIds({ messages, entries: [], latestTurn }),
 }: {
   latestTurn: OrchestrationLatestTurn | null
+  turns?: Readonly<Record<string, OrchestrationLatestTurn>>
   messages: readonly ChatTimelineMessage[]
   showCompletionSummary?: boolean
   activeResponseTurnIds?: ReadonlySet<TurnId>
@@ -40,6 +45,8 @@ export function chatMessageTimelineMetadata({
   const metadataByMessageId = new Map<string, ChatMessageTimelineMetadata>()
 
   for (const message of messages) {
+    const turn =
+      message.turnId === latestTurn?.turnId ? latestTurn : (turns[message.turnId ?? ''] ?? null)
     const assistantTurnInProgress = isAssistantTurnInProgress(message, activeResponseTurnIds)
     metadataByMessageId.set(message.id, {
       assistantStreaming: isAssistantMessageStreaming(message, latestTurn),
@@ -47,6 +54,7 @@ export function chatMessageTimelineMetadata({
       completionSummary,
       durationEnd: durationEndForMessage(message, latestTurn, completionDividerMessageId),
       durationStart: durationStartByMessageId.get(message.id) ?? message.createdAt,
+      incomplete: turnStoppedShort(turn) && terminalAssistantMessageIds.has(message.id),
       showAssistantCopyButton:
         message.role === 'assistant' && terminalAssistantMessageIds.has(message.id),
       showCompletionDivider:
@@ -66,6 +74,7 @@ export function fallbackChatMessageTimelineMetadata(
     completionSummary: null,
     durationEnd: message.updatedAt,
     durationStart: message.createdAt,
+    incomplete: false,
     showAssistantCopyButton: false,
     showCompletionDivider: false,
   }
@@ -222,8 +231,6 @@ function formatCompletionSummary(turn: OrchestrationLatestTurn) {
   if (!turn.completedAt) return null
   const elapsed = formatChatElapsed(turn.startedAt ?? turn.requestedAt, turn.completedAt)
   if (!elapsed) return null
-  if (turn.state === 'interrupted') return `You stopped after ${elapsed}`
-  if (turn.state === 'error') return `Failed after ${elapsed}`
 
-  return `Worked for ${elapsed}`
+  return stoppedTurnLabel(turn, elapsed) ?? `Worked for ${elapsed}`
 }

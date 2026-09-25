@@ -22,6 +22,8 @@ import type { ChatInputTerminalContext } from './chat-input-draft-store'
 export type ComposerInboxEntry =
   | { readonly kind: 'terminal-context'; readonly context: ChatInputTerminalContext }
   | { readonly kind: 'text'; readonly text: string }
+  /** Text for the end of the prompt, added once: a prompt already ending with it keeps as is. */
+  | { readonly kind: 'append'; readonly text: string }
 
 type ComposerInboxState = {
   pending: readonly ComposerInboxEntry[]
@@ -38,6 +40,7 @@ type ComposerInboxActions = {
   take: (accept: (entry: ComposerInboxEntry) => boolean) => readonly ComposerInboxEntry[]
   /** Text to splice in at the caret. Returns false for nothing worth inserting. */
   queueText: (text: string) => boolean
+  queueAppend: (text: string) => boolean
   queueTerminalContext: (selection: TerminalContextSelection) => ChatInputTerminalContext | null
 }
 
@@ -61,6 +64,14 @@ export const useComposerInboxStore = create<ComposerInboxStore>((set, get) => ({
     if (trimmed.length === 0) return false
 
     set((state) => ({ pending: state.pending.concat({ kind: 'text', text: trimmed }) }))
+
+    return true
+  },
+  queueAppend: (text) => {
+    const trimmed = text.trim()
+    if (trimmed.length === 0) return false
+
+    set((state) => ({ pending: state.pending.concat({ kind: 'append', text: trimmed }) }))
 
     return true
   },

@@ -6,20 +6,17 @@ import { ActivityRow } from '@/features/chat/components/activity-row'
 import { useWorkLogScroll } from '@/features/chat/hooks/use-work-log-scroll'
 import { useChatWorkLogExpansionStore } from '@/features/chat/state/chat-work-log-expansion-store'
 import type { ChatWorkLogEntry } from '@/features/chat/utils/work-log'
-import { isWorkLogFailure } from '@/features/chat/utils/work-row'
-import { activityGroupSummary } from '@/features/chat/utils/activity-visibility'
+import {
+  activityGroupSummary,
+  isPinnedWorkLogEntry,
+} from '@/features/chat/utils/activity-visibility'
 
 export function ActivityGroupRow({ activities }: { activities: readonly ChatWorkLogEntry[] }) {
   const groupId = activities[0]?.id ?? ''
   const expanded = useChatWorkLogExpansionStore((state) => state.expandedGroupIds[groupId] ?? false)
   const toggle = useChatWorkLogExpansionStore((state) => state.toggleGroupExpanded)
   const scrollRef = useWorkLogScroll(`group:${groupId}`, activities.length)
-  const visible = expanded
-    ? activities
-    : activities.filter(
-        (entry) =>
-          isWorkLogFailure(entry) || entry.icon === 'approval' || entry.icon === 'user-input',
-      )
+  const visible = expanded ? activities : activities.filter(isPinnedWorkLogEntry)
   const hiddenCount = activities.length - visible.length
   const summary = activityGroupSummary(activities)
 

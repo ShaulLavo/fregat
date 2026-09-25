@@ -42,6 +42,24 @@ export const checkpointErrors = defineErrorCatalog('checkpoint', {
 })
 
 export const sessionDomainErrors = defineErrorCatalog('orchestration', {
+  APPROVAL_REQUEST_UNKNOWN: {
+    status: 404,
+    message: 'This approval request is unavailable.',
+    why: 'The session has no record of this request.',
+    fix: 'Refresh the session to see its current requests.',
+  },
+  APPROVAL_ALREADY_DECIDED: {
+    status: 409,
+    message: 'This approval was already answered with a different choice.',
+    why: 'Another window or an earlier click answered it first, and an agent takes one answer per request.',
+    fix: 'The first answer stands. Check the transcript for what was decided.',
+  },
+  APPROVAL_REQUEST_ENDED: {
+    status: 410,
+    message: 'This approval ended before your answer arrived.',
+    why: 'The turn that asked finished, was stopped, or the server restarted, so the agent stopped waiting.',
+    fix: 'Send a new message if the agent should try again.',
+  },
   STEER_TURN_NOT_ACTIVE: {
     status: 409,
     message: 'The turn has finished or is waiting for a response. Your message was not sent.',

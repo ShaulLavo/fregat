@@ -55,7 +55,171 @@ if (scenario === 'background-liveness')
     record({ event: `background-${step}` })
   }, 50)
 
+// Turn ids stay unique across a runtime restart, which spawns a fresh process.
+let activeTurnId = null
+function startOwnTurn(message) {
+  activeTurnId = `${threadId}-turn-${process.pid}-${++turnCount}`
+  const turn = { id: activeTurnId, status: 'inProgress', items: [] }
+  send({ id: message.id, result: { turn } })
+  send({ method: 'turn/started', params: { threadId, turn } })
+  return activeTurnId
+}
+const agentDelta = (turn, itemId, delta) =>
+  send({ method: 'item/agentMessage/delta', params: { threadId, turnId: turn, itemId, delta } })
+const agentMessage = (turn, itemId, text) =>
+  send({
+    method: 'item/completed',
+    params: { threadId, turnId: turn, item: { id: itemId, type: 'agentMessage', text } },
+  })
+const endTurn = (turn, status, error) =>
+  send({
+    method: 'turn/completed',
+    params: { threadId, turn: { id: turn, status, items: [], ...(error ? { error } : {}) } },
+  })
+const promptText = (message) =>
+  message.params.input
+    .filter((entry) => entry.type === 'text')
+    .map((entry) => entry.text)
+    .join('\n')
+
+/** Streams `chunks` as deltas `delayMs` apart, then settles the message and the turn. */
+function streamAnswer(turn, itemId, chunks, delayMs) {
+  const next = (index) => {
+    if (index === chunks.length) {
+      agentMessage(turn, itemId, chunks.join(''))
+      endTurn(turn, 'completed')
+      record({ event: 'stream-complete', itemId })
+      return
+    }
+    agentDelta(turn, itemId, chunks[index])
+    setTimeout(() => next(index + 1), delayMs)
+  }
+  next(0)
+}
+
+const LONG_ANSWER = Array.from(
+  { length: 40 },
+  (_, index) => `Paragraph ${index + 1} of a long answer that makes the transcript scroll.\n\n`,
+)
+const AMBIGUOUS_TAIL_CHUNKS = [
+  'Intro line.\n\n',
+  '#',
+  '# ',
+  'Heading two\n\n',
+  'Use `',
+  'code',
+  '` inline.\n\n',
+  '| Col A | Col B |\n',
+  '| --',
+  '- | --- |\n',
+  '| 1 | 2 |\n\n',
+  '* ',
+  'item one\n\nDone.',
+]
+const CODE_COLOUR_CHUNKS = [
+  'Here is the code:\n\n```ts\n',
+  'export interface Point {\n',
+  '  readonly x: number\n',
+  '  readonly y: number\n}\n\n',
+  'export function distance(a: Point, ',
+  'b: Point): number {\n',
+  '  const dx = a.x - b.x\n',
+  '  const dy = a.y - b.y\n',
+  '  return Math.sqrt(dx * dx + dy * dy)\n}\n\n',
+  'const label = `distance: ${distance({ x: 0, y: 0 }, { x: 3, y: 4 })}`\n',
+  'console.log(label)\n```\n\nDone.',
+]
+
+/**
+ * `stopped-turn-reasons` keys each turn on its prompt: a partial answer that waits to be
+ * stopped, a failure, a long answer, and a repeated prompt answered after a pause.
+ */
+// Counted from the log, not memory: a runtime restart spawns a fresh process.
+function promptAttempts(text) {
+  const lines = readFileSync(join(root, 'native.jsonl'), 'utf8').split('\n').filter(Boolean)
+  return lines
+    .map((line) => JSON.parse(line))
+    .filter((entry) => entry.event === 'turn/start' && entry.input === text).length
+}
+function stoppedTurnReasons(message) {
+  const text = promptText(message)
+  const seen = promptAttempts(text) + 1
+  record({ event: 'turn/start', input: text, seen })
+  const turn = startOwnTurn(message)
+  const itemId = `${turn}-answer`
+  if (text.startsWith('FILL')) {
+    streamAnswer(turn, itemId, LONG_ANSWER, 0)
+    return
+  }
+  if (seen > 1) {
+    setTimeout(() => streamAnswer(turn, itemId, LONG_ANSWER, 50), 2_500)
+    return
+  }
+  agentDelta(turn, itemId, `PARTIAL_ANSWER ${text.split(' ')[0]} The first half of an answer, `)
+  if (text.startsWith('FAIL'))
+    setTimeout(() => endTurn(turn, 'failed', { message: 'Verification provider failure.' }), 500)
+}
+
 function handle(message) {
+  if (scenario === 'stopped-turn-reasons' && message.method === 'turn/start') {
+    stoppedTurnReasons(message)
+    return
+  }
+  if (scenario === 'stopped-turn-reasons' && message.method === 'turn/interrupt') {
+    endTurn(activeTurnId, 'interrupted')
+    send({ id: message.id, result: {} })
+    return
+  }
+  if (scenario === 'chat-multiple-models' && message.method === 'turn/start') {
+    record({ event: 'turn/start', model: message.params.model, input: promptText(message) })
+    const turn = startOwnTurn(message)
+    agentMessage(turn, `${turn}-answer`, `MULTIPLE_MODELS ${message.params.model}`)
+    endTurn(turn, 'completed')
+    return
+  }
+  if (scenario === 'chat-multiple-models' && message.method === 'model/list') {
+    const entry = (id) => ({
+      id,
+      model: id,
+      displayName: id,
+      description: 'Isolated fan-out fixture',
+      hidden: false,
+      isDefault: id === 'gpt-5.5',
+      defaultReasoningEffort: 'medium',
+      supportedReasoningEfforts: [{ reasoningEffort: 'medium', description: 'Medium' }],
+    })
+    send({
+      id: message.id,
+      result: { data: [entry('gpt-5.5'), entry('gpt-5.5-mini')], nextCursor: null },
+    })
+    return
+  }
+  if (scenario === 'chat-artifact-template' && message.method === 'turn/start') {
+    const turn = startOwnTurn(message)
+    agentMessage(
+      turn,
+      `${turn}-answer`,
+      [
+        'I saved your document template.',
+        '',
+        '::artifact-template{artifact_kind="document" display_name="Weekly Report" skill_directory="/tmp/skills/artifact-template-weekly-report" skill_name="artifact-template-weekly-report"}',
+        '',
+        'Use it any time.',
+      ].join('\n'),
+    )
+    endTurn(turn, 'completed')
+    return
+  }
+  if (scenario === 'stream-ambiguous-tail' && message.method === 'turn/start') {
+    const turn = startOwnTurn(message)
+    streamAnswer(turn, `${turn}-answer`, AMBIGUOUS_TAIL_CHUNKS, 250)
+    return
+  }
+  if (scenario === 'stream-code-colour' && message.method === 'turn/start') {
+    const turn = startOwnTurn(message)
+    streamAnswer(turn, `${turn}-answer`, CODE_COLOUR_CHUNKS, 250)
+    return
+  }
   if (scenario === 'response-delivery' && message.method === 'turn/start') {
     send({ id: message.id, result: { turn: { id: turnId, status: 'inProgress', items: [] } } })
     send({

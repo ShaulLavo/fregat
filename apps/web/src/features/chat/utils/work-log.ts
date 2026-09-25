@@ -21,13 +21,16 @@ import {
 } from '@/features/chat/utils/activity-presentation'
 import { isVisibleChatActivity } from '@/features/chat/utils/activity-visibility'
 import { chatAgentActivity } from '@/features/chat/utils/agent-activity'
+import { mergePlanSteps, type ChatPlanStep } from '@/features/chat/utils/plan-steps'
 
 type ChatWorkLogTone = 'error' | 'info' | 'thinking' | 'tool'
 
 export type ChatWorkLogPlan = {
   completedCount: number
   currentStep: string | null
-  steps: readonly ChatActivityPlanStep[]
+  /** Steps that are not dropped; progress counts only these. */
+  liveCount: number
+  steps: readonly ChatPlanStep[]
 }
 
 export type ChatWorkLogEntry = {
@@ -40,11 +43,15 @@ export type ChatWorkLogEntry = {
   id: string
   input: string | null
   itemType: string | null
+  /** The newest event folded into this row; `createdAt` stays the first. */
+  lastActivityAt: string
   lifecycle: ChatActivityLifecycle | null
   outcome: ChatActivityOutcome | null
   output: string | null
   result?: string
   plan: ChatWorkLogPlan | null
+  /** Folded from provider reasoning deltas, as opposed to task progress that shares its tone. */
+  reasoning: boolean
   requestId: string | null
   sourceKind: string
   status: string | null
@@ -58,7 +65,6 @@ type DerivedChatWorkLogEntry = ChatWorkLogEntry & {
   activityKind: string
   collapseKey: string | null
   toolCallKey: string | null
-  reasoningDelta: boolean
 }
 
 type TurnPlanRow = {
@@ -76,9 +82,11 @@ const WORK_LOG_SCALAR_FIELDS = [
   'id',
   'input',
   'itemType',
+  'lastActivityAt',
   'lifecycle',
   'outcome',
   'output',
+  'reasoning',
   'result',
   'requestId',
   'sourceKind',
@@ -121,7 +129,6 @@ export function chatWorkLogEntries({
       activityKind: _activityKind,
       collapseKey: _collapseKey,
       toolCallKey: _toolCallKey,
-      reasoningDelta: _reasoningDelta,
       ...entry
     }) => entry,
   )
@@ -160,13 +167,14 @@ function chatWorkLogPlanEquals(left: ChatWorkLogPlan | null, right: ChatWorkLogP
   if (left === right) return true
   if (!left || !right) return false
   if (left.completedCount !== right.completedCount) return false
+  if (left.liveCount !== right.liveCount) return false
   if (left.currentStep !== right.currentStep) return false
   if (left.steps.length !== right.steps.length) return false
 
   return left.steps.every((step, index) => planStepEquals(step, right.steps[index]))
 }
 
-function planStepEquals(left: ChatActivityPlanStep, right: ChatActivityPlanStep | undefined) {
+function planStepEquals(left: ChatPlanStep, right: ChatPlanStep | undefined) {
   return left.status === right?.status && left.step === right.step
 }
 
@@ -211,7 +219,7 @@ function turnPlanRows(ordered: readonly OrchestrationSessionActivity[]) {
     if (activity.kind !== 'turn.plan.updated') continue
 
     const key = turnPlanKey(activity)
-    const plan = workLogPlan(activity)
+    const plan = workLogPlan(activity, rows.get(key)?.entry.plan?.steps ?? [])
     // A later snapshot with no steps withdraws the plan; keeping the stale row would
     // freeze the timeline on a plan the model already abandoned.
     if (!plan) {
@@ -247,14 +255,18 @@ function turnPlanKey(activity: OrchestrationSessionActivity) {
   return activity.turnId ?? 'no-turn'
 }
 
-function workLogPlan(activity: OrchestrationSessionActivity): ChatWorkLogPlan | null {
-  const steps = chatActivityPlanSteps(activity)
-  if (steps.length === 0) return null
+function workLogPlan(
+  activity: OrchestrationSessionActivity,
+  previous: readonly ChatPlanStep[],
+): ChatWorkLogPlan | null {
+  const next = chatActivityPlanSteps(activity)
+  if (next.length === 0) return null
 
   return {
-    completedCount: steps.filter((step) => step.status === 'completed').length,
-    currentStep: currentPlanStep(steps),
-    steps,
+    completedCount: next.filter((step) => step.status === 'completed').length,
+    currentStep: currentPlanStep(next),
+    liveCount: next.length,
+    steps: mergePlanSteps(previous, next),
   }
 }
 
@@ -282,6 +294,7 @@ function planWorkLogEntry(
     id: `turn-plan:${key}`,
     input: null,
     itemType: null,
+    lastActivityAt: activity.createdAt,
     lifecycle: null,
     outcome: null,
     output: null,
@@ -291,7 +304,7 @@ function planWorkLogEntry(
     status: null,
     title: activity.summary || 'Plan updated',
     toolCallKey: null,
-    reasoningDelta: false,
+    reasoning: false,
     tone: 'info',
     turnId: activity.turnId,
   }
@@ -313,6 +326,7 @@ function derivedWorkLogEntry(activity: OrchestrationSessionActivity): DerivedCha
     id: activity.id,
     input: presentation.input,
     itemType: stringPayloadValue(activity.payload, 'itemType'),
+    lastActivityAt: activityEndedAt(activity),
     lifecycle: presentation.lifecycle,
     outcome: presentation.outcome,
     output: presentation.output,
@@ -323,7 +337,7 @@ function derivedWorkLogEntry(activity: OrchestrationSessionActivity): DerivedCha
     status: presentation.status,
     title: presentation.title,
     toolCallKey: workLogIdentity(activity, presentation.toolCallId),
-    reasoningDelta: chatActivityReasoningDelta(activity) !== null,
+    reasoning: chatActivityReasoningDelta(activity) !== null,
     tone: workLogTone(activity, presentation.outcome),
     ...(presentation.tool ? { tool: presentation.tool } : {}),
     turnId: activity.turnId,
@@ -407,6 +421,9 @@ function shouldCollapseWorkLogEntries(
   if (!isCollapsibleToolLifecycleKind(next.activityKind)) return false
   if (previous.activityKind === 'tool.completed') return false
   if (!previous.collapseKey || !next.collapseKey) return false
+  // Two provider call ids are two calls: a retry or a parallel run must not rewrite the row.
+  if (previous.toolCallKey && next.toolCallKey && previous.toolCallKey !== next.toolCallKey)
+    return false
 
   return previous.collapseKey === next.collapseKey
 }
@@ -431,6 +448,7 @@ function mergeWorkLogEntries(
     id: previous.id,
     input: next.input ?? previous.input,
     itemType: next.itemType ?? previous.itemType,
+    lastActivityAt: newestTimestamp(previous.lastActivityAt, next.lastActivityAt),
     lifecycle,
     outcome: mergedOutcome(previous.outcome, next.outcome, lifecycle),
     output: next.output ?? previous.output,
@@ -441,8 +459,19 @@ function mergeWorkLogEntries(
   }
 }
 
+function newestTimestamp(left: string, right: string) {
+  return right.localeCompare(left) > 0 ? right : left
+}
+
+/** Reasoning chunks keep the first delta's `createdAt` for ordering; `updatedAt` is when each arrived. */
+function activityEndedAt(activity: OrchestrationSessionActivity) {
+  if (chatActivityReasoningDelta(activity) === null) return activity.createdAt
+
+  return stringPayloadValue(activity.payload, 'updatedAt') ?? activity.createdAt
+}
+
 function mergedTitle(previous: DerivedChatWorkLogEntry, next: DerivedChatWorkLogEntry) {
-  if (!previous.reasoningDelta || !next.reasoningDelta) return next.title || previous.title
+  if (!previous.reasoning || !next.reasoning) return next.title || previous.title
 
   return previous.title + next.title
 }

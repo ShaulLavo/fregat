@@ -1,3 +1,4 @@
+import { errorStringField } from '@workspace/contracts'
 import { defineErrorCatalog } from 'evlog'
 
 export const sessionIdentityErrors = defineErrorCatalog('provider', {
@@ -91,11 +92,36 @@ export const sessionIdentityErrors = defineErrorCatalog('provider', {
     why: 'The isolated provider process could not return the local conversation transcript.',
     fix: 'Check that this provider instance can access the session files and retry the import.',
   },
+  CLAUDE_CLI_TOO_OLD: {
+    status: 409,
+    message: ({ version, minimum }: { version: string; minimum: string }) =>
+      `Claude Code ${version} is older than the minimum ${minimum}`,
+    why: 'Older CLIs lack the result and sign-in fields this app reads, so their turns cannot be reported correctly.',
+    fix: 'Update the Claude CLI, or clear the binary path in the provider settings to use the bundled one.',
+  },
+  CODEX_EXITED: {
+    status: 502,
+    message: 'The Codex app-server exited',
+    why: 'The Codex process ended while this app still had requests waiting on it.',
+    fix: 'Send the message again. If it keeps exiting, run `codex app-server` in a terminal to see why.',
+  },
   CLAUDE_BINARY_MISSING: {
     status: 500,
     message: 'The configured Claude binary was not found',
     why: 'The provider instance names a binary path that does not resolve to an executable.',
     fix: 'Correct the binary path in the provider settings, or clear it to use the installed `claude`.',
+  },
+  REQUEST_GONE: {
+    status: 410,
+    message: 'The agent no longer holds this request',
+    why: 'The provider session that asked was restarted or recovered, and its pending requests do not survive that.',
+    fix: 'Restart the turn to continue.',
+  },
+  NOT_INSTALLED: {
+    status: 503,
+    message: 'The provider CLI is not installed',
+    why: 'No executable for this provider was found on the PATH the server runs with.',
+    fix: 'Install the CLI, or set its binary path in the provider settings.',
   },
   HISTORY_UNSUPPORTED: {
     status: 400,
@@ -104,3 +130,12 @@ export const sessionIdentityErrors = defineErrorCatalog('provider', {
     fix: 'Choose a provider listed in the conversation import settings.',
   },
 })
+
+/** The provider has no callback for this request any more; the caller branches on the code. */
+export function requestGone(requestKind: 'approval' | 'user-input', requestId: string) {
+  return sessionIdentityErrors.REQUEST_GONE({ internal: { requestId, requestKind } })
+}
+
+export function isNotInstalledError(error: unknown) {
+  return errorStringField(error, 'code') === sessionIdentityErrors.NOT_INSTALLED.code
+}

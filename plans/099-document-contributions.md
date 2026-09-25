@@ -19,6 +19,9 @@ This document plans the refactor. It does not start production implementation, a
 or a PR. The planning work covers grounding, competing designs, synthesis, and review. Implementation
 begins only when requested. Reconcile both checkouts and their dirty diffs before executing it.
 
+Decided 2026-09-25: owner — units 0–1 (baseline and consumer inventory, then buffer publication) are approved to
+start. Units 2–7 stay gated as this plan says: implementation of them begins only when requested.
+
 ## Scope and completion boundary
 
 Route every successful buffer mutation through one publication operation. Route every first-party
@@ -567,7 +570,10 @@ Keep only domain-specific synchronization required to update parser/tokenizer st
 common reader advances.
 
 Keep their separate workers. Delete the `shared-utf16` text payload, encode/decode helpers, source
-capability selection, and obsolete transport-only tests in this same unit. Carry forward exact
+capability selection, and obsolete transport-only tests in this same unit. Decided 2026-09-25: owner — that deletion
+is queued ahead of this plan as Editor
+[E057](../../Editor/plans/e057-delete-sab-transport.md); if E057 has landed, this unit has no SAB
+work left. Carry forward exact
 UTF-16, chunk identity, and retention coverage against strings. Preserve atomic cancellation and
 packed-result transfer behavior; neither is shared document storage.
 
@@ -630,6 +636,16 @@ Verify cancellation on supported hosts and packed-result transfers independently
 decision is settled; this unit does not add a competing shared-storage prototype or a relay worker.
 Keep the recorded SAB measurements as evidence, without maintaining obsolete production transport
 solely to rerun them. Report remaining E009 measurement gaps without making SAB research a rollout gate.
+
+Decided 2026-09-25: owner — Editor E009 (worker transport costs) is folded into this unit and closed in the Editor
+backlog. Its open scope, carried here: measure the string path through visible completion, memory
+and lifecycle stress, over the E001 workload matrix (cold open, warm small edits, large paste,
+branch-changing undo, document replacement, worker restart, several retained documents), counting
+bytes in both main and worker heaps. Then decide result representation and ownership transfer:
+residual packed-token unpacking, lazy packed views against the public token representation, and
+transferable typed arrays where the protocol allows. Check dedup identity across a buffer ID reused
+after undo and a same-length replacement. The full E009 plan is in Editor git history as
+`plans/e009-worker-transport-costs.md`, deleted 2026-09-25.
 
 ### 7. Enforce the boundary and close the refactor
 
@@ -786,11 +802,12 @@ and complete validation. Writing the plan does not schedule production execution
   Reconcile overlapping consumer moves instead of implementing parallel abstractions.
 - [Completed E032](../../Editor/docs/performance/e032-edit-batches.md) supplies incremental batch
   behavior and measurements. Preserve its sparse-region requirements and canonical batch semantics.
-- [E009](../../Editor/plans/e009-worker-transport-costs.md) supplies transport measurement scope.
+- E009 supplied transport measurement scope and is folded into unit 6 (2026-09-25).
   Its initial measurements informed the decision to remove SAB text transport in unit 2. Unit 6
   validates string delivery under the new runtime and records remaining measurement gaps.
-- [E013](../../Editor/plans/e013-shared-document-snapshots.md) and E010–E012 are deferred shared-storage
-  research outside this architecture. Reopening shared text storage requires a separate explicit
+- E010, E012 and E013, the shared-storage research, were closed as no-go on 2026-09-25
+  ([decision](../../Editor/docs/performance/sab-transport-2026-09-12.md#decision-2026-09-25)); E011
+  is parked under Plan 112. All were outside this architecture. Reopening shared text storage requires a separate explicit
   decision; this plan provides no production abstraction or implementation dependency for it.
 - [E014](../../Editor/plans/e014-parallel-search.md) must reuse the common reader and job lifecycle
   if parallel search is implemented. This plan does not add a parallel search engine.

@@ -71,7 +71,8 @@ function settingOperations(
   if (id === 'environments.machines') return keyedOperations(current, value, 'machine')
   if (id === 'keybindings.overrides') return keyedOperations(current, value, 'keybinding')
   if (id === 'models.order') return [operation({ kind: 'model.setOrder', order: value })]
-  if (id === 'models.hidden') return hiddenModelOperations(current, value)
+  if (id === 'models.hidden') return modelMembershipOperations(current, value, 'hidden')
+  if (id === 'models.favorites') return modelMembershipOperations(current, value, 'favorite')
   if (id === 'providers.instances') return providerOperations(value, snapshot)
   const scalar = operation({ kind: 'set', key: id, value })
   const theme = snapshot.values['workbench.theme']
@@ -158,7 +159,7 @@ function keyedOperations(previous: unknown, next: unknown, kind: 'machine' | 'ke
   ]
 }
 
-function hiddenModelOperations(previous: unknown, next: unknown) {
+function modelMembershipOperations(previous: unknown, next: unknown, list: 'favorite' | 'hidden') {
   const current = v.parse(v.optional(v.array(v.unknown()), []), previous)
   const values = v.parse(v.array(v.unknown()), next)
   const removed = current.filter(
@@ -167,10 +168,13 @@ function hiddenModelOperations(previous: unknown, next: unknown) {
   const added = values.filter(
     (ref) => !current.some((value) => JSON.stringify(value) === JSON.stringify(ref)),
   )
-  return [
-    ...removed.map((ref) => operation({ kind: 'model.setHidden', ref, hidden: false })),
-    ...added.map((ref) => operation({ kind: 'model.setHidden', ref, hidden: true })),
-  ]
+  const set = (ref: unknown, member: boolean) =>
+    operation(
+      list === 'hidden'
+        ? { kind: 'model.setHidden', ref, hidden: member }
+        : { kind: 'model.setFavorite', ref, favorite: member },
+    )
+  return [...removed.map((ref) => set(ref, false)), ...added.map((ref) => set(ref, true))]
 }
 
 function providerOperations(next: unknown, snapshot: SettingsSnapshot) {

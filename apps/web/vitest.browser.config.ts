@@ -79,6 +79,7 @@ export default defineConfig({
       // list (built from this port) matches the real test origin.
       api: { host: '127.0.0.1', port: Number(browserTestPort) },
       commands: {
+        acquireWorkspaceOpen,
         diffMouseWheel,
         proofContextClick,
         proofKeyDown,
@@ -87,6 +88,7 @@ export default defineConfig({
         proofMouseDrag,
         proofMouseHover,
         proofMouseUp,
+        releaseWorkspaceOpen,
       },
       enabled: true,
       headless: true,
@@ -204,6 +206,25 @@ type ProofMouseDragStep =
       readonly kind: 'pause'
       readonly ms?: number
     }
+
+// Test files run in parallel pages against one file server, which keeps one workspace: an open
+// that overlaps another page's comes back `superseded`. Opens take turns here.
+let workspaceOpenQueue: Promise<void> = Promise.resolve()
+const workspaceOpenReleases = new Map<string, () => void>()
+
+async function acquireWorkspaceOpen({ sessionId }: { readonly sessionId: string }) {
+  const previous = workspaceOpenQueue
+  const turn = new Promise<void>((resolve) => workspaceOpenReleases.set(sessionId, resolve))
+  workspaceOpenQueue = previous.then(() => turn)
+  await previous
+}
+
+function releaseWorkspaceOpen({ sessionId }: { readonly sessionId: string }) {
+  const release = workspaceOpenReleases.get(sessionId)
+  workspaceOpenReleases.delete(sessionId)
+  // Pages stamp an open with `Date.now()` and the server keeps only a strictly newer one.
+  setTimeout(() => release?.(), 1)
+}
 
 async function proofKeyPress(context: ProofKeyCommandContext, input: ProofKeyPressInput) {
   await context.page.keyboard.press(input.key)

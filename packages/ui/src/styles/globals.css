@@ -588,6 +588,17 @@
   text-transform: uppercase;
 }
 
+/* Text that stops mid-thought: the last lines fade out instead of ending on a hard edge. */
+@utility fade-out-bottom {
+  /* Capped by the block's own height and never fully clear, so a one-line answer stays legible. */
+  --fade-out-height: min(3lh, 60%);
+  mask-image: linear-gradient(
+    to bottom,
+    black calc(100% - var(--fade-out-height)),
+    rgb(0 0 0 / 0.35)
+  );
+}
+
 @utility pressable {
   @apply transition-[color,background-color,border-color,box-shadow] active:not-disabled:not-aria-disabled:not-aria-[haspopup]:translate-y-px;
   transition-duration: var(--duration-color);
@@ -1047,4 +1058,50 @@
   to {
     height: 0;
   }
+}
+
+/* Effort sparkle: the highest reasoning levels twinkle. Opacity only, so it runs
+   on the compositor; faster at max. Reduced motion keeps a still sprinkle. */
+:root {
+  --effort-sparkle-duration-xhigh: 2.6s;
+  --effort-sparkle-duration-max: 1.7s;
+}
+
+@keyframes app-effort-twinkle {
+  0%,
+  72%,
+  100% {
+    opacity: 0;
+  }
+
+  86% {
+    opacity: 0.45;
+  }
+}
+
+@utility effort-sparkle-cell {
+  opacity: 0;
+  animation: app-effort-twinkle var(--effort-sparkle-duration) linear infinite;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+    opacity: 0.18;
+  }
+}
+
+/* The composer's "ultrathink", one hue per letter through the CSS Highlight API. */
+::highlight(ultrathink-0) {
+  color: var(--destructive);
+}
+
+::highlight(ultrathink-1) {
+  color: var(--warning);
+}
+
+::highlight(ultrathink-2) {
+  color: var(--success);
+}
+
+::highlight(ultrathink-3) {
+  color: var(--info);
 }

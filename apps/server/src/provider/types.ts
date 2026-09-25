@@ -1,4 +1,5 @@
 import type {
+  TurnEndReason,
   ApprovalRequestId,
   ChatAttachment,
   ChatAgent,
@@ -355,9 +356,10 @@ export type ProviderRuntimeEventPayload =
   | (ProviderRuntimeBaseEvent & {
       type: 'turn.completed'
       payload: {
+        /** Only a reason the harness itself reported; our own causes are projected from our events. */
+        endReason?: TurnEndReason
         errorMessage?: string
         state: ProviderRuntimeTurnState
-        stopReason?: string | null
         usage?: unknown
       }
     })

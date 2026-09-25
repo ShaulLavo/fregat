@@ -198,7 +198,7 @@ export function DiffPane({
       onFocusCapture={onFocus ? () => onFocus(side) : undefined}
     >
       <EditorHost
-        className='flex h-full min-h-0 w-full min-w-0 flex-1 overflow-hidden'
+        className='app-editor-host flex h-full min-h-0 w-full min-w-0 flex-1 overflow-hidden'
         controller={controller}
       />
     </div>

@@ -196,3 +196,102 @@ describe('the streaming tail', () => {
     expect(nodesOf(settled)).toEqual(fullParse(source))
   })
 })
+
+describe('holding an ambiguous tail', () => {
+  function streamed(text: string) {
+    return nodesOf(createMarkdownSession().update(text, { heal: true }))
+  }
+
+  test.each([
+    ['#', ''],
+    ['## ', ''],
+    ['Intro\n\n###', 'Intro\n\n'],
+    ['> quoted\n> #', '> quoted\n'],
+  ])('a line of only # marks: %j renders as %j', (text, held) => {
+    expect(streamed(text)).toEqual(streamed(held))
+  })
+
+  test.each([
+    ['Run `', 'Run '],
+    ['``', ''],
+    ['a `b` `', 'a `b` '],
+  ])('an unmatched trailing backtick run: %j renders as %j', (text, held) => {
+    expect(streamed(text)).toEqual(streamed(held))
+  })
+
+  test('a backtick run that closes a code span is not held', () => {
+    expect(streamed('Run `npm`')).toMatchObject([
+      { children: [{ type: 'text' }, { type: 'inlineCode', value: 'npm' }], type: 'paragraph' },
+    ])
+  })
+
+  test.each([
+    ['-', ''],
+    ['* ', ''],
+    ['Steps:\n\n1.', 'Steps:\n\n'],
+    ['- one\n- ', '- one\n'],
+    ['para\n-', 'para\n'],
+  ])('a list marker with nothing after it: %j renders as %j', (text, held) => {
+    expect(streamed(text)).toEqual(streamed(held))
+  })
+
+  test.each([
+    ['| a | b |', ''],
+    ['| a | b |\n', ''],
+    ['| a | b |\n|--', ''],
+    ['Intro\n\n| a | b | c |\n|---|-', 'Intro\n\n'],
+  ])('a table row with no separator row yet: %j renders as %j', (text, held) => {
+    expect(streamed(text)).toEqual(streamed(held))
+  })
+
+  test('a table renders once its separator row parses', () => {
+    expect(streamed('| a | b |\n|---|---')).toMatchObject([{ type: 'table' }])
+    expect(streamed('| a | b |\n|---|---|\n| 1 |')).toMatchObject([
+      { children: [{ type: 'tableRow' }, { type: 'tableRow' }], type: 'table' },
+    ])
+  })
+
+  test('the next delta re-evaluates the tail', () => {
+    const session = createMarkdownSession()
+    const held = session.update('Intro\n\n## ', { heal: true })
+    const released = session.update('Intro\n\n## Title', { heal: true })
+
+    expect(nodesOf(held)).toEqual(streamed('Intro\n\n'))
+    expect(released.at(-1)?.nodes[0]).toMatchObject({ depth: 2, type: 'heading' })
+  })
+
+  test('settled text is never held', () => {
+    const blocks = createMarkdownSession().update('| a |\n\n#\n\n- \n\nmore', { heal: true })
+
+    expect(blocks.map((block) => block.settled)).toEqual([true, true, true, false])
+    expect(nodesOf(blocks).map((node) => node.type)).toEqual([
+      'paragraph',
+      'heading',
+      'list',
+      'paragraph',
+    ])
+  })
+
+  test('nothing is held once the stream ends', () => {
+    const session = createMarkdownSession()
+    session.update('Intro\n\n##', { heal: true })
+
+    expect(nodesOf(session.update('Intro\n\n##', { heal: false }))).toEqual(
+      fullParse('Intro\n\n##'),
+    )
+    expect(fullParse('Intro\n\n##').at(-1)).toMatchObject({ type: 'heading' })
+  })
+
+  test('nothing is held inside an open fence', () => {
+    const blocks = createMarkdownSession().update('```md\n# title\n| a |\n-', { heal: true })
+
+    expect(nodesOf(blocks)).toMatchObject([{ type: 'code', value: '# title\n| a |\n-' }])
+  })
+
+  test('nothing is held inside a math block', () => {
+    const blocks = createMarkdownSession().update('$$\nx\n#', { heal: true })
+
+    expect(nodesOf(blocks)).toMatchObject([{ type: 'math' }])
+    expect(JSON.stringify(nodesOf(blocks))).toContain('x\\n#')
+  })
+})

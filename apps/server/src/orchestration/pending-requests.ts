@@ -1,3 +1,5 @@
+import { sessionIdentityErrors } from '../provider/structured-errors'
+
 /**
  * The blocked-on-you fold, shared by the decider guards, the in-memory
  * projector and the SQL projection so the three can never disagree on what
@@ -120,18 +122,11 @@ function isRespondFailureKind(kind: string) {
 }
 
 /**
- * A respond failure only clears the request when the request itself is gone —
- * the provider forgot it, or no session is bound to answer it any more. Any
- * other failure (a transient provider error) leaves the request open, because
- * the user can still answer it.
+ * A respond failure clears the request only when the provider says the request is
+ * gone. Any other failure leaves it open, because the user can still answer it.
  */
 function isDeadRequestFailureDetail(payload: Record<string, unknown> | null) {
-  const detail = typeof payload?.detail === 'string' ? payload.detail.toLowerCase() : null
-  if (detail === null) return false
-  if (detail.includes('no active provider session')) return true
-  if (detail.startsWith('stale pending ')) return true
-
-  return detail.includes('unknown pending ')
+  return payload?.code === sessionIdentityErrors.REQUEST_GONE.code
 }
 
 function activityPayloadRecord(payload: unknown) {

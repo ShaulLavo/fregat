@@ -19,6 +19,9 @@ describe('decider event envelope', () => {
 
   it('lifts the request id into the envelope of an approval response', async () => {
     const engine = await createEngineWithSession()
+    await engine.dispatch(
+      activityAppendCommand('approval-request', 'approval.requested', { requestId: 'req-1' }),
+    )
 
     await engine.dispatch(
       command({

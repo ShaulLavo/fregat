@@ -1,8 +1,8 @@
 import { describe } from 'vitest'
 
-import { expect, test as it } from '../../../../../test/fixtures'
+import { expect, test as it } from '../../../test/fixtures'
 
-import { ansiSpans } from '@/features/git/utils/ansi-spans'
+import { ansiSpans } from '@/lib/ansi-spans'
 
 const PLAIN = { bold: false, dim: false, italic: false, underline: false }
 

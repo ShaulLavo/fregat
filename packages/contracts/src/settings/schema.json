@@ -129,6 +129,12 @@
       "enum": ["paragraph", "token", "turn"],
       "type": "string"
     },
+    "chat.sendShortcut": {
+      "default": "enter",
+      "description": "Which key sends a message. enter: Enter sends and Shift+Enter adds a line. mod-enter-multiline: like enter until the message has a second line, then Ctrl/Cmd+Enter sends. mod-enter: Ctrl/Cmd+Enter sends and Enter adds a line. Where Ctrl/Cmd+Enter sends, Shift+Ctrl/Cmd+Enter takes the other follow-up behavior.",
+      "enum": ["enter", "mod-enter-multiline", "mod-enter"],
+      "type": "string"
+    },
     "chat.sessionSortOrder": {
       "default": "updated_at",
       "description": "Order palette sessions and choose the surviving project session after deletion by latest user activity or creation time. Shelf ordering remains independent.",
@@ -645,6 +651,27 @@
         "type": "string"
       },
       "type": "object"
+    },
+    "models.favorites": {
+      "default": [],
+      "description": "Models starred as favorites. The picker lists them first and gathers them under Favorites.",
+      "items": {
+        "properties": {
+          "model": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "providerInstanceId": {
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[a-zA-Z][a-zA-Z0-9_-]*$",
+            "type": "string"
+          }
+        },
+        "required": ["model", "providerInstanceId"],
+        "type": "object"
+      },
+      "type": "array"
     },
     "models.hidden": {
       "default": [],

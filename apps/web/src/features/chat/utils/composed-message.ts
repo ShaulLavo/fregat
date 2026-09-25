@@ -15,4 +15,5 @@ export type ChatInputSubmitPayload = {
   text: string
 }
 
-export type ChatInputSubmitResult = 'sent' | 'queued' | 'rejected'
+/** `started`: sent, and the draft stays for the next message with its workspace choices. */
+export type ChatInputSubmitResult = 'sent' | 'started' | 'queued' | 'rejected'

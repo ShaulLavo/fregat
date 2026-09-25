@@ -1,6 +1,7 @@
 import type { RecordedModelPrice } from '../provider/utils/model-prices'
 import type { UsageContribution } from '../provider/utils/usage-contributions'
 import {
+  TURN_END_REASONS,
   providerUsagePurposeSchema,
   sessionRuntimeStatusSchema,
   type WorkspaceAddressId,
@@ -429,6 +430,7 @@ export const projectionSessionMessages = sqliteTable(
     role: text('role', { enum: ['user', 'assistant', 'system'] }).notNull(),
     text: text('text').notNull(),
     attachmentsJson: text('attachments_json').notNull().default('[]'),
+    modelSelectionJson: text('model_selection_json'),
     streaming: integer('streaming', { mode: 'boolean' }).notNull(),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull(),
@@ -514,6 +516,7 @@ export const projectionTurns = sqliteTable(
     requestedAt: text('requested_at').notNull(),
     startedAt: text('started_at'),
     completedAt: text('completed_at'),
+    endReason: text('end_reason', { enum: TURN_END_REASONS }),
   },
   (table) => [
     uniqueIndex('projection_turns_session_turn_idx').on(table.sessionId, table.turnId),

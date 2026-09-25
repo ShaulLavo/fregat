@@ -1,4 +1,6 @@
 import { beforeEach } from 'vitest'
+import { installTestEnvironment } from '../../../../../test/factories/client-binding'
+import { resetChatMessageIntents } from '../chat-message-intents'
 import { MAX_CHAT_ATTACHMENTS } from '@workspace/contracts'
 import { expect, test } from '../../../../../test/fixtures'
 import {
@@ -15,6 +17,8 @@ import {
 } from '../chat-input-draft-store'
 import { restoreFollowUps } from '../restore-follow-ups'
 import { messageSubmission } from '../submit-message'
+import { sendFollowUp } from '../send-follow-up'
+import { unsupportedChatTransport } from '../../../../../test/factories/chat-transport'
 import { followUpDue } from '../../utils/follow-up-policy'
 
 const owner = { environmentId: TEST_ENVIRONMENT_ID, sessionId: fixtureSessionId(1) }
@@ -141,3 +145,30 @@ function message(id: string): QueuedFollowUp {
     },
   }
 }
+
+test('accepted sends return the sent result even if both projection reads fail', async ({
+  client,
+  onTestFinished,
+}) => {
+  const restore = await installTestEnvironment('http://accepted-send.test', client)
+  onTestFinished(() => {
+    resetChatMessageIntents()
+    restore()
+  })
+  let dispatched = 0
+  const transport = unsupportedChatTransport({
+    dispatchCommand: async () => {
+      dispatched += 1
+      return { deduped: false, sequence: 2, result: null }
+    },
+  })
+  const result = await sendFollowUp({
+    transport,
+    session: { ...session(), latestTurn: null, runtime: null },
+    target,
+    followUpBehavior: 'queue',
+    input: { kind: 'draft', payload: message('Accepted').payload, alternate: false },
+  })
+  expect(result).toBe('sent')
+  expect(dispatched).toBe(1)
+})

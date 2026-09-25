@@ -65,7 +65,8 @@ describe('pending request counters', () => {
       turnStartEvent('turn-1', requestedAt),
       approvalRequested('req-1'),
       requestActivity('provider.approval.respond.failed', 'activity-fail-2', 'req-1', {
-        detail: 'Unknown pending approval request',
+        code: 'provider.REQUEST_GONE',
+        detail: 'The agent no longer holds this request. Restart the turn to continue.',
       }),
     ])
 

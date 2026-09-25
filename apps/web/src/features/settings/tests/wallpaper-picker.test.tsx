@@ -42,7 +42,7 @@ test('several uploads land under Your uploads and the last one becomes the selec
     new File([wallpaperPng()], 'first.png', { type: 'image/png' }),
     new File([secondWallpaperPng()], 'second.png', { type: 'image/png' }),
   ]
-  await userEvent.upload(within(dialog).getByLabelText('Upload wallpapers'), files)
+  await userEvent.upload(await within(dialog).findByLabelText('Upload wallpapers'), files)
 
   const uploads = within(await within(dialog).findByRole('region', { name: 'Your uploads' }))
   const second = await uploads.findByRole('button', { name: 'Select second.png' })
@@ -60,7 +60,7 @@ test('several uploads land under Your uploads and the last one becomes the selec
 
 test('a file that is not an image is refused and the selection stays', async ({ client }) => {
   const dialog = await openPicker()
-  const input = within(dialog).getByLabelText('Upload wallpapers')
+  const input = await within(dialog).findByLabelText('Upload wallpapers')
   await userEvent.upload(input, new File(['nope'], 'broken.png', { type: 'image/png' }))
 
   expect(await screen.findByText('broken.png was not added')).toBeInTheDocument()

@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import { useProvider } from '@/features/chat/hooks/use-provider'
 import type { ProviderModelOption } from '@workspace/client-core/chat/providers/models'
 import { reconcileModelOptions } from '@workspace/client-core/chat/providers/options'
+import { toggledModelSelection } from '@/features/chat/utils/multiple-models'
 import {
   ChatModelPickerContext,
   type ChatModelPicker,
@@ -12,6 +13,8 @@ import {
   useChatInputDraftStore,
   type ChatInputDraftTarget,
 } from '@/features/chat/state/chat-input-draft-store'
+
+const NO_MODELS: readonly ModelSelection[] = []
 
 // The draft selection applies to the next turn; existing sessions keep their provider.
 export function ChatModelPickerProvider({
@@ -32,6 +35,9 @@ export function ChatModelPickerProvider({
     (state) => state.getDraft(draftTarget).modelSelection,
   )
   const setModelSelection = useChatInputDraftStore((state) => state.setModelSelection)
+  const additionalModels = useChatInputDraftStore(
+    (state) => state.getDraft(draftTarget).additionalModelSelections,
+  )
   const activeModelSelection = draftModelSelection ?? modelSelection
   const provider = useProvider(activeModelSelection?.providerInstanceId)
   function selectModel(option: ProviderModelOption) {
@@ -50,11 +56,22 @@ export function ChatModelPickerProvider({
     persistModelSelection(next)
   }
 
+  function toggleAdditionalModel(option: ProviderModelOption) {
+    const next = toggledModelSelection(
+      additionalModels,
+      activeModelSelection,
+      option.modelSelection,
+    )
+    useChatInputDraftStore.getState().setAdditionalModelSelections(draftTarget, next)
+  }
+
   const value: ChatModelPicker = {
     sessionProviderInstanceId,
     modelSelection: activeModelSelection,
     provider,
     selectModel,
+    additionalModels: sessionProviderInstanceId === null ? additionalModels : NO_MODELS,
+    toggleAdditionalModel: sessionProviderInstanceId === null ? toggleAdditionalModel : null,
   }
 
   return <ChatModelPickerContext value={value}>{children}</ChatModelPickerContext>

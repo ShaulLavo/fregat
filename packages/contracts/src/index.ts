@@ -511,6 +511,7 @@ export {
   type ScalarSettingOperation,
   type SetKeybindingOperation,
   type SetModelHiddenOperation,
+  type SetModelFavoriteOperation,
   type SetModelOrderOperation,
   type SetProviderEnabledOperation,
   type SettingsEvent,
@@ -564,6 +565,12 @@ export {
 } from './chat-ids'
 
 export {
+  APPROVAL_ANSWER_SUBMITTED_KIND,
+  TURN_END_REASONS,
+  TURN_ENDED_ACTIVITY_KIND,
+  turnEndReasonSchema,
+  turnEndedPayloadSchema,
+  type TurnEndReason,
   isoDateTimeSchema,
   chatAttachmentUploadSchema,
   type ChatAttachmentMimeType,

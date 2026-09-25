@@ -1,6 +1,10 @@
 import { deepStrictEqual } from 'node:assert/strict'
 import { selectors } from '../selectors'
-import { isolatedNativeScenario, nativeLog } from './native-provider-verification'
+import {
+  isolatedNativeScenario,
+  nativeLog,
+  requestAppApproval,
+} from './native-provider-verification'
 
 export const mcpApproval = isolatedNativeScenario({
   name: 'mcp-approval',
@@ -8,9 +12,7 @@ export const mcpApproval = isolatedNativeScenario({
     'Approve native app access after reload, verify the exact reply, and remove the isolated provider/session.',
   fixture: new URL('../fixtures/native-codex.mjs', import.meta.url),
   async drive(page, { step, root }) {
-    await selectors.chatMessage(page).fill('Request the isolated app approval.')
-    await selectors.chatSend(page).click()
-    await selectors.appApproval(page).waitFor({ timeout: 30_000 })
+    await requestAppApproval(page)
     await step('native-app-access-request')
     await page.reload()
     await selectors.appApproval(page).waitFor({ timeout: 30_000 })

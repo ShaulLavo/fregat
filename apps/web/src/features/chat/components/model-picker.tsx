@@ -5,7 +5,7 @@ import { useSettingValue } from '@/hooks/use-setting-value'
 import { Command, CommandEmpty, CommandInput, CommandList } from '@workspace/ui/components/command'
 import { Popover, PopoverContent } from '@workspace/ui/components/popover'
 import { cn } from '@workspace/ui/lib/utils'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 
 import { log } from '@/lib/client-logging'
 import { useModelPicker } from '@/features/chat/hooks/use-model-picker'
@@ -13,6 +13,7 @@ import { useProviderSignInDialog } from '@/features/chat/hooks/use-provider-sign
 import { rankModelPickerOptions } from '@/features/chat/utils/model-picker-search'
 import type { ProviderSignInTarget } from '@workspace/client-core/chat/providers/auth'
 import {
+  favoriteModelOptions,
   providerModelOptionGroups,
   providerModelSelectionKey,
   type ProviderModelOption,
@@ -72,7 +73,15 @@ export function ModelPicker({
   readonly busy: boolean
   readonly disabled: boolean
 }) {
-  const { sessionProviderInstanceId, modelSelection, selectModel } = useModelPicker()
+  const {
+    additionalModels,
+    modelSelection,
+    selectModel,
+    sessionProviderInstanceId,
+    toggleAdditionalModel,
+  } = useModelPicker()
+  // cmdk's onSelect carries no event, so the Shift that makes a pick additive is read here.
+  const additivePick = useRef(false)
   const { openSignIn } = useProviderSignInDialog()
   const providersQuery = useQuery(providerListQueryOptions())
   const [open, setOpen] = useState(false)
@@ -81,26 +90,38 @@ export function ModelPicker({
   const [railProviderInstanceId, setRailProviderInstanceId] = useState<ProviderInstanceId | null>(
     null,
   )
+  const [favoritesSelected, setFavoritesSelected] = useState(false)
 
   // The picker is where hiding and ordering a model has to mean something.
   // Until now both lists were written and never read.
-  const availableGroups = providerModelOptionGroups(providersQuery.data?.providers, {
+  const preferences = {
+    favorites: useSettingValue('models.favorites'),
     hidden: useSettingValue('models.hidden'),
     order: useSettingValue('models.order'),
-  })
+  }
+  const availableGroups = providerModelOptionGroups(providersQuery.data?.providers, preferences)
   const groups =
     sessionProviderInstanceId === null
       ? availableGroups
       : availableGroups.filter((group) => group.providerInstanceId === sessionProviderInstanceId)
-  // The rail scopes the list to one provider. It appears the moment a second
-  // provider exists and always has a selection, so the list is never an
-  // unscoped pile of every provider's models.
+  const favorites = favoriteModelOptions(providersQuery.data?.providers, preferences).filter(
+    (option) =>
+      sessionProviderInstanceId === null || option.providerInstanceId === sessionProviderInstanceId,
+  )
+  // The rail scopes the list to one provider, or to favorites. It appears once a
+  // second provider or a favorite exists and always has a selection, so the list
+  // is never an unscoped pile of every provider's models.
   const activeGroup = railGroup(
     groups,
     railProviderInstanceId ?? modelSelection?.providerInstanceId ?? null,
+    favorites.length > 0,
   )
-  const list = pickerList(groups, activeGroup, query)
+  const showFavorites = favoritesSelected && favorites.length > 0
+  const list = showFavorites
+    ? favoritesList(favorites, groups, query)
+    : pickerList(groups, activeGroup, query)
   const selectedKey = modelSelection ? providerModelSelectionKey(modelSelection) : null
+  const additionalKeys = new Set(additionalModels.map(providerModelSelectionKey))
   const emptyLabel = pickerEmptyLabel(providersQuery.isPending, groups.length > 0)
 
   function handleOpenChange(nextOpen: boolean) {
@@ -123,6 +144,10 @@ export function ModelPicker({
   }
 
   function handleSelect(option: ProviderModelOption) {
+    if (additivePick.current && toggleAdditionalModel) {
+      toggleAdditionalModel(option)
+      return
+    }
     selectModel(option)
     setQuery('')
     setOpen(false)
@@ -140,12 +165,30 @@ export function ModelPicker({
       <PopoverContent align='start' className={PANEL_CLASS} side='top'>
         {activeGroup ? (
           <ModelPickerRail
-            activeProviderInstanceId={activeGroup.providerInstanceId}
+            activeProviderInstanceId={showFavorites ? null : activeGroup.providerInstanceId}
+            favorites={
+              favorites.length > 0
+                ? { active: showFavorites, onSelect: () => setFavoritesSelected(true) }
+                : null
+            }
             groups={groups}
-            onSelect={setRailProviderInstanceId}
+            onSelect={(providerInstanceId) => {
+              setFavoritesSelected(false)
+              setRailProviderInstanceId(providerInstanceId)
+            }}
           />
         ) : null}
-        <Command className='min-w-0 flex-1' label='Models' shouldFilter={false}>
+        <Command
+          className='min-w-0 flex-1'
+          label='Models'
+          shouldFilter={false}
+          onKeyDownCapture={(event) => {
+            additivePick.current = event.shiftKey
+          }}
+          onPointerDownCapture={(event) => {
+            additivePick.current = event.shiftKey
+          }}
+        >
           <div
             className={cn(
               'px-(--density-row-padding-x) pt-(--density-section-gap)',
@@ -174,7 +217,7 @@ export function ModelPicker({
                 <ModelPickerRow
                   key={option.key}
                   option={option}
-                  selected={option.key === selectedKey}
+                  selected={option.key === selectedKey || additionalKeys.has(option.key)}
                   onSelect={handleSelect}
                 />
               ))}
@@ -190,7 +233,7 @@ export function ModelPicker({
                     <ModelPickerRow
                       key={option.key}
                       option={option}
-                      selected={option.key === selectedKey}
+                      selected={option.key === selectedKey || additionalKeys.has(option.key)}
                       onSelect={handleSelect}
                     />
                   ))
@@ -207,8 +250,9 @@ export function ModelPicker({
 function railGroup(
   groups: readonly ProviderModelOptionGroup[],
   providerInstanceId: ProviderInstanceId | null,
+  hasFavorites: boolean,
 ): ProviderModelOptionGroup | null {
-  if (groups.length < 2) return null
+  if (groups.length < 2 && !hasFavorites) return null
 
   const match = groups.find((group) => group.providerInstanceId === providerInstanceId)
 
@@ -241,6 +285,17 @@ function pickerList(
     options: group.options.filter((option) => !option.legacy),
     signInTarget: group.signInTarget,
   }
+}
+
+/** Favorites span providers, so a search over them ranks the whole catalogue as usual. */
+function favoritesList(
+  favorites: readonly ProviderModelOption[],
+  groups: readonly ProviderModelOptionGroup[],
+  query: string,
+): ModelPickerList {
+  if (query.trim()) return pickerList(groups, null, query)
+
+  return { legacyOptions: [], options: favorites, signInTarget: null }
 }
 
 function selectedIsLegacy(groups: readonly ProviderModelOptionGroup[], selectedKey: string | null) {

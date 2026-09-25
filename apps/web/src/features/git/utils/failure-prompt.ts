@@ -1,4 +1,4 @@
-import { ansiSpans } from '@/features/git/utils/ansi-spans'
+import { ansiSpans } from '@/lib/ansi-spans'
 
 export type GitFailure = {
   /** The mutation key's operation segment, such as `push` or `stage-many`. */

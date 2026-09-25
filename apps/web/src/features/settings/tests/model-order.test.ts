@@ -5,7 +5,10 @@ import {
   applyModelPreferences,
   modelPreferenceRows,
 } from '@workspace/client-core/chat/providers/preferences'
-import { providerModelOptions } from '@workspace/client-core/chat/providers/models'
+import {
+  favoriteModelOptions,
+  providerModelOptions,
+} from '@workspace/client-core/chat/providers/models'
 
 import { withMovedModel } from '../utils/patch'
 
@@ -142,5 +145,65 @@ describe('the settings model list', () => {
     // No snapshot to borrow a label from, so the slug stands in.
     expect(retired?.label).toBe('gpt-4-retired')
     expect(retired?.providerLabel).toBe('codex')
+  })
+})
+
+describe('favorite models', () => {
+  const codexRef = (model: string) => ({ model, providerInstanceId: 'codex' }) as never
+  const claudeRef = (model: string) => ({ model, providerInstanceId: 'claude' }) as never
+  const providers = [snapshot('codex', ['gpt-5', 'gpt-5-mini']), snapshot('claude', ['opus'])]
+
+  it('lists favorites first within their provider, ahead of the explicit order', () => {
+    const options = [option('a'), option('b'), option('c')]
+
+    const ordered = applyModelPreferences(options, {
+      favorites: [ref('c')],
+      hidden: [],
+      order: [ref('b')],
+    })
+
+    expect(ordered.map((entry) => entry.key)).toEqual(['c', 'b', 'a'])
+  })
+
+  it('gathers favorites across providers in starred order', () => {
+    const favorites = favoriteModelOptions(providers, {
+      favorites: [claudeRef('opus'), codexRef('gpt-5-mini')],
+      hidden: [],
+      order: [],
+    })
+
+    expect(favorites.map((entry) => entry.key)).toEqual(['claude:opus', 'codex:gpt-5-mini'])
+    expect(favorites.every((entry) => entry.disabledReason === null)).toBe(true)
+  })
+
+  it('keeps a favorite that left the catalogue as unavailable, and never shows a hidden one', () => {
+    const favorites = favoriteModelOptions(providers, {
+      favorites: [codexRef('gpt-4'), codexRef('gpt-5')],
+      hidden: [codexRef('gpt-5')],
+      order: [],
+    })
+
+    expect(favorites).toEqual([
+      expect.objectContaining({
+        disabledReason: expect.objectContaining({
+          kind: 'unavailable',
+          label: 'No longer offered',
+        }),
+        key: 'codex:gpt-4',
+      }),
+    ])
+  })
+
+  it('marks favorite rows and keeps a row for a favorite the catalogue dropped', () => {
+    const rows = modelPreferenceRows(providerModelOptions([snapshot('codex', ['gpt-5'])]), {
+      favorites: [codexRef('gpt-5'), codexRef('gpt-4')],
+      hidden: [],
+      order: [],
+    })
+
+    expect(rows.map((row) => [row.ref.model, row.favorite])).toEqual([
+      ['gpt-5', true],
+      ['gpt-4', true],
+    ])
   })
 })

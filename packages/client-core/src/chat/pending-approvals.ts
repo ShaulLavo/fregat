@@ -1,10 +1,12 @@
 import { nonEmptyText } from '@workspace/utils/strings'
 import {
+  APPROVAL_ANSWER_SUBMITTED_KIND,
   approvalRequestIdSchema,
   providerApprovalOptionSchema,
   DEFAULT_APPROVAL_OPTIONS,
   type ProviderApprovalOption,
   type ApprovalRequestId,
+  type OrchestrationLatestTurn,
   type OrchestrationSessionActivity,
   type TurnId,
 } from '@workspace/contracts'
@@ -17,11 +19,15 @@ export type PendingApproval = {
   /** The harness marked this ask risky: no choice may be one keystroke away. */
   readonly defaultToNo: boolean
   readonly createdAt: string
+  /** The arguments the harness asked about, as `[name, text]` pairs. */
+  readonly args: readonly (readonly [string, string])[]
   readonly detail: string | null
   readonly requestId: ApprovalRequestId
   readonly requestKind: PendingApprovalKind | null
   readonly requestType: string | null
   readonly turnId: TurnId | null
+  /** An answer the server admitted, from this window or another, that the agent has not resolved. */
+  readonly submittedDecision: string | null
 }
 
 /**
@@ -45,6 +51,7 @@ const APPROVAL_KIND_BY_REQUEST_TYPE: Record<string, PendingApprovalKind> = {
  * parsed and a failed parse drops the activity.
  */
 const approvalPayloadSchema = v.object({
+  args: v.optional(v.fallback(v.record(v.string(), v.string()), {})),
   options: v.optional(v.array(providerApprovalOptionSchema)),
   defaultToNo: v.nullish(v.boolean()),
   detail: v.nullish(v.string()),
@@ -55,17 +62,29 @@ const approvalPayloadSchema = v.object({
 
 type ApprovalPayload = v.InferOutput<typeof approvalPayloadSchema>
 
+const submittedAnswerSchema = v.object({ decision: v.string(), requestId: approvalRequestIdSchema })
+
 /**
  * Requested minus resolved, oldest first. Deriving from the activity stream
  * instead of the `projection_pending_approvals` table lets the panel answer a
- * request the moment its activity lands, with no second round trip.
+ * request the moment its activity lands, with no second round trip. A request
+ * dies with its turn, so a settled latest turn closes its approvals too.
  */
 export function derivePendingApprovals(
   activities: readonly OrchestrationSessionActivity[],
+  latestTurn: Pick<OrchestrationLatestTurn, 'state' | 'turnId'> | null = null,
 ): PendingApproval[] {
   const open = new Map<ApprovalRequestId, PendingApproval>()
 
   for (const activity of orderedSessionActivities(activities)) {
+    if (activity.kind === APPROVAL_ANSWER_SUBMITTED_KIND) {
+      markSubmitted(open, activity.payload)
+      continue
+    }
+    if (activity.kind === 'provider.approval.respond.failed') {
+      markFailed(open, activity.payload)
+      continue
+    }
     if (!isApprovalActivity(activity.kind)) continue
 
     const parsed = v.safeParse(approvalPayloadSchema, activity.payload)
@@ -79,7 +98,44 @@ export function derivePendingApprovals(
     open.set(parsed.output.requestId, pendingApproval(activity, parsed.output))
   }
 
-  return [...open.values()]
+  return [...open.values()].filter((approval) => !endedWithTurn(approval, latestTurn))
+}
+
+function markFailed(open: Map<ApprovalRequestId, PendingApproval>, payload: unknown) {
+  const parsed = v.safeParse(
+    v.object({
+      requestId: approvalRequestIdSchema,
+      code: v.optional(v.string()),
+    }),
+    payload,
+  )
+  if (!parsed.success) return
+  const { requestId, code } = parsed.output
+  const approval = open.get(requestId)
+  if (!approval) return
+  if (code === 'provider.REQUEST_GONE') {
+    open.delete(requestId)
+    return
+  }
+  open.set(requestId, { ...approval, submittedDecision: null })
+}
+
+function markSubmitted(open: Map<ApprovalRequestId, PendingApproval>, payload: unknown) {
+  const parsed = v.safeParse(submittedAnswerSchema, payload)
+  if (!parsed.success) return
+  const approval = open.get(parsed.output.requestId)
+  if (!approval) return
+
+  open.set(parsed.output.requestId, { ...approval, submittedDecision: parsed.output.decision })
+}
+
+function endedWithTurn(
+  approval: PendingApproval,
+  latestTurn: Pick<OrchestrationLatestTurn, 'state' | 'turnId'> | null,
+) {
+  if (!latestTurn || latestTurn.state === 'running') return false
+
+  return approval.turnId === latestTurn.turnId
 }
 
 /**
@@ -123,11 +179,13 @@ function pendingApproval(
     options: payload.options ?? DEFAULT_APPROVAL_OPTIONS,
     defaultToNo: payload.defaultToNo === true,
     createdAt: activity.createdAt,
+    args: Object.entries(payload.args ?? {}),
     detail: nonEmptyText(payload.detail),
     requestId: payload.requestId,
     requestKind: approvalKind(payload.requestKind, payload.requestType),
     requestType: nonEmptyText(payload.requestType),
     turnId: activity.turnId,
+    submittedDecision: null,
   }
 }
 

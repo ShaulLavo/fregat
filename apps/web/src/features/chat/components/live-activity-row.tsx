@@ -4,6 +4,7 @@ import { Spinner } from '@workspace/ui/components/spinner'
 import { cn } from '@workspace/ui/lib/utils'
 
 import { ActivityRow } from '@/features/chat/components/activity-row'
+import { LiveTail } from '@/features/chat/components/live-tail'
 import { useWorkLogScroll } from '@/features/chat/hooks/use-work-log-scroll'
 import { useChatWorkLogExpansionStore } from '@/features/chat/state/chat-work-log-expansion-store'
 import type { ChatLiveActivity } from '@/features/chat/utils/live-activity'
@@ -29,6 +30,7 @@ export function LiveActivityRow({
       ) : (
         <HandPalmIcon aria-hidden='true' className='size-(--icon-size-sm) shrink-0' />
       )}
+      {activity.active ? <span className='text-foreground shrink-0'>Working…</span> : null}
       <span className='min-w-0 truncate' role='status'>
         {activity.label}
       </span>
@@ -45,11 +47,11 @@ export function LiveActivityRow({
   )
 
   return (
-    <section className='min-h-7 min-w-0' data-live-activity>
+    <section className='min-w-0' data-live-activity>
       {expandable ? (
         <Button
           aria-expanded={expanded}
-          className='text-muted-foreground h-auto max-w-full justify-start gap-2 px-1 py-1 text-xs font-normal'
+          className='text-muted-foreground h-7 max-w-full justify-start gap-2 px-1 text-xs font-normal'
           data-scroll-anchor-ignore
           title={activity.label}
           variant='ghost'
@@ -59,12 +61,13 @@ export function LiveActivityRow({
         </Button>
       ) : (
         <div
-          className='text-muted-foreground flex min-h-7 items-center gap-2 px-1 py-1 text-xs'
+          className='text-muted-foreground flex h-7 items-center gap-2 px-1 text-xs'
           title={activity.label}
         >
           {label}
         </div>
       )}
+      {!expanded && activity.tail.length > 0 ? <LiveTail entries={activity.tail} /> : null}
       {expanded && expandable ? (
         <div
           className='ml-2 max-h-[min(18rem,50dvh)] overflow-auto pl-2'

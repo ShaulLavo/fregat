@@ -21,6 +21,84 @@ function database() {
 }
 
 describe('session domain projection', () => {
+  it.each([true, false])(
+    'records the turn start before a final-only answer (runtime start=%s)',
+    (runtimeStarted) => {
+      const db = database()
+      const pipeline = new OrchestrationProjectionPipeline(db)
+      const startedAt = runtimeStarted ? '2026-09-05T00:00:01.000Z' : DOMAIN_AT
+      const answeredAt = '2026-09-05T00:00:10.000Z'
+      const completedAt = '2026-09-05T00:00:10.001Z'
+      pipeline.applyEvents(domainBootstrap())
+      pipeline.applyEvents([
+        domainEvent(
+          'session.turn-start-requested',
+          {
+            sessionId: DOMAIN_IDS.session,
+            turnId: DOMAIN_IDS.turn,
+            messageId: 'question',
+            createdAt: DOMAIN_AT,
+          },
+          4,
+        ),
+      ])
+      if (runtimeStarted) {
+        pipeline.applyEvents([
+          domainEvent(
+            'session.runtime-set',
+            {
+              sessionId: DOMAIN_IDS.session,
+              runtime: {
+                sessionId: DOMAIN_IDS.session,
+                providerInstanceId: 'mock',
+                providerName: 'Mock',
+                providerBindingHandle: 'mock-binding',
+                providerConversationMarker: null,
+                providerResumeCursor: null,
+                runtimeEpoch: 'test-epoch',
+                runtimeMode: 'full-access',
+                activeTurnId: DOMAIN_IDS.turn,
+                status: 'running',
+                lastError: null,
+                updatedAt: startedAt,
+              },
+            },
+            5,
+          ),
+        ])
+        expect(
+          new OrchestrationSnapshotQuery(db).fullReadModel().sessions.get(DOMAIN_IDS.session)
+            ?.latestTurn?.startedAt,
+        ).toBe(startedAt)
+      }
+      pipeline.applyEvents([
+        domainEvent(
+          'session.message-sent',
+          {
+            sessionId: DOMAIN_IDS.session,
+            turnId: DOMAIN_IDS.turn,
+            messageId: 'final-answer',
+            role: 'assistant',
+            text: 'Done',
+            attachments: [],
+            streaming: false,
+            createdAt: answeredAt,
+            updatedAt: completedAt,
+          },
+          6,
+        ),
+      ])
+      expect(db.select().from(projectionTurns).get()).toMatchObject({
+        requestedAt: DOMAIN_AT,
+        startedAt,
+      })
+      expect(
+        new OrchestrationSnapshotQuery(db).fullReadModel().sessions.get(DOMAIN_IDS.session)
+          ?.latestTurn?.startedAt,
+      ).toBe(startedAt)
+    },
+  )
+
   it('interrupts ambiguous provider adoption even after assistant text completed', () => {
     const db = database()
     const pipeline = new OrchestrationProjectionPipeline(db)

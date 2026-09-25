@@ -372,7 +372,10 @@ function timelineOf(messages: readonly OrchestrationMessage[]) {
   return (
     <EditorStateProvider>
       <ChatTransportContext value={unsupportedChatTransport()}>
-        <ChatTimelineActionsProvider revertToCheckpoint={() => {}}>
+        <ChatTimelineActionsProvider
+          retry={{ blocked: false, carryOn: () => {}, tryAgain: null }}
+          revertToCheckpoint={() => {}}
+        >
           <MessagesTimeline optimisticMessages={[]} session={session} />
         </ChatTimelineActionsProvider>
       </ChatTransportContext>

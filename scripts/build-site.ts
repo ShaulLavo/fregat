@@ -12,6 +12,7 @@ await run(['bun', 'astro', 'build'], site)
 await run(
   [
     'bun',
+    '--bun',
     'vite',
     'build',
     '--mode',

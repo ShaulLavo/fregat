@@ -44,6 +44,7 @@ function withProviders(children: ReactNode) {
     openCheckpointDiff: (_summary, path?: string) => void openedDiffs.push(path),
     openSessionCheckpointDiff: () => undefined,
     revertToCheckpoint: () => undefined,
+    retry: { blocked: false, carryOn: () => undefined, tryAgain: null },
   }
 
   return (

@@ -43,6 +43,7 @@ import type {
   ProviderSessionDiscoveryInput,
   ProviderSessionHistoryInput,
 } from '../types'
+import { isNotInstalledError, requestGone, sessionIdentityErrors } from '../structured-errors'
 import { RuntimeAdapter } from './state/runtime-adapter'
 import { SessionContext } from './state/session-context'
 import {
@@ -105,14 +106,8 @@ const CODEX_USAGE_TIMEOUT_MS = 3_000
 const CODEX_DISCOVERY_PAGE_SIZE = 50
 const ANSI_ESCAPE_CHAR = String.fromCharCode(27)
 const ANSI_ESCAPE_REGEX = new RegExp(`${ANSI_ESCAPE_CHAR}\\[[0-9;]*m`, 'g')
-const CODEX_STDERR_LOG_REGEX =
-  /^\d{4}-\d{2}-\d{2}T\S+\s+(TRACE|DEBUG|INFO|WARN|ERROR)\s+\S+:\s+(.*)$/
-const CODEX_DIAGNOSTIC_STDERR_REGEX =
-  /^\d{4}-\d{2}-\d{2}T\S+\s+(TRACE|DEBUG|INFO|WARN|ERROR)\s+[a-zA-Z0-9_]+(?:::[a-zA-Z0-9_]+)*:\s+/
-const BENIGN_CODEX_STDERR_ERROR_SNIPPETS = [
-  'state db missing rollout path for thread',
-  'state db record_discrepancy: find_thread_path_by_id_str_in_subdir, falling_back',
-]
+const CODEX_STDERR_TAIL_LINES = 20
+const CODEX_STDERR_LINE_MAX = 500
 export const CODEX_ADAPTER_CAPABILITIES = {
   conversationRollback: true,
   listCommands: true,
@@ -283,8 +278,7 @@ export class CodexProviderAdapter
         ...(probe.message ? { message: probe.message } : {}),
       }
     } catch (error) {
-      if (isMissingCodexBinaryError(error))
-        return unavailableCodexSnapshot(checkedAt, this.settings)
+      if (isNotInstalledError(error)) return unavailableCodexSnapshot(checkedAt, this.settings)
 
       recordChatPipelineWarning('chat.pipeline.codex_adapter.snapshot.failed', {
         error,
@@ -824,7 +818,7 @@ class CodexAppServerSession extends SessionContext {
 
   async respondApproval(input: ProviderApprovalResponseInput) {
     const pending = this.pendingApprovals.get(input.requestId)
-    if (!pending) throw createInternalError(`Unknown pending approval request: ${input.requestId}`)
+    if (!pending) throw requestGone('approval', input.requestId)
 
     const decision = v.parse(providerApprovalDecisionSchema, input.decision)
     const response = offeredResponse(pending.offers, decision, input.requestId)
@@ -856,8 +850,7 @@ class CodexAppServerSession extends SessionContext {
 
   async respondUserInput(input: ProviderUserInputResponseInput) {
     const pending = this.pendingUserInputs.get(input.requestId)
-    if (!pending)
-      throw createInternalError(`Unknown pending user-input request: ${input.requestId}`)
+    if (!pending) throw requestGone('user-input', input.requestId)
 
     const answers = codexUserInputAnswers(input.answers)
     this.pendingUserInputs.delete(input.requestId)
@@ -1086,8 +1079,6 @@ class CodexAppServerSession extends SessionContext {
 
   private async handleManualNotification(method: string, params: unknown) {
     switch (method) {
-      case 'process/stderr':
-        return this.handleProcessStderrNotification(params)
       case 'thread/status/changed':
         return this.handleSessionStatusChangedNotification(params)
       case 'thread/name/updated':
@@ -1150,19 +1141,6 @@ class CodexAppServerSession extends SessionContext {
       default:
         return false
     }
-  }
-
-  private handleProcessStderrNotification(params: unknown) {
-    const message = stringField(asRecord(params), 'message')
-    if (!message) return true
-
-    this.emitRuntimeNotification(
-      'runtime.warning',
-      { detail: params, message },
-      'process/stderr',
-      params,
-    )
-    return true
   }
 
   private handleSessionStatusChangedNotification(params: unknown) {
@@ -2098,7 +2076,7 @@ class CodexAppServerSession extends SessionContext {
     this.emit({
       createdAt: new Date().toISOString(),
       eventId: runtimeEventId('codex-turn-failed'),
-      payload: { errorMessage: message, state: 'failed' },
+      payload: { endReason: 'provider-error', errorMessage: message, state: 'failed' },
       provider: DEFAULT_CODEX_PROVIDER_SETTINGS.driverKind,
       providerInstanceId: this.providerInstanceId,
       ...(providerTurnId !== undefined ? { providerRefs: { providerTurnId } } : {}),
@@ -2193,6 +2171,8 @@ class CodexAppServerRpcClient {
   private closed = false
   private nextId = 1
   private stderrBuffer = ''
+  /** Stderr is diagnostics, never classified: the last lines ride on the exit event. */
+  private readonly stderrTail: string[] = []
 
   private constructor(process: ChildProcessWithoutNullStreams) {
     this.process = process
@@ -2202,17 +2182,14 @@ class CodexAppServerRpcClient {
     this.process.stdout.on('data', (chunk: string) => this.readStdout(chunk))
     this.process.stderr.on('data', (chunk: string) => this.readStderr(chunk))
     this.process.on('error', (error) => this.closeWithError(error))
-    this.process.on('exit', (code) => {
-      if (!this.closed)
-        this.closeWithError(createInternalError(`Codex app-server exited with ${code}.`))
-    })
+    this.process.on('exit', (code) => this.handleExit(code))
   }
 
   static start(env: NodeJS.ProcessEnv = process.env, cwd?: string) {
     return new CodexAppServerRpcClient(
       spawn(codexBinary(env), ['app-server'], {
         cwd,
-        env: cwd ? { ...env, PWD: cwd } : env,
+        env,
         stdio: ['pipe', 'pipe', 'pipe'],
       }),
     )
@@ -2369,20 +2346,24 @@ class CodexAppServerRpcClient {
     }
   }
 
-  private handleStderrLine(line: string) {
-    const classified = classifyCodexStderrLine(line)
-    if (!classified) return
-    if (isBackgroundCodexDiagnostic(classified.message)) {
-      recordChatPipelineWarning('chat.pipeline.codex_process.stderr', {
-        diagnostic: classified.message,
-        processId: this.process.pid,
-      })
-      return
-    }
+  private handleStderrLine(rawLine: string) {
+    const line = rawLine.replaceAll(ANSI_ESCAPE_REGEX, '').trim()
+    if (!line) return
 
-    for (const handler of this.handlers) {
-      handler({ method: 'process/stderr', params: { message: classified.message } })
+    this.stderrTail.push(line.slice(0, CODEX_STDERR_LINE_MAX))
+    if (this.stderrTail.length > CODEX_STDERR_TAIL_LINES) this.stderrTail.shift()
+  }
+
+  private handleExit(exitCode: number | null) {
+    const context = { exitCode, processId: this.process.pid, stderrTail: [...this.stderrTail] }
+    if (exitCode === 0 || this.closed) {
+      recordChatPipelineInfo('chat.pipeline.codex_process.exited', context)
+    } else {
+      recordChatPipelineWarning('chat.pipeline.codex_process.exited', context)
     }
+    if (this.closed) return
+
+    this.closeWithError(sessionIdentityErrors.CODEX_EXITED({ internal: context }))
   }
 
   private rejectRequest(id: JsonRpcId, error: unknown) {
@@ -2405,6 +2386,9 @@ class CodexAppServerRpcClient {
 }
 
 async function probeCodexProvider(env: NodeJS.ProcessEnv) {
+  if (!Bun.which(codexBinary(env), { PATH: env.PATH ?? '' })) {
+    throw sessionIdentityErrors.NOT_INSTALLED({ internal: { provider: 'codex' } })
+  }
   const client = CodexAppServerRpcClient.start(env)
   try {
     const initialize = await initializeCodexClient(client, PROVIDER_PROBE_TIMEOUT_MS)
@@ -2981,12 +2965,6 @@ function codexVersionFromInitialize(response: CodexClientRequestResultByMethod['
   return userAgent.match(/\/([^\s]+)/)?.[1] ?? userAgent
 }
 
-function isMissingCodexBinaryError(error: unknown) {
-  if (typeof error !== 'object' || error === null) return false
-
-  return 'code' in error && error.code === 'ENOENT'
-}
-
 function unavailableCodexSnapshot(
   checkedAt: string,
   settings: ProviderInstanceSettings,
@@ -3349,24 +3327,4 @@ function realtimePayload(method: string, params: unknown) {
     default:
       return { message: stringField(record, 'message') ?? 'Realtime error' }
   }
-}
-
-function classifyCodexStderrLine(rawLine: string) {
-  const line = rawLine.replaceAll(ANSI_ESCAPE_REGEX, '').trim()
-  if (!line) return null
-
-  const match = line.match(CODEX_STDERR_LOG_REGEX)
-  if (!match) return { message: line }
-
-  const level = match[1]
-  if (level && level !== 'ERROR') return null
-  if (BENIGN_CODEX_STDERR_ERROR_SNIPPETS.some((snippet) => line.includes(snippet))) return null
-
-  return { message: line }
-}
-
-function isBackgroundCodexDiagnostic(message: string) {
-  if (message.toLowerCase().includes('failed to connect to websocket')) return false
-
-  return CODEX_DIAGNOSTIC_STDERR_REGEX.test(message)
 }

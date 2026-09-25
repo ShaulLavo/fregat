@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "bun run --parallel dev:vite dev:types",
-    "build": "tsgo --build && bun --env-file=../../.env vite build",
+    "build": "tsgo --build && bun --bun --env-file=../../.env vite build",
     "bundle:report": "bun scripts/bundle-report.ts",
     "proof:workspace-reload": "bun scripts/workspace-reload-proof.mjs --check",
     "bench:editor-open": "bun scripts/editor-open-benchmark.mjs",
@@ -23,7 +23,7 @@
     "bench:file-tree-prepared-input": "bun scripts/file-tree-prepared-input-benchmark.ts",
     "bench:file-tree-prepared-input:gate": "bun scripts/file-tree-prepared-input-benchmark.ts --gate",
     "bench:fixture": "node scripts/generate-bench-fixture.mjs",
-    "start": "bun --env-file=../../.env vite preview",
+    "start": "bun --bun --env-file=../../.env vite preview",
     "lint": "oxlint .",
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",
@@ -31,7 +31,7 @@
     "test:watch": "bun --bun vitest --project node --project dom",
     "test:browser": "vitest run --config vitest.browser.config.ts",
     "typecheck": "tsgo --build",
-    "preview": "bun --env-file=../../.env vite preview",
+    "preview": "bun --bun --env-file=../../.env vite preview",
     "dev:vite": "bun ../../scripts/run-with-env.ts vite",
     "dev:types": "bun ../../scripts/check-dev-types.ts --watch",
     "typecheck:dev": "bun ../../scripts/check-dev-types.ts"

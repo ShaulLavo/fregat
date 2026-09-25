@@ -21,7 +21,8 @@ export function PromptStashMenu({
   return (
     <div className='flex min-w-0 flex-col gap-1'>
       <p className='text-muted-foreground section-label px-1'>Stashed prompts</p>
-      <ul className='flex max-h-72 min-w-0 flex-col gap-0.5 overflow-y-auto overscroll-contain'>
+      {/* Press feedback needs 1px of room so a scrollbar cannot steal pointer-up. */}
+      <ul className='flex max-h-72 min-w-0 flex-col gap-0.5 overflow-y-auto overscroll-contain pb-px'>
         {entries.map((entry) => (
           <li className='group/stash flex min-w-0 items-center gap-1' key={entry.id}>
             <Button

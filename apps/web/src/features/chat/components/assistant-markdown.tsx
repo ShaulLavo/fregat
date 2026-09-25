@@ -6,10 +6,8 @@ import {
 import { CodeHighlighterContext } from '@workspace/markdown/providers/code-highlighter-context'
 import { cn } from '@workspace/ui/lib/utils'
 import { useQueryClient } from '@tanstack/react-query'
-import { type ClipboardEvent } from 'react'
-import type { ThemeRegistrationAny } from 'shiki/core'
+import { Fragment, type ClipboardEvent } from 'react'
 
-import { useEditorColorTheme } from '@/lib/editor-theme/hooks/use-editor-color-theme'
 import { serverEndpoint } from '@/lib/client'
 import { originForQueryClient } from '@/lib/environments/state/query-clients'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
@@ -19,13 +17,17 @@ import { useOpenFileReference } from '../hooks/use-open-file-reference'
 import { MarkdownDiagramContext } from '../providers/markdown-diagram-context'
 import { MarkdownFileLinkContext } from '../providers/markdown-file-link-context'
 import { normalizeAgentMarkdown } from '@/features/chat/utils/agent-markdown'
-import { codeHighlighterForTheme } from '@/features/chat/state/code-highlighters'
-import { editorThemeHighlightKey } from '@/features/chat/utils/code-highlighter-theme'
+import { useChatCodeHighlighter } from '@/features/chat/hooks/use-chat-code-highlighter'
 import { chatMarkdownClipboardPayload } from '@/features/chat/utils/markdown-clipboard'
 import { remarkFileLinkChips } from '@/features/chat/utils/markdown-file-link-chips'
 import { remarkWorkspaceImages } from '@/features/chat/utils/markdown-images'
 import { remarkNormalizeListItemIndentation } from '@/features/chat/utils/markdown-list-indentation'
+import { ArtifactTemplateCard } from './artifact-template-card'
 import { AssistantMarkdownCodeBlock } from './assistant-markdown-code-block'
+import {
+  splitArtifactTemplateMarkdown,
+  type ArtifactTemplateSegment,
+} from '@/features/chat/utils/artifact-templates'
 import { AssistantMarkdownImage } from './assistant-markdown-image'
 import { AssistantMarkdownInlineCode } from './assistant-markdown-inline-code'
 import { AssistantMarkdownLink } from './assistant-markdown-link'
@@ -47,20 +49,11 @@ export function AssistantMarkdown({
   streaming?: boolean
   text: string
 }) {
-  const { colorMode, definition, editorTheme, registration } = useEditorColorTheme()
   const { openFileReference, rootPath, workspacePath } = useOpenFileReference()
   const owner = originForQueryClient(useQueryClient())
   const environment = useEnvironmentsStore((state) => state.entries[owner])
   const origin = serverEndpoint(environment?.origin ?? owner)
-  const themeKey = editorThemeHighlightKey(editorTheme, colorMode, definition?.shikiName)
-  const highlighter = registration
-    ? codeHighlighterForTheme({
-        colorMode,
-        editorTheme,
-        registration: registration as ThemeRegistrationAny,
-        themeKey,
-      })
-    : null
+  const highlighter = useChatCodeHighlighter()
   const renderedText = normalizeAgentMarkdown(text)
   const mermaid = useMermaid(renderedText, streaming)
   const fileLinkActions = { openFileReference, rootPath }
@@ -86,20 +79,39 @@ export function AssistantMarkdown({
     event.clipboardData.setData('text/html', payload.html)
   }
 
+  const segments = splitArtifactTemplateMarkdown(renderedText, streaming)
+  const onlyMarkdown =
+    segments.length === 1 && segments[0]?.kind === 'markdown' ? segments[0].markdown : null
+  const renderMarkdown = (markdown: string, live: boolean) => (
+    <Markdown
+      caret={live}
+      className={cn('max-w-full min-w-0 break-words whitespace-pre-wrap', className)}
+      codeBlock={AssistantMarkdownCodeBlock}
+      components={markdownComponents}
+      remarkPlugins={remarkPlugins}
+      streaming={live}
+      text={markdown}
+    />
+  )
+
+  // A card splits the answer, so only the last Markdown part carries the live caret.
+  function renderSegment(segment: ArtifactTemplateSegment, index: number) {
+    if (segment.kind === 'artifact-template') {
+      return <ArtifactTemplateCard key={index} template={segment.template} />
+    }
+    const live = streaming && index === segments.length - 1
+
+    return <Fragment key={index}>{renderMarkdown(segment.markdown, live)}</Fragment>
+  }
+
   return (
     <div className='min-w-0' data-chat-markdown='true' onCopy={handleCopy}>
       <MarkdownFileLinkContext value={fileLinkActions}>
         <CodeHighlighterContext value={highlighter}>
           <MarkdownDiagramContext value={mermaid}>
-            <Markdown
-              caret={streaming}
-              className={cn('max-w-full min-w-0 break-words whitespace-pre-wrap', className)}
-              codeBlock={AssistantMarkdownCodeBlock}
-              components={markdownComponents}
-              remarkPlugins={remarkPlugins}
-              streaming={streaming}
-              text={renderedText}
-            />
+            {onlyMarkdown === null
+              ? segments.map(renderSegment)
+              : renderMarkdown(onlyMarkdown, streaming)}
           </MarkdownDiagramContext>
         </CodeHighlighterContext>
       </MarkdownFileLinkContext>

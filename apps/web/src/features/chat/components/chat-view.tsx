@@ -35,6 +35,7 @@ import { ChatTimelineActionsProvider } from '../providers/timeline-actions-provi
 import type { ChatInputDraftTarget } from '../state/chat-input-draft-store'
 import { useCheckpointRewind } from '@/features/chat/hooks/use-checkpoint-rewind'
 import { errorMessage } from '@/lib/error-message'
+import { carryOnPayload, tryAgainPayload } from '@/features/chat/utils/turn-retry'
 
 export function ChatView({
   activeSessionId,
@@ -133,6 +134,8 @@ export function ChatView({
     )
   }
 
+  const tryAgain = tryAgainPayload(session)
+
   function handleConfirmRevert(restoreFiles: boolean) {
     if (
       !currentDetail ||
@@ -173,7 +176,14 @@ export function ChatView({
       />
       <ChatWorkspaceRootContext value={session.worktree}>
         <ChatTransportContext value={transport}>
-          <ChatTimelineActionsProvider revertToCheckpoint={handleRevertToCheckpoint}>
+          <ChatTimelineActionsProvider
+            retry={{
+              blocked: busy || composer.sendBlocked,
+              carryOn: () => void composer.send(carryOnPayload(session)),
+              tryAgain: tryAgain ? () => void composer.send(tryAgain) : null,
+            }}
+            revertToCheckpoint={handleRevertToCheckpoint}
+          >
             <MessagesTimeline
               checkpointRevertPending={revertingCheckpoint || !currentDetail}
               optimisticMessages={optimisticMessages}

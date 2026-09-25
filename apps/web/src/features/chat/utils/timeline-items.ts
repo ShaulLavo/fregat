@@ -1,5 +1,6 @@
 import { compareMessagesByCreatedAt } from '@/features/chat/utils/message-metadata'
 import type {
+  ModelSelection,
   OrchestrationLatestTurn,
   OrchestrationMessage,
   OrchestrationProposedPlan,
@@ -16,8 +17,19 @@ import {
 import type { ChatTurnDiffSummary } from '@workspace/client-core/chat/types'
 import { chatActiveResponseTurnIds } from '@/features/chat/utils/active-response'
 import { isWorkLogFailure } from '@/features/chat/utils/work-row'
-import { deriveChatLiveActivity, type ChatLiveActivity } from '@/features/chat/utils/live-activity'
+import {
+  deriveChatLiveActivity,
+  LIVE_TAIL_ROWS,
+  type ChatLiveActivity,
+} from '@/features/chat/utils/live-activity'
 import { formatChatElapsed } from '@/features/chat/utils/formatters'
+import {
+  modelSwitches,
+  sameModelSelection,
+  type ModelSwitch,
+  type ModelSwitchKind,
+} from '@/features/chat/utils/model-switch'
+import { stoppedTurnLabel, turnStoppedShort } from '@/features/chat/utils/turn-end-label'
 import {
   chatMessageTimelineMetadata,
   type ChatTimelineMessage,
@@ -55,12 +67,21 @@ export type ChatTimelineItem =
       type: 'activity-group'
     }
   | {
+      entry: ChatWorkLogEntry
+      id: string
+      /** The newest thing in a running turn, so its text is still arriving. */
+      streaming: boolean
+      timestamp: string
+      type: 'reasoning'
+    }
+  | {
       assistantStreaming: boolean
       assistantTurnInProgress: boolean
       completionSummary: string | null
       durationEnd: string
       durationStart: string
       id: string
+      incomplete: boolean
       message: OrchestrationMessage | OptimisticChatMessage
       revertTurnCount: number | null
       showAssistantCopyButton: boolean
@@ -87,9 +108,22 @@ export type ChatTimelineItem =
     }
   | {
       id: string
+      timestamp: string
+      turnId: TurnId
+      type: 'turn-retry'
+    }
+  | {
+      id: string
       plan: OrchestrationProposedPlan
       timestamp: string
       type: 'proposed-plan'
+    }
+  | {
+      id: string
+      kind: ModelSwitchKind
+      selection: ModelSelection
+      timestamp: string
+      type: 'model-switch'
     }
 
 type ChronologicalTimelineItem =
@@ -114,6 +148,7 @@ type ChronologicalTimelineItem =
       durationEnd: string
       durationStart: string
       id: string
+      incomplete: boolean
       message: OrchestrationMessage | OptimisticChatMessage
       revertTurnCount: number | null
       showAssistantCopyButton: boolean
@@ -129,6 +164,14 @@ type ChronologicalTimelineItem =
       sourceOrder: number
       timestamp: string
       type: 'proposed-plan'
+    }
+  | {
+      id: string
+      kind: ModelSwitchKind
+      selection: ModelSelection
+      sourceOrder: number
+      timestamp: string
+      type: 'model-switch'
     }
 
 type TurnFold = {
@@ -154,6 +197,8 @@ type StableTimelineItems = {
 }
 
 const NO_FOLDS: ReadonlyMap<string, TurnFold> = new Map()
+/** `--density-row-height` at the default compact density. */
+const ESTIMATED_ROW_HEIGHT = 20
 const EMPTY_STABLE_TIMELINE_ITEMS: StableTimelineItems = { byId: new Map(), result: [] }
 /** One entry per session the user has open; sessions are switched, not held. */
 const MAX_STABLE_TIMELINES = 8
@@ -168,6 +213,7 @@ const stableTimelineItemsBySession = new Map<string, StableTimelineItems>()
 export function chatTimelineItems({
   activities,
   latestTurn,
+  turns = {},
   messages,
   optimisticMessages,
   proposedPlans,
@@ -175,6 +221,7 @@ export function chatTimelineItems({
 }: {
   activities: readonly OrchestrationSessionActivity[]
   latestTurn: OrchestrationLatestTurn | null
+  turns?: Readonly<Record<string, OrchestrationLatestTurn>>
   messages: readonly OrchestrationMessage[]
   optimisticMessages: readonly OptimisticChatMessage[]
   proposedPlans: readonly OrchestrationProposedPlan[]
@@ -195,6 +242,7 @@ export function chatTimelineItems({
   const messageMetadata = chatMessageTimelineMetadata({
     activeResponseTurnIds,
     latestTurn,
+    turns,
     messages: timelineMessages,
     // The completion divider reports the latest turn's duration, so only that turn's
     // work decides whether there was anything to report.
@@ -247,6 +295,9 @@ export function chatTimelineItems({
     items.push(activityTimelineItem(activity, sourceOrder))
     sourceOrder += 1
   }
+  for (const modelSwitch of modelSwitches(messages, activities)) {
+    items.push(modelSwitchTimelineItem(modelSwitch))
+  }
   for (const group of agentGroups) {
     items.push({
       group,
@@ -261,12 +312,13 @@ export function chatTimelineItems({
   const chronological = items.toSorted(compareTimelineEntries)
   const timelineItems = arrangeTimelineItems(
     chronological,
-    deriveTurnFolds(chronological, latestTurn, activeResponseTurnIds),
+    deriveTurnFolds(chronological, latestTurn, activeResponseTurnIds, turns),
   )
   if (latestTurn?.state === 'running' && latestTurn.completedAt === null) {
     appendActiveResponse(timelineItems, latestTurn, workLogEntries, activeResponseTurnIds)
   }
   appendEmptyTurnStatus(timelineItems, latestTurn)
+  appendTurnRetry(timelineItems, latestTurn)
 
   return shareTimelineItems(
     timelineCacheKey(messages, activities, proposedPlans, optimisticMessages),
@@ -320,6 +372,9 @@ function appendActiveResponse(
       trailing.activities.slice(0, trailing.activities.length - trailingActivities.length),
     )
   }
+  if (trailing?.type === 'reasoning' && trailing.entry.turnId === latestTurn.turnId) {
+    items[items.length - 1] = reasoningTimelineItem(trailing.entry, true)
+  }
   items.splice(userIndex + 1, 0, workingTimelineItem(latestTurn, startedAt))
   items.push({
     activity,
@@ -362,15 +417,26 @@ function appendEmptyTurnStatus(
     latestTurn.startedAt ?? latestTurn.requestedAt,
     latestTurn.completedAt,
   )
-  let label = elapsed ? `Worked for ${elapsed}` : 'Response completed'
-  if (latestTurn.state === 'error') label = elapsed ? `Failed after ${elapsed}` : 'Response failed'
-  if (latestTurn.state === 'interrupted')
-    label = elapsed ? `You stopped after ${elapsed}` : 'You stopped this response'
+  const label =
+    stoppedTurnLabel(latestTurn, elapsed) ??
+    (elapsed ? `Worked for ${elapsed}` : 'Response completed')
   items.push({
     id: `turn-status:${latestTurn.turnId}`,
     timestamp: latestTurn.completedAt,
     type: 'turn-status',
     label,
+  })
+}
+
+/** Carry on and Try again sit under the latest turn once it stopped short. */
+function appendTurnRetry(items: ChatTimelineItem[], latestTurn: OrchestrationLatestTurn | null) {
+  if (!latestTurn?.completedAt || !turnStoppedShort(latestTurn)) return
+
+  items.push({
+    id: `turn-retry:${latestTurn.turnId}`,
+    timestamp: latestTurn.completedAt,
+    turnId: latestTurn.turnId,
+    type: 'turn-retry',
   })
 }
 
@@ -406,8 +472,10 @@ function latestTurnWorkLogEntryCount(
 export function timelineRowSpacing(item: ChatTimelineItem) {
   if (item.type === 'turn-fold' || item.type === 'working' || item.type === 'turn-status')
     return 'pb-1.5'
+  if (item.type === 'model-switch') return 'pb-1'
   if (
     item.type === 'activity-group' ||
+    item.type === 'reasoning' ||
     item.type === 'live-activity' ||
     item.type === 'agent-group'
   )
@@ -425,11 +493,16 @@ export function chatTimelineItemEstimate(item: ChatTimelineItem | undefined) {
     const visibleFailures = item.activities.filter(isWorkLogFailure).length
     return 36 + visibleFailures * 28
   }
+  if (item.type === 'reasoning') return item.streaming ? 96 : 32
   if (item.type === 'proposed-plan') return 160
   if (item.type === 'turn-fold') return 34
   if (item.type === 'working') return 36
-  if (item.type === 'live-activity') return 32
+  if (item.type === 'live-activity') {
+    return item.activity.tail.length > 0 ? 36 + LIVE_TAIL_ROWS * ESTIMATED_ROW_HEIGHT : 36
+  }
   if (item.type === 'turn-status') return 36
+  if (item.type === 'turn-retry') return 36
+  if (item.type === 'model-switch') return 24
 
   const dividerHeight = item.showCompletionDivider ? 34 : 0
   const changedFilesHeight =
@@ -458,6 +531,7 @@ function messageTimelineItem(
     durationEnd: metadata.durationEnd,
     durationStart: metadata.durationStart,
     id: `message:${message.id}`,
+    incomplete: metadata.incomplete,
     message,
     revertTurnCount,
     showAssistantCopyButton: metadata.showAssistantCopyButton,
@@ -492,6 +566,18 @@ function workingTimelineItem(
     startedAt,
     timestamp: latestTurn.startedAt ?? latestTurn.requestedAt,
     type: 'working',
+  }
+}
+
+/** Sorts just above its anchor: same timestamp, lower source order. */
+function modelSwitchTimelineItem(modelSwitch: ModelSwitch): ChronologicalTimelineItem {
+  return {
+    id: `model-switch:${modelSwitch.anchorId}`,
+    kind: modelSwitch.kind,
+    selection: modelSwitch.selection,
+    sourceOrder: -1,
+    timestamp: modelSwitch.timestamp,
+    type: 'model-switch',
   }
 }
 
@@ -536,6 +622,11 @@ function arrangeTimelineItems(
       arranged.push(turnFoldTimelineItem(fold))
     }
     if (hiddenEntryIds.has(entry.id)) continue
+    if (entry.type === 'activity' && entry.activity.reasoning) {
+      flushActivities()
+      arranged.push(reasoningTimelineItem(entry.activity, false))
+      continue
+    }
     if (entry.type === 'activity') {
       pendingActivities.push(entry.activity)
       continue
@@ -579,6 +670,10 @@ function timelineItemFromEntry(
 ): ChatTimelineItem {
   if (item.type === 'agent-group')
     return { group: item.group, id: item.id, timestamp: item.timestamp, type: item.type }
+  if (item.type === 'model-switch') {
+    const { sourceOrder: _sourceOrder, ...modelSwitch } = item
+    return modelSwitch
+  }
   if (item.type === 'message') {
     const turnId = entryTurnId(item)
 
@@ -589,6 +684,7 @@ function timelineItemFromEntry(
       durationEnd: item.durationEnd,
       durationStart: item.durationStart,
       id: item.id,
+      incomplete: item.incomplete,
       message: item.message,
       revertTurnCount: item.revertTurnCount,
       showAssistantCopyButton: item.showAssistantCopyButton,
@@ -619,6 +715,7 @@ function deriveTurnFolds(
   entries: readonly ChronologicalTimelineItem[],
   latestTurn: OrchestrationLatestTurn | null,
   activeResponseTurnIds: ReadonlySet<TurnId>,
+  turns: Readonly<Record<string, OrchestrationLatestTurn>>,
 ) {
   const unsettledTurnId = deriveUnsettledTurnId(latestTurn)
   const folds = new Map<string, TurnFold>()
@@ -635,7 +732,11 @@ function deriveTurnFolds(
 
     folds.set(anchor.id, {
       entries: foldable,
-      label: turnFoldLabel(group, latestTurn, turnId),
+      label: turnFoldLabel(
+        group,
+        latestTurn?.turnId === turnId ? latestTurn : (turns[turnId] ?? null),
+        turnId,
+      ),
       turnId,
     })
   }
@@ -724,12 +825,8 @@ function turnFoldLabel(
   turnId: TurnId,
 ) {
   const elapsed = turnFoldElapsed(group, latestTurn, turnId)
-  if (latestTurn?.turnId === turnId && latestTurn.state === 'error') {
-    return elapsed ? `Failed after ${elapsed}` : 'Response failed'
-  }
-  if (latestTurn?.turnId === turnId && latestTurn.state === 'interrupted') {
-    return elapsed ? `You stopped after ${elapsed}` : 'You stopped this response'
-  }
+  const stopped = latestTurn?.turnId === turnId ? stoppedTurnLabel(latestTurn, elapsed) : null
+  if (stopped) return stopped
 
   return elapsed ? `Worked for ${elapsed}` : 'Worked'
 }
@@ -830,6 +927,16 @@ function revertTurnCountAfterUserMessage(
   return null
 }
 
+function reasoningTimelineItem(entry: ChatWorkLogEntry, streaming: boolean): ChatTimelineItem {
+  return {
+    entry,
+    id: `reasoning:${entry.id}`,
+    streaming,
+    timestamp: entry.createdAt,
+    type: 'reasoning',
+  }
+}
+
 function appendActivityGroup(items: ChatTimelineItem[], activities: readonly ChatWorkLogEntry[]) {
   const firstActivity = activities[0]
   if (!firstActivity) return
@@ -919,15 +1026,23 @@ function timelineItemsEqual(left: ChatTimelineItem, right: ChatTimelineItem): bo
   if (left.type === 'agent-group' && right.type === 'agent-group')
     return chatAgentGroupsEqual(left.group, right.group)
   if (left.type === 'turn-status' && right.type === 'turn-status') return left.label === right.label
+  if (left.type === 'turn-retry' && right.type === 'turn-retry') return true
+  if (left.type === 'model-switch' && right.type === 'model-switch') {
+    return left.kind === right.kind && sameModelSelection(left.selection, right.selection)
+  }
   if (left.type === 'live-activity' && right.type === 'live-activity') {
     return (
       left.activity.label === right.activity.label &&
       left.activity.active === right.activity.active &&
       left.activity.entry?.id === right.activity.entry?.id &&
-      activityListsEqual(left.activity.activities, right.activity.activities)
+      activityListsEqual(left.activity.activities, right.activity.activities) &&
+      activityListsEqual(left.activity.tail, right.activity.tail)
     )
   }
   if (left.type === 'message' && right.type === 'message') return messageItemsEqual(left, right)
+  if (left.type === 'reasoning' && right.type === 'reasoning') {
+    return left.streaming === right.streaming && chatWorkLogEntryEquals(left.entry, right.entry)
+  }
   if (left.type === 'activity-group' && right.type === 'activity-group') {
     return activityListsEqual(left.activities, right.activities)
   }
@@ -955,6 +1070,7 @@ function messageItemsEqual(
     left.completionSummary === right.completionSummary &&
     left.durationEnd === right.durationEnd &&
     left.durationStart === right.durationStart &&
+    left.incomplete === right.incomplete &&
     left.revertTurnCount === right.revertTurnCount &&
     left.showAssistantCopyButton === right.showAssistantCopyButton &&
     left.showCompletionDivider === right.showCompletionDivider

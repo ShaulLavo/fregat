@@ -13,12 +13,12 @@ import type { ChatInputTrigger } from '@/features/chat/utils/input-logic'
 import { ChatInputDraftPlugin } from './chat-input-draft-plugin'
 import { ChatInputLineBoundaryPlugin } from './chat-input-line-boundary-plugin'
 import { ChatInputMentionPlugin } from './chat-input-mention-plugin'
+import { ChatInputPasteFoldPlugin } from './chat-input-paste-fold-plugin'
 import { ChatInputSubmitPlugin } from './chat-input-submit-plugin'
 import { ChatInputSurroundPlugin } from './chat-input-surround-plugin'
 import { ChatInputHistoryPlugin } from '@/features/chat/components/chat-input-history-plugin'
 
 export function ChatInputEditor({
-  busy = false,
   disabled,
   draftKey,
   onCommandMenuCommit,
@@ -31,13 +31,12 @@ export function ChatInputEditor({
   rootPath,
   trigger,
 }: {
-  busy?: boolean
   disabled: boolean
   draftKey: string
   onCommandMenuCommit: () => boolean
   onCommandMenuMove: (offset: number) => boolean
   onEditorReady: (editor: LexicalEditor | null) => void
-  onImageFiles: (files: readonly File[]) => void
+  onImageFiles: (files: readonly File[]) => Promise<boolean>
   onSubmitRequest: (alternate?: boolean) => Promise<boolean>
   onTriggerChange: (trigger: ChatInputTrigger | null) => void
   placeholder: string
@@ -94,7 +93,6 @@ export function ChatInputEditor({
         onTriggerChange={onTriggerChange}
       />
       <ChatInputSubmitPlugin
-        busy={busy}
         commandMenuOpen={trigger !== null}
         disabled={disabled}
         onCommandMenuCommit={onCommandMenuCommit}
@@ -108,6 +106,7 @@ export function ChatInputEditor({
         rootPath={rootPath}
       />
       <ChatInputMentionPlugin />
+      <ChatInputPasteFoldPlugin onFiles={onImageFiles} />
       <ChatInputSurroundPlugin />
       <HistoryPlugin />
     </div>

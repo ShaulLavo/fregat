@@ -84,6 +84,7 @@ export function messageFromRow(row: OrchestrationSessionMessageRow) {
     ...row,
     id: row.messageId,
     attachments: parseJson(row.attachmentsJson, []),
+    modelSelection: parseJson(row.modelSelectionJson) ?? undefined,
   })
 }
 

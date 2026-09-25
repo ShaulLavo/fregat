@@ -264,7 +264,12 @@ test(
       harness.documentStore.getState().getLiveEditorDocument(fileDocumentKey(PATH))?.buffer,
     ).toBe(retained.buffer)
     await expect.poll(delayedFileRead.observedStatus).toBe(200)
-    expect(performance.getEntriesByName('editor.authoritative_highlight_paint')).toHaveLength(0)
+    // The retained buffer highlights on the worker's clock while the file read is still held.
+    await expect
+      .poll(() => performance.getEntriesByName('editor.authoritative_highlight_paint').length, {
+        timeout: 10_000,
+      })
+      .toBe(1)
 
     delayedFileRead.release()
     await nextAnimationFrame()

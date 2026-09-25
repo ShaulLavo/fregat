@@ -2,7 +2,8 @@
 
 Status: **PHASE 1 IMPLEMENTED AND DEPLOYED 2026-09-23** (release
 `20260923T083633Z-51995766-plan-131-132-phase1`); Phases 2–4 proposed; D4 decided
-2026-09-21: delete the migrations. Requested 2026-09-21. Phase 1 outcome:
+2026-09-21: delete the migrations. Phase 4's backup and reset of the dev and prod databases
+approved 2026-09-25, after all lanes merge. Requested 2026-09-21. Phase 1 outcome:
 item 1 — each desktop child is spawned `detached` (its own process group, so one signal also reaches
 Vite's node child) and recorded with its `ps lstart` in `~/.platform/desktop/<hash of root>.json`;
 launch stops only live leased groups, then a held port is `desktop.PORT_IN_USE` in a native dialog
@@ -23,7 +24,7 @@ now names the native backend. Session discovery started one `claude-discovery-wo
 per page every minute (168 roots, 13.4 s per scan); it is now one call with every root, one
 worker (or one Codex app-server) per scan, 185 ms for the same 106 sessions. Inspected
 at Platform `d1ca6472`. Covers `apps/desktop`, `apps/tui`, `apps/server` outside the provider
-adapters ([plan 131](131-provider-codes-not-prose.md)), `apps/web/vite.config.ts` and `scripts/`.
+adapters (plan 131, done), `apps/web/vite.config.ts` and `scripts/`.
 
 These are the places where one process guesses about another: who holds a port, which window is
 ours, whether a binary is a shim, whether a save came from the app. The guess is a name, a path
@@ -104,6 +105,23 @@ number.
 
 Landing this means deleting the dev and mesh databases once. Sessions, chat history and terminal
 history in them are lost; say so in the deploy reason.
+
+Decided 2026-09-25: owner — approved: back up, then reset, the dev database
+(`/work/platform-dev/home/fs-metadata.sqlite`) and the production database
+(`~/.platform/fs-metadata.sqlite`), after all completion-wave lanes have merged. Phase 4 lands
+last, against the final migration chain. Constraint: production already has migrations applied up
+to version 30, so the one schema must cover everything through the final merged chain, and the
+backup is taken from that version-30 database.
+
+## Research questions
+
+1. **Vite dev server memory: leak or load?** On 2026-09-25 per-lane Vite dev servers grew to
+   2–3 GB within about ten minutes of scenario runs; lane L4's reached 2.06 GB ten minutes after a
+   restart. Suspects: linked Editor sources under `/@fs` re-transformed while the Editor checkout
+   changes (item 12's forced reload is the same path), and fresh pages loading the unbundled dev
+   graph. Measure with heap snapshots of the Vite process before and after a scenario run, and
+   compare the retained module-graph and transform-cache sizes. The answer decides whether this
+   joins Phase 2.
 
 ## Verification
 

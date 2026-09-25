@@ -4,12 +4,7 @@ import {
 } from '../../../../../test/factories/chat'
 import { act, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import {
-  eventIdSchema,
-  type ClientOrchestrationCommand,
-  type SessionId,
-} from '@workspace/contracts'
-import type { ReactNode } from 'react'
+import { eventIdSchema, type ClientOrchestrationCommand } from '@workspace/contracts'
 import * as v from 'valibot'
 
 import { PendingApprovalPanel } from '@/features/chat/components/pending-approval-panel'
@@ -67,13 +62,14 @@ test('allowing dispatches the respond command for that request', async () => {
     requestId: REQUEST_ID,
     type: 'session.approval.respond',
   })
-  expect(screen.getByText('Response sent. Waiting for agent…')).toBeVisible()
+  expect(await screen.findByText('Response sent. Waiting for agent…')).toBeVisible()
   expect(screen.getByRole('button', { name: 'Allow' })).toBeDisabled()
 })
 
 test('an accepted response becomes retryable when the provider rejects that attempt', async () => {
   const { dispatched, updateActivities } = renderPanel([requestedActivity()])
   await userEvent.click(screen.getByRole('button', { name: 'Allow' }))
+  await screen.findByText('Response sent. Waiting for agent…')
   act(() =>
     updateActivities([
       requestedActivity(),
@@ -207,13 +203,14 @@ function renderPanel(
       sessions: [seeded],
     }),
   )
-  useChatProjectionStore.getState().syncSessionDetailSnapshot(FIXTURE_ENVIRONMENT_ID, {
+  let snapshot = {
     checkpoints: [],
     proposedPlans: [],
     snapshotSequence: 1,
     // The store's ChatSession drops `deletedAt`; the wire snapshot still carries it.
     session: { deletion: null, ...seeded, deletedAt: null },
-  })
+  }
+  useChatProjectionStore.getState().syncSessionDetailSnapshot(FIXTURE_ENVIRONMENT_ID, snapshot)
 
   const dispatched: ClientOrchestrationCommand[] = []
   const dispatchCommand = async (command: ClientOrchestrationCommand) => {
@@ -224,43 +221,28 @@ function renderPanel(
   }
 
   renderWithProviders(
-    <Wrap dispatchCommand={dispatchCommand} sessionId={seeded.id}>
+    <ChatPendingRequestsProvider
+      transport={unsupportedChatTransport({
+        dispatchCommand,
+        replayEvents: async () => ({ events: [] }),
+        sessionDetailSnapshot: async () => snapshot,
+      })}
+      sessionId={seeded.id}
+    >
       <PendingApprovalPanel />
-    </Wrap>,
+    </ChatPendingRequestsProvider>,
   )
 
   return {
     dispatched,
     updateActivities: (nextActivities: ReturnType<typeof sessionActivity>[]) => {
-      useChatProjectionStore.getState().syncSessionDetailSnapshot(FIXTURE_ENVIRONMENT_ID, {
+      snapshot = {
         checkpoints: [],
         proposedPlans: [],
         snapshotSequence: 2,
         session: { deletion: null, ...seeded, activities: nextActivities, deletedAt: null },
-      })
+      }
+      useChatProjectionStore.getState().syncSessionDetailSnapshot(FIXTURE_ENVIRONMENT_ID, snapshot)
     },
   }
-}
-
-function Wrap({
-  children,
-  dispatchCommand,
-  sessionId,
-}: {
-  children: ReactNode
-  dispatchCommand: (command: ClientOrchestrationCommand) => Promise<{
-    result: null
-    deduped: boolean
-    sequence: number
-  }>
-  sessionId: SessionId
-}) {
-  return (
-    <ChatPendingRequestsProvider
-      transport={{ ...unsupportedChatTransport(), dispatchCommand }}
-      sessionId={sessionId}
-    >
-      {children}
-    </ChatPendingRequestsProvider>
-  )
 }

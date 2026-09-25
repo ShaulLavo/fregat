@@ -28,6 +28,7 @@ test.for([false, true])(
       >
         <Approval
           request={{
+            args: [],
             createdAt: '2026-09-20T00:00:00Z',
             detail: 'Safari',
             requestId: v.parse(approvalRequestIdSchema, 'mcp-test'),
@@ -36,6 +37,7 @@ test.for([false, true])(
             turnId: null,
             options,
             defaultToNo: false,
+            submittedDecision: null,
           }}
           theme={resolveTheme('dark', 'dark', true)}
           enabled

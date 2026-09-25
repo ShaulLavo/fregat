@@ -8,8 +8,15 @@ import {
 } from 'lexical'
 import { useEffect } from 'react'
 
+import { useSettingValue } from '@/hooks/use-setting-value'
+import { composerEnterIntent, type SendShortcut } from '@/features/chat/utils/enter-intent'
+import { $readChatInputTextSnapshot } from '@/features/chat/utils/input-editor-actions'
+
+/**
+ * Enter submits per `chat.sendShortcut`. The alternate send is each composer's to define:
+ * a running session swaps queue and steer, a new draft starts in the background.
+ */
 export function ChatInputSubmitPlugin({
-  busy = false,
   commandMenuOpen,
   disabled,
   onCommandMenuCommit,
@@ -17,25 +24,25 @@ export function ChatInputSubmitPlugin({
   onSubmitRequest,
 }: {
   commandMenuOpen: boolean
-  busy?: boolean
   disabled: boolean
   onCommandMenuCommit: () => boolean
   onCommandMenuMove: (offset: number) => boolean
   onSubmitRequest: (alternate?: boolean) => Promise<boolean>
 }) {
   const [editor] = useLexicalComposerContext()
+  const sendShortcut = useSettingValue('chat.sendShortcut')
 
   useEffect(() => {
     const unregisterEnter = editor.registerCommand(
       KEY_ENTER_COMMAND,
       (event) =>
         handleEnterCommand({
-          busy,
           commandMenuOpen,
           disabled,
           event,
           onCommandMenuCommit,
           onSubmitRequest,
+          sendShortcut,
         }),
       COMMAND_PRIORITY_HIGH,
     )
@@ -62,32 +69,32 @@ export function ChatInputSubmitPlugin({
       unregisterArrowUp()
     }
   }, [
-    busy,
     commandMenuOpen,
     disabled,
     editor,
     onCommandMenuCommit,
     onCommandMenuMove,
     onSubmitRequest,
+    sendShortcut,
   ])
 
   return null
 }
 
 function handleEnterCommand({
-  busy,
   commandMenuOpen,
   disabled,
   event,
   onCommandMenuCommit,
   onSubmitRequest,
+  sendShortcut,
 }: {
-  busy: boolean
   commandMenuOpen: boolean
   disabled: boolean
   event: KeyboardEvent | null
   onCommandMenuCommit: () => boolean
   onSubmitRequest: (alternate?: boolean) => Promise<boolean>
+  sendShortcut: SendShortcut
 }) {
   if (disabled) return false
   if (event && isImeCompositionEnter(event)) {
@@ -97,12 +104,20 @@ function handleEnterCommand({
     event.stopPropagation()
     return true
   }
-  if (event?.shiftKey) return false
-  if (handleMenuCommitCommand(commandMenuOpen, event, onCommandMenuCommit)) return true
+  if (!event?.shiftKey && handleMenuCommitCommand(commandMenuOpen, event, onCommandMenuCommit))
+    return true
+  const intent = composerEnterIntent({
+    modifierKey: Boolean(event?.metaKey || event?.ctrlKey),
+    prompt: $readChatInputTextSnapshot().text,
+    sendShortcut,
+    shiftKey: Boolean(event?.shiftKey),
+  })
+  // Unhandled, so the editor's own Enter adds the line.
+  if (intent === 'newline') return false
 
   event?.preventDefault()
   event?.stopPropagation()
-  void onSubmitRequest(busy && Boolean(event?.metaKey || event?.ctrlKey))
+  void onSubmitRequest(intent === 'alternate')
 
   return true
 }

@@ -302,3 +302,28 @@ function renderMenu({
     { queryClient },
   )
 }
+
+test('the trigger sparkles at max and the menu previews every sparkling level', async () => {
+  renderMenu({
+    options: { effort: 'max' },
+    capabilities: { optionDescriptors: promptDescriptors },
+  })
+  const trigger = screen.getByRole('button', { name: 'Model options' })
+  expect(trigger.querySelector('[data-effort-sparkle="max"]')).not.toBeNull()
+
+  await userEvent.click(screen.getByRole('button', { name: 'Model options' }))
+  const sparkles = (name: string) =>
+    screen.getByRole('menuitemradio', { name }).querySelector('[data-effort-sparkle]')
+  expect(sparkles('High')).toBeNull()
+  expect(sparkles('Max')).not.toBeNull()
+  expect(sparkles('Ultrathink')).not.toBeNull()
+})
+
+test('a high effort does not sparkle', () => {
+  renderMenu({
+    options: { effort: 'high' },
+    capabilities: { optionDescriptors: promptDescriptors },
+  })
+  const trigger = screen.getByRole('button', { name: 'Model options' })
+  expect(trigger.querySelector('[data-effort-sparkle]')).toBeNull()
+})

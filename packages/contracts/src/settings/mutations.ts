@@ -38,6 +38,7 @@ const NON_SCALAR_SETTING_IDS = [
   'providers.instances',
   'models.hidden',
   'models.order',
+  'models.favorites',
   'keybindings.overrides',
   'chat.projectResponseStreamingModes',
   'chat.textGenerationModel',
@@ -97,6 +98,12 @@ export type SetModelHiddenOperation = {
   readonly hidden: boolean
 }
 
+export type SetModelFavoriteOperation = {
+  readonly kind: 'model.setFavorite'
+  readonly ref: ModelRef
+  readonly favorite: boolean
+}
+
 export type SetModelOrderOperation = {
   readonly kind: 'model.setOrder'
   readonly order: readonly ModelRef[]
@@ -132,6 +139,7 @@ export type SettingsOperation =
   | SetMachineOperation
   | RemoveMachineOperation
   | SetModelHiddenOperation
+  | SetModelFavoriteOperation
   | SetModelOrderOperation
   | SetProviderEnabledOperation
 
@@ -238,6 +246,11 @@ export const settingsOperationSchemasByKind = {
     kind: v.literal('model.setHidden'),
     ref: modelRefSchema,
     hidden: v.boolean(),
+  }),
+  'model.setFavorite': v.strictObject({
+    kind: v.literal('model.setFavorite'),
+    ref: modelRefSchema,
+    favorite: v.boolean(),
   }),
   'model.setOrder': v.strictObject({
     kind: v.literal('model.setOrder'),
@@ -357,6 +370,9 @@ export function settingsOperationResourceKeys(
   if (operation.kind === 'model.setHidden') {
     return [memberResourceKey('models.hidden', modelResourceId(operation.ref))]
   }
+  if (operation.kind === 'model.setFavorite') {
+    return [memberResourceKey('models.favorites', modelResourceId(operation.ref))]
+  }
   if (operation.kind === 'model.setOrder') return [settingResourceKey('models.order')]
 
   return [memberResourceKey('providers.instances', operation.providerInstanceId)]
@@ -387,7 +403,12 @@ function applySettingsOperation(
   if (operation.kind === 'machine.remove') return removeMachine(raw, operation.name)
   if (operation.kind === 'keybinding.set') return setKeybinding(raw, operation)
   if (operation.kind === 'keybinding.remove') return removeKeybinding(raw, operation.command)
-  if (operation.kind === 'model.setHidden') return setModelHidden(raw, operation)
+  if (operation.kind === 'model.setHidden') {
+    return setModelMembership(raw, 'models.hidden', operation.ref, operation.hidden)
+  }
+  if (operation.kind === 'model.setFavorite') {
+    return setModelMembership(raw, 'models.favorites', operation.ref, operation.favorite)
+  }
   if (operation.kind === 'model.setOrder') {
     return replaceSetting(raw, 'models.order', operation.order)
   }
@@ -473,19 +494,20 @@ function removeKeybinding(
   return replaceSetting(raw, 'keybindings.overrides', next)
 }
 
-function setModelHidden(
+/** Adds a model to the end of a model list, or removes it; a no-op when already so. */
+function setModelMembership(
   raw: Readonly<Record<string, unknown>>,
-  operation: SetModelHiddenOperation,
+  key: 'models.favorites' | 'models.hidden',
+  ref: ModelRef,
+  member: boolean,
 ): Readonly<Record<string, unknown>> {
-  const current = arraySetting(raw, 'models.hidden')
-  const includes = current.some((entry) => matchesModelRef(entry, operation.ref))
-  if (includes === operation.hidden) return raw
+  const current = arraySetting(raw, key)
+  const includes = current.some((entry) => matchesModelRef(entry, ref))
+  if (includes === member) return raw
 
-  const next = operation.hidden
-    ? [...current, operation.ref]
-    : current.filter((entry) => !matchesModelRef(entry, operation.ref))
+  const next = member ? [...current, ref] : current.filter((entry) => !matchesModelRef(entry, ref))
 
-  return replaceSetting(raw, 'models.hidden', next)
+  return replaceSetting(raw, key, next)
 }
 
 function setProviderEnabled(
@@ -536,7 +558,7 @@ function recordSetting(
 
 function arraySetting(
   raw: Readonly<Record<string, unknown>>,
-  key: 'models.hidden' | 'providers.instances',
+  key: 'models.favorites' | 'models.hidden' | 'providers.instances',
 ): readonly unknown[] {
   const value = raw[key]
 
@@ -580,6 +602,7 @@ function touchedSettingIds(operation: SettingsOperation): readonly SettingId[] {
     return ['keybindings.overrides']
   }
   if (operation.kind === 'model.setHidden') return ['models.hidden']
+  if (operation.kind === 'model.setFavorite') return ['models.favorites']
   if (operation.kind === 'model.setOrder') return ['models.order']
 
   return ['providers.instances']

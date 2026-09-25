@@ -176,39 +176,59 @@ describe('log reader', () => {
     const logs = new LogReaderService({ dir })
     const abort = new AbortController()
     const iterator = logs.live({ pollIntervalMs: 50, signal: abort.signal })[Symbol.asyncIterator]()
-    const nextEvent = iterator.next()
-
-    await appendLogEvent(dir, {
-      action: 'app.bootstrap',
-      area: 'app',
-      level: 'info',
-      source: 'fe',
-      timestamp: new Date().toISOString(),
-    })
-
-    // Generous on purpose: this guards against a tail that never fires, not
-    // against a slow one. A loaded CI runner needs well past 2s to poll.
-    const result = await withTimeout(nextEvent, 15_000)
-    if (result.done) throw new TypeError('expected live event')
-
-    abort.abort()
-    await iterator.return?.(result.value)
-
-    expect(result.value).toMatchObject({
-      event: {
+    try {
+      await waitForLogTail(dir, iterator)
+      const nextEvent = nextLogEvent(iterator, 'app.bootstrap')
+      await appendLogEvent(dir, {
         action: 'app.bootstrap',
         area: 'app',
-      },
-      detail: {
-        rawJson: {
-          action: 'app.bootstrap',
-          area: 'app',
-        },
-      },
-      kind: 'event',
-    })
+        level: 'info',
+        source: 'fe',
+        timestamp: new Date().toISOString(),
+      })
+
+      expect(await withTimeout(nextEvent, 15_000)).toMatchObject({
+        event: { action: 'app.bootstrap', area: 'app' },
+        detail: { rawJson: { action: 'app.bootstrap', area: 'app' } },
+        kind: 'event',
+      })
+    } finally {
+      abort.abort()
+      await iterator.return(undefined)
+    }
   })
 })
+
+async function waitForLogTail(dir: string, iterator: ReturnType<LogReaderService['live']>) {
+  const stop = new AbortController()
+  // evlog exposes no ready signal; receiving a marker proves its startup snapshot is complete.
+  const writes = writeTailReadiness(dir, stop.signal)
+  try {
+    await withTimeout(Promise.race([nextLogEvent(iterator, 'tail.ready'), writes]), 15_000)
+  } finally {
+    stop.abort()
+    await writes
+  }
+}
+
+async function writeTailReadiness(dir: string, signal: AbortSignal) {
+  while (!signal.aborted) {
+    await appendLogEvent(dir, {
+      action: 'tail.ready',
+      level: 'debug',
+      timestamp: new Date().toISOString(),
+    })
+    await new Promise((resolve) => setTimeout(resolve, 50))
+  }
+}
+
+async function nextLogEvent(iterator: ReturnType<LogReaderService['live']>, action: string) {
+  while (true) {
+    const result = await iterator.next()
+    if (result.done) throw new TypeError('expected live event')
+    if (result.value.event.action === action) return result.value
+  }
+}
 
 async function fixtureLogDir() {
   const root = await mkdtemp(path.join(tmpdir(), 'platform-log-reader-'))

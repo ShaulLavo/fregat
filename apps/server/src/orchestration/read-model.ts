@@ -1,3 +1,4 @@
+import type { ApprovalRequests } from './approval-requests'
 import { planStepStatus } from '@workspace/contracts'
 import type {
   TerminalLease,
@@ -40,6 +41,7 @@ export type OrchestrationProjectedSession = OrchestrationSession & {
   latestUserMessageAt: string | null
   pendingRewindCommandId: string | null
   pendingRewindRestoreFiles: boolean
+  approvalRequests: ApprovalRequests
   pendingApprovalCount: number
   pendingUserInputCount: number
 }
