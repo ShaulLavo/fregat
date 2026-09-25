@@ -55,3 +55,7 @@ Every explicit copy goes through `lib/clipboard.ts`, which tries `navigator.clip
 ## Base components
 
 Tabs and segmented rows (settings scope and view, git Changes/Graph, diff scope, snooze, usage range) are Base UI tabs with one sliding indicator. Irreversible confirms (discard, checkpoint rewind, forced worktree removal, history clear, session and project delete) are hold-to-confirm. `scenario base-components` releases a discard hold early and requires the file to stay edited, holds Space until the dialog closes and requires the file restored, then samples the settings scope indicator every frame after a click and requires an in-between position. Status marks are square `StatusDot`s; `scenario spinner-palette` shows a working session's breathing dots in the rail and header.
+
+## Connection frames
+
+Booting, and connecting to a server, show one `StatusFrame`: a mark, a title, a detail line and an action row, each the same size pending and failed. `scenario connection-frame` clears the cached binding, holds then refuses `/health`, and requires zero blank frames and an unchanged frame box from pending to error, then presses Retry connection and requires the app.

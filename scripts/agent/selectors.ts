@@ -732,6 +732,9 @@ export const selectors = {
       .locator('[data-git-file]')
       .filter({ has: page.getByText(name, { exact: true }) })
       .getByRole('button', { name: label, exact: true }),
+  statusFrame: (page: Page, tone: 'pending' | 'error') =>
+    page.locator(`[data-slot="status-frame"][data-tone="${tone}"]`),
+  statusFrameBody: (page: Page) => page.locator('[data-slot="status-frame"] > div'),
   holdButton: (scope: Locator, name: string) =>
     scope.locator('[data-slot="hold-button"]').filter({ hasText: name }),
   tabsIndicator: (page: Page, list: string) =>

@@ -165,6 +165,12 @@ edge path). Rules that keep it from being annoying:
 
 ## 5. Connection and boot frames
 
+**Done 2026-09-25 (lane L1).** `packages/ui/src/patterns/status-frame.tsx`; both gates use it; scenario
+`connection-frame`. The reconnect scrim was not built: checked first, an already-connected workspace
+that loses its machine keeps its cached content with a `StaleNotice` banner ("… is unreachable.
+Showing cached data."), which already keeps the layout, and a scrim would hide the cached data it
+exists to show. The text below is the original plan.
+
 **Today.** Two full-screen gates each render three unrelated layouts:
 
 - `features/environments/components/connection-gate.tsx:36-61`: `InlineError` plus a Retry

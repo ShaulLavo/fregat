@@ -9,6 +9,7 @@
     "./components/*": "./src/components/*.tsx",
     "./hooks/*": "./src/hooks/*.ts",
     "./patterns/delete-dialog-footer": "./src/patterns/delete-dialog-footer.tsx",
+    "./patterns/status-frame": "./src/patterns/status-frame.tsx",
     "./patterns/list-row": "./src/patterns/list-row.tsx",
     "./patterns/list-row-classes": "./src/patterns/list-row-classes.ts",
     "./patterns/listbox-keys": "./src/patterns/listbox-keys.ts",
