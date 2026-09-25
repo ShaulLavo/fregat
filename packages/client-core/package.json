@@ -116,7 +116,11 @@
     "./files/search-replace": "./src/files/search-replace.ts",
     "./transport/socket": "./src/transport/socket.ts",
     "./settings/operations": "./src/settings/operations.ts",
-    "./commands/recent-commands": "./src/commands/recent-commands.ts"
+    "./commands/recent-commands": "./src/commands/recent-commands.ts",
+    "./chat/activity-visibility": "./src/chat/activity-visibility.ts",
+    "./commands/bindings": "./src/commands/bindings.ts",
+    "./chat/worktrees/actions": "./src/chat/worktrees/actions.ts",
+    "./chat/worktrees/confirmation": "./src/chat/worktrees/confirmation.ts"
   },
   "scripts": {
     "build": "tsgo --noEmit",

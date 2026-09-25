@@ -18,6 +18,16 @@ export const searchEditorGeometrySelectors = {
 
 // Stable handles the app already exposes. Add here, never inline a selector in a scenario.
 export const selectors = {
+  manageWorktrees: (page: Page) =>
+    page.getByRole('button', { name: 'Manage worktrees', exact: true }),
+  worktreeManager: (page: Page) => page.getByRole('dialog', { name: 'Worktrees', exact: true }),
+  releaseWorktree: (page: Page) => page.getByRole('button', { name: 'Release…', exact: true }),
+  releaseWorktreeDialog: (page: Page) =>
+    page.getByRole('dialog', { name: 'Release worktree', exact: true }),
+  cancelWorktreeRelease: (page: Page) =>
+    page
+      .getByRole('dialog', { name: 'Release worktree', exact: true })
+      .getByRole('button', { name: 'Cancel', exact: true }),
   completedWorkGroup: (page: Page) => page.getByRole('button', { name: /^Worked for / }),
   reasoningDeliveryRow: (page: Page) => page.getByRole('button', { name: /^REASONING_BEGIN / }),
   reasoningDeliveryDetail: (page: Page, text: string) => page.getByText(text, { exact: true }),

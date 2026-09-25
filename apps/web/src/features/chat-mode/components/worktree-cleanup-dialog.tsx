@@ -1,3 +1,4 @@
+import { cleanupConfirmationText } from '@workspace/client-core/chat/worktrees/confirmation'
 import { Button } from '@workspace/ui/components/button'
 import {
   Dialog,
@@ -27,17 +28,10 @@ export function WorktreeCleanupDialog({
   readonly onConfirm: () => void
 }) {
   const force = confirmation?.kind === 'force'
-  const missing = confirmation?.kind === 'missing'
-  let action = 'Release worktree'
-  let description = `Keep ${label} and its branch on disk. Platform will give up cleanup ownership. Any later cleanup must be done manually.`
-  if (force) {
-    action = 'Discard changes and remove'
-    description = `Remove ${label} and permanently discard its tracked, untracked, and ignored files. The branch and commits will be retained.`
-  }
-  if (missing) {
-    action = 'Confirm checkout is absent'
-    description = `Resolve the absent checkout ${label}. No files will be deleted. Its branch and commits may still exist.`
-  }
+  const { action, description } = cleanupConfirmationText(
+    confirmation ?? { kind: 'release' },
+    label,
+  )
   return (
     <Dialog
       open={confirmation !== null}
@@ -48,14 +42,8 @@ export function WorktreeCleanupDialog({
       <DialogContent className='max-w-md' showCloseButton={!pending}>
         <DialogHeader>
           <DialogTitle>{action}</DialogTitle>
-          <DialogDescription>{description}</DialogDescription>
+          <DialogDescription className='tabular-nums'>{description}</DialogDescription>
         </DialogHeader>
-        {confirmation?.kind === 'force' ? (
-          <p className='text-muted-foreground text-sm tabular-nums'>
-            {confirmation.preview.changedFileCount} changed files. Any further edit requires a new
-            confirmation.
-          </p>
-        ) : null}
         {error ? (
           <InlineError message={error} onHandOff={onCancel} title='Worktree cleanup' />
         ) : null}

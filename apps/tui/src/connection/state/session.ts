@@ -1,3 +1,4 @@
+import { createObservableStore } from '@/host/state/observable-store'
 import { createChatOwner, type ChatOwner } from '@workspace/client-core/chat/owner'
 import { readEnvironmentDescriptor } from '@workspace/client-core/environments/descriptor'
 import { createEnvironmentsStore } from '@workspace/client-core/environments/state/store'
@@ -45,9 +46,12 @@ export type SettingsSession = ReturnType<typeof createSettingsSession>
 export function createSettingsSession(options: SessionOptions) {
   const origin = canonicalServerOrigin(options.origin)
   const environments = createEnvironmentsStore({ primaryOrigin: origin })
-  const listeners = new Set<() => void>()
+
   const lifetime = new AbortController()
-  let state: SessionState = { kind: 'loading' }
+  const store = createObservableStore<SessionState>(
+    { kind: 'loading' },
+    { signal: lifetime.signal },
+  )
   let current: AbortController | null = null
   let currentRpc: OrchestrationRpcClient | null = null
   let currentOwner: SettingsOwner | null = null
@@ -55,11 +59,7 @@ export function createSettingsSession(options: SessionOptions) {
   let storage: ReturnType<typeof openFileStorage> | null = null
   let savedStorage: FileStorage | null = null
 
-  function publish(next: SessionState) {
-    if (lifetime.signal.aborted) return
-    state = next
-    for (const listener of listeners) listener()
-  }
+  const publish = store.replace
 
   async function refresh() {
     if (lifetime.signal.aborted) return
@@ -122,8 +122,8 @@ export function createSettingsSession(options: SessionOptions) {
       controller.signal.addEventListener('abort', () => chat.dispose(), { once: true })
       controller.signal.addEventListener('abort', () => owner.dispose(), { once: true })
       owner.subscribe(() => {
-        if (controller.signal.aborted || state.kind !== 'ready') return
-        publish({ ...state, settings: owner.getSnapshot().snapshot })
+        if (controller.signal.aborted || store.value.kind !== 'ready') return
+        publish({ ...store.value, settings: owner.getSnapshot().snapshot })
       })
       publish({
         kind: 'ready',
@@ -160,10 +160,10 @@ export function createSettingsSession(options: SessionOptions) {
   }
 
   function disconnected(controller: AbortController, error: unknown) {
-    if (controller.signal.aborted || lifetime.signal.aborted || state.kind !== 'ready') return
+    if (controller.signal.aborted || lifetime.signal.aborted || store.value.kind !== 'ready') return
     currentOwner?.pause()
     currentChat?.dispose()
-    publish({ ...state, connection: { kind: 'offline', failure: connectionFailure(error) } })
+    publish({ ...store.value, connection: { kind: 'offline', failure: connectionFailure(error) } })
   }
 
   return {
@@ -181,7 +181,7 @@ export function createSettingsSession(options: SessionOptions) {
     },
     async ensureWorktree(rootPath: string) {
       lifetime.signal.throwIfAborted()
-      if (!currentRpc || state.kind !== 'ready' || state.connection.kind !== 'live')
+      if (!currentRpc || store.value.kind !== 'ready' || store.value.connection.kind !== 'live')
         throw createTuiError(
           'The environment is disconnected.',
           'Reconnect before opening a terminal.',
@@ -195,13 +195,8 @@ export function createSettingsSession(options: SessionOptions) {
     },
     record: (event: Record<string, unknown>) => options.record?.(event),
     refresh,
-    getSnapshot: () => state,
-    subscribe(listener: () => void) {
-      listeners.add(listener)
-      return () => {
-        listeners.delete(listener)
-      }
-    },
+    getSnapshot: store.getSnapshot,
+    subscribe: store.subscribe,
     dispose() {
       if (lifetime.signal.aborted) return
       lifetime.abort()
@@ -209,7 +204,7 @@ export function createSettingsSession(options: SessionOptions) {
       currentChat?.dispose()
       currentRpc?.close()
       currentOwner?.dispose()
-      listeners.clear()
+      store.dispose()
       savedStorage?.close()
     },
     async flush() {

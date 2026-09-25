@@ -272,7 +272,7 @@ plans is the divergent helpers, where a decision picks which behaviour wins; the
 
 The completion wave (lane L6, 2026-09-25) finished Plans 091, 092, 093 and 095 and deleted them;
 the owner decided 091 §9.3 (adopt the cause routing) and 093 §5.1 (the theme context keeps `undefined`).
-[Plan 094](plans/094-client-core-web-tui-parity.md) is next in that lane. Plan 096 is complete; its
+Plan 094 is complete; its [verification record](docs/verification/2026-09-25-client-core-parity.md) records the shared policies and host boundaries. Plan 096 is complete; its
 [web layering reference](docs/web-layering.md) records the implementation and review.
 
 The middle plans consolidate onto the shared packages. Plan 091 widens the observability sanitizer,

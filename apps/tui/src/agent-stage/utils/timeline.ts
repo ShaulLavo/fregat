@@ -1,3 +1,4 @@
+import { isVisibleChatActivity } from '@workspace/client-core/chat/activity-visibility'
 import type {
   OrchestrationMessage,
   OrchestrationProposedPlan,
@@ -33,7 +34,7 @@ export function timelineRows(session: ChatSession): readonly TimelineRow[] {
     message,
   }))
   const activities: TimelineRow[] = session.activities
-    .filter((activity) => activity.kind !== 'context-window.updated')
+    .filter(isVisibleChatActivity)
     .map((activity) => ({ kind: 'activity', id: activity.id, time: activity.createdAt, activity }))
   const plans: TimelineRow[] = session.proposedPlans.map((plan) => ({
     kind: 'plan',

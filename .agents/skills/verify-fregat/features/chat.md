@@ -106,3 +106,4 @@ Each surface lists the states it must survive and the scenario that drives each 
 - `chat-artifact-template`: a native-fixture answer with an `::artifact-template{…}` directive renders one card; Use appends the template prompt to the composer once.
 - `chat-composer-editing`: with `chat.sendShortcut` set to mod-enter, Enter adds a line and Ctrl+Enter sends; a 40 KB clipboard paste folds into `pasted-text.txt`, and Ctrl+Shift+V pastes it inline. Restores the setting.
 - `chat-multiple-models`: Shift+select a second model in a new draft and send; two sessions start on two new worktrees, one per model, and no recoverable draft is left. Deletes the sessions and releases their worktrees.
+`chat-draft-context-strip` also opens Manage worktrees, checks the shared release confirmation and cancels it while retaining the checkout.

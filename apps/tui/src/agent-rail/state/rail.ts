@@ -1,3 +1,4 @@
+import { createObservableStore } from '@/host/state/observable-store'
 import {
   createProjectRegistrationCommand,
   projectRegistrationResult,
@@ -43,27 +44,26 @@ export function createAgentRailState(
   ready: Extract<SessionState, { kind: 'ready' }>,
 ) {
   const lifetime = new AbortController()
-  const listeners = new Set<() => void>()
+
   let request = new AbortController()
   let timer: ReturnType<typeof setTimeout> | null = null
-  let state: State = {
-    query: '',
-    view: 'active',
-    scope: null,
-    marked: [],
-    anchor: null,
-    search: {},
-    searching: false,
-    collapsed: readCollapsed(ready.storage),
-    seen: readSeen(ready.storage),
-    busy: false,
-    error: null,
-  }
-  function publish(patch: Partial<State>) {
-    if (lifetime.signal.aborted) return
-    state = { ...state, ...patch }
-    for (const listener of listeners) listener()
-  }
+  const store = createObservableStore<State>(
+    {
+      query: '',
+      view: 'active',
+      scope: null,
+      marked: [],
+      anchor: null,
+      search: {},
+      searching: false,
+      collapsed: readCollapsed(ready.storage),
+      seen: readSeen(ready.storage),
+      busy: false,
+      error: null,
+    },
+    { signal: lifetime.signal },
+  )
+  const publish = store.patch
   async function search(query: string, signal: AbortSignal) {
     try {
       const response = await session.client.orchestration['session-search'].post(
@@ -106,7 +106,7 @@ export function createAgentRailState(
       }, 220)
   }
   async function run<T>(action: () => Promise<T>): Promise<T | null> {
-    if (state.busy || lifetime.signal.aborted) return null
+    if (store.value.busy || lifetime.signal.aborted) return null
     publish({ busy: true, error: null })
     try {
       const connection = session.getSnapshot()
@@ -124,34 +124,37 @@ export function createAgentRailState(
     }
   }
   return {
-    getSnapshot: () => state,
-    subscribe(listener: () => void) {
-      listeners.add(listener)
-      return () => {
-        listeners.delete(listener)
-      }
-    },
+    getSnapshot: store.getSnapshot,
+    subscribe: store.subscribe,
     setQuery,
     setScope: (scope: string | null) => publish({ scope, marked: [], anchor: null }),
     toggleArchived: () =>
-      publish({ view: state.view === 'active' ? 'archived' : 'active', marked: [], anchor: null }),
+      publish({
+        view: store.value.view === 'active' ? 'archived' : 'active',
+        marked: [],
+        anchor: null,
+      }),
     toggleCollapsed(keys: readonly string[]) {
-      const allCollapsed = keys.every((key) => state.collapsed.includes(key))
-      const collapsed = state.collapsed.filter((key) => !keys.includes(key))
+      const allCollapsed = keys.every((key) => store.value.collapsed.includes(key))
+      const collapsed = store.value.collapsed.filter((key) => !keys.includes(key))
       if (!allCollapsed) collapsed.push(...new Set(keys))
       ready.storage.setItem('agent:rail:collapsed', JSON.stringify(collapsed))
       publish({ collapsed })
     },
-    mark: (id: SessionId) => publish({ marked: toggledSessionIds(state.marked, id), anchor: id }),
+    mark: (id: SessionId) =>
+      publish({ marked: toggledSessionIds(store.value.marked, id), anchor: id }),
     markRange: (ids: readonly SessionId[], id: SessionId) =>
-      publish({ marked: sessionIdRange(ids, state.anchor, id), anchor: state.anchor ?? id }),
+      publish({
+        marked: sessionIdRange(ids, store.value.anchor, id),
+        anchor: store.value.anchor ?? id,
+      }),
     markAll: (marked: readonly SessionId[]) => publish({ marked }),
     clearMarks: () => publish({ marked: [], anchor: null }),
     markSeen(id: SessionId, stamp: string | null) {
       if (!stamp) return
       const key = scopedSessionKey({ environmentId: ready.descriptor.environmentId, sessionId: id })
-      if (state.seen[key] === stamp) return
-      const seen = { ...state.seen, [key]: stamp }
+      if (store.value.seen[key] === stamp) return
+      const seen = { ...store.value.seen, [key]: stamp }
       ready.storage.setItem('agent:rail:seen', JSON.stringify(seen))
       publish({ seen })
     },
@@ -162,7 +165,7 @@ export function createAgentRailState(
           for (const command of commands) {
             await ready.chat.dispatch(command)
             if (clearCompletedMarks && 'sessionId' in command)
-              publish({ marked: state.marked.filter((id) => id !== command.sessionId) })
+              publish({ marked: store.value.marked.filter((id) => id !== command.sessionId) })
           }
           return true
         })) === true
@@ -185,7 +188,7 @@ export function createAgentRailState(
       lifetime.abort()
       request.abort()
       if (timer) clearTimeout(timer)
-      listeners.clear()
+      store.dispose()
     },
   }
 }

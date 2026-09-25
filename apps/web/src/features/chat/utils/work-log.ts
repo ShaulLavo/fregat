@@ -8,7 +8,6 @@ import { compactActivityLabel } from '@/features/chat/utils/activity-label'
 import type { OrchestrationLatestTurn, OrchestrationSessionActivity } from '@workspace/contracts'
 
 import {
-  chatActivityHasFailure,
   chatActivityPlanSteps,
   chatActivityPresentation,
   chatActivityReasoningDelta,
@@ -19,7 +18,10 @@ import {
   type ChatActivityPlanStep,
   type ChatActivityTool,
 } from '@/features/chat/utils/activity-presentation'
-import { isVisibleChatActivity } from '@/features/chat/utils/activity-visibility'
+import {
+  isVisibleChatActivity,
+  chatActivityHasFailure,
+} from '@workspace/client-core/chat/activity-visibility'
 import { chatAgentActivity } from '@/features/chat/utils/agent-activity'
 import { mergePlanSteps, type ChatPlanStep } from '@/features/chat/utils/plan-steps'
 

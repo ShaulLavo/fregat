@@ -1,3 +1,4 @@
+import { bindingsCollide, defaultBindingPane } from '@workspace/client-core/commands/bindings'
 import { parseHotkey } from '@tanstack/hotkeys'
 import type { KeybindingOverrides } from '@workspace/contracts'
 import {
@@ -9,7 +10,6 @@ import {
   chordKeys,
   isBindableChord,
   normalizedChord,
-  keysConflict,
   chordStrokes,
 } from '@workspace/client-core/commands/chord'
 import type { FocusArea } from '@workspace/client-core/commands/focus'
@@ -73,7 +73,7 @@ export function effectiveTerminalBindings(overrides: KeybindingOverrides, kitty 
     .map((binding) => ({ ...binding, keys: terminalChord(binding.keys) }))
   const winners: TerminalBinding[] = []
   for (const binding of user.toReversed()) {
-    const winner = winners.find((candidate) => collides(candidate, binding))
+    const winner = winners.find((candidate) => bindingsCollide(candidate, binding))
     if (winner) {
       diagnostics.push({
         command: binding.command,
@@ -85,7 +85,7 @@ export function effectiveTerminalBindings(overrides: KeybindingOverrides, kitty 
     winners.push(binding)
   }
   const bindings = kept.filter((binding) => {
-    const winner = winners.find((candidate) => collides(candidate, binding))
+    const winner = winners.find((candidate) => bindingsCollide(candidate, binding))
     if (winner)
       diagnostics.push({
         command: binding.command,
@@ -123,20 +123,10 @@ export function terminalBindingReason(
   return null
 }
 
-export function activeTerminalBindings(bindings: readonly TerminalBinding[], area: FocusArea) {
-  return bindings
-    .filter((binding) => !binding.pane || binding.pane === 'any' || binding.pane === area)
-    .toSorted((left, right) => Number(right.pane === area) - Number(left.pane === area))
-}
-
-function collides(left: TerminalBinding, right: TerminalBinding) {
-  return (left.pane ?? 'any') === (right.pane ?? 'any') && keysConflict(left.keys, right.keys)
-}
-
 function defaultPane(command: CommandId): FocusArea | 'any' {
   const metadata = commandById(command)
   const authored = metadata?.keys?.find((key) => key.platforms?.includes('tui'))
-  return authored?.pane ?? (metadata?.target === 'editor' ? 'editor' : 'any')
+  return defaultBindingPane(metadata?.target, authored?.pane)
 }
 
 function terminalChord(keys: string) {

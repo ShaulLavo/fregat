@@ -1,3 +1,4 @@
+import { createObservableStore } from '@/host/state/observable-store'
 import * as v from 'valibot'
 import {
   errorStringField,
@@ -13,8 +14,8 @@ import {
 } from '@workspace/client-core/chat/worktrees/commands'
 import { requireEdenData } from '@workspace/client-core/transport/eden'
 import type { SettingsSession } from '@/connection/state/session'
-import { worktreeActions, type WorktreeAction } from '@/worktrees/utils/choices'
-import type { CleanupConfirmation } from '@/worktrees/utils/confirmation'
+import { worktreeActions, type WorktreeAction } from '@workspace/client-core/chat/worktrees/actions'
+import type { CleanupConfirmation } from '@workspace/client-core/chat/worktrees/confirmation'
 
 type Snapshot = {
   readonly pending: boolean
@@ -33,15 +34,13 @@ export function createWorktreeActions({
   readonly worktreeId: WorktreeId
   readonly currentWorktreeId: WorktreeId | null
 }) {
-  const listeners = new Set<() => void>()
   const lifetime = new AbortController()
-  let snapshot: Snapshot = { pending: false, error: null, confirmation: null }
+  const store = createObservableStore<Snapshot>(
+    { pending: false, error: null, confirmation: null },
+    { signal: lifetime.signal },
+  )
 
-  function publish(patch: Partial<Snapshot>) {
-    if (lifetime.signal.aborted) return
-    snapshot = { ...snapshot, ...patch }
-    for (const listener of listeners) listener()
-  }
+  const publish = store.patch
 
   function allowed(action: WorktreeAction) {
     const connection = session.getSnapshot()
@@ -57,7 +56,7 @@ export function createWorktreeActions({
   }
 
   async function perform(operation: () => Promise<void>) {
-    if (snapshot.pending || lifetime.signal.aborted) return
+    if (store.value.pending || lifetime.signal.aborted) return
     publish({ pending: true, error: null })
     try {
       await operation()
@@ -94,34 +93,30 @@ export function createWorktreeActions({
   }
 
   async function request(action: WorktreeAction) {
-    if (snapshot.pending || !allowed(action)) return
+    if (store.value.pending || !allowed(action)) return
     if (action === 'cleanup' || action === 'release') {
       publish({ confirmation: { kind: action === 'cleanup' ? 'safe' : 'release' }, error: null })
       return
     }
     if (action === 'force' || action === 'missing') return perform(() => preview(action))
     const worktree = chat.getSnapshot().projection.worktreeById[worktreeId]
-    let type: 'worktree.retry' | 'worktree.cleanup' | 'worktree.retain' | 'worktree.adopt' =
-      'worktree.retry'
-    if (action === 'retry' && worktree?.lifecycle.state !== 'creation-failed')
-      type = 'worktree.cleanup'
-    if (action === 'retain') type = 'worktree.retain'
-    if (action === 'adopt') type = 'worktree.adopt'
-    return perform(() => dispatch(worktreeActionCommand(type, worktreeId)))
+    if (!worktree) return
+    const option = worktreeActions(worktree, worktreeId === currentWorktreeId).find(
+      (item) => item.value === action,
+    )
+    if (option?.kind !== 'run') return
+    return perform(() => dispatch(worktreeActionCommand(option.command, worktreeId)))
   }
 
   return {
-    getSnapshot: () => snapshot,
-    subscribe(listener: () => void) {
-      listeners.add(listener)
-      return () => listeners.delete(listener)
-    },
+    getSnapshot: store.getSnapshot,
+    subscribe: store.subscribe,
     request,
     dismiss() {
-      if (!snapshot.pending) publish({ confirmation: null, error: null })
+      if (!store.value.pending) publish({ confirmation: null, error: null })
     },
     async confirm() {
-      const confirmation = snapshot.confirmation
+      const confirmation = store.value.confirmation
       if (!confirmation || !allowed(confirmation.kind === 'safe' ? 'cleanup' : confirmation.kind))
         return
       const command =
@@ -132,7 +127,7 @@ export function createWorktreeActions({
     },
     dispose() {
       lifetime.abort()
-      listeners.clear()
+      store.dispose()
     },
   }
 }

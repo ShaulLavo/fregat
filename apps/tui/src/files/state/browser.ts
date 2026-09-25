@@ -1,3 +1,4 @@
+import { createObservableStore } from '@/host/state/observable-store'
 import { isDirectoryEntry, type FileTreeEntry } from '@workspace/contracts'
 import {
   readDirectory,
@@ -24,34 +25,30 @@ type Preview =
   | { readonly kind: 'ready'; readonly path: string; readonly content: string }
 
 export function createFileBrowser(client: Client, storage: KeyValueStorage) {
-  const listeners = new Set<() => void>()
-  let state: {
+  const store = createObservableStore<{
     paths: ServerPaths | null
     path: string
     parentPath: string | null
     listing: Listing
     preview: Preview
     location: FileLocation | null
-  } = {
+  }>({
     paths: null,
     path: '',
     parentPath: null,
     listing: { kind: 'loading' },
     preview: { kind: 'empty' },
     location: null,
-  }
+  })
   let request = new AbortController()
   let preview = new AbortController()
-  let disposed = false
 
-  function publish(next: typeof state) {
-    if (disposed) return
-    state = { ...next, parentPath: next.path ? parentDirectory(next.path) : null }
-    for (const listener of listeners) listener()
+  function publish(next: typeof store.value) {
+    store.replace({ ...next, parentPath: next.path ? parentDirectory(next.path) : null })
   }
 
   async function navigate(path: string) {
-    if (disposed) return
+    if (store.disposed) return
     request.abort()
     preview.abort()
     const controller = new AbortController()
@@ -64,7 +61,7 @@ export function createFileBrowser(client: Client, storage: KeyValueStorage) {
     controller: AbortController,
     destination: 'directory' | 'file' = 'directory',
   ) {
-    publish({ ...state, path, listing: { kind: 'loading' }, preview: { kind: 'empty' } })
+    publish({ ...store.value, path, listing: { kind: 'loading' }, preview: { kind: 'empty' } })
     try {
       const result = await readDirectory({ client, path, signal: controller.signal })
       controller.signal.throwIfAborted()
@@ -75,24 +72,27 @@ export function createFileBrowser(client: Client, storage: KeyValueStorage) {
       )
       storage.setItem('file-picker-directory', result.path)
       const location: FileLocation | null =
-        state.paths && destination === 'directory'
+        store.value.paths && destination === 'directory'
           ? {
               path: result.path,
               rootPath: result.path,
               kind: 'directory',
             }
-          : state.location
-      publish({ ...state, path: result.path, listing: { kind: 'ready', entries }, location })
+          : store.value.location
+      publish({ ...store.value, path: result.path, listing: { kind: 'ready', entries }, location })
       return !controller.signal.aborted
     } catch (error) {
       if (controller.signal.aborted) return false
-      publish({ ...state, listing: { kind: 'failed', message: connectionFailure(error).message } })
+      publish({
+        ...store.value,
+        listing: { kind: 'failed', message: connectionFailure(error).message },
+      })
       return false
     }
   }
 
   async function open(initialPath?: string) {
-    if (disposed) return
+    if (store.disposed) return
     request.abort()
     preview.abort()
     const controller = new AbortController()
@@ -100,11 +100,11 @@ export function createFileBrowser(client: Client, storage: KeyValueStorage) {
     try {
       const paths = await readServerPaths({ client, signal: controller.signal })
       controller.signal.throwIfAborted()
-      publish({ ...state, paths })
+      publish({ ...store.value, paths })
       const input = initialPath ?? storage.getItem('file-picker-directory') ?? paths.defaultPath
       const parsed = input ? parsePickerPathInput(input, paths) : { error: null, path: '' }
       if (parsed.error !== null) {
-        publish({ ...state, listing: { kind: 'failed', message: parsed.error } })
+        publish({ ...store.value, listing: { kind: 'failed', message: parsed.error } })
         return
       }
       if (initialPath !== undefined && parsed.path) {
@@ -114,7 +114,10 @@ export function createFileBrowser(client: Client, storage: KeyValueStorage) {
       await loadDirectory(parsed.path, controller)
     } catch (error) {
       if (controller.signal.aborted) return
-      publish({ ...state, listing: { kind: 'failed', message: connectionFailure(error).message } })
+      publish({
+        ...store.value,
+        listing: { kind: 'failed', message: connectionFailure(error).message },
+      })
     }
   }
 
@@ -132,11 +135,11 @@ export function createFileBrowser(client: Client, storage: KeyValueStorage) {
 
   async function select(entry: FileTreeEntry) {
     if (isDirectoryEntry(entry)) return navigate(entry.path)
-    if (disposed) return
+    if (store.disposed) return
     preview.abort()
     const controller = new AbortController()
     preview = controller
-    publish({ ...state, preview: { kind: 'loading', path: entry.path } })
+    publish({ ...store.value, preview: { kind: 'loading', path: entry.path } })
     try {
       // A glance pane in a terminal: raw control bytes would wreck the render, and nobody asked
       // to open this file. Deliberate opens stay permissive and show whatever is there.
@@ -147,30 +150,34 @@ export function createFileBrowser(client: Client, storage: KeyValueStorage) {
         signal: controller.signal,
       })
       controller.signal.throwIfAborted()
-      const location: FileLocation | null = state.paths
+      const location: FileLocation | null = store.value.paths
         ? {
             path: file.path,
             rootPath: parentDirectory(file.path),
             kind: 'file',
           }
-        : state.location
+        : store.value.location
       publish({
-        ...state,
+        ...store.value,
         preview: { kind: 'ready', path: file.path, content: file.content },
         location,
       })
     } catch (error) {
       if (controller.signal.aborted) return
       publish({
-        ...state,
+        ...store.value,
         preview: { kind: 'failed', path: entry.path, message: connectionFailure(error).message },
       })
     }
   }
 
   async function completePath(input: string) {
-    if (!state.paths || disposed) return input
-    const parsed = parseBrowserPathInput({ input, currentPath: state.path, paths: state.paths })
+    if (!store.value.paths || store.disposed) return input
+    const parsed = parseBrowserPathInput({
+      input,
+      currentPath: store.value.path,
+      paths: store.value.paths,
+    })
     if (parsed.error !== null) return input
     const directoryInput = input.trim().endsWith('/')
     const parent = directoryInput ? parsed.path : parentDirectory(parsed.path)
@@ -183,7 +190,7 @@ export function createFileBrowser(client: Client, storage: KeyValueStorage) {
         (entry) => isDirectoryEntry(entry) && entry.name.startsWith(prefix),
       )
       if (matches.length !== 1) return input
-      return `${absolutePickerPath(matches[0].path, state.paths.workspaceRoot)}/`
+      return `${absolutePickerPath(matches[0].path, store.value.paths.workspaceRoot)}/`
     } catch (error) {
       if (signal.aborted) return input
       throw error
@@ -194,43 +201,41 @@ export function createFileBrowser(client: Client, storage: KeyValueStorage) {
     open,
     navigate,
     async goUp() {
-      if (state.parentPath === null) return
-      await navigate(state.parentPath)
+      if (store.value.parentPath === null) return
+      await navigate(store.value.parentPath)
     },
     select,
     completePath,
     clearPreview() {
-      if (state.preview.kind === 'empty') return
+      if (store.value.preview.kind === 'empty') return
       preview.abort()
       const location: FileLocation | null =
-        state.paths && state.listing.kind === 'ready'
+        store.value.paths && store.value.listing.kind === 'ready'
           ? {
-              path: state.path,
-              rootPath: state.path,
+              path: store.value.path,
+              rootPath: store.value.path,
               kind: 'directory',
             }
-          : state.location
-      publish({ ...state, preview: { kind: 'empty' }, location })
+          : store.value.location
+      publish({ ...store.value, preview: { kind: 'empty' }, location })
     },
     enterPath(input: string) {
-      if (!state.paths) return 'Server paths are not available yet.'
-      const parsed = parseBrowserPathInput({ input, currentPath: state.path, paths: state.paths })
+      if (!store.value.paths) return 'Server paths are not available yet.'
+      const parsed = parseBrowserPathInput({
+        input,
+        currentPath: store.value.path,
+        paths: store.value.paths,
+      })
       if (parsed.error !== null) return parsed.error
       void navigate(parsed.path)
       return null
     },
-    getSnapshot: () => state,
-    subscribe(listener: () => void) {
-      listeners.add(listener)
-      return () => {
-        listeners.delete(listener)
-      }
-    },
+    getSnapshot: store.getSnapshot,
+    subscribe: store.subscribe,
     dispose() {
-      disposed = true
+      store.dispose()
       request.abort()
       preview.abort()
-      listeners.clear()
     },
   }
 }

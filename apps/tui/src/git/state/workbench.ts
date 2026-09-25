@@ -1,3 +1,4 @@
+import { createObservableStore } from '@/host/state/observable-store'
 import type { Client } from '@workspace/client-core/transport/client'
 import { requireEdenData } from '@workspace/client-core/transport/eden'
 import { readGitCommitStream } from '@workspace/client-core/git/commit-stream'
@@ -20,22 +21,20 @@ type Diff =
 type State = { listing: Listing; diff: Diff; busy: boolean; message: string; progress: string }
 
 export function createGitWorkbench(client: Client, rootPath: string) {
-  const listeners = new Set<() => void>()
   const lifetime = new AbortController()
   let statusRequest = new AbortController()
   let diffRequest = new AbortController()
-  let state: State = {
-    listing: { kind: 'loading' },
-    diff: { kind: 'empty' },
-    busy: false,
-    message: '',
-    progress: '',
-  }
-  function publish(next: State) {
-    if (lifetime.signal.aborted) return
-    state = next
-    for (const listener of listeners) listener()
-  }
+  const store = createObservableStore<State>(
+    {
+      listing: { kind: 'loading' },
+      diff: { kind: 'empty' },
+      busy: false,
+      message: '',
+      progress: '',
+    },
+    { signal: lifetime.signal },
+  )
+  const publish = store.replace
   async function refresh() {
     if (lifetime.signal.aborted) return
     statusRequest.abort()
@@ -43,16 +42,16 @@ export function createGitWorkbench(client: Client, rootPath: string) {
     const controller = new AbortController()
     statusRequest = controller
     const signal = AbortSignal.any([lifetime.signal, controller.signal])
-    publish({ ...state, listing: { kind: 'loading' }, diff: { kind: 'empty' } })
+    publish({ ...store.value, listing: { kind: 'loading' }, diff: { kind: 'empty' } })
     try {
       const data = requireEdenData(
         await client.git.status.get({ query: { path: rootPath }, fetch: { signal } }),
       )
-      if (!signal.aborted) publish({ ...state, listing: { kind: 'ready', data } })
+      if (!signal.aborted) publish({ ...store.value, listing: { kind: 'ready', data } })
     } catch (error) {
       if (!signal.aborted)
         publish({
-          ...state,
+          ...store.value,
           listing: { kind: 'failed', message: connectionFailure(error).message },
         })
     }
@@ -63,23 +62,26 @@ export function createGitWorkbench(client: Client, rootPath: string) {
     const controller = new AbortController()
     diffRequest = controller
     const signal = AbortSignal.any([lifetime.signal, controller.signal])
-    publish({ ...state, diff: { kind: 'loading' } })
+    publish({ ...store.value, diff: { kind: 'loading' } })
     try {
       const files = await readDiffFiles(client, path, staged, signal)
-      if (!signal.aborted) publish({ ...state, diff: { kind: 'ready', files } })
+      if (!signal.aborted) publish({ ...store.value, diff: { kind: 'ready', files } })
     } catch (error) {
       if (!signal.aborted)
-        publish({ ...state, diff: { kind: 'failed', message: connectionFailure(error).message } })
+        publish({
+          ...store.value,
+          diff: { kind: 'failed', message: connectionFailure(error).message },
+        })
     }
   }
   async function mutate(action: () => Promise<unknown>, message: string | (() => string)) {
-    if (state.busy || lifetime.signal.aborted) return false
+    if (store.value.busy || lifetime.signal.aborted) return false
     diffRequest.abort()
-    publish({ ...state, busy: true, message: '', progress: '', diff: { kind: 'empty' } })
+    publish({ ...store.value, busy: true, message: '', progress: '', diff: { kind: 'empty' } })
     try {
       await action()
       publish({
-        ...state,
+        ...store.value,
         busy: false,
         message: typeof message === 'function' ? message() : message,
         diff: { kind: 'empty' },
@@ -87,7 +89,7 @@ export function createGitWorkbench(client: Client, rootPath: string) {
       await refresh()
       return true
     } catch (error) {
-      publish({ ...state, busy: false, message: connectionFailure(error).message })
+      publish({ ...store.value, busy: false, message: connectionFailure(error).message })
       await refresh()
       return false
     }
@@ -103,7 +105,7 @@ export function createGitWorkbench(client: Client, rootPath: string) {
       )
       const outcome = await readGitCommitStream(stream, (line) => {
         // 8000 chars is a display budget for the progress pane, not a transport limit.
-        publish({ ...state, progress: `${state.progress}${line.text}\n`.slice(-8000) })
+        publish({ ...store.value, progress: `${store.value.progress}${line.text}\n`.slice(-8000) })
       })
       if (outcome.kind === 'failed')
         throw createTuiError(
@@ -118,8 +120,8 @@ export function createGitWorkbench(client: Client, rootPath: string) {
     }, 'Committed staged changes.')
   }
   async function generateMessage() {
-    if (state.busy || lifetime.signal.aborted) return null
-    publish({ ...state, busy: true, message: '' })
+    if (store.value.busy || lifetime.signal.aborted) return null
+    publish({ ...store.value, busy: true, message: '' })
     try {
       const result = requireEdenData(
         await client.git['commit-message'].post(
@@ -127,10 +129,10 @@ export function createGitWorkbench(client: Client, rootPath: string) {
           { fetch: { signal: lifetime.signal } },
         ),
       )
-      publish({ ...state, busy: false })
+      publish({ ...store.value, busy: false })
       return result.message
     } catch (error) {
-      publish({ ...state, busy: false, message: connectionFailure(error).message })
+      publish({ ...store.value, busy: false, message: connectionFailure(error).message })
       return null
     }
   }
@@ -151,13 +153,8 @@ export function createGitWorkbench(client: Client, rootPath: string) {
     )
   }
   return {
-    subscribe(listener: () => void) {
-      listeners.add(listener)
-      return () => {
-        listeners.delete(listener)
-      }
-    },
-    getSnapshot: () => state,
+    subscribe: store.subscribe,
+    getSnapshot: store.getSnapshot,
     refresh,
     openDiff,
     commit,
@@ -197,7 +194,7 @@ export function createGitWorkbench(client: Client, rootPath: string) {
       lifetime.abort()
       statusRequest.abort()
       diffRequest.abort()
-      listeners.clear()
+      store.dispose()
     },
   }
 }

@@ -6,8 +6,8 @@ import { expect, test as it } from '@/keymap/../../test/fixtures'
 import { binding } from '@/keymap/../../test/factories/key-binding'
 import { chordStrokes } from '@workspace/client-core/commands/chord'
 
+import { activeBindings } from '@workspace/client-core/commands/bindings'
 import {
-  activePlatformKeyBindings,
   commandKeyBindings,
   keyBindingResolution,
   resolvedPlatformKeyBindings,
@@ -24,7 +24,7 @@ describe('activePlatformKeyBindings', () => {
       binding('Mod+P', { command: 'workspace.openFilePicker', pane: 'any' }),
     ]
 
-    expect(commands(activePlatformKeyBindings(bindings, 'editor'))).toEqual([
+    expect(commands(activeBindings(bindings, 'editor'))).toEqual([
       'workspace.focusEditor',
       'workspace.openFilePicker',
     ])
@@ -36,7 +36,7 @@ describe('activePlatformKeyBindings', () => {
       binding('Mod+P', { command: 'workspace.focusEditor', pane: 'editor' }),
     ]
 
-    expect(commands(activePlatformKeyBindings(bindings, 'editor'))).toEqual([
+    expect(commands(activeBindings(bindings, 'editor'))).toEqual([
       'workspace.focusEditor',
       'workspace.openFilePicker',
     ])
@@ -92,10 +92,8 @@ describe('resolvedPlatformKeyBindings', () => {
         pane: 'editor',
       }),
     )
-    expect(commands(activePlatformKeyBindings(resolved, 'global'))).toContain(
-      'workspace.showCommandPalette',
-    )
-    expect(commands(activePlatformKeyBindings(resolved, 'editor'))).toContain(
+    expect(commands(activeBindings(resolved, 'global'))).toContain('workspace.showCommandPalette')
+    expect(commands(activeBindings(resolved, 'editor'))).toContain(
       'editor.editor.action.peekDefinition',
     )
   })
@@ -739,7 +737,7 @@ it('keeps conditional alternatives in preset and pane order', () => {
   const global = binding('Escape', { command: 'workspace.showSettings', pane: 'any' })
   const resolved = keyBindingResolution([global, find, selection], {}, 'linux')
   expect(resolved.bindings).toEqual([global, find, selection])
-  expect(activePlatformKeyBindings(resolved.bindings, 'editor')).toEqual([find, selection, global])
+  expect(activeBindings(resolved.bindings, 'editor')).toEqual([find, selection, global])
   expect(resolved.report).toEqual([])
 })
 

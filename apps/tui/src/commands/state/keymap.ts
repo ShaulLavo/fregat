@@ -9,7 +9,8 @@ import { CHORD_TIMEOUT_MS, parsedChord } from '@workspace/client-core/commands/c
 
 import type { CommandBus } from '@/commands/state/bus'
 import type { FocusRegistry } from '@/commands/state/focus'
-import { activeTerminalBindings, type TerminalBinding } from '@/commands/utils/bindings'
+import { activeBindings } from '@workspace/client-core/commands/bindings'
+import { type TerminalBinding } from '@/commands/utils/bindings'
 import { terminalKeyboardEvent, type TerminalKeyEvent } from '@/commands/utils/keyboard'
 
 type Candidate = TerminalBinding & { readonly firesWhileTyping: boolean }
@@ -118,7 +119,7 @@ export function createKeymapSession(options: Options) {
 function makeTrie(bindings: readonly TerminalBinding[], focus: FocusRegistry) {
   const area = focus.getSnapshot().current?.area ?? 'global'
   return buildKeymapTrie(
-    activeTerminalBindings(bindings, area)
+    activeBindings(bindings, area)
       .filter((binding) => {
         if (area !== 'terminal' || binding.pane === 'terminal') return true
         return (

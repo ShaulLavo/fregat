@@ -1,3 +1,4 @@
+import { createObservableStore } from '@/host/state/observable-store'
 import { readFilePreview } from '@workspace/client-core/files/read'
 import type { SettingsSession } from '@/connection/state/session'
 import { connectionFailure } from '@/connection/utils/failure'
@@ -38,16 +39,12 @@ export function createViewerDocument({
   const drafts = createViewerDraftCache(sessionState.storage, rootPath, path)
   const lifetime = new AbortController()
   const signal = AbortSignal.any([lifetime.signal, session.signal])
-  const listeners = new Set<() => void>()
-  let state: ViewerDocument = { kind: 'loading' }
-  const publish = (next: ViewerDocument) => {
-    if (signal.aborted) return
-    state = next
-    for (const listener of listeners) listener()
-  }
+
+  const store = createObservableStore<ViewerDocument>({ kind: 'loading' }, { signal: signal })
+  const publish = store.replace
   async function load(discardDraft: boolean) {
-    if (state.kind === 'ready' && state.editing) return
-    const previousDraft = state.kind === 'ready' ? state.draft : null
+    if (store.value.kind === 'ready' && store.value.editing) return
+    const previousDraft = store.value.kind === 'ready' ? store.value.draft : null
     publish({ kind: 'loading' })
     try {
       if (discardDraft) await drafts.remove(previousDraft)
@@ -67,8 +64,8 @@ export function createViewerDocument({
     }
   }
   async function edit() {
-    if (state.kind !== 'ready' || state.editing || signal.aborted) return
-    const snapshot = state
+    if (store.value.kind !== 'ready' || store.value.editing || signal.aborted) return
+    const snapshot = store.value
     publish({ ...snapshot, editing: true, error: null })
     let draft = snapshot.draft
     try {
@@ -132,16 +129,11 @@ export function createViewerDocument({
     open: () => load(false),
     reload: () => load(true),
     edit,
-    getSnapshot: () => state,
-    subscribe: (listener: () => void) => {
-      listeners.add(listener)
-      return () => {
-        listeners.delete(listener)
-      }
-    },
+    getSnapshot: store.getSnapshot,
+    subscribe: store.subscribe,
     dispose() {
       lifetime.abort()
-      listeners.clear()
+      store.dispose()
     },
   }
 }

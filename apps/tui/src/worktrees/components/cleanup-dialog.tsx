@@ -6,7 +6,10 @@ import { Select } from '@/components/select'
 import { Spinner } from '@/components/spinner'
 import type { Theme } from '@/theme/utils/theme'
 import { WorktreeDescription } from '@/worktrees/components/description'
-import { cleanupConfirmationText, type CleanupConfirmation } from '@/worktrees/utils/confirmation'
+import {
+  cleanupConfirmationText,
+  type CleanupConfirmation,
+} from '@workspace/client-core/chat/worktrees/confirmation'
 
 export function WorktreeCleanupDialog({
   confirmation,

@@ -1,3 +1,4 @@
+import { chatActivityHasFailure } from '@workspace/client-core/chat/activity-visibility'
 import { planStepStatus } from '@workspace/contracts'
 import { compactActivityLabel } from '@/features/chat/utils/activity-label'
 import type { OrchestrationSessionActivity } from '@workspace/contracts'
@@ -489,21 +490,6 @@ function activityOutput(data: Record<string, unknown>) {
 
 function joinedOutput(data: Record<string, unknown>) {
   return [stringValue(data.stdout), stringValue(data.stderr)].filter(Boolean).join('\n') || null
-}
-
-export function chatActivityHasFailure(activity: OrchestrationSessionActivity) {
-  const payload = recordPayload(activity.payload)
-  const status = recordPayload(payload.status)
-  if (activity.tone === 'error') return true
-  if (payload.success === false || payload.status === 'failed' || status.status === 'failed')
-    return true
-
-  return Boolean(
-    stringValue(payload.error) ??
-    stringValue(payload.failureReason) ??
-    stringValue(recordPayload(payload.error).message) ??
-    firstStringValue(status, ['error', 'failureReason']),
-  )
 }
 
 function toolResultText(content: unknown) {
