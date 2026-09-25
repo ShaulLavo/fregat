@@ -445,20 +445,15 @@ Suggested order (steps 1–3 done 2026-09-23; step 4 is next):
 
 The owner decided Plan 132 D4 on 2026-09-21: the server's migrations are deleted and the schema
 starts from scratch (Plan 132 Phase 4). External-change
-and dirty-buffer safety from Plan 133 D1 are now owned by Plan 134 below. No lane is reordered
+and dirty-buffer safety from Plan 133 D1 were verified and closed by Plan 134. No lane is reordered
 by this one.
 
 ## External edits and language-server freshness
 
-[Plan 134](plans/134-external-edit-and-lsp-freshness.md) owns the investigation and repair of
-external file synchronization, language-server filesystem watches, and recovery after event gaps.
-It starts from measured failures in native TypeScript dependency refresh and symlinked-file updates.
-Run its reproduction and tracing phase first, then document synchronization, backend watcher support,
-and reconnect recovery, followed by verification against the running deployment.
-
-Plan 134 also owns the dirty-buffer safety verification raised by Plan 133 D1. Reconcile the audit
-with the existing conflict implementation before adding any new conflict machinery. Coordinate
-backend lifetime changes with Plan 132. This work is independent of the AI diagnostic action plan.
+Plan 134 is done (2026-09-25): external edits, linked packages, configuration, installs and branch
+switches reach open documents and language servers; streams and language servers recover from gaps;
+diagnostics say how fresh they are. What was found and decided is in
+[the findings](docs/external-edit-lsp-findings.md).
 
 ## Agent workbench lane
 

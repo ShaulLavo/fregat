@@ -137,3 +137,33 @@ test('reopens both streams after they end and delivers later edits', async ({ se
     streams.close()
   }
 })
+
+test('replaces a stream whose watcher failed, since events may have been lost', async ({
+  server,
+}) => {
+  await mkdir(path.join(server.root, 'project'))
+  const { client, injectWatchError } = createCuttableEventsClient(server)
+  const messages: WatchServerMessage[] = []
+  const interruptions: StreamInterruption[] = []
+  const streams = startWorkspaceEventStreams({
+    client,
+    rootPath: 'project',
+    onMessage: (message) => messages.push(message),
+    onFilesReady: () => undefined,
+    onError: (error) => {
+      throw error
+    },
+    onInterrupted: (interruption) => interruptions.push(interruption),
+  })
+  try {
+    await expect.poll(() => messages.filter((message) => message.type === 'ready')).toHaveLength(1)
+
+    injectWatchError()
+
+    await expect.poll(() => messages.map((message) => message.type)).toContain('error')
+    await expect.poll(() => interruptions.map(({ scope }) => scope)).toContain('project')
+    await expect.poll(() => messages.filter((message) => message.type === 'ready')).toHaveLength(2)
+  } finally {
+    streams.close()
+  }
+})

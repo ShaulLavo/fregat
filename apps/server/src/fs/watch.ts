@@ -329,9 +329,7 @@ export class FileChangeHub {
       let type = classify(entry)
       if (!type) return
       if (type === 'deleted' && marker && entry?.version === marker.version) type = 'changed'
-      this.emit(
-        nativeWatchEvent(type, relativePath, isIgnoredPath(relativePath) ? undefined : entry),
-      )
+      this.emit(nativeWatchEvent(type, relativePath, entry))
       return
     }
   }

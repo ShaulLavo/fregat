@@ -86,6 +86,34 @@ describe('LspSessionPool pooling', () => {
     })
   })
 
+  it('replays the newest result when a dependency changed and the text did not', async () => {
+    const fixture = await initializedFixture()
+    const uri = 'file:///repo/a.ts'
+    await fixture.first.handleClientMessage(json(didOpen(uri, 'import { v } from "./dep"', 40)))
+    const publish = (message: string) =>
+      fixture.respond({
+        jsonrpc: '2.0',
+        method: 'textDocument/publishDiagnostics',
+        params: { uri, version: 40, diagnostics: [{ message, severity: 1 }] },
+      })
+    publish('Before the dependency changed')
+    publish('After the dependency changed')
+    fixture.secondSocket.sent.length = 0
+    await fixture.second.handleClientMessage(json(initializeRequest(2)))
+    await fixture.second.handleClientMessage(json(didOpen(uri, 'import { v } from "./dep"', 0)))
+
+    const published = () =>
+      fixture.secondSocket.sent
+        .filter((message) => message.method === 'textDocument/publishDiagnostics')
+        .map((message) => (message.params as { diagnostics: { message: string }[] }).diagnostics)
+    expect(published()).toEqual([[{ message: 'After the dependency changed', severity: 1 }]])
+
+    // A publication that lands after the join reaches the joined browser like any other.
+    publish('Later still')
+    await waitFor(() => published().length === 2, 'the late publication was not forwarded')
+    expect(published().at(-1)).toEqual([{ message: 'Later still', severity: 1 }])
+  })
+
   it.each(['change', 'open', 'close', 'old-version'])(
     'does not replay diagnostics after %s invalidates their document',
     async (invalidation) => {
@@ -1411,6 +1439,10 @@ describe('LspSessionPool watched files', () => {
     await expect
       .poll(() => fixture.watchedChanges(), { timeout: 3000 })
       .toEqual([{ uri: fileUriForPath(source), type: 2 }])
+
+    // Watches belong to the backend: another browser joining it adds none.
+    await fixture.second.handleClientMessage(json(initializeRequest(2)))
+    expect(fixture.hub().info().nativeWatcherCount).toBe(1)
   })
 
   it('reports a registration it cannot honour instead of acknowledging it', async () => {

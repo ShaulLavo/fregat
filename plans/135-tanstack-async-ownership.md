@@ -44,7 +44,7 @@ Overlap to reconcile, without reimplementing those plans:
   preparation; it does not replace that coordinator or its store.
 - Plan 094 owns web/TUI parity. Pagination query definitions belong in client-core and
   must serve both consumers rather than growing another web-only implementation.
-- Plan 134 owns file freshness and conflict handling. Do not introduce speculative file
+- File freshness and conflict handling are settled (Plan 134, done). Do not introduce speculative file
   reads around its admission rules as part of this plan.
 
 `PLAN.md` remains authoritative for cross-project scheduling. This plan is an unscheduled

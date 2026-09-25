@@ -59,7 +59,7 @@ export type WatchedFilesStats = {
 export class LspWatchedFiles {
   private readonly registrations = new Map<string, readonly Watcher[]>()
   private readonly watches = new Map<string, WatchEntry>()
-  private readonly pending = new Map<string, FileChangeType>()
+  private readonly pending = new Map<string, PendingChange>()
   private links: readonly LinkedDirectory[] = []
   private linkScan: Promise<readonly LinkedDirectory[]> | null = null
   private readonly root: string
@@ -232,7 +232,11 @@ export class LspWatchedFiles {
     for (const candidate of this.aliases(change)) {
       if (!this.matches(candidate)) continue
       const uri = fileUriForPath(candidate.path)
-      this.pending.set(uri, mergeChange(this.pending.get(uri), changeType(candidate.type)))
+      const previous = this.pending.get(uri)
+      this.pending.set(uri, {
+        type: mergeChange(previous?.type, changeType(candidate.type)),
+        directory: candidate.directory ?? previous?.directory ?? false,
+      })
       this.flushTimer ??= setTimeout(() => this.flush(), FLUSH_DELAY_MS)
     }
   }
@@ -261,7 +265,7 @@ export class LspWatchedFiles {
   private flush(): void {
     this.flushTimer = null
     if (this.disposed || this.pending.size === 0) return
-    const changes = [...this.pending].flatMap(([uri, type]) => fileEvents(uri, type))
+    const changes = [...this.pending].flatMap(([uri, change]) => fileEvents(uri, change))
     this.pending.clear()
     this.notificationCount += 1
     this.changeCount += changes.length
@@ -367,13 +371,15 @@ function isSameOrInside(ancestor: string, target: string) {
   return !isOutsideRoot(path.relative(ancestor, target))
 }
 
+type PendingChange = { readonly type: FileChangeType; readonly directory: boolean }
+
 /**
  * A rename onto an existing path reports `created`, and typescript-go 7.0.2 ignores Created for a
  * file it already has, keeping the old text. A preceding Deleted is true of a replacement and
- * harmless for a new file.
+ * harmless for a new file — but not for a directory, which 7.0.2 then treats as gone.
  */
-function fileEvents(uri: string, type: FileChangeType): FileEvent[] {
-  if (type !== CREATED) return [{ uri, type }]
+function fileEvents(uri: string, { type, directory }: PendingChange): FileEvent[] {
+  if (type !== CREATED || directory) return [{ uri, type }]
   return [
     { uri, type: DELETED },
     { uri, type: CREATED },

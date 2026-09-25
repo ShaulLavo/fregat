@@ -191,6 +191,95 @@ describe('workspace TypeScript against real language servers', () => {
     },
   )
 
+  it.each(RUNTIMES)(
+    'rechecks the project when its configuration changes with $packageName',
+    async ({ packageName, native }) => {
+      // An implicit any is an error only under `noImplicitAny`; unused locals stay suggestions.
+      const config = (noImplicitAny: boolean) =>
+        `{"compilerOptions":{"noImplicitAny":${noImplicitAny}},"files":["probe.ts"]}\n`
+      const probe = await openProbe(
+        packageName,
+        { 'tsconfig.json': config(false) },
+        'export function f(x) {\n  return x\n}\n',
+      )
+      await expectCodes(probe, native, [])
+
+      await writeFile(path.join(probe.root, 'tsconfig.json'), config(true))
+      await assertExternalDiagnostics(probe.session, probe.socket, native, probe.uri, 20, [7006])
+    },
+  )
+
+  it.each(RUNTIMES)(
+    'resolves a package once it is installed with $packageName',
+    async ({ packageName, native }) => {
+      const probe = await openProbe(
+        packageName,
+        {},
+        'import { fresh } from "fresh";\nexport const n: number = fresh;\n',
+      )
+      await expectCodes(probe, native, [2307])
+
+      // Bun's layout: the package lands in its store, then a link appears at the top level.
+      const store = path.join(probe.root, 'node_modules/.bun/fresh@1.0.0/node_modules/fresh')
+      await mkdir(store, { recursive: true })
+      await writeFile(
+        path.join(store, 'package.json'),
+        '{"name":"fresh","version":"1.0.0","types":"index.d.ts"}',
+      )
+      await writeFile(path.join(store, 'index.d.ts'), 'export declare const fresh: number\n')
+      await symlink(
+        '.bun/fresh@1.0.0/node_modules/fresh',
+        path.join(probe.root, 'node_modules/fresh'),
+      )
+      await assertExternalDiagnostics(probe.session, probe.socket, native, probe.uri, 20, [])
+    },
+  )
+
+  it.each(RUNTIMES)(
+    'follows a branch switch that rewrites a dependency with $packageName',
+    async ({ packageName, native }) => {
+      const probe = await openProbe(
+        packageName,
+        { 'dependency.ts': 'export const value = 1;\n' },
+        'import { value } from "./dependency";\nexport const count: number = value;\n',
+      )
+      await expectCodes(probe, native, [])
+      const git = (...args: string[]) => {
+        const result = Bun.spawnSync(['git', '-C', probe.root, ...args], { stderr: 'pipe' })
+        if (result.exitCode !== 0) throw createInternalError(result.stderr.toString())
+      }
+      git('init', '--quiet', '--initial-branch=main')
+      git('-c', 'user.name=t', '-c', 'user.email=t@example.invalid', 'add', 'dependency.ts')
+      git(
+        '-c',
+        'user.name=t',
+        '-c',
+        'user.email=t@example.invalid',
+        'commit',
+        '--quiet',
+        '-m',
+        'main',
+      )
+      git('checkout', '--quiet', '-b', 'other')
+      await writeFile(path.join(probe.root, 'dependency.ts'), 'export const value = "wrong";\n')
+      git(
+        '-c',
+        'user.name=t',
+        '-c',
+        'user.email=t@example.invalid',
+        'commit',
+        '--quiet',
+        '-am',
+        'other',
+      )
+      await assertExternalDiagnostics(probe.session, probe.socket, native, probe.uri, 20, [2322])
+
+      probe.socket.sent.length = 0
+      git('checkout', '--quiet', 'main')
+      await assertExternalDiagnostics(probe.session, probe.socket, native, probe.uri, 21, [])
+    },
+  )
+
   it.each(RUNTIMES)('serves editor features with $packageName', async ({ packageName, native }) => {
     const fixture = await installedTypeScriptRuntimeFixture(packageName, {
       'package.json': '{"private":true,"type":"module"}\n',
@@ -305,11 +394,8 @@ async function assertExternalDiagnostics(
   id: number,
   codes: readonly number[],
 ) {
-  const expected = codes.map((code) => expect.objectContaining({ code }))
   if (!native) {
-    await expect
-      .poll(() => socket.notification('textDocument/publishDiagnostics'), { timeout: 20_000 })
-      .toMatchObject({ uri, diagnostics: expected })
+    await expect.poll(() => publishedErrors(socket, uri), { timeout: 20_000 }).toEqual(codes)
     return
   }
   await expect
@@ -321,7 +407,80 @@ async function assertExternalDiagnostics(
     identifier: 'typescript',
     textDocument: { uri },
   })
-  expect(result).toMatchObject({ kind: 'full', items: expected })
+  expect(errorCodes(result, 'items')).toEqual(codes)
+}
+
+/** Error codes only: TypeScript also reports suggestions, such as an unused local, as hints. */
+function errorCodes(container: unknown, field: 'items' | 'diagnostics') {
+  const list = isRecord(container) && Array.isArray(container[field]) ? container[field] : []
+  return list.flatMap((item: unknown) => (isRecord(item) && item.severity === 1 ? [item.code] : []))
+}
+
+function publishedErrors(socket: RecordingSocket, uri: string) {
+  const params = socket.sent.findLast(
+    (message) =>
+      message.method === 'textDocument/publishDiagnostics' &&
+      isRecord(message.params) &&
+      message.params.uri === uri,
+  )?.params
+  return params === undefined ? null : errorCodes(params, 'diagnostics')
+}
+
+type Probe = {
+  readonly root: string
+  readonly session: LspProxyClientSession
+  readonly socket: RecordingSocket
+  readonly uri: string
+}
+
+async function openProbe(
+  packageName: string,
+  files: Readonly<Record<string, string>>,
+  source: string,
+): Promise<Probe> {
+  const fixture = await installedTypeScriptRuntimeFixture(packageName, {
+    'package.json': '{"private":true,"type":"module"}\n',
+    'tsconfig.json': '{"compilerOptions":{"strict":true},"files":["probe.ts"]}\n',
+    ...files,
+    'probe.ts': source,
+  })
+  fixtures.push(fixture)
+  const { root } = fixture
+  const filePath = path.join(root, 'probe.ts')
+  const uri = fileUriForPath(filePath)
+  const match = await resolveLspServer({
+    filePath,
+    serverId: 'typescript',
+    settings: SETTINGS,
+    workspaceRoot: root,
+  })
+  if (!match) throw createInternalError('TypeScript fixture did not match its language server')
+  const socket = new RecordingSocket()
+  const session = await watchedPool().acquire(socket, match, root)
+  if (!session) throw createInternalError('TypeScript fixture did not start its language server')
+  await request(session, socket, 1, 'initialize', initializeParams(root))
+  await notify(session, 'initialized', {})
+  await notify(session, 'textDocument/didOpen', {
+    textDocument: { languageId: 'typescript', text: source, uri, version: 1 },
+  })
+  return { root, session, socket, uri }
+}
+
+/** The state the server settles on first; there is no refresh to wait for yet. */
+async function expectCodes(probe: Probe, native: boolean, codes: readonly number[]) {
+  if (!native) {
+    await expect
+      .poll(() => publishedErrors(probe.socket, probe.uri), { timeout: 20_000 })
+      .toEqual(codes)
+    probe.socket.sent.length = 0
+    return
+  }
+  const result = await request(probe.session, probe.socket, 2, 'textDocument/diagnostic', {
+    identifier: 'typescript',
+    textDocument: { uri: probe.uri },
+  })
+  expect(errorCodes(result, 'items')).toEqual(codes)
+  probe.socket.sent.length = 0
 }
 
 async function linkedPackage(name: string, type: string) {

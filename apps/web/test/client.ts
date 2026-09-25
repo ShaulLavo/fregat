@@ -38,10 +38,14 @@ export function createObservedInProcessClient(
   return createClient(server, fetcher)
 }
 
-/** Ends every open `/fs/events` response on demand, as a server restart or dropped link would. */
+/**
+ * Ends every open `/fs/events` response on demand, as a server restart or dropped link would, or
+ * sends each one the error a failed native watch reports.
+ */
 export function createCuttableEventsClient(server: TestServer) {
   const directFetch = directInProcessFetcher(server)
   const open = new Set<() => void>()
+  const injectors = new Set<(chunk: Uint8Array) => void>()
   const fetcher = (async (input, init) => {
     const request = new Request(input, init)
     const response = await directFetch(request)
@@ -50,12 +54,15 @@ export function createCuttableEventsClient(server: TestServer) {
     let end = () => {}
     const body = new ReadableStream<Uint8Array>({
       start(controller) {
+        const inject = (chunk: Uint8Array) => controller.enqueue(chunk)
         end = () => {
           open.delete(end)
+          injectors.delete(inject)
           void reader.cancel()
           controller.close()
         }
         open.add(end)
+        injectors.add(inject)
       },
       async pull(controller) {
         const { done, value } = await reader.read()
@@ -76,6 +83,11 @@ export function createCuttableEventsClient(server: TestServer) {
     endEventStreams: () => {
       // Each end removes itself; deleting the current entry keeps a Set iteration valid.
       for (const end of open) end()
+    },
+    injectWatchError: () => {
+      const data = JSON.stringify({ type: 'error', code: 'WATCH_FAILED', message: 'watch failed' })
+      const chunk = new TextEncoder().encode(`event: error\ndata: ${data}\n\n`)
+      for (const inject of injectors) inject(chunk)
     },
   }
 }

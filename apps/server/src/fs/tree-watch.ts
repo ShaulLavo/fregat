@@ -13,6 +13,8 @@ export type TreeWatchChange = {
   /** Absolute path. */
   readonly path: string
   readonly type: 'created' | 'changed' | 'deleted'
+  /** Known for entries that exist; a deleted path's kind is gone with it. */
+  readonly directory?: boolean
 }
 
 export type TreeWatchCallbacks = {
@@ -67,6 +69,14 @@ function deliver(event: WatchServerMessage, paths: WorkspacePaths, callbacks: Tr
     callbacks.change({ path: paths.resolve(event.path).absolutePath, type: 'created' })
     return
   }
-  if (event.type !== 'created' && event.type !== 'changed' && event.type !== 'deleted') return
-  callbacks.change({ path: paths.resolve(event.path).absolutePath, type: event.type })
+  if (event.type === 'deleted') {
+    callbacks.change({ path: paths.resolve(event.path).absolutePath, type: event.type })
+    return
+  }
+  if (event.type !== 'created' && event.type !== 'changed') return
+  callbacks.change({
+    path: paths.resolve(event.path).absolutePath,
+    type: event.type,
+    directory: event.entry?.type === 'directory' || event.entry?.targetType === 'directory',
+  })
 }

@@ -90,6 +90,18 @@ describe.runIf(process.platform === 'linux')('watched files on a real hub', () =
       ])
   })
 
+  it('reports a new directory as created only: a delete first would read as gone', async () => {
+    const { changes, root, watched } = await fixture()
+    await watched.register('all', { watchers: [{ globPattern: `${root}/**/*` }] })
+
+    await mkdir(path.join(root, 'package'))
+
+    const uri = fileUriForPath(path.join(root, 'package'))
+    await expect
+      .poll(() => changes.filter((change) => change.uri === uri), { timeout: 3000 })
+      .toEqual([{ uri, type: 1 }])
+  })
+
   it('sees packages arrive in node_modules without crawling them', async () => {
     const { changes, hub, root, watched } = await fixture()
     await mkdir(path.join(root, 'node_modules/existing'), { recursive: true })

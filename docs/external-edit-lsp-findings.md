@@ -30,6 +30,33 @@ The ordinary-file check passed, but two broader checks failed. The diagnostic re
 
 The native TypeScript source describes a built-in watcher fallback only for certain platforms when client watcher registration is unavailable. See [TypeScript's LSP server](https://github.com/microsoft/typescript-go/blob/main/internal/lsp/server.go). The behavioral failure above was measured against the installed version, rather than inferred from upstream source.
 
-Follow-up on 2026-09-24 (Plan 134): the symlink failure was the files stream waiting on the project watcher behind parcel's serialized crawls, and TypeScript 7 needed client file watching. Both are fixed; the plan's Progress section has the causes and what remains.
+Resolved by Plan 134 (2026-09-24 and 25); see [Resolution](#resolution).
 
 The immediate concern is therefore broader than Platform opening its own repository. Ordinary external editing works in the tested case, while linked paths and native TypeScript dependency refresh still need work.
+
+## Resolution
+
+Plan 134 closed this on 2026-09-25. What each failure turned out to be, and what now holds:
+
+| Failure                                     | Cause                                                                                                                                                                                                                               | Now                                                                                                                                                           |
+| ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Symlinked open file kept its old text       | The open-file stream waited for the project watcher, and parcel ran every subscribe behind any crawl in the process (8–22 s with three roots open). Parcel also dropped writes in new, moved-in, renamed and recreated directories. | Open files have their own watches. Parcel is gone: Bun's recursive `fs.watch` attaches in 0.1–0.3 s and keeps all of those writes.                            |
+| TypeScript 7 never refreshed                | 7.0.2 has no watcher on Linux; the proxy acknowledged its watch registrations and did nothing.                                                                                                                                      | `apps/server/src/lsp/watched-files.ts` implements them at the pooled backend.                                                                                 |
+| Linked declarations went stale              | 7.0.2 names the common ancestor of files outside the project and, after a rebuild deletes them, waits for them through the link in `node_modules`.                                                                                  | The registry watches the real targets of directories linked into the project and reports a change at both the real path and the link.                         |
+| Edits made during a gap were lost           | Event streams never reopened, and a read that an event asked for could fail offline.                                                                                                                                                | Streams reopen with backoff; every new stream and every return online resyncs open files (a dirty one only conflicts if its disk version moved) and the tree. |
+| A dead language server stayed dead          | The browser retired the connection on the first loss.                                                                                                                                                                               | `@singapore-editor/lsp-plugin` reconnects with `reconnect.delaysMs`; the "stopped" toast appears only when that gives up.                                     |
+| An empty Problems panel could mean anything | A cleared or pending result looked like a clean one.                                                                                                                                                                                | Every diagnostic summary carries `freshness`.                                                                                                                 |
+
+Decisions that hold the design together:
+
+- Watches are bounded, not literal. A `node_modules` base is watched one level deep, as VS Code's default exclude does. An ancestor of the project is clamped to the project plus its linked targets, never the whole drive.
+- A rename over an existing file arrives as `created`, and 7.0.2 ignores Created for a file it already has. Files are sent as Deleted then Created. Directories are sent as Created only: after a Deleted, 7.0.2 treats a directory as gone.
+- Registration replies wait until the watch is attached. Registrations that cannot be honoured get an error reply, not an acknowledgement.
+
+Limits and traps found on the way:
+
+- 7.0.2 reports an unused local as a suggestion even under `noUnusedLocals`, so the lever for a configuration test is `noImplicitAny`.
+- Chromium's offline emulation does not drop a localhost SSE stream. The deployment is where a real drop happens.
+- `curl … | head -1` returns on the second event, not the first. It produced false readiness timings early on.
+
+Verification lives in `apps/server/src/lsp/tests/typescript-server.test.ts` (both runtimes: external edits, linked packages, configuration, installs, branch switches) and the scenarios `editor-external-edit`, `editor-external-diagnostics`, `editor-linked-package`, `editor-offline-resync` and `editor-lsp-server-exit`.

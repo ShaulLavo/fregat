@@ -100,3 +100,6 @@ export function clientCapabilitiesForServer(serverId: string): lsp.ClientCapabil
 export const LANGUAGE_SERVER_CLIENT_INFO = { name: '@singapore-editor/lsp' } as const
 
 export const LANGUAGE_SERVER_REQUEST_TIMEOUT_MS = 15_000
+
+/** Long enough to outlast a server restart; a server that keeps dying gets the toast instead. */
+export const LANGUAGE_SERVER_RECONNECT = { delaysMs: [500, 2_000, 5_000, 10_000] } as const

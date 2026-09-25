@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rename, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rename, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -196,6 +196,42 @@ describe.runIf(process.platform === 'linux')('native watch structure changes', (
       await expectWrite('renamed/deep/again.txt')
     } finally {
       abort.abort()
+      await hub.close()
+    }
+  })
+})
+
+describe.runIf(process.platform === 'linux')('native watch lifetime', () => {
+  it('returns to no watches after repeated opens and closes', async () => {
+    const base = await fixtureRoot()
+    const root = path.join(base, 'root')
+    await mkdir(path.join(root, 'src'), { recursive: true })
+    await mkdir(path.join(base, 'target'))
+    await symlink('../target', path.join(root, 'linked'))
+    await writeFile(path.join(root, 'src/a.ts'), 'a')
+    await writeFile(path.join(base, 'target/b.ts'), 'b')
+    const hub = new FileChangeHub(createWorkspacePaths(root), { enabled: true })
+    try {
+      for (let round = 0; round < 20; round += 1) {
+        const abort = new AbortController()
+        const project = collect(hub.stream(['src'], abort.signal))
+        const files = collect(
+          hub.stream(['src'], abort.signal, {
+            files: ['src/a.ts', 'linked/b.ts'],
+            onlyFiles: true,
+          }),
+        )
+        await expect.poll(() => project.length > 0 && files.length > 0).toBe(true)
+        abort.abort()
+      }
+      await expect
+        .poll(() => hub.info())
+        .toMatchObject({
+          nativeWatcherCount: 0,
+          openFileWatcherCount: 0,
+          shallowWatcherCount: 0,
+        })
+    } finally {
       await hub.close()
     }
   })
