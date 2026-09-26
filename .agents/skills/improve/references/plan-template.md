@@ -79,7 +79,7 @@ The facts the executor needs, inlined — never "as discussed" or "see audit":
 executor's environment. Skip the section otherwise.)
 
 - Skills the executor should invoke if available, and for what:
-  "use `vercel-react-best-practices` when writing the memoization in step 3".
+  "use `react-best-practices` when restructuring the render path in step 3".
 - Reference docs worth reading before starting, by path or URL.
 
 ## Scope
