@@ -19,7 +19,7 @@ describe('ChordRecorder', () => {
     render(<ChordRecorder conflictCount={0} id='k' onChange={onChange} value='' />)
 
     await userEvent.click(screen.getByRole('button'))
-    record({ key: 's', metaKey: true, shiftKey: true })
+    record({ key: 's', ctrlKey: true, shiftKey: true })
 
     // Recorded modifiers remain portable across keyboards.
     expect(onChange).toHaveBeenCalledWith(expect.stringContaining('Mod'))
