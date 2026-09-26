@@ -1,3 +1,4 @@
+import { deferredDialogs } from './deferred-dialogs'
 import { textFieldFkeys } from './text-field-fkeys'
 import { settingsRoutePreparation } from './settings-route-preparation'
 import { settingsModuleFailure } from './settings-module-failure'
@@ -518,6 +519,7 @@ export const scenarios: readonly Scenario[] = [
   settingsRoutePreparation,
   textFieldFkeys,
   settingsModuleFailure,
+  deferredDialogs,
   projectMenu,
   workspaceSwitch,
   serverRestart,
