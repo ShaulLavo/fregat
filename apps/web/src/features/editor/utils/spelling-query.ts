@@ -4,7 +4,7 @@ import { editorQueryKeys } from '@/features/editor/utils/query-keys'
 
 const SUGGESTION_LIMIT = 5
 
-/** Suggestions depend on the word alone, so a second right-click on it answers from the cache. */
+/** Cached by word; the editor runtime invalidates suggestions when its accepted dictionary changes. */
 export function spellingSuggestionsQueryOptions(
   spelling: EditorSpellcheckFeature | null,
   issue: SpellIssue | null,

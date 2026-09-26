@@ -1,4 +1,5 @@
 import { SpellcheckService } from '@singapore-editor/spellcheck'
+import { editorQueryKeys } from '@/features/editor/utils/query-keys'
 import { LanguageServerDocuments } from '@/features/editor/state/language-server-documents'
 import { openLanguageServerBuffers } from '@/features/editor/utils/open-language-server-buffers'
 import { activeEditorTabForWorkbenchPanels } from '@/features/workbench/utils/panels'
@@ -106,6 +107,12 @@ export function createEditorRuntime({
   const languageServerDocuments = new LanguageServerDocuments()
   // One dictionary worker for every editor on the page; it starts on the first word checked.
   const spellcheck = new SpellcheckService()
+  spellcheck.onDidChangeAcceptedWords(() => {
+    const filters = { queryKey: editorQueryKeys.allSpellingSuggestions }
+    // Cancel first so an old dictionary reply cannot repopulate the invalidated cache.
+    void queryClient.cancelQueries(filters)
+    void queryClient.invalidateQueries(filters)
+  })
   const retainLanguageServers = () =>
     languageServerDocuments.retain(
       openLanguageServerBuffers(workspaceStore.getState(), documentStore.getState()),
