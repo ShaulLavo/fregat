@@ -93,7 +93,10 @@ Platform's `features/editor/**`.
 1. 182 P1: grammar signature computed once (774 MB serialised per scroll today).
 2. 170 Editor fix (owner: first): sessions send their grammar once, edits send none, worker dedupes.
 3. 179 P1: occurrence-highlight `<style>` churn.
-4. 176 P0: table cells parsed, the 255-paragraph cap gone, injection child-node rule, long-doc scenario.
+4. 176 P0 (now M): table cells parsed, the 255-paragraph cap gone, injection child-node rule, and
+   the worker fixes from the calibration: re-find paragraphs only where the edit reaches (today 12 ms
+   per keystroke at 46 KB, 34–77 ms at 1 MB), stop reads at each range end, one idle reparse after a
+   full parse; long-doc scenario. Branch `research/176b` holds the measurements.
 5. 122 P1–P2: E027 lifecycle ownership; per-event dispatch (quadratic loop, double pass).
 6. E057: delete the SAB transport.
 7. 122 P3–P5: `createPlugin` (one public API, owner), E026 commands, E028 modal (keys split by
