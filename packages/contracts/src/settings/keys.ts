@@ -1120,6 +1120,29 @@ export const SETTINGS_REGISTRY = {
     requiresRestart: true,
     keywords: ['window', 'transparency', 'vibrancy', 'compositor', 'desktop', 'wallpaper', 'blur'],
   }),
+  'prefetch.enabled': defineSetting({
+    schema: v.boolean(),
+    default: true,
+    scope: 'application',
+    widget: 'boolean',
+    category: 'Prefetch',
+    title: 'Prefetch on intent',
+    description:
+      'Start loading what a press will open while the pointer heads for it or a key moves to it, so it paints at once. Folder listings follow this switch; each other surface has its own switch under it.',
+    keywords: ['prefetch', 'preload', 'hover', 'intent', 'speed', 'latency'],
+  }),
+  'prefetch.files': defineSetting({
+    schema: v.boolean(),
+    default: true,
+    scope: 'application',
+    widget: 'boolean',
+    category: 'Prefetch',
+    dependsOn: 'prefetch.enabled',
+    title: 'Prefetch files',
+    description:
+      'Read a file and colour its syntax while the pointer heads for its tree row, tab or definition link.',
+    keywords: ['prefetch', 'preload', 'files', 'tree', 'tabs', 'hover', 'syntax'],
+  }),
   'files.autoSave': defineSetting({
     schema: v.picklist(['off', 'afterDelay', 'onFocusChange', 'onWindowChange'] as const),
     default: 'off',
@@ -1137,6 +1160,31 @@ export const SETTINGS_REGISTRY = {
     category: 'Files',
     description: 'Milliseconds of quiet before an automatic save, when saving after a delay.',
     keywords: ['autosave', 'delay', 'debounce', 'files'],
+  }),
+  'files.picker.pinnedLocations': defineSetting({
+    schema: v.array(v.string()),
+    default: [],
+    // Machine scope: the paths name folders on the machine being browsed.
+    scope: 'machine',
+    widget: 'list',
+    visibility: 'internal',
+    category: 'Files',
+    title: 'Pinned picker locations',
+    description:
+      'Folders pinned to the top of the file picker sidebar on this machine, as paths from the browsable root.',
+    keywords: ['files', 'folders', 'picker', 'pin', 'favorites', 'sidebar', 'places'],
+  }),
+  'files.picker.hiddenLocations': defineSetting({
+    schema: v.array(v.string()),
+    default: [],
+    scope: 'machine',
+    widget: 'list',
+    visibility: 'internal',
+    category: 'Files',
+    title: 'Removed picker locations',
+    description:
+      'Places, project folders and drives removed from the file picker sidebar on this machine, as paths from the browsable root.',
+    keywords: ['files', 'folders', 'picker', 'hide', 'remove', 'sidebar', 'places'],
   }),
   'files.picker.view': defineSetting({
     schema: v.picklist(['auto', 'columns', 'list', 'icons'] as const),

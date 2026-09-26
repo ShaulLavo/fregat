@@ -1,6 +1,6 @@
 import type { AgentDiagnosticsSource } from '../../../lsp/agent-diagnostics'
 import { BackgroundTaskRegistry } from '../../background-liveness'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterAll, assert, beforeAll, describe, expect, it, vi } from 'vitest'
@@ -1075,6 +1075,42 @@ describe('ClaudeProviderAdapter', () => {
     await harness.adapter.stopAll()
   })
 
+  it('keeps unapproved project MCP servers off, and restarts the idle session on approval', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'platform-claude-project-mcp-'))
+    const cwd = path.join(root, 'repo')
+    const approvalsFile = path.join(root, 'state', 'approvals.json')
+    await mkdir(cwd, { recursive: true })
+    await writeFile(
+      path.join(cwd, '.mcp.json'),
+      JSON.stringify({ mcpServers: { deploy: { command: 'deploy-server' } } }),
+    )
+    const harness = claudeHarness(true, undefined, undefined, approvalsFile)
+    const input = { ...sessionStartInput({}), cwd }
+    try {
+      await harness.adapter.startRuntime(input)
+      expect(latestOptions(harness).settings).toMatchObject({ disabledMcpjsonServers: ['deploy'] })
+      expect(await harness.adapter.mcpServers({ sessionId: input.sessionId })).toContainEqual({
+        error: null,
+        name: 'deploy',
+        status: 'unapproved',
+      })
+
+      await harness.adapter.approveMcpServer({ name: 'deploy', sessionId: input.sessionId })
+
+      expect(harness.queries).toHaveLength(2)
+      expect(latestOptions(harness).settings).toBeUndefined()
+      expect(Object.values(JSON.parse(await readFile(approvalsFile, 'utf8')).approved)).toEqual([
+        'deploy',
+      ])
+      await expect(
+        harness.adapter.approveMcpServer({ name: 'deploy', sessionId: input.sessionId }),
+      ).rejects.toMatchObject({ code: 'provider.MCP_SERVER_NOT_AWAITING_APPROVAL' })
+    } finally {
+      await harness.adapter.stopAll()
+      await rm(root, { force: true, recursive: true })
+    }
+  })
+
   it('rejects a second turn while one is still in flight', async () => {
     const harness = claudeHarness()
     const input = providerTurnInput()
@@ -1490,6 +1526,7 @@ function claudeHarness(
   acknowledgeStop = true,
   historyRunner?: ClaudeHistoryRunner,
   agentDiagnostics?: AgentDiagnosticsSource,
+  projectMcpApprovalsFile?: string,
 ): ClaudeHarness {
   const events: ProviderRuntimeEvent[] = []
   const options: Options[] = []
@@ -1499,6 +1536,7 @@ function claudeHarness(
 
   const adapter = new ClaudeProviderAdapter({
     ...(agentDiagnostics ? { agentDiagnostics } : {}),
+    ...(projectMcpApprovalsFile ? { projectMcpApprovalsFile } : {}),
     historyRunner,
     attachmentsDir,
     auth: signedInClaudeAuth(),

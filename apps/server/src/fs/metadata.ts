@@ -153,6 +153,28 @@ export class FsMetadataStore {
       .all()
   }
 
+  /** Folders picked most recently first; the parents of these are where projects live. */
+  listPickedDirectories(limit: number) {
+    return this.db
+      .select({ path: fsMetadata.path })
+      .from(fsMetadata)
+      .where(and(eq(fsMetadata.entryType, 'directory'), isNotNull(fsMetadata.lastPickedAt)))
+      .orderBy(desc(fsMetadata.lastPickedAt))
+      .limit(limit)
+      .all()
+      .map((row) => row.path)
+  }
+
+  /** Every folder ever opened as a workspace on this filesystem, as canonical absolute paths. */
+  listWorkspaceAddressPaths(filesystemRoot: string) {
+    return this.db
+      .select({ path: workspaceAddresses.canonicalPath })
+      .from(workspaceAddresses)
+      .where(eq(workspaceAddresses.filesystemRoot, filesystemRoot))
+      .all()
+      .map((row) => row.path)
+  }
+
   close() {
     this.ownedHandle?.close()
   }

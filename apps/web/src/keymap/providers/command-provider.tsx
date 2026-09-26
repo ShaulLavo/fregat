@@ -1,3 +1,4 @@
+import { selectSettingsProject } from '@/lib/project-settings/state/selection'
 import { activeEditorTabForWorkbenchPanels } from '@/features/workbench/utils/panels'
 import { wallpaperLibraryOptions } from '@/lib/wallpapers/state/queries'
 import { selectSettingsSearch } from '@/features/settings/state/search-store'
@@ -291,6 +292,7 @@ export function CommandProvider({ children }: { readonly children: ReactNode }) 
       showCloneRepository: () =>
         setCloneParent(parentPath(workspace.getState().rootFolder?.path ?? '')),
       showMachines: () => {
+        selectSettingsProject(null)
         selectSettingsScope('user')
         void openWorkspaceSettings(focus, workspace, adaptersRef.current.editor, 'Machines')
           .completion
@@ -307,6 +309,7 @@ export function CommandProvider({ children }: { readonly children: ReactNode }) 
       },
       showSettings: (origin, search) => {
         if (search !== undefined) {
+          selectSettingsProject(null)
           selectSettingsSearch(search)
           selectSettingsView('form')
         }

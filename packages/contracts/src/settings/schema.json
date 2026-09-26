@@ -474,6 +474,22 @@
       "minimum": 100,
       "type": "integer"
     },
+    "files.picker.hiddenLocations": {
+      "default": [],
+      "description": "Places, project folders and drives removed from the file picker sidebar on this machine, as paths from the browsable root.",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "files.picker.pinnedLocations": {
+      "default": [],
+      "description": "Folders pinned to the top of the file picker sidebar on this machine, as paths from the browsable root.",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
     "files.picker.view": {
       "default": "auto",
       "description": "How the file picker shows a folder: columns, a list, or icons. Auto uses columns when choosing a folder and a list when choosing a file.",
@@ -906,6 +922,17 @@
         "type": "object"
       },
       "type": "array"
+    },
+    "prefetch.enabled": {
+      "default": true,
+      "description": "Start loading what a press will open while the pointer heads for it or a key moves to it, so it paints at once. Folder listings follow this switch; each other surface has its own switch under it.",
+      "type": "boolean"
+    },
+    "prefetch.files": {
+      "default": true,
+      "description": "Read a file and colour its syntax while the pointer heads for its tree row, tab or definition link.",
+      "markdownDescription": "Read a file and colour its syntax while the pointer heads for its tree row, tab or definition link.\n\nApplies while `prefetch.enabled` is on.",
+      "type": "boolean"
     },
     "providers.instances": {
       "default": [],

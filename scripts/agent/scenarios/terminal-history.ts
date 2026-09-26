@@ -3,6 +3,7 @@ import type { Page } from 'playwright'
 import { installCaptureSocketPrefix } from '../product-terminal'
 import { runPaletteCommand, selectors, waitForApp } from '../selectors'
 import type { Scenario } from './index'
+import { openWiredContextPage } from '../wired-context'
 
 type ObservedTerminal = {
   output: string
@@ -83,7 +84,7 @@ export const terminalHistory: Scenario = {
     const marker = `TERMINAL_${suffix}`
     const owners = new Map<string, URL>()
     const first = await isolate(page, prefix, owners)
-    let second: Page | undefined
+    let secondWindow: Awaited<ReturnType<typeof openWiredContextPage>> | undefined
     let cleanupComplete = false
     try {
       await page.reload()
@@ -101,7 +102,8 @@ export const terminalHistory: Scenario = {
         'Shell must output the marker',
       )
       await step('owned-terminal-output')
-      second = await page.context().newPage()
+      secondWindow = await openWiredContextPage(page)
+      const second = secondWindow.page
       const other = await isolate(second, prefix, owners)
       await second.goto(page.url())
       await showTerminal(second)
@@ -185,7 +187,7 @@ export const terminalHistory: Scenario = {
       strictEqual(first.at(-1)?.output.includes('RESTART_BEFORE_old'), false)
       await step('restart-replaces-process-and-preserves-viewers')
     } finally {
-      await second?.close()
+      await secondWindow?.close()
       await page.goto('about:blank')
       const results = []
       for (const url of owners.values()) {

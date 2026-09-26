@@ -66,6 +66,11 @@ function appendOperationMetadata(
     for (const ref of operation.order) appendUnique(affectedIds, modelRefKey(ref))
     return
   }
+  if (operation.kind === 'project.set') {
+    appendUnique(settingIds, operation.key)
+    appendUnique(affectedIds, operation.projectId)
+    return
+  }
 
   appendUnique(settingIds, 'providers.instances')
   appendUnique(affectedIds, operation.providerInstanceId)

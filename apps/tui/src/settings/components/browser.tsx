@@ -162,7 +162,8 @@ export function SettingsBrowser({
     return null
   }
   const editDisabled = (context: CommandContext) =>
-    settingsDisabled(context) ?? settingEditDisabledReason(selectedId, target, writable)
+    settingsDisabled(context) ??
+    settingEditDisabledReason(selectedId, target, writable, snapshot.values)
   useCommandHandlers({
     'settings.editRaw': {
       disabledReason: (context) =>
