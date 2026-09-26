@@ -474,6 +474,13 @@
       "enum": ["auto", "columns", "icons", "list"],
       "type": "string"
     },
+    "files.previewKilobytes": {
+      "default": 64,
+      "description": "Kilobytes of a text file the file picker and quick open read for their preview. A longer file shows its first part and says how much of it that is.",
+      "maximum": 1024,
+      "minimum": 4,
+      "type": "integer"
+    },
     "files.searchIndexIdleMinutes": {
       "default": 15,
       "description": "Minutes a folder keeps its file index after the last window showing it closes, so reopening it searches at full speed at once.",

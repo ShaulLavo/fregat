@@ -9,6 +9,7 @@ import { renderWithProviders } from '../../../../test/render'
 const actions = {
   jumpTo: () => undefined,
   navigateTo: () => undefined,
+  resizeColumn: () => undefined,
   revealEntry: () => undefined,
   selectEntry: () => undefined,
 }
@@ -63,7 +64,6 @@ function pickerList(
     <FilePickerSessionActionsContext value={actions}>
       <FileList
         entries={entries}
-        iconMode='default'
         isBusy={false}
         isSearching={false}
         loadState={loadState}

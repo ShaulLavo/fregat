@@ -9,8 +9,10 @@ import {
   statPath,
 } from '@/lib/file-server'
 import { createClientError } from '@workspace/client-core/errors'
-import { clientErrors } from '@/lib/structured-errors'
+import { clientErrors, createRpcError } from '@/lib/structured-errors'
 import type { Client } from '@/lib/client'
+import { clientLogContext } from '@/lib/environments/state/log-context'
+import { observeClientOperation } from '@/lib/client-logging'
 import { streamWorkspaceSearch } from '@workspace/client-core/files/search-client'
 
 import {
@@ -59,6 +61,26 @@ export async function loadDirectoryData(
 
 export function fetchServerInfo(signal: AbortSignal, client: Client) {
   return fetchSharedServerInfo(signal, client)
+}
+
+/** The home's Desktop, Documents and Downloads that exist on the machine being browsed. */
+export function fetchPlaces(signal: AbortSignal, client: Client) {
+  return observeClientOperation(
+    {
+      ...clientLogContext(client),
+      action: 'fs.places',
+      area: 'fs',
+      method: 'GET',
+      route: '/fs/places',
+      signal,
+    },
+    async () => {
+      const response = await client.fs.places.get({ fetch: { signal } })
+      if (response.error) throw createRpcError(response.error)
+      return response.data.places
+    },
+    (places) => ({ placeCount: places.length }),
+  )
 }
 
 export function fetchRecentEntries(

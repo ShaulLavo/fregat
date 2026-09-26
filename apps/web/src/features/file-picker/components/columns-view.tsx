@@ -7,7 +7,8 @@ import {
   selectInColumn,
   type ColumnTrail,
 } from '@/features/file-picker/utils/columns'
-import type { FilePickerIconMode, FilePickerMode } from '@/features/file-picker/utils/model'
+import type { FilePickerMode } from '@/features/file-picker/utils/model'
+import type { ColumnWidths } from '@/features/file-picker/utils/column-widths'
 
 /**
  * Finder's columns: the current folder, then one column per selected folder. Columns past the
@@ -15,8 +16,8 @@ import type { FilePickerIconMode, FilePickerMode } from '@/features/file-picker/
  */
 export function ColumnsView({
   accept,
+  columnWidths,
   currentPath,
-  iconMode,
   isBusy,
   mode,
   showHidden,
@@ -28,8 +29,8 @@ export function ColumnsView({
   onTrailChange,
 }: {
   accept?: readonly string[]
+  columnWidths: ColumnWidths
   currentPath: string
-  iconMode: FilePickerIconMode
   isBusy: boolean
   mode: FilePickerMode
   showHidden: boolean
@@ -104,7 +105,7 @@ export function ColumnsView({
           accept={accept}
           active={column === Math.min(activeColumn, folders.length - 1)}
           column={column}
-          iconMode={iconMode}
+          width={columnWidths.get(column) ?? null}
           isBusy={isBusy}
           key={path}
           mode={mode}
