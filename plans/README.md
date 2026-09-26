@@ -19,7 +19,7 @@ a bare root `bun run verify`.
 
 | Plan                                                                                    | State                                                                               |
 | --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| [191 — file picker, resizable and in the app's icons](191-file-picker-polish.md)        | **PROPOSED 2026-09-26 — OWNER DECISIONS D1–D6 OPEN**                                |
+| [191 — file picker, resizable and in the app's icons](191-file-picker-polish.md)        | **APPROVED 2026-09-26 — WAVE 2; ALL RECOMMENDATIONS TAKEN**                         |
 | [190 — faster CI](190-faster-ci.md)                                                     | **PROPOSED 2026-09-26 — READY; FIRST IN WAVE 2**                                    |
 | [189 — keep improving tree-sitter-md](189-tree-sitter-md-improvement.md)                | **PROPOSED 2026-09-26 — AFTER PLAN 176; OPEN ITEMS, THEN CORRECTNESS, SIZE, SPEED** |
 | [188 — server TypeScript only](188-server-typescript-only.md)                           | **DONE 2026-09-26 ON LANE L7 (#37); OWNER RULING; CLOSES 153**                      |

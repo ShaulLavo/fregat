@@ -2,7 +2,7 @@
 
 ## Status and authorization
 
-- Status: PROPOSED 2026-09-26. Nothing here authorizes implementation until the owner answers D1–D6.
+- Status: APPROVED 2026-09-26. The owner took every recommendation in D1–D6; part of wave 2.
 - Planned at: Platform `531d78a9e`, 2026-09-26. Follows Plan 159 (columns, previews, icons grid), done and deleted in
   `712270d64`; read it with `git show 712270d64^:plans/159-file-picker.md`.
 - Origin: owner review of the Plan 159 picker, 2026-09-26. Every pane needs to resize, the blue file
@@ -126,7 +126,7 @@ file up to a size limit and scrolls both ways; nothing is cut off at its edges.
 
 ## Decisions
 
-Each has a recommendation; the owner picks.
+Decided 2026-09-26: the owner took every recommendation. The alternatives stay as a record.
 
 - **D1: folders.** The tree draws no folder glyph, only a chevron. The picker has no chevron column
   (columns carry a trailing caret, the list has none). Recommended: the app pack's folder glyph, as
@@ -139,9 +139,8 @@ Each has a recommendation; the owner picks.
   open at the default. Alternative: one shared width for every column (Finder's ⌥-drag), persisted
   as a setting. Both are small; the first is closer to Finder.
 - **D4: where pane sizes persist.** Recommended: `PersistedResizablePanelGroup`, the mechanism chat
-  mode and the terminal split already use. It writes one browser-storage entry, which AGENTS.md's
-  "no new `localStorage` keys" rule would otherwise forbid; the alternative is a `window`-scope
-  registry setting that follows the owner across devices.
+  mode and the terminal split already use. The owner dropped AGENTS.md's "no new `localStorage`
+  keys" rule the same day; browser storage holds per-browser view state such as pane sizes.
 - **D5: how much text the preview shows.** Recommended: 64 KB, no wrapping, scroll both ways, line
   numbers. Alternatives: a wrap toggle; or a read-only editor in the preview (more weight in the
   dialog for a view that lives a few seconds).
