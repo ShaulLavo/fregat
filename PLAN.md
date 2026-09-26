@@ -537,6 +537,7 @@ of the plans, both logs and the service journal named what stands in the way. Th
 | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | 146 (done)                                     | Dev and prod stop sharing `~/.platform`; each `agent:browser` run gets its own server and state                          |
 | [147](plans/147-log-hygiene-and-noise-gate.md) | Producer fixes, level rules, the reaper give-up, ACK timeout vs overflow, a `logs:census` gate                           |
+| [175](plans/175-large-folder-open.md)          | Opening a huge folder: watch limit, unreadable folders, switch not cancelled by clicks, bounded prefetch                 |
 | [148](plans/148-restart-when-idle.md)          | `deploy --server` stages; the server restarts when no turn is running                                                    |
 | [149](plans/149-terminal-host.md)              | A PTY host that survives server restarts                                                                                 |
 | 150 (done)                                     | Remote servers are checked for protocol; a stale one relaunches or reads "Server out of date"                            |
@@ -553,7 +554,9 @@ Suggested order:
 5. ~~Plan 150~~ — done 2026-09-25 (completion wave): protocol check at both ends of the SSH
    launch, stale relaunch, structured machine errors, "Server out of date". Plan 151 done 2026-09-25
    (completion wave; live Mac update is an owner check). Plan 152 done the same day.
-6. Then Claude rewind and fork ([Plan 145 fork](plans/145-harness-controls/fork.md), Plan 126
+6. Plan 175, reported 2026-09-26: opening `/work` froze the server for 10.8 s and took 92% of the
+   machine's inotify watches. Phases 1–2 need no decision.
+7. Then Claude rewind and fork ([Plan 145 fork](plans/145-harness-controls/fork.md), Plan 126
    RUNTIME-01) and the Plan 139 research phase.
 
 ## UI refresh lane

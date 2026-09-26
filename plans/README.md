@@ -19,6 +19,7 @@ a bare root `bun run verify`.
 
 | Plan                                                                                    | State                                                                    |
 | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| [175 — opening a very large folder](175-large-folder-open.md)                           | **PROPOSED — D1–D4 NEED THE OWNER; PHASES 1–2 READY**                    |
 | [174 — managed external MCP servers](174-external-mcp-servers.md)                       | **PLACEHOLDER — SPLIT FROM 087 M2/M3; UNSCHEDULED**                      |
 | [173 — two devices opening one workspace](173-two-devices-one-workspace.md)             | **RESEARCH — BEFORE PLAN 143'S PHONE SHELL**                             |
 | [172 — one shared undo/redo stack](172-shared-undo-stack.md)                            | **RESEARCH — LIFE-13 IS THE FIRST CONSUMER**                             |
