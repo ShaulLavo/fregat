@@ -301,6 +301,7 @@ import { editorProduct } from './editor-product'
 import { treeFileClicks } from './tree-file-clicks'
 import { treeStickyScroll } from './tree-sticky-scroll'
 import { treeParity } from './tree-parity'
+import { fileIconHues } from './file-icon-hues'
 import { treeParityBehaviour } from './tree-parity-behaviour'
 import { demoWorkspace } from './demo-workspace'
 import { demoAgentGit } from './demo-agent-git'
@@ -590,6 +591,7 @@ export const scenarios: readonly Scenario[] = [
   editorProduct,
   treeStickyScroll,
   treeParity,
+  fileIconHues,
   treeParityBehaviour,
   treeFileClicks,
 ]

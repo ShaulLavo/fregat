@@ -1,7 +1,12 @@
-import { getBuiltInFileIconColor } from '@workspace/tree'
 import type { FileTreeIconConfig, RemappedIcon } from '@workspace/tree'
 
-import { VSCODE_ICON_GLYPHS } from '@/lib/vscode-icon-glyphs'
+import {
+  FILE_ICON_EXTENSIONS,
+  FILE_ICON_FILE_NAMES,
+  FILE_ICON_RULES,
+  type FileIconRuleName,
+} from '@/lib/file-icon-rules.generated'
+import { VSCODE_ICON_GLYPHS, type FileIconGlyph } from '@/lib/vscode-icon-glyphs'
 import { lastPathSegment } from '@/lib/path-formatters'
 
 export type FileIconEntry = {
@@ -9,308 +14,13 @@ export type FileIconEntry = {
   type: 'file' | 'directory' | 'symlink' | 'other'
 }
 
-const VSCODE_ICON_NAMES = [
-  'IconLayers3Middle',
-  'astro',
-  'babel',
-  'bash-duo',
-  'bash',
-  'biome',
-  'bootstrap-duo',
-  'bootstrap',
-  'braces',
-  'browserslist-duo',
-  'bun-duo',
-  'bun',
-  'claude',
-  'code-block-duo',
-  'code',
-  'css',
-  'docker',
-  'eslint',
-  'extension',
-  'file-duo',
-  'file-plus-duo',
-  'file-symlink-duo',
-  'file-symlink',
-  'file-table-duo',
-  'file-table',
-  'file-text-duo',
-  'file-text',
-  'file-zip-duo',
-  'file-zip',
-  'file',
-  'folder-duo',
-  'folder-open-duo',
-  'folder-open',
-  'folder-plus-duo',
-  'folder-zip-duo',
-  'folder-zip',
-  'folder',
-  'folders',
-  'font',
-  'gear',
-  'git',
-  'graphql',
-  'html',
-  'image-duo',
-  'image',
-  'javascript',
-  'lang-c',
-  'lang-css-duo',
-  'lang-css',
-  'lang-go',
-  'lang-html-duo',
-  'lang-html',
-  'lang-html5-duo',
-  'lang-html5',
-  'lang-javascript-duo',
-  'lang-javascript',
-  'lang-markdown',
-  'lang-python',
-  'lang-ruby',
-  'lang-rust',
-  'lang-swift',
-  'lang-typescript-duo',
-  'lang-typescript',
-  'markdown',
-  'mcp',
-  'nextjs',
-  'npm-duo',
-  'npm',
-  'oxc-fill',
-  'oxc',
-  'postcss',
-  'prettier',
-  'react',
-  'rss',
-  'sass',
-  'server-duo',
-  'server',
-  'stylelint',
-  'svelte',
-  'svg-2',
-  'svg',
-  'svgo',
-  'tailwind',
-  'terraform',
-  'typescript',
-  'vite',
-  'vscode',
-  'vue',
-  'wasm-duo',
-  'wasm',
-  'webpack',
-  'yml',
-  'zig',
-] as const
-
-type VscodeIconName = (typeof VSCODE_ICON_NAMES)[number]
-
-type IconRule = {
-  filenames?: readonly string[]
-  stems?: readonly string[]
-  extensions?: readonly string[]
-}
-
 export type ResolvedFileIcon = {
-  name: VscodeIconName
+  name: FileIconRuleName
 }
 
 const TREE_ICON_SYMBOL_PREFIX = 'app-vscode-icon-'
 const DEFAULT_FILE_ICON_TOKEN = 'default'
-
-const VSCODE_ICON_RULES = {
-  IconLayers3Middle: { stems: ['layers', 'layer', 'stack'] },
-  astro: {
-    filenames: ['astro.config.js', 'astro.config.mjs', 'astro.config.ts'],
-    extensions: ['.astro'],
-  },
-  babel: {
-    filenames: [
-      '.babelrc',
-      '.babelrc.json',
-      'babel.config.js',
-      'babel.config.json',
-      'babel.config.cjs',
-      'babel.config.mjs',
-    ],
-  },
-  'bash-duo': {
-    filenames: ['.bashrc', '.bash_profile', '.bash_aliases', '.zshrc', '.zprofile'],
-    extensions: ['.bash', '.zsh'],
-  },
-  bash: {
-    filenames: ['bashrc', 'zshrc'],
-    extensions: ['.sh', '.fish', '.ksh'],
-  },
-  biome: { filenames: ['biome.json', 'biome.jsonc'] },
-  'bootstrap-duo': { stems: ['bootstrap-duo'] },
-  bootstrap: { stems: ['bootstrap'] },
-  braces: { stems: ['braces'], extensions: ['.json', '.jsonc'] },
-  'browserslist-duo': { filenames: ['.browserslistrc', 'browserslist'] },
-  'bun-duo': { filenames: ['bun.lock', 'bun.lockb'] },
-  bun: { filenames: ['bunfig.toml'], stems: ['bun'] },
-  claude: { filenames: ['claude.md'], stems: ['claude'] },
-  'code-block-duo': {
-    stems: ['code-block', 'snippet'],
-    extensions: ['.code-snippets'],
-  },
-  code: { stems: ['code'], extensions: ['.editorconfig'] },
-  css: { extensions: ['.css'] },
-  docker: {
-    filenames: [
-      'dockerfile',
-      '.dockerignore',
-      'docker-compose.yml',
-      'docker-compose.yaml',
-      'compose.yml',
-      'compose.yaml',
-    ],
-  },
-  eslint: {
-    filenames: [
-      '.eslintrc',
-      '.eslintrc.js',
-      '.eslintrc.cjs',
-      '.eslintrc.json',
-      'eslint.config.js',
-      'eslint.config.mjs',
-      'eslint.config.ts',
-    ],
-  },
-  extension: { stems: ['extension'], extensions: ['.vsix'] },
-  'file-duo': { stems: ['file-duo'] },
-  'file-plus-duo': { stems: ['file-plus', 'new-file'] },
-  'file-symlink-duo': { stems: ['file-symlink-duo'] },
-  'file-symlink': { stems: ['file-symlink'], extensions: ['.lnk'] },
-  'file-table-duo': { extensions: ['.csv', '.tsv'] },
-  'file-table': { extensions: ['.xls', '.xlsx', '.ods'] },
-  'file-text-duo': { extensions: ['.txt', '.log'] },
-  'file-text': { extensions: ['.rtf'] },
-  'file-zip-duo': { extensions: ['.zip', '.tar', '.gz'] },
-  'file-zip': { extensions: ['.7z', '.bz2', '.rar', '.tgz', '.xz'] },
-  file: { stems: ['file'] },
-  'folder-duo': { stems: ['folder-duo'] },
-  'folder-open-duo': { stems: ['folder-open-duo'] },
-  'folder-open': { stems: ['folder-open'] },
-  'folder-plus-duo': { stems: ['folder-plus'] },
-  'folder-zip-duo': { stems: ['folder-zip-duo'] },
-  'folder-zip': { stems: ['folder-zip'] },
-  folder: { stems: ['folder'] },
-  folders: { stems: ['folders'] },
-  font: { extensions: ['.eot', '.otf', '.ttf', '.woff', '.woff2'] },
-  gear: {
-    filenames: ['.env', '.env.local', '.env.development', '.env.production'],
-    stems: ['config', 'settings'],
-  },
-  git: {
-    filenames: ['.gitignore', '.gitattributes', '.gitmodules', '.gitkeep', 'gitconfig'],
-  },
-  graphql: { extensions: ['.graphql', '.gql'] },
-  html: { extensions: ['.html', '.htm'] },
-  'image-duo': { extensions: ['.apng', '.avif', '.bmp', '.gif'] },
-  image: { extensions: ['.ico', '.jpeg', '.jpg', '.png', '.webp'] },
-  javascript: { extensions: ['.cjs', '.js', '.mjs'] },
-  'lang-c': {
-    extensions: ['.c', '.cc', '.cpp', '.cxx', '.h', '.hpp', '.m', '.mm'],
-  },
-  'lang-css-duo': { stems: ['lang-css-duo'] },
-  'lang-css': { stems: ['lang-css'] },
-  'lang-go': { extensions: ['.go', '.mod', '.sum'] },
-  'lang-html-duo': { stems: ['lang-html-duo'] },
-  'lang-html': { stems: ['lang-html'] },
-  'lang-html5-duo': { stems: ['lang-html5-duo'] },
-  'lang-html5': { stems: ['lang-html5'] },
-  'lang-javascript-duo': { extensions: ['.jsx'] },
-  'lang-javascript': { stems: ['lang-javascript'] },
-  'lang-markdown': { stems: ['lang-markdown'] },
-  'lang-python': { extensions: ['.py', '.pyi', '.pyw'] },
-  'lang-ruby': { extensions: ['.rb', '.erb', '.gemspec', '.rake'] },
-  'lang-rust': { extensions: ['.rs'] },
-  'lang-swift': { extensions: ['.swift'] },
-  'lang-typescript-duo': { extensions: ['.tsx'] },
-  'lang-typescript': { extensions: ['.d.ts'] },
-  markdown: { extensions: ['.markdown', '.md', '.mdx'] },
-  mcp: { filenames: ['mcp.json'], stems: ['mcp'] },
-  nextjs: {
-    filenames: ['next.config.js', 'next.config.mjs', 'next.config.ts'],
-  },
-  'npm-duo': { filenames: ['package-lock.json', '.npmrc'] },
-  npm: { filenames: ['package.json', 'npm-shrinkwrap.json'] },
-  'oxc-fill': { stems: ['oxc-fill'] },
-  oxc: { filenames: ['.oxlintrc.json', 'oxlint.json'], stems: ['oxc'] },
-  postcss: {
-    filenames: [
-      'postcss.config.js',
-      'postcss.config.cjs',
-      'postcss.config.mjs',
-      'postcss.config.ts',
-      '.postcssrc',
-    ],
-  },
-  prettier: {
-    filenames: [
-      '.prettierrc',
-      '.prettierrc.json',
-      '.prettierrc.js',
-      '.prettierrc.cjs',
-      'prettier.config.js',
-      'prettier.config.cjs',
-    ],
-  },
-  react: { stems: ['react'], extensions: ['.jsx', '.tsx'] },
-  rss: { extensions: ['.atom', '.rss'] },
-  sass: { extensions: ['.sass', '.scss'] },
-  'server-duo': { stems: ['server-duo'] },
-  server: { stems: ['server'] },
-  stylelint: {
-    filenames: [
-      '.stylelintrc',
-      '.stylelintrc.json',
-      '.stylelintrc.js',
-      'stylelint.config.js',
-      'stylelint.config.mjs',
-    ],
-  },
-  svelte: { filenames: ['svelte.config.js'], extensions: ['.svelte'] },
-  'svg-2': { stems: ['svg-2'] },
-  svg: { extensions: ['.svg'] },
-  svgo: { filenames: ['svgo.config.js', 'svgo.config.mjs', 'svgo.config.ts'] },
-  tailwind: {
-    filenames: [
-      'tailwind.config.js',
-      'tailwind.config.cjs',
-      'tailwind.config.mjs',
-      'tailwind.config.ts',
-    ],
-  },
-  terraform: { extensions: ['.tf', '.tfvars'] },
-  typescript: {
-    filenames: ['tsconfig.json', 'tsconfig.app.json', 'tsconfig.node.json'],
-    extensions: ['.ts'],
-  },
-  vite: { filenames: ['vite.config.js', 'vite.config.mjs', 'vite.config.ts'] },
-  vscode: { filenames: ['.vscodeignore'], stems: ['vscode'] },
-  vue: { extensions: ['.vue'] },
-  'wasm-duo': { stems: ['wasm-duo'] },
-  wasm: { extensions: ['.wasm', '.wat'] },
-  webpack: {
-    filenames: [
-      'webpack.config.js',
-      'webpack.config.cjs',
-      'webpack.config.mjs',
-      'webpack.config.ts',
-    ],
-  },
-  yml: { extensions: ['.yaml', '.yml'] },
-  zig: { extensions: ['.zig', '.zon'] },
-} satisfies Record<VscodeIconName, IconRule>
-
-const ICON_RULES: Record<VscodeIconName, IconRule> = VSCODE_ICON_RULES
-const EXACT_FILENAME_ICONS = iconMapFor('filenames')
-const STEM_ICONS = iconMapFor('stems')
-const EXTENSION_ICONS = iconMapFor('extensions')
+const GLYPH_NAMES = Object.keys(VSCODE_ICON_GLYPHS) as FileIconGlyph[]
 
 const MIME_BY_EXTENSION = new Map<string, string>([
   ['.babelrc', 'application/json'],
@@ -377,11 +87,9 @@ export function fileTreeIconsForPaths(paths: readonly string[]): FileTreeIconCon
   }
 }
 
-export function colorForFileIcon(icon: ResolvedFileIcon) {
-  return (
-    getBuiltInFileIconColor(tokenForIconName(icon.name)) ??
-    getBuiltInFileIconColor(DEFAULT_FILE_ICON_TOKEN)
-  )
+/** The glyph and the literal hue classes a resolved icon draws with. */
+export function fileIconRule(icon: ResolvedFileIcon) {
+  return FILE_ICON_RULES[icon.name]
 }
 
 export function fileMatchesAccept(name: string, accept?: readonly string[]) {
@@ -399,27 +107,17 @@ function mimeForFileName(name: string) {
   return 'application/octet-stream'
 }
 
-function iconNameForFile(name: string): VscodeIconName {
+function iconNameForFile(name: string): FileIconRuleName {
   const normalizedName = normalizeName(name)
-  const filenameIcon = EXACT_FILENAME_ICONS.get(normalizedName)
-  if (filenameIcon) return filenameIcon
+  const fileNameIcon = FILE_ICON_FILE_NAMES[normalizedName]
+  if (fileNameIcon) return fileNameIcon
 
-  const stemIcon = STEM_ICONS.get(stemForName(normalizedName))
-  if (stemIcon) return stemIcon
-
-  const extensionIcon = iconForExtension(normalizedName)
-  if (extensionIcon) return extensionIcon
-
-  return 'file-duo'
-}
-
-function iconForExtension(name: string) {
-  for (const extension of extensionCandidates(name)) {
-    const icon = EXTENSION_ICONS.get(extension)
+  for (const extension of extensionCandidates(normalizedName)) {
+    const icon = FILE_ICON_EXTENSIONS[extension]
     if (icon) return icon
   }
 
-  return null
+  return 'file-duo'
 }
 
 function fileMatchesAcceptToken(name: string, token: string) {
@@ -443,35 +141,13 @@ function mimeMatches(name: string, token: string) {
   return mime === token
 }
 
-function iconMapFor(key: keyof IconRule) {
-  const map = new Map<string, VscodeIconName>()
-
-  for (const iconName of VSCODE_ICON_NAMES) {
-    const values = ICON_RULES[iconName][key] ?? []
-    for (const value of values) setIconMapValue(map, value, iconName)
-  }
-
-  return map
-}
-
-function setIconMapValue(
-  map: Map<string, VscodeIconName>,
-  value: string,
-  iconName: VscodeIconName,
-) {
-  const normalizedValue = normalizeRuleValue(value)
-  if (map.has(normalizedValue)) return
-
-  map.set(normalizedValue, iconName)
-}
-
-function iconResult(name: VscodeIconName): ResolvedFileIcon {
+function iconResult(name: FileIconRuleName): ResolvedFileIcon {
   return {
     name,
   }
 }
 
-const ICON_TOKENS: Partial<Record<VscodeIconName, string>> = {
+const ICON_TOKENS: Partial<Record<FileIconGlyph, string>> = {
   astro: 'astro',
   babel: 'babel',
   'bash-duo': 'bash',
@@ -572,65 +248,38 @@ function fileTreeFileNameIconsForPaths(paths: readonly string[]) {
 
 function fileTreeFileNameIconRules() {
   const icons: Record<string, RemappedIcon> = {}
-
-  for (const iconName of VSCODE_ICON_NAMES) {
-    const rule = ICON_RULES[iconName]
-    addFileTreeIconRules(icons, rule.filenames, iconName)
-    addFileTreeIconRules(icons, rule.stems, iconName)
+  for (const [name, rule] of Object.entries(FILE_ICON_FILE_NAMES)) {
+    icons[name] = treeIconReference(rule)
   }
-
   return icons
 }
 
 function fileTreeExtensionIconRules() {
   const icons: Record<string, RemappedIcon> = {}
-
-  for (const iconName of VSCODE_ICON_NAMES) {
-    const extensions = ICON_RULES[iconName].extensions ?? []
-    for (const extension of extensions) {
-      icons[extension.replace(/^\./u, '')] = treeIconReference(iconName)
-    }
+  for (const [extension, rule] of Object.entries(FILE_ICON_EXTENSIONS)) {
+    icons[extension.replace(/^\./u, '')] = treeIconReference(rule)
   }
-
   return icons
 }
 
-function addFileTreeIconRules(
-  icons: Record<string, RemappedIcon>,
-  values: readonly string[] | undefined,
-  iconName: VscodeIconName,
-) {
-  if (!values) return
-
-  for (const value of values) {
-    icons[normalizeRuleValue(value)] = treeIconReference(iconName)
-  }
-}
-
 function vscodeIconSpriteSheet() {
-  const symbols = VSCODE_ICON_NAMES.map(vscodeIconSymbol).join('')
+  const symbols = GLYPH_NAMES.map(vscodeIconSymbol).join('')
 
   return `<svg data-vscode-icon-sprite aria-hidden="true" width="0" height="0">${symbols}</svg>`
 }
 
-function vscodeIconSymbol(name: VscodeIconName) {
+function vscodeIconSymbol(name: FileIconGlyph) {
   const glyph = VSCODE_ICON_GLYPHS[name]
-  return `<symbol id="${treeIconSymbolName(name)}" viewBox="${glyph.viewBox}">${glyph.paths}</symbol>`
+  return `<symbol id="${TREE_ICON_SYMBOL_PREFIX}${name}" viewBox="${glyph.viewBox}">${glyph.paths}</symbol>`
 }
 
-function treeIconReference(name: VscodeIconName): RemappedIcon {
+/** The tree draws each rule's glyph with the tree's own colour token for it. */
+function treeIconReference(rule: FileIconRuleName): RemappedIcon {
+  const glyph = FILE_ICON_RULES[rule].glyph
   return {
-    name: treeIconSymbolName(name),
-    token: tokenForIconName(name),
+    name: `${TREE_ICON_SYMBOL_PREFIX}${glyph}`,
+    token: ICON_TOKENS[glyph] ?? DEFAULT_FILE_ICON_TOKEN,
   } as RemappedIcon
-}
-
-function treeIconSymbolName(name: VscodeIconName) {
-  return `${TREE_ICON_SYMBOL_PREFIX}${name}`
-}
-
-function tokenForIconName(name: VscodeIconName) {
-  return ICON_TOKENS[name] ?? DEFAULT_FILE_ICON_TOKEN
 }
 
 function extensionCandidates(name: string) {
@@ -651,17 +300,6 @@ function indexesOf(value: string, needle: string) {
   return indexes
 }
 
-function stemForName(name: string) {
-  const index = name.indexOf('.')
-  if (index < 0) return name
-
-  return name.slice(0, index)
-}
-
 function normalizeName(name: string) {
   return name.trim().toLocaleLowerCase()
-}
-
-function normalizeRuleValue(value: string) {
-  return normalizeName(value)
 }
