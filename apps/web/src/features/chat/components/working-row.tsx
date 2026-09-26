@@ -1,4 +1,5 @@
 import type { OrchestrationLatestTurn } from '@workspace/contracts'
+import { TurnStatusFrame } from '@/features/chat/components/turn-status-frame'
 import { WorkingTimer } from '@/features/chat/components/working-timer'
 
 export function WorkingRow({
@@ -9,9 +10,11 @@ export function WorkingRow({
   startedAt: string
 }) {
   return (
-    <div className='text-muted-foreground px-1 pt-1 pb-2 text-xs tabular-nums'>
-      {latestTurn.sourceProposedPlan ? 'Working from plan for ' : 'Working for '}
-      <WorkingTimer startedAt={startedAt} />
-    </div>
+    <TurnStatusFrame>
+      <p className='px-1'>
+        {latestTurn.sourceProposedPlan ? 'Working from plan for ' : 'Working for '}
+        <WorkingTimer startedAt={startedAt} />
+      </p>
+    </TurnStatusFrame>
   )
 }
