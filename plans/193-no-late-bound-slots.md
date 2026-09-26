@@ -52,6 +52,10 @@ Keep, with the reason on record:
 - `bindDiffPlugin` (`features/editor/state/diff-presentation.ts:59`): a per-pane plugin instance.
 - The command runtime binding itself: palette and dialog setters are React state (phase 4 only
   shrinks what it carries).
+- The editor's colour mode (`color-theme-store.ts:44`, pushed at `color-theme-provider.tsx:80-82`):
+  it mirrors `useTransitionedColorMode`, which commits a dark/light switch inside the
+  `color-mode` view transition (`globals.css:130`). Reading the setting directly would switch the
+  editor's code colours before the page's cross-fade starts.
 
 ## Phase 1: navigation is bound at boot
 
@@ -140,15 +144,12 @@ the palette refs stay: they are React-owned actions and state.
 
 ## Phase 5: editor theme selection from settings
 
-`EditorColorThemeProvider` pushes the dark and light theme ids (`:39-42`) and the resolved colour
-mode (`:80-82`) into module state that the Shiki resolver reads.
+`EditorColorThemeProvider` pushes the dark and light theme ids (`:39-42`) into module state that
+the Shiki resolver reads. The colour mode it also pushes stays (see Keep).
 
 - The theme ids can come from the phase 3 subscription, except that `useSettingValue` also layers
   the Theme Studio preview (`AppearancePreviewContext`, React state). Move that preview into a
   store first, then subscribe.
-- The colour mode mirrors `useTransitionedColorMode`, which lags one transition on purpose so the
-  editor repaints in step with the page. It stays pushed from React unless the owner accepts
-  losing that sync (question below).
 - Verify: `scenario editor-theme-preview`, `scenario theme-studio-preview`,
   `scenario color-mode-preview`, each with `look`.
 
@@ -158,11 +159,6 @@ Add to AGENTS.md › React: "A module variable filled from an effect so non-Reac
 is a last resort, for DOM nodes, live sockets and held component state. Anything else is read
 where it lives or pushed by its non-React owner." No census: the shape is too varied to grep
 reliably, and review catches it.
-
-## Owner questions
-
-1. Phase 5: may the editor's colour mode follow settings directly and drop the one-transition lag,
-   or does the painted-frame sync stay (and with it that one React push)?
 
 ## Found along the way
 
