@@ -17,6 +17,7 @@ import {
 } from '../adapters/utils/claude-project-mcp'
 import { MockProviderAdapter } from '../adapters/mock'
 import type { ClaudeMcpCli } from '../adapters/utils/claude-mcp-config'
+import { mcpConfigErrors } from '../structured-errors'
 import { ProviderAdapterRegistry } from '../provider-adapter-registry'
 import { testSettingsOptions } from '../../settings/testing'
 
@@ -293,6 +294,9 @@ describe('MCP config routes', () => {
       },
       remove: async () => {},
       read: async () => ({ transport: 'stdio', command: 'unused', args: [], env: {} }),
+      signIn: async () => {
+        throw mcpConfigErrors.MCP_SIGN_IN_UNSUPPORTED({ internal: { provider: 'fixture' } })
+      },
     })
     const body = { scope: 'project', folder: project, target: { providerInstanceId: 'codex' } }
     const denied = await send(app, 'POST', '/providers/claude/mcp/deploy/copy', body)
