@@ -42,7 +42,7 @@ export function LocationButton({
           <span className='min-w-0 flex-1'>
             <span className='block truncate'>{location.label}</span>
             {location.detail ? (
-              <span className='text-muted-foreground text-2xs block font-mono whitespace-normal tabular-nums'>
+              <span className='text-muted-foreground text-2xs block font-mono whitespace-pre-line tabular-nums'>
                 {location.detail}
               </span>
             ) : null}
