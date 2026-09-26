@@ -44,12 +44,9 @@ export async function startIsolatedServer(
   const productionRoot = path.join(directory, 'production')
   mkdirSync(home)
   mkdirSync(productionRoot)
-  if (existsSync(path.join(productionStateHome, 'wallpapers'))) linkWallpaperLibrary(home)
-  const port = await selectAvailablePort({
-    isAvailable: (candidate) => isPortAvailable('127.0.0.1', candidate),
-    // A band per web port: two worktrees probing one port at once can both see it free, and the
-    // loser's health check then passes against the winner's server, which refuses its origin.
-    preferredPort: 33_400 + (Number(webOrigin.port) % 100) * 10,
+  const port = await prepareHome(home, webOrigin).catch((error: unknown) => {
+    rmSync(directory, { recursive: true, force: true })
+    throw error
   })
   const env: Record<string, string | undefined> = {
     ...process.env,
@@ -133,6 +130,16 @@ export async function startIsolatedServer(
     signal,
     stop,
   }
+}
+
+async function prepareHome(home: string, webOrigin: URL) {
+  if (existsSync(path.join(productionStateHome, 'wallpapers'))) linkWallpaperLibrary(home)
+  return selectAvailablePort({
+    isAvailable: (candidate) => isPortAvailable('127.0.0.1', candidate),
+    // A band per web port: two worktrees probing one port at once can both see it free, and the
+    // loser's health check then passes against the winner's server, which refuses its origin.
+    preferredPort: 33_400 + (Number(webOrigin.port) % 100) * 10,
+  })
 }
 
 async function waitForHealth(
