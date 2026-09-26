@@ -16,8 +16,13 @@ export function createLanguageServerSocket() {
       closed = true
       events.dispatchEvent(new Event('close'))
     },
-    addEventListener: events.addEventListener.bind(events),
-    removeEventListener: events.removeEventListener.bind(events),
+    // EventTarget types its listener as a plain Event one; the socket's are typed per event.
+    addEventListener(type, listener, options) {
+      events.addEventListener(type, listener as EventListener, options)
+    },
+    removeEventListener(type, listener, options) {
+      events.removeEventListener(type, listener as EventListener, options)
+    },
   }
   return {
     socket,
