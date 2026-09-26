@@ -125,6 +125,7 @@ import { itemNavigation } from './item-navigation'
 import { shortcutHints } from './shortcut-hints'
 import { editorAddToChat } from './editor-add-to-chat'
 import { markdownSplitView } from './markdown-split-view'
+import { markdownPreviewClobber } from './markdown-preview-clobber'
 import { gitOpenAllDiffsSpam } from './git-open-all-diffs-spam'
 import { gitStageSettles } from './git-stage-settles'
 import { gitChangesScroll } from './git-changes-scroll'
@@ -421,6 +422,7 @@ export const scenarios: readonly Scenario[] = [
   shortcutHints,
   editorAddToChat,
   markdownSplitView,
+  markdownPreviewClobber,
   gitOpenAllDiffsSpam,
   gitStageSettles,
   gitChangesScroll,

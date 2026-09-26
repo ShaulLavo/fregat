@@ -170,16 +170,25 @@ export function fsRoutes(fs: FileSystemService) {
 
 type BlobFile = Awaited<ReturnType<FileSystemService['blob']>>
 
+/** A document type that can run script when a browser opens it at our origin. */
+const ACTIVE_DOCUMENT_TYPE =
+  /^(?:text\/html|image\/svg\+xml|application\/xhtml\+xml|(?:application|text)\/xml)\b/u
+
 async function fileResponse(result: BlobFile) {
   const file = Bun.file(result.absolutePath)
+  const type = file.type || 'application/octet-stream'
   const headers = new Headers({
     'content-length': String(result.size),
+    'content-type': type,
+    // A repository's file is served as what its name says, never sniffed into something else.
+    'x-content-type-options': 'nosniff',
     'x-fs-path': result.path,
     'x-fs-mtime-ms': String(result.mtimeMs),
     'x-fs-version': result.version,
   })
+  // Opened directly, a repository's HTML or SVG gets an opaque origin and runs no script.
+  if (ACTIVE_DOCUMENT_TYPE.test(type)) headers.set('content-security-policy', 'sandbox')
 
-  headers.set('content-type', file.type || 'application/octet-stream')
   return new Response(file, { headers })
 }
 

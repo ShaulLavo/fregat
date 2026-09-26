@@ -196,6 +196,11 @@ Each phase is independent and shippable. Verification runs through `agent:browse
    `rehypeDecorate`. Tests: `hast.test.ts` footnote case plus `<img name="getSelection">`,
    `<form name>`, raw `id`. Scenario: commit `p179-clobber` as `markdown-preview-clobber` (no page
    errors, `typeof document.getSelection === 'function'`).
+   Landed 2026-09-26 (wave 2 lane B): `toHast` leaves ids bare, the sanitizer prefixes every
+   `id`, `name` and aria reference with `user-content-` (`MARKDOWN_ID_PREFIX`), and
+   `rehypeDecorate` prefixes in-document `#` hrefs; chat's fragment-link resolver drops the prefix
+   before matching a heading slug. Scenario `markdown-preview-clobber` fails on the old sanitizer
+   (`typeof document.getSelection === 'object'`) and passes now.
 3. **Mermaid in a root (M, `features/chat`).**
    - Render as today (light-DOM measurement), then mount the SVG into an open shadow root on the
      `role="img"` host with one adopted sheet shared by every diagram (`:host` font, colours from
@@ -211,6 +216,8 @@ Each phase is independent and shippable. Verification runs through `agent:browse
 4. **`/fs/blob` headers (S, `apps/server/src/fs/routes.ts`).** `x-content-type-options: nosniff` on
    every response; `content-security-policy: sandbox` on HTML, SVG and XML. Route test in
    `apps/server/src/fs/tests/`.
+   Landed 2026-09-26 (wave 2 lane B), with `application/xhtml+xml` and XML covered too; route test
+   `fs/tests/blob-headers.test.ts`.
 5. **App CSS hygiene (S, `packages/ui/src/styles/globals.css`).** Move the spinner palette off the
    universal bucket (a class-keyed selector at zero specificity via `:where()` around a single
    class, the `@supports` block flattened), and audit the Tailwind `:is(… *)` star variants the
