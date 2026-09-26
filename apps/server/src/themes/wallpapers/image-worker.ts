@@ -1,3 +1,4 @@
+import { finished } from 'node:stream/promises'
 import { serialize } from 'node:v8'
 import { wallpaperErrors } from './structured-errors'
 
@@ -6,7 +7,9 @@ const options = { maxPixels: 40_000_000 }
 try {
   const bytes = new Uint8Array(await Bun.stdin.arrayBuffer())
   const result = await decode(bytes)
-  await Bun.write(Bun.stdout, serialize(result))
+  // Large renditions exceed the pipe buffer; drain the stream before exiting.
+  process.stdout.end(serialize(result))
+  await finished(process.stdout)
 } catch {
   process.exitCode = 1
 }
