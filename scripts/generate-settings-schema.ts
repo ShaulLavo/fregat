@@ -60,14 +60,15 @@ function settingPropertySchema(
     ...converted,
     default: descriptor.default as JsonValue,
     description: descriptor.description,
+    ...(descriptor.deprecationReason ? { deprecated: true } : {}),
   }
-  if (!descriptor.deprecationReason) return property
+  const notes = [
+    descriptor.dependsOn ? `Applies while \`${descriptor.dependsOn}\` is on.` : null,
+    descriptor.deprecationReason ? `Deprecated: ${descriptor.deprecationReason}` : null,
+  ].filter((note) => note !== null)
+  if (notes.length === 0) return property
 
-  return {
-    ...property,
-    deprecated: true,
-    markdownDescription: `${descriptor.description}\n\nDeprecated: ${descriptor.deprecationReason}`,
-  }
+  return { ...property, markdownDescription: [descriptor.description, ...notes].join('\n\n') }
 }
 
 function withoutRootSchema(schema: JsonObject): JsonObject {

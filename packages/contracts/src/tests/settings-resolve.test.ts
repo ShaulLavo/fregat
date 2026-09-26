@@ -309,3 +309,57 @@ describe('the shipping registry', () => {
     expect(diagnostics).toEqual([])
   })
 })
+
+describe('dependsOn', () => {
+  const dependent = {
+    'files.watch': defineSetting({
+      schema: v.boolean(),
+      default: true,
+      scope: 'window',
+      widget: 'boolean',
+      category: 'Files',
+      description: 'Watch files.',
+    }),
+    'files.watchHidden': defineSetting({
+      schema: v.boolean(),
+      default: true,
+      scope: 'window',
+      widget: 'boolean',
+      category: 'Files',
+      dependsOn: 'files.watch',
+      description: 'Watch hidden files too.',
+    }),
+    'files.watchLimit': defineSetting({
+      schema: v.number(),
+      default: 10,
+      scope: 'window',
+      widget: 'number',
+      category: 'Files',
+      dependsOn: 'files.watch',
+      description: 'Most files watched.',
+    }),
+  }
+
+  it('reads a boolean child as off while its parent is off, and keeps other children', () => {
+    const { values } = resolveSettings(
+      [layer('user', { 'files.watch': false, 'files.watchHidden': true, 'files.watchLimit': 4 })],
+      { registry: dependent },
+    )
+
+    expect(values['files.watchHidden']).toBe(false)
+    expect(values['files.watchLimit']).toBe(4)
+  })
+
+  it("gives a child its own value back once the parent is on, and inspect keeps the child's layer", () => {
+    const layers = [
+      layer('user', { 'files.watch': false, 'files.watchHidden': true }),
+      layer('workspace', { 'files.watch': true }),
+    ]
+    const resolution = resolveSettings(layers, { registry: dependent })
+
+    expect(resolution.values['files.watchHidden']).toBe(true)
+    expect(inspectSetting('files.watchHidden', layers, resolution, dependent).effectiveLayer).toBe(
+      'user',
+    )
+  })
+})

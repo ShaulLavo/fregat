@@ -299,6 +299,7 @@
     "editor.history.persistBudget": {
       "default": 67108864,
       "description": "Total stored undo history across closed files, in UTF-16 code units. The least recently saved files go first when it is exceeded.",
+      "markdownDescription": "Total stored undo history across closed files, in UTF-16 code units. The least recently saved files go first when it is exceeded.\n\nApplies while `editor.history.persist` is on.",
       "maximum": 1073741824,
       "minimum": 0,
       "type": "integer"
@@ -306,6 +307,7 @@
     "editor.history.persistDays": {
       "default": 30,
       "description": "Days a closed file keeps its stored undo history before it is dropped.",
+      "markdownDescription": "Days a closed file keeps its stored undo history before it is dropped.\n\nApplies while `editor.history.persist` is on.",
       "maximum": 365,
       "minimum": 1,
       "type": "integer"
@@ -592,6 +594,7 @@
     "lsp.semanticTokens.delta": {
       "default": true,
       "description": "Ask delta-capable language servers for only the tokens an edit changed. Saves bandwidth, parse time and garbage on every keystroke.",
+      "markdownDescription": "Ask delta-capable language servers for only the tokens an edit changed. Saves bandwidth, parse time and garbage on every keystroke.\n\nApplies while `lsp.semanticTokens.enabled` is on.",
       "type": "boolean"
     },
     "lsp.semanticTokens.enabled": {

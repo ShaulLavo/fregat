@@ -141,6 +141,13 @@ export type SettingDescriptor<TSchema extends v.GenericSchema = v.GenericSchema>
    * a real key, so the looser type costs nothing.
    */
   readonly rowOwner?: string
+  /**
+   * A boolean key this one is a sub-option of. The page indents the row under it
+   * and disables it while the parent is off, and the resolver reads a boolean
+   * child as `false` then, so a consumer checks one key. A non-boolean child keeps
+   * its value: only code that already checks the parent reads it.
+   */
+  readonly dependsOn?: string
   readonly visibility?: SettingVisibility
   readonly merge?: SettingMerge
   /** Extra words the page's search should match beyond id, category and description. */
@@ -223,6 +230,7 @@ export function registryProblems(registry: SettingsRegistryShape): RegistryProbl
     }
 
     problems.push(...rowOwnerProblems(registry, id, descriptor))
+    problems.push(...dependsOnProblems(registry, id, descriptor))
   }
 
   return problems
@@ -252,4 +260,53 @@ function rowOwnerProblems(
   }
 
   return []
+}
+
+/**
+ * A parent the page cannot place the child under, or one with no "off", would
+ * leave the child disabled forever or indented under nothing.
+ */
+function dependsOnProblems(
+  registry: SettingsRegistryShape,
+  id: string,
+  descriptor: SettingDescriptor,
+): RegistryProblem[] {
+  const parentId = descriptor.dependsOn
+  if (parentId === undefined) return []
+  if (parentId === id) return [{ id, reason: 'dependsOn cannot name its own key' }]
+
+  const parent = registry[parentId]
+  if (!parent) return [{ id, reason: `dependsOn names an unregistered key: ${parentId}` }]
+  if (typeof parent.default !== 'boolean') {
+    return [{ id, reason: `dependsOn must name a boolean key: ${parentId} is not` }]
+  }
+  // One level: the page indents once, and the resolver reads each parent once.
+  if (parent.dependsOn !== undefined) {
+    return [{ id, reason: `dependsOn must name a top-level key: ${parentId} depends on another` }]
+  }
+  if (parent.category !== descriptor.category) {
+    return [{ id, reason: `dependsOn must name a key in the same category: ${parentId} is not` }]
+  }
+  if (descriptor.rowOwner !== undefined || parent.rowOwner !== undefined) {
+    return [{ id, reason: 'dependsOn needs both keys to own their rows' }]
+  }
+
+  return []
+}
+
+/**
+ * Reads each boolean child as `false` while its parent is `false`. Mutates
+ * `values`, which must already hold every key of `registry`.
+ */
+export function applySettingDependencies(
+  registry: SettingsRegistryShape,
+  values: Record<string, unknown>,
+): void {
+  for (const [id, descriptor] of Object.entries(registry)) {
+    if (descriptor.dependsOn === undefined) continue
+    if (typeof values[id] !== 'boolean') continue
+    if (values[descriptor.dependsOn] !== false) continue
+
+    values[id] = false
+  }
 }

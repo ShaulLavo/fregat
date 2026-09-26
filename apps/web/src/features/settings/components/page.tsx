@@ -4,7 +4,7 @@ import { workspaceRoot } from '@/lib/documents/utils/identity'
 import type { TabId, WorkspaceRoot } from '@/lib/documents/utils/types'
 import { useNavigation } from '@/hooks/use-navigation'
 import { useSettingsSearch, selectSettingsSearch } from '@/features/settings/state/search-store'
-import { descriptorFor, type SettingId } from '@workspace/contracts'
+import { descriptorFor, settingParentId, type SettingId } from '@workspace/contracts'
 import { Button } from '@workspace/ui/components/button'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@workspace/ui/components/input-group'
 import { Spinner } from '@workspace/ui/components/spinner'
@@ -306,5 +306,28 @@ function groupByCategory(ids: readonly SettingId[]): Map<string, SettingId[]> {
     categories.set(category, [id])
   }
 
+  for (const [category, members] of categories) {
+    categories.set(category, withChildrenUnderParents(members))
+  }
+
   return categories
+}
+
+/** A `dependsOn` row follows its parent's row, so its indent reads as belonging to it. */
+function withChildrenUnderParents(ids: readonly SettingId[]): SettingId[] {
+  const present = new Set(ids)
+  const childrenOf = new Map<SettingId, SettingId[]>()
+  for (const id of ids) {
+    const parent = settingParentId(id)
+    if (parent === undefined || !present.has(parent)) continue
+
+    childrenOf.set(parent, [...(childrenOf.get(parent) ?? []), id])
+  }
+
+  return ids.flatMap((id) => {
+    const parent = settingParentId(id)
+    if (parent !== undefined && present.has(parent)) return []
+
+    return [id, ...(childrenOf.get(id) ?? [])]
+  })
 }

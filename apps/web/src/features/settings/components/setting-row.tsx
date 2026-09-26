@@ -4,6 +4,7 @@ import {
   descriptorFor,
   SCALAR_SETTING_IDS,
   settingControl,
+  settingParentId,
   settingRowIds,
   type SettingId,
   type ScalarSettingId,
@@ -39,6 +40,8 @@ export function SettingRow({ id, snapshot }: { id: SettingId; snapshot: Settings
   // on the page rather than in a commit message. It outranks the scope reason —
   // no scope makes a read-only key writable.
   const disabledReason = descriptor.readOnlyReason ?? inspection.disabledReason
+  const parentId = settingParentId(id)
+  const parentOff = parentId !== undefined && snapshot.values[parentId] === false
   const value = snapshot.values[id]
   const hasCodePreview =
     descriptor.widget === 'code-theme' ||
@@ -50,7 +53,9 @@ export function SettingRow({ id, snapshot }: { id: SettingId; snapshot: Settings
       className={cn(
         'flex flex-col gap-(--density-control-gap) py-(--density-section-padding) @3xl/settings:items-start @3xl/settings:justify-between @3xl/settings:gap-6',
         descriptor.widget !== 'theme' && '@3xl/settings:flex-row',
+        parentId !== undefined && 'pl-(--density-section-padding)',
       )}
+      data-depends-on={parentId}
     >
       <div className='flex min-w-0 flex-col gap-1 @max-3xl/settings:wrap-anywhere'>
         <div className='flex flex-wrap items-center gap-2'>
@@ -96,6 +101,11 @@ export function SettingRow({ id, snapshot }: { id: SettingId; snapshot: Settings
           </p>
         ) : null}
         {disabledReason ? <p className='text-warning text-xs'>{disabledReason}</p> : null}
+        {parentOff ? (
+          <p className='text-muted-foreground text-xs'>
+            Applies while {settingRowTitle(parentId)} is on
+          </p>
+        ) : null}
       </div>
 
       <div
@@ -106,7 +116,7 @@ export function SettingRow({ id, snapshot }: { id: SettingId; snapshot: Settings
         )}
       >
         <SettingControl
-          disabled={disabledReason !== null}
+          disabled={disabledReason !== null || parentOff}
           id={id}
           onChange={(next) => {
             if (!SCALAR_SETTING_IDS.includes(id as ScalarSettingId)) return

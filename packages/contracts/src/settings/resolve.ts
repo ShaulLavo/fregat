@@ -3,11 +3,12 @@ import { isRecord } from '@workspace/utils/objects'
 import { jsonEqual } from './json-equal'
 import { SETTINGS_REGISTRY, type SettingId, type SettingsValues } from './keys'
 import { migrateSetting } from './migrations'
-import type {
-  RegistryValues,
-  SettingDescriptor,
-  SettingScope,
-  SettingsRegistryShape,
+import {
+  applySettingDependencies,
+  type RegistryValues,
+  type SettingDescriptor,
+  type SettingScope,
+  type SettingsRegistryShape,
 } from './registry'
 
 /**
@@ -369,6 +370,7 @@ function buildValues(
   for (const id of Object.keys(registry)) {
     values[id] = reuseOrCombine(registry, id, contributions.get(id), previous)
   }
+  applySettingDependencies(registry, values)
 
   return values
 }

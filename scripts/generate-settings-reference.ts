@@ -29,9 +29,11 @@ function table(ids: readonly SettingId[]) {
       descriptor.sensitive ? 'sensitive' : '',
     ].filter(Boolean)
 
+    const parent = descriptor.dependsOn ? ` Applies while \`${descriptor.dependsOn}\` is on.` : ''
+
     return `| \`${id}\` | \`${JSON.stringify(descriptor.default)}\` | ${descriptor.scope} | ${
       descriptor.description
-    }${flags.length > 0 ? ` _(${flags.join(', ')})_` : ''} |`
+    }${parent}${flags.length > 0 ? ` _(${flags.join(', ')})_` : ''} |`
   })
 
   return align([

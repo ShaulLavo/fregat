@@ -510,6 +510,7 @@ export {
   DEFAULT_SETTING_VALUES,
   descriptorFor,
   isSettingId,
+  settingParentId,
   SETTING_IDS,
   SETTING_ROW_IDS,
   SETTINGS_REGISTRY,
