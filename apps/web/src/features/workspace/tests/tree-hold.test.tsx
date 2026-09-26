@@ -41,6 +41,9 @@ test.for(['missing', 'not-directory', 'permission-denied'] as const)(
       for (const root of ['first', 'second']) {
         rendered.rerender(view(root))
         await screen.findByText(`${root}.txt`)
+        await waitFor(() =>
+          expect(queryClient.getQueryState(fileSystemKeys.tree(root))?.status).toBe('success'),
+        )
         const model = queryClient.getQueryData<TreeModel>(fileSystemKeys.tree(root))!
         captureTree(queryClient, model, {
           root: filesystemPath(root),
