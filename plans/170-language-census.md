@@ -235,6 +235,7 @@ safe to use: stale entries are still present and counted.
 2. **Drop "theme" from this plan's title and scope?** Themes are not preloaded after first paint,
    and the census cannot inform them. **Recommendation: yes;** the palette-open preload of 66
    themes is a separate question if it matters.
+   Decided 2026-09-26: recommendation (coordinator) — yes; the plan covers grammars only.
 
 ### Proposed phases
 
