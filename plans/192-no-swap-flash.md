@@ -45,8 +45,8 @@ subjects and reads `blank-frames-0`, like `quick-open-no-flicker`.
 | 14  | `features/editor/components/compare-saved-view.tsx`                                                          | compare tab                  | skeleton                                 | likely        |
 | 15  | `features/editor/components/history-pane.tsx`                                                                | undo-history compare         | "Comparing states"                       | likely        |
 | 16  | `features/workbench/components/file-navigator-panel.tsx` (`key={rootPath}`)                                  | tree root / session worktree | `TreeLoading`                            | **fixed**     |
-| 17  | `features/chat-mode/components/turn-files.tsx`                                                               | turn / session               | hunks vanish, "0 changes"                | likely        |
-| 18  | `features/git/components/branch-actions.tsx`                                                                 | session worktree             | Push/PR buttons vanish                   | likely        |
+| 17  | `features/chat-mode/components/turn-files.tsx`                                                               | turn / session               | hunks vanish, "0 changes"                | **fixed**     |
+| 18  | `features/git/components/branch-actions.tsx`                                                                 | session worktree             | Push/PR buttons vanish                   | **fixed**     |
 | 19  | `features/workbench/components/editor-group.tsx` (`EditorBreadcrumbs key`)                                   | tab switch                   | symbol crumbs blank (arguably right)     | likely, low   |
 | 20  | `features/file-picker/hooks/use-directory-load.ts`                                                           | show-hidden / mode toggle    | list skeleton                            | likely        |
 | 21  | `features/settings/components/page.tsx`                                                                      | form ↔ JSON, remote owner    | `PageLoading`                            | likely, edge  |
@@ -163,3 +163,33 @@ one root preserves the other root's persisted observation.
   Screenshots 04, 06, and 10 were read back. The sole failed response is the intentional missing
   root's 404; no page errors. Mock provider only, no model turns. Vite 5254 stopped after the run.
 - `bun run gates`, including knip, and the final scripts typecheck passed. No deployment.
+
+## Rows 17–18 proof
+
+`TurnFiles` holds the summary, worktree, open-file callback, hunks and undo states together with
+`useHeldUntilReady`. Its count appears only after a successful diff read. First loads use
+`CheckpointLoading`; failed reads show an error. The header spinner marks a pending switch.
+
+`BranchActions` holds the worktree, PR title, branch state and PR state with the same hook.
+Mutation controls are disabled while the next subject loads. Publishing a repository still
+needs only the local branch read; remote actions wait for the PR lookup too.
+
+- `turn-files-no-flicker`: 25 blank hunk frames before, 0 after on both measured switches.
+  Every sampled header names the shown hunk's turn, with no loading frame reporting 0 changes.
+- `branch-actions-no-flicker`: 15 blank action frames before, 0 after on both measured switches.
+- Focused DOM tests cover first load, cross-session retention, genuine empty and failed reads,
+  and retaining both Push and the PR link while branch and PR requests finish separately.
+- All seven focused DOM tests and the repository typecheck pass. Both manual memos are classified
+  `needed` by `compiler:memos` because the hold hook compares identity during render.
+
+Screenshots read back:
+
+- Turn before: `/work/tmp/fregat-evidence/20260926T200646Z-scenario-turn-files-no-flicker/`
+- Turn after: `/work/tmp/fregat-evidence/20260926T201420Z-scenario-turn-files-no-flicker/`
+- Branch before: `/work/tmp/fregat-evidence/20260926T201219Z-scenario-branch-actions-no-flicker/`
+- Branch after: `/work/tmp/fregat-evidence/20260926T201845Z-scenario-branch-actions-no-flicker/`
+
+The turn scenario uses the native checkpoint fixture; branch sessions use a mock provider and never run a model, and
+all remotes are local bare repositories. The turn runs include transient `client.RPC_FAILED`
+startup/read warnings; the measured switches completed and the final run had no failed HTTP
+responses. No deployment was performed for this wave worker PR.

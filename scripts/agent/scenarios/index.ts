@@ -1,5 +1,7 @@
 import { deferredDialogs } from './deferred-dialogs'
 import { rootSwitchNoFlicker } from './root-switch-no-flicker'
+import { turnFilesNoFlicker } from './turn-files-no-flicker'
+import { branchActionsNoFlicker } from './branch-actions-no-flicker'
 import { textFieldFkeys } from './text-field-fkeys'
 import { settingsRoutePreparation } from './settings-route-preparation'
 import { settingsModuleFailure } from './settings-module-failure'
@@ -509,6 +511,8 @@ export const scenarios: readonly Scenario[] = [
   quickOpenNoFlicker,
   paletteThemeNoFlicker,
   studioThemeNoFlicker,
+  turnFilesNoFlicker,
+  branchActionsNoFlicker,
   gitHistorySearchNoFlicker,
   logsSearchNoFlicker,
   searchTypeDelete,
