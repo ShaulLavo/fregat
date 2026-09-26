@@ -805,15 +805,28 @@ describe('treeRowDecoration', () => {
   function rowAt(path: string) {
     return { item: { path } } as FileTreeRowDecorationContext
   }
+  function noFix() {}
 
   it('says no access for a folder the server may not read, and names it', () => {
     const model = treeModel(tree('repo', [directory('repo/locked')]), 'repo')
     model.errorByDirectoryPath.set('locked', { message: 'Permission denied', denied: true })
 
-    expect(treeRowDecoration(model, rowAt('locked/'))).toEqual({
+    const handed: unknown[] = []
+    const decoration = treeRowDecoration(model, rowAt('locked/'), (error) => handed.push(error))
+
+    expect(decoration).toMatchObject({
       text: 'no access',
       title: "The server's user cannot read /repo/locked",
+      action: { label: 'Fix with AI' },
     })
+    if (decoration && 'action' in decoration) decoration.action?.onActivate()
+    expect(handed).toEqual([
+      {
+        code: 'PERMISSION_DENIED',
+        message: "The server's user cannot read /repo/locked",
+        title: 'The file tree has no access to a folder',
+      },
+    ])
   })
 
   it('keeps error and loading for other folders', () => {
@@ -824,11 +837,12 @@ describe('treeRowDecoration', () => {
     model.errorByDirectoryPath.set('broken', { message: 'Could not load' })
     model.loadingDirectoryPaths.add('slow')
 
-    expect(treeRowDecoration(model, rowAt('broken/'))).toEqual({
+    expect(treeRowDecoration(model, rowAt('broken/'), noFix)).toMatchObject({
       text: 'error',
       title: 'Could not load',
+      action: { label: 'Fix with AI' },
     })
-    expect(treeRowDecoration(model, rowAt('slow/'))).toEqual({ text: 'loading' })
+    expect(treeRowDecoration(model, rowAt('slow/'), noFix)).toEqual({ text: 'loading' })
   })
 
   it('keys the repaint on what rows show, never on a clone', () => {

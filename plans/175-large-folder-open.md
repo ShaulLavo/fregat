@@ -316,3 +316,22 @@ Departures, each for a reason found while building:
   none from scrolling.
 - **Copy for a spent limit.** When other roots use the whole limit the tooltip says so; the first
   run showed "more than -44,846 folders" because the fixture server's own workspace was watched.
+
+### Review fixes (2026-09-26, `d103638de` and after)
+
+A self-review found gaps; each is fixed and tested:
+
+- Changing `files.watchDirectoryLimit` rebalances at once: lowering sheds the largest recursive
+  watches (largest first, cannot oscillate), raising upgrades limited roots; the index goes `off`
+  or rebuilds (`watch-limit-freed`).
+- A crashed watch worker evicts its watches; holders reattach through a fresh worker, and a late
+  release checks entry identity so it never counts down a replacement.
+- A limited root re-reads a folder on a fresh expand (the D2 item the first build left out).
+- A pending switch dims and shields the workspace being left after 150 ms.
+- Measurements the first build lacked: on 150,151 directories the old main-thread watch stalled
+  251–266 ms, the hub's longest main-thread gap is 15 ms; `renders tree-file-clicks` is unchanged by
+  the decoration repaint (FileTreeView 29 → 29); prod logs show no read that needed the dropped 4xx
+  retry.
+- Owner request: a gray "Fix with AI" sparkle beside every tree `error` and `no access`, with the
+  shared tooltip. The tooltip layer now reads the composed path and follows pointer moves, because
+  Chromium sends no `pointerover` inside the tree's shadow root after a click there.

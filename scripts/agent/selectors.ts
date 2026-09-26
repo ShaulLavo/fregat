@@ -264,6 +264,11 @@ export const selectors = {
     page.getByRole('button', { name: 'Live updates limited', exact: true }),
   navigationTarget: (page: Page) => page.locator('[data-navigation-target]'),
   navigationShield: (page: Page) => page.locator('[data-navigation-shield]'),
+  treeItemFixWithAi: (page: Page, name: string) =>
+    page
+      .getByLabel('Folder tree', { exact: true })
+      .getByRole('treeitem', { name, exact: true })
+      .getByRole('button', { name: 'Fix with AI', exact: true }),
   treeItemDecoration: (page: Page, name: string) =>
     page
       .getByLabel('Folder tree', { exact: true })

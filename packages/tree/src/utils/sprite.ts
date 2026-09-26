@@ -4,3 +4,4 @@ export type SVGSpriteNames =
   | 'file-tree-icon-dot'
   | 'file-tree-icon-lock'
   | 'file-tree-icon-ellipsis'
+  | 'file-tree-icon-sparkle'

@@ -129,6 +129,21 @@ export const workspaceOpenUnreadableChild: Scenario = {
       strictEqual(await selectors.liveUpdatesLimited(page).count(), 0, 'The folder fits the limit')
       strictEqual(await page.locator('[data-sonner-toast]').count(), 0, 'Opening must not toast')
       await step('live')
+
+      const fix = selectors.treeItemFixWithAi(page, 'locked')
+      const box = await fix.boundingBox()
+      ok(box, 'The fix icon must be laid out')
+      await selectors.treeItem(page, 'locked').hover()
+      // Along the row to the icon, the path a person's pointer takes after reading the row.
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 8 })
+      await page
+        .locator('[data-slot="tooltip-content"]')
+        .filter({ hasText: 'Fix with AI' })
+        .waitFor()
+      await step('fix-with-ai-tooltip')
+      await fix.click()
+      await page.getByText('cannot read', { exact: false }).first().waitFor({ timeout: 10_000 })
+      await step('fix-with-ai-chat')
     } finally {
       await fixture.release()
     }

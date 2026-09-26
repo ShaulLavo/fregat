@@ -23,6 +23,7 @@ import { useFileTreeActions } from '@/features/workspace/hooks/use-file-tree-act
 import { useFileTreeIntentPrefetch } from '@/features/workspace/hooks/use-file-tree-intent-prefetch'
 import { useWatchCoverage } from '@/hooks/use-watch-coverage'
 import { treeDecorationKey, treeRowDecoration } from '@/features/workspace/utils/tree-decoration'
+import { fixWithAgent } from '@/lib/fix-with-agent'
 import { useEditorColorTheme } from '@/lib/editor-theme/hooks/use-editor-color-theme'
 import { useRowHeight } from '@workspace/ui/patterns/use-row-height'
 import { useFileTreeMutationEvents } from '@/features/workspace/hooks/use-file-tree-mutation-events'
@@ -225,7 +226,8 @@ function ReadyTreePane({
       onError: (error) => reportError(toClientError({ code: 'INVALID_PATH', error })),
       onRename: (event: FileTreeRenameEvent) => completeRenameRef.current(event),
     },
-    renderRowDecoration: (context) => treeRowDecoration(modelRef.current, context),
+    renderRowDecoration: (context) =>
+      treeRowDecoration(modelRef.current, context, (error) => void fixWithAgent(error)),
     unsafeCSS: treeUnsafeCss,
   })
 
