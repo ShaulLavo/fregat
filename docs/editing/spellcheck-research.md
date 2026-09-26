@@ -61,6 +61,10 @@ Corpora:
 
 Notes on the table:
 
+- Top-1/top-5 are conditional suggestion-ranking percentages over each engine's eligible pairs,
+  as defined above. Eligibility differs between engines. These historical rows did not separately
+  report target coverage or accepted typos, so they cannot establish overall detection accuracy.
+  The current `packages/spellcheck/bench/engine.ts` reports all three counts explicitly.
 - `hunspell-asm` would not load under Node 26 or Bun: its 2020 Emscripten glue fails. It is also
   excluded on licence, because it compiles Hunspell (MPL-1.1/GPL-2/LGPL-2.1).
 - Harper lints text rather than checking words. Its 6.1 s is the whole 1 MB file as markdown with
@@ -93,16 +97,18 @@ dialect is a build step, not a new dependency.
 
 ## Licences
 
-Only English, Dutch and Russian have permissive dictionaries. French is doubtful. Hebrew exists
-only under AGPL.
+This historical package survey found permissive candidates for English, Dutch and Russian,
+unclear French provenance, and AGPL Hebrew candidates. It is a sample of the packages examined,
+not an exhaustive or current licensing inventory. Review the exact source, version, license and
+attribution of every dictionary before adding it; an engine's license does not cover its data.
 
-| Language | Permissive source                                                                        | Copyleft only                                           |
+| Language | Permissive source surveyed                                                               | Copyleft source surveyed                                |
 | -------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------- |
 | English  | SCOWL (en_US, en_GB, en_CA, en_AU): Atkinson's notice plus Ispell BSD and WordNet notices | `@cspell/dict-en-gb` is LGPL-3.0 (another source)       |
 | Dutch    | OpenTaal, BSD-3 or CC-BY-3.0 (`dictionary-nl`)                                           | —                                                       |
 | Russian  | `dictionary-ru`, BSD-3                                                                   | `@cspell/dict-ru_ru` is GPL-3.0                          |
 | French   | `@cspell/dict-fr-fr` says MIT, but its source (Dicollecte) is MPL-2.0                   | `dictionary-fr` is MPL-2.0                              |
-| German, Spanish, Italian, Portuguese | —                                                            | GPL, LGPL or MPL in every package                        |
+| German, Spanish, Italian, Portuguese | —                                                            | GPL, LGPL or MPL in the surveyed packages                |
 | Hebrew   | —                                                                                        | hspell, AGPL-3.0 (`dictionary-he`, `@cspell/dict-he`)   |
 
 `@cspell/dict-en_us` declares MIT. Its README says the words "come directly from SCOWL and is thus

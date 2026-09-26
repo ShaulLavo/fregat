@@ -9,7 +9,7 @@ failure settlement; measure rendering before deciding on changes. Keep file defa
 - [x] Measure controller, highlight updates and overall typing; fix supported rendering waste.
 - [x] Verify paint in Chromium, Firefox and WebKit.
 - [x] Document English policy, language design and benchmark denominators.
-- [ ] Run checks, commit and push Editor changes, integrate and deploy Platform.
+- [x] Run checks, commit and push Editor changes, integrate and deploy Platform.
 
 ## Baseline
 
@@ -92,3 +92,16 @@ The log contains connection-abort warnings during fixture navigation; no spellch
 A repeated browser run exposed a test readiness race: the failure test sometimes typed before
 first layout had requested a check. It now waits for the injected worker factory to run before
 asserting that further typing causes no retry. All 67 tests pass with that wait.
+
+
+## Shipped
+
+Editor runtime commit `dab873292fb9b0cd38c7c9fc4cd4c84951734e2b` is pushed to main.
+Platform pins it in `c1391065a`, whose pre-commit gates and repository typechecks passed.
+The web release `20260926T211241Z-c1391065-spellcheck-hardening` is live on the mesh and passed
+its live browser check. The existing server bundle was reused. Live-check output reported three
+known orchestration/provider log groups; no new spellcheck failure.
+
+Multilingual implementation and fully incremental overlay repaint remain scoped follow-ups.
+No file-spellcheck default was changed. The full Editor suite and comparative engine suite were
+not rerun; validation used the spellcheck suite, overlay tests, local benchmarks and real app path.
