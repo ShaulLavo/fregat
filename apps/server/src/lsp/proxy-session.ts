@@ -1,3 +1,5 @@
+import { withinDiagnosticsBudget } from './diagnostics-budget'
+
 import { lineStartOffset } from '@workspace/utils/strings'
 import { errorMessage } from '@workspace/contracts'
 import { fileUriForNativePath } from './language'
@@ -17,7 +19,12 @@ import type { ChildProcessWithoutNullStreams } from 'node:child_process'
 
 import type { LspServerHandle, LspServerMatch } from './registry'
 import { LspStdioMessageReader, writeLspStdioMessage } from './stdio-rpc'
-import { DID_CHANGE_WATCHED_FILES, LspWatchedFiles, type FileEvent } from './watched-files'
+import {
+  DID_CHANGE_WATCHED_FILES,
+  FILE_CHANGED,
+  LspWatchedFiles,
+  type FileEvent,
+} from './watched-files'
 import type { TreeWatchSource } from '../fs/tree-watch'
 import {
   operatorErrorSummary,
@@ -148,6 +155,12 @@ type TextDocumentContentChange = {
     readonly end: { readonly line: number; readonly character: number }
   }
   readonly text: string
+}
+
+/** A file's diagnostics as the backend has them: pulled on request, or its last publish. */
+export type LspFileDiagnostics = {
+  readonly mode: 'pull' | 'push'
+  readonly diagnostics: readonly unknown[]
 }
 
 export type LspProxySocket = {
@@ -303,6 +316,26 @@ export class LspSessionPool implements LspSessionSource {
     return null
   }
 
+  /**
+   * A file's diagnostics from a backend that is already running for `match`, within `timeoutMs`.
+   * Spawns nothing: an agent's edit is checked only where a language server already serves it.
+   */
+  async fileDiagnostics(
+    match: LspServerMatch,
+    uri: string,
+    timeoutMs: number,
+    text: string,
+  ): Promise<LspFileDiagnostics | null> {
+    return withinDiagnosticsBudget(timeoutMs, async (remaining) => {
+      for (const session of this.liveSessions(lspProxySessionKey(match))) {
+        if (remaining() <= 0) return null
+        const result = await session.fileDiagnostics(uri, remaining(), text)
+        if (result) return result
+      }
+      return null
+    })
+  }
+
   private liveSessions(key: string): readonly PooledLspProxySession[] {
     return (this.sessions.get(key) ?? []).filter((session) => !session.isDisposed)
   }
@@ -370,6 +403,8 @@ class PooledLspProxySession {
   readonly key: string
   private readonly match: LspServerMatch
   private readonly pendingRequests = new Map<JsonRpcId, PendingBackendRequest>()
+  /** Readers waiting for document synchronization or diagnostics, per uri. */
+  private readonly fileWaiters = new Map<string, Set<() => void>>()
   private readonly idleTimeoutMs: () => number
   private readonly deltaEnabled: () => boolean
   private readonly pool: LspSessionPool
@@ -458,6 +493,107 @@ class PooledLspProxySession {
 
   get negotiatedSemanticTokens(): LspNegotiatedSemanticTokens | null {
     return negotiatedSemanticTokens(this.initializeResult?.result)
+  }
+
+  /** Open documents must match the disk snapshot before their diagnostics can describe the edit. */
+  fileDiagnostics(
+    uri: string,
+    timeoutMs: number,
+    text: string,
+  ): Promise<LspFileDiagnostics | null> {
+    return withinDiagnosticsBudget(timeoutMs, async (remaining) => {
+      if (this.disposed || !this.initializeResult) return null
+      const synchronized = await this.waitForFileState(uri, remaining(), () => {
+        const document = this.documents.get(uri)
+        return !document || document.text === text
+      })
+      if (!synchronized || remaining() <= 0) return null
+      if (supportsPullDiagnostics(this.initializeResult.result))
+        return this.pullFileDiagnostics(uri, text, remaining())
+      return this.publishedFileDiagnostics(uri, text, remaining())
+    })
+  }
+
+  private async pullFileDiagnostics(
+    uri: string,
+    text: string,
+    timeoutMs: number,
+  ): Promise<LspFileDiagnostics | null> {
+    const document = this.documents.get(uri)
+    if (document && document.text !== text) return null
+    const version = document?.backendVersion
+    this.notifyWatchedFiles([{ uri, type: FILE_CHANGED }])
+    const response = await this.backendRequest(
+      'textDocument/diagnostic',
+      { textDocument: { uri } },
+      timeoutMs,
+    )
+    if (this.documents.get(uri) !== document || document?.backendVersion !== version) return null
+    const items = isRecord(response?.result) ? response.result.items : null
+    return Array.isArray(items) ? { mode: 'pull', diagnostics: items } : null
+  }
+
+  private async publishedFileDiagnostics(
+    uri: string,
+    text: string,
+    timeoutMs: number,
+  ): Promise<LspFileDiagnostics | null> {
+    if (!this.documents.has(uri)) return null
+    const ready = await this.waitForFileState(uri, timeoutMs, () => {
+      const document = this.documents.get(uri)
+      return !document || (document.text === text && document.diagnostics !== null)
+    })
+    const document = this.documents.get(uri)
+    if (!ready || document?.text !== text) return null
+    const published = publishedDiagnostics(document.diagnostics)
+    return published ? { mode: 'push', diagnostics: published } : null
+  }
+
+  private backendRequest(method: string, params: unknown, timeoutMs: number) {
+    const backendId = this.nextBackendRequestId()
+    return new Promise<JsonRpcResponse | null>((resolve) => {
+      const timer = setTimeout(() => {
+        this.pendingRequests.delete(backendId)
+        this.cancelBackendRequest(backendId)
+        resolve(null)
+      }, timeoutMs)
+      const settle = (response: JsonRpcResponse | null) => {
+        clearTimeout(timer)
+        resolve(response)
+      }
+      this.pendingRequests.set(backendId, {
+        clientId: null,
+        connection: null,
+        method,
+        reject: () => settle(null),
+        resolve: settle,
+      })
+      this.writeToServer(JSON.stringify({ id: backendId, jsonrpc: '2.0', method, params }))
+    })
+  }
+
+  private waitForFileState(uri: string, timeoutMs: number, ready: () => boolean): Promise<boolean> {
+    if (this.disposed || timeoutMs <= 0) return Promise.resolve(false)
+    if (ready()) return Promise.resolve(true)
+    return new Promise<boolean>((resolve) => {
+      const waiters = this.fileWaiters.get(uri) ?? new Set<() => void>()
+      const done = (value: boolean) => {
+        clearTimeout(timer)
+        waiters.delete(check)
+        if (waiters.size === 0) this.fileWaiters.delete(uri)
+        resolve(value)
+      }
+      const check = () => {
+        if (this.disposed || ready()) done(!this.disposed)
+      }
+      const timer = setTimeout(() => done(false), timeoutMs)
+      waiters.add(check)
+      this.fileWaiters.set(uri, waiters)
+    })
+  }
+
+  private wakeFileReaders(uri: string): void {
+    for (const waiter of this.fileWaiters.get(uri) ?? []) waiter()
   }
 
   connect(socket: LspProxySocket): LspProxyClientSession {
@@ -1076,6 +1212,7 @@ class PooledLspProxySession {
     shared.text = opened.text
     shared.owners.set(connection, synchronizedOwner(opened, shared))
     connection.addDocument(opened.uri)
+    this.wakeFileReaders(opened.uri)
   }
 
   private openBackendDocument(
@@ -1095,6 +1232,7 @@ class PooledLspProxySession {
     this.documents.set(document.uri, shared)
     owner.addDocument(document.uri)
     this.writeToServer(JSON.stringify(rewriteTextDocumentVersion(message, shared.backendVersion)))
+    this.wakeFileReaders(document.uri)
   }
 
   private handleDidChange(connection: LspProxyConnection, message: JsonRpcNotification): void {
@@ -1143,6 +1281,7 @@ class PooledLspProxySession {
     owner.lastSyncEpoch = syncEpoch
     owner.synchronizedBackendVersion = backendVersion
     owner.text = text
+    this.wakeFileReaders(change.uri)
   }
 
   private handleDidClose(connection: LspProxyConnection, message: JsonRpcNotification): void {
@@ -1164,6 +1303,7 @@ class PooledLspProxySession {
     if (document.owners.size > 0) return
 
     this.documents.delete(uri)
+    this.wakeFileReaders(uri)
     // The server's own cache for this document dies with the `didClose`, so a
     // baseline kept past it would be a `previousResultId` nothing can diff.
     this.semanticTokenBaselines.delete(uri)
@@ -1451,6 +1591,7 @@ class PooledLspProxySession {
     if (!document || !Array.isArray(params.diagnostics)) return
     if (params.version !== undefined && params.version !== document.backendVersion) return
     document.diagnostics = notification
+    this.wakeFileReaders(params.uri)
   }
 
   private broadcastServerMessage(message: string): void {
@@ -1600,6 +1741,7 @@ class PooledLspProxySession {
 
   /** Says why, then closes; the editor reports the close as `LspServerExitedError`. */
   private closeConnections(outcome: string): void {
+    for (const uri of this.fileWaiters.keys()) this.wakeFileReaders(uri)
     const exit = JSON.stringify({
       jsonrpc: '2.0',
       method: LSP_SERVER_EXITED,
@@ -2436,4 +2578,19 @@ function capabilityChanges(params: unknown, field: 'registrations' | 'unregister
       ? [{ id: change.id, method: change.method, registerOptions: change.registerOptions }]
       : [],
   )
+}
+
+function supportsPullDiagnostics(result: unknown) {
+  return (
+    isRecord(result) &&
+    isRecord(result.capabilities) &&
+    Boolean(result.capabilities.diagnosticProvider)
+  )
+}
+
+function publishedDiagnostics(notification: string | null): readonly unknown[] | null {
+  if (!notification) return null
+  const message: unknown = JSON.parse(notification)
+  if (!isRecord(message) || !isRecord(message.params)) return null
+  return Array.isArray(message.params.diagnostics) ? message.params.diagnostics : null
 }

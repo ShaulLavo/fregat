@@ -20,6 +20,7 @@ const WATCH_KIND = { created: 1, changed: 2, deleted: 4 } as const
 const FLUSH_DELAY_MS = 50
 
 type FileChangeType = typeof CREATED | typeof CHANGED | typeof DELETED
+export const FILE_CHANGED: FileChangeType = CHANGED
 
 export type FileEvent = { readonly uri: string; readonly type: FileChangeType }
 

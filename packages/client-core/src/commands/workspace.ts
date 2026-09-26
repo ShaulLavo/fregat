@@ -496,6 +496,17 @@ export const workspaceCommandMetadata = {
     when: ['fileBackedTab'],
     title: 'Cycle markdown view',
   }),
+  'workspace.showSpellingSuggestions': defineMetadata({
+    category: 'Editor',
+    description:
+      'Open the editor menu at the caret, led by replacements for the misspelled word under it.',
+    id: 'workspace.showSpellingSuggestions',
+    execution: 'sync',
+    target: 'workspace',
+    undoCategory: 'view-only',
+    when: ['fileBackedTab'],
+    title: 'Spelling suggestions',
+  }),
   'workspace.addFileToChat': defineMetadata({
     category: 'Chat',
     description: "Mention the active file in this workspace's chat composer.",

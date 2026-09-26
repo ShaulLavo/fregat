@@ -1,3 +1,4 @@
+import type { AgentDiagnosticsSource } from '../../../lsp/agent-diagnostics'
 import { BackgroundTaskRegistry } from '../../background-liveness'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -769,6 +770,18 @@ describe('ClaudeProviderAdapter', () => {
     await harness.adapter.stopAll()
   })
 
+  it('adds the edit diagnostics hooks beside the Stop hook when a reader is wired', async () => {
+    const reader: AgentDiagnosticsSource = { enabled: () => true, errors: async () => null }
+    const harness = claudeHarness(true, undefined, reader)
+    await harness.adapter.startRuntime(sessionStartInput({}))
+    expect(Object.keys(latestOptions(harness).hooks ?? {}).toSorted()).toEqual([
+      'PostToolUse',
+      'PreToolUse',
+      'Stop',
+    ])
+    await harness.adapter.stopAll()
+  })
+
   it('keeps ephemeral utility sessions free of the schedule hook', async () => {
     const harness = claudeHarness()
     await harness.adapter.startRuntime(sessionStartInput({ ephemeral: true }))
@@ -1071,7 +1084,7 @@ describe('ClaudeProviderAdapter', () => {
       path.join(cwd, '.mcp.json'),
       JSON.stringify({ mcpServers: { deploy: { command: 'deploy-server' } } }),
     )
-    const harness = claudeHarness(true, undefined, approvalsFile)
+    const harness = claudeHarness(true, undefined, undefined, approvalsFile)
     const input = { ...sessionStartInput({}), cwd }
     try {
       await harness.adapter.startRuntime(input)
@@ -1346,6 +1359,17 @@ describe('ClaudeProviderAdapter', () => {
     await ephemeral.adapter.stopAll()
   })
 
+  it('asks for the output schema a session was started with, and reports the parsed answer', async () => {
+    const harness = claudeHarness()
+    const schema = { type: 'object', properties: { ok: { type: 'boolean' } } }
+    await harness.adapter.startRuntime({
+      ...sessionStartInput({ ephemeral: true }),
+      outputSchema: schema,
+    })
+    expect(latestOptions(harness).outputFormat).toEqual({ type: 'json_schema', schema })
+    await harness.adapter.stopAll()
+  })
+
   it('treats ultrathink as a prompt keyword instead of an effort flag', async () => {
     const harness = claudeHarness()
     const input = providerTurnInput({
@@ -1512,6 +1536,7 @@ describe('ClaudeProviderAdapter catalog', () => {
 function claudeHarness(
   acknowledgeStop = true,
   historyRunner?: ClaudeHistoryRunner,
+  agentDiagnostics?: AgentDiagnosticsSource,
   projectMcpApprovalsFile?: string,
 ): ClaudeHarness {
   const events: ProviderRuntimeEvent[] = []
@@ -1521,6 +1546,7 @@ function claudeHarness(
   const queries: FakeClaudeQuery[] = []
 
   const adapter = new ClaudeProviderAdapter({
+    ...(agentDiagnostics ? { agentDiagnostics } : {}),
     ...(projectMcpApprovalsFile ? { projectMcpApprovalsFile } : {}),
     historyRunner,
     attachmentsDir,
