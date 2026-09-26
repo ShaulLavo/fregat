@@ -8,7 +8,7 @@ import { sendPrompt } from './native-provider-verification'
 
 const REPLY = 'Wake-up scheduled'
 
-/** Plan 144 P2: a mock turn that schedules a wake-up leaves the session sleeping until it. */
+/** A mock turn that schedules a wake-up leaves the session sleeping until it. */
 export const chatSleepingSession: Scenario = {
   name: 'chat-sleeping-session',
   description:

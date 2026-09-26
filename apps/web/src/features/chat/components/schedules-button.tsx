@@ -1,5 +1,5 @@
 import { MoonIcon } from '@phosphor-icons/react'
-import type { ScopedSessionRef } from '@workspace/contracts'
+import type { ProviderSessionSchedule, ScopedSessionRef } from '@workspace/contracts'
 import { Button } from '@workspace/ui/components/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@workspace/ui/components/popover'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
@@ -26,15 +26,16 @@ export function SchedulesButton({ sessionRef }: { readonly sessionRef: ScopedSes
   )
   const [open, setOpen] = useState(false)
   const nowMs = useMinuteClock()
-  const schedules = useSessionSchedules(sessionRef, open)
+  const schedules = useSessionSchedules(sessionRef, open || sleepingUntil !== null)
   const cancel = useCancelSchedules(sessionRef)
   const cancelling =
     useIsMutating({
       mutationKey: chatMutationKeys.cancelSchedules(sessionRef.environmentId, sessionRef.sessionId),
     }) > 0
-  if (!sleepingUntil && !open) return null
+  const wakesAt = schedules.data ? earliestFire(schedules.data.schedules) : sleepingUntil
+  if (!wakesAt && !open) return null
 
-  const when = sleepingUntil ? formatWakeTime(sleepingUntil, nowMs) : null
+  const when = wakesAt ? formatWakeTime(wakesAt, nowMs) : null
   const label = when === 'due' ? 'Wake-up due' : `Sleeping until ${when ?? '…'}`
   const hasSchedules = (schedules.data?.schedules.length ?? 0) > 0
 
@@ -83,4 +84,13 @@ export function SchedulesButton({ sessionRef }: { readonly sessionRef: ScopedSes
       </PopoverContent>
     </Popover>
   )
+}
+
+function earliestFire(schedules: readonly ProviderSessionSchedule[]) {
+  let earliest: string | null = null
+  for (const schedule of schedules) {
+    if (schedule.nextFireAt && (earliest === null || schedule.nextFireAt < earliest))
+      earliest = schedule.nextFireAt
+  }
+  return earliest
 }

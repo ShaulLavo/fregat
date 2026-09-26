@@ -61,6 +61,16 @@ describe('session schedules', () => {
     )
   })
 
+  it('reads a one-shot first reported after its minute as due, not next year', () => {
+    const registry = new SessionScheduleRegistry()
+    registry.record('s', [wakeup], at('2026-09-26T14:39'))
+    expect(registry.sleepingUntil('s', at('2026-09-26T14:40'))).toBe(
+      at('2026-09-26T14:37').toISOString(),
+    )
+    registry.record('late', [wakeup], at('2026-09-26T14:37:20'))
+    expect(registry.sleepingUntil('late')).toBe(at('2026-09-26T14:37').toISOString())
+  })
+
   it('drops a session’s schedules when its runtime exits', () => {
     const registry = new SessionScheduleRegistry()
     const sessionId = v.parse(sessionIdSchema, '5d0c3a4e-8f1b-4c2d-9e7a-6b5c4d3e2f10')

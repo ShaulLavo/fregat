@@ -58,8 +58,10 @@ export class SessionScheduleRegistry {
     return (this.sessions.get(sessionId) ?? []).map(({ firstSeenAt, ...schedule }) => ({
       ...schedule,
       nextFireAt:
-        nextCronFire(schedule.schedule, schedule.recurring ? now : firstSeenAt)?.toISOString() ??
-        null,
+        nextCronFire(
+          schedule.schedule,
+          schedule.recurring ? now : oneShotFrom(firstSeenAt),
+        )?.toISOString() ?? null,
     }))
   }
 
@@ -72,4 +74,12 @@ export class SessionScheduleRegistry {
     }
     return earliest
   }
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000
+
+// A one-shot names one date and time, which may already have passed when a turn that ran long
+// first reports it; searching from a day earlier finds that time, so it reads as due.
+function oneShotFrom(firstSeenAt: Date) {
+  return new Date(firstSeenAt.getTime() - DAY_MS)
 }
