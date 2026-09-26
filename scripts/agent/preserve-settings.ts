@@ -1,6 +1,6 @@
 import { ok, strictEqual } from 'node:assert/strict'
 import type { Page } from 'playwright'
-import type { SettingsOperation } from '../../packages/contracts/src/settings'
+import type { SettingsOperation } from '../../packages/contracts/src/settings/mutations'
 
 /** The settings API behind the page: the mesh serves it under /platform, dev on the API port. */
 function settingsApi(page: Page) {
