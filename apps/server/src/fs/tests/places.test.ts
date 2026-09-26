@@ -103,8 +103,8 @@ describe('filesystem places', () => {
     })
 
     const result = await places(root, app)
-    expect(result.places).toEqual([{ kind: 'folder', label: 'Projects', path: 'code' }])
-    expect(result.projects).toEqual([])
+    expect(result.places).toEqual([])
+    expect(result.projects).toEqual([{ label: 'code', path: 'code', repoCount: 2 }])
   })
 
   it('drops a projects folder once it is deleted, though its picks remain', async () => {
