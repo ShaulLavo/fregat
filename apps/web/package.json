@@ -31,6 +31,7 @@
     "test": "bun --bun vitest run --project node --project dom",
     "test:watch": "bun --bun vitest --project node --project dom",
     "test:browser": "vitest run --config vitest.browser.config.ts",
+    "test:durations": "bun --bun vitest run --project node --project dom --reporter=json --outputFile=node_modules/.cache/shard-durations-report.json; bun scripts/shard-durations.ts node_modules/.cache/shard-durations-report.json",
     "typecheck": "tsc --build",
     "preview": "bun --bun --env-file=../../.env vite preview",
     "dev:vite": "bun ../../scripts/run-with-env.ts vite",

@@ -108,6 +108,8 @@ change can reach. The targets are confirmed or revised by phase 0's measurements
    re-balance web and TUI shards by recorded durations instead of file count, and look for the
    slowest files in each (cold process spawns, real timers) before adding shards: shards cost
    runners, and runners are the queue.
+   Done 2026-09-26 (wave 2 lane B). Web shards by recorded file duration: `apps/web/test/shard-sequencer.ts` deals files out longest first, each to the lightest shard (file time plus 0.5 s of import and setup), from `apps/web/test/shard-durations.json`; `bun run --cwd apps/web test:durations` refreshes it. Stale or missing entries cost only balance: every shard computes the same assignment, and a test proves each file lands in exactly one shard. Vitest's path-hash split had put 93 s of recorded test time on one shard and 36 s on another; locally the four shards now take 49, 50, 56 and 50 s. Server tests split in two by Vitest's own hash (207 s and 182 s of file time, close enough to skip a durations file). TUI stays one job. Slowest files, left as leads: web `settings/tests/page.test.tsx` 27 s and `keybinding-section.test.tsx` 10 s; server `fs/tests/workspace-edit.test.ts` 40 s, `lsp/tests/typescript-server.test.ts` 37 s, `machines/tests/update.test.ts` 32 s, `terminal/tests/service.test.ts` 26 s.
+
 4. **Lint and boundaries** (S). Profile the 100 s lint and the 55 s feature-boundaries check: find out
    whether the time is the tool, a type-aware rule, or a whole-repo walk that could run once and feed
    both. Run them in parallel inside one job if they are independent.
@@ -147,6 +149,8 @@ with phase 5.
 - **E5. Skip what a change cannot affect** (S). Phase 2's path filter for the Editor: plan- and
   doc-only changes run format and the doc checks only, behind one required summary status.
 - Platform's side of the Editor (building it at `editor-ref` in every job) is phase 1.
+
+A green PR is green against the `main` it was tested with. A `pull_request` run checks out GitHub's merge ref, the PR merged with `main` as it stood when the run started; #59 and #60 were each green that way and red together (2026-09-26). The fix is to test against the `main` a PR merges into: re-run (or rebase) a PR after anything else merges and merge only on that run, or let GitHub enforce it with branch protection on `main` requiring the one `CI` status (phase 2) and "Require branches to be up to date before merging". GitHub's merge queue would batch this but is not offered for a repository owned by a user account. Branch protection is a repository setting: owner decision. Main's own runs now always finish (phase 5), so a combination that slips through shows as a red `main` run naming its commit range.
 
 Larger runners cost money, which is an owner decision; this plan does not buy them.
 
