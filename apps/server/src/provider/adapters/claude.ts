@@ -11,6 +11,7 @@ import {
   type Options,
   type PermissionResult,
   type Query,
+  type SDKActiveGoalMessage,
   type SDKControlGetContextUsageResponse,
   type SDKMessage,
   type SDKRateLimitEvent,
@@ -982,6 +983,35 @@ class ClaudeAgentSession extends SessionContext {
     }
   }
 
+  /** `/goal` reports after each check; null once the condition is met or cleared. */
+  private emitGoal(message: SDKActiveGoalMessage) {
+    const value = message.value
+    this.emit({
+      createdAt: new Date().toISOString(),
+      eventId: runtimeEventId('claude-goal-updated'),
+      payload: {
+        goal: value
+          ? {
+              objective: value.condition,
+              status: 'active',
+              tokenBudget: null,
+              tokensUsed: null,
+              timeUsedSeconds: Math.max(0, Math.round((Date.now() - value.set_at) / 1000)),
+              iterations: value.iterations,
+              lastReason: value.last_reason ?? null,
+            }
+          : null,
+      },
+      provider: DEFAULT_CLAUDE_PROVIDER_SETTINGS.driverKind,
+      providerInstanceId: this.providerInstanceId,
+      providerBindingHandle: this.providerBindingHandle(),
+      runtimeMode: this.runtimeMode,
+      sessionId: this.sessionId,
+      ...(this.activeTurn ? { turnId: this.activeTurn.canonicalTurnId } : {}),
+      type: 'goal.updated',
+    })
+  }
+
   async close() {
     recordChatPipelineInfo('chat.pipeline.claude_session.close', {
       providerBindingHandle: this.providerBindingHandle(),
@@ -1044,7 +1074,12 @@ class ClaudeAgentSession extends SessionContext {
     this.rejectAllTurns(createInternalError(message))
   }
 
-  private handleMessage(message: SDKMessage) {
+  // The SDK yields `active_goal` although its message union leaves it out.
+  private handleMessage(message: SDKMessage | SDKActiveGoalMessage) {
+    if (message.type === 'active_goal') {
+      this.emitGoal(message)
+      return
+    }
     switch (message.type) {
       case 'system':
         this.handleSystemMessage(message)

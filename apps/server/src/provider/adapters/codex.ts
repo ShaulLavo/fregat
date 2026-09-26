@@ -22,6 +22,7 @@ import {
   type ChatAgent,
   type InteractionMode,
   type ProviderConfiguredHook,
+  type ProviderGoalAction,
   type ProviderMcpServer,
   type ProviderModel,
   type ProviderInstanceId,
@@ -62,6 +63,7 @@ import {
 import {
   CODEX_CLIENT_REQUEST_METHODS,
   CodexAccountRateLimitsUpdatedNotificationSchema,
+  CodexThreadGoalUpdatedNotificationSchema,
   CodexThreadTokenUsageUpdatedNotificationSchema,
   parseCodexServerNotification,
   parseCodexClientRequestParams,
@@ -74,6 +76,7 @@ import {
   type CodexMcpServerStatus,
   type CodexServerNotificationParamsByMethod,
   type CodexSkillMetadata,
+  type CodexThreadGoal,
 } from './codex-protocol'
 import { errorMessage as providerErrorMessage } from '@workspace/contracts'
 import { codexTurnExists, prepareCodexRewind } from './utils/codex-rewind'
@@ -90,6 +93,13 @@ import { canonicalTurnId } from './utils/turn-ids'
 import { CodexChildAgents } from './state/codex-child-agents'
 import { codexUserInputAnswers } from './utils/codex-user-input'
 import { canonicalItemType } from './utils/codex-item-type'
+import {
+  CODEX_GOAL_COMMAND,
+  codexGoalCommand,
+  codexGoalReply,
+  codexSessionGoal,
+  type CodexGoalCommand,
+} from './utils/codex-goals'
 import { codexUsageTotals, type ProviderUsageTotals } from '../utils/usage-totals'
 import {
   codexLimitNextStep,
@@ -115,6 +125,8 @@ import { readJsonLines } from '../utils/json-lines'
 const DEFAULT_CODEX_BINARY = 'codex'
 const DEFAULT_CODEX_MODEL = 'gpt-5.5'
 const REQUEST_TIMEOUT_MS = 30_000
+/** How long a set or resumed goal may take to start its first turn before `/goal` answers itself. */
+const GOAL_TURN_WAIT_MS = 5_000
 const PROVIDER_PROBE_TIMEOUT_MS = 8_000
 const CODEX_USAGE_TIMEOUT_MS = 3_000
 const CODEX_DISCOVERY_PAGE_SIZE = 50
@@ -436,6 +448,10 @@ export class CodexProviderAdapter
     return this.requireSession(sessionId, 'mcpServer/oauth/login').signInMcpServer(name)
   }
 
+  async controlGoal({ action, sessionId }: { action: ProviderGoalAction; sessionId: SessionId }) {
+    await this.requireSession(sessionId, 'thread/goal/set').controlGoal(action)
+  }
+
   async configuredHooks({ cwd, sessionId }: { cwd: string; sessionId: SessionId }) {
     return (await this.activeSession(sessionId)?.configuredHooks(cwd)) ?? null
   }
@@ -703,6 +719,13 @@ class CodexAppServerSession extends SessionContext {
       })
       session.emitSessionStarted(input.providerResumeCursor ?? null)
       session.emitConversationStarted()
+      if (typeof input.providerResumeCursor === 'string')
+        void session.readGoal().catch((error: unknown) =>
+          recordChatPipelineWarning('chat.pipeline.codex_session.goal_read.failed', {
+            error,
+            sessionId: input.sessionId,
+          }),
+        )
       session.initialUsage = await readCodexUsageBaseline({
         model: input.model,
         resumed: typeof input.providerResumeCursor === 'string',
@@ -795,6 +818,52 @@ class CodexAppServerSession extends SessionContext {
     return { authorizationUrl: response.authorizationUrl }
   }
 
+  /** A resumed thread keeps its goal; the indicator learns of it before the first turn. */
+  async readGoal() {
+    const response = await this.client.request('thread/goal/get', {
+      threadId: this.providerConversationMarker,
+    })
+    if (response.goal) this.emitGoal(response.goal)
+  }
+
+  async controlGoal(action: ProviderGoalAction) {
+    const threadId = this.providerConversationMarker
+    if (action === 'clear') {
+      await this.client.request('thread/goal/clear', { threadId })
+      this.emitGoal(null)
+      return
+    }
+    const status = action === 'pause' ? 'paused' : 'active'
+    const response = await this.client.request('thread/goal/set', { threadId, status })
+    this.emitGoal(response.goal)
+  }
+
+  private emitGoal(goal: CodexThreadGoal | null) {
+    this.emit({
+      createdAt: new Date().toISOString(),
+      eventId: runtimeEventId('codex-goal-updated'),
+      payload: { goal: goal ? codexSessionGoal(goal) : null },
+      provider: DEFAULT_CODEX_PROVIDER_SETTINGS.driverKind,
+      providerInstanceId: this.providerInstanceId,
+      providerBindingHandle: this.providerBindingHandle,
+      runtimeMode: this.runtimeMode,
+      sessionId: this.sessionId,
+      type: 'goal.updated',
+    })
+  }
+
+  private handleGoalNotification(method: string, params: unknown) {
+    if (method === 'thread/goal/cleared') {
+      if (stringField(asRecord(params), 'threadId') === this.providerConversationMarker)
+        this.emitGoal(null)
+      return true
+    }
+    const parsed = v.safeParse(CodexThreadGoalUpdatedNotificationSchema, params)
+    if (parsed.success && parsed.output.threadId === this.providerConversationMarker)
+      this.emitGoal(parsed.output.goal)
+    return true
+  }
+
   async configuredHooks(cwd: string) {
     const response = await this.client.request('hooks/list', { cwds: [cwd] })
     const entries = response.data.filter((entry) => entry.cwd === cwd)
@@ -821,6 +890,8 @@ class CodexAppServerSession extends SessionContext {
   }
 
   async sendTurn({ input, messageId }: { input: ProviderTurnInput; messageId: string }) {
+    const goalCommand = input.kind ? null : codexGoalCommand(input.messageText)
+    if (goalCommand) return this.sendGoalTurn({ command: goalCommand, input, messageId })
     recordChatPipelineInfo('chat.pipeline.codex_session.send_turn.start', {
       ...providerTurnSummary(input),
       messageId,
@@ -892,6 +963,96 @@ class CodexAppServerSession extends SessionContext {
       sessionId: this.sessionId,
       turnId: input.turnId,
     })
+  }
+
+  /**
+   * `/goal` maps onto the thread goal API. Setting or resuming a goal on an idle thread starts
+   * the model's first turn for it, which answers this one; otherwise a short local reply does.
+   */
+  private async sendGoalTurn({
+    command,
+    input,
+    messageId,
+  }: {
+    command: CodexGoalCommand
+    input: ProviderTurnInput
+    messageId: string
+  }) {
+    const activeTurn = activeProviderTurn({ canonicalTurnId: input.turnId, messageId })
+    this.pendingTurn = activeTurn
+    void activeTurn.promise.catch(noop)
+    this.ingestSession('running', input.turnId)
+    const threadId = this.providerConversationMarker
+    try {
+      let goal: CodexThreadGoal | null = null
+      if (command.kind === 'objective') {
+        goal = (
+          await this.client.request('thread/goal/set', {
+            threadId,
+            objective: command.objective,
+            status: 'active',
+          })
+        ).goal
+        this.emitGoal(goal)
+      } else if (command.kind === 'action') {
+        await this.controlGoal(command.action)
+      } else {
+        goal = (await this.client.request('thread/goal/get', { threadId })).goal ?? null
+      }
+      const startsTurn =
+        command.kind === 'objective' || (command.kind === 'action' && command.action === 'resume')
+      if (startsTurn)
+        await Promise.race([activeTurn.promise.catch(noop), Bun.sleep(GOAL_TURN_WAIT_MS)])
+      if (this.pendingTurn === activeTurn && !activeTurn.settled())
+        await this.answerLocally(
+          activeTurn,
+          codexGoalReply(command, goal ? codexSessionGoal(goal) : null),
+        )
+      await activeTurn.promise
+    } catch (error) {
+      if (activeTurn.settled()) return activeTurn.promise
+      this.clearPendingTurn(activeTurn)
+      this.rejectUnmappedTurn(activeTurn, error)
+      recordChatPipelineWarning('chat.pipeline.codex_session.goal_turn.failed', {
+        command: command.kind,
+        error,
+        sessionId: this.sessionId,
+        turnId: input.turnId,
+      })
+      throw error
+    }
+  }
+
+  /** Completes a turn the app-server never ran, with `text` as its reply. */
+  private async answerLocally(turn: ActiveProviderTurn, text: string) {
+    const providerTurnId = `local:${crypto.randomUUID()}`
+    this.attachProviderTurn(providerTurnId, turn)
+    const base = {
+      provider: DEFAULT_CODEX_PROVIDER_SETTINGS.driverKind,
+      providerInstanceId: this.providerInstanceId,
+      providerBindingHandle: this.providerBindingHandle,
+      runtimeMode: this.runtimeMode,
+      sessionId: this.sessionId,
+      turnId: turn.canonicalTurnId,
+    }
+    this.emit({
+      ...base,
+      createdAt: new Date().toISOString(),
+      eventId: runtimeEventId('codex-local-turn-started'),
+      payload: { model: this.model },
+      providerRefs: { providerTurnId },
+      type: 'turn.started',
+    })
+    this.emit({
+      createdAt: new Date().toISOString(),
+      delta: text,
+      eventId: runtimeEventId('codex-local-reply'),
+      messageId: turn.messageId,
+      sessionId: this.sessionId,
+      turnId: turn.canonicalTurnId,
+      type: 'assistant.delta',
+    })
+    await this.completeTurn(providerTurnId, turn)
   }
 
   providerConversationMarkerForTurn() {
@@ -1256,6 +1417,9 @@ class CodexAppServerSession extends SessionContext {
         return this.handleSessionNameUpdatedNotification(params)
       case 'thread/tokenUsage/updated':
         return this.handleSessionTokenUsageUpdatedNotification(params)
+      case 'thread/goal/updated':
+      case 'thread/goal/cleared':
+        return this.handleGoalNotification(method, params)
       case 'turn/diff/updated':
         return this.handleTurnDiffUpdatedNotification(params)
       case 'turn/plan/updated':
@@ -2670,7 +2834,7 @@ async function probeCodexCommandCatalog(
     // Codex has no app-server method that lists or selects agent definitions.
     return {
       agents: [],
-      commands: [],
+      commands: [CODEX_GOAL_COMMAND],
       skills: codexCatalogSkills(codexSkillCatalog(response), cwd),
     }
   } finally {

@@ -4,7 +4,9 @@ import { existsSync, readFileSync } from 'node:fs'
 
 import {
   DEFAULT_CODEX_PROVIDER_SETTINGS,
+  type ProviderGoalAction,
   type ProviderModel,
+  type ProviderSessionGoal,
   type ProviderApprovalDecision,
   type ProviderDriverKind,
   type ProviderInstanceId,
@@ -130,6 +132,7 @@ export class MockProviderAdapter implements ProviderAdapter {
   private readonly stepDelayMs: number
   private readonly wakeupMinutes: number | null
   private readonly completedTurns = new Map<SessionId, number>()
+  private readonly goals = new Map<SessionId, ProviderSessionGoal>()
   private readonly shouldFail: boolean
   private readonly stopError: string | null
   private readonly userInputError: Error | null
@@ -263,6 +266,9 @@ export class MockProviderAdapter implements ProviderAdapter {
 
     const messageId = `assistant:${input.turnId}`
     this.publishTurnStarted(input)
+    const objective = /^\/goal\s+(.+)$/s.exec(input.messageText.trim())?.[1]
+    if (objective && objective !== 'clear') this.setGoal(input, objective)
+    if (objective === 'clear') this.publishGoal(input.sessionId, input, null)
     if (this.script) {
       void this.runScriptedTurn(input, messageId)
       return
@@ -426,6 +432,49 @@ export class MockProviderAdapter implements ProviderAdapter {
       sessionId: input.sessionId,
       turnId: input.turnId,
       type: 'conversation.token-usage.updated',
+    })
+  }
+
+  /** A goal as Codex reports one: a budget, the tokens and time spent so far. */
+  private setGoal(input: ProviderTurnInput, objective: string) {
+    this.publishGoal(input.sessionId, input, {
+      objective,
+      status: 'active',
+      tokenBudget: 50_000,
+      tokensUsed: 12_400,
+      timeUsedSeconds: 95,
+      iterations: null,
+      lastReason: null,
+    })
+  }
+
+  private publishGoal(
+    sessionId: SessionId,
+    runtime: Pick<ProviderTurnInput, 'providerInstanceId' | 'runtimeEpoch'>,
+    goal: ProviderSessionGoal | null,
+  ) {
+    if (goal) this.goals.set(sessionId, goal)
+    else this.goals.delete(sessionId)
+    this.events.publish({
+      createdAt: new Date().toISOString(),
+      eventId: `mock-goal:${crypto.randomUUID()}`,
+      payload: { goal },
+      provider: this.driverKind,
+      providerInstanceId: runtime.providerInstanceId,
+      runtimeEpoch: runtime.runtimeEpoch,
+      sessionId,
+      type: 'goal.updated',
+    })
+  }
+
+  async controlGoal({ action, sessionId }: { action: ProviderGoalAction; sessionId: SessionId }) {
+    const runtime = this.sessions.get(sessionId)
+    const goal = this.goals.get(sessionId)
+    if (!runtime || !goal) return
+    if (action === 'clear') return this.publishGoal(sessionId, runtime, null)
+    this.publishGoal(sessionId, runtime, {
+      ...goal,
+      status: action === 'pause' ? 'paused' : 'active',
     })
   }
 

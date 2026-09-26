@@ -8,6 +8,7 @@ import type {
   Options,
   PermissionUpdate,
   Query,
+  SDKActiveGoalMessage,
   SDKMessage,
   SDKRateLimitInfo,
   SDKUserMessage,
@@ -872,6 +873,47 @@ describe('ClaudeProviderAdapter', () => {
       },
       sessionId,
     })
+    await harness.adapter.stopAll()
+  })
+
+  it('reports a /goal from active_goal, and its end when the value is null', async () => {
+    const harness = claudeHarness()
+    await harness.adapter.startRuntime(sessionStartInput({}))
+    const query = latestQuery(harness)
+    const setAt = Date.now() - 90_000
+    const activeGoal = (value: SDKActiveGoalMessage['value']): SDKActiveGoalMessage => ({
+      type: 'active_goal',
+      value,
+      uuid: SYSTEM_UUID,
+      session_id: SESSION_ID,
+    })
+    // The SDK yields this message though its union leaves it out.
+    query.emit(
+      activeGoal({
+        condition: 'tests pass',
+        iterations: 2,
+        set_at: setAt,
+        tokens_at_start: 0,
+        last_reason: 'two failures left',
+      }) as unknown as SDKMessage,
+    )
+    expect(await waitForEvent(harness, 'goal.updated')).toMatchObject({
+      payload: {
+        goal: {
+          objective: 'tests pass',
+          status: 'active',
+          iterations: 2,
+          lastReason: 'two failures left',
+          timeUsedSeconds: 90,
+        },
+      },
+    })
+    query.emit(activeGoal(null) as unknown as SDKMessage)
+    await vi.waitFor(() =>
+      expect(harness.events.filter((event) => event.type === 'goal.updated').at(-1)).toMatchObject({
+        payload: { goal: null },
+      }),
+    )
     await harness.adapter.stopAll()
   })
 
