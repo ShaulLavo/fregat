@@ -210,6 +210,9 @@
   --picker-tile-width: 7rem;
   /* The glyph inside a tile of the icons view and the preview fallback. */
   --picker-tile-icon-size: 2.5rem;
+  /* A chat turn's status line under its prompt: Working, then the finished status or its fold.
+     The fold's text-xs button (1.625rem) plus the line's top and bottom padding. */
+  --turn-status-height: 2.375rem;
   --scrollbar-track: 6px;
   --scrollbar-thumb: color-mix(in oklch, var(--muted-foreground) 45%, transparent);
   /* How deep a scroller's edge fades once content is past it. */

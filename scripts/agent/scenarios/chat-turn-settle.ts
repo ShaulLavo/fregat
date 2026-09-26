@@ -1,7 +1,7 @@
 import { ok } from 'node:assert/strict'
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import type { Page } from 'playwright'
+import type { Locator, Page } from 'playwright'
 
 import { selectors } from '../selectors'
 import { isolatedNativeScenario, nativeLog, sendPrompt } from './native-provider-verification'
@@ -32,14 +32,25 @@ const HOLD_MS = 1_500
 export const chatTurnSettle = isolatedNativeScenario({
   name: 'chat-turn-settle',
   description:
-    'A finished turn keeps its answer still: the Working row becomes the finished status in the same slot under the prompt, for a turn with no tool steps and for one with a tool.',
+    'A finished turn keeps its answer still: the Working row becomes the finished status in the same slot under the prompt, for a turn with no tool steps and for one with a tool. The first turn keeps its status and place once the next prompt runs, and the fold caret turns when it opens.',
   fixture: new URL('../fixtures/native-codex.mjs', import.meta.url),
   async drive(page, { step, root }) {
     const turns = [
       await settleTurn(page, root, step, 1, 'no-tool', 'Answer without tools.'),
       await settleTurn(page, root, step, 2, 'tool', 'Answer with a tool.'),
     ]
-    await toggleToolFold(page, step)
+    const caret = await toggleToolFold(page, step)
+    const [first, second] = turns
+    ok(first && second, 'Both turns settled')
+    const kept = movedRows(first.rowsAfter, second.rowsBefore)
+    ok(
+      kept.length === 0,
+      `Sending the next prompt leaves the finished turn as it was: ${kept.join(', ')}`,
+    )
+    ok(
+      caret.expanded !== caret.collapsed,
+      `The fold's caret turns when it opens: ${caret.collapsed} closed, ${caret.expanded} open`,
+    )
     for (const turn of turns) {
       ok(
         Math.abs(turn.shift + turn.foldedHeight) <= 1,
@@ -52,9 +63,21 @@ export const chatTurnSettle = isolatedNativeScenario({
         `The ${turn.kind} status takes Working's slot: ${rowSummary([working])} became ${rowSummary(turn.rowsAfter)}`,
       )
     }
-    return turns
+    return { turns, caret }
   },
 })
+
+/** Rows of `before` that are gone or sit elsewhere relative to the first row in `after`. */
+function movedRows(before: readonly RowBox[], after: readonly RowBox[]) {
+  const origin = (rows: readonly RowBox[]) => rows[0]?.top ?? 0
+  const afterById = new Map(after.map((row) => [row.id, row]))
+  return before.flatMap((row) => {
+    const now = afterById.get(row.id)
+    if (!now) return [`${row.id} disappeared`]
+    const shift = now.top - origin(after) - (row.top - origin(before))
+    return Math.abs(shift) > 1 ? [`${row.id} moved ${Math.round(shift)}px`] : []
+  })
+}
 
 async function settleTurn(
   page: Page,
@@ -116,12 +139,30 @@ async function toggleToolFold(page: Page, step: (name: string) => Promise<void>)
   const fold = selectors.completedWorkGroup(page).first()
   await fold.hover()
   await step('tool-fold-hover')
+  const collapsed = await caretTurn(fold)
   await fold.click()
   await selectors.chatMessages(page).getByText('echo SETTLE_TOOL').waitFor()
+  const expanded = await caretTurn(fold)
   await step('tool-fold-expanded')
   await fold.click()
   await selectors.chatMessages(page).getByText('echo SETTLE_TOOL').waitFor({ state: 'detached' })
   await step('tool-fold-closed')
+  return { collapsed, expanded }
+}
+
+/**
+ * The caret's painted turn once its transition ends, whichever property carries it. A capture
+ * in the transition's first frame shows the closed caret on an open fold.
+ */
+function caretTurn(fold: Locator) {
+  return fold
+    .locator('svg')
+    .first()
+    .evaluate(async (caret) => {
+      await Promise.all(caret.getAnimations().map((animation) => animation.finished))
+      const style = getComputedStyle(caret)
+      return `rotate ${style.rotate}, transform ${style.transform}`
+    })
 }
 
 function answer(page: Page, index: number) {

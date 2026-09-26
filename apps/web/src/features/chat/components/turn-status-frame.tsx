@@ -6,7 +6,7 @@ import type { ReactNode } from 'react'
  */
 export function TurnStatusFrame({ children }: { children: ReactNode }) {
   return (
-    <div className='text-muted-foreground flex h-9.5 items-center pt-1 pb-2 text-xs tabular-nums'>
+    <div className='text-muted-foreground flex h-(--turn-status-height) items-center pt-1 pb-2 text-xs tabular-nums'>
       {children}
     </div>
   )
