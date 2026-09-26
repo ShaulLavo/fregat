@@ -99,7 +99,6 @@
         "@singapore-editor/core": "0.1.2",
         "@singapore-editor/diff": "0.2.0",
         "@singapore-editor/lsp": "0.1.1",
-        "@tanstack/hotkeys": "^0.10.0",
         "@tanstack/query-core": "^5.104.0",
         "@workspace/client-core": "workspace:*",
         "@workspace/contracts": "workspace:*",

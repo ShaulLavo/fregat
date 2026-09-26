@@ -70,7 +70,6 @@
         "prod.ts",
         "tui.ts",
         "web-layering.mjs",
-        "lint/web-boundaries.mjs",
         "skills/port-pstack.ts",
         "themes/import-omarchy-palette.ts",
         "themes/import-omarchy-wallpapers.ts",
