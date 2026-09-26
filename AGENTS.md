@@ -1,5 +1,15 @@
 # Repository Guidelines
 
+## Running A Task
+
+- When a step does not need the owner, keep going. Put a status note in the same message as the next action; do not stop to summarize the next step, offer to continue, or list options that do not block the work.
+- Stop and ask only when you cannot continue without the owner, or before something destructive: deleting data the owner keeps (`~/.platform`, `/work/platform-dev/home`, anything not yours in `/work`), force-pushing or rewriting pushed history, taking another session's changes out of the tree, or changing anything outside this checkout other than the linked repos (`../Editor`, `/work/projects/ghostty-webgpu`).
+- Done means: the narrowest check that could fail passes, a UI change has `look` or scenario evidence you read back, your files are committed by path and pushed, and the mesh runs it (`bun run deploy`, `--server` when the server changed). None of these is a stop. Name any you skipped and why.
+- A run with more than a few steps keeps its checklist in a file and ticks items as they land: the plan's own file when one exists, otherwise the scratchpad. Long runs get summarized; the file survives that, the scrollback does not.
+- An audit, review or migration that spans many features splits across subagents, one slice each. Check each subagent's evidence before accepting it, and finish with one table.
+- A review lists only what you would block the merge for: file and line, why it is wrong, and how to show it fails.
+- End a run with what you need from the owner first (an open decision, something to approve), then what changed, then what you found. Mark anything you could not confirm and say where you looked.
+
 ## Reference Clones
 
 - Upstream code we compare against (vscode, t3code, opencode, codex, …) is cloned under `references/` at the repo root, gitignored. Look there before cloning anything, and add new clones there — not in `/work/projects/references/`.
@@ -30,7 +40,7 @@
 
 ## Control Flow
 
-- The `never-nester` skill is part of every development task: `/Users/shaul/.agents/skills/never-nester/SKILL.md`.
+- The `never-nester` skill is part of every development task: `~/.agents/skills/never-nester/SKILL.md`.
 - Keep nesting depth to 3 or less.
 - Use guard clauses and early returns. Keep the happy path shallow.
 - In loops, use inverted conditions with `continue` instead of wrapping the body in `if`.
@@ -82,6 +92,7 @@
 - Panes compose `ToolPane` and its `ToolPaneHeader`: `PaneBar` headers, pending before error before empty, and a body focus ring. A terminal's host stays mounted while its loading overlay is visible.
 - Icons have two density tokens: `size-(--icon-size)` on controls and headings, `size-(--icon-size-sm)` in rows and text. Never choose a numeric icon size at a call site.
 - Text has two colors, `text-foreground` and `text-muted-foreground`; use `text-2xs` for a quieter size, never alpha. Disabled controls may use whole-control `opacity-50`.
+- A number that updates (timer, counter, percentage, live count) carries `tabular-nums`, so its width holds while the digits change.
 - Icon-only controls carry a `Tooltip`; `title` recovers truncated values and never duplicates a tooltip. Tooltip delays belong to the shared provider. Controls inside virtualized rows use `data-tooltip` (the shared layer) instead: a `Tooltip` root per recycled row is a scroll cost.
 
 - Style with Tailwind classes and the `@workspace/ui` primitives. Do not write raw CSS or inline `style` props except for values that must be computed at runtime (dynamic positions, measured sizes).
@@ -293,7 +304,7 @@ Interaction treatments are utilities, not strings to copy:
 
 ## Gates
 
-- `bun run gates` is the whole-tree set a commit must not break: `dupes:functions`, `dupes`, `design:census`, `compiler:census`. It runs in `pre-commit` through lefthook, in `verify`, and in CI, and a test pins all three so a gate cannot exist without being run. Under two seconds together.
+- `bun run gates` is the whole-tree set a commit must not break: `dupes:functions`, `dupes`, `design:census`, `compiler:census`, `errors:census`. It runs in `pre-commit` through lefthook, in `verify`, and in CI, and `react-compiler-census.test.ts` pins the list and the hook so a gate cannot exist without being run. About five seconds together.
 - A staged-file lint cannot see a clone, a duplicated helper or a refused component, which is why these run over the tree rather than over `{staged_files}`.
 - `bun run hooks:pre-commit` is **not** a dry run. Its fix jobs carry `stage_fixed: true`, so invoking it by hand stages every file they touch. Run the individual gate you want instead.
 - `packages/ui` and `packages/tree` run their tests through the React Compiler, because the app that ships them compiles them. Without it a test exercises unmemoized source: manual memoization the compiler makes redundant looks load-bearing, and a value the compiler over-caches never shows up.
@@ -372,11 +383,3 @@ Interaction treatments are utilities, not strings to copy:
 - Under Vitest transforms, `import.meta.path` and `import.meta.dir` are `undefined`. `import.meta.dirname` works. Avoid Bun-only `import.meta` fields in code that tests must drive.
 - Cold process-spawning tests can exceed Vitest's 5s default timeout. If CI flakes cold, raise `testTimeout` for that project.
 - Terminal processes use `@workspace/pty` directly. Run their tests under Bun; terminal input and output are binary WebSocket frames, with JSON reserved for controls.
-
-`tabular-nums` should be the default for any number that updates ( timers, counters, prices, percentages, scores, live data etc ).
-
-you can enable this tnum OpenType feature using the CSS property `font-variant-numeric`.
-
-.tabular-nums {
-font-variant-numeric: tabular-nums;
-}
