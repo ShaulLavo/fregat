@@ -1,6 +1,7 @@
 import { sessionNoFlicker } from './session-no-flicker'
 import { restNoFlicker } from './rest-no-flicker'
 import { deferredDialogs } from './deferred-dialogs'
+import { dialogEscape } from './dialog-escape'
 import { rootSwitchNoFlicker } from './root-switch-no-flicker'
 import { turnFilesNoFlicker } from './turn-files-no-flicker'
 import { branchActionsNoFlicker } from './branch-actions-no-flicker'
@@ -571,6 +572,7 @@ export const scenarios: readonly Scenario[] = [
   textFieldFkeys,
   settingsModuleFailure,
   deferredDialogs,
+  dialogEscape,
   projectMenu,
   workspaceSwitch,
   serverRestart,
