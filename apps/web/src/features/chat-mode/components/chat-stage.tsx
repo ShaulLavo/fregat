@@ -1,3 +1,5 @@
+import { useHeldUntilReady } from '@/hooks/use-held-until-ready'
+import { useSessionReady } from '@/hooks/use-session-ready'
 import { useSessionRailItem } from '@/hooks/use-session-rail-item'
 import { EMPTY_ACTIVITIES } from '@/lib/empty-activities'
 import { useApplicationRuntime } from '@/hooks/use-application-runtime'
@@ -27,8 +29,16 @@ export function ChatStage({
   const navigation = useNavigation()
   const application = useApplicationRuntime()
   const draftGeneration = useSessionSelectionStore((state) => state.draftGeneration)
-  const { activeSession, transport, error, project, worktree, ready, rootPath } =
-    useChatModeSession()
+  const selected = useChatModeSession()
+  const sessionReady = useSessionReady(selected.transport, selected.activeSession.sessionId)
+  const held = useHeldUntilReady(selected, sessionReady)
+  const shown =
+    held.activeSession.sessionId &&
+    held.transport.environmentId === selected.transport.environmentId
+      ? held
+      : selected
+  const { activeSession, transport, error, project, worktree, ready, rootPath } = shown
+  const switching = activeSession.sessionId !== selected.activeSession.sessionId
   // Read by id rather than from the provider's list: the archive browser can put a
   // filed-away session on the stage, and that list deliberately excludes them.
   const summary = useActiveChatProjection(
@@ -70,6 +80,7 @@ export function ChatStage({
   return (
     <section className='flex h-full min-h-0 min-w-0 flex-col overflow-hidden'>
       <Header
+        switching={switching}
         contextUsage={contextUsageForActivities(activities)}
         projectTitle={project?.title ?? null}
         session={session}
@@ -80,6 +91,7 @@ export function ChatStage({
           resetKeys={[activeSession.status, activeSession.sessionId]}
         >
           <StageBody
+            switching={switching}
             activeSession={activeSession}
             transport={transport}
             project={project}

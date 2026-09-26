@@ -50,7 +50,7 @@ test('includes both strokes in a chord shortcut hint', () => {
   const bindings = resolvedPlatformKeyBindings(
     defaultPlatformKeyBindings('linux'),
     {
-      'workspace.showSettings': 'Mod+K Mod+S',
+      'workspace.showSettings': ['Mod+K Mod+S'],
     },
     'linux',
   )

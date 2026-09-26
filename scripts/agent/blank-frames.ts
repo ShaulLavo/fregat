@@ -1,12 +1,13 @@
 import type { Page } from 'playwright'
 
 // Page scripts are strings: the scripts project compiles without the DOM lib.
-const startSampling = `(selector) => {
+const startSampling = `({ selector, shadowHost }) => {
   const counter = { blank: 0, running: true }
   window.__agentBlankFrames = counter
   const sample = () => {
     if (!counter.running) return
-    if (!document.querySelector(selector)) counter.blank += 1
+    const root = shadowHost ? document.querySelector(shadowHost)?.shadowRoot : document
+    if (!root?.querySelector(selector)) counter.blank += 1
     requestAnimationFrame(sample)
   }
   requestAnimationFrame(sample)
@@ -23,8 +24,11 @@ export async function countBlankFrames(
   page: Page,
   rowSelector: string,
   drive: () => Promise<void>,
+  shadowHost?: string,
 ): Promise<number> {
-  await page.evaluate(`(${startSampling})(${JSON.stringify(rowSelector)})`)
+  await page.evaluate(
+    `(${startSampling})(${JSON.stringify({ selector: rowSelector, shadowHost })})`,
+  )
   await drive()
 
   return page.evaluate<number>(stopSampling)

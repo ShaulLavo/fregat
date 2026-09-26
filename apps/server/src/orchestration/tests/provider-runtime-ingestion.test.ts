@@ -323,6 +323,12 @@ describe('provider runtime ingestion', () => {
         type: 'mcp.status.updated',
         payload: { status: { name: 'GitHub', status: 'failed', error: 'Authentication required' } },
       },
+      {
+        ...base,
+        eventId: 'mcp-needs-auth',
+        type: 'mcp.status.updated',
+        payload: { status: { name: 'Sentry', status: 'needs-auth', error: null } },
+      },
       { ...base, eventId: 'auth-failed', type: 'auth.status', payload: { error: 'Token expired' } },
       {
         ...base,
@@ -369,6 +375,7 @@ describe('provider runtime ingestion', () => {
     )
     expect(activities.map((activity) => activity.summary)).toEqual([
       'GitHub connection failed: Authentication required',
+      'Sentry needs sign-in',
       'Authentication failed: Token expired',
       'Linear sign-in failed: Access denied',
       'Could not save files',
@@ -385,7 +392,7 @@ describe('provider runtime ingestion', () => {
     expect(activities.filter((activity) => activity.kind === 'runtime.error')).toMatchObject([
       { payload: { message: 'Rate limit exceeded', class: 'provider_error' }, tone: 'error' },
     ])
-    expect(activities[3]?.payload).toMatchObject({ detail: 'output.txt: Permission denied' })
+    expect(activities[4]?.payload).toMatchObject({ detail: 'output.txt: Permission denied' })
   })
 
   it('streams assistant deltas by default', async () => {

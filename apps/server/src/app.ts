@@ -1,3 +1,5 @@
+import { mcpConfigRoutes } from './provider/mcp-config-routes'
+import { McpSignInAttempts } from './provider/mcp-sign-in'
 import { McpGrantRegistry } from './mcp/grants'
 import { mcpRoutes } from './mcp/routes'
 import { AgentDiagnosticsReader } from './lsp/agent-diagnostics'
@@ -128,6 +130,8 @@ export type AppOptions = FileSystemServiceOptions & {
     root?: string
     /** Populate the wallpaper picker from packaged artwork during startup. */
     seedWallpapers?: boolean
+    /** After seeding, add this machine's installed Omarchy backgrounds. */
+    importOmarchyWallpapers?: boolean
   }
   orchestration?: {
     attachmentsDir?: string
@@ -277,6 +281,14 @@ export function createApp(options: AppOptions) {
           durationMs: Math.round(performance.now() - started),
           ...result,
         })
+        if (!options.themes?.importOmarchyWallpapers) return
+        const importStarted = performance.now()
+        const omarchy = await wallpapers.importInstalledOmarchy()
+        recordProcessInfo('wallpapers.omarchy-import', {
+          durationMs: Math.round(performance.now() - importStarted),
+          installed: omarchy !== null,
+          ...omarchy,
+        })
       },
       { area: 'wallpaper', operation: 'library.seed' },
     )
@@ -327,6 +339,7 @@ export function createApp(options: AppOptions) {
     ...(options.mcp ? { mcp: { endpoint: options.mcp.endpoint, grants: mcpGrants } } : {}),
     sessionDirectory: new ProviderSessionDirectory(database),
   })
+  const mcpSignIns = new McpSignInAttempts()
   const providerUsage = new ProviderUsageStore(providerAdapterRegistry)
   const providerResetCredits = new ProviderResetCredits(
     database,
@@ -465,6 +478,7 @@ export function createApp(options: AppOptions) {
     providerMaintenance,
     providerResetCredits,
     sessionPush,
+    mcpSignIns,
   )
   const update = new ServerUpdate({
     root: options.update?.root ?? null,
@@ -579,7 +593,8 @@ export function createApp(options: AppOptions) {
         providerResetCredits,
       ),
     )
-    .use(sessionControlRoutes(providerService))
+    .use(sessionControlRoutes(providerService, mcpSignIns))
+    .use(mcpConfigRoutes(providerAdapterRegistry, mcpSignIns))
     .use(agentReviewRoutes(agentReviews))
     .use(orchestrationRoutes(orchestration, checkpointDiff, sessionSearch, checkpointHunks))
     .use(
@@ -666,6 +681,7 @@ function appCleanup(
   providerMaintenance: ProviderMaintenance,
   providerResetCredits: ProviderResetCredits,
   sessionPush: SessionNoticePush,
+  mcpSignIns: McpSignInAttempts,
 ) {
   let closed = false
 
@@ -677,6 +693,8 @@ function appCleanup(
     orchestration.holdProviderStarts()
     orchestrationSockets.closeAll()
     sessionPush.close()
+    // A sign-in holds a provider CLI or app-server open until its page finishes.
+    mcpSignIns.cancelAll()
     // Kills the language servers, before any await: the service manager signals them with the
     // server, and an exit that lands before this is logged as a crash.
     lspPool.disposeAll()

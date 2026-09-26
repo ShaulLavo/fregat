@@ -71,6 +71,40 @@ test('keeps placeholders within one directory and never carries them across navi
   queryClient.clear()
 })
 
+test('keeps the current listing during hidden and mode changes', async ({ client }) => {
+  await client.fs['create-folder'].post({ path: 'held/visible', recursive: true })
+  await client.fs['create-folder'].post({ path: 'held/.hidden', recursive: true })
+  const queryClient = createTestQueryClient()
+  const { result, rerender } = renderHook(
+    ({ mode, showHidden }: { mode: 'file' | 'folder'; showHidden: boolean }) =>
+      useDirectoryLoad({
+        currentPath: 'held',
+        effectiveQuery: '',
+        mode,
+        open: true,
+        serverInfo: SERVER_INFO,
+        showHidden,
+      }),
+    {
+      initialProps: { mode: 'folder' as 'file' | 'folder', showHidden: false },
+      wrapper: queryClientWrapper(queryClient),
+    },
+  )
+  await waitFor(() => expect(entryPaths(result.current.loadState)).toEqual(['held/visible']))
+  rerender({ mode: 'folder', showHidden: true })
+  expect(result.current.loadState).toEqual({
+    status: 'loading',
+    data: [expect.objectContaining({ path: 'held/visible' })],
+  })
+  expect(result.current.currentEntry?.path).toBe('held')
+  await waitFor(() => expect(entryPaths(result.current.loadState)).toHaveLength(2))
+  rerender({ mode: 'file', showHidden: true })
+  expect(result.current.loadState.status).toBe('loading')
+  expect('data' in result.current.loadState && result.current.loadState.data).toHaveLength(2)
+  await waitFor(() => expect(result.current.loadState.status).toBe('ready'))
+  queryClient.clear()
+})
+
 test('refreshes the current directory without growing the query cache', async ({ client }) => {
   await client.fs['create-folder'].post({ path: 'project', recursive: true })
   await client.fs['create-file'].post({ path: 'project/one.ts' })

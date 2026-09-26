@@ -1,3 +1,4 @@
+import { Spinner } from '@workspace/ui/components/spinner'
 import { useSettingValue } from '@/hooks/use-setting-value'
 import { SessionTitleStatus } from '@/features/chat-mode/components/session-title-status'
 import { WorktreeChip } from '@/features/chat-mode/components/worktree-chip'
@@ -23,13 +24,19 @@ import { ToolPaneHeader } from '@workspace/ui/patterns/tool-pane-header'
 import { cn } from '@workspace/ui/lib/utils'
 
 export type StageHeaderProps = {
+  readonly switching?: boolean
   readonly contextUsage: ContextUsage | null
   readonly projectTitle: string | null
   /** Null while the stage is on the composer — there is no session to name or act on. */
   readonly session: SessionRailItem | null
 }
 
-export function StageHeader({ contextUsage, projectTitle, session }: StageHeaderProps) {
+export function StageHeader({
+  contextUsage,
+  switching = false,
+  projectTitle,
+  session,
+}: StageHeaderProps) {
   const contextMeterEnabled = useSettingValue('chat.contextWindowMeterEnabled')
   const { rootPath } = useChatModeSession()
   const editing = useSessionRenaming(session, 'header')
@@ -38,6 +45,7 @@ export function StageHeader({ contextUsage, projectTitle, session }: StageHeader
     <ToolPaneHeader
       actions={
         <>
+          {switching ? <Spinner size='xs' label='Loading conversation' /> : null}
           {session?.branch && session.worktree.lifecycle.state === 'ready' ? (
             <BranchActions
               pullRequestTitle={session.title}

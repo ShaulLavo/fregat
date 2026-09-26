@@ -1,6 +1,5 @@
 export { FileTree } from './components/FileTree'
 export { useFileTree } from './hooks/useFileTree'
-export { getBuiltInFileIconColor } from './utils/builtInIcons'
 export { prepareFileTreeInput, preparePresortedFileTreeInput } from './utils/preparedInput'
 export { FileTree as FileTreeModel } from './utils/render/FileTree'
 export type { FileTreeRowElement } from './utils/render/rowElements'

@@ -1,7 +1,7 @@
 import type { GitFileDiff } from '@workspace/contracts'
 import { comparisonRequest } from '@/lib/documents/utils/comparisons'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
-import { useQueries, useQuery, type UseQueryOptions } from '@tanstack/react-query'
+import { useQueries, type UseQueryOptions } from '@tanstack/react-query'
 import { useMemo } from 'react'
 
 import {
@@ -29,15 +29,17 @@ type DiffQueryOptions = UseQueryOptions<DiffList, Error, DiffList, readonly unkn
  * content-addressed and checkpoint ids are pinned to a turn range, so neither
  * result can go stale once fetched.
  */
-export function useDiffDocumentDiffs(info: GitComparison) {
-  const query = useQuery(diffDocumentQueryOptions(info))
-  const displayed = info.kind === 'snapshot' ? null : displayedCheckpointEntry(query.data ?? [])
+export function useDiffDocumentDiffs(info: GitComparison | null) {
+  const documentQueries: DiffQueryOptions[] = info ? [diffDocumentQueryOptions(info)] : []
+  const [query] = useQueries({ queries: documentQueries })
+  const displayed =
+    !info || info.kind === 'snapshot' ? null : displayedCheckpointEntry(query?.data ?? [])
   const blobRequest = checkpointBlobRequest(displayed)
   // Checkpoints list patch snippets; only the displayed file needs its complete Git blobs.
   const queries: DiffQueryOptions[] = blobRequest ? [blobDiffQueryOptions(blobRequest)] : []
   const [blob] = useQueries({ queries })
-  const error = query.error ?? blob?.error
-  const listedData = query.data
+  const error = query?.error ?? blob?.error
+  const listedData = query?.data
   const blobData = blob?.data
   const blobPending = Boolean(blob?.isPending)
   const resolving = blobRequest !== null
@@ -52,7 +54,7 @@ export function useDiffDocumentDiffs(info: GitComparison) {
   return {
     diffs: diffs ?? [],
     failure: error ? errorMessage(error, 'Diff unavailable.') : null,
-    pending: query.isPending || blobPending,
+    pending: Boolean(query?.isPending) || blobPending,
   }
 }
 

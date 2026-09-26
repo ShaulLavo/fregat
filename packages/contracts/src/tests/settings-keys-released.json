@@ -91,6 +91,7 @@
     "models.favorites",
     "models.hidden",
     "models.order",
+    "prefetch.diffs",
     "prefetch.enabled",
     "prefetch.files",
     "providers.instances",
@@ -129,6 +130,9 @@
     "workbench.theme.customizations",
     "workbench.tree.indentGuides",
     "workbench.wallpaper",
-    "workbench.wallpaper.enabled"
+    "workbench.wallpaper.downloadTimeoutMs",
+    "workbench.wallpaper.enabled",
+    "workbench.wallpaper.omarchyCatalog",
+    "workbench.wallpaper.previewCloud"
   ]
 }
