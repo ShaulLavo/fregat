@@ -10,10 +10,13 @@ import {
   type ProviderInstanceId,
   type ProviderInstanceSettings,
   type ProviderSnapshot,
+  type ProviderTurnOrigin,
   type ProviderUserInputAnswers,
   type ApprovalRequestId,
   type SessionId,
+  turnIdSchema,
 } from '@workspace/contracts'
+import * as v from 'valibot'
 import { ProviderRuntimeEventStream } from '../provider-runtime-event-stream'
 import type {
   ProviderAdapter,
@@ -127,6 +130,7 @@ export class MockProviderAdapter implements ProviderAdapter {
   private readonly script: MockTurnScript | null
   private readonly stepDelayMs: number
   private readonly completedTurns = new Map<SessionId, number>()
+  private providerTurnCount = 0
   private readonly shouldFail: boolean
   private readonly stopError: string | null
   private readonly userInputError: Error | null
@@ -396,6 +400,60 @@ export class MockProviderAdapter implements ProviderAdapter {
       turnId: input.turnId,
       type: 'conversation.token-usage.updated',
     })
+  }
+
+  /**
+   * A turn the harness starts with no prompt (a wakeup, a finished background task), as the
+   * Claude and Codex adapters report one. `finish` ends it with the given reply.
+   */
+  startProviderTurn(input: { origin: ProviderTurnOrigin; sessionId: SessionId }) {
+    const session = this.sessions.get(input.sessionId)
+    if (!session) throw createInternalError('Mock provider has no runtime for that session.')
+    this.providerTurnCount += 1
+    const turnId = v.parse(turnIdSchema, `provider:mock-${this.providerTurnCount}`)
+    const base = {
+      provider: this.driverKind,
+      providerInstanceId: session.providerInstanceId,
+      providerBindingHandle: `mock:${input.sessionId}`,
+      runtimeMode: session.runtimeMode,
+      runtimeEpoch: session.runtimeEpoch,
+      sessionId: input.sessionId,
+      turnId,
+    }
+    this.events.publish({
+      ...base,
+      createdAt: new Date().toISOString(),
+      eventId: `mock-provider-turn-started:${turnId}`,
+      payload: { model: session.modelSelection.model, origin: input.origin },
+      type: 'turn.started',
+    })
+    const finish = (text: string) => {
+      const messageId = `assistant:${turnId}`
+      this.events.publish({
+        ...base,
+        createdAt: new Date().toISOString(),
+        delta: text,
+        eventId: `mock-provider-turn-delta:${turnId}`,
+        messageId,
+        type: 'assistant.delta',
+      })
+      this.events.publish({
+        ...base,
+        completedAt: new Date().toISOString(),
+        eventId: `mock-provider-turn-complete:${turnId}`,
+        messageId,
+        type: 'assistant.complete',
+      })
+      this.events.publish({
+        ...base,
+        createdAt: new Date().toISOString(),
+        eventId: `mock-provider-turn-completed:${turnId}`,
+        payload: { state: 'completed' },
+        type: 'turn.completed',
+      })
+    }
+
+    return { finish, turnId }
   }
 
   async hasRuntime({ sessionId }: { sessionId: SessionId }) {

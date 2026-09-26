@@ -102,6 +102,7 @@ const DETAIL_EVENT_TYPES = new Set<OrchestrationEvent['type']>([
   'session.provider-start-claimed',
   'session.provider-start-adopted',
   'session.provider-start-settled',
+  'session.turn-provider-started',
   'session.runtime-recovered',
   'session.deletion-updated',
 ])
