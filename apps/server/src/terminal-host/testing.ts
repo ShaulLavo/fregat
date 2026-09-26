@@ -2,12 +2,8 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 
-import {
-  hostPtyFactory,
-  TerminalHostClient,
-  type HostLauncher,
-} from '../../src/terminal/host-client'
-import { hostPaths } from '../../src/terminal-host/protocol'
+import { hostPtyFactory, TerminalHostClient, type HostLauncher } from '../terminal/host-client'
+import { hostPaths } from './protocol'
 
 const HOST_EXIT_MS = 5_000
 

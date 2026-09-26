@@ -3,7 +3,7 @@ import path from 'node:path'
 import { afterEach, expect, test } from 'vitest'
 import { agentTerminalHandoffs } from '../../db/schema'
 import { createAgentTerminalFixture } from '../../../test/factories/agent-terminal'
-import { createTestTerminalHost } from '../../../test/factories/terminal-host'
+import { createTestTerminalHost } from '../../terminal-host/testing'
 
 const cleanups: (() => Promise<void>)[] = []
 afterEach(async () => {
