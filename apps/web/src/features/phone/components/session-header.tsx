@@ -24,7 +24,12 @@ export function SessionHeader({ projectTitle, session }: StageHeaderProps) {
   const navigation = useNavigation()
   const status =
     session && session.status !== 'ready' ? (
-      <span className={cn('flex items-center gap-1.5', sessionStatusTextClass(session.status))}>
+      <span
+        className={cn(
+          'flex items-center gap-(--density-gap-tight)',
+          sessionStatusTextClass(session.status),
+        )}
+      >
         <SessionAttentionIndicator status={session.status} />
         {sessionStatusLabel(session.status)}
       </span>

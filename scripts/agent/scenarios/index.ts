@@ -100,6 +100,7 @@ import { chatComposerInsert } from './chat-composer-insert'
 import { chatDisclosureSettle } from './chat-disclosure-settle'
 import { chatTurnAnatomy } from './chat-turn-anatomy'
 import { phoneShell } from './phone-shell'
+import { shellSwitch } from './shell-switch'
 import { chatSleepingSession } from './chat-sleeping-session'
 import { chatSessionGoal } from './chat-session-goal'
 import { chatAgentReview } from './chat-agent-review'
@@ -569,6 +570,7 @@ export const scenarios: readonly Scenario[] = [
   chatDisclosureSettle,
   chatTurnAnatomy,
   phoneShell,
+  shellSwitch,
   chatSleepingSession,
   chatSessionGoal,
   chatAgentReview,

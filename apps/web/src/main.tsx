@@ -45,6 +45,7 @@ import { applicationHost } from '@/lib/application-host'
 import { configureIntentPrediction } from '@/lib/intent-prefetch-options'
 import { useShellStore, watchShellKind } from '@/lib/shell/state/store'
 import { installLongPressContextMenu } from '@/keymap/menus/state/long-press'
+import { COARSE_POINTER_QUERY } from '@/lib/shell/utils/kind'
 import { shellQueryOptions } from '@/features/workspace/utils/shell-query'
 
 installEditorPerformanceTraceFromUrl()
@@ -85,10 +86,10 @@ for (const font of fontsInUse(boot))
 // Preserve explicit fields before Router normalizes defaults; boot merges them with the cache.
 const initialHref = applicationHost()?.initialAddress ?? selectInitialAddress(window.location.href)
 const initialIntent = parseAddressIntent(initialHref)
-// Only a phone booting from the bare app URL; a window narrowed later keeps its session.
+// Only a touch phone booting from the bare app URL: a narrow desk window keeps its session.
 useShellStore.setState({
   phoneStartsAtSessions:
-    useShellStore.getState().kind === 'phone' &&
+    window.matchMedia(COARSE_POINTER_QUERY).matches &&
     initialHref !== selectInitialAddress(window.location.href, null),
 })
 const routerHistory = applicationHost()?.history ?? createBrowserHistory()

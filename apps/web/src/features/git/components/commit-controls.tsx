@@ -141,7 +141,7 @@ export function CommitControls({
               <CheckIcon className='size-(--icon-size-sm)' />
             )}
             Commit
-            <span className='text-primary-foreground/65 text-3xs phone:hidden'>⌘↵</span>
+            <span className='text-primary-foreground/65 text-3xs touch:hidden'>⌘↵</span>
           </Button>
         )}
       </PaneBar>

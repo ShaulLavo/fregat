@@ -762,6 +762,12 @@
     "reason": "owner: the phone shell composes its screens from the real chat, git and editor features, not copies of them."
   },
   {
+    "from": "phone",
+    "to": "server-update",
+    "module": "features/server-update/components/status.tsx",
+    "reason": "owner: the phone shell composes its screens from the real chat, git and editor features, not copies of them."
+  },
+  {
     "from": "search",
     "to": "editor",
     "module": "features/editor/state/document-state.tsx",

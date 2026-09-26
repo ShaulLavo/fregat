@@ -1,7 +1,8 @@
-import { GearSixIcon, CommandIcon } from '@phosphor-icons/react'
+import { GearSixIcon, ListMagnifyingGlassIcon } from '@phosphor-icons/react'
 import { RenderErrorBoundary } from '@workspace/ui/patterns/render-error-boundary'
 
 import { SessionRail } from '@/features/chat-mode/components/session-rail'
+import { ServerUpdateStatus } from '@/features/server-update/components/status'
 import { Header } from '@/features/phone/components/header'
 import { HeaderButton } from '@/features/phone/components/header-button'
 import { useCommandBus } from '@/keymap/hooks/use-command-bus'
@@ -16,9 +17,10 @@ export function SessionsScreen() {
       <Header
         actions={
           <>
+            <ServerUpdateStatus />
             <HeaderButton
               command='workspace.showCommandPalette'
-              icon={CommandIcon}
+              icon={ListMagnifyingGlassIcon}
               label='Command palette'
               onClick={() => bus.dispatch('workspace.showCommandPalette', { source })}
             />

@@ -1,4 +1,4 @@
-import type { PhoneScreen } from '@workspace/client-core/address/grammar'
+import type { AddressMode, PhoneScreen } from '@workspace/client-core/address/grammar'
 import { create } from 'zustand'
 
 import {
@@ -15,6 +15,8 @@ type ShellState = {
   readonly phoneScreen: PhoneScreen | null
   /** A cold start from the bare app URL restored a stored address; the phone opens on its session list instead. */
   readonly phoneStartsAtSessions: boolean
+  /** The desk's mode when the phone shell took over, put back when the workbench returns. */
+  readonly deskMode: AddressMode | null
 }
 
 // Node-environment tests import the store; with no window there is no phone.
@@ -24,7 +26,19 @@ export const useShellStore = create<ShellState>(() => ({
   kind: initialShellKind(matches),
   phoneScreen: null,
   phoneStartsAtSessions: false,
+  deskMode: null,
 }))
+
+/** Opening a session on the phone moves it to chat mode; the desk gets its own mode back. */
+export function rememberDeskMode(mode: AddressMode) {
+  if (useShellStore.getState().deskMode === null) useShellStore.setState({ deskMode: mode })
+}
+
+export function takeDeskMode() {
+  const { deskMode } = useShellStore.getState()
+  if (deskMode !== null) useShellStore.setState({ deskMode: null })
+  return deskMode
+}
 
 /** True once, for the first phone shell after a cold start from the bare app URL. */
 export function takePhoneStartAtSessions() {

@@ -31,7 +31,11 @@ export function useOpenCheckpointDiffDocument() {
   const navigation = useNavigation()
   const workspaceStore = useEditorWorkspaceStoreApi()
 
-  async function openCheckpointDiff(summary: ChatTurnDiffSummary, path?: string) {
+  async function openCheckpointDiff(
+    summary: ChatTurnDiffSummary,
+    path?: string,
+    replace?: boolean,
+  ) {
     if (checkpointAvailability(summary).kind !== 'available') return false
 
     const rootPath = workspaceStore.getState().rootFolder?.path ?? null
@@ -66,7 +70,7 @@ export function useOpenCheckpointDiffDocument() {
       queryClient.setQueryData(checkpointDiffQueryKey(checkpointRequest(documentInput.source)), [
         diff,
       ])
-    const opened = await selectContent(documentTab(documentInput))
+    const opened = await selectContent(documentTab(documentInput), replace)
     if (opened.status !== 'applied') return false
     await rememberTurnScope(summary, documentPath)
 

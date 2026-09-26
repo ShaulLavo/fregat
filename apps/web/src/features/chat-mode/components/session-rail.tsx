@@ -396,7 +396,11 @@ export function SessionRail({
                 items={model.groups.map((group) => group.key)}
                 strategy={verticalListSortingStrategy}
               >
-                {model.sections.map((section) => (
+                {/* Nothing is dragged into an empty shelf where the list is its own screen. */}
+                {(standalone
+                  ? model.sections.filter((section) => section.groups.length > 0)
+                  : model.sections
+                ).map((section) => (
                   <SessionShelf key={section.state} shelf={section.state} title={section.title}>
                     {section.groups.map((group) => (
                       <SessionGroup group={group} key={group.key} />

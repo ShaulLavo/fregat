@@ -22,7 +22,8 @@ type ScopeFiles = {
 
 /**
  * The open diff's place among the files of the scope it came from, a turn or the working tree,
- * and the steps to the files either side. Null for anything else.
+ * and the steps to the files either side. A step replaces the history entry, so Back leaves the
+ * file screen instead of walking the files. Null for anything else.
  */
 export function useScopeFiles(
   diffScope: ReturnType<typeof useSessionDiffScope>,
@@ -47,8 +48,10 @@ export function useScopeFiles(
     const { next, previous } = found
     return {
       ...found,
-      next: next ? () => void navigation.openDiff({ owner, row: next }) : null,
-      previous: previous ? () => void navigation.openDiff({ owner, row: previous }) : null,
+      next: next ? () => void navigation.openDiff({ owner, row: next, replace: true }) : null,
+      previous: previous
+        ? () => void navigation.openDiff({ owner, row: previous, replace: true })
+        : null,
     }
   }
   if (source?.kind !== 'checkpoint-file' || !diffScope.turnSummary) return null
@@ -59,7 +62,7 @@ export function useScopeFiles(
   const { next, previous } = found
   return {
     ...found,
-    next: next ? () => diffScope.openTurnFile(next) : null,
-    previous: previous ? () => diffScope.openTurnFile(previous) : null,
+    next: next ? () => diffScope.openTurnFile(next, true) : null,
+    previous: previous ? () => diffScope.openTurnFile(previous, true) : null,
   }
 }
