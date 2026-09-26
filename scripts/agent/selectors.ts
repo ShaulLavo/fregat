@@ -914,6 +914,8 @@ export const selectors = {
   terminalSurface: (page: Page) =>
     page.locator('[data-slot="tool-pane"][aria-label="Terminal"]:visible'),
   paletteRowSelector: '[data-slot="command-list"] [role="option"]',
+  paletteLoading: (page: Page) => page.getByRole('status', { name: 'Loading commands' }),
+  pickerLoading: (page: Page) => page.getByRole('status', { name: 'Loading file picker' }),
   paletteInput: (page: Page) => page.locator('[data-slot="command-input"]').first(),
   paletteOptions: (page: Page) => page.locator('[data-slot="command-list"]').getByRole('option'),
   selectedPaletteOption: (page: Page) => page.locator('[cmdk-item][data-selected="true"]'),
