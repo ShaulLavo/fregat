@@ -65,14 +65,26 @@ jobs:
       - name: Setup
         uses: ./.github/actions/setup
 
+      - name: Playwright version
+        id: playwright
+        working-directory: packages/editor
+        run: echo "version=$(./node_modules/.bin/playwright --version | cut -d ' ' -f 2)" >> "$GITHUB_OUTPUT"
+
+      # Browsers are a download per Playwright release; the OS libraries still come from apt.
+      - name: Cache Playwright browsers
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}-${{ github.job }}
+
       # Browser projects check geometry and CSS behavior that happy-dom cannot reproduce.
       # Run the workspace's own Playwright, not `bunx playwright` — bare `bunx` fetches the latest
-      # from the registry, which downloads browsers into a revision directory the pinned 1.60.0
+      # from the registry, which downloads browsers into a revision directory the pinned version
       # does not look in, so the install "succeeds" and the launch still fails.
       #
       # Chromium and its headless shell, deliberately: vitest browser mode runs `headless: true`,
       # which launches `chrome-headless-shell`, a separate download from `chromium`. Firefox and
-      # WebKit are for core's highlight-paint project.
+      # WebKit are for core's highlight-paint project only.
       - name: Install Playwright browsers
         working-directory: packages/editor
         run: ./node_modules/.bin/playwright install --with-deps chromium chromium-headless-shell firefox webkit
@@ -93,6 +105,18 @@ jobs:
 
       - name: Setup
         uses: ./.github/actions/setup
+
+      - name: Playwright version
+        id: playwright
+        working-directory: packages/editor
+        run: echo "version=$(./node_modules/.bin/playwright --version | cut -d ' ' -f 2)" >> "$GITHUB_OUTPUT"
+
+      # Browsers are a download per Playwright release; the OS libraries still come from apt.
+      - name: Cache Playwright browsers
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}-${{ github.job }}
 
       - name: Install Playwright browsers
         working-directory: packages/editor
