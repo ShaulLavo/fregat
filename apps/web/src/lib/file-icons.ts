@@ -89,7 +89,9 @@ export function fileTreeIconsForPaths(paths: readonly string[]): FileTreeIconCon
 
 /** The glyph and the literal hue classes a resolved icon draws with. */
 export function fileIconRule(icon: ResolvedFileIcon) {
-  return FILE_ICON_RULES[icon.name]
+  return Object.hasOwn(FILE_ICON_RULES, icon.name)
+    ? FILE_ICON_RULES[icon.name]
+    : FILE_ICON_RULES['file-duo']
 }
 
 export function fileMatchesAccept(name: string, accept?: readonly string[]) {
@@ -109,12 +111,12 @@ function mimeForFileName(name: string) {
 
 function iconNameForFile(name: string): FileIconRuleName {
   const normalizedName = normalizeName(name)
-  const fileNameIcon = FILE_ICON_FILE_NAMES[normalizedName]
-  if (fileNameIcon) return fileNameIcon
+  if (Object.hasOwn(FILE_ICON_FILE_NAMES, normalizedName)) {
+    return FILE_ICON_FILE_NAMES[normalizedName]
+  }
 
   for (const extension of extensionCandidates(normalizedName)) {
-    const icon = FILE_ICON_EXTENSIONS[extension]
-    if (icon) return icon
+    if (Object.hasOwn(FILE_ICON_EXTENSIONS, extension)) return FILE_ICON_EXTENSIONS[extension]
   }
 
   return 'file-duo'
@@ -234,7 +236,7 @@ const BASE_FILE_TREE_ICONS = {
 } satisfies FileTreeIconConfig
 
 function fileTreeFileNameIconsForPaths(paths: readonly string[]) {
-  const icons: Record<string, RemappedIcon> = {}
+  const icons: Record<string, RemappedIcon> = Object.create(null)
 
   for (const path of paths) {
     if (path.endsWith('/')) continue
@@ -247,7 +249,7 @@ function fileTreeFileNameIconsForPaths(paths: readonly string[]) {
 }
 
 function fileTreeFileNameIconRules() {
-  const icons: Record<string, RemappedIcon> = {}
+  const icons: Record<string, RemappedIcon> = Object.create(null)
   for (const [name, rule] of Object.entries(FILE_ICON_FILE_NAMES)) {
     icons[name] = treeIconReference(rule)
   }
@@ -255,7 +257,7 @@ function fileTreeFileNameIconRules() {
 }
 
 function fileTreeExtensionIconRules() {
-  const icons: Record<string, RemappedIcon> = {}
+  const icons: Record<string, RemappedIcon> = Object.create(null)
   for (const [extension, rule] of Object.entries(FILE_ICON_EXTENSIONS)) {
     icons[extension.replace(/^\./u, '')] = treeIconReference(rule)
   }
@@ -275,7 +277,7 @@ function vscodeIconSymbol(name: FileIconGlyph) {
 
 /** The tree draws each rule's glyph with the tree's own colour token for it. */
 function treeIconReference(rule: FileIconRuleName): RemappedIcon {
-  const glyph = FILE_ICON_RULES[rule].glyph
+  const glyph = fileIconRule({ name: rule }).glyph
   return {
     name: `${TREE_ICON_SYMBOL_PREFIX}${glyph}`,
     token: ICON_TOKENS[glyph] ?? DEFAULT_FILE_ICON_TOKEN,

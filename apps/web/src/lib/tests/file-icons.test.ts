@@ -1,4 +1,4 @@
-import { fileIconRule, iconForEntry } from '@/lib/file-icons'
+import { fileIconRule, fileTreeIconsForPaths, iconForEntry } from '@/lib/file-icons'
 import { expect, test } from '../../../test/fixtures'
 
 function iconFor(name: string) {
@@ -80,3 +80,24 @@ test('Python, Astro and webpack paint their back layer in a second hue', () => {
     '--file-icon-back',
   )
 })
+
+test.each(['constructor', '__proto__', 'toString'])(
+  '%s resolves to the default file icon',
+  (name) => {
+    expect(iconFor(name)).toBe('file-duo gray')
+  },
+)
+
+test.each(['constructor', '__proto__', 'toString'])(
+  '%s gets its own default tree icon override',
+  (name) => {
+    const icons = fileTreeIconsForPaths([`src/${name}`])
+    const key = name.toLocaleLowerCase()
+    expect(icons.byFileName).toBeDefined()
+    expect(Object.hasOwn(icons.byFileName ?? {}, key)).toBe(true)
+    expect(icons.byFileName?.[key]).toEqual({
+      name: 'app-vscode-icon-file-duo',
+      token: 'default',
+    })
+  },
+)
