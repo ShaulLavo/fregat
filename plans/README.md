@@ -19,12 +19,14 @@ a bare root `bun run verify`.
 
 | Plan                                                                                    | State                                                                    |
 | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| [175 — opening a very large folder](175-large-folder-open.md)                           | **DECIDED 2026-09-26 — IMPLEMENTING**                                    |
+| [177 — prefetch every press](177-prefetch-every-press.md)                               | **PROPOSED 2026-09-26 — RESEARCH FIRST**                                 |
+| [176 — one markdown parser](176-markdown-parser.md)                                     | **RESEARCH — AUTHORIZED 2026-09-26; REPLACES 108 D5**                    |
+| [175 — opening a very large folder](175-large-folder-open.md)                           | **IMPLEMENTED 2026-09-26; PROD CHECK PENDING**                           |
 | [174 — managed external MCP servers](174-external-mcp-servers.md)                       | **PLACEHOLDER — SPLIT FROM 087 M2/M3; UNSCHEDULED**                      |
 | [173 — two devices opening one workspace](173-two-devices-one-workspace.md)             | **RESEARCH — BEFORE PLAN 143'S PHONE SHELL**                             |
 | [172 — one shared undo/redo stack](172-shared-undo-stack.md)                            | **RESEARCH — LIFE-13 IS THE FIRST CONSUMER**                             |
 | [171 — the chat composer runs on our own editor](171-composer-on-our-editor.md)         | **RESEARCH — AFTER PLAN 111**                                            |
-| [170 — language census for grammar and theme prefetch](170-language-census.md)          | **PROPOSED — SPLIT FROM 110 Q7**                                         |
+| [170 — language census for grammar and theme prefetch](170-language-census.md)          | **PROPOSED — SPLIT FROM 110 Q7; TREE-SITTER WARM-UP ADDED 2026-09-26** |
 | [167 — settings defaults, setting details, and copy](167-settings-and-copy.md)          | **PROPOSED — READY; D1–D4 DECIDED**                                      |
 | [166 — keyboard shortcuts, redone](166-shortcuts-editor.md)                             | **PROPOSED — RESEARCH FIRST; D1–D6 DECIDED**                             |
 | [164 — what feels right in Neon](164-what-feels-right-in-neon.md)                       | **FIRST PASS SHIPPED; METADATA SWEEP LEFT**                              |
@@ -67,7 +69,7 @@ a bare root `bun run verify`.
 | [124 — the theme studio](124-theme-studio.md)                                           | **PROPOSED — REPLACES 117'S SURFACE; DATA STAYS**                        |
 | [122 - composable full-power plugins](122-composable-plugins.md)                        | **PROPOSED - RESEARCH AND PERFORMANCE GATES FIRST**                      |
 | [114 — Polaron, a desktop shell we own](114-polaron-shell.md)                           | **PARKED — NEEDS A GO/NO-GO**                                            |
-| [108 — two markdown modes](108-markdown-modes.md)                                       | **PROPOSED — PHASE 1 READY; PHASE 2 NEEDS 111**                          |
+| [108 — two markdown modes](108-markdown-modes.md)                                       | **PROPOSED — PHASE 1 READY; PHASE 2 NEEDS 111 AND 176**                  |
 | [109 — boot boundaries and gate](109-boot-boundaries.md)                                | **PHASES 2–3 IMPLEMENTED 2026-09-21; GATE NOT STARTED**                  |
 | [110 — workspace indexing](110-workspace-indexing.md)                                   | **RESEARCH — NO IMPLEMENTATION SCOPE YET**                               |
 | [111 — editor decorations](111-editor-decorations.md)                                   | **RESEARCH — AUTHORIZED 2026-09-25; BEFORE THE NEXT WAVE**               |

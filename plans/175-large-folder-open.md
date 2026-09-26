@@ -2,8 +2,8 @@
 
 ## Status and authorization
 
-- Status: DECIDED 2026-09-26 — the owner took every recommendation and made the worker (D3)
-  unconditional. Implementation authorized.
+- Status: IMPLEMENTED 2026-09-26 — all phases, D1–D4 as recommended and D3 unconditional. See
+  [Progress](#progress-2026-09-26) for where the build departed from the plan.
 - Priority: P1. Opening `/work` froze the prod server for 10.8 s and left it holding 92% of the
   machine's inotify watches.
 - Planned at: Platform `86ac6f6b0`, 2026-09-26. Origin: the owner opened `/work` as a workspace in
@@ -281,3 +281,38 @@ Then `bun run deploy --server` and re-open `/work` in prod: the server's inotify
 
 Phase 1 first. Phase 2 next: it is the smallest, and it fixes symptoms 2 and 5 and the failed
 index. Then Phases 3, 4, 5 and 6 in any order, then Phase 7.
+
+## Progress (2026-09-26)
+
+All seven phases landed (committed with other sessions' work in `bed2fd6c3` and `d42184dc2`).
+Evidence: `workspace-open-large-root`, `workspace-open-unreadable-child`,
+`workspace-switch-click-during-open` and `file-picker-prefetch-bound` under
+`/work/tmp/fregat-evidence/20260926T07*`.
+
+Departures, each for a reason found while building:
+
+- **Errors go only to the streams that use the failing watcher.** The hub broadcast every
+  watcher error to every stream, which is why `/work`'s failure toasted in platform's stream and
+  was filed under `work/projects/platform` (F9's last sentence). Errors and the new `coverage`
+  message carry the watcher root.
+- **A limited root is upgraded when room frees.** On a switch the old root is still watched while
+  the new one is counted, so the new one came out limited for good. A released recursive watch now
+  offers its room to limited roots: the hub attaches the full watch, sends `coverage`, the client
+  resyncs and drops the indicator, and the index builds (`watch-limit-freed`).
+- **Phase 2's 403 needed a tree repaint.** Rows only ask for their decoration when something else
+  re-renders them, so `no access` (and the old `error`) waited for an unrelated repaint.
+  `FileTreeModel.refreshDecorations()` is called when a folder's load state changes.
+- **Phase 5 item 3 keeps the early activation.** Chat follows the active project on the next frame
+  by design (`active-project.ts`), so the open moves it back when it is abandoned instead of moving
+  it later.
+- **D4 fires once the destination is known.** A request's destination is only known after its
+  async preparation; the guard applies from commit on, which covers the slow root open and keeps a
+  same-workspace preparation cancellable. The old click-wins test was rewritten to the new rule.
+- **Phase 6:** the cap skips a guess when four listings are loading instead of cancelling the oldest,
+  because a click's load shares the prefetch's query key. The `stat` stays in a row prefetch: the
+  current entry's canonical path comes from it. Measured on a 600-folder list, scroll prediction
+  asked for 112 of 145 row prefetches; it is off (`configureIntentPrediction`), and the picker list
+  ignores intents for 150 ms after a scroll. Sweep plus 12 wheel turns went from 77 listings to 33,
+  none from scrolling.
+- **Copy for a spent limit.** When other roots use the whole limit the tooltip says so; the first
+  run showed "more than -44,846 folders" because the fixture server's own workspace was watched.

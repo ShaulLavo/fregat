@@ -13,6 +13,7 @@ type Evidence = {
   liveRowHeights: number[]
   maxBurst: { sweeps: number; rainbowOnTrigger: number } | null
   reducedMotionSweep: string | null
+  caret: { label: string; painted: string | null; html: string }[]
   ultra: {
     levelBurst: boolean
     wordBurst: boolean
@@ -39,6 +40,7 @@ export const chatTurnAnatomy: Scenario = {
       liveRowHeights: [],
       maxBurst: null,
       reducedMotionSweep: null,
+      caret: [],
       ultra: null,
     }
     evidenceByPage.set(page, evidence)
@@ -217,6 +219,7 @@ async function ultrathinkWord(page: Page, step: Step, evidence: Evidence) {
   await step('composer-ultrathink')
   await burst.waitFor({ state: 'detached', timeout: 5_000 })
   const burstMs = Date.now() - burstStart
+  const caret = await caretKeepsRainbow(page, word)
 
   const label = selectors.effortRainbow(trigger)
   const playState = (locator: Locator) =>
@@ -246,6 +249,7 @@ async function ultrathinkWord(page: Page, step: Step, evidence: Evidence) {
     driftOnHover,
     rainbowRows,
   }
+  evidence.caret = caret
   ok(levelBurst, 'Picking Ultra plays the ultra burst')
   ok(wordBurst, 'Ultra to Ultrathink plays it again')
   ok(burstMs < 2_500, `The ultra burst ends on its own: ${burstMs}ms`)
@@ -256,7 +260,39 @@ async function ultrathinkWord(page: Page, step: Step, evidence: Evidence) {
   equal(driftAtRest, 'paused', 'The trigger rainbow rests until hovered')
   equal(driftOnHover, 'running', 'Hover sets the trigger rainbow drifting')
   equal(rainbowRows.join(), 'Ultra,Ultrathink', 'Only the ultra rows wear the rainbow')
+  for (const probe of caret)
+    equal(probe.painted, 'ultrathink', `The word keeps its rainbow: ${probe.label} ${probe.html}`)
   await selectors.chatMessage(page).fill('')
+}
+
+/** A caret next to, inside, or typing beside the word must leave it painted. */
+async function caretKeepsRainbow(page: Page, word: Locator) {
+  const composer = selectors.chatMessage(page)
+  const probes: { label: string; painted: string | null; html: string }[] = []
+  const probe = async (label: string) => {
+    await page.waitForTimeout(200)
+    probes.push({
+      label,
+      painted: await selectors
+        .effortRainbow(composer)
+        .first()
+        .textContent({ timeout: 500 })
+        .catch(() => null),
+      html: await composer.innerHTML(),
+    })
+  }
+  const box = await word.boundingBox()
+  if (!box) throw new Error('the painted word has no box')
+  await page.mouse.click(box.x + box.width - 1, box.y + box.height / 2)
+  await probe('caret after the word')
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2)
+  await probe('caret inside the word')
+  await page.keyboard.press('End')
+  await page.keyboard.type(' now', { delay: 40 })
+  await probe('typing at the end')
+  await page.mouse.click(box.x + 1, box.y + box.height / 2)
+  await probe('caret before the word')
+  return probes
 }
 
 async function stackFrame(page: Page, step: Step) {

@@ -1,6 +1,6 @@
 # Plan 170: Language census for grammar and theme prefetch
 
-Status: **research done 2026-09-25** (findings below; the in-app before/after paint measurement belongs to the implementation phases). Split out of [Plan 110](110-workspace-indexing.md) question 7. Decided 2026-09-25: owner — split the language census into its own small plan. [Root PLAN.md](../PLAN.md) owns scheduling.
+Status: **research done 2026-09-25** (findings below; the in-app before/after paint measurement belongs to the implementation phases). Split out of [Plan 110](110-workspace-indexing.md) question 7. Decided 2026-09-25: owner — split the language census into its own small plan. Amended 2026-09-26: tree-sitter warm-up joins the scope (see "Tree-sitter has no warm-up"). [Root PLAN.md](../PLAN.md) owns scheduling.
 
 ## Why
 
@@ -98,6 +98,35 @@ ordering.
    The worker also dedupes background loading per highlighter (`backgroundLoaded`,
    `shiki.worker.ts:43, 259-261`), so a second preload with a different language set, such as
    after a workspace switch, is ignored.
+
+### Tree-sitter has no warm-up (added 2026-09-26)
+
+Found while investigating markdown files that paint as raw source before their live-preview
+decorations land. Read from Platform `d42184dc` and Editor `74e76be`.
+
+- **Tree-sitter is on the paint path in every theme.** With a built-in theme (`tree-sitter-dark`,
+  `tree-sitter-light`) it provides the colours. With any theme it provides folds, brackets and the
+  captures markdown's live preview is built from, so markdown decorations wait on it even under
+  Shiki. The shipped defaults `dark-plus` / `light-plus` are Shiki themes.
+- **Nothing warms it.** Shiki gets `preloadLanguages` (`syntax-highlighting.ts:89`); the tree-sitter
+  provider gets nothing. Its worker starts on the first request (`getWorker`,
+  `Editor/packages/tree-sitter/src/treeSitter/workerClient.ts:341`), `init` then loads
+  `web-tree-sitter.wasm`, each language descriptor resolves on first use through the registry's
+  lazy `load()`, and the worker compiles each grammar's wasm and queries the first time it needs
+  them.
+- **Markdown pays the most.** Its injection closure is seven descriptors (markdown,
+  markdown_inline, html, javascript, css, regex, jsdoc), resolved one after another in
+  `withInjectedLanguages` (`Editor/packages/tree-sitter/src/session.ts:350`). TypeScript's is
+  three.
+- **Effect.** The first file of each language pays the worker start, the wasm and its grammars,
+  inside its hover preparation or after the click when nothing prepared it. Prepared-open logs,
+  2026-09-23 to 26: markdown stages averaged 257 ms (Shiki) and 191 ms (tree-sitter), n=8;
+  TypeScript 45 ms and 23 ms, n=17. Markdown's Shiki stage costing five times TypeScript's with a
+  smaller grammar is unexplained; the per-message registrations above are one candidate.
+
+Scope addition: the consumer warms tree-sitter from the same census and floor. After first paint it
+starts the worker, registers the census languages with their injection closures, and compiles their
+wasm. A language below the floor still loads on demand, as it does for Shiki.
 
 ### The census on real repositories
 
@@ -218,6 +247,11 @@ safe to use: stale entries are still present and counted.
    does, `plugin.ts:33`); Platform passes one that reads the census from the query cache and
    falls back to today's list. The provider is a module singleton (`syntax-highlighting.ts:84-97`),
    so the getter is read at preload time, not at construction.
-4. **Measurement.** `editor-syntax-benchmark` (shiki engine, settle background) and
+4. **Tree-sitter consumer.** The tree-sitter provider gains the same getter-driven warm-up: start
+   the worker after first paint, then register and compile the census languages with their
+   injection closures. Worker-side dedupe per language, as for Shiki.
+5. **Measurement.** `editor-syntax-benchmark` (shiki engine, settle background) and
    `editor-reload-paint` on Platform and on vscode, before and after: grammars loaded, bytes
-   fetched, first highlighted paint, and worker busy time after paint.
+   fetched, first highlighted paint, and worker busy time after paint. For tree-sitter: time to the
+   first tree-sitter result for the session's first markdown file, and frames until its decorations
+   appear, using [Plan 177](177-prefetch-every-press.md)'s Phase 0 scenario.

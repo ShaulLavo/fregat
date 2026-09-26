@@ -35,3 +35,11 @@ Every create, rename, drag, duplicate and delete is a journaled `file-operation`
 ## Hover prefetch
 
 `bun run agent:browser scenario file-tree-hover-prefetch` moves the pointer onto a file row in a fixture workspace. It must see `/fs/read` for that file before any click, and no editor tab may open. The rows come from `FileTreeModel.getRowElements()`, so a tree change that stops registering rows shows up here.
+
+## Large and unreadable folders
+
+`bun run agent:browser scenario workspace-open-large-root` lowers `files.watchDirectoryLimit`, opens a fixture over it through the folder picker, and expects the "Live updates limited" header control with its tooltip, `no access` on an unreadable child after one 403 (no retry), a new top-level file appearing live, and no toast. `workspace-open-unreadable-child` opens the same shape under the limit: full watch, `no access`, no limited control. The log carries `fs.workspace_index.build` (`off` with `watch-limit` for a limited root) and each attach's `watch.roots` with its directory count. Directory errors reach the rows through `FileTreeModel.refreshDecorations()`; without it a `no access` or `error` decoration waits for an unrelated repaint.
+
+## Folder switches and the picker
+
+`bun run agent:browser scenario workspace-switch-click-during-open` holds `/fs/workspace-root` for three seconds, expects the "Opening target" status, clicks a file in the old workspace (logged as `navigation.dropped`) and expects the switch to land. `file-picker-prefetch-bound` sweeps and scrolls a 600-folder list in the picker; scrolling under a still pointer must list at most four folders, and `file-picker.prefetch_intents` counts Foresight hits by predictor.
