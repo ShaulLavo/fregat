@@ -1,3 +1,4 @@
+import { sessionNoFlicker } from './session-no-flicker'
 import { restNoFlicker } from './rest-no-flicker'
 import { deferredDialogs } from './deferred-dialogs'
 import { rootSwitchNoFlicker } from './root-switch-no-flicker'
@@ -381,6 +382,7 @@ export const scenarios: readonly Scenario[] = [
   chatStashContext,
   chatStream,
   chatHistoryPages,
+  sessionNoFlicker,
   chatQueue,
   providerModelOptions,
   draftRecovery,

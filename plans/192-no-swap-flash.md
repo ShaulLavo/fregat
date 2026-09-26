@@ -37,8 +37,8 @@ subjects and reads `blank-frames-0`, like `quick-open-no-flicker`.
 | 6   | `features/git/utils/history-query.ts`, `HistoryList key`                                                     | ref switch                   | skeleton, scroll lost (deliberate today) | **fixed**    |
 | 7   | `features/git/components/panel.tsx` (`History key={rootPath}`)                                               | root switch                  | remount + skeleton                       | **fixed**    |
 | 8   | `features/git/components/panel.tsx`, `hooks/use-status.ts`                                                   | root / session worktree      | `PanelLoading`                           | **fixed**    |
-| 9   | `features/chat-mode/components/stage-body.tsx` (`key={sessionId}`), `chat/components/timeline-viewport.tsx`  | session switch               | conversation skeleton under new title    | confirmed    |
-| 10  | `features/chat/components/side-panel-content.tsx`                                                            | side-panel session switch    | same as 9                                | confirmed    |
+| 9   | `features/chat-mode/components/stage-body.tsx` (`key={sessionId}`), `chat/components/timeline-viewport.tsx`  | session switch               | conversation skeleton under new title    | **fixed**    |
+| 10  | `features/chat/components/side-panel-content.tsx`                                                            | side-panel session switch    | same as 9                                | **fixed**    |
 | 11  | `stage-body.tsx`, `side-panel-content.tsx`                                                                   | new chat / empty project     | "Opening draft"                          | likely       |
 | 12  | `stage-body.tsx`, `chat-mode/utils/active-session.ts`                                                        | session not yet projected    | "Opening session"                        | likely       |
 | 13  | `features/git/components/diff-view.tsx` → `editor/components/diff-editor.tsx`                                | diff tab                     | "Loading comparison"                     | **fixed**    |
@@ -53,7 +53,9 @@ subjects and reads `blank-frames-0`, like `quick-open-no-flicker`.
 | 22  | `features/settings/components/widgets/font-sample.tsx`                                                       | font choice                  | label in fallback face                   | **fixed**    |
 
 Inverse bug: `features/chat/hooks/use-session-goal.ts` holds the previous session's goal under the new
-session's header (`keepPreviousData` without a subject check). Fix with shape 2.
+session's header (`keepPreviousData` without a subject check). **Fixed** with shape 2; the
+result carries its environment and session, including mutation settlement. Placeholders survive
+turn changes only within that subject, and the goal popover is scoped to the subject too.
 
 ## Order
 
@@ -90,6 +92,32 @@ cover successful, binary and missing-file reads.
 
 - Before: `/work/tmp/fregat-evidence/20260926T184042Z-scenario-quick-open-no-flicker/`
 - After: `/work/tmp/fregat-evidence/20260926T184641Z-scenario-quick-open-no-flicker/`
+
+## Rows 9 and 10 proof
+
+The main stage and sidebar use `useHeldUntilReady` around the complete shown conversation.
+`useSessionReady` retains the selected detail stream before the hosts swap their header and body.
+First loads proceed directly; blocked and reconnecting streams reveal their own connection notice. Both headers
+show a spinner during a hold, and the retained composer waits for the switch before accepting a send.
+
+The hosts and timeline stay mounted. The timeline's existing session-aware reducer resets scroll
+intent before paint; disclosure measurement state resets with it. Input and checkpoint state stay
+scoped to the shown session. The sidebar terminal retains its mounted host through the switches.
+
+`session-no-flicker` uses a native fixture provider and delays session subscriptions by 450 ms.
+It starts measuring only after the first conversation has rendered message text. Main blank frames:
+27 before, 0 after. Sidebar blank frames: 25 before, 0 after. Header/body mismatches also fell from
+27 and 25 to 0. The proof checks header spinners, scroll isolation and terminal retention;
+`inspection.json` retains the sampled frames. DOM tests cover rapid selection, refused detail
+streams and retryable failures, and goal placeholder isolation across sessions, environments and turns.
+
+- Before: `/work/tmp/fregat-evidence/20260926T203304Z-scenario-session-no-flicker/`
+- After: `/work/tmp/fregat-evidence/20260926T203340Z-scenario-session-no-flicker/`
+- Reconnect regression: `/work/tmp/fregat-evidence/20260926T211935Z-scenario-pr133-session-no-flicker-built/`
+
+The reconnect regression rejects an uncached subscription with a retryable 503 in both hosts.
+Each host shows the selected title and reconnect notice. Its readiness test failed before the fix.
+Runtime alerts and plan follow-up state are keyed by the scoped session identity.
 
 ## Rows 3 and 4 proof
 

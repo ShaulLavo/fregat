@@ -1,4 +1,4 @@
-import { keepPreviousData, useQuery } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import type { ScopedSessionRef } from '@workspace/contracts'
 
 import {
@@ -19,8 +19,11 @@ export function useSessionGoal(ref: ScopedSessionRef) {
   })
   return useQuery({
     queryKey: sessionGoalKeys.state(ref.environmentId, ref.sessionId, turnStamp),
-    queryFn: ({ signal }) => fetchSessionGoal(ref, signal),
-    placeholderData: keepPreviousData,
+    queryFn: async ({ signal }) => ({ ...(await fetchSessionGoal(ref, signal)), ...ref }),
+    placeholderData: (previous) =>
+      previous?.environmentId === ref.environmentId && previous.sessionId === ref.sessionId
+        ? previous
+        : undefined,
     refetchInterval: (query) =>
       query.state.data?.goal?.status === 'active' ? ACTIVE_GOAL_REFRESH_MS : false,
   })

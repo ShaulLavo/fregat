@@ -1,3 +1,5 @@
+import { useHeldUntilReady } from '@/hooks/use-held-until-ready'
+import { useSessionReady } from '@/hooks/use-session-ready'
 import { useChatInputDraftStore } from '../state/chat-input-draft-store'
 import { useSidebarSelectionStore } from '../state/sidebar-selection-store'
 import { useNavigation } from '@/hooks/use-navigation'
@@ -6,7 +8,7 @@ import type { SessionId, WorktreeId } from '@workspace/contracts'
 import { selectChatSessionById, selectCurrentWorktree } from '@workspace/client-core/chat/selectors'
 import { useSessionRailItem } from '@/hooks/use-session-rail-item'
 import { useActiveChatProjection } from '@/features/chat/hooks/use-active-projection'
-import { memo, useEffect, useRef, useState } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
 
 import { useActiveChatSessionId } from '../hooks/use-active-chat-session-id'
 import { useChatShellSubscription } from '../hooks/use-chat-shell-subscription'
@@ -32,9 +34,21 @@ export const ChatSidePanelContent = memo(({ rootPath }: { rootPath: string }) =>
   const sessionIds = sessions.map((session) => session.id)
   const { activeSessionId, selectDraftSession, setActiveSessionId, promoteDraftSession } =
     useActiveChatSessionId({ sessionIds, environmentId: transport.environmentId, projectId })
+  const sessionReady = useSessionReady(transport, activeSessionId)
+  // useHeldUntilReady compares subjects by identity across its own state update.
+  const selected = useMemo(
+    () => ({ activeSessionId, transport, rootPath }),
+    [activeSessionId, transport, rootPath],
+  )
+  const held = useHeldUntilReady(selected, sessionReady)
+  const shown =
+    held.activeSessionId && held.transport.environmentId === transport.environmentId
+      ? held
+      : selected
+  const switching = shown.activeSessionId !== activeSessionId
   const selection = useSidebarSelectionStore((state) => state.selection)
   const activeSummary = useActiveChatProjection(
-    (state) => selectChatSessionById(state, activeSessionId) ?? null,
+    (state) => selectChatSessionById(state, shown.activeSessionId) ?? null,
   )
   const activeRailItem = useSessionRailItem(activeSummary, transport.environmentId)
   const restoredDraft = useChatInputDraftStore((state) =>
@@ -77,7 +91,7 @@ export const ChatSidePanelContent = memo(({ rootPath }: { rootPath: string }) =>
   const disabled = !projectState.project || projectState.status !== 'ready'
 
   const handleNewChat = () => {
-    const source = sessions.find((session) => session.id === activeSessionId)
+    const source = sessions.find((session) => session.id === shown.activeSessionId)
     setDraftBaseId(source?.worktreeId ?? null)
     currentDraftGeneration.current += 1
     setDraftGeneration(currentDraftGeneration.current)
@@ -92,7 +106,8 @@ export const ChatSidePanelContent = memo(({ rootPath }: { rootPath: string }) =>
   return (
     <div className='flex h-full min-h-0 flex-col'>
       <ChatPanelHeader
-        activeSessionId={activeSessionId}
+        activeSessionId={shown.activeSessionId}
+        switching={switching}
         creating={false}
         disabled={disabled}
         sessions={sessions}
@@ -100,12 +115,12 @@ export const ChatSidePanelContent = memo(({ rootPath }: { rootPath: string }) =>
         onSelectSession={setActiveSessionId}
         session={activeRailItem}
       />
-      {activeSessionId ? (
+      {shown.activeSessionId ? (
         <ChatView
-          key={activeSessionId}
-          activeSessionId={activeSessionId}
-          transport={transport}
-          rootPath={rootPath}
+          switching={switching}
+          activeSessionId={shown.activeSessionId}
+          transport={shown.transport}
+          rootPath={shown.rootPath}
           onSessionCreated={handleSessionCreated}
         />
       ) : draftId ? (
