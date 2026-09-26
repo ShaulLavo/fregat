@@ -737,7 +737,6 @@ export function TreeView({
   useLayoutEffect(() => {
     let scrollTimer: ReturnType<typeof setTimeout> | null = null
     const scrollElement = getScroll()
-    const listElement = getList()
     const rootElement = getRoot()
     if (scrollElement == null) {
       return
@@ -824,9 +823,6 @@ export function TreeView({
     // too late — the user would see the floating trigger sit at its old row
     // position for a frame while the rows themselves have already scrolled.
     const markScrolling = (): void => {
-      if (listElement != null) {
-        if (listElement.dataset.isScrolling == null) listElement.dataset.isScrolling = ''
-      }
       if (rootElement != null) {
         if (rootElement.dataset.isScrolling == null) rootElement.dataset.isScrolling = ''
       }
@@ -835,9 +831,6 @@ export function TreeView({
         clearTimeout(scrollTimer)
       }
       scrollTimer = setTimeout(() => {
-        if (listElement != null) {
-          delete listElement.dataset.isScrolling
-        }
         if (rootElement != null) {
           delete rootElement.dataset.isScrolling
         }
@@ -969,9 +962,6 @@ export function TreeView({
       if (overlayRevealTimer != null) {
         clearTimeout(overlayRevealTimer)
       }
-      if (listElement != null) {
-        delete listElement.dataset.isScrolling
-      }
       if (rootElement != null) {
         delete rootElement.dataset.isScrolling
         delete rootElement.dataset.overlayReveal
@@ -986,7 +976,6 @@ export function TreeView({
     }
   }, [
     controller,
-    getList,
     getRoot,
     getScroll,
     initialViewportHeight,
