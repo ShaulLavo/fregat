@@ -1,3 +1,5 @@
+import { withinDiagnosticsBudget } from './diagnostics-budget'
+
 import { lineStartOffset } from '@workspace/utils/strings'
 import { errorMessage } from '@workspace/contracts'
 import { fileUriForNativePath } from './language'
@@ -323,11 +325,14 @@ export class LspSessionPool implements LspSessionSource {
     uri: string,
     timeoutMs: number,
   ): Promise<LspFileDiagnostics | null> {
-    for (const session of this.liveSessions(lspProxySessionKey(match))) {
-      const result = await session.fileDiagnostics(uri, timeoutMs)
-      if (result) return result
-    }
-    return null
+    return withinDiagnosticsBudget(timeoutMs, async (remaining) => {
+      for (const session of this.liveSessions(lspProxySessionKey(match))) {
+        if (remaining() <= 0) return null
+        const result = await session.fileDiagnostics(uri, remaining())
+        if (result) return result
+      }
+      return null
+    })
   }
 
   private liveSessions(key: string): readonly PooledLspProxySession[] {

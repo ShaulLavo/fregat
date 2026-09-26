@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises'
 import { fileUriForPath } from '@workspace/contracts'
 import { isRecord } from '@workspace/utils/objects'
 
+import { withinDiagnosticsBudget } from './diagnostics-budget'
 import type { LspFileDiagnostics } from './proxy-session'
 import {
   bestLspMatchForFeature,
@@ -61,15 +62,18 @@ export class AgentDiagnosticsReader implements AgentDiagnosticsSource {
     this.settings = input.settings
   }
 
-  async errors(filePath: string, workspaceRoot: string, timeoutMs: number) {
-    const text = await readFile(filePath, 'utf8').catch(() => null)
-    if (text === null) return null
-    const matches = await matchLspServers({ filePath, settings: this.settings(), workspaceRoot })
-    const match = bestLspMatchForFeature(matches, 'diagnostics') ?? matches[0]
-    if (!match) return null
-    const result = await this.pool().fileDiagnostics(match, fileUriForPath(filePath), timeoutMs)
-    if (!result) return null
-    return { text, mode: result.mode, errors: result.diagnostics.flatMap(agentError) }
+  errors(filePath: string, workspaceRoot: string, timeoutMs: number) {
+    return withinDiagnosticsBudget(timeoutMs, async (remaining) => {
+      const [text, matches] = await Promise.all([
+        readFile(filePath, 'utf8'),
+        matchLspServers({ filePath, settings: this.settings(), workspaceRoot }),
+      ])
+      const match = bestLspMatchForFeature(matches, 'diagnostics') ?? matches[0]
+      if (!match || remaining() <= 0) return null
+      const result = await this.pool().fileDiagnostics(match, fileUriForPath(filePath), remaining())
+      if (!result) return null
+      return { text, mode: result.mode, errors: result.diagnostics.flatMap(agentError) }
+    })
   }
 }
 

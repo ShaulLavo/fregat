@@ -57,8 +57,8 @@ export function claudeDiagnosticsHooks(
     return { hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: feedback } }
   }
   return {
-    PreToolUse: [{ matcher: EDIT_TOOLS, hooks: [before] }],
-    PostToolUse: [{ matcher: EDIT_TOOLS, hooks: [after] }],
+    PreToolUse: [{ matcher: EDIT_TOOLS, timeout: BUDGET_MS / 2_000, hooks: [before] }],
+    PostToolUse: [{ matcher: EDIT_TOOLS, timeout: BUDGET_MS / 2_000, hooks: [after] }],
   }
 }
 
