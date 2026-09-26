@@ -20,7 +20,7 @@ export function PinFolderButton({ currentPath }: { currentPath: string }) {
         type='button'
         variant='ghost'
       >
-        <PushPinIcon weight={pinned ? 'fill' : 'regular'} />
+        {pinned ? <PushPinIcon weight='fill' /> : <PushPinIcon weight='regular' />}
       </Button>
     </IconTooltip>
   )
