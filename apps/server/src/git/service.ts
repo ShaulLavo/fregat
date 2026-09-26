@@ -311,9 +311,16 @@ export class GitService {
     const tracked = parseDiff(result.stdout, repository.rootPath, staged)
     const untracked = staged ? [] : await this.untrackedDiffs(repository)
     const diffs = tracked.concat(untracked)
-    const results = await mapWithConcurrency(diffs, this.diffConcurrency, async (diff) =>
-      this.withDiffSnapshotRefs(repository, diff),
-    )
+    const results = await mapWithConcurrency(diffs, this.diffConcurrency, async (diff) => {
+      const snapshot = await this.withDiffSnapshotRefs(repository, diff)
+      if (!snapshot.oldObjectId && !snapshot.newObjectId) return snapshot
+      // A file open needs both sources; directory-wide patch listings stay bounded to patches.
+      const paths = [diff.path, diff.oldPath].filter((value) => value !== undefined)
+      const singleFile = paths.some(
+        (value) => repositoryRelativePath(repository.rootPath, value) === repository.pathspec,
+      )
+      return singleFile ? this.withBlobDiffContent(repository, snapshot, snapshot) : snapshot
+    })
     recordRequestContext({ git: { diffCount: results.length } })
     return results
   }

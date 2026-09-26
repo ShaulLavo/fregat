@@ -1157,8 +1157,8 @@ describe('git rpc', () => {
     ])
     expect(diffPayload[0].oldObjectId).toEqual(expect.any(String))
     expect(diffPayload[0].newObjectId).toEqual(expect.any(String))
-    expect(diffPayload[0].oldText).toBeUndefined()
-    expect(diffPayload[0].newText).toBeUndefined()
+    expect(diffPayload[0].oldText).toBe('before\n')
+    expect(diffPayload[0].newText).toBe('after\n')
     expect(untrackedDiff.status).toBe(200)
     const untrackedDiffPayload = (await untrackedDiff.json()) as GitDiffTestPayload
     expect(untrackedDiffPayload).toMatchObject([
@@ -1173,8 +1173,8 @@ describe('git rpc', () => {
         ],
       },
     ])
-    expect(untrackedDiffPayload[0].oldText).toBeUndefined()
-    expect(untrackedDiffPayload[0].newText).toBeUndefined()
+    expect(untrackedDiffPayload[0].oldText).toBe('')
+    expect(untrackedDiffPayload[0].newText).toBe('new\n')
     expect(staged.status).toBe(200)
     const stagedPayload = (await staged.json()) as GitStatusTestPayload
     expect(stagedPayload.files).toContainEqual(

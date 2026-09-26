@@ -1,3 +1,4 @@
+// Modified for Platform from Pierre. Apache-2.0; see packages/tree/LICENSE-pierre and UPSTREAM.md.
 // Pure state classifier for the rename handoff effect. The effect has four
 // distinct responses it can take — reset tracking state, reveal the canonical
 // row if only a sticky mirror is rendered, focus the rendered input, or leave

@@ -13,6 +13,8 @@ export const providerSessionRuntimePayloadSchema = v.object({
   interactionMode: v.optional(interactionModeSchema),
   modelSelection: v.optional(modelSelectionSchema),
   runtimeMode: v.optional(runtimeModeSchema),
+  /** MCP servers the owner turned off for this session; every start and resume carries them. */
+  mcpOff: v.optional(v.array(v.string())),
 })
 
 export type ProviderSessionRuntimePayload = v.InferOutput<

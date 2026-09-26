@@ -274,6 +274,363 @@ export type V2CommandExecutionOutputDeltaNotification = v.InferOutput<
   typeof CodexAgentMessageDeltaNotificationSchema
 >
 
+export const CodexMergeStrategySchema = openEnum(['replace', 'upsert'])
+export type CodexMergeStrategy = v.InferOutput<typeof CodexMergeStrategySchema>
+
+export const CodexConfigEditSchema = v.looseObject({
+  keyPath: v.string(),
+  mergeStrategy: CodexMergeStrategySchema,
+  value: v.unknown(),
+})
+export type CodexConfigEdit = v.InferOutput<typeof CodexConfigEditSchema>
+
+export const CodexConfigBatchWriteParamsSchema = v.looseObject({
+  edits: v.array(CodexConfigEditSchema),
+  expectedVersion: v.optional(v.union([v.string(), v.null()])),
+  filePath: v.optional(v.union([v.string(), v.null()])),
+  reloadUserConfig: v.optional(v.boolean()),
+})
+export type CodexConfigBatchWriteParams = v.InferOutput<typeof CodexConfigBatchWriteParamsSchema>
+
+export type V2ConfigBatchWriteParams = v.InferOutput<typeof CodexConfigBatchWriteParamsSchema>
+
+export const CodexConfigReadParamsSchema = v.looseObject({
+  cwd: v.optional(v.union([v.string(), v.null()])),
+  includeLayers: v.optional(v.boolean()),
+})
+export type CodexConfigReadParams = v.InferOutput<typeof CodexConfigReadParamsSchema>
+
+export type V2ConfigReadParams = v.InferOutput<typeof CodexConfigReadParamsSchema>
+
+export const CodexAllowDenyRequirementSchema = openEnum(['allow', 'deny'])
+export type CodexAllowDenyRequirement = v.InferOutput<typeof CodexAllowDenyRequirementSchema>
+
+export const CodexAnalyticsConfigSchema = v.looseObject({
+  enabled: v.optional(v.union([v.boolean(), v.null()])),
+})
+export type CodexAnalyticsConfig = v.InferOutput<typeof CodexAnalyticsConfigSchema>
+
+export const CodexApprovalsReviewerSchema = openEnum(['user', 'auto_review', 'guardian_subagent'])
+export type CodexApprovalsReviewer = v.InferOutput<typeof CodexApprovalsReviewerSchema>
+
+export const CodexAppToolApprovalSchema = openEnum(['auto', 'prompt', 'writes', 'approve'])
+export type CodexAppToolApproval = v.InferOutput<typeof CodexAppToolApprovalSchema>
+
+export const CodexAppLinksConfigSchema = v.looseObject({})
+export type CodexAppLinksConfig = v.InferOutput<typeof CodexAppLinksConfigSchema>
+
+export const CodexToolExposureSurfaceSchema = openEnum(['code_mode', 'deferred', 'direct'])
+export type CodexToolExposureSurface = v.InferOutput<typeof CodexToolExposureSurfaceSchema>
+
+export const CodexAppConfigSchema = v.looseObject({
+  approvals_reviewer: v.optional(v.union([CodexApprovalsReviewerSchema, v.null()])),
+  default_tools_approval_mode: v.optional(v.union([CodexAppToolApprovalSchema, v.null()])),
+  default_tools_enabled: v.optional(v.union([v.boolean(), v.null()])),
+  destructive_enabled: v.optional(v.union([v.boolean(), v.null()])),
+  enabled: v.optional(v.boolean()),
+  links: v.optional(v.union([CodexAppLinksConfigSchema, v.null()])),
+  omit_tools_from: v.optional(v.union([v.array(CodexToolExposureSurfaceSchema), v.null()])),
+  open_world_enabled: v.optional(v.union([v.boolean(), v.null()])),
+  tools: v.optional(v.union([CodexAppLinksConfigSchema, v.null()])),
+})
+export type CodexAppConfig = v.InferOutput<typeof CodexAppConfigSchema>
+
+export const CodexAppLinkConfigSchema = v.looseObject({
+  approvals_reviewer: v.optional(v.union([CodexApprovalsReviewerSchema, v.null()])),
+  default_tools_approval_mode: v.optional(v.union([CodexAppToolApprovalSchema, v.null()])),
+})
+export type CodexAppLinkConfig = v.InferOutput<typeof CodexAppLinkConfigSchema>
+
+export const CodexAppToolConfigSchema = v.looseObject({
+  approval_mode: v.optional(v.union([CodexAppToolApprovalSchema, v.null()])),
+  enabled: v.optional(v.union([v.boolean(), v.null()])),
+})
+export type CodexAppToolConfig = v.InferOutput<typeof CodexAppToolConfigSchema>
+
+export const CodexAppsDefaultConfigSchema = v.looseObject({
+  ...v.pick(CodexAppConfigSchema, ['approvals_reviewer', 'default_tools_approval_mode', 'enabled'])
+    .entries,
+  destructive_enabled: v.optional(v.boolean()),
+  open_world_enabled: v.optional(v.boolean()),
+})
+export type CodexAppsDefaultConfig = v.InferOutput<typeof CodexAppsDefaultConfigSchema>
+
+export const CodexAppsConfigSchema = v.looseObject({
+  _default: v.optional(v.union([CodexAppsDefaultConfigSchema, v.null()])),
+})
+export type CodexAppsConfig = v.InferOutput<typeof CodexAppsConfigSchema>
+
+export const CodexMcpElicitationsRequestPermissionsRulesSandboxApprovalSkillApprovalObjectSchema =
+  v.looseObject({
+    mcp_elicitations: v.boolean(),
+    request_permissions: v.optional(v.boolean()),
+    rules: v.boolean(),
+    sandbox_approval: v.boolean(),
+    skill_approval: v.optional(v.boolean()),
+  })
+export type CodexMcpElicitationsRequestPermissionsRulesSandboxApprovalSkillApprovalObject =
+  v.InferOutput<
+    typeof CodexMcpElicitationsRequestPermissionsRulesSandboxApprovalSkillApprovalObjectSchema
+  >
+
+export const CodexGranularAskForApprovalSchema = v.looseObject({
+  granular: CodexMcpElicitationsRequestPermissionsRulesSandboxApprovalSkillApprovalObjectSchema,
+})
+export type CodexGranularAskForApproval = v.InferOutput<typeof CodexGranularAskForApprovalSchema>
+
+export const CodexAskForApprovalSchema = v.union([
+  openEnum(['untrusted', 'on-request', 'never']),
+  CodexGranularAskForApprovalSchema,
+])
+export type CodexAskForApproval = v.InferOutput<typeof CodexAskForApprovalSchema>
+
+export const CodexAutoCompactTokenLimitScopeSchema = openEnum(['total', 'body_after_prefix'])
+export type CodexAutoCompactTokenLimitScope = v.InferOutput<
+  typeof CodexAutoCompactTokenLimitScopeSchema
+>
+
+export const CodexBrowserUseOriginPolicyConfigSchema = v.looseObject({
+  access: v.optional(v.union([CodexAllowDenyRequirementSchema, v.null()])),
+  downloads: v.optional(v.union([CodexAllowDenyRequirementSchema, v.null()])),
+  full_cdp_access: v.optional(v.union([CodexAllowDenyRequirementSchema, v.null()])),
+  uploads: v.optional(v.union([CodexAllowDenyRequirementSchema, v.null()])),
+})
+export type CodexBrowserUseOriginPolicyConfig = v.InferOutput<
+  typeof CodexBrowserUseOriginPolicyConfigSchema
+>
+
+export const CodexBrowserUseConfigSchema = v.looseObject({
+  allow_history_access: v.optional(v.union([v.boolean(), v.null()])),
+  default_origin_policy: v.optional(v.union([CodexBrowserUseOriginPolicyConfigSchema, v.null()])),
+  origins: v.optional(
+    v.union([v.record(v.string(), CodexBrowserUseOriginPolicyConfigSchema), v.null()]),
+  ),
+})
+export type CodexBrowserUseConfig = v.InferOutput<typeof CodexBrowserUseConfigSchema>
+
+export const CodexComputerUseMacosConfigSchema = v.looseObject({
+  bundle_ids: v.optional(
+    v.union([v.record(v.string(), CodexAllowDenyRequirementSchema), v.null()]),
+  ),
+})
+export type CodexComputerUseMacosConfig = v.InferOutput<typeof CodexComputerUseMacosConfigSchema>
+
+export const CodexComputerUseWindowsExeConfigSchema = v.looseObject({
+  access: CodexAllowDenyRequirementSchema,
+  binary_name: v.optional(v.union([v.string(), v.null()])),
+  product_name: v.string(),
+  publisher_name: v.string(),
+})
+export type CodexComputerUseWindowsExeConfig = v.InferOutput<
+  typeof CodexComputerUseWindowsExeConfigSchema
+>
+
+export const CodexComputerUseWindowsConfigSchema = v.looseObject({
+  aumids: v.optional(v.union([v.record(v.string(), CodexAllowDenyRequirementSchema), v.null()])),
+  exes: v.optional(v.union([v.array(CodexComputerUseWindowsExeConfigSchema), v.null()])),
+})
+export type CodexComputerUseWindowsConfig = v.InferOutput<
+  typeof CodexComputerUseWindowsConfigSchema
+>
+
+export const CodexComputerUseConfigSchema = v.looseObject({
+  default_app_access: v.optional(v.union([CodexAllowDenyRequirementSchema, v.null()])),
+  macos: v.optional(v.union([CodexComputerUseMacosConfigSchema, v.null()])),
+  windows: v.optional(v.union([CodexComputerUseWindowsConfigSchema, v.null()])),
+})
+export type CodexComputerUseConfig = v.InferOutput<typeof CodexComputerUseConfigSchema>
+
+export const CodexForcedChatgptWorkspaceIdsSchema = v.union([v.string(), v.array(v.string())])
+export type CodexForcedChatgptWorkspaceIds = v.InferOutput<
+  typeof CodexForcedChatgptWorkspaceIdsSchema
+>
+
+export const CodexForcedLoginMethodSchema = openEnum(['chatgpt', 'api'])
+export type CodexForcedLoginMethod = v.InferOutput<typeof CodexForcedLoginMethodSchema>
+
+export const CodexReasoningSummarySchema = v.union([
+  openEnum(['auto', 'concise', 'detailed']),
+  v.literal('none'),
+])
+export type CodexReasoningSummary = v.InferOutput<typeof CodexReasoningSummarySchema>
+
+export const CodexVerbositySchema = openEnum(['low', 'medium', 'high'])
+export type CodexVerbosity = v.InferOutput<typeof CodexVerbositySchema>
+
+export const CodexSandboxModeSchema = openEnum([
+  'read-only',
+  'workspace-write',
+  'danger-full-access',
+])
+export type CodexSandboxMode = v.InferOutput<typeof CodexSandboxModeSchema>
+
+export const CodexSandboxWorkspaceWriteSchema = v.looseObject({
+  exclude_slash_tmp: v.optional(v.boolean()),
+  exclude_tmpdir_env_var: v.optional(v.boolean()),
+  network_access: v.optional(v.boolean()),
+  writable_roots: v.optional(v.array(v.string())),
+})
+export type CodexSandboxWorkspaceWrite = v.InferOutput<typeof CodexSandboxWorkspaceWriteSchema>
+
+export const CodexWebSearchLocationSchema = v.looseObject({
+  city: v.optional(v.union([v.string(), v.null()])),
+  country: v.optional(v.union([v.string(), v.null()])),
+  region: v.optional(v.union([v.string(), v.null()])),
+  timezone: v.optional(v.union([v.string(), v.null()])),
+})
+export type CodexWebSearchLocation = v.InferOutput<typeof CodexWebSearchLocationSchema>
+
+export const CodexWebSearchToolConfigSchema = v.looseObject({
+  allowed_domains: v.optional(v.union([v.array(v.string()), v.null()])),
+  context_size: v.optional(v.union([CodexVerbositySchema, v.null()])),
+  location: v.optional(v.union([CodexWebSearchLocationSchema, v.null()])),
+})
+export type CodexWebSearchToolConfig = v.InferOutput<typeof CodexWebSearchToolConfigSchema>
+
+export const CodexToolsV2Schema = v.looseObject({
+  web_search: v.optional(v.union([CodexWebSearchToolConfigSchema, v.null()])),
+})
+export type CodexToolsV2 = v.InferOutput<typeof CodexToolsV2Schema>
+
+export const CodexWebSearchModeSchema = openEnum(['disabled', 'cached', 'indexed', 'live'])
+export type CodexWebSearchMode = v.InferOutput<typeof CodexWebSearchModeSchema>
+
+export const CodexConfigSchema = v.looseObject({
+  analytics: v.optional(v.union([CodexAnalyticsConfigSchema, v.null()])),
+  approval_policy: v.optional(v.union([CodexAskForApprovalSchema, v.null()])),
+  approvals_reviewer: v.optional(v.union([CodexApprovalsReviewerSchema, v.null()])),
+  browser_use: v.optional(v.union([CodexBrowserUseConfigSchema, v.null()])),
+  compact_prompt: v.optional(v.union([v.string(), v.null()])),
+  computer_use: v.optional(v.union([CodexComputerUseConfigSchema, v.null()])),
+  desktop: v.optional(v.union([v.looseObject({}), v.null()])),
+  developer_instructions: v.optional(v.union([v.string(), v.null()])),
+  forced_chatgpt_workspace_id: v.optional(
+    v.union([CodexForcedChatgptWorkspaceIdsSchema, v.null()]),
+  ),
+  forced_login_method: v.optional(v.union([CodexForcedLoginMethodSchema, v.null()])),
+  instructions: v.optional(v.union([v.string(), v.null()])),
+  model: v.optional(v.union([v.string(), v.null()])),
+  model_auto_compact_token_limit: v.optional(v.union([v.pipe(v.number(), v.integer()), v.null()])),
+  model_auto_compact_token_limit_scope: v.optional(
+    v.union([CodexAutoCompactTokenLimitScopeSchema, v.null()]),
+  ),
+  model_context_window: v.optional(v.union([v.pipe(v.number(), v.integer()), v.null()])),
+  model_provider: v.optional(v.union([v.string(), v.null()])),
+  model_reasoning_effort: v.optional(v.union([CodexAbsolutePathBufSchema, v.null()])),
+  model_reasoning_summary: v.optional(v.union([CodexReasoningSummarySchema, v.null()])),
+  model_verbosity: v.optional(v.union([CodexVerbositySchema, v.null()])),
+  review_model: v.optional(v.union([v.string(), v.null()])),
+  sandbox_mode: v.optional(v.union([CodexSandboxModeSchema, v.null()])),
+  sandbox_workspace_write: v.optional(v.union([CodexSandboxWorkspaceWriteSchema, v.null()])),
+  service_tier: v.optional(v.union([v.string(), v.null()])),
+  tools: v.optional(v.union([CodexToolsV2Schema, v.null()])),
+  web_search: v.optional(v.union([CodexWebSearchModeSchema, v.null()])),
+})
+export type CodexConfig = v.InferOutput<typeof CodexConfigSchema>
+
+export const CodexPackagedDefaultsConfigLayerSourceSchema = v.looseObject({
+  file: CodexAbsolutePathBufSchema,
+  type: v.literal('packagedDefaults'),
+})
+export type CodexPackagedDefaultsConfigLayerSource = v.InferOutput<
+  typeof CodexPackagedDefaultsConfigLayerSourceSchema
+>
+
+export const CodexMdmConfigLayerSourceSchema = v.looseObject({
+  domain: v.string(),
+  key: v.string(),
+  type: v.literal('mdm'),
+})
+export type CodexMdmConfigLayerSource = v.InferOutput<typeof CodexMdmConfigLayerSourceSchema>
+
+export const CodexSystemConfigLayerSourceSchema = v.looseObject({
+  file: CodexAbsolutePathBufSchema,
+  type: v.literal('system'),
+})
+export type CodexSystemConfigLayerSource = v.InferOutput<typeof CodexSystemConfigLayerSourceSchema>
+
+export const CodexEnterpriseManagedConfigLayerSourceSchema = v.looseObject({
+  id: v.string(),
+  name: v.string(),
+  type: v.literal('enterpriseManaged'),
+})
+export type CodexEnterpriseManagedConfigLayerSource = v.InferOutput<
+  typeof CodexEnterpriseManagedConfigLayerSourceSchema
+>
+
+export const CodexUserConfigLayerSourceSchema = v.looseObject({
+  file: CodexAbsolutePathBufSchema,
+  profile: v.optional(v.union([v.string(), v.null()])),
+  type: v.literal('user'),
+})
+export type CodexUserConfigLayerSource = v.InferOutput<typeof CodexUserConfigLayerSourceSchema>
+
+export const CodexProjectConfigLayerSourceSchema = v.looseObject({
+  dotCodexFolder: CodexAbsolutePathBufSchema,
+  type: v.literal('project'),
+})
+export type CodexProjectConfigLayerSource = v.InferOutput<
+  typeof CodexProjectConfigLayerSourceSchema
+>
+
+export const CodexSessionFlagsConfigLayerSourceSchema = v.looseObject({
+  type: v.literal('sessionFlags'),
+})
+export type CodexSessionFlagsConfigLayerSource = v.InferOutput<
+  typeof CodexSessionFlagsConfigLayerSourceSchema
+>
+
+export const CodexLegacyManagedConfigTomlFromFileConfigLayerSourceSchema = v.looseObject({
+  file: CodexAbsolutePathBufSchema,
+  type: v.literal('legacyManagedConfigTomlFromFile'),
+})
+export type CodexLegacyManagedConfigTomlFromFileConfigLayerSource = v.InferOutput<
+  typeof CodexLegacyManagedConfigTomlFromFileConfigLayerSourceSchema
+>
+
+export const CodexLegacyManagedConfigTomlFromMdmConfigLayerSourceSchema = v.looseObject({
+  type: v.literal('legacyManagedConfigTomlFromMdm'),
+})
+export type CodexLegacyManagedConfigTomlFromMdmConfigLayerSource = v.InferOutput<
+  typeof CodexLegacyManagedConfigTomlFromMdmConfigLayerSourceSchema
+>
+
+export const CodexConfigLayerSourceSchema = v.union([
+  CodexPackagedDefaultsConfigLayerSourceSchema,
+  CodexMdmConfigLayerSourceSchema,
+  CodexSystemConfigLayerSourceSchema,
+  CodexEnterpriseManagedConfigLayerSourceSchema,
+  CodexUserConfigLayerSourceSchema,
+  CodexProjectConfigLayerSourceSchema,
+  CodexSessionFlagsConfigLayerSourceSchema,
+  CodexLegacyManagedConfigTomlFromFileConfigLayerSourceSchema,
+  CodexLegacyManagedConfigTomlFromMdmConfigLayerSourceSchema,
+])
+export type CodexConfigLayerSource = v.InferOutput<typeof CodexConfigLayerSourceSchema>
+
+export const CodexConfigLayerSchema = v.looseObject({
+  config: v.unknown(),
+  disabledReason: v.optional(v.union([v.string(), v.null()])),
+  name: CodexConfigLayerSourceSchema,
+  version: v.string(),
+})
+export type CodexConfigLayer = v.InferOutput<typeof CodexConfigLayerSchema>
+
+export const CodexConfigLayerMetadataSchema = v.looseObject({
+  name: CodexConfigLayerSourceSchema,
+  version: v.string(),
+})
+export type CodexConfigLayerMetadata = v.InferOutput<typeof CodexConfigLayerMetadataSchema>
+
+export const CodexConfigReadResponseSchema = v.looseObject({
+  config: CodexConfigSchema,
+  layers: v.optional(v.union([v.array(CodexConfigLayerSchema), v.null()])),
+  origins: v.record(v.string(), CodexConfigLayerMetadataSchema),
+})
+export type CodexConfigReadResponse = v.InferOutput<typeof CodexConfigReadResponseSchema>
+
+export type V2ConfigReadResponse = v.InferOutput<typeof CodexConfigReadResponseSchema>
+
 export const CodexTextPositionSchema = v.looseObject({
   column: v.pipe(v.number(), v.integer(), v.minValue(0)),
   line: v.pipe(v.number(), v.integer(), v.minValue(0)),
@@ -297,6 +654,26 @@ export type CodexConfigWarningNotification = v.InferOutput<
 >
 
 export type V2ConfigWarningNotification = v.InferOutput<typeof CodexConfigWarningNotificationSchema>
+
+export const CodexOverriddenMetadataSchema = v.looseObject({
+  effectiveValue: v.unknown(),
+  message: v.string(),
+  overridingLayer: CodexConfigLayerMetadataSchema,
+})
+export type CodexOverriddenMetadata = v.InferOutput<typeof CodexOverriddenMetadataSchema>
+
+export const CodexWriteStatusSchema = openEnum(['ok', 'okOverridden'])
+export type CodexWriteStatus = v.InferOutput<typeof CodexWriteStatusSchema>
+
+export const CodexConfigWriteResponseSchema = v.looseObject({
+  filePath: CodexAbsolutePathBufSchema,
+  overriddenMetadata: v.optional(v.union([CodexOverriddenMetadataSchema, v.null()])),
+  status: CodexWriteStatusSchema,
+  version: v.string(),
+})
+export type CodexConfigWriteResponse = v.InferOutput<typeof CodexConfigWriteResponseSchema>
+
+export type V2ConfigWriteResponse = v.InferOutput<typeof CodexConfigWriteResponseSchema>
 
 export const CodexConsumeAccountRateLimitResetCreditParamsSchema = v.looseObject({
   creditId: v.optional(v.union([v.string(), v.null()])),
@@ -1586,13 +1963,6 @@ export type CodexAdditionalFileSystemPermissions = v.InferOutput<
   typeof CodexAdditionalFileSystemPermissionsSchema
 >
 
-export const CodexAdditionalNetworkPermissionsSchema = v.looseObject({
-  enabled: v.optional(v.union([v.boolean(), v.null()])),
-})
-export type CodexAdditionalNetworkPermissions = v.InferOutput<
-  typeof CodexAdditionalNetworkPermissionsSchema
->
-
 export const CodexAutoReviewDecisionSourceSchema = v.literal('agent')
 export type CodexAutoReviewDecisionSource = v.InferOutput<
   typeof CodexAutoReviewDecisionSourceSchema
@@ -1638,7 +2008,7 @@ export type CodexNetworkApprovalProtocol = v.InferOutput<typeof CodexNetworkAppr
 
 export const CodexRequestPermissionProfileSchema = v.looseObject({
   fileSystem: v.optional(v.union([CodexAdditionalFileSystemPermissionsSchema, v.null()])),
-  network: v.optional(v.union([CodexAdditionalNetworkPermissionsSchema, v.null()])),
+  network: v.optional(v.union([CodexAnalyticsConfigSchema, v.null()])),
 })
 export type CodexRequestPermissionProfile = v.InferOutput<
   typeof CodexRequestPermissionProfileSchema
@@ -1920,12 +2290,7 @@ export type V2McpServerOauthLoginResponse = v.InferOutput<
   typeof CodexMcpServerOauthLoginResponseSchema
 >
 
-export const CodexMcpServerRefreshResponseSchema = v.looseObject({})
-export type CodexMcpServerRefreshResponse = v.InferOutput<
-  typeof CodexMcpServerRefreshResponseSchema
->
-
-export type V2McpServerRefreshResponse = v.InferOutput<typeof CodexMcpServerRefreshResponseSchema>
+export type V2McpServerRefreshResponse = v.InferOutput<typeof CodexAppLinksConfigSchema>
 
 export const CodexMcpServerStartupFailureReasonSchema = v.literal('reauthenticationRequired')
 export type CodexMcpServerStartupFailureReason = v.InferOutput<
@@ -2481,7 +2846,7 @@ export type V2ServerRequestResolvedNotification = v.InferOutput<
   typeof CodexServerRequestResolvedNotificationSchema
 >
 
-export type V2SkillsChangedNotification = v.InferOutput<typeof CodexMcpServerRefreshResponseSchema>
+export type V2SkillsChangedNotification = v.InferOutput<typeof CodexAppLinksConfigSchema>
 
 export const CodexSkillsListParamsSchema = v.looseObject({
   cwds: v.optional(v.array(v.string())),
@@ -2574,41 +2939,7 @@ export type V2ThreadClosedNotification = v.InferOutput<typeof CodexThreadArchive
 
 export type V2ThreadCompactStartParams = v.InferOutput<typeof CodexThreadArchivedNotificationSchema>
 
-export type V2ThreadCompactStartResponse = v.InferOutput<typeof CodexMcpServerRefreshResponseSchema>
-
-export const CodexApprovalsReviewerSchema = openEnum(['user', 'auto_review', 'guardian_subagent'])
-export type CodexApprovalsReviewer = v.InferOutput<typeof CodexApprovalsReviewerSchema>
-
-export const CodexMcpElicitationsRequestPermissionsRulesSandboxApprovalSkillApprovalObjectSchema =
-  v.looseObject({
-    mcp_elicitations: v.boolean(),
-    request_permissions: v.optional(v.boolean()),
-    rules: v.boolean(),
-    sandbox_approval: v.boolean(),
-    skill_approval: v.optional(v.boolean()),
-  })
-export type CodexMcpElicitationsRequestPermissionsRulesSandboxApprovalSkillApprovalObject =
-  v.InferOutput<
-    typeof CodexMcpElicitationsRequestPermissionsRulesSandboxApprovalSkillApprovalObjectSchema
-  >
-
-export const CodexGranularAskForApprovalSchema = v.looseObject({
-  granular: CodexMcpElicitationsRequestPermissionsRulesSandboxApprovalSkillApprovalObjectSchema,
-})
-export type CodexGranularAskForApproval = v.InferOutput<typeof CodexGranularAskForApprovalSchema>
-
-export const CodexAskForApprovalSchema = v.union([
-  openEnum(['untrusted', 'on-request', 'never']),
-  CodexGranularAskForApprovalSchema,
-])
-export type CodexAskForApproval = v.InferOutput<typeof CodexAskForApprovalSchema>
-
-export const CodexSandboxModeSchema = openEnum([
-  'read-only',
-  'workspace-write',
-  'danger-full-access',
-])
-export type CodexSandboxMode = v.InferOutput<typeof CodexSandboxModeSchema>
+export type V2ThreadCompactStartResponse = v.InferOutput<typeof CodexAppLinksConfigSchema>
 
 export const CodexThreadForkParamsSchema = v.looseObject({
   approvalPolicy: v.optional(v.union([CodexAskForApprovalSchema, v.null()])),
@@ -2919,9 +3250,6 @@ export type V2ThreadGoalUpdatedNotification = v.InferOutput<
 export const CodexSortDirectionSchema = openEnum(['asc', 'desc'])
 export type CodexSortDirection = v.InferOutput<typeof CodexSortDirectionSchema>
 
-export const CodexThreadListCwdFilterSchema = v.union([v.string(), v.array(v.string())])
-export type CodexThreadListCwdFilter = v.InferOutput<typeof CodexThreadListCwdFilterSchema>
-
 export const CodexThreadSortKeySchema = openEnum([
   'created_at',
   'updated_at',
@@ -2947,7 +3275,7 @@ export type CodexThreadSourceKind = v.InferOutput<typeof CodexThreadSourceKindSc
 export const CodexThreadListParamsSchema = v.looseObject({
   archived: v.optional(v.union([v.boolean(), v.null()])),
   cursor: v.optional(v.union([v.string(), v.null()])),
-  cwd: v.optional(v.union([CodexThreadListCwdFilterSchema, v.null()])),
+  cwd: v.optional(v.union([CodexForcedChatgptWorkspaceIdsSchema, v.null()])),
   limit: v.optional(v.union([v.pipe(v.number(), v.integer(), v.minValue(0)), v.null()])),
   modelProviders: v.optional(v.union([v.array(v.string()), v.null()])),
   originators: v.optional(v.union([v.array(v.string()), v.null()])),
@@ -3364,7 +3692,7 @@ export type V2TurnDiffUpdatedNotification = v.InferOutput<
 
 export type V2TurnInterruptParams = v.InferOutput<typeof CodexContextCompactedNotificationSchema>
 
-export type V2TurnInterruptResponse = v.InferOutput<typeof CodexMcpServerRefreshResponseSchema>
+export type V2TurnInterruptResponse = v.InferOutput<typeof CodexAppLinksConfigSchema>
 
 export const CodexTurnPlanStepStatusSchema = openEnum(['pending', 'inProgress', 'completed'])
 export type CodexTurnPlanStepStatus = v.InferOutput<typeof CodexTurnPlanStepStatusSchema>
@@ -3399,12 +3727,6 @@ export const CodexAdditionalContextEntrySchema = v.looseObject({
   value: v.string(),
 })
 export type CodexAdditionalContextEntry = v.InferOutput<typeof CodexAdditionalContextEntrySchema>
-
-export const CodexReasoningSummarySchema = v.union([
-  openEnum(['auto', 'concise', 'detailed']),
-  v.literal('none'),
-])
-export type CodexReasoningSummary = v.InferOutput<typeof CodexReasoningSummarySchema>
 
 export const CodexTurnToolOutputSchema = v.looseObject({
   ...v.pick(CodexFunctionCallOutputThreadItemSchema, ['name', 'namespace', 'output']).entries,

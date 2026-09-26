@@ -1,3 +1,4 @@
+// Modified for Platform from Pierre. Apache-2.0; see LICENSE-pierre and UPSTREAM.md.
 import { hasNodeFlag, isDirectoryNode } from './internal-types'
 import type { NodeId } from './internal-types'
 import { PATH_STORE_NODE_FLAG_ROOT } from './internal-types'

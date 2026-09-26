@@ -194,7 +194,7 @@ stays safe to read, share and export.
 
 ### Details
 
-- `keybindings.overrides`: In settings.json this is command id to shortcut: one hotkey, or two separated by a single space. A missing command keeps its default; null unbinds it.
+- `keybindings.overrides`: In settings.json this is command id to its complete list of shortcuts, each one hotkey or two separated by a single space. A missing command keeps its defaults; null or an empty list unbinds it.
 
 ## Language servers
 
@@ -247,6 +247,7 @@ stays safe to read, share and export.
 | ------------------ | ------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `prefetch.enabled` | `true`  | application | Start loading what a press will open while the pointer heads for it or a key moves to it, so it paints at once. Folder listings follow this switch; each other surface has its own switch under it. |
 | `prefetch.files`   | `true`  | application | Read a file and colour its syntax while the pointer heads for its tree row, tab or definition link. Applies while `prefetch.enabled` is on.                                                         |
+| `prefetch.diffs`   | `true`  | application | Load changes, commit files and checkpoint diffs when their rows are hovered or active. Applies while `prefetch.enabled` is on.                                                                      |
 
 ## Providers
 

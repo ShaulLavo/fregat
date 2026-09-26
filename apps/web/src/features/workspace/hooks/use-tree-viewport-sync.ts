@@ -1,3 +1,4 @@
+// Modified for Platform from Pierre. Apache-2.0; see packages/tree/LICENSE-pierre and UPSTREAM.md.
 import type { FileTreeController } from '@workspace/tree'
 import { type RefObject, useLayoutEffect, useRef } from 'react'
 
@@ -27,7 +28,6 @@ export type TreeContextMenuScrollActions = {
 export function useTreeViewportSync({
   contextMenuScrollActionsRef,
   controller,
-  getList,
   getRoot,
   getScroll,
   initialScrollTop,
@@ -46,7 +46,6 @@ export function useTreeViewportSync({
 }: {
   readonly contextMenuScrollActionsRef: RefObject<TreeContextMenuScrollActions>
   readonly controller: FileTreeController
-  readonly getList: () => HTMLElement | null
   readonly getRoot: () => HTMLElement | null
   readonly getScroll: () => HTMLElement | null
   readonly initialScrollTop: number | undefined
@@ -94,7 +93,6 @@ export function useTreeViewportSync({
   useLayoutEffect(() => {
     let scrollTimer: ReturnType<typeof setTimeout> | null = null
     const scrollElement = getScroll()
-    const listElement = getList()
     const rootElement = getRoot()
     if (scrollElement == null) {
       return
@@ -181,9 +179,6 @@ export function useTreeViewportSync({
     // too late — the user would see the floating trigger sit at its old row
     // position for a frame while the rows themselves have already scrolled.
     const markScrolling = (): void => {
-      if (listElement != null) {
-        if (listElement.dataset.isScrolling == null) listElement.dataset.isScrolling = ''
-      }
       if (rootElement != null) {
         if (rootElement.dataset.isScrolling == null) rootElement.dataset.isScrolling = ''
       }
@@ -192,9 +187,6 @@ export function useTreeViewportSync({
         clearTimeout(scrollTimer)
       }
       scrollTimer = setTimeout(() => {
-        if (listElement != null) {
-          delete listElement.dataset.isScrolling
-        }
         if (rootElement != null) {
           delete rootElement.dataset.isScrolling
         }
@@ -326,9 +318,6 @@ export function useTreeViewportSync({
       if (overlayRevealTimer != null) {
         clearTimeout(overlayRevealTimer)
       }
-      if (listElement != null) {
-        delete listElement.dataset.isScrolling
-      }
       if (rootElement != null) {
         delete rootElement.dataset.isScrolling
         delete rootElement.dataset.overlayReveal
@@ -343,7 +332,6 @@ export function useTreeViewportSync({
     }
   }, [
     controller,
-    getList,
     getRoot,
     getScroll,
     initialViewportHeight,

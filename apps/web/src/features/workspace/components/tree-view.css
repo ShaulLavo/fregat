@@ -4,18 +4,14 @@
 
 @layer file-tree {
   [data-file-tree] {
-    /* The tree was drawn against browser defaults; the app's preflight must not resize it. */
-    & *,
-    & *::before,
-    & *::after {
+    /* The inputs were drawn against browser defaults; the app's preflight must not resize them.
+     * Only inputs: a universal rule here is matched against every row element on each restyle. */
+    & input {
       box-sizing: revert;
       margin: revert;
       padding: revert;
       border-style: revert;
       border-width: revert;
-    }
-
-    & input {
       line-height: revert;
     }
 
@@ -559,10 +555,6 @@
       min-height: 100%;
       width: 100%;
       overflow-anchor: none;
-
-      &[data-is-scrolling] {
-        pointer-events: none;
-      }
     }
 
     [data-file-tree-virtualized-sticky-offset='true'] {
@@ -656,7 +648,10 @@
       --truncate-marker-background-overlay-color: transparent;
       --truncate-marker-block-inset: 0px;
 
-      &:hover,
+      /* Hover waits for scrolling to stop. Gating on the root flag restyles the rows alone; an
+       * inherited `pointer-events` flip fully restyles every element under them (the app's base
+       * rule gives each a var(), which rules out Blink's inherited fast path). */
+      [data-file-tree-virtualized-root='true']:not([data-is-scrolling]) &:hover,
       &[data-item-context-hover='true'] {
         background-color: var(--trees-bg-muted);
         --truncate-marker-background-overlay-color: var(--trees-bg-muted);
@@ -743,7 +738,8 @@
       align-items: center;
       gap: 2px;
     }
-    [data-item-flattened-subitem]:hover,
+    [data-file-tree-virtualized-root='true']:not([data-is-scrolling])
+      [data-item-flattened-subitem]:hover,
     [data-item-flattened-subitem]:focus-visible {
       text-decoration: underline;
     }
@@ -972,7 +968,8 @@
       opacity: 0.7;
     }
 
-    [data-item-decoration-action]:hover {
+    [data-file-tree-virtualized-root='true']:not([data-is-scrolling])
+      [data-item-decoration-action]:hover {
       color: var(--trees-fg);
       opacity: 1;
     }

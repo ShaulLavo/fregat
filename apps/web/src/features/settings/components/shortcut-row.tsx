@@ -6,6 +6,7 @@ import type { HTMLAttributes, MouseEvent } from 'react'
 
 import { ShortcutKeys } from '@/features/settings/components/shortcut-keys'
 import {
+  shortcutConflictLabel,
   shortcutIdMatches,
   shortcutPlacesLabel,
   shortcutSourceLabel,
@@ -38,10 +39,11 @@ export function ShortcutRow({
   rowProps: HTMLAttributes<HTMLDivElement> & { 'aria-selected': boolean }
 }) {
   const takenBy = row.shadowedBy ? shortcutTitle(row.shadowedBy) : null
-  const where = takenBy ? `Taken by ${takenBy}` : shortcutPlacesLabel(row.places)
+  const where = shortcutConflictLabel(row) ?? shortcutPlacesLabel(row.places)
+  const hasLoss = row.losses.length > 0
   const source = shortcutSourceLabel(row.source)
   const modified = row.source === 'custom' || row.source === 'removed'
-  const bound = row.keys.length > 0
+  const bound = row.keys !== null
 
   return (
     <ListRow
@@ -52,13 +54,15 @@ export function ShortcutRow({
         '@max-3xl/settings:h-12 @max-3xl/settings:flex-col @max-3xl/settings:items-stretch @max-3xl/settings:justify-center @max-3xl/settings:gap-0.5',
       )}
       data-shortcut-command={row.command}
+      data-shortcut-keys={row.keys ?? undefined}
+      data-shortcut-row={row.id}
       onContextMenu={(event: MouseEvent<HTMLDivElement>) => {
         event.preventDefault()
         onMenu(event.currentTarget)
       }}
       onDoubleClick={onChange}
       role='option'
-      title={rowTitle(row, where, keptNote, platform)}
+      title={rowTitle(row, keptNote, platform)}
     >
       {modified ? (
         <span
@@ -74,7 +78,9 @@ export function ShortcutRow({
           ) : null}
         </span>
         <span className='flex min-w-0 shrink-0 items-center gap-1 @3xl/settings:overflow-hidden'>
-          <ShortcutKeys keys={row.keys} platform={platform} struck={takenBy !== null} />
+          {row.keys ? (
+            <ShortcutKeys keys={row.keys} platform={platform} struck={takenBy !== null} />
+          ) : null}
           {keptNote ? (
             <WarningIcon
               aria-label={keptNote}
@@ -89,11 +95,11 @@ export function ShortcutRow({
         <span
           className={cn(
             'flex min-w-0 items-center gap-1',
-            takenBy && 'text-warning',
+            hasLoss && 'text-warning',
             !where && '@max-3xl/settings:hidden',
           )}
         >
-          {takenBy ? <WarningIcon aria-hidden className='size-(--icon-size-sm) shrink-0' /> : null}
+          {hasLoss ? <WarningIcon aria-hidden className='size-(--icon-size-sm) shrink-0' /> : null}
           <span className='truncate'>{where}</span>
         </span>
         <span
@@ -130,17 +136,13 @@ export function ShortcutRow({
 }
 
 /** Everything the row cannot show: the id, every chord, every place, and who took a chord. */
-function rowTitle(
-  row: ShortcutRowModel,
-  where: string,
-  keptNote: string | null,
-  platform: PlatformName,
-): string {
+function rowTitle(row: ShortcutRowModel, keptNote: string | null, platform: PlatformName): string {
   const parts = [`${row.title} (${row.command})`]
-  if (row.keys.length > 0)
-    parts.push(row.keys.map((keys) => formatChord(keys, platform)).join(', '))
+  if (row.keys) parts.push(formatChord(row.keys, platform))
+  if (row.commandKeys.length > 1) parts.push(`${row.commandKeys.length} shortcuts`)
   if (row.places.length > 0) parts.push(row.places.join('; '))
-  if (row.shadowedBy) parts.push(where)
+  for (const loss of row.losses)
+    parts.push(`Taken by ${shortcutTitle(loss.winner)} in ${loss.place}`)
   if (keptNote) parts.push(keptNote)
 
   return parts.join(' · ')

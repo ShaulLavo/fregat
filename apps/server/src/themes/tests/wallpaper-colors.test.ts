@@ -1,6 +1,6 @@
 import { mkdir, mkdtemp, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import sharp from 'sharp'
+import { PNG } from 'pngjs'
 import { afterEach, expect, it } from 'vitest'
 
 import { SettingsStore } from '../../settings/store'
@@ -17,25 +17,12 @@ afterEach(async () => {
 
 /** Three quarters deep blue, one quarter orange: two clusters with known weights. */
 async function twoColorImage() {
-  const blue = await sharp({
-    create: { width: 300, height: 200, channels: 3, background: { r: 20, g: 40, b: 120 } },
-  })
-    .png()
-    .toBuffer()
-  return sharp(blue)
-    .composite([
-      {
-        input: await sharp({
-          create: { width: 75, height: 200, channels: 3, background: { r: 240, g: 140, b: 20 } },
-        })
-          .png()
-          .toBuffer(),
-        left: 225,
-        top: 0,
-      },
-    ])
-    .png()
-    .toBuffer()
+  const image = new PNG({ width: 300, height: 200 })
+  for (let pixel = 0; pixel < 300 * 200; pixel++) {
+    const color = pixel % 300 < 225 ? [20, 40, 120, 255] : [240, 140, 20, 255]
+    image.data.set(color, pixel * 4)
+  }
+  return PNG.sync.write(image)
 }
 
 async function fixture() {
@@ -48,7 +35,7 @@ async function fixture() {
   })
   stores.push(settings)
   const library = new WallpaperLibrary({ directory: path.join(root, 'wallpapers'), settings })
-  const asset = await library.upload(new File([await twoColorImage()], 'split.png'))
+  const asset = await library.upload(new File([new Uint8Array(await twoColorImage())], 'split.png'))
 
   return { root, library, asset }
 }

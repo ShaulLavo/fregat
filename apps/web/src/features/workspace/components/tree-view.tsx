@@ -1,3 +1,4 @@
+// Modified for Platform from Pierre. Apache-2.0; see packages/tree/LICENSE-pierre and UPSTREAM.md.
 /** @jsxImportSource react */
 
 import { type JSX, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
@@ -314,7 +315,6 @@ export function TreeView({
   useTreeViewportSync({
     contextMenuScrollActionsRef,
     controller,
-    getList,
     getRoot,
     getScroll,
     initialScrollTop,

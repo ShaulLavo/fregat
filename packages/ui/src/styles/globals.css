@@ -6,6 +6,8 @@
 /* The bundled Graphite palette, generated from data; the app's <style> for the
    selected palette outranks it because that one is unlayered. */
 @import './palette.generated.css';
+/* File icon hues per mode, generated with the icon rules. */
+@import './file-icons.generated.css';
 
 @custom-variant dark (&:is(.dark *));
 @source '../../../../apps/**/*.{ts,tsx}';
@@ -309,54 +311,6 @@
      whichever one wins; a copied literal would drift. */
   --border-subtle: color-mix(in oklch, var(--border) 55%, transparent);
   --radius: 0.5rem;
-  --trees-file-icon-color-astro: #a631be;
-  --trees-file-icon-color-babel: #d5a910;
-  --trees-file-icon-color-bash: #199f43;
-  --trees-file-icon-color-biome: #1a85d4;
-  --trees-file-icon-color-bootstrap: #693acf;
-  --trees-file-icon-color-browserslist: #d5a910;
-  --trees-file-icon-color-bun: #d32a61;
-  --trees-file-icon-color-claude: #d47628;
-  --trees-file-icon-color-css: #693acf;
-  --trees-file-icon-color-database: #a631be;
-  --trees-file-icon-color-default: #84848a;
-  --trees-file-icon-color-docker: #1a85d4;
-  --trees-file-icon-color-eslint: #693acf;
-  --trees-file-icon-color-git: #ff8c5b;
-  --trees-file-icon-color-go: #1ca1c7;
-  --trees-file-icon-color-graphql: #d32a61;
-  --trees-file-icon-color-html: #d47628;
-  --trees-file-icon-color-image: #d32a61;
-  --trees-file-icon-color-javascript: #d5a910;
-  --trees-file-icon-color-json: #d47628;
-  --trees-file-icon-color-markdown: #199f43;
-  --trees-file-icon-color-mcp: #17a5af;
-  --trees-file-icon-color-npm: #d52c36;
-  --trees-file-icon-color-oxc: #1ca1c7;
-  --trees-file-icon-color-postcss: #d52c36;
-  --trees-file-icon-color-prettier: #17a5af;
-  --trees-file-icon-color-python: #1a85d4;
-  --trees-file-icon-color-react: #1ca1c7;
-  --trees-file-icon-color-ruby: #d52c36;
-  --trees-file-icon-color-rust: #d47628;
-  --trees-file-icon-color-sass: #d32a61;
-  --trees-file-icon-color-svg: #d47628;
-  --trees-file-icon-color-svelte: #d52c36;
-  --trees-file-icon-color-svgo: #199f43;
-  --trees-file-icon-color-swift: #d47628;
-  --trees-file-icon-color-table: #17a5af;
-  --trees-file-icon-color-tailwind: #1ca1c7;
-  --trees-file-icon-color-terraform: #693acf;
-  --trees-file-icon-color-text: #84848a;
-  --trees-file-icon-color-typescript: #1a85d4;
-  --trees-file-icon-color-vite: #a631be;
-  --trees-file-icon-color-vscode: #1a85d4;
-  --trees-file-icon-color-vue: #199f43;
-  --trees-file-icon-color-wasm: #693acf;
-  --trees-file-icon-color-webpack: #1a85d4;
-  --trees-file-icon-color-yml: #d52c36;
-  --trees-file-icon-color-zig: #d47628;
-  --trees-file-icon-color-zip: #d47628;
   --search-result-match-background: color-mix(in oklch, oklch(0.86 0.17 91) 42%, transparent);
   --search-result-match-active-background: color-mix(
     in oklch,
@@ -461,54 +415,6 @@
      presence on a dark popover — the lift --trees-file-icon-color-claude
      already makes, kept smaller because this is the real brand color. */
   --brand-anthropic: oklch(0.76 0.131 38.8);
-  --trees-file-icon-color-astro: #d568ea;
-  --trees-file-icon-color-babel: #ffd452;
-  --trees-file-icon-color-bash: #5ecc71;
-  --trees-file-icon-color-biome: #69b1ff;
-  --trees-file-icon-color-bootstrap: #9d6afb;
-  --trees-file-icon-color-browserslist: #ffd452;
-  --trees-file-icon-color-bun: #ff678d;
-  --trees-file-icon-color-claude: #ffa359;
-  --trees-file-icon-color-css: #9d6afb;
-  --trees-file-icon-color-database: #d568ea;
-  --trees-file-icon-color-default: #adadb1;
-  --trees-file-icon-color-docker: #69b1ff;
-  --trees-file-icon-color-eslint: #9d6afb;
-  --trees-file-icon-color-git: #d5512f;
-  --trees-file-icon-color-go: #68cdf2;
-  --trees-file-icon-color-graphql: #ff678d;
-  --trees-file-icon-color-html: #ffa359;
-  --trees-file-icon-color-image: #ff678d;
-  --trees-file-icon-color-javascript: #ffd452;
-  --trees-file-icon-color-json: #ffa359;
-  --trees-file-icon-color-markdown: #5ecc71;
-  --trees-file-icon-color-mcp: #64d1db;
-  --trees-file-icon-color-npm: #ff6762;
-  --trees-file-icon-color-oxc: #68cdf2;
-  --trees-file-icon-color-postcss: #ff6762;
-  --trees-file-icon-color-prettier: #64d1db;
-  --trees-file-icon-color-python: #69b1ff;
-  --trees-file-icon-color-react: #68cdf2;
-  --trees-file-icon-color-ruby: #ff6762;
-  --trees-file-icon-color-rust: #ffa359;
-  --trees-file-icon-color-sass: #ff678d;
-  --trees-file-icon-color-svg: #ffa359;
-  --trees-file-icon-color-svelte: #ff6762;
-  --trees-file-icon-color-svgo: #5ecc71;
-  --trees-file-icon-color-swift: #ffa359;
-  --trees-file-icon-color-table: #64d1db;
-  --trees-file-icon-color-tailwind: #68cdf2;
-  --trees-file-icon-color-terraform: #9d6afb;
-  --trees-file-icon-color-text: #adadb1;
-  --trees-file-icon-color-typescript: #69b1ff;
-  --trees-file-icon-color-vite: #d568ea;
-  --trees-file-icon-color-vscode: #69b1ff;
-  --trees-file-icon-color-vue: #5ecc71;
-  --trees-file-icon-color-wasm: #9d6afb;
-  --trees-file-icon-color-webpack: #69b1ff;
-  --trees-file-icon-color-yml: #ff6762;
-  --trees-file-icon-color-zig: #ffa359;
-  --trees-file-icon-color-zip: #ffa359;
   --search-result-match-background: color-mix(in oklch, oklch(0.84 0.17 91) 36%, transparent);
   --search-result-match-active-background: color-mix(
     in oklch,
@@ -2841,7 +2747,7 @@
   }
 }
 
-:root[data-feel]:not([data-feel='flat']) [data-slot='ticker-digit'] {
+:root[data-feel] [data-slot='ticker-digit'] {
   transition: transform var(--spring-snappy-duration) var(--spring-snappy);
   @media (prefers-reduced-motion: reduce) {
     transition: none;

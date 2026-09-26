@@ -1,6 +1,10 @@
 import { CrosshairIcon } from '@phosphor-icons/react'
 import { useIsMutating } from '@tanstack/react-query'
-import type { ProviderGoalAction, ScopedSessionRef } from '@workspace/contracts'
+import {
+  scopedSessionKey,
+  type ProviderGoalAction,
+  type ScopedSessionRef,
+} from '@workspace/contracts'
 import { Button } from '@workspace/ui/components/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@workspace/ui/components/popover'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
@@ -39,6 +43,7 @@ export function GoalButton({ sessionRef }: { readonly sessionRef: ScopedSessionR
   const goal = state.data?.goal ?? null
   if (!goal || !interactionMode || !runtimeMode) return null
 
+  const goalIdentity = `${scopedSessionKey(sessionRef)}:${goal.objective}`
   const controllable = state.data?.controllable ?? false
   const status = goalStatusLabel(goal.status)
   // The popover stays open on the new status; a cleared goal takes the button with it.
@@ -47,8 +52,8 @@ export function GoalButton({ sessionRef }: { readonly sessionRef: ScopedSessionR
 
   return (
     <Popover
-      open={openFor === goal.objective}
-      onOpenChange={(next) => setOpenFor(next ? goal.objective : null)}
+      open={openFor === goalIdentity}
+      onOpenChange={(next) => setOpenFor(next ? goalIdentity : null)}
     >
       <Tooltip>
         <TooltipTrigger

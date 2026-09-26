@@ -1,9 +1,16 @@
 import type { Locator, Page } from 'playwright'
 import { createScriptError } from '../structured-errors'
 
+export const folderTreeShadowHost = 'file-tree-container[aria-label="Folder tree"]'
+export const rootSwitchRows = {
+  Git: '[aria-label="Git changes"] [role="treeitem"][aria-level="2"]',
+  Files: '[role="treeitem"]',
+} as const
+
 export const fileIconSelector = '[data-file-icon], [style*="vscode-icons/"]'
 export const wallpaperLayerSelector = '[data-workbench] img[data-workbench-wallpaper-layer="still"]'
 export const diffPaneSelector = '.editor-diff-pane'
+export const diffContentRowSelector = '.editor-diff-pane [data-editor-virtual-row]'
 export const editorViewportSelector = '.editor-virtualized-viewport'
 /** Rows the markdown live preview has decorated (headings, lists, emphasis). */
 export const markdownPreviewRowSelector = '[class*="editor-inline-"]'
@@ -209,6 +216,7 @@ export const selectors = {
       .getByRole('log', { name: 'Messages', exact: true })
       .locator('[data-index] > [data-timeline-row-id]'),
   timelineJumpToLatest: (page: Page) => page.locator('[data-slot="tail-jump-button"]'),
+  breadcrumbLoadedSelector: '[aria-label="Breadcrumbs"] [data-breadcrumb-item]',
   breadcrumbCrumb: (page: Page, label: string) =>
     page
       .getByRole('navigation', { name: 'Breadcrumbs', exact: true })
@@ -275,6 +283,10 @@ export const selectors = {
   newTerminal: (page: Page) => page.getByRole('button', { name: 'New terminal', exact: true }),
   projectMenu: (page: Page) => page.getByRole('button', { name: 'Switch project', exact: true }),
   openFolderMenu: (page: Page) => page.getByRole('menuitem', { name: 'Open folder…', exact: true }),
+  pickerLoadedRowsSelector: '[role="dialog"] [role="option"]',
+  settingsContentSelector: '[aria-label="Settings form"], .editor-virtualized-viewport',
+  fontSampleReadySelector: '[aria-label="Code font"] span[style]:not(:has([data-slot="shimmer"]))',
+  settingsFormView: (page: Page) => page.getByRole('tab', { name: 'Settings', exact: true }),
   pickerDialog: (page: Page) => page.getByRole('dialog', { name: 'Choose folder', exact: true }),
   pickerList: (page: Page) => page.getByRole('listbox', { name: 'Folders and files', exact: true }),
   pickerOptions: (page: Page) =>
@@ -321,6 +333,8 @@ export const selectors = {
   quickOpenPreviewHeaderSelector: '[aria-label="File preview"] header',
   quickOpenPreviewTextSelector: '[aria-label="File preview"] [data-file-preview-text]',
   quickOpenPreview: (page: Page) => page.getByRole('region', { name: 'File preview', exact: true }),
+  pickerFolderColumn: (page: Page, path: string) =>
+    page.locator(`[data-picker-column-folder="${path.replace(/^\//u, '')}"]`),
   pickerColumn: (page: Page, index: number) => page.locator(`[data-picker-column="${index}"]`),
   pickerColumnBox: (page: Page, index: number) =>
     page.locator('[data-picker-column-folder]').nth(index),
@@ -501,6 +515,13 @@ export const selectors = {
     page
       .getByRole('navigation', { name: 'Tool tabs' })
       .getByRole('button', { name: 'Terminal', exact: true }),
+  codeThemePreviewHeaderSelector:
+    '[aria-label="Code theme sample"] [aria-live] > span:first-child, [aria-label="Theme studio"] [data-slot="tool-pane-header"] .font-medium',
+  codeThemePreviewContentSelector: '[data-code-theme-preview] pre[data-theme-id]',
+  studioCodeColors: (page: Page) =>
+    selectors.themeStudio(page).getByRole('listbox', { name: 'Code colors' }),
+  codeThemeDialog: (page: Page) =>
+    page.getByRole('dialog', { name: 'Choose code theme', exact: true }),
   codeThemeOptions: (page: Page) => page.locator('[data-value^="color-theme:"]'),
   codeThemeOption: (page: Page, id: string) => page.locator(`[data-value="color-theme:${id}"]`),
   wallpaperAsset: (page: Page, id: string) =>
@@ -538,6 +559,8 @@ export const selectors = {
     page.locator('[data-slot="combobox-group-label"]', { hasText: name }),
   chooseFolder: (page: Page) => page.getByRole('button', { name: 'Choose folder', exact: true }),
   settingsDialog: (page: Page) => page.getByRole('dialog', { name: 'Settings', exact: true }),
+  mcpSettings: (page: Page) => page.locator('[data-mcp-section]'),
+  mcpSettingsRow: (page: Page, name: string) => page.locator(`[data-mcp-server="${name}"]`),
   settingsSearch: (page: Page) => page.getByRole('textbox', { name: 'Search settings' }),
   settingsShowAll: (page: Page) => page.getByRole('button', { name: 'Show all settings' }),
   settingsCategoryHeading: (page: Page, name: string) =>
@@ -565,8 +588,10 @@ export const selectors = {
   shortcutsSearch: (page: Page) =>
     page.getByRole('textbox', { name: 'Search keyboard shortcuts', exact: true }),
   shortcutsList: (page: Page) => page.getByRole('listbox', { name: 'Keyboard shortcuts' }),
-  shortcutRow: (page: Page, command: string) =>
-    page.locator(`[data-shortcut-command="${command}"]`),
+  shortcutRow: (page: Page, command: string, keys?: string) =>
+    page.locator(
+      `[data-shortcut-command="${command}"]${keys ? `[data-shortcut-keys="${keys}"]` : ''}`,
+    ),
   shortcutRecorder: (page: Page, title: string) =>
     page.getByRole('textbox', { name: `Press the new shortcut for ${title}`, exact: true }),
   shortcutFilter: (page: Page, name: 'All' | 'Custom' | 'Conflicts' | 'Unassigned') =>
@@ -587,8 +612,8 @@ export const selectors = {
   settingsDensityOption: (page: Page, density: 'compact' | 'cozy') =>
     page.getByRole('option', { name: density, exact: true }),
   settingsJsonView: (page: Page) => page.getByRole('tab', { name: 'settings.json', exact: true }),
-  settingsScopeTab: (page: Page, name: 'User' | 'Workspace' | 'Defaults') =>
-    page.getByRole('tab', { name, exact: true }),
+  settingsScopeTab: (page: Page, name: 'User' | 'Workspace' | 'Defaults', selected?: boolean) =>
+    page.getByRole('tab', { name, exact: true, selected }),
   settingsDefaultsBanner: (page: Page) => page.getByText('Defaults are read-only', { exact: true }),
   settingsRowActions: (page: Page, id: string) =>
     page.getByRole('button', { name: `Actions for ${id}`, exact: true }),
@@ -648,6 +673,8 @@ export const selectors = {
       .getByRole('option')
       .nth(index),
   historyRestore: (page: Page) => page.getByRole('button', { name: 'Restore', exact: true }),
+  comparisonRowsSelector: '.editor-diff-pane [data-editor-virtual-row]',
+  selectedComparisonTabSelector: '[data-editor-tab-id][aria-selected="true"]',
   diffRows: (page: Page) => page.locator('.editor-diff-pane [data-editor-virtual-row]'),
   diffPanes: (page: Page) => page.locator(diffPaneSelector),
   diffExpandRows: (page: Page) => page.locator('.editor-diff-pane .editor-diff-row-expandable'),
@@ -911,6 +938,12 @@ export const selectors = {
       .getByRole('alert')
       .filter({ hasText: /not initialized/ })
       .getByRole('button', { name: 'Initialize', exact: true }),
+  filesPaneError: (page: Page) =>
+    page.getByRole('status').filter({ hasText: 'Unable to load files' }),
+  filesPaneLoading: (page: Page) =>
+    page.getByRole('status', { name: 'Loading files', exact: true }),
+  folderTreeScroll: (page: Page) =>
+    page.locator(folderTreeShadowHost).locator('[data-file-tree-virtualized-scroll]'),
   folderTree: (page: Page) => page.getByLabel('Folder tree', { exact: true }),
   focusedTreeRow: (page: Page) =>
     page.getByLabel('Folder tree', { exact: true }).locator('[role="treeitem"][tabindex="0"]'),
@@ -1012,11 +1045,37 @@ export const selectors = {
     page
       .getByRole('tablist', { name: 'Diff scope' })
       .getByRole('tab', { name: scope, exact: true }),
+  turnHunkSelector: '[aria-label="Turn changed files"] [data-turn-hunk]',
+  turnFilesHeaderSelector: 'div:has(> [aria-label="Turn changed files"]) > p',
+  branchActionSelector: '[data-branch-actions] button',
+  branchPush: (page: Page, count: number) =>
+    page.getByRole('button', { name: `Push ${count}`, exact: true }),
   turnFiles: (page: Page) => page.getByRole('tree', { name: 'Turn changed files' }),
   worktreeFiles: (page: Page) => page.locator('[data-git-file]:not([data-history-file])'),
   historyList: (page: Page) => page.getByRole('listbox', { name: 'Commit history' }),
   historyRowSelector: '[data-history-commit]',
+  historyDetailsFrameSampler: `() => {
+    const details = document.querySelector('[aria-label="Commit details"]')
+    return {
+      hash: details?.querySelector('[aria-label="Commit information"]')?.getAttribute('title'),
+      subject: details?.querySelector('p')?.textContent,
+    }
+  }`,
   logRowSelector: '[data-log-row-summary]',
+  chatReconnecting: (page: Page) => page.getByText('Reconnecting chat…', { exact: true }),
+  conversationTitle: (page: Page, title: string) =>
+    page
+      .getByRole('navigation', { name: 'Session', exact: true })
+      .getByRole('heading', { name: title, exact: true })
+      .or(page.locator('[data-workbench-tool-pane-header]').getByTitle(title, { exact: true })),
+  conversationHistory: (page: Page) =>
+    page.getByRole('button', { name: 'Conversation history', exact: true }),
+  conversationChoice: (page: Page, title: string) =>
+    page.getByRole('menuitem').filter({ hasText: title }),
+  conversationTitleSelector:
+    'nav[aria-label="Session"] h1, [data-workbench-tool-pane-header] > div[title] > .truncate',
+  conversationLoadingSelector:
+    '[data-slot="tool-pane-header"] [data-slot="spinner"][aria-label="Loading conversation"]',
   chatAssistantMarkdown: (page: Page) =>
     page.locator(
       `${chatMessagesLogSelector} article:not(:has([data-user-message-body])) [data-chat-markdown]`,
@@ -1038,10 +1097,13 @@ export const selectors = {
       .getByRole('button', { name: 'Retry' }),
   historyRows: (page: Page) => page.locator('[data-history-commit]'),
   historyCircles: (page: Page) => page.locator('[data-history-commit] svg circle'),
+  historyFileSelector: '[data-history-file]',
   historyFiles: (page: Page) => page.locator('[data-history-file]'),
   historyDetails: (page: Page) => page.getByRole('region', { name: 'Commit details' }),
   historyInformation: (page: Page) =>
     page.getByRole('button', { name: 'Commit information', exact: true }),
+  historyInformationFor: (page: Page, commit: string) =>
+    page.locator('[aria-label="Commit information"]').and(page.locator(`[title="${commit}"]`)),
   historyCopyMessage: (page: Page) =>
     page.getByRole('button', { name: 'Copy message', exact: true }),
   historySearch: (page: Page) => page.getByRole('textbox', { name: 'Search commit history' }),

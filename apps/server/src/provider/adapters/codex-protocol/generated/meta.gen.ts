@@ -27,6 +27,8 @@ export const CODEX_CLIENT_REQUEST_METHODS = {
   'mcpServerStatus/list': 'mcpServerStatus/list',
   'account/rateLimits/read': 'account/rateLimits/read',
   'account/rateLimitResetCredit/consume': 'account/rateLimitResetCredit/consume',
+  'config/read': 'config/read',
+  'config/batchWrite': 'config/batchWrite',
   'account/read': 'account/read',
 } as const
 
@@ -117,6 +119,8 @@ export interface CodexClientRequestParamsByMethod {
   readonly 'mcpServerStatus/list': CodexSchema.V2ListMcpServerStatusParams
   readonly 'account/rateLimits/read': CodexSchema.V2NullableGetAccountRateLimitsParams | undefined
   readonly 'account/rateLimitResetCredit/consume': CodexSchema.V2ConsumeAccountRateLimitResetCreditParams
+  readonly 'config/read': CodexSchema.V2ConfigReadParams
+  readonly 'config/batchWrite': CodexSchema.V2ConfigBatchWriteParams
   readonly 'account/read': CodexSchema.V2GetAccountParams
 }
 
@@ -143,6 +147,8 @@ export interface CodexClientRequestResultByMethod {
   readonly 'mcpServerStatus/list': CodexSchema.V2ListMcpServerStatusResponse
   readonly 'account/rateLimits/read': CodexSchema.V2GetAccountRateLimitsResponse
   readonly 'account/rateLimitResetCredit/consume': CodexSchema.V2ConsumeAccountRateLimitResetCreditResponse
+  readonly 'config/read': CodexSchema.V2ConfigReadResponse
+  readonly 'config/batchWrite': CodexSchema.V2ConfigWriteResponse
   readonly 'account/read': CodexSchema.V2GetAccountResponse
 }
 
@@ -231,6 +237,8 @@ export const CODEX_CLIENT_REQUEST_PARAMS = {
   'account/rateLimits/read': v.optional(CodexSchema.CodexNullableGetAccountRateLimitsParamsSchema),
   'account/rateLimitResetCredit/consume':
     CodexSchema.CodexConsumeAccountRateLimitResetCreditParamsSchema,
+  'config/read': CodexSchema.CodexConfigReadParamsSchema,
+  'config/batchWrite': CodexSchema.CodexConfigBatchWriteParamsSchema,
   'account/read': CodexSchema.CodexGetAccountParamsSchema,
 } as const
 
@@ -242,7 +250,7 @@ export const CODEX_CLIENT_REQUEST_RESULTS = {
   'thread/goal/set': CodexSchema.CodexThreadGoalSetResponseSchema,
   'thread/goal/get': CodexSchema.CodexThreadGoalGetResponseSchema,
   'thread/goal/clear': CodexSchema.CodexThreadGoalClearResponseSchema,
-  'thread/compact/start': CodexSchema.CodexMcpServerRefreshResponseSchema,
+  'thread/compact/start': CodexSchema.CodexAppLinksConfigSchema,
   'thread/revert': CodexSchema.CodexThreadRevertResponseSchema,
   'thread/list': CodexSchema.CodexThreadListResponseSchema,
   'thread/read': CodexSchema.CodexThreadReadResponseSchema,
@@ -250,14 +258,16 @@ export const CODEX_CLIENT_REQUEST_RESULTS = {
   'hooks/list': CodexSchema.CodexHooksListResponseSchema,
   'turn/start': CodexSchema.CodexTurnStartResponseSchema,
   'turn/steer': CodexSchema.CodexTurnSteerResponseSchema,
-  'turn/interrupt': CodexSchema.CodexMcpServerRefreshResponseSchema,
+  'turn/interrupt': CodexSchema.CodexAppLinksConfigSchema,
   'model/list': CodexSchema.CodexModelListResponseSchema,
   'mcpServer/oauth/login': CodexSchema.CodexMcpServerOauthLoginResponseSchema,
-  'config/mcpServer/reload': CodexSchema.CodexMcpServerRefreshResponseSchema,
+  'config/mcpServer/reload': CodexSchema.CodexAppLinksConfigSchema,
   'mcpServerStatus/list': CodexSchema.CodexListMcpServerStatusResponseSchema,
   'account/rateLimits/read': CodexSchema.CodexGetAccountRateLimitsResponseSchema,
   'account/rateLimitResetCredit/consume':
     CodexSchema.CodexConsumeAccountRateLimitResetCreditResponseSchema,
+  'config/read': CodexSchema.CodexConfigReadResponseSchema,
+  'config/batchWrite': CodexSchema.CodexConfigWriteResponseSchema,
   'account/read': CodexSchema.CodexGetAccountResponseSchema,
 } as const
 
@@ -269,7 +279,7 @@ export const CODEX_SERVER_NOTIFICATION_PARAMS = {
   'thread/unarchived': CodexSchema.CodexThreadArchivedNotificationSchema,
   'thread/closed': CodexSchema.CodexThreadArchivedNotificationSchema,
   'thread/reverted': CodexSchema.CodexThreadArchivedNotificationSchema,
-  'skills/changed': CodexSchema.CodexMcpServerRefreshResponseSchema,
+  'skills/changed': CodexSchema.CodexAppLinksConfigSchema,
   'thread/name/updated': CodexSchema.CodexThreadNameUpdatedNotificationSchema,
   'thread/goal/updated': CodexSchema.CodexThreadGoalUpdatedNotificationSchema,
   'thread/goal/cleared': CodexSchema.CodexThreadArchivedNotificationSchema,
