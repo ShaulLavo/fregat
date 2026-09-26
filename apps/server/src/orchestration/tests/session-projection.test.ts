@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { createMetadataDatabase, type MetadataDatabaseHandle } from '../../db/client'
-import { migratePlatformDatabase } from '../../db/migrations'
+import { initializePlatformDatabase } from '../../db/initialize'
 import { projectionTurns } from '../../db/schema'
 import { OrchestrationEventStore } from '../event-store'
 import { OrchestrationProjectionPipeline } from '../projection-pipeline'
@@ -16,7 +16,7 @@ afterEach(() => {
 function database() {
   const handle = createMetadataDatabase({ databasePath: ':memory:' })
   handles.push(handle)
-  migratePlatformDatabase(handle.db)
+  initializePlatformDatabase(handle.db)
   return handle.db
 }
 

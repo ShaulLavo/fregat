@@ -2,7 +2,7 @@
  * Shared harness for tests that drive the real in-process server.
  *
  * Every app built here owns an in-memory database, so a test run never opens,
- * migrates, or WAL-locks the developer's real `~/.platform/fs-metadata.sqlite`.
+ * writes, or WAL-locks the developer's real `~/.platform/fs-metadata.sqlite`.
  * `createMetadataDatabase` refuses the default path from a test process, so a
  * call site that forgets to inject fails loudly instead of leaking.
  */

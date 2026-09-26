@@ -10,7 +10,7 @@ import {
   orchestrationCommandSchema,
   type OrchestrationCommand,
 } from '@workspace/contracts'
-import { migratePlatformDatabase as migrateOrchestrationDatabase } from '../../db/migrations'
+import { initializePlatformDatabase } from '../../db/initialize'
 import * as schema from '../../db/schema'
 import { projectionSessions } from '../../db/schema'
 import { OrchestrationEngine } from '../engine'
@@ -1112,7 +1112,7 @@ type TestDatabase = ReturnType<typeof drizzle<typeof schema>>
 async function createEngineWithSession() {
   const sqlite = new Database(':memory:', { create: true })
   const database = drizzle({ client: sqlite, schema })
-  migrateOrchestrationDatabase(database)
+  initializePlatformDatabase(database)
   fixtures.push({ close: () => sqlite.close() })
   const engine = new OrchestrationEngine(database)
 

@@ -235,14 +235,6 @@ function refreshTerminalCounts(database: PlatformDatabase, worktreeId: string) {
   })
 }
 
-export function refreshAllWorktreePolicies(database: PlatformDatabase) {
-  for (const row of database
-    .select({ worktreeId: projectionWorktrees.worktreeId })
-    .from(projectionWorktrees)
-    .all())
-    refreshWorktreePolicy(database, row.worktreeId)
-}
-
 export function refreshWorktreePolicy(database: PlatformDatabase, worktreeId: string) {
   const row = database
     .select()

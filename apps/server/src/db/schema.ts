@@ -21,17 +21,6 @@ import {
   uniqueIndex,
 } from 'drizzle-orm/sqlite-core'
 
-/**
- * The migration ledger. One row per applied migration, written in the same
- * transaction as that migration's DDL, so a crash can never record a version
- * whose statements did not commit.
- */
-export const schemaMigrations = sqliteTable('schema_migrations', {
-  version: integer('version').primaryKey(),
-  name: text('name').notNull(),
-  appliedAt: text('applied_at').notNull(),
-})
-
 export const terminalSessionCleanup = sqliteTable('terminal_session_cleanup', {
   sessionId: text('session_id').primaryKey(),
 })

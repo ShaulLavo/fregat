@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
-import { migratePlatformDatabase as migrateOrchestrationDatabase } from '../../../db/migrations'
+import { initializePlatformDatabase } from '../../../db/initialize'
 import * as schema from '../../../db/schema'
 import { OrchestrationEventStore, type PendingOrchestrationEvent } from '../../event-store'
 import { OrchestrationProjectionPipeline } from '../../projection-pipeline'
@@ -14,7 +14,7 @@ export const SESSION_ID = '00000000-0000-4000-8000-000000000001'
 export function createProjectionFixture() {
   const sqlite = new Database(':memory:', { create: true })
   const database = drizzle({ client: sqlite, schema })
-  migrateOrchestrationDatabase(database)
+  initializePlatformDatabase(database)
   const eventStore = new OrchestrationEventStore(database)
 
   return {

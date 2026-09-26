@@ -1,12 +1,12 @@
 export async function bootstrapOrchestration(steps: {
-  migrate: () => void
+  initialize: () => void
   catchUp: () => void
   load: () => void
   recover: () => Promise<void>
   startReactors: () => void
 }) {
   await Promise.resolve()
-  steps.migrate()
+  steps.initialize()
   steps.catchUp()
   steps.load()
   await steps.recover()

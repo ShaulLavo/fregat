@@ -1,13 +1,13 @@
 import { afterEach, expect, it } from 'vitest'
 import { closeTestApps, createTestDatabase } from '../../../test/server'
-import { migratePlatformDatabase } from '../../db/migrations'
+import { initializePlatformDatabase } from '../../db/initialize'
 import { TerminalHistory } from '../history'
 
 afterEach(closeTestApps)
 
 it('stores the host cursor across a replay gap and scrollback clear', () => {
   const { db } = createTestDatabase()
-  migratePlatformDatabase(db)
+  initializePlatformDatabase(db)
   const history = new TerminalHistory(db, 'gap')
   history.append(Buffer.from('before'), 6)
   history.append(Buffer.from('Output lost while the server was down.'), 1_000)
@@ -21,7 +21,7 @@ it('stores the host cursor across a replay gap and scrollback clear', () => {
 
 it('starts a replacement stream at zero while retaining earlier scrollback', () => {
   const { db } = createTestDatabase()
-  migratePlatformDatabase(db)
+  initializePlatformDatabase(db)
   const history = new TerminalHistory(db, 'replacement')
   history.append(Buffer.from('earlier output'), 1_000)
   history.setOffset(0)

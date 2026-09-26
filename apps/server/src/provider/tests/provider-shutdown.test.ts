@@ -8,7 +8,7 @@ import {
 } from '@workspace/contracts'
 import * as v from 'valibot'
 import { describe, expect, it } from 'vitest'
-import { migratePlatformDatabase as migrateOrchestrationDatabase } from '../../db/migrations'
+import { initializePlatformDatabase } from '../../db/initialize'
 import * as schema from '../../db/schema'
 import { MOCK_ADAPTER_CAPABILITIES, MockProviderAdapter } from '../adapters/mock'
 import type { ProviderDriver } from '../driver'
@@ -99,7 +99,7 @@ function isRunning(pid: number) {
 function createFixture() {
   const sqlite = new Database(':memory:', { create: true })
   const database = drizzle({ client: sqlite, schema })
-  migrateOrchestrationDatabase(database)
+  initializePlatformDatabase(database)
 
   return {
     close: () => sqlite.close(),

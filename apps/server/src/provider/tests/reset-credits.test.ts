@@ -5,7 +5,7 @@ import { afterEach, expect, test, vi } from 'vitest'
 import * as v from 'valibot'
 import { providerInstanceIdSchema, type ProviderResetCreditOutcome } from '@workspace/contracts'
 import { createMetadataDatabase } from '../../db/client'
-import { migratePlatformDatabase } from '../../db/migrations'
+import { initializePlatformDatabase } from '../../db/initialize'
 import { providerResetCreditAttempts } from '../../db/schema'
 import { MockProviderAdapter } from '../adapters/mock'
 import { ProviderResetCredits } from '../reset-credits'
@@ -32,7 +32,7 @@ async function fixture(consume: (key: string) => Promise<ProviderResetCreditOutc
   cleanups.push(() => rm(root, { recursive: true, force: true }))
   const databasePath = path.join(root, 'fixture.sqlite')
   let handle = createMetadataDatabase({ databasePath })
-  migratePlatformDatabase(handle.db)
+  initializePlatformDatabase(handle.db)
   const adapter: ProviderAdapter = new MockProviderAdapter()
   const nativeCalls: Array<Parameters<NonNullable<ProviderAdapter['consumeResetCredit']>>[0]> = []
   adapter.consumeResetCredit = (input) => {
@@ -84,7 +84,7 @@ async function fixture(consume: (key: string) => Promise<ProviderResetCreditOutc
       service.close()
       handle.close()
       handle = createMetadataDatabase({ databasePath })
-      migratePlatformDatabase(handle.db)
+      initializePlatformDatabase(handle.db)
       service = new ProviderResetCredits(handle.db, registry, usage, () => state.now)
     },
   }

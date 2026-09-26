@@ -1,7 +1,7 @@
 import { Database } from 'bun:sqlite'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
 import { afterEach, expect, it, vi } from 'vitest'
-import { migratePlatformDatabase } from '../../db/migrations'
+import { initializePlatformDatabase } from '../../db/initialize'
 import * as schema from '../../db/schema'
 import { ProviderPriceCatalog } from '../price-catalog'
 import bundledPrices from '../model-prices.json'
@@ -132,6 +132,6 @@ function database() {
   const sqlite = new Database(':memory:')
   closers.push(() => sqlite.close())
   const db = drizzle({ client: sqlite, schema })
-  migratePlatformDatabase(db)
+  initializePlatformDatabase(db)
   return db
 }

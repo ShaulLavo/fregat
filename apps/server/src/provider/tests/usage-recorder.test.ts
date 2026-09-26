@@ -9,7 +9,7 @@ import {
 } from '@workspace/contracts'
 import * as v from 'valibot'
 import { afterEach, describe, expect, it } from 'vitest'
-import { migratePlatformDatabase } from '../../db/migrations'
+import { initializePlatformDatabase } from '../../db/initialize'
 import * as schema from '../../db/schema'
 import type { ProviderRuntimeEvent } from '../types'
 
@@ -539,7 +539,7 @@ function recorderFixture(
 ) {
   const sqlite = new Database(':memory:', { create: true })
   const database = drizzle({ client: sqlite, schema })
-  migratePlatformDatabase(database)
+  initializePlatformDatabase(database)
   closers.push(() => sqlite.close())
   const accounts = {
     usageAccount: (providerInstanceId: ProviderInstanceId) => {

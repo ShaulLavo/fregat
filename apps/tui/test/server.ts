@@ -6,7 +6,7 @@ import {
   closeApp,
   createApp,
   createMetadataDatabase,
-  migratePlatformDatabase,
+  initializePlatformDatabase,
   MockProviderAdapter,
   LogReaderService,
   FontCatalogService,
@@ -65,7 +65,7 @@ function createServerWithDatabase(
   options: TestServerOptions,
   host: TestTerminalHost | null,
 ) {
-  migratePlatformDatabase(database.db)
+  initializePlatformDatabase(database.db)
   const {
     providerAdapter = new MockProviderAdapter(),
     providerRuntime = false,

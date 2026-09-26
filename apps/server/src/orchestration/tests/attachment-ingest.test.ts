@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import * as v from 'valibot'
 
 import * as schema from '../../db/schema'
-import { migratePlatformDatabase as migrateOrchestrationDatabase } from '../../db/migrations'
+import { initializePlatformDatabase } from '../../db/initialize'
 import { OrchestrationEngine } from '../engine'
 import { orchestrationCommandSummary } from '../orchestration-logging'
 import { orchestrationCommandSchema, type OrchestrationCommand } from '@workspace/contracts'
@@ -213,7 +213,7 @@ async function createFixture() {
   const sqlite = new Database(':memory:', { create: true })
   closers.push(() => sqlite.close())
   const database = drizzle({ client: sqlite, schema })
-  migrateOrchestrationDatabase(database)
+  initializePlatformDatabase(database)
 
   return {
     attachmentsDir,

@@ -9,7 +9,7 @@ import {
   sessionIdSchema,
   type SessionId,
 } from '@workspace/contracts'
-import { migratePlatformDatabase as migrateOrchestrationDatabase } from '../../db/migrations'
+import { initializePlatformDatabase } from '../../db/initialize'
 import * as schema from '../../db/schema'
 import { OrchestrationProjectionPipeline } from '../../orchestration/projection-pipeline'
 import {
@@ -182,7 +182,7 @@ function createFixture(
 ) {
   const sqlite = new Database(':memory:', { create: true })
   const database = drizzle({ client: sqlite, schema })
-  migrateOrchestrationDatabase(database)
+  initializePlatformDatabase(database)
 
   const pipeline = new OrchestrationProjectionPipeline(database)
   pipeline.applyEvents(domainBootstrap())

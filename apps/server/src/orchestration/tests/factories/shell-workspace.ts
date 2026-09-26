@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
-import { migratePlatformDatabase as migrateOrchestrationDatabase } from '../../../db/migrations'
+import { initializePlatformDatabase } from '../../../db/initialize'
 import * as schema from '../../../db/schema'
 import type { PlatformDatabase } from '../../../db/client'
 import { OrchestrationEventStore, type PendingOrchestrationEvent } from '../../event-store'
@@ -21,7 +21,7 @@ const CREATED_AT = '2026-05-24T00:00:00.000Z'
 export function createShellWorkspace(sessionCount: number) {
   const sqlite = new Database(':memory:', { create: true })
   const database = drizzle({ client: sqlite, schema })
-  migrateOrchestrationDatabase(database)
+  initializePlatformDatabase(database)
 
   const eventStore = new OrchestrationEventStore(database)
   const pipeline = new OrchestrationProjectionPipeline(database, eventStore)
