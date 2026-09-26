@@ -93,6 +93,8 @@ import { chatComposerInsert } from './chat-composer-insert'
 import { chatDisclosureSettle } from './chat-disclosure-settle'
 import { chatTurnAnatomy } from './chat-turn-anatomy'
 import { fileTreeHoverPrefetch } from './file-tree-hover-prefetch'
+import { prefetchChatSwitch } from './prefetch-chat-switch'
+import { prefetchFirstPaint } from './prefetch-first-paint'
 import {
   filePickerPrefetchBound,
   workspaceOpenLargeRoot,
@@ -522,6 +524,8 @@ export const scenarios: readonly Scenario[] = [
   chatDisclosureSettle,
   chatTurnAnatomy,
   fileTreeHoverPrefetch,
+  prefetchFirstPaint,
+  prefetchChatSwitch,
   workspaceOpenLargeRoot,
   workspaceOpenUnreadableChild,
   workspaceSwitchClickDuringOpen,

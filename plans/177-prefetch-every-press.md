@@ -126,6 +126,18 @@ scenarios before and after.
 
 ### Phase 0 — Measure (M)
 
+Done 2026-09-26 (wave 2, lane F). The open events carry `prefetch` (`hit`, `partial`, `miss`,
+and `live` for a document already open) and `firstPaint` (`textMs`, `colourMs`, `highlight`);
+`editor.command.select_tab` (keyboard and mouse tab switches, which never reached `select_file`)
+and `editor.command.open_diff` are new events, each held open until its target paints colour (at
+most 10 s). `previewMs` is measured by the scenario only: the markdown live preview emits no
+event. The `[circular]` target is lane B's fix. Baseline, dev build, second run after a Vite start
+(`/work/tmp/fregat-evidence/20260926T142611Z-scenario-prefetch-first-paint/`,
+`…T142717Z-scenario-prefetch-chat-switch/`), text / colour ms: quick open TS cold 121 / 348,
+warm 86 / 122; quick open md cold 109 / 208, warm 72 / 104; keyboard next tab 38–54 / 82–116;
+tree md no dwell 81 / 120, 1.5 s hover md 40 / 40, TS 64 / 180; git diff md first 309 / 349,
+revisit 130 / 269; TS diff first 381 / 897, revisit 104 / 496; chat switch 63–123 first message.
+
 - Scenarios `prefetch-first-paint` and `prefetch-chat-switch` from the research probe
   (`/work/tmp/research2/177/`), with selectors moved into `scripts/agent/selectors.ts` and a
   feature-map line. They report text, colour and preview milliseconds per press.
