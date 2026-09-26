@@ -36,11 +36,22 @@ export function pullRequestBadge(pullRequest: WorktreePullRequest | null): PullR
   if (pullRequest?.status !== 'found') return null
   const state = pullRequest.state === 'open' && pullRequest.draft ? 'draft' : pullRequest.state
   const stateLabel = STATE_LABEL[state]
+  const repository = pullRequestRepository(pullRequest.url)
+  const reference = `${repository ?? ''}#${pullRequest.number}`
   return {
     state,
     text: `#${pullRequest.number}`,
-    label: `Pull request #${pullRequest.number} · ${stateLabel}: ${pullRequest.title}`,
+    label: `Pull request ${reference} · ${stateLabel}: ${pullRequest.title}`,
     summary: `PR #${pullRequest.number} ${stateLabel.toLowerCase()}`,
     url: pullRequest.url,
   }
+}
+
+// GitHub `/o/r/pull/1`, GitLab `/g/r/-/merge_requests/1`, Bitbucket `/w/r/pull-requests/1`.
+const PULL_REQUEST_PATH = /^\/(.+?)\/(?:-\/)?(?:pull|merge_requests|pull-requests)\/\d+/u
+
+/** The repository a pull request lives in, which differs from the worktree's for a fork. */
+export function pullRequestRepository(url: string): string | null {
+  if (!URL.canParse(url)) return null
+  return PULL_REQUEST_PATH.exec(new URL(url).pathname)?.[1] ?? null
 }
