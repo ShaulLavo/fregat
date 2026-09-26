@@ -21,6 +21,37 @@
   every few minutes, so most main runs end `cancelled`. On 2026-09-26 the newest completed CI run
   on main was over 30 minutes and many commits old, so a broken main goes unnoticed.
 
+## Phase 0: inside `Setup` (measured 2026-09-26, five green runs, 50 jobs)
+
+Runs 36247125169, 36246218759, 36244928208, 36244474365, 36243710777 (four on main, one PR). The
+composite action's sub-steps are visible as `##[group]Run …` markers in each job log, so this needed
+no workflow change: each sub-step runs from its marker to the next, the last to the step's end.
+Wall time 272–307 s; the longest wait for a runner was 3–10 s in these runs.
+
+| Sub-step                                                                   | Median s | Range s   |
+| -------------------------------------------------------------------------- | -------- | --------- |
+| Build the Editor (`bun install` 0.6 s + `turbo build`, 20 tasks, 0 cached) | 31.2     | 18.1–33.9 |
+| Restore the Bun cache (1,353 MB: ~14 s download, ~12 s extract)            | 22.8     | 18.1–36.6 |
+| `apt-get update` + install `fd-find`, `ripgrep`                            | 10.9     | 9.4–21.5  |
+| Clone the Editor                                                           | 1.9      | 1.1–3.1   |
+| Setup Bun                                                                  | 1.5      | 0.7–2.4   |
+| Clone ghostty-webgpu                                                       | 0.9      | 0.3–1.7   |
+| `bun install` (repo, 1,008 packages; Bun reports 0.7 s)                    | < 1      | < 1–2.6   |
+| Setup Node                                                                 | 0.7      | 0.4–4.1   |
+| Build and link ghostty-webgpu                                              | 0.5      | 0.3–0.6   |
+| git identity, link the Editor                                              | 0.1      | 0.0–0.1   |
+
+`Setup` as a whole: median 74 s, 64–89 s, 744 runner-seconds per run. Three sub-steps are 87% of it:
+the Editor build (phase 1 caches `dist/` by `editor-ref`), the Bun cache (1.35 GB restored for an
+install that then takes under a second; a lockfile change saves the restored fallback plus the new
+packages, so the cache only grows), and `apt-get update` (a pinned `fd`/`rg` release download
+replaces it).
+
+Per job (median wall s): lint 264, server 252, web shard 238, TUI 190, browser 163, typecheck 145,
+packages 114. Steps over 5 s after `Setup`: server tests 172, web tests 150 per shard, TUI tests
+101, lint 100, browser (web) 68, feature boundaries 54, typecheck 36, packages tests 27, the t3code
+reference checkout 8 in each of seven jobs, first-load gate 8, benchmark gate 9, Chromium install 7.
+
 ## Where the Editor's time goes (measured 2026-09-26, singapore `ci.yml`, five green runs)
 
 - **One serial `verify` job, 6.2–6.8 minutes.** Test 269–296 s, Playwright install 37–56 s
@@ -46,6 +77,7 @@ change can reach. The targets are confirmed or revised by phase 0's measurements
 
 0. **Measure setup** (S). Time every step inside the composite action (a timestamp per step, or split
    it into visible steps) across five runs. Record the table here before changing anything.
+   Done 2026-09-26: the table above, read from the job logs' group markers.
 1. **Build the Editor and ghostty once per pinned ref** (S–M). Since `editor-ref` is pinned (2026-09-26),
    cache the built `dist/` of the Editor packages and ghostty-webgpu keyed by ref, toolchain and
    lockfile, or build them in one upfront job and hand them to the others as an artifact. Same for
