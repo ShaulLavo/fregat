@@ -293,6 +293,7 @@ const SESSION_WORKTREE_POLICY_EVENTS = new Set<OrchestrationEvent['type']>([
   'session.provider-start-claimed',
   'session.provider-start-adopted',
   'session.provider-start-settled',
+  'session.turn-provider-started',
 ])
 
 export function worktreesAffectedByEvent(

@@ -940,6 +940,139 @@ describe('ClaudeProviderAdapter', () => {
     await harness.adapter.stopAll()
   })
 
+  it('stamps each prompt with a uuid and the human origin', async () => {
+    const harness = claudeHarness()
+    const pending = harness.adapter.sendTurn(providerTurnInput())
+    await waitFor(() => harness.prompts.length === 1, 'the prompt was never pushed')
+
+    expect(harness.prompts[0]).toMatchObject({ origin: { kind: 'human' } })
+    expect(harness.prompts[0]?.uuid).toMatch(UUID_PATTERN)
+    latestQuery(harness).emit(successResult())
+    await pending
+    await harness.adapter.stopAll()
+  })
+
+  it('gives a wakeup turn its own turn, reply and completion', async () => {
+    const harness = claudeHarness()
+    const input = providerTurnInput()
+    await runOwnTurn(harness, input, 'Scheduled.')
+    const query = latestQuery(harness)
+
+    query.emit(commandLifecycle('d1407b55-97f0-434a-899d-397d1a308eb4', 'started'))
+    query.emit(initMessage())
+    query.emit(assistantText('AWAKE'))
+    query.emit(successResult())
+    query.emit(commandLifecycle('d1407b55-97f0-434a-899d-397d1a308eb4', 'completed'))
+    await waitFor(() => turnsCompleted(harness).length === 2, 'the wakeup turn never completed')
+
+    const started = turnsStarted(harness).at(-1)
+    assert(started, 'the wakeup turn never started')
+    expect(started.payload).toMatchObject({ origin: 'scheduled' })
+    expect(started.turnId).not.toBe(input.turnId)
+    expect(assistantReplies(harness)).toEqual([
+      { text: 'Scheduled.', turnId: input.turnId },
+      { text: 'AWAKE', turnId: started.turnId },
+    ])
+    expect(turnsCompleted(harness).at(-1)).toMatchObject({
+      payload: { state: 'completed' },
+      turnId: started.turnId,
+    })
+    await harness.adapter.stopAll()
+  })
+
+  it('adopts the turn that reads a finished background task', async () => {
+    const harness = claudeHarness()
+    await runOwnTurn(harness, providerTurnInput(), 'Started it.')
+    const query = latestQuery(harness)
+
+    query.emit(taskNotification())
+    query.emit(initMessage())
+    query.emit(assistantText('The task finished.'))
+    query.emit(successResult())
+    await waitFor(() => turnsCompleted(harness).length === 2, 'the task turn never completed')
+
+    const started = turnsStarted(harness).at(-1)
+    expect(started?.payload).toMatchObject({ origin: 'task' })
+    expect(assistantReplies(harness).at(-1)).toEqual({
+      text: 'The task finished.',
+      turnId: started?.turnId,
+    })
+    await harness.adapter.stopAll()
+  })
+
+  it('gives a prompt sent during a harness turn its own result', async () => {
+    const harness = claudeHarness()
+    await runOwnTurn(harness, providerTurnInput(), 'Scheduled.')
+    const query = latestQuery(harness)
+    query.emit(commandLifecycle('570c33d5-b2cb-4c4b-938c-774ca382d2bd', 'started'))
+    query.emit(initMessage())
+    await waitFor(() => turnsStarted(harness).length === 2, 'the wakeup turn never started')
+    const wakeupTurnId = turnsStarted(harness)[1]?.turnId
+
+    const second = providerTurnInput({ turnId: 'turn-2' })
+    let resolved = false
+    const pending = harness.adapter.sendTurn(second).then(() => {
+      resolved = true
+    })
+    await waitFor(() => harness.prompts.length === 2, 'the second prompt was never pushed')
+    const secondUuid = harness.prompts[1]?.uuid
+    assert(secondUuid, 'the second prompt carried no uuid')
+    query.emit(commandLifecycle(secondUuid, 'queued'))
+    query.emit(assistantText('one two three'))
+    query.emit(successResult())
+    query.emit(commandLifecycle('570c33d5-b2cb-4c4b-938c-774ca382d2bd', 'completed'))
+    await waitFor(() => turnsCompleted(harness).length === 2, 'the wakeup turn never completed')
+    expect(resolved).toBe(false)
+
+    query.emit(commandLifecycle(secondUuid, 'started'))
+    query.emit(initMessage())
+    query.emit(assistantText('USERTURN'))
+    query.emit(successResult())
+    query.emit(commandLifecycle(secondUuid, 'completed'))
+    await pending
+
+    expect(assistantReplies(harness).slice(1)).toEqual([
+      { text: 'one two three', turnId: wakeupTurnId },
+      { text: 'USERTURN', turnId: second.turnId },
+    ])
+    expect(turnsCompleted(harness).map((event) => event.turnId)).toEqual([
+      'turn-1',
+      wakeupTurnId,
+      second.turnId,
+    ])
+    await harness.adapter.stopAll()
+  })
+
+  it('does not close a queued prompt with the result of a harness turn that ran first', async () => {
+    const harness = claudeHarness()
+    const input = providerTurnInput()
+    let resolved = false
+    const pending = harness.adapter.sendTurn(input).then(() => {
+      resolved = true
+    })
+    await waitFor(() => harness.prompts.length === 1, 'the prompt was never pushed')
+    const uuid = harness.prompts[0]?.uuid
+    assert(uuid, 'the prompt carried no uuid')
+    const query = latestQuery(harness)
+
+    query.emit(commandLifecycle(uuid, 'queued'))
+    query.emit(commandLifecycle('d1407b55-97f0-434a-899d-397d1a308eb4', 'started'))
+    query.emit(initMessage())
+    query.emit(assistantText('AWAKE'))
+    query.emit(successResult())
+    query.emit(commandLifecycle(uuid, 'started'))
+    await waitFor(() => assistantReplies(harness).length === 1, 'the wakeup reply was lost')
+    expect(resolved).toBe(false)
+
+    query.emit(initMessage())
+    query.emit(assistantText('Hello'))
+    query.emit(successResult())
+    await pending
+    expect(turnsCompleted(harness)).toHaveLength(1)
+    expect(assistantReplies(harness).map((reply) => reply.text)).toEqual(['AWAKE', 'Hello'])
+    await harness.adapter.stopAll()
+  })
+
   it('rejects a second turn while one is still in flight', async () => {
     const harness = claudeHarness()
     const input = providerTurnInput()
@@ -1950,6 +2083,76 @@ const MESSAGE_MAPPINGS: ReadonlyArray<{
     },
   },
 ]
+
+/** The owner's turn from push to result, lifecycle frames included. */
+async function runOwnTurn(harness: ClaudeHarness, input: ProviderTurnInput, reply: string) {
+  const pushed = harness.prompts.length
+  const pending = harness.adapter.sendTurn(input)
+  await waitFor(() => harness.prompts.length > pushed, 'the prompt was never pushed')
+  const uuid = harness.prompts.at(-1)?.uuid
+  assert(uuid, 'the prompt carried no uuid')
+  const query = latestQuery(harness)
+  query.emit(commandLifecycle(uuid, 'queued'))
+  query.emit(commandLifecycle(uuid, 'started'))
+  query.emit(initMessage())
+  query.emit(assistantText(reply))
+  query.emit(successResult())
+  query.emit(commandLifecycle(uuid, 'completed'))
+  await pending
+}
+
+function turnsStarted(harness: ClaudeHarness) {
+  return harness.events.filter(
+    (event): event is Extract<ProviderRuntimeEvent, { type: 'turn.started' }> =>
+      event.type === 'turn.started',
+  )
+}
+
+function turnsCompleted(harness: ClaudeHarness) {
+  return harness.events.filter(
+    (event): event is Extract<ProviderRuntimeEvent, { type: 'turn.completed' }> =>
+      event.type === 'turn.completed',
+  )
+}
+
+function assistantReplies(harness: ClaudeHarness) {
+  return harness.events.flatMap((event) =>
+    event.type === 'item.completed' && event.payload.itemType === 'assistant_message'
+      ? [{ text: event.payload.detail, turnId: event.turnId }]
+      : [],
+  )
+}
+
+/** Not in the SDK's message union; the CLI sends it for every uuid-stamped prompt and each wakeup. */
+function commandLifecycle(commandUuid: string, state: string): SDKMessage {
+  return {
+    command_uuid: commandUuid,
+    session_id: SESSION_ID,
+    state,
+    type: 'command_lifecycle',
+    uuid: SYSTEM_UUID,
+  } as unknown as SDKMessage
+}
+
+function assistantText(text: string): SDKMessage {
+  return {
+    message: { content: [{ text, type: 'text' }], role: 'assistant' },
+    parent_tool_use_id: null,
+    session_id: SESSION_ID,
+    type: 'assistant',
+    uuid: '55555555-5555-4555-8555-555555555555',
+  } as unknown as SDKMessage
+}
+
+function taskNotification(): SDKMessage {
+  return systemMessage({
+    output_file: '/tmp/sleep.log',
+    status: 'completed',
+    subtype: 'task_notification',
+    summary: 'sleep 20 finished',
+    task_id: 'task-sleep',
+  })
+}
 
 function initMessage(): SDKMessage {
   return {

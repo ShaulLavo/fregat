@@ -38,6 +38,7 @@ import {
   sourceProposedPlanReferenceSchema,
   sessionLifecycleReasonSchema,
   trimmedNonEmptyStringSchema,
+  providerTurnOriginSchema,
 } from './chat-model'
 import {
   DEFAULT_INTERACTION_MODE,
@@ -326,6 +327,14 @@ export const sessionProviderStartPayloadSchema = v.object({
   createdAt: isoDateTimeSchema,
 })
 
+export const sessionTurnProviderStartedPayloadSchema = v.object({
+  sessionId: sessionIdSchema,
+  turnId: turnIdSchema,
+  origin: providerTurnOriginSchema,
+  runtimeEpoch: trimmedNonEmptyStringSchema,
+  createdAt: isoDateTimeSchema,
+})
+
 export const sessionRuntimeRecoveredPayloadSchema = v.object({
   sessionId: sessionIdSchema,
   turnId: v.optional(turnIdSchema),
@@ -438,6 +447,7 @@ export const ORCHESTRATION_EVENT_PAYLOADS = {
   'session.provider-start-claimed': sessionProviderStartPayloadSchema,
   'session.provider-start-adopted': sessionProviderStartPayloadSchema,
   'session.provider-start-settled': sessionProviderStartPayloadSchema,
+  'session.turn-provider-started': sessionTurnProviderStartedPayloadSchema,
   'session.runtime-recovered': sessionRuntimeRecoveredPayloadSchema,
   'session.deletion-updated': sessionDeletionUpdatedPayloadSchema,
   'session.discovery-metadata-updated': sessionDiscoveryMetadataUpdatedPayloadSchema,

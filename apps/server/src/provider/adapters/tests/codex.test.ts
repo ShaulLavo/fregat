@@ -531,6 +531,16 @@ function handle(message) {
       send({ id: message.id, result: { turn: fakeTurn('completed') } });
       return;
     }
+    if (mode === 'goal-continuation') {
+      sendAgentMessageItemCompleted('item-1', 'Goal set.');
+      send({ method: 'turn/completed', params: { threadId: 'provider-thread-1', turn: fakeTurn('completed') } });
+      send({ id: message.id, result: { turn: fakeTurn('completed') } });
+      const goalTurn = { id: 'goal-turn-1', status: 'inProgress', items: [] };
+      send({ method: 'turn/started', params: { threadId: 'provider-thread-1', turn: goalTurn } });
+      send({ method: 'item/completed', params: { threadId: 'provider-thread-1', turnId: goalTurn.id, completedAtMs: 1770000003000, item: { id: 'goal-item', type: 'agentMessage', text: 'Goal met.' } } });
+      send({ method: 'turn/completed', params: { threadId: 'provider-thread-1', turn: { ...goalTurn, status: 'completed' } } });
+      return;
+    }
     if (mode === 'echo-turn-params') {
       sendAgentMessageItemCompleted(
         'item-1',
@@ -2673,6 +2683,44 @@ describe('CodexProviderAdapter', () => {
     )
   })
 
+  it('adopts a turn the app server starts on its own as a provider-started turn', async () => {
+    await withFakeCodex(
+      async () => {
+        const adapter = new CodexProviderAdapter()
+        const events: ProviderRuntimeEvent[] = []
+        collectAdapterEvents(adapter, events)
+        try {
+          await adapter.sendTurn(providerTurnInput())
+          await waitForCodexEvent(
+            events,
+            (event) =>
+              event.type === 'turn.completed' && event.turnId !== providerTurnInput().turnId,
+          )
+          const started = events.filter((event) => event.type === 'turn.started')
+          expect(started).toMatchObject([
+            { turnId: providerTurnInput().turnId },
+            { payload: { origin: 'provider' } },
+          ])
+          const goalTurnId = started[1]?.turnId
+          expect(goalTurnId).not.toBe(providerTurnInput().turnId)
+          expect(
+            events.flatMap((event) =>
+              event.type === 'item.completed' && event.payload.itemType === 'assistant_message'
+                ? [{ text: event.payload.detail, turnId: event.turnId }]
+                : [],
+            ),
+          ).toEqual([
+            { text: 'Goal set.', turnId: providerTurnInput().turnId },
+            { text: 'Goal met.', turnId: goalTurnId },
+          ])
+        } finally {
+          await adapter.stopAll()
+        }
+      },
+      { mode: 'goal-continuation' },
+    )
+  })
+
   it('compacts through thread/compact/start and settles on the native turn it starts', async () => {
     await withFakeCodex(async ({ spawnLogPath }) => {
       const adapter = new CodexProviderAdapter()
@@ -2979,6 +3027,17 @@ function echoedModeParams(events: ProviderRuntimeEvent[]) {
   }
 
   return echoes
+}
+
+async function waitForCodexEvent(
+  events: readonly ProviderRuntimeEvent[],
+  predicate: (event: ProviderRuntimeEvent) => boolean,
+) {
+  for (let attempt = 0; attempt < 500; attempt += 1) {
+    if (events.some(predicate)) return
+    await new Promise((resolve) => setTimeout(resolve, 5))
+  }
+  expect(events.some(predicate)).toBe(true)
 }
 
 async function settleRuntimeEvents() {
