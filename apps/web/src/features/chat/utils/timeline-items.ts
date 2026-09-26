@@ -317,7 +317,7 @@ export function chatTimelineItems({
   if (latestTurn?.state === 'running' && latestTurn.completedAt === null) {
     appendActiveResponse(timelineItems, latestTurn, workLogEntries, activeResponseTurnIds)
   }
-  appendEmptyTurnStatus(timelineItems, latestTurn)
+  insertEmptyTurnStatus(timelineItems, latestTurn)
   appendTurnRetry(timelineItems, latestTurn)
 
   return shareTimelineItems(
@@ -397,7 +397,7 @@ function trailingLiveActivities(
   return item.activities.slice(boundaryIndex + 1)
 }
 
-function appendEmptyTurnStatus(
+function insertEmptyTurnStatus(
   items: ChatTimelineItem[],
   latestTurn: OrchestrationLatestTurn | null,
 ) {
@@ -420,7 +420,11 @@ function appendEmptyTurnStatus(
   const label =
     stoppedTurnLabel(latestTurn, elapsed) ??
     (elapsed ? `Worked for ${elapsed}` : 'Response completed')
-  items.push({
+  // The slot the Working row held, as a tool turn's fold does: the answer below stays put.
+  const userIndex = items.findLastIndex(
+    (item) => item.type === 'message' && item.message.role === 'user',
+  )
+  items.splice(userIndex + 1, 0, {
     id: `turn-status:${latestTurn.turnId}`,
     timestamp: latestTurn.completedAt,
     type: 'turn-status',
@@ -495,12 +499,11 @@ export function chatTimelineItemEstimate(item: ChatTimelineItem | undefined) {
   }
   if (item.type === 'reasoning') return item.streaming ? 96 : 32
   if (item.type === 'proposed-plan') return 160
-  if (item.type === 'turn-fold') return 34
-  if (item.type === 'working') return 36
+  // Working, the fold and the finished status share one frame: 38px plus the row's pb-1.5.
+  if (item.type === 'turn-fold' || item.type === 'working' || item.type === 'turn-status') return 44
   if (item.type === 'live-activity') {
     return item.activity.tail.length > 0 ? 36 + LIVE_TAIL_ROWS * ESTIMATED_ROW_HEIGHT : 36
   }
-  if (item.type === 'turn-status') return 36
   if (item.type === 'turn-retry') return 36
   if (item.type === 'model-switch') return 24
 

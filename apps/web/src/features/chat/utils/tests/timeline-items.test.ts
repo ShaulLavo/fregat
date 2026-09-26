@@ -502,6 +502,37 @@ describe('chat timeline items', () => {
     expect(items.some((item) => item.type === 'turn-fold')).toBe(false)
   })
 
+  it('puts a finished turn with no tool steps in the slot Working held', () => {
+    const sessionId = parseSessionId('5d0c3f7e-8a4b-5c61-9e2f-0b7a1d3c4e58')
+    const turnId = parseTurnId('turn-1')
+    const prompt = message('message-1', sessionId, timestamp(1), 'user', { turnId })
+    const answer = message('message-2', sessionId, timestamp(2), 'assistant', { turnId })
+    const input = { activities: [], optimisticMessages: [], proposedPlans: [] }
+    const running = chatTimelineItems({
+      ...input,
+      latestTurn: runningTurn(turnId, timestamp(1)),
+      messages: [prompt, { ...answer, streaming: true }],
+    })
+    const settled = chatTimelineItems({
+      ...input,
+      latestTurn: settledTurn(turnId, 'completed', timestamp(4)),
+      messages: [prompt, answer],
+    })
+
+    expect(running.slice(0, 3).map((item) => item.id)).toEqual([
+      'message:message-1',
+      'working:turn-1',
+      'message:message-2',
+    ])
+    expect(settled.map((item) => item.id)).toEqual([
+      'message:message-1',
+      'turn-status:turn-1',
+      'message:message-2',
+    ])
+    expect(settled[1]).toMatchObject({ label: 'Worked for 3.0s' })
+    expect(chatTimelineItemEstimate(settled[1])).toBe(chatTimelineItemEstimate(running[1]))
+  })
+
   it.for([
     { endReason: 'user-stop', label: 'You stopped it after 2.0s' },
     { endReason: 'server-restart', label: 'Interrupted by a server restart after 2.0s' },
