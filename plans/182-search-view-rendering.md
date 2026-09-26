@@ -217,6 +217,8 @@ Decided 2026-09-26: owner — B.
 text-model change at all, and B stays open: A's excerpt map is B's data model if the mirror proves
 fragile.
 
+Owner, 2026-09-26: leans B, a real multibuffer. Not final: see Q4.
+
 **Q4. Long lines, now that the whole view is one editor?**
 
 - A. Real source lines with one horizontal scroll for the whole view; headers, the gutter and the
@@ -228,6 +230,11 @@ fragile.
 **Recommendation: A.** Today each file block scrolls sideways on its own, which one editor cannot do,
 and editing needs the real line. Wrap makes the row count depend on width, which moves every header
 on resize.
+
+Owner, 2026-09-26: not decided. Per-file sideways scrolling is a feature the owner likes about
+today's many-editor view, and asks whether many editors can be made fast instead. A third research
+pass measures that (editor recycling, mount cost, per-excerpt horizontal scroll inside a
+multibuffer) before Q3 and Q4 are settled.
 
 ## Proposed phases
 
