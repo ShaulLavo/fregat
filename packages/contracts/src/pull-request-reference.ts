@@ -14,6 +14,21 @@ export function parsePullRequestReference(input: string): number | null {
   return number ? Number(number) : null
 }
 
+/**
+ * The repository a pasted pull request URL belongs to, as lowercased host and path (`owner/repo`,
+ * `group/sub/project`, `org/project/_git/repo`). Null for a bare number or checkout command.
+ */
+export function pullRequestReferenceRepository(input: string) {
+  const trimmed = checkoutArgument(input.trim()) ?? input.trim()
+  if (!URL_PATTERNS.some((pattern) => pattern.test(trimmed))) return null
+  const url = new URL(trimmed)
+  const path = url.pathname.split(REQUEST_SEGMENT)[0]?.replace(/^\/+/, '')
+  if (!path) return null
+  return { host: url.hostname.toLowerCase(), path: path.toLowerCase() }
+}
+
+const REQUEST_SEGMENT = /\/(?:pulls?|-\/merge_requests|pullrequest|pull-requests)\/\d+/i
+
 const URL_PATTERNS = [
   /^https?:\/\/[^/\s]+\/(?:[^/\s]+\/)+[^/\s]+\/pulls\/(\d+)(?:[/?#].*)?$/i,
   /^https:\/\/[^/\s]+\/[^/\s]+\/[^/\s]+\/pull\/(\d+)(?:[/?#].*)?$/i,

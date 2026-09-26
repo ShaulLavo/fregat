@@ -39,7 +39,10 @@ type CreatePullRequestInput = {
 export type ForgeProvider = {
   readonly kind: GitForgeKind
   support: (context: ForgeContext) => Promise<Exclude<GitPullRequestSupport, 'no-forge'>>
-  /** The newest pull request per branch in the requested states, or null for proven absence. */
+  /**
+   * The newest pull request per branch in the requested states, or null for proven absence. A
+   * branch left out of the map is unknown: a bounded scan ended before it was found.
+   */
   pullRequests: (
     context: ForgeContext,
     query: PullRequestQuery,

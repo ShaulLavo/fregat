@@ -41,6 +41,36 @@ describe('push', () => {
     expect(result.setUpstream).toBe(false)
   })
 
+  it('pushes a branch cut from origin/main under its own name', async () => {
+    const { origin, work } = await clonedRepo()
+    const main = (await runGit(origin, ['rev-parse', 'main'])).trim()
+    await runGit(work, ['checkout', '-b', 'feature', 'origin/main'])
+    await commit(work, 'two\n', 'add feature')
+
+    await gitService(work).push(work)
+
+    expect((await runGit(origin, ['rev-parse', 'main'])).trim()).toBe(main)
+    expect(await remoteBranches(origin)).toContain('feature')
+  })
+
+  it('pushes a tracked pull request branch to its differently named upstream', async () => {
+    const { origin, seed, work } = await clonedRepo()
+    await runGit(seed, ['checkout', '-b', 'contributor/fix'])
+    await commit(seed, 'fix\n', 'fix')
+    await runGit(seed, ['push', 'origin', 'contributor/fix'])
+    await runGit(work, ['checkout', '-b', 'pr/7'])
+    const service = gitService(work)
+    await service.trackRemoteBranch({ path: work, remote: 'origin', branch: 'contributor/fix' })
+    await runGit(work, ['reset', '--hard', 'origin/contributor/fix'])
+    await commit(work, 'review\n', 'address review')
+
+    await service.push(work)
+
+    const pushed = (await runGit(origin, ['rev-parse', 'contributor/fix'])).trim()
+    expect(pushed).toBe((await runGit(work, ['rev-parse', 'HEAD'])).trim())
+    expect(await remoteBranches(origin)).not.toContain('pr/7')
+  })
+
   it('refuses to push a detached head instead of pushing the wrong thing', async () => {
     const { work } = await clonedRepo()
     const head = (await runGit(work, ['rev-parse', 'HEAD'])).trim()

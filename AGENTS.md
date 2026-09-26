@@ -4,6 +4,7 @@
 
 - Upstream code we compare against (vscode, t3code, opencode, codex, …) is cloned under `references/` at the repo root, gitignored. Look there before cloning anything, and add new clones there — not in `/work/projects/references/`.
 - CI, the parity scripts and several tests resolve `references/t3code` by relative path, so the directory stays inside the repo.
+- When a clone you consult is behind upstream, pull it (`git -C references/<name> pull`). If a plan pins an upstream commit (Plan 126 does), note the new upstream head in that plan and anything relevant that changed. Clones refresh as they are used; there is no scheduled sweep.
 
 ## Code Organization
 
@@ -315,6 +316,7 @@ Interaction treatments are utilities, not strings to copy:
 - Do not run tests unless they are necessary. Before running one, identify the specific plausible failure it could catch; if there is none, skip it.
 - Prefer the narrowest relevant test. Do not run a package or repository-wide suite when a focused check, typecheck, lint, config inspection, or diff review proves the change.
 - Tests run on Vitest.
+- PR CI runs Vitest with `retry` at 0; the nightly `flake-watch.yml` runs the web, server, TUI and browser suites five times and posts per-test failure counts as its job summary. Fix a flake it reports at the cause.
 - Apps run under Bun: `bun --bun vitest`.
 - Runtime-neutral `packages/*` run plain `vitest`.
 - Use these environments, in this order of preference: real browser, happy-dom, never jsdom.

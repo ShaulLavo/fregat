@@ -768,6 +768,18 @@ describe('owner review regressions', () => {
     ).rejects.toThrow('command-line tool is not installed')
   })
 
+  it('names why a pinned pull request read cannot reach its forge', async () => {
+    const forge = boundary('https://gitlab.com/team/repo.git', (argv) =>
+      argv[0] === 'glab' ? 'missing' : undefined,
+    )
+    await expect(
+      readPullRequestsByNumber(
+        { cwd: await checkout(), remoteUrl: 'https://gitlab.com/team/repo.git', numbers: [1] },
+        forge,
+      ),
+    ).rejects.toThrow('GitLab is not ready: its command-line tool is not installed')
+  })
+
   it('bounds Forgejo history scans and preserves unknown absence', async () => {
     let pages = 0
     const forge = boundary('https://codeberg.org/owner/repo.git', (argv) => {
@@ -784,10 +796,16 @@ describe('owner review regressions', () => {
         })),
       )
     })
-    await expect(
-      readBranchPullRequests({ cwd: await checkout(), branches: ['absent'] }, forge),
-    ).rejects.toThrow('lookup limit')
+    const cwd = await checkout()
+    const result = await readBranchPullRequests({ cwd, branches: ['absent', 'other'] }, forge)
     expect(pages).toBeLessThanOrEqual(5)
+    // One unmatched branch is unknown; it does not fail the branches the scan did answer.
+    expect(result.kind === 'ready' && result.pullRequests.has('absent')).toBe(false)
+    expect(result.kind === 'ready' && result.pullRequests.get('other')).toMatchObject({
+      number: 50,
+    })
+    pages = 0
+    await expect(readPullRequest({ cwd, branch: 'absent' }, forge)).rejects.toThrow('lookup limit')
   })
 
   it('checks out an Azure fork from its source repository at the reported commit', async () => {

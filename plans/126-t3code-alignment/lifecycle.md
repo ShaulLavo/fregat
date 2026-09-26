@@ -178,6 +178,7 @@ LIFE-01/02 implementation shipped on 2026-09-20; [delivery evidence](archive-del
 > several undo implementations (the file-tree journal in `apps/server/src/fs/workspace-edit-journal.ts`, snooze Undo in
 > `session-rail-store.ts`, the Editor undo graph) but no shared stack. Extract one reusable stack and use it here. Lane L5's
 > latest-slot version (PR #38) is a first step; this row reopens.
+> The research is [Plan 172](../172-shared-undo-stack.md).
 
 - **Status/confidence:** Owner correction implemented 2026-09-25. Atomic server restore and shared web/TUI Undo/Redo are verified by the expanded `session-undo` scenario. See the [delivery record](lifecycle-undo-delivery.md).
 - **`mod+z` precedence (audit D11, shared with Plan 080):** Plan 080 has no `mod+z` rule, so the implementation note below is the recommendation: `mod+z` undoes the latest session action from any pane without its own undo, and yields to text entry, so the composer, editors, terminals and the file tree keep theirs. Decided 2026-09-25: recommendation (completion wave).

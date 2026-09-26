@@ -14,6 +14,8 @@ export function useInitSubmodulesMutation(rootPath: string) {
       return initializeSubmodules(rootPath, clientForQueryClient(client))
     },
     mutationKey: mutationKeys.initSubmodules(rootPath),
+    // It settles status like stage and discard, so it must land in the same order they do.
+    scope: { id: `git-index:${rootPath}` },
     onError: notifyMutationError,
     onSuccess: (status, _variables, _onMutateResult, { client }) =>
       settleDiskWriteGitStatus(client, rootPath, status),

@@ -8,6 +8,8 @@ import { DEFAULT_MAX_TEXT_FILE_BYTES } from '../../fs/limits'
 import { createWorkspacePaths } from '../../fs/path'
 import type { RunProcess } from '../forges/types'
 import { GitService } from '../service'
+import { gitPublishBodySchema } from '../contracts'
+import * as v from 'valibot'
 
 const roots: string[] = []
 afterEach(async () => {
@@ -65,6 +67,29 @@ const request: GitPublishRequest = {
 }
 
 describe('publish', () => {
+  it('rereads remotes after adding one instead of serving the cached absence', async () => {
+    const { root, work } = await checkout()
+    const forge = github()
+    let remoteReads = 0
+    const run: RunProcess = async (input) => {
+      if (input.argv[0] !== 'git') return forge.run(input)
+      remoteReads += Number(input.argv.includes('remote'))
+      const child = Bun.spawn([...input.argv], { cwd: work, stdout: 'pipe', stderr: 'pipe' })
+      const [stdout, stderr, exitCode] = await Promise.all([
+        new Response(child.stdout).text(),
+        new Response(child.stderr).text(),
+        child.exited,
+      ])
+      return { exitCode, stderr, stdout }
+    }
+    const git = service(root, run)
+    expect((await git.pullRequestState('work')).support).toBe('no-forge')
+    await git.publish(request)
+    await git.pullRequestState('work')
+    // The cached "no remote" answer is dropped, so the new remote is read at once.
+    expect(remoteReads).toBe(2)
+  })
+
   it('creates the repository, adds origin and pushes the branch', async () => {
     const { root, work, bare } = await checkout()
     const forge = github()
@@ -117,5 +142,15 @@ describe('publish', () => {
     await runGit(work, ['remote', 'add', 'origin', 'https://example.com/other.git'])
     const result = await service(root, github().run).publish({ ...request, protocol: 'https' })
     expect(result.remoteName).toBe('origin-1')
+  })
+})
+
+describe('publish body', () => {
+  it.each(['acme/app', 'acme/.github', 'group/sub/app'])('accepts %s', (repository) => {
+    expect(v.safeParse(gitPublishBodySchema, { ...request, repository }).success).toBe(true)
+  })
+
+  it.each(['-pX/Y', 'acme/-x', '../x', 'acme/..', 'acme/./app'])('refuses %s', (repository) => {
+    expect(v.safeParse(gitPublishBodySchema, { ...request, repository }).success).toBe(false)
   })
 })

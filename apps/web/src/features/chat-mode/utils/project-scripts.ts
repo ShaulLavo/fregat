@@ -66,19 +66,16 @@ export function projectScriptSuggestions({
   readonly projectFile?: readonly OrchestrationProjectScript[]
   readonly saved: readonly OrchestrationProjectScript[]
 }): readonly ProjectScriptSuggestion[] {
-  const savedCommands = new Set(saved.map((script) => script.command))
-  const unsaved = (
-    scripts: readonly OrchestrationProjectScript[],
-    origin: ProjectScriptSuggestion['origin'],
-  ) =>
-    scripts
-      .filter((script) => !savedCommands.has(script.command))
-      .map((script) => ({ ...script, saved: false, origin }))
+  const fileScripts = importableScripts(projectFile, saved)
+  // Rows share a cmdk value by command, so one command must never be two rows.
+  const taken = new Set([...saved, ...fileScripts].map((script) => script.command))
 
   return [
     ...saved.map((script) => ({ ...script, saved: true, origin: 'saved' as const })),
-    ...unsaved(importableScripts(projectFile, saved), 't3.json'),
-    ...unsaved(discovered, 'package.json'),
+    ...fileScripts.map((script) => ({ ...script, saved: false, origin: 't3.json' as const })),
+    ...discovered
+      .filter((script) => !taken.has(script.command))
+      .map((script) => ({ ...script, saved: false, origin: 'package.json' as const })),
   ]
 }
 

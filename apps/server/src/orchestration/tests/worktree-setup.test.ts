@@ -1,7 +1,8 @@
 import * as v from 'valibot'
 import { orchestrationCommandSchema } from '@workspace/contracts'
 import { SetupRunner } from '../setup-runner'
-import { readFile } from 'node:fs/promises'
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, expect, test } from 'vitest'
 import { closeTestApps } from '../../../test/server'
@@ -170,6 +171,36 @@ test.each(['queued', 'running', 'cancelling'] as const)(
   },
 )
 
+test('restart fails an interrupted foreground creation instead of holding boot for its setup', async () => {
+  const fixture = await withSetup('exit 1', true)
+  expect((await fixture.create()).lifecycle.state).toBe('creation-failed')
+  const stopped = await stopLifecycleEffects(fixture)
+  await stopped.engine.dispatchClientCommand({
+    type: 'project.meta.update',
+    commandId: 'slow-setup',
+    projectId: fixture.registration.projectId,
+    scripts: [
+      { name: 'Install', command: 'sleep 30', runOnWorktreeCreate: true, waitForSetup: true },
+    ],
+  })
+  await stopped.engine.dispatchClientCommand({
+    type: 'worktree.retry',
+    commandId: 'interrupted-retry',
+    worktreeId: lifecycleWorktreeId,
+  })
+  const pending = (await stopped.engine.readModelSnapshot()).worktrees.get(lifecycleWorktreeId)
+  expect(pending?.lifecycle.state).toBe('provisioning')
+  await stopped.engine.close()
+  const startedAt = performance.now()
+  await fixture.restart()
+  expect(performance.now() - startedAt).toBeLessThan(10_000)
+  expect((await worktree(fixture))?.lifecycle).toMatchObject({
+    state: 'creation-failed',
+    errorCode: 'worktree.SETUP_FAILED',
+  })
+  expect(fixture.adapter.startedTurns).toHaveLength(0)
+})
+
 test('cancellation owns the setup before the running report completes', async () => {
   const fixture = await worktreeLifecycleFixture()
   fixtures.push(fixture)
@@ -191,4 +222,32 @@ test('cancellation owns the setup before the running report completes', async ()
   expect((await running).state).toBe('cancelled')
   await expect(readFile(path.join(fixture.root, 'cancelled-setup'))).rejects.toThrow()
   await runner.close()
+})
+
+test('a setup whose directory is gone fails instead of staying running', async () => {
+  const runner = new SetupRunner()
+  const missing = path.join(tmpdir(), `platform-missing-${crypto.randomUUID()}`)
+  const outcome = await runner.run(
+    lifecycleWorktreeId,
+    { command: 'true', worktreePath: missing, projectRoot: missing },
+    async () => {},
+  )
+  expect(outcome).toMatchObject({ state: 'failed', exitCode: null })
+  expect(runner.isRunning(lifecycleWorktreeId)).toBe(false)
+  await runner.close()
+})
+
+test('a setup that leaves a process holding its output finishes when the script exits', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'platform-setup-'))
+  const runner = new SetupRunner()
+  const startedAt = performance.now()
+  const outcome = await runner.run(
+    lifecycleWorktreeId,
+    { command: 'sleep 20 & echo started', worktreePath: root, projectRoot: root },
+    async () => {},
+  )
+  expect(performance.now() - startedAt).toBeLessThan(5_000)
+  expect(outcome).toMatchObject({ state: 'done', exitCode: 0, output: ['started'] })
+  await runner.close()
+  await rm(root, { recursive: true, force: true })
 })

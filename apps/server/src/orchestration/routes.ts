@@ -51,13 +51,21 @@ export function orchestrationRoutes(
   return new Elysia({ name: 'orchestration-routes' }).group('/orchestration', (app) =>
     app
       .get('/session-import', () => engine.sessionImportSources())
-      .post('/pull-request-session', ({ body }) => engine.startPullRequestSession(body), {
-        body: v.object({
-          worktreeId: worktreeIdSchema,
-          reference: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(2048)),
-          modelSelection: modelSelectionSchema,
-        }),
-      })
+      .post(
+        '/pull-request-session',
+        ({ body, request, server }) => {
+          // Fetch, checkout, submodules and a foreground setup outlast Bun's idle HTTP timeout.
+          server?.timeout(request, 0)
+          return engine.startPullRequestSession(body)
+        },
+        {
+          body: v.object({
+            worktreeId: worktreeIdSchema,
+            reference: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(2048)),
+            modelSelection: modelSelectionSchema,
+          }),
+        },
+      )
       .post(
         '/session-import',
         ({ body, request, server }) => {

@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 import { createReadStream, watch } from 'node:fs'
 import path from 'node:path'
+import { setTimeout as delay } from 'node:timers/promises'
 import {
   errorSummary,
   recordRequestContext,
@@ -67,6 +68,10 @@ const createWriteSettleMs = 250
 
 // One kernel tick at HZ=100, the coarsest common configuration.
 const coarseClockToleranceMs = 10
+
+// Bun's fs.watch drops a second change to a path that lands within about a millisecond of the
+// first, and writeFile writes before it truncates: a stat taken at once can keep a half write.
+const nativeEventSettleMs = 20
 
 export type WatchOptions = {
   enabled: boolean
@@ -320,6 +325,8 @@ export class FileChangeHub {
     relativePath: string,
     classify: (entry: TreeEntry | undefined) => 'created' | 'changed' | 'deleted' | null,
   ) {
+    // Our own writes and transactions account for their paths; waiting would outlive their barrier.
+    if (!this.insideBarrier(relativePath)) await delay(nativeEventSettleMs)
     while (true) {
       await this.waitForWrite(relativePath)
       const marker = this.writeResultMarkers.get(relativePath)
@@ -516,6 +523,13 @@ export class FileChangeHub {
 
   private withSequence(event: WatchServerMessage): WatchServerMessage {
     return { ...event, sequence: this.nextSequence++ }
+  }
+
+  private insideBarrier(relativePath: string) {
+    const probe: WatchServerMessage = { type: 'changed', path: relativePath }
+    return (
+      this.writeBarrierFor(probe) !== undefined || this.transactionBarrierFor(probe) !== undefined
+    )
   }
 
   private transactionBarrierFor(event: WatchServerMessage) {

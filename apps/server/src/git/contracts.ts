@@ -37,7 +37,8 @@ export const gitPublishBodySchema = v.object({
     v.trim(),
     v.minLength(1),
     v.maxLength(512),
-    v.regex(/^[\w.-]+(?:\/[\w.-]+){0,4}$/),
+    // Segments reach CLI argv and API paths: none may read as an option or climb a path.
+    v.regex(/^(?!(?:.*\/)?\.{1,2}(?:\/|$))[\w.][\w.-]*(?:\/[\w.][\w.-]*){0,4}$/),
   ),
   visibility: v.picklist(['private', 'public']),
   protocol: v.picklist(['ssh', 'https']),

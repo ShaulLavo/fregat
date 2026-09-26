@@ -185,8 +185,8 @@ export class PullRequestSyncReactor {
     }
     this.backoff.delete(projectId)
     const byBranch = new Map(candidates.map((candidate, index) => [candidate.branch, heads[index]]))
-    const changed = await this.apply(candidates, ({ branch }) =>
-      pullRequestFor(answer, byBranch.get(branch) ?? branch),
+    const changed = await this.apply(candidates, ({ branch, worktree }) =>
+      pullRequestFor(answer, byBranch.get(branch) ?? branch, worktree.pullRequest),
     )
     return { changed: changed + pinnedChanged, failed: false }
   }
@@ -307,8 +307,13 @@ function sessionActivity(model: OrchestrationReadModel) {
   return activity
 }
 
-function pullRequestFor(answer: BranchPullRequests, branch: string): WorktreePullRequest {
+function pullRequestFor(
+  answer: BranchPullRequests,
+  branch: string,
+  held: WorktreePullRequest | null,
+): WorktreePullRequest {
   if (answer.kind === 'unsupported') return { status: 'unsupported', support: answer.support }
+  if (!answer.pullRequests.has(branch)) return held ?? { status: 'unknown' }
   const pullRequest = answer.pullRequests.get(branch)
   if (!pullRequest) return { status: 'none' }
   return { status: 'found', ...pullRequest, closedAt: pullRequest.closedAt ?? null }
