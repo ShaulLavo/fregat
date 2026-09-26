@@ -85,6 +85,7 @@ import { runtimeInterruptedByRestart } from './utils/restart-interruption'
 import { ProviderCommandReactor } from './provider-command-reactor'
 import { ProviderRuntimeIngestion, type ProviderRuntimeSource } from './provider-runtime-ingestion'
 import { SessionDeletionReactor } from './session-deletion-reactor'
+import { IdleShellReactor } from './idle-shell-reactor'
 import { SessionDiscoveryReconciler } from './session-discovery'
 import { sessionImportErrors } from './import-errors'
 import { importedHistoryMessages, historyRevision } from './utils/import-history'
@@ -167,6 +168,7 @@ export class OrchestrationEngine {
   private readonly attachmentsDir: string
   private checkpointReactor: CheckpointReactor | null = null
   private deletionReactor: SessionDeletionReactor | null = null
+  private idleShellReactor: IdleShellReactor | null = null
   private discovery: SessionDiscoveryReconciler | null = null
   private pullRequestSync: PullRequestSyncReactor | null = null
   private autoSettleRules: OrchestrationEngineOptions['autoSettleRules']
@@ -230,6 +232,7 @@ export class OrchestrationEngine {
         this.createSettlement(options)
         this.createWorktreeCleanup(options)
         this.createDeletionReactor(options.terminalService)
+        this.createIdleShellReactor(options.terminalService)
         this.createDiscoveryReconciler()
       },
       recover: () => this.recover(),
@@ -237,6 +240,7 @@ export class OrchestrationEngine {
         this.reactorsStarted = true
         if (this.worktreeReactor) this.domainEvents.subscribe(this.worktreeReactor)
         if (this.deletionReactor) this.domainEvents.subscribe(this.deletionReactor)
+        if (this.idleShellReactor) this.domainEvents.subscribe(this.idleShellReactor)
         for (const reactor of [this.pullRequestSync, this.settlement, this.worktreeCleanup]) {
           if (!reactor) continue
           this.domainEvents.subscribe(reactor)
@@ -927,6 +931,17 @@ export class OrchestrationEngine {
       dispatch: (command) => this.enqueue(command),
     })
     this.deletionReactor = reactor
+    this.reactors.register({
+      name: reactor.name,
+      drain: () => reactor.drain(),
+      isIdle: () => reactor.isIdle(),
+    })
+  }
+
+  private createIdleShellReactor(terminals: TerminalService | undefined) {
+    if (!terminals) return
+    const reactor = new IdleShellReactor({ getReadModel: () => this.readModel, terminals })
+    this.idleShellReactor = reactor
     this.reactors.register({
       name: reactor.name,
       drain: () => reactor.drain(),

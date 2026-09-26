@@ -32,14 +32,13 @@ jobs:
       - name: Format
         run: bun run format:check
 
+      # Workspaces lint in parallel (no dependency order to respect), and `apps/web`'s lint
+      # already runs the root config's feature-boundary rules over all of `apps/web`.
       - name: Lint
         run: bun run lint
 
       - name: Query API
         run: bun run query:check
-
-      - name: Feature boundaries
-        run: bun run boundaries:check
 
       - name: Design language census
         run: bun run design:census
