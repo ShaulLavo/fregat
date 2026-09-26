@@ -6,7 +6,6 @@ import { Wallpaper } from '@/components/wallpaper'
 import { usePanelSurface } from '@/hooks/use-panel-surface'
 import { cn } from '@workspace/ui/lib/utils'
 import { useFocusTarget } from '@/lib/focus/hooks/use-target'
-import { useFixWithAgentBinding } from '@/features/chat/hooks/use-fix-with-agent-binding'
 
 export function AppShell({
   dirtyTabCloseDialog,
@@ -16,7 +15,6 @@ export function AppShell({
   readonly restoringWorkspace: boolean
 }) {
   const surface = usePanelSurface()
-  useFixWithAgentBinding()
   const { ref: shellRef } = useFocusTarget<HTMLDivElement>({
     area: 'global',
     id: { kind: 'app-shell' },

@@ -1,3 +1,4 @@
+// Modified for Platform from Pierre. Apache-2.0; see packages/tree/LICENSE-pierre and UPSTREAM.md.
 import { normalizeText as normalizeIconRuleKey } from '@workspace/utils/strings'
 import { getBuiltInFileIconName, resolveBuiltInFileIconToken } from '@workspace/tree'
 import { type FileTreeIcons, normalizeFileTreeIcons, type RemappedIcon } from '@workspace/tree'

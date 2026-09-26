@@ -1,3 +1,4 @@
+// Modified for Platform from Pierre. Apache-2.0; see LICENSE-pierre and UPSTREAM.md.
 // Rename parity is defined around basename edits, so this helper strips the
 // trailing slash from canonical directory paths before deriving the visible
 // editable leaf segment.

@@ -1,3 +1,4 @@
+// Modified for Platform from Pierre. Apache-2.0; see packages/tree/LICENSE-pierre and UPSTREAM.md.
 /** @jsxImportSource react */
 import type { FileTreeLayoutStickyRow, FileTreeVisibleRow } from '@workspace/tree'
 import type { JSX } from 'react'

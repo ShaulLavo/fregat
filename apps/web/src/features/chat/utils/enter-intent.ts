@@ -14,7 +14,10 @@ export function composerEnterIntent(input: {
   readonly prompt: string
   readonly sendShortcut: SendShortcut
   readonly shiftKey: boolean
+  /** A touch keyboard's Return adds a line; the Send button sends. */
+  readonly touch: boolean
 }): EnterIntent {
+  if (input.touch) return 'newline'
   const modifierSends =
     input.sendShortcut === 'mod-enter' ||
     (input.sendShortcut === 'mod-enter-multiline' && /[\r\n]/.test(input.prompt))

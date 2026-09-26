@@ -1,3 +1,4 @@
+// Modified for Platform from Pierre. Apache-2.0; see packages/tree/LICENSE-pierre and UPSTREAM.md.
 import { type Dispatch, type SetStateAction, useLayoutEffect } from 'react'
 
 import { getActiveTreeElement } from '@/features/workspace/utils/tree-focus'

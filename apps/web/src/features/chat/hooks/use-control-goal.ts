@@ -44,7 +44,7 @@ export function useControlGoal(ref: ScopedSessionRef) {
     },
     onSuccess: async (state: ProviderSessionGoalState | null) => {
       const key = sessionGoalKeys.all(ref.environmentId, ref.sessionId)
-      if (state) queryClient.setQueriesData({ queryKey: key }, state)
+      if (state) queryClient.setQueriesData({ queryKey: key }, { ...state, ...ref })
       else await queryClient.invalidateQueries({ queryKey: key })
     },
     onError: (error) =>

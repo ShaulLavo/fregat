@@ -1,3 +1,4 @@
+// Modified for Platform from Pierre. Apache-2.0; see packages/tree/LICENSE-pierre and UPSTREAM.md.
 import type { FileTreeLayoutSnapshot, FileTreeVisibleRow } from '@workspace/tree'
 
 import type { TreeParkedRow } from '@/features/workspace/components/tree-row-window'

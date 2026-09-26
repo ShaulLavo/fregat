@@ -14,7 +14,10 @@ import * as v from 'valibot'
 import { TurnFiles } from '@/features/chat-mode/components/turn-files'
 import { expect, test } from '../../../../../test/fixtures'
 import { createRailHarness } from '../../../../../test/factories/rail-harness'
-import { renderWithProviders } from '../../../../../test/render'
+import { createObservedInProcessClient } from '../../../../../test/client'
+import { registerEnvironmentQueryClient } from '@/lib/environments/state/query-clients'
+import { activeServerOrigin } from '@/lib/client'
+import { createTestQueryClient, renderWithProviders } from '../../../../../test/render'
 
 const IDENTITY = ['-c', 'user.email=t@example.com', '-c', 'user.name=T'] as const
 const before = Array.from({ length: 20 }, (_, index) => `line ${index + 1}`)
@@ -22,7 +25,10 @@ const after = before.map((line, index) => (index === 1 || index === 17 ? `${line
 const time = '2026-09-25T00:00:00.000Z'
 const files = [{ additions: 2, deletions: 2, kind: 'modified' as const, path: 'app.txt' }]
 
-test('undoes one change of a turn from its row and puts it back', async ({ client, server }) => {
+test('undoes and reapplies changes, then retains the turn until an empty session is ready', async ({
+  client,
+  server,
+}) => {
   // The repository exists before the project registers, so its worktree is a git checkout.
   const root = server.root
   const file = join(root, 'app.txt')
@@ -30,7 +36,7 @@ test('undoes one change of a turn from its row and puts it back', async ({ clien
   await writeFile(file, `${before.join('\n')}\n`)
   await runGit(root, ['add', 'app.txt'], { cwdMode: 'option' })
   await runGit(root, [...IDENTITY, 'commit', '-qm', 'zero'], { cwdMode: 'option' })
-  const h = await createRailHarness(client, server, ['Turn session'], '')
+  const h = await createRailHarness(client, server, ['Turn session', 'Empty session'], '')
   const sessionId = h.sessionIds[0]!
   await runGit(root, ['update-ref', checkpointRefForSessionTurn(sessionId, 0), 'HEAD'], {
     cwdMode: 'option',
@@ -55,7 +61,18 @@ test('undoes one change of a turn from its row and puts it back', async ({ clien
     }),
   )
 
-  renderWithProviders(
+  const emptySessionId = h.sessionIds[1]!
+  const firstLoad = Promise.withResolvers<void>()
+  const barrier = Promise.withResolvers<void>()
+  const queryClient = createTestQueryClient()
+  const observed = createObservedInProcessClient(server, async (request) => {
+    const url = new URL(request.url)
+    if (url.pathname !== '/orchestration/turn-diff') return
+    if (url.searchParams.get('sessionId') === sessionId) await firstLoad.promise
+    if (url.searchParams.get('sessionId') === emptySessionId) await barrier.promise
+  })
+  registerEnvironmentQueryClient(queryClient, activeServerOrigin(), observed)
+  const rendered = renderWithProviders(
     <TurnFiles
       rootPath=''
       summary={{
@@ -70,8 +87,16 @@ test('undoes one change of a turn from its row and puts it back', async ({ clien
       }}
       onOpenFile={() => {}}
     />,
-    { application: h.application, command: { bindings: [] } },
+    { application: h.application, command: { bindings: [] }, queryClient },
   )
+
+  try {
+    await screen.findByRole('status', { name: 'Loading turn changes' })
+    expect(screen.queryByText(/0 changes/)).toBeNull()
+    expect(screen.queryAllByRole('treeitem')).toHaveLength(0)
+  } finally {
+    firstLoad.resolve()
+  }
 
   const hunks = await screen.findAllByRole('treeitem', { name: /line 2|line 18/ })
   expect(hunks).toHaveLength(2)
@@ -111,4 +136,53 @@ test('undoes one change of a turn from its row and puts it back', async ({ clien
   await waitFor(() => expect(reapplyFile).toHaveAttribute('aria-disabled', 'false'))
   await userEvent.click(reapplyFile)
   await waitFor(async () => expect(await readFile(file, 'utf8')).toBe(`${after.join('\n')}\n`))
+
+  await runGit(root, ['update-ref', checkpointRefForSessionTurn(emptySessionId, 0), 'HEAD'], {
+    cwdMode: 'option',
+  })
+  const nextRef = checkpointRefForSessionTurn(emptySessionId, 1)
+  await runGit(root, ['update-ref', nextRef, 'HEAD'], { cwdMode: 'option' })
+  const nextSummary = {
+    assistantMessageId: null,
+    checkpointRef: nextRef,
+    checkpointTurnCount: 1,
+    completedAt: time,
+    files: [],
+    sessionId: emptySessionId,
+    status: 'ready' as const,
+    turnId: v.parse(turnIdSchema, 'turn-two'),
+  }
+  await orchestrationForApp(server.app).dispatch(
+    v.parse(orchestrationCommandSchema, {
+      ...nextSummary,
+      assistantMessageId: v.parse(messageIdSchema, 'message-2'),
+      commandId: v.parse(commandIdSchema, 'turn-two-checkpoint'),
+      createdAt: time,
+      type: 'session.turn.diff.complete',
+    }),
+  )
+  try {
+    rendered.rerender(<TurnFiles rootPath='' summary={nextSummary} onOpenFile={() => {}} />)
+    expect(screen.getByText('Turn 1 · 1 files · 2 changes')).toBeVisible()
+    expect(screen.getAllByRole('treeitem', { name: /line 2|line 18/ })).toHaveLength(2)
+    expect(screen.getByRole('status', { name: 'Loading turn changes' })).toBeVisible()
+    expect(screen.queryByText(/0 changes/)).toBeNull()
+    await act(async () => {
+      barrier.resolve()
+    })
+    await screen.findByText('Turn 1 · 0 files · 0 changes')
+    expect(screen.queryAllByRole('treeitem')).toHaveLength(0)
+    rendered.rerender(
+      <TurnFiles
+        rootPath=''
+        summary={{ ...nextSummary, checkpointTurnCount: 3 }}
+        onOpenFile={() => {}}
+      />,
+    )
+    await screen.findByText('Could not load turn changes')
+    expect(screen.queryByText(/0 changes/)).toBeNull()
+  } finally {
+    barrier.resolve()
+    rendered.unmount()
+  }
 })

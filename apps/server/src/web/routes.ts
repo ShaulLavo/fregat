@@ -52,6 +52,12 @@ async function releaseDescriptor(
 
 function webFile(root: string, request: Request) {
   const pathname = decodedPathname(request)
+  if (pathname === '/licenses')
+    return new Response(null, { status: 308, headers: { location: 'licenses/' } })
+  if (pathname === '/licenses/server.txt') {
+    const notice = path.resolve(root, '../server/THIRD_PARTY_NOTICES.txt')
+    if (isFile(notice)) return staticFile(notice, pathname)
+  }
   const file = releaseFile(root, pathname)
   if (file) return staticFile(file, pathname)
   const page = isDocumentNavigation(request) ? documentFor(root, pathname) : null
@@ -103,6 +109,7 @@ function isDocumentNavigation(request: Request) {
 function documentFor(root: string, pathname: string) {
   if (pathname === '/' || pathname.startsWith('/~') || pathname.startsWith('/@'))
     return path.join(root, 'index.html')
+  if (pathname === '/licenses/') return releaseFile(root, '/licenses/index.html')
   if (pathname === '/dev' || pathname.startsWith('/dev/')) return releaseFile(root, '/dev.html')
 
   return null

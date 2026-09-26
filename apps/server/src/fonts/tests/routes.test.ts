@@ -6,7 +6,7 @@ import { Elysia } from 'elysia'
 
 import { FontCatalogService } from '../catalog'
 import { fontRoutes } from '../routes'
-import { fontsourceRoutes, routedFetcher } from './fixtures'
+import { fontsourceRoutes, routedFetcher, nerdArchive, nerdRelease } from './fixtures'
 
 const roots: string[] = []
 const NERD_ZIP =
@@ -183,12 +183,12 @@ const FC_LIST = 'Berkeley Mono\t80\t0\t100\t/fonts/BerkeleyMono-Regular.otf\n'
 async function testApp({ fontsource = true, nerd = true } = {}) {
   const root = await mkdtemp(path.join(tmpdir(), 'platform-font-routes-'))
   roots.push(root)
-  const archive = await nerdArchive()
+  const archive = nerdArchive()
   const { fetcher } = routedFetcher({
     ...(nerd
       ? {
-          'https://www.nerdfonts.com/font-downloads': () =>
-            new Response(`<a href="${NERD_ZIP}">Download</a>`),
+          'https://api.github.com/repos/ryanoasis/nerd-fonts/releases/latest': () =>
+            Response.json(nerdRelease(['JetBrainsMono'])),
           [NERD_ZIP]: () => new Response(archive),
         }
       : {}),
@@ -202,11 +202,4 @@ async function testApp({ fontsource = true, nerd = true } = {}) {
     readInstalled: async () => Buffer.from('installed-font'),
   })
   return { app: new Elysia().use(fontRoutes(fonts)) }
-}
-
-async function nerdArchive() {
-  const { default: JSZip } = await import('jszip')
-  const zip = new JSZip()
-  zip.file('JetBrainsMonoNerdFont-Regular.ttf', 'regular-font')
-  return zip.generateAsync({ type: 'arraybuffer' })
 }
