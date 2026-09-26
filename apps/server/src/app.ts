@@ -21,7 +21,7 @@ import { Elysia } from 'elysia'
 import { attachmentRoutes } from './attachments/routes'
 import { authGuard, createAuthConfig, isCorsOriginAllowed, type AuthOptions } from './auth'
 import { getDefaultPlatformDatabase } from './db/client'
-import { migratePlatformDatabase } from './db/migrations'
+import { initializePlatformDatabase } from './db/initialize'
 import { readEnvironmentIdentity } from './db/environment-identity'
 import { fontRoutes } from './fonts/routes'
 import { FontCatalogService } from './fonts/catalog'
@@ -189,8 +189,8 @@ export function createApp(options: AppOptions) {
   const database = options.orchestration?.database ?? getDefaultPlatformDatabase()
   // The schema has to exist before anything below reads this handle: the
   // identity row, the settings store, and the engine all query it while
-  // `createApp` is still running. Idempotent — applied versions are skipped.
-  migratePlatformDatabase(database)
+  // `createApp` is still running. A database already at the schema version is left as is.
+  initializePlatformDatabase(database)
   const terminal: TerminalService = new TerminalService({
     database,
     ...options.terminal,

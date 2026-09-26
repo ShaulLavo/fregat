@@ -9,7 +9,7 @@ import {
 } from '@workspace/contracts'
 import * as v from 'valibot'
 import { expect, it } from 'vitest'
-import { migratePlatformDatabase } from '../../db/migrations'
+import { initializePlatformDatabase } from '../../db/initialize'
 import * as schema from '../../db/schema'
 import { ProviderAdapterRegistry } from '../provider-adapter-registry'
 import { ProviderPriceCatalog } from '../price-catalog'
@@ -24,7 +24,7 @@ import { codexUsageTotals } from '../utils/usage-totals'
 it('serves automatically priced usage from the real catalog, recorder and history route', async () => {
   const sqlite = new Database(':memory:')
   const database = drizzle({ client: sqlite, schema })
-  migratePlatformDatabase(database)
+  initializePlatformDatabase(database)
   const registry = new ProviderAdapterRegistry({ drivers: [] })
   const prices = new ProviderPriceCatalog(database, async () =>
     Response.json({

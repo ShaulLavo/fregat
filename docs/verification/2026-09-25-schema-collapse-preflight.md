@@ -1,5 +1,8 @@
 # Plan 132 schema preflight
 
+Implemented 2026-09-26 on branch `plan-132-p4` against the final chain (migration 38). The
+mismatch behavior below is `db.SCHEMA_VERSION_MISMATCH` in `apps/server/src/db/initialize.ts`.
+
 Phase 4 is held until the coordinator confirms that the other approved lane changes have landed.
 The owner must approve any reset of real state separately. This record prepares that decision.
 It does not authorize a reset, and no real database was opened, copied, migrated or deleted.

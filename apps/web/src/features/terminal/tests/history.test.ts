@@ -3,7 +3,7 @@ import { onTestFinished } from 'vitest'
 import { join } from 'node:path'
 import { createOrchestrationFixture } from '../../../../../server/test/factories/orchestration'
 import { createMetadataDatabase } from '../../../../../server/src/db/client'
-import { migratePlatformDatabase } from '../../../../../server/src/db/migrations'
+import { initializePlatformDatabase } from '../../../../../server/src/db/initialize'
 import { TerminalHistory } from '../../../../../server/src/terminal/history'
 
 // SQLite is the persistence boundary; no simulated storage or PTY is involved here.
@@ -90,7 +90,7 @@ test('matches pinned terminal history for text split across byte and line bounda
   // The tests above cover disk durability; this matrix exercises trimming and decoding.
   const database = createMetadataDatabase({ databasePath: ':memory:' })
   onTestFinished(() => database.close())
-  migratePlatformDatabase(database.db)
+  initializePlatformDatabase(database.db)
   const inputs = [1, 4_999, 5_000, 5_001, 6_001].flatMap((count) =>
     ['plain\n', 'λ😀\r\n', '\n', 'unterminated'].map((text) => text.repeat(count)),
   )

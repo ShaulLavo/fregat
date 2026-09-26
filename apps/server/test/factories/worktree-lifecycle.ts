@@ -1,6 +1,6 @@
 import { tmpdir } from 'node:os'
 import { mkdirSync, writeFileSync } from 'node:fs'
-import { migratePlatformDatabase } from '../../src/db/migrations'
+import { initializePlatformDatabase } from '../../src/db/initialize'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import * as v from 'valibot'
@@ -38,7 +38,7 @@ export async function worktreeLifecycleFixture(
   await runGit(root, ['add', '.'], { cwdMode: 'option' })
   await runGit(root, ['commit', '-m', 'initial'], { cwdMode: 'option' })
   const database = createTestDatabase()
-  migratePlatformDatabase(database.db)
+  initializePlatformDatabase(database.db)
   let adapter = new MockProviderAdapter(options.adapter)
   const build = () =>
     createTestApp({

@@ -9,7 +9,7 @@ import {
   DEFAULT_RUNTIME_MODE,
   sessionIdSchema,
 } from '@workspace/contracts'
-import { migratePlatformDatabase as migrateOrchestrationDatabase } from '../../db/migrations'
+import { initializePlatformDatabase } from '../../db/initialize'
 import * as schema from '../../db/schema'
 import { ProviderSessionDirectory } from '../provider-session-directory'
 
@@ -84,7 +84,7 @@ describe('ProviderSessionDirectory', () => {
 function createFixture() {
   const sqlite = new Database(':memory:', { create: true })
   const database = drizzle({ client: sqlite, schema })
-  migrateOrchestrationDatabase(database)
+  initializePlatformDatabase(database)
 
   return {
     close: () => sqlite.close(),

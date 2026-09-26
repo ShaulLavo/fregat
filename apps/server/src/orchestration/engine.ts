@@ -61,7 +61,7 @@ import {
   writeAttachmentFromDataUrl,
   attachmentFilePath,
 } from '../attachments/store'
-import { migratePlatformDatabase as migrateOrchestrationDatabase } from '../db/migrations'
+import { initializePlatformDatabase } from '../db/initialize'
 import { orchestrationErrors } from '../observability'
 import { requireActionableSourcePlan } from './command-invariants'
 
@@ -215,8 +215,8 @@ export class OrchestrationEngine {
     )
     this.streams = new OrchestrationStreams(this.snapshotQuery, { database })
     this.ready = bootstrapOrchestration({
-      migrate: () => {
-        migrateOrchestrationDatabase(database)
+      initialize: () => {
+        initializePlatformDatabase(database)
       },
       catchUp: () => {
         this.projectionPipeline.catchUp()

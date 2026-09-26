@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, expect, test } from 'vitest'
 import { createMetadataDatabase } from '../../db/client'
-import { migratePlatformDatabase } from '../../db/migrations'
+import { initializePlatformDatabase } from '../../db/initialize'
 import { SettingsStore } from '../../settings/store'
 import { testSettingsOptions } from '../../settings/testing'
 import { createPushSubscriber } from '../../../test/factories/push-subscriber'
@@ -20,7 +20,7 @@ const notice = { title: 'Done', body: 'Turn complete', path: '', tag: 'race' }
 async function fixture(fetcher: PushFetcher) {
   const root = await mkdtemp(path.join(tmpdir(), 'push-races-'))
   const database = createMetadataDatabase({ databasePath: ':memory:' })
-  migratePlatformDatabase(database.db)
+  initializePlatformDatabase(database.db)
   const settings = new SettingsStore(testSettingsOptions(root))
   cleanups.push(async () => {
     settings.close()

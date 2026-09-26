@@ -9,7 +9,7 @@
 export { closeApp, createApp, orchestrationForApp, machinesForApp, updateForApp } from './app'
 export type { App, AppOptions } from './app'
 export { createMetadataDatabase } from './db/client'
-export { migratePlatformDatabase } from './db/migrations'
+export { initializePlatformDatabase } from './db/initialize'
 export { FontCatalogService } from './fonts/catalog'
 export { MockProviderAdapter } from './provider/adapters/mock'
 export { ProviderAdapterRegistry } from './provider/provider-adapter-registry'

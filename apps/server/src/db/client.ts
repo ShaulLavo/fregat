@@ -29,14 +29,14 @@ function resolveDefaultDatabasePath(): string {
   if (explicit) return explicit
 
   // A test process must never touch the developer's real database. Defaulting
-  // silently is what let the server suite migrate and WAL-lock ~/.platform.
+  // silently is what let the server suite write and WAL-lock ~/.platform.
   if (isTestProcess()) {
     throw createStructuredError({
       code: 'db.TEST_DATABASE_NOT_INJECTED',
       fix: "Inject a database in the test: `createMetadataDatabase({ databasePath: ':memory:' })`, then pass it as `metadataDatabase` and `orchestration.database`. See `apps/web/test/server.ts`.",
       message: 'A test process reached the default platform database path',
       status: 500,
-      why: "The default path is the developer's real ~/.platform/fs-metadata.sqlite; opening it from a test migrates and WAL-locks live state and makes results depend on that machine's data.",
+      why: "The default path is the developer's real ~/.platform/fs-metadata.sqlite; opening it from a test writes and WAL-locks live state and makes results depend on that machine's data.",
     })
   }
 
@@ -60,7 +60,7 @@ function openPlatformDatabase(databasePath: string) {
 
   const sqlite = new Database(databasePath, { create: true })
   // `busy_timeout` is what makes concurrent startup safe: two processes opening
-  // the same file both run the migration ledger, and the loser of the
+  // the same file both initialize the schema, and the loser of the
   // `BEGIN IMMEDIATE` race waits for the write lock instead of failing busy.
   sqlite.exec('PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;')
 

@@ -2,7 +2,7 @@ import { Database } from 'bun:sqlite'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
 import type { ProviderUsagePurpose } from '@workspace/contracts'
 import { afterEach, describe, expect, it } from 'vitest'
-import { migratePlatformDatabase } from '../../db/migrations'
+import { initializePlatformDatabase } from '../../db/initialize'
 import * as schema from '../../db/schema'
 import { ProviderUsageHistoryReader } from '../usage-history'
 
@@ -181,7 +181,7 @@ type TurnRow = {
 function historyFixture() {
   const sqlite = new Database(':memory:', { create: true })
   const database = drizzle({ client: sqlite, schema })
-  migratePlatformDatabase(database)
+  initializePlatformDatabase(database)
   closers.push(() => sqlite.close())
   const reader = new ProviderUsageHistoryReader(database, { now: () => NOW })
 

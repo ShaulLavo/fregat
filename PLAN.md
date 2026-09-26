@@ -464,7 +464,7 @@ Suggested order (steps 1–4 done by 2026-09-23; step 5 is in progress):
    rows 2, 7, 8, 9, 11 and the rest of row 5 done 2026-09-25 (lane L7), row 8 closing Plan 130
    item 8. Row 4 and `getStackedRows` close Plan 130 on 2026-09-25. The diff comment layer asks the mounted plugin, and theme colours flow through EditorTheme; light/dark browser proof passes.
 
-Left in the lane: Plan 132 Phases 2–4. E050 and Plan 130 are complete.
+Left in the lane: the Plan 132 items its file still lists, and the Phase 4 database reset at deploy. E050 and Plan 130 are complete.
 
 The owner decided Plan 132 D4 on 2026-09-21: the server's migrations are deleted and the schema
 starts from scratch (Plan 132 Phase 4). External-change

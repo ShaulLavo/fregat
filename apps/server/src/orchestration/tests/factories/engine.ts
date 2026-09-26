@@ -8,7 +8,7 @@ import {
   type PreparedProjectCreateCommand,
   orchestrationCommandSchema,
 } from '@workspace/contracts'
-import { migratePlatformDatabase } from '../../../db/migrations'
+import { initializePlatformDatabase } from '../../../db/initialize'
 import * as schema from '../../../db/schema'
 import { OrchestrationEngine } from '../../engine'
 
@@ -75,7 +75,7 @@ export function sessionCreateCommand(
 export function createDomainEngine() {
   const sqlite = new Database(':memory:', { create: true })
   const database = drizzle({ client: sqlite, schema })
-  migratePlatformDatabase(database)
+  initializePlatformDatabase(database)
   const engine = new OrchestrationEngine(database)
   onTestFinished(async () => {
     await engine.close()

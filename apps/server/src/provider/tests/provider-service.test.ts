@@ -33,7 +33,7 @@ import {
   turnIdSchema,
   worktreeIdSchema,
 } from '@workspace/contracts'
-import { migratePlatformDatabase as migrateOrchestrationDatabase } from '../../db/migrations'
+import { initializePlatformDatabase } from '../../db/initialize'
 import * as schema from '../../db/schema'
 import { WorktreeExecutionGate } from '../../orchestration/worktree-execution-gate'
 import { MockProviderAdapter } from '../adapters/mock'
@@ -953,7 +953,7 @@ function providerSessionPayload(input: ProviderTurnInput) {
 function createFixture() {
   const sqlite = new Database(':memory:', { create: true })
   const database = drizzle({ client: sqlite, schema })
-  migrateOrchestrationDatabase(database)
+  initializePlatformDatabase(database)
 
   return {
     close: () => sqlite.close(),

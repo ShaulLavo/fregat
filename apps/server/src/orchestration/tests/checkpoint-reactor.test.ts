@@ -17,7 +17,7 @@ import {
 } from '@workspace/contracts'
 
 import * as schema from '../../db/schema'
-import { migratePlatformDatabase as migrateOrchestrationDatabase } from '../../db/migrations'
+import { initializePlatformDatabase } from '../../db/initialize'
 import { DEFAULT_MAX_TEXT_FILE_BYTES } from '../../fs/limits'
 import { createWorkspacePaths } from '../../fs/path'
 import { GitService } from '../../git/service'
@@ -689,7 +689,7 @@ function command(value: unknown) {
 function createFixture() {
   const sqlite = new Database(':memory:', { create: true })
   const database = drizzle({ client: sqlite, schema })
-  migrateOrchestrationDatabase(database)
+  initializePlatformDatabase(database)
 
   return { close: () => sqlite.close(), database }
 }

@@ -7,7 +7,7 @@ import {
   createApp,
   createMetadataDatabase,
   FontCatalogService,
-  migratePlatformDatabase,
+  initializePlatformDatabase,
   MockProviderAdapter,
   ProviderAdapterRegistry,
   releaseSource,
@@ -70,7 +70,7 @@ export async function makeTestServer({
       ? path.join(root, '.platform-test', 'metadata.sqlite')
       : ':memory:',
   })
-  migratePlatformDatabase(database.db)
+  initializePlatformDatabase(database.db)
   if (environmentId)
     database.db.$client.run('UPDATE environment_identity SET id = ?', [environmentId])
   const buildApp = () =>

@@ -13,7 +13,7 @@ import {
   type MetadataDatabaseHandle,
   type PlatformDatabase,
 } from '../db/client'
-import { migratePlatformDatabase as migrateMetadataDatabase } from '../db/migrations'
+import { initializePlatformDatabase } from '../db/initialize'
 import { fsMetadata, workspaceAddresses } from '../db/schema'
 
 export type FsMetadataEntry = {
@@ -52,7 +52,7 @@ export class FsMetadataStore {
       this.databasePath = this.ownedHandle.databasePath
     }
 
-    migrateMetadataDatabase(this.db)
+    initializePlatformDatabase(this.db)
   }
 
   registerWorkspaceAddress(filesystemRoot: string, canonicalPath: string): WorkspaceAddressId {

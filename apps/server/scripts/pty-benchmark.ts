@@ -1,5 +1,5 @@
 import { createMetadataDatabase } from '../src/db/client'
-import { migratePlatformDatabase } from '../src/db/migrations'
+import { initializePlatformDatabase } from '../src/db/initialize'
 import { processExists } from './process-exists'
 import { existsSync } from 'node:fs'
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
@@ -104,7 +104,7 @@ async function openSession(root: string, id: string) {
   const capture = new OutputCapture()
   const pidFile = path.join(root, `${id}.pid`)
   const historyDatabase = createMetadataDatabase({ databasePath: path.join(root, `${id}.sqlite`) })
-  migratePlatformDatabase(historyDatabase.db)
+  initializePlatformDatabase(historyDatabase.db)
   const options = {
     database: historyDatabase.db,
     lifecycle,
