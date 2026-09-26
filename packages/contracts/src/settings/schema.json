@@ -5,11 +5,13 @@
     "chat.activeFileContext": {
       "default": false,
       "description": "Show the file open in the editor as a chip in the composer. While the chip is there, sending mentions that file. Remove the chip to send without it.",
+      "markdownDescription": "Show the file open in the editor as a chip in the composer. While the chip is there, sending mentions that file. Remove the chip to send without it.\n\nThe chip names the file relative to the workspace. Removing it lasts until the editor's active file changes.",
       "type": "boolean"
     },
     "chat.autoSettleAfterDays": {
       "default": 3,
       "description": "Move a session to Settled once it has had no activity for this many days, including existing sessions. 0 turns it off.",
+      "markdownDescription": "Move a session to Settled once it has had no activity for this many days, including existing sessions. 0 turns it off.\n\nThe server checks every 5 minutes. A session with an open pull request, a pending approval or question, a queued or running turn, or live background work stays unsettled.",
       "maximum": 365,
       "minimum": 0,
       "type": "integer"
@@ -17,33 +19,37 @@
     "chat.autoSettleOnMerge": {
       "default": true,
       "description": "Move a session to Settled when its worktree's pull request is merged. A closed pull request settles it whenever automatic settlement is on.",
+      "markdownDescription": "Move a session to Settled when its worktree's pull request is merged. A closed pull request settles it whenever automatic settlement is on.\n\nA merge or close counts when it happens after your last request in the session.",
       "type": "boolean"
     },
     "chat.confirmSessionDelete": {
       "default": true,
-      "description": "Ask before permanently deleting one or more conversations.",
+      "description": "Ask before permanently deleting one or more sessions.",
       "type": "boolean"
     },
     "chat.contextWindowMeterEnabled": {
-      "default": false,
-      "description": "Show conversation context occupancy in the composer and session header. Provider quota information is independent.",
+      "default": true,
+      "description": "Show how full the session's context window is, in the composer and the session header.",
+      "markdownDescription": "Show how full the session's context window is, in the composer and the session header.\n\nClaude reports what fills the window: system prompt, tools, messages, and the reserve kept for compaction. Other providers show the turn's token counts. The meter's popover also shows the session's tokens and cost.",
       "type": "boolean"
     },
     "chat.defaultInteractionMode": {
       "default": "default",
       "description": "Whether a new session starts in plan mode.",
       "enum": ["default", "plan"],
+      "markdownDescription": "Whether a new session starts in plan mode.\n\nApplies while `chat.planModeEnabled` is on.",
       "type": "string"
     },
     "chat.defaultRuntimeMode": {
       "default": "full-access",
       "description": "Permission posture a new session starts in.",
       "enum": ["approval-required", "auto-accept-edits", "full-access"],
+      "markdownDescription": "Permission posture a new session starts in.\n\nFull access suits a machine with one owner who trusts agents with its checkouts: Codex starts with approval policy never and sandbox danger-full-access, and Claude pre-approves every tool. This is an application setting, so a workspace file in a cloned repository cannot change it.",
       "type": "string"
     },
     "chat.followUpBehavior": {
       "default": "queue",
-      "description": "Queue messages during a running turn or send them immediately as corrections. Ctrl/Cmd+Enter uses the other behavior.",
+      "description": "Queue messages sent during a running turn, or send them at once as corrections. The alternate send key (Ctrl/Cmd+Enter, or Shift+Ctrl/Cmd+Enter where Ctrl/Cmd+Enter sends) takes the other behavior.",
       "enum": ["queue", "steer"],
       "type": "string"
     },
@@ -55,6 +61,7 @@
     "chat.keepImportedSessionsUpdated": {
       "default": true,
       "description": "Imported chats receive one-way updates from local history until you send their first message in Platform. New chats are only imported when you click Import.",
+      "markdownDescription": "Imported chats receive one-way updates from local history until you send their first message in Platform. New chats are only imported when you click Import.\n\nThe server rescans local Claude and Codex history every minute and brings imported chats up to date. A chat stops updating once it has a turn sent from Platform.",
       "type": "boolean"
     },
     "chat.notificationMode": {
@@ -94,6 +101,7 @@
       "default": "repository",
       "description": "Group projects by repository, repository-relative path, or owning machine. Git projects currently register at the repository root, so both repository modes are equivalent.",
       "enum": ["repository_path", "repository", "separate"],
+      "markdownDescription": "Group projects by repository, repository-relative path, or owning machine. Git projects currently register at the repository root, so both repository modes are equivalent.\n\nRepository puts one repository's checkouts on this machine and on connected machines under one project row. Separate gives each machine's project its own row.",
       "type": "string"
     },
     "chat.projectGroupingOverrides": {
@@ -165,12 +173,14 @@
     "chat.pushNotifications": {
       "default": false,
       "description": "Push to every device registered below when a session needs attention or completes. Held back while a window of this server is visible and focused.",
+      "markdownDescription": "Push to every device registered below when a session needs attention or completes. Held back while a window of this server is visible and focused.\n\nOnly live changes push: replaying history, recovering after a restart and archived sessions never notify. A device the push service rejects with 404 or 410 is removed.",
       "type": "boolean"
     },
     "chat.responseStreamingMode": {
       "default": "paragraph",
       "description": "Publish assistant responses by paragraph, complete turn, or individual token.",
       "enum": ["paragraph", "token", "turn"],
+      "markdownDescription": "Publish assistant responses by paragraph, complete turn, or individual token.\n\nParagraph publishes text at blank lines, closed code fences and new list items: the first break at once, later ones at least 400 ms apart. The end of the turn, a question from the agent, or 24,000 buffered characters flushes the rest. Token mode still delivers reasoning by paragraph.",
       "type": "string"
     },
     "chat.sendShortcut": {
@@ -181,7 +191,7 @@
     },
     "chat.sessionSortOrder": {
       "default": "updated_at",
-      "description": "Order palette sessions and choose the surviving project session after deletion by latest user activity or creation time. Shelf ordering remains independent.",
+      "description": "Order sessions in the palette, and pick which session opens after a deletion, by latest user activity or by creation time.",
       "enum": ["created_at", "updated_at"],
       "type": "string"
     },
@@ -193,7 +203,8 @@
         },
         "providerInstanceId": "codex"
       },
-      "description": "Provider and model used to generate session titles, independently of the conversation model.",
+      "description": "Provider and model that write session titles.",
+      "markdownDescription": "Provider and model that write session titles.\n\nTitles use gpt-5.6-luna at low effort through Codex. When Codex is disabled or missing, the server uses the first enabled provider in the order Codex, Claude, Cursor, Grok, OpenCode, Antigravity, with that provider's small model. A failed title request keeps the current title and logs a warning.",
       "properties": {
         "model": {
           "minLength": 1,
@@ -230,6 +241,7 @@
     "developer.deployRestartWaitMinutes": {
       "default": 30,
       "description": "Minutes `bun run deploy --restart` waits for running sessions to finish before it gives up. `--interrupt` restarts at once and ends those turns.",
+      "markdownDescription": "Minutes `bun run deploy --restart` waits for running sessions to finish before it gives up. `--interrupt` restarts at once and ends those turns.\n\nThirty minutes covers a typical agent turn. A session busy for longer is usually stuck or running background work, and deploy --interrupt ends it.",
       "maximum": 1440,
       "minimum": 1,
       "type": "integer"
@@ -264,6 +276,7 @@
       "default": "off",
       "description": "Animate a file as it opens, as if it were being written.",
       "enum": ["autoregressive", "diffusion", "off", "parallel", "token"],
+      "markdownDescription": "Animate a file as it opens, as if it were being written.\n\nAutoregressive types one character at a time, line after line. Parallel types every line at once, staggered. Token streams one token at a time, like a language model. Diffusion settles scrambled glyphs into the text.",
       "type": "string"
     },
     "editor.diff.viewMode": {
@@ -275,6 +288,7 @@
     "editor.fontFamily": {
       "default": "bundled:jetbrains-mono",
       "description": "Font for the editor, the terminal, and code and metadata across the app.",
+      "markdownDescription": "Font for the editor, the terminal, and code and metadata across the app.\n\nAlso the terminal font. A code font without Nerd Font icons borrows them from Nerd Fonts Symbols Only, so terminal prompts keep their glyphs. Installed fonts come from the server machine (fc-list).",
       "maxLength": 160,
       "minLength": 3,
       "type": "string"
@@ -299,7 +313,7 @@
     "editor.history.persistBudget": {
       "default": 67108864,
       "description": "Total stored undo history across closed files, in UTF-16 code units. The least recently saved files go first when it is exceeded.",
-      "markdownDescription": "Total stored undo history across closed files, in UTF-16 code units. The least recently saved files go first when it is exceeded.\n\nApplies while `editor.history.persist` is on.",
+      "markdownDescription": "Total stored undo history across closed files, in UTF-16 code units. The least recently saved files go first when it is exceeded.\n\nSame ceiling as the retained text budget, capped at 1 GiB because browser storage is shared with every other site. A single history larger than the budget is skipped.\n\nApplies while `editor.history.persist` is on.",
       "maximum": 1073741824,
       "minimum": 0,
       "type": "integer"
@@ -315,14 +329,16 @@
     "editor.history.retainedStates": {
       "default": 200,
       "description": "Earlier states kept per open file, across every undo branch. The least recently visited go first when the budget is exceeded.",
+      "markdownDescription": "Earlier states kept per open file, across every undo branch. The least recently visited go first when the budget is exceeded.\n\nA state is a run of typing. Each retained state keeps its text snapshot in memory, and each edit copies a map of them: 1,000 commits with pruning took 4.55 ms under Bun in the Editor's undo-graph measurement.",
       "maximum": 5000,
       "minimum": 10,
       "type": "integer"
     },
     "editor.inputRoute": {
       "default": "edit-context",
-      "description": "How typed text reaches the editor. EditContext (Chromium) receives IME, autocorrect and dictation edits with their exact ranges instead of reading them back out of a hidden textarea; other browsers always use the textarea.",
+      "description": "How typed text reaches the editor. EditContext (Chromium) hands IME, autocorrect and dictation edits to the editor with their exact ranges. Other browsers use a hidden textarea.",
       "enum": ["edit-context", "textarea"],
+      "markdownDescription": "How typed text reaches the editor. EditContext (Chromium) hands IME, autocorrect and dictation edits to the editor with their exact ranges. Other browsers use a hidden textarea.\n\nIn the editor-edit-context-input scenario, an IME correction over the first word yields Hello日本 on EditContext and hello日本Hello on the textarea. EditContext is Chromium-only; Firefox and Safari use the textarea whatever this says.",
       "type": "string"
     },
     "editor.lineHeight": {
@@ -336,6 +352,7 @@
       "default": "preview",
       "description": "How markdown files open: source text, source beside a rendered view, or rendered in place while you edit. Cycle markdown view changes one file.",
       "enum": ["preview", "source", "split"],
+      "markdownDescription": "How markdown files open: source text, source beside a rendered view, or rendered in place while you edit. Cycle markdown view changes one file.\n\nLive preview draws markdown from tree-sitter's markdown captures, so with syntax highlighting off a file shows as source. Split view renders with the chat's markdown renderer.",
       "type": "string"
     },
     "editor.minimap.enabled": {
@@ -346,6 +363,7 @@
     "editor.retainedTextBudget": {
       "default": 67108864,
       "description": "Total text the editor keeps resident across the active and parked projects, in UTF-16 code units, re-checked at a project switch and a tab close. The active project is charged first and is never trimmed, so a large one leaves less room for parked projects.",
+      "markdownDescription": "Total text the editor keeps resident across the active and parked projects, in UTF-16 code units, re-checked at a project switch and a tab close. The active project is charged first and is never trimmed, so a large one leaves less room for parked projects.\n\nChecked at a project switch and at a tab close, so opening two large projects can exceed it until the next switch or close. Counted in UTF-16 code units, which equals bytes for ASCII text. Parked documents over the budget are dropped and reload from disk when you switch back.",
       "maximum": 1073741824,
       "minimum": 0,
       "type": "integer"
@@ -358,6 +376,7 @@
     "editor.tabSize": {
       "default": 4,
       "description": "Width of a tab character, in spaces. Also the indentation width for a file whose own cannot be detected.",
+      "markdownDescription": "Width of a tab character, in spaces. Also the indentation width for a file whose own cannot be detected.\n\nDiffs skip indentation detection, so tabs in a diff always use this width.",
       "maximum": 16,
       "minimum": 1,
       "type": "integer"
@@ -370,11 +389,13 @@
     "editor.unicodeHighlight.ambiguousCharacters": {
       "default": true,
       "description": "Highlight Unicode characters that resemble other characters. Hover a highlight for an explanation.",
+      "markdownDescription": "Highlight Unicode characters that resemble other characters. Hover a highlight for an explanation.\n\nA confusable character looks like an ASCII one, so the Cyrillic а in pаssword names a different identifier from the one you read. Typographic punctuation such as an en dash also counts; add it to Allowed characters to stop highlighting it.",
       "type": "boolean"
     },
     "editor.unicodeHighlight.invisibleCharacters": {
       "default": true,
       "description": "Highlight invisible Unicode characters. Hover a highlight for its code point.",
+      "markdownDescription": "Highlight invisible Unicode characters. Hover a highlight for its code point.\n\nAn invisible character draws nothing. A bidirectional override can reorder a line so the code the compiler reads differs from the line on screen.",
       "type": "boolean"
     },
     "environments.machines": {
@@ -461,6 +482,7 @@
     "files.watchDirectoryLimit": {
       "default": 200000,
       "description": "How many folders all open workspaces may watch for live changes together. A workspace that would pass it updates its top level and open files only.",
+      "markdownDescription": "How many folders all open workspaces may watch for live changes together. A workspace that would pass it updates its top level and open files only.\n\nEach watched folder uses one inotify watch from a per-user pool that every watcher on the machine shares (524,288 on the owner's machine). Opening /work took 484,687 watches and other apps began failing with ENOSPC. 200,000 fits four roots the size of the Platform checkout (45,036 folders) and leaves 62% of the pool free.",
       "maximum": 2000000,
       "minimum": 0,
       "type": "integer"
@@ -468,6 +490,7 @@
     "git.autoPull": {
       "default": false,
       "description": "Fast-forward a project checkout on its default branch when its upstream moves. A checkout with changes, local commits or another branch checked out is left alone.",
+      "markdownDescription": "Fast-forward a project checkout on its default branch when its upstream moves. A checkout with changes, local commits or another branch checked out is left alone.\n\nChecked on each Git status read after the background fetch moves the upstream. After a failed pull the next try waits 60 seconds. The Git panel shows why a pull was skipped.",
       "type": "boolean"
     },
     "git.projectAutoPull": {
@@ -507,12 +530,14 @@
     "git.worktreeCleanupOnDelete": {
       "default": false,
       "description": "Remove a session worktree once every session using it is deleted and has stopped, including earlier deletions. A worktree with uncommitted changes, ignored files other than node_modules, or another branch checked out stays.",
+      "markdownDescription": "Remove a session worktree once every session using it is deleted and has stopped, including earlier deletions. A worktree with uncommitted changes, ignored files other than node_modules, or another branch checked out stays.\n\nWhile this is off, the delete dialog offers removal for that one deletion. node_modules is allowed because a package install recreates it.",
       "type": "boolean"
     },
     "git.worktreeSubmodules": {
       "default": "recursive",
       "description": "Initialize every nested submodule, only the ones this repository declares, or none when a session creates a worktree.",
       "enum": ["none", "recursive", "top-level"],
+      "markdownDescription": "Initialize every nested submodule, only the ones this repository declares, or none when a session creates a worktree.\n\nRuns git submodule update --init after the worktree is created, with --recursive in the recursive mode. Credential prompts are off and the step stops after 15 minutes. A failed step keeps the worktree, and the Git panel offers Initialize to retry.",
       "type": "string"
     },
     "keybindings.overrides": {
@@ -565,7 +590,7 @@
     },
     "lsp.experimental.tyForPython": {
       "default": false,
-      "description": "Use ty instead of pyright for Python. Files already open keep their current server until reopened.",
+      "description": "Run ty as the Python language server. Off runs pyright. Files already open keep their current server until reopened.",
       "type": "boolean"
     },
     "lsp.idleTimeoutMs": {
@@ -594,12 +619,13 @@
     "lsp.semanticTokens.delta": {
       "default": true,
       "description": "Ask delta-capable language servers for only the tokens an edit changed. Saves bandwidth, parse time and garbage on every keystroke.",
-      "markdownDescription": "Ask delta-capable language servers for only the tokens an edit changed. Saves bandwidth, parse time and garbage on every keystroke.\n\nApplies while `lsp.semanticTokens.enabled` is on.",
+      "markdownDescription": "Ask delta-capable language servers for only the tokens an edit changed. Saves bandwidth, parse time and garbage on every keystroke.\n\nMeasured with rust-analyzer on hashbrown's map.rs (197 KB, 11,978 tokens) over twelve keystrokes: whole files cost 1.60 MB, 14.1 ms of JSON.parse and 9.0 MB of heap; deltas cost 1.9 KB, 0.1 ms and 2.0 MB, at the same latency. About 5 of 37 servers support delta.\n\nApplies while `lsp.semanticTokens.enabled` is on.",
       "type": "boolean"
     },
     "lsp.semanticTokens.enabled": {
       "default": false,
       "description": "Ask language servers to colour identifiers they have actually resolved. Off means no token request is ever sent. Each server still has its own default under lsp.semanticTokens.servers.",
+      "markdownDescription": "Ask language servers to colour identifiers they have actually resolved. Off means no token request is ever sent. Each server still has its own default under lsp.semanticTokens.servers.\n\nServer colour paints over the syntax highlighter's colour. On a first open with no saved paint, a warm server can answer before the highlighter has run, so identifiers take colour while the rest of the text is still plain, for up to about a second and a half. Reopening a file with a saved paint is unaffected.",
       "type": "boolean"
     },
     "lsp.semanticTokens.servers": {
@@ -607,7 +633,8 @@
         "type": "boolean"
       },
       "default": {},
-      "description": "Server id to true or false, overriding the per-server default. Lets one misbehaving server be turned off without turning the feature off.",
+      "description": "Server id to true or false, overriding the per-server default. Turns one server's semantic colour on or off while the feature stays on.",
+      "markdownDescription": "Server id to true or false, overriding the per-server default. Turns one server's semantic colour on or off while the feature stays on.\n\nSix servers are measured and on by default: rust-analyzer 1.88.0, gopls v0.21.0, clangd, zls 0.16.0, terraform-ls and typescript-language-server. A server nobody has measured stays off until named here.",
       "propertyNames": {
         "minLength": 1,
         "type": "string"
@@ -822,6 +849,7 @@
         "required": ["model", "providerInstanceId"],
         "type": "object"
       },
+      "markdownDescription": "Which models the picker offers, and in what order. Turn one off to keep it out of the picker.\n\nOnly turned-off models are stored, so a model a provider adds later appears in the picker on its own.",
       "type": "array"
     },
     "models.order": {
@@ -930,6 +958,7 @@
     "search.maxResultFiles": {
       "default": 20000,
       "description": "How many files a workspace search returns matches from.",
+      "markdownDescription": "How many files a workspace search returns matches from.\n\nEvery file in the results holds at least one match, so at the default the match limit always stops a search first. It takes effect when set below the match limit.",
       "maximum": 20000,
       "minimum": 1,
       "type": "integer"
@@ -937,6 +966,7 @@
     "search.maxResults": {
       "default": 20000,
       "description": "How many matches a workspace search returns.",
+      "markdownDescription": "How many matches a workspace search returns.\n\n20,000 is VS Code's default cap. Once a parallel ripgrep run is cut off, which matches it returns can change from run to run, so the cap sits high enough that this is rare. The server refuses larger values.",
       "maximum": 20000,
       "minimum": 1,
       "type": "integer"
@@ -982,6 +1012,7 @@
       "default": "compositor",
       "description": "Where the see-through comes from: the window manager blending an opaque window, or a per-pixel transparent window (which costs a full-surface CPU copy per frame).",
       "enum": ["compositor", "window"],
+      "markdownDescription": "Where the see-through comes from: the window manager blending an opaque window, or a per-pixel transparent window (which costs a full-surface CPU copy per frame).\n\nA per-pixel transparent window switches the embedded Chromium renderer to off-screen rendering. On macOS a 1440×960 window then copies 5.5 MB through the CPU on every paint, where the opaque window produced no paint events at all. On Linux the window manager already blends an opaque window over the desktop.",
       "type": "string"
     },
     "workbench.colorTheme": {
@@ -1000,11 +1031,13 @@
       "default": "flat",
       "description": "Motion and control depth: Flat, Seam, Brisk, Relaxed or Playful.",
       "enum": ["brisk", "flat", "playful", "relaxed", "seam"],
+      "markdownDescription": "Motion and control depth: Flat, Seam, Brisk, Relaxed or Playful.\n\nFlat moves on fixed durations with flat controls. Seam, Brisk, Relaxed and Playful move on springs and give controls raised keys, sunken wells and squircle corners (squircles in Chromium only). Under reduced motion every feel uses fades.",
       "type": "string"
     },
     "workbench.fontFamily": {
       "default": "bundled:inter",
       "description": "Font for the words the app writes: titles, labels, menus and prose.",
+      "markdownDescription": "Font for the words the app writes: titles, labels, menus and prose.\n\nBundled fonts ship with the app and load with no network. Installed fonts come from the server machine's fontconfig (fc-list), so a font installed there works on every device; a server without fontconfig lists none.",
       "maxLength": 160,
       "minLength": 3,
       "type": "string"
@@ -1018,11 +1051,13 @@
     "workbench.reduceMotion": {
       "default": false,
       "description": "Slow terminal loading indicators while keeping progress visible.",
+      "markdownDescription": "Slow terminal loading indicators while keeping progress visible.\n\nApplies to the terminal app: its spinners and loaders run at half speed. The web app follows the operating system's reduce-motion setting.",
       "type": "boolean"
     },
     "workbench.sounds.controls": {
       "default": false,
       "description": "Play clicks when pressing controls and changing values with the pointer.",
+      "markdownDescription": "Play clicks when pressing controls and changing values with the pointer.\n\nOnly pointer presses click. Keyboard presses stay silent, and nothing sounds while the tab is hidden.",
       "type": "boolean"
     },
     "workbench.sounds.errors": {
@@ -1038,11 +1073,13 @@
     "workbench.sounds.terminalBell": {
       "default": false,
       "description": "Play a click when a terminal program rings the bell.",
+      "markdownDescription": "Play a click when a terminal program rings the bell.\n\nAt most one bell every 500 ms. Silent while the tab is hidden.",
       "type": "boolean"
     },
     "workbench.sounds.volume": {
       "default": 50,
       "description": "Loudness of every sound, agent notifications included.",
+      "markdownDescription": "Loudness of every sound, agent notifications included.\n\nAgent notification sounds (turn finished, input requested) play through this volume too. At 100 they play at their recorded level.",
       "maximum": 100,
       "minimum": 0,
       "type": "integer"
@@ -1050,6 +1087,7 @@
     "workbench.surface.blur": {
       "default": 9,
       "description": "Backdrop blur radius, in pixels, behind translucent surfaces.",
+      "markdownDescription": "Backdrop blur radius, in pixels, behind translucent surfaces.\n\nCapped at 40 px. A repository's settings file can set this, and a large backdrop blur costs GPU time on every frame.",
       "maximum": 40,
       "minimum": 0,
       "type": "integer"
@@ -1057,13 +1095,14 @@
     "workbench.surface.contentOpacity": {
       "default": 50,
       "description": "How opaque the extra layer under the editor, terminal and settings is. It sits on top of the panel, so 0 leaves them as see-through as a sidebar.",
+      "markdownDescription": "How opaque the extra layer under the editor, terminal and settings is. It sits on top of the panel, so 0 leaves them as see-through as a sidebar.\n\nThis layer sits over the panel's own surface, so 50 over a panel at 80 makes the ground behind code and terminal text 90% opaque: text stays readable and a trace of the wallpaper shows through.",
       "maximum": 100,
       "minimum": 0,
       "type": "integer"
     },
     "workbench.surface.continuousSeams": {
       "default": false,
-      "description": "Carry one background across panels and their resize handles, instead of showing the wallpaper in the gap between them.",
+      "description": "Paint one background across panels and the resize handles between them, so the panels read as one surface. Off, the wallpaper shows in the gaps between panels.",
       "type": "boolean"
     },
     "workbench.surface.opacity": {
@@ -1274,7 +1313,8 @@
         }
       ],
       "default": null,
-      "description": "App colors, code colors, wallpaper and surfaces, in a light and a dark version. Try them in the theme studio."
+      "description": "App colors, code colors, wallpaper and surfaces, in a light and a dark version. Try them in the theme studio.",
+      "markdownDescription": "App colors, code colors, wallpaper and surfaces, in a light and a dark version. Try them in the theme studio.\n\nPicking a theme sets the app colors, code colors, wallpaper and surfaces at once. Changes you make afterwards are saved for that theme and come back when you pick it again. With no theme, the app uses Graphite colors, Dark+ and Light+ code colors and the desktop wallpaper."
     },
     "workbench.theme.customizations": {
       "additionalProperties": {
@@ -1458,6 +1498,7 @@
         }
       },
       "description": "Choose a wallpaper and turn it on or off without losing the selection.",
+      "markdownDescription": "Choose a wallpaper and turn it on or off without losing the selection.\n\nDesktop shows the server machine's current wallpaper: Omarchy's current background on Linux, the desktop picture on macOS. On a Linux screen the compositor already shows the desktop behind the window, so Desktop draws nothing there.",
       "properties": {
         "enabled": {
           "type": "boolean"
