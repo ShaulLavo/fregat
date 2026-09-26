@@ -21,6 +21,7 @@ import { Button, buttonVariants } from '@workspace/ui/components/button'
 import { cn } from '@workspace/ui/lib/utils'
 import { changeRequestLabel } from '@/features/git/utils/forge-terms'
 import { PublishRepositoryDialog } from '@/features/git/components/publish-repository-dialog'
+import { PullRequestLookupRetry } from '@/features/git/components/pull-request-lookup-retry'
 
 /**
  * Publish, push and open-a-pull-request, in the header where the branch already
@@ -39,10 +40,11 @@ export function BranchActions({
   const { data: state } = useBranchRemoteState(rootPath)
   // Its own query, and never awaited by the rest: reading a pull request shells
   // out to the forge CLI, and Publish must not wait on the network to appear.
-  const { data: pullRequestState } = usePullRequestState(rootPath)
+  const lookup = usePullRequestState(rootPath)
+  const pullRequestState = lookup.isSuccess ? lookup.data : undefined
   const push = usePushRemoteMutation(rootPath)
   const createPullRequest = useCreatePullRequestMutation(rootPath)
-  const requestLabel = changeRequestLabel(pullRequestState?.forge)
+  const requestLabel = changeRequestLabel(lookup.data?.forge)
   const ship = usePushAndOpenPullRequestMutation(rootPath, requestLabel)
   const [publishing, setPublishing] = useState(false)
   if (!state?.branch) return null
@@ -113,6 +115,7 @@ export function BranchActions({
           <ArrowSquareOutIcon className='size-(--icon-size-sm) opacity-60' />
         </a>
       ) : null}
+      <PullRequestLookupRetry requestLabel={requestLabel} rootPath={rootPath} />
       {canCreatePullRequest(state, pullRequestState) ? (
         <Button
           className='text-2xs'
