@@ -132,7 +132,7 @@ export class FileSystemService {
   readonly metadata
   private readonly appWrites = new AppWrites()
   private readonly maxSearchContentBytes
-  readonly maxTextFileBytes
+  private readonly maxTextFileBytes
   private readonly workspaceEditJournalRoot
   private readonly workspaceEditReady
   private readonly workspaceEdits

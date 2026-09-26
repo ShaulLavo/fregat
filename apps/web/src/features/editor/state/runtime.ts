@@ -1,4 +1,3 @@
-import { configureWorkerProjects } from '@/features/editor/state/typescript-worker-project'
 import { LanguageServerDocuments } from '@/features/editor/state/language-server-documents'
 import { openLanguageServerBuffers } from '@/features/editor/utils/open-language-server-buffers'
 import { activeEditorTabForWorkbenchPanels } from '@/features/workbench/utils/panels'
@@ -244,7 +243,6 @@ export function createEditorRuntime({
     },
     suspend,
     dispose() {
-      configureWorkerProjects(queryClient, { backend: 'server', maxFiles: 0, maxBytes: 0 })
       if (disposed) return
       suspend()
       disposed = true

@@ -1,19 +1,10 @@
 import { useDiagnosticFix } from '@/lib/diagnostic-ai/hooks/use-diagnostic-fix'
 import { diagnosticHoverActions } from '@/features/editor/utils/diagnostic-hover-actions'
-import { useSettingValue } from '@/hooks/use-setting-value'
-import {
-  withTypeScriptWorker,
-  withWorkerStatus,
-} from '@/features/editor/state/typescript-worker-plugin'
 import { useLanguageServerMatchConfiguration } from '@/features/editor/providers/language-server-match-context'
 import { useEditorRuntime } from '@/features/editor/hooks/use-runtime'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import type { LanguageServerDocument } from '@/lib/language-server-document'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
-import {
-  isMissingWorkerProject,
-  typescriptWorkerProjectQuery,
-} from '@/features/editor/utils/typescript-worker-query'
+import { useQueryClient } from '@tanstack/react-query'
 import { originForQueryClient } from '@/lib/environments/state/query-clients'
 import type { LanguageServerDefinitionTarget } from '@singapore-editor/lsp-plugin/websocket'
 import type {
@@ -66,11 +57,7 @@ export function useLanguageServerPlugin({
   const buffer = useStore(documentStore, (state) =>
     documentKey === null ? null : (state.liveDocumentsByKey[documentKey]?.buffer ?? null),
   )
-  const queryClient = useQueryClient()
-  const origin = originForQueryClient(queryClient)
-  const backend = useSettingValue('lsp.typescript.backend')
-  const maxFiles = useSettingValue('lsp.typescript.workerMaxFiles')
-  const maxBytes = useSettingValue('lsp.typescript.workerMaxBytes')
+  const origin = originForQueryClient(useQueryClient())
   const {
     available,
     mutation: { mutateAsync },
@@ -80,12 +67,6 @@ export function useLanguageServerPlugin({
     () => (available ? diagnosticHoverActions(mutateAsync) : undefined),
     [available, mutateAsync],
   )
-  const workerCandidate = enabled && backend === 'worker' && /\.[cm]?[jt]sx?$/.test(filePath)
-  const workerProject = useQuery({
-    ...typescriptWorkerProjectQuery(rootPath, filePath),
-    enabled: workerCandidate,
-  })
-  const worker = workerCandidate && !isMissingWorkerProject(workerProject.error)
   const { service: fileOpenIntent } = useFileOpenIntent()
   // Manual memo: `languageServerStatusSource` is a useMemo dependency, and the compiler's cache is a
   // cache, not an identity guarantee — when it recomputes, the useMemo re-runs.
@@ -101,7 +82,7 @@ export function useLanguageServerPlugin({
   const matches = useLanguageServerMatches(rootPath, target.matchPath, enabled && document !== null)
 
   const languageServer = useMemo(() => {
-    const server = createMatchedLanguageServerPlugin({
+    return createMatchedLanguageServerPlugin({
       document:
         documentKey !== null && documentUri !== null
           ? { key: documentKey, uri: documentUri }
@@ -112,13 +93,9 @@ export function useLanguageServerPlugin({
       documents: languageServerDocuments,
       configurationGeneration,
       buffer,
-      matches: worker
-        ? (matches?.filter((match) => match.serverId !== 'typescript') ?? null)
-        : matches,
+      matches,
       rootPath,
-      statusSource: worker
-        ? withWorkerStatus(languageServerStatusSource)
-        : languageServerStatusSource,
+      statusSource: languageServerStatusSource,
       target,
       onApplyWorkspaceEdit,
       onDefinitionLinkHover: (definition) => {
@@ -133,30 +110,7 @@ export function useLanguageServerPlugin({
       onDidNavigateDiagnostic,
       getDiagnosticActions,
     })
-    if (!worker || documentKey === null || documentUri === null) return server
-    return withTypeScriptWorker({
-      documents: documentStore,
-      server,
-      client: queryClient,
-      root: rootPath,
-      file: filePath,
-      document: { key: documentKey, uri: documentUri },
-      maxFiles,
-      maxBytes,
-      status: languageServerStatusSource,
-      documentSyncController,
-      onApplyWorkspaceEdit,
-      onOpenDefinition,
-      onOpenReferences,
-      getDiagnosticActions,
-    })
   }, [
-    worker,
-    documentStore,
-    queryClient,
-    maxFiles,
-    maxBytes,
-    filePath,
     documentKey,
     documentUri,
     origin,

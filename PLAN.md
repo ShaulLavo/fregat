@@ -587,6 +587,7 @@ surfaces, the file picker and the site. The owner is taking it one topic at a ti
 | [180](plans/180-file-icon-variants.md)          | Quick research: more glyphs, variants and per-mode colours from the icon pack we already use                              |
 | [181](plans/181-chat-timeline-end-anchoring.md) | The chat timeline on TanStack's end anchoring after a 3.14.13 upgrade; prerequisite to 178's virtualization               |
 | [182](plans/182-search-view-rendering.md)       | Quick research: why the full search view renders slowly, and what would fix it                                            |
+| [185](plans/185-server-typescript-only.md)      | Platform uses only the server TypeScript backend; the browser worker stays an Editor feature (owner ruling, closes 153)   |
 
 Suggested order:
 

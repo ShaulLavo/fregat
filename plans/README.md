@@ -19,6 +19,7 @@ a bare root `bun run verify`.
 
 | Plan                                                                                    | State                                                                     |
 | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| [185 — server TypeScript only](185-server-typescript-only.md)                           | **DONE 2026-09-26 ON LANE L7 (#37); OWNER RULING; CLOSES 153**            |
 | [184 — dependency diet](184-dependency-diet.md)                                         | **PROPOSED 2026-09-26 — READY; SLICE 1 IS A LIVE BUG**                    |
 | [183 — Platform as Claude Code's IDE in its terminals](183-claude-ide-in-terminals.md)  | **PLACEHOLDER — LOW PRIORITY; SPLIT FROM 140 Q1**                         |
 | [177 — prefetch every press](177-prefetch-every-press.md)                               | **PROPOSED 2026-09-26 — RESEARCH FIRST**                                  |

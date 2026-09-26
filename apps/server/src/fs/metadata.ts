@@ -70,7 +70,7 @@ export class FsMetadataStore {
     }
   }
 
-  workspaceAddressForDirectory(filesystemRoot: string, canonicalPath: string) {
+  private workspaceAddressForDirectory(filesystemRoot: string, canonicalPath: string) {
     return this.db
       .select({ id: workspaceAddresses.id })
       .from(workspaceAddresses)

@@ -36,14 +36,6 @@ import { setLspDownloadPolicy } from './lsp/installers'
 import { LspSessionPool } from './lsp/proxy-session'
 import { lspMatchQuerySchema, lspRouteMatch, lspRouteSemanticTokens, lspRoutes } from './lsp/routes'
 import {
-  listProgramFiles,
-  programFilesQuerySchema,
-  programFilesReadBodySchema,
-  readProgramFiles,
-  resolveProgramProject,
-  workerProjectQuerySchema,
-} from './lsp/typescript/program-files'
-import {
   applyObservability,
   flushObservability,
   isEvlogError,
@@ -518,25 +510,6 @@ export function createApp(options: AppOptions) {
       '/lsp/semantic-tokens',
       ({ query }) => lspRouteSemanticTokens(fs.paths, query, lspSettings(), lspPool),
       { query: lspMatchQuerySchema },
-    )
-    .get(
-      '/lsp/typescript/program-files',
-      ({ query, request }) => listProgramFiles(fs, query, request.signal),
-      {
-        query: programFilesQuerySchema,
-      },
-    )
-    .get(
-      '/lsp/typescript/project',
-      ({ query, request }) => resolveProgramProject(fs, query, request.signal),
-      { query: workerProjectQuerySchema },
-    )
-    .post(
-      '/lsp/typescript/program-files/read',
-      ({ body }) => readProgramFiles(fs, body.paths, body.maxBytes, body.versions),
-      {
-        body: programFilesReadBodySchema,
-      },
     )
     .ws('/lsp', lspRoutes(fs, auth, { pool: lspPool, settings: lspSettings }))
     .ws('/terminal', terminal.routes(auth))

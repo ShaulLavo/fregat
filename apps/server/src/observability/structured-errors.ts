@@ -165,36 +165,6 @@ export const lspErrors = defineErrorCatalog('lsp', {
     why: 'The language server process exited or failed while the editor was connected to it.',
     fix: 'Run the language server from a terminal to see why it exits, then reopen the file.',
   },
-  PROGRAM_ROOT_NOT_OPEN: {
-    status: 403,
-    message: 'This folder is not an open workspace',
-    why: 'Program files are listed only for a workspace root this server has opened.',
-    fix: 'Open the folder as a workspace, then try again.',
-  },
-  PROGRAM_TSCONFIG_OUTSIDE_ROOT: {
-    status: 403,
-    message: 'The TypeScript project file is outside the workspace',
-    why: 'The tsconfig must sit inside the workspace root it is listed for.',
-    fix: 'Pick a tsconfig inside the open workspace.',
-  },
-  PROGRAM_NO_PROJECT: {
-    status: 404,
-    message: 'This file belongs to no TypeScript project',
-    why: 'No tsconfig inside the workspace includes the file.',
-    fix: 'Add the file to a tsconfig, or keep the server backend for loose files.',
-  },
-  PROGRAM_LIST_FAILED: {
-    status: 422,
-    message: 'TypeScript could not list the files of this project',
-    why: 'The TypeScript compiler exited without naming any program file, usually because the tsconfig is invalid or matches no files.',
-    fix: 'Run `tsc -p <tsconfig> --listFilesOnly` in the workspace and fix the errors it prints.',
-  },
-  PROGRAM_LIST_LIMIT: {
-    status: 504,
-    message: 'Listing the TypeScript program took too long or printed too much',
-    why: 'The compiler run is bounded by time and output size, and this project exceeded one of them.',
-    fix: 'Narrow the tsconfig `include` so the program holds fewer files.',
-  },
   WATCHED_FILES_REGISTRATION_INVALID: {
     status: 400,
     message: 'The language server asked to watch files in a form this client does not read',

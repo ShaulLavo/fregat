@@ -1033,34 +1033,6 @@ export const SETTINGS_REGISTRY = {
     description: 'Show dot-prefixed files and folders in file pickers.',
     keywords: ['files', 'folders', 'hidden', 'dotfiles', 'picker'],
   }),
-  'lsp.typescript.backend': defineSetting({
-    schema: v.picklist(['server', 'worker']),
-    default: 'server',
-    scope: 'machine',
-    widget: 'enum',
-    category: 'Language servers',
-    title: 'TypeScript backend',
-    description: 'Run TypeScript language features on the server or in a browser worker.',
-  }),
-  'lsp.typescript.workerMaxFiles': defineSetting({
-    schema: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(50000)),
-    default: 12000,
-    scope: 'machine',
-    widget: 'number',
-    category: 'Language servers',
-    title: 'TypeScript worker file limit',
-    description: 'Maximum program files loaded by a TypeScript browser worker.',
-  }),
-  'lsp.typescript.workerMaxBytes': defineSetting({
-    schema: v.pipe(v.number(), v.integer(), v.minValue(1024), v.maxValue(268435456)),
-    default: 67108864,
-    scope: 'machine',
-    widget: 'number',
-    category: 'Language servers',
-    title: 'TypeScript worker source byte limit',
-    description:
-      'Maximum source bytes loaded by a TypeScript browser worker. Runtime memory is higher.',
-  }),
   'files.watchDirectoryLimit': defineSetting({
     // Each watched directory is one inotify watch from the machine's per-user pool, which every
     // other watcher on the box shares; a workspace file must never raise it.

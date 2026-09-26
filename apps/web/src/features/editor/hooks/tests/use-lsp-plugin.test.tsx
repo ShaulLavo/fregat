@@ -12,9 +12,7 @@ const dependencies = vi.hoisted(() => ({
   fileOpenIntent: { service: { prepare: vi.fn() } },
   controller: {},
   apply: vi.fn(),
-  matches: [] as { serverId: string }[],
-  backend: 'server',
-  projectError: null as unknown,
+  matches: [],
 }))
 vi.mock('@/features/editor/hooks/use-runtime', () => ({
   useEditorRuntime: () => dependencies.runtime,
@@ -35,14 +33,7 @@ vi.mock('@/features/editor/providers/workspace-edit-context', () => ({
 vi.mock('@/lib/diagnostic-ai/hooks/use-diagnostic-fix', () => ({
   useDiagnosticFix: () => ({ available: true, mutation: { mutateAsync: dependencies.apply } }),
 }))
-vi.mock('@/hooks/use-setting-value', () => ({
-  useSettingValue: (key: string) =>
-    key === 'lsp.typescript.backend' ? dependencies.backend : 12000,
-}))
-vi.mock('@tanstack/react-query', () => ({
-  useQueryClient: () => null,
-  useQuery: () => ({ error: dependencies.projectError }),
-}))
+vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => null }))
 vi.mock('@/lib/environments/state/query-clients', () => ({
   originForQueryClient: () => 'http://localhost:3001',
 }))
@@ -83,28 +74,5 @@ describe('useLanguageServerPlugin', () => {
     })
     expect(result.current.languageServer).toBe(replacementPlugin)
     unmount()
-  })
-
-  it('keeps a file no tsconfig includes on the server backend', () => {
-    dependencies.runtime = { documentStore: createEditorDocumentStore() }
-    dependencies.backend = 'worker'
-    dependencies.matches = [{ serverId: 'typescript' }]
-    dependencies.projectError = { code: 'lsp.PROGRAM_NO_PROJECT' }
-    const path = filesystemPath('/repo/scripts/loose.ts')
-    const { result, unmount } = renderHook(() =>
-      useLanguageServerPlugin({
-        document: { key: fileDocumentKey(path), uri: 'file:///repo/scripts/loose.ts' },
-        filePath: path,
-        rootPath: '/repo',
-      }),
-    )
-    expect(result.current.languageServer.name).toBe('test-lsp')
-    expect(vi.mocked(createMatchedLanguageServerPlugin).mock.lastCall?.[0].matches).toEqual([
-      { serverId: 'typescript' },
-    ])
-    unmount()
-    dependencies.backend = 'server'
-    dependencies.matches = []
-    dependencies.projectError = null
   })
 })

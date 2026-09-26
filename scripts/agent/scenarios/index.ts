@@ -1,5 +1,3 @@
-import { editorTypeScriptWorkerMemory } from './editor-typescript-worker-memory'
-import { editorTypeScriptWorker } from './editor-typescript-worker'
 import { connectionRefusalRetention } from './connection-refusal-retention'
 import { cachedProtocolStartup } from './cached-protocol-startup'
 import { editorLspTabSwitch } from './editor-lsp-tab-switch'
@@ -448,8 +446,6 @@ export const scenarios: readonly Scenario[] = [
   editorLspUnnecessary,
   editorLspTabSwitch,
   editorLspServerExit,
-  editorTypeScriptWorker,
-  editorTypeScriptWorkerMemory,
   editorTypography,
   editorDecodeReveal,
   editorDefinitionCrlf,
