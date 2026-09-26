@@ -66,10 +66,12 @@ import type { EditorWorkspaceStoreApi } from '@/features/editor/state/workspace-
 import {
   createEditorApplyActions,
   activateWorkbenchSelection,
+  filePathForContent,
 } from '@/features/editor/state/apply-actions'
 import {
   activeEditorTabForWorkbenchPanels,
   closeEditorTabInWorkbenchPanels,
+  editorTabRecordsForWorkbenchPanels,
   editorOpenContentsForWorkbenchPanels,
   type WorkbenchPanels,
   type WorkbenchSidebarTab,
@@ -123,6 +125,14 @@ import {
   resizeMutationOptions,
 } from '@/features/editor/state/group-mutations'
 import { runMutation } from '@/lib/mutations/run'
+import { createWideEventScope } from '@/lib/wide-event-scope'
+import { diffDocumentQueryKey } from '@/features/git/utils/diff-document-query'
+import {
+  beginPressPaint,
+  endPressPaint,
+  notePressPrefetch,
+  type PressPrefetch,
+} from '@/lib/intent-prefetch/state/press-paint'
 
 export function createNavigation(
   router: ApplicationRouter,
@@ -411,7 +421,10 @@ export function createNavigation(
     if (editorGroups === state.workbenchPanels.editorGroups) return
     const panels = { ...state.workbenchPanels, editorGroups }
     editor.workspaceStore.getState().setWorkbenchPanels(panels)
-    activateWorkbenchSelection(panels, editor.editorActivation)
+    const prefetch = activateWorkbenchSelection(panels, editor.editorActivation)
+    const active = activeEditorTabForWorkbenchPanels(panels)
+    const target = active ? filePathForContent(active.content) : null
+    if (target && prefetch) notePressPrefetch('files', target, prefetch)
     const selected = editor.workspaceStore.getState().selectedTabContent
     editor.workspaceStore.setState({
       editorHistory: editorHistoryForSelection(state.editorHistory, selected),
@@ -562,12 +575,14 @@ export function createNavigation(
         openContent({ owner, content: documentTab({ kind: 'search', root: rootPath }) }),
       openSettingsEditor: (category?: string | null) =>
         openContent({ owner, content: settingsTab(), settingsCategory: category }),
-      selectTab: ({ groupId, tabId }: { groupId: GroupId; tabId: TabId }) =>
-        editGroups(owner, (groups) =>
+      selectTab: ({ groupId, tabId }: { groupId: GroupId; tabId: TabId }) => {
+        beginTabPress(owner, groupId, tabId)
+        return editGroups(owner, (groups) =>
           groupForTab(groups, tabId)?.id === groupId
             ? selectEditorGroupTab(groups, groupId, tabId)
             : null,
-        ),
+        )
+      },
       setActiveGroup: (groupId: GroupId) => {
         const editor = coordinator.getApplication()?.getSnapshot().editor
         if (!editor || editor.workspaceStore !== owner) return supersededNavigation()
@@ -668,21 +683,30 @@ export function createNavigation(
     startComposerDraft: createComposerDraftNavigation(coordinator, openChat),
     openWorkspace,
     openDiff({ owner, row }: { readonly owner: EditorWorkspaceStoreApi; readonly row: ChangeRow }) {
-      return ownedRequest(owner, async ({ application, address }) => {
-        const staged = row.section === 'staged'
+      const staged = row.section === 'staged'
+      const path = row.file.path
+      beginPressPaint(
+        'diffs',
+        path,
+        createWideEventScope({ action: 'editor.command.open_diff', area: 'git', path, staged }),
+      )
+      const request = ownedRequest(owner, async ({ application, address }) => {
+        const queryClient = application.getSnapshot().queryClient
+        const listCached = queryClient.getQueryData(gitKeys.diff(path, staged)) !== undefined
         // Query signal only: a fetch shared by key must not die with one caller's navigation.
-        const diffs = await application.getSnapshot().queryClient.query({
+        const diffs = await queryClient.query({
           queryFn: ({ signal, client }) =>
-            fetchDiff(row.file.path, staged, signal, clientForQueryClient(client)),
-          queryKey: gitKeys.diff(row.file.path, staged),
+            fetchDiff(path, staged, signal, clientForQueryClient(client)),
+          queryKey: gitKeys.diff(path, staged),
           staleTime: 1000,
         })
-        const diff = diffs.find(
-          (entry) => entry.path === row.file.path || entry.oldPath === row.file.path,
-        )
+        const diff = diffs.find((entry) => entry.path === path || entry.oldPath === path)
         const document = diff ? snapshotDocument(diff) : null
         if (!document)
           throw createClientInvariantError('The requested change has no available file snapshot.')
+        const blobCached =
+          queryClient.getQueryData(diffDocumentQueryKey(document.source)) !== undefined
+        notePressPrefetch('diffs', path, diffPrefetch(listCached, blobCached))
         const next = addressWithContent(
           address,
           documentTab(document),
@@ -697,6 +721,13 @@ export function createNavigation(
           beforeApply: () => revealEditor(application),
         }
       })
+      void request.then(
+        (result) => {
+          if (result.status !== 'applied') endPressPaint('diffs', path, result.status)
+        },
+        () => endPressPaint('diffs', path, 'failed'),
+      )
+      return request
     },
     editorCommands,
     setWorkbenchPanels,
@@ -1002,4 +1033,23 @@ export type Navigation = ReturnType<typeof createNavigation>
 function categoryForAddress(category: string | null | undefined, current: string | null) {
   if (category === undefined) return current
   return category ? settingsCategorySlug(category) : null
+}
+
+function diffPrefetch(listCached: boolean, blobCached: boolean): PressPrefetch {
+  if (listCached && blobCached) return 'hit'
+  return listCached || blobCached ? 'partial' : 'miss'
+}
+
+/** Opens `select_tab` for a file tab that is not already shown; it ends when the file paints. */
+function beginTabPress(owner: EditorWorkspaceStoreApi, groupId: GroupId, tabId: TabId) {
+  const panels = owner.getState().workbenchPanels
+  const tab = editorTabRecordsForWorkbenchPanels(panels).find((record) => record.id === tabId)
+  const target = tab ? filePathForContent(tab.content) : null
+  if (!target || activeEditorTabForWorkbenchPanels(panels)?.id === tabId) return
+
+  beginPressPaint(
+    'files',
+    target,
+    createWideEventScope({ action: 'editor.command.select_tab', area: 'editor', groupId, tabId }),
+  )
 }

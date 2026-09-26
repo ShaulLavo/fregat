@@ -57,6 +57,9 @@ const MIRRORED_KEYS = [
   'editor.syntaxHighlighting.enabled',
   'editor.tabSize',
   'logs.defaultTimeRange',
+  // Read per pointer intent, outside React.
+  'prefetch.enabled',
+  'prefetch.files',
   'logs.slowThresholdMs',
   // The semantic-token controller is a plain object hanging off an LSP
   // connection, not a component, and it re-reads these on every request so the

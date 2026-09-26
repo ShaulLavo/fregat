@@ -1023,6 +1023,29 @@ export const SETTINGS_REGISTRY = {
     requiresRestart: true,
     keywords: ['window', 'transparency', 'vibrancy', 'compositor', 'desktop', 'wallpaper', 'blur'],
   }),
+  'prefetch.enabled': defineSetting({
+    schema: v.boolean(),
+    default: true,
+    scope: 'application',
+    widget: 'boolean',
+    category: 'Prefetch',
+    title: 'Prefetch on intent',
+    description:
+      'Start loading what a press will open while the pointer heads for it or a key moves to it, so it paints at once. Folder listings follow this switch; each other surface has its own switch under it.',
+    keywords: ['prefetch', 'preload', 'hover', 'intent', 'speed', 'latency'],
+  }),
+  'prefetch.files': defineSetting({
+    schema: v.boolean(),
+    default: true,
+    scope: 'application',
+    widget: 'boolean',
+    category: 'Prefetch',
+    dependsOn: 'prefetch.enabled',
+    title: 'Prefetch files',
+    description:
+      'Read a file and colour its syntax while the pointer heads for its tree row, tab or definition link.',
+    keywords: ['prefetch', 'preload', 'files', 'tree', 'tabs', 'hover', 'syntax'],
+  }),
   'files.autoSave': defineSetting({
     schema: v.picklist(['off', 'afterDelay', 'onFocusChange', 'onWindowChange'] as const),
     default: 'off',

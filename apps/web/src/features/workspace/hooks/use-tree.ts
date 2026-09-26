@@ -19,7 +19,7 @@ import { log } from '@/lib/client-logging'
 import { createCoalescedLogQueue } from '@/lib/coalesced-log'
 import { canonicalTreePath, toTreePath } from '@/lib/path-formatters'
 import { fileSystemKeys } from '@/lib/query-keys'
-import { hasPrefetchRoom } from '@/lib/prefetch-room'
+import { hasPrefetchRoom } from '@/lib/intent-prefetch/state/scheduler'
 import {
   type DirectoryLoadOptions,
   markDirectoryError,
@@ -136,7 +136,8 @@ export function useWorkspaceTreeForRootPath(rootPath: string | null) {
     if (treeState.status !== 'ready') return
     if (!isDirectoryEntry(entry)) return
     if (!shouldLoadDirectory(treeState.data, treePath)) return
-    if (!hasPrefetchRoom(queryClient, fileSystemKeys.tree(rootPath))) return
+    if (!hasPrefetchRoom('folders', queryClient, { queryKey: fileSystemKeys.tree(rootPath) }))
+      return
 
     void queryClient
       .query({

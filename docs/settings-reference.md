@@ -163,6 +163,13 @@ stays safe to read, share and export.
 | `models.order`     | `[]`    | application | Explicit leading order for the picker. Models named by neither list stay visible after these, in provider order. |
 | `models.favorites` | `[]`    | application | Models starred as favorites. The picker lists them first and gathers them under Favorites.                       |
 
+## Prefetch
+
+| Setting            | Default | Scope       | What it does                                                                                                                                                                                        |
+| ------------------ | ------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `prefetch.enabled` | `true`  | application | Start loading what a press will open while the pointer heads for it or a key moves to it, so it paints at once. Folder listings follow this switch; each other surface has its own switch under it. |
+| `prefetch.files`   | `true`  | application | Read a file and colour its syntax while the pointer heads for its tree row, tab or definition link. Applies while `prefetch.enabled` is on.                                                         |
+
 ## Providers
 
 | Setting               | Default | Scope       | What it does                                                       |
