@@ -53,6 +53,7 @@ const ENTRY: GitFileDiff = {
     {
       changes: [],
       header: '@@ -2,7 +2,7 @@',
+      id: '0000000000000001',
       newLines: 7,
       newStart: 2,
       oldLines: 7,
