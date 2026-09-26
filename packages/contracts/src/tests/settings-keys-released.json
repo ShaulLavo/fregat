@@ -60,6 +60,8 @@
     "files.autoSave",
     "files.autoSaveDelay",
     "files.picker.view",
+    "files.searchIndexIdleMinutes",
+    "files.searchIndexLimit",
     "files.showHidden",
     "files.watchDirectoryLimit",
     "git.autoPull",
