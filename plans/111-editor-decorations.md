@@ -172,7 +172,9 @@ Phases 1–3 are the composer path; 4 and 5 are the markdown path and can run af
 
 ### Phase 1 as landed (2026-09-26)
 
-Editor commit `88a2a16`, covered on `new Editor(element)` plus `setText` (`test/atomicReplacements.test.ts`,
+Editor commits `88a2a16` and `42837cc` (review fixes: a syntax-triggered provider's map is carried across
+edits by its anchors instead of rerun on stale captures, and an edit-triggered provider derives chips for text
+set after it registered), covered on `new Editor(element)` plus `setText` (`test/atomicReplacements.test.ts`,
 `test/atomicReplacements.browser.test.ts`, `test/pasteHandlers.test.ts` drop cases, `test/inlineMap.test.ts`
 reveal cases):
 
@@ -181,7 +183,8 @@ reveal cases):
   and soft-keyboard range deletes take them whole.
 - `registerInlineReplacementProvider(provider, { trigger: 'edit' })` (and `setInlineReplacementProvider`)
   reruns inside every operation that edits or moves a selection, with no capture demand. The context gains
-  `selections`. The rename to `registerDecorationSource` stays with Phase 4, where the unified range set
+  `selections`. Syntax-triggered providers rerun only when captures land; between parses their map is
+  carried to the current text by its anchors and merged with the edit-derived specs. The rename to `registerDecorationSource` stays with Phase 4, where the unified range set
   lands.
 - Host shape from Plan 171: `scrollPastEnd`, `onDidChangeContentHeight` / `getContentHeight`, `inputLabel`,
   `inputKind: 'prose'` (autocapitalize, autocorrect), `autoClosingPairs` and `surroundingPairs`, public
