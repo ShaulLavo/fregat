@@ -22,3 +22,9 @@ test('names what was free when other folders use part of the limit', () => {
     }),
   ).toContain('50,000 of the 200,000 folder watches are free')
 })
+
+test('says when other folders use the whole limit', () => {
+  expect(
+    limitedWatchDescription({ mode: 'limited', directoryCount: 1, available: 0, limit: 40 }),
+  ).toContain('other open folders use all 40 folder watches')
+})

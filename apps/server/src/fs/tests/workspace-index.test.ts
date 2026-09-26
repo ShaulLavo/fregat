@@ -939,6 +939,29 @@ describe('workspace index', () => {
     }
   })
 
+  it('builds the index once a limited root is watched in full', async () => {
+    const root = await fixtureRoot()
+    await writeFile(path.join(root, 'indexed.ts'), 'export const indexed = true\n')
+    const index = new WorkspaceIndex(createWorkspacePaths(root), TEST_INDEX_OPTIONS)
+    const events = controlledWatchEvents()
+    const subscription = watchWorkspaceIndex(index, events.stream, { coalesceMs: 1 })
+
+    try {
+      events.push({ type: 'ready', root: '', watch: { mode: 'limited', limit: 1 } })
+      await subscription.ready
+      index.turnOff('watch-limit')
+      expect(index.status().readiness).toBe('off')
+
+      events.push({ type: 'coverage', path: '', watch: { mode: 'recursive', limit: 10 } })
+
+      await waitForStatus(index, 'ready')
+      expect(index.get('indexed.ts')).toMatchObject({ type: 'file' })
+      expect(index.status().rebuildReason).toBe('watch-limit-freed')
+    } finally {
+      await subscription.close()
+    }
+  })
+
   it('marks the live index failed after watcher errors without rescanning', async () => {
     const root = await fixtureRoot()
     await writeFile(path.join(root, 'indexed.ts'), 'export const indexed = true\n')

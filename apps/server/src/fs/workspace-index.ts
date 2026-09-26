@@ -182,6 +182,17 @@ export class WorkspaceIndex {
     }
   }
 
+  /** A root that was too large to watch now fits; build the index it went without. */
+  async turnOn(reason: string) {
+    if (this.state.readiness !== 'off') return this.status()
+    this.state = { ...this.state, readiness: 'cold' }
+    try {
+      return await this.rebuild({ reason })
+    } catch {
+      return this.status()
+    }
+  }
+
   /** For a root too large to watch: nothing would keep an index current, so none is built. */
   turnOff(reason: string) {
     this.nextRebuildId()
@@ -573,6 +584,7 @@ class WorkspaceIndexEventWatcher implements WorkspaceIndexWatchSubscription {
     try {
       for await (const event of this.events(this.abort.signal)) {
         if (event.type === 'ready') this.coverage ??= event.watch
+        if (event.type === 'coverage') this.resumeWhenWatched(event.watch)
         this.resolveReady()
         this.enqueue(event)
       }
@@ -586,6 +598,14 @@ class WorkspaceIndexEventWatcher implements WorkspaceIndexWatchSubscription {
       this.resolveReady()
       await this.finishConsumingEvents(streamFailed)
     }
+  }
+
+  private resumeWhenWatched(coverage: WatchCoverage) {
+    this.coverage = coverage
+    if (coverage.mode !== 'recursive') return
+    this.flushChain = this.flushChain.then(async () => {
+      await this.index.turnOn('watch-limit-freed')
+    })
   }
 
   private async finishConsumingEvents(streamFailed: boolean) {

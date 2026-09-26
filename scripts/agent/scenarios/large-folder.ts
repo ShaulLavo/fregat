@@ -79,6 +79,8 @@ export const workspaceOpenLargeRoot: Scenario = {
       await selectors.liveUpdatesLimited(page).hover()
       await page.getByText('Live updates limited:', { exact: false }).waitFor()
       await step('limited-tooltip')
+      await page.mouse.move(900, 400)
+      await page.getByText('Live updates limited:', { exact: false }).waitFor({ state: 'hidden' })
       await expectNoAccess(page)
       await step('no-access')
       await expectTopLevelLive(page, fixture.big)
@@ -181,14 +183,25 @@ export const filePickerPrefetchBound: Scenario = {
       ok(list, 'The list must be laid out')
       await page.mouse.move(list.x + 40, list.y + 10)
       await page.mouse.move(list.x + 40, list.y + list.height - 10, { steps: 30 })
+      await page.waitForTimeout(500)
+      const swept = treeRequests.length
+      await step(`after-sweep-${swept}-listings`)
       for (let turn = 0; turn < 12; turn += 1) {
         await page.mouse.wheel(0, 400)
         await page.waitForTimeout(60)
       }
       await page.waitForTimeout(500)
-      await step(`after-sweep-${treeRequests.length}-listings`)
+      const scrolled = treeRequests.length - swept
+      await step(`after-scroll-${scrolled}-listings`)
+      // A scroll under a still pointer is no intent; 12 turns pass about 200 rows.
+      ok(scrolled <= 4, `Scrolling listed ${scrolled} folders the pointer never moved toward`)
       await page.keyboard.press('Escape')
-      console.log(`file-picker-prefetch-bound: ${treeRequests.length} row listings`)
+      await selectors.pickerDialog(page).waitFor({ state: 'hidden' })
+      // The intent log is written on close and reaches the server with the next client batch.
+      await page.waitForTimeout(6000)
+      console.log(
+        `file-picker-prefetch-bound: ${swept} listings from the sweep, ${scrolled} from scrolling`,
+      )
     } finally {
       await releaseFixture(root)
     }

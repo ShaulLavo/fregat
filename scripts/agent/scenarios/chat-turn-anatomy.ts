@@ -14,15 +14,16 @@ type Evidence = {
   maxBurst: { sweeps: number; rainbowOnTrigger: number } | null
   reducedMotionSweep: string | null
   ultra: {
-    burst: boolean
+    levelBurst: boolean
+    wordBurst: boolean
     burstMs: number
     triggerLabel: string | null
-    glintRanges: number
+    word: string | null
+    wordDrift: string
     driftAtRest: string
     driftOnHover: string
     rainbowRows: string[]
   } | null
-  ultrathinkRanges: number
 }
 
 const evidenceByPage = new WeakMap<Page, Evidence>()
@@ -39,7 +40,6 @@ export const chatTurnAnatomy: Scenario = {
       maxBurst: null,
       reducedMotionSweep: null,
       ultra: null,
-      ultrathinkRanges: 0,
     }
     evidenceByPage.set(page, evidence)
     const { base, cleanup, sessionId } = await createScriptedSession(page, await openChat(page))
@@ -192,31 +192,38 @@ async function thirdTurn(page: Page, step: Step) {
 }
 
 async function ultrathinkWord(page: Page, step: Step, evidence: Evidence) {
-  await selectors.chatMessage(page).fill('Please ultrathink about the parser.')
-  await page.waitForFunction(() => (CSS.highlights.get('ultrathink-0')?.size ?? 0) > 0)
-  evidence.ultrathinkRanges = await page.evaluate(
-    () => CSS.highlights.get('ultrathink-0')?.size ?? 0,
-  )
-  ok(evidence.ultrathinkRanges > 0, 'The composer colours the word ultrathink')
-
+  const trigger = selectors.modelOptions(page)
   const burst = selectors.effortBurst(page, 'ultra')
-  const burstSeen = await burst
-    .waitFor({ state: 'attached', timeout: 2_000 })
-    .then(() => true)
-    .catch(() => false)
-  const burstStart = Date.now()
+  const burstPlays = () =>
+    burst
+      .waitFor({ state: 'attached', timeout: 2_000 })
+      .then(() => true)
+      .catch(() => false)
+
+  // An `ultra` level id, the one Codex uses.
+  await trigger.click()
+  await page.getByRole('menuitemradio', { name: 'Ultra', exact: true }).click()
+  const levelBurst = await burstPlays()
   await page.waitForTimeout(350)
   await step('burst-ultra')
   await burst.waitFor({ state: 'detached', timeout: 5_000 })
-  const burstMs = Date.now() - burstStart
-  const glintRanges = await glintSize(page)
 
-  const trigger = selectors.modelOptions(page)
+  // Ultra to Ultrathink is a new level, so it plays again.
+  await selectors.chatMessage(page).fill('Please ultrathink about the parser.')
+  const wordBurst = await burstPlays()
+  const burstStart = Date.now()
+  const word = selectors.effortRainbow(selectors.chatMessage(page))
+  await word.waitFor()
+  await step('composer-ultrathink')
+  await burst.waitFor({ state: 'detached', timeout: 5_000 })
+  const burstMs = Date.now() - burstStart
+
   const label = selectors.effortRainbow(trigger)
-  const drift = () => label.evaluate((node) => getComputedStyle(node).animationPlayState)
-  const driftAtRest = await drift()
+  const playState = (locator: Locator) =>
+    locator.evaluate((node) => getComputedStyle(node).animationPlayState)
+  const driftAtRest = await playState(label)
   await trigger.hover()
-  const driftOnHover = await drift()
+  const driftOnHover = await playState(label)
   await step('trigger-ultra-hover')
   await trigger.click()
   await page.getByRole('menuitemradio', { name: 'Ultrathink', exact: true }).waitFor()
@@ -229,38 +236,27 @@ async function ultrathinkWord(page: Page, step: Step, evidence: Evidence) {
   await page.keyboard.press('Escape')
 
   evidence.ultra = {
-    burst: burstSeen,
+    levelBurst,
+    wordBurst,
     burstMs,
     triggerLabel: await label.textContent(),
-    glintRanges,
+    word: await word.textContent(),
+    wordDrift: await playState(word),
     driftAtRest,
     driftOnHover,
     rainbowRows,
   }
-  ok(burstSeen, 'Typing ultrathink plays the ultra burst')
+  ok(levelBurst, 'Picking Ultra plays the ultra burst')
+  ok(wordBurst, 'Ultra to Ultrathink plays it again')
   ok(burstMs < 2_500, `The ultra burst ends on its own: ${burstMs}ms`)
   equal(await burst.count(), 0, 'Hovering and opening the menu do not replay it')
+  equal(evidence.ultra.word, 'ultrathink', 'The composer word is one rainbow span')
+  equal(evidence.ultra.wordDrift, 'running', 'The composer word drifts')
   equal(evidence.ultra.triggerLabel, 'Ultrathink', 'The trigger paints the ultra effort')
-  equal(driftAtRest, 'paused', 'The rainbow rests until hovered')
-  equal(driftOnHover, 'running', 'Hover sets the rainbow drifting')
-  equal(rainbowRows.join(), 'Ultrathink', 'Only the ultra row wears the rainbow')
+  equal(driftAtRest, 'paused', 'The trigger rainbow rests until hovered')
+  equal(driftOnHover, 'running', 'Hover sets the trigger rainbow drifting')
+  equal(rainbowRows.join(), 'Ultra,Ultrathink', 'Only the ultra rows wear the rainbow')
   await selectors.chatMessage(page).fill('')
-}
-
-/** The glint rests between sweeps, so wait for the next pass instead of sampling once. */
-async function glintSize(page: Page) {
-  const handle = await page.waitForFunction(
-    () => {
-      const size = Array.from(
-        { length: 7 },
-        (_, hue) => CSS.highlights.get(`ultrathink-glint-${hue}`)?.size ?? 0,
-      ).reduce((sum, count) => sum + count, 0)
-      return size > 0 ? size : null
-    },
-    undefined,
-    { timeout: 5_000 },
-  )
-  return Number(await handle.jsonValue())
 }
 
 async function stackFrame(page: Page, step: Step) {

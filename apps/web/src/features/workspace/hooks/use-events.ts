@@ -199,6 +199,15 @@ export function useWorkspaceEvents(rootFolder: PickedFsEntry | null) {
             applyReady(controller.signal, rootPath, eventsScope, gitInvalidation.maybeExecute)
             return
           }
+          if (message.type === 'coverage') {
+            eventsScope.increment('subscription.coverageCount')
+            eventsScope.set({ watch: message.watch })
+            limited = message.watch.mode === 'limited'
+            setWatchCoverage(coverageKey, message.watch)
+            // What changed below the top level while it was limited arrived nowhere; read it again.
+            applyReady(controller.signal, rootPath, eventsScope, gitInvalidation.maybeExecute)
+            return
+          }
           if (message.type === 'error') {
             eventsScope.increment('subscription.errorCount')
             eventsScope.warn(message.message, {

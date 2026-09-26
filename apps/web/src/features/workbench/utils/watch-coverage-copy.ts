@@ -7,6 +7,9 @@ const stillLive =
 export function limitedWatchDescription(coverage: WatchCoverage) {
   const limit = coverage.limit ?? 0
   const available = coverage.available ?? 0
+  if (available <= 0) {
+    return `Live updates limited: other open folders use all ${limit.toLocaleString()} folder watches. ${stillLive}`
+  }
   if (available >= limit) {
     return `Live updates limited: this folder has more than ${limit.toLocaleString()} folders, the folder watch limit. ${stillLive}`
   }

@@ -1106,8 +1106,6 @@
   --rainbow-5: oklch(0.58 0.15 245);
   --rainbow-6: oklch(0.56 0.17 285);
   --rainbow-7: oklch(0.6 0.18 330);
-  /* The glint deepens a letter on a light ground; a lighter one would vanish. */
-  --rainbow-glint: var(--foreground);
   --rainbow-spectrum: linear-gradient(
     90deg,
     var(--rainbow-1),
@@ -1132,7 +1130,6 @@
   --rainbow-5: oklch(0.78 0.11 245);
   --rainbow-6: oklch(0.76 0.12 285);
   --rainbow-7: oklch(0.78 0.13 330);
-  --rainbow-glint: white;
 }
 
 /* The size is two spectra wide and the drift moves one whole tile, so the loop is seamless. */
@@ -1290,61 +1287,4 @@
   background-image: var(--burst-wash);
   opacity: 0;
   animation: app-effort-wash calc(var(--burst-duration) * 1.2) var(--ease-out-strong) both;
-}
-
-/* The composer's "ultrathink": one hue per letter, and a glint that walks across it. */
-::highlight(ultrathink-0) {
-  color: var(--rainbow-1);
-}
-
-::highlight(ultrathink-1) {
-  color: var(--rainbow-2);
-}
-
-::highlight(ultrathink-2) {
-  color: var(--rainbow-3);
-}
-
-::highlight(ultrathink-3) {
-  color: var(--rainbow-4);
-}
-
-::highlight(ultrathink-4) {
-  color: var(--rainbow-5);
-}
-
-::highlight(ultrathink-5) {
-  color: var(--rainbow-6);
-}
-
-::highlight(ultrathink-6) {
-  color: var(--rainbow-7);
-}
-
-::highlight(ultrathink-glint-0) {
-  color: color-mix(in oklch, var(--rainbow-1) 55%, var(--rainbow-glint));
-}
-
-::highlight(ultrathink-glint-1) {
-  color: color-mix(in oklch, var(--rainbow-2) 55%, var(--rainbow-glint));
-}
-
-::highlight(ultrathink-glint-2) {
-  color: color-mix(in oklch, var(--rainbow-3) 55%, var(--rainbow-glint));
-}
-
-::highlight(ultrathink-glint-3) {
-  color: color-mix(in oklch, var(--rainbow-4) 55%, var(--rainbow-glint));
-}
-
-::highlight(ultrathink-glint-4) {
-  color: color-mix(in oklch, var(--rainbow-5) 55%, var(--rainbow-glint));
-}
-
-::highlight(ultrathink-glint-5) {
-  color: color-mix(in oklch, var(--rainbow-6) 55%, var(--rainbow-glint));
-}
-
-::highlight(ultrathink-glint-6) {
-  color: color-mix(in oklch, var(--rainbow-7) 55%, var(--rainbow-glint));
 }

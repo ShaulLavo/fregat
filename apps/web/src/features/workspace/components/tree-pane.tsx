@@ -233,6 +233,10 @@ function ReadyTreePane({
   useLayoutEffect(() => {
     tree.setLoadingPaths(loadingTreePath ? [loadingTreePath] : [])
   }, [loadingTreePath, tree])
+  // A folder's load state lives in the model, which the tree's own rendering never reads.
+  useLayoutEffect(() => {
+    tree.refreshDecorations()
+  }, [model.errorByDirectoryPath, model.loadingDirectoryPaths, tree])
   useFileTreeMutationEvents({ rootPath, tree })
 
   useFileTreeIntentPrefetch({

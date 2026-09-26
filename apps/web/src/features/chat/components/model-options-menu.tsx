@@ -27,7 +27,7 @@ import {
   withUltrathinkPrefix,
   withoutUltrathinkPrefix,
 } from '../utils/model-options'
-import { composerEffortTier } from '@/features/chat/utils/effort-tier'
+import { composerEffortLevel, effortTier } from '@/features/chat/utils/effort-tier'
 import { ModelOptionsGroup } from './model-options-group'
 import { ModelOptionsSummary } from './model-options-summary'
 import { ModelOptionsTriggerIcon } from './model-options-trigger-icon'
@@ -55,7 +55,7 @@ export function ModelOptionsMenu({
   const selection = modelSelection
   const summary = descriptorSummary(descriptors, selection, prompt)
   const effort = promptEffortState(descriptors, prompt)
-  const ultra = composerEffortTier(descriptors, selection, prompt) === 'ultra'
+  const ultra = effortTier(composerEffortLevel(descriptors, selection, prompt) ?? '') === 'ultra'
   const selects = descriptors.filter(
     (descriptor): descriptor is Extract<ProviderOptionDescriptor, { type: 'select' }> =>
       descriptor.type === 'select',

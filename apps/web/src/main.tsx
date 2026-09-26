@@ -39,8 +39,10 @@ import { applyBackdrop, resolveBackdrop } from '@/lib/platform/backdrop.ts'
 import { installEditorPerformanceTraceFromUrl } from '@/features/editor/state/performance-trace.ts'
 import { reportReactError } from '@/lib/react-error-reporting.ts'
 import { applicationHost } from '@/lib/application-host'
+import { configureIntentPrediction } from '@/lib/intent-prefetch-options'
 
 installEditorPerformanceTraceFromUrl()
+configureIntentPrediction()
 initializeClientLogging()
 applyBackdrop(applicationHost()?.backdrop ?? resolveBackdrop())
 // Before `createRoot`, deliberately. The mirrored appearance is initial

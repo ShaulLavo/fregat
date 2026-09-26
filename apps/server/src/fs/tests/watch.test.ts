@@ -317,7 +317,7 @@ describe.runIf(process.platform === 'linux')('native watch limit and unreadable 
     }
   })
 
-  it('shares one limit across every root and frees it when a root closes', async () => {
+  it('shares one limit across every root and gives freed room to a limited root', async () => {
     const root = await fixtureRoot()
     await mkdir(path.join(root, 'one/x'), { recursive: true })
     await mkdir(path.join(root, 'two/y'), { recursive: true })
@@ -338,7 +338,15 @@ describe.runIf(process.platform === 'linux')('native watch limit and unreadable 
       expect(hub.info()).toMatchObject({ watchedDirectoryCount: 2 })
 
       firstAbort.abort()
-      await expect.poll(() => hub.info().watchedDirectoryCount).toBe(0)
+      await expect.poll(() => second.some((event) => event.type === 'coverage')).toBe(true)
+      expect(second.find((event) => event.type === 'coverage')).toMatchObject({
+        path: 'two',
+        watch: { mode: 'recursive', directoryCount: 2 },
+      })
+      expect(hub.info()).toMatchObject({ watchedDirectoryCount: 2 })
+
+      await writeFile(path.join(root, 'two/y/deep.txt'), 'x')
+      await expect.poll(() => paths(second), { timeout: 3000 }).toContain('two/y/deep.txt')
     } finally {
       firstAbort.abort()
       secondAbort.abort()

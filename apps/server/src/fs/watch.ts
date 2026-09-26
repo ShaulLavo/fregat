@@ -48,6 +48,8 @@ type RetainedWatch = {
 type WatcherEntry = {
   refCount: number
   attached: Promise<AttachedWatch>
+  /** Set once `attached` settles, so a limited root can be found without awaiting. */
+  resolved?: AttachedWatch
 }
 type WakeSlot = {
   current: (() => void) | null
@@ -125,6 +127,8 @@ export class FileChangeHub {
   private readonly native = new NativeWatchHost()
   private nextSequence = 1
   private reservedDirectories = 0
+  private upgrades = Promise.resolve()
+  private closing = false
   directoryLimit: () => number
 
   constructor(paths: WorkspacePaths, options: WatchOptions) {
@@ -290,6 +294,7 @@ export class FileChangeHub {
   }
 
   async close() {
+    this.closing = true
     this.openFiles.close()
     const releases = (
       await Promise.all(
@@ -417,6 +422,7 @@ export class FileChangeHub {
     }
 
     const attached = await entry.attached
+    entry.resolved ??= attached
     return { release: () => this.releaseWatcher(watchers, root), coverage: attached.coverage }
   }
 
@@ -439,37 +445,74 @@ export class FileChangeHub {
     const target = this.resolveWatchTarget(relativeRoot)
     if (!target) return failedWatch(relativeRoot)
 
+    const fitted = await this.attachIfItFits(relativeRoot, target)
+    if (fitted.attached) return fitted.attached
+    return this.attachShallow(relativeRoot, fitted.limited)
+  }
+
+  /** A recursive watch when the root's directories fit what the limit has free, else the numbers. */
+  private async attachIfItFits(relativeRoot: string, target: string) {
     const limit = this.directoryLimit()
     const counted = await countDirectories(target, limit - this.reservedDirectories)
-    const available = limit - this.reservedDirectories
+    const available = Math.max(0, limit - this.reservedDirectories)
     if (!counted.complete || counted.count > available) {
-      return this.attachShallow(relativeRoot, {
+      const limited: WatchCoverage = {
         mode: 'limited',
         directoryCount: counted.count,
         available,
         limit,
-      })
+      }
+      return { attached: null, limited }
     }
 
     this.reservedDirectories += counted.count
-    const attached = await this.attachNative(relativeRoot, target, true)
-    const release = () => {
+    const native = await this.attachNative(relativeRoot, target, true)
+    const release = async () => {
       this.reservedDirectories -= counted.count
-      return attached.close()
+      await native.close()
+      this.upgradeLimitedWatchers()
     }
-    if (!attached.coverage) {
+    if (!native.coverage) {
       await release()
-      return failedWatch(relativeRoot)
+      return { attached: failedWatch(relativeRoot), limited: null }
     }
-    return {
+    const attached: AttachedWatch = {
       close: release,
       coverage: {
-        ...attached.coverage,
+        ...native.coverage,
         mode: 'recursive',
         directoryCount: counted.count,
         available,
         limit,
       },
+    }
+    return { attached, limited: null }
+  }
+
+  // A root is limited by what else was watched when it attached, so freed room is offered back.
+  private upgradeLimitedWatchers() {
+    if (this.closing) return
+    this.upgrades = this.upgrades.then(() => this.upgradeLimitedWatchersNow())
+  }
+
+  private async upgradeLimitedWatchersNow() {
+    for (const [root, entry] of this.nativeWatchers) {
+      if (this.closing) return
+      const current = entry.resolved
+      if (current?.coverage.mode !== 'limited') continue
+      const target = this.resolveWatchTarget(root)
+      if (!target) continue
+      const fitted = await this.attachIfItFits(root, target)
+      if (!fitted.attached) continue
+      if (this.nativeWatchers.get(root) !== entry || entry.resolved !== current) {
+        await releaseWatcher(fitted.attached.close)
+        continue
+      }
+      entry.attached = Promise.resolve(fitted.attached)
+      entry.resolved = fitted.attached
+      await releaseWatcher(current.close)
+      const coverage = streamCoverage([fitted.attached.coverage])
+      if (coverage) this.emit({ type: 'coverage', path: root, watch: coverage })
     }
   }
 
@@ -820,7 +863,8 @@ function deliverWatchEvent(
   files: Set<string>,
   onlyFiles = false,
 ) {
-  if (event.type === 'error') return errorConcernsStream(event.path, roots, files)
+  if (event.type === 'error' || event.type === 'coverage')
+    return concernsStream(event.path, roots, files)
   if (!isFilesystemEvent(event)) return true
   if (files.has(event.path)) return true
   if (event.type === 'renamed' && files.has(event.oldPath)) return true
@@ -838,8 +882,8 @@ function streamEvent(event: WatchServerMessage, files: Set<string>, includeIgnor
   return null
 }
 
-// A failed watcher concerns its own root, every root it covers below it, and its open file.
-function errorConcernsStream(path: string | undefined, roots: Set<string>, files: Set<string>) {
+// A watcher's failure or new coverage concerns its own root, every root below it, and its open file.
+function concernsStream(path: string | undefined, roots: Set<string>, files: Set<string>) {
   if (path === undefined || files.has(path)) return true
   for (const root of roots) {
     if (path === root || !path || root.startsWith(`${path}/`)) return true

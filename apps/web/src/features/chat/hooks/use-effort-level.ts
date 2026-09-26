@@ -5,17 +5,17 @@ import {
   useChatInputDraftStore,
   type ChatInputDraftTarget,
 } from '@/features/chat/state/chat-input-draft-store'
-import { composerEffortTier } from '@/features/chat/utils/effort-tier'
+import { composerEffortLevel } from '@/features/chat/utils/effort-tier'
 
-/** The composer's effort tier; `undefined` until the model's options are known. */
-export function useEffortTier(draftTarget: ChatInputDraftTarget) {
+/** The composer's effort level; `undefined` until the model's options are known. */
+export function useEffortLevel(draftTarget: ChatInputDraftTarget) {
   const { modelSelection, provider } = useModelPicker()
   const model = provider?.models.find((candidate) => candidate.slug === modelSelection?.model)
   const descriptors = model ? modelOptionDescriptors(model) : []
 
-  // Selects the tier, not the prompt, so typing re-renders only when the tier changes.
+  // Selects the level, not the prompt, so typing re-renders only when the level changes.
   return useChatInputDraftStore((state) => {
     if (!modelSelection || descriptors.length === 0) return undefined
-    return composerEffortTier(descriptors, modelSelection, state.getDraft(draftTarget).prompt)
+    return composerEffortLevel(descriptors, modelSelection, state.getDraft(draftTarget).prompt)
   })
 }
