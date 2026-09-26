@@ -3,22 +3,25 @@
 Survey of 14 libraries, 2026-09-25. One file per library; this page groups the findings by where they land
 in Platform. Sources are cloned under `references/` (gitignored). Nothing here is implemented yet.
 
-| File                               | Library              | License              | One line                                                                                   |
-| ---------------------------------- | -------------------- | -------------------- | ------------------------------------------------------------------------------------------ |
-| [neon-ui.md](neon-ui.md)           | Neon UI              | MIT                  | Same stack as ours (Base UI + Tailwind v4); richest source of primitives and chat receipts |
-| [extend-ui.md](extend-ui.md)       | Extend UI            | MIT                  | Base UI + Phosphor; File System component shares our tree's `@pierre/trees` lineage        |
-| [seamui.md](seamui.md)             | Seam UI              | MIT                  | Synthesized click sounds + press feel; physical-mode sketch                                |
-| [animate-ui.md](animate-ui.md)     | Animate UI           | MIT + Commons Clause | Gliding tooltip: too heavy as shipped, rebuildable in CSS on our tooltip layer             |
-| [kokonutui.md](kokonutui.md)       | Kokonut UI           | MIT                  | Loaders (already being ported into `spinner.tsx`), progress mask, status text swap         |
-| [agentui.md](agentui.md)           | AgentUI              | MIT                  | Plan step marks, approval receipts, live tool tail; built on `motion`                      |
-| [ai-elements.md](ai-elements.md)   | Vercel AI Elements   | Apache-2.0           | Reasoning block, context token breakdown, tool detail; built on Radix                      |
-| [tinkerers-ui.md](tinkerers-ui.md) | Mischief (Tinkerers) | MIT                  | Stopped-run treatment, context split, subagent tree                                        |
-| [scrimui.md](scrimui.md)           | Scrim UI             | MIT                  | Per-component failure modes; approval gate states we lack                                  |
-| [manifest-ui.md](manifest-ui.md)   | Manifest UI          | MIT                  | Nothing to copy; MCP Apps hosting is the idea                                              |
-| [benday.md](benday.md)             | benday               | MIT                  | Halftone logo "thinking" canvas; brand moments                                             |
-| [brainless.md](brainless.md)       | brainless            | MIT                  | Agent CLI screens as HTML; the landing-page demo                                           |
-| [cligentic.md](cligentic.md)       | cligentic            | MIT                  | Building blocks for agent-driven CLIs; applies to our own tooling                          |
-| [creative-tim.md](creative-tim.md) | Creative Tim         | mixed                | Mostly commercial; usage totals idea only                                                  |
+| File                                       | Library              | License              | One line                                                                                   |
+| ------------------------------------------ | -------------------- | -------------------- | ------------------------------------------------------------------------------------------ |
+| [neon-ui.md](neon-ui.md)                   | Neon UI              | MIT                  | Same stack as ours (Base UI + Tailwind v4); richest source of primitives and chat receipts |
+| [extend-ui.md](extend-ui.md)               | Extend UI            | MIT                  | Base UI + Phosphor; File System component shares our tree's `@pierre/trees` lineage        |
+| [seamui.md](seamui.md)                     | Seam UI              | MIT                  | Synthesized click sounds + press feel; physical-mode sketch                                |
+| [animate-ui.md](animate-ui.md)             | Animate UI           | MIT + Commons Clause | Gliding tooltip: too heavy as shipped, rebuildable in CSS on our tooltip layer             |
+| [kokonutui.md](kokonutui.md)               | Kokonut UI           | MIT                  | Loaders (already being ported into `spinner.tsx`), progress mask, status text swap         |
+| [agentui.md](agentui.md)                   | AgentUI              | MIT                  | Plan step marks, approval receipts, live tool tail; built on `motion`                      |
+| [ai-elements.md](ai-elements.md)           | Vercel AI Elements   | Apache-2.0           | Reasoning block, context token breakdown, tool detail; built on Radix                      |
+| [tinkerers-ui.md](tinkerers-ui.md)         | Mischief (Tinkerers) | MIT                  | Stopped-run treatment, context split, subagent tree                                        |
+| [scrimui.md](scrimui.md)                   | Scrim UI             | MIT                  | Per-component failure modes; approval gate states we lack                                  |
+| [manifest-ui.md](manifest-ui.md)           | Manifest UI          | MIT                  | Nothing to copy; MCP Apps hosting is the idea                                              |
+| [benday.md](benday.md)                     | benday               | MIT                  | Halftone logo "thinking" canvas; brand moments                                             |
+| [brainless.md](brainless.md)               | brainless            | MIT                  | Agent CLI screens as HTML; the landing-page demo                                           |
+| [cligentic.md](cligentic.md)               | cligentic            | MIT                  | Building blocks for agent-driven CLIs; applies to our own tooling                          |
+| [creative-tim.md](creative-tim.md)         | Creative Tim         | mixed                | Mostly commercial; usage totals idea only                                                  |
+| [cursor-demo.md](cursor-demo.md)           | cursor.com hero      | n/a (teardown)       | DOM replica, data-shaped scripts, end state for reduced motion; Plan 155                   |
+| [landing-replicas.md](landing-replicas.md) | 15 landing pages     | n/a (survey)         | Editor and agent products draw their app as DOM; none embeds the live app                  |
+| [replay-tools.md](replay-tools.md)         | replay tools         | mixed                | rrweb, asciinema, magic-move, timeline engines; our own small player wins                  |
 
 Nothing copies verbatim. Every library uses edge borders, palette colours, `text-[Npx]` or `motion`, so each
 item is a port: rewrite classes to our tokens, drop the hairlines, keep the behaviour.

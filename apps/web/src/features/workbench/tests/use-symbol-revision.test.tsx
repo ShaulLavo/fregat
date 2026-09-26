@@ -69,7 +69,9 @@ test('switching documents cancels the old burst and unmounting cancels the new o
   await waitFor(() =>
     expect(rendered.result.current).toBe(store.getState().documentContentRevisions[first.key]),
   )
-  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+  // The buffer's storage maintenance slices on performance.now; on a slow clock it spills into
+  // another timer, which these counts would read as the hook's.
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] })
   try {
     act(() => firstSession.applyText('old '))
     rendered.rerender({ key: second.key })

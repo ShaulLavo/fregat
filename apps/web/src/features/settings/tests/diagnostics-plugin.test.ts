@@ -124,6 +124,7 @@ test('cleanup clears editor markers and unsubscribes from settings updates', () 
     'test-settings-diagnostics-information',
     'test-settings-diagnostics-hint',
     'test-settings-diagnostics-deprecated',
+    'test-settings-diagnostics-unnecessary',
   ])
   expect(host.highlights).toHaveLength(rendered)
 })

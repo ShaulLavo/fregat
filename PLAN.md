@@ -236,8 +236,10 @@ Requested 2026-09-11. [Plan 087](plans/087-stateless-mcp.md) precedes
 [Plan 088](plans/088-native-code-intelligence.md). Both are proposed; implementation has not started.
 Decided 2026-09-25: owner — approve 087 milestone M0 only; M1+ is discussed with the owner before
 anything else in 087 or 088 starts.
+Decided 2026-09-26: recommendation (owner deferred) — 087 narrows to our own tool endpoint; managed
+external MCP servers (former M2/M3) move to the unscheduled [Plan 174](plans/174-external-mcp-servers.md).
 
-Plan 087 delivers managed external MCP servers and an authenticated native tool endpoint. The
+Plan 087 delivers an authenticated native tool endpoint. The
 required wire revision is stateless MCP `2026-07-28`, implemented with explicitly configured SDK v2.
 Scoped machine-client authentication and real MCP calls from both providers are prerequisites,
 not assumptions supplied by existing provider MCP event handling.
@@ -406,6 +408,9 @@ CodeMirror 6 decorations and Lexical's decorator nodes, and gates Plan 108 Phase
 Obsidian mode, and the question of whether the chat composer still needs Lexical.
 Decided 2026-09-25: owner — 111's research is authorized with the composer as its first consumer,
 and runs before the next wave.
+[Plan 171](plans/171-composer-on-our-editor.md) is that composer migration: it inventories what
+the composer uses Lexical for and orders the Editor gaps to close, with 111 first (decided
+2026-09-25: owner — delete Lexical; the replacement is our own editor).
 
 Coordinate shared editor and chat surfaces with Plans 101–103 and 115; do not interleave edits to the same
 files. Plan 085 owns first paint and restoration, which this lane measures but does not change.
@@ -490,16 +495,18 @@ asked which large agent features Platform lacks. The owner grouped the answers i
 Research plans do enough research to be correct, then their research phase rewrites their own
 phases or splits them into executable plans; not all research happens up front.
 
-| Plan                                       | Kind                     | Owns                                                                                                                        |
-| ------------------------------------------ | ------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
-| 138 (done)                                 | executable               | Claude models from the Claude CLI; chat runs the installed CLI                                                              |
-| [139](plans/139-acting-on-agent-diffs.md)  | research                 | Keep or undo agent edits per hunk, batched diff comments to the agent, review mode, second-model review, plan line feedback |
-| [140](plans/140-editor-agent-advantage.md) | research                 | Editor context into chat, fix with AI, diagnostics fed back to the agent                                                    |
-| [141](plans/141-usage-and-rate-limits.md)  | executable               | Rate-limit meter, usage page with cost, usage history                                                                       |
-| [142](plans/142-web-push.md)               | executable after a spike | Web Push from the mesh server                                                                                               |
-| [143](plans/143-phone-layout.md)           | direction approved       | What the phone is for; web layout versus the later companion app                                                            |
-| [144](plans/144-unattended-agent-work.md)  | research                 | Scheduled, looping and multi-agent work: surface what the harnesses already do, build only the rest                         |
-| [145](plans/145-harness-controls.md)       | small executable plans   | Fork, approval rules, MCP status, background tasks, hooks, custom agents, compact, export                                   |
+| Plan                                          | Kind                     | Owns                                                                                                                        |
+| --------------------------------------------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
+| 138 (done)                                    | executable               | Claude models from the Claude CLI; chat runs the installed CLI                                                              |
+| [139](plans/139-acting-on-agent-diffs.md)     | research                 | Keep or undo agent edits per hunk, batched diff comments to the agent, review mode, second-model review, plan line feedback |
+| [140](plans/140-editor-agent-advantage.md)    | research                 | Editor context into chat, fix with AI, diagnostics fed back to the agent                                                    |
+| [141](plans/141-usage-and-rate-limits.md)     | executable               | Rate-limit meter, usage page with cost, usage history                                                                       |
+| [142](plans/142-web-push.md)                  | executable after a spike | Web Push from the mesh server                                                                                               |
+| [143](plans/143-phone-layout.md)              | direction approved       | What the phone is for; web layout versus the later companion app                                                            |
+| [144](plans/144-unattended-agent-work.md)     | research                 | Scheduled, looping and multi-agent work: surface what the harnesses already do, build only the rest                         |
+| [145](plans/145-harness-controls.md)          | small executable plans   | Fork, approval rules, MCP status, background tasks, hooks, custom agents, compact, export                                   |
+| [172](plans/172-shared-undo-stack.md)         | research                 | One undo/redo stack behind Mod+Z, extracted from the existing undo implementations; Plan 126 LIFE-13 first                  |
+| [173](plans/173-two-devices-one-workspace.md) | research                 | Two clients opening a workspace on one server: per-client open generations, what the losing client sees                     |
 
 [Plan 126](plans/126-t3code-alignment.md) also gained the T3 features shipped after its
 2026-09-19 audit, and four reopened non-parity decisions.
@@ -514,6 +521,10 @@ Suggested order:
    088; its editor-to-chat work does not.
 5. Plan 144's capability inventory. It decides how much of that lane is built rather than surfaced.
 6. Plan 143: direction approved 2026-09-25 (two lazy shells behind one URL; Tailscale now, pairing URL, relay later). Research phase next.
+7. Plan 172's research before Plan 126 LIFE-13 is rebuilt (decided 2026-09-25: owner — one shared
+   undo/redo stack replaces the latest-undo slot).
+8. Plan 173's research before Plan 143's phone shell: the phone becomes a second client of the
+   same server.
 
 ## Daily-driver lane
 
