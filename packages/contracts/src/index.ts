@@ -986,6 +986,7 @@ export {
   type WallpaperSource,
   type WallpaperSelection,
   type WallpaperAsset,
+  type WallpaperCatalogEntry,
 } from './themes/wallpaper'
 
 export * from './themes/bundle'
@@ -1094,3 +1095,14 @@ export {
   type StagedRelease,
 } from './server-update'
 export * from './provider-mcp'
+export {
+  AGENT_REVIEW_OUTPUT_SCHEMA,
+  agentReviewFindingSchema,
+  agentReviewRequestSchema,
+  agentReviewResultSchema,
+  agentReviewTargetSchema,
+  type AgentReviewFinding,
+  type AgentReviewRequest,
+  type AgentReviewResult,
+  type AgentReviewTarget,
+} from './agent-review'

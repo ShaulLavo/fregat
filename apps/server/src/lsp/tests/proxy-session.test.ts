@@ -1,3 +1,6 @@
+import * as fs from 'node:fs/promises'
+import { AgentDiagnosticsReader } from '../agent-diagnostics'
+
 import { EventEmitter } from 'node:events'
 import { mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -25,6 +28,8 @@ import {
   initializeObservability,
   resetObservabilityForTests,
 } from '../../observability/runtime'
+
+vi.mock('node:fs/promises', { spy: true })
 
 const databases: { close: () => void }[] = []
 const pools: LspSessionPool[] = []
@@ -56,6 +61,126 @@ afterEach(async () => {
   for (const database of databases.splice(0)) database.close()
   await Promise.all(hubs.splice(0).map((hub) => hub.close()))
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
+})
+
+describe('agent diagnostics deadlines', () => {
+  it('shares one deadline across stalled sibling backends', async () => {
+    const fixture = await lspFixture()
+    const first = await fixture.pool.acquire(fixture.firstSocket, fixture.match, '')
+    const second = await fixture.pool.acquire(fixture.secondSocket, fixture.match, '')
+    if (!first || !second) throw new TypeError('expected pooled sessions')
+    const sibling = siblingBackend(fixture)
+    const initializing = first.handleClientMessage(json(initializeRequest(1)))
+    await fixture.waitForServerMessageCount(1)
+    const result = { capabilities: { diagnosticProvider: {} } }
+    fixture.respond({ id: fixture.serverMessages[0]?.id, jsonrpc: '2.0', result })
+    await initializing
+    const joining = second.handleClientMessage(
+      json(
+        initializeRequest(2, {
+          initializationOptions: { sibling: true },
+        }),
+      ),
+    )
+    await waitFor(() => sibling.messages.length === 1, 'expected sibling initialize')
+    sibling.respond({ id: sibling.messages[0]?.id, jsonrpc: '2.0', result })
+    await joining
+
+    vi.useFakeTimers()
+    try {
+      let settled = false
+      const reading = fixture.pool
+        .fileDiagnostics(fixture.match, 'file:///repo/a.ts', 100, '')
+        .then((value) => {
+          settled = true
+          return value
+        })
+      await vi.advanceTimersByTimeAsync(101)
+      expect(settled).toBe(true)
+      expect(await reading).toBeNull()
+      expect(sibling.messages.some((message) => message.method === 'textDocument/diagnostic')).toBe(
+        false,
+      )
+    } finally {
+      await vi.runAllTimersAsync()
+      vi.useRealTimers()
+    }
+  })
+
+  it('includes delayed filesystem matching in the read deadline and drops its late result', async () => {
+    const fixture = await initializedFixture()
+    const filePath = path.join(fixture.match.root, 'probe.ts')
+    await writeFile(filePath, 'export const value = 1')
+    await writeFile(path.join(fixture.match.root, 'tsconfig.json'), '{}')
+    const uri = fileUriForPath(filePath)
+    await fixture.first.handleClientMessage(json(didOpen(uri, 'export const value = 1')))
+    fixture.respond({
+      jsonrpc: '2.0',
+      method: 'textDocument/publishDiagnostics',
+      params: { uri, diagnostics: [] },
+    })
+    let poolReads = 0
+    const reader = new AgentDiagnosticsReader({
+      enabled: () => true,
+      pool: () => {
+        poolReads += 1
+        return fixture.pool
+      },
+      settings: () => ({
+        servers: {},
+        languageServers: { typescript: ['typescript'] },
+        tyForPython: false,
+      }),
+    })
+    // The same real filesystem lookup reaches the backend when it is not delayed.
+    const good = reader.errors(filePath, fixture.match.root, 500)
+    setTimeout(
+      () =>
+        fixture.respond({
+          jsonrpc: '2.0',
+          method: 'textDocument/publishDiagnostics',
+          params: { uri, diagnostics: [] },
+        }),
+      30,
+    )
+    await expect(good).resolves.toEqual({
+      mode: 'push',
+      text: 'export const value = 1',
+      errors: [],
+    })
+    expect(poolReads).toBe(1)
+    let entered!: () => void
+    let release!: () => void
+    const matching = new Promise<void>((resolve) => {
+      entered = resolve
+    })
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const access = fs.access
+    const delayed = vi.spyOn(fs, 'access').mockImplementation(async (...args) => {
+      entered()
+      await gate
+      return access(...args)
+    })
+    let settled = false
+    const reading = reader.errors(filePath, fixture.match.root, 20).then((value) => {
+      settled = true
+      return value
+    })
+    try {
+      await matching
+      await new Promise((resolve) => setTimeout(resolve, 60))
+      expect(settled).toBe(true)
+      expect(await reading).toBeNull()
+    } finally {
+      release()
+      delayed.mockRestore()
+      await reading
+    }
+    await new Promise((resolve) => setTimeout(resolve, 30))
+    expect(poolReads).toBe(1)
+  })
 })
 
 describe('LspSessionPool pooling', () => {

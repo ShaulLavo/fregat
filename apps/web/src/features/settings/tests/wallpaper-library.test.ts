@@ -1,4 +1,4 @@
-import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, readdir, readFile, rm, utimes, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { test, expect } from '../../../../test/fixtures'
 import { SettingsStore } from '../../../../../server/src/settings/store'
@@ -181,4 +181,33 @@ test('imports a theme fixture twice with stable ids and complete provenance', as
     })),
   )
   expect(assets[0]?.redistribution).toBe('unverified')
+})
+
+test('the boot import stores originals alone and rereads only changed files', async ({
+  server,
+}) => {
+  const themes = path.join(server.root, 'installed-themes')
+  for (const theme of ['day', 'night']) {
+    await mkdir(path.join(themes, theme, 'backgrounds'), { recursive: true })
+    await writeFile(path.join(themes, theme, 'backgrounds', 'still.png'), wallpaperPng())
+  }
+  await writeFile(path.join(themes, 'night', 'backgrounds', 'broken.png'), 'not an image')
+  const settings = new SettingsStore({
+    userFilePath: path.join(server.root, 'boot-settings.json'),
+    secretsFilePath: path.join(server.root, 'boot-secrets.json'),
+    watch: false,
+  })
+  const directory = path.join(server.root, 'boot-library')
+  const library = new WallpaperLibrary({ directory, settings })
+  expect(await library.importInstalledOmarchy(themes)).toEqual({ files: 3, read: 3, skipped: 1 })
+  const [asset] = await library.list()
+  expect(asset?.provenance).toHaveLength(2)
+  expect((await readdir(directory)).filter((name) => name.endsWith('.webp'))).toEqual([])
+  expect(await library.importInstalledOmarchy(themes)).toEqual({ files: 3, read: 0, skipped: 0 })
+  const later = new Date(Date.now() + 60_000)
+  await utimes(path.join(themes, 'day', 'backgrounds', 'still.png'), later, later)
+  expect(await library.importInstalledOmarchy(themes)).toEqual({ files: 3, read: 1, skipped: 0 })
+  const thumbnail = await library.rendition(asset!.id, 'thumbnail')
+  expect((await readFile(thumbnail)).subarray(8, 12).toString()).toBe('WEBP')
+  settings.close()
 })

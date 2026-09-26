@@ -27,13 +27,13 @@ test('the Defaults tab opens the generated document, and the form view leaves it
   // A form for values nobody set has nothing to do, so the tab is a document only.
   expect(settingsScope()).toBe('default')
   expect(settingsView()).toBe('json')
-  expect(screen.queryByLabelText('Search settings')).toBeNull()
+  expect(screen.queryByRole('textbox', { name: 'Search settings' })).toBeNull()
 
   await userEvent.click(await screen.findByRole('tab', { name: 'Settings' }))
 
   expect(settingsScope()).toBe('user')
   expect(settingsView()).toBe('form')
-  expect(await screen.findByLabelText('Search settings')).toBeDefined()
+  expect(await screen.findByRole('textbox', { name: 'Search settings' })).toBeDefined()
 })
 
 test('the Defaults tab is disabled outside an editor tab, where there is no document view', async ({
