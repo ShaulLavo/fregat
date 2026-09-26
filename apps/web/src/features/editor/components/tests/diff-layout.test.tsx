@@ -16,18 +16,20 @@ test('switching diff tabs restores each tab’s pane proportions', async () => {
   const uiStore = createEditorUiStore()
   const first = tabId('first-diff')
   const second = tabId('second-diff')
+  const unsaved = tabId('unsaved-diff')
   uiStore.getState().tabPresentation.get(first).setDiffLayout({ 'diff-old': 40, 'diff-new': 60 })
   uiStore.getState().tabPresentation.get(second).setDiffLayout({ 'diff-old': 75, 'diff-new': 25 })
-  const files = [first, second].map((id) =>
+  const tabs = [first, second, unsaved]
+  const files = tabs.map((id) =>
     createTextDiff({
       oldFile: { path: id, text: 'before\n' },
       newFile: { path: id, text: 'after\n' },
     }),
   )
-  function body(index: 0 | 1) {
+  function body(index: 0 | 1 | 2) {
     return (
       <EditorUiStateContext value={uiStore}>
-        <DiffEditor file={files[index]!} mode='split' tabId={index === 0 ? first : second} />
+        <DiffEditor file={files[index]!} mode='split' tabId={tabs[index]} />
       </EditorUiStateContext>
     )
   }
@@ -36,9 +38,11 @@ test('switching diff tabs restores each tab’s pane proportions', async () => {
     const oldPane = () => document.getElementById('diff-old')?.style.flexGrow
     await waitFor(() => expect(oldPane()).toBe('40'))
     rendered.rerender(body(1))
-    await waitFor(() => expect(oldPane()).toBe('75'))
+    expect(oldPane()).toBe('75')
+    rendered.rerender(body(2))
+    expect(oldPane()).toBe('50')
     rendered.rerender(body(0))
-    await waitFor(() => expect(oldPane()).toBe('40'))
+    expect(oldPane()).toBe('40')
   } finally {
     width.mockRestore()
   }

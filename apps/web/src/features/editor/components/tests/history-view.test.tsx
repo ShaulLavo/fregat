@@ -50,6 +50,23 @@ test('lists every retained state and diffs a focused one against the current tex
   expect(await screen.findByText('This is the current state.')).toBeInTheDocument()
 })
 
+test('retains the editor when arrows turn a focused diff into a selected-pair comparison', async () => {
+  stubEditorViewport()
+  const user = userEvent.setup()
+  await renderHistory({ edits: ['one', 'two', 'three'] })
+  const options = await screen.findAllByRole('option')
+  await user.click(options[0]!)
+  await waitFor(() => expect(diffRowTexts()).toContain('alphaonetwothree'))
+  const host = document.querySelector('.editor-diff-pane .editor-virtualized')
+  expect(host).not.toBeNull()
+  const states = screen.getByRole('listbox', { name: 'History states' })
+  states.focus()
+  await user.keyboard('{Shift>}{ArrowRight}{/Shift}')
+  await waitFor(() => expect(diffRowTexts()).toContain('alphaone'))
+  expect(document.querySelector('.editor-diff-pane .editor-virtualized')).toBe(host)
+  expect(screen.queryByRole('status', { name: 'Comparing states' })).not.toBeInTheDocument()
+})
+
 test('clears history after confirmation and leaves the text alone', async () => {
   stubEditorViewport()
   const user = userEvent.setup()

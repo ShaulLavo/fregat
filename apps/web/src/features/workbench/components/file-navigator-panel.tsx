@@ -1,3 +1,4 @@
+import { useHeldUntilReady } from '@/hooks/use-held-until-ready'
 import type { FilesystemPath } from '@/lib/documents/utils/types'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { useState } from 'react'
@@ -12,9 +13,17 @@ import { createTreeToolbarStore } from '@/features/workbench/utils/tree-toolbar-
 import { createVisibleTreeItemCountStore } from '@/features/workbench/utils/visible-tree-item-count-store'
 import { useWorkspaceTreeForRootPath } from '@/features/workspace/hooks/use-tree'
 
-export function FileNavigatorPanel({ rootPath }: { readonly rootPath: FilesystemPath }) {
-  const { loadTreeDirectory, prefetchTreeDirectory, treeState } =
-    useWorkspaceTreeForRootPath(rootPath)
+export function FileNavigatorPanel({
+  rootPath: selectedRoot,
+}: {
+  readonly rootPath: FilesystemPath
+}) {
+  const nextTree = useWorkspaceTreeForRootPath(selectedRoot)
+  // Opening a workspace clears tree queries, so retain the model with its root and actions.
+  const { rootPath, loadTreeDirectory, prefetchTreeDirectory, treeState } = useHeldUntilReady(
+    { rootPath: selectedRoot, ...nextTree },
+    nextTree.treeState.status !== 'loading',
+  )
   const [visibleTreeItemCountStore] = useState(() => createVisibleTreeItemCountStore())
   const [treeToolbarStore] = useState(() => createTreeToolbarStore())
   // Measured: visible-count publication should update the header, not repaint FilesPane.
@@ -31,6 +40,7 @@ export function FileNavigatorPanel({ rootPath }: { readonly rootPath: Filesystem
   return (
     <section className='flex h-full min-h-0 min-w-0 flex-col overflow-hidden'>
       <FileNavigatorHeader
+        loading={rootPath !== selectedRoot}
         rootPath={filesystemPath(rootPath)}
         treeState={treeState}
         treeToolbarStore={treeToolbarStore}
@@ -38,6 +48,7 @@ export function FileNavigatorPanel({ rootPath }: { readonly rootPath: Filesystem
       />
       <div className='min-h-0 min-w-0 flex-1 overflow-hidden'>
         <FileTreeActionsContext value={fileTreeActions}>
+          {/* The held root keeps this instance alive until its replacement can restore and paint. */}
           <FilesPane key={rootPath} rootPath={filesystemPath(rootPath)} state={treeState} />
         </FileTreeActionsContext>
       </div>

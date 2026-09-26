@@ -49,7 +49,10 @@ const schema = v.object({
 })
 type Record = v.InferOutput<typeof schema>
 type Observation = { readonly record: Record; readonly model: TreeModel }
-const owners = new WeakMap<QueryClient, { storage: ScopedStorage; saved: Observation | null }>()
+const owners = new WeakMap<
+  QueryClient,
+  { storage: ScopedStorage; saved: Map<string, Observation | null>; persistedRoot: string | null }
+>()
 
 export function prepareTreeReload(owner: QueryClient, storage: ScopedStorage) {
   const record = readReloadCache<Record>(KEY, schema, storage, TREE_RELOAD_MAX_BYTES)
@@ -65,12 +68,30 @@ export function prepareTreeReload(owner: QueryClient, storage: ScopedStorage) {
         },
       }
     : null
-  owners.set(owner, { storage, saved })
+  owners.set(owner, {
+    storage,
+    saved: new Map(saved ? [[saved.record.root, saved]] : []),
+    persistedRoot: record?.root ?? null,
+  })
 }
 
 export function savedTree(owner: QueryClient, root: string, worktree: string | null) {
-  const saved = owners.get(owner)?.saved
+  const saved = owners.get(owner)?.saved.get(root)
   return saved?.record.root === root && saved.record.worktree === worktree ? saved : null
+}
+
+export function forgetTree(owner: QueryClient, root: string) {
+  const state = owners.get(owner)
+  if (!state) return
+  state.saved.set(root, null)
+  if (state.persistedRoot !== root) return
+  state.storage.removeItem(KEY)
+  state.persistedRoot = null
+}
+
+export function confirmTreeRoot(owner: QueryClient, root: string) {
+  const saved = owners.get(owner)?.saved
+  if (saved?.get(root) === null) saved.delete(root)
 }
 
 export function captureTree(
@@ -84,13 +105,15 @@ export function captureTree(
 ) {
   const state = owners.get(owner)
   if (!state) return
+  // A held pane can unmount after a missing-root response has discarded its observation.
+  if (state.saved.get(view.root) === null) return
   if (
     model.entriesByTreePath.size > MAX_ENTRIES ||
     model.paths.length > MAX_ENTRIES ||
     (view.git?.entries.length ?? 0) > MAX_ENTRIES
   ) {
     state.storage.removeItem(KEY)
-    state.saved = null
+    state.saved.delete(view.root)
     return
   }
   const record: Record = {
@@ -109,8 +132,9 @@ export function captureTree(
   })
   if (result.status === 'oversized') {
     state.storage.removeItem(KEY)
-    state.saved = null
+    state.saved.delete(view.root)
     return
   }
-  state.saved = { record, model }
+  state.saved.set(view.root, { record, model })
+  state.persistedRoot = view.root
 }

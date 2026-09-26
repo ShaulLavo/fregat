@@ -17,17 +17,15 @@ for (const { input, leave } of [
   { input: 'keyboard', leave: 'cursor movement' },
   { input: 'click', leave: 'unmount' },
 ] as const) {
-  test(`${input} checkpoint open survives ${leave} while its display diff is pending`, async ({
+  test(`${input} checkpoint open reuses loaded turn data across ${leave}`, async ({
     client,
     server,
   }) => {
     const h = await checkpointTurn(client, server)
-    const held = Promise.withResolvers<void>()
     const requests: Request[] = []
-    const observed = createObservedInProcessClient(server, async (request) => {
+    const observed = createObservedInProcessClient(server, (request) => {
       if (new URL(request.url).pathname !== '/orchestration/turn-diff') return
       requests.push(request)
-      await held.promise
     })
     const queryClient = createTestQueryClient()
     registerEnvironmentQueryClient(queryClient, originForQueryClient(queryClient), observed)
@@ -47,27 +45,23 @@ for (const { input, leave } of [
     })
     try {
       const tree = await screen.findByRole('tree', { name: 'Turn changed files' })
+      await screen.findByRole('treeitem', { name: /app.txt/ })
       act(() => tree.focus())
       await userEvent.keyboard('{Home}')
       const options = checkpointIntentOptions(h.summary)!
       await waitFor(() =>
-        expect(queryClient.getQueryState(options.queryKey)?.fetchStatus).toBe('fetching'),
+        expect(queryClient.getQueryState(options.queryKey)?.status).toBe('success'),
       )
-      await waitFor(() => expect(requests).toHaveLength(2))
+      await waitFor(() => expect(requests).toHaveLength(1))
       if (input === 'keyboard') await userEvent.keyboard('{Enter}')
       else await userEvent.click(screen.getByRole('treeitem', { name: /app.txt/ }))
       expect(result).toBeDefined()
       if (leave === 'unmount') rendered.rerender(view(false))
       else await userEvent.keyboard('{ArrowDown}')
-      const displayRequest = requests.find(
-        (request) => new URL(request.url).searchParams.get('ignoreWhitespace') === 'true',
-      )!
-      expect(displayRequest.signal.aborted).toBe(false)
       await act(async () => {
-        held.resolve()
         expect(await result).toBe(true)
       })
-      expect(requests).toHaveLength(2)
+      expect(requests).toHaveLength(1)
       expect(queryClient.getQueryData(options.queryKey)).toEqual(
         expect.arrayContaining([expect.objectContaining({ path: 'app.txt' })]),
       )
@@ -81,7 +75,6 @@ for (const { input, leave } of [
         },
       })
     } finally {
-      held.resolve()
       await result
       rendered.unmount()
       queryClient.clear()
