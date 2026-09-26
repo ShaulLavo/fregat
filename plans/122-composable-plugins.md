@@ -439,6 +439,7 @@ Probes are throwaway, in `/work/tmp/research2/122/` (real Chromium 153, three en
    plugin (about 20 more after phase 3) migrates within this plan. (b) Both stay public: `createPlugin`
    for authors, `EditorPlugin` as the low-level layer. **Recommendation: (a).** The greenfield rule and
    requirement 1 rule out two public models; phase 9 is sized for it.
+   Decided 2026-09-26: owner — (a).
 2. **Who gets a key first in a plugin-owned view** (E027 owner question 2, still open)? (a) The key
    participant sees every key first, so a Vim plugin can take Ctrl+R or Ctrl+W and the app binding
    stops working in that view. (b) Platform's keymap first; the participant sees only unbound keys, as
@@ -447,6 +448,7 @@ Probes are throwaway, in `/work/tmp/research2/122/` (real Chromium 153, three en
    (E026 default keys), which then appears as an ordinary binding with its conflicts shown in the
    shortcut recorder. **Recommendation: (c).** Modal editing needs every printable key, and app
    shortcuts keep working unless a plugin claims one where the user can see it.
+   Decided 2026-09-26: owner — (c). This also answers Editor E027 owner question 2.
 
 [sg-plugins]: https://github.com/ShaulLavo/singapore/blob/16736ade269981a9d7566013f57ee1952bcffcdc/packages/editor/src/plugins.ts
 [sg-react]: https://github.com/ShaulLavo/singapore/blob/16736ade269981a9d7566013f57ee1952bcffcdc/packages/react/src/index.ts

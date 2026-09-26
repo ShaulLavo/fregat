@@ -4,7 +4,9 @@
 
 - Status: RESEARCH DONE 2026-09-26 — no new glyphs upstream (our 93 are the whole pack, byte-identical);
   the gain is a generator, a hue-token file, two live colour bugs fixed, three two-hue icons, a
-  stronger light palette and wider file coverage (5.6% → 2.1% generic). Three owner questions.
+  stronger light palette and wider file coverage (5.6% → 2.1% generic). Provenance settled in round 2:
+  the pack is Pierre's own drawing on its `@pierre/icons` library plus brand marks, not a recoloured
+  VS Code set; one glyph (`claude`) is a verbatim Codicons copy. Q3 reopened with a cheaper route.
   Nothing here authorizes implementation.
 - Planned at: Platform `0de7f2212`, 2026-09-26; researched at `c130dd35a`. Origin: [Plan 178](178-tree-in-the-app.md)
   Q1, where the tree's icon colours looked better than the app's in places.
@@ -27,7 +29,19 @@ pack, proposed, proposed light at 3:1), 3 one hue vs two, 4 variant families, 5 
 bundles.
 
 Upstream clones: `references/pierre` (`cc4963a`), `references/pierre-vscode-icons` (HEAD `04a9028`
-= tag `v0.0.9`), `references/pierre-theme` (`7169333`, new, for the full colour scales).
+= tag `v0.0.9`), `references/pierre-theme` (`7169333`, new, for the full colour scales),
+`references/pierre-icons` (`1c93d61`, new, Pierre's icon library) and `references/seti-ui` (new, the
+SVG sources of VS Code's default Seti font).
+
+Provenance probes (round 2) are in `/work/tmp/research2/180b/`: `collect.ts` gathers 42,081
+candidate glyphs (`@pierre/icons` 0.9.0, Seti, and the Iconify JSON packs of Codicons, vscode-icons,
+Material Icon Theme, Catppuccin, Octicons, Phosphor, Lucide, Bootstrap Icons, Simple Icons, devicon,
+Tabler, MDI, MingCute, Heroicons). `match2.ts` rasterises every glyph in Chromium, crops it to its
+ink box, scales it into 32×32, blurs 3×3 twice and scores soft IoU (Σmin/Σmax of alpha) against each
+pack glyph; `pi-direct.ts` compares the pack with `@pierre/icons` on the shared 16px grid at 1:1 and
+14/16; `ngram.ts` looks for shared runs of path numbers (verbatim copies). `sheet.ts` + `shoot.ts`
+write `sheet-full.png` and `section-{1,2,3}.png`: closest glyph per set, overlays on the 16px grid,
+and the missing types with two recolouring routes.
 
 ## Findings
 
@@ -59,6 +73,76 @@ Upstream clones: `references/pierre` (`cc4963a`), `references/pierre-vscode-icon
   `lang-ruby`).
 - So "more glyphs" from the pack means **more mappings onto the 93**, which is what the pack itself
   does: `lang-cpp`, `lang-csharp` and `lang-objc` reuse the `lang-c` glyph under other hues.
+
+### Where the glyphs come from
+
+The pack is not a recoloured VS Code set. It is Pierre's own drawing, built on Pierre's icon
+library, plus brand marks.
+
+- **Pierre's library.** `@pierre/icons` (Apache-2.0, 373 icons, `github.com/pierrecomputer/icons`,
+  "source SVGs exported from Figma"; 25 of 27 commits by Mark Otto, who also wrote every pack commit).
+  The pack's GitHub description says it is "based on Pierre and Diffs.com", and it still ships a file
+  named after a library export, `IconLayers3Middle.svg`: the same paths rounded to two decimals.
+- **Copies from that library** (`pi-direct.ts`, same grid): `font` = `IconType` (IoU 0.997),
+  `file-plus-duo` = `IconFilePlus` (0.996), `git` = `IconBrandGit` at 14/16 (0.991), `vscode` =
+  `IconBrandVsCode` at 14/16 (0.990), `folders` = `IconFolders` (0.967), `gear` = `IconGearFill` at
+  14/16 (0.938), and `IconLayers3Middle` by path. The pack's convention is the library's 16px shape
+  scaled to 14px with a 1px inset: `bash`'s squircle is `IconTerminalBashFill`'s outline at exactly
+  14/16 (`c5.77 0 7 1.24` = `C14.588 0 16 1.412` × 0.875), with the `$_` re-placed.
+- **Lighter redraws of library glyphs.** `file`, `file-text`, `file-zip`, `file-table`,
+  `file-symlink`, `folder*`, `image`, `code`, `braces` and `server` share the library's construction
+  (rounded corners, a rounded-pocket fold on files) at a 1px weight instead of 1.5px. Sheet section 2
+  overlays them: `file` over `IconFile` is the same outline one stroke-width thinner.
+- **No external source for the generic glyphs.** Across the 42,081 candidates nothing reaches the
+  copy band (copies score ≥0.98: `font`/`IconType` 1.00, `claude`/Codicons 0.99). Best external scores
+  for the telling glyphs: `file` 0.83 (Phosphor `file`), `file-text` 0.77, `file-zip` 0.74, `file-table`
+  0.73, `folder` 0.87, `bash` 0.90 (Tabler's letter-in-rounded-square). Against VS Code's own sets:
+  Codicons 0.51–0.78, Seti 0.45–0.81. Simple shapes saturate this score (any outline document gets
+  0.7–0.83), so the overlays decide: Codicons' `file` has a straight diagonal fold and square corners,
+  Octicons' and Phosphor's differ in corner radius and fold, and no candidate shares a run of path
+  numbers with any pack generic glyph (`ngram.ts`, background noise ≤20% of 4-grams).
+- **Brand marks** are the brands' own logos, as in every set: 11 pack glyphs score ≥0.95 against a
+  published copy (Simple Icons, devicon, vscode-icons). `terraform` is Simple Icons' path at 2/3
+  scale to within 0.03px (overlay in section 2). The squircle letter badges (`typescript`,
+  `javascript`, `css`, `html`, `lang-*`) sit on the library's `IconSquircleLg` shape (0.83–0.90).
+- **One verbatim third-party copy: `claude`** is Codicons' `claude` icon (IoU 0.99; 202 of 272 path
+  4-grams shared, against ≤20% for any unrelated pair). Codicons are **CC-BY-4.0**, which requires
+  attribution; the pack's MIT licence does not carry it, and we ship the glyph. Phase 1 adds a
+  `NOTICE` line (Codicons, Microsoft, CC-BY-4.0). The mark itself is Anthropic's.
+- The owner's hunch is right about the look: 16px, one colour, a 1px outline file. That family
+  resemblance is Pierre's (and before that Octicons', where Mark Otto worked), not shared paths.
+
+### What a larger set offers for the missing types
+
+The leftover generic share is test fixtures (`.golden`, `.weir`, `.tst`, 1,200+ files) plus these
+real types (`leftover.ts`, `references/` at today's 151,587 files, repos in brackets): `.mp3` (8),
+`.php` (7), `.kt` (6), `.java` (7), `.tex` (8), `.mp4` (6), `.lua` (6), `.r` (7), `.dart` (7), `.pdf`
+(5), `.jl`, `.pl`, `.clj`, `.hs`, `.groovy`, `.fs` (5 each), `Makefile` (5), `.aac`/`.wav`,
+`.proto`, `.bazel`, `.glsl`/`.hlsl`, `.erl`, `.ex`, `.pem`.
+
+| Type                                                                              | Seti (VS Code default, MIT) | vscode-icons (MIT) | Material (MIT) | Catppuccin (MIT) | Simple Icons (CC0)  | Codicons (CC-BY-4.0) | `@pierre/icons`  |
+| --------------------------------------------------------------------------------- | --------------------------- | ------------------ | -------------- | ---------------- | ------------------- | -------------------- | ---------------- |
+| audio                                                                             | yes                         | yes                | yes            | yes              | –                   | `file-media`         | `IconMicrophone` |
+| video                                                                             | yes                         | yes                | yes            | yes              | –                   | camera               | –                |
+| PDF                                                                               | yes                         | yes                | yes            | yes              | –                   | `file-pdf`           | –                |
+| Java                                                                              | yes                         | yes                | yes            | yes              | OpenJDK's Duke only | –                    | –                |
+| Kotlin, PHP, Lua, TeX, Dart, R, Julia, Perl, Clojure, Elixir, Haskell, Erlang, F# | yes (most)                  | yes                | yes            | yes              | yes                 | –                    | –                |
+| Makefile                                                                          | yes                         | –                  | yes            | yes              | CMake, GNU          | –                    | –                |
+
+- **Seti** (what VS Code shows by default) covers nearly every row, but its glyphs are chunky
+  font shapes drawn on a 32px grid; recoloured they read as a different set (section 3, first column).
+- **Catppuccin** is the closest _style_: 16px, 1px round-capped strokes. One hue (section 3,
+  "Catppuccin, one hue") works for audio, video and PDF; its language marks are outlines, where the
+  pack's are solid.
+- **Simple Icons** is what the pack already does for brands: a solid mark, one colour. Recolouring
+  is mechanical: take the 24px path, scale 2/3 (full bleed, like `terraform`) or 14/24 with a 1px
+  inset (like the squircles), fill `currentColor`, assign a hue in `rules.ts`. A two-layer version
+  needs a person to class the secondary sub-paths `bg` and pick an opacity, per icon. Java is the gap:
+  Simple Icons carries only Duke, so Java takes a letter badge on the pack's squircle, the recipe
+  `typescript` and `javascript` already use.
+- **Media and PDF** have no brand. The pack's own recipe is its `file` frame plus an emblem
+  (`file-text`, `file-zip`, `file-table`); a note, a play triangle and a PDF mark on that frame are
+  three small path edits, and they match the pack exactly, which no borrowed glyph does.
 
 ### Colours today
 
@@ -176,10 +260,16 @@ Measured with the app's own resolver (`iconForEntry` imported from `lib/file-ico
   column for the look.
   Decided 2026-09-26: owner — (b).
 - **Q3. File types with no glyph** (media, PDF, Java, Kotlin, PHP, Lua and similar; 2.1% of files
-  after aliasing). (a) Leave them generic. (b) Draw about six glyphs in the pack's style (audio,
-  video, PDF, Java, Kotlin, one generic "source" shape). (c) Borrow Phosphor's fill glyphs.
-  **Recommendation: (a) for now.** Aliasing already takes the generic share from 5.6% to 2.1%; (b)
-  is Phase 5 whenever the owner wants it, and (c) clashes with the pack's shapes.
+  after aliasing). The pack is not derived from a larger set, so no set fills its gaps in its own
+  shapes (see "Where the glyphs come from"). (a) Leave them generic. (b) The pack's own recipes:
+  Simple Icons marks (CC0) recoloured by the generator for the languages (Kotlin, PHP, Lua, TeX, Dart,
+  R, Julia, Perl, Clojure, Elixir, Haskell, Erlang, F#, Groovy), a letter badge on the squircle for
+  Java, and the `file` frame plus an emblem for audio, video and PDF. (c) Catppuccin's glyphs (MIT)
+  recoloured to one hue for everything. **Recommendation: (b).** The languages cost a list of names
+  and hues, not drawing, and it is how the pack made its own brand glyphs; only three media glyphs
+  and one badge are drawn. (c) is quicker but outlined where the pack is solid.
+  Decided 2026-09-26: owner — (c) Catppuccin, but not flattened to one hue: keep each glyph's own
+  colours, mapped onto the icon hue tokens so light and dark each get their palette values.
 
 ## Proposed phases
 
@@ -199,6 +289,7 @@ Measured with the app's own resolver (`iconForEntry` imported from `lib/file-ico
    - `components/file-type-icon.tsx` takes a literal `text-file-icon-<hue>` class from a generated
      record, so Tailwind sees it; no inline colour.
    - `components/tests/file-type-icon.test.tsx` follows the class change.
+   - A `NOTICE` entry for the `claude` glyph (Codicons, Microsoft, CC-BY-4.0).
      This phase carries the two bug fixes (vermilion, C) and the mauve `bun` into every app surface.
      The tree keeps its own `:host` colours until 178 icons. Verify: `look` on quick open, git changes
      and an editor tab strip in light and dark; the generator's `--check` in CI.
@@ -211,8 +302,11 @@ Measured with the app's own resolver (`iconForEntry` imported from `lib/file-ico
    through `<use>` too, because custom properties inherit into the sprite's shadow tree.
 4. **Light palette (S), after Q2.** The generator takes light values per hue from `rules.ts`
    (yellow, orange, mint, teal, cyan at the Pierre theme's 700). Dark untouched.
-5. **New glyphs (M), only if Q3 is (b).** `scripts/icons/svgs/` overlay read after the pack; drawn
-   16×16 with `fg`/`bg` classes like the pack's sources.
+5. **New glyphs (S–M), only if Q3 is (b).** `simple-icons` (CC0) pinned as a dev dependency;
+   `rules.ts` names the marks to import with a hue and a scale (2/3 full bleed or 14/24 inset); the
+   generator emits them as one-colour glyphs beside the pack's. `scripts/icons/svgs/` holds the four
+   drawn ones (`file-audio`, `file-video`, `file-pdf` on the pack's `file` frame; `lang-java` as a
+   squircle badge), 16×16 with `fg`/`bg` classes like the pack's sources. Rerun `alias-cover.ts`.
 
 ## Coordination with Plan 178
 

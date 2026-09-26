@@ -1,388 +1,130 @@
 # Repository Guidelines
 
+## Running A Task
+
+- Keep going when a step does not need the owner; put status notes in the same message as the next action. Stop only when blocked, or before something destructive: deleting data the owner keeps (`~/.platform`, `/work/platform-dev/home`, anything not yours in `/work`), force-pushing, taking another session's changes out of the tree, or changing anything outside this checkout except `../Editor` and `/work/projects/ghostty-webgpu`.
+- Done means: the narrowest check that could fail passes, a UI change has `look` evidence you read back, your files are committed by path and pushed, and the mesh runs it. Name anything you skipped.
+- Long runs keep their checklist in a file (the plan file, or the scratchpad) and tick items as they land.
+- End a run with what you need from the owner first, then what changed, then what you found. Mark what you could not confirm and where you looked.
+
 ## Reference Clones
 
-- Upstream code we compare against (vscode, t3code, opencode, codex, …) is cloned under `references/` at the repo root, gitignored. Look there before cloning anything, and add new clones there — not in `/work/projects/references/`.
-- CI, the parity scripts and several tests resolve `references/t3code` by relative path, so the directory stays inside the repo.
-- When a clone you consult is behind upstream, pull it (`git -C references/<name> pull`). If a plan pins an upstream commit (Plan 126 does), note the new upstream head in that plan and anything relevant that changed. Clones refresh as they are used; there is no scheduled sweep.
+- Upstream code we compare against (vscode, t3code, opencode, codex, …) lives in `references/` at the repo root, gitignored. Check there before cloning; add new clones there, not in `/work/projects/references/`. CI and tests resolve `references/t3code` by relative path.
+- Pull a clone that is behind before relying on it. If a plan pins an upstream commit (Plan 126), record the new head and what changed in that plan.
 
 ## Code Organization
 
-- Features are leaves: import shared code from `@workspace/*`, `@/lib/*`, `@/components/*`, `@/hooks/*`, or `@/keymap/*`; never add a feature-to-feature import. Existing exact modules are frozen in `scripts/lint/web-feature-allow.json` with reasons.
-- Domain-free UI patterns live in `packages/ui/src/patterns/`; app-specific header menus and actions stay in the app composition layer.
-- Each reading feature owns `utils/query-keys.ts`, and each writing feature owns `utils/mutation-keys.ts`; shared key groups stay in `lib/` only while the two-consumer rule holds.
-- Feature roots contain kind directories only. Shared helpers move with their callers, and different path or hostname behavior needs a call-site test before consolidation.
+- Features are leaves: import shared code from `@workspace/*`, `@/lib/*`, `@/components/*`, `@/hooks/*` or `@/keymap/*`, never from another feature. Frozen exceptions are in `scripts/lint/web-feature-allow.json`.
+- A feature root holds kind directories only: `components/` (`.tsx` render components), `hooks/` (`use-*`), `providers/` (providers and `*-context.ts`), `state/` (stores; co-locating with the owner is also fine), `utils/` (pure, no React, no module state), `tests/`. No empty folders.
+- Import exact files through `@/`. Barrels only at package entry points (`packages/*/src/index.ts`).
+- `apps/web/src/lib/` holds a module only while two or more consumers outside `lib/` import it (each feature counts once; also `components/`, `hooks/`, `keymap/`, `main.tsx`), or a qualifying `lib/` module depends on it. Move it down when it drops to one consumer, up when a second feature needs it. `lib/` never imports `@/features/*`; policy that needs feature knowledge lives with its domain (command enablement is in `keymap/`).
+- Each reading feature owns `utils/query-keys.ts`, each writing feature `utils/mutation-keys.ts`.
+- Domain-free UI patterns live in `packages/ui/src/patterns/`.
+- Same-signature helpers are not automatically duplicates: the six `basename` variants differ in empty-path fallback and casing. Merge only with a test per call site.
 
-- Group by feature, then by kind:
-  - `components/` — React render components only (`.tsx`)
-  - `hooks/` — `use-*` hooks
-  - `providers/` — context providers and `*-context.ts` modules
-  - `state/` — optional home for stores and other stateful modules. Co-locating a store next to its provider is fine too
-  - `utils/` — pure, stateless, non-React code only. No stores, no module-level mutable state, no subscriptions, nothing that imports React
-  - `tests/` — feature tests
-- Do not create empty folders.
-- Import exact files through `@/`. Do not add barrel `index.ts` files.
-- Barrel files are allowed only at package entry points such as `packages/*/src/index.ts` that back the package's `"."` export. Do not add feature, folder, or utility barrels.
-- `apps/web/src/lib/` is the app-level shared layer. It is not a kind directory and it is not a junk drawer. **A module belongs in `lib/` only if two or more consumers outside `lib/` import it** — counting `features/*` (each feature counts once), `components/`, `hooks/`, `keymap/`, and `main.tsx` — **or if it is a dependency of a `lib/` module that qualifies.** A module with a single outside consumer lives inside that consumer instead.
-- The rule runs both ways. When a `lib/` module drops to one consumer, move it into that consumer. When a feature-local module gains a second feature consumer, move it up to `lib/` in the same pass — do not import across features to reach it.
-- `lib/` sits below `features/`: a `lib/` module should not import from `@/features/*`. Shared policy that genuinely needs feature knowledge belongs in the layer that already owns the domain — command enablement lives in `keymap/`, next to the command registry, not in `lib/` and not in `components/`.
-- Two implementations of the same-sounding helper are not automatically duplicates. Before merging them, diff their _behaviour_ — the six `basename` variants in `apps/web/src` have three different empty-path fallbacks (`'Root'`, `''`, and the whole path) and one of them lowercases its result, yet all six share the signature `(string) => string`, so a wrong merge typechecks. Merge only with a test per call site, or leave a comment saying why they differ.
+## Code Style
 
-## Control Flow
-
-- The `never-nester` skill is part of every development task: `/Users/shaul/.agents/skills/never-nester/SKILL.md`.
-- Keep nesting depth to 3 or less.
-- Use guard clauses and early returns. Keep the happy path shallow.
-- In loops, use inverted conditions with `continue` instead of wrapping the body in `if`.
-- Extract inner logic into named functions when inversion is not enough.
-- Do not use `else` after an early return.
-- Never use nested ternaries. Split the logic into `if` statements or a named helper.
-
-## Comments
-
-- Keep comments short. One or two lines. Three is already suspicious.
-- A comment earns its place by saying what the code cannot: a non-obvious constraint, the bug it prevents, why an obvious simplification is wrong. Everything else is noise.
-- No essays, no history lessons, no restating the next line in prose. If the explanation is long, the code or the name is wrong.
+- Max nesting 3 (the `never-nester` skill): guard clauses, `continue` in loops, no `else` after a return, no nested ternaries.
+- Comments are one or two lines and say only what the code cannot: a constraint, the bug prevented, why the obvious simplification is wrong. No plan numbers or history.
+- Readonly/mutable mismatches are contract bugs: widen the callee's parameter to readonly; never copy (`[...x]`) just to satisfy TypeScript.
+- Do not repeat the folder name in file or symbol names (`workspace/sidebar.tsx`). Rename file, exports and call sites in one pass.
+- Greenfield, no users: no compatibility shims, aliases or migrations. Update every call site; delete obsolete tests; when a fix invalidates persisted state, delete the state instead of writing healing code.
+- Performance: measure before and after. Before tuning, say whether the data layout or design is the real bottleneck.
+- Debugging: confirm the thing you are looking for would be observable on a known-good case first. When a theory needs a second special case, drop it and re-derive from raw evidence.
 
 ## Copy
 
-- Copy says what a thing is and what it does, and stops there. Never write what it is not: no "…, not latency", no "rather than" or "instead of" contrast, no disclaimer clause. When the contrast holds a fact, state the fact ("same latency either way").
-- A plain negative fact is fine: "No sessions", "Off", "That path is not a folder", a type error.
-- Copy is every string the app shows: labels, setting descriptions, tooltips, toasts, empty states, and an error's `message`, `why` and `fix`.
+- Every string the app shows (labels, setting descriptions, tooltips, toasts, empty states, error `message`/`why`/`fix`) says what a thing is and does. Never what it is not: no "rather than", "instead of", "…, not X". Plain negative facts ("No sessions", "Off") are fine. Ellipsis is `…`.
 
-## React Code
+## React
 
-- One component per file. Do not export multiple components from one component file.
-- One hook per file. Keep hook files focused on the hook and its React wiring.
-- Keep pure helpers out of component and hook files. Move formatters, transforms, constants, models, and other pure reusable logic into `utils/`.
-- Stores are stateful, so they never go in `utils/`. Where they do live is flexible: `state/`, or co-located with the provider or feature code that owns them.
-- Keep providers and context-object modules in `providers/`, not `components/`.
-- Do not prop-drill app-level commands, state setters, or callbacks through layout/presentation components. If a prop is only forwarded, or a command crosses more than two component boundaries, stop and add a narrow feature provider/hook or colocate the command with the state owner.
-- Keep leaf callbacks as props only when they are local UI behavior owned by the direct parent. Context/provider APIs should expose small domain actions such as `selectTab` or `requestCloseTab`, not broad state blobs.
-- Avoid manual React memoization. Do not add `memo`, `useMemo`, or `useCallback` for ordinary render values or callbacks. Use them only for measured performance issues, required stable identity, or correctness. Add a short reason when you do.
+- One component per file, one hook per file; pure helpers go to `utils/`.
+- No prop-drilling of app commands or setters: a prop that is only forwarded, or a command crossing more than two components, gets a narrow provider/hook. Providers expose small domain actions (`selectTab`), not state blobs.
+- The React Compiler memoizes the app. Do not add `memo`, `useMemo` or `useCallback` by hand, except where identity is load-bearing: a value in a dependency array, a value passed to a hook (store selector, `useSyncExternalStore` pair), or a ref callback. The compiler's cache may recompute; those keep their manual memo with a comment naming the dependent hook.
+- Read what the compiler did; do not infer it. `bun run compiler:explain <file> [--component Name]` prints memo blocks as `[keys] → value`. `bun run compiler:memos [paths…]` classifies each manual memo: `redundant` (delete), `needed`, or `differs` (a missing key is a stale-value bug). Rows are not independent: remove memos one at a time.
+- Removing `useMemo<T>(…)` drops its contextual type; write `const value: T = …`.
+- `exhaustive-deps` misreads compiler-memoized values. Use `useEffectEvent` when the dep is the action. When the effect truly keys on the value, suppress with `// oxlint-disable-next-line react/exhaustive-deps` and the compiler's keys; the `react-hooks/…` spelling makes the compiler refuse the component.
+- `bun run compiler:census` fails on any refused component not excused in `scripts/lint/react-compiler-allow.json`. Repairs: lazily filled ref → lazy `useState`; `try`/`finally` → module-scope function; suppressed deps → `useEffectEvent` with the trigger as an argument; declare handlers after those they call; pass `ref` through JSX, not `createElement`.
 
-## React Compiler: Read The Output, Do Not Guess
+## Design Language
 
-- The compiler memoizes this app, and what it chose is a fact you can read. Never reason about it from the source. `bun run compiler:explain <file> [--component Name]` prints every component and hook in the file: whether it compiled, and each memo block as `[keys] → value`, with temporaries resolved to named values.
-- `bun run compiler:memos [paths…]` audits every `useMemo` and `useCallback`. It recompiles the file with that one memo removed and compares keys. `redundant` means the compiler picks the same keys, so delete the memo. `needed` means the compiler refuses the component or leaves the value unmemoized without it. `differs` means read both key lists: a coarser compiler key justifies the memo, and a manual list missing a key the compiler found is a stale-value bug. `--undecided` hides the `needed` rows.
-- **Compiler memoization is a cache, not an identity guarantee.** It may recompute, so anything whose identity something else keys on keeps its manual memo however exactly the inferred keys match. Three shapes, all of which `compiler:memos` reports as `needed` before it compares keys: a value named in a `useEffect`, `useLayoutEffect`, `useMemo`, `useCallback` or `useImperativeHandle` dependency array; a value handed to a hook as an argument, which is how a store selector and a `useSyncExternalStore` subscribe/snapshot pair reach it; and a ref callback, because React calls the old one with `null` whenever its identity changes. The symptom is not a slow render — it is an effect that re-runs forever, a store that resubscribes every frame, or a DOM registration that detaches and re-registers.
-- A manual memo that survives carries its verdict as the reason, and a memo kept for the rule above says so at the site: name the hook that depends on it and what a recompute would redo. `history-pane.tsx` keeps one for a different reason — the compiler keys the diff on the whole viewer `state`.
-- Run `compiler:memos` on a file before adding a memo to it and after touching one. Run it on the feature when chasing a render or performance problem, before `renders` or `trace`.
-- Each row is measured with that one memo removed and the rest still in place, so a file's rows are not independent. Removing several at once can shift a downstream key that each row on its own said was safe. Remove them one at a time and re-read the file's keys after each.
-- `exhaustive-deps` and the compiler disagree by design. The rule reads the source, so it calls a compiler-memoized value "changes every render". When the dep is the action rather than the trigger, `useEffectEvent` is the fix; when the effect genuinely keys on the value, the warning is wrong and the memo does not come back. Silence that last case with `// oxlint-disable-next-line react/exhaustive-deps` and a comment naming the keys the compiler chose. Spelling matters: the compiler's suppression detector watches the `react-hooks/…` alias and will refuse the component over it, while `react/…`, the name this repo actually configures, it does not see. That makes the `react/` spelling an unguarded escape — use it only for a claim you have checked against `compiler:explain` output, never to quiet a rule you have not read.
-- Removing a memo drops the contextual type its type argument supplied. Carry `useMemo<T>(…)` over as `const value: T = …`, or the parameters inside it silently become `any`.
-- `bun run compiler:census` gates refusals in `verify` and CI: any refused component fails unless `scripts/lint/react-compiler-allow.json` excuses it with a reason. Lint cannot stand in for it, because its compiler rules miss components wrapped in `memo()`.
-- Refusals have known repairs. A lazily filled ref or an equal-value ref cache becomes lazy `useState`. A `try`/`finally` moves to a module-scope function or returns a result the caller settles. A suppressed `exhaustive-deps` becomes `useEffectEvent`, with the trigger passed in as an argument so the dependency is still read. Handlers are declared after the handlers they call. JSX, not `createElement`, carries a `ref`.
+`scripts/lint/web-design-census.mjs` enforces most of this; exceptions live in `scripts/lint/web-design-allow.json` with a reason. A case these rules do not cover needs a new token, not a local choice.
 
-## Styling
+- Tailwind classes and `@workspace/ui` primitives only. No raw CSS or inline `style` except runtime-computed values. No raw `<button>`/`<input>` when a primitive exists, and no restyling primitives at the call site (no radius class, no hover on `Button`).
+- Colors are theme tokens only: no palette classes, hex or `oklch()`, no hand-rolled `dark:` pairs. Status: `destructive`, `info`, `success`, `warning`; diffs: `diff-added`, `diff-removed`. Tokens take opacity (`bg-success/10`). A missing color goes into `packages/ui/src/styles/globals.css` (`:root`, `.dark`, `@theme inline`).
+- Text: `text-foreground` or `text-muted-foreground`, never alpha; disabled controls may use whole-control `opacity-50`. Sizes `text-sm`, `text-xs`, `text-2xs`, `text-3xs`; no `text-[Npx]`. Bar title `text-xs font-medium`, pane section heading `text-sm font-semibold`, group label `section-label`. App words are Inter; code and short metadata (counts, times, hashes, branches, chords, diff stats) are `font-mono`. Updating numbers carry `tabular-nums`.
+- Corners: controls, chips, kbd, inline code and skeleton bars `md`; floating surfaces `lg`; pills `rounded-full`; rows, bars, headers, panes and bar tabs square. Bare `rounded` and redundant `rounded-none` are banned.
+- Every horizontal bar is `h-(--bar-height) px-(--bar-padding-x)`, ideally `PaneBar`; rails are `w-(--rail-width)`. Skeleton bars use the same token. Spacing uses `--density-*`; there is no `compact:` variant.
+- No dividers: surfaces separate by tone (`bg-background` beside `bg-content-well`, chips `bg-muted`, callouts a status tint). No `border-border`, `border-subtle`, `divide-*` or edge borders; `border border-transparent` only as the base for a state color. Panels take `bg-background`, not `bg-card`.
+- Pane surfaces follow `--surface-opacity` and are painted once: `ToolPane` paints nothing, the region owning the surface does (sidebar `aside`, chat tool panel, dialog, or a `ToolPane` that is the whole region). `backdrop-material` over wallpaper.
+- Floating UI (dialogs, menus, popovers, toasts, tooltips, editor hovers) is opaque: `bg-popover-solid` or `bg-popover`, no blur. Floating surfaces keep `ring-1 ring-foreground/10`. Elevation: `shadow-xl` modal, `shadow-md` menu/popover, nothing else.
+- Rows are `ListRow` with `bg-row-hover`/`-active`/`-selected` (no opacity modifier), `aria-selected`, `data-marked`. Lists focus through `useListbox`. Row windowing is `VirtualList`. Toggled controls: `bg-accent` with `aria-pressed`/`aria-selected`.
+- Panes compose `ToolPane` + `ToolPaneHeader`, rendering pending before error before empty.
+- Icons: `size-(--icon-size)` on controls and headings, `size-(--icon-size-sm)` in rows and text.
+- Icon-only controls get a `Tooltip`; inside virtualized rows use `data-tooltip`. Truncated values get a native `title`, never both on one control.
+- Focus: `focus-ring` (act on), `focus-ring-within` (type into), `focus-ring-inset` (full-bleed scrollers); tint with `--focus-ring-color`, never a `ring-*` class. Opt out with `focus-visible:ring-0`. Inside a wrapper that draws the field ring, use `shadow-none!` and `aria-invalid:ring-0` on the inner control. A new `@utility` that sets `box-shadow` must join the focus class group in `packages/ui/src/lib/utils.ts` (tailwind-merge cannot see custom utilities).
+- `pressable` for press feedback. Motion uses the configured defaults (`--duration-enter`/`-exit`, `ease-*-strong`); never hand-write durations or curves. A transition that animates a focus ring must list `box-shadow`.
+- Composite fields (leading icon, trailing button or count) are `InputGroup` with addons, never absolute icons over a padded input.
 
-- Rows are `ListRow`: token height, square corners, `aria-selected` selection, `data-marked` inset ring, and immediate hover/press paint. Disabled rows keep title recovery and are skipped by navigation.
-- Lists focus through `useListbox`: one container tab stop, `aria-activedescendant`, no wrapping, and modifier chords reserved for the keymap. Typeahead is opt-in; the shadow-root file tree retains its own keyboard model.
-- Row windowing uses `VirtualList`, which measures `--density-row-height`; variable message and expanded-log bodies use measured flow layout. Editor line windowing keeps its specialized virtualizer.
-- Panes compose `ToolPane` and its `ToolPaneHeader`: `PaneBar` headers, pending before error before empty, and a body focus ring. A terminal's host stays mounted while its loading overlay is visible.
-- Icons have two density tokens: `size-(--icon-size)` on controls and headings, `size-(--icon-size-sm)` in rows and text. Never choose a numeric icon size at a call site.
-- Text has two colors, `text-foreground` and `text-muted-foreground`; use `text-2xs` for a quieter size, never alpha. Disabled controls may use whole-control `opacity-50`.
-- Icon-only controls carry a `Tooltip`; `title` recovers truncated values and never duplicates a tooltip. Tooltip delays belong to the shared provider. Controls inside virtualized rows use `data-tooltip` (the shared layer) instead: a `Tooltip` root per recycled row is a scroll cost.
+## Loading, Empty And Error States
 
-- Style with Tailwind classes and the `@workspace/ui` primitives. Do not write raw CSS or inline `style` props except for values that must be computed at runtime (dynamic positions, measured sizes).
-- Use theme tokens only. Color classes must resolve to a token: `bg-background`, `text-foreground`, `text-muted-foreground`, `bg-primary`, `bg-card`, `border-border`, etc.
-- Never use raw Tailwind palette colors (`bg-blue-600`, `text-red-500`, `text-sky-300`, `amber-*`, `emerald-*`) or hex/`oklch()` literals in components. They bypass theming and dark mode.
-- Status and diff colors have tokens — use them instead of picking a palette hue:
-  - error / danger → `destructive`
-  - info / primary action → `info`
-  - success / passed → `success`
-  - warning / degraded → `warning`
-  - diff added / removed → `diff-added` / `diff-removed`
-- These tokens flip automatically between light and dark. Do not hand-roll dark variants like `text-sky-700 dark:text-sky-300`; write `text-info` once.
-- A token works with opacity and every utility: `bg-success/10`, `border-warning/30`, `ring-info`.
-- Need a color with no token? Add it to `packages/ui/src/styles/globals.css` (light `:root`, `.dark`, and the `@theme inline` map) instead of inlining a palette class.
-- Compose the shared primitives; do not restyle them ad-hoc or reach for a raw `<button>`/`<input>` when a primitive exists.
-- Pane surfaces (`bg-background`, `bg-card`, `bg-muted`, `bg-accent`) follow `--surface-opacity`. Use `backdrop-material` for panes over wallpaper or content.
-- A surface is painted once. Because it is translucent, a second `bg-background` inside a `bg-background` region reads as an extra layer against the wallpaper. `ToolPane` therefore paints nothing; the region that owns the surface does — the sidebar `aside`, the chat-mode tool panel, a dialog. A `ToolPane` that is itself the whole region (a settings or search editor tab, the bottom panel) carries `bg-background` at the call site.
-- Floating UI is always opaque: dialogs, menus, popovers, toasts, tooltips, and editor hover/completion panels. Use `bg-popover-solid` or another solid theme token. Do not add backdrop blur, wallpaper layers, or transparency derived from pane settings.
-- `bg-popover` also resolves to the solid popover token. The `-solid` utilities deliberately ignore the user's transparency setting.
+- Three loaders from `@workspace/ui`, nothing hand-rolled: `LoadingState` (skeleton for a region with no content yet, mirroring the loaded view's primitives, one placeholder per element), `Spinner` (anything else; `size` `xs` rows, `sm` control icon, `md` panel, `lg` surface; none inside `Button`; no `text-*` class), `Shimmer` (inline in a running sentence only).
+- Branch on pending before empty; loading and empty must never look alike. Do not defeat `LoadingState`'s 120ms delay or add `motion-reduce:` at call sites.
+- Render failures: `RenderErrorBoundary` (`@workspace/ui/patterns/render-error-boundary`) at each seam `ToolPane` does not cover, with `resetKeys` set to the shown identity. Local boundaries do not log (the root's `onCaughtError` does). Query and mutation failures stay state; no `throwOnError`. Keep boundaries below anything that must stay mounted (terminals).
+- Content that must outlive its layout (terminals) goes through `lib/keep-alive` (`KeepAliveProvider`, `KeepAliveSlot`, `useKeptIds`); kept content sees the provider's context, and stands down via `attached`.
 
-## The Design Language
+## Truncation
 
-These six are settled. A call site never re-decides them; if one does not cover your case, the
-answer is a missing token, not a local choice. `scripts/lint/web-design-census.mjs` enforces them
-and runs in `verify` and CI; `scripts/lint/web-design-allow.json` holds the exceptions, and an
-entry without a real reason is itself a violation.
-
-- **Corners belong to the primitives.** Controls (button, input, select, textarea, input group,
-  badge) are the `md` step; floating surfaces (dialog, popover, dropdown, context menu, command
-  palette, tooltip) are `lg`; chips, tags, thumbnails, inline code, kbd, count badges and skeleton
-  placeholder bars are `md`; circles and pills are `rounded-full`. List rows, bars, headers, pane
-  surfaces and tabs inside a bar are square. A `@workspace/ui` primitive call site carries no
-  radius class at all. Bare `rounded` is off-scale and banned, and a redundant `rounded-none` is
-  just noise — no class already means no radius.
-- **One bar height.** Every horizontal bar — titlebar, pane headers, tab strips, dialog headers and
-  footers — is `h-(--bar-height)` with `px-(--bar-padding-x)`, ideally by composing `PaneBar`.
-  Vertical icon rails are `w-(--rail-width)`, which equals the bar height so a rail lines up with
-  the header beside it. A skeleton bar uses the same token as the bar it stands in for; a header
-  that changes height when data arrives is the bug this rule exists to prevent.
-- **One density system.** The `--density-*` custom properties. Never hand-write a
-  `compact:`-prefixed pair; the variant no longer exists.
-- **No dividers.** Surfaces separate by tone, never by a line: a panel is `bg-background` beside a
-  `bg-content-well`, a chip is a `bg-muted` fill, a callout is a status tint. Panels take the
-  darker neutral, not `bg-card`: it scrims the wallpaper where a lighter surface veils it, and
-  an Omarchy palette derives `card` and `muted` from one color, so a chip only steps on
-  `bg-background`. `border-border`,
-  `border-subtle`, `divide-*` and any edge border are banned (`hairlines` in the census); a bare
-  `border` survives only as `border border-transparent`, the sizing base for a state color such as
-  `aria-invalid:border-destructive`. Floating surfaces keep their `ring-1 ring-foreground/10`.
-- **Four type sizes.** `text-sm`, `text-xs`, `text-2xs` (11px), `text-3xs` (10px). An arbitrary
-  `text-[Npx]` is banned. A bar title is `text-xs font-medium`; a pane section heading is
-  `text-sm font-semibold`.
-- **Two type voices.** Words the app writes (titles, labels, prose) are Inter (`--font-ui`). Code
-  and short metadata are `font-mono`, the user's coding font: counts, timestamps, hashes, branch
-  names, setting ids, key chords, line numbers, diff stats. There is one mono, never a second.
-  A small uppercase group label is `section-label`, never a hand-rolled `uppercase tracking-*`
-  recipe.
-- **Fills and elevation.** Elevation is three levels: `shadow-xl` on a modal dialog, `shadow-md` on
-  a menu or popover, nothing anywhere else. List rows use `bg-row-hover`, `bg-row-active` and
-  `bg-row-selected`, never an opacity modifier on them — the alpha is the design. Toggled controls
-  use `bg-accent` with `aria-pressed` or `aria-selected`. A `Button` call site never re-declares
-  hover; the primitive owns it.
-
-Interaction treatments are utilities, not strings to copy:
-
-- `focus-ring` for anything you act on (gated on `:focus-visible`, so a clicked control never
-  glows), `focus-ring-within` for anything you type into and its wrappers (gated on `:focus-within`,
-  because a text surface must show where the caret went however it was reached), and
-  `focus-ring-inset` for full-bleed scroll containers whose outset ring would be clipped. Tint one
-  by setting `--focus-ring-color`; do not add a `ring-*` class, which cannot work because the
-  utility owns the box-shadow.
-- `pressable` for press feedback. It deliberately does not nudge a control that opens a menu,
-  because the popup would travel with it.
-- Motion comes from `--duration-enter`, `--duration-exit` and the `ease-*-strong` curves. Those are
-  Tailwind's configured defaults, so a bare `transition-*` already inherits them. Never hand-write
-  a duration or an easing curve. When a transition animates a focus ring, name `box-shadow` in the
-  property list: `transition-colors` does not include it, so the border would fade while the ring
-  snapped in.
-- A custom `@utility` is invisible to `tailwind-merge`, so it never conflicts with anything and both
-  classes survive a merge. Two focus utilities on one element would therefore both set `box-shadow`
-  and the element would draw whichever was emitted last, so they are registered as one class group
-  in `packages/ui/src/lib/utils.ts`; anything else you add as a `@utility` needs the same treatment.
-  A Tailwind `ring-*` or `shadow-*` class does still win the property at CSS level, because it is
-  emitted after the custom utilities at equal specificity — so `focus-visible:ring-0` is how a call
-  site opts out of the halo, though not out of the `border-color` half. Inside a wrapper that draws
-  the ring for the whole field, suppress the inner control's own ring with `shadow-none!` for the
-  utility's raw shadow and `aria-invalid:ring-0` for the primitive's invalid ring; `shadow-none!`
-  cannot do the second, because it zeroes `--tw-shadow` while still composing `--tw-ring-shadow`.
-- Composite fields — anything with a leading icon, a trailing button or a trailing count — are
-  built from `InputGroup` with addons. Never position an icon absolutely over a padded input, and
-  never hand-pick a `pl-*`/`pr-*` to clear one.
-
-## Loading And Empty States
-
-- Never hand-roll a loader. There are three, they live in `@workspace/ui`, and every waiting state in the app is one of them. No `animate-spin` on a borrowed icon, no `animate-pulse` dots, no bare "Loading…" paragraph.
-- Pick by **where the wait is**, not by which feature you are in:
-  - `LoadingState` — a region with no content yet (a pane, a list, a popover menu). Skeleton rows.
-  - `Spinner` — everything else: a control mid-action, or a process with no known end in a slot beside a label (a header cell, a list row, a status line), or a whole surface waiting. Pick a `size`, never a size class: `xs` in rows and text, `sm` for a control's icon slot, `md` for a panel, `lg` for a whole surface. Leave `size` off inside a `Button` and the button sizes it like the icon it replaced. The spinner owns its colours, drawn from the theme's primary; never put a `text-*` class on one.
-  - `Shimmer` — text already on screen, transiently in progress, _inline inside a running sentence_ where a mark would break the flow. Never a substitute for a loader in a slot that can hold one.
-- A loading state and an empty state must never look alike. "Loading X" and "No X" set in the same type is a bug — the user cannot tell a slow panel from an empty one. Pending gets a loader; `EmptyState` is only for a verdict the app can actually deliver.
-- A skeleton mounts the same primitive and the same density variables as the loaded view, and draws one placeholder per real element. `LoadingState` never wraps a loader.
-- Check the fall-through. A list that only branches on `error` and `length === 0` will show "Nothing here" while it is still fetching. Branch on pending **before** empty.
-- `LoadingState` holds its bars back for 120ms (`delayMs`) so a fast query does not flash a skeleton. The `role="status"` container mounts immediately either way, so assistive tech is told at once. Do not defeat this with your own conditional.
-- Reduced motion is handled inside the primitives — they slow down rather than freeze, because a stopped spinner reads as a hung process. Do not add `motion-reduce:` classes at the call site.
-- Ellipsis is `…`, never `...`.
-
-## Render Errors
-
-- Render failures are contained by `RenderErrorBoundary` (`@workspace/ui/patterns/render-error-boundary`, over `react-error-boundary`). Never hand-write a boundary class. `ToolPane` wraps its body in one; the composition layer wraps each seam a `ToolPane` body cannot cover: sidebar panel, editor tab body, each terminal, chat stage, tool pane, timeline row.
-- Pass `resetKeys` with the identity of what is shown (tab id, session id, row id) so navigating away heals the region. Retry covers the rest.
-- A local boundary does not log. The root's `onCaughtError` reports every caught error once; `onError` is only for fields the root cannot know, such as a fence language.
-- Boundaries are for render bugs. Query and mutation failures stay state rendered through `ToolPane`; do not adopt `throwOnError`.
-- Keep a boundary below anything that must stay mounted. A terminal unmounted by a sibling's crash detaches its PTY.
-- Content that must outlive its layout goes through `lib/keep-alive`: `KeepAliveProvider` above every layout it must survive, a `KeepAliveSlot` where it shows, `useKeptIds` as the only thing that ends it. Terminals use it, so a mode switch, a collapsed panel or another tab parks a terminal instead of unmounting it. Do not re-solve this with `invisible` + `inert` wrappers or collapsed panels. Kept content renders under the provider, so it sees the provider's context, not its slot's; take the `attached` argument to stand down while parked.
-- `LoggingErrorBoundary` at the root is the last resort for providers, router and bootstrap.
-
-## Truncation And Recovery
-
-- Truncation is correct in a one-line row, but the cut part must be recoverable. Any element carrying `truncate` or `line-clamp-N` whose content is a value the app did not author (a path, a branch, a session title, a model name, a machine label, a host, a code excerpt) carries a native `title` with the complete value. `scripts/lint/web-design-census.mjs` measures this as `truncationRecovery`.
-- The `title` goes on the element that spans the whole row: the row container, or the truncating block when that block is its own full-width row. Never on a `shrink-0` span inside a wider row, and never on the inner text cell of a row whose icon and status columns then recover nothing.
-- A title adds, it does not echo. Where the row knows more than it shows (the full path behind a basename, the file and line behind an excerpt, why a tab is read-only), the title says that. A title identical to the visible text is allowed only when the row has nothing to add.
-- Static app-authored labels ("Chat", "References", a column header) are exempt, and so is `packages/ui`: a primitive cannot know whether it renders a label or a value, so the consumer sets the title. Every exemption is an entry in `scripts/lint/web-design-allow.json` with a reason.
-- `title` and `Tooltip` split by job. `Tooltip` is for icon-only controls and for explanations that need styling and a delay. Native `title` recovers truncated text, where a portalled popup in a virtualized list is the wrong machinery. Do not convert a truncation site to `Tooltip`, and never put both on one control: the browser shows two. A control that already earns a `Tooltip` for an explanation may name its value there too; that is the one direction this runs.
-- No middle truncation. A row that must show a path renders the basename first and the directory second, muted, so a right cut eats the directory and leaves the name. `features/git/components/file-row.tsx` is the reference; `basename` and `parentPath` in `lib/path-formatters.ts` are the helpers.
+- `truncate`/`line-clamp` on a value the app did not author (path, branch, title, model, host, excerpt) needs a native `title` on the element spanning the row, adding what the row cannot show (full path behind a basename). The census gates this as `truncationRecovery`; `packages/ui` and static labels are exempt.
+- No middle truncation: basename first, muted directory second (`components/file-label.tsx`, `basename`/`parentPath` in `lib/path-formatters.ts`).
 
 ## Settings
 
-- Every user-facing knob is a registry entry in `packages/contracts/src/settings/keys.ts`. Never a new `localStorage` key, never a new env var, never a hardcoded constant someone has to recompile to change.
-- A key is never registered inert. Register it in the same pass that wires its consumer, or do not register it — a knob that writes a file nothing reads is worse than no knob.
-- Scope is a security boundary. A value that reaches **execution** — selects a binary, sets env, becomes a flag name, or binds a key — is `application` or `machine`, never `window`: a workspace file ships inside a cloned repository. A value that reaches only **suppression** may be `window`, and then it must show the cross-scope indicator.
-- Settings are read through `useSettingValue` in React, or `readSettingsMirror()` outside it (module scope, async generators). Do not reach into the query cache directly.
-- Secrets never enter the settings document. They go to the secret store, which is why the raw JSON view, export and the settings file itself are safe to read.
-- Regenerate `docs/settings-reference.md` with `bun run settings:reference` after changing the registry.
+- Every knob is a registry entry in `packages/contracts/src/settings/keys.ts`, registered in the same pass as its consumer. No new `localStorage` keys, env vars or hardcoded tunables.
+- A value that reaches execution (binary, env, flag, keybinding) is `application` or `machine` scope, never `window`: workspace files ship in cloned repos. Suppression-only values may be `window` and show the cross-scope indicator.
+- Read with `useSettingValue`, or `readSettingsMirror()` outside React. Secrets go to the secret store. Run `bun run settings:reference` after changing the registry.
 
 ## Async Effects Go Through TanStack
 
-- TanStack owns async operation state, caching, deduplication, and retries, including code imports and local work. Use queries for reads and mutations for effects. Outside React, use QueryClient and MutationObserver APIs; do not build parallel promise caches or pending/error state machines. The streaming and intent-queue exceptions below still apply.
+- Reads are queries (even over POST), effects are mutations, including local work and code imports. Outside React, run the same `mutationOptions` through `runMutation` (`lib/mutations/run.ts`). No bare `await client.x.post()` behind a `useState` flag, no promise caches, no local `pending` booleans: in-flight state comes from `useIsMutating`/`useMutationState` via the feature's `mutation-keys.ts`.
+- A mutation settles the cache before it resolves (`setQueryData` with the response, else `invalidateQueries`), even when the socket will also deliver it.
+- Concurrent calls of one mutation serialize with `scope: { id }`; the second checks the first's result before acting. Retries live in `retry`/`retryDelay`.
+- Exceptions carry a comment: streaming transports (terminal input, orchestration frames) and intent queues (`runIntent`, `runTreeIntent`, `runWorkspaceMutation`). They still settle the cache.
 
-- Every effect that reaches the server or writes state another consumer reads is a TanStack mutation: `useMutation` in React, the same `mutationOptions` executed through `runMutation` in `lib/mutations/run.ts` outside it, which is a `MutationObserver` over the same client. Command handlers, services in `state/`, toast buttons and dialogs are not exempt. A bare `await client.x.y.post()` or `await writeFileContent()` behind a `useState` flag is the thing this rule bans.
-- Every mutation carries a `mutationKey` from the feature's `mutation-keys.ts`. That key is how the rest of the app sees the effect: in-flight state is `useIsMutating` / `useMutationState`, never a local `pending` or `saving` boolean, and a `Button` shows `Spinner` from that.
-- A mutation settles the cache before it resolves. `setQueryData` with the response when the server returned the new state, `invalidateQueries` on the keys it could have changed otherwise. "It will arrive over the socket" is not settlement; taint the query anyway. The cost of a redundant refetch is nothing, the cost of a stale snapshot is a phantom conflict.
-- Two calls of the same mutation while one is in flight never throw "busy". Give them a `scope: { id }` so TanStack runs them serially, and let the second observe the first's result before it decides whether it still has work. VS Code's save sequentializer is the model: join an identical request, queue at most one follow-up.
-- A read is a query even when the transport is a POST. Session search and root validation are reads; they get `queryOptions`, a `queryKey` and a `staleTime`, not an ad-hoc abort controller.
-- Retries live in the mutation's `retry` / `retryDelay`, not in a loop written inside `onSuccess`. A retry the mutation cache cannot see is a retry devtools, `isPending` and the wide event cannot see either.
-- Exceptions exist and each one carries a comment saying why: streaming transports (terminal input, orchestration WebSocket frames), and intent queues that already serialize by resource (`runIntent`, `runTreeIntent`, the workspace-edit lifecycle behind `runWorkspaceMutation`). Those still settle the cache when they finish.
+## Logs And Errors
+
+- Structured JSONL in `logs/<date>.jsonl` (`.N.jsonl` continuations, highest newest); fields `timestamp`, `level`, `source` (`be`, `client`, `keyboard`), `requestId`, `area`, `version`, `commitHash`. Read them before forming a theory; if they cannot explain a failure, add the missing fields first. `bun run logs --since 5m` filters.
+- One wide event per operation (evlog): add fields, not extra lines.
+- Never `new Error`: use the feature's `structured-errors.ts` (`createStructuredError`, `defineErrorCatalog`) so errors carry `code`, `status`, `why`, `fix`. `why` and `fix` reach the user's toast, so write `fix` for them. Runtime facts (observed vs expected, exit code, state) go in `internal`; `bun run errors:census` fails a constant-message error without them.
+- Never put a setting value, file content or secret in a message or `internal`; name the type and constraint.
+- Levels: `error` means someone must act; `warn` means degraded and recovered or gave up; a missing file the caller asked about is `info`, no stack. A recovering failure series logs `warn` once at its start and `info` with a count at its end, never per attempt. Every retry loop, reaper and sweep has a give-up. `bun run logs:census` fails on noise (a group over 50 lines, or one repeating for over an hour); `scripts/lint/log-noise-allow.json` excuses a group only with a reason.
 
 ## Git: One Shared Checkout
 
-- Several sessions work in this checkout on `main` at the same time. Every uncommitted change in the tree may be another session's live work.
-- **Never stash.** No `git stash`, in any form, for any reason. A stash pulls other sessions' edits out from under them mid-task, and a stash popped by the wrong session lands someone else's work.
-- The same goes for anything else that takes changes out of the tree: no `git reset --hard`, `git checkout -- <path>`, `git restore`, `git clean` or branch switching on this checkout.
-- Commit your own work: stage the files you changed by path and push. Leave other sessions' changes in the tree for them.
-- Never split a file. When a file you changed also holds another session's edits, commit the whole file, and say so in the message. Only then does their work go in with yours.
-- A rejected push means `git pull --rebase`, then push again.
+- Several sessions work on `main` in this checkout at once; any uncommitted change may be someone else's live work.
+- Never `git stash`, `reset --hard`, `checkout -- <path>`, `restore`, `clean`, or switch branches here.
+- Stage your own files by path, commit and push. If a file you changed holds another session's edits too, commit the whole file and say so. A rejected push: `git pull --rebase`, push again.
 
-## Greenfield, No Backward Compatibility
+## Dev, Gates, Verification
 
-- This project is greenfield and not live: no releases, no external users, no data anyone needs migrated.
-- No backward compatibility shims, no legacy aliases, no deprecation windows. Update every call site in the same pass.
-- When a bug fix invalidates state the buggy code already persisted (localStorage, caches, on-disk files), do not write healing or migration code. Delete the bad state, or tell the user what to delete. One corrupted dev machine never justifies permanent code.
-
-## Naming And Refactors
-
-- Do not repeat the folder name in file or symbol names. In `workspace/`, prefer `sidebar.tsx`, not `workspace-sidebar.tsx`.
-- Keep qualifiers only when they add meaning: domain types like `WorkspaceCommand`, domain terms like `workspacePath`, or root components like `WorkspaceView`.
-- When removing a redundant prefix, rename the file, exports, and all call sites in one pass.
-- Delete obsolete tests instead of preserving old behavior.
-- Remove duplicate code aggressively.
-
-## Optimization And Performance Work
-
-- Look beyond the local minimum. Before tuning an implementation, ask whether the data layout, algorithm, or overall design is the real bottleneck. Challenging the frame beats polishing it.
-- Tweak-level wins (caching a value, hoisting a loop, batching calls) are easy to find and easy to overrate. Treat them as a floor, not the goal.
-- Question the expensive work's right to exist: can allocations be eliminated instead of pooled, can the computation be done once instead of cached, can the layer be deleted instead of sped up?
-- State the structural alternative even when only asked for a quick optimization. If a redesign would beat every local tweak, say so before spending effort on tweaks.
-- Measure before and after. An optimization without a benchmark or profile is a guess.
-- Aim for the domain-expert ceiling, not the first improvement that works: zero allocations, no redundant passes, data shaped for how it is actually accessed.
-
-## Debugging
-
-- Calibrate the instrument before trusting its readings. Before debugging "X isn't happening", first confirm X would be observable if it did happen — e.g. before chasing a highlight that "doesn't paint", check what color it is supposed to paint and that the color is distinguishable from the background. Verify the expected observable on a known-good case as a control.
-- Treat contradictions as falsification, not as detail to patch around. When a theory needs a new special case after each new observation (per-object, then per-node, then per-row, then global), the theory is wrong — stop patching it, go back to raw ground truth, and re-derive. Two epicycles is the limit.
-
-## Logs
-
-- The app writes structured JSONL logs to `logs/`, one file per day (`logs/2026-06-12.jsonl`). Days that grow too big roll over into numbered continuations (`2026-06-12.1.jsonl`); the highest number is the newest.
-- Each line is one JSON object with `timestamp`, `level` (`debug`/`info`/`warn`/`error`), and `source` (`be` = server, `client` = web app, `keyboard`), plus request/operation fields like `requestId` and `area`. Filter with `grep`/`jq` instead of reading raw.
-- Looking at the logs is highly encouraged for any task. When debugging, it is a must — check them before forming a theory.
-- If the logs do not explain the failure, that is itself the bug to fix first: add the missing log events or fields, then debug with the better logs. Do not debug blind.
-- Logging is wide-event style (evlog). Always prefer wide logs: enrich the one event per operation/request with more fields instead of emitting extra narrow log lines.
-- Never throw `new Error`. Create errors with `createError` from `evlog` — in practice through the feature's `structured-errors.ts` wrapper (`createStructuredError` or a `defineErrorCatalog` entry) so the error carries `code`, `status`, `why`, and `fix`.
-- `why` and `fix` reach the client. `responseErrorPayload` puts them on the wire, `createRpcError` carries them through, and `clientErrorDescription` renders message + fix in the toast. A catalog entry's `fix` is the sentence the user acts on, so write it for them, not for the person editing the registry.
-- Runtime facts go in `internal`, which evlog keeps out of every HTTP response and our logger writes to the wide event. Attach what the message cannot say: the observed value against the expected one, an exit code, a lifecycle state, which of several identical checks failed. `bun run errors:census` gates this — an error whose catalog `message` is a constant string carries nothing but a code, so throwing one bare is a failure. An entry with a templated message is exempt: it already names its own facts.
-- Never put a setting value, a file's contents or a secret in a message or in `internal`. Name the type and the constraint instead (`Expected number, received string`). `apps/server/src/observability/tests/runtime.test.ts` pins it, and the sanitizer redacts a known-sensitive key wherever it is nested.
-- Every log line carries `version` and `commitHash` from the running release, so a web build newer than the server is visible in the log rather than only in `GET /release`.
-- `error` means someone must act. `warn` means something degraded and the app recovered or gave up. A missing file the caller asked about is an answer: `info`, no stack.
-- A failure the code recovers from logs once at `warn` when the series starts and once at `info` with a count when it ends. Never one line per attempt.
-- Every retry loop, reaper and sweep has a give-up: after N identical failures the item enters a terminal state and logs once. A loop that can fail forever is a bug.
-- A client failure is one line. Checkpoints are for events that never finish.
-- `bun run logs:census` groups a day of warn and error lines (`--dir` for another log directory, such as production's) and fails on noise: a group over 50 lines, or one that repeats without a ten-minute gap for over an hour. `scripts/lint/log-noise-allow.json` excuses a group only with a reason. The deploy's live check runs it over production's last 24 hours.
-
-## TypeScript Fixes
-
-- Treat readonly/mutable mismatches as contract bugs first.
-- Do not copy containers just to satisfy TypeScript.
-- If a callee does not mutate a value, make its parameter or model type accept readonly data.
-- Avoid fake fixes like `sizes: [...node.sizes]`. Copy only for a real ownership boundary or real mutation.
-
-## Dev Server
-
-- A dev server is always running; never start another by hand. `agent:browser` starts its own throwaway API server per run against the shared Vite and removes it afterwards.
-- `/dev` is a gallery page beside the app (`dev.html`, `features/dev`): the dev server and every release serve it, so the mesh has it at `/platform/dev`. Each tab is `/dev/<tab>`; add one for anything worth eyeballing outside the app, such as every loader in every bundled palette.
-- State is separated by `PLATFORM_HOME`: production keeps `~/.platform`, the dev server uses `/work/platform-dev/home` (seeded once from production by `scripts/dev.ts`), and each `agent:browser` run gets a temp home. Language-server and font downloads stay in `~/.platform` for all of them.
-
-## Gates
-
-- `bun run gates` is the whole-tree set a commit must not break: `dupes:functions`, `dupes`, `design:census`, `compiler:census`. It runs in `pre-commit` through lefthook, in `verify`, and in CI, and a test pins all three so a gate cannot exist without being run. Under two seconds together.
-- A staged-file lint cannot see a clone, a duplicated helper or a refused component, which is why these run over the tree rather than over `{staged_files}`.
-- `bun run hooks:pre-commit` is **not** a dry run. Its fix jobs carry `stage_fixed: true`, so invoking it by hand stages every file they touch. Run the individual gate you want instead.
-- `packages/ui` and `packages/tree` run their tests through the React Compiler, because the app that ships them compiles them. Without it a test exercises unmemoized source: manual memoization the compiler makes redundant looks load-bearing, and a value the compiler over-caches never shows up.
-
-## Verification
-
-- The `verify-fregat` skill (`.agents/skills/verify-fregat/`) is how a change is proven in the running app. Its CLI is `bun run agent:browser` with the verbs `look`, `scenario`, `trace`, `renders` and `caches`, and `bun run logs` reads the structured log. Evidence lands in `/work/tmp/fregat-evidence/<run>/` with a `summary.md` short enough to read whole.
-- A UI change is not done until you have run `look` (or a scenario) on the changed surface, read the screenshot back, and named the evidence directory in your report. "It typechecks" and "the test passes" do not stand in for looking.
-- A performance claim cites `trace <scenario>` before and after, with `--compare`. A "fewer renders" claim cites `renders <scenario>` before and after. A claim about a query or mutation not settling cites `caches`.
-- Reproduce a reported bug on the same surface before fixing it, and re-run the same drive after. Hand the reproduction to the user only when the CLI cannot reach the surface, and say why.
-- When you touch a surface with no scenario, add one under `scripts/agent/scenarios/` and a line in the feature map. Selectors go in `scripts/agent/selectors.ts`, never inline.
-- The dev server is the target. The CLI never starts one; if it is down, say so.
+- A dev server is always running (Vite on 5173, API on 3001); never start another. State homes: production `~/.platform`, dev `/work/platform-dev/home`, each `agent:browser` run a temp home. `/dev` (and `/platform/dev` on the mesh) is a component gallery; add a tab for anything worth eyeballing.
+- `bun run gates` (`dupes:functions`, `dupes`, `design:census`, `compiler:census`, `errors:census`) runs in pre-commit, `verify` and CI. `bun run hooks:pre-commit` is not a dry run: it stages what it fixes.
+- Prove changes with the `verify-fregat` skill (`bun run agent:browser look|scenario|trace|renders|caches`); evidence lands in `/work/tmp/fregat-evidence/<run>/`. Read the screenshot back and name the directory. Performance claims cite `trace --compare`, render claims `renders` before and after, settlement claims `caches`. Reproduce a bug on its surface before fixing it. A surface with no scenario gets one in `scripts/agent/scenarios/`, selectors in `scripts/agent/selectors.ts`.
 
 ## Deployment: The Mesh
 
-- Every change ships to the mesh once it is done, so a production build is always available to look at. Treat the deploy as the last step of the task, not an extra.
-- The mesh is a plain local deployment. Mesh (`mesh serve`) publishes a port on this machine to the owner's Tailscale network, so the production build is reachable from their own devices at `https://omarchy.mesh.shaulavo.dev/platform`. Nothing is public. This is the deployment until a packaged release exists, and it may stay the deployment.
-- One route, one `systemd --user` service, one process: `/platform` → port 3301, `platform-prod.service`, running `/work/platform-production/current/server/index.js`, which serves the API and the built web from `current/web`. `current` is a symlink into `/work/platform-production/releases/<UTC stamp>-<commit>-<slug>/`, and every release holds `web/`, `server/`, `build-config.json`, the build logs and the live check output.
-- Deploy with `bun run deploy` from the checkout. It builds the web, reuses the running server bundle, verifies the candidate (index.html paths, the wasm artifact, and a boot of the candidate server on a spare port), swaps `current`, and runs the headless live check through the mesh URL. While a server release is staged, a web-only deploy builds on the staged server and replaces it, so it goes live at the next Restart.
-- Server changes need `bun run deploy --server`, which builds the server and stages it as `/work/platform-production/pending`. The app then shows "Update available", and the server restarts only when someone clicks Restart; with turns running, Restart first names the sessions it will interrupt. The command returns before any restart, so a server change is verified on the dev server before deploying, and "did it land" is `GET /platform/release` after the restart. Restart writes a one-use `restart-approved.json` for the exact staged release. The unit's `ExecStartPre` consumes that approval before promoting `pending` to `current`; a crash or reboot keeps the current release. Promotion then starts the live check in a transient `systemd-run --user` unit outside the service, which waits for the restart and writes `live-check.json`.
-- `--slug=<name>` names the release (default: the branch), `--reason=<text>` is recorded, `--rollback` drops any staged release, moves `current` back to the previous release and restarts at once if its server differs. If the app does not come back after Restart, run `bun run deploy --rollback` from a terminal outside Platform.
-- The page derives its API address from its own URL, so the build carries no server URL. `VITE_SERVER_URL` is a development-only override.
-- `GET /platform/release` reports the served release name, commit and dirty-file count, the release the running server bundle came from, and `pending`, `phase` and `liveCheck` for a staged update. That is how "did it land" is answered.
-- The procedure lives in `scripts/deploy/`: `mesh.ts` (the command), `live-check.mjs` (the browser check, run by the command or after a restart by the promotion step; a failure the previous release already had is reported but does not fail the deploy), `systemd/promote.ts` (the promotion step and the only `SIGUSR2` sender, installed into `/work/platform-production/bin/`), and `systemd/platform-prod.service` (the unit template, rendered and installed by the command; a changed unit applies at the next restart). The mesh route itself is set up once by hand: `mesh serve omarchy 3301 --at /platform --isolate`.
-- `ghostty-webgpu` is a `link:` to `/work/projects/ghostty-webgpu`. A change there needs `bun run build` in that repo before the web build picks it up.
-- CI builds the Editor at the commit pinned as `editor-ref` in `.github/actions/setup/action.yml`. A Platform change that needs newer Editor code bumps that pin in the same commit.
-- A release's `server/node_modules` is a symlink to the checkout's `apps/server/node_modules`: the bundle resolves language servers and its external packages at runtime. Rolling back a release does not roll back a `bun install`.
+- Every finished change ships: `bun run deploy` (web only, reuses the server bundle) or `bun run deploy --server`, which builds the server and stages it as `/work/platform-production/pending`: the app shows "Update available" and the server restarts only when someone clicks Restart, so verify a server change on the dev server first. `--rollback` drops a staged release and moves `current` back; if the app does not return after Restart, run it from a terminal outside Platform. It serves `https://omarchy.mesh.shaulavo.dev/platform` from `platform-prod.service` on port 3301, private to the owner's Tailscale. The route was set up once by hand: `mesh serve omarchy 3301 --at /platform --isolate`.
+- `GET /platform/release` reports the served release, commit and dirty count, plus `pending`, `phase` and `liveCheck` for a staged update.
+- `ghostty-webgpu` is a `link:`; run `bun run build` there first. CI builds the Editor at `editor-ref` in `.github/actions/setup/action.yml`; bump it in the same commit when Platform needs newer Editor code.
+- A release's `server/node_modules` symlinks to the checkout's, so rollback does not undo a `bun install`.
 
 ## Testing
 
-- Do not run tests unless they are necessary. Before running one, identify the specific plausible failure it could catch; if there is none, skip it.
-- Prefer the narrowest relevant test. Do not run a package or repository-wide suite when a focused check, typecheck, lint, config inspection, or diff review proves the change.
-- Tests run on Vitest.
-- PR CI runs Vitest with `retry` at 0; the nightly `flake-watch.yml` runs the web, server, TUI and browser suites five times and posts per-test failure counts as its job summary. Fix a flake it reports at the cause.
-- Apps run under Bun: `bun --bun vitest`.
-- Runtime-neutral `packages/*` run plain `vitest`.
-- Use these environments, in this order of preference: real browser, happy-dom, never jsdom.
-- Test projects:
-  - `node` — pure logic and in-process server tests. Runs under `--bun`.
-  - `dom` — hook and component tests in happy-dom. Runs under `--bun`.
-  - `browser` — real layout/paint `*.browser.tsx` tests via Playwright. Runs under plain Node because Vitest browser orchestration breaks under `--bun`.
-- In `apps/web` the browser world lives in its own `vitest.browser.config.ts`. Vitest merges Vite-level options such as `define` across the projects of one config file, so a `define` written for the browser project silently rewrites the same constant for `node` and `dom`. Keep the two files separate.
-- The `--bun` flag is required for app tests. Without it, `bun:sqlite`, `Bun.spawn`, and other Bun APIs do not resolve. Coverage is the only casualty; we do not use it.
-
-### Use Real App Code
-
-- Import `{ test, expect }` from `apps/web/test/fixtures.ts`, not from `vitest`, for app tests.
-- Drive the real in-process Elysia server. The `server` fixture builds `createApp` over a temp workspace. The `client` fixture is a real `treaty` client wired to `app.handle`.
-- Do not `mock.module` or `vi.mock` our server, client, or feature modules.
-- Production code calls `getClient()` from `@/lib/client`. Tests inject the real client with `setClient`, and restore whatever was installed before rather than resetting to a default — the `dom` project installs a real in-process client for every file in `test/env/dom.ts`, so a reset would hand later tests in the file a socket.
-- No test may open a socket to our own server. MSW runs with `onUnhandledRequest: 'error'`, so an escape fails the test that caused it instead of printing a bare `ECONNREFUSED` from Bun's http client.
-- Build real state. For example, `git init` a temp repo and write real files, then assert through real routes.
-
-### Mock Boundaries Only
-
-- Mock only the outside world and unspawnable processes.
-- Use MSW or injected `fetcher`s for third-party HTTP. Set `onUnhandledRequest: 'error'`.
-- Use injectable factories for PTY and LSP child processes.
-- Mock serialization edges a real server cannot reproduce, such as Eden `Date` normalization.
-- `MockProviderAdapter` is a production adapter, not a test stub. Prefer it over the real Codex adapter, which spawns an external binary.
-- Browser tests cannot import the Bun-native server into Node. Spawn the real server as a child `bun` process behind the Vite proxy in `apps/web/test/env/browser-file-server.ts`.
-- Node and dom tests import the server in-process.
-
-### Test Hygiene
-
-- Shared test code lives under `test/`.
-- Use `fixtures.ts` for `test.extend`.
-- Use `render.tsx`; `renderWithProviders` mirrors the app's `main.tsx` provider stack.
-- Put shared builders in `test/factories/`.
-- Put environment and MSW setup in `test/env/` and `test/msw/`.
-- Do not redefine per-file factories.
-- Do not hand-roll provider trees.
-- Avoid import-time nondeterminism, such as `Math.random()` at module scope. Use deterministic or seedable ids.
-
-### Bun/Vitest Gotchas
-
-- Under Vitest transforms, `import.meta.path` and `import.meta.dir` are `undefined`. `import.meta.dirname` works. Avoid Bun-only `import.meta` fields in code that tests must drive.
-- Cold process-spawning tests can exceed Vitest's 5s default timeout. If CI flakes cold, raise `testTimeout` for that project.
-- Terminal processes use `@workspace/pty` directly. Run their tests under Bun; terminal input and output are binary WebSocket frames, with JSON reserved for controls.
-
-`tabular-nums` should be the default for any number that updates ( timers, counters, prices, percentages, scores, live data etc ).
-
-you can enable this tnum OpenType feature using the CSS property `font-variant-numeric`.
-
-.tabular-nums {
-font-variant-numeric: tabular-nums;
-}
+- Run only a test that could catch a specific plausible failure, and the narrowest one.
+- Vitest. Apps run `bun --bun vitest` (Bun APIs need `--bun`); runtime-neutral `packages/*` run plain `vitest`. Projects: `node`, `dom` (happy-dom, never jsdom), `browser` (`*.browser.tsx`, Playwright, plain Node, own `vitest.browser.config.ts` because `define` leaks across projects in one config).
+- App tests import `{ test, expect }` from `apps/web/test/fixtures.ts` and drive the real in-process Elysia server (`server`, `client` fixtures) over real state (temp git repos, real files). Never mock our own modules. `setClient` in tests restores the previous client, not a default. No test opens a socket to our server; MSW uses `onUnhandledRequest: 'error'`.
+- Mock only the outside world: MSW or injected fetchers for third-party HTTP, injectable factories for PTY and LSP processes, Eden `Date` normalization. Prefer `MockProviderAdapter` over the real Codex adapter. Browser tests spawn the real server via `apps/web/test/env/browser-file-server.ts`.
+- Shared helpers: `test/fixtures.ts`, `test/render.tsx` (`renderWithProviders`), `test/factories/`, `test/env/`, `test/msw/`. No per-file factories or provider trees, no module-scope randomness.
+- `packages/ui` and `packages/tree` tests run through the React Compiler.
+- `import.meta.path`/`dir` are undefined under Vitest; use `import.meta.dirname`. Cold process-spawning tests may need a higher `testTimeout`.
+- The nightly `flake-watch.yml` reports flakes; fix them at the cause.

@@ -50,20 +50,24 @@ Parked: EXT-07 and EXT-09 (Plan 087 automation, Plan 143 research, per-OS matrix
    so a destructive action stays inside it; (b) close LIFE-09 with subprojects unsupported.
    **Recommendation: (a), after batches A–E.** It is the only way `repository_path` means
    anything, and monorepo subprojects are a common layout. L.
+   Decided 2026-09-26: owner — (a), after batches A–E.
 2. **LIFE-12: Project settings.** Eight per-project override keys (`chat.projectAutoSettle`,
    `git.projectAutoPull`, `chat.projectTextGenerationModels`, …) exist with no UI. (a) A Project
    page in Settings, opened from the row and project menus, editing those keys on the owning
    machine; (b) keep editing them as JSON and close LIFE-12. **Recommendation: (a).** Upstream's
    thread menu has it, and the keys are unusable without it. M.
+   Decided 2026-09-26: owner — (a).
 3. **EXT-12: idle worktree removal.** Upstream's age, merge and unchanged rules remove an idle
    thread's checkout and recreate it from the branch when the thread resumes. (a) Build that
    restore-on-resume step, off by default like upstream; (b) close EXT-12 with only
    delete-time cleanup. **Recommendation: (b).** Every rule is off by default upstream, and
    restore-on-resume adds a new failure path to every session start. L if (a).
+   Decided 2026-09-26: owner — (b).
 4. **EXT-17: prices.** Plan 141 replaced upstream's editable prices with automatic models.dev
    pricing; a model with no price shows "Price unavailable". (a) Close EXT-17 on automatic
    pricing; (b) add a manual price override for unpriced models. **Recommendation: (a).** Your
    141 decision already chose automatic pricing, and unknown prices never show a wrong number. S if (b).
+   Decided 2026-09-26: owner — (a); models.dev already prices every model it knows.
 
 ## Authority and completion rule
 
