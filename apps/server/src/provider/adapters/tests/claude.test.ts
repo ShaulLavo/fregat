@@ -375,6 +375,87 @@ describe('ClaudeProviderAdapter', () => {
     await harness.adapter.stopAll()
   })
 
+  it('approves only registered read-only tools from this runtime’s Platform MCP binding', async () => {
+    const harness = claudeHarness()
+    await harness.adapter.startRuntime({
+      ...sessionStartInput({ runtimeMode: 'approval-required' }),
+      platformMcp: { token: 'private-token', url: 'http://127.0.0.1:39087/mcp' },
+    })
+    const canUseTool = latestOptions(harness).canUseTool
+    assert(canUseTool)
+    const servers = harness.queries.at(-1)?.mcpBindings[0]
+    assert(servers)
+    const name = Object.keys(servers)[0]!
+    try {
+      for (const tool of ['read_file', 'workspace_info']) {
+        expect(
+          await canUseTool(
+            `mcp__${name}__${tool}`,
+            {},
+            {
+              ...canUseToolOptions(),
+              mcpServer: { name, source: 'dynamic' },
+            },
+          ),
+        ).toEqual({ behavior: 'allow', updatedInput: {} })
+      }
+      expect(harness.events.filter((event) => event.type === 'request.opened')).toEqual([])
+    } finally {
+      await harness.adapter.stopAll()
+    }
+  })
+
+  it.each([
+    { binding: false, name: 'platform', source: 'project', tool: 'read_file' },
+    { binding: true, name: 'platform__evil', source: 'project', tool: 'delete' },
+    { binding: true, name: 'registered', source: 'project', tool: 'read_file' },
+    { binding: true, name: 'registered', source: 'user', tool: 'read_file' },
+    { binding: true, name: 'registered', source: 'unknown-source', tool: 'read_file' },
+    { binding: true, name: 'registered', source: 'dynamic', tool: 'delete' },
+    { binding: true, name: 'registered', source: undefined, tool: 'read_file' },
+    { binding: true, name: 'platform', source: 'dynamic', tool: 'read_file' },
+  ])(
+    'asks approval for untrusted MCP provenance $name/$source/$tool with binding=$binding',
+    async (testCase) => {
+      const harness = claudeHarness()
+      const input = sessionStartInput({ runtimeMode: 'approval-required' })
+      await harness.adapter.startRuntime({
+        ...input,
+        ...(testCase.binding
+          ? {
+              platformMcp: { token: 'private-token', url: 'http://127.0.0.1:39087/mcp' },
+            }
+          : {}),
+      })
+      const servers = harness.queries.at(-1)?.mcpBindings[0]
+      const name = testCase.name === 'registered' ? Object.keys(servers ?? {})[0]! : testCase.name
+      const canUseTool = latestOptions(harness).canUseTool
+      assert(canUseTool)
+      try {
+        const permission = canUseTool(
+          `mcp__${name}__${testCase.tool}`,
+          {},
+          {
+            ...canUseToolOptions(),
+            ...(testCase.source ? { mcpServer: { name, source: testCase.source } } : {}),
+          },
+        )
+        // Approval creation is synchronous; an auto-allow returns without creating one.
+        const opened = harness.events.find((event) => event.type === 'request.opened')
+        assert(opened?.type === 'request.opened')
+        assert(opened.requestId)
+        await harness.adapter.respondApproval({
+          decision: 'decline',
+          requestId: v.parse(approvalRequestIdSchema, opened.requestId),
+          sessionId: input.sessionId,
+        })
+        expect(await permission).toMatchObject({ behavior: 'deny' })
+      } finally {
+        await harness.adapter.stopAll()
+      }
+    },
+  )
+
   it('opens an approval request per canUseTool call and resolves it with the decision', async () => {
     const harness = claudeHarness()
     const sessionId = v.parse(sessionIdSchema, '8d0c6924-9495-5fd9-a04a-08b1e925b65d')
@@ -1344,6 +1425,24 @@ describe('ClaudeProviderAdapter', () => {
     expect(options.model).toBe(`${SYNTHETIC_OPUS}[1m]`)
     expect('settings' in options).toBe(false)
     expect('thinking' in options).toBe(false)
+    await harness.adapter.stopAll()
+  })
+
+  it('adds Platform’s MCP endpoint to a session that has a binding, always loaded', async () => {
+    const harness = claudeHarness()
+    const platformMcp = { token: 'grant-token', url: 'http://127.0.0.1:3301/mcp' }
+    await harness.adapter.startRuntime({ ...sessionStartInput({}), platformMcp })
+    expect(latestOptions(harness).mcpServers).toBeUndefined()
+    const bindings = harness.queries.at(-1)?.mcpBindings[0]
+    assert(bindings)
+    expect(Object.values(bindings)).toEqual([
+      {
+        alwaysLoad: true,
+        headers: { Authorization: 'Bearer grant-token' },
+        type: 'http',
+        url: 'http://127.0.0.1:3301/mcp',
+      },
+    ])
     await harness.adapter.stopAll()
   })
 

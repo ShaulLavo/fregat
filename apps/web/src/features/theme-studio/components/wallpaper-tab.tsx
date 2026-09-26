@@ -4,6 +4,7 @@ import type {
   AssetId,
   PaletteColors,
   WallpaperAsset,
+  WallpaperCatalogEntry,
   WallpaperSelection,
   WallpaperSource,
 } from '@workspace/contracts'
@@ -24,6 +25,8 @@ import { wallpaperColorsOptions, wallpaperLibraryOptions } from '@/lib/wallpaper
 import { wallpaperSections } from '@/lib/wallpapers/utils/groups'
 import { visibleWallpaper } from '@/lib/wallpapers/utils/selection'
 import { WallpaperCard } from '@/features/theme-studio/components/wallpaper-card'
+import { WallpaperCatalogCard } from '@/features/theme-studio/components/wallpaper-catalog-card'
+import { useSettingValue } from '@/hooks/use-setting-value'
 import { WallpaperSection } from '@/features/theme-studio/components/wallpaper-section'
 import { WallpaperSourceCard } from '@/features/theme-studio/components/wallpaper-source-card'
 import { WallpaperUploadTile } from '@/features/theme-studio/components/wallpaper-upload-tile'
@@ -63,7 +66,8 @@ export function WallpaperTab({
     { queries: (matching ? assets : []).map((asset) => wallpaperColorsOptions(asset.id)) },
     owner,
   )
-  const sections = wallpaperSections(assets, search)
+  const previewCloud = useSettingValue('workbench.wallpaper.previewCloud')
+  const sections = wallpaperSections(assets, search, library.data?.catalog)
   const colorsById = new Map(
     colorQueries.flatMap((query, index) => (query.data ? [[assets[index]!.id, query.data]] : [])),
   )
@@ -91,6 +95,26 @@ export function WallpaperTab({
                     }),
                 })
             : undefined
+        }
+      />
+    )
+  }
+
+  function catalogCard(entry: WallpaperCatalogEntry) {
+    return (
+      <WallpaperCatalogCard
+        key={entry.asset}
+        entry={entry}
+        cloud={previewCloud}
+        installing={actions.install.isPending && actions.install.variables === entry.asset}
+        onSelect={() =>
+          actions.install.mutate(entry.asset, {
+            onSuccess: (asset) => select({ kind: 'library', asset: asset.id }),
+            onError: (error) =>
+              toastError(`${entry.file} could not be downloaded`, {
+                description: errorMessage(error, 'Try again.'),
+              }),
+          })
         }
       />
     )
@@ -202,8 +226,13 @@ export function WallpaperTab({
               </WallpaperSection>
             ) : null}
             {sections.themes.map((group) => (
-              <WallpaperSection key={group.id} heading={group.heading} count={group.assets.length}>
+              <WallpaperSection
+                key={group.id}
+                heading={group.heading}
+                count={group.assets.length + group.catalog.length}
+              >
                 {group.assets.map((asset) => card(asset, false))}
+                {group.catalog.map(catalogCard)}
               </WallpaperSection>
             ))}
           </>
