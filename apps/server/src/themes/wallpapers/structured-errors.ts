@@ -32,11 +32,18 @@ export const wallpaperErrors = defineErrorCatalog('wallpapers', {
     why: 'The asset is absent from the library.',
     fix: 'Refresh the library and select an existing image.',
   },
+  // A 4xx logs at warn: an offline machine or a GitHub outage is degraded, and the next pick retries.
   DOWNLOAD: {
-    status: 502,
+    status: 424,
     message: 'Omarchy wallpaper could not be downloaded.',
-    why: 'GitHub did not return the pinned wallpaper file.',
+    why: 'GitHub did not return the pinned wallpaper file in time.',
     fix: 'Check the network connection and pick the wallpaper again.',
+  },
+  DOWNLOAD_MISMATCH: {
+    status: 502,
+    message: 'Downloaded Omarchy wallpaper does not match the pinned file.',
+    why: 'GitHub returned bytes whose size or sha256 differs from the catalog.',
+    fix: 'Regenerate the catalog with `bun run themes:omarchy-catalog` and redeploy the server.',
   },
   DIRECTORY: {
     status: 400,

@@ -67,7 +67,11 @@ export const app = createApp({
     watch: Bun.env.FS_WATCH !== 'false',
   },
   systemRoot,
-  themes: { seedWallpapers: true },
+  themes: {
+    seedWallpapers: true,
+    // An agent:browser run's home is thrown away with the run; importing the machine's art there is waste.
+    importOmarchyWallpapers: Bun.env.PLATFORM_AGENT_HARNESS !== '1',
+  },
   treeConcurrency,
   watch,
   update: {

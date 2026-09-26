@@ -1588,6 +1588,13 @@
       "required": ["enabled", "source"],
       "type": "object"
     },
+    "workbench.wallpaper.downloadTimeoutMs": {
+      "default": 60000,
+      "description": "Milliseconds a picked Omarchy wallpaper may take to download from GitHub before the download stops.",
+      "maximum": 600000,
+      "minimum": 1000,
+      "type": "integer"
+    },
     "workbench.wallpaper.omarchyCatalog": {
       "default": true,
       "description": "List every Omarchy theme wallpaper in the picker. Picking one downloads it from a pinned Omarchy commit on GitHub.",

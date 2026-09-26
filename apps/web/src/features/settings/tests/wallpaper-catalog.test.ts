@@ -58,3 +58,36 @@ test('the catalog is empty while the setting is off', async ({ client }) => {
   })
   expect((await client.themes.wallpapers.get()).data?.catalog).toEqual([])
 })
+
+test('a stalled download leaves the listing free and gives up at the timeout', async ({
+  client,
+}) => {
+  const written = await client.settings.write.post({
+    mutationId: crypto.randomUUID(),
+    target: 'user',
+    operations: [{ kind: 'set', key: 'workbench.wallpaper.downloadTimeoutMs', value: 1000 }],
+  })
+  expect(written.error).toBeNull()
+  msw.use(http.get(LOGO_URL, () => new Promise<never>(() => {})))
+  const install = client.themes.wallpapers.catalog({ id: LOGO }).post()
+  const first = await Promise.race([
+    install.then(() => 'install'),
+    client.themes.wallpapers.get().then(() => 'list'),
+  ])
+  expect(first).toBe('list')
+  expect((await install).error?.status).toBe(424)
+})
+
+test('a body longer than the pinned size is refused', async ({ client }) => {
+  const oversized = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(omarchyCatalogWebp())
+      controller.enqueue(new Uint8Array(64 * 1024))
+      controller.close()
+    },
+  })
+  msw.use(http.get(LOGO_URL, () => new HttpResponse(oversized)))
+  const installed = await client.themes.wallpapers.catalog({ id: LOGO }).post()
+  expect(installed.error?.status).toBe(502)
+  expect((await client.themes.wallpapers.get()).data?.assets).toEqual([])
+})

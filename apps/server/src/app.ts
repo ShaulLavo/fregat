@@ -123,6 +123,8 @@ export type AppOptions = FileSystemServiceOptions & {
     root?: string
     /** Populate the wallpaper picker from packaged artwork during startup. */
     seedWallpapers?: boolean
+    /** After seeding, add this machine's installed Omarchy backgrounds. */
+    importOmarchyWallpapers?: boolean
   }
   orchestration?: {
     attachmentsDir?: string
@@ -266,11 +268,17 @@ export function createApp(options: AppOptions) {
       async () => {
         const started = performance.now()
         const result = await wallpapers.seed()
-        const omarchy = await wallpapers.importInstalledOmarchy()
         recordProcessInfo('wallpapers.seed', {
           durationMs: Math.round(performance.now() - started),
           ...result,
-          omarchy,
+        })
+        if (!options.themes?.importOmarchyWallpapers) return
+        const importStarted = performance.now()
+        const omarchy = await wallpapers.importInstalledOmarchy()
+        recordProcessInfo('wallpapers.omarchy-import', {
+          durationMs: Math.round(performance.now() - importStarted),
+          installed: omarchy !== null,
+          ...omarchy,
         })
       },
       { area: 'wallpaper', operation: 'library.seed' },

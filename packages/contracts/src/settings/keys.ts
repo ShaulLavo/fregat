@@ -660,6 +660,19 @@ export const SETTINGS_REGISTRY = {
       'Cloudinary cloud name that resizes Omarchy wallpaper previews through its fetch mode.',
     keywords: ['wallpaper', 'cloudinary', 'preview', 'thumbnail'],
   }),
+  'workbench.wallpaper.downloadTimeoutMs': defineSetting({
+    schema: v.pipe(v.number(), v.integer(), v.minValue(1000), v.maxValue(600_000)),
+    default: 60_000,
+    // Machine scope: the right wait depends on this box's network.
+    scope: 'machine',
+    widget: 'number',
+    category: 'Appearance',
+    title: 'Wallpaper download timeout',
+    description:
+      'Milliseconds a picked Omarchy wallpaper may take to download from GitHub before the download stops.',
+    visibility: 'advanced',
+    keywords: ['wallpaper', 'omarchy', 'github', 'download', 'timeout'],
+  }),
   'workbench.tree.indentGuides': defineSetting({
     schema: v.picklist(['none', 'onHover', 'always'] as const),
     default: 'always',

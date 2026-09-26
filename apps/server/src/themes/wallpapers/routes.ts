@@ -3,12 +3,7 @@ import { Elysia, t } from 'elysia'
 import { observeRequestOperation } from '../../observability'
 import { wallpaperColors } from './colors'
 import { wallpaperErrors } from './structured-errors'
-import {
-  displayName,
-  OMARCHY_THEMES_DIRECTORY,
-  parseAssetId,
-  type WallpaperLibrary,
-} from './library'
+import { OMARCHY_THEMES_DIRECTORY, parseAssetId, type WallpaperLibrary } from './library'
 
 export function wallpaperLibraryRoutes(library: WallpaperLibrary) {
   return new Elysia({ name: 'wallpaper-library' }).group('/themes/wallpapers', (app) =>
@@ -90,12 +85,11 @@ function media(library: WallpaperLibrary, input: string, kind: MediaKind) {
     { area: 'wallpaper', operation: `library.${kind}`, sourceKind: 'library', assetId: id },
     async () => {
       const asset = await library.read(id)
-      const names = {
-        asset: `${id}.${asset.extension}`,
-        display: displayName(id),
-        thumbnail: asset.thumbnail,
-      }
-      const file = Bun.file(path.join(await library.assetDirectory(id), names[kind]))
+      const file = Bun.file(
+        kind === 'asset'
+          ? path.join(await library.assetDirectory(id), `${id}.${asset.extension}`)
+          : await library.rendition(id, kind),
+      )
       if (!(await file.exists()))
         throw wallpaperErrors.NOT_FOUND({ internal: { at: 'serve', asset: id, kind } })
       return new Response(file, {
