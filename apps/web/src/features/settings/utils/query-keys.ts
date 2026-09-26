@@ -14,4 +14,6 @@ export const settingsQueryKeys = {
   usageHistoryAll: ['providers', 'usage', 'history'] as const,
   usageHistory: (days: number, utcOffsetMinutes: number) =>
     ['providers', 'usage', 'history', days, utcOffsetMinutes] as const,
+  pushDevices: ['push', 'devices'] as const,
+  pushThisDevice: ['push', 'this-device'] as const,
 } as const

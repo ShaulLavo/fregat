@@ -220,6 +220,7 @@
       "session.delete",
       "session.fork",
       "session.interaction-mode.set",
+      "session.lifecycle.restore",
       "session.meta.update",
       "session.pin",
       "session.pin.reorder",
@@ -242,12 +243,15 @@
       "worktree.release",
       "worktree.resolve-missing",
       "worktree.retain",
-      "worktree.retry"
+      "worktree.retry",
+      "worktree.setup.cancel",
+      "worktree.setup.run"
     ],
     "internal": [
       "project.create",
       "project.revive",
       "session.activity.append",
+      "session.auto-settle",
       "session.create",
       "session.deletion.update",
       "session.discover",
@@ -284,10 +288,12 @@
       "worktree.mark-missing",
       "worktree.metadata.refresh",
       "worktree.orphan.register",
+      "worktree.pull-request.sync",
       "worktree.register",
       "worktree.resolve-missing",
       "worktree.retain",
-      "worktree.revive"
+      "worktree.revive",
+      "worktree.setup.update"
     ]
   },
   "operations": [

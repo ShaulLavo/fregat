@@ -6,7 +6,7 @@ import { useSettingsOwner } from '@/features/settings/hooks/use-settings-owner'
 import { settingsMutationKeys } from '@/features/settings/utils/mutation-keys'
 import { updateProvider } from '@/features/settings/utils/provider-update-query'
 import { settingsQueryKeys } from '@/features/settings/utils/query-keys'
-import { clientErrorText } from '@/lib/client-error-taxonomy'
+import { clientErrorDescription, toClientError } from '@/lib/client-error-taxonomy'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import { providerQueryKeys } from '@/lib/query-keys'
 import { toastError } from '@/lib/toast-error'
@@ -33,7 +33,7 @@ export function useProviderUpdate(providerInstanceId: ProviderInstanceId, label:
           queryKey: settingsQueryKeys.providerUpdate(providerInstanceId),
         })
         toastError(`Could not update ${label}`, {
-          description: clientErrorText(error, 'The update did not finish.'),
+          description: clientErrorDescription(toClientError(error)),
         })
       },
     },

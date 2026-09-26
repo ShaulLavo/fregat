@@ -375,13 +375,16 @@ export function createSessionUnarchiveCommand({
 
 export function createSessionDeleteCommand({
   sessionId,
+  removeWorktree,
 }: {
   sessionId: SessionId
+  removeWorktree?: boolean
 }): SessionDeleteCommand {
   return {
     commandId: createCommandId(),
     sessionId,
     type: 'session.delete',
+    ...(removeWorktree ? { removeWorktree } : {}),
   }
 }
 
@@ -669,7 +672,8 @@ export function createUserInputDismissCommand(input: {
 }
 
 export type SessionLifecycleChange =
-  | { readonly type: 'settle' | 'unsettle' | 'unsnooze' | 'pin' | 'unpin' }
+  | { readonly type: 'settle' | 'unsettle' | 'unsnooze' | 'unpin' }
+  | { readonly type: 'pin'; readonly orderKey?: string }
   | { readonly type: 'snooze'; readonly snoozedUntil: string }
 
 export function createSessionActiveReorderCommand({
@@ -702,7 +706,9 @@ export function createSessionLifecycleCommand(
     case 'unsnooze':
       return { type: 'session.unsnooze', commandId, sessionId, reason: 'user' }
     case 'pin':
-      return { type: 'session.pin', commandId, sessionId }
+      return change.orderKey === undefined
+        ? { type: 'session.pin', commandId, sessionId }
+        : { type: 'session.pin', commandId, sessionId, orderKey: change.orderKey }
     case 'unpin':
       return { type: 'session.unpin', commandId, sessionId }
   }

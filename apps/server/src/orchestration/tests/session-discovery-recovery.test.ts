@@ -1,6 +1,6 @@
 import { mkdir, symlink } from 'node:fs/promises'
 import path from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import * as v from 'valibot'
 import { providerInstanceIdSchema, sessionIdSchema } from '@workspace/contracts'
 import { SessionDiscoveryReconciler } from '../session-discovery'
@@ -113,6 +113,11 @@ describe('session discovery reconciliation', () => {
       ).not.toBeNull()
 
       expect(await reconciler.scan()).toMatchObject({ imported: 1, skipped: {} })
+      // The lifecycle reactor fills headCommit after a revive; its event would land after the snapshot.
+      await vi.waitFor(() => {
+        const live = [...fixture.getReadModel().worktrees.values()].filter((row) => !row.retiredAt)
+        expect(live.every((row) => row.headCommit)).toBe(true)
+      })
       const snapshot = await fixture.engine.shellSnapshot()
       expect(
         snapshot.worktrees.find((worktree) => worktree.id === initial.result?.worktreeId),

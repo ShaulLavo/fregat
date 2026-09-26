@@ -3,7 +3,7 @@
 ## Status and authorization
 
 - Status: RESEARCH DONE (2026-09-25) — findings, recommendations and proposed phases below;
-  three owner questions open. Nothing here authorizes implementation.
+  owner questions answered 2026-09-26. Nothing here authorizes implementation.
 - Priority: P2.
 - Planned at: Platform `9f343825`, 2026-09-25. Origin: Plan 126
   [LIFE-13](126-t3code-alignment/lifecycle.md) owner correction.
@@ -198,14 +198,17 @@ same order from pane-scoped bindings, with no second dispatch mechanism.
    (upstream); your stack correction and L5 say yes, until 50 steps. Options: (a) the stack stays
    live; (b) entries expire with the notice. **Recommendation: (a)**, and update the LIFE-13
    acceptance line.
+   Decided 2026-09-26: owner — (b): Mod+Z does not act once the 5 s notice is gone, matching LIFE-13's acceptance and upstream.
 2. **Should rail undo survive a reload?** Options: (a) memory, per window; (b) IndexedDB, per
    browser; (c) on the server, across devices. **Recommendation: (a).** (b) can be added later
    without a server change.
+   Decided 2026-09-26: owner — (a) memory only now; surviving a reload is a low-priority nice-to-have.
 3. **One app timeline or one per domain, once a second app-level consumer exists** (for example
    workspace edits, which have no key today)? Options: (a) one history instance holding a tagged
    union, where Mod+Z steps back through whatever happened last; (b) a history per domain, each
    with its own command. **Recommendation: (a)**, matching "steps back through recent actions".
    LIFE-13 ships with one domain either way, and the API above supports both.
+   Decided 2026-09-26: owner — (b) one stack per domain, no merged app timeline; this overrides the recommendation.
 
 ### Proposed phases
 

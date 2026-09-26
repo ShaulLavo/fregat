@@ -1,6 +1,7 @@
 import { sessionTitleEntries } from './session-titles'
 import { WORKTREE_EVENT_PAYLOADS } from './worktree-lifecycle'
 import * as v from 'valibot'
+import { sessionLifecycleStateSchema } from './session-lifecycle'
 import {
   approvalRequestIdSchema,
   commandIdSchema,
@@ -126,6 +127,7 @@ export const sessionMetaUpdatedPayloadSchema = v.object({
 export const sessionDeletedPayloadSchema = v.object({
   sessionId: sessionIdSchema,
   deletedAt: isoDateTimeSchema,
+  removeWorktree: v.optional(v.boolean()),
 })
 
 export const sessionArchivedPayloadSchema = v.object({
@@ -390,6 +392,12 @@ export const ORCHESTRATION_EVENT_PAYLOADS = {
   'session.meta-updated': sessionMetaUpdatedPayloadSchema,
   'session.deleted': sessionDeletedPayloadSchema,
   'session.archived': sessionArchivedPayloadSchema,
+  'session.lifecycle-restored': v.object({
+    sessionId: sessionIdSchema,
+    expectedRevision: nonNegativeIntegerSchema,
+    state: sessionLifecycleStateSchema,
+    updatedAt: isoDateTimeSchema,
+  }),
   'session.unarchived': sessionUnarchivedPayloadSchema,
   'session.settled': sessionSettledPayloadSchema,
   'session.unsettled': sessionUnsettledPayloadSchema,

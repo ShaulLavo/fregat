@@ -1,4 +1,5 @@
 import { forkAttachment, forkMessages } from './utils/fork-messages'
+import { restoreLifecycle } from './lifecycle-restore'
 import { questionAnswerHistory } from './question-answer-history'
 import { approvalResponseEvents, endedApprovalEvents } from './approval-admission'
 import { decideSessionTitle, titleMetadata } from './title-decider'
@@ -21,6 +22,7 @@ import {
   DEFAULT_INTERACTION_MODE,
   DEFAULT_RUNTIME_MODE,
   type OrchestrationCommand,
+  type OrchestrationCommandReceipt,
   approvalRequestIdSchema,
   messageIdSchema,
   turnIdSchema,
@@ -61,10 +63,11 @@ import type { OrchestrationProjectedSession, OrchestrationReadModel } from './re
 export function decideOrchestrationCommand(
   command: OrchestrationCommand,
   model: OrchestrationReadModel,
+  restoreReceipt?: OrchestrationCommandReceipt | null,
 ): PendingOrchestrationEvent[] {
   requireNoRewindConflict(command, model)
   const at = new Date().toISOString()
-  const events = decideCommandEvents(command, model, at)
+  const events = decideCommandEvents(command, model, at, restoreReceipt)
 
   return [...events, ...endedApprovalEvents(command, events, model, at)]
 }
@@ -73,6 +76,7 @@ function decideCommandEvents(
   command: OrchestrationCommand,
   model: OrchestrationReadModel,
   at: string,
+  restoreReceipt: OrchestrationCommandReceipt | null | undefined,
 ): PendingOrchestrationEvent[] {
   switch (command.type) {
     case 'session.title.generate.complete':
@@ -93,6 +97,10 @@ function decideCommandEvents(
     case 'worktree.cleanup.fail':
     case 'worktree.mark-missing':
     case 'worktree.metadata.refresh':
+    case 'worktree.pull-request.sync':
+    case 'worktree.setup.update':
+    case 'worktree.setup.run':
+    case 'worktree.setup.cancel':
     case 'worktree.orphan.register':
     case 'session.worktree.release':
     case 'terminal.lease.request':
@@ -137,7 +145,10 @@ function decideCommandEvents(
       return one(command, at, 'session.deleted', {
         deletedAt: at,
         sessionId: command.sessionId,
+        ...(command.removeWorktree ? { removeWorktree: true } : {}),
       })
+    case 'session.lifecycle.restore':
+      return restoreLifecycle(command, model, at, restoreReceipt)
     case 'session.archive':
       requireSessionNotArchived(model, command.sessionId, command.type)
 
@@ -153,6 +164,8 @@ function decideCommandEvents(
         sessionId: command.sessionId,
         updatedAt: at,
       })
+    case 'session.auto-settle':
+      return sessionAutoSettled(command, model, at)
     case 'session.settle':
       return sessionSettled(command, model, at)
     case 'session.unsettle':
@@ -611,7 +624,7 @@ function sessionSettled(
     sessionId: command.sessionId,
     updatedAt: settledAt ? session.updatedAt : at,
   })
-  const events = [
+  return [
     ...messageQuestionDismissalEvents(
       command,
       session.id,
@@ -619,7 +632,46 @@ function sessionSettled(
       at,
     ),
     settled,
+    ...settlementCompanions(command, session, at),
   ]
+}
+
+/**
+ * The server's own settle, from an inactivity or pull request decision. It never answers a
+ * question for the user, and it settles at the last activity rather than at sweep time.
+ */
+function sessionAutoSettled(
+  command: Extract<OrchestrationCommand, { type: 'session.auto-settle' }>,
+  model: OrchestrationReadModel,
+  at: string,
+) {
+  const session = requireSessionNotArchived(model, command.sessionId, command.type)
+  if (session.settledOverride != null)
+    throw sessionDomainErrors.AUTO_SETTLE_STALE({
+      sessionId: command.sessionId,
+      internal: { settledOverride: session.settledOverride },
+    })
+  requireSettleable(session, command.type, at)
+  return [
+    event(command, at, 'session.settled', {
+      settledAt: command.settledAt,
+      acknowledgedFailureThroughSequence: Math.max(
+        session.latestFailureSequence ?? 0,
+        session.latestInterruptionSequence ?? 0,
+      ),
+      sessionId: command.sessionId,
+      updatedAt: at,
+    }),
+    ...settlementCompanions(command, session, at),
+  ]
+}
+
+function settlementCompanions(
+  command: Extract<OrchestrationCommand, { type: 'session.settle' | 'session.auto-settle' }>,
+  session: OrchestrationProjectedSession,
+  at: string,
+) {
+  const events: PendingOrchestrationEvent[] = []
   if (session.pinnedAt)
     events.push(event(command, at, 'session.unpinned', { sessionId: session.id, updatedAt: at }))
   if (session.snoozedUntil != null)
