@@ -81,6 +81,35 @@ test('Python, Astro and webpack paint their back layer in a second hue', () => {
   )
 })
 
+test.each([
+  ['song.mp3', 'catppuccin-audio'],
+  ['clip.mp4', 'catppuccin-video'],
+  ['paper.pdf', 'catppuccin-pdf'],
+  ['Main.java', 'catppuccin-java'],
+  ['build.gradle.kts', 'catppuccin-kotlin'],
+  ['index.php', 'catppuccin-php'],
+  ['init.lua', 'catppuccin-lua'],
+  ['paper.tex', 'catppuccin-latex'],
+  ['main.dart', 'catppuccin-dart'],
+  ['model.R', 'catppuccin-r'],
+  ['solve.jl', 'catppuccin-julia'],
+  ['tool.pl', 'catppuccin-perl'],
+  ['core.clj', 'catppuccin-clojure'],
+  ['app.ex', 'catppuccin-elixir'],
+  ['Main.hs', 'catppuccin-haskell'],
+  ['srv.erl', 'catppuccin-erlang'],
+  ['Lib.fs', 'catppuccin-fsharp'],
+  ['build.groovy', 'catppuccin-groovy'],
+  ['Makefile', 'catppuccin-makefile'],
+  ['CMakeLists.txt', 'catppuccin-cmake'],
+  ['api.proto', 'catppuccin-proto'],
+  ['BUILD.bazel', 'catppuccin-bazel'],
+  ['blur.glsl', 'catppuccin-shader'],
+  ['server.pem', 'catppuccin-certificate'],
+])('Catppuccin draws %s as %s', (name, glyph) => {
+  expect(fileIconRule(iconForEntry({ name, type: 'file' })).glyph).toBe(glyph)
+})
+
 test.each(['constructor', '__proto__', 'toString'])(
   '%s resolves to the default file icon',
   (name) => {

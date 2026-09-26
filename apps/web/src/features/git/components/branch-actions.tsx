@@ -5,13 +5,14 @@ import {
   GitPullRequestIcon,
   UploadSimpleIcon,
 } from '@phosphor-icons/react'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import type {
   GitBranchRemoteState,
   GitPullRequest,
   GitPullRequestState,
 } from '@workspace/contracts'
 
+import { useHeldUntilReady } from '@/hooks/use-held-until-ready'
 import { useBranchRemoteState } from '@/features/git/hooks/use-branch-remote-state'
 import { useCreatePullRequestMutation } from '@/features/git/hooks/use-create-pull-request-mutation'
 import { usePullRequestState } from '@/features/git/hooks/use-pull-request-state'
@@ -30,51 +31,70 @@ import { PullRequestLookupRetry } from '@/features/git/components/pull-request-l
  * were able to ask the forge and it said there is none.
  */
 export function BranchActions({
-  pullRequestTitle,
-  rootPath,
+  pullRequestTitle: nextTitle,
+  rootPath: nextRootPath,
 }: {
   /** What a new pull request is called. The session's own title, not the branch. */
   readonly pullRequestTitle: string
   readonly rootPath: string
 }) {
-  const { data: state } = useBranchRemoteState(rootPath)
-  // Its own query, and never awaited by the rest: reading a pull request shells
-  // out to the forge CLI, and Publish must not wait on the network to appear.
-  const lookup = usePullRequestState(rootPath)
-  const pullRequestState = lookup.isSuccess ? lookup.data : undefined
+  const branch = useBranchRemoteState(nextRootPath)
+  const pullRequest = usePullRequestState(nextRootPath)
+  // Publishing a repository needs only local git; remote actions also need the forge's answer.
+  const loading =
+    branch.isPending ||
+    (Boolean(branch.data?.branch && branch.data.hasRemote) && pullRequest.isPending)
+  // useHeldUntilReady needs stable identity when React retries a render.
+  const next = useMemo(
+    () => ({
+      rootPath: nextRootPath,
+      pullRequestTitle: nextTitle,
+      state: branch.data,
+      pullRequestState: pullRequest.isSuccess ? pullRequest.data : undefined,
+      requestLabel: changeRequestLabel(pullRequest.data?.forge),
+    }),
+    [nextRootPath, nextTitle, branch.data, pullRequest.data, pullRequest.isSuccess],
+  )
+  const { rootPath, pullRequestTitle, state, pullRequestState, requestLabel } = useHeldUntilReady(
+    next,
+    !loading,
+  )
   const push = usePushRemoteMutation(rootPath)
   const createPullRequest = useCreatePullRequestMutation(rootPath)
-  const requestLabel = changeRequestLabel(lookup.data?.forge)
   const ship = usePushAndOpenPullRequestMutation(rootPath, requestLabel)
-  const [publishing, setPublishing] = useState(false)
-  if (!state?.branch) return null
+  const [publishing, setPublishing] = useState<string | null>(null)
+  const spinner = loading ? <Spinner label='Loading branch actions' size='xs' /> : null
+  if (!state?.branch) return spinner
   if (!state.hasRemote)
     return (
-      <>
+      <span className='flex shrink-0 items-center gap-1' data-branch-actions={rootPath}>
+        {spinner}
         <Button
+          disabled={loading}
           className='text-2xs'
           size='sm'
           type='button'
           variant='ghost'
-          onClick={() => setPublishing(true)}
+          onClick={() => setPublishing(rootPath)}
         >
           <CloudArrowUpIcon className='size-(--icon-size-sm)' />
           Publish repository
         </Button>
         <PublishRepositoryDialog
-          open={publishing}
-          onOpenChange={setPublishing}
-          rootPath={rootPath}
+          open={publishing !== null}
+          onOpenChange={(open) => setPublishing(open ? rootPath : null)}
+          rootPath={publishing ?? rootPath}
         />
-      </>
+      </span>
     )
 
   return (
-    <span className='flex shrink-0 items-center gap-1'>
+    <span className='flex shrink-0 items-center gap-1' data-branch-actions={rootPath}>
+      {spinner}
       {pushLabel(state) ? (
         <Button
           className='text-2xs'
-          disabled={push.isPending}
+          disabled={loading || push.isPending}
           size='sm'
           type='button'
           variant='ghost'
@@ -87,7 +107,7 @@ export function BranchActions({
       {canShip(state, pullRequestState) ? (
         <Button
           className='text-2xs'
-          disabled={ship.isPending || push.isPending}
+          disabled={loading || ship.isPending || push.isPending}
           size='sm'
           type='button'
           variant='ghost'
@@ -119,7 +139,7 @@ export function BranchActions({
       {canCreatePullRequest(state, pullRequestState) ? (
         <Button
           className='text-2xs'
-          disabled={createPullRequest.isPending}
+          disabled={loading || createPullRequest.isPending}
           size='sm'
           type='button'
           variant='ghost'

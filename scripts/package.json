@@ -13,6 +13,7 @@
     "@workspace/utils": "workspace:*"
   },
   "devDependencies": {
+    "@iconify-json/catppuccin": "1.2.17",
     "@jridgewell/trace-mapping": "0.3.31",
     "@pierre/vscode-icons": "0.0.9",
     "@types/bun": "1.4.2",

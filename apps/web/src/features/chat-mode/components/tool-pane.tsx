@@ -1,3 +1,4 @@
+import { usePanelRoot } from '@/features/git/hooks/use-panel-root'
 import { ToolPane as PaneShell } from '@workspace/ui/patterns/tool-pane'
 import type { GitFileStatus } from '@workspace/contracts'
 import { filesystemPath } from '@/lib/documents/utils/identity'
@@ -54,10 +55,21 @@ export function ToolPane({
   // checkout rather than the project root. Same value for a session with no
   // worktree; the difference only appears once one has its own.
   const toolRoot = useSessionToolRoot()
+  const holdsGit = tab === 'git' && diffScope.scope.kind === 'working-tree'
+  const shownGitRoot = usePanelRoot(toolRoot, holdsGit)
   useSessionCheckoutRefresh()
   const terminalSessionId = useSessionTerminalId()
   if (tab !== 'terminal') {
-    return toolBody({ conflicts, diffScope, gitFiles, rootPath, tab, toolRoot, workbenchPanels })
+    return toolBody({
+      conflicts,
+      diffScope,
+      gitFiles,
+      rootPath,
+      tab,
+      toolRoot: holdsGit ? shownGitRoot : toolRoot,
+      gitLoading: holdsGit && shownGitRoot !== toolRoot,
+      workbenchPanels,
+    })
   }
 
   return (
@@ -85,6 +97,7 @@ export function ToolPane({
 }
 
 function toolBody({
+  gitLoading,
   conflicts,
   diffScope,
   gitFiles,
@@ -93,6 +106,7 @@ function toolBody({
   toolRoot,
   workbenchPanels,
 }: {
+  readonly gitLoading: boolean
   readonly conflicts: EditorTabConflictMap
   readonly diffScope: SessionDiffScopeState
   readonly gitFiles: readonly GitFileStatus[]
@@ -112,7 +126,7 @@ function toolBody({
     )
   }
   if (tab === 'files') return <FileNavigatorPanel rootPath={filesystemPath(toolRoot)} />
-  if (tab === 'git') return gitToolPane(toolRoot, diffScope)
+  if (tab === 'git') return gitToolPane(toolRoot, diffScope, gitLoading)
   if (tab === 'logs') return <LogsPanel active />
   if (tab === 'search') return <SearchPane rootPath={toolRoot} />
 
@@ -132,14 +146,14 @@ function toolBody({
  * its own: the scope bar has to sit between the header and the panel body, and
  * that panel belongs to the workbench sidebar too.
  */
-function gitToolPane(rootPath: string, diffScope: SessionDiffScopeState) {
+function gitToolPane(rootPath: string, diffScope: SessionDiffScopeState, loading: boolean) {
   const { latestTurnId, scope, selectTurnScope, selectWorkingTreeScope } = diffScope
 
   return (
     <PaneShell
       className='h-full min-w-0 overflow-hidden'
       scroll={false}
-      header={<GitPaneHeader rootPath={rootPath} />}
+      header={<GitPaneHeader rootPath={rootPath} loading={loading} />}
       subheader={
         <PaneBar>
           <Tabs

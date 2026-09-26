@@ -1282,5 +1282,23 @@
     "to": "settings",
     "module": "features/settings/utils/shortcut-rows.ts",
     "reason": "owner: the /dev gallery shows the settings shortcut rows and recorder over fixture overrides, so a phone check needs no settings state."
+  },
+  {
+    "from": "workbench",
+    "to": "git",
+    "module": "features/git/hooks/use-diff-document-diffs.ts",
+    "reason": "owner: workbench coordinates the comparison tab label and body; Git supplies readiness for the patch and its complete blobs."
+  },
+  {
+    "from": "chat-mode",
+    "to": "git",
+    "module": "features/git/hooks/use-panel-root.ts",
+    "reason": "owner: The composed Git header and body share the root held until status and visible history are ready."
+  },
+  {
+    "from": "workbench",
+    "to": "git",
+    "module": "features/git/hooks/use-panel-root.ts",
+    "reason": "owner: The composed Git header and body share the root held until status and visible history are ready."
   }
 ]
