@@ -5,7 +5,7 @@ import type { Client } from '@/lib/client'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import { admitIndexWrite } from '@/features/git/utils/admit-mutation'
 import { notifyMutationError } from '@/features/git/utils/notify-mutation-error'
-import { settleDiscardedGitStatus, settleGitStatus } from '@/features/git/utils/settle-status'
+import { settleDiskWriteGitStatus, settleGitStatus } from '@/features/git/utils/settle-status'
 
 type IndexWrite = {
   readonly mutationKey: MutationKey
@@ -17,7 +17,7 @@ type IndexWrite = {
 
 /** A write that answers with the repository's new status, which seeds the cache directly. */
 export function useIndexMutation({ discards, mutationKey, rootPath, run }: IndexWrite) {
-  const settle = discards ? settleDiscardedGitStatus : settleGitStatus
+  const settle = discards ? settleDiskWriteGitStatus : settleGitStatus
 
   return useMutation({
     mutationFn: async (_variables: void, { client }) => {

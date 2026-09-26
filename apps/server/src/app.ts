@@ -63,6 +63,11 @@ import { themeRoutes } from './themes/routes'
 import { DEFAULT_PROVIDER_INSTANCES } from './provider/drivers/built-in'
 import { mergeProviderInstanceConfigs } from './provider/utils/instance-config-merge'
 import { SettingsStore, type SettingsStoreOptions } from './settings/store'
+import { worktreeSubmoduleMode } from './git/submodules'
+import { autoPullEnabled } from './git/auto-pull'
+import { autoSettleRules } from './orchestration/utils/auto-settle-settings'
+import { readBranchPullRequests, type ForgeBoundaries } from './git/pull-request'
+import type { BranchPullRequestLookup } from './orchestration/pull-request-sync-reactor'
 import { TerminalService, type TerminalPtyFactory } from './terminal/service'
 import { wallpaperRoutes } from './wallpaper/routes'
 import { webRoutes, type WebOptions } from './web/routes'
@@ -99,6 +104,10 @@ export type AppOptions = FileSystemServiceOptions & {
     database?: OrchestrationDatabase
     providerAdapterRegistry?: ProviderAdapterRegistry
     providerRuntime?: boolean
+    /** Null turns pull request sync off; tests never reach a forge. */
+    pullRequestLookup?: BranchPullRequestLookup | null
+    /** Test seam: the forge CLIs and APIs the git service calls. */
+    forgeBoundaries?: ForgeBoundaries
   }
   lsp?: {
     /**
@@ -140,7 +149,10 @@ const appCleanups = new WeakMap<object, () => Promise<void>>()
 export function createApp(options: AppOptions) {
   const fs = new FileSystemService(options)
   const git = new GitService(fs.paths, {
+    autoPullPolicy: (root) =>
+      autoPullEnabled(settings, () => orchestration.checkoutProjectId(root)),
     maxTextFileBytes: fs.info().maxTextFileBytes,
+    forgeBoundaries: options.orchestration?.forgeBoundaries,
   })
   const database = options.orchestration?.database ?? getDefaultPlatformDatabase()
   // The schema has to exist before anything below reads this handle: the
@@ -263,6 +275,19 @@ export function createApp(options: AppOptions) {
     },
     keepImportedSessionsUpdated: () =>
       settings.snapshot().values['chat.keepImportedSessionsUpdated'],
+    worktreeSubmodules: (projectId) => worktreeSubmoduleMode(settings, projectId),
+    autoSettleRules: (projectId) => autoSettleRules(settings, projectId),
+    worktreeCleanupOnDelete: (projectId) => {
+      const values = settings.snapshot().values
+      return (
+        values['git.projectWorktreeCleanupOnDelete'][projectId] ??
+        values['git.worktreeCleanupOnDelete']
+      )
+    },
+    pullRequestLookup:
+      options.orchestration?.pullRequestLookup === undefined
+        ? (input) => readBranchPullRequests(input)
+        : (options.orchestration.pullRequestLookup ?? undefined),
     providerService,
     terminalService: terminal,
     attachmentsDir: options.orchestration?.attachmentsDir,
@@ -270,6 +295,13 @@ export function createApp(options: AppOptions) {
     providerRuntime: options.orchestration?.providerRuntime
       ? { checkpointGit: git, providerService }
       : false,
+  })
+  settings.onChange(() => {
+    runDetached(() => orchestration.settleSessions(), { area: 'chat', operation: 'auto_settle' })
+    runDetached(() => orchestration.cleanupWorktrees(), {
+      area: 'worktree',
+      operation: 'auto_cleanup',
+    })
   })
   const identity = readEnvironmentIdentity(database)
   const serverConfig = orchestrationWsServerConfig(identity)
@@ -418,6 +450,9 @@ export function createApp(options: AppOptions) {
       gitRoutes(git, commitMessages, {
         resolveBaseCommit: (checkoutPath) => orchestration.worktreeBaseCommit(checkoutPath),
         refreshMetadata: (checkoutPath) => orchestration.refreshWorktreeMetadata(checkoutPath),
+        registerClone: (absolutePath) => orchestration.registerCheckout(absolutePath),
+        submoduleMode: async (checkoutPath) =>
+          worktreeSubmoduleMode(settings, await orchestration.worktreeProjectId(checkoutPath)),
       }),
     )
     .use(fsRoutes(fs))

@@ -1,7 +1,16 @@
+import { usePushPending } from '@/features/git/hooks/use-push-pending'
 import { pushRemote } from '@/features/git/utils/api'
-import { mutationKeys } from '@/features/git/utils/mutation-keys'
+import { gitRemoteMutationScope, mutationKeys } from '@/features/git/utils/mutation-keys'
 import { useRemoteMutation } from '@/features/git/hooks/use-remote-mutation'
 
 export function usePushRemoteMutation(rootPath: string) {
-  return useRemoteMutation({ mutationKey: mutationKeys.push(rootPath), rootPath, run: pushRemote })
+  const isPending = usePushPending(rootPath)
+  const mutation = useRemoteMutation({
+    mutationKey: mutationKeys.push(rootPath),
+    refetch: 'checkout',
+    rootPath,
+    run: pushRemote,
+    scope: gitRemoteMutationScope(rootPath),
+  })
+  return { ...mutation, isPending }
 }

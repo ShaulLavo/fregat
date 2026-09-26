@@ -202,7 +202,7 @@ function firstRow(harness: RailHarness) {
   return model.sessions.find((session) => session.id === harness.sessionIds[0]) ?? null
 }
 
-function renderInHarness(harness: RailHarness, children: ReactNode) {
+export function renderInRailHarness(harness: RailHarness, children: ReactNode) {
   return renderWithProviders(
     <EditorStateProvider runtime={harness.application.getSnapshot().editor}>
       <ChatModeSessionContext value={harness.context}>{children}</ChatModeSessionContext>
@@ -220,7 +220,7 @@ export function renderRailHarness(
   onRender: ProfilerOnRenderCallback = () => {},
 ) {
   const row = firstRow(harness)
-  return renderInHarness(
+  return renderInRailHarness(
     harness,
     <ChatRailOrderProvider>
       {header ? (
@@ -249,7 +249,7 @@ export function renderRailHarness(
  */
 export function renderSessionHeaders(harness: RailHarness) {
   const row = firstRow(harness)
-  return renderInHarness(
+  return renderInRailHarness(
     harness,
     <>
       <section aria-label='Stage header'>

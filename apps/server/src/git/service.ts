@@ -10,9 +10,13 @@ import type {
   GitCommitProgressEvent,
   GitPullRequestCreateResult,
   GitPullRequestState,
+  GitPublishRequest,
+  GitPublishResult,
   GitPushResult,
+  GitShipResult,
+  WorktreeSubmoduleMode,
 } from '@workspace/contracts'
-import { isBinaryGitDiff } from '@workspace/contracts'
+import { errorMessage, isBinaryGitDiff } from '@workspace/contracts'
 import {
   gitCommonDirectory,
   withGitRepositoryLane,
@@ -31,7 +35,15 @@ import type {
   GitPathsBody,
 } from './contracts'
 import { parseDiff, rewriteBlobPatchPaths } from './diff'
-import { createPullRequest, readPullRequest } from './pull-request'
+import { forgetForgeContext } from './forges/registry'
+import {
+  createForgeRepository,
+  createPullRequest,
+  readPullRequest,
+  resolvePullRequest,
+  readPullRequestsByNumber,
+  type ForgeBoundaries,
+} from './pull-request'
 import {
   mutationPaths,
   pathspecArgs,
@@ -42,6 +54,14 @@ import { gitCwdForPath, lexicalRepositoryRoot } from './repository'
 import { parseNumstat, untrackedLineStats, withLineStats } from './numstat'
 import { parseRepositoryInfo, parseStatus, statusMatchesPathspec } from './status'
 import { UpstreamFetchScheduler } from './upstream-fetch'
+import { AutoPull, type AutoPullPolicy } from './auto-pull'
+import { cloneRepository } from './clone'
+import {
+  hasSubmodules,
+  SUBMODULE_UPDATE_OPTIONS,
+  submoduleUpdateArgs,
+  uninitializedSubmoduleCount,
+} from './submodules'
 import { BoundedTtlCache } from './utils/bounded-cache'
 import { gitPullRequestErrors } from './utils/pull-request-errors'
 import { conflictSummary, pullFailureReason } from './utils/pull-failure'
@@ -81,6 +101,9 @@ type GitRepositoryRoot = {
 }
 
 type GitServiceOptions = {
+  autoPullPolicy?: AutoPullPolicy
+  /** The forge CLIs and HTTP APIs; tests replace them, production spawns and fetches. */
+  forgeBoundaries?: ForgeBoundaries
   diffConcurrency?: number
   maxCommandOutputBytes?: number
   maxTextFileBytes: number
@@ -136,6 +159,9 @@ const STATUS_CACHE_CAPACITY = 2_048
 const REPOSITORY_CACHE_TTL_MS = 60_000
 const REPOSITORY_CACHE_CAPACITY = 512
 
+/** Marks a branch whose pushes go to its differently named upstream: a pull request checkout. */
+const PUSH_TO_UPSTREAM_KEY = 'platformPushToUpstream'
+
 /**
  * Verbs that cannot change what `git status` reports. `hash-object -w` is in
  * here because it only adds a loose object; the index and the worktree are
@@ -169,6 +195,8 @@ export class GitService {
   private readonly repositoryRoots: BoundedTtlCache<GitRepositoryRoot | null>
   private readonly statuses: BoundedTtlCache<GitStatusResult>
   private readonly upstreamFetch: UpstreamFetchScheduler
+  private readonly autoPull: AutoPull | null
+  private readonly forgeBoundaries: ForgeBoundaries
 
   constructor(paths: WorkspacePaths, options: GitServiceOptions) {
     this.paths = paths
@@ -191,6 +219,16 @@ export class GitService {
         await this.git(rootAbsolutePath, ['fetch', remote])
       },
     })
+    this.forgeBoundaries = options.forgeBoundaries ?? {}
+    this.autoPull = options.autoPullPolicy
+      ? new AutoPull({
+          policy: options.autoPullPolicy,
+          withLane: async (root, action) =>
+            withGitRepositoryLane(await this.commonDirectory(root), action),
+          run: (root, args, runOptions) => this.git(root, args, runOptions),
+          onSettled: (root) => this.invalidateStatus(root),
+        })
+      : null
   }
 
   subscribeMutations(listener: (path: string) => Promise<void>) {
@@ -239,7 +277,8 @@ export class GitService {
   async status(input = '', fresh = false): Promise<GitStatusResult> {
     recordGitServiceOperation('status', input)
     const repository = await this.resolveRepositoryLocation(input, fresh)
-    if (!repository) return { repository: null, files: [] }
+    if (!repository)
+      return { repository: null, files: [], uninitializedSubmodules: 0, autoPull: null }
 
     if (fresh) this.invalidateStatus(repository.rootAbsolutePath)
     const cacheKey = statusCacheKey(repository)
@@ -608,6 +647,96 @@ export class GitService {
     return { output: commandOutput(result), repository: repository.info }
   }
 
+  async initializeSubmodules(input: string, mode: WorktreeSubmoduleMode) {
+    recordGitServiceOperation('submodules_init', input, { mode })
+    const repository = await this.requiredRepositoryLocation(input)
+    await this.updateSubmodules(repository.rootAbsolutePath, mode)
+    return this.status(repository.rootPath)
+  }
+
+  /**
+   * Outside the repository lane on purpose: each worktree clones its submodules
+   * over the network into its own admin directory, and holding the lane for that
+   * would block every commit in every checkout of the repository.
+   */
+  async updateSubmodules(root: string, mode: WorktreeSubmoduleMode) {
+    if (mode === 'none' || !(await hasSubmodules(root))) return false
+    try {
+      await this.runGit(root, submoduleUpdateArgs(mode), SUBMODULE_UPDATE_OPTIONS)
+    } finally {
+      await this.notifyMutation(root)
+    }
+    return true
+  }
+
+  /**
+   * Clones into a folder inside the workspace. Not in the repository lane: there is no
+   * repository yet, and the new checkout is registered only once it is complete.
+   */
+  cloneProgress(
+    body: { source: string; destination: string },
+    register: (absolutePath: string) => Promise<string | null>,
+    signal?: AbortSignal,
+  ) {
+    recordGitServiceOperation('clone', body.destination)
+    const destination = this.resolveServicePath(body.destination)
+    return cloneRepository({
+      paths: this.paths,
+      signal,
+      source: body.source,
+      destination: destination.absolutePath,
+      displayPath: destination.relativePath,
+      register,
+    })
+  }
+
+  /**
+   * Creates the repository on a forge, adds it as a remote (reusing one with the same URL), and
+   * pushes the current branch when there is a commit to push. A push that fails after the
+   * repository exists is reported as such, never as a failed publish.
+   */
+  async publish(body: GitPublishRequest): Promise<GitPublishResult> {
+    recordGitServiceOperation('publish', body.path, { forge: body.forge })
+    const repository = await this.requiredRepository(body.path)
+    const root = repository.rootAbsolutePath
+    const created = await createForgeRepository(body, root, this.forgeBoundaries)
+    const remoteUrl = body.protocol === 'ssh' ? created.sshUrl : created.httpsUrl
+    const remoteName = await this.ensureRemote(root, remoteUrl)
+    const branch = repository.info.branch
+    const head = await this.git(root, ['rev-parse', '--verify', '--quiet', 'HEAD'], {
+      allowFailure: true,
+    })
+    const result = { url: created.url, remoteName, remoteUrl, branch, pushError: null }
+    if (head.exitCode !== 0) return { ...result, status: 'remote-added' }
+    const target = branch ?? 'main'
+    const push = await this.git(
+      root,
+      ['push', '--set-upstream', remoteName, `HEAD:refs/heads/${target}`],
+      {
+        allowFailure: true,
+        env: { GIT_TERMINAL_PROMPT: '0' },
+      },
+    )
+    if (push.exitCode === 0) return { ...result, status: 'pushed' }
+    return { ...result, status: 'push-failed', pushError: gitErrorMessage(push) }
+  }
+
+  /** `origin` unless another remote already has that name for a different URL. */
+  private async ensureRemote(root: string, url: string) {
+    const listed = await this.git(root, ['remote', '-v'], { allowFailure: true })
+    const remotes = new Map<string, string>()
+    for (const line of listed.stdout.split('\n')) {
+      const [name, remoteUrl] = line.trim().split(/\s+/)
+      if (name && remoteUrl) remotes.set(name, remoteUrl)
+    }
+    for (const [name, remoteUrl] of remotes) if (remoteUrl === url) return name
+    let name = 'origin'
+    for (let suffix = 1; remotes.has(name); suffix += 1) name = `origin-${suffix}`
+    await this.git(root, ['remote', 'add', name, url])
+    forgetForgeContext(root)
+    return name
+  }
+
   async pull(input = '') {
     recordGitServiceOperation('pull', input)
     const repository = await this.requiredRepository(input)
@@ -645,8 +774,11 @@ export class GitService {
     const branch = repository.info.branch
     if (!branch) throw gitPullRequestErrors.PUSH_DETACHED_HEAD({ path: repository.info.path })
 
-    const setUpstream = !(await this.upstreamRef(repository.rootAbsolutePath))
-    const args = setUpstream ? ['push', '--set-upstream', 'origin', branch] : ['push']
+    const upstream = await this.pushTarget(repository.rootAbsolutePath, branch)
+    const setUpstream = upstream === null
+    const args = upstream
+      ? ['push', upstream.remote, `HEAD:refs/heads/${upstream.branch}`]
+      : ['push', '--set-upstream', 'origin', branch]
     const result = await this.git(repository.rootAbsolutePath, args)
 
     return { branch, output: commandOutput(result), repository: repository.info, setUpstream }
@@ -668,11 +800,16 @@ export class GitService {
     const branch = repository.info.branch
     const upstream = branch ? await this.upstreamRef(repository.rootAbsolutePath) : null
 
+    const remotes = upstream
+      ? null
+      : await this.git(repository.rootAbsolutePath, ['remote'], { allowFailure: true })
+
     return {
       ahead: repository.info.ahead,
       behind: repository.info.behind,
       branch,
       hasUpstream: Boolean(upstream),
+      hasRemote: upstream !== null || Boolean(remotes?.stdout.trim()),
     }
   }
 
@@ -680,11 +817,34 @@ export class GitService {
     recordGitServiceOperation('pull_request_state', input)
     const repository = await this.requiredRepository(input)
     const branch = repository.info.branch
-    if (!branch) return { branch: null, pullRequest: null, support: 'no-github-remote' }
+    if (!branch) return { branch: null, pullRequest: null, support: 'no-forge', forge: null }
 
-    const read = await readPullRequest({ branch, cwd: repository.rootAbsolutePath })
+    const upstream = await this.pushTarget(repository.rootAbsolutePath, branch)
+    const read = await readPullRequest(
+      { branch: upstream?.branch ?? branch, cwd: repository.rootAbsolutePath },
+      this.forgeBoundaries,
+    )
 
     return { branch, ...read }
+  }
+
+  /** Pushes the branch, then opens its pull request; a failed step stops what follows it. */
+  async pushAndOpenPullRequest(body: GitCreatePullRequestBody): Promise<GitShipResult> {
+    recordGitServiceOperation('push_and_open_pull_request', body.path)
+    let pushed: GitPushResult
+    try {
+      pushed = await this.push(body.path)
+    } catch (error) {
+      return { push: { ok: false, message: errorMessage(error) }, pullRequest: null }
+    }
+    try {
+      return { push: { ok: true, result: pushed }, pullRequest: await this.createPullRequest(body) }
+    } catch (error) {
+      return {
+        push: { ok: true, result: pushed },
+        pullRequest: { kind: 'failed', message: errorMessage(error) },
+      }
+    }
   }
 
   async createPullRequest(body: GitCreatePullRequestBody): Promise<GitPullRequestCreateResult> {
@@ -692,15 +852,124 @@ export class GitService {
     const repository = await this.requiredRepository(body.path)
     const branch = repository.info.branch
     if (!branch) throw gitPullRequestErrors.PUSH_DETACHED_HEAD({ path: repository.info.path })
+    const upstream = await this.pushTarget(repository.rootAbsolutePath, branch)
 
-    return createPullRequest({
-      base: body.base,
-      body: body.body,
-      branch,
-      cwd: repository.rootAbsolutePath,
-      draft: body.draft,
-      title: body.title,
+    return createPullRequest(
+      {
+        base: body.base,
+        body: body.body,
+        branch: upstream?.branch ?? branch,
+        cwd: repository.rootAbsolutePath,
+        draft: body.draft,
+        title: body.title,
+      },
+      this.forgeBoundaries,
+    )
+  }
+
+  /**
+   * What stops an unattended removal of a worktree checkout: changes, another branch checked out,
+   * or ignored files. Ignored files can hold secrets or local data; `node_modules` is reinstallable.
+   */
+  async removalObstacle(input: { path: string; branch: string | null }) {
+    const [status, head, ignored] = await Promise.all([
+      this.git(input.path, ['status', '--porcelain', '--untracked-files=normal'], {
+        allowFailure: true,
+      }),
+      this.git(input.path, ['rev-parse', '--abbrev-ref', 'HEAD'], { allowFailure: true }),
+      this.git(
+        input.path,
+        ['ls-files', '--others', '--ignored', '--exclude-standard', '--directory', '-z'],
+        { allowFailure: true },
+      ),
+    ])
+    if (status.exitCode !== 0 || ignored.exitCode !== 0) return 'unreadable' as const
+    if (status.stdout.trim()) return 'dirty' as const
+    if (head.stdout.trim() !== input.branch) return 'branch-moved' as const
+    const residue = ignored.stdout
+      .split('\0')
+      .some((entry) => entry !== '' && !/(^|\/)node_modules\/$/.test(entry))
+    return residue ? ('ignored-files' as const) : null
+  }
+
+  /** The branch a local branch tracks, as its remote and the remote's branch name. */
+  async upstreamBranch(cwd: string, branch: string) {
+    const read = (key: string) =>
+      this.git(cwd, ['config', '--get', `branch.${branch}.${key}`], { allowFailure: true })
+    const [remote, merge] = await Promise.all([read('remote'), read('merge')])
+    const remoteName = remote.stdout.trim()
+    const mergeRef = merge.stdout.trim()
+    if (!remoteName || remoteName === '.' || !mergeRef.startsWith('refs/heads/')) return null
+    return { remote: remoteName, branch: mergeRef.slice('refs/heads/'.length) }
+  }
+
+  /**
+   * Where this branch's commits go. Only a branch `trackRemoteBranch` set up pushes under its
+   * upstream's name: `checkout -b feature origin/main` tracks `main` and must never push there.
+   */
+  async pushTarget(cwd: string, branch: string) {
+    const upstream = await this.upstreamBranch(cwd, branch)
+    if (!upstream || upstream.branch === branch) return upstream
+    const marker = await this.git(
+      cwd,
+      ['config', '--get', `branch.${branch}.${PUSH_TO_UPSTREAM_KEY}`],
+      {
+        allowFailure: true,
+      },
+    )
+    if (marker.stdout.trim() === 'true') return upstream
+    return { remote: upstream.remote, branch }
+  }
+
+  /** A pull request by number from the forge this checkout's remote names. */
+  async resolvePullRequest(path: string, number: number, remoteUrl?: string) {
+    const repository = await this.requiredRepositoryLocation(path)
+    return resolvePullRequest(
+      { cwd: repository.rootAbsolutePath, number, remoteUrl },
+      this.forgeBoundaries,
+    )
+  }
+
+  async readPullRequestsByNumber(path: string, remoteUrl: string, numbers: readonly number[]) {
+    const repository = await this.requiredRepositoryLocation(path)
+    return readPullRequestsByNumber(
+      { cwd: repository.rootAbsolutePath, remoteUrl, numbers },
+      this.forgeBoundaries,
+    )
+  }
+
+  /** Fetches a pull request's head into a local branch, replacing an earlier fetch of it. */
+  async fetchPullRequestHead(input: {
+    path: string
+    remote: string
+    ref: string
+    branch: string
+    expectedCommit?: string
+  }) {
+    recordGitServiceOperation('fetch_pull_request_head', input.path)
+    const repository = await this.requiredRepositoryLocation(input.path)
+    const root = repository.rootAbsolutePath
+    await withGitRepositoryLane(await this.commonDirectory(root), async () => {
+      await this.git(root, ['fetch', '--', input.remote, input.ref])
+      const head = await this.git(root, ['rev-parse', 'FETCH_HEAD^{commit}'])
+      if (input.expectedCommit && head.stdout.trim() !== input.expectedCommit) {
+        throw gitPullRequestErrors.PULL_REQUEST_HEAD_CHANGED({
+          internal: { expectedCommit: input.expectedCommit, actualCommit: head.stdout.trim() },
+        })
+      }
+      await this.git(root, ['branch', '-f', '--', input.branch, head.stdout.trim()])
     })
+  }
+
+  /** Makes the checked-out branch track `remote/branch`, so its pushes and pull request follow it. */
+  async trackRemoteBranch(input: { path: string; remote: string; branch: string }) {
+    recordGitServiceOperation('track_remote_branch', input.path)
+    const repository = await this.requiredRepositoryLocation(input.path)
+    const root = repository.rootAbsolutePath
+    await this.git(root, ['fetch', '--', input.remote, input.branch])
+    await this.git(root, ['branch', `--set-upstream-to=${input.remote}/${input.branch}`])
+    const local = (await this.git(root, ['symbolic-ref', '--short', 'HEAD'])).stdout.trim()
+    await this.git(root, ['config', `branch.${local}.${PUSH_TO_UPSTREAM_KEY}`, 'true'])
   }
 
   private async upstreamRef(cwd: string) {
@@ -797,11 +1066,33 @@ export class GitService {
     ])
     void this.upstreamFetch.schedule(repository.rootAbsolutePath, result.stdout)
     const files = parseStatus(result.stdout, repository.rootPath)
+    const [withLines, uninitializedSubmodules, autoPull] = await Promise.all([
+      files.length > 0 ? this.withLineStats(repository, files) : files,
+      uninitializedSubmoduleCount(repository.rootAbsolutePath, (args, options) =>
+        this.git(repository.rootAbsolutePath, args, options),
+      ),
+      this.autoPull?.evaluate(repository.rootAbsolutePath, result.stdout, () =>
+        repository.pathspec ? this.changedFileCount(repository) : Promise.resolve(files.length),
+      ) ?? null,
+    ])
 
     return {
       repository: parseRepositoryInfo(result.stdout, repository.rootPath),
-      files: files.length > 0 ? await this.withLineStats(repository, files) : files,
+      files: withLines,
+      uninitializedSubmodules,
+      autoPull,
     }
+  }
+
+  /** The whole checkout's change count, for a status read that was limited to a folder. */
+  private async changedFileCount(repository: GitRepositoryLocation) {
+    const result = await this.git(repository.rootAbsolutePath, [
+      'status',
+      '--porcelain=v2',
+      '-z',
+      '--untracked-files=all',
+    ])
+    return parseStatus(result.stdout, repository.rootPath).length
   }
 
   private async withLineStats(repository: GitRepositoryLocation, files: GitFileStatus[]) {
@@ -1473,6 +1764,9 @@ function isReadOnlyGit(args: readonly string[]) {
   const action = gitAction(args)
   if (READ_ONLY_GIT_ACTIONS.has(action)) return true
   const actionIndex = args.indexOf(action)
+  if (action === 'config') return args.includes('--get-regexp') || args.includes('--get')
+  // Listing remotes reads config; `remote add` and friends write it.
+  if (action === 'remote') return [undefined, '-v', 'get-url'].includes(args[actionIndex + 1])
   return action === 'worktree' && args[actionIndex + 1] === 'list'
 }
 

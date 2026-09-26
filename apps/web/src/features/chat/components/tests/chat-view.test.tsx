@@ -1,7 +1,7 @@
 import { settingsKeys } from '@workspace/client-core/settings/query-keys'
 import { settingsSnapshot } from '../../../../../test/factories/settings'
 import { createClientError } from '@workspace/client-core/errors'
-import { providerListQueryOptions } from '@/features/chat/utils/provider-query'
+import { providerListQueryOptions } from '@/lib/provider-query'
 import {
   resetChatInputDraftStore,
   useChatInputDraftStore,

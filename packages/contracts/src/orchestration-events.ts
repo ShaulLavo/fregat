@@ -128,6 +128,7 @@ export const sessionMetaUpdatedPayloadSchema = v.object({
 export const sessionDeletedPayloadSchema = v.object({
   sessionId: sessionIdSchema,
   deletedAt: isoDateTimeSchema,
+  removeWorktree: v.optional(v.boolean()),
 })
 
 export const sessionArchivedPayloadSchema = v.object({

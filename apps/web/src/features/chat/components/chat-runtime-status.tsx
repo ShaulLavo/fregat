@@ -8,7 +8,7 @@ import { useState } from 'react'
 import { chatRuntimeAlerts, type ChatRuntimeAlert } from '@/features/chat/utils/runtime-state'
 import { errorMessage } from '@/lib/error-message'
 import { useProviderSignInDialog } from '../hooks/use-provider-sign-in-dialog'
-import { providerListQueryOptions } from '@/features/chat/utils/provider-query'
+import { providerListQueryOptions } from '@/lib/provider-query'
 import type { ChatSession } from '@workspace/client-core/chat/types'
 import { FixWithAgentButton } from '@/components/fix-with-agent-button'
 

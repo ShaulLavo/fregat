@@ -1,4 +1,4 @@
-import { useMutation, type MutationKey } from '@tanstack/react-query'
+import { useMutation, type MutationKey, type MutationScope } from '@tanstack/react-query'
 
 import type { Client } from '@/lib/client'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
@@ -10,10 +10,19 @@ type RemoteWrite<T> = {
   readonly mutationKey: MutationKey
   readonly rootPath: string
   readonly run: (rootPath: string, owner: Client) => Promise<T>
+  readonly scope?: MutationScope
+  /** `checkout` refetches only this checkout's git queries; the default refetches every repository's. */
+  readonly refetch?: 'checkout' | 'workspace'
 }
 
 /** A write whose effects reach past the status it could return, so the workspace refetches. */
-export function useRemoteMutation<T>({ mutationKey, rootPath, run }: RemoteWrite<T>) {
+export function useRemoteMutation<T>({
+  mutationKey,
+  refetch = 'workspace',
+  rootPath,
+  run,
+  scope,
+}: RemoteWrite<T>) {
   return useMutation({
     mutationFn: async (_variables: void, { client }) => {
       admitGitWrite(client)
@@ -21,6 +30,8 @@ export function useRemoteMutation<T>({ mutationKey, rootPath, run }: RemoteWrite
     },
     mutationKey,
     onError: notifyMutationError,
-    onSuccess: (_result, _variables, _onMutateResult, { client }) => invalidateWorkspace(client),
+    onSuccess: (_result, _variables, _onMutateResult, { client }) =>
+      invalidateWorkspace(client, refetch === 'checkout' ? rootPath : undefined),
+    scope,
   })
 }

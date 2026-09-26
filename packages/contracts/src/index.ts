@@ -57,7 +57,19 @@ export type {
   GitWorktree,
   GitWorktreeCreateResult,
   GitWorktreeRemoveResult,
+  WorktreeSubmoduleMode,
+  GitAutoPullSkipReason,
+  GitAutoPullState,
+  GitForge,
+  GitForgeKind,
+  GitCloneStage,
+  GitCloneProgressEvent,
+  GitPublishRequest,
+  GitPublishResult,
+  GitRepositoryVisibility,
+  GitShipResult,
 } from './git'
+export { GIT_FORGE_KINDS, WORKTREE_SUBMODULE_MODES } from './git'
 export {
   GIT_FILE_STATUSES,
   GIT_OBJECT_ID_PATTERN,
@@ -933,3 +945,4 @@ export {
 export { fontRefSchema } from './fonts/schema'
 export { CURATED_FONTS, type CuratedFont } from './fonts/curated'
 export type { FontCatalogEntry } from './fonts/catalog'
+export { parsePullRequestReference, pullRequestReferenceRepository } from './pull-request-reference'

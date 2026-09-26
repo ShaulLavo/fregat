@@ -2,7 +2,7 @@ import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 import { ChatRuntimeStatus } from '@/features/chat/components/chat-runtime-status'
-import { providerListQueryOptions } from '@/features/chat/utils/provider-query'
+import { providerListQueryOptions } from '@/lib/provider-query'
 import { ChatProviderSignInProvider } from '@/features/chat/providers/provider-sign-in-provider'
 import type { ChatSession } from '@workspace/client-core/chat/types'
 import { providerSnapshot, session } from '../../../../../test/factories/chat'
