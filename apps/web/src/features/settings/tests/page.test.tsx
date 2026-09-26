@@ -179,7 +179,7 @@ test(
     )
 
     await userEvent.click(await screen.findByRole('tab', { name: 'Workspace' }))
-    await userEvent.type(await screen.findByLabelText('Search settings'), 'runtime')
+    await userEvent.type(await screen.findByRole('textbox', { name: 'Search settings' }), 'runtime')
     // The scope rule surfaces where the user meets it rather than only as a
     // server error after a failed save.
     expect(
@@ -195,7 +195,7 @@ test(
     expect(client).toBeDefined()
     renderWithProviders(<SettingsPage />)
 
-    await userEvent.type(await screen.findByLabelText('Search settings'), 'providers')
+    await userEvent.type(await screen.findByRole('textbox', { name: 'Search settings' }), 'providers')
 
     // The built-in providers live in the registry as constants, not in the
     // settings document, so the row has to source them from the running snapshots.
@@ -218,7 +218,7 @@ test('lists the real model catalog, and hiding one keeps its row to bring it bac
   expect(client).toBeDefined()
   renderWithProviders(<SettingsPage />)
 
-  await userEvent.type(await screen.findByLabelText('Search settings'), 'models')
+  await userEvent.type(await screen.findByRole('textbox', { name: 'Search settings' }), 'models')
 
   // Same defect as the providers section, one screen over: settings remember the
   // models you have an opinion about, so listing those meant the screen for
@@ -248,7 +248,7 @@ test('hiding and ordering models are one row, not the catalogue printed twice', 
   expect(client).toBeDefined()
   renderWithProviders(<SettingsPage />)
 
-  await userEvent.type(await screen.findByLabelText('Search settings'), 'models')
+  await userEvent.type(await screen.findByRole('textbox', { name: 'Search settings' }), 'models')
 
   // One row, named for the decision rather than for the denylist that stores it.
   // "Hidden" over switches that are *on* for the models you can see reads as a
@@ -276,7 +276,7 @@ test('a collection edited back to empty leaves no key behind to look modified', 
   expect(client).toBeDefined()
   renderWithProviders(<SettingsPage />)
 
-  await userEvent.type(await screen.findByLabelText('Search settings'), 'models')
+  await userEvent.type(await screen.findByRole('textbox', { name: 'Search settings' }), 'models')
 
   const first = (await screen.findAllByRole('switch', { name: /Show / }))[0]
   expect(first).toBeDefined()
@@ -327,14 +327,14 @@ test('Escape from a row returns focus to the search box', async ({ client }) => 
 
   // One key back to the top from anywhere in the list, so a keyboard user is
   // never stranded partway down a long page.
-  expect(document.activeElement).toBe(screen.getByLabelText('Search settings'))
+  expect(document.activeElement).toBe(screen.getByRole('textbox', { name: 'Search settings' }))
 })
 
 test('every visible row is reachable and operable from the keyboard', async ({ client }) => {
   expect(client).toBeDefined()
   renderWithProviders(<SettingsPage />)
 
-  await userEvent.type(await screen.findByLabelText('Search settings'), 'plan mode')
+  await userEvent.type(await screen.findByRole('textbox', { name: 'Search settings' }), 'plan mode')
   const planMode = await planModeSwitch()
 
   planMode.focus()
