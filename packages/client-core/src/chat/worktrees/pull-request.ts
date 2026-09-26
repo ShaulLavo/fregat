@@ -6,7 +6,7 @@ export type PullRequestBadge = {
   readonly state: PullRequestBadgeState
   /** What the badge prints beside its glyph. */
   readonly text: string
-  /** The badge's accessible name and hover text: number, state and title. */
+  /** The badge's accessible name and hover text: repository, number, state and title. */
   readonly label: string
   /** The text-only rail's form, such as `PR #12 draft`. */
   readonly summary: string
@@ -47,11 +47,17 @@ export function pullRequestBadge(pullRequest: WorktreePullRequest | null): PullR
   }
 }
 
-// GitHub `/o/r/pull/1`, GitLab `/g/r/-/merge_requests/1`, Bitbucket `/w/r/pull-requests/1`.
-const PULL_REQUEST_PATH = /^\/(.+?)\/(?:-\/)?(?:pull|merge_requests|pull-requests)\/\d+/u
+// GitHub `/o/r/pull/1`, Forgejo `/o/r/pulls/1`, GitLab `/g/r/-/merge_requests/1`,
+// Bitbucket `/w/r/pull-requests/1`.
+const PULL_REQUEST_PATH = /^\/(.+?)\/(?:-\/)?(?:pulls?|merge_requests|pull-requests)\/\d+/u
+// Azure DevOps `/org/project/_git/repo/pullrequest/1`, named `org/project/repo`.
+const AZURE_PULL_REQUEST_PATH = /^\/(.+?)\/_git\/([^/]+)\/pullrequest\/\d+/u
 
 /** The repository a pull request lives in, which differs from the worktree's for a fork. */
 export function pullRequestRepository(url: string): string | null {
   if (!URL.canParse(url)) return null
-  return PULL_REQUEST_PATH.exec(new URL(url).pathname)?.[1] ?? null
+  const pathname = new URL(url).pathname
+  const azure = AZURE_PULL_REQUEST_PATH.exec(pathname)
+  if (azure) return `${azure[1]}/${azure[2]}`
+  return PULL_REQUEST_PATH.exec(pathname)?.[1] ?? null
 }

@@ -6,6 +6,8 @@ describe('pullRequestRepository', () => {
     ['https://github.com/fregat/fixture/pull/31', 'fregat/fixture'],
     ['https://gitlab.com/group/sub/repo/-/merge_requests/5', 'group/sub/repo'],
     ['https://bitbucket.org/team/repo/pull-requests/7', 'team/repo'],
+    ['https://codeberg.org/owner/repo/pulls/5', 'owner/repo'],
+    ['https://dev.azure.com/org/proj/_git/repo/pullrequest/5', 'org/proj/repo'],
     ['https://example.com/no-pull-request-here', null],
     ['not a url', null],
   ])('reads %s as %s', (url, repository) => {
