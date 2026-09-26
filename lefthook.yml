@@ -19,6 +19,12 @@ pre-commit:
       glob: '*.{ts,tsx,js,jsx,mjs,cjs,json,jsonc,css,md,mdx,yml,yaml}'
       run: PATH="$HOME/.bun/bin:/opt/homebrew/bin:/usr/local/bin:$PATH" bun x oxfmt --check {staged_files}
 
+    # A new setting that skips its released-id record or leaves the generated
+    # schema/reference stale only shows up in CI otherwise; catch it at commit time.
+    - name: settings registry checks
+      glob: 'packages/contracts/src/settings/**'
+      run: PATH="$HOME/.bun/bin:/opt/homebrew/bin:/usr/local/bin:$PATH" bun run settings:schema:check && bun run settings:reference:check && bun run --cwd packages/contracts test -- src/tests/settings-migrations.test.ts src/tests/settings-schema.test.ts
+
     # Whole-tree gates: a clone or a compiler refusal is invisible to a staged-file lint, and
     # these are the ones that went red on main unnoticed. Together they cost under two seconds.
     - name: whole-tree gates
