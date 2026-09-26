@@ -416,3 +416,15 @@ test('bundle wallpaper toggle retains the active variant image', async ({ client
   }
   view.unmount()
 })
+
+test('start from pull request explains the missing checkout when no folder is open', async () => {
+  const queryClient = createTestQueryClient()
+  const view = renderCommandProvider(queryClient)
+  await waitFor(() => expect(capturedBus).not.toBeNull())
+  act(() => {
+    capturedBus!.dispatch('workspace.startPullRequestSession', invocation())
+  })
+  expect(await screen.findByRole('dialog', { name: 'Start from pull request' })).toBeVisible()
+  expect(screen.getByText('Open a project checkout to start from its pull requests.')).toBeVisible()
+  view.unmount()
+})

@@ -1,7 +1,8 @@
-import { PlayIcon } from '@phosphor-icons/react'
+import { DownloadSimpleIcon } from '@phosphor-icons/react'
 import { CommandEmpty, CommandGroup, CommandItem } from '@workspace/ui/components/command'
 
 import { ScriptsLoading } from '@/features/command-palette/components/scripts-loading'
+import { ScriptRow } from '@/features/command-palette/components/script-row'
 import { useActions } from '@/features/command-palette/hooks/use-actions'
 import type { ProjectScriptSuggestion } from '@/features/chat-mode/utils/project-scripts'
 
@@ -17,9 +18,10 @@ export function ScriptGroups({
   readonly isPending: boolean
   readonly scripts: readonly ProjectScriptSuggestion[]
 }) {
-  const { selectScript } = useActions()
+  const { importScripts, selectScript } = useActions()
   const saved = scripts.filter((script) => script.saved)
-  const discovered = scripts.filter((script) => !script.saved)
+  const projectFile = scripts.filter((script) => script.origin === 't3.json')
+  const discovered = scripts.filter((script) => script.origin === 'package.json')
 
   if (isPending && scripts.length === 0) {
     // Still a CommandItem: an empty list would let CommandEmpty deliver a verdict mid-fetch.
@@ -39,6 +41,17 @@ export function ScriptGroups({
   return (
     <>
       <ScriptGroup heading='Project Scripts' scripts={saved} onSelect={selectScript} />
+      {projectFile.length > 0 ? (
+        <CommandGroup heading='From t3.json'>
+          <CommandItem value='scripts:import-t3' onSelect={() => importScripts(projectFile)}>
+            <DownloadSimpleIcon className='size-(--icon-size) shrink-0 opacity-60' />
+            <span>Import scripts from t3.json</span>
+          </CommandItem>
+          {projectFile.map((script) => (
+            <ScriptRow key={script.command} script={script} onSelect={selectScript} />
+          ))}
+        </CommandGroup>
+      ) : null}
       <ScriptGroup heading='From package.json' scripts={discovered} onSelect={selectScript} />
     </>
   )
@@ -58,19 +71,7 @@ function ScriptGroup({
   return (
     <CommandGroup heading={heading}>
       {scripts.map((script) => (
-        <CommandItem
-          key={script.command}
-          keywords={[script.command]}
-          title={script.command}
-          value={script.command}
-          onSelect={() => onSelect(script)}
-        >
-          <PlayIcon className='size-(--icon-size) shrink-0 opacity-60' />
-          <span className='truncate'>{script.name}</span>
-          <span className='text-muted-foreground text-2xs ml-auto truncate pl-3 font-mono'>
-            {script.command}
-          </span>
-        </CommandItem>
+        <ScriptRow key={script.command} script={script} onSelect={onSelect} />
       ))}
     </CommandGroup>
   )

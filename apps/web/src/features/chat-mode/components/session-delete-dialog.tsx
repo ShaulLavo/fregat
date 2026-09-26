@@ -1,4 +1,5 @@
 import { useIsMutating } from '@tanstack/react-query'
+import { useState } from 'react'
 import { chatModeMutationKeys } from '@/features/chat-mode/utils/mutation-keys'
 import { Button } from '@workspace/ui/components/button'
 import {
@@ -21,6 +22,9 @@ import {
   sessionDeleteTitle,
 } from '@/features/chat-mode/utils/session-delete-prompt'
 import { DeleteDialogFooter } from '@workspace/ui/patterns/delete-dialog-footer'
+import { SessionDeleteWorktreeOption } from '@/features/chat-mode/components/session-delete-worktree-option'
+import { worktreeRemovalChoice } from '@/features/chat-mode/utils/worktree-removal-choice'
+import { useSettingValue } from '@/hooks/use-setting-value'
 
 /**
  * Deleting a session takes its whole event history with it and there is no undo, so it
@@ -37,9 +41,20 @@ export function SessionDeleteDialog() {
   )
   const session = ref ? projection?.sessionById[ref.sessionId] : undefined
   const worktree = session ? projection?.worktreeById[session.worktreeId] : undefined
+  const cleanupOnDelete = useSettingValue('git.worktreeCleanupOnDelete')
+  const projectCleanup = useSettingValue('git.projectWorktreeCleanupOnDelete')
+  const choice = worktreeRemovalChoice(
+    worktree,
+    (worktree ? projectCleanup[worktree.projectId] : undefined) ?? cleanupOnDelete,
+  )
+  const [removeWorktree, setRemoveWorktree] = useState(false)
+  const close = () => {
+    setRemoveWorktree(false)
+    actions.cancelDelete()
+  }
 
   return (
-    <Dialog onOpenChange={(open) => open || actions.cancelDelete()} open={request !== null}>
+    <Dialog onOpenChange={(open) => open || close()} open={request !== null}>
       <DialogContent
         className='w-[min(420px,calc(100vw-2rem))] max-w-none text-sm sm:max-w-none'
         showCloseButton={false}
@@ -50,15 +65,17 @@ export function SessionDeleteDialog() {
             {sessionDeletePrompt({ count, title: request?.title ?? 'this session' })}
           </DialogDescription>
         </DialogHeader>
-        <p className='text-muted-foreground text-xs'>
-          The checkout and its changes stay on disk. Use Manage worktrees for separate cleanup.
-        </p>
+        <SessionDeleteWorktreeOption
+          choice={ref ? choice : 'kept'}
+          checked={removeWorktree}
+          onCheckedChange={setRemoveWorktree}
+        />
         {ref && worktree ? (
           <Button
             variant='link'
             className='justify-start px-0'
             onClick={() => {
-              actions.cancelDelete()
+              close()
               useWorktreeManagerStore.getState().openManager({
                 environmentId: ref.environmentId,
                 projectId: worktree.projectId,
@@ -69,8 +86,14 @@ export function SessionDeleteDialog() {
           </Button>
         ) : null}
         <DeleteDialogFooter
-          onCancel={() => actions.cancelDelete()}
-          onConfirm={() => request && actions.confirmDelete(request)}
+          onCancel={close}
+          onConfirm={() => {
+            if (!request) return
+            setRemoveWorktree(false)
+            void actions.confirmDelete(request, {
+              removeWorktree: choice === 'offer' && removeWorktree,
+            })
+          }}
           pending={pending}
         />
       </DialogContent>

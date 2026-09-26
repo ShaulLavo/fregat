@@ -20,8 +20,8 @@ test('the run prefix puts the palette in script mode and is stripped from the qu
 
 test('separates the project’s saved scripts from what the manifest offered', () => {
   renderScripts([
-    { command: 'bun run dev', name: 'Start the app', saved: true },
-    { command: 'bun run test', name: 'test', saved: false },
+    { command: 'bun run dev', name: 'Start the app', saved: true, origin: 'saved' },
+    { command: 'bun run test', name: 'test', saved: false, origin: 'package.json' },
   ])
 
   expect(screen.getByText('Project Scripts')).toBeInTheDocument()
@@ -30,7 +30,9 @@ test('separates the project’s saved scripts from what the manifest offered', (
 })
 
 test('hands the picked script to the runner, command and all', async () => {
-  const actions = renderScripts([{ command: 'bun run test', name: 'test', saved: false }])
+  const actions = renderScripts([
+    { command: 'bun run test', name: 'test', saved: false, origin: 'package.json' },
+  ])
 
   await userEvent.click(screen.getByText('test'))
 
@@ -39,6 +41,18 @@ test('hands the picked script to the runner, command and all', async () => {
   expect(actions.selectScript).toHaveBeenCalledWith(
     expect.objectContaining({ command: 'bun run test' }),
   )
+})
+
+test('previews file scripts until the user imports them', async () => {
+  const actions = renderScripts([
+    { command: 'echo setup', name: 'Setup project', saved: false, origin: 't3.json' },
+  ])
+  await userEvent.click(screen.getByText('Setup project'))
+  expect(actions.selectScript).not.toHaveBeenCalled()
+  await userEvent.click(screen.getByText('Import scripts from t3.json'))
+  expect(actions.importScripts).toHaveBeenCalledWith([
+    expect.objectContaining({ command: 'echo setup' }),
+  ])
 })
 
 test('says a project has no scripts instead of showing an empty list', () => {
@@ -55,7 +69,10 @@ test('holds the verdict while the manifest is still being read', () => {
 })
 
 test('shows saved scripts at once instead of waiting for the manifest', () => {
-  renderScripts([{ command: 'bun run dev', name: 'Start the app', saved: true }], true)
+  renderScripts(
+    [{ command: 'bun run dev', name: 'Start the app', saved: true, origin: 'saved' }],
+    true,
+  )
 
   expect(screen.getByText('Start the app')).toBeInTheDocument()
 })
@@ -94,6 +111,7 @@ function commandPaletteActions(): CommandPaletteActions {
     selectFile: vi.fn(),
     selectPlatformCommand: vi.fn(),
     selectScript: vi.fn(),
+    importScripts: vi.fn(),
     selectSession: vi.fn(),
     selectGotoLine: vi.fn(),
     selectSymbol: vi.fn(),
