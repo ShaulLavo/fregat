@@ -444,7 +444,7 @@ type Probe = {
 }
 
 async function openProbe(
-  packageName: string,
+  packageName: (typeof RUNTIMES)[number]['packageName'],
   files: Readonly<Record<string, string>>,
   source: string,
 ): Promise<Probe> {

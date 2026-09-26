@@ -1,7 +1,16 @@
 import { TickerDigit } from './ticker-digit'
 
-export function Ticker({ value }: { readonly value: number }) {
-  const text = value.toLocaleString(undefined, { maximumFractionDigits: 0 })
+export function Ticker({
+  value,
+  decimals = 0,
+}: {
+  readonly value: number
+  readonly decimals?: number
+}) {
+  const text = value.toLocaleString(undefined, {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  })
   return (
     <span aria-label={text} role='img' className='inline-flex font-mono tabular-nums'>
       <span aria-hidden className='inline-flex'>

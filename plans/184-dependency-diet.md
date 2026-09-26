@@ -39,6 +39,20 @@ release installs that carry every package the server loads at runtime.
    it), `react-animated-counter` (pulls lodash), `@foresightjs/react` (keep `js.foresight`),
    `@tanstack/pacer` in the server (one throttle), `nanoid`, `html-void-elements`, `culori` if the
    palette code can use the colour math it already has.
+   Implemented on `w2/cx-184-thin`: removed 2,800+ lines of unused in-process TypeScript LSP
+   code and its implementation tests. Kept TypeScript 6 as a devDependency because the live
+   legacy-server integration suite still uses it. Removed the server pacer dependency, NanoID,
+   the React Foresight wrapper, animated-counter and the markdown void-elements dependency.
+   Workspace IDs retain their 16-character alphabet and 96 bits of randomness. The shared
+   ticker now honors decimals, including its accessible label. Culori stays: local conversion
+   math does not replace its CSS syntax parser.
+   Server bundle: 5,139,799 → 5,101,077 bytes. Web first-load JS gzip: 1,761,157 → 1,758,507;
+   all JS chunks: 62,029,559 → 62,022,715 bytes. Passed 15 git/metadata tests, 12 real TS 7/6
+   integration cases, 57 markdown tests, hook lifecycle and ticker precision tests, workspace
+   typechecks and gates. The built physical gallery screenshot was read back; its static
+   preview has one expected unavailable Nerd Fonts endpoint. Evidence:
+   `/work/tmp/w2-184-thin-evidence/` and
+   `/work/tmp/fregat-evidence/20260926T190920Z-look-fregat-1440x1000/`.
 7. **Duplicates in the web bundle:** a `resolve.dedupe` list in `apps/web/vite.config.ts` for the
    markdown parser stack (~240 KB carried twice, Platform and Editor), `@tanstack/hotkeys` (three
    copies) and `evlog` (two). Measure with the bundle report before and after.

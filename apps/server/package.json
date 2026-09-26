@@ -37,8 +37,6 @@
     "@anthropic-ai/claude-agent-sdk": "^0.3.283",
     "@elysiajs/cors": "^1.4.2",
     "@singapore-editor/lsp": "0.1.1",
-    "@singapore-editor/typescript-lsp": "0.1.1",
-    "@tanstack/pacer": "^0.22.0",
     "@tanstack/query-core": "^5.104.0",
     "@workspace/contracts": "workspace:*",
     "@workspace/observability": "workspace:*",
@@ -51,14 +49,11 @@
     "ignore": "^7.0.10",
     "jsonc-parser": "3.3.1",
     "jszip": "^3.10.2",
-    "nanoid": "6.0.1",
     "sharp": "^0.35.4",
     "subset-font": "^2.9.0",
     "typescript": "^7.0.2",
     "typescript-language-server": "6.0.1",
-    "typescript-language-service": "npm:typescript@6.0.3",
     "valibot": "^1.5.0",
-    "vscode-languageserver-protocol": "^3.18.4",
     "web-push": "3.6.7"
   },
   "devDependencies": {
@@ -70,6 +65,7 @@
     "eslint": "^10.11.0",
     "oxfmt": "0.70.0",
     "oxlint": "1.85.0",
+    "typescript-language-service": "npm:typescript@6.0.3",
     "vitest": "catalog:",
     "vscode-langservers-extracted": "4.10.0"
   }
