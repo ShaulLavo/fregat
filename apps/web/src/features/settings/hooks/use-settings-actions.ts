@@ -31,7 +31,8 @@ import {
   type ColorMode,
   type ThemeVariantPatch,
 } from '@workspace/contracts'
-import { useMutation, useMutationState, type QueryClient } from '@tanstack/react-query'
+import { mutationOptions, type QueryClient } from '@tanstack/react-query'
+import { runMutation } from '@/lib/mutations/run'
 import { useSettingsOwner } from '@/lib/settings-owner/hooks/use-settings-owner'
 
 import type { PlatformCommandId } from '@/keymap/types'
@@ -75,7 +76,6 @@ import { createClientInvariantError } from '@/lib/structured-errors'
 import type { Client } from '@/lib/client'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 
-import { useSettingsProjection } from '@/features/settings/hooks/use-settings-projection'
 import { withMovedModel } from '@/features/settings/utils/patch'
 
 const SETTINGS_MUTATION_SCOPE = 'settings-document'
@@ -86,59 +86,8 @@ export function useSettingsActions(owner?: QueryClient) {
   const settingsOwner = useSettingsOwner()
   const queryClient = owner ?? settingsOwner
   const client = clientForQueryClient(queryClient)
-  const projection = useSettingsProjection(queryClient)
-  const transport = useMutation(
-    {
-      mutationFn: (entry: ActiveSettingsIntent) =>
-        transportAndAdmitSettingsIntent(queryClient, entry, client),
-      mutationKey: SETTINGS_MUTATION_KEY,
-      onError: (error, entry) => {
-        logSettingsMutationFailure(entry, error)
-        if (settingsIntentStatus(entry.intentId) === 'acknowledged') return
-
-        const failed = failSettingsIntent(entry.intentId, error)
-        if (!failed) return
-        if (failed.superseded) return
-
-        notifySaveError({
-          discard: () => discardFailedMutation(failed.intentId),
-          error,
-          mutationId: failed.intentId,
-          retry: () => retryFailedIntent(failed.intentId, transport.mutate),
-        })
-      },
-      onSettled: (_result, _error, entry) => {
-        settleSettingsIntentTransport(entry.intentId)
-      },
-      onSuccess: ({ admission, result, startedAt }, entry) => {
-        log.info({
-          action: 'settings.write',
-          appliedEpoch: result.appliedVersion.epoch,
-          appliedSequence: result.appliedVersion.sequence,
-          area: 'settings',
-          clientInstanceId: clientInstanceId(),
-          durationMs: elapsedMs(startedAt),
-          duplicate: result.duplicate,
-          ...settingsMutationLogContext(entry),
-          outcome: settingsMutationSuccessOutcome(result, admission.snapshot),
-          queueWaitMs: durationBetweenMs(entry.enqueuedAt, startedAt),
-          snapshotEpoch: admission.snapshot?.serverVersion.epoch,
-          snapshotSequence: admission.snapshot?.serverVersion.sequence,
-        })
-      },
-      retry: shouldRetrySettingsTransport,
-      retryDelay: settingsRetryDelay,
-      scope: { id: SETTINGS_MUTATION_SCOPE },
-    },
-    queryClient,
-  )
-  const pendingTransports = useMutationState(
-    {
-      filters: { mutationKey: SETTINGS_MUTATION_KEY, status: 'pending' },
-      select: () => true,
-    },
-    queryClient,
-  )
+  // Read at call time: a subscription here would re-render every settings row on every write.
+  const projection = () => readLiveSettingsProjection(queryClient)
 
   const submit = (
     target: SettingsWriteTarget,
@@ -153,7 +102,7 @@ export function useSettingsActions(owner?: QueryClient) {
       initiator,
     )
     for (const mutationId of supersededMutationIds) dismissSaveError(mutationId)
-    transport.mutate(entry)
+    sendSettingsIntent(queryClient, client, entry)
 
     return {
       kind: 'submitted',
@@ -162,7 +111,7 @@ export function useSettingsActions(owner?: QueryClient) {
     }
   }
 
-  const targetFor = (key: SettingId) => deriveWriteTarget(key, projection?.layers ?? [])
+  const targetFor = (key: SettingId) => deriveWriteTarget(key, projection()?.layers ?? [])
 
   const setSetting = <K extends ScalarSettingId>(
     key: K,
@@ -171,7 +120,7 @@ export function useSettingsActions(owner?: QueryClient) {
     initiator?: string,
   ): SettingsSubmission => {
     const operation = { kind: 'set', key, value } as SettingsOperation
-    const current = readLiveSettingsProjection(queryClient) ?? projection
+    const current = projection()
     const theme = current?.values['workbench.theme']
     const patch = operation.kind === 'set' ? themePartPatch(operation) : null
     if (!theme || !patch || target !== 'user') return submit(target, [operation], initiator)
@@ -198,7 +147,6 @@ export function useSettingsActions(owner?: QueryClient) {
   }
 
   return {
-    isSaving: pendingTransports.length > 0,
     selectBundle: (theme: ThemeBundle, initiator = 'settings.theme.select') =>
       submit('user', [{ kind: 'set', key: 'workbench.theme', value: theme }], initiator),
     resetBundle: (id: ThemeId) =>
@@ -231,11 +179,12 @@ export function useSettingsActions(owner?: QueryClient) {
     resetKeybinding: (command: PlatformCommandId) =>
       submit(targetFor('keybindings.overrides'), [{ kind: 'keybinding.remove', command }]),
     resetSetting: (key: SettingId, target: SettingsWriteTarget = 'user') => {
-      const theme = projection?.values['workbench.theme']
-      if (!theme || target !== 'user')
+      const current = projection()
+      const theme = current?.values['workbench.theme']
+      if (!current || !theme || target !== 'user')
         return submit(target, [{ kind: 'reset', keys: settingRowIds(key) }])
       const defaults = resolveThemeSettings(
-        { ...projection.values, 'workbench.theme.customizations': {} },
+        { ...current.values, 'workbench.theme.customizations': {} },
         systemColorMode(),
       )
       const parsed = v.safeParse(settingsOperationSchema, {
@@ -248,12 +197,16 @@ export function useSettingsActions(owner?: QueryClient) {
       return setSetting(parsed.output.key, parsed.output.value, target)
     },
     setColorTheme,
-    setKeybinding: (command: PlatformCommandId, keys: string | null) =>
+    /** The command's complete list; an empty list or `null` unbinds it. */
+    setKeybinding: (command: PlatformCommandId, keys: readonly string[] | null) =>
       submit(targetFor('keybindings.overrides'), [{ command, keys, kind: 'keybinding.set' }]),
     setModelHidden: (ref: ModelRef, hidden: boolean) =>
       submit(targetFor('models.hidden'), [{ hidden, kind: 'model.setHidden', ref }]),
     setModelFavorite: (ref: ModelRef, favorite: boolean) =>
       submit(targetFor('models.favorites'), [{ favorite, kind: 'model.setFavorite', ref }]),
+    /** Accepts a word in one layer's spellcheck dictionary, or marks it again with `false`. */
+    setSpellingWord: (word: string, accepted: boolean, target: SettingsWriteTarget) =>
+      submit(target, [{ kind: 'spellcheck.setWord', word, accepted }], 'editor.spelling.addWord'),
     setProjectOverride: (operation: Omit<SetProjectOverrideOperation, 'kind'>) =>
       submit(targetFor(operation.key), [
         { ...operation, kind: 'project.set' } as SetProjectOverrideOperation,
@@ -264,12 +217,65 @@ export function useSettingsActions(owner?: QueryClient) {
   }
 }
 
-function retryFailedIntent(mutationId: string, mutate: (entry: ActiveSettingsIntent) => void) {
+// Module scope, run through runMutation: one mutation per write, with no observer per caller.
+function sendSettingsIntent(queryClient: QueryClient, client: Client, entry: ActiveSettingsIntent) {
+  // Failures are handled in onError; the rejected promise has no other reader.
+  runMutation(queryClient, settingsTransportOptions(queryClient, client), entry).catch(
+    () => undefined,
+  )
+}
+
+function settingsTransportOptions(queryClient: QueryClient, client: Client) {
+  return mutationOptions({
+    mutationFn: (entry: ActiveSettingsIntent) =>
+      transportAndAdmitSettingsIntent(queryClient, entry, client),
+    mutationKey: SETTINGS_MUTATION_KEY,
+    onError: (error, entry) => {
+      logSettingsMutationFailure(entry, error)
+      if (settingsIntentStatus(entry.intentId) === 'acknowledged') return
+
+      const failed = failSettingsIntent(entry.intentId, error)
+      if (!failed) return
+      if (failed.superseded) return
+
+      notifySaveError({
+        discard: () => discardFailedMutation(failed.intentId),
+        error,
+        mutationId: failed.intentId,
+        retry: () => retryFailedIntent(queryClient, client, failed.intentId),
+      })
+    },
+    onSettled: (_result, _error, entry) => {
+      settleSettingsIntentTransport(entry.intentId)
+    },
+    onSuccess: ({ admission, result, startedAt }, entry) => {
+      log.info({
+        action: 'settings.write',
+        appliedEpoch: result.appliedVersion.epoch,
+        appliedSequence: result.appliedVersion.sequence,
+        area: 'settings',
+        clientInstanceId: clientInstanceId(),
+        durationMs: elapsedMs(startedAt),
+        duplicate: result.duplicate,
+        ...settingsMutationLogContext(entry),
+        outcome: settingsMutationSuccessOutcome(result, admission.snapshot),
+        queueWaitMs: durationBetweenMs(entry.enqueuedAt, startedAt),
+        snapshotEpoch: admission.snapshot?.serverVersion.epoch,
+        snapshotSequence: admission.snapshot?.serverVersion.sequence,
+      })
+    },
+    retry: shouldRetrySettingsTransport,
+    retryDelay: settingsRetryDelay,
+    scope: { id: SETTINGS_MUTATION_SCOPE },
+  })
+}
+
+function retryFailedIntent(queryClient: QueryClient, client: Client, mutationId: string) {
   const entry = retrySettingsIntent(mutationId)
   if (!entry) return
 
   dismissSaveError(mutationId)
-  mutate(entry)
+  sendSettingsIntent(queryClient, client, entry)
 }
 
 function discardFailedMutation(mutationId: string) {

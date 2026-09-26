@@ -1368,10 +1368,13 @@ function mcpStatusActivity(event: Extract<ProviderRuntimeEvent, { type: 'mcp.sta
   const status = event.payload.status
   if (!isPlainRecord(status)) return []
 
+  const name = firstText(status.name) ?? 'MCP server'
+  if (status.status === 'needs-auth')
+    return [providerWarningActivity(event, `${name} needs sign-in`)]
+
   const error = firstText(status.error, status.failureReason)
   if (!error && status.status !== 'failed') return []
 
-  const name = firstText(status.name) ?? 'MCP server'
   const message = error ? `${name} connection failed: ${error}` : `${name} connection failed`
   return [providerWarningActivity(event, message)]
 }

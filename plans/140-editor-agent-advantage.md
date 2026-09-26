@@ -345,3 +345,32 @@ SubagentStop, Stop and Interrupt (`config/src/hook_config.rs`). There are two ha
      push (tsserver).
 5. Symbol-tool steering (after 088). A PreToolUse reminder on `Grep|Glob` (Claude) and a
    PreToolUse `command` hook (Codex), sent once per session per tool kind.
+
+Phase 4 status (2026-09-26, wave 2 lane A): 4a and 4b done, 4c waits on an owner check.
+
+- D2, D3 and D4: Decided 2026-09-26: recommendation (wave 2).
+- 4a: `LspSessionPool.fileDiagnostics` asks only a backend that is already running for the
+  file. It spawns nothing. An open document must match the captured disk text before the reader
+  asks for diagnostics. A pull server (TypeScript 7) is sent `didChangeWatchedFiles` and then
+  `textDocument/diagnostic`; a document change during the pull discards the result. A push server
+  answers with diagnostics for the synchronized document. `lsp/agent-diagnostics.ts`
+  (`AgentDiagnosticsReader`) keeps errors only (severity 1), with one-based lines.
+- 4b: `provider/adapters/utils/claude-diagnostics-hooks.ts` puts a PreToolUse baseline and a
+  PostToolUse `additionalContext` on `Edit|Write|MultiEdit|NotebookEdit`, within a 1.5 s budget.
+  Each hook has a 750 ms deadline covering disk reads, matching, sibling backends and editor
+  synchronization. An unavailable baseline suppresses feedback for that edit. Unchanged lines
+  are mapped between the before and after snapshots to subtract old diagnostic occurrences.
+  Only errors new since the baseline are sent (`utils/agent-diagnostics-feedback.ts`), at most
+  10 per file and 4,000 characters. One `agent.diagnostics` event per edit carries no messages or
+  paths. The reader reaches Claude sessions through `ProviderDriverServices`. Setting
+  `agent.diagnosticsFeedback` (application, on).
+- Verified with real servers: `lsp/tests/typescript-server.test.ts` drives the Claude hooks on
+  open documents with TypeScript 7 (pull) and tsserver (push), including delayed synchronization,
+  absent synchronization and an inserted duplicate error whose old occurrence moves. The
+  original unopened pull test remains. Hook and proxy tests cover unavailable baselines, stalled
+  sibling backends and delayed filesystem matching. Each blocking review finding was reproduced
+  by a failing test before its fix; no real model was called.
+- 4c (Codex): not built. The plan's first step is a live run of a session-flags hook on
+  codex-cli ≥ 0.157, and a real-provider turn is a hard stop for the wave. Owner check pending:
+  run one Codex session with a `config.hooks` PostToolUse command hook and confirm that it loads,
+  with its trusted hash, and that its `additionalContext` reaches the model.

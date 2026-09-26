@@ -1,4 +1,4 @@
-import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk'
+import type { McpServerStatus, SDKMessage, Query } from '@anthropic-ai/claude-agent-sdk'
 import { ClaudeAuthRunner } from '../../src/provider/adapters/utils/claude-auth'
 import { claudeModelRows } from './claude-models'
 
@@ -67,6 +67,11 @@ type FakeWaiter = {
  * waiter list, and call recorders for the control requests the adapter uses.
  */
 export class FakeClaudeQuery implements AsyncIterable<SDKMessage> {
+  readonly mcpBindings: Parameters<Query['setMcpServers']>[0][] = []
+  readonly setMcpServers: Query['setMcpServers'] = async (servers) => {
+    this.mcpBindings.push(servers)
+    return { added: Object.keys(servers), removed: [], errors: {} }
+  }
   readonly setModelCalls: Array<string | undefined> = []
   readonly stoppedTasks: string[] = []
   readonly getContextUsage = async () => ({
@@ -82,10 +87,27 @@ export class FakeClaudeQuery implements AsyncIterable<SDKMessage> {
     totalTokens: 12_000,
   })
   readonly reconnected: string[] = []
-  readonly mcpServerStatus = async () => [
-    { name: 'linear', status: 'connected' as const },
-    { error: 'spawn ENOENT', name: 'broken', status: 'failed' as const },
+  mcpStatus: McpServerStatus[] = [
+    {
+      config: {
+        headers: { Authorization: 'Bearer secret' },
+        type: 'http',
+        url: 'https://mcp.linear.app/mcp',
+      },
+      name: 'linear',
+      source: 'user',
+      status: 'connected',
+      tools: [{ name: 'list_issues' }],
+    },
+    {
+      config: { command: 'broken-server', env: { TOKEN: 'secret' } },
+      error: 'spawn ENOENT',
+      name: 'broken',
+      scope: 'project',
+      status: 'failed',
+    },
   ]
+  readonly mcpServerStatus = async () => this.mcpStatus
   readonly reconnectMcpServer = async (name: string) => {
     this.reconnected.push(name)
   }

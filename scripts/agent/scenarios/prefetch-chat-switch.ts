@@ -3,7 +3,12 @@ import type { Page } from 'playwright'
 import { measurePress, pressStampScript, type PressTiming } from '../press-timing'
 import { chatMessagesLogSelector, selectors } from '../selectors'
 import { dispatch, openChat, readShell } from './chat-verification'
-import { sendPrompt, settingsSnapshot, writeSettings } from './native-provider-verification'
+import {
+  sendPrompt,
+  settingsSnapshot,
+  writeRawSetting,
+  writeSettings,
+} from './native-provider-verification'
 import type { Scenario } from './index'
 
 const results = new WeakMap<Page, PressTiming[]>()
@@ -117,11 +122,8 @@ export const prefetchChatSwitch: Scenario = {
       )
       const originallySet =
         before.layers.find((layer) => layer.id === 'user')?.raw['providers.instances'] !== undefined
-      await writeSettings(page, base, [
-        originallySet
-          ? { kind: 'set', key: 'providers.instances', value: remaining }
-          : { kind: 'reset', keys: ['providers.instances'] },
-      ])
+      if (originallySet) await writeRawSetting(page, base, 'providers.instances', remaining)
+      else await writeSettings(page, base, [{ kind: 'reset', keys: ['providers.instances'] }])
     }
   },
 }

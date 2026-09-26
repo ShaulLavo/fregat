@@ -53,6 +53,7 @@ const ASYNC_COMMAND_IDS = [
   'workspace.showFontSettings',
   'workspace.showWatchSettings',
   'workspace.showUsage',
+  'workspace.showMcpServers',
   'workspace.showTransparencySettings',
   'fileTree.newFile',
   'fileTree.newFolder',
@@ -193,6 +194,7 @@ const WORKSPACE_OPERATION_COMMAND_IDS = [
 
 const FILE_BACKED_COMMAND_IDS = [
   'workspace.cycleMarkdownView',
+  'workspace.showSpellingSuggestions',
   'workspace.addSelectionToChat',
   'workspace.addFileToChat',
   'workspace.goToLine',

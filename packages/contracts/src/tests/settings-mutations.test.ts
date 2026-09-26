@@ -107,7 +107,7 @@ describe('settings mutation schemas', () => {
     ).toBe(false)
     expect(
       parseRequest([
-        { kind: 'keybinding.set', command: 'workspace.save', keys: 'Mod+S' },
+        { kind: 'keybinding.set', command: 'workspace.save', keys: ['Mod+S'] },
         { kind: 'keybinding.remove', command: 'workspace.save' },
       ]).success,
     ).toBe(false)
@@ -125,7 +125,7 @@ describe('settings mutation schemas', () => {
   it('allows disjoint operations, including distinct members of one collection', () => {
     const parsed = parseRequest([
       { kind: 'set', key: 'editor.fontSize', value: 14 },
-      { kind: 'keybinding.set', command: 'workspace.save', keys: 'Mod+S' },
+      { kind: 'keybinding.set', command: 'workspace.save', keys: ['Mod+S'] },
       { kind: 'keybinding.remove', command: 'workspace.open' },
       { kind: 'model.setHidden', ref: MODEL_A, hidden: true },
       { kind: 'model.setHidden', ref: MODEL_B, hidden: false },
@@ -305,26 +305,26 @@ describe('settings operation reducer', () => {
   it('sets one keybinding and preserves unrelated command entries', () => {
     const raw = {
       'keybindings.overrides': {
-        'workspace.open': 'Mod+O',
-        'future.command': 'Mod+9',
+        'workspace.open': ['Mod+O'],
+        'future.command': ['Mod+9'],
       },
     }
     const result = applyIdempotently(raw, {
       kind: 'keybinding.set',
       command: 'workspace.save',
-      keys: 'Mod+S',
+      keys: ['Mod+S'],
     })
 
     expect(result.raw['keybindings.overrides']).toEqual({
-      'workspace.open': 'Mod+O',
-      'future.command': 'Mod+9',
-      'workspace.save': 'Mod+S',
+      'workspace.open': ['Mod+O'],
+      'future.command': ['Mod+9'],
+      'workspace.save': ['Mod+S'],
     })
   })
 
   it('removes one keybinding and deletes the default-empty collection', () => {
     const result = applyIdempotently(
-      { 'keybindings.overrides': { 'workspace.save': 'Mod+S' }, untouched: true },
+      { 'keybindings.overrides': { 'workspace.save': ['Mod+S'] }, untouched: true },
       { kind: 'keybinding.remove', command: 'workspace.save' },
     )
 
@@ -362,6 +362,22 @@ describe('settings operation reducer', () => {
       favorite: false,
     })
     expect(unstarred.raw['models.favorites']).toEqual([MODEL_B])
+  })
+
+  it('writes one spellcheck word into the layer, keeping the words it already holds', () => {
+    const added = applyIdempotently(
+      { 'spellcheck.words': { fregat: true } },
+      { kind: 'spellcheck.setWord', word: 'worktree', accepted: true },
+    )
+    expect(added.raw['spellcheck.words']).toEqual({ fregat: true, worktree: true })
+    expect(added.touchedSettingIds).toEqual(['spellcheck.words'])
+
+    const unaccepted = applyIdempotently(added.raw, {
+      kind: 'spellcheck.setWord',
+      word: 'fregat',
+      accepted: false,
+    })
+    expect(unaccepted.raw['spellcheck.words']).toEqual({ fregat: false, worktree: true })
   })
 
   it('sets one project override and removes it, leaving the others', () => {
@@ -477,7 +493,7 @@ describe('settings operation reducer', () => {
 describe('settings mutation resources', () => {
   it('distinguishes collection members but intersects a reset with any member', () => {
     const save = settingsOperationResourceKeys(
-      operation({ kind: 'keybinding.set', command: 'workspace.save', keys: 'Mod+S' }),
+      operation({ kind: 'keybinding.set', command: 'workspace.save', keys: ['Mod+S'] }),
     )[0]!
     const open = settingsOperationResourceKeys(
       operation({ kind: 'keybinding.remove', command: 'workspace.open' }),

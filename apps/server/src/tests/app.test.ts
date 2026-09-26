@@ -75,6 +75,25 @@ describe('fs rpc auth', () => {
     expect(await errorCode(response)).toBe('UNAUTHORIZED')
   })
 
+  // A download link on the dev page (5173) navigates to the API port (3001) without an Origin.
+  it('accepts a same-site navigation whose referrer is an allowlisted origin', async () => {
+    const app = testApp(await fixtureRoot())
+    const navigation = (referer: string, site: string) =>
+      app.handle(
+        new Request('http://local/health', {
+          headers: { referer, 'sec-fetch-mode': 'navigate', 'sec-fetch-site': site },
+        }),
+      )
+
+    expect((await navigation(`${TRUSTED_ORIGIN}/chat`, 'same-site')).status).toBe(200)
+    const foreign = await navigation('http://localhost:8080/page', 'same-site')
+    expect(foreign.status).toBe(401)
+    expect(await errorCode(foreign)).toBe('UNAUTHORIZED')
+    const crossSite = await navigation(`${TRUSTED_ORIGIN}/chat`, 'cross-site')
+    expect(crossSite.status).toBe(401)
+    expect(await errorCode(crossSite)).toBe('UNAUTHORIZED')
+  })
+
   it('rejects disallowed origins', async () => {
     const app = testApp(await fixtureRoot())
     const response = await app.handle(
@@ -1138,8 +1157,8 @@ describe('git rpc', () => {
     ])
     expect(diffPayload[0].oldObjectId).toEqual(expect.any(String))
     expect(diffPayload[0].newObjectId).toEqual(expect.any(String))
-    expect(diffPayload[0].oldText).toBeUndefined()
-    expect(diffPayload[0].newText).toBeUndefined()
+    expect(diffPayload[0].oldText).toBe('before\n')
+    expect(diffPayload[0].newText).toBe('after\n')
     expect(untrackedDiff.status).toBe(200)
     const untrackedDiffPayload = (await untrackedDiff.json()) as GitDiffTestPayload
     expect(untrackedDiffPayload).toMatchObject([
@@ -1154,8 +1173,8 @@ describe('git rpc', () => {
         ],
       },
     ])
-    expect(untrackedDiffPayload[0].oldText).toBeUndefined()
-    expect(untrackedDiffPayload[0].newText).toBeUndefined()
+    expect(untrackedDiffPayload[0].oldText).toBe('')
+    expect(untrackedDiffPayload[0].newText).toBe('new\n')
     expect(staged.status).toBe(200)
     const stagedPayload = (await staged.json()) as GitStatusTestPayload
     expect(stagedPayload.files).toContainEqual(

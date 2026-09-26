@@ -1,3 +1,10 @@
+import { mcpConfigRoutes } from './provider/mcp-config-routes'
+import { McpSignInAttempts } from './provider/mcp-sign-in'
+import { McpGrantRegistry } from './mcp/grants'
+import { mcpRoutes } from './mcp/routes'
+import { AgentDiagnosticsReader } from './lsp/agent-diagnostics'
+import { AgentReviewService } from './review/agent-review'
+import { agentReviewRoutes } from './review/routes'
 import { sessionControlRoutes } from './provider/session-control-routes'
 import { createAttachmentOwnership } from './attachments/ownership'
 import { selectTitleModel } from './orchestration/title-generation'
@@ -123,6 +130,8 @@ export type AppOptions = FileSystemServiceOptions & {
     root?: string
     /** Populate the wallpaper picker from packaged artwork during startup. */
     seedWallpapers?: boolean
+    /** After seeding, add this machine's installed Omarchy backgrounds. */
+    importOmarchyWallpapers?: boolean
   }
   orchestration?: {
     attachmentsDir?: string
@@ -151,6 +160,8 @@ export type AppOptions = FileSystemServiceOptions & {
   settings?: Omit<SettingsStoreOptions, 'workspaceRoot'>
   /** The origin forwarded to remote machines as this app's web origin. */
   webOrigin?: string
+  /** Serves Platform's MCP tools to provider agents at this loopback URL; absent serves none. */
+  mcp?: { readonly endpoint: string }
   web?: WebOptions
   /** Staged releases and Restart. Absent leaves both inert, as in dev and tests. */
   update?: UpdateOptions
@@ -270,10 +281,24 @@ export function createApp(options: AppOptions) {
           durationMs: Math.round(performance.now() - started),
           ...result,
         })
+        if (!options.themes?.importOmarchyWallpapers) return
+        const importStarted = performance.now()
+        const omarchy = await wallpapers.importInstalledOmarchy()
+        recordProcessInfo('wallpapers.omarchy-import', {
+          durationMs: Math.round(performance.now() - importStarted),
+          installed: omarchy !== null,
+          ...omarchy,
+        })
       },
       { area: 'wallpaper', operation: 'library.seed' },
     )
   }
+  // Read lazily: the language-server pool is built further down, and hooks only ask during turns.
+  const agentDiagnostics = new AgentDiagnosticsReader({
+    enabled: () => settings.snapshot().values['agent.diagnosticsFeedback'],
+    pool: () => lspPool,
+    settings: () => lspSettings(),
+  })
   const providerAdapterRegistry: ProviderAdapterRegistry =
     options.orchestration?.providerAdapterRegistry ??
     createDefaultProviderAdapterRegistry(
@@ -295,6 +320,7 @@ export function createApp(options: AppOptions) {
         // the deferral would never resolve.
         hasLiveSessions: (providerInstanceId) =>
           providerService.hasActiveRuntimeForInstance(providerInstanceId),
+        services: { agentDiagnostics },
       },
     )
   // A saved provider list is inert unless something re-runs the registry when
@@ -307,10 +333,13 @@ export function createApp(options: AppOptions) {
   settings.onChange(() => {
     runDetached(reconcileProviderSettings, { area: 'provider', operation: 'reconcile' })
   })
+  const mcpGrants = new McpGrantRegistry()
   const providerService = new ProviderService({
     adapterRegistry: providerAdapterRegistry,
+    ...(options.mcp ? { mcp: { endpoint: options.mcp.endpoint, grants: mcpGrants } } : {}),
     sessionDirectory: new ProviderSessionDirectory(database),
   })
+  const mcpSignIns = new McpSignInAttempts()
   const providerUsage = new ProviderUsageStore(providerAdapterRegistry)
   const providerResetCredits = new ProviderResetCredits(
     database,
@@ -379,6 +408,7 @@ export function createApp(options: AppOptions) {
   const serverConfig = orchestrationWsServerConfig(identity)
   const commitMessages = new CommitMessageGenerator(git, providerAdapterRegistry, providerService)
   const checkpointDiff = new OrchestrationCheckpointDiffQuery(database, git)
+  const agentReviews = new AgentReviewService({ checkpointDiff, git, providers: providerService })
   const checkpointHunks = new OrchestrationCheckpointHunks({
     runWorkspaceOperation: (sessionId, operation) =>
       orchestration.runWorkspaceOperation(sessionId, operation),
@@ -448,6 +478,7 @@ export function createApp(options: AppOptions) {
     providerMaintenance,
     providerResetCredits,
     sessionPush,
+    mcpSignIns,
   )
   const update = new ServerUpdate({
     root: options.update?.root ?? null,
@@ -483,6 +514,16 @@ export function createApp(options: AppOptions) {
     // mounted after one parent `onBeforeHandle` inherits the parent's later
     // hooks too, which would put the auth guard in front of index.html.
     .use(webRoutes(options.web ?? {}, update, terminal))
+    // Before the browser guard, which refuses the Origin-less requests agents send.
+    .use(
+      options.mcp
+        ? mcpRoutes({
+            allowedOrigins: auth.allowedOrigins,
+            endpoint: options.mcp.endpoint,
+            grants: mcpGrants,
+          })
+        : new Elysia({ name: 'mcp-routes' }),
+    )
     .onBeforeHandle(({ request }) => {
       recordClientInstance(request)
     })
@@ -552,7 +593,9 @@ export function createApp(options: AppOptions) {
         providerResetCredits,
       ),
     )
-    .use(sessionControlRoutes(providerService))
+    .use(sessionControlRoutes(providerService, mcpSignIns))
+    .use(mcpConfigRoutes(providerAdapterRegistry, mcpSignIns))
+    .use(agentReviewRoutes(agentReviews))
     .use(orchestrationRoutes(orchestration, checkpointDiff, sessionSearch, checkpointHunks))
     .use(
       attachmentRoutes({
@@ -638,6 +681,7 @@ function appCleanup(
   providerMaintenance: ProviderMaintenance,
   providerResetCredits: ProviderResetCredits,
   sessionPush: SessionNoticePush,
+  mcpSignIns: McpSignInAttempts,
 ) {
   let closed = false
 
@@ -649,6 +693,8 @@ function appCleanup(
     orchestration.holdProviderStarts()
     orchestrationSockets.closeAll()
     sessionPush.close()
+    // A sign-in holds a provider CLI or app-server open until its page finishes.
+    mcpSignIns.cancelAll()
     // Kills the language servers, before any await: the service manager signals them with the
     // server, and an exit that lands before this is logged as a crash.
     lspPool.disposeAll()

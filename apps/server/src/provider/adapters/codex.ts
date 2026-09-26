@@ -4,6 +4,21 @@ import path from 'node:path'
 import { defaultAttachmentsDir } from '../../attachments/store'
 import { resolveCodexAttachments } from './utils/codex-attachments'
 import { codexAsyncQuestions } from './utils/codex-async-questions'
+import {
+  codexMcpDefinitions,
+  codexMcpServer,
+  type CodexMcpDefinition,
+} from './utils/codex-mcp-status'
+import {
+  CODEX_MCP_SCOPES,
+  codexMcpConfigServers,
+  codexMcpDefinition,
+  codexMcpTable,
+  isCodexConfigConflict,
+  layerServers,
+  requireCodexScope,
+  userLayer,
+} from './utils/codex-mcp-config'
 import { offeredOptions, offeredResponse, type ApprovalOffer } from './utils/approval-offers'
 import { codexCommandApprovalOffers } from './utils/codex-command-approval'
 import { parseCodexElicitation } from './utils/codex-elicitation'
@@ -36,8 +51,12 @@ import {
   type TurnId,
 } from '@workspace/contracts'
 import * as v from 'valibot'
+import type { McpSignInFlow } from '../mcp-sign-in'
+import { replayMcpCallback } from '../mcp-sign-in'
 import type {
   ProviderAdapter,
+  ProviderMcpConfigAccess,
+  ProviderMcpWrite,
   ProviderAdapterRuntime,
   ProviderApprovalResponseInput,
   ProviderCommandCatalogInput,
@@ -46,6 +65,7 @@ import type {
   ProviderHookOutcome,
   ProviderRuntimeEvent,
   ProviderRuntimeStartInput,
+  PlatformMcpBinding,
   ProviderTurnInput,
   ProviderTurnSteerInput,
   ProviderUserInputResponseInput,
@@ -53,7 +73,12 @@ import type {
   ProviderSessionHistoryInput,
   ProviderForkInput,
 } from '../types'
-import { isNotInstalledError, requestGone, sessionIdentityErrors } from '../structured-errors'
+import {
+  isNotInstalledError,
+  mcpConfigErrors,
+  requestGone,
+  sessionIdentityErrors,
+} from '../structured-errors'
 import { RuntimeAdapter } from './state/runtime-adapter'
 import { SessionContext } from './state/session-context'
 import {
@@ -64,6 +89,7 @@ import {
 import {
   CODEX_CLIENT_REQUEST_METHODS,
   CodexAccountRateLimitsUpdatedNotificationSchema,
+  CodexMcpServerStatusUpdatedNotificationSchema,
   CodexThreadGoalUpdatedNotificationSchema,
   CodexThreadTokenUsageUpdatedNotificationSchema,
   parseCodexServerNotification,
@@ -88,7 +114,7 @@ import { codexModelCapabilities } from './utils/codex-models'
 import { asRecord, numberField, stringField } from './utils/records'
 import { noop, runtimeEventId } from './utils/runtime-ids'
 import { isPresent } from '@workspace/utils/objects'
-import { sessionInputFromTurn } from './utils/session-input'
+import { reopenWithMcpOff, sessionInputFromTurn } from './utils/session-input'
 import { normalizeWorkspaceCwd } from './utils/workspace-cwd'
 import { canonicalTurnId } from './utils/turn-ids'
 import { CodexChildAgents } from './state/codex-child-agents'
@@ -129,6 +155,8 @@ const REQUEST_TIMEOUT_MS = 30_000
 /** How long a set or resumed goal may take to start its first turn before `/goal` answers itself. */
 const GOAL_TURN_WAIT_MS = 5_000
 const PROVIDER_PROBE_TIMEOUT_MS = 8_000
+/** Matches the sign-in attempt's own five minutes. */
+const CODEX_SIGN_IN_TIMEOUT_SECS = 300
 const CODEX_USAGE_TIMEOUT_MS = 3_000
 const CODEX_DISCOVERY_PAGE_SIZE = 50
 const ANSI_ESCAPE_CHAR = String.fromCharCode(27)
@@ -228,6 +256,8 @@ export class CodexProviderAdapter
   private readonly attachmentsDir: string
   private readonly env: NodeJS.ProcessEnv
   private readonly clients = new Map<SessionId, CodexAppServerRpcClient>()
+  /** What each live session started from, so a changed off list can reopen its thread. */
+  private readonly startInputs = new Map<SessionId, ProviderRuntimeStartInput>()
   private readonly settings: ProviderInstanceSettings
 
   constructor(options: CodexAdapterOptions = {}) {
@@ -449,6 +479,125 @@ export class CodexProviderAdapter
     return this.requireSession(sessionId, 'mcpServer/oauth/login').signInMcpServer(name)
   }
 
+  readonly mcpConfig: ProviderMcpConfigAccess = {
+    scopes: CODEX_MCP_SCOPES,
+    list: ({ folder }) => this.listConfiguredMcpServers(folder),
+    add: ({ definition, ...input }) =>
+      this.writeMcpServer(input, (servers) => {
+        if (input.name in servers)
+          throw mcpConfigErrors.MCP_NAME_TAKEN({
+            internal: { name: input.name, scope: input.scope },
+          })
+        return codexMcpTable(definition)
+      }),
+    remove: (input) =>
+      this.writeMcpServer(input, (servers) => {
+        if (input.name in servers) return null
+        throw mcpConfigErrors.MCP_SERVER_NOT_FOUND({
+          internal: { name: input.name, scope: input.scope, defined: false },
+        })
+      }),
+    read: ({ folder, name, scope }) => {
+      requireCodexScope(scope)
+      return inspectCodexHistory(this.env, async (client) =>
+        codexMcpDefinition(await readCodexConfig(client, folder), name),
+      )
+    },
+    signIn: ({ folder, name }) => this.signInOutsideSession(folder, name),
+  }
+
+  /** Its own app-server, kept until the sign-in settles: the redirect lands on its loopback. */
+  private async signInOutsideSession(folder: string, name: string) {
+    const client = CodexAppServerRpcClient.start(this.env, folder)
+    try {
+      await initializeCodexClient(client)
+      const flow = await startCodexMcpSignIn(client, { name, threadId: null })
+      void flow.done.catch(noop).finally(() => void client.close())
+      return {
+        ...flow,
+        cancel: () => {
+          flow.cancel()
+          void client.close()
+        },
+      }
+    } catch (error) {
+      await client.close()
+      throw error
+    }
+  }
+
+  private async listConfiguredMcpServers(folder: string) {
+    try {
+      return await inspectCodexHistory(this.env, async (client) => {
+        const [statuses, config] = await Promise.all([
+          listCodexMcpStatus(client, null),
+          readCodexConfig(client, folder),
+        ])
+        return codexMcpConfigServers(statuses, config)
+      })
+    } catch (error) {
+      throw mcpConfigErrors.MCP_PROBE_FAILED({
+        cause: error instanceof Error ? error : undefined,
+        internal: { provider: 'codex' },
+      })
+    }
+  }
+
+  /** One `config/batchWrite` against the version just read, then every live session reloads. */
+  private async writeMcpServer(
+    input: ProviderMcpWrite,
+    table: (servers: Record<string, unknown>) => unknown,
+  ) {
+    requireCodexScope(input.scope)
+    await inspectCodexHistory(this.env, async (client) => {
+      const layer = userLayer(await readCodexConfig(client, input.folder))
+      const value = table(layerServers(layer))
+      await client
+        .request('config/batchWrite', {
+          edits: [{ keyPath: `mcp_servers.${input.name}`, mergeStrategy: 'replace', value }],
+          expectedVersion: layer?.version ?? null,
+          reloadUserConfig: true,
+        })
+        .catch((error: unknown) => {
+          if (isCodexConfigConflict(error))
+            throw mcpConfigErrors.MCP_CONFIG_CHANGED({
+              cause: error instanceof Error ? error : undefined,
+              internal: { name: input.name },
+            })
+          throw mcpConfigErrors.MCP_WRITE_FAILED({
+            cause: error instanceof Error ? error : undefined,
+            internal: { command: 'config/batchWrite', name: input.name },
+          })
+        })
+    })
+    await this.reloadLiveMcpServers()
+  }
+
+  /** Each session has its own app-server, which reads `config.toml` only on reload. */
+  private async reloadLiveMcpServers() {
+    for (const [sessionId, session] of this.sessions) {
+      if (!session.isActive()) continue
+      await session.reloadMcpServers().catch((error: unknown) => {
+        recordChatPipelineWarning('chat.pipeline.codex_adapter.mcp_reload.failed', {
+          error,
+          sessionId,
+        })
+      })
+    }
+  }
+
+  /** Per-thread config applies at thread/resume, so an idle session reopens its thread now. */
+  async applyMcpSessionOff({ off, sessionId }: { off: readonly string[]; sessionId: SessionId }) {
+    await reopenWithMcpOff({
+      off,
+      reopen: (start, session) =>
+        this.ensureRuntimeSession({ ...start, providerResumeCursor: session.conversationMarker() }),
+      session: this.activeSession(sessionId),
+      sessionId,
+      startInputs: this.startInputs,
+    })
+  }
+
   async controlGoal({ action, sessionId }: { action: ProviderGoalAction; sessionId: SessionId }) {
     await this.requireSession(sessionId, 'thread/goal/set').controlGoal(action)
   }
@@ -505,6 +654,7 @@ export class CodexProviderAdapter
     else await client?.close()
     if (this.sessions.get(sessionId) === session) this.sessions.delete(sessionId)
     if (this.clients.get(sessionId) === client) this.clients.delete(sessionId)
+    this.startInputs.delete(sessionId)
   }
 
   async stopAll() {
@@ -521,10 +671,13 @@ export class CodexProviderAdapter
     const interactionMode = input.interactionMode ?? DEFAULT_INTERACTION_MODE
     const modelOptions = codexModelOptions(input)
     const ephemeral = input.ephemeral ?? false
+    const mcpOff = [...(input.mcpOff ?? [])].sort()
+    this.startInputs.set(input.sessionId, input)
     if (
       existing?.matches({
         cwd,
         ephemeral,
+        mcpOff,
         model,
         runtimeMode: input.runtimeMode,
         runtimeEpoch: input.runtimeEpoch,
@@ -569,6 +722,7 @@ export class CodexProviderAdapter
       env: this.env,
       ephemeral,
       interactionMode,
+      mcpOff,
       model,
       modelOptions,
       providerInstanceId: input.providerInstanceId,
@@ -577,6 +731,7 @@ export class CodexProviderAdapter
       runtimeEpoch: input.runtimeEpoch,
       sessionId: input.sessionId,
       ...(input.fork ? { fork: input.fork } : {}),
+      ...(input.platformMcp ? { platformMcp: input.platformMcp } : {}),
     })
     this.sessions.set(input.sessionId, session)
     recordChatPipelineInfo('chat.pipeline.codex_adapter.session.started', {
@@ -612,10 +767,13 @@ class CodexAppServerSession extends SessionContext {
   /** This session's view of the plan windows, read back when a turn stops on one. */
   private usageWindows: ProviderUsageWindow[] = []
   private rateLimitReachedType: string | null = null
+  /** Servers this thread was opened without. */
+  private readonly mcpOff: readonly string[]
 
   private constructor(input: {
     client: CodexAppServerRpcClient
     cwd: string
+    mcpOff: readonly string[]
     emit: (event: ProviderRuntimeEvent) => void
     ephemeral: boolean
     interactionMode: InteractionMode
@@ -630,6 +788,7 @@ class CodexAppServerSession extends SessionContext {
   }) {
     super(input)
     this.client = input.client
+    this.mcpOff = input.mcpOff
     this.resumedConversationMarker = input.resumedConversationMarker
     this.interactionMode = input.interactionMode
     this.providerBindingHandle = `codex:${input.providerConversationMarker}`
@@ -668,12 +827,14 @@ class CodexAppServerSession extends SessionContext {
 
   static async start(input: {
     fork?: ProviderForkStart
+    platformMcp?: PlatformMcpBinding
     onClient: (client: CodexAppServerRpcClient) => void
     cwd: string
     emit: (event: ProviderRuntimeEvent) => void
     env: NodeJS.ProcessEnv
     ephemeral: boolean
     interactionMode: InteractionMode
+    mcpOff: readonly string[]
     model: string
     modelOptions: CodexModelOptions
     providerInstanceId: ProviderTurnInput['providerInstanceId']
@@ -691,11 +852,34 @@ class CodexAppServerSession extends SessionContext {
       runtimeEpoch: input.runtimeEpoch,
       sessionId: input.sessionId,
     })
-    const client = CodexAppServerRpcClient.start(input.env, input.cwd)
+    const client = CodexAppServerRpcClient.start(input.env, input.cwd, (failed) => {
+      input.emit({
+        createdAt: new Date().toISOString(),
+        eventId: runtimeEventId('codex-session-exited'),
+        payload: {
+          exitKind: failed ? 'error' : 'graceful',
+          reason: 'Codex runtime ended.',
+          recoverable: true,
+        },
+        provider: DEFAULT_CODEX_PROVIDER_SETTINGS.driverKind,
+        providerInstanceId: input.providerInstanceId,
+        providerBindingHandle: null,
+        runtimeMode: input.runtimeMode,
+        runtimeEpoch: input.runtimeEpoch,
+        sessionId: input.sessionId,
+        type: 'runtime.exited',
+      })
+    })
     input.onClient(client)
     try {
       await initializeCodexClient(client)
-      const response = await openCodexSession(client, input)
+      const mcpOff = await configuredMcpOff(client, input.cwd, input.mcpOff)
+      // A same-named server in the user's config merges into ours and breaks the binding.
+      const platformMcp =
+        input.platformMcp && !(await configuresPlatformMcp(client, input.cwd))
+          ? input.platformMcp
+          : undefined
+      const response = await openCodexSession(client, { ...input, platformMcp, mcpOff })
       const providerConversationMarker = response.thread.id
       recordChatPipelineInfo('chat.pipeline.codex_session.started', {
         providerConversationMarker,
@@ -705,6 +889,7 @@ class CodexAppServerSession extends SessionContext {
       const session = new CodexAppServerSession({
         client,
         cwd: input.cwd,
+        mcpOff: input.mcpOff,
         emit: input.emit,
         ephemeral: input.ephemeral,
         interactionMode: input.interactionMode,
@@ -720,6 +905,7 @@ class CodexAppServerSession extends SessionContext {
       })
       session.emitSessionStarted(input.providerResumeCursor ?? null)
       session.emitConversationStarted()
+      if (input.platformMcp && !platformMcp) session.warnPlatformMcpShadowed()
       if (typeof input.providerResumeCursor === 'string')
         void session.readGoal().catch((error: unknown) =>
           recordChatPipelineWarning('chat.pipeline.codex_session.goal_read.failed', {
@@ -748,17 +934,28 @@ class CodexAppServerSession extends SessionContext {
   matches(input: {
     cwd: string
     ephemeral: boolean
+    mcpOff: readonly string[]
     model: string
     runtimeMode: RuntimeMode
     runtimeEpoch: string
   }) {
     if (this.client.isClosed()) return false
+    // Per-thread config is read at thread/start and thread/resume only.
+    if (this.mcpOff.join('\0') !== input.mcpOff.join('\0')) return false
     if (this.runtimeEpoch !== input.runtimeEpoch) return false
     if (this.cwd !== input.cwd) return false
     if (this.ephemeral !== input.ephemeral) return false
     if (this.model !== input.model) return false
 
     return this.runtimeMode === input.runtimeMode
+  }
+
+  isBusy() {
+    return this.pendingTurn !== null || this.activeProviderTurnId !== null
+  }
+
+  conversationMarker() {
+    return this.providerConversationMarker
   }
 
   /** Reports whether the live session had to change mode, for the reuse event. */
@@ -793,30 +990,19 @@ class CodexAppServerSession extends SessionContext {
   }
 
   async mcpServers(): Promise<ProviderMcpServer[]> {
-    const servers: ProviderMcpServer[] = []
-    let cursor: string | null = null
-    do {
-      const page: CodexClientRequestResultByMethod['mcpServerStatus/list'] =
-        await this.client.request('mcpServerStatus/list', {
-          threadId: this.providerConversationMarker,
-          ...(cursor ? { cursor } : {}),
-        })
-      servers.push(...page.data.map(codexMcpServer))
-      cursor = page.nextCursor ?? null
-    } while (cursor)
-    return servers
+    const [statuses, definitions] = await Promise.all([
+      listCodexMcpStatus(this.client, this.providerConversationMarker),
+      readCodexMcpDefinitions(this.client, this.cwd),
+    ])
+    return statuses.map((server) => codexMcpServer(server, definitions.get(server.name)))
   }
 
   async reloadMcpServers() {
     await this.client.request('config/mcpServer/reload', undefined)
   }
 
-  async signInMcpServer(name: string) {
-    const response = await this.client.request('mcpServer/oauth/login', {
-      name,
-      threadId: this.providerConversationMarker,
-    })
-    return { authorizationUrl: response.authorizationUrl }
+  async signInMcpServer(name: string): Promise<McpSignInFlow> {
+    return startCodexMcpSignIn(this.client, { name, threadId: this.providerConversationMarker })
   }
 
   /** A resumed thread keeps its goal; the indicator learns of it before the first turn. */
@@ -1730,7 +1916,30 @@ class CodexAppServerSession extends SessionContext {
     return true
   }
 
+  warnPlatformMcpShadowed() {
+    this.emitRuntimeNotification(
+      'runtime.warning',
+      {
+        message:
+          "This session runs without Platform's tools: your Codex config defines its own MCP server named platform.",
+      },
+      'config/read',
+      null,
+    )
+  }
+
   private handleMcpStatusUpdatedNotification(params: unknown) {
+    const parsed = v.safeParse(CodexMcpServerStatusUpdatedNotificationSchema, params)
+    if (parsed.success && parsed.output.name === 'platform' && parsed.output.status === 'failed')
+      this.emitRuntimeNotification(
+        'runtime.warning',
+        {
+          detail: params,
+          message: `Platform's tools did not start in this session: ${parsed.output.error ?? 'Codex gave no reason'}.`,
+        },
+        'mcpServer/startupStatus/updated',
+        params,
+      )
     this.emitRuntimeNotification(
       'mcp.status.updated',
       { status: params },
@@ -2527,7 +2736,10 @@ class CodexAppServerRpcClient {
   /** Stderr is diagnostics, never classified: the last lines ride on the exit event. */
   private readonly stderrTail: string[] = []
 
-  private constructor(process: ChildProcessWithoutNullStreams) {
+  private readonly onEnd: ((failed: boolean) => void) | undefined
+
+  private constructor(process: ChildProcessWithoutNullStreams, onEnd?: (failed: boolean) => void) {
+    this.onEnd = onEnd
     this.process = process
     this.lifetime = new ProviderProcessLifetime(process)
     this.process.stdout.setEncoding('utf8')
@@ -2538,13 +2750,18 @@ class CodexAppServerRpcClient {
     this.process.on('exit', (code) => this.handleExit(code))
   }
 
-  static start(env: NodeJS.ProcessEnv = process.env, cwd?: string) {
+  static start(
+    env: NodeJS.ProcessEnv = process.env,
+    cwd?: string,
+    onEnd?: (failed: boolean) => void,
+  ) {
     return new CodexAppServerRpcClient(
       spawn(codexBinary(env), ['app-server'], {
         cwd,
         env,
         stdio: ['pipe', 'pipe', 'pipe'],
       }),
+      onEnd,
     )
   }
 
@@ -2635,7 +2852,7 @@ class CodexAppServerRpcClient {
   }
 
   async close() {
-    this.closeWithError(createInternalError('Codex app-server closed.'))
+    this.closeWithError(createInternalError('Codex app-server closed.'), false)
     await this.lifetime.close()
   }
 
@@ -2718,7 +2935,7 @@ class CodexAppServerRpcClient {
     }
     if (this.closed) return
 
-    this.closeWithError(sessionIdentityErrors.CODEX_EXITED({ internal: context }))
+    this.closeWithError(sessionIdentityErrors.CODEX_EXITED({ internal: context }), exitCode !== 0)
   }
 
   private rejectRequest(id: JsonRpcId, error: unknown) {
@@ -2730,8 +2947,10 @@ class CodexAppServerRpcClient {
     pending.reject(createInternalError(providerErrorMessage(error)))
   }
 
-  private closeWithError(error: Error) {
+  private closeWithError(error: Error, failed = true) {
+    if (this.closed) return
     this.closed = true
+    this.onEnd?.(failed)
     for (const [id, pending] of this.pending) {
       clearTimeout(pending.timer)
       this.pending.delete(id)
@@ -2781,6 +3000,90 @@ async function readCodexUsage(client: CodexAppServerRpcClient): Promise<Provider
     kind: 'reading',
     update: codexUsageUpdate(snapshot),
     resetCredits: codexResetCredits(response),
+  }
+}
+
+async function listCodexMcpStatus(client: CodexAppServerRpcClient, threadId: string | null) {
+  const servers: CodexMcpServerStatus[] = []
+  let cursor: string | null = null
+  do {
+    const page: CodexClientRequestResultByMethod['mcpServerStatus/list'] = await client.request(
+      'mcpServerStatus/list',
+      { threadId, ...(cursor ? { cursor } : {}) },
+    )
+    servers.push(...page.data)
+    cursor = page.nextCursor ?? null
+  } while (cursor)
+  return servers
+}
+
+/** An `enabled` key for a server no config defines any more would leave a half table behind. */
+async function configuredMcpOff(
+  client: CodexAppServerRpcClient,
+  cwd: string,
+  mcpOff: readonly string[],
+) {
+  if (mcpOff.length === 0) return mcpOff
+
+  const definitions = await readCodexMcpDefinitions(client, cwd)
+  return mcpOff.filter((name) => definitions.has(name))
+}
+
+/**
+ * `mcpServer/oauth/login` on a live app-server. It reports the outcome as
+ * `mcpServer/oauthLogin/completed`; a pasted address is replayed against its loopback listener.
+ */
+async function startCodexMcpSignIn(
+  client: CodexAppServerRpcClient,
+  input: { name: string; threadId: string | null },
+): Promise<McpSignInFlow> {
+  const outcome = Promise.withResolvers<void>()
+  client.onMessage((message) => {
+    if (message.method !== 'mcpServer/oauthLogin/completed') return
+    const params = asRecord(message.params)
+    if (params.name !== input.name) return
+    if (params.success === true) {
+      outcome.resolve()
+      return
+    }
+    outcome.reject(
+      mcpConfigErrors.MCP_SIGN_IN_FAILED({
+        internal: { reported: typeof params.error === 'string', stage: 'exchange' },
+      }),
+    )
+  })
+  const response = await client
+    .request('mcpServer/oauth/login', {
+      name: input.name,
+      timeoutSecs: CODEX_SIGN_IN_TIMEOUT_SECS,
+      ...(input.threadId ? { threadId: input.threadId } : {}),
+    })
+    .catch((error: unknown) => {
+      throw mcpConfigErrors.MCP_SIGN_IN_UNSUPPORTED({
+        cause: error instanceof Error ? error : undefined,
+        internal: { name: input.name },
+      })
+    })
+  return {
+    authorizationUrl: response.authorizationUrl,
+    cancel: () =>
+      outcome.reject(mcpConfigErrors.MCP_SIGN_IN_FAILED({ internal: { stage: 'cancelled' } })),
+    done: outcome.promise,
+    finish: replayMcpCallback,
+  }
+}
+
+function readCodexConfig(client: CodexAppServerRpcClient, cwd: string) {
+  return client.request('config/read', { cwd, includeLayers: true })
+}
+
+/** Sources and transports are extras: an app-server that cannot read its config still lists status. */
+async function readCodexMcpDefinitions(client: CodexAppServerRpcClient, cwd: string) {
+  try {
+    return codexMcpDefinitions(await client.request('config/read', { cwd }))
+  } catch (error) {
+    recordChatPipelineWarning('chat.pipeline.codex_session.mcp_config_read.failed', { error })
+    return new Map<string, CodexMcpDefinition>()
   }
 }
 
@@ -2986,8 +3289,10 @@ async function openCodexSession(
     cwd: string
     ephemeral: boolean
     fork?: ProviderForkStart
+    mcpOff: readonly string[]
     model: string
     modelOptions: CodexModelOptions
+    platformMcp?: PlatformMcpBinding
     providerResumeCursor?: unknown | null
     runtimeMode: RuntimeMode
   },
@@ -3007,25 +3312,6 @@ async function openCodexSession(
     REQUEST_TIMEOUT_MS,
     (response) => v.parse(codexSessionResumeSchema, response),
   )
-}
-
-function codexMcpServer(server: CodexMcpServerStatus): ProviderMcpServer {
-  return {
-    error: server.toolsError ?? null,
-    name: server.name,
-    status: codexMcpStatus(server),
-  }
-}
-
-function codexMcpStatus(server: CodexMcpServerStatus): ProviderMcpServer['status'] {
-  const runtime = server.runtimeStatus
-  if (runtime === 'connected') return 'connected'
-  if (runtime === 'disabled') return 'disabled'
-  if (runtime === 'failed' || runtime === 'cancelled') return 'failed'
-  if (runtime === 'authenticationRequired' || server.authStatus === 'notLoggedIn')
-    return 'needs-auth'
-
-  return 'pending'
 }
 
 function codexConfiguredHook(hook: CodexHookMetadata): ProviderConfiguredHook {
@@ -3076,8 +3362,10 @@ async function requestCodexModels(client: CodexAppServerRpcClient) {
 function threadStartParams(input: {
   cwd: string
   ephemeral: boolean
+  mcpOff: readonly string[]
   model: string
   modelOptions: CodexModelOptions
+  platformMcp?: PlatformMcpBinding
   runtimeMode: RuntimeMode
 }): CodexClientRequestParamsByMethod['thread/start'] {
   const runtime = runtimeModeToSessionConfig(input.runtimeMode)
@@ -3085,6 +3373,7 @@ function threadStartParams(input: {
   return {
     approvalPolicy: runtime.approvalPolicy,
     approvalsReviewer: runtime.approvalsReviewer,
+    ...codexMcpConfig(input.platformMcp, input.mcpOff),
     cwd: input.cwd,
     ...(input.ephemeral ? { ephemeral: true } : {}),
     experimentalRawEvents: true,
@@ -3097,14 +3386,17 @@ function threadStartParams(input: {
 
 function threadResumeParams(input: {
   cwd: string
+  mcpOff: readonly string[]
   model: string
   modelOptions: CodexModelOptions
+  platformMcp?: PlatformMcpBinding
   runtimeMode: RuntimeMode
 }) {
   const runtime = runtimeModeToSessionConfig(input.runtimeMode)
 
   return {
     approvalsReviewer: runtime.approvalsReviewer,
+    ...codexMcpConfig(input.platformMcp, input.mcpOff),
     cwd: input.cwd,
     model: input.model,
     sandbox: runtime.sandbox,
@@ -3135,6 +3427,7 @@ function turnStartParams(
     sandboxPolicy: runtime.sandboxPolicy,
     ...(modelOptions.effort ? { effort: modelOptions.effort } : {}),
     ...(modelOptions.serviceTier ? { serviceTier: modelOptions.serviceTier } : {}),
+    ...(input.outputSchema ? { outputSchema: input.outputSchema } : {}),
     threadId: session.providerConversationMarkerForTurn(),
   } as CodexClientRequestParamsByMethod['turn/start']
 }
@@ -3770,4 +4063,39 @@ function codexResetCredits(response: CodexClientRequestResultByMethod['account/r
     creditId: credit?.id ?? null,
     available: Math.max(0, response.rateLimitResetCredits?.availableCount ?? 0),
   }
+}
+
+/**
+ * Per-thread config, so no user file is touched; it does not persist, so every start, resume and
+ * fork carries it again. Codex speaks MCP 2026-07-28 only behind this feature flag.
+ */
+function codexMcpConfig(binding: PlatformMcpBinding | undefined, mcpOff: readonly string[]) {
+  if (!binding && mcpOff.length === 0) return {}
+  return {
+    config: {
+      ...Object.fromEntries(mcpOff.map((name) => [`mcp_servers.${name}.enabled`, false])),
+      ...(binding
+        ? {
+            'features.mcp_2026_07_28': true,
+            'mcp_servers.platform.http_headers': { Authorization: `Bearer ${binding.token}` },
+            'mcp_servers.platform.url': binding.url,
+            suppress_unstable_features_warning: true,
+          }
+        : {}),
+    },
+  }
+}
+
+/** Whether the user's or project's Codex config already names an MCP server `platform`. */
+async function configuresPlatformMcp(client: CodexAppServerRpcClient, cwd: string) {
+  const response = await client
+    .requestRaw('config/read', { cwd }, REQUEST_TIMEOUT_MS, (value) => value)
+    .catch((error: unknown) => {
+      // Unread config binds anyway: a clash then shows as the server's startup failure.
+      recordChatPipelineWarning('chat.pipeline.codex_session.config_read.failed', { error })
+      return null
+    })
+  return Object.keys(asRecord(asRecord(response).origins)).some(
+    (key) => key === 'mcp_servers.platform' || key.startsWith('mcp_servers.platform.'),
+  )
 }

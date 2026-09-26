@@ -1,5 +1,6 @@
 import type { ProviderUsagePurpose } from '@workspace/contracts'
 import { BackgroundTaskRegistry } from './background-liveness'
+import type { McpGrantRegistry } from '../mcp/grants'
 import { SessionScheduleRegistry } from './session-schedules'
 import { SessionGoalRegistry } from './session-goals'
 import { elapsedMs } from '@workspace/utils/timing'
@@ -77,6 +78,8 @@ import {
 
 export type ProviderServiceOptions = {
   adapterRegistry?: ProviderAdapterRegistry
+  /** Platform's MCP endpoint; each chat runtime gets a token scoped to its session and checkout. */
+  mcp?: { readonly endpoint: string; readonly grants: McpGrantRegistry }
   /** Overridden in tests that need the deadline to be reachable within one. */
   idleSessionDeadlineMs?: number
   sessionDirectory?: ProviderSessionDirectory
@@ -146,6 +149,7 @@ export class ProviderService {
   private readonly backgroundTasks = new BackgroundTaskRegistry()
   private readonly taskRosters = new Map<SessionId, ProviderBackgroundTask[]>()
   private readonly schedules = new SessionScheduleRegistry()
+  private readonly mcp: ProviderServiceOptions['mcp'] | null
   private readonly goals = new SessionGoalRegistry()
   private readonly reaperTimer: ReturnType<typeof setInterval>
   private readonly reaper: ProviderSessionReaper
@@ -174,6 +178,7 @@ export class ProviderService {
   constructor(options: ProviderServiceOptions = {}) {
     this.adapterRegistry = options.adapterRegistry ?? createDefaultProviderAdapterRegistry()
     this.sessionDirectory = options.sessionDirectory ?? new ProviderSessionDirectory()
+    this.mcp = options.mcp ?? null
     this.reaper = new ProviderSessionReaper({
       deadlineMs: options.idleSessionDeadlineMs,
       directory: this.sessionDirectory,
@@ -389,10 +394,18 @@ export class ProviderService {
     })
     this.requireSdkOwnership(input.sessionId)
     this.recordLaunch(input, adapter)
-    const session = await adapter.startRuntime({
-      ...providerRuntimeStartInput(input, input.runtimePayload, continuation),
-      ...(!existing && input.fork ? { fork: input.fork.native } : {}),
-    })
+    const mcpOff = existing?.runtimePayload?.mcpOff
+    const session = await adapter
+      .startRuntime({
+        ...providerRuntimeStartInput(input, input.runtimePayload, continuation),
+        ...(mcpOff?.length ? { mcpOff } : {}),
+        ...this.mcpBinding(input.sessionId, input.runtimeEpoch, input.runtimePayload.cwd),
+        ...(!existing && input.fork ? { fork: input.fork.native } : {}),
+      })
+      .catch((error: unknown) => {
+        this.mcp?.grants.revoke(input.sessionId, input.runtimeEpoch)
+        throw error
+      })
     this.requireRunning()
     const binding = this.sessionDirectory.upsert({
       adapterKey: adapter.adapterKey,
@@ -500,6 +513,7 @@ export class ProviderService {
     }
     const task = new ProviderTextGenerationTask({
       interrupt,
+      outputSchema: input.outputSchema,
       providerInstanceId,
       purpose: input.purpose,
       ...ids,
@@ -517,12 +531,15 @@ export class ProviderService {
 
     try {
       throwIfTextGenerationAborted(input.signal)
-      isolatedCwd = await mkdtemp(path.join(tmpdir(), 'platform-provider-text-'))
+      if (!input.cwd) isolatedCwd = await mkdtemp(path.join(tmpdir(), 'platform-provider-text-'))
+      const cwd = input.cwd ?? isolatedCwd ?? ''
+      const interactionMode = input.interactionMode ?? DEFAULT_INTERACTION_MODE
       startPromise = adapter.startRuntime({
-        cwd: isolatedCwd,
+        cwd,
         ephemeral: true,
-        interactionMode: DEFAULT_INTERACTION_MODE,
+        interactionMode,
         modelSelection: input.modelSelection,
+        ...(input.outputSchema ? { outputSchema: input.outputSchema } : {}),
         providerInstanceId,
         runtimeMode: 'approval-required',
         sessionId: ids.sessionId,
@@ -534,11 +551,12 @@ export class ProviderService {
       await adapter.sendTurn({
         attachments: input.attachments ?? [],
         attachmentsDir: input.attachmentsDir,
-        cwd: isolatedCwd,
+        cwd,
         ephemeral: true,
-        interactionMode: DEFAULT_INTERACTION_MODE,
+        interactionMode,
         messageText: input.messageText,
         modelSelection: input.modelSelection,
+        ...(input.outputSchema ? { outputSchema: input.outputSchema } : {}),
         providerInstanceId,
         runtimeMode: 'approval-required',
         sessionId: ids.sessionId,
@@ -943,9 +961,31 @@ export class ProviderService {
     return {
       canReconnect: Boolean(adapter?.reconnectMcpServer),
       canSignIn: Boolean(adapter?.signInMcpServer),
+      canTurnOff: Boolean(adapter?.applyMcpSessionOff),
+      off: this.sessionDirectory.getBinding(sessionId)?.runtimePayload?.mcpOff ?? [],
       running: servers !== null,
       servers: servers ?? [],
     }
+  }
+
+  /** The off list lives on the binding, so every later start, resume and restart carries it. */
+  async setMcpSessionOff(input: { name: string; off: boolean; sessionId: SessionId }) {
+    const adapter = this.requireSessionControl(input.sessionId, 'applyMcpSessionOff')
+    const binding = this.sessionDirectory.getBinding(input.sessionId)
+    if (!binding)
+      throw sessionIdentityErrors.SESSION_NOT_RUNNING({ internal: { sessionId: input.sessionId } })
+    const current = binding.runtimePayload?.mcpOff ?? []
+    const off = input.off
+      ? [...new Set([...current, input.name])].sort()
+      : current.filter((name) => name !== input.name)
+    this.sessionDirectory.upsert({ ...bindingForUpsert(binding), runtimePayload: { mcpOff: off } })
+    recordChatPipelineInfo('chat.pipeline.provider_service.mcp_session_off', {
+      name: input.name,
+      off: input.off,
+      sessionId: input.sessionId,
+    })
+    await adapter.applyMcpSessionOff?.({ off, sessionId: input.sessionId })
+    return this.sessionMcp(input.sessionId)
   }
 
   async reconnectMcpServer(input: { name: string; sessionId: SessionId }) {
@@ -960,12 +1000,15 @@ export class ProviderService {
     return this.sessionMcp(input.sessionId)
   }
 
+  /** The sign-in's redirect goes to the provider's loopback; the caller tracks the attempt. */
   async signInMcpServer(input: { name: string; sessionId: SessionId }) {
     const adapter = this.requireSessionControl(input.sessionId, 'signInMcpServer')
     const signIn = adapter.signInMcpServer
     if (!signIn) throw sessionIdentityErrors.SESSION_CONTROL_UNSUPPORTED({ internal: input })
 
-    return v.parse(providerMcpSignInSchema, await signIn.call(adapter, input))
+    const flow = await signIn.call(adapter, input)
+    v.parse(providerMcpSignInSchema, { authorizationUrl: flow.authorizationUrl })
+    return flow
   }
 
   async sessionHooks(sessionId: SessionId): Promise<ProviderSessionHooks> {
@@ -982,7 +1025,12 @@ export class ProviderService {
 
   private requireSessionControl(
     sessionId: SessionId,
-    control: 'approveMcpServer' | 'reconnectMcpServer' | 'signInMcpServer' | 'controlGoal',
+    control:
+      | 'applyMcpSessionOff'
+      | 'approveMcpServer'
+      | 'reconnectMcpServer'
+      | 'signInMcpServer'
+      | 'controlGoal',
   ) {
     this.requireRunning()
     const adapter = this.routeSession(sessionId)?.adapter
@@ -1024,18 +1072,35 @@ export class ProviderService {
     )
   }
 
+  /** A turn may reopen its runtime, so it carries the same binding the start did. */
   private turnWithResumeCursor(
     input: ProviderTurnInput,
     adapter: ReturnType<ProviderAdapterRegistry['getByInstance']>,
   ): ProviderTurnInput {
-    if (input.providerResumeCursor !== undefined && input.providerResumeCursor !== null)
-      return input
+    const bound = { ...input, ...this.mcpBinding(input.sessionId, input.runtimeEpoch, input.cwd) }
+    return this.withResumeCursor(bound, adapter)
+  }
 
+  private mcpBinding(sessionId: SessionId, runtimeEpoch: string, cwd: string) {
+    if (!this.mcp) return {}
+    const token = this.mcp.grants.bind({ cwd, runtimeEpoch, sessionId })
+    return { platformMcp: { token, url: this.mcp.endpoint } }
+  }
+
+  private withResumeCursor(
+    input: ProviderTurnInput,
+    adapter: ReturnType<ProviderAdapterRegistry['getByInstance']>,
+  ): ProviderTurnInput {
     const binding = this.sessionDirectory.getBinding(input.sessionId)
-    const continuation = continuableBinding(binding, adapter, input.providerInstanceId)
-    if (!continuation) return input
+    const mcpOff = binding?.runtimePayload?.mcpOff
+    // A turn may reopen its runtime, so it carries the servers the session runs without.
+    const turn = mcpOff?.length ? { ...input, mcpOff } : input
+    if (turn.providerResumeCursor !== undefined && turn.providerResumeCursor !== null) return turn
 
-    return { ...input, providerResumeCursor: continuation.providerResumeCursor }
+    const continuation = continuableBinding(binding, adapter, input.providerInstanceId)
+    if (!continuation) return turn
+
+    return { ...turn, providerResumeCursor: continuation.providerResumeCursor }
   }
 
   /** `adapter` is null when the binding's instance has left the registry. */
@@ -1053,6 +1118,7 @@ export class ProviderService {
   private releaseUnroutedBinding(binding: ProviderRuntimeBindingWithMetadata) {
     this.backgroundTasks.clear(binding.sessionId)
     this.schedules.clear(binding.sessionId)
+    this.mcp?.grants.revoke(binding.sessionId)
     this.goals.clear(binding.sessionId)
     this.releaseWorktree(binding.sessionId)
     recordChatPipelineWarning(
@@ -1169,6 +1235,7 @@ export class ProviderService {
     this.taskRosters.delete(sessionId)
     this.schedules.clear(sessionId)
     this.goals.clear(sessionId)
+    this.mcp?.grants.revoke(sessionId)
     this.releaseWorktree(sessionId)
   }
 
@@ -1265,6 +1332,9 @@ export class ProviderService {
     this.adapterSubscriptions.set(providerInstanceId, {
       adapter,
       unsubscribe: adapter.subscribeEvents((event) => {
+        // Revoke synchronously, including startup failures and exits queued behind a turn.
+        if (event.type === 'runtime.exited')
+          this.mcp?.grants.revoke(event.sessionId, event.runtimeEpoch)
         void this.runtimeEvents.enqueue({ adapter, event, providerInstanceId }).catch((error) => {
           recordChatPipelineWarning('chat.pipeline.provider_service.runtime_stream.failed', {
             adapterKey: adapter.adapterKey,
@@ -1607,5 +1677,5 @@ function textGenerationResult(task: ProviderTextGenerationTask): ProviderTextGen
     )
   }
 
-  return { text: outcome.text }
+  return { structured: outcome.structured, text: outcome.text }
 }

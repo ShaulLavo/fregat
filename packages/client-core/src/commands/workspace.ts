@@ -253,6 +253,16 @@ export const workspaceCommandMetadata = {
     when: [],
     title: 'Open usage',
   }),
+  'workspace.showMcpServers': defineMetadata({
+    category: 'Chat',
+    description: 'List, add, copy and delete the MCP servers Claude and Codex start.',
+    id: 'workspace.showMcpServers',
+    execution: 'async',
+    target: 'workspace',
+    undoCategory: 'view-only',
+    when: [],
+    title: 'Open MCP servers',
+  }),
   'workspace.exportTranscript': defineMetadata({
     category: 'Chat',
     description: 'Save the selected session as Markdown.',
@@ -495,6 +505,17 @@ export const workspaceCommandMetadata = {
     undoCategory: 'view-only',
     when: ['fileBackedTab'],
     title: 'Cycle markdown view',
+  }),
+  'workspace.showSpellingSuggestions': defineMetadata({
+    category: 'Editor',
+    description:
+      'Open the editor menu at the caret, led by replacements for the misspelled word under it.',
+    id: 'workspace.showSpellingSuggestions',
+    execution: 'sync',
+    target: 'workspace',
+    undoCategory: 'view-only',
+    when: ['fileBackedTab'],
+    title: 'Spelling suggestions',
   }),
   'workspace.addFileToChat': defineMetadata({
     category: 'Chat',

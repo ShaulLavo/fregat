@@ -256,8 +256,13 @@ export {
   providerAgentSelectionSchema,
   providerBackgroundTaskSchema,
   providerConfiguredHookSchema,
+  providerMcpAuthSchema,
   providerMcpServerSchema,
+  providerMcpSessionOffBodySchema,
   providerMcpServerStatusSchema,
+  providerMcpTransportSchema,
+  providerMcpSignInAttemptSchema,
+  providerMcpSignInFinishBodySchema,
   providerMcpSignInSchema,
   providerSessionHooksSchema,
   providerSessionMcpSchema,
@@ -287,9 +292,12 @@ export {
   type ProviderAgentSelection,
   type ProviderBackgroundTask,
   type ProviderConfiguredHook,
+  type ProviderMcpAuth,
   type ProviderMcpServer,
   type ProviderMcpServerStatus,
+  type ProviderMcpTransport,
   type ProviderMcpSignIn,
+  type ProviderMcpSignInAttempt,
   type ProviderSessionHooks,
   type ProviderSessionMcp,
   type ProviderSessionSchedule,
@@ -497,6 +505,8 @@ export {
 } from './lsp-protocol'
 export {
   keybindingChordSchema,
+  keybindingListSchema,
+  MAX_KEYBINDINGS_PER_COMMAND,
   lspFeatureRanksOverrideSchema,
   lspLanguageServerListsSchema,
   lspServerOverrideSchema,
@@ -981,6 +991,7 @@ export {
   type WallpaperSource,
   type WallpaperSelection,
   type WallpaperAsset,
+  type WallpaperCatalogEntry,
 } from './themes/wallpaper'
 
 export * from './themes/bundle'
@@ -1088,3 +1099,15 @@ export {
   type ServerUpdatePhase,
   type StagedRelease,
 } from './server-update'
+export * from './provider-mcp'
+export {
+  AGENT_REVIEW_OUTPUT_SCHEMA,
+  agentReviewFindingSchema,
+  agentReviewRequestSchema,
+  agentReviewResultSchema,
+  agentReviewTargetSchema,
+  type AgentReviewFinding,
+  type AgentReviewRequest,
+  type AgentReviewResult,
+  type AgentReviewTarget,
+} from './agent-review'

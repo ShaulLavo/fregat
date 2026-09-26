@@ -2,6 +2,12 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "additionalProperties": false,
   "properties": {
+    "agent.diagnosticsFeedback": {
+      "default": true,
+      "description": "After an agent edits a file, tell it the errors that edit introduced, so it can fix them in the same turn.",
+      "markdownDescription": "After an agent edits a file, tell it the errors that edit introduced, so it can fix them in the same turn.\n\nOnly errors the edit introduced, from the language server already open for that file: up to 10 per file.",
+      "type": "boolean"
+    },
     "chat.activeFileContext": {
       "default": false,
       "description": "Show the file open in the editor as a chip in the composer. While the chip is there, sending mentions that file. Remove the chip to send without it.",
@@ -368,6 +374,12 @@
       "minimum": 0,
       "type": "integer"
     },
+    "editor.spellcheck": {
+      "default": "off",
+      "description": "Mark misspelled words: in plain text and Markdown prose, or also in code comments and strings. Right-click a marked word for suggestions.",
+      "enum": ["off", "prose", "proseAndCode"],
+      "type": "string"
+    },
     "editor.syntaxHighlighting.enabled": {
       "default": true,
       "description": "Colour code by syntax. Turning this off makes very large files faster.",
@@ -581,10 +593,14 @@
       "additionalProperties": {
         "anyOf": [
           {
-            "maxLength": 64,
-            "minLength": 1,
-            "pattern": "^\\S+(?: \\S+)?$",
-            "type": "string"
+            "items": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^\\S+(?: \\S+)?$",
+              "type": "string"
+            },
+            "maxItems": 8,
+            "type": "array"
           },
           {
             "type": "null"
@@ -592,7 +608,8 @@
         ]
       },
       "default": {},
-      "description": "Command id to shortcut: one hotkey or two separated by a single space. A missing key keeps the default; an explicit null unbinds the command.",
+      "description": "Every command and its keys.",
+      "markdownDescription": "Every command and its keys.\n\nIn settings.json this is command id to its complete list of shortcuts, each one hotkey or two separated by a single space. A missing command keeps its defaults; null or an empty list unbinds it.",
       "propertyNames": {
         "maxLength": 120,
         "minLength": 1,
@@ -917,6 +934,12 @@
       },
       "type": "array"
     },
+    "prefetch.diffs": {
+      "default": true,
+      "description": "Load changes, commit files and checkpoint diffs when their rows are hovered or active.",
+      "markdownDescription": "Load changes, commit files and checkpoint diffs when their rows are hovered or active.\n\nApplies while `prefetch.enabled` is on.",
+      "type": "boolean"
+    },
     "prefetch.enabled": {
       "default": true,
       "description": "Start loading what a press will open while the pointer heads for it or a key moves to it, so it paints at once. Folder listings follow this switch; each other surface has its own switch under it.",
@@ -1037,6 +1060,19 @@
       "default": false,
       "description": "Match whole words by default.",
       "type": "boolean"
+    },
+    "spellcheck.words": {
+      "additionalProperties": {
+        "type": "boolean"
+      },
+      "default": {},
+      "description": "Words spellcheck never marks. Set a word to false to mark it again where another scope accepts it.",
+      "propertyNames": {
+        "maxLength": 100,
+        "minLength": 1,
+        "type": "string"
+      },
+      "type": "object"
     },
     "terminal.integrated.cursorBlinking": {
       "default": true,
@@ -1587,6 +1623,25 @@
       },
       "required": ["enabled", "source"],
       "type": "object"
+    },
+    "workbench.wallpaper.downloadTimeoutMs": {
+      "default": 60000,
+      "description": "Milliseconds a picked Omarchy wallpaper may take to download from GitHub before the download stops.",
+      "maximum": 600000,
+      "minimum": 1000,
+      "type": "integer"
+    },
+    "workbench.wallpaper.omarchyCatalog": {
+      "default": true,
+      "description": "List every Omarchy theme wallpaper in the picker. Picking one downloads it from a pinned Omarchy commit on GitHub.",
+      "type": "boolean"
+    },
+    "workbench.wallpaper.previewCloud": {
+      "default": "",
+      "description": "Cloudinary cloud name that resizes Omarchy wallpaper previews through its fetch mode.",
+      "markdownDescription": "Cloudinary cloud name that resizes Omarchy wallpaper previews through its fetch mode.\n\nThe account needs fetched URLs allowed for raw.githubusercontent.com (Cloudinary Settings → Security). Empty loads full-size previews from GitHub.",
+      "pattern": "^[A-Za-z0-9_-]*$",
+      "type": "string"
     }
   },
   "type": "object"

@@ -27,6 +27,7 @@ import {
   FloppyDiskIcon,
   FolderOpenIcon,
   GaugeIcon,
+  PlugsConnectedIcon,
   GitForkIcon,
   GitPullRequestIcon,
   GearSixIcon,
@@ -40,6 +41,7 @@ import {
   SquaresFourIcon,
   SunIcon,
   TerminalIcon,
+  TextAaIcon,
   XIcon,
 } from '@phosphor-icons/react'
 import type { QueryClient } from '@tanstack/react-query'
@@ -858,6 +860,14 @@ export const workspaceCommands = [
       ),
   }),
   defineCommand({
+    ...workspaceCommandMetadata['workspace.showMcpServers'],
+    icon: PlugsConnectedIcon,
+    run: ({ invocation, runtime }) =>
+      transitionStart(
+        runtime.shell.showSettings(invocation.origin as FocusTargetToken | null, 'mcp'),
+      ),
+  }),
+  defineCommand({
     ...workspaceCommandMetadata['workspace.showTransparencySettings'],
     icon: GearSixIcon,
     run: ({ invocation, runtime }) =>
@@ -1033,6 +1043,15 @@ export const workspaceCommands = [
     ...workspaceCommandMetadata['workspace.addSelectionToChat'],
     icon: ChatCircleIcon,
     run: addSelectionToChat,
+  }),
+  defineCommand({
+    ...workspaceCommandMetadata['workspace.showSpellingSuggestions'],
+    icon: TextAaIcon,
+    run: ({ runtime, snapshot }) => {
+      if (!snapshot.activeTabId) return declined
+      runtime.editorUi.getState().requestTextMenu(snapshot.activeTabId)
+      return handled
+    },
   }),
   defineCommand({
     ...workspaceCommandMetadata['workspace.cycleMarkdownView'],

@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import { appendFileSync, readFileSync } from 'node:fs'
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { createServer } from 'node:http'
 import { basename, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createInterface } from 'node:readline'
@@ -102,6 +103,10 @@ function streamAnswer(turn, itemId, chunks, delayMs) {
 const LONG_ANSWER = Array.from(
   { length: 40 },
   (_, index) => `Paragraph ${index + 1} of a long answer that makes the transcript scroll.\n\n`,
+)
+const OVERFLOW_PARAGRAPHS = Array.from(
+  { length: 2500 },
+  (_, index) => `Overflow paragraph ${index + 1}.\n\n`,
 )
 const AMBIGUOUS_TAIL_CHUNKS = [
   'Intro line.\n\n',
@@ -242,7 +247,263 @@ function historyPages(message) {
   })
 }
 
+/** What `mcpServerStatus/list`, `config/read` and `config/batchWrite` report for the MCP scenarios. */
+const MCP_TOOL = (name) => ({ name, inputSchema: { type: 'object' } })
+// Every probe is its own app-server process, so the user config lives in a file, like config.toml.
+const mcpUserFile = join(root, 'mcp-user.json')
+function readMcpUser() {
+  try {
+    return JSON.parse(readFileSync(mcpUserFile, 'utf8'))
+  } catch {
+    return {
+      version: 1,
+      servers: {
+        linear: {
+          url: 'https://mcp.linear.app/mcp',
+          http_headers: { Authorization: 'Bearer fixture' },
+        },
+        sentry: { url: 'https://mcp.sentry.dev/mcp' },
+      },
+    }
+  }
+}
+const mcpProjectServers = { broken: { command: 'platform-fixture-missing-mcp-binary' } }
+function mcpStatusOf(name, table) {
+  const base = { name, tools: {}, resources: [], resourceTemplates: [] }
+  if (name === 'linear')
+    return {
+      ...base,
+      authStatus: 'oAuth',
+      runtimeStatus: 'connected',
+      httpOrigin: 'https://mcp.linear.app',
+      tools: { list_issues: MCP_TOOL('list_issues'), create_issue: MCP_TOOL('create_issue') },
+    }
+  if (name === 'sentry' && existsSync(join(root, 'sentry-signed-in')))
+    return {
+      ...base,
+      authStatus: 'oAuth',
+      runtimeStatus: 'connected',
+      httpOrigin: 'https://mcp.sentry.dev',
+      tools: { issues: MCP_TOOL('issues') },
+    }
+  if (name === 'sentry')
+    return {
+      ...base,
+      authStatus: 'notLoggedIn',
+      runtimeStatus: 'authenticationRequired',
+      httpOrigin: 'https://mcp.sentry.dev',
+    }
+  if (name === 'broken')
+    return {
+      ...base,
+      authStatus: 'unsupported',
+      runtimeStatus: 'failed',
+      toolsError: 'spawn platform-fixture-missing-mcp-binary ENOENT',
+    }
+  return {
+    ...base,
+    authStatus: table.url ? 'unknown' : 'unsupported',
+    runtimeStatus: 'connected',
+    ...(table.url ? { httpOrigin: new URL(table.url).origin } : {}),
+  }
+}
+function mcpConfig(includeLayers) {
+  const { servers: mcpUserServers, version } = readMcpUser()
+  const user = {
+    name: { type: 'user', file: join(root, 'config.toml'), profile: null },
+    version: `v${version}`,
+  }
+  const project = {
+    name: { type: 'project', dotCodexFolder: join(process.cwd(), '.codex') },
+    version: 'p1',
+  }
+  const origins = {}
+  for (const [name, table] of Object.entries(mcpUserServers))
+    origins[`mcp_servers.${name}.${table.url ? 'url' : 'command'}`] = user
+  for (const name of Object.keys(mcpProjectServers))
+    origins[`mcp_servers.${name}.command`] = project
+  return {
+    config: { mcp_servers: { ...mcpUserServers, ...mcpProjectServers } },
+    origins,
+    layers: includeLayers
+      ? [
+          { ...user, disabledReason: null, config: { mcp_servers: mcpUserServers } },
+          { ...project, disabledReason: null, config: { mcp_servers: mcpProjectServers } },
+        ]
+      : null,
+  }
+}
+let threadConfig = {}
+function handleMcpStatus(message) {
+  // Opening a thread falls through to the shared handler; only its per-thread config is recorded.
+  if (message.method === 'thread/start' || message.method === 'thread/resume') {
+    threadConfig = message.params?.config ?? {}
+    // Record switch state and binding presence; the bearer stays out of fixture evidence.
+    record({
+      event: message.method,
+      config: Object.fromEntries(
+        Object.entries(threadConfig).filter(([key]) => key.endsWith('.enabled')),
+      ),
+      platformMcp:
+        typeof threadConfig['mcp_servers.platform.url'] === 'string' &&
+        threadConfig['features.mcp_2026_07_28'] === true,
+    })
+    return false
+  }
+  if (message.method === 'mcpServerStatus/list') {
+    record({ event: message.method, threadId: message.params?.threadId ?? null })
+    const servers = { ...readMcpUser().servers, ...mcpProjectServers }
+    const data = Object.entries(servers).map(([name, table]) =>
+      threadConfig[`mcp_servers.${name}.enabled`] === false && message.params?.threadId
+        ? { ...mcpStatusOf(name, table), runtimeStatus: 'disabled', tools: {} }
+        : mcpStatusOf(name, table),
+    )
+    send({ id: message.id, result: { data, nextCursor: null } })
+    return true
+  }
+  if (message.method === 'config/read') {
+    send({ id: message.id, result: mcpConfig(Boolean(message.params?.includeLayers)) })
+    return true
+  }
+  if (message.method === 'config/batchWrite') {
+    // Values stay out of the log: only the key paths and whether each edit sets or deletes.
+    record({
+      event: message.method,
+      edits: message.params.edits.map((edit) => ({
+        keyPath: edit.keyPath,
+        deletes: edit.value === null,
+      })),
+    })
+    const user = readMcpUser()
+    for (const edit of message.params.edits) {
+      const name = edit.keyPath.replace(/^mcp_servers\./, '')
+      if (edit.value === null) delete user.servers[name]
+      else user.servers[name] = edit.value
+    }
+    user.version += 1
+    writeFileSync(mcpUserFile, JSON.stringify(user))
+    send({
+      id: message.id,
+      result: {
+        status: 'ok',
+        version: `v${user.version}`,
+        filePath: join(root, 'config.toml'),
+        overriddenMetadata: null,
+      },
+    })
+    return true
+  }
+  if (message.method === 'config/mcpServer/reload') {
+    send({ id: message.id, result: {} })
+    return true
+  }
+  if (message.method === 'mcpServer/oauth/login') {
+    // Stands in for the provider's page and Codex's loopback listener, on one fixture port.
+    const name = message.params.name
+    const listener = createServer((request, response) => {
+      const url = new URL(request.url, 'http://127.0.0.1')
+      if (url.pathname === '/authorize') {
+        const redirect = new URL(url.searchParams.get('redirect_uri'))
+        redirect.searchParams.set('code', 'fixture-code')
+        redirect.searchParams.set('state', url.searchParams.get('state'))
+        response.writeHead(302, { location: redirect.toString() })
+        response.end()
+        return
+      }
+      const success = url.searchParams.get('state') === 'fixture-state'
+      record({ event: 'oauth-callback', name, success })
+      if (success) writeFileSync(join(root, `${name}-signed-in`), 'yes')
+      response.end('Signed in. You can close this tab.')
+      send({ method: 'mcpServer/oauthLogin/completed', params: { name, success } })
+    })
+    listener.listen(0, '127.0.0.1', () => {
+      const origin = `http://127.0.0.1:${listener.address().port}`
+      const redirect = encodeURIComponent(`${origin}/callback`)
+      send({
+        id: message.id,
+        result: {
+          authorizationUrl: `${origin}/authorize?redirect_uri=${redirect}&state=fixture-state`,
+        },
+      })
+    })
+    return true
+  }
+  if (message.method === 'hooks/list') {
+    send({
+      id: message.id,
+      result: { data: [{ cwd: message.params.cwds[0], errors: [], warnings: [], hooks: [] }] },
+    })
+    return true
+  }
+  if (message.method !== 'turn/start') return false
+
+  const turn = startOwnTurn(message)
+  send({
+    method: 'mcpServer/startupStatus/updated',
+    params: {
+      name: 'broken',
+      status: 'failed',
+      error: 'spawn platform-fixture-missing-mcp-binary ENOENT',
+    },
+  })
+  agentMessage(turn, `${turn}-answer`, 'MCP_STATUS_READY')
+  endTurn(turn, 'completed')
+  return true
+}
+
+/**
+ * A signed-in account at its session limit with one reset credit. Each usage read spawns a fresh
+ * process, so whether the credit was spent lives in a file beside the log.
+ */
+function resetCreditAccount(message) {
+  const redeemedFile = join(root, 'reset-redeemed')
+  let redeemed = false
+  try {
+    redeemed = readFileSync(redeemedFile, 'utf8') === 'yes'
+  } catch {}
+  if (message.method === 'account/read') {
+    send({
+      id: message.id,
+      result: {
+        account: { type: 'chatgpt', email: 'verify@example.test', planType: 'pro' },
+        requiresOpenaiAuth: false,
+      },
+    })
+    return
+  }
+  if (message.method === 'account/rateLimitResetCredit/consume') {
+    record({ event: 'reset-consume', params: message.params })
+    writeFileSync(redeemedFile, 'yes')
+    send({ id: message.id, result: { outcome: 'reset' } })
+    return
+  }
+  const resetsAt = Math.floor(Date.now() / 1000) + 3600
+  send({
+    id: message.id,
+    result: {
+      accountId: 'verify-account',
+      rateLimits: {
+        planType: 'pro',
+        primary: { usedPercent: redeemed ? 0 : 100, resetsAt, windowDurationMins: 300 },
+        secondary: { usedPercent: 40, resetsAt: resetsAt + 86_400, windowDurationMins: 10_080 },
+      },
+      rateLimitResetCredits: {
+        availableCount: redeemed ? 0 : 1,
+        credits: [
+          {
+            id: 'credit-verify',
+            grantedAt: 0,
+            resetType: 'codexRateLimits',
+            status: redeemed ? 'redeemed' : 'available',
+          },
+        ],
+      },
+    },
+  })
+}
+
 function handle(message) {
+  if (scenario.startsWith('mcp-') && scenario !== 'mcp-approval' && handleMcpStatus(message)) return
   if (scenario === 'chat-history-pages' && message.method === 'turn/start')
     return historyPages(message)
   if (scenario === 'chat-stream' && message.method === 'turn/start') return streamWorkLog(message)
@@ -293,6 +554,39 @@ function handle(message) {
       ].join('\n'),
     )
     endTurn(turn, 'completed')
+    return
+  }
+  if (scenario === 'stream-overflow' && message.method === 'turn/start') {
+    // One paragraph per delta, all at once: more live events than a subscription may hold.
+    const turn = startOwnTurn(message)
+    const itemId = `${turn}-answer`
+    for (const paragraph of OVERFLOW_PARAGRAPHS) agentDelta(turn, itemId, paragraph)
+    agentMessage(turn, itemId, OVERFLOW_PARAGRAPHS.join(''))
+    endTurn(turn, 'completed')
+    record({ event: 'overflow-sent', paragraphs: OVERFLOW_PARAGRAPHS.length })
+    return
+  }
+  if (scenario === 'reset-credit-redemption' && message.method?.startsWith('account/'))
+    return resetCreditAccount(message)
+  if (scenario === 'native-permission-grant' && message.method === 'turn/start') {
+    const turn = startOwnTurn(message)
+    send({
+      id: 992,
+      method: 'item/permissions/requestApproval',
+      params: {
+        threadId,
+        turnId: turn,
+        itemId: `${turn}-permission`,
+        reason: 'Reach the package registry',
+        permissions: { network: { enabled: true } },
+      },
+    })
+    return
+  }
+  if (scenario === 'native-permission-grant' && message.id === 992 && !message.method) {
+    record({ event: 'permission-response', id: message.id, result: message.result })
+    agentMessage(activeTurnId, `${activeTurnId}-answer`, 'PERMISSION_GRANT_VERIFIED')
+    endTurn(activeTurnId, 'completed')
     return
   }
   if (scenario === 'stream-ambiguous-tail' && message.method === 'turn/start') {

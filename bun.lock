@@ -41,6 +41,7 @@
       "dependencies": {
         "@anthropic-ai/claude-agent-sdk": "^0.3.283",
         "@elysiajs/cors": "^1.4.2",
+        "@modelcontextprotocol/server": "2.1.0",
         "@singapore-editor/lsp": "0.1.1",
         "@singapore-editor/typescript-lsp": "0.1.1",
         "@tanstack/pacer": "^0.22.0",
@@ -50,6 +51,7 @@
         "@workspace/pty": "workspace:*",
         "@workspace/utils": "workspace:*",
         "cheerio": "^1.2.0",
+        "diff": "9.0.0",
         "drizzle-orm": "^0.45.3",
         "elysia": "^1.4.30",
         "evlog": "catalog:",
@@ -68,6 +70,7 @@
       },
       "devDependencies": {
         "@anthropic-ai/sdk": "^0.128.0",
+        "@modelcontextprotocol/client": "2.1.0",
         "@types/bun": "1.4.2",
         "@types/node": "^26.6.3",
         "@types/subset-font": "^2.3.0",
@@ -147,6 +150,7 @@
         "@singapore-editor/plugin-ui": "0.1.0",
         "@singapore-editor/react": "0.1.1",
         "@singapore-editor/scope-lines": "0.1.1",
+        "@singapore-editor/spellcheck": "0.1.1",
         "@singapore-editor/textbuffer": "0.1.0",
         "@singapore-editor/tree-sitter": "0.1.1",
         "@singapore-editor/tree-sitter-languages": "0.1.1",
@@ -407,7 +411,9 @@
         "@workspace/utils": "workspace:*",
       },
       "devDependencies": {
+        "@iconify-json/catppuccin": "1.2.17",
         "@jridgewell/trace-mapping": "0.3.31",
+        "@pierre/vscode-icons": "0.0.9",
         "@types/bun": "1.4.2",
         "@types/node": "^26.6.3",
         "@valibot/to-json-schema": "1.8.0",
@@ -438,6 +444,7 @@
     "@singapore-editor/plugin-ui": "link:@singapore-editor/plugin-ui",
     "@singapore-editor/react": "link:@singapore-editor/react",
     "@singapore-editor/scope-lines": "link:@singapore-editor/scope-lines",
+    "@singapore-editor/spellcheck": "link:@singapore-editor/spellcheck",
     "@singapore-editor/textbuffer": "link:@singapore-editor/textbuffer",
     "@singapore-editor/tree-sitter": "link:@singapore-editor/tree-sitter",
     "@singapore-editor/tree-sitter-languages": "link:@singapore-editor/tree-sitter-languages",
@@ -706,6 +713,8 @@
 
     "@humanwhocodes/retry": ["@humanwhocodes/retry@0.4.3", "", {}, "sha512-bV0Tgo9K4hfPCek+aMAn81RppFKv2ySDQeMoSZuvTASywNTnVJCArCZE2FWqpvIatKu7VMRLWlR1EazvVhDyhQ=="],
 
+    "@iconify-json/catppuccin": ["@iconify-json/catppuccin@1.2.17", "", { "dependencies": { "@iconify/types": "*" } }, "sha512-l1pFOADEUlw+j7V+yfFzBowdE4deeMuI4amqfKaN+7uTI9B0Ho24C86DitQk5zb62NkEM9poOyfuG7WS2bw6jg=="],
+
     "@iconify/types": ["@iconify/types@2.0.0", "", {}, "sha512-+wluvCrRhXrhyOmRDJ3q8mux9JkKy5SJ/v8ol2tu4FVjyYvtEzkc/3pK15ET6RKg4b4w4BmTk1+gsCUhf21Ykg=="],
 
     "@iconify/utils": ["@iconify/utils@3.1.7", "", { "dependencies": { "@antfu/install-pkg": "^2.0.1", "@iconify/types": "^2.0.0", "import-meta-resolve": "^4.2.0" } }, "sha512-JZHlwdID+dy+lTgbYC8NEC4zeugqeYsc6jewvzb4c58kHauJn+X7rNwQjxz5p2qSjqaEeQoLkCIQ9v/H4PK0/w=="],
@@ -836,7 +845,13 @@
 
     "@mermaid-js/parser": ["@mermaid-js/parser@2.0.0", "", { "dependencies": { "@chevrotain/types": "~11.1.2" } }, "sha512-K8BeapFUfrfxbRAUQAG5oBOCwo1+bNWzaVnPxTCutkfrTBn6T/j91FIhqxWJ32SUeQ9T3iy1zcmPZ5ROZEvDrg=="],
 
+    "@modelcontextprotocol/client": ["@modelcontextprotocol/client@2.1.0", "", { "dependencies": { "@modelcontextprotocol/core": "2.1.0", "cross-spawn": "^7.0.5", "eventsource": "^3.0.2", "eventsource-parser": "^3.0.0", "jose": "^6.1.3", "pkce-challenge": "^5.0.0", "zod": "^4.2.0" } }, "sha512-mDVhoy5WjDb0U+4dQPzLcciC2erSex/GRVQqnoZdiuMoE3YiTZdiS7ezNcFwX4XEOWOaj7jZr0kLYnILnL8orA=="],
+
+    "@modelcontextprotocol/core": ["@modelcontextprotocol/core@2.1.0", "", { "dependencies": { "zod": "^4.2.0" } }, "sha512-YdFj5gMRHr0gYNAhTbQDgjLHiEJdIAUYxomhKseUNye7ZGlISQmUoLh2sveFFCiQ7j2YMffT1kgSND0FSfIFjQ=="],
+
     "@modelcontextprotocol/sdk": ["@modelcontextprotocol/sdk@1.30.0", "", { "dependencies": { "@hono/node-server": "^1.19.9 || ^2.0.5", "ajv": "^8.17.1", "ajv-formats": "^3.0.1", "content-type": "^1.0.5", "cors": "^2.8.5", "cross-spawn": "^7.0.5", "eventsource": "^3.0.2", "eventsource-parser": "^3.0.0", "express": "^5.2.1", "express-rate-limit": "^8.2.1", "hono": "^4.11.4", "jose": "^6.1.3", "json-schema-typed": "^8.0.2", "pkce-challenge": "^5.0.0", "raw-body": "^3.0.0", "zod": "^3.25 || ^4.0", "zod-to-json-schema": "^3.25.1" }, "peerDependencies": { "@cfworker/json-schema": "^4.1.1" }, "optionalPeers": ["@cfworker/json-schema"] }, "sha512-xKd8OIzlqNzcqcNumGAa6g+PW2kjD5vrpcKOnfldAUPP3j7lnqMPwlTXQm8gF+UwH72z0lqaRbjr9hqGz0eITA=="],
+
+    "@modelcontextprotocol/server": ["@modelcontextprotocol/server@2.1.0", "", { "dependencies": { "@modelcontextprotocol/core": "2.1.0", "zod": "^4.2.0" } }, "sha512-FdvwZU5N03O77Suh35JqjAqq5R1ZTEPFtwu6N4BgBq28qrQtrCnpbLL5U2pwYCuE194jAw0xnlOVmIqhfoYuUQ=="],
 
     "@mswjs/interceptors": ["@mswjs/interceptors@0.41.9", "", { "dependencies": { "@open-draft/deferred-promise": "^2.2.0", "@open-draft/logger": "^0.3.0", "@open-draft/until": "^2.0.0", "is-node-process": "^1.2.0", "outvariant": "^1.4.3", "strict-event-emitter": "^0.5.1" } }, "sha512-VVPPgHyQ6ShqnrmDWuxjmUIsO9gWyOZFmuOfLd9LfBGQJwZfy0gvv9pbHSJuoFNIYC7ZDX9aoFwowjcdSC4E8w=="],
 
@@ -1074,6 +1089,8 @@
 
     "@phosphor-icons/react": ["@phosphor-icons/react@2.1.10", "", { "peerDependencies": { "react": ">= 16.8", "react-dom": ">= 16.8" } }, "sha512-vt8Tvq8GLjheAZZYa+YG/pW7HDbov8El/MANW8pOAz4eGxrwhnbfrQZq0Cp4q8zBEu8NIhHdnr+r8thnfRSNYA=="],
 
+    "@pierre/vscode-icons": ["@pierre/vscode-icons@0.0.9", "", {}, "sha512-nhKu2wr9wBhnzIJBqj8rZGJfh23fkLT9ehTK7TrY4ywqqWIzc23V2y+mkHmXP1sGA6hHjTcLLDQt1jXaEM+iWA=="],
+
     "@polka/url": ["@polka/url@1.0.0-next.29", "", {}, "sha512-wwQAWhWSuHaag8c4q/KN/vCoeOJYshAIvMQwD4GpSb3OiZklFfvAgmj0VCBBImRpuF/aFgIRzllXlVX93Jevww=="],
 
     "@preact/signals-core": ["@preact/signals-core@1.14.4", "", {}, "sha512-HNB6HYeYKhQbJ1aKl+YRjrS4+QWHLKX6qKoUsfS/m0vqzsVaEBiZiaKbG/e+NKk2ch5ALQr/ihWaMHxiCuuWHA=="],
@@ -1185,6 +1202,8 @@
     "@singapore-editor/react": ["@singapore-editor/react@link:@singapore-editor/react", {}],
 
     "@singapore-editor/scope-lines": ["@singapore-editor/scope-lines@link:@singapore-editor/scope-lines", {}],
+
+    "@singapore-editor/spellcheck": ["@singapore-editor/spellcheck@link:@singapore-editor/spellcheck", {}],
 
     "@singapore-editor/textbuffer": ["@singapore-editor/textbuffer@link:@singapore-editor/textbuffer", {}],
 

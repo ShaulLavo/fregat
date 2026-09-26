@@ -83,6 +83,18 @@ export const SETTINGS_REGISTRY = {
     description:
       'Show the Plan mode picker and /plan and /default commands for providers that support them. Stored draft preferences are retained while hidden.',
   }),
+  'agent.diagnosticsFeedback': defineSetting({
+    schema: v.boolean(),
+    default: true,
+    scope: 'application',
+    widget: 'boolean',
+    category: 'Chat',
+    title: 'Errors after agent edits',
+    details:
+      'Only errors the edit introduced, from the language server already open for that file: up to 10 per file.',
+    description:
+      'After an agent edits a file, tell it the errors that edit introduced, so it can fix them in the same turn.',
+  }),
   'chat.activeFileContext': defineSetting({
     schema: v.boolean(),
     default: false,
@@ -636,6 +648,43 @@ export const SETTINGS_REGISTRY = {
     description: 'Choose a wallpaper and turn it on or off without losing the selection.',
     keywords: ['wallpaper', 'background', 'desktop'],
   }),
+  'workbench.wallpaper.omarchyCatalog': defineSetting({
+    schema: v.boolean(),
+    default: true,
+    scope: 'application',
+    widget: 'boolean',
+    category: 'Appearance',
+    title: 'Omarchy wallpapers from GitHub',
+    description:
+      'List every Omarchy theme wallpaper in the picker. Picking one downloads it from a pinned Omarchy commit on GitHub.',
+    keywords: ['wallpaper', 'omarchy', 'github', 'download'],
+  }),
+  'workbench.wallpaper.previewCloud': defineSetting({
+    schema: v.pipe(v.string(), v.regex(/^[A-Za-z0-9_-]*$/)),
+    default: '',
+    scope: 'application',
+    widget: 'string',
+    category: 'Appearance',
+    title: 'Wallpaper preview cloud',
+    details:
+      'The account needs fetched URLs allowed for raw.githubusercontent.com (Cloudinary Settings → Security). Empty loads full-size previews from GitHub.',
+    description:
+      'Cloudinary cloud name that resizes Omarchy wallpaper previews through its fetch mode.',
+    keywords: ['wallpaper', 'cloudinary', 'preview', 'thumbnail'],
+  }),
+  'workbench.wallpaper.downloadTimeoutMs': defineSetting({
+    schema: v.pipe(v.number(), v.integer(), v.minValue(1000), v.maxValue(600_000)),
+    default: 60_000,
+    // Machine scope: the right wait depends on this box's network.
+    scope: 'machine',
+    widget: 'number',
+    category: 'Appearance',
+    title: 'Wallpaper download timeout',
+    description:
+      'Milliseconds a picked Omarchy wallpaper may take to download from GitHub before the download stops.',
+    visibility: 'advanced',
+    keywords: ['wallpaper', 'omarchy', 'github', 'download', 'timeout'],
+  }),
   'workbench.tree.indentGuides': defineSetting({
     schema: v.picklist(['none', 'onHover', 'always'] as const),
     default: 'always',
@@ -747,6 +796,35 @@ export const SETTINGS_REGISTRY = {
     description:
       'How markdown files open: source text, source beside a rendered view, or rendered in place while you edit. Cycle markdown view changes one file.',
     keywords: ['markdown', 'preview', 'split', 'render'],
+  }),
+  'editor.spellcheck': defineSetting({
+    schema: v.picklist(['off', 'prose', 'proseAndCode'] as const),
+    // Off for files until marks stop costing a keystroke several milliseconds (E058 question 3).
+    default: 'off',
+    // Suppression, not execution: it only decides which words are marked, so a docs repository may
+    // turn it on for itself.
+    scope: 'window',
+    widget: 'enum',
+    category: 'Editor',
+    title: 'Spellcheck',
+    description:
+      'Mark misspelled words: in plain text and Markdown prose, or also in code comments and strings. Right-click a marked word for suggestions.',
+    keywords: ['spelling', 'spellcheck', 'dictionary', 'typo', 'prose'],
+  }),
+  'spellcheck.words': defineSetting({
+    schema: v.record(v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(100)), v.boolean()),
+    default: {},
+    merge: 'record',
+    // Suppression only: a workspace dictionary lists the words its files use.
+    scope: 'window',
+    widget: 'complex',
+    // Words arrive from the editor menu; settings.json is where a list is edited by hand.
+    visibility: 'internal',
+    category: 'Editor',
+    title: 'Spellcheck dictionary',
+    description:
+      'Words spellcheck never marks. Set a word to false to mark it again where another scope accepts it.',
+    keywords: ['spelling', 'spellcheck', 'dictionary', 'words', 'ignore'],
   }),
   'editor.diff.viewMode': defineSetting({
     schema: v.picklist(['split', 'stacked'] as const),
@@ -1131,6 +1209,18 @@ export const SETTINGS_REGISTRY = {
       'Read a file and colour its syntax while the pointer heads for its tree row, tab or definition link.',
     keywords: ['prefetch', 'preload', 'files', 'tree', 'tabs', 'hover', 'syntax'],
   }),
+  'prefetch.diffs': defineSetting({
+    schema: v.boolean(),
+    default: true,
+    scope: 'application',
+    widget: 'boolean',
+    category: 'Prefetch',
+    dependsOn: 'prefetch.enabled',
+    title: 'Prefetch diffs',
+    description:
+      'Load changes, commit files and checkpoint diffs when their rows are hovered or active.',
+    keywords: ['prefetch', 'preload', 'diffs', 'git', 'history', 'checkpoints'],
+  }),
   'files.autoSave': defineSetting({
     schema: v.picklist(['off', 'afterDelay', 'onFocusChange', 'onWindowChange'] as const),
     default: 'off',
@@ -1456,8 +1546,10 @@ export const SETTINGS_REGISTRY = {
     scope: 'application',
     widget: 'keybindings',
     category: 'Keyboard shortcuts',
-    description:
-      'Command id to shortcut: one hotkey or two separated by a single space. A missing key keeps the default; an explicit null unbinds the command.',
+    title: 'Shortcuts',
+    description: 'Every command and its keys.',
+    details:
+      'In settings.json this is command id to its complete list of shortcuts, each one hotkey or two separated by a single space. A missing command keeps its defaults; null or an empty list unbinds it.',
     // The one key that merges rather than replaces: a later layer should be able
     // to bind a command without dropping every other binding the user set.
     merge: 'record',

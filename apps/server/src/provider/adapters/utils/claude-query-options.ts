@@ -38,6 +38,8 @@ export type ClaudeQueryOptionsInput = ClaudeRuntimeSelection & {
   /** The instance's resolved CLI; without it the SDK runs its bundled one. */
   executablePath: string
   model: string
+  /** The JSON schema every final message must match; the result carries it parsed. */
+  outputSchema?: Record<string, unknown>
   /** False keeps isolated utility turns out of the provider's transcript store. */
   persistSession?: boolean
   /** Effort/thinking for this session; absent means "send neither". */
@@ -48,6 +50,8 @@ export type ClaudeQueryOptionsInput = ClaudeRuntimeSelection & {
   agent?: string
   /** The checkout's `.mcp.json` servers the owner has not approved; they stay off. */
   unapprovedProjectMcpServers?: string[]
+  /** Servers the owner turned off for this session, split by the flag that turns each off. */
+  sessionOffMcpServers?: { readonly project: readonly string[]; readonly other: readonly string[] }
   /** A new session branching off `sourceSessionId`, cut after `resumeSessionAt` when set. */
   fork?: ClaudeForkOptions
 }
@@ -138,11 +142,21 @@ function claudeSettingsOptions(
   input: ClaudeQueryOptionsInput,
 ): Pick<Options, 'effort' | 'settings'> {
   const reasoning = claudeReasoningQueryOptions(input.reasoning ?? {})
-  const gated = input.unapprovedProjectMcpServers ?? []
-  if (gated.length === 0) return reasoning
+  const off = input.sessionOffMcpServers ?? { other: [], project: [] }
+  const gated = [...new Set([...(input.unapprovedProjectMcpServers ?? []), ...off.project])]
+  if (gated.length === 0 && off.other.length === 0) return reasoning
 
   const settings = typeof reasoning.settings === 'object' ? reasoning.settings : {}
-  return { ...reasoning, settings: { ...settings, disabledMcpjsonServers: gated } }
+  return {
+    ...reasoning,
+    settings: {
+      ...settings,
+      ...(gated.length > 0 ? { disabledMcpjsonServers: gated } : {}),
+      ...(off.other.length > 0
+        ? { deniedMcpServers: off.other.map((serverName) => ({ serverName })) }
+        : {}),
+    },
+  }
 }
 
 export function claudeQueryOptions(input: ClaudeQueryOptionsInput): Options {
@@ -164,6 +178,9 @@ export function claudeQueryOptions(input: ClaudeQueryOptionsInput): Options {
     ...claudeSessionOptions(input),
     ...(input.canUseTool ? { canUseTool: input.canUseTool } : {}),
     ...(input.hooks ? { hooks: input.hooks } : {}),
+    ...(input.outputSchema
+      ? { outputFormat: { type: 'json_schema' as const, schema: input.outputSchema } }
+      : {}),
     // Absent `env` makes the CLI inherit process.env untouched, which is what a
     // single-instance install wants. When it is present it carries
     // CLAUDE_CONFIG_DIR for the instance — NEVER an overridden HOME: that

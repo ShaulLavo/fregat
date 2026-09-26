@@ -1,5 +1,6 @@
 import { ok, strictEqual } from 'node:assert/strict'
 import type { Page } from 'playwright'
+import type { SettingsOperation } from '../../packages/contracts/src/settings/mutations'
 
 /** The settings API behind the page: the mesh serves it under /platform, dev on the API port. */
 function settingsApi(page: Page) {
@@ -11,6 +12,7 @@ function settingsApi(page: Page) {
 }
 
 type SettingOperation =
+  | Extract<SettingsOperation, { readonly kind: 'keybinding.set' }>
   | { readonly kind: 'set'; readonly key: string; readonly value: unknown }
   | { readonly kind: 'reset'; readonly keys: readonly string[] }
   | { readonly kind: 'machine.set'; readonly name: string; readonly machine: unknown }
@@ -28,6 +30,28 @@ export async function writeUserOperations(page: Page, operations: readonly Setti
     true,
     `Write user settings ${keys.join(', ')}: ${response.status()} ${await response.text()}`,
   )
+}
+
+/** The value the user layer itself holds for `key`, as the settings API reports it. */
+export async function readUserSetting(page: Page, key: string): Promise<unknown> {
+  const { base, headers } = settingsApi(page)
+  const snapshot: unknown = await (await page.request.get(`${base}settings`, { headers })).json()
+  ok(snapshot && typeof snapshot === 'object' && 'layers' in snapshot)
+  ok(Array.isArray(snapshot.layers))
+  const user: unknown = snapshot.layers.find((layer) => layer.id === 'user')
+  ok(user && typeof user === 'object' && 'raw' in user && user.raw && typeof user.raw === 'object')
+  return (user.raw as Record<string, unknown>)[key]
+}
+
+/** The resolved value of one key on the server behind the page. */
+export async function readSetting(page: Page, key: string): Promise<unknown> {
+  const { base, headers } = settingsApi(page)
+  const snapshot: unknown = await (await page.request.get(`${base}settings`, { headers })).json()
+  ok(snapshot && typeof snapshot === 'object' && 'values' in snapshot)
+  const values = snapshot.values
+  ok(values && typeof values === 'object')
+
+  return (values as Record<string, unknown>)[key]
 }
 
 export async function writeUserSetting(page: Page, key: string, value: unknown) {
@@ -65,5 +89,6 @@ export async function preserveAppearance(page: Page, onlyKeys?: readonly string[
 function operationKeys(operation: SettingOperation): readonly string[] {
   if (operation.kind === 'set') return [operation.key]
   if (operation.kind === 'reset') return operation.keys
+  if (operation.kind === 'keybinding.set') return ['keybindings.overrides']
   return [`environments.machines.${operation.name}`]
 }

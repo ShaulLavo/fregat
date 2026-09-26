@@ -1,8 +1,10 @@
 import type { Locator, Page } from 'playwright'
+import { createScriptError } from '../structured-errors'
 
 export const fileIconSelector = '[data-file-icon], [style*="vscode-icons/"]'
 export const wallpaperLayerSelector = '[data-workbench] img[data-workbench-wallpaper-layer="still"]'
 export const diffPaneSelector = '.editor-diff-pane'
+export const diffContentRowSelector = '.editor-diff-pane [data-editor-virtual-row]'
 export const editorViewportSelector = '.editor-virtualized-viewport'
 /** Rows the markdown live preview has decorated (headings, lists, emphasis). */
 export const markdownPreviewRowSelector = '[class*="editor-inline-"]'
@@ -37,6 +39,7 @@ function sessionRowForWorktree(page: Page, worktreeId: string) {
 }
 
 export const selectors = {
+  pullRequestLookupRetry: (page: Page) => page.locator('[data-pull-request-lookup-retry]'),
   liveWorkLogToggle: (page: Page) =>
     page.locator('[data-live-activity]').getByRole('button').first(),
   workLogGroup: (page: Page) => page.getByRole('region', { name: 'Tool calls', exact: true }),
@@ -146,6 +149,8 @@ export const selectors = {
     page
       .getByRole('region', { name: 'App access', exact: true })
       .getByRole('button', { name: label, exact: true }),
+  genericApproval: (page: Page) =>
+    page.getByRole('region', { name: 'Approval requested', exact: true }),
   commandApproval: (page: Page) => page.getByRole('region', { name: 'Run a command', exact: true }),
   commandApprovalDecision: (page: Page, label: string | RegExp) =>
     page
@@ -205,6 +210,7 @@ export const selectors = {
       .getByRole('log', { name: 'Messages', exact: true })
       .locator('[data-index] > [data-timeline-row-id]'),
   timelineJumpToLatest: (page: Page) => page.locator('[data-slot="tail-jump-button"]'),
+  breadcrumbLoadedSelector: '[aria-label="Breadcrumbs"] [data-breadcrumb-item]',
   breadcrumbCrumb: (page: Page, label: string) =>
     page
       .getByRole('navigation', { name: 'Breadcrumbs', exact: true })
@@ -271,6 +277,10 @@ export const selectors = {
   newTerminal: (page: Page) => page.getByRole('button', { name: 'New terminal', exact: true }),
   projectMenu: (page: Page) => page.getByRole('button', { name: 'Switch project', exact: true }),
   openFolderMenu: (page: Page) => page.getByRole('menuitem', { name: 'Open folder…', exact: true }),
+  pickerLoadedRowsSelector: '[role="dialog"] [role="option"]',
+  settingsContentSelector: '[aria-label="Settings form"], .editor-virtualized-viewport',
+  fontSampleReadySelector: '[aria-label="Code font"] span[style]:not(:has([data-slot="shimmer"]))',
+  settingsFormView: (page: Page) => page.getByRole('tab', { name: 'Settings', exact: true }),
   pickerDialog: (page: Page) => page.getByRole('dialog', { name: 'Choose folder', exact: true }),
   pickerList: (page: Page) => page.getByRole('listbox', { name: 'Folders and files', exact: true }),
   pickerOptions: (page: Page) =>
@@ -317,6 +327,8 @@ export const selectors = {
   quickOpenPreviewHeaderSelector: '[aria-label="File preview"] header',
   quickOpenPreviewTextSelector: '[aria-label="File preview"] [data-file-preview-text]',
   quickOpenPreview: (page: Page) => page.getByRole('region', { name: 'File preview', exact: true }),
+  pickerFolderColumn: (page: Page, path: string) =>
+    page.locator(`[data-picker-column-folder="${path.replace(/^\//u, '')}"]`),
   pickerColumn: (page: Page, index: number) => page.locator(`[data-picker-column="${index}"]`),
   pickerColumnBox: (page: Page, index: number) =>
     page.locator('[data-picker-column-folder]').nth(index),
@@ -534,6 +546,8 @@ export const selectors = {
     page.locator('[data-slot="combobox-group-label"]', { hasText: name }),
   chooseFolder: (page: Page) => page.getByRole('button', { name: 'Choose folder', exact: true }),
   settingsDialog: (page: Page) => page.getByRole('dialog', { name: 'Settings', exact: true }),
+  mcpSettings: (page: Page) => page.locator('[data-mcp-section]'),
+  mcpSettingsRow: (page: Page, name: string) => page.locator(`[data-mcp-server="${name}"]`),
   settingsSearch: (page: Page) => page.getByRole('textbox', { name: 'Search settings' }),
   settingsShowAll: (page: Page) => page.getByRole('button', { name: 'Show all settings' }),
   settingsCategoryHeading: (page: Page, name: string) =>
@@ -558,6 +572,20 @@ export const selectors = {
     page.getByRole('dialog', { name: 'Physical dialog', exact: true }),
   physicalRow: (page: Page) => page.getByRole('option', { name: 'Silent row', exact: true }),
   settingsHeader: (page: Page) => page.locator('[data-settings-header]'),
+  shortcutsSearch: (page: Page) =>
+    page.getByRole('textbox', { name: 'Search keyboard shortcuts', exact: true }),
+  shortcutsList: (page: Page) => page.getByRole('listbox', { name: 'Keyboard shortcuts' }),
+  shortcutRow: (page: Page, command: string, keys?: string) =>
+    page.locator(
+      `[data-shortcut-command="${command}"]${keys ? `[data-shortcut-keys="${keys}"]` : ''}`,
+    ),
+  shortcutRecorder: (page: Page, title: string) =>
+    page.getByRole('textbox', { name: `Press the new shortcut for ${title}`, exact: true }),
+  shortcutFilter: (page: Page, name: 'All' | 'Custom' | 'Conflicts' | 'Unassigned') =>
+    page.getByRole('tab', { name: new RegExp(`^${name}`) }),
+  shortcutRecordKeys: (page: Page) =>
+    page.getByRole('button', { name: 'Record keys', exact: true }),
+  shortcutMenuItem: (page: Page, name: RegExp) => page.getByRole('menuitem', { name }),
   settingDetailsButton: (page: Page, title: string) =>
     page.getByRole('button', { name: `About ${title}`, exact: true }),
   settingsSwitch: (page: Page, title: string) =>
@@ -571,8 +599,8 @@ export const selectors = {
   settingsDensityOption: (page: Page, density: 'compact' | 'cozy') =>
     page.getByRole('option', { name: density, exact: true }),
   settingsJsonView: (page: Page) => page.getByRole('tab', { name: 'settings.json', exact: true }),
-  settingsScopeTab: (page: Page, name: 'User' | 'Workspace' | 'Defaults') =>
-    page.getByRole('tab', { name, exact: true }),
+  settingsScopeTab: (page: Page, name: 'User' | 'Workspace' | 'Defaults', selected?: boolean) =>
+    page.getByRole('tab', { name, exact: true, selected }),
   settingsDefaultsBanner: (page: Page) => page.getByText('Defaults are read-only', { exact: true }),
   settingsRowActions: (page: Page, id: string) =>
     page.getByRole('button', { name: `Actions for ${id}`, exact: true }),
@@ -607,6 +635,8 @@ export const selectors = {
     page.getByRole('button', { name: /^Select .+/ }).filter({ has: page.locator('img') }),
   wallpaperCard: (page: Page, name: string) =>
     page.getByRole('button', { name: `Select ${name}`, exact: true }),
+  wallpaperCatalogCard: (page: Page, theme: string, file: string) =>
+    page.getByRole('button', { name: `Download and select ${theme} ${file}`, exact: true }),
   wallpaperFilter: (page: Page) => page.getByRole('textbox', { name: 'Filter wallpapers' }),
   wallpaperUploadInput: (page: Page) => page.getByLabel('Upload wallpapers', { exact: true }),
   wallpaperActions: (page: Page, name: string) =>
@@ -782,6 +812,9 @@ export const selectors = {
     page.getByRole('button', { name: 'Send correction', exact: true }),
   chatStop: (page: Page) => page.getByRole('button', { name: 'Stop current turn', exact: true }),
   chatSend: (page: Page) => page.getByRole('button', { name: 'Send message', exact: true }),
+  reviewChanges: (page: Page) =>
+    page.getByRole('button', { name: 'Review changes', exact: true }).first(),
+  reviewComments: (page: Page) => page.getByRole('group', { name: 'Review comments' }),
   sleepingSchedules: (page: Page) =>
     page.getByRole('button', { name: /^(Sleeping until|Wake-up due)/ }).first(),
   cancelSchedules: (page: Page) =>
@@ -996,7 +1029,11 @@ export const selectors = {
   historyList: (page: Page) => page.getByRole('listbox', { name: 'Commit history' }),
   historyRowSelector: '[data-history-commit]',
   logRowSelector: '[data-log-row-summary]',
-  /** Every rendered assistant answer in the chat timeline, for page-side frame samplers. */
+  chatAssistantMarkdown: (page: Page) =>
+    page.locator(
+      `${chatMessagesLogSelector} article:not(:has([data-user-message-body])) [data-chat-markdown]`,
+    ),
+  /** Every rendered markdown body in the chat timeline, including user messages. */
   chatMarkdownSelector: '[role="log"][aria-label="Messages"] [data-chat-markdown]',
   chatCodeBlockSelector: '[data-markdown="code-block"]',
   logCopyButtons: (page: Page) => page.getByRole('button', { name: 'Copy log event', exact: true }),
@@ -1013,6 +1050,7 @@ export const selectors = {
       .getByRole('button', { name: 'Retry' }),
   historyRows: (page: Page) => page.locator('[data-history-commit]'),
   historyCircles: (page: Page) => page.locator('[data-history-commit] svg circle'),
+  historyFileSelector: '[data-history-file]',
   historyFiles: (page: Page) => page.locator('[data-history-file]'),
   historyDetails: (page: Page) => page.getByRole('region', { name: 'Commit details' }),
   historyInformation: (page: Page) =>
@@ -1066,6 +1104,32 @@ export async function holdToConfirm(page: Page, button: Locator, done: () => Pro
 export async function focusEditor(page: Page) {
   await selectors.editorSurface(page).first().click()
   await selectors.editorInput(page).first().focus()
+}
+
+/** Right-clicks the middle of the first visible occurrence of `word` in any editor's text. */
+export async function rightClickEditorWord(page: Page, word: string) {
+  const point = await page.evaluate((target) => {
+    for (const surface of document.querySelectorAll('.editor-virtualized-viewport')) {
+      const walker = document.createTreeWalker(surface, NodeFilter.SHOW_TEXT)
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        const index = node.textContent?.indexOf(target) ?? -1
+        if (index < 0) continue
+        const range = document.createRange()
+        range.setStart(node, index)
+        range.setEnd(node, index + target.length)
+        const rect = range.getBoundingClientRect()
+        if (rect.width === 0 || rect.height === 0) continue
+        const x = rect.left + rect.width / 2
+        const y = rect.top + rect.height / 2
+        // A kept-alive editor for another tab holds text too, under whatever is on top.
+        if (!surface.contains(document.elementFromPoint(x, y))) continue
+        return { x, y }
+      }
+    }
+    return null
+  }, word)
+  if (!point) throw createScriptError(`"${word}" is not on a visible editor row`)
+  await page.mouse.click(point.x, point.y, { button: 'right' })
 }
 
 /** Whether any language-server error is painted, read from the CSS highlight registry. */

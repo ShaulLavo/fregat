@@ -1,3 +1,4 @@
+import { restNoFlicker } from './rest-no-flicker'
 import { deferredDialogs } from './deferred-dialogs'
 import { textFieldFkeys } from './text-field-fkeys'
 import { settingsRoutePreparation } from './settings-route-preparation'
@@ -32,6 +33,12 @@ import { projectGrouping } from './project-grouping'
 import { sessionSearch, sessionSearchEnvironments } from './session-search'
 import { sessionUnread } from './session-unread'
 import { mcpApproval } from './mcp-approval'
+import { mcpSettings } from './mcp-settings'
+import { mcpStatus } from './mcp-status'
+import { nativePermissionGrant } from './native-permission-grant'
+import { resetCreditRedemption } from './reset-credit-redemption'
+import { pullRequestLookupFailure } from './pull-request-lookup-failure'
+import { streamOverflow } from './stream-overflow'
 import { chatScreenshot } from './chat-screenshot'
 import { chatMultipleModels } from './chat-multiple-models'
 import { chatComposerEditing } from './chat-composer-editing'
@@ -97,8 +104,10 @@ import { chatDisclosureSettle } from './chat-disclosure-settle'
 import { chatTurnAnatomy } from './chat-turn-anatomy'
 import { chatSleepingSession } from './chat-sleeping-session'
 import { chatSessionGoal } from './chat-session-goal'
+import { chatAgentReview } from './chat-agent-review'
 import { fileTreeHoverPrefetch } from './file-tree-hover-prefetch'
 import { prefetchChatSwitch } from './prefetch-chat-switch'
+import { prefetchDiffQueries } from './prefetch-diff-queries'
 import { prefetchFirstPaint } from './prefetch-first-paint'
 import { prefetchSettings } from './prefetch-settings'
 import {
@@ -129,6 +138,7 @@ import { sidebarToggle } from './sidebar-toggle'
 import { itemNavigation } from './item-navigation'
 import { shortcutHints } from './shortcut-hints'
 import { editorAddToChat } from './editor-add-to-chat'
+import { editorSpellcheck } from './editor-spellcheck'
 import { markdownSplitView } from './markdown-split-view'
 import { markdownPreviewClobber } from './markdown-preview-clobber'
 import { gitOpenAllDiffsSpam } from './git-open-all-diffs-spam'
@@ -142,6 +152,7 @@ import { connectionFrame } from './connection-frame'
 import { settingsValueGrids } from './settings-value-grids'
 import { settingsDependentRow } from './settings-dependent-row'
 import { settingsRowDetails } from './settings-row-details'
+import { settingsKeybindings } from './settings-keybindings'
 import { tailFollow } from './tail-follow'
 import { checkpointRestore } from './checkpoint-restore'
 import { themeStudioAsync } from './theme-studio-async'
@@ -200,6 +211,7 @@ import { editorLspRenameKey } from './editor-lsp-rename-key'
 import { editorLspSignatureHelp } from './editor-lsp-signature-help'
 import { editorMarkdownPunctuation } from './editor-markdown-punctuation'
 import { wallpaperLibrary } from './wallpaper-library'
+import { wallpaperCatalog } from './wallpaper-catalog'
 import { wallpaperPalette } from './wallpaper-palette'
 import { themeBundlePalette } from './theme-bundle-palette'
 import { settingsColdLoad } from './settings-cold-load'
@@ -250,6 +262,8 @@ export type Scenario = {
   readonly capture?: Partial<CaptureSize>
   readonly run: (page: Page, context: ScenarioContext) => Promise<void>
   readonly inspect?: (page: Page) => Promise<unknown>
+  /** Fixture scenarios must reject shared servers before opening the first page. */
+  readonly requiresIsolatedServer?: boolean
   /**
    * Runs before the throwaway server starts. A directory it returns goes first on the server's
    * PATH, which is how a scenario stands in for an outside CLI such as `gh`.
@@ -302,6 +316,7 @@ import { editorProduct } from './editor-product'
 import { treeFileClicks } from './tree-file-clicks'
 import { treeStickyScroll } from './tree-sticky-scroll'
 import { treeParity } from './tree-parity'
+import { fileIconHues } from './file-icon-hues'
 import { treeParityBehaviour } from './tree-parity-behaviour'
 import { demoWorkspace } from './demo-workspace'
 import { demoAgentGit } from './demo-agent-git'
@@ -329,6 +344,12 @@ export const scenarios: readonly Scenario[] = [
   sessionNotifications,
   composerDefaults,
   mcpApproval,
+  mcpStatus,
+  mcpSettings,
+  nativePermissionGrant,
+  resetCreditRedemption,
+  pullRequestLookupFailure,
+  streamOverflow,
   chatScreenshot,
   chatMultipleModels,
   chatComposerEditing,
@@ -365,6 +386,7 @@ export const scenarios: readonly Scenario[] = [
   chatModelPicker,
   chatUsageMeter,
   chatComposerNarrow,
+  restNoFlicker,
   settingsUsage,
   pushSubscribe,
   pushSessionNotice,
@@ -437,6 +459,7 @@ export const scenarios: readonly Scenario[] = [
   itemNavigation,
   shortcutHints,
   editorAddToChat,
+  editorSpellcheck,
   markdownSplitView,
   markdownPreviewClobber,
   gitOpenAllDiffsSpam,
@@ -450,6 +473,7 @@ export const scenarios: readonly Scenario[] = [
   settingsValueGrids,
   settingsDependentRow,
   settingsRowDetails,
+  settingsKeybindings,
   tailFollow,
   checkpointRestore,
   filePickerBrowse,
@@ -510,6 +534,7 @@ export const scenarios: readonly Scenario[] = [
   paneRenderCrash,
   wallpaperModeToggle,
   wallpaperLibrary,
+  wallpaperCatalog,
   wallpaperPalette,
   themeBundlePalette,
   settingsDefaults,
@@ -554,8 +579,10 @@ export const scenarios: readonly Scenario[] = [
   chatTurnAnatomy,
   chatSleepingSession,
   chatSessionGoal,
+  chatAgentReview,
   fileTreeHoverPrefetch,
   prefetchFirstPaint,
+  prefetchDiffQueries,
   prefetchChatSwitch,
   prefetchSettings,
   workspaceOpenLargeRoot,
@@ -592,6 +619,7 @@ export const scenarios: readonly Scenario[] = [
   editorProduct,
   treeStickyScroll,
   treeParity,
+  fileIconHues,
   treeParityBehaviour,
   treeFileClicks,
 ]
