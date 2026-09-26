@@ -4,6 +4,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readlinkSync,
+  readdirSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -241,4 +242,16 @@ test('an approval cannot promote a replacement stage or authorize a later start'
   link('pending', release('D'))
   expect(promote(root, launch)).toBe('none')
   expect(current()).toBe(next)
+})
+
+test('a promotion leaves no claim behind on any outcome', () => {
+  link('current', release('A'))
+  link('pending', release('B'))
+  approve()
+  rmSync(path.join(root, 'pending'))
+  link('pending', release('C'))
+  expect(promote(root, launch)).toBe('none')
+  approve()
+  expect(promote(root, launch)).toBe('promoted')
+  expect(readdirSync(root).filter((name) => name.startsWith('pending.claim-'))).toEqual([])
 })

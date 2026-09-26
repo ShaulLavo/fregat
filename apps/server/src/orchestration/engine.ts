@@ -456,13 +456,15 @@ export class OrchestrationEngine {
   /**
    * Accepts a restart when every busy session is in `interrupt`. Runs on the command queue, so
    * each claim enqueued earlier has committed and none can commit after an accepted answer.
+   * `commit` runs before the hold, so a throw leaves starts open.
    */
-  async beginRestart(interrupt: ReadonlySet<SessionId>): Promise<RestartAnswer> {
+  async beginRestart(interrupt: ReadonlySet<SessionId>, commit = noop): Promise<RestartAnswer> {
     await this.ready
     return this.schedule(() => {
       const busy = this.busySessions()
       if (busy.some((session) => !interrupt.has(session.sessionId)))
         return { restarting: false, busy }
+      commit()
       this.startsHeld = true
       return { restarting: true, interrupted: busy }
     })

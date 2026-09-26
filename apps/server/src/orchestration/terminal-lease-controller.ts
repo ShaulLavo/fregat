@@ -63,21 +63,23 @@ export class TerminalLeaseController {
       queue = queue.catch(() => {}).then(() => this.untilAccepted(send, type))
       return queue
     }
+    // A rejected end is forgotten, so the terminal's reconnect retry writes it again.
+    const finish = (type: TerminalCommand['type']) => {
+      ended ??= enqueue(type)
+        .finally(() => shared.release())
+        .catch((error: unknown) => {
+          ended = null
+          throw error
+        })
+      return ended
+    }
     return {
       terminalLeaseId,
       runtimeEpoch: this.runtimeEpoch,
       activate: () => ended ?? enqueue('terminal.lease.activate'),
       terminate: () => ended ?? enqueue('terminal.lease.terminate'),
-      end: () => {
-        // A rejected end is forgotten, so the terminal's reconnect retry writes it again.
-        ended ??= enqueue('terminal.lease.end')
-          .finally(() => shared.release())
-          .catch((error: unknown) => {
-            ended = null
-            throw error
-          })
-        return ended
-      },
+      end: () => finish('terminal.lease.end'),
+      markUnknown: () => finish('terminal.lease.mark-unknown'),
     }
   }
 
@@ -178,21 +180,23 @@ export class TerminalLeaseController {
     let ended: Promise<void> | null = null
     const send = (type: TerminalCommand['type']) =>
       this.send(type, worktreeId, terminalLeaseId, this.runtimeEpoch)
+    const finish = (type: TerminalCommand['type']) => {
+      ended ??= this.untilAccepted(send, type)
+        .finally(() => shared.release())
+        .catch((error: unknown) => {
+          ended = null
+          throw error
+        })
+      return ended
+    }
     return {
       terminalLeaseId,
       runtimeEpoch: this.runtimeEpoch,
       // Adopting already left the lease active; nothing to claim first.
       activate: () => Promise.resolve(),
       terminate: () => ended ?? this.untilAccepted(send, 'terminal.lease.terminate'),
-      end: () => {
-        ended ??= this.untilAccepted(send, 'terminal.lease.end')
-          .finally(() => shared.release())
-          .catch((error: unknown) => {
-            ended = null
-            throw error
-          })
-        return ended
-      },
+      end: () => finish('terminal.lease.end'),
+      markUnknown: () => finish('terminal.lease.mark-unknown'),
     }
   }
 

@@ -121,3 +121,15 @@ test('HTTP lines group by route with ids folded', () => {
     'warn fs GET /fs/workspace-address NOT_FOUND',
   )
 })
+
+test('a short window allows one line per group, and an invalid window throws', async () => {
+  writeLog([line(1, reaper)])
+  const since = new Date(UNTIL.getTime() - 10 * 60_000)
+  const allowFile = writeAllow({})
+
+  const result = await logNoiseCensus({ directory, since, until: UNTIL, allowFile })
+  expect(result.groups.find((group) => group.key === REAPER_KEY)?.reasons).toEqual([])
+  await expect(
+    logNoiseCensus({ directory, since: new Date(Number.NaN), until: UNTIL, allowFile }),
+  ).rejects.toMatchObject({ code: expect.any(String) })
+})

@@ -4,6 +4,7 @@ import { resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 
 import { parseSince, readLogs, type LogEvent } from '../agent/logs'
+import { createScriptError } from '../structured-errors'
 
 /**
  * Runtime log noise (AGENTS.md "Logs"). Warn and error lines are grouped by level, area, action
@@ -50,13 +51,19 @@ export type NoiseOptions = {
 
 export async function logNoiseCensus(options: NoiseOptions): Promise<NoiseCensus> {
   const until = options.until ?? new Date()
+  const window = until.getTime() - options.since.getTime()
+  if (!Number.isFinite(window) || window <= 0)
+    throw createScriptError(
+      `The census window from ${options.since.toString()} to ${until.toString()} is empty or invalid.`,
+    )
   const events = await readLogs({
     directory: options.directory,
     level: 'warn',
     since: options.since,
     until,
   })
-  const budget = Math.round((DAILY_BUDGET * (until.getTime() - options.since.getTime())) / DAY_MS)
+  // A short window still allows one line per group.
+  const budget = Math.max(1, Math.ceil((DAILY_BUDGET * window) / DAY_MS))
   const allow = readAllowList(options.allowFile ?? DEFAULT_ALLOW)
   const buckets = new Map<string, LogEvent[]>()
   for (const event of events) {

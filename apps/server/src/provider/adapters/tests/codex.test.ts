@@ -1641,7 +1641,7 @@ describe('CodexProviderAdapter', () => {
         })
         await adapter.sendTurn(input)
         await Promise.all(responses)
-        await waitForFakeCodexEvent(spawnLogPath, 'server-response')
+        await waitForFakeCodexEvent(spawnLogPath, 'server-response', 2)
         await adapter.stopAll()
         const entries = await readFakeCodexLog(spawnLogPath)
         expect(entries.filter((entry) => entry.event === 'server-response')).toMatchObject([

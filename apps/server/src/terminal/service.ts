@@ -34,7 +34,7 @@ import type { WorkspacePaths } from '../fs/path'
 import { limitText, recordProcessInfo, recordProcessWarning } from '../observability'
 import { readForegroundProcessName, type ForegroundProcessReader } from './foreground'
 import { hostPtyFactory, TerminalHostClient } from './host-client'
-import type { HostSessionInfo } from '../terminal-host/protocol'
+import { terminalHostErrors, type HostSessionInfo } from '../terminal-host/protocol'
 import { isTestProcess, platformHomePath } from '../home'
 
 /** `key` names the shell in the terminal host, which a later server attaches to. */
@@ -155,15 +155,21 @@ export class TerminalService {
     if (!this.host) return
     const infos = await this.listHostSessions()
     if (!infos) return
-    for (const info of infos) {
-      await this.reattachSession(info).catch((error: unknown) => {
-        recordProcessWarning('terminal.host.recovery_failed', {
-          area: 'terminal',
-          key: info.key,
-          session: info.session,
-          error,
-        })
+    for (const info of infos) await this.recoverSession(info)
+  }
+
+  // A shell whose recovery failed has no owner left in this process, so it is killed.
+  private async recoverSession(info: HostSessionInfo) {
+    try {
+      await this.reattachSession(info)
+    } catch (error) {
+      recordProcessWarning('terminal.host.recovery_failed', {
+        area: 'terminal',
+        key: info.key,
+        session: info.session,
+        error,
       })
+      await this.host?.killSession(info.session).catch(() => {})
     }
   }
 
@@ -176,9 +182,31 @@ export class TerminalService {
     if (!root) return this.orphan(info, 'worktree-missing')
     const lease = (await this.resolveAdoptedLease?.(info.key)) ?? null
     if (!lease) {
-      if (info.exited) return this.host?.killSession(info.session)
+      if (info.exited) return this.drainExited(info)
       return this.orphan(info, 'lease-missing')
     }
+    try {
+      if (await this.resumeSession(info, decoded, root, lease)) return
+    } catch (error) {
+      await this.discard(info, lease).catch((cleanupError: unknown) =>
+        recordProcessWarning('terminal.host.recovery_cleanup_failed', {
+          area: 'terminal',
+          key: info.key,
+          session: info.session,
+          error: cleanupError,
+        }),
+      )
+      throw error
+    }
+    await this.discard(info, lease)
+  }
+
+  private async resumeSession(
+    info: HostSessionInfo,
+    decoded: { worktreeId: WorktreeId; sessionId: string },
+    root: { absolutePath: string; relativePath: string },
+    lease: TerminalExecutionLease,
+  ) {
     const history = new TerminalHistory(this.database, info.key)
     const session = new TerminalSession({
       history,
@@ -197,11 +225,29 @@ export class TerminalService {
       rootPath: root.relativePath,
       sessionId: decoded.sessionId,
     })
-    if (!(await session.reattach(this.host as TerminalHostClient, history.offset, info.session))) {
-      await lease.end()
-      return
-    }
+    if (!(await session.reattach(this.host as TerminalHostClient, history.offset, info.session)))
+      return false
     this.persistentSessions.set(info.key, session)
+    return true
+  }
+
+  private async discard(info: HostSessionInfo, lease: TerminalExecutionLease) {
+    await this.host?.killSession(info.session)
+    await lease.end()
+  }
+
+  /** Saves the output a shell wrote before it exited unseen; attaching also lets the host forget it. */
+  private async drainExited(info: HostSessionInfo) {
+    if (!this.host) return
+    const history = new TerminalHistory(this.database, info.key)
+    const pty = await this.host.attach({
+      key: info.key,
+      session: info.session,
+      from: history.offset,
+      onData: (data, offset) => history.append(data, offset + data.byteLength),
+      onGap: (_from, to) => history.append(GAP_MESSAGE, to),
+    })
+    await pty.exited
   }
 
   private async orphan(info: HostSessionInfo, reason: string) {
@@ -930,8 +976,33 @@ export class TerminalSession {
       pid: this.pty?.pid,
       error,
     })
+    if (errorStringField(error, 'code') === terminalHostErrors.HOST_UNREACHABLE.code)
+      return this.releaseUnknown(error)
     this.emit({ type: 'error', message: 'Terminal cleanup could not be confirmed.' })
     this.closeConnections()
+  }
+
+  /** The host is out of reach and the shell may live on: the lease records that, and a reopen starts fresh. */
+  private releaseUnknown(error: unknown) {
+    this.disposed = true
+    this.cancelProcessPoll()
+    this.cancelRepaint()
+    this.emit({ type: 'error', message: terminalSpawnErrorMessage(error) })
+    this.closeConnections()
+    this.disposal = this.lease
+      .markUnknown()
+      .catch((markError: unknown) =>
+        recordProcessWarning('terminal.session.end_failed', {
+          area: 'terminal',
+          worktreeId: this.worktreeId,
+          error: markError,
+        }),
+      )
+      .finally(() => {
+        this.recordSession()
+        this.onDispose(this)
+      })
+    return this.disposal
   }
 
   private emitReady(restoredHistory: boolean) {

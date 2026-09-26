@@ -35,12 +35,13 @@
       "title": "Restore the rewound user message into the composer",
       "report": "interaction.md",
       "wave": "1",
-      "status": "in-progress",
-      "evidence_level": "implementation-deployed; local-regressions-and-browser-verified; live-upstream-comparison-pending",
+      "status": "verified",
+      "evidence_level": "scenario-verified",
       "acceptance": "interaction.md, INTERACTION-05, Acceptance / verification",
       "execution_evidence": [
         "rewind-permissions-delivery.md",
-        "/work/tmp/fregat-evidence/20260920T133321Z-scenario-checkpoint-rewind; real Codex native conversation rewind and draft restoration verified"
+        "/work/tmp/fregat-evidence/20260920T133321Z-scenario-checkpoint-rewind; real Codex native conversation rewind and draft restoration verified",
+        "2026-09-25 closed (completion wave bookkeeping): the paired upstream run was the only residue, and the owner dropped it. scripts/agent/scenarios/checkpoint-rewind.ts restored the rewound prompt into the draft at /work/tmp/fregat-evidence/20260920T133321Z-scenario-checkpoint-rewind; not re-run for this flip."
       ]
     },
     {
@@ -76,13 +77,14 @@
       "title": "Validate rewind before touching files, and separate conversation rewind",
       "report": "runtime.md",
       "wave": "1",
-      "status": "in-progress",
-      "evidence_level": "source-reviewed",
+      "status": "verified",
+      "evidence_level": "scenario-verified",
       "acceptance": "runtime.md, RUNTIME-01, Acceptance / verification",
       "execution_evidence": [
         "rewind-permissions-delivery.md",
         "Server release 20260920T125500Z-02885149-plan126-rewind-permissions; web release 20260920T125946Z-b915d3e0-rewind-draft-identity",
-        "Focused real-engine/native-process tests pass; live rewind and paired upstream runtime evidence pending"
+        "Focused real-engine/native-process tests pass; live rewind and paired upstream runtime evidence pending",
+        "2026-09-25 closed (completion wave bookkeeping): the paired upstream run was the only residue, and the owner dropped it. scripts/agent/scenarios/checkpoint-rewind.ts passed with a real Codex conversation-only rewind at /work/tmp/fregat-evidence/20260920T133321Z-scenario-checkpoint-rewind; not re-run for this flip. Claude rewind stays unsupported until Plan 145 fork."
       ]
     },
     {
@@ -135,14 +137,15 @@
       "title": "Add input/completion notifications and sound behavior",
       "report": "adjacent.md",
       "wave": "2",
-      "status": "in-progress",
-      "evidence_level": "historical-local-and-browser-evidence; full-acceptance-pending",
+      "status": "verified",
+      "evidence_level": "scenario-verified",
       "acceptance": "adjacent.md, EXT-06, Acceptance / verification",
       "execution_evidence": [
         "notifications-delivery.md",
         "Historical release 20260920T153923Z-b915d3e0-plan126-stash-notices-history; /work/tmp/fregat-evidence/20260920T154618Z-scenario-session-notifications/summary.md records completed headed browser verification",
         "Recorded proof covers toast navigation, native Notification construction, favicon count, click/focus cleanup, silent reload and archive; pinned decision comparison covers 900 cases",
-        "Remaining: visible operating-system popup and audible output, desktop bridges and badges, cross-machine live navigation, and full upstream runtime comparison"
+        "Remaining: visible operating-system popup and audible output, desktop bridges and badges, cross-machine live navigation, and full upstream runtime comparison",
+        "Decided 2026-09-25: owner — close on the existing scenarios: scripts/agent/scenarios/session-notifications.ts passed at /work/tmp/fregat-evidence/20260920T154618Z-scenario-session-notifications, with the pinned decision comparison (900 cases). OS popup and sound, desktop bridges and badges carry on under EXT-09; push is Plan 142."
       ]
     },
     {
@@ -191,14 +194,15 @@
       "title": "P1: Match unread defaults, manual unread, and wake state",
       "report": "lifecycle.md",
       "wave": "2",
-      "status": "in-progress",
-      "evidence_level": "historical-local-and-browser-evidence; full-acceptance-pending",
+      "status": "verified",
+      "evidence_level": "scenario-verified",
       "acceptance": "lifecycle.md, LIFE-07, Acceptance / verification",
       "execution_evidence": [
         "unread-delivery.md",
         "Historical release 20260920T132650Z-b915d3e0-plan126-live-delivery; /work/tmp/fregat-evidence/20260920T132724Z-scenario-session-unread/summary.md records completed browser verification",
         "Recorded proof covers completion while away, visit acknowledgment, manual unread after reload, timer wake retention and explicit wake acknowledgment; pinned wake comparison covers 189 cases",
-        "Remaining: live background-tab visibility, native/mobile controls and full upstream runtime comparison"
+        "Remaining: live background-tab visibility, native/mobile controls and full upstream runtime comparison",
+        "Decided 2026-09-25: owner — close on the existing scenarios: scripts/agent/scenarios/session-unread.ts passed at /work/tmp/fregat-evidence/20260920T132724Z-scenario-session-unread, with the pinned wake comparison (189 cases). Native and mobile controls carry on under EXT-09."
       ]
     },
     {
@@ -379,7 +383,9 @@
         "Recorded comparison executes the pinned interaction-mode resolver over 20 flag/provider/mode combinations",
         "Remaining: rich composition and mobile plain-Enter newline. Completion-wave verification uses our agent:browser scenarios; the paired upstream run is no longer required.",
         "2026-09-25 lane L2: chat.sendShortcut (enter, mod-enter-multiline, mod-enter) and large-paste folding at 32 KB with Ctrl/Cmd+Shift+V inline; scripts/agent/scenarios/chat-composer-editing.ts passed. Open: mobile plain-Enter newline. Rich composition and Lexical removal are parked by the latest owner ruling.",
-        "2026-09-25 owner ruling supersedes the earlier deletion instruction: retain Lexical until Editor completes a full Markdown/composer support plan. L2/L7 audit found no such plan in Editor plans/*.md, plans/backlog.json, plans/README.md or TODO.md. packages/markdown/README.md documents live preview only; ordered lists, block quotes, escapes and fenced code blocks remain source text. composerRichTextEnabled waits for a working consumer. No new Editor Markdown plan is part of this wave."
+        "2026-09-25 owner ruling supersedes the earlier deletion instruction: retain Lexical until Editor completes a full Markdown/composer support plan. L2/L7 audit found no such plan in Editor plans/*.md, plans/backlog.json, plans/README.md or TODO.md. packages/markdown/README.md documents live preview only; ordered lists, block quotes, escapes and fenced code blocks remain source text. composerRichTextEnabled waits for a working consumer. No new Editor Markdown plan is part of this wave.",
+        "2026-09-25 owner ruling, restated: the row's goal is to delete Lexical and support Markdown as you type; Lexical stays until the editor can carry the composer. That prerequisite is Plan 111 (authorized 2026-09-25 with the composer as its first consumer), replacing the 'no Editor Markdown plan exists' gap recorded above.",
+        "Decided 2026-09-25: owner — ship the mobile plain-Enter newline now, without waiting for the phone shell. Queued work."
       ]
     },
     {
@@ -397,10 +403,13 @@
       "title": "Show provider quota limits separately from context occupancy",
       "report": "interaction.md",
       "wave": "4",
-      "status": "in-progress",
-      "evidence_level": "implementation-deployed via Plan 141 (93e65be2); scenario chat-usage-meter; full-acceptance-pending",
+      "status": "verified",
+      "evidence_level": "scenario-verified",
       "acceptance": "interaction.md, INTERACTION-07, Acceptance / verification",
-      "execution_evidence": ["scripts/agent/scenarios/chat-usage-meter.ts"]
+      "execution_evidence": [
+        "scripts/agent/scenarios/chat-usage-meter.ts",
+        "2026-09-25 closed (completion wave bookkeeping): Plan 141 Phase 1 (93e65be2) ships the composer plan-usage meter; scripts/agent/scenarios/chat-usage-meter.ts passed at /work/tmp/fregat-evidence/20260925T032254Z-scenario-chat-usage-meter. Reset credits stay with RUNTIME-08."
+      ]
     },
     {
       "id": "INTERACTION-08",
@@ -432,7 +441,9 @@
       "status": "open",
       "evidence_level": "source-reviewed",
       "acceptance": "runtime.md, RUNTIME-02, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "Decided 2026-09-25: owner — build all four drivers (Cursor, Grok, OpenCode, Antigravity). Smoke-test each where an account exists; otherwise ship it marked \"untested\". Missing accounts no longer block the row."
+      ]
     },
     {
       "id": "RUNTIME-05",
@@ -449,8 +460,8 @@
       "title": "Preserve advertised model option descriptors and service tiers",
       "report": "runtime.md",
       "wave": "4",
-      "status": "in-progress",
-      "evidence_level": "paired-pure-policy-and-deployed-native-browser-verified; full-acceptance-pending",
+      "status": "verified",
+      "evidence_level": "scenario-verified",
       "acceptance": "runtime.md, RUNTIME-06, Acceptance / verification",
       "execution_evidence": [
         "model-options-delivery.md",
@@ -462,7 +473,8 @@
         "Mesh cleanup follow-up API checks confirm session/provider removed, original project model restored, fixture directory absent and all seven native processes exited. No browser/console errors or non-abort network failures. Seven unrelated application warnings inspected and retained: PR lookup503 and six older title-fixture reaper warnings",
         "/work/tmp/fregat-evidence/20260923T175135Z-scenario-visual-search-scroll-content/: linked Editor caller migration content/navigation check passed in 4.905 seconds; all eleven screenshots inspected, syntax excerpts render after wheel/jump scrolling and selected result opens source editor. No application warnings/errors; not full LSP proof",
         "Whole-workspace typecheck and lint, structural gates, and changed-file formatting pass. Full unused check retains baseline cache-budget.ts, workspaceEditCategorySchema and normalizeWorkspaceNamespacePath findings; no aggregate verify-green claim",
-        "Remaining: CLI-version gating, legacy Claude model-catalog expansion, live Claude/provider-account checks and paired upstream full-workflow evidence. Finding remains in-progress"
+        "Remaining: CLI-version gating, legacy Claude model-catalog expansion, live Claude/provider-account checks and paired upstream full-workflow evidence. Finding remains in-progress",
+        "2026-09-25 closed (completion wave bookkeeping): Plan 138 (f4e6cb70) closed the legacy Claude catalog and CLI version residue; scripts/agent/scenarios/provider-model-options.ts passed at /work/tmp/fregat-evidence/20260925T044005Z-scenario-provider-model-options."
       ]
     },
     {
@@ -477,7 +489,8 @@
         "background-delivery.md",
         "Actual pinned liveness720transitions, three negative controls; periodic reaper tests pass",
         "Native child live142923: completed parent working, child idle and late metadata/reload remains ready; screenshots inspected",
-        "Monitor-only native Codex wire and automatic settlement are not claimed"
+        "Monitor-only native Codex wire and automatic settlement are not claimed",
+        "Decided 2026-09-25: owner — recheck the monitor-only signal against Codex 0.157 (approved)."
       ]
     },
     {
@@ -488,22 +501,25 @@
       "status": "open",
       "evidence_level": "source-reviewed",
       "acceptance": "runtime.md, RUNTIME-08, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "Decided 2026-09-25: owner — build with boundary fixtures only; nothing is spent until the owner does one live redemption."
+      ]
     },
     {
       "id": "RUNTIME-09",
       "title": "Match response delivery modes and paragraph default",
       "report": "runtime.md",
       "wave": "4",
-      "status": "in-progress",
-      "evidence_level": "source-reviewed",
+      "status": "verified",
+      "evidence_level": "scenario-verified",
       "acceptance": "runtime.md, RUNTIME-09, Acceptance / verification",
       "execution_evidence": [
         "response-delivery.md",
         "/work/tmp/plan126-response-delivery-90-tests.log: 61 native adapter + 29 ingestion tests pass; six adapter-to-database full reasoning cases",
         "Pinned splitter248 and buffering190 cases match; two negative controls rejected; 19 work-log cases pass",
         "Live response-delivery161535 on web/server161447: full expanded reasoning and reload exact text pass, both screenshots inspected, owned session/provider/processes cleaned",
-        "Reasoning remains activity-domain mapping; full upstream reasoning-message UI and cross-provider live matrix are not claimed"
+        "Reasoning remains activity-domain mapping; full upstream reasoning-message UI and cross-provider live matrix are not claimed",
+        "2026-09-25 closed (completion wave bookkeeping): scripts/agent/scenarios/response-delivery.ts passed at /work/tmp/fregat-evidence/20260920T161535Z-scenario-response-delivery, and the leftover reasoning UX is Plan 160's reasoning fold, proven by scripts/agent/scenarios/chat-turn-anatomy.ts at /work/tmp/fregat-evidence/20260925T162417Z-scenario-chat-turn-anatomy."
       ]
     },
     {
@@ -700,7 +716,9 @@
       "status": "open",
       "evidence_level": "source-reviewed",
       "acceptance": "adjacent.md, EXT-16, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": [
+        "Decided 2026-09-25: owner — the balancing preferences use settings scope `application`: they pick where execution happens. No longer parked on 143/144."
+      ]
     },
     {
       "id": "EXT-17",

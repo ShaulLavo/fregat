@@ -66,13 +66,15 @@ export function createShikiHighlighter({
     if (pending) return pending
 
     const grammar = bundledLanguages[language as keyof typeof bundledLanguages]
-    const promise = highlighterCore()
-      .then((highlighter) => (grammar ? highlighter.loadLanguage(grammar) : undefined))
-      .then(
-        () => void loadedLanguages.add(language),
+    const promise = highlighterCore().then(
+      async (highlighter) => {
         // A grammar that fails to load renders as plain text for the session.
-        () => void loadedLanguages.add(language),
-      )
+        if (grammar) await highlighter.loadLanguage(grammar).catch(noop)
+        loadedLanguages.add(language)
+      },
+      // A core that failed to load is retried by the next fence.
+      () => void loading.delete(language),
+    )
     loading.set(language, promise)
 
     return promise
@@ -119,3 +121,5 @@ function namedTheme(
 ): ThemeRegistrationAny & { name: string } {
   return { ...theme, name: theme.name ?? `markdown-${slot}` }
 }
+
+function noop() {}

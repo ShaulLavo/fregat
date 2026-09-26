@@ -125,13 +125,20 @@ export class ServerUpdate {
       throw updateErrors.NO_UPDATE_STAGED({ internal: { root: this.root, reason } })
     }
 
-    const answer = await this.gate.beginRestart(new Set(interrupt))
+    // Approves inside the gate: a failed write or a restaged release leaves turns startable.
+    const answer = await this.gate.beginRestart(new Set(interrupt), () => {
+      this.reread('restart')
+      if (!sameStaged(this.pending, staged))
+        throw updateErrors.STAGED_RELEASE_CHANGED({
+          internal: { approved: staged, pending: this.pending },
+        })
+      approveRestart(root, staged)
+    })
     if (!answer.restarting) {
       recordRequestContext({ update: { answer: 'busy', busyCount: answer.busy.length } })
       return { restarting: false, busy: answer.busy }
     }
 
-    approveRestart(root, staged)
     const interrupted = answer.interrupted.map(({ sessionId, state }) => ({ sessionId, state }))
     recordRequestContext({
       update: {

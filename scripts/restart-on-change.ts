@@ -8,7 +8,8 @@ import { parseArgs } from 'node:util'
  * as zombies; a new process lets the old one's children go to init, which reaps them.
  */
 
-const STOP_GRACE_MS = 5_000
+// The server's own shutdown deadline (RESTART_DEADLINE_MS); a kill before it strands terminals and agents.
+const STOP_GRACE_MS = 20_000
 const DEBOUNCE_MS = 100
 const IGNORED = /(?:^|\/)(?:node_modules|dist|tests?|\.[^/]+)(?:\/|$)|\.test\.tsx?$/
 

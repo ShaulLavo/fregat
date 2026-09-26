@@ -198,6 +198,7 @@ async function main() {
         runtimeEpoch: 'smoke-test',
         activate: async () => {},
         terminate: async () => {},
+        markUnknown: async () => {},
         end: async () => {
           endedLeases += 1
         },

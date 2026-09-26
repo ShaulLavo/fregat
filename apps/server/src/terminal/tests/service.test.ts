@@ -8,6 +8,7 @@ import { readFsLogs } from 'evlog/fs'
 import {
   TERMINAL_MAX_COLS,
   TERMINAL_MIN_ROWS,
+  terminalLeaseIdSchema,
   parseTerminalServerMessage,
   type TerminalServerMessage,
   worktreeIdSchema,
@@ -15,12 +16,15 @@ import {
 
 import { createOrchestrationFixture } from '../../../test/factories/orchestration'
 import { createTestTerminalHost } from '../../../test/factories/terminal-host'
+import { createFakeTerminalHost } from '../../../test/factories/fake-terminal-host'
 import {
   createFakePtyFactory,
   terminalOutputBytes,
   terminalOutputText,
 } from '../../../test/factories/terminal'
 import { requireWorktree } from '../../orchestration/read-model'
+import { terminalHostErrors } from '../../terminal-host/protocol'
+import { TerminalHistory } from '../history'
 import { projectionTerminalLeases } from '../../db/schema'
 import { createAuthConfig } from '../../auth'
 import { createWorkspacePaths, type WorkspacePaths } from '../../fs/path'
@@ -42,10 +46,12 @@ const registrations = new Map<string, string>()
 const services: TerminalService[] = []
 
 const hosts: Awaited<ReturnType<typeof createTestTerminalHost>>[] = []
+const fakeHosts: Awaited<ReturnType<typeof createFakeTerminalHost>>[] = []
 
 afterEach(async () => {
   await Promise.all(services.splice(0).map((service) => service.dispose()))
   await Promise.all(hosts.splice(0).map((host) => host.close()))
+  await Promise.all(fakeHosts.splice(0).map((host) => host.close()))
   await Promise.all([...fixtures.values()].map((fixture) => fixture.close()))
   fixtures.clear()
   registrations.clear()
@@ -1103,6 +1109,151 @@ describe('terminal service', () => {
     await service.reattach()
     await expect.poll(() => observer.list()).toEqual([])
   })
+
+  it('saves the final output of a real shell that exited while the server was down', async () => {
+    const root = await fixtureRoot()
+    const host = await nativeHost()
+    const worktreeId = v.parse(worktreeIdSchema, registrations.get(root))
+    const key = terminalSessionKey(worktreeId, 'exited-native')
+    const exitFile = path.join(host.paths.directory, 'exit')
+    await host.client.spawn({
+      key,
+      command: [
+        '/bin/sh',
+        '-c',
+        'while [ ! -f "$1" ]; do sleep 0.01; done; echo LAST_WORDS',
+        'sh',
+        exitFile,
+      ],
+      onData: () => {},
+    })
+    host.client.close()
+    const observer = host.connect()
+    await observer.list()
+    await writeFile(exitFile, '')
+    await expect.poll(async () => (await observer.list())[0]?.exited).toBe(true)
+    const service = testService(root, { hostClient: host.connect() })
+
+    await service.reattach()
+
+    const history = new TerminalHistory(requiredFixture(root).database, key)
+    expect(Buffer.concat(history.values()).toString()).toContain('LAST_WORDS')
+    await expect.poll(() => observer.list()).toEqual([])
+  })
+
+  it('keeps streaming a shell after the host connection drops', async () => {
+    const root = await fixtureRoot()
+    const host = await fakeHost()
+    const worktreeId = v.parse(worktreeIdSchema, registrations.get(root))
+    const service = testService(root, { hostClient: host.connect() })
+    const socket = fakeSocket(root, '', 'dropped')
+    await service.routes(auth()).open(socket)
+    const [session] = host.sessions.values()
+    host.write(session!.session, 'before-drop;')
+    await waitForTerminalOutput(socket.messages, 'before-drop;')
+
+    host.drop()
+    host.write(session!.session, 'after-drop;')
+
+    await waitForTerminalOutput(socket.messages, 'after-drop;')
+    expect(socket.closed).toBe(false)
+    expect(service.hasWorktreeRuntime(worktreeId)).toBe(true)
+  })
+
+  it('marks ownership unknown and forgets the session when the host cannot be reached again', async () => {
+    const root = await fixtureRoot()
+    const fixture = requiredFixture(root)
+    const host = await fakeHost()
+    const worktreeId = v.parse(worktreeIdSchema, registrations.get(root))
+    const service = testService(root, { hostClient: host.connect() })
+    const socket = fakeSocket(root, '', 'stranded')
+    await service.routes(auth()).open(socket)
+
+    await host.stop()
+
+    await expect.poll(() => service.hasWorktreeRuntime(worktreeId)).toBe(false)
+    expect(socket.closed).toBe(true)
+    expect([...(await fixture.engine.readModelSnapshot()).terminalLeases.values()][0]?.state).toBe(
+      'ownership-unknown',
+    )
+    expect(fixture.engine.worktreeExecutionGate.tryAcquireExclusive(worktreeId).acquired).toBe(true)
+  })
+
+  it('starts a fresh shell on reopen after the host connection was lost', async () => {
+    const root = await fixtureRoot()
+    const worktreeId = v.parse(worktreeIdSchema, registrations.get(root))
+    const pty = createFakePtyFactory({ holdUntilExit: true })
+    const service = testService(root, { ptyFactory: pty.factory })
+    const routes = service.routes(auth())
+    await routes.open(fakeSocket(root, '', 'lost'))
+
+    pty.ptys[0]?.fail(terminalHostErrors.HOST_UNREACHABLE({ internal: { reason: 'test' } }))
+    await expect.poll(() => service.hasWorktreeRuntime(worktreeId)).toBe(false)
+    const reopened = fakeSocket(root, '', 'lost')
+    await routes.open(reopened)
+
+    expect(pty.spawns).toHaveLength(2)
+    expect(reopened.messages.some((message) => message.type === 'ready')).toBe(true)
+  })
+
+  it('saves the final output of a shell that exited while the server was down', async () => {
+    const root = await fixtureRoot()
+    const fixture = requiredFixture(root)
+    const host = await fakeHost()
+    const worktreeId = v.parse(worktreeIdSchema, registrations.get(root))
+    const key = terminalSessionKey(worktreeId, 'exited-offline')
+    new TerminalHistory(fixture.database, key).append(Buffer.from('seen;'), 5)
+    const session = host.add(key, 'seen;last words;')
+    host.exit(session.session, 0)
+    const service = testService(root, { hostClient: host.connect() })
+
+    await service.reattach()
+
+    const history = new TerminalHistory(fixture.database, key)
+    expect(Buffer.concat(history.values()).toString()).toBe('seen;last words;')
+    expect(history.offset).toBe(16)
+    expect(host.sessions.size).toBe(0)
+  })
+
+  it('kills the host session and ends its lease when reattaching fails', async () => {
+    const root = await fixtureRoot()
+    const host = await fakeHost()
+    const worktreeId = v.parse(worktreeIdSchema, registrations.get(root))
+    const session = host.add(terminalSessionKey(worktreeId, 'unattachable'))
+    host.refused.add('attach')
+    const lease = recordingLease()
+    const service = testService(root, {
+      hostClient: host.connect(),
+      resolveAdoptedLease: async () => lease,
+    })
+
+    await service.reattach()
+
+    await expect
+      .poll(() => host.received)
+      .toContainEqual({ type: 'kill', session: session.session })
+    expect(lease.ended).toBe(1)
+    expect(service.hasWorktreeRuntime(worktreeId)).toBe(false)
+  })
+
+  it('kills the host session when its recovery throws', async () => {
+    const root = await fixtureRoot()
+    const host = await fakeHost()
+    const worktreeId = v.parse(worktreeIdSchema, registrations.get(root))
+    const session = host.add(terminalSessionKey(worktreeId, 'throws'))
+    const service = testService(root, {
+      hostClient: host.connect(),
+      resolveAdoptedLease: async () => {
+        throw new TypeError('Recovery fixture failure')
+      },
+    })
+
+    await service.reattach()
+
+    await expect
+      .poll(() => host.received)
+      .toContainEqual({ type: 'kill', session: session.session })
+  })
 })
 
 // Shells run in a real terminal host in a throwaway state root.
@@ -1110,6 +1261,28 @@ async function nativeHost() {
   const host = await createTestTerminalHost()
   hosts.push(host)
   return host
+}
+
+// Speaks the host protocol in-process, so recovery runs without a native PTY.
+async function fakeHost() {
+  const host = await createFakeTerminalHost()
+  fakeHosts.push(host)
+  return host
+}
+
+function recordingLease() {
+  const lease = {
+    terminalLeaseId: v.parse(terminalLeaseIdSchema, crypto.randomUUID()),
+    runtimeEpoch: 'recording',
+    ended: 0,
+    activate: async () => {},
+    terminate: async () => {},
+    end: async () => {
+      lease.ended += 1
+    },
+    markUnknown: async () => {},
+  }
+  return lease
 }
 
 function testService(

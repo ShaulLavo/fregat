@@ -1,0 +1,14 @@
+{
+  "engine": "firefox",
+  "version": "155.0",
+  "oneByteMaxUnits": 1073741822,
+  "oneByteAtBound": false,
+  "oneByteMaxMiB": 1023.9999980926514,
+  "twoByteMaxUnits": 1073741822,
+  "twoByteAtBound": false,
+  "decodeAtCeilingOk": false,
+  "decodeOverCeilingOk": false,
+  "json": { "envelopeUnits": 187, "maxContentUnits": 1073741635 },
+  "heap": { "chunkMiB": 64, "heldMiB": 3072, "capMiB": 3072, "failure": null },
+  "ms": 5084
+}
