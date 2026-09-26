@@ -21,11 +21,26 @@
   every few minutes, so most main runs end `cancelled`. On 2026-09-26 the newest completed CI run
   on main was over 30 minutes and many commits old, so a broken main goes unnoticed.
 
+## Where the Editor's time goes (measured 2026-09-26, singapore `ci.yml`, five green runs)
+
+- **One serial `verify` job, 6.2–6.8 minutes.** Test 269–296 s, Playwright install 37–56 s
+  (Chromium, headless shell, Firefox, WebKit, with OS deps), typecheck 34–36 s, tree-sitter browser
+  worker 12–14 s. Typecheck builds all 20 packages first (34 s); Test reuses those builds.
+- **Test is `turbo test --concurrency=1`,** one package at a time: core 112 s, textbuffer 61 s, find
+  15 s, typescript-lsp 12 s, lsp-plugin 12 s, the other 15 packages 1–6 s each. `--concurrency=1`
+  exists to cap browser processes, and it serialises the Node-only packages too.
+- **The turbo cache starts empty every run** ("Remote caching disabled", every task a cache miss),
+  so a change to one leaf package still re-tests all of them.
+- **Same `cancel-in-progress` on main.** On 2026-09-26 the last green Editor CI on main was 10:11;
+  every later run failed or was cancelled, so that afternoon's stale health baseline surfaced only
+  through the separate Architecture Health workflow.
+
 ## Outcome
 
 A PR that changes code gets a full verdict in about two minutes of wall time; a PR that changes only
 plans or docs gets its checks in well under a minute. Each job spends seconds on setup, not a minute.
-The targets are confirmed or revised by phase 0's measurements.
+The Editor's CI gives a code PR its verdict in about three minutes and re-tests only the packages a
+change can reach. The targets are confirmed or revised by phase 0's measurements.
 
 ## Phases
 
@@ -58,6 +73,29 @@ The targets are confirmed or revised by phase 0's measurements.
 6. **Fewer jobs per run** (S, after 1–4). With setup down to seconds, merge small jobs (packages,
    parity, typecheck) so one run takes fewer of the 20 runners, and wave 2's eight lanes queue less.
 
+### Editor (singapore `ci.yml`)
+
+Each slice lands in the Editor repository and is measured the same way. E1 is independent; land it
+with phase 5.
+
+- **E1. Main always ends with a verdict** (S). The phase 5 change in the Editor's `ci.yml`.
+- **E2. Keep the turbo cache between runs** (S). Restore `.turbo/cache` with `actions/cache` keyed by
+  the commit, falling back to the newest cache for the branch, then main. Turbo already hashes each
+  task's inputs and its dependencies' builds, so an unchanged package's `build` and `test` replay from
+  the cache. Before trusting hits, declare every env var and generated input a test reads
+  (`globalEnv`, `inputs`) and prove a hit is stale-safe: change a textbuffer file and see core
+  re-test.
+- **E3. Split the job** (S). Three parallel jobs after one shared install: typecheck + lint + the
+  language-catalog check; core's tests; everything else, with Node-only packages at turbo's default
+  concurrency and only the browser projects serial. Core's 112 s then sets the wall time; shard core
+  by file if it still dominates.
+- **E4. Browsers on demand** (S). Cache `~/.cache/ms-playwright` keyed by the Playwright version, and
+  install only the browsers the jobs that run need. Find which tests use Firefox and WebKit; if
+  none do on CI, drop them from the install.
+- **E5. Skip what a change cannot affect** (S). Phase 2's path filter for the Editor: plan- and
+  doc-only changes run format and the doc checks only, behind one required summary status.
+- Platform's side of the Editor (building it at `editor-ref` in every job) is phase 1.
+
 Larger runners cost money, which is an owner decision; this plan does not buy them.
 
 ## Verification
@@ -65,3 +103,5 @@ Larger runners cost money, which is an owner decision; this plan does not buy th
 Before and after for each phase: wall time and queue time of five runs, per-job and per-step times
 from `gh run view --json jobs`. Coverage does not shrink: every test and check that ran before still
 runs for the changes it can affect, and the nightly `flake-watch.yml` keeps running the full suites.
+For the Editor, the same before and after from singapore's `ci.yml`, plus one run with a cold turbo
+cache to show a miss still runs everything.
