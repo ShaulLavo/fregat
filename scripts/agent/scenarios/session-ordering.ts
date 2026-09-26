@@ -1,14 +1,15 @@
 import { ok } from 'node:assert/strict'
 import type { Scenario } from './index'
 import { selectors } from '../selectors'
-import { dispatch, openChatShell, readShell } from './chat-verification'
+import { createSession, dispatch, openChatWorkspace, readShell } from './chat-verification'
 
 export const sessionOrdering: Scenario = {
   name: 'session-ordering',
   description:
     'Move disposable sessions between empty shelves by pointer and keyboard, then verify persisted active ordering after reload.',
   async run(page, { step }) {
-    const { base, project, worktree } = await openChatShell(page)
+    const workspace = await openChatWorkspace(page)
+    const { base } = workspace
     const first = crypto.randomUUID()
     const second = crypto.randomUUID()
     const prefix = `Ordering verification ${first.slice(0, 8)}`
@@ -17,13 +18,7 @@ export const sessionOrdering: Scenario = {
       [first, title],
       [second, `${prefix} second`],
     ])
-      await dispatch(page, base, {
-        type: 'session.create',
-        sessionId,
-        title: label,
-        modelSelection: project.defaultModelSelection,
-        worktreeTarget: { kind: 'current', worktreeId: worktree.id },
-      })
+      await createSession(page, workspace, sessionId, label)
     const pointerTo = async (shelf: 'pinned' | 'active' | 'settled') => {
       const source = await selectors.sessionByTitle(page, title).boundingBox()
       const target = await selectors.sessionShelfTarget(page, shelf).boundingBox()

@@ -73,10 +73,7 @@ export async function createIdleSessions(
   prefix: string,
   count: number,
 ) {
-  const modelSelection = workspace.project?.defaultModelSelection ?? {
-    providerInstanceId: 'claude',
-    model: 'claude-sonnet-5',
-  }
+  const modelSelection = idleModelSelection(workspace.project)
   const ids = Array.from({ length: count }, () => crypto.randomUUID())
   for (const [index, sessionId] of ids.entries())
     await dispatch(page, workspace.base, {
@@ -103,19 +100,28 @@ async function platformWorktree(page: Page, base: string) {
 
 export type ChatShell = Awaited<ReturnType<typeof openChatShell>>
 
-/** Creates one disposable session on the shell's worktree with the project's default model. */
+type ChatWorkspace = Awaited<ReturnType<typeof openChatWorkspace>>
+
+/** A session that never runs a turn still names a model; a throwaway server's project may have none. */
+function idleModelSelection(project: ChatWorkspace['project']) {
+  return (
+    project?.defaultModelSelection ?? { providerInstanceId: 'claude', model: 'claude-sonnet-5' }
+  )
+}
+
+/** Creates one disposable session on the workspace's worktree with the project's default model. */
 export async function createSession(
   page: Page,
-  shell: Pick<ChatShell, 'base' | 'project' | 'worktree'>,
+  workspace: Pick<ChatWorkspace, 'base' | 'project' | 'worktree'>,
   sessionId: string,
   title: string,
 ) {
-  await dispatch(page, shell.base, {
+  await dispatch(page, workspace.base, {
     type: 'session.create',
     sessionId,
     title,
-    worktreeTarget: { kind: 'current', worktreeId: shell.worktree.id },
-    modelSelection: shell.project.defaultModelSelection,
+    worktreeTarget: { kind: 'current', worktreeId: workspace.worktree.id },
+    modelSelection: idleModelSelection(workspace.project),
   })
 }
 

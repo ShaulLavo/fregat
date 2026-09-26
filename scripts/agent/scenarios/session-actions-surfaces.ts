@@ -6,12 +6,12 @@ import { selectors } from '../selectors'
 import {
   createSession,
   dispatch,
-  openChatShell,
+  openChatWorkspace,
   readShell,
   type ChatShell,
 } from './chat-verification'
 
-async function sessionState(page: Page, shell: ChatShell, sessionId: string) {
+async function sessionState(page: Page, shell: Pick<ChatShell, 'base'>, sessionId: string) {
   const snapshot = await readShell(page, shell.base)
   const session = snapshot.sessions.find((candidate) => candidate.id === sessionId)
   ok(session, `Session ${sessionId} must still exist`)
@@ -20,7 +20,7 @@ async function sessionState(page: Page, shell: ChatShell, sessionId: string) {
 
 async function until(
   page: Page,
-  shell: ChatShell,
+  shell: Pick<ChatShell, 'base'>,
   sessionId: string,
   check: (session: Awaited<ReturnType<typeof sessionState>>) => boolean,
   message: string,
@@ -43,7 +43,7 @@ export const sessionActionsSurfaces: Scenario = {
   description:
     'One disposable metadata session: rename from the rail row, pin and rename from the chat stage header, then rename, snooze, cancel a delete and archive from the editor sidebar chat header. No provider turn; the session is deleted at the end.',
   async run(page, { step }) {
-    const shell = await openChatShell(page)
+    const shell = await openChatWorkspace(page)
     const sessionId = crypto.randomUUID()
     const title = `Actions verification ${sessionId.slice(0, 8)}`
     const renamed = `${title} renamed`

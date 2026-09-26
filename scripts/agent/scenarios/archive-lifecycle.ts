@@ -1,5 +1,5 @@
 import { ok, strictEqual } from 'node:assert/strict'
-import { createSession, dispatch, openChatShell, readShell } from './chat-verification'
+import { createSession, dispatch, openChatWorkspace, readShell } from './chat-verification'
 import type { Scenario } from './index'
 import { selectors } from '../selectors'
 
@@ -8,7 +8,7 @@ export const archiveLifecycle: Scenario = {
   description:
     'Archive an isolated session, open it from archive, reload and explicitly restore it. Deletes only its own session.',
   async run(page, { step }) {
-    const shell = await openChatShell(page)
+    const shell = await openChatWorkspace(page)
     const sessionId = crypto.randomUUID()
     const title = `Archive verification ${sessionId.slice(0, 8)}`
     await createSession(page, shell, sessionId, title)
@@ -32,7 +32,8 @@ export const archiveLifecycle: Scenario = {
       await page.reload()
       await selectors.sessionSearch(page).fill(title)
       const archive = selectors.archivedSessions(page)
-      if ((await archive.getAttribute('aria-pressed')) !== 'true') await archive.click()
+      // The address carries ?rail=archived, so the archive view comes back once boot applies it.
+      await archive.and(page.locator('[aria-pressed="true"]')).waitFor()
       await selectors.sessionByTitle(page, title).waitFor()
       await step('archive-survives-reload')
       await selectors.sessionByTitle(page, title).click({ button: 'right' })
