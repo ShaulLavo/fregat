@@ -20,6 +20,11 @@ import type { ChildProcessWithoutNullStreams } from 'node:child_process'
 import type { LspServerHandle, LspServerMatch } from './registry'
 import { LspStdioMessageReader, writeLspStdioMessage } from './stdio-rpc'
 import {
+  lspDiagnosticsFromTsserver,
+  offersTsserverRequests,
+  tsserverDiagnosticRequests,
+} from './typescript/tsserver-diagnostics'
+import {
   DID_CHANGE_WATCHED_FILES,
   FILE_CHANGED,
   LspWatchedFiles,
@@ -508,10 +513,31 @@ class PooledLspProxySession {
         return !document || document.text === text
       })
       if (!synchronized || remaining() <= 0) return null
-      if (supportsPullDiagnostics(this.initializeResult.result))
+      const capabilities = this.initializeResult.result
+      if (supportsPullDiagnostics(capabilities))
         return this.pullFileDiagnostics(uri, text, remaining())
+      if (offersTsserverRequests(capabilities))
+        return this.tsserverFileDiagnostics(uri, text, remaining())
       return this.publishedFileDiagnostics(uri, text, remaining())
     })
+  }
+
+  private async tsserverFileDiagnostics(
+    uri: string,
+    text: string,
+    timeoutMs: number,
+  ): Promise<LspFileDiagnostics | null> {
+    const document = this.documents.get(uri)
+    if (!document || document.text !== text) return null
+    const version = document.backendVersion
+    const responses = await Promise.all(
+      tsserverDiagnosticRequests(uri).map((params) =>
+        this.backendRequest('workspace/executeCommand', params, timeoutMs),
+      ),
+    )
+    if (this.documents.get(uri) !== document || document.backendVersion !== version) return null
+    const diagnostics = lspDiagnosticsFromTsserver(responses.map((response) => response?.result))
+    return diagnostics ? { mode: 'pull', diagnostics } : null
   }
 
   private async pullFileDiagnostics(
