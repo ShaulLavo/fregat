@@ -1,7 +1,7 @@
 import { ok, strictEqual } from 'node:assert/strict'
 import type { Page } from 'playwright'
 import type { Scenario } from './index'
-import { selectors } from '../selectors'
+import { runPaletteCommand, selectors } from '../selectors'
 import { serverApi } from '../server-api'
 
 async function userSettings(page: Page, base: string) {
@@ -43,7 +43,7 @@ async function createWallpaperFixture(page: Page, base: string) {
 export const wallpaperIconHints: Scenario = {
   name: 'wallpaper-icon-hints',
   description:
-    'Create an unselected wallpaper fixture, hover its action and open its menu, then remove the fixture and verify settings are unchanged.',
+    'Create an unselected wallpaper fixture, hover its action on the studio Wallpaper tab and open its menu, then remove the fixture and verify settings are unchanged.',
   async run(page, { step }) {
     const { base: api, headers } = serverApi(page)
     const base = `${api}/`
@@ -51,11 +51,10 @@ export const wallpaperIconHints: Scenario = {
     const fixture = await createWallpaperFixture(page, base)
     try {
       await selectors.workspaceMode(page, 'Workbench').click()
-      await page.keyboard.press('Control+,')
-      await selectors.settingsSearch(page).fill('wallpaper')
-      await selectors.wallpaperTile(page).click()
-      const picker = selectors.wallpaperPicker(page)
-      await picker.waitFor()
+      await runPaletteCommand(page, 'Theme studio')
+      const studio = selectors.themeStudio(page)
+      await studio.waitFor()
+      await selectors.themeStudioTab(page, 'Wallpaper').click()
       const actions = selectors.wallpaperActions(page, fixture.name)
       await actions.waitFor({ timeout: 20_000 })
       const label = await actions.getAttribute('aria-label')
@@ -69,9 +68,12 @@ export const wallpaperIconHints: Scenario = {
       await selectors.menuItem(page, 'Delete').waitFor()
       await step('wallpaper-actions-menu')
       await page.keyboard.press('Escape')
-      await selectors.wallpaperClose(page).click()
-      await picker.waitFor({ state: 'hidden' })
-      await step('wallpaper-picker-closed')
+      await selectors.popupMenu(page).waitFor({ state: 'hidden' })
+      await studio.focus()
+      await page.keyboard.press('Escape')
+      await page.keyboard.press('Escape')
+      await studio.waitFor({ state: 'detached' })
+      await step('studio-closed')
     } finally {
       const response = await page.request.post(`${base}themes/wallpapers/${fixture.id}/delete`, {
         headers,

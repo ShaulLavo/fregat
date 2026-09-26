@@ -175,6 +175,11 @@ export function normalizeColor(color: Oklch): Oklch {
   return stabilize({ ...color, h: normalizeHue(color.h), c: Math.max(0, color.c) })
 }
 
+/** An 8-bit sRGB pixel as OKLCH, for code that reads images rather than CSS. */
+export function oklchFromRgb(rgb: Rgb): Oklch {
+  return rgbToOklch(rgb)
+}
+
 function rgbToOklch(rgb: Rgb): Oklch {
   const linear = decodeChannels(rgb.r / 255, rgb.g / 255, rgb.b / 255)
 

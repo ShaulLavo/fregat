@@ -1,5 +1,6 @@
 import { CopyIcon } from '@phosphor-icons/react'
 import { Button } from '@workspace/ui/components/button'
+import { StatusDot } from '@workspace/ui/components/status-dot'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { copyTextToClipboard } from '@/lib/clipboard'
 import { logCopyValue } from '@/features/logs/utils/copy'
@@ -15,7 +16,7 @@ import {
   formatLogSecondary,
   formatLogTime,
   logLevelClass,
-  logLevelDotClass,
+  logLevelTone,
 } from '@/features/logs/utils/formatters'
 import {
   logRowPointerStart,
@@ -66,7 +67,7 @@ export const LogsEventRow = memo(function LogsEventRow({
         onPointerDown={handlePointerDown}
       >
         <span className='text-muted-foreground text-3xs flex shrink-0 items-center gap-1.5 font-mono'>
-          <span className={cn('size-1.5 shrink-0 rounded-full', logLevelDotClass(event.level))} />
+          <StatusDot tone={logLevelTone(event.level)} />
           {formatLogTime(event.timestamp)}
         </span>
         <span className='min-w-0 flex-1 truncate'>

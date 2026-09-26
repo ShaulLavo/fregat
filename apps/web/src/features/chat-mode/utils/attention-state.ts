@@ -1,4 +1,5 @@
 import type { SessionRailStatus } from '@workspace/contracts'
+import type { StatusDotTone } from '@workspace/ui/components/status-dot'
 
 export function sessionStatusLabel(status: SessionRailStatus) {
   if (status === 'approval') return 'Approval requested'
@@ -10,13 +11,12 @@ export function sessionStatusLabel(status: SessionRailStatus) {
   return 'Ready'
 }
 
-/** Token classes only — these flip with the theme and must never be palette hues. */
-export function sessionStatusDotClass(status: SessionRailStatus) {
-  if (status === 'approval' || status === 'input') return 'bg-warning'
-  if (status === 'failed') return 'bg-destructive'
-  if (status === 'working' || status === 'monitoring') return 'bg-info'
+export function sessionStatusTone(status: SessionRailStatus): StatusDotTone {
+  if (status === 'approval' || status === 'input') return 'warning'
+  if (status === 'failed') return 'destructive'
+  if (status === 'working' || status === 'monitoring') return 'info'
 
-  return 'bg-muted-foreground/40'
+  return 'neutral'
 }
 
 export function sessionStatusTextClass(status: SessionRailStatus) {

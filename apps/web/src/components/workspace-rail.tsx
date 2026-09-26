@@ -2,6 +2,8 @@ import type { ReactNode } from 'react'
 import { GearSixIcon } from '@phosphor-icons/react'
 import { Button } from '@workspace/ui/components/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
+import { Kbd } from '@workspace/ui/components/kbd'
+import { useCommandShortcut } from '@/keymap/hooks/use-command-shortcut'
 import { cn } from '@workspace/ui/lib/utils'
 import { useCommandBus } from '@/keymap/hooks/use-command-bus'
 
@@ -17,6 +19,7 @@ export function WorkspaceRail({
   readonly side: 'left' | 'right'
 }) {
   const bus = useCommandBus()
+  const settingsShortcut = useCommandShortcut('workspace.showSettings')
 
   return (
     <nav
@@ -43,7 +46,10 @@ export function WorkspaceRail({
         >
           <GearSixIcon className='size-(--icon-size)' />
         </TooltipTrigger>
-        <TooltipContent side={side === 'left' ? 'right' : 'left'}>Settings</TooltipContent>
+        <TooltipContent side={side === 'left' ? 'right' : 'left'}>
+          Settings
+          {settingsShortcut ? <Kbd>{settingsShortcut}</Kbd> : null}
+        </TooltipContent>
       </Tooltip>
     </nav>
   )

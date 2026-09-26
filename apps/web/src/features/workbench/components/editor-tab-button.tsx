@@ -78,6 +78,7 @@ export function EditorTabButton({
   // Raw <button>: spreads dnd-kit drag listeners and needs role='tab'; Button offers neither.
   const trigger = (
     <button
+      data-feedback='silent'
       {...dragAttributes}
       {...dragListeners}
       aria-busy={loading || undefined}

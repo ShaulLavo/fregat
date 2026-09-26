@@ -25,6 +25,7 @@ export const sharedSessionId = v.parse(sessionIdSchema, '33333333-3333-4333-8333
 export async function worktreeLifecycleFixture(
   options: {
     adapter?: ConstructorParameters<typeof MockProviderAdapter>[0]
+    baseBranch?: string
     pullRequestLookup?: BranchPullRequestLookup
     forgeBoundaries?: ForgeBoundaries
   } = {},
@@ -97,6 +98,7 @@ export async function worktreeLifecycleFixture(
               kind: 'new',
               worktreeId: lifecycleWorktreeId,
               baseWorktreeId: registration.worktreeId,
+              baseBranch: options.baseBranch,
             },
             title: 'Isolated session',
             modelSelection: FIXTURE_MODEL,

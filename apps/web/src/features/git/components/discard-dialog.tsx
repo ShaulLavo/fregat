@@ -8,6 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@workspace/ui/components/dialog'
+import { HoldButton } from '@workspace/ui/components/hold-button'
 import { Spinner } from '@workspace/ui/components/spinner'
 
 import { useDiscardPathsMutation } from '@/features/git/hooks/use-discard-paths-mutation'
@@ -54,15 +55,13 @@ export function DiscardDialog({ rootPath }: { rootPath: string }) {
           <Button disabled={pending} onClick={close} type='button' variant='outline'>
             Cancel
           </Button>
-          <Button
+          <HoldButton
             disabled={pending}
-            onClick={() => discard.mutate(undefined, { onSettled: close })}
-            type='button'
-            variant='destructive'
+            onConfirm={() => discard.mutate(undefined, { onSettled: close })}
           >
             {icon}
             {prompt?.confirm}
-          </Button>
+          </HoldButton>
         </DialogFooter>
       </DialogContent>
     </Dialog>

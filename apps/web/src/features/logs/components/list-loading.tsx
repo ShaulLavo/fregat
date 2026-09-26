@@ -11,7 +11,7 @@ export function LogsListLoading() {
             className='flex h-(--density-row-height) items-center gap-2 px-(--density-row-padding-x)'
             key={row}
           >
-            <div className='skeleton-sweep size-1.5 shrink-0 rounded-full' />
+            <div className='skeleton-sweep size-(--status-dot-size) shrink-0' />
             <div className='skeleton-sweep h-2.5 w-12 shrink-0 rounded-md' />
             <div className={`skeleton-sweep h-3 rounded-md ${width}`} />
             <div className='skeleton-sweep ml-auto h-2.5 w-8 shrink-0 rounded-md' />

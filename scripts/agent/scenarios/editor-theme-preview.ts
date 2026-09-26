@@ -15,7 +15,7 @@ export const editorThemePreview: Scenario = {
     await page.waitForTimeout(2000)
     const committedColors = await syntaxColors(page)
     await page.keyboard.press(chords.commandPalette)
-    await selectors.paletteInput(page).fill('theme ')
+    await selectors.paletteInput(page).fill('code ')
     await selectors.codeThemeOptions(page).first().waitFor()
     const ids = await selectors.codeThemeOptions(page).evaluateAll((rows) =>
       rows

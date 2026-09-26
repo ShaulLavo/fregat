@@ -25,6 +25,7 @@ export function ModelPickerRailItem({
         <TooltipTrigger
           render={
             <button
+              data-feedback='silent'
               aria-disabled={blocked}
               aria-label={group.displayLabel}
               className={listRowClassName({

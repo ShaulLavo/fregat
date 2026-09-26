@@ -23,12 +23,30 @@ async function fixtureRepo() {
 }
 
 describe('worktree provisioning', () => {
+  it('records the local source branch when a tag has the same name', async () => {
+    const fixture = await fixtureRepo()
+    await runGit(fixture.root, ['tag', 'main'])
+    const mutations: string[] = []
+    fixture.git.subscribeMutations(async (root) => {
+      mutations.push(root)
+    })
+    const prepared = await fixture.worktrees.prepareCreate({
+      path: fixture.root,
+      worktreeId: worktreeA,
+    })
+    expect(prepared.baseBranch).toBe('main')
+    expect(mutations).toEqual([])
+    const created = await fixture.worktrees.create({ ...prepared, path: fixture.root })
+    expect(created.worktree.commit).toBe(prepared.baseCommit)
+  })
+
   it('uses the full UUID and persisted base even when the base branch moves', async () => {
     const fixture = await fixtureRepo()
     const prepared = await fixture.worktrees.prepareCreate({
       path: fixture.root,
       worktreeId: worktreeA,
     })
+    expect(prepared.baseBranch).toBe('main')
     await writeFile(path.join(fixture.root, 'tracked.txt'), 'later\n')
     await runGit(fixture.root, ['commit', '-am', 'base moved'])
     const created = await fixture.worktrees.create({ ...prepared, path: fixture.root })
@@ -57,6 +75,7 @@ describe('worktree provisioning', () => {
       baseBranch: 'release',
     })
     expect(prepared.baseCommit).toBe(start)
+    expect(prepared.baseBranch).toBe('release')
     const created = await fixture.worktrees.create({ ...prepared, path: fixture.root })
     expect(await readFile(path.join(created.worktree.absolutePath, 'tracked.txt'), 'utf8')).toBe(
       'one\n',
@@ -105,6 +124,7 @@ describe('worktree provisioning', () => {
       path: first.worktree.absolutePath,
       worktreeId: worktreeB,
     })
+    expect(prepared.baseBranch).toBe(first.worktree.branch)
     const second = await fixture.worktrees.create({
       ...prepared,
       path: first.worktree.absolutePath,

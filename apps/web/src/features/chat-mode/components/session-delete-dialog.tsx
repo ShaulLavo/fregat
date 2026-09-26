@@ -88,6 +88,7 @@ export function SessionDeleteDialog() {
           </Button>
         ) : null}
         <DeleteDialogFooter
+          hold
           onCancel={close}
           onConfirm={() => {
             if (!request) return

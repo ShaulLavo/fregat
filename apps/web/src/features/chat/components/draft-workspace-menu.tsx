@@ -13,7 +13,8 @@ import {
 import { Spinner } from '@workspace/ui/components/spinner'
 
 import { worktreeLabel } from '@workspace/client-core/chat/worktrees/label'
-import { workspaceChoiceLabel } from '../utils/draft-workspace'
+import { WORKSPACE_CHOICE_LABELS, workspaceChoiceLabel } from '../utils/draft-workspace'
+import { WidestLabel } from '@workspace/ui/components/widest-label'
 
 const NEW_WORKTREE = 'new'
 const ICONS = { current: FolderIcon, linked: FoldersIcon, new: GitForkIcon } as const
@@ -61,7 +62,7 @@ export function DraftWorkspaceMenu({
             ) : (
               <Icon className='size-(--icon-size-sm) shrink-0' />
             )}
-            <span className='truncate'>{choice.label}</span>
+            <WidestLabel labels={WORKSPACE_CHOICE_LABELS}>{choice.label}</WidestLabel>
             <CaretDownIcon className='size-(--icon-size-sm) shrink-0 opacity-60' />
           </Button>
         }
@@ -118,7 +119,7 @@ export function DraftWorkspaceMenu({
                 <FoldersIcon className='size-(--icon-size-sm)' />
                 <span className='truncate'>{worktreeLabel(worktree, 'git')}</span>
                 {worktree.cleanupEligibility.nonDeletedSessionCount > 0 ? (
-                  <span className='text-muted-foreground text-2xs ml-auto tabular-nums'>
+                  <span className='text-muted-foreground text-2xs ml-auto font-mono tabular-nums'>
                     {worktree.cleanupEligibility.nonDeletedSessionCount}
                   </span>
                 ) : null}

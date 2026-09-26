@@ -49,6 +49,10 @@ test('anchors the diagnostic React surface through edits and restores editor foc
   const first = current.claim(markerEvent(currentVersion(), rangeAnchor(6, 11)))
   expect(first.kind).toBe('claimed')
   await expect.poll(() => document.querySelector('[data-diagnostic-peek]')).not.toBeNull()
+  // Overscrolling the peek must not move the line it points at.
+  expect(
+    getComputedStyle(document.querySelector('[data-diagnostic-peek]')!).overscrollBehaviorY,
+  ).toBe('contain')
   const initialLeft = peekLeft()
 
   current.controller.commands.edit({ from: 0, to: 0, text: '>> ' })

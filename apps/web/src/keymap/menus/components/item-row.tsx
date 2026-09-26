@@ -1,3 +1,4 @@
+import { Kbd } from '@workspace/ui/components/kbd'
 import type { ResolvedMenuInvocation, ResolvedMenuItem } from '@/keymap/menus/utils/resolve'
 import {
   ContextMenuCheckboxItem,
@@ -89,7 +90,12 @@ export function MenuItemRow({
     >
       {item.icon ? <item.icon /> : null}
       <span className={item.mono ? 'font-mono' : undefined}>{item.label}</span>
-      {item.trailing ? <ContextMenuShortcut>{item.trailing}</ContextMenuShortcut> : null}
+      {item.reason ? <ContextMenuShortcut>{item.reason}</ContextMenuShortcut> : null}
+      {item.shortcut ? (
+        <ContextMenuShortcut>
+          <Kbd>{item.shortcut}</Kbd>
+        </ContextMenuShortcut>
+      ) : null}
     </ContextMenuItem>
   )
 }

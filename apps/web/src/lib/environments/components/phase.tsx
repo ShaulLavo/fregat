@@ -1,6 +1,7 @@
 import type { EnvironmentPhase } from '@workspace/client-core/environments/utils/connection'
 import { Spinner } from '@workspace/ui/components/spinner'
-import { cn } from '@workspace/ui/lib/utils'
+import { StatusDot } from '@workspace/ui/components/status-dot'
+import { phaseTone } from '@/lib/environments/utils/phase-tone'
 
 export function Phase({
   phase,
@@ -19,15 +20,7 @@ export function Phase({
       aria-label={`${label} ${phase}`}
       className='flex size-3 shrink-0 items-center justify-center'
     >
-      <span
-        className={cn(
-          'size-2 rounded-full',
-          phase === 'live' && 'bg-success',
-          phase === 'idle' && 'bg-muted-foreground',
-          phase === 'offline' && 'bg-warning',
-          (phase === 'blocked' || phase === 'identity-drift') && 'bg-destructive',
-        )}
-      />
+      <StatusDot tone={phaseTone(phase)} />
     </span>
   )
 }

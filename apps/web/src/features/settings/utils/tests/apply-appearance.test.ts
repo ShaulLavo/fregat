@@ -29,6 +29,7 @@ const appearance = (overrides: Partial<AppearanceValues> = {}): AppearanceValues
   'editor.fontFamily': DEFAULT_SETTING_VALUES['editor.fontFamily'],
   'workbench.colorTheme': DEFAULT_SETTING_VALUES['workbench.colorTheme'],
   'workbench.density': DEFAULT_SETTING_VALUES['workbench.density'],
+  'workbench.feel': DEFAULT_SETTING_VALUES['workbench.feel'],
   'workbench.fontFamily': DEFAULT_SETTING_VALUES['workbench.fontFamily'],
   'workbench.surface.blur': DEFAULT_SETTING_VALUES['workbench.surface.blur'],
   'workbench.surface.contentOpacity': DEFAULT_SETTING_VALUES['workbench.surface.contentOpacity'],

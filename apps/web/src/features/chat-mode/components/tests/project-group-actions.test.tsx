@@ -12,6 +12,7 @@ import {
 } from '../../../../../test/factories/federation'
 import { renderWithProviders } from '../../../../../test/render'
 import { expect, test } from '../../../../../test/fixtures'
+import { holdToConfirm } from '../../../../../test/hold'
 
 for (const filtered of [false, true]) {
   test(`archive and delete preview retain ${filtered ? 'filtered' : 'all'} real owners sharing a project ID`, async ({
@@ -75,7 +76,7 @@ for (const filtered of [false, true]) {
       target: screen.getByRole('button', { name: 'Project actions' }),
     })
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Delete Project' }))
-    await userEvent.click(screen.getByRole('button', { name: /^Delete$/ }))
+    holdToConfirm(screen.getByRole('button', { name: /^Delete$/ }))
     await waitFor(async () => {
       expect((await h.clientA.orchestration['shell-snapshot'].get()).data!.projects).toHaveLength(
         filtered ? 1 : 0,

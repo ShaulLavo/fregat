@@ -41,7 +41,7 @@ test('custom snooze rejects invalid input and persists a duration', async ({ cli
   renderRailHarness(h)
   await menu('Snooze…')
   expect(screen.getByRole('button', { name: 'Snooze until chosen time' })).toBeDisabled()
-  await userEvent.click(screen.getByRole('button', { name: 'Duration' }))
+  await userEvent.click(screen.getByRole('tab', { name: 'Duration' }))
   const amount = screen.getByRole('spinbutton', { name: 'Duration' })
   await userEvent.type(amount, '-1')
   expect(screen.getByRole('button', { name: 'Snooze until chosen time' })).toBeDisabled()

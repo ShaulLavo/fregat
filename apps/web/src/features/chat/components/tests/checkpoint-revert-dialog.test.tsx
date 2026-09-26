@@ -5,6 +5,7 @@ import { vi } from 'vitest'
 import { CheckpointRevertDialog } from '@/features/chat/components/checkpoint-revert-dialog'
 import { expect, test } from '../../../../../test/fixtures'
 import { renderWithProviders } from '../../../../../test/render'
+import { holdToConfirm } from '../../../../../test/hold'
 
 test('checkpoint zero opens an in-app confirmation with Cancel focused', async () => {
   const onCancel = vi.fn()
@@ -66,7 +67,7 @@ test('Revert waits while the session is busy and requires an explicit click', as
       onConfirm={onConfirm}
     />,
   )
-  await userEvent.click(screen.getByRole('button', { name: 'Rewind conversation only' }))
+  holdToConfirm(screen.getByRole('button', { name: 'Rewind conversation only' }))
   expect(onConfirm).toHaveBeenCalledWith(false)
   expect(onCancel).not.toHaveBeenCalled()
 })

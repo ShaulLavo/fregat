@@ -5,15 +5,16 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: 'bg-primary text-primary-foreground [a]:not-aria-disabled:hover:bg-primary/80',
+        default:
+          'shadow-(--shadow-key) bg-primary text-primary-foreground [a]:not-aria-disabled:hover:bg-primary/80',
         outline:
-          'bg-input/30 not-aria-disabled:hover:bg-muted not-aria-disabled:hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:not-aria-disabled:hover:bg-input/50',
+          'shadow-(--shadow-key) bg-input/30 not-aria-disabled:hover:bg-muted not-aria-disabled:hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:not-aria-disabled:hover:bg-input/50',
         secondary:
-          'bg-secondary text-secondary-foreground not-aria-disabled:hover:bg-secondary/80 aria-expanded:bg-secondary aria-expanded:text-secondary-foreground',
+          'shadow-(--shadow-key) bg-secondary text-secondary-foreground not-aria-disabled:hover:bg-secondary/80 aria-expanded:bg-secondary aria-expanded:text-secondary-foreground',
         ghost:
           'not-aria-disabled:hover:bg-muted not-aria-disabled:hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:not-aria-disabled:hover:bg-muted/50',
         destructive:
-          'bg-destructive/10 text-destructive not-aria-disabled:hover:bg-destructive/20 [--focus-ring-color:var(--destructive)] dark:bg-destructive/20 dark:not-aria-disabled:hover:bg-destructive/30',
+          'shadow-(--shadow-key) bg-destructive/10 text-destructive not-aria-disabled:hover:bg-destructive/20 [--focus-ring-color:var(--destructive)] dark:bg-destructive/20 dark:not-aria-disabled:hover:bg-destructive/30',
         link: 'text-primary underline-offset-4 not-aria-disabled:hover:underline',
       },
       size: {

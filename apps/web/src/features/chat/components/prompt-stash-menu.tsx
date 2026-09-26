@@ -36,7 +36,7 @@ export function PromptStashMenu({
               <span className='min-w-0 flex-1 truncate'>
                 {promptSnippet(stashMessageLabel(entry))}
               </span>
-              <span className='text-muted-foreground text-3xs shrink-0 tabular-nums'>
+              <span className='text-muted-foreground text-3xs shrink-0 font-mono tabular-nums'>
                 {formatChatTimestamp(entry.createdAt)}
               </span>
             </Button>

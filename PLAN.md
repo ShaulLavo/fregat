@@ -575,17 +575,12 @@ surfaces, the file picker and the site. The owner is taking it one topic at a ti
 
 | Plan                                            | Owns                                                                                                                      |
 | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| [157](plans/157-base-components.md)             | Tabs, scroll fades, hold-to-confirm, status dots, typeahead refine; queued next                                           |
-| [158](plans/158-app-polish.md)                  | Tail following with "N new" in `VirtualList`, secrets display, checkpoint restore, branch lanes, boot frame               |
-| [159](plans/159-file-picker.md)                 | File and folder picker rewrite: columns, real previews, thumbnails, history keys                                          |
 | 160 (done, lane L2)                             | Reasoning fold, turn receipts, live tail, model marker, tool details, plan steps, subagents, ultra sparkle                |
 | 161 (done, lane L2)                             | Approval lifecycle, stopped turns, streaming holds, folding rules, hostile-state scenarios                                |
 | ~~162~~                                         | Done 2026-09-25 (lane L3): context breakdown, usable window, session total, usage-page honesty                            |
 | 163 (done, lane L2)                             | Screenshot attachment in the composer (export shipped with Plan 145)                                                      |
-| [164](plans/164-what-feels-right-in-neon.md)    | First pass shipped (Inter, one mono, `section-label`, radius); a metadata font sweep is left                              |
 | 165 (done)                                      | Nerd Fonts + Fontsource on demand; interface-font setting; curated autocomplete picker                                    |
 | [166](plans/166-shortcuts-editor.md)            | Keyboard shortcuts page rebuilt from VS Code research: full-width list, save on Enter, several per command                |
-| [154](plans/154-physical-mode.md)               | The seamui feel (springs, depth, motion in every primitive) and interface sounds                                          |
 | [155](plans/155-site-demo-replica.md)           | Placeholder: the site hero becomes an animated replica of the app, like cursor.com                                        |
 | [156](plans/156-documents-in-the-editor.md)     | Placeholder, far future: PDF, DOCX, XLSX, PPTX and CSV as editor documents agents can edit                                |
 | [178](plans/178-tree-in-the-app.md)             | Plan of plans: the file tree rebuilt on app primitives (VirtualList, useListbox, dnd-kit, icons, Tailwind) at full parity |

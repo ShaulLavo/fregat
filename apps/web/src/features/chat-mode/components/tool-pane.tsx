@@ -1,7 +1,7 @@
 import { ToolPane as PaneShell } from '@workspace/ui/patterns/tool-pane'
 import type { GitFileStatus } from '@workspace/contracts'
 import { filesystemPath } from '@/lib/documents/utils/identity'
-import { Button } from '@workspace/ui/components/button'
+import { Tabs, TabsList, TabsTab } from '@workspace/ui/components/tabs'
 import { PaneBar } from '@workspace/ui/components/pane-bar'
 
 import { SearchPane } from '@/features/workspace/components/search-pane'
@@ -63,7 +63,8 @@ export function ToolPane({
   return (
     <PaneShell
       className='h-full min-w-0 overflow-hidden'
-      bodyClassName='bg-content-well overflow-hidden'
+      bodyClassName='bg-content-well'
+      scroll={false}
       header={<ToolPaneHeader tab='terminal' />}
     >
       {/* Kept, so another tool, a collapsed pane or another session never ends this shell. */}
@@ -118,7 +119,7 @@ function toolBody({
   return (
     <PaneShell
       className='h-full min-w-0 overflow-hidden'
-      bodyClassName='overflow-hidden'
+      scroll={false}
       header={<ToolPaneHeader tab='problems' />}
     >
       <DiagnosticsPanel />
@@ -137,26 +138,32 @@ function gitToolPane(rootPath: string, diffScope: SessionDiffScopeState) {
   return (
     <PaneShell
       className='h-full min-w-0 overflow-hidden'
-      bodyClassName='overflow-hidden'
+      scroll={false}
       header={<GitPaneHeader rootPath={rootPath} />}
       subheader={
-        <PaneBar aria-label='Diff scope' role='group'>
-          {scopeButton({
-            active: scope.kind === 'working-tree',
-            label: 'Working tree',
-            onSelect: selectWorkingTreeScope,
-          })}
-          {scopeButton({
-            active: scope.kind === 'turn',
-            // A session that has not produced a checkpoint has no turn to show, and
-            // an inert button is worse than one that says so.
-            disabled: !latestTurnId,
-            label: 'Turn',
-            onSelect: () => {
-              if (!latestTurnId) return
-              selectTurnScope(latestTurnId)
-            },
-          })}
+        <PaneBar>
+          <Tabs
+            value={scope.kind}
+            onValueChange={(next: typeof scope.kind) => {
+              if (next === 'working-tree') return selectWorkingTreeScope()
+              if (latestTurnId) selectTurnScope(latestTurnId)
+            }}
+          >
+            <TabsList aria-label='Diff scope' variant='segmented'>
+              <TabsTab value='working-tree'>Working tree</TabsTab>
+              {/* A session with no checkpoint has no turn to show; an inert tab says so. */}
+              <TabsTab
+                disabled={!latestTurnId}
+                value='turn'
+                // Clicking the selected tab changes no value; from an older turn it returns to the latest.
+                onClick={() => {
+                  if (scope.kind === 'turn' && latestTurnId) selectTurnScope(latestTurnId)
+                }}
+              >
+                Turn
+              </TabsTab>
+            </TabsList>
+          </Tabs>
         </PaneBar>
       }
     >
@@ -166,32 +173,6 @@ function gitToolPane(rootPath: string, diffScope: SessionDiffScopeState) {
         <GitPanel rootPath={filesystemPath(rootPath)} />
       )}
     </PaneShell>
-  )
-}
-
-function scopeButton({
-  active,
-  disabled = false,
-  label,
-  onSelect,
-}: {
-  readonly active: boolean
-  readonly disabled?: boolean
-  readonly label: string
-  readonly onSelect: () => void
-}) {
-  return (
-    <Button
-      aria-pressed={active}
-      className='text-muted-foreground hover:text-foreground aria-pressed:bg-accent aria-pressed:text-accent-foreground'
-      disabled={disabled}
-      size='xs'
-      type='button'
-      variant='ghost'
-      onClick={onSelect}
-    >
-      {label}
-    </Button>
   )
 }
 

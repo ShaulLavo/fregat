@@ -1,7 +1,7 @@
+import { bundleQueryKey } from '@/lib/theme-library/utils/query-keys'
 import { useQuery } from '@tanstack/react-query'
 import { BUNDLED_THEMES } from '@workspace/contracts'
-import { useSettingsOwner } from '@/features/settings/hooks/use-settings-owner'
-import { bundleQueryKey } from '@/features/settings/utils/query-keys'
+import { useSettingsOwner } from '@/lib/settings-owner/hooks/use-settings-owner'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import { createRpcError } from '@/lib/structured-errors'
 

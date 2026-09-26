@@ -57,7 +57,7 @@ test('page reset follows the remote JSON document and returns to the primary own
     expect(primarySnapshot.values['editor.fontSize']).toBe(19)
     act(() => primary.setQueryData(settingsKeys.document(), primarySnapshot))
 
-    await userEvent.click(screen.getByRole('button', { name: /^Settings$/ }))
+    await userEvent.click(screen.getByRole('tab', { name: /^Settings$/ }))
     await userEvent.click(await screen.findByRole('button', { name: 'Settings actions' }))
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Reset all user settings' }))
     await waitFor(async () => {

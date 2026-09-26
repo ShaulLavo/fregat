@@ -106,7 +106,10 @@ export function WorkspaceProjectMenu({ workspaceTitle }: { readonly workspaceTit
         ) : null}
         <CaretDownIcon className='text-muted-foreground size-(--icon-size-sm) shrink-0' />
       </DropdownMenuTrigger>
-      <DropdownMenuContent align='start' className='max-h-[60vh] w-64 overflow-y-auto p-1'>
+      <DropdownMenuContent
+        align='start'
+        className='max-h-[60vh] w-64 overflow-y-auto overscroll-contain p-1'
+      >
         <DropdownMenuRadioGroup value={rootPath ?? ''}>
           {/* Inside the group: base-ui resolves the label against its group context. */}
           <DropdownMenuLabel>Recent</DropdownMenuLabel>

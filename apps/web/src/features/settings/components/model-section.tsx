@@ -8,7 +8,7 @@ import { useSettingValue } from '@/hooks/use-setting-value'
 import { EmptyRow } from './empty-row'
 import { ModelLoading } from './model-loading'
 import { ModelRow } from './model-row'
-import { useSettingsOwner } from '@/features/settings/hooks/use-settings-owner'
+import { useSettingsOwner } from '@/lib/settings-owner/hooks/use-settings-owner'
 
 /**
  * The model list, as the single control over both `models.hidden` and `models.order`.
@@ -39,7 +39,7 @@ export function ModelSection() {
   const displayed = rows.map((row) => row.ref)
 
   return (
-    <div className='bg-muted flex max-h-64 w-96 max-w-full min-w-0 flex-col overflow-y-auto rounded-lg @max-3xl/settings:w-full'>
+    <div className='bg-muted flex max-h-64 w-96 max-w-full min-w-0 flex-col overflow-y-auto overscroll-contain rounded-lg @max-3xl/settings:w-full'>
       {rows.map((row, index) => (
         <ModelRow
           canMoveDown={index < rows.length - 1}

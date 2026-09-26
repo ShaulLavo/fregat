@@ -44,7 +44,7 @@ hand-rolled copies.
 
 - **Today:** 6px, stable gutter, thumb `fg 25%` 4px wide, visible only while hovered
   (`style.css:410-461`). `.app-scrollbar-thin` always shows its thumb.
-- **Work:** land [Plan 102](../102-scroll-and-keyboard-affordance.md) D2/D3 with the tree's recipe
+- **Work:** land Plan 102 D2/D3 (done in lane L1) with the tree's recipe
   as the shared `@utility`, plus a `scroll-gutter` utility. Plan 102 already names the tree's recipe
   as the better one.
 

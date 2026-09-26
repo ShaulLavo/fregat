@@ -50,7 +50,8 @@ export const SearchPane = memo(
     return (
       <ToolPane
         className={cn('h-full min-w-0 overflow-hidden', !compact && 'bg-background')}
-        bodyClassName='flex flex-col overflow-hidden'
+        bodyClassName='flex flex-col'
+        scroll={false}
         ref={setRootRef}
         header={
           compact ? (

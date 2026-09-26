@@ -2,7 +2,7 @@ import { useMutation } from '@tanstack/react-query'
 import type { ProviderInstanceId } from '@workspace/contracts'
 import { toast } from 'sonner'
 
-import { useSettingsOwner } from '@/features/settings/hooks/use-settings-owner'
+import { useSettingsOwner } from '@/lib/settings-owner/hooks/use-settings-owner'
 import { settingsMutationKeys } from '@/features/settings/utils/mutation-keys'
 import { updateProvider } from '@/features/settings/utils/provider-update-query'
 import { settingsQueryKeys } from '@/features/settings/utils/query-keys'

@@ -23,5 +23,5 @@ test('an open dialog shows the real settings page', async ({ client }) => {
   expect(
     await screen.findByLabelText('Search settings', undefined, { timeout: 10_000 }),
   ).toBeDefined()
-  expect(await screen.findByRole('button', { name: 'Choose wallpaper' })).toBeDefined()
+  expect(await screen.findByRole('button', { name: 'Open studio' })).toBeDefined()
 })

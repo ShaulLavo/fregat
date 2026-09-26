@@ -22,7 +22,7 @@ test('code theme sample follows highlighted rows and labels a retained sample af
     </TestEditorStateProvider>,
     {
       application: createTestApplicationRuntime(),
-      command: { paletteOpen: true, paletteSearch: 'theme ' },
+      command: { paletteOpen: true, paletteSearch: 'code ' },
       queryClient,
     },
   )

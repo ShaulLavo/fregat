@@ -220,7 +220,10 @@ function handle(message) {
     streamAnswer(turn, `${turn}-answer`, CODE_COLOUR_CHUNKS, 250)
     return
   }
-  if (scenario === 'response-delivery' && message.method === 'turn/start') {
+  if (
+    ['response-delivery', 'physical-chat'].includes(scenario) &&
+    message.method === 'turn/start'
+  ) {
     send({ id: message.id, result: { turn: { id: turnId, status: 'inProgress', items: [] } } })
     send({
       method: 'turn/started',

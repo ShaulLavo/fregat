@@ -119,6 +119,20 @@ import { gitOpenAllDiffsSpam } from './git-open-all-diffs-spam'
 import { gitStageSettles } from './git-stage-settles'
 import { gitChangesScroll } from './git-changes-scroll'
 import { gitDiscardConfirm } from './git-discard-confirm'
+import { baseComponents } from './base-components'
+import { physicalMode } from './physical-mode'
+import { physicalChat } from './physical-chat'
+import { connectionFrame } from './connection-frame'
+import { settingsValueGrids } from './settings-value-grids'
+import { tailFollow } from './tail-follow'
+import { checkpointRestore } from './checkpoint-restore'
+import { themeStudioAsync } from './theme-studio-async'
+import { themeStudioPreview } from './theme-studio-preview'
+import { filePickerSelection } from './file-picker-selection'
+import { filePickerBrowse } from './file-picker-browse'
+import { quickOpenPreview } from './quick-open-preview'
+import { themeStudio } from './theme-studio'
+import { themeStudioLibrary } from './theme-studio-library'
 import { serverUpdate } from './server-update'
 import { commandPaletteTypeBurst } from './command-palette-type-burst'
 import { paletteScriptsPending } from './palette-scripts-pending'
@@ -149,9 +163,7 @@ import { editorOfflineResync } from './editor-offline-resync'
 import { editorThemePreview } from './editor-theme-preview'
 import { editorNativeCoverage } from './editor-native-coverage'
 import { editorSyntaxBenchmark } from './editor-syntax-benchmark'
-import { themeBundles } from './theme-bundles'
 import { bundleWallpapers } from './bundle-wallpapers'
-import { themeGallery } from './theme-gallery'
 import { colorModePreview } from './color-mode-preview'
 import { wallpaperModeToggle } from './wallpaper-mode-toggle'
 import { editorAutoClose } from './editor-auto-close'
@@ -390,6 +402,20 @@ export const scenarios: readonly Scenario[] = [
   gitStageSettles,
   gitChangesScroll,
   gitDiscardConfirm,
+  baseComponents,
+  physicalMode,
+  physicalChat,
+  connectionFrame,
+  settingsValueGrids,
+  tailFollow,
+  checkpointRestore,
+  filePickerBrowse,
+  filePickerSelection,
+  themeStudioPreview,
+  themeStudioAsync,
+  quickOpenPreview,
+  themeStudio,
+  themeStudioLibrary,
   serverUpdate,
   commandPaletteTypeBurst,
   paletteScriptsPending,
@@ -402,10 +428,8 @@ export const scenarios: readonly Scenario[] = [
   editorNativeCoverage('dark'),
   editorSyntaxBenchmark('shiki'),
   editorSyntaxBenchmark('shiki', true),
-  themeGallery,
   colorModePreview,
   pageLifecycle,
-  themeBundles,
   bundleWallpapers,
   editorAutoClose,
   editorFormatChord,

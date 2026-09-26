@@ -293,6 +293,7 @@ export const projectionWorktrees = sqliteTable(
       enum: ['protected', 'external', 'platform', 'unclaimed'],
     }).notNull(),
     baseWorktreeId: text('base_worktree_id'),
+    baseBranch: text('base_branch'),
     baseCommit: text('base_commit'),
     headCommit: text('head_commit'),
     metadataVersion: integer('metadata_version').notNull().default(0),

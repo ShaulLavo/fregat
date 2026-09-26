@@ -1,9 +1,9 @@
 import { CodeIcon, SlidersHorizontalIcon } from '@phosphor-icons/react'
-import { Button } from '@workspace/ui/components/button'
+import { Tabs, TabsList, TabsTab } from '@workspace/ui/components/tabs'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 
 import { selectSettingsScope, settingsScope } from '../state/scope-store'
-import { selectSettingsView, useSettingsView } from '../state/view-store'
+import { selectSettingsView, useSettingsView, type SettingsView } from '../state/view-store'
 
 /**
  * Switches the settings tab between the form and the document it edits.
@@ -20,56 +20,43 @@ export function ViewToggle() {
   const view = useSettingsView()
 
   return (
-    <div className='flex items-center gap-0.5'>
-      <ViewButton
-        active={view === 'form'}
-        icon={<SlidersHorizontalIcon aria-hidden />}
-        label='Settings'
-        onSelect={showForm}
-      />
-      <ViewButton
-        active={view === 'json'}
-        icon={<CodeIcon aria-hidden />}
-        label='settings.json'
-        onSelect={() => selectSettingsView('json')}
-      />
-    </div>
+    <Tabs value={view} onValueChange={(next: SettingsView) => selectView(next)}>
+      <TabsList aria-label='Settings view' variant='segmented'>
+        <ViewTab icon={<SlidersHorizontalIcon aria-hidden />} label='Settings' value='form' />
+        <ViewTab icon={<CodeIcon aria-hidden />} label='settings.json' value='json' />
+      </TabsList>
+    </Tabs>
   )
 }
 
 // The defaults tab has no form, so asking for one means leaving that tab.
-function showForm() {
-  if (settingsScope() === 'default') selectSettingsScope('user')
-  selectSettingsView('form')
+function selectView(view: SettingsView) {
+  if (view === 'form' && settingsScope() === 'default') selectSettingsScope('user')
+  selectSettingsView(view)
 }
 
-function ViewButton({
-  active,
+function ViewTab({
   icon,
   label,
-  onSelect,
+  value,
 }: {
-  active: boolean
   icon: React.ReactNode
   label: string
-  onSelect: () => void
+  value: SettingsView
 }) {
   return (
     <Tooltip>
       <TooltipTrigger
         render={
-          <Button
+          <TabsTab
             aria-label={label}
-            aria-pressed={active}
-            className='text-muted-foreground hover:text-foreground aria-pressed:bg-accent aria-pressed:text-accent-foreground'
-            onClick={onSelect}
-            size='icon-sm'
-            variant='ghost'
-          >
-            {icon}
-          </Button>
+            className='w-(--density-control-height-sm) px-0'
+            value={value}
+          />
         }
-      />
+      >
+        {icon}
+      </TooltipTrigger>
       <TooltipContent>{label}</TooltipContent>
     </Tooltip>
   )

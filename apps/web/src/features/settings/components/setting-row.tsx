@@ -1,6 +1,5 @@
 import { NotificationModeWidget } from '@/features/settings/components/widgets/notification-mode-widget'
 import { ThemeWidget } from '@/features/settings/components/widgets/theme-widget'
-import { WallpaperWidget } from '@/features/settings/components/widgets/wallpaper-widget'
 import {
   descriptorFor,
   SCALAR_SETTING_IDS,
@@ -18,12 +17,10 @@ import { MachinesSection } from '@/features/settings/components/machines-section
 import { ProviderSection } from '@/features/settings/components/provider-section'
 import { RowActions } from '@/features/settings/components/row-actions'
 import { BooleanWidget } from '@/features/settings/components/widgets/boolean-widget'
-import { CodeThemeWidget } from '@/features/settings/components/widgets/code-theme-widget'
 import { EnumWidget } from '@/features/settings/components/widgets/enum-widget'
 import { isFontSettingId } from '@/features/settings/utils/font-options'
 import { FontWidget } from '@/features/settings/components/widgets/font-widget'
 import { NumberWidget } from '@/features/settings/components/widgets/number-widget'
-import { PaletteWidget } from '@/features/settings/components/widgets/palette-widget'
 import { StringWidget } from '@/features/settings/components/widgets/string-widget'
 import { settingInspection } from '@/features/settings/hooks/use-setting-inspection'
 import { useSettingsActions } from '@/features/settings/hooks/use-settings-actions'
@@ -172,17 +169,6 @@ function SettingControl({
 
   if (control.widget === 'font' && isFontSettingId(id)) {
     return <FontWidget disabled={disabled} id={id} onChange={onChange} value={control.value} />
-  }
-
-  if (control.widget === 'code-theme') {
-    return <CodeThemeWidget disabled={disabled} id={id} onChange={onChange} value={control.value} />
-  }
-
-  if (control.widget === 'wallpaper')
-    return <WallpaperWidget disabled={disabled} value={control.value} onChange={onChange} />
-
-  if (control.widget === 'palette') {
-    return <PaletteWidget disabled={disabled} id={id} value={control.value} />
   }
 
   if (control.widget === 'string' || control.widget === 'multiline') {

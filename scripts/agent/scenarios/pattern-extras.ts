@@ -176,7 +176,7 @@ async function withPatternFixture(page: Page, run: () => Promise<void>) {
 
 export const patternHints: Scenario = {
   name: 'pattern-hints',
-  description: 'Inspect shared icon hints and open their menus without changing chat or settings.',
+  description: 'Inspect shared icon hints and open their menus without changing chat.',
   async run(page, { step }) {
     await runPaletteCommand(page, 'Workbench mode')
     await runPaletteCommand(page, 'Show chat')
@@ -201,28 +201,5 @@ export const patternHints: Scenario = {
     })
     await step('chat-history-menu')
     await page.keyboard.press('Escape')
-    await page.keyboard.press('Control+,')
-    await selectors.settingsSearch(page).fill('app colors')
-    const actions = selectors.paletteCardActions(page).first()
-    await actions.hover()
-    const label = await actions.getAttribute('aria-label')
-    ok(label)
-    await selectors.hint(page, label).waitFor()
-    await step('palette-actions-hint')
-    await actions.click()
-    await selectors.popupMenu(page).waitFor()
-    await selectors.popupMenu(page).evaluate(async (element) => {
-      await Promise.all(element.getAnimations().map((animation) => animation.finished))
-    })
-    await step('palette-actions-menu')
-    await page.keyboard.press('Escape')
-    await selectors.settingsSearch(page).fill('wallpaper')
-    await selectors.wallpaperTile(page).click()
-    await selectors.wallpaperClose(page).hover()
-    await selectors.hint(page, 'Close').waitFor()
-    await step('wallpaper-close-hint')
-    await selectors.wallpaperClose(page).click()
-    await selectors.wallpaperPicker(page).waitFor({ state: 'hidden' })
-    await step('wallpaper-closed')
   },
 }

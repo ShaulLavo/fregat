@@ -186,7 +186,7 @@ export const SearchResultEditorSurface = memo(
           activeRow ? searchResultDomId(treeId, searchResultVirtualRowId(activeRow)) : undefined
         }
         aria-label='Search result editor'
-        className='app-scrollbar-thin min-h-0 overflow-x-hidden overflow-y-auto'
+        className='min-h-0 overflow-x-hidden overflow-y-auto'
         ref={parentRef}
         role='tree'
         tabIndex={0}

@@ -22,7 +22,7 @@ export function BreadcrumbSymbolRows({
         <SymbolKindIcon className='size-(--icon-size-sm) shrink-0' kind={row.symbol.kind} />
       )}
       renderTrailing={(row) => (
-        <span className='text-muted-foreground text-2xs tabular-nums'>
+        <span className='text-muted-foreground text-2xs font-mono tabular-nums'>
           {row.symbol.selectionRange.start.line + 1}
         </span>
       )}

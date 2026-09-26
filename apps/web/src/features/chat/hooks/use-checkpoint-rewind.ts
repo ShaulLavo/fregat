@@ -20,7 +20,7 @@ import { createChatPipelineScope } from '@/features/chat/utils/pipeline-logging'
 import { serverEndpoint } from '@/lib/client'
 import { createClientInvariantError } from '@/lib/structured-errors'
 
-type CheckpointRewindVariables = {
+export type CheckpointRewindVariables = {
   target: ChatInputDraftTarget & { draftKey: SessionId }
   message: OrchestrationMessage
   turnCount: number

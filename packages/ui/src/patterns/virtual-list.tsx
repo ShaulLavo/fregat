@@ -11,7 +11,10 @@ import {
 } from 'react'
 
 import { cn } from '@workspace/ui/lib/utils'
+import type { TailEdge } from '@workspace/ui/patterns/tail-follow'
+import { TailJumpButton } from '@workspace/ui/patterns/tail-jump-button'
 import { useRowHeight } from '@workspace/ui/patterns/use-row-height'
+import { useTailFollow } from '@workspace/ui/patterns/use-tail-follow'
 
 export type VirtualListHandle = Pick<
   Virtualizer<HTMLDivElement, HTMLDivElement>,
@@ -43,6 +46,14 @@ export type VirtualListProps<T> = Omit<ComponentProps<'div'>, 'children' | 'ref'
   scrollRef?: RefObject<HTMLDivElement | null>
   handleRef?: Ref<VirtualListHandle>
   contentClassName?: string
+  /** Fades the edge content lies past. Off for a list that draws its own edge. */
+  fade?: boolean
+  /** Follows the live edge and offers a way back with the count of rows that arrived meanwhile. */
+  follow?: {
+    readonly edge: TailEdge
+    readonly noun: string
+    readonly count?: (value: number) => ReactNode
+  }
   onItemsRendered?: (range: { startIndex: number; endIndex: number }) => void
   renderLayout?: (layout: VirtualListLayout) => ReactNode
 }
@@ -65,6 +76,8 @@ export function VirtualList<T>({
   handleRef,
   className,
   contentClassName,
+  fade = true,
+  follow,
   onItemsRendered,
   renderLayout,
   ...props
@@ -102,6 +115,18 @@ export function VirtualList<T>({
         return indices
       return [...indices, activeIndex].sort((left, right) => left - right)
     },
+  })
+  const tail = useTailFollow({
+    edge: follow?.edge ?? 'end',
+    enabled: follow !== undefined,
+    keys: follow ? items.map(getKey) : [],
+    scrollRef: ref,
+    scrollToEdge: () => {
+      if (items.length === 0) return
+      if (follow?.edge === 'start') virtualizer.scrollToOffset(0)
+      else virtualizer.scrollToIndex(items.length - 1, { align: 'end' })
+    },
+    slack: rowHeight,
   })
   const rows = virtualizer.getVirtualItems()
   const previousHeight = useRef(rowHeight)
@@ -180,14 +205,43 @@ export function VirtualList<T>({
   // eslint-disable-next-line oxc-react-compiler/refs -- The layout forwards scrollRef to its DOM scroller without reading current.
   if (renderLayout) return renderLayout({ virtualizer, content, scrollRef: ref })
 
-  return (
+  const scroller = (
     <div
       {...props}
       ref={ref}
+      data-pinned={follow && tail.following ? '' : undefined}
       data-slot='virtual-list'
-      className={cn('relative min-h-0 overflow-auto', className)}
+      className={cn(
+        'relative min-h-0 overflow-auto data-pinned:scroll-pinned',
+        // The follow hook corrects for prepended rows itself; browser anchoring would double it.
+        follow && '[overflow-anchor:none]',
+        fade && 'scroll-fade',
+        className,
+      )}
     >
       {content}
+    </div>
+  )
+  if (!follow) return scroller
+
+  return (
+    <div className='relative flex min-h-0 flex-1 flex-col'>
+      {scroller}
+      {tail.following ? null : (
+        <TailJumpButton
+          arrivals={tail.arrivals}
+          className={cn(
+            'absolute left-1/2 -translate-x-1/2',
+            follow.edge === 'start'
+              ? 'top-(--density-section-padding)'
+              : 'bottom-(--density-section-padding)',
+          )}
+          count={follow.count}
+          edge={follow.edge}
+          noun={follow.noun}
+          onJump={tail.jumpToEdge}
+        />
+      )}
     </div>
   )
 }

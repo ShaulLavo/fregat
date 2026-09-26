@@ -177,10 +177,7 @@ export function SearchResultsView({
         scrollRef={parentRef}
         handleRef={virtualRef}
         aria-label='Search results'
-        className={cn(
-          'focus-ring-inset app-scrollbar-thin h-full min-h-0 overflow-x-hidden',
-          className,
-        )}
+        className={cn('focus-ring-inset scroll-gutter h-full min-h-0 overflow-x-hidden', className)}
         initialOffset={initialViewport.top}
         initialRect={{ width: 0, height: initialViewport.height }}
         items={items}

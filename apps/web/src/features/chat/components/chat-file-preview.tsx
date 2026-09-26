@@ -55,7 +55,7 @@ export function ChatFilePreview({
         )}
         {previewable && preview.isSuccess && (
           <pre
-            className='bg-muted max-h-96 overflow-auto p-3 text-xs whitespace-pre-wrap'
+            className='bg-muted max-h-96 overflow-auto overscroll-contain p-3 text-xs whitespace-pre-wrap'
             data-chat-file-preview
           >
             {preview.data}

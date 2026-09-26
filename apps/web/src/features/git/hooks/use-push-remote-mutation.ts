@@ -1,6 +1,7 @@
 import { usePushPending } from '@/features/git/hooks/use-push-pending'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import { useMutation } from '@tanstack/react-query'
+import { playFeedback } from '@workspace/ui/patterns/feedback-layer'
 
 import { pushRemote } from '@/features/git/utils/api'
 import { gitRemoteMutationScope, mutationKeys } from '@/features/git/utils/mutation-keys'
@@ -14,8 +15,10 @@ export function usePushRemoteMutation(rootPath: string) {
     mutationFn: (_variables, { client }) => pushRemote(rootPath, clientForQueryClient(client)),
     mutationKey: mutationKeys.push(rootPath),
     onError: notifyMutationError,
-    onSuccess: (_result, _variables, _onMutateResult, { client }) =>
-      invalidateWorkspace(client, rootPath),
+    onSuccess: (_result, _variables, _onMutateResult, { client }) => {
+      playFeedback('success', 'git')
+      return invalidateWorkspace(client, rootPath)
+    },
   })
   return { ...mutation, isPending }
 }

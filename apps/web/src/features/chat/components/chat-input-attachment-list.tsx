@@ -97,7 +97,7 @@ export function ChatInputAttachmentList({
           {/* Not on the chip: its remove button is a Tooltip control (D4). */}
           <span className='min-w-0 flex-1 text-xs' title={attachment.name}>
             <span className='block truncate font-medium'>{attachment.name}</span>
-            <span className='text-muted-foreground block tabular-nums'>
+            <span className='text-muted-foreground block font-mono tabular-nums'>
               {formatSize(attachment.sizeBytes)}
             </span>
             {attachment.upload?.status === 'uploading' && (

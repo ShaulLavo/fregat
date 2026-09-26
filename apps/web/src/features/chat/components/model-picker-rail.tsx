@@ -24,7 +24,7 @@ export function ModelPickerRail({
 }) {
   return (
     <div className='bg-muted w-(--rail-width) shrink-0 overflow-hidden'>
-      <div className='h-full overflow-y-auto overscroll-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
+      <div className='no-scrollbar h-full overflow-y-auto overscroll-contain'>
         <div className='relative flex min-h-full flex-col gap-1 p-1'>
           {favorites ? (
             <ModelPickerFavoritesRailItem active={favorites.active} onSelect={favorites.onSelect} />

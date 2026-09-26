@@ -1,129 +1,70 @@
-import type { FsEntry, PickedFsEntry } from '@/lib/file-system-types'
-import { isDirectoryEntry } from '@/lib/file-system-types'
-import { FolderOpenIcon, MagnifyingGlassIcon, ProhibitIcon } from '@phosphor-icons/react'
+import { useIsFetching } from '@tanstack/react-query'
+import { useDebouncedValue } from '@tanstack/react-pacer/debouncer'
+import { Spinner } from '@workspace/ui/components/spinner'
 import { ToolPane } from '@workspace/ui/patterns/tool-pane'
-import { Separator } from '@workspace/ui/components/separator'
 
-import { EntryIcon } from '@/features/file-picker/components/entry-icon'
-import { EntryPreviewTile } from '@/features/file-picker/components/entry-preview-tile'
-import { KindBadge } from '@/features/file-picker/components/kind-badge'
-import {
-  formatModified,
-  formatSize,
-  kindLabel,
-  pickerCopy,
-  type FilePickerIconMode,
-  type FilePickerMode,
-} from '@/features/file-picker/utils/model'
+import type { FsEntry } from '@/lib/file-system-types'
+import { filePreviewKeys } from '@/lib/query-keys'
+import { EntryContent } from '@/features/file-picker/components/entry-content'
+import { EntryFacts } from '@/features/file-picker/components/entry-facts'
+import { NoPreview } from '@/features/file-picker/components/no-preview'
+import type { FilePickerIconMode, FilePickerMode } from '@/features/file-picker/utils/model'
+import { PREVIEW_SETTLE_MS } from '@/lib/file-preview/utils/preview'
 
+/**
+ * The selection's content and facts. It follows the selection only once it rests, so holding an
+ * arrow key reads nothing, and the previous preview stays up until the next one lands.
+ */
 export function PreviewPane({
+  accept,
+  className = 'hidden lg:flex',
   entry,
   iconMode,
   isSearching,
   mode,
+  showHidden,
 }: {
+  accept?: readonly string[]
+  className?: string
   entry: FsEntry | null
   iconMode: FilePickerIconMode
   isSearching: boolean
   mode: FilePickerMode
+  showHidden: boolean
 }) {
+  const [settled] = useDebouncedValue(entry, { wait: PREVIEW_SETTLE_MS })
+  const shown = settled
+  const fetching = useIsFetching({ queryKey: filePreviewKeys.preview(shown?.path ?? '') }) > 0
+
   return (
     <ToolPane
+      actions={fetching ? <Spinner label='Loading preview' size='xs' /> : null}
       title='Preview'
-      className='hidden lg:flex'
-      bodyClassName='flex flex-col p-(--density-section-padding)'
+      className={className}
+      bodyClassName='flex flex-col gap-(--density-section-padding) p-(--density-section-padding)'
     >
-      {entry ? (
-        <EntryPreviewDetails entry={entry} iconMode={iconMode} />
+      {shown ? (
+        <div
+          className='flex min-h-0 flex-1 flex-col items-center gap-(--density-section-gap)'
+          data-file-preview={shown.path}
+        >
+          <div className='flex max-h-72 min-h-0 w-full shrink justify-center overflow-hidden'>
+            <EntryContent
+              accept={accept}
+              entry={shown}
+              iconMode={iconMode}
+              mode={mode}
+              showHidden={showHidden}
+            />
+          </div>
+          <div className='w-full min-w-0 text-center' title={shown.path}>
+            <div className='truncate text-xs font-medium'>{shown.name}</div>
+          </div>
+          <EntryFacts entry={shown} />
+        </div>
       ) : (
         <NoPreview isSearching={isSearching} mode={mode} />
       )}
     </ToolPane>
-  )
-}
-
-export function SelectedSummary({
-  entry,
-  iconMode,
-  mode,
-}: {
-  entry: PickedFsEntry | null
-  iconMode: FilePickerIconMode
-  mode: FilePickerMode
-}) {
-  const copy = pickerCopy(mode)
-
-  if (!entry) {
-    return (
-      <div className='text-muted-foreground flex min-w-0 items-center gap-2 text-xs'>
-        <ProhibitIcon className='size-(--icon-size) shrink-0' />
-        {copy.noSelectionLabel}
-      </div>
-    )
-  }
-
-  return (
-    <div className='flex min-w-0 items-center gap-2 text-xs' title={entry.path}>
-      <EntryIcon
-        className='size-(--icon-size)'
-        entry={entry}
-        iconMode={iconMode}
-        selected={false}
-      />
-      <span className='truncate font-medium'>{entry.name}</span>
-    </div>
-  )
-}
-
-function EntryPreviewDetails({
-  entry,
-  iconMode,
-}: {
-  entry: FsEntry
-  iconMode: FilePickerIconMode
-}) {
-  return (
-    <div className='flex min-h-0 flex-1 flex-col items-center text-center'>
-      <EntryPreviewTile entry={entry} iconMode={iconMode} selected={false} size='lg' />
-      <div className='mt-(--density-section-gap) w-full min-w-0' title={entry.path}>
-        <div className='truncate text-xs font-medium'>{entry.name}</div>
-      </div>
-      <div className='mt-(--density-section-gap)'>
-        <KindBadge entry={entry} />
-      </div>
-      <Separator className='my-(--density-section-padding)' />
-      <dl className='text-2xs grid w-full gap-(--density-control-gap) text-left'>
-        <PreviewFact label='Kind' value={kindLabel(entry)} />
-        {!isDirectoryEntry(entry) && <PreviewFact label='Size' value={formatSize(entry.size)} />}
-        <PreviewFact label='Modified' value={formatModified(entry.mtimeMs)} />
-        <PreviewFact label='Created' value={formatModified(entry.birthtimeMs)} />
-      </dl>
-    </div>
-  )
-}
-
-function PreviewFact({ label, value }: { label: string; value: string }) {
-  return (
-    <div className='grid grid-cols-[64px_minmax(0,1fr)] gap-2'>
-      <dt className='text-muted-foreground'>{label}</dt>
-      <dd className='text-foreground min-w-0 text-right break-words tabular-nums'>{value}</dd>
-    </div>
-  )
-}
-
-function NoPreview({ isSearching, mode }: { isSearching: boolean; mode: FilePickerMode }) {
-  const copy = pickerCopy(mode)
-
-  return (
-    <div className='flex min-h-0 flex-1 flex-col items-center justify-center text-center'>
-      <div className='text-muted-foreground flex items-center justify-center'>
-        {isSearching ? (
-          <MagnifyingGlassIcon className='size-(--icon-size)' />
-        ) : (
-          <FolderOpenIcon className='size-(--icon-size)' weight='duotone' />
-        )}
-      </div>
-      <div className='text-muted-foreground text-2xs mt-2'>{copy.emptyPreviewTitle}</div>
-    </div>
   )
 }

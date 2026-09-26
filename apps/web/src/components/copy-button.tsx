@@ -4,6 +4,8 @@ import { Button } from '@workspace/ui/components/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { useEffect, useState } from 'react'
 
+import { cn } from '@workspace/ui/lib/utils'
+
 import { copyTextMutationOptions } from '@/lib/clipboard'
 
 const COPIED_FOR_MS = 1200
@@ -52,11 +54,22 @@ export function CopyButton({
           />
         }
       >
-        {copied ? (
-          <CheckIcon className='size-(--icon-size-sm)' />
-        ) : (
-          <CopyIcon className='size-(--icon-size-sm)' />
-        )}
+        <span className='grid size-(--icon-size-sm)' aria-hidden>
+          <CheckIcon
+            data-copy-icon
+            className={cn(
+              'col-start-1 row-start-1 size-(--icon-size-sm)',
+              copied ? 'opacity-100' : 'opacity-0',
+            )}
+          />
+          <CopyIcon
+            data-copy-icon
+            className={cn(
+              'col-start-1 row-start-1 size-(--icon-size-sm)',
+              copied ? 'opacity-0' : 'opacity-100',
+            )}
+          />
+        </span>
       </TooltipTrigger>
       <TooltipContent>{name}</TooltipContent>
     </Tooltip>

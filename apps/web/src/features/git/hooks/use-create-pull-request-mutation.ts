@@ -1,5 +1,6 @@
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { playFeedback } from '@workspace/ui/patterns/feedback-layer'
 
 import { gitKeys } from '@/lib/query-keys'
 import { createPullRequest } from '@/features/git/utils/api'
@@ -16,7 +17,9 @@ export function useCreatePullRequestMutation(rootPath: string) {
     ) => createPullRequest({ ...input, path: rootPath }, clientForQueryClient(client)),
     mutationKey: mutationKeys.createPullRequest(rootPath),
     onError: notifyMutationError,
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: gitKeys.pullRequestState(rootPath) }),
+    onSuccess: () => {
+      playFeedback('success', 'git')
+      return queryClient.invalidateQueries({ queryKey: gitKeys.pullRequestState(rootPath) })
+    },
   })
 }

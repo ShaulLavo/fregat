@@ -29,7 +29,7 @@ test('the Defaults tab opens the generated document, and the form view leaves it
   expect(settingsView()).toBe('json')
   expect(screen.queryByLabelText('Search settings')).toBeNull()
 
-  await userEvent.click(await screen.findByRole('button', { name: 'Settings' }))
+  await userEvent.click(await screen.findByRole('tab', { name: 'Settings' }))
 
   expect(settingsScope()).toBe('user')
   expect(settingsView()).toBe('form')
@@ -43,7 +43,7 @@ test('the Defaults tab is disabled outside an editor tab, where there is no docu
   renderWithProviders(<SettingsPage />)
 
   const tab = await screen.findByRole('tab', { name: 'Defaults' })
-  expect(tab.hasAttribute('disabled')).toBe(true)
+  expect(tab.getAttribute('aria-disabled')).toBe('true')
 })
 
 test('the defaults document is a member of the settings tab with nothing to save to', () => {

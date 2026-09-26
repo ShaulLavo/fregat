@@ -64,7 +64,7 @@ describe('platform migration ledger', () => {
     expect(ledgerRow(handle, 11)?.applied_at).toEqual(expect.any(String))
   })
 
-  it('preserves deployed extra schema and records while adding turn metadata at versions 29 and 30', () => {
+  it('preserves deployed extra schema and records while adding turn and parent metadata', () => {
     const handle = openTempDatabase()
     migratePlatformDatabase(
       handle.db,
@@ -103,15 +103,22 @@ describe('platform migration ledger', () => {
       { version: 32, name: 'provider_usage_source' },
       { version: 33, name: 'terminal_lease_key' },
       { version: 34, name: 'terminal_session_offsets' },
+      { version: 35, name: 'worktree_base_branch' },
       { version: 36, name: 'provider_usage_import_requests' },
       { version: 37, name: 'terminal_session_cleanup' },
       { version: 38, name: 'provider_reset_credit_attempts' },
     ])
     expect(columnNames(handle, 'projection_turns')).toContain('end_reason')
     expect(columnNames(handle, 'projection_session_messages')).toContain('model_selection_json')
+    expect(columnNames(handle, 'projection_worktrees')).toContain('base_branch')
     expect(
-      rows(handle, sql`SELECT pull_request_json, setup_json FROM projection_worktrees`),
-    ).toEqual([{ pull_request_json: '{"number":31}', setup_json: '{"state":"ready"}' }])
+      rows(
+        handle,
+        sql`SELECT pull_request_json, setup_json, base_branch FROM projection_worktrees`,
+      ),
+    ).toEqual([
+      { pull_request_json: '{"number":31}', setup_json: '{"state":"ready"}', base_branch: null },
+    ])
     expect(tableNames(handle)).toContain('push_devices')
     expect(columnNames(handle, 'projection_sessions')).toContain('lifecycle_revision')
     expect(ledgerVersions(handle)).toEqual(
@@ -146,6 +153,7 @@ describe('platform migration ledger', () => {
       { version: 32, name: 'provider_usage_source' },
       { version: 33, name: 'terminal_lease_key' },
       { version: 34, name: 'terminal_session_offsets' },
+      { version: 35, name: 'worktree_base_branch' },
       { version: 36, name: 'provider_usage_import_requests' },
       { version: 37, name: 'terminal_session_cleanup' },
       { version: 38, name: 'provider_reset_credit_attempts' },
@@ -169,9 +177,9 @@ describe('platform migration ledger', () => {
     const plan = () => messagePaginationPlan(handle)
     expect(plan()).toEqual(expect.arrayContaining([expect.stringContaining('TEMP B-TREE')]))
 
-    expect(migratePlatformDatabase(handle.db).map((migration) => migration.version)).toEqual([
-      15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 36, 37, 38,
-    ])
+    expect(migratePlatformDatabase(handle.db).map((migration) => migration.version)).toEqual(
+      ledgerVersionNumbers.filter((version) => version >= 15),
+    )
 
     expect(plan()).toEqual(
       expect.arrayContaining([
@@ -207,10 +215,9 @@ describe('platform migration ledger', () => {
       platformMigrations.filter((migration) => migration.version === 11),
     )
     seedVersion11Worktrees(handle.db)
-    expect(migratePlatformDatabase(handle.db).map((migration) => migration.version)).toEqual([
-      12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34,
-      36, 37, 38,
-    ])
+    expect(migratePlatformDatabase(handle.db).map((migration) => migration.version)).toEqual(
+      ledgerVersionNumbers.filter((version) => version > 11),
+    )
     const query = new OrchestrationSnapshotQuery(handle.db)
     const migrated = query.shellSnapshot()
     const worktrees = [...query.fullReadModel().worktrees.values()]

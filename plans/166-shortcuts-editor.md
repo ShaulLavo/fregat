@@ -15,8 +15,8 @@
 - Planned at: Platform `3347239f`, 2026-09-25; researched at `c130dd35a`. Before screenshots and
   their script: `/work/tmp/fregat-evidence/20260925-keybindings-before/`. Research probes, the
   mockup generator and the compiled mockup pages: `/work/tmp/research2/166/`.
-- Depends on: [Plan 102](102-scroll-and-keyboard-affordance.md) P3 and
-  [Plan 157](157-base-components.md), both in lane L1 (PR #30, not on `main` at research time):
+- Depends on: Plan 102 P3 and
+  Plan 157, both done in lane L1 (PR #30, not on `main` at research time):
   `Kbd`, `TabsList variant='segmented'`, listbox typeahead refine, `hold-button`. Phase 1 does not
   need them; Phase 2 lands after L1. Plan 080 is on `main` (preset titles Platform / VS Code,
   [keyboard modes](../docs/keymap/modes.md)). Lane L8 has merged, so `keymap/**` is open.

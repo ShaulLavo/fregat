@@ -47,15 +47,13 @@ export const themeBundleSchema = v.strictObject({
   revision: v.pipe(v.string(), v.minLength(1), v.maxLength(64)),
   source: v.picklist(['bundled', 'user']),
 })
-export const themeCustomizationsSchema = v.record(
-  themeIdSchema,
-  v.partial(
-    v.strictObject({
-      light: themeVariantPatchSchema,
-      dark: themeVariantPatchSchema,
-    }),
-  ),
+const themeCustomizationSchema = v.partial(
+  v.strictObject({
+    light: themeVariantPatchSchema,
+    dark: themeVariantPatchSchema,
+  }),
 )
+export const themeCustomizationsSchema = v.record(themeIdSchema, themeCustomizationSchema)
 export const themeCustomizeOperationSchema = v.strictObject({
   kind: v.literal('theme.customize'),
   id: themeIdSchema,
@@ -65,12 +63,15 @@ export const themeCustomizeOperationSchema = v.strictObject({
 export const themeResetOperationSchema = v.strictObject({
   kind: v.literal('theme.reset'),
   id: themeIdSchema,
+  // What the theme's customization becomes; absent or empty clears it.
+  to: v.optional(themeCustomizationSchema),
 })
 export type ThemeId = v.InferOutput<typeof themeIdSchema>
 export type ThemeDocument = v.InferOutput<typeof themeDocumentSchema>
 export type ThemeBundle = v.InferOutput<typeof themeBundleSchema>
 export type ThemeVariant = v.InferOutput<typeof themeVariantSchema>
 export type ThemeVariantPatch = v.InferOutput<typeof themeVariantPatchSchema>
+export type ThemeCustomization = v.InferOutput<typeof themeCustomizationSchema>
 export type ThemeCustomizations = v.InferOutput<typeof themeCustomizationsSchema>
 export type ThemeCustomizeOperation = v.InferOutput<typeof themeCustomizeOperationSchema>
 export type ThemeResetOperation = v.InferOutput<typeof themeResetOperationSchema>

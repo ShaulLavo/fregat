@@ -1,11 +1,12 @@
 import { CodeThemePreviewPanel } from '@/features/command-palette/components/code-theme-preview-panel'
+import { FilePreviewPanel } from '@/features/command-palette/components/file-preview-panel'
 import {
   CommandDialog,
   CommandEmpty,
   CommandInput,
   CommandList,
 } from '@workspace/ui/components/command'
-import { useEffect, useMemo, useRef, type KeyboardEvent } from 'react'
+import { useEffect, useEffectEvent, useMemo, useRef, type KeyboardEvent } from 'react'
 
 import { GroupsFactory } from '@/features/command-palette/components/groups-factory'
 import { colorModePaletteItems, viewPaletteItems } from '@/features/command-palette/utils/data'
@@ -20,7 +21,9 @@ import {
   focusTransitionAcknowledged,
   groupedCommandItems,
   inspectedCommandItems,
-  isColorPreviewMode,
+  isPreviewScope,
+  PREVIEW_SCOPES,
+  type PreviewScope,
   paletteCommandInvocation,
   paletteCommandSucceeded,
   paletteOwnsItemOrder,
@@ -31,6 +34,7 @@ import {
   quickAccessQuery,
   scopeLabelForMode,
   scopedPaletteFilter,
+  highlightedFileItem,
 } from '@/features/command-palette/utils/query'
 import { fileUriForPath } from '@/lib/file-uri'
 import { ScopeChip } from '@/features/command-palette/components/scope-chip'
@@ -180,23 +184,26 @@ export function CommandPaletteContent() {
     },
   })
 
+  // Release only this palette’s previews when switching commands or closing.
+  const previewed = useRef(new Set<PreviewScope>())
+  const release = useEffectEvent((scope: PreviewScope) => {
+    if (!previewed.current.delete(scope)) return
+    if (scope === 'colorTheme') clearEditorThemePreview()
+    if (scope === 'colorMode') clearThemePreview()
+    if (scope === 'appColors') clearPalettePreview()
+    if (scope === 'themeBundle') clearBundlePreview()
+    if (scope === 'wallpaper') clearWallpaperPreview()
+  })
+
   useEffect(() => {
-    if (mode !== 'colorTheme') clearEditorThemePreview()
-    if (mode !== 'colorMode') clearThemePreview()
-    if (mode !== 'appColors') clearPalettePreview()
-    if (mode !== 'themeBundle') clearBundlePreview()
-    if (mode !== 'wallpaper') clearWallpaperPreview()
-  }, [clearBundlePreview, clearWallpaperPreview, clearPalettePreview, clearThemePreview, mode])
+    for (const scope of PREVIEW_SCOPES) if (scope !== mode) release(scope)
+  }, [mode])
 
   useEffect(
     () => () => {
-      clearEditorThemePreview()
-      clearThemePreview()
-      clearPalettePreview()
-      clearBundlePreview()
-      clearWallpaperPreview()
+      for (const scope of PREVIEW_SCOPES) release(scope)
     },
-    [clearBundlePreview, clearWallpaperPreview, clearPalettePreview, clearThemePreview],
+    [],
   )
 
   function previewHighlightedColorTheme(value: string) {
@@ -211,6 +218,7 @@ export function CommandPaletteContent() {
   }
 
   function previewHighlighted(value: string) {
+    if (isPreviewScope(mode)) previewed.current.add(mode)
     if (mode === 'wallpaper') {
       const source = wallpaperSourceFromItemValue(value)
       if (source) previewWallpaper(source)
@@ -394,7 +402,7 @@ export function CommandPaletteContent() {
       onOpenChange={setPaletteOpen}
       open={open}
       overlayClassName={
-        isColorPreviewMode(mode) ? 'supports-backdrop-filter:backdrop-blur-none' : undefined
+        isPreviewScope(mode) ? 'supports-backdrop-filter:backdrop-blur-none' : undefined
       }
     >
       <CommandInput
@@ -409,11 +417,11 @@ export function CommandPaletteContent() {
         className={
           mode === 'colorTheme'
             ? 'max-h-60 min-h-0 shrink overflow-y-auto py-1'
-            : 'max-h-[min(440px,calc(100vh-8rem))] py-1'
+            : 'max-h-[min(440px,calc(100vh-8rem))] overscroll-contain py-1'
         }
         ref={listRef}
       >
-        {isColorPreviewMode(mode) && <HighlightReporter onHighlight={previewHighlighted} />}
+        {isPreviewScope(mode) && <HighlightReporter onHighlight={previewHighlighted} />}
         {!fileSearchUnsettled && <CommandEmpty>{emptyLabelForMode(mode)}</CommandEmpty>}
         <CommandPaletteActionsContext value={actions}>
           <GroupsFactory
@@ -437,6 +445,9 @@ export function CommandPaletteContent() {
         </CommandPaletteActionsContext>
       </CommandList>
       {mode === 'colorTheme' && <CodeThemePreviewPanel query={query} />}
+      {mode === 'files' ? (
+        <FilePreviewPanel item={highlightedFileItem(visibleFileItems, selectedCommandValue)} />
+      ) : null}
     </CommandDialog>
   )
 }

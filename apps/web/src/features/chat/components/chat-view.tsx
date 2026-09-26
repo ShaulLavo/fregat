@@ -151,6 +151,8 @@ export function ChatView({
     const message = session.messages.find((entry) => entry.id === pendingCheckpoint.messageId)
     if (!message || message.role !== 'user') return
     setSendError(null)
+    // The held confirm is the decision; the timeline shows the restore from here.
+    setPendingCheckpoint(null)
     rewind.mutate(
       {
         message,
@@ -159,7 +161,6 @@ export function ChatView({
         target: { ...draftTarget, draftKey: session.id },
       },
       {
-        onSuccess: () => setPendingCheckpoint(null),
         onError: (error) => setSendError(errorMessage(error, 'Could not rewind this session.')),
       },
     )
