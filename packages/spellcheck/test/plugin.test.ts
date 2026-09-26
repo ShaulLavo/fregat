@@ -145,6 +145,62 @@ describe('spellcheck plugin', () => {
     expect(painted.ranges).toEqual([])
   })
 
+  it('rechecks cached correct verdicts when an accepted word is removed', async () => {
+    const checker = new FakeChecker(['fregat'])
+    checker.setAcceptedWords(['fregat'])
+    const { feature, painted } = mount(checker, 'ship fregat today')
+    await checker.answerAll()
+    expect(painted.ranges).toEqual([])
+
+    feature.setAcceptedWords([])
+    await checker.answerAll()
+    expect(painted.ranges).toEqual([{ start: 5, end: 11 }])
+  })
+
+  it('ignores an accepted-dictionary reply that lands after the dictionary changes', async () => {
+    const checker = new FakeChecker(['fregat'])
+    checker.setAcceptedWords(['fregat'])
+    const { feature, painted } = mount(checker, 'ship fregat today')
+    const oldCheck = checker.checks.shift()!
+    feature.setAcceptedWords([])
+    await checker.answerAll()
+    oldCheck.answer()
+    await Promise.resolve()
+    expect(painted.ranges).toEqual([{ start: 5, end: 11 }])
+  })
+
+  it('replaces a curly-apostrophe misspelling and undoes it', async () => {
+    const checker = new FakeChecker(["wrold's"])
+    const text = 'the wrold’s end'
+    const { editor, feature, painted } = mount(checker, text)
+    await checker.answerAll()
+    expect(marked(text, painted.ranges)).toEqual(['wrold’s'])
+    expect(feature.replace(6, "world's")).toBe(true)
+    expect(editor.materializeFullText()).toBe("the world's end")
+    editor.dispatchCommand('undo')
+    expect(editor.materializeFullText()).toBe(text)
+  })
+
+  it('rechecks cached verdicts when fresh captures exclude an edited code span', async () => {
+    const checker = new FakeChecker(['befor'])
+    const { editor, feature, painted } = mount(checker, 'say befor today')
+    editor.setText('say befor today', { languageId: 'markdown' })
+    editor['setSyntaxCaptures']([])
+    await checker.answerAll()
+    expect(feature.issueAt(5)?.word).toBe('befor')
+
+    editor.edit([
+      { from: 4, to: 4, text: '`' },
+      { from: 9, to: 9, text: '`' },
+    ])
+    editor.setSelection(0)
+    editor['setSyntaxCaptures']([])
+    expect(feature.issueAt(6)?.word).toBe('befor')
+    editor['setSyntaxCaptures']([{ startIndex: 4, endIndex: 11, captureName: 'text.literal' }])
+    expect(painted.ranges).toEqual([])
+    expect(feature.issueAt(6)).toBeNull()
+  })
+
   it('never checks a span an inline replacement stands in for', async () => {
     const checker = new FakeChecker(['srcc', 'befor'])
     const text = 'ask @srcc/foo.ts befor'

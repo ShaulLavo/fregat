@@ -79,6 +79,33 @@ describe('syntax captures for inline replacement providers', () => {
     expect(seen.at(-1)).toEqual(CAPTURES)
   })
 
+  it('withholds old capture offsets after an edit until a current parse lands', async () => {
+    let readCaptures: () => readonly EditorSyntaxCapture[] | null = () => null
+    editor = new Editor(container, {
+      plugins: [
+        {
+          name: 'test.capture-reader',
+          activate: (context) =>
+            context.registerViewContribution({
+              createContribution: (view) => {
+                readCaptures = () => view.getSyntaxCaptures()
+                const captures = view.requestSyntaxCaptures()
+                return { update: () => undefined, dispose: () => captures.dispose() }
+              },
+            }),
+        },
+      ],
+    })
+    editor.setText(TEXT, { languageId: 'markdown' })
+    await flushSyntaxDebounce()
+    expect(readCaptures()).toEqual(CAPTURES)
+
+    editor.edit({ from: 0, to: 0, text: 'intro ' })
+    expect(readCaptures()).toBeNull()
+    await flushSyntaxDebounce()
+    expect(readCaptures()).toEqual(CAPTURES)
+  })
+
   async function openDocument(): Promise<void> {
     editor?.openDocument({ documentId: 'readme.md', languageId: 'markdown', text: TEXT })
     await flushSyntaxDebounce()

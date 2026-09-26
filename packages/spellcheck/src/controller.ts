@@ -9,7 +9,12 @@ import type { EditorSpellcheckFeature, SpellIssue } from './feature'
 import { spellcheckRegions, type SpellcheckRegions, type SpellcheckScope } from './proseRanges'
 import type { SpellcheckService } from './service'
 import { SPELLING_STYLE } from './styles'
-import { tokenizeSpellWords, type SpellTextRange, type SpellWord } from './tokenizer'
+import {
+  foldApostrophes,
+  tokenizeSpellWords,
+  type SpellTextRange,
+  type SpellWord,
+} from './tokenizer'
 
 export type SpellcheckChecker = Pick<
   SpellcheckService,
@@ -43,6 +48,7 @@ export class SpellcheckController {
   private held: readonly SpellTextRange[] = []
   private paintedKey = ''
   private recheckInputs = ''
+  private dictionaryVersion = 0
   private verdictVersion = 0
   private wordsKey = ''
   private wordsCaptures: readonly unknown[] | null = null
@@ -60,6 +66,9 @@ export class SpellcheckController {
     this.highlightName = `${context.highlightPrefix}-spelling`
     const captures = context.requestSyntaxCaptures()
     const accepted = this.checker.onDidChangeAcceptedWords(() => {
+      this.dictionaryVersion += 1
+      this.verdicts.clear()
+      this.pending.clear()
       this.verdictVersion += 1
       this.refresh()
     })
@@ -111,7 +120,10 @@ export class SpellcheckController {
 
     const window = checkWindow(snapshot)
     const words = window ? this.windowWords(snapshot, context, window) : []
-    if (!words) return
+    if (!words) {
+      this.recheckInputs = ''
+      return this.paint([], null)
+    }
 
     const carets = caretOffsets(snapshot)
     const mounted = mountedRange(snapshot)
@@ -158,6 +170,7 @@ export class SpellcheckController {
       scope: this.scope,
     })
     if (!regions) return null
+    this.recheckInputs = ''
     this.cachedWords = this.words(snapshot, regions, replacements)
     this.wordsKey = key
     this.wordsCaptures = captures
@@ -216,9 +229,14 @@ export class SpellcheckController {
     if (words.length === 0) return
 
     for (const word of words) this.pending.add(word)
+    const dictionaryVersion = this.dictionaryVersion
     this.checker.check(words).then(
-      (misspelled) => this.settle(words, new Set(misspelled)),
-      (error: unknown) => this.fail(words, error),
+      (misspelled) => {
+        if (dictionaryVersion === this.dictionaryVersion) this.settle(words, new Set(misspelled))
+      },
+      (error: unknown) => {
+        if (dictionaryVersion === this.dictionaryVersion) this.fail(words, error)
+      },
     )
   }
 
@@ -268,7 +286,8 @@ export class SpellcheckController {
     const edit = this.edit
     if (!issue || !edit) return false
     const text = edit.getTextSnapshot()
-    if (!text || text.readRange(issue.start, issue.end) !== issue.word) return false
+    if (!text || foldApostrophes(text.readRange(issue.start, issue.end)) !== issue.word)
+      return false
 
     edit.applyEdits([{ from: issue.start, to: issue.end, text: word }], 'spellcheck.replace')
     return true

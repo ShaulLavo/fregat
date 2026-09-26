@@ -391,8 +391,8 @@ export class Editor {
   private syntaxInlineMap: InlineMap | null = null
   private syntaxCaptures: readonly EditorSyntaxCapture[] = []
   private syntaxCaptureDemand = 0
-  // Whether the captures held are from a parse that was asked for them, on the current document.
-  private syntaxCapturesLanded = false
+  // The text version whose parse supplied the requested captures.
+  private syntaxCapturesVersion: number | null = null
   /**
    * Regions the user drew rather than any provider describing them. They are held here and merged in
    * at the fan-in instead of being registered as a contribution, because the contribution set is
@@ -1374,14 +1374,14 @@ export class Editor {
     this.syntaxCaptures = captures
     this.refreshInlineMap('rerun')
     if (this.syntaxCaptureDemand === 0) return
-    this.syntaxCapturesLanded = true
+    this.syntaxCapturesVersion = this.textVersion
     // With a highlighter attached, no token adoption follows a structural parse to say it landed.
     this.notifyViewContributions('tokens', null)
   }
 
   private requestSyntaxCaptures(): EditorDisposable {
     // A parse from before the first request carried none, whatever it left in `syntaxCaptures`.
-    if (this.syntaxCaptureDemand === 0) this.syntaxCapturesLanded = false
+    if (this.syntaxCaptureDemand === 0) this.syntaxCapturesVersion = null
     this.syntaxCaptureDemand += 1
     this.syntax.syncCaptureRequirement()
     let released = false
@@ -2119,7 +2119,7 @@ export class Editor {
         structural: preparedTransferStage(prepared?.structural),
         highlighter: preparedTransferStage(prepared?.highlighter),
       })
-      this.syntaxCapturesLanded = false
+      this.syntaxCapturesVersion = null
       this.syntax.startDocument(syntaxDocument, prepared)
       this.lifecycleSummary.document.startedCount += 1
       this.syncViewEditability()
@@ -2239,7 +2239,7 @@ export class Editor {
     const attachment = this.document.resetOwnedDocument(document, options)
     this.subscribeToBufferSession(attachment.session)
     if (this.view.isProvisional) this.snapshotGeneration = attachment.documentVersion
-    this.syntaxCapturesLanded = false
+    this.syntaxCapturesVersion = null
     this.syntax.startDocument({
       documentId: attachment.internalDocumentId,
       languageId: attachment.languageId,
@@ -3272,7 +3272,8 @@ export class Editor {
       setRangeHighlight: (name, ranges, style) => this.view.setRangeHighlight(name, ranges, style),
       clearRangeHighlight: (name) => this.view.clearRangeHighlight(name),
       requestSyntaxCaptures: () => this.requestSyntaxCaptures(),
-      getSyntaxCaptures: () => (this.syntaxCapturesLanded ? this.syntaxCaptures : null),
+      getSyntaxCaptures: () =>
+        this.syntaxCapturesVersion === this.textVersion ? this.syntaxCaptures : null,
       getInlineReplacementRanges: () => this.view.inlineReplacementRanges(),
     }
   }

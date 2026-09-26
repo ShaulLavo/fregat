@@ -14,10 +14,11 @@ export class FakeChecker implements SpellcheckChecker {
   }
 
   public check(words: readonly string[]): Promise<readonly string[]> {
+    const misspelled = words.filter((word) => this.misspelled.has(word) && !this.isAccepted(word))
     return new Promise((resolve) => {
       this.checks.push({
         words,
-        answer: () => resolve(words.filter((word) => this.misspelled.has(word))),
+        answer: () => resolve(misspelled),
       })
     })
   }

@@ -95,7 +95,7 @@ function isCamelCase(word: string): boolean {
   return /[A-Z]/.test(word.slice(1))
 }
 
-function foldApostrophes(word: string): string {
+export function foldApostrophes(word: string): string {
   return word.replaceAll('’', "'")
 }
 

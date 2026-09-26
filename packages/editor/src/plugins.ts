@@ -657,7 +657,7 @@ export type EditorViewContributionContext = {
    * them unasked; a `tokens` update follows each set that lands.
    */
   requestSyntaxCaptures(): EditorDisposable
-  /** The captures of the document's last parse; null until one asked for them has landed. */
+  /** The current text's captures; null until a requested parse of this text version has landed. */
   getSyntaxCaptures(): readonly EditorSyntaxCapture[] | null
   /** Source spans painted as something else: hidden markup, chips, phantom text excluded. */
   getInlineReplacementRanges(): readonly TextOffsetRange[]
