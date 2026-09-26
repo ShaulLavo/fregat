@@ -2,14 +2,17 @@
 
 ## Status and authorization
 
-- Status: RESEARCH DONE 2026-09-26 — second pass: the result set becomes one Editor over a results
-  document, with today's file headers rendered by Platform into Editor block rows. A prototype of that
-  shape flings the broad tier with 150 ms of main-thread time and no long task; today's view takes
-  2,000 ms with 18 long tasks on the same build. Design: [docs/search-view-results-in-editor.md](../docs/search-view-results-in-editor.md).
-  First-pass measurements: [docs/search-view-rendering-findings.md](../docs/search-view-rendering-findings.md).
+- Status: RESEARCH DONE 2026-09-26 — third pass: many editors, recycled and with two layout reads
+  removed, fling the broad tier in 1,176 ms with no long task (today 1,767 ms and 15), and one editor
+  does it in 151–155 ms. One editor keeps per-file sideways scroll through a per-block x offset:
+  158–177 ms in a prototype. Recommendation: one editor, per-block sideways scroll, and editing on a
+  multibuffer. Third pass: [docs/search-view-many-editors.md](../docs/search-view-many-editors.md).
+  Second pass (design): [docs/search-view-results-in-editor.md](../docs/search-view-results-in-editor.md).
+  First pass: [docs/search-view-rendering-findings.md](../docs/search-view-rendering-findings.md).
   Two owner questions (Q3, Q4) stand before implementation. Nothing here authorizes implementation.
 - Planned at: Platform `d5a901726`, 2026-09-26. Researched at Platform `c130dd35a`, Editor `74e76be`;
-  second pass at Platform `4c78266f8`, Editor `74e76be`, Zed `933d8d9`, VS Code `90da900128e`.
+  second pass at Platform `4c78266f8`, Editor `74e76be`, Zed `933d8d9`, VS Code `90da900128e`; third
+  pass at Platform `e04c94271`, Editor `860f861`, Zed `933d8d9`.
   Origin: the virtualizer discussion behind [Plan 181](181-chat-timeline-end-anchoring.md) and
   [Plan 178](178-tree-in-the-app.md).
 
@@ -24,6 +27,10 @@ sidebar results list) is not in scope: it already runs on `VirtualList`
 result set lives inside our editor, as Zed's project search is one editor over a multibuffer of
 excerpts: edit in place, with edits landing in the files. It looks exactly as the full search view
 looks today. Take Zed's model, not its platform-specific parts.
+
+2026-09-26, after the second pass: leans toward a real multibuffer in the Editor core over the
+results document. Each file block scrolling sideways on its own is a feature of today's view the owner
+likes, and asks whether many editors can be made fast instead. The third pass measures both.
 
 ## Scope
 
@@ -110,24 +117,69 @@ Second pass, 2026-09-26. The design, the measurements and the Zed and VS Code te
   - pixel heights through the row-height index it already keeps unfed (S–M)
   - host edits into a read-only document, and a token range update (S)
   - `useEditorBlocks` in the React package (S)
-  - an edit filter, needed only for editing in place (M)
+  - an edit filter, needed only for editing by forwarding (M)
+  - per-block sideways scroll, if Q4 = A (M–L, third pass)
 
   The deleted block-surface subsystem's lesson applies: reserve space in the row list, host the DOM in
   a stable layer.
 
-- **Editing in place forwards edits.**
+- **Editing in place forwards edits** (pass 2's design; Q3 = D). The third pass recommends a
+  multibuffer for editing instead (M1, R5).
   - The filter keeps each edit inside one result line.
   - Platform maps it to `(file, line, column)` and applies it to that file's live document, which is
     opened on first edit and checked against what the search saw.
   - Changes to those files mirror back as host edits.
   - Undo in the view undoes the source transactions it made (Zed's semantics).
   - Save saves what the view touched.
-- **Zed's core model, a multibuffer in the Editor, is the XL alternative** (Q3). A composite snapshot
-  over many sessions, with edits split per session and cross-session undo. It removes the mirror, and
-  nothing asked for needs it first.
+- **Zed's core model, a multibuffer in the Editor, is XL** (M1). A composite snapshot over many
+  sessions, with edits split per session and cross-session undo. It removes the mirror, and the
+  read-only view needs none of it, so it follows the read-only phases.
 - **VS Code's search editor is the other reference.** Headers are text lines, nothing streams, and edits
   never reach files; go-to re-parses the text. Its useful lessons: keep the mapping beside the text, and
   declare block heights the host already knows.
+
+## Many editors or one: third pass
+
+Measured on a production build with pass 1's harness, runtime flags selecting each variant, three
+traces per variant. Tables and method: [docs/search-view-many-editors.md](../docs/search-view-many-editors.md).
+
+- **Where an editor mount goes** (today, broad fling, 228 mounts, 8.4 ms each):
+  - style, layout and paint: 585 ms
+  - the grammar-signature bug: 308 ms
+  - two viewport reads that force layout (`measureInitialViewport`, `synchronizeOrigin`): 298 ms
+  - caret geometry on every open: 217 ms, although a result editor is read-only and unfocused
+  - React commit: 164 ms
+
+  Construction and disposal are under 0.5 ms per editor.
+
+- **Recycling works, with a ceiling.** Slots keyed by position turn 228 editor builds per fling into
+  17–19 `openDocument` calls.
+
+  | Broad wheel-fast, median | Busy     | Long tasks |
+  | ------------------------ | -------- | ---------- |
+  | Today                    | 1,767 ms | 15         |
+  | Signature memo           | 1,589 ms | 9          |
+  | Recycled pool            | 1,281 ms | 1          |
+  | Pool + two layout fixes  | 1,176 ms | 0          |
+  | One editor (prototype)   | 151 ms   | 0          |
+  - After recycling, style, layout and paint stay at 590 ms: every file that scrolls in brings fresh
+    row, gutter and action DOM.
+  - The pathological tier barely moves (922 → 850 ms), because big blocks reopen their document every
+    28 px.
+
+- **The pool has two traps.** Rendering slots out of slot order makes React move editor subtrees
+  (Layerize 134 → 580 ms). Slots over the whole overscanned item window keep about 37 live editors.
+- **Per-file sideways scroll fits in one editor.**
+  - **Prototype:** it translates each block's rows by that block's x offset, with a thin thumb in
+    the gap under the block. The fling costs 158–177 ms against 151–155 ms, and 40 sideways steps cost
+    2.1 ms of script.
+  - **Pinned parts:** headers and line numbers stay put.
+  - **Wheel listener:** it must be passive. A non-passive one made vertical scroll wait on the main
+    thread.
+  - **Editor work (M–L):** hit-testing resolves the row before x, about 20 row-x → content-x sites
+    subtract the row's offset, and long-line chunking and caret reveal use the block's offset.
+- **Zed has one horizontal scroll.** The whole multibuffer's longest row sets its width, and file
+  headers are `Sticky` blocks that stay put.
 
 ## Decisions
 
@@ -155,15 +207,22 @@ Second pass, 2026-09-26. The design, the measurements and the Zed and VS Code te
 - Decided 2026-09-26: research recommendation. Editing in place starts with in-line edits (no newline
   inserted or removed, never across rows or on a header); full excerpt editing and context lines with
   expand controls come later. Why: in-line edits map one row to one source line with no excerpt
-  resizing, which keeps the forwarding small.
-- Decided 2026-09-26: research recommendation. Undo in the results view undoes the source transactions
-  the view made, through the document transaction receipts the workspace-edit service already uses;
-  Save saves the documents the view touched. Why: edits land in the files, so their undo belongs there
-  too (Zed's semantics).
+  resizing, which keeps the first editing phase small whichever model Q3 picks.
+- Decided 2026-09-26: research recommendation. Undo in the results view undoes the edits the view made
+  in the files, one step per edit group, and Save saves the documents the view touched. Why: edits land
+  in the files, so their undo belongs there too (Zed's semantics). On a multibuffer this is its own
+  undo; with forwarding (Q3 = D) it goes through the document transaction receipts the workspace-edit
+  service already uses.
 - Decided 2026-09-26: research recommendation. Header content is React through portals; the Editor core
   stays framework-agnostic and hands out containers, and `@singapore-editor/react` adds
   `useEditorBlocks`. Why: the header is the existing component, inside the app's providers, and a
   core-owned container never lags its row.
+- Decided 2026-09-26: research recommendation. An unfocused editor stops measuring its caret on open,
+  and the scroll element's padding is read once (Phase 1b). Why: 217 + 298 ms of forced layout in one
+  broad fling, and every editor open in the app pays them. With the signature memo they take the fling
+  from 1,767 to 1,405 ms and its long tasks from 15 to 2, whatever Q3 decides.
+- Decided 2026-09-26: research recommendation. Per-block sideways scroll does not depend on Q3's
+  model: it needs block rows to know where a block starts, and nothing else from the text model.
 - Decided 2026-09-26: research recommendation. `docs/search-tab-performance-workstreams.md` is deleted.
   Why: it analysed a dev-mode trace of code that has since changed; the verdicts moved to the findings.
 
@@ -202,46 +261,55 @@ fivefold with no information lost.
 
 Decided 2026-09-26: owner — B.
 
-**Q3. Where does the multi-file model live?**
+**Q3. What renders the full search view, and where does the multi-file model live?**
 
-- A. A results document plus forwarding. The editor shows one document of matched lines; Platform owns
-  the excerpt map and forwards edits to each file's live document, mirroring file changes back. Editor
-  work: block rows, pixel heights, host edits, token ranges, then an edit filter (about M + S–M + S + S,
-  then M).
-- B. A multibuffer in the Editor core, Zed's model. One view over many document sessions without copied
-  text, edits split per session, one undo transaction across sessions. It reaches the document
-  controller, history, selections, syntax, decorations and LSP sync (XL). Edits are the files' own, with
-  no mirror to keep equal.
+- A. Recycled many editors: today's components on a fixed pool of editors reused by position, plus
+  Phase 1b.
+  - **Speed:** broad fling 1,176 ms with no long task (today 1,767 ms and 15). Pathological 850 ms
+    (today 922).
+  - **What it keeps:** today's look, and per-file sideways scroll for free.
+  - **What it cannot do:** selection, multi-cursor and undo across files. Editing in place is per file.
+  - **Size:** S in the Editor, M in Platform.
+- B. One editor over a results document for the read-only view. Editing in place then lands on a
+  multibuffer in the Editor core, the owner's lean.
+  - **Speed:** 151–155 ms broad and 230 ms pathological in the prototype.
+  - **Reuse:** the read-only phases (E1–E3, E5, R1–R4) ship without any text-model change. When
+    editing starts, the excerpt map becomes the multibuffer's excerpt table, and block rows,
+    per-block scroll and React headers carry over.
+- C. One editor on a multibuffer in the Editor core from the start (XL before anything ships).
+- D. One editor with editing forwarded to the files' own documents and mirrored back (pass 2's
+  recommendation).
 
-**Recommendation: A.** It reuses the Editor's one-document machinery, it ships read-only first with no
-text-model change at all, and B stays open: A's excerpt map is B's data model if the mirror proves
-fragile.
+**Recommendation: B.** It is the owner's multibuffer, with the read-only view shipping first. A
+measured 7× faster than A's best (151–155 ms against 1,176 ms on the same fling), and A's remaining
+cost is the row DOM each file brings, which one editor's virtualizer already recycles.
 
-Owner, 2026-09-26: leans B, a real multibuffer. Not final: see Q4.
+**Q4. How do long lines scroll sideways, now that the whole view is one editor?**
 
-**Q4. Long lines, now that the whole view is one editor?**
+- A. Each file block scrolls sideways on its own, as today: a per-block x offset in the Editor, with a
+  thin scrollbar under each overflowing block. Headers and line numbers stay put. Editor E5 (M–L),
+  before the new view replaces today's.
+- B. One horizontal scroll for the whole view, as Zed and VS Code do. The widest line of any file sets
+  the scroll width.
+- C. Soft wrap to the view width (the Editor's `wordWrap`).
 
-- A. Real source lines with one horizontal scroll for the whole view; headers, the gutter and the
-  action strip stay pinned. What Zed and VS Code do.
-- B. Real source lines, soft-wrapped to the view width (the Editor's `wordWrap`).
-- C. Lines clipped as today (a 160-character preview), with one horizontal scroll. Editing in place then
-  cannot reach text past the clip.
-
-**Recommendation: A.** Today each file block scrolls sideways on its own, which one editor cannot do,
-and editing needs the real line. Wrap makes the row count depend on width, which moves every header
-on resize.
-
-Owner, 2026-09-26: not decided. Per-file sideways scrolling is a feature the owner likes about
-today's many-editor view, and asks whether many editors can be made fast instead. A third research
-pass measures that (editor recycling, mount cost, per-excerpt horizontal scroll inside a
-multibuffer) before Q3 and Q4 are settled.
+**Recommendation: A.** It keeps the feature the owner likes. It measured 158–177 ms against 151–155 ms
+per fling and 2.1 ms of script for 40 sideways steps. The Editor work is one bounded feature that does
+not depend on Q3.
 
 ## Proposed phases
 
-Phases 1, 2 and 3 stand on their own and can ship any time. E1–E3 (Editor repo) and R1–R4 (Platform)
-assume Q3 = A and give today's view, read-only, inside one editor; E4 and R5 add editing in place.
-With Q3 = B, E1–E3 still hold (block rows are needed either way), R1's excerpt map moves into the
-Editor, and E4/R5 become the multibuffer plan.
+Phases 1, 1b, 2 and 3 stand on their own and can ship any time.
+
+- **As recommended (Q3 = B, Q4 = A):** E1–E3 and E5 (Editor repo) with R1–R4 (Platform) put today's
+  view, read-only, inside one editor with per-block sideways scroll. E5 lands before R2 replaces
+  today's view, so the feature is never missing. M1 and R5 then add editing in place on a multibuffer.
+- **Other answers:**
+  - Q3 = A: Phases 1, 1b, 2 and 3, then P1 below and the 200-match cap fix; nothing else.
+  - Q3 = C: M1 moves before R2.
+  - Q3 = D: M1 is replaced by an edit filter and R5 by forwarding (pass 2's design,
+    [results in the editor § 7.8](../docs/search-view-results-in-editor.md)).
+  - Q4 = B drops E5. Q4 = C drops E5 and R2 turns on `wordWrap`.
 
 1. **Grammar signature memo** (S, Editor: `packages/tree-sitter/src/treeSitter/workerClient.ts`).
    Compute `languageDescriptorSignature` once per descriptor object (a `WeakMap`) and leave `wasmUrl`
@@ -252,6 +320,19 @@ Editor, and E4/R5 become the multibuffer plan.
    `hooks/use-result-scroll-position.ts`). Take the offset from the scroll event without reading layout,
    and find the anchor row by binary search. The sidebar list keeps using it after R2. Proof: `trace` of
    the sidebar fling loses the 83 ms; `search-type-delete` still restores position.
+   1b. **No forced layout on open for an unfocused editor** (S, Editor:
+   `virtualization/virtualizedTextViewHighlights.ts` `renderCaret`,
+   `virtualization/virtualizedTextViewHelpers.ts` `scrollElementPadding`,
+   `virtualization/scrollViewport.ts` `synchronizeOrigin`).
+   - **Caret:** an editor without focus skips caret geometry, and positions its caret when it takes
+     focus or its selection changes. If an unfocused caret must stay visible somewhere, measure it in
+     the next frame's read phase instead.
+   - **Padding:** the scroll element's padding is read once, and read again only when the view changes
+     it (reserved overlay width) or the text metrics are invalidated.
+   - **Tests:** opening a document in an unfocused editor reads no layout (a counting stub for
+     `getBoundingClientRect` and `getComputedStyle`), and focusing it places the caret.
+   - **Proof:** with Phase 1, today's broad fling went from 1,767 to 1,405 ms and from 15 long tasks to
+     2 in the research build. `trace research-search-view` before and after.
 3. **Selection without a full rebuild** (M, shared search state: `state/buffer-state.tsx` `selectResult`,
    `utils/result-items.ts`). Keep an id → index map per result set and update only the active id.
    Proof: `trace` of 20 ArrowDown presses in the sidebar on the pathological set (175 ms in
@@ -286,13 +367,35 @@ block) → { update?, dispose }`), shaped as building blocks of Plan 122's `crea
   - Replace one offset range of the token store with new tokens, leaving the rest.
   - Tests: a host append to a read-only document; typing into it is still refused; a range replace
     leaves tokens outside the range untouched.
-- **E4. Edit filter** (M; `plugins.ts`, `editor/src/editor/inputSelectionController.ts` and every edit
-  entry).
-  - `registerEditFilter(edits → edits | null)` is consulted before any user-originated edit applies:
-    typing, IME commit, paste, cut, delete and word-delete, multi-cursor, snippets, auto-close,
-    line operations.
-  - A refused edit changes neither text nor selection.
-  - Tests per entry point, including IME composition across a refused boundary.
+- **E5. Per-block sideways scroll** (M–L; `virtualization/virtualizedTextViewRows.ts`,
+  `virtualizedTextView.ts`, `scrollViewport.ts`, `virtualizedTextViewHighlights.ts`, the block layer
+  from E1; depends on E1).
+  - **API:** a view option `horizontalScroll: 'view' | 'per-block'`. In per-block mode each block row
+    starts a scroll group that runs to the next block row, with its own x offset.
+  - **Rows:** the view's native horizontal scroll is off (`overflow-x: hidden`,
+    `overscroll-behavior-x: contain`), and each mounted row carries its group's offset as a CSS
+    `translate`. `horizontalChunkWindow` takes the row's group offset in place of `scrollLeft`.
+  - **Coordinates:** `viewportPointMetrics` resolves the row from y before x and adds that row's
+    offset. The row-x → content-x sites (`caretPositionAtX` and about 20 more) subtract it.
+  - **Reveal and drag:** caret reveal and drag autoscroll write the target row's group offset.
+  - **Input:** a passive wheel listener moves the group under the pointer on horizontal deltas. A
+    non-passive one makes vertical scrolling wait on the main thread (measured).
+  - **Scrollbar:** a thin thumb under each overflowing group's last row, in the block layer, with drag
+    and track click.
+  - **Tests:** a hit test in a scrolled group; caret and selection rects in two groups with different
+    offsets; reveal scrolls only its group; horizontal wheel over one group moves only that group;
+    chunk windows of a long line follow its group; headers and gutter do not move.
+- **M1. Multibuffer in the Editor core** (XL; its own Editor plan before sizing: document controller,
+  history, selections and anchors, syntax scheduling, decorations).
+  - **Model:** a composite `TextReadSnapshot` over excerpts of many document sessions, Zed's model
+    (pass 2 § 3). Composite anchors are `(document, piece anchor)`. Headers are E1 block rows, so
+    separators carry no text.
+  - **Edits:** split per session and clamped at an excerpt's end (Zed `multi_buffer.rs:1612-1729`). One
+    undo step maps to per-session transactions. Changes made elsewhere reach the view by rebasing each
+    session's edits into composite coordinates.
+  - **Syntax:** each excerpt reads its own session's tokens.
+  - **Open cost:** Zed opens a buffer for every matched file. At 2,400 files that is the cost to avoid:
+    an excerpt reads the search's text until its first edit opens the file's session.
 
 **Platform phases** (`features/search/`).
 
@@ -306,7 +409,7 @@ block) → { update?, dispose }`), shaped as building blocks of Plan 122's `crea
     shift for rows inserted above a given row.
   - **Pure and tested:** the pathological tier (20,000 matches), a mid-list insertion, collapse and
     expand, a re-query that keeps half the files.
-- **R2. The view on one editor** (L; depends on E1–E3 and R1).
+- **R2. The view on one editor** (L; depends on E1–E3, E5 and R1).
   - **New component:** `components/results-editor.tsx`. It uses `useEditor` with a read-only session
     document, `lineHeight` 22, `rowGap` 6, `fontSize` 12 and the cursor-line paint off.
   - **What it wires:**
@@ -340,16 +443,12 @@ block) → { update?, dispose }`), shaped as building blocks of Plan 122's `crea
     wheel-fast on any tier.
   - `look` at the view in compact and cozy and in a light and a dark palette, comparing header
     spacing against today's screenshots.
-- **R5. Editing in place, in-line edits** (L; depends on E4).
-  - **Filter:** an E4 filter keeps each edit inside one result row.
-  - **Forwarding:** the host maps edits through the excerpt map and applies them to the file's live
-    document (`ensureLiveEditorDocument`). The document is opened on first edit, checked against the
-    search's line, and refused with an error naming the file when it differs.
-  - **Mirroring:** file changes mirror back as host edits.
-  - **Undo, dirty and save:** undo in the view reverts the source transactions it made (document
-    transaction receipts). The tab shows dirty while a touched document is dirty, and Ctrl+S saves them.
-  - **Check:** a debug-only comparison of each edited row against its source line logs a wide event
-    on mismatch.
+- **R5. Editing in place on the multibuffer** (L; depends on M1).
+  - **Model:** the view's excerpt table comes from R1's excerpt map. An edit lands in the file's own
+    session, which is opened on first edit and checked against the search's line; the edit is refused
+    with an error naming the file when the line differs.
+  - **Undo, dirty and save:** undo in the view is the multibuffer's undo. The tab shows dirty while a
+    touched document is dirty, and Ctrl+S saves those documents.
   - **Tests:**
     - typing in two files with multi-cursor lands in both files
     - undo in the view reverts both
@@ -357,6 +456,11 @@ block) → { update?, dispose }`), shaped as building blocks of Plan 122's `crea
     - an edit over a stale line is refused
   - **New scenario:** `search-edit-in-place`, which edits two results and then reads the files from
     disk after save.
+- **P1. Only if Q3 = A: recycled editor pool** (M; `components/result-editor-virtual-window.tsx`,
+  `result-file-editor-pool-slot.tsx`, `result-file-editor.tsx`, `state/result-editor-pool.ts`).
+  - Slots keyed by position, taken only by files whose line window is non-empty, rendered in slot order.
+  - A freed slot parks its editor under `content-visibility: hidden` until the next file takes it.
+  - **Proof:** editors built per broad fling 228 → about 19, no long task in `trace research-search-view`.
 - Later, not sized here: full excerpt editing (Enter inside a result), and context lines with Zed's
   expand controls.
 
