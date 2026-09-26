@@ -3,7 +3,7 @@ import type { Page } from 'playwright'
 
 import { selectors } from '../selectors'
 import { dispatch, readShell } from './chat-verification'
-import { settingsSnapshot, writeSettings } from './native-provider-verification'
+import { settingsSnapshot, writeRawSetting, writeSettings } from './native-provider-verification'
 
 /**
  * A mock provider instance with `config`, and a session on it opened in the chat. `cleanup`
@@ -12,7 +12,13 @@ import { settingsSnapshot, writeSettings } from './native-provider-verification'
 export async function createMockProviderSession(
   page: Page,
   orchestration: string,
-  input: { readonly name: string; readonly displayLabel: string; readonly config: object },
+  input: {
+    readonly name: string
+    readonly displayLabel: string
+    readonly config: object
+    /** The checkout the session runs in; the first registered one when absent. */
+    readonly worktreeId?: string
+  },
 ) {
   const base = orchestration.replace(/\/orchestration$/, '')
   const before = await settingsSnapshot(page, base)
@@ -34,12 +40,12 @@ export async function createMockProviderSession(
       },
     },
   ])
-  const worktree = await firstWorktree(page, orchestration)
+  const worktreeId = input.worktreeId ?? (await firstWorktree(page, orchestration)).id
   await dispatch(page, orchestration, {
     type: 'session.create',
     sessionId,
     title,
-    worktreeTarget: { kind: 'current', worktreeId: worktree.id },
+    worktreeTarget: { kind: 'current', worktreeId },
     modelSelection: { providerInstanceId, model: 'gpt-5.5' },
   })
   await selectors.sessionSearch(page).fill(title)
@@ -54,11 +60,11 @@ export async function createMockProviderSession(
       (item) => item.providerInstanceId !== providerInstanceId,
     )
     const unchanged = JSON.stringify(remaining) === JSON.stringify(originalInstances)
-    await writeSettings(page, base, [
-      !originallySet && unchanged
-        ? { kind: 'reset', keys: ['providers.instances'] }
-        : { kind: 'set', key: 'providers.instances', value: remaining },
-    ])
+    if (!originallySet && unchanged) {
+      await writeSettings(page, base, [{ kind: 'reset', keys: ['providers.instances'] }])
+      return
+    }
+    await writeRawSetting(page, base, 'providers.instances', remaining)
   }
   return { base, cleanup, sessionId }
 }

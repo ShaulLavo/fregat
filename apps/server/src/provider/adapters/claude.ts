@@ -674,6 +674,7 @@ export class ClaudeProviderAdapter
       env: this.env,
       ephemeral,
       executablePath: await this.executablePath(),
+      ...(input.outputSchema ? { outputSchema: input.outputSchema } : {}),
       interactionMode,
       model,
       providerInstanceId: input.providerInstanceId,
@@ -780,6 +781,7 @@ class ClaudeAgentSession extends SessionContext {
     executablePath: string
     interactionMode: InteractionMode
     model: string
+    outputSchema?: Record<string, unknown>
     providerInstanceId: ProviderTurnInput['providerInstanceId']
     reasoning: ClaudeReasoning
     resumeExisting?: boolean
@@ -814,6 +816,7 @@ class ClaudeAgentSession extends SessionContext {
       ...(input.agent ? { agent: input.agent } : {}),
       fork: input.fork,
       persistSession: input.ephemeral ? false : undefined,
+      ...(input.outputSchema ? { outputSchema: input.outputSchema } : {}),
       interactionMode: input.interactionMode,
       model: input.model,
       reasoning: input.reasoning,
@@ -1945,6 +1948,12 @@ class ClaudeAgentSession extends SessionContext {
       return
     }
     if (message.subtype === 'success') {
+      if (message.structured_output !== undefined)
+        this.emitRuntimeNotification(
+          'turn.structured-output',
+          { value: message.structured_output },
+          message,
+        )
       this.completeTurn(turn, message.usage, claudeSuccessEndReason(message))
       return
     }
