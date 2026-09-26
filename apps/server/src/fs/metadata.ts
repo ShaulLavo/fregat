@@ -1,5 +1,5 @@
 import { and, asc, desc, eq, inArray, isNotNull, sql } from 'drizzle-orm'
-import { nanoid } from 'nanoid'
+import { randomBytes } from 'node:crypto'
 import {
   effectiveEntryType,
   WORKSPACE_ADDRESS_ID_LENGTH,
@@ -181,5 +181,10 @@ export class FsMetadataStore {
 }
 
 function createWorkspaceAddressId(): WorkspaceAddressId {
-  return v.parse(workspaceAddressIdSchema, nanoid(WORKSPACE_ADDRESS_ID_LENGTH))
+  return v.parse(
+    workspaceAddressIdSchema,
+    randomBytes(Math.ceil((WORKSPACE_ADDRESS_ID_LENGTH * 3) / 4))
+      .toString('base64url')
+      .slice(0, WORKSPACE_ADDRESS_ID_LENGTH),
+  )
 }

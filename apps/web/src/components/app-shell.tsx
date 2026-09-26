@@ -6,7 +6,6 @@ import { Wallpaper } from '@/components/wallpaper'
 import { usePanelSurface } from '@/hooks/use-panel-surface'
 import { cn } from '@workspace/ui/lib/utils'
 import { useFocusTarget } from '@/lib/focus/hooks/use-target'
-import { useFixWithAgentBinding } from '@/features/chat/hooks/use-fix-with-agent-binding'
 import { useDisplayedShell } from '@/features/workspace/hooks/use-displayed-shell'
 import { useEditorWorkspaceState } from '@/features/editor/state/workspace-state'
 
@@ -20,7 +19,6 @@ export function AppShell({
   const surface = usePanelSurface()
   const shell = useDisplayedShell().kind
   const hasWorkspace = useEditorWorkspaceState((state) => state.rootFolder !== null)
-  useFixWithAgentBinding()
   // The phone density step keys on this; the boot script sets it before the first paint.
   useLayoutEffect(() => {
     document.documentElement.dataset.shell = shell

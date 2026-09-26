@@ -51,6 +51,26 @@ describe('UpstreamFetchScheduler', () => {
     expect(fetches).toHaveLength(2)
   })
 
+  it('keeps a slow fetch single-flight even after its interval elapses', async () => {
+    const pending = Promise.withResolvers<void>()
+    let calls = 0
+    const scheduler = testScheduler(async () => {
+      calls += 1
+      await pending.promise
+    })
+    const first = scheduler.schedule('/repo', STATUS_WITH_UPSTREAM)
+    await vi.advanceTimersByTimeAsync(30_000)
+    await scheduler.schedule('/repo', STATUS_WITH_UPSTREAM)
+    expect(calls).toBe(1)
+    pending.resolve()
+    await first
+    await scheduler.schedule('/repo', STATUS_WITH_UPSTREAM)
+    expect(calls).toBe(1)
+    vi.advanceTimersByTime(15_000)
+    await scheduler.schedule('/repo', STATUS_WITH_UPSTREAM)
+    expect(calls).toBe(2)
+  })
+
   it('skips repositories without an upstream', async () => {
     const fetches: string[] = []
     const scheduler = testScheduler(async (root) => {

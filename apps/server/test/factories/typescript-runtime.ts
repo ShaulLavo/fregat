@@ -6,11 +6,16 @@ import { isRecord } from '@workspace/utils/objects'
 
 import { createInternalError } from '../../src/observability/structured-errors'
 
+const INSTALLED_RUNTIMES = {
+  typescript: import.meta.resolve('typescript/package.json'),
+  'typescript-language-service': import.meta.resolve('typescript-language-service/package.json'),
+}
+
 export async function installedTypeScriptRuntimeFixture(
-  packageName: string,
+  packageName: keyof typeof INSTALLED_RUNTIMES,
   files: Readonly<Record<string, string>>,
 ) {
-  const packagePath = fileURLToPath(import.meta.resolve(`${packageName}/package.json`))
+  const packagePath = fileURLToPath(INSTALLED_RUNTIMES[packageName])
   const metadata: unknown = JSON.parse(await readFile(packagePath, 'utf8'))
   if (!isRecord(metadata) || typeof metadata.version !== 'string') {
     throw createInternalError('TypeScript fixture package has no version')

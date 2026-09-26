@@ -502,7 +502,44 @@ function resetCreditAccount(message) {
   })
 }
 
+/** A blocking `item/tool/requestUserInput` question whose answer the work log keeps. */
+function handleQuestionHistory(message) {
+  if (message.id === 992 && !message.method) {
+    record({ event: 'user-input-response', result: message.result })
+    agentMessage(activeTurnId, `${activeTurnId}-answer`, 'QUESTION_HISTORY_VERIFIED')
+    endTurn(activeTurnId, 'completed')
+    return true
+  }
+  if (message.method !== 'turn/start') return false
+
+  const turn = startOwnTurn(message)
+  send({
+    id: 992,
+    method: 'item/tool/requestUserInput',
+    params: {
+      threadId,
+      turnId: turn,
+      itemId: `${turn}-ask`,
+      questions: [
+        {
+          id: 'language',
+          header: 'Language',
+          question: 'Which language should the fixture use?',
+          isOther: true,
+          isSecret: false,
+          options: [
+            { label: 'Rust', description: 'Systems' },
+            { label: 'Go', description: 'Services' },
+          ],
+        },
+      ],
+    },
+  })
+  return true
+}
+
 function handle(message) {
+  if (scenario === 'question-history' && handleQuestionHistory(message)) return
   if (scenario === 'session-no-flicker' && message.method === 'turn/start') {
     const turn = startOwnTurn(message)
     const text = promptText(message)
@@ -527,14 +564,14 @@ function handle(message) {
     send({ id: message.id, result: {} })
     return
   }
-  if (scenario === 'chat-multiple-models' && message.method === 'turn/start') {
+  if (scenario.startsWith('chat-multiple-models') && message.method === 'turn/start') {
     record({ event: 'turn/start', model: message.params.model, input: promptText(message) })
     const turn = startOwnTurn(message)
     agentMessage(turn, `${turn}-answer`, `MULTIPLE_MODELS ${message.params.model}`)
     endTurn(turn, 'completed')
     return
   }
-  if (scenario === 'chat-multiple-models' && message.method === 'model/list') {
+  if (scenario.startsWith('chat-multiple-models') && message.method === 'model/list') {
     const entry = (id) => ({
       id,
       model: id,

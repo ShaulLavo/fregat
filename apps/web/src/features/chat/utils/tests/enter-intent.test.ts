@@ -3,7 +3,7 @@ import { expect, test } from '../../../../../test/fixtures'
 
 function intents(sendShortcut: SendShortcut, prompt = 'one line') {
   const press = (shiftKey: boolean, modifierKey: boolean) =>
-    composerEnterIntent({ modifierKey, prompt, sendShortcut, shiftKey })
+    composerEnterIntent({ modifierKey, prompt, sendShortcut, shiftKey, touch: false })
   return {
     enter: press(false, false),
     mod: press(false, true),
@@ -33,4 +33,18 @@ test('mod-enter: Enter adds a line, Ctrl/Cmd+Enter sends, Shift adds the alterna
 test('mod-enter-multiline: like enter on one line, like mod-enter from the second line', () => {
   expect(intents('mod-enter-multiline')).toEqual(intents('enter'))
   expect(intents('mod-enter-multiline', 'first\nsecond')).toEqual(intents('mod-enter'))
+})
+
+test('touch: Return always adds a line, whatever the send shortcut', () => {
+  for (const sendShortcut of ['enter', 'mod-enter', 'mod-enter-multiline'] as const) {
+    expect(
+      composerEnterIntent({
+        modifierKey: false,
+        prompt: 'hi',
+        sendShortcut,
+        shiftKey: false,
+        touch: true,
+      }),
+    ).toBe('newline')
+  }
 })

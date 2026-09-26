@@ -687,7 +687,7 @@ export function createNavigation(
     openFile,
     openContent,
     openChat,
-    startComposerDraft: createComposerDraftNavigation(coordinator, openChat),
+    ...createComposerDraftNavigation(coordinator, openChat),
     openWorkspace,
     openDiff({
       owner,

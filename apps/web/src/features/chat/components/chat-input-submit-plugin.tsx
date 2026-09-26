@@ -111,6 +111,7 @@ function handleEnterCommand({
     prompt: $readChatInputTextSnapshot().text,
     sendShortcut,
     shiftKey: Boolean(event?.shiftKey),
+    touch: touchKeyboard(),
   })
   // Unhandled, so the editor's own Enter adds the line.
   if (intent === 'newline') return false
@@ -156,4 +157,9 @@ function handleMenuMoveCommand(
   event?.preventDefault()
   event?.stopPropagation()
   return true
+}
+
+/** A device whose main pointer is a finger: its on-screen keyboard has no Shift+Return habit. */
+function touchKeyboard() {
+  return window.matchMedia('(hover: none) and (pointer: coarse)').matches
 }

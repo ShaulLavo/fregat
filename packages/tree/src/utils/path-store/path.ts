@@ -1,3 +1,4 @@
+// Modified for Platform from Pierre. Apache-2.0; see LICENSE-pierre and UPSTREAM.md.
 import type { LookupPath, PreparedPath } from './internal-types'
 
 // Canonical path parsing runs once per input path during prepare steps, so keep

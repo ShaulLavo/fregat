@@ -215,7 +215,10 @@ async function openAgentFile(
   await expect.poll(() => publishedErrors(socket, uri), { timeout: 20_000 }).toEqual(codes)
 }
 
-async function agentFileFixture(packageName: string, clean: string) {
+async function agentFileFixture(
+  packageName: (typeof RUNTIMES)[number]['packageName'],
+  clean: string,
+) {
   const fixture = await installedTypeScriptRuntimeFixture(packageName, {
     'package.json': '{"private":true,"type":"module"}\n',
     'tsconfig.json': '{"compilerOptions":{"strict":true},"files":["probe.ts"]}\n',
@@ -641,7 +644,7 @@ type Probe = {
 }
 
 async function openProbe(
-  packageName: string,
+  packageName: (typeof RUNTIMES)[number]['packageName'],
   files: Readonly<Record<string, string>>,
   source: string,
 ): Promise<Probe> {

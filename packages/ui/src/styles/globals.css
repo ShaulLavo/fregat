@@ -2781,7 +2781,7 @@
   }
 }
 
-:root[data-feel]:not([data-feel='flat']) [data-slot='ticker-digit'] {
+:root[data-feel] [data-slot='ticker-digit'] {
   transition: transform var(--spring-snappy-duration) var(--spring-snappy);
   @media (prefers-reduced-motion: reduce) {
     transition: none;

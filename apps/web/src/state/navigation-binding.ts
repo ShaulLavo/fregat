@@ -10,6 +10,11 @@ export function bindNavigation(navigation: Navigation) {
   }
 }
 
+/** For callers with a fallback when the app shell has not mounted yet. */
+export function findNavigation() {
+  return current
+}
+
 export function getNavigation() {
   if (!current) throw createClientInvariantError('Navigation is not attached to the application.')
   return current
