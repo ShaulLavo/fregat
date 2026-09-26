@@ -23,6 +23,7 @@ export type AddressSnapshot = {
   readonly mode: Address['mode']
   /** Unowned search keys observed at boot, carried so a rewrite cannot drop them. */
   readonly passthrough: Readonly<Record<string, string>>
+  readonly phoneScreen: Address['screen']
   readonly railView: Address['rail']
   readonly rootPath: string | null
   readonly settingsCategory: string | null
@@ -48,6 +49,7 @@ export function emptyAddressSnapshot(): AddressSnapshot {
     workspaceAddress: null,
     mode: null,
     passthrough: {},
+    phoneScreen: null,
     railView: null,
     rootPath: null,
     logs: null,
@@ -80,6 +82,7 @@ export function completeAddressFromSnapshot(snapshot: AddressSnapshot): Address 
     passthrough: { ...snapshot.passthrough },
     logs: snapshot.logs ? { ...snapshot.logs } : null,
     rail: snapshot.railView,
+    screen: snapshot.phoneScreen,
     search: snapshot.search ? { ...snapshot.search } : null,
     settings: settingsCategory(snapshot),
     side: snapshot.sidebarTab,

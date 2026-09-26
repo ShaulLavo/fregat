@@ -4,14 +4,18 @@ export type CaptureSize = {
   readonly width: number
   readonly height: number
   readonly scale: number
+  /** A touch phone: coarse pointer, touch events and a mobile viewport (Chromium and WebKit). */
+  readonly touch: boolean
 }
 
 export function captureSize(values: {
   readonly width?: string
   readonly height?: string
   readonly scale?: string
+  readonly touch?: boolean
 }): CaptureSize {
   return {
+    touch: values.touch ?? false,
     width: boundedNumber('width', values.width, 1440, 320, 4096, true),
     height: boundedNumber('height', values.height, 1000, 240, 4096, true),
     scale: boundedNumber('scale', values.scale, 1, 1, 3, false),

@@ -12,14 +12,20 @@ import { RenderErrorBoundary } from '@workspace/ui/patterns/render-error-boundar
 import { contextUsageForActivities } from '@workspace/client-core/chat/context-usage'
 import { selectChatSessionById } from '@workspace/client-core/chat/selectors'
 import { StageBody } from '@/features/chat-mode/components/stage-body'
-import { StageHeader } from '@/features/chat-mode/components/stage-header'
+import { StageHeader, type StageHeaderProps } from '@/features/chat-mode/components/stage-header'
+import type { ComponentType } from 'react'
 import { useMarkSessionSeen } from '@/features/chat-mode/hooks/use-mark-session-seen'
 import { useChatModeSession } from '@/features/chat-mode/providers/session-context'
 import { useSessionSelectionStore } from '@/features/chat-mode/state/session-selection-store'
 import { isDraftFor } from '@/features/chat-mode/utils/active-session'
 import { sessionVisitAt } from '@workspace/client-core/chat/rail/unread'
 
-export function ChatStage() {
+export function ChatStage({
+  Header = StageHeader,
+}: {
+  /** The phone shell swaps in its own header; the body is the same. */
+  readonly Header?: ComponentType<StageHeaderProps>
+}) {
   const navigation = useNavigation()
   const application = useApplicationRuntime()
   const draftGeneration = useSessionSelectionStore((state) => state.draftGeneration)
@@ -73,7 +79,7 @@ export function ChatStage() {
 
   return (
     <section className='flex h-full min-h-0 min-w-0 flex-col overflow-hidden'>
-      <StageHeader
+      <Header
         switching={switching}
         contextUsage={contextUsageForActivities(activities)}
         projectTitle={project?.title ?? null}
