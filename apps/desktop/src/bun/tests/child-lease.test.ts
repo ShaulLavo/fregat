@@ -47,7 +47,9 @@ test('a recorded pid that now belongs to another process is left running', async
   const startedAt = await processStart(stranger.pid)
   await writeFile(
     file,
-    JSON.stringify([{ name: 'server', pid: stranger.pid, startedAt: 'Thu Jan  1 00:00:00 1970' }]),
+    JSON.stringify([
+      { name: 'server', pid: stranger.pid, startedAt: 'Thu Jan  1 00:00:00 1970', target: 'group' },
+    ]),
   )
   expect(startedAt).not.toBe('Thu Jan  1 00:00:00 1970')
 

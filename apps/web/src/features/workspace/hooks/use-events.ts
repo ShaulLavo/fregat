@@ -27,7 +27,8 @@ import { fileSnapshotQueryOptions, setFileSnapshotQueryData } from '@/lib/file-s
 import { fetchFile, fetchTree } from '@/lib/file-server'
 import type { FileResult } from '@/lib/file-system-types'
 import type { Client } from '@/lib/client'
-import { clientForQueryClient } from '@/lib/environments/state/query-clients'
+import { clientForQueryClient, originForQueryClient } from '@/lib/environments/state/query-clients'
+import { setWatchCoverage, watchCoverageKey } from '@/lib/state/watch-coverage'
 import {
   createDirectoryChurn,
   type DirectoryChurn,
@@ -57,7 +58,12 @@ import {
   type WorkspaceConflictContext,
 } from '@/features/workspace/state/event-conflict-adapter'
 import { patchTreeEntryMetadata, replaceDirectoryLoad, type TreeModel } from '@/lib/tree-model'
-import { onlineManager, useQueryClient, type QueryClient } from '@tanstack/react-query'
+import {
+  focusManager,
+  onlineManager,
+  useQueryClient,
+  type QueryClient,
+} from '@tanstack/react-query'
 import { useEffect, useEffectEvent } from 'react'
 import type { TreeEntry, WatchServerMessage } from '@workspace/contracts'
 import { useWorkspaceEditEventClassifier } from '@/features/editor/providers/workspace-edit-context'
@@ -174,6 +180,8 @@ export function useWorkspaceEvents(rootFolder: PickedFsEntry | null) {
         path: rootPath,
       })
       const churn = createDirectoryChurn()
+      const coverageKey = watchCoverageKey(originForQueryClient(queryClient), rootPath)
+      let limited = false
       const queue = createEventQueue((events) => {
         publishFilesystemEvents(queryClient, events)
         churn.record(events.flatMap((event) => filesystemEventDirectories(event, rootPath)))
@@ -188,6 +196,18 @@ export function useWorkspaceEvents(rootFolder: PickedFsEntry | null) {
           if (message.type === 'ready') {
             publishFilesystemEvents(queryClient, [{ type: 'rescan', path: rootPath }])
             eventsScope.increment('subscription.readyCount')
+            limited = message.watch?.mode === 'limited'
+            if (message.watch) eventsScope.set({ watch: message.watch })
+            setWatchCoverage(coverageKey, message.watch)
+            applyReady(controller.signal, rootPath, eventsScope, gitInvalidation.maybeExecute)
+            return
+          }
+          if (message.type === 'coverage') {
+            eventsScope.increment('subscription.coverageCount')
+            eventsScope.set({ watch: message.watch })
+            limited = message.watch.mode === 'limited'
+            setWatchCoverage(coverageKey, message.watch)
+            // What changed below the top level while it was limited arrived nowhere; read it again.
             applyReady(controller.signal, rootPath, eventsScope, gitInvalidation.maybeExecute)
             return
           }
@@ -238,8 +258,16 @@ export function useWorkspaceEvents(rootFolder: PickedFsEntry | null) {
         eventsScope.increment('subscription.onlineResyncCount')
         applyReady(controller.signal, rootPath, eventsScope, gitInvalidation.maybeExecute)
       })
+      // A limited root reports only its top level, so coming back to the window rereads the rest.
+      const unsubscribeFocus = focusManager.subscribe((focused) => {
+        if (!focused || !limited) return
+        eventsScope.increment('subscription.focusResyncCount')
+        applyReady(controller.signal, rootPath, eventsScope, gitInvalidation.maybeExecute)
+      })
 
       return () => {
+        unsubscribeFocus()
+        setWatchCoverage(coverageKey, undefined)
         unsubscribeOnline()
         unsubscribeFiles()
         streams.close()
@@ -265,6 +293,7 @@ function endWorkspaceEventsScope(eventsScope: WideEventScope) {
 }
 
 function workspaceEventsScopeHasWork(eventsScope: WideEventScope) {
+  if (eventsScope.count('warningCount') > 0) return true
   if (eventsScope.count('events.eventCount') > 0) return true
   if (eventsScope.count('subscription.readyCount') > 0) return true
   if (eventsScope.count('subscription.errorCount') > 0) return true

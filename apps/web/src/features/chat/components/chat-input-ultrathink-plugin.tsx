@@ -3,9 +3,9 @@ import { modelOptionDescriptors } from '@workspace/client-core/chat/providers/op
 import { useEffect } from 'react'
 
 import { useModelPicker } from '@/features/chat/hooks/use-model-picker'
-import { clearUltrathink, paintUltrathink } from '@/features/chat/state/ultrathink-highlights'
+import { registerUltrathinkEntity } from '@/features/chat/utils/ultrathink-node'
 
-/** Colours the word "ultrathink" while the model lets it switch the effort. */
+/** Paints the word "ultrathink" while the model lets it switch the effort. */
 export function ChatInputUltrathinkPlugin() {
   const [editor] = useLexicalComposerContext()
   const { modelSelection, provider } = useModelPicker()
@@ -15,25 +15,7 @@ export function ChatInputUltrathinkPlugin() {
     : undefined
   const enabled = Boolean(effort?.type === 'select' && effort.promptInjectedValues?.length)
 
-  useEffect(() => {
-    let root = editor.getRootElement()
-    const paint = () => {
-      if (root) paintUltrathink(root, enabled)
-    }
-    paint()
-    const removeRoot = editor.registerRootListener((next, previous) => {
-      if (previous) clearUltrathink(previous)
-      root = next
-      paint()
-    })
-    const removeUpdate = editor.registerUpdateListener(paint)
-
-    return () => {
-      removeRoot()
-      removeUpdate()
-      if (root) clearUltrathink(root)
-    }
-  }, [editor, enabled])
+  useEffect(() => registerUltrathinkEntity(editor, enabled), [editor, enabled])
 
   return null
 }

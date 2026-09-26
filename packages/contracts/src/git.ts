@@ -67,6 +67,8 @@ export type GitLineChange = {
 }
 
 export type GitDiffHunk = {
+  /** Stable for the same path and hunk text: sha256 of path, old path and patch, 16 hex. */
+  id: string
   header: string
   oldStart: number
   oldLines: number

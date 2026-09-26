@@ -7,6 +7,7 @@ import {
   trimmedNonEmptyStringSchema,
 } from './chat-model'
 import { clientOrchestrationCommandSchema } from './orchestration-commands'
+import { serverUpdateSchema } from './server-update'
 import {
   ORCHESTRATION_SESSION_DETAIL_MAX_PAGE_SIZE,
   orchestrationReplayEventsInputSchema,
@@ -31,8 +32,9 @@ import {
  *     subscriptions still push snapshot *frames*; only the requests are gone.
  * 4 — added the durable environment identity to the handshake.
  * 8 — added the client `presence` message.
+ * 9 — added the `server.update` push (staged release, restart phase, live check).
  */
-export const ORCHESTRATION_WS_PROTOCOL_VERSION = 8
+export const ORCHESTRATION_WS_PROTOCOL_VERSION = 9
 
 /**
  * Hard ceiling on one `replayEvents` page. `replayEvents` is client-reachable,
@@ -328,6 +330,12 @@ export const orchestrationWsPongMessageSchema = v.object({
   requestId: orchestrationWsRequestIdSchema,
 })
 
+/** The server's staged-update state, sent after `connected` and on every change (Plan 148). */
+export const orchestrationWsServerUpdateMessageSchema = v.object({
+  kind: v.literal('server.update'),
+  update: serverUpdateSchema,
+})
+
 export const orchestrationWsServerMessageSchema = v.union([
   orchestrationWsConnectedMessageSchema,
   orchestrationWsResponseMessageSchema,
@@ -335,6 +343,7 @@ export const orchestrationWsServerMessageSchema = v.union([
   orchestrationWsSubscriptionErrorMessageSchema,
   orchestrationWsSubscriptionCompleteMessageSchema,
   orchestrationWsPongMessageSchema,
+  orchestrationWsServerUpdateMessageSchema,
 ])
 
 export type OrchestrationStreamSynchronizedItem = v.InferOutput<

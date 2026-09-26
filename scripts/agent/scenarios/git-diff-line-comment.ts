@@ -13,7 +13,7 @@ const CHANGED_LINE = 30
 export const gitDiffLineComment: Scenario = {
   name: 'git-diff-line-comment',
   description:
-    'Drag a line range in a diff: the selection bar must name the dragged lines, and still name the right ones after unhiding the unmodified lines above shifts every row.',
+    'Drag a line range in a diff: the selection bar must name the dragged lines, and still name the right ones after unhiding the unmodified lines above shifts every row; a comment on them joins the review draft in the composer.',
   async run(page, { step }) {
     const fixture = await mkdtemp('/work/tmp/fregat-diff-comment-')
     try {
@@ -48,6 +48,24 @@ export const gitDiffLineComment: Scenario = {
       await dragChangedLine(page)
       await step('light-expanded-selection')
       await assertLabel(page, 'light')
+
+      // A comment joins the review draft instead of the composer text.
+      await page.getByRole('button', { name: 'Comment', exact: true }).click()
+      await page
+        .getByRole('textbox', { name: 'Review comment', exact: true })
+        .fill('Why true here?')
+      await page.keyboard.press('Enter')
+      await selectors.sidebarTab(page, 'Chat').click()
+      const review = page.getByRole('group', { name: 'Review comments', exact: true })
+      await review.waitFor({ timeout: 10_000 })
+      const text = (await review.textContent()) ?? ''
+      if (!text.includes(`a.ts:${CHANGED_LINE}`) || !text.includes('Why true here?'))
+        throw createScriptError(
+          `The review draft does not show the comment: ${JSON.stringify(text)}`,
+        )
+      await step('review-draft-in-composer')
+      await review.getByRole('button', { name: 'Discard', exact: true }).click()
+      await review.waitFor({ state: 'detached' })
     } finally {
       await releaseFixture(fixture)
     }

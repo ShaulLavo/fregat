@@ -1,5 +1,5 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
-import { ChatCircleIcon, XIcon } from '@phosphor-icons/react'
+import { ChatCircleIcon, NotePencilIcon, XIcon } from '@phosphor-icons/react'
 import {
   diffRowAtEvent,
   type DiffFile,
@@ -9,14 +9,18 @@ import {
 import { Button } from '@workspace/ui/components/button'
 import { useEffect, useRef, useState, type RefObject } from 'react'
 
-import { useAttachToComposer } from '@/features/chat/hooks/use-attach-to-composer'
+import { useAttachToComposer } from '@/lib/composer-attach/hooks/use-attach-to-composer'
+import { useEnvironmentId } from '@/lib/environments/hooks/use-environment-id'
+import { addReviewComment } from '@/lib/review-draft/state/store'
+import { ReviewCommentInput } from '@/components/review-comment-input'
 import {
   diffLineAddress,
   diffLineAddressLabel,
-  diffLineSelectionText,
   diffRowsForAddress,
+  selectedText,
   selectedDiffRows,
   type DiffLineAddress,
+  type SelectedDiffText,
 } from '../utils/diff-line-selection'
 
 /**
@@ -30,13 +34,20 @@ export function DiffLineCommentAction({
   file,
   hostRef,
   getStackedRows,
+  rootPath,
 }: {
   file: DiffFile
   hostRef: RefObject<HTMLElement | null>
   getStackedRows: () => readonly DiffRenderRow[]
+  rootPath: string
 }) {
-  const { attachText } = useAttachToComposer()
+  const { attachText } = useAttachToComposer(rootPath)
+  const environmentId = useEnvironmentId()
   const [address, setAddress] = useState<DiffLineAddress | null>(null)
+  // Quoted at selection: a diff that refreshes while the user types must not shift the lines.
+  const [selected, setSelected] = useState<SelectedDiffText | null>(null)
+  // A comment waits in the review draft and goes out with the next message.
+  const [commenting, setCommenting] = useState(false)
   // Not state: re-rendering mid-drag on the anchor would only throw the drag away.
   const anchor = useRef<DiffRowHit | null>(null)
 
@@ -48,6 +59,7 @@ export function DiffLineCommentAction({
       if (event.button !== 0) return
 
       setAddress(null)
+      setCommenting(false)
       anchor.current = diffRowAtEvent(event)
     }
 
@@ -62,7 +74,9 @@ export function DiffLineCommentAction({
       const headRow = head?.side === start.side ? head.rowIndex : start.rowIndex
       const dragged = selectedDiffRows(start.rows, start.rowIndex, headRow)
       const stackedRows = getStackedRows()
-      setAddress(canonicalAddress(diffLineAddress(dragged), stackedRows))
+      const next = canonicalAddress(diffLineAddress(dragged), stackedRows)
+      setAddress(next)
+      setSelected(next ? selectedText(file, stackedRows, next) : null)
     }
 
     host.addEventListener('mousedown', onMouseDown, true)
@@ -72,17 +86,33 @@ export function DiffLineCommentAction({
       host.removeEventListener('mousedown', onMouseDown, true)
       host.ownerDocument.removeEventListener('mouseup', onMouseUp)
     }
-  }, [getStackedRows, hostRef])
+  }, [file, getStackedRows, hostRef])
 
   if (!address) return null
 
   const ask = () => {
-    // Resolved against the stacked projection so the agent gets both sides of
-    // the change even when the range was dragged out in one split pane.
-    const rows = diffRowsForAddress(getStackedRows(), address)
-    if (rows.length === 0) return
-    if (!attachText('git-diff', diffLineSelectionText(file.path, address, rows))) return
+    if (!selected || !attachText('git-diff', selected.text)) return
 
+    setAddress(null)
+  }
+
+  const saveComment = (body: string) => {
+    if (!selected || !body.trim()) return
+    addReviewComment({
+      anchor: {
+        kind: 'diff',
+        newObjectId: selected.newObjectId,
+        newRange: address.newRange,
+        oldObjectId: selected.oldObjectId,
+        oldRange: address.oldRange,
+        path: file.path,
+      },
+      author: 'user',
+      body,
+      destination: { environmentId, rootPath },
+      quote: selected.text,
+    })
+    setCommenting(false)
     setAddress(null)
   }
 
@@ -92,10 +122,20 @@ export function DiffLineCommentAction({
         <span className='text-muted-foreground px-(--density-control-padding-x-tight) text-xs tabular-nums'>
           {diffLineAddressLabel(address)}
         </span>
-        <Button onClick={ask} size='sm' variant='ghost'>
-          <ChatCircleIcon data-icon='inline-start' />
-          Ask the agent about these lines
-        </Button>
+        {commenting ? (
+          <ReviewCommentInput onCancel={() => setCommenting(false)} onSave={saveComment} />
+        ) : (
+          <>
+            <Button onClick={ask} size='sm' variant='ghost'>
+              <ChatCircleIcon data-icon='inline-start' />
+              Ask the agent about these lines
+            </Button>
+            <Button onClick={() => setCommenting(true)} size='sm' variant='ghost'>
+              <NotePencilIcon data-icon='inline-start' />
+              Comment
+            </Button>
+          </>
+        )}
         <Tooltip>
           <TooltipTrigger
             render={

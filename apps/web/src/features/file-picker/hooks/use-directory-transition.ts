@@ -1,4 +1,6 @@
 import { directoryQueryOptions } from '@/features/file-picker/utils/directory-query'
+import { hasPrefetchRoom } from '@/lib/prefetch-room'
+import { filePickerKeys } from '@/lib/query-keys'
 import { errorMessage } from '@/lib/error-message'
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useLayoutEffect, useRef } from 'react'
@@ -42,6 +44,12 @@ export function useDirectoryTransition({
     return queryClient.prefetchQuery(directoryQueryOptions({ mode, path, query: '', showHidden }))
   }
 
+  /** A row's hover or scroll intent: a guess, so it waits when enough listings are already loading. */
+  const guessDirectory = (path: string) => {
+    if (!hasPrefetchRoom(queryClient, filePickerKeys.directories())) return
+    return preloadDirectory(path)
+  }
+
   const loadDirectory = async (path: string, intentId?: number) => {
     if (!enabled) return false
 
@@ -65,5 +73,5 @@ export function useDirectoryTransition({
     return requestId === requestIdRef.current
   }
 
-  return { beginDirectoryIntent, loadDirectory, preloadDirectory }
+  return { beginDirectoryIntent, guessDirectory, loadDirectory, preloadDirectory }
 }

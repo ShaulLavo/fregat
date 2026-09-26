@@ -2,8 +2,8 @@
 
 ## Status and authorization
 
-- Status: PROPOSED — research done 2026-09-25 (findings and proposed phases below). Three owner
-  questions are open. Nothing here authorizes implementation.
+- Status: PROPOSED — research done 2026-09-25 (findings and proposed phases below). Owner questions answered
+  2026-09-26; the phone layout waits on Plan 143. Nothing here authorizes implementation.
 - Priority: P3. The site is not live.
 - Planned at: Platform `9c1c45d1`, 2026-09-25. Origin: the UI library survey
   ([docs/ui-research/brainless.md](../docs/ui-research/brainless.md)).
@@ -220,13 +220,18 @@ way to touch fregat without cloning.
    the vite `demo` mode, the second build in `scripts/build-site.ts`, and `site.yml`'s
    `apps/web/**` trigger.
    (c) Keep it as the hero behind a click-to-load.
+   Decided 2026-09-26: owner — (b) delete it. Long term, a real browser-only build of the server
+   replaces it; that is its own future plan, not a revived mock backend.
 2. **Which story.** (a) The table in 4: one Claude turn end to end, with codex finishing in
    parallel (recommended, and it matches "claude code and codex inside"). (b) Cursor's shape: only
    agents finishing, no editor or terminal beats. (c) An editor-first story: Singapore editing,
    search, git, with agents secondary.
+   Decided 2026-09-26: owner — (a).
 3. **Phones.** The 1360×840 stage scaled to a 390 px phone is about 0.29×, which is unreadable.
    (a) On narrow screens show only the agent pane at native size, playing the same script
    (recommended). (b) Scale the whole stage. (c) Show the still first frame.
+   Decided 2026-09-26: owner — none yet: the phone hero shows what the app looks like on a phone,
+   so it waits on [Plan 143](143-phone-layout.md)'s phone shell and is designed from it.
 
 ### Proposed phases
 

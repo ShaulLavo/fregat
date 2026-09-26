@@ -2,6 +2,12 @@ import { errorStringField } from '@workspace/contracts'
 import { defineErrorCatalog } from 'evlog'
 
 export const sessionIdentityErrors = defineErrorCatalog('provider', {
+  UPDATE_MANUAL_ONLY: {
+    status: 409,
+    message: 'This CLI updates from outside the app.',
+    why: 'Its install belongs to a version manager, Homebrew or the app itself, or its origin is unknown.',
+    fix: 'Run the command shown beside the version, or reinstall the CLI with npm or its own installer.',
+  },
   ROLLBACK_UNSUPPORTED: {
     status: 409,
     message: 'This provider cannot rewind its conversation.',
@@ -13,6 +19,24 @@ export const sessionIdentityErrors = defineErrorCatalog('provider', {
     message: 'The provider runtime is unavailable for rewind.',
     why: 'Rewind requires an active binding to the same native conversation.',
     fix: 'Resume the provider session before rewinding. No files were restored.',
+  },
+  SESSION_NOT_RUNNING: {
+    status: 409,
+    message: 'The session is not running.',
+    why: 'This control talks to the live provider process, and the session has none.',
+    fix: 'Send a message to start the session, then try again.',
+  },
+  SESSION_CONTROL_UNSUPPORTED: {
+    status: 409,
+    message: "This session's provider does not offer that control.",
+    why: 'The session runs on a provider without it, or has no provider binding yet.',
+    fix: 'Use the provider’s own settings or command line for this.',
+  },
+  TASK_STOP_UNSUPPORTED: {
+    status: 409,
+    message: "This provider's background tasks cannot be stopped from here.",
+    why: 'The session runs on a provider with no stop-task control.',
+    fix: 'Stop the whole agent session instead.',
   },
   STEERING_UNAVAILABLE: {
     status: 409,
@@ -86,6 +110,12 @@ export const sessionIdentityErrors = defineErrorCatalog('provider', {
     why: 'The isolated provider metadata process could not return valid session metadata.',
     fix: 'Inspect the provider instance configuration and retry the scan.',
   },
+  FORK_POINT_UNAVAILABLE: {
+    status: 409,
+    message: 'The fork point is not in the source conversation',
+    why: "The harness's own history holds fewer turns than the session shows, so the turn to branch after cannot be found.",
+    fix: 'Fork from a later turn, or start a new session.',
+  },
   HISTORY_FAILED: {
     status: 502,
     message: 'Claude conversation history could not be read',
@@ -129,6 +159,12 @@ export const sessionIdentityErrors = defineErrorCatalog('provider', {
     why: 'The configured provider has no local history reader.',
     fix: 'Choose a provider listed in the conversation import settings.',
   },
+  RESET_CREDIT_REJECTED: {
+    status: 409,
+    message: ({ reason }: { reason: string }) => reason,
+    why: 'The provider answered the request without spending a credit.',
+    fix: 'Refresh usage, then confirm a reset again.',
+  },
 })
 
 /** The provider has no callback for this request any more; the caller branches on the code. */
@@ -138,4 +174,9 @@ export function requestGone(requestKind: 'approval' | 'user-input', requestId: s
 
 export function isNotInstalledError(error: unknown) {
   return errorStringField(error, 'code') === sessionIdentityErrors.NOT_INSTALLED.code
+}
+
+/** Only a definite answer from the provider clears a reset attempt; anything else may have spent it. */
+export function isResetCreditRejected(error: unknown) {
+  return errorStringField(error, 'code') === sessionIdentityErrors.RESET_CREDIT_REJECTED.code
 }

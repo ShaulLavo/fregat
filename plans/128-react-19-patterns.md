@@ -9,7 +9,7 @@ guidance that makes each one the default for the code written after it. It does 
 it names: compiler bailouts, the two `ref={focusTarget.ref}` destructures, the stage/unstage
 settlement and the one-capture-per-palette-keystroke change belong to
 Plan 127; transferred bytes and loading boundaries belong to
-[Plan 109](109-boot-boundaries.md) and Plan 106; async effect ownership is
+Plan 109 ([boot and first load](../docs/boot-and-first-load.md)) and Plan 106; async effect ownership is
 already settled by Plan 118.
 
 Root `PLAN.md` owns scheduling. This plan owns its internal execution order and does not reorder
@@ -972,7 +972,7 @@ say so rather than substituting a unit test.
 - **No `memo()` deletions.** The 24 are deliberate; they guard `VirtualList` rows the compiler cannot
   reach through the render prop.
 - **No bundle, chunking or dependency work.** That is Plan 106 and
-  [Plan 109](109-boot-boundaries.md).
+  Plan 109 ([boot and first load](../docs/boot-and-first-load.md)).
 - **No conversion of `workspace/components/view.tsx:22`**, the sidebar tab strip, the chat session
   stage, or `packages/ui/src/patterns/tool-pane.tsx`. Each is blocked on a prerequisite this plan
   lands or scopes, and each needs its own hidden-render cost measurement first.

@@ -19,7 +19,11 @@ export type ProviderUsageUpdate = {
 
 /** A full read replaces the account's windows; `unsupported` means no plan limits apply. */
 export type ProviderUsageProbe =
-  | { kind: 'reading'; update: ProviderUsageUpdate }
+  | {
+      kind: 'reading'
+      update: ProviderUsageUpdate
+      resetCredits?: { available: number; accountKey: string; creditId: string | null } | null
+    }
   | { kind: 'unsupported' }
 
 const SESSION_MINUTES = 5 * 60

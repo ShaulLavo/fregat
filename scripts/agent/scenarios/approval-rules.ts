@@ -5,8 +5,14 @@ import path from 'node:path'
 import type { Page } from 'playwright'
 import type { Scenario } from './index'
 import { selectors } from '../selectors'
-import { createGitFixture, fixtureGit, releaseFixture } from '../fixture-workspace'
-import { dispatch, openChat } from './chat-verification'
+import { createGitFixture, fixtureGit } from '../fixture-workspace'
+import {
+  dispatch,
+  openChat,
+  removeScenarioSessions,
+  typePrompt,
+  waitForReply,
+} from './chat-verification'
 import { registerFixtureProject } from './native-provider-verification'
 
 const MARKER = 'marker-145.txt'
@@ -69,26 +75,20 @@ function approvalRulesScenario(provider: ApprovalRulesProvider): Scenario {
 
         await selectors.commandApprovalDecision(page, provider.always).click()
         await selectors.commandApproval(page).waitFor({ state: 'hidden', timeout: 30_000 })
-        await waitForReply(page)
+        await waitForReply(page, DONE)
         await access(path.join(fixture, MARKER))
         await provider.ruleWritten(fixture)
         await step('rule-written')
 
         await run('remembered')
-        await waitForReply(page)
+        await waitForReply(page, DONE)
         strictEqual(await selectors.commandApproval(page).count(), 0)
         await step('second-session-not-asked')
       } catch (error) {
         await step('failed-before-cleanup')
         throw error
       } finally {
-        for (const sessionId of sessions) {
-          await dispatch(page, orchestration, { type: 'session.runtime.stop', sessionId })
-          await dispatch(page, orchestration, { type: 'session.delete', sessionId })
-        }
-        if (projectId)
-          await dispatch(page, orchestration, { type: 'project.delete', projectId, force: true })
-        await releaseFixture(fixture)
+        await removeScenarioSessions(page, orchestration, { fixture, projectId, sessions })
         await restore?.()
       }
     },
@@ -174,25 +174,4 @@ async function startSession(
   await page.waitForURL((url) => url.href.includes(sessionId))
   await typePrompt(page, provider.prompt)
   await selectors.chatSend(page).click()
-}
-
-// The prompt itself contains the word, so the reply is the second match.
-async function waitForReply(page: Page) {
-  const matches = selectors.chatMessages(page).getByText(DONE)
-  const deadline = Date.now() + 120_000
-  while (Date.now() < deadline) {
-    if ((await matches.count()) >= 2) return
-    await Bun.sleep(250)
-  }
-  ok(false, `The agent never replied ${DONE}`)
-}
-
-// The composer re-mounts once the session loads, which drops text typed before it.
-async function typePrompt(page: Page, prompt: string) {
-  for (let attempt = 0; attempt < 10; attempt += 1) {
-    await selectors.chatMessage(page).fill(prompt)
-    await Bun.sleep(300)
-    if (await selectors.chatSend(page).isEnabled()) return
-  }
-  ok(false, 'The composer never accepted the prompt')
 }

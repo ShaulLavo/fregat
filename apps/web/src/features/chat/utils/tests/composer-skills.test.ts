@@ -41,6 +41,7 @@ test('an unavailable provider answers with an empty catalog instead of an error'
   void client
 
   expect(await fetchProviderCommandCatalog(missing, '/tmp/some-project', getClient())).toEqual({
+    agents: [],
     commands: [],
     providerInstanceId: 'not-a-provider',
     skills: [],

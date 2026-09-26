@@ -372,6 +372,7 @@ export function TerminalPanel({
         <TerminalMenu
           anchor={contextMenu.anchor}
           onOpenChange={handleTerminalMenuOpenChange}
+          rootPath={rootPath}
           target={menuTarget}
         />
       ) : null}

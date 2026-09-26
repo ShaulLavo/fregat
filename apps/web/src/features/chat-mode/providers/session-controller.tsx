@@ -1,3 +1,4 @@
+import { ComposerRootsContext } from '@/lib/composer-attach/providers/roots-context'
 import { useActiveChatProjection } from '@/features/chat/hooks/use-active-projection'
 import type { ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
@@ -99,9 +100,12 @@ export function ChatModeSessionController({
 
   return (
     <ChatModeSessionContext value={value}>
-      {/* Inside the session context, which is where the dispatching transport
-          lives, and above the rail, which is the only surface that reorders. */}
-      <ChatRailOrderProvider>{children}</ChatRailOrderProvider>
+      {/* The editor addresses captures by its own root; a linked worktree's composer takes them. */}
+      <ComposerRootsContext value={[rootPath, editorRootPath]}>
+        {/* Inside the session context, which is where the dispatching transport
+            lives, and above the rail, which is the only surface that reorders. */}
+        <ChatRailOrderProvider>{children}</ChatRailOrderProvider>
+      </ComposerRootsContext>
       <ProjectDeleteDialog />
       <ProjectRenameDialog />
     </ChatModeSessionContext>

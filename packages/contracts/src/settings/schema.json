@@ -2,6 +2,11 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "additionalProperties": false,
   "properties": {
+    "chat.activeFileContext": {
+      "default": false,
+      "description": "Show the file open in the editor as a chip in the composer. While the chip is there, sending mentions that file. Remove the chip to send without it.",
+      "type": "boolean"
+    },
     "chat.autoSettleAfterDays": {
       "default": 3,
       "description": "Move a session to Settled once it has had no activity for this many days, including existing sessions. 0 turns it off.",
@@ -311,6 +316,12 @@
       "minimum": 8,
       "type": "integer"
     },
+    "editor.markdownView": {
+      "default": "preview",
+      "description": "How markdown files open: source text, source beside a rendered view, or rendered in place while you edit. Cycle markdown view changes one file.",
+      "enum": ["preview", "source", "split"],
+      "type": "string"
+    },
     "editor.minimap.enabled": {
       "default": true,
       "description": "Show the minimap beside the editor.",
@@ -425,6 +436,13 @@
       "description": "Show dot-prefixed files and folders in file pickers.",
       "type": "boolean"
     },
+    "files.watchDirectoryLimit": {
+      "default": 200000,
+      "description": "How many folders all open workspaces may watch for live changes together. A workspace that would pass it updates its top level and open files only.",
+      "maximum": 2000000,
+      "minimum": 0,
+      "type": "integer"
+    },
     "git.autoPull": {
       "default": false,
       "description": "Fast-forward a project checkout on its default branch when its upstream moves. A checkout with changes, local commits or another branch checked out is left alone.",
@@ -501,7 +519,7 @@
     },
     "keybindings.preset": {
       "default": "default",
-      "description": "Editor shortcuts to use before applying your overrides. Default uses the native editor pack; vscode uses the VS Code pack.",
+      "description": "Shortcuts your overrides apply on top of. VS Code keeps VS Code bindings. Platform starts from them and adds its own keys for tabs, chats and sidebar panels.",
       "enum": ["default", "vscode"],
       "type": "string"
     },

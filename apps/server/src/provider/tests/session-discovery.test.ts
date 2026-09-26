@@ -57,8 +57,24 @@ describe('Claude discovery boundary', () => {
         },
       },
       {
-        uuid: 'answer-2',
+        uuid: 'interrupt-1',
         parentUuid: 'tool-result-1',
+        type: 'user',
+        message: { role: 'user', content: '[Request interrupted by user]' },
+      },
+      {
+        uuid: 'compact-summary',
+        parentUuid: 'interrupt-1',
+        type: 'user',
+        isCompactSummary: true,
+        message: {
+          role: 'user',
+          content: 'This session is being continued from a previous conversation.',
+        },
+      },
+      {
+        uuid: 'answer-2',
+        parentUuid: 'compact-summary',
         type: 'assistant',
         message: { role: 'assistant', content: [{ type: 'text', text: 'Final answer' }] },
       },

@@ -7,6 +7,7 @@ import {
   type OrchestrationEvent,
 } from '@workspace/contracts'
 import { recordProcessInfo, recordProcessWarning, type OperationContext } from '../observability'
+import { sanitizeErrorCause } from '../observability/logging'
 
 import type {
   ProviderRuntimeEvent,
@@ -199,6 +200,7 @@ function serializableError(value: unknown): unknown {
     ...errorField(value, 'status'),
     ...errorField(value, 'why'),
     ...errorField(value, 'fix'),
+    ...errorInternal(value),
     ...(value.stack ? { stack: value.stack.split('\n').slice(0, 6).join('\n') } : {}),
     ...(cause === undefined ? {} : { cause: serializableError(cause) }),
   }
@@ -209,6 +211,14 @@ function errorField(error: Error, key: string) {
   if (value === undefined) return {}
 
   return { [key]: value }
+}
+
+// Runtime facts get the redaction a request's error gets, so a sensitive key never lands raw.
+function errorInternal(error: Error) {
+  const { internal } = error as Error & { internal?: unknown }
+  if (internal === undefined) return {}
+
+  return { internal: sanitizeErrorCause(internal) }
 }
 
 function eventPayloadSummary(event: OrchestrationEvent): ChatPipelineContext {

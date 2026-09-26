@@ -1,4 +1,4 @@
-import { defineErrorCatalog } from 'evlog'
+import { EvlogError, defineErrorCatalog } from 'evlog'
 
 const errors = defineErrorCatalog('orchestration', {
   LIVE_STREAM_OVERFLOW: {
@@ -7,7 +7,17 @@ const errors = defineErrorCatalog('orchestration', {
     why: 'The consumer has not acknowledged updates fast enough to keep retained delivery bounded.',
     fix: 'Resume the subscription from the last applied sequence.',
   },
+  LIVE_STREAM_ACK_TIMEOUT: {
+    status: 408,
+    message: 'Live updates went unacknowledged, so the server closed the connection.',
+    why: 'The client left a delivery unacknowledged past the server timeout.',
+    fix: 'Reconnect and resume the subscription from the last applied sequence.',
+  },
 })
+
+export function isLiveStreamAckTimeout(error: unknown) {
+  return EvlogError.isEvlogError(error) && error.code === errors.LIVE_STREAM_ACK_TIMEOUT.code
+}
 
 export type RetainedLiveItem<T> = { readonly value: T; readonly serializedBytes: number }
 export type LiveStreamLimits = { readonly maxItems: number; readonly maxBytes: number }
@@ -50,13 +60,9 @@ export class LiveStreamBudget {
     return next
   }
 
-  overflow(extra: Record<string, number> = {}) {
-    const error = errors.LIVE_STREAM_OVERFLOW({
-      internal: { ...this.usage, ...this.limits, ...extra },
-    })
-    this.controller.abort(error)
-    this.clear()
-    return error
+  /** Ends delivery for a consumer that stopped acknowledging; the caps were not reached. */
+  ackTimeout(extra: Record<string, number>) {
+    return this.abort(errors.LIVE_STREAM_ACK_TIMEOUT({ internal: { ...this.usage, ...extra } }))
   }
 
   release(items: readonly RetainedLiveItem<unknown>[]) {
@@ -69,6 +75,18 @@ export class LiveStreamBudget {
   dispose() {
     this.controller.abort()
     this.clear()
+  }
+
+  private overflow(extra: Record<string, number>) {
+    return this.abort(
+      errors.LIVE_STREAM_OVERFLOW({ internal: { ...this.usage, ...this.limits, ...extra } }),
+    )
+  }
+
+  private abort(error: EvlogError) {
+    this.controller.abort(error)
+    this.clear()
+    return error
   }
 
   private clear() {

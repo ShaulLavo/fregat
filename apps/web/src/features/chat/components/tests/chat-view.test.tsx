@@ -8,7 +8,11 @@ import {
 } from '@/features/chat/state/chat-input-draft-store'
 import { act, fireEvent, waitFor } from '@testing-library/react'
 import { useComposerInboxStore } from '@/features/chat/state/composer-inbox-store'
-import { vi } from 'vitest'
+import { afterEach, vi } from 'vitest'
+import {
+  chatMessageIntents,
+  resetChatMessageIntents,
+} from '@/features/chat/state/chat-message-intents'
 import {
   eventIdSchema,
   messageIdSchema,
@@ -35,6 +39,10 @@ import {
 } from '../../../../../test/factories/chat'
 import { renderCachedChatSelection } from '../../../../../test/factories/chat-view'
 import { unsupportedChatTransport } from '../../../../../test/factories/chat-transport'
+
+afterEach(() => {
+  expect(chatMessageIntents.getState().active).toEqual([])
+})
 
 test('selecting a cached session keeps its transcript readable and resumes detail when a live transport returns', async () => {
   const previousProjection = useChatProjectionStore.getState()
@@ -403,7 +411,12 @@ test('correction retry consumes content while model and mode choices reach the n
       })
       useChatProjectionStore.getState().syncSessionDetailSnapshot(TEST_ENVIRONMENT_ID, snapshot)
     })
-    act(() => useComposerInboxStore.getState().queueText('Now implement it.'))
+    act(() =>
+      useComposerInboxStore.getState().queueText('Now implement it.', {
+        environmentId: target.environmentId,
+        rootPath: target.rootPath,
+      }),
+    )
     await waitFor(() =>
       expect(useChatInputDraftStore.getState().getDraft(target).prompt).toBe('Now implement it. '),
     )
@@ -431,6 +444,7 @@ test('correction retry consumes content while model and mode choices reach the n
     disconnect()
     height.mockRestore()
     resetChatInputDraftStore()
+    resetChatMessageIntents()
     useChatProjectionStore.setState(previousProjection, true)
   }
 })

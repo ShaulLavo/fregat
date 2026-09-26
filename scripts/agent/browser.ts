@@ -152,7 +152,9 @@ async function main() {
   if (!needsIsolatedServer(verb, scenario, options, values['shared-dev']))
     return runVerb(verb, scenario, options, values['shared-dev'])
   const prepared = await scenario?.prepareServer?.()
-  const server = await startIsolatedServer(new URL(options.url), prepared?.pathPrefix)
+  const server = await startIsolatedServer(new URL(options.url), {
+    pathPrefix: prepared?.pathPrefix,
+  })
   process.env.PORT = String(server.port)
   process.env.OBSERVABILITY_DIR = server.logs
   process.env.PLATFORM_HOME = server.home
@@ -283,7 +285,7 @@ async function runScenario(scenario: Scenario, options: Options) {
     const started = performance.now()
     let failure: string | null = null
     try {
-      await scenario.run(page, { file: options.file, step })
+      await scenario.run(page, { file: options.file, server: options.server, step })
       if (scenario.inspect) await evidence.json('inspection.json', await scenario.inspect(page))
     } catch (error) {
       failure = error instanceof Error ? error.message : String(error)
@@ -339,6 +341,7 @@ async function traceScenario(scenario: Scenario, options: Options) {
     try {
       await scenario.run(page, {
         file: options.file,
+        server: options.server,
         step: async (label) => {
           await page.evaluate((name) => performance.mark(`fregat:step:${name}`), label)
         },
@@ -412,6 +415,7 @@ async function countRenders(scenario: Scenario, options: Options) {
     try {
       await scenario.run(page, {
         file: options.file,
+        server: options.server,
         step: async (label) => {
           const rows = await page.evaluate(
             () =>

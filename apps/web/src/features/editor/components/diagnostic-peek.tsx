@@ -2,7 +2,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/component
 import { Button } from '@workspace/ui/components/button'
 import { cn } from '@workspace/ui/lib/utils'
 import { XIcon } from '@phosphor-icons/react'
-import { useLayoutEffect, useRef, useState } from 'react'
+import { use, useLayoutEffect, useRef, useState } from 'react'
 
 import type { DiagnosticPeekModel } from '@/features/editor/state/diagnostic-peek-source'
 import {
@@ -11,6 +11,8 @@ import {
   type DiagnosticPeekPlacement,
 } from '@/features/editor/utils/diagnostic-peek-placement'
 import { useFocusTarget } from '@/lib/focus/hooks/use-target'
+import { DiagnosticPeekFixButton } from '@/features/editor/components/diagnostic-peek-fix-button'
+import { DiagnosticFixContext } from '@/lib/diagnostic-ai/providers/context'
 
 type DiagnosticPeekProps = {
   readonly model: DiagnosticPeekModel
@@ -23,6 +25,7 @@ type DiagnosticPeekProps = {
 
 export function DiagnosticPeek({ model, onClose, onOpenTarget, tabId }: DiagnosticPeekProps) {
   const layerRef = useRef<HTMLDivElement | null>(null)
+  const canFix = use(DiagnosticFixContext) !== null
   const surfaceRef = useRef<HTMLDivElement | null>(null)
   const [placement, setPlacement] = useState<DiagnosticPeekPlacement | null>(null)
   const { ref: focusTargetRef } = useFocusTarget<HTMLDivElement>({
@@ -110,6 +113,9 @@ export function DiagnosticPeek({ model, onClose, onOpenTarget, tabId }: Diagnost
           <div className='text-muted-foreground mt-2 text-xs'>
             {[model.source, model.code].filter(Boolean).join(' · ')}
           </div>
+        ) : null}
+        {canFix ? (
+          <DiagnosticPeekFixButton model={model} tabId={tabId} onOpened={() => onClose(false)} />
         ) : null}
         {model.relatedInformation.length > 0 ? (
           <div className='mt-3 pt-2'>

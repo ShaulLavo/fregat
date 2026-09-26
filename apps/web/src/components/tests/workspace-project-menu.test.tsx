@@ -53,8 +53,8 @@ test('lists a folder only once when recents include a symlink through its parent
   await userEvent.click(screen.getByRole('button', { name: 'Switch project' }))
   await waitFor(() => {
     expect(
-      queryClient.getQueryData(['project-menu', 'canonical-root', 'Projects/platform']),
-    ).toMatchObject({ path: 'projects/platform' })
+      queryClient.getQueryData(['project-menu', 'canonical-roots', ['Projects/platform']]),
+    ).toMatchObject([{ path: 'Projects/platform', address: { path: 'projects/platform' } }])
   })
 
   await waitFor(() => expect(screen.queryByRole('status', { name: 'Loading projects' })).toBeNull())

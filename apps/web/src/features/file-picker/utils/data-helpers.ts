@@ -1,12 +1,11 @@
 import { filesystemPath } from '@/lib/documents/utils/identity'
-import type { FsEntry, PickedFsEntry } from '@/lib/file-system-types'
+import type { FsEntry } from '@/lib/file-system-types'
 import { isDirectoryEntry } from '@/lib/file-system-types'
 import {
   createFolderPath,
   fetchRecentEntries as fetchSharedRecentEntries,
   fetchServerInfo as fetchSharedServerInfo,
   fetchTree,
-  recordRecentEntry,
   statPath,
 } from '@/lib/file-server'
 import { createClientError } from '@workspace/client-core/errors'
@@ -69,10 +68,6 @@ export function fetchRecentEntries(
   client: Client,
 ) {
   return fetchSharedRecentEntries({ limit: RECENT_LIMIT, mode, showHidden }, signal, client)
-}
-
-export async function recordRecent(entry: PickedFsEntry, client: Client) {
-  await recordRecentEntry(entry.path, client)
 }
 
 export async function createPickerFolder(request: CreatePickerFolderRequest, client: Client) {

@@ -8,7 +8,10 @@
     "apps/server": {
       "entry": [
         "src/provider/claude-discovery-worker.ts",
+        "src/fs/watch-worker.ts",
+        "src/fs/tests/fixtures/crashing-watch-worker.ts",
         "src/installation/remote-support.ts",
+        "src/terminal-host/main.ts",
         "scripts/pty-benchmark.ts",
         "scripts/pty-smoke.ts",
         "scripts/workspace-search-benchmark.ts",
@@ -55,6 +58,7 @@
         "agent/logs.ts",
         "deploy/mesh.ts",
         "deploy/live-check.mjs",
+        "deploy/systemd/promote.ts",
         "desktop-dev.ts",
         "dev.ts",
         "flake-summary.ts",

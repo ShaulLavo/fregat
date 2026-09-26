@@ -5,12 +5,14 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/component
 export function ToggleIconButton({
   active,
   icon,
+  keyShortcuts,
   label,
   tooltipSide = 'bottom',
   onClick,
 }: {
   readonly active: boolean
   readonly icon: ReactNode
+  readonly keyShortcuts?: string
   readonly label: string
   readonly tooltipSide?: 'left' | 'right' | 'bottom'
   readonly onClick: () => void
@@ -20,6 +22,7 @@ export function ToggleIconButton({
       <TooltipTrigger
         render={
           <Button
+            aria-keyshortcuts={keyShortcuts}
             aria-label={label}
             aria-pressed={active}
             className={cn('text-muted-foreground', active && 'bg-accent text-accent-foreground')}

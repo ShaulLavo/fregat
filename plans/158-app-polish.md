@@ -59,6 +59,10 @@
   hides the scrollbar.
 - `VirtualList` gains an optional `follow` prop that mounts both pieces. A list that does not ask
   for it pays nothing.
+- 2026-09-26: build on [Plan 181](181-chat-timeline-end-anchoring.md), which lands first. At an end
+  edge, "at the edge" is TanStack's `isAtEnd` / `scrollEndThreshold` and following is
+  `followOnAppend`; the store keeps only `arrivals` and the pill. Holding the reader across a
+  prepend is `anchorTo: 'end'` with stable keys, which also answers the logs check below.
 
 **Apply.**
 

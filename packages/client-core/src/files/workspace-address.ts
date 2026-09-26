@@ -19,6 +19,25 @@ export async function registerWorkspaceAddress({
   return v.parse(workspaceAddressSchema, data)
 }
 
+const workspaceAddressLookupSchema = v.object({
+  entries: v.array(v.object({ path: v.string(), address: v.nullable(workspaceAddressSchema) })),
+})
+
+/** One request for many candidate roots; a path that cannot be a root answers `address: null`. */
+export async function lookupWorkspaceAddresses({
+  client,
+  paths,
+  signal,
+}: RequestOptions & { readonly paths: readonly string[] }) {
+  const { data, error } = await client.fs['workspace-addresses'].post(
+    { paths },
+    { fetch: { signal } },
+  )
+  if (error) throw createRpcError(error)
+  signal.throwIfAborted()
+  return v.parse(workspaceAddressLookupSchema, data).entries
+}
+
 export async function readWorkspaceAddress({
   client,
   id,

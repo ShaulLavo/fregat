@@ -68,6 +68,15 @@ import { fileLabelCohesion } from './file-label-cohesion'
 import { checkpointStates } from './checkpoint-states'
 import { checkpointDiffTokens } from './checkpoint-diff-tokens'
 import { sessionActionsSurfaces } from './session-actions-surfaces'
+import { exportTranscript } from './export-transcript'
+import { claudeHookRows } from './hook-rows'
+import { claudeBackgroundTasks } from './background-tasks'
+import { claudeCustomAgent } from './custom-agent'
+import { customAgentProviderSwitch } from './custom-agent-switch'
+import { claudeContextPopover } from './context-popover'
+import { claudeManualCompaction, codexManualCompaction } from './manual-compaction'
+import { claudeSessionTools, codexSessionTools } from './session-tools'
+import { claudeSessionFork, codexSessionFork } from './session-fork'
 import { searchFileActions } from './search-file-actions'
 import { settingsStaleDiagnostics } from './settings-stale-diagnostics'
 import { fontPicker } from './font-picker'
@@ -82,6 +91,12 @@ import { chatComposerInsert } from './chat-composer-insert'
 import { chatDisclosureSettle } from './chat-disclosure-settle'
 import { chatTurnAnatomy } from './chat-turn-anatomy'
 import { fileTreeHoverPrefetch } from './file-tree-hover-prefetch'
+import {
+  filePickerPrefetchBound,
+  workspaceOpenLargeRoot,
+  workspaceOpenUnreadableChild,
+  workspaceSwitchClickDuringOpen,
+} from './large-folder'
 import { wallpaperBootHandoff } from './wallpaper-boot-handoff'
 import { chatGitTabSwitch } from './chat-git-tab-switch'
 import { chatGitTurnRows } from './chat-git-turn-rows'
@@ -97,16 +112,26 @@ import { machineConnectError } from './machine-connect-error'
 import { machineProtocolMismatch } from './machine-protocol-mismatch'
 import { wallpaperIconHints } from './wallpaper-icon-hints'
 import { terminalBackground } from './terminal-background'
+import { terminalRenderer, terminalRendererWebgl } from './terminal-renderer'
 import { bottomPanelPersistence } from './bottom-panel-persistence'
+import { sidebarToggle } from './sidebar-toggle'
+import { itemNavigation } from './item-navigation'
+import { shortcutHints } from './shortcut-hints'
+import { editorAddToChat } from './editor-add-to-chat'
+import { markdownSplitView } from './markdown-split-view'
 import { gitOpenAllDiffsSpam } from './git-open-all-diffs-spam'
 import { gitStageSettles } from './git-stage-settles'
 import { gitChangesScroll } from './git-changes-scroll'
 import { gitDiscardConfirm } from './git-discard-confirm'
+import { serverUpdate } from './server-update'
 import { commandPaletteTypeBurst } from './command-palette-type-burst'
 import { paletteScriptsPending } from './palette-scripts-pending'
 import { settingsModelsPending } from './settings-models-pending'
+import { settingsProviderUpdate } from './settings-provider-update'
+import { claudeUsageImport } from './claude-usage-import'
 import { chatFollowUp } from './chat-follow-up'
 import { chatDiffSyntax } from './chat-diff-syntax'
+import { chatMarkdownFence } from './chat-markdown-fence'
 import { editorSplitDrag } from './editor-split-drag'
 import { editorSplitActions } from './editor-split-actions'
 import { editorSplitUnmounted } from './editor-split-unmounted'
@@ -167,9 +192,12 @@ import { searchTypeDelete } from './search-type-delete'
 import { searchResultLinePick } from './search-result-line-pick'
 import { paneRenderCrash } from './pane-render-crash'
 import type { Page } from 'playwright'
+import type { IsolatedServer } from '../isolated-server'
 
 type ScenarioContext = {
   readonly file: string
+  /** The throwaway API server, when the run started one. */
+  readonly server?: IsolatedServer
   /** Screenshots `target`, the scenario's page unless a second window is named. */
   readonly step: (label: string, target?: Page) => Promise<void>
 }
@@ -324,9 +352,22 @@ export const scenarios: readonly Scenario[] = [
   checkpointStates,
   checkpointDiffTokens,
   sessionActionsSurfaces,
+  exportTranscript,
+  claudeHookRows,
+  claudeBackgroundTasks,
+  claudeCustomAgent,
+  customAgentProviderSwitch,
+  claudeContextPopover,
+  claudeManualCompaction,
+  codexManualCompaction,
+  claudeSessionTools,
+  codexSessionTools,
+  claudeSessionFork,
+  codexSessionFork,
   searchFileActions,
   chatFollowUp,
   chatDiffSyntax,
+  chatMarkdownFence,
   editorSplitDrag,
   editorSplitActions,
   editorSplitUnmounted,
@@ -345,14 +386,24 @@ export const scenarios: readonly Scenario[] = [
   editorLinkedPackage,
   editorOfflineResync,
   terminalBackground,
+  terminalRenderer,
+  terminalRendererWebgl,
   bottomPanelPersistence,
+  sidebarToggle,
+  itemNavigation,
+  shortcutHints,
+  editorAddToChat,
+  markdownSplitView,
   gitOpenAllDiffsSpam,
   gitStageSettles,
   gitChangesScroll,
   gitDiscardConfirm,
+  serverUpdate,
   commandPaletteTypeBurst,
   paletteScriptsPending,
   settingsModelsPending,
+  settingsProviderUpdate,
+  claudeUsageImport,
   editorThemePreview,
   editorSyntaxBenchmark('native'),
   editorNativeCoverage('light'),
@@ -435,6 +486,10 @@ export const scenarios: readonly Scenario[] = [
   chatDisclosureSettle,
   chatTurnAnatomy,
   fileTreeHoverPrefetch,
+  workspaceOpenLargeRoot,
+  workspaceOpenUnreadableChild,
+  workspaceSwitchClickDuringOpen,
+  filePickerPrefetchBound,
   wallpaperBootHandoff,
   chatGitTabSwitch,
   chatGitTurnRows,

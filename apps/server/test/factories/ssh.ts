@@ -13,7 +13,7 @@ import { parseDescriptor, type RemoteRecord } from '../../src/machines/records'
 import { reserveForwardPort, type SshChild, type SshSpawner } from '../../src/machines/forward'
 import { MachineService } from '../../src/machines/service'
 import type { ReleaseInstallation, ServerInstallation } from '../../src/installation/descriptor'
-import { REMOTE_SUPPORT } from '../../src/installation/release-files'
+import { PTY_HOST, REMOTE_SUPPORT, WATCH_WORKER } from '../../src/installation/release-files'
 
 /** A production primary with no release to ship, as tests run the server from source. */
 export const noRelease = releaseSource('/platform-test/no-release/server')
@@ -300,7 +300,7 @@ function remoteSupportBundle() {
 
 /**
  * `<serverRoot>/releases/<name>`: its server/index.js answers /health with `protocolVersion` and
- * reports `name` as its serverVersion, beside the real remote-support.js. A `supportProtocol`
+ * reports `name` as its serverVersion, beside the real remote-support.js and a stub pty-host.js. A `supportProtocol`
  * other than this server's wraps that bundle so the release claims the older constant.
  */
 export async function writeRelease(
@@ -312,6 +312,8 @@ export async function writeRelease(
   const server = path.join(serverRoot, 'releases', name, 'server')
   await mkdir(server, { recursive: true })
   await writeFile(path.join(server, 'index.js'), healthServerSource(protocolVersion, name))
+  await writeFile(path.join(server, PTY_HOST), `// ${name} terminal host\n`)
+  await writeFile(path.join(server, WATCH_WORKER), '')
   if (supportProtocol === ORCHESTRATION_WS_PROTOCOL_VERSION) {
     await copyFile(await remoteSupportBundle(), path.join(server, REMOTE_SUPPORT))
     return
@@ -328,6 +330,7 @@ export async function writeCrashingRelease(serverRoot: string, name: string) {
   const server = path.join(serverRoot, 'releases', name, 'server')
   await mkdir(server, { recursive: true })
   await writeFile(path.join(server, 'index.js'), 'process.exit(3)')
+  await writeFile(path.join(server, WATCH_WORKER), '')
   await copyFile(await remoteSupportBundle(), path.join(server, REMOTE_SUPPORT))
 }
 

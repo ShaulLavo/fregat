@@ -33,6 +33,8 @@ export type MenuActionItem = MenuItemShared & {
   readonly destructive?: boolean
   readonly disabled?: boolean
   readonly shortcut?: string
+  /** Sets the label in the coding font, for a row whose label is a value such as a renderer name. */
+  readonly mono?: boolean
   /** The action puts focus somewhere itself, such as a rename field; closing must not take it back. */
   readonly takesFocus?: boolean
 }

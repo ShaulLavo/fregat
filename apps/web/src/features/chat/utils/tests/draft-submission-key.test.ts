@@ -9,6 +9,7 @@ import {
 import { draftSubmissionKey } from '../draft-submission-key'
 
 const input: Parameters<typeof draftSubmissionKey>[0] = {
+  agent: null,
   environmentId: TEST_ENVIRONMENT_ID,
   fanOut: false,
   worktreeTarget: { kind: 'current', worktreeId: TEST_WORKTREE_ID },
@@ -24,6 +25,17 @@ const input: Parameters<typeof draftSubmissionKey>[0] = {
 
 test('identical complete submissions reuse their command key', () => {
   expect(draftSubmissionKey(structuredClone(input))).toBe(draftSubmissionKey(input))
+})
+
+test('changing the custom agent gets a fresh command', () => {
+  const agent = {
+    name: 'reviewer',
+    providerInstanceId: input.payload.modelSelection.providerInstanceId,
+  }
+  expect(draftSubmissionKey({ ...input, agent })).not.toBe(draftSubmissionKey(input))
+  expect(draftSubmissionKey({ ...input, agent })).not.toBe(
+    draftSubmissionKey({ ...input, agent: { ...agent, name: 'builder' } }),
+  )
 })
 
 test.each([

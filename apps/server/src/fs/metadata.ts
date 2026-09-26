@@ -126,6 +126,17 @@ export class FsMetadataStore {
       .run()
   }
 
+  /** Drops recents whose paths are gone. Returns how many rows it removed. */
+  forgetPicked(paths: readonly string[]) {
+    if (paths.length === 0) return 0
+
+    return this.db
+      .delete(fsMetadata)
+      .where(inArray(fsMetadata.path, paths))
+      .returning({ path: fsMetadata.path })
+      .all().length
+  }
+
   listRecentEntryCandidates({ limit, offset }: { limit: number; offset: number }) {
     return this.db
       .select()

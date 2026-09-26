@@ -9,6 +9,8 @@ import { createScriptError } from './structured-errors'
 const root = path.resolve(import.meta.dirname, '..')
 const cwd = process.cwd()
 const env = observabilityEnvFromFile(path.join(root, '.env'), Bun.env)
+// A production terminal carries this; a dev process must never act on production's `pending`.
+delete env.PLATFORM_PRODUCTION_ROOT
 
 try {
   const commandArgs = applyEnvAssignments(Bun.argv.slice(2))

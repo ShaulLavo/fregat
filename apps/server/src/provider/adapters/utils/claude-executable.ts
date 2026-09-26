@@ -2,9 +2,9 @@ import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import path from 'node:path'
 import { sessionIdentityErrors } from '../../structured-errors'
+import { readCliVersion } from '../../utils/cli-version'
 
 const SDK_ENTRY = '@anthropic-ai/claude-agent-sdk'
-const VERSION_TIMEOUT_MS = 5_000
 
 type ClaudeExecutableSource = 'bundled' | 'configured' | 'installed'
 
@@ -24,7 +24,7 @@ export type ClaudeExecutableProbe = {
 
 const defaultProbe: ClaudeExecutableProbe = {
   bundled: bundledClaudeExecutable,
-  version: readClaudeVersion,
+  version: readCliVersion,
   which: (command, env) => Bun.which(command, { PATH: env.PATH ?? '' }),
 }
 
@@ -77,10 +77,6 @@ function bundledClaudeExecutable(): ClaudeExecutable | null {
   }
 }
 
-export function parseClaudeVersion(output: string): string | null {
-  return /\d+\.\d+\.\d+/.exec(output)?.[0] ?? null
-}
-
 async function configuredExecutable(
   binaryPath: string,
   env: NodeJS.ProcessEnv,
@@ -122,21 +118,4 @@ function sdkClaudeCodeVersion(sdkEntry: string): string | null {
   if (!('claudeCodeVersion' in manifest)) return null
 
   return typeof manifest.claudeCodeVersion === 'string' ? manifest.claudeCodeVersion : null
-}
-
-async function readClaudeVersion(executablePath: string, env: NodeJS.ProcessEnv) {
-  try {
-    const child = Bun.spawn([executablePath, '--version'], {
-      env,
-      stderr: 'ignore',
-      stdin: 'ignore',
-      stdout: 'pipe',
-      timeout: VERSION_TIMEOUT_MS,
-    })
-    const [stdout, exitCode] = await Promise.all([new Response(child.stdout).text(), child.exited])
-
-    return exitCode === 0 ? parseClaudeVersion(stdout) : null
-  } catch {
-    return null
-  }
 }

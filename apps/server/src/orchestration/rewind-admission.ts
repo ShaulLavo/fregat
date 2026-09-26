@@ -71,6 +71,6 @@ function requireWorktreeAvailable(model: OrchestrationReadModel, worktreeId: str
   }
 }
 
-function requireNoPendingRewind(session: OrchestrationProjectedSession | undefined) {
+export function requireNoPendingRewind(session: OrchestrationProjectedSession | undefined) {
   if (session?.pendingRewindCommandId) throw errors.SESSION_REWIND_PENDING()
 }

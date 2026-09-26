@@ -5,15 +5,21 @@ import { cn } from '@workspace/ui/lib/utils'
 import { diagnosticRuleClass } from '@/features/workbench/utils/diagnostic-style'
 import type { DiagnosticItemRow } from '@/features/workbench/utils/diagnostic-rows'
 import { diagnosticSeverityLabel } from '@/lib/diagnostic'
+import { FixDiagnosticButton } from '@/features/workbench/components/fix-diagnostic-button'
 
 /** One diagnostic: severity and line on the row, then its complete message beneath. */
 export function DiagnosticRow({
+  fixing,
   row,
   rowProps,
+  onFix,
   onOpen,
 }: {
+  /** Absent where there is no chat to open. */
+  readonly fixing: boolean | null
   readonly row: DiagnosticItemRow
   readonly rowProps: ReturnType<ReturnType<typeof useListbox>['rowProps']>
+  readonly onFix: () => void
   readonly onOpen: () => void
 }) {
   const line = row.target.range.start.line + 1
@@ -37,7 +43,10 @@ export function DiagnosticRow({
         </span>
         <span className='text-muted-foreground text-2xs ml-auto tabular-nums'>Line {line}</span>
       </ListRow>
-      <p className='px-(--density-row-padding-x) pb-(--density-gap-tight)'>{row.label}</p>
+      <div className='flex items-start gap-(--density-gap-tight) px-(--density-row-padding-x) pb-(--density-gap-tight)'>
+        <p className='min-w-0 flex-1'>{row.label}</p>
+        {fixing === null ? null : <FixDiagnosticButton pending={fixing} onFix={onFix} />}
+      </div>
     </div>
   )
 }

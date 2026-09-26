@@ -2,7 +2,7 @@ import { unique } from '@workspace/utils/collections'
 import { errorMessage } from '@workspace/contracts'
 import { homedir } from 'node:os'
 import path from 'node:path'
-import { closeApp, createApp } from './app'
+import { closeApp, createApp, updateForApp } from './app'
 import { DEFAULT_ALLOWED_ORIGINS } from './auth'
 import { getDefaultPlatformDatabase } from './db/client'
 import { platformHomePath } from './home'
@@ -14,11 +14,16 @@ import {
   recordProcessError,
   recordProcessInfo,
   recordProcessWarning,
+  runDetached,
   serverErrors,
 } from './observability'
 import { defaultSecretsFilePath, defaultSettingsFilePath } from './settings/paths'
 import { settingsPolicyFromEnv } from './settings/policy'
+import type { RestartRecord } from './update/service'
+import { readStagedRelease } from './update/staged-release'
 import { readReleaseInfoSync, releaseFileFor } from './web/release'
+
+type StopReason = NodeJS.Signals | { reason: 'restart'; record: RestartRecord }
 
 const port = Number(Bun.env.PORT ?? 3001)
 const hostname = Bun.env.FS_HOST ?? Bun.env.HOST ?? '127.0.0.1'
@@ -28,6 +33,12 @@ const configuredWorkspaceRoot = Bun.env.FS_WORKSPACE_ROOT
 const workspaceRoot = configuredWorkspaceRoot ?? systemRoot
 const watch = Bun.env.FS_WATCH !== 'false'
 const webRoot = Bun.env.WEB_ROOT
+// Deleted so a PTY or agent this server starts cannot read production's `pending`. Bun.spawn
+// without an `env` still passes the original environ; user-facing spawns pass `env`.
+const productionRoot = Bun.env.PLATFORM_PRODUCTION_ROOT || null
+delete process.env.PLATFORM_PRODUCTION_ROOT
+const serverReleaseFile = releaseFileFor(import.meta.dirname)
+const serverRelease = readReleaseInfoSync(serverReleaseFile).release
 const configuredOrigins = allowedOriginsFromEnv(Bun.env.SERVER_ALLOWED_ORIGINS)
 // The server serves the page itself, so its own loopback address is a web origin.
 const allowedOrigins = unique([
@@ -37,6 +48,8 @@ const allowedOrigins = unique([
 const maxTextFileBytes = numberFromEnv(Bun.env.FS_DEV_MAX_TEXT_FILE_BYTES)
 const treeConcurrency = numberFromEnv(Bun.env.FS_TREE_CONCURRENCY)
 let serverShutdown: Promise<void> | null = null
+// Module scope: a SIGTERM during a Restart must not start a second exit path.
+let stopping = false
 
 assertLoopbackHost(hostname)
 initializeObservability(Bun.env, readReleaseInfoSync(webRoot ? releaseFileFor(webRoot) : undefined))
@@ -57,15 +70,24 @@ export const app = createApp({
   themes: { seedWallpapers: true },
   treeConcurrency,
   watch,
-  web: { root: webRoot, serverReleaseFile: releaseFileFor(import.meta.dirname) },
+  update: {
+    root: productionRoot,
+    // After the POST answer flushes; closeApp runs before the listener stops.
+    restart: (record) => setImmediate(() => stop({ reason: 'restart', record })),
+  },
+  web: { root: webRoot, serverReleaseFile },
   webOrigin: configuredOrigins?.[0] ?? loopbackOrigins(hostname, port)[0],
   workspaceRoot: configuredWorkspaceRoot,
-}).listen({ hostname, port }, (server) => {
+})
+// A separate statement: Bun runs this callback inside listen(), before a chained `app` exists.
+app.listen({ hostname, port }, (server) => {
   recordProcessInfo('server.start', {
     environmentId: readEnvironmentIdentity(getDefaultPlatformDatabase()).id,
     homeDirectory,
     hostname: server.hostname,
+    pendingRelease: readStagedRelease(productionRoot, serverRelease).staged?.release ?? null,
     port: server.port,
+    productionRoot,
     stateRoot: platformHomePath(),
     systemRoot,
     webRoot: webRoot ?? null,
@@ -73,6 +95,7 @@ export const app = createApp({
   })
 })
 installShutdownHandlers()
+installUpdateHandler()
 
 export type App = typeof app
 
@@ -111,34 +134,77 @@ function shutdownServer() {
 }
 
 function installShutdownHandlers() {
-  let stopping = false
-
-  const stop = (signal: NodeJS.Signals) => {
-    if (stopping) return
-
-    stopping = true
-    void stopServer(signal)
-  }
-
   process.once('SIGINT', stop)
   process.once('SIGTERM', stop)
 }
 
-async function stopServer(signal: NodeJS.Signals) {
-  recordProcessInfo('server.stop', { signal })
+// Unconditional, so an answered /release proves SIGUSR2 no longer terminates this server.
+function installUpdateHandler() {
+  process.on('SIGUSR2', () => {
+    runDetached(async () => updateForApp(app).reread('signal'), {
+      area: 'update',
+      operation: 'reread',
+    })
+  })
+}
+
+function stop(reason: StopReason) {
+  if (stopping) return
+
+  stopping = true
+  void stopServer(reason)
+}
+
+// A signal stop has systemd's stop timeout behind it; a Restart has nothing, so it sets its own.
+const RESTART_DEADLINE_MS = 20_000
+
+async function stopServer(reason: StopReason) {
+  recordProcessInfo('server.stop', stopEvent(reason))
+  if (typeof reason !== 'string') armRestartDeadline()
 
   try {
     await shutdownServer()
   } catch (error) {
     recordProcessWarning('server.stop_failed', {
       error: errorMessage(error),
-      signal,
+      reason: typeof reason === 'string' ? reason : reason.reason,
     })
     await flushObservability()
     process.exit(1)
   }
 
-  process.exit(exitCodeForSignal(signal))
+  process.exit(exitCode(reason))
+}
+
+function armRestartDeadline() {
+  const timer = setTimeout(() => {
+    recordProcessWarning('server.stop_deadline', { deadlineMs: RESTART_DEADLINE_MS })
+    void flushObservability().finally(() => process.exit(RESTART_EXIT_CODE))
+  }, RESTART_DEADLINE_MS)
+  timer.unref()
+}
+
+function stopEvent(reason: StopReason) {
+  if (typeof reason === 'string') {
+    return {
+      reason,
+      trigger: 'signal',
+      release: { from: serverRelease },
+      pendingRelease: updateForApp(app).state().pending?.release ?? null,
+    }
+  }
+
+  const { record } = reason
+  return {
+    reason: 'restart',
+    trigger: record.trigger,
+    release: { from: record.from, to: record.to },
+    stagedAt: record.stagedAt,
+    stagedForMs: Date.now() - Date.parse(record.stagedAt),
+    interrupted: record.interrupted,
+    interruptedCount: record.interrupted.length,
+    clientInstance: record.clientInstance,
+  }
 }
 
 function allowedOriginsFromEnv(value: string | undefined) {
@@ -169,9 +235,13 @@ function assertLoopbackHost(host: string) {
   throw serverErrors.LOOPBACK_HOST_REQUIRED({ internal: { host, port } })
 }
 
-function exitCodeForSignal(signal: NodeJS.Signals) {
-  if (signal === 'SIGINT') return 130
-  if (signal === 'SIGTERM') return 143
+// 75 (EX_TEMPFAIL) is the unit's RestartForceExitStatus: systemd starts the staged release.
+const RESTART_EXIT_CODE = 75
+
+function exitCode(reason: StopReason) {
+  if (reason === 'SIGINT') return 130
+  if (reason === 'SIGTERM') return 143
+  if (typeof reason === 'object') return RESTART_EXIT_CODE
 
   return 0
 }

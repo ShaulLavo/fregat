@@ -30,10 +30,10 @@ describe('matchingKeybindingRows', () => {
   // The case an id-only search would miss, and the whole reason the title is in
   // the haystack: neither word appears in the command id.
   test('matches on the title alone', () => {
-    const matched = matchingKeybindingRows(rows, 'files pane')
+    const matched = matchingKeybindingRows(rows, 'next tab or chat')
 
     expect(matched).toHaveLength(1)
-    expect(matched[0]?.command).toBe('workspace.toggleSidebarVisibility')
+    expect(matched[0]?.command).toBe('workspace.nextItem')
   })
 
   test('matches on a single shortcut', () => {

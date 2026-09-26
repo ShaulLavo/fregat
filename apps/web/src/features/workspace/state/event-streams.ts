@@ -1,6 +1,8 @@
 import type { WatchServerMessage } from '@workspace/contracts'
+import { isObject } from '@workspace/utils/objects'
 import type { Client } from '@/lib/client'
 import { streamWorkspaceEvents } from '@/features/workspace/state/event-stream'
+import { log } from '@/lib/client-logging'
 
 type FileStream = {
   readonly controller: AbortController
@@ -37,6 +39,7 @@ export function startWorkspaceEventStreams({
   let pending: FileStream | null = null
   let filesAttempt = 0
   let filesRetry: ReturnType<typeof setTimeout> | null = null
+  let rejectedFiles: readonly string[] | null = null
 
   void runProjectStream()
 
@@ -97,11 +100,30 @@ export function startWorkspaceEventStreams({
     if (stream === pending) pending = null
     const retryInMs = reconnectDelay(filesAttempt++)
     onInterrupted({ scope: 'files', error, retryInMs })
-    if (filesRetry) clearTimeout(filesRetry)
+    cancelFilesRetry()
     filesRetry = setTimeout(() => {
       filesRetry = null
-      if (!current && !pending) setFiles(stream.files)
+      // While the tabs' own set is refused, an older set is no one's to reopen.
+      if (!current && !pending && !rejectedFiles) setFiles(stream.files)
     }, retryInMs)
+  }
+
+  /** The server refused this exact set; asking again gets the same answer until the set changes. */
+  function rejectFiles(stream: FileStream, error: unknown) {
+    if (stream !== current && stream !== pending) return
+    stream.controller.abort()
+    if (stream === current) current = null
+    if (stream === pending) pending = null
+    rejectedFiles = stream.files
+    log.warn({
+      action: 'workspace.events.files_rejected',
+      area: 'workspace-events',
+      fileCount: stream.files.length,
+      path: rootPath,
+      retryCount: filesAttempt,
+      status: responseStatus(error),
+    })
+    filesAttempt = 0
   }
 
   function setFiles(paths: readonly string[]) {
@@ -109,6 +131,10 @@ export function startWorkspaceEventStreams({
     const files = [...new Set(paths)].sort()
     const desired = pending ?? current
     if (desired && sameFiles(desired.files, files)) return
+    // A retry scheduled for an earlier set would resubscribe files no tab holds any more.
+    cancelFilesRetry()
+    if (rejectedFiles && sameFiles(rejectedFiles, files)) return
+    rejectedFiles = null
     pending?.controller.abort()
     pending = null
     if (current && sameFiles(current.files, files)) return
@@ -132,10 +158,19 @@ export function startWorkspaceEventStreams({
       },
       (error: unknown) => {
         if (stream.controller.signal.aborted) return
+        if (isFinalRejection(error)) {
+          rejectFiles(stream, error)
+          return
+        }
         if (filesAttempt === 0) onError(error)
         interruptFiles(stream, error)
       },
     )
+  }
+
+  function cancelFilesRetry() {
+    if (filesRetry) clearTimeout(filesRetry)
+    filesRetry = null
   }
 
   return {
@@ -144,12 +179,25 @@ export function startWorkspaceEventStreams({
       project.abort()
       pending?.controller.abort()
       current?.controller.abort()
-      if (filesRetry) clearTimeout(filesRetry)
-      filesRetry = null
+      cancelFilesRetry()
       pending = null
       current = null
     },
   }
+}
+
+// Sign-in, timeouts and rate limits clear with the same file set; any other 4xx is about the set.
+const RETRYABLE_CLIENT_STATUSES = new Set([401, 408, 429])
+
+function responseStatus(error: unknown) {
+  if (!isObject(error) || typeof error.status !== 'number') return undefined
+  return error.status
+}
+
+function isFinalRejection(error: unknown) {
+  const status = responseStatus(error)
+  if (status === undefined || status < 400 || status >= 500) return false
+  return !RETRYABLE_CLIENT_STATUSES.has(status)
 }
 
 function reconnectDelay(attempt: number) {

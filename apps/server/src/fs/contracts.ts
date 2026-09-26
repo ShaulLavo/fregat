@@ -46,6 +46,11 @@ export const pathQuerySchema = v.object({
   path: v.optional(pathSchema, ''),
 })
 
+export const appWriteQuerySchema = v.object({
+  path: pathSchema,
+  version: v.pipe(v.string(), v.maxLength(128)),
+})
+
 export const readQuerySchema = v.object({
   path: v.optional(pathSchema, ''),
   acceptTextOnly: v.optional(booleanQueryValueSchema),
@@ -87,12 +92,14 @@ const workspaceSearchIndexReadinessSchema = v.union([
   v.literal('ready'),
   v.literal('stale'),
   v.literal('failed'),
+  v.literal('off'),
 ])
 const workspaceSearchIndexFallbackReasonSchema = v.union([
   v.literal('building'),
   v.literal('cold'),
   v.literal('disabled'),
   v.literal('failed'),
+  v.literal('off'),
   v.literal('regex-name-query'),
   v.literal('root-mismatch'),
   v.literal('stale'),
@@ -184,6 +191,9 @@ export const openWorkspaceRootBodySchema = v.object({
 })
 
 export const registerWorkspaceAddressBodySchema = v.object({ path: pathSchema })
+export const lookupWorkspaceAddressesBodySchema = v.object({
+  paths: v.pipe(v.array(pathSchema), v.maxLength(1024), v.readonly()),
+})
 export const workspaceAddressParamsSchema = v.object({ id: workspaceAddressIdSchema })
 
 export const writeBodySchema = v.object({

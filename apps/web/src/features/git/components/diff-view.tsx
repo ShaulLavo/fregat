@@ -129,6 +129,7 @@ export function DiffView({
               (panes.stacked.plugin ?? panes.new.plugin ?? panes.old.plugin)?.getStackedRows() ?? []
             )
           }}
+          rootPath={rootPath}
         />
       ) : null}
     </div>

@@ -8,9 +8,13 @@ import { renderWithProviders } from '../../../../../test/render'
 
 function usage(overrides: Partial<ContextUsage> = {}): ContextUsage {
   return {
+    breakdown: null,
     compactsAutomatically: false,
+    estimated: false,
     maxTokens: 200_000,
     ratio: 0.25,
+    reserveTokens: null,
+    segments: null,
     totalProcessedTokens: null,
     usedTokens: 50_000,
     ...overrides,

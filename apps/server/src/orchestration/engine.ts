@@ -1,5 +1,6 @@
 import { SETUP_TIMEOUT_MS } from './setup-runner'
 import { commandUploadClaim } from './command-attachments'
+import { copyForkAttachments, discardUnclaimedForkAttachments } from '../attachments/fork'
 import { withAttachmentLanes } from '../attachments/lanes'
 import { createAttachmentOwnership, type AttachmentOwnership } from '../attachments/ownership'
 import { sessionTitleMessages } from './title-messages'
@@ -26,7 +27,8 @@ import { WorktreeCommandPreparation } from './worktree-command-preparation'
 import { TerminalLeaseController } from './terminal-lease-controller'
 import { remoteHost, remoteRepositoryPath } from '../git/forges/detect'
 import { GitWorktreeService } from '../git/worktrees'
-import type { TerminalService } from '../terminal/service'
+import { terminalSessionKey, type TerminalService } from '../terminal/service'
+import type { HostSessionInfo } from '../terminal-host/protocol'
 import { worktreeRuntimeErrors } from './worktree-runtime-errors'
 import {
   type ProviderInstanceId,
@@ -46,6 +48,8 @@ import {
   errorStringField,
   type ClientOrchestrationCommand,
   type OrchestrationCommandReceipt,
+  type BusySession,
+  type BusySessionState,
   type WorktreeSubmoduleMode,
   parsePullRequestReference,
   pullRequestReferenceRepository,
@@ -68,13 +72,15 @@ import { decideOrchestrationCommand } from './decider'
 import { OrchestrationEventStore, type OrchestrationDatabase } from './event-store'
 import { OrchestrationProjectionPipeline } from './projection-pipeline'
 import { bootstrapOrchestration } from './bootstrap'
-import { createEmptyReadModel } from './read-model'
+import { createEmptyReadModel, requireSession, requireWorktree } from './read-model'
+import { forkMessages } from './utils/fork-messages'
 import { prepareProjectRegistration, type RegistrationBoundary } from './registration'
 import { registrationResult } from './registration-decider'
 import { commandFingerprint } from './utils/command-intent'
 import { internalCommandKey } from './utils/repository-ids'
 import { verifyReceiptIntent } from './command-receipts'
 import { sessionDomainErrors } from './structured-errors'
+import { runtimeInterruptedByRestart } from './utils/restart-interruption'
 
 import { ProviderCommandReactor } from './provider-command-reactor'
 import { ProviderRuntimeIngestion, type ProviderRuntimeSource } from './provider-runtime-ingestion'
@@ -83,6 +89,7 @@ import { SessionDiscoveryReconciler } from './session-discovery'
 import { sessionImportErrors } from './import-errors'
 import { importedHistoryMessages, historyRevision } from './utils/import-history'
 import type { ProviderHistoryMessage } from '../provider/types'
+import { checkpointErrors } from './structured-errors'
 import { resolveSessionOwner } from './session-owner'
 import {
   createDefaultProviderAdapterRegistry,
@@ -139,6 +146,10 @@ export type OrchestrationEngineOptions = {
 
 type OrchestrationCommandSummary = ReturnType<typeof orchestrationCommandSummary>
 
+export type RestartAnswer =
+  | { restarting: false; busy: BusySession[] }
+  | { restarting: true; interrupted: BusySession[] }
+
 export class OrchestrationEngine {
   readonly worktreeExecutionGate = new WorktreeExecutionGate()
   private worktreeReactor: WorktreeLifecycleReactor | null = null
@@ -148,7 +159,10 @@ export class OrchestrationEngine {
   private readonly terminalHistoryRecoveries = new Map<SessionId, Promise<void>>()
   private unsubscribeGitMutations: (() => void) | null = null
   private reactorsStarted = false
+  // Set once a restart is accepted and never cleared: the process exits after it.
+  private startsHeld = false
   private queue = Promise.resolve()
+  private readonly workspaceOperations = new Set<string>()
   private readonly attachmentOwnership: AttachmentOwnership
   private readonly attachmentsDir: string
   private checkpointReactor: CheckpointReactor | null = null
@@ -161,6 +175,7 @@ export class OrchestrationEngine {
   private titleReactor: SessionTitleReactor | null = null
   private readonly keepImportedSessionsUpdated: () => boolean
   private providerService: ProviderService | null = null
+  private readonly terminalService: TerminalService | null
   private readonly registration: RegistrationBoundary | undefined
   private readonly preparationLanes = new Map<string, Promise<OrchestrationDispatchResult>>()
   readonly ready: Promise<void>
@@ -184,10 +199,12 @@ export class OrchestrationEngine {
     this.registration = options.registration
     this.providerService = options.providerService ?? null
     this.terminalHandoffs = new TerminalHandoffs(database)
+    this.terminalService = options.terminalService ?? null
     this.terminalLeases = new TerminalLeaseController({
       gate: this.worktreeExecutionGate,
       dispatch: (command) => this.enqueue(command),
       getReadModel: () => this.readModel,
+      queryHostSessions: () => this.hostSessions(),
     })
     this.eventStore = new OrchestrationEventStore(database)
     this.receipts = new OrchestrationCommandReceipts(database)
@@ -281,14 +298,24 @@ export class OrchestrationEngine {
       this.attachmentsDir,
       this.attachmentOwnership,
     )
-    const result = await this.enqueue(ingested.command, ingested.attachmentIngest, fingerprint)
-    return result
+    try {
+      return await this.enqueue(ingested.command, ingested.attachmentIngest, fingerprint)
+    } catch (error) {
+      if (prepared.type === 'session.fork')
+        await discardUnclaimedForkAttachments(
+          this.attachmentsDir,
+          prepared.attachmentCopies,
+          this.attachmentOwnership,
+        )
+      throw error
+    }
   }
 
   private async prepare(
     command: ClientOrchestrationCommand,
     fingerprint: string,
   ): Promise<OrchestrationCommand> {
+    if (command.type === 'session.fork') return this.prepareFork(command)
     if (command.type !== 'project.create') {
       if (this.worktreePreparation) return this.worktreePreparation.prepare(command, fingerprint)
       return v.parse(orchestrationCommandSchema, command)
@@ -308,6 +335,44 @@ export class OrchestrationEngine {
     return prepared
   }
 
+  private async prepareFork(
+    command: Extract<ClientOrchestrationCommand, { type: 'session.fork' }>,
+  ) {
+    const model = this.commandReadModel(command)
+    const source = requireSession(model, command.sourceSessionId)
+    const worktree = requireWorktree(model, source.worktreeId)
+    const messages = forkMessages(source, command.throughTurnId)
+    const providerTurnId = this.forkProviderTurn(source.id, command.throughTurnId)
+    if (!this.providerService || !providerTurnId)
+      throw sessionIdentityErrors.FORK_POINT_UNAVAILABLE({
+        internal: { sessionId: source.id, turnId: command.throughTurnId },
+      })
+    const native = await this.providerService.prepareFork({
+      cwd: worktree.canonicalPath,
+      providerTurnId,
+      conversationId: source.forkedFrom?.native.conversationId,
+      providerInstanceId: source.modelSelection.providerInstanceId,
+      sessionId: source.id,
+    })
+    const attachmentCopies = await copyForkAttachments(
+      this.attachmentsDir,
+      command.commandId,
+      messages,
+    )
+    return { ...command, native, attachmentCopies }
+  }
+
+  private forkProviderTurn(sessionId: SessionId, turnId: string): string | null {
+    let source = this.readModel.sessions.get(sessionId)
+    while (source) {
+      const native = this.eventStore.providerTurnId(source.id, turnId)
+      if (native) return native
+      if (!source.forkedFrom) return null
+      source = this.readModel.sessions.get(source.forkedFrom.sessionId)
+    }
+    return null
+  }
+
   async dispatch(command: OrchestrationCommand, attachmentIngest?: CommandAttachmentIngest) {
     await this.ready
     return this.enqueue(command, attachmentIngest)
@@ -316,6 +381,41 @@ export class OrchestrationEngine {
   async dispatchProviderCommand(command: OrchestrationCommand, source: ProviderRuntimeSource) {
     await this.ready
     return this.enqueueProviderCommand(command, source)
+  }
+
+  async runWorkspaceOperation<T>(sessionId: SessionId, operation: () => Promise<T>): Promise<T> {
+    await this.ready
+    const path = await this.schedule(() => {
+      const { worktree } = resolveSessionOwner(this.readModel, sessionId)
+      this.requireWorkspaceAvailable(worktree.canonicalPath)
+      this.workspaceOperations.add(worktree.canonicalPath)
+      return worktree.canonicalPath
+    })
+    try {
+      return await operation()
+    } finally {
+      this.workspaceOperations.delete(path)
+    }
+  }
+
+  private requireWorkspaceAvailable(path: string | undefined) {
+    if (path && this.workspaceOperations.has(path))
+      throw checkpointErrors.WORKSPACE_BUSY({ internal: { path } })
+  }
+
+  private requireWorkspaceCommandAvailable(command: OrchestrationCommand) {
+    if (command.type !== 'session.turn.start' && command.type !== 'session.checkpoint.revert')
+      return
+    const bootstrap =
+      command.type === 'session.turn.start'
+        ? command.bootstrap?.createSession?.worktreeTarget
+        : undefined
+    const targetId =
+      bootstrap?.kind === 'current'
+        ? bootstrap.worktreeId
+        : this.readModel.sessions.get(command.sessionId)?.worktreeId
+    const worktree = targetId ? this.readModel.worktrees.get(targetId) : undefined
+    this.requireWorkspaceAvailable(worktree?.canonicalPath)
   }
 
   private schedule<T>(operation: () => T | Promise<T>) {
@@ -338,7 +438,9 @@ export class OrchestrationEngine {
       this.attachmentsDir,
       claim.attachments.map((attachment) => attachment.id),
       async () => {
-        for (const attachment of claim.attachments)
+        for (const attachment of claim.attachments.filter((entry) =>
+          entry.id.startsWith('upload-'),
+        ))
           await validateAttachmentUpload(
             this.attachmentsDir,
             attachment,
@@ -437,6 +539,10 @@ export class OrchestrationEngine {
     await this.ready
     return this.snapshotQuery.sessionDetailPage(input)
   }
+  async sessionTranscript(sessionId: string) {
+    await this.ready
+    return this.snapshotQuery.sessionTranscript(sessionId)
+  }
   async replay(input: Parameters<OrchestrationEventStore['readAfter']>[0]) {
     await this.ready
     return { events: this.eventStore.readAfter(input) }
@@ -467,7 +573,66 @@ export class OrchestrationEngine {
     this.unsubscribeGitMutations?.()
     await this.worktreeReactor?.closeSetups()
     await this.worktreeReactor?.drain()
+    // A turn that ended just before shutdown still gets its checkpoint.
+    await this.checkpointReactor?.drain()
     await this.queue
+  }
+
+  /** Best effort for a signal stop: no claim or rewind commits after this. */
+  holdProviderStarts() {
+    this.startsHeld = true
+  }
+
+  /**
+   * Accepts a restart when every busy session is in `interrupt`. Runs on the command queue, so
+   * each claim enqueued earlier has committed and none can commit after an accepted answer.
+   * `commit` runs before the hold, so a throw leaves starts open.
+   */
+  async beginRestart(interrupt: ReadonlySet<SessionId>, commit = noop): Promise<RestartAnswer> {
+    await this.ready
+    return this.schedule(() => {
+      const busy = this.busySessions()
+      if (busy.some((session) => !interrupt.has(session.sessionId)))
+        return { restarting: false, busy }
+      commit()
+      this.startsHeld = true
+      return { restarting: true, interrupted: busy }
+    })
+  }
+
+  private busySessions() {
+    const busy: BusySession[] = []
+    for (const session of this.readModel.sessions.values()) {
+      if (session.deletedAt) continue
+      const state = this.busyState(session)
+      if (!state) continue
+      busy.push({
+        sessionId: session.id,
+        title: session.title,
+        projectTitle: this.projectTitle(session),
+        state,
+      })
+    }
+    return busy.sort(
+      (left, right) =>
+        left.title.localeCompare(right.title) || left.sessionId.localeCompare(right.sessionId),
+    )
+  }
+
+  private busyState(session: OrchestrationProjectedSession): BusySessionState | null {
+    if (session.pendingRewindCommandId) return 'rewinding'
+    const interruption = runtimeInterruptedByRestart(session)
+    if (interruption?.activeStatus) return interruption.activeStatus
+    if (interruption?.claimedTurn?.providerStartState === 'adopted') return 'running'
+    if (interruption || this.providerService?.isLaunching(session.id)) return 'starting'
+    if (session.pendingApprovalCount + session.pendingUserInputCount > 0) return 'waiting'
+    if (this.providerService?.backgroundLiveness(session.id)) return 'background'
+    return null
+  }
+
+  private projectTitle(session: OrchestrationProjectedSession) {
+    const worktree = this.readModel.worktrees.get(session.worktreeId)
+    return (worktree && this.readModel.projects.get(worktree.projectId)?.title) ?? null
   }
 
   private dispatchFromReceipt(
@@ -491,7 +656,9 @@ export class OrchestrationEngine {
 
     const existing = this.receipts.find(command.commandId)
     if (existing) return this.dispatchFromReceipt(existing, command.type, fingerprint)
+    this.requireStartsOpen(command)
 
+    this.requireWorkspaceCommandAvailable(command)
     const committed = this.commitNewCommand(command, summary, fingerprint)
     recordChatPipelineInfo('chat.pipeline.command.complete', {
       ...summary,
@@ -508,6 +675,19 @@ export class OrchestrationEngine {
       sequence: committed.sequence,
       ...receiptResult(committed.receipt.result),
     }
+  }
+
+  // A claim or rewind committed after an accepted restart would be interrupted unseen.
+  private requireStartsOpen(command: OrchestrationCommand) {
+    if (!this.startsHeld) return
+    if (
+      command.type !== 'session.provider-start.claim' &&
+      command.type !== 'session.checkpoint.revert'
+    )
+      return
+    throw sessionDomainErrors.SERVER_RESTARTING({
+      internal: { commandType: command.type, sessionId: command.sessionId },
+    })
   }
 
   private requireCommandRuntimeOwnership(command: OrchestrationCommand) {
@@ -558,7 +738,11 @@ export class OrchestrationEngine {
         command.type === 'session.lifecycle.restore'
           ? this.receipts.find(command.restoreCommandId)
           : null
-      const pendingEvents = decideOrchestrationCommand(command, this.readModel, restoreReceipt)
+      const pendingEvents = decideOrchestrationCommand(
+        command,
+        this.commandReadModel(command),
+        restoreReceipt,
+      )
       recordChatPipelineInfo('chat.pipeline.command.decided', {
         ...summary,
         eventCount: pendingEvents.length,
@@ -572,6 +756,18 @@ export class OrchestrationEngine {
       this.recordDispatchFailure(command, summary, error, fingerprint)
       throw error
     }
+  }
+
+  private commandReadModel(
+    command: OrchestrationCommand | ClientOrchestrationCommand,
+  ): OrchestrationReadModel {
+    if (command.type !== 'session.fork') return this.readModel
+    const source = this.readModel.sessions.get(command.sourceSessionId)
+    if (!source) return this.readModel
+    const messages = this.snapshotQuery.sessionTranscript(source.id).session.messages
+    const sessions = new Map(this.readModel.sessions)
+    sessions.set(source.id, { ...source, messages })
+    return { ...this.readModel, sessions }
   }
 
   // Checked on the dispatch queue, so nothing can land between this read and the decision.
@@ -797,14 +993,11 @@ export class OrchestrationEngine {
   }
 
   private async recoverRuntime(session: OrchestrationProjectedSession) {
-    const turn = session.latestTurn
-    const ambiguous =
-      turn?.providerStartState === 'claimed' || turn?.providerStartState === 'adopted'
-    const active =
-      session.runtime && ['starting', 'running', 'waiting'].includes(session.runtime.status)
-    if (!ambiguous && !active) return
-    const runtimeEpoch = ambiguous ? turn.runtimeEpoch : session.runtime?.runtimeEpoch
-    const observedSequence = ambiguous ? turn.providerStartSequence : session.runtimeSequence
+    const interruption = runtimeInterruptedByRestart(session)
+    if (!interruption) return
+    const turn = interruption.claimedTurn
+    const runtimeEpoch = turn ? turn.runtimeEpoch : session.runtime?.runtimeEpoch
+    const observedSequence = turn ? turn.providerStartSequence : session.runtimeSequence
     if (!runtimeEpoch || observedSequence === null) return
 
     let message =
@@ -819,7 +1012,7 @@ export class OrchestrationEngine {
     await this.enqueue({
       type: 'session.runtime.recover',
       sessionId: session.id,
-      ...(ambiguous ? { turnId: turn.turnId } : {}),
+      ...(turn ? { turnId: turn.turnId } : {}),
       observedSequence,
       runtimeEpoch,
       message,
@@ -1170,25 +1363,84 @@ export class OrchestrationEngine {
     })
   }
 
-  async beginTerminalLease(worktreeId: WorktreeId) {
+  async beginTerminalLease(worktreeId: WorktreeId, key?: string) {
     await this.ready
-    return this.terminalLeases.begin(worktreeId)
+    return this.terminalLeases.begin(worktreeId, key)
   }
 
+  /** A lease already adopted at boot, for the terminal reattaching its host session. */
+  async adoptedLeaseForKey(key: string) {
+    await this.ready
+    const lease = [...this.readModel.terminalLeases.values()].find(
+      (candidate) => candidate.key === key && candidate.state === 'active',
+    )
+    if (!lease) return null
+    const owned = this.terminalLeases.attachAdopted(lease.worktreeId, lease.terminalLeaseId)
+    const provider = this.providerService
+    const handoff = this.terminalHandoffs
+      .pending()
+      .find((entry) => entry.terminalLeaseId === lease.terminalLeaseId)
+    if (!provider || !handoff) return owned
+    return {
+      ...owned,
+      end: async () => {
+        this.terminalHandoffs.exited(handoff.sessionId)
+        await this.appendTerminalHistory(provider, handoff)
+        await owned.end()
+        this.terminalHandoffs.complete(handoff.sessionId)
+        provider.releaseTerminalOwnership(handoff.sessionId)
+      },
+    }
+  }
+
+  private hostSessions(): Promise<readonly HostSessionInfo[] | null> {
+    return this.terminalService?.listHostSessions() ?? Promise.resolve(null)
+  }
+
+  /**
+   * A pending agent-in-terminal handoff is adopted when the host still runs its shell, so the
+   * session resumes as an ordinary terminal instead of being blocked on unknown ownership.
+   */
   private async recoverTerminalHistory() {
     const provider = this.providerService
     if (!provider) return
     const pending = this.terminalHandoffs.pending()
-    for (const handoff of pending)
-      provider.restoreTerminalOwnership(
-        handoff.sessionId,
-        handoff.phase === 'history' ? 'history' : 'unknown',
-      )
+    const sessions = await this.hostSessions()
+    const byKey = sessions ? new Map(sessions.map((session) => [session.key, session])) : null
     for (const handoff of pending) {
-      await this.retryTerminalHistory(handoff, provider).catch((error: unknown) =>
-        this.recordTerminalHistoryFailure(handoff.sessionId, handoff.startedAt, error),
-      )
+      await this.recoverTerminalHandoff(handoff, provider, byKey)
     }
+  }
+
+  private async recoverTerminalHandoff(
+    handoff: TerminalHandoff,
+    provider: ProviderService,
+    sessions: ReadonlyMap<string, HostSessionInfo> | null,
+  ) {
+    const key = terminalSessionKey(handoff.worktreeId, handoff.sessionId, handoff.sessionId)
+    const live = sessions?.get(key)
+    if (handoff.phase === 'active' && live && !live.exited) {
+      const lease = this.readModel.terminalLeases.get(handoff.terminalLeaseId)
+      if (lease)
+        await this.terminalLeases.adopt(
+          handoff.worktreeId,
+          lease.terminalLeaseId,
+          lease.runtimeEpoch,
+        )
+      provider.restoreTerminalOwnership(handoff.sessionId, 'terminal')
+      return
+    }
+    if (handoff.phase === 'active' && sessions !== null) {
+      this.terminalHandoffs.exited(handoff.sessionId)
+      handoff = { ...handoff, phase: 'history' }
+    }
+    provider.restoreTerminalOwnership(
+      handoff.sessionId,
+      handoff.phase === 'history' ? 'history' : 'unknown',
+    )
+    await this.retryTerminalHistory(handoff, provider).catch((error: unknown) =>
+      this.recordTerminalHistoryFailure(handoff.sessionId, handoff.startedAt, error),
+    )
   }
 
   private retryTerminalHistory(handoff: TerminalHandoff, provider: ProviderService) {

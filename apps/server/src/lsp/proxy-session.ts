@@ -1559,6 +1559,7 @@ class PooledLspProxySession {
   }
 
   private closeFromProcess(outcome: string): void {
+    // An exit after `dispose` is ours whatever its code, and `dispose` already logged it at info.
     if (this.disposed) return
 
     this.disposed = true

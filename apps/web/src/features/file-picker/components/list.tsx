@@ -10,6 +10,7 @@ import { ListLoading } from '@/features/file-picker/components/list-loading'
 import { FileRow } from '@/features/file-picker/components/file-row'
 import { useFilePickerSessionActions } from '@/features/file-picker/hooks/use-file-picker-session-actions'
 import { fileListRows } from '@/features/file-picker/utils/rows'
+import { SCROLL_INTENT_SETTLE_MS } from '@/features/file-picker/utils/intent'
 import {
   listLabel,
   pickerCopy,
@@ -52,6 +53,7 @@ export function FileList({
   const internalRef = useRef<HTMLDivElement>(null)
   const containerRef = listRef ?? internalRef
   const virtualRef = useRef<VirtualListHandle>(null)
+  const lastScrollAt = useRef(Number.NEGATIVE_INFINITY)
   const statusId = useId()
   const rows = fileListRows(entries, isSearching)
   const { selectEntry } = useFilePickerSessionActions()
@@ -90,6 +92,11 @@ export function FileList({
   const showEmpty = !showLoading && !showError && entries.length === 0
   const showStatus = showLoading || showError || showEmpty
 
+  function signalDirectoryIntent(path: string) {
+    if (performance.now() - lastScrollAt.current < SCROLL_INTENT_SETTLE_MS) return
+    onDirectoryIntent(path)
+  }
+
   function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     list.containerProps.onKeyDown(event)
     if (event.defaultPrevented || event.nativeEvent.isComposing || isBusy) return
@@ -105,6 +112,9 @@ export function FileList({
       <VirtualList
         {...list.containerProps}
         onKeyDown={handleKeyDown}
+        onScroll={() => {
+          lastScrollAt.current = performance.now()
+        }}
         activeIndex={list.activeIndex}
         scrollRef={containerRef}
         handleRef={virtualRef}
@@ -132,7 +142,7 @@ export function FileList({
               rowProps={list.rowProps(row.key)}
               isBusy={isBusy}
               mode={mode}
-              onDirectoryIntent={onDirectoryIntent}
+              onDirectoryIntent={signalDirectoryIntent}
               onDoubleClick={onEntryDoubleClick}
               position={row.position}
               selected={row.entry.path === selectedPath}

@@ -1,10 +1,4 @@
-import {
-  createHighlighterCore,
-  type HighlighterCore,
-  type ThemeRegistrationAny,
-  type TokensResult,
-} from 'shiki/core'
-import { createJavaScriptRegexEngine } from 'shiki/engine/javascript'
+import type { HighlighterCore, ThemeRegistrationAny, TokensResult } from 'shiki/core'
 import { bundledLanguages, bundledLanguagesInfo } from 'shiki/langs'
 
 import type { CodeHighlighter, HighlightInput } from '../providers/code-highlighter-context'
@@ -39,13 +33,12 @@ export function createShikiHighlighter({
   themeKey,
 }: ShikiHighlighterOptions): CodeHighlighter {
   const [light, dark] = [namedTheme(themes[0], 'light'), namedTheme(themes[1], 'dark')]
-  const engine = createJavaScriptRegexEngine({ forgiving: true })
   let core: HighlighterCore | null = null
   let ready: Promise<HighlighterCore> | null = null
   // Created on the first fence, not at construction, so building a
   // highlighter during render has no side effect.
   function highlighterCore(): Promise<HighlighterCore> {
-    ready ??= createHighlighterCore({ engine, langs: [], themes: [light, dark] }).then(
+    ready ??= loadHighlighterCore([light, dark]).then(
       (highlighter) => {
         core = highlighter
         return highlighter
@@ -73,13 +66,15 @@ export function createShikiHighlighter({
     if (pending) return pending
 
     const grammar = bundledLanguages[language as keyof typeof bundledLanguages]
-    const promise = highlighterCore()
-      .then((highlighter) => (grammar ? highlighter.loadLanguage(grammar) : undefined))
-      .then(
-        () => void loadedLanguages.add(language),
+    const promise = highlighterCore().then(
+      async (highlighter) => {
         // A grammar that fails to load renders as plain text for the session.
-        () => void loadedLanguages.add(language),
-      )
+        if (grammar) await highlighter.loadLanguage(grammar).catch(noop)
+        loadedLanguages.add(language)
+      },
+      // A core that failed to load is retried by the next fence.
+      () => void loading.delete(language),
+    )
     loading.set(language, promise)
 
     return promise
@@ -107,9 +102,24 @@ export function createShikiHighlighter({
   }
 }
 
+// Shiki loads with the first fence; a static import would put it in the entry chunk.
+async function loadHighlighterCore(themes: ThemeRegistrationAny[]): Promise<HighlighterCore> {
+  const [{ createHighlighterCore }, { createJavaScriptRegexEngine }] = await Promise.all([
+    import('shiki/core'),
+    import('shiki/engine/javascript'),
+  ])
+  return createHighlighterCore({
+    engine: createJavaScriptRegexEngine({ forgiving: true }),
+    langs: [],
+    themes,
+  })
+}
+
 function namedTheme(
   theme: ThemeRegistrationAny,
   slot: 'dark' | 'light',
 ): ThemeRegistrationAny & { name: string } {
   return { ...theme, name: theme.name ?? `markdown-${slot}` }
 }
+
+function noop() {}

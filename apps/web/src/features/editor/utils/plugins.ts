@@ -47,6 +47,8 @@ const PLATFORM_SEARCH_RESULT_EDITOR_LOGGING_PLUGIN = createEditorLoggingPlugin(
 export type CriticalEditorCorePluginOptions = {
   /** Backs the "Compare Changes" lens on a merge conflict; absent hides it. */
   readonly compareMergeConflict?: () => void
+  /** Markdown renders in place (live preview); false shows its source. */
+  readonly markdownPreview?: boolean
 }
 
 export function createCriticalEditorCorePlugins(
@@ -85,7 +87,9 @@ export function createCriticalEditorCorePlugins(
     // Critical rather than lazy: loading it after first paint would flash raw markdown first. It
     // derives its replacements from tree-sitter's markdown captures, so a file renders as source
     // while syntax highlighting is off.
-    ...(languageId === 'markdown' ? [createMarkdownPreviewPlugin()] : []),
+    ...(languageId === 'markdown' && options.markdownPreview !== false
+      ? [createMarkdownPreviewPlugin()]
+      : []),
     createPlatformEditorLoggingPlugin(),
   ]
 }

@@ -59,96 +59,101 @@ export function createChatNavigation(coordinator: ReturnType<typeof createNaviga
       !sidebarOwnerMatches(coordinator.getApplication(), environmentId, projectId)
     )
       return supersededNavigation()
-    return coordinator.request(async ({ application, address, signal, isCurrent }) => {
-      const previous = chatReferenceForToken(
-        surface === 'sidebar' ? (address.chat ?? null) : address.document,
-      )
-      const identity =
-        draftId ??
-        (!newDraft && previous?.kind === 'draft' ? previous.draftId : undefined) ??
-        crypto.randomUUID()
-      const token = sessionId ? `t/${sessionId}` : `t/draft-${identity}`
-      const origin = confirmedEnvironmentOrigin(environmentId)
-      if (surface === 'sidebar') {
-        if (confirmedEnvironmentId(application.getSnapshot().origin) !== environmentId)
-          throw createClientInvariantError(
-            'A sidebar conversation must belong to the active environment.',
-          )
-        const sidebarChat: ChatReference = sessionId
-          ? { kind: 'session', sessionId }
-          : { kind: 'draft', draftId: identity }
-        return {
-          address: { ...address, chat: token, side: 'chat' },
-          replace,
-          historyTarget: { kind: 'sidebar-chat', chat: sidebarChat },
-        }
-      }
-      const { slice, snapshot } = await chatProjectionForNavigation(
-        environmentId,
-        sessionId,
-        signal,
-      )
-      if (!isCurrent()) return { address, replace }
-      const recovered = draftId ? recoverableDraft(environmentId, draftId)?.identity : null
-      if (draftId && !recovered)
-        throw createClientInvariantError('This draft is unavailable on this machine.')
-      if (recovered && projectId && recovered.projectId !== projectId)
-        throw createClientInvariantError('This draft belongs to another project.')
-      const ownership = sessionId ? selectSessionOwnership(slice, sessionId) : null
-      if (sessionId && !ownership)
-        throw createClientInvariantError('The conversation is unavailable.')
-      const worktree =
-        ownership?.worktree ??
-        (recovered ? slice.worktreeById[recovered.baseWorktreeId] : null) ??
-        (worktreeId ? slice.worktreeById[worktreeId] : null) ??
-        (projectId ? selectCurrentWorktree(slice, projectId) : null)
-      if (
-        recovered &&
-        (!worktree ||
-          worktree.id !== recovered.baseWorktreeId ||
-          worktree.path !== recovered.rootPath ||
-          worktree.lifecycle.state !== 'ready')
-      )
-        throw createClientInvariantError(
-          'The draft worktree is unavailable. Restore that worktree before opening this draft.',
+    return coordinator.request(
+      async ({ application, address, signal, isCurrent }) => {
+        const previous = chatReferenceForToken(
+          surface === 'sidebar' ? (address.chat ?? null) : address.document,
         )
-      if (!worktree) throw createClientInvariantError('The conversation workspace is unavailable.')
-      if (projectId && worktree.projectId !== projectId)
-        throw createClientInvariantError('The conversation does not belong to this project.')
-      const editorWorktree = availableEditorWorktree(slice, worktree)
-      const workspace = await registerWorkspaceAddress({
-        client: clientForQueryClient(queryClientFor(origin)),
-        path: editorWorktree.path,
-        signal,
-      })
-      if (!isCurrent()) return { address, replace }
-      const sameRoot =
-        application.getSnapshot().origin === origin &&
-        application.getSnapshot().editor.workspaceStore.getState().rootFolder?.path ===
-          workspace.path
-      const next = sameRoot
-        ? address
-        : await workspaceAddressFor(application, environmentId, workspace, address)
-      return {
-        address: {
-          ...next,
+        const identity =
+          draftId ??
+          (!newDraft && previous?.kind === 'draft' ? previous.draftId : undefined) ??
+          crypto.randomUUID()
+        const token = sessionId ? `t/${sessionId}` : `t/draft-${identity}`
+        const origin = confirmedEnvironmentOrigin(environmentId)
+        if (surface === 'sidebar') {
+          if (confirmedEnvironmentId(application.getSnapshot().origin) !== environmentId)
+            throw createClientInvariantError(
+              'A sidebar conversation must belong to the active environment.',
+            )
+          const sidebarChat: ChatReference = sessionId
+            ? { kind: 'session', sessionId }
+            : { kind: 'draft', draftId: identity }
+          return {
+            address: { ...address, chat: token, side: 'chat' },
+            replace,
+            historyTarget: { kind: 'sidebar-chat', chat: sidebarChat },
+          }
+        }
+        const { slice, snapshot } = await chatProjectionForNavigation(
           environmentId,
-          workspace: workspaceToken(workspace),
-          mode: 'chat',
-          editor: editorDocumentToken(next),
-          document: token,
-          rail: newDraft ? null : next.rail,
-        },
-        replace,
-        historyTarget: null,
-        draftWorktreeId: sessionId === null ? worktree.id : undefined,
-        beforeApply: () =>
-          applyPreparedChat({
-            snapshot,
+          sessionId,
+          signal,
+        )
+        if (!isCurrent()) return { address, replace }
+        const recovered = draftId ? recoverableDraft(environmentId, draftId)?.identity : null
+        if (draftId && !recovered)
+          throw createClientInvariantError('This draft is unavailable on this machine.')
+        if (recovered && projectId && recovered.projectId !== projectId)
+          throw createClientInvariantError('This draft belongs to another project.')
+        const ownership = sessionId ? selectSessionOwnership(slice, sessionId) : null
+        if (sessionId && !ownership)
+          throw createClientInvariantError('The conversation is unavailable.')
+        const worktree =
+          ownership?.worktree ??
+          (recovered ? slice.worktreeById[recovered.baseWorktreeId] : null) ??
+          (worktreeId ? slice.worktreeById[worktreeId] : null) ??
+          (projectId ? selectCurrentWorktree(slice, projectId) : null)
+        if (
+          recovered &&
+          (!worktree ||
+            worktree.id !== recovered.baseWorktreeId ||
+            worktree.path !== recovered.rootPath ||
+            worktree.lifecycle.state !== 'ready')
+        )
+          throw createClientInvariantError(
+            'The draft worktree is unavailable. Restore that worktree before opening this draft.',
+          )
+        if (!worktree)
+          throw createClientInvariantError('The conversation workspace is unavailable.')
+        if (projectId && worktree.projectId !== projectId)
+          throw createClientInvariantError('The conversation does not belong to this project.')
+        const editorWorktree = availableEditorWorktree(slice, worktree)
+        const workspace = await registerWorkspaceAddress({
+          client: clientForQueryClient(queryClientFor(origin)),
+          path: editorWorktree.path,
+          signal,
+        })
+        if (!isCurrent()) return { address, replace }
+        const sameRoot =
+          application.getSnapshot().origin === origin &&
+          application.getSnapshot().editor.workspaceStore.getState().rootFolder?.path ===
+            workspace.path
+        const next = sameRoot
+          ? address
+          : await workspaceAddressFor(application, environmentId, workspace, address)
+        return {
+          address: {
+            ...next,
             environmentId,
-          }),
-      }
-    })
+            workspace: workspaceToken(workspace),
+            mode: 'chat',
+            editor: editorDocumentToken(next),
+            document: token,
+            rail: newDraft ? null : next.rail,
+          },
+          replace,
+          historyTarget: null,
+          draftWorktreeId: sessionId === null ? worktree.id : undefined,
+          beforeApply: () =>
+            applyPreparedChat({
+              snapshot,
+              environmentId,
+            }),
+        }
+      },
+      'immediate',
+      'workspace',
+    )
   }
 
   return openChat

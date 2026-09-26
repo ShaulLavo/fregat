@@ -649,6 +649,8 @@ export class OrchestrationProjectionPipeline {
         pendingUserInputCount: 0,
         pinOrderKey: null,
         planProgressJson: null,
+        forkedFromJson: event.payload.forkedFrom ? JSON.stringify(event.payload.forkedFrom) : null,
+        agent: event.payload.agent ?? null,
         pinnedAt: null,
         worktreeId: event.payload.worktreeId,
         origin: event.payload.origin,
@@ -704,9 +706,12 @@ export class OrchestrationProjectionPipeline {
           text: message.text,
           createdAt: message.createdAt,
           updatedAt: message.createdAt,
-          attachmentsJson: '[]',
+          attachmentsJson: JSON.stringify(message.attachments),
           streaming: false,
-          turnId: null,
+          turnId: message.turnId,
+          modelSelectionJson: message.modelSelection
+            ? JSON.stringify(message.modelSelection)
+            : null,
         })
         .run()
     }

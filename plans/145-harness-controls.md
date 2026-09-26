@@ -26,27 +26,100 @@ provider and the other provider shows a disabled reason; it is never faked.
 
 ## Sub-plans
 
-| Plan                                                         | Outcome                                                         | Claude                                             | Codex                                                  | Size | Status            | Depends on                               |
-| ------------------------------------------------------------ | --------------------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------ | ---- | ----------------- | ---------------------------------------- |
-| approval-rules                                               | "Always allow" writes a real rule; "for this session" holds     | `updatedPermissions` from `canUseTool` suggestions | `acceptWithExecpolicyAmendment` (not in pinned schema) | M    | DONE (`89c58188`) | none (server requests are not generated) |
-| [fork](145-harness-controls/fork.md)                         | Fork a session from any turn into a new session                 | `forkSession(id, { upToMessageId })`               | `thread/fork`                                          | M    | PROPOSED          | Codex schema refresh                     |
-| [mcp-status](145-harness-controls/mcp-status.md)             | See each MCP server's state; reconnect or sign in               | `mcpServerStatus()`, `reconnectMcpServer()`        | `mcpServerStatus/list`, `mcpServer/oauth/login`        | M    | PROPOSED          | Codex schema refresh                     |
-| [background-tasks](145-harness-controls/background-tasks.md) | List a session's background tasks and stop one                  | `background_tasks_changed`, `stopTask(taskId)`     | `thread/backgroundTerminals/*` (experimental API only) | S–M  | PROPOSED          | none                                     |
-| [hooks](145-harness-controls/hooks.md)                       | See which hooks ran in a turn and what they returned            | `includeHookEvents`, `hook_*` messages             | `hooks/list`, `hook/started`, `hook/completed`         | S    | PROPOSED          | Codex schema refresh for `hooks/list`    |
-| [custom-agents](145-harness-controls/custom-agents.md)       | Browse a project's agent definitions and start a session as one | `supportedAgents()`, `agent` option                | to verify                                              | S–M  | PROPOSED          | none                                     |
-| [compact](145-harness-controls/compact.md)                   | Manual compaction (owned by Plan 126)                           | `/compact` path to verify                          | `thread/compact/start`                                 | —    | POINTER           | Plan 126 RUNTIME-05, INTERACTION-06      |
-| [export](145-harness-controls/export.md)                     | Export a transcript as Markdown or JSON                         | n/a (Platform projection)                          | n/a (Platform projection)                              | S    | PROPOSED          | none (web-only)                          |
+| Plan                                       | Outcome                                                         | Claude                                             | Codex                                                  | Size | Status            | Depends on                               |
+| ------------------------------------------ | --------------------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------ | ---- | ----------------- | ---------------------------------------- |
+| approval-rules                             | "Always allow" writes a real rule; "for this session" holds     | `updatedPermissions` from `canUseTool` suggestions | `acceptWithExecpolicyAmendment` (not in pinned schema) | M    | DONE (`89c58188`) | none (server requests are not generated) |
+| fork                                       | Fork a session from any turn into a new session                 | `resume` + `forkSession` + `resumeSessionAt`       | `thread/fork`                                          | M    | DONE (lane L3)    | Codex schema refresh                     |
+| mcp-status                                 | See each MCP server's state; reconnect or sign in               | `mcpServerStatus()`, `reconnectMcpServer()`        | `mcpServerStatus/list`, `mcpServer/oauth/login`        | M    | DONE (lane L3)    | Codex schema refresh                     |
+| background-tasks                           | List a session's background tasks and stop one                  | `background_tasks_changed`, `stopTask(taskId)`     | `thread/backgroundTerminals/*` (experimental API only) | S–M  | DONE (lane L3)    | none                                     |
+| hooks                                      | See which hooks ran in a turn and what they returned            | `includeHookEvents`, `hook_*` messages             | `hooks/list`, `hook/started`, `hook/completed`         | S    | DONE (lane L3)    | Codex schema refresh for `hooks/list`    |
+| custom-agents                              | Browse a project's agent definitions and start a session as one | `supportedAgents()`, `agent` option                | to verify                                              | S–M  | DONE (lane L3)    | none                                     |
+| [compact](145-harness-controls/compact.md) | Manual compaction (owned by Plan 126)                           | `/compact` path to verify                          | `thread/compact/start`                                 | —    | POINTER           | Plan 126 RUNTIME-05, INTERACTION-06      |
+| export                                     | Export a transcript as Markdown or JSON                         | n/a (Platform projection)                          | n/a (Platform projection)                              | S    | DONE (lane L3)    | none                                     |
 
 ### Codex schema refresh
 
-Our Codex client is generated from a pinned upstream ref,
-`CODEX_PROTOCOL_UPSTREAM_REF = 'be75785504ff152fa6333e380a2d50642f42fba0'` in
-`apps/server/src/provider/adapters/codex-protocol/generate.ts`, and its `CLIENT_REQUEST_METHODS`
-list has none of the methods above. The installed `codex-cli 0.156.1` has all of them
-(`codex app-server generate-json-schema`), except `thread/backgroundTerminals/*`, which appears
-only with `--experimental`. The first Codex-facing plan to execute moves the pin, adds its
-methods to `CLIENT_REQUEST_METHODS`, runs `bun run codex-protocol:generate` in `apps/server`, and
-keeps `bun run codex-protocol:check` green. Later plans only add their methods.
+Done 2026-09-25 (lane L3). The pin is `rust-v0.157.0` (`00c972ed…`), matching the installed
+`codex-cli 0.157.0`. `CLIENT_REQUEST_METHODS` now carries `thread/revert` (upstream removed
+`thread/rollback`), `thread/fork`, `thread/compact/start`, `hooks/list`, `mcpServerStatus/list`,
+`mcpServer/oauth/login` and `config/mcpServer/reload`; the generator reads optional params
+(`params?: X | undefined`, published as `Nullable<X>`). Later plans only add their methods.
+
+### Export (done)
+
+Done 2026-09-25 (lane L3). D1 and D2 decided 2026-09-25: recommendation (completion wave). The
+web holds only the latest 200 messages and activities, so per D1 the transcript is read whole
+from the server: `GET /orchestration/session-transcript`, fetched as a TanStack query
+(`features/chat/state/transcript-export.ts`) and formatted by the pure
+`features/chat/utils/transcript-export.ts` (D2: Markdown gives each tool call one line, JSON
+carries everything). Surfaces: the session menu (header and rail), the message menu's
+conversation section, and the palette's `workspace.exportTranscript`. Scenario `export-transcript`.
+
+### Fork (done)
+
+Done 2026-09-25 (lane L3). D1–D3 decided 2026-09-25: recommendation (completion wave): completed
+turns only, inclusive; the fork shares the source's checkout and restores no files; Claude
+rewind stays out of scope (fork-then-archive is a candidate for a later plan).
+
+- `session.fork` (client command) emits `session.created` with `forkedFrom { sessionId, turnId,
+droppedPrompts }` and `session.history-imported` with the source's messages through the turn.
+  `droppedPrompts` counts the user prompts after the fork point, so it stays exact when the
+  source's early history is outside the in-memory window. Migration 25 adds
+  `projection_sessions.forked_from_json`.
+- The harness fork happens lazily, on the fork's first start (no binding yet): Claude resumes the
+  source with `forkSession: true`, our minted `sessionId` and `resumeSessionAt` at the last
+  transcript entry before the first dropped prompt (read through the history worker, so the
+  instance's `CLAUDE_CONFIG_DIR` holds); Codex calls `thread/fork` with `lastTurnId` found by
+  paging `thread/turns/list` from the end (shared with rewind).
+- Web: "Fork from Here" in the message menu for any message of a finished turn; the mutation opens
+  the new session. Scenarios `claude-session-fork` and `codex-session-fork` (real runs: the fork
+  recalls turns 1–2 and not 3; the source keeps its turns).
+- Known limits: attachments and tool rows are not copied into the fork's timeline (the harness
+  history has them); a steer inside a dropped Codex turn counts as an extra prompt.
+
+### Background tasks (done)
+
+Done 2026-09-25 (lane L3). D1 and D2 decided 2026-09-25: recommendation (completion wave): the
+list is Claude's `background_tasks_changed` level signal (ambient tasks dropped), and Codex is
+not covered while its background-terminal API is experimental; its sessions report no roster,
+so the control does not appear. The roster is live provider state kept in `ProviderService`
+(cleared when the CLI restarts or exits) and read at `GET /providers/sessions/:id/background-tasks`;
+`POST …/:taskId/stop` calls `query.stopTask` and answers with the roster. The header shows a
+Background tasks popover while the session has background work. `BackgroundTaskRegistry` still
+drives liveness. Scenario `claude-background-tasks`.
+
+### Hooks (done)
+
+Done 2026-09-25 (lane L3). D1 and D2 decided 2026-09-25: recommendation (completion wave).
+Claude sessions set `includeHookEvents`; exit 2 is `blocked`. Codex hook notifications are parsed
+as the run summary they are in 0.157 (the old flat read paired nothing). Ingestion lists a hook
+that blocked, failed or produced output and counts silent ones into one `hook.summary` row per
+turn; the turn summary says "Ran N hooks". The configured-hook list is Codex `hooks/list` for the
+session's checkout, in the header's MCP servers and hooks popover; Claude says hooks live in its
+settings files. Scenarios `claude-hook-rows`, `codex-session-tools`.
+
+### MCP status (done)
+
+Done 2026-09-25 (lane L3). D1 and D2 decided 2026-09-25: recommendation (completion wave): a
+per-session popover from the header (MCP servers and hooks), reconnect and sign-in only.
+`GET /providers/sessions/:id/mcp`, `POST …/mcp/:name/reconnect` (Claude `reconnectMcpServer`,
+Codex `config/mcpServer/reload`, which reloads every server) and `POST …/mcp/:name/sign-in` (Codex
+`mcpServer/oauth/login`, opened in a new tab; Claude's `needs-auth` rows point at `/mcp`). The
+generator now gives `oneOf` members the fields their parent declares beside the union, which is
+what types `hooks/list` entries. Scenarios `claude-session-tools` (working and broken project
+servers) and `codex-session-tools`.
+
+### Custom agents (done)
+
+Done 2026-09-25 (lane L3). D1 and D2 decided 2026-09-25: recommendation (completion wave): the
+list comes from the command-catalog probe (`initializationResult().agents`, which matches
+`supportedAgents()`), and the agent is chosen per session at start. A session's `agent` rides
+`session.create` and the turn bootstrap, is stored on the projection (migration 25), and reaches
+Claude as `Options.agent`; a fork keeps its source's agent. The new-session strip has a Run as
+menu, and the header names the agent. Codex lists none: its app-server has no agent listing.
+Scenario `claude-custom-agent`. The picker probes the worktree's canonical path: the
+root-relative `path` resolves against the server's own cwd in `normalizeWorkspaceCwd`, which
+the composer's `/` menu (`rootPath`) may hit too.
 
 ## Suggested order
 

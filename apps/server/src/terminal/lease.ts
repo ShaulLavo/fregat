@@ -6,8 +6,10 @@ export type TerminalExecutionLease = {
   activate: () => Promise<void>
   terminate: () => Promise<void>
   end: () => Promise<void>
+  /** The host became unreachable while the shell may still run; releases the gate like `end`. */
+  markUnknown: () => Promise<void>
 }
 
 export type TerminalLeaseBoundary = {
-  begin: (worktreeId: WorktreeId) => Promise<TerminalExecutionLease>
+  begin: (worktreeId: WorktreeId, key?: string) => Promise<TerminalExecutionLease>
 }

@@ -1,6 +1,6 @@
 # Fix diagnostics with AI
 
-Status: implemented. The Problems list and keyboard diagnostic popup landed with lane L8 (Platform #33). The hover entry (lane L7, Platform #37) calls L8's `useDiagnosticFix`; it was reverted while #33 was pending and restored once #33 reached main. The Editor side is on Editor main (per-diagnostic hover actions, Editor #36).
+Status: implemented (Plan 140 P3). The shared handoff, the Problems list and the keyboard popup landed with lane L8 (Platform #33, 2026-09-25). The hover entry (lane L7, Platform #37) calls L8's `useDiagnosticFix` through the per-diagnostic hover actions on Editor main (Editor #36); it was reverted while #33 was pending and restored once #33 reached main. Every error and warning is covered in diagnostic hover messages, the keyboard diagnostic popup, and the Problems list.
 
 Clicking **Fix with AI** opens a chat draft containing the diagnostic and its source context. The user reviews and sends it through the existing agent workflow. Keep native language-server quick fixes alongside it. This action must work even when the server offers no code actions.
 

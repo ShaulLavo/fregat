@@ -21,12 +21,17 @@ import { useSessionRailStore } from '@/features/chat-mode/state/session-rail-sto
 import { sessionClickIntent } from '@workspace/client-core/chat/rail/multi-select'
 import type { SessionRailItem } from '@workspace/client-core/chat/rail/model'
 import { cn } from '@workspace/ui/lib/utils'
+import { ShortcutHintBadge } from '@/components/shortcut-hint-badge'
+import { useKeyShortcuts } from '@/keymap/hooks/use-key-shortcuts'
+import { selectItemCommandId } from '@/keymap/types'
 
 export function SessionRow({ session }: { readonly session: SessionRailItem }) {
   // Subscribed rather than read in render: an in-render `Date.now()` is frozen
   // by the React Compiler's memo scope, which would leave every idle row's
   // label stuck at whatever it said when the row mounted.
-  const { rowProps, active } = useSessionListRow(session.key)
+  const { rowProps, active, position } = useSessionListRow(session.key)
+  const itemCommand = position ? selectItemCommandId(position) : null
+  const keyShortcuts = useKeyShortcuts(itemCommand)
   const nowMs = useCoarseNow()
   const wokeAt = useSessionWake(session.ref)
   const renaming = useSessionRailStore((state) => state.renaming)
@@ -60,13 +65,14 @@ export function SessionRow({ session }: { readonly session: SessionRailItem }) {
           {...(session.canDrag ? attributes : {})}
           {...listeners}
           {...rowProps}
+          aria-keyshortcuts={keyShortcuts}
           role='option'
           selected={active}
           data-active={active || undefined}
           data-dragging={isDragging || undefined}
           marked={marked}
           className={cn(
-            'group/session h-auto w-full shrink-0 touch-none flex-col items-start justify-start gap-(--density-gap-tight) py-(--density-row-padding-y) text-left select-none',
+            'group/session relative h-auto w-full shrink-0 touch-none flex-col items-start justify-start gap-(--density-gap-tight) py-(--density-row-padding-y) text-left select-none',
             isDragging && 'relative z-10',
           )}
           ref={setNodeRef}
@@ -83,6 +89,7 @@ export function SessionRow({ session }: { readonly session: SessionRailItem }) {
             void activateSessionRow(session, intent)
           }}
         >
+          <ShortcutHintBadge className='top-1 left-0.5' command={itemCommand} />
           <span className='flex w-full min-w-0 items-center gap-2'>
             <SessionAttentionIndicator status={session.status} />
             <span

@@ -10,9 +10,11 @@ import {
   type Options,
   type PermissionResult,
   type Query,
+  type SDKControlGetContextUsageResponse,
   type SDKMessage,
   type SDKRateLimitEvent,
   type SDKUserMessage,
+  type AgentInfo,
   type SlashCommand,
 } from '@anthropic-ai/claude-agent-sdk'
 import {
@@ -20,13 +22,16 @@ import {
   DEFAULT_INTERACTION_MODE,
   approvalRequestIdSchema,
   messageIdSchema,
+  sessionIdSchema,
   type ApprovalRequestId,
   type InteractionMode,
   type ProviderApprovalOption,
   type ProviderInstanceId,
   type ProviderInstanceSettings,
+  type ProviderAgent,
   type ProviderSkill,
   type ProviderSlashCommand,
+  type ProviderMcpServer,
   type ProviderSnapshot,
   type RuntimeMode,
   type SessionId,
@@ -51,6 +56,7 @@ import { isNotInstalledError, requestGone, sessionIdentityErrors } from '../stru
 import {
   discoverClaudeSessions,
   readClaudeSessionHistory,
+  readClaudeSessionUsage,
   type ClaudeDiscoveryRunner,
   type ClaudeHistoryRunner,
 } from '../claude-discovery'
@@ -60,14 +66,18 @@ import type {
   ProviderApprovalResponseInput,
   ProviderCommandCatalogInput,
   ProviderCommandCatalogResult,
+  ProviderForkStart,
+  ProviderHookOutcome,
   ProviderRuntimeEvent,
   ProviderRuntimeStartInput,
   ProviderSessionDiscoveryInput,
   ProviderSessionHistoryInput,
+  ProviderForkInput,
   ProviderSignInInput,
   ProviderTurnInput,
   ProviderUserInputResponseInput,
 } from '../types'
+import { claudeForkPoint } from './utils/claude-fork'
 import { activeProviderTurn, type ActiveProviderTurn } from './utils/active-turn'
 import { errorMessage as providerErrorMessage } from '@workspace/contracts'
 import {
@@ -88,7 +98,11 @@ import {
 } from '../utils/usage-windows'
 import { offeredOptions, offeredResponse, type ApprovalOffer } from './utils/approval-offers'
 import { claudeApprovalOffers, claudePermissionUpdateCount } from './utils/claude-permissions'
-import { claudeModelId, claudeQueryOptions } from './utils/claude-query-options'
+import {
+  claudeModelId,
+  claudeQueryOptions,
+  type ClaudeForkOptions,
+} from './utils/claude-query-options'
 import {
   claudePromptText,
   claudeReasoning,
@@ -312,13 +326,22 @@ export class ClaudeProviderAdapter
     return executable.path
   }
 
+  forgetExecutable() {
+    this.executablePromise = null
+  }
+
   /**
    * Reuses the capability probe: the same never-yielding prompt that reads
    * account state also carries the command list, and the skill list is one more
    * control request on the already-running CLI. No turn is spent either way.
    */
   async listCommands({ cwd }: ProviderCommandCatalogInput) {
-    return probeClaudeCommandCatalog(this.createQuery, this.env, await this.executablePath(), cwd)
+    return probeClaudeCommandCatalog(
+      this.createQuery,
+      this.env,
+      await this.executablePath(),
+      cwd ? normalizeWorkspaceCwd(cwd) : undefined,
+    )
   }
 
   async readUsage(): Promise<ProviderUsageProbe> {
@@ -429,6 +452,10 @@ export class ClaudeProviderAdapter
     return readClaudeSessionHistory({ request, env: this.env, runner: this.historyRunner })
   }
 
+  readSessionUsage(request: ProviderSessionHistoryInput) {
+    return readClaudeSessionUsage({ request, env: this.env, runner: this.historyRunner })
+  }
+
   async hasRuntime({ sessionId }: { sessionId: SessionId }) {
     return this.sessions.get(sessionId)?.hasProcess() ?? false
   }
@@ -456,6 +483,26 @@ export class ClaudeProviderAdapter
     await this.sessions.get(sessionId)?.interruptTurn(turnId)
   }
 
+  async mcpServers({ sessionId }: { sessionId: SessionId }) {
+    return (await this.sessions.get(sessionId)?.mcpServers()) ?? null
+  }
+
+  async reconnectMcpServer({ name, sessionId }: { name: string; sessionId: SessionId }) {
+    recordChatPipelineInfo('chat.pipeline.claude_adapter.mcp_reconnect', { name, sessionId })
+    const session = this.sessions.get(sessionId)
+    if (!session) throw sessionIdentityErrors.SESSION_NOT_RUNNING({ internal: { sessionId } })
+
+    await session.reconnectMcpServer(name)
+  }
+
+  async stopBackgroundTask({ sessionId, taskId }: { sessionId: SessionId; taskId: string }) {
+    recordChatPipelineInfo('chat.pipeline.claude_adapter.stop_task', { sessionId, taskId })
+    const session = this.sessions.get(sessionId)
+    if (!session) throw sessionIdentityErrors.SESSION_NOT_RUNNING({ internal: { sessionId } })
+
+    await session.stopBackgroundTask(taskId)
+  }
+
   async stopRuntime({ sessionId }: { sessionId: SessionId }) {
     recordChatPipelineInfo('chat.pipeline.claude_adapter.stop', { sessionId })
     const session = this.sessions.get(sessionId)
@@ -470,6 +517,14 @@ export class ClaudeProviderAdapter
       sessionCount: this.sessions.size,
     })
     for (const sessionId of this.sessions.keys()) await this.stopRuntime({ sessionId })
+  }
+
+  async prepareFork(input: ProviderForkInput): Promise<ProviderForkStart> {
+    const history = await this.readSessionHistory({
+      ...input,
+      sessionId: v.parse(sessionIdSchema, input.conversationId),
+    })
+    return { boundaryId: claudeForkPoint(history, input), conversationId: input.conversationId }
   }
 
   protected async ensureRuntimeSession(input: ProviderRuntimeStartInput) {
@@ -531,6 +586,8 @@ export class ClaudeProviderAdapter
     }
 
     recordChatPipelineInfo('chat.pipeline.claude_adapter.session.start', {
+      agent: input.agent,
+      forked: Boolean(input.fork),
       interactionMode,
       model,
       providerInstanceId: input.providerInstanceId,
@@ -539,7 +596,15 @@ export class ClaudeProviderAdapter
       runtimeEpoch: input.runtimeEpoch,
       sessionId: input.sessionId,
     })
+    const fork = input.fork
+      ? {
+          resumeSessionAt: input.fork.boundaryId,
+          sourceSessionId: v.parse(sessionIdSchema, input.fork.conversationId),
+        }
+      : undefined
     const session = await ClaudeAgentSession.start({
+      ...(input.agent ? { agent: input.agent } : {}),
+      fork,
       onCreated: (session) => this.sessions.set(input.sessionId, session),
       attachmentsDir: this.attachmentsDir,
       createQuery: this.createQuery,
@@ -622,6 +687,8 @@ class ClaudeAgentSession extends SessionContext {
 
   // Streaming input withholds init until the first prompt; adopt the caller's UUID before it.
   static async start(input: {
+    agent?: string
+    fork?: ClaudeForkOptions
     onCreated: (session: ClaudeAgentSession) => void
     attachmentsDir: string
     createQuery: ClaudeCreateQuery
@@ -661,6 +728,8 @@ class ClaudeAgentSession extends SessionContext {
       cwd: input.cwd,
       env: input.env,
       executablePath: input.executablePath,
+      ...(input.agent ? { agent: input.agent } : {}),
+      fork: input.fork,
       persistSession: input.ephemeral ? false : undefined,
       interactionMode: input.interactionMode,
       model: input.model,
@@ -770,7 +839,7 @@ class ClaudeAgentSession extends SessionContext {
     const turn = activeProviderTurn({ canonicalTurnId: input.turnId, messageId })
     // Minted locally — unlike Codex there is no provider-assigned turn id to
     // late-bind to, which is what deletes codex's whole pending-turn machinery.
-    const providerTurnId = `claude-turn:${crypto.randomUUID()}`
+    const providerTurnId = crypto.randomUUID()
     this.activeTurn = turn
     this.activeProviderTurnId = providerTurnId
     this.announcedLimitStops.clear()
@@ -782,7 +851,7 @@ class ClaudeAgentSession extends SessionContext {
       // `ultrathink` reaches the model here, in the text — it is a prompt
       // keyword, and `claudeReasoning` already kept it out of `Options.effort`.
       const messageText = claudePromptText(input.messageText, this.reasoning)
-      this.prompt.push(claudeUserMessage({ messageText, resolved }))
+      this.prompt.push({ ...claudeUserMessage({ messageText, resolved }), uuid: providerTurnId })
       this.emitTurnStarted(providerTurnId)
     } catch (error) {
       recordChatPipelineWarning('chat.pipeline.claude_session.send_turn.failed', {
@@ -799,6 +868,32 @@ class ClaudeAgentSession extends SessionContext {
       sessionId: this.sessionId,
       turnId: input.turnId,
     })
+  }
+
+  async mcpServers(): Promise<ProviderMcpServer[] | null> {
+    if (!this.query) return null
+
+    return (await this.query.mcpServerStatus()).map((server) => ({
+      error: server.error ?? null,
+      name: server.name,
+      status: server.status,
+    }))
+  }
+
+  async reconnectMcpServer(name: string) {
+    if (!this.query)
+      throw sessionIdentityErrors.SESSION_NOT_RUNNING({ internal: { sessionId: this.sessionId } })
+
+    await this.query.reconnectMcpServer(name)
+  }
+
+  async stopBackgroundTask(taskId: string) {
+    if (!this.query)
+      throw sessionIdentityErrors.SESSION_NOT_RUNNING({
+        internal: { sessionId: this.sessionId },
+      })
+
+    await this.query.stopTask(taskId)
   }
 
   async interruptTurn(turnId: TurnId | undefined) {
@@ -1074,8 +1169,10 @@ class ClaudeAgentSession extends SessionContext {
           'hook.completed',
           {
             exitCode: message.exit_code,
+            hookEvent: message.hook_event,
             hookId: message.hook_id,
-            outcome: message.outcome,
+            hookName: message.hook_name,
+            outcome: claudeHookOutcome(message),
             output: message.output,
             stderr: message.stderr,
             stdout: message.stdout,
@@ -1184,7 +1281,20 @@ class ClaudeAgentSession extends SessionContext {
         this.dropMessage(message, 'thinking estimates are not session token usage')
         return
       case 'background_tasks_changed':
-        this.dropMessage(message, 'roster snapshot; task.* events carry per-task truth')
+        // Ambient tasks are watchers the SDK says to keep out of activity indicators.
+        this.emitRuntimeNotification(
+          'tasks.roster',
+          {
+            tasks: message.tasks
+              .filter((task) => !task.ambient)
+              .map((task) => ({
+                description: task.description,
+                taskId: task.task_id,
+                taskType: task.task_type,
+              })),
+          },
+          message,
+        )
         return
       case 'commands_changed':
         this.dropMessage(message, 'no slash-command surface')
@@ -2078,13 +2188,7 @@ class ClaudeAgentSession extends SessionContext {
       const context = await query.getContextUsage()
       this.emitRuntimeNotification(
         'conversation.token-usage.updated',
-        {
-          usage: {
-            compactsAutomatically: true,
-            maxTokens: context.maxTokens,
-            usedTokens: context.totalTokens,
-          },
-        },
+        { usage: claudeContextUsage(context) },
         message,
       )
     } catch (error) {
@@ -2286,6 +2390,7 @@ async function probeClaudeCommandCatalog(
     )
 
     return {
+      agents: claudeAgents(initialization.agents),
       commands: claudeSlashCommands(initialization.commands),
       skills: await claudeSkills(query),
     }
@@ -2304,6 +2409,16 @@ async function claudeSkills(query: Query): Promise<ProviderSkill[]> {
   )
 
   return namedClaudeEntries(reloaded.skills).map(claudeSkill)
+}
+
+function claudeAgents(agents: readonly AgentInfo[] | undefined): ProviderAgent[] {
+  return (agents ?? [])
+    .filter((agent) => agent.name.trim().length > 0)
+    .map((agent) => ({
+      description: agent.description.trim(),
+      model: agent.model?.trim() || null,
+      name: agent.name.trim(),
+    }))
 }
 
 function claudeSlashCommands(commands: readonly SlashCommand[] | undefined) {
@@ -2608,15 +2723,53 @@ function claudeTerminalTaskStatus(status: string | undefined) {
   return null
 }
 
+/**
+ * The result message sums every API call of the turn, so on a multi-call turn it
+ * overstates occupancy: it is an estimate until `getContextUsage` reports.
+ */
 function claudeTokenUsage(usage: unknown) {
   const record = asRecord(usage)
+  const inputTokens = numberField(record, 'input_tokens')
+  const outputTokens = numberField(record, 'output_tokens')
+  const cacheWriteTokens = numberField(record, 'cache_creation_input_tokens')
+  const cachedInputTokens = numberField(record, 'cache_read_input_tokens')
+  const reasoningOutputTokens = numberField(
+    asRecord(record.output_tokens_details),
+    'thinking_tokens',
+  )
   const usedTokens =
-    (numberField(record, 'input_tokens') ?? 0) +
-    (numberField(record, 'output_tokens') ?? 0) +
-    (numberField(record, 'cache_creation_input_tokens') ?? 0) +
-    (numberField(record, 'cache_read_input_tokens') ?? 0)
+    (inputTokens ?? 0) + (outputTokens ?? 0) + (cacheWriteTokens ?? 0) + (cachedInputTokens ?? 0)
 
-  return { ...record, usedTokens }
+  return {
+    estimated: true,
+    usedTokens,
+    ...(inputTokens === null ? {} : { inputTokens }),
+    ...(cachedInputTokens === null ? {} : { cachedInputTokens }),
+    ...(cacheWriteTokens === null ? {} : { cacheWriteTokens }),
+    ...(outputTokens === null ? {} : { outputTokens }),
+    ...(reasoningOutputTokens === null ? {} : { reasoningOutputTokens }),
+  }
+}
+
+/**
+ * `maxTokens` includes the compaction reserve when the CLI keeps one (the
+ * `buffer` category), so the usable window is the rest. Classified on `kind`,
+ * never on the English name.
+ */
+function claudeContextUsage(context: SDKControlGetContextUsageResponse) {
+  const reserveTokens = context.categories
+    .filter((category) => category.kind === 'buffer')
+    .reduce((sum, category) => sum + category.tokens, 0)
+  return {
+    compactsAutomatically: true,
+    maxTokens: Math.max(1, context.maxTokens - reserveTokens),
+    ...(reserveTokens > 0 ? { reserveTokens } : {}),
+    segments: context.categories
+      .filter((category) => category.kind === 'used' || category.kind === 'deferred')
+      .filter((category) => category.tokens > 0)
+      .map((category) => ({ kind: category.kind, name: category.name, tokens: category.tokens })),
+    usedTokens: context.totalTokens,
+  }
 }
 
 /** The CLI stamps aborts: mid-tool-call is `aborted_tools`, mid-stream `aborted_streaming`. */
@@ -2658,4 +2811,11 @@ function claudeResultErrorMessage(message: Extract<SDKMessage, { type: 'result' 
   )
 
   return userFacing ?? `Claude turn failed (${message.subtype}).`
+}
+
+/** Exit code 2 is Claude Code's documented "block this action" signal. */
+function claudeHookOutcome(message: { exit_code?: number; outcome: ProviderHookOutcome }) {
+  if (message.outcome === 'error' && message.exit_code === 2) return 'blocked'
+
+  return message.outcome
 }

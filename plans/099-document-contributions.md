@@ -943,3 +943,4 @@ changes what views and the language client receive, which is a unit 2 question.
    before the buffer changes. (b) As its own Editor plan ahead of unit 1. Recommendation: (a). It is
    small, unit 0 is already approved, and a separate plan would add a scheduling step without a new
    decision.
+   Decided 2026-09-26: recommendation (coordinator) — (a).

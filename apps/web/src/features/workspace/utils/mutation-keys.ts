@@ -1,5 +1,6 @@
 export const workspaceMutationKeys = {
   openRoot: (path: string) => ['workspace', 'open-root', path] as const,
+  recordRecent: (path: string) => ['workspace', 'record-recent', path] as const,
   resolveConflict: (conflictId: string) => ['workspace', 'conflict', conflictId] as const,
   tree: (kind: string, rootPath: string) => ['workspace', 'tree', kind, rootPath] as const,
   fileHistory: (direction: 'redo' | 'undo', rootPath: string) =>

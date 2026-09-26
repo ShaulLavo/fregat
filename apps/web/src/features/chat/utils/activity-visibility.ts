@@ -66,12 +66,14 @@ export function activityGroupSummary(activities: readonly ChatWorkLogEntry[]) {
   const reads = tools.filter((activity) => activity.tool?.kind === 'read').length
   const searches = tools.filter((activity) => activity.tool?.kind === 'search').length
   const others = tools.length - commands - edits.length - reads - searches
+  const hooks = activities.reduce((sum, activity) => sum + (activity.hookCount ?? 0), 0)
   const parts: string[] = []
   if (commands > 0) parts.push(`Ran ${commands} ${commands === 1 ? 'command' : 'commands'}`)
   if (files > 0) parts.push(`Changed ${files} ${files === 1 ? 'file' : 'files'}`)
   if (reads > 0) parts.push(`Read ${reads} ${reads === 1 ? 'file' : 'files'}`)
   if (searches > 0) parts.push(`Searched ${searches} ${searches === 1 ? 'time' : 'times'}`)
   if (others > 0) parts.push(`Used ${others} ${others === 1 ? 'tool' : 'tools'}`)
+  if (hooks > 0) parts.push(`Ran ${hooks} ${hooks === 1 ? 'hook' : 'hooks'}`)
   if (parts.length === 0) parts.push(`${activities.length} steps`)
   const failures = activities.filter(isWorkLogFailure).length
   if (failures > 0) parts.push(`${failures} failed`)

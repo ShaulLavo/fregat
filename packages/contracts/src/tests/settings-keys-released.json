@@ -9,6 +9,7 @@
     "is the record of what users may still have on disk."
   ],
   "ids": [
+    "chat.activeFileContext",
     "chat.autoSettleAfterDays",
     "chat.autoSettleOnMerge",
     "chat.confirmSessionDelete",
@@ -45,6 +46,7 @@
     "editor.history.retainedStates",
     "editor.inputRoute",
     "editor.lineHeight",
+    "editor.markdownView",
     "editor.minimap.enabled",
     "editor.retainedTextBudget",
     "editor.syntaxHighlighting.enabled",
@@ -56,6 +58,7 @@
     "files.autoSave",
     "files.autoSaveDelay",
     "files.showHidden",
+    "files.watchDirectoryLimit",
     "git.autoPull",
     "git.projectAutoPull",
     "git.projectWorktreeCleanupOnDelete",

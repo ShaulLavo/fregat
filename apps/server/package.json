@@ -16,10 +16,10 @@
     }
   },
   "scripts": {
-    "dev": "bun ../../scripts/run-with-env.ts --watch src/index.ts",
+    "dev": "bun ../../scripts/run-with-env.ts bun ../../scripts/restart-on-change.ts src/index.ts --watch src --watch ../../packages",
     "server": "bun --env-file=../../.env src/index.ts",
     "start": "NODE_ENV=production bun --env-file=../../.env dist/index.js",
-    "build": "tsgo --noEmit && bun scripts/package-wallpapers.ts && bun build src/index.ts --target bun --outdir dist --external sharp --external @anthropic-ai/claude-agent-sdk && bun build src/provider/claude-discovery-worker.ts --target bun --outfile dist/claude-discovery-worker.ts --external @anthropic-ai/claude-agent-sdk && bun build src/installation/remote-support.ts --target bun --outfile dist/remote-support.js && bun build src/lsp/typescript/worker-discovery-process.ts --target bun --outfile dist/worker-discovery-process.ts",
+    "build": "tsgo --noEmit && bun scripts/package-wallpapers.ts && bun build src/index.ts --target bun --outdir dist --external sharp --external @anthropic-ai/claude-agent-sdk && bun build src/provider/claude-discovery-worker.ts --target bun --outfile dist/claude-discovery-worker.ts --external @anthropic-ai/claude-agent-sdk && bun build src/fs/watch-worker.ts --target bun --outfile dist/watch-worker.ts && bun build src/installation/remote-support.ts --target bun --outfile dist/remote-support.js && bun build src/terminal-host/main.ts --target bun --outfile dist/pty-host.js && bun build src/lsp/typescript/worker-discovery-process.ts --target bun --outfile dist/worker-discovery-process.ts",
     "prices:update": "bun scripts/update-model-prices.ts",
     "codex-protocol:check": "bun src/provider/adapters/codex-protocol/generate.ts --check",
     "codex-protocol:generate": "bun src/provider/adapters/codex-protocol/generate.ts",

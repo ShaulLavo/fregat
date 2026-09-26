@@ -19,6 +19,7 @@ import {
   usageWindowTone,
 } from '@/features/chat/utils/usage-meter'
 import { UsageWindowRow } from './usage-window-row'
+import { ResetCreditAction } from './reset-credit-action'
 
 /**
  * How much of the account's plan is left, beside the context ring and deliberately
@@ -87,6 +88,7 @@ export function UsageLimitsMeter({
             <UsageWindowRow key={window.id} nowMs={nowMs} window={window} />
           ))}
         </ul>
+        <ResetCreditAction account={account} />
         <div className='mt-2.5 flex items-center justify-between gap-2'>
           <p className='text-muted-foreground text-2xs tabular-nums' data-usage-checked>
             {usageCheckedLabel(account.checkedAt, nowMs)}

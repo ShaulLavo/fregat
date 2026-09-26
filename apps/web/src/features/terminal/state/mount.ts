@@ -25,6 +25,8 @@ import { reportError, toClientError } from '@/lib/client-error-taxonomy'
 import { fontStack } from '@/lib/fonts/utils/stack'
 import { DEFAULT_CODE_FONT } from '@workspace/contracts'
 import { UNFOCUSED_TERMINAL_CURSOR_STYLE } from '@/features/terminal/utils/appearance'
+import { log } from '@/lib/client-logging'
+import { elapsedMs, nowMs } from '@workspace/utils/timing'
 
 export type TerminalInputSender = (data: string) => boolean
 type TerminalDimensions = { cols: number; rows: number }
@@ -87,6 +89,7 @@ export function mountTerminal({
   const inputEncoder = new TextEncoder()
 
   const open = async () => {
+    const startedAt = nowMs()
     const [runtime, worktreeId] = await Promise.all([
       initializeGhostty(),
       fetchTerminalCheckout(queryClientFor(origin), rootPath),
@@ -118,6 +121,15 @@ export function mountTerminal({
     titleDisposable = terminal.on('title', (title) => onTitleChange(title))
     await terminal.open(host)
     if (cancelled || signal.aborted) return
+
+    // `open` installs the renderer, so the tier is known from here on.
+    log.info({
+      action: 'terminal.mount',
+      area: 'terminal',
+      durationMs: elapsedMs(startedAt),
+      rendererBackend: terminal.diagnostics.rendererBackend ?? null,
+      sessionId,
+    })
 
     // The theme lands in onReady, which sees the palette current at handover.
     terminalDimensions = currentTerminalDimensions(terminal)

@@ -36,6 +36,16 @@ export const providerAccountUsageSchema = v.object({
   windows: v.array(providerUsageWindowSchema),
   /** When a reading last confirmed these windows; the client tells old from current by it. */
   checkedAt: isoDateTimeSchema,
+  resetCredits: v.optional(
+    v.nullable(
+      v.object({
+        available: v.pipe(v.number(), v.integer(), v.minValue(0)),
+        accountKey: trimmedNonEmptyStringSchema,
+        creditId: v.nullable(trimmedNonEmptyStringSchema),
+      }),
+    ),
+  ),
+  resetPending: v.optional(v.boolean()),
 })
 
 export const providerUsageResultSchema = v.object({
@@ -81,6 +91,14 @@ const usageTokensEntries = {
  */
 const providerUsageCostSourceSchema = v.picklist(['provider', 'catalog', 'none'])
 
+/** Dollars per million tokens, as recorded with the turns. */
+const providerUsageRatesSchema = v.object({
+  input: v.number(),
+  output: v.number(),
+  cacheRead: v.nullable(v.number()),
+  cacheWrite: v.nullable(v.number()),
+})
+
 const providerUsageModelRowSchema = v.object({
   model: trimmedNonEmptyStringSchema,
   driverKind: trimmedNonEmptyStringSchema,
@@ -88,6 +106,15 @@ const providerUsageModelRowSchema = v.object({
   ...usageTokensEntries,
   costUsd: v.nullable(v.number()),
   costSource: providerUsageCostSourceSchema,
+  /** The standard rates behind a catalog price; null when none, or when they changed in the range. */
+  rates: v.nullable(providerUsageRatesSchema),
+})
+
+const providerUsageDayModelSchema = v.object({
+  model: trimmedNonEmptyStringSchema,
+  driverKind: trimmedNonEmptyStringSchema,
+  tokens: tokenCountSchema,
+  costUsd: v.nullable(v.number()),
 })
 
 const providerUsageDayRowSchema = v.object({
@@ -95,6 +122,9 @@ const providerUsageDayRowSchema = v.object({
   day: v.pipe(v.string(), v.isoDate()),
   tokens: tokenCountSchema,
   costUsd: v.nullable(v.number()),
+  /** Tokens that day with no price, so a day with only unpriced usage never reads as quiet. */
+  unpricedTokens: tokenCountSchema,
+  models: v.array(providerUsageDayModelSchema),
 })
 
 const providerUsagePurposeRowSchema = v.object({
@@ -122,11 +152,22 @@ export const providerUsageHistorySchema = v.object({
   purposes: v.array(providerUsagePurposeRowSchema),
 })
 
+/** What one session has used so far. `costUsd` sums priced turns; unpriced tokens are named apart. */
+export const providerUsageSessionTotalSchema = v.object({
+  costUsd: v.nullable(v.number()),
+  tokens: tokenCountSchema,
+  turns: tokenCountSchema,
+  unpricedTokens: tokenCountSchema,
+})
+
+export type ProviderUsageSessionTotal = v.InferOutput<typeof providerUsageSessionTotalSchema>
 export type ProviderUsagePurpose = v.InferOutput<typeof providerUsagePurposeSchema>
 export type ProviderUsageHistoryQuery = v.InferOutput<typeof providerUsageHistoryQuerySchema>
 export type ProviderUsageCostSource = v.InferOutput<typeof providerUsageCostSourceSchema>
 export type ProviderUsageModelRow = v.InferOutput<typeof providerUsageModelRowSchema>
 export type ProviderUsageDayRow = v.InferOutput<typeof providerUsageDayRowSchema>
+export type ProviderUsageDayModel = v.InferOutput<typeof providerUsageDayModelSchema>
+export type ProviderUsageRates = v.InferOutput<typeof providerUsageRatesSchema>
 export type ProviderUsagePurposeRow = v.InferOutput<typeof providerUsagePurposeRowSchema>
 export type ProviderUsageHistory = v.InferOutput<typeof providerUsageHistorySchema>
 
@@ -139,3 +180,24 @@ export function usageTokenCount(row: {
 }) {
   return row.inputTokens + row.outputTokens + row.cacheReadTokens + row.cacheWriteTokens
 }
+
+export const providerResetCreditOutcomeSchema = v.picklist([
+  'reset',
+  'nothingToReset',
+  'noCredit',
+  'alreadyRedeemed',
+])
+export const providerResetCreditBodySchema = v.object({
+  accountKey: trimmedNonEmptyStringSchema,
+  creditId: trimmedNonEmptyStringSchema,
+  checkedAt: v.pipe(v.string(), v.isoTimestamp()),
+  confirmed: v.literal(true),
+})
+export const providerResetCreditResultSchema = v.object({
+  outcome: providerResetCreditOutcomeSchema,
+  refresh: v.picklist(['confirmed', 'unconfirmed']),
+  usage: providerUsageResultSchema,
+})
+export type ProviderResetCreditOutcome = v.InferOutput<typeof providerResetCreditOutcomeSchema>
+export type ProviderResetCreditBody = v.InferOutput<typeof providerResetCreditBodySchema>
+export type ProviderResetCreditResult = v.InferOutput<typeof providerResetCreditResultSchema>

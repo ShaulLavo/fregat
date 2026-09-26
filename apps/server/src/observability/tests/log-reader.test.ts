@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { LogReaderService, normalizeLogEvent } from '../log-reader'
+import { identify, LogReaderService, normalizeLogEvent } from '../log-reader'
 
 const roots: string[] = []
 
@@ -13,30 +13,34 @@ afterEach(async () => {
 
 describe('log reader', () => {
   it('normalizes wide events and generates stable ids', () => {
-    const first = normalizeLogEvent({
-      action: 'fs.read',
-      area: 'fs',
-      duration: '1.25s',
-      environment: 'test',
-      level: 'warn',
-      path: '/fs/read',
-      requestId: 'request-1',
-      service: 'platform',
-      source: 'be',
-      timestamp: '2026-05-25T10:00:00.000Z',
-    })
-    const second = normalizeLogEvent({
-      requestId: 'request-1',
-      timestamp: '2026-05-25T10:00:00.000Z',
-      source: 'be',
-      path: '/fs/read',
-      level: 'warn',
-      duration: '1.25s',
-      environment: 'test',
-      area: 'fs',
-      action: 'fs.read',
-      service: 'platform',
-    })
+    const first = identify(
+      normalizeLogEvent({
+        action: 'fs.read',
+        area: 'fs',
+        duration: '1.25s',
+        environment: 'test',
+        level: 'warn',
+        path: '/fs/read',
+        requestId: 'request-1',
+        service: 'platform',
+        source: 'be',
+        timestamp: '2026-05-25T10:00:00.000Z',
+      }),
+    )
+    const second = identify(
+      normalizeLogEvent({
+        requestId: 'request-1',
+        timestamp: '2026-05-25T10:00:00.000Z',
+        source: 'be',
+        path: '/fs/read',
+        level: 'warn',
+        duration: '1.25s',
+        environment: 'test',
+        area: 'fs',
+        action: 'fs.read',
+        service: 'platform',
+      }),
+    )
 
     expect(first.summary).toMatchObject({
       action: 'fs.read',

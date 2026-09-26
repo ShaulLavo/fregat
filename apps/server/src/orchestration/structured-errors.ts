@@ -6,6 +6,25 @@ import { defineErrorCatalog } from 'evlog'
  * message — a rewording silently turned a permanent failure into a retry loop.
  */
 export const checkpointErrors = defineErrorCatalog('checkpoint', {
+  WORKSPACE_BUSY: {
+    status: 409,
+    message: 'The checkout is being updated.',
+    why: 'A checkpoint change is being undone or reapplied.',
+    fix: 'Retry after the change finishes.',
+  },
+  HUNK_CONFLICT: {
+    status: 409,
+    message: ({ action, path }: { action: 'undone' | 'reapplied'; path: string }) =>
+      `The change to ${path} no longer matches the file, so it cannot be ${action} on its own`,
+    why: 'The lines this change touched were edited again after the turn, by the agent or by hand.',
+    fix: 'Open the file and edit it directly, or rewind the whole turn.',
+  },
+  HUNK_NOT_FOUND: {
+    status: 404,
+    message: ({ path }: { path: string }) => `That change to ${path} is not in this turn`,
+    why: 'The turn diff no longer contains a change with this id; the page may be showing an older diff.',
+    fix: 'Reload the turn changes and pick the change again.',
+  },
   WORKSPACE_NOT_ISOLATED: {
     status: 409,
     message: 'File restore requires an isolated worktree.',
@@ -87,6 +106,24 @@ export const sessionDomainErrors = defineErrorCatalog('orchestration', {
     why: 'The turn that asked finished, was stopped, or the server restarted, so the agent stopped waiting.',
     fix: 'Send a new message if the agent should try again.',
   },
+  COMPACT_EMPTY: {
+    status: 409,
+    message: 'There is no conversation to compact yet.',
+    why: 'Compaction summarises earlier turns, and this session has none.',
+    fix: 'Send a message first.',
+  },
+  FORK_TURN_RUNNING: {
+    status: 409,
+    message: 'A turn still running cannot be forked.',
+    why: 'A fork carries the conversation through a finished turn; this one has not finished.',
+    fix: 'Wait for the turn to finish, or fork from an earlier turn.',
+  },
+  FORK_TURN_NOT_FOUND: {
+    status: 404,
+    message: 'That turn is not in the session any more.',
+    why: 'The fork point names a turn the session no longer holds, usually after a rewind.',
+    fix: 'Reload the session and fork from a turn the timeline shows.',
+  },
   LIFECYCLE_RESTORE_UNAVAILABLE: {
     status: 409,
     message: 'The original session action is unavailable.',
@@ -149,6 +186,12 @@ export const sessionDomainErrors = defineErrorCatalog('orchestration', {
     message: ({ sessionId }: { sessionId: string }) => `Provider start changed: ${sessionId}`,
     why: 'The observed turn generation or start sequence no longer matches the durable state.',
     fix: 'Read the current turn and retry its permitted transition.',
+  },
+  SERVER_RESTARTING: {
+    status: 503,
+    message: 'The server is restarting.',
+    why: 'A restart into a new release is under way, and it admits no new provider starts or rewinds.',
+    fix: 'Wait for it to reconnect, then try again.',
   },
   REGISTRATION_BUSY: {
     status: 409,

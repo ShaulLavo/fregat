@@ -172,7 +172,7 @@ describe('provider runtime ingestion', () => {
     ).toBe('First paragraph.\n\nLast paragraph.')
   })
 
-  it('keeps hook lifecycle events out of chat activities, matching T3 Code', async () => {
+  it('lists a hook that blocked, failed or spoke, and only counts the silent ones', async () => {
     const { dispatched, ingestion } = fixture()
     const base = { createdAt: now, runtimeEpoch: 'epoch-ingestion', sessionId, turnId }
 
@@ -181,13 +181,7 @@ describe('provider runtime ingestion', () => {
         ...base,
         eventId: `${hookId}-start`,
         type: 'hook.started',
-        payload: { hookEvent: 'SessionStart', hookId, hookName: 'SessionStart:startup' },
-      })
-      await ingestion.ingest({
-        ...base,
-        eventId: `${hookId}-progress`,
-        type: 'hook.progress',
-        payload: { hookId, stdout: 'Preparing session' },
+        payload: { hookEvent: 'PreToolUse', hookId, hookName: 'guard.sh' },
       })
       await ingestion.ingest({
         ...base,
@@ -196,22 +190,40 @@ describe('provider runtime ingestion', () => {
         payload: { hookId, exitCode: 0, outcome: 'success' },
       })
     }
+    expect(dispatched).toEqual([])
+
     await ingestion.ingest({
       ...base,
-      eventId: 'hook-failure',
+      eventId: 'hook-blocked',
       type: 'hook.completed',
-      payload: { hookId: 'failed-hook', exitCode: 1, outcome: 'error' },
+      payload: {
+        exitCode: 2,
+        hookEvent: 'PreToolUse',
+        hookId: 'blocked-hook',
+        hookName: 'guard.sh',
+        outcome: 'blocked',
+        output: 'rm is not allowed here\n',
+        stderr: 'rm is not allowed here\n',
+      },
+    })
+    await ingestion.ingest({
+      ...base,
+      eventId: 'turn-done',
+      type: 'turn.completed',
+      payload: { state: 'completed' },
     })
 
-    expect(dispatched).toEqual([])
-    await ingestion.ingest({
-      ...base,
-      eventId: 'runtime-warning',
-      type: 'runtime.warning',
-      payload: { message: 'A Stop hook blocked continuation.' },
-    })
-    expect(dispatched).toMatchObject([
-      { type: 'session.activity.append', activity: { kind: 'runtime.warning' } },
+    const activities = dispatched.flatMap((command) =>
+      command.type === 'session.activity.append' ? [command.activity] : [],
+    )
+    expect(activities).toMatchObject([
+      {
+        kind: 'hook.completed',
+        payload: { detail: 'rm is not allowed here', hookEvent: 'PreToolUse', outcome: 'blocked' },
+        summary: 'guard.sh blocked',
+        tone: 'error',
+      },
+      { kind: 'hook.summary', payload: { count: 3 }, summary: '3 hooks ran', tone: 'info' },
     ])
   })
 

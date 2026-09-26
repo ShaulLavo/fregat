@@ -163,6 +163,7 @@ export function commandAggregate(command: ReceiptCommand) {
     case 'terminal.lease.terminate':
     case 'terminal.lease.end':
     case 'terminal.lease.mark-unknown':
+    case 'terminal.lease.adopt':
     case 'worktree.register':
     case 'worktree.revive':
       return { id: command.worktreeId, kind: 'worktree' as const }
@@ -211,6 +212,7 @@ export function commandAggregate(command: ReceiptCommand) {
     case 'session.unsnooze':
     case 'session.user-input.respond':
     case 'session.user-input.dismiss':
+    case 'session.fork':
       return { id: command.sessionId, kind: 'session' as const }
     default: {
       const exhaustive: never = command

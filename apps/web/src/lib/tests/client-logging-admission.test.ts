@@ -81,9 +81,9 @@ test('a late scope failure survives zero success sampling in real evlog', () => 
   scope.increment('items', 100)
   scope.error(createError({ message: 'connection lost', status: 502 }), { token: 'private' })
   scope.end()
-  expect(events).toHaveLength(2)
+  expect(events).toHaveLength(1)
+  expect(events[0]).not.toHaveProperty('checkpoint')
   expect(events[0]).toMatchObject({
-    checkpoint: 'failure',
     level: 'error',
     items: 100,
     token: '[redacted]',

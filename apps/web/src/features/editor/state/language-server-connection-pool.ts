@@ -1,8 +1,9 @@
 import { errorMessage } from '@workspace/contracts'
-import { LspTransportClosedError } from '@singapore-editor/lsp'
+import { LspServerExitedError, LspTransportClosedError } from '@singapore-editor/lsp'
 import { LspConnectionPool, type LspConnectionPoolEvent } from '@singapore-editor/lsp-plugin'
 
 import { serverExitFields } from '@/features/editor/utils/server-exit-fields'
+import { isAbortError } from '@/lib/abort-error'
 import { log } from '@/lib/client-logging'
 
 /** Separates the two halves of a pool key without colliding with either. */
@@ -66,17 +67,20 @@ function report(event: LspConnectionPoolEvent): void {
     ...closeFields(event.error),
   }
 
-  if (event.kind === 'error' || event.kind === 'handler_ignored') {
-    log.warn(fields)
-    return
-  }
-  // `reconnecting` is the client's only record of a server that died and came back.
-  if (event.kind === 'ready' || event.kind === 'closed' || event.kind === 'reconnecting') {
-    log.info(fields)
-    return
-  }
+  log[eventLevel(event)](fields)
+}
 
-  log.debug(fields)
+function eventLevel(event: LspConnectionPoolEvent): 'debug' | 'info' | 'warn' {
+  if (event.kind === 'handler_ignored') return 'warn'
+  // `error` means reconnecting gave up, whatever the close code: the server's bare close() is 1000.
+  // An AbortError is this side's suspended environment refusing the socket.
+  if (event.kind === 'error') return isAbortError(event.error) ? 'info' : 'warn'
+  // After an announced server exit, `reconnecting` is the client's only record of the restart.
+  if (event.kind === 'reconnecting')
+    return event.error instanceof LspServerExitedError ? 'info' : 'debug'
+  if (event.kind === 'ready' || event.kind === 'closed') return 'info'
+
+  return 'debug'
 }
 
 /** The server's `lsp.socket.close` fields from this end, or what the exit notice before it said. */

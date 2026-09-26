@@ -52,7 +52,7 @@ describe('replaceDirectoryLoad', () => {
         tree('repo/src/nested', [file('repo/src/nested/a.txt')]),
       ])
       model.loadingDirectoryPaths.add('src/nested/pending')
-      model.errorByDirectoryPath.set('src/nested/failed', 'Unavailable')
+      model.errorByDirectoryPath.set('src/nested/failed', { message: 'Unavailable' })
       const entries =
         refreshedPath === 'repo'
           ? [directory('repo/src'), file('repo/new.txt')]
@@ -62,7 +62,7 @@ describe('replaceDirectoryLoad', () => {
       expect(next.entriesByTreePath.get('src/nested/a.txt')).toEqual(file('repo/src/nested/a.txt'))
       expect(next.loadedDirectoryPaths).toEqual(new Set(['src', 'src/nested']))
       expect(next.loadingDirectoryPaths.has('src/nested/pending')).toBe(true)
-      expect(next.errorByDirectoryPath.get('src/nested/failed')).toBe('Unavailable')
+      expect(next.errorByDirectoryPath.get('src/nested/failed')).toEqual({ message: 'Unavailable' })
       expect(model.entriesByTreePath.has('new.txt')).toBe(false)
     },
   )
@@ -92,7 +92,7 @@ describe('replaceDirectoryLoad', () => {
       tree('repo/src/nested', [file('repo/src/nested/a.txt')]),
     ])
     model.loadingDirectoryPaths.add('src/pending')
-    model.errorByDirectoryPath.set('src/failed', 'Unavailable')
+    model.errorByDirectoryPath.set('src/failed', { message: 'Unavailable' })
     const next = replaceDirectoryLoad(model, 'repo', tree('repo', [file('repo/src')]))
 
     expect(next.paths).toEqual(['src'])
@@ -133,7 +133,7 @@ describe('shouldLoadDirectory', () => {
     loading.loadingDirectoryPaths.add('src')
 
     const errored = treeModel(tree('repo', [directory('repo/src')]), 'repo')
-    errored.errorByDirectoryPath.set('src', 'Could not load')
+    errored.errorByDirectoryPath.set('src', { message: 'Could not load' })
 
     expect(shouldLoadDirectory(loaded, 'src/')).toBe(false)
     expect(shouldLoadDirectory(loading, 'src/')).toBe(false)
@@ -142,7 +142,7 @@ describe('shouldLoadDirectory', () => {
 
   it('allows an errored directory to load for an explicit retry', () => {
     const model = treeModel(tree('repo', [directory('repo/src')]), 'repo')
-    model.errorByDirectoryPath.set('src', 'Could not load')
+    model.errorByDirectoryPath.set('src', { message: 'Could not load' })
 
     expect(shouldLoadDirectory(model, 'src/', { retry: true })).toBe(true)
   })
@@ -209,7 +209,7 @@ describe('moveTreeModelPaths', () => {
     model.loadedDirectoryPaths.add('src')
     model.loadedDirectoryPaths.add('src/components')
     model.loadingDirectoryPaths.add('src/components/pending')
-    model.errorByDirectoryPath.set('src/components/broken', 'Could not load')
+    model.errorByDirectoryPath.set('src/components/broken', { message: 'Could not load' })
 
     const next = moveTreeModelPaths(model, root, [
       { fromTreePath: 'src/components', toTreePath: 'packages/components' },
@@ -234,7 +234,7 @@ describe('moveTreeModelPaths', () => {
     expect(next.loadedDirectoryPaths).toEqual(new Set(['src', 'packages/components']))
     expect(next.loadingDirectoryPaths).toEqual(new Set(['packages/components/pending']))
     expect(next.errorByDirectoryPath).toEqual(
-      new Map([['packages/components/broken', 'Could not load']]),
+      new Map([['packages/components/broken', { message: 'Could not load' }]]),
     )
   })
 

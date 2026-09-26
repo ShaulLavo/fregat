@@ -1,13 +1,15 @@
-import type {
-  OrchestrationSessionStreamItem,
-  SessionRuntimeState,
-  SessionId,
-  EnvironmentId,
+import {
+  errorStringField,
+  type OrchestrationSessionStreamItem,
+  type SessionRuntimeState,
+  type SessionId,
+  type EnvironmentId,
 } from '@workspace/contracts'
 
 import { errorMessage } from '@/lib/error-message'
 import type { ChatTransport } from '@/features/chat/transport/chat-transport'
 import { createOrchestrationRpcClosedError } from '@workspace/client-core/transport/structured-errors'
+import { isOrchestrationConnectionFailure } from '@workspace/client-core/transport/orchestration-rpc-client'
 import {
   chatStreamItemSummary,
   createChatPipelineScope,
@@ -298,10 +300,7 @@ export function createSessionDetailSubscriptionCache(
       if (signal.aborted) return { blocked: false, error: null }
 
       entry.scope.increment('stream.errorCount')
-      entry.scope.warn('Session detail stream failed.', {
-        afterSequence,
-        error,
-      })
+      recordStreamFailure(entry.scope, error, afterSequence)
 
       return {
         blocked: isBlockedStreamError(error),
@@ -476,4 +475,13 @@ function isBusySession(runtime: SessionRuntimeState | null) {
   return (
     runtime.status === 'starting' || runtime.status === 'running' || runtime.status === 'waiting'
   )
+}
+
+// A dead socket warns once in the connection's failure series; this entry only counts it.
+function recordStreamFailure(scope: ChatPipelineScope, error: unknown, afterSequence: number) {
+  if (isOrchestrationConnectionFailure(error)) {
+    scope.set({ stream: { lastFailureCode: errorStringField(error, 'code') } })
+    return
+  }
+  scope.warn('Session detail stream failed.', { afterSequence, error })
 }
