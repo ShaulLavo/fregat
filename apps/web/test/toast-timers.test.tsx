@@ -3,6 +3,8 @@ import { Toaster } from '@workspace/ui/components/sonner'
 import { toast } from 'sonner'
 import { afterAll, expect, test, vi } from 'vitest'
 
+// Keep scheduling evidence even if a slow runner lets the timer fire before the assertion.
+let scheduledRemovals = 0
 // Removal timers sonner scheduled that have not fired yet.
 const pendingRemovals = new Set<ReturnType<typeof setTimeout>>()
 const realSetTimeout = globalThis.setTimeout
@@ -15,7 +17,10 @@ const spy = vi.spyOn(globalThis, 'setTimeout').mockImplementation(((
     pendingRemovals.delete(id)
     callback(...args)
   }, ms)
-  if (ms === 200) pendingRemovals.add(id)
+  if (ms === 200) {
+    scheduledRemovals++
+    pendingRemovals.add(id)
+  }
   return id
 }) as typeof setTimeout)
 
@@ -40,7 +45,7 @@ test("a toast closed in a test starts sonner's removal timer", async () => {
     await nextTask()
   })
 
-  expect(pendingRemovals.size).toBeGreaterThan(0)
+  expect(scheduledRemovals).toBeGreaterThan(0)
 })
 
 test('no removal timer outlives the test that started it', () => {
