@@ -4,8 +4,7 @@ import * as v from 'valibot'
 const TSSERVER_REQUEST = 'typescript.tsserverRequest'
 /** Suggestion diagnostics are never errors, so an agent's read skips them. */
 const DIAGNOSTIC_COMMANDS = ['syntacticDiagnosticsSync', 'semanticDiagnosticsSync'] as const
-const CATEGORIES = ['error', 'warning', 'message', 'suggestion'] as const
-type DiagnosticCategory = (typeof CATEGORIES)[number]
+const SEVERITY = { error: 1, warning: 2, message: 3, suggestion: 4 } as const
 
 const locationSchema = v.object({ line: v.number(), offset: v.number() })
 const responseSchema = v.object({
@@ -16,7 +15,7 @@ const responseSchema = v.object({
       end: locationSchema,
       text: v.string(),
       code: v.optional(v.number()),
-      category: v.picklist(CATEGORIES),
+      category: v.picklist(['error', 'warning', 'message', 'suggestion']),
     }),
   ),
 })
@@ -51,7 +50,7 @@ export function lspDiagnosticsFromTsserver(results: readonly unknown[]): unknown
     for (const diagnostic of parsed.output.body) {
       diagnostics.push({
         range: { start: lspPosition(diagnostic.start), end: lspPosition(diagnostic.end) },
-        severity: lspSeverity(diagnostic.category),
+        severity: SEVERITY[diagnostic.category],
         message: diagnostic.text,
         code: diagnostic.code,
         source: 'typescript',
@@ -61,25 +60,6 @@ export function lspDiagnosticsFromTsserver(results: readonly unknown[]): unknown
   return diagnostics
 }
 
-/** tsserver already counts in UTF-16 code units, so a surrogate pair or a precomposed accent needs no re-encoding: only the 1-based offset moves. */
 function lspPosition(location: v.InferOutput<typeof locationSchema>) {
   return { line: location.line - 1, character: location.offset - 1 }
-}
-
-/**
- * typescript-language-server maps every category but warning and suggestion to Error
- * (`default: return apiExports$2.DiagnosticSeverity.Error` in its `toDiagnosticSeverity`), and so
- * does VS Code's `getDiagnosticSeverity`
- * (`default: return vscode.DiagnosticSeverity.Error;`, extensions/typescript-language-features/src/typeScriptServiceClientHost.ts).
- * `message` diagnostics almost never reach this reader, but they default to Error the same way.
- */
-function lspSeverity(category: DiagnosticCategory): number {
-  switch (category) {
-    case 'warning':
-      return 2
-    case 'suggestion':
-      return 4
-    default:
-      return 1
-  }
 }

@@ -3,10 +3,10 @@ import { captureTree, savedTree } from '@/features/workspace/state/tree-reload'
 import { addLifecycleFlush } from '@/lib/lifecycle-flush'
 import { disabledFileQueryKey } from '@/features/workspace/utils/query-keys'
 import type { FileTreeDropContext, FileTreeDropResult, FileTreeRenameEvent } from '@workspace/tree'
-import { FileTree } from '@workspace/tree'
-import { useFileTree } from '@workspace/tree'
+import { TreeHost } from '@/features/workspace/components/tree-host'
+import { useTreeModel } from '@/features/workspace/hooks/use-tree-model'
 import type { GitStatusEntry } from '@workspace/tree'
-import type { FileTreeModel } from '@workspace/tree'
+import type { TreeViewModel } from '@/features/workspace/state/tree-model'
 import { WarningCircleIcon } from '@phosphor-icons/react'
 import { EmptyState } from '@workspace/ui/components/empty-state'
 
@@ -146,7 +146,7 @@ function ReadyTreePane({
     rootPath: restored ? rootPath : null,
     selectedFilePath: restored ? selectedFilePath : undefined,
   })
-  const treeRef = useRef<FileTreeModel | null>(null)
+  const treeRef = useRef<TreeViewModel | null>(null)
   const observedGit = useRef(savedTree(queryClient, rootPath, worktree)?.record.git)
   const [initialGitStatus] = useState(
     () =>
@@ -166,7 +166,7 @@ function ReadyTreePane({
   const createEntryRef = useRef(fsActions.actions.createEntry)
   const revealActiveFileRef = useRef<() => boolean>(() => false)
   const limited = useWatchCoverage(rootPath)?.mode === 'limited'
-  const loadExpandedDirectoriesForCurrentModel = useEffectEvent((currentTree: FileTreeModel) => {
+  const loadExpandedDirectoriesForCurrentModel = useEffectEvent((currentTree: TreeViewModel) => {
     expandedDirectoryPathsRef.current = loadExpandedDirectories(
       currentTree,
       model,
@@ -175,7 +175,7 @@ function ReadyTreePane({
       limited,
     )
   })
-  const publishVisibleTreeItemCount = useEffectEvent((currentTree: FileTreeModel) => {
+  const publishVisibleTreeItemCount = useEffectEvent((currentTree: TreeViewModel) => {
     publishVisibleItemCountAction(visibleTreeItemCount(currentTree, modelRef.current))
   })
   const resumeDeferredCreate = useEffectEvent(() => fsActions.resumeDeferredCreate())
@@ -183,7 +183,7 @@ function ReadyTreePane({
   const initialSelectedPaths = selectedFilePath
     ? [treePathForSelectedPath(rootPath, selectedFilePath)]
     : undefined
-  const { model: tree } = useFileTree({
+  const { model: tree } = useTreeModel({
     density: 'compact',
     itemHeight: rowHeight,
     flattenEmptyDirectories: true,
@@ -395,7 +395,7 @@ function ReadyTreePane({
 
   return (
     <div className='h-full' ref={treeFocusTargetRef}>
-      <FileTree
+      <TreeHost
         aria-label='Folder tree'
         className='block h-full'
         model={tree}
@@ -457,7 +457,7 @@ function selectionSyncPlan({
   rootPath: FilesystemPath
   selectedFilePath: string | null
   state: SelectionSyncState
-  tree: FileTreeModel
+  tree: TreeViewModel
 }): SelectionSyncPlan {
   const treePath = selectedTreePath(rootPath, selectedFilePath)
   const canComplete = selectedFilePathCanCompleteSync(tree, treePath, selectedFilePath)
@@ -479,7 +479,7 @@ function selectedTreePath(rootPath: FilesystemPath, selectedFilePath: string | n
 }
 
 function selectedFilePathCanCompleteSync(
-  tree: FileTreeModel,
+  tree: TreeViewModel,
   treePath: string | null,
   selectedFilePath: string | null,
 ) {

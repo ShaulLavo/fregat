@@ -14,12 +14,13 @@ import { isDirectoryEntry } from '@/lib/file-system-types'
 import { INTENT_PREFETCH_HIT_SLOP_PX } from '@/lib/intent-prefetch-options'
 import { canonicalTreePath } from '@/lib/path-formatters'
 import { entryForTreePath, type TreeModel } from '@/lib/tree-model'
-import type { FileTreeModel, FileTreeRowElement } from '@workspace/tree'
+import type { TreeViewModel } from '@/features/workspace/state/tree-model'
+import type { TreeRowElement } from '@/features/workspace/state/tree-row-elements'
 
 type FileTreeIntentPrefetchOptions = {
   model: TreeModel
   rootPath: string
-  tree: FileTreeModel
+  tree: TreeViewModel
 }
 
 export function useFileTreeIntentPrefetch({
@@ -72,7 +73,7 @@ export function useFileTreeIntentPrefetch({
   }, [rootPath, tree])
 }
 
-function fileTreeRowTarget({ element, path }: FileTreeRowElement): IntentPrefetchTarget<string> {
+function fileTreeRowTarget({ element, path }: TreeRowElement): IntentPrefetchTarget<string> {
   const treePath = canonicalTreePath(path)
 
   return {

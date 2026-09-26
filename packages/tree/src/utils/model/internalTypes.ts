@@ -1,14 +1,7 @@
 // Modified for Platform from Pierre. Apache-2.0; see LICENSE-pierre and UPSTREAM.md.
-import type { FileTreeIcons } from '../iconConfig'
-import type { GitStatus } from '../publicTypes'
 import type {
-  FileTreeCompositionOptions,
-  FileTreePublicId,
-  FileTreeRenderOptions,
-  FileTreeRowDecorationRenderer,
   FileTreeScrollBehavior,
   FileTreeScrollOffset,
-  FileTreeSearchBlurBehavior,
   FileTreeVisibleRow,
 } from './publicTypes'
 
@@ -24,26 +17,4 @@ export interface FileTreeScrollRequest {
   id: number
   offset: FileTreeScrollOffset
   visibleIndex: number
-}
-export interface FileTreeViewProps extends Omit<FileTreeRenderOptions, 'initialVisibleRowCount'> {
-  composition?: FileTreeCompositionOptions
-  controller: import('./FileTreeController').FileTreeController
-  directoriesWithGitChanges?: ReadonlySet<FileTreePublicId>
-  gitStatusByPath?: ReadonlyMap<FileTreePublicId, GitStatus>
-  ignoredGitDirectories?: ReadonlySet<FileTreePublicId>
-  icons?: FileTreeIcons
-  // First-render viewport height in CSS pixels, used as the fallback when the
-  // scroll element's clientHeight is still zero. The public option is
-  // `initialVisibleRowCount` (rows); the resolver multiplies it by itemHeight
-  // before passing the pixel value down here.
-  initialViewportHeight?: number
-  instanceId?: string
-  loadingPaths?: ReadonlySet<FileTreePublicId>
-  renamingEnabled?: boolean
-  renderRowDecoration?: FileTreeRowDecorationRenderer
-  rowElements?: import('../render/rowElements').FileTreeRowElements
-  searchBlurBehavior?: FileTreeSearchBlurBehavior
-  searchEnabled?: boolean
-  searchFakeFocus?: boolean
-  searchPlaceholder?: string
 }

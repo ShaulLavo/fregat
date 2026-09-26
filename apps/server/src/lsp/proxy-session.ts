@@ -404,13 +404,6 @@ class PooledLspProxySession {
   private readonly semanticTokenBaselines = new Map<string, SemanticTokenBaseline>()
   /** Backend request id per uri, so two tabs asking at once ask the backend once. */
   private readonly semanticTokenInFlight = new Map<string, JsonRpcId>()
-  /**
-   * The tsserver diagnostics request ids in flight per uri. tsls's `TSServerRequestCommand` takes
-   * no cancellation token, so `$/cancelRequest` here cancels only our own wait, not tsserver's
-   * queued work; tracking only the latest pair per uri still keeps a burst of reads for one file
-   * from piling up, and a read superseded before its answer lands is dropped.
-   */
-  private readonly tsserverDiagnosticsInFlight = new Map<string, readonly JsonRpcId[]>()
   private semanticTokenDeltaRejections = 0
   readonly key: string
   private readonly match: LspServerMatch
@@ -537,53 +530,14 @@ class PooledLspProxySession {
     const document = this.documents.get(uri)
     if (!document || document.text !== text) return null
     const version = document.backendVersion
-
-    const superseded = this.tsserverDiagnosticsInFlight.get(uri)
-    if (superseded) for (const id of superseded) this.cancelBackendRequest(id)
-    const ids: JsonRpcId[] = []
-    const answered = Promise.all(
+    const responses = await Promise.all(
       tsserverDiagnosticRequests(uri).map((params) =>
-        this.backendRequest('workspace/executeCommand', params, timeoutMs, (id) => ids.push(id)),
+        this.backendRequest('workspace/executeCommand', params, timeoutMs),
       ),
     )
-    this.tsserverDiagnosticsInFlight.set(uri, ids)
-    const responses = await answered
-    // A newer read for this uri already replaced the map entry: the newest wins, so this
-    // superseded answer, valid or not, is dropped rather than delivered stale.
-    const current = this.tsserverDiagnosticsInFlight.get(uri) === ids
-    if (current) this.tsserverDiagnosticsInFlight.delete(uri)
-    if (!current) return null
-
     if (this.documents.get(uri) !== document || document.backendVersion !== version) return null
-
-    const failed = responses.find((response) => response !== null && response.error !== undefined)
-    if (failed) {
-      recordProcessWarning('lsp.tsserver_diagnostics_failed', {
-        area: 'lsp',
-        error: operatorErrorSummary(failed.error),
-        reason: 'backend-error',
-        rootPath: this.rootPath,
-        serverId: this.match.server.id,
-        uri,
-      })
-      return null
-    }
-    // A request this call is still waiting on times out silently: the read gives up rather than
-    // hang the caller, and the budget itself is the signal worth watching, not a log line.
-    if (responses.some((response) => response === null)) return null
-
     const diagnostics = lspDiagnosticsFromTsserver(responses.map((response) => response?.result))
-    if (!diagnostics) {
-      recordProcessWarning('lsp.tsserver_diagnostics_failed', {
-        area: 'lsp',
-        reason: 'unparsed',
-        rootPath: this.rootPath,
-        serverId: this.match.server.id,
-        uri,
-      })
-      return null
-    }
-    return { mode: 'pull', diagnostics }
+    return diagnostics ? { mode: 'pull', diagnostics } : null
   }
 
   private async pullFileDiagnostics(
@@ -621,14 +575,8 @@ class PooledLspProxySession {
     return published ? { mode: 'push', diagnostics: published } : null
   }
 
-  private backendRequest(
-    method: string,
-    params: unknown,
-    timeoutMs: number,
-    onBackendId?: (id: JsonRpcId) => void,
-  ) {
+  private backendRequest(method: string, params: unknown, timeoutMs: number) {
     const backendId = this.nextBackendRequestId()
-    onBackendId?.(backendId)
     return new Promise<JsonRpcResponse | null>((resolve) => {
       const timer = setTimeout(() => {
         this.pendingRequests.delete(backendId)
