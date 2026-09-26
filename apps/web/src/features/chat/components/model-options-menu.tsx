@@ -20,16 +20,10 @@ import {
   type ChatInputDraftTarget,
 } from '@/features/chat/state/chat-input-draft-store'
 
-import {
-  descriptorSummary,
-  effectiveOptionValue,
-  promptEffortState,
-  withUltrathinkPrefix,
-  withoutUltrathinkPrefix,
-} from '../utils/model-options'
-import { EffortSparkle } from '@/features/chat/components/effort-sparkle'
-import { triggerSparkleLevel } from '@/features/chat/utils/effort-sparkle'
+import { descriptorSummary, effectiveOptionValue, promptEffortState } from '../utils/model-options'
+import { composerEffortLevel, effortTier } from '@/features/chat/utils/effort-tier'
 import { ModelOptionsGroup } from './model-options-group'
+import { ModelOptionsSummary } from './model-options-summary'
 import { ModelOptionsTriggerIcon } from './model-options-trigger-icon'
 
 export function ModelOptionsMenu({
@@ -55,7 +49,7 @@ export function ModelOptionsMenu({
   const selection = modelSelection
   const summary = descriptorSummary(descriptors, selection, prompt)
   const effort = promptEffortState(descriptors, prompt)
-  const sparkle = triggerSparkleLevel(descriptors, selection, prompt)
+  const ultra = effortTier(composerEffortLevel(descriptors, selection, prompt) ?? '') === 'ultra'
   const selects = descriptors.filter(
     (descriptor): descriptor is Extract<ProviderOptionDescriptor, { type: 'select' }> =>
       descriptor.type === 'select',
@@ -63,17 +57,11 @@ export function ModelOptionsMenu({
   const switches = descriptors.filter((descriptor) => descriptor.type === 'boolean')
   const tooltip = summary.fast ? `${summary.label}, fast mode on` : summary.label
 
+  // Ultrathink is stored like any level; the server adds the word to the prompt it sends.
   function selectOption(descriptor: ProviderOptionDescriptor, value: string | boolean) {
-    const drafts = useChatInputDraftStore.getState()
-    const currentPrompt = drafts.getDraft(draftTarget).prompt
-    if (descriptor.type === 'select' && descriptor.promptInjectedValues?.includes(String(value))) {
-      drafts.setPrompt(draftTarget, withUltrathinkPrefix(currentPrompt))
-      return
-    }
+    const currentPrompt = useChatInputDraftStore.getState().getDraft(draftTarget).prompt
     const currentEffort = promptEffortState(descriptors, currentPrompt)
-    if (descriptor.id === currentEffort.descriptorId && currentEffort.inBody) return
-    if (descriptor.id === currentEffort.descriptorId && currentEffort.controlled)
-      drafts.setPrompt(draftTarget, withoutUltrathinkPrefix(currentPrompt))
+    if (descriptor.id === currentEffort.descriptorId && currentEffort.controlled) return
     setModelSelection(draftTarget, withModelOption(selection, descriptor, value))
   }
 
@@ -86,16 +74,20 @@ export function ModelOptionsMenu({
               render={
                 <Button
                   aria-label='Model options'
-                  className='text-muted-foreground relative min-w-0 gap-1 text-xs font-normal'
+                  className='group/options text-muted-foreground min-w-0 gap-1 text-xs font-normal'
                   disabled={disabled}
                   focusableWhenDisabled
                   size='sm'
                   type='button'
                   variant='ghost'
                 >
-                  <EffortSparkle level={sparkle} />
-                  <ModelOptionsTriggerIcon compact={compact} fast={summary.fast} />
-                  {compact ? null : <span className='truncate'>{summary.label}</span>}
+                  <ModelOptionsTriggerIcon compact={compact} fast={summary.fast} ultra={ultra} />
+                  {compact ? null : (
+                    <ModelOptionsSummary
+                      parts={summary.parts}
+                      ultraPartId={ultra ? effort.descriptorId : undefined}
+                    />
+                  )}
                   {narrow ? null : (
                     <CaretUpDownIcon className='size-(--icon-size-sm) shrink-0 opacity-60' />
                   )}
@@ -112,7 +104,7 @@ export function ModelOptionsMenu({
             key={descriptor.id}
             descriptor={descriptor}
             first={index === 0}
-            locked={effort.inBody && descriptor.id === effort.descriptorId}
+            locked={effort.controlled && descriptor.id === effort.descriptorId}
             value={
               effort.controlled && descriptor.id === effort.descriptorId
                 ? 'ultrathink'

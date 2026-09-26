@@ -6,6 +6,7 @@ import type {
   FileTreeFileHandle,
   FileTreeItemHandle,
   FileTreeMutationEvent,
+  FileTreeRowDecorationContext,
 } from '@workspace/tree'
 import { FileTreeModel } from '@workspace/tree'
 
@@ -18,7 +19,8 @@ import { selectedFileEntryForTreeSelection } from '@/features/workspace/utils/tr
 import { preparedTreeInputForPaths } from '@/features/workspace/state/prepared-tree-input-cache'
 import { treeMutationLogContext } from '@/features/workspace/utils/tree-mutation-log'
 import type { TreeEntry, TreeResult } from '@/lib/file-system-types'
-import { mergeDirectoryLoad, treeModel } from '@/lib/tree-model'
+import { cloneTreeModel, mergeDirectoryLoad, treeModel } from '@/lib/tree-model'
+import { treeDecorationKey, treeRowDecoration } from '@/features/workspace/utils/tree-decoration'
 
 describe('syncTreePaneState', () => {
   it('continues expanding newly loaded ancestors for the selected file', () => {
@@ -524,7 +526,7 @@ describe('loadExpandedDirectories', () => {
   it('does not retry an errored directory before expansion history is known', () => {
     const root = 'repo'
     const model = treeModel(tree(root, [directory('repo/src')]), root)
-    model.errorByDirectoryPath.set('src', 'Could not load')
+    model.errorByDirectoryPath.set('src', { message: 'Could not load' })
     const fileTree = new FileTreeModel({
       flattenEmptyDirectories: true,
       initialExpansion: 'closed',
@@ -545,7 +547,7 @@ describe('loadExpandedDirectories', () => {
   it('does not retry an errored directory while it remains expanded', () => {
     const root = 'repo'
     const model = treeModel(tree(root, [directory('repo/src')]), root)
-    model.errorByDirectoryPath.set('src', 'Could not load')
+    model.errorByDirectoryPath.set('src', { message: 'Could not load' })
     const fileTree = new FileTreeModel({
       flattenEmptyDirectories: true,
       initialExpansion: 'closed',
@@ -568,10 +570,43 @@ describe('loadExpandedDirectories', () => {
     }
   })
 
+  it('reads a loaded directory again on a fresh expand when the root is limited', () => {
+    const root = 'repo'
+    const model = mergeDirectoryLoad(
+      treeModel(tree(root, [directory('repo/src')]), root),
+      root,
+      tree('repo/src', [file('repo/src/a.ts')]),
+      'src',
+    )
+    const fileTree = new FileTreeModel({
+      flattenEmptyDirectories: true,
+      initialExpansion: 'closed',
+      paths: model.paths,
+    })
+    const loads: Array<{ path: string; refresh?: boolean }> = []
+
+    try {
+      getDirectory(fileTree, 'src/').expand()
+      loadExpandedDirectories(fileTree, model, () => {}, new Set(['src']), true)
+      loadExpandedDirectories(
+        fileTree,
+        model,
+        (_entry, path, options) => loads.push({ path, refresh: options?.refresh }),
+        new Set(),
+        true,
+      )
+      loadExpandedDirectories(fileTree, model, (_entry, path) => loads.push({ path }), new Set())
+
+      expect(loads).toEqual([{ path: 'src/', refresh: true }])
+    } finally {
+      fileTree.cleanUp()
+    }
+  })
+
   it('retries an errored directory after a fresh expand gesture', () => {
     const root = 'repo'
     const model = treeModel(tree(root, [directory('repo/src')]), root)
-    model.errorByDirectoryPath.set('src', 'Could not load')
+    model.errorByDirectoryPath.set('src', { message: 'Could not load' })
     const fileTree = new FileTreeModel({
       flattenEmptyDirectories: true,
       initialExpansion: 'closed',
@@ -765,3 +800,57 @@ function file(path: string): TreeEntry {
     version: `test:1:${path}`,
   }
 }
+
+describe('treeRowDecoration', () => {
+  function rowAt(path: string) {
+    return { item: { path } } as FileTreeRowDecorationContext
+  }
+  function noFix() {}
+
+  it('says no access for a folder the server may not read, and names it', () => {
+    const model = treeModel(tree('repo', [directory('repo/locked')]), 'repo')
+    model.errorByDirectoryPath.set('locked', { message: 'Permission denied', denied: true })
+
+    const handed: unknown[] = []
+    const decoration = treeRowDecoration(model, rowAt('locked/'), (error) => handed.push(error))
+
+    expect(decoration).toMatchObject({
+      text: 'no access',
+      title: "The server's user cannot read /repo/locked",
+      action: { label: 'Fix with AI' },
+    })
+    if (decoration && 'action' in decoration) decoration.action?.onActivate()
+    expect(handed).toEqual([
+      {
+        code: 'PERMISSION_DENIED',
+        message: "The server's user cannot read /repo/locked",
+        title: 'The file tree has no access to a folder',
+      },
+    ])
+  })
+
+  it('keeps error and loading for other folders', () => {
+    const model = treeModel(
+      tree('repo', [directory('repo/broken'), directory('repo/slow')]),
+      'repo',
+    )
+    model.errorByDirectoryPath.set('broken', { message: 'Could not load' })
+    model.loadingDirectoryPaths.add('slow')
+
+    expect(treeRowDecoration(model, rowAt('broken/'), noFix)).toMatchObject({
+      text: 'error',
+      title: 'Could not load',
+      action: { label: 'Fix with AI' },
+    })
+    expect(treeRowDecoration(model, rowAt('slow/'), noFix)).toEqual({ text: 'loading' })
+  })
+
+  it('keys the repaint on what rows show, never on a clone', () => {
+    const model = treeModel(tree('repo', [directory('repo/locked')]), 'repo')
+    const before = treeDecorationKey(model)
+
+    expect(treeDecorationKey(cloneTreeModel(model))).toBe(before)
+    model.errorByDirectoryPath.set('locked', { message: 'Permission denied', denied: true })
+    expect(treeDecorationKey(model)).not.toBe(before)
+  })
+})

@@ -3,10 +3,16 @@ import type { TreeEntry, TreeResult } from '@/lib/file-system-types'
 import { isDirectoryEntry } from '@/lib/file-system-types'
 import { canonicalTreePath, toTreePath } from '@/lib/path-formatters'
 
+/** Why a directory's children could not be listed; `denied` means the server may not read it. */
+export type DirectoryLoadError = {
+  readonly message: string
+  readonly denied?: boolean
+}
+
 export type TreeModel = {
   paths: string[]
   entriesByTreePath: Map<string, TreeEntry>
-  errorByDirectoryPath: Map<string, string>
+  errorByDirectoryPath: Map<string, DirectoryLoadError>
   loadedDirectoryPaths: Set<string>
   loadingDirectoryPaths: Set<string>
 }
@@ -18,6 +24,8 @@ export type TreePathMove = {
 
 export type DirectoryLoadOptions = {
   retry?: boolean
+  /** Read a loaded directory again; a limited root has no watch to say what changed in it. */
+  refresh?: boolean
 }
 
 export function treeModel(result: TreeResult, rootPath: string): TreeModel {
@@ -60,7 +68,7 @@ export function shouldLoadDirectory(
   options: DirectoryLoadOptions = {},
 ) {
   const canonicalPath = canonicalTreePath(treePath)
-  if (model.loadedDirectoryPaths.has(canonicalPath)) return false
+  if (model.loadedDirectoryPaths.has(canonicalPath) && !options.refresh) return false
   if (model.loadingDirectoryPaths.has(canonicalPath)) return false
   if (model.errorByDirectoryPath.has(canonicalPath) && !options.retry) return false
 
@@ -77,11 +85,11 @@ export function markDirectoryLoading(model: TreeModel, directoryTreePath: string
 export function markDirectoryError(
   model: TreeModel,
   directoryTreePath: string,
-  message: string,
+  error: DirectoryLoadError,
 ): TreeModel {
   const next = cloneTreeModel(model)
   next.loadingDirectoryPaths.delete(directoryTreePath)
-  next.errorByDirectoryPath.set(directoryTreePath, message)
+  next.errorByDirectoryPath.set(directoryTreePath, error)
 
   return next
 }

@@ -19,7 +19,7 @@
     "dev": "bun ../../scripts/run-with-env.ts --watch src/index.ts",
     "server": "bun --env-file=../../.env src/index.ts",
     "start": "NODE_ENV=production bun --env-file=../../.env dist/index.js",
-    "build": "tsgo --noEmit && bun scripts/package-wallpapers.ts && bun build src/index.ts --target bun --outdir dist --external sharp --external @anthropic-ai/claude-agent-sdk && bun build src/provider/claude-discovery-worker.ts --target bun --outfile dist/claude-discovery-worker.ts --external @anthropic-ai/claude-agent-sdk && bun build src/installation/remote-support.ts --target bun --outfile dist/remote-support.js",
+    "build": "tsgo --noEmit && bun scripts/package-wallpapers.ts && bun build src/index.ts --target bun --outdir dist --external sharp --external @anthropic-ai/claude-agent-sdk && bun build src/provider/claude-discovery-worker.ts --target bun --outfile dist/claude-discovery-worker.ts --external @anthropic-ai/claude-agent-sdk && bun build src/fs/watch-worker.ts --target bun --outfile dist/watch-worker.ts && bun build src/installation/remote-support.ts --target bun --outfile dist/remote-support.js",
     "prices:update": "bun scripts/update-model-prices.ts",
     "codex-protocol:check": "bun src/provider/adapters/codex-protocol/generate.ts --check",
     "codex-protocol:generate": "bun src/provider/adapters/codex-protocol/generate.ts",

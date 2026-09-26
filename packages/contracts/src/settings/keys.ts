@@ -944,6 +944,20 @@ export const SETTINGS_REGISTRY = {
     description: 'Show dot-prefixed files and folders in file pickers.',
     keywords: ['files', 'folders', 'hidden', 'dotfiles', 'picker'],
   }),
+  'files.watchDirectoryLimit': defineSetting({
+    // Each watched directory is one inotify watch from the machine's per-user pool, which every
+    // other watcher on the box shares; a workspace file must never raise it.
+    schema: v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(2_000_000)),
+    default: 200_000,
+    scope: 'machine',
+    widget: 'number',
+    category: 'Files',
+    title: 'Folder watch limit',
+    description:
+      'How many folders all open workspaces may watch for live changes together. A workspace that would pass it updates its top level and open files only.',
+    visibility: 'advanced',
+    keywords: ['files', 'watch', 'watcher', 'inotify', 'limit', 'large', 'folders', 'live'],
+  }),
   'lsp.experimental.tyForPython': defineSetting({
     schema: v.boolean(),
     default: false,

@@ -214,6 +214,16 @@ export const workspaceCommandMetadata = {
     when: [],
     title: 'Open font settings',
   }),
+  'workspace.showWatchSettings': defineMetadata({
+    category: 'Files',
+    description: 'Change how many folders open workspaces may watch for live changes.',
+    id: 'workspace.showWatchSettings',
+    execution: 'async',
+    target: 'workspace',
+    undoCategory: 'view-only',
+    when: [],
+    title: 'Open folder watch settings',
+  }),
   'workspace.cloneRepository': defineMetadata({
     category: 'Git',
     description: 'Clone a repository into a new folder and open it as a project.',

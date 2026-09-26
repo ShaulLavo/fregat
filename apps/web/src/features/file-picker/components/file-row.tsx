@@ -20,6 +20,7 @@ import { fileListAvailabilityLabel } from '@/features/file-picker/utils/availabi
 import { EntryIcon } from '@/features/file-picker/components/entry-icon'
 import { DIRECTORY_QUERY_STALE_MS } from '@/features/file-picker/utils/directory-query'
 import { INTENT_PREFETCH_HIT_SLOP_PX } from '@/lib/intent-prefetch-options'
+import { FILE_PICKER_INTENT_PREFIX } from '@/features/file-picker/utils/intent'
 
 export function FileRow({
   accept,
@@ -56,7 +57,7 @@ export function FileRow({
     enabled: directory && !isBusy,
     hitSlop: INTENT_PREFETCH_HIT_SLOP_PX,
     meta: { path: entry.path },
-    name: `file-picker-directory:${entry.path}`,
+    name: `${FILE_PICKER_INTENT_PREFIX}${entry.path}`,
     reactivateAfter: DIRECTORY_QUERY_STALE_MS,
   })
 

@@ -5,10 +5,7 @@ import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import { recordRecentEntry } from '@/lib/file-server'
 import { filePickerKeys } from '@/lib/query-keys'
 import { recentFolderKeys } from '@/lib/recent-folders-query'
-
-const recentMutationKeys = {
-  record: (path: FilesystemPath) => ['recents', 'record', path] as const,
-}
+import { workspaceMutationKeys } from '@/features/workspace/utils/mutation-keys'
 
 export function recordRecentMutationOptions(
   queryClient: QueryClient,
@@ -18,7 +15,7 @@ export function recordRecentMutationOptions(
     mutationFn: async (_variables, { client }) => {
       await recordRecentEntry(path, clientForQueryClient(client))
     },
-    mutationKey: recentMutationKeys.record(path),
+    mutationKey: workspaceMutationKeys.recordRecent(path),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: recentFolderKeys.all })
       await queryClient.invalidateQueries({ queryKey: filePickerKeys.recents() })

@@ -62,6 +62,7 @@ import { ChatInputActions } from './chat-input-actions'
 import { ChatInputCommandMenu } from './chat-input-command-menu'
 import { ChatInputEditor } from './chat-input-editor'
 import { ChatInputUltrathinkPlugin } from './chat-input-ultrathink-plugin'
+import { EffortBurst } from './effort-burst'
 import { ChatInputTerminalContextList } from './chat-input-terminal-context-list'
 import { CHAT_INPUT_EDITOR_NODES } from './chat-input-mention-node'
 import { useFocusTarget } from '@/lib/focus/hooks/use-target'
@@ -440,7 +441,7 @@ export function ChatInput({
                 nothing at all. */}
             <div
               className={cn(
-                'focus-ring-within border-transparent bg-input/30 relative overflow-hidden rounded-lg border',
+                'focus-ring-within border-transparent bg-input/30 relative isolate overflow-hidden rounded-lg border',
                 // Tint rather than restate: the utility owns the border colour under
                 // :focus-within, so a bare border-primary would lose to it mid-drag.
                 dropTargetActive && 'border-primary [--focus-ring-color:var(--primary)]',
@@ -450,6 +451,7 @@ export function ChatInput({
               onDragOver={handleComposerDragOver}
               onDrop={handleComposerDrop}
             >
+              <EffortBurst key={draftKey} draftTarget={draftTarget} />
               <ChatInputEditor
                 disabled={composerDisabled}
                 draftKey={draftKey}

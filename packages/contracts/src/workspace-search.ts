@@ -7,7 +7,7 @@ export const WORKSPACE_SEARCH_LIMIT_MAX = 20000
 
 export type WorkspaceSearchMatchMode = 'literal' | 'regex' | 'fuzzy'
 export type WorkspaceSearchProviderSource = 'fallback' | 'fd' | 'index' | 'rg'
-type WorkspaceSearchIndexReadiness = 'cold' | 'building' | 'ready' | 'stale' | 'failed'
+type WorkspaceSearchIndexReadiness = 'cold' | 'building' | 'ready' | 'stale' | 'failed' | 'off'
 export type WorkspaceSearchWarningCode =
   | 'content-tool-partial-failure'
   | 'file-limit-reached'
@@ -17,6 +17,7 @@ export type WorkspaceSearchIndexFallbackReason =
   | 'cold'
   | 'disabled'
   | 'failed'
+  | 'off'
   | 'regex-name-query'
   | 'root-mismatch'
   | 'stale'

@@ -58,6 +58,7 @@
     "files.autoSave",
     "files.autoSaveDelay",
     "files.showHidden",
+    "files.watchDirectoryLimit",
     "git.autoPull",
     "git.projectAutoPull",
     "git.projectWorktreeCleanupOnDelete",

@@ -405,6 +405,10 @@ CodeMirror 6 decorations and Lexical's decorator nodes, and gates Plan 108 Phase
 Obsidian mode, and the question of whether the chat composer still needs Lexical.
 Decided 2026-09-25: owner — 111's research is authorized with the composer as its first consumer,
 and runs before the next wave.
+[Plan 176](plans/176-markdown-parser.md) replaces Plan 108 D5 (decided 2026-09-26: owner): it
+measures which parser drives live preview, with tree-sitter as the lead against `@lezer/markdown`, a
+Rust parser and remark, and whether the winner can also replace remark in chat. Plan 108 Phase 2
+waits on it.
 [Plan 171](plans/171-composer-on-our-editor.md) is that composer migration: it inventories what
 the composer uses Lexical for and orders the Editor gaps to close, with 111 first (decided
 2026-09-25: owner — delete Lexical; the replacement is our own editor).
@@ -534,6 +538,8 @@ of the plans, both logs and the service journal named what stands in the way. Th
 | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | 146 (done)                                     | Dev and prod stop sharing `~/.platform`; each `agent:browser` run gets its own server and state                          |
 | [147](plans/147-log-hygiene-and-noise-gate.md) | Producer fixes, level rules, the reaper give-up, ACK timeout vs overflow, a `logs:census` gate                           |
+| [175](plans/175-large-folder-open.md)          | Opening a huge folder: watch limit, unreadable folders, switch not cancelled by clicks, bounded prefetch                 |
+| [177](plans/177-prefetch-every-press.md)       | Prefetch on intent for every async press (diffs, chats, quick open, search), per-surface toggles                         |
 | [148](plans/148-restart-when-idle.md)          | `deploy --server` stages; the server restarts when no turn is running                                                    |
 | [149](plans/149-terminal-host.md)              | A PTY host that survives server restarts                                                                                 |
 | 150 (done)                                     | Remote servers are checked for protocol; a stale one relaunches or reads "Server out of date"                            |
@@ -550,7 +556,11 @@ Suggested order:
 5. ~~Plan 150~~ — done 2026-09-25 (completion wave): protocol check at both ends of the SSH
    launch, stale relaunch, structured machine errors, "Server out of date". Plan 151 done 2026-09-25
    (completion wave; live Mac update is an owner check). Plan 152 done the same day.
-6. Then Claude rewind and fork ([Plan 145 fork](plans/145-harness-controls/fork.md), Plan 126
+6. Plan 175, reported 2026-09-26: opening `/work` froze the server for 10.8 s and took 92% of the
+   machine's inotify watches. Phases 1–2 need no decision.
+7. Plan 177's research (requested 2026-09-26). Its Phase 0 first-paint measurement is also the
+   baseline for Plans 170 and 176.
+8. Then Claude rewind and fork ([Plan 145 fork](plans/145-harness-controls/fork.md), Plan 126
    RUNTIME-01) and the Plan 139 research phase.
 
 ## UI refresh lane
@@ -559,21 +569,23 @@ Requested 2026-09-25. A survey of 14 component libraries
 ([docs/ui-research](docs/ui-research/README.md)) listed what to take for the base components, chat
 surfaces, the file picker and the site. The owner is taking it one topic at a time.
 
-| Plan                                         | Owns                                                                                                        |
-| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| [157](plans/157-base-components.md)          | Tabs, scroll fades, hold-to-confirm, status dots, typeahead refine; queued next                             |
-| [158](plans/158-app-polish.md)               | Tail following with "N new" in `VirtualList`, secrets display, checkpoint restore, branch lanes, boot frame |
-| [159](plans/159-file-picker.md)              | File and folder picker rewrite: columns, real previews, thumbnails, history keys                            |
-| 160 (done, lane L2)                          | Reasoning fold, turn receipts, live tail, model marker, tool details, plan steps, subagents, ultra sparkle  |
-| 161 (done, lane L2)                          | Approval lifecycle, stopped turns, streaming holds, folding rules, hostile-state scenarios                  |
-| [162](plans/162-context-and-cost.md)         | Context breakdown, usable-window fullness, session totals, usage-page honesty (after Plan 141)              |
-| 163 (done, lane L2)                          | Screenshot attachment in the composer (export lives in Plan 145's export plan)                              |
-| [164](plans/164-what-feels-right-in-neon.md) | First pass shipped (Inter, one mono, `section-label`, radius); a metadata font sweep is left                |
-| 165 (done)                                   | Nerd Fonts + Fontsource on demand; interface-font setting; curated autocomplete picker                      |
-| [166](plans/166-shortcuts-editor.md)         | Keyboard shortcuts page rebuilt from VS Code research: full-width list, save on Enter, several per command  |
-| [154](plans/154-physical-mode.md)            | The seamui feel (springs, depth, motion in every primitive) and interface sounds                            |
-| [155](plans/155-site-demo-replica.md)        | Placeholder: the site hero becomes an animated replica of the app, like cursor.com                          |
-| [156](plans/156-documents-in-the-editor.md)  | Placeholder, far future: PDF, DOCX, XLSX, PPTX and CSV as editor documents agents can edit                  |
+| Plan                                          | Owns                                                                                                        |
+| --------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| [157](plans/157-base-components.md)           | Tabs, scroll fades, hold-to-confirm, status dots, typeahead refine; queued next                             |
+| [158](plans/158-app-polish.md)                | Tail following with "N new" in `VirtualList`, secrets display, checkpoint restore, branch lanes, boot frame |
+| [159](plans/159-file-picker.md)               | File and folder picker rewrite: columns, real previews, thumbnails, history keys                            |
+| 160 (done, lane L2)                           | Reasoning fold, turn receipts, live tail, model marker, tool details, plan steps, subagents, ultra sparkle  |
+| 161 (done, lane L2)                           | Approval lifecycle, stopped turns, streaming holds, folding rules, hostile-state scenarios                  |
+| [162](plans/162-context-and-cost.md)          | Context breakdown, usable-window fullness, session totals, usage-page honesty (after Plan 141)              |
+| 163 (done, lane L2)                           | Screenshot attachment in the composer (export lives in Plan 145's export plan)                              |
+| [164](plans/164-what-feels-right-in-neon.md)  | First pass shipped (Inter, one mono, `section-label`, radius); a metadata font sweep is left                |
+| 165 (done)                                    | Nerd Fonts + Fontsource on demand; interface-font setting; curated autocomplete picker                      |
+| [166](plans/166-shortcuts-editor.md)          | Keyboard shortcuts page rebuilt from VS Code research: full-width list, save on Enter, several per command  |
+| [154](plans/154-physical-mode.md)             | The seamui feel (springs, depth, motion in every primitive) and interface sounds                            |
+| [155](plans/155-site-demo-replica.md)         | Placeholder: the site hero becomes an animated replica of the app, like cursor.com                          |
+| [156](plans/156-documents-in-the-editor.md)   | Placeholder, far future: PDF, DOCX, XLSX, PPTX and CSV as editor documents agents can edit                  |
+| [178](plans/178-tree-in-the-app.md)           | The file tree leaves its shadow root: app React root, tokens and primitives, model stays in `packages/tree` |
+| [179](plans/179-isolating-foreign-content.md) | Where a shadow root earns its place: mermaid, previews, an editor style-recalc experiment                   |
 
 Suggested order:
 
@@ -588,6 +600,9 @@ Suggested order:
 6. Plans 155 and 156 are placeholders; their research phases run when the site or documents matter.
 7. Plan 166 any time; its research phase runs first, and it takes 102 P3, 157 and 080 from `main` as
    they land.
+8. Plan 178 once the in-flight "Fix with AI" tree work lands; D1–D6 first. Plan 179's Phase 0
+   instruments (style recalc split out of `trace`) any time; its editor experiment reuses Plan 178's
+   scroll numbers.
 
 ## Parked plans
 

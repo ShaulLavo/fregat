@@ -436,6 +436,13 @@
       "description": "Show dot-prefixed files and folders in file pickers.",
       "type": "boolean"
     },
+    "files.watchDirectoryLimit": {
+      "default": 200000,
+      "description": "How many folders all open workspaces may watch for live changes together. A workspace that would pass it updates its top level and open files only.",
+      "maximum": 2000000,
+      "minimum": 0,
+      "type": "integer"
+    },
     "git.autoPull": {
       "default": false,
       "description": "Fast-forward a project checkout on its default branch when its upstream moves. A checkout with changes, local commits or another branch checked out is left alone.",
