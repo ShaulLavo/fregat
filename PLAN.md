@@ -572,21 +572,23 @@ Requested 2026-09-25. A survey of 14 component libraries
 ([docs/ui-research](docs/ui-research/README.md)) listed what to take for the base components, chat
 surfaces, the file picker and the site. The owner is taking it one topic at a time.
 
-| Plan                                         | Owns                                                                                                        |
-| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| [157](plans/157-base-components.md)          | Tabs, scroll fades, hold-to-confirm, status dots, typeahead refine; queued next                             |
-| [158](plans/158-app-polish.md)               | Tail following with "N new" in `VirtualList`, secrets display, checkpoint restore, branch lanes, boot frame |
-| [159](plans/159-file-picker.md)              | File and folder picker rewrite: columns, real previews, thumbnails, history keys                            |
-| 160 (done, lane L2)                          | Reasoning fold, turn receipts, live tail, model marker, tool details, plan steps, subagents, ultra sparkle  |
-| 161 (done, lane L2)                          | Approval lifecycle, stopped turns, streaming holds, folding rules, hostile-state scenarios                  |
-| [162](plans/162-context-and-cost.md)         | Context breakdown, usable-window fullness, session totals, usage-page honesty (after Plan 141)              |
-| 163 (done, lane L2)                          | Screenshot attachment in the composer (export lives in Plan 145's export plan)                              |
-| [164](plans/164-what-feels-right-in-neon.md) | First pass shipped (Inter, one mono, `section-label`, radius); a metadata font sweep is left                |
-| 165 (done)                                   | Nerd Fonts + Fontsource on demand; interface-font setting; curated autocomplete picker                      |
-| [166](plans/166-shortcuts-editor.md)         | Keyboard shortcuts page rebuilt from VS Code research: full-width list, save on Enter, several per command  |
-| [154](plans/154-physical-mode.md)            | The seamui feel (springs, depth, motion in every primitive) and interface sounds                            |
-| [155](plans/155-site-demo-replica.md)        | Placeholder: the site hero becomes an animated replica of the app, like cursor.com                          |
-| [156](plans/156-documents-in-the-editor.md)  | Placeholder, far future: PDF, DOCX, XLSX, PPTX and CSV as editor documents agents can edit                  |
+| Plan                                          | Owns                                                                                                        |
+| --------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| [157](plans/157-base-components.md)           | Tabs, scroll fades, hold-to-confirm, status dots, typeahead refine; queued next                             |
+| [158](plans/158-app-polish.md)                | Tail following with "N new" in `VirtualList`, secrets display, checkpoint restore, branch lanes, boot frame |
+| [159](plans/159-file-picker.md)               | File and folder picker rewrite: columns, real previews, thumbnails, history keys                            |
+| 160 (done, lane L2)                           | Reasoning fold, turn receipts, live tail, model marker, tool details, plan steps, subagents, ultra sparkle  |
+| 161 (done, lane L2)                           | Approval lifecycle, stopped turns, streaming holds, folding rules, hostile-state scenarios                  |
+| [162](plans/162-context-and-cost.md)          | Context breakdown, usable-window fullness, session totals, usage-page honesty (after Plan 141)              |
+| 163 (done, lane L2)                           | Screenshot attachment in the composer (export lives in Plan 145's export plan)                              |
+| [164](plans/164-what-feels-right-in-neon.md)  | First pass shipped (Inter, one mono, `section-label`, radius); a metadata font sweep is left                |
+| 165 (done)                                    | Nerd Fonts + Fontsource on demand; interface-font setting; curated autocomplete picker                      |
+| [166](plans/166-shortcuts-editor.md)          | Keyboard shortcuts page rebuilt from VS Code research: full-width list, save on Enter, several per command  |
+| [154](plans/154-physical-mode.md)             | The seamui feel (springs, depth, motion in every primitive) and interface sounds                            |
+| [155](plans/155-site-demo-replica.md)         | Placeholder: the site hero becomes an animated replica of the app, like cursor.com                          |
+| [156](plans/156-documents-in-the-editor.md)   | Placeholder, far future: PDF, DOCX, XLSX, PPTX and CSV as editor documents agents can edit                  |
+| [178](plans/178-tree-in-the-app.md)           | The file tree leaves its shadow root: app React root, tokens and primitives, model stays in `packages/tree` |
+| [179](plans/179-isolating-foreign-content.md) | Where a shadow root earns its place: mermaid, previews, an editor style-recalc experiment                   |
 
 Suggested order:
 
@@ -601,6 +603,9 @@ Suggested order:
 6. Plans 155 and 156 are placeholders; their research phases run when the site or documents matter.
 7. Plan 166 any time; its research phase runs first, and it takes 102 P3, 157 and 080 from `main` as
    they land.
+8. Plan 178 once the in-flight "Fix with AI" tree work lands; D1–D6 first. Plan 179's Phase 0
+   instruments (style recalc split out of `trace`) any time; its editor experiment reuses Plan 178's
+   scroll numbers.
 
 ## Parked plans
 
