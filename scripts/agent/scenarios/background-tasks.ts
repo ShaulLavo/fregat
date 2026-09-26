@@ -15,6 +15,7 @@ const DONE = 'BACKGROUND_STARTED'
 
 export const claudeBackgroundTasks: Scenario = {
   name: 'claude-background-tasks',
+  realProviders: true,
   description:
     'Real Claude (Haiku) starts two background sleeps; the header lists both under Background tasks, stopping one removes it and leaves the other running. Removes the fixture, session and project.',
   async run(page, { step }) {

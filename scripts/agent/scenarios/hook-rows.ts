@@ -27,6 +27,7 @@ const HOOK_SETTINGS = {
 
 export const claudeHookRows: Scenario = {
   name: 'claude-hook-rows',
+  realProviders: true,
   description:
     'Real Claude (Haiku) in a disposable repository whose project PreToolUse hook blocks every Bash call: the turn shows the blocking hook and its message in the work log. Removes the fixture, session and project.',
   async run(page, { step }) {
