@@ -256,7 +256,8 @@ In the order a user meets them:
    `bench:large-file` with a 150 MiB save case.
    Partly landed 2026-09-26 (wave 2 lane B): `createApp` sets Bun's `maxRequestBodySize` to six
    times the open limit plus 1 MiB (a JSON character can take six bytes), so a 129–200 MiB file
-   saves (`fs/tests/large-save.test.ts` posts 130 MiB over the wire: 413 before, 200 after); the
+   saves (`src/tests/request-body-limit.test.ts`: every worst-case JSON encoding of a max-size file
+   fits the limit, and the app is built with it; a 129 MiB POST returned 413 before); the
    client write log counts characters instead of copying the text into a `Blob`. Still open in
    this phase: the saved text outliving the save in the query cache, the git-diff budget, and
    `bench:large-file`.
