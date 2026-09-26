@@ -102,6 +102,8 @@ export function AppProviders({
       })
     const activeNavigation = navigation ?? createTestNavigation({ application: navigationOwner })
     const detach = activeNavigation.attach(navigationOwner)
+    // Binding in an effect is safe only here: children mount after setRuntime below.
+    // App code binds at boot, in createBootstrap.
     const unbind = bindNavigation(activeNavigation)
     // Runtime subscriptions belong to this effect's lifetime, including StrictMode replay.
     // oxlint-disable-next-line oxc-react-compiler/set-state-in-effect

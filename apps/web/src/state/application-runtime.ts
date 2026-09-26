@@ -25,6 +25,7 @@ import type { EditorWorkspaceStoreApi } from '@/features/editor/state/workspace-
 import type { QueryClient } from '@tanstack/react-query'
 import type { EditorPreparedEnvironment } from '@/features/editor/utils/prepared-document'
 import { readWorkspaceCache, type CachedWorkspaceState } from '@/features/workspace/state/cache'
+import { subscribeWorkspaceCachePersistence } from '@/features/workspace/state/cache-persistence'
 import { activateWorkspaceRoot } from '@/features/workspace/state/active-project'
 import { createCommandRuntimeBinding } from '@/keymap/state/runtime-binding'
 import { canonicalServerOrigin } from '@workspace/client-core/transport/client'
@@ -41,6 +42,7 @@ type RetainedEnvironment = {
   readonly queryClient: QueryClient
   readonly editor: EditorRuntime
   readonly stopSearchReload: () => void
+  readonly stopCachePersistence: () => void
   readonly unsubscribeRoot: () => void
 }
 
@@ -86,6 +88,13 @@ export function createApplicationRuntime({
       queryClient,
       editor,
       stopSearchReload,
+      // Before any recovery, so a recovered root recreates its erased cache entry.
+      stopCachePersistence: subscribeWorkspaceCachePersistence({
+        storage,
+        documentStore: editor.documentStore,
+        searchStore: editor.searchBufferStore,
+        workspaceStore: editor.workspaceStore,
+      }),
       unsubscribeRoot: editor.workspaceStore.subscribe(
         (state) => state.rootFolder?.path ?? null,
         (root) => {
@@ -99,6 +108,7 @@ export function createApplicationRuntime({
   current = createEnvironment(activeServerOrigin(), workspaceCache)
   restoreEnvironmentSessionSelection(confirmedEnvironmentId(current.origin))
   resumeEnvironmentActivity(current.origin)
+  current.editor.resume()
   environments.set(confirmedEnvironmentId(current.origin), current)
   activateWorkspaceRoot(current.editor.workspaceStore.getState().rootFolder?.path ?? null)
 
@@ -133,6 +143,7 @@ export function createApplicationRuntime({
       void current.queryClient.cancelQueries()
       resumeEnvironmentActivity(next.origin)
       current = next
+      current.editor.resume()
       activateWorkspaceRoot(current.editor.workspaceStore.getState().rootFolder?.path ?? null)
       restoreEnvironmentSessionSelection(environmentId)
       useEnvironmentsStore.getState().activate(next.origin)
@@ -175,6 +186,7 @@ export function createApplicationRuntime({
         suspendEnvironmentActivity(environment.origin)
         environment.unsubscribeRoot()
         environment.stopSearchReload()
+        environment.stopCachePersistence()
         environment.editor.dispose()
         environment.queryClient.unmount()
       }

@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, type ReactNode } from 'react'
+import { useLayoutEffect, type ReactNode } from 'react'
 
 import { useLanguageCensus } from '@/features/editor/hooks/use-language-census'
 import { useEditorColorTheme } from '@/lib/editor-theme/hooks/use-editor-color-theme'
@@ -8,7 +8,6 @@ import { EditorRuntimeContext } from '@/features/editor/providers/runtime-contex
 import { WorkspaceEditProvider } from '@/features/editor/providers/workspace-edit-provider'
 import { EditorConflictStateContext } from '@/features/editor/state/conflict-state'
 import { EditorDocumentStateContext } from '@/features/editor/state/document-state'
-import { registerEditorOpenBenchmarkControl } from '@/features/editor/state/performance-trace'
 import type { EditorRuntime } from '@/features/editor/state/runtime'
 import { EditorUiStateContext } from '@/features/editor/state/ui-state'
 import { EditorWorkspaceStateContext } from '@/features/editor/state/workspace-state'
@@ -17,7 +16,6 @@ import { createPlatformFileOpenPreparer } from '@/features/editor/utils/prepared
 import { SearchBufferStateContext } from '@/features/search/state/buffer-state'
 import { useSettingValue } from '@/hooks/use-setting-value'
 import { FileOpenIntentProvider } from '@/lib/file-open-intent/providers/context'
-import { useFileAvailability } from '@/features/editor/hooks/use-file-availability'
 import { useSpellcheckDictionary } from '@/features/editor/hooks/use-spellcheck-dictionary'
 
 export function EditorStateProvider({
@@ -28,18 +26,12 @@ export function EditorStateProvider({
   readonly runtime: EditorRuntime
 }) {
   useLanguageCensus(runtime)
-  useFileAvailability(runtime)
   useSpellcheckDictionary(runtime.spellcheck)
   const { appliedThemeContentHash, appliedThemeId, selectedThemeId } = useEditorColorTheme()
   const syntaxHighlightingEnabled = useSettingValue('editor.syntaxHighlighting.enabled')
   const tabSize = useSettingValue('editor.tabSize')
   const languageServerMatchConfiguration = useLanguageServerMatchConfiguration()
-  const { editorOpenBenchmarkControl, fileOpenIntentOwner, queryClient } = runtime
-
-  useEffect(
-    () => registerEditorOpenBenchmarkControl(editorOpenBenchmarkControl),
-    [editorOpenBenchmarkControl],
-  )
+  const { fileOpenIntentOwner, queryClient } = runtime
 
   useLayoutEffect(() => {
     fileOpenIntentOwner.setEnvironment(
@@ -69,11 +61,6 @@ export function EditorStateProvider({
         .catch(() => undefined),
     )
   }, [fileOpenIntentOwner, languageServerMatchConfiguration, queryClient, runtime])
-
-  useEffect(() => {
-    runtime.resume()
-    return () => runtime.suspend()
-  }, [runtime])
 
   return (
     <EditorRuntimeContext value={runtime}>

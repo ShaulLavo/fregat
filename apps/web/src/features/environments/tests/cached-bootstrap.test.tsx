@@ -17,6 +17,7 @@ import { transportFor, closeChatTransports } from '@/features/chat/state/active-
 import { writeBootMirror } from '@/lib/settings-boot-mirror'
 import { createBootRuntime } from '@/state/bootstrap-runtime'
 import { createBootstrap } from '@/state/bootstrap'
+import { getNavigation } from '@/state/navigation-binding'
 import { createTestNavigation } from '../../../../test/factories/navigation'
 import { currentRailEnvironments } from '@/features/chat-mode/state/rail-environments'
 import { createInProcessClient } from '../../../../test/client'
@@ -38,6 +39,7 @@ test('warm bootstrap exists before mount and effect replay retains the same runt
   const boot = createBootstrap(navigation)
   const application = boot.getState().application
   try {
+    expect(getNavigation()).toBe(navigation)
     expect(application).not.toBeNull()
     expect(() => assertEnvironmentWritable(origin)).toThrow()
     boot.start()
