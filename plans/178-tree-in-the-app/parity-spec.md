@@ -190,6 +190,26 @@ Mod+Shift+E reach the app keymap.
 - ✗ No label on the tree inside the root; no `aria-multiselectable`; filter input unlabelled;
   decoration action not focusable; git letters not in the accessible name.
 
+## Harness findings (2026-09-26)
+
+The [parity harness](parity-harness.md) pins today's behaviour; where it differs from the text
+above, the harness is right and these are the corrections.
+
+- **Menu:** a wheel over the tree while the menu is open is eaten by the menu's wash, so the list
+  does not scroll and the menu stays open; "closes on user scroll" only happens for scrolls that
+  bypass the wash. Removing the menu's row leaves the menu open (the close effect does not re-run).
+- **Filter:** Escape restores the saved expansion and leaves focus in the emptied filter box.
+- **Git:** a merge conflict (`UU`) renders as `M` in `--warning`; `.gitignore`d files and folders
+  render as plain rows, so the ignored style (muted, icon at 0.5) never shows in the app.
+- **Chains:** the flattened chain's segments are real drop targets (`flattenedSegmentPath`).
+- **Composer drop:** a real row drag onto the composer starts, drops, and leaves the composer
+  empty (quirk 8), pinned by `tree-parity-behaviour`.
+- **Touch:** Chromium holds back `touchmove` within its ~15px slop, so the 10px cancel only shows
+  past that.
+
+Every ✗ above now has a test except the drop effect shown over an invalid target, which real input cannot read: `packages/tree/src/tests/parity-*.browser.tsx` or the
+`tree-parity-behaviour` scenario.
+
 ## Quirks
 
 Answered 2026-09-26 (index § Decisions, Q2): 1, 8 and 9 are bugs and get fixed; the rest stay.
