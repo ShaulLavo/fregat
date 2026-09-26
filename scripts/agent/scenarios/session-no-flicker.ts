@@ -1,7 +1,7 @@
 import { appendFile } from 'node:fs/promises'
 import path from 'node:path'
 import { ok, strictEqual } from 'node:assert/strict'
-import type { Page } from 'playwright'
+import type { Page, WebSocketRoute } from 'playwright'
 import { countBlankFrames, recordFrames } from '../blank-frames'
 import { selectors, chatMessagesLogSelector } from '../selectors'
 import { dispatch, readShell } from './chat-verification'
@@ -46,24 +46,9 @@ export const sessionNoFlicker = isolatedNativeScenario({
         await selectors.sessionByTitle(page, titles[index]!).waitFor()
       }
       let unavailableSessionId: string | null = null
-      await page.routeWebSocket(/\/orchestration\/rpc(?:\?|$)/, (route) => {
-        const server = route.connectToServer()
-        route.onMessage((message) => {
-          const frame = JSON.parse(message.toString())
-          if (frame.method === 'subscribeSession' && frame.sessionId === unavailableSessionId) {
-            route.send(
-              JSON.stringify({
-                kind: 'subscription.error',
-                subscriptionId: frame.subscriptionId,
-                error: { status: 503, message: 'Fixture session temporarily unavailable' },
-              }),
-            )
-            return
-          }
-          if (frame.method === 'subscribeSession') setTimeout(() => server.send(message), 450)
-          else server.send(message)
-        })
-      })
+      await page.routeWebSocket(/\/orchestration\/rpc(?:\?|$)/, (route) =>
+        connectSessionStream(route, () => unavailableSessionId),
+      )
       const blanks: number[] = []
       const mismatches: number[] = []
       const waits: number[] = []
@@ -177,4 +162,23 @@ async function selectConversation(page: Page, surface: 'main' | 'sidebar', title
   }
   await selectors.conversationHistory(page).click()
   await selectors.conversationChoice(page, title).click()
+}
+
+function connectSessionStream(route: WebSocketRoute, unavailableSessionId: () => string | null) {
+  const server = route.connectToServer()
+  route.onMessage((message) => {
+    const frame = JSON.parse(message.toString())
+    if (frame.method === 'subscribeSession' && frame.sessionId === unavailableSessionId()) {
+      route.send(
+        JSON.stringify({
+          kind: 'subscription.error',
+          subscriptionId: frame.subscriptionId,
+          error: { status: 503, message: 'Fixture session temporarily unavailable' },
+        }),
+      )
+      return
+    }
+    if (frame.method === 'subscribeSession') setTimeout(() => server.send(message), 450)
+    else server.send(message)
+  })
 }
