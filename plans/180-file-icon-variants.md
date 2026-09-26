@@ -268,6 +268,8 @@ Measured with the app's own resolver (`iconForEntry` imported from `lib/file-ico
   recoloured to one hue for everything. **Recommendation: (b).** The languages cost a list of names
   and hues, not drawing, and it is how the pack made its own brand glyphs; only three media glyphs
   and one badge are drawn. (c) is quicker but outlined where the pack is solid.
+  Decided 2026-09-26: owner — (c) Catppuccin, but not flattened to one hue: keep each glyph's own
+  colours, mapped onto the icon hue tokens so light and dark each get their palette values.
 
 ## Proposed phases
 

@@ -50,6 +50,7 @@ Parked: EXT-07 and EXT-09 (Plan 087 automation, Plan 143 research, per-OS matrix
    so a destructive action stays inside it; (b) close LIFE-09 with subprojects unsupported.
    **Recommendation: (a), after batches A–E.** It is the only way `repository_path` means
    anything, and monorepo subprojects are a common layout. L.
+   Decided 2026-09-26: owner — (a), after batches A–E.
 2. **LIFE-12: Project settings.** Eight per-project override keys (`chat.projectAutoSettle`,
    `git.projectAutoPull`, `chat.projectTextGenerationModels`, …) exist with no UI. (a) A Project
    page in Settings, opened from the row and project menus, editing those keys on the owning
@@ -61,10 +62,12 @@ Parked: EXT-07 and EXT-09 (Plan 087 automation, Plan 143 research, per-OS matrix
    restore-on-resume step, off by default like upstream; (b) close EXT-12 with only
    delete-time cleanup. **Recommendation: (b).** Every rule is off by default upstream, and
    restore-on-resume adds a new failure path to every session start. L if (a).
+   Decided 2026-09-26: owner — (b).
 4. **EXT-17: prices.** Plan 141 replaced upstream's editable prices with automatic models.dev
    pricing; a model with no price shows "Price unavailable". (a) Close EXT-17 on automatic
    pricing; (b) add a manual price override for unpriced models. **Recommendation: (a).** Your
    141 decision already chose automatic pricing, and unknown prices never show a wrong number. S if (b).
+   Decided 2026-09-26: owner — (a); models.dev already prices every model it knows.
 
 ## Authority and completion rule
 
