@@ -3,8 +3,9 @@ import type { Locator, Page } from 'playwright'
 
 import type { Scenario } from './index'
 import { selectors } from '../selectors'
-import { dispatch, openChat, readSessionDetail, readShell } from './chat-verification'
-import { sendPrompt, settingsSnapshot, writeSettings } from './native-provider-verification'
+import { openChat, readSessionDetail } from './chat-verification'
+import { createMockProviderSession } from './mock-provider-session'
+import { sendPrompt, writeSettings } from './native-provider-verification'
 
 const STEP_DELAY_MS = 1_200
 const FRAME = 'apps/web/src/features/chat/utils/work-log.ts:30'
@@ -388,62 +389,12 @@ async function waitForTurnEnd(page: Page) {
 
 /** A mock provider instance running the scripted turn, and a session on it. */
 async function createScriptedSession(page: Page, orchestration: string) {
-  const base = orchestration.replace(/\/orchestration$/, '')
-  const before = await settingsSnapshot(page, base)
-  const originallySet =
-    before.layers.find((layer) => layer.id === 'user')?.raw['providers.instances'] !== undefined
-  const originalInstances = before.values['providers.instances']
-  const providerInstanceId = `anatomy-${crypto.randomUUID()}`
-  const sessionId = crypto.randomUUID()
-  const title = `chat-turn-anatomy ${sessionId.slice(0, 8)}`
-  await writeSettings(page, base, [
-    {
-      kind: 'provider.setEnabled',
-      providerInstanceId,
-      enabled: true,
-      createIfMissing: {
-        driverKind: 'mock',
-        displayLabel: 'Scripted mock',
-        config: { script: 'turn-anatomy', stepDelayMs: STEP_DELAY_MS },
-      },
-    },
-  ])
-  const worktree = await firstWorktree(page, orchestration)
-  await dispatch(page, orchestration, {
-    type: 'session.create',
-    sessionId,
-    title,
-    worktreeTarget: { kind: 'current', worktreeId: worktree.id },
-    modelSelection: { providerInstanceId, model: 'gpt-5.5' },
+  const session = await createMockProviderSession(page, orchestration, {
+    name: 'chat-turn-anatomy',
+    displayLabel: 'Scripted mock',
+    config: { script: 'turn-anatomy', stepDelayMs: STEP_DELAY_MS },
   })
-  await selectors.sessionSearch(page).fill(title)
-  await selectors.sessionByTitle(page, title).click()
-  await page.waitForURL((url) => url.href.includes(sessionId))
   await page.reload()
   await selectors.chatMessage(page).waitFor()
-
-  const cleanup = async () => {
-    await dispatch(page, orchestration, { type: 'session.runtime.stop', sessionId })
-    await dispatch(page, orchestration, { type: 'session.delete', sessionId })
-    const current = await settingsSnapshot(page, base)
-    const remaining = current.values['providers.instances'].filter(
-      (item) => item.providerInstanceId !== providerInstanceId,
-    )
-    const unchanged = JSON.stringify(remaining) === JSON.stringify(originalInstances)
-    await writeSettings(page, base, [
-      !originallySet && unchanged
-        ? { kind: 'reset', keys: ['providers.instances'] }
-        : { kind: 'set', key: 'providers.instances', value: remaining },
-    ])
-  }
-  return { base, cleanup, sessionId }
-}
-
-async function firstWorktree(page: Page, base: string) {
-  for (let attempt = 0; attempt < 100; attempt += 1) {
-    const worktree = (await readShell(page, base)).worktrees[0]
-    if (worktree) return worktree
-    await page.waitForTimeout(100)
-  }
-  ok(false, 'A worktree exists')
+  return session
 }

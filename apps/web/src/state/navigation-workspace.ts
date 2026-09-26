@@ -26,6 +26,8 @@ import { confirmedEnvironmentId, confirmedEnvironmentOrigin } from '@/lib/enviro
 import { environmentScopedStorage } from '@/lib/environments/state/scoped-storage'
 import { clientForQueryClient, queryClientFor } from '@/lib/environments/state/query-clients'
 import type { ApplicationRuntime } from '@/state/application-runtime'
+import { fileSystemKeys } from '@/lib/query-keys'
+import { registerWorkspaceAddress } from '@workspace/client-core/files/workspace-address'
 
 export function scopedMainSelection(
   environmentId: EnvironmentId,
@@ -42,6 +44,19 @@ export function scopedMainSelection(
   return selectWorktreeAtPath(slice, rootPath)?.projectId === selection.projectId
     ? selection
     : { kind: 'auto' }
+}
+
+/**
+ * A folder's address is permanent once registered (the server keeps one id per canonical path),
+ * so each environment asks once per folder; every chat open used to repeat the POST.
+ */
+export function registeredWorkspaceAddress(origin: string, path: string) {
+  return queryClientFor(origin).query({
+    queryFn: ({ client, signal }) =>
+      registerWorkspaceAddress({ client: clientForQueryClient(client), path, signal }),
+    queryKey: fileSystemKeys.workspaceAddress(path),
+    staleTime: Number.POSITIVE_INFINITY,
+  })
 }
 
 export async function workspaceAddressFor(

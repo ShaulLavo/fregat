@@ -155,6 +155,7 @@ function createContribution(context: EditorViewContributionContext, options: Dif
   element.addEventListener('mouseleave', handleLeave)
 
   return {
+    inputs: [],
     update: () => undefined,
     dispose: () => {
       hover.dispose()

@@ -3,6 +3,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseSync } from 'oxc-parser'
+import { contrastPhrase } from '../../packages/utils/src/copy.ts'
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url))
 const ALLOW = 'scripts/lint/error-context-allow.json'
@@ -64,6 +65,42 @@ function constantMessageCodes(program) {
   return codes
 }
 
+/**
+ * `message`, `why` and `fix` reach the user's toast, so the Copy rule applies to
+ * them: each catalog entry's text is checked for contrast phrasing.
+ */
+function copyFindings(program, text, file) {
+  const findings = []
+  walk(program, (node) => {
+    if (node.type !== 'CallExpression') return
+    if (node.callee?.name !== 'defineErrorCatalog') return
+    const map = node.arguments?.[1]
+    if (map?.type !== 'ObjectExpression') return
+    for (const entry of map.properties) {
+      if (entry.type !== 'Property' || entry.value?.type !== 'ObjectExpression') continue
+      for (const property of entry.value.properties) {
+        const field = property.type === 'Property' ? propertyName(property) : null
+        if (field !== 'message' && field !== 'why' && field !== 'fix') continue
+        const phrase = contrastPhrase(literalText(property.value))
+        if (!phrase) continue
+        findings.push(
+          `${path.relative(ROOT, file)}:${lineOf(text, property.start)} ${propertyName(entry)}.${field}: "${phrase}"`,
+        )
+      }
+    }
+  })
+  return findings
+}
+
+/** A string literal's text, or a template's static parts joined by a space. */
+function literalText(node) {
+  if (node?.type === 'Literal' && typeof node.value === 'string') return node.value
+  if (node?.type === 'TemplateLiteral')
+    return node.quasis.map((quasi) => quasi.value.cooked).join(' ')
+  if (node?.type === 'ArrowFunctionExpression') return literalText(node.body)
+  return ''
+}
+
 function propertyName(property) {
   return property.key?.name ?? property.key?.value
 }
@@ -108,8 +145,10 @@ function collect() {
   }
 
   const findings = []
+  const copy = []
   let measured = 0
   for (const [file, { text, program }] of parsed) {
+    copy.push(...copyFindings(program, text, file))
     for (const site of throwSites(program)) {
       if (!constantCodes.has(site.code)) continue
       measured += 1
@@ -120,7 +159,7 @@ function collect() {
       })
     }
   }
-  return { findings, measured }
+  return { copy, findings, measured }
 }
 
 function allowances() {
@@ -131,7 +170,7 @@ function allowances() {
   }
 }
 
-const { findings, measured } = collect()
+const { copy, findings, measured } = collect()
 const allowed = allowances()
 const unexcused = findings.filter((finding) => !allowed[finding.key]?.trim())
 const stale = Object.keys(allowed).filter((key) => !findings.some((finding) => finding.key === key))
@@ -154,10 +193,19 @@ console.log(
 for (const finding of unexcused) console.log(`  ${finding.key} (line ${finding.line})`)
 for (const key of stale) console.log(`  stale allowance: ${key}`)
 
+console.log(`error catalog copy: ${copy.length} contrast phrases`)
+for (const finding of copy) console.log(`  ${finding}`)
+
 if (!process.argv.includes('--check')) process.exit(0)
-if (unexcused.length === 0 && stale.length === 0) {
-  console.log('gate: every constant-message error carries runtime context')
+if (unexcused.length === 0 && stale.length === 0 && copy.length === 0) {
+  console.log(
+    'gate: every constant-message error carries runtime context; catalog copy says what things are',
+  )
   process.exit(0)
 }
-console.log('gate: a constant-message error thrown bare logs only its code')
+if (copy.length > 0)
+  console.log('gate: catalog text reaches the toast; say what a thing is and does (AGENTS.md Copy)')
+if (unexcused.length > 0 || stale.length > 0) {
+  console.log('gate: a constant-message error thrown bare logs only its code')
+}
 process.exit(1)

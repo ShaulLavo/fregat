@@ -8,6 +8,11 @@ import type { ChatSessionListProjection } from '@workspace/client-core/chat/sele
 // shape happened to be requested first.
 const timeOfDayFormat = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' })
 const dayMonthFormat = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short' })
+const weekdayTimeFormat = new Intl.DateTimeFormat(undefined, {
+  weekday: 'short',
+  hour: 'numeric',
+  minute: '2-digit',
+})
 const dayMonthYearFormat = new Intl.DateTimeFormat(undefined, {
   day: 'numeric',
   month: 'short',
@@ -72,6 +77,21 @@ export function formatChatTimestamp(value: string) {
   return dayMonthFormat.format(date)
 }
 
+/**
+ * When a schedule wakes a session: the time today, a weekday and time within the week the
+ * harness keeps schedules, and "due" once the moment has passed without a fire.
+ */
+export function formatWakeTime(value: string, nowMs: number) {
+  const atMs = Date.parse(value)
+  if (Number.isNaN(atMs)) return ''
+  if (atMs <= nowMs) return 'due'
+
+  const date = new Date(atMs)
+  if (sameLocalDate(date, new Date(nowMs))) return timeOfDayFormat.format(date)
+  if (atMs - nowMs < WEEK_MS) return weekdayTimeFormat.format(date)
+  return dayMonthFormat.format(date)
+}
+
 export function formatChatDateLabel(value: string) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return ''
@@ -107,7 +127,7 @@ export function formatChatRelativeTime(value: string, nowMs: number) {
   return calendarDateLabel(new Date(atMs), new Date(nowMs))
 }
 
-function formatChatDuration(durationMs: number) {
+export function formatChatDuration(durationMs: number) {
   if (!Number.isFinite(durationMs)) return '0ms'
   if (durationMs < 0) return '0ms'
   if (durationMs < 1000) return `${Math.max(1, Math.round(durationMs))}ms`

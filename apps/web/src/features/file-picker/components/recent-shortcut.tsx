@@ -29,12 +29,7 @@ export function RecentShortcut({ currentPath, entry }: { currentPath: string; en
       type='button'
       variant='ghost'
     >
-      <EntryIcon
-        className='size-(--icon-size)'
-        entry={entry}
-        iconMode='default'
-        selected={selected}
-      />
+      <EntryIcon className='size-(--icon-size)' entry={entry} open={selected} />
       <span className='truncate'>{entry.name}</span>
     </Button>
   )

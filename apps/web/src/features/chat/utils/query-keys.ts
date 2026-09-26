@@ -44,6 +44,19 @@ export const backgroundTaskKeys = {
     ['chat', 'background-tasks', environmentId, sessionId] as const,
 }
 
+export const sessionScheduleKeys = {
+  list: (environmentId: EnvironmentId, sessionId: SessionId) =>
+    ['chat', 'session-schedules', environmentId, sessionId] as const,
+}
+
+export const sessionGoalKeys = {
+  all: (environmentId: EnvironmentId, sessionId: SessionId) =>
+    ['chat', 'session-goal', environmentId, sessionId] as const,
+  /** Keyed by the latest turn too: goals change when turns start and end. */
+  state: (environmentId: EnvironmentId, sessionId: SessionId, turnStamp: string) =>
+    [...sessionGoalKeys.all(environmentId, sessionId), turnStamp] as const,
+}
+
 export const sessionToolKeys = {
   mcp: (environmentId: EnvironmentId, sessionId: SessionId) =>
     ['chat', 'session-mcp', environmentId, sessionId] as const,

@@ -28,6 +28,7 @@ export function createMarkdownScrollSync() {
         createContribution: (viewContext) => {
           context = viewContext
           return {
+            inputs: ['viewport'],
             update: (view, kind) => {
               if (kind === 'viewport') report(view)
             },

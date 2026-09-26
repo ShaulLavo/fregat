@@ -26,8 +26,8 @@ export type ClientError = {
 const messagesByCategory: Record<ErrorCategory, string> = {
   not_found: 'The requested file or folder could not be found.',
   permission_denied: 'You do not have permission to access that path.',
-  not_a_file: 'That path is a directory, not a file.',
-  not_a_directory: 'That path is a file, not a directory.',
+  not_a_file: 'That path is a folder. Open a file inside it.',
+  not_a_directory: 'That path is a file. Choose a folder.',
   too_large: 'The file is larger than the workspace size limit.',
   binary_file: 'The file appears to be binary.',
   lossy_write: 'Saving would rewrite bytes this file never showed you, so the write was refused.',

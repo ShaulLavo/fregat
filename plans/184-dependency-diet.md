@@ -20,6 +20,11 @@ release installs that carry every package the server loads at runtime.
    bundle, but they are missing from `RUNTIME_PACKAGES`. The mesh works only because its
    `node_modules` links the checkout; a release installed elsewhere (the Mac, Plan 151) should fail
    Nerd Font installs and font subsetting. Reproduce on an isolated release install, fix, test.
+   Landed 2026-09-26 (wave 2 lane B): both are in `RUNTIME_PACKAGES`, and the release-files test
+   also collects `require('…')` calls in files that use `createRequire`, which the bundler leaves
+   for run time. Isolated release install (the font modules bundled, the runtime manifest written
+   from `bun.lock`, `bun install --production --frozen-lockfile`, `node_modules` linked beside the
+   bundle, run from `/`): before, `Cannot find package 'subset-font'`; after, both load.
 2. **`cheerio` out.** One call site scrapes nerdfonts.com and costs 22% of the 4.7 MB server bundle.
    Use the GitHub releases API.
 3. **`jszip` out.** Download the `.tar.xz` and use system `tar`, or `fflate`.

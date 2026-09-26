@@ -4,12 +4,14 @@ import { useSessionMenuActions } from '@/hooks/use-session-menu-actions'
 import { openSessionRow, startSessionDraft } from '@/features/chat-mode/state/session-commands'
 import { useSessionRailStore } from '@/features/chat-mode/state/session-rail-store'
 import { sessionMenu } from '@/features/chat-mode/utils/session-menu'
+import { useOpenProjectSettings } from '@/keymap/hooks/use-open-project-settings'
 
 /** The rail row's menu: the shared session actions plus open, draft and project filter. */
 export function useSessionMenu(session: SessionRailItem) {
   const actions = useSessionMenuActions(session, 'rail')
   const scope = useSessionRailStore((state) => state.scope)
   const setScope = useSessionRailStore((state) => state.setScope)
+  const openProjectSettings = useOpenProjectSettings()
 
   const pullRequest = session.worktree.pullRequest
   return sessionMenu({
@@ -29,6 +31,11 @@ export function useSessionMenu(session: SessionRailItem) {
         { baseWorktree: { environmentId: session.environmentId, worktreeId: session.worktree.id } },
       ),
     open: () => openSessionRow(session),
+    openProjectSettings: () =>
+      openProjectSettings({
+        ref: { environmentId: session.environmentId, projectId: session.projectId },
+        title: session.projectTitle,
+      }),
     scopedToProject: scope === session.projectGroupKey,
     scopeToProject: () => setScope(session.projectGroupKey),
   })

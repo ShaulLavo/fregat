@@ -2,8 +2,9 @@
 
 ## Status and authorization
 
-- Status: RESEARCH DONE (2026-09-25) — verified gap table, order and proposed phases below; Plan 111's three
-  owner questions are answered (2026-09-26). Nothing here authorizes implementation.
+- Status: PHASE 1 IMPLEMENTED 2026-09-26 (wave 2 lane E2, with Plan 111 Phase 1: rows 1a–1e, 5, 8, 11,
+  12 label, 15, 19). Phase 2 (prose wrap) and Editor E058 are next, then phase 3. Research done 2026-09-25;
+  Plan 111's three owner questions are answered (2026-09-26).
 - Priority: P2. The composer works today; this removes a second editor framework.
 - Planned at: Platform `9f343825`, Editor `e2fd299`, 2026-09-25. Origin: Plan 126
   [INTERACTION-11](126-t3code-alignment/interaction.md) owner ruling.

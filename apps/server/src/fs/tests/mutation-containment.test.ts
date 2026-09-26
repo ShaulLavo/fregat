@@ -251,9 +251,9 @@ test('opening a nested project keeps sibling files inside the manual mutation bo
   await writeFile(path.join(workspace.root, 'sibling.txt'), 'before')
   const app = workspace.openApp()
 
-  const opened = await request(app, '/fs/workspace-root', { path: 'project', generation: 1 })
+  const opened = await request(app, '/fs/workspace-root', { path: 'project' })
   expect(opened.status).toBe(200)
-  expect(await opened.json()).toMatchObject({ status: 'opened', entry: { path: 'project' } })
+  expect(await opened.json()).toMatchObject({ entry: { path: 'project' } })
 
   const written = await request(app, '/fs/write', { path: 'sibling.txt', content: 'after' })
 

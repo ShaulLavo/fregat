@@ -603,7 +603,7 @@ async function verifyAppIdentity({ page, entry }) {
 async function folderlessSettings({ page, record, entry }) {
   const settings = page.getByRole('dialog', { name: 'Settings', exact: true })
   const clearCategory = settings.getByRole('button', {
-    name: 'Show all settings, not just Machines',
+    name: 'Clear the Machines filter and show every setting',
     exact: true,
   })
   await page.goto(new URL('~-/workbench/settings?settings=machines', options.appUrl).href)

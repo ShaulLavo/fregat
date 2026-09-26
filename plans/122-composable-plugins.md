@@ -2,7 +2,22 @@
 
 Status: RESEARCH DONE 2026-09-26 — Phase 0 comparison, measured controls and the selected
 `createPlugin` shape are below; the evidence is in [Phase 0 research](../docs/composable-plugins/phase-0-research.md).
-Implementation has not started; the proposed phases wait on two owner questions.
+Both owner questions are decided (below). Phases 1 and 2 done 2026-09-26 in wave 2, lane E1:
+[singapore#50](https://github.com/ShaulLavo/singapore/pull/50) (lifecycle ownership, D7) and
+[singapore#51](https://github.com/ShaulLavo/singapore/pull/51) (per-input dispatch: D1–D4 counters in
+`viewContributionDispatch.browser.test.ts`; `bench:dispatch` T1 34–38 → 1.0–1.5 µs, T2 71–149 → 18–21 ns
+per piece). Five Editor and four Platform view contributions declare inputs; the rest stay on every
+kind until their owners classify them (T4's "undeclared 0" is not met yet).
+Phases 3 and 4 done 2026-09-26 (lane E1): [singapore#53](https://github.com/ShaulLavo/singapore/pull/53) and
+[#54](https://github.com/ShaulLavo/singapore/pull/54) (`createPlugin`, the view scope, inputs, `derive`,
+state, channels, `uses`; occurrence highlight, bracket match and document links migrated), and
+[#55](https://github.com/ShaulLavo/singapore/pull/55) (E026 catalog, contributed commands under the plugin's
+name; client-core builds its editor table from the catalog). Phase 4 leaves Platform's runtime command
+segment for contributed commands (palette, keybinding table, recorder) to phase 6, when Platform first
+attaches a `createPlugin` plugin. Phase 5 done the same day ([#56](https://github.com/ShaulLavo/singapore/pull/56)): key
+participant, text gate, cursor style and per-caret `applyEdits` on the scope; the E028 modal proof
+passes on both input routes with IME, readonly and two views; verdict go
+([findings](../../Editor/docs/architecture/modal-input-findings.md)).
 Requested: 2026-09-16. Owners: Fregat and Singapore.
 
 This is a cross-repository plan, not an implementation or a settled API signature.
@@ -245,13 +260,13 @@ primitive each example requires; add one only for a demonstrated missing composi
 Phase 0 is done (research findings below). The rest is ordered; each phase ships on its own and
 carries its own evidence. Sizes: S about a day, M a lane of a few days, L a week or more.
 
-1. **Editor: lifecycle ownership (S).** E027's proposed phase 1, unchanged: a context object per
+1. **Done (singapore#50).** **Editor: lifecycle ownership (S).** E027's proposed phase 1, unchanged: a context object per
    plugin so late registrations belong to it, a disposable store per contribution released with it
    (including `onDidType` and keymap context keys), bracket-match and merge-conflict state moved into
    `activate`, and E027 checks 1–3. Files: `packages/editor/src/plugins.ts`, `editor/Editor.ts`
    (`createContributionSafely`), `bracketMatchPlugin.ts`, `mergeConflictPlugin.ts`,
    `pluginLifecycle.test.ts`. Owner: Editor.
-2. **Editor: per-input dispatch (M).** Contributions declare the inputs they act on; each input keeps
+2. **Done (singapore#51).** **Editor: per-input dispatch (M).** Contributions declare the inputs they act on; each input keeps
    its own subscriber set, as `updateViewport` already does; undeclared means today's catch-all,
    kept explicit. One operation publishes its changed inputs in one pass (fold the `selection`
    notify from `syncDomSelection` into the flush). `requestViewUpdate` re-runs the requester and paint
@@ -262,7 +277,7 @@ carries its own evidence. Sizes: S about a day, M a lane of a few days, L a week
    `editor/viewContributions.ts`, `editor/Editor.ts`, `editor/inputSelectionController.ts`, the
    contribution files, Platform `apps/web/src/features/{editor,workbench,settings}` contributions.
    Owner: Editor, with Platform for its nine. Gates D1–D4, T1, T2, T4.
-3. **Editor: `createPlugin` and the view scope, experimental (M).** E027 phase 2 built in the selected
+3. **Done (singapore#53, #54).** **Editor: `createPlugin` and the view scope, experimental (M).** E027 phase 2 built in the selected
    shape: the combined per-view context becomes `ViewScope`; inputs, `derive`, channels with a change
    subscription and `one`/`many`/`combine` policy, `state`, `onDispose`/`own`, `uses` with identity
    dedup and ref-counted ownership, `editor` labelled unstable, a multi-selection read. Lowers onto
@@ -271,12 +286,12 @@ carries its own evidence. Sizes: S about a day, M a lane of a few days, L a week
    provider plumbing in the same pass. Marks use `setRangeHighlight` until Plan 111 phase 1 lands
    `registerDecorationSource`, which `scope.decorations` then wraps with an input trigger. Export from
    `@singapore-editor/core/extensions`; `public-api.test.ts` gains the symbols. Owner: Editor. Gates D5–D7.
-4. **Commands (M, cross-repo).** E026 as planned, plus the namespace rule: a contributed ID starts with
+4. **Done, except the runtime segment (singapore#55).** **Commands (M, cross-repo).** E026 as planned, plus the namespace rule: a contributed ID starts with
    its plugin's `name` and a dot. Then the alignment proof (multicursor batch, one undo) on
    `createPlugin`. Platform gains a runtime command segment: palette, keybinding table, recorder,
    enablement and focus target read plugin declarations
    (`packages/client-core/src/commands/`, `apps/web/src/keymap/`). Owner: Editor then Platform.
-5. **Modal input (M).** E028 on `createPlugin`: key participant, text gate, cursor style and the
+5. **Done (singapore#56).** **Modal input (M).** E028 on `createPlugin`: key participant, text gate, cursor style and the
    `applyEdits` selection list as scope methods, proved in a real browser on both input routes, two
    splits, readonly and IME. Applies owner question 2's key precedence. Owner: Editor.
 6. **Fregat attachment (M).** `editor.tsx` takes plugin values; the first-party set becomes one list of

@@ -186,6 +186,8 @@ export const filePicker: Scenario = {
   async run(page, { step }) {
     await selectors.projectMenu(page).click()
     await selectors.openFolderMenu(page).click()
+    // Folder mode opens in columns; this path is about the list's single focus target.
+    await selectors.pickerView(page, 'List').click()
     await selectors.pickerOptions(page).first().waitFor()
     await step('folder-picker')
     const list = selectors.pickerList(page)

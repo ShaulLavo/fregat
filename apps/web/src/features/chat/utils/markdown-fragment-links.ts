@@ -1,8 +1,11 @@
+import { MARKDOWN_ID_PREFIX } from '@workspace/markdown'
+
 /**
  * `#fragment` links inside a message have nowhere to navigate to — the app is
  * not a document at a URL — so they are resolved against the rendered message
  * itself. The renderer emits headings without ids, so a heading is matched by
- * the GitHub-style slug of its own text.
+ * the GitHub-style slug of its own text. The renderer prefixes every id and
+ * in-document link, so the prefix is dropped before matching a slug.
  */
 
 const HEADING_SELECTOR = 'h1, h2, h3, h4, h5, h6'
@@ -37,7 +40,10 @@ export function findMarkdownFragmentTarget(anchor: Element, href: string | undef
 }
 
 function targetWithin(root: Element, fragment: string) {
-  return elementWithId(root, fragment) ?? headingWithSlug(root, fragment)
+  const slug = fragment.startsWith(MARKDOWN_ID_PREFIX)
+    ? fragment.slice(MARKDOWN_ID_PREFIX.length)
+    : fragment
+  return elementWithId(root, fragment) ?? headingWithSlug(root, slug)
 }
 
 function markdownHeadingSlug(text: string) {

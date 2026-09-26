@@ -121,7 +121,7 @@ test('settle Undo by Mod+Z restores the pin key, active slot and snooze that set
   neutral.remove()
 })
 
-test('Mod+Z leaves text fields, the composer, editors, terminals and the file tree their own undo', async ({
+test('Mod+Z leaves text fields, editors, terminals and the file tree their own undo', async ({
   client,
   server,
 }) => {
@@ -134,7 +134,6 @@ test('Mod+Z leaves text fields, the composer, editors, terminals and the file tr
   await waitFor(async () => expect((await current()).settledOverride).toBe('settled'))
 
   const surfaces: readonly (readonly [FocusArea, FocusTargetId])[] = [
-    ['chat', { kind: 'chat-composer', key: 'composer' }],
     ['editor', { kind: 'editor', key: '/project/a.ts', surface: 'document' }],
     ['terminal', { kind: 'terminal', rootPath: '/project', sessionId: 'shell' }],
     ['file-tree', { kind: 'file-tree', rootPath: '/project' }],
@@ -163,7 +162,7 @@ test('Mod+Z leaves text fields, the composer, editors, terminals and the file tr
   neutral.remove()
 })
 
-test('Mod+Z undoes from a pane without its own undo, such as the git pane', async ({
+test('Mod+Z undoes from panes without their own undo: the git pane and the chat transcript', async ({
   client,
   server,
 }) => {
@@ -172,22 +171,23 @@ test('Mod+Z undoes from a pane without its own undo, such as the git pane', asyn
   const focus = new FocusService()
   renderRailHarness(h, false, undefined, focus)
   const current = async () => (await h.refresh()).sessions.find((session) => session.id === first)!
-  await menu('Mark as settled')
-  await waitFor(async () => expect((await current()).settledOverride).toBe('settled'))
-  const element = document.createElement('div')
-  element.tabIndex = -1
-  document.body.append(element)
-  const registration = focus.register({
-    area: 'git',
-    element,
-    id: { kind: 'git', rootPath: '/project' },
-    onIntent: () => false,
-  })
-  act(() => element.focus())
-  expect(pressUndo(element).defaultPrevented).toBe(true)
-  await waitFor(async () => expect((await current()).settledOverride).toBeNull())
-  registration.unregister()
-  element.remove()
+  const surfaces: readonly (readonly [FocusArea, FocusTargetId])[] = [
+    ['git', { kind: 'git', rootPath: '/project' }],
+    ['chat', { kind: 'turn-changes', key: 'transcript' }],
+  ]
+  for (const [area, id] of surfaces) {
+    await menu('Mark as settled')
+    await waitFor(async () => expect((await current()).settledOverride).toBe('settled'))
+    const element = document.createElement('div')
+    element.tabIndex = -1
+    document.body.append(element)
+    const registration = focus.register({ area, element, id, onIntent: () => false })
+    act(() => element.focus())
+    expect(pressUndo(element).defaultPrevented, area).toBe(true)
+    await waitFor(async () => expect((await current()).settledOverride).toBeNull())
+    registration.unregister()
+    element.remove()
+  }
 })
 
 test('archiving the viewed session opens a draft, and Undo unarchives it and opens it again', async ({

@@ -6,6 +6,9 @@
   [docs/ui-research/keyboard-shortcuts.md](../docs/ui-research/keyboard-shortcuts.md), mockups at
   1440, 820 and 390 in `docs/images/shortcuts-mock-*.webp`. D1–D6 decided by the owner on
   2026-09-25. Q1–Q2 below need the owner; the owner reviews the mockups (Q1) before Phase 2.
+- Phase 1's two keymap fixes landed 2026-09-26 (wave 2, lane S): an override keeps every default
+  (pane, `editorWhen`) template of its command, and the recorder keeps Control and Meta apart
+  (`recordedStroke(event, platform)`; the TUI records as Linux).
 - Priority: P2 in the UI refresh lane. The owner asked for it on 2026-09-25: research how VS Code
   does it, make it work on a phone, and redo it.
 - Effort: M overall. Phase 1 fixes two live keymap bugs. Phase 7 (several shortcuts per command,

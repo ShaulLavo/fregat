@@ -105,7 +105,17 @@ export function MachineRow({
             Connect
           </Button>
         )}
-        {phase !== 'idle' && phase !== 'live' ? (
+        {phase === 'identity-drift' ? (
+          <Button
+            size='sm'
+            variant='secondary'
+            disabled={working}
+            onClick={() => void run(() => connections.trustMachine(name))}
+          >
+            Trust replacement
+          </Button>
+        ) : null}
+        {phase !== 'idle' && phase !== 'live' && phase !== 'identity-drift' ? (
           <Button
             size='sm'
             variant='ghost'

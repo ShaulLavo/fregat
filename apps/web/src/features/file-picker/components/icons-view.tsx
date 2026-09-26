@@ -14,7 +14,6 @@ import {
   listLabel,
   pickerCopy,
   type EntriesLoadState,
-  type FilePickerIconMode,
   type FilePickerMode,
 } from '@/features/file-picker/utils/model'
 
@@ -24,7 +23,6 @@ import {
  */
 export function IconsView({
   entries,
-  iconMode,
   isBusy,
   listRef,
   loadState,
@@ -36,7 +34,6 @@ export function IconsView({
   onRetry,
 }: {
   entries: readonly FsEntry[]
-  iconMode: FilePickerIconMode
   isBusy: boolean
   listRef: RefObject<HTMLDivElement | null>
   loadState: EntriesLoadState
@@ -98,7 +95,6 @@ export function IconsView({
             {row.map((entry) => (
               <FileTile
                 entry={entry}
-                iconMode={iconMode}
                 isBusy={isBusy}
                 key={entry.path}
                 rowProps={list.rowProps(entry.path)}

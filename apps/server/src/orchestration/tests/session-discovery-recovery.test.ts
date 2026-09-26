@@ -1,6 +1,6 @@
 import { mkdir, symlink } from 'node:fs/promises'
 import path from 'node:path'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import * as v from 'valibot'
 import { providerInstanceIdSchema, sessionIdSchema } from '@workspace/contracts'
 import { SessionDiscoveryReconciler } from '../session-discovery'
@@ -113,11 +113,9 @@ describe('session discovery reconciliation', () => {
       ).not.toBeNull()
 
       expect(await reconciler.scan()).toMatchObject({ imported: 1, skipped: {} })
-      // The lifecycle reactor fills headCommit after a revive; its event would land after the snapshot.
-      await vi.waitFor(() => {
-        const live = [...fixture.getReadModel().worktrees.values()].filter((row) => !row.retiredAt)
-        expect(live.every((row) => row.headCommit)).toBe(true)
-      })
+      // A registration or revive hands the worktree to the lifecycle reactor, whose metadata
+      // refresh commits after the scan returns; the snapshot is taken once that work is done.
+      await fixture.engine.providerRuntimeIdle()
       const snapshot = await fixture.engine.shellSnapshot()
       expect(
         snapshot.worktrees.find((worktree) => worktree.id === initial.result?.worktreeId),
@@ -245,12 +243,14 @@ describe('session discovery reconciliation', () => {
       await fixture.git('worktree', 'add', '-b', 'feature', linked)
       await fixture.register()
       expect(await reconciler.scan()).toMatchObject({ imported: 1, skipped: {} })
+      await fixture.engine.providerRuntimeIdle()
       const first = await fixture.engine.shellSnapshot()
       expect(first.worktrees).toHaveLength(2)
       const worktree = first.worktrees.find((entry) => entry.canonicalPath === linked)
       expect(worktree).toMatchObject({ kind: 'linked', ownership: 'external', branch: 'feature' })
       expect(first.sessions[0]?.worktreeId).toBe(worktree?.id)
       await reconciler.scan()
+      await fixture.engine.providerRuntimeIdle()
       expect((await fixture.engine.shellSnapshot()).snapshotSequence).toBe(first.snapshotSequence)
     } finally {
       await reconciler.close()

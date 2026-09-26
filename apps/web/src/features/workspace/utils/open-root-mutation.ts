@@ -6,7 +6,6 @@ import { openWorkspaceRootPath } from '@/lib/file-server'
 import { workspaceMutationKeys } from '@/features/workspace/utils/mutation-keys'
 
 export type OpenWorkspaceRootVariables = {
-  readonly generation: number
   readonly signal: AbortSignal
 }
 
@@ -18,8 +17,8 @@ export function openWorkspaceRootMutationOptions(
   OpenWorkspaceRootVariables
 > {
   return {
-    mutationFn: ({ generation, signal }, { client }) =>
-      openWorkspaceRootPath(path, generation, signal, clientForQueryClient(client)),
+    mutationFn: ({ signal }, { client }) =>
+      openWorkspaceRootPath(path, signal, clientForQueryClient(client)),
     mutationKey: workspaceMutationKeys.openRoot(path),
   }
 }

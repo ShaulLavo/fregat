@@ -64,14 +64,6 @@ jobs:
       - name: Setup
         uses: ./.github/actions/setup
 
-      - name: Checkout pinned alignment reference
-        uses: actions/checkout@v4
-        with:
-          repository: pingdotgg/t3code
-          ref: 7445aa733ada33e45289e5aa5055f79142556513
-          path: references/t3code
-          persist-credentials: false
-
       - name: Cache Playwright browsers
         if: ${{ matrix.suite.browser }}
         uses: actions/cache@v4

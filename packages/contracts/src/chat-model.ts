@@ -391,6 +391,12 @@ export const TURN_END_REASONS = [
 export const turnEndReasonSchema = v.picklist(TURN_END_REASONS)
 export type TurnEndReason = v.InferOutput<typeof turnEndReasonSchema>
 
+/** Why a harness started a turn no prompt asked for: a wakeup or cron, a finished background task. */
+export const PROVIDER_TURN_ORIGINS = ['scheduled', 'task', 'provider'] as const
+export const providerTurnOriginSchema = v.picklist(PROVIDER_TURN_ORIGINS)
+export type ProviderTurnOrigin = v.InferOutput<typeof providerTurnOriginSchema>
+export const PROVIDER_TURN_STARTED_ACTIVITY_KIND = 'turn.provider-started'
+
 /** A harness-reported end reason, carried to the turn row as a quiet activity. */
 export const TURN_ENDED_ACTIVITY_KIND = 'turn.ended'
 export const turnEndedPayloadSchema = v.object({ endReason: turnEndReasonSchema })

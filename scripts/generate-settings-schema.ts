@@ -63,6 +63,7 @@ function settingPropertySchema(
     ...(descriptor.deprecationReason ? { deprecated: true } : {}),
   }
   const notes = [
+    descriptor.details ?? null,
     descriptor.dependsOn ? `Applies while \`${descriptor.dependsOn}\` is on.` : null,
     descriptor.deprecationReason ? `Deprecated: ${descriptor.deprecationReason}` : null,
   ].filter((note) => note !== null)

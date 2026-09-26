@@ -70,13 +70,16 @@ import {
 export class OrchestrationSnapshotQuery {
   private readonly database: OrchestrationDatabase
   readonly backgroundLiveness: (sessionId: string) => 'working' | 'monitoring' | null
+  readonly sleepingUntil: (sessionId: string) => string | null
 
   constructor(
     database: OrchestrationDatabase = getDefaultPlatformDatabase(),
     backgroundLiveness: (sessionId: string) => 'working' | 'monitoring' | null = () => null,
+    sleepingUntil: (sessionId: string) => string | null = () => null,
   ) {
     this.database = database
     this.backgroundLiveness = backgroundLiveness
+    this.sleepingUntil = sleepingUntil
   }
 
   latestProposedPlan(sessionId: string) {
@@ -233,6 +236,7 @@ export class OrchestrationSnapshotQuery {
       .map((session) => ({
         ...sessionShellFromRow(session, this.sessionRuntime(session.sessionId)),
         backgroundLiveness: this.backgroundLiveness(session.sessionId),
+        sleepingUntil: this.sleepingUntil(session.sessionId),
       }))
 
     return v.parse(orchestrationShellSnapshotSchema, {

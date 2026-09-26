@@ -100,7 +100,7 @@ test('recording a chord writes the override through, and Reset takes it back out
 
   const recorder = await screen.findByRole('button', { name: SAVE_RECORDER })
   await userEvent.click(recorder)
-  fireEvent.keyDown(recorder, { altKey: true, key: 'j', metaKey: true })
+  fireEvent.keyDown(recorder, { altKey: true, key: 'j', ctrlKey: true })
 
   await waitFor(async () => {
     const snapshot = await fetchSettings(undefined, getClient())

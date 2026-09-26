@@ -5,6 +5,11 @@ import { parseHotkey } from '@tanstack/hotkeys'
 import { expect, test as it } from '@/keymap/../../test/fixtures'
 import { binding } from '@/keymap/../../test/factories/key-binding'
 import { chordStrokes } from '@workspace/client-core/commands/chord'
+import {
+  FOCUS_AREAS,
+  UNDO_OWNING_PANES,
+  type FocusArea,
+} from '@workspace/client-core/commands/focus'
 
 import { activeBindings } from '@workspace/client-core/commands/bindings'
 import {
@@ -44,6 +49,25 @@ describe('activePlatformKeyBindings', () => {
 })
 
 describe('resolvedPlatformKeyBindings', () => {
+  it('keeps every pane a command is bound in when its keys are overridden', () => {
+    const resolved = resolvedPlatformKeyBindings(
+      defaultPlatformKeyBindings('linux'),
+      { 'workspace.undoSessionAction': 'Mod+Alt+Z' },
+      'linux',
+    )
+    const overridden = resolved.filter(
+      (binding) => binding.command === 'workspace.undoSessionAction',
+    )
+
+    const defaultPanes = defaultPlatformKeyBindings('linux')
+      .filter((binding) => binding.command === 'workspace.undoSessionAction')
+      .map((binding) => binding.pane)
+    expect(overridden.map((binding) => binding.pane).toSorted()).toEqual(defaultPanes.toSorted())
+    expect(defaultPanes.length).toBeGreaterThan(1)
+    expect(overridden.every((binding) => binding.keys === 'Mod+Alt+Z')).toBe(true)
+    expect(commands(activeBindings(resolved, 'git'))).toContain('workspace.undoSessionAction')
+  })
+
   it('replaces every default a command had with the one hotkey the user chose', () => {
     const resolved = resolvedPlatformKeyBindings(
       defaultPlatformKeyBindings('linux'),
@@ -502,22 +526,28 @@ describe('defaultPlatformKeyBindings', () => {
     }
   })
 
-  it('binds session Undo to Mod+Z only outside the surfaces that own an undo', () => {
+  it('routes Mod+Z and Mod+Shift+Z to session history in every pane without its own undo', () => {
     const bindings = defaultPlatformKeyBindings('linux')
-    const undoIn = (pane: Parameters<typeof appKeyBindingsForPane>[1]) =>
-      commands(appKeyBindingsForPane(bindings, pane).filter((binding) => binding.keys === 'Mod+Z'))
+    const commandsIn = (pane: FocusArea, keys: string) =>
+      commands(appKeyBindingsForPane(bindings, pane).filter((binding) => binding.keys === keys))
 
-    const sessionUndo = bindings.filter(
-      (binding) => binding.command === 'workspace.undoSessionAction',
-    )
-    expect(new Set(sessionUndo.map((binding) => binding.keys))).toEqual(new Set(['Mod+Z']))
-    expect(sessionUndo.every((binding) => binding.yieldsToTextEntry)).toBe(true)
-    for (const pane of ['global', 'git', 'logs', 'problems', 'search', 'settings'] as const)
-      expect(undoIn(pane), pane).toEqual(['workspace.undoSessionAction'])
-    expect(undoIn('file-tree')).toEqual(['fileTree.undo'])
-    expect(undoIn('editor')).toContain('editor.undo')
-    for (const pane of ['chat', 'editor', 'terminal', 'file-tree', 'dialog'] as const)
-      expect(undoIn(pane)).not.toContain('workspace.undoSessionAction')
+    for (const command of ['workspace.undoSessionAction', 'workspace.redoSessionAction']) {
+      const session = bindings.filter((binding) => binding.command === command)
+      expect(session.every((binding) => binding.yieldsToTextEntry)).toBe(true)
+    }
+    for (const pane of FOCUS_AREAS) {
+      const undo = commandsIn(pane, 'Mod+Z')
+      const redo = commandsIn(pane, 'Mod+Shift+Z')
+      if (UNDO_OWNING_PANES.has(pane)) {
+        expect(undo, pane).not.toContain('workspace.undoSessionAction')
+        expect(redo, pane).not.toContain('workspace.redoSessionAction')
+        continue
+      }
+      expect(undo, pane).toEqual(['workspace.undoSessionAction'])
+      expect(redo, pane).toEqual(['workspace.redoSessionAction'])
+    }
+    expect(commandsIn('file-tree', 'Mod+Z')).toEqual(['fileTree.undo'])
+    expect(commandsIn('editor', 'Mod+Z')).toContain('editor.undo')
   })
 
   it('binds file-tree focus globally and file filtering only inside the tree', () => {

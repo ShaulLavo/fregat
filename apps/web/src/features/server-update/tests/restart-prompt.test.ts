@@ -39,6 +39,7 @@ test('the waiting note appears only for a session holding an approval or questio
 
 test('each busy state has a label and a row title adds the project', () => {
   expect(busyStateLabel('background')).toBe('Running in the background')
+  expect(busyStateLabel('sleeping')).toBe('Sleeping; its wake-ups end')
   expect(busySessionTitle(busy('running'))).toBe('Fix the parser')
   expect(busySessionTitle({ ...busy('running'), projectTitle: 'platform' })).toBe(
     'Fix the parser · platform',

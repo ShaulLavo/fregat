@@ -9,7 +9,7 @@
 
 ## Reference Clones
 
-- Upstream code we compare against (vscode, t3code, opencode, codex, …) lives in `references/` at the repo root, gitignored. Check there before cloning; add new clones there, not in `/work/projects/references/`. CI and tests resolve `references/t3code` by relative path.
+- Upstream code we compare against (vscode, t3code, opencode, codex, …) lives in `references/` at the repo root, gitignored. Check there before cloning; add new clones there, not in `/work/projects/references/`. Tests and `scripts/parity` resolve `references/t3code` by relative path; CI does not fetch it, so those checks skip there and run locally.
 - Pull a clone that is behind before relying on it. If a plan pins an upstream commit (Plan 126), record the new head and what changed in that plan.
 
 ## Code Organization
@@ -73,6 +73,7 @@
 
 - Three loaders from `@workspace/ui`, nothing hand-rolled: `LoadingState` (skeleton for a region with no content yet, mirroring the loaded view's primitives, one placeholder per element), `Spinner` (anything else; `size` `xs` rows, `sm` control icon, `md` panel, `lg` surface; none inside `Button`; no `text-*` class), `Shimmer` (inline in a running sentence only).
 - Branch on pending before empty; loading and empty must never look alike. Do not defeat `LoadingState`'s 120ms delay or add `motion-reduce:` at call sites.
+- A view that switches subjects (selection, commit, session, tab, theme) keeps the old subject whole, header and body, until the new one can paint, then swaps in one frame; the wait is a `Spinner` in the header. Skeletons are for a region's first load. Hold with `useHeldUntilReady` (`hooks/use-held-until-ready.ts`) or `placeholderData` that carries its subject, never with a header from the new subject over the old body; no `key={subject}` on a view whose data loads.
 - Render failures: `RenderErrorBoundary` (`@workspace/ui/patterns/render-error-boundary`) at each seam `ToolPane` does not cover, with `resetKeys` set to the shown identity. Local boundaries do not log (the root's `onCaughtError` does). Query and mutation failures stay state; no `throwOnError`. Keep boundaries below anything that must stay mounted (terminals).
 - Content that must outlive its layout (terminals) goes through `lib/keep-alive` (`KeepAliveProvider`, `KeepAliveSlot`, `useKeptIds`); kept content sees the provider's context, and stands down via `attached`. Connection notices overlay the retained host (`features/terminal/components/panel.tsx`).
 - Observe rendered children with a Fragment ref and `observeUsing` (`editor-tab-bar.tsx`); keep wrappers that own layout. Text in a height-capped `pre` changes its scroll boundary without resizing, so `activity-detail-section.tsx` keeps a mutation observer.
@@ -84,7 +85,7 @@
 
 ## Settings
 
-- Every knob is a registry entry in `packages/contracts/src/settings/keys.ts`, registered in the same pass as its consumer. No new `localStorage` keys, env vars or hardcoded tunables.
+- Every knob is a registry entry in `packages/contracts/src/settings/keys.ts`, registered in the same pass as its consumer. No new env vars or hardcoded tunables. Browser storage may hold per-browser view state, such as pane sizes.
 - A value that reaches execution (binary, env, flag, keybinding) is `application` or `machine` scope, never `window`: workspace files ship in cloned repos. Suppression-only values may be `window` and show the cross-scope indicator.
 - Read with `useSettingValue`, or `readSettingsMirror()` outside React. Secrets go to the secret store. Run `bun run settings:reference` after changing the registry.
 
@@ -113,7 +114,7 @@
 ## Dev, Gates, Verification
 
 - The dev server is a mesh route: the first connection to 5173 (Vite) or 3001 (API) starts it, and it stops after the idle window (`developer.devServerIdleMinutes`). Never start one by hand. `mesh serve ls` shows the `:5173` route, `mesh serve stop :5173` restarts it on the next connection, and `bun run dev:serve` registers it on a machine that lacks it. State homes: production `~/.platform`, dev `/work/platform-dev/home`, each `agent:browser` run a temp home. `/dev` (and `/platform/dev` on the mesh) is a component gallery; add a tab for anything worth eyeballing.
-- `bun run gates` (`dupes:functions`, `dupes`, `design:census`, `compiler:census`, `errors:census`, `query:check`) runs in pre-commit, `verify` and CI. `bun run hooks:pre-commit` is not a dry run: it stages what it fixes.
+- `bun run gates` (`dupes:functions`, `dupes`, `design:census`, `compiler:census`, `errors:census`, `query:check`, `unused:check`) runs in pre-commit, `verify` and CI. `bun run hooks:pre-commit` is not a dry run: it stages what it fixes.
 - Prove changes with the `verify-fregat` skill (`bun run agent:browser look|scenario|trace|renders|caches`); evidence lands in `/work/tmp/fregat-evidence/<run>/`. Read the screenshot back and name the directory. Performance claims cite `trace --compare`, render claims `renders` before and after, settlement claims `caches`. Reproduce a bug on its surface before fixing it. A surface with no scenario gets one in `scripts/agent/scenarios/`, selectors in `scripts/agent/selectors.ts`.
 
 ## Deployment: The Mesh

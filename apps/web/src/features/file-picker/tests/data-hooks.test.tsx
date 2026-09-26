@@ -22,16 +22,7 @@ const SERVER_INFO: ServerInfo = {
   watchDirectoryLimit: 200_000,
   systemRoot: '',
   watchEnabled: false,
-  workspaceIndex: {
-    entryCount: 0,
-    fileCount: 0,
-    pendingCreatedPathCount: 0,
-    readiness: 'ready',
-    scanRoot: null,
-    scanWarningCount: 0,
-    skippedEntryCount: 0,
-    staleEntryCount: 0,
-  },
+  workspaceIndexes: [],
   workspaceRoot: '',
 }
 

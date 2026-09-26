@@ -35,7 +35,12 @@ import { activityRequestId } from './pending-requests'
 import { event, one } from './event-factory'
 import { settlementActivityEvents, userEngagementEvents } from './lifecycle-events'
 import { decideRegistration, decideWorktreeCommand } from './registration-decider'
-import { decideProviderStart, decideRuntimeRecovery, decideDeletionUpdate } from './runtime-decider'
+import {
+  decideDeletionUpdate,
+  decideProviderStart,
+  decideProviderStartedTurn,
+  decideRuntimeRecovery,
+} from './runtime-decider'
 import { requireWorktree } from './read-model'
 import { sessionDomainErrors } from './structured-errors'
 import {
@@ -134,6 +139,8 @@ function decideCommandEvents(
     case 'session.provider-start.adopt':
     case 'session.provider-start.settle':
       return decideProviderStart(command, model, at)
+    case 'session.turn.provider-start':
+      return decideProviderStartedTurn(command, model, at)
     case 'session.runtime.recover':
       return decideRuntimeRecovery(command, model, at)
     case 'session.deletion.update':

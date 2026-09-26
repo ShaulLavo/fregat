@@ -5,6 +5,11 @@
 - Status: RESEARCH DONE (2026-09-25) — findings, recommendations and proposed phases below;
   owner questions answered 2026-09-26. Nothing here authorizes implementation. "Work items"
   records a fix to shipped behaviour that the owner ordered 2026-09-26.
+- Phase 2 (routing) DONE 2026-09-26, wave 2 lane W: `UNDO_OWNING_PANES` and `FOCUS_AREAS` in
+  `client-core/src/commands/focus.ts`; session undo and redo bind Mod+Z / Mod+Shift+Z in every
+  other pane, `chat` included on the desktop platforms (the TUI chat pane keeps U / Shift+U).
+  `keymap.test.ts` pins every `FocusArea`. One stack per domain (owner question 3): only the
+  session history takes the app-level key.
 - Priority: P2.
 - Planned at: Platform `9f343825`, 2026-09-25. Origin: Plan 126
   [LIFE-13](126-t3code-alignment/lifecycle.md) owner correction.

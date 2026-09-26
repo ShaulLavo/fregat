@@ -12,6 +12,7 @@ export const fileSystemKeys = {
   tree: (rootPath: string) => [...fileSystemKeys.trees(), rootPath] as const,
   treeDirectory: (rootPath: string, treePath: string, path: string) =>
     [...fileSystemKeys.tree(rootPath), 'directory', treePath, path] as const,
+  workspaceAddress: (path: string) => [...fileSystemKeys.all, 'workspace-address', path] as const,
 }
 
 export const appearanceKeys = {
@@ -22,17 +23,20 @@ export const appearanceKeys = {
 export const filePickerKeys = {
   all: ['file-picker'] as const,
   serverInfo: () => [...filePickerKeys.all, 'server-info'] as const,
+  places: () => [...filePickerKeys.all, 'places'] as const,
   directories: () => [...filePickerKeys.all, 'directories'] as const,
   directory: (path: string, query: string, mode: 'file' | 'folder', showHidden: boolean) =>
     [...filePickerKeys.directories(), { mode, path, query, showHidden }] as const,
   recents: () => [...filePickerKeys.all, 'recents'] as const,
   recentList: (mode: 'file' | 'folder', showHidden: boolean) =>
     [...filePickerKeys.recents(), 'list', { mode, showHidden }] as const,
+  imageReady: (src: string) => [...filePickerKeys.all, 'image-ready', src] as const,
 }
 
 export const filePreviewKeys = {
   all: ['file-preview'] as const,
-  preview: (path: string) => [...filePreviewKeys.all, path] as const,
+  file: (path: string) => [...filePreviewKeys.all, path] as const,
+  preview: (path: string, maxBytes: number) => [...filePreviewKeys.file(path), maxBytes] as const,
 }
 
 export const gitKeys = {
@@ -64,8 +68,9 @@ export const gitKeys = {
 
 export const documentSymbolKeys = {
   all: ['document-symbols'] as const,
-  document: (rootPath: string, path: string, contentRevision: string) =>
-    [...documentSymbolKeys.all, rootPath, path, contentRevision] as const,
+  /** `flat` rows (the palette's `@`) and the nested `tree` (breadcrumbs) are different answers. */
+  document: (rootPath: string, path: string, contentRevision: string, shape: 'flat' | 'tree') =>
+    [...documentSymbolKeys.all, shape, rootPath, path, contentRevision] as const,
 }
 
 export const providerQueryKeys = {

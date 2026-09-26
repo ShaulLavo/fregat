@@ -123,7 +123,7 @@ async function get(
         homePath: DEMO_ROOT,
         defaultPath: DEMO_ROOT,
         maxTextFileBytes: 4_194_304,
-        workspaceIndex: indexStatus(workspace),
+        workspaceIndexes: [indexStatus(workspace)],
       })
     case '/settings':
       return json(workspace.settings)
@@ -249,11 +249,7 @@ async function post(
         })),
       })
     case '/fs/workspace-root':
-      return json({
-        status: 'opened',
-        entry: { ...workspace.stat(DEMO_ROOT), workspaceAddress: DEMO_ADDRESS },
-        workspaceIndex: indexStatus(workspace),
-      })
+      return json({ entry: { ...workspace.stat(DEMO_ROOT), workspaceAddress: DEMO_ADDRESS } })
     case '/fs/recents':
       return json({ recorded: true })
     case '/fs/write': {
@@ -318,6 +314,7 @@ function indexStatus(workspace: DemoWorkspace) {
   return {
     entryCount: workspace.files.size + workspace.directories.size,
     fileCount: workspace.files.size,
+    holderCount: 1,
     pendingCreatedPathCount: 0,
     readiness: 'ready',
     scanWarningCount: 0,

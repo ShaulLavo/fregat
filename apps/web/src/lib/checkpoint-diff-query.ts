@@ -3,6 +3,7 @@ import type { GitFileDiff, GitFileStatus } from '@workspace/contracts'
 import { clientLogContext } from '@/lib/environments/state/log-context'
 import type { SessionId } from '@workspace/contracts'
 
+import type { QueryClient } from '@tanstack/react-query'
 import type { Client } from '@/lib/client'
 import { observeClientOperation } from '@/lib/client-logging'
 import { unwrapEdenResponse } from '@/lib/eden-events'
@@ -53,6 +54,17 @@ export function checkpointDiffInputForSummary(
     sessionId: summary.sessionId,
     toTurnCount: summary.checkpointTurnCount,
   }
+}
+
+/**
+ * The chat git pane already holds a turn with whitespace counted, because its hunk ids must be the
+ * server's. Opening a file from it shows that same diff, so the open hits the cache and the tab
+ * shows every hunk the pane listed.
+ */
+export function cachedCountedTurnDiff(queryClient: QueryClient, input: CheckpointDiffQueryInput) {
+  return queryClient.getQueryData<GitFileDiff[]>(
+    checkpointDiffQueryKey({ ...input, ignoreWhitespace: false }),
+  )
 }
 
 export function checkpointFullSessionDiffInputForSummary(

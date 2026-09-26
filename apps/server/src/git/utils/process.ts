@@ -48,7 +48,7 @@ export const gitProcessErrors = defineErrorCatalog('git', {
     status: 413,
     message: ({ action, maxBytes, stream }: { action: string; maxBytes: number; stream: string }) =>
       `git ${action} wrote more than ${maxBytes} bytes to ${stream}`,
-    why: 'Buffering the whole output would grow the server heap without bound, so the read stops at the limit and the partial output is discarded rather than returned as a complete result.',
+    why: 'Buffering the whole output would grow the server heap without bound, so the read stops at the limit and discards the partial output.',
     fix: 'Narrow the command (fewer paths, a smaller revision range) or raise maxOutputBytes for that call when the large output is expected.',
   },
 })

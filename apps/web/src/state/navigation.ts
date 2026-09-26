@@ -10,7 +10,11 @@ import {
   historyTargetForEditorChange,
 } from '@/features/address/utils/history'
 import { useSidebarSelectionStore } from '@/features/chat/state/sidebar-selection-store'
-import { scopedMainSelection, workspaceAddressFor } from '@/state/navigation-workspace'
+import {
+  registeredWorkspaceAddress,
+  scopedMainSelection,
+  workspaceAddressFor,
+} from '@/state/navigation-workspace'
 import { fetchDiff, fetchGitFile } from '@/features/git/utils/api'
 import { snapshotDocument } from '@/lib/documents/utils/comparisons'
 import {
@@ -45,7 +49,6 @@ import {
   type Address,
 } from '@workspace/client-core/address/grammar'
 import { workspaceToken } from '@workspace/client-core/address/workspace'
-import { registerWorkspaceAddress } from '@workspace/client-core/files/workspace-address'
 import type { LanguageServerDefinitionTarget } from '@singapore-editor/lsp-plugin/websocket'
 import { createNavigationCoordinator, type NavigationResult } from '@/state/navigation-coordinator'
 import type { ApplicationRouter } from '@/state/router'
@@ -57,7 +60,7 @@ import {
   addressForRenamedFile,
 } from '@/features/address/utils/resource-address'
 import { confirmedEnvironmentId, confirmedEnvironmentOrigin } from '@/lib/environments/state/domain'
-import { clientForQueryClient, queryClientFor } from '@/lib/environments/state/query-clients'
+import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import {
   useChatProjectionStore,
   selectChatProjectionSlice,
@@ -303,11 +306,8 @@ export function createNavigation(
     return coordinator.request(
       async ({ signal, application, address, isCurrent }) => {
         const origin = confirmedEnvironmentOrigin(environmentId)
-        const workspace = await registerWorkspaceAddress({
-          client: clientForQueryClient(queryClientFor(origin)),
-          path,
-          signal,
-        })
+        const workspace = await registeredWorkspaceAddress(origin, path)
+        signal.throwIfAborted()
         if (!isCurrent()) return { address, replace }
         const current = application.getSnapshot()
         const same =

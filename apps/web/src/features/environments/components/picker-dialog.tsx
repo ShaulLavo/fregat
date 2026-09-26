@@ -65,6 +65,13 @@ export function PickerDialog({
       setError(errorMessage(cause, 'The machine action failed.'))
     }
   }
+  async function trust(name: string) {
+    setError(null)
+    setFailedName(null)
+    const result = await connections.trustMachine(name)
+    if (result === 'connected') return onClose()
+    if (result === 'failed') setFailedName(name)
+  }
   if (showForm)
     return (
       <FormDialog
@@ -115,6 +122,16 @@ export function PickerDialog({
                   : machine.phase}
               </span>
             </Button>
+            {connecting && machine.phase === 'identity-drift' ? (
+              <Button
+                size='sm'
+                variant='secondary'
+                disabled={working.size > 0}
+                onClick={() => void trust(machine.name)}
+              >
+                Trust replacement
+              </Button>
+            ) : null}
             {connecting ? (
               <ServerUpdateButton
                 name={machine.name}

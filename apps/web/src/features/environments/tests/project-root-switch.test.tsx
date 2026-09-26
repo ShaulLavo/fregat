@@ -14,7 +14,7 @@ import { readWorkspaceCache, writeRootFolderCache } from '@/features/workspace/s
 import { activeServerOrigin, getClient, setActiveServerOrigin, setClient } from '@/lib/client'
 import { originForQueryClient, queryClientFor } from '@/lib/environments/state/query-clients'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
-import { createFolderPath, fetchServerInfo } from '@/lib/file-server'
+import { createFolderPath } from '@/lib/file-server'
 import { createApplicationRuntime } from '@/state/application-runtime'
 
 import { createInProcessClient } from '../../../../test/client'
@@ -38,7 +38,7 @@ test.for([
     rootB: 'only-on-a',
     missingOnB: true,
   },
-])('$name', async ({ originA, originB, rootB, missingOnB }, { client, server }) => {
+])('$name', async ({ originA, originB, rootB, missingOnB }, { client }) => {
   const secondServer = await makeTestServer({ filesystemWatch: false })
   const clientB = createInProcessClient(secondServer)
   const rootAEntry = await createFolderPath(filesystemPath('a'), client)
@@ -83,10 +83,6 @@ test.for([
     expect(screen.getByTestId('editor-root').textContent).toBe('a')
     expect(screen.getByTestId('bf451e7b-070d-5d48-b2e4-227226449bc9').textContent).toBe('a')
     const editorA = application.getSnapshot().editor
-    await waitFor(async () => {
-      const info = await fetchServerInfo(new AbortController().signal, client)
-      expect(info.workspaceIndex?.scanRoot).toBe(join(server.root, 'a'))
-    })
 
     writeRootFolderCache(environmentScopedStorage(confirmedEnvironmentId(originB)), {
       ...rootBEntry,
@@ -111,11 +107,6 @@ test.for([
       expectedRootB ?? 'none',
     )
     expect(useActiveProjectStore.getState().workspaceRoot).toBe(expectedRootB)
-    await waitFor(async () => {
-      if (missingOnB) return
-      const info = await fetchServerInfo(new AbortController().signal, clientB)
-      expect(info.workspaceIndex?.scanRoot).toBe(join(secondServer.root, rootB))
-    })
 
     act(() => application.activateEnvironment(originA))
     await waitFor(() => expect(screen.getByTestId('active-origin').textContent).toBe(originA))

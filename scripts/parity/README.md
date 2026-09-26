@@ -1,11 +1,27 @@
 # Alignment records and executable comparisons
 
-Run from the repository root:
+These checks run locally only; CI does not fetch t3code. They need the pinned checkout at
+`references/t3code`:
+
+```sh
+git clone https://github.com/pingdotgg/t3code references/t3code
+git -C references/t3code checkout 7445aa733ada33e45289e5aa5055f79142556513
+```
+
+Then, from the repository root:
 
 ```sh
 python3 -B scripts/parity/check.py
 python3 -B scripts/parity/source.py --reference references/t3code
 python3 -B -m unittest discover -s scripts/parity -p 'test_*.py'
+bun scripts/parity/wake.ts
+bun scripts/parity/snooze.ts
+bun scripts/parity/ordering.ts
+bun scripts/parity/response-delivery.ts
+bun scripts/parity/background.ts
+bun scripts/parity/model-options.ts
+python3 -B scripts/parity/run.py --operation client-command:thread.turn.start \
+  --scenario follow-up-queue-policy --check
 bun scripts/parity/follow-ups.ts --summary
 ```
 
@@ -69,7 +85,7 @@ python3 -B scripts/parity/run.py \
 ```
 
 The output directory must be new. Use `--check` instead of `--output` to execute and
-validate without writing artifacts, as the queued-policy CI step does.
+validate without writing artifacts.
 The runner gets `PARITY_UPSTREAM_COMMIT` and
 `PARITY_SUBJECT`, and emits one JSON object on stdout:
 
@@ -107,8 +123,8 @@ be that finding's ID. A single operation's report cannot close an entire finding
 These checks validate retained observations and make executable cases repeatable. They do
 not prove an adapter is honest, that normalization preserves every behavior, or that a narrow
 corpus covers an entire feature. Review the adapter and its source anchors. Hashes cover the
-runner and declared local entry points, not every transitive dependency. CI reruns the paired
-suites to catch changes in the actual code they import. Absolute temporary browser evidence
+runner and declared local entry points, not every transitive dependency. Rerun the paired
+suites locally to catch changes in the actual code they import. Absolute temporary browser evidence
 can remain on in-progress findings but cannot satisfy durable comparison requirements.
 
 ## Paired queued follow-up policy

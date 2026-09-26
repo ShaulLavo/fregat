@@ -30,20 +30,28 @@ export function createShellRowReader(
   snapshots: OrchestrationSnapshotQuery,
   database?: PlatformDatabase,
 ): OrchestrationShellRowReader {
-  if (database) return new ProjectionShellRowReader(database, snapshots.backgroundLiveness)
+  if (database)
+    return new ProjectionShellRowReader(
+      database,
+      snapshots.backgroundLiveness,
+      snapshots.sleepingUntil,
+    )
   return new SnapshotShellRowReader(snapshots)
 }
 
 export class ProjectionShellRowReader implements OrchestrationShellRowReader {
   private readonly database: PlatformDatabase
   private readonly backgroundLiveness: OrchestrationSnapshotQuery['backgroundLiveness']
+  private readonly sleepingUntil: OrchestrationSnapshotQuery['sleepingUntil']
 
   constructor(
     database: PlatformDatabase,
     backgroundLiveness: OrchestrationSnapshotQuery['backgroundLiveness'] = () => null,
+    sleepingUntil: OrchestrationSnapshotQuery['sleepingUntil'] = () => null,
   ) {
     this.database = database
     this.backgroundLiveness = backgroundLiveness
+    this.sleepingUntil = sleepingUntil
   }
 
   beginWindow() {}
@@ -94,6 +102,7 @@ export class ProjectionShellRowReader implements OrchestrationShellRowReader {
     return {
       ...sessionShellFromRow(row, runtime),
       backgroundLiveness: this.backgroundLiveness(sessionId),
+      sleepingUntil: this.sleepingUntil(sessionId),
     }
   }
 }

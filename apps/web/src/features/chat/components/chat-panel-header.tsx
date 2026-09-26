@@ -14,6 +14,8 @@ import { chatSessionPreview, formatChatDateLabel } from '@/features/chat/utils/f
 import { ToolPaneHeader } from '@/components/tool-pane-header'
 import { SessionActionsButton } from '@/components/session-actions-button'
 import { BackgroundTasksButton } from '@/features/chat/components/background-tasks-button'
+import { SchedulesButton } from '@/features/chat/components/schedules-button'
+import { GoalButton } from '@/features/chat/components/goal-button'
 import { SessionToolsButton } from '@/features/chat/components/session-tools-button'
 import { SessionRename } from '@/components/session-rename'
 import { useSessionRenaming } from '@/hooks/use-session-renaming'
@@ -117,6 +119,8 @@ export function ChatPanelHeader({
             </DropdownMenuContent>
           </DropdownMenu>
           {session ? <BackgroundTasksButton sessionRef={session.ref} /> : null}
+          {session ? <GoalButton sessionRef={session.ref} /> : null}
+          {session ? <SchedulesButton sessionRef={session.ref} /> : null}
           {session ? <SessionToolsButton sessionRef={session.ref} /> : null}
           {session ? <SessionActionsButton session={session} surface='sidebar' /> : null}
         </>

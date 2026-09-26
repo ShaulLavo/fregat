@@ -66,7 +66,8 @@ function commandActor(command: OrchestrationCommand) {
     type.startsWith('session.message.') ||
     type === 'session.runtime.set' ||
     type === 'session.activity.append' ||
-    type === 'session.proposed-plan.upsert'
+    type === 'session.proposed-plan.upsert' ||
+    type === 'session.turn.provider-start'
   )
     return 'provider'
   if (

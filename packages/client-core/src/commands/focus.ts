@@ -1,16 +1,27 @@
-export type FocusArea =
-  | 'chat'
-  | 'command-palette'
-  | 'dialog'
-  | 'editor'
-  | 'file-tree'
-  | 'git'
-  | 'global'
-  | 'logs'
-  | 'problems'
-  | 'search'
-  | 'settings'
-  | 'terminal'
+export const FOCUS_AREAS = [
+  'chat',
+  'command-palette',
+  'dialog',
+  'editor',
+  'file-tree',
+  'git',
+  'global',
+  'logs',
+  'problems',
+  'search',
+  'settings',
+  'terminal',
+] as const
+export type FocusArea = (typeof FOCUS_AREAS)[number]
+
+/** Panes whose focused surface owns Mod+Z, even with nothing to undo; the app history stays out. */
+export const UNDO_OWNING_PANES: ReadonlySet<FocusArea> = new Set([
+  'command-palette',
+  'dialog',
+  'editor',
+  'file-tree',
+  'terminal',
+])
 export type FocusLayout = 'chat' | 'workbench'
 
 export type FocusTargetId =

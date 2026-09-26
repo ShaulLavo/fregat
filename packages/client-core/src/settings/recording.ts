@@ -1,4 +1,4 @@
-import { isModifierKey, normalizeKeyName } from '@tanstack/hotkeys'
+import { detectPlatform, isModifierKey, normalizeKeyName } from '@tanstack/hotkeys'
 
 type RecordingKeyEvent = {
   readonly key: string
@@ -16,12 +16,18 @@ export function recordingControl(event: RecordingKeyEvent) {
   return null
 }
 
-export function recordedStroke(event: RecordingKeyEvent): string | null {
+export function recordedStroke(
+  event: RecordingKeyEvent,
+  platform: ReturnType<typeof detectPlatform> = detectPlatform(),
+): string | null {
   const key = normalizeKeyName(event.key)
   if (isModifierKey(key)) return null
   const parts: string[] = []
-  // Keep recordings portable between Command and Control keyboards.
-  if (event.metaKey || event.ctrlKey) parts.push('Mod')
+  // Mod is the platform's primary modifier (Cmd on macOS, Ctrl elsewhere), which keeps a
+  // recording portable; the other key records under its own name.
+  const mac = platform === 'mac'
+  if (mac ? event.metaKey : event.ctrlKey) parts.push('Mod')
+  if (mac ? event.ctrlKey : event.metaKey) parts.push(mac ? 'Control' : 'Meta')
   if (event.altKey) parts.push('Alt')
   if (event.shiftKey) parts.push('Shift')
   parts.push(key)

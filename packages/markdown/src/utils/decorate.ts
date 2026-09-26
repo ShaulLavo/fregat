@@ -1,6 +1,8 @@
 import type { Element, Root } from 'hast'
 import { visit } from 'unist-util-visit'
 
+import { MARKDOWN_ID_PREFIX } from './sanitize-schema'
+
 /**
  * Presentation the pipeline owns. Applied after sanitization, since the schema
  * strips classes, and before component overrides, which receive these as
@@ -42,6 +44,7 @@ export function rehypeDecorate() {
         node.properties.dataSourceEndLine = node.position.end.line
       }
       if (node.tagName === 'a' && node.properties.dataIncomplete) delete node.properties.href
+      if (node.tagName === 'a') prefixFragmentHref(node)
       if (node.tagName === 'code' && parent?.type === 'element' && parent.tagName === 'pre') return
       if (node.tagName === 'table' && parent && typeof index === 'number') {
         parent.children[index] = wrapTable(node)
@@ -51,6 +54,15 @@ export function rehypeDecorate() {
       if (className) node.properties.className = className.split(' ')
     })
   }
+}
+
+/** An in-document link follows its target's id through the sanitizer's prefix. */
+function prefixFragmentHref(link: Element) {
+  const href = link.properties.href
+  if (typeof href !== 'string' || !href.startsWith('#') || href.length === 1) return
+  if (href.startsWith(`#${MARKDOWN_ID_PREFIX}`)) return
+
+  link.properties.href = `#${MARKDOWN_ID_PREFIX}${href.slice(1)}`
 }
 
 function wrapTable(table: Element): Element {

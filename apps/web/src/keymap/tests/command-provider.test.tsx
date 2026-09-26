@@ -1,3 +1,11 @@
+import { SettingsPage } from '@/features/settings/components/page'
+import { useOpenProjectSettings } from '@/keymap/hooks/use-open-project-settings'
+import { selectSettingsProject, type SettingsProject } from '@/lib/project-settings/state/selection'
+import { selectSettingsScope, settingsScope } from '@/features/settings/state/scope-store'
+import { tabId } from '@/lib/documents/utils/identity'
+import { settingsView } from '@/features/settings/state/view-store'
+import type { ReactNode } from 'react'
+import type { ProjectId } from '@workspace/contracts'
 import { settingsPageQueryOptions } from '@/features/settings/utils/page-query'
 import { primaryQueryClient } from '@/lib/environments/state/query-clients'
 import { BUNDLED_THEMES, resolveThemeSettings } from '@workspace/contracts'
@@ -33,9 +41,13 @@ import { createTestApplicationRuntime } from '../../../test/factories/applicatio
 import { activeEnvironmentId } from '@/lib/environments/state/domain'
 
 let capturedBus: PlatformCommandBus | null = null
+let openProjectSettings: ((project: SettingsProject) => void) | null = null
 
 test.beforeEach(() => {
   capturedBus = null
+  openProjectSettings = null
+  selectSettingsProject(null)
+  selectSettingsScope('user')
   selectSettingsSearch('')
   selectSettingsCategory(null)
   selectSettingsView('form')
@@ -45,6 +57,9 @@ test.beforeEach(() => {
 
 test.afterEach(() => {
   capturedBus = null
+  openProjectSettings = null
+  selectSettingsProject(null)
+  selectSettingsScope('user')
   selectSettingsSearch('')
   selectSettingsCategory(null)
   selectSettingsView('form')
@@ -295,24 +310,28 @@ test.for([
 
 function BusCapture() {
   const { bus } = useCommand()
-  useEffect(() => captureBus(bus), [bus])
+  const openProject = useOpenProjectSettings()
+  useEffect(() => captureBus(bus, openProject), [bus, openProject])
   return null
 }
 
-function captureBus(bus: PlatformCommandBus) {
+function captureBus(bus: PlatformCommandBus, openProject: (project: SettingsProject) => void) {
   capturedBus = bus
+  openProjectSettings = openProject
 }
 
 function renderCommandProvider(
   queryClient: ReturnType<typeof createTestQueryClient>,
   settingsOwner = queryClient,
   application?: ReturnType<typeof createTestApplicationRuntime>,
+  children?: ReactNode,
 ) {
   return renderWithProviders(
     <EditorStateProvider>
       <EditorTabActionsProvider requestCloseTab={rejectCloseTab} requestCloseTabs={rejectCloseTabs}>
         <CommandProvider>
           <BusCapture />
+          {children}
         </CommandProvider>
       </EditorTabActionsProvider>
     </EditorStateProvider>,
@@ -432,3 +451,77 @@ test('start from pull request explains the missing checkout when no folder is op
   expect(screen.getByText('Open a project checkout to start from its pull requests.')).toBeVisible()
   view.unmount()
 })
+
+test.for(['json', 'default'] as const)(
+  'project navigation opens writable controls after the remembered %s view',
+  async (remembered, { client }) => {
+    const root = await createFolderPath(filesystemPath('project-navigation'), client)
+    const application = createTestApplicationRuntime()
+    await application.openEnvironmentWorkspaceRoot(activeEnvironmentId(), root.path)
+    const queryClient = application.getSnapshot().queryClient
+    queryClient.setQueryData(settingsKeys.document(), await fetchSettings(undefined, client))
+    const view = renderCommandProvider(
+      queryClient,
+      queryClient,
+      application,
+      <SettingsPage tabId={tabId('project-settings')} />,
+    )
+    try {
+      await waitFor(() => expect(openProjectSettings).not.toBeNull())
+      act(() => {
+        selectSettingsView('json')
+        selectSettingsScope(remembered === 'default' ? 'default' : 'workspace')
+        openProjectSettings!({
+          ref: {
+            environmentId: activeEnvironmentId(),
+            projectId: 'navigation-project' as ProjectId,
+          },
+          title: 'Navigation project',
+        })
+      })
+      expect(settingsView()).toBe('form')
+      expect(settingsScope()).toBe('user')
+      expect(
+        await screen.findByRole('combobox', { name: 'Keep the default branch current' }),
+      ).toBeVisible()
+    } finally {
+      view.unmount()
+      application.dispose()
+    }
+  },
+)
+
+test.for([
+  ['workspace.showUsage', 'Usage'],
+  ['workspace.showFontSettings', 'Editor'],
+] as const)(
+  'project navigation permits %s to replace the project controls',
+  async ([command, heading], { client }) => {
+    const queryClient = createTestQueryClient()
+    queryClient.setQueryData(settingsKeys.document(), await fetchSettings(undefined, client))
+    const view = renderCommandProvider(queryClient)
+    try {
+      await waitFor(() => expect(openProjectSettings).not.toBeNull())
+      act(() =>
+        openProjectSettings!({
+          ref: {
+            environmentId: activeEnvironmentId(),
+            projectId: 'navigation-project' as ProjectId,
+          },
+          title: 'Navigation project',
+        }),
+      )
+      expect(
+        await screen.findByRole('combobox', { name: 'Keep the default branch current' }),
+      ).toBeVisible()
+      act(() => {
+        capturedBus!.dispatch(command, invocation())
+      })
+      expect(await screen.findByRole('heading', { name: heading })).toBeVisible()
+      expect(screen.queryByRole('combobox', { name: 'Keep the default branch current' })).toBeNull()
+    } finally {
+      view.unmount()
+      queryClient.clear()
+    }
+  },
+)

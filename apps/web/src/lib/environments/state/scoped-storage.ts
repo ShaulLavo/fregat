@@ -78,3 +78,20 @@ export function storedEnvironmentScopes(key: string): readonly ScopedStorage[] {
     return []
   }
 }
+
+export function forgetEnvironmentStorage(environmentId: string): boolean {
+  const namespace = `env:${environmentId}|`
+  for (const key of globalChromeStorage.keys(namespace)) globalChromeStorage.removeItem(key)
+  forgetWindowEntries(namespace)
+  return globalChromeStorage.keys(namespace).length === 0
+}
+
+function forgetWindowEntries(namespace: string) {
+  try {
+    for (const key of Object.keys(sessionStorage)) {
+      if (key.startsWith(namespace)) sessionStorage.removeItem(key)
+    }
+  } catch {
+    return
+  }
+}

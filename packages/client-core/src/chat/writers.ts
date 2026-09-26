@@ -471,6 +471,8 @@ function applyFreshSessionEvent(
       })
     case 'session.turn-start-requested':
       return applySessionTurnStartRequestedEvent(state, event)
+    case 'session.turn-provider-started':
+      return applySessionTurnProviderStartedEvent(state, event)
     case 'session.turn-interrupt-requested':
       return applySessionTurnInterruptRequestedEvent(state, event)
     case 'session.runtime-stop-requested':
@@ -824,6 +826,30 @@ function applySessionTurnStartRequestedEvent(
   return writeSessionTurn(nextState, event.payload.sessionId, {
     liveTurn: latestTurn,
     pendingSourceProposedPlan: event.payload.sourceProposedPlan,
+  })
+}
+
+function applySessionTurnProviderStartedEvent(
+  state: ChatProjectionSlice,
+  event: Extract<OrchestrationEvent, { type: 'session.turn-provider-started' }>,
+): ChatProjectionSlice {
+  const latestTurn: OrchestrationLatestTurn = {
+    providerStartState: 'adopted',
+    providerStartGeneration: 0,
+    providerStartSequence: event.sequence,
+    runtimeEpoch: event.payload.runtimeEpoch,
+    assistantMessageId: null,
+    completedAt: null,
+    endReason: null,
+    requestedAt: event.payload.createdAt,
+    startedAt: event.payload.createdAt,
+    state: 'running',
+    turnId: event.payload.turnId,
+  }
+
+  return writeSessionTurn(state, event.payload.sessionId, {
+    liveTurn: latestTurn,
+    pendingSourceProposedPlan: undefined,
   })
 }
 
