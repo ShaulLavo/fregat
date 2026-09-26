@@ -1,6 +1,6 @@
 # Implement stateless MCP support
 
-Status: M0 built 2026-09-26 (wave 2 lane A); its live provider calls are an owner check. M1 next (scope decided). Requested 2026-09-11. **M0 approved; M1+ not approved.**
+Status: M0 and M1 (scope (b)) built 2026-09-26 (wave 2 lane A); M0's live provider calls are an owner check. M2/M3 moved to Plan 174; M4 remains. Requested 2026-09-11. **M0 approved; M1+ not approved.**
 
 Decided 2026-09-25: owner — approve milestone M0 only. The owner wants to discuss M1 onward before
 anything else in this plan starts; M0's exit result is the input to that conversation.
@@ -200,6 +200,25 @@ Not approved yet: the owner discusses M1+ after M0 (2026-09-25).
 
 Exit: two environments with identical relative paths cannot read, approve, or mutate each other's
 resources, including after an active-workspace switch.
+
+M1 as decided (Q3 → (b): local tokens plus file access confined to the session's checkout),
+built 2026-09-26 (wave 2 lane A):
+
+- Tokens are local, in memory, and scoped to `(sessionId, runtimeEpoch, cwd)`. They are revoked
+  when the runtime stops or exits, or its instance goes away, and replaced when the epoch or
+  checkout changes. They carry no expiry, because a provider holds its header for the life of the
+  process. Remote/SSH routing and external-client credentials stay out, as decided.
+- A checkout boundary (`mcp/boundary.ts`) resolves every path a tool is given, relative or
+  absolute, through `realpath`, and refuses anything outside the grant's checkout, including
+  symlinks that lead out. `read_file` (read-only) is its first consumer.
+- Q4 → (a): Claude runs `mcp__platform__*` tools without an approval in every runtime mode. Codex
+  follows its own approval policy for MCP tools, and that is not verified live.
+- The hazards moved from M0: a Codex user or project config that names its own `platform` server
+  (`config/read` origins) makes the thread start without the binding, with a timeline warning
+  saying why. A `platform` server that fails at startup (the version error) is named in a warning.
+- Exit test: two checkouts with the same relative paths; each grant reads its own and is refused
+  the other's by absolute path, by `..` and by a symlink (`src/mcp/tests/routes.test.ts`).
+  "Approve" and "mutate" have no tool yet: Platform's MCP tools only read (088 adds the rest).
 
 ### M2. Build the managed external MCP client
 

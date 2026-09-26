@@ -1,3 +1,4 @@
+import { platformReadTools } from '../../mcp/tool-names'
 import { spawn } from 'node:child_process'
 import { ProviderProcessLifetime } from './process-lifetime'
 import { createInternalError, isEvlogError } from '../../observability/structured-errors'
@@ -728,6 +729,7 @@ class ClaudeAgentSession extends SessionContext {
   private nextHarnessOrigin: ProviderTurnOrigin | null = null
   /** This CLI reports `command_lifecycle`, so an owner turn is running only once its own frame says so. */
   private lifecycleReported = false
+  private platformMcpName: string | null = null
   private query: Query | null = null
   private pumpCompletion: Promise<void> | null = null
   private streamEnded = true
@@ -846,11 +848,12 @@ class ClaudeAgentSession extends SessionContext {
         'Claude session start timed out.',
       )
       if (input.platformMcp) {
+        const name = `platform_${crypto.randomUUID().replaceAll('-', '')}`
         // The SDK serializes initial mcpServers into argv and its spawn debug log.
         await withClaudeTimeout(
           query
             .setMcpServers({
-              platform: {
+              [name]: {
                 alwaysLoad: true,
                 headers: { Authorization: `Bearer ${input.platformMcp.token}` },
                 type: 'http',
@@ -859,7 +862,7 @@ class ClaudeAgentSession extends SessionContext {
             })
             .then(
               (result) => {
-                if (Object.keys(result.errors).length > 0)
+                if (Object.keys(result.errors).length > 0 || !result.added.includes(name))
                   throw createInternalError('Platform MCP connection failed.')
               },
               () => {
@@ -869,6 +872,7 @@ class ClaudeAgentSession extends SessionContext {
           CLAUDE_INIT_TIMEOUT_MS,
           'Platform MCP connection timed out.',
         )
+        session.platformMcpName = name
       }
       session.status = 'ready'
     } catch (error) {
@@ -2161,6 +2165,17 @@ class ClaudeAgentSession extends SessionContext {
     if (this.runtimeMode === 'full-access') {
       return Promise.resolve({ behavior: 'allow', updatedInput: toolInput })
     }
+    // HTTP servers installed by setMcpServers report dynamic provenance; the name is per runtime.
+    if (
+      this.isActive() &&
+      this.platformMcpName !== null &&
+      options.mcpServer?.source === 'dynamic' &&
+      options.mcpServer.name === this.platformMcpName &&
+      Object.values(platformReadTools).some(
+        (tool) => toolName === `mcp__${this.platformMcpName}__${tool}`,
+      )
+    )
+      return Promise.resolve({ behavior: 'allow', updatedInput: toolInput })
 
     return this.requestApproval(toolName, toolInput, options)
   }
