@@ -6,7 +6,9 @@ import { TerminalHostClient } from '../../apps/server/src/terminal/host-client'
 import { startIsolatedServer } from './isolated-server'
 
 it('ends the isolated host and its live shell before removing its home', async () => {
-  const server = await startIsolatedServer(new URL('http://localhost:5214'), tmpdir())
+  const server = await startIsolatedServer(new URL('http://localhost:5214'), {
+    scratchRoot: tmpdir(),
+  })
   const client = new TerminalHostClient({ stateRoot: server.home })
   const host = await client.host()
   const shell = await client.spawn({

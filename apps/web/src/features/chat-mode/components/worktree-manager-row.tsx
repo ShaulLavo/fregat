@@ -17,6 +17,7 @@ import {
 } from '@workspace/client-core/chat/worktrees/cleanup'
 import { worktreeLabel } from '@workspace/client-core/chat/worktrees/label'
 import { InlineError } from '@/components/inline-error'
+import { WorktreeSetupStatus } from '@/features/chat-mode/components/worktree-setup-status'
 
 export function WorktreeManagerRow({
   environmentId,
@@ -37,6 +38,13 @@ export function WorktreeManagerRow({
         {actions.pending ? <Spinner /> : null}
       </div>
       <p className='text-muted-foreground text-xs tabular-nums'>{cleanupStatusLabel(worktree)}</p>
+      <WorktreeSetupStatus
+        worktree={worktree}
+        hasSetupScript={project.scripts.some((script) => script.runOnWorktreeCreate)}
+        pending={actions.pending}
+        onRun={() => void actions.run('worktree.setup.run')}
+        onStop={() => void actions.run('worktree.setup.cancel')}
+      />
       {actions.error ? <InlineError message={actions.error} title='Worktree action' /> : null}
       <div className='flex flex-wrap gap-1'>
         {eligible && worktree.lifecycle.state === 'ready' ? (

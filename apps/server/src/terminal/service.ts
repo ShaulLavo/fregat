@@ -1,7 +1,7 @@
-import { errorMessage, errorStringField } from '@workspace/contracts'
+import { errorMessage, errorStringField, type SessionId } from '@workspace/contracts'
 import { createStructuredError } from '../observability/structured-errors'
 import type { PlatformDatabase } from '../db/client'
-import { TerminalHistory } from './history'
+import { agentHistoryCleaned, deleteAgentHistory, TerminalHistory } from './history'
 import { isNonEmptyString as isString } from '@workspace/utils/objects'
 import { adaptWebSocket } from '../utils/websocket'
 import { elapsedMs } from '@workspace/utils/timing'
@@ -276,17 +276,56 @@ export class TerminalService {
         return
       }
       await session.dispose({ kill: true, deleteHistory: true })
-      if (this.persistentSessions.get(key) === session)
-        throw createStructuredError({
-          code: 'terminal.CLEANUP_UNCONFIRMED',
-          status: 500,
-          message: 'Terminal cleanup could not be confirmed.',
-          why: 'The process, ownership lease or saved history could not be released.',
-          fix: 'Reconnect the terminal to retry cleanup, then close it again.',
-        })
+      this.assertDisposed(key, session)
       killed = true
     })
     return { killed }
+  }
+
+  /**
+   * Ends a deleted session's own agent terminals and their saved history. Ordinary shells belong
+   * to the worktree and outlive any one session, so they stay.
+   */
+  async closeSessionTerminals(sessionId: SessionId) {
+    if (agentHistoryCleaned(this.database, sessionId)) return { closed: 0 }
+    // Shells the host kept across a restart are resumed, or their final output saved, by recovery.
+    await this.reattach().catch(() => {})
+    let closed = await this.killUnrecoveredAgentShells(sessionId)
+    // Rescan until empty: an open may register while a disposal awaits. The last scan and the
+    // cleanup marker run without an await between them, and later opens refuse on the marker.
+    for (let owned = this.agentSessions(sessionId); owned.length > 0;) {
+      for (const [key, session] of owned) {
+        await this.runExclusive(key, async () => {
+          await session.dispose({ kill: true, deleteHistory: true })
+          this.assertDisposed(key, session)
+        })
+        closed++
+      }
+      owned = this.agentSessions(sessionId)
+    }
+    deleteAgentHistory(this.database, sessionId)
+    return { closed }
+  }
+
+  // With no boot listing, recovery left every host shell alone; the deleted session's are killed here.
+  private async killUnrecoveredAgentShells(sessionId: SessionId) {
+    if (!this.host || (await this.listHostSessions())) return 0
+    const stray = (await this.host.list()).filter(
+      (info) => ownedByAgentSession(info.key, sessionId) && !this.persistentSessions.has(info.key),
+    )
+    for (const info of stray) await this.host.killSession(info.session)
+    return stray.length
+  }
+
+  private assertDisposed(key: string, session: TerminalSession) {
+    if (this.persistentSessions.get(key) !== session) return
+    throw createStructuredError({
+      code: 'terminal.CLEANUP_UNCONFIRMED',
+      status: 500,
+      message: 'Terminal cleanup could not be confirmed.',
+      why: 'The process, ownership lease or saved history could not be released.',
+      fix: 'Reconnect the terminal to retry cleanup, then close it again.',
+    })
   }
 
   async clear({ worktreeId, terminalId }: TerminalClearInput) {
@@ -374,6 +413,10 @@ export class TerminalService {
       await Promise.allSettled(connections.map((connection) => rejectConnection(connection, error)))
       throw error
     }
+  }
+
+  private agentSessions(sessionId: SessionId) {
+    return [...this.persistentSessions].filter(([key]) => ownedByAgentSession(key, sessionId))
   }
 
   private runExclusive(key: string, operation: () => Promise<void>) {
@@ -526,6 +569,12 @@ export class TerminalService {
     const lease = execution.lease
     if (this.disposed || !this.opening.has(socket.key)) {
       await lease.end()
+      return
+    }
+    const agentSessionId = socket.input?.agentSessionId
+    if (agentSessionId && agentHistoryCleaned(this.database, agentSessionId)) {
+      await lease.end()
+      socket.close(1008, 'session-deleted')
       return
     }
     const session = new TerminalSession({
@@ -1304,14 +1353,21 @@ export function terminalSessionKey(
   ])
 }
 
-function decodeSessionKey(key: string): { worktreeId: WorktreeId; sessionId: string } | null {
+function ownedByAgentSession(key: string, sessionId: SessionId) {
+  const decoded = decodeSessionKey(key)
+  return decoded?.kind === 'agent' && decoded.sessionId === sessionId
+}
+
+function decodeSessionKey(
+  key: string,
+): { worktreeId: WorktreeId; kind: 'shell' | 'agent'; sessionId: string } | null {
   try {
     const parsed: unknown = JSON.parse(key)
     if (!Array.isArray(parsed) || parsed.length !== 3) return null
     const [worktreeId, kind, id] = parsed as unknown[]
     if (typeof worktreeId !== 'string' || typeof id !== 'string') return null
     if (kind !== 'shell' && kind !== 'agent') return null
-    return { worktreeId: worktreeId as WorktreeId, sessionId: id }
+    return { worktreeId: worktreeId as WorktreeId, kind, sessionId: id }
   } catch {
     return null
   }

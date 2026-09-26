@@ -31,6 +31,7 @@ import {
   recordChatPipelineWarning,
 } from './orchestration-logging'
 import { orchestrationReplaySummary } from '@workspace/contracts'
+import type { ClientPresence } from './client-presence'
 import type { OrchestrationEngine } from './engine'
 import type { ServerUpdate } from '../update/service'
 
@@ -143,6 +144,7 @@ export function orchestrationWsRoutes(
   identity: EnvironmentIdentity,
   sockets: OrchestrationSockets,
   update: Pick<ServerUpdate, 'enabled' | 'state' | 'subscribe'>,
+  presence: ClientPresence,
 ) {
   const states = new WeakMap<object, OrchestrationRpcConnectionState>()
   const config = orchestrationWsServerConfig(identity)
@@ -195,6 +197,10 @@ export function orchestrationWsRoutes(
       const state = states.get(socket.key)
       if (!state) return
 
+      if (message.kind === 'presence') {
+        presence.report(socket.key, message.focused)
+        return
+      }
       handleOrchestrationRpcMessage(engine, socket, state, message, config)
     },
     close(ws, code, reason) {
@@ -208,6 +214,7 @@ export function orchestrationWsRoutes(
 
       states.delete(socket.key)
       sockets.delete(socket)
+      presence.forget(socket.key)
       // A close the server chose logged its cause when it chose it.
       const abnormal = isAbnormalWebSocketClose(code) && !state?.serverCloseReason
       const record = abnormal ? recordChatPipelineWarning : recordChatPipelineInfo
@@ -227,7 +234,7 @@ function handleOrchestrationRpcMessage(
   engine: OrchestrationEngine,
   socket: OrchestrationRpcWebSocket,
   state: OrchestrationRpcConnectionState,
-  message: OrchestrationWsClientMessage,
+  message: Exclude<OrchestrationWsClientMessage, { kind: 'presence' }>,
   config: OrchestrationWsServerConfig,
 ) {
   if (message.kind === 'subscription.ack') {

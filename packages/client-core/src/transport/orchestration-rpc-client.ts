@@ -100,6 +100,12 @@ type RpcSubscription = {
   sessionId?: SessionId
 }
 
+/** Whether the host's window is visible and focused, and a way to hear when that changes. */
+export type OrchestrationPresenceSource = {
+  readonly focused: () => boolean
+  readonly subscribe: (listener: () => void) => () => void
+}
+
 export type OrchestrationRpcClientOptions = {
   readonly createSocket: (url: string) => OrchestrationSocket
   /**
@@ -116,6 +122,8 @@ export type OrchestrationRpcClientOptions = {
    * transport tests depend on when the dial is off.
    */
   readonly beforeRequest?: () => Promise<void> | undefined
+  /** Reported to the server, which holds push notices while a window is focused. */
+  readonly presence?: OrchestrationPresenceSource
   /**
    * Holds a new socket until the host says it can survive (a hidden browser page
    * loses its sockets within a minute). Returning nothing opens it now.
@@ -164,11 +172,14 @@ export class OrchestrationRpcClient {
   private socketScope: RpcEventScope | null = null
   private subscriptionCounter = 0
   private subscriptions = new Map<OrchestrationWsSubscriptionId, RpcSubscription>()
+  private reportedPresence: boolean | null = null
+  private readonly stopPresence: (() => void) | null
 
   private readonly options: OrchestrationRpcClientOptions
 
   constructor(options: OrchestrationRpcClientOptions) {
     this.options = { ...options, origin: canonicalServerOrigin(options.origin) }
+    this.stopPresence = options.presence?.subscribe(() => this.reportPresence()) ?? null
   }
 
   get closed() {
@@ -184,6 +195,7 @@ export class OrchestrationRpcClient {
 
     const error = createOrchestrationRpcClosedError()
     this.closedError = error
+    this.stopPresence?.()
     this.lifetime.abort(error)
     this.rejectOpening?.(error)
     const socket = this.socket
@@ -633,6 +645,7 @@ export class OrchestrationRpcClient {
         protocolVersion: message.config.protocolVersion,
         serverInstanceId: message.config.serverInstanceId,
       })
+      this.reportPresence()
       return
     }
     if (!this.handshakeReceived) return
@@ -663,6 +676,19 @@ export class OrchestrationRpcClient {
 
     if (message.kind === 'subscription.complete') {
       this.subscriptions.get(message.subscriptionId)?.queue.close()
+    }
+  }
+
+  private reportPresence(refresh = false) {
+    const presence = this.options.presence
+    if (!presence) return
+    const focused = presence.focused()
+    if ((!refresh && focused === this.reportedPresence) || !this.openSocket()) return
+    try {
+      this.sendClientMessageIfOpen({ kind: 'presence', focused })
+      this.reportedPresence = focused
+    } catch {
+      // A failed send closes the socket, and the next handshake reports again.
     }
   }
 
@@ -768,6 +794,7 @@ export class OrchestrationRpcClient {
     this.rejectOpening?.(error)
     this.socket = null
     this.handshakeReceived = false
+    this.reportedPresence = null
     this.opening = null
     this.stopHeartbeat()
     this.options.environments.getState().markDisconnected(this.options.origin)
@@ -886,6 +913,7 @@ export class OrchestrationRpcClient {
     if (this.socket !== socket) return
     if (this.pendingPingRequestId !== null) return
 
+    this.reportPresence(true)
     const requestId = this.nextRequestId('ping')
     this.pendingPingRequestId = requestId
     this.pongTimeoutId = setTimeout(

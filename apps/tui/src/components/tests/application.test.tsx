@@ -159,7 +159,7 @@ test('shows cached settings while disconnected and Ctrl+R restores the live conn
   await session.refresh()
   const frame = await testRender(
     <Application
-      initialLocation={{ kind: 'settings', query: '' }}
+      initialLocation={{ kind: 'settings', query: 'workbench.colorTheme' }}
       session={session}
       onExit={() => {}}
     />,
@@ -170,6 +170,9 @@ test('shows cached settings while disconnected and Ctrl+R restores the live conn
     },
   )
   try {
+    await frame.renderOnce()
+    expect(frame.captureCharFrame()).toContain('Live')
+    expect(frame.captureCharFrame()).toContain(settingRowTitle('workbench.colorTheme'))
     await act(async () => {
       transport.sockets[0].serverClose({ code: 1006, wasClean: false })
     })

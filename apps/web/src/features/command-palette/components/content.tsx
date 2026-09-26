@@ -53,6 +53,7 @@ import { useScripts } from '@/features/command-palette/hooks/use-scripts'
 import { useSessions } from '@/features/command-palette/hooks/use-sessions'
 import { useSymbols } from '@/features/command-palette/hooks/use-symbols'
 import { useSaveProjectScript } from '@/features/chat-mode/hooks/use-save-project-script'
+import { useImportProjectScripts } from '@/features/chat-mode/hooks/use-import-project-scripts'
 import { openSessionRow, startSessionDraft } from '@/features/chat-mode/state/session-commands'
 import {
   clearEditorThemePreview,
@@ -131,6 +132,7 @@ export function CommandPaletteContent() {
     enabled: open && mode === 'scripts',
     rootPath: rootFolder?.path ?? null,
   })
+  const importProjectScripts = useImportProjectScripts(rootFolder?.path ?? null)
   // One capture per render, and only in the modes that list commands: a capture reads the
   // whole workspace, and quick open would pay for it on every keystroke and discard it.
   const commandContext =
@@ -319,8 +321,14 @@ export function CommandPaletteContent() {
 
         closePalette(true)
       },
+      importScripts: (scripts) => {
+        importProjectScripts(scripts)
+        closePalette(false)
+      },
       selectScript: async (script) => {
-        saveProjectScript(script)
+        if (script.origin === 't3.json' && !script.saved) return
+        // Running a file's script saves what it runs, never its setup flags: that takes an import.
+        saveProjectScript({ name: script.name, command: script.command })
         queueTerminalCommand(script.command)
         await revealDestination('workspace.revealTerminal')
       },
@@ -355,6 +363,7 @@ export function CommandPaletteContent() {
     queueTerminalCommand,
     resolvedTheme,
     saveProjectScript,
+    importProjectScripts,
     selectFile,
     selectContent,
     selectTheme,

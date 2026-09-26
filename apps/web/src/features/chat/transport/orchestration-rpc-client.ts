@@ -11,6 +11,7 @@ import { readSettingsMirror } from '@/lib/settings-boot-mirror'
 import { clientInstanceId, instanceQueryParam } from '@/lib/instance-id'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
 import { createRpcEventScope } from '@/features/chat/transport/rpc-event-scope'
+import { windowPresence } from '@/features/chat/transport/window-presence'
 
 export type WebOrchestrationRpcClientOptions = Omit<
   OrchestrationRpcClientOptions,
@@ -21,6 +22,7 @@ export function createOrchestrationRpcClient(options: WebOrchestrationRpcClientO
   return new OrchestrationRpcClient({
     ...options,
     beforeRequest: simulateLatency,
+    presence: windowPresence,
     beforeConnect: untilPageShows,
     createSocket: options.createSocket ?? openSocket,
     resolveEndpoint: serverEndpoint,

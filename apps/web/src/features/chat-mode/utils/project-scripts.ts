@@ -1,3 +1,4 @@
+import { isRecord } from '@workspace/utils/objects'
 import type { OrchestrationProjectScript } from '@workspace/contracts'
 
 /**
@@ -17,6 +18,8 @@ const RUNNER_BY_LOCKFILE = {
 export type ProjectScriptSuggestion = OrchestrationProjectScript & {
   /** True once the project already saved a script with this command. */
   readonly saved: boolean
+  /** Where an unsaved suggestion was read from. */
+  readonly origin: 'saved' | 'package.json' | 't3.json'
 }
 
 export function packageScriptRunner(lockfileNames: readonly string[]) {
@@ -49,26 +52,73 @@ export function packageJsonScripts(
 }
 
 /**
- * Saved scripts first, in the order the project holds them, then whatever the
- * manifest offers that is not already saved. Deduplicated by command rather than
+ * Saved scripts first, in the order the project holds them, then whatever `t3.json`
+ * and the manifest offer that is not already saved. Deduplicated by command rather than
  * by name: two entries that run the same thing are one row however they are
  * labelled, and the saved label is the one the user chose.
  */
 export function projectScriptSuggestions({
   discovered,
+  projectFile = [],
   saved,
 }: {
   readonly discovered: readonly OrchestrationProjectScript[]
+  readonly projectFile?: readonly OrchestrationProjectScript[]
   readonly saved: readonly OrchestrationProjectScript[]
 }): readonly ProjectScriptSuggestion[] {
-  const savedCommands = new Set(saved.map((script) => script.command))
+  const fileScripts = importableScripts(projectFile, saved)
+  // Rows share a cmdk value by command, so one command must never be two rows.
+  const taken = new Set([...saved, ...fileScripts].map((script) => script.command))
 
   return [
-    ...saved.map((script) => ({ ...script, saved: true })),
+    ...saved.map((script) => ({ ...script, saved: true, origin: 'saved' as const })),
+    ...fileScripts.map((script) => ({ ...script, saved: false, origin: 't3.json' as const })),
     ...discovered
-      .filter((script) => !savedCommands.has(script.command))
-      .map((script) => ({ ...script, saved: false })),
+      .filter((script) => !taken.has(script.command))
+      .map((script) => ({ ...script, saved: false, origin: 'package.json' as const })),
   ]
+}
+
+/**
+ * Scripts a `t3.json` project file declares, mapped the way upstream's Import scripts maps them:
+ * `async` defaults to true, and only a worktree-creation script with `async: false` holds the
+ * first turn. Tolerant like `packageJsonScripts`: an unreadable file offers nothing.
+ */
+export function t3ProjectScripts(contents: string): readonly OrchestrationProjectScript[] {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(contents)
+  } catch {
+    return []
+  }
+  const scripts = isRecord(parsed) && Array.isArray(parsed.scripts) ? parsed.scripts : []
+  return scripts.flatMap((entry: unknown) => {
+    if (!isRecord(entry)) return []
+    const name = typeof entry.name === 'string' ? entry.name.trim() : ''
+    const command = typeof entry.command === 'string' ? entry.command.trim() : ''
+    if (!name || !command) return []
+    const runOnWorktreeCreate = entry.runOnWorktreeCreate === true
+    return [
+      {
+        name,
+        command,
+        ...(runOnWorktreeCreate ? { runOnWorktreeCreate } : {}),
+        ...(runOnWorktreeCreate && entry.async === false ? { waitForSetup: true } : {}),
+      },
+    ]
+  })
+}
+
+/** File scripts the project has not saved yet, by command or by name, ignoring case. */
+export function importableScripts(
+  file: readonly OrchestrationProjectScript[],
+  saved: readonly OrchestrationProjectScript[],
+) {
+  const commands = new Set(saved.map((script) => script.command))
+  const names = new Set(saved.map((script) => script.name.toLowerCase()))
+  return file.filter(
+    (script) => !commands.has(script.command) && !names.has(script.name.toLowerCase()),
+  )
 }
 
 function parseScriptMap(contents: string): Record<string, unknown> | null {

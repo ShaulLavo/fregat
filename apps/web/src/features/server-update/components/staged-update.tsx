@@ -19,7 +19,7 @@ import {
 } from '@/features/server-update/utils/restart-outcome'
 import { restartTooltip } from '@/features/server-update/utils/restart-prompt'
 import { primaryServerOrigin } from '@/lib/client'
-import { clientErrorText } from '@/lib/client-error-taxonomy'
+import { clientErrorDescription, toClientError } from '@/lib/client-error-taxonomy'
 import { primaryQueryClient } from '@/lib/environments/state/query-clients'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
 import { NATIVE_WINDOW_NO_DRAG_CLASS } from '@/lib/platform/window-drag'
@@ -37,7 +37,7 @@ export function StagedUpdate({ update, release }: { update: ServerUpdate; releas
   const restarting = showsRestarting(update, marker, connection)
   let dialogError: string | null = null
   if (busy && restart.isError && !isRestartDisconnect(restart.error))
-    dialogError = clientErrorText(restart.error, 'Restart failed')
+    dialogError = clientErrorDescription(toClientError(restart.error))
 
   // The server pushes `restarting` itself; the marker covers a push lost to the exit.
   function markRestarting(instance: string | null, confirmed: boolean) {

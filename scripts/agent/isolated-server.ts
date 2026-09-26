@@ -31,7 +31,7 @@ export type IsolatedServer = {
  */
 export async function startIsolatedServer(
   webOrigin: URL,
-  scratchRoot = '/work/tmp',
+  { pathPrefix, scratchRoot = '/work/tmp' }: { pathPrefix?: string; scratchRoot?: string } = {},
 ): Promise<IsolatedServer> {
   const directory = mkdtempSync(path.join(scratchRoot, 'fregat-agent-'))
   const home = path.join(directory, 'home')
@@ -51,6 +51,7 @@ export async function startIsolatedServer(
     FS_HOST: '127.0.0.1',
     FS_METADATA_DB: path.join(home, 'fs-metadata.sqlite'),
     OBSERVABILITY_DIR: logs,
+    PATH: pathPrefix ? `${pathPrefix}${path.delimiter}${process.env.PATH ?? ''}` : process.env.PATH,
     // Offers the mock provider driver, so a scenario can script a whole turn.
     PLATFORM_AGENT_HARNESS: '1',
     PLATFORM_HOME: home,
@@ -63,7 +64,12 @@ export async function startIsolatedServer(
     ),
   }
   const child = Bun.spawn({
-    cmd: [process.execPath, 'src/index.ts'],
+    cmd: [
+      process.execPath,
+      '--preload',
+      new URL('./push-boundary.ts', import.meta.url).pathname,
+      'src/index.ts',
+    ],
     cwd: SERVER_ROOT,
     env,
     stderr: Bun.file(path.join(directory, 'server.stderr')),

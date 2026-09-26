@@ -13,6 +13,7 @@ import { sessionAttachments } from './session-attachments'
 import type { OrchestrationDatabase } from './event-store'
 import type { ProviderService } from '../provider/provider-service'
 import type { OrchestrationReadModel } from './read-model'
+import type { TerminalService } from '../terminal/service'
 
 import { internalCommandKey } from './utils/repository-ids'
 import { recordChatPipelineInfo, recordChatPipelineWarning } from './orchestration-logging'
@@ -26,6 +27,8 @@ type Options = {
   providerService: ProviderService | null
   getReadModel: () => OrchestrationReadModel
   dispatch: (command: OrchestrationCommand) => Promise<unknown>
+  /** Closes the terminals the session itself owns; worktree shells stay open. */
+  terminals: Pick<TerminalService, 'closeSessionTerminals'> | null
 }
 
 export class SessionDeletionReactor implements OrchestrationDomainEventReactor {
@@ -51,7 +54,10 @@ export class SessionDeletionReactor implements OrchestrationDomainEventReactor {
 
   async recover() {
     for (const session of this.options.getReadModel().sessions.values()) {
-      if (!session.deletedAt || !session.deletion || cleanupComplete(session.deletion)) continue
+      if (!session.deletedAt) continue
+      // A restart ends every terminal process, but a deleted session's saved history survives it.
+      await this.closeTerminals(session.id)
+      if (!session.deletion || cleanupComplete(session.deletion)) continue
       this.enqueue(session.id)
     }
     await this.drain()
@@ -79,6 +85,7 @@ export class SessionDeletionReactor implements OrchestrationDomainEventReactor {
     const previous = this.options.getReadModel().sessions.get(sessionId)?.deletion
     if (!previous || cleanupComplete(previous)) return
     const startedAt = performance.now()
+    const terminals = await this.closeTerminals(sessionId)
     const provider = await this.releaseRuntime(sessionId, previous)
     if (provider.providerStop !== 'failed') this.options.providerService?.deleteBinding(sessionId)
     const blobs = await this.reclaimBlobs(sessionId, previous)
@@ -106,13 +113,25 @@ export class SessionDeletionReactor implements OrchestrationDomainEventReactor {
     const context = {
       sessionId,
       ...deletion,
+      ...terminals,
       durationMs: Math.round(performance.now() - startedAt),
     }
-    if (cleanupComplete(deletion)) {
+    if (cleanupComplete(deletion) && terminals.terminalCleanup !== 'failed') {
       recordChatPipelineInfo('chat.pipeline.session_deletion.cleanup', context)
       return
     }
     recordChatPipelineWarning('chat.pipeline.session_deletion.cleanup', context)
+  }
+
+  private async closeTerminals(sessionId: SessionId) {
+    const terminals = this.options.terminals
+    if (!terminals) return { terminalCleanup: 'no-terminals' as const, terminalsClosed: 0 }
+    try {
+      const { closed } = await terminals.closeSessionTerminals(sessionId)
+      return { terminalCleanup: 'completed' as const, terminalsClosed: closed }
+    } catch (error) {
+      return { terminalCleanup: 'failed' as const, terminalCleanupError: errorMessage(error) }
+    }
   }
 
   private async releaseRuntime(

@@ -1,4 +1,4 @@
-import { ChatCircleIcon, FunnelIcon, PlusIcon } from '@phosphor-icons/react'
+import { ChatCircleIcon, FunnelIcon, PlusIcon, ArrowSquareOutIcon } from '@phosphor-icons/react'
 
 import { actionItem, section, type Menu } from '@/keymap/menus/utils/model'
 import {
@@ -12,6 +12,7 @@ export type SessionMenuContext = SessionActionsMenuContext & {
   readonly scopedToProject: boolean
   readonly newSession: () => void
   readonly open: () => void
+  readonly pullRequest?: { readonly number: number; readonly open: () => void }
   readonly scopeToProject: () => void
 }
 
@@ -19,6 +20,13 @@ export function sessionMenu(context: SessionMenuContext): Menu {
   return sessionActionsMenu(context, {
     open: section('open', [
       actionItem({ icon: ChatCircleIcon, id: 'open', label: 'Open', run: context.open }),
+      !!context.pullRequest &&
+        actionItem({
+          icon: ArrowSquareOutIcon,
+          id: 'openPullRequest',
+          label: `Open pull request #${context.pullRequest.number}`,
+          run: context.pullRequest.open,
+        }),
       actionItem({
         icon: PlusIcon,
         id: 'newSession',

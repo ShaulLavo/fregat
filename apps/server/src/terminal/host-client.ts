@@ -6,6 +6,7 @@ import { elapsedMs } from '@workspace/utils/timing'
 import { errorStringField } from '@workspace/contracts'
 import * as v from 'valibot'
 
+import { PTY_HOST } from '../installation/release-files'
 import { recordProcessInfo } from '../observability'
 import {
   encodeControl,
@@ -674,9 +675,9 @@ function definedEnv(env: Readonly<Record<string, string | undefined>>) {
   return defined
 }
 
-// The bundle ships the host as `pty-host.js` beside itself; source runs the entry directly.
+// The bundle ships the host beside itself; source runs the entry directly.
 function hostEntry() {
-  const bundled = path.join(import.meta.dirname, 'pty-host.js')
+  const bundled = path.join(import.meta.dirname, PTY_HOST)
   if (existsSync(bundled)) return bundled
   return path.join(import.meta.dirname, '../terminal-host/main.ts')
 }

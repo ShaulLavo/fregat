@@ -50,6 +50,10 @@ export function createInProcessOrchestrationSocket(
     receive(message: OrchestrationWsClientMessage) {
       Reflect.apply(onMessage, undefined, [socket, message])
     },
+    /** The client going away: the server runs its close handler. */
+    disconnect() {
+      Reflect.apply(onClose, undefined, [socket, 1001, ''])
+    },
     /** The client going away. */
     close: () => socket.close(1000, ''),
   }

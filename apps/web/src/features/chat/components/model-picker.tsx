@@ -19,7 +19,7 @@ import {
   type ProviderModelOption,
   type ProviderModelOptionGroup,
 } from '@workspace/client-core/chat/providers/models'
-import { providerListQueryOptions } from '@/features/chat/utils/provider-query'
+import { providerListQueryOptions } from '@/lib/provider-query'
 import { ModelPickerLegacyRow } from '@/features/chat/components/model-picker-legacy-row'
 import { ModelPickerRail } from '@/features/chat/components/model-picker-rail'
 import { ModelPickerRow } from '@/features/chat/components/model-picker-row'

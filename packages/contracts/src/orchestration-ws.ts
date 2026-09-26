@@ -1,4 +1,5 @@
 import * as v from 'valibot'
+import { sessionLifecycleResultSchema } from './session-lifecycle'
 import { environmentIdSchema, projectIdSchema, worktreeIdSchema, sessionIdSchema } from './chat-ids'
 import {
   isoDateTimeSchema,
@@ -30,6 +31,7 @@ import {
  *     the socket head-of-line-blocked every other frame for its duration. The
  *     subscriptions still push snapshot *frames*; only the requests are gone.
  * 4 — added the durable environment identity to the handshake.
+ * 8 — added the client `presence` message.
  * 9 — added the `server.update` push (staged release, restart phase, live check).
  */
 export const ORCHESTRATION_WS_PROTOCOL_VERSION = 9
@@ -190,6 +192,12 @@ export const orchestrationWsPingSchema = v.object({
   requestId: orchestrationWsRequestIdSchema,
 })
 
+/** Whether the client's window is visible and focused. The server holds push notices while one is. */
+const orchestrationWsPresenceSchema = v.object({
+  kind: v.literal('presence'),
+  focused: v.boolean(),
+})
+
 const orchestrationWsSubscriptionAckSchema = v.object({
   kind: v.literal('subscription.ack'),
   subscriptionId: orchestrationWsSubscriptionIdSchema,
@@ -202,6 +210,7 @@ export const orchestrationWsClientMessageSchema = v.union([
   orchestrationWsSubscribeSchema,
   orchestrationWsUnsubscribeSchema,
   orchestrationWsPingSchema,
+  orchestrationWsPresenceSchema,
 ])
 
 /**
@@ -269,17 +278,13 @@ export const orchestrationWsResponseMessageSchema = v.variant('ok', [
   }),
 ])
 
-/**
- * The wire form of what dispatching a command returns. `sequence` is the stream
- * position the command's events landed at; `deduped` says the command id had
- * already been accepted, so nothing new was appended and `sequence` is the
- * earlier attempt's. Both are what a caller needs to know where to resume its
- * projection from — nothing else about the command's receipt crosses the wire.
- */
+// Repeated command ids retain their committed sequence and receipt.
+// Lifecycle receipts carry the original state and identity used by guarded Undo/Redo.
 export const orchestrationDispatchResultSchema = v.object({
   deduped: v.boolean(),
   sequence: nonNegativeIntegerSchema,
   result: v.nullable(projectRegistrationResultSchema),
+  lifecycle: v.optional(sessionLifecycleResultSchema),
 })
 
 /**

@@ -2,6 +2,18 @@ import * as v from 'valibot'
 import { healthDescriptorSchema } from './health'
 import { machineNameSchema } from './machines'
 
+/**
+ * A failure as the catalog phrased it: the code names it, `fix` is what the user does next.
+ * `action` is set only when the server decided installing its release would clear the failure.
+ */
+export const connectionErrorSchema = v.object({
+  code: v.string(),
+  message: v.string(),
+  why: v.optional(v.string()),
+  fix: v.optional(v.string()),
+  action: v.optional(v.picklist(['install', 'update'])),
+})
+
 export const machineConnectionStateSchema = v.variant('phase', [
   v.object({ name: machineNameSchema, phase: v.literal('idle') }),
   v.object({ name: machineNameSchema, phase: v.literal('launching') }),
@@ -16,19 +28,19 @@ export const machineConnectionStateSchema = v.variant('phase', [
   v.object({
     name: machineNameSchema,
     phase: v.literal('offline'),
-    lastError: v.string(),
+    lastError: connectionErrorSchema,
     lastErrorAt: v.number(),
   }),
   v.object({
     name: machineNameSchema,
     phase: v.literal('blocked'),
-    lastError: v.string(),
+    lastError: connectionErrorSchema,
     lastErrorAt: v.number(),
   }),
   v.object({
     name: machineNameSchema,
     phase: v.literal('identity-drift'),
-    lastError: v.string(),
+    lastError: connectionErrorSchema,
     lastErrorAt: v.number(),
   }),
 ])
@@ -50,6 +62,7 @@ export const machineAuthResponseSchema = v.object({
   response: v.nullable(v.pipe(v.string(), v.maxLength(16_384))),
 })
 
+export type ConnectionError = v.InferOutput<typeof connectionErrorSchema>
 export type MachineConnectionState = v.InferOutput<typeof machineConnectionStateSchema>
 export type MachineAuthPrompt = v.InferOutput<typeof machineAuthPromptSchema>
 export type MachineEvent = v.InferOutput<typeof machineEventSchema>

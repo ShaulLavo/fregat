@@ -12,6 +12,7 @@ import {
 } from '@/features/chat-mode/state/session-rail-store'
 import { sessionLifecyclePolicy } from '@/features/chat-mode/utils/session-lifecycle'
 import { chatModeMutationKeys } from '@/features/chat-mode/utils/mutation-keys'
+import { primaryQueryClient } from '@/lib/environments/state/query-clients'
 import { sessionTitlePolicy } from '@/features/chat-mode/utils/session-title'
 import {
   selectChatProjectionSlice,
@@ -35,8 +36,10 @@ export function useSessionMenuActions(
 ): SessionActionsMenuContext {
   const actions = useSessionActions()
   const titleActions = useSessionTitleActions()
-  const requestingTitle = useIsMutating({ mutationKey: chatModeMutationKeys.regenerateTitle() }) > 0
-  const pending = useIsMutating({ mutationKey: chatModeMutationKeys.lifecycle() }) > 0
+  const requestingTitle =
+    useIsMutating({ mutationKey: chatModeMutationKeys.regenerateTitle() }, primaryQueryClient()) > 0
+  const pending =
+    useIsMutating({ mutationKey: chatModeMutationKeys.lifecycle() }, primaryQueryClient()) > 0
   const owner = useEnvironmentsStore((state) =>
     Object.values(state.entries).find((entry) => entry.environmentId === session.environmentId),
   )

@@ -1,5 +1,5 @@
 import * as v from 'valibot'
-import { environmentIdSchema } from '@workspace/contracts'
+import { environmentIdSchema, type ConnectionError } from '@workspace/contracts'
 import { createEnvironmentEntry } from '@workspace/client-core/environments/utils/connection'
 import { createTestEnvironmentConnections } from './environment-connections'
 import { activeServerOrigin, primaryServerOrigin, setActiveServerOrigin } from '@/lib/client'
@@ -9,8 +9,29 @@ import { makeTestServer } from '../server'
 import { createInProcessClient, createObservedInProcessClient } from '../client'
 import { installTestEnvironment } from './client-binding'
 
-export const MACHINE_SETUP_ERROR =
-  'The SSH machine could not be reached. Platform server is not installed for this SSH user. Run bun run server:install from a prepared Platform checkout on this machine, then connect again. Check the SSH connection. Install the server for that SSH user with bun run server:install from a prepared Platform checkout.'
+export const MACHINE_SETUP_ERROR = {
+  code: 'machines.SSH_NOT_INSTALLED',
+  message: 'Platform server is not installed for this SSH user.',
+  why: 'The probe found no platform-server on PATH or in ~/.local/bin.',
+  fix: 'Select Install server to put this server’s release on that machine.',
+  action: 'install',
+} satisfies ConnectionError
+
+export const MACHINE_PROTOCOL_ERROR = {
+  code: 'machines.SSH_PROTOCOL',
+  message: 'The remote server speaks protocol 6, and this Platform needs protocol 7.',
+  why: 'The server on that machine was started from a different Platform version.',
+  fix: 'Select Update server to install this server’s release on that machine and reconnect.',
+  action: 'update',
+} satisfies ConnectionError
+
+// The server withholds `action` from a newer remote: updating it would install an older release.
+export const MACHINE_NEWER_PROTOCOL_ERROR = {
+  code: 'machines.SSH_PROTOCOL',
+  message: 'The remote server speaks protocol 8, and this Platform needs protocol 7.',
+  why: 'The server on that machine was started from a different Platform version.',
+  fix: 'Update this Platform server to the version on that machine, then Retry.',
+} satisfies ConnectionError
 
 export async function createConnectionNoticeFixture(
   beforeRequest?: (request: Request) => void | Promise<void>,
