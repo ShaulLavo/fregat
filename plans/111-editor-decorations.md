@@ -1,6 +1,6 @@
 # Editor decorations: learn from CodeMirror and Lexical, then beat what we have
 
-Status: **Phase 1 implemented 2026-09-26** (wave 2 lane E2, Editor PR `w2/e2-111`); phases 2–3 are
+Status: **Phase 1 implemented 2026-09-26** (wave 2 lane E2, Editor `6544b02`); phases 2–3 are
 Plan 171's, phases 4–5 wave 3. Research done 2026-09-25. Requested 2026-09-13.
 
 Decided 2026-09-25: owner — the research is authorized, with the chat composer as its first consumer
@@ -172,7 +172,7 @@ Phases 1–3 are the composer path; 4 and 5 are the markdown path and can run af
 
 ### Phase 1 as landed (2026-09-26)
 
-Editor commits `88a2a16` and `42837cc` (review fixes: a syntax-triggered provider's map is carried across
+Editor PR singapore#37, merged as `6544b02` (commits `88a2a16` and the review fixes `42837cc`: a syntax-triggered provider's map is carried across
 edits by its anchors instead of rerun on stale captures, and an edit-triggered provider derives chips for text
 set after it registered), covered on `new Editor(element)` plus `setText` (`test/atomicReplacements.test.ts`,
 `test/atomicReplacements.browser.test.ts`, `test/pasteHandlers.test.ts` drop cases, `test/inlineMap.test.ts`
