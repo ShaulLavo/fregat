@@ -81,8 +81,7 @@ export function toClientError(input: unknown): ClientError {
   if (isConnectivityError(input)) return categorizedClientError('connectivity', input)
 
   const code = extractFsErrorCode(input)
-  if (code)
-    return { ...categorizedClientError(categoryByFsErrorCode[code], input), ...guidance(input) }
+  if (code) return categorizedClientError(categoryByFsErrorCode[code], input)
 
   // Structured errors from any non-fs catalog — settings, orchestration — carry
   // their own message, `why` and `fix`. Falling through to `unknown` here is
@@ -259,13 +258,6 @@ function structuredError(input: unknown) {
   if (!code || !message) return null
 
   return { code, fix: text(error.fix), message, why: text(error.why) }
-}
-
-/** A catalog error's own `why` and `fix`, kept under the category's wording. */
-function guidance(input: unknown) {
-  const structured = structuredError(input)
-  if (!structured) return {}
-  return { code: structured.code, fix: structured.fix, why: structured.why }
 }
 
 function text(value: unknown) {

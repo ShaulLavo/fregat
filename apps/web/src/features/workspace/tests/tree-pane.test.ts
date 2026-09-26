@@ -524,7 +524,7 @@ describe('loadExpandedDirectories', () => {
   it('does not retry an errored directory before expansion history is known', () => {
     const root = 'repo'
     const model = treeModel(tree(root, [directory('repo/src')]), root)
-    model.errorByDirectoryPath.set('src', 'Could not load')
+    model.errorByDirectoryPath.set('src', { message: 'Could not load' })
     const fileTree = new FileTreeModel({
       flattenEmptyDirectories: true,
       initialExpansion: 'closed',
@@ -545,7 +545,7 @@ describe('loadExpandedDirectories', () => {
   it('does not retry an errored directory while it remains expanded', () => {
     const root = 'repo'
     const model = treeModel(tree(root, [directory('repo/src')]), root)
-    model.errorByDirectoryPath.set('src', 'Could not load')
+    model.errorByDirectoryPath.set('src', { message: 'Could not load' })
     const fileTree = new FileTreeModel({
       flattenEmptyDirectories: true,
       initialExpansion: 'closed',
@@ -571,7 +571,7 @@ describe('loadExpandedDirectories', () => {
   it('retries an errored directory after a fresh expand gesture', () => {
     const root = 'repo'
     const model = treeModel(tree(root, [directory('repo/src')]), root)
-    model.errorByDirectoryPath.set('src', 'Could not load')
+    model.errorByDirectoryPath.set('src', { message: 'Could not load' })
     const fileTree = new FileTreeModel({
       flattenEmptyDirectories: true,
       initialExpansion: 'closed',

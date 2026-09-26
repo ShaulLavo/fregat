@@ -12,11 +12,12 @@ import { reportError, toClientError } from '@/lib/client-error-taxonomy'
 import { log } from '@/lib/client-logging'
 import { fileSystemKeys } from '@/lib/query-keys'
 import { runMutation } from '@/lib/mutations/run'
-import { recordRecentMutationOptions } from '@/lib/record-recent-mutation'
+import { recordRecentMutationOptions } from '@/features/workspace/utils/record-recent-mutation'
 import { openWorkspaceRootMutationOptions } from '@/features/workspace/utils/open-root-mutation'
 import {
   activateWorkspaceRoot,
   isActiveWorkspaceRoot,
+  useActiveProjectStore,
 } from '@/features/workspace/state/active-project'
 import { claimWorkspaceOpenGeneration } from '@/features/workspace/state/open-generation'
 
@@ -43,7 +44,26 @@ export async function openWorkspaceRootForOwner(
   const reservation = workspaceEdits?.acquireRootSwitchReservation() ?? null
   if (workspaceEdits && !reservation) return 'failed'
   const generation = claimWorkspaceOpenGeneration()
+  const startedAt = performance.now()
+  const previousRoot = useActiveProjectStore.getState().workspaceRoot
   activateWorkspaceRoot(workspaceRoot)
+  // Chat follows the active project at once; an open that never lands must hand it back.
+  const release = () => {
+    const claimed = !isActiveWorkspaceRoot(workspaceRoot)
+    if (!claimed) activateWorkspaceRoot(previousRoot)
+    return claimed
+  }
+  const abandon = (endedBy: string) => {
+    const claimed = release()
+    log.info({
+      action: 'workspace.root_open_superseded',
+      area: 'workspace',
+      path: workspaceRoot,
+      endedBy: claimed ? 'claimed' : endedBy,
+      durationMs: Math.round(performance.now() - startedAt),
+    })
+    return 'superseded' as const
+  }
 
   try {
     confirmedEnvironmentId(origin)
@@ -53,19 +73,10 @@ export async function openWorkspaceRootForOwner(
       { generation, signal: activity },
     )
     // A later request already claimed the app; landing now would drag it back.
-    if (
-      activity.aborted ||
-      options.isCurrent?.() === false ||
-      result.status === 'superseded' ||
-      !isActiveWorkspaceRoot(workspaceRoot)
-    ) {
-      log.info({
-        action: 'workspace.root_open_superseded',
-        area: 'workspace',
-        path: workspaceRoot,
-      })
-      return 'superseded'
-    }
+    if (activity.aborted) return abandon('aborted')
+    if (options.isCurrent?.() === false) return abandon('not-current')
+    if (result.status === 'superseded') return abandon('server')
+    if (!isActiveWorkspaceRoot(workspaceRoot)) return abandon('claimed')
     confirmedEnvironmentId(origin)
     const entry = result.entry
     if (!entry) return 'superseded'
@@ -89,7 +100,9 @@ export async function openWorkspaceRootForOwner(
     void recordRootAsRecent(queryClient, entry.path)
     return 'opened'
   } catch (error) {
-    if (activity.aborted || options.isCurrent?.() === false) return 'superseded'
+    if (activity.aborted) return abandon('aborted')
+    if (options.isCurrent?.() === false) return abandon('not-current')
+    release()
     log.warn({ action: 'workspace.root_open_rejected', area: 'workspace', path: workspaceRoot })
     reportError(toClientError(error))
     return 'failed'

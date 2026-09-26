@@ -47,13 +47,19 @@ export type NavigationResult =
   | { readonly status: 'unavailable'; readonly reason: string }
   | { readonly status: 'superseded' }
 
+/** What a pending navigation is opening, when the destination names something worth showing. */
+export type NavigationTarget = { readonly name: string; readonly path: string }
+
 export type NavigationStatus =
-  | { readonly status: 'pending'; readonly href: string }
+  | { readonly status: 'pending'; readonly href: string; readonly target?: NavigationTarget }
   | { readonly status: 'applied'; readonly href: string }
   | { readonly status: 'unavailable'; readonly href: string; readonly reason: string }
 
 type ApplicationReason = 'boot' | 'traverse' | 'navigate'
 type HistoryWriteMode = 'immediate' | 'continuous'
+/** What a request may change: the view inside the current workspace, or the workspace itself. */
+export type NavigationReach = 'view' | 'workspace'
+type SupersedeKind = 'request' | 'transient' | 'history' | 'attach' | 'unavailable' | 'detach'
 type PendingHistory = { readonly owner: ApplicationRuntime; readonly identity: string }
 type AddressReconciliation = {
   readonly owner: EditorWorkspaceStoreApi
@@ -76,6 +82,7 @@ type Operation = {
   readonly generation: number
   readonly abort: AbortController
   readonly reason: ApplicationReason
+  readonly reach: NavigationReach
   readonly historyWriteMode: HistoryWriteMode
   readonly settle: (result: NavigationResult) => void
   readonly result: Promise<NavigationResult>
@@ -102,6 +109,7 @@ export type NavigationPreparation = {
 type Destination = {
   readonly address: Address
   readonly replace: boolean
+  readonly target?: NavigationTarget
   readonly historyTarget?: NavigationHistoryTarget | null
   readonly preserveTransient?: boolean
   readonly beforeApply?: () => void
@@ -155,13 +163,16 @@ export function createNavigationCoordinator(router: ApplicationRouter, initial: 
     reason: ApplicationReason,
     href: string | null,
     historyWriteMode: HistoryWriteMode = 'immediate',
+    kind: SupersedeKind = 'history',
+    reach: NavigationReach = 'workspace',
   ): Operation {
-    cancel(historyWriteMode === 'continuous')
+    cancel(historyWriteMode === 'continuous', { kind, generation: generation + 1 })
     const completion = Promise.withResolvers<NavigationResult>()
     const next: Operation = {
       generation: ++generation,
       abort: new AbortController(),
       reason,
+      reach,
       historyWriteMode,
       href,
       complete: null,
@@ -178,11 +189,51 @@ export function createNavigationCoordinator(router: ApplicationRouter, initial: 
     return next
   }
 
-  function cancel(preserveHistory = false) {
+  function cancel(
+    preserveHistory = false,
+    by: { readonly kind: SupersedeKind; readonly generation?: number } = { kind: 'detach' },
+  ) {
     if (!preserveHistory) cancelHistory()
-    operation?.abort.abort()
-    operation?.settle({ status: 'superseded' })
+    const cancelled = operation
     operation = null
+    if (!cancelled) return
+    cancelled.abort.abort()
+    cancelled.settle({ status: 'superseded' })
+    logSuperseded(cancelled, by)
+  }
+
+  function logSuperseded(
+    op: Operation,
+    by: { readonly kind: SupersedeKind | 'apply'; readonly generation?: number },
+  ) {
+    log.info({
+      action: 'navigation.completed',
+      area: 'address',
+      status: 'superseded',
+      generation: op.generation,
+      reason: op.reason,
+      reach: op.reach,
+      historyWriteMode: op.historyWriteMode,
+      supersededBy: by,
+    })
+  }
+
+  /** A pending move to another workspace; a view change inside the one being left waits it out. */
+  function switchingWorkspace() {
+    const op = operation
+    if (!op?.complete || op.reach !== 'workspace' || op.reason === 'boot' || !application)
+      return false
+    return !sameWorkspaceOwner(payloadAddress(op.complete), captureAddress(application, accepted))
+  }
+
+  function droppedForSwitch(kind: SupersedeKind): Promise<NavigationResult> {
+    log.info({
+      action: 'navigation.dropped',
+      area: 'address',
+      kind,
+      pendingGeneration: operation?.generation,
+    })
+    return Promise.resolve({ status: 'superseded' })
   }
 
   function cancelHistory() {
@@ -278,7 +329,10 @@ export function createNavigationCoordinator(router: ApplicationRouter, initial: 
       op.historyWriteMode === 'continuous' && result.status === 'applied'
         ? buildAddressLocation(router, accepted).publicHref
         : router.history.location.href
-    if (result.status === 'superseded') return
+    if (result.status === 'superseded') {
+      logSuperseded(op, { kind: 'apply' })
+      return
+    }
     publish({ ...result, href })
     const budget = op.complete ? budgetAddress(payloadAddress(op.complete)) : null
     log.info({
@@ -393,6 +447,13 @@ export function createNavigationCoordinator(router: ApplicationRouter, initial: 
 
   async function commit(op: Operation, destination: Destination) {
     if (!isCurrent(op)) return
+    if (destination.target) {
+      publish({
+        status: 'pending',
+        href: router.history.location.href,
+        target: destination.target,
+      })
+    }
     const address = destination.address
     op.complete = payloadForAddress(address)
     op.editorOwner = destination.editorOwner
@@ -419,11 +480,13 @@ export function createNavigationCoordinator(router: ApplicationRouter, initial: 
   function request(
     prepare: (context: NavigationPreparation) => Destination | Promise<Destination>,
     historyWriteMode: HistoryWriteMode = 'immediate',
+    reach: NavigationReach = 'view',
   ): Promise<NavigationResult> {
     if (!application || stopped) return Promise.resolve({ status: 'superseded' })
+    if (reach === 'view' && switchingWorkspace()) return droppedForSwitch('request')
     const owner = application
     const address = currentAddress()
-    const op = begin('navigate', null, historyWriteMode)
+    const op = begin('navigate', null, historyWriteMode, 'request', reach)
     void prepareAndCommit(op, owner, address, prepare)
     return op.result
   }
@@ -627,7 +690,7 @@ export function createNavigationCoordinator(router: ApplicationRouter, initial: 
       stopped = false
       const currentAttachment = ++attachment
       const reason = bootIntentAvailable ? 'boot' : (operation?.reason ?? 'navigate')
-      const op = begin(reason, router.history.location.href)
+      const op = begin(reason, router.history.location.href, 'immediate', 'attach')
       if (resumed) {
         op.complete = payloadForAddress(resumed)
         op.preserveTransient = true
@@ -652,13 +715,14 @@ export function createNavigationCoordinator(router: ApplicationRouter, initial: 
     },
     transient(select: (owner: ApplicationRuntime) => void): Promise<NavigationResult> {
       if (!application) return Promise.resolve({ status: 'superseded' })
-      cancel(true)
+      if (switchingWorkspace()) return droppedForSwitch('transient')
+      cancel(true, { kind: 'transient' })
       select(application)
       publish({ status: 'applied', href: router.history.location.href })
       return Promise.resolve({ status: 'applied' })
     },
     unavailable(reason: string) {
-      cancel()
+      cancel(false, { kind: 'unavailable' })
       publish({ status: 'unavailable', href: router.history.location.href, reason })
     },
     dispose() {

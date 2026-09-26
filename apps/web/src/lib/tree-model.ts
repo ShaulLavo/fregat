@@ -3,10 +3,16 @@ import type { TreeEntry, TreeResult } from '@/lib/file-system-types'
 import { isDirectoryEntry } from '@/lib/file-system-types'
 import { canonicalTreePath, toTreePath } from '@/lib/path-formatters'
 
+/** Why a directory's children could not be listed; `denied` means the server may not read it. */
+export type DirectoryLoadError = {
+  readonly message: string
+  readonly denied?: boolean
+}
+
 export type TreeModel = {
   paths: string[]
   entriesByTreePath: Map<string, TreeEntry>
-  errorByDirectoryPath: Map<string, string>
+  errorByDirectoryPath: Map<string, DirectoryLoadError>
   loadedDirectoryPaths: Set<string>
   loadingDirectoryPaths: Set<string>
 }
@@ -77,11 +83,11 @@ export function markDirectoryLoading(model: TreeModel, directoryTreePath: string
 export function markDirectoryError(
   model: TreeModel,
   directoryTreePath: string,
-  message: string,
+  error: DirectoryLoadError,
 ): TreeModel {
   const next = cloneTreeModel(model)
   next.loadingDirectoryPaths.delete(directoryTreePath)
-  next.errorByDirectoryPath.set(directoryTreePath, message)
+  next.errorByDirectoryPath.set(directoryTreePath, error)
 
   return next
 }

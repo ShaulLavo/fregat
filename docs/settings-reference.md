@@ -98,11 +98,12 @@ stays safe to read, share and export.
 
 ## Files
 
-| Setting               | Default | Scope  | What it does                                                               |
-| --------------------- | ------- | ------ | -------------------------------------------------------------------------- |
-| `files.autoSave`      | `"off"` | window | Save edited files automatically, and when.                                 |
-| `files.autoSaveDelay` | `1000`  | window | Milliseconds of quiet before an automatic save, when saving after a delay. |
-| `files.showHidden`    | `false` | window | Show dot-prefixed files and folders in file pickers.                       |
+| Setting                     | Default  | Scope   | What it does                                                                                                                                        |
+| --------------------------- | -------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `files.autoSave`            | `"off"`  | window  | Save edited files automatically, and when.                                                                                                          |
+| `files.autoSaveDelay`       | `1000`   | window  | Milliseconds of quiet before an automatic save, when saving after a delay.                                                                          |
+| `files.showHidden`          | `false`  | window  | Show dot-prefixed files and folders in file pickers.                                                                                                |
+| `files.watchDirectoryLimit` | `200000` | machine | How many folders all open workspaces may watch for live changes together. A workspace that would pass it updates its top level and open files only. |
 
 ## Git
 

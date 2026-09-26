@@ -1,3 +1,4 @@
+import { workspacePathLeaf } from '@workspace/client-core/files/path'
 import { supersededNavigation } from '@/state/navigation-result'
 import { captureEditorScrollPositions } from '@/features/editor/state/scroll-persistence'
 import { createChatNavigation } from '@/state/navigation-chat'
@@ -287,27 +288,34 @@ export function createNavigation(
     readonly path: string
     readonly replace?: boolean
   }) {
-    return coordinator.request(async ({ signal, application, address, isCurrent }) => {
-      const origin = confirmedEnvironmentOrigin(environmentId)
-      const workspace = await registerWorkspaceAddress({
-        client: clientForQueryClient(queryClientFor(origin)),
-        path,
-        signal,
-      })
-      if (!isCurrent()) return { address, replace }
-      const current = application.getSnapshot()
-      const same =
-        current.origin === origin &&
-        current.editor.workspaceStore.getState().rootFolder?.path === workspace.path
-      const next = same
-        ? address
-        : await workspaceAddressFor(application, environmentId, workspace, address)
-      return {
-        address: { ...next, environmentId, workspace: workspaceToken(workspace) },
-        replace,
-        historyTarget: null,
-      }
-    })
+    return coordinator.request(
+      async ({ signal, application, address, isCurrent }) => {
+        const origin = confirmedEnvironmentOrigin(environmentId)
+        const workspace = await registerWorkspaceAddress({
+          client: clientForQueryClient(queryClientFor(origin)),
+          path,
+          signal,
+        })
+        if (!isCurrent()) return { address, replace }
+        const current = application.getSnapshot()
+        const same =
+          current.origin === origin &&
+          current.editor.workspaceStore.getState().rootFolder?.path === workspace.path
+        const next = same
+          ? address
+          : await workspaceAddressFor(application, environmentId, workspace, address)
+        return {
+          address: { ...next, environmentId, workspace: workspaceToken(workspace) },
+          replace,
+          historyTarget: null,
+          target: same
+            ? undefined
+            : { name: workspacePathLeaf(workspace.path), path: workspace.path },
+        }
+      },
+      'immediate',
+      'workspace',
+    )
   }
 
   function setWorkbenchPanels(
@@ -934,35 +942,43 @@ export function createNavigation(
         (root !== ref.rootPath && selectWorktreeAtPath(slice, root)?.projectId !== ref.projectId)
       )
         return supersededNavigation()
-      return coordinator.request(({ address }) => ({
-        address: {
-          ...emptyAddress(),
-          workspace: '-',
-          mode: 'workbench',
-          environmentId: address.environmentId,
-          passthrough: address.passthrough,
-        },
-        replace: true,
-        historyTarget: null,
-      }))
+      return coordinator.request(
+        ({ address }) => ({
+          address: {
+            ...emptyAddress(),
+            workspace: '-',
+            mode: 'workbench',
+            environmentId: address.environmentId,
+            passthrough: address.passthrough,
+          },
+          replace: true,
+          historyTarget: null,
+        }),
+        'immediate',
+        'workspace',
+      )
     },
     openEnvironment(environmentId: EnvironmentId) {
-      return coordinator.request(async ({ application, address }) => {
-        const retained = application.getEnvironment(environmentId)
-        const cache = readWorkspaceCache(environmentScopedStorage(environmentId))
-        const root = retained
-          ? retained.editor.workspaceStore.getState().rootFolder
-          : cache.rootFolder
-        const next = root?.workspaceAddress
-          ? await workspaceAddressFor(application, environmentId, root.workspaceAddress, address)
-          : {
-              ...emptyAddress(),
-              workspace: '-',
-              mode: address.mode ?? 'workbench',
-              passthrough: address.passthrough,
-            }
-        return { address: { ...next, environmentId }, replace: false }
-      })
+      return coordinator.request(
+        async ({ application, address }) => {
+          const retained = application.getEnvironment(environmentId)
+          const cache = readWorkspaceCache(environmentScopedStorage(environmentId))
+          const root = retained
+            ? retained.editor.workspaceStore.getState().rootFolder
+            : cache.rootFolder
+          const next = root?.workspaceAddress
+            ? await workspaceAddressFor(application, environmentId, root.workspaceAddress, address)
+            : {
+                ...emptyAddress(),
+                workspace: '-',
+                mode: address.mode ?? 'workbench',
+                passthrough: address.passthrough,
+              }
+          return { address: { ...next, environmentId }, replace: false }
+        },
+        'immediate',
+        'workspace',
+      )
     },
     startDraft: (ref: ScopedProjectRef, worktreeId?: WorktreeId) =>
       openChat({ ...ref, sessionId: null, surface: 'main', worktreeId, newDraft: true }),

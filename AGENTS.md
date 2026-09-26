@@ -228,6 +228,14 @@ Interaction treatments are utilities, not strings to copy:
 - Retries live in the mutation's `retry` / `retryDelay`, not in a loop written inside `onSuccess`. A retry the mutation cache cannot see is a retry devtools, `isPending` and the wide event cannot see either.
 - Exceptions exist and each one carries a comment saying why: streaming transports (terminal input, orchestration WebSocket frames), and intent queues that already serialize by resource (`runIntent`, `runTreeIntent`, the workspace-edit lifecycle behind `runWorkspaceMutation`). Those still settle the cache when they finish.
 
+## Git: One Shared Checkout
+
+- Several sessions work in this checkout on `main` at the same time. Every uncommitted change in the tree may be another session's live work.
+- **Never stash.** No `git stash`, in any form, for any reason. A stash pulls other sessions' edits out from under them mid-task, and a stash popped by the wrong session lands someone else's work.
+- The same goes for anything else that takes changes out of the tree: no `git reset --hard`, `git checkout -- <path>`, `git restore`, `git clean` or branch switching on this checkout.
+- To commit, commit everything: `git add -A`, one commit, push. Other sessions' changes go in with yours; the message can say so. Never pick your own files or hunks.
+- A rejected push means `git pull --rebase`, then push again.
+
 ## Greenfield, No Backward Compatibility
 
 - This project is greenfield and not live: no releases, no external users, no data anyone needs migrated.

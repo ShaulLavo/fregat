@@ -494,7 +494,11 @@ function updateSelectionSyncState(
 function treeRowDecoration(model: TreeModel, context: FileTreeRowDecorationContext) {
   const treePath = canonicalTreePath(context.item.path)
   const error = model.errorByDirectoryPath.get(treePath)
-  if (error) return { text: 'error', title: error }
+  if (error?.denied) {
+    const path = model.entriesByTreePath.get(treePath)?.path ?? treePath
+    return { text: 'no access', title: `The server's user cannot read /${path}` }
+  }
+  if (error) return { text: 'error', title: error.message }
   if (model.loadingDirectoryPaths.has(treePath)) return { text: 'loading' }
 
   return null

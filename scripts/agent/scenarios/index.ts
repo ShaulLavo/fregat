@@ -78,6 +78,12 @@ import { chatComposerInsert } from './chat-composer-insert'
 import { chatDisclosureSettle } from './chat-disclosure-settle'
 import { chatTurnAnatomy } from './chat-turn-anatomy'
 import { fileTreeHoverPrefetch } from './file-tree-hover-prefetch'
+import {
+  filePickerPrefetchBound,
+  workspaceOpenLargeRoot,
+  workspaceOpenUnreadableChild,
+  workspaceSwitchClickDuringOpen,
+} from './large-folder'
 import { wallpaperBootHandoff } from './wallpaper-boot-handoff'
 import { chatGitTabSwitch } from './chat-git-tab-switch'
 import { chatGitTurnRows } from './chat-git-turn-rows'
@@ -421,6 +427,10 @@ export const scenarios: readonly Scenario[] = [
   chatDisclosureSettle,
   chatTurnAnatomy,
   fileTreeHoverPrefetch,
+  workspaceOpenLargeRoot,
+  workspaceOpenUnreadableChild,
+  workspaceSwitchClickDuringOpen,
+  filePickerPrefetchBound,
   wallpaperBootHandoff,
   chatGitTabSwitch,
   chatGitTurnRows,

@@ -256,6 +256,18 @@ export const selectors = {
   pickerSearch: (page: Page) =>
     page.getByRole('textbox', { name: 'Search files and folders', exact: true }),
   pickerEmpty: (page: Page) => page.getByText('Nothing here', { exact: true }),
+  pickerChoose: (page: Page) =>
+    page
+      .getByRole('dialog', { name: 'Choose folder', exact: true })
+      .getByRole('button', { name: 'Choose folder', exact: true }),
+  liveUpdatesLimited: (page: Page) =>
+    page.getByRole('button', { name: 'Live updates limited', exact: true }),
+  navigationTarget: (page: Page) => page.locator('[data-navigation-target]'),
+  treeItemDecoration: (page: Page, name: string) =>
+    page
+      .getByLabel('Folder tree', { exact: true })
+      .getByRole('treeitem', { name, exact: true })
+      .locator('[data-item-section="decoration"]'),
   pickerCurrentFolderHeading: (page: Page) =>
     page
       .getByRole('listbox', { name: 'Folders and files', exact: true })

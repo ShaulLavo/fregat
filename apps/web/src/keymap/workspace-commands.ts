@@ -615,6 +615,17 @@ export const workspaceCommands = [
       ),
   }),
   defineCommand({
+    ...workspaceCommandMetadata['workspace.showWatchSettings'],
+    icon: GearSixIcon,
+    run: ({ invocation, runtime }) =>
+      transitionStart(
+        runtime.shell.showSettings(
+          invocation.origin as FocusTargetToken | null,
+          'files.watchDirectoryLimit',
+        ),
+      ),
+  }),
+  defineCommand({
     ...workspaceCommandMetadata['workspace.cloneRepository'],
     icon: GitForkIcon,
     run: ({ runtime }) => {
