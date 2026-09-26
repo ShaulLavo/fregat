@@ -791,7 +791,7 @@ export class OrchestrationEngine {
             session,
             pullRequest: worktree.pullRequest,
             pendingPullRequest: pendingPullRequest(worktree),
-            backgroundLive: liveness !== null,
+            backgroundLive: this.providerService?.keepsProcess(command.sessionId) ?? false,
             now: Date.now(),
             rules,
           })
@@ -1078,7 +1078,7 @@ export class OrchestrationEngine {
       getReadModel: () => this.readModel,
       dispatch: (command) => this.enqueue(command),
       rules,
-      backgroundLive: (sessionId) => this.providerService?.backgroundLiveness(sessionId) != null,
+      backgroundLive: (sessionId) => this.providerService?.keepsProcess(sessionId) ?? false,
     })
   }
 
