@@ -28,7 +28,8 @@ export type ShikiHighlighterPluginOptions = {
   readonly resolveTheme: ShikiThemeRegistrationResolver
   readonly theme?: string | (() => string)
   readonly languages?: ShikiLanguageMap
-  readonly preloadLanguages?: readonly string[]
+  /** Grammars loaded in the background after the first highlight; a getter is read then. */
+  readonly preloadLanguages?: readonly string[] | (() => readonly string[])
   /** Additional themes to load in the background after a session opens. */
   readonly preloadThemes?: readonly string[] | (() => readonly string[])
   readonly onThemeChanged?: (listener: () => void) => (() => void) | void
@@ -93,7 +94,7 @@ const createSession = (
 ) => {
   if (!owner.canUseWorker()) return null
 
-  const lang = shikiLanguageForSession(sessionOptions, pluginOptions.languages)
+  const lang = shikiLanguageForDocument(sessionOptions, pluginOptions.languages)
   if (!lang) return null
 
   const theme = shikiThemeName(pluginOptions)
@@ -145,8 +146,12 @@ const shikiThemeName = (options: ShikiHighlighterPluginOptions): string => {
   return theme ?? DEFAULT_THEME
 }
 
-const shikiLanguageForSession = (
-  options: EditorHighlighterSessionOptions,
+/**
+ * The Shiki grammar a document uses: an explicit map entry, then its extension (`.tsx`, `.jsx`),
+ * then the default map. Hosts that choose grammars ahead of a document use the same answer.
+ */
+export const shikiLanguageForDocument = (
+  options: Pick<EditorHighlighterSessionOptions, 'documentId' | 'languageId'>,
   languages: ShikiLanguageMap | undefined,
 ): string | null => {
   if (!options.languageId) return null
@@ -161,7 +166,11 @@ const shikiLanguageForSession = (
 const preloadLanguages = (
   lang: string,
   options: ShikiHighlighterPluginOptions,
-): readonly string[] => [lang, ...Array.from(options.preloadLanguages ?? [])]
+): readonly string[] => {
+  const languages = options.preloadLanguages
+  const extra = typeof languages === 'function' ? languages() : languages
+  return [lang, ...Array.from(extra ?? [])]
+}
 
 type ShikiRegistrationCache = {
   readonly loadedThemes: (themes: readonly string[]) => readonly ShikiWorkerThemeRegistration[]
