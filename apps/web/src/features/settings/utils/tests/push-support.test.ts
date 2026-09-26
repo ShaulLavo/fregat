@@ -43,6 +43,9 @@ describe('push support', () => {
     const demo = 'https://omarchy.example.test/platform/mockServiceWorker.js'
     expect(pushSupport(environment({ controllerScript: demo }))).toBe('scope-taken')
     expect(pushSupport(environment({ controllerScript: WORKER }))).toBe('supported')
+    expect(pushSupport(environment({ controllerScript: `${WORKER}?label=Chrome` }))).toBe(
+      'supported',
+    )
   })
 
   it('needs a secure context, service workers, the Push API and notifications', () => {

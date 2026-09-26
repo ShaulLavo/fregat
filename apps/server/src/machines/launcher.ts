@@ -97,6 +97,8 @@ export function createSshLauncher(options: LauncherOptions) {
   const pending = new Map<string, Promise<MachineConnectionState>>()
   const disconnecting = new Map<string, Promise<void>>()
   const updating = new Map<string, Promise<MachineConnectionState>>()
+  // An update outlives the connection it started on: activation replaces it with a new one.
+  const updateAborts = new Map<string, AbortController>()
   const ports = new Map<string, number>()
   const identities = new Map<string, EnvironmentId>()
   const spawn = options.spawn ?? spawnSsh
@@ -131,6 +133,7 @@ export function createSshLauncher(options: LauncherOptions) {
     await disconnecting.get(name)
     const running = updating.get(name)
     if (running) return running
+    refuseUnofferedUpdate(connections.get(name)?.state)
     const operation = update(name).finally(() => updating.delete(name))
     updating.set(name, operation)
     return operation
@@ -146,24 +149,27 @@ export function createSshLauncher(options: LauncherOptions) {
       outcome: 'pending',
     }
     const startedAt = Date.now()
+    const abort = new AbortController()
+    updateAborts.set(name, abort)
     const machine = await resolveMachine(name)
     const connection = connections.get(name) ?? idleConnection(name)
     connections.set(name, connection)
     event.target = machine.target
     try {
-      const remote = { spawn, target: machine.target, signal: connection.controller.signal }
+      const remote = { spawn, target: machine.target, signal: abort.signal }
       await installRelease(
         remote,
         supply,
         event,
         (source) => activateRelease(name, connection, event, source),
-        () => recoverRelease(name, connection),
+        () => recoverRelease(name, connection, abort.signal),
       )
       event.outcome = 'success'
       return connections.get(name)?.state ?? connection.state
     } catch (error) {
-      return failedUpdate(connections.get(name) ?? connection, event, error)
+      return failedUpdate(connections.get(name) ?? connection, event, error, abort.signal)
     } finally {
+      if (updateAborts.get(name) === abort) updateAborts.delete(name)
       event.durationMs = Date.now() - startedAt
       writeLog('machines.server.update', event, event.outcome === 'failed')
     }
@@ -184,15 +190,20 @@ export function createSshLauncher(options: LauncherOptions) {
       })
   }
 
-  async function recoverRelease(name: string, connection: Connection) {
-    if (connection.controller.signal.aborted) return
+  async function recoverRelease(name: string, connection: Connection, signal: AbortSignal) {
+    if (signal.aborted) return
     const active = connections.get(name) ?? connection
     await cleanup(active)
     await trackConnect(name)
   }
 
-  function failedUpdate(connection: Connection, event: UpdateEvent, error: unknown) {
-    event.outcome = connection.controller.signal.aborted ? 'cancelled' : 'failed'
+  function failedUpdate(
+    connection: Connection,
+    event: UpdateEvent,
+    error: unknown,
+    signal: AbortSignal,
+  ) {
+    event.outcome = signal.aborted ? 'cancelled' : 'failed'
     event.error = errorMessage(error)
     event.errorCode = isEvlogError(error) ? error.code : undefined
     event.errorInternal = isEvlogError(error) ? error.internal : undefined
@@ -421,7 +432,10 @@ export function createSshLauncher(options: LauncherOptions) {
     event.errorCode = lastError.code
     event.errorInternal = isEvlogError(error) ? error.internal : undefined
     const updateFix = releaseUpdateFix(lastError.code, event.errorInternal, supply.channel)
-    if (updateFix && (await supply.available())) lastError.fix = updateFix
+    if (updateFix && (await supply.available())) {
+      lastError.fix = updateFix
+      lastError.action = lastError.code === sshProtocolCode ? 'update' : 'install'
+    }
     if (lastError.code === 'machines.SSH_IDENTITY') event.step = 'identity'
     if (lastError.code === sshProtocolCode) event.step = 'protocol'
     event.outcome = cancelled ? 'cancelled' : 'failed'
@@ -506,6 +520,7 @@ export function createSshLauncher(options: LauncherOptions) {
     const running = disconnecting.get(name)
     if (running) return running
     connections.get(name)?.controller.abort()
+    updateAborts.get(name)?.abort()
     const operation = disconnect(name).finally(() => disconnecting.delete(name))
     disconnecting.set(name, operation)
     return operation
@@ -576,6 +591,13 @@ export function createSshLauncher(options: LauncherOptions) {
 
 function changedRemote(previous: SshMachineDefinition, next: SshMachineDefinition) {
   return previous.target !== next.target || previous.remotePort !== next.remotePort
+}
+
+// The client offers Update server only on `action`; a newer, external or shared server never gets one.
+function refuseUnofferedUpdate(state: MachineConnectionState | undefined) {
+  if (!state || !('lastError' in state)) return
+  if (state.lastError.code !== sshProtocolCode || state.lastError.action) return
+  throw updateErrors.refused({ internal: { phase: state.phase, code: state.lastError.code } })
 }
 
 function failurePhase(step: SshErrorStep) {

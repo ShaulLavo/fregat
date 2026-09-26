@@ -5,6 +5,7 @@ import path from 'node:path'
 import { expect, test } from 'vitest'
 import {
   missingReleaseFiles,
+  reachablePackages,
   REMOTE_SUPPORT,
   RUNTIME_PACKAGES,
   runtimeManifest,
@@ -139,7 +140,33 @@ test('the standalone runtime lock preserves transitive resolutions and integrity
       expect.stringMatching(/^sha512-/),
     ])
     expect(Object.keys(runtime.workspaces)).toEqual([''])
+    expect(runtime.packages).not.toHaveProperty('react')
   } finally {
     await rm(server, { recursive: true, force: true })
   }
+})
+
+test('the runtime lock keeps only what the runtime packages reach, nested resolutions first', () => {
+  const entry = (spec: string, dependencies: Record<string, string> = {}) => [
+    spec,
+    '',
+    { dependencies },
+    'sha512-x',
+  ]
+  const packages = {
+    sharp: entry('sharp@1.0.0', { 'detect-libc': '^2', '@img/core': '^1' }),
+    'detect-libc': entry('detect-libc@2.0.0'),
+    '@img/core': entry('@img/core@1.0.0', { 'iconv-lite': '^0.7' }),
+    'iconv-lite': entry('iconv-lite@0.6.3'),
+    '@img/core/iconv-lite': entry('iconv-lite@0.7.3', { 'safer-buffer': '*' }),
+    'safer-buffer': entry('safer-buffer@2.1.2'),
+    react: entry('react@19.0.0'),
+  }
+  expect(Object.keys(reachablePackages(packages, ['sharp'])).sort()).toEqual([
+    '@img/core',
+    '@img/core/iconv-lite',
+    'detect-libc',
+    'safer-buffer',
+    'sharp',
+  ])
 })

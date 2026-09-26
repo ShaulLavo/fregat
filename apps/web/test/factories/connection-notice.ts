@@ -13,14 +13,24 @@ export const MACHINE_SETUP_ERROR = {
   code: 'machines.SSH_NOT_INSTALLED',
   message: 'Platform server is not installed for this SSH user.',
   why: 'The probe found no platform-server on PATH or in ~/.local/bin.',
-  fix: 'Run bun run server:install from a prepared Platform checkout on that machine, then connect again.',
+  fix: 'Select Install server to put this server’s release on that machine.',
+  action: 'install',
 } satisfies ConnectionError
 
 export const MACHINE_PROTOCOL_ERROR = {
   code: 'machines.SSH_PROTOCOL',
   message: 'The remote server speaks protocol 6, and this Platform needs protocol 7.',
   why: 'The server on that machine was started from a different Platform version.',
-  fix: 'Update the Platform checkout at /Users/shaul/projects/platform to this server’s version, run bun install there, then Retry.',
+  fix: 'Select Update server to install this server’s release on that machine and reconnect.',
+  action: 'update',
+} satisfies ConnectionError
+
+// The server withholds `action` from a newer remote: updating it would install an older release.
+export const MACHINE_NEWER_PROTOCOL_ERROR = {
+  code: 'machines.SSH_PROTOCOL',
+  message: 'The remote server speaks protocol 8, and this Platform needs protocol 7.',
+  why: 'The server on that machine was started from a different Platform version.',
+  fix: 'Update this Platform server to the version on that machine, then Retry.',
 } satisfies ConnectionError
 
 export async function createConnectionNoticeFixture(

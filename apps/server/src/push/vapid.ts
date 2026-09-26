@@ -9,12 +9,18 @@ export type VapidKeys = {
   readonly privateKey: string
 }
 
-/** Reads the key pair, generating the private key into the secret store on first use. */
-export async function loadVapidKeys(settings: SettingsStore): Promise<VapidKeys> {
-  const privateKey = await settings.ensureSecret(
-    VAPID_PRIVATE_KEY_REF,
-    () => generateVAPIDKeys().privateKey,
-  )
+/**
+ * Reads the key pair, generating the private key into the secret store on first use.
+ * `onGenerate` runs before a new key replaces a lost one, while old subscriptions still exist.
+ */
+export async function loadVapidKeys(
+  settings: SettingsStore,
+  onGenerate: () => void,
+): Promise<VapidKeys> {
+  const privateKey = await settings.ensureSecret(VAPID_PRIVATE_KEY_REF, () => {
+    onGenerate()
+    return generateVAPIDKeys().privateKey
+  })
 
   return { privateKey, publicKey: vapidPublicKey(privateKey) }
 }

@@ -1,4 +1,4 @@
-import { readFile, readlink, writeFile } from 'node:fs/promises'
+import { readFile, readlink, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { ORCHESTRATION_WS_PROTOCOL_VERSION } from '@workspace/contracts'
 import { expect, test } from 'vitest'
@@ -44,7 +44,7 @@ test('an outdated server is updated, restarted and reconnected live', async () =
 
   expect(await launcher.connectMachine('fixture')).toMatchObject({
     phase: 'blocked',
-    lastError: { code: 'machines.SSH_PROTOCOL', fix: updateFix },
+    lastError: { code: 'machines.SSH_PROTOCOL', fix: updateFix, action: 'update' },
   })
   const updated = await launcher.updateMachine('fixture')
   expect(updated).toMatchObject({
@@ -74,7 +74,7 @@ test('an outdated server is updated, restarted and reconnected live', async () =
 })
 
 test('a machine without a server is installed from this server’s release', async () => {
-  const { home, local } = await updateFixture()
+  const { home, local, serverRoot } = await updateFixture()
   const ssh = localSsh({ home })
   const { launcher } = updateLauncher(ssh, await shippableRelease(local, 'first'))
   expect(await launcher.connectMachine('fixture')).toMatchObject({
@@ -82,12 +82,15 @@ test('a machine without a server is installed from this server’s release', asy
     lastError: {
       code: 'machines.SSH_NOT_INSTALLED',
       fix: 'Select Install server to put this server’s release on that machine.',
+      action: 'install',
     },
   })
   expect(await launcher.updateMachine('fixture')).toMatchObject({
     phase: 'live',
     descriptor: { serverVersion: 'first' },
   })
+  // The lease and process records stay private to the SSH user.
+  expect((await stat(path.join(serverRoot, '.platform-ssh-launch'))).mode & 0o777).toBe(0o700)
 })
 
 test('a live machine is moved to the new release by an update', async () => {
@@ -104,6 +107,46 @@ test('a live machine is moved to the new release by an update', async () => {
     phase: 'live',
     descriptor: { serverVersion: 'second' },
   })
+})
+
+test('a newer server is offered no update, and an update request is refused', async () => {
+  const fixture = await updateFixture()
+  await writeRelease(fixture.serverRoot, 'newer', expected + 1, expected + 1)
+  await pointCurrent(fixture.serverRoot, 'newer')
+  await installServerLauncher({
+    homeDirectory: fixture.home,
+    installation: releaseInstallation(fixture.serverRoot),
+  })
+  const ssh = localSsh({ home: fixture.home })
+  const { launcher } = updateLauncher(ssh, await shippableRelease(fixture.local, 'new'))
+  const blocked = await launcher.connectMachine('fixture')
+  expect(blocked).toMatchObject({ phase: 'blocked', lastError: { code: 'machines.SSH_PROTOCOL' } })
+  expect(blocked).not.toHaveProperty('lastError.action')
+  await expect(launcher.updateMachine('fixture')).rejects.toMatchObject({
+    code: 'machines.SSH_UPDATE_REFUSED',
+  })
+  expect(await readlink(path.join(fixture.serverRoot, 'current'))).toContain('newer')
+})
+
+test('a disconnect while the new release connects cancels the update without relaunching', async () => {
+  const { home, local } = await outdatedMachine()
+  const ssh = localSsh({ home })
+  let launches = 0
+  let disconnect = () => {}
+  const spawn: typeof ssh.spawn = (command, stdin) => {
+    if (command.at(-1)?.includes('await withLeaseLock(launch);') && ++launches === 1) disconnect()
+    return ssh.spawn(command, stdin)
+  }
+  const { launcher, events } = updateLauncher(
+    { ...ssh, spawn },
+    await shippableRelease(local, 'new'),
+  )
+  const disconnected: Promise<void>[] = []
+  disconnect = () => void disconnected.push(launcher.disconnectMachine('fixture'))
+  await launcher.updateMachine('fixture')
+  await Promise.all(disconnected)
+  expect(updateEvent(events)).toMatchObject({ outcome: 'cancelled' })
+  expect(launches).toBe(1)
 })
 
 test('concurrent updates and a connect during one join a single update', async () => {

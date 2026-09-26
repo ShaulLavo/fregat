@@ -39,6 +39,9 @@ import {
   installVerticalRailRects,
   dragRailWithKeyboard,
 } from '../../../../../test/factories/rail-drag'
+import { runMutation } from '@/lib/mutations/run'
+import { primaryQueryClient } from '@/lib/environments/state/query-clients'
+import { CHAT_SESSION_SCOPE, chatModeMutationKeys } from '@/features/chat-mode/utils/mutation-keys'
 import { expect, test } from '../../../../../test/fixtures'
 
 test('keyboard dragging places a real session and settles its scoped optimistic key', async ({
@@ -325,4 +328,34 @@ test('an interleaved unpin drop forgets its older undo when it cannot offer a re
   if (!outcome?.ok) throw new Error('Expected an accepted rail drop')
   expect(outcome.result).toBeNull()
   expect(useSessionUndoStore.getState().undo).toHaveLength(0)
+})
+
+test('a session drop waits behind a running Undo step', async ({ client, server }) => {
+  const h = await createRailHarness(client, server)
+  for (const sessionId of h.sessionIds)
+    await h.dispatch(createSessionLifecycleCommand(sessionId, { type: 'pin' }))
+  await h.refresh()
+  const step = Promise.withResolvers<void>()
+  const undo = runMutation(
+    primaryQueryClient(),
+    {
+      mutationKey: chatModeMutationKeys.lifecycleUndo(),
+      scope: { id: CHAT_SESSION_SCOPE },
+      mutationFn: () => step.promise,
+    },
+    undefined,
+  )
+  const first = scopedSessionKey({ environmentId: h.environmentId, sessionId: h.sessionIds[0]! })
+  const second = scopedSessionKey({ environmentId: h.environmentId, sessionId: h.sessionIds[1]! })
+  const dropped = reorderRailSession({ activeId: first, overId: second })
+  await new Promise((resolve) => setTimeout(resolve, 50))
+  expect(
+    (await h.refresh()).sessions.find((session) => session.id === h.sessionIds[0])?.pinOrderKey,
+  ).toBeNull()
+  step.resolve()
+  await undo
+  await dropped
+  expect(
+    (await h.refresh()).sessions.find((session) => session.id === h.sessionIds[0])?.pinOrderKey,
+  ).not.toBeNull()
 })

@@ -51,7 +51,7 @@ export class PushService {
   }
 
   async list(): Promise<PushDevices> {
-    const keys = await loadVapidKeys(this.settings)
+    const keys = await this.keys()
     const devices = this.devices.list().map(publicDevice)
     recordRequestContext({ push: { deviceCount: devices.length } })
 
@@ -60,6 +60,7 @@ export class PushService {
 
   async register(input: unknown, origin: string | null): Promise<PushDevice> {
     const { label, subscription } = parseRegistration(input)
+    await this.keys()
     const now = new Date().toISOString()
     const row = this.devices.upsert({
       ...subscription,
@@ -87,7 +88,7 @@ export class PushService {
     if (!device)
       throw pushErrors.DEVICE_NOT_FOUND({ internal: { deviceCount: this.devices.list().length } })
 
-    const keys = await loadVapidKeys(this.settings)
+    const keys = await this.keys()
     const delivery = await this.deliver(device, keys, TEST_NOTICE, {
       topic: 'push-test',
       ttlSeconds: 300,
@@ -107,11 +108,16 @@ export class PushService {
     const devices = this.devices.list()
     if (devices.length === 0) return { deviceCount: 0, deliveries: [] }
 
-    const keys = await loadVapidKeys(this.settings)
+    const keys = await this.keys()
     const deliveries = await Promise.all(
       devices.map((device) => this.deliver(device, keys, notice, options)),
     )
     return { deviceCount: devices.length, deliveries }
+  }
+
+  // Every stored subscription was made with the lost key and can never receive again.
+  private keys() {
+    return loadVapidKeys(this.settings, () => this.devices.clear())
   }
 
   // The push service never takes an expired subscription back, so its row goes at once.

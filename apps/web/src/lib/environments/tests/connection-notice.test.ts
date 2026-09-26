@@ -37,6 +37,15 @@ test('a failed update reads as such and can be tried again; a source primary’s
   expect(serverUpdateLabel(null)).toBeNull()
 })
 
+test('offers an install or update only where the server decided one clears the failure', () => {
+  const protocol = { code: 'machines.SSH_PROTOCOL', message: 'Protocol mismatch.' }
+  expect(serverUpdateLabel(protocol)).toBeNull()
+  expect(serverUpdateLabel({ ...protocol, action: 'update' })).toBe('Update server')
+  const missing = { code: 'machines.SSH_NOT_INSTALLED', message: 'Not installed.' }
+  expect(serverUpdateLabel(missing)).toBeNull()
+  expect(serverUpdateLabel({ ...missing, action: 'install' })).toBe('Install server')
+})
+
 test('describes either protocol direction without calling a newer server out of date', () => {
   for (const message of [
     'Server speaks protocol 7, this client needs 8.',

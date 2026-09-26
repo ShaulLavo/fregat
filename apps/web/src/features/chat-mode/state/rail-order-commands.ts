@@ -35,9 +35,9 @@ import { railReorderIntent } from '@workspace/client-core/chat/rail/reorder'
 import { sessionRailModel } from '@workspace/client-core/chat/rail/model'
 import { log } from '@/lib/client-logging'
 import { confirmedEnvironmentOrigin } from '@/lib/environments/state/domain'
-import { queryClientFor } from '@/lib/environments/state/query-clients'
+import { primaryQueryClient, queryClientFor } from '@/lib/environments/state/query-clients'
 import { runMutation } from '@/lib/mutations/run'
-import { chatModeMutationKeys } from '@/features/chat-mode/utils/mutation-keys'
+import { CHAT_SESSION_SCOPE, chatModeMutationKeys } from '@/features/chat-mode/utils/mutation-keys'
 import {
   sessionLifecycleUndoEntry,
   type SessionLifecycleUndoEntry,
@@ -150,11 +150,12 @@ export function reorderRailSession({ activeId, overId, undoShortcut }: SessionDr
 }
 
 function performSessionDrop(patch: SessionDropPatch) {
+  // Shares Undo/Redo's client and scope: a drop settling mid-step would record over the step's inverse.
   return runMutation(
-    queryClientFor(confirmedEnvironmentOrigin(patch.ref.environmentId)),
+    primaryQueryClient(),
     {
       mutationKey: chatModeMutationKeys.railOrder(patch.ref.environmentId),
-      scope: { id: 'chat.rail.drop' },
+      scope: { id: CHAT_SESSION_SCOPE },
       mutationFn: async () => {
         const abort = new AbortController()
         const read = (ref: SessionDropPatch['ref']) =>

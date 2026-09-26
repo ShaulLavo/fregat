@@ -870,6 +870,34 @@ describe('terminal service', () => {
     }
   })
 
+  it('refuses an agent terminal whose open was in flight when the session was cleaned up', async () => {
+    const root = await fixtureRoot()
+    const sessionId = v.parse(sessionIdSchema, '00000000-0000-4000-8000-000000000002')
+    const pty = createFakePtyFactory()
+    const entered = Promise.withResolvers<void>()
+    const release = Promise.withResolvers<void>()
+    const service = testService(root, {
+      ptyFactory: pty.factory,
+      resolveAgentSession: async () => {
+        entered.resolve()
+        await release.promise
+        return { command: ['agent'], env: {}, release() {}, async reconcile() {} }
+      },
+    })
+    const socket = fakeSocket(root, '', 'agent-racing-delete')
+    const agentSocket = {
+      ...socket,
+      data: { ...socket.data, query: { ...socket.data.query, agentSessionId: sessionId } },
+    }
+    const opening = service.routes(auth()).open(agentSocket)
+    await entered.promise
+    await expect(service.closeSessionTerminals(sessionId)).resolves.toEqual({ closed: 0 })
+    release.resolve()
+    await opening
+    expect(pty.ptys).toHaveLength(0)
+    expect(agentSocket.closeDetails).toEqual({ code: 1008, reason: 'session-deleted' })
+  })
+
   it('refuses unconfirmed agent cleanup and preserves history until retry succeeds', async () => {
     const root = await fixtureRoot()
     const fixture = requiredFixture(root)
