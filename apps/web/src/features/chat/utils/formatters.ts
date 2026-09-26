@@ -127,7 +127,7 @@ export function formatChatRelativeTime(value: string, nowMs: number) {
   return calendarDateLabel(new Date(atMs), new Date(nowMs))
 }
 
-function formatChatDuration(durationMs: number) {
+export function formatChatDuration(durationMs: number) {
   if (!Number.isFinite(durationMs)) return '0ms'
   if (durationMs < 0) return '0ms'
   if (durationMs < 1000) return `${Math.max(1, Math.round(durationMs))}ms`

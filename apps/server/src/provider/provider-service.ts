@@ -1,6 +1,7 @@
 import type { ProviderUsagePurpose } from '@workspace/contracts'
 import { BackgroundTaskRegistry } from './background-liveness'
 import { SessionScheduleRegistry } from './session-schedules'
+import { SessionGoalRegistry } from './session-goals'
 import { elapsedMs } from '@workspace/utils/timing'
 import path from 'node:path'
 import { tmpdir } from 'node:os'
@@ -14,6 +15,8 @@ import type {
   ProviderBackgroundTask,
   ProviderBackgroundTasks,
   ProviderSessionSchedules,
+  ProviderGoalAction,
+  ProviderSessionGoalState,
   ProviderInstanceId,
   ProviderSessionHooks,
   ProviderSessionMcp,
@@ -143,6 +146,7 @@ export class ProviderService {
   private readonly backgroundTasks = new BackgroundTaskRegistry()
   private readonly taskRosters = new Map<SessionId, ProviderBackgroundTask[]>()
   private readonly schedules = new SessionScheduleRegistry()
+  private readonly goals = new SessionGoalRegistry()
   private readonly reaperTimer: ReturnType<typeof setInterval>
   private readonly reaper: ProviderSessionReaper
   private readonly runtimeEventListeners = new Set<ProviderRuntimeEventListener>()
@@ -239,9 +243,27 @@ export class ProviderService {
       )
   }
 
-  /** Background work and schedules both live in the provider process; stopping it loses them. */
+  sessionGoal(sessionId: SessionId): ProviderSessionGoalState {
+    return {
+      goal: this.goals.get(sessionId),
+      controllable: Boolean(this.routeSession(sessionId)?.adapter?.controlGoal),
+    }
+  }
+
+  async controlGoal(input: { action: ProviderGoalAction; sessionId: SessionId }) {
+    const adapter = this.requireSessionControl(input.sessionId, 'controlGoal')
+    await adapter.controlGoal?.(input)
+    await this.drainRuntimeEvents()
+    return this.sessionGoal(input.sessionId)
+  }
+
+  /** Background work, schedules and an active goal live in the provider process. */
   keepsProcess(sessionId: SessionId) {
-    return this.backgroundTasks.get(sessionId) !== null || this.schedules.has(sessionId)
+    return (
+      this.backgroundTasks.get(sessionId) !== null ||
+      this.schedules.has(sessionId) ||
+      this.goals.isActive(sessionId)
+    )
   }
 
   /** A provider launch between claim and adopt; a restart would interrupt it. */
@@ -954,7 +976,7 @@ export class ProviderService {
 
   private requireSessionControl(
     sessionId: SessionId,
-    control: 'reconnectMcpServer' | 'signInMcpServer',
+    control: 'reconnectMcpServer' | 'signInMcpServer' | 'controlGoal',
   ) {
     this.requireRunning()
     const adapter = this.routeSession(sessionId)?.adapter
@@ -1025,6 +1047,7 @@ export class ProviderService {
   private releaseUnroutedBinding(binding: ProviderRuntimeBindingWithMetadata) {
     this.backgroundTasks.clear(binding.sessionId)
     this.schedules.clear(binding.sessionId)
+    this.goals.clear(binding.sessionId)
     this.releaseWorktree(binding.sessionId)
     recordChatPipelineWarning(
       'chat.pipeline.provider_service.stop.instance_missing',
@@ -1139,6 +1162,7 @@ export class ProviderService {
     this.backgroundTasks.clear(sessionId)
     this.taskRosters.delete(sessionId)
     this.schedules.clear(sessionId)
+    this.goals.clear(sessionId)
     this.releaseWorktree(sessionId)
   }
 
@@ -1278,6 +1302,7 @@ export class ProviderService {
     this.backgroundTasks.accept(task.event)
     this.acceptTaskRoster(task.event)
     this.acceptSchedules(task.event)
+    this.goals.accept(task.event)
     this.recordRuntimeEvent(task.event, task.adapter)
     this.publishUsage(task.event, 'turn')
     await this.emitRuntimeEvent(task.event)

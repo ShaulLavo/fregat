@@ -2,8 +2,8 @@
 
 ## Status and authorization
 
-- Status: IN PROGRESS — Phase 2 done 2026-09-26 (wave 2 lane A); Phase 1 on lane B; Phase 3
-  next. Research done 2026-09-25. Q1–Q3 decided 2026-09-25. PRs #32 (Plan 148) and #35 (Plan 145)
+- Status: IN PROGRESS — Phases 2–3 done 2026-09-26 (wave 2 lane A); Phase 1 on lane B; Phase 4
+  waits on Plan 087 M1+. Research done 2026-09-25. Q1–Q3 decided 2026-09-25. PRs #32 (Plan 148) and #35 (Plan 145)
   were still open, so the research read their lane branches as current truth. One gap: the
   Platform-side rendering of a self-started turn is established by code reading, because the dev
   server was down (see Q1).
@@ -367,6 +367,23 @@ Phase 1, lane A Phases 2–3.
   The chat headers show `SchedulesButton` (moon, wake time, list from
   `GET /providers/sessions/:id/schedules`, "Cancel schedules" = `session.runtime.stop`). The mock
   driver's `wakeupMinutes` stands in for `ScheduleWakeup`; scenario `chat-sleeping-session`.
+  Review fixes: the settings-change warning is published by `ProviderService` with the new epoch;
+  auto-settlement exempts `keepsProcess`; a failed turn outranks `sleeping`; a held one-shot reads
+  as due; the header's wake time follows the schedule list.
+- **Phase 3 — done 2026-09-26 (lane A).** A `goal.updated` runtime event carries a
+  provider-neutral goal (objective, status, budget, tokens, time, Claude's checks and last
+  verdict). Claude: the SDK's `active_goal` message (yielded though its union omits it); `/goal`
+  and `/goal clear` run as prompts the CLI answers. Codex: `thread/goal/set|get|clear` and
+  `thread/goal/updated|cleared` are generated; a `/goal` prompt maps onto the goal API
+  (`utils/codex-goals.ts`): an objective or `resume` settles on the turn the app-server starts, or
+  answers itself after 5 s; `pause`, `clear` and a bare `/goal` answer locally. Codex's catalog
+  offers `/goal`. A resumed thread reads its goal on start. `SessionGoalRegistry` keeps the goal;
+  an active goal keeps the process (reaper, idle stop, auto-settlement). `GET/POST
+/providers/sessions/:id/goal` read and pause, resume or clear it where the adapter has
+  `controlGoal` (Codex, mock); elsewhere Clear sends `/goal clear`. `GoalButton` in both chat
+  headers shows the status and a popover with the details and controls. Scenario
+  `chat-session-goal`. A restart leaves goals alone: both harnesses keep them in their own
+  session store.
 
 ## Dependencies
 

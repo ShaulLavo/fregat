@@ -5,6 +5,8 @@ import {
   providerSessionHooksSchema,
   providerSessionMcpSchema,
   providerSessionSchedulesSchema,
+  providerSessionGoalStateSchema,
+  providerGoalActionSchema,
   sessionIdSchema,
   trimmedNonEmptyStringSchema,
 } from '@workspace/contracts'
@@ -21,7 +23,7 @@ const taskParamsSchema = v.object({
   taskId: trimmedNonEmptyStringSchema,
 })
 
-/** A session's live provider controls: background tasks, schedules, MCP servers and hooks. */
+/** A session's live provider controls: background tasks, schedules, goal, MCP servers and hooks. */
 export function sessionControlRoutes(providerService: ProviderService) {
   return new Elysia({ name: 'session-control-routes' })
     .get(
@@ -41,6 +43,21 @@ export function sessionControlRoutes(providerService: ProviderService) {
       '/providers/sessions/:sessionId/schedules',
       ({ params }) => providerService.sessionSchedules(params.sessionId),
       { params: sessionParamsSchema, response: providerSessionSchedulesSchema },
+    )
+    .get(
+      '/providers/sessions/:sessionId/goal',
+      ({ params }) => providerService.sessionGoal(params.sessionId),
+      { params: sessionParamsSchema, response: providerSessionGoalStateSchema },
+    )
+    .post(
+      '/providers/sessions/:sessionId/goal',
+      ({ body, params }) =>
+        providerService.controlGoal({ action: body.action, sessionId: params.sessionId }),
+      {
+        body: v.object({ action: providerGoalActionSchema }),
+        params: sessionParamsSchema,
+        response: providerSessionGoalStateSchema,
+      },
     )
     .get(
       '/providers/sessions/:sessionId/mcp',

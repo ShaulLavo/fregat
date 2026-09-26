@@ -11,6 +11,8 @@ import type {
   ProviderAgent,
   ProviderAuth,
   ProviderBackgroundTask,
+  ProviderGoalAction,
+  ProviderSessionGoal,
   ProviderDriverKind,
   ProviderMcpServer,
   ProviderMcpSignIn,
@@ -408,6 +410,11 @@ export type ProviderRuntimeEventPayload =
       payload: { tasks: ProviderBackgroundTask[] }
     })
   | (ProviderRuntimeBaseEvent & {
+      /** The session's goal as the harness last reported it; null once cleared or met. */
+      type: 'goal.updated'
+      payload: { goal: ProviderSessionGoal | null }
+    })
+  | (ProviderRuntimeBaseEvent & {
       /** Every schedule the harness process holds after a turn; replaces the previous set. */
       type: 'schedules.updated'
       payload: { schedules: ProviderHarnessSchedule[] }
@@ -628,6 +635,8 @@ export type ProviderAdapter = {
   }) => Promise<Pick<ProviderSessionHooks, 'errors' | 'hooks'> | null>
   /** Stops one background task without stopping the agent. */
   stopBackgroundTask?: (input: { sessionId: SessionId; taskId: string }) => Promise<void>
+  /** Pauses, resumes or clears the session's goal without a turn; the adapter reports the result. */
+  controlGoal?: (input: { action: ProviderGoalAction; sessionId: SessionId }) => Promise<void>
   prepareRollbackSession: (input: {
     numTurns: number
     sessionId: SessionId
