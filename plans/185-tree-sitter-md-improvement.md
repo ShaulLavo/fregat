@@ -40,8 +40,8 @@ and the first publish. What remains:
 
 ## Pass 1: correctness
 
-Goal: the 676 examples all pass, and nothing we render differs from micromark except where we chose
-to.
+Goal: the 676 examples all pass, apart from the intended differences the extensions make, and nothing
+we render differs from micromark except where we chose to.
 
 - **Differential fuzzing against micromark.** Generate random markdown (nesting, delimiters, links,
   entities, HTML, tables, lists) and compare construct lists with micromark + GFM. Every difference
@@ -50,9 +50,12 @@ to.
   plus Platform and Editor, run through the corpus check in CI as a mismatch count that only goes down.
 - **Full GFM.** Tables, strikethrough, task lists and autolinks against the whole GFM spec, not only
   its extension examples.
-- **Extensions behind switches**, when a consumer asks: footnotes, `$$` math and CJK-friendly
-  flanking (needed only if chat moves off remark, Plan 176 question 2); wiki links, callouts and
-  `==highlights==` for Plan 108's Obsidian phase.
+- **Extensions, always on** (owner, 2026-09-26: not optional): footnotes, `$$` math, CJK-friendly
+  flanking, wiki links, callouts (`> [!NOTE]`, GitHub alerts included) and `==highlights==`. They
+  are part of the grammar and resolver, with no switch. Where one changes what a CommonMark or GFM
+  example produces, the spec runner lists that example as an intended difference with its reason,
+  and the corpus check compares against micromark with the matching extensions. This also covers
+  what chat needs from remark (Plan 176 question 2) and Plan 108's Obsidian phase.
 
 ## Pass 2: memory and bundle size
 
