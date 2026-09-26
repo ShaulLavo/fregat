@@ -25,6 +25,7 @@ import { fileVersion } from './version'
 const SNIFF_BYTES = 512
 const DEFAULT_INDEX_UPDATE_COALESCE_MS = 25
 const DEFAULT_INDEX_REBUILD_EVENT_LIMIT = 500
+const IGNORE_FILE_NAMES = new Set(['.gitignore', '.ignore'])
 
 type WorkspaceIndexContentKind = 'binary' | 'image' | 'text' | 'unknown'
 type WorkspaceIndexFileKind = 'binary' | 'config' | 'document' | 'image' | 'other' | 'source'
@@ -247,7 +248,7 @@ export class WorkspaceIndex {
     if (!this.canCommitIncrementalUpdate(updateId)) return this.status()
 
     this.removeEntriesAt(relativePath)
-    this.state = incrementalStatus(this.state, this.counts())
+    this.state = incrementalStatus(this.state, this.counts(), this.pendingCreatedPaths)
     return this.status()
   }
 
@@ -299,12 +300,22 @@ export class WorkspaceIndex {
       this.pendingCreatedPaths.delete(indexPathKey(event.path))
     }
 
-    this.state = statusWithPendingCreatedPathCount(this.state, this.pendingCreatedPaths)
+    this.state = statusWithPendingCreatedPathCount(
+      this.state,
+      this.counts(),
+      this.pendingCreatedPaths,
+    )
   }
 
   private async applyFilesystemEvent(event: WorkspaceIndexFilesystemEvent, updateId: number) {
-    if (shouldRebuildForFilesystemEvent(event)) {
+    const ignoreScope = ignoreFileScope(event)
+    if (ignoreScope === '') {
       await this.rebuild({ reason: 'gitignore-change' })
+      return
+    }
+    // A nested ignore file governs its own directory, so rescanning that subtree reclassifies it.
+    if (ignoreScope !== undefined) {
+      await this.refreshForUpdate(ignoreScope, updateId)
       return
     }
 
@@ -364,7 +375,7 @@ export class WorkspaceIndex {
       this.setEntry(entry)
     }
 
-    this.state = incrementalStatus(this.state, this.counts(), result)
+    this.state = incrementalStatus(this.state, this.counts(), this.pendingCreatedPaths, result)
     return this.status()
   }
 
@@ -950,12 +961,17 @@ async function sniffReadableKnownTextContentKind(
   absolutePath: string,
   size: number,
 ): Promise<WorkspaceIndexContentKind> {
-  return (await readSniffBytes(absolutePath, size)).includes(0) ? 'binary' : 'text'
+  const bytes = await readSniffBytes(absolutePath, size)
+  if (hasUtf16Bom(bytes)) return 'text'
+
+  return bytes.includes(0) ? 'binary' : 'text'
 }
 
 function sniffBytes(bytes: Uint8Array): WorkspaceIndexContentKind {
   if (bytes.length === 0) return 'text'
   if (isImageBytes(bytes)) return 'image'
+  // rg transcodes BOM'd UTF-16 and searches it; its NULs are code-unit halves.
+  if (hasUtf16Bom(bytes)) return 'text'
   if (bytes.includes(0)) return 'binary'
   if (hasBinaryControlByte(bytes)) return 'binary'
 
@@ -969,6 +985,12 @@ function isImageBytes(bytes: Uint8Array) {
   if (isWebpBytes(bytes)) return true
 
   return isBmpBytes(bytes)
+}
+
+function hasUtf16Bom(bytes: Uint8Array) {
+  if (bytesStartWith(bytes, [0xff, 0xfe])) return true
+
+  return bytesStartWith(bytes, [0xfe, 0xff])
 }
 
 function isPngBytes(bytes: Uint8Array) {
@@ -1190,11 +1212,20 @@ function markWatchEventStale(index: WorkspaceIndex, event: WatchServerMessage) {
   index.markSubtreeStale(event.oldPath)
 }
 
-function shouldRebuildForFilesystemEvent(event: WorkspaceIndexFilesystemEvent) {
-  if (event.path === '.gitignore') return true
-  if (event.type !== 'renamed') return false
+/** The directory an ignore-file event reclassifies (`''` for the root), or undefined for other paths. */
+function ignoreFileScope(event: WorkspaceIndexFilesystemEvent) {
+  const scope = ignoreFileDirectory(event.path)
+  if (scope !== undefined || event.type !== 'renamed') return scope
 
-  return event.oldPath === '.gitignore'
+  return ignoreFileDirectory(event.oldPath)
+}
+
+function ignoreFileDirectory(relativePath: string) {
+  const normalized = indexPathKey(relativePath)
+  if (!IGNORE_FILE_NAMES.has(path.posix.basename(normalized))) return undefined
+
+  const directory = path.posix.dirname(normalized)
+  return directory === '.' ? '' : directory
 }
 
 function specialKindFromStats(stats: Stats): WorkspaceIndexSpecialKind | undefined {
@@ -1340,6 +1371,7 @@ function staleLiveStatus(
 function incrementalStatus(
   previous: WorkspaceIndexMutableStatus,
   counts: WorkspaceIndexCounts,
+  pendingCreatedPaths: ReadonlySet<string>,
   result?: ScanResult,
 ): WorkspaceIndexStatus {
   return {
@@ -1348,8 +1380,8 @@ function incrementalStatus(
     errorMessage: undefined,
     fileCount: counts.fileCount,
     lastIncrementalUpdateAtMs: Date.now(),
-    pendingCreatedPathCount: 0,
-    readiness: counts.staleEntryCount === 0 ? 'ready' : 'stale',
+    pendingCreatedPathCount: pendingCreatedPaths.size,
+    readiness: liveReadiness(counts, pendingCreatedPaths),
     scanWarningCount: previous.scanWarningCount + (result?.scanWarningCount ?? 0),
     skippedEntryCount: previous.skippedEntryCount + (result?.skippedEntryCount ?? 0),
     staleEntryCount: counts.staleEntryCount,
@@ -1358,12 +1390,24 @@ function incrementalStatus(
 
 function statusWithPendingCreatedPathCount(
   previous: WorkspaceIndexMutableStatus,
+  counts: WorkspaceIndexCounts,
   pendingCreatedPaths: ReadonlySet<string>,
 ): WorkspaceIndexStatus {
+  if (!canApplyIncrementalUpdates(previous.readiness))
+    return { ...previous, pendingCreatedPathCount: pendingCreatedPaths.size }
+
   return {
     ...previous,
     pendingCreatedPathCount: pendingCreatedPaths.size,
+    readiness: liveReadiness(counts, pendingCreatedPaths),
   }
+}
+
+// `ready` promises no known pending change: a created path the index has not scanned is one.
+function liveReadiness(counts: WorkspaceIndexCounts, pendingCreatedPaths: ReadonlySet<string>) {
+  if (counts.staleEntryCount > 0 || pendingCreatedPaths.size > 0) return 'stale'
+
+  return 'ready'
 }
 
 function cloneEntry(entry: WorkspaceIndexEntry): WorkspaceIndexEntry {

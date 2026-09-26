@@ -4,6 +4,7 @@ import {
   CaretRightIcon,
   CopyIcon,
   FunnelIcon,
+  GearSixIcon,
   PencilSimpleIcon,
   PlusIcon,
   GitForkIcon,
@@ -25,6 +26,7 @@ export type ProjectMenuContext = {
   readonly deleteProject: () => void
   readonly newSession: () => void
   readonly manageWorktrees: () => void
+  readonly openSettings: () => void
   readonly renameProject: () => void
   readonly scopeToProject: () => void
   readonly toggleCollapsed: () => void
@@ -48,6 +50,12 @@ export function projectMenu(context: ProjectMenuContext): Menu {
         id: 'manageWorktrees',
         label: context.ownerLabel ? `Manage Worktrees (${context.ownerLabel})` : 'Manage Worktrees',
         run: context.manageWorktrees,
+      }),
+      actionItem({
+        icon: GearSixIcon,
+        id: 'projectSettings',
+        label: context.ownerLabel ? `Project Settings (${context.ownerLabel})` : 'Project Settings',
+        run: context.openSettings,
       }),
       actionItem({
         icon: PencilSimpleIcon,

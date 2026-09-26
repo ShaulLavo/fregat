@@ -145,12 +145,19 @@ function runtimeBindings(
       typeof first === 'string'
         ? parseHotkey(first, platform)
         : rawHotkeyToParsedHotkey(first, platform)
+    const bareFunctionKey =
+      !stroke.ctrl &&
+      !stroke.meta &&
+      !stroke.alt &&
+      !stroke.shift &&
+      /^F([1-9]|1[0-2])$/.test(stroke.key ?? '')
     return {
       chord: binding.chord,
       payload: {
         binding,
         firesWhileTyping:
-          !binding.yieldsToTextEntry && (stroke.ctrl || stroke.meta || stroke.key === 'Escape'),
+          bareFunctionKey ||
+          (!binding.yieldsToTextEntry && (stroke.ctrl || stroke.meta || stroke.key === 'Escape')),
       },
       preventDefault: binding.preventDefault,
       stopPropagation: binding.stopPropagation,

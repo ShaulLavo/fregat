@@ -27,6 +27,7 @@ import {
   type SettingsOperation,
   type SettingsValues,
   type SettingsWriteTarget,
+  type SetProjectOverrideOperation,
   type ColorMode,
   type ThemeVariantPatch,
 } from '@workspace/contracts'
@@ -80,10 +81,12 @@ import { withMovedModel } from '@/features/settings/utils/patch'
 const SETTINGS_MUTATION_SCOPE = 'settings-document'
 
 /** Semantic settings actions shared by commands and settings controls. */
-export function useSettingsActions() {
-  const queryClient = useSettingsOwner()
+/** `owner` writes another machine's settings, such as the one a file picker browses. */
+export function useSettingsActions(owner?: QueryClient) {
+  const settingsOwner = useSettingsOwner()
+  const queryClient = owner ?? settingsOwner
   const client = clientForQueryClient(queryClient)
-  const projection = useSettingsProjection()
+  const projection = useSettingsProjection(queryClient)
   const transport = useMutation(
     {
       mutationFn: (entry: ActiveSettingsIntent) =>
@@ -251,6 +254,10 @@ export function useSettingsActions() {
       submit(targetFor('models.hidden'), [{ hidden, kind: 'model.setHidden', ref }]),
     setModelFavorite: (ref: ModelRef, favorite: boolean) =>
       submit(targetFor('models.favorites'), [{ favorite, kind: 'model.setFavorite', ref }]),
+    setProjectOverride: (operation: Omit<SetProjectOverrideOperation, 'kind'>) =>
+      submit(targetFor(operation.key), [
+        { ...operation, kind: 'project.set' } as SetProjectOverrideOperation,
+      ]),
     setProviderEnabled: (instance: ProviderInstanceConfig, enabled: boolean) =>
       submit(targetFor('providers.instances'), [providerEnabledOperation(instance, enabled)]),
     setSetting,
