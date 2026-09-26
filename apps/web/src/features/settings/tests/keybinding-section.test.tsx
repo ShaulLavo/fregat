@@ -289,17 +289,6 @@ test('warns before taking a chord in one pane and keeps that loss in Conflicts',
   client,
 }) => {
   expect(client).toBeDefined()
-  await saveSettings(
-    {
-      mutationId: 'shortcuts-earlier-override',
-      operations: [
-        { command: 'workspace.saveFile', keys: 'Mod+Alt+J', kind: 'keybinding.set' },
-        { command: 'workspace.togglePanel', keys: 'Mod+Alt+K', kind: 'keybinding.set' },
-      ],
-      target: 'user',
-    },
-    getClient(),
-  )
   renderWithProviders(<KeybindingSection />)
   await showOnly('workspace.toggleCheckpointChange')
   fireEvent.doubleClick(row('workspace.toggleCheckpointChange'))
