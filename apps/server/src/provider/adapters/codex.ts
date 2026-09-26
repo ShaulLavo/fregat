@@ -46,6 +46,7 @@ import type {
   ProviderHookOutcome,
   ProviderRuntimeEvent,
   ProviderRuntimeStartInput,
+  PlatformMcpBinding,
   ProviderTurnInput,
   ProviderTurnSteerInput,
   ProviderUserInputResponseInput,
@@ -577,6 +578,7 @@ export class CodexProviderAdapter
       runtimeEpoch: input.runtimeEpoch,
       sessionId: input.sessionId,
       ...(input.fork ? { fork: input.fork } : {}),
+      ...(input.platformMcp ? { platformMcp: input.platformMcp } : {}),
     })
     this.sessions.set(input.sessionId, session)
     recordChatPipelineInfo('chat.pipeline.codex_adapter.session.started', {
@@ -668,6 +670,7 @@ class CodexAppServerSession extends SessionContext {
 
   static async start(input: {
     fork?: ProviderForkStart
+    platformMcp?: PlatformMcpBinding
     onClient: (client: CodexAppServerRpcClient) => void
     cwd: string
     emit: (event: ProviderRuntimeEvent) => void
@@ -2988,6 +2991,7 @@ async function openCodexSession(
     fork?: ProviderForkStart
     model: string
     modelOptions: CodexModelOptions
+    platformMcp?: PlatformMcpBinding
     providerResumeCursor?: unknown | null
     runtimeMode: RuntimeMode
   },
@@ -3078,6 +3082,7 @@ function threadStartParams(input: {
   ephemeral: boolean
   model: string
   modelOptions: CodexModelOptions
+  platformMcp?: PlatformMcpBinding
   runtimeMode: RuntimeMode
 }): CodexClientRequestParamsByMethod['thread/start'] {
   const runtime = runtimeModeToSessionConfig(input.runtimeMode)
@@ -3085,6 +3090,7 @@ function threadStartParams(input: {
   return {
     approvalPolicy: runtime.approvalPolicy,
     approvalsReviewer: runtime.approvalsReviewer,
+    ...codexMcpConfig(input.platformMcp),
     cwd: input.cwd,
     ...(input.ephemeral ? { ephemeral: true } : {}),
     experimentalRawEvents: true,
@@ -3099,12 +3105,14 @@ function threadResumeParams(input: {
   cwd: string
   model: string
   modelOptions: CodexModelOptions
+  platformMcp?: PlatformMcpBinding
   runtimeMode: RuntimeMode
 }) {
   const runtime = runtimeModeToSessionConfig(input.runtimeMode)
 
   return {
     approvalsReviewer: runtime.approvalsReviewer,
+    ...codexMcpConfig(input.platformMcp),
     cwd: input.cwd,
     model: input.model,
     sandbox: runtime.sandbox,
@@ -3769,5 +3777,21 @@ function codexResetCredits(response: CodexClientRequestResultByMethod['account/r
     accountKey: codexResetAccountKey(response.accountId),
     creditId: credit?.id ?? null,
     available: Math.max(0, response.rateLimitResetCredits?.availableCount ?? 0),
+  }
+}
+
+/**
+ * Per-thread config, so no user file is touched; it does not persist, so every start, resume and
+ * fork carries it again. Codex speaks MCP 2026-07-28 only behind this feature flag.
+ */
+function codexMcpConfig(binding: PlatformMcpBinding | undefined) {
+  if (!binding) return {}
+  return {
+    config: {
+      'features.mcp_2026_07_28': true,
+      'mcp_servers.platform.http_headers': { Authorization: `Bearer ${binding.token}` },
+      'mcp_servers.platform.url': binding.url,
+      suppress_unstable_features_warning: true,
+    },
   }
 }

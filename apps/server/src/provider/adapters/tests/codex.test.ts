@@ -1379,6 +1379,27 @@ describe('CodexProviderAdapter', () => {
     )
   })
 
+  it('binds Platform’s MCP endpoint per thread, on the 2026-07-28 client', async () => {
+    await withFakeCodex(async ({ spawnLogPath }) => {
+      const adapter = new CodexProviderAdapter()
+      const platformMcp = { token: 'grant-token', url: 'http://127.0.0.1:3301/mcp' }
+      try {
+        await adapter.sendTurn({ ...providerTurnInput(), platformMcp })
+        const records = await readFakeCodexLog(spawnLogPath)
+        expect(records.find((record) => record.event === 'thread/start')?.params).toMatchObject({
+          config: {
+            'features.mcp_2026_07_28': true,
+            'mcp_servers.platform.http_headers': { Authorization: 'Bearer grant-token' },
+            'mcp_servers.platform.url': 'http://127.0.0.1:3301/mcp',
+            suppress_unstable_features_warning: true,
+          },
+        })
+      } finally {
+        await adapter.stopAll()
+      }
+    })
+  })
+
   it('disables provider transcript persistence only for ephemeral sessions', async () => {
     await withFakeCodex(
       async () => {

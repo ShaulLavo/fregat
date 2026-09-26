@@ -1,6 +1,6 @@
 # Implement stateless MCP support
 
-Status: M0 research done 2026-09-25 (both providers call a 2026-07-28 endpoint in probes); M0 in-repo build not started. Requested 2026-09-11. **M0 approved; M1+ not approved.**
+Status: M0 built 2026-09-26 (wave 2 lane A); its live provider calls are an owner check. M1 next (scope decided). Requested 2026-09-11. **M0 approved; M1+ not approved.**
 
 Decided 2026-09-25: owner — approve milestone M0 only. The owner wants to discuss M1 onward before
 anything else in this plan starts; M0's exit result is the input to that conversation.
@@ -441,7 +441,30 @@ needs.
    `canUseTool` in approval-required sessions.
    Decided 2026-09-26: recommendation (owner deferred) — (a): read-only tools run without an approval prompt.
 
-### Remaining M0 work (approved, not started)
+### M0 build (2026-09-26, wave 2 lane A)
+
+- `@modelcontextprotocol/server` 2.1.0 (and `client` 2.1.0 for tests), pinned in `apps/server`.
+- `apps/server/src/mcp/`: `McpGrantRegistry` holds opaque in-memory tokens keyed to
+  `(sessionId, runtimeEpoch, cwd)`. `mcpRoutes` serves `createMcpHandler(…, { legacy: 'reject' })`
+  at `/mcp`, mounted before the browser guard, with its own loopback Host, Origin and bearer checks.
+  `workspace_info` answers with the grant's session and checkout. The server's loopback URL
+  comes from `index.ts` (`AppOptions.mcp`).
+- `ProviderService` binds a token on every runtime start and turn, and revokes it when the runtime
+  stops, exits or its instance goes away. Utility turns (`generateText`) get none.
+- Claude: `mcpServers.platform` (`type: 'http'`, bearer header, `alwaysLoad: true`). Codex: per-thread
+  `config` on `thread/start`, `thread/resume` and `thread/fork` with `features.mcp_2026_07_28` and
+  `suppress_unstable_features_warning` (Q1 → (a)).
+- Tests (`src/mcp/tests/routes.test.ts`): a pinned SDK v2 `Client` over `app.handle` calls
+  `workspace_info` with alternating grants, and each gets its own. The endpoint refuses a missing
+  token (401), a foreign Origin (403), a tailnet Host (421), a 2025 `initialize` (400, naming
+  2026-07-28) and GET (405). A token issued through `ProviderService.ensureRuntime` reaches the tool
+  and is revoked on stop. Adapter tests check the Claude `mcpServers` and Codex `config` shapes.
+- Not done in M0: refusing to bind when Codex `config/read` shows a user `mcp_servers.platform`
+  (hazard 1), and failing loudly on `mcpServer/startupStatus/updated` version errors. Both move to M1.
+- Owner check pending (the exit evidence): one live call per provider through the dev server. Each
+  needs a real model turn, which is a hard stop for the wave.
+
+### Remaining M0 work (approved; done 2026-09-26 except the live calls)
 
 1. Add pinned `@modelcontextprotocol/server` 2.1.0 (and `client` for tests). Mount
    `apps/server/src/mcp/server.ts` before the browser auth guard, with Host, Origin and bearer checks
