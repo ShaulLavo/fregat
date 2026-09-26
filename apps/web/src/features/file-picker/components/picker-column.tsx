@@ -67,7 +67,10 @@ export function PickerColumn({
   onOpen: (entry: FsEntry) => void
   onSelect: (column: number, entry: FsEntry) => void
 }) {
-  const query = useQuery(directoryQueryOptions({ mode, path, query: '', showHidden }))
+  const query = useQuery({
+    ...directoryQueryOptions({ mode, path, query: '', showHidden }),
+    placeholderData: (previous) => (previous?.currentEntry?.path === path ? previous : undefined),
+  })
   const entries = sortFilePickerEntries(
     filterPickerEntries(query.data?.entries ?? [], mode, accept),
     BY_NAME,

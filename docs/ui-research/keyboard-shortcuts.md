@@ -1,6 +1,6 @@
 # Keyboard shortcuts editor: research for Plan 166
 
-Phase 0 of [Plan 166](../../plans/166-shortcuts-editor.md), 2026-09-26. Sources: `references/vscode`
+Phase 0 of Plan 166 (done), 2026-09-26. Sources: `references/vscode`
 at `90da900128e` (pulled 2026-09-26), `references/zed` at `933d8d9`, vscode.dev screenshots taken
 with Playwright, and web sources linked inline. Mockups are static HTML built from the app's own
 `globals.css`; see [Mockups](#mockups).

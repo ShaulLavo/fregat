@@ -501,6 +501,8 @@ export {
 } from './lsp-protocol'
 export {
   keybindingChordSchema,
+  keybindingListSchema,
+  MAX_KEYBINDINGS_PER_COMMAND,
   lspFeatureRanksOverrideSchema,
   lspLanguageServerListsSchema,
   lspServerOverrideSchema,

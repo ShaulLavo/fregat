@@ -10,8 +10,8 @@ import { presetPlatformKeyBindings } from '@/keymap/default-bindings'
 
 // Two custom chords, one clash and one removal, the states the page has to draw.
 const FIXTURE_OVERRIDES = {
-  'workspace.goToLine': 'Mod+P',
-  'workspace.togglePanel': 'Mod+Alt+J',
+  'workspace.goToLine': ['Mod+P'],
+  'workspace.togglePanel': ['Mod+Alt+J'],
   'workspace.saveAllFiles': null,
 } as const
 

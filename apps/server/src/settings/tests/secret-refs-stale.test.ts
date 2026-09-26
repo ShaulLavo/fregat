@@ -84,7 +84,7 @@ function touchSettings(store: SettingsStore, binding: string) {
   writeSequence += 1
   return store.write({
     mutationId: `touch-${writeSequence}`,
-    operations: [{ command: 'a.one', keys: binding, kind: 'keybinding.set' }],
+    operations: [{ command: 'a.one', keys: [binding], kind: 'keybinding.set' }],
     target: 'user',
   })
 }
