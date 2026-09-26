@@ -8,6 +8,13 @@ Both owner questions are decided (below). Phases 1 and 2 done 2026-09-26 in wave
 `viewContributionDispatch.browser.test.ts`; `bench:dispatch` T1 34–38 → 1.0–1.5 µs, T2 71–149 → 18–21 ns
 per piece). Five Editor and four Platform view contributions declare inputs; the rest stay on every
 kind until their owners classify them (T4's "undeclared 0" is not met yet).
+Phases 3 and 4 done 2026-09-26 (lane E1): [singapore#53](https://github.com/ShaulLavo/singapore/pull/53) and
+[#54](https://github.com/ShaulLavo/singapore/pull/54) (`createPlugin`, the view scope, inputs, `derive`,
+state, channels, `uses`; occurrence highlight, bracket match and document links migrated), and
+[#55](https://github.com/ShaulLavo/singapore/pull/55) (E026 catalog, contributed commands under the plugin's
+name; client-core builds its editor table from the catalog). Phase 4 leaves Platform's runtime command
+segment for contributed commands (palette, keybinding table, recorder) to phase 6, when Platform first
+attaches a `createPlugin` plugin.
 Requested: 2026-09-16. Owners: Fregat and Singapore.
 
 This is a cross-repository plan, not an implementation or a settled API signature.
@@ -267,7 +274,7 @@ carries its own evidence. Sizes: S about a day, M a lane of a few days, L a week
    `editor/viewContributions.ts`, `editor/Editor.ts`, `editor/inputSelectionController.ts`, the
    contribution files, Platform `apps/web/src/features/{editor,workbench,settings}` contributions.
    Owner: Editor, with Platform for its nine. Gates D1–D4, T1, T2, T4.
-3. **Editor: `createPlugin` and the view scope, experimental (M).** E027 phase 2 built in the selected
+3. **Done (singapore#53, #54).** **Editor: `createPlugin` and the view scope, experimental (M).** E027 phase 2 built in the selected
    shape: the combined per-view context becomes `ViewScope`; inputs, `derive`, channels with a change
    subscription and `one`/`many`/`combine` policy, `state`, `onDispose`/`own`, `uses` with identity
    dedup and ref-counted ownership, `editor` labelled unstable, a multi-selection read. Lowers onto
@@ -276,7 +283,7 @@ carries its own evidence. Sizes: S about a day, M a lane of a few days, L a week
    provider plumbing in the same pass. Marks use `setRangeHighlight` until Plan 111 phase 1 lands
    `registerDecorationSource`, which `scope.decorations` then wraps with an input trigger. Export from
    `@singapore-editor/core/extensions`; `public-api.test.ts` gains the symbols. Owner: Editor. Gates D5–D7.
-4. **Commands (M, cross-repo).** E026 as planned, plus the namespace rule: a contributed ID starts with
+4. **Done, except the runtime segment (singapore#55).** **Commands (M, cross-repo).** E026 as planned, plus the namespace rule: a contributed ID starts with
    its plugin's `name` and a dot. Then the alignment proof (multicursor batch, one undo) on
    `createPlugin`. Platform gains a runtime command segment: palette, keybinding table, recorder,
    enablement and focus target read plugin declarations
