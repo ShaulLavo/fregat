@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
-import sharp from 'sharp'
+import { PNG } from 'pngjs'
 import * as v from 'valibot'
 import {
   normalizeColor,
@@ -34,12 +34,23 @@ export async function wallpaperColors(
   const display = path.join(directory, displayName(id))
   if (!(await Bun.file(display).exists()))
     throw wallpaperErrors.NOT_FOUND({ internal: { at: 'colors', asset: id } })
-  const { data, info } = await sharp(display)
-    .resize(SAMPLE_WIDTH, SAMPLE_HEIGHT, { fit: 'cover' })
-    .removeAlpha()
-    .raw()
-    .toBuffer({ resolveWithObject: true })
-  const colors = quantize(labPixels(data, info.channels), CLUSTERS)
+  const image = new Bun.Image(display)
+  const { width, height } = await image.metadata()
+  const scale = Math.max(SAMPLE_WIDTH / width, SAMPLE_HEIGHT / height)
+  const sample = PNG.sync.read(
+    await image
+      .resize(Math.ceil(width * scale), Math.ceil(height * scale))
+      .png()
+      .buffer(),
+  )
+  const left = Math.floor((sample.width - SAMPLE_WIDTH) / 2)
+  const top = Math.floor((sample.height - SAMPLE_HEIGHT) / 2)
+  const data = Buffer.alloc(SAMPLE_WIDTH * SAMPLE_HEIGHT * 4)
+  for (let row = 0; row < SAMPLE_HEIGHT; row++) {
+    const start = ((top + row) * sample.width + left) * 4
+    sample.data.copy(data, row * SAMPLE_WIDTH * 4, start, start + SAMPLE_WIDTH * 4)
+  }
+  const colors = quantize(labPixels(data, 4), CLUSTERS)
   await library.writeCache(id, path.basename(cache), `${JSON.stringify(colors)}\n`)
   return colors
 }
