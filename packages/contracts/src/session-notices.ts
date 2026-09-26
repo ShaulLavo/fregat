@@ -68,7 +68,9 @@ export function sessionNotificationTransition(
   prior?: NotificationCursor,
 ) {
   let status = sessionRailStatus(session)
-  if (status === 'ready' && session.latestTurn?.state === 'error') status = 'failed'
+  // A failed turn outranks a schedule the session still holds.
+  if ((status === 'ready' || status === 'sleeping') && session.latestTurn?.state === 'error')
+    status = 'failed'
   let attention: string | null = null
   if (status === 'input' || status === 'approval' || status === 'failed')
     attention = `${session.latestTurn?.turnId ?? ''}:${status}`

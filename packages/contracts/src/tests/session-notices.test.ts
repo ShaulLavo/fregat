@@ -81,3 +81,16 @@ test('a session that scheduled a wake-up reads as sleeping and still announces i
     'working',
   )
 })
+
+test('a failed turn on a sleeping session still announces the failure', () => {
+  const failed = {
+    ...session,
+    sleepingUntil: '2026-09-25T11:00:00.000Z',
+    latestTurn: { turnId, state: 'error' as const, completedAt: null },
+  }
+  const transition = sessionNotificationTransition(
+    failed,
+    sessionNotificationTransition(session).cursor,
+  )
+  expect(transition).toMatchObject({ status: 'failed', kind: 'input' })
+})
