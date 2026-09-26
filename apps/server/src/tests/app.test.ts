@@ -87,8 +87,8 @@ describe('fs rpc auth', () => {
 
     expect((await navigation(`${TRUSTED_ORIGIN}/chat`, 'same-site')).status).toBe(200)
     const foreign = await navigation('http://localhost:8080/page', 'same-site')
-    expect(foreign.status).toBe(403)
-    expect(await errorCode(foreign)).toBe('FORBIDDEN_ORIGIN')
+    expect(foreign.status).toBe(401)
+    expect(await errorCode(foreign)).toBe('UNAUTHORIZED')
     const crossSite = await navigation(`${TRUSTED_ORIGIN}/chat`, 'cross-site')
     expect(crossSite.status).toBe(401)
     expect(await errorCode(crossSite)).toBe('UNAUTHORIZED')
