@@ -32,7 +32,7 @@ import { matchingShortcutRows } from '@/features/settings/utils/shortcut-rows'
 import { StatusMessage } from '@/components/status-message'
 import { ViewToggle } from '@/features/settings/components/view-toggle'
 import { useHasWorkspace } from '@/features/settings/hooks/use-has-workspace'
-import { useSettingsActions } from '@/features/settings/hooks/use-settings-actions'
+import { useSettingsSaving } from '@/features/settings/hooks/use-settings-saving'
 import { useHeldDisplay } from '@/features/settings/hooks/use-held-display'
 import { useSettingsOwner } from '@/lib/settings-owner/hooks/use-settings-owner'
 import { SettingsOwnerProvider } from '@/features/settings/providers/owner-provider'
@@ -76,7 +76,7 @@ export function SettingsPage({
     pending,
     liveDocument: shownDocument,
   } = useHeldDisplay(tabId, liveDocument)
-  const { isSaving } = useSettingsActions(owner)
+  const isSaving = useSettingsSaving(owner)
   const editorHasWorkspace = useHasWorkspace()
   const hasWorkspace =
     showJson || editorOwner === settingsOwner
