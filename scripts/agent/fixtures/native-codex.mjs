@@ -644,6 +644,7 @@ function handle(message) {
           mode: 'form',
           message: 'Allow ChatGPT to use Verification App?',
           serverName: 'verification-only',
+          _meta: { persist: ['session', 'always'] },
           requestedSchema: {
             properties: {
               approval: {
