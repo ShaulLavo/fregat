@@ -2,6 +2,7 @@ import { expect, test } from 'vitest'
 
 import {
   allowedOriginsForWebPort,
+  devPorts,
   portFromEnv,
   runtimeUrl,
   selectAvailablePort,
@@ -54,4 +55,12 @@ test('reads validated ports from runtime environment', () => {
 
 test('brackets IPv6 hosts in runtime URLs', () => {
   expect(runtimeUrl('::1', 3000)).toBe('http://[::1]:3000')
+})
+
+test('puts the mesh upstream ports beside the public dev ports', () => {
+  expect(devPorts({})).toEqual({ web: 5173, api: 3001, webUpstream: 15173, apiUpstream: 13001 })
+  expect(devPorts({ WEB_PORT: '4000', PORT: '4001' })).toMatchObject({
+    webUpstream: 14000,
+    apiUpstream: 14001,
+  })
 })

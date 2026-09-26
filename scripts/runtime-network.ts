@@ -49,6 +49,21 @@ export function portFromEnv(env: RuntimeEnv, name: string, fallback: number) {
   throw createScriptError(`${name} must be an integer between 1 and 65535.`)
 }
 
+/** Mesh's upstream for a public dev port; one rule so dev.ts and dev-serve.ts cannot drift. */
+const UPSTREAM_PORT_OFFSET = 10_000
+
+/** The dev pair's ports: public ones clients use, upstream ones the pair binds behind mesh. */
+export function devPorts(env: RuntimeEnv) {
+  const web = portFromEnv(env, 'WEB_PORT', 5173)
+  const api = portFromEnv(env, 'PORT', 3001)
+  return {
+    web,
+    api,
+    webUpstream: web + UPSTREAM_PORT_OFFSET,
+    apiUpstream: api + UPSTREAM_PORT_OFFSET,
+  }
+}
+
 export function runtimeUrl(host: string, port: number) {
   return `http://${urlHost(host)}:${port}`
 }

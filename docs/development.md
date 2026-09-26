@@ -44,6 +44,12 @@ two things still need a build step. ghostty's `ghostty-vt.wasm` and `bridge.wasm
 
 restart dev after changing a package's export map or relinking a checkout
 
+## the shared dev server
+
+on a machine with mesh, `bun run dev:serve` registers the dev pair as a mesh route named `:5173`. mesh holds 5173 and 3001 and proxies them to 15173 and 13001, where `bun run dev:upstream` binds vite and the api on `127.0.0.1`. the first connection starts it and holds requests until both ports answer; an open tab counts as use, and once nothing has been connected for `developer.devServerIdleMinutes` (15 by default) mesh stops it. rerun `dev:serve` after changing that setting
+
+`mesh serve stop :5173` restarts it on the next connection, which is the way to pick up a changed export map or a relinked checkout. `bun run dev` beside the route stops with an error naming it, never a second copy on another port. `bun run dev:unserve` removes the route. the desktop app in dev opens the shared server like any browser
+
 ## shipping it
 
 `bun run deploy` builds the web app, verifies the candidate, swaps a symlink and runs a headless check against the live url. nothing restarts, so open terminals and agent sessions survive it. server changes need `bun run deploy --server`, which restarts the unit and drops every live session, so do not reach for it on web-only work

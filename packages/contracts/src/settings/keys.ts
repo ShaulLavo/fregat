@@ -971,6 +971,19 @@ export const SETTINGS_REGISTRY = {
     visibility: 'advanced',
     keywords: ['developer', 'latency', 'delay', 'slow', 'network', 'optimistic', 'pending'],
   }),
+  'developer.devServerIdleMinutes': defineSetting({
+    schema: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(1440)),
+    default: 15,
+    // Machine scope: `bun run dev:serve` passes it to mesh, which stops a process with it.
+    scope: 'machine',
+    widget: 'number',
+    category: 'Developer',
+    title: 'Dev server idle window',
+    description:
+      'Minutes the shared dev server keeps running after its last connection closes; mesh then stops it and starts it again on the next connection. Takes effect the next time `bun run dev:serve` runs.',
+    visibility: 'advanced',
+    keywords: ['developer', 'dev server', 'mesh', 'idle', 'vite'],
+  }),
   'window.transparency': defineSetting({
     // Who supplies the see-through, not how much of it there is.
     //
