@@ -384,6 +384,11 @@ session model.
   then trades the code for an `HttpOnly; SameSite=Strict; Secure` cookie. A device that cannot
   open the link types the code on the pairing screen it gets instead of the app. `bun run pair`
   prints a link from this machine's shell, for when no browser here is at hand.
+- **Revocation reaches live connections.** Every socket a paired device opens (orchestration,
+  terminal, language server, machine relay) is held against that device; removing it, or its
+  going idle (swept hourly), closes them with 1008 `device removed`.
+- **Machine relay.** `/machines/:name/proxy` drops forwarding headers along with the cookie: this
+  server's gate admitted the device, so the machine behind it sees this server's own hop.
 - **Devices.** Kept in `devices.json` in the state home (mode 0600, secrets stored as SHA-256
   hashes), not in the database: a table would bump the schema version and reset every session.
   The list shows label, paired and last-seen times; any trusted browser removes a device except
@@ -394,7 +399,8 @@ session model.
   renaming a device; a log-hygiene unit test (the wide events carry the outcome only, checked in
   the scenario's server log).
 - Evidence: scenario `device-pairing` (Settings link and QR, the phone's pairing screen at 390px
-  through a forwarded address, a claim, the phone in the list, a second claim refused).
+  through a forwarded address, the phone's browser opening the generated link, which strips it and
+  pairs, the phone in the list, a second claim refused). The production server serves `/pair`.
 - Owner check pending: pairing a real phone through the mesh, and the MacBook once after deploy.
 
 ### Q6: native app technology

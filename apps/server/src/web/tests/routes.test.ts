@@ -24,6 +24,14 @@ describe('web routes', () => {
     }
   })
 
+  it('serves the page for a pairing link, whose code stays in the fragment', async () => {
+    const app = await webApp()
+    const response = await app.handle(navigation('/pair'))
+
+    expect(response.status).toBe(200)
+    expect(await response.text()).toContain('<div id="root">')
+  })
+
   it('serves the dev gallery under /dev only when the release carries it', async () => {
     const app = await webApp()
     for (const pathname of ['/dev', '/dev/loaders']) {

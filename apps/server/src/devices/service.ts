@@ -19,6 +19,8 @@ const DEVICE_IDLE_MS = 30 * 24 * 60 * 60_000
 const LAST_SEEN_STEP_MS = 10 * 60_000
 /** The browser keeps the cookie as long as it allows; the server's idle limit decides. */
 const COOKIE_MAX_AGE_SECONDS = 400 * 24 * 60 * 60
+/** How often idle devices are dropped, closing what they still hold open. */
+const SWEEP_MS = 60 * 60_000
 
 type Admission = { readonly trust: PairingTrust; readonly deviceId: string | null }
 
@@ -32,6 +34,8 @@ export class DevicePairing {
   private readonly required: () => boolean
   private readonly own: () => ReadonlySet<string>
   private readonly now: () => number
+  /** The close of every live socket, by the device it was admitted for. */
+  private readonly live = new Map<string, Set<() => void>>()
   readonly cookieName: string
 
   constructor(options: {
@@ -60,6 +64,34 @@ export class DevicePairing {
     if (!device) return { trust: 'unpaired', deviceId: null }
     this.markSeen(device.id, device.lastSeenAt)
     return { trust: 'device', deviceId: device.id }
+  }
+
+  /**
+   * Ties a live socket to the device it was admitted for: removing the device, or its going idle,
+   * closes the socket, so nothing already open keeps the access. Returns the release for its close.
+   */
+  hold(header: HeaderReader, close: () => void) {
+    const { deviceId } = this.admit(header)
+    if (deviceId === null) return noop
+    const closes = this.live.get(deviceId) ?? new Set()
+    closes.add(close)
+    this.live.set(deviceId, closes)
+    return () => {
+      closes.delete(close)
+      if (closes.size === 0) this.live.delete(deviceId)
+    }
+  }
+
+  /** Sweeps every hour until the returned stop is called. */
+  startSweeping() {
+    const timer = setInterval(() => this.sweep(), SWEEP_MS)
+    timer.unref?.()
+    return () => clearInterval(timer)
+  }
+
+  /** Drops the devices unseen for 30 days, and closes what they still had open. */
+  sweep() {
+    for (const device of this.store.list()) if (this.idle(device.lastSeenAt)) this.forget(device.id)
   }
 
   /** True when the request may go on: from this machine, from a paired device, or pairing is off. */
@@ -115,6 +147,18 @@ export class DevicePairing {
       throw pairingErrors.DEVICE_NOT_FOUND({
         internal: { deviceId: id, pairedCount: this.store.list().length },
       })
+    this.closeSockets(id)
+  }
+
+  private forget(id: string) {
+    this.store.remove(id)
+    this.closeSockets(id)
+  }
+
+  private closeSockets(id: string) {
+    const closes = this.live.get(id)
+    this.live.delete(id)
+    for (const close of closes ?? []) close()
   }
 
   private device(header: HeaderReader) {
@@ -157,3 +201,5 @@ function sameHash(left: string, right: string) {
   const b = Buffer.from(right, 'hex')
   return a.length === b.length && timingSafeEqual(a, b)
 }
+
+function noop() {}

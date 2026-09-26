@@ -93,6 +93,21 @@ export function authenticateWebSocketData(data: unknown, auth: AuthConfig): FsEr
   )
 }
 
+const heldSockets = new WeakMap<object, () => void>()
+
+/** Ties an admitted socket to its device, so removing the device closes it. Call once it opens. */
+export function holdWebSocket(data: unknown, auth: AuthConfig, close: () => void) {
+  if (!auth.devices || !isRecord(data) || !isRecord(data.headers)) return
+  heldSockets.set(data, auth.devices.hold(headersReader(data.headers), close))
+}
+
+/** Call from the socket's close: it no longer needs closing. */
+export function releaseWebSocket(data: unknown) {
+  if (!isRecord(data)) return
+  heldSockets.get(data)?.()
+  heldSockets.delete(data)
+}
+
 function unpairedDeviceError(auth: AuthConfig, header: HeaderReader) {
   if (!auth.devices || auth.devices.allows(header)) return null
 

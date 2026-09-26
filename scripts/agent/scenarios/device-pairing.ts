@@ -9,9 +9,10 @@ const PHONE_ADDRESS = '100.64.0.9'
 
 /**
  * Pairing a phone: this machine makes a link in Settings › Machines, a phone reaching the machine
- * through the proxy sees the pairing screen, claims the code, and joins the paired list. The dev
- * page talks to its API cross-origin, where a cookie never rides along, so the claim is made the
- * way the page makes it and the list is read back; the paired phone itself is the owner's check.
+ * through the proxy sees the pairing screen, opens the link, and joins the paired list. The dev
+ * page talks to its API cross-origin, where no cookie rides along, so the phone's app stays on
+ * the pairing screen here; in production page and API share an origin, and a real phone is the
+ * owner's check.
  */
 export const devicePairing: Scenario = {
   name: 'device-pairing',
@@ -74,15 +75,16 @@ async function pairPhone(
         await step('phone-failed', phonePage)
         throw error
       })
-    await phonePage.getByRole('textbox', { name: 'Pairing code' }).fill(code.toLowerCase())
+    await phonePage.getByRole('textbox', { name: 'Pairing code' }).fill('abcd efgh')
     await step('phone-unpaired', phonePage)
 
-    const claimed = await phone.request.post(`${api}/pairing/claim`, {
-      data: { code, label: 'iPhone · Safari' },
-      headers: { origin, 'x-forwarded-for': PHONE_ADDRESS },
-    })
-    equal(claimed.status(), 200, 'The phone claims the code')
-    ok(claimed.headers()['set-cookie']?.includes('HttpOnly'), 'The cookie is HttpOnly')
+    // The link itself, as a camera opens it: the boot takes the code out of the address and
+    // claims it before anything else asks the machine.
+    await phonePage.goto(link)
+    await phonePage.waitForURL((url) => !url.hash.includes('token'))
+    equal(new URL(phonePage.url()).pathname, '/', 'The pairing path leaves the address too')
+    await waitForPairedDevice(api, origin)
+
     const reused = await phone.request.post(`${api}/pairing/claim`, {
       data: { code, label: 'Another phone' },
       headers: { origin, 'x-forwarded-for': PHONE_ADDRESS },
@@ -95,6 +97,21 @@ async function pairPhone(
   await page.reload()
   await selectors.sidebarSettingsButton(page).click()
   await selectors.settingsSearch(page).fill('pair')
-  await page.locator('[data-paired-device]').getByText('iPhone · Safari').waitFor()
+  await page.locator('[data-paired-device]').first().waitFor()
   await step('host-devices')
+}
+
+/** The paired devices this machine lists, asked as this machine. */
+async function pairedLabels(api: string, origin: string) {
+  const response = await fetch(`${api}/pairing/devices`, { headers: { origin } })
+  const { devices } = (await response.json()) as { devices: { label: string }[] }
+  return devices.map((device) => device.label)
+}
+
+async function waitForPairedDevice(api: string, origin: string) {
+  const deadline = Date.now() + 15_000
+  while ((await pairedLabels(api, origin)).length === 0) {
+    ok(Date.now() < deadline, 'Opening the link pairs the phone')
+    await Bun.sleep(200)
+  }
 }

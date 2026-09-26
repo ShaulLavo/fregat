@@ -10,7 +10,7 @@ import { createAttachmentOwnership } from './attachments/ownership'
 import { selectTitleModel } from './orchestration/title-generation'
 import { errorMessage } from '@workspace/contracts'
 import { BundleLibrary } from './themes/bundle-library'
-import { platformHomePath } from './home'
+import { isTestProcess, platformHomePath } from './home'
 import { bundleRoutes } from './themes/bundle-routes'
 import { WallpaperLibrary } from './themes/wallpapers/library'
 import { wallpaperLibraryRoutes } from './themes/wallpapers/routes'
@@ -22,7 +22,7 @@ import {
   terminalKillInputSchema,
   type HealthDescriptor,
 } from '@workspace/contracts'
-import { homedir, hostname } from 'node:os'
+import { homedir, hostname, tmpdir } from 'node:os'
 import path from 'node:path'
 import { Elysia } from 'elysia'
 import { attachmentRoutes } from './attachments/routes'
@@ -428,12 +428,13 @@ export function createApp(options: AppOptions) {
   })
   const sessionSearch = new OrchestrationSessionSearchQuery(database)
   const devices = new DevicePairing({
-    store: new DeviceStore(options.devices?.filePath ?? platformHomePath('devices.json')),
+    store: new DeviceStore(options.devices?.filePath ?? defaultDeviceFile()),
     required: () => settings.snapshot().values['environments.devicePairing'],
     cookieName: options.devices?.cookieName ?? 'platform_device',
     ownAddresses: options.devices?.ownAddresses,
   })
   const auth = createAuthConfig(options.auth, devices)
+  const stopDeviceSweep = devices.startSweeping()
   const push = new PushService({ database, settings, fetcher: options.push?.fetcher })
   const presence = new ClientPresence()
   const sessionPush = new SessionNoticePush({
@@ -494,6 +495,7 @@ export function createApp(options: AppOptions) {
     providerResetCredits,
     sessionPush,
     mcpSignIns,
+    stopDeviceSweep,
   )
   const update = new ServerUpdate({
     root: options.update?.root ?? null,
@@ -699,6 +701,7 @@ function appCleanup(
   providerResetCredits: ProviderResetCredits,
   sessionPush: SessionNoticePush,
   mcpSignIns: McpSignInAttempts,
+  stopDeviceSweep: () => void,
 ) {
   let closed = false
 
@@ -706,6 +709,7 @@ function appCleanup(
     if (closed) return
 
     closed = true
+    stopDeviceSweep()
     // A signal stop admits no provider start while the runtime shuts down.
     orchestration.holdProviderStarts()
     orchestrationSockets.closeAll()
@@ -785,3 +789,9 @@ function definedOnly(values: Record<string, string | undefined>) {
 }
 
 function noop() {}
+
+/** A test that names no file must never write the real state home's paired devices. */
+function defaultDeviceFile() {
+  if (!isTestProcess()) return platformHomePath('devices.json')
+  return path.join(tmpdir(), `platform-test-devices-${process.pid}.json`)
+}

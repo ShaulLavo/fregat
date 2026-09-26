@@ -1,13 +1,17 @@
 import { mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterEach, expect, test } from 'vitest'
+import { afterEach, expect, onTestFinished, test } from 'vitest'
 
 import { closeTestApps, createTestApp } from '../../../test/server'
 import { testSettingsOptions } from '../../settings/testing'
 import { authenticateWebSocketData, createAuthConfig } from '../../auth'
 import { DeviceStore } from '../device-store'
 import { DevicePairing } from '../service'
+import { createAgentTerminalFixture } from '../../../test/factories/agent-terminal'
+import { createInProcessTerminalSocket } from '../../../test/terminal-socket'
+import { machineProxyAdapter } from '../../../test/machine-proxy'
+import { machineProxyHeaders } from '../../machines/proxy-http'
 
 const ORIGIN = 'https://omarchy.mesh.example'
 const PHONE = '100.64.0.9'
@@ -155,4 +159,137 @@ test('a socket from an unpaired device is refused, and one carrying the cookie i
 
   expect(authenticateWebSocketData(socket({}), auth)?.code).toBe('DEVICE_NOT_PAIRED')
   expect(authenticateWebSocketData(socket({ cookie: cookie.split(';')[0]! }), auth)).toBeNull()
+})
+
+test('removing a device closes the sockets it holds open, such as a terminal', async () => {
+  const fixture = await createAgentTerminalFixture()
+  onTestFinished(() => fixture.close())
+  const origin = 'platform-tui://local'
+  const phone = { origin, 'x-forwarded-for': PHONE, 'content-type': 'application/json' }
+  const link = await fixture.app.handle(
+    new Request('http://local/pairing/links', { method: 'POST', headers: { origin } }),
+  )
+  const { code } = (await link.json()) as { code: string }
+  const claimed = await fixture.app.handle(
+    new Request('http://local/pairing/claim', {
+      method: 'POST',
+      headers: phone,
+      body: JSON.stringify({ code, label: 'iPhone · Safari' }),
+    }),
+  )
+  const cookie = claimed.headers.get('set-cookie')!.split(';')[0]!
+  const terminal = createInProcessTerminalSocket(
+    fixture.app,
+    { worktreeId: fixture.worktreeId, terminalId: 'phone-shell' },
+    origin,
+    { 'x-forwarded-for': PHONE, cookie },
+  )
+  await terminal.open()
+  expect(terminal.closes).toEqual([])
+
+  const devices = await fixture.app.handle(
+    new Request('http://local/pairing/devices', { headers: { origin } }),
+  )
+  const [device] = ((await devices.json()) as { devices: { id: string }[] }).devices
+  await fixture.app.handle(
+    new Request(`http://local/pairing/devices/${device!.id}`, {
+      method: 'DELETE',
+      headers: { origin },
+    }),
+  )
+
+  expect(terminal.closes).toEqual([{ code: 1008, reason: 'device removed' }])
+})
+
+test('the idle sweep drops a device unseen for 30 days and closes what it held', () => {
+  const home = mkdtempSync(path.join(tmpdir(), 'platform-pairing-'))
+  homes.push(home)
+  let now = Date.parse('2026-09-26T12:00:00Z')
+  const devices = new DevicePairing({
+    store: new DeviceStore(path.join(home, 'devices.json')),
+    required: () => true,
+    cookieName: 'platform_device_test',
+    ownAddresses: () => new Set([THIS_MACHINE]),
+    now: () => now,
+  })
+  const { code } = devices.issueLink(() => null)
+  const { cookie } = devices.claim({ code, label: 'Pixel · Chrome' }, true)
+  const header = (name: string) =>
+    ({ 'x-forwarded-for': PHONE, cookie: cookie.split(';')[0]! })[name] ?? null
+  const closed: string[] = []
+  devices.hold(header, () => closed.push('terminal'))
+
+  now += 31 * 24 * 60 * 60_000
+  devices.sweep()
+
+  expect(closed).toEqual(['terminal'])
+  expect(devices.list(null)).toEqual([])
+})
+
+test('through the machine proxy, an admitted device reaches the machine and an unpaired one stops here', async () => {
+  const home = mkdtempSync(path.join(tmpdir(), 'platform-pairing-'))
+  homes.push(home)
+  const machineOrigin = 'http://localhost:5173'
+  const machine = createTestApp({
+    auth: { allowedOrigins: [machineOrigin] },
+    settings: testSettingsOptions(path.join(home, 'machine')),
+    workspaceRoot: home,
+  })
+  const devices = new DevicePairing({
+    store: new DeviceStore(path.join(home, 'devices.json')),
+    required: () => true,
+    cookieName: 'platform_device_test',
+    ownAddresses: () => new Set([THIS_MACHINE]),
+  })
+  const auth = createAuthConfig({ allowedOrigins: [ORIGIN] }, devices)
+  const { app } = machineProxyAdapter({
+    auth,
+    resolve: () => ({ origin: 'http://machine', webOrigin: machineOrigin }),
+    fetcher: (url, init) => machine.handle(new Request(url, init)),
+  })
+  const { code } = devices.issueLink(() => null)
+  const cookie = devices.claim({ code, label: 'iPhone · Safari' }, true).cookie.split(';')[0]!
+  const through = (headers: Record<string, string>) =>
+    app.handle(
+      new Request('http://local/platform-api/machines/mac/proxy/health', {
+        headers: { origin: ORIGIN, 'x-forwarded-for': PHONE, ...headers },
+      }),
+    )
+
+  expect((await through({ cookie })).status).toBe(200)
+  expect((await through({})).status).toBe(401)
+  // The socket relay sends the same headers: the machine admits it as its own hop.
+  const upgrade = new Request('http://local/machines/mac/proxy/orchestration/rpc', {
+    headers: { origin: ORIGIN, 'x-forwarded-for': PHONE, cookie, upgrade: 'websocket' },
+  })
+  const relayed = Object.fromEntries(machineProxyHeaders(upgrade, machineOrigin))
+  const machineAuth = createAuthConfig(
+    { allowedOrigins: [machineOrigin] },
+    new DevicePairing({
+      store: new DeviceStore(path.join(home, 'machine-devices.json')),
+      required: () => true,
+      cookieName: 'platform_device_test',
+      ownAddresses: () => new Set(),
+    }),
+  )
+  expect(authenticateWebSocketData({ headers: relayed }, machineAuth)).toBeNull()
+})
+
+test('a claim from a page on another origin is refused before the code is looked at', async () => {
+  const { app } = pairingApp()
+  const code = await issueCode(app)
+  const foreign = await app.handle(
+    new Request('http://local/pairing/claim', {
+      method: 'POST',
+      headers: {
+        origin: 'https://evil.example',
+        'x-forwarded-for': PHONE,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ code, label: 'iPhone · Safari' }),
+    }),
+  )
+
+  expect(foreign.status).toBe(403)
+  expect((await claim(app, code)).status).toBe(200)
 })
