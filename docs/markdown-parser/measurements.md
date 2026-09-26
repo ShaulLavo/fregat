@@ -18,6 +18,8 @@ the recommendation and the phases; this file carries the method and the tables.
 | pulldown-cmark-wasm (npm)            | 0.1.0 (2022, wraps an old pulldown-cmark)                              |
 | CommonMark spec                      | 0.31.2 (`commonmark-spec` npm, 652 examples)                           |
 | GFM spec                             | cmark-gfm `test/spec.txt`, the 24 extension examples                   |
+| tree-sitter-md (spike)               | `ShaulLavo/tree-sitter-md` `b962319`: grammar from upstream v0.5.3     |
+| pulldown-cmark / tree-sitter (Rust)  | 0.13.4 / 0.27.0, compiled into tree-sitter-md's wasm                   |
 
 Probes live in `/work/tmp/research2/176/` (throwaway): `ts.mjs` (tree-sitter as the worker runs
 it, plus variants), `constructs.mjs` (normalizer), `spec-run.mjs`, `corpus-run.mjs`, `bench.mjs`,
@@ -157,7 +159,11 @@ GFM. Math kinds excluded.
 | ---------------------------- | -------------------: | -------------------: | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | tree-sitter today            |              182/183 |              215/497 | 18,002 / 161: 13,440 code spans, 3,306 strong, 789 links lost to the layer cap and unparsed table cells                                                         |
 | tree-sitter binding+refcheck |              183/183 |              386/497 | 239 / 66, of which 168 are frontmatter (tree-sitter is right) and 67 are real: 22 autolink literals, 20 code spans, 16 emphasis, 8 strikethrough, 1 inline HTML |
+| tree-sitter-md ¶             |              183/183 |              406/497 | 208 / 33 of 105,952: 172 frontmatter, 33 + 33 task-item shape (as lezer), 3 positionless mdast autolinks (as lezer); 0 real                                     |
 | lezer GFM+refcheck           |              183/183 |              488/497 | 43 / 46, of which about 20 are real: 6 email false positives, 14 code spans                                                                                     |
+
+¶ Measured 2026-09-26 with the docs read from Platform `c130dd35a` and Editor `74e76be`
+(105,952 constructs; lezer measures 43 / 46 on that set, as above).
 
 Both candidates agree with micromark on every construct of every real chat message. The shared
 residue (33 paragraphs on each side) is a shape difference in GFM task items.
@@ -168,29 +174,37 @@ Full parse, one-character edit near the middle, and a 60-row viewport parse. Nod
 Chromium runs); Bun within 10%. 2 KB is a real assistant message, 45 KB is `AGENTS.md` (381
 lines), 1 MB is `docs/` and `plans/` concatenated (7,318 lines).
 
-| ms, median                                   |  2 KB | 45 KB |  1 MB |
-| -------------------------------------------- | ----: | ----: | ----: |
-| micromark + GFM (mdast)                      |  0.62 |  16.3 |   311 |
-| tree-sitter today (worker shape, cap 256)    |  1.08 |  18.7 |   151 |
-| tree-sitter block + every inline             |  1.05 |  18.9 |   419 |
-| tree-sitter block only                       |  0.34 |   7.4 |   133 |
-| tree-sitter combined inline                  |  1.13 |  28.2 | 1,857 |
-| tree-sitter 60 visible rows (block + inline) |  1.01 |   9.1 |   129 |
-| tree-sitter edit (block + touched inline)    |  0.45 |  0.81 |  42.4 |
-| lezer + GFM full                             |  0.17 |  2.76 |  40.9 |
-| lezer 60 visible rows (`stopAt`)             |  0.14 |  0.37 |  0.42 |
-| lezer edit (`TreeFragment.applyChanges`)     | 0.086 | 0.086 |  0.82 |
-| comrak `parseMarkdown` (AST to JS)           |  0.11 |   2.8 |   323 |
-| pulldown-cmark-wasm (HTML string only)       | 0.044 |  0.47 |   5.3 |
+| ms, median                                                |  2 KB |        45 KB |       1 MB |
+| --------------------------------------------------------- | ----: | -----------: | ---------: |
+| micromark + GFM (mdast)                                   |  0.62 |         16.3 |        311 |
+| tree-sitter today (worker shape, cap 256)                 |  1.08 |         18.7 |        151 |
+| tree-sitter block + every inline                          |  1.05 |         18.9 |        419 |
+| tree-sitter block only                                    |  0.34 |          7.4 |        133 |
+| tree-sitter combined inline                               |  1.13 |         28.2 |      1,857 |
+| tree-sitter 60 visible rows (block + inline)              |  1.01 |          9.1 |        129 |
+| tree-sitter edit on a fresh tree (block + touched inline) |  0.45 |         0.81 |       42.4 |
+| tree-sitter keystroke, careful integration ‡              |     — |         0.30 |        2.4 |
+| tree-sitter-md full (block; inlines resolve lazily) §     |     — |          1.4 |         26 |
+| tree-sitter-md keystroke, median / p95 §                  |     — | 0.079 / 0.14 | 0.49 / 1.0 |
+| tree-sitter-md first frame, 60 rows decorated §           |     — |         0.39 |       0.36 |
+| lezer + GFM full                                          |  0.17 |         2.76 |       40.9 |
+| lezer 60 visible rows (`stopAt`)                          |  0.14 |         0.37 |       0.42 |
+| lezer edit (`TreeFragment.applyChanges`)                  | 0.086 |        0.086 |       0.82 |
+| comrak `parseMarkdown` (AST to JS)                        |  0.11 |          2.8 |        323 |
+| pulldown-cmark-wasm (HTML string only)                    | 0.044 |         0.47 |        5.3 |
 
 The tree-sitter "1 MB today" figure is lower than the full parse because the cap stops inline
 parsing after 255 layers.
 
-tree-sitter's block reparse scales with the document even when nothing changed: an unchanged
-reparse with the old tree costs 0 ms at 92 KB, 1.8 ms at 184 KB, 4.4 ms at 368 KB, 9.3 ms at
-737 KB (`AGENTS.md` repeated) and 47.6 ms on 1.36 MB of mixed docs, and a one-character edit
-costs the same at every position from 2% to 98% of the file. It is not the input callback: a
-4 KB-chunk callback measures the same.
+The "edit on a fresh tree" row reparses `tree.copy()` of a full parse each time, which is the
+first keystroke after a full parse. That reparse is O(document) (0 ms at 92 KB, 9.3 ms at 737 KB,
+43 ms at 1 MB, at any edit position): tree-sitter refuses to reuse a block whose first token was
+lexed in another lex mode when the state has external tokens, and every state in this grammar
+does. The reparse re-lexes those tokens, so the tree it returns reparses cheaply. ‡ is the
+evolving tree plus lazy, text-cached inline nodes for the viewport; lezer measured 0.10 and
+0.65 ms in the same run. Method and the causes: [tree-sitter-calibration.md](tree-sitter-calibration.md).
+§ Same harness and edits as ‡, medians of three runs in which lezer measured 0.097 / 0.21 ms
+(46 KB) and 0.59 / 3.0 ms (1 MB) per keystroke; see [tree-sitter-md](#tree-sitter-md-custom-grammar--rust-resolver).
 
 Streaming, 24-character chunks, per chunk (Bun):
 
@@ -221,6 +235,10 @@ Fresh browser context per run, `cache-control: no-store`, local server, `AGENTS.
 | tree-sitter | 12.4 ms (runtime + 2 grammars) |     40.5 ms |    20.1 ms |  6.0 ms (2,266 nodes) |                                    22.6 ms |
 | micromark   |                         3.5 ms |     36.3 ms |    16.6 ms |                     — | fails: its entity decoder needs `document` |
 
+tree-sitter-md, same setup, first 60 rows decorated instead of a whole parse: load 2.4 ms, first
+frame 6.4 ms (`AGENTS.md`) and 9.5 ms (1 MB), warm full parse of 1 MB 31 ms; lezer in the same
+harness: load 4.2 ms, first frame 7.7 and 6.4 ms, warm full parse 45 ms.
+
 Bundle bytes (esbuild, minified; gzip -9):
 
 | Payload                                                        |          Raw |       Gzip | Already shipped?        |
@@ -230,6 +248,7 @@ Bundle bytes (esbuild, minified; gzip -9):
 | micromark + GFM to mdast                                       |        80 KB |      23 KB | inside the remark chain |
 | web-tree-sitter JS + runtime wasm                              |  75 + 202 KB | 19 + 80 KB | yes, editor worker      |
 | markdown + markdown-inline grammars (0.3.2)                    | 379 + 374 KB | 60 + 62 KB | yes, editor worker      |
+| tree-sitter-md.wasm (grammar + runtime + resolver, `-O3`)      |       562 KB |     193 KB | no                      |
 | comrak (wasm inlined in JS)                                    |       633 KB |     380 KB | no                      |
 | pulldown-cmark-wasm                                            |       181 KB |      76 KB | no                      |
 
@@ -243,8 +262,10 @@ the tree-sitter figures are a floor.
 - One parse per paragraph is what keeps constructs inside their block. The combined parse leaks
   across block boundaries: a code span across two list items (example 42), strikethrough across
   two paragraphs (GFM 492), a link across paragraphs (551).
-- It is also slower: 28 ms against 19 ms at 45 KB, 1,857 ms against 419 ms at 1 MB. Each
-  per-paragraph parse costs about 35 µs.
+- It is also slower: 28 ms against 19 ms at 45 KB, 1,857 ms against 419 ms at 1 MB (natively
+  too: `ts_lexer_goto` scans the included ranges from index 0 per token). Each per-paragraph
+  parse costs about 35 µs with the whole document as input and 17 µs with input bounded to the
+  paragraph.
 - Past the cap. The worker stops adding injection layers at 256, counting fences and nested
   injections, in document order. In `/work/tmp/fregat-evidence/20260926T095101Z-scenario-research-176-preview/`
   a 300-paragraph file shows bold, italics, code and collapsed links through paragraph 145 and raw
@@ -253,3 +274,57 @@ the tree-sitter figures are a floor.
 - Table cells are never inline-parsed: the Editor's injection query names only `(inline)`, while
   upstream's Rust binding parses `inline` and `pipe_table_cell`. 167 of 382 Platform docs have
   tables; the same evidence run shows `**bold**`, `` `code` `` and `[link](…)` raw inside cells.
+
+## tree-sitter-md (custom grammar + Rust resolver)
+
+Spike of 2026-09-26 in `ShaulLavo/tree-sitter-md` `b962319` (`/work/projects/tree-sitter-md`):
+a fork of the v0.5.3 block grammar with one token per line and link reference definitions left
+to the resolver, and a Rust pass that runs each leaf block through pulldown-cmark 0.13.4's inline
+algorithm, with a document-wide definition map and per-leaf caching. Runners live in the repo's
+`bench/` (`spec.mjs`, `corpus.mjs`, `keystroke.mjs`, `fuzz.mjs`, `memory.mjs`, `chromium.mjs`),
+with this file's normalizer (`constructs.mjs`) and a reader for the module's records.
+
+Spec, same normalizer and reference as the section table above:
+
+| Section                    |   n |  tree-sitter-md | lezer + refcheck |
+| -------------------------- | --: | --------------: | ---------------: |
+| Tabs                       |  11 |              11 |               10 |
+| Setext headings            |  27 |              25 |               27 |
+| HTML blocks                |  44 |              44 |               43 |
+| Link reference definitions |  27 |              26 |               26 |
+| List items                 |  48 |              47 |               46 |
+| Links                      |  90 |              90 |               84 |
+| Raw HTML                   |  20 |              20 |               17 |
+| Every other section        | 409 |             409 |              409 |
+| **Total**                  | 676 | **672 (99.4%)** |      662 (97.9%) |
+
+Failing: 96 and 98 (`---` at the start reads as frontmatter, always on), 216 (a setext underline
+under a paragraph of definitions), 260 (lazy continuation in nested quotes in a list).
+
+Keystrokes: Node 26.7.0, the calibration's text and 200 seeded edits, each followed by
+decorations for the 60 rows around the edit; medians of three runs in a wave-heavy slot, lezer in
+the same runs:
+
+| ms                                       | tree-sitter-md 46 KB | lezer 46 KB | tree-sitter-md 1 MB | lezer 1 MB |
+| ---------------------------------------- | -------------------: | ----------: | ------------------: | ---------: |
+| First frame (60-row prefix, decorated)   |                 0.39 |        0.57 |                0.36 |       0.47 |
+| Full parse (tree-sitter-md: block only)  |                  1.4 |         3.3 |                  26 |         48 |
+| Decorate the whole document              |                  1.1 |           — |                16.5 |          — |
+| Rest of the document as an append edit   |                  2.2 |           — |                  29 |          — |
+| Idle reparse after the append            |                  0.0 |           — |                 7.9 |          — |
+| First keystroke (after the idle reparse) |                 0.44 |        0.79 |                 1.6 |        2.3 |
+| First keystroke (no idle reparse)        |                 0.45 |         1.0 |                 2.4 |        2.4 |
+| Keystroke median                         |                0.079 |       0.097 |                0.49 |       0.59 |
+| Keystroke p95                            |                 0.14 |        0.21 |                 1.0 |        3.0 |
+| Keystroke max                            |                 0.31 |           — |                 1.4 |          — |
+
+The 1 MB keystroke is 0.19 ms edit (block reparse, definitions, cache invalidation) plus 0.27 ms
+for the 60 rows (the edited paragraph resolved again). Warm, 60 rows cost 0.023 ms (decorations),
+0.024 ms (highlight captures), 0.008 ms (folds), 0.007 ms (fence injections). Every edited
+document equalled a fresh parse (11,300 random edits, `fuzz.mjs`; a control against altered text
+fails every check).
+
+Wasm: 562 KB, 193 KB gzip (`opt-level=z`: 458 / 161 KB, 10–20% slower keystrokes). Code:
+pulldown-cmark about 120 KB, tree-sitter C runtime 96 KB, the resolver 49 KB, scanner and lexer
+28 KB; data 178 KB. Linear memory per document (fresh instance, high-water): 0.5 MB for
+`AGENTS.md`, 7.5 MB for 1 MB after parsing, 8.4 MB with every inline resolved.
