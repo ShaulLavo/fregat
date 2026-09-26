@@ -183,7 +183,8 @@ checks are owner checks.
 
 ## Wave 3 (what wave 2 unblocks)
 
-171 composer (if E2 did not reach it); 111 P4–P5 → 108 P2–P3; 122 P6–P9 and E025; 088 after 087; 178 drag-and-drop and cleanup;
+Plan 185 (keep improving tree-sitter-md: open items, then correctness, memory and size, speed)
+after the MD lane; 171 composer (if E2 did not reach it); 111 P4–P5 → 108 P2–P3; 122 P6–P9 and E025; 088 after 087; 178 drag-and-drop and cleanup;
 143 P5–P6 and 155 (after 143); 156 P3–P5; 126 batches G (four drivers), H (pairing, balancing),
 I (PR review workspace); 177 P3 if it slipped.
 
