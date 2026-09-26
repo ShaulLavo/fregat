@@ -5,7 +5,8 @@
 - Status: RESEARCH DONE 2026-09-26 — the per-file editors are the cost (windowing is 3 ms of
   2,059 ms); fix is flat rows on `VirtualList`, plus an Editor signature memo and a scroll-listener
   fix. Findings: [docs/search-view-rendering-findings.md](../docs/search-view-rendering-findings.md).
-  Implementation waits on the owner questions below; nothing here authorizes it yet.
+  Owner redirected Q1 on 2026-09-26: design the results as one editor over excerpts (Zed-style) with
+  today's look; the flat-rows fix is not wanted. Nothing here authorizes implementation.
 - Planned at: Platform `d5a901726`, 2026-09-26. Researched at Platform `c130dd35a`, Editor `74e76be`.
   Origin: the virtualizer discussion behind [Plan 181](181-chat-timeline-end-anchoring.md) and
   [Plan 178](178-tree-in-the-app.md).
@@ -91,6 +92,13 @@ workstreams doc is deleted; its A–H verdicts are in the findings doc, section 
 **Recommendation: A.** Measured 3.4× less main-thread time on the same data with no long task, and it
 deletes about 1,700 lines; B still builds editor DOM for every file that scrolls in and roughly halves
 the cost at best.
+
+Decided 2026-09-26: owner — none of these yet. Speed is not urgent; the view may stay slow for now.
+The direction is the whole result set inside our editor, the way Zed's project search is one editor
+over a multibuffer of excerpts, while looking exactly as the view looks today. That means the Editor
+hosting app-rendered (React) blocks for file headers and line chrome, and it needs design first:
+take Zed's model, not its platform-specific parts. Design research runs in round 2 (Phase 0 below).
+The independent fixes (Editor grammar-signature memo, scroll listener) still ship on their own.
 
 **Q2. One row per match or one row per source line?**
 
