@@ -408,6 +408,10 @@ CodeMirror 6 decorations and Lexical's decorator nodes, and gates Plan 108 Phase
 Obsidian mode, and the question of whether the chat composer still needs Lexical.
 Decided 2026-09-25: owner — 111's research is authorized with the composer as its first consumer,
 and runs before the next wave.
+[Plan 176](plans/176-markdown-parser.md) replaces Plan 108 D5 (decided 2026-09-26: owner): it
+measures which parser drives live preview, with tree-sitter as the lead against `@lezer/markdown`, a
+Rust parser and remark, and whether the winner can also replace remark in chat. Plan 108 Phase 2
+waits on it.
 [Plan 171](plans/171-composer-on-our-editor.md) is that composer migration: it inventories what
 the composer uses Lexical for and orders the Editor gaps to close, with 111 first (decided
 2026-09-25: owner — delete Lexical; the replacement is our own editor).
@@ -538,6 +542,7 @@ of the plans, both logs and the service journal named what stands in the way. Th
 | 146 (done)                                     | Dev and prod stop sharing `~/.platform`; each `agent:browser` run gets its own server and state                          |
 | [147](plans/147-log-hygiene-and-noise-gate.md) | Producer fixes, level rules, the reaper give-up, ACK timeout vs overflow, a `logs:census` gate                           |
 | [175](plans/175-large-folder-open.md)          | Opening a huge folder: watch limit, unreadable folders, switch not cancelled by clicks, bounded prefetch                 |
+| [177](plans/177-prefetch-every-press.md)       | Prefetch on intent for every async press (diffs, chats, quick open, search), per-surface toggles                         |
 | [148](plans/148-restart-when-idle.md)          | `deploy --server` stages; the server restarts when no turn is running                                                    |
 | [149](plans/149-terminal-host.md)              | A PTY host that survives server restarts                                                                                 |
 | 150 (done)                                     | Remote servers are checked for protocol; a stale one relaunches or reads "Server out of date"                            |
@@ -556,7 +561,9 @@ Suggested order:
    (completion wave; live Mac update is an owner check). Plan 152 done the same day.
 6. Plan 175, reported 2026-09-26: opening `/work` froze the server for 10.8 s and took 92% of the
    machine's inotify watches. Phases 1–2 need no decision.
-7. Then Claude rewind and fork ([Plan 145 fork](plans/145-harness-controls/fork.md), Plan 126
+7. Plan 177's research (requested 2026-09-26). Its Phase 0 first-paint measurement is also the
+   baseline for Plans 170 and 176.
+8. Then Claude rewind and fork ([Plan 145 fork](plans/145-harness-controls/fork.md), Plan 126
    RUNTIME-01) and the Plan 139 research phase.
 
 ## UI refresh lane
