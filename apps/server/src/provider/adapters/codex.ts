@@ -2547,10 +2547,10 @@ class CodexAppServerRpcClient {
   /** Stderr is diagnostics, never classified: the last lines ride on the exit event. */
   private readonly stderrTail: string[] = []
 
-  private constructor(
-    process: ChildProcessWithoutNullStreams,
-    private readonly onEnd?: (failed: boolean) => void,
-  ) {
+  private readonly onEnd: ((failed: boolean) => void) | undefined
+
+  private constructor(process: ChildProcessWithoutNullStreams, onEnd?: (failed: boolean) => void) {
+    this.onEnd = onEnd
     this.process = process
     this.lifetime = new ProviderProcessLifetime(process)
     this.process.stdout.setEncoding('utf8')

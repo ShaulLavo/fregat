@@ -45,9 +45,9 @@ it('keeps the MCP bearer out of real SDK argv and debug logs, delivering it over
       cwd: root,
       modelSelection: {
         model: SYNTHETIC_OPUS,
-        providerInstanceId: DEFAULT_CLAUDE_PROVIDER_SETTINGS.id,
+        providerInstanceId: DEFAULT_CLAUDE_PROVIDER_SETTINGS.providerInstanceId,
       },
-      providerInstanceId: DEFAULT_CLAUDE_PROVIDER_SETTINGS.id,
+      providerInstanceId: DEFAULT_CLAUDE_PROVIDER_SETTINGS.providerInstanceId,
       platformMcp: { token, url: 'http://127.0.0.1:39087/mcp' },
       runtimeMode: 'approval-required',
       runtimeEpoch: 'epoch-1',
