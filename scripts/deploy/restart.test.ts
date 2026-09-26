@@ -96,6 +96,20 @@ test('--interrupt sends the busy sessions back, and re-sends when another became
   expect(run.elapsed()).toBe(0)
 })
 
+test('sleeping sessions do not hold the restart; their schedules end once the rest is idle', async () => {
+  const sleeping: BusySession = { ...busySession('s'), state: 'sleeping' }
+  const run = scripted((interrupt, time) => {
+    if (interrupt.includes('s' as SessionId)) return { restarting: true }
+    if (time < MINUTE) return { restarting: false, busy: [busySession('a'), sleeping] }
+    return { restarting: false, busy: [sleeping] }
+  })
+
+  await requestRestart(waiting, run.control)
+
+  expect(run.requests.at(-1)).toEqual(['s'])
+  expect(run.printed.at(-1)).toContain('ending the schedules of 1 sleeping session')
+})
+
 test('inside a Platform chat the busy text says the caller needs --interrupt', () => {
   const text = busyText([busySession('a')], { ...waiting, insidePlatform: true })
 

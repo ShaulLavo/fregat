@@ -4,13 +4,20 @@ import type { SettingsValues } from './settings/keys'
 
 // One derivation for the tab's toasts and sounds and for the server's push notices.
 
-export type SessionRailStatus = 'approval' | 'input' | 'working' | 'monitoring' | 'failed' | 'ready'
+export type SessionRailStatus =
+  | 'approval'
+  | 'input'
+  | 'working'
+  | 'monitoring'
+  | 'sleeping'
+  | 'failed'
+  | 'ready'
 
 export function sessionRailStatus(
   session: Pick<
     OrchestrationSessionShell,
     'pendingApprovalCount' | 'pendingUserInputCount' | 'runtime' | 'backgroundLiveness'
-  >,
+  > & { readonly sleepingUntil?: string | null },
 ): SessionRailStatus {
   if (session.pendingApprovalCount > 0) return 'approval'
   if (session.pendingUserInputCount > 0) return 'input'
@@ -18,6 +25,7 @@ export function sessionRailStatus(
     return 'working'
   if (session.backgroundLiveness) return session.backgroundLiveness
   if (session.runtime?.status === 'error') return 'failed'
+  if (session.sleepingUntil) return 'sleeping'
   return 'ready'
 }
 
@@ -31,6 +39,7 @@ export type NotificationSession = Pick<
   | 'pendingUserInputCount'
   | 'runtime'
   | 'backgroundLiveness'
+  | 'sleepingUntil'
 > & {
   latestTurn: Pick<
     NonNullable<OrchestrationSessionShell['latestTurn']>,
@@ -65,8 +74,9 @@ export function sessionNotificationTransition(
     attention = `${session.latestTurn?.turnId ?? ''}:${status}`
   const completedAt = Date.parse(session.latestTurn?.completedAt ?? '')
   let completion = prior?.completion ?? null
+  // A session that scheduled a wake-up still finished this turn.
   if (
-    status === 'ready' &&
+    (status === 'ready' || status === 'sleeping') &&
     session.latestTurn?.state === 'completed' &&
     Number.isFinite(completedAt)
   )

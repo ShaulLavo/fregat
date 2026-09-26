@@ -6,6 +6,7 @@ import {
   query as claudeSdkQuery,
   type AccountInfo,
   type CanUseTool,
+  type HookCallback,
   type ModelInfo,
   type Options,
   type PermissionResult,
@@ -581,6 +582,7 @@ export class ClaudeProviderAdapter
         runtimeEpoch: input.runtimeEpoch,
         sessionId: input.sessionId,
       })
+      existing.warnSchedulesDropped()
       await existing.close()
       this.sessions.delete(input.sessionId)
     }
@@ -658,6 +660,8 @@ class ClaudeAgentSession extends SessionContext {
   private status: ProviderAdapterRuntime['status'] = 'starting'
   /** `type:resetsAt` of the limit stops this turn has already announced. */
   private readonly announcedLimitStops = new Set<string>()
+  /** How many schedules the last Stop hook listed; a replaced query drops them. */
+  private scheduleCount = 0
   private readonly scopedUsageModel: () => string | null
   private readonly resumed: boolean
 
@@ -726,6 +730,7 @@ class ClaudeAgentSession extends SessionContext {
       abortController: session.abortController,
       canUseTool: session.canUseTool(),
       cwd: input.cwd,
+      ...(input.ephemeral ? {} : { hooks: { Stop: [{ hooks: [session.stopHook()] }] } }),
       env: input.env,
       executablePath: input.executablePath,
       ...(input.agent ? { agent: input.agent } : {}),
@@ -952,6 +957,41 @@ class ClaudeAgentSession extends SessionContext {
 
   hasProcess() {
     return this.processes.some((process) => process.isAlive()) || !this.streamEnded
+  }
+
+  /** Every Stop names the session's crons, wake-ups and loops, harness-started turns included. */
+  stopHook(): HookCallback {
+    return async (input) => {
+      if (input.hook_event_name !== 'Stop') return {}
+      const schedules = (input.session_crons ?? []).map((cron) => ({
+        id: cron.id,
+        prompt: cron.prompt,
+        recurring: cron.recurring,
+        schedule: cron.schedule,
+      }))
+      this.scheduleCount = schedules.length
+      this.emit({
+        createdAt: new Date().toISOString(),
+        eventId: runtimeEventId('claude-schedules-updated'),
+        payload: { schedules },
+        provider: DEFAULT_CLAUDE_PROVIDER_SETTINGS.driverKind,
+        providerInstanceId: this.providerInstanceId,
+        providerBindingHandle: this.providerBindingHandle(),
+        runtimeMode: this.runtimeMode,
+        sessionId: this.sessionId,
+        ...(this.activeTurn ? { turnId: this.activeTurn.canonicalTurnId } : {}),
+        type: 'schedules.updated',
+      })
+      return {}
+    }
+  }
+
+  /** The replacement query starts without the old process's schedules; the timeline says so. */
+  warnSchedulesDropped() {
+    if (this.scheduleCount === 0) return
+    const count = this.scheduleCount === 1 ? 'its schedule' : `its ${this.scheduleCount} schedules`
+    this.emitRuntimeWarning(`Claude restarted with the new settings and ended ${count}.`)
+    this.scheduleCount = 0
   }
 
   async close() {

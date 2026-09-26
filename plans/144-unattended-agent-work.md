@@ -2,8 +2,8 @@
 
 ## Status and authorization
 
-- Status: RESEARCH DONE 2026-09-25 — findings, capability matrix and proposed phases below;
-  phases await owner approval. Q1–Q3 decided 2026-09-25. PRs #32 (Plan 148) and #35 (Plan 145)
+- Status: IN PROGRESS — Phase 2 done 2026-09-26 (wave 2 lane A); Phase 1 on lane B; Phase 3
+  next. Research done 2026-09-25. Q1–Q3 decided 2026-09-25. PRs #32 (Plan 148) and #35 (Plan 145)
   were still open, so the research read their lane branches as current truth. One gap: the
   Platform-side rendering of a self-started turn is established by code reading, because the dev
   server was down (see Q1).
@@ -295,10 +295,12 @@ which is Plan 142.
    - A: accept the loss; Restart and model switch name the schedules they drop.
    - B: build a Platform scheduler now (Paseo's model) for prompts that must survive.
    - Recommendation: A. Revisit B when a real daily routine needs it; no harness offers it today.
+   - Decided 2026-09-26: recommendation (wave 2) — A.
 2. **Keep-alive budget.** Each sleeping Claude session keeps a 160–490 MB process.
    - A: no cap; the rail shows sleeping sessions and the wide event carries the count.
    - B: cap sleeping sessions at N and refuse new schedules past it.
    - Recommendation: A, on this 31 GB machine with the count logged.
+   - Decided 2026-09-26: recommendation (wave 2) — A.
 
 ### Proposed phases
 
@@ -319,7 +321,22 @@ which is Plan 142.
 
 ## Phases
 
-Proposed under Research findings; not yet approved.
+Proposed under Research findings; approved as wave 2 lanes (`docs/next-wave.md`): lane B runs
+Phase 1, lane A Phases 2–3.
+
+- **Phase 2 — done 2026-09-26 (lane A).** An in-process `Stop` hook (`ClaudeAgentSession.stopHook`,
+  not on ephemeral sessions) emits `schedules.updated` with the session's `session_crons`.
+  `SessionScheduleRegistry` (`provider/session-schedules.ts`) holds them per session, cleared when
+  the runtime starts, exits or stops; `utils/cron-next.ts` computes each next fire in local time
+  (a one-shot from when a report first listed it). The reaper and the idle stop keep a session with
+  schedules (`keepsProcess`); the sweep and a `schedules.changed` event log the sleeping count.
+  The shell carries `sleepingUntil`, the rail reads `sleeping`, and a completed turn still
+  notifies. Restart lists sleeping sessions (`BusySessionState` `sleeping`, "Sleeping; its wake-ups
+  end"); `bun run deploy --restart` waits out other busy sessions, then ends sleeping ones' schedules
+  without waiting. Replacing the Claude query (model, effort, mode, folder) warns in the timeline.
+  The chat headers show `SchedulesButton` (moon, wake time, list from
+  `GET /providers/sessions/:id/schedules`, "Cancel schedules" = `session.runtime.stop`). The mock
+  driver's `wakeupMinutes` stands in for `ScheduleWakeup`; scenario `chat-sleeping-session`.
 
 ## Dependencies
 

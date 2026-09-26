@@ -45,7 +45,7 @@ a bare root `bun run verify`.
 | [148 — server deploys restart when idle](148-restart-when-idle.md)                      | **PROPOSED — D3 REPLACED: RESTART ON CLICK (COMPLETION WAVE)**                      |
 | [147 — log hygiene and a noise gate](147-log-hygiene-and-noise-gate.md)                 | **PROPOSED — PHASE 1 READY; PHASE 3 CARRIES PLAN 125'S REST**                       |
 | [145 — harness controls](145-harness-controls.md)                                       | **IMPLEMENTED (L3); OWNER REVIEW FIXES COMPLETE, VALIDATION IN PROGRESS**           |
-| [144 — unattended agent work](144-unattended-agent-work.md)                             | **RESEARCH — Q1–Q3 DECIDED; AFTER PRS #32 AND #35**                                 |
+| [144 — unattended agent work](144-unattended-agent-work.md)                             | **IN PROGRESS — P2 DONE (LANE A); P1 LANE B; P3 NEXT**                              |
 | [143 — phone layout](143-phone-layout.md)                                               | **DISCUSSION — OWNER DIRECTION FIRST**                                              |
 | [142 — web push](142-web-push.md)                                                       | **PROPOSED — SPIKE FIRST**                                                          |
 | [141 — usage and rate limits](141-usage-and-rate-limits.md)                             | **PHASES 1–3 IMPLEMENTED; PHASE 4 OPEN; PHASE 5 NEEDS THE OWNER**                   |

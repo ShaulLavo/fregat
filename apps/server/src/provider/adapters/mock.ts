@@ -56,6 +56,8 @@ export type MockProviderAdapterOptions = {
   script?: MockTurnScript
   /** Pause between scripted steps, so a reader can watch each one land. */
   stepDelayMs?: number
+  /** After each turn, report a one-shot wake-up this many minutes ahead, as `ScheduleWakeup` does. */
+  wakeupMinutes?: number
   shouldFail?: boolean
   stopError?: string
   userInputError?: Error
@@ -126,6 +128,7 @@ export class MockProviderAdapter implements ProviderAdapter {
   private readonly responseText: string
   private readonly script: MockTurnScript | null
   private readonly stepDelayMs: number
+  private readonly wakeupMinutes: number | null
   private readonly completedTurns = new Map<SessionId, number>()
   private readonly shouldFail: boolean
   private readonly stopError: string | null
@@ -154,6 +157,7 @@ export class MockProviderAdapter implements ProviderAdapter {
     this.responseText = options.responseText ?? 'Mock response'
     this.script = options.script ?? null
     this.stepDelayMs = options.stepDelayMs ?? DEFAULT_SCRIPT_STEP_DELAY_MS
+    this.wakeupMinutes = options.wakeupMinutes ?? null
     this.shouldFail = options.shouldFail ?? false
     this.stopError = options.stopError ?? null
     this.userInputError = options.userInputError ?? null
@@ -327,7 +331,34 @@ export class MockProviderAdapter implements ProviderAdapter {
       type: 'assistant.complete',
     })
     this.publishUsageTotals(input)
+    this.publishWakeup(input)
     this.publishTurnEnd(input, 'completed')
+  }
+
+  /** What Claude's Stop hook reports after a turn that called `ScheduleWakeup`. */
+  private publishWakeup(input: ProviderTurnInput) {
+    if (this.wakeupMinutes === null) return
+    const fire = new Date(Date.now() + this.wakeupMinutes * 60_000)
+    this.events.publish({
+      createdAt: new Date().toISOString(),
+      eventId: `mock-schedules:${input.turnId}`,
+      payload: {
+        schedules: [
+          {
+            id: `wakeup-${input.turnId}`,
+            prompt: 'Check whether the build finished.',
+            recurring: false,
+            schedule: `${fire.getMinutes()} ${fire.getHours()} ${fire.getDate()} ${fire.getMonth() + 1} *`,
+          },
+        ],
+      },
+      provider: this.driverKind,
+      providerInstanceId: input.providerInstanceId,
+      runtimeEpoch: input.runtimeEpoch,
+      sessionId: input.sessionId,
+      turnId: input.turnId,
+      type: 'schedules.updated',
+    })
   }
 
   private publishTurnEnd(input: ProviderTurnInput, state: 'completed' | 'interrupted') {

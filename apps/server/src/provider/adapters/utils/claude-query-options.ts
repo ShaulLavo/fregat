@@ -33,6 +33,8 @@ export type ClaudeQueryOptionsInput = ClaudeRuntimeSelection & {
   cwd: string
   /** Per-instance spawn env. Absent means "inherit the server's env untouched". */
   env?: NodeJS.ProcessEnv
+  /** In-process hook callbacks; they add to the hooks the user's settings declare. */
+  hooks?: Options['hooks']
   /** The instance's resolved CLI; without it the SDK runs its bundled one. */
   executablePath: string
   model: string
@@ -147,6 +149,7 @@ export function claudeQueryOptions(input: ClaudeQueryOptionsInput): Options {
     ...claudePermissionOptions(input),
     ...claudeSessionOptions(input),
     ...(input.canUseTool ? { canUseTool: input.canUseTool } : {}),
+    ...(input.hooks ? { hooks: input.hooks } : {}),
     // Absent `env` makes the CLI inherit process.env untouched, which is what a
     // single-instance install wants. When it is present it carries
     // CLAUDE_CONFIG_DIR for the instance — NEVER an overridden HOME: that

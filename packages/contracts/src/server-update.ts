@@ -39,6 +39,7 @@ export const busySessionStateSchema = v.picklist([
   'waiting',
   'rewinding',
   'background',
+  'sleeping',
 ])
 
 export const busySessionSchema = v.object({

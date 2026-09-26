@@ -64,3 +64,20 @@ test('a completion announces once, an archived session stays silent, and a failu
     failed: true,
   })
 })
+
+test('a session that scheduled a wake-up reads as sleeping and still announces its completion', () => {
+  const sleeping = {
+    ...session,
+    sleepingUntil: '2026-09-25T11:00:00.000Z',
+    latestTurn: { turnId, state: 'completed' as const, completedAt: '2026-09-25T10:00:00.000Z' },
+  }
+  const done = sessionNotificationTransition(
+    sleeping,
+    sessionNotificationTransition(session).cursor,
+  )
+  expect(done.status).toBe('sleeping')
+  expect(done.kind).toBe('completion')
+  expect(sessionNotificationTransition({ ...sleeping, backgroundLiveness: 'working' }).status).toBe(
+    'working',
+  )
+})
