@@ -231,6 +231,7 @@ safe to use: stale entries are still present and counted.
    - (c) Leave the Editor as is.
    - **Recommendation: (a).** It is the larger win for every workspace, including the fallback
      path, and Phase 3 needs the same Editor option change anyway.
+   - Decided 2026-09-26: owner — (a): the Editor payload fix lands before the census.
 2. **Drop "theme" from this plan's title and scope?** Themes are not preloaded after first paint,
    and the census cannot inform them. **Recommendation: yes;** the palette-open preload of 66
    themes is a separate question if it matters.

@@ -318,6 +318,7 @@ Interaction treatments are utilities, not strings to copy:
 - `GET /platform/release` reports the served release name, commit and dirty-file count, plus the release the running server bundle came from. That is how "did it land" is answered.
 - The procedure lives in `scripts/deploy/`: `mesh.ts` (the command), `live-check.mjs` (the browser check, run by the command; a failure the previous release already had is reported but does not fail the deploy), and `systemd/platform-prod.service` (the unit template, rendered and installed by the command). The mesh route itself is set up once by hand: `mesh serve omarchy 3301 --at /platform --isolate`.
 - `ghostty-webgpu` is a `link:` to `/work/projects/ghostty-webgpu`. A change there needs `bun run build` in that repo before the web build picks it up.
+- CI builds the Editor at the commit pinned as `editor-ref` in `.github/actions/setup/action.yml`. A Platform change that needs newer Editor code bumps that pin in the same commit.
 - A release's `server/node_modules` is a symlink to the checkout's `apps/server/node_modules`: the bundle resolves language servers and its external packages at runtime. Rolling back a release does not roll back a `bun install`.
 
 ## Testing
