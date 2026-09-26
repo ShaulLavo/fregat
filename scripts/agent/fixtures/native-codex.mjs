@@ -320,11 +320,22 @@ function mcpConfig(includeLayers) {
       : null,
   }
 }
+let threadConfig = {}
 function handleMcpStatus(message) {
+  // Opening a thread falls through to the shared handler; only its per-thread config is recorded.
+  if (message.method === 'thread/start' || message.method === 'thread/resume') {
+    threadConfig = message.params?.config ?? {}
+    record({ event: message.method, config: message.params?.config ?? null })
+    return false
+  }
   if (message.method === 'mcpServerStatus/list') {
     record({ event: message.method, threadId: message.params?.threadId ?? null })
     const servers = { ...readMcpUser().servers, ...mcpProjectServers }
-    const data = Object.entries(servers).map(([name, table]) => mcpStatusOf(name, table))
+    const data = Object.entries(servers).map(([name, table]) =>
+      threadConfig[`mcp_servers.${name}.enabled`] === false && message.params?.threadId
+        ? { ...mcpStatusOf(name, table), runtimeStatus: 'disabled', tools: {} }
+        : mcpStatusOf(name, table),
+    )
     send({ id: message.id, result: { data, nextCursor: null } })
     return true
   }

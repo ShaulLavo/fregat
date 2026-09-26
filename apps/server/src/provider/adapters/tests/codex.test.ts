@@ -2891,6 +2891,28 @@ describe('CodexProviderAdapter', () => {
     })
   })
 
+  it('opens a thread without the servers turned off for the session, and reopens it when the list changes', async () => {
+    await withFakeCodex(async ({ spawnLogPath }) => {
+      const adapter = new CodexProviderAdapter()
+      const input = providerTurnInput()
+      try {
+        await adapter.startRuntime({ ...input, mcpOff: ['ghost', 'linear'] })
+        await adapter.applyMcpSessionOff({ off: [], sessionId: input.sessionId })
+
+        const opened = (await readFakeCodexLog(spawnLogPath)).filter(
+          (entry) => entry.event === 'thread/start' || entry.event === 'thread/resume',
+        )
+        expect(opened.map((entry) => [entry.event, entry.params?.config])).toEqual([
+          // `ghost` is in no config: an `enabled` key alone would leave a half table.
+          ['thread/start', { 'mcp_servers.linear.enabled': false }],
+          ['thread/resume', undefined],
+        ])
+      } finally {
+        await adapter.stopAll()
+      }
+    })
+  })
+
   it('lists configured MCP servers with their files and writes through config/batchWrite', async () => {
     await withFakeCodex(async ({ projectPath, spawnLogPath }) => {
       const adapter = new CodexProviderAdapter()

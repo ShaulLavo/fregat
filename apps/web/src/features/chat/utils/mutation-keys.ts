@@ -26,6 +26,8 @@ export const chatMutationKeys = {
     ['chat', 'approve-mcp-server', environmentId, sessionId] as const,
   reconnectMcpServer: (environmentId: string, sessionId: string) =>
     ['chat', 'reconnect-mcp-server', environmentId, sessionId] as const,
+  setMcpSessionOff: (environmentId: string, sessionId: string) =>
+    ['chat', 'mcp-session-off', environmentId, sessionId] as const,
   signInMcpServer: (environmentId: string, sessionId: string) =>
     ['chat', 'sign-in-mcp-server', environmentId, sessionId] as const,
   stopBackgroundTask: (environmentId: string, sessionId: string) =>

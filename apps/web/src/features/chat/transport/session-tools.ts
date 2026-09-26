@@ -42,6 +42,15 @@ export async function approveMcpServer(ref: ScopedSessionRef, name: string) {
   })
 }
 
+/** Resolves with the server list after the change, which restarts an idle session. */
+export async function setMcpSessionOff(ref: ScopedSessionRef, name: string, off: boolean) {
+  const response = await sessionControls(ref).mcp({ name })['session-off'].post({ off })
+  return unwrapEdenResponse<ProviderSessionMcp>(response, {
+    emptyMessage: 'the change carried no server list',
+    requireData: true,
+  })
+}
+
 export async function signInMcpServer(ref: ScopedSessionRef, name: string) {
   const response = await sessionControls(ref).mcp({ name })['sign-in'].post()
   const result = unwrapEdenResponse<ProviderMcpSignIn>(response, {

@@ -50,6 +50,8 @@ export type ProviderTurnInput = {
   kind?: SessionTurnKind
   messageText: string
   modelSelection: ModelSelection
+  /** MCP servers turned off for this session, filled in by `ProviderService` from the binding. */
+  mcpOff?: readonly string[]
   sessionId: SessionId
   runtimeEpoch: string
   providerInstanceId: ProviderInstanceId
@@ -76,6 +78,8 @@ export type ProviderRuntimeStartInput = {
   cwd: string
   ephemeral?: boolean
   interactionMode?: InteractionMode
+  /** MCP servers this session runs without. */
+  mcpOff?: readonly string[]
   modelSelection: ModelSelection
   providerInstanceId: ProviderInstanceId
   providerResumeCursor?: unknown | null
@@ -654,6 +658,11 @@ export type ProviderAdapter = {
   signInMcpServer?: (input: { name: string; sessionId: SessionId }) => Promise<ProviderMcpSignIn>
   /** The instance's configured MCP servers, outside any session. */
   mcpConfig?: ProviderMcpConfigAccess
+  /**
+   * Applies the session's off list: an idle session restarts on its conversation at once, a busy
+   * one at its next start.
+   */
+  applyMcpSessionOff?: (input: { off: readonly string[]; sessionId: SessionId }) => Promise<void>
   /** Hooks configured for the checkout; null when the session has no live provider process. */
   configuredHooks?: (input: {
     cwd: string

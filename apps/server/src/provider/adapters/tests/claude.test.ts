@@ -1103,6 +1103,41 @@ describe('ClaudeProviderAdapter', () => {
     }
   })
 
+  it('turns servers off for one session at CLI start, and restarts an idle session to apply it', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'platform-claude-session-off-'))
+    const cwd = path.join(root, 'repo')
+    await mkdir(cwd, { recursive: true })
+    await writeFile(
+      path.join(cwd, '.mcp.json'),
+      JSON.stringify({ mcpServers: { deploy: { command: 'deploy-server' } } }),
+    )
+    const harness = claudeHarness(true, undefined, path.join(root, 'state', 'approvals.json'))
+    const input = { ...sessionStartInput({}), cwd }
+    try {
+      await harness.adapter.startRuntime(input)
+      expect(harness.queries).toHaveLength(1)
+
+      await harness.adapter.applyMcpSessionOff({
+        off: ['deploy', 'linear'],
+        sessionId: input.sessionId,
+      })
+
+      expect(harness.queries).toHaveLength(2)
+      expect(latestOptions(harness).settings).toMatchObject({
+        deniedMcpServers: [{ serverName: 'linear' }],
+        disabledMcpjsonServers: ['deploy'],
+      })
+      const servers = await harness.adapter.mcpServers({ sessionId: input.sessionId })
+      expect(servers?.find((server) => server.name === 'linear')?.status).toBe('disabled')
+
+      await harness.adapter.startRuntime({ ...input, mcpOff: ['deploy', 'linear'] })
+      expect(harness.queries).toHaveLength(2)
+    } finally {
+      await harness.adapter.stopAll()
+      await rm(root, { force: true, recursive: true })
+    }
+  })
+
   it('rejects a second turn while one is still in flight', async () => {
     const harness = claudeHarness()
     const input = providerTurnInput()

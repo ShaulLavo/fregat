@@ -258,6 +258,7 @@ export {
   providerConfiguredHookSchema,
   providerMcpAuthSchema,
   providerMcpServerSchema,
+  providerMcpSessionOffBodySchema,
   providerMcpServerStatusSchema,
   providerMcpTransportSchema,
   providerMcpSignInSchema,

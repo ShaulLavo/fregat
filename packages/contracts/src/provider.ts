@@ -339,8 +339,13 @@ export const providerSessionMcpSchema = v.object({
   running: v.boolean(),
   canReconnect: v.boolean(),
   canSignIn: v.boolean(),
+  /** The session can start without a server; `off` names the ones it runs without. */
+  canTurnOff: v.boolean(),
+  off: v.array(v.string()),
   servers: v.array(providerMcpServerSchema),
 })
+
+export const providerMcpSessionOffBodySchema = v.object({ off: v.boolean() })
 
 export const providerMcpSignInSchema = v.object({
   authorizationUrl: v.pipe(

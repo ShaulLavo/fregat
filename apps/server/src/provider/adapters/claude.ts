@@ -124,7 +124,9 @@ import { claudeUserInputAnswers, claudeUserInputQuestions } from './utils/claude
 import {
   approveProjectMcpServer,
   defaultProjectMcpApprovalsPath,
+  splitSessionOffMcp,
   unapprovedProjectMcpServers,
+  type SessionOffMcp,
 } from './utils/claude-project-mcp'
 import {
   claudeMcpConfigAccess,
@@ -135,10 +137,12 @@ import {
   ClaudeMcpStatusWatch,
   claudeMcpServer,
   gatedProjectMcpServer,
+  sessionOffPlaceholder,
+  sessionOffServer,
 } from './utils/claude-mcp-status'
 import { asRecord, numberField, stringField } from './utils/records'
 import { noop, runtimeEventId } from './utils/runtime-ids'
-import { sessionInputFromTurn } from './utils/session-input'
+import { reopenWithMcpOff, sessionInputFromTurn } from './utils/session-input'
 import { normalizeWorkspaceCwd } from './utils/workspace-cwd'
 
 /**
@@ -570,6 +574,21 @@ export class ClaudeProviderAdapter
     })
   }
 
+  /** Flag settings apply at CLI start, so an idle session restarts on its conversation now. */
+  async applyMcpSessionOff({ off, sessionId }: { off: readonly string[]; sessionId: SessionId }) {
+    await reopenWithMcpOff({
+      off,
+      reopen: (start, session) =>
+        this.ensureRuntimeSession({
+          ...start,
+          resumeExisting: start.resumeExisting || session.hasConversation(),
+        }),
+      session: this.sessions.get(sessionId),
+      sessionId,
+      startInputs: this.startInputs,
+    })
+  }
+
   async stopBackgroundTask({ sessionId, taskId }: { sessionId: SessionId; taskId: string }) {
     recordChatPipelineInfo('chat.pipeline.claude_adapter.stop_task', { sessionId, taskId })
     const session = this.sessions.get(sessionId)
@@ -629,6 +648,7 @@ export class ClaudeProviderAdapter
       approvalsFile: this.projectMcpApprovalsFile,
       cwd,
     })
+    const sessionOffMcp = await splitSessionOffMcp(cwd, input.mcpOff ?? [])
     this.startInputs.set(input.sessionId, input)
     if (
       existing?.matches({
@@ -636,6 +656,7 @@ export class ClaudeProviderAdapter
         runtimeEpoch: input.runtimeEpoch,
         ephemeral,
         interactionMode,
+        mcpOff: sessionOffMcp.all,
         model,
         reasoningKey,
         runtimeMode: input.runtimeMode,
@@ -703,6 +724,7 @@ export class ClaudeProviderAdapter
       runtimeEpoch: input.runtimeEpoch,
       scopedUsageModel: () => this.scopedUsageModel,
       sessionId: input.sessionId,
+      sessionOffMcp,
       unapprovedProjectMcp,
     })
     this.sessions.set(input.sessionId, session)
@@ -756,6 +778,8 @@ class ClaudeAgentSession extends SessionContext {
   private readonly resumed: boolean
   /** Project servers this session started with turned off, awaiting the owner's approval. */
   private readonly unapprovedProjectMcp: readonly string[]
+  /** Servers the owner turned off for this session, kept off by flag settings at CLI start. */
+  private readonly mcpOff: readonly string[]
   private readonly mcpStatusWatch = new ClaudeMcpStatusWatch()
   private conversationStarted: boolean
 
@@ -773,12 +797,14 @@ class ClaudeAgentSession extends SessionContext {
     runtimeEpoch: string
     scopedUsageModel: () => string | null
     sessionId: SessionId
+    sessionOffMcp: SessionOffMcp
     unapprovedProjectMcp: readonly string[]
   }) {
     super(input)
     this.resumed = input.resumeExisting === true
     this.conversationStarted = this.resumed
     this.unapprovedProjectMcp = input.unapprovedProjectMcp
+    this.mcpOff = input.sessionOffMcp.all
     this.attachmentsDir = input.attachmentsDir
     this.scopedUsageModel = input.scopedUsageModel
     this.interactionMode = input.interactionMode
@@ -807,6 +833,7 @@ class ClaudeAgentSession extends SessionContext {
     runtimeEpoch: string
     scopedUsageModel: () => string | null
     sessionId: SessionId
+    sessionOffMcp: SessionOffMcp
     unapprovedProjectMcp: readonly string[]
   }) {
     recordChatPipelineInfo('chat.pipeline.claude_session.start', {
@@ -840,6 +867,7 @@ class ClaudeAgentSession extends SessionContext {
       resumeExisting: input.resumeExisting,
       runtimeMode: input.runtimeMode,
       sessionId,
+      sessionOffMcpServers: input.sessionOffMcp,
       unapprovedProjectMcpServers: [...input.unapprovedProjectMcp],
     })
 
@@ -884,6 +912,7 @@ class ClaudeAgentSession extends SessionContext {
     runtimeEpoch: string
     ephemeral: boolean
     interactionMode: InteractionMode
+    mcpOff: readonly string[]
     model: string
     reasoningKey: string
     runtimeMode: RuntimeMode
@@ -892,6 +921,7 @@ class ClaudeAgentSession extends SessionContext {
     if (!this.isActive()) return false
     // The gate is a spawn-time setting: an approval (or a new .mcp.json server) needs a new CLI.
     if (this.unapprovedProjectMcp.join('\0') !== input.unapprovedProjectMcp.join('\0')) return false
+    if (this.mcpOff.join('\0') !== input.mcpOff.join('\0')) return false
     if (this.runtimeEpoch !== input.runtimeEpoch) return false
     if (this.cwd !== input.cwd) return false
     if (this.ephemeral !== input.ephemeral) return false
@@ -1079,13 +1109,16 @@ class ClaudeAgentSession extends SessionContext {
     if (!this.query) return null
 
     const servers: ProviderMcpServer[] = (await this.query.mcpServerStatus()).map((server) =>
-      claudeMcpServer(server, this.awaitsApproval(server.name)),
+      sessionOffServer(claudeMcpServer(server, this.awaitsApproval(server.name)), this.mcpOff),
     )
     const listed = new Set(servers.map((server) => server.name))
     const gated = this.unapprovedProjectMcp
       .filter((name) => !listed.has(name))
       .map(gatedProjectMcpServer)
-    return [...servers, ...gated]
+    const off = this.mcpOff
+      .filter((name) => !listed.has(name) && !this.unapprovedProjectMcp.includes(name))
+      .map(sessionOffPlaceholder)
+    return [...servers, ...gated, ...off]
   }
 
   /** Claude has no status stream: read it at `init` and each turn end, and warn on a new failure. */

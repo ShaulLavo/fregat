@@ -110,7 +110,7 @@ import { codexModelCapabilities } from './utils/codex-models'
 import { asRecord, numberField, stringField } from './utils/records'
 import { noop, runtimeEventId } from './utils/runtime-ids'
 import { isPresent } from '@workspace/utils/objects'
-import { sessionInputFromTurn } from './utils/session-input'
+import { reopenWithMcpOff, sessionInputFromTurn } from './utils/session-input'
 import { normalizeWorkspaceCwd } from './utils/workspace-cwd'
 import { canonicalTurnId } from './utils/turn-ids'
 import { CodexChildAgents } from './state/codex-child-agents'
@@ -250,6 +250,8 @@ export class CodexProviderAdapter
   private readonly attachmentsDir: string
   private readonly env: NodeJS.ProcessEnv
   private readonly clients = new Map<SessionId, CodexAppServerRpcClient>()
+  /** What each live session started from, so a changed off list can reopen its thread. */
+  private readonly startInputs = new Map<SessionId, ProviderRuntimeStartInput>()
   private readonly settings: ProviderInstanceSettings
 
   constructor(options: CodexAdapterOptions = {}) {
@@ -557,6 +559,18 @@ export class CodexProviderAdapter
     }
   }
 
+  /** Per-thread config applies at thread/resume, so an idle session reopens its thread now. */
+  async applyMcpSessionOff({ off, sessionId }: { off: readonly string[]; sessionId: SessionId }) {
+    await reopenWithMcpOff({
+      off,
+      reopen: (start, session) =>
+        this.ensureRuntimeSession({ ...start, providerResumeCursor: session.conversationMarker() }),
+      session: this.activeSession(sessionId),
+      sessionId,
+      startInputs: this.startInputs,
+    })
+  }
+
   async controlGoal({ action, sessionId }: { action: ProviderGoalAction; sessionId: SessionId }) {
     await this.requireSession(sessionId, 'thread/goal/set').controlGoal(action)
   }
@@ -613,6 +627,7 @@ export class CodexProviderAdapter
     else await client?.close()
     if (this.sessions.get(sessionId) === session) this.sessions.delete(sessionId)
     if (this.clients.get(sessionId) === client) this.clients.delete(sessionId)
+    this.startInputs.delete(sessionId)
   }
 
   async stopAll() {
@@ -629,10 +644,13 @@ export class CodexProviderAdapter
     const interactionMode = input.interactionMode ?? DEFAULT_INTERACTION_MODE
     const modelOptions = codexModelOptions(input)
     const ephemeral = input.ephemeral ?? false
+    const mcpOff = [...(input.mcpOff ?? [])].sort()
+    this.startInputs.set(input.sessionId, input)
     if (
       existing?.matches({
         cwd,
         ephemeral,
+        mcpOff,
         model,
         runtimeMode: input.runtimeMode,
         runtimeEpoch: input.runtimeEpoch,
@@ -677,6 +695,7 @@ export class CodexProviderAdapter
       env: this.env,
       ephemeral,
       interactionMode,
+      mcpOff,
       model,
       modelOptions,
       providerInstanceId: input.providerInstanceId,
@@ -720,10 +739,13 @@ class CodexAppServerSession extends SessionContext {
   /** This session's view of the plan windows, read back when a turn stops on one. */
   private usageWindows: ProviderUsageWindow[] = []
   private rateLimitReachedType: string | null = null
+  /** Servers this thread was opened without. */
+  private readonly mcpOff: readonly string[]
 
   private constructor(input: {
     client: CodexAppServerRpcClient
     cwd: string
+    mcpOff: readonly string[]
     emit: (event: ProviderRuntimeEvent) => void
     ephemeral: boolean
     interactionMode: InteractionMode
@@ -738,6 +760,7 @@ class CodexAppServerSession extends SessionContext {
   }) {
     super(input)
     this.client = input.client
+    this.mcpOff = input.mcpOff
     this.resumedConversationMarker = input.resumedConversationMarker
     this.interactionMode = input.interactionMode
     this.providerBindingHandle = `codex:${input.providerConversationMarker}`
@@ -782,6 +805,7 @@ class CodexAppServerSession extends SessionContext {
     env: NodeJS.ProcessEnv
     ephemeral: boolean
     interactionMode: InteractionMode
+    mcpOff: readonly string[]
     model: string
     modelOptions: CodexModelOptions
     providerInstanceId: ProviderTurnInput['providerInstanceId']
@@ -803,7 +827,8 @@ class CodexAppServerSession extends SessionContext {
     input.onClient(client)
     try {
       await initializeCodexClient(client)
-      const response = await openCodexSession(client, input)
+      const mcpOff = await configuredMcpOff(client, input.cwd, input.mcpOff)
+      const response = await openCodexSession(client, { ...input, mcpOff })
       const providerConversationMarker = response.thread.id
       recordChatPipelineInfo('chat.pipeline.codex_session.started', {
         providerConversationMarker,
@@ -813,6 +838,7 @@ class CodexAppServerSession extends SessionContext {
       const session = new CodexAppServerSession({
         client,
         cwd: input.cwd,
+        mcpOff: input.mcpOff,
         emit: input.emit,
         ephemeral: input.ephemeral,
         interactionMode: input.interactionMode,
@@ -856,17 +882,28 @@ class CodexAppServerSession extends SessionContext {
   matches(input: {
     cwd: string
     ephemeral: boolean
+    mcpOff: readonly string[]
     model: string
     runtimeMode: RuntimeMode
     runtimeEpoch: string
   }) {
     if (this.client.isClosed()) return false
+    // Per-thread config is read at thread/start and thread/resume only.
+    if (this.mcpOff.join('\0') !== input.mcpOff.join('\0')) return false
     if (this.runtimeEpoch !== input.runtimeEpoch) return false
     if (this.cwd !== input.cwd) return false
     if (this.ephemeral !== input.ephemeral) return false
     if (this.model !== input.model) return false
 
     return this.runtimeMode === input.runtimeMode
+  }
+
+  isBusy() {
+    return this.pendingTurn !== null || this.activeProviderTurnId !== null
+  }
+
+  conversationMarker() {
+    return this.providerConversationMarker
   }
 
   /** Reports whether the live session had to change mode, for the reuse event. */
@@ -2899,6 +2936,30 @@ async function listCodexMcpStatus(client: CodexAppServerRpcClient, threadId: str
   return servers
 }
 
+/**
+ * Per-thread config: it touches no user file and does not persist, so every start, resume and fork
+ * carries it again. It merges into the user's definition of each name.
+ */
+function codexSessionOffConfig(mcpOff: readonly string[]) {
+  if (mcpOff.length === 0) return {}
+
+  return {
+    config: Object.fromEntries(mcpOff.map((name) => [`mcp_servers.${name}.enabled`, false])),
+  }
+}
+
+/** An `enabled` key for a server no config defines any more would leave a half table behind. */
+async function configuredMcpOff(
+  client: CodexAppServerRpcClient,
+  cwd: string,
+  mcpOff: readonly string[],
+) {
+  if (mcpOff.length === 0) return mcpOff
+
+  const definitions = await readCodexMcpDefinitions(client, cwd)
+  return mcpOff.filter((name) => definitions.has(name))
+}
+
 function readCodexConfig(client: CodexAppServerRpcClient, cwd: string) {
   return client.request('config/read', { cwd, includeLayers: true })
 }
@@ -3115,6 +3176,7 @@ async function openCodexSession(
     cwd: string
     ephemeral: boolean
     fork?: ProviderForkStart
+    mcpOff: readonly string[]
     model: string
     modelOptions: CodexModelOptions
     providerResumeCursor?: unknown | null
@@ -3186,6 +3248,7 @@ async function requestCodexModels(client: CodexAppServerRpcClient) {
 function threadStartParams(input: {
   cwd: string
   ephemeral: boolean
+  mcpOff: readonly string[]
   model: string
   modelOptions: CodexModelOptions
   runtimeMode: RuntimeMode
@@ -3195,6 +3258,7 @@ function threadStartParams(input: {
   return {
     approvalPolicy: runtime.approvalPolicy,
     approvalsReviewer: runtime.approvalsReviewer,
+    ...codexSessionOffConfig(input.mcpOff),
     cwd: input.cwd,
     ...(input.ephemeral ? { ephemeral: true } : {}),
     experimentalRawEvents: true,
@@ -3207,6 +3271,7 @@ function threadStartParams(input: {
 
 function threadResumeParams(input: {
   cwd: string
+  mcpOff: readonly string[]
   model: string
   modelOptions: CodexModelOptions
   runtimeMode: RuntimeMode
@@ -3215,6 +3280,7 @@ function threadResumeParams(input: {
 
   return {
     approvalsReviewer: runtime.approvalsReviewer,
+    ...codexSessionOffConfig(input.mcpOff),
     cwd: input.cwd,
     model: input.model,
     sandbox: runtime.sandbox,

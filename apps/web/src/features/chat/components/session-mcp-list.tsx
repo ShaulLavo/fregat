@@ -6,6 +6,7 @@ import { LoadingState } from '@workspace/ui/components/loading-state'
 import { McpServerRow } from '@/features/chat/components/mcp-server-row'
 import { useApproveMcpServer } from '@/features/chat/hooks/use-approve-mcp-server'
 import { useReconnectMcpServer } from '@/features/chat/hooks/use-reconnect-mcp-server'
+import { useSetMcpSessionOff } from '@/features/chat/hooks/use-set-mcp-session-off'
 import type { useSessionMcp } from '@/features/chat/hooks/use-session-mcp'
 import { useSignInMcpServer } from '@/features/chat/hooks/use-sign-in-mcp-server'
 import { chatMutationKeys } from '@/features/chat/utils/mutation-keys'
@@ -21,6 +22,7 @@ export function SessionMcpList({
   const approve = useApproveMcpServer(sessionRef)
   const reconnect = useReconnectMcpServer(sessionRef)
   const signIn = useSignInMcpServer(sessionRef)
+  const sessionOff = useSetMcpSessionOff(sessionRef)
   const reconnecting = useMutationState({
     filters: {
       mutationKey: chatMutationKeys.reconnectMcpServer(
@@ -48,7 +50,17 @@ export function SessionMcpList({
     },
     select: (mutation) => mutation.state.variables,
   })
-  const busy = [...approving, ...reconnecting, ...signingIn]
+  const switching = useMutationState({
+    filters: {
+      mutationKey: chatMutationKeys.setMcpSessionOff(
+        sessionRef.environmentId,
+        sessionRef.sessionId,
+      ),
+      status: 'pending',
+    },
+    select: (mutation) => (mutation.state.variables as { name: string } | undefined)?.name,
+  })
+  const busy = [...approving, ...reconnecting, ...signingIn, ...switching]
 
   if (mcp.isPending)
     return (
@@ -79,7 +91,13 @@ export function SessionMcpList({
       onApprove={() => approve.mutate(server.name)}
       onReconnect={() => reconnect.mutate(server.name)}
       onSignIn={() => signIn.mutate(server.name)}
+      onSessionOffChange={(off) => sessionOff.mutate({ name: server.name, off })}
       server={server}
+      sessionOff={
+        mcp.data.canTurnOff && server.status !== 'unapproved'
+          ? mcp.data.off.includes(server.name)
+          : null
+      }
     />
   ))
 }

@@ -208,6 +208,21 @@ Each phase ships and deploys on its own; phases 1, 3, 5 and 6 change the server
    path as Plan 087's endpoint) and as Claude flag settings at CLI start. The switch's
    description names the checkout-wide alternative. Files: orchestration session projection,
    `provider-command-reactor.ts`, both adapters, popover. Scenarios per provider.
+   Landed 2026-09-26 (wave 2 lane M), stored on the provider binding's runtime payload
+   (`mcpOff`), not the session projection. The binding already outlives restarts and holds
+   what a start needs; the projection would have needed a `SCHEMA_VERSION` bump, which means
+   deleting every database. `ProviderService` puts the list into every runtime start and every
+   turn (a turn may reopen its runtime). Codex sends
+   `config['mcp_servers.<name>.enabled'] = false` on `thread/start`, `resume` and `fork`, only for
+   names `config/read` still defines. Claude sends `disabledMcpjsonServers` for `.mcp.json` names and
+   `deniedMcpServers` for the rest. An idle session reopens on its conversation at once; a busy one
+   at its next turn, because the off list is part of each adapter's reuse check. The popover row
+   has a switch (`<name> in this session`) and reads "Off for this session".
+   Not built: Claude's "Off in this checkout" (`toggleMcpServer`) action. The switch and the
+   settings page's Delete cover the two cases the owner asked for.
+   Not run: the Claude scenario (a real Claude session, a wave 2 hard stop). Covered by the Claude
+   adapter test (flag settings and restart) and, for Codex, the fixture scenario `mcp-status`,
+   whose resume carries the config.
 6. **Sign in from any device (M, blocked on Q3).** Claude: run `claude mcp login --no-browser
 <name>` with the instance environment, show its URL as "Open sign-in page", then take the
    final page address the user pastes and write it to the CLI's stdin. Codex: the same paste

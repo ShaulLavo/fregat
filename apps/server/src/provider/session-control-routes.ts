@@ -1,6 +1,7 @@
 import { Elysia } from 'elysia'
 import {
   providerBackgroundTasksSchema,
+  providerMcpSessionOffBodySchema,
   providerMcpSignInSchema,
   providerSessionHooksSchema,
   providerSessionMcpSchema,
@@ -76,6 +77,15 @@ export function sessionControlRoutes(providerService: ProviderService) {
       '/providers/sessions/:sessionId/mcp/:name/approve',
       ({ params }) => providerService.approveMcpServer(params),
       { params: serverParamsSchema, response: providerSessionMcpSchema },
+    )
+    .post(
+      '/providers/sessions/:sessionId/mcp/:name/session-off',
+      ({ body, params }) => providerService.setMcpSessionOff({ ...params, off: body.off }),
+      {
+        body: providerMcpSessionOffBodySchema,
+        params: serverParamsSchema,
+        response: providerSessionMcpSchema,
+      },
     )
     .post(
       '/providers/sessions/:sessionId/mcp/:name/sign-in',

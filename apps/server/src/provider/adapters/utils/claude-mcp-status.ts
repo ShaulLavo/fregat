@@ -30,6 +30,30 @@ export function gatedProjectMcpServer(name: string): ProviderMcpServer {
   }
 }
 
+/** A server this session runs without reads as off, whatever the CLI calls the way it was kept off. */
+export function sessionOffServer(
+  server: ProviderMcpServer,
+  off: readonly string[],
+): ProviderMcpServer {
+  if (!off.includes(server.name) || server.status === 'unapproved') return server
+
+  return { ...server, error: null, status: 'disabled' }
+}
+
+/** An off server the CLI no longer lists: only its name is known. */
+export function sessionOffPlaceholder(name: string): ProviderMcpServer {
+  return {
+    auth: 'unknown',
+    error: null,
+    name,
+    origin: null,
+    source: null,
+    status: 'disabled',
+    tools: [],
+    transport: null,
+  }
+}
+
 function claudeMcpTransport(config: McpServerStatus['config']): ProviderMcpTransport | null {
   if (!config) return null
   if (config.type === 'claudeai-proxy') return 'http'

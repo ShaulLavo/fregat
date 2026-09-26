@@ -48,6 +48,8 @@ export type ClaudeQueryOptionsInput = ClaudeRuntimeSelection & {
   agent?: string
   /** The checkout's `.mcp.json` servers the owner has not approved; they stay off. */
   unapprovedProjectMcpServers?: string[]
+  /** Servers the owner turned off for this session, split by the flag that turns each off. */
+  sessionOffMcpServers?: { readonly project: readonly string[]; readonly other: readonly string[] }
   /** A new session branching off `sourceSessionId`, cut after `resumeSessionAt` when set. */
   fork?: ClaudeForkOptions
 }
@@ -138,11 +140,21 @@ function claudeSettingsOptions(
   input: ClaudeQueryOptionsInput,
 ): Pick<Options, 'effort' | 'settings'> {
   const reasoning = claudeReasoningQueryOptions(input.reasoning ?? {})
-  const gated = input.unapprovedProjectMcpServers ?? []
-  if (gated.length === 0) return reasoning
+  const off = input.sessionOffMcpServers ?? { other: [], project: [] }
+  const gated = [...new Set([...(input.unapprovedProjectMcpServers ?? []), ...off.project])]
+  if (gated.length === 0 && off.other.length === 0) return reasoning
 
   const settings = typeof reasoning.settings === 'object' ? reasoning.settings : {}
-  return { ...reasoning, settings: { ...settings, disabledMcpjsonServers: gated } }
+  return {
+    ...reasoning,
+    settings: {
+      ...settings,
+      ...(gated.length > 0 ? { disabledMcpjsonServers: gated } : {}),
+      ...(off.other.length > 0
+        ? { deniedMcpServers: off.other.map((serverName) => ({ serverName })) }
+        : {}),
+    },
+  }
 }
 
 export function claudeQueryOptions(input: ClaudeQueryOptionsInput): Options {
