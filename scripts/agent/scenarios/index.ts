@@ -2,6 +2,11 @@ import { deferredDialogs } from './deferred-dialogs'
 import { rootSwitchNoFlicker } from './root-switch-no-flicker'
 import { turnFilesNoFlicker } from './turn-files-no-flicker'
 import { branchActionsNoFlicker } from './branch-actions-no-flicker'
+import {
+  diffNoFlicker,
+  savedComparisonNoFlicker,
+  historyComparisonNoFlicker,
+} from './comparison-no-flicker'
 import { textFieldFkeys } from './text-field-fkeys'
 import { settingsRoutePreparation } from './settings-route-preparation'
 import { settingsModuleFailure } from './settings-module-failure'
@@ -316,6 +321,9 @@ import { demoThemeStartup } from './demo-theme-startup'
 import { demoWallpaperStartup } from './demo-wallpaper-startup'
 
 export const scenarios: readonly Scenario[] = [
+  diffNoFlicker,
+  savedComparisonNoFlicker,
+  historyComparisonNoFlicker,
   terminalHistory,
   responseDelivery,
   archiveLifecycle,

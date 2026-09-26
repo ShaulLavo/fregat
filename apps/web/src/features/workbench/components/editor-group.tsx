@@ -1,3 +1,4 @@
+import { useShownComparisonTab } from '@/features/workbench/hooks/use-shown-comparison-tab'
 import type { GitFileStatus } from '@workspace/contracts'
 import { FileDashedIcon } from '@phosphor-icons/react'
 import { EmptyState } from '@workspace/ui/components/empty-state'
@@ -31,11 +32,19 @@ export function EditorGroup({
   readonly rootPath: FilesystemPath
 }) {
   const commands = useEditorCommands()
-  const selectedTab = group.tabs.find((tab) => tab.id === group.selectedTabId) ?? null
-  const inputPending = useEditorInputPending(selectedTab?.content)
+  const requestedTab = group.tabs.find((tab) => tab.id === group.selectedTabId) ?? null
+  const { shown, pending: comparisonPending } = useShownComparisonTab(requestedTab)
+  const selectedTab = group.tabs.some((tab) => tab.id === shown?.id) ? shown : requestedTab
+  const inputPending = useEditorInputPending(requestedTab?.content)
   const filePath = selectedTab ? tabFileResource(selectedTab.content)?.path : null
   const tabs = group.tabs.map((tab) =>
-    editorTabModel({ conflicts, gitFiles, rootPath, selectedTabId: group.selectedTabId, tab }),
+    editorTabModel({
+      conflicts,
+      gitFiles,
+      rootPath,
+      selectedTabId: selectedTab?.id ?? null,
+      tab: selectedTab && tab.id === selectedTab.id ? selectedTab : tab,
+    }),
   )
 
   // Manual memo: React unregisters and re-registers a ref callback whose identity changes, and the
@@ -60,7 +69,7 @@ export function EditorGroup({
     >
       <EditorTabBar
         groupId={group.id}
-        loadingTabId={inputPending ? selectedTab?.id : null}
+        loadingTabId={inputPending || comparisonPending ? selectedTab?.id : null}
         tabs={tabs}
       />
       <div

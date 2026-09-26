@@ -90,7 +90,6 @@ export function DiffEditor({
   return (
     <div className='editor-diff-view flex h-full min-h-0 w-full min-w-0 overflow-hidden'>
       <ResizablePanelGroup
-        key={tabId}
         className='min-h-0 min-w-0'
         defaultLayout={layout}
         id={`diff-panes-${tabId ?? 'standalone'}`}

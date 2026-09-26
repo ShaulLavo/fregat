@@ -41,9 +41,9 @@ subjects and reads `blank-frames-0`, like `quick-open-no-flicker`.
 | 10  | `features/chat/components/side-panel-content.tsx`                                                            | side-panel session switch    | same as 9                                | confirmed     |
 | 11  | `stage-body.tsx`, `side-panel-content.tsx`                                                                   | new chat / empty project     | "Opening draft"                          | likely        |
 | 12  | `stage-body.tsx`, `chat-mode/utils/active-session.ts`                                                        | session not yet projected    | "Opening session"                        | likely        |
-| 13  | `features/git/components/diff-view.tsx` → `editor/components/diff-editor.tsx`                                | diff tab                     | "Loading comparison"                     | confirmed     |
-| 14  | `features/editor/components/compare-saved-view.tsx`                                                          | compare tab                  | skeleton                                 | likely        |
-| 15  | `features/editor/components/history-pane.tsx`                                                                | undo-history compare         | "Comparing states"                       | likely        |
+| 13  | `features/git/components/diff-view.tsx` → `editor/components/diff-editor.tsx`                                | diff tab                     | "Loading comparison"                     | **fixed**     |
+| 14  | `features/editor/components/compare-saved-view.tsx`                                                          | compare tab                  | skeleton                                 | **fixed**     |
+| 15  | `features/editor/components/history-pane.tsx`                                                                | undo-history compare         | "Comparing states"                       | **fixed**     |
 | 16  | `features/workbench/components/file-navigator-panel.tsx` (`key={rootPath}`)                                  | tree root / session worktree | `TreeLoading`                            | **fixed**     |
 | 17  | `features/chat-mode/components/turn-files.tsx`                                                               | turn / session               | hunks vanish, "0 changes"                | **fixed**     |
 | 18  | `features/git/components/branch-actions.tsx`                                                                 | session worktree             | Push/PR buttons vanish                   | **fixed**     |
@@ -193,3 +193,35 @@ The turn scenario uses the native checkpoint fixture; branch sessions use a mock
 all remotes are local bare repositories. The turn runs include transient `client.RPC_FAILED`
 startup/read warnings; the measured switches completed and the final run had no failed HTTP
 responses. No deployment was performed for this wave worker PR.
+
+## Rows 13–15 proof
+
+The workbench holds comparison tabs with `useHeldUntilReady` until Git has resolved the
+comparison and any checkpoint blobs, or the saved-file read has settled. The active tab's label,
+breadcrumbs and body use the held subject; its header shows a spinner during the wait. Errors
+release the hold. Split comparisons reuse both editor instances after removing the tab key.
+
+Undo history holds its displayed state, including the focused header and selected pair, while the
+next comparison resolves. Focused and pair comparisons share one body so changing between them
+preserves the editor instance.
+
+- Row 13, `diff-no-flicker`: delayed Git blob reads, **20 → 0** blank frames. Every sampled frame
+  pairs the active tab label with the shown body.
+- Row 14, `saved-comparison-no-flicker`: warm saved comparisons, **0 → 0** blank frames, with
+  every frame pairing its tab label and body. DOM tests
+  also cover a delayed saved-file read, a superseded selection and a failed read.
+- Row 15, `history-comparison-no-flicker`: Shift+arrow through pairs, **0 → 0** blank frames. A DOM
+  regression fails before the fix because the editor is destroyed; it passes after the fix with
+  the same editor DOM node. A separate test proves both split-editor instances survive tab changes.
+
+Before evidence:
+
+- `/work/tmp/fregat-evidence/20260926T201644Z-scenario-diff-no-flicker/`
+- `/work/tmp/fregat-evidence/20260926T201659Z-scenario-saved-comparison-no-flicker/`
+- `/work/tmp/fregat-evidence/20260926T201712Z-scenario-history-comparison-no-flicker/`
+
+After evidence, screenshots read back:
+
+- `/work/tmp/fregat-evidence/20260926T202812Z-scenario-diff-no-flicker/`
+- `/work/tmp/fregat-evidence/20260926T203038Z-scenario-saved-comparison-no-flicker/`
+- `/work/tmp/fregat-evidence/20260926T201804Z-scenario-history-comparison-no-flicker/`

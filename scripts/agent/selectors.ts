@@ -643,6 +643,8 @@ export const selectors = {
       .getByRole('option')
       .nth(index),
   historyRestore: (page: Page) => page.getByRole('button', { name: 'Restore', exact: true }),
+  comparisonRowsSelector: '.editor-diff-pane [data-editor-virtual-row]',
+  selectedComparisonTabSelector: '[data-editor-tab-id][aria-selected="true"]',
   diffRows: (page: Page) => page.locator('.editor-diff-pane [data-editor-virtual-row]'),
   diffPanes: (page: Page) => page.locator(diffPaneSelector),
   diffExpandRows: (page: Page) => page.locator('.editor-diff-pane .editor-diff-row-expandable'),
