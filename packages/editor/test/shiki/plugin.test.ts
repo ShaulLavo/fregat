@@ -6,6 +6,7 @@ import type { EditorDisposable, EditorHighlighterProvider, EditorPlugin } from '
 import {
   createShikiHighlighterPlugin,
   createShikiHighlighterProvider,
+  shikiLanguageForDocument,
   type ShikiHighlighterPluginOptions,
   type ShikiHighlighterSessionOptions,
   type ShikiWorkerOwner,
@@ -241,6 +242,45 @@ describe('createShikiHighlighterPlugin', () => {
     expect(registrations.languageRegistrations.map((registration) => registration.name)).toEqual([
       'html',
     ])
+  })
+
+  it('reads a preload getter when the preload runs, after the session opened', async () => {
+    let wanted: readonly string[] = []
+    const provider = activateHighlighterProvider({ preloadLanguages: () => wanted })
+    const text = 'const value = 1'
+    provider.createSession({
+      documentId: 'first.ts',
+      languageId: 'typescript',
+      textSnapshot: createDocumentTextSnapshot(createPieceTableSnapshot(text), text),
+      snapshot: createPieceTableSnapshot(text),
+    })
+    const [options] = workerOwner.createSession.mock.calls.at(-1) as unknown as [
+      ShikiHighlighterSessionOptions,
+    ]
+    wanted = ['json']
+
+    const preload = options.preloadRegistrations
+    if (typeof preload !== 'function') throw new Error('expected a lazy preload')
+    await expect(preload()).resolves.toMatchObject({
+      languageRegistrations: [{ name: 'typescript' }, { name: 'json' }],
+    })
+  })
+
+  it('answers the grammar a document would use without opening it', () => {
+    expect(shikiLanguageForDocument({ documentId: 'App.tsx', languageId: 'typescript' }, {})).toBe(
+      'tsx',
+    )
+    expect(
+      shikiLanguageForDocument(
+        { documentId: 'notes.md', languageId: 'markdown' },
+        {
+          markdown: 'mdc',
+        },
+      ),
+    ).toBe('mdc')
+    expect(shikiLanguageForDocument({ documentId: 'a.css', languageId: 'css' }, undefined)).toBe(
+      'css',
+    )
   })
 
   it('requires a non-empty name on resolved theme registrations', async () => {
