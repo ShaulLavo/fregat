@@ -1,7 +1,6 @@
 # Plan 099: Route document consumers through one contribution runtime
 
-Status: proposed; only the session diff source correction has landed (2026-09-25). Requested on
-2026-09-12.
+Status: proposed. The session diff source correction has landed (2026-09-25). Unit 0 research partial (2026-09-25): inventory, baseline identity and probes done; harness extension and calibrated controls left for the unit 1 lane. Requested on 2026-09-12.
 Owner: Editor and Platform. Priority P1, effort XL, change risk high.
 Inspected Platform: `2f9528ac1e147615cf81431ef8509f551af4b290`.
 Inspected Editor: `64926519bfdd39f4afcfae225019a932d3e27785`.
@@ -834,3 +833,113 @@ If two independent adapters need their own generic source cursor, reset policy, 
 after migration, the proposed boundary has failed. Redesign it before migrating more consumers.
 If the common runtime introduces document-size-dependent publication work or measurable input
 regression, revise the data structures rather than hiding the cost with longer debounce delays.
+
+## Research findings (2026-09-25)
+
+Read from `origin/main` (`9f343825`); the plan is identical there and on every open lane branch
+except draft PR #37 (`lane/L7`), which carries an older copy plus a "Landed 2026-09-25: diff source
+correction" section for the checkpoint diff fix. That fix is on the unmerged `lane/L7` branch, so on
+`main` the session-diff correction is still unit 2 work. Editor read at `origin/main` `e2fd299`.
+
+Unit 0 is partial. The inventory, baseline identity and the measurements that need no product code
+are done; the full record is [baseline and inventory](../docs/document-contributions/baseline-and-inventory.md).
+The harness extension and the calibrated `bench:input` controls are not: the extension is Editor
+code, which this research pass may not write, and the controls need it.
+
+### Unit 0 questions, answered
+
+**Baseline identity.** Platform `9f343825`, Editor `e2fd299`. The shared Editor checkout is 5 commits
+behind at `c23cd306` with no difference under `packages/` or `examples/`, so the probes measure
+`e2fd299` code. Platform dev loads Editor `src/`; a Platform build loads `dist/`, and
+`packages/editor/dist` predates the latest core source commit. Record both builds by hash before
+the frozen comparison.
+
+**Mutation publishers.** Ten methods in `PieceTableEditorTextBuffer` publish, and eight of them
+repeat the same six steps (snapshot, revision, edit chain, change, selections, emit). The transition
+table above misses three that Platform calls: `checkoutHistoryState` (undo graph), `clearHistory`
+and `restoreHistory` (history-only `checkout` events with no revision). Platform "reload" never
+publishes a replacement: `resetDocumentText` builds a new buffer and rebinds views, a new
+incarnation. `rotateSyncSegment` publishes nothing; consumers see the new segment as a `null` from
+`changesSinceDocumentSyncPoint`.
+
+**Publication cost.** Flat in document size for every path but history checkout: typing 4.7–9.4 µs
+median from 64 KiB to 32 MiB, undo/redo 1.5–3.9 µs, logical-only 0.6–1.4 µs. Checkout diffs the two
+snapshots and costs 0.2, 2.2 and 17 ms at 64 KiB, 4 MiB and 32 MiB for a root ↔ tip move. It is
+mutation work, outside publication.
+
+**Nested notification.** The existing queue in `emitChange` already delivers R to every observer
+before R+1. The published change carries no revision and no sync point, so listeners read the
+mutable head, and during a nested commit the head is R+1 while the frame is R. A replay of Platform's
+`acceptBufferChange` logic loses a text revision committed inside a `synchronize` dispatch. No
+production listener commits there today.
+
+**Raw subscriptions and session creation.** Every `Editor` subscribes to the buffer and runs its own
+syntax pipeline, with two private dispatch cursors in the per-view syntax controller. Tree-sitter
+gives each session its own worker `runtimeSessionId`; Shiki keeps its own snapshot baseline; minimap
+creates a worker per view. Direct `createSession` callers outside the view path: prepared documents,
+diff syntax, snippet tokens, Platform's file-open preparer and Platform's search excerpt cache.
+The browser probe counts what that costs: a second view on the same buffer doubles every
+consumer's open payload (Tree-sitter 630,371 → 1,260,711 code units on a 624,000-character file,
+Shiki and minimap the same), and the peer view refreshes syntax on every keystroke because only the
+typing view defers (Tree-sitter 5 → 15 messages for 20 characters). Scrolling sent no document
+text. This is the duplicate work unit 2's shared sessions must remove, measured before any change.
+
+**Instrument calibration.** A control read of 1,000 units registers as one `textSnapshot.read` of
+1,000 units, so the read counter works; it does not see everything. Minimap's open walks the whole
+document line by line (32,045 reads, 592,799 units on a 624,000-character file) with no
+`materializeFullText`, and Tree-sitter builds its chunks from piece-table buffers below the counter
+(43 reads). Units 2 and 3 must be judged on `textSnapshot.read` units plus message payloads; a
+full-read count alone would miss both.
+
+**Unclassified callers, resolved.** Platform document symbols send a dirty document's full text as
+`didOpen` version 1 on a separate socket (`lib/document-symbols.ts:181`), outside the retained
+language-server lane: unit 4. Platform saved-state diffs read whole text, one through
+`materializePieceTableFullText`: units 2 and 5 with the other diff callers. The browser TypeScript
+LSP worker is used only by Editor `examples/app`; Platform runs TypeScript on the server. The TUI
+viewer's LSP client has no Editor buffer and is outside the plan.
+
+**SAB (Editor E057).** Owner decision: the SAB text transport is deleted. E057 is Proposed and not
+landed; the `shared-utf16` arm, `useSharedBuffers` and `supportsSharedTreeSitterSource` still exist,
+all in `packages/tree-sitter/src/treeSitter/source.ts`. Nothing else in either repository passes the
+option. Unit 1 does not touch them; if E057 lands first, unit 2 has no SAB work.
+
+**E009 in unit 6.** Owner decision: E009 is folded into unit 6 and closed in the Editor backlog.
+The per-keystroke message and payload counts above are the unit-0 slice of its string-path
+measurement. Still open for unit 6: visible completion time, main and worker heap bytes, the E001
+workload matrix (cold open, warm edits, large paste, branch-changing undo, replacement, worker
+restart, several retained documents), result representation, and dedup identity across a reused
+buffer ID.
+
+### What unit 1 needs
+
+1. The harness extension from unit 0, as the first commit: consumer configurations in the stress
+   workload identity, controls that instantiate Tree-sitter, Shiki and minimap separately and
+   together, readiness assertions, and fixtures frozen as hashed files. Then three controls, a
+   holdout and the 20 ms negative control against the pre-refactor build.
+2. One private `publish(transition)` in the buffer for the eight revision-advancing paths, and one
+   for the two history-only paths. Keep the queue order, per-listener isolation
+   (`editor/emitter.ts:33`), storage maintenance per publish, and eventless segment rotation.
+3. Revision before and after and the sync point after the transition on the published frame, so no
+   listener reads the head. Head readers to move: Platform `acceptBufferChange`, `lsp-plugin`
+   `bufferDocumentSnapshot`, the view snapshot's `documentSyncPoint`, and the guard in
+   `composeSkippedChanges`.
+4. The transition table extended with checkout, clear and restore; replacement stated as a new
+   incarnation in Platform and an `applyEdits` with `history: 'skip'` in Editor.
+5. Proof per path, including nested commits and a throwing listener: the revision and edits each
+   observer receives. The publication table in the baseline record is the cost to hold.
+
+Recommendation: do items 2–4 as one change to the buffer and its event type, with every listener
+migrated in the same pass. The plan allows no compatibility path, and there are five production
+subscribers: `Editor.ts:3284`, `historyViewer.ts:137`, `lsp-plugin/src/document.ts:98`, and
+Platform's `workspace-document-service.ts:1392` and `use-editor-visible-snapshot.ts:133`.
+
+Recommendation: leave checkout's snapshot diff as is in unit 1 and keep its `session.checkout`
+timing separate. Publishing the history path's own edits would remove the size dependence, but it
+changes what views and the language client receive, which is a unit 2 question.
+
+### Owner questions
+
+1. **Where does the harness extension land?** (a) As the first commit of the unit 1 lane, measured
+   before the buffer changes. (b) As its own Editor plan ahead of unit 1. Recommendation: (a). It is
+   small, unit 0 is already approved, and a separate plan would add a scheduling step without a new
+   decision.

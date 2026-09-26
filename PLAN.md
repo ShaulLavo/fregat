@@ -235,8 +235,10 @@ Requested 2026-09-11. [Plan 087](plans/087-stateless-mcp.md) precedes
 [Plan 088](plans/088-native-code-intelligence.md). Both are proposed; implementation has not started.
 Decided 2026-09-25: owner — approve 087 milestone M0 only; M1+ is discussed with the owner before
 anything else in 087 or 088 starts.
+Decided 2026-09-26: recommendation (owner deferred) — 087 narrows to our own tool endpoint; managed
+external MCP servers (former M2/M3) move to the unscheduled [Plan 174](plans/174-external-mcp-servers.md).
 
-Plan 087 delivers managed external MCP servers and an authenticated native tool endpoint. The
+Plan 087 delivers an authenticated native tool endpoint. The
 required wire revision is stateless MCP `2026-07-28`, implemented with explicitly configured SDK v2.
 Scoped machine-client authentication and real MCP calls from both providers are prerequisites,
 not assumptions supplied by existing provider MCP event handling.

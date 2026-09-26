@@ -10,6 +10,8 @@ import { parseRecentCommands, RECENT_COMMANDS } from '@/storage/recents'
 
 type Update = (current: string | null) => string | null
 
+const SQLITE_BUSY = 5
+
 export async function openFileStorage(directory: string, environmentId: EnvironmentId) {
   const id = v.parse(environmentIdSchema, environmentId)
   const filename = path.join(directory, `${id}.sqlite`)
@@ -55,11 +57,16 @@ async function enableWal(database: Database) {
       database.exec('PRAGMA journal_mode = WAL')
       return
     } catch (error) {
-      if (!(error instanceof SQLiteError) || error.code !== 'SQLITE_BUSY') throw error
+      if (!isBusy(error)) throw error
       if (Date.now() >= deadline) throw error
     }
     await setTimeout(10)
   }
+}
+
+// Extended codes such as SQLITE_BUSY_RECOVERY (261) keep SQLITE_BUSY (5) in their low byte.
+function isBusy(error: unknown) {
+  return error instanceof SQLiteError && (error.errno & 0xff) === SQLITE_BUSY
 }
 
 async function initialize(database: Database) {

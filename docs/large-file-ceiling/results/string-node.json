@@ -1,0 +1,14 @@
+{
+  "engine": "node",
+  "version": "v26.7.0",
+  "oneByteMaxUnits": 536870888,
+  "oneByteAtBound": false,
+  "oneByteMaxMiB": 511.9999771118164,
+  "twoByteMaxUnits": 536870888,
+  "twoByteAtBound": false,
+  "decodeAtCeilingOk": true,
+  "decodeOverCeilingOk": false,
+  "json": { "envelopeUnits": 187, "maxContentUnits": 536870701 },
+  "heap": { "chunkMiB": 64, "heldMiB": 3072, "capMiB": 3072, "failure": null },
+  "ms": 1138
+}

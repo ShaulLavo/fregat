@@ -422,20 +422,24 @@ needs.
    version-pinned and checked; (b) hold the Codex half until upstream promotes it; (c) serve a
    2025-era leg to Codex, which the plan forbids. Recommendation: (a). It is the only way to meet
    the plan's revision rule today, and it touches no user config.
+   Decided 2026-09-26: recommendation (owner deferred) — (a): Codex's per-thread flag, pinned to a checked version.
 2. **Split external MCP management out of 087?** Both providers already manage the user's own MCP
    servers natively, and plan 088 needs only the native endpoint. (a) Keep M2 and M3 (managed
    external client, OAuth, stdio lifecycle, gateway) in 087; (b) cut 087 to the native endpoint
    (M0, M1, the relevant M4 checks) and move external management to its own unscheduled plan.
    Recommendation: (b). It unblocks 088 soonest and avoids a second MCP manager beside the
    providers' own.
+   Decided 2026-09-26: recommendation (owner deferred) — (b): 087 is our own tool endpoint; M2/M3 move to [Plan 174](174-external-mcp-servers.md).
 3. **How wide should M1 be?** It currently covers remote federation routing, managed external-client
    credentials and the filesystem boundary together. (a) As written; (b) M1 = local provider grants
    plus a checkout-contained filesystem boundary, with remote/SSH routing and external-client
    credentials in a later milestone. Recommendation: (b).
+   Decided 2026-09-26: recommendation (owner deferred) — (b): M1 is local tokens plus file access confined to the session's checkout.
 4. **Approval for native tools.** (a) Read-only native tools run without a prompt in every runtime
    mode, and mutating tools go through the existing approval flow; (b) every native call follows
    the session's runtime mode. Recommendation: (a). Claude would otherwise route each read through
    `canUseTool` in approval-required sessions.
+   Decided 2026-09-26: recommendation (owner deferred) — (a): read-only tools run without an approval prompt.
 
 ### Remaining M0 work (approved, not started)
 

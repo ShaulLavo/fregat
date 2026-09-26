@@ -1,6 +1,7 @@
 # The large-file ceiling: what we can actually open, and who gets to decide
 
-Status: **research — no implementation scope yet.** Requested 2026-09-13.
+Status: **research done 2026-09-25; owner decided, phases proposed.** Requested
+2026-09-13. Measurements: [docs/large-file-ceiling/](../docs/large-file-ceiling/README.md).
 
 Decided 2026-09-25: owner — this plan and Editor
 [E015 massive file loading](../../Editor/plans/e015-massive-file-loading.md) run as one lane, 112
@@ -153,3 +154,113 @@ limit is owned, and the executable plans this becomes.
 - It does not change the transport on the strength of the server-side measurement alone.
 - It does not assume the answer is a bigger file. "200 MiB is already past the useful point, and the
   work is a better refusal" is a legitimate outcome.
+
+## Research findings (2026-09-25)
+
+Read from `origin/main` 9f3438258; no lane branch changes this plan. Method, tables and raw rows
+are in [docs/large-file-ceiling/](../docs/large-file-ceiling/README.md). All app numbers come from
+a production build of this tree in Chromium 153, one file per run, inside a 7 GB memory scope
+covering browser, server and language servers.
+
+### What fails first
+
+In the order a user meets them:
+
+1. **Typing latency, from 50 MiB.** Plain-text key p95 is 17 ms at 1 MiB, 133 ms at 50 MiB,
+   261 ms at 100 MiB and 332 ms at 150 MiB. A CPU profile at 100 MiB puts 1.7 s of the 30-key
+   window in the minimap's edit update, which materializes every fold marker in the document
+   (Editor `secondaryViews.ts:147`, `minimap/src/workerClient.ts:674`). With syntax and the
+   TypeScript server on, a 10 MiB `.ts` file already types at p50 118 ms.
+2. **Save, above 128 MiB.** Bun's default `maxRequestBodySize` is 128 MiB (a 129 MiB POST returns
+   413 on Bun 1.4.0) and `apps/server/src/index.ts:63` does not raise it. 150 and 200 MiB files
+   open under the default 200 MiB limit, then every save returns 413 with "Something unexpected
+   went wrong". That is a data-loss bug today, independent of the rest of this plan.
+3. **Memory.** Plain text: 300 MiB opens in 2.2 s and the renderer crashes on save. TypeScript:
+   100 MiB takes the renderer to 5.3 GB within 20 s of opening, with the server tree at up to
+   1.8 GB, and the scope is killed. 50 MiB `.ts` survives, but its save took 65 s, 55 s of it
+   inside the server's `fs.write` while the event loop relayed language-server symbol traffic
+   (inferred from log timestamps).
+4. **Server JSON serialization, between 300 and 400 MiB.** Elysia's `json` throws
+   `RangeError: Out of memory` at 400 MiB.
+5. **The engine string ceiling is never reached.** Every path above fails first.
+
+### Answers
+
+1. **Detect or declare?** Neither. The engine ceiling is not the binding limit, so a probe or a
+   table would guard a number nobody reaches. The client must verify instead: past 512 MiB
+   Chromium's `TextDecoder.decode` and `Response.text()` return `""` with no error, so a
+   client-side decode compares its byte count with the size it was sent and refuses on a
+   mismatch. **Recommendation:** no probe, no table; a length check in the shared decoder.
+2. **Who owns the number?** The server, with two budgets it can defend: the largest file it sends
+   and the largest body it accepts, the second at least the first. Negotiation buys nothing while
+   the Editor's limits sit an order of magnitude below every engine ceiling.
+   **Recommendation:** server-owned; revisit only if E015 ships paging.
+3. **Is the string ceiling binding?** No. Measured: V8 536,870,888 units (Node 26.7, Chromium
+   153), SpiderMonkey 1,073,741,822 (Firefox 155), JSC at least 2^31−1 in Bun 1.4.0 and in
+   WebKitGTK 2.52.6, Electrobun's Linux engine. The app fails on latency at 50 MiB, on save at
+   128 MiB and on memory at 100 MiB (TypeScript) or 300 MiB (plain text).
+4. **Which transport?** Raw bytes with metadata in headers, the `/fs/blob` shape. In the browser
+   it is 3.3–3.7x faster than JSON from 100 MiB up (200 MiB: 292 ms against 976 ms), answers
+   headers in 2–7 ms against up to 800 ms, keeps server RSS flat (300 MiB: 167 MiB against
+   1,399 MiB) and still works at 400 MiB, where JSON fails. At 1 MiB the difference is 5 ms.
+   Chunked delivery into the Editor needs E015's streamed construction first; raw bytes do not.
+   **Recommendation:** raw bytes for `/fs/read` with a byte-hash `version` and the decoder in a
+   shared package; a raw body for `/fs/write` too, so the body limit and the JSON copy go together.
+5. **A different read path for large files?** Not below 300 MiB: text opens in 1.6–2.6 s up to
+   there. Editing features break, reading does not. **Recommendation:** a large-file mode first;
+   E015's paged read-only view only for files past the memory ceiling.
+6. **Singapore's own ceiling?** Below the transport's. With all features, about 10 MiB for
+   TypeScript and 50 MiB for plain text. The main-thread heap is 2.8x the document at open and
+   grows by one document on the first save, because the saved text stays in the query cache while
+   the buffer keeps the original (`file-sync-service.ts:238`). The textbuffer is 116 of the
+   281 MiB at 100 MiB; the rest is view and plugin state for E015 step 1 to attribute.
+7. **Separate the git-diff budget?** Yes. `GitService` uses `maxTextFileBytes` as the `git show`
+   output cap and the diff gate (`git/service.ts:418,1052,1104,1168,1245,1256`). A diff holds both
+   sides plus its model; VS Code caps diffs at 50 MB (`diffEditor.maxFileSize`).
+   **Recommendation:** its own setting, default 50 MiB.
+8. **What does the user see at the ceiling?** Over the limit: an empty-looking line 1 with "The
+   file is larger than the workspace size limit." and a Retry that cannot succeed. 128–200 MiB: a
+   save that fails with a generic toast. 400 MiB with a raised limit: "The file server could not
+   complete the filesystem operation." **Recommendation:** degrade before refusing (owner
+   question 1).
+
+### E011, E015, E016
+
+- **Piece memory does not dominate.** At open the textbuffer adds 5.6 bytes per line (32 MiB at
+  200 MiB); 10,000 typed keys make 3 pieces; 10,000 scattered edits add 5 MiB; retaining every
+  snapshot costs 34 MiB per 20,000 edits. It rivals the text only after hundreds of thousands of
+  scattered edits (200,000 on 50 MiB: +95 MiB). **Recommendation:** E011 stays parked.
+- **E015:** text reads fine to 300 MiB; the costs are per-edit whole-document work and view and
+  plugin state. Its step 1 should attribute the heap beyond the textbuffer and fix the minimap
+  fold projection before designing paging.
+- **E016** is justified by the TypeScript rows, but the 5.3 GB renderer peak covers Tree-sitter,
+  Shiki, the minimap and the TypeScript client together. Attribute per worker before choosing a
+  bounded parse. VS Code turns tokenization and folding off above 20 MB or 300K lines and stops
+  syncing models to extensions above 50 MB (`textModel.ts:188–191`).
+
+### Owner decisions (2026-09-25)
+
+1. **Tiers, and the tier thresholds go up.** All features up to a size, then a large-file mode
+   with syntax, folding, minimap and language-server sync off, then refusal. The measured
+   thresholds (about 10 MiB for syntax and language server, 50 MiB for the rest) are today's
+   floor, not the target. Like the RSC payload problem, the cost comes from moving and
+   re-deriving whole documents, and it gets fixed: every phase below aims to raise a threshold,
+   and `bench:large-file` shows whether it moved.
+2. **The default open limit stays at 200 MiB**, and saving at that size gets fixed (Phase 1).
+
+### Proposed phases
+
+1. **Save and limit bugs.** Raise `maxRequestBodySize` above `maxTextFileBytes`, drop the
+   `new Blob([content])` byte count from the write log (`file-server.ts:323,387`), stop the saved
+   text outliving the save in the query cache, split the git-diff budget, and land the harness as
+   `bench:large-file` with a 150 MiB save case.
+2. **Raw-bytes transport** for read and write: shared decoder with the decoded-length check,
+   byte-hash `version`, metadata in headers.
+3. **Raise the thresholds.** Remove per-edit whole-document work, starting with the minimap
+   fold projection (Editor), and attribute the heap beyond the textbuffer per worker (E015
+   step 1, E016 step 1). Measured targets: typing p95 under one frame at 200 MiB plain text, and
+   syntax plus language server usable well past 10 MiB. Re-run `bench:large-file` after each fix.
+4. **Tiers.** Per-feature thresholds taken from the Phase 3 re-measurement, not from today's
+   numbers.
+5. **E015 paged read-only view**, for files past the resident-memory ceiling (about 300 MiB
+   today).

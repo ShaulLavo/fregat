@@ -182,6 +182,10 @@ None new. Plan 111's three (composer font and wrap, native spellcheck, hand-type
 this plan's too. One refinement to its question 1: option (b), the coding font, still needs
 word-boundary wrap, so wrap work is on the path in every option.
 
+- Decided 2026-09-26: owner — Plan 111 question 1 (a): E052 plus word-boundary wrap are composer prerequisites.
+- Decided 2026-09-26: recommendation (owner deferred) — Plan 111 question 3 (a): a hand-typed `@path` becomes a chip once complete.
+- Plan 111 question 2 (native spellcheck) is still open.
+
 ### Proposed phases
 
 Numbers are the coordinator's.
