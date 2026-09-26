@@ -261,7 +261,9 @@ export class FileSystemService {
       (result) => ({ failureCount: result.failures.length, prunedCount: result.prunedCount }),
     )
     // A missing folder is an answer; a candidate the server could not read is degraded.
-    const unreadable = failures.filter((failure) => failure.status >= 500)
+    const unreadable = failures.filter(
+      (failure) => failure.status >= 500 || failure.code === 'PERMISSION_DENIED',
+    )
     if (unreadable.length > 0) {
       recordRequestWarning('workspace address lookup could not read some candidates', {
         failureCodes: [...new Set(unreadable.map((failure) => failure.code))],

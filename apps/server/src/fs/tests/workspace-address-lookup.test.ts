@@ -79,7 +79,7 @@ test('an unreadable candidate answers null without failing the others and logs a
     await chmod(path.join(workspace.root, 'locked'), 0o755)
   }
   expect(await lookupEvent(logDir)).toMatchObject({
-    failureCodes: ['OPERATION_FAILED'],
+    failureCodes: ['PERMISSION_DENIED'],
     level: 'warn',
     status: 200,
     unreadableCount: 1,
