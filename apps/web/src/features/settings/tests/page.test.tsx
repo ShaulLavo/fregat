@@ -195,7 +195,10 @@ test(
     expect(client).toBeDefined()
     renderWithProviders(<SettingsPage />)
 
-    await userEvent.type(await screen.findByRole('textbox', { name: 'Search settings' }), 'providers')
+    await userEvent.type(
+      await screen.findByRole('textbox', { name: 'Search settings' }),
+      'providers',
+    )
 
     // The built-in providers live in the registry as constants, not in the
     // settings document, so the row has to source them from the running snapshots.

@@ -59,8 +59,8 @@
     "environments.machines",
     "files.autoSave",
     "files.autoSaveDelay",
-    "files.picker.pinnedLocations",
     "files.picker.hiddenLocations",
+    "files.picker.pinnedLocations",
     "files.picker.view",
     "files.previewKilobytes",
     "files.searchIndexIdleMinutes",
@@ -126,6 +126,8 @@
     "workbench.theme.customizations",
     "workbench.tree.indentGuides",
     "workbench.wallpaper",
-    "workbench.wallpaper.enabled"
+    "workbench.wallpaper.enabled",
+    "workbench.wallpaper.omarchyCatalog",
+    "workbench.wallpaper.previewCloud"
   ]
 }

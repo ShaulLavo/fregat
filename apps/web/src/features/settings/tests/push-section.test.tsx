@@ -317,7 +317,10 @@ test('settings search reaches the push section by its own words', async ({ clien
   const rendered = renderWithProviders(<SettingsPage />)
 
   try {
-    await userEvent.type(await screen.findByRole('textbox', { name: 'Search settings' }), 'push devices')
+    await userEvent.type(
+      await screen.findByRole('textbox', { name: 'Search settings' }),
+      'push devices',
+    )
     expect(await screen.findByRole('heading', { name: 'Push notifications' })).toBeVisible()
   } finally {
     rendered.unmount()
