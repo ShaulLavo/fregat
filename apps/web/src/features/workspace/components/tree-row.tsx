@@ -9,7 +9,10 @@ import {
   type TouchEvent as ReactTouchEvent,
 } from 'react'
 
-import { Icon } from '@/features/workspace/components/tree-icon'
+import { SparkleIcon } from '@phosphor-icons/react'
+import { FileTypeIcon } from '@/components/file-type-icon'
+import { iconForEntry } from '@/lib/file-icons'
+import { TreeGlyph } from '@/features/workspace/components/tree-glyph'
 import { MiddleTruncate } from '@/features/workspace/components/tree-middle-truncate'
 import { Truncate } from '@/features/workspace/components/tree-truncate'
 import { RenameInput } from '@/features/workspace/components/tree-rename-input'
@@ -26,7 +29,6 @@ import type {
 import type { GitStatus } from '@workspace/tree'
 import { createAnchorRectFromPoint } from '@/features/workspace/utils/tree-context-menu-anchor'
 import { focusElement } from '@/features/workspace/utils/tree-focus'
-import { createTreeIconResolver } from '@/features/workspace/utils/tree-icon-resolver'
 import { computeTreeRowElementAttributes } from '@/features/workspace/utils/tree-row-attributes'
 import type { TreeRowClickMode } from '@/features/workspace/utils/tree-row-click-plan'
 import {
@@ -34,7 +36,6 @@ import {
   getTreeRowAriaLabel,
   getTreeRowPath,
 } from '@/features/workspace/utils/tree-row-identity'
-import type { SVGSpriteNames } from '@workspace/tree'
 
 function formatFlattenedSegments(
   row: FileTreeVisibleRow,
@@ -66,12 +67,16 @@ function formatFlattenedSegments(
   )
 }
 
+type TreeGitDecoration =
+  | { readonly text: string; readonly title: string | undefined }
+  | { readonly dot: true; readonly title: string }
+
 // Built-in git decorations now live in their own fixed lane so custom row
 // decorations can coexist without borrowing git styling or precedence.
 function getBuiltInGitStatusDecoration(
   gitStatus: GitStatus | null,
   containsGitChange: boolean,
-): FileTreeRowDecoration | null {
+): TreeGitDecoration | null {
   if (gitStatus != null) {
     const label = GIT_STATUS_LABEL[gitStatus]
     if (label == null) {
@@ -85,10 +90,7 @@ function getBuiltInGitStatusDecoration(
   }
 
   if (containsGitChange) {
-    return {
-      icon: { name: 'file-tree-icon-dot', width: 6, height: 6 },
-      title: GIT_STATUS_DESCENDANT_TITLE,
-    }
+    return { dot: true, title: GIT_STATUS_DESCENDANT_TITLE }
   }
 
   return null
@@ -132,47 +134,27 @@ function getInheritedIgnoredGitStatus(
   return null
 }
 
-function isBuiltInDecorationIconName(name: string): name is SVGSpriteNames {
-  return (
-    name === 'file-tree-icon-chevron' ||
-    name === 'file-tree-icon-dot' ||
-    name === 'file-tree-icon-file' ||
-    name === 'file-tree-icon-lock'
-  )
-}
-
-function renderRowDecoration(
-  decoration: FileTreeRowDecoration | null,
-  resolveIcon: ReturnType<typeof createTreeIconResolver>['resolveIcon'],
-): JSX.Element | null {
+function renderRowDecoration(decoration: FileTreeRowDecoration | null): JSX.Element | null {
   if (decoration == null) {
     return null
   }
 
-  if ('text' in decoration) {
-    return (
-      <span title={decoration.title}>
-        {decoration.text}
-        {decoration.action ? <DecorationAction action={decoration.action} /> : null}
-      </span>
-    )
-  }
-
-  let icon: ReturnType<typeof resolveIcon>
-  if (typeof decoration.icon === 'string') {
-    icon = isBuiltInDecorationIconName(decoration.icon)
-      ? resolveIcon(decoration.icon)
-      : { name: decoration.icon }
-  } else if (isBuiltInDecorationIconName(decoration.icon.name)) {
-    const resolvedIcon = resolveIcon(decoration.icon.name)
-    const { name: _ignoredName, ...iconOverrides } = decoration.icon
-    icon = { ...resolvedIcon, ...iconOverrides }
-  } else {
-    icon = decoration.icon
-  }
   return (
     <span title={decoration.title}>
-      <Icon {...icon} />
+      {decoration.text}
+      {decoration.action ? <DecorationAction action={decoration.action} /> : null}
+    </span>
+  )
+}
+
+function renderGitDecoration(decoration: TreeGitDecoration | null): JSX.Element | null {
+  if (decoration == null) {
+    return null
+  }
+
+  return (
+    <span title={decoration.title}>
+      {'dot' in decoration ? <TreeGlyph name='dot' /> : decoration.text}
     </span>
   )
 }
@@ -193,14 +175,13 @@ function DecorationAction({ action }: { action: FileTreeRowDecorationAction }): 
       onMouseDown={(event) => event.stopPropagation()}
       onPointerDown={(event) => event.stopPropagation()}
     >
-      <Icon height={12} name='file-tree-icon-sparkle' viewBox='0 0 256 256' width={12} />
+      <SparkleIcon aria-hidden='true' size={12} />
     </span>
   )
 }
 
 function renderTreeRowContent(
   row: FileTreeVisibleRow,
-  resolveIcon: ReturnType<typeof createTreeIconResolver>['resolveIcon'],
   {
     actionLaneEnabled = false,
     customDecoration = null,
@@ -213,14 +194,12 @@ function renderTreeRowContent(
     actionLaneEnabled?: boolean
     customDecoration?: FileTreeRowDecoration | null
     decorationLaneEnabled?: boolean
-    gitDecoration?: FileTreeRowDecoration | null
+    gitDecoration?: TreeGitDecoration | null
     gitLaneActive?: boolean
     renameInput?: JSX.Element | null
     showDecorativeActionAffordance?: boolean
   } = {},
 ): JSX.Element {
-  const targetPath = getTreeRowPath(row)
-
   return (
     <Fragment>
       {row.depth > 0 ? (
@@ -236,9 +215,9 @@ function renderTreeRowContent(
       ) : null}
       <div data-item-section='icon'>
         {row.kind === 'directory' ? (
-          <Icon {...resolveIcon('file-tree-icon-chevron')} />
+          <TreeGlyph name='chevron' />
         ) : (
-          <Icon {...resolveIcon('file-tree-icon-file', targetPath)} />
+          <FileTypeIcon icon={iconForEntry({ name: row.name, type: 'file' })} sprite />
         )}
       </div>
       <div data-item-section='content'>
@@ -251,18 +230,16 @@ function renderTreeRowContent(
             ))}
       </div>
       {decorationLaneEnabled ? (
-        <div data-item-section='decoration'>
-          {customDecoration != null ? renderRowDecoration(customDecoration, resolveIcon) : null}
-        </div>
+        <div data-item-section='decoration'>{renderRowDecoration(customDecoration)}</div>
       ) : null}
       {gitLaneActive ? (
-        <div data-item-section='git'>{renderRowDecoration(gitDecoration, resolveIcon)}</div>
+        <div data-item-section='git'>{renderGitDecoration(gitDecoration)}</div>
       ) : null}
       {actionLaneEnabled ? (
         <div data-item-section='action'>
           {showDecorativeActionAffordance ? (
             <span aria-hidden='true' data-item-action-affordance='decorative'>
-              <Icon {...resolveIcon('file-tree-icon-ellipsis')} />
+              <TreeGlyph name='ellipsis' />
             </span>
           ) : null}
         </div>
@@ -314,7 +291,6 @@ export interface TreeRenderRowFrame {
   readonly contextMenuRightClickEnabled: boolean
   readonly registerRenameInput: (element: HTMLInputElement | null) => void
   readonly registerButton: (path: string, element: HTMLElement | null) => void
-  readonly resolveIcon: ReturnType<typeof createTreeIconResolver>['resolveIcon']
   readonly renderDecorationForRow: (
     row: FileTreeVisibleRow,
     targetPath: string,
@@ -378,7 +354,6 @@ export function TreeRow({ frame, options = {}, row }: TreeRowProps): JSX.Element
     contextMenuRightClickEnabled,
     registerRenameInput,
     registerButton,
-    resolveIcon,
     renderDecorationForRow,
     openContextMenuForRow,
     onRowClick,
@@ -417,7 +392,7 @@ export function TreeRow({ frame, options = {}, row }: TreeRowProps): JSX.Element
         }}
       />
     )
-  const rowContent = renderTreeRowContent(row, resolveIcon, {
+  const rowContent = renderTreeRowContent(row, {
     actionLaneEnabled,
     customDecoration,
     decorationLaneEnabled,

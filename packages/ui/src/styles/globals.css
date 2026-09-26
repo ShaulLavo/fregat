@@ -412,7 +412,7 @@
   --row-active: color-mix(in oklch, var(--foreground) 10%, transparent);
   --row-selected: color-mix(in oklch, var(--foreground) 14%, transparent);
   /* Same rust hue and chroma, lifted in lightness so the glyph keeps its
-     presence on a dark popover — the lift --trees-file-icon-color-claude
+     presence on a dark popover — the lift the Claude file icon
      already makes, kept smaller because this is the real brand color. */
   --brand-anthropic: oklch(0.76 0.131 38.8);
   --search-result-match-background: color-mix(in oklch, oklch(0.84 0.17 91) 36%, transparent);
