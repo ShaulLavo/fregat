@@ -1,3 +1,8 @@
+import {
+  diffNoFlicker,
+  savedComparisonNoFlicker,
+  historyComparisonNoFlicker,
+} from './comparison-no-flicker'
 import { textFieldFkeys } from './text-field-fkeys'
 import { settingsRoutePreparation } from './settings-route-preparation'
 import { settingsModuleFailure } from './settings-module-failure'
@@ -310,6 +315,9 @@ import { demoThemeStartup } from './demo-theme-startup'
 import { demoWallpaperStartup } from './demo-wallpaper-startup'
 
 export const scenarios: readonly Scenario[] = [
+  diffNoFlicker,
+  savedComparisonNoFlicker,
+  historyComparisonNoFlicker,
   terminalHistory,
   responseDelivery,
   archiveLifecycle,

@@ -860,6 +860,12 @@
   {
     "from": "workbench",
     "to": "git",
+    "module": "features/git/hooks/use-diff-document-diffs.ts",
+    "reason": "owner: workbench coordinates the comparison tab label and body; Git supplies readiness for the patch and its complete blobs."
+  },
+  {
+    "from": "workbench",
+    "to": "git",
     "module": "features/git/components/branch-chip.tsx",
     "reason": "owner: The workbench composes feature panes and their commands; this module supplies BranchChip."
   },
