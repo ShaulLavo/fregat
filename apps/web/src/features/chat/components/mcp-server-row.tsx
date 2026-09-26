@@ -1,4 +1,4 @@
-import { ArrowsClockwiseIcon, SignInIcon } from '@phosphor-icons/react'
+import { ArrowsClockwiseIcon, CheckIcon, SignInIcon } from '@phosphor-icons/react'
 import type { ProviderMcpServer } from '@workspace/contracts'
 import { ListRow } from '@workspace/ui/patterns/list-row'
 import { cn } from '@workspace/ui/lib/utils'
@@ -12,6 +12,7 @@ export function McpServerRow({
   busy,
   canReconnect,
   canSignIn,
+  onApprove,
   onReconnect,
   onSignIn,
   server,
@@ -20,12 +21,13 @@ export function McpServerRow({
   readonly busy: boolean
   readonly canReconnect: boolean
   readonly canSignIn: boolean
+  readonly onApprove: () => void
   readonly onReconnect: () => void
   readonly onSignIn: () => void
   readonly server: ProviderMcpServer
 }) {
   const needsAuth = server.status === 'needs-auth'
-  const hint = needsAuth && !canSignIn ? 'Sign in with /mcp in Claude Code.' : server.error
+  const hint = mcpServerHint(server, canSignIn)
   return (
     <ListRow
       className='h-auto flex-col items-stretch gap-0.5 py-(--density-row-padding-y)'
@@ -40,6 +42,11 @@ export function McpServerRow({
         {needsAuth && canSignIn && !authorizationUrl ? (
           <RowIconAction busy={busy} label={`Sign in to ${server.name}`} onClick={onSignIn}>
             <SignInIcon className='size-(--icon-size-sm)' />
+          </RowIconAction>
+        ) : null}
+        {server.status === 'unapproved' ? (
+          <RowIconAction busy={busy} label={`Approve ${server.name}`} onClick={onApprove}>
+            <CheckIcon className='size-(--icon-size-sm)' />
           </RowIconAction>
         ) : null}
         {server.status === 'failed' && canReconnect ? (
@@ -61,4 +68,11 @@ export function McpServerRow({
       {hint ? <span className='text-muted-foreground text-2xs truncate'>{hint}</span> : null}
     </ListRow>
   )
+}
+
+function mcpServerHint(server: ProviderMcpServer, canSignIn: boolean) {
+  if (server.status === 'needs-auth' && !canSignIn) return 'Sign in with /mcp in Claude Code.'
+  if (server.status === 'unapproved')
+    return 'Defined by a .mcp.json in this folder or above it. Approve to let sessions start it; a changed definition asks again.'
+  return server.error
 }

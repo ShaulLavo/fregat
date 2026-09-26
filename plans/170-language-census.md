@@ -1,6 +1,6 @@
 # Plan 170: Language census for grammar and theme prefetch
 
-Status: **research done 2026-09-25** (findings below; the in-app before/after paint measurement belongs to the implementation phases). Split out of [Plan 110](110-workspace-indexing.md) question 7. Decided 2026-09-25: owner — split the language census into its own small plan. Amended 2026-09-26: tree-sitter warm-up joins the scope (see "Tree-sitter has no warm-up"). [Root PLAN.md](../PLAN.md) owns scheduling.
+Status: **Phase 1 done 2026-09-26** (wave 2 lane W: `GET /fs/workspace-index/languages?root=`, on the per-root indexes of [Plan 173](173-two-devices-one-workspace.md)); research done 2026-09-25 (findings below; the in-app before/after paint measurement belongs to the implementation phases). Split out of [Plan 110](110-workspace-indexing.md) question 7. Decided 2026-09-25: owner — split the language census into its own small plan. Amended 2026-09-26: tree-sitter warm-up joins the scope (see "Tree-sitter has no warm-up"). [Root PLAN.md](../PLAN.md) owns scheduling.
 
 Editor fix (owner question 1, answer (a)) done 2026-09-26 in wave 2, lane E1:
 [singapore#41](https://github.com/ShaulLavo/singapore/pull/41), in `editor-ref` `ec3fc15`. A Shiki

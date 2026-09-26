@@ -133,6 +133,27 @@ export type SetProviderEnabledOperation = {
   readonly createIfMissing?: NonSecretProviderSeed
 }
 
+/** The per-project records, each keyed by project id, that `project.set` edits one entry of. */
+export const PROJECT_OVERRIDE_SETTING_IDS = [
+  'chat.projectResponseStreamingModes',
+  'chat.projectAutoSettle',
+  'git.projectAutoPull',
+  'git.projectWorktreeSubmodules',
+  'git.projectWorktreeCleanupOnDelete',
+] as const satisfies readonly NonScalarSettingId[]
+
+export type ProjectOverrideSettingId = (typeof PROJECT_OVERRIDE_SETTING_IDS)[number]
+
+/** Sets or, with `value: null`, removes one project's entry in a per-project record. */
+export type SetProjectOverrideOperation = {
+  [K in ProjectOverrideSettingId]: {
+    readonly kind: 'project.set'
+    readonly key: K
+    readonly projectId: string
+    readonly value: SettingsValues[K][string] | null
+  }
+}[ProjectOverrideSettingId]
+
 export type SettingsOperation =
   | ThemeCustomizeOperation
   | ThemeResetOperation
@@ -146,6 +167,7 @@ export type SettingsOperation =
   | SetModelFavoriteOperation
   | SetModelOrderOperation
   | SetProviderEnabledOperation
+  | SetProjectOverrideOperation
 
 export type SettingsMutationRequest = {
   readonly mutationId: string
@@ -197,6 +219,26 @@ const scalarSettingOperationSchemas = SCALAR_SETTING_IDS.map((key) =>
     key: v.literal(key),
     value: descriptorFor(key).schema,
   }),
+)
+
+// Each record's own entry schema, so a value that would not parse in the file is refused here.
+const projectOverrideOperationSchema = v.union(
+  PROJECT_OVERRIDE_SETTING_IDS.map((key) =>
+    v.strictObject({
+      kind: v.literal('project.set'),
+      key: v.literal(key),
+      projectId: trimmedNonEmptyStringSchema,
+      value: v.nullable(
+        (
+          descriptorFor(key).schema as v.RecordSchema<
+            v.GenericSchema<string>,
+            v.GenericSchema,
+            undefined
+          >
+        ).value,
+      ),
+    }),
+  ),
 )
 
 const uniqueSettingIdsSchema = v.pipe(
@@ -266,6 +308,7 @@ export const settingsOperationSchemasByKind = {
     enabled: v.boolean(),
     createIfMissing: v.optional(nonSecretProviderSeedSchema),
   }),
+  'project.set': projectOverrideOperationSchema,
 } satisfies Record<Exclude<SettingsOperation['kind'], 'set'>, v.GenericSchema>
 
 /** Every `kind` the operation union accepts, so a rejection can name a bad one. */
@@ -378,6 +421,8 @@ export function settingsOperationResourceKeys(
     return [memberResourceKey('models.favorites', modelResourceId(operation.ref))]
   }
   if (operation.kind === 'model.setOrder') return [settingResourceKey('models.order')]
+  if (operation.kind === 'project.set')
+    return [memberResourceKey(operation.key, operation.projectId)]
 
   return [memberResourceKey('providers.instances', operation.providerInstanceId)]
 }
@@ -416,6 +461,7 @@ function applySettingsOperation(
   if (operation.kind === 'model.setOrder') {
     return replaceSetting(raw, 'models.order', operation.order)
   }
+  if (operation.kind === 'project.set') return setProjectOverride(raw, operation)
 
   return setProviderEnabled(raw, operation)
 }
@@ -551,9 +597,18 @@ function appendProviderSeed(
   return replaceSetting(raw, 'providers.instances', [...current, instance])
 }
 
+function setProjectOverride(
+  raw: Readonly<Record<string, unknown>>,
+  operation: SetProjectOverrideOperation,
+): Readonly<Record<string, unknown>> {
+  const { [operation.projectId]: _previous, ...rest } = recordSetting(raw, operation.key)
+  const next = operation.value === null ? rest : { ...rest, [operation.projectId]: operation.value }
+  return replaceSetting(raw, operation.key, next)
+}
+
 function recordSetting(
   raw: Readonly<Record<string, unknown>>,
-  key: 'environments.machines' | 'keybindings.overrides',
+  key: 'environments.machines' | 'keybindings.overrides' | ProjectOverrideSettingId,
 ): Readonly<Record<string, unknown>> {
   const value = raw[key]
 
@@ -608,6 +663,7 @@ function touchedSettingIds(operation: SettingsOperation): readonly SettingId[] {
   if (operation.kind === 'model.setHidden') return ['models.hidden']
   if (operation.kind === 'model.setFavorite') return ['models.favorites']
   if (operation.kind === 'model.setOrder') return ['models.order']
+  if (operation.kind === 'project.set') return [operation.key]
 
   return ['providers.instances']
 }

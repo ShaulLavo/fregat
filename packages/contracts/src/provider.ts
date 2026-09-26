@@ -302,6 +302,8 @@ export const providerMcpServerStatusSchema = v.picklist([
   'needs-auth',
   'pending',
   'disabled',
+  // A checkout's project server the owner has not approved; it stays off until approved.
+  'unapproved',
 ])
 
 export const providerMcpServerSchema = v.object({

@@ -3,6 +3,8 @@ import { Toaster } from '@workspace/ui/components/sonner'
 import { toast } from 'sonner'
 import { afterAll, expect, test, vi } from 'vitest'
 
+// Keep scheduling evidence even if a slow runner lets the timer fire before the assertion.
+let scheduledRemovals = 0
 // Removal timers sonner scheduled that have not fired yet.
 const pendingRemovals = new Set<ReturnType<typeof setTimeout>>()
 const realSetTimeout = globalThis.setTimeout
@@ -15,7 +17,10 @@ const spy = vi.spyOn(globalThis, 'setTimeout').mockImplementation(((
     pendingRemovals.delete(id)
     callback(...args)
   }, ms)
-  if (ms === 200) pendingRemovals.add(id)
+  if (ms === 200) {
+    scheduledRemovals++
+    pendingRemovals.add(id)
+  }
   return id
 }) as typeof setTimeout)
 
@@ -23,12 +28,12 @@ afterAll(() => {
   spy.mockRestore()
 })
 
-/** sonner applies each toast change on a zero-delay timer of its own. */
+/** Sonner adds a toast on a zero-delay timer. */
 function nextTask() {
   return new Promise((resolve) => realSetTimeout(resolve, 0))
 }
 
-test("a toast closed in a test starts sonner's removal timer", async () => {
+test("a dismissed toast starts sonner's removal timer after both animation frames", async () => {
   render(<Toaster />)
   await act(async () => {
     toast('Session archived', { id: 'toast-timers' })
@@ -37,10 +42,12 @@ test("a toast closed in a test starts sonner's removal timer", async () => {
   expect(document.querySelectorAll('[data-sonner-toast]')).toHaveLength(1)
   await act(async () => {
     toast.dismiss('toast-timers')
-    await nextTask()
+    // The store notifies on one frame; the Toaster marks the toast deleted on the next.
+    await new Promise(requestAnimationFrame)
+    await new Promise(requestAnimationFrame)
   })
 
-  expect(pendingRemovals.size).toBeGreaterThan(0)
+  expect(scheduledRemovals).toBeGreaterThan(0)
 })
 
 test('no removal timer outlives the test that started it', () => {
@@ -60,4 +67,23 @@ test('a toast left open is closed with its test', async () => {
 test('the open toast neither stays nor leaves a removal timer behind', () => {
   expect(toast.getToasts()).toHaveLength(0)
   expect(pendingRemovals.size).toBe(0)
+})
+
+let removalsBeforeDeferredDismiss = 0
+
+test('a dismissal can still be waiting for its animation frames when a test ends', async () => {
+  render(<Toaster />)
+  await act(async () => {
+    toast('Session archived', { duration: Infinity, id: 'toast-timers-deferred' })
+    await nextTask()
+  })
+
+  removalsBeforeDeferredDismiss = scheduledRemovals
+  toast.dismiss('toast-timers-deferred')
+})
+
+test('cleanup flushes the deferred dismissal and drains its removal timer', () => {
+  expect(scheduledRemovals).toBeGreaterThan(removalsBeforeDeferredDismiss)
+  expect(pendingRemovals.size).toBe(0)
+  expect(toast.getToasts()).toHaveLength(0)
 })

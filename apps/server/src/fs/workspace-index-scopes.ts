@@ -79,6 +79,19 @@ export class WorkspaceIndexScopes {
     return scope.index
   }
 
+  /** The root's index once its first build settles, or as it stands when `signal` aborts. */
+  async settled(absoluteRoot: string, signal: AbortSignal) {
+    const scope = this.scopes.get(absoluteRoot)
+    if (!scope) return undefined
+    const aborted = new Promise<void>((resolve) => {
+      if (signal.aborted) resolve()
+      signal.addEventListener('abort', () => resolve(), { once: true })
+    })
+    await Promise.race([scope.startup, aborted])
+    scope.lastUsedAt = performance.now()
+    return scope.index
+  }
+
   statuses(): WorkspaceIndexScopeStatus[] {
     return [...this.scopes.values()].map((scope) => ({
       ...scope.index.status(),

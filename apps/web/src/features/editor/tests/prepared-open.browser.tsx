@@ -32,6 +32,7 @@ import {
   type EditorOpenSampleResetResult,
 } from '@/features/editor/state/performance-trace'
 import {
+  awaitEditorShikiRuntimeSessionIdle,
   awaitEditorSyntaxWorkerIdleFences,
   disposeEditorShikiWorkerOwner,
   disposeEditorTreeSitterSyntaxProvider,
@@ -301,6 +302,8 @@ test(
 
     await triggerForesightIntent()
     await expect.poll(workerRequestGate.heldTypes, { timeout: 20_000 }).toEqual(['queryRange'])
+    // Both stages start together; Shiki finishes while Tree-sitter's query is held.
+    await Promise.all(workerRuntimeSessionIds('shiki').map(awaitEditorShikiRuntimeSessionIdle))
     diagnostics = []
     performance.clearMarks('editor.worker.request')
     performance.clearMarks('editor.authoritative_text_paint')

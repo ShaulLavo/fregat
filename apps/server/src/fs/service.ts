@@ -15,7 +15,9 @@ import { FileChangeHub } from './watch'
 import { entryFromStat } from './entry'
 import { DEFAULT_MAX_TEXT_FILE_BYTES, MAX_TEXT_FILE_BYTES_UPPER_BOUND } from './limits'
 import { statPath } from './stat'
+import { readDrives } from './drives'
 import { readUserPlaces } from './places'
+import { readProjectFolders } from './project-folders'
 import { readTree } from './tree'
 import { getBlobFile, readTextFile, readTextHead } from './read'
 import { writeTextFile } from './write'
@@ -49,6 +51,7 @@ import {
   resolveWorkspaceAddress,
 } from './workspace-address'
 import { WorkspaceIndexScopes } from './workspace-index-scopes'
+import { languageCensus } from './language-census'
 import type {
   CopyBody,
   CreateFileBody,
@@ -76,8 +79,12 @@ export type FileSystemServiceOptions = {
   workspaceRoot?: string
   systemRoot?: string
   homeDirectory?: string
-  /** xdg-user-dirs' `user-dirs.dirs`; defaults to the one under the home's config directory. */
-  userDirsFile?: string
+  /** Holds `user-dirs.dirs` and `gtk-3.0/bookmarks`; defaults to the home's config directory. */
+  configDirectory?: string
+  /** Test seam: the mount table (`/proc/mounts`) read for the picker's drives. */
+  mountsFile?: string
+  /** Test seam: macOS's `/Volumes`. */
+  volumesDirectory?: string
   watch?: boolean
   maxSearchContentBytes?: number
   maxTextFileBytes?: number
@@ -129,8 +136,8 @@ export class FileSystemService {
   readonly systemRoot
   readonly defaultPath
   readonly metadata
-  private readonly homeDirectory
-  private readonly userDirsFile
+  private readonly placeSources
+  private readonly driveSources
   private readonly appWrites = new AppWrites()
   private readonly maxSearchContentBytes
   private readonly maxTextFileBytes
@@ -156,8 +163,16 @@ export class FileSystemService {
       excludedNames: [driveJournalName(process.getuid?.() ?? 0)],
     })
     this.homePath = resolveHomePath(this.paths, homeDirectory)
-    this.homeDirectory = homeDirectory
-    this.userDirsFile = options.userDirsFile ?? defaultUserDirsFile(options.homeDirectory)
+    this.placeSources = {
+      configDirectory: options.configDirectory ?? defaultConfigDirectory(options.homeDirectory),
+      homeDirectory,
+      platform: process.platform,
+    }
+    this.driveSources = {
+      mountsFile: options.mountsFile ?? '/proc/mounts',
+      platform: process.platform,
+      volumesDirectory: options.volumesDirectory ?? '/Volumes',
+    }
     this.defaultPath = this.homePath
     this.metadata = new FsMetadataStore({
       database: options.metadataDatabase,
@@ -194,6 +209,36 @@ export class FileSystemService {
     return this.workspaceIndexes.get(this.paths.resolve(root).absolutePath)
   }
 
+  /**
+   * Files per language key under `root`, from its index once the first build settles. A root no
+   * client holds has no index and answers `cold` with no counts; so does a build still running
+   * when the request ends.
+   */
+  languageCensus(root: string, signal: AbortSignal) {
+    return observeRequestOperation(
+      { area: 'fs', operation: 'language_census', path: root },
+      () => this.languageCensusObserved(root, signal),
+      (result) => ({
+        keyCount: Object.keys(result.counts).length,
+        readiness: result.readiness,
+      }),
+    )
+  }
+
+  private async languageCensusObserved(root: string, signal: AbortSignal) {
+    const absoluteRoot = this.paths.resolve(root).absolutePath
+    const index = await this.workspaceIndexes.settled(absoluteRoot, signal)
+    const status = index?.status()
+    const readiness = status?.readiness ?? 'cold'
+    // A stale index still holds every entry, so its counts stand.
+    const counted = readiness === 'ready' || readiness === 'stale'
+    return {
+      counts: counted && index ? languageCensus(index) : {},
+      readiness,
+      scanRoot: status?.scanRoot ?? null,
+    }
+  }
+
   /** `files.searchIndexLimit` and `files.searchIndexIdleMinutes`, read when they apply. */
   set searchIndexSettings(read: () => SearchIndexSettings) {
     this.readSearchIndexSettings = read
@@ -225,11 +270,24 @@ export class FileSystemService {
   places() {
     return observeRequestOperation(
       { area: 'fs', operation: 'places' },
-      async () => ({
-        places: await readUserPlaces(this.paths, this.homeDirectory, this.userDirsFile),
+      () => this.placesObserved(),
+      (result) => ({
+        driveCount: result.drives.length,
+        placeCount: result.places.length,
+        projectFolderCount: result.projects.length,
       }),
-      (result) => ({ placeCount: result.places.length }),
     )
+  }
+
+  private async placesObserved() {
+    const [places, drives] = await Promise.all([
+      readUserPlaces(this.paths, this.placeSources),
+      readDrives(this.paths, this.driveSources),
+    ])
+    const covered = new Set([this.homePath, ...drives.map((drive) => drive.path)])
+    const projects = await readProjectFolders(this.paths, this.metadata, covered)
+    const projectPaths = new Set(projects.map((folder) => folder.path))
+    return { drives, places: places.filter((place) => !projectPaths.has(place.path)), projects }
   }
 
   stat(path: string) {
@@ -941,11 +999,9 @@ function watchStreamSummary(
 }
 
 // An injected home (tests, a second owner) reads its own config, never the process's XDG_CONFIG_HOME.
-function defaultUserDirsFile(injectedHome: string | undefined) {
-  const configHome = injectedHome
-    ? path.join(injectedHome, '.config')
-    : process.env.XDG_CONFIG_HOME || path.join(homedir(), '.config')
-  return path.join(configHome, 'user-dirs.dirs')
+function defaultConfigDirectory(injectedHome: string | undefined) {
+  if (injectedHome) return path.join(injectedHome, '.config')
+  return process.env.XDG_CONFIG_HOME || path.join(homedir(), '.config')
 }
 
 function resolveHomePath(paths: ReturnType<typeof createWorkspacePaths>, homeDirectory: string) {

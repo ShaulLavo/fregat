@@ -124,6 +124,12 @@ describe('workspace index', () => {
     await writeFile(path.join(root, 'blob.txt'), Buffer.from([0, 1, 2, 3]))
     await writeFile(path.join(root, 'ansi.log'), '\u001b[31mhello\u001b[0m\n')
     await writeFile(path.join(root, 'raw-image'), pngBytes)
+    const utf16 = Buffer.from('hello from UTF-16\n', 'utf16le')
+    await writeFile(path.join(root, 'notes.txt'), Buffer.concat([Buffer.from([0xff, 0xfe]), utf16]))
+    await writeFile(
+      path.join(root, 'notes-be'),
+      Buffer.concat([Buffer.from([0xfe, 0xff]), utf16.swap16()]),
+    )
     await writeFile(path.join(root, 'pixel.png'), pngBytes)
     await symlink('pixel.png', path.join(root, 'linked.png'))
 
@@ -145,6 +151,8 @@ describe('workspace index', () => {
       contentKind: 'text',
       fileKind: 'document',
     })
+    expect(index.get('notes.txt')).toMatchObject({ contentKind: 'text' })
+    expect(index.get('notes-be')).toMatchObject({ contentKind: 'text' })
     expect(index.get('raw-image')).toMatchObject({
       contentKind: 'image',
       fileKind: 'image',
@@ -683,6 +691,38 @@ describe('workspace index', () => {
     },
   )
 
+  it('counts files per language key for a held root, leaving ignored files out', async () => {
+    const root = await fixtureRoot()
+    await mkdir(path.join(root, 'app/src'), { recursive: true })
+    await writeFile(path.join(root, 'app/src/a.ts'), 'export {}\n')
+    await writeFile(path.join(root, 'app/src/B.TS'), 'export {}\n')
+    await writeFile(path.join(root, 'app/Dockerfile'), 'FROM scratch\n')
+    await writeFile(path.join(root, 'app/.gitignore'), '*.log\n')
+    await writeFile(path.join(root, 'app/debug.log'), 'noise\n')
+    const service = testService(root)
+    const signal = new AbortController().signal
+
+    try {
+      expect(await service.languageCensus('app', signal)).toEqual({
+        counts: {},
+        readiness: 'cold',
+        scanRoot: null,
+      })
+
+      const hold = await holdRoot(service, 'app')
+      const census = await service.languageCensus('app', signal)
+      await hold.release()
+
+      expect(census).toEqual({
+        counts: { '.gitignore': 1, '.ts': 2, dockerfile: 1 },
+        readiness: 'ready',
+        scanRoot: path.join(root, 'app'),
+      })
+    } finally {
+      await service.close()
+    }
+  })
+
   it('opens a root without building an index for it', async () => {
     const root = await fixtureRoot()
     await mkdir(path.join(root, 'a'), { recursive: true })
@@ -900,6 +940,46 @@ describe('workspace index', () => {
       type: 'directory',
     })
     expect(index.get('ignored/secret.ts')).toBeUndefined()
+  })
+
+  it('reclassifies a subtree when a nested ignore file is created, edited or deleted', async () => {
+    const root = await fixtureRoot()
+    await mkdir(path.join(root, 'sub'), { recursive: true })
+    await writeFile(path.join(root, 'sub', 'gen.log'), 'generated\n')
+    await writeFile(path.join(root, 'sub', 'keep.ts'), 'export {}\n')
+    const index = await buildWorkspaceIndex(createWorkspacePaths(root), TEST_INDEX_OPTIONS)
+    expect(index.get('sub/gen.log')).toMatchObject({ gitIgnored: false })
+
+    await writeFile(path.join(root, 'sub', '.gitignore'), '*.log\n')
+    await index.applyWatchEvents([{ type: 'created', path: 'sub/.gitignore' }])
+    expect(index.status().readiness).toBe('ready')
+    expect(index.get('sub/gen.log')).toMatchObject({ gitIgnored: true })
+    expect(index.get('sub/keep.ts')).toMatchObject({ gitIgnored: false })
+
+    await writeFile(path.join(root, 'sub', '.ignore'), 'keep.ts\n')
+    await index.applyWatchEvents([{ type: 'created', path: 'sub/.ignore' }])
+    expect(index.get('sub/keep.ts')).toMatchObject({ gitIgnored: true })
+
+    await rm(path.join(root, 'sub', '.gitignore'))
+    await index.applyWatchEvents([{ type: 'deleted', path: 'sub/.gitignore' }])
+    expect(index.get('sub/gen.log')).toMatchObject({ gitIgnored: false })
+    expect(index.get('sub/.gitignore')).toBeUndefined()
+  })
+
+  it('stays stale while a created path is pending behind an applied batch', async () => {
+    const root = await fixtureRoot()
+    await writeFile(path.join(root, 'a.ts'), 'export const a = 1\n')
+    const index = await buildWorkspaceIndex(createWorkspacePaths(root), TEST_INDEX_OPTIONS)
+
+    // The create arrives while an earlier batch is applying; that batch must not report `ready`.
+    index.markCreatedPathPending('b.ts')
+    await writeFile(path.join(root, 'b.ts'), 'export const b = 1\n')
+    await index.applyWatchEvents([{ type: 'changed', path: 'a.ts' }])
+    expect(index.status()).toMatchObject({ pendingCreatedPathCount: 1, readiness: 'stale' })
+
+    await index.applyWatchEvents([{ type: 'created', path: 'b.ts' }])
+    expect(index.status()).toMatchObject({ pendingCreatedPathCount: 0, readiness: 'ready' })
+    expect(index.get('b.ts')).toMatchObject({ type: 'file' })
   })
 
   it('coalesces watch stream events before applying incremental updates', async () => {
