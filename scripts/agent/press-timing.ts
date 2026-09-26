@@ -3,7 +3,7 @@ import type { Page } from 'playwright'
 import { recordFrames } from './blank-frames'
 
 /** One animation frame: whether the target is on screen, coloured, and preview-decorated. */
-export type PressFrame = {
+type PressFrame = {
   readonly t: number
   readonly text: boolean
   readonly colour: boolean
