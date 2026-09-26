@@ -159,7 +159,7 @@ GFM. Math kinds excluded.
 | ---------------------------- | -------------------: | -------------------: | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | tree-sitter today            |              182/183 |              215/497 | 18,002 / 161: 13,440 code spans, 3,306 strong, 789 links lost to the layer cap and unparsed table cells                                                         |
 | tree-sitter binding+refcheck |              183/183 |              386/497 | 239 / 66, of which 168 are frontmatter (tree-sitter is right) and 67 are real: 22 autolink literals, 20 code spans, 16 emphasis, 8 strikethrough, 1 inline HTML |
-| tree-sitter-md ¶             |              183/183 |              406/497 | 208 / 33 of 105,952: 171 frontmatter, 33 + 33 task-item shape (as lezer), 3 positionless mdast autolinks (as lezer); 0 real                                     |
+| tree-sitter-md ¶             |              183/183 |              406/497 | 208 / 33 of 105,952: 172 frontmatter, 33 + 33 task-item shape (as lezer), 3 positionless mdast autolinks (as lezer); 0 real                                     |
 | lezer GFM+refcheck           |              183/183 |              488/497 | 43 / 46, of which about 20 are real: 6 email false positives, 14 code spans                                                                                     |
 
 ¶ Measured 2026-09-26 with the docs read from Platform `c130dd35a` and Editor `74e76be`
