@@ -50,7 +50,7 @@ test.each(['range', 'refetch'] as const)(
     await page.getByRole('button', { name: /^B / }).click()
     expect(screen.getByRole('button', { name: /^C / })).toHaveAttribute('aria-pressed', 'true')
 
-    if (change === 'range') await page.getByRole('button', { name: '7 days' }).click()
+    if (change === 'range') await page.getByRole('tab', { name: '7 days' }).click()
     if (change === 'refetch') act(() => client.setQueryData(key(30), history(['A', 'B'])))
     await waitFor(() => expect(screen.queryByRole('button', { name: /^C / })).toBeNull())
 
