@@ -43,6 +43,10 @@ export type VirtualListProps<T> = Omit<ComponentProps<'div'>, 'children' | 'ref'
   initialOffset?: number
   paddingStart?: number
   paddingEnd?: number
+  /** The list's offset inside a scroller it shares with content above it. */
+  scrollMargin?: number
+  /** Space a sticky header covers, so a revealed row lands below it. */
+  scrollPaddingStart?: number
   scrollRef?: RefObject<HTMLDivElement | null>
   handleRef?: Ref<VirtualListHandle>
   contentClassName?: string
@@ -72,6 +76,8 @@ export function VirtualList<T>({
   initialOffset,
   paddingStart = 0,
   paddingEnd = 0,
+  scrollMargin = 0,
+  scrollPaddingStart = 0,
   scrollRef,
   handleRef,
   className,
@@ -104,6 +110,8 @@ export function VirtualList<T>({
     initialOffset,
     paddingStart,
     paddingEnd,
+    scrollMargin,
+    scrollPaddingStart,
     rangeExtractor: (range) => {
       const indices = defaultRangeExtractor(range)
       if (
@@ -172,8 +180,9 @@ export function VirtualList<T>({
       style={
         layout === 'flow'
           ? {
-              paddingTop: rows[0]?.start ?? 0,
-              paddingBottom: virtualizer.getTotalSize() - (rows.at(-1)?.end ?? 0),
+              paddingTop: (rows[0]?.start ?? scrollMargin) - scrollMargin,
+              paddingBottom:
+                virtualizer.getTotalSize() - ((rows.at(-1)?.end ?? scrollMargin) - scrollMargin),
             }
           : { height: virtualizer.getTotalSize() }
       }
@@ -189,7 +198,7 @@ export function VirtualList<T>({
             className={cn('w-full', layout === 'absolute' && 'absolute top-0 left-0')}
             style={
               layout === 'absolute'
-                ? { transform: `translateY(${row.start}px)` }
+                ? { transform: `translateY(${row.start - scrollMargin}px)` }
                 : {
                     marginTop: row.start - (rows[index - 1]?.end ?? row.start),
                   }

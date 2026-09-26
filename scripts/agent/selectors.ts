@@ -519,6 +519,18 @@ export const selectors = {
     page.getByRole('dialog', { name: 'Physical dialog', exact: true }),
   physicalRow: (page: Page) => page.getByRole('option', { name: 'Silent row', exact: true }),
   settingsHeader: (page: Page) => page.locator('[data-settings-header]'),
+  shortcutsSearch: (page: Page) =>
+    page.getByRole('textbox', { name: 'Search keyboard shortcuts', exact: true }),
+  shortcutsList: (page: Page) => page.getByRole('listbox', { name: 'Keyboard shortcuts' }),
+  shortcutRow: (page: Page, command: string) =>
+    page.locator(`[data-shortcut-command="${command}"]`),
+  shortcutRecorder: (page: Page, title: string) =>
+    page.getByRole('textbox', { name: `Press the new shortcut for ${title}`, exact: true }),
+  shortcutFilter: (page: Page, name: 'All' | 'Custom' | 'Conflicts' | 'Unassigned') =>
+    page.getByRole('tab', { name: new RegExp(`^${name}`) }),
+  shortcutRecordKeys: (page: Page) =>
+    page.getByRole('button', { name: 'Record keys', exact: true }),
+  shortcutMenuItem: (page: Page, name: RegExp) => page.getByRole('menuitem', { name }),
   settingDetailsButton: (page: Page, title: string) =>
     page.getByRole('button', { name: `About ${title}`, exact: true }),
   settingsSwitch: (page: Page, title: string) =>

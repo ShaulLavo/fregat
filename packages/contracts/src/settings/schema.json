@@ -555,7 +555,8 @@
         ]
       },
       "default": {},
-      "description": "Command id to shortcut: one hotkey or two separated by a single space. A missing key keeps the default; an explicit null unbinds the command.",
+      "description": "Every command and its keys.",
+      "markdownDescription": "Every command and its keys.\n\nIn settings.json this is command id to shortcut: one hotkey, or two separated by a single space. A missing command keeps its default; null unbinds it.",
       "propertyNames": {
         "maxLength": 120,
         "minLength": 1,

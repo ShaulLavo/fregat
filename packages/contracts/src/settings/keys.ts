@@ -1359,8 +1359,10 @@ export const SETTINGS_REGISTRY = {
     scope: 'application',
     widget: 'keybindings',
     category: 'Keyboard shortcuts',
-    description:
-      'Command id to shortcut: one hotkey or two separated by a single space. A missing key keeps the default; an explicit null unbinds the command.',
+    title: 'Shortcuts',
+    description: 'Every command and its keys.',
+    details:
+      'In settings.json this is command id to shortcut: one hotkey, or two separated by a single space. A missing command keeps its default; null unbinds it.',
     // The one key that merges rather than replaces: a later layer should be able
     // to bind a command without dropping every other binding the user set.
     merge: 'record',

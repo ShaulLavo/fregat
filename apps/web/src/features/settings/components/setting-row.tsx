@@ -20,6 +20,7 @@ import { RowActions } from '@/features/settings/components/row-actions'
 import { SettingDetails } from '@/features/settings/components/setting-details'
 import { BooleanWidget } from '@/features/settings/components/widgets/boolean-widget'
 import { EnumWidget } from '@/features/settings/components/widgets/enum-widget'
+import { SegmentedWidget } from '@/features/settings/components/widgets/segmented-widget'
 import { isFontSettingId } from '@/features/settings/utils/font-options'
 import { FontWidget } from '@/features/settings/components/widgets/font-widget'
 import { NumberWidget } from '@/features/settings/components/widgets/number-widget'
@@ -52,6 +53,8 @@ export function SettingRow({
   const disabledReason = descriptor.readOnlyReason ?? inspection.disabledReason
   const dependencyNote = settingDependencyNote(id, snapshot.values)
   const value = snapshot.values[id]
+  // Full width, like the theme picker: a list of every command does not fit half a row.
+  const fullWidth = descriptor.widget === 'theme' || descriptor.widget === 'keybindings'
   const hasCodePreview =
     descriptor.widget === 'code-theme' ||
     descriptor.widget === 'palette' ||
@@ -61,7 +64,7 @@ export function SettingRow({
     <div
       className={cn(
         'flex flex-col gap-(--density-control-gap) py-(--density-section-padding) @3xl/settings:items-start @3xl/settings:justify-between @3xl/settings:gap-6',
-        descriptor.widget !== 'theme' && '@3xl/settings:flex-row',
+        !fullWidth && '@3xl/settings:flex-row',
         underParent && 'pl-(--density-section-padding)',
       )}
       data-depends-on={settingParentId(id)}
@@ -119,7 +122,7 @@ export function SettingRow({
       <div
         className={cn(
           'flex max-w-full min-w-0 shrink-0 items-center gap-1 @max-3xl/settings:w-full',
-          descriptor.widget === 'theme' && 'w-full',
+          fullWidth && 'w-full',
           hasCodePreview && 'items-start @3xl/settings:w-1/2 @3xl/settings:max-w-xl',
         )}
       >
@@ -132,7 +135,10 @@ export function SettingRow({
           }}
           value={value}
         />
-        <RowActions id={id} isModified={isModified} value={value} />
+        {/* The shortcut list carries its own menu with the same actions. */}
+        {descriptor.widget === 'keybindings' ? null : (
+          <RowActions id={id} isModified={isModified} value={value} />
+        )}
       </div>
     </div>
   )
@@ -197,6 +203,18 @@ function SettingControl({
         onCommit={onChange}
         value={control.value}
         verbatim={id === 'editor.unicodeHighlight.allowedCharacters'}
+      />
+    )
+  }
+
+  if (control.widget === 'enum' && id === 'keybindings.preset') {
+    return (
+      <SegmentedWidget
+        disabled={disabled}
+        id={id}
+        onChange={onChange}
+        options={control.options}
+        value={control.value}
       />
     )
   }
