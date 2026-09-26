@@ -74,6 +74,7 @@ Parked: EXT-07 and EXT-09 (Plan 087 automation, Plan 143 research, per-OS matrix
    `#N`, so a fork's pull request looks like any other until hovered. (a) Hover only; (b) visible
    `owner/repo#N` on the badge, costing rail row width. **Recommendation: (a).** One worktree has
    one pull request, and the row is narrow.
+   Decided 2026-09-26: recommendation (wave 2) — (a), hover only.
 6. **LIFE-06: the per-session auto-settle switch needs a database reset.** (Raised 2026-09-26 by
    wave 2 lane W; not built.) Upstream stores `autoSettleDisabledAt` on the thread row. Ours would
    add an `auto_settle_disabled_at` column to `sessions`, and since Plan 132 Phase 4 any schema
@@ -83,6 +84,7 @@ Parked: EXT-07 and EXT-09 (Plan 087 automation, Plan 143 research, per-OS matrix
    schema change is due and take one reset for both; (c) close LIFE-06 on the per-project
    `chat.projectAutoSettle` alone. **Recommendation: (b).** The switch is small, and each reset
    costs the owner every session.
+   Decided 2026-09-26: recommendation (wave 2) — (b), held until another schema change is due.
 7. **LIFE-04 idle shells: which terminals does settling close?** (Raised 2026-09-26 by wave 2
    lane W; not built.) Upstream `1a0c915c` closes a settled thread's shells that sit at an idle
    prompt, keeping their output. Here ordinary shells belong to the worktree and outlive any one
@@ -91,6 +93,8 @@ Parked: EXT-07 and EXT-09 (Plan 087 automation, Plan 143 research, per-OS matrix
    shells whose foreground is the shell itself, keeping their history; (b) close nothing and
    close LIFE-04's idle-shell part as not applicable. No recommendation: (a) changes who owns a
    worktree shell, which Plan 149 settled.
+   Decided 2026-09-26: owner — (a). A shell running a foreground program stays, and a worktree
+   with another live session keeps its shells.
 
 ## Kept by the owner (2026-09-26)
 
