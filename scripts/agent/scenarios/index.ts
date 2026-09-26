@@ -1,3 +1,4 @@
+import { deferredDialogs } from './deferred-dialogs'
 import { textFieldFkeys } from './text-field-fkeys'
 import { settingsRoutePreparation } from './settings-route-preparation'
 import { settingsModuleFailure } from './settings-module-failure'
@@ -31,6 +32,10 @@ import { projectGrouping } from './project-grouping'
 import { sessionSearch, sessionSearchEnvironments } from './session-search'
 import { sessionUnread } from './session-unread'
 import { mcpApproval } from './mcp-approval'
+import { nativePermissionGrant } from './native-permission-grant'
+import { resetCreditRedemption } from './reset-credit-redemption'
+import { pullRequestLookupFailure } from './pull-request-lookup-failure'
+import { streamOverflow } from './stream-overflow'
 import { chatScreenshot } from './chat-screenshot'
 import { chatMultipleModels } from './chat-multiple-models'
 import { chatComposerEditing } from './chat-composer-editing'
@@ -96,6 +101,7 @@ import { chatDisclosureSettle } from './chat-disclosure-settle'
 import { chatTurnAnatomy } from './chat-turn-anatomy'
 import { chatSleepingSession } from './chat-sleeping-session'
 import { chatSessionGoal } from './chat-session-goal'
+import { chatAgentReview } from './chat-agent-review'
 import { fileTreeHoverPrefetch } from './file-tree-hover-prefetch'
 import { prefetchChatSwitch } from './prefetch-chat-switch'
 import { prefetchFirstPaint } from './prefetch-first-paint'
@@ -128,6 +134,7 @@ import { sidebarToggle } from './sidebar-toggle'
 import { itemNavigation } from './item-navigation'
 import { shortcutHints } from './shortcut-hints'
 import { editorAddToChat } from './editor-add-to-chat'
+import { editorSpellcheck } from './editor-spellcheck'
 import { markdownSplitView } from './markdown-split-view'
 import { markdownPreviewClobber } from './markdown-preview-clobber'
 import { gitOpenAllDiffsSpam } from './git-open-all-diffs-spam'
@@ -141,6 +148,7 @@ import { connectionFrame } from './connection-frame'
 import { settingsValueGrids } from './settings-value-grids'
 import { settingsDependentRow } from './settings-dependent-row'
 import { settingsRowDetails } from './settings-row-details'
+import { settingsKeybindings } from './settings-keybindings'
 import { tailFollow } from './tail-follow'
 import { checkpointRestore } from './checkpoint-restore'
 import { themeStudioAsync } from './theme-studio-async'
@@ -249,6 +257,8 @@ export type Scenario = {
   readonly capture?: Partial<CaptureSize>
   readonly run: (page: Page, context: ScenarioContext) => Promise<void>
   readonly inspect?: (page: Page) => Promise<unknown>
+  /** Fixture scenarios must reject shared servers before opening the first page. */
+  readonly requiresIsolatedServer?: boolean
   /**
    * Runs before the throwaway server starts. A directory it returns goes first on the server's
    * PATH, which is how a scenario stands in for an outside CLI such as `gh`.
@@ -328,6 +338,10 @@ export const scenarios: readonly Scenario[] = [
   sessionNotifications,
   composerDefaults,
   mcpApproval,
+  nativePermissionGrant,
+  resetCreditRedemption,
+  pullRequestLookupFailure,
+  streamOverflow,
   chatScreenshot,
   chatMultipleModels,
   chatComposerEditing,
@@ -436,6 +450,7 @@ export const scenarios: readonly Scenario[] = [
   itemNavigation,
   shortcutHints,
   editorAddToChat,
+  editorSpellcheck,
   markdownSplitView,
   markdownPreviewClobber,
   gitOpenAllDiffsSpam,
@@ -449,6 +464,7 @@ export const scenarios: readonly Scenario[] = [
   settingsValueGrids,
   settingsDependentRow,
   settingsRowDetails,
+  settingsKeybindings,
   tailFollow,
   checkpointRestore,
   filePickerBrowse,
@@ -516,6 +532,7 @@ export const scenarios: readonly Scenario[] = [
   settingsRoutePreparation,
   textFieldFkeys,
   settingsModuleFailure,
+  deferredDialogs,
   projectMenu,
   workspaceSwitch,
   serverRestart,
@@ -552,6 +569,7 @@ export const scenarios: readonly Scenario[] = [
   chatTurnAnatomy,
   chatSleepingSession,
   chatSessionGoal,
+  chatAgentReview,
   fileTreeHoverPrefetch,
   prefetchFirstPaint,
   prefetchChatSwitch,

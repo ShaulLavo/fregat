@@ -60,6 +60,11 @@ export class OrchestrationCheckpointDiffQuery {
     })
   }
 
+  /** The number of the session's latest checkpointed turn; 0 before the first. */
+  latestTurnCount(sessionId: string) {
+    return maxCheckpointTurnCount(this.checkpointRows(sessionId))
+  }
+
   private sessionCheckpointContext(sessionId: string): SessionCheckpointContext {
     const { worktree } = readSessionOwner(this.database, sessionId)
     const workspacePath = worktree.canonicalPath

@@ -8,6 +8,7 @@ export function sessionInputFromTurn(input: ProviderTurnInput): ProviderRuntimeS
     interactionMode: input.interactionMode,
     modelSelection: input.modelSelection,
     ...(input.platformMcp ? { platformMcp: input.platformMcp } : {}),
+    ...(input.outputSchema ? { outputSchema: input.outputSchema } : {}),
     providerInstanceId: input.providerInstanceId,
     providerResumeCursor: input.providerResumeCursor ?? null,
     runtimeMode: input.runtimeMode,
