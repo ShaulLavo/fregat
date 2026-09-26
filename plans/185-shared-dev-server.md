@@ -2,7 +2,7 @@
 
 ## Status and authorization
 
-- Status: PROPOSED 2026-09-26. **Blocked on mesh T28** (`/work/projects/mesh/docs/tasks/T28-serve-on-demand.md`,
+- Status: PROPOSED 2026-09-26. Owner decisions recorded. **Blocked on mesh T28** (`/work/projects/mesh/docs/tasks/T28-serve-on-demand.md`,
   mesh `05a5d02`). Owner direction: one dev server that every session uses, started when someone
   needs it and gone when nobody does, built as a mesh feature. This plan is the Platform side.
   It replaces the "a dev server is always running" rule in `AGENTS.md`, which is false today
@@ -50,17 +50,16 @@ localhost:3001 ─┴─▶ mesh daemon (T28) ─┴─▶ 127.0.0.1:13001  API 
    and exits after the idle window; never start one by hand. `mesh serve ls` shows it, and
    `mesh ls` lists its session for the output."
 
-## Open questions for the owner
+## Owner decisions (2026-09-26, all as recommended)
 
-- **Q1: idle window.** Recommend 15 minutes: it covers a lunch break without holding memory all day.
-- **Q2: background tabs.** A forgotten tab keeps the server alive indefinitely. Recommend accepting
-  that (a tab is use) over having the client drop its sockets when hidden, which would make HMR and
-  live data reconnect on every focus.
+- **Q1: idle window.** Decided: 15 minutes, since it covers a lunch break without holding memory all day.
+- **Q2: background tabs.** Decided: a tab is use, so a forgotten tab keeps the server alive. The
+  client keeps its sockets when hidden, so HMR and live data never reconnect on focus.
 - **Q3: the desktop app.** `apps/desktop` launches its own dev children under leases (Plan 132 D1).
-  Recommend it connects to the shared ports in dev, like any browser, and stops spawning them.
+  Decided: in dev it connects to the shared ports like any browser, and stops spawning them.
 
-T28's own questions (a tailnet path that also starts it; explicit holds without a connection) are in
-the mesh brief.
+T28's own questions are decided in the mesh brief: the tailnet path also starts the route, and
+there are no explicit holds.
 
 ## Verification
 
