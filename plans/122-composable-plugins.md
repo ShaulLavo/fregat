@@ -1,15 +1,16 @@
 # Plan 122: Composable, full-power plugins with selective execution
 
-Status: proposed; research and API design first; implementation has not started.
+Status: RESEARCH DONE 2026-09-26 — Phase 0 comparison, measured controls and the selected
+`createPlugin` shape are below; the evidence is in [Phase 0 research](../docs/composable-plugins/phase-0-research.md).
+Implementation has not started; the proposed phases wait on two owner questions.
 Requested: 2026-09-16. Owners: Fregat and Singapore.
 
 This is a cross-repository plan, not an implementation or a settled API signature.
 [Root PLAN.md](../PLAN.md) remains the sole authority for execution order. This proposal
 adds no priority over existing lanes. Its phases describe internal dependencies only.
 
-Recorded baselines: Fregat `465760323da4feb260e923b6d502794b0518ca84` and Singapore
-`16736ade269981a9d7566013f57ee1952bcffcdc`. Reconcile current source, HEADs, and dirty diffs
-before implementation; do not treat either repository's older plan baselines as current.
+Research baselines: Fregat `c130dd35a` and Singapore (Editor) `74e76bef`. Reconcile current
+source, HEADs, and dirty diffs before implementation.
 
 ## Outcome and settled requirements
 
@@ -45,15 +46,15 @@ configuration syntax, and loading strategy remain design work.
 
 ## Current foundations and gaps
 
-| Source                                                                                                    | Existing seam and implication                                                                                                                                                                                                    |
-| --------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [Fregat editor assembly](../apps/web/src/features/editor/components/editor.tsx)                           | Combines built-ins and `additionalPlugins` and passes them to `useEditor`. Extend this integration rather than create another embedded editor.                                                                                   |
-| [Fregat built-ins](../apps/web/src/features/editor/utils/plugins.ts)                                      | Assembles feature-specific factories. This is a migration target, not the desired public authoring contract.                                                                                                                     |
-| [Singapore plugin contracts and host][sg-plugins]                                                         | Already provides lifecycle, disposables, contribution contexts, single-owner capabilities, and multi-provider language features. Reuse useful internals while simplifying the public layer.                                      |
-| [Singapore React adapter][sg-react]                                                                       | Synchronizes plugin configuration through `editor.setPlugins`. Preserve stable definition identity and live attachment without recreating document state.                                                                        |
-| [Singapore view contributions][sg-views]                                                                  | The viewport lane checks a dedicated subscriber set before constructing its payload. General updates construct a snapshot and visit all view contributions. This is an optimization candidate, not a measured latency diagnosis. |
-| [Singapore command IDs][sg-commands] and [Fregat keymap adapter](../apps/web/src/keymap/editor-keymap.ts) | Editor IDs are a closed union; Fregat disables the standalone editor keymap. Custom commands need typed IDs and integration with Fregat's existing command/focus routing.                                                        |
-| [Plan 099](099-document-contributions.md)                                                                 | Owns canonical buffer publication and shared document synchronization. It remains proposed. Reuse its owner and progress contracts; do not add a second document bus or worker-sync layer.                                       |
+| Source                                                                                                    | Existing seam and implication                                                                                                                                                                                   |
+| --------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Fregat editor assembly](../apps/web/src/features/editor/components/editor.tsx)                           | Combines built-ins and `additionalPlugins` and passes them to `useEditor`. Extend this integration rather than create another embedded editor.                                                                  |
+| [Fregat built-ins](../apps/web/src/features/editor/utils/plugins.ts)                                      | Assembles feature-specific factories. This is a migration target, not the desired public authoring contract.                                                                                                    |
+| [Singapore plugin contracts and host][sg-plugins]                                                         | Already provides lifecycle, disposables, contribution contexts, single-owner capabilities, and multi-provider language features. Reuse useful internals while simplifying the public layer.                     |
+| [Singapore React adapter][sg-react]                                                                       | Synchronizes plugin configuration through `editor.setPlugins`. Preserve stable definition identity and live attachment without recreating document state.                                                       |
+| [Singapore view contributions][sg-views]                                                                  | The viewport lane checks a dedicated subscriber set before constructing its payload. Every other update builds a snapshot and visits all view contributions; measured costs are in the research findings below. |
+| [Singapore command IDs][sg-commands] and [Fregat keymap adapter](../apps/web/src/keymap/editor-keymap.ts) | Editor IDs are a closed union; Fregat disables the standalone editor keymap. Custom commands need typed IDs and integration with Fregat's existing command/focus routing.                                       |
+| [Plan 099](099-document-contributions.md)                                                                 | Owns canonical buffer publication and shared document synchronization. It remains proposed. Reuse its owner and progress contracts; do not add a second document bus or worker-sync layer.                      |
 
 No rewrite of the text buffer, document identity, transaction model, rendering engine, or
 application command bus is authorized by this plan. Preserve their contracts while making
@@ -61,9 +62,8 @@ customization easier. Full access does not imply that every internal property is
 
 ## Research gate: CodeMirror and Monaco before API selection
 
-Use primary documentation and source, pin the versions used in experiments, and record the
-actual implementation behind each claimed behavior. The following are starting references,
-not a completed comparative benchmark:
+Done 2026-09-26: versions pinned, implementation cited and the dispatch model measured in all three
+editors ([Phase 0 research](../docs/composable-plugins/phase-0-research.md)). The references were:
 
 | Reference                                           | What to study and what not to assume                                                                                                                                                 |
 | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -73,50 +73,46 @@ not a completed comparative benchmark:
 | [Monaco editor API][monaco-editor]                  | Direct editor operations, distinct content/selection/scroll events, actions, widgets, and decoration ownership. Inspect editor, model, and global registration lifetimes separately. |
 | [Monaco completion registration][monaco-completion] | Typed provider registration with disposal. Learn ergonomics and scope without copying a feature-specific registration API for every possible extension.                              |
 
-Implement the same small experiments against candidate Singapore APIs: a named command,
-a selection-driven decoration, and bounded modal input. Add the shared-channel and backend
-proofs below before calling the chosen contract complete.
+The named command, the selection-driven decoration and bounded modal input, plus the annotation
+channel, were written against both candidate shapes and type-checked; running them on Singapore is
+phases 3–5 below, and the backend proof is phase 8. The decision record, examples, rejected
+alternatives and what a third-party library can extend without a new core method are in the
+research doc.
 
-Compare a declarative composition-first shape with a scoped setup/subscription shape. Both
-must use `createPlugin`, accept reusable pieces, expose the real editor when needed, and avoid
-mandatory generic updates. Record required imports, distinct concepts, nesting, ownership code,
-configuration behavior, inferred types, and measured runtime cost. Do not select by line count alone.
+## Selected authoring model
 
-Produce one decision record with examples, rejected alternatives, migration implications, and
-benchmark evidence. It must explain what a third-party library can extend without asking core
-for a new top-level method. Do not add a speculative forest of APIs to satisfy an inventory.
-
-## Candidate authoring model
-
-The following shows composition only. `name` and `extensions` are illustrative fields, not
-newly implemented exports or an approved final signature:
+Selected in Phase 0 (decision record in the research doc): one `createPlugin` with static
+declarations plus a scoped per-view setup. A composition-first shape (every capability a piece in
+an `extensions` array) was written for the same four examples and type-checked; it needed 10
+constructors against 4, threaded `view` through every callback, and kept per-view state in module
+values, which is how E027's factory-state bug happens. Dispatch cost is the same for both.
 
 ```ts
-export const annotations = createPlugin({
-  name: 'acme.annotations',
-  extensions: [annotationState, annotationGutter, annotationCommands],
+export const modal = createPlugin({
+  name: 'acme.modal', // namespace and dedup identity
+  uses: [wordMotions], // bundles: identity dedup, ref-counted ownership, order is precedence
+  commands: [enterInsert], // E026 declarations: data, known before any editor exists
+  view(scope) {
+    // once per matching editor view; everything registered here is owned by the scope
+    const mode = scope.state<Mode>({ kind: 'normal', count: 0 })
+    scope.handle(enterInsert, () => mode.set({ kind: 'insert' }))
+    scope.keyParticipant((event, context) =>
+      mode.get().kind === 'insert' ? 'delegate' : 'consume',
+    )
+  },
+  // document(scope) arrives with Plan 099 unit 2; backend with the loader phase
 })
 ```
 
-A primitive and a bundle should both be installable values. Definitions are reusable; mutable
-instances have an explicit lifetime. Repeated React renders must not reinstall them. Shared
-pieces need a defined identity, deduplication policy, configuration conflict policy, and
-reference-counted ownership when more than one bundle requires them.
-
-Keep the conceptual vocabulary small:
-
-- **State and derivation:** local state and cached computed values with explicit dependencies.
-- **Subscriptions and effects:** react only to declared inputs, or to an explicitly requested
-  catch-all stream. Generic observation is opt-in and exposes its cost.
-- **Typed contributions:** libraries define channels and specify whether inputs compose,
-  choose by precedence, or require a single owner. Commands and rendering use these pieces
-  plus the real editor operations; they are not a closed list of plugin classes.
-- **Composition and lifetime:** bundles, configuration, activation, and owned disposal.
-
-These are semantic responsibilities, not a demand for four new public constructor families.
-A convenient scoped context may collect registrations, but it must not pretend to collect
-arbitrary DOM listeners, timers, native processes, or other raw side effects automatically.
-Provide explicit cleanup for resources created outside managed primitives.
+The scope carries `editor` (the live editor, labelled unstable), `read` and `watch` over typed
+inputs (`selection`, `text`, `viewport`, `tokens`, `theme`, `document`) and over inputs built with
+`derive` (recompute on change, stop on equality), `provide` to a library-defined channel, `handle`, `decorations`, `keyParticipant`, `textGate`,
+`applyEdits`, `state`, `onDispose` and `own`. Channels are the existing tokens with a public change
+subscription and a `one`, `many` or `combine` policy, so a third-party library defines an extension
+point, others contribute, and core adds no method. `onDispose` is explicit cleanup for raw DOM
+listeners, timers and processes; the scope does not claim to collect them. `createPlugin` lowers to
+the existing `EditorPlugin` host, so there is no second lifecycle. The full contract, the rules for
+dynamic subscriptions and the rejected alternatives are in the research doc.
 
 ## Selective runtime contract
 
@@ -246,56 +242,66 @@ primitive each example requires; add one only for a demonstrated missing composi
 
 ## Delivery phases and existing-plan reconciliation
 
-### Phase 0: Inventory, comparison, and calibrated controls
+Phase 0 is done (research findings below). The rest is ordered; each phase ships on its own and
+carries its own evidence. Sizes: S about a day, M a lane of a few days, L a week or more.
 
-Refresh both repository baselines and source links. Inventory public/internal hooks, first-party
-consumers, subscription fan-out, payload creation, and current timing/allocation evidence. Run the
-CodeMirror/Monaco experiments and candidate API comparisons before selecting a signature.
+1. **Editor: lifecycle ownership (S).** E027's proposed phase 1, unchanged: a context object per
+   plugin so late registrations belong to it, a disposable store per contribution released with it
+   (including `onDidType` and keymap context keys), bracket-match and merge-conflict state moved into
+   `activate`, and E027 checks 1–3. Files: `packages/editor/src/plugins.ts`, `editor/Editor.ts`
+   (`createContributionSafely`), `bracketMatchPlugin.ts`, `mergeConflictPlugin.ts`,
+   `pluginLifecycle.test.ts`. Owner: Editor.
+2. **Editor: per-input dispatch (M).** Contributions declare the inputs they act on; each input keeps
+   its own subscriber set, as `updateViewport` already does; undeclared means today's catch-all,
+   kept explicit. One operation publishes its changed inputs in one pass (fold the `selection`
+   notify from `syncDomSelection` into the flush). `requestViewUpdate` re-runs the requester and paint
+   capture only. Membership becomes a `Set` (removes the quadratic `includes`). The snapshot is built
+   only when a pass has a subscriber. Migrate the 15 Editor and 9 Platform view contributions to
+   declare inputs using the table in the research doc. Move the counter matrix into an Editor browser
+   test and the back-to-back bench into `examples/stress` as its own suite. Files:
+   `editor/viewContributions.ts`, `editor/Editor.ts`, `editor/inputSelectionController.ts`, the
+   contribution files, Platform `apps/web/src/features/{editor,workbench,settings}` contributions.
+   Owner: Editor, with Platform for its nine. Gates D1–D4, T1, T2, T4.
+3. **Editor: `createPlugin` and the view scope, experimental (M).** E027 phase 2 built in the selected
+   shape: the combined per-view context becomes `ViewScope`; inputs, `derive`, channels with a change
+   subscription and `one`/`many`/`combine` policy, `state`, `onDispose`/`own`, `uses` with identity
+   dedup and ref-counted ownership, `editor` labelled unstable, a multi-selection read. Lowers onto
+   phases 1–2. Proofs: caret-word decoration and the annotation channel (two contributors, one
+   consumer). Migrate occurrence highlight, bracket match and document links and delete their
+   provider plumbing in the same pass. Marks use `setRangeHighlight` until Plan 111 phase 1 lands
+   `registerDecorationSource`, which `scope.decorations` then wraps with an input trigger. Export from
+   `@singapore-editor/core/extensions`; `public-api.test.ts` gains the symbols. Owner: Editor. Gates D5–D7.
+4. **Commands (M, cross-repo).** E026 as planned, plus the namespace rule: a contributed ID starts with
+   its plugin's `name` and a dot. Then the alignment proof (multicursor batch, one undo) on
+   `createPlugin`. Platform gains a runtime command segment: palette, keybinding table, recorder,
+   enablement and focus target read plugin declarations
+   (`packages/client-core/src/commands/`, `apps/web/src/keymap/`). Owner: Editor then Platform.
+5. **Modal input (M).** E028 on `createPlugin`: key participant, text gate, cursor style and the
+   `applyEdits` selection list as scope methods, proved in a real browser on both input routes, two
+   splits, readonly and IME. Applies owner question 2's key precedence. Owner: Editor.
+6. **Fregat attachment (M).** `editor.tsx` takes plugin values; the first-party set becomes one list of
+   `createPlugin` values that configuration can replace by name; surfaces are opt-in beyond code tabs
+   (diff, search, settings, composer); an application-scoped enable setting and a startup mode with
+   third-party plugins off. Scenarios under `scripts/agent/scenarios/` for two splits, document swap
+   and A-to-B-to-A environment switch. Owner: Platform. Gate T5.
+7. **Document scope (M).** `document(scope)` is Plan 099's document contribution, once per document
+   incarnation, with shared analysis once per demanded revision across views; the annotation proof's
+   shared analysis moves here. Starts after Plan 099 units 1–2. Owner: Editor and Platform.
+8. **Loading and backend (L).** E025's loader (states, generations, reload with owned rollback) with its
+   measured comparison of prebuilt ESM and host-compiled TypeScript, an in-process Bun backend entry,
+   the typed service bridge with captured environment, document, view and generation identity, and the
+   backend formatter proof. The loader is a lazy chunk. Owner: Platform with Editor. Gates T6, T8.
+9. **Migration and documentation (M–L).** The remaining first-party plugins move to `createPlugin`
+   (about 20 across Editor and Platform), the public `EditorPlugin` and provider kinds go per owner
+   question 1, author docs and the measured costs are published, and the counter and dispatch gates
+   run in CI. Owner: Editor and Platform.
 
-Reconcile E025 through E028 in a paired Singapore planning change before their implementation:
-
-- [E025][e025] gains the single-entrypoint, composition, selective-execution, isomorphic packaging,
-  and full-power requirements. Its current loader-focused text does not record those decisions.
-- [E026][e026] owns command metadata and extensible IDs, coordinated with Fregat's command bus.
-- [E027][e027] owns the simple primitive/hook contract, typed library-defined extension points,
-  direct editor access, notification ownership, and supported versus unstable API documentation.
-- [E028][e028] supplies the modal-input proof before broader loader/API stability claims.
-
-Keep E025's lifecycle/reload work, but do not preserve a narrow authoring API simply because it exists.
-Plan 099's document-publication semantics remain authoritative; its factory-shaped sketches are not a
-reason to retain author ceremony. Coordinate actual overlapping changes, not two incompatible runtimes.
-Coordinate decoration semantics with [Plan 111](111-editor-decorations.md) rather than start a second
-rendering redesign. Baseline research and view-local prototypes need not wait for all of Plan 099;
-production shared-document integration must use its agreed publication contract.
-
-Deliverables: one source-backed decision record, chosen candidate examples, benchmark controls, and
-updated paired-plan dependencies. Root PLAN.md must record production scheduling when that work starts.
-
-### Phase 1: Singapore composition and selective primitives
-
-Implement only the primitives justified by the proofs. Define identity, scoped state, typed custom
-channels, precedence, dependency routing, managed cleanup, and synchronous input contracts. Build and
-test package exports. Establish deterministic fan-out/payload counters before optimizing timings.
-
-### Phase 2: Fregat editor and command integration
-
-Bind the definitions to current and future editor owners using the existing integration. Pass actual
-editor access and host services without introducing a second lifecycle. Integrate custom commands,
-settings, and replaceable defaults through existing registries. Prove standalone/hosted parity,
-multiple views, document swaps, and environment ownership.
-
-### Phase 3: Runtime package loading and full-stack proof
-
-Implement the loading strategy selected in Phase 0. Add enable/disable/reload and generation handling,
-module/dependency resolution, and the service bridge. Complete the backend formatter proof and recovery
-from failed activation, disconnected clients, and disposed owners. Keep no-plugin startup lightweight.
-
-### Phase 4: Migration, performance gates, and documentation
-
-Migrate representative built-ins, remove obsolete paths in those migration units, and run the proof
-matrix against the real app. Publish author examples, lifecycle/scope rules, measured costs, known
-limitations, and the remaining migration inventory. Do not call the migration complete while first-party
-features still maintain an alternate public authoring model without an explicit follow-up owner.
+Paired-plan changes for the Editor repository, to land with phase 1: E027's phase 2 is phase 3 here
+and uses its shape; E026 adds the namespace rule; E028 targets `createPlugin`; E025 keeps its loader
+and reload work and records the single entry point and full-access decision. Plan 099 stays
+authoritative for publication: the `text` input carries its unit-1 transition frame, and phase 7
+waits for its unit 2. Plan 111's decoration source gains an input-driven trigger for `selection`.
+Root PLAN.md schedules these.
 
 ## Verification and acceptance
 
@@ -331,6 +337,31 @@ speedups from source inspection. At fixed interested work, unrelated plugin coun
 callback/payload counters, and runtime overhead must stay inside the calibrated control envelope.
 If indexing or derivation bookkeeping scales with all installed pieces, revise the design.
 
+Proposed numbers, from the Phase 0 controls. Counter gates are exact and hardware-independent;
+timing gates compare against controls run on the same machine and build, never against a fixed
+millisecond figure. Today's values are from the 20,000-line fixture in the research doc.
+
+| Gate | Measure                                                                                                                  | Today                              | Required                                                                       | Harness                                                   |
+| ---- | ------------------------------------------------------------------------------------------------------------------------ | ---------------------------------- | ------------------------------------------------------------------------------ | --------------------------------------------------------- |
+| D1   | Calls to 1,000 selection-only pieces per page scroll / per scroll inside mounted rows                                    | 1,000 / 0                          | 0 / 0                                                                          | counter test (phase 2)                                    |
+| D2   | Calls to 1,000 selection-only pieces per keystroke                                                                       | 2,000                              | 1,000                                                                          | counter test                                              |
+| D3   | Snapshots or input payloads built per operation for an input with no subscriber                                          | 1 per pass, 2 per keystroke plus 1 | 0                                                                              | counter test                                              |
+| D4   | Other contributions re-run when one calls `requestViewUpdate`                                                            | all                                | 0                                                                              | counter test                                              |
+| D5   | Calls to 1,000 command-only plugins per edit, selection or scroll                                                        | not installable                    | 0                                                                              | counter test (phase 3)                                    |
+| D6   | Downstream calls when a derived input's value is equal                                                                   | no derive                          | 0                                                                              | counter test                                              |
+| D7   | Registrations surviving plugin removal, including late ones, `onDidType` and key readers                                 | survive (E027 probes 1–2)          | 0                                                                              | lifecycle test (phase 1)                                  |
+| T1   | Back-to-back pass, 1 interested piece plus 1,000 irrelevant, against 0 irrelevant                                        | 38–42 µs against 6–8 µs            | inside the control envelope (±2 µs in Phase 0)                                 | dispatch suite (phase 2)                                  |
+| T2   | Marginal cost per interested no-op subscriber between 1,000 and 4,000                                                    | 111 ns and rising (quadratic)      | ≤ 20 ns and flat (CM 5 ns; Monaco 4 ns to 1,000)                               | dispatch suite                                            |
+| T3   | E002 input suite, 108 blocking groups, for two new workloads: first-party set, and the same plus 1,000 irrelevant pieces | no plugin workloads exist          | every group inside its calibrated limit, 20 ms negative control fails          | `bench:input` with the Plan 099 unit 1 workload extension |
+| T4   | Sum of first-party contribution `update` time per keystroke; work on undeclared inputs                                   | 119 µs; about 21 µs undeclared     | ≤ control envelope of 119 µs; undeclared 0                                     | attribution counters in diagnostics                       |
+| T5   | Platform open, typing and scroll                                                                                         | passing                            | existing limits                                                                | `bench:editor-*:gate`                                     |
+| T6   | Weight: `plugins.js` + `viewContributions.js` gzip; loader in no-plugin startup                                          | 7.7 KB; no loader                  | plugin runtime ≤ 12 KB gzip; loader 0 bytes until used                         | build output                                              |
+| T7   | `new Editor` with 1,000 inert plugins against none (median of 5)                                                         | +3 ms (27 against 30 ms), in noise | inside the control envelope                                                    | dispatch suite                                            |
+| T8   | 100 reload cycles                                                                                                        | no loader                          | 0 extra registrations; retained module generations within the documented bound | loader suite (phase 8)                                    |
+
+Allocation and GC counts have no harness today; D3's payload counter stands in for them until a
+heap-sampling mode is added to the stress runner.
+
 ### Test and evidence workflow
 
 Build Singapore's affected public packages and run focused export, lifecycle, routing, dependency,
@@ -356,6 +387,66 @@ needs and measured costs, while keeping extension points open to third-party com
 Completion means the chosen `createPlugin` contract, selective runtime, Fregat attachment, full-stack
 proof, and required verification all work together. Landing a convenience wrapper or loader alone
 is not completion of this plan.
+
+## Research findings (2026-09-26)
+
+Full evidence, citations and method: [Phase 0 research](../docs/composable-plugins/phase-0-research.md).
+Probes are throwaway, in `/work/tmp/research2/122/` (real Chromium 153, three engines, same ops).
+
+- **The notification itself is not where time goes.** A no-op piece costs about 5 ns in CodeMirror,
+  4 ns in Monaco and 13 ns in Singapore up to 100 pieces. Op-level timing cannot see 1,000 inert
+  pieces in any of the three; page-to-page noise on this machine is up to 2×.
+- **Singapore's loop is quadratic.** `includes` inside the per-contribution loop makes 1,000, 2,000 and
+  4,000 pieces cost 38, 110 and 372 µs per pass; CodeMirror stays linear (12, 18, 28 µs).
+- **One keystroke is two full passes, then a third.** `selection` from `syncDomSelection`, then
+  `content` from the flush, each with a fresh snapshot; one frame later scope lines calls
+  `requestViewUpdate`, which re-runs every contribution as `layout`.
+- **Page scrolls broadcast to everyone.** Only scrolls inside the mounted rows use the selective
+  viewport lane; a scroll that moves the mounted range calls every view contribution.
+- **First-party contribution work is 6–16% of an operation**: 88 µs of 534 per selection, 119 of 1,497
+  per keystroke, 82 of 3,023 per page scroll. About 8–21 µs of that is on inputs the contribution
+  does not act on. Selective routing is a scaling guarantee and a fix for the double pass; it will
+  not produce a visible latency win for today's plugins.
+- **CodeMirror is not selective either.** Every `ViewPlugin.update` runs on every viewport change and
+  every `StateField.update` on every transaction; only `facet.compute(deps)` is. Monaco is selective
+  per event but builds payloads before checking listeners and instantiates every registered
+  contribution in every editor.
+- **Gaps for full access:** the public `Editor` cannot read multiple selections (`getState()` has one
+  cursor), command IDs are a closed union with one handler each, and Platform's command table is a
+  static const with no runtime segment.
+
+### Decisions
+
+- Decided 2026-09-26: research recommendation — scoped setup with static declarations (candidate B)
+  over composition-first. Fewer concepts (4 imports against 10), per-view state has one home, and
+  dispatch cost is identical.
+- Decided 2026-09-26: research recommendation — E027 owner question 1 (full editor access) is (a): the
+  scope carries the public `Editor`, labelled unstable. Requirement 3 of this plan already settles
+  full access; only the stability label was open.
+- Decided 2026-09-26: research recommendation — per-input dispatch (phase 2) lands before
+  `createPlugin` (phase 3). `watch` lowers onto it, and it fixes the double pass on its own.
+- Decided 2026-09-26: research recommendation — contributed command IDs start with the owning
+  plugin's `name` and a dot; built-in IDs stay a closed union, as E026 requires.
+- Decided 2026-09-26: research recommendation — default surfaces are code-editor tabs; diff, search,
+  settings and composer editors attach only when a plugin names them, as this plan already allows.
+- Decided 2026-09-26: research recommendation — loading mechanism stays with E025's measured
+  comparison in phase 8; Phase 0 did not run loader experiments and the trust model is already decided.
+
+### Owner questions
+
+1. **One public authoring model.** Once `createPlugin` exists, what happens to `EditorPlugin` and the
+   six `register*Contribution` kinds? (a) They become internal lowering targets and every first-party
+   plugin (about 20 more after phase 3) migrates within this plan. (b) Both stay public: `createPlugin`
+   for authors, `EditorPlugin` as the low-level layer. **Recommendation: (a).** The greenfield rule and
+   requirement 1 rule out two public models; phase 9 is sized for it.
+2. **Who gets a key first in a plugin-owned view** (E027 owner question 2, still open)? (a) The key
+   participant sees every key first, so a Vim plugin can take Ctrl+R or Ctrl+W and the app binding
+   stops working in that view. (b) Platform's keymap first; the participant sees only unbound keys, as
+   terminals pre-claim chords today. (c) The participant sees unmodified and Shift keys first;
+   Ctrl, Cmd and Alt chords go to Platform's keymap unless the plugin declares the chord on a command
+   (E026 default keys), which then appears as an ordinary binding with its conflicts shown in the
+   shortcut recorder. **Recommendation: (c).** Modal editing needs every printable key, and app
+   shortcuts keep working unless a plugin claims one where the user can see it.
 
 [sg-plugins]: https://github.com/ShaulLavo/singapore/blob/16736ade269981a9d7566013f57ee1952bcffcdc/packages/editor/src/plugins.ts
 [sg-react]: https://github.com/ShaulLavo/singapore/blob/16736ade269981a9d7566013f57ee1952bcffcdc/packages/react/src/index.ts
