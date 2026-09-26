@@ -214,6 +214,7 @@ export class OrchestrationEngine {
     this.snapshotQuery = new OrchestrationSnapshotQuery(
       database,
       (sessionId) => this.providerService?.backgroundLiveness(sessionId) ?? null,
+      (sessionId) => this.providerService?.sleepingUntil(sessionId) ?? null,
     )
     this.streams = new OrchestrationStreams(this.snapshotQuery, { database })
     this.ready = bootstrapOrchestration({
@@ -631,6 +632,8 @@ export class OrchestrationEngine {
     if (interruption || this.providerService?.isLaunching(session.id)) return 'starting'
     if (session.pendingApprovalCount + session.pendingUserInputCount > 0) return 'waiting'
     if (this.providerService?.backgroundLiveness(session.id)) return 'background'
+    // Nothing runs, but the schedules live in the provider process a restart ends.
+    if (this.providerService?.sleepingUntil(session.id)) return 'sleeping'
     return null
   }
 
@@ -792,7 +795,7 @@ export class OrchestrationEngine {
             session,
             pullRequest: worktree.pullRequest,
             pendingPullRequest: pendingPullRequest(worktree),
-            backgroundLive: liveness !== null,
+            backgroundLive: this.providerService?.keepsProcess(command.sessionId) ?? false,
             now: Date.now(),
             rules,
           })
@@ -1090,7 +1093,7 @@ export class OrchestrationEngine {
       getReadModel: () => this.readModel,
       dispatch: (command) => this.enqueue(command),
       rules,
-      backgroundLive: (sessionId) => this.providerService?.backgroundLiveness(sessionId) != null,
+      backgroundLive: (sessionId) => this.providerService?.keepsProcess(sessionId) ?? false,
     })
   }
 

@@ -247,6 +247,24 @@ export const providerBackgroundTasksSchema = v.object({
   tasks: v.array(providerBackgroundTaskSchema),
 })
 
+/**
+ * One session-scoped schedule the harness will wake the session for: a cron, a
+ * `ScheduleWakeup` or a `/loop`. `nextFireAt` is null when the expression never matches again.
+ */
+export const providerSessionScheduleSchema = v.object({
+  id: trimmedNonEmptyStringSchema,
+  schedule: v.string(),
+  recurring: v.boolean(),
+  prompt: v.string(),
+  nextFireAt: v.nullable(isoDateTimeSchema),
+})
+
+/** `heldByBackgroundWork`: the harness fires nothing while background work runs. */
+export const providerSessionSchedulesSchema = v.object({
+  schedules: v.array(providerSessionScheduleSchema),
+  heldByBackgroundWork: v.boolean(),
+})
+
 export const providerMcpServerStatusSchema = v.picklist([
   'connected',
   'failed',
@@ -305,6 +323,8 @@ export type ProviderSessionHooks = v.InferOutput<typeof providerSessionHooksSche
 export type ProviderAgent = v.InferOutput<typeof providerAgentSchema>
 export type ProviderBackgroundTask = v.InferOutput<typeof providerBackgroundTaskSchema>
 export type ProviderBackgroundTasks = v.InferOutput<typeof providerBackgroundTasksSchema>
+export type ProviderSessionSchedule = v.InferOutput<typeof providerSessionScheduleSchema>
+export type ProviderSessionSchedules = v.InferOutput<typeof providerSessionSchedulesSchema>
 export type ProviderSignInMethod = v.InferOutput<typeof providerSignInMethodSchema>
 export type ProviderLoginState = v.InferOutput<typeof providerLoginStateSchema>
 export type ProviderLoginAttempt = v.InferOutput<typeof providerLoginAttemptSchema>

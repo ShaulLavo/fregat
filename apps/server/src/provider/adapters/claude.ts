@@ -6,6 +6,7 @@ import {
   query as claudeSdkQuery,
   type AccountInfo,
   type CanUseTool,
+  type HookCallback,
   type ModelInfo,
   type Options,
   type PermissionResult,
@@ -745,6 +746,7 @@ class ClaudeAgentSession extends SessionContext {
       abortController: session.abortController,
       canUseTool: session.canUseTool(),
       cwd: input.cwd,
+      ...(input.ephemeral ? {} : { hooks: { Stop: [{ hooks: [session.stopHook()] }] } }),
       env: input.env,
       executablePath: input.executablePath,
       ...(input.agent ? { agent: input.agent } : {}),
@@ -1068,6 +1070,32 @@ class ClaudeAgentSession extends SessionContext {
 
   hasProcess() {
     return this.processes.some((process) => process.isAlive()) || !this.streamEnded
+  }
+
+  /** Every Stop names the session's crons, wake-ups and loops, harness-started turns included. */
+  stopHook(): HookCallback {
+    return async (input) => {
+      if (input.hook_event_name !== 'Stop') return {}
+      const schedules = (input.session_crons ?? []).map((cron) => ({
+        id: cron.id,
+        prompt: cron.prompt,
+        recurring: cron.recurring,
+        schedule: cron.schedule,
+      }))
+      this.emit({
+        createdAt: new Date().toISOString(),
+        eventId: runtimeEventId('claude-schedules-updated'),
+        payload: { schedules },
+        provider: DEFAULT_CLAUDE_PROVIDER_SETTINGS.driverKind,
+        providerInstanceId: this.providerInstanceId,
+        providerBindingHandle: this.providerBindingHandle(),
+        runtimeMode: this.runtimeMode,
+        sessionId: this.sessionId,
+        ...(this.activeTurn ? { turnId: this.activeTurn.canonicalTurnId } : {}),
+        type: 'schedules.updated',
+      })
+      return {}
+    }
   }
 
   async close() {

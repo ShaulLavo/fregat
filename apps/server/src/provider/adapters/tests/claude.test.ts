@@ -693,6 +693,47 @@ describe('ClaudeProviderAdapter', () => {
     await harness.adapter.stopAll()
   })
 
+  it('reports the Stop hook’s schedules', async () => {
+    const harness = claudeHarness()
+    const sessionId = v.parse(sessionIdSchema, '2f6b8c1d-4e3a-5b7c-9d8e-1a2b3c4d5e6f')
+    await harness.adapter.startRuntime(sessionStartInput({ options: { effort: 'low' }, sessionId }))
+    const stop = latestOptions(harness).hooks?.Stop?.[0]?.hooks[0]
+    assert(stop, 'sessions pass an in-process Stop hook')
+
+    await stop(
+      {
+        hook_event_name: 'Stop',
+        session_id: sessionId,
+        transcript_path: '/tmp/transcript.jsonl',
+        cwd: WORKSPACE_ROOT,
+        stop_hook_active: false,
+        session_crons: [
+          { id: 'c1', schedule: '*/5 * * * *', recurring: true, prompt: 'poll the deploy' },
+          { id: 'w1', schedule: '37 14 26 9 *', recurring: false, prompt: 'check back' },
+        ],
+      },
+      undefined,
+      { signal: new AbortController().signal },
+    )
+    expect(await waitForEvent(harness, 'schedules.updated')).toMatchObject({
+      payload: {
+        schedules: [
+          { id: 'c1', prompt: 'poll the deploy', recurring: true, schedule: '*/5 * * * *' },
+          { id: 'w1', prompt: 'check back', recurring: false, schedule: '37 14 26 9 *' },
+        ],
+      },
+      sessionId,
+    })
+    await harness.adapter.stopAll()
+  })
+
+  it('keeps ephemeral utility sessions free of the schedule hook', async () => {
+    const harness = claudeHarness()
+    await harness.adapter.startRuntime(sessionStartInput({ ephemeral: true }))
+    expect(latestOptions(harness).hooks).toBeUndefined()
+    await harness.adapter.stopAll()
+  })
+
   it('rejects the turn with a structured error when the result is an error subtype', async () => {
     const harness = claudeHarness()
     const input = providerTurnInput()

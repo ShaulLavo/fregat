@@ -160,6 +160,14 @@ type ProviderRuntimePlanStepStatus = 'pending' | 'inProgress' | 'completed'
 /** `blocked` is a hook that refused the action it guarded, which is not the same as failing. */
 export type ProviderHookOutcome = 'success' | 'blocked' | 'error' | 'cancelled'
 
+/** A session cron, `ScheduleWakeup` or `/loop` as the harness reports it (five-field cron). */
+export type ProviderHarnessSchedule = {
+  id: string
+  schedule: string
+  recurring: boolean
+  prompt: string
+}
+
 export type ProviderRuntimeEvent = ProviderRuntimeEventPayload & { runtimeEpoch: string }
 
 export type ProviderRuntimeEventPayload =
@@ -398,6 +406,11 @@ export type ProviderRuntimeEventPayload =
       /** Every live, non-ambient background task; replaces the previous set. */
       type: 'tasks.roster'
       payload: { tasks: ProviderBackgroundTask[] }
+    })
+  | (ProviderRuntimeBaseEvent & {
+      /** Every schedule the harness process holds after a turn; replaces the previous set. */
+      type: 'schedules.updated'
+      payload: { schedules: ProviderHarnessSchedule[] }
     })
   | (ProviderRuntimeBaseEvent & {
       type: 'hook.started'
