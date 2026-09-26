@@ -46,6 +46,10 @@ export const pathQuerySchema = v.object({
   path: v.optional(pathSchema, ''),
 })
 
+export const languageCensusQuerySchema = v.object({
+  root: v.optional(pathSchema, ''),
+})
+
 export const appWriteQuerySchema = v.object({
   path: pathSchema,
   version: v.pipe(v.string(), v.maxLength(128)),
