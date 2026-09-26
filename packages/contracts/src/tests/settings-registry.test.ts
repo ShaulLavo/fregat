@@ -47,7 +47,7 @@ describe('keybinding chord shape', () => {
 /**
  * Type-derivation gate.
  *
- * These are declarations, not assertions: `tsgo --noEmit` is what enforces them.
+ * These are declarations, not assertions: `tsc --noEmit` is what enforces them.
  * `expectTypeOf` would be a runtime no-op here, because no vitest project in
  * this repo enables `test.typecheck` — a broken derivation would report green.
  */

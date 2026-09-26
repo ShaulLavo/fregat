@@ -49,6 +49,43 @@ export function inProcessServerSocketConstructor(server: InProcessServer) {
       this.opening = Promise.resolve().then(() => this.open())
     }
 
+    // WebSocket's typed overloads: bare EventTarget listeners no longer satisfy socket types.
+    override addEventListener<K extends keyof WebSocketEventMap>(
+      type: K,
+      listener: (event: WebSocketEventMap[K]) => void,
+      options?: boolean | AddEventListenerOptions,
+    ): void
+    override addEventListener(
+      type: string,
+      listener: EventListenerOrEventListenerObject | null,
+      options?: boolean | AddEventListenerOptions,
+    ): void
+    override addEventListener(
+      type: string,
+      listener: EventListenerOrEventListenerObject | null,
+      options?: boolean | AddEventListenerOptions,
+    ) {
+      super.addEventListener(type, listener, options)
+    }
+
+    override removeEventListener<K extends keyof WebSocketEventMap>(
+      type: K,
+      listener: (event: WebSocketEventMap[K]) => void,
+      options?: boolean | EventListenerOptions,
+    ): void
+    override removeEventListener(
+      type: string,
+      listener: EventListenerOrEventListenerObject | null,
+      options?: boolean | EventListenerOptions,
+    ): void
+    override removeEventListener(
+      type: string,
+      listener: EventListenerOrEventListenerObject | null,
+      options?: boolean | EventListenerOptions,
+    ) {
+      super.removeEventListener(type, listener, options)
+    }
+
     send(message: SocketFrame) {
       if (this.readyState !== 1)
         throw createClientError({

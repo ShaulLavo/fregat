@@ -498,18 +498,20 @@ asked which large agent features Platform lacks. The owner grouped the answers i
 Research plans do enough research to be correct, then their research phase rewrites their own
 phases or splits them into executable plans; not all research happens up front.
 
-| Plan                                          | Kind                   | Owns                                                                                                                        |
-| --------------------------------------------- | ---------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| 138 (done)                                    | executable             | Claude models from the Claude CLI; chat runs the installed CLI                                                              |
-| [139](plans/139-acting-on-agent-diffs.md)     | research               | Keep or undo agent edits per hunk, batched diff comments to the agent, review mode, second-model review, plan line feedback |
-| [140](plans/140-editor-agent-advantage.md)    | research               | Editor context into chat, fix with AI, diagnostics fed back to the agent                                                    |
-| [141](plans/141-usage-and-rate-limits.md)     | executable             | Rate-limit meter, usage page with cost, usage history                                                                       |
-| 142 (done)                                    | executable             | Web Push from the mesh server                                                                                               |
-| [143](plans/143-phone-layout.md)              | direction approved     | What the phone is for; web layout versus the later companion app                                                            |
-| [144](plans/144-unattended-agent-work.md)     | research               | Scheduled, looping and multi-agent work: surface what the harnesses already do, build only the rest                         |
-| [145](plans/145-harness-controls.md)          | small executable plans | Fork, approval rules, MCP status, background tasks, hooks, custom agents, compact, export                                   |
-| [172](plans/172-shared-undo-stack.md)         | research               | One undo/redo stack behind Mod+Z, extracted from the existing undo implementations; Plan 126 LIFE-13 first                  |
-| [173](plans/173-two-devices-one-workspace.md) | research               | Two clients opening a workspace on one server: per-client open generations, what the losing client sees                     |
+| Plan                                           | Kind                   | Owns                                                                                                                        |
+| ---------------------------------------------- | ---------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| 138 (done)                                     | executable             | Claude models from the Claude CLI; chat runs the installed CLI                                                              |
+| [139](plans/139-acting-on-agent-diffs.md)      | research               | Keep or undo agent edits per hunk, batched diff comments to the agent, review mode, second-model review, plan line feedback |
+| [140](plans/140-editor-agent-advantage.md)     | research               | Editor context into chat, fix with AI, diagnostics fed back to the agent                                                    |
+| [141](plans/141-usage-and-rate-limits.md)      | executable             | Rate-limit meter, usage page with cost, usage history                                                                       |
+| 142 (done)                                     | executable             | Web Push from the mesh server                                                                                               |
+| [143](plans/143-phone-layout.md)               | direction approved     | What the phone is for; web layout versus the later companion app                                                            |
+| [144](plans/144-unattended-agent-work.md)      | research               | Scheduled, looping and multi-agent work: surface what the harnesses already do, build only the rest                         |
+| [145](plans/145-harness-controls.md)           | small executable plans | Fork, approval rules, MCP status, background tasks, hooks, custom agents, compact, export                                   |
+| [172](plans/172-shared-undo-stack.md)          | research               | One undo/redo stack behind Mod+Z, extracted from the existing undo implementations; Plan 126 LIFE-13 first                  |
+| [173](plans/173-two-devices-one-workspace.md)  | research               | Two clients opening a workspace on one server: per-client open generations, what the losing client sees                     |
+| [186](plans/186-pull-request-sync-rate.md)     | executable             | PR sync off switch and poll rate: open or unknown only, idle and hidden backoff, forge rate-limit headers (LIFE-14)         |
+| [187](plans/187-setup-scripts-in-terminals.md) | executable             | Setup scripts run in a visible, interruptible terminal, as T3 Code does (EXT-04)                                            |
 
 [Plan 126](plans/126-t3code-alignment.md) also gained the T3 features shipped after its
 2026-09-19 audit, and four reopened non-parity decisions.
@@ -529,6 +531,10 @@ Suggested order:
    undo/redo stack replaces the latest-undo slot).
 8. Plan 173's research before Plan 143's phone shell: the phone becomes a second client of the
    same server.
+9. Plans 186 and 187 and Plan 172's work item 1 (session Mod+Z only while the Undo notice shows),
+   any time: follow-ups the owner ordered 2026-09-26 from the direction audit. The owner kept
+   auto-settle, multi-model send, five forges, the terminal host and the remote install model as
+   shipped ([Plan 126](plans/126-t3code-alignment.md#kept-by-the-owner-2026-09-26)).
 
 ## Daily-driver lane
 
@@ -587,7 +593,7 @@ surfaces, the file picker and the site. The owner is taking it one topic at a ti
 | [180](plans/180-file-icon-variants.md)          | Quick research: more glyphs, variants and per-mode colours from the icon pack we already use                              |
 | [181](plans/181-chat-timeline-end-anchoring.md) | The chat timeline on TanStack's end anchoring after a 3.14.13 upgrade; prerequisite to 178's virtualization               |
 | [182](plans/182-search-view-rendering.md)       | Quick research: why the full search view renders slowly, and what would fix it                                            |
-| [185](plans/185-server-typescript-only.md)      | Platform uses only the server TypeScript backend; the browser worker stays an Editor feature (owner ruling, closes 153)   |
+| [188](plans/188-server-typescript-only.md)      | Platform uses only the server TypeScript backend; the browser worker stays an Editor feature (owner ruling, closes 153)   |
 
 Suggested order:
 

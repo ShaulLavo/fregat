@@ -9,7 +9,7 @@ import { readDevSources, type DevPackage } from './dev-sources'
  * `devSourcePlugin` (`apps/web/vite.config.ts`) rewrites every
  * `@singapore-editor/*` specifier to the checkout's `src` during `serve`, and
  * `check-dev-types.ts` generates a tsconfig with the same mapping. But plain
- * `tsgo` — what `bun run typecheck` runs in every package — has no `paths` for
+ * `tsc` — what `bun run typecheck` runs in every package — has no `paths` for
  * those ids, so it resolves them through the published `exports` map and reads
  * `dist/*.d.ts`.
  *

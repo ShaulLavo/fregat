@@ -10,7 +10,7 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   plugins: [react({ compiler: true })],
   resolve: {
-    alias: { '@workspace/ui': path.resolve(__dirname, './src') },
+    alias: { '@workspace/ui': path.resolve(import.meta.dirname, './src') },
     dedupe: ['react', 'react-dom'],
   },
   test: {

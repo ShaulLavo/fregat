@@ -3,6 +3,7 @@ import {
   normalizeRegisterableHotkey,
   parseHotkey,
   validateHotkey,
+  type ParsedHotkey,
   type RawHotkey,
 } from '@tanstack/hotkeys'
 import { MAX_KEYBINDING_CHORD_STROKES } from '@workspace/contracts'
@@ -10,6 +11,9 @@ import { MAX_KEYBINDING_CHORD_STROKES } from '@workspace/contracts'
 import type { KeyChord } from '@singapore-editor/core/keymap'
 
 export type PlatformName = ReturnType<typeof detectPlatform>
+
+/** A stroke bound by the character it types. Physical `[Code]` strokes are not bindable. */
+export type KeyStroke = Extract<ParsedHotkey, { code?: never }>
 
 export const MAX_CHORD_STROKES = MAX_KEYBINDING_CHORD_STROKES
 export const CHORD_TIMEOUT_MS = 5_000
@@ -56,8 +60,15 @@ export function isChordPrefix(keys: string, table: readonly { readonly keys: str
   )
 }
 
+/** Null for a physical `[Code]` stroke, which `isBindableChord` rejects. */
+export function parseKeyStroke(stroke: string, platform: PlatformName): KeyStroke | null {
+  const parsed = parseHotkey(stroke, platform)
+  return parsed.code === undefined ? parsed : null
+}
+
 function isBindableStroke(stroke: string): boolean {
   if (!stroke || /\s/u.test(stroke)) return false
+  if (!parseKeyStroke(stroke, 'mac')) return false
   const result = validateHotkey(stroke)
   // Unknown keys are only warnings in the library, but no keyboard can produce them.
   return result.valid && result.warnings.length === 0
@@ -65,11 +76,7 @@ function isBindableStroke(stroke: string): boolean {
 
 function rawStroke(keys: string, platform: PlatformName): RawHotkey {
   const parsed = parseHotkey(keys, platform)
-  return {
-    alt: parsed.alt,
-    ctrl: parsed.ctrl,
-    key: parsed.key,
-    meta: parsed.meta,
-    shift: parsed.shift,
-  }
+  const modifiers = { alt: parsed.alt, ctrl: parsed.ctrl, meta: parsed.meta, shift: parsed.shift }
+  if (parsed.code !== undefined) return { ...modifiers, code: parsed.code }
+  return { ...modifiers, key: parsed.key }
 }

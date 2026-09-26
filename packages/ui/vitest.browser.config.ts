@@ -7,8 +7,8 @@ export default defineConfig({
   plugins: [tailwindcss()],
   resolve: {
     alias: {
-      '@workspace/ui/globals.css': path.resolve(__dirname, './src/styles/globals.css'),
-      '@workspace/ui': path.resolve(__dirname, './src'),
+      '@workspace/ui/globals.css': path.resolve(import.meta.dirname, './src/styles/globals.css'),
+      '@workspace/ui': path.resolve(import.meta.dirname, './src'),
     },
     dedupe: ['react', 'react-dom'],
   },

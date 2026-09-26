@@ -16,23 +16,23 @@ import { devPagePlugin } from './scripts/dev-page-plugin'
 import { bootAppearancePlugin } from './scripts/boot-appearance-plugin'
 import { phosphorWeightPlugin } from './scripts/phosphor-weight-plugin'
 
-const workspaceRoot = path.resolve(__dirname, '../..')
+const workspaceRoot = path.resolve(import.meta.dirname, '../..')
 const devServerHost = process.env.WEB_HOST ?? '127.0.0.1'
 const devServerPort = portFromEnv(process.env, 'WEB_PORT', 5173)
 
 export default defineConfig(({ command, isPreview, mode }) => {
-  const packages = command === 'serve' && !isPreview ? readDevSources(__dirname) : []
+  const packages = command === 'serve' && !isPreview ? readDevSources(import.meta.dirname) : []
   // A build compiles the linked checkouts' pre-built `dist`; none of it is ours to memoize.
-  const linkedDist = command === 'build' ? readDevSources(__dirname) : []
+  const linkedDist = command === 'build' ? readDevSources(import.meta.dirname) : []
   return {
     build: {
       rollupOptions: {
         input:
           mode === 'demo'
-            ? path.resolve(__dirname, 'demo.html')
+            ? path.resolve(import.meta.dirname, 'demo.html')
             : {
-                index: path.resolve(__dirname, 'index.html'),
-                dev: path.resolve(__dirname, 'dev.html'),
+                index: path.resolve(import.meta.dirname, 'index.html'),
+                dev: path.resolve(import.meta.dirname, 'dev.html'),
               },
       },
     },
@@ -47,8 +47,8 @@ export default defineConfig(({ command, isPreview, mode }) => {
       exclude: ['@shikijs/themes', 'ghostty-webgpu', ...packages.map((pkg) => pkg.name)],
     },
     plugins: [
-      bootAppearancePlugin(__dirname),
-      demoPreviewPlugin(__dirname),
+      bootAppearancePlugin(import.meta.dirname),
+      demoPreviewPlugin(import.meta.dirname),
       devPagePlugin(),
       devSourcePlugin(packages),
       appSaveHmrPlugin({
@@ -68,14 +68,14 @@ export default defineConfig(({ command, isPreview, mode }) => {
       }),
       tailwindcss(),
       phosphorWeightPlugin([
-        path.resolve(__dirname, 'src'),
+        path.resolve(import.meta.dirname, 'src'),
         path.resolve(workspaceRoot, 'packages/ui/src'),
       ]),
       bundleStatsPlugin(),
     ],
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, './src'),
+        '@': path.resolve(import.meta.dirname, './src'),
       },
       // evlog resolves as two peer variants of one version (the root pins an older vite), and both
       // copies ship; one is enough because its config lives on globalThis.

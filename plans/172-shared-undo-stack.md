@@ -3,7 +3,8 @@
 ## Status and authorization
 
 - Status: RESEARCH DONE (2026-09-25) — findings, recommendations and proposed phases below;
-  owner questions answered 2026-09-26. Nothing here authorizes implementation.
+  owner questions answered 2026-09-26. Nothing here authorizes implementation. "Work items"
+  records a fix to shipped behaviour that the owner ordered 2026-09-26.
 - Priority: P2.
 - Planned at: Platform `9f343825`, 2026-09-25. Origin: Plan 126
   [LIFE-13](126-t3code-alignment/lifecycle.md) owner correction.
@@ -12,7 +13,8 @@
 
 One undo/redo stack, extracted once and reused: Mod+Z steps back through recent actions and redo
 steps forward again. LIFE-13 (settle, snooze, archive, unpin) is its first consumer. New
-undo features use it.
+undo features use it. For session actions, Mod+Z acts only while the Undo notice is showing
+(owner question 1); once the notice is gone, Mod+Z does nothing to sessions.
 
 ## What exists today
 
@@ -199,6 +201,9 @@ same order from pane-scoped bindings, with no second dispatch mechanism.
    live; (b) entries expire with the notice. **Recommendation: (a)**, and update the LIFE-13
    acceptance line.
    Decided 2026-09-26: owner — (b): Mod+Z does not act once the 5 s notice is gone, matching LIFE-13's acceptance and upstream.
+   Confirmed 2026-09-26 (direction audit): owner — "Mod+Z only while the Undo notice is showing (a
+   few seconds). Once the notice is gone, Mod+Z does nothing here." LIFE-13's text in
+   [lifecycle.md](126-t3code-alignment/lifecycle.md) now says the same.
 2. **Should rail undo survive a reload?** Options: (a) memory, per window; (b) IndexedDB, per
    browser; (c) on the server, across devices. **Recommendation: (a).** (b) can be added later
    without a server change.
@@ -209,6 +214,17 @@ same order from pane-scoped bindings, with no second dispatch mechanism.
    with its own command. **Recommendation: (a)**, matching "steps back through recent actions".
    LIFE-13 ships with one domain either way, and the API above supports both.
    Decided 2026-09-26: owner — (b) one stack per domain, no merged app timeline; this overrides the recommendation.
+
+### Work items
+
+1. **Fix the shipped session undo (ordered 2026-09-26).** Lane L5 shipped LIFE-13 with
+   `apps/web/src/features/chat-mode/state/session-undo.ts` keeping its 50-step history live after
+   the 5 s notice closes, so Mod+Z / Mod+Shift+Z still walk it. Change it so session history
+   entries expire with the notice: once no session Undo notice is showing, the session undo and
+   redo bindings do not act (their `when` fails, so the chord falls through). Apply the same rule
+   to the TUI rail's U / Shift+U, which share `client-core/src/chat/rail/lifecycle-undo.ts`.
+   Update `session-undo` unit and DOM tests and the `session-undo` scenario: an undo by key within
+   the notice works, a key press after it closes changes nothing. Can land before the phases below.
 
 ### Proposed phases
 

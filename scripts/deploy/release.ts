@@ -137,7 +137,7 @@ export function removePending() {
 export async function buildWeb(release: Release) {
   log('web', 'typecheck')
   await runOrFail(
-    ['bunx', 'tsgo', '--build'],
+    ['bunx', 'tsc', '--build'],
     webPackage,
     path.join(release.directory, 'web-typecheck.log'),
   )

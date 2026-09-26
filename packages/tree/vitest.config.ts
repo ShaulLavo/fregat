@@ -4,7 +4,7 @@ import { playwright } from '@vitest/browser-playwright'
 import { defineConfig } from 'vitest/config'
 
 const alias = {
-  '@workspace/tree': path.resolve(__dirname, './src'),
+  '@workspace/tree': path.resolve(import.meta.dirname, './src'),
 }
 
 // The compiler runs here because it runs in the app that mounts this fork: without it a test

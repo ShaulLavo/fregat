@@ -145,6 +145,8 @@ Each flag gives what it is, where it ships, why that matters, and the options.
   - Replace it with WebCrypto: an ES256 VAPID JWT plus RFC 8291 `aes128gcm`, about 150 lines.
     This drops MPL and 17 packages.
   - Keep it and list it in the notices file.
+  - Decided 2026-09-26: owner — web push and `web-push` stay; isolate the package so only push
+    loads it ([Plan 184](../plans/184-dependency-diet.md) slice 4). The WebCrypto rewrite is off the table.
 
 **`sharp` 0.35.4 with `@img/sharp-libvips-*` 1.3.3 (LGPL-3.0-or-later)**
 

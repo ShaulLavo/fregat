@@ -5,7 +5,7 @@
 - Status: CLOSED — Phase 1 landed; the Platform worker phases (2 and 3) were dropped by the owner
   on 2026-09-26: "I don't want Platform to know about it at all; that's a mistake. Platform always
   uses server TS; the worker should just be a nice-to-have Editor feature." Lane L7 built them and
-  [Plan 185](185-server-typescript-only.md) removed them before PR #37 merged. The worker backend
+  [Plan 188](188-server-typescript-only.md) removed them before PR #37 merged. The worker backend
   stays in the Editor repo (`@singapore-editor/typescript-lsp`, Editor PR #34).
 - Priority: P3. The server path works; this is a second backend, useful where no server runs a
   language server (a remote machine without Node tooling, a read-only share) and as a fallback.
@@ -105,7 +105,7 @@ catalog guidance once.
 - The toast reads the guidance straight from the exit params, the same field `serverFailed` reads,
   so guidance without a catalog code still reaches the user.
 
-### Phase 2: A program's files from the server (dropped, removed by Plan 185)
+### Phase 2: A program's files from the server (dropped, removed by Plan 188)
 
 `GET /lsp/typescript/program-files?root=&tsconfig=` returns the list D3 settles on, and a batched
 read returns their text in one response. Evidence: a route test against a fixture project, and the

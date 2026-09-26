@@ -1,4 +1,4 @@
-# Plan 185: Platform always uses the server TypeScript backend
+# Plan 188: Platform always uses the server TypeScript backend
 
 ## Status and authorization
 
