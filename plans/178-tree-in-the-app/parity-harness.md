@@ -80,3 +80,32 @@ search results when they adopt the primitives this plan builds.
   the tree opens, so it has none.
 - **Spec corrections** found while pinning today's behaviour are in the parity spec under
   "Harness findings".
+
+## PR 68 follow-up verification
+
+The harness now verifies both bundled font families loaded and records its 1440×900 viewport and
+DPR 2 in `tree-parity-environment.json`. A missing font fails before baseline capture. Selecting
+`TREE_PARITY_STATES=folder-error` also runs its loading-folder prerequisite.
+
+Tree tests serialize browser files, release held mouse/touch input during cleanup, and disable
+touch emulation after each test. Expansion waits for rendered rows. The 50ms scroll-menu boundary
+uses Playwright's clock with real wheel and mouse input. Frame-driven drag scrolling has a bounded
+3s assertion deadline. CPU-constrained runs exposed the former frame-count and wall-clock races.
+
+Verification on 2026-09-26, through the wave-heavy runner:
+
+- Two full compare runs at `/work/tmp/fregat-evidence/20260926T184525Z-scenario-tree-parity/` and
+  `/work/tmp/fregat-evidence/20260926T184846Z-scenario-tree-parity/`: 60 captures each, zero pixel
+  mismatches and zero style differences, about 58s each. Baselines remain unchanged.
+- Temporary 0.5px row-name padding: all four rest captures failed, 45 style differences each and
+  24,369–24,994 mismatched pixels. Evidence:
+  `/work/tmp/fregat-evidence/20260926T184713Z-scenario-tree-parity/`.
+- Temporary ArrowDown reversal: the real-input keyboard test failed, expecting `src/b.ts` and
+  receiving `src/lib/`. Both mutations were restored byte for byte. Logs:
+  `/work/tmp/w2-cx-68-style-mutation.log` and `/work/tmp/w2-cx-68-behaviour-mutation.log`.
+- Tree browser suite: 69 tests. Also exercised with the entire runner and Chromium restricted to
+  one CPU core. No model requests are needed for these fixtures.
+
+The visual matrix remains an explicit local scenario, so this PR adds no matrix work to CI. The
+existing browser CI job has a 15-minute cap; local tree browser runs take about 10–12s with serial
+input. Every polling wait and animation wait remains bounded.

@@ -19,6 +19,8 @@ async function frameOffset(context: Parameters<BrowserCommand<[]>>[0]): Promise<
 
 type CommandPage = Parameters<BrowserCommand<[]>>[0]['page']
 const touchSessions = new WeakMap<CommandPage, Awaited<ReturnType<typeof openTouchSession>>>()
+const activeTouches = new WeakSet<CommandPage>()
+const pausedClocks = new WeakSet<CommandPage>()
 
 // Emulation lives as long as its session, so one session serves every touch of a page.
 async function openTouchSession(page: CommandPage) {
@@ -37,6 +39,26 @@ async function touchSession(page: CommandPage) {
 
 // Real pointer, touch and wheel input at in-frame client coordinates, for the parity tests.
 const treeCommands = {
+  async treeClock(context, action: 'pause' | 'advance', milliseconds = 0) {
+    if (action === 'advance') return context.page.clock.runFor(milliseconds)
+    const now = Date.now()
+    await context.page.clock.install({ time: now })
+    await context.page.clock.pauseAt(now)
+    pausedClocks.add(context.page)
+  },
+  async treeResetInput(context) {
+    if (pausedClocks.has(context.page)) await context.page.clock.resume()
+    pausedClocks.delete(context.page)
+    await context.page.mouse.up()
+    const session = touchSessions.get(context.page)
+    if (!session) return
+    if (activeTouches.has(context.page))
+      await session.send('Input.dispatchTouchEvent', { type: 'touchCancel', touchPoints: [] })
+    activeTouches.delete(context.page)
+    await session.send('Emulation.setTouchEmulationEnabled', { enabled: false })
+    await session.detach()
+    touchSessions.delete(context.page)
+  },
   async treeMouse(
     context,
     action: 'click' | 'down' | 'move' | 'up',
@@ -89,6 +111,8 @@ const treeCommands = {
         ? []
         : [{ x: offset.x + point.x, y: offset.y + point.y }]
     await session.send('Input.dispatchTouchEvent', { type, touchPoints })
+    if (type === 'touchStart') activeTouches.add(context.page)
+    if (type === 'touchEnd' || type === 'touchCancel') activeTouches.delete(context.page)
   },
 } satisfies Record<string, BrowserCommand<never[]>>
 
@@ -96,6 +120,8 @@ const treeCommands = {
 // exercises unmemoized source, and manual memoization the compiler makes redundant looks load-bearing.
 export default defineConfig({
   test: {
+    // Chromium's native drag and touch state must not overlap another file's input.
+    fileParallelism: false,
     projects: [
       {
         resolve: { alias },

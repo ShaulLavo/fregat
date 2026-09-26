@@ -1,3 +1,4 @@
+import { strictEqual, ok } from 'node:assert/strict'
 import { existsSync } from 'node:fs'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -52,6 +53,7 @@ export const treeParity: Scenario = {
   capture: { scale: 2, width: 1440, height: 900 },
   async run(page, { evidence }) {
     const update = process.env.TREE_PARITY_UPDATE === '1'
+    await verifyCaptureEnvironment(page, evidence.dir)
     const fixture = await createTreeParityFixture()
     const held = heldRequests(page)
     try {
@@ -90,6 +92,8 @@ function selectedStates() {
   const unknown = names.filter((name) => !PARITY_STATES.some((state) => state.name === name))
   if (unknown.length > 0)
     throw createScriptError(`Unknown tree parity state(s): ${unknown.join(', ')}.`)
+  // The error capture consumes the failed request left by the loading-folder state.
+  if (names.includes('folder-error')) names.push('loading-folder')
   return PARITY_STATES.filter((state) => names.includes(state.name))
 }
 
@@ -244,4 +248,28 @@ async function captureCombo(
     styles,
     failed,
   }
+}
+
+async function verifyCaptureEnvironment(page: Page, evidenceDir: string) {
+  const environment = await page.evaluate(async () => {
+    const fonts = await Promise.all(
+      ['Inter Variable', 'JetBrains Mono Variable'].map(async (family) => {
+        const faces = await document.fonts.load(`12.5px "${family}"`)
+        return {
+          family,
+          loaded: faces.length > 0 && faces.every((face) => face.status === 'loaded'),
+        }
+      }),
+    )
+    return { fonts, dpr: devicePixelRatio, width: innerWidth, height: innerHeight }
+  })
+  await writeFile(
+    path.join(evidenceDir, 'tree-parity-environment.json'),
+    JSON.stringify(environment, null, 2),
+  )
+  strictEqual(environment.dpr, 2, 'Tree parity baselines require device scale 2')
+  strictEqual(environment.width, 1440, 'Tree parity baselines require width 1440')
+  strictEqual(environment.height, 900, 'Tree parity baselines require height 900')
+  for (const font of environment.fonts)
+    ok(font.loaded, `Tree parity font failed to load: ${font.family}`)
 }

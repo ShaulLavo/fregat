@@ -31,6 +31,8 @@ declare module 'vitest/browser' {
       options?: MouseOptions,
     ): Promise<void>
     treeReducedMotion(reduce: boolean): Promise<void>
+    treeResetInput(): Promise<void>
+    treeClock(action: 'pause' | 'advance', milliseconds?: number): Promise<void>
     treeWheel(point: Point, deltaY: number): Promise<void>
     treeTouch(
       type: 'touchCancel' | 'touchEnd' | 'touchMove' | 'touchStart',
@@ -80,7 +82,9 @@ type Mounted = { readonly model: FileTreeModel; readonly events: ParityEvents }
 let root: Root | null = null
 let mounted: FileTreeModel | null = null
 
-export function unmountParityTree() {
+export async function unmountParityTree() {
+  await commands.treeResetInput()
+  await commands.treeReducedMotion(false)
   mounted?.cleanUp()
   mounted = null
   flushSync(() => root?.unmount())
@@ -218,6 +222,9 @@ export async function expandPaths(model: FileTreeModel, paths: readonly string[]
     const item = model.getItem(path)
     if (item && 'expand' in item) item.expand()
   }
+  await vi.waitFor(() => {
+    for (const path of paths) expect(row(path).getAttribute('aria-expanded')).toBe('true')
+  })
   await frames()
 }
 

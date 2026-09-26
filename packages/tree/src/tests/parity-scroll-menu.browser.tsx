@@ -21,10 +21,7 @@ import {
   unmountParityTree,
 } from './parity-harness'
 
-afterEach(async () => {
-  await commands.treeReducedMotion(false)
-  unmountParityTree()
-})
+afterEach(unmountParityTree)
 
 function menuOpen() {
   return document.querySelector('[role="menu"][aria-label="Row menu"]') !== null
@@ -126,8 +123,7 @@ describe('sticky folders', () => {
     await frames(2)
     await commands.treeReducedMotion(true)
     model.scrollToPath('src/lib/z-39.ts', { behavior: 'smooth', focus: false, offset: 'top' })
-    await frames(1)
-    expect(scroller().scrollTop).toBeGreaterThan(30 * ROW_HEIGHT)
+    await vi.waitFor(() => expect(scroller().scrollTop).toBeGreaterThan(30 * ROW_HEIGHT))
   })
 })
 
@@ -196,13 +192,13 @@ describe('row menu', () => {
   it('ignores a right-click during a scroll and for 50ms after it', async () => {
     const { model, events } = await mountParityTree()
     await expandPaths(model, ['src/', 'src/lib/'])
+    await commands.treeClock('pause')
     await wheel(2 * ROW_HEIGHT)
+    await commands.treeClock('advance', 16)
     await mouse('click', center(row('src/lib/y.ts')), { button: 'right' })
-    await frames(1)
     expect(events.menus).toHaveLength(0)
-    await scrollSettled()
-    await new Promise((resolve) => setTimeout(resolve, 80))
+    await commands.treeClock('advance', 80)
     await mouse('click', center(row('src/lib/y.ts')), { button: 'right' })
-    await vi.waitFor(() => expect(events.menus).toHaveLength(1))
+    expect(events.menus).toHaveLength(1)
   })
 })

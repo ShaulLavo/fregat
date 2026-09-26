@@ -106,7 +106,9 @@ describe('drag and drop', () => {
     await dragTo(center(row('src/lib/x.ts')), { x: edge.left + 80, y: edge.bottom - 8 })
     await vi.waitFor(() => expect(scroller().scrollTop).toBeGreaterThan(ROW_HEIGHT))
     // The dragged row stays mounted, parked, once the window leaves it behind.
-    await vi.waitFor(() => expect(scroller().scrollTop).toBeGreaterThan(20 * ROW_HEIGHT))
+    await vi.waitFor(() => expect(scroller().scrollTop).toBeGreaterThan(20 * ROW_HEIGHT), {
+      timeout: 3000,
+    })
     expect(hasRow('src/lib/x.ts')).toBe(true)
     expect(row('src/lib/x.ts').dataset.itemParked).toBe('true')
     await mouse('up')
