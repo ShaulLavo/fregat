@@ -22,6 +22,7 @@ export function buildHighlightOverlayMask(
   codeUnit: (offset: number) => number,
 ): readonly HighlightOverlayRange[] {
   const edges: Edge[] = []
+  const normalized = new Map<HighlightOverlay, HighlightOverlay>()
   for (const [id, range] of ranges.entries()) {
     validateHighlightOverlay(range.overlay)
     let start = Math.max(0, Math.min(length, Math.trunc(range.start)))
@@ -29,7 +30,9 @@ export function buildHighlightOverlayMask(
     if (end <= start) continue
     if (splitsSurrogate(start, length, codeUnit)) start--
     if (splitsSurrogate(end, length, codeUnit)) end++
-    edges.push({ at: start, id, overlay: range.overlay }, { at: end, id })
+    const overlay = normalizeOverlay(range.overlay, normalized)
+    if (!overlay) continue
+    edges.push({ at: start, id, overlay }, { at: end, id })
   }
   edges.sort((left, right) => left.at - right.at)
   const active = new Map<number, HighlightOverlay>()
@@ -37,7 +40,7 @@ export function buildHighlightOverlayMask(
   let previous = edges[0]?.at ?? 0
   for (let index = 0; index < edges.length;) {
     const at = edges[index]!.at
-    appendOverlay(mask, previous, at, mergedOverlay(active.values()))
+    appendOverlay(mask, previous, at, activeOverlay(active))
     while (index < edges.length && edges[index]!.at === at) {
       const edge = edges[index++]!
       if (edge.overlay) active.set(edge.id, edge.overlay)
@@ -46,6 +49,26 @@ export function buildHighlightOverlayMask(
     previous = at
   }
   return mask
+}
+
+// Every spelling range shares one style. Parse that CSS once per mask, then reuse it between edges.
+function normalizeOverlay(
+  overlay: HighlightOverlay,
+  cache: Map<HighlightOverlay, HighlightOverlay>,
+): HighlightOverlay | undefined {
+  const cached = cache.get(overlay)
+  if (cached) return cached
+  const normalized = mergedOverlay([overlay])
+  if (normalized) cache.set(overlay, normalized)
+  return normalized
+}
+
+function activeOverlay(
+  active: ReadonlyMap<number, HighlightOverlay>,
+): HighlightOverlay | undefined {
+  if (active.size === 0) return undefined
+  if (active.size === 1) return active.values().next().value
+  return mergedOverlay(active.values())
 }
 
 export function validateHighlightOverlay(overlay: HighlightOverlay): void {

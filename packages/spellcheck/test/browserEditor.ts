@@ -7,6 +7,9 @@ import { EDITOR_SPELLCHECK_FEATURE, type EditorSpellcheckFeature } from '../src/
 declare module 'vitest/browser' {
   interface BrowserCommands {
     proofRowScreenshot: (hostId: string) => Promise<string>
+    proofPaste: (text: string) => Promise<void>
+    proofProfileStart: () => Promise<void>
+    proofProfileStop: () => Promise<readonly { function: string; url: string; samples?: number }[]>
     proofType: (text: string) => Promise<void>
   }
 }

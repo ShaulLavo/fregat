@@ -23,6 +23,9 @@ export type SpellTokenizeOptions = {
 const MIN_PROSE_LENGTH = 2
 // cSpell's default for code: shorter camelCase parts are mostly abbreviations.
 const MIN_CODE_PART_LENGTH = 4
+const MAX_STRUCTURED_LENGTH = 256
+// Skip generated/minified lines before reading or caching their text on each keystroke.
+export const MAX_SPELLCHECK_LINE_LENGTH = 16_384
 
 const URL_PATTERN = /\b(?:[a-z][a-z0-9+.-]*:\/\/|www\.)[^\s<>()"'`]+/gi
 const EMAIL_PATTERN = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g
@@ -38,6 +41,36 @@ export function tokenizeSpellWords(
   text: string,
   options: SpellTokenizeOptions = {},
 ): readonly SpellWord[] {
+  const words: SpellWord[] = []
+  const excluded = sortedRanges(options.excluded ?? [])
+  let cursor = 0
+  for (const chunk of text.matchAll(/\S+/g)) {
+    if (chunk[0].length > MAX_STRUCTURED_LENGTH) continue
+    cursor = advancePast(excluded, cursor, chunk.index)
+    const local = chunkExclusions(excluded, cursor, chunk.index, chunk[0].length)
+    for (const word of tokenizeChunk(chunk[0], { ...options, excluded: local })) {
+      words.push({ ...word, start: word.start + chunk.index, end: word.end + chunk.index })
+    }
+  }
+  return words
+}
+
+function chunkExclusions(
+  ranges: readonly SpellTextRange[],
+  cursor: number,
+  start: number,
+  length: number,
+): readonly SpellTextRange[] {
+  const local: SpellTextRange[] = []
+  for (let index = cursor; index < ranges.length; index++) {
+    const range = ranges[index]!
+    if (range.start >= start + length) break
+    local.push({ start: range.start - start, end: range.end - start })
+  }
+  return local
+}
+
+function tokenizeChunk(text: string, options: SpellTokenizeOptions): readonly SpellWord[] {
   const skipped = sortedRanges([...(options.excluded ?? []), ...structuredRanges(text)])
   const mode = options.mode ?? 'prose'
   const words: SpellWord[] = []
@@ -73,7 +106,7 @@ function pushProseWord(words: SpellWord[], run: Run): void {
 }
 
 function codeWords(run: Run): readonly SpellWord[] {
-  // A run holding a non-English letter is some other language's word, never a misspelling.
+  // The bundled English policy only submits ASCII letters and supported apostrophes.
   if (/[^\p{N}_'’a-zA-Z]/u.test(run.text)) return []
 
   const words: SpellWord[] = []

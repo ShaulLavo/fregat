@@ -51,7 +51,7 @@ describe('tokenizeSpellWords', () => {
     expect(words(text, { excluded: [chip, code] })).toEqual(['run', 'then', 'ask', 'abuot', 'it'])
   })
 
-  it('never returns Hebrew or other non-English words', () => {
+  it('skips runs containing letters outside ASCII', () => {
     expect(words('שלום עולם and naïve café straße')).toEqual(['and'])
   })
 
@@ -82,5 +82,30 @@ describe('tokenizeSpellWords', () => {
     expect(found.map((word) => word.word)).toEqual(['parse', 'Respnse', 'retrys'])
     const respnse = found[1]
     expect(text.slice(respnse?.start, respnse?.end)).toBe('Respnse')
+  })
+})
+
+describe('bounded structured classification', () => {
+  it.each(['a', 'a.', 'a@', 'a/', "a'", 'a-._@'])(
+    'skips oversized chunks shaped like %s and preserves surrounding offsets',
+    (unit) => {
+      const text = `before ${unit.repeat(20_000)} after`
+      expect(tokenizeSpellWords(text)).toEqual([
+        { start: 0, end: 6, word: 'before' },
+        { start: text.length - 5, end: text.length, word: 'after' },
+      ])
+      expect(words(text, { mode: 'code' })).toEqual(['before', 'after'])
+    },
+  )
+
+  it('retains exclusions across whitespace-delimited chunks', () => {
+    expect(words('before hidden words after', { excluded: [{ start: 7, end: 19 }] })).toEqual([
+      'before',
+      'after',
+    ])
+  })
+
+  it('documents ASCII-shaped foreign text and accented text', () => {
+    expect(words('שלום עולם привет мир hola mundo café cafe')).toEqual(['hola', 'mundo', 'cafe'])
   })
 })

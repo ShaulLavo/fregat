@@ -11,6 +11,7 @@ import type { SpellcheckService } from './service'
 import { SPELLING_STYLE } from './styles'
 import {
   foldApostrophes,
+  MAX_SPELLCHECK_LINE_LENGTH,
   tokenizeSpellWords,
   type SpellTextRange,
   type SpellWord,
@@ -187,6 +188,7 @@ export class SpellcheckController {
     const words: SpellWord[] = []
     for (const region of regions.prose) this.proseWords(text, region, excluded, words)
     for (const region of regions.code) {
+      if (region.end - region.start > MAX_SPELLCHECK_LINE_LENGTH) continue
       const source = text.readRange(region.start, region.end)
       const local = localRanges(excluded, region)
       for (const word of tokenizeSpellWords(source, { mode: 'code', excluded: local })) {
@@ -206,6 +208,7 @@ export class SpellcheckController {
     const lastLine = text.lineAt(region.end)
     for (let line = firstLine; line <= lastLine; line++) {
       const range = text.lineRange(line)
+      if (range.end - range.start > MAX_SPELLCHECK_LINE_LENGTH) continue
       const local = localRanges(excluded, range)
       const lineWords = this.lineWords(text.readRange(range.start, range.end), local)
       for (const word of lineWords) words.push(shifted(word, range.start))

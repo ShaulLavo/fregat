@@ -77,9 +77,10 @@ function proseWords(text: string): readonly string[] {
 }
 
 async function suggestionQuality(spell: SpellEngine) {
-  const pairs = (await typoPairs()).filter(
-    ([target, wrong]) => spell.isCorrect(target) && !spell.isCorrect(wrong),
-  )
+  const all = await typoPairs()
+  const covered = all.filter(([target]) => spell.isCorrect(target))
+  const missed = covered.filter(([, wrong]) => spell.isCorrect(wrong))
+  const pairs = covered.filter(([, wrong]) => !spell.isCorrect(wrong))
   const times: number[] = []
   let top1 = 0
   let top5 = 0
@@ -91,12 +92,16 @@ async function suggestionQuality(spell: SpellEngine) {
     if (suggestions.includes(target)) top5++
   }
   return {
-    typoPairs: pairs.length,
+    evaluationPairs: all.length,
+    targetCoveredPairs: covered.length,
+    targetCoveragePercent: round((100 * covered.length) / all.length),
+    missedTyposWithCoveredTarget: missed.length,
+    eligibleRankingPairs: pairs.length,
     suggestMedianMs: round(percentile(times, 0.5), 2),
     suggestP95Ms: round(percentile(times, 0.95), 2),
     suggestMaxMs: round(Math.max(...times), 1),
-    top1: round((100 * top1) / pairs.length),
-    top5: round((100 * top5) / pairs.length),
+    eligibleTop1Percent: pairs.length ? round((100 * top1) / pairs.length) : null,
+    eligibleTop5Percent: pairs.length ? round((100 * top5) / pairs.length) : null,
   }
 }
 

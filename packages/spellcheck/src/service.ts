@@ -7,7 +7,7 @@ export type SpellcheckServiceOptions = {
 
 type Pending = {
   readonly resolve: (value: readonly string[]) => void
-  readonly reject: (error: Error) => void
+  readonly reject: (error: unknown) => void
 }
 
 const DEFAULT_SUGGESTIONS = 5
@@ -41,7 +41,13 @@ export class SpellcheckService {
   public setAcceptedWords(words: readonly string[]): void {
     this.acceptedWords = words
     this.accepted = new Set(words)
-    if (this.worker) this.worker.postMessage({ type: 'setAcceptedWords', words })
+    if (this.worker) {
+      try {
+        this.worker.postMessage({ type: 'setAcceptedWords', words })
+      } catch (error) {
+        this.stop(error)
+      }
+    }
     for (const listener of this.acceptedListeners) listener()
   }
 
@@ -66,10 +72,13 @@ export class SpellcheckService {
     if (this.disposed) return Promise.reject(new Error('The spellcheck service was disposed'))
 
     const id = this.nextId++
-    const worker = this.ensureWorker()
     return new Promise((resolve, reject) => {
       this.pending.set(id, { resolve, reject })
-      worker.postMessage(build(id))
+      try {
+        this.ensureWorker().postMessage(build(id))
+      } catch (error) {
+        this.stop(error)
+      }
     })
   }
 
@@ -81,10 +90,11 @@ export class SpellcheckService {
       new Worker(new URL('./spellcheck.worker.ts', import.meta.url), { type: 'module' })
     worker.onmessage = (event: MessageEvent<SpellcheckWorkerResponse>) => this.receive(event.data)
     worker.onerror = (event: ErrorEvent) => this.crash(event.message)
+    worker.onmessageerror = () => this.crash('The worker response could not be decoded')
+    this.worker = worker
     if (this.acceptedWords.length > 0) {
       worker.postMessage({ type: 'setAcceptedWords', words: this.acceptedWords })
     }
-    this.worker = worker
     return worker
   }
 
@@ -101,8 +111,9 @@ export class SpellcheckService {
   }
 
   private settleError(id: number | null, message: string): void {
-    const pending = id === null ? undefined : this.pending.get(id)
-    if (!pending || id === null) return
+    if (id === null) return this.crash(message)
+    const pending = this.pending.get(id)
+    if (!pending) return
     this.pending.delete(id)
     pending.reject(new Error(`Spellcheck failed: ${message}`))
   }
@@ -112,8 +123,13 @@ export class SpellcheckService {
     this.stop(new Error(`The spellcheck worker stopped: ${message}`))
   }
 
-  private stop(error: Error): void {
-    this.worker?.terminate()
+  private stop(error: unknown): void {
+    if (this.worker) {
+      this.worker.onmessage = null
+      this.worker.onerror = null
+      this.worker.onmessageerror = null
+      this.worker.terminate()
+    }
     this.worker = null
     for (const pending of this.pending.values()) pending.reject(error)
     this.pending.clear()
