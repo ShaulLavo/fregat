@@ -1,4 +1,5 @@
 import {
+  forgetEnvironmentStorage,
   storedEnvironmentScopes,
   type ScopedStorage,
 } from '@/lib/environments/state/scoped-storage'
@@ -6,7 +7,6 @@ import {
   healthDescriptorSchema,
   machineNameSchema,
   originMachineSchema,
-  type EnvironmentId,
 } from '@workspace/contracts'
 import * as v from 'valibot'
 import {
@@ -32,7 +32,7 @@ export type EnvironmentCacheBinding = Omit<
   readonly names: readonly string[]
 }
 
-const cacheBindings = new Map<EnvironmentId, EnvironmentCacheBinding>()
+const cacheBindings = new Map<string, EnvironmentCacheBinding>()
 
 function readEnvironmentBinding(storage: ScopedStorage): EnvironmentCacheBinding | null {
   const cached = readWorkspaceCacheEntry<v.InferOutput<typeof recordSchema> | null>(
@@ -78,4 +78,10 @@ export function readCachedEnvironmentBindings(
     if (!binding || !binding.names.some((name) => wanted.has(name))) return []
     return [binding]
   })
+}
+
+/** Deletes everything this browser keeps for an environment; true when nothing is left. */
+export function forgetCachedEnvironment(environmentId: string): boolean {
+  cacheBindings.delete(environmentId)
+  return forgetEnvironmentStorage(environmentId)
 }

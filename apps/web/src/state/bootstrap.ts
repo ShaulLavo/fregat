@@ -7,6 +7,8 @@ import { primaryServerOrigin } from '@/lib/client'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
 import { readEnvironmentDescriptor } from '@/lib/environments/utils/descriptor'
 import { toConnectionError } from '@/lib/client-error-taxonomy'
+import { selectServerConnection } from '@workspace/client-core/environments/state/store'
+import { replacePrimaryIdentity } from '@/state/primary-identity'
 
 type BootstrapState = {
   readonly application: ApplicationRuntime | null
@@ -14,7 +16,10 @@ type BootstrapState = {
 }
 
 // Prepared before createRoot. React's effect replay must never destroy retained documents.
-export function createBootstrap(navigation: ReturnType<typeof createNavigation>) {
+export function createBootstrap(
+  navigation: ReturnType<typeof createNavigation>,
+  { reload }: { readonly reload?: () => void } = {},
+) {
   const store = createStore<BootstrapState>(() => ({
     application: prepareCachedRuntime(navigation),
     error: null,
@@ -23,6 +28,13 @@ export function createBootstrap(navigation: ReturnType<typeof createNavigation>)
   let detach: (() => void) | undefined
   let disposed = false
   let generation = 0
+  let replacingIdentity = false
+  // Any path can meet the replacement first: boot health, the gate's query, or a socket handshake.
+  const stopIdentityWatch = useEnvironmentsStore.subscribe((state) => {
+    const connection = selectServerConnection(state, primaryServerOrigin())
+    if (connection.phase !== 'identity-drift' || replacingIdentity) return
+    replacingIdentity = replacePrimaryIdentity(connection.expected, connection.received, reload)
+  })
 
   function start() {
     if (abort || disposed) return
@@ -46,6 +58,7 @@ export function createBootstrap(navigation: ReturnType<typeof createNavigation>)
       .catch((cause) => {
         if (controller.signal.aborted) return
         const failure = toConnectionError(cause, 'Cannot connect to the local machine.')
+        if (replacingIdentity) return
         const phase = useEnvironmentsStore.getState().entries[primaryServerOrigin()]?.phase
         if (phase === 'identity-drift' || phase === 'blocked') {
           detach?.()
@@ -73,6 +86,7 @@ export function createBootstrap(navigation: ReturnType<typeof createNavigation>)
   function dispose() {
     if (disposed) return
     disposed = true
+    stopIdentityWatch()
     abort?.abort()
     detach?.()
     store.getState().application?.dispose()
