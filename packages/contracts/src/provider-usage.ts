@@ -59,7 +59,7 @@ export type ProviderAccountUsage = v.InferOutput<typeof providerAccountUsageSche
 export type ProviderUsageResult = v.InferOutput<typeof providerUsageResultSchema>
 
 /** What a recorded turn was for: a chat turn, or a generation the app ran itself. */
-export const providerUsagePurposeSchema = v.picklist(['turn', 'title', 'commit-message'])
+export const providerUsagePurposeSchema = v.picklist(['turn', 'title', 'commit-message', 'review'])
 
 export const USAGE_HISTORY_DAYS = [7, 30, 90] as const
 

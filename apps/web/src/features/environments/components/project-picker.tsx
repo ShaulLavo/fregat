@@ -9,7 +9,7 @@ import {
   DialogTitle,
 } from '@workspace/ui/components/dialog'
 
-import { FilePickerDialog } from '@/components/file-picker-dialog'
+import { DeferredFilePickerDialog } from '@/components/deferred-file-picker-dialog'
 import { Phase } from '@/lib/environments/components/phase'
 import { useNavigation } from '@/hooks/use-navigation'
 import { queryClientFor } from '@/lib/environments/state/query-clients'
@@ -30,7 +30,7 @@ export function ProjectPicker({
   if (selected) {
     return (
       <QueryClientProvider key={selected.environmentId} client={queryClientFor(selected.origin)}>
-        <FilePickerDialog
+        <DeferredFilePickerDialog
           open
           mode='folder'
           value={null}

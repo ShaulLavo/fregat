@@ -1,3 +1,4 @@
+import { platformReadTools } from '../../mcp/tool-names'
 import { spawn } from 'node:child_process'
 import { ProviderProcessLifetime } from './process-lifetime'
 import { createInternalError, isEvlogError } from '../../observability/structured-errors'
@@ -54,6 +55,8 @@ import {
   recordChatPipelineInfo,
   recordChatPipelineWarning,
 } from '../../orchestration/orchestration-logging'
+import type { AgentDiagnosticsSource } from '../../lsp/agent-diagnostics'
+import { claudeDiagnosticsHooks } from './utils/claude-diagnostics-hooks'
 import { RuntimeAdapter } from './state/runtime-adapter'
 import { SessionContext } from './state/session-context'
 import { isNotInstalledError, requestGone, sessionIdentityErrors } from '../structured-errors'
@@ -78,6 +81,7 @@ import type {
   ProviderSessionHistoryInput,
   ProviderForkInput,
   ProviderSignInInput,
+  PlatformMcpBinding,
   ProviderTurnInput,
   ProviderUserInputResponseInput,
 } from '../types'
@@ -164,6 +168,8 @@ export type ClaudeCreateQuery = (input: {
 }) => Query
 
 export type ClaudeAdapterOptions = {
+  /** Reads the errors an agent's edit introduced; sessions then feed them back through hooks. */
+  agentDiagnostics?: AgentDiagnosticsSource
   discoveryRunner?: ClaudeDiscoveryRunner
   historyRunner?: ClaudeHistoryRunner
   attachmentsDir?: string
@@ -234,6 +240,7 @@ export class ClaudeProviderAdapter
   readonly adapterKey: ProviderInstanceId
   readonly capabilities = CLAUDE_ADAPTER_CAPABILITIES
   readonly driverKind = DEFAULT_CLAUDE_PROVIDER_SETTINGS.driverKind
+  private readonly agentDiagnostics: AgentDiagnosticsSource | null
   private readonly attachmentsDir: string
   private readonly auth: ClaudeAuthRunner
   private readonly createQuery: ClaudeCreateQuery
@@ -265,6 +272,7 @@ export class ClaudeProviderAdapter
     super('Claude', 'session')
     this.adapterKey =
       options.providerInstanceId ?? DEFAULT_CLAUDE_PROVIDER_SETTINGS.providerInstanceId
+    this.agentDiagnostics = options.agentDiagnostics ?? null
     this.attachmentsDir = options.attachmentsDir ?? defaultAttachmentsDir()
     this.env = options.env ?? process.env
     const env = this.env
@@ -659,7 +667,9 @@ export class ClaudeProviderAdapter
     const session = await ClaudeAgentSession.start({
       ...(input.agent ? { agent: input.agent } : {}),
       fork,
+      ...(input.platformMcp ? { platformMcp: input.platformMcp } : {}),
       onCreated: (session) => this.sessions.set(input.sessionId, session),
+      agentDiagnostics: this.agentDiagnostics,
       attachmentsDir: this.attachmentsDir,
       createQuery: this.createQuery,
       cwd,
@@ -667,6 +677,7 @@ export class ClaudeProviderAdapter
       env: this.env,
       ephemeral,
       executablePath: await this.executablePath(),
+      ...(input.outputSchema ? { outputSchema: input.outputSchema } : {}),
       interactionMode,
       model,
       providerInstanceId: input.providerInstanceId,
@@ -718,6 +729,7 @@ class ClaudeAgentSession extends SessionContext {
   private nextHarnessOrigin: ProviderTurnOrigin | null = null
   /** This CLI reports `command_lifecycle`, so an owner turn is running only once its own frame says so. */
   private lifecycleReported = false
+  private platformMcpName: string | null = null
   private query: Query | null = null
   private pumpCompletion: Promise<void> | null = null
   private streamEnded = true
@@ -763,6 +775,8 @@ class ClaudeAgentSession extends SessionContext {
     agent?: string
     fork?: ClaudeForkOptions
     onCreated: (session: ClaudeAgentSession) => void
+    platformMcp?: PlatformMcpBinding
+    agentDiagnostics: AgentDiagnosticsSource | null
     attachmentsDir: string
     createQuery: ClaudeCreateQuery
     cwd: string
@@ -772,6 +786,7 @@ class ClaudeAgentSession extends SessionContext {
     executablePath: string
     interactionMode: InteractionMode
     model: string
+    outputSchema?: Record<string, unknown>
     providerInstanceId: ProviderTurnInput['providerInstanceId']
     reasoning: ClaudeReasoning
     resumeExisting?: boolean
@@ -800,12 +815,13 @@ class ClaudeAgentSession extends SessionContext {
       abortController: session.abortController,
       canUseTool: session.canUseTool(),
       cwd: input.cwd,
-      ...(input.ephemeral ? {} : { hooks: { Stop: [{ hooks: [session.stopHook()] }] } }),
+      ...(input.ephemeral ? {} : { hooks: sessionHooks(session, input.agentDiagnostics) }),
       env: input.env,
       executablePath: input.executablePath,
       ...(input.agent ? { agent: input.agent } : {}),
       fork: input.fork,
       persistSession: input.ephemeral ? false : undefined,
+      ...(input.outputSchema ? { outputSchema: input.outputSchema } : {}),
       interactionMode: input.interactionMode,
       model: input.model,
       reasoning: input.reasoning,
@@ -831,6 +847,33 @@ class ClaudeAgentSession extends SessionContext {
         CLAUDE_INIT_TIMEOUT_MS,
         'Claude session start timed out.',
       )
+      if (input.platformMcp) {
+        const name = `platform_${crypto.randomUUID().replaceAll('-', '')}`
+        // The SDK serializes initial mcpServers into argv and its spawn debug log.
+        await withClaudeTimeout(
+          query
+            .setMcpServers({
+              [name]: {
+                alwaysLoad: true,
+                headers: { Authorization: `Bearer ${input.platformMcp.token}` },
+                type: 'http',
+                url: input.platformMcp.url,
+              },
+            })
+            .then(
+              (result) => {
+                if (Object.keys(result.errors).length > 0 || !result.added.includes(name))
+                  throw createInternalError('Platform MCP connection failed.')
+              },
+              () => {
+                throw createInternalError('Platform MCP connection failed.')
+              },
+            ),
+          CLAUDE_INIT_TIMEOUT_MS,
+          'Platform MCP connection timed out.',
+        )
+        session.platformMcpName = name
+      }
       session.status = 'ready'
     } catch (error) {
       recordChatPipelineWarning('chat.pipeline.claude_session.start.failed', {
@@ -1937,6 +1980,12 @@ class ClaudeAgentSession extends SessionContext {
       return
     }
     if (message.subtype === 'success') {
+      if (message.structured_output !== undefined)
+        this.emitRuntimeNotification(
+          'turn.structured-output',
+          { value: message.structured_output },
+          message,
+        )
       this.completeTurn(turn, message.usage, claudeSuccessEndReason(message))
       return
     }
@@ -2116,6 +2165,17 @@ class ClaudeAgentSession extends SessionContext {
     if (this.runtimeMode === 'full-access') {
       return Promise.resolve({ behavior: 'allow', updatedInput: toolInput })
     }
+    // HTTP servers installed by setMcpServers report dynamic provenance; the name is per runtime.
+    if (
+      this.isActive() &&
+      this.platformMcpName !== null &&
+      options.mcpServer?.source === 'dynamic' &&
+      options.mcpServer.name === this.platformMcpName &&
+      Object.values(platformReadTools).some(
+        (tool) => toolName === `mcp__${this.platformMcpName}__${tool}`,
+      )
+    )
+      return Promise.resolve({ behavior: 'allow', updatedInput: toolInput })
 
     return this.requestApproval(toolName, toolInput, options)
   }
@@ -3102,4 +3162,15 @@ function claudeHookOutcome(message: { exit_code?: number; outcome: ProviderHookO
   if (message.outcome === 'error' && message.exit_code === 2) return 'blocked'
 
   return message.outcome
+}
+
+/** Every Platform session reports its schedules; edits get their errors back when a reader exists. */
+function sessionHooks(
+  session: ClaudeAgentSession,
+  diagnostics: AgentDiagnosticsSource | null,
+): Options['hooks'] {
+  return {
+    ...(diagnostics ? claudeDiagnosticsHooks(diagnostics) : {}),
+    Stop: [{ hooks: [session.stopHook()] }],
+  }
 }

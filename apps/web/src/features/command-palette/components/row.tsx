@@ -30,7 +30,7 @@ export function PaletteRow({ disabledReason, item }: PaletteRowProps) {
         descriptionClassName={cn(disabled && 'text-muted-foreground')}
       />
       {item.shortcut && (
-        <CommandShortcut>
+        <CommandShortcut className='phone:hidden'>
           <Kbd>{item.shortcut}</Kbd>
         </CommandShortcut>
       )}

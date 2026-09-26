@@ -3,6 +3,8 @@ import { beginReloadBudget, prepareWithinReloadBudget } from '@/lib/reload-budge
 import { loadEditorThemeForSelection } from '@/features/editor/state/color-theme-store'
 import { createBootstrap } from '@/state/bootstrap'
 import { settingsPageQueryOptions } from '@/features/settings/utils/page-query'
+import { paletteContentQueryOptions } from '@/features/command-palette/utils/content-query'
+import { filePickerDialogQueryOptions } from '@/features/file-picker/utils/dialog-query'
 import { terminalPanelQueryOptions } from '@/features/terminal/utils/panel-query'
 import { primaryQueryClient } from '@/lib/environments/state/query-clients'
 import { systemColorMode } from '@/features/settings/state/system-color-mode'
@@ -157,9 +159,16 @@ createRoot(document.getElementById('root')!, {
   </StrictMode>,
 )
 
-// After the first frame, so opening a terminal or settings never waits on the
-// network. A failed prefetch is silent: the query retries when the pane opens.
+// Warm closed views on idle. A failed prefetch is silent: the query retries when opened.
 const prefetchDeferredChunks = () => {
+  void resourceQueryClient
+    .query(paletteContentQueryOptions)
+    .then(() => undefined)
+    .catch(() => undefined)
+  void resourceQueryClient
+    .query(filePickerDialogQueryOptions)
+    .then(() => undefined)
+    .catch(() => undefined)
   void resourceQueryClient
     .query(terminalPanelQueryOptions)
     .then(() => undefined)

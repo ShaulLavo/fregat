@@ -1,13 +1,13 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { FilePickerDialog } from '@/components/file-picker-dialog'
+import { DeferredFilePickerDialog } from '@/components/deferred-file-picker-dialog'
 import { expect, test } from '../../../../test/fixtures'
-import { renderWithProviders } from '../../../../test/render'
+import { renderWithLoadedDialogs } from '../../../../test/render'
 
 test('the sidebar lists only the home folders that exist', async ({ client }) => {
   await client.fs['create-folder'].post({ path: 'Documents' })
-  renderWithProviders(
-    <FilePickerDialog open value={null} onOpenChange={() => {}} onPick={() => {}} />,
+  await renderWithLoadedDialogs(
+    <DeferredFilePickerDialog open value={null} onOpenChange={() => {}} onPick={() => {}} />,
   )
 
   expect((await screen.findAllByRole('button', { name: 'Documents' })).length).toBeGreaterThan(0)
@@ -20,8 +20,8 @@ test('pinning the open folder adds it to Pinned, and a removed place comes back'
   client,
 }) => {
   await client.fs['create-folder'].post({ path: 'Documents' })
-  renderWithProviders(
-    <FilePickerDialog open value={null} onOpenChange={() => {}} onPick={() => {}} />,
+  await renderWithLoadedDialogs(
+    <DeferredFilePickerDialog open value={null} onOpenChange={() => {}} onPick={() => {}} />,
   )
 
   fireEvent.click(await screen.findByRole('button', { name: 'Pin this folder' }))
