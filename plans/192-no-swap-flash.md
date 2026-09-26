@@ -27,30 +27,30 @@ subjects and reads `blank-frames-0`, like `quick-open-no-flicker`.
 
 ## Sites (survey 2026-09-26; `confirmed` = code path read end to end)
 
-| #   | Where                                                                                                        | Switch                       | Flash                                    | Status        |
-| --- | ------------------------------------------------------------------------------------------------------------ | ---------------------------- | ---------------------------------------- | ------------- |
-| 1   | `features/file-picker/components/preview.tsx`                                                                | picker selection             | tile/skeleton under new name             | **fixed**     |
-| 2   | `features/command-palette/components/file-preview-panel.tsx`, `lib/file-preview/components/text-preview.tsx` | quick-open highlight         | panel blanks and collapses               | **fixed**     |
-| 3   | `features/command-palette/components/code-theme-preview-panel.tsx`, `lib/code-theme/hooks/use-preview.ts`    | palette theme arrow          | new label over skeleton                  | confirmed     |
-| 4   | `features/theme-studio/components/code-tab.tsx`                                                              | theme studio list            | skeleton                                 | confirmed     |
-| 5   | `features/git/components/history.tsx` (`key={selected}`), `commit-details.tsx`, `utils/history-query.ts`     | commit selection             | new hash over skeleton                   | confirmed     |
-| 6   | `features/git/utils/history-query.ts`, `HistoryList key`                                                     | ref switch                   | skeleton, scroll lost (deliberate today) | confirmed     |
-| 7   | `features/git/components/panel.tsx` (`History key={rootPath}`)                                               | root switch                  | remount + skeleton                       | likely        |
-| 8   | `features/git/components/panel.tsx`, `hooks/use-status.ts`                                                   | root / session worktree      | `PanelLoading`                           | likely        |
-| 9   | `features/chat-mode/components/stage-body.tsx` (`key={sessionId}`), `chat/components/timeline-viewport.tsx`  | session switch               | conversation skeleton under new title    | **fixed**     |
-| 10  | `features/chat/components/side-panel-content.tsx`                                                            | side-panel session switch    | same as 9                                | **fixed**     |
-| 11  | `stage-body.tsx`, `side-panel-content.tsx`                                                                   | new chat / empty project     | "Opening draft"                          | likely        |
-| 12  | `stage-body.tsx`, `chat-mode/utils/active-session.ts`                                                        | session not yet projected    | "Opening session"                        | likely        |
-| 13  | `features/git/components/diff-view.tsx` → `editor/components/diff-editor.tsx`                                | diff tab                     | "Loading comparison"                     | confirmed     |
-| 14  | `features/editor/components/compare-saved-view.tsx`                                                          | compare tab                  | skeleton                                 | likely        |
-| 15  | `features/editor/components/history-pane.tsx`                                                                | undo-history compare         | "Comparing states"                       | likely        |
-| 16  | `features/workbench/components/file-navigator-panel.tsx` (`key={rootPath}`)                                  | tree root / session worktree | `TreeLoading`                            | likely        |
-| 17  | `features/chat-mode/components/turn-files.tsx`                                                               | turn / session               | hunks vanish, "0 changes"                | likely        |
-| 18  | `features/git/components/branch-actions.tsx`                                                                 | session worktree             | Push/PR buttons vanish                   | likely        |
-| 19  | `features/workbench/components/editor-group.tsx` (`EditorBreadcrumbs key`)                                   | tab switch                   | symbol crumbs blank (arguably right)     | likely, low   |
-| 20  | `features/file-picker/hooks/use-directory-load.ts`                                                           | show-hidden / mode toggle    | list skeleton                            | likely        |
-| 21  | `features/settings/components/page.tsx`                                                                      | form ↔ JSON, remote owner    | `PageLoading`                            | likely, edge  |
-| 22  | `features/settings/components/widgets/font-sample.tsx`                                                       | font choice                  | label in fallback face                   | likely, minor |
+| #   | Where                                                                                                        | Switch                       | Flash                                    | Status       |
+| --- | ------------------------------------------------------------------------------------------------------------ | ---------------------------- | ---------------------------------------- | ------------ |
+| 1   | `features/file-picker/components/preview.tsx`                                                                | picker selection             | tile/skeleton under new name             | **fixed**    |
+| 2   | `features/command-palette/components/file-preview-panel.tsx`, `lib/file-preview/components/text-preview.tsx` | quick-open highlight         | panel blanks and collapses               | **fixed**    |
+| 3   | `features/command-palette/components/code-theme-preview-panel.tsx`, `lib/code-theme/hooks/use-preview.ts`    | palette theme arrow          | new label over skeleton                  | confirmed    |
+| 4   | `features/theme-studio/components/code-tab.tsx`                                                              | theme studio list            | skeleton                                 | confirmed    |
+| 5   | `features/git/components/history.tsx` (`key={selected}`), `commit-details.tsx`, `utils/history-query.ts`     | commit selection             | new hash over skeleton                   | confirmed    |
+| 6   | `features/git/utils/history-query.ts`, `HistoryList key`                                                     | ref switch                   | skeleton, scroll lost (deliberate today) | confirmed    |
+| 7   | `features/git/components/panel.tsx` (`History key={rootPath}`)                                               | root switch                  | remount + skeleton                       | likely       |
+| 8   | `features/git/components/panel.tsx`, `hooks/use-status.ts`                                                   | root / session worktree      | `PanelLoading`                           | likely       |
+| 9   | `features/chat-mode/components/stage-body.tsx` (`key={sessionId}`), `chat/components/timeline-viewport.tsx`  | session switch               | conversation skeleton under new title    | **fixed**    |
+| 10  | `features/chat/components/side-panel-content.tsx`                                                            | side-panel session switch    | same as 9                                | **fixed**    |
+| 11  | `stage-body.tsx`, `side-panel-content.tsx`                                                                   | new chat / empty project     | "Opening draft"                          | likely       |
+| 12  | `stage-body.tsx`, `chat-mode/utils/active-session.ts`                                                        | session not yet projected    | "Opening session"                        | likely       |
+| 13  | `features/git/components/diff-view.tsx` → `editor/components/diff-editor.tsx`                                | diff tab                     | "Loading comparison"                     | confirmed    |
+| 14  | `features/editor/components/compare-saved-view.tsx`                                                          | compare tab                  | skeleton                                 | likely       |
+| 15  | `features/editor/components/history-pane.tsx`                                                                | undo-history compare         | "Comparing states"                       | likely       |
+| 16  | `features/workbench/components/file-navigator-panel.tsx` (`key={rootPath}`)                                  | tree root / session worktree | `TreeLoading`                            | likely       |
+| 17  | `features/chat-mode/components/turn-files.tsx`                                                               | turn / session               | hunks vanish, "0 changes"                | likely       |
+| 18  | `features/git/components/branch-actions.tsx`                                                                 | session worktree             | Push/PR buttons vanish                   | likely       |
+| 19  | `features/workbench/components/editor-group.tsx` (`EditorBreadcrumbs key`)                                   | tab switch                   | symbol crumbs blank (arguably right)     | left (below) |
+| 20  | `features/file-picker/hooks/use-directory-load.ts`                                                           | show-hidden / mode toggle    | list skeleton                            | **fixed**    |
+| 21  | `features/settings/components/page.tsx`                                                                      | form ↔ JSON, remote owner    | `PageLoading`                            | **fixed**    |
+| 22  | `features/settings/components/widgets/font-sample.tsx`                                                       | font choice                  | label in fallback face                   | **fixed**    |
 
 Inverse bug: `features/chat/hooks/use-session-goal.ts` holds the previous session's goal under the new
 session's header (`keepPreviousData` without a subject check). **Fixed** with shape 2; the
@@ -79,7 +79,7 @@ cover successful, binary and missing-file reads.
 
 The main stage and sidebar use `useHeldUntilReady` around the complete shown conversation.
 `useSessionReady` retains the selected detail stream before the hosts swap their header and body.
-First loads proceed directly; blocked streams reveal their own connection notice. Both headers
+First loads proceed directly; blocked and reconnecting streams reveal their own connection notice. Both headers
 show a spinner during a hold, and the retained composer waits for the switch before accepting a send.
 
 The hosts and timeline stay mounted. The timeline's existing session-aware reducer resets scroll
@@ -91,7 +91,55 @@ It starts measuring only after the first conversation has rendered message text.
 27 before, 0 after. Sidebar blank frames: 25 before, 0 after. Header/body mismatches also fell from
 27 and 25 to 0. The proof checks header spinners, scroll isolation and terminal retention;
 `inspection.json` retains the sampled frames. DOM tests cover rapid selection, refused detail
-streams, and goal placeholder isolation across sessions, environments and turns.
+streams and retryable failures, and goal placeholder isolation across sessions, environments and turns.
 
 - Before: `/work/tmp/fregat-evidence/20260926T203304Z-scenario-session-no-flicker/`
 - After: `/work/tmp/fregat-evidence/20260926T203340Z-scenario-session-no-flicker/`
+- Reconnect regression: `/work/tmp/fregat-evidence/20260926T211935Z-scenario-pr133-session-no-flicker-built/`
+
+The reconnect regression rejects an uncached subscription with a retryable 503 in both hosts.
+Each host shows the selected title and reconnect notice. Its readiness test failed before the fix.
+Runtime alerts and plan follow-up state are keyed by the scoped session identity.
+
+## Rows 19–22 proof
+
+`rest-no-flicker` delays directory reads by 400 ms and font samples by 1500 ms, toggles hidden
+entries in separate List and Columns folders, switches form → JSON → Defaults → form, chooses
+a font, and clicks between two editor tabs. It uses disposable filesystem fixtures and sends
+no model turns. Each loaded region is sampled with `countBlankFrames`.
+
+| Region                 | Before | After |
+| ---------------------- | ------ | ----- |
+| Picker List            | 6      | 0     |
+| Picker Columns         | 7      | 0     |
+| Settings view          | 0      | 0     |
+| Font sample ready face | 44     | 0     |
+| Breadcrumb path        | 0      | 0     |
+
+Row 19 remains keyed. File breadcrumbs and the editor change tabs immediately; retaining the
+previous tab's symbol names and navigation targets beside the new path would be misleading.
+The file path remains present while the new tab's symbols arrive.
+
+Row 20 uses same-directory placeholder data carrying `currentEntry` and entries, including in
+Columns view. Navigating to another directory still uses the existing prepared navigation.
+Row 21 holds view, scope, owner and the JSON buffer with `useHeldUntilReady`; the scope and view
+controls render the held subject, and the header shows a spinner. Separate form and JSON query
+subscriptions stay attached to their owners. Clicking the held tab cancels a pending switch.
+Row 22 holds the sample text and face together, with a spinner while the next face loads; a
+failed font load settles to its fallback.
+
+The local settings scenario had no blank frames before the change. A controlled hook test proves
+that an uncached JSON owner and a missing JSON buffer retain the old form, scope and owner until
+both are ready. DOM tests also cover picker mode/visibility changes, cancellation, font success
+and failure, and reset actions across two real in-process owners. All 28 targeted tests passed.
+
+- Before: `/work/tmp/fregat-evidence/20260926T202726Z-scenario-rest-no-flicker/`
+- After: `/work/tmp/fregat-evidence/20260926T202931Z-scenario-rest-no-flicker/`
+
+Screenshots were read back, including the waiting font sample. The final scenario had no console
+errors, failed responses or warning/error log events. The baseline fixture's missing initial
+commit caused an unrelated project-create conflict; the final fixture commits before opening.
+
+The DOM run temporarily deduplicated `@singapore-editor/core` within this worktree: the shared
+Editor React checkout resolved core through another worker's benchmark checkout, causing a
+piece-table identity failure. No shared dependency links were modified.

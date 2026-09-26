@@ -497,6 +497,8 @@ export {
 } from './lsp-protocol'
 export {
   keybindingChordSchema,
+  keybindingListSchema,
+  MAX_KEYBINDINGS_PER_COMMAND,
   lspFeatureRanksOverrideSchema,
   lspLanguageServerListsSchema,
   lspServerOverrideSchema,
@@ -981,6 +983,7 @@ export {
   type WallpaperSource,
   type WallpaperSelection,
   type WallpaperAsset,
+  type WallpaperCatalogEntry,
 } from './themes/wallpaper'
 
 export * from './themes/bundle'

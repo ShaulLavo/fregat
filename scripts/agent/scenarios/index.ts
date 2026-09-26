@@ -1,4 +1,5 @@
 import { sessionNoFlicker } from './session-no-flicker'
+import { restNoFlicker } from './rest-no-flicker'
 import { deferredDialogs } from './deferred-dialogs'
 import { textFieldFkeys } from './text-field-fkeys'
 import { settingsRoutePreparation } from './settings-route-preparation'
@@ -208,6 +209,7 @@ import { editorLspRenameKey } from './editor-lsp-rename-key'
 import { editorLspSignatureHelp } from './editor-lsp-signature-help'
 import { editorMarkdownPunctuation } from './editor-markdown-punctuation'
 import { wallpaperLibrary } from './wallpaper-library'
+import { wallpaperCatalog } from './wallpaper-catalog'
 import { wallpaperPalette } from './wallpaper-palette'
 import { themeBundlePalette } from './theme-bundle-palette'
 import { settingsColdLoad } from './settings-cold-load'
@@ -380,6 +382,7 @@ export const scenarios: readonly Scenario[] = [
   chatModelPicker,
   chatUsageMeter,
   chatComposerNarrow,
+  restNoFlicker,
   settingsUsage,
   pushSubscribe,
   pushSessionNotice,
@@ -527,6 +530,7 @@ export const scenarios: readonly Scenario[] = [
   paneRenderCrash,
   wallpaperModeToggle,
   wallpaperLibrary,
+  wallpaperCatalog,
   wallpaperPalette,
   themeBundlePalette,
   settingsDefaults,

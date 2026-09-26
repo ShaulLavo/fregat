@@ -17,7 +17,7 @@ test('finds imports in Chat settings and persists the default-on update preferen
   const rendered = renderWithProviders(<SettingsPage />)
 
   try {
-    const search = await screen.findByLabelText('Search settings')
+    const search = await screen.findByRole('textbox', { name: 'Search settings' })
     await userEvent.type(search, 'codex')
     expect(await screen.findByRole('heading', { name: 'Import existing chats' })).toBeVisible()
     expect(await screen.findByText('No import sources available')).toBeVisible()
