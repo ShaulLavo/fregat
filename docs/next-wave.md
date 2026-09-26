@@ -41,12 +41,11 @@ merge, and a day of rebasing. Wave 2 keeps the lanes and changes how work lands.
 
 ## Owner decisions still open before or during the wave
 
-| Plan | Question                                                                        | Blocks                     |
-| ---- | ------------------------------------------------------------------------------- | -------------------------- |
-| 176  | Parser behind live preview (lezer recommended); chat parser after               | 176 P1–P4, 108 P2 (wave 3) |
-| 182  | Q3 multibuffer vs results document, Q4 long lines (third research pass running) | 182 E1–R5 (wave 3)         |
-| —    | Merge cadence and lane count below                                              | Starting the wave          |
-| —    | Project LICENSE                                                                 | Nothing scheduled          |
+| Plan | Question                                                          | Blocks                     |
+| ---- | ----------------------------------------------------------------- | -------------------------- |
+| 176  | Parser behind live preview (lezer recommended); chat parser after | 176 P1–P4, 108 P2 (wave 3) |
+| —    | Merge cadence and lane count below                                | Starting the wave          |
+| —    | Project LICENSE                                                   | Nothing scheduled          |
 
 ## Lane protocol
 
@@ -90,7 +89,8 @@ or scenario.
 **E1 — Editor core · port 5221.** Owns the Editor repo's editor, tree-sitter and plugin host;
 Platform's `features/editor/**`.
 
-1. 182 P1: grammar signature computed once (774 MB serialised per scroll today).
+1. 182 P1 + 1b: grammar signature computed once (774 MB serialised per scroll today); an unfocused
+   editor skips caret measuring on open and reads padding once (helps every editor).
 2. 170 Editor fix (owner: first): sessions send their grammar once, edits send none, worker dedupes.
 3. 179 P1: occurrence-highlight `<style>` churn.
 4. 176 P0 (now M): table cells parsed, the 255-paragraph cap gone, injection child-node rule, and
@@ -167,7 +167,7 @@ dependency manifests, `vite.config.ts`.
 P2–P4 (raw-byte transport, thresholds after the minimap fold fix, tiers).
 
 **V — virtual lists and search · port 5231.** 181 (reproduce owner's chat scroll list first), then
-178 virtualization once T's app-owned-state lands, then 178 keyboard-and-selection; 182 P3.
+178 virtualization once T's app-owned-state lands, then 178 keyboard-and-selection; 182 P3 and P1 recycled editor pool (owner: recycled many editors).
 
 **M — MCP and composer rows · port 5232.** 174 P1, P3–P6 (status, settings page, add/copy,
 per-session off, paste-back sign-in); 126 batches D and F.
@@ -178,7 +178,7 @@ checks are owner checks.
 ## Wave 3 (what wave 2 unblocks)
 
 171 composer (if E2 did not reach it); 111 P4–P5 → 108 P2–P3; 176 P1–P4 after the owner's
-decision; 182 E1–R5 per Q3/Q4; 122 P6–P9 and E025; 088 after 087; 178 drag-and-drop and cleanup;
+decision; 122 P6–P9 and E025; 088 after 087; 178 drag-and-drop and cleanup;
 143 P5–P6 and 155 (after 143); 156 P3–P5; 126 batches G (four drivers), H (pairing, balancing),
 I (PR review workspace); 177 P3 if it slipped.
 
