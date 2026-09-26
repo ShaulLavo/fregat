@@ -1,11 +1,11 @@
 import fs from 'node:fs'
-import { createRequire } from 'node:module'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { parseArgs } from 'node:util'
 
 import { isTestFile } from './web-design-census.mjs'
 import { formatGate, formatHistogram, formatList, histogram } from './census-report.mjs'
+import { compileLikeBuild } from './react-compiler.mjs'
 
 const REPOSITORY = path.resolve(import.meta.dirname, '../..')
 // The design census's roots plus the tree fork, which holds React the design census does not read.
@@ -16,12 +16,6 @@ const DEFAULT_ROOTS = [
   'packages/ui/src',
 ].map((root) => path.join(REPOSITORY, root))
 const DEFAULT_ALLOW = path.join(REPOSITORY, 'scripts/lint/react-compiler-allow.json')
-
-// Loaded from apps/web, where it is installed unhoisted: the census must run the exact compiler
-// the build runs, because another version reports a different set of bailouts.
-const { transformSync } = createRequire(path.join(REPOSITORY, 'apps/web/package.json'))(
-  'oxc-transform-react',
-)
 
 /**
  * Every measure the census reports. `limit` gates: a hit over it fails `--check` unless the
@@ -82,10 +76,7 @@ function mergeCensus(censuses) {
 export function censusSource(file, source) {
   const census = emptyCensus()
   census.files = 1
-  const result = transformSync(file, source, {
-    jsx: { runtime: 'automatic' },
-    reactCompiler: {},
-  })
+  const result = compileLikeBuild(file, source)
   const memoized = /\b_c\(\d+\)/.test(result.code)
   const lineAt = lineLocator(source)
   const diagnostics = result.errors.map((error) => ({

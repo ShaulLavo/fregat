@@ -1,11 +1,11 @@
 import fs from 'node:fs'
-import { createRequire } from 'node:module'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { parseArgs } from 'node:util'
 
 import { parseSync } from 'oxc-parser'
 
+import { compileLikeBuild } from './react-compiler.mjs'
 import { isTestFile } from './web-design-census.mjs'
 
 const REPOSITORY = path.resolve(import.meta.dirname, '../..')
@@ -24,16 +24,6 @@ const DEPENDENCY_HOOKS = new Set([
   'useImperativeHandle',
 ])
 const SUMMARY_WIDTH = 96
-
-// The build's own compiler, for the reason the census gives: another version memoizes differently.
-const { transformSync } = createRequire(path.join(REPOSITORY, 'apps/web/package.json'))(
-  'oxc-transform-react',
-)
-
-function compile(file, source) {
-  const result = transformSync(file, source, { jsx: { runtime: 'automatic' }, reactCompiler: {} })
-  return { code: result.code, errors: result.errors }
-}
 
 function parse(file, code) {
   return parseSync(file, code).program
@@ -183,7 +173,7 @@ function isReactFunction(name) {
 
 /** Every component and hook in a file: whether it compiled, and what each memo block is keyed on. */
 export function explainSource(file, source) {
-  const { code, errors } = compile(file, source)
+  const { code, errors } = compileLikeBuild(file, source)
   const found = []
   for (const statement of parse(file, code).body) collectFunctions(statement, null, found)
   const functions = found
@@ -298,7 +288,7 @@ function lineOf(source, offset) {
 
 /** Compiles the file once per manual memo with that memo removed, and compares the keys. */
 export function auditManualMemos(file, source) {
-  const baseline = compile(file, source).errors.length
+  const baseline = compileLikeBuild(file, source).errors.length
   const tree = parse(file, source)
   const dependencies = dependencyNames(tree)
   return manualMemoSites(tree).flatMap((site) => {
