@@ -28,15 +28,8 @@ export const settingsKeybindings: Scenario = {
   description:
     'The shortcuts editor at 1440 and 390: search, filters, Record keys, recording with a conflict shown before saving, the row menu, and settings.json after each write. Writes only the throwaway server.',
   async run(page, { step }) {
-    const home = new URL(page.url())
-    home.pathname = `${home.pathname.split('/~')[0]}/`
-    home.search = ''
-    home.hash = ''
-    await page.goto(home.href, { waitUntil: 'domcontentloaded' })
-    await selectors.chooseFolder(page).waitFor()
     await page.setViewportSize({ width: 1440, height: 1000 })
     await page.keyboard.press('Control+,')
-    await selectors.settingsDialog(page).waitFor()
     await selectors.settingsSearch(page).fill('keyboard')
     await selectors.shortcutsList(page).waitFor()
     ok(
@@ -86,7 +79,23 @@ export const settingsKeybindings: Scenario = {
     await waitForOverride(page, 'workspace.goToLine', undefined)
     await selectors.shortcutFilter(page, 'All').click()
 
+    // A phone opens Settings as the full-screen dialog of a fresh window.
+    await page.addInitScript(() => {
+      localStorage.clear()
+      sessionStorage.clear()
+    })
+    const home = new URL(page.url())
+    home.pathname = `${home.pathname.split('/~')[0]}/`
+    home.search = ''
+    home.hash = ''
     await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto(home.href, { waitUntil: 'domcontentloaded' })
+    await selectors.chooseFolder(page).waitFor()
+    await page.keyboard.press('Control+,')
+    await selectors.settingsDialog(page).waitFor()
+    // Settings search finds the command and brings the shortcut list with it.
+    await selectors.settingsSearch(page).fill('Save')
+    await selectors.shortcutsList(page).waitFor()
     await showOnly(page, 'Save')
     const saveRow = selectors.shortcutRow(page, 'workspace.saveFile')
     await saveRow.waitFor()

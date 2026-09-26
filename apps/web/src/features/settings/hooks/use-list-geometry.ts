@@ -1,4 +1,4 @@
-import { useLayoutEffect, useState, type RefObject } from 'react'
+import { useEffect, useState, type RefObject } from 'react'
 
 type ListGeometry = {
   /** The list's offset from the top of the scroller's content. */
@@ -26,7 +26,8 @@ export function useListGeometry(
     stickyHeight: 0,
   })
 
-  useLayoutEffect(() => {
+  // Passive: a parent's ref attaches after its children's layout effects run.
+  useEffect(() => {
     const scroller = scrollRef?.current
     const list = listRef.current
     if (!scroller || !list) return

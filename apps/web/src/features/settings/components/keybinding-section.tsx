@@ -161,6 +161,8 @@ export function KeybindingSection() {
                 onClick: (event) => {
                   listbox.rowProps(row.command).onClick(event)
                   if (geometry.narrow) {
+                    // The menu starts listening for outside presses during this click.
+                    event.stopPropagation()
                     setOverlay({ kind: 'menu', command: row.command, anchor: event.currentTarget })
                   }
                 },
