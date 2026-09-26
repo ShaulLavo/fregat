@@ -1,3 +1,4 @@
+import { ComposerAttachProvider } from '@/providers/composer-attach-provider'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import {
   render,
@@ -110,7 +111,9 @@ export function AppProviders({
   const { application: navigationOwner, navigation: activeNavigation } = runtime
   const content = (
     <EnvironmentConnectionsContext value={connections ?? navigationOwner.connections}>
-      <TooltipProvider delay={0}>{children}</TooltipProvider>
+      <TooltipProvider delay={0}>
+        <ComposerAttachProvider>{children}</ComposerAttachProvider>
+      </TooltipProvider>
     </EnvironmentConnectionsContext>
   )
 

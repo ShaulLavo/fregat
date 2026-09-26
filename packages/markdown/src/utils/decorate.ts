@@ -37,6 +37,10 @@ const TABLE_WRAPPER_CLASS_NAME = 'my-4 overflow-x-auto rounded-md bg-background'
 export function rehypeDecorate() {
   return (tree: Root) => {
     visit(tree, 'element', (node, index, parent) => {
+      if (node.position) {
+        node.properties.dataSourceLine = node.position.start.line
+        node.properties.dataSourceEndLine = node.position.end.line
+      }
       if (node.tagName === 'a' && node.properties.dataIncomplete) delete node.properties.href
       if (node.tagName === 'code' && parent?.type === 'element' && parent.tagName === 'pre') return
       if (node.tagName === 'table' && parent && typeof index === 'number') {

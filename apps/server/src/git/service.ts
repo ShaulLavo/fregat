@@ -520,6 +520,18 @@ export class GitService {
     return this.status(repository.rootPath)
   }
 
+  /** Whether a patch applies to the worktree as it is now, without applying it. */
+  async patchApplies(input: { path: string; patch: string; reverse: boolean }) {
+    const repository = await this.requiredRepository(input.path)
+    const args = ['apply', '--check', '--whitespace=nowarn']
+    if (input.reverse) args.push('--reverse')
+    const result = await this.git(repository.rootAbsolutePath, args, {
+      allowFailure: true,
+      input: input.patch,
+    })
+    return result.exitCode === 0
+  }
+
   async commit(body: GitCommitBody) {
     recordGitServiceOperation('commit', body.path, {
       messageBytes: Buffer.byteLength(body.message, 'utf8'),
@@ -1774,6 +1786,7 @@ function gitAction(args: readonly string[]) {
 function isReadOnlyGit(args: readonly string[]) {
   const action = gitAction(args)
   if (READ_ONLY_GIT_ACTIONS.has(action)) return true
+  if (action === 'apply' && args.includes('--check')) return true
   const actionIndex = args.indexOf(action)
   if (action === 'config') return args.includes('--get-regexp') || args.includes('--get')
   // Listing remotes reads config; `remote add` and friends write it.

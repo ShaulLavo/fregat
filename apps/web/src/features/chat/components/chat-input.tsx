@@ -1,3 +1,10 @@
+import { ReviewDraftBar } from '@/features/chat/components/review-draft-bar'
+import { useReviewDraft } from '@/lib/review-draft/hooks/use-review-draft'
+import { removeReviewComments } from '@/lib/review-draft/state/store'
+import { withReviewComments } from '@/lib/review-draft/utils/prompt'
+import { ActiveFileChip } from '@/features/chat/components/active-file-chip'
+import { useActiveFileChip } from '@/features/chat/hooks/use-active-file-chip'
+import { withActiveFileMention } from '@/features/chat/utils/active-file-mention'
 import { useSettingValue } from '@/hooks/use-setting-value'
 import { resolveComposerInteractionMode } from '@workspace/client-core/chat/composer-interaction'
 import { useEnvironmentId } from '@/lib/environments/hooks/use-environment-id'
@@ -10,7 +17,7 @@ import type {
   RuntimeMode,
 } from '@workspace/contracts'
 import { $setSelection, type LexicalEditor } from 'lexical'
-import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from 'react'
+import { use, useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from 'react'
 import { cn } from '@workspace/ui/lib/utils'
 
 import {
@@ -36,6 +43,7 @@ import {
 import { useProjectEntrySearch } from '../hooks/use-project-entry-search'
 import { providerCommandCatalogQueryOptions } from '@/features/chat/utils/composer-skills'
 import { useComposerInbox } from '../hooks/use-composer-inbox'
+import { ComposerRootsContext } from '@/lib/composer-attach/providers/roots-context'
 import { useAttachmentPreparation } from '@/features/chat/hooks/use-attachment-preparation'
 import { useProvider } from '@/features/chat/hooks/use-provider'
 import { chatSubmissionValidation } from '@/features/chat/utils/submission-validation'
@@ -132,6 +140,9 @@ export function ChatInput({
   })
   const images = useChatInputDraftStore(imagesSelector)
   const terminalContexts = useChatInputDraftStore(terminalContextsSelector)
+  const activeFile = useActiveFileChip(rootPath)
+  const aliasRoots = use(ComposerRootsContext)
+  const reviewComments = useReviewDraft({ environmentId, rootPaths: [rootPath, ...aliasRoots] })
   const persistenceError = useChatInputDraftStore((store) => store.persistenceError)
   const clearStoredDraft = useChatInputDraftStore((store) => store.clearDraft)
   const clearStoredDraftContent = useChatInputDraftStore((store) => store.clearDraftContent)
@@ -223,7 +234,7 @@ export function ChatInput({
   // Captures made outside chat wait in the inbox until a composer exists to
   // hold them — the terminal is often right-clicked while the sidebar is on
   // Files, so the reveal that follows is what mounts this component.
-  useComposerInbox(draftTarget, editorRef, editorReady)
+  useComposerInbox(draftTarget, editorRef, editorReady, aliasRoots)
 
   useEffect(() => {
     const activeItemStillPresent = commandMenuItems.some((item) => item.id === activeCommandItemId)
@@ -255,7 +266,8 @@ export function ChatInput({
     if (busy && !queuesFollowUp && steerDisabledReason !== null) return false
 
     const editor = editorRef.current
-    const text = editor ? readChatInputText(editor).trim() : ''
+    const typed = editor ? readChatInputText(editor).trim() : ''
+    const text = withReviewComments(typed, reviewComments)
     const draft = useChatInputDraftStore.getState().getDraft(draftTarget)
     const validation = chatSubmissionValidation(text, draft.terminalContexts)
     setValidationError(validation)
@@ -283,10 +295,11 @@ export function ChatInput({
           modelSelection: selected,
           runtimeMode: draft.runtimeMode ?? runtimeMode,
           terminalContexts: draft.terminalContexts,
-          text,
+          text: withActiveFileMention(text, activeFile.path),
         },
         alternate,
       )
+      if (result !== 'rejected') removeReviewComments(reviewComments.map((comment) => comment.id))
       if (
         sentDraftStillCurrent(
           result,
@@ -453,6 +466,14 @@ export function ChatInput({
                 onTriggerChange={setTrigger}
               />
               <ChatInputUltrathinkPlugin />
+              <ReviewDraftBar comments={reviewComments} disabled={composerDisabled} />
+              {activeFile.path ? (
+                <ActiveFileChip
+                  disabled={composerDisabled}
+                  path={activeFile.path}
+                  onRemove={activeFile.remove}
+                />
+              ) : null}
               <ChatInputTerminalContextList
                 contexts={terminalContexts}
                 disabled={composerDisabled}

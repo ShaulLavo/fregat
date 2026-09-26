@@ -1,4 +1,5 @@
 import { workspacePathLeaf } from '@workspace/client-core/files/path'
+import { createComposerDraftNavigation } from '@/state/composer-draft-navigation'
 import { supersededNavigation } from '@/state/navigation-result'
 import { captureEditorScrollPositions } from '@/features/editor/state/scroll-persistence'
 import { createChatNavigation } from '@/state/navigation-chat'
@@ -663,6 +664,7 @@ export function createNavigation(
     openFile,
     openContent,
     openChat,
+    startComposerDraft: createComposerDraftNavigation(coordinator, openChat),
     openWorkspace,
     openDiff({ owner, row }: { readonly owner: EditorWorkspaceStoreApi; readonly row: ChangeRow }) {
       return ownedRequest(owner, async ({ application, address }) => {

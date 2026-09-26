@@ -488,20 +488,20 @@ describe('defaultPlatformKeyBindings', () => {
     )
   })
 
-  it('does not bind browser tab switching keys to pane focus commands', () => {
-    const bindings = defaultPlatformKeyBindings('linux')
+  it('gives Mod+1 to the first tab or chat, or to the first editor group in VS Code mode', () => {
+    const platform = defaultPlatformKeyBindings('linux')
+    const vscode = defaultPlatformKeyBindings('linux', 'vscode')
 
-    expect(keysFor(bindings, 'workspace.focusFileTree')).not.toContain('Mod+1')
-    expect(commands(appKeyBindingsForPane(bindings, 'editor'))).not.toContain(
-      'workspace.focusFirstEditorGroup',
-    )
-    expect(bindings).toContainEqual(
-      expect.objectContaining({
-        command: null,
-        keys: 'Mod+1',
-        vscodeCommandId: 'workbench.action.focusFirstEditorGroup',
-      }),
-    )
+    expect(keysFor(platform, 'workspace.selectItem1')).toEqual(['Mod+1'])
+    expect(keysFor(platform, 'workspace.focusFirstEditorGroup')).toEqual([])
+    expect(keysFor(vscode, 'workspace.focusFirstEditorGroup')).toEqual(['Mod+1'])
+    expect(keysFor(vscode, 'workspace.selectItem1')).toEqual(['Alt+1', 'Mod+Alt+1'])
+    for (const bindings of [platform, vscode]) {
+      expect(keysFor(bindings, 'workspace.focusFileTree')).not.toContain('Mod+1')
+      expect(bindings.some((binding) => binding.command === null && binding.keys === 'Mod+1')).toBe(
+        false,
+      )
+    }
   })
 
   it('binds session Undo to Mod+Z only outside the surfaces that own an undo', () => {
@@ -817,7 +817,7 @@ it('reports invalid spelling independently from unknown commands', () => {
 })
 
 it.each(defaultBindingPlatforms)(
-  'imports both complete and distinct Editor presets on %s',
+  'imports the complete Editor pack in both modes on %s',
   (platform) => {
     const native = presetPlatformKeyBindings(platform, 'default')
     const vscode = presetPlatformKeyBindings(platform, 'vscode')
@@ -827,7 +827,6 @@ it.each(defaultBindingPlatforms)(
       ),
     ).toBe(true)
     expect(vscode.unmapped).toEqual(native.unmapped)
-    expect(native.bindings).not.toEqual(vscode.bindings)
     for (const preset of [native, vscode]) {
       expect(preset.bindings).toContainEqual(
         expect.objectContaining({ command: 'editor.editor.action.toggleTabFocusMode' }),
@@ -839,6 +838,37 @@ it.each(defaultBindingPlatforms)(
         expect.objectContaining({ command: 'editor.editor.foldAll' }),
       )
     }
+  },
+)
+
+it.each(defaultBindingPlatforms)(
+  'edits with the VS Code pack in Platform mode on %s, except folding on macOS',
+  (platform) => {
+    const editorRows = (preset: 'default' | 'vscode') =>
+      defaultPlatformKeyBindings(platform, preset)
+        .filter((row) => row.pane === 'editor' && row.command?.startsWith('editor.'))
+        .map((row) => `${row.keys} ${row.command}`)
+    const platformRows = editorRows('default')
+    const vscodeRows = editorRows('vscode')
+    const onlyPlatform = platformRows.filter((row) => !vscodeRows.includes(row))
+    const onlyVscode = vscodeRows.filter((row) => !platformRows.includes(row))
+    if (platform !== 'mac') {
+      expect(onlyPlatform).toEqual([])
+      expect(onlyVscode).toEqual([])
+      return
+    }
+    expect(onlyPlatform.toSorted()).toEqual([
+      'Mod+K Mod+Shift+[ editor.editor.foldRecursively',
+      'Mod+K Mod+Shift+] editor.editor.unfoldRecursively',
+      'Mod+K Mod+[ editor.editor.fold',
+      'Mod+K Mod+] editor.editor.unfold',
+    ])
+    expect(onlyVscode.toSorted()).toEqual([
+      'Mod+Alt+[ editor.editor.fold',
+      'Mod+Alt+] editor.editor.unfold',
+      'Mod+K Mod+[ editor.editor.foldRecursively',
+      'Mod+K Mod+] editor.editor.unfoldRecursively',
+    ])
   },
 )
 

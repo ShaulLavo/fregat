@@ -50,6 +50,8 @@ export type DiagnosticPeekModel = {
   readonly message: string
   readonly relatedInformation: readonly DiagnosticPeekRelatedInformation[]
   readonly severity: string
+  /** The language server's number, for Fix with AI; `severity` is its label. */
+  readonly severityLevel: number | undefined
   readonly source: string | null
 }
 
@@ -222,6 +224,7 @@ function normalizeEvent(
       ]
     }),
     severity: diagnosticSeverityLabel(event.diagnostic.severity),
+    severityLevel: event.diagnostic.severity,
     source: event.diagnostic.source ?? null,
   }
 }

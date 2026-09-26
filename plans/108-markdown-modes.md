@@ -1,6 +1,13 @@
 # Two markdown modes: split view and live preview
 
-Status: proposed, implementation not started. Requested 2026-09-13.
+Status: Phase 1 done (completion wave, lane L8, 2026-09-25): the mode setting
+`editor.markdownView` (default live preview, the behaviour before this plan; source; split),
+Cycle markdown view (per-document, in the palette and the editor title), the rendered pane
+(`features/workbench/components/markdown-preview-pane.tsx`) with the chat renderer and the
+editor's fence theme (highlighters moved to `lib/code-highlight`), workspace links and images,
+and scroll sync both ways. Scenario `markdown-split-view` drives all of it. Phase 2 stays parked on Plan 111.
+Default mode: live preview, the behaviour before this plan (no recommendation was written;
+Decided 2026-09-25 by keeping the existing behaviour).
 
 The editor already renders markdown as formatted text while the buffer keeps holding markdown source — [`@singapore-editor/markdown`](../../Editor/packages/markdown/src/index.ts) hides fences, drops heading `#`, collapses links to their labels, and restores the source under the caret so it stays editable. That is Obsidian's Live Preview, and it was built as an experiment. It looks right and it is incomplete.
 

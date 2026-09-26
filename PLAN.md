@@ -112,12 +112,9 @@ Default and VS Code presets, conditional bindings, and Settings resolution diagn
 
 See [shared keymap delivery](docs/keymap/delivery.md) for the paired revision, verification, and boundaries.
 
-[Plan 080](plans/080-platform-keybinding-modes.md) is the proposed follow-up for Platform and VS Code
-keyboard modes across the app. Platform defaults start from VS Code bindings and document intentional
-differences. Whole-sidebar Cmd+B is the first milestone. Editor tabs and chats share navigation keys,
-while numbered panel shortcuts use a separate combination. Held-modifier hints follow the matching
-targets. Interaction rules are confirmed; the exact keys remain proposed. Implementation follows
-the delivered shared runtime and has not started.
+Plan 080 is done: Platform and VS Code keyboard modes across the app, whole-sidebar Cmd+B, shared
+tab-or-chat navigation, numbered panels and held-modifier badges. [Keyboard modes](docs/keymap/modes.md)
+records the per-host comparison and the owner checks still pending on the Mac.
 
 ## Document contribution refactor
 

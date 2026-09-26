@@ -4,7 +4,7 @@ import type { FocusArea } from './focus'
 
 type CommandPlatformName = 'linux' | 'mac' | 'windows' | 'tui'
 
-export type CommandTargetKind = 'editor' | 'workspace'
+export type CommandTargetKind = 'editor' | 'workspace' | 'diagnostic' | 'checkpoint-change'
 
 export type CommandWhen =
   | 'chatMode'
@@ -24,6 +24,9 @@ export type CommandWhen =
 
 export type CommandExecution = 'async' | 'sync'
 
+/** The `keybindings.preset` values. `default` is Platform mode. */
+export type KeybindingPreset = 'default' | 'vscode'
+
 export type CommandUndoCategory =
   | 'file-operation'
   | 'text-edit'
@@ -36,6 +39,8 @@ export type CommandKeyDefault = {
   readonly chord: KeyChord
   readonly pane?: FocusArea | 'any'
   readonly platforms?: readonly CommandPlatformName[]
+  /** Keyboard modes this default belongs to; every mode when absent. */
+  readonly presets?: readonly KeybindingPreset[]
   readonly preventDefault?: boolean
   readonly stopPropagation?: boolean
   /** A modifier chord that leaves a focused text box its own meaning, such as Mod+Z. */

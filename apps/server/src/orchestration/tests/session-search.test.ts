@@ -9,6 +9,7 @@ import {
 import { DEFAULT_MAX_TEXT_FILE_BYTES } from '../../fs/limits'
 import { createWorkspacePaths } from '../../fs/path'
 import { GitService } from '../../git/service'
+import { OrchestrationCheckpointHunks } from '../checkpoint-hunks'
 import { OrchestrationCheckpointDiffQuery } from '../checkpoint-diff-query'
 import { OrchestrationEngine } from '../engine'
 import type { OrchestrationDatabase } from '../event-store'
@@ -134,15 +135,21 @@ function createSearchApp(
   database: OrchestrationDatabase,
   sessionSearch: OrchestrationSessionSearchQuery,
 ) {
+  const engine = new OrchestrationEngine(database)
+  const git = new GitService(createWorkspacePaths(), {
+    maxTextFileBytes: DEFAULT_MAX_TEXT_FILE_BYTES,
+  })
+  const checkpointDiff = new OrchestrationCheckpointDiffQuery(database, git)
+  const checkpointHunks = new OrchestrationCheckpointHunks({
+    runWorkspaceOperation: (sessionId, operation) =>
+      engine.runWorkspaceOperation(sessionId, operation),
+    activeRuntimes: async () => [],
+    diffs: checkpointDiff,
+    git,
+    readModel: () => engine.readModelSnapshot(),
+  })
   return new Elysia().use(
-    orchestrationRoutes(
-      new OrchestrationEngine(database),
-      new OrchestrationCheckpointDiffQuery(
-        database,
-        new GitService(createWorkspacePaths(), { maxTextFileBytes: DEFAULT_MAX_TEXT_FILE_BYTES }),
-      ),
-      sessionSearch,
-    ),
+    orchestrationRoutes(engine, checkpointDiff, sessionSearch, checkpointHunks),
   )
 }
 

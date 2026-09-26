@@ -1,6 +1,8 @@
 import {
   ArrowSquareOutIcon,
   BracketsCurlyIcon,
+  ChatCircleIcon,
+  ChatCircleTextIcon,
   ClockCounterClockwiseIcon,
   CodeBlockIcon,
   CodeIcon,
@@ -59,6 +61,16 @@ export function editorTextMenu(): Menu {
       commandItem('editor.editor.action.revealDefinitionAside', {
         icon: ColumnsPlusRightIcon,
         label: 'Open Definition to the Side',
+      }),
+    ]),
+    section('chat', [
+      commandItem('workspace.addSelectionToChat', {
+        icon: ChatCircleIcon,
+        label: 'Add Selection to Chat',
+      }),
+      commandItem('workspace.addFileToChat', {
+        icon: ChatCircleTextIcon,
+        label: 'Add File to Chat',
       }),
     ]),
     section('edit', [

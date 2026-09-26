@@ -54,6 +54,14 @@ function pinnedOptions(
   return Object.fromEntries((parsed ?? []).map(({ id, value }) => [id, value]))
 }
 
+// Departure: upstream swaps a prompt-injected level for the default; ours stores it like any
+// level and the server adds the word to the prompt.
+function expectedOptions(descriptor: ProviderOptionDescriptor, previous: ModelSelection) {
+  if (descriptor.type !== 'select') return pinnedOptions([descriptor], previous)
+  const { promptInjectedValues: _, ...plain } = descriptor
+  return pinnedOptions([plain], previous)
+}
+
 const choiceSets = [
   [],
   [{ id: 'standard', label: 'Standard' }],
@@ -93,7 +101,7 @@ let cases = 0
 for (const descriptor of descriptors) {
   for (const value of values) {
     const previous = { ...base, options: value === undefined ? {} : { [descriptor.id]: value } }
-    const expected = pinnedOptions([descriptor], previous)
+    const expected = expectedOptions(descriptor, previous)
     const actual = reconcileModelOptions(previous, base, [descriptor]).options ?? {}
     deepStrictEqual(actual, expected, JSON.stringify({ descriptor, value }))
     cases += 1

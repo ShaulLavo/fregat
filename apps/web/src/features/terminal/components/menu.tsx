@@ -10,13 +10,15 @@ import type { TerminalMenuTarget } from '@/features/terminal/utils/commands'
 export function TerminalMenu({
   anchor,
   onOpenChange,
+  rootPath,
   target,
 }: {
   readonly anchor: MenuAnchor
   readonly onOpenChange: (open: boolean) => void
+  readonly rootPath: string
   readonly target: TerminalMenuTarget
 }) {
-  const menu = useTerminalMenu(target)
+  const menu = useTerminalMenu(target, rootPath)
 
   return (
     <MenuSurface

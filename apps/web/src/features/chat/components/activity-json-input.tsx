@@ -2,7 +2,7 @@ import { HighlightedCode } from '@workspace/markdown/components/highlighted-code
 import { CodeHighlighterContext } from '@workspace/markdown/providers/code-highlighter-context'
 import type { Ref } from 'react'
 
-import { useChatCodeHighlighter } from '@/features/chat/hooks/use-chat-code-highlighter'
+import { useCodeHighlighter } from '@/lib/code-highlight/hooks/use-code-highlighter'
 
 export function ActivityJsonInput({
   className,
@@ -15,7 +15,7 @@ export function ActivityJsonInput({
   label: string
   scrollRef: Ref<HTMLPreElement>
 }) {
-  const highlighter = useChatCodeHighlighter()
+  const highlighter = useCodeHighlighter()
 
   return (
     <CodeHighlighterContext value={highlighter}>

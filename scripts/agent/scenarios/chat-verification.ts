@@ -50,13 +50,55 @@ export async function openChat(page: Page) {
  * the orchestration base URL, the platform worktree and the project that owns it.
  */
 export async function openChatShell(page: Page) {
+  const workspace = await openChatWorkspace(page)
+  ok(workspace.project?.defaultModelSelection, 'Project must have a default model')
+  return { ...workspace, project: workspace.project }
+}
+
+/** Chat mode on the platform worktree, for scenarios that never run a turn and need no model. */
+export async function openChatWorkspace(page: Page) {
   const base = await openChat(page)
-  const snapshot = await readShell(page, base)
-  const worktree = snapshot.worktrees.find((item) => item.path.endsWith('/projects/platform'))
-  ok(worktree, 'Platform worktree must be registered')
+  const { snapshot, worktree } = await platformWorktree(page, base)
   const project = snapshot.projects.find((item) => item.id === worktree.projectId)
-  ok(project?.defaultModelSelection, 'Project must have a default model')
   return { base, project, snapshot, worktree }
+}
+
+/**
+ * Sessions that never run a turn, titled `${prefix} 1…count`, on the platform worktree. A
+ * throwaway server has no provider, so the project may have no default model to borrow.
+ */
+export async function createIdleSessions(
+  page: Page,
+  workspace: Awaited<ReturnType<typeof openChatWorkspace>>,
+  prefix: string,
+  count: number,
+) {
+  const modelSelection = workspace.project?.defaultModelSelection ?? {
+    providerInstanceId: 'claude',
+    model: 'claude-sonnet-5',
+  }
+  const ids = Array.from({ length: count }, () => crypto.randomUUID())
+  for (const [index, sessionId] of ids.entries())
+    await dispatch(page, workspace.base, {
+      type: 'session.create',
+      sessionId,
+      title: `${prefix} ${index + 1}`,
+      modelSelection,
+      worktreeTarget: { kind: 'current', worktreeId: workspace.worktree.id },
+    })
+  return ids
+}
+
+// A fresh server registers the workspace while the page boots, so the first snapshot can miss it.
+async function platformWorktree(page: Page, base: string) {
+  const deadline = Date.now() + 10_000
+  for (;;) {
+    const snapshot = await readShell(page, base)
+    const worktree = snapshot.worktrees.find((item) => item.path.endsWith('/projects/platform'))
+    if (worktree) return { snapshot, worktree }
+    ok(Date.now() < deadline, 'Platform worktree must be registered')
+    await page.waitForTimeout(200)
+  }
 }
 
 export type ChatShell = Awaited<ReturnType<typeof openChatShell>>

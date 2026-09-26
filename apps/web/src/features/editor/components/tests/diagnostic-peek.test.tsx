@@ -72,6 +72,7 @@ function model(): DiagnosticPeekModel {
       },
     ],
     severity: 'Error',
+    severityLevel: 1,
     source: 'typescript',
   }
 }

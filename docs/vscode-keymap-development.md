@@ -1,18 +1,17 @@
 # VS Code keymap development status
 
-## Proposed keyboard modes
+## Keyboard modes
 
-[Plan 080](../plans/080-platform-keybinding-modes.md) preserves VS Code parity as a selectable mode
-and defines Platform defaults based on it. The existing preset selector currently changes editor
-packs; the proposal extends it to workspace commands. Proposed behavior is not shipped behavior.
+`keybindings.preset` is the keyboard mode: Platform (the default) or VS Code. Both edit with the
+VS Code pack and both let `Mod+B` hide the current screen's whole sidebar (the session rail in chat).
+Platform adds numbered tabs or chats on `Mod+1`–`9`, previous and next on `Mod+Alt+[` / `]`, and
+numbered sidebar panels on `Mod+Alt+1`–`9`; VS Code mode keeps VS Code's editor-index and
+editor-group keys. Held modifiers badge the matching targets. [Keyboard modes](keymap/modes.md)
+has the per-host comparison, Platform's differences, the editor-pack change and the host checks.
 
-Its first milestone makes Cmd+B toggle the entire sidebar while preserving the selected panel.
-VS Code already toggles the whole primary sidebar; Platform's current Files-specific handler is a
-mismatch. Confirmed Platform rules keep Cmd+B on the current screen, toggle a visible panel when
-its shortcut repeats, and use the same navigation keys for editor tabs and chats. Panel shortcuts
-use a separate combination. Proposed keys are Cmd+1–9 for tabs or chats, Cmd+Option+[ and ] for
-previous and next, and Cmd+Option+1–9 for panels. Held-modifier hints identify the matching targets.
-The plan records host-conflict checks and the pinned T3 Code reference.
+A preset key default carries `presets` in its command metadata (`CommandKeyDefault`); a default
+without it belongs to both modes. `presetPlatformKeyBindings` filters by it and applies Platform's
+macOS folding chords to the VS Code pack.
 
 ## Existing implementation record
 
@@ -86,14 +85,18 @@ command.
 - Save and sidebar visibility: `Mod+S` and `Mod+B`.
 - Settings: `Mod+,` followed by the new secondary `Mod+K Mod+S` default. The primary menu hint
   remains `Mod+,`.
-- Editor defaults come from the shared default and VS Code packs, including folding and
+- Editor defaults come from the shared VS Code pack in both modes, including folding and
   `editor.action.moveSelectionToNextFindMatch`. The command registry includes every Editor command.
+- Tabs, chats and sidebar panels: see [Keyboard modes](keymap/modes.md).
 
 Workspace defaults are in `keymap/workspace-commands.ts`. Editor defaults and platform restrictions
 come from `@singapore-editor/core/keymap`, with Platform policy applied in `keymap/editor-keymap.ts`.
 Browser-hostile desktop shortcuts remain explicit reservations where Platform cannot perform the desktop action.
 
 ## Remaining parity work
+
+- The Windows AltGr overlap with `Mod+Alt+digit` needs the shared matcher to skip its
+  physical-key fallback while `AltGraph` is down (see [Keyboard modes](keymap/modes.md)).
 
 - Review save-all, show-all-editors, and other VS Code `Mod+K` defaults against the shared command
   table. They no longer need a new runtime mechanism.

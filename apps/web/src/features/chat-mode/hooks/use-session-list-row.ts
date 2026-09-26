@@ -8,5 +8,5 @@ export function useSessionListRow(id: string) {
   const list = useContext(SessionListContext)
   if (!list) throw clientErrors.CONTEXT_MISSING({ message: 'Session rows require a session list' })
   const active = useStore(list.selection, (activeId) => activeId === id)
-  return { rowProps: list.rowBindings(id), active }
+  return { rowProps: list.rowBindings(id), active, position: list.positions.get(id) ?? null }
 }

@@ -20,8 +20,18 @@ const OPEN_FILE_SNAPSHOT: CommandWhenSnapshot = {
   workspaceOpen: true,
 }
 
-test('sections run navigate, edit, file, then palette', () => {
-  expect(editorTextMenu().map((entry) => entry.id)).toEqual(['navigate', 'edit', 'file', 'palette'])
+test('sections run navigate, chat, edit, file, then palette', () => {
+  expect(editorTextMenu().map((entry) => entry.id)).toEqual([
+    'navigate',
+    'chat',
+    'edit',
+    'file',
+    'palette',
+  ])
+})
+
+test('the chat section hands the selection or the file to the composer', () => {
+  expect(labels('chat')).toEqual(['Add Selection to Chat', 'Add File to Chat'])
 })
 
 // Revert File is intentionally absent: our revert rebuilds the buffer and discards undo history,

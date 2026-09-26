@@ -2,8 +2,9 @@
 
 ## Status and authorization
 
-- Status: RESEARCH PLAN — scope agreed by the owner 2026-09-24; the research phase rewrites
-  "Phases" before implementation, and may split review mode into its own plan.
+- Status: DONE except as noted, 2026-09-25 (completion wave, lane L8): phases 1, 2, 3 and 6
+  landed; review mode and second-model review moved to Plan 169; comment re-anchoring is left
+  (Phase 3 note). Delete this plan once the owner checks pass.
 - Priority: P1. `docs/product-vision.md` makes the diff the reviewable artifact under every
   harness, and today it ends in a view the user cannot act on.
 - Effort: L overall. Risk: MED — per-hunk undo writes to a worktree an agent may still be
@@ -114,6 +115,8 @@ Added 2026-09-25 from the UI library survey (`docs/ui-research/tinkerers-ui.md` 
 - **D4 — Second-model default.** Recommended: the user picks the reviewer per request; a
   remembered default is a setting (application scope) only after the flow is used.
 
+D1–D4: Decided 2026-09-25: recommendation (completion wave). D4 moves to Plan 169 with review mode.
+
 ## Research phase
 
 Answer, then rewrite "Phases" (and split review mode into its own plan if it is larger than
@@ -142,16 +145,84 @@ M):
 Deliverable: rewritten Phases with named files, mutations and mutation keys, scenarios, and the
 list of settings (if any) with their scopes.
 
-## Phases (provisional)
+## Research answers (2026-09-25, lane L8)
 
-1. Move `useAttachToComposer` to its shared home; composer inbox entries carry environment and
-   root (the gap `docs/diagnostic-ai-fix-plan.md` step 4 also names).
-2. Per-hunk and per-file undo over the checkpoint diff, as a keyed mutation that settles the
-   checkpoint and git status queries; stepping in the diff view.
-3. Review draft: multi-comment model, anchoring, resolve, one send.
-4. Review mode on Codex, then Claude; findings as comments.
-5. Second-model review.
-6. Plan line comments.
+1. **Hunk addressing.** `DiffHunk` has no id, only an index; rows carry `hunkIndex` and the
+   projections return `hunkRows` (Editor `packages/diff/src/types.ts:30-87`, `projection.ts:3-12`).
+   The server already sends per-hunk patch text: `GitDiffHunk.patch` is the `@@` header plus body,
+   and the file header is `GitFileDiff.patch` up to the first `@@` (`contracts/src/git.ts:45-67`,
+   `server/src/git/diff.ts:45-166`). But the single-file view re-diffs on the client with jsdiff
+   (`client-core/src/git/diff-files.ts:23-33`), and every display diff uses
+   `--ignore-all-space`. So the server builds the reverse patch itself from the turn's refs
+   without `-w`, found by hunk id; the client never sends patch text.
+2. **Safety.** `assertRewindIsolation` checks only where the session lives
+   (`orchestration/rewind-isolation.ts:10-63`); the mid-turn block is `requireSettleable`
+   (`command-invariants.ts:150-185`). `/git/apply-patch` bypasses both. Hunk undo is therefore an
+   orchestration command that reuses `requireSettleable`, the pending-rewind check, SDK ownership
+   and the overlapping-runtime loop, without the linked-worktree rule (`git apply` refuses on
+   mismatch rather than overwriting).
+3. **After an undo.** Checkpoint refs never change; the next turn diffs `turn/N..turn/N+1`, so
+   the undo shows up inside the next turn (the same gap any user edit between turns has today).
+   Turn N's diff is pinned, so "undone" is a record per `(session, turn)` in the projection. The
+   mutation settles `gitKeys.status` with the returned status and invalidates `gitKeys.diffs()`,
+   `fileSystemKeys.fileSnapshots()` and `fileSystemKeys.trees()`.
+4. **Anchoring.** Orca stores a new-side line only. Anchor = `{ path, oldPath?, DiffLineAddress,
+oldObjectId, newObjectId, excerpt + hash, origin { sessionId, toTurnCount } }`: exact while the
+   blob ids match, else re-found by excerpt nearest the old line, else "outdated" (kept, never
+   dropped).
+5. **Review mode.** Codex `review/start` is missing from our generated methods and its review
+   items map to `unknown`; Claude's `/code-review` output has no contract. Both runtimes can force
+   a JSON output schema. Bigger than M, so review mode moves to **Plan 169**.
+6. **Second model.** `generateText` runs an ephemeral turn in an empty directory; measured turn
+   diffs stay under 160 KB, a 20-commit branch is 1.27 MB. Plan 169 carries the budget and the
+   `review` usage purpose.
+7. **Plan comments.** `toJsxRuntime` runs with `passNode: true`, so a component override sees
+   each block's `position` (`packages/markdown/src/hooks/use-markdown-elements.ts:40-49`); the
+   displayed plan is stripped (`client-core/src/chat/proposed-plan.ts:31-45`), so lines need an
+   offset back to `planMarkdown`. Comments live in the expanded view only.
+8. **Hunk identity.** The server stamps `GitDiffHunk.id = sha256(path \0 oldPath \0
+hunk.patch)` (16 hex), scoped by session, turns and whitespace mode. A hunk is actionable only
+   when its turn summary is `ready` and `!isChatSessionBusy(session)`; otherwise undo is disabled
+   with "Agent is working".
+
+## Phases
+
+1. Shared attach with workspace identity. **Done 2026-09-25 (lane L8)**, see Plan 140 P1.
+2. **Hunk and file undo.** Server: hunk ids in `git/diff.ts`; command
+   `session.checkpoint.hunk-revert { sessionId, turnCount, path, hunkId | null }` (null = whole
+   file) guarded as in answer 2; the reactor reverse-applies the hunk built from the turn's refs
+   and records `session.checkpoint.hunk-reverted` with the ids, or refuses with a named reason on
+   overlap (D2). Client: the turn's diff renders git's hunks; each hunk and file gets Undo, with
+   "n of m" stepping; the mutation (key in `features/chat/utils/mutation-keys.ts`) settles the
+   keys in answer 3. Scenario: hunk undo on a real temp repo, including the overlap refusal.
+   **Done 2026-09-25 (lane L8)** with two changes from the sketch: a guarded route
+   (`/orchestration/checkpoint-hunks`, `…/revert`) over the read model rather than an event-sourced
+   command, and "undone" read from the worktree with `git apply --check` rather than stored.
+   The Turn tab lists each file's changes with Undo / Reapply, whole-file undo, `Mod+Backspace` on
+   the active row and "n of m"; the single-file diff view still shows the whitespace-free diff.
+   Proof: server test on a real repo (`checkpoint-hunks.test.ts`) and a DOM test through the real
+   server (`turn-files.test.tsx`). `agent:browser` cannot reach a turn's changes without a real
+   provider turn, which spends credit: **owner check** — undo one change in the Turn tab.
+3. **Review draft.** Many comments across files with the anchor from answer 4, resolve, one send
+   (the prompt lists each comment under its path and lines). Replaces the single-range line
+   comment. Findings from Plan 169 land in the same model, marked by author (D3).
+   **Done 2026-09-25 (lane L8), anchoring partly:** the diff selection bar gains Comment (the
+   single-range Ask stays beside it); comments live in `lib/review-draft` per workspace, show as a
+   Review bar in that workspace's composer with remove and discard, and go out with the next
+   message, numbered, each quote followed by its comment. Each comment stores the anchor from
+   answer 4 (path, old and new ranges, blob ids); re-finding a moved comment and marking it
+   outdated is **left** for when comments are drawn inline in the diff. Scenario
+   `git-diff-line-comment`.
+4. Review mode on Codex, then Claude: **moved to Plan 169**.
+5. Second-model review: **moved to Plan 169**.
+6. **Plan line comments.** Block-level comments on an expanded proposed plan, stored in the review
+   draft with `target: { kind: 'plan', planId, planHash }`, sent with "refine".
+   **Done 2026-09-25 (lane L8)** by selection rather than per block: selecting text in an
+   expanded plan offers "Comment on the selection"; the selection is matched back to the plan's
+   own lines (`features/chat/utils/plan-comment.ts`), quoted, and joins the same review draft
+   (anchor `{ kind: 'plan', planId, lines }`), going out with the next message. DOM test in
+   `proposed-plan-card.test.tsx`. A plan needs a provider turn, so the in-app look is an
+   **owner check**.
 
 ## Verification
 

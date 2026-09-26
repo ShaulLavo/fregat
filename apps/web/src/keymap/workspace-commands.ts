@@ -1,10 +1,12 @@
 import { clientForQueryClient, originForQueryClient } from '@/lib/environments/state/query-clients'
 import { workbenchCommandMetadata } from '@workspace/client-core/commands/workbench'
 import {
+  selectItemMetadata,
+  sidebarPanelMetadata,
   workspaceCommandMetadata,
-  sessionJumpMetadata,
 } from '@workspace/client-core/commands/workspace'
 import {
+  ArticleIcon,
   ArrowClockwiseIcon,
   ArrowCounterClockwiseIcon,
   BracketsCurlyIcon,
@@ -72,20 +74,31 @@ import {
   saveCapability,
 } from '@/lib/documents/utils/capabilities'
 import { documentTab, sameTabContent } from '@/lib/documents/utils/tabs'
-import type { DocumentRef, TabId } from '@/lib/documents/utils/types'
+import type { DocumentRef, EditorTabRecord, TabId } from '@/lib/documents/utils/types'
 import type { EditorDocumentStoreApi } from '@/features/editor/state/document-state'
 import { nextEditorDiffViewMode } from '@/features/editor/utils/diff-view-mode'
 import { commitMessageFilePath } from '@/keymap/utils/commit-message-file'
+import { focusInsideSidebar } from '@/keymap/utils/sidebar-focus'
+import { markdownViewOverride, setMarkdownViewOverride } from '@/lib/markdown-mode/state/overrides'
+import { isMarkdownPath, nextMarkdownView } from '@/lib/markdown-mode/utils/mode'
+import { readSettingsMirror } from '@/lib/settings-boot-mirror'
+import { selectionPrompt, type SelectedLines } from '@/keymap/utils/selection-prompt'
+import { activeEnvironmentId } from '@/lib/environments/state/domain'
+import { toTreePath } from '@/lib/path-formatters'
+import { resolveSelection } from '@singapore-editor/core/document'
+import { serializeComposerMention } from '@workspace/contracts'
 import {
   activeEditorTabForWorkbenchPanels,
   openTerminalTabInWorkbenchPanels,
   selectAdjacentTerminalTabInWorkbenchPanels,
   showWorkbenchBottomTab,
+  setWorkbenchSidebarOpen,
   showWorkbenchSidebarTab,
   toggleWorkbenchBottomTab,
-  toggleWorkbenchSidebarTab,
+  WORKBENCH_SIDEBAR_TABS,
   type TerminalTabDirection,
   type WorkbenchPanels,
+  type WorkbenchSidebarTab,
 } from '@/features/workbench/utils/panels'
 import { killTerminalTab } from '@/features/workbench/state/kill-terminal-tab'
 import { fetchFile } from '@/lib/file-server'
@@ -109,15 +122,16 @@ import {
 import { matchesActiveSurface } from '@/lib/focus/utils/active-surface'
 import { toggledWorkspaceUiMode } from '@/lib/ui-mode'
 import { allEditorGroups, activeEditorGroup } from '@/lib/documents/utils/groups'
-import type { GroupEdge } from '@/lib/documents/utils/group-types'
+import type { EditorGroup, GroupEdge } from '@/lib/documents/utils/group-types'
 import { groupSplitVerdict } from '@/features/workbench/state/group-geometry'
 
 import {
   defineCommand,
   type WorkspaceCommandHandlerContext,
   type WorkspaceCommandRuntime,
+  type WorkspaceCommandSnapshot,
 } from './define-command'
-import { SESSION_JUMP_POSITIONS } from './types'
+import { ITEM_POSITIONS } from './types'
 
 const handled = { status: 'handled' } as const
 const declined = { reason: 'handler-declined', status: 'unhandled' } as const
@@ -136,11 +150,6 @@ function runSessionCommand(
   const result = run()
   if (result instanceof Promise) return operationStart(result)
   return dispositionFor(result)
-}
-
-function sessionTraversalHandler(direction: SessionTraversalDirection) {
-  return (context: WorkspaceCommandHandlerContext) =>
-    runSessionCommand(context, () => selectAdjacentSession(direction))
 }
 
 function dispositionFor(accepted: boolean): ImmediateCommandDisposition {
@@ -480,21 +489,200 @@ function chatFocusStart(
   return focusIdInLayoutStart(runtime, { key: rootPath, kind: 'chat-composer' }, layout)
 }
 
+// Visibility only: the selected panel and outside focus stay as they were.
+function toggleWorkbenchSidebar({ runtime, snapshot }: WorkspaceCommandHandlerContext) {
+  if (!snapshot.rootPath) return declined
+
+  const panels = setWorkbenchSidebarOpen(
+    snapshot.workbenchPanels,
+    !snapshot.workbenchPanels.sidebarOpen,
+  )
+  const stranded = !panels.sidebarOpen && focusInsideSidebar()
+  return afterNavigation(
+    getNavigation().setWorkbenchPanels(panels, runtime.workspace, 'workbench'),
+    () => (stranded ? focusActiveSurfaceOrShell(runtime) : handled),
+  )
+}
+
+function toggleSessionRail({ runtime, snapshot }: WorkspaceCommandHandlerContext) {
+  const open = !snapshot.chatModePanels.sessionRailOpen
+  const stranded = !open && focusInsideSidebar()
+  return afterNavigation(
+    getNavigation().setChatModePanels(
+      setChatModeSessionRailOpen(snapshot.chatModePanels, open),
+      runtime.workspace,
+    ),
+    () => (stranded ? chatFocusStart(runtime, snapshot.rootPath, 'chat') : handled),
+  )
+}
+
+function addSelectionToChat({ runtime, snapshot }: WorkspaceCommandHandlerContext) {
+  const target = chatAttachTarget(snapshot)
+  if (!target || !snapshot.activeTabId) return declined
+
+  const selections = selectedLines(runtime, snapshot.activeTabId)
+  if (selections.length === 0) return attachFileMention(runtime, target)
+  const text = selectionPrompt(target.path, selections)
+  return dispositionFor(runtime.composer.attachText('editor-selection', text, target.destination))
+}
+
+function attachFileMention(
+  runtime: WorkspaceCommandRuntime,
+  target: NonNullable<ReturnType<typeof chatAttachTarget>>,
+) {
+  const mention = serializeComposerMention(target.path)
+  return dispositionFor(runtime.composer.attachText('editor-file', mention, target.destination))
+}
+
+// The active file, workspace-relative, and the workspace whose composer should take it.
+function chatAttachTarget(snapshot: WorkspaceCommandSnapshot) {
+  const path = filesystemResource(snapshot.activeDocument)?.path
+  if (!path || !snapshot.rootPath) return null
+
+  return {
+    destination: { environmentId: activeEnvironmentId(), rootPath: snapshot.rootPath },
+    path: toTreePath(path, snapshot.rootPath),
+  }
+}
+
+function selectedLines(runtime: WorkspaceCommandRuntime, tabId: TabId): readonly SelectedLines[] {
+  const documents = runtime.documents.store.getState()
+  const view = documents.getEditorView(tabId)
+  const live = view ? documents.getLiveEditorDocument(view.documentKey) : null
+  if (!view || !live) return []
+
+  const pieces = live.buffer.getSnapshot()
+  const text = live.buffer.getTextSnapshot()
+  return view.view.getSelections().selections.flatMap((selection) => {
+    const { endOffset, startOffset } = resolveSelection(pieces, selection)
+    if (startOffset === endOffset) return []
+    return [
+      {
+        startLine: text.lineAt(startOffset) + 1,
+        endLine: text.lineAt(endOffset - 1) + 1,
+        text: text.readRange(startOffset, endOffset),
+      },
+    ]
+  })
+}
+
 /**
- * The nine jump slots are one shape, so they are written once. They are hidden
- * from the palette for the same reason as their four named siblings: they are
- * keyboard navigation for the visible chat rail, not general palette actions.
+ * One key per slot for both screens: the snapshot's layout picks editor tabs or chats,
+ * so a user override moves both at once. Hidden from the palette, like next/previous.
  */
-function sessionJumpCommands() {
-  return SESSION_JUMP_POSITIONS.map((position) =>
+function selectItemCommands() {
+  return ITEM_POSITIONS.map((position) =>
     defineCommand({
-      ...sessionJumpMetadata(position),
-      run: (context) => runSessionCommand(context, () => jumpToSession(position)),
+      ...selectItemMetadata(position),
+      run: (context) => {
+        if (context.snapshot.uiMode === 'chat')
+          return runSessionCommand(context, () => jumpToSession(position))
+        const group = activeEditorGroup(context.snapshot.workbenchPanels.editorGroups)
+        return selectEditorTab(
+          context.runtime,
+          group,
+          position === 9 ? group.tabs.at(-1) : group.tabs[position - 1],
+        )
+      },
     }),
   )
 }
 
+function adjacentItemHandler(direction: SessionTraversalDirection) {
+  return (context: WorkspaceCommandHandlerContext) => {
+    if (context.snapshot.uiMode === 'chat')
+      return runSessionCommand(context, () => selectAdjacentSession(direction))
+    const group = activeEditorGroup(context.snapshot.workbenchPanels.editorGroups)
+    return selectEditorTab(context.runtime, group, adjacentTab(group, direction))
+  }
+}
+
+// Wraps at both ends, like the session rail.
+function adjacentTab(group: EditorGroup, direction: SessionTraversalDirection) {
+  const count = group.tabs.length
+  if (count === 0) return undefined
+  const index = group.tabs.findIndex((tab) => tab.id === group.selectedTabId)
+  if (index < 0) return group.tabs[direction === 'next' ? 0 : count - 1]
+  const step = direction === 'next' ? 1 : -1
+  return group.tabs[(index + step + count) % count]
+}
+
+function selectEditorTab(
+  runtime: WorkspaceCommandRuntime,
+  group: EditorGroup,
+  tab: EditorTabRecord | undefined,
+) {
+  if (!tab) return declined
+  return afterNavigation(runtime.editor.selectTab({ groupId: group.id, tabId: tab.id }), () =>
+    focusActiveSurface(runtime),
+  )
+}
+
+// Panels exist only in the workbench; chat has no numbered target for these keys.
+function sidebarPanelCommands() {
+  return ITEM_POSITIONS.map((position) =>
+    defineCommand({
+      ...sidebarPanelMetadata(position),
+      run: (context) => {
+        const tab = WORKBENCH_SIDEBAR_TABS[position - 1]
+        if (context.snapshot.uiMode !== 'workbench' || !tab) return declined
+        return toggleSidebarPanel(context, tab)
+      },
+    }),
+  )
+}
+
+function toggleSidebarPanel(
+  { runtime, snapshot }: WorkspaceCommandHandlerContext,
+  tab: WorkbenchSidebarTab,
+) {
+  const rootPath = snapshot.rootPath
+  if (!rootPath) return declined
+
+  const current = snapshot.workbenchPanels
+  const showing = current.sidebarOpen && current.activeSidebarTab === tab
+  const panels = showing
+    ? setWorkbenchSidebarOpen(current, false)
+    : showWorkbenchSidebarTab(current, tab)
+  const stranded = !panels.sidebarOpen && focusInsideSidebar()
+  return afterNavigation(
+    getNavigation().setWorkbenchPanels(panels, runtime.workspace, 'workbench'),
+    () => {
+      if (panels.sidebarOpen) return focusSidebarPanel(runtime, rootPath, tab)
+      return stranded ? focusActiveSurfaceOrShell(runtime) : handled
+    },
+  )
+}
+
+function focusSidebarPanel(
+  runtime: WorkspaceCommandRuntime,
+  rootPath: string,
+  tab: WorkbenchSidebarTab,
+) {
+  if (tab === 'chat') return chatFocusStart(runtime, rootPath, 'workbench')
+  return focusIdInLayoutStart(runtime, sidebarFocusTarget(rootPath, tab), 'workbench')
+}
+
+function sidebarFocusTarget(
+  rootPath: string,
+  tab: Exclude<WorkbenchSidebarTab, 'chat'>,
+): FocusTargetId {
+  if (tab === 'git') return { kind: 'git', rootPath }
+  if (tab === 'logs') return { kind: 'logs' }
+  if (tab === 'search') return { kind: 'search', rootPath, surface: 'sidebar' }
+  return { kind: 'file-tree', rootPath }
+}
+
 export const workspaceCommands = [
+  defineCommand({
+    ...workspaceCommandMetadata['workspace.fixDiagnostic'],
+    run: ({ target }) => (target.kind === 'diagnostic' && target.execute() ? handled : declined),
+  }),
+  defineCommand({
+    ...workspaceCommandMetadata['workspace.toggleCheckpointChange'],
+    run: ({ target }) =>
+      target.kind === 'checkpoint-change' && target.execute() ? handled : declined,
+  }),
   defineCommand({
     ...workspaceCommandMetadata['workspace.undoWorkspaceEdit'],
     icon: ArrowCounterClockwiseIcon,
@@ -822,28 +1010,38 @@ export const workspaceCommands = [
     },
   }),
   defineCommand({
+    ...workspaceCommandMetadata['workspace.addSelectionToChat'],
+    icon: ChatCircleIcon,
+    run: addSelectionToChat,
+  }),
+  defineCommand({
+    ...workspaceCommandMetadata['workspace.cycleMarkdownView'],
+    icon: ArticleIcon,
+    run: ({ snapshot }) => {
+      const document = snapshot.activeDocument
+      const path = filesystemResource(document)?.path
+      if (!document || !path || !isMarkdownPath(path)) return declined
+      const key = documentKey(document)
+      const current = markdownViewOverride(key) ?? readSettingsMirror()['editor.markdownView']
+      setMarkdownViewOverride(key, nextMarkdownView(current))
+      return handled
+    },
+  }),
+  defineCommand({
+    ...workspaceCommandMetadata['workspace.addFileToChat'],
+    icon: ChatCircleIcon,
+    run: ({ runtime, snapshot }) => {
+      const target = chatAttachTarget(snapshot)
+      return target ? attachFileMention(runtime, target) : declined
+    },
+  }),
+  defineCommand({
     ...workspaceCommandMetadata['workspace.toggleSidebarVisibility'],
     icon: SidebarSimpleIcon,
-    run: ({ runtime, snapshot }) => {
-      const rootPath = snapshot.rootPath
-      if (!rootPath) return declined
-
-      const workspace = runtime.workspace.getState()
-      // Arriving from chat mode reveals the pane rather than toggling it: the
-      // workbench panels the user is about to see were never on screen, so
-      // hiding one would answer a keystroke they could not have aimed.
-      const revealing = workspace.uiMode !== 'workbench'
-      const panels = revealing
-        ? showWorkbenchSidebarTab(snapshot.workbenchPanels, 'files')
-        : toggleWorkbenchSidebarTab(snapshot.workbenchPanels, 'files')
-      return afterNavigation(
-        getNavigation().setWorkbenchPanels(panels, runtime.workspace, 'workbench'),
-        () => {
-          if (!panels.sidebarOpen) return handled
-          return focusIdInLayoutStart(runtime, { kind: 'file-tree', rootPath }, 'workbench')
-        },
-      )
-    },
+    run: (context) =>
+      context.snapshot.uiMode === 'chat'
+        ? toggleSessionRail(context)
+        : toggleWorkbenchSidebar(context),
   }),
   defineCommand({
     ...workspaceCommandMetadata['workspace.togglePanel'],
@@ -1191,36 +1389,27 @@ export const workspaceCommands = [
       )
     },
   }),
-  // Chat sessions all sit under Mod+Alt: the plain Mod digits are reserved for the
-  // editor groups VS Code puts there, and Mod+B already toggles the Files pane.
   defineCommand({
     ...workspaceCommandMetadata['workspace.newSession'],
     run: (context) => runSessionCommand(context, startScopedSessionDraft),
   }),
   defineCommand({
-    ...workspaceCommandMetadata['workspace.nextSession'],
-    run: sessionTraversalHandler('next'),
+    ...workspaceCommandMetadata['workspace.nextItem'],
+    run: adjacentItemHandler('next'),
   }),
   defineCommand({
-    ...workspaceCommandMetadata['workspace.previousSession'],
-    run: sessionTraversalHandler('previous'),
+    ...workspaceCommandMetadata['workspace.previousItem'],
+    run: adjacentItemHandler('previous'),
   }),
   defineCommand({
     ...workspaceCommandMetadata['workspace.toggleSessionRail'],
     run: (context) => {
       if (context.snapshot.uiMode !== 'chat') return declined
-      return navigationStart(
-        getNavigation().setChatModePanels(
-          setChatModeSessionRailOpen(
-            context.snapshot.chatModePanels,
-            !context.snapshot.chatModePanels.sessionRailOpen,
-          ),
-          context.runtime.workspace,
-        ),
-      )
+      return toggleSessionRail(context)
     },
   }),
-  ...sessionJumpCommands(),
+  ...selectItemCommands(),
+  ...sidebarPanelCommands(),
 ]
 
 export type WorkspaceCommandId = (typeof workspaceCommands)[number]['id']

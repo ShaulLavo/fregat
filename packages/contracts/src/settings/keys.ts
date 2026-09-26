@@ -80,6 +80,16 @@ export const SETTINGS_REGISTRY = {
     description:
       'Show the Plan mode picker and /plan and /default commands for providers that support them. Stored draft preferences are retained while hidden.',
   }),
+  'chat.activeFileContext': defineSetting({
+    schema: v.boolean(),
+    default: false,
+    scope: 'application',
+    widget: 'boolean',
+    category: 'Chat',
+    title: 'Active file in the composer',
+    description:
+      'Show the file open in the editor as a chip in the composer. While the chip is there, sending mentions that file. Remove the chip to send without it.',
+  }),
   'chat.contextWindowMeterEnabled': defineSetting({
     schema: v.boolean(),
     default: false,
@@ -597,6 +607,17 @@ export const SETTINGS_REGISTRY = {
       'Total stored undo history across closed files, in UTF-16 code units. The least recently saved files go first when it is exceeded.',
     visibility: 'advanced',
     keywords: ['undo', 'history', 'storage', 'budget', 'persist'],
+  }),
+  'editor.markdownView': defineSetting({
+    schema: v.picklist(['source', 'split', 'preview'] as const),
+    default: 'preview',
+    scope: 'window',
+    widget: 'enum',
+    category: 'Editor',
+    title: 'Markdown view',
+    description:
+      'How markdown files open: source text, source beside a rendered view, or rendered in place while you edit. Cycle markdown view changes one file.',
+    keywords: ['markdown', 'preview', 'split', 'render'],
   }),
   'editor.diff.viewMode': defineSetting({
     schema: v.picklist(['split', 'stacked'] as const),
@@ -1125,9 +1146,9 @@ export const SETTINGS_REGISTRY = {
     scope: 'application',
     widget: 'enum',
     category: 'Keyboard shortcuts',
-    title: 'Keyboard preset',
+    title: 'Keyboard mode',
     description:
-      'Editor shortcuts to use before applying your overrides. Default uses the native editor pack; vscode uses the VS Code pack.',
+      'Shortcuts your overrides apply on top of. VS Code keeps VS Code bindings. Platform starts from them and adds its own keys for tabs, chats and sidebar panels.',
     keywords: ['keybinding', 'shortcut', 'preset', 'vscode', 'keymap'],
   }),
   'keybindings.overrides': defineSetting({

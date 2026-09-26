@@ -1,4 +1,10 @@
+import { useMemo, useState } from 'react'
 import { documentKey } from '@/lib/documents/utils/identity'
+import { MarkdownPreviewPane } from '@/features/workbench/components/markdown-preview-pane'
+import { createMarkdownScrollSync } from '@/features/workbench/state/markdown-scroll-sync'
+import { fileBodyGridClass } from '@/features/workbench/utils/file-body-grid'
+import { useMarkdownView } from '@/lib/markdown-mode/hooks/use-markdown-view'
+import { isMarkdownPath } from '@/lib/markdown-mode/utils/mode'
 import { filesystemResource } from '@/lib/documents/utils/capabilities'
 import type { FilesystemPath, StandaloneDocumentRef, TabId } from '@/lib/documents/utils/types'
 import { useEditorRuntime } from '@/features/editor/hooks/use-runtime'
@@ -77,6 +83,23 @@ export function FileEditorBody({
     theme: { appliedThemeId, committedThemeId, selectedThemeId },
   })
 
+  const markdownView = useMarkdownView(key)
+  const splitMarkdown =
+    markdownView === 'split' &&
+    editorDocument !== null &&
+    resource !== null &&
+    isMarkdownPath(resource.path)
+  const [scrollSync] = useState(createMarkdownScrollSync)
+  // Manual memo: plugin identity is the editor's registration lifetime; a new array re-registers
+  // every plugin on each render.
+  const editorPlugins = useMemo(
+    () =>
+      splitMarkdown
+        ? [...visibleSnapshot.additionalPlugins, scrollSync.plugin]
+        : visibleSnapshot.additionalPlugins,
+    [scrollSync, splitMarkdown, visibleSnapshot.additionalPlugins],
+  )
+
   function recordInitialPaint(event: EditorInitialPaintEvent) {
     if (resource) fileOpenIntent.recordInitialPaint(resource.path, event)
   }
@@ -105,17 +128,11 @@ export function FileEditorBody({
   }
 
   return (
-    <div
-      className={
-        currentReferences
-          ? 'grid h-full min-h-0 min-w-0 grid-cols-[minmax(0,1fr)_minmax(260px,340px)] grid-rows-[minmax(0,1fr)] overflow-hidden'
-          : 'grid h-full min-h-0 min-w-0 grid-cols-1 grid-rows-[minmax(0,1fr)] overflow-hidden'
-      }
-    >
+    <div className={fileBodyGridClass(splitMarkdown, currentReferences !== null)}>
       <div className='relative flex min-h-0 min-w-0 flex-col overflow-hidden'>
         <Editor
           active={active && currentActions !== null}
-          additionalPlugins={visibleSnapshot.additionalPlugins}
+          additionalPlugins={editorPlugins}
           definitionTarget={currentActions ? definitionTarget : null}
           document={editorDocument}
           paintKey={visibleSnapshot.paintKey}
@@ -153,6 +170,14 @@ export function FileEditorBody({
           </div>
         ) : null}
       </div>
+      {splitMarkdown && editorDocument && resource ? (
+        <MarkdownPreviewPane
+          buffer={editorDocument.buffer}
+          documentPath={resource.path}
+          rootPath={rootPath}
+          sync={scrollSync}
+        />
+      ) : null}
       {currentReferences && currentActions ? (
         <LanguageServerReferencesPane
           references={currentReferences}
