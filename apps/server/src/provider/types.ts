@@ -14,8 +14,10 @@ import type {
   ProviderGoalAction,
   ProviderSessionGoal,
   ProviderDriverKind,
+  ProviderMcpConfigServer,
+  ProviderMcpDefinition,
+  ProviderMcpScope,
   ProviderMcpServer,
-  ProviderMcpSignIn,
   ProviderSessionHooks,
   ProviderInstanceId,
   ProviderLoginAttempt,
@@ -33,6 +35,7 @@ import type {
   TurnId,
   UserInputQuestions,
 } from '@workspace/contracts'
+import type { McpSignInFlow } from './mcp-sign-in'
 import type { ProviderUsageAmounts, ProviderUsageTotals } from './utils/usage-totals'
 import type { ProviderUsageProbe, ProviderUsageUpdate } from './utils/usage-windows'
 
@@ -50,6 +53,8 @@ export type ProviderTurnInput = {
   kind?: SessionTurnKind
   messageText: string
   modelSelection: ModelSelection
+  /** MCP servers turned off for this session, filled in by `ProviderService` from the binding. */
+  mcpOff?: readonly string[]
   /** Absent for utility turns and when no endpoint is served. */
   platformMcp?: PlatformMcpBinding
   /** A JSON schema the turn's final message must match; Codex takes it per turn. */
@@ -80,6 +85,8 @@ export type ProviderRuntimeStartInput = {
   cwd: string
   ephemeral?: boolean
   interactionMode?: InteractionMode
+  /** MCP servers this session runs without. */
+  mcpOff?: readonly string[]
   modelSelection: ModelSelection
   platformMcp?: PlatformMcpBinding
   /** A JSON schema every final message must match; Claude takes it per session. */
@@ -601,6 +608,27 @@ export type ProviderAdapterRuntime = {
   sessionId: SessionId
 }
 
+export type ProviderMcpWrite = {
+  folder: string
+  name: string
+  scope: ProviderMcpScope
+}
+
+/**
+ * An instance's MCP servers as its harness keeps them. The harness config is the only store:
+ * reads go through a probe, writes through the harness's own writer.
+ */
+export type ProviderMcpConfigAccess = {
+  readonly scopes: readonly ProviderMcpScope[]
+  list: (input: { folder: string }) => Promise<ProviderMcpConfigServer[]>
+  add: (input: ProviderMcpWrite & { definition: ProviderMcpDefinition }) => Promise<void>
+  remove: (input: ProviderMcpWrite) => Promise<void>
+  /** The stored definition, secrets included; used only to copy a server to another instance. */
+  read: (input: ProviderMcpWrite) => Promise<ProviderMcpDefinition>
+  /** Starts an OAuth sign-in for one HTTP server, outside any session. */
+  signIn: (input: { folder: string; name: string }) => Promise<McpSignInFlow>
+}
+
 export type ProviderAdapter = {
   operationTimeoutMs: number
   adapterKey: string
@@ -644,7 +672,14 @@ export type ProviderAdapter = {
   reconnectMcpServer?: (input: { name: string; sessionId: SessionId }) => Promise<void>
   /** Approves a checkout's project server this session turned off, and restarts an idle session. */
   approveMcpServer?: (input: { name: string; sessionId: SessionId }) => Promise<void>
-  signInMcpServer?: (input: { name: string; sessionId: SessionId }) => Promise<ProviderMcpSignIn>
+  signInMcpServer?: (input: { name: string; sessionId: SessionId }) => Promise<McpSignInFlow>
+  /** The instance's configured MCP servers, outside any session. */
+  mcpConfig?: ProviderMcpConfigAccess
+  /**
+   * Applies the session's off list: an idle session restarts on its conversation at once, a busy
+   * one at its next start.
+   */
+  applyMcpSessionOff?: (input: { off: readonly string[]; sessionId: SessionId }) => Promise<void>
   /** Hooks configured for the checkout; null when the session has no live provider process. */
   configuredHooks?: (input: {
     cwd: string

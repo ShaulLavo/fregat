@@ -1,3 +1,5 @@
+import { MCP_CATEGORY, matchesMcpSearch } from '@/features/settings/utils/mcp'
+import { McpSection } from '@/features/settings/components/mcp-section'
 import { SettingsDisplayProvider } from '@/features/settings/providers/display-provider'
 import { useReloadView } from '@/features/settings/hooks/use-reload-view'
 import { ToolPane } from '@workspace/ui/patterns/tool-pane'
@@ -134,6 +136,7 @@ export function SettingsPage({
   // The push switch renders inside the push section, beside the devices it sends to.
   const categories = groupByCategory(visible.filter((id) => id !== 'chat.pushNotifications'))
   if (matchesUsageSearch(query)) categories.set('Usage', [])
+  if (matchesMcpSearch(query)) categories.set(MCP_CATEGORY, [])
   moveCategoryLast(categories, SHORTCUTS_CATEGORY)
   const showPush =
     matchesPushSearch(query) ||
@@ -147,6 +150,7 @@ export function SettingsPage({
     ? [...categories].filter(([category]) => category === selectedCategory)
     : [...categories]
 
+  const onlyMcp = shown.length === 1 && shown[0]?.[0] === MCP_CATEGORY
   const onlyUsage = shown.length === 1 && shown[0]?.[0] === 'Usage'
 
   return (
@@ -198,7 +202,8 @@ export function SettingsPage({
                   <p className='text-muted-foreground text-xs tabular-nums'>
                     {project ? 'Project settings' : null}
                     {!project && onlyUsage ? 'Usage report' : null}
-                    {!project && !onlyUsage && (
+                    {!project && onlyMcp ? MCP_CATEGORY : null}
+                    {!project && !onlyUsage && !onlyMcp && (
                       <>
                         {selectedCategory ? `${shownCount(shown)} of ` : ''}
                         {visible.length} {visible.length === 1 ? 'setting' : 'settings'}
@@ -288,6 +293,7 @@ export function SettingsPage({
                     <section className='mb-6' key={category}>
                       <h2 className='text-foreground mb-1 text-sm font-semibold'>{category}</h2>
                       {category === 'Usage' ? <UsageSection /> : null}
+                      {category === MCP_CATEGORY ? <McpSection /> : null}
                       {ids.includes('chat.keepImportedSessionsUpdated') ? <ImportSection /> : null}
                       {category === 'Chat' && showPush ? (
                         <PushSection snapshot={projection} />

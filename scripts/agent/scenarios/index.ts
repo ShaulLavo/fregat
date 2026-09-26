@@ -34,6 +34,8 @@ import { projectGrouping } from './project-grouping'
 import { sessionSearch, sessionSearchEnvironments } from './session-search'
 import { sessionUnread } from './session-unread'
 import { mcpApproval } from './mcp-approval'
+import { mcpSettings } from './mcp-settings'
+import { mcpStatus } from './mcp-status'
 import { nativePermissionGrant } from './native-permission-grant'
 import { resetCreditRedemption } from './reset-credit-redemption'
 import { pullRequestLookupFailure } from './pull-request-lookup-failure'
@@ -106,6 +108,7 @@ import { chatSessionGoal } from './chat-session-goal'
 import { chatAgentReview } from './chat-agent-review'
 import { fileTreeHoverPrefetch } from './file-tree-hover-prefetch'
 import { prefetchChatSwitch } from './prefetch-chat-switch'
+import { prefetchDiffQueries } from './prefetch-diff-queries'
 import { prefetchFirstPaint } from './prefetch-first-paint'
 import { prefetchSettings } from './prefetch-settings'
 import {
@@ -314,6 +317,7 @@ import { editorProduct } from './editor-product'
 import { treeFileClicks } from './tree-file-clicks'
 import { treeStickyScroll } from './tree-sticky-scroll'
 import { treeParity } from './tree-parity'
+import { fileIconHues } from './file-icon-hues'
 import { treeParityBehaviour } from './tree-parity-behaviour'
 import { demoWorkspace } from './demo-workspace'
 import { demoAgentGit } from './demo-agent-git'
@@ -341,6 +345,8 @@ export const scenarios: readonly Scenario[] = [
   sessionNotifications,
   composerDefaults,
   mcpApproval,
+  mcpStatus,
+  mcpSettings,
   nativePermissionGrant,
   resetCreditRedemption,
   pullRequestLookupFailure,
@@ -578,6 +584,7 @@ export const scenarios: readonly Scenario[] = [
   chatAgentReview,
   fileTreeHoverPrefetch,
   prefetchFirstPaint,
+  prefetchDiffQueries,
   prefetchChatSwitch,
   prefetchSettings,
   workspaceOpenLargeRoot,
@@ -614,6 +621,7 @@ export const scenarios: readonly Scenario[] = [
   editorProduct,
   treeStickyScroll,
   treeParity,
+  fileIconHues,
   treeParityBehaviour,
   treeFileClicks,
 ]

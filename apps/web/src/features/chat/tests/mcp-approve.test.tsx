@@ -16,17 +16,18 @@ import {
   MetadataProviderAdapter,
   makeSessionDomainFixture,
 } from '../../../../test/factories/session-domain'
+import { mcpServer } from '../../../../test/factories/mcp-server'
 
 class GatedAdapter extends MetadataProviderAdapter {
   readonly approved: string[] = []
 
   async mcpServers(): Promise<ProviderMcpServer[]> {
     return [
-      {
+      mcpServer({
         name: 'deploy',
+        source: 'project',
         status: this.approved.includes('deploy') ? 'connected' : 'unapproved',
-        error: null,
-      },
+      }),
     ]
   }
 

@@ -56,57 +56,6 @@ export type BuiltInFileIconToken =
   | 'zig'
   | 'zip'
 
-const BUILT_IN_FILE_ICON_COLOR_FALLBACKS: Partial<Record<string, string>> = {
-  astro: 'light-dark(#a631be, #d568ea)',
-  babel: 'light-dark(#d5a910, #ffd452)',
-  bash: 'light-dark(#199f43, #5ecc71)',
-  biome: 'light-dark(#1a85d4, #69b1ff)',
-  bootstrap: 'light-dark(#693acf, #9d6afb)',
-  browserslist: 'light-dark(#d5a910, #ffd452)',
-  bun: 'light-dark(#d32a61, #ff678d)',
-  claude: 'light-dark(#d47628, #ffa359)',
-  css: 'light-dark(#693acf, #9d6afb)',
-  database: 'light-dark(#a631be, #d568ea)',
-  default: 'light-dark(#84848a, #adadb1)',
-  docker: 'light-dark(#1a85d4, #69b1ff)',
-  eslint: 'light-dark(#693acf, #9d6afb)',
-  git: 'light-dark(#ff8c5b, #d5512f)',
-  go: 'light-dark(#1ca1c7, #68cdf2)',
-  graphql: 'light-dark(#d32a61, #ff678d)',
-  html: 'light-dark(#d47628, #ffa359)',
-  image: 'light-dark(#d32a61, #ff678d)',
-  javascript: 'light-dark(#d5a910, #ffd452)',
-  json: 'light-dark(#d47628, #ffa359)',
-  markdown: 'light-dark(#199f43, #5ecc71)',
-  mcp: 'light-dark(#17a5af, #64d1db)',
-  npm: 'light-dark(#d52c36, #ff6762)',
-  oxc: 'light-dark(#1ca1c7, #68cdf2)',
-  postcss: 'light-dark(#d52c36, #ff6762)',
-  prettier: 'light-dark(#17a5af, #64d1db)',
-  python: 'light-dark(#1a85d4, #69b1ff)',
-  react: 'light-dark(#1ca1c7, #68cdf2)',
-  ruby: 'light-dark(#d52c36, #ff6762)',
-  rust: 'light-dark(#d47628, #ffa359)',
-  sass: 'light-dark(#d32a61, #ff678d)',
-  svg: 'light-dark(#d47628, #ffa359)',
-  svelte: 'light-dark(#d52c36, #ff6762)',
-  svgo: 'light-dark(#199f43, #5ecc71)',
-  swift: 'light-dark(#d47628, #ffa359)',
-  table: 'light-dark(#17a5af, #64d1db)',
-  tailwind: 'light-dark(#1ca1c7, #68cdf2)',
-  terraform: 'light-dark(#693acf, #9d6afb)',
-  text: 'light-dark(#84848a, #adadb1)',
-  typescript: 'light-dark(#1a85d4, #69b1ff)',
-  vite: 'light-dark(#a631be, #d568ea)',
-  vscode: 'light-dark(#1a85d4, #69b1ff)',
-  vue: 'light-dark(#199f43, #5ecc71)',
-  wasm: 'light-dark(#693acf, #9d6afb)',
-  webpack: 'light-dark(#1a85d4, #69b1ff)',
-  yml: 'light-dark(#d52c36, #ff6762)',
-  zig: 'light-dark(#d47628, #ffa359)',
-  zip: 'light-dark(#d47628, #ffa359)',
-}
-
 const MINIMAL_SVG_SPRITE_SHEET = `<svg data-icon-sprite aria-hidden="true" width="0" height="0">
   <symbol id="file-tree-icon-chevron" viewBox="0 0 16 16">
     <path d="M12.4697 5.46973C12.7626 5.17684 13.2374 5.17684 13.5303 5.46973C13.8232 5.76262 13.8232 6.23738 13.5303 6.53028L8.53028 11.5303C8.23738 11.8232 7.76262 11.8232 7.46973 11.5303L2.46973 6.53028C2.17684 6.23738 2.17684 5.76262 2.46973 5.46973C2.76262 5.17684 3.23738 5.17684 3.53028 5.46973L8 9.93946L12.4697 5.46973Z" fill="currentcolor"/>
@@ -728,15 +677,6 @@ export function getBuiltInSpriteSheet(set: FileTreeBuiltInIconSet | 'none'): str
 
 export function getBuiltInFileIconName(token: BuiltInFileIconToken): string {
   return `file-tree-builtin-${token}`
-}
-
-export function getBuiltInFileIconColor(token: string): string | undefined {
-  const fallback = BUILT_IN_FILE_ICON_COLOR_FALLBACKS[token]
-  if (fallback == null) {
-    return undefined
-  }
-
-  return `var(--trees-file-icon-color-${token}, var(--trees-file-icon-color, ${fallback}))`
 }
 
 export function isColoredBuiltInIconSet(set: FileTreeBuiltInIconSet | 'none'): boolean {

@@ -35,7 +35,7 @@ const results = new WeakMap<Page, PressTiming[]>()
 type Target = { readonly needle: string; readonly kind: 'file' | 'diff' }
 
 // A view is the target's when it holds the marker line written into that file only.
-function sampler({ needle, kind }: Target) {
+export function sampleEditorPaint({ needle, kind }: Target) {
   return `() => {
     const diff = ${JSON.stringify(kind === 'diff')}
     let view = null
@@ -61,7 +61,7 @@ function sampler({ needle, kind }: Target) {
 async function measure(page: Page, name: string, target: Target, press: () => Promise<void>) {
   // Lets the previous open's background work settle, so each press starts from rest.
   await page.waitForTimeout(1200)
-  const timing = await measurePress(page, name, sampler(target), press)
+  const timing = await measurePress(page, name, sampleEditorPaint(target), press)
   results.get(page)?.push(timing)
   console.log(JSON.stringify(timing))
 }
