@@ -50,6 +50,8 @@ type WatcherEntry = {
   attached: Promise<AttachedWatch>
   /** Set once `attached` settles, so a limited root can be found without awaiting. */
   resolved?: AttachedWatch
+  /** When the last holder let go of a recursive watch that stays attached for the next one. */
+  idleSince?: number
 }
 type WakeSlot = {
   current: (() => void) | null
@@ -197,6 +199,7 @@ export class FileChangeHub {
     return {
       nativeWatcherCount: this.nativeWatchers.size,
       openFileWatcherCount: this.openFiles.size,
+      idleWatcherCount: [...this.nativeWatchers.values()].filter(isIdle).length,
       shallowWatcherCount: this.shallowWatchers.size,
       watchedDirectoryCount: this.reservedDirectories,
       watchDirectoryLimit: this.directoryLimit(),
@@ -418,8 +421,10 @@ export class FileChangeHub {
     attach: () => Promise<AttachedWatch>,
   ): Promise<RetainedWatch> {
     let entry = watchers.get(root)
-    if (entry) entry.refCount += 1
-    else {
+    if (entry) {
+      entry.refCount += 1
+      entry.idleSince = undefined
+    } else {
       entry = { refCount: 1, attached: attach() }
       watchers.set(root, entry)
     }
@@ -444,6 +449,13 @@ export class FileChangeHub {
     entry.refCount -= 1
     if (entry.refCount > 0) return
 
+    // Bun's recursive watch attaches slower after every close and reopen in one process (seconds
+    // after a few dozen), so it stays attached until an active root needs its room.
+    if (watchers === this.nativeWatchers && entry.resolved?.coverage.mode === 'recursive') {
+      entry.idleSince = performance.now()
+      this.upgradeLimitedWatchers()
+      return
+    }
     watchers.delete(relativeRoot)
     await releaseWatcher((await entry.attached).close)
   }
@@ -452,6 +464,7 @@ export class FileChangeHub {
   rebalance() {
     if (this.closing) return
     this.upgrades = this.upgrades.then(async () => {
+      this.evictIdleWatchers(0, this.directoryLimit())
       await this.downgradeOverLimit()
       await this.upgradeLimitedWatchersNow()
     })
@@ -473,7 +486,9 @@ export class FileChangeHub {
   /** A recursive watch when the root's directories fit what the limit has free, else the numbers. */
   private async attachIfItFits(relativeRoot: string, target: string) {
     const limit = this.directoryLimit()
-    const counted = await countDirectories(target, limit - this.reservedDirectories)
+    const reclaimable = limit - this.reservedDirectories + this.idleDirectories()
+    const counted = await countDirectories(target, reclaimable)
+    if (counted.complete) this.evictIdleWatchers(counted.count, limit)
     const available = Math.max(0, limit - this.reservedDirectories)
     if (!counted.complete || counted.count > available) {
       const limited: WatchCoverage = {
@@ -507,6 +522,26 @@ export class FileChangeHub {
       },
     }
     return { attached, limited: null }
+  }
+
+  private idleDirectories() {
+    let total = 0
+    for (const entry of this.nativeWatchers.values())
+      if (isIdle(entry)) total += directoryCountOf(entry)
+    return total
+  }
+
+  /** Closes idle recursive watches, longest idle first, until `needed` more directories fit. */
+  private evictIdleWatchers(needed: number, limit: number) {
+    const idle = [...this.nativeWatchers]
+      .filter(([, entry]) => isIdle(entry))
+      .toSorted(([, a], [, b]) => (a.idleSince ?? 0) - (b.idleSince ?? 0))
+    for (const [root, entry] of idle) {
+      if (this.reservedDirectories + needed <= limit) return
+      this.nativeWatchers.delete(root)
+      // The close gives back the reservation before its first await.
+      if (entry.resolved) void releaseWatcher(entry.resolved.close)
+    }
   }
 
   // A root is limited by what else was watched when it attached, so freed room is offered back.
@@ -1125,6 +1160,10 @@ function streamCoverage(coverages: readonly WatchRootCoverage[]): WatchCoverage 
   if (!shown || shown.mode === 'failed' || shown.mode === 'disabled') return null
   const { mode, directoryCount, available, limit } = shown
   return { mode, directoryCount, available, limit }
+}
+
+function isIdle(entry: WatcherEntry) {
+  return entry.refCount === 0 && entry.idleSince !== undefined
 }
 
 function directoryCountOf(entry: WatcherEntry) {
