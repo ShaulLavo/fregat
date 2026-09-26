@@ -79,6 +79,7 @@ import { readBranchPullRequests, type ForgeBoundaries } from './git/pull-request
 import type { BranchPullRequestLookup } from './orchestration/pull-request-sync-reactor'
 import { TerminalService, type TerminalPtyFactory } from './terminal/service'
 import type { TerminalHostClient } from './terminal/host-client'
+import type { ShellCommandReader } from './terminal/foreground'
 import { wallpaperRoutes } from './wallpaper/routes'
 import { webRoutes, type WebOptions } from './web/routes'
 import { readReleaseInfoSync } from './web/release'
@@ -113,6 +114,8 @@ export type AppOptions = FileSystemServiceOptions & {
     env?: NodeJS.ProcessEnv
     ptyFactory?: TerminalPtyFactory
     hostClient?: TerminalHostClient
+    /** Test seam: whether a shell runs a command, which fake PTYs cannot answer. */
+    shellCommand?: ShellCommandReader
   }
   fonts?: FontCatalogService
   themes?: {
