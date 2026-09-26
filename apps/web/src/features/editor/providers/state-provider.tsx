@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, type ReactNode } from 'react'
 
+import { useLanguageCensus } from '@/features/editor/hooks/use-language-census'
 import { useEditorColorTheme } from '@/lib/editor-theme/hooks/use-editor-color-theme'
 import { useLanguageServerMatchConfiguration } from '@/features/editor/providers/language-server-match-context'
 import { MountedEditorProvider } from '@/features/editor/providers/mounted-editor-provider'
@@ -17,6 +18,7 @@ import { SearchBufferStateContext } from '@/features/search/state/buffer-state'
 import { useSettingValue } from '@/hooks/use-setting-value'
 import { FileOpenIntentProvider } from '@/lib/file-open-intent/providers/context'
 import { useFileAvailability } from '@/features/editor/hooks/use-file-availability'
+import { useSpellcheckDictionary } from '@/features/editor/hooks/use-spellcheck-dictionary'
 
 export function EditorStateProvider({
   children,
@@ -25,7 +27,9 @@ export function EditorStateProvider({
   readonly children: ReactNode
   readonly runtime: EditorRuntime
 }) {
+  useLanguageCensus(runtime)
   useFileAvailability(runtime)
+  useSpellcheckDictionary(runtime.spellcheck)
   const { appliedThemeContentHash, appliedThemeId, selectedThemeId } = useEditorColorTheme()
   const syntaxHighlightingEnabled = useSettingValue('editor.syntaxHighlighting.enabled')
   const tabSize = useSettingValue('editor.tabSize')

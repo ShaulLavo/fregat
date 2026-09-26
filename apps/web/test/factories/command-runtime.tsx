@@ -369,6 +369,7 @@ function createRuntime(
     composer,
     documents,
     editor,
+    editorUi: owner?.uiStore ?? createEditorUiStore(),
     files,
     focus,
     git,
