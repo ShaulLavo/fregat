@@ -9,7 +9,7 @@ import { selectors } from '../selectors'
 import { createScriptError } from '../../structured-errors'
 import type { Scenario } from './index'
 import { dispatch, openChat } from './chat-verification'
-import { registerFixtureProject } from './native-provider-verification'
+import { assertFixtureProviders, registerFixtureProject } from './native-provider-verification'
 
 // The server's PATH is fixed when it starts, so the forge exists before the drive.
 let prepared: Awaited<ReturnType<typeof createFakeForge>> | null = null
@@ -17,14 +17,11 @@ let prepared: Awaited<ReturnType<typeof createFakeForge>> | null = null
 /** A pull-request lookup that fails offers the lookup again and never Create. */
 export const pullRequestLookupFailure: Scenario = {
   name: 'pull-request-lookup-failure',
+  requiresIsolatedServer: true,
   description:
-    'A fake gh answers every branch with a malformed pull request: the session header offers to check again, never to create one, and a second failed check sends no create either.',
+    'A fake gh first reports no pull request, then fails the cached lookup: the session header offers to check again, never to create one, and a second failed check sends no create either.',
   async prepareServer() {
     const forge = await createFakeForge()
-    await writeFile(
-      join(forge.directory, 'forge.json'),
-      JSON.stringify({ branches: { '*': { number: 'malformed' } } }),
-    )
     prepared = forge
     return { pathPrefix: forge.directory }
   },
@@ -32,6 +29,7 @@ export const pullRequestLookupFailure: Scenario = {
     if (!prepared) throw createScriptError('The fake forge was not prepared')
     const forge = prepared
     const base = await openChat(page)
+    await assertFixtureProviders(page, base.replace(/\/orchestration$/, ''))
     const fixture = await committedFixture('pull-request-lookup-failure')
     await fixtureGit(fixture.path, [
       'remote',
@@ -56,19 +54,42 @@ export const pullRequestLookupFailure: Scenario = {
       })
       await selectors.sessionSearch(page).fill(title)
       await selectors.sessionByTitle(page, title).click()
-      const retry = page.locator('[data-pull-request-lookup-retry]')
-      await retry.waitFor({ timeout: 45_000 })
+      await page.getByRole('button', { name: /^Push and open/ }).waitFor({ timeout: 45_000 })
+      await step('successful-absent-lookup-offers-create')
+      await writeFile(
+        join(forge.directory, 'forge.json'),
+        JSON.stringify({ branches: { '*': { number: 'malformed' } } }),
+      )
+      // Leave the successful result cached; the real polling query must enter its error state.
+      const retry = selectors.pullRequestLookupRetry(page)
+      await retry.waitFor({ timeout: 75_000 })
       equal(await page.getByRole('button', { name: 'Pull request', exact: true }).count(), 0)
       equal(await page.getByRole('button', { name: /^Push and open/ }).count(), 0)
       await step('failed-lookup-offers-retry')
 
-      const lookups = (await forge.calls()).filter((call) => call[0] === 'api').length
+      const lookups = (await forge.calls()).filter(
+        (call) => call[0] === 'pr' && call[1] === 'list',
+      ).length
       await retry.click()
       for (let attempt = 0; attempt < 100; attempt += 1) {
-        if ((await forge.calls()).filter((call) => call[0] === 'api').length > lookups) break
+        if (
+          (await forge.calls()).filter((call) => call[0] === 'pr' && call[1] === 'list').length >
+          lookups
+        )
+          break
         await Bun.sleep(100)
       }
-      await retry.waitFor()
+      ok(
+        (await forge.calls()).filter((call) => call[0] === 'pr' && call[1] === 'list').length >
+          lookups,
+        'Retry sends another gh pr list',
+      )
+      await page.waitForFunction(() => {
+        const button = document.querySelector('[data-pull-request-lookup-retry]')
+        return button !== null && !button.hasAttribute('disabled')
+      })
+      equal(await page.getByRole('button', { name: 'Pull request', exact: true }).count(), 0)
+      equal(await page.getByRole('button', { name: /^Push and open/ }).count(), 0)
       ok(
         !(await forge.calls()).some((call) => call[0] === 'pr' && call[1] === 'create'),
         'No failed lookup leads to a create',

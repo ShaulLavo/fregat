@@ -20,6 +20,15 @@ export const resetCreditRedemption = isolatedNativeScenario({
     const popover = selectors.usagePopover(page)
     const action = popover.getByRole('button', { name: 'Use reset credit…', exact: true })
     await action.waitFor({ timeout: 30_000 })
+    equal(
+      await selectors
+        .usageWindowRows(page)
+        .first()
+        .locator('[data-usage-fill]')
+        .evaluate((el) => (el as HTMLElement).style.width),
+      '100%',
+      'Initial session window is exhausted',
+    )
     await step('credit-offered')
 
     await action.click()
@@ -39,6 +48,14 @@ export const resetCreditRedemption = isolatedNativeScenario({
     const params = consume?.params as { creditId: string; idempotencyKey: string } | undefined
     deepStrictEqual(params?.creditId, 'credit-verify')
     equal(typeof params?.idempotencyKey, 'string')
-    await step('credit-spent-once')
+    if (!(await popover.isVisible())) await meter.click()
+    await page.waitForFunction(() => {
+      const fill = document.querySelector<HTMLElement>(
+        '[data-usage-popover] [data-usage-window] [data-usage-fill]',
+      )
+      return fill?.style.width === '0%'
+    })
+    equal(await action.count(), 0, 'The spent credit action is removed')
+    await step('credit-spent-once-and-session-window-reset')
   },
 })

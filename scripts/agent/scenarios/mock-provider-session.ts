@@ -3,7 +3,7 @@ import type { Page } from 'playwright'
 
 import { selectors } from '../selectors'
 import { dispatch, readShell } from './chat-verification'
-import { settingsSnapshot, writeSettings } from './native-provider-verification'
+import { settingsSnapshot, writeRawSetting, writeSettings } from './native-provider-verification'
 
 /**
  * A mock provider instance with `config`, and a session on it opened in the chat. `cleanup`
@@ -54,11 +54,11 @@ export async function createMockProviderSession(
       (item) => item.providerInstanceId !== providerInstanceId,
     )
     const unchanged = JSON.stringify(remaining) === JSON.stringify(originalInstances)
-    await writeSettings(page, base, [
-      !originallySet && unchanged
-        ? { kind: 'reset', keys: ['providers.instances'] }
-        : { kind: 'set', key: 'providers.instances', value: remaining },
-    ])
+    if (!originallySet && unchanged) {
+      await writeSettings(page, base, [{ kind: 'reset', keys: ['providers.instances'] }])
+      return
+    }
+    await writeRawSetting(page, base, 'providers.instances', remaining)
   }
   return { base, cleanup, sessionId }
 }

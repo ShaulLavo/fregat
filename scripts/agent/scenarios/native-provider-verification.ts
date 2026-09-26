@@ -4,6 +4,8 @@ import { join } from 'node:path'
 import type { Page } from 'playwright'
 import * as v from 'valibot'
 import {
+  DEFAULT_CODEX_PROVIDER_SETTINGS,
+  DEFAULT_CLAUDE_PROVIDER_SETTINGS,
   providerListResultSchema,
   settingsSnapshotSchema,
 } from '../../../packages/contracts/src/index'
@@ -17,6 +19,29 @@ const nativeEntrySchema = v.looseObject({
   pid: v.optional(v.number()),
   result: v.optional(v.unknown()),
 })
+
+/** Fail before a scenario proceeds if settings could launch an unowned account. */
+export async function assertFixtureProviders(page: Page, base: string, binaryPath?: string) {
+  const snapshot = await settingsSnapshot(page, base)
+  const instances = snapshot.values['providers.instances']
+  for (const defaults of [DEFAULT_CODEX_PROVIDER_SETTINGS, DEFAULT_CLAUDE_PROVIDER_SETTINGS])
+    ok(
+      instances.some(
+        (provider) =>
+          provider.providerInstanceId === defaults.providerInstanceId && !provider.enabled,
+      ),
+      'Built-in providers must be explicitly disabled before any scenario runs',
+    )
+  const enabled = instances.filter((provider) => provider.enabled)
+  ok(
+    enabled.every(
+      (provider) =>
+        provider.driverKind === 'mock' ||
+        (binaryPath !== undefined && provider.binaryPath === binaryPath),
+    ),
+    'Only mock providers or this scenario’s fixture binary may be enabled',
+  )
+}
 
 export async function settingsSnapshot(page: Page, base: string) {
   const response = await page.request.get(`${base}/settings`, {
@@ -206,21 +231,19 @@ export function isolatedNativeScenario(options: {
       worktreeId: string
       worktreePath: string
     },
-  ) => Promise<void>
+  ) => Promise<unknown>
 }): Scenario {
   const evidence = new WeakMap<Page, unknown>()
   return {
     name: options.name,
+    requiresIsolatedServer: true,
     description: options.description,
     prepareServer: options.prepareServer,
     inspect: async (page) => evidence.get(page) ?? null,
     async run(page, { step }) {
       const orchestration = await openChat(page)
       const base = orchestration.replace(/\/orchestration$/, '')
-      const before = await settingsSnapshot(page, base)
-      const originallySet =
-        before.layers.find((layer) => layer.id === 'user')?.raw['providers.instances'] !== undefined
-      const originalInstances = before.values['providers.instances']
+      await assertFixtureProviders(page, base)
       const root = await mkdtemp(`/work/tmp/fregat-${options.name}-native-`)
       const binary = join(root, 'codex.mjs')
       await copyFile(options.fixture, binary)
@@ -230,6 +253,7 @@ export function isolatedNativeScenario(options: {
       const sessionId = crypto.randomUUID()
       const title = `${options.name} verification ${sessionId.slice(0, 8)}`
       let created = false
+      let driveEvidence: unknown
       const prepared = await options.prepareWorktree?.()
       let fixtureProjectId: string | null = null
       const newWorktreeId = options.newWorktree ? crypto.randomUUID() : null
@@ -247,6 +271,7 @@ export function isolatedNativeScenario(options: {
             },
           },
         ])
+        await assertFixtureProviders(page, base, binary)
         const worktree = prepared
           ? await registerFixtureProject(page, orchestration, prepared.path)
           : await firstWorktree(page, orchestration)
@@ -279,8 +304,14 @@ export function isolatedNativeScenario(options: {
           ),
           'Reloaded browser provider snapshot includes the isolated provider',
         )
+        ok(
+          providers.providers
+            .filter((provider) => provider.enabled)
+            .every((provider) => provider.providerInstanceId === providerInstanceId),
+          'The running registry enables only the scenario fixture',
+        )
         await selectors.chatMessage(page).waitFor()
-        await options.drive(page, {
+        driveEvidence = await options.drive(page, {
           step,
           root,
           orchestration,
@@ -296,6 +327,7 @@ export function isolatedNativeScenario(options: {
         await step('failed-before-cleanup')
         throw error
       } finally {
+        await assertFixtureProviders(page, base, binary)
         // A drive may have deleted the session and removed its worktree itself.
         const shell = created ? await readShell(page, orchestration) : null
         if (shell?.sessions.some((session) => session.id === sessionId)) {
@@ -325,14 +357,10 @@ export function isolatedNativeScenario(options: {
         const remaining = current.values['providers.instances'].filter(
           (item) => item.providerInstanceId !== providerInstanceId,
         )
-        const unchanged = JSON.stringify(remaining) === JSON.stringify(originalInstances)
-        const operation =
-          !originallySet && unchanged
-            ? { kind: 'reset', keys: ['providers.instances'] }
-            : { kind: 'set', key: 'providers.instances', value: remaining }
-        await writeSettings(page, base, [operation])
+        await writeRawSetting(page, base, 'providers.instances', remaining)
         const entries = await waitForNativeExit(root)
         evidence.set(page, {
+          driveEvidence,
           nativeReplies: entries.filter(
             (entry) => entry.event !== 'spawn' && entry.event !== 'exit',
           ),
