@@ -30,6 +30,7 @@ type ResolvedRunItem = {
   readonly reason: string | null
   readonly disabled: boolean
   readonly destructive: boolean
+  readonly mono: boolean
   readonly command: PlatformCommandId | null
   readonly run: () => ResolvedMenuInvocation
   readonly takesFocus: boolean
@@ -140,6 +141,7 @@ function resolveItem(item: MenuItem, context: MenuResolveContext): ResolvedMenuI
     key: item.id,
     kind: 'run',
     label: item.label,
+    mono: Boolean(item.mono),
     run: () => {
       item.run()
     },
@@ -164,6 +166,7 @@ function resolveCommandItem(
     key: menuItemKey(item),
     kind: 'run',
     label: item.label ?? spec?.title ?? item.command,
+    mono: false,
     run: () => context.dispatch(item.command),
     takesFocus: Boolean(item.takesFocus),
     shortcut:

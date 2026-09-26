@@ -87,6 +87,7 @@ export class SessionDeletionReactor implements OrchestrationDomainEventReactor {
     const startedAt = performance.now()
     const terminals = await this.closeTerminals(sessionId)
     const provider = await this.releaseRuntime(sessionId, previous)
+    if (provider.providerStop !== 'failed') this.options.providerService?.deleteBinding(sessionId)
     const blobs = await this.reclaimBlobs(sessionId, previous)
     const deletion: SessionDeletionState = {
       ...previous,

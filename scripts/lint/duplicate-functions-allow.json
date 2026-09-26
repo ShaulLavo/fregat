@@ -9,5 +9,10 @@
       "scripts/agent/fixtures/native-titles.mjs"
     ],
     "reason": "Each fixture is copied on its own into an isolated temp directory and spawned as a standalone mock binary, so none can import a shared module."
+  },
+  {
+    "name": "textFileVersion",
+    "files": ["apps/server/src/fs/version.ts", "apps/web/scripts/app-save-hmr-plugin.ts"],
+    "reason": "The Vite dev plugin must not import apps/server/src (Plan 132 item 3); it recomputes the server's content version, and the plugin test pins that the two agree against the real server."
   }
 ]

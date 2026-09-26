@@ -135,6 +135,11 @@ jobs:
       - name: Benchmark gate (file tree prepared input)
         run: bun run --cwd apps/web bench:file-tree-prepared-input:gate
 
+      # Byte counts, not timings: a production build is deterministic, so this gate runs on a
+      # shared runner. It builds itself and never reads a cached bundle-stats.json.
+      - name: First-load gate
+        run: bun run --cwd apps/web bundle:gate
+
   test:
     name: Test (${{ matrix.suite.name }})
     runs-on: ubuntu-latest

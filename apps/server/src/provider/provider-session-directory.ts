@@ -1,5 +1,5 @@
 import { sessionIdentityErrors } from './structured-errors'
-import { and, asc, eq, lt } from 'drizzle-orm'
+import { and, asc, eq, isNull, lt } from 'drizzle-orm'
 import {
   DEFAULT_RUNTIME_MODE,
   providerDriverKindSchema,
@@ -16,6 +16,7 @@ import * as v from 'valibot'
 import { getDefaultPlatformDatabase } from '../db/client'
 import {
   projectionSessionRuntime,
+  projectionSessions,
   providerSessionRuntime,
   type ProviderSessionRuntimeRow,
 } from '../db/schema'
@@ -117,15 +118,28 @@ export class ProviderSessionDirectory {
           eq(projectionSessionRuntime.runtimeEpoch, providerSessionRuntime.runtimeEpoch),
         ),
       )
+      .innerJoin(
+        projectionSessions,
+        eq(projectionSessions.sessionId, providerSessionRuntime.sessionId),
+      )
       .where(
         and(
           lt(providerSessionRuntime.lastSeenAt, cutoffIso),
           eq(projectionSessionRuntime.status, status),
+          isNull(projectionSessions.deletedAt),
         ),
       )
       .orderBy(asc(providerSessionRuntime.lastSeenAt), asc(providerSessionRuntime.sessionId))
       .all()
       .map(({ binding }) => rowToBinding(binding))
+  }
+
+  delete(sessionId: SessionId) {
+    this.lastSeenWriteAtMs.delete(sessionId)
+    this.database
+      .delete(providerSessionRuntime)
+      .where(eq(providerSessionRuntime.sessionId, sessionId))
+      .run()
   }
 
   markSeen(sessionId: SessionId) {

@@ -108,6 +108,7 @@ import { machineConnectError } from './machine-connect-error'
 import { machineProtocolMismatch } from './machine-protocol-mismatch'
 import { wallpaperIconHints } from './wallpaper-icon-hints'
 import { terminalBackground } from './terminal-background'
+import { terminalRenderer, terminalRendererWebgl } from './terminal-renderer'
 import { bottomPanelPersistence } from './bottom-panel-persistence'
 import { sidebarToggle } from './sidebar-toggle'
 import { itemNavigation } from './item-navigation'
@@ -132,6 +133,7 @@ import { filePickerBrowse } from './file-picker-browse'
 import { quickOpenPreview } from './quick-open-preview'
 import { themeStudio } from './theme-studio'
 import { themeStudioLibrary } from './theme-studio-library'
+import { serverUpdate } from './server-update'
 import { commandPaletteTypeBurst } from './command-palette-type-burst'
 import { paletteScriptsPending } from './palette-scripts-pending'
 import { settingsModelsPending } from './settings-models-pending'
@@ -139,6 +141,7 @@ import { settingsProviderUpdate } from './settings-provider-update'
 import { claudeUsageImport } from './claude-usage-import'
 import { chatFollowUp } from './chat-follow-up'
 import { chatDiffSyntax } from './chat-diff-syntax'
+import { chatMarkdownFence } from './chat-markdown-fence'
 import { editorSplitDrag } from './editor-split-drag'
 import { editorSplitActions } from './editor-split-actions'
 import { editorSplitUnmounted } from './editor-split-unmounted'
@@ -195,9 +198,12 @@ import { searchTypeDelete } from './search-type-delete'
 import { searchResultLinePick } from './search-result-line-pick'
 import { paneRenderCrash } from './pane-render-crash'
 import type { Page } from 'playwright'
+import type { IsolatedServer } from '../isolated-server'
 
 type ScenarioContext = {
   readonly file: string
+  /** The throwaway API server, when the run started one. */
+  readonly server?: IsolatedServer
   /** Screenshots `target`, the scenario's page unless a second window is named. */
   readonly step: (label: string, target?: Page) => Promise<void>
 }
@@ -365,6 +371,7 @@ export const scenarios: readonly Scenario[] = [
   searchFileActions,
   chatFollowUp,
   chatDiffSyntax,
+  chatMarkdownFence,
   editorSplitDrag,
   editorSplitActions,
   editorSplitUnmounted,
@@ -383,6 +390,8 @@ export const scenarios: readonly Scenario[] = [
   editorLinkedPackage,
   editorOfflineResync,
   terminalBackground,
+  terminalRenderer,
+  terminalRendererWebgl,
   bottomPanelPersistence,
   sidebarToggle,
   itemNavigation,
@@ -407,6 +416,7 @@ export const scenarios: readonly Scenario[] = [
   quickOpenPreview,
   themeStudio,
   themeStudioLibrary,
+  serverUpdate,
   commandPaletteTypeBurst,
   paletteScriptsPending,
   settingsModelsPending,

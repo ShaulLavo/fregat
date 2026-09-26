@@ -1,6 +1,7 @@
 import { elapsedMs } from '@workspace/utils/timing'
 import {
   ORCHESTRATION_WS_RESULTS,
+  errorNumberField,
   errorStringField,
   orchestrationShellStreamItemSchema,
   orchestrationSessionStreamItemSchema,
@@ -40,9 +41,36 @@ import type {
 } from './rpc-host'
 
 const serverError = Symbol('orchestration RPC server response')
+// A newer server may push kinds this client predates; those are dropped without a warning.
+const KNOWN_SERVER_MESSAGE_KINDS: Readonly<Record<OrchestrationWsServerMessage['kind'], true>> = {
+  connected: true,
+  response: true,
+  'subscription.next': true,
+  'subscription.error': true,
+  'subscription.complete': true,
+  pong: true,
+  'server.update': true,
+}
 
 export function isOrchestrationRpcServerError(error: unknown) {
   return error !== null && typeof error === 'object' && serverError in error
+}
+
+const CONNECTION_FAILURE_CODES = new Set([
+  'ORCHESTRATION_WS_CLOSED',
+  'ORCHESTRATION_WS_CONNECT_TIMEOUT',
+  'ORCHESTRATION_WS_ERROR',
+  'ORCHESTRATION_WS_HEARTBEAT_TIMEOUT',
+])
+// The server dropped one subscription's delivery; resubscribing from the cursor recovers it.
+const RESUMABLE_SUBSCRIPTION_CODES = new Set([
+  'orchestration.LIVE_STREAM_ACK_TIMEOUT',
+  'orchestration.LIVE_STREAM_OVERFLOW',
+])
+
+/** The shared socket died; the connection's failure series reports it. */
+export function isOrchestrationConnectionFailure(error: unknown) {
+  return CONNECTION_FAILURE_CODES.has(errorStringField(error, 'code') ?? '')
 }
 
 const ORCHESTRATION_RPC_CONNECT_TIMEOUT_MS = 10_000
@@ -51,6 +79,8 @@ const ORCHESTRATION_RPC_HEARTBEAT_MS = 30_000
 const ORCHESTRATION_RPC_HEARTBEAT_TIMEOUT_MS = 10_000
 /** Past this, an answer is late enough that the UI should stop pretending it is instant. */
 const ORCHESTRATION_RPC_SLOW_REQUEST_MS = 4_000
+/** A restart the server announced stays quiet this long before its failures warn. */
+const ANNOUNCED_RESTART_GRACE_MS = 60_000
 
 type PendingRequest = {
   method: OrchestrationWsRequest['method']
@@ -94,14 +124,39 @@ export type OrchestrationRpcClientOptions = {
   readonly beforeRequest?: () => Promise<void> | undefined
   /** Reported to the server, which holds push notices while a window is focused. */
   readonly presence?: OrchestrationPresenceSource
+  /**
+   * Holds a new socket until the host says it can survive (a hidden browser page
+   * loses its sockets within a minute). Returning nothing opens it now.
+   */
+  readonly beforeConnect?: (signal: AbortSignal) => Promise<void> | undefined
   heartbeatIntervalMs?: number
   heartbeatTimeoutMs?: number
   slowRequestMs?: number
   readonly origin: string
 }
 
+/** How a socket ended, which decides whether it logs and whether it joins a failure series. */
+type SocketEnd =
+  | { readonly kind: 'owner' | 'normal' | 'refused' | 'restart' }
+  | { readonly kind: 'failure'; readonly message: string }
+
+/** Consecutive unexpected disconnects, from the first one until a socket answers a heartbeat. */
+type FailureSeries = {
+  readonly scope: RpcEventScope
+  readonly announcedRestart: boolean
+  readonly serverInstanceId: string | null
+  readonly startedAt: number
+  failureCount: number
+  warned: boolean
+}
+
 export class OrchestrationRpcClient {
   private closedError: ReturnType<typeof createOrchestrationRpcClosedError> | null = null
+  private failureSeries: FailureSeries | null = null
+  private readonly lifetime = new AbortController()
+  private pausedMs = 0
+  private pausing: Promise<void> | null = null
+  private serverInstanceId: string | null = null
   private handshakeReceived = false
   private rejectOpening: ((error: unknown) => void) | null = null
   private resolveOpening: (() => void) | null = null
@@ -141,15 +196,17 @@ export class OrchestrationRpcClient {
     const error = createOrchestrationRpcClosedError()
     this.closedError = error
     this.stopPresence?.()
+    this.lifetime.abort(error)
     this.rejectOpening?.(error)
     const socket = this.socket
     if (socket) {
-      this.teardownSocket(socket, error, { explicitlyClosed: true })
+      this.teardownSocket(socket, error, { explicitlyClosed: true }, { kind: 'owner' })
       socket.close()
     }
     this.stopHeartbeat()
     this.rejectPendingRequests(error)
     this.failSubscriptions(error)
+    this.endFailureSeries(false)
   }
 
   dispatchCommand(command: ClientOrchestrationCommand) {
@@ -320,6 +377,7 @@ export class OrchestrationRpcClient {
       afterSequence: message.afterSequence,
       attempt: 0,
       failedCursor: undefined,
+      warned: false,
     }
     while (!input.signal?.aborted) {
       const current = {
@@ -329,8 +387,7 @@ export class OrchestrationRpcClient {
       }
       const failure = yield* this.consumeSubscription(current, input, schema, recovery)
       if (!failure || input.signal?.aborted) return
-      if (errorStringField(failure.error, 'code') !== 'orchestration.LIVE_STREAM_OVERFLOW')
-        throw failure.error
+      if (!isResumableSubscriptionFailure(failure.error)) throw failure.error
       await waitForSubscriptionRetry(advanceSubscriptionRetry(recovery), input.signal)
     }
   }
@@ -344,7 +401,7 @@ export class OrchestrationRpcClient {
     recovery: SubscriptionRecovery,
   ) {
     try {
-      for await (const item of this.subscribe(message, input, schema)) {
+      for await (const item of this.subscribe(message, input, schema, recovery)) {
         yield item
         recordSubscriptionConsumption(recovery, item)
       }
@@ -358,6 +415,7 @@ export class OrchestrationRpcClient {
     message: OrchestrationWsSubscribe,
     { signal, onSynchronized }: OrchestrationStreamInput,
     schema: TSchema,
+    recovery: SubscriptionRecovery,
   ) {
     if (signal?.aborted) return
 
@@ -385,6 +443,7 @@ export class OrchestrationRpcClient {
       subscriptionId: message.subscriptionId,
       sessionId,
     })
+    if (recovery.attempt > 0) scope.set({ retryAttempt: recovery.attempt })
     const subscription: RpcSubscription = {
       method: message.method,
       queue,
@@ -413,7 +472,9 @@ export class OrchestrationRpcClient {
       scope.increment('subscription.openCount')
       yield* drainSubscriptionItems(queue, onSynchronized, acknowledge)
     } catch (error) {
-      if (error !== this.closedError) scope.error(error)
+      // A server `subscription.error` was recorded when it arrived.
+      if (!isOrchestrationRpcServerError(error))
+        this.recordSubscriptionFailure(scope, error, recovery)
       if (!signal?.aborted) throw error
     } finally {
       signal?.removeEventListener('abort', abort)
@@ -437,6 +498,12 @@ export class OrchestrationRpcClient {
     if (open) return open
     if (this.opening) return this.opening
 
+    const pause = this.pausing ?? this.startPause()
+    if (pause) {
+      await pause
+      return this.connect()
+    }
+
     const { origin, resolveEndpoint } = this.options
     const url = orchestrationRpcUrl(resolveEndpoint?.(origin) ?? origin)
     const socket = this.options.createSocket(url)
@@ -449,17 +516,38 @@ export class OrchestrationRpcClient {
       origin,
       url,
     })
+    if (this.pausedMs > 0) this.socketScope.set({ pausedMs: this.pausedMs })
+    this.pausedMs = 0
     this.opening = this.openSocketConnection(socket)
 
     return this.opening
   }
 
+  // One pause is shared by every caller waiting for a socket.
+  private startPause() {
+    const pause = this.options.beforeConnect?.(this.lifetime.signal)
+    if (!pause) return null
+
+    const startedAt = performance.now()
+    this.pausing = pause.finally(() => {
+      this.pausing = null
+      const pausedMs = Math.round(elapsedMs(startedAt))
+      this.pausedMs += pausedMs
+      this.failureSeries?.scope.increment('pausedMs', pausedMs)
+    })
+
+    return this.pausing
+  }
+
   private openSocketConnection(socket: OrchestrationSocket) {
     return new Promise<OrchestrationSocket>((resolve, reject) => {
       const timeoutId = setTimeout(() => {
-        this.teardownSocket(socket, createOrchestrationRpcConnectTimeoutError(), {
-          connectTimedOut: true,
-        })
+        this.teardownSocket(
+          socket,
+          createOrchestrationRpcConnectTimeoutError(),
+          { connectTimedOut: true },
+          { kind: 'failure', message: 'Orchestration WebSocket did not open in time.' },
+        )
         socket.close()
       }, ORCHESTRATION_RPC_CONNECT_TIMEOUT_MS)
       this.rejectOpening = (error) => {
@@ -486,20 +574,14 @@ export class OrchestrationRpcClient {
         this.handleSocketMessage(socket, event)
       })
       let transportError = false
-      socket.addEventListener('error', (event) => {
+      socket.addEventListener('error', () => {
         if (this.socket !== socket) return
         transportError = true
-        this.socketScope?.warn('Orchestration WebSocket transport error.', {
-          eventType: event.type,
-        })
         // Teardown waits for the `close` that always follows: it carries the code and `wasClean`.
         socket.close()
       })
       socket.addEventListener('close', (event) => {
-        const error = transportError
-          ? createOrchestrationRpcSocketError()
-          : createOrchestrationRpcCloseError(event)
-        this.handleSocketClose(socket, event, error, transportError)
+        this.handleSocketClose(socket, event, transportError)
       })
     })
   }
@@ -551,11 +633,12 @@ export class OrchestrationRpcClient {
       try {
         this.options.environments.getState().recordHandshake(this.options.origin, message.config)
       } catch (error) {
-        this.teardownSocket(socket, error, { identityRefused: true })
+        this.teardownSocket(socket, error, { identityRefused: true }, { kind: 'refused' })
         socket.close()
         return
       }
       this.handshakeReceived = true
+      this.serverInstanceId = message.config.serverInstanceId
       this.resolveOpening?.()
       this.socketScope?.set({
         environmentId: message.config.environmentId,
@@ -583,6 +666,11 @@ export class OrchestrationRpcClient {
 
     if (message.kind === 'pong') {
       this.handlePongMessage(message.requestId)
+      return
+    }
+
+    if (message.kind === 'server.update') {
+      this.options.environments.getState().recordServerUpdate(this.options.origin, message.update)
       return
     }
 
@@ -648,25 +736,49 @@ export class OrchestrationRpcClient {
     const subscription = this.subscriptions.get(message.subscriptionId)
     if (!subscription) return
 
-    subscription.scope.error(createOrchestrationRpcServerError(message.error), {
-      code: message.error.code,
-      status: message.error.status,
-    })
-    subscription.queue.fail(createOrchestrationRpcServerError(message.error))
+    const error = createOrchestrationRpcServerError(message.error)
+    this.recordSubscriptionFailure(subscription.scope, error)
+    subscription.queue.fail(error)
+  }
+
+  private recordSubscriptionFailure(
+    scope: RpcEventScope,
+    error: unknown,
+    recovery: SubscriptionRecovery | null = null,
+  ) {
+    if (error === this.closedError) return
+
+    const failure = {
+      code: errorStringField(error, 'code'),
+      status: errorNumberField(error, 'status'),
+    }
+    if (isReportedElsewhere(error, recovery)) {
+      scope.set({ failure })
+      return
+    }
+    // Only this client saw its own buffer overflow, so it warns once per resume series.
+    if (recovery && isResumableSubscriptionFailure(error)) {
+      recovery.warned = true
+      scope.warn('Live updates overflowed the client subscription buffer.', { failure })
+      return
+    }
+    scope.error(error, failure)
   }
 
   private handleSocketClose(
     socket: OrchestrationSocket,
     event: OrchestrationSocketEvents['close'],
-    error: unknown,
     transportError: boolean,
   ) {
-    this.teardownSocket(socket, error, {
-      code: event.code,
-      reason: event.reason,
-      transportError,
-      wasClean: event.wasClean,
-    })
+    const error = transportError
+      ? createOrchestrationRpcSocketError()
+      : createOrchestrationRpcCloseError(event)
+    this.teardownSocket(
+      socket,
+      error,
+      { code: event.code, reason: event.reason, transportError, wasClean: event.wasClean },
+      socketCloseEnd(event, transportError),
+    )
   }
 
   // Every owner must settle when its socket dies, including a connection still opening.
@@ -674,6 +786,7 @@ export class OrchestrationRpcClient {
     socket: OrchestrationSocket,
     error: unknown,
     summary: Record<string, unknown>,
+    end: SocketEnd,
   ) {
     if (this.socket !== socket) return
 
@@ -689,9 +802,55 @@ export class OrchestrationRpcClient {
     this.socketScope = null
     this.rejectPendingRequests(error)
     this.failSubscriptions(error)
+    if (scope) this.recordSocketEnd(scope, end)
     scope?.increment('socket.closeCount')
     scope?.end(summary)
     if (!this.closed) this.notifyDisconnect(error)
+  }
+
+  /** The first unexpected disconnect warns; the rest of its series count toward one summary. */
+  private recordSocketEnd(scope: RpcEventScope, end: SocketEnd) {
+    if (end.kind === 'owner' || end.kind === 'normal' || end.kind === 'refused') return
+
+    const series = this.failureSeries ?? this.startFailureSeries(end.kind === 'restart')
+    series.failureCount += 1
+    series.scope.increment('failureCount')
+    scope.set({ failureSeries: { count: series.failureCount } })
+    if (end.kind !== 'failure' || !shouldWarnFailureSeries(series)) return
+
+    series.warned = true
+    scope.warn(end.message)
+  }
+
+  private startFailureSeries(announcedRestart: boolean) {
+    const series: FailureSeries = {
+      scope: this.options.observation.createScope({
+        action: 'orchestration.ws.failure_series.summary',
+        announcedRestart,
+        area: 'orchestration',
+        origin: this.options.origin,
+      }),
+      announcedRestart,
+      serverInstanceId: this.serverInstanceId,
+      startedAt: performance.now(),
+      failureCount: 0,
+      warned: false,
+    }
+    this.failureSeries = series
+
+    return series
+  }
+
+  private endFailureSeries(recovered: boolean) {
+    const series = this.failureSeries
+    if (!series) return
+
+    this.failureSeries = null
+    const startedOn = series.serverInstanceId
+    series.scope.end({
+      recovered,
+      serverRestarted: startedOn !== null && startedOn !== this.serverInstanceId,
+    })
   }
 
   private notifyDisconnect(error: unknown) {
@@ -728,7 +887,12 @@ export class OrchestrationRpcClient {
     }
 
     try {
-      return v.parse(orchestrationWsServerMessageSchema, JSON.parse(data))
+      const parsed: unknown = JSON.parse(data)
+      if (isUnknownMessageKind(parsed)) {
+        this.socketScope?.increment('message.unknownKindCount')
+        return null
+      }
+      return v.parse(orchestrationWsServerMessageSchema, parsed)
     } catch (error) {
       this.socketScope?.increment('message.invalidCount')
       this.socketScope?.warn('Invalid orchestration WebSocket message.', { error })
@@ -765,6 +929,8 @@ export class OrchestrationRpcClient {
 
     this.clearPendingPing()
     this.socketScope?.increment('heartbeat.pongCount')
+    // A handshake alone proves nothing: a hidden page's sockets handshake, then die within a minute.
+    this.endFailureSeries(true)
   }
 
   private failSocketLiveness(socket: OrchestrationSocket, requestId: string) {
@@ -772,11 +938,12 @@ export class OrchestrationRpcClient {
     if (this.pendingPingRequestId !== requestId) return
 
     this.socketScope?.increment('heartbeat.timeoutCount')
-    this.socketScope?.warn('Orchestration WebSocket heartbeat went unanswered.', { requestId })
-    this.teardownSocket(socket, createOrchestrationRpcHeartbeatTimeoutError(), {
-      heartbeatTimedOut: true,
-      requestId,
-    })
+    this.teardownSocket(
+      socket,
+      createOrchestrationRpcHeartbeatTimeoutError(),
+      { heartbeatTimedOut: true, requestId },
+      { kind: 'failure', message: 'Orchestration WebSocket heartbeat went unanswered.' },
+    )
     socket.close()
   }
 
@@ -820,6 +987,39 @@ function orchestrationRpcUrl(origin: string) {
 
 function streamGuardSequence(afterSequence: number | undefined) {
   return afterSequence === undefined ? -1 : afterSequence - 1
+}
+
+function isResumableSubscriptionFailure(error: unknown) {
+  return RESUMABLE_SUBSCRIPTION_CODES.has(errorStringField(error, 'code') ?? '')
+}
+
+/** A dead socket warns in its failure series, and the server logs the drops it reports. */
+function isReportedElsewhere(error: unknown, recovery: SubscriptionRecovery | null) {
+  if (isOrchestrationConnectionFailure(error)) return true
+  if (!isResumableSubscriptionFailure(error)) return false
+
+  return isOrchestrationRpcServerError(error) || recovery?.warned === true
+}
+
+function socketCloseEnd(
+  event: OrchestrationSocketEvents['close'],
+  transportError: boolean,
+): SocketEnd {
+  if (transportError)
+    return { kind: 'failure', message: 'Orchestration WebSocket transport error.' }
+  if (event.code === 1000) return { kind: 'normal' }
+  // A server closing with 1001 is going down; 1012 is the registered "service restart".
+  if (event.code === 1001 || event.code === 1012) return { kind: 'restart' }
+  if (event.code === 1008) return { kind: 'refused' }
+
+  return { kind: 'failure', message: 'Orchestration WebSocket closed unexpectedly.' }
+}
+
+function shouldWarnFailureSeries(series: FailureSeries) {
+  if (series.warned) return false
+  if (!series.announcedRestart) return true
+
+  return elapsedMs(series.startedAt) > ANNOUNCED_RESTART_GRACE_MS
 }
 
 function createOrchestrationRpcServerError(error: OrchestrationWsError) {
@@ -965,6 +1165,8 @@ type SubscriptionRecovery = {
   afterSequence: number
   attempt: number
   failedCursor: number | undefined
+  /** A consumed item ends the series, so the next overflow warns again. */
+  warned: boolean
 }
 
 function recordSubscriptionConsumption(
@@ -975,6 +1177,7 @@ function recordSubscriptionConsumption(
   if (sequence > recovery.afterSequence) recovery.failedCursor = undefined
   recovery.afterSequence = sequence
   recovery.attempt = 0
+  recovery.warned = false
 }
 
 function advanceSubscriptionRetry(recovery: SubscriptionRecovery) {
@@ -984,4 +1187,11 @@ function advanceSubscriptionRetry(recovery: SubscriptionRecovery) {
   recovery.failedCursor = cursor
   recovery.attempt += 1
   return Math.min(100 * 2 ** Math.min(recovery.attempt - 1, 5), 2_000)
+}
+
+function isUnknownMessageKind(message: unknown): boolean {
+  if (message === null || typeof message !== 'object' || !('kind' in message)) return false
+  return (
+    typeof message.kind === 'string' && !Object.hasOwn(KNOWN_SERVER_MESSAGE_KINDS, message.kind)
+  )
 }

@@ -28,11 +28,16 @@ export type LogTailInput = LogDashboardFilters & {
   signal?: AbortSignal
 }
 
+type LogEventFields = Omit<LogEventSummary, 'id'>
+
+// The id costs a stable serialization and a hash, so only events that leave the reader get one.
 type NormalizedLogEvent = {
+  fields: LogEventFields
   rawJson: Record<string, unknown>
-  rawText: string
-  summary: LogEventSummary
+  timestampMs: number
 }
+
+type IdentifiedLogEvent = NormalizedLogEvent & { summary: LogEventSummary }
 
 type TimelineRange = {
   endMs: number
@@ -48,7 +53,7 @@ const validLevels: ReadonlySet<string> = new Set(['debug', 'error', 'info', 'war
 
 export class LogReaderService {
   private readonly dir: string
-  private readonly detailCache = new Map<string, NormalizedLogEvent>()
+  private readonly detailCache = new Map<string, IdentifiedLogEvent>()
 
   constructor(options: { dir?: string } = {}) {
     this.dir = options.dir ?? observabilityConfig().logDir
@@ -65,13 +70,13 @@ export class LogReaderService {
     const offset = cursorOffset(input.cursor)
     const events = await this.filteredEvents(input)
     const sorted = sortNewest(events)
-    const pageEvents = sorted.slice(offset, offset + limit)
-    const page = pageEvents.map((event) => event.summary)
+    const pageEvents = sorted.slice(offset, offset + limit).map(identify)
+    for (const event of pageEvents) this.rememberEvent(event)
     const nextOffset = offset + pageEvents.length
 
     return {
       detailsById: eventDetailsById(pageEvents),
-      events: page,
+      events: pageEvents.map((event) => event.summary),
       nextCursor: nextOffset < sorted.length ? String(nextOffset) : null,
       total: sorted.length,
     }
@@ -82,11 +87,12 @@ export class LogReaderService {
     if (cached && matchesEventFilters(cached, filters)) return eventDetail(cached)
 
     for await (const rawEvent of readFsLogs(readOptions(this.dir, filters))) {
-      const event = normalizeLogEvent(rawEvent)
-      this.rememberEvent(event)
-      if (!matchesEventFilters(event, filters)) continue
+      const normalized = normalizeLogEvent(rawEvent)
+      if (!matchesEventFilters(normalized, filters)) continue
+      const event = identify(normalized)
       if (event.summary.id !== id) continue
 
+      this.rememberEvent(event)
       return eventDetail(event)
     }
 
@@ -102,9 +108,10 @@ export class LogReaderService {
     }
 
     for await (const rawEvent of tailFsLogs(options)) {
-      const event = normalizeLogEvent(rawEvent)
-      if (!matchesFilters(event, input)) continue
+      const normalized = normalizeLogEvent(rawEvent)
+      if (!matchesFilters(normalized, input)) continue
 
+      const event = identify(normalized)
       this.rememberEvent(event)
       yield { detail: eventDetail(event), event: event.summary, kind: 'event' }
     }
@@ -115,7 +122,6 @@ export class LogReaderService {
 
     for await (const rawEvent of readFsLogs(readOptions(this.dir, filters))) {
       const event = normalizeLogEvent(rawEvent)
-      this.rememberEvent(event)
       if (!matchesFilters(event, filters)) continue
 
       events.push(event)
@@ -124,7 +130,7 @@ export class LogReaderService {
     return events
   }
 
-  private rememberEvent(event: NormalizedLogEvent) {
+  private rememberEvent(event: IdentifiedLogEvent) {
     this.detailCache.delete(event.summary.id)
     this.detailCache.set(event.summary.id, event)
 
@@ -139,8 +145,7 @@ export class LogReaderService {
 
 export function normalizeLogEvent(event: WideEvent): NormalizedLogEvent {
   const rawJson = rawEventRecord(event)
-  const rawText = stableStringify(rawJson)
-  const summary: LogEventSummary = {
+  const fields: LogEventFields = {
     action: stringField(rawJson.action),
     area: stringField(rawJson.area),
     durationMs: durationMs(rawJson),
@@ -148,7 +153,6 @@ export function normalizeLogEvent(event: WideEvent): NormalizedLogEvent {
     errorCode: stringField(errorStringField(rawJson.error, 'code')),
     errorMessage: stringField(errorStringField(rawJson.error, 'message')),
     errorName: stringField(errorStringField(rawJson.error, 'name')),
-    id: eventId(rawJson, rawText),
     level: logLevel(rawJson.level),
     message: stringField(rawJson.message),
     method: stringField(rawJson.method),
@@ -163,7 +167,11 @@ export function normalizeLogEvent(event: WideEvent): NormalizedLogEvent {
     timestamp: timestampString(rawJson.timestamp),
   }
 
-  return { rawJson, rawText, summary }
+  return { fields, rawJson, timestampMs: Date.parse(fields.timestamp) }
+}
+
+export function identify(event: NormalizedLogEvent): IdentifiedLogEvent {
+  return { ...event, summary: { ...event.fields, id: eventId(event.rawJson) } }
 }
 
 function readOptions(dir: string, filters: LogDashboardFilters) {
@@ -176,8 +184,8 @@ function readOptions(dir: string, filters: LogDashboardFilters) {
 }
 
 function matchesFilters(event: NormalizedLogEvent, filters: LogDashboardFilters) {
-  if (!includesNullable(filters.areas, event.summary.area)) return false
-  if (!includesNullable(filters.sources, event.summary.source)) return false
+  if (!includesNullable(filters.areas, event.fields.area)) return false
+  if (!includesNullable(filters.sources, event.fields.source)) return false
   if (!matchesSearch(event, filters.search)) return false
 
   return true
@@ -190,9 +198,9 @@ function matchesEventFilters(event: NormalizedLogEvent, filters: LogDashboardFil
 }
 
 function matchesReadFilters(event: NormalizedLogEvent, filters: LogDashboardFilters) {
-  if (filters.levels?.length && !filters.levels.includes(event.summary.level)) return false
+  if (filters.levels?.length && !filters.levels.includes(event.fields.level)) return false
 
-  const timestamp = timestampMs(event.summary)
+  const timestamp = event.timestampMs
   const since = timestampFromFilter(filters.since)
   const until = timestampFromFilter(filters.until)
   if (since !== undefined && timestamp < since) return false
@@ -201,11 +209,11 @@ function matchesReadFilters(event: NormalizedLogEvent, filters: LogDashboardFilt
   return true
 }
 
-function eventDetail(event: NormalizedLogEvent): LogEventDetail {
+function eventDetail(event: IdentifiedLogEvent): LogEventDetail {
   return { event: event.summary, rawJson: event.rawJson }
 }
 
-function eventDetailsById(events: readonly NormalizedLogEvent[]) {
+function eventDetailsById(events: readonly IdentifiedLogEvent[]) {
   const detailsById: Record<string, LogEventDetail> = {}
 
   for (const event of events) {
@@ -231,17 +239,17 @@ function matchesSearch(event: NormalizedLogEvent, search: string | undefined) {
 
 function searchText(event: NormalizedLogEvent) {
   return [
-    event.summary.action,
-    event.summary.area,
-    event.summary.errorCode,
-    event.summary.errorMessage,
-    event.summary.message,
-    event.summary.operation,
-    event.summary.path,
-    event.summary.requestId,
-    event.summary.source,
-    event.summary.sessionId,
-    event.rawText,
+    event.fields.action,
+    event.fields.area,
+    event.fields.errorCode,
+    event.fields.errorMessage,
+    event.fields.message,
+    event.fields.operation,
+    event.fields.path,
+    event.fields.requestId,
+    event.fields.source,
+    event.fields.sessionId,
+    JSON.stringify(event.rawJson),
   ]
     .filter((value): value is string => typeof value === 'string')
     .join('\n')
@@ -252,7 +260,7 @@ function logSummary(
   events: readonly NormalizedLogEvent[],
   filters: LogDashboardFilters,
 ): LogDashboardSummary {
-  const summaries = events.map((event) => event.summary)
+  const summaries = events.map((event) => event.fields)
   const durations = numericDurations(summaries)
   const range = timelineRange(summaries, filters)
 
@@ -274,12 +282,12 @@ function logSummary(
 }
 
 function sortNewest(events: readonly NormalizedLogEvent[]) {
-  return events.toSorted((left, right) => timestampMs(right.summary) - timestampMs(left.summary))
+  return events.toSorted((left, right) => right.timestampMs - left.timestampMs)
 }
 
 function breakdown(
-  events: readonly LogEventSummary[],
-  valueForEvent: (event: LogEventSummary) => string | null,
+  events: readonly LogEventFields[],
+  valueForEvent: (event: LogEventFields) => string | null,
 ): LogDashboardBreakdownItem[] {
   const counts = new Map<string, number>()
 
@@ -298,7 +306,7 @@ function compareBreakdownItems(left: LogDashboardBreakdownItem, right: LogDashbo
 }
 
 function timeline(
-  events: readonly LogEventSummary[],
+  events: readonly LogEventFields[],
   range: TimelineRange,
   filters: LogDashboardFilters,
 ): LogDashboardTimelineBucket[] {
@@ -328,7 +336,7 @@ function createTimelineBuckets(startMs: number, bucketMs: number) {
 
 function addEventToTimelineBucket(
   buckets: LogDashboardTimelineBucket[],
-  event: LogEventSummary,
+  event: LogEventFields,
   startMs: number,
   bucketMs: number,
   filters: LogDashboardFilters,
@@ -346,7 +354,7 @@ function addEventToTimelineBucket(
 }
 
 function timelineRange(
-  events: readonly LogEventSummary[],
+  events: readonly LogEventFields[],
   filters: LogDashboardFilters,
 ): TimelineRange {
   const endMs = timestampFromFilter(filters.until) ?? Date.now()
@@ -355,7 +363,7 @@ function timelineRange(
   return startMs < endMs ? { endMs, startMs } : { endMs: endMs + 1, startMs: endMs }
 }
 
-function earliestTimelineStart(events: readonly LogEventSummary[], fallbackEndMs: number) {
+function earliestTimelineStart(events: readonly LogEventFields[], fallbackEndMs: number) {
   if (!events.length) return fallbackEndMs - 60 * 60 * 1_000
 
   return Math.min(...events.map(timestampMs))
@@ -368,21 +376,21 @@ function timestampFromFilter(value: string | undefined) {
   return Number.isFinite(timestamp) ? timestamp : undefined
 }
 
-function firstTimestamp(events: readonly LogEventSummary[]) {
+function firstTimestamp(events: readonly LogEventFields[]) {
   if (!events.length) return null
 
   return new Date(Math.min(...events.map(timestampMs))).toISOString()
 }
 
-function lastTimestamp(events: readonly LogEventSummary[]) {
+function lastTimestamp(events: readonly LogEventFields[]) {
   if (!events.length) return null
 
   return new Date(Math.max(...events.map(timestampMs))).toISOString()
 }
 
 function countWhere(
-  events: readonly LogEventSummary[],
-  predicate: (event: LogEventSummary) => boolean,
+  events: readonly LogEventFields[],
+  predicate: (event: LogEventFields) => boolean,
 ) {
   let count = 0
 
@@ -393,13 +401,13 @@ function countWhere(
   return count
 }
 
-function isSlowEvent(event: LogEventSummary, filters: LogDashboardFilters) {
+function isSlowEvent(event: LogEventFields, filters: LogDashboardFilters) {
   if (event.durationMs === null) return false
 
   return event.durationMs >= (filters.slowMs ?? defaultSlowMs)
 }
 
-function numericDurations(events: readonly LogEventSummary[]) {
+function numericDurations(events: readonly LogEventFields[]) {
   return events
     .map((event) => event.durationMs)
     .filter((value): value is number => typeof value === 'number' && Number.isFinite(value))
@@ -435,11 +443,12 @@ function rawEventRecord(event: WideEvent) {
   return isRecord(event) ? (event as Record<string, unknown>) : { value: event }
 }
 
-function eventId(event: Record<string, unknown>, rawText: string) {
+function eventId(event: Record<string, unknown>) {
   const existing = stringField(event.logId) ?? stringField(event.id) ?? stringField(event.eventId)
   if (existing) return existing
 
-  return createHash('sha256').update(eventIdMaterial(event, rawText)).digest('hex').slice(0, 24)
+  const material = eventIdMaterial(event, stableStringify(event))
+  return createHash('sha256').update(material).digest('hex').slice(0, 24)
 }
 
 function eventIdMaterial(event: Record<string, unknown>, rawText: string) {
@@ -476,7 +485,7 @@ function dateString(value: string) {
   return new Date(timestamp).toISOString()
 }
 
-function timestampMs(event: LogEventSummary) {
+function timestampMs(event: LogEventFields) {
   return Date.parse(event.timestamp)
 }
 

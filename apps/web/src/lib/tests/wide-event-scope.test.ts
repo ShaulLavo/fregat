@@ -1,8 +1,8 @@
 import { createError, initLogger } from 'evlog'
-import { afterEach, beforeEach, describe, vi } from 'vitest'
+import { afterEach, beforeEach, describe, onTestFinished, vi } from 'vitest'
 
 import { expect, test } from '../../../test/fixtures'
-import { createWideEventScope } from '@/lib/wide-event-scope'
+import { createWideEventScope, FAILURE_CHECKPOINT_GRACE_MS } from '@/lib/wide-event-scope'
 
 const emittedEvents: Record<string, unknown>[] = []
 
@@ -46,24 +46,46 @@ describe('createWideEventScope', () => {
     })
   })
 
-  test('folds warnings and errors into the same real event', () => {
+  test('a failed scope writes one line, when it ends', () => {
     const scope = createWideEventScope({ action: 'chat.stream.summary', area: 'chat' })
 
     scope.warn('slow stream', { slow: true })
     scope.error(createError({ message: 'closed', status: 502 }), { code: 'CLOSED' })
-    expect(emittedEvents).toHaveLength(2)
-    expect(emittedEvents[0]?.scopeId).toBe(emittedEvents[1]?.scopeId)
+    expect(emittedEvents).toEqual([])
     scope.end()
 
-    expect(emittedEvents).toHaveLength(3)
-    expect(emittedEvents[1]).toMatchObject({ checkpoint: 'failure', level: 'error' })
-    expect(emittedEvents[2]).toMatchObject({
+    expect(emittedEvents).toHaveLength(1)
+    expect(emittedEvents[0]).not.toHaveProperty('checkpoint')
+    expect(emittedEvents[0]).toMatchObject({
       code: 'CLOSED',
       slow: true,
       level: 'error',
       error: { message: 'closed', status: 502 },
       requestLogs: [expect.objectContaining({ level: 'warn', message: 'slow stream' })],
     })
+  })
+
+  test('a failed scope still open after the grace is checkpointed once, then ends', () => {
+    vi.useFakeTimers()
+    onTestFinished(() => {
+      vi.useRealTimers()
+    })
+    const scope = createWideEventScope({ action: 'workspace.events.summary', area: 'workspace' })
+
+    scope.warn('ready events failed')
+    scope.error(createError({ message: 'stream lost', status: 502 }))
+    vi.advanceTimersByTime(FAILURE_CHECKPOINT_GRACE_MS - 1)
+    expect(emittedEvents).toEqual([])
+    vi.advanceTimersByTime(1)
+    expect(emittedEvents).toEqual([
+      expect.objectContaining({ checkpoint: 'failure', level: 'error' }),
+    ])
+
+    vi.advanceTimersByTime(FAILURE_CHECKPOINT_GRACE_MS)
+    scope.end()
+    expect(emittedEvents).toHaveLength(2)
+    expect(emittedEvents[1]).not.toHaveProperty('checkpoint')
+    expect(emittedEvents[1]).toMatchObject({ level: 'error', scopeId: emittedEvents[0]?.scopeId })
   })
 
   test('respects the browser logging switch', () => {

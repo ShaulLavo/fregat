@@ -63,7 +63,8 @@ export function useTerminalLinks(rootPath: string) {
       return
     }
 
-    openFileReference(link.reference)
+    // Open the path the stat just confirmed: the server form, whatever root the editor has.
+    openFileReference({ ...link.reference, path: workspaceRequestPath(link.reference.path) })
   })
 
   return (terminal: Terminal) => {

@@ -3,6 +3,7 @@ import {
   type ConnectionError,
   type HealthDescriptor,
   type OrchestrationWsServerConfig,
+  type ServerUpdate,
 } from '@workspace/contracts'
 import { createStore } from 'zustand/vanilla'
 
@@ -26,6 +27,8 @@ export type EnvironmentsState = {
   readonly activeOrigin: string
   readonly entries: Readonly<Record<string, EnvironmentEntry>>
   readonly connectionByOrigin: Readonly<Record<string, ServerConnectionState>>
+  /** Kept apart from `connectionByOrigin`, whose resets would wipe it mid-restart. */
+  readonly updateByOrigin: Readonly<Record<string, ServerUpdate>>
 }
 
 type EnvironmentsActions = {
@@ -40,6 +43,7 @@ type EnvironmentsActions = {
   markDisconnected(origin: string): void
   recordHandshake(origin: string, config: OrchestrationWsServerConfig): void
   recordDescriptor(origin: string, descriptor: HealthDescriptor): void
+  recordServerUpdate(origin: string, update: ServerUpdate): void
   restoreDescriptor(origin: string, descriptor: HealthDescriptor): boolean
   markSlowRequest(origin: string, requestId: string): void
   clearSlowRequest(origin: string, requestId: string): void
@@ -56,6 +60,7 @@ export function createEnvironmentsStore({ primaryOrigin }: { readonly primaryOri
     activeOrigin: primaryOrigin,
     entries: { [primaryOrigin]: createEnvironmentEntry(primaryOrigin, primaryOrigin) },
     connectionByOrigin: { [primaryOrigin]: initialServerConnection },
+    updateByOrigin: {},
     activate(origin) {
       origin = canonicalServerOrigin(origin)
       const state = get()
@@ -179,6 +184,10 @@ export function createEnvironmentsStore({ primaryOrigin }: { readonly primaryOri
           [origin]: connectionAfterDescriptor(selectServerConnection(state, origin)),
         },
       })
+    },
+    recordServerUpdate(origin, update) {
+      origin = canonicalServerOrigin(origin)
+      set({ updateByOrigin: { ...get().updateByOrigin, [origin]: update } })
     },
     markSlowRequest(origin, requestId) {
       origin = canonicalServerOrigin(origin)

@@ -1,7 +1,8 @@
-// Headless check of the deployed page through the mesh. Run by scripts/deploy/mesh.ts;
-// exits non-zero on a failure the previous release's check did not already have.
+// Headless check of the deployed page through the mesh. Run by scripts/deploy/mesh.ts, or after a
+// restart by the promotion step; exits non-zero on a failure the previous release's check lacked.
+import { execFile } from 'node:child_process'
 import { readFile, writeFile } from 'node:fs/promises'
-import { parseArgs } from 'node:util'
+import { parseArgs, promisify } from 'node:util'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright'
@@ -16,11 +17,20 @@ const publicFaviconUrl =
 const { values } = parseArgs({
   options: {
     baseline: { type: 'string', default: '' },
+    logs: { type: 'string', default: '' },
     out: { type: 'string', default: fileURLToPath(new URL('.', import.meta.url)) },
     release: { type: 'string' },
     target: { type: 'string', default: base },
+    'wait-for-server': { type: 'string', default: '0' },
   },
 })
+
+const report = { release: values.release, target: values.target, failures: [], preexisting: [] }
+const waitMs = Number(values['wait-for-server'])
+if (waitMs > 0 && !(await serverReports(values.release, waitMs))) {
+  report.failures = [`server did not report ${values.release} within ${waitMs}ms`]
+  await finish([])
+}
 
 const browser = await chromium.launch({ headless: true })
 const page = await browser.newPage({
@@ -30,7 +40,6 @@ const page = await browser.newPage({
 })
 const observed = attachObserver(page, base)
 
-const report = { release: values.release, target: values.target, failures: [], preexisting: [] }
 try {
   await page.goto(values.target, { waitUntil: 'domcontentloaded' })
   await page.getByLabel('Window toolbar', { exact: true }).waitFor({ timeout: 45_000 })
@@ -67,17 +76,49 @@ try {
   await browser.close()
 }
 
-report.preexisting = await baselineFailures(values.baseline)
-const fresh = report.failures.filter((failure) => !report.preexisting.includes(failure))
-await writeFile(resolve(values.out, 'live-check.json'), `${JSON.stringify(report, null, 2)}\n`)
-for (const failure of report.failures) {
-  const tag = fresh.includes(failure) ? 'FAIL' : 'known'
-  console.log(`[live] ${tag}: ${failure}`)
+report.logNoise = await logNoise(values.logs)
+report.failures.push(...report.logNoise.failures)
+report.preexisting = await baselineFailures(values.baseline, report.logNoise.failures)
+await finish(report.preexisting)
+
+// Writes the report with its verdict; the server reads status, checkedAt and fresh.
+async function finish(preexisting) {
+  const fresh = report.failures.filter((failure) => !preexisting.includes(failure))
+  Object.assign(report, {
+    status: fresh.length === 0 ? 'passed' : 'failed',
+    checkedAt: new Date().toISOString(),
+    fresh,
+  })
+  await writeFile(resolve(values.out, 'live-check.json'), `${JSON.stringify(report, null, 2)}\n`)
+  for (const failure of report.failures) {
+    const tag = fresh.includes(failure) ? 'FAIL' : 'known'
+    console.log(`[live] ${tag}: ${failure}`)
+  }
+  console.log(
+    `[live] ${fresh.length === 0 ? 'passed' : `${fresh.length} new failure(s)`} — ${values.out}/live-check.json`,
+  )
+  process.exit(fresh.length === 0 ? 0 : 1)
 }
-console.log(
-  `[live] ${fresh.length === 0 ? 'passed' : `${fresh.length} new failure(s)`} — ${values.out}/live-check.json`,
-)
-process.exit(fresh.length === 0 ? 0 : 1)
+
+// After a restart the check waits until the new server answers through the mesh.
+async function serverReports(release, timeoutMs) {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    if ((await servedServerRelease()) === release) return true
+    await new Promise((done) => setTimeout(done, 1_000))
+  }
+  return false
+}
+
+async function servedServerRelease() {
+  try {
+    const response = await fetch(`${base}release`, { signal: AbortSignal.timeout(5_000) })
+    if (!response.ok) return null
+    return (await response.json()).server?.release ?? null
+  } catch {
+    return null
+  }
+}
 
 function failures({ served, rendered, publicFavicon, observed }) {
   const found = []
@@ -99,13 +140,39 @@ function failures({ served, rendered, publicFavicon, observed }) {
   return found
 }
 
-async function baselineFailures(file) {
+// A previous check without a log census has no noise baseline, so today's noise counts as known.
+async function baselineFailures(file, noise) {
   if (!file) return []
   try {
     const previous = JSON.parse(await readFile(file, 'utf8'))
-    return Array.isArray(previous.failures) ? previous.failures : []
+    const failures = Array.isArray(previous.failures) ? previous.failures : []
+    return previous.logNoise ? failures : [...failures, ...noise]
   } catch {
     return []
+  }
+}
+
+// The census over the last 24 hours of production logs (AGENTS.md "Logs").
+async function logNoise(directory) {
+  if (!directory) return { failures: [], groups: [] }
+  const census = fileURLToPath(new URL('../lint/log-noise-census.ts', import.meta.url))
+  try {
+    const { stdout } = await promisify(execFile)(
+      'bun',
+      [census, `--dir=${directory}`, '--since=24h', '--json'],
+      { maxBuffer: 64 * 1024 * 1024 },
+    )
+    const result = JSON.parse(stdout)
+    const groups = result.failures.map(({ key, count, reasons }) => ({ key, count, reasons }))
+    return {
+      failures: [
+        ...groups.map((group) => `log noise: ${group.key}`),
+        ...result.allowProblems.map((problem) => `log noise allow list: ${problem}`),
+      ],
+      groups,
+    }
+  } catch (error) {
+    return { failures: [`log census did not run: ${error.message}`], groups: [] }
   }
 }
 

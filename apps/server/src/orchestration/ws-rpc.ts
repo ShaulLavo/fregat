@@ -1,7 +1,8 @@
-import { LiveStreamBudget } from './live-stream-budget'
+import { isLiveStreamAckTimeout, LiveStreamBudget } from './live-stream-budget'
 import { errorSummary as serializeOrchestrationRpcError } from '@workspace/contracts'
 import { adaptWebSocket, isAbnormalWebSocketClose } from '../utils/websocket'
 import { elapsedMs } from '@workspace/utils/timing'
+import { isRecord } from '@workspace/utils/objects'
 import {
   ORCHESTRATION_REPLAY_MAX_EVENTS,
   ORCHESTRATION_RESUME_MAX_GAP,
@@ -32,6 +33,7 @@ import {
 import { orchestrationReplaySummary } from '@workspace/contracts'
 import type { ClientPresence } from './client-presence'
 import type { OrchestrationEngine } from './engine'
+import type { ServerUpdate } from '../update/service'
 
 /**
  * Identity of this server process. `serverInstanceId` changes on every restart,
@@ -40,6 +42,10 @@ import type { OrchestrationEngine } from './engine'
  */
 const SERVER_INSTANCE_ID = crypto.randomUUID()
 const SERVER_STARTED_AT = new Date().toISOString()
+const ACK_TIMEOUT_MS = 30_000
+// Private-use code: the client files it in its failure series, which warns once per series.
+const ACK_TIMEOUT_CLOSE_CODE = 4408
+const ACK_TIMEOUT_CLOSE_REASON = 'live-stream-ack-timeout'
 
 export function orchestrationWsServerConfig(
   identity: EnvironmentIdentity,
@@ -68,10 +74,15 @@ type OrchestrationRpcWebSocket = {
   send(message: string): unknown
 }
 
+type ConnectionLogContext = { client?: { instanceId: string } }
+
 type OrchestrationRpcConnectionState = {
+  log: ConnectionLogContext
   nextDeliveryId: number
   openedAt: number
+  serverCloseReason: string | null
   subscriptions: Map<OrchestrationWsSubscriptionId, OrchestrationRpcSubscription>
+  unsubscribeUpdate: () => void
 }
 
 type OrchestrationRpcSubscription = {
@@ -84,10 +95,55 @@ type OrchestrationRpcSubscription = {
 
 type OrchestrationStreamItem = OrchestrationShellStreamFrame | OrchestrationSessionStreamFrame
 
+const SERVICE_RESTART_CLOSE_CODE = 1012
+const SERVICE_RESTART_CLOSE_REASON = 'service restart'
+
+export type OrchestrationSockets = ReturnType<typeof createOrchestrationSockets>
+
+/** The open orchestration sockets, so a shutdown can announce itself before the listener stops. */
+export function createOrchestrationSockets() {
+  let closing = false
+  const open = new Map<
+    object,
+    { socket: OrchestrationRpcWebSocket; state: OrchestrationRpcConnectionState }
+  >()
+
+  return {
+    add(socket: OrchestrationRpcWebSocket, state: OrchestrationRpcConnectionState) {
+      if (closing) {
+        closeForRestart(socket, state)
+        return false
+      }
+      open.set(socket.key, { socket, state })
+      return true
+    },
+    delete(socket: OrchestrationRpcWebSocket) {
+      open.delete(socket.key)
+    },
+    // 1012 is the registered "service restart"; a client logs the reconnect that follows at info.
+    closeAll() {
+      closing = true
+      for (const { socket, state } of [...open.values()]) {
+        closeForRestart(socket, state)
+      }
+    },
+  }
+}
+
+function closeForRestart(
+  socket: OrchestrationRpcWebSocket,
+  state: OrchestrationRpcConnectionState,
+) {
+  state.serverCloseReason = SERVICE_RESTART_CLOSE_REASON
+  socket.close(SERVICE_RESTART_CLOSE_CODE, SERVICE_RESTART_CLOSE_REASON)
+}
+
 export function orchestrationWsRoutes(
   engine: OrchestrationEngine,
   auth: AuthConfig,
   identity: EnvironmentIdentity,
+  sockets: OrchestrationSockets,
+  update: Pick<ServerUpdate, 'enabled' | 'state' | 'subscribe'>,
   presence: ClientPresence,
 ) {
   const states = new WeakMap<object, OrchestrationRpcConnectionState>()
@@ -99,9 +155,11 @@ export function orchestrationWsRoutes(
       const socket = adaptWebSocket(ws)
       if (!socket) return
 
+      const log = connectionLogContext(socket.data)
       const authError = authenticateWebSocketData(socket.data, auth)
       if (authError) {
         recordChatPipelineWarning('chat.pipeline.ws.auth_failed', {
+          ...log,
           errorCode: authError.code,
           status: authError.statusCode,
         })
@@ -109,16 +167,23 @@ export function orchestrationWsRoutes(
         return
       }
 
-      states.set(socket.key, {
+      const state: OrchestrationRpcConnectionState = {
+        log,
         nextDeliveryId: 1,
         openedAt: performance.now(),
+        serverCloseReason: null,
         subscriptions: new Map(),
-      })
+        unsubscribeUpdate: noop,
+      }
+      states.set(socket.key, state)
+      if (!sockets.add(socket, state)) return
       // The handshake is pushed rather than requested so the client reaches an
       // honest `connected` phase — and can compare protocol versions — without
       // paying a round trip before it may subscribe.
-      sendOrchestrationRpcMessage(socket, { config, kind: 'connected' })
+      sendOrchestrationRpcMessage(socket, state, { config, kind: 'connected' })
+      publishServerUpdate(socket, state, update)
       recordChatPipelineInfo('chat.pipeline.ws.open', {
+        ...log,
         environmentId: config.environmentId,
         protocolVersion: config.protocolVersion,
         serverInstanceId: config.serverInstanceId,
@@ -144,17 +209,21 @@ export function orchestrationWsRoutes(
 
       const state = states.get(socket.key)
       const subscriptionCount = state?.subscriptions.size ?? 0
+      state?.unsubscribeUpdate()
       if (state) closeOrchestrationRpcState(state)
 
       states.delete(socket.key)
+      sockets.delete(socket)
       presence.forget(socket.key)
-      const record = isAbnormalWebSocketClose(code)
-        ? recordChatPipelineWarning
-        : recordChatPipelineInfo
+      // A close the server chose logged its cause when it chose it.
+      const abnormal = isAbnormalWebSocketClose(code) && !state?.serverCloseReason
+      const record = abnormal ? recordChatPipelineWarning : recordChatPipelineInfo
       record('chat.pipeline.ws.close', {
+        ...state?.log,
         code,
         durationMs: state ? Math.round(performance.now() - state.openedAt) : null,
         reason: reason || null,
+        serverCloseReason: state?.serverCloseReason ?? null,
         subscriptionCount,
       })
     },
@@ -175,7 +244,7 @@ function handleOrchestrationRpcMessage(
   }
 
   if (message.kind === 'request') {
-    void handleOrchestrationRpcRequest(engine, socket, message, config)
+    void handleOrchestrationRpcRequest(engine, socket, state, message, config)
     return
   }
 
@@ -189,7 +258,7 @@ function handleOrchestrationRpcMessage(
     return
   }
 
-  sendOrchestrationRpcMessage(socket, {
+  sendOrchestrationRpcMessage(socket, state, {
     kind: 'pong',
     requestId: message.requestId,
   })
@@ -198,16 +267,17 @@ function handleOrchestrationRpcMessage(
 async function handleOrchestrationRpcRequest(
   engine: OrchestrationEngine,
   socket: OrchestrationRpcWebSocket,
+  state: OrchestrationRpcConnectionState,
   message: OrchestrationWsRequest,
   config: OrchestrationWsServerConfig,
 ) {
   const startedAt = performance.now()
-  const context = orchestrationRpcRequestSummary(message)
+  const context = { ...state.log, ...orchestrationRpcRequestSummary(message) }
   recordChatPipelineInfo('chat.pipeline.ws.request.received', context)
 
   try {
     const data = await resolveOrchestrationRpcRequest(engine, message, config)
-    sendOrchestrationRpcMessage(socket, {
+    sendOrchestrationRpcMessage(socket, state, {
       data,
       kind: 'response',
       ok: true,
@@ -219,7 +289,7 @@ async function handleOrchestrationRpcRequest(
       durationMs: elapsedMs(startedAt),
     })
   } catch (error) {
-    sendOrchestrationRpcMessage(socket, {
+    sendOrchestrationRpcMessage(socket, state, {
       error: serializeOrchestrationRpcError(error),
       kind: 'response',
       ok: false,
@@ -287,10 +357,10 @@ function handleOrchestrationRpcSubscribe(
     sessionId: message.method === 'subscribeSession' ? message.sessionId : undefined,
   }
   state.subscriptions.set(message.subscriptionId, subscription)
-  recordChatPipelineInfo(
-    'chat.pipeline.ws.subscription.start',
-    orchestrationRpcSubscribeSummary(message),
-  )
+  recordChatPipelineInfo('chat.pipeline.ws.subscription.start', {
+    ...state.log,
+    ...orchestrationRpcSubscribeSummary(message),
+  })
 
   const stream = orchestrationRpcStream(
     engine,
@@ -314,7 +384,7 @@ async function pumpOrchestrationRpcSubscription(
 
       const deliveryId = state.nextDeliveryId++
       const acknowledgement = awaitSubscriptionAck(subscription, deliveryId)
-      const sent = sendOrchestrationRpcMessage(socket, {
+      const sent = sendOrchestrationRpcMessage(socket, state, {
         item,
         kind: 'subscription.next',
         subscriptionId,
@@ -324,7 +394,7 @@ async function pumpOrchestrationRpcSubscription(
       await acknowledgement
     }
   } catch (error) {
-    handleOrchestrationRpcSubscriptionError(socket, subscriptionId, subscription, error)
+    handleOrchestrationRpcSubscriptionError(socket, state, subscriptionId, subscription, error)
   } finally {
     subscription.budget.dispose()
     completeOrchestrationRpcSubscription(socket, state, subscriptionId, subscription)
@@ -333,23 +403,40 @@ async function pumpOrchestrationRpcSubscription(
 
 function handleOrchestrationRpcSubscriptionError(
   socket: OrchestrationRpcWebSocket,
+  state: OrchestrationRpcConnectionState,
   subscriptionId: OrchestrationWsSubscriptionId,
   subscription: OrchestrationRpcSubscription,
   error: unknown,
 ) {
   if (subscription.abortController.signal.aborted) return
 
-  sendOrchestrationRpcMessage(socket, {
+  sendOrchestrationRpcMessage(socket, state, {
     error: serializeOrchestrationRpcError(error),
     kind: 'subscription.error',
     subscriptionId,
   })
-  recordChatPipelineWarning('chat.pipeline.ws.subscription.error', {
+  const ackTimedOut = isLiveStreamAckTimeout(error)
+  const record = ackTimedOut ? recordChatPipelineInfo : recordChatPipelineWarning
+  record('chat.pipeline.ws.subscription.error', {
+    ...state.log,
     error,
     method: subscription.method,
     subscriptionId,
     sessionId: subscription.sessionId,
   })
+  if (ackTimedOut) closeSilentPeer(socket, state)
+}
+
+// A peer that leaves a delivery unacknowledged for the whole timeout is gone.
+// Its client resumes every subscription on a new socket.
+function closeSilentPeer(
+  socket: OrchestrationRpcWebSocket,
+  state: OrchestrationRpcConnectionState,
+) {
+  if (state.serverCloseReason) return
+
+  state.serverCloseReason = ACK_TIMEOUT_CLOSE_REASON
+  socket.close(ACK_TIMEOUT_CLOSE_CODE, ACK_TIMEOUT_CLOSE_REASON)
 }
 
 function completeOrchestrationRpcSubscription(
@@ -363,12 +450,13 @@ function completeOrchestrationRpcSubscription(
 
   state.subscriptions.delete(subscriptionId)
   if (!subscription.abortController.signal.aborted) {
-    sendOrchestrationRpcMessage(socket, {
+    sendOrchestrationRpcMessage(socket, state, {
       kind: 'subscription.complete',
       subscriptionId,
     })
   }
   recordChatPipelineInfo('chat.pipeline.ws.subscription.closed', {
+    ...state.log,
     aborted: subscription.abortController.signal.aborted,
     method: subscription.method,
     subscriptionId,
@@ -404,9 +492,24 @@ function unsubscribeOrchestrationRpcState(
   subscription.abortController.abort()
   subscription.budget.dispose()
   recordChatPipelineInfo('chat.pipeline.ws.subscription.unsubscribe', {
+    ...state.log,
     method: subscription.method,
     subscriptionId,
     sessionId: subscription.sessionId,
+  })
+}
+
+// A server without a production root has no update to announce, so its clients hear nothing.
+function publishServerUpdate(
+  socket: OrchestrationRpcWebSocket,
+  state: OrchestrationRpcConnectionState,
+  update: Pick<ServerUpdate, 'enabled' | 'state' | 'subscribe'>,
+) {
+  if (!update.enabled) return
+
+  sendOrchestrationRpcMessage(socket, state, { kind: 'server.update', update: update.state() })
+  state.unsubscribeUpdate = update.subscribe((next) => {
+    sendOrchestrationRpcMessage(socket, state, { kind: 'server.update', update: next })
   })
 }
 
@@ -420,6 +523,7 @@ function closeOrchestrationRpcState(state: OrchestrationRpcConnectionState) {
 
 function sendOrchestrationRpcMessage(
   socket: OrchestrationRpcWebSocket,
+  state: OrchestrationRpcConnectionState,
   message: OrchestrationWsServerMessage,
 ) {
   try {
@@ -427,6 +531,7 @@ function sendOrchestrationRpcMessage(
     return true
   } catch (error) {
     recordChatPipelineWarning('chat.pipeline.ws.send_failed', {
+      ...state.log,
       error,
       messageKind: message.kind,
     })
@@ -507,9 +612,34 @@ function awaitSubscriptionAck(subscription: OrchestrationRpcSubscription, delive
       reject(error)
     }
     const abort = () => finish(signal.reason)
-    const timer = setTimeout(() => subscription.budget.overflow(), 30_000)
+    const timer = setTimeout(
+      () => subscription.budget.ackTimeout({ deliveryId, timeoutMs: ACK_TIMEOUT_MS }),
+      ACK_TIMEOUT_MS,
+    )
     subscription.pendingAck = { deliveryId, resolve: () => finish() }
     signal.addEventListener('abort', abort, { once: true })
     if (signal.aborted) abort()
   })
 }
+
+/**
+ * Subscription ids are numbered per client, so the instance id is what tells two
+ * clients' events apart. Browsers cannot set socket headers; they send the query param.
+ */
+function connectionLogContext(data: unknown): ConnectionLogContext {
+  const instanceId = clientInstanceId(data)
+
+  return instanceId ? { client: { instanceId } } : {}
+}
+
+function clientInstanceId(data: unknown) {
+  if (!isRecord(data)) return null
+  const query = isRecord(data.query) ? data.query.instance : undefined
+  const header = isRecord(data.headers) ? data.headers['x-client-instance'] : undefined
+  const value = typeof query === 'string' ? query : header
+  if (typeof value !== 'string') return null
+
+  return value.trim().slice(0, 64) || null
+}
+
+function noop() {}

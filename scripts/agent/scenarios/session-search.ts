@@ -11,11 +11,12 @@ async function searchConversation(
 ) {
   const bases = collectOrchestrationBases(page)
   const connected = page.waitForEvent('websocket', {
-    predicate: (socket) => socket.url().endsWith('/orchestration/rpc'),
+    predicate: (socket) => new URL(socket.url()).pathname.endsWith('/orchestration/rpc'),
   })
   await page.goto(page.url().replace(/\/workbench(?:\?.*)?$/, '/chat'))
   const primary = (await connected)
     .url()
+    .split('?')[0]!
     .replace(/^ws/, 'http')
     .replace(/\/rpc$/, '')
   await selectors.sessionSearch(page).waitFor()

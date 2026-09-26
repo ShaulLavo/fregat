@@ -90,6 +90,28 @@ test('an activated native link opens the file without a second modifier gate', a
   expect((await client.fs.stat.get({ query: { path: selectedPath } })).data?.type).toBe('file')
 })
 
+test('an absolute path opens the file the stat confirmed, inside the project or beside it', async ({
+  client,
+  server,
+}) => {
+  // Stack traces print absolute paths; the terminal reads them against the server root.
+  const terminal = fakeTerminal(['  at /repo/src/a.ts:3', '  at /other/b.ts:3'])
+  const opened = openedPaths()
+  const { getByTestId } = await renderTerminalLinks(client, server, terminal, opened)
+  await writeWorkspaceFile(server.root, 'src/a.ts')
+  await mkdir(path.join(server.root, 'other'), { recursive: true })
+  await writeFile(path.join(server.root, 'other', 'b.ts'), 'export const other = 1\n')
+  expect((await client.fs.stat.get({ query: { path: 'other/b.ts' } })).data?.type).toBe('file')
+  await waitFor(() => expect(terminal.providers).toHaveLength(1))
+
+  await activateLink(terminal, 0, clickEvent())
+  await waitFor(() => expect(getByTestId('selected-path')).toHaveTextContent('repo/src/a.ts'))
+  await activateLink(terminal, 1, clickEvent())
+  await waitFor(() => expect(getByTestId('selected-path')).toHaveTextContent('other/b.ts'))
+
+  expect(opened.paths).toEqual(['repo/src/a.ts', 'other/b.ts'])
+})
+
 test('a path that is not on disk reports instead of opening a phantom tab', async ({
   client,
   server,

@@ -367,11 +367,19 @@ export const projectionTerminalLeases = sqliteTable(
         'ownership-unknown',
       ],
     }).notNull(),
+    /** The host session key this lease belongs to; null for a lease begun before Plan 149. */
+    key: text('key'),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull(),
   },
   (table) => [index('projection_terminal_leases_worktree_idx').on(table.worktreeId)],
 )
+
+/** The last offset each terminal session has written to history, so a reattach resumes there. */
+export const terminalSessionOffsets = sqliteTable('terminal_session_offsets', {
+  owner: text('owner').primaryKey(),
+  offset: integer('offset').notNull(),
+})
 
 export const agentTerminalHandoffs = sqliteTable('agent_terminal_handoffs', {
   sessionId: text('session_id').primaryKey(),

@@ -41,7 +41,7 @@ export type TestServer = {
 // app routes, valibot contracts, and filesystem are the genuine article.
 type TestServerOptions = Pick<
   AppOptions,
-  'workspaceEditClock' | 'workspaceEditDriver' | 'machines'
+  'workspaceEditClock' | 'workspaceEditDriver' | 'machines' | 'update'
 > & {
   persistentDatabase?: boolean
   providerRuntime?: boolean
@@ -61,6 +61,7 @@ export async function makeTestServer({
   workspaceEditClock,
   workspaceEditDriver,
   machines,
+  update,
 }: TestServerOptions = {}): Promise<TestServer> {
   const root = await mkdtemp(path.join(tmpdir(), 'web-itest-'))
   const workspaceEditJournalRoot = path.join(root, '.platform-test', 'workspace-edit-journals')
@@ -109,6 +110,7 @@ export async function makeTestServer({
         releaseSource: releaseSource('/platform-test/no-release/server'),
         ...machines,
       },
+      update,
     })
 
   let app = buildApp()

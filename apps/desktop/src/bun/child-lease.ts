@@ -4,7 +4,7 @@ import { recordDesktopInfo } from './observability'
 import { groupAlive, processStart, signalGroup } from './processes'
 import { desktopErrors } from './structured-errors'
 
-type LeasedChild = { name: string; pid: number; startedAt: string }
+type LeasedChild = { name: string; pid: number; startedAt: string; target: 'group' | 'process' }
 
 // Children exit together at quit; unserialized read-modify-writes lose records and race the rename.
 const writes = new Map<string, Promise<unknown>>()
@@ -24,13 +24,18 @@ export function childLeaseFile(home: string, root: string) {
   return path.join(home, '.platform', 'desktop', `${Bun.hash(root).toString(36)}.json`)
 }
 
-export async function leaseChild(file: string, name: string, pid: number) {
+export async function leaseChild(
+  file: string,
+  name: string,
+  pid: number,
+  target: LeasedChild['target'] = 'group',
+) {
   const startedAt = await processStart(pid)
   if (!startedAt) return
 
   await serialized(file, async () => {
     const children = (await readLease(file)).filter((child) => child.pid !== pid)
-    await writeLease(file, [...children, { name, pid, startedAt }])
+    await writeLease(file, [...children, { name, pid, startedAt, target }])
   })
 }
 
@@ -64,14 +69,14 @@ export async function stopLeftoverChildren(file: string) {
 
 async function stopGroups(children: readonly LeasedChild[]) {
   recordDesktopInfo('desktop.leftovers.stop', { children })
-  for (const child of children) signalGroup(child.pid, 'SIGTERM')
+  for (const child of children) signalChild(child, 'SIGTERM')
   if (await waitForGroupsExit(children, 2_500)) return
 
   // A live group keeps its id from being reused, so these are still ours.
-  for (const child of children) signalGroup(child.pid, 'SIGKILL')
+  for (const child of children) signalChild(child, 'SIGKILL')
   if (await waitForGroupsExit(children, 2_500)) return
 
-  const stuck = children.filter((child) => groupAlive(child.pid))
+  const stuck = children.filter(childAlive)
   throw desktopErrors.LEFTOVER_RUNNING({
     names: stuck.map((child) => child.name),
     internal: { pids: stuck.map((child) => child.pid) },
@@ -82,7 +87,7 @@ async function waitForGroupsExit(children: readonly LeasedChild[], timeoutMs: nu
   const deadline = Date.now() + timeoutMs
 
   while (Date.now() < deadline) {
-    if (!children.some((child) => groupAlive(child.pid))) return true
+    if (!children.some(childAlive)) return true
 
     await Bun.sleep(100)
   }
@@ -116,10 +121,30 @@ function isLeasedChild(value: unknown): value is LeasedChild {
 
   const record = value as Record<string, unknown>
   return (
+    (record.target === 'group' || record.target === 'process') &&
     typeof record.name === 'string' &&
     Number.isInteger(record.pid) &&
     (record.pid as number) > 1 &&
     typeof record.startedAt === 'string' &&
     record.startedAt.length > 0
   )
+}
+
+function childAlive(child: LeasedChild) {
+  if (child.target === 'group') return groupAlive(child.pid)
+  try {
+    process.kill(child.pid, 0)
+    return true
+  } catch {
+    return false
+  }
+}
+
+function signalChild(child: LeasedChild, signal: NodeJS.Signals) {
+  if (child.target === 'group') return signalGroup(child.pid, signal)
+  try {
+    process.kill(child.pid, signal)
+  } catch {
+    // The process exited after the identity check.
+  }
 }

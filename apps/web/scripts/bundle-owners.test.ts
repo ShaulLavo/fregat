@@ -98,3 +98,13 @@ test('splits first-load bytes from lazy bytes per owner', () => {
     },
   ])
 })
+
+test('attributes resolved linked code consistently from a worktree', () => {
+  const editorFile = '/work/projects/Editor/packages/core/dist/index.js'
+  const linked = [{ owner: 'Editor', root: '/work/projects/Editor' }]
+  expect(moduleOwner(editorFile, '/work/worktrees/platform/L4', linked)).toBe('Editor')
+  expect(moduleOwner(editorFile, '/work/projects/platform', linked)).toBe('Editor')
+  expect(
+    moduleOwner('/work/projects/Editor-next/src/index.ts', '/work/worktrees/platform/L4', linked),
+  ).toBe('external')
+})

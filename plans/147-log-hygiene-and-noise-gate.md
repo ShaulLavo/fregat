@@ -2,7 +2,9 @@
 
 ## Status and authorization
 
-- Status: PROPOSED — research done; Phase 1 ready.
+- Status: IN PROGRESS — lane L4 of the completion wave (`/work/worktrees/platform/L4`, PR #32).
+  Every phase and step is done; the plan closes after the post-deploy 24 h census (owner check). See
+  "Landed" below.
 - Priority: P1. The production log is the first thing read when something breaks, and today a
   real failure is buried under thousands of lines a day that need no action.
 - Effort: M. Six small producer fixes, one census script, one `AGENTS.md` edit.
@@ -89,7 +91,8 @@ There is no runtime log gate. `bun run gates` covers source only (`package.json:
 
 ## Decisions
 
-- **D1 — Level semantics.** Recommended, added to the `AGENTS.md` "Logs" section:
+- **D1 — Level semantics.** Decided 2026-09-25: recommendation (completion wave). Recommended,
+  added to the `AGENTS.md` "Logs" section:
 
   > - `error` means someone must act. `warn` means something degraded and the app recovered or
   >   gave up. A missing file the caller asked about is an answer: `info`, no stack.
@@ -99,14 +102,15 @@ There is no runtime log gate. `bun run gates` covers source only (`package.json:
   >   a terminal state and logs once. A loop that can fail forever is a bug.
   > - A client failure is one line. Checkpoints are for events that never finish.
 
-- **D2 — What happens to a binding the reaper cannot stop.** Recommended: after two sweeps with
+- **D2 — What happens to a binding the reaper cannot stop.** Decided 2026-09-25: recommendation
+  (completion wave). Recommended: after two sweeps with
   the same error it is marked `orphaned`, logged once at warn, and skipped. Deleting a session
   deletes its bindings, so the orphan case is left for genuinely stuck processes.
-- **D3 — The hidden tab.** Recommended: stop reconnecting while `document.visibilityState` is
+- **D3 — The hidden tab.** Decided 2026-09-25: recommendation (completion wave). Recommended: stop reconnecting while `document.visibilityState` is
   `hidden` and reconnect on `visibilitychange`, the way `environment-recovery.ts:45-49` already
   wakes. Find the ~59s 1006 cause first (Phase 2 step 1); if it is the mesh proxy's idle timeout,
   that is a separate fix and pausing is still correct.
-- **D4 — Gate budgets.** Recommended: a group (level + area + action + code) fails when it exceeds
+- **D4 — Gate budgets.** Decided 2026-09-25: recommendation (completion wave). Recommended: a group (level + area + action + code) fails when it exceeds
   50 lines in 24h, or repeats the same key within 10 minutes for over an hour, unless
   `scripts/lint/log-noise-allow.json` names it with a reason. An allow entry without a reason is
   itself a failure, as in the other censuses.
@@ -164,6 +168,103 @@ changing it, and ship a change only with the measured cost beside it:
 7. Total-byte admission for the client's HTTP log queue, beside its existing count bound.
 8. The two evidence drives Plan 125 left: a development-server baseline for its scenarios, and a
    live mock-provider streaming and reconnect drive with the admission changes in place.
+
+## Landed (2026-09-25, lane L4)
+
+Phase 1:
+
+- Step 1: a 404 a handler answers is `info` with no stack. A route miss (Elysia's `NotFoundError`,
+  or the web catch-all, now `FsError('ROUTE_NOT_FOUND')`) stays `warn` with its stack: it is a
+  client or release mismatch. The stack reaches the event through up to three `logger.error`
+  calls, so the enrich hook in `observability/elysia.ts` drops it once on the merged event. The
+  same hook used to set the level from the status alone, so every `recordRequestWarning` on a 2xx
+  was saved at `info` (production: `git.commit_message.provider_failed`, 21 lines);
+  `raiseForWarning` keeps those at `warn`.
+- Step 2: the reaper's throw came from a binding whose session was deleted on 2026-09-20 with its
+  runtime left `ready` (52 of 70 production binding rows belong to deleted sessions; they stay,
+  harmless, no healing code). `listIdleSince` skips deleted sessions; deleting a session deletes
+  its binding (`session-deletion-reactor.ts`); a binding whose provider instance left the registry
+  is stopped with one warn and a synthetic `runtime.exited`, so no later sweep lists it. D2's give-up
+  is in memory: info on the first failure, one warn `provider_session_reaper.orphaned` on the
+  second identical one, then skipped. After a restart a stuck binding is retried once more.
+- Step 3: `TerminalSession.closeRequested` is set when we send the kill; any exit after it is
+  `closed` at info. The language-server sessions got the same treatment.
+- Step 4: `LIVE_STREAM_ACK_TIMEOUT` (408) at info, and the socket closes with code 4408
+  (`live-stream-ack-timeout`). A client counts 4408 as a failure, so a stalled consumer on a visible
+  page warns once per failure series. `LIVE_STREAM_OVERFLOW` stays for a real cap breach.
+- Step 5: `internal` survives on chat-pipeline errors through `sanitizeErrorCause`; the web opens
+  the orchestration socket with `?instance=<clientInstanceId>`, and every server `ws.*` event
+  carries `client.instanceId`.
+- Shutdown closes every orchestration socket with 1012 ("service restart") before anything else
+  stops (`createOrchestrationSockets` in `ws-rpc.ts`, called first in `appCleanup`), so a deploy's
+  reconnect logs at info on both sides.
+
+Phase 2:
+
+- Step 1, the cause: the browser ends a hidden page's sockets itself. After about five minutes
+  hidden, every socket closed at the page's one-minute timer wake, 58.9–59.0 s after it opened; the
+  page saw `error` then 1006 while the server received a 1001 close frame, which the byte-copying
+  mesh proxy cannot produce. A second pattern (another browser): a socket opened while hidden
+  received no frames, the server's ACK timer fired at 30 s and the client's pong timeout closed the
+  socket at 44 s. Not reproducible headless; pausing while hidden stops both.
+- Step 2 (D3): client-core takes an injectable `beforeConnect(signal)`; the web passes
+  `untilPageShows`, the TUI nothing. The first unexpected disconnect warns; later ones log at info
+  with the series count, and one `orchestration.ws.failure_series.summary` at info closes the
+  series on the first answered heartbeat. 1000 is info; 1001 and 1012 are a known restart with a
+  60 s grace. D3 refinement, decided 2026-09-25 (completion wave): the pause is skipped while
+  `chat.notificationMode` is on, because session notifications come from the shell stream and a
+  hidden tab is who they are for.
+- Step 3: with LSP reconnect on for every lane (since `a985b43f`), `lsp.connection.error` fires
+  only when the reconnects run out, so it stays `warn` for every close code; only this side's
+  suspended environment refusing the socket is info. The pool's own closes never produce it.
+- Step 4: a failed browser scope that ends within 5 s writes one line; one still open after 5 s,
+  or at page hide, writes one `checkpoint:"failure"` line first. `workspace.events.summary` now ends
+  a scope that only warned.
+- Step 5: `POST /fs/workspace-addresses` answers every candidate in one call; the server prunes a
+  recent it finds missing. Scenario `project-menu` records a live and a missing recent.
+- New producer, not in the table: a chat file link to an absolute path outside the chat workspace
+  opened an editor tab with that absolute path, and the files event stream retried the 403 every
+  10 s for as long as the tab stayed open (163 `/fs/events` + 119 client `fs.read` warns on
+  2026-09-25).
+
+- The outside-workspace producer is fixed (`200a59d5`): chat links map through the server root, terminal
+  links open the path they statted, and a 4xx on the files stream is final for that file set.
+  Language servers are disposed before the first await at shutdown (`6d80564b`), because systemd
+  signals them with the server and their exits were logged as crashes.
+- Open leads: `/fs/events` answers HTTP 503 while its body carries the real 403, so SSE routes that
+  fail before their first event lose `why`/`fix`; `clientErrors.WATCH_FAILED` names its message
+  parameter `status`, an evlog override key, so its message never shows the status.
+
+Phase 3:
+
+- Steps 1–4: D1's rules are in `AGENTS.md`; `bun run logs:census`
+  (`scripts/lint/log-noise-census.ts`, reusing `scripts/agent/logs.ts`) with
+  `scripts/lint/log-noise-allow.json`; the live check runs it over production's last 24 hours and
+  fails on a group the previous check did not have (a previous check without a census counts
+  today's noise as known). Over 2026-09-24/25 it finds 13 noisy groups, each one a producer above.
+- Step 5, measured: `readLogs` (the script reader) scans 24 h of production logs (52 MB, 56k
+  events) in ~100 ms; no change. The server log viewer took 1,034 ms for a 24 h summary, of which
+  ~155 ms was evlog's read: it stable-stringified and hashed every event and cached all of them.
+  Ids are now computed only for events a page or the live tail returns (same material, so ids are
+  unchanged): 24 h summary 1,034 → 212 ms, 1 h summary 154 → 87 ms, 24 h warn+error page 340 →
+  125 ms, 24 h search 921 → 246 ms.
+- Step 6, measured: the Editor gates `Editor.log` only on a logger being registered, and Platform
+  always registers one. Of its 32 producers, the ones that can fire per frame are
+  `editor.viewport.changed` (Platform reads it to cache scroll positions, so it must still be
+  built), `editor.command.dispatched` and the decoration-change events. Building one payload the
+  way `Editor.log` does costs ~165 ns in Bun, about 0.001% of a 16.7 ms frame. No gating added; the
+  Editor half needs no change.
+- Step 8, drives on the lane dev server (2026-09-25): typing baseline `trace editor-type-burst`
+  uploaded 65 events / 33,071 bytes in 10 requests
+  (`/work/tmp/fregat-evidence/20260925T141022Z-trace-editor-type-burst`), in line with Plan 125's
+  production 55 events / 28,727 bytes. Mock-provider streaming `scenario chat-queue` completed with
+  47 events / 27,742 bytes (the later run under `…scenario-chat-queue`). Reconnect
+  `scenario page-lifecycle` passes its retained-page restore and confirmed-reload reconnect steps;
+  its repeated-reload loop fails with Chromium `net::ERR_INSUFFICIENT_RESOURCES` loading ~2,000
+  unbundled dev modules, an environment limit (`…20260925T143124Z-scenario-page-lifecycle`).
+- Step 7, measured: client lines on 2026-09-25 are p50 746 B, p99 2.9 KB, max 9.3 KB, and the
+  sanitizer caps strings and arrays, so the 1,000-event queue bound already caps the queue near
+  9 MB. No byte bound added.
 
 ## Verification
 

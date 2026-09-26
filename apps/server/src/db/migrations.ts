@@ -37,6 +37,8 @@ export const platformMigrations: readonly Migration[] = [
   { version: 30, name: 'message_model_selection', up: applyMessageModelSelection },
   { version: 31, name: 'session_fork_and_agent', up: applySessionForkAndAgent },
   { version: 32, name: 'provider_usage_source', up: applyProviderUsageSource },
+  { version: 33, name: 'terminal_lease_key', up: applyTerminalLeaseKey },
+  { version: 34, name: 'terminal_session_offsets', up: applyTerminalSessionOffsets },
   { version: 35, name: 'worktree_base_branch', up: applyWorktreeBaseBranch },
   { version: 36, name: 'provider_usage_import_requests', up: applyProviderUsageImportRequests },
   { version: 37, name: 'terminal_session_cleanup', up: applyTerminalSessionCleanup },
@@ -75,6 +77,16 @@ function applyMessageModelSelection(database: PlatformDatabase) {
 
 function applyTurnEndReason(database: PlatformDatabase) {
   database.run(sql`ALTER TABLE projection_turns ADD COLUMN end_reason TEXT`)
+}
+
+function applyTerminalLeaseKey(database: PlatformDatabase) {
+  database.run(sql`ALTER TABLE projection_terminal_leases ADD COLUMN key TEXT`)
+}
+
+function applyTerminalSessionOffsets(database: PlatformDatabase) {
+  database.run(
+    sql`CREATE TABLE terminal_session_offsets (owner TEXT PRIMARY KEY NOT NULL, offset INTEGER NOT NULL)`,
+  )
 }
 
 function applyProviderUsageSource(database: PlatformDatabase) {

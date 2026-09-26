@@ -53,17 +53,29 @@ export function runtimeUrl(host: string, port: number) {
   return `http://${urlHost(host)}:${port}`
 }
 
-// The origin guard is exact, so register both loopback spellings and the TUI origin.
+/** The API server a dev process talks to: `VITE_SERVER_URL`, else the server's host and port. */
+export function serverUrlFromEnv(env: RuntimeEnv) {
+  if (env.VITE_SERVER_URL) return env.VITE_SERVER_URL
+
+  return runtimeUrl(env.FS_HOST ?? env.HOST ?? '127.0.0.1', portFromEnv(env, 'PORT', 3001))
+}
+
+/** `SERVER_ALLOWED_ORIGINS` for a page served at the web port; the server allows nothing else. */
 export function allowedOriginsForWebPort(
   configuredOrigins: string | undefined,
   webHost: string,
   webPort: number,
 ) {
+  return webOrigins(configuredOrigins, webHost, webPort).join(',')
+}
+
+// The origin guard is exact, so register both loopback spellings and the TUI origin.
+function webOrigins(configuredOrigins: string | undefined, webHost: string, webPort: number) {
   return unique([
     ...browserOriginsForWebPort(webHost, webPort),
     TUI_CLIENT_ORIGIN,
     ...originsFromEnv(configuredOrigins),
-  ]).join(',')
+  ])
 }
 
 function closePortProbe(server: net.Server, resolve: (available: boolean) => void) {
