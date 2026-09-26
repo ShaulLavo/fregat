@@ -126,6 +126,7 @@
     "workbench.theme.customizations",
     "workbench.tree.indentGuides",
     "workbench.wallpaper",
+    "workbench.wallpaper.downloadTimeoutMs",
     "workbench.wallpaper.enabled",
     "workbench.wallpaper.omarchyCatalog",
     "workbench.wallpaper.previewCloud"
