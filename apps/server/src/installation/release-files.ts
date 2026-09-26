@@ -25,6 +25,7 @@ export const PTY_HOST = 'pty-host.js'
 /** Built by the `build` script; the bundle starts it as its native watch worker. */
 export const WATCH_WORKER = 'watch-worker.ts'
 export const IMAGE_WORKER = 'image-worker.ts'
+export const THIRD_PARTY_NOTICES = 'THIRD_PARTY_NOTICES.txt'
 
 // bun.lock keys a workspace's own resolution `<workspace>/<package>`; it wins over the hoisted one.
 const SERVER_WORKSPACE = 'server'
@@ -66,6 +67,7 @@ export async function missingReleaseFiles(serverDirectory: string) {
     PTY_HOST,
     WATCH_WORKER,
     IMAGE_WORKER,
+    THIRD_PARTY_NOTICES,
   ]
   const present = await Promise.all(
     files.map((file) =>
