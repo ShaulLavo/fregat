@@ -1,10 +1,25 @@
 import { strictEqual } from 'node:assert/strict'
+import type { Page } from 'playwright'
 import { selectors } from '../selectors'
 import {
   isolatedNativeScenario,
   settingsSnapshot,
   writeSettings,
 } from './native-provider-verification'
+
+// Markdown renders the reasoning as paragraphs, so compare the words, not the whitespace.
+const words = (text: string) => text.replace(/\s+/g, ' ').trim()
+
+/** Opens the one reasoning row, which may already be open, and returns its rendered text. */
+async function expandedReasoning(page: Page) {
+  const row = selectors.reasoningRows(page).getByRole('button')
+  await row.first().waitFor()
+  strictEqual(await row.count(), 1)
+  if ((await row.getAttribute('aria-expanded')) !== 'true') await row.click()
+  const detail = selectors.reasoningDetail(page)
+  await detail.waitFor()
+  return words(await detail.innerText())
+}
 
 export const responseDelivery = isolatedNativeScenario({
   name: 'response-delivery',
@@ -30,20 +45,13 @@ export const responseDelivery = isolatedNativeScenario({
         '\n\n' +
         'REASONING_END ' +
         'Final retained detail. '.repeat(20)
-      const row = selectors.reasoningDeliveryRow(page)
-      strictEqual(await row.count(), 1)
-      await row.click()
-      const detail = selectors.reasoningDeliveryDetail(page, text).last()
-      await detail.waitFor()
-      strictEqual(await detail.textContent(), text)
+      strictEqual(await expandedReasoning(page), words(text))
       await step('full-buffered-reasoning-expanded')
       await page.reload()
       await selectors.chatExactText(page, 'RESPONSE_DELIVERY_VERIFIED').waitFor()
       const group = selectors.completedWorkGroup(page)
       if ((await group.getAttribute('aria-expanded')) !== 'true') await group.click()
-      const restored = selectors.reasoningDeliveryRow(page)
-      if ((await restored.getAttribute('aria-expanded')) !== 'true') await restored.click()
-      strictEqual(await selectors.reasoningDeliveryDetail(page, text).last().textContent(), text)
+      strictEqual(await expandedReasoning(page), words(text))
       await step('buffered-reasoning-retained-after-reload')
     } finally {
       await writeSettings(page, base, [

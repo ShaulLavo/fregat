@@ -51,8 +51,7 @@ export const selectors = {
       .getByRole('dialog', { name: 'Release worktree', exact: true })
       .getByRole('button', { name: 'Cancel', exact: true }),
   completedWorkGroup: (page: Page) => page.getByRole('button', { name: /^Worked for / }),
-  reasoningDeliveryRow: (page: Page) => page.getByRole('button', { name: /^REASONING_BEGIN / }),
-  reasoningDeliveryDetail: (page: Page, text: string) => page.getByText(text, { exact: true }),
+  reasoningDetail: (page: Page) => page.getByRole('region', { name: 'Reasoning', exact: true }),
   recoverableDraft: (page: Page, label: string) =>
     page
       .getByRole('listbox', { name: 'Drafts', exact: true })
