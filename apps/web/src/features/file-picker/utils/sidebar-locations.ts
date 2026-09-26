@@ -140,11 +140,11 @@ function checkoutCount(count: number) {
 
 function driveUsage(drive: PlacesData['drives'][number]) {
   if (drive.freeBytes === null || drive.totalBytes === null) return null
-  return `${formatSize(drive.totalBytes - drive.freeBytes)} used\nof ${formatSize(drive.totalBytes)} total`
+  return `${formatSize(drive.totalBytes - drive.freeBytes)}/${formatSize(drive.totalBytes)}`
 }
 
 function driveTitle(drive: PlacesData['drives'][number]) {
   const where = displayPath(drive.path)
   const usage = driveUsage(drive)
-  return usage ? `${where} · ${usage}` : where
+  return usage ? `${where} · ${usage} used/total` : where
 }

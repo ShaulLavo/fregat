@@ -314,6 +314,8 @@ export const selectors = {
     page.locator(`[data-studio-themes] [role="option"][data-theme-id="${id}"]`),
   titlebar: (page: Page) => page.locator('header[data-native-window-drag-region]').first(),
   themeStudioOpen: (page: Page) => page.getByRole('button', { name: 'Open studio', exact: true }),
+  quickOpenPreviewHeaderSelector: '[aria-label="File preview"] header',
+  quickOpenPreviewTextSelector: '[aria-label="File preview"] [data-file-preview-text]',
   quickOpenPreview: (page: Page) => page.getByRole('region', { name: 'File preview', exact: true }),
   pickerColumn: (page: Page, index: number) => page.locator(`[data-picker-column="${index}"]`),
   pickerColumnBox: (page: Page, index: number) =>
@@ -912,6 +914,8 @@ export const selectors = {
   terminalSurface: (page: Page) =>
     page.locator('[data-slot="tool-pane"][aria-label="Terminal"]:visible'),
   paletteRowSelector: '[data-slot="command-list"] [role="option"]',
+  paletteLoading: (page: Page) => page.getByRole('status', { name: 'Loading commands' }),
+  pickerLoading: (page: Page) => page.getByRole('status', { name: 'Loading file picker' }),
   paletteInput: (page: Page) => page.locator('[data-slot="command-input"]').first(),
   paletteOptions: (page: Page) => page.locator('[data-slot="command-list"]').getByRole('option'),
   selectedPaletteOption: (page: Page) => page.locator('[cmdk-item][data-selected="true"]'),
