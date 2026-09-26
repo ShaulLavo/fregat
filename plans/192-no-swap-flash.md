@@ -36,7 +36,7 @@ subjects and reads `blank-frames-0`, like `quick-open-no-flicker`.
 | 5   | `features/git/components/history.tsx` (`key={selected}`), `commit-details.tsx`, `utils/history-query.ts`     | commit selection             | new hash over skeleton                   | **fixed**     |
 | 6   | `features/git/utils/history-query.ts`, `HistoryList key`                                                     | ref switch                   | skeleton, scroll lost (deliberate today) | **fixed**     |
 | 7   | `features/git/components/panel.tsx` (`History key={rootPath}`)                                               | root switch                  | remount + skeleton                       | **fixed**     |
-| 8   | `features/git/components/panel.tsx`, `hooks/use-status.ts`                                                   | root / session worktree      | `PanelLoading`                           | likely        |
+| 8   | `features/git/components/panel.tsx`, `hooks/use-status.ts`                                                   | root / session worktree      | `PanelLoading`                           | **fixed**     |
 | 9   | `features/chat-mode/components/stage-body.tsx` (`key={sessionId}`), `chat/components/timeline-viewport.tsx`  | session switch               | conversation skeleton under new title    | confirmed     |
 | 10  | `features/chat/components/side-panel-content.tsx`                                                            | side-panel session switch    | same as 9                                | confirmed     |
 | 11  | `stage-body.tsx`, `side-panel-content.tsx`                                                                   | new chat / empty project     | "Opening draft"                          | likely        |
@@ -44,7 +44,7 @@ subjects and reads `blank-frames-0`, like `quick-open-no-flicker`.
 | 13  | `features/git/components/diff-view.tsx` → `editor/components/diff-editor.tsx`                                | diff tab                     | "Loading comparison"                     | confirmed     |
 | 14  | `features/editor/components/compare-saved-view.tsx`                                                          | compare tab                  | skeleton                                 | likely        |
 | 15  | `features/editor/components/history-pane.tsx`                                                                | undo-history compare         | "Comparing states"                       | likely        |
-| 16  | `features/workbench/components/file-navigator-panel.tsx` (`key={rootPath}`)                                  | tree root / session worktree | `TreeLoading`                            | likely        |
+| 16  | `features/workbench/components/file-navigator-panel.tsx` (`key={rootPath}`)                                  | tree root / session worktree | `TreeLoading`                            | **fixed**     |
 | 17  | `features/chat-mode/components/turn-files.tsx`                                                               | turn / session               | hunks vanish, "0 changes"                | likely        |
 | 18  | `features/git/components/branch-actions.tsx`                                                                 | session worktree             | Push/PR buttons vanish                   | likely        |
 | 19  | `features/workbench/components/editor-group.tsx` (`EditorBreadcrumbs key`)                                   | tab switch                   | symbol crumbs blank (arguably right)     | likely, low   |
@@ -58,6 +58,24 @@ session's header (`keepPreviousData` without a subject check). Fix with shape 2.
 ## Order
 
 9/10 (most used), 5, 2, 3/4, then 8 + 16 (they flash together with 9 on a worktree switch), then the rest.
+
+## Rows 8 and 16 proof
+
+`root-switch-no-flicker` clicks three idle fixture sessions with different roots, delaying status
+and tree reads by 700 ms. `countBlankFrames` first verifies that loaded rows are observable,
+including the file tree's shadow root. Baseline: Git 66 blank frames, files 93. After: both 0.
+The scenario also expands a 100-file folder, scrolls 500 px, switches away and back, and verifies
+restoration. No provider turn runs.
+
+- Shape 1: `useHeldUntilReady` around each whole panel. Git holds above its branch header and
+  actions in both workbench and chat. The file navigator holds its model and actions with the
+  root because workspace navigation evicts tree queries. Its key changes only once ready.
+- Git state follows the shown root, preserving the commit draft while waiting. Tree view records
+  remain separate per root, and capture uses the shown confirmed model after query eviction.
+- Baseline evidence: `/work/tmp/fregat-evidence/20260926T185129Z-scenario-root-switch-no-flicker/`.
+- After evidence: `/work/tmp/fregat-evidence/20260926T190147Z-scenario-root-switch-no-flicker/`.
+  Screenshots read back. DOM tests cover first load, delayed/superseded/error Git switches and
+  commit drafts; tree record tests cover per-root expansion and scroll retention.
 
 ## Row 2 proof
 
@@ -117,3 +135,31 @@ commit frame for a matching header hash and message. No provider runs a turn.
 - After: `/work/tmp/fregat-evidence/20260926T185111Z-scenario-git-history-no-flicker/`
 - Screenshots read back. DOM coverage gates a real in-process commit request and verifies the
   held hash, files and header spinner. The existing first-load panel-state test also passes.
+
+## Rows 8 and 16 review corrections
+
+The shown tree resolves its active file from that root's active or parked workspace. Its
+selection capture and ancestor-directory fetch use the same root, so switching to another
+workspace's selected file cannot overwrite the saved expansion or scroll association.
+
+A missing root, a root replaced by a file, or an invalid root path discards the saved model and
+shows the terminal load error. The rejected root stays marked until a successful root read,
+preventing a held pane's cleanup from saving the removed rows again after query eviction.
+Permission-denied refreshes retain the saved rows and show the refresh warning. Invalidating
+one root preserves the other root's persisted observation.
+
+- Failing before: selecting different files in A and B made the expansion/scroll return check
+  time out in `/work/tmp/fregat-evidence/20260926T200109Z-scenario-root-switch-no-flicker/`.
+  The delayed deleted-directory DOM test expected `error` and received `ready` with saved rows.
+- Focused verification: 59 tests across tree loading, reload observations, tree synchronization,
+  and editor workspace state passed. The tests include real missing-directory, non-directory,
+  and permission-denied responses, plus cleanup after query eviction and subsequent recovery.
+- Repository typecheck passed. The bundle gate failed only on the total: 1,761,886 gzip bytes
+  against a 1,760,711 limit, 1,175 bytes over. No owner failed; pins were left unchanged.
+- Final browser proof: `/work/tmp/fregat-evidence/20260926T201142Z-scenario-root-switch-no-flicker/`.
+  The scenario selects different files before B's first tree read, checks A's scroll during the
+  delayed hold, restores A's expansion and scroll, and records zero blank frames for both panes.
+  It then deletes A during a held root read and verifies that the settled error replaces all rows.
+  Screenshots 04, 06, and 10 were read back. The sole failed response is the intentional missing
+  root's 404; no page errors. Mock provider only, no model turns. Vite 5254 stopped after the run.
+- `bun run gates`, including knip, and the final scripts typecheck passed. No deployment.

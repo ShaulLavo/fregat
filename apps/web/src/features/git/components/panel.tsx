@@ -1,3 +1,6 @@
+import { useEditorRuntime } from '@/features/editor/hooks/use-runtime'
+import { filesystemPath } from '@/lib/documents/utils/identity'
+import { StateContext } from '@/features/git/state/store'
 import { TickerNumber } from '@/components/ticker-number'
 import { Spinner } from '@workspace/ui/components/spinner'
 import { disabledDiffQueryKey } from '@/features/git/utils/query-keys'
@@ -33,6 +36,8 @@ import { StaleNotice } from '@/lib/environments/components/stale-notice'
 const EMPTY_FILES: readonly GitFileStatus[] = []
 
 export function Panel({ className, rootPath }: ComponentProps<'section'> & { rootPath: string }) {
+  const runtime = useEditorRuntime()
+  const store = runtime.gitStoreForRoot(filesystemPath(rootPath))
   const navigation = useNavigation()
   const panels = useEditorWorkspaceState((state) => state.workbenchPanels)
   const view = panels.activeGitTab
@@ -63,87 +68,89 @@ export function Panel({ className, rootPath }: ComponentProps<'section'> & { roo
   const loadingDiff = selectedDiffPending && selectedDiff?.kind === 'snapshot' ? selectedDiff : null
 
   return (
-    <FocusablePanel
-      area='git'
-      target={{ kind: 'git', rootPath }}
-      aria-label='Git panel'
-      className={cn('flex h-full min-h-0 flex-col text-foreground', className)}
-    >
-      <StaleNotice />
-      <ToolPane
-        bodyClassName='flex flex-col'
-        scroll={false}
-        state={{
-          pending: view !== 'graph' && status.isPending,
-          error: status.isError && !status.data,
-          empty: !status.isPending && !repository,
-        }}
-        loading={<PanelLoading />}
-        errorState={
-          <EmptyState
-            align='start'
-            className='min-h-0 flex-1'
-            action={
-              <Button
-                disabled={status.isFetching}
-                onClick={() => void status.refetch()}
-                size='sm'
-                variant='outline'
-              >
-                {status.isFetching ? <Spinner /> : null}Retry
-              </Button>
-            }
-            description={clientErrorMessage(status.error)}
-            title='Git is unavailable'
-            tone='error'
-          />
-        }
-        emptyState={
-          <EmptyState align='start' className='min-h-0 flex-1' title='No Git repository' />
-        }
-        header={
-          <PaneBar>
-            <Tabs value={view} onValueChange={(next: typeof view) => setView(next)}>
-              <TabsList aria-label='Git view'>
-                <TabsTab value='changes'>
-                  <GitDiffIcon />
-                  Changes
-                  <span className='text-muted-foreground text-2xs tabular-nums'>
-                    <TickerNumber value={files.length} />
-                  </span>
-                </TabsTab>
-                <TabsTab value='graph'>
-                  <GitBranchIcon />
-                  Graph
-                </TabsTab>
-              </TabsList>
-            </Tabs>
-          </PaneBar>
-        }
+    <StateContext value={store}>
+      <FocusablePanel
+        area='git'
+        target={{ kind: 'git', rootPath }}
+        aria-label='Git panel'
+        className={cn('flex h-full min-h-0 flex-col text-foreground', className)}
       >
-        <Activity mode={view === 'graph' ? 'visible' : 'hidden'}>
-          <History rootPath={rootPath} />
-        </Activity>
-        <Activity mode={view === 'changes' ? 'visible' : 'hidden'}>
-          {repository ? (
-            <CommitControls
-              hasLocalChanges={hasLocalChanges}
-              repository={repository}
-              rootPath={rootPath}
+        <StaleNotice />
+        <ToolPane
+          bodyClassName='flex flex-col'
+          scroll={false}
+          state={{
+            pending: view !== 'graph' && status.isPending,
+            error: status.isError && !status.data,
+            empty: !status.isPending && !repository,
+          }}
+          loading={<PanelLoading />}
+          errorState={
+            <EmptyState
+              align='start'
+              className='min-h-0 flex-1'
+              action={
+                <Button
+                  disabled={status.isFetching}
+                  onClick={() => void status.refetch()}
+                  size='sm'
+                  variant='outline'
+                >
+                  {status.isFetching ? <Spinner /> : null}Retry
+                </Button>
+              }
+              description={clientErrorMessage(status.error)}
+              title='Git is unavailable'
+              tone='error'
             />
-          ) : null}
-          <AutoPullStatus rootPath={rootPath} />
-          <SubmodulesNotice rootPath={rootPath} />
-          <ChangesList
-            rootPath={rootPath}
-            staged={rows.staged}
-            worktree={rows.worktree}
-            loadingPath={loadingDiff?.path}
-            loadingSection={loadingDiff?.source}
-          />
-        </Activity>
-      </ToolPane>
-      <DiscardDialog rootPath={rootPath} />
-    </FocusablePanel>
+          }
+          emptyState={
+            <EmptyState align='start' className='min-h-0 flex-1' title='No Git repository' />
+          }
+          header={
+            <PaneBar>
+              <Tabs value={view} onValueChange={(next: typeof view) => setView(next)}>
+                <TabsList aria-label='Git view'>
+                  <TabsTab value='changes'>
+                    <GitDiffIcon />
+                    Changes
+                    <span className='text-muted-foreground text-2xs tabular-nums'>
+                      <TickerNumber value={files.length} />
+                    </span>
+                  </TabsTab>
+                  <TabsTab value='graph'>
+                    <GitBranchIcon />
+                    Graph
+                  </TabsTab>
+                </TabsList>
+              </Tabs>
+            </PaneBar>
+          }
+        >
+          <Activity mode={view === 'graph' ? 'visible' : 'hidden'}>
+            <History rootPath={rootPath} />
+          </Activity>
+          <Activity mode={view === 'changes' ? 'visible' : 'hidden'}>
+            {repository ? (
+              <CommitControls
+                hasLocalChanges={hasLocalChanges}
+                repository={repository}
+                rootPath={rootPath}
+              />
+            ) : null}
+            <AutoPullStatus rootPath={rootPath} />
+            <SubmodulesNotice rootPath={rootPath} />
+            <ChangesList
+              rootPath={rootPath}
+              staged={rows.staged}
+              worktree={rows.worktree}
+              loadingPath={loadingDiff?.path}
+              loadingSection={loadingDiff?.source}
+            />
+          </Activity>
+        </ToolPane>
+        <DiscardDialog rootPath={rootPath} />
+      </FocusablePanel>
+    </StateContext>
   )
 }
