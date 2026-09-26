@@ -107,9 +107,10 @@ export class McpSignInAttempts {
 /** The pasted address, when it is the redirect this attempt is waiting for. */
 export function matchingCallback(authorizationUrl: string, pasted: string) {
   const authorization = new URL(authorizationUrl)
-  const redirect = URL.canParse(authorization.searchParams.get('redirect_uri') ?? '')
-    ? new URL(authorization.searchParams.get('redirect_uri') ?? '')
-    : null
+  const redirects = authorization.searchParams.getAll('redirect_uri')
+  const states = authorization.searchParams.getAll('state')
+  const redirectValue = redirects.length === 1 ? redirects[0] : undefined
+  const redirect = redirectValue && URL.canParse(redirectValue) ? new URL(redirectValue) : null
   const callback = URL.canParse(pasted) ? new URL(pasted) : null
   const facts = {
     loopback: callback ? LOOPBACK_HOSTS.has(callback.hostname) : false,
@@ -118,8 +119,11 @@ export function matchingCallback(authorizationUrl: string, pasted: string) {
     path: callback !== null && callback.pathname === redirect?.pathname,
     port: callback !== null && callback.port === redirect?.port,
     state:
+      states.length === 1 &&
+      Boolean(states[0]) &&
       callback !== null &&
-      callback.searchParams.get('state') === authorization.searchParams.get('state'),
+      callback.searchParams.getAll('state').length === 1 &&
+      callback.searchParams.get('state') === states[0],
   }
   // Delivered to the exact origin the harness listens on: `localhost` may resolve to `::1`.
   if (callback && redirect && callback.protocol === 'http:' && Object.values(facts).every(Boolean))

@@ -18,6 +18,26 @@ describe('matchingCallback', () => {
   })
 
   it.each([
+    [
+      'duplicate redirect',
+      `${AUTHORIZATION}&redirect_uri=http%3A%2F%2Flocalhost%3A9%2Fadmin`,
+      'state=s-1',
+    ],
+    [
+      'duplicate matching redirect',
+      `${AUTHORIZATION}&redirect_uri=http%3A%2F%2Flocalhost%3A56536%2Fcallback`,
+      'state=s-1',
+    ],
+    ['missing state', AUTHORIZATION.replace('&state=s-1', ''), 'code=c'],
+    ['empty state', AUTHORIZATION.replace('state=s-1', 'state='), 'state='],
+    ['duplicate state', `${AUTHORIZATION}&state=other`, 'state=s-1'],
+  ])('refuses an authorization URL with %s', (_label, authorization, query) => {
+    expect(() =>
+      matchingCallback(authorization, `http://localhost:56536/callback?${query}`),
+    ).toThrow(expect.objectContaining({ code: 'provider.MCP_SIGN_IN_ADDRESS_MISMATCH' }))
+  })
+
+  it.each([
     ['another host', 'http://evil.example.test:56536/callback?code=c&state=s-1'],
     ['another port', 'http://localhost:9/callback?code=c&state=s-1'],
     ['another path', 'http://localhost:56536/admin?code=c&state=s-1'],
