@@ -9,7 +9,8 @@
 - Repository: [ShaulLavo/tree-sitter-md](https://github.com/ShaulLavo/tree-sitter-md) (MIT), npm
   `tree-sitter-md`. Spike findings: `docs/FINDINGS.md` in that repository; Platform measurements in
   [`docs/markdown-parser/measurements.md`](../docs/markdown-parser/measurements.md).
-- Starting point (spike, 2026-09-26): 672/676 spec examples, 0 real mismatches against micromark on
+- Starting point (spike, 2026-09-26, Rust resolver; Plan 176 Phase 0 moves it to C at the same
+  numbers or better): 672/676 spec examples, 0 real mismatches against micromark on
   our corpus, keystroke at 1 MB 0.49 ms median and 1.0 ms p95, first frame 0.36 ms warm and
   6.4–9.5 ms cold, full parse 26 ms at 1 MB, 193 KB gzip, 7.5 MB linear memory for a 1 MB document.
 
@@ -56,18 +57,21 @@ to.
   ones it wants. With all options off the spec runner holds the plain CommonMark and GFM floor; with
   each option on, its own test suite and the corpus check against micromark with the matching
   extension. This covers what chat needs from remark (Plan 176 question 2) and Plan 108's Obsidian
-  phase.
+  phase. The resolver is C on cmark (Plan 176 Phase 0), which has none of these: footnotes port from
+  cmark-gfm's extension; math, wiki links, callouts, highlights and CJK flanking are written here
+  (pulldown-cmark had math, wiki links and GitHub alerts; choosing C moved them into this pass).
 
 ## Pass 2: memory and bundle size
 
-Starting at 193 KB gzip (pulldown-cmark ~120 KB of code, the tree-sitter C runtime 96 KB, parse tables
-and data 178 KB raw) and 7.5 MB of linear memory for a 1 MB document (2 MB of it the UTF-16 text).
+Starting at Phase 0's C release; the spike measured 193 KB gzip (pulldown-cmark ~120 KB of code, the
+tree-sitter C runtime 96 KB, parse tables and data 178 KB raw) and 7.5 MB of linear memory for a 1 MB
+document (2 MB of it the UTF-16 text). Re-measure before the first change.
 
-- **Size.** After Plan 176 Phase 0 removes most of pulldown-cmark: `opt-level=z` and `wasm-opt`
-  (measured 161 KB before that, 10–20% slower keystrokes, so decide with Pass 3's numbers); compress
-  or drop the entity table; strip what the Editor never calls. Measure sharing one tree-sitter
-  runtime with web-tree-sitter (the grammar as a web-tree-sitter language, the resolver as its own
-  module) against the cost of the tree crossing a module boundary.
+- **Size.** `-Oz` against `-O3` and `wasm-opt` (the Rust build measured 161 KB at `opt-level=z`, 10–20%
+  slower keystrokes, so decide with Pass 3's numbers); compress or drop the entity table; strip what
+  the Editor never calls. If Phase 0 found that grammar and resolver load as one web-tree-sitter side
+  module, drop the module's own tree-sitter runtime and share the Editor's; otherwise measure the
+  cost of the tree crossing a module boundary against the 96 KB.
 - **Memory.** Stop holding the document twice: read text from JS in chunks or keep one UTF-8 copy;
   bound the per-paragraph inline cache; reuse linear memory across documents, since a wasm heap grows
   and never shrinks.
