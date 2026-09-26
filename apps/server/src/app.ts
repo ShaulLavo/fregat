@@ -213,6 +213,13 @@ export function createApp(options: AppOptions) {
   // keeps a test run from writing into the developer's real settings.
   const settings = new SettingsStore({ ...options.settings, workspaceRoot: fs.paths.workspaceRoot })
   fs.watchDirectoryLimit = () => settings.snapshot().values['files.watchDirectoryLimit']
+  fs.searchIndexSettings = () => {
+    const values = settings.snapshot().values
+    return {
+      idleMinutes: values['files.searchIndexIdleMinutes'],
+      limit: values['files.searchIndexLimit'],
+    }
+  }
   let watchDirectoryLimit = settings.snapshot().values['files.watchDirectoryLimit']
   settings.onChange(() => {
     const next = settings.snapshot().values['files.watchDirectoryLimit']

@@ -185,10 +185,7 @@ export const recordRecentBodySchema = v.object({
   path: pathSchema,
 })
 
-export const openWorkspaceRootBodySchema = v.object({
-  generation: v.pipe(v.number(), v.safeInteger(), v.minValue(1)),
-  path: pathSchema,
-})
+export const openWorkspaceRootBodySchema = v.object({ path: pathSchema })
 
 export const registerWorkspaceAddressBodySchema = v.object({ path: pathSchema })
 export const lookupWorkspaceAddressesBodySchema = v.object({

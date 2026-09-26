@@ -1078,6 +1078,31 @@ export const SETTINGS_REGISTRY = {
     visibility: 'advanced',
     keywords: ['files', 'watch', 'watcher', 'inotify', 'limit', 'large', 'folders', 'live'],
   }),
+  'files.searchIndexLimit': defineSetting({
+    // Each index holds every entry of its folder in server memory (about 870 B per entry).
+    schema: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(64)),
+    default: 4,
+    scope: 'machine',
+    widget: 'number',
+    category: 'Files',
+    title: 'Search index limit',
+    description:
+      'How many open folders keep a file index for fast search at once. Opening one more drops the least recently used index; search there reads the disk until the folder is opened again.',
+    visibility: 'advanced',
+    keywords: ['files', 'search', 'index', 'limit', 'memory', 'folders', 'quick open'],
+  }),
+  'files.searchIndexIdleMinutes': defineSetting({
+    schema: v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(1440)),
+    default: 15,
+    scope: 'machine',
+    widget: 'number',
+    category: 'Files',
+    title: 'Search index idle time',
+    description:
+      'Minutes a folder keeps its file index after the last window showing it closes, so reopening it searches at full speed at once.',
+    visibility: 'advanced',
+    keywords: ['files', 'search', 'index', 'idle', 'warm', 'folders', 'quick open'],
+  }),
   'lsp.experimental.tyForPython': defineSetting({
     schema: v.boolean(),
     default: false,

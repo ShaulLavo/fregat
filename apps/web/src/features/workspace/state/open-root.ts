@@ -19,7 +19,6 @@ import {
   isActiveWorkspaceRoot,
   useActiveProjectStore,
 } from '@/features/workspace/state/active-project'
-import { claimWorkspaceOpenGeneration } from '@/features/workspace/state/open-generation'
 
 export type OpenWorkspaceRootResult = 'already-open' | 'failed' | 'opened' | 'superseded'
 
@@ -43,7 +42,6 @@ export async function openWorkspaceRootForOwner(
   if (activity.aborted || options.isCurrent?.() === false) return 'superseded'
   const reservation = workspaceEdits?.acquireRootSwitchReservation() ?? null
   if (workspaceEdits && !reservation) return 'failed'
-  const generation = claimWorkspaceOpenGeneration()
   const startedAt = performance.now()
   const previousRoot = useActiveProjectStore.getState().workspaceRoot
   activateWorkspaceRoot(workspaceRoot)
@@ -70,16 +68,14 @@ export async function openWorkspaceRootForOwner(
     const result = await runMutation(
       queryClient,
       openWorkspaceRootMutationOptions(filesystemPath(workspaceRoot)),
-      { generation, signal: activity },
+      { signal: activity },
     )
     // A later request already claimed the app; landing now would drag it back.
     if (activity.aborted) return abandon('aborted')
     if (options.isCurrent?.() === false) return abandon('not-current')
-    if (result.status === 'superseded') return abandon('server')
     if (!isActiveWorkspaceRoot(workspaceRoot)) return abandon('claimed')
     confirmedEnvironmentId(origin)
     const entry = result.entry
-    if (!entry) return 'superseded'
     activateWorkspaceRoot(entry.path)
     const alreadyOpen = workspaceStore.getState().rootFolder?.path === entry.path
     if (alreadyOpen) {

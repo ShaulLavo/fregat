@@ -103,13 +103,15 @@ stays safe to read, share and export.
 
 ## Files
 
-| Setting                     | Default  | Scope       | What it does                                                                                                                                        |
-| --------------------------- | -------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `files.autoSave`            | `"off"`  | window      | Save edited files automatically, and when.                                                                                                          |
-| `files.autoSaveDelay`       | `1000`   | window      | Milliseconds of quiet before an automatic save, when saving after a delay.                                                                          |
-| `files.picker.view`         | `"auto"` | application | How the file picker shows a folder: columns, a list, or icons. Auto uses columns when choosing a folder and a list when choosing a file.            |
-| `files.showHidden`          | `false`  | window      | Show dot-prefixed files and folders in file pickers.                                                                                                |
-| `files.watchDirectoryLimit` | `200000` | machine     | How many folders all open workspaces may watch for live changes together. A workspace that would pass it updates its top level and open files only. |
+| Setting                        | Default  | Scope       | What it does                                                                                                                                                                         |
+| ------------------------------ | -------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `files.autoSave`               | `"off"`  | window      | Save edited files automatically, and when.                                                                                                                                           |
+| `files.autoSaveDelay`          | `1000`   | window      | Milliseconds of quiet before an automatic save, when saving after a delay.                                                                                                           |
+| `files.picker.view`            | `"auto"` | application | How the file picker shows a folder: columns, a list, or icons. Auto uses columns when choosing a folder and a list when choosing a file.                                             |
+| `files.showHidden`             | `false`  | window      | Show dot-prefixed files and folders in file pickers.                                                                                                                                 |
+| `files.watchDirectoryLimit`    | `200000` | machine     | How many folders all open workspaces may watch for live changes together. A workspace that would pass it updates its top level and open files only.                                  |
+| `files.searchIndexLimit`       | `4`      | machine     | How many open folders keep a file index for fast search at once. Opening one more drops the least recently used index; search there reads the disk until the folder is opened again. |
+| `files.searchIndexIdleMinutes` | `15`     | machine     | Minutes a folder keeps its file index after the last window showing it closes, so reopening it searches at full speed at once.                                                       |
 
 ## Git
 

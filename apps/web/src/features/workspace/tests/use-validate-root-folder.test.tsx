@@ -22,7 +22,7 @@ import { onTestFinished } from 'vitest'
 
 import { expect, test } from '../../../../test/fixtures'
 import { useValidateRootFolder } from '@/features/workspace/hooks/use-validate-root-folder'
-import { createFileContent, ensureFolderPath, fetchFile, fetchServerInfo } from '@/lib/file-server'
+import { createFileContent, ensureFolderPath, fetchFile } from '@/lib/file-server'
 import type { PickedFsEntry } from '@/lib/file-system-types'
 
 test('clears a cached root folder that no longer exists on disk', async ({ client }) => {
@@ -42,18 +42,11 @@ test('clears a cached root folder that points at a file', async ({ client }) => 
   await waitFor(() => expect(store.getState().rootFolder).toBeNull())
 })
 
-test('keeps a cached root folder that still exists and makes it the index scope', async ({
-  client,
-  server,
-}) => {
+test('keeps a cached root folder that still exists', async ({ client }) => {
   void client
   await ensureFolderPath(filesystemPath('repo'), getClient())
   const { store } = await renderValidation(client, 'repo')
 
-  await waitFor(async () => {
-    const info = await fetchServerInfo(new AbortController().signal, getClient())
-    expect(info.workspaceIndex?.scanRoot).toBe(path.join(server.root, 'repo'))
-  })
   expect(store.getState().rootFolder?.path).toBe('repo')
   await waitFor(() =>
     expect(store.getState().rootFolder?.workspaceAddress).toMatchObject({ path: 'repo' }),
