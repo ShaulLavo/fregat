@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import path from 'node:path'
 
+import { promote } from '../deploy/systemd/promote'
 import { stopTerminalHost } from '../../apps/server/src/terminal-host/identity'
 import { hostPaths } from '../../apps/server/src/terminal-host/protocol'
 
@@ -11,6 +12,8 @@ import { createScriptError } from '../structured-errors'
 const SERVER_ROOT = path.resolve(import.meta.dirname, '../../apps/server')
 const START_TIMEOUT_MS = 30_000
 const STOP_TIMEOUT_MS = 5_000
+// The server's exit after Restart, the unit's RestartForceExitStatus.
+const RESTART_EXIT_CODE = 75
 
 export type IsolatedServer = {
   readonly port: number
@@ -20,6 +23,8 @@ export type IsolatedServer = {
   readonly logs: string
   /** The server's `PLATFORM_PRODUCTION_ROOT`: stage a release by linking `pending` here. */
   readonly productionRoot: string
+  /** How long the supervisor waits after a Restart exit before starting the server again. */
+  restartDelayMs: number
   signal(signal: NodeJS.Signals): void
   stop(): Promise<void>
 }
@@ -65,20 +70,34 @@ export async function startIsolatedServer(
       Number(webOrigin.port),
     ),
   }
-  const child = Bun.spawn({
-    cmd: [
-      process.execPath,
-      '--preload',
-      new URL('./push-boundary.ts', import.meta.url).pathname,
-      'src/index.ts',
-    ],
-    cwd: SERVER_ROOT,
-    env,
-    stderr: Bun.file(path.join(directory, 'server.stderr')),
-    stdout: Bun.file(path.join(directory, 'server.stdout')),
-  })
+  const spawn = () =>
+    Bun.spawn({
+      cmd: [
+        process.execPath,
+        '--preload',
+        new URL('./push-boundary.ts', import.meta.url).pathname,
+        'src/index.ts',
+      ],
+      cwd: SERVER_ROOT,
+      env,
+      stderr: Bun.file(path.join(directory, 'server.stderr')),
+      stdout: Bun.file(path.join(directory, 'server.stdout')),
+    })
+  let child = spawn()
   const origin = `http://localhost:${port}`
   let stopping: Promise<void> | undefined
+  // Prod's RestartSec.
+  let restartDelayMs = 250
+  // Plays systemd's part: a Restart exit promotes the approved release and starts the server again.
+  const supervise = async (exited: Bun.Subprocess) => {
+    if ((await exited.exited) !== RESTART_EXIT_CODE || stopping) return
+    promote(productionRoot, () => true)
+    await Bun.sleep(restartDelayMs)
+    if (stopping) return
+    child = spawn()
+    void supervise(child)
+  }
+  void supervise(child)
   const stop = () => {
     process.off('SIGINT', onSignal)
     process.off('SIGTERM', onSignal)
@@ -98,7 +117,22 @@ export async function startIsolatedServer(
   const signal = (name: NodeJS.Signals) => {
     if (child.exitCode === null) child.kill(name)
   }
-  return { port, origin, directory, home, logs, productionRoot, signal, stop }
+  return {
+    port,
+    origin,
+    directory,
+    home,
+    logs,
+    productionRoot,
+    get restartDelayMs() {
+      return restartDelayMs
+    },
+    set restartDelayMs(ms: number) {
+      restartDelayMs = ms
+    },
+    signal,
+    stop,
+  }
 }
 
 async function waitForHealth(
