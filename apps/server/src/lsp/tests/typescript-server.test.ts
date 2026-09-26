@@ -18,6 +18,7 @@ import { treeWatchSource } from '../../fs/tree-watch'
 import { FileChangeHub } from '../../fs/watch'
 import { createInternalError } from '../../observability/structured-errors'
 import { fileUriForPath } from '@workspace/contracts'
+import { AgentDiagnosticsReader } from '../agent-diagnostics'
 import { LspSessionPool, type LspProxyClientSession, type LspProxySocket } from '../proxy-session'
 import { resolveLspServer } from '../registry'
 import { LspWatchedFiles } from '../watched-files'
@@ -72,6 +73,65 @@ class RecordingSocket implements LspProxySocket {
     return this.sent.findLast((message) => message.method === method)?.params
   }
 }
+
+describe('the errors an agent edit introduced, from a running language server', () => {
+  it.each(RUNTIMES)(
+    'reads the disk edit with $packageName (pulled unopened, or published after the editor syncs)',
+    async ({ packageName, native }) => {
+      const clean = 'export const count: number = 1\n'
+      const broken = 'export const count: number = "one"\n'
+      const fixture = await installedTypeScriptRuntimeFixture(packageName, {
+        'package.json': '{"private":true,"type":"module"}\n',
+        'tsconfig.json': '{"compilerOptions":{"strict":true},"files":["probe.ts"]}\n',
+        'probe.ts': clean,
+      })
+      fixtures.push(fixture)
+      const { root } = fixture
+      const filePath = path.join(root, 'probe.ts')
+      const uri = fileUriForPath(filePath)
+      const match = await resolveLspServer({
+        filePath,
+        serverId: 'typescript',
+        settings: SETTINGS,
+        workspaceRoot: root,
+      })
+      if (!match) throw createInternalError('TypeScript fixture did not match its language server')
+      const { pool } = watchedPool()
+      const socket = new RecordingSocket()
+      const session = await pool.acquire(socket, match, root)
+      if (!session)
+        throw createInternalError('TypeScript fixture did not start its language server')
+      await request(session, socket, 1, 'initialize', initializeParams(root))
+      await notify(session, 'initialized', {})
+      const reader = new AgentDiagnosticsReader({
+        enabled: () => true,
+        pool: () => pool,
+        settings: () => SETTINGS,
+      })
+      if (native)
+        expect(await reader.errors(filePath, root, 20_000)).toEqual({ mode: 'pull', errors: [] })
+      if (!native)
+        await notify(session, 'textDocument/didOpen', {
+          textDocument: { languageId: 'typescript', text: clean, uri, version: 1 },
+        })
+
+      await writeFile(filePath, broken)
+      const reading = reader.errors(filePath, root, 20_000)
+      if (!native)
+        await notify(session, 'textDocument/didChange', {
+          contentChanges: [{ text: broken }],
+          textDocument: { uri, version: 2 },
+        })
+
+      expect(await reading).toEqual({
+        mode: native ? 'pull' : 'push',
+        errors: [
+          { code: '2322', line: 1, message: "Type 'string' is not assignable to type 'number'." },
+        ],
+      })
+    },
+  )
+})
 
 describe('workspace TypeScript against real language servers', () => {
   it.each(RUNTIMES)(

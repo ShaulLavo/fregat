@@ -345,3 +345,25 @@ SubagentStop, Stop and Interrupt (`config/src/hook_config.rs`). There are two ha
      push (tsserver).
 5. Symbol-tool steering (after 088). A PreToolUse reminder on `Grep|Glob` (Claude) and a
    PreToolUse `command` hook (Codex), sent once per session per tool kind.
+
+Phase 4 status (2026-09-26, wave 2 lane A): 4a and 4b done, 4c waits on an owner check.
+
+- D2, D3 and D4: Decided 2026-09-26: recommendation (wave 2).
+- 4a: `LspSessionPool.fileDiagnostics` asks only a backend that is already running for the
+  file. It spawns nothing. A pull server (TypeScript 7) is sent `didChangeWatchedFiles` and then
+  `textDocument/diagnostic`. A push server answers with its next publish for an open document,
+  which the editor's sync of the disk edit triggers. `lsp/agent-diagnostics.ts`
+  (`AgentDiagnosticsReader`) keeps errors only (severity 1), with one-based lines.
+- 4b: `provider/adapters/utils/claude-diagnostics-hooks.ts` puts a PreToolUse baseline and a
+  PostToolUse `additionalContext` on `Edit|Write|MultiEdit|NotebookEdit`, within a 1.5 s budget.
+  Only errors new since the baseline are sent (`utils/agent-diagnostics-feedback.ts`), at most
+  10 per file and 4,000 characters. One `agent.diagnostics` event per edit carries no messages or
+  paths. The reader reaches Claude sessions through `ProviderDriverServices`. Setting
+  `agent.diagnosticsFeedback` (application, on).
+- Verified with real servers: `lsp/tests/typescript-server.test.ts` covers "the errors an agent
+  edit introduced" on TypeScript 7 (pull, file not open) and tsserver (push, after the editor's
+  `didChange`).
+- 4c (Codex): not built. The plan's first step is a live run of a session-flags hook on
+  codex-cli ≥ 0.157, and a real-provider turn is a hard stop for the wave. Owner check pending:
+  run one Codex session with a `config.hooks` PostToolUse command hook and confirm that it loads,
+  with its trusted hash, and that its `additionalContext` reaches the model.

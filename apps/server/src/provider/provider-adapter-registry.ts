@@ -24,7 +24,7 @@ import {
 } from '../orchestration/orchestration-logging'
 import { AsyncQueue } from '../async-queue'
 import { ProviderCredentialWatch } from './credential-watch'
-import type { AnyProviderDriver, ProviderInstanceConfig } from './driver'
+import type { AnyProviderDriver, ProviderDriverServices, ProviderInstanceConfig } from './driver'
 import { DEFAULT_PROVIDER_INSTANCES, productProviderDrivers } from './drivers/built-in'
 import { defaultProviderStatusCacheDir, ProviderStatusCache } from './status-cache'
 import type { ProviderAdapter } from './types'
@@ -56,6 +56,8 @@ export type ProviderAdapterRegistryOptions = {
   /** Pre-materialized adapters, for tests and for the deterministic harness. */
   adapters?: readonly ProviderAdapter[]
   drivers?: readonly AnyProviderDriver[]
+  /** Handed to every driver's `create`. */
+  services?: ProviderDriverServices
   statusCache?: ProviderStatusCache
   /**
    * Whether an instance is still serving a session.
@@ -93,6 +95,7 @@ export class ProviderAdapterRegistry {
     providerInstanceId: ProviderInstanceId,
   ) => boolean | Promise<boolean>
   private readonly instances = new Map<ProviderInstanceId, LiveProviderInstance>()
+  private readonly services: ProviderDriverServices
   private readonly leaseDeferredInstances = new Set<ProviderInstanceId>()
   private desiredEntries: readonly ProviderInstanceConfig[] | null = null
   private disposed = false
@@ -107,6 +110,7 @@ export class ProviderAdapterRegistry {
       : (options as ProviderAdapterRegistryOptions)
     this.statusCache = resolved.statusCache ?? new ProviderStatusCache()
     this.hasLiveSessions = resolved.hasLiveSessions ?? (() => false)
+    this.services = resolved.services ?? {}
     for (const driver of resolved.drivers ?? []) {
       this.registerDriver(driver)
     }
@@ -490,6 +494,7 @@ export class ProviderAdapterRegistry {
       enabled: entry.enabled ?? true,
       env,
       providerInstanceId: entry.providerInstanceId,
+      services: this.services,
     })
 
     this.instances.set(entry.providerInstanceId, {
@@ -653,11 +658,13 @@ export function createDefaultProviderAdapterRegistry(
   savedInstances: readonly ProviderInstanceConfig[] = [],
   options: {
     hasLiveSessions?: (providerInstanceId: ProviderInstanceId) => boolean | Promise<boolean>
+    services?: ProviderDriverServices
   } = {},
 ) {
   const registry = new ProviderAdapterRegistry({
     drivers: productProviderDrivers(),
     hasLiveSessions: options.hasLiveSessions,
+    services: options.services,
     statusCache: new ProviderStatusCache({ directory: defaultProviderStatusCacheDir() }),
   })
   // Reconciled against the settings document rather than a constant. Passing

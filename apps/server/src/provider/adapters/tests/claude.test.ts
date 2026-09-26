@@ -1,3 +1,4 @@
+import type { AgentDiagnosticsSource } from '../../../lsp/agent-diagnostics'
 import { BackgroundTaskRegistry } from '../../background-liveness'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -769,6 +770,18 @@ describe('ClaudeProviderAdapter', () => {
     await harness.adapter.stopAll()
   })
 
+  it('adds the edit diagnostics hooks beside the Stop hook when a reader is wired', async () => {
+    const reader: AgentDiagnosticsSource = { enabled: () => true, errors: async () => null }
+    const harness = claudeHarness(true, undefined, reader)
+    await harness.adapter.startRuntime(sessionStartInput({}))
+    expect(Object.keys(latestOptions(harness).hooks ?? {}).toSorted()).toEqual([
+      'PostToolUse',
+      'PreToolUse',
+      'Stop',
+    ])
+    await harness.adapter.stopAll()
+  })
+
   it('keeps ephemeral utility sessions free of the schedule hook', async () => {
     const harness = claudeHarness()
     await harness.adapter.startRuntime(sessionStartInput({ ephemeral: true }))
@@ -1473,7 +1486,11 @@ describe('ClaudeProviderAdapter catalog', () => {
   })
 })
 
-function claudeHarness(acknowledgeStop = true, historyRunner?: ClaudeHistoryRunner): ClaudeHarness {
+function claudeHarness(
+  acknowledgeStop = true,
+  historyRunner?: ClaudeHistoryRunner,
+  agentDiagnostics?: AgentDiagnosticsSource,
+): ClaudeHarness {
   const events: ProviderRuntimeEvent[] = []
   const options: Options[] = []
   const prompts: SDKUserMessage[] = []
@@ -1481,6 +1498,7 @@ function claudeHarness(acknowledgeStop = true, historyRunner?: ClaudeHistoryRunn
   const queries: FakeClaudeQuery[] = []
 
   const adapter = new ClaudeProviderAdapter({
+    ...(agentDiagnostics ? { agentDiagnostics } : {}),
     historyRunner,
     attachmentsDir,
     auth: signedInClaudeAuth(),

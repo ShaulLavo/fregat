@@ -54,6 +54,8 @@ import {
   recordChatPipelineInfo,
   recordChatPipelineWarning,
 } from '../../orchestration/orchestration-logging'
+import type { AgentDiagnosticsSource } from '../../lsp/agent-diagnostics'
+import { claudeDiagnosticsHooks } from './utils/claude-diagnostics-hooks'
 import { RuntimeAdapter } from './state/runtime-adapter'
 import { SessionContext } from './state/session-context'
 import { isNotInstalledError, requestGone, sessionIdentityErrors } from '../structured-errors'
@@ -159,6 +161,8 @@ export type ClaudeCreateQuery = (input: {
 }) => Query
 
 export type ClaudeAdapterOptions = {
+  /** Reads the errors an agent's edit introduced; sessions then feed them back through hooks. */
+  agentDiagnostics?: AgentDiagnosticsSource
   discoveryRunner?: ClaudeDiscoveryRunner
   historyRunner?: ClaudeHistoryRunner
   attachmentsDir?: string
@@ -227,6 +231,7 @@ export class ClaudeProviderAdapter
   readonly adapterKey: ProviderInstanceId
   readonly capabilities = CLAUDE_ADAPTER_CAPABILITIES
   readonly driverKind = DEFAULT_CLAUDE_PROVIDER_SETTINGS.driverKind
+  private readonly agentDiagnostics: AgentDiagnosticsSource | null
   private readonly attachmentsDir: string
   private readonly auth: ClaudeAuthRunner
   private readonly createQuery: ClaudeCreateQuery
@@ -255,6 +260,7 @@ export class ClaudeProviderAdapter
     super('Claude', 'session')
     this.adapterKey =
       options.providerInstanceId ?? DEFAULT_CLAUDE_PROVIDER_SETTINGS.providerInstanceId
+    this.agentDiagnostics = options.agentDiagnostics ?? null
     this.attachmentsDir = options.attachmentsDir ?? defaultAttachmentsDir()
     this.env = options.env ?? process.env
     const env = this.env
@@ -615,6 +621,7 @@ export class ClaudeProviderAdapter
       ...(input.agent ? { agent: input.agent } : {}),
       fork,
       onCreated: (session) => this.sessions.set(input.sessionId, session),
+      agentDiagnostics: this.agentDiagnostics,
       attachmentsDir: this.attachmentsDir,
       createQuery: this.createQuery,
       cwd,
@@ -711,6 +718,7 @@ class ClaudeAgentSession extends SessionContext {
     agent?: string
     fork?: ClaudeForkOptions
     onCreated: (session: ClaudeAgentSession) => void
+    agentDiagnostics: AgentDiagnosticsSource | null
     attachmentsDir: string
     createQuery: ClaudeCreateQuery
     cwd: string
@@ -747,7 +755,7 @@ class ClaudeAgentSession extends SessionContext {
       abortController: session.abortController,
       canUseTool: session.canUseTool(),
       cwd: input.cwd,
-      ...(input.ephemeral ? {} : { hooks: { Stop: [{ hooks: [session.stopHook()] }] } }),
+      ...(input.ephemeral ? {} : { hooks: sessionHooks(session, input.agentDiagnostics) }),
       env: input.env,
       executablePath: input.executablePath,
       ...(input.agent ? { agent: input.agent } : {}),
@@ -3027,4 +3035,15 @@ function claudeHookOutcome(message: { exit_code?: number; outcome: ProviderHookO
   if (message.outcome === 'error' && message.exit_code === 2) return 'blocked'
 
   return message.outcome
+}
+
+/** Every Platform session reports its schedules; edits get their errors back when a reader exists. */
+function sessionHooks(
+  session: ClaudeAgentSession,
+  diagnostics: AgentDiagnosticsSource | null,
+): Options['hooks'] {
+  return {
+    ...(diagnostics ? claudeDiagnosticsHooks(diagnostics) : {}),
+    Stop: [{ hooks: [session.stopHook()] }],
+  }
 }
