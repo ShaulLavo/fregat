@@ -2,6 +2,12 @@
 
 Status: **research done 2026-09-25** (findings below; the in-app before/after paint measurement belongs to the implementation phases). Split out of [Plan 110](110-workspace-indexing.md) question 7. Decided 2026-09-25: owner — split the language census into its own small plan. Amended 2026-09-26: tree-sitter warm-up joins the scope (see "Tree-sitter has no warm-up"). [Root PLAN.md](../PLAN.md) owns scheduling.
 
+Editor fix (owner question 1, answer (a)) done 2026-09-26 in wave 2, lane E1:
+[singapore#41](https://github.com/ShaulLavo/singapore/pull/41), in `editor-ref` `ec3fc15`. A Shiki
+session's open carries only its own grammar, edits carry no registrations (84 grammars cost 18.1 ms
+to clone per keystroke; now under 0.1 ms), and the worker schedules background languages once per
+language. Phase 3's getter and the census phases remain.
+
 ## Why
 
 The editor preloads every Shiki grammar and every theme after first paint
