@@ -20,6 +20,8 @@ import { messageSubmission } from '../submit-message'
 import { sendFollowUp } from '../send-follow-up'
 import { unsupportedChatTransport } from '../../../../../test/factories/chat-transport'
 import { followUpDue } from '../../utils/follow-up-policy'
+import { extractReviewComments, withReviewComments } from '@/lib/review-draft/utils/prompt'
+import { resetReviewDraftStore, useReviewDraftStore } from '@/lib/review-draft/state/store'
 
 const owner = { environmentId: TEST_ENVIRONMENT_ID, sessionId: fixtureSessionId(1) }
 const target = { environmentId: owner.environmentId, draftKey: owner.sessionId, rootPath: '/repo' }
@@ -125,6 +127,38 @@ function attachment(id: string): ChatInputAttachment {
     upload: { status: 'ready', attachment: metadata, expiresAt: '2099-01-01T00:00:00Z' },
   }
 }
+
+test('a queued message returns its review comments to the composer as comments, not markup', () => {
+  resetReviewDraftStore()
+  const anchor = { kind: 'plan' as const, lines: { end: 1, start: 1 }, planId: 'plan-1' }
+  const text = withReviewComments('Also this', [
+    {
+      anchor,
+      author: 'user',
+      body: 'rename it',
+      createdAt: '',
+      destination: { environmentId: target.environmentId, rootPath: target.rootPath },
+      id: 'c1',
+      quote: 'About the proposed plan, line 1:\n\n> Step',
+    },
+  ])
+  const review = extractReviewComments(text)
+  restoreFollowUps(owner, [
+    {
+      ...message('with-review'),
+      content: {
+        prompt: review.text,
+        attachments: [],
+        terminalContexts: [],
+        reviewComments: review.comments,
+      },
+    },
+  ])
+  expect(useChatInputDraftStore.getState().getDraft(target).prompt).toBe('Also this')
+  expect(useReviewDraftStore.getState().comments).toMatchObject([
+    { anchor, body: 'rename it', destination: { rootPath: target.rootPath } },
+  ])
+})
 
 function message(id: string): QueuedFollowUp {
   const running = session()

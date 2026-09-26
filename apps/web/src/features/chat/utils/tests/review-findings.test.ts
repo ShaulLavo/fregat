@@ -23,7 +23,7 @@ test('a finding becomes an agent comment on the new lines it cites, and reads as
     destination,
   })
   const prompt = reviewPrompt([{ ...comment, createdAt: '', id: 'c1' }])
-  expect(prompt).toContain('1. About `src/sum.ts`, new lines 2-3:')
+  expect(prompt).toContain('About `src/sum.ts`, new lines 2-3:')
   expect(prompt).toContain('Reviewer finding: Off by one: The loop skips the last item.')
 })
 

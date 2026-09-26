@@ -10,6 +10,7 @@ import { useChatInputDraftStore, type ChatInputDraftTarget } from './chat-input-
 import { useFollowUpStore } from './follow-up-store'
 import { releaseUnusedDraftAttachments } from './stash-transfer'
 import { messageSubmission, submitMessage } from './submit-message'
+import { extractReviewComments } from '@/lib/review-draft/utils/prompt'
 
 type SendFollowUpInput = {
   transport: ChatTransport
@@ -35,14 +36,17 @@ export async function sendFollowUp({
   if (input.kind === 'queued') return sendQueuedFollowUp({ transport, session, id: input.id })
   if (busy && (followUpBehavior === 'queue') !== input.alternate) {
     const draft = useChatInputDraftStore.getState().getDraft(target)
+    // The review block goes back to the composer as comments, never as markup in the text.
+    const review = extractReviewComments(input.payload.text)
     store.enqueue(ref, {
       id: crypto.randomUUID(),
       target,
       payload: input.payload,
       content: {
-        prompt: input.payload.text,
+        prompt: review.text,
         attachments: draft.attachments,
         terminalContexts: draft.terminalContexts,
+        reviewComments: review.comments,
       },
       afterToolActivityId: toolId,
       held: false,

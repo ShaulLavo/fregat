@@ -50,6 +50,8 @@ import { pullRequestLookupFailure } from './pull-request-lookup-failure'
 import { streamOverflow } from './stream-overflow'
 import { chatScreenshot } from './chat-screenshot'
 import { chatMultipleModels } from './chat-multiple-models'
+import { chatAssistantCitation } from './chat-assistant-citation'
+import { chatReviewContext } from './chat-review-context'
 import { chatComposerEditing } from './chat-composer-editing'
 import { chatArtifactTemplate } from './chat-artifact-template'
 import { chatModelFavorites } from './chat-model-favorites'
@@ -366,6 +368,8 @@ export const scenarios: readonly Scenario[] = [
   streamOverflow,
   chatScreenshot,
   chatMultipleModels,
+  chatAssistantCitation,
+  chatReviewContext,
   chatComposerEditing,
   chatArtifactTemplate,
   chatModelFavorites,

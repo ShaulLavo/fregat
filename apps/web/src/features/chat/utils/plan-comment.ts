@@ -35,13 +35,22 @@ function boundaryLine(node: Node, offset: number, end: boolean): number | null {
 
 /** What the agent reads above the comment: the plan's own lines, quoted. */
 export function planCommentQuote(planMarkdown: string, lines: { start: number; end: number }) {
-  const quoted = planMarkdown
+  return markdownQuote(planMarkdown, lines, 'the proposed plan')
+}
+
+/** Lines of a markdown source, quoted under where they came from. */
+export function markdownQuote(
+  markdown: string,
+  lines: { start: number; end: number },
+  subject: string,
+) {
+  const quoted = markdown
     .split(/\r?\n/)
     .slice(lines.start - 1, lines.end)
     .map((line) => `> ${line}`)
   const where =
     lines.start === lines.end ? `line ${lines.start}` : `lines ${lines.start}–${lines.end}`
-  return [`About the proposed plan, ${where}:`, '', ...quoted].join('\n')
+  return [`About ${subject}, ${where}:`, '', ...quoted].join('\n')
 }
 
 export function planSourceLineOffset(planMarkdown: string, displayedMarkdown: string) {

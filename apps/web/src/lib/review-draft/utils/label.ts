@@ -9,6 +9,10 @@ export function reviewCommentLabel(anchor: ReviewCommentAnchor) {
     const { end, start } = anchor.lines
     return start === end ? `Plan line ${start}` : `Plan lines ${start}–${end}`
   }
+  if (anchor.kind === 'message') {
+    const { end, start } = anchor.lines
+    return start === end ? `Reply line ${start}` : `Reply lines ${start}–${end}`
+  }
   const range = anchor.newRange ?? anchor.oldRange
   return range ? `${basename(anchor.path)}:${lineSpan(range)}` : basename(anchor.path)
 }

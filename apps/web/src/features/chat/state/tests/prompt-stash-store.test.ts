@@ -15,6 +15,11 @@ import {
 } from '../chat-input-draft-store'
 import { transferStash } from '../stash-transfer'
 import { readPersistedChatInputDrafts } from '../../utils/draft-storage'
+import {
+  addReviewComment,
+  resetReviewDraftStore,
+  useReviewDraftStore,
+} from '@/lib/review-draft/state/store'
 
 const target = {
   environmentId: testScopedStorage.environmentId,
@@ -29,6 +34,7 @@ beforeEach(() => {
   hydrateChatInputDraftStoreFromStorage(testScopedStorage)
   initializePromptStashStore(testScopedStorage)
   resetPromptStashStore()
+  resetReviewDraftStore()
 })
 afterEach(() => {
   vi.restoreAllMocks()
@@ -90,4 +96,45 @@ test('stash writes preserve unrelated composed drafts', async () => {
   await transferStash(target, { kind: 'stash' })
   const stored = readPersistedChatInputDrafts(testScopedStorage)
   expect(Object.values(stored.draftsByKey).map((item) => item.prompt)).toEqual(['untouched'])
+})
+
+test('a stashed message takes its review comments and quoted replies, and restoring returns them', async () => {
+  drafts().setPrompt(target, 'fix both')
+  const comment = addReviewComment({
+    anchor: { kind: 'message', lines: { end: 2, start: 1 }, messageId: 'm-1', sessionId: 's-1' },
+    author: 'user',
+    body: 'this part',
+    destination: { environmentId: target.environmentId, rootPath: '/repo' },
+    quote: 'About your earlier reply, lines 1–2:\n\n> one\n> two',
+  })
+  await transferStash(target, { kind: 'stash' }, [comment])
+  expect(useReviewDraftStore.getState().comments).toEqual([])
+  const entry = stash().entries[0]!
+  expect(entry.reviewComments).toEqual([
+    { anchor: comment.anchor, author: 'user', body: 'this part', quote: comment.quote },
+  ])
+  expect(readPersistedChatInputDrafts(testScopedStorage).stashEntries[0]?.reviewComments).toEqual(
+    entry.reviewComments,
+  )
+
+  await transferStash(target, { kind: 'restore', entry })
+  expect(useReviewDraftStore.getState().comments).toMatchObject([
+    {
+      anchor: comment.anchor,
+      body: 'this part',
+      destination: { environmentId: target.environmentId, rootPath: '/repo' },
+    },
+  ])
+})
+
+test('a draft holding only review comments can be stashed', async () => {
+  const comment = addReviewComment({
+    anchor: { kind: 'plan', lines: { end: 1, start: 1 }, planId: 'plan-1' },
+    author: 'user',
+    body: 'rename',
+    destination: { environmentId: target.environmentId, rootPath: '/repo' },
+    quote: 'About the proposed plan, line 1:\n\n> Step',
+  })
+  expect(await transferStash(target, { kind: 'stash' }, [comment])).not.toBeNull()
+  expect(stash().entries).toHaveLength(1)
 })

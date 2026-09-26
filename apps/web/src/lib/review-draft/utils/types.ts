@@ -18,6 +18,14 @@ export type ReviewCommentAnchor =
       /** One-based lines of the plan's markdown. */
       readonly lines: LineRange
     }
+  | {
+      /** A quote from an earlier assistant reply in the same session. */
+      readonly kind: 'message'
+      readonly sessionId: string
+      readonly messageId: string
+      /** One-based lines of the reply's markdown. */
+      readonly lines: LineRange
+    }
 
 export type ReviewComment = {
   readonly id: string
@@ -29,3 +37,6 @@ export type ReviewComment = {
   /** The quoted lines as the agent will read them: a fenced excerpt under its location. */
   readonly quote: string
 }
+
+/** A comment as it went out with a message: what the transcript reads back from its text. */
+export type SentReviewComment = Pick<ReviewComment, 'anchor' | 'author' | 'body' | 'quote'>

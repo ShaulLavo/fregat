@@ -502,7 +502,33 @@ function resetCreditAccount(message) {
   })
 }
 
+/** A plain reply per turn, several lines long, for the review-context and citation scenarios. */
+function handleContextReply(message) {
+  if (message.method !== 'turn/start') return false
+
+  const turn = startOwnTurn(message)
+  record({ event: 'turn/start', input: promptText(message) })
+  agentMessage(
+    turn,
+    `${turn}-answer`,
+    [
+      `CONTEXT_REPLY ${turnCount}`,
+      '',
+      'The cache keeps one entry per key.',
+      'Entries expire after ten minutes.',
+      'A miss reads through to the store.',
+    ].join('\n'),
+  )
+  endTurn(turn, 'completed')
+  return true
+}
+
 function handle(message) {
+  if (
+    (scenario === 'chat-review-context' || scenario === 'chat-assistant-citation') &&
+    handleContextReply(message)
+  )
+    return
   if (scenario === 'session-no-flicker' && message.method === 'turn/start') {
     const turn = startOwnTurn(message)
     const text = promptText(message)

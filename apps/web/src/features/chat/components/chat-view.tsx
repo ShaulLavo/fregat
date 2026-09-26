@@ -246,7 +246,7 @@ export function ChatView({
             <PendingApprovalPanel />
             <PendingUserInputPanel />
             <ChatPlanFollowUpProvider
-              key={sessionKey}
+              key={`plan:${sessionKey}`}
               draftTarget={draftTarget}
               disabledReason={
                 disabledReason ??
@@ -268,7 +268,7 @@ export function ChatView({
               onRestore={composer.restore}
             />
             <ChatInput
-              key={sessionKey}
+              key={`input:${sessionKey}`}
               busy={busy}
               correctionDisabledReason={correctionUnavailableReason(session)}
               disabledReason={disabledReason}

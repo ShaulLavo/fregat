@@ -81,6 +81,7 @@
     "./chat/worktree-event": "./src/chat/worktree-event.ts",
     "./chat/commands": "./src/chat/commands.ts",
     "./chat/terminal-context": "./src/chat/terminal-context.ts",
+    "./chat/context-markup": "./src/chat/context-markup.ts",
     "./chat/pending-approvals": "./src/chat/pending-approvals.ts",
     "./chat/pending-user-input": "./src/chat/pending-user-input.ts",
     "./chat/proposed-plan": "./src/chat/proposed-plan.ts",

@@ -1,7 +1,7 @@
 import { SKIP_DOM_SELECTION_TAG } from 'lexical'
 import { useStore } from 'zustand'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { use, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { errorMessage } from '@/lib/error-message'
 import { $setChatInputText } from '../utils/input-editor-actions'
@@ -10,6 +10,8 @@ import { promptStashStoreFor, type PromptStashEntry } from '../state/prompt-stas
 import { transferStash } from '../state/stash-transfer'
 import { chatMutationKeys } from '../utils/mutation-keys'
 import { toastError } from '@/lib/toast-error'
+import { ComposerRootsContext } from '@/lib/composer-attach/providers/roots-context'
+import { inDestination, useReviewDraftStore } from '@/lib/review-draft/state/store'
 
 export function usePromptStash(draftTarget: ChatInputDraftTarget) {
   const [editor] = useLexicalComposerContext()
@@ -20,6 +22,7 @@ export function usePromptStash(draftTarget: ChatInputDraftTarget) {
       activeTarget.current = null
     }
   }, [draftTarget])
+  const aliasRoots = use(ComposerRootsContext)
   const stashStore = promptStashStoreFor(draftTarget.environmentId)
   const entries = useStore(stashStore, (state) => state.entries)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -29,7 +32,12 @@ export function usePromptStash(draftTarget: ChatInputDraftTarget) {
     mutationFn: (input: {
       target: ChatInputDraftTarget
       action: Parameters<typeof transferStash>[1]
-    }) => transferStash(input.target, input.action),
+    }) =>
+      transferStash(
+        input.target,
+        input.action,
+        input.action.kind === 'stash' ? reviewCommentsFor(input.target, aliasRoots) : [],
+      ),
     onSuccess: (content, { target, action }) => {
       const current = activeTarget.current
       if (
@@ -77,4 +85,15 @@ export function usePromptStash(draftTarget: ChatInputDraftTarget) {
     restoreEntry: (entry: PromptStashEntry) =>
       mutation.mutate({ target: draftTarget, action: { kind: 'restore', entry } }),
   }
+}
+
+/** Read when the stash runs, so a comment added a moment before it goes with the message. */
+function reviewCommentsFor(target: ChatInputDraftTarget, aliasRoots: readonly string[]) {
+  const composer = {
+    environmentId: target.environmentId,
+    rootPaths: [target.rootPath, ...aliasRoots],
+  }
+  return useReviewDraftStore
+    .getState()
+    .comments.filter((comment) => inDestination(comment, composer))
 }
