@@ -34,6 +34,7 @@ export function restoreFollowUps(ref: ScopedSessionRef, messages: readonly Queue
         ...message.payload,
         text: '',
         attachments: chatInputUploadAttachments(remaining),
+        reviewComments: [],
         terminalContexts: [],
       },
     })

@@ -4,12 +4,9 @@ import type { Page } from 'playwright'
 import { selectors } from '../selectors'
 import { isolatedNativeScenario, nativeLog, sendPrompt } from './native-provider-verification'
 
-/** Selects whole lines of the first reply, from the start of one text to the end of another. */
-async function selectReplyLines(page: Page, first: string, last: string) {
-  const reply = selectors
-    .chatMessages(page)
-    .locator('article')
-    .filter({ hasText: 'CONTEXT_REPLY 1' })
+/** Selects whole lines of a reply, from the start of one text to the end of another. */
+export async function selectReplyLines(page: Page, heading: string, first: string, last: string) {
+  const reply = selectors.chatMessages(page).locator('article').filter({ hasText: heading })
   await reply.evaluate(
     (article, [from, to]) => {
       const texts: Text[] = []
@@ -43,6 +40,7 @@ export const chatAssistantCitation = isolatedNativeScenario({
 
     await selectReplyLines(
       page,
+      'CONTEXT_REPLY 1',
       'The cache keeps one entry per key.',
       'Entries expire after ten minutes.',
     )

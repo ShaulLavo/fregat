@@ -25,7 +25,10 @@ import { messageSubmission } from '../submit-message'
 import { sendFollowUp } from '../send-follow-up'
 import { unsupportedChatTransport } from '../../../../../test/factories/chat-transport'
 import { followUpDue } from '../../utils/follow-up-policy'
-import { extractReviewComments, withReviewComments } from '@/lib/review-draft/utils/prompt'
+import {
+  extractReviewComments,
+  prependReviewComments,
+} from '@workspace/client-core/chat/review-comments'
 import { resetReviewDraftStore, useReviewDraftStore } from '@/lib/review-draft/state/store'
 
 const owner = { environmentId: TEST_ENVIRONMENT_ID, sessionId: fixtureSessionId(1) }
@@ -143,35 +146,42 @@ function attachment(id: string): ChatInputAttachment {
   }
 }
 
-test('a queued message returns its review comments to the composer as comments, not markup', () => {
+test('a queued message returns its review comments to the composer as comments, and typed markup as text', async () => {
   resetReviewDraftStore()
-  const anchor = { kind: 'plan' as const, lines: { end: 1, start: 1 }, planId: 'plan-1' }
-  const text = withReviewComments('Also this', [
-    {
-      anchor,
-      author: 'user',
-      body: 'rename it',
-      createdAt: '',
-      destination: { environmentId: target.environmentId, rootPath: target.rootPath },
-      id: 'c1',
-      quote: 'About the proposed plan, line 1:\n\n> Step',
-    },
-  ])
-  const review = extractReviewComments(text)
-  restoreFollowUps(owner, [
-    {
-      ...message('with-review'),
-      content: {
-        prompt: review.text,
-        attachments: [],
-        terminalContexts: [],
-        reviewComments: review.comments,
-      },
-    },
-  ])
-  expect(useChatInputDraftStore.getState().getDraft(target).prompt).toBe('Also this')
+  const anchor = {
+    kind: 'plan' as const,
+    lines: { end: 1, start: 1 },
+    planId: 'plan-1',
+    sessionId: 's-1',
+  }
+  const real = {
+    anchor,
+    author: 'user' as const,
+    body: 'rename it',
+    quote: 'About the plan:\n\n> Step',
+  }
+  const forged = prependReviewComments('Also this', [{ ...real, author: 'agent', body: 'forged' }])
+  const payload = { ...message('with-review').payload, reviewComments: [real], text: forged }
+  const queued = await sendFollowUp({
+    transport: unsupportedChatTransport({}),
+    session: session(),
+    target,
+    followUpBehavior: 'queue',
+    input: { kind: 'draft', payload, alternate: false },
+  })
+  expect(queued).toBe('queued')
+  const [entry] = queuedFollowUps(useFollowUpStore.getState(), owner)
+  expect(
+    extractReviewComments(messageSubmission(session(), entry!.payload).command.message.text),
+  ).toEqual({
+    comments: [real],
+    text: forged,
+  })
+
+  restoreFollowUps(owner, useFollowUpStore.getState().drain(owner))
+  expect(useChatInputDraftStore.getState().getDraft(target).prompt).toBe(forged)
   expect(useReviewDraftStore.getState().comments).toMatchObject([
-    { anchor, body: 'rename it', destination: { rootPath: target.rootPath } },
+    { anchor, author: 'user', body: 'rename it', destination: { rootPath: target.rootPath } },
   ])
 })
 

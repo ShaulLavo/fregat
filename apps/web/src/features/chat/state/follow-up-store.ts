@@ -6,7 +6,7 @@ import type {
 } from '@workspace/client-core/chat/commands'
 import type { ChatInputDraft, ChatInputDraftTarget } from './chat-input-draft-store'
 import type { ChatInputSubmitPayload } from '../utils/composed-message'
-import type { SentReviewComment } from '@/lib/review-draft/utils/types'
+import type { SentReviewComment } from '@workspace/client-core/chat/review-comments'
 
 export type MessageSubmission = ReturnType<
   typeof createTurnSubmission | typeof createSteerSubmission

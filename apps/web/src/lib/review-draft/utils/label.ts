@@ -1,5 +1,5 @@
 import { basename } from '@/lib/path-formatters'
-import type { ReviewCommentAnchor } from '@/lib/review-draft/utils/types'
+import type { ReviewCommentAnchor } from '@workspace/client-core/chat/review-comments'
 
 type LineRange = { readonly start: number; readonly end: number }
 

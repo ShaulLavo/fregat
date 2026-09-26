@@ -1,7 +1,7 @@
 import type { PromptStashEntry } from './draft-storage'
 import type { ComposedMessage } from '../state/prompt-stash-store'
 import { createClientInvariantError } from '@/lib/structured-errors'
-import type { SentReviewComment } from '@/lib/review-draft/utils/types'
+import type { SentReviewComment } from '@workspace/client-core/chat/review-comments'
 
 export function composedMessageEmpty(
   content: ComposedMessage,

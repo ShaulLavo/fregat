@@ -27,7 +27,7 @@ import { TerminalContextChip } from './terminal-context-chip'
 import { SentReviewComments } from './sent-review-comments'
 import { ReplyQuoteBar } from './reply-quote-bar'
 import { planSelectionLines, type PlanSelectionLines } from '@/features/chat/utils/plan-comment'
-import { extractReviewComments } from '@/lib/review-draft/utils/prompt'
+import { extractReviewComments } from '@workspace/client-core/chat/review-comments'
 import { UserMessageBody } from './user-message-body'
 
 export function MessageBubble({
@@ -150,7 +150,7 @@ export function MessageBubble({
         >
           {user ? (
             <>
-              <SentReviewComments comments={reviewSplit.comments} />
+              <SentReviewComments comments={reviewSplit.comments} sessionId={message.sessionId} />
               {attachmentList}
               {userMessage.text.trim().length > 0 ? (
                 <UserMessageBody text={userMessage.text} />

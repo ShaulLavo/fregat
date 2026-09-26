@@ -5,16 +5,20 @@
 
 type LineRange = { readonly start: number; readonly end: number }
 
-/** The new side of a quoted diff excerpt: its added and context lines, without their markers. */
-export function diffQuoteNewLines(quote: string): string[] | null {
+/**
+ * One side of a quoted diff excerpt without its markers: the new side is its added and context
+ * lines, the old side its deleted and context lines.
+ */
+export function diffQuoteLines(quote: string, side: 'new' | 'old'): string[] | null {
   const lines = quote.split('\n')
   const header = lines.findIndex((line) => line.startsWith('@@ '))
   if (header < 0) return null
 
+  const otherSide = side === 'new' ? '-' : '+'
   const body: string[] = []
   for (const line of lines.slice(header + 1)) {
     if (/^`{3,}\s*$/.test(line)) break
-    if (line.startsWith('-')) continue
+    if (line.startsWith(otherSide)) continue
     body.push(line.slice(1))
   }
   return body

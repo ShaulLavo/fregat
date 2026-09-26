@@ -1,11 +1,11 @@
 import { describe } from 'vitest'
 import { expect, test } from '../../../../../test/fixtures'
 
-import { blockQuoteLines, diffQuoteNewLines, linesMatch } from '@/features/chat/utils/review-source'
+import { blockQuoteLines, diffQuoteLines, linesMatch } from '@/features/chat/utils/review-source'
 import { markdownQuote } from '@/features/chat/utils/plan-comment'
 
 describe('review sources', () => {
-  test('the new side of a quoted diff is its added and context lines', () => {
+  test('each side of a quoted diff is its own changed lines and the context', () => {
     const quote = [
       'About `src/app.ts`, new lines 2-3:',
       '',
@@ -16,8 +16,9 @@ describe('review sources', () => {
       '+const b = 3',
       '```',
     ].join('\n')
-    expect(diffQuoteNewLines(quote)).toEqual(['const a = 1', 'const b = 3'])
-    expect(diffQuoteNewLines('no hunk here')).toBeNull()
+    expect(diffQuoteLines(quote, 'new')).toEqual(['const a = 1', 'const b = 3'])
+    expect(diffQuoteLines(quote, 'old')).toEqual(['const a = 1', 'const b = 2'])
+    expect(diffQuoteLines('no hunk here', 'new')).toBeNull()
   })
 
   test('a quoted reply reads back as its own lines, and only the same lines match', () => {

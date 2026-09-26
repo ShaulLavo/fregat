@@ -1,4 +1,4 @@
-import { blobDiffQueryOptions } from '@/features/git/utils/blob-diff-query'
+import { blobDiffQueryOptions } from '@/lib/blob-diff-query'
 import { useHeldUntilReady } from '@/hooks/use-held-until-ready'
 import { Spinner } from '@workspace/ui/components/spinner'
 import { useListbox } from '@workspace/ui/patterns/use-listbox'

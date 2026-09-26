@@ -1,5 +1,5 @@
 import { persistedAttachmentDraftSchema } from './attachment-draft'
-import { sentReviewCommentSchema } from '@/lib/review-draft/utils/prompt'
+import { sentReviewCommentSchema } from '@workspace/client-core/chat/review-comments'
 import { readWorkspaceCacheEntry, writeWorkspaceCacheEntry } from '@/lib/workspace-cache-storage'
 import type { ScopedStorage } from '@/lib/environments/state/scoped-storage'
 import type { EnvironmentId } from '@workspace/contracts'

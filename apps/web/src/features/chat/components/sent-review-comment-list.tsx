@@ -1,17 +1,20 @@
 import { ArrowSquareOutIcon } from '@phosphor-icons/react'
 import { Button } from '@workspace/ui/components/button'
+import type { SessionId } from '@workspace/contracts'
 
 import { useOpenReviewSource } from '@/features/chat/hooks/use-open-review-source'
 import { reviewCommentLabel } from '@/lib/review-draft/utils/label'
-import type { SentReviewComment } from '@/lib/review-draft/utils/types'
+import type { SentReviewComment } from '@workspace/client-core/chat/review-comments'
 
 /** Chips for a message's review comments; each opens the source it quoted. */
 export function SentReviewCommentList({
   comments,
+  sessionId,
 }: {
   readonly comments: readonly SentReviewComment[]
+  readonly sessionId: SessionId
 }) {
-  const open = useOpenReviewSource()
+  const open = useOpenReviewSource(sessionId)
 
   return (
     <div aria-label='Review comments' className='mb-2 flex min-w-0 flex-col gap-1' role='group'>

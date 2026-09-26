@@ -11,7 +11,6 @@ import { transferStash } from '../state/stash-transfer'
 import { chatMutationKeys } from '../utils/mutation-keys'
 import { toastError } from '@/lib/toast-error'
 import { ComposerRootsContext } from '@/lib/composer-attach/providers/roots-context'
-import { inDestination, useReviewDraftStore } from '@/lib/review-draft/state/store'
 
 export function usePromptStash(draftTarget: ChatInputDraftTarget) {
   const [editor] = useLexicalComposerContext()
@@ -32,12 +31,7 @@ export function usePromptStash(draftTarget: ChatInputDraftTarget) {
     mutationFn: (input: {
       target: ChatInputDraftTarget
       action: Parameters<typeof transferStash>[1]
-    }) =>
-      transferStash(
-        input.target,
-        input.action,
-        input.action.kind === 'stash' ? reviewCommentsFor(input.target, aliasRoots) : [],
-      ),
+    }) => transferStash(input.target, input.action, aliasRoots),
     onSuccess: (content, { target, action }) => {
       const current = activeTarget.current
       if (
@@ -85,15 +79,4 @@ export function usePromptStash(draftTarget: ChatInputDraftTarget) {
     restoreEntry: (entry: PromptStashEntry) =>
       mutation.mutate({ target: draftTarget, action: { kind: 'restore', entry } }),
   }
-}
-
-/** Read when the stash runs, so a comment added a moment before it goes with the message. */
-function reviewCommentsFor(target: ChatInputDraftTarget, aliasRoots: readonly string[]) {
-  const composer = {
-    environmentId: target.environmentId,
-    rootPaths: [target.rootPath, ...aliasRoots],
-  }
-  return useReviewDraftStore
-    .getState()
-    .comments.filter((comment) => inDestination(comment, composer))
 }

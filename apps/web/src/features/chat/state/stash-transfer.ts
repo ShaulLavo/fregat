@@ -14,14 +14,18 @@ import {
 import { cloneStashAttachments, releaseStashAttachments } from './stash-attachments'
 import { composedMessageEmpty, stashMessage } from '../utils/stash-message'
 import { useFollowUpStore } from './follow-up-store'
-import { addReviewComment, removeReviewComments } from '@/lib/review-draft/state/store'
-import type { ReviewComment } from '@/lib/review-draft/utils/types'
+import {
+  addReviewComment,
+  inDestination,
+  removeReviewComments,
+  useReviewDraftStore,
+} from '@/lib/review-draft/state/store'
 
 export async function transferStash(
   target: ChatInputDraftTarget,
   action: { kind: 'stash' } | { kind: 'restore' | 'remove'; entry: PromptStashEntry },
-  /** The review comments riding with this composer: they are stashed with its message. */
-  reviewComments: readonly ReviewComment[] = [],
+  /** Other roots this composer's review comments may name, such as a worktree's checkout. */
+  aliasRoots: readonly string[] = [],
 ) {
   const store = promptStashStoreFor(target.environmentId)
   const entries = store.getState().entries
@@ -35,6 +39,8 @@ export async function transferStash(
   if (chatInputAttachmentsPreparing(drafts, target))
     throw createClientInvariantError('Wait for attachments to finish preparing before stashing.')
   const expected = drafts.getDraft(target)
+  // Read as the transfer runs: the outgoing message, stashed or swapped out, takes its review.
+  const reviewComments = composerReviewComments(target, aliasRoots)
   if (expected.attachments.some((item) => item.upload && item.upload.status !== 'ready'))
     throw createClientInvariantError('Retry or remove unfinished attachments before stashing.')
   if (action.kind === 'stash' && composedMessageEmpty(expected, reviewComments)) return null
@@ -91,6 +97,16 @@ export async function transferStash(
         ...incomingAttachments,
       ])
   }
+}
+
+function composerReviewComments(target: ChatInputDraftTarget, aliasRoots: readonly string[]) {
+  const composer = {
+    environmentId: target.environmentId,
+    rootPaths: [target.rootPath, ...aliasRoots],
+  }
+  return useReviewDraftStore
+    .getState()
+    .comments.filter((comment) => inDestination(comment, composer))
 }
 
 export async function releaseUnusedDraftAttachments(
