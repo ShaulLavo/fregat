@@ -348,7 +348,7 @@ describe('file open intent service', () => {
     expect(service.claimReadyClean(file.path)).toBeNull()
   })
 
-  it('refreshes one queued structural stage from a far-down retained scroll seed', async () => {
+  it('seeds the structural stage range from a far-down retained scroll position', async () => {
     const path = '/repo/large.ts'
     const content = 'a'.repeat(800_000)
     const file = { ...fileResult(path), content, size: content.length }
@@ -358,7 +358,6 @@ describe('file open intent service', () => {
     const preparedDocument = preparedDocumentLease()
     const events = recordingEvents()
     const ranges: FileOpenIntentStructuralRange[] = []
-    let scrollPosition = { left: 0, top: 120_000 }
     const highlighter = vi.fn(async () => undefined)
     const structural = vi.fn(async () => undefined)
     const preparer: FileOpenIntentPreparer = {
@@ -382,7 +381,7 @@ describe('file open intent service', () => {
     const owner = createFileOpenIntentServiceOwner({
       createEvent: events.factory,
       getLiveDocument: () => null,
-      getRetainedScrollPosition: () => scrollPosition,
+      getRetainedScrollPosition: () => ({ left: 0, top: 120_000 }),
       isActive: () => false,
       mountedEditors: inertMountedEditors(),
       preparer,
@@ -396,21 +395,12 @@ describe('file open intent service', () => {
 
     owner.service.prepare(intent(path))
     runtime.startNext()
-    await vi.waitFor(() => expect(runtime.queued()).toBe(1))
+    await vi.waitFor(() => expect(runtime.queued()).toBe(2))
+    expect(ranges).toHaveLength(1)
     expect(ranges[0]?.startIndex).toBeGreaterThan(500_000)
-    const initialRange = { ...ranges[0]! }
-
-    scrollPosition = { left: 0, top: 140_000 }
-    owner.service.prepare(intent(path))
-    expect(ranges).toHaveLength(2)
-    const refreshedRange = { ...ranges[1]! }
-    expect(refreshedRange.startIndex).toBeGreaterThan(initialRange.startIndex)
-
-    owner.service.prepare(intent(path))
-    expect(ranges).toHaveLength(2)
     owner.disposeNow()
     expect(events.emitted[0]).toMatchObject({
-      preparation: { ranges: { structural: refreshedRange } },
+      preparation: { ranges: { structural: ranges[0] } },
     })
   })
 
@@ -449,6 +439,91 @@ describe('file open intent service', () => {
     await vi.waitFor(() => expect(order).toHaveLength(3))
 
     expect(order).toEqual([paths[0], paths[2], paths[1]])
+  })
+
+  it('starts a queued read while another path prepares', async () => {
+    const queryClient = new QueryClient()
+    const first = deferred<FileResult>()
+    const [a, b] = [filesystemPath('/repo/a.ts'), filesystemPath('/repo/b.ts')]
+    void queryClient.query({ ...fileSnapshotQueryOptions(a), queryFn: () => first.promise })
+    const prepare = vi.fn((buffer: ReturnType<typeof createEditorTextBuffer>) => ({
+      buffer,
+      preparedDocument: preparedDocumentLease(),
+    }))
+    const service = createTestFileOpenIntentOwner(
+      queryClient,
+      testPreparer(prepare),
+      () => null,
+      () => false,
+      () => false,
+      () => undefined,
+    )
+    service.setRoot(filesystemPath('/repo'))
+
+    service.prepare(intent(a))
+    service.prepare(intent(b))
+
+    expect(queryClient.getQueryState(fileSnapshotQueryOptions(b).queryKey)?.fetchStatus).toBe(
+      'fetching',
+    )
+    expect(prepare).not.toHaveBeenCalled()
+    service.disposeNow()
+    first.resolve(fileResult(a))
+  })
+
+  it('claims a clean record whose snapshot is older than the freshness window', async () => {
+    const queryClient = new QueryClient()
+    const file = fileResult('/repo/a.ts')
+    const { queryKey } = fileSnapshotQueryOptions(file.path)
+    queryClient.setQueryData(queryKey, file)
+    const prepare = vi.fn((buffer: ReturnType<typeof createEditorTextBuffer>) => ({
+      buffer,
+      preparedDocument: preparedDocumentLease(),
+    }))
+    const service = createTestFileOpenIntentOwner(
+      queryClient,
+      testPreparer(prepare),
+      () => null,
+      () => false,
+      () => false,
+      () => undefined,
+    )
+    service.setRoot(filesystemPath('/repo'))
+    service.prepare(intent(file.path))
+    await vi.waitFor(() => expect(prepare).toHaveBeenCalledOnce())
+    await Promise.resolve()
+    queryClient.setQueryData(queryKey, file, { updatedAt: Date.now() - 60_000 })
+
+    expect(service.claimReadyClean(file.path)).not.toBeNull()
+  })
+
+  it('prepares nothing while the files switch is off', async () => {
+    const queryClient = new QueryClient()
+    const file = fileResult('/repo/a.ts')
+    queryClient.setQueryData(fileSnapshotQueryOptions(file.path).queryKey, file)
+    const prepare = vi.fn((buffer: ReturnType<typeof createEditorTextBuffer>) => ({
+      buffer,
+      preparedDocument: preparedDocumentLease(),
+    }))
+    const owner = createFileOpenIntentServiceOwner({
+      getLiveDocument: () => null,
+      getRetainedScrollPosition: () => null,
+      isActive: () => false,
+      isEnabled: () => false,
+      mountedEditors: inertMountedEditors(),
+      preparer: testPreparer(prepare),
+      prefetchRelated: () => undefined,
+      queryClient,
+      subscribeLiveDocuments: () => () => undefined,
+    })
+    owner.setRoot(filesystemPath('/repo'))
+    owner.connect()
+
+    owner.service.prepare(intent(file.path))
+    await new Promise((resolve) => queueMicrotask(() => resolve(undefined)))
+
+    expect(prepare).not.toHaveBeenCalled()
+    expect(owner.service.claimReadyClean(file.path)).toBeNull()
   })
 
   it('evicts settled stage results when their retained bytes exceed the service budget', async () => {
@@ -520,9 +595,10 @@ describe('file open intent service', () => {
     service.prepare(intent(file.path))
     expect(runtime.queued()).toBe(1)
     runtime.startNext()
-    await vi.waitFor(() => expect(runtime.queued()).toBe(1))
+    await vi.waitFor(() => expect(runtime.queued()).toBe(2))
 
     expect(service.claimReadyClean(file.path)).not.toBeNull()
+    runtime.startNext()
     runtime.startNext()
     await runtime.settled()
 
@@ -752,14 +828,13 @@ describe('file open intent service', () => {
     expect(service.claimReadyClean(markdown.path)?.preparedDocument).toBe(newMarkdownDocument)
   })
 
-  it('replaces only an unstarted family when the environment changes', async () => {
+  it('rebuilds a record whose running family changes with the environment', async () => {
     const queryClient = new QueryClient()
     const file = fileResult('/repo/a.ts')
     const runtime = manualRuntime()
     const preparedDocument = preparedDocumentLease()
     const replacementDocument = preparedDocumentLease()
-    const highlighterCompletion = deferred<string>()
-    const startHighlighter = vi.fn(() => highlighterCompletion.promise)
+    const startHighlighter = vi.fn(async () => 'ready')
     const startOldStructural = vi.fn(async () => 'old')
     const startNewStructural = vi.fn(async () => 'new')
     const highlighterStage = {
@@ -781,17 +856,16 @@ describe('file open intent service', () => {
       start: startNewStructural,
     }
     queryClient.setQueryData(fileSnapshotQueryOptions(file.path).queryKey, file)
-    const initialPrepare = vi.fn((buffer) => ({
-      buffer,
-      documentConfigurationTag: ['document', 'same'] as const,
-      preparedDocument,
-      stages: [highlighterStage, oldStructuralStage],
-    }))
     const service = createTestFileOpenIntentOwner(
       queryClient,
       {
         environment: testEnvironment('old'),
-        prepare: initialPrepare,
+        prepare: (buffer) => ({
+          buffer,
+          documentConfigurationTag: ['document', 'same'] as const,
+          preparedDocument,
+          stages: [highlighterStage, oldStructuralStage],
+        }),
         reconfigure: () => ({
           documentConfigurationTag: ['document', 'same'],
           stages: [highlighterStage, oldStructuralStage],
@@ -807,34 +881,33 @@ describe('file open intent service', () => {
 
     service.prepare(intent(file.path))
     runtime.startNext()
-    await vi.waitFor(() => expect(runtime.queued()).toBe(1))
-    runtime.startNext()
-    await vi.waitFor(() => expect(startHighlighter).toHaveBeenCalledOnce())
+    // Both families start together; neither has run yet.
+    await vi.waitFor(() => expect(runtime.queued()).toBe(2))
 
-    const replacementPrepare = vi.fn((buffer) => ({
-      buffer,
-      documentConfigurationTag: ['document', 'same'] as const,
-      preparedDocument: replacementDocument,
-      stages: [highlighterStage, newStructuralStage],
-    }))
     service.setEnvironment({
       environment: testEnvironment('new'),
-      prepare: replacementPrepare,
+      prepare: (buffer) => ({
+        buffer,
+        documentConfigurationTag: ['document', 'same'] as const,
+        preparedDocument: replacementDocument,
+        stages: [highlighterStage, newStructuralStage],
+      }),
       reconfigure: () => ({
         documentConfigurationTag: ['document', 'same'],
         stages: [highlighterStage, newStructuralStage],
       }),
     })
-    highlighterCompletion.resolve('ready')
-    await vi.waitFor(() => expect(runtime.queued()).toBe(1))
-    runtime.startNext()
+    expect(preparedDocument.dispose).toHaveBeenCalledOnce()
+    // The rebuild queues behind the running preparation, so tasks are drained as they appear.
+    await vi.waitFor(() => {
+      while (runtime.queued() > 0) runtime.startNext()
+      expect(startNewStructural).toHaveBeenCalledOnce()
+    })
     await runtime.settled()
 
-    expect(replacementPrepare).not.toHaveBeenCalled()
-    expect(preparedDocument.dispose).not.toHaveBeenCalled()
     expect(startOldStructural).not.toHaveBeenCalled()
     expect(startNewStructural).toHaveBeenCalledOnce()
-    expect(service.claimReadyClean(file.path)?.preparedDocument).toBe(preparedDocument)
+    expect(service.claimReadyClean(file.path)?.preparedDocument).toBe(replacementDocument)
   })
 
   it('compares environment fields without delimiter collisions', async () => {
@@ -941,8 +1014,9 @@ describe('file open intent service', () => {
     lsp.resolve(undefined)
     await vi.waitFor(() => expect(events.emitted).toHaveLength(1))
     expect(events.emitted[0]).toMatchObject({
-      action: 'editor.file_open_intent',
+      action: 'prefetch.intent',
       area: 'editor',
+      surface: 'files',
       dedupeCount: 1,
       preparationEnvironment: {
         configurationTag: ['test'],
@@ -954,7 +1028,7 @@ describe('file open intent service', () => {
       intentSource: 'tab',
       intentSources: ['tab', 'file-tree'],
       knownSize: file.size,
-      outcome: 'promoted',
+      outcome: 'hit',
       pathClassification: 'descendant',
       preparation: {
         documentConfigurationTag: [],
@@ -1058,7 +1132,7 @@ describe('file open intent service', () => {
     service.recordInitialPaint(file.path, highlightPaint)
     expect(events.emitted).toHaveLength(1)
     expect(events.emitted[0]).toMatchObject({
-      outcome: 'promoted',
+      outcome: 'hit',
       promotion: { paintOutcome: 'painted' },
     })
   })
