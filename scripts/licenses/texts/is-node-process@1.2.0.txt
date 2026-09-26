@@ -1,0 +1,28 @@
+Source: https://github.com/mswjs/is-node-process/tree/8a6152c795d8705be97166bd5167e70ac6efc67c (v1.2.0)
+Package licence declaration: https://registry.npmjs.org/is-node-process/1.2.0 ("license": "MIT")
+Maintainer of record: https://registry.npmjs.org/is-node-process (kettanaito / Artem Zakharchenko)
+
+The repository has no LICENSE file at any commit; package.json declares MIT.
+Full terms: https://spdx.org/licenses/MIT.html
+
+The MIT License (MIT)
+
+Copyright (c) 2021 Artem Zakharchenko
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
