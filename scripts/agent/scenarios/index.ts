@@ -1,3 +1,4 @@
+import { restNoFlicker } from './rest-no-flicker'
 import { deferredDialogs } from './deferred-dialogs'
 import { textFieldFkeys } from './text-field-fkeys'
 import { settingsRoutePreparation } from './settings-route-preparation'
@@ -379,6 +380,7 @@ export const scenarios: readonly Scenario[] = [
   chatModelPicker,
   chatUsageMeter,
   chatComposerNarrow,
+  restNoFlicker,
   settingsUsage,
   pushSubscribe,
   pushSessionNotice,
