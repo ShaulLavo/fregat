@@ -67,10 +67,10 @@ const EMPTY_SEARCH_MATCHES = {}
 const RAIL_DND_MODIFIERS = [restrictToVerticalAxis]
 
 export function SessionRail({
-  showsActive = true,
+  standalone = false,
 }: {
-  /** False where the list is its own screen: no session is open beside it to mark. */
-  readonly showsActive?: boolean
+  /** The list is a screen of its own (the phone's first screen): no session is open beside it. */
+  readonly standalone?: boolean
 }) {
   const { activeSession, addProject, project, ready, transport } = useChatModeSession()
   const { reorderProject, reorderSession } = useChatRailOrder()
@@ -100,7 +100,7 @@ export function SessionRail({
     (state) => state.matchedQuery === query.trim() && state.unavailable.length > 0,
   )
   const activeSessionKey =
-    showsActive && activeSession.sessionId
+    !standalone && activeSession.sessionId
       ? scopedSessionKey({
           environmentId: transport.environmentId,
           sessionId: activeSession.sessionId,
@@ -389,7 +389,11 @@ export function SessionRail({
                 items={model.groups.map((group) => group.key)}
                 strategy={verticalListSortingStrategy}
               >
-                {model.sections.map((section) => (
+                {/* Nothing is dragged into an empty shelf where the list is its own screen. */}
+                {(standalone
+                  ? model.sections.filter((section) => section.groups.length > 0)
+                  : model.sections
+                ).map((section) => (
                   <SessionShelf key={section.state} shelf={section.state} title={section.title}>
                     {section.groups.map((group) => (
                       <SessionGroup group={group} key={group.key} />

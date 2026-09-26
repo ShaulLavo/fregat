@@ -13,8 +13,14 @@ import { useScopeFiles } from '@/features/phone/hooks/use-scope-files'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { activeEditorGroup } from '@/lib/documents/utils/groups'
 import { tabLabel, tabTitle } from '@/lib/documents/utils/labels'
+import type { TabContent } from '@/lib/documents/utils/types'
 
 const NO_GIT_FILES: readonly GitFileStatus[] = []
+
+function screenTitle(content: TabContent | null) {
+  if (!content) return 'No file open'
+  return content.kind === 'settings' ? 'Settings' : tabLabel(content)
+}
 
 /** One file or diff in the active editor group; a diff steps through the files of its scope. */
 export function FileScreen({ diffScope, rootPath }: ScreenProps) {
@@ -60,7 +66,7 @@ export function FileScreen({ diffScope, rootPath }: ScreenProps) {
                 ) : null
               }
               fullTitle={selected ? tabTitle(selected) : undefined}
-              title={selected ? tabLabel(selected) : 'No file open'}
+              title={screenTitle(selected)}
             />
           )}
           conflicts={conflicts}

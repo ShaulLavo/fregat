@@ -18,7 +18,7 @@ export function Stack({ rootPath }: { readonly rootPath: string }) {
   const selection = useSessionSelectionStore((state) => state.selection.kind)
   const screen = useShellStore((state) => state.phoneScreen)
   const level = phoneLevel(selection, screen)
-  const back = useBackAction(level)
+  const back = useBackAction(level, selection)
   const surface = usePanelSurface()
   const frameRef = useKeyboardInset<HTMLDivElement>()
   // Mounted at every level, as the chat tool pane mounts them for every tab: the diff pick must
