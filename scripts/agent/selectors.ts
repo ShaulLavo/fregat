@@ -1,4 +1,5 @@
 import type { Locator, Page } from 'playwright'
+import { createScriptError } from '../structured-errors'
 
 export const fileIconSelector = '[data-file-icon], [style*="vscode-icons/"]'
 export const wallpaperLayerSelector = '[data-workbench] img[data-workbench-wallpaper-layer="still"]'
@@ -37,6 +38,7 @@ function sessionRowForWorktree(page: Page, worktreeId: string) {
 }
 
 export const selectors = {
+  pullRequestLookupRetry: (page: Page) => page.locator('[data-pull-request-lookup-retry]'),
   liveWorkLogToggle: (page: Page) =>
     page.locator('[data-live-activity]').getByRole('button').first(),
   workLogGroup: (page: Page) => page.getByRole('region', { name: 'Tool calls', exact: true }),
@@ -146,6 +148,8 @@ export const selectors = {
     page
       .getByRole('region', { name: 'App access', exact: true })
       .getByRole('button', { name: label, exact: true }),
+  genericApproval: (page: Page) =>
+    page.getByRole('region', { name: 'Approval requested', exact: true }),
   commandApproval: (page: Page) => page.getByRole('region', { name: 'Run a command', exact: true }),
   commandApprovalDecision: (page: Page, label: string | RegExp) =>
     page
@@ -558,6 +562,18 @@ export const selectors = {
     page.getByRole('dialog', { name: 'Physical dialog', exact: true }),
   physicalRow: (page: Page) => page.getByRole('option', { name: 'Silent row', exact: true }),
   settingsHeader: (page: Page) => page.locator('[data-settings-header]'),
+  shortcutsSearch: (page: Page) =>
+    page.getByRole('textbox', { name: 'Search keyboard shortcuts', exact: true }),
+  shortcutsList: (page: Page) => page.getByRole('listbox', { name: 'Keyboard shortcuts' }),
+  shortcutRow: (page: Page, command: string) =>
+    page.locator(`[data-shortcut-command="${command}"]`),
+  shortcutRecorder: (page: Page, title: string) =>
+    page.getByRole('textbox', { name: `Press the new shortcut for ${title}`, exact: true }),
+  shortcutFilter: (page: Page, name: 'All' | 'Custom' | 'Conflicts' | 'Unassigned') =>
+    page.getByRole('tab', { name: new RegExp(`^${name}`) }),
+  shortcutRecordKeys: (page: Page) =>
+    page.getByRole('button', { name: 'Record keys', exact: true }),
+  shortcutMenuItem: (page: Page, name: RegExp) => page.getByRole('menuitem', { name }),
   settingDetailsButton: (page: Page, title: string) =>
     page.getByRole('button', { name: `About ${title}`, exact: true }),
   settingsSwitch: (page: Page, title: string) =>
@@ -782,6 +798,9 @@ export const selectors = {
     page.getByRole('button', { name: 'Send correction', exact: true }),
   chatStop: (page: Page) => page.getByRole('button', { name: 'Stop current turn', exact: true }),
   chatSend: (page: Page) => page.getByRole('button', { name: 'Send message', exact: true }),
+  reviewChanges: (page: Page) =>
+    page.getByRole('button', { name: 'Review changes', exact: true }).first(),
+  reviewComments: (page: Page) => page.getByRole('group', { name: 'Review comments' }),
   sleepingSchedules: (page: Page) =>
     page.getByRole('button', { name: /^(Sleeping until|Wake-up due)/ }).first(),
   cancelSchedules: (page: Page) =>
@@ -914,6 +933,8 @@ export const selectors = {
   terminalSurface: (page: Page) =>
     page.locator('[data-slot="tool-pane"][aria-label="Terminal"]:visible'),
   paletteRowSelector: '[data-slot="command-list"] [role="option"]',
+  paletteLoading: (page: Page) => page.getByRole('status', { name: 'Loading commands' }),
+  pickerLoading: (page: Page) => page.getByRole('status', { name: 'Loading file picker' }),
   paletteInput: (page: Page) => page.locator('[data-slot="command-input"]').first(),
   paletteOptions: (page: Page) => page.locator('[data-slot="command-list"]').getByRole('option'),
   selectedPaletteOption: (page: Page) => page.locator('[cmdk-item][data-selected="true"]'),
@@ -994,11 +1015,12 @@ export const selectors = {
   historyList: (page: Page) => page.getByRole('listbox', { name: 'Commit history' }),
   historyRowSelector: '[data-history-commit]',
   logRowSelector: '[data-log-row-summary]',
-  /** Every rendered assistant answer in the chat timeline, for page-side frame samplers. */
+  chatReconnecting: (page: Page) => page.getByText('Reconnecting chat…', { exact: true }),
   conversationTitle: (page: Page, title: string) =>
     page
       .getByRole('navigation', { name: 'Session', exact: true })
-      .getByRole('heading', { name: title, exact: true }),
+      .getByRole('heading', { name: title, exact: true })
+      .or(page.locator('[data-workbench-tool-pane-header]').getByTitle(title, { exact: true })),
   conversationHistory: (page: Page) =>
     page.getByRole('button', { name: 'Conversation history', exact: true }),
   conversationChoice: (page: Page, title: string) =>
@@ -1007,6 +1029,11 @@ export const selectors = {
     'nav[aria-label="Session"] h1, [data-workbench-tool-pane-header] > div[title] > .truncate',
   conversationLoadingSelector:
     '[data-slot="tool-pane-header"] [data-slot="spinner"][aria-label="Loading conversation"]',
+  chatAssistantMarkdown: (page: Page) =>
+    page.locator(
+      `${chatMessagesLogSelector} article:not(:has([data-user-message-body])) [data-chat-markdown]`,
+    ),
+  /** Every rendered markdown body in the chat timeline, including user messages. */
   chatMarkdownSelector: '[role="log"][aria-label="Messages"] [data-chat-markdown]',
   chatCodeBlockSelector: '[data-markdown="code-block"]',
   logCopyButtons: (page: Page) => page.getByRole('button', { name: 'Copy log event', exact: true }),
@@ -1076,6 +1103,32 @@ export async function holdToConfirm(page: Page, button: Locator, done: () => Pro
 export async function focusEditor(page: Page) {
   await selectors.editorSurface(page).first().click()
   await selectors.editorInput(page).first().focus()
+}
+
+/** Right-clicks the middle of the first visible occurrence of `word` in any editor's text. */
+export async function rightClickEditorWord(page: Page, word: string) {
+  const point = await page.evaluate((target) => {
+    for (const surface of document.querySelectorAll('.editor-virtualized-viewport')) {
+      const walker = document.createTreeWalker(surface, NodeFilter.SHOW_TEXT)
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        const index = node.textContent?.indexOf(target) ?? -1
+        if (index < 0) continue
+        const range = document.createRange()
+        range.setStart(node, index)
+        range.setEnd(node, index + target.length)
+        const rect = range.getBoundingClientRect()
+        if (rect.width === 0 || rect.height === 0) continue
+        const x = rect.left + rect.width / 2
+        const y = rect.top + rect.height / 2
+        // A kept-alive editor for another tab holds text too, under whatever is on top.
+        if (!surface.contains(document.elementFromPoint(x, y))) continue
+        return { x, y }
+      }
+    }
+    return null
+  }, word)
+  if (!point) throw createScriptError(`"${word}" is not on a visible editor row`)
+  await page.mouse.click(point.x, point.y, { button: 'right' })
 }
 
 /** Whether any language-server error is painted, read from the CSS highlight registry. */

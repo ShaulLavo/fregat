@@ -45,10 +45,21 @@ export const sessionNoFlicker = isolatedNativeScenario({
         })
         await selectors.sessionByTitle(page, titles[index]!).waitFor()
       }
+      let unavailableSessionId: string | null = null
       await page.routeWebSocket(/\/orchestration\/rpc(?:\?|$)/, (route) => {
         const server = route.connectToServer()
         route.onMessage((message) => {
           const frame = JSON.parse(message.toString())
+          if (frame.method === 'subscribeSession' && frame.sessionId === unavailableSessionId) {
+            route.send(
+              JSON.stringify({
+                kind: 'subscription.error',
+                subscriptionId: frame.subscriptionId,
+                error: { status: 503, message: 'Fixture session temporarily unavailable' },
+              }),
+            )
+            return
+          }
           if (frame.method === 'subscribeSession') setTimeout(() => server.send(message), 450)
           else server.send(message)
         })
@@ -121,6 +132,24 @@ export const sessionNoFlicker = isolatedNativeScenario({
             'The workbench terminal stayed mounted through session switches',
           )
         await step(`${surface}-scroll-isolated`)
+      }
+      for (const surface of ['sidebar', 'main'] as const) {
+        if (surface === 'main') await selectors.workspaceMode(page, 'Chat').click()
+        unavailableSessionId = crypto.randomUUID()
+        ids.push(unavailableSessionId)
+        const title = `Unavailable ${surface}`
+        await dispatch(page, orchestration, {
+          type: 'session.create',
+          sessionId: unavailableSessionId,
+          title,
+          modelSelection: { providerInstanceId, model: 'gpt-5.5' },
+          worktreeTarget: { kind: 'current', worktreeId },
+        })
+        await selectConversation(page, surface, title)
+        await selectors.conversationTitle(page, title).waitFor()
+        await selectors.chatReconnecting(page).waitFor()
+        strictEqual(await page.locator(selectors.conversationLoadingSelector).count(), 0)
+        await step(`${surface}-uncached-session-reconnecting`)
       }
       strictEqual(blanks[0], 0, 'Main conversation blanked while switching sessions')
       strictEqual(blanks[1], 0, 'Sidebar conversation blanked while switching sessions')

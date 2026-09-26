@@ -215,7 +215,11 @@ export function ChatView({
             </ChatTimelineActionsProvider>
           </ChatTransportContext>
         </ChatWorkspaceRootContext>
-        <ChatRuntimeStatus commandFailure={sendError ?? composer.error} session={session} />
+        <ChatRuntimeStatus
+          key={sessionKey}
+          commandFailure={sendError ?? composer.error}
+          session={session}
+        />
         {/* The panels sit above the composer rather than inside it: each one is a
           request holding the turn open, so it stays visible while the user
           types their answer. */}
@@ -242,6 +246,7 @@ export function ChatView({
             <PendingApprovalPanel />
             <PendingUserInputPanel />
             <ChatPlanFollowUpProvider
+              key={sessionKey}
               draftTarget={draftTarget}
               disabledReason={
                 disabledReason ??

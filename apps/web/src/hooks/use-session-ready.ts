@@ -18,17 +18,17 @@ export function useSessionReady(transport: ChatTransport, sessionId: SessionId |
       selectChatProjectionSlice(state, transport.environmentId).sessionById[sessionId]
         ?.detailSynced === true,
   )
-  const blocked = useSessionDetailSyncStore(
-    (state) =>
-      selectSessionDetailSync(
-        state,
-        sessionId ? { environmentId: transport.environmentId, sessionId } : null,
-      ).status === 'blocked',
-  )
+  const connectionFailed = useSessionDetailSyncStore((state) => {
+    const sync = selectSessionDetailSync(
+      state,
+      sessionId ? { environmentId: transport.environmentId, sessionId } : null,
+    )
+    return sync.status === 'blocked' || sync.attempt > 0
+  })
   useEffect(() => {
     if (!sessionId || transport.closed) return
     return transport.retainSessionDetail(sessionId)
   }, [transport, sessionId])
-  // A refused stream must reveal its own connection notice so a hold cannot hide the failure.
-  return sessionId === null || detailSynced || blocked || transport.closed
+  // A failed stream must reveal its own connection notice so a hold cannot hide the failure.
+  return sessionId === null || detailSynced || connectionFailed || transport.closed
 }

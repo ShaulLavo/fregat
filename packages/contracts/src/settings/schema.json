@@ -2,6 +2,12 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "additionalProperties": false,
   "properties": {
+    "agent.diagnosticsFeedback": {
+      "default": true,
+      "description": "After an agent edits a file, tell it the errors that edit introduced, so it can fix them in the same turn.",
+      "markdownDescription": "After an agent edits a file, tell it the errors that edit introduced, so it can fix them in the same turn.\n\nOnly errors the edit introduced, from the language server already open for that file: up to 10 per file.",
+      "type": "boolean"
+    },
     "chat.activeFileContext": {
       "default": false,
       "description": "Show the file open in the editor as a chip in the composer. While the chip is there, sending mentions that file. Remove the chip to send without it.",
@@ -368,6 +374,12 @@
       "minimum": 0,
       "type": "integer"
     },
+    "editor.spellcheck": {
+      "default": "off",
+      "description": "Mark misspelled words: in plain text and Markdown prose, or also in code comments and strings. Right-click a marked word for suggestions.",
+      "enum": ["off", "prose", "proseAndCode"],
+      "type": "string"
+    },
     "editor.syntaxHighlighting.enabled": {
       "default": true,
       "description": "Colour code by syntax. Turning this off makes very large files faster.",
@@ -592,7 +604,8 @@
         ]
       },
       "default": {},
-      "description": "Command id to shortcut: one hotkey or two separated by a single space. A missing key keeps the default; an explicit null unbinds the command.",
+      "description": "Every command and its keys.",
+      "markdownDescription": "Every command and its keys.\n\nIn settings.json this is command id to shortcut: one hotkey, or two separated by a single space. A missing command keeps its default; null unbinds it.",
       "propertyNames": {
         "maxLength": 120,
         "minLength": 1,
@@ -1037,6 +1050,19 @@
       "default": false,
       "description": "Match whole words by default.",
       "type": "boolean"
+    },
+    "spellcheck.words": {
+      "additionalProperties": {
+        "type": "boolean"
+      },
+      "default": {},
+      "description": "Words spellcheck never marks. Set a word to false to mark it again where another scope accepts it.",
+      "propertyNames": {
+        "maxLength": 100,
+        "minLength": 1,
+        "type": "string"
+      },
+      "type": "object"
     },
     "terminal.integrated.cursorBlinking": {
       "default": true,
