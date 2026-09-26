@@ -53,6 +53,8 @@ function fade(element: HTMLElement) {
   }
 }
 
+// Flaked once under load: bottom read '0.25px' at the end, i.e. scrollTop 1px short of the
+// timeline's end (24px over 96px). ~385 runs, 28 cores pegged and fractional boxes did not reproduce it.
 it('fades only the edge content lies past', async () => {
   const scroller = render(100)
   await frames()
