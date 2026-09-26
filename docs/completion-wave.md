@@ -242,6 +242,11 @@ Owns `packages/{utils,observability,contracts/src/*uri*}`, `apps/web/src/lib/*er
    the other lanes are between landings and land it in one push. Then P1–P5 and P8. P6 and P7
    (high risk) go last.
 
+Status 2026-09-26 (PR #36): items 1, 2 and 4–6 are done, with 091–095, 128 and 135 deleted.
+Two steps wait for L6's final rebase, after every other lane has merged, and the coordinator
+starts them: 132 P4 (see [Plan 132](../plans/132-process-and-dev-ownership.md) Phase 4), and
+the 135 P0 sweep again over whatever the other lanes landed (`bun run query:check` must pass).
+
 ### L7 — Editor · port 5217 (Platform half)
 
 Owns the Editor repo. On the Platform side it owns `features/editor/**`,

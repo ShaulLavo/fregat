@@ -428,7 +428,8 @@ and before/after traces in [the verification record](docs/verification/2026-09-2
 
 Plan 135 is complete and deleted. Query now owns browser and Markdown resource acquisition,
 IndexedDB connections, server lookups, settings recovery, and shared web/TUI history pages.
-The deprecated-API gate runs in `verify`, `gates`, and CI. The [verification record](docs/verification/2026-09-25-query-ownership.md)
+The deprecated-API gate runs in `verify`, `gates`, and CI. Lanes that merge before L6 do not run it,
+so L6's final rebase reruns the P0 sweep over their code, together with Plan 132 Phase 4. The [verification record](docs/verification/2026-09-25-query-ownership.md)
 records cache lifetimes, route preparation, regressions, browser evidence and bundle measurements.
 
 ## Workaround removal lane
