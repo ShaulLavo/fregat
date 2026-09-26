@@ -3,6 +3,7 @@ import type { LocationRewrite } from '@tanstack/react-router'
 import { createError } from 'evlog'
 import * as v from 'valibot'
 import {
+  PHONE_SCREENS,
   serializeAddress,
   type Address,
   type AddressEnvironments,
@@ -37,6 +38,7 @@ export const routeSearchSchema = v.object({
     undefined,
   ),
   rail: v.fallback(v.optional(v.picklist(['active', 'archived'])), undefined),
+  screen: v.fallback(v.optional(v.picklist(PHONE_SCREENS)), undefined),
   diff: optionalText,
   settings: optionalText,
   's.q': optionalText,

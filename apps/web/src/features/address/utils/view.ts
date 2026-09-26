@@ -33,6 +33,7 @@ export type WorkspaceView = {
   readonly bottom: NonNullable<Address['bottom']>
   readonly tool: ChatModeToolTab
   readonly rail: NonNullable<Address['rail']>
+  readonly screen: Address['screen']
   readonly diff: SessionDiffScope | null
   readonly search: Omit<SearchBufferFacts, 'filtersVisible'>
   readonly logs: Readonly<LogsFilterState>
@@ -57,6 +58,7 @@ export function viewForAddress(address: Address, logDefaults: LogsFilterState): 
     bottom: address.bottom ?? 'terminal',
     tool: isChatModeToolTab(address.tool) ? address.tool : 'git',
     rail: address.rail ?? 'active',
+    screen: address.screen,
     diff: diffScopeFor(address.diff),
     search: {
       caseSensitive: search?.caseSensitive ?? false,
@@ -92,6 +94,7 @@ export function addressForView(
     bottom: view.bottom,
     tool: view.tool,
     rail: view.rail,
+    screen: view.screen,
     diff: diffScopeParam(view.diff),
     search: searchParamsFor({ ...view.search, filtersVisible: true }),
     logs: logsParamsFor(view.logs, logDefaults),

@@ -134,6 +134,7 @@
     "workbench.wallpaper.downloadTimeoutMs",
     "workbench.wallpaper.enabled",
     "workbench.wallpaper.omarchyCatalog",
-    "workbench.wallpaper.previewCloud"
+    "workbench.wallpaper.previewCloud",
+    "environments.devicePairing"
   ]
 }

@@ -121,6 +121,7 @@ export function ProposedPlanCard({ plan }: { plan: OrchestrationProposedPlan }) 
             planId={plan.id}
             planMarkdown={plan.planMarkdown}
             selection={selection}
+            sessionId={plan.sessionId}
             onDone={() => setSelection(null)}
           />
         ) : null}

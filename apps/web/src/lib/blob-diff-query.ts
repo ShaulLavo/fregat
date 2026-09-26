@@ -2,11 +2,18 @@ import type { GitFileDiff } from '@workspace/contracts'
 import { clientLogContext } from '@/lib/environments/state/log-context'
 import type { Client } from '@/lib/client'
 import { observeClientOperation } from '@/lib/client-logging'
-import { unwrapGit } from '@/features/git/utils/api'
+import { unwrapEdenResponse } from '@/lib/eden-events'
 import { gitKeys } from '@/lib/query-keys'
 import { queryOptions } from '@tanstack/react-query'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
-import type { BlobDiffRequest } from '@/features/git/utils/types'
+
+/** Two blob versions of one file, named by their git object ids. */
+export type BlobDiffRequest = {
+  path: string
+  oldPath?: string
+  oldObjectId?: string
+  newObjectId?: string
+}
 
 export function blobDiffQueryOptions(query: BlobDiffRequest) {
   return queryOptions<readonly GitFileDiff[]>({
@@ -57,7 +64,10 @@ export async function fetchBlobDiff(
         },
       })
 
-      return unwrapGit<GitFileDiff[]>(response)
+      return unwrapEdenResponse<GitFileDiff[]>(response, {
+        requireData: true,
+        emptyMessage: 'git server returned an empty response',
+      })
     },
     (diffs) => ({ diffCount: diffs.length }),
   )

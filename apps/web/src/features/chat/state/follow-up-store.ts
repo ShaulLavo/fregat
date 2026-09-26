@@ -6,11 +6,15 @@ import type {
 } from '@workspace/client-core/chat/commands'
 import type { ChatInputDraft, ChatInputDraftTarget } from './chat-input-draft-store'
 import type { ChatInputSubmitPayload } from '../utils/composed-message'
+import type { SentReviewComment } from '@workspace/client-core/chat/review-comments'
 
 export type MessageSubmission = ReturnType<
   typeof createTurnSubmission | typeof createSteerSubmission
 >
-type ComposedContent = Pick<ChatInputDraft, 'prompt' | 'attachments' | 'terminalContexts'>
+type ComposedContent = Pick<ChatInputDraft, 'prompt' | 'attachments' | 'terminalContexts'> & {
+  /** Review comments sent with it; restoring the message returns them to the composer. */
+  readonly reviewComments?: readonly SentReviewComment[]
+}
 export type QueuedFollowUp = {
   id: string
   target: ChatInputDraftTarget

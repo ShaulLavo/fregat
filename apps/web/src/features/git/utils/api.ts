@@ -407,7 +407,7 @@ export async function syncRemote(path: string, client: Client) {
 }
 
 /** Every git route answers with a body; an empty one is a server fault. */
-export function unwrapGit<T>(response: { data?: T | null; error?: unknown }) {
+function unwrapGit<T>(response: { data?: T | null; error?: unknown }) {
   return unwrapEdenResponse(response, {
     requireData: true,
     emptyMessage: 'git server returned an empty response',

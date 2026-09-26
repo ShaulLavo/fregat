@@ -1097,3 +1097,28 @@ function activityListsEqual(left: readonly ChatWorkLogEntry[], right: readonly C
     return other !== undefined && chatWorkLogEntryEquals(entry, other)
   })
 }
+
+/**
+ * Where a row sits in the timeline: the index of its top-level item, and the folds that hold it,
+ * outermost first. Null when no item is or holds that row.
+ */
+export function timelineRowPath(
+  items: readonly ChatTimelineItem[],
+  rowId: string,
+): { readonly index: number; readonly folds: readonly string[] } | null {
+  for (const [index, item] of items.entries()) {
+    const folds = foldsHolding(item, rowId)
+    if (folds) return { index, folds }
+  }
+  return null
+}
+
+function foldsHolding(item: ChatTimelineItem, rowId: string): string[] | null {
+  if (item.id === rowId) return []
+  if (item.type !== 'turn-fold') return null
+  for (const nested of item.items) {
+    const folds = foldsHolding(nested, rowId)
+    if (folds) return [item.id, ...folds]
+  }
+  return null
+}

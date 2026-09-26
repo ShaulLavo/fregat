@@ -25,6 +25,7 @@ import { browserAddressHref } from '@/features/address/utils/browser-url'
 import { createBrowserHistory } from '@tanstack/react-router'
 import { createApplicationRouter } from '@/state/router'
 import { createNavigation } from '@/state/navigation'
+import { bindNavigation } from '@/state/navigation-binding'
 import { canPlaceEditorTab } from '@/features/workbench/state/group-geometry'
 import { NavigationProvider } from '@/providers/navigation-provider'
 import { LoggingErrorBoundary } from '@/components/logging-error-boundary.tsx'
@@ -43,6 +44,10 @@ import { installEditorPerformanceTraceFromUrl } from '@/features/editor/state/pe
 import { reportReactError } from '@/lib/react-error-reporting.ts'
 import { applicationHost } from '@/lib/application-host'
 import { configureIntentPrediction } from '@/lib/intent-prefetch-options'
+import { takePairingCodeFromLocation } from '@/lib/pairing/state/link-claim'
+import { useShellStore, watchShellKind } from '@/lib/shell/state/store'
+import { COARSE_POINTER_QUERY } from '@/lib/shell/utils/kind'
+import { shellQueryOptions } from '@/features/workspace/utils/shell-query'
 
 installEditorPerformanceTraceFromUrl()
 configureIntentPrediction()
@@ -79,15 +84,26 @@ for (const font of fontsInUse(boot))
     .then(() => undefined)
     .catch(() => undefined)
 
+// First: the code must leave the address bar before anything records the location.
+const pairingCode = takePairingCodeFromLocation(
+  new URL(import.meta.env.BASE_URL, location.href).href,
+)
 // Preserve explicit fields before Router normalizes defaults; boot merges them with the cache.
 const initialHref = applicationHost()?.initialAddress ?? selectInitialAddress(window.location.href)
 const initialIntent = parseAddressIntent(initialHref)
+// Only a touch phone booting from the bare app URL: a narrow desk window keeps its session.
+useShellStore.setState({
+  phoneStartsAtSessions:
+    window.matchMedia(COARSE_POINTER_QUERY).matches &&
+    initialHref !== selectInitialAddress(window.location.href, null),
+})
 const routerHistory = applicationHost()?.history ?? createBrowserHistory()
 const initialBrowserHref = browserAddressHref(initialHref)
 if (routerHistory.location.href !== initialBrowserHref) routerHistory.replace(initialBrowserHref)
 routerHistory.flush()
 const router = createApplicationRouter({ history: routerHistory, resources: resourceQueryClient })
 const navigation = createNavigation(router, initialIntent, { canPlaceTab: canPlaceEditorTab })
+bindNavigation(navigation)
 
 beginReloadBudget()
 const bootstrap = prepareWithinReloadBudget(() => createBootstrap(navigation))
@@ -95,7 +111,20 @@ const restoredWorkspace = bootstrap
   .getState()
   .application?.getSnapshot()
   .editor.workspaceStore.getState()
-const warmViews: Promise<unknown>[] = []
+// Paired before the bootstrap asks the machine anything, so its first request carries the cookie.
+// Loaded only for a pairing link; if it fails to load, the pairing screen still takes the code.
+if (pairingCode)
+  await import('@/lib/pairing/state/claim-at-boot')
+    .then(({ claimAtBoot }) => claimAtBoot(pairingCode))
+    .catch(() => undefined)
+// The boot script already preloads the chosen shell's chunks; this evaluates them before the first render.
+const warmViews: Promise<unknown>[] = [
+  resourceQueryClient
+    .query(shellQueryOptions(useShellStore.getState().kind))
+    .then(() => undefined)
+    .catch(() => undefined),
+]
+watchShellKind()
 if (restoredWorkspace?.selectedTabContent?.kind === 'settings')
   warmViews.push(
     resourceQueryClient

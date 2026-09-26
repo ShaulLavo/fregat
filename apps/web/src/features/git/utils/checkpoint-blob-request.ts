@@ -1,5 +1,5 @@
 import type { GitFileDiff } from '@workspace/contracts'
-import type { BlobDiffRequest } from '@/features/git/utils/types'
+import type { BlobDiffRequest } from '@/lib/blob-diff-query'
 
 /** The checkpoint entry the diff view draws: the first one with hunks. */
 export function displayedCheckpointEntry(diffs: readonly GitFileDiff[]): GitFileDiff | null {
