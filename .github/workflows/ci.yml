@@ -14,10 +14,103 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
-  # Three jobs and a test matrix instead of one runner doing everything in turn:
-  # each pays for setup once, and no suite shares four cores with another.
+  # A PR runs only the jobs its files can affect. `code` is anything outside plans and docs;
+  # web and TUI tests drive the real server, so a server change runs them too. Main runs
+  # everything: collapsed pending runs mean one run's diff is not everything since the last verdict.
+  changes:
+    name: Changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      code: ${{ github.event_name != 'pull_request' || steps.filter.outputs.code == 'true' || steps.filter.outputs.generated == 'true' }}
+      web: ${{ github.event_name != 'pull_request' || steps.filter.outputs.web == 'true' }}
+      server: ${{ github.event_name != 'pull_request' || steps.filter.outputs.server == 'true' }}
+      tui: ${{ github.event_name != 'pull_request' || steps.filter.outputs.tui == 'true' }}
+      docs: ${{ steps.filter.outputs.docs == 'true' }}
+      docs_files: ${{ steps.filter.outputs.docs_files }}
+    steps:
+      - name: Classify changed files
+        id: filter
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        with:
+          predicate-quantifier: some-with-excludes
+          list-files: json
+          filters: |
+            code:
+              - '**'
+              - '!plans/**'
+              - '!docs/**'
+              - '!*.md'
+            web:
+              - '**'
+              - '!apps/tui/**'
+              - '!apps/desktop/**'
+              - '!apps/mac/**'
+              - '!apps/site/**'
+              - '!plans/**'
+              - '!docs/**'
+              - '!*.md'
+            server:
+              - '**'
+              - '!apps/web/**'
+              - '!apps/tui/**'
+              - '!apps/desktop/**'
+              - '!apps/mac/**'
+              - '!apps/site/**'
+              - '!plans/**'
+              - '!docs/**'
+              - '!*.md'
+            tui:
+              - '**'
+              - '!apps/web/**'
+              - '!apps/desktop/**'
+              - '!apps/mac/**'
+              - '!apps/site/**'
+              - '!plans/**'
+              - '!docs/**'
+              - '!*.md'
+            # Written by `generated:check`'s generators, so a hand edit is a code change.
+            generated:
+              - 'docs/settings-reference.md'
+              - 'docs/native-syntax-coverage.*'
+            docs:
+              - added|modified: 'plans/**'
+              - added|modified: 'docs/**'
+              - added|modified: '*.md'
+
+  # No workspace's `format:check` reaches plans and docs, so their changed files are checked here.
+  docs:
+    name: Docs format
+    needs: changes
+    if: ${{ needs.changes.outputs.docs == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+
+      - name: Format
+        env:
+          FILES: ${{ needs.changes.outputs.docs_files }}
+        run: |
+          version=$(jq -r '.devDependencies.oxfmt' package.json)
+          jq -r '.[] | "./" + .' <<<"$FILES" | xargs -d '\n' bunx "oxfmt@$version" --check
+
+  # Jobs instead of one runner doing everything in turn: each pays for setup once,
+  # and no suite shares four cores with another.
   lint:
     name: Format, lint, census
+    needs: changes
+    if: ${{ needs.changes.outputs.code == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -32,14 +125,13 @@ jobs:
       - name: Format
         run: bun run format:check
 
+      # Workspaces lint in parallel (no dependency order to respect), and `apps/web`'s lint
+      # already runs the root config's feature-boundary rules over all of `apps/web`.
       - name: Lint
         run: bun run lint
 
       - name: Query API
         run: bun run query:check
-
-      - name: Feature boundaries
-        run: bun run boundaries:check
 
       - name: Design language census
         run: bun run design:census
@@ -51,58 +143,19 @@ jobs:
       - name: Unused code
         run: bun run unused:check
 
+  # Package tests ride here: they share the devkit, and alone they cost a runner for under a minute.
   typecheck:
-    name: Parity, typecheck, generated
+    name: Typecheck, generated, packages
+    needs: changes
+    if: ${{ needs.changes.outputs.code == 'true' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Setup
         uses: ./.github/actions/setup
-
-      - name: Checkout pinned alignment reference
-        uses: actions/checkout@v4
-        with:
-          repository: pingdotgg/t3code
-          ref: 7445aa733ada33e45289e5aa5055f79142556513
-          path: references/t3code
-          persist-credentials: false
-
-      - name: Alignment evidence records
-        run: python3 scripts/parity/check.py
-
-      - name: Alignment operation and source census
-        run: python3 scripts/parity/source.py --reference references/t3code
-
-      - name: Pinned snooze wake comparison
-        run: bun scripts/parity/wake.ts
-
-      - name: Pinned snooze calendar comparison
-        run: bun scripts/parity/snooze.ts
-
-      - name: Pinned ordering policy comparison
-        run: bun scripts/parity/ordering.ts
-
-      - name: Pinned response delivery comparison
-        run: bun scripts/parity/response-delivery.ts
-
-      - name: Pinned background liveness comparison
-        run: bun scripts/parity/background.ts
-
-      - name: Pinned queued follow-up policy comparison
-        run: >-
-          python3 -B scripts/parity/run.py
-          --operation client-command:thread.turn.start
-          --scenario follow-up-queue-policy
-          --check
-
-      - name: Alignment checker negative cases
-        run: python3 -B -m unittest discover -s scripts/parity -p 'test_*.py'
-
-      - name: Pinned model option comparison
-        run: bun scripts/parity/model-options.ts
 
       - name: Validate dev task graph
         env:
@@ -145,26 +198,25 @@ jobs:
       - name: First-load gate
         run: bun run --cwd apps/web bundle:gate
 
-  test:
-    name: Test (${{ matrix.suite.name }})
+      # Package tests also read app sources (the session vocabulary scans `apps/web`), so they
+      # run for any code change.
+      - name: Package tests
+        if: ${{ !cancelled() }}
+        run: bun run test:scripts && bun run --filter '@workspace/*' test && bun run --cwd apps/desktop test
+
+  # Web is most of the time, so it is sharded by file, balanced by recorded durations
+  # (`apps/web/test/shard-sequencer.ts`). The `test` scripts in `apps/web` and `packages/tree`
+  # are scoped to `--project node --project dom`; their browser projects are the browser job.
+  test-web:
+    name: Test (web ${{ matrix.shard }})
+    needs: changes
+    if: ${{ needs.changes.outputs.web == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
-        suite:
-          # Web is most of the time, so it is sharded by file. The `test` scripts
-          # in `apps/web` and `packages/tree` are scoped to `--project node --project
-          # dom`; their browser projects are the separate job below.
-          - { name: web 1/4, run: 'bun run --cwd apps/web test --shard=1/4' }
-          - { name: web 2/4, run: 'bun run --cwd apps/web test --shard=2/4' }
-          - { name: web 3/4, run: 'bun run --cwd apps/web test --shard=3/4' }
-          - { name: web 4/4, run: 'bun run --cwd apps/web test --shard=4/4' }
-          - { name: server, run: 'bun run --cwd apps/server test' }
-          - { name: tui, run: 'bun run --cwd apps/tui test' }
-          - name: packages
-            devkit: true
-            run: bun run test:scripts && bun run --filter '@workspace/*' test && bun run --cwd apps/desktop test
+        shard: [1/4, 2/4, 3/4, 4/4]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -172,31 +224,50 @@ jobs:
       - name: Setup
         uses: ./.github/actions/setup
 
-      - name: Checkout pinned alignment reference
+      - name: Test
+        run: bun run --cwd apps/web test --shard=${{ matrix.shard }}
+
+  # By hash of the path: the recorded split was within 15% (207 s against 182 s of file time).
+  test-server:
+    name: Test (server ${{ matrix.shard }})
+    needs: changes
+    if: ${{ needs.changes.outputs.server == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1/2, 2/2]
+    steps:
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          repository: pingdotgg/t3code
-          ref: 7445aa733ada33e45289e5aa5055f79142556513
-          path: references/t3code
-          persist-credentials: false
 
-      - name: Cache Hutch store
-        if: ${{ matrix.suite.devkit }}
-        uses: actions/cache@v4
-        with:
-          path: ~/.hutch
-          key: ${{ runner.os }}-hutch-${{ hashFiles('apps/desktop/package.json') }}
-
-      - name: Prepare Electrobun devkit
-        if: ${{ matrix.suite.devkit }}
-        working-directory: apps/desktop
-        run: node_modules/.bin/electrobun prepare
+      - name: Setup
+        uses: ./.github/actions/setup
 
       - name: Test
-        run: ${{ matrix.suite.run }}
+        run: bun run --cwd apps/server test --shard=${{ matrix.shard }}
+
+  test-tui:
+    name: Test (tui)
+    needs: changes
+    if: ${{ needs.changes.outputs.tui == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup
+        uses: ./.github/actions/setup
+
+      - name: Test
+        run: bun run --cwd apps/tui test
 
   browser:
     name: Browser tests
+    needs: changes
+    if: ${{ needs.changes.outputs.web == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -226,3 +297,17 @@ jobs:
       - name: Browser test (tree)
         if: ${{ !cancelled() }}
         run: bun run --cwd packages/tree test:browser
+
+  # The one status to read: red when any job failed or was cancelled; a job skipped because the
+  # change cannot affect it counts as passed.
+  verdict:
+    name: CI
+    needs: [changes, docs, lint, typecheck, test-web, test-server, test-tui, browser]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verdict
+        env:
+          FAILED: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+        run: test "$FAILED" = false

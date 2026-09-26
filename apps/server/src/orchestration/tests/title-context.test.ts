@@ -1,6 +1,3 @@
-import { execFileSync } from 'node:child_process'
-import { existsSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
 import { expect, test } from 'vitest'
 import { chatAttachmentSchema } from '@workspace/contracts'
 import * as v from 'valibot'
@@ -10,8 +7,8 @@ import {
   type SessionTitleMessage,
 } from '../title-context'
 import { assistantCitationsToPlainText } from '../title-citations'
+import { pinnedT3codeSource, requireT3codeReference } from '../../testing/t3code-reference'
 
-const reference = fileURLToPath(new URL('../../../../../references/t3code', import.meta.url))
 const attachment = (id: string) =>
   v.parse(chatAttachmentSchema, {
     type: 'image',
@@ -56,36 +53,25 @@ test('truncates both ends without exceeding budget', () => {
   expect(limitTitleMessage('x'.repeat(50), 20)).toBe('')
 })
 
-test.skipIf(!existsSync(reference))(
-  'matches actual pinned context algorithm for 144 bounded conversations',
-  async () => {
-    const source = execFileSync(
-      'git',
-      [
-        '-C',
-        reference,
-        'show',
-        '7445aa733ada33e45289e5aa5055f79142556513:apps/server/src/textGeneration/ThreadTitleContext.ts',
-      ],
-      { encoding: 'utf8' },
-    )
-    // This corpus has no citation links; citation validation has separate boundary cases below.
-    const plainSource = source.replace(
-      'import { assistantCitationsToPlainText } from "@t3tools/shared/assistantCitations";',
-      'const assistantCitationsToPlainText = (text: string) => text;',
-    )
-    const javascript = new Bun.Transpiler({ loader: 'ts' }).transformSync(plainSource)
-    const upstream = await import(
-      `data:text/javascript;base64,${Buffer.from(javascript).toString('base64')}`
-    )
-    for (let count = 0; count < 24; count++) {
-      for (const length of [0, 1, 100, 1_999, 2_001, 10_000]) {
-        const input = messages(count, length)
-        expect(formatSessionTitleContext(input)).toEqual(upstream.formatThreadTitleContext(input))
-      }
+test('matches actual pinned context algorithm for 144 bounded conversations', async ({ skip }) => {
+  requireT3codeReference(skip)
+  const source = pinnedT3codeSource('apps/server/src/textGeneration/ThreadTitleContext.ts')
+  // This corpus has no citation links; citation validation has separate boundary cases below.
+  const plainSource = source.replace(
+    'import { assistantCitationsToPlainText } from "@t3tools/shared/assistantCitations";',
+    'const assistantCitationsToPlainText = (text: string) => text;',
+  )
+  const javascript = new Bun.Transpiler({ loader: 'ts' }).transformSync(plainSource)
+  const upstream = await import(
+    `data:text/javascript;base64,${Buffer.from(javascript).toString('base64')}`
+  )
+  for (let count = 0; count < 24; count++) {
+    for (const length of [0, 1, 100, 1_999, 2_001, 10_000]) {
+      const input = messages(count, length)
+      expect(formatSessionTitleContext(input)).toEqual(upstream.formatThreadTitleContext(input))
     }
-  },
-)
+  }
+})
 
 function citation(overrides: Record<string, string> = {}) {
   return `[Assistant quote](t3-citation://v1/env/thread/message?${new URLSearchParams({ text: 'quoted intent', start: '1', end: '14', prefix: '', suffix: '', ...overrides })})`

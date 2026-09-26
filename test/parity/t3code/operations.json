@@ -271,6 +271,7 @@
       "session.title.refine",
       "session.title.regeneration.complete",
       "session.turn.diff.complete",
+      "session.turn.provider-start",
       "session.turn.start",
       "session.worktree.release",
       "terminal.lease.activate",

@@ -117,6 +117,13 @@ export type SettingDescriptor<TSchema extends v.GenericSchema = v.GenericSchema>
   readonly category: string
   readonly description: string
   /**
+   * Why the default is what it is, when that rests on a measurement, a trade-off
+   * or a server quirk: short paragraphs separated by a blank line, facts with
+   * their source. The row shows it behind an info icon; a self-explanatory key
+   * has none.
+   */
+  readonly details?: string
+  /**
    * The row's human name. Defaults to the humanized id, which is right for
    * almost every key.
    *
@@ -223,6 +230,10 @@ export function registryProblems(registry: SettingsRegistryShape): RegistryProbl
     const parsed = v.safeParse(descriptor.schema, descriptor.default)
     if (!parsed.success) {
       problems.push({ id, reason: `default does not parse: ${v.summarize(parsed.issues)}` })
+    }
+
+    if (descriptor.details !== undefined && descriptor.details.trim() === '') {
+      problems.push({ id, reason: 'details must be omitted when there is nothing to say' })
     }
 
     if (descriptor.merge === 'record' && !isRecord(descriptor.default)) {

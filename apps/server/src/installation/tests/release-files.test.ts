@@ -45,6 +45,10 @@ test('the runtime packages cover every package the server resolves beside its bu
     const source = await readFile(path.join(serverPackage, file), 'utf8')
     for (const match of source.matchAll(/import\.meta\.resolve\('((?:@[^/']+\/)?[^/']+)/g))
       resolved.add(match[1]!)
+    // `createRequire` calls are left for run time too: the bundler cannot follow them.
+    if (!source.includes('createRequire(')) continue
+    for (const match of source.matchAll(/\brequire\('((?:@[^/']+\/)?[^/.'][^/']*)/g))
+      resolved.add(match[1]!)
   }
   expect(resolved.size).toBeGreaterThan(0)
   for (const name of resolved) expect(RUNTIME_PACKAGES).toContain(name)
@@ -76,6 +80,8 @@ test('manifest versions come from bun.lock, with the server workspace resolution
     typescript: 'typescript@7.0.0',
     'site/typescript': 'typescript@5.0.0',
     'typescript-language-server': 'typescript-language-server@6.0.0',
+    jszip: 'jszip@3.10.1',
+    'subset-font': 'subset-font@2.4.0',
   })
   expect(JSON.parse(runtimeManifest(lock))).toEqual({
     name: 'platform-server-runtime',
@@ -85,6 +91,8 @@ test('manifest versions come from bun.lock, with the server workspace resolution
       '@anthropic-ai/claude-agent-sdk': '1.2.3',
       typescript: '7.0.0',
       'typescript-language-server': '6.0.0',
+      jszip: '3.10.1',
+      'subset-font': '2.4.0',
     },
   })
 })
@@ -104,7 +112,7 @@ test('a runtime package missing from bun.lock fails the manifest', () => {
     expect.objectContaining({
       code: 'installation.RUNTIME_PACKAGE_MISSING',
       message:
-        'bun.lock resolves no version for the server runtime packages @anthropic-ai/claude-agent-sdk, typescript-language-server.',
+        'bun.lock resolves no version for the server runtime packages @anthropic-ai/claude-agent-sdk, typescript-language-server, jszip, subset-font.',
     }),
   )
 })

@@ -8,6 +8,7 @@ import { useDebouncedValue } from '@tanstack/react-pacer/debouncer'
 import { useState } from 'react'
 
 import { ROOT_PATH, initialPathForOpen, pickerParentPath } from '@/features/file-picker/utils/model'
+import { NO_COLUMN_WIDTHS, withColumnWidth } from '@/features/file-picker/utils/column-widths'
 
 type NavigationState = {
   readonly backHistory: readonly string[]
@@ -28,6 +29,7 @@ export function useFilePickerSession(value: PickedFsEntry | null) {
   const [debouncedQuery] = useDebouncedValue(query, { wait: 180 })
   const effectiveQuery = query.trim() ? debouncedQuery : ''
   const [selectedEntry, setSelectedEntry] = useState<FsEntry | null>(value)
+  const [columnWidths, setColumnWidths] = useState(NO_COLUMN_WIDTHS)
 
   const initializeOpenSession = (info: ServerInfo) => {
     if (isInitialized) return
@@ -47,6 +49,11 @@ export function useFilePickerSession(value: PickedFsEntry | null) {
     setNavigation(initialNavigationState)
     setQuery('')
     setSelectedEntry(null)
+    setColumnWidths(NO_COLUMN_WIDTHS)
+  }
+
+  const setColumnWidth = (depth: number, width: number) => {
+    setColumnWidths((current) => withColumnWidth(current, depth, width))
   }
 
   const moveToPath = (path: string) => {
@@ -89,6 +96,7 @@ export function useFilePickerSession(value: PickedFsEntry | null) {
     canGoBack: navigation.backHistory.length > 0,
     canGoForward: navigation.forwardHistory.length > 0,
     canGoUp: navigation.currentPath !== ROOT_PATH,
+    columnWidths,
     currentPath: navigation.currentPath,
     effectiveQuery,
     forwardPath: navigation.forwardHistory[0] ?? null,
@@ -102,6 +110,7 @@ export function useFilePickerSession(value: PickedFsEntry | null) {
     revealEntry,
     resetOpenSession,
     selectedEntry,
+    setColumnWidth,
     setQuery,
     setSelectedEntry,
   }

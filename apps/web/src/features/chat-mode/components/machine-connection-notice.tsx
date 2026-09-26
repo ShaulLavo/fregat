@@ -65,7 +65,7 @@ export function MachineConnectionNotice({
         <ServerUpdateButton name={machine} label={label} error={details} size='xs' />
       ) : null}
       <Button size='xs' variant='ghost' disabled={pending} onClick={() => void retryConnection()}>
-        {phase === 'idle' ? 'Connect' : 'Retry'}
+        {noticeActionLabel(phase)}
       </Button>
       <Tooltip>
         <TooltipTrigger
@@ -84,4 +84,10 @@ export function MachineConnectionNotice({
       </Tooltip>
     </div>
   )
+}
+
+function noticeActionLabel(phase: EnvironmentPhase) {
+  if (phase === 'identity-drift') return 'Trust replacement'
+  if (phase === 'idle') return 'Connect'
+  return 'Retry'
 }

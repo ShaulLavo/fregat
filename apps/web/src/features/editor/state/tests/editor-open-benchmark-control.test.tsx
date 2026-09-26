@@ -348,7 +348,7 @@ function benchmarkOwner(sample: FileOpenIntentBenchmarkSample): FileOpenIntentSe
 }
 
 const inertActivation: EditorActivation = {
-  activate: () => undefined,
+  activate: () => null,
   setRoot: () => undefined,
 }
 

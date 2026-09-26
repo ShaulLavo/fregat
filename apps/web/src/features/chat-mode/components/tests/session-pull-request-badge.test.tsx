@@ -50,21 +50,25 @@ test('open, draft, merged and closed pull requests each show their own badge', a
 }) => {
   const harness = await createWorktreeLifecycleHarness(client, server)
   const cases = [
-    { pullRequest: found(11, 'open'), state: 'open', label: 'Pull request #11 · Open: Change 11' },
+    {
+      pullRequest: found(11, 'open'),
+      state: 'open',
+      label: 'Pull request fregat/fixture#11 · Open: Change 11',
+    },
     {
       pullRequest: found(12, 'open', true),
       state: 'draft',
-      label: 'Pull request #12 · Draft: Change 12',
+      label: 'Pull request fregat/fixture#12 · Draft: Change 12',
     },
     {
       pullRequest: found(13, 'merged'),
       state: 'merged',
-      label: 'Pull request #13 · Merged: Change 13',
+      label: 'Pull request fregat/fixture#13 · Merged: Change 13',
     },
     {
       pullRequest: found(14, 'closed'),
       state: 'closed',
-      label: 'Pull request #14 · Closed: Change 14',
+      label: 'Pull request fregat/fixture#14 · Closed: Change 14',
     },
   ] as const
   const worktrees: string[] = []

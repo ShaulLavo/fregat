@@ -12,6 +12,7 @@ import {
   type OrchestrationCommand,
   type MessageId,
   type SessionRuntimeState,
+  type SessionRuntimeStatus,
   type OrchestrationSessionActivity,
   type SessionId,
   type TurnId,
@@ -19,7 +20,11 @@ import {
   type UserInputQuestionOption,
 } from '@workspace/contracts'
 import * as v from 'valibot'
-import { TURN_ENDED_ACTIVITY_KIND } from '@workspace/contracts'
+import {
+  PROVIDER_TURN_STARTED_ACTIVITY_KIND,
+  TURN_ENDED_ACTIVITY_KIND,
+  type ProviderTurnOrigin,
+} from '@workspace/contracts'
 import { endedApprovalActivityId } from './approval-admission'
 import type { ProviderRuntimeEvent } from '../provider/types'
 import { checkpointFilesFromUnifiedDiff } from './checkpoint-files'
@@ -30,6 +35,7 @@ import {
   PROVIDER_RUNTIME_BUFFER_TTL_MS,
   ProviderRuntimeBuffers,
 } from './provider-runtime-buffers'
+import { recordChatPipelineInfo } from './orchestration-logging'
 import { SerialWorker } from './serial-worker'
 
 export type ProviderRuntimeDispatch = (
@@ -144,6 +150,8 @@ export class ProviderRuntimeIngestion {
 
     this.seenEventIds.set(event.eventId, true)
     this.onLiveness?.(event.sessionId)
+    if (event.type === 'turn.started' && event.payload?.origin)
+      await this.dispatchProviderStartedTurn(event)
     await this.dispatchSessionCommand(event)
     await this.dispatchMetadataCommands(event)
     await this.dispatchReasoning(event)
@@ -183,6 +191,41 @@ export class ProviderRuntimeIngestion {
         sessionId: event.sessionId,
         turnId: event.turnId,
         type: 'session.turn.diff.complete',
+      },
+      event,
+    )
+  }
+
+  /**
+   * A turn the harness started (a wakeup, a finished background task) joins the log before its
+   * lifecycle does, so the lifecycle finds it as the latest turn. A requested turn still starting
+   * or running owns the runtime; the harness turn is then left to the adapter.
+   */
+  private async dispatchProviderStartedTurn(
+    event: Extract<ProviderRuntimeEvent, { type: 'turn.started' }>,
+  ) {
+    if (!event.payload.origin || !event.turnId) return
+    const turn = this.getReadModel?.().sessions.get(event.sessionId)?.latestTurn
+    if (turn && turn.state === 'running' && turn.providerStartState !== 'settled') {
+      if (turn.turnId === event.turnId) return
+      recordChatPipelineInfo('chat.pipeline.provider_started_turn.skipped', {
+        latestTurnId: turn.turnId,
+        providerStartState: turn.providerStartState,
+        sessionId: event.sessionId,
+        turnId: event.turnId,
+      })
+      return
+    }
+
+    await this.dispatch(
+      {
+        commandId: providerCommandId(event.eventId, 'turn-provider-start'),
+        createdAt: event.createdAt,
+        origin: event.payload.origin,
+        runtimeEpoch: event.runtimeEpoch,
+        sessionId: event.sessionId,
+        turnId: event.turnId,
+        type: 'session.turn.provider-start',
       },
       event,
     )
@@ -838,11 +881,16 @@ function sessionFromLifecycleEvent(event: ProviderRuntimeEvent): SessionRuntimeS
   })
 }
 
+const ACTIVE_RUNTIME_STATES = new Set<SessionRuntimeStatus>(['running', 'waiting'])
+
 function lifecycleActiveTurnId(
   event: Extract<ProviderRuntimeEvent, { type: LifecycleSessionType }>,
 ) {
   if (event.type === 'turn.started') return event.turnId ?? null
   if (event.type === 'turn.completed' || event.type === 'runtime.exited') return null
+  // A turn's end carries its id so the lifecycle filter can drop it; the runtime it leaves is idle.
+  if (event.type === 'runtime.state.changed' && !ACTIVE_RUNTIME_STATES.has(event.payload.state))
+    return null
 
   return event.turnId ?? null
 }
@@ -960,6 +1008,8 @@ function activitiesForRuntimeEvent(
       return [taskCompletedActivity(event, taskTitle)]
     case 'turn.plan.updated':
       return [turnPlanUpdatedActivity(event)]
+    case 'turn.started':
+      return providerStartedTurnActivity(event)
     case 'turn.completed':
       return turnEndedActivity(event)
     case 'auth.status':
@@ -987,6 +1037,29 @@ function activitiesForRuntimeEvent(
     default:
       return []
   }
+}
+
+const PROVIDER_TURN_SUMMARY: Record<ProviderTurnOrigin, string> = {
+  provider: 'The agent started this turn',
+  scheduled: 'Scheduled wake-up',
+  task: 'A background task finished',
+}
+
+function providerStartedTurnActivity(
+  event: Extract<ProviderRuntimeEvent, { type: 'turn.started' }>,
+) {
+  const origin = event.payload?.origin
+  if (!origin) return []
+
+  return [
+    baseActivity(
+      event,
+      'info',
+      PROVIDER_TURN_STARTED_ACTIVITY_KIND,
+      PROVIDER_TURN_SUMMARY[origin],
+      { origin },
+    ),
+  ]
 }
 
 function turnEndedActivity(event: Extract<ProviderRuntimeEvent, { type: 'turn.completed' }>) {

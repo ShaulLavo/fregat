@@ -1,5 +1,5 @@
 import { BackgroundTaskRegistry } from '../../background-liveness'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterAll, assert, beforeAll, describe, expect, it, vi } from 'vitest'
@@ -8,6 +8,7 @@ import type {
   Options,
   PermissionUpdate,
   Query,
+  SDKActiveGoalMessage,
   SDKMessage,
   SDKRateLimitInfo,
   SDKUserMessage,
@@ -28,15 +29,19 @@ import * as v from 'valibot'
 import { writeAttachmentFromDataUrl } from '../../../attachments/store'
 import { ClaudeProviderAdapter } from '../claude'
 import type { ClaudeHistoryRunner } from '../../claude-discovery'
-import { ClaudeAuthRunner } from '../utils/claude-auth'
 import { resolveClaudeExecutable } from '../utils/claude-executable'
 import {
-  claudeModelRows,
   FAKE_CLAUDE_EXECUTABLE,
   resolveFakeClaudeExecutable,
   SYNTHETIC_HAIKU,
   SYNTHETIC_OPUS,
 } from '../../../../test/factories/claude-models'
+import {
+  assistantText,
+  commandLifecycle,
+  FakeClaudeQuery,
+  signedInClaudeAuth,
+} from '../../../../test/factories/fake-claude-query'
 import type {
   ProviderRuntimeEvent,
   ProviderRuntimeStartInput,
@@ -60,158 +65,6 @@ const SESSION_ID = 'ee84050b-1b17-5fe8-9f71-0983f1fceccc'
 const SECOND_SESSION_ID = '5d0c3a4e-8f1b-4c2d-9e7a-6b5c4d3e2f10'
 const SYSTEM_UUID = '44444444-4444-4444-8444-444444444444'
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
-
-/**
- * The real `initializationResult()` answers in ~0.5s with NO prompt pushed, and
- * its payload carries NO `session_id` — which is the whole reason the adapter
- * has to mint the id itself. Keep this faithful to that shape.
- */
-const INITIALIZE_RESPONSE = {
-  account: { email: 'dev@example.com', subscriptionType: 'max' },
-  agents: [
-    { description: ' Reviews a diff ', model: 'sonnet', name: 'reviewer' },
-    { description: 'Unnamed', name: ' ' },
-  ],
-  available_output_styles: ['default'],
-  commands: [],
-  models: claudeModelRows(),
-  output_style: 'default',
-}
-
-/** `get_usage` as the CLI answers it for a Max account: 0–100 percentages, ISO resets. */
-const GET_USAGE_RESPONSE = {
-  behaviors: null,
-  rate_limits: {
-    five_hour: { resets_at: '2026-09-24T12:00:00Z', utilization: 54 },
-    model_scoped: [{ display_name: 'Fable', resets_at: null, utilization: 73 }],
-    seven_day: { resets_at: null, utilization: 18.4 },
-  },
-  rate_limits_available: true,
-  session: {
-    model_usage: {},
-    total_api_duration_ms: 0,
-    total_cost_usd: 0,
-    total_duration_ms: 0,
-    total_lines_added: 0,
-    total_lines_removed: 0,
-  },
-  subscription_type: 'max',
-}
-
-type FakeWaiter = {
-  reject: (reason: unknown) => void
-  resolve: (value: IteratorResult<SDKMessage>) => void
-}
-
-/**
- * Ported from `references/t3code/.../ClaudeAdapter.test.ts` with the Effect
- * wrapper dropped: a hand-driven `AsyncIterable<SDKMessage>` with a queue, a
- * waiter list, and call recorders for the control requests the adapter uses.
- */
-class FakeClaudeQuery implements AsyncIterable<SDKMessage> {
-  readonly setModelCalls: Array<string | undefined> = []
-  readonly stoppedTasks: string[] = []
-  readonly getContextUsage = async () => ({
-    categories: [
-      { color: 'a', kind: 'used' as const, name: 'System tools', tokens: 9_000 },
-      { color: 'b', kind: 'used' as const, name: 'Messages', tokens: 3_000 },
-      { color: 'c', kind: 'deferred' as const, name: 'MCP tools (deferred)', tokens: 21_000 },
-      { color: 'd', kind: 'buffer' as const, name: 'Autocompact buffer', tokens: 13_000 },
-      { color: 'e', kind: 'free' as const, name: 'Free space', tokens: 175_000 },
-    ],
-    maxTokens: 200_000,
-    rawMaxTokens: 200_000,
-    totalTokens: 12_000,
-  })
-  readonly reconnected: string[] = []
-  readonly mcpServerStatus = async () => [
-    { name: 'linear', status: 'connected' as const },
-    { error: 'spawn ENOENT', name: 'broken', status: 'failed' as const },
-  ]
-  readonly reconnectMcpServer = async (name: string) => {
-    this.reconnected.push(name)
-  }
-  readonly stopTask = async (taskId: string) => {
-    this.stoppedTasks.push(taskId)
-  }
-  acknowledgeClose = true
-  closeCalls = 0
-  interruptCalls = 0
-  private readonly queue: SDKMessage[] = []
-  private readonly waiters: FakeWaiter[] = []
-  private done = false
-  private failure: unknown = undefined
-
-  emit(message: SDKMessage) {
-    if (this.done) return
-
-    const waiter = this.waiters.shift()
-    if (waiter) {
-      waiter.resolve({ done: false, value: message })
-      return
-    }
-
-    this.queue.push(message)
-  }
-
-  fail(cause: unknown) {
-    if (this.done) return
-
-    this.done = true
-    this.failure = cause
-    for (const waiter of this.waiters.splice(0)) {
-      waiter.reject(cause)
-    }
-  }
-
-  finish() {
-    if (this.done) return
-
-    this.done = true
-    for (const waiter of this.waiters.splice(0)) {
-      waiter.resolve({ done: true, value: undefined })
-    }
-  }
-
-  readonly interrupt = async () => {
-    this.interruptCalls += 1
-    return undefined
-  }
-
-  readonly initializationResult = async () => INITIALIZE_RESPONSE
-
-  readonly usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET = async () =>
-    GET_USAGE_RESPONSE
-
-  readonly setModel = async (model?: string) => {
-    this.setModelCalls.push(model)
-  }
-
-  readonly close = () => {
-    this.closeCalls += 1
-    if (this.acknowledgeClose) this.finish()
-  };
-
-  [Symbol.asyncIterator](): AsyncIterator<SDKMessage> {
-    return { next: () => this.next() }
-  }
-
-  private next(): Promise<IteratorResult<SDKMessage>> {
-    const value = this.queue.shift()
-    if (value) return Promise.resolve({ done: false, value })
-
-    if (this.failure !== undefined) {
-      const failure = this.failure
-      this.failure = undefined
-      return Promise.reject(failure)
-    }
-    if (this.done) return Promise.resolve({ done: true, value: undefined })
-
-    return new Promise<IteratorResult<SDKMessage>>((resolve, reject) => {
-      this.waiters.push({ reject, resolve })
-    })
-  }
-}
 
 type ClaudeHarness = {
   adapter: ClaudeProviderAdapter
@@ -841,6 +694,88 @@ describe('ClaudeProviderAdapter', () => {
     await harness.adapter.stopAll()
   })
 
+  it('reports the Stop hook’s schedules', async () => {
+    const harness = claudeHarness()
+    const sessionId = v.parse(sessionIdSchema, '2f6b8c1d-4e3a-5b7c-9d8e-1a2b3c4d5e6f')
+    await harness.adapter.startRuntime(sessionStartInput({ options: { effort: 'low' }, sessionId }))
+    const stop = latestOptions(harness).hooks?.Stop?.[0]?.hooks[0]
+    assert(stop, 'sessions pass an in-process Stop hook')
+
+    await stop(
+      {
+        hook_event_name: 'Stop',
+        session_id: sessionId,
+        transcript_path: '/tmp/transcript.jsonl',
+        cwd: WORKSPACE_ROOT,
+        stop_hook_active: false,
+        session_crons: [
+          { id: 'c1', schedule: '*/5 * * * *', recurring: true, prompt: 'poll the deploy' },
+          { id: 'w1', schedule: '37 14 26 9 *', recurring: false, prompt: 'check back' },
+        ],
+      },
+      undefined,
+      { signal: new AbortController().signal },
+    )
+    expect(await waitForEvent(harness, 'schedules.updated')).toMatchObject({
+      payload: {
+        schedules: [
+          { id: 'c1', prompt: 'poll the deploy', recurring: true, schedule: '*/5 * * * *' },
+          { id: 'w1', prompt: 'check back', recurring: false, schedule: '37 14 26 9 *' },
+        ],
+      },
+      sessionId,
+    })
+    await harness.adapter.stopAll()
+  })
+
+  it('reports a /goal from active_goal, and its end when the value is null', async () => {
+    const harness = claudeHarness()
+    await harness.adapter.startRuntime(sessionStartInput({}))
+    const query = latestQuery(harness)
+    const setAt = Date.now() - 90_000
+    const activeGoal = (value: SDKActiveGoalMessage['value']): SDKActiveGoalMessage => ({
+      type: 'active_goal',
+      value,
+      uuid: SYSTEM_UUID,
+      session_id: SESSION_ID,
+    })
+    // The SDK yields this message though its union leaves it out.
+    query.emit(
+      activeGoal({
+        condition: 'tests pass',
+        iterations: 2,
+        set_at: setAt,
+        tokens_at_start: 0,
+        last_reason: 'two failures left',
+      }) as unknown as SDKMessage,
+    )
+    expect(await waitForEvent(harness, 'goal.updated')).toMatchObject({
+      payload: {
+        goal: {
+          objective: 'tests pass',
+          status: 'active',
+          iterations: 2,
+          lastReason: 'two failures left',
+          timeUsedSeconds: 90,
+        },
+      },
+    })
+    query.emit(activeGoal(null) as unknown as SDKMessage)
+    await vi.waitFor(() =>
+      expect(harness.events.filter((event) => event.type === 'goal.updated').at(-1)).toMatchObject({
+        payload: { goal: null },
+      }),
+    )
+    await harness.adapter.stopAll()
+  })
+
+  it('keeps ephemeral utility sessions free of the schedule hook', async () => {
+    const harness = claudeHarness()
+    await harness.adapter.startRuntime(sessionStartInput({ ephemeral: true }))
+    expect(latestOptions(harness).hooks).toBeUndefined()
+    await harness.adapter.stopAll()
+  })
+
   it('rejects the turn with a structured error when the result is an error subtype', async () => {
     const harness = claudeHarness()
     const input = providerTurnInput()
@@ -938,6 +873,229 @@ describe('ClaudeProviderAdapter', () => {
     expect(await harness.adapter.hasRuntime({ sessionId: input.sessionId })).toBe(false)
     expect(harness.events.some((event) => event.type === 'runtime.configured')).toBe(false)
     await harness.adapter.stopAll()
+  })
+
+  it('stamps each prompt with a uuid and the human origin', async () => {
+    const harness = claudeHarness()
+    const pending = harness.adapter.sendTurn(providerTurnInput())
+    await waitFor(() => harness.prompts.length === 1, 'the prompt was never pushed')
+
+    expect(harness.prompts[0]).toMatchObject({ origin: { kind: 'human' } })
+    expect(harness.prompts[0]?.uuid).toMatch(UUID_PATTERN)
+    latestQuery(harness).emit(successResult())
+    await pending
+    await harness.adapter.stopAll()
+  })
+
+  it('gives a wakeup turn its own turn, reply and completion', async () => {
+    const harness = claudeHarness()
+    const input = providerTurnInput()
+    await runOwnTurn(harness, input, 'Scheduled.')
+    const query = latestQuery(harness)
+
+    query.emit(commandLifecycle('d1407b55-97f0-434a-899d-397d1a308eb4', 'started'))
+    query.emit(initMessage())
+    query.emit(assistantText('AWAKE'))
+    query.emit(successResult())
+    query.emit(commandLifecycle('d1407b55-97f0-434a-899d-397d1a308eb4', 'completed'))
+    await waitFor(() => turnsCompleted(harness).length === 2, 'the wakeup turn never completed')
+
+    const started = turnsStarted(harness).at(-1)
+    assert(started, 'the wakeup turn never started')
+    expect(started.payload).toMatchObject({ origin: 'scheduled' })
+    expect(started.turnId).not.toBe(input.turnId)
+    expect(assistantReplies(harness)).toEqual([
+      { text: 'Scheduled.', turnId: input.turnId },
+      { text: 'AWAKE', turnId: started.turnId },
+    ])
+    expect(turnsCompleted(harness).at(-1)).toMatchObject({
+      payload: { state: 'completed' },
+      turnId: started.turnId,
+    })
+    await harness.adapter.stopAll()
+  })
+
+  it('adopts the turn that reads a finished background task', async () => {
+    const harness = claudeHarness()
+    await runOwnTurn(harness, providerTurnInput(), 'Started it.')
+    const query = latestQuery(harness)
+
+    query.emit(taskNotification())
+    query.emit(initMessage())
+    query.emit(assistantText('The task finished.'))
+    query.emit(successResult())
+    await waitFor(() => turnsCompleted(harness).length === 2, 'the task turn never completed')
+
+    const started = turnsStarted(harness).at(-1)
+    expect(started?.payload).toMatchObject({ origin: 'task' })
+    expect(assistantReplies(harness).at(-1)).toEqual({
+      text: 'The task finished.',
+      turnId: started?.turnId,
+    })
+    await harness.adapter.stopAll()
+  })
+
+  it('gives a prompt sent during a harness turn its own result', async () => {
+    const harness = claudeHarness()
+    await runOwnTurn(harness, providerTurnInput(), 'Scheduled.')
+    const query = latestQuery(harness)
+    query.emit(commandLifecycle('570c33d5-b2cb-4c4b-938c-774ca382d2bd', 'started'))
+    query.emit(initMessage())
+    await waitFor(() => turnsStarted(harness).length === 2, 'the wakeup turn never started')
+    const wakeupTurnId = turnsStarted(harness)[1]?.turnId
+
+    const second = providerTurnInput({ turnId: 'turn-2' })
+    let resolved = false
+    const pending = harness.adapter.sendTurn(second).then(() => {
+      resolved = true
+    })
+    await waitFor(() => harness.prompts.length === 2, 'the second prompt was never pushed')
+    const secondUuid = harness.prompts[1]?.uuid
+    assert(secondUuid, 'the second prompt carried no uuid')
+    query.emit(commandLifecycle(secondUuid, 'queued'))
+    query.emit(assistantText('one two three'))
+    query.emit(successResult())
+    query.emit(commandLifecycle('570c33d5-b2cb-4c4b-938c-774ca382d2bd', 'completed'))
+    await waitFor(() => turnsCompleted(harness).length === 2, 'the wakeup turn never completed')
+    expect(resolved).toBe(false)
+
+    query.emit(commandLifecycle(secondUuid, 'started'))
+    query.emit(initMessage())
+    query.emit(assistantText('USERTURN'))
+    query.emit(successResult())
+    query.emit(commandLifecycle(secondUuid, 'completed'))
+    await pending
+
+    expect(assistantReplies(harness).slice(1)).toEqual([
+      { text: 'one two three', turnId: wakeupTurnId },
+      { text: 'USERTURN', turnId: second.turnId },
+    ])
+    expect(turnsCompleted(harness).map((event) => event.turnId)).toEqual([
+      'turn-1',
+      wakeupTurnId,
+      second.turnId,
+    ])
+    await harness.adapter.stopAll()
+  })
+
+  it('does not close a queued prompt with the result of a harness turn that ran first', async () => {
+    const harness = claudeHarness()
+    const input = providerTurnInput()
+    let resolved = false
+    const pending = harness.adapter.sendTurn(input).then(() => {
+      resolved = true
+    })
+    await waitFor(() => harness.prompts.length === 1, 'the prompt was never pushed')
+    const uuid = harness.prompts[0]?.uuid
+    assert(uuid, 'the prompt carried no uuid')
+    const query = latestQuery(harness)
+
+    query.emit(commandLifecycle(uuid, 'queued'))
+    query.emit(commandLifecycle('d1407b55-97f0-434a-899d-397d1a308eb4', 'started'))
+    query.emit(initMessage())
+    query.emit(assistantText('AWAKE'))
+    query.emit(successResult())
+    query.emit(commandLifecycle(uuid, 'started'))
+    await waitFor(() => assistantReplies(harness).length === 1, 'the wakeup reply was lost')
+    expect(resolved).toBe(false)
+
+    query.emit(initMessage())
+    query.emit(assistantText('Hello'))
+    query.emit(successResult())
+    await pending
+    expect(turnsCompleted(harness)).toHaveLength(1)
+    expect(assistantReplies(harness).map((reply) => reply.text)).toEqual(['AWAKE', 'Hello'])
+    await harness.adapter.stopAll()
+  })
+
+  it('keeps a wakeup that fires before the prompt is queued off the owner turn', async () => {
+    const harness = claudeHarness()
+    await runOwnTurn(harness, providerTurnInput(), 'Scheduled.')
+    const second = providerTurnInput({ turnId: 'turn-2' })
+    let resolved = false
+    const pending = harness.adapter.sendTurn(second).then(() => {
+      resolved = true
+    })
+    await waitFor(() => harness.prompts.length === 2, 'the second prompt was never pushed')
+    const uuid = harness.prompts[1]?.uuid
+    assert(uuid, 'the second prompt carried no uuid')
+    const query = latestQuery(harness)
+
+    // The wakeup starts before the CLI has even queued the prompt.
+    query.emit(commandLifecycle('d1407b55-97f0-434a-899d-397d1a308eb4', 'started'))
+    query.emit(initMessage())
+    query.emit(commandLifecycle(uuid, 'queued'))
+    query.emit(assistantText('AWAKE'))
+    query.emit(successResult())
+    query.emit(commandLifecycle('d1407b55-97f0-434a-899d-397d1a308eb4', 'completed'))
+    query.emit(commandLifecycle(uuid, 'started'))
+    await waitFor(() => assistantReplies(harness).length === 2, 'the wakeup reply was lost')
+    expect(resolved).toBe(false)
+
+    query.emit(initMessage())
+    query.emit(assistantText('Hello'))
+    query.emit(successResult())
+    await pending
+    expect(turnsStarted(harness).map((event) => event.turnId)).toEqual(['turn-1', 'turn-2'])
+    expect(turnsCompleted(harness).map((event) => event.turnId)).toEqual(['turn-1', 'turn-2'])
+    expect(assistantReplies(harness).slice(1)).toEqual([
+      { text: 'AWAKE', turnId: second.turnId },
+      { text: 'Hello', turnId: second.turnId },
+    ])
+    await harness.adapter.stopAll()
+  })
+
+  it('ends a harness turn with a ready state bound to that turn', async () => {
+    const harness = claudeHarness()
+    await runOwnTurn(harness, providerTurnInput(), 'Scheduled.')
+    const query = latestQuery(harness)
+    query.emit(commandLifecycle('d1407b55-97f0-434a-899d-397d1a308eb4', 'started'))
+    query.emit(initMessage())
+    query.emit(successResult())
+    await waitFor(() => turnsCompleted(harness).length === 2, 'the wakeup turn never completed')
+
+    const wakeupTurnId = turnsStarted(harness)[1]?.turnId
+    const readies = harness.events.filter(
+      (event) => event.type === 'runtime.state.changed' && event.payload.state === 'ready',
+    )
+    expect(readies.map((event) => event.turnId)).toEqual(['turn-1', wakeupTurnId])
+    await harness.adapter.stopAll()
+  })
+
+  it('keeps unapproved project MCP servers off, and restarts the idle session on approval', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'platform-claude-project-mcp-'))
+    const cwd = path.join(root, 'repo')
+    const approvalsFile = path.join(root, 'state', 'approvals.json')
+    await mkdir(cwd, { recursive: true })
+    await writeFile(
+      path.join(cwd, '.mcp.json'),
+      JSON.stringify({ mcpServers: { deploy: { command: 'deploy-server' } } }),
+    )
+    const harness = claudeHarness(true, undefined, approvalsFile)
+    const input = { ...sessionStartInput({}), cwd }
+    try {
+      await harness.adapter.startRuntime(input)
+      expect(latestOptions(harness).settings).toMatchObject({ disabledMcpjsonServers: ['deploy'] })
+      expect(await harness.adapter.mcpServers({ sessionId: input.sessionId })).toContainEqual({
+        error: null,
+        name: 'deploy',
+        status: 'unapproved',
+      })
+
+      await harness.adapter.approveMcpServer({ name: 'deploy', sessionId: input.sessionId })
+
+      expect(harness.queries).toHaveLength(2)
+      expect(latestOptions(harness).settings).toBeUndefined()
+      expect(Object.values(JSON.parse(await readFile(approvalsFile, 'utf8')).approved)).toEqual([
+        'deploy',
+      ])
+      await expect(
+        harness.adapter.approveMcpServer({ name: 'deploy', sessionId: input.sessionId }),
+      ).rejects.toMatchObject({ code: 'provider.MCP_SERVER_NOT_AWAITING_APPROVAL' })
+    } finally {
+      await harness.adapter.stopAll()
+      await rm(root, { force: true, recursive: true })
+    }
   })
 
   it('rejects a second turn while one is still in flight', async () => {
@@ -1334,7 +1492,7 @@ describe('ClaudeProviderAdapter catalog', () => {
   it('reports a missing configured binary with its fix instead of falling back', async () => {
     const adapter = new ClaudeProviderAdapter({
       attachmentsDir,
-      auth: signedInAuth(),
+      auth: signedInClaudeAuth(),
       createQuery: () => expect.unreachable('No CLI may run without an executable.'),
       resolveExecutable: () =>
         resolveClaudeExecutable({
@@ -1351,16 +1509,11 @@ describe('ClaudeProviderAdapter catalog', () => {
   })
 })
 
-function signedInAuth() {
-  return new ClaudeAuthRunner({
-    spawn: () => ({
-      exited: Promise.resolve({ exitCode: 0, stderr: '', stdout: '{"loggedIn":true}' }),
-      kill: () => undefined,
-    }),
-  })
-}
-
-function claudeHarness(acknowledgeStop = true, historyRunner?: ClaudeHistoryRunner): ClaudeHarness {
+function claudeHarness(
+  acknowledgeStop = true,
+  historyRunner?: ClaudeHistoryRunner,
+  projectMcpApprovalsFile?: string,
+): ClaudeHarness {
   const events: ProviderRuntimeEvent[] = []
   const options: Options[] = []
   const prompts: SDKUserMessage[] = []
@@ -1368,9 +1521,10 @@ function claudeHarness(acknowledgeStop = true, historyRunner?: ClaudeHistoryRunn
   const queries: FakeClaudeQuery[] = []
 
   const adapter = new ClaudeProviderAdapter({
+    ...(projectMcpApprovalsFile ? { projectMcpApprovalsFile } : {}),
     historyRunner,
     attachmentsDir,
-    auth: signedInAuth(),
+    auth: signedInClaudeAuth(),
     createQuery: (input) => {
       if (input.options.strictMcpConfig) {
         probes.push(input.options)
@@ -1950,6 +2104,55 @@ const MESSAGE_MAPPINGS: ReadonlyArray<{
     },
   },
 ]
+
+/** The owner's turn from push to result, lifecycle frames included. */
+async function runOwnTurn(harness: ClaudeHarness, input: ProviderTurnInput, reply: string) {
+  const pushed = harness.prompts.length
+  const pending = harness.adapter.sendTurn(input)
+  await waitFor(() => harness.prompts.length > pushed, 'the prompt was never pushed')
+  const uuid = harness.prompts.at(-1)?.uuid
+  assert(uuid, 'the prompt carried no uuid')
+  const query = latestQuery(harness)
+  query.emit(commandLifecycle(uuid, 'queued'))
+  query.emit(commandLifecycle(uuid, 'started'))
+  query.emit(initMessage())
+  query.emit(assistantText(reply))
+  query.emit(successResult())
+  query.emit(commandLifecycle(uuid, 'completed'))
+  await pending
+}
+
+function turnsStarted(harness: ClaudeHarness) {
+  return harness.events.filter(
+    (event): event is Extract<ProviderRuntimeEvent, { type: 'turn.started' }> =>
+      event.type === 'turn.started',
+  )
+}
+
+function turnsCompleted(harness: ClaudeHarness) {
+  return harness.events.filter(
+    (event): event is Extract<ProviderRuntimeEvent, { type: 'turn.completed' }> =>
+      event.type === 'turn.completed',
+  )
+}
+
+function assistantReplies(harness: ClaudeHarness) {
+  return harness.events.flatMap((event) =>
+    event.type === 'item.completed' && event.payload.itemType === 'assistant_message'
+      ? [{ text: event.payload.detail, turnId: event.turnId }]
+      : [],
+  )
+}
+
+function taskNotification(): SDKMessage {
+  return systemMessage({
+    output_file: '/tmp/sleep.log',
+    status: 'completed',
+    subtype: 'task_notification',
+    summary: 'sleep 20 finished',
+    task_id: 'task-sleep',
+  })
+}
 
 function initMessage(): SDKMessage {
   return {

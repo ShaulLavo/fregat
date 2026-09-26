@@ -26,9 +26,11 @@ test('correlates repeated real write/create echoes and hides only issued tempora
   events.length = 0
 
   await service.write({ path: 'alias/file.txt', content: 'saved', origin, writeId: 'write' })
-  await vi.waitFor(() => expect(targetEvents(events).length).toBeGreaterThanOrEqual(2))
+  await vi.waitFor(() => expect(savedEvents(events).length).toBeGreaterThanOrEqual(2))
   await delay(100)
-  expect(targetEvents(events).every((event) => event.writeId === 'write')).toBe(true)
+  // A late echo of the 16 MiB create can still arrive here; it must carry the create's id.
+  expect(savedEvents(events).every((event) => event.writeId === 'write')).toBe(true)
+  expect(targetEvents(events).every((event) => event.writeId !== undefined)).toBe(true)
   expect(events.some((event) => 'path' in event && event.path?.endsWith('.tmp'))).toBe(false)
 
   events.length = 0
@@ -126,6 +128,11 @@ function fileEvents(events: readonly WatchServerMessage[]) {
   return events.filter(
     (event): event is FilesystemEvent => isFilesystemEvent(event) && event.path === 'file.txt',
   )
+}
+
+/** The write's own echoes: what the file holds after `service.write` saved it. */
+function savedEvents(events: readonly WatchServerMessage[]) {
+  return targetEvents(events).filter((event) => event.version === textFileVersion('saved'))
 }
 
 function targetEvents(events: readonly WatchServerMessage[]) {

@@ -184,10 +184,12 @@ describe('editor workspace state', () => {
     const commands = createEditorApplyActions({
       retainedTextBudget: () => Number.MAX_SAFE_INTEGER,
       activation: {
-        activate: (content) =>
+        activate: (content) => {
           events.push(
             `activated:${content.kind === 'document' && content.document.kind === 'file' ? content.document.resource.path : ''}`,
-          ),
+          )
+          return null
+        },
         setRoot: () => undefined,
       },
       documentStore,
@@ -211,7 +213,7 @@ describe('editor workspace state', () => {
     documentStore.getState().setFileOrphaned(document.key, true)
     const commands = createEditorApplyActions({
       retainedTextBudget: () => Number.MAX_SAFE_INTEGER,
-      activation: { activate: () => undefined, setRoot: () => undefined },
+      activation: { activate: () => null, setRoot: () => undefined },
       documentStore,
       searchStore: createSearchBufferStore(),
       uiStore: createEditorUiStore(),
@@ -661,7 +663,7 @@ function editorHarness(
   const workspaceStore = createEditorWorkspaceStore(cachedWorkspace(slice))
   const commands = createEditorApplyActions({
     retainedTextBudget,
-    activation: { activate: () => undefined, setRoot: () => undefined },
+    activation: { activate: () => null, setRoot: () => undefined },
     documentStore,
     searchStore,
     uiStore,

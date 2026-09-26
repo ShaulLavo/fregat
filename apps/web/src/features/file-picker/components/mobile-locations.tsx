@@ -2,18 +2,18 @@ import type { EntriesLoadState } from '@/features/file-picker/utils/model'
 
 import { LocationPill } from '@/features/file-picker/components/location-pill'
 import { RecentPill } from '@/features/file-picker/components/recent-pill'
-import { sidebarLocationsFor } from '@/features/file-picker/utils/sidebar-locations'
+import type { SidebarSection } from '@/features/file-picker/utils/sidebar-locations'
 
 export function MobileLocations({
   currentPath,
-  homePath,
   recentState,
+  sections,
 }: {
   currentPath: string
-  homePath: string
   recentState: EntriesLoadState
+  sections: readonly SidebarSection[]
 }) {
-  const locations = sidebarLocationsFor(homePath)
+  const locations = sections.flatMap((section) => section.locations)
   const recents = recentState.status === 'ready' ? recentState.data : []
 
   return (

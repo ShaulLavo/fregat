@@ -129,6 +129,6 @@ function terminalLinkError(error: unknown) {
 
   return {
     category: 'not_a_file' as const,
-    message: 'That path is a directory, not a file.',
+    message: 'That path is a folder. Open a file inside it.',
   }
 }

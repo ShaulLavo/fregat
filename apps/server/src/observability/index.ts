@@ -10,6 +10,7 @@ export {
   recordProcessError,
   recordProcessInfo,
   recordProcessWarning,
+  setLogRetentionDays,
 } from './runtime'
 export {
   operatorErrorSummary,

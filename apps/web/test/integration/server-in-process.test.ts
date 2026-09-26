@@ -9,6 +9,8 @@ import {
   type WorkspaceSearchResult,
 } from '@workspace/client-core/files/search-client'
 import type { Client } from '@workspace/client-core/transport/client'
+import { onTestFinished } from 'vitest'
+import { streamWorkspaceEvents } from '@/features/workspace/state/event-stream'
 import { expect, test } from '../fixtures'
 
 // Proves the phase-2 foundation: a real server, driven in-process through the
@@ -30,9 +32,15 @@ test('reads a file written to the real workspace', async ({ client, server }) =>
 })
 
 test('quick-open file search reuses the workspace search index', async ({ client }) => {
-  // The index is installed by opening a root, the same call the app makes when it restores one.
-  // Without it there is no index to reuse and names correctly fall back to fd.
-  await client.fs['workspace-root'].post({ generation: 1, path: '' })
+  // A project event stream holds its root's index, as the app's does while the root is open.
+  // Without one there is no index to reuse and names correctly fall back to fd.
+  const stream = new AbortController()
+  onTestFinished(() => stream.abort())
+  const ready = Promise.withResolvers<void>()
+  streamWorkspaceEvents(client, '', stream.signal, (message) => {
+    if (message.type === 'ready') ready.resolve()
+  }).catch(() => undefined)
+  await ready.promise
   await client.fs['create-folder'].post({ path: 'src', recursive: true })
   await client.fs['create-file'].post({
     content: 'export const commandPalette = true\n',

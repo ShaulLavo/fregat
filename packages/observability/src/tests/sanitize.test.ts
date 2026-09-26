@@ -73,3 +73,15 @@ test('a capped record policy bounds depth, arrays and keys and drops the stack i
     nested: { a: '[truncated]', token: '[redacted]' },
   })
 })
+
+test('an object two fields share is logged at both, and only a cycle is circular', () => {
+  const shared = { kind: 'document', path: 'main/keep.txt' }
+  const cycle: Record<string, unknown> = { name: 'loop' }
+  cycle.self = cycle
+
+  expect(sanitizeRecord({ requested: shared, selected: shared, cycle })).toEqual({
+    requested: shared,
+    selected: shared,
+    cycle: { name: 'loop', self: '[circular]' },
+  })
+})

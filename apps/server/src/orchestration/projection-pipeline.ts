@@ -216,6 +216,9 @@ export class OrchestrationProjectionPipeline {
       case 'session.provider-start-settled':
         this.updateProviderStart(event)
         return
+      case 'session.turn-provider-started':
+        this.insertProviderStartedTurn(event)
+        return
       case 'session.runtime-recovered':
         this.recoverRuntime(event)
         return
@@ -506,6 +509,37 @@ export class OrchestrationProjectionPipeline {
       )
       .run()
     this.refreshLatestTurn(event.payload.sessionId, event.payload.createdAt)
+  }
+
+  /** Already running in the harness: adopted from birth, settled by the runtime like any turn. */
+  private insertProviderStartedTurn(
+    event: Extract<OrchestrationEvent, { type: 'session.turn-provider-started' }>,
+  ) {
+    const { createdAt, runtimeEpoch, sessionId, turnId } = event.payload
+    const row = {
+      assistantMessageId: null,
+      completedAt: null,
+      requestedAt: createdAt,
+      sourceProposedPlanJson: null,
+      startedAt: createdAt,
+      state: 'running' as const,
+      providerStartState: 'adopted' as const,
+      providerStartGeneration: 0,
+      providerStartSequence: event.sequence,
+      runtimeEpoch,
+      sessionId,
+      turnId,
+      userMessageId: null,
+    }
+    this.database.insert(projectionTurns).values(row).onConflictDoNothing().run()
+    const turn = this.selectTurn(sessionId, turnId)
+    if (!turn) return
+
+    this.updateSession(sessionId, {
+      latestTurnId: turnId,
+      latestTurnJson: JSON.stringify(latestTurnJson(turn)),
+      updatedAt: createdAt,
+    })
   }
 
   private recoverRuntime(

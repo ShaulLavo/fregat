@@ -24,25 +24,22 @@ test('registers canonical directory identity across symlink aliases without acti
   expect(canonical).toMatchObject({ name: 'library', path: 'packages/library' })
   expect(canonical.id).toHaveLength(16)
   expect(canonical.id).toMatch(/^[A-Za-z0-9_-]{16}$/)
-  expect(await (await request(app, '/health')).json()).toMatchObject({
-    workspaceIndex: { scanRoot: null },
-  })
+  expect(await (await request(app, '/health')).json()).toMatchObject({ workspaceIndexes: [] })
   expect(
     await (await request(app, '/fs/recents?mode=folder&showHidden=true')).json(),
   ).toMatchObject({ entries: [] })
 
-  const opened = await request(app, '/fs/workspace-root', { generation: 1, path: 'alias' })
+  const opened = await request(app, '/fs/workspace-root', { path: 'alias' })
   expect(opened.status).toBe(200)
-  expect(await opened.json()).toMatchObject({
-    status: 'opened',
-    entry: {
+  expect(await opened.json()).toEqual({
+    entry: expect.objectContaining({
       type: 'directory',
       path: 'packages/library',
       canonicalPath: 'packages/library',
       workspaceAddress: canonical,
-    },
-    workspaceIndex: { scanRoot: path.join(workspace.root, 'packages/library') },
+    }),
   })
+  expect(await (await request(app, '/health')).json()).toMatchObject({ workspaceIndexes: [] })
 })
 
 test('assigns distinct addresses to an empty namespace root and arbitrary nested directories', async ({
@@ -109,9 +106,7 @@ test('rejects unknown IDs, files, absent paths, and paths escaping the filesyste
   ] as const) {
     expect((await request(app, '/fs/workspace-address', { path: entry })).status).toBe(status)
   }
-  expect((await request(app, '/fs/workspace-root', { generation: 1, path: 'escape' })).status).toBe(
-    403,
-  )
+  expect((await request(app, '/fs/workspace-root', { path: 'escape' })).status).toBe(403)
 })
 
 test('revalidates resolved directories and never retargets a stored ID through a replacement symlink', async ({
@@ -161,15 +156,11 @@ test('keys identity by the real filesystem namespace and canonical directory tog
   expect((await request(nestedApp, `/fs/workspace-address/${registered.id}`)).status).toBe(404)
 })
 
-test('register and GET resolution leave the active index, open generation, and recents alone', async ({
-  workspace,
-}) => {
+test('register and GET resolution leave recents alone', async ({ workspace }) => {
   await mkdir(path.join(workspace.root, 'active'))
   await mkdir(path.join(workspace.root, 'linked'))
   const app = workspace.openApp()
-  expect((await request(app, '/fs/workspace-root', { generation: 1, path: 'active' })).status).toBe(
-    200,
-  )
+  expect((await request(app, '/fs/workspace-root', { path: 'active' })).status).toBe(200)
   const registered = v.parse(
     workspaceAddressSchema,
     await (await request(app, '/fs/workspace-address', { path: 'linked' })).json(),
@@ -179,15 +170,9 @@ test('register and GET resolution leave the active index, open generation, and r
       registered,
     )
   }
-  expect(await (await request(app, '/health')).json()).toMatchObject({
-    workspaceIndex: { scanRoot: path.join(workspace.root, 'active') },
-  })
   expect(
     await (await request(app, '/fs/recents?mode=folder&showHidden=true')).json(),
   ).toMatchObject({ entries: [] })
-  const opened = await request(app, '/fs/workspace-root', { generation: 2, path: 'linked' })
-  expect(await opened.json()).toMatchObject({
-    status: 'opened',
-    entry: { workspaceAddress: registered },
-  })
+  const opened = await request(app, '/fs/workspace-root', { path: 'linked' })
+  expect(await opened.json()).toMatchObject({ entry: { workspaceAddress: registered } })
 })

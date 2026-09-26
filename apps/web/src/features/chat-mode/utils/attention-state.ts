@@ -7,6 +7,7 @@ export function sessionStatusLabel(status: SessionRailStatus) {
   if (status === 'failed') return 'Failed'
   if (status === 'working') return 'Working'
   if (status === 'monitoring') return 'Monitoring'
+  if (status === 'sleeping') return 'Sleeping'
 
   return 'Ready'
 }
@@ -14,7 +15,7 @@ export function sessionStatusLabel(status: SessionRailStatus) {
 export function sessionStatusTone(status: SessionRailStatus): StatusDotTone {
   if (status === 'approval' || status === 'input') return 'warning'
   if (status === 'failed') return 'destructive'
-  if (status === 'working' || status === 'monitoring') return 'info'
+  if (status === 'working' || status === 'monitoring' || status === 'sleeping') return 'info'
 
   return 'neutral'
 }

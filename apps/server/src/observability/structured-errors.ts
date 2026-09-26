@@ -104,7 +104,7 @@ export const orchestrationErrors = defineErrorCatalog('orchestration', {
       expectedBranch: string | null
       sessionId: string
     }) =>
-      `Session ${sessionId} is on branch ${actualBranch ?? 'none'}, not the expected ${expectedBranch ?? 'none'}`,
+      `Session ${sessionId} is on branch ${actualBranch ?? 'none'}; the update expected ${expectedBranch ?? 'none'}`,
     why: 'The compare-and-swap guard failed: the session moved branches since the client read it.',
     fix: 'Reload the session and reissue the update against its current branch.',
   },

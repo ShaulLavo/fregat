@@ -15,14 +15,12 @@ import {
   listLabel,
   pickerCopy,
   type EntriesLoadState,
-  type FilePickerIconMode,
   type FilePickerMode,
 } from '@/features/file-picker/utils/model'
 
 export function FileList({
   accept,
   entries,
-  iconMode,
   isBusy,
   isSearching,
   listRef,
@@ -37,7 +35,6 @@ export function FileList({
 }: {
   accept?: readonly string[]
   entries: FsEntry[]
-  iconMode: FilePickerIconMode
   isBusy: boolean
   isSearching: boolean
   listRef?: RefObject<HTMLDivElement | null>
@@ -138,7 +135,6 @@ export function FileList({
             <FileRow
               accept={accept}
               entry={row.entry}
-              iconMode={iconMode}
               rowProps={list.rowProps(row.key)}
               isBusy={isBusy}
               mode={mode}

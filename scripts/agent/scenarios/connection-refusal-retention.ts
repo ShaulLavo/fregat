@@ -8,7 +8,7 @@ import type { Scenario } from './index'
 export const connectionRefusalRetention: Scenario = {
   name: 'connection-refusal-retention',
   description:
-    'Keep the workbench and terminal pane through later protocol and identity refusals, then reconnect the same shell through the notice Retry.',
+    'Keep the workbench and terminal pane through a later protocol refusal, then reconnect the same shell through the notice Retry.',
   async run(page, { step }) {
     const base = await openChat(page)
     const response = await page.request.get(`${base.replace(/\/orchestration$/, '')}/health`, {
@@ -16,16 +16,13 @@ export const connectionRefusalRetention: Scenario = {
     })
     const descriptor = await response.json()
     const sockets = new Set<WebSocketRoute>()
-    let refusal: 'protocol' | 'identity' | null = null
+    let refused = false
     await page.routeWebSocket(/\/orchestration\/rpc(?:\?|$)/, (route) => {
       const server = route.connectToServer()
       sockets.add(route)
       server.onMessage((raw) => {
         const message = JSON.parse(raw.toString())
-        if (message.kind === 'connected' && refusal === 'protocol')
-          message.config.protocolVersion += 1
-        if (message.kind === 'connected' && refusal === 'identity')
-          message.config.environmentId = '00000000-0000-4000-8000-000000000099'
+        if (message.kind === 'connected' && refused) message.config.protocolVersion += 1
         route.send(JSON.stringify(message))
       })
     })
@@ -59,38 +56,31 @@ export const connectionRefusalRetention: Scenario = {
       const retained = await terminal.elementHandle()
       ok(retained)
       await step('live-terminal-before-refusal')
-      for (const kind of ['protocol', 'identity'] as const) {
-        refusal = kind
-        for (const route of sockets)
-          await route.close({ code: 4000, reason: 'Verification reconnect' })
-        sockets.clear()
-        const summary = kind === 'protocol' ? 'Protocol mismatch' : 'Machine identity changed'
-        const notice = selectors.machineConnectionNotice(page, descriptor.label, summary)
-        await notice.waitFor()
-        await selectors.windowToolbar(page).waitFor()
-        ok(
-          await retained.evaluate((element) => element.isConnected),
-          'Terminal DOM survives refusal',
-        )
-        await step(`${kind}-refusal-keeps-terminal-pane`)
-        refusal = null
-        ready = false
-        await notice.getByRole('button', { name: 'Retry', exact: true }).click()
-        await selectors.machineLiveStatus(page, descriptor.label).waitFor()
-        for (let attempt = 0; attempt < 100 && !ready; attempt++) await page.waitForTimeout(50)
-        ok(ready, 'Terminal reconnects after compatibility is restored')
-        ok(await retained.evaluate((element) => element.isConnected))
-        const marker = `RETAINED_${kind.toUpperCase()}`
-        await terminal.click({ position: { x: 100, y: 60 } })
-        await page.keyboard.type(`printf '\\nRETAINED_%s\\n' '${kind.toUpperCase()}'`)
-        await page.keyboard.press('Enter')
-        for (let attempt = 0; attempt < 100 && !output.includes(marker); attempt++)
-          await page.waitForTimeout(50)
-        ok(output.includes(marker), 'Retained shell still executes input')
-        await step(`${kind}-retry-recovers-without-remount`)
-      }
+      refused = true
+      for (const route of sockets)
+        await route.close({ code: 4000, reason: 'Verification reconnect' })
+      sockets.clear()
+      const notice = selectors.machineConnectionNotice(page, descriptor.label, 'Protocol mismatch')
+      await notice.waitFor()
+      await selectors.windowToolbar(page).waitFor()
+      ok(await retained.evaluate((element) => element.isConnected), 'Terminal DOM survives refusal')
+      await step('protocol-refusal-keeps-terminal-pane')
+      refused = false
+      ready = false
+      await notice.getByRole('button', { name: 'Retry', exact: true }).click()
+      await selectors.machineLiveStatus(page, descriptor.label).waitFor()
+      for (let attempt = 0; attempt < 100 && !ready; attempt++) await page.waitForTimeout(50)
+      ok(ready, 'Terminal reconnects after compatibility is restored')
+      ok(await retained.evaluate((element) => element.isConnected))
+      await terminal.click({ position: { x: 100, y: 60 } })
+      await page.keyboard.type(`printf '\\nRETAINED_%s\\n' 'PROTOCOL'`)
+      await page.keyboard.press('Enter')
+      for (let attempt = 0; attempt < 100 && !output.includes('RETAINED_PROTOCOL'); attempt++)
+        await page.waitForTimeout(50)
+      ok(output.includes('RETAINED_PROTOCOL'), 'Retained shell still executes input')
+      await step('protocol-retry-recovers-without-remount')
     } finally {
-      refusal = null
+      refused = false
       await page.goto('about:blank')
       for (const url of owners.values()) {
         const target = `${url.protocol === 'wss:' ? 'https:' : 'http:'}//${url.host}${url.pathname}/kill`

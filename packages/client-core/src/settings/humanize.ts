@@ -1,8 +1,22 @@
-import { descriptorFor, type SettingId, type SettingsDiagnostic } from '@workspace/contracts'
+import {
+  descriptorFor,
+  settingParentId,
+  type SettingId,
+  type SettingsDiagnostic,
+  type SettingsValues,
+} from '@workspace/contracts'
 
 // Registry titles describe the choice, which can invert the stored value for hidden models.
 export function settingRowTitle(id: SettingId): string {
   return descriptorFor(id).title ?? humanizeSettingId(id)
+}
+
+/** Why a `dependsOn` row does nothing right now, or null while its parent is on. */
+export function settingDependencyNote(id: SettingId, values: SettingsValues): string | null {
+  const parent = settingParentId(id)
+  if (parent === undefined || values[parent] !== false) return null
+
+  return `Applies while ${settingRowTitle(parent)} is on`
 }
 
 export function settingOptionTitle(id: SettingId, value: string): string {

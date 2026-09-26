@@ -42,6 +42,7 @@ const sessionCache = new WeakMap<
 export type ChatSessionListProjection = Pick<
   ProjectionSession,
   | 'backgroundLiveness'
+  | 'sleepingUntil'
   | 'archivedAt'
   | 'createdAt'
   | 'hasActionableProposedPlan'
@@ -222,6 +223,7 @@ function sessionListProjection(
     snoozedAt: session.snoozedAt,
     snoozedUntil: session.snoozedUntil,
     backgroundLiveness: session.backgroundLiveness ?? null,
+    sleepingUntil: session.sleepingUntil ?? null,
     archivedAt: session.archivedAt,
     createdAt: session.createdAt,
     hasActionableProposedPlan: session.hasActionableProposedPlan,
@@ -251,6 +253,7 @@ function listProjectionMatches(
     previous.createdSortAt === sessionSortTimestamp(session, 'created_at') &&
     previous.updatedSortAt === sessionSortTimestamp(session, 'updated_at') &&
     previous.backgroundLiveness === (session.backgroundLiveness ?? null) &&
+    previous.sleepingUntil === (session.sleepingUntil ?? null) &&
     previous.archivedAt === session.archivedAt &&
     previous.createdAt === session.createdAt &&
     previous.hasActionableProposedPlan === session.hasActionableProposedPlan &&

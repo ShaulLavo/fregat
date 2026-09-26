@@ -5,6 +5,8 @@ import { SessionAttentionIndicator } from '@/features/chat-mode/components/sessi
 import { CaretRightIcon } from '@phosphor-icons/react'
 
 import { BackgroundTasksButton } from '@/features/chat/components/background-tasks-button'
+import { SchedulesButton } from '@/features/chat/components/schedules-button'
+import { GoalButton } from '@/features/chat/components/goal-button'
 import { SessionAgentChip } from '@/features/chat/components/session-agent-chip'
 import { SessionToolsButton } from '@/features/chat/components/session-tools-button'
 import { ContextUsageRing } from '@/features/chat/components/context-usage-ring'
@@ -49,7 +51,8 @@ export function StageHeader({
               rootPath={session.worktreePath ?? rootPath}
             />
           ) : null}
-          {session && session.status !== 'ready' ? (
+          {/* The schedules button names a sleeping session's wake time itself. */}
+          {session && session.status !== 'ready' && session.status !== 'sleeping' ? (
             <span
               className={cn(
                 'flex shrink-0 items-center gap-1.5 text-2xs',
@@ -66,6 +69,8 @@ export function StageHeader({
           ) : null}
           {session ? <SessionAgentChip sessionRef={session.ref} /> : null}
           {session ? <BackgroundTasksButton sessionRef={session.ref} /> : null}
+          {session ? <GoalButton sessionRef={session.ref} /> : null}
+          {session ? <SchedulesButton sessionRef={session.ref} /> : null}
           {session ? <SessionToolsButton sessionRef={session.ref} /> : null}
           {session ? <SessionActionsButton session={session} surface='header' /> : null}
         </>

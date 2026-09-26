@@ -9,6 +9,9 @@ export const CODEX_CLIENT_REQUEST_METHODS = {
   'thread/start': 'thread/start',
   'thread/resume': 'thread/resume',
   'thread/fork': 'thread/fork',
+  'thread/goal/set': 'thread/goal/set',
+  'thread/goal/get': 'thread/goal/get',
+  'thread/goal/clear': 'thread/goal/clear',
   'thread/compact/start': 'thread/compact/start',
   'thread/revert': 'thread/revert',
   'thread/list': 'thread/list',
@@ -37,6 +40,8 @@ export const CODEX_SERVER_NOTIFICATION_METHODS = {
   'thread/reverted': 'thread/reverted',
   'skills/changed': 'skills/changed',
   'thread/name/updated': 'thread/name/updated',
+  'thread/goal/updated': 'thread/goal/updated',
+  'thread/goal/cleared': 'thread/goal/cleared',
   'thread/tokenUsage/updated': 'thread/tokenUsage/updated',
   'turn/started': 'turn/started',
   'hook/started': 'hook/started',
@@ -94,6 +99,9 @@ export interface CodexClientRequestParamsByMethod {
   readonly 'thread/start': CodexSchema.V2ThreadStartParams
   readonly 'thread/resume': CodexSchema.V2ThreadResumeParams
   readonly 'thread/fork': CodexSchema.V2ThreadForkParams
+  readonly 'thread/goal/set': CodexSchema.V2ThreadGoalSetParams
+  readonly 'thread/goal/get': CodexSchema.V2ThreadGoalGetParams
+  readonly 'thread/goal/clear': CodexSchema.V2ThreadGoalClearParams
   readonly 'thread/compact/start': CodexSchema.V2ThreadCompactStartParams
   readonly 'thread/revert': CodexSchema.V2ThreadRevertParams
   readonly 'thread/list': CodexSchema.V2ThreadListParams
@@ -117,6 +125,9 @@ export interface CodexClientRequestResultByMethod {
   readonly 'thread/start': CodexSchema.V2ThreadStartResponse
   readonly 'thread/resume': CodexSchema.V2ThreadResumeResponse
   readonly 'thread/fork': CodexSchema.V2ThreadForkResponse
+  readonly 'thread/goal/set': CodexSchema.V2ThreadGoalSetResponse
+  readonly 'thread/goal/get': CodexSchema.V2ThreadGoalGetResponse
+  readonly 'thread/goal/clear': CodexSchema.V2ThreadGoalClearResponse
   readonly 'thread/compact/start': CodexSchema.V2ThreadCompactStartResponse
   readonly 'thread/revert': CodexSchema.V2ThreadRevertResponse
   readonly 'thread/list': CodexSchema.V2ThreadListResponse
@@ -145,6 +156,8 @@ export interface CodexServerNotificationParamsByMethod {
   readonly 'thread/reverted': CodexSchema.V2ThreadRevertedNotification
   readonly 'skills/changed': CodexSchema.V2SkillsChangedNotification
   readonly 'thread/name/updated': CodexSchema.V2ThreadNameUpdatedNotification
+  readonly 'thread/goal/updated': CodexSchema.V2ThreadGoalUpdatedNotification
+  readonly 'thread/goal/cleared': CodexSchema.V2ThreadGoalClearedNotification
   readonly 'thread/tokenUsage/updated': CodexSchema.V2ThreadTokenUsageUpdatedNotification
   readonly 'turn/started': CodexSchema.V2TurnStartedNotification
   readonly 'hook/started': CodexSchema.V2HookStartedNotification
@@ -199,6 +212,9 @@ export const CODEX_CLIENT_REQUEST_PARAMS = {
   'thread/start': CodexSchema.CodexThreadStartParamsSchema,
   'thread/resume': CodexSchema.CodexThreadResumeParamsSchema,
   'thread/fork': CodexSchema.CodexThreadForkParamsSchema,
+  'thread/goal/set': CodexSchema.CodexThreadGoalSetParamsSchema,
+  'thread/goal/get': CodexSchema.CodexThreadArchivedNotificationSchema,
+  'thread/goal/clear': CodexSchema.CodexThreadArchivedNotificationSchema,
   'thread/compact/start': CodexSchema.CodexThreadArchivedNotificationSchema,
   'thread/revert': CodexSchema.CodexThreadRevertParamsSchema,
   'thread/list': CodexSchema.CodexThreadListParamsSchema,
@@ -223,6 +239,9 @@ export const CODEX_CLIENT_REQUEST_RESULTS = {
   'thread/start': CodexSchema.CodexThreadForkResponseSchema,
   'thread/resume': CodexSchema.CodexThreadResumeResponseSchema,
   'thread/fork': CodexSchema.CodexThreadForkResponseSchema,
+  'thread/goal/set': CodexSchema.CodexThreadGoalSetResponseSchema,
+  'thread/goal/get': CodexSchema.CodexThreadGoalGetResponseSchema,
+  'thread/goal/clear': CodexSchema.CodexThreadGoalClearResponseSchema,
   'thread/compact/start': CodexSchema.CodexMcpServerRefreshResponseSchema,
   'thread/revert': CodexSchema.CodexThreadRevertResponseSchema,
   'thread/list': CodexSchema.CodexThreadListResponseSchema,
@@ -252,6 +271,8 @@ export const CODEX_SERVER_NOTIFICATION_PARAMS = {
   'thread/reverted': CodexSchema.CodexThreadArchivedNotificationSchema,
   'skills/changed': CodexSchema.CodexMcpServerRefreshResponseSchema,
   'thread/name/updated': CodexSchema.CodexThreadNameUpdatedNotificationSchema,
+  'thread/goal/updated': CodexSchema.CodexThreadGoalUpdatedNotificationSchema,
+  'thread/goal/cleared': CodexSchema.CodexThreadArchivedNotificationSchema,
   'thread/tokenUsage/updated': CodexSchema.CodexThreadTokenUsageUpdatedNotificationSchema,
   'turn/started': CodexSchema.CodexTurnCompletedNotificationSchema,
   'hook/started': CodexSchema.CodexHookCompletedNotificationSchema,

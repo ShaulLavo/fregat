@@ -64,6 +64,17 @@ describe('automatic settlement through the engine', () => {
     expect(session?.settledAt).toBe(session?.latestTurn?.completedAt)
   })
 
+  test('a merge leaves a sleeping session active, so its schedules keep running', async () => {
+    const fixture = await worktreeLifecycleFixture({
+      adapter: { wakeupMinutes: 30 },
+      pullRequestLookup: forge('merged', new Date(Date.now() + 60_000).toISOString()),
+    })
+    fixtures.push(fixture)
+    await fixture.create()
+    await fixture.engine.providerRuntimeIdle()
+    expect((await settledSession(fixture))?.settledOverride ?? null).toBeNull()
+  })
+
   test('a merge before the last request, or with merge settlement off, leaves it active', async () => {
     const stale = await worktreeLifecycleFixture({
       pullRequestLookup: forge('merged', new Date(Date.now() - DAY).toISOString()),

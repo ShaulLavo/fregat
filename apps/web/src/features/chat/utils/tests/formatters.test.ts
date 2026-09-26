@@ -2,6 +2,7 @@ import {
   formatChatDateLabel,
   formatChatRelativeTime,
   formatChatTimestamp,
+  formatWakeTime,
 } from '@/features/chat/utils/formatters'
 import { expect, test } from '../../../../../test/fixtures'
 
@@ -119,4 +120,20 @@ test('formatting a rail full of rows builds no new date formatters', () => {
   }
 
   expect(constructed).toBe(0)
+})
+
+test('a wake-up reads as a time today, a weekday within the week, and due once it passed', () => {
+  const now = new Date(2026, 8, 26, 10, 0).getTime()
+  const later = new Date(2026, 8, 26, 14, 30)
+  const tomorrow = new Date(2026, 8, 27, 9, 0)
+  const clock = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' })
+  const weekday = new Intl.DateTimeFormat(undefined, {
+    weekday: 'short',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+
+  expect(formatWakeTime(later.toISOString(), now)).toBe(clock.format(later))
+  expect(formatWakeTime(tomorrow.toISOString(), now)).toBe(weekday.format(tomorrow))
+  expect(formatWakeTime(new Date(now - 60_000).toISOString(), now)).toBe('due')
 })

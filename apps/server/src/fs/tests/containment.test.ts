@@ -68,13 +68,10 @@ describe('workspace containment', () => {
     const root = await fixtureRoot()
     const app = testApp(root)
 
-    for (const [generation, input] of [
-      [1, '../outside'],
-      [2, '/etc'],
-    ] as const) {
+    for (const input of ['../outside', '/etc']) {
       const response = await app.handle(
         new Request('http://local/fs/workspace-root', {
-          body: JSON.stringify({ generation, path: input }),
+          body: JSON.stringify({ path: input }),
           headers: trustedOriginHeaders({ 'content-type': 'application/json' }),
           method: 'POST',
         }),
@@ -86,9 +83,7 @@ describe('workspace containment', () => {
     const health = await app.handle(
       new Request('http://local/health', { headers: trustedOriginHeaders() }),
     )
-    expect(await health.json()).toMatchObject({
-      workspaceIndex: { readiness: 'cold', scanRoot: null },
-    })
+    expect(await health.json()).toMatchObject({ workspaceIndexes: [] })
   })
 
   it('classifies relative paths as inside or outside the root', () => {

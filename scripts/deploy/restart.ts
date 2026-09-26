@@ -54,6 +54,13 @@ export async function requestRestart(options: RestartOptions, control = liveRest
       interrupting = answer.busy.map((session) => session.sessionId)
       continue
     }
+    // A sleeping session runs nothing, so waiting never ends it; the restart ends its schedules.
+    const sleeping = answer.busy.filter((session) => session.state === 'sleeping')
+    if (sleeping.length === answer.busy.length) {
+      control.print(sleepingText(sleeping))
+      interrupting = sleeping.map((session) => session.sessionId)
+      continue
+    }
     if (!shown) control.print(busyText(answer.busy, options))
     shown = true
     await control.sleep(BUSY_POLL_MS)
@@ -72,6 +79,13 @@ export function busyText(busy: readonly BusySession[], options: RestartOptions) 
       '[restart] Rerun with --interrupt; the restart then ends this turn too.',
     )
   return lines.join('\n')
+}
+
+function sleepingText(sleeping: readonly BusySession[]) {
+  return [
+    `[restart] ending the schedules of ${sleeping.length} sleeping session${sleeping.length === 1 ? '' : 's'}:`,
+    ...sleeping.map((session) => `  ${sessionLabel(session)}`),
+  ].join('\n')
 }
 
 function sessionLabel(session: BusySession) {

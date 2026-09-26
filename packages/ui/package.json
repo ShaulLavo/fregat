@@ -30,7 +30,8 @@
     "./patterns/tool-pane-header": "./src/patterns/tool-pane-header.tsx",
     "./patterns/use-row-height": "./src/patterns/use-row-height.ts",
     "./patterns/bar-tabs": "./src/patterns/bar-tabs.ts",
-    "./patterns/panel-surface": "./src/patterns/panel-surface.ts"
+    "./patterns/panel-surface": "./src/patterns/panel-surface.ts",
+    "./patterns/width-handle": "./src/patterns/width-handle.tsx"
   },
   "scripts": {
     "lint": "oxlint .",

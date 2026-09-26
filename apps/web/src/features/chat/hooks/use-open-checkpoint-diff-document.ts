@@ -9,6 +9,7 @@ import { checkpointRequest } from '@/lib/documents/utils/comparisons'
 import { useEditorWorkspaceStoreApi } from '@/features/editor/state/workspace-state'
 import { checkpointAvailability } from '@/lib/checkpoint-availability'
 import {
+  cachedCountedTurnDiff,
   checkpointFileDocument,
   checkpointDiffRetry,
   checkpointDiffRetryDelay,
@@ -38,14 +39,7 @@ export function useOpenCheckpointDiffDocument() {
     const owner = filesystemPath(rootPath)
     const operation = navigation.getSnapshot()
     const rangeInput = checkpointDiffInputForSummary(summary)
-    const diffs = await queryClient.query({
-      queryFn: ({ signal, client }) =>
-        fetchCheckpointDiff(rangeInput, signal, clientForQueryClient(client)),
-      queryKey: checkpointDiffQueryKey(rangeInput),
-      retry: checkpointDiffRetry,
-      retryDelay: checkpointDiffRetryDelay,
-      staleTime: Infinity,
-    })
+    const diffs = cachedCountedTurnDiff(queryClient, rangeInput) ?? (await rangeDiffs(rangeInput))
     if (navigation.getSnapshot() !== operation) return false
     if (!path) {
       const documentInput = checkpointTurnDocument(summary, owner)
@@ -77,6 +71,17 @@ export function useOpenCheckpointDiffDocument() {
     await rememberTurnScope(summary, documentPath)
 
     return true
+  }
+
+  function rangeDiffs(input: ReturnType<typeof checkpointDiffInputForSummary>) {
+    return queryClient.query({
+      queryFn: ({ signal, client }) =>
+        fetchCheckpointDiff(input, signal, clientForQueryClient(client)),
+      queryKey: checkpointDiffQueryKey(input),
+      retry: checkpointDiffRetry,
+      retryDelay: checkpointDiffRetryDelay,
+      staleTime: Infinity,
+    })
   }
 
   async function openFullSessionCheckpointDiff(summary: ChatTurnDiffSummary) {

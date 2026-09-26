@@ -24,9 +24,15 @@ import {
 } from '@workspace/ui/components/dialog'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@workspace/ui/components/input-group'
 import { PaneBar } from '@workspace/ui/components/pane-bar'
+import {
+  PersistedResizablePanelGroup,
+  ResizableHandle,
+  ResizablePanel,
+} from '@workspace/ui/components/resizable'
 import { Separator } from '@workspace/ui/components/separator'
 import { deriveWriteTarget, policyControlledIds } from '@workspace/contracts'
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 
 import { useDirectoryTransition } from '@/features/file-picker/hooks/use-directory-transition'
 import { useIntentHitLog } from '@/features/file-picker/hooks/use-intent-hit-log'
@@ -45,6 +51,8 @@ import {
   type PickerView,
 } from '@/features/file-picker/utils/columns'
 import { useElementWidth } from '@/hooks/use-element-width'
+import { useWideLayout } from '@/features/file-picker/hooks/use-wide-layout'
+import { BROWSE_MIN_PX, PLACES_PANE, PREVIEW_PANE } from '@/features/file-picker/utils/panes'
 import { Tabs, TabsList, TabsTab } from '@workspace/ui/components/tabs'
 import { ListHeader } from '@/features/file-picker/components/list-header'
 import {
@@ -57,13 +65,18 @@ import {
   pickerCopy,
   toPickedEntry,
   type EntriesLoadState,
-  type FilePickerIconMode,
   type FilePickerMode,
 } from '@/features/file-picker/utils/model'
 import { NewFolderPopover } from '@/features/file-picker/components/new-folder-popover'
 import { LocationBar } from '@/features/file-picker/components/location-bar'
 import { MobileLocations } from '@/features/file-picker/components/mobile-locations'
 import { PlacesSidebar } from '@/features/file-picker/components/places-sidebar'
+import { PinFolderButton } from '@/features/file-picker/components/pin-folder-button'
+import {
+  PickerLocationActionsContext,
+  type PickerLocationActions,
+} from '@/features/file-picker/providers/locations-context'
+import { sidebarSectionsFor } from '@/features/file-picker/utils/sidebar-locations'
 import { TypeFilter } from '@/features/file-picker/components/type-filter'
 import {
   filterPickerEntries,
@@ -79,6 +92,7 @@ import {
 import { useFilePickerSession } from '@/features/file-picker/state/picker'
 import { useDirectoryLoad } from '@/features/file-picker/hooks/use-directory-load'
 import { useRecentEntries } from '@/features/file-picker/hooks/use-recent-entries'
+import { usePlaces } from '@/features/file-picker/hooks/use-places'
 import { useServerInfoForOpen } from '@/features/file-picker/hooks/use-server-info-for-open'
 import {
   isBackShortcut,
@@ -100,7 +114,6 @@ import { useSettingsActions } from '@/features/settings/hooks/use-settings-actio
 
 type FilePickerDialogProps = {
   accept?: readonly string[]
-  iconMode?: FilePickerIconMode
   mode?: FilePickerMode
   open: boolean
   value: PickedFsEntry | null
@@ -114,7 +127,6 @@ export type { FilePickerMode }
 
 export function FilePickerDialog({
   accept,
-  iconMode,
   mode = 'folder',
   open,
   value,
@@ -150,6 +162,7 @@ export function FilePickerDialog({
     serverInfo,
     showHidden,
   })
+  const { places, refresh: refreshPlaces } = usePlaces(open, serverInfo)
   const { loadState: recentState, refresh: refreshRecents } = useRecentEntries({
     mode,
     open,
@@ -212,6 +225,7 @@ export function FilePickerDialog({
   const viewSetting = useSettingValue('files.picker.view')
   const chosenView = pickerView(viewSetting, mode)
   const [middleRef, middleWidth] = useElementWidth<HTMLDivElement>()
+  const wide = useWideLayout()
   const view = shownPickerView(chosenView, isSearching, middleWidth)
   const [trailState, setTrailState] = useState<{ path: string; trail: ColumnTrail } | null>(null)
   const heldTrail =
@@ -232,17 +246,47 @@ export function FilePickerDialog({
       : toPickedEntry(focusedEntry, mode, activeAccept)
   const selectedPickable = focusedPickable ?? currentPickableEntry(currentEntry, mode)
   const homePath = serverInfo?.homePath ?? ROOT_PATH
+  // Pins name folders on the machine being browsed, so they live in that machine's settings.
+  const machine = useQueryClient()
+  const machineSettings = useSettingsProjection(machine)
+  const machineSettingsActions = useSettingsActions(machine)
+  const pinned = machineSettings?.values['files.picker.pinnedLocations'] ?? []
+  const hidden = machineSettings?.values['files.picker.hiddenLocations'] ?? []
+  const sections = sidebarSectionsFor({ data: places, hidden, homePath, pinned })
+  const setLocations = (
+    key: 'files.picker.pinnedLocations' | 'files.picker.hiddenLocations',
+    next: readonly string[],
+  ) => machineSettingsActions.setSetting(key, [...new Set(next)], 'user')
+  const locationActions: PickerLocationActions = {
+    hiddenCount: hidden.length,
+    hide: (path) => setLocations('files.picker.hiddenLocations', [...hidden, path]),
+    pin: (path) => {
+      setLocations('files.picker.pinnedLocations', [...pinned, path])
+      if (hidden.includes(path))
+        setLocations(
+          'files.picker.hiddenLocations',
+          hidden.filter((entry) => entry !== path),
+        )
+    },
+    pinned,
+    restoreHidden: () => setLocations('files.picker.hiddenLocations', []),
+    unpin: (path) =>
+      setLocations(
+        'files.picker.pinnedLocations',
+        pinned.filter((entry) => entry !== path),
+      ),
+  }
   const settingsLayers = settings?.layers ?? []
   const hiddenWriteTarget = deriveWriteTarget('files.showHidden', settingsLayers)
   const hiddenManagedByPolicy = policyControlledIds(settingsLayers).includes('files.showHidden')
   const hiddenSettingDisabled = !settings || hiddenManagedByPolicy
   const copy = pickerCopy(mode)
-  const displayedIconMode = iconMode ?? (mode === 'file' ? 'vscode' : 'default')
   // The list rows consume these actions through context, so identity must stay
   // stable while typing or scrolling to avoid rerendering every visible row.
   const sessionActions: FilePickerSessionActions = {
     jumpTo: navigateTo,
     navigateTo,
+    resizeColumn: session.setColumnWidth,
     revealEntry,
     selectEntry: session.setSelectedEntry,
   }
@@ -258,7 +302,7 @@ export function FilePickerDialog({
   }, [preloadDirectory, focusedEntry])
 
   function refresh() {
-    void Promise.all([refreshDirectory(), refreshRecents(), refreshServerInfo()])
+    void Promise.all([refreshDirectory(), refreshRecents(), refreshPlaces(), refreshServerInfo()])
   }
 
   function goBack() {
@@ -394,7 +438,20 @@ export function FilePickerDialog({
     session.setSelectedEntry(next[0] ?? null)
   }
 
+  // Columns show a selection deeper than the current folder; list and icons show one folder,
+  // so a switch opens the deepest selection's folder and a return rebuilds the trail from it.
+  function carrySelection(next: PickerView) {
+    if (next === 'columns') return setTrailState(null)
+    if (view !== 'columns') return
+    const deepest = trail.at(-1)
+    if (!deepest) return
+    const folder = pickerParentPath(deepest.path)
+    if (folder === session.currentPath) return session.setSelectedEntry(deepest)
+    navigateSelecting(folder, deepest)
+  }
+
   function chooseView(next: PickerView) {
+    carrySelection(next)
     settingsActions.setSetting(
       'files.picker.view',
       next,
@@ -479,6 +536,73 @@ export function FilePickerDialog({
     session.setSelectedEntry(entry)
   }
 
+  const browsing = (
+    <div className='bg-background h-full min-h-0' ref={middleRef}>
+      {view === 'columns' ? (
+        <ColumnsView
+          accept={activeAccept}
+          columnWidths={session.columnWidths}
+          currentPath={session.currentPath}
+          isBusy={listInteractionPending}
+          mode={mode}
+          showHidden={showHidden}
+          trail={trail}
+          onCommit={commitEntry}
+          onDirectoryIntent={guessDirectory}
+          onGoParent={() => {
+            // Finder keeps the folder just left selected in the new first column.
+            if (session.canGoUp)
+              navigateSelecting(pickerParentPath(session.currentPath), currentEntry)
+          }}
+          onOpen={handleEntryDoubleClick}
+          onTrailChange={changeTrail}
+        />
+      ) : view === 'icons' ? (
+        <IconsView
+          entries={entries}
+          isBusy={listInteractionPending}
+          listRef={listRef}
+          loadState={loadState}
+          onRetry={refresh}
+          mode={mode}
+          selectedPath={selectedEntry?.path ?? null}
+          onCommitEntry={commitEntry}
+          onEntryDoubleClick={handleEntryDoubleClick}
+          onGoParent={() => {
+            if (session.canGoUp) navigateTo(pickerParentPath(session.currentPath))
+          }}
+        />
+      ) : (
+        <div className='grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)]'>
+          <ListHeader
+            isLoading={loadState.status === 'loading' || listInteractionPending}
+            isSearching={isSearching}
+            mode={mode}
+            onSort={handleSort}
+            sort={effectiveSort}
+          />
+          <FileList
+            accept={activeAccept}
+            entries={entries}
+            isBusy={listInteractionPending}
+            isSearching={isSearching}
+            listRef={listRef}
+            loadState={loadState}
+            mode={mode}
+            onDirectoryIntent={guessDirectory}
+            onEntryDoubleClick={handleEntryDoubleClick}
+            onCommitEntry={commitEntry}
+            onGoParent={() => {
+              if (session.canGoUp) navigateTo(pickerParentPath(session.currentPath))
+            }}
+            onRetry={refresh}
+            selectedPath={selectedEntry?.path ?? null}
+          />
+        </div>
+      )}
+    </div>
+  )
+
   return (
     <Dialog onOpenChange={onOpenChange} open={open}>
       <DialogContent
@@ -487,290 +611,265 @@ export function FilePickerDialog({
         showCloseButton={false}
       >
         <FilePickerSessionActionsContext value={sessionActions}>
-          {/* Named for assistive tech only. On screen the dialog is its own label:
+          <PickerLocationActionsContext value={locationActions}>
+            {/* Named for assistive tech only. On screen the dialog is its own label:
               the breadcrumb says where you are and the commit button says what
               will happen, so a title bar repeating both is chrome for nothing. */}
-          <DialogHeader className='sr-only'>
-            <DialogTitle>{copy.title}</DialogTitle>
-            <DialogDescription>{`Browsing ${displayPath(session.currentPath)}.`}</DialogDescription>
-          </DialogHeader>
+            <DialogHeader className='sr-only'>
+              <DialogTitle>{copy.title}</DialogTitle>
+              <DialogDescription>{`Browsing ${displayPath(session.currentPath)}.`}</DialogDescription>
+            </DialogHeader>
 
-          <PaneBar>
-            <div
-              aria-label='Folder history'
-              className='flex shrink-0 items-center gap-0.5'
-              role='group'
-            >
-              <IconTooltip label='Back' shortcut='Mod+['>
-                <Button
-                  aria-keyshortcuts='Meta+['
-                  aria-label='Back'
-                  disabled={!session.canGoBack}
-                  focusableWhenDisabled
-                  onClick={goBack}
-                  size='icon-sm'
-                  type='button'
-                  variant='ghost'
-                >
-                  <ArrowLeftIcon />
-                </Button>
-              </IconTooltip>
-              <IconTooltip label='Forward' shortcut='Mod+]'>
-                <Button
-                  aria-keyshortcuts='Meta+]'
-                  aria-label='Forward'
-                  disabled={!session.canGoForward}
-                  focusableWhenDisabled
-                  onClick={goForward}
-                  size='icon-sm'
-                  type='button'
-                  variant='ghost'
-                >
-                  <ArrowRightIcon />
-                </Button>
-              </IconTooltip>
-              <IconTooltip label='Up one folder' shortcut='Mod+ArrowUp'>
-                <Button
-                  aria-keyshortcuts='Meta+ArrowUp'
-                  aria-label='Up one folder'
-                  disabled={!session.canGoUp}
-                  focusableWhenDisabled
-                  onClick={() => navigateTo(pickerParentPath(session.currentPath))}
-                  size='icon-sm'
-                  type='button'
-                  variant='ghost'
-                >
-                  <ArrowUpIcon />
-                </Button>
-              </IconTooltip>
-            </div>
-            <Separator className='h-4' orientation='vertical' />
-            <LocationBar
-              currentPath={session.currentPath}
-              draft={pathInput.draft}
-              error={pathInput.error}
-              inputRef={pathInput.inputRef}
-              isEditing={pathInput.isEditing}
-              isPending={pathInput.isPending}
-              onCancel={pathInput.close}
-              onChange={pathInput.change}
-              onEdit={pathInput.open}
-              onSubmit={pathInput.submit}
-            />
-            <InputGroup className='h-(--density-control-height-sm) w-52 shrink-0 max-sm:w-32'>
-              <InputGroupAddon align='inline-start'>
-                <MagnifyingGlassIcon aria-hidden='true' className='size-(--icon-size-sm)' />
-              </InputGroupAddon>
-              <InputGroupInput
-                ref={searchInputRef}
-                aria-label={copy.searchLabel}
-                autoCapitalize='off'
-                autoComplete='off'
-                autoCorrect='off'
-                autoFocus
-                className='h-full text-xs'
-                onChange={handleSearchChange}
-                onKeyDown={handleSearchKeyDown}
-                placeholder={copy.searchPlaceholder}
-                spellCheck={false}
-                value={session.query}
-              />
-            </InputGroup>
-            <Tabs value={chosenView} onValueChange={(next: PickerView) => chooseView(next)}>
-              <TabsList aria-label='View' variant='segmented'>
-                <IconTooltip label='Columns'>
-                  <TabsTab
-                    aria-label='Columns'
-                    className='w-(--density-control-height-sm) px-0'
-                    value='columns'
-                  >
-                    <ColumnsIcon />
-                  </TabsTab>
-                </IconTooltip>
-                <IconTooltip label='List'>
-                  <TabsTab
-                    aria-label='List'
-                    className='w-(--density-control-height-sm) px-0'
-                    value='list'
-                  >
-                    <ListIcon />
-                  </TabsTab>
-                </IconTooltip>
-                <IconTooltip label='Icons'>
-                  <TabsTab
-                    aria-label='Icons'
-                    className='w-(--density-control-height-sm) px-0'
-                    value='icons'
-                  >
-                    <GridFourIcon />
-                  </TabsTab>
-                </IconTooltip>
-              </TabsList>
-            </Tabs>
-            <Separator className='h-4' orientation='vertical' />
-            <div
-              aria-label='Folder display actions'
-              className='flex shrink-0 items-center gap-0.5'
-              role='group'
-            >
-              <IconTooltip label='Refresh'>
-                <Button
-                  aria-label='Refresh'
-                  onClick={refresh}
-                  size='icon-sm'
-                  type='button'
-                  variant='ghost'
-                >
-                  <ArrowClockwiseIcon />
-                </Button>
-              </IconTooltip>
-              <NewFolderPopover currentPath={session.currentPath} onCreated={handleFolderCreated} />
-              <IconTooltip
-                label={showHidden ? 'Hide hidden files' : 'Show hidden files'}
-                shortcut='Mod+Shift+.'
+            <PaneBar>
+              <div
+                aria-label='Folder history'
+                className='flex shrink-0 items-center gap-0.5'
+                role='group'
               >
-                <Button
-                  aria-keyshortcuts='Meta+Shift+.'
-                  aria-label={showHidden ? 'Hide hidden files' : 'Show hidden files'}
-                  aria-pressed={showHidden}
-                  disabled={hiddenSettingDisabled}
-                  focusableWhenDisabled
-                  onClick={toggleHiddenFiles}
-                  size='icon-sm'
-                  type='button'
-                  variant='ghost'
-                >
-                  {showHidden ? <EyeIcon /> : <EyeSlashIcon />}
-                </Button>
-              </IconTooltip>
-            </div>
-          </PaneBar>
-
-          <div className='px-(--bar-padding-x) lg:hidden'>
-            <MobileLocations
-              currentPath={session.currentPath}
-              homePath={homePath}
-              recentState={recentState}
-            />
-          </div>
-
-          <div className='grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[170px_minmax(0,1fr)_240px]'>
-            <PlacesSidebar
-              currentPath={session.currentPath}
-              homePath={homePath}
-              recentState={recentState}
-            />
-            <div className='bg-background min-h-0' ref={middleRef}>
-              {view === 'columns' ? (
-                <ColumnsView
-                  accept={activeAccept}
-                  currentPath={session.currentPath}
-                  iconMode={displayedIconMode}
-                  isBusy={listInteractionPending}
-                  mode={mode}
-                  showHidden={showHidden}
-                  trail={trail}
-                  onCommit={commitEntry}
-                  onDirectoryIntent={guessDirectory}
-                  onGoParent={() => {
-                    // Finder keeps the folder just left selected in the new first column.
-                    if (session.canGoUp)
-                      navigateSelecting(pickerParentPath(session.currentPath), currentEntry)
-                  }}
-                  onOpen={handleEntryDoubleClick}
-                  onTrailChange={changeTrail}
-                />
-              ) : view === 'icons' ? (
-                <IconsView
-                  entries={entries}
-                  iconMode={displayedIconMode}
-                  isBusy={listInteractionPending}
-                  listRef={listRef}
-                  loadState={loadState}
-                  onRetry={refresh}
-                  mode={mode}
-                  selectedPath={selectedEntry?.path ?? null}
-                  onCommitEntry={commitEntry}
-                  onEntryDoubleClick={handleEntryDoubleClick}
-                  onGoParent={() => {
-                    if (session.canGoUp) navigateTo(pickerParentPath(session.currentPath))
-                  }}
-                />
-              ) : (
-                <div className='grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)]'>
-                  <ListHeader
-                    isLoading={loadState.status === 'loading' || listInteractionPending}
-                    isSearching={isSearching}
-                    mode={mode}
-                    onSort={handleSort}
-                    sort={effectiveSort}
-                  />
-                  <FileList
-                    accept={activeAccept}
-                    entries={entries}
-                    iconMode={displayedIconMode}
-                    isBusy={listInteractionPending}
-                    isSearching={isSearching}
-                    listRef={listRef}
-                    loadState={loadState}
-                    mode={mode}
-                    onDirectoryIntent={guessDirectory}
-                    onEntryDoubleClick={handleEntryDoubleClick}
-                    onCommitEntry={commitEntry}
-                    onGoParent={() => {
-                      if (session.canGoUp) navigateTo(pickerParentPath(session.currentPath))
-                    }}
-                    onRetry={refresh}
-                    selectedPath={selectedEntry?.path ?? null}
-                  />
-                </div>
-              )}
-            </div>
-            <PreviewPane
-              accept={activeAccept}
-              entry={previewEntry}
-              iconMode={displayedIconMode}
-              isSearching={isSearching}
-              mode={mode}
-              showHidden={showHidden}
-            />
-          </div>
-
-          {mode === 'file' && accept?.length ? (
-            <PaneBar className='shrink-0 justify-end'>
-              <span className='text-muted-foreground text-xs'>File type</span>
-              <TypeFilter
-                accept={accept}
-                value={selectedType}
-                onChange={(next) => {
-                  setTypeFilter(next)
-                  const chosen = session.selectedEntry
-                  if (
-                    chosen &&
-                    !filterPickerEntries([chosen], mode, pickerAccept(accept, next)).length
-                  )
-                    session.setSelectedEntry(null)
-                }}
+                <IconTooltip label='Back' shortcut='Mod+['>
+                  <Button
+                    aria-keyshortcuts='Meta+['
+                    aria-label='Back'
+                    disabled={!session.canGoBack}
+                    focusableWhenDisabled
+                    onClick={goBack}
+                    size='icon-sm'
+                    type='button'
+                    variant='ghost'
+                  >
+                    <ArrowLeftIcon />
+                  </Button>
+                </IconTooltip>
+                <IconTooltip label='Forward' shortcut='Mod+]'>
+                  <Button
+                    aria-keyshortcuts='Meta+]'
+                    aria-label='Forward'
+                    disabled={!session.canGoForward}
+                    focusableWhenDisabled
+                    onClick={goForward}
+                    size='icon-sm'
+                    type='button'
+                    variant='ghost'
+                  >
+                    <ArrowRightIcon />
+                  </Button>
+                </IconTooltip>
+                <IconTooltip label='Up one folder' shortcut='Mod+ArrowUp'>
+                  <Button
+                    aria-keyshortcuts='Meta+ArrowUp'
+                    aria-label='Up one folder'
+                    disabled={!session.canGoUp}
+                    focusableWhenDisabled
+                    onClick={() => navigateTo(pickerParentPath(session.currentPath))}
+                    size='icon-sm'
+                    type='button'
+                    variant='ghost'
+                  >
+                    <ArrowUpIcon />
+                  </Button>
+                </IconTooltip>
+              </div>
+              <Separator className='h-4' orientation='vertical' />
+              <LocationBar
+                currentPath={session.currentPath}
+                draft={pathInput.draft}
+                error={pathInput.error}
+                inputRef={pathInput.inputRef}
+                isEditing={pathInput.isEditing}
+                isPending={pathInput.isPending}
+                onCancel={pathInput.close}
+                onChange={pathInput.change}
+                onEdit={pathInput.open}
+                onSubmit={pathInput.submit}
               />
+              <InputGroup className='h-(--density-control-height-sm) w-52 shrink-0 max-sm:w-32'>
+                <InputGroupAddon align='inline-start'>
+                  <MagnifyingGlassIcon aria-hidden='true' className='size-(--icon-size-sm)' />
+                </InputGroupAddon>
+                <InputGroupInput
+                  ref={searchInputRef}
+                  aria-label={copy.searchLabel}
+                  autoCapitalize='off'
+                  autoComplete='off'
+                  autoCorrect='off'
+                  autoFocus
+                  className='h-full text-xs'
+                  onChange={handleSearchChange}
+                  onKeyDown={handleSearchKeyDown}
+                  placeholder={copy.searchPlaceholder}
+                  spellCheck={false}
+                  value={session.query}
+                />
+              </InputGroup>
+              <Tabs value={chosenView} onValueChange={(next: PickerView) => chooseView(next)}>
+                <TabsList aria-label='View' variant='segmented'>
+                  <IconTooltip label='Columns'>
+                    <TabsTab
+                      aria-label='Columns'
+                      className='w-(--density-control-height-sm) px-0'
+                      value='columns'
+                    >
+                      <ColumnsIcon />
+                    </TabsTab>
+                  </IconTooltip>
+                  <IconTooltip label='List'>
+                    <TabsTab
+                      aria-label='List'
+                      className='w-(--density-control-height-sm) px-0'
+                      value='list'
+                    >
+                      <ListIcon />
+                    </TabsTab>
+                  </IconTooltip>
+                  <IconTooltip label='Icons'>
+                    <TabsTab
+                      aria-label='Icons'
+                      className='w-(--density-control-height-sm) px-0'
+                      value='icons'
+                    >
+                      <GridFourIcon />
+                    </TabsTab>
+                  </IconTooltip>
+                </TabsList>
+              </Tabs>
+              <Separator className='h-4' orientation='vertical' />
+              <div
+                aria-label='Folder display actions'
+                className='flex shrink-0 items-center gap-0.5'
+                role='group'
+              >
+                <IconTooltip label='Refresh'>
+                  <Button
+                    aria-label='Refresh'
+                    onClick={refresh}
+                    size='icon-sm'
+                    type='button'
+                    variant='ghost'
+                  >
+                    <ArrowClockwiseIcon />
+                  </Button>
+                </IconTooltip>
+                <NewFolderPopover
+                  currentPath={session.currentPath}
+                  onCreated={handleFolderCreated}
+                />
+                <PinFolderButton currentPath={session.currentPath} />
+                <IconTooltip
+                  label={showHidden ? 'Hide hidden files' : 'Show hidden files'}
+                  shortcut='Mod+Shift+.'
+                >
+                  <Button
+                    aria-keyshortcuts='Meta+Shift+.'
+                    aria-label={showHidden ? 'Hide hidden files' : 'Show hidden files'}
+                    aria-pressed={showHidden}
+                    disabled={hiddenSettingDisabled}
+                    focusableWhenDisabled
+                    onClick={toggleHiddenFiles}
+                    size='icon-sm'
+                    type='button'
+                    variant='ghost'
+                  >
+                    {showHidden ? <EyeIcon /> : <EyeSlashIcon />}
+                  </Button>
+                </IconTooltip>
+              </div>
             </PaneBar>
-          ) : null}
-          <DialogFooter className='flex h-(--bar-height) shrink-0 flex-row items-center justify-between gap-(--density-control-gap) px-(--bar-padding-x) sm:justify-between'>
-            <SelectedSummary entry={selectedPickable} iconMode={displayedIconMode} mode={mode} />
-            <span
-              className='text-muted-foreground text-2xs ml-auto shrink-0 font-mono tabular-nums'
-              role='status'
-            >
-              {loadState.status === 'loading' ? null : listCountLabel(entries.length, isSearching)}
-            </span>
-            <div className='flex shrink-0 gap-1.5'>
-              <Button onClick={() => onOpenChange(false)} size='sm' type='button' variant='ghost'>
-                Cancel
-              </Button>
-              <Button disabled={!selectedPickable} onClick={chooseSelected} size='sm' type='button'>
-                {copy.chooseLabel}
-              </Button>
+
+            <div className='px-(--bar-padding-x) lg:hidden'>
+              <MobileLocations
+                currentPath={session.currentPath}
+                recentState={recentState}
+                sections={sections}
+              />
             </div>
-          </DialogFooter>
+
+            {wide ? (
+              <PersistedResizablePanelGroup
+                className='min-h-0 flex-1'
+                id='file-picker'
+                storageKey='file-picker'
+              >
+                <ResizablePanel
+                  className='min-h-0'
+                  defaultSize={PLACES_PANE.defaultPx}
+                  id='places'
+                  maxSize={PLACES_PANE.maxPx}
+                  minSize={PLACES_PANE.minPx}
+                >
+                  <PlacesSidebar
+                    currentPath={session.currentPath}
+                    recentState={recentState}
+                    sections={sections}
+                  />
+                </ResizablePanel>
+                <ResizableHandle id='places-handle' withHandle />
+                <ResizablePanel className='min-h-0 min-w-0' id='browse' minSize={BROWSE_MIN_PX}>
+                  {browsing}
+                </ResizablePanel>
+                <ResizableHandle id='preview-handle' withHandle />
+                <ResizablePanel
+                  className='min-h-0 min-w-0'
+                  defaultSize={PREVIEW_PANE.defaultPx}
+                  id='preview'
+                  maxSize={PREVIEW_PANE.maxPx}
+                  minSize={PREVIEW_PANE.minPx}
+                >
+                  <PreviewPane
+                    accept={activeAccept}
+                    entry={previewEntry}
+                    isSearching={isSearching}
+                    mode={mode}
+                    showHidden={showHidden}
+                  />
+                </ResizablePanel>
+              </PersistedResizablePanelGroup>
+            ) : (
+              <div className='min-h-0 flex-1'>{browsing}</div>
+            )}
+
+            {mode === 'file' && accept?.length ? (
+              <PaneBar className='shrink-0 justify-end'>
+                <span className='text-muted-foreground text-xs'>File type</span>
+                <TypeFilter
+                  accept={accept}
+                  value={selectedType}
+                  onChange={(next) => {
+                    setTypeFilter(next)
+                    const chosen = session.selectedEntry
+                    if (
+                      chosen &&
+                      !filterPickerEntries([chosen], mode, pickerAccept(accept, next)).length
+                    )
+                      session.setSelectedEntry(null)
+                  }}
+                />
+              </PaneBar>
+            ) : null}
+            <DialogFooter className='flex h-(--bar-height) shrink-0 flex-row items-center justify-between gap-(--density-control-gap) px-(--bar-padding-x) sm:justify-between'>
+              <SelectedSummary entry={selectedPickable} mode={mode} />
+              <span
+                className='text-muted-foreground text-2xs ml-auto shrink-0 font-mono tabular-nums'
+                role='status'
+              >
+                {loadState.status === 'loading'
+                  ? null
+                  : listCountLabel(entries.length, isSearching)}
+              </span>
+              <div className='flex shrink-0 gap-1.5'>
+                <Button onClick={() => onOpenChange(false)} size='sm' type='button' variant='ghost'>
+                  Cancel
+                </Button>
+                <Button
+                  disabled={!selectedPickable}
+                  onClick={chooseSelected}
+                  size='sm'
+                  type='button'
+                >
+                  {copy.chooseLabel}
+                </Button>
+              </div>
+            </DialogFooter>
+          </PickerLocationActionsContext>
         </FilePickerSessionActionsContext>
       </DialogContent>
     </Dialog>

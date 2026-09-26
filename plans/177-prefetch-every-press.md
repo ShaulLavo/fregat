@@ -60,6 +60,11 @@ runs 2–4); log numbers are production client events, 2026-09-20 to 26. Method 
   - Palette `@` symbols and the breadcrumbs store different shapes under one query key (found by
     reading the code, not reproduced).
   - `editor.command.select_file` logs its target as `[circular]`.
+  - Fixed 2026-09-26 (wave 2 lane B), the four above: a file opened from the chat git pane
+    reuses the pane's whitespace-counted turn diff; `POST /fs/workspace-address` is a query per
+    folder (addresses are permanent per canonical path); the symbol key carries its shape (`flat`
+    or `tree`); the log sanitizer marks only a real cycle `[circular]` (a value two fields share
+    was the `select_file` case).
   - `SIDEBAR_SESSION_DETAIL_PREWARM_LIMIT` has no reader.
   - `presentationReady` in `diff-pane.tsx` gates a snapshot the diff never has.
 
@@ -125,6 +130,18 @@ In order. Each phase registers its surface's toggle with its consumer and re-run
 scenarios before and after.
 
 ### Phase 0 — Measure (M)
+
+Done 2026-09-26 (wave 2, lane F). The open events carry `prefetch` (`hit`, `partial`, `miss`,
+and `live` for a document already open) and `firstPaint` (`textMs`, `colourMs`, `highlight`);
+`editor.command.select_tab` (keyboard and mouse tab switches, which never reached `select_file`)
+and `editor.command.open_diff` are new events, each held open until its target paints colour (at
+most 10 s). `previewMs` is measured by the scenario only: the markdown live preview emits no
+event. The `[circular]` target is lane B's fix. Baseline, dev build, second run after a Vite start
+(`/work/tmp/fregat-evidence/20260926T142611Z-scenario-prefetch-first-paint/`,
+`…T142717Z-scenario-prefetch-chat-switch/`), text / colour ms: quick open TS cold 121 / 348,
+warm 86 / 122; quick open md cold 109 / 208, warm 72 / 104; keyboard next tab 38–54 / 82–116;
+tree md no dwell 81 / 120, 1.5 s hover md 40 / 40, TS 64 / 180; git diff md first 309 / 349,
+revisit 130 / 269; TS diff first 381 / 897, revisit 104 / 496; chat switch 63–123 first message.
 
 - Scenarios `prefetch-first-paint` and `prefetch-chat-switch` from the research probe
   (`/work/tmp/research2/177/`), with selectors moved into `scripts/agent/selectors.ts` and a
@@ -210,7 +227,7 @@ The cap keeps a held arrow key from flooding: a guess is skipped while four are 
    a master switch adds a dependency the settings page cannot show, for a saving of two clicks.
    Decided 2026-09-26: owner — (c), and the settings page learns to show the dependency: a
    `dependsOn` field in the registry renders child keys indented and disabled while the parent is
-   off ([Plan 167](167-settings-and-copy.md) Part D). The master switch is `prefetch.enabled`.
+   off (Plan 167 Part D, done). The master switch is `prefetch.enabled`.
 
 ## Verification
 

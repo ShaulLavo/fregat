@@ -43,6 +43,19 @@ function table(ids: readonly SettingId[]) {
   ])
 }
 
+/** A table cell holds one line, so each key's details follow its category's table. */
+function detailsList(ids: readonly SettingId[]): string[] {
+  const entries = ids.flatMap((id) => {
+    const details = descriptorFor(id).details
+    if (!details) return []
+
+    return [`- \`${id}\`: ${details.split('\n\n').join('\n\n  ')}`]
+  })
+  if (entries.length === 0) return []
+
+  return ['### Details', entries.join('\n')]
+}
+
 /**
  * Pads the columns so the generator's output is what stays in the file.
  *
@@ -78,7 +91,7 @@ for (const id of SETTING_IDS) {
 
 const sections = [...byCategory]
   .sort(([left], [right]) => left.localeCompare(right))
-  .map(([category, ids]) => `## ${category}\n\n${table(ids)}`)
+  .map(([category, ids]) => [`## ${category}`, table(ids), ...detailsList(ids)].join('\n\n'))
 
 const body = `> [!NOTE]
 > Generated from the settings registry by \`bun scripts/generate-settings-reference.ts\`.

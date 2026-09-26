@@ -1,8 +1,8 @@
-import { editorDocumentToken } from '@workspace/client-core/address/grammar'
+import { editorDocumentToken, emptyAddress } from '@workspace/client-core/address/grammar'
 import { retainedTextBudgetFromSettings } from '@/features/editor/utils/retained-text-budget'
 import { NO_WORKSPACE_TOKEN, parseWorkspaceToken } from '@workspace/client-core/address/workspace'
 import { readWorkspaceAddress } from '@workspace/client-core/files/workspace-address'
-import type { EnvironmentId, WorktreeId } from '@workspace/contracts'
+import { errorStringField, type EnvironmentId, type WorktreeId } from '@workspace/contracts'
 import {
   applyAddressChat,
   needsChatSnapshot,
@@ -26,6 +26,8 @@ import { useEnvironmentsStore } from '@/lib/environments/state/store'
 import { errorMessage } from '@/lib/error-message'
 import type { ApplicationRuntime } from '@/state/application-runtime'
 import type { EditorWorkspaceStoreApi } from '@/features/editor/state/workspace-state'
+import { intentForAddress } from '@/features/address/utils/intent'
+import { toast } from 'sonner'
 
 export type AddressApplyReason = 'boot' | 'traverse' | 'navigate'
 export type AddressApplyResult =
@@ -103,6 +105,7 @@ async function applyCurrentView(
   const addressedRoot = await resolveRoot(address.workspace, owner, trace, client, signal)
   if (!current()) return superseded()
   confirmedEnvironmentId(owner.origin)
+  if (addressedRoot === UNKNOWN_ROOT) return landOnStart(options, owner, trace)
   if (addressedRoot === null)
     return { status: 'unavailable', reason: 'The link does not contain a valid workspace ID.' }
 
@@ -157,8 +160,37 @@ async function resolveRoot(
     return root.path
   }
   trace.workspaceSource = 'server'
-  const workspace = await readWorkspaceAddress({ client, id: parsed.id, signal })
-  return workspace.path
+  try {
+    const workspace = await readWorkspaceAddress({ client, id: parsed.id, signal })
+    return workspace.path
+  } catch (error) {
+    if (errorStringField(error, 'code') === 'WORKSPACE_ADDRESS_NOT_FOUND') return UNKNOWN_ROOT
+    throw error
+  }
+}
+
+const UNKNOWN_ROOT = Symbol('unknown workspace address')
+
+/** A link minted by another database: open the start page, keeping only the view mode. */
+function landOnStart(
+  options: ApplyOptions,
+  owner: ReturnType<ApplicationRuntime['getSnapshot']>,
+  trace: ApplyTrace,
+): AddressApplyResult {
+  const { address } = options.address
+  const start = intentForAddress({
+    ...emptyAddress(),
+    environmentId: address.environmentId,
+    mode: address.mode,
+    passthrough: address.passthrough,
+    workspace: NO_WORKSPACE_TOKEN,
+  })
+  const result = applyFolderless({ ...options, address: start }, owner, trace)
+  if (result.status !== 'applied') return result
+  toast.info('Workspace link not found', {
+    description: 'This server has no workspace for that link. Open a folder to continue.',
+  })
+  return result
 }
 
 function openRoot(

@@ -16,6 +16,7 @@ const mockConfigSchema = v.object({
   responseText: v.optional(v.pipe(v.string(), v.minLength(1))),
   script: v.optional(v.picklist(['turn-anatomy'])),
   stepDelayMs: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0))),
+  wakeupMinutes: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1))),
 })
 
 export type MockDriverConfig = v.InferOutput<typeof mockConfigSchema>
@@ -33,6 +34,9 @@ export const mockDriver: ProviderDriver<MockDriverConfig> = {
       ...(input.config.responseText ? { responseText: input.config.responseText } : {}),
       ...(input.config.script ? { script: input.config.script } : {}),
       ...(input.config.stepDelayMs === undefined ? {} : { stepDelayMs: input.config.stepDelayMs }),
+      ...(input.config.wakeupMinutes === undefined
+        ? {}
+        : { wakeupMinutes: input.config.wakeupMinutes }),
     })
 
     return { adapter, dispose: () => adapter.stopAll() }

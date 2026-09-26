@@ -323,20 +323,27 @@ export function createSessionArchiveCommand({
  * A turn that compacts the conversation. The session's own modes ride along so the
  * turn never changes them; the text is the harness's own command.
  */
-export function createSessionCompactCommand({
-  interactionMode,
-  runtimeMode,
-  sessionId,
-}: {
+export function createSessionCompactCommand(modes: SessionTurnModes): SessionTurnStartCommand {
+  return { ...createSessionHarnessCommand({ ...modes, text: '/compact' }), kind: 'compact' }
+}
+
+type SessionTurnModes = {
   interactionMode: InteractionMode
   runtimeMode: RuntimeMode
   sessionId: SessionId
-}): SessionTurnStartCommand {
+}
+
+/** A turn whose text is one harness command, such as `/goal clear`, in the session's own modes. */
+export function createSessionHarnessCommand({
+  interactionMode,
+  runtimeMode,
+  sessionId,
+  text,
+}: SessionTurnModes & { text: string }): SessionTurnStartCommand {
   return {
     commandId: createCommandId(),
     interactionMode,
-    kind: 'compact',
-    message: { attachments: [], messageId: createMessageId(), role: 'user', text: '/compact' },
+    message: { attachments: [], messageId: createMessageId(), role: 'user', text },
     runtimeMode,
     sessionId,
     turnId: createTurnId(),

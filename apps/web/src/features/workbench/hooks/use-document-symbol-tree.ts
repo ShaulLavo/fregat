@@ -41,6 +41,7 @@ export function useDocumentSymbolTree(rootPath: FilesystemPath, filePath: Filesy
       rootPath,
       filePath ?? '',
       `${serverId ?? ''}:${settledRevision ?? 'disk'}`,
+      'tree',
     ),
     placeholderData: (previous) => previous,
   })

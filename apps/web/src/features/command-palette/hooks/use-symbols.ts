@@ -65,6 +65,7 @@ export function useSymbols({
       rootPath ?? '',
       selectedFileBackedPath ?? '',
       `${serverId ?? ''}:${selectedDocumentContentRevision ?? 'disk'}`,
+      'flat',
     ),
   })
 

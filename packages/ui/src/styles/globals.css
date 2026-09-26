@@ -206,6 +206,8 @@
   --picker-column-width: 15rem;
   /* One tile in the file picker's icons view; `TILE_WIDTH_PX` in the picker must match. */
   --picker-tile-width: 7rem;
+  /* The glyph inside a tile of the icons view and the preview fallback. */
+  --picker-tile-icon-size: 2.5rem;
   --scrollbar-track: 6px;
   --scrollbar-thumb: color-mix(in oklch, var(--muted-foreground) 45%, transparent);
   /* How deep a scroller's edge fades once content is past it. */

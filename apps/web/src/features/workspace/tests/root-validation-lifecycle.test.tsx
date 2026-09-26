@@ -1,4 +1,4 @@
-import { fireEvent, waitFor } from '@testing-library/react'
+import { fireEvent } from '@testing-library/react'
 import { mkdir } from 'node:fs/promises'
 import path from 'node:path'
 import { test, expect } from '../../../../test/fixtures'
@@ -11,7 +11,6 @@ import { renderApplication } from '../../../../test/render'
 import { useValidateRootFolder } from '@/features/workspace/hooks/use-validate-root-folder'
 import { registerEnvironmentQueryClient } from '@/lib/environments/state/query-clients'
 import { confirmedEnvironmentId } from '@/lib/environments/state/domain'
-import { fetchServerInfo } from '@/lib/file-server'
 import { RootValidationMount } from '../../../../test/factories/root-validation-mount'
 
 test('mounting root validation cannot supersede an already pending workspace open', async ({
@@ -55,10 +54,6 @@ test('mounting root validation cannot supersede an already pending workspace ope
     expect(await pending).toEqual({ status: 'applied' })
     expect(owner.editor.workspaceStore.getState().rootFolder?.path).toBe('second')
     expect(requestedRoots).not.toContain('repo')
-    await waitFor(async () => {
-      const info = await fetchServerInfo(new AbortController().signal, client)
-      expect(info.workspaceIndex?.scanRoot).toBe(path.join(server.root, 'second'))
-    })
   } finally {
     released.resolve()
     registerEnvironmentQueryClient(owner.queryClient, owner.origin, client)

@@ -46,6 +46,10 @@ export const pathQuerySchema = v.object({
   path: v.optional(pathSchema, ''),
 })
 
+export const languageCensusQuerySchema = v.object({
+  root: v.optional(pathSchema, ''),
+})
+
 export const appWriteQuerySchema = v.object({
   path: pathSchema,
   version: v.pipe(v.string(), v.maxLength(128)),
@@ -54,6 +58,14 @@ export const appWriteQuerySchema = v.object({
 export const readQuerySchema = v.object({
   path: v.optional(pathSchema, ''),
   acceptTextOnly: v.optional(booleanQueryValueSchema),
+})
+
+/** A preview's budget: at most 1 MiB of a file's head. */
+const HEAD_MAX_BYTES = 1024 * 1024
+
+export const headQuerySchema = v.object({
+  path: pathSchema,
+  maxBytes: integerQueryValueSchema('65536', HEAD_MAX_BYTES),
 })
 
 export const treeQuerySchema = v.object({
@@ -185,10 +197,7 @@ export const recordRecentBodySchema = v.object({
   path: pathSchema,
 })
 
-export const openWorkspaceRootBodySchema = v.object({
-  generation: v.pipe(v.number(), v.safeInteger(), v.minValue(1)),
-  path: pathSchema,
-})
+export const openWorkspaceRootBodySchema = v.object({ path: pathSchema })
 
 export const registerWorkspaceAddressBodySchema = v.object({ path: pathSchema })
 export const lookupWorkspaceAddressesBodySchema = v.object({
