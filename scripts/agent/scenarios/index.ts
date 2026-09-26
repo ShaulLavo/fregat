@@ -285,6 +285,8 @@ export type Scenario = {
   readonly inspect?: (page: Page) => Promise<unknown>
   /** Fixture scenarios must reject shared servers before opening the first page. */
   readonly requiresIsolatedServer?: boolean
+  /** Spends turns on a real Codex or Claude account, so it runs only with `--real-providers`. */
+  readonly realProviders?: true
   /**
    * Runs before the throwaway server starts. A directory it returns goes first on the server's
    * PATH, which is how a scenario stands in for an outside CLI such as `gh`.
