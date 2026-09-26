@@ -21,7 +21,14 @@ import { SurfacesTab } from '@/features/theme-studio/components/surfaces-tab'
 import { ThemesTab } from '@/features/theme-studio/components/themes-tab'
 import { useStudioDraft } from '@/features/theme-studio/hooks/use-studio-draft'
 import { useStudioPreview } from '@/features/theme-studio/hooks/use-studio-preview'
-import { editVariant, previewBundle, variantPatch } from '@/features/theme-studio/utils/draft'
+import {
+  draftsEqual,
+  editVariant,
+  previewBundle,
+  savedDraft,
+  variantPatch,
+} from '@/features/theme-studio/utils/draft'
+import type { StudioDraft } from '@/lib/theme-studio/state/studio-store'
 import { selectWallpaper } from '@/lib/wallpapers/utils/selection'
 import type { AssetId, ThemeVariant, ThemeVariantPatch } from '@workspace/contracts'
 import { useIsMutating } from '@tanstack/react-query'
@@ -111,7 +118,18 @@ export function Dock() {
     store.closeStudio()
   }
 
+  // Browsing themes is free; leaving a theme with edits of its own asks first, like closing.
+  function chooseTheme(next: StudioDraft) {
+    const edited =
+      Object.keys(store.paletteEdits).length > 0 ||
+      (draft !== null && !draftsEqual(draft, savedDraft(draft.theme, customizations)))
+    if (edited && !store.confirmingDiscard) return store.setConfirmingDiscard(true)
+    store.chooseTheme(next)
+  }
+
   function handleKeyDown(event: KeyboardEvent<HTMLElement>) {
+    // Portalled dialogs and menus bubble here through React; their Escape is theirs.
+    if (event.target instanceof Node && !event.currentTarget.contains(event.target)) return
     if (
       event.defaultPrevented ||
       event.nativeEvent.isComposing ||
@@ -166,7 +184,7 @@ export function Dock() {
               draft={draft}
               mode={mode}
               onApply={() => void apply()}
-              onChoose={store.chooseTheme}
+              onChoose={chooseTheme}
             />
           ) : null}
           {store.tab === 'colors' && draft ? (

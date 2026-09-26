@@ -56,7 +56,7 @@ export function DockHeader({
       <span className='min-w-0 flex-1' />
       {confirmingDiscard ? (
         <span className='text-muted-foreground shrink-0 text-xs' role='status'>
-          Press Escape again to discard
+          Repeat to discard edits
         </span>
       ) : null}
       <Button disabled={!dirty} size='sm' variant='ghost' onClick={onRevert}>

@@ -254,6 +254,27 @@ export class WallpaperLibrary {
     if (missing[1]) await writeFile(path.join(this.directory, missing[1]), derived.display)
   }
 
+  /** Writes a cache file beside a wallpaper, unless a delete removed the wallpaper meanwhile. */
+  writeCache(id: AssetId, name: string, content: string) {
+    return this.#serialize(async () => {
+      if (!(await this.#exists(id))) return
+      await mkdir(this.directory, { recursive: true })
+      const target = path.join(this.directory, name)
+      const staging = `${target}.${randomUUID()}.tmp`
+      try {
+        await writeFile(staging, content)
+        await rename(staging, target)
+      } finally {
+        await rm(staging, { force: true })
+      }
+    })
+  }
+
+  async #exists(id: AssetId) {
+    if (await this.#readIndex(id)) return true
+    return (await readArchivePart(await this.archiveDirectories(), 'wallpapers', id)) !== null
+  }
+
   async #readIndex(id: AssetId): Promise<WallpaperAsset | null> {
     try {
       return v.parse(

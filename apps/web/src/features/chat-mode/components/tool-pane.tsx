@@ -150,7 +150,14 @@ function gitToolPane(rootPath: string, diffScope: SessionDiffScopeState) {
             <TabsList aria-label='Diff scope' variant='segmented'>
               <TabsTab value='working-tree'>Working tree</TabsTab>
               {/* A session with no checkpoint has no turn to show; an inert tab says so. */}
-              <TabsTab disabled={!latestTurnId} value='turn'>
+              <TabsTab
+                disabled={!latestTurnId}
+                value='turn'
+                // Clicking the selected tab changes no value; from an older turn it returns to the latest.
+                onClick={() => {
+                  if (scope.kind === 'turn' && latestTurnId) selectTurnScope(latestTurnId)
+                }}
+              >
                 Turn
               </TabsTab>
             </TabsList>

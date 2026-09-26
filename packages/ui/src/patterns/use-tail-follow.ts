@@ -72,6 +72,8 @@ export function useTailFollow({
     const onScroll = () =>
       setState((previous) => tailFollowScrolled(previous, isAtEdge(element, edge, slack)))
     element.addEventListener('scroll', onScroll, { passive: true })
+    // A restored offset can land before this listener exists; an untouched list starts following.
+    if (element.scrollTop !== 0) onScroll()
     return () => element.removeEventListener('scroll', onScroll)
   }, [edge, enabled, scrollRef, slack])
 

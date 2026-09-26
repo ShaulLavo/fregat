@@ -111,7 +111,7 @@ export const themeStudio: Scenario = {
 
     await dock.getByRole('listbox', { name: 'Code colors' }).or(dock).first().focus()
     await page.keyboard.press('Escape')
-    await dock.getByText('Press Escape again to discard').waitFor()
+    await dock.getByText('Repeat to discard edits').waitFor()
     await page.keyboard.press('Escape')
     await dock.waitFor({ state: 'detached' })
     await page.waitForFunction(

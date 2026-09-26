@@ -1,6 +1,10 @@
-import type { FsEntry } from '@/lib/file-system-types'
+import type { FsEntry, PickedFsEntry } from '@/lib/file-system-types'
 import { isDirectoryEntry } from '@/lib/file-system-types'
-import { pickerParentPath, type FilePickerMode } from '@/features/file-picker/utils/model'
+import {
+  pickerParentPath,
+  toPickedEntry,
+  type FilePickerMode,
+} from '@/features/file-picker/utils/model'
 
 /** The column narrower than this does not fit beside the places and the preview. */
 const COLUMNS_MIN_WIDTH = 520
@@ -60,4 +64,17 @@ export function visibleTrail(trail: ColumnTrail, showHidden: boolean): ColumnTra
   if (showHidden) return trail
   const hidden = trail.findIndex((entry) => entry.name.startsWith('.'))
   return hidden === -1 ? trail : trail.slice(0, hidden)
+}
+
+/** The deepest entry in the trail that the mode can pick: a file past the folder is skipped. */
+export function deepestPickable(
+  trail: ColumnTrail,
+  mode: FilePickerMode,
+  accept?: readonly string[],
+): PickedFsEntry | null {
+  for (let index = trail.length - 1; index >= 0; index -= 1) {
+    const picked = toPickedEntry(trail[index] ?? null, mode, accept)
+    if (picked) return picked
+  }
+  return null
 }

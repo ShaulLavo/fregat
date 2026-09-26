@@ -9,8 +9,8 @@ import { isImageName, PREVIEW_SETTLE_MS, previewImageUrl } from '@/lib/file-prev
 import type { FilePaletteItem } from '@/features/command-palette/utils/types'
 
 /**
- * What is in the highlighted file, below the results. It follows the highlight only once it rests,
- * and keeps the previous file up until the next one has loaded.
+ * What is in the highlighted file, below the results. It follows the highlight only once it rests;
+ * a new file never shows the previous file's body under its name.
  */
 export function FilePreviewPanel({ item }: { readonly item: FilePaletteItem | null }) {
   const [settled] = useDebouncedValue(item, { wait: PREVIEW_SETTLE_MS })
