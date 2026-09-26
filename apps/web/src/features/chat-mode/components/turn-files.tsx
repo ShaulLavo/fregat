@@ -1,3 +1,4 @@
+import { checkpointIntentOptions } from '@/lib/checkpoint-intent'
 import { ArrowCounterClockwiseIcon } from '@phosphor-icons/react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { selectChatSessionById } from '@workspace/client-core/chat/selectors'
@@ -186,6 +187,7 @@ export function TurnFiles({
                       <ArrowCounterClockwiseIcon className='size-(--icon-size-sm)' />
                     </Button>
                   }
+                  prefetch={checkpointIntentOptions(summary)}
                   key={row.id}
                   path={row.file.path}
                   rootPath={rootPath}

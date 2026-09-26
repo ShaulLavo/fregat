@@ -11,9 +11,13 @@ import { environmentClientFor } from '@/lib/client'
 import { unwrapEdenResponse } from '@/lib/eden-events'
 import { confirmedEnvironmentOrigin } from '@/lib/environments/state/domain'
 
+/** The session's own machine: its MCP servers and sign-ins live there. */
+export function sessionClient(ref: ScopedSessionRef) {
+  return environmentClientFor(confirmedEnvironmentOrigin(ref.environmentId))
+}
+
 function sessionControls(ref: ScopedSessionRef) {
-  const client = environmentClientFor(confirmedEnvironmentOrigin(ref.environmentId))
-  return client.providers.sessions({ sessionId: ref.sessionId })
+  return sessionClient(ref).providers.sessions({ sessionId: ref.sessionId })
 }
 
 export async function fetchSessionMcp(ref: ScopedSessionRef, signal: AbortSignal) {
@@ -38,6 +42,15 @@ export async function approveMcpServer(ref: ScopedSessionRef, name: string) {
   const response = await sessionControls(ref).mcp({ name }).approve.post()
   return unwrapEdenResponse<ProviderSessionMcp>(response, {
     emptyMessage: 'the approval response carried no server list',
+    requireData: true,
+  })
+}
+
+/** Resolves with the server list after the change, which restarts an idle session. */
+export async function setMcpSessionOff(ref: ScopedSessionRef, name: string, off: boolean) {
+  const response = await sessionControls(ref).mcp({ name })['session-off'].post({ off })
+  return unwrapEdenResponse<ProviderSessionMcp>(response, {
+    emptyMessage: 'the change carried no server list',
     requireData: true,
   })
 }

@@ -1,3 +1,5 @@
+import { useDiffIntent } from '@/lib/intent-prefetch/hooks/use-diff-intent'
+import { commitDetailsQueryOptions } from '@/features/git/utils/history-query'
 import { useEffect, useState } from 'react'
 import { useDebouncedValue } from '@tanstack/react-pacer/debouncer'
 import { useHistoryView } from '@/features/git/hooks/use-history-view'
@@ -47,6 +49,11 @@ export function History({ rootPath: nextRoot }: { rootPath: string }) {
   const refs = history.data?.pages[0]?.refs ?? []
   const labels = historyRefLabels(refs)
   const rows = history.shownSearch ? layoutHistoryMatches(commits) : layoutHistory(commits)
+  const cursor = commits.findIndex((commit) => commit.id === selected)
+  const previous = commits[cursor - 1]
+  const next = cursor >= 0 ? commits[cursor + 1] : undefined
+  useDiffIntent(previous ? commitDetailsQueryOptions(rootPath, previous.id) : null, rootPath, true)
+  useDiffIntent(next ? commitDetailsQueryOptions(rootPath, next.id) : null, rootPath, true)
   const loadedPages = history.data?.pages.length ?? 0
 
   useEffect(() => {

@@ -50,8 +50,33 @@ export async function approveProjectMcpServer(input: {
   return true
 }
 
+/**
+ * Servers turned off for one session, split by how the CLI turns them off: `.mcp.json` servers
+ * through `disabledMcpjsonServers`, every other source through `deniedMcpServers`.
+ */
+export type SessionOffMcp = {
+  readonly all: readonly string[]
+  readonly project: readonly string[]
+  readonly other: readonly string[]
+}
+
+export async function splitSessionOffMcp(
+  cwd: string,
+  off: readonly string[],
+): Promise<SessionOffMcp> {
+  const all = [...off].sort()
+  if (all.length === 0) return { all, other: [], project: [] }
+
+  const project = new Set((await projectMcpServers(cwd)).map((server) => server.name))
+  return {
+    all,
+    other: all.filter((name) => !project.has(name)),
+    project: all.filter((name) => project.has(name)),
+  }
+}
+
 /** Every server the CLI would load, fingerprinted by each file that defines it and how. */
-async function projectMcpServers(cwd: string): Promise<ProjectMcpServer[]> {
+export async function projectMcpServers(cwd: string): Promise<ProjectMcpServer[]> {
   const definitions = new Map<string, Array<[string, unknown]>>()
   for (const file of await mcpConfigFiles(cwd)) {
     const servers = (await readJson(file))?.mcpServers

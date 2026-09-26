@@ -1,3 +1,4 @@
+import { restNoFlicker } from './rest-no-flicker'
 import { deferredDialogs } from './deferred-dialogs'
 import { rootSwitchNoFlicker } from './root-switch-no-flicker'
 import { turnFilesNoFlicker } from './turn-files-no-flicker'
@@ -40,6 +41,8 @@ import { projectGrouping } from './project-grouping'
 import { sessionSearch, sessionSearchEnvironments } from './session-search'
 import { sessionUnread } from './session-unread'
 import { mcpApproval } from './mcp-approval'
+import { mcpSettings } from './mcp-settings'
+import { mcpStatus } from './mcp-status'
 import { nativePermissionGrant } from './native-permission-grant'
 import { resetCreditRedemption } from './reset-credit-redemption'
 import { pullRequestLookupFailure } from './pull-request-lookup-failure'
@@ -112,6 +115,7 @@ import { chatSessionGoal } from './chat-session-goal'
 import { chatAgentReview } from './chat-agent-review'
 import { fileTreeHoverPrefetch } from './file-tree-hover-prefetch'
 import { prefetchChatSwitch } from './prefetch-chat-switch'
+import { prefetchDiffQueries } from './prefetch-diff-queries'
 import { prefetchFirstPaint } from './prefetch-first-paint'
 import { prefetchSettings } from './prefetch-settings'
 import {
@@ -215,6 +219,7 @@ import { editorLspRenameKey } from './editor-lsp-rename-key'
 import { editorLspSignatureHelp } from './editor-lsp-signature-help'
 import { editorMarkdownPunctuation } from './editor-markdown-punctuation'
 import { wallpaperLibrary } from './wallpaper-library'
+import { wallpaperCatalog } from './wallpaper-catalog'
 import { wallpaperPalette } from './wallpaper-palette'
 import { themeBundlePalette } from './theme-bundle-palette'
 import { settingsColdLoad } from './settings-cold-load'
@@ -321,6 +326,7 @@ import { editorProduct } from './editor-product'
 import { treeFileClicks } from './tree-file-clicks'
 import { treeStickyScroll } from './tree-sticky-scroll'
 import { treeParity } from './tree-parity'
+import { fileIconHues } from './file-icon-hues'
 import { treeParityBehaviour } from './tree-parity-behaviour'
 import { demoWorkspace } from './demo-workspace'
 import { demoAgentGit } from './demo-agent-git'
@@ -351,6 +357,8 @@ export const scenarios: readonly Scenario[] = [
   sessionNotifications,
   composerDefaults,
   mcpApproval,
+  mcpStatus,
+  mcpSettings,
   nativePermissionGrant,
   resetCreditRedemption,
   pullRequestLookupFailure,
@@ -391,6 +399,7 @@ export const scenarios: readonly Scenario[] = [
   chatModelPicker,
   chatUsageMeter,
   chatComposerNarrow,
+  restNoFlicker,
   settingsUsage,
   pushSubscribe,
   pushSessionNotice,
@@ -543,6 +552,7 @@ export const scenarios: readonly Scenario[] = [
   paneRenderCrash,
   wallpaperModeToggle,
   wallpaperLibrary,
+  wallpaperCatalog,
   wallpaperPalette,
   themeBundlePalette,
   settingsDefaults,
@@ -591,6 +601,7 @@ export const scenarios: readonly Scenario[] = [
   chatAgentReview,
   fileTreeHoverPrefetch,
   prefetchFirstPaint,
+  prefetchDiffQueries,
   prefetchChatSwitch,
   prefetchSettings,
   workspaceOpenLargeRoot,
@@ -627,6 +638,7 @@ export const scenarios: readonly Scenario[] = [
   editorProduct,
   treeStickyScroll,
   treeParity,
+  fileIconHues,
   treeParityBehaviour,
   treeFileClicks,
 ]

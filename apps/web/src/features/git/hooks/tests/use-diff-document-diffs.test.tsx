@@ -1,3 +1,10 @@
+import { diffQueryOptions } from '@/features/git/utils/diff-query'
+import { blobDiffQueryOptions } from '@/features/git/utils/blob-diff-query'
+import { createObservedInProcessClient } from '../../../../../test/client'
+import {
+  registerEnvironmentQueryClient,
+  originForQueryClient,
+} from '@/lib/environments/state/query-clients'
 import type { GitFileDiff } from '@workspace/contracts'
 import { act, waitFor } from '@testing-library/react'
 import { execFileSync } from 'node:child_process'
@@ -80,7 +87,8 @@ async function twoEntries(root: string, client: Client) {
   for (const name of ['first', 'second']) {
     await writeFile(path.join(repo, `${name}.ts`), `${name} edited\n`)
     const [entry] = await fetchDiff(`repo/${name}.ts`, false, undefined, client)
-    entries.push(entry!)
+    const { oldText: _old, newText: _new, ...patch } = entry!
+    entries.push(patch)
     await writeFile(path.join(repo, `${name}.ts`), 'unrelated working copy\n')
   }
 
@@ -90,3 +98,23 @@ async function twoEntries(root: string, client: Client) {
 function git(cwd: string, ...args: string[]) {
   return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: 'pipe' })
 }
+
+test('a file diff seeds complete immutable blob content without a second HTTP read', async ({
+  client,
+  server,
+}) => {
+  await twoEntries(server.root, client)
+  const reads: string[] = []
+  const observed = createObservedInProcessClient(server, (request) => {
+    reads.push(new URL(request.url).pathname)
+  })
+  const queryClient = createTestQueryClient()
+  registerEnvironmentQueryClient(queryClient, originForQueryClient(queryClient), observed)
+  const [diff] = await queryClient.query(diffQueryOptions('repo/first.ts', false))
+  expect(diff?.oldText).toBe('first\n')
+  expect(diff?.newText).toBe('unrelated working copy\n')
+  await writeFile(path.join(server.root, 'repo/first.ts'), 'changed after the snapshot\n')
+  const cached = await queryClient.query(blobDiffQueryOptions(diff!))
+  expect(cached).toEqual([diff])
+  expect(reads).toEqual(['/git/diff'])
+})
