@@ -27,10 +27,11 @@ afterEach(() => {
 const theme = { name: 'plain', type: 'light' as const, settings: [], colors: {} }
 
 function highlightOnce(highlighter: ReturnType<typeof createShikiHighlighter>) {
-  const { promise, resolve } = Promise.withResolvers<unknown>()
-  const immediate = highlighter.highlight({ code: 'const a = 1', language: 'ts' }, resolve)
-  if (immediate) resolve(immediate)
-  return promise
+  // Promise.withResolvers is missing on Node 20, which runs the package tests.
+  return new Promise<unknown>((resolve) => {
+    const immediate = highlighter.highlight({ code: 'const a = 1', language: 'ts' }, resolve)
+    if (immediate) resolve(immediate)
+  })
 }
 
 test('a core that fails to load is retried by the next fence of the same language', async () => {
