@@ -224,8 +224,6 @@
     "CodexThreadHistoryModeSchema": 3,
     "CodexThreadItem": 1,
     "CodexThreadItemSchema": 4,
-    "CodexThreadListCwdFilter": 1,
-    "CodexThreadListCwdFilterSchema": 3,
     "CodexThreadListParams": 1,
     "CodexThreadListParamsSchema": 3,
     "CodexThreadListResponse": 1,
@@ -385,7 +383,7 @@
     "thread/started": 3,
     "thread/status/changed": 2,
     "thread/tokenUsage/updated": 2,
-    "threadId": 29,
+    "threadId": 30,
     "threadResumeParams": 4,
     "threadStartParams": 2,
     "threadStateFromValue": 2
