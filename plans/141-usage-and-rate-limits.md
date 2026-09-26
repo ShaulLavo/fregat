@@ -2,8 +2,9 @@
 
 ## Status and authorization
 
-- Status: PHASES 1–4 IMPLEMENTED (meter 2026-09-24; per-turn recording, the usage page and
-  backfill 2026-09-25). Phase 5 fixture implementation is approved; the owner performs the live redemption.
+- Status: PHASES 1–5 IMPLEMENTED (meter 2026-09-24; per-turn recording, the usage page and
+  backfill 2026-09-25; Phase 5 on fixtures, scenario 2026-09-26). Owner check pending: the one live
+  redemption. Delete this plan after it.
 - Priority: P1 for the meter, P2 for the usage page and history.
 - Effort: S for Phase 1, M overall. Reset-credit redemption (Phase 5) is L and gated.
 - Risk: LOW for display. HIGH only for Phase 5, which spends an account resource.
@@ -284,6 +285,11 @@ Boundary fixtures cover concurrency, account switches, timeout/restart, differen
 changed advertised credits, refresh failure, and confirmation replay. The real HTTP route is covered
 through the confirmation UI; Chromium covers cancel, confirm, and pending state. Automated checks
 never call a real credit endpoint. The owner live redemption remains pending.
+
+Scenario `reset-credit-redemption` (2026-09-26, wave 2 lane A) drives it end to end on the native
+Codex fixture: a signed-in account at its session limit with one credit, Cancel spends nothing,
+Confirm consumes the credit once with an idempotency key, and the meter reads the reset limits.
+Plan 126 RUNTIME-08 is closed on it; the owner's live redemption is the only thing left.
 
 ## Verification
 

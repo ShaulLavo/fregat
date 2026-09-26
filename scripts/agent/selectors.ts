@@ -146,6 +146,8 @@ export const selectors = {
     page
       .getByRole('region', { name: 'App access', exact: true })
       .getByRole('button', { name: label, exact: true }),
+  genericApproval: (page: Page) =>
+    page.getByRole('region', { name: 'Approval requested', exact: true }),
   commandApproval: (page: Page) => page.getByRole('region', { name: 'Run a command', exact: true }),
   commandApprovalDecision: (page: Page, label: string | RegExp) =>
     page

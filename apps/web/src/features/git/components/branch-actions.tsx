@@ -21,6 +21,7 @@ import { Button, buttonVariants } from '@workspace/ui/components/button'
 import { cn } from '@workspace/ui/lib/utils'
 import { changeRequestLabel } from '@/features/git/utils/forge-terms'
 import { PublishRepositoryDialog } from '@/features/git/components/publish-repository-dialog'
+import { PullRequestLookupRetry } from '@/features/git/components/pull-request-lookup-retry'
 
 /**
  * Publish, push and open-a-pull-request, in the header where the branch already
@@ -113,6 +114,7 @@ export function BranchActions({
           <ArrowSquareOutIcon className='size-(--icon-size-sm) opacity-60' />
         </a>
       ) : null}
+      <PullRequestLookupRetry requestLabel={requestLabel} rootPath={rootPath} />
       {canCreatePullRequest(state, pullRequestState) ? (
         <Button
           className='text-2xs'

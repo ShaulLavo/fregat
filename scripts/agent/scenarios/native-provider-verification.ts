@@ -13,6 +13,7 @@ import { dispatch, openChat, readShell } from './chat-verification'
 
 const nativeEntrySchema = v.looseObject({
   event: v.string(),
+  params: v.optional(v.unknown()),
   pid: v.optional(v.number()),
   result: v.optional(v.unknown()),
 })
