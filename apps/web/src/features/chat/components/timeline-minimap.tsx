@@ -75,6 +75,7 @@ export function TimelineMinimap({
             <TooltipTrigger
               render={
                 <button
+                  data-feedback='silent'
                   aria-current={mark.id === activeMarkId ? 'true' : undefined}
                   aria-label={`Jump to turn ${mark.ordinal} of ${marks.length}`}
                   className='focus-ring pointer-events-auto absolute right-0 flex h-3 w-full -translate-y-1/2 items-center justify-end focus-visible:outline-none'

@@ -99,7 +99,7 @@ export class LoggingErrorBoundary extends Component<
                   Stack trace
                 </AccordionTrigger>
                 <AccordionContent className='px-(--density-control-padding-x)'>
-                  <pre className='app-scrollbar-thin bg-muted/30 text-muted-foreground text-2xs/relaxed max-h-64 overflow-y-auto overscroll-contain p-(--density-control-padding-x) font-mono wrap-anywhere whitespace-pre-wrap'>
+                  <pre className='bg-muted/30 text-muted-foreground text-2xs/relaxed max-h-64 overflow-y-auto overscroll-contain p-(--density-control-padding-x) font-mono wrap-anywhere whitespace-pre-wrap'>
                     {stackTrace || 'No stack trace available.'}
                   </pre>
                 </AccordionContent>

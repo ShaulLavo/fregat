@@ -37,7 +37,7 @@ export function DiagnosticGroupRow({
         )}
       />
       <FileLabel path={row.path} />
-      <span className='bg-muted text-muted-foreground text-3xs rounded-md px-1 leading-4 tabular-nums'>
+      <span className='bg-muted text-muted-foreground text-3xs rounded-md px-1 font-mono leading-4 tabular-nums'>
         {row.count}
       </span>
     </ListRow>

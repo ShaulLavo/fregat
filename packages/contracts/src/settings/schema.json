@@ -431,6 +431,12 @@
       "minimum": 100,
       "type": "integer"
     },
+    "files.picker.view": {
+      "default": "auto",
+      "description": "How the file picker shows a folder: columns, a list, or icons. Auto uses columns when choosing a folder and a list when choosing a file.",
+      "enum": ["auto", "columns", "icons", "list"],
+      "type": "string"
+    },
     "files.showHidden": {
       "default": false,
       "description": "Show dot-prefixed files and folders in file pickers.",
@@ -993,6 +999,12 @@
       "enum": ["compact", "cozy"],
       "type": "string"
     },
+    "workbench.feel": {
+      "default": "flat",
+      "description": "Motion and control depth: Flat, Seam, Brisk, Relaxed or Playful.",
+      "enum": ["brisk", "flat", "playful", "relaxed", "seam"],
+      "type": "string"
+    },
     "workbench.fontFamily": {
       "default": "bundled:inter",
       "description": "Font for the words the app writes: titles, labels, menus and prose.",
@@ -1010,6 +1022,33 @@
       "default": false,
       "description": "Slow terminal loading indicators while keeping progress visible.",
       "type": "boolean"
+    },
+    "workbench.sounds.controls": {
+      "default": false,
+      "description": "Play clicks when pressing controls and changing values with the pointer.",
+      "type": "boolean"
+    },
+    "workbench.sounds.errors": {
+      "default": false,
+      "description": "Play a short rattle when an error toast appears.",
+      "type": "boolean"
+    },
+    "workbench.sounds.git": {
+      "default": false,
+      "description": "Play two rising clicks when a commit is created, a push finishes or a pull request opens.",
+      "type": "boolean"
+    },
+    "workbench.sounds.terminalBell": {
+      "default": false,
+      "description": "Play a click when a terminal program rings the bell.",
+      "type": "boolean"
+    },
+    "workbench.sounds.volume": {
+      "default": 50,
+      "description": "Loudness of every sound, agent notifications included.",
+      "maximum": 100,
+      "minimum": 0,
+      "type": "integer"
     },
     "workbench.surface.blur": {
       "default": 9,
@@ -1238,7 +1277,7 @@
         }
       ],
       "default": null,
-      "description": "A light and dark version of your app colors, code colors, wallpaper and material."
+      "description": "App colors, code colors, wallpaper and surfaces, in a light and a dark version. Try them in the theme studio."
     },
     "workbench.theme.customizations": {
       "additionalProperties": {

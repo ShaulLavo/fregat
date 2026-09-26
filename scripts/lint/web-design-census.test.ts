@@ -6,6 +6,21 @@ import { expect, test } from 'vitest'
 import { censusSource, evaluate, isTestFile, TARGETS } from './web-design-census.mjs'
 
 type Hit = { readonly file: string; readonly line: number; readonly value: string }
+
+test('physical depth tokens belong to primitives', () => {
+  const source = "export const depth = 'shadow-(--shadow-key) shadow-(--shadow-well)'"
+  expect(
+    gate(censusFile('packages/ui/src/components/button.tsx', source)).offenders.shadow,
+  ).toEqual([])
+  expect(
+    gate(censusFile('apps/web/src/components/button.tsx', source)).offenders.shadow,
+  ).toHaveLength(2)
+})
+
+test('a native role button also needs a primitive or an explicit exception', () => {
+  const subject = censusFile('apps/web/src/probe.tsx', '<div role="button" />')
+  expect(gate(subject).offenders.rawControls.map((hit) => hit.value)).toEqual(['role="button"'])
+})
 type Census = { readonly hits: Readonly<Record<string, readonly Hit[]>> }
 type Result = {
   readonly offenders: Readonly<Record<string, readonly Hit[]>>
@@ -608,4 +623,56 @@ test('fails an allow-list entry that matches nothing in the census', () => {
 
   expect(result.passed).toBe(false)
   expect(result.allowProblems[0]).toContain('stale')
+})
+
+test('flags a hand-made round status dot and leaves pills and bars alone', () => {
+  const subject = census(
+    "import { cn } from '@workspace/ui/lib/utils'",
+    'export const Dot = ({ tone }: { readonly tone: string }) => (',
+    '  <>',
+    "    <span className={cn('size-1.5 shrink-0 rounded-full', tone)} />",
+    "    <span className='bg-info h-3 w-0.5 rounded-full' />",
+    "    <span className='bg-muted h-1 flex-1 rounded-full' />",
+    '  </>',
+    ')',
+  )
+
+  expect(locations(subject, 'statusDots')).toEqual(['probe.tsx:4 rounded-full'])
+  expect(gate(subject).offenders.statusDots).toHaveLength(1)
+})
+
+test('flags a class that restyles or hides a scrollbar', () => {
+  const subject = census(
+    "export const a = 'no-scrollbar overflow-x-auto'",
+    "export const b = 'overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'",
+    "export const c = 'scroll-gutter scroll-fade overflow-y-auto'",
+  )
+
+  expect(values(subject, 'scrollIdiom')).toEqual([
+    'no-scrollbar',
+    '[scrollbar-width:none]',
+    '[&::-webkit-scrollbar]:hidden',
+  ])
+})
+
+test('flags a capped scroller that hands the wheel to the pane behind it', () => {
+  const subject = census(
+    "export const a = 'max-h-48 overflow-y-auto'",
+    "export const b = 'max-h-48 overflow-y-auto overscroll-contain'",
+    "export const c = 'h-full overflow-y-auto'",
+    "export const d = 'max-h-48 overflow-hidden'",
+  )
+
+  expect(locations(subject, 'uncontainedScroller')).toEqual(['probe.tsx:1 max-h-48'])
+})
+
+test('a key is drawn by Kbd and nowhere else', () => {
+  const source = "export const Hint = () => <kbd className='font-mono'>⌘K</kbd>"
+
+  expect(values(censusFile('apps/web/src/components/hint.tsx', source), 'kbdSpelling')).toEqual([
+    '<kbd>',
+  ])
+  expect(values(censusFile('packages/ui/src/components/kbd.tsx', source), 'kbdSpelling')).toEqual(
+    [],
+  )
 })

@@ -87,7 +87,8 @@ export class GitWorktreeService {
         throw gitWorktreeErrors.WORKTREE_BRANCH_EXISTS({
           internal: { at: 'prepare', branch, worktreeId: body.worktreeId },
         })
-      const head = await this.baseCommit(runner, body)
+      const baseBranch = body.baseBranch ?? (await this.headBranch(runner))
+      const head = await this.baseCommit(runner, { ...body, baseBranch: baseBranch ?? undefined })
       const absolutePath = await managedWorktreePath(runner, body.worktreeId)
       if (
         (await maybeStat(absolutePath)) ||
@@ -97,7 +98,7 @@ export class GitWorktreeService {
           internal: { at: 'prepare', reason: 'path-occupied', worktreeId: body.worktreeId },
         })
       }
-      return { worktreeId: body.worktreeId, absolutePath, branch, baseCommit: head }
+      return { worktreeId: body.worktreeId, absolutePath, branch, baseBranch, baseCommit: head }
     })
   }
 
@@ -462,11 +463,13 @@ export class GitWorktreeService {
   }
 
   private async headBranch(runner: GitRepositoryRunner) {
-    const result = await runner.run(['rev-parse', '--abbrev-ref', 'HEAD'], { allowFailure: true })
-    const branch = result.stdout.trim()
-    if (result.exitCode !== 0 || !branch || branch === 'HEAD') return null
+    const result = await runner.run(['rev-parse', '--symbolic-full-name', 'HEAD'], {
+      allowFailure: true,
+    })
+    const ref = result.stdout.trim()
+    if (result.exitCode !== 0 || !ref.startsWith('refs/heads/')) return null
 
-    return branch
+    return ref.slice('refs/heads/'.length)
   }
 
   private async mergeBase(runner: GitRepositoryRunner, baseRef: string) {

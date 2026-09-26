@@ -14,6 +14,7 @@ function Button({
   return (
     <ButtonPrimitive
       data-slot='button'
+      data-feedback='tap'
       data-variant={variant}
       className={cn(buttonVariants({ variant, size, className }))}
       {...props}

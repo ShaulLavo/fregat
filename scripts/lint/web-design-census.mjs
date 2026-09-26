@@ -72,6 +72,14 @@ export const TARGETS = {
   textAlpha: { title: 'text alpha', limit: 0, listed: true },
   iconOnlyHint: { title: 'icon-only controls without a Tooltip', limit: 0, listed: true },
   paletteLeaks: { title: 'raw palette colours', limit: 0, listed: true },
+  statusDots: { title: 'hand-made status dots', limit: 0, listed: true },
+  scrollIdiom: { title: 'hand-styled scrollbars', limit: 0, listed: true },
+  kbdSpelling: { title: 'keys drawn outside Kbd', limit: 0, listed: true },
+  uncontainedScroller: {
+    title: 'capped scrollers without overscroll-contain',
+    limit: 0,
+    listed: true,
+  },
   truncationRecovery: {
     title: 'truncation with no title on the row',
     limit: 0,
@@ -122,6 +130,15 @@ const ROW_FILL_OPACITY = /^(?:hover:)?bg-row-(?:hover|selected)\/\d+$/
 const HAIRLINE =
   /^(?:border(?:-(?:[trbl]|x|y|s|e))?(?:-(?:border|subtle)(?:\/\d+)?)?|divide-(?:x|y))$/
 const HAIRLINE_BASE = /\bborder-transparent\b/
+// A small round mark is a StatusDot drawn by hand; its colour often comes from a helper elsewhere.
+const DOT_MARK = /^size-(?:1|1\.5|2|2\.5)$/
+// The base layer styles every bar; a class that restyles or hides one is an exception. Read
+// from the raw string, because an arbitrary property fails the class-string test.
+const SCROLLBAR_CLASS = /(?:^|\s)((?:\S*[[:]\S*scrollbar|no-scrollbar)\S*)/g
+// A capped scroller sits inside something else that scrolls, so it keeps the wheel to itself.
+const CAPPED = /^max-h-/
+const SCROLLS = /^overflow-(?:[xy]-)?(?:auto|scroll)$/
+const KBD_PRIMITIVE = 'packages/ui/src/components/kbd.tsx'
 const HEIGHT_TOKEN = /^h-(?:\d+(?:\.\d+)?|px|\[[^\]]*\]|\([^)]*\))$/
 const TRUNCATION = /^(?:truncate|line-clamp-\d+)$/
 const SOURCE_FILE = /\.tsx?$/
@@ -235,6 +252,8 @@ export function censusSource(file, source) {
     recordString(census, file, entry, lineAt, groups)
   }
   recordBarHeights(census, groups)
+  recordStatusDots(census, groups)
+  recordUncontainedScrollers(census, groups)
   return census
 }
 
@@ -422,6 +441,10 @@ const RAW_CONTROL_ELEMENTS = new Set(['button', 'input', 'select', 'textarea'])
 function recordElement(census, file, element, lineAt) {
   const hit = { file, line: lineAt(element.start), value: `<${element.name}>` }
   if (RAW_CONTROL_ELEMENTS.has(element.name)) census.hits.rawControls.push(hit)
+  if (/^[a-z]/.test(element.name) && attributeValue(element.opening, 'role') === 'button') {
+    census.hits.rawControls.push({ ...hit, value: 'role="button"' })
+  }
+  if (element.name === 'kbd' && file !== KBD_PRIMITIVE) census.hits.kbdSpelling.push(hit)
   if (!isControl(element)) return
   const ownChildren = element.children.filter(isVisibleChild)
   const children =
@@ -508,6 +531,9 @@ function lineOfEntry(entry, lineAt) {
 
 function recordString(census, file, entry, lineAt, groups) {
   const lineOf = lineOfEntry(entry, lineAt)
+  for (const match of entry.value.matchAll(SCROLLBAR_CLASS)) {
+    census.hits.scrollIdiom.push({ file, line: lineOf(match.index), value: match[1] })
+  }
   if (!looksLikeClassString(entry.value)) return
   recordDensityVars(census, file, entry, lineOf)
   const group = groupFor(groups, entry)
@@ -534,7 +560,7 @@ function groupFor(groups, entry) {
   const key = entry.elementKey ?? `s${entry.start}`
   const existing = groups.get(key)
   if (existing) return existing
-  const created = { bases: new Set(), heights: [] }
+  const created = { bases: new Set(), heights: [], round: null, cap: null }
   groups.set(key, created)
   return created
 }
@@ -558,6 +584,8 @@ function recordToken(census, file, entry, token, lineOf, group) {
 
 function recordBarShape(group, hit, base) {
   group.bases.add(base)
+  if (base === 'rounded-full') group.round = hit
+  if (CAPPED.test(base)) group.cap = hit
   if (HEIGHT_TOKEN.test(base)) group.heights.push(hit)
 }
 
@@ -625,6 +653,22 @@ function recordBarHeights(census, groups) {
       seen.add(`${hit.file}:${hit.line}:${hit.value}`)
       census.hits.barHeights.push(hit)
     }
+  }
+}
+
+function recordStatusDots(census, groups) {
+  for (const group of groups.values()) {
+    if (group.round === null) continue
+    if (![...group.bases].some((base) => DOT_MARK.test(base))) continue
+    census.hits.statusDots.push(group.round)
+  }
+}
+
+function recordUncontainedScrollers(census, groups) {
+  for (const group of groups.values()) {
+    if (group.cap === null || group.bases.has('overscroll-contain')) continue
+    if (![...group.bases].some((base) => SCROLLS.test(base))) continue
+    census.hits.uncontainedScroller.push(group.cap)
   }
 }
 
@@ -705,6 +749,14 @@ function offTarget(hits, allowed) {
   return hits.filter((hit) => !allowed.includes(hit.value))
 }
 
+function offScaleShadows(census) {
+  return offTarget(census.hits.shadow, TARGETS.shadow.allowed).filter(
+    (hit) =>
+      !hit.file.startsWith(UI_PACKAGE) ||
+      !['shadow-(--shadow-key)', 'shadow-(--shadow-well)'].includes(hit.value),
+  )
+}
+
 /** An exception matching nothing is a claim about code that no longer exists. */
 function staleEntries(entries, census) {
   if (!Array.isArray(entries)) return []
@@ -731,13 +783,17 @@ export function evaluate(census, allowEntries = [], { checkStale = true } = {}) 
     barHeights: gate('barHeights', offTarget(census.hits.barHeights, TARGETS.barHeights.allowed)),
     hairlines: gate('hairlines', census.hits.hairlines),
     arbitraryText: gate('arbitraryText', census.hits.arbitraryText),
-    shadow: gate('shadow', offTarget(census.hits.shadow, TARGETS.shadow.allowed)),
+    shadow: gate('shadow', offScaleShadows(census)),
     rawControls: gate('rawControls', census.hits.rawControls),
     hoverFills: gate('hoverFills', rowFillOpacityHits(census)),
     iconSize: gate('iconSize', offTarget(census.hits.iconSize, TARGETS.iconSize.allowed)),
     textAlpha: gate('textAlpha', census.hits.textAlpha),
     iconOnlyHint: gate('iconOnlyHint', census.hits.iconOnlyHint),
     paletteLeaks: gate('paletteLeaks', census.hits.paletteLeaks),
+    statusDots: gate('statusDots', census.hits.statusDots),
+    scrollIdiom: gate('scrollIdiom', census.hits.scrollIdiom),
+    uncontainedScroller: gate('uncontainedScroller', census.hits.uncontainedScroller),
+    kbdSpelling: gate('kbdSpelling', census.hits.kbdSpelling),
     truncationRecovery: gate('truncationRecovery', census.hits.truncationRecovery),
   }
   const failures = Object.entries(offenders)

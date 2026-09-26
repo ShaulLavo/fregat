@@ -13,12 +13,18 @@ export type ListboxKeyInput = {
   pageSize: number
   canCollapse?: boolean
   isCollapsed?: boolean
+  /** Tiles per row in a grid: ↑↓ move a whole row and ←→ one tile. Absent for a plain list. */
+  columns?: number
 }
 
 export function listboxKeyAction(input: ListboxKeyInput): ListboxKeyAction {
   const { key, modifiers, role, count, activeIndex, pageSize, canCollapse, isCollapsed } = input
   if (modifiers && Object.values(modifiers).some(Boolean)) return { kind: 'none' }
   if (count === 0) return { kind: 'none' }
+  if (input.columns !== undefined) {
+    const grid = gridKeyAction(key, count, Math.max(0, activeIndex), input.columns)
+    if (grid) return grid
+  }
   const index = Math.max(0, activeIndex)
   const page = Math.max(1, pageSize)
 
@@ -70,16 +76,31 @@ export function enabledListboxIndex(
   return -1
 }
 
-export function typeaheadListboxIndex(
-  items: readonly ListboxItem[],
-  activeIndex: number,
-  query: string,
-) {
-  for (let offset = 1; offset <= items.length; offset += 1) {
-    const index = (Math.max(-1, activeIndex) + offset) % items.length
+// Searches from `from` inclusive, wrapping, so a longer buffer can stay on a row that still matches.
+export function typeaheadListboxIndex(items: readonly ListboxItem[], from: number, query: string) {
+  const start = Math.max(0, from)
+  const needle = query.toLocaleLowerCase()
+  for (let offset = 0; offset < items.length; offset += 1) {
+    const index = (start + offset) % items.length
     const item = items[index]
     if (item?.disabled || !item?.label) continue
-    if (item.label.toLocaleLowerCase().startsWith(query.toLocaleLowerCase())) return index
+    if (item.label.toLocaleLowerCase().startsWith(needle)) return index
   }
   return -1
+}
+
+/** Grid moves; anything else falls through to the list's keys. Never wraps past either end. */
+function gridKeyAction(
+  key: string,
+  count: number,
+  index: number,
+  columns: number,
+): ListboxKeyAction | null {
+  const step = Math.max(1, columns)
+  if (key === 'ArrowDown')
+    return { kind: 'move', index: index + step < count ? index + step : index }
+  if (key === 'ArrowUp') return { kind: 'move', index: index - step >= 0 ? index - step : index }
+  if (key === 'ArrowRight') return { kind: 'move', index: Math.min(count - 1, index + 1) }
+  if (key === 'ArrowLeft') return { kind: 'move', index: Math.max(0, index - 1) }
+  return null
 }

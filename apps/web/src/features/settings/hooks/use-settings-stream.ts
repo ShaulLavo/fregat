@@ -5,7 +5,7 @@ import {
   superviseSettingsStream as runSettingsStream,
   type SettingsStreamDependencies,
 } from '@workspace/client-core/settings/stream'
-import { useSettingsOwner } from '@/features/settings/hooks/use-settings-owner'
+import { useSettingsOwner } from '@/lib/settings-owner/hooks/use-settings-owner'
 import { clientForQueryClient, originForQueryClient } from '@/lib/environments/state/query-clients'
 import { environmentLogContext } from '@/lib/environments/state/log-context'
 import { log } from '@/lib/client-logging'

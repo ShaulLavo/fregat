@@ -27,9 +27,11 @@ import {
   type SettingsOperation,
   type SettingsValues,
   type SettingsWriteTarget,
+  type ColorMode,
+  type ThemeVariantPatch,
 } from '@workspace/contracts'
 import { useMutation, useMutationState, type QueryClient } from '@tanstack/react-query'
-import { useSettingsOwner } from '@/features/settings/hooks/use-settings-owner'
+import { useSettingsOwner } from '@/lib/settings-owner/hooks/use-settings-owner'
 
 import type { PlatformCommandId } from '@/keymap/types'
 import {
@@ -60,7 +62,7 @@ import {
 import { elapsedMs } from '@workspace/utils/timing'
 import { durationBetweenMs } from '@workspace/utils/timing'
 import { dismissSaveError, notifySaveError } from '@/features/settings/utils/notify-save-error'
-import { providerEnabledOperation } from '@/features/settings/utils/operations'
+import { providerEnabledOperation, themeCustomization } from '@/features/settings/utils/operations'
 import { admitSettingsMutationResult } from '@/features/settings/state/snapshot-admission'
 import { annotateClientError, clientErrorMetadata } from '@/lib/client-error-context'
 import { log } from '@/lib/client-logging'
@@ -195,6 +197,20 @@ export function useSettingsActions() {
       submit('user', [{ kind: 'set', key: 'workbench.theme', value: theme }], initiator),
     resetBundle: (id: ThemeId) =>
       submit('user', [{ kind: 'theme.reset', id }], 'settings.theme.defaults'),
+    /** The theme and both halves as edited, in one write: what the theme studio's Apply does. */
+    applyBundle: (
+      theme: ThemeBundle,
+      patches: Readonly<Record<ColorMode, ThemeVariantPatch | null>>,
+      initiator = 'theme-studio.apply',
+    ) =>
+      submit(
+        'user',
+        [
+          { kind: 'set', key: 'workbench.theme', value: theme },
+          { kind: 'theme.reset', id: theme.id, to: themeCustomization(patches) },
+        ],
+        initiator,
+      ),
     setMachine: (name: string, machine: MachineDefinition) =>
       submit('user', [{ kind: 'machine.set', name, machine }]),
     removeMachine: (name: string) => submit('user', [{ kind: 'machine.remove', name }]),

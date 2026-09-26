@@ -1,5 +1,6 @@
 import { BAR_TAB_STRIP_CLASS, barTabClassName } from '@workspace/ui/patterns/bar-tabs'
 import { LoadersTab } from '@/features/dev/components/loaders-tab'
+import { PhysicalTab } from '@/features/dev/components/physical-tab'
 import { DEV_TABS, devTabForPath, devTabHref } from '@/features/dev/utils/tabs'
 
 /** The gallery at /dev. Tabs are plain links: one page load per tab is fine here. */
@@ -25,6 +26,7 @@ export function DevPage() {
       </header>
       <main className='bg-content-well min-h-0 flex-1 overflow-auto'>
         {active === 'loaders' && <LoadersTab />}
+        {active === 'physical' && <PhysicalTab />}
       </main>
     </div>
   )

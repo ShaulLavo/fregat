@@ -44,7 +44,10 @@ export function SessionScopeMenu({
           </Button>
         }
       />
-      <DropdownMenuContent align='start' className='max-h-[60vh] w-60 overflow-y-auto p-1'>
+      <DropdownMenuContent
+        align='start'
+        className='max-h-[60vh] w-60 overflow-y-auto overscroll-contain p-1'
+      >
         <DropdownMenuRadioGroup value={scope ?? ALL_PROJECTS_VALUE}>
           {/* Inside the group: base-ui resolves the label against its group context. */}
           <DropdownMenuLabel>Show sessions from</DropdownMenuLabel>
@@ -66,7 +69,7 @@ export function SessionScopeMenu({
                   </span>
                 ) : null}
               </span>
-              <span className='text-muted-foreground text-2xs shrink-0 tabular-nums'>
+              <span className='text-muted-foreground text-2xs shrink-0 font-mono tabular-nums'>
                 {project.sessionCount}
               </span>
             </DropdownMenuRadioItem>

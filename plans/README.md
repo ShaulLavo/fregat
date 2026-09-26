@@ -31,13 +31,8 @@ a bare root `bun run verify`.
 | [170 — language census for grammar and theme prefetch](170-language-census.md)          | **PROPOSED — SPLIT FROM 110 Q7; TREE-SITTER WARM-UP ADDED 2026-09-26**    |
 | [167 — settings defaults, setting details, and copy](167-settings-and-copy.md)          | **PROPOSED — READY; D1–D4 DECIDED**                                       |
 | [166 — keyboard shortcuts, redone](166-shortcuts-editor.md)                             | **PROPOSED — RESEARCH FIRST; D1–D6 DECIDED**                              |
-| [164 — what feels right in Neon](164-what-feels-right-in-neon.md)                       | **FIRST PASS SHIPPED; METADATA SWEEP LEFT**                               |
-| [159 — file and folder picker](159-file-picker.md)                                      | **PROPOSED — READY; DECISIONS ACCEPTED**                                  |
-| [158 — app polish from Neon](158-app-polish.md)                                         | **PROPOSED — READY; DECISIONS ACCEPTED**                                  |
-| [157 — base components](157-base-components.md)                                         | **PROPOSED — READY; QUEUED NEXT**                                         |
 | [156 — documents in the editor](156-documents-in-the-editor.md)                         | **PLACEHOLDER — FAR FUTURE; RESEARCH FIRST**                              |
 | [155 — site demo becomes an animated replica](155-site-demo-replica.md)                 | **PLACEHOLDER — RESEARCH NOT STARTED**                                    |
-| [154 — physical mode](154-physical-mode.md)                                             | **PROPOSED — D6 (SETTINGS SHAPE) FIRST**                                  |
 | [152 — dev primary ships its working tree](152-remote-dev-builds.md)                    | **PROPOSED — NICE TO HAVE; AFTER 151**                                    |
 | [151 — remote machines run the primary's release](151-remote-server-releases.md)        | **PROPOSED — DEPENDS ON 150 PHASE 1; D2/D4 TO CONFIRM**                   |
 | [150 — remote machines run a server that matches](150-remote-server-version.md)         | **PHASE 1 PARTLY DONE (`129fdea6`); PHASE 2 → PLANS 151/152**             |
@@ -63,8 +58,6 @@ a bare root `bun run verify`.
 | [092 — path and URI helpers](092-path-and-uri-helpers.md)                               | **PARTIAL — IDENTICAL HALVES MERGED (`becdf722`); REST OPEN**             |
 | [093 — web React and store ceremony](093-web-react-and-store-ceremony.md)               | **PARTIAL — 3 OF 14 DONE; GUARD SWEEP AFTER 091 ITEM 1.4**                |
 | [099 — document contribution runtime](099-document-contributions.md)                    | **PROPOSED — UNITS 0–1 APPROVED 2026-09-25; 2–7 GATED**                   |
-| [102 — scroll and keyboard affordance](102-scroll-and-keyboard-affordance.md)           | **PROPOSED — DECISIONS D2 AND D7 NEED CONFIRMATION**                      |
-| [124 — the theme studio](124-theme-studio.md)                                           | **PROPOSED — REPLACES 117'S SURFACE; DATA STAYS**                         |
 | [122 - composable full-power plugins](122-composable-plugins.md)                        | **PROPOSED - RESEARCH AND PERFORMANCE GATES FIRST**                       |
 | [114 — Polaron, a desktop shell we own](114-polaron-shell.md)                           | **PARKED — NEEDS A GO/NO-GO**                                             |
 | [108 — two markdown modes](108-markdown-modes.md)                                       | **PROPOSED — PHASE 1 READY; PHASE 2 NEEDS 111 AND 176**                   |

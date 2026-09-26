@@ -2,6 +2,7 @@ import { stat } from 'node:fs/promises'
 import path from 'node:path'
 import { Elysia, t } from 'elysia'
 import { observeRequestOperation } from '../../observability'
+import { wallpaperColors } from './colors'
 import { wallpaperErrors } from './structured-errors'
 import {
   displayName,
@@ -47,6 +48,18 @@ export function wallpaperLibraryRoutes(library: WallpaperLibrary) {
       .get('/:id/asset', ({ params }) => media(library, params.id, 'asset'))
       .get('/:id/display', ({ params }) => media(library, params.id, 'display'))
       .get('/:id/thumbnail', ({ params }) => media(library, params.id, 'thumbnail'))
+      .get('/:id/colors', ({ params }) =>
+        observeRequestOperation(
+          {
+            area: 'wallpaper',
+            operation: 'library.colors',
+            sourceKind: 'library',
+            assetId: params.id,
+          },
+          () => wallpaperColors(library, parseAssetId(params.id)),
+          (colors) => ({ clusterCount: colors.clusters.length }),
+        ),
+      )
       .post('/:id/delete', ({ params }) =>
         observeRequestOperation(
           {

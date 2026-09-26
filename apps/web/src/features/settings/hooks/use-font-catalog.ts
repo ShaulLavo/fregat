@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import type { FontCatalogEntry } from '@workspace/contracts'
 
-import { useSettingsOwner } from '@/features/settings/hooks/use-settings-owner'
+import { useSettingsOwner } from '@/lib/settings-owner/hooks/use-settings-owner'
 import { settingsQueryKeys } from '@/features/settings/utils/query-keys'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import { createRpcError } from '@/lib/structured-errors'

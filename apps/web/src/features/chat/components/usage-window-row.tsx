@@ -32,6 +32,7 @@ export function UsageWindowRow({
       </div>
       <div className='bg-muted relative h-1 rounded-full'>
         <div
+          data-usage-fill
           className={cn('h-full rounded-full', USAGE_TONE_FILL[tone])}
           style={{ width: `${window.usedPercent}%` }}
         />

@@ -27,3 +27,26 @@ export function isToggleHiddenShortcut(event: PickerKeyboardEvent) {
 export function isGoUpShortcut(event: PickerKeyboardEvent) {
   return hasCommandModifier(event) && !event.shiftKey && event.key === 'ArrowUp'
 }
+
+function isUnshiftedCommand(event: PickerKeyboardEvent) {
+  return hasCommandModifier(event) && !event.shiftKey && !event.altKey
+}
+
+export function isBackShortcut(event: PickerKeyboardEvent) {
+  return isUnshiftedCommand(event) && (event.code === 'BracketLeft' || event.key === '[')
+}
+
+export function isForwardShortcut(event: PickerKeyboardEvent) {
+  return isUnshiftedCommand(event) && (event.code === 'BracketRight' || event.key === ']')
+}
+
+/** Finder's ⌘↓: enter the selected folder, or choose the selected file. */
+export function isOpenShortcut(event: PickerKeyboardEvent) {
+  return isUnshiftedCommand(event) && event.key === 'ArrowDown'
+}
+
+/** "12 items", or "3 results" while a search runs. */
+export function listCountLabel(count: number, searching: boolean) {
+  const noun = searching ? 'result' : 'item'
+  return `${count} ${count === 1 ? noun : `${noun}s`}`
+}

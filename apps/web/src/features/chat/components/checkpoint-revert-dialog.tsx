@@ -1,5 +1,6 @@
 import { Spinner } from '@workspace/ui/components/spinner'
 import { Button } from '@workspace/ui/components/button'
+import { HoldButton } from '@workspace/ui/components/hold-button'
 import {
   Dialog,
   DialogContent,
@@ -47,19 +48,14 @@ export function CheckpointRevertDialog({
             Cancel
           </Button>
           {canRestoreFiles ? (
-            <Button
-              type='button'
-              variant='destructive'
-              disabled={disabled}
-              onClick={() => onConfirm(true)}
-            >
+            <HoldButton disabled={disabled} onConfirm={() => onConfirm(true)}>
               Rewind and restore files
-            </Button>
+            </HoldButton>
           ) : null}
-          <Button type='button' disabled={disabled} onClick={() => onConfirm(false)}>
+          <HoldButton disabled={disabled} onConfirm={() => onConfirm(false)} variant='default'>
             {pending ? <Spinner aria-hidden /> : null}
             Rewind conversation only
-          </Button>
+          </HoldButton>
         </DialogFooter>
       </DialogContent>
     </Dialog>

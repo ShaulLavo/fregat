@@ -169,7 +169,8 @@ export function HistoryPane({
     <ToolPane
       className='h-full'
       header={null}
-      bodyClassName='flex flex-col overflow-hidden'
+      bodyClassName='flex flex-col'
+      scroll={false}
       data-history-pane={documentKey}
       ref={focusRef}
       subheader={

@@ -86,6 +86,7 @@ export function ProjectDeleteDialog() {
           />
         ) : null}
         <DeleteDialogFooter
+          hold
           cancelDisabled={pending}
           confirmDisabled={managedCount > 0 || request?.members.some((member) => !member.available)}
           onCancel={() => actions.cancelDelete()}

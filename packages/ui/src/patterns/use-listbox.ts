@@ -33,6 +33,8 @@ export type UseListboxOptions<Id extends string> = {
   revealOnMount?: boolean
   containerRef?: RefObject<HTMLDivElement | null>
   onActiveKeyDown?: (event: KeyboardEvent<HTMLDivElement>, id: Id) => void
+  /** Tiles per row, for a grid of options. */
+  columns?: number
 }
 
 export function useListbox<Id extends string>({
@@ -50,6 +52,7 @@ export function useListbox<Id extends string>({
   revealOnMount = true,
   containerRef,
   onActiveKeyDown,
+  columns,
 }: UseListboxOptions<Id>) {
   const internalRef = useRef<HTMLDivElement>(null)
   const ref = containerRef ?? internalRef
@@ -81,9 +84,12 @@ export function useListbox<Id extends string>({
   useEffect(() => {
     const previous = previousCursor.current
     previousCursor.current = { index: cursorIndex, id: cursor?.id }
-    if (!revealOnMount && previous.index === cursorIndex && previous.id === cursor?.id) return
+    const moved = previous.index !== cursorIndex || previous.id !== cursor?.id
+    if (!moved && !revealOnMount) return
+    // With nothing active the cursor is only the first row; a row arriving above it is not a move.
+    if (moved && activeIndex < 0) return
     revealCurrentCursor()
-  }, [cursorIndex, cursor?.id, prefix, revealOnMount])
+  }, [activeIndex, cursorIndex, cursor?.id, prefix, revealOnMount])
 
   function moveTo(index: number) {
     const item = items[index]
@@ -97,10 +103,10 @@ export function useListbox<Id extends string>({
     const previous = now - typed.current.timestamp > 700 ? '' : typed.current.query
     const query = previous + event.key
     typed.current = { query, timestamp: now }
-    let index = typeaheadListboxIndex(items, cursorIndex, query)
-    if (index < 0 && [...query].every((character) => character === event.key)) {
-      index = typeaheadListboxIndex(items, cursorIndex, event.key)
-    }
+    const repeated = [...query].every((character) => character === event.key)
+    const from = repeated ? cursorIndex + 1 : cursorIndex
+    let index = typeaheadListboxIndex(items, from, query)
+    if (index < 0 && repeated) index = typeaheadListboxIndex(items, cursorIndex + 1, event.key)
     if (index < 0) return
     event.preventDefault()
     moveTo(index)
@@ -122,6 +128,7 @@ export function useListbox<Id extends string>({
       pageSize: pageSize ?? visibleCount,
       canCollapse: cursor?.hasChildren ?? cursor?.expanded !== undefined,
       isCollapsed: !cursor?.expanded,
+      columns,
     })
     if (action.kind === 'none') return handleTypeahead(event)
     event.preventDefault()

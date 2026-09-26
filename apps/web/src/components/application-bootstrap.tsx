@@ -6,8 +6,7 @@ import type { createBootstrap } from '@/state/bootstrap'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { HotkeysProvider } from '@tanstack/react-hotkeys'
 import { ActiveEnvironmentApplication } from '@/components/active-environment-application'
-import { EmptyState } from '@workspace/ui/components/empty-state'
-import { Spinner } from '@workspace/ui/components/spinner'
+import { StatusFrame } from '@workspace/ui/patterns/status-frame'
 import { Button } from '@workspace/ui/components/button'
 import { SettingsOwnerProvider } from '@/features/settings/providers/owner-provider'
 import { SimulatedLatencyBridge } from '@/features/settings/components/simulated-latency-bridge'
@@ -42,28 +41,14 @@ export function ApplicationBootstrap({
   }, [application, error])
   if (error)
     return (
-      <EmptyState
-        action={
-          <Button onClick={bootstrap.retry} size='sm' variant='outline'>
-            Retry connection
-          </Button>
-        }
-        className='min-h-svh'
-        description={error}
+      <StatusFrame
+        action={<Button onClick={bootstrap.retry}>Retry connection</Button>}
+        detail={error}
         title='Cannot connect to the local machine'
         tone='error'
       />
     )
-  if (!application)
-    return (
-      <div
-        className='bg-background text-foreground grid min-h-svh place-content-center gap-3'
-        role='status'
-      >
-        <Spinner size='lg' aria-hidden='true' className='mx-auto' />
-        <p className='text-sm'>Connecting to local machine…</p>
-      </div>
-    )
+  if (!application) return <StatusFrame title='Connecting to local machine…' tone='pending' />
   return (
     <QueryClientProvider client={primaryQueryClient()}>
       <SettingsOwnerProvider queryClient={primaryQueryClient()}>

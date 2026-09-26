@@ -1,6 +1,6 @@
 import { useMutation } from '@tanstack/react-query'
 
-import { useSettingsOwner } from '@/features/settings/hooks/use-settings-owner'
+import { useSettingsOwner } from '@/lib/settings-owner/hooks/use-settings-owner'
 import {
   pushDevicesQueryOptions,
   registerPushDevice,

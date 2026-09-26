@@ -2,6 +2,7 @@ import { editorMutationKeys } from '@/features/editor/utils/mutation-keys'
 import type { DocumentKey } from '@/lib/documents/utils/types'
 import { useIsMutating } from '@tanstack/react-query'
 import { Button } from '@workspace/ui/components/button'
+import { HoldButton } from '@workspace/ui/components/hold-button'
 import {
   Dialog,
   DialogContent,
@@ -47,10 +48,10 @@ export function HistoryClearDialog({
           >
             Cancel
           </Button>
-          <Button disabled={pending} onClick={onConfirm} type='button' variant='destructive'>
+          <HoldButton disabled={pending} onConfirm={onConfirm}>
             {pending ? <Spinner /> : null}
             Clear history
-          </Button>
+          </HoldButton>
         </DialogFooter>
       </DialogContent>
     </Dialog>

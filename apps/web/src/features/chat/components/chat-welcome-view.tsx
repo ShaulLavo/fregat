@@ -1,4 +1,5 @@
 import { ChatTeardropDotsIcon } from '@phosphor-icons/react'
+import { Kbd } from '@workspace/ui/components/kbd'
 
 export function ChatWelcomeView() {
   return (
@@ -23,9 +24,7 @@ export function ChatWelcomeView() {
 function WelcomeHint({ glyph, label }: { glyph: string; label: string }) {
   return (
     <span className='bg-muted/40 inline-flex items-center gap-1.5 rounded-md py-0.5 pr-2 pl-1.5'>
-      <kbd className='text-foreground bg-background text-3xs rounded-md px-1 font-mono leading-none'>
-        {glyph}
-      </kbd>
+      <Kbd className='text-foreground'>{glyph}</Kbd>
       {label}
     </span>
   )

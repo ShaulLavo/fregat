@@ -62,6 +62,7 @@ const ASYNC_COMMAND_IDS = [
   'workspace.showCommandPalette',
   'workspace.showSettings',
   'workspace.openSearchEditor',
+  'workspace.openThemeStudio',
   'workspace.quickOpenPreviousEditor',
   'workspace.quickOpenView',
   'workspace.gotoSymbol',

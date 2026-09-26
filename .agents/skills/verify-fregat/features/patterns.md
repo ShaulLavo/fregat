@@ -53,3 +53,23 @@ Every explicit copy goes through `lib/clipboard.ts`, which tries `navigator.clip
 ## File labels
 
 `FileLabel` (`components/file-label.tsx`) draws a file as icon, basename, then muted directory, so a right cut eats the directory; `FileStatusCell` draws the change letter. Git rows, Search group headers (sidebar and editor), the Turn panel and the timeline's changed-files tree share them. `scenario file-label-cohesion` makes a disposable repository, registers it as its own project, and runs a native checkpoint fixture (`fixtures/native-checkpoint.mjs`, no tokens) whose turn adds, deletes, renames and modifies named files. It asserts A/D/R/M in both the timeline tree and the Turn panel, then basename-first rows in Search and Git for a file twelve directories deep. It deletes the session, project and provider it created and releases the fixture; `inspection.json` records each.
+
+## Base components
+
+Tabs and segmented rows (settings scope and view, git Changes/Graph, diff scope, snooze, usage range) are Base UI tabs with one sliding indicator. Irreversible confirms (discard, checkpoint rewind, forced worktree removal, history clear, session and project delete) are hold-to-confirm. `scenario base-components` releases a discard hold early and requires the file to stay edited, holds Space until the dialog closes and requires the file restored, then samples the settings scope indicator every frame after a click and requires an in-between position. Status marks are square `StatusDot`s; `scenario spinner-palette` shows a working session's breathing dots in the rail and header.
+
+## Connection frames
+
+Booting, and connecting to a server, show one `StatusFrame`: a mark, a title, a detail line and an action row, each the same size pending and failed. `scenario connection-frame` clears the cached binding, holds then refuses `/health`, and requires zero blank frames and an unchanged frame box from pending to error, then presses Retry connection and requires the app.
+
+## Physical feel
+
+`scenario physical-mode` selects each Feel in Settings, verifies the choice survives navigation,
+and exercises the shared controls at `/dev/physical`: pointer and Space depth, switch stretch,
+menu and dialog surfaces, an invalid field, silent keyboard and row activation, and the control
+sound switch. It repeats with reduced motion. The gallery also gives the owner a device check.
+
+`physical-chat` uses the isolated native fixture to stream a response and scroll the transcript;
+recycled rows must never replay a live entrance. `PHYSICAL_BASELINE=1` selects Flat for trace comparisons.
+
+The `chat-draft-context-strip` scenario checks the flat branch picker for external branches, then creates an app worktree from release, reloads, checks its recorded parent and fixed lane gutter, and selects that branch. Parent persistence uses migration 35; the picker never infers ancestry from Git.

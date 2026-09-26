@@ -152,7 +152,7 @@ export function WorkspaceEditRecoveryDialog() {
               the workspace was restored.
             </DialogDescription>
           </DialogHeader>
-          <ul className='bg-muted text-2xs grid max-h-40 gap-1 overflow-auto rounded-lg p-3 font-mono'>
+          <ul className='bg-muted text-2xs grid max-h-40 gap-1 overflow-auto overscroll-contain rounded-lg p-3 font-mono'>
             {recovery?.unrecoveredPaths.map((path) => (
               <li key={path}>{path}</li>
             ))}

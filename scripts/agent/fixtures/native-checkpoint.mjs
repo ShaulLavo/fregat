@@ -23,6 +23,8 @@ let turnNumber = 0
 let conversationTurns = 0
 let threadCwd = process.cwd()
 const held = new Set()
+// Conversation turns, oldest first, so a rewind can list and drop them.
+const turns = []
 const record = (entry) => appendFileSync(join(root, 'native.jsonl'), `${JSON.stringify(entry)}\n`)
 const send = (message) => process.stdout.write(`${JSON.stringify(message)}\n`)
 const control = () => JSON.parse(readFileSync(join(root, 'checkpoint-control.json'), 'utf8'))
@@ -114,6 +116,7 @@ function startTurn(message) {
   }
 
   conversationTurns += 1
+  turns.push(turnId)
   const settings = control()
   const refused = applyTurnEdits(settings)
   record({ event: 'conversation-turn', pid: process.pid, turnId, refused })
@@ -176,6 +179,8 @@ function result(message) {
       return { data: [], nextCursor: null }
     case 'skills/list':
       return { data: [] }
+    case 'thread/turns/list':
+      return { data: turns.toReversed().map((id) => ({ id })), nextCursor: null }
     case 'turn/interrupt':
       for (const turnId of held) {
         held.delete(turnId)
@@ -190,9 +195,21 @@ function result(message) {
   }
 }
 
+/** Drops the turn and everything after it, after `revertDelayMs` so a caller can watch it run. */
+function revert(message) {
+  const index = turns.indexOf(message.params?.beforeTurnId)
+  if (index >= 0) turns.splice(index)
+  record({ event: 'revert', pid: process.pid, beforeTurnId: message.params?.beforeTurnId })
+  setTimeout(
+    () => send({ id: message.id, result: { thread: thread() } }),
+    control().revertDelayMs ?? 0,
+  )
+}
+
 function handle(message) {
   if (message.id === undefined) return
   if (message.method === 'turn/start') return startTurn(message)
+  if (message.method === 'thread/revert') return revert(message)
 
   const answer = result(message)
   if (answer !== undefined) return send({ id: message.id, result: answer })

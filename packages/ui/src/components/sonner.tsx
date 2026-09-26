@@ -1,15 +1,10 @@
 import type { CSSProperties } from 'react'
-import {
-  CheckCircleIcon,
-  InfoIcon,
-  WarningCircleIcon,
-  WarningIcon,
-  XIcon,
-} from '@phosphor-icons/react'
+import { CheckCircleIcon, InfoIcon, WarningIcon, XIcon } from '@phosphor-icons/react'
 import { Toaster as Sonner, type ToasterProps } from 'sonner'
 
 import { buttonVariants } from './button-variants'
 import { Spinner } from '@workspace/ui/components/spinner'
+import { ToastErrorIcon } from '@workspace/ui/components/toast-error-icon'
 import { cn } from '@workspace/ui/lib/utils'
 
 type ToasterStyle = CSSProperties & Record<`--${string}`, string>
@@ -20,7 +15,7 @@ const TOASTER_STYLE = { '--width': '380px' } satisfies ToasterStyle
 
 const TOAST_ICONS = {
   close: <XIcon />,
-  error: <WarningCircleIcon className='text-destructive' weight='fill' />,
+  error: <ToastErrorIcon />,
   info: <InfoIcon className='text-info' weight='fill' />,
   loading: <Spinner />,
   success: <CheckCircleIcon className='text-success' weight='fill' />,

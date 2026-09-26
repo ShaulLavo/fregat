@@ -142,6 +142,8 @@ export const worktreeLifecycleEntries = {
   lifecycle: worktreeLifecycleSchema,
   operationId: v.nullable(commandIdSchema),
   baseWorktreeId: v.nullable(worktreeIdSchema),
+  /** Source branch recorded at creation; unknown for external or detached sources. */
+  baseBranch: v.optional(v.nullable(text)),
   baseCommit: v.nullable(text),
   headCommit: v.nullable(text),
   metadataVersion: count,
@@ -158,6 +160,7 @@ export const worktreeProvisioningSchema = v.object({
   worktreeId: worktreeIdSchema,
   baseWorktreeId: worktreeIdSchema,
   projectId: projectIdSchema,
+  baseBranch: v.optional(v.nullable(text)),
   baseCommit: text,
   branch: text,
   path: v.string(),

@@ -25,12 +25,14 @@ import { sseResponse, toSse } from '../sse'
 import type { GitService } from './service'
 import { GitWorktreeService } from './worktrees'
 import { GitHistory } from './history'
+import { errorSummary, recordRequestWarning } from '../observability/logging'
 
 export function gitRoutes(
   git: GitService,
   commitMessages: CommitMessageGenerator,
   options: {
     resolveBaseCommit?: (path: string) => Promise<string | null>
+    worktreeBaseBranches?: () => Promise<ReadonlyMap<string, string | null>>
     refreshMetadata?: (path: string) => Promise<void>
     submoduleMode?: (path: string) => Promise<WorktreeSubmoduleMode>
     /** Registers a finished clone as a project; returns its id. */
@@ -85,9 +87,24 @@ export function gitRoutes(
           query: gitBranchDiffQuerySchema,
         },
       )
-      .get('/worktrees', ({ query }) => worktrees.list(query.path), {
-        query: gitPathQuerySchema,
-      })
+      .get(
+        '/worktrees',
+        async ({ query }) => {
+          const [entries, baseBranches] = await Promise.all([
+            worktrees.list(query.path),
+            readBaseBranches(options.worktreeBaseBranches),
+          ])
+          return entries.map((worktree) => ({
+            ...worktree,
+            // Managed branches are created as worktree/<id>; the path can later hold another branch.
+            baseBranch:
+              worktree.branch === `worktree/${worktree.worktreeId}`
+                ? (baseBranches?.get(worktree.absolutePath) ?? null)
+                : null,
+          }))
+        },
+        { query: gitPathQuerySchema },
+      )
       .post('/stage', ({ body }) => git.stage(body), {
         body: gitPathsBodySchema,
       })
@@ -180,4 +197,17 @@ export function gitRoutes(
         body: gitCreatePullRequestBodySchema,
       }),
   )
+}
+
+// Base branches only draw the lane gutter; the worktree list stays up without them.
+async function readBaseBranches(
+  read: (() => Promise<ReadonlyMap<string, string | null>>) | undefined,
+) {
+  if (!read) return null
+  try {
+    return await read()
+  } catch (error) {
+    recordRequestWarning('worktree base branches unavailable', { error: errorSummary(error) })
+    return null
+  }
 }

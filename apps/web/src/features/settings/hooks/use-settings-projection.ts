@@ -2,7 +2,7 @@ import { resolveThemeSettings } from '@workspace/contracts'
 import { useSystemColorMode } from '@/features/settings/hooks/use-system-color-mode'
 import { useSettingsIntentStore } from '@/features/settings/state/intent-store'
 import type { QueryClient } from '@tanstack/react-query'
-import { useSettingsOwner } from '@/features/settings/hooks/use-settings-owner'
+import { useSettingsOwner } from '@/lib/settings-owner/hooks/use-settings-owner'
 import {
   projectSettings,
   type SettingsProjection,

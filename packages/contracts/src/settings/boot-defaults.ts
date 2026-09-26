@@ -11,6 +11,14 @@ export type WorkbenchDensity = (typeof WORKBENCH_DENSITIES)[number]
 
 export const DEFAULT_WORKBENCH_DENSITY: WorkbenchDensity = 'compact'
 
+export const WORKBENCH_FEELS = ['flat', 'seam', 'brisk', 'relaxed', 'playful'] as const
+export type WorkbenchFeel = (typeof WORKBENCH_FEELS)[number]
+export const DEFAULT_WORKBENCH_FEEL: WorkbenchFeel = 'flat'
+
+export function isWorkbenchFeel(value: unknown): value is WorkbenchFeel {
+  return WORKBENCH_FEELS.some((feel) => feel === value)
+}
+
 export const COLOR_THEME_MODES = ['dark', 'light', 'system'] as const
 
 export const DEFAULT_COLOR_THEME: (typeof COLOR_THEME_MODES)[number] = 'system'

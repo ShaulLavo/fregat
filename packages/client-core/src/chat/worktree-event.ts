@@ -28,6 +28,7 @@ export function projectWorktreeEvent(
       setup: payload.setup ?? base.setup,
       operationId: payload.operationId,
       baseCommit: payload.baseCommit,
+      baseBranch: payload.baseBranch ?? null,
       baseWorktreeId: payload.baseWorktreeId,
       pathKind: 'id-derived',
       lifecycle: {
@@ -81,6 +82,7 @@ export function projectWorktreeEvent(
   return {
     ...held,
     ownership,
+    baseBranch: event.type === 'worktree.released' ? null : held.baseBranch,
     lifecycle,
     operationId: 'operationId' in lifecycle ? lifecycle.operationId : null,
     headCommit: event.type === 'worktree.created' ? event.payload.headCommit : held.headCommit,
@@ -99,6 +101,7 @@ function registeredWorktree(
     id: payload.worktreeId,
     operationId: null,
     lifecycle: { state: 'ready' },
+    baseBranch: null,
     baseWorktreeId: null,
     baseCommit: null,
     headCommit: null,

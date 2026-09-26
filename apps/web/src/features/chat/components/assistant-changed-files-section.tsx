@@ -95,7 +95,7 @@ export function AssistantChangedFilesSection({ summary }: { summary: ChatTurnDif
             )}
           />
           <span className='text-muted-foreground section-label truncate'>
-            <span className='tabular-nums'>{files.length}</span>
+            <span className='font-mono tabular-nums'>{files.length}</span>
             {files.length === 1 ? ' changed file' : ' changed files'}
           </span>
           {hasNonZeroChatTurnDiffStat(summaryStat) ? (
@@ -166,7 +166,7 @@ export function AssistantChangedFilesSection({ summary }: { summary: ChatTurnDif
               <span className='inline-flex items-center gap-1' key={scope.label}>
                 {index > 0 ? <span aria-hidden='true'>·</span> : null}
                 <span className='text-foreground font-mono'>{scope.label}</span>
-                <span className='tabular-nums'>{scope.fileCount}</span>
+                <span className='font-mono tabular-nums'>{scope.fileCount}</span>
                 <span>{scope.fileCount === 1 ? 'file' : 'files'}</span>
               </span>
             ))}

@@ -68,7 +68,7 @@ export function SshHostList({
     <div
       {...list.containerProps}
       aria-label='SSH hosts'
-      className='focus-ring-inset max-h-48 overflow-y-auto'
+      className='focus-ring-inset max-h-48 overflow-y-auto overscroll-contain'
     >
       {matching.map((host) => (
         <SshHostOption

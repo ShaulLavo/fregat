@@ -1,10 +1,7 @@
-import { Button } from '@workspace/ui/components/button'
+import { Tabs, TabsList, TabsTab } from '@workspace/ui/components/tabs'
 
 import { selectSettingsScope, useSettingsScope, type SettingsScope } from '../state/scope-store'
 import { selectSettingsView } from '../state/view-store'
-
-const TAB_CLASS =
-  'text-muted-foreground hover:text-foreground aria-selected:bg-accent aria-selected:text-accent-foreground'
 
 /**
  * User, Workspace and Defaults. There is no Folder tab: this app holds exactly
@@ -24,52 +21,43 @@ export function ScopeTabs({
   const scope = useSettingsScope()
 
   return (
-    <div className='flex min-w-0 items-center gap-1' role='tablist'>
-      <ScopeTab active={scope === 'user'} label='User' scope='user' />
-      <ScopeTab
-        active={scope === 'workspace'}
-        // Gated on a folder being open rather than hidden: the tab is real, it
-        // just has no file to write to until there is a workspace.
-        disabledReason={hasWorkspace ? null : 'Open a folder to use workspace settings'}
-        label='Workspace'
-        scope='workspace'
-      />
-      <ScopeTab
-        active={scope === 'default'}
-        disabledReason={hasDefaults ? null : 'Open Settings in a tab to read the defaults'}
-        label='Defaults'
-        scope='default'
-      />
-    </div>
+    <Tabs value={scope} onValueChange={(next: SettingsScope) => selectScope(next)}>
+      <TabsList aria-label='Settings scope'>
+        <ScopeTab label='User' scope='user' />
+        <ScopeTab
+          // Gated on a folder being open rather than hidden: the tab is real, it
+          // just has no file to write to until there is a workspace.
+          disabledReason={hasWorkspace ? null : 'Open a folder to use workspace settings'}
+          label='Workspace'
+          scope='workspace'
+        />
+        <ScopeTab
+          disabledReason={hasDefaults ? null : 'Open Settings in a tab to read the defaults'}
+          label='Defaults'
+          scope='default'
+        />
+      </TabsList>
+    </Tabs>
   )
 }
 
+function selectScope(scope: SettingsScope) {
+  selectSettingsScope(scope)
+  if (scope === 'default') selectSettingsView('json')
+}
+
 function ScopeTab({
-  active,
   disabledReason = null,
   label,
   scope,
 }: {
-  active: boolean
   disabledReason?: string | null
   label: string
   scope: SettingsScope
 }) {
   return (
-    <Button
-      aria-selected={active}
-      className={TAB_CLASS}
-      disabled={disabledReason !== null}
-      onClick={() => {
-        selectSettingsScope(scope)
-        if (scope === 'default') selectSettingsView('json')
-      }}
-      role='tab'
-      size='sm'
-      title={disabledReason ?? undefined}
-      variant='ghost'
-    >
+    <TabsTab disabled={disabledReason !== null} title={disabledReason ?? undefined} value={scope}>
       {label}
-    </Button>
+    </TabsTab>
   )
 }

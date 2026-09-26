@@ -1,9 +1,9 @@
 import { usePushPending } from '@/features/git/hooks/use-push-pending'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import { useMutation } from '@tanstack/react-query'
-import { toast } from 'sonner'
 
 import { admitGitWrite } from '@/features/git/utils/admit-mutation'
+import { announceOutcome } from '@/features/git/utils/announce-outcome'
 import { pushAndOpenPullRequest } from '@/features/git/utils/api'
 import { invalidateWorkspace } from '@/features/git/utils/invalidate-workspace'
 import { gitRemoteMutationScope, mutationKeys } from '@/features/git/utils/mutation-keys'
@@ -23,9 +23,7 @@ export function usePushAndOpenPullRequestMutation(rootPath: string, label: strin
     onSuccess: async (result, _input, _onMutateResult, { client }) => {
       // Upstream, ahead count and the pull request all moved.
       await invalidateWorkspace(client, rootPath)
-      const outcome = shipOutcome(result, label)
-      if (outcome.tone === 'error') toast.error(outcome.title, { description: outcome.detail })
-      else toast.success(outcome.title, { description: outcome.detail })
+      announceOutcome(shipOutcome(result, label))
     },
   })
   return { ...mutation, isPending }

@@ -6,10 +6,11 @@ import {
   readTimelineReload,
 } from '@/features/chat/state/timeline-reload'
 import { addLifecycleFlush } from '@/lib/lifecycle-flush'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
-import { Button } from '@workspace/ui/components/button'
 import { cn } from '@workspace/ui/lib/utils'
-import { ArrowDownIcon } from '@phosphor-icons/react'
+import { TailJumpButton } from '@workspace/ui/patterns/tail-jump-button'
+import { TickerNumber } from '@/components/ticker-number'
+import { useTimelineArrivals } from '@/features/chat/hooks/use-timeline-arrivals'
+import { useLiveEntrances } from '@/features/chat/hooks/use-live-entrances'
 import { useEffect, useLayoutEffect, useState, type Dispatch } from 'react'
 import type { VirtualListLayout } from '@workspace/ui/patterns/virtual-list'
 import type { ChatSession } from '@workspace/client-core/chat/types'
@@ -62,6 +63,7 @@ export function TimelineViewport({
   'use no memo' // Minimap and follow state read the virtualizer's mutable geometry.
   const { environmentId } = useChatTransport()
   const scrollElement = virtualizer.scrollElement
+  useLiveEntrances(scrollElement, items)
   // A disclosure keeps its row still until the row's new size has been measured.
   const [disclosureSettle, setDisclosureSettle] = useState<{
     disclosure: Element
@@ -70,6 +72,8 @@ export function TimelineViewport({
   const unmeasuredDisclosure = disclosureSettle?.measured
     ? null
     : (disclosureSettle?.disclosure ?? null)
+  const freeScrolling = scrollState.followMode === 'free-scrolling'
+  const arrivals = useTimelineArrivals(items, freeScrolling)
   const virtualItems = virtualizer.getVirtualItems()
   const contentHeight = virtualizer.getTotalSize()
   const viewportHeight = virtualizer.scrollRect?.height ?? 0
@@ -248,7 +252,8 @@ export function TimelineViewport({
       <AgentsPanel activities={session.activities} />
       <div
         aria-label='Messages'
-        className='app-scrollbar-thin focus-ring-inset h-full overflow-x-hidden overflow-y-auto overscroll-y-contain px-3 outline-none [scrollbar-gutter:stable] sm:px-5'
+        className='focus-ring-inset scroll-fade scroll-gutter data-pinned:scroll-pinned h-full overflow-x-hidden overflow-y-auto overscroll-y-contain px-3 outline-none sm:px-5'
+        data-pinned={scrollState.followMode === 'following-end' ? '' : undefined}
         ref={scrollRef}
         role='log'
         tabIndex={0}
@@ -277,27 +282,18 @@ export function TimelineViewport({
           onLoad={earlierPage.loadEarlier}
         />
       ) : null}
-      <Tooltip>
-        <TooltipTrigger
-          render={
-            <Button
-              aria-label='Scroll to latest message'
-              className={cn(
-                'bg-popover-solid absolute right-(--density-section-padding) bottom-(--density-section-padding) rounded-full shadow-md transition-opacity',
-                scrollState.followMode !== 'free-scrolling' && 'pointer-events-none opacity-0',
-              )}
-              size='icon'
-              tabIndex={scrollState.followMode === 'free-scrolling' ? 0 : -1}
-              type='button'
-              variant='outline'
-              onClick={() => dispatch({ type: 'jump-to-end' })}
-            >
-              <ArrowDownIcon aria-hidden='true' className='size-(--icon-size-sm)' />
-            </Button>
-          }
-        />{' '}
-        <TooltipContent>{'Scroll to latest message'}</TooltipContent>
-      </Tooltip>
+      <TailJumpButton
+        arrivals={arrivals}
+        className={cn(
+          'absolute right-(--density-section-padding) bottom-(--density-section-padding) transition-opacity',
+          !freeScrolling && 'pointer-events-none opacity-0',
+        )}
+        count={(value) => <TickerNumber value={value} />}
+        edge='end'
+        noun='message'
+        tabIndex={freeScrolling ? 0 : -1}
+        onJump={() => dispatch({ type: 'jump-to-end' })}
+      />
     </div>
   )
 }

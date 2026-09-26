@@ -80,7 +80,7 @@ export function DiagnosticPeek({ model, onClose, onOpenTarget, tabId }: Diagnost
       <div
         aria-label={`${model.severity} diagnostic`}
         className={cn(
-          'bg-popover-solid pointer-events-auto absolute max-h-[calc(100%-1rem)] w-96 max-w-[calc(100%-1rem)] overflow-y-auto rounded-lg p-3 text-sm shadow-md ring-1 ring-foreground/10',
+          'bg-popover-solid pointer-events-auto absolute overscroll-contain max-h-[calc(100%-1rem)] w-96 max-w-[calc(100%-1rem)] overflow-y-auto rounded-lg p-3 text-sm shadow-md ring-1 ring-foreground/10',
           !placement && 'invisible',
         )}
         data-diagnostic-peek=''

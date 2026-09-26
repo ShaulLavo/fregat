@@ -1,3 +1,4 @@
+import { playControlFeedback } from '@workspace/ui/patterns/feedback-layer'
 import * as React from 'react'
 import { ContextMenu as ContextMenuPrimitive } from '@base-ui/react/context-menu'
 
@@ -58,7 +59,7 @@ function ContextMenuContent({
         <ContextMenuPrimitive.Popup
           data-slot='context-menu-content'
           className={cn(
-            'z-50 max-h-(--available-height) min-w-36 origin-(--transform-origin) overflow-x-hidden overflow-y-auto rounded-lg text-popover-foreground shadow-md ring-1 ring-foreground/10 bg-popover-solid ease-out-strong data-open:animation-duration-(--duration-enter) data-closed:animation-duration-(--duration-exit) outline-none data-[side=bottom]:slide-in-from-top-2 data-[side=inline-end]:slide-in-from-left-2 data-[side=inline-start]:slide-in-from-right-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95',
+            'z-50 overscroll-contain max-h-(--available-height) min-w-36 origin-(--transform-origin) overflow-x-hidden overflow-y-auto rounded-lg text-popover-foreground shadow-md ring-1 ring-foreground/10 bg-popover-solid ease-out-strong data-open:animation-duration-(--duration-enter) data-closed:animation-duration-(--duration-exit) outline-none data-[side=bottom]:slide-in-from-top-2 data-[side=inline-end]:slide-in-from-left-2 data-[side=inline-start]:slide-in-from-right-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95',
             className,
           )}
           {...props}
@@ -104,6 +105,7 @@ function ContextMenuItem({
   return (
     <ContextMenuPrimitive.Item
       data-slot='context-menu-item'
+      data-feedback='tap'
       data-inset={inset}
       data-variant={variant}
       className={cn(
@@ -176,9 +178,13 @@ function ContextMenuCheckboxItem({
       )}
       checked={checked}
       {...props}
+      onCheckedChange={(value, details) => {
+        props.onCheckedChange?.(value, details)
+        if (!details.isCanceled) playControlFeedback('tick', details.event)
+      }}
     >
       <span className='pointer-events-none absolute right-2'>
-        <ContextMenuPrimitive.CheckboxItemIndicator>
+        <ContextMenuPrimitive.CheckboxItemIndicator data-slot='check-indicator'>
           <CheckIcon />
         </ContextMenuPrimitive.CheckboxItemIndicator>
       </span>
@@ -188,7 +194,16 @@ function ContextMenuCheckboxItem({
 }
 
 function ContextMenuRadioGroup({ ...props }: ContextMenuPrimitive.RadioGroup.Props) {
-  return <ContextMenuPrimitive.RadioGroup data-slot='context-menu-radio-group' {...props} />
+  return (
+    <ContextMenuPrimitive.RadioGroup
+      data-slot='context-menu-radio-group'
+      {...props}
+      onValueChange={(value, details) => {
+        props.onValueChange?.(value, details)
+        if (!details.isCanceled) playControlFeedback('tick', details.event)
+      }}
+    />
+  )
 }
 
 function ContextMenuRadioItem({
@@ -210,7 +225,7 @@ function ContextMenuRadioItem({
       {...props}
     >
       <span className='pointer-events-none absolute right-2'>
-        <ContextMenuPrimitive.RadioItemIndicator>
+        <ContextMenuPrimitive.RadioItemIndicator data-slot='check-indicator'>
           <CheckIcon />
         </ContextMenuPrimitive.RadioItemIndicator>
       </span>

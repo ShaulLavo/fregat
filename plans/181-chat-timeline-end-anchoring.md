@@ -89,9 +89,11 @@ library now owns.
 
 ## Relation to Plan 158
 
-[Plan 158](158-app-polish.md) item 1 (the "N new" pill and `VirtualList`'s `follow` prop) lands
-after this plan and builds on its options: TanStack owns "at the edge" and following, 158 adds the
-arrivals count and the pill, which replaces the chat's icon-only jump button.
+Plan 158 item 1 (the "N new" pill and `VirtualList`'s `follow` prop, `patterns/tail-follow.ts`)
+shipped first, in lane L1 (PR #30), and Plan 158 is closed. This plan moves "at the edge" and
+following onto TanStack's `isAtEnd` / `scrollEndThreshold` and `followOnAppend`; the tail-follow
+store keeps only the arrivals count and the pill. Holding the reader across a prepend is
+`anchorTo: 'end'` with stable keys.
 
 ## Verification
 

@@ -1,5 +1,5 @@
 import { bundledPalette, paletteColorsFor } from '@workspace/contracts'
-import { contrastFailures } from '@/features/settings/utils/palette-editing'
+import { contrastFailures } from '@workspace/client-core/themes/palette-editing'
 import { readdir } from 'node:fs/promises'
 import path from 'node:path'
 import { themeDocument } from '../../../../test/factories/theme-bundle'
@@ -97,6 +97,20 @@ test('switches every part by mode and retains concurrent customizations by varia
     operations: [{ kind: 'theme.reset', id: theme.id }],
   })
   expect(duplicate.data?.duplicate).toBe(true)
+
+  // The studio's Apply: one write that selects the theme and replaces its whole customization.
+  const replaced = await client.settings.write.post({
+    mutationId: 'theme-replace',
+    target: 'user',
+    operations: [
+      { kind: 'set', key: 'workbench.theme', value: theme },
+      { kind: 'theme.reset', id: theme.id, to: { dark: { material: { blur: 5 } } } },
+    ],
+  })
+  expect(replaced.error).toBeNull()
+  expect(replaced.data!.snapshot.values['workbench.theme.customizations'][theme.id]).toEqual({
+    dark: { material: { blur: 5 } },
+  })
 })
 
 test('round trips artwork into an empty library without the source machine', async ({ client }) => {

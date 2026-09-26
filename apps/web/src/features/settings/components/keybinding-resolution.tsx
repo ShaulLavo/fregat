@@ -15,7 +15,7 @@ export function KeybindingResolution({
       <summary className='cursor-pointer'>Shortcut resolution</summary>
       <ul
         aria-label='Shortcut resolution report'
-        className='mt-2 flex max-h-48 flex-col gap-2 overflow-y-auto'
+        className='mt-2 flex max-h-48 flex-col gap-2 overflow-y-auto overscroll-contain'
       >
         {report.map((entry) => (
           <li key={`${entry.bindingId}:${entry.reason}`}>
@@ -39,7 +39,7 @@ export function KeybindingResolution({
       <p className='mt-2'>Commands without a shortcut in this preset</p>
       <ul
         aria-label='Preset omissions'
-        className='mt-1 flex max-h-32 flex-col gap-1 overflow-y-auto'
+        className='mt-1 flex max-h-32 flex-col gap-1 overflow-y-auto overscroll-contain'
       >
         {omitted.map((command) => (
           <li key={command}>

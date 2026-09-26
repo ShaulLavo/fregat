@@ -69,6 +69,7 @@ import {
 import { documentKey } from '@/lib/documents/utils/identity'
 import { runMutation } from '@/lib/mutations/run'
 import { copyTextToClipboard } from '@/lib/clipboard'
+import { useStudioStore } from '@/lib/theme-studio/state/studio-store'
 import { historyRestoreMutationOptions } from '@/features/editor/state/history-mutations'
 import { adjacentHistoryState } from '@/features/editor/utils/history-navigation'
 import {
@@ -755,8 +756,17 @@ export const workspaceCommands = [
     icon: SwatchesIcon,
     run: ({ invocation, runtime }) =>
       transitionStart(
-        runtime.shell.showCommandPalette('bundle ', invocation.origin as FocusTargetToken | null),
+        runtime.shell.showCommandPalette('theme ', invocation.origin as FocusTargetToken | null),
       ),
+  }),
+  defineCommand({
+    ...workspaceCommandMetadata['workspace.openThemeStudio'],
+    icon: PaletteIcon,
+    run: ({ runtime }) => {
+      const studio = useStudioStore.getState()
+      studio.openStudio()
+      return focusIdStart(runtime, { kind: 'theme-studio' })
+    },
   }),
   defineCommand({
     ...workspaceCommandMetadata['workspace.selectWallpaper'],
@@ -1359,7 +1369,7 @@ export const workspaceCommands = [
     icon: PaletteIcon,
     run: ({ invocation, runtime }) =>
       transitionStart(
-        runtime.shell.showCommandPalette('theme ', invocation.origin as FocusTargetToken | null),
+        runtime.shell.showCommandPalette('code ', invocation.origin as FocusTargetToken | null),
       ),
   }),
   defineCommand({

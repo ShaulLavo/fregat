@@ -8,6 +8,7 @@ export type AppearanceValues = Pick<
   | 'editor.fontFamily'
   | 'workbench.colorTheme'
   | 'workbench.density'
+  | 'workbench.feel'
   | 'workbench.fontFamily'
   | 'workbench.surface.blur'
   | 'workbench.surface.contentOpacity'
@@ -47,6 +48,7 @@ export function applyAppearance(values: AppearanceValues, root: Root, prefersDar
   // The palette is not written here: it is a stylesheet, owned by
   // `applyPaletteStylesheet`, so the same root can carry both modes at once.
   root.setAttribute('data-density', values['workbench.density'])
+  root.setAttribute('data-feel', values['workbench.feel'])
 
   root.style.setProperty('--surface-opacity', `${values['workbench.surface.opacity']}%`)
   root.style.setProperty('--content-opacity', `${values['workbench.surface.contentOpacity']}%`)

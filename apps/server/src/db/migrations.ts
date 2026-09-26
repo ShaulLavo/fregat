@@ -39,10 +39,15 @@ export const platformMigrations: readonly Migration[] = [
   { version: 32, name: 'provider_usage_source', up: applyProviderUsageSource },
   { version: 33, name: 'terminal_lease_key', up: applyTerminalLeaseKey },
   { version: 34, name: 'terminal_session_offsets', up: applyTerminalSessionOffsets },
+  { version: 35, name: 'worktree_base_branch', up: applyWorktreeBaseBranch },
   { version: 36, name: 'provider_usage_import_requests', up: applyProviderUsageImportRequests },
   { version: 37, name: 'terminal_session_cleanup', up: applyTerminalSessionCleanup },
   { version: 38, name: 'provider_reset_credit_attempts', up: applyProviderResetCreditAttempts },
 ]
+
+function applyWorktreeBaseBranch(database: PlatformDatabase) {
+  database.run(sql`ALTER TABLE projection_worktrees ADD COLUMN base_branch TEXT`)
+}
 
 function applyTerminalSessionCleanup(database: PlatformDatabase) {
   database.run(sql`CREATE TABLE terminal_session_cleanup (session_id TEXT PRIMARY KEY NOT NULL)`)

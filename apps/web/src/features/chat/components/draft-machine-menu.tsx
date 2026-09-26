@@ -2,6 +2,7 @@ import { CaretDownIcon } from '@phosphor-icons/react'
 import type { EnvironmentId } from '@workspace/contracts'
 import { Button } from '@workspace/ui/components/button'
 import { Spinner } from '@workspace/ui/components/spinner'
+import { WidestLabel } from '@workspace/ui/components/widest-label'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -49,7 +50,9 @@ export function DraftMachineMenu({
             ) : (
               <Phase phase={current.phase} label={current.label} />
             )}
-            <span className='truncate'>{current.label}</span>
+            <WidestLabel labels={machines.map((machine) => machine.label)}>
+              {current.label}
+            </WidestLabel>
             <CaretDownIcon className='size-(--icon-size-sm) shrink-0 opacity-60' />
           </Button>
         }

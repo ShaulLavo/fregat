@@ -30,7 +30,7 @@ import { ViewToggle } from '@/features/settings/components/view-toggle'
 import { useHasWorkspace } from '@/features/settings/hooks/use-has-workspace'
 import { useSettingsActions } from '@/features/settings/hooks/use-settings-actions'
 import { useSettingsDisplay } from '@/features/settings/hooks/use-settings-display'
-import { useSettingsOwner } from '@/features/settings/hooks/use-settings-owner'
+import { useSettingsOwner } from '@/lib/settings-owner/hooks/use-settings-owner'
 import { SettingsOwnerProvider } from '@/features/settings/providers/owner-provider'
 import { useSettingsScope, writableSettingsScope } from '@/features/settings/state/scope-store'
 import { useSettingsView } from '@/features/settings/state/view-store'
@@ -133,7 +133,8 @@ export function SettingsPage({
   return (
     <ToolPane
       className='@container/settings h-full min-w-0'
-      bodyClassName='flex flex-col overflow-hidden'
+      bodyClassName='flex flex-col'
+      scroll={false}
       ref={setRootRef}
       tabIndex={-1}
       header={

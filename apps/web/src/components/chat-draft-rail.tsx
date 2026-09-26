@@ -140,7 +140,10 @@ export function ChatDraftRail({
   })
   if (archived || visible.length === 0) return null
   return (
-    <section aria-label='Recoverable drafts' className='max-h-48 shrink-0 overflow-y-auto px-1'>
+    <section
+      aria-label='Recoverable drafts'
+      className='max-h-48 shrink-0 overflow-y-auto overscroll-contain px-1'
+    >
       <p className='text-muted-foreground text-2xs px-2 py-1'>Drafts</p>
       <div
         {...list.containerProps}

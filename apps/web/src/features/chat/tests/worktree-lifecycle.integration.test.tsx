@@ -15,6 +15,7 @@ import { renderRailHarness } from '../../../../test/factories/rail-harness'
 import { executeDomainGit } from '../../../../test/factories/session-domain'
 import { expect, test } from '../../../../test/fixtures'
 import { renderWithProviders } from '../../../../test/render'
+import { holdToConfirm } from '../../../../test/hold'
 
 test('draft choices, shared chips and dirty worktree cleanup survive deletion and restart', async ({
   client,
@@ -134,9 +135,7 @@ test('draft choices, shared chips and dirty worktree cleanup survive deletion an
   await userEvent.click(screen.getByRole('button', { name: 'Discard changes…' }))
   const confirmation = await screen.findByRole('dialog', { name: 'Discard changes and remove' })
   await writeFile(path.join(managed.canonicalPath, 'ignored.txt'), 'Changed after confirmation\n')
-  await userEvent.click(
-    within(confirmation).getByRole('button', { name: 'Discard changes and remove' }),
-  )
+  holdToConfirm(within(confirmation).getByRole('button', { name: 'Discard changes and remove' }))
   await waitFor(async () => {
     const next = await harness.worktree(managedId)
     expect(next.lifecycle).toMatchObject({
@@ -147,7 +146,7 @@ test('draft choices, shared chips and dirty worktree cleanup survive deletion an
   expect(await screen.findByText('Changes need a new confirmation')).toBeInTheDocument()
   await userEvent.click(screen.getByRole('button', { name: 'Discard changes…' }))
   const renewed = await screen.findByRole('dialog', { name: 'Discard changes and remove' })
-  await userEvent.click(within(renewed).getByRole('button', { name: 'Discard changes and remove' }))
+  holdToConfirm(within(renewed).getByRole('button', { name: 'Discard changes and remove' }))
   await waitFor(async () =>
     expect((await harness.worktree(managedId)).lifecycle).toEqual({
       state: 'removed',

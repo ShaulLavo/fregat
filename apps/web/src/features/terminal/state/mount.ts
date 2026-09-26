@@ -25,6 +25,7 @@ import { reportError, toClientError } from '@/lib/client-error-taxonomy'
 import { fontStack } from '@/lib/fonts/utils/stack'
 import { DEFAULT_CODE_FONT } from '@workspace/contracts'
 import { UNFOCUSED_TERMINAL_CURSOR_STYLE } from '@/features/terminal/utils/appearance'
+import { playFeedback } from '@workspace/ui/patterns/feedback-layer'
 import { log } from '@/lib/client-logging'
 import { elapsedMs, nowMs } from '@workspace/utils/timing'
 
@@ -72,6 +73,7 @@ export function mountTerminal({
   let resizeDisposable: GhosttyWebGpuTerminalSubscription | null = null
   let scrollDisposable: GhosttyWebGpuTerminalSubscription | null = null
   let titleDisposable: GhosttyWebGpuTerminalSubscription | null = null
+  let bellDisposable: GhosttyWebGpuTerminalSubscription | null = null
   let socket: EdenServerSocket | null = null
   let disposeSocket: (() => void) | undefined
   let terminal: Terminal | null = null
@@ -119,6 +121,7 @@ export function mountTerminal({
       captureTimer = setTimeout(flushCapture, 250)
     })
     titleDisposable = terminal.on('title', (title) => onTitleChange(title))
+    bellDisposable = terminal.on('bell', () => playFeedback('bell', 'terminalBell'))
     await terminal.open(host)
     if (cancelled || signal.aborted) return
 
@@ -183,6 +186,7 @@ export function mountTerminal({
     resizeDisposable?.dispose()
     scrollDisposable?.dispose()
     titleDisposable?.dispose()
+    bellDisposable?.dispose()
     disposeSocket?.()
     terminal?.dispose()
     closeTerminalSocket(socket)

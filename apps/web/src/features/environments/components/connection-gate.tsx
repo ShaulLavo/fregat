@@ -12,8 +12,8 @@ import { clientForQueryClient, originForQueryClient } from '@/lib/environments/s
 import { selectServerConnection } from '@workspace/client-core/environments/state/store'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
 import { readEnvironmentDescriptor } from '@/lib/environments/utils/descriptor'
-import { toClientError } from '@/lib/client-error-taxonomy'
-import { InlineError } from '@/components/inline-error'
+import { clientErrorDescription, toClientError } from '@/lib/client-error-taxonomy'
+import { StatusFrame } from '@workspace/ui/patterns/status-frame'
 
 export function ConnectionGate({
   origin,
@@ -50,30 +50,23 @@ export function ConnectionGate({
   const refused = connection.phase === 'identity-drift' || connection.phase === 'protocol-mismatch'
   if (refused || (query.isError && !query.data && !known)) {
     return (
-      <div className='bg-background text-foreground grid min-h-svh place-content-center gap-4 p-8'>
-        <InlineError
-          message={
-            refused ? refusalMessage(connection, origin) : toClientError(query.error).message
-          }
-          title='Server connection'
-        />
-        <Button onClick={() => retry.mutate()} disabled={retry.isPending || query.isFetching}>
-          {retry.isPending || query.isFetching ? <Spinner /> : null} Retry connection
-        </Button>
-      </div>
+      <StatusFrame
+        action={
+          <Button onClick={() => retry.mutate()} disabled={retry.isPending || query.isFetching}>
+            {retry.isPending || query.isFetching ? <Spinner /> : null} Retry connection
+          </Button>
+        }
+        detail={
+          refused
+            ? refusalMessage(connection, origin)
+            : clientErrorDescription(toClientError(query.error))
+        }
+        title='Cannot connect to the server'
+        tone='error'
+      />
     )
   }
   if (known) return children
-  if (query.isPending) {
-    return (
-      <div
-        role='status'
-        className='bg-background text-foreground grid min-h-svh place-content-center gap-3'
-      >
-        <Spinner size='lg' className='mx-auto' />
-        <p className='text-sm'>Connecting to server…</p>
-      </div>
-    )
-  }
+  if (query.isPending) return <StatusFrame title='Connecting to server…' tone='pending' />
   return children
 }

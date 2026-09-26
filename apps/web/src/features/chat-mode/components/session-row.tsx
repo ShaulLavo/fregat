@@ -1,6 +1,7 @@
 import { SessionTitleStatus } from '@/features/chat-mode/components/session-title-status'
 import { useSessionWake } from '@/features/chat-mode/hooks/use-session-wake'
 import { ListRow } from '@workspace/ui/patterns/list-row'
+import { StatusDot } from '@workspace/ui/components/status-dot'
 import { useSessionListRow } from '@/features/chat-mode/hooks/use-session-list-row'
 import { SessionAttentionIndicator } from '@/features/chat-mode/components/session-attention-indicator'
 import { MachineChip } from '@/features/chat-mode/components/machine-chip'
@@ -102,14 +103,14 @@ export function SessionRow({ session }: { readonly session: SessionRailItem }) {
             </span>
             <SessionPullRequestBadge pullRequest={session.worktree.pullRequest} />
             {session.unread ? (
-              <span
+              <StatusDot
                 aria-label='Unread'
-                className='bg-info size-1.5 shrink-0 rounded-full'
                 role='status'
                 title='Finished since you last opened it'
+                tone='info'
               />
             ) : null}
-            <span className='text-muted-foreground text-3xs shrink-0 tabular-nums'>
+            <span className='text-muted-foreground text-3xs shrink-0 font-mono tabular-nums'>
               {formatChatRelativeTime(session.activityAt, nowMs)}
             </span>
           </span>
