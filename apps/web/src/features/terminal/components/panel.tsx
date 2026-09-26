@@ -46,6 +46,8 @@ import { isFocusOutsideElement } from '@/features/terminal/utils/focus-target'
 import { useSettingValue } from '@/hooks/use-setting-value'
 import { fontStack } from '@/lib/fonts/utils/stack'
 import { useUnavailableEnvironment } from '@/lib/environments/hooks/use-unavailable-environment'
+import { ConnectionNotice } from '@/features/terminal/components/connection-notice'
+import { useServerRestarting } from '@/lib/environments/hooks/use-server-restarting'
 import { FixWithAgentButton } from '@/components/fix-with-agent-button'
 
 export function TerminalPanel({
@@ -60,6 +62,7 @@ export function TerminalPanel({
 }: TerminalPanelProps) {
   const unavailable = useUnavailableEnvironment()
   const machineUnavailable = unavailable !== null
+  const serverRestarting = useServerRestarting()
   const queryClient = useQueryClient()
   const origin = originForQueryClient(queryClient)
   const focus = useFocusService()
@@ -347,15 +350,13 @@ export function TerminalPanel({
           }}
         />
       ) : null}
+      {/* Keyed: the socket reconnects just after a restart ends, so the warning waits afresh. */}
       {!socketConnected && (machineUnavailable || savedPaint || hasLivePaint) ? (
-        <p
-          role='status'
-          className='text-warning bg-popover-solid absolute right-0 bottom-0 px-2 py-1 text-xs'
-        >
-          {unavailable
-            ? `${unavailable.label ?? unavailable.name} is unreachable. Reconnect to use this terminal.`
-            : 'Terminal connection pending. Saved output is read-only.'}
-        </p>
+        <ConnectionNotice
+          key={serverRestarting ? 'restarting' : 'pending'}
+          restarting={serverRestarting}
+          unreachable={unavailable ? (unavailable.label ?? unavailable.name) : null}
+        />
       ) : null}
       {!machineUnavailable && terminalFailure?.identity === terminalMountIdentity ? (
         <div

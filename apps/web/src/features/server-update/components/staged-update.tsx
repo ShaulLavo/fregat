@@ -3,7 +3,6 @@ import { useIsMutating } from '@tanstack/react-query'
 import { selectServerConnection } from '@workspace/client-core/environments/state/store'
 import type { BusySession, ServerUpdate, SessionId } from '@workspace/contracts'
 import { Button } from '@workspace/ui/components/button'
-import { Spinner } from '@workspace/ui/components/spinner'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { cn } from '@workspace/ui/lib/utils'
 import { useState } from 'react'
@@ -35,15 +34,24 @@ export function StagedUpdate({ update, release }: { update: ServerUpdate; releas
   const [busy, setBusy] = useState<readonly BusySession[] | null>(null)
   const [marker, setMarker] = useState<RestartMarker | null>(null)
   const restarting = showsRestarting(update, marker, connection)
+  // From the click until the new server replaces this item; the dialog shows its own wait.
+  const spinning = restarting || (pending && !busy)
   let dialogError: string | null = null
   if (busy && restart.isError && !isRestartDisconnect(restart.error))
     dialogError = clientErrorDescription(toClientError(restart.error))
 
-  // The server pushes `restarting` itself; the marker covers a push lost to the exit.
+  // The server pushes `restarting` itself; a confirmed answer records it too, since the push can
+  // be lost to the exit and every surface reads it. A dropped request only guesses, so it stays local.
   function markRestarting(instance: string | null, confirmed: boolean) {
-    const latest = useEnvironmentsStore.getState().updateByOrigin[primaryServerOrigin()]
+    const environments = useEnvironmentsStore.getState()
+    const latest = environments.updateByOrigin[primaryServerOrigin()]
     setBusy(null)
-    if (latest) setMarker({ update: latest, instance, confirmed })
+    if (!latest) return
+    if (confirmed) {
+      environments.recordServerUpdate(primaryServerOrigin(), { ...latest, phase: 'restarting' })
+      return
+    }
+    setMarker({ update: latest, instance, confirmed })
   }
 
   function send(interrupt: SessionId[], onFailure: (error: Error) => void) {
@@ -82,33 +90,30 @@ export function StagedUpdate({ update, release }: { update: ServerUpdate; releas
       )}
       data-server-update={restarting ? 'restarting' : 'staged'}
     >
-      {restarting ? (
-        <>
-          <Spinner label='Restarting server' size='xs' />
-          <span className='text-muted-foreground text-xs'>Restarting…</span>
-        </>
-      ) : (
-        <>
-          <span className='text-xs'>Update available</span>
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  disabled={pending}
-                  onClick={requestRestart}
-                  size='xs'
-                  type='button'
-                  variant='secondary'
-                >
-                  {pending && !busy ? <Spinner /> : <ArrowClockwiseIcon data-icon='inline-start' />}
-                  Restart
-                </Button>
-              }
-            />
-            <TooltipContent>{restartTooltip(release)}</TooltipContent>
-          </Tooltip>
-        </>
-      )}
+      {restarting ? null : <span className='text-xs'>Update available</span>}
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            // Busy, not disabled: a faded control reads as unavailable, and this one is working; clicks do nothing.
+            <Button
+              aria-busy={spinning}
+              disabled={pending && !spinning}
+              onClick={spinning ? undefined : requestRestart}
+              size='xs'
+              type='button'
+              variant='secondary'
+            >
+              <ArrowClockwiseIcon
+                className={cn(spinning && 'icon-spin')}
+                data-icon='inline-start'
+                data-restart-spinning={spinning ? '' : undefined}
+              />
+              {restarting ? 'Restarting…' : 'Restart'}
+            </Button>
+          }
+        />
+        <TooltipContent>{restartTooltip(release)}</TooltipContent>
+      </Tooltip>
       <RestartDialog
         busy={restarting ? null : busy}
         error={dialogError}

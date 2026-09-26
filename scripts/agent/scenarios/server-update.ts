@@ -35,7 +35,7 @@ async function completeTurn(root: string) {
 }
 
 /** Links `pending` the way `deploy --server` does, then signals the server the way it does. */
-async function stageRelease(server: IsolatedServer) {
+export async function stageRelease(server: IsolatedServer) {
   const release = join(server.productionRoot, 'releases', STAGED)
   await mkdir(release, { recursive: true })
   await symlink(release, join(server.productionRoot, 'pending'))

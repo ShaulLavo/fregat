@@ -190,6 +190,7 @@ import { wallpaperLibrary } from './wallpaper-library'
 import { wallpaperPalette } from './wallpaper-palette'
 import { themeBundlePalette } from './theme-bundle-palette'
 import { settingsColdLoad } from './settings-cold-load'
+import { serverRestart } from './server-restart'
 import { settingsDefaults } from './settings-defaults'
 import { projectMenu } from './project-menu'
 import { workspaceSwitch } from './workspace-switch'
@@ -486,6 +487,7 @@ export const scenarios: readonly Scenario[] = [
   settingsModuleFailure,
   projectMenu,
   workspaceSwitch,
+  serverRestart,
   sidebarSettingsButton,
   fontPicker,
   fontPickerHover,

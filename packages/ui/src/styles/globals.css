@@ -939,9 +939,18 @@
   animation: app-loader-spin 3.5s linear infinite;
 }
 
+/* A control's own icon turning while the action it names is under way. */
+@utility icon-spin {
+  animation: app-loader-spin 1.2s linear infinite;
+}
+
 /* Slow down rather than stop. A frozen spinner reads as a hung process, which
    is the opposite of what it is there to say. */
 @media (prefers-reduced-motion: reduce) {
+  .icon-spin {
+    animation-duration: 4s;
+  }
+
   .spinner-rings {
     animation: none;
   }
