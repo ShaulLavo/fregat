@@ -12,6 +12,7 @@ export const fileSystemKeys = {
   tree: (rootPath: string) => [...fileSystemKeys.trees(), rootPath] as const,
   treeDirectory: (rootPath: string, treePath: string, path: string) =>
     [...fileSystemKeys.tree(rootPath), 'directory', treePath, path] as const,
+  workspaceAddress: (path: string) => [...fileSystemKeys.all, 'workspace-address', path] as const,
 }
 
 export const appearanceKeys = {
@@ -64,8 +65,9 @@ export const gitKeys = {
 
 export const documentSymbolKeys = {
   all: ['document-symbols'] as const,
-  document: (rootPath: string, path: string, contentRevision: string) =>
-    [...documentSymbolKeys.all, rootPath, path, contentRevision] as const,
+  /** `flat` rows (the palette's `@`) and the nested `tree` (breadcrumbs) are different answers. */
+  document: (rootPath: string, path: string, contentRevision: string, shape: 'flat' | 'tree') =>
+    [...documentSymbolKeys.all, shape, rootPath, path, contentRevision] as const,
 }
 
 export const providerQueryKeys = {
