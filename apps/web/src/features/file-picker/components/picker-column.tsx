@@ -9,9 +9,18 @@ import { isDirectoryEntry } from '@/lib/file-system-types'
 import { ColumnLoading } from '@/features/file-picker/components/column-loading'
 import { ColumnRow } from '@/features/file-picker/components/column-row'
 import { directoryQueryOptions } from '@/features/file-picker/utils/directory-query'
-import type { FilePickerIconMode, FilePickerMode } from '@/features/file-picker/utils/model'
+import type { FilePickerMode } from '@/features/file-picker/utils/model'
 import { filterPickerEntries } from '@/features/file-picker/utils/type-filter'
 import { sortFilePickerEntries } from '@/features/file-picker/utils/sort-entries'
+import { folderLabel } from '@/features/file-picker/utils/columns'
+import { WidthHandle } from '@workspace/ui/patterns/width-handle'
+import { useElementWidth } from '@/hooks/use-element-width'
+import { useFilePickerSessionActions } from '@/features/file-picker/hooks/use-file-picker-session-actions'
+import {
+  COLUMN_MAX_WIDTH_PX,
+  COLUMN_MIN_WIDTH_PX,
+} from '@/features/file-picker/utils/column-widths'
+import { fitColumnWidth } from '@/features/file-picker/utils/fit-column'
 
 const BY_NAME = { direction: 'ascending', key: 'name' } as const
 
@@ -23,13 +32,13 @@ export function PickerColumn({
   accept,
   active,
   column,
-  iconMode,
   isBusy,
   mode,
   path,
   selectFirst,
   selectedPath,
   showHidden,
+  width,
   onActivate,
   onCommit,
   onDirectoryIntent,
@@ -41,7 +50,6 @@ export function PickerColumn({
   accept?: readonly string[]
   active: boolean
   column: number
-  iconMode: FilePickerIconMode
   isBusy: boolean
   mode: FilePickerMode
   path: string
@@ -49,6 +57,8 @@ export function PickerColumn({
   selectFirst: boolean
   selectedPath: string | null
   showHidden: boolean
+  /** Pixels the user dragged this depth to; null is the default width. */
+  width: number | null
   onActivate: (column: number) => void
   onCommit: (entry: FsEntry) => void
   onDirectoryIntent: (path: string) => void
@@ -63,6 +73,8 @@ export function PickerColumn({
     BY_NAME,
   )
   const containerRef = useRef<HTMLDivElement>(null)
+  const [columnRef, measuredWidth] = useElementWidth<HTMLDivElement>()
+  const { resizeColumn } = useFilePickerSessionActions()
   const virtualRef = useRef<VirtualListHandle>(null)
   const find = (id: string) => entries.find((entry) => entry.path === id)
   const list = useListbox({
@@ -111,10 +123,23 @@ export function PickerColumn({
     if (selectFirst && selectedPath === null && first) selectFirstEntry(first)
   }, [first, selectFirst, selectedPath])
 
+  function fitToNames() {
+    const scroller = containerRef.current
+    const fitted = scroller
+      ? fitColumnWidth(
+          scroller,
+          entries.map((entry) => entry.name),
+        )
+      : null
+    if (fitted !== null) resizeColumn(column, fitted)
+  }
+
   return (
     <div
       className='relative flex h-full w-(--picker-column-width) shrink-0 flex-col'
       data-picker-column-folder={path}
+      ref={columnRef}
+      style={width === null ? undefined : { width }}
     >
       {query.isPending ? <ColumnLoading /> : null}
       {query.isError ? (
@@ -126,7 +151,7 @@ export function PickerColumn({
       <VirtualList
         {...list.containerProps}
         activeIndex={list.activeIndex}
-        aria-label={`${path.split('/').at(-1) || 'Root'} folder`}
+        aria-label={`${folderLabel(path)} folder`}
         className='focus-ring-inset absolute inset-0 outline-none'
         data-picker-column={column}
         getKey={(entry) => entry.path}
@@ -136,7 +161,6 @@ export function PickerColumn({
           <ColumnRow
             accept={accept}
             entry={entry}
-            iconMode={iconMode}
             isBusy={isBusy}
             mode={mode}
             rowProps={list.rowProps(entry.path)}
@@ -149,6 +173,14 @@ export function PickerColumn({
         tabIndex={active ? 0 : -1}
         onFocus={() => onActivate(column)}
         onKeyDown={handleKeyDown}
+      />
+      <WidthHandle
+        label={`Resize ${folderLabel(path)} column`}
+        max={COLUMN_MAX_WIDTH_PX}
+        min={COLUMN_MIN_WIDTH_PX}
+        width={width ?? measuredWidth ?? 0}
+        onFit={fitToNames}
+        onResize={(next) => resizeColumn(column, next)}
       />
     </div>
   )

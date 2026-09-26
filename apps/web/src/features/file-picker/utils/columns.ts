@@ -6,8 +6,9 @@ import {
   type FilePickerMode,
 } from '@/features/file-picker/utils/model'
 
-/** The column narrower than this does not fit beside the places and the preview. */
-const COLUMNS_MIN_WIDTH = 520
+// Below the browsing pane's minimum (BROWSE_MIN_PX), so dragging panes never flips columns to a
+// list; only a phone-narrow dialog is too tight for a column.
+const COLUMNS_MIN_WIDTH = 300
 
 export type PickerViewSetting = 'auto' | 'columns' | 'list' | 'icons'
 export type PickerView = 'columns' | 'list' | 'icons'
@@ -30,6 +31,11 @@ export function shownPickerView(
   if (view === 'list' || searching) return 'list'
   if (view === 'icons') return 'icons'
   return width !== null && width < COLUMNS_MIN_WIDTH ? 'list' : 'columns'
+}
+
+/** A column's folder as its name; the root has none. */
+export function folderLabel(path: string) {
+  return path.split('/').at(-1) || 'Root'
 }
 
 /** The selection in each column, starting with the current folder's. */

@@ -662,15 +662,15 @@ describe('workspace edit transactions', () => {
     const tree = await fixture.service.tree('', 10)
     expect(tree.entries.some((entry) => entry.path.startsWith('journals-visible'))).toBe(false)
 
-    await fixture.service.openWorkspaceRoot({ generation: 1, path: '' })
-    await waitForIndexReady(fixture.service)
-    expect(fixture.service.workspaceIndex?.get('journals-visible')).toBeUndefined()
-
-    const matches = await collectSearchMatches(fixture.service, 'journal-exclusion-after')
-    expect(matches).toEqual([])
-
+    // The project stream holds the root's index.
     const stream = await startEvents(fixture.service)
     try {
+      await waitForIndexReady(fixture.service)
+      expect(fixture.service.workspaceIndex('')?.get('journals-visible')).toBeUndefined()
+
+      const matches = await collectSearchMatches(fixture.service, 'journal-exclusion-after')
+      expect(matches).toEqual([])
+
       fixture.service.changes.emit({ path: 'journals-visible/leak', type: 'created' })
       fixture.service.changes.emit({ path: 'ordinary.txt', type: 'created' })
       expect(await nextEvent(stream.events)).toMatchObject({ path: 'ordinary.txt' })
@@ -2383,8 +2383,8 @@ async function collectSearchMatches(service: FileSystemService, query: string) {
 
 async function waitForIndexReady(service: FileSystemService) {
   for (let attempt = 0; attempt < 100; attempt += 1) {
-    if (service.workspaceIndex?.status().readiness === 'ready') return
+    if (service.workspaceIndex('')?.status().readiness === 'ready') return
     await delay(10)
   }
-  expect(service.workspaceIndex?.status().readiness).toBe('ready')
+  expect(service.workspaceIndex('')?.status().readiness).toBe('ready')
 }

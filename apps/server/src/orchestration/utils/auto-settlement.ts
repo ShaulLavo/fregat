@@ -18,6 +18,7 @@ export function autoSettlementAt(input: {
   readonly session: OrchestrationProjectedSession
   readonly pullRequest: WorktreePullRequest | null
   readonly pendingPullRequest: boolean
+  /** Background work or a schedule holds the provider process; settling would stop it. */
   readonly backgroundLive: boolean
   readonly now: number
   readonly rules: AutoSettleRules

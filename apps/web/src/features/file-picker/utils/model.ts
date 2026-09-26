@@ -7,7 +7,6 @@ import { formatSize } from '@/lib/path-formatters'
 
 export { basename, displayPath, formatSize } from '@/lib/path-formatters'
 import { compareFuzzyRankedTargets } from '@workspace/contracts'
-import { cn } from '@workspace/ui/lib/utils'
 
 export type EntriesLoadState = LoadState<FsEntry[]>
 
@@ -23,7 +22,6 @@ export type DirectoryFsEntry = FsEntry &
   )
 
 export type FilePickerMode = 'folder' | 'file'
-export type FilePickerIconMode = 'default' | 'vscode'
 
 export const ROOT_PATH = ''
 
@@ -145,18 +143,6 @@ export function compareSearchEntries(query: string) {
     compareFuzzyRankedTargets(entryRankTarget(a), entryRankTarget(b), query) || compareEntries(a, b)
 }
 
-export function tileTone(entry: FsEntry, selected: boolean) {
-  if (isDirectoryEntry(entry)) {
-    return cn('bg-warning/10 text-warning', selected && 'bg-warning/15')
-  }
-
-  if (isFileEntry(entry)) {
-    return cn('bg-info/10 text-info', selected && 'bg-info/15')
-  }
-
-  return 'bg-muted/30 text-muted-foreground'
-}
-
 export function kindLabel(entry: FsEntry) {
   if (entry.type === 'symlink' && entry.targetType === 'directory') {
     return 'Alias folder'
@@ -169,14 +155,6 @@ export function kindLabel(entry: FsEntry) {
   if (entry.type === 'symlink') return 'Alias'
 
   return 'Other'
-}
-
-export function fileExtension(name: string) {
-  const index = name.lastIndexOf('.')
-  if (index <= 0) return ''
-  if (index === name.length - 1) return ''
-
-  return name.slice(index + 1, index + 5)
 }
 
 export function formatSizeLabel(entry: FsEntry) {

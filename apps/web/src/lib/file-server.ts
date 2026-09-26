@@ -71,9 +71,7 @@ type DeleteResult = {
 }
 
 type OpenWorkspaceRootResult = {
-  entry?: Omit<WorkspaceRootEntry, 'path'> & { path: FilesystemPath }
-  status: 'opened' | 'superseded'
-  workspaceIndex: NonNullable<ServerInfo['workspaceIndex']>
+  entry: Omit<WorkspaceRootEntry, 'path'> & { path: FilesystemPath }
 }
 
 export type RecentEntriesOptions = {
@@ -249,6 +247,36 @@ export async function fetchFile(
   }
 }
 
+/** The first `maxBytes` of a text file, for a preview; a binary file fails with FILE_IS_BINARY. */
+export async function fetchFileHead(
+  path: string,
+  maxBytes: number,
+  signal: AbortSignal,
+  client: Client,
+) {
+  return observeClientOperation(
+    {
+      ...clientLogContext(client),
+      action: 'fs.head',
+      area: 'fs',
+      maxBytes,
+      method: 'GET',
+      path,
+      route: '/fs/head',
+      signal,
+    },
+    async () => {
+      const response = await client.fs.head.get({
+        query: { maxBytes, path },
+        fetch: { signal },
+      })
+      if (response.error) throw createRpcError(response.error)
+      return response.data
+    },
+    (head) => ({ size: head.size, truncated: head.truncated }),
+  )
+}
+
 export async function fetchQuickOpenFiles(
   {
     path,
@@ -320,7 +348,8 @@ export async function writeFileContent(
       action: 'fs.write',
       area: 'fs',
       hasBaseVersion: writeOptions.baseVersion !== undefined && writeOptions.baseVersion !== null,
-      contentBytes: new Blob([content]).size,
+      // The server logs the byte count; a UTF-8 copy here would double a large save.
+      contentLength: content.length,
       hasExpectedMtime:
         writeOptions.expectedMtimeMs !== undefined && writeOptions.expectedMtimeMs !== null,
       method: 'POST',
@@ -384,7 +413,8 @@ export async function createFileContent(
       action: 'fs.create_file',
       ...identity,
       area: 'fs',
-      contentBytes: new Blob([content]).size,
+      // The server logs the byte count; a UTF-8 copy here would double a large save.
+      contentLength: content.length,
       method: 'POST',
       path,
       route: '/fs/create-file',
@@ -523,7 +553,7 @@ export async function fetchServerInfo(signal: AbortSignal, client: Client) {
     },
     (info) => ({
       homePath: info.homePath,
-      workspaceIndexReadiness: info.workspaceIndex?.readiness,
+      workspaceIndexCount: info.workspaceIndexes.length,
     }),
   )
 }
@@ -559,7 +589,6 @@ export async function statPath(path: FilesystemPath, signal: AbortSignal, client
 
 export async function openWorkspaceRootPath(
   path: FilesystemPath,
-  generation: number,
   signal: AbortSignal,
   client: Client,
 ) {
@@ -568,31 +597,21 @@ export async function openWorkspaceRootPath(
       ...clientLogContext(client),
       action: 'fs.open_workspace_root',
       area: 'fs',
-      generation,
       method: 'POST',
       path,
       route: '/fs/workspace-root',
       signal,
     },
     async () => {
-      const response = await client.fs['workspace-root'].post(
-        { generation, path },
-        { fetch: { signal } },
-      )
+      const response = await client.fs['workspace-root'].post({ path }, { fetch: { signal } })
 
       if (response.error) throw createRpcError(response.error)
 
-      const result = response.data
       return {
-        ...result,
-        entry: result.entry ? metadataFromResponse(result.entry) : undefined,
+        entry: metadataFromResponse(response.data.entry),
       } satisfies OpenWorkspaceRootResult
     },
-    (result) => ({
-      openStatus: result.status,
-      scanRoot: result.workspaceIndex.scanRoot,
-      workspaceIndexReadiness: result.workspaceIndex.readiness,
-    }),
+    (result) => ({ canonicalPath: result.entry.path }),
   )
 }
 

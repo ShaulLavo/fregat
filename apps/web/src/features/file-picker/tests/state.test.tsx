@@ -3,6 +3,11 @@ import { act, renderHook } from '@testing-library/react'
 
 import { expect, test } from '../../../../test/fixtures'
 import { useFilePickerSession } from '@/features/file-picker/state/picker'
+import {
+  COLUMN_MAX_WIDTH_PX,
+  COLUMN_MIN_WIDTH_PX,
+  fittedColumnWidth,
+} from '@/features/file-picker/utils/column-widths'
 import type { FsEntry, ServerInfo } from '@/lib/file-system-types'
 
 test('moves backward and forward through visited paths', () => {
@@ -124,16 +129,7 @@ function serverInfo(defaultPath: string): ServerInfo {
     watchDirectoryLimit: 200_000,
     systemRoot: '',
     watchEnabled: false,
-    workspaceIndex: {
-      entryCount: 0,
-      fileCount: 0,
-      pendingCreatedPathCount: 0,
-      readiness: 'ready',
-      scanRoot: null,
-      scanWarningCount: 0,
-      skippedEntryCount: 0,
-      staleEntryCount: 0,
-    },
+    workspaceIndexes: [],
     workspaceRoot: '',
   }
 }
@@ -149,3 +145,28 @@ function entry(path: string, type: 'directory' | 'file'): FsEntry {
     version: '1',
   }
 }
+
+test('column widths hold by depth for the session, clamped, and clear when it closes', () => {
+  const { result } = renderHook(() => useFilePickerSession(null))
+  act(() => result.current.initializeOpenSession(serverInfo('home')))
+  act(() => result.current.navigateTo('home/projects'))
+
+  expect(result.current.columnWidths.get(1)).toBeUndefined()
+  act(() => result.current.setColumnWidth(0, 300))
+  act(() => result.current.setColumnWidth(1, 5000))
+  expect(result.current.columnWidths.get(0)).toBe(300)
+  expect(result.current.columnWidths.get(1)).toBe(COLUMN_MAX_WIDTH_PX)
+  expect(result.current.columnWidths.get(2)).toBeUndefined()
+
+  act(() => result.current.navigateTo('home'))
+  expect(result.current.columnWidths.get(0)).toBe(300)
+
+  act(() => result.current.resetOpenSession())
+  expect(result.current.columnWidths.size).toBe(0)
+})
+
+test('a fitted column shows its widest name and its row chrome, within bounds', () => {
+  expect(fittedColumnWidth([80, 150.2, 40], 44)).toBe(195)
+  expect(fittedColumnWidth([], 44)).toBe(COLUMN_MIN_WIDTH_PX)
+  expect(fittedColumnWidth([4000], 44)).toBe(COLUMN_MAX_WIDTH_PX)
+})

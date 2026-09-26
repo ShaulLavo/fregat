@@ -1081,7 +1081,7 @@ describe('terminal service', () => {
     const socket = fakeSocket(root, '', 'detach-term')
     await routes.open(socket)
     routes.message(socket, Buffer.from('printf "PID:%s\\n" "$$"\n'))
-    await waitForTerminalOutput(socket.messages, 'PID:')
+    await waitForTerminalOutput(socket.messages, /PID:\d+/)
 
     await service.dispose()
 
@@ -1100,7 +1100,7 @@ describe('terminal service', () => {
       const socketA = fakeSocket(root, '', 'reattach-term')
       await routesA.open(socketA)
       routesA.message(socketA, Buffer.from('printf "PID:%s\\n" "$$"\n'))
-      await waitForTerminalOutput(socketA.messages, 'PID:')
+      await waitForTerminalOutput(socketA.messages, /PID:\d+/)
       const pid = terminalOutputText(socketA.messages).match(/PID:(\d+)/)?.[1]
       if (!pid) throw new TypeError('Missing pid marker in the first shell output')
 
@@ -1523,10 +1523,15 @@ function fakeSocket(
   }
 }
 
-async function waitForTerminalOutput(messages: readonly TerminalServerMessage[], text: string) {
+/** A string also matches the terminal's echo of the typed command; a marker the echo lacks does not. */
+async function waitForTerminalOutput(
+  messages: readonly TerminalServerMessage[],
+  text: string | RegExp,
+) {
   const deadline = Date.now() + 5_000
   while (Date.now() < deadline) {
-    if (terminalOutputText(messages).includes(text)) return
+    const output = terminalOutputText(messages)
+    if (typeof text === 'string' ? output.includes(text) : text.test(output)) return
 
     await Bun.sleep(25)
   }

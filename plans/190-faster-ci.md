@@ -83,6 +83,14 @@ change can reach. The targets are confirmed or revised by phase 0's measurements
    lockfile, or build them in one upfront job and hand them to the others as an artifact. Same for
    the search tools. Cache `node_modules` keyed by the lockfile if `bun install` still costs seconds
    after the cache restore.
+   Done 2026-09-26 (wave 2 lane B): the Editor's `packages/*/dist` is cached by `editor-ref` and Bun
+   version (12 MB; examples are no longer built); ghostty's build already took 0.5 s and stays;
+   `fd` and `rg` are pinned release binaries checked by SHA-256; the t3code reference is cached by
+   its pin and checked out only on a miss. The Bun cache is gone: restoring its 1.35 GB took 23 s,
+   while a cold `bun install` from the registry takes 4–5 s on a runner (measured with the cache
+   removed). Warm run 36249174610: `Setup` median 19 s (12–24 s), 180 runner-seconds per run,
+   down from 74 s and 744. That run also waited up to 1,906 s for a runner while other lanes' runs
+   held all 20, so queueing, not setup, is now the largest cost: phases 2 and 6.
 2. **Skip what a change cannot affect** (S). A path filter job decides what runs: plan- and doc-only
    PRs run format and the doc checks only; a change confined to one app skips the other app's test
    shards. Branch protection keeps one required status that summarises the rest, so skipped jobs

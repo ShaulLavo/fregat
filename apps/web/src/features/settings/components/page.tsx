@@ -210,7 +210,7 @@ export function SettingsPage({
                 {/* Clear a category supplied by an incoming address. */}
                 {selectedCategory ? (
                   <Button
-                    aria-label={`Show all settings, not just ${selectedCategory}`}
+                    aria-label={`Clear the ${selectedCategory} filter and show every setting`}
                     onClick={() => void navigation.setSettingsCategory(null)}
                     size='sm'
                     variant='secondary'

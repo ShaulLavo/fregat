@@ -10,6 +10,12 @@
   Second pass (design): [docs/search-view-results-in-editor.md](../docs/search-view-results-in-editor.md).
   First pass: [docs/search-view-rendering-findings.md](../docs/search-view-rendering-findings.md).
   Two owner questions (Q3, Q4) stand before implementation. Nothing here authorizes implementation.
+- Phases 1 and 1b done 2026-09-26 (wave 2, lane E1): Editor
+  [singapore#40](https://github.com/ShaulLavo/singapore/pull/40). The unfocused caret is drawn in the
+  next frame (still visible), padding is read once per element, and the viewport origin waits for the
+  first size. Broad wheel-fast on a production build, four interleaved traces each on a shared machine:
+  busy 2,206 → 1,814 ms median, long tasks 20 → 8 median (range 1–18). What remains per open is the
+  layout read in `measureInitialViewport`.
 - Planned at: Platform `d5a901726`, 2026-09-26. Researched at Platform `c130dd35a`, Editor `74e76be`;
   second pass at Platform `4c78266f8`, Editor `74e76be`, Zed `933d8d9`, VS Code `90da900128e`; third
   pass at Platform `e04c94271`, Editor `860f861`, Zed `933d8d9`.
@@ -317,7 +323,7 @@ Phases 1, 1b, 2 and 3 stand on their own and can ship any time.
     [results in the editor § 7.8](../docs/search-view-results-in-editor.md)).
   - Q4 = B drops E5. Q4 = C drops E5 and R2 turns on `wordWrap`.
 
-1. **Grammar signature memo** (S, Editor: `packages/tree-sitter/src/treeSitter/workerClient.ts`).
+1. **Done (singapore#40).** **Grammar signature memo** (S, Editor: `packages/tree-sitter/src/treeSitter/workerClient.ts`).
    Compute `languageDescriptorSignature` once per descriptor object (a `WeakMap`) and leave `wasmUrl`
    out of the string in favour of an identity check. Test: registering one descriptor twice stringifies
    once. Proof: the first pass's probe counters fall to one call per language. Every editor open
@@ -326,7 +332,7 @@ Phases 1, 1b, 2 and 3 stand on their own and can ship any time.
    `hooks/use-result-scroll-position.ts`). Take the offset from the scroll event without reading layout,
    and find the anchor row by binary search. The sidebar list keeps using it after R2. Proof: `trace` of
    the sidebar fling loses the 83 ms; `search-type-delete` still restores position.
-   1b. **No forced layout on open for an unfocused editor** (S, Editor:
+   1b. **Done (singapore#40).** **No forced layout on open for an unfocused editor** (S, Editor:
    `virtualization/virtualizedTextViewHighlights.ts` `renderCaret`,
    `virtualization/virtualizedTextViewHelpers.ts` `scrollElementPadding`,
    `virtualization/scrollViewport.ts` `synchronizeOrigin`).

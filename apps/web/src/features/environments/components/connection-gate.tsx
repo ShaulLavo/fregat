@@ -36,24 +36,32 @@ export function ConnectionGate({
     retry: false,
   })
   const machine = connections.machines.find((machine) => machine.origin === origin)
+  const drifted = connection.phase === 'identity-drift'
+  async function reconnect() {
+    const primary = origin === primaryServerOrigin()
+    if (drifted && primary) return connections.trustPrimary()
+    if (drifted && machine) return connections.trustMachine(machine.name)
+    if (primary) return connections.retryPrimary()
+    if (machine) return connections.retryMachine(machine.name)
+  }
   const retry = useMutation({
     mutationKey: environmentMutationKeys.machine('connect', machine?.name ?? '@primary'),
     scope: { id: `environment-retry:${origin}` },
     mutationFn: async () => {
-      if (origin === primaryServerOrigin()) await connections.retryPrimary()
-      else if (machine) await connections.retryMachine(machine.name)
+      await reconnect()
       await query.refetch()
     },
   })
   // Only a completed handshake admits the retained tree; persisted descriptors start at generation zero.
   if (known && connection.generation > 0) return children
-  const refused = connection.phase === 'identity-drift' || connection.phase === 'protocol-mismatch'
+  const refused = drifted || connection.phase === 'protocol-mismatch'
   if (refused || (query.isError && !query.data && !known)) {
     return (
       <StatusFrame
         action={
           <Button onClick={() => retry.mutate()} disabled={retry.isPending || query.isFetching}>
-            {retry.isPending || query.isFetching ? <Spinner /> : null} Retry connection
+            {retry.isPending || query.isFetching ? <Spinner /> : null}{' '}
+            {drifted ? 'Trust replacement' : 'Retry connection'}
           </Button>
         }
         detail={

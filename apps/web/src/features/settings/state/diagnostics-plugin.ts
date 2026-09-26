@@ -32,6 +32,7 @@ export function createSettingsDiagnosticsPlugin(source: SettingsDiagnosticsSourc
 }
 
 class SettingsDiagnosticsContribution implements EditorViewContribution {
+  readonly inputs = ['content'] as const
   private readonly presenter: DiagnosticsPresenter
   private readonly unsubscribe: () => void
 
@@ -52,8 +53,6 @@ class SettingsDiagnosticsContribution implements EditorViewContribution {
       this.presenter.clear()
       return
     }
-    if (kind !== 'document' && kind !== 'content') return
-
     this.render(snapshot)
   }
 

@@ -1,9 +1,6 @@
 /** Moving through a list reads nothing until the selection rests this long. */
 export const PREVIEW_SETTLE_MS = 120
 
-/** Enough of a file to recognise it; a preview is not a reader. */
-const PREVIEW_LINES = 40
-
 const IMAGE_EXTENSIONS = new Set([
   'apng',
   'avif',
@@ -18,7 +15,13 @@ const IMAGE_EXTENSIONS = new Set([
 ])
 
 export type PreviewContent =
-  | { readonly kind: 'text'; readonly text: string }
+  | {
+      readonly kind: 'text'
+      readonly text: string
+      /** The whole file's bytes; `text` is its head when `truncated`. */
+      readonly size: number
+      readonly truncated: boolean
+    }
   | { readonly kind: 'binary' }
 
 /** The whole extension, lowercased; it doubles as the highlighter's language alias. */
@@ -31,13 +34,10 @@ export function isImageName(name: string) {
   return IMAGE_EXTENSIONS.has(previewExtension(name))
 }
 
-export function previewLines(content: string) {
-  let end = -1
-  for (let line = 0; line < PREVIEW_LINES; line += 1) {
-    end = content.indexOf('\n', end + 1)
-    if (end < 0) return content
-  }
-  return content.slice(0, end)
+/** `1` to the last line's number, one per line, for a gutter beside `text`. */
+export function lineNumbers(text: string) {
+  const lines = text.split('\n').length - (text.endsWith('\n') ? 1 : 0)
+  return Array.from({ length: Math.max(lines, 1) }, (_, index) => index + 1).join('\n')
 }
 
 export function previewImageUrl(origin: string, path: string) {

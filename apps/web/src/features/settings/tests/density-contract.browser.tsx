@@ -411,6 +411,7 @@ test('file-picker path controls and breadcrumbs follow density', () => {
   const actions = {
     jumpTo: () => undefined,
     navigateTo: () => undefined,
+    resizeColumn: () => undefined,
     revealEntry: () => undefined,
     selectEntry: () => undefined,
   }

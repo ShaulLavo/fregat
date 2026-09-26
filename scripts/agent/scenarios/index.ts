@@ -2,6 +2,7 @@ import { settingsRoutePreparation } from './settings-route-preparation'
 import { settingsModuleFailure } from './settings-module-failure'
 import { connectionRefusalRetention } from './connection-refusal-retention'
 import { cachedProtocolStartup } from './cached-protocol-startup'
+import { primaryIdentityReplacement } from './primary-identity-replacement'
 import { editorLspTabSwitch } from './editor-lsp-tab-switch'
 import { editorLspServerExit } from './editor-lsp-server-exit'
 import { editorTypography } from './editor-typography'
@@ -92,6 +93,8 @@ import { chatCardNarrow } from './chat-card-narrow'
 import { chatComposerInsert } from './chat-composer-insert'
 import { chatDisclosureSettle } from './chat-disclosure-settle'
 import { chatTurnAnatomy } from './chat-turn-anatomy'
+import { chatSleepingSession } from './chat-sleeping-session'
+import { chatSessionGoal } from './chat-session-goal'
 import { fileTreeHoverPrefetch } from './file-tree-hover-prefetch'
 import { prefetchChatSwitch } from './prefetch-chat-switch'
 import { prefetchFirstPaint } from './prefetch-first-paint'
@@ -124,6 +127,7 @@ import { itemNavigation } from './item-navigation'
 import { shortcutHints } from './shortcut-hints'
 import { editorAddToChat } from './editor-add-to-chat'
 import { markdownSplitView } from './markdown-split-view'
+import { markdownPreviewClobber } from './markdown-preview-clobber'
 import { gitOpenAllDiffsSpam } from './git-open-all-diffs-spam'
 import { gitStageSettles } from './git-stage-settles'
 import { gitChangesScroll } from './git-changes-scroll'
@@ -141,6 +145,7 @@ import { themeStudioAsync } from './theme-studio-async'
 import { themeStudioPreview } from './theme-studio-preview'
 import { filePickerSelection } from './file-picker-selection'
 import { filePickerBrowse } from './file-picker-browse'
+import { filePickerAppearance } from './file-picker-appearance'
 import { quickOpenPreview } from './quick-open-preview'
 import { themeStudio } from './theme-studio'
 import { themeStudioLibrary } from './theme-studio-library'
@@ -206,6 +211,7 @@ import { visualSearchHeaders } from './visual-search-headers'
 import { visualSearchScrollContent } from './visual-search-scroll-content'
 import { quickOpenNewFile } from './quick-open-new-file'
 import { projectSettings } from './project-settings'
+import { workspaceTwoRoots } from './workspace-two-roots'
 import { quickOpenLinkedFile } from './quick-open-linked-file'
 import { quickOpenNoFlicker } from './quick-open-no-flicker'
 import { gitHistorySearchNoFlicker } from './git-history-search-no-flicker'
@@ -303,6 +309,7 @@ export const scenarios: readonly Scenario[] = [
   sessionLifecycle,
   sessionUndo,
   cachedProtocolStartup,
+  primaryIdentityReplacement,
   connectionRefusalRetention,
   sessionNavigation,
   sessionOrdering,
@@ -419,6 +426,7 @@ export const scenarios: readonly Scenario[] = [
   shortcutHints,
   editorAddToChat,
   markdownSplitView,
+  markdownPreviewClobber,
   gitOpenAllDiffsSpam,
   gitStageSettles,
   gitChangesScroll,
@@ -433,6 +441,7 @@ export const scenarios: readonly Scenario[] = [
   tailFollow,
   checkpointRestore,
   filePickerBrowse,
+  filePickerAppearance,
   filePickerSelection,
   themeStudioPreview,
   themeStudioAsync,
@@ -478,6 +487,7 @@ export const scenarios: readonly Scenario[] = [
   visualSearchScrollContent,
   quickOpenNewFile,
   projectSettings,
+  workspaceTwoRoots,
   quickOpenLinkedFile,
   quickOpenNoFlicker,
   gitHistorySearchNoFlicker,
@@ -527,6 +537,8 @@ export const scenarios: readonly Scenario[] = [
   chatComposerInsert,
   chatDisclosureSettle,
   chatTurnAnatomy,
+  chatSleepingSession,
+  chatSessionGoal,
   fileTreeHoverPrefetch,
   prefetchFirstPaint,
   prefetchChatSwitch,

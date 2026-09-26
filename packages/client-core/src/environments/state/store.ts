@@ -45,6 +45,8 @@ type EnvironmentsActions = {
   recordDescriptor(origin: string, descriptor: HealthDescriptor): void
   recordServerUpdate(origin: string, update: ServerUpdate): void
   restoreDescriptor(origin: string, descriptor: HealthDescriptor): boolean
+  /** Trusting a replacement server: the next descriptor records whatever identity it carries. */
+  forgetIdentity(origin: string): void
   markSlowRequest(origin: string, requestId: string): void
   clearSlowRequest(origin: string, requestId: string): void
 }
@@ -162,6 +164,20 @@ export function createEnvironmentsStore({ primaryOrigin }: { readonly primaryOri
         connectionByOrigin: { ...state.connectionByOrigin, [origin]: initialServerConnection },
       })
       return true
+    },
+    forgetIdentity(origin) {
+      origin = canonicalServerOrigin(origin)
+      const state = get()
+      const entry = state.entries[origin]
+      if (!entry) return
+      slowRequestIdsByOrigin.delete(origin)
+      set({
+        entries: {
+          ...state.entries,
+          [origin]: { ...entry, environmentId: null, descriptor: null, lastError: null },
+        },
+        connectionByOrigin: { ...state.connectionByOrigin, [origin]: initialServerConnection },
+      })
     },
     recordDescriptor(origin, descriptor) {
       origin = canonicalServerOrigin(origin)

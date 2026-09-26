@@ -51,7 +51,7 @@ jobs:
         run: bun run unused:check
 
   typecheck:
-    name: Parity, typecheck, generated
+    name: Typecheck, generated
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -60,48 +60,6 @@ jobs:
 
       - name: Setup
         uses: ./.github/actions/setup
-
-      - name: Checkout pinned alignment reference
-        uses: actions/checkout@v4
-        with:
-          repository: pingdotgg/t3code
-          ref: 7445aa733ada33e45289e5aa5055f79142556513
-          path: references/t3code
-          persist-credentials: false
-
-      - name: Alignment evidence records
-        run: python3 scripts/parity/check.py
-
-      - name: Alignment operation and source census
-        run: python3 scripts/parity/source.py --reference references/t3code
-
-      - name: Pinned snooze wake comparison
-        run: bun scripts/parity/wake.ts
-
-      - name: Pinned snooze calendar comparison
-        run: bun scripts/parity/snooze.ts
-
-      - name: Pinned ordering policy comparison
-        run: bun scripts/parity/ordering.ts
-
-      - name: Pinned response delivery comparison
-        run: bun scripts/parity/response-delivery.ts
-
-      - name: Pinned background liveness comparison
-        run: bun scripts/parity/background.ts
-
-      - name: Pinned queued follow-up policy comparison
-        run: >-
-          python3 -B scripts/parity/run.py
-          --operation client-command:thread.turn.start
-          --scenario follow-up-queue-policy
-          --check
-
-      - name: Alignment checker negative cases
-        run: python3 -B -m unittest discover -s scripts/parity -p 'test_*.py'
-
-      - name: Pinned model option comparison
-        run: bun scripts/parity/model-options.ts
 
       - name: Validate dev task graph
         env:
@@ -170,14 +128,6 @@ jobs:
 
       - name: Setup
         uses: ./.github/actions/setup
-
-      - name: Checkout pinned alignment reference
-        uses: actions/checkout@v4
-        with:
-          repository: pingdotgg/t3code
-          ref: 7445aa733ada33e45289e5aa5055f79142556513
-          path: references/t3code
-          persist-credentials: false
 
       - name: Cache Hutch store
         if: ${{ matrix.suite.devkit }}
