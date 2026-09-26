@@ -75,8 +75,8 @@ test('direct address commands replace drafts and retain a usable request lifetim
   const state = session.getSnapshot()
   if (state.kind !== 'ready') return expect.unreachable('Expected ready session')
   const submission = state.owner.submit('user', [
-    { kind: 'keybinding.set', command: 'workspace.openAddress', keys: 'F8' },
-    { kind: 'keybinding.set', command: 'workspace.copyAddress', keys: 'F9' },
+    { kind: 'keybinding.set', command: 'workspace.openAddress', keys: ['F8'] },
+    { kind: 'keybinding.set', command: 'workspace.copyAddress', keys: ['F9'] },
   ])
   if (submission.kind === 'submitted') await submission.settled
   const frame = await renderTui(

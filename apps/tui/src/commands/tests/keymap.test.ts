@@ -155,12 +155,12 @@ test('Kitty release events do not invoke commands and legacy Alt is not desktop 
 
 test('overrides resolve Mod as Control, retain scope, unbind, and reject ambiguous keys', () => {
   const resolution = effectiveTerminalBindings({
-    'workspace.showSettings': 'Mod+K e',
+    'workspace.showSettings': ['Mod+K e'],
     'workspace.showQuickAccess': null,
-    'settings.edit': 'F7',
-    'workspace.copyAddress': 'Ctrl+S',
-    'workspace.openAddress': 'Ctrl+C',
-    missing: 'F8',
+    'settings.edit': ['F7'],
+    'workspace.copyAddress': ['Ctrl+S'],
+    'workspace.openAddress': ['Ctrl+C'],
+    missing: ['F8'],
   })
   expect(resolution.bindings).toContainEqual({
     command: 'workspace.showSettings',
@@ -186,7 +186,7 @@ test('overrides resolve Mod as Control, retain scope, unbind, and reject ambiguo
 })
 
 test('an override replaces a matching chord but keeps an alternative shortcut', () => {
-  const { bindings } = effectiveTerminalBindings({ 'workspace.showSettings': 'Control+K p' })
+  const { bindings } = effectiveTerminalBindings({ 'workspace.showSettings': ['Control+K p'] })
   const palette = bindings.filter((binding) => binding.command === 'workspace.showCommandPalette')
   expect(palette.map((binding) => binding.keys)).toEqual(['F1'])
 })

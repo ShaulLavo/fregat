@@ -37,7 +37,7 @@ function setKeybinding(store: SettingsStore, command: string, keys: string | nul
   mutationSequence += 1
   return store.write({
     mutationId: `store-watch-${mutationSequence}`,
-    operations: [{ command, keys, kind: 'keybinding.set' }],
+    operations: [{ command, keys: keys === null ? null : [keys], kind: 'keybinding.set' }],
     target: 'user',
   })
 }
@@ -228,13 +228,13 @@ describe('external edits', () => {
 
     await writeFile(
       path.join(root, 'settings.json'),
-      '{\n  "keybindings.overrides": { "workspace.saveFile": "Mod+Alt+S" }\n}\n',
+      '{\n  "keybindings.overrides": { "workspace.saveFile": ["Mod+Alt+S"] }\n}\n',
       'utf8',
     )
 
     const snapshot = await changed
     expect(snapshot.values['keybindings.overrides']).toEqual({
-      'workspace.saveFile': 'Mod+Alt+S',
+      'workspace.saveFile': ['Mod+Alt+S'],
     })
     expect(snapshot.serverVersion.sequence).toBe(1)
   })
@@ -284,7 +284,7 @@ describe('external edits', () => {
   it('delivers an edit that landed between the read and the watcher', async () => {
     const root = await tempRoot()
     const filePath = path.join(root, 'settings.json')
-    await writeFile(filePath, '{ "keybindings.overrides": { "a.one": "Mod+1" } }', 'utf8')
+    await writeFile(filePath, '{ "keybindings.overrides": { "a.one": ["Mod+1"] } }', 'utf8')
 
     // Driven through the layer because `SettingsStore`'s constructor reads and
     // arms in one synchronous breath, so this window cannot be opened from
@@ -298,7 +298,7 @@ describe('external edits', () => {
 
     // Finished before the watcher exists, so no filesystem event can carry it.
     // The change below is the arming catch-up or it is nothing.
-    await writeFile(filePath, '{ "keybindings.overrides": { "a.two": "Mod+2" } }', 'utf8')
+    await writeFile(filePath, '{ "keybindings.overrides": { "a.two": ["Mod+2"] } }', 'utf8')
     // Bun's watcher is fuzzy at both ends of its arming window: it drops events
     // that land just after, and sometimes replays ones from just before. This
     // wait is the second of those, and it only ever makes the test stricter —
@@ -317,23 +317,23 @@ describe('external edits', () => {
       })
     })
 
-    expect(layer.snapshot().raw).toEqual({ 'keybindings.overrides': { 'a.two': 'Mod+2' } })
+    expect(layer.snapshot().raw).toEqual({ 'keybindings.overrides': { 'a.two': ['Mod+2'] } })
   })
 
   it('survives the file being replaced rather than modified in place', async () => {
     const root = await tempRoot()
     const filePath = path.join(root, 'settings.json')
-    await writeFile(filePath, '{ "keybindings.overrides": { "a.one": "Mod+1" } }', 'utf8')
+    await writeFile(filePath, '{ "keybindings.overrides": { "a.one": ["Mod+1"] } }', 'utf8')
     const store = createStore(root)
 
     const changed = nextChange(store)
     // An atomic save replaces the inode, which detaches a plain file watcher.
     // The directory watcher is what keeps this working.
     await rm(filePath)
-    await writeFile(filePath, '{ "keybindings.overrides": { "a.two": "Mod+2" } }', 'utf8')
+    await writeFile(filePath, '{ "keybindings.overrides": { "a.two": ["Mod+2"] } }', 'utf8')
 
     const snapshot = await changed
-    expect(snapshot.values['keybindings.overrides']).toEqual({ 'a.two': 'Mod+2' })
+    expect(snapshot.values['keybindings.overrides']).toEqual({ 'a.two': ['Mod+2'] })
   })
 
   it('reports a change again after the file returns to content it once wrote', async () => {
@@ -345,8 +345,8 @@ describe('external edits', () => {
     const written = await readFile(filePath, 'utf8')
 
     const away = nextChange(store)
-    await writeFile(filePath, '{ "keybindings.overrides": { "a.one": "Mod+9" } }', 'utf8')
-    expect((await away).values['keybindings.overrides']).toEqual({ 'a.one': 'Mod+9' })
+    await writeFile(filePath, '{ "keybindings.overrides": { "a.one": ["Mod+9"] } }', 'utf8')
+    expect((await away).values['keybindings.overrides']).toEqual({ 'a.one': ['Mod+9'] })
 
     // Undo in the user's editor, restoring the exact bytes the store wrote. If
     // the echo-suppression hash is not cleared on every applied reload, this
@@ -355,7 +355,7 @@ describe('external edits', () => {
     const back = nextChange(store)
     await writeFile(filePath, written, 'utf8')
 
-    expect((await back).values['keybindings.overrides']).toEqual({ 'a.one': 'Mod+1' })
+    expect((await back).values['keybindings.overrides']).toEqual({ 'a.one': ['Mod+1'] })
   })
 
   it('does not report the echo of its own write', async () => {
@@ -479,11 +479,11 @@ describe('the policy layer', () => {
   it('wins over the file and refuses a write to the key it owns', async () => {
     const root = await tempRoot()
     const store = createStore(root, {
-      policy: { 'keybindings.overrides': { 'a.locked': 'Mod+L' } },
+      policy: { 'keybindings.overrides': { 'a.locked': ['Mod+L'] } },
       watch: false,
     })
 
-    expect(store.snapshot().values['keybindings.overrides']).toEqual({ 'a.locked': 'Mod+L' })
+    expect(store.snapshot().values['keybindings.overrides']).toEqual({ 'a.locked': ['Mod+L'] })
     // Accepting the write and then resolving back to the policy value would look
     // like a silent failure, which is worse than a refusal.
     await expect(setKeybinding(store, 'a.locked', 'Mod+L')).rejects.toMatchObject({
@@ -532,21 +532,21 @@ describe('a secrets file that cannot be read', () => {
 
     await writeFile(
       path.join(root, 'settings.json'),
-      '{ "keybindings.overrides": { "a.one": "Mod+1" } }',
+      '{ "keybindings.overrides": { "a.one": ["Mod+1"] } }',
       'utf8',
     )
 
-    expect((await degraded).values['keybindings.overrides']).toEqual({ 'a.one': 'Mod+1' })
+    expect((await degraded).values['keybindings.overrides']).toEqual({ 'a.one': ['Mod+1'] })
 
     // And the store recovers on its own once the file is readable again.
     await rm(secretsPath, { recursive: true })
     const recovered = nextChange(store)
     await writeFile(
       path.join(root, 'settings.json'),
-      '{ "keybindings.overrides": { "a.two": "Mod+2" } }',
+      '{ "keybindings.overrides": { "a.two": ["Mod+2"] } }',
       'utf8',
     )
 
-    expect((await recovered).values['keybindings.overrides']).toEqual({ 'a.two': 'Mod+2' })
+    expect((await recovered).values['keybindings.overrides']).toEqual({ 'a.two': ['Mod+2'] })
   })
 })

@@ -30,6 +30,7 @@ import {
   shortcutFilterMatches,
   shortcutPlacesLabel,
   shortcutRows,
+  shortcutListWith,
   shortcutRowsWithChord,
   type ShortcutFilter,
   type ShortcutRow as ShortcutRowModel,
@@ -37,9 +38,12 @@ import {
 import { keyBindingResolution } from '@/keymap/active-bindings'
 import type { PlatformCommandId } from '@/keymap/types'
 
-type Overlay =
-  | { readonly kind: 'record'; readonly command: PlatformCommandId; readonly anchor: HTMLElement }
-  | { readonly kind: 'menu'; readonly command: PlatformCommandId; readonly anchor: HTMLElement }
+/** A row's recorder (replacing its chord, or adding one to its command) or its menu. */
+type Overlay = {
+  readonly kind: 'change' | 'add' | 'menu'
+  readonly rowId: string
+  readonly anchor: HTMLElement
+}
 
 /**
  * Every command and its keys, in the settings page's own scroller: a sticky toolbar, then one
@@ -58,7 +62,7 @@ export function KeybindingSection() {
   const geometry = useListGeometry(scrollRef, listRef, toolbarRef)
   const [search, setSearch] = useState<ShortcutSearch>({ kind: 'text', query: '' })
   const [filter, setFilter] = useState<ShortcutFilter>('all')
-  const [activeId, setActiveId] = useState<PlatformCommandId | null>(null)
+  const [activeId, setActiveId] = useState<string | null>(null)
   const [overlay, setOverlay] = useState<Overlay | null>(null)
 
   useEffect(() => {
@@ -74,36 +78,45 @@ export function KeybindingSection() {
   const pageRows = pageNarrows ? matchingShortcutRows(rows, pageQuery, platform) : rows
   const searched = searchedRows(pageRows, search, platform)
   const visible = searched.filter((row) => shortcutFilterMatches(row, filter))
-  const overlayRow = overlay ? rows.find((row) => row.command === overlay.command) : undefined
+  const overlayRow = overlay ? rows.find((row) => row.id === overlay.rowId) : undefined
+  const recordMode = overlay && overlay.kind !== 'menu' ? overlay.kind : null
   const { report, unmapped, omitted } = {
     ...defaults,
     report: keyBindingResolution(defaults.bindings, overrides, platform).report,
   }
 
-  function openRecorder(command: PlatformCommandId, anchor: HTMLElement | null) {
-    if (anchor) setOverlay({ kind: 'record', command, anchor })
+  function openRecorder(row: ShortcutRowModel, anchor: HTMLElement | null) {
+    if (anchor) setOverlay({ kind: row.keys === null ? 'add' : 'change', rowId: row.id, anchor })
   }
 
-  function rowElement(command: PlatformCommandId) {
-    return listRef.current?.querySelector<HTMLElement>(`[data-shortcut-command="${command}"]`)
+  function rowById(rowId: string) {
+    return rows.find((row) => row.id === rowId)
+  }
+
+  function rowElement(rowId: string) {
+    return listRef.current?.querySelector<HTMLElement>(`[data-shortcut-row="${CSS.escape(rowId)}"]`)
   }
 
   const listbox = useListbox({
     activeId,
     containerRef: listRef,
-    items: visible.map((row) => ({ id: row.command, label: row.title })),
+    items: visible.map((row) => ({ id: row.id, label: row.title })),
     onActiveChange: setActiveId,
-    onCommit: (command) => openRecorder(command, rowElement(command) ?? null),
-    onActiveKeyDown: (event: KeyboardEvent<HTMLDivElement>, command) => {
-      const anchor = rowElement(command)
-      if (!anchor) return
-      if (event.key === 'Delete') {
+    onCommit: (rowId) => {
+      const row = rowById(rowId)
+      if (row) openRecorder(row, rowElement(rowId) ?? null)
+    },
+    onActiveKeyDown: (event: KeyboardEvent<HTMLDivElement>, rowId) => {
+      const row = rowById(rowId)
+      const anchor = rowElement(rowId)
+      if (!row || !anchor) return
+      if (event.key === 'Delete' && row.keys !== null) {
         event.preventDefault()
-        setKeybinding(command, null)
+        setKeybinding(row.command, shortcutListWith(row, { remove: true }))
       }
       if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
         event.preventDefault()
-        setOverlay({ kind: 'menu', command, anchor })
+        setOverlay({ kind: 'menu', rowId, anchor })
       }
     },
     role: 'listbox',
@@ -114,10 +127,14 @@ export function KeybindingSection() {
     typeahead: true,
   })
 
-  function preview(command: PlatformCommandId, keys: string) {
-    const candidate = shortcutRows(defaults.bindings, { ...overrides, [command]: keys }, platform)
+  function nextList(row: ShortcutRowModel, mode: 'change' | 'add', keys: string) {
+    return shortcutListWith(row, mode === 'add' ? { add: keys } : { replace: keys })
+  }
+
+  function preview(command: PlatformCommandId, list: readonly string[], keys: string) {
+    const candidate = shortcutRows(defaults.bindings, { ...overrides, [command]: list }, platform)
     const takes = candidate
-      .filter((row) => row.shadowedBy === command)
+      .filter((row) => row.shadowedBy === command && row.command !== command)
       .map((row) => ({ title: row.title, where: shortcutPlacesLabel(row.places) }))
 
     return { kept: kept(keys), takes }
@@ -148,7 +165,7 @@ export function KeybindingSection() {
           activeIndex={listbox.activeIndex}
           estimateSize={geometry.narrow ? () => 48 : undefined}
           fade={false}
-          getKey={(row) => row.command}
+          getKey={(row) => row.id}
           handleRef={handleRef}
           // Rows paint before the scroller is measured; the window is the page's upper bound.
           initialRect={{ width: 0, height: window.innerHeight }}
@@ -157,24 +174,24 @@ export function KeybindingSection() {
           renderLayout={scrollRef ? ({ content }) => content : undefined}
           renderRow={(row) => (
             <ShortcutRow
-              keptNote={row.keys[0] ? kept(row.keys[0]) : null}
-              onChange={() => openRecorder(row.command, rowElement(row.command) ?? null)}
-              onMenu={(anchor) => setOverlay({ kind: 'menu', command: row.command, anchor })}
+              keptNote={row.keys ? kept(row.keys) : null}
+              onChange={() => openRecorder(row, rowElement(row.id) ?? null)}
+              onMenu={(anchor) => setOverlay({ kind: 'menu', rowId: row.id, anchor })}
               platform={platform}
               query={search.kind === 'text' ? search.query || pageQuery : pageQuery}
               row={row}
               rowProps={{
-                ...listbox.rowProps(row.command),
+                ...listbox.rowProps(row.id),
                 onMouseDown: (event) => {
-                  listbox.rowProps(row.command).onMouseDown(event)
+                  listbox.rowProps(row.id).onMouseDown(event)
                   // Focusing the list selects its first row and scrolls to it, which would move the
                   // pressed row out from under the pointer before the click lands.
-                  setActiveId(row.command)
+                  setActiveId(row.id)
                 },
                 onClick: (event) => {
-                  listbox.rowProps(row.command).onClick(event)
+                  listbox.rowProps(row.id).onClick(event)
                   if (!geometry.narrow) return
-                  setOverlay({ kind: 'menu', command: row.command, anchor: event.currentTarget })
+                  setOverlay({ kind: 'menu', rowId: row.id, anchor: event.currentTarget })
                 },
               }}
             />
@@ -185,25 +202,28 @@ export function KeybindingSection() {
         />
       </div>
       {preset === 'vscode' ? <UnmappedShortcuts platform={platform} unmapped={unmapped} /> : null}
-      {overlay?.kind === 'record' && overlayRow ? (
+      {recordMode && overlay && overlayRow ? (
         <ShortcutRecorder
-          adding={overlayRow.keys.length === 0}
+          adding={recordMode === 'add'}
           anchor={overlay.anchor}
           onClose={() => setOverlay(null)}
           onSave={(keys) => {
             setOverlay(null)
-            setKeybinding(overlayRow.command, keys)
+            setKeybinding(overlayRow.command, nextList(overlayRow, recordMode, keys))
           }}
           platform={platform}
-          preview={(keys) => preview(overlayRow.command, keys)}
+          preview={(keys) =>
+            preview(overlayRow.command, nextList(overlayRow, recordMode, keys), keys)
+          }
           title={overlayRow.title}
         />
       ) : null}
       {overlay?.kind === 'menu' && overlayRow ? (
         <ShortcutMenu
           anchor={overlay.anchor}
-          onChange={() => setOverlay({ ...overlay, kind: 'record' })}
-          onClose={() => setOverlay(null)}
+          onChange={(mode) => setOverlay({ ...overlay, kind: mode })}
+          // The menu closes as its item runs; an item that opened the recorder keeps it open.
+          onClose={() => setOverlay((current) => (current?.kind === 'menu' ? null : current))}
           onShowConflicts={(keys) => {
             setOverlay(null)
             setFilter('conflicts')

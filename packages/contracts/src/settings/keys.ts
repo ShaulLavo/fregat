@@ -1411,7 +1411,7 @@ export const SETTINGS_REGISTRY = {
     title: 'Shortcuts',
     description: 'Every command and its keys.',
     details:
-      'In settings.json this is command id to shortcut: one hotkey, or two separated by a single space. A missing command keeps its default; null unbinds it.',
+      'In settings.json this is command id to its complete list of shortcuts, each one hotkey or two separated by a single space. A missing command keeps its defaults; null or an empty list unbinds it.',
     // The one key that merges rather than replaces: a later layer should be able
     // to bind a command without dropping every other binding the user set.
     merge: 'record',

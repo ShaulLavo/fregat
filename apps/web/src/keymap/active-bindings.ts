@@ -11,12 +11,7 @@ import {
 
 import { commandHotkeyMeta } from '@/keymap/command-registry'
 import { platformCommand, platformCommands } from '@/keymap/table'
-import type {
-  CommandKeyBinding,
-  KeyBindingSource,
-  PlatformCommandId,
-  PlatformKeyBinding,
-} from '@/keymap/types'
+import type { PlatformCommandId, PlatformKeyBinding } from '@/keymap/types'
 
 type PlatformName = ReturnType<typeof detectPlatform>
 
@@ -41,13 +36,14 @@ export type KeyBindingResolution = {
   readonly bindings: readonly PlatformKeyBinding[]
   readonly report: readonly BindingResolutionEntry[]
   readonly shadowedBy: ReadonlyMap<PlatformCommandId, PlatformCommandId>
+  /** Every chord a command lost, with the command that took it. */
+  readonly lostChords: readonly LostChord[]
 }
 
-/** A settings row: the effective binding plus the command that took its key. */
-export type CommandKeyBindingRow = CommandKeyBinding & {
-  readonly effectiveKeys: readonly string[]
-  /** Set only when the command has no binding left because another one won the key. */
-  readonly shadowedBy: PlatformCommandId | null
+export type LostChord = {
+  readonly command: PlatformCommandId
+  readonly keys: string
+  readonly winner: PlatformCommandId
 }
 
 export function resolvedPlatformKeyBindings(
@@ -56,27 +52,6 @@ export function resolvedPlatformKeyBindings(
   platform: PlatformName = detectPlatform(),
 ): readonly PlatformKeyBinding[] {
   return keyBindingResolution(defaults, overrides, platform).bindings
-}
-
-export function commandKeyBindings(
-  defaults: readonly PlatformKeyBinding[],
-  overrides: KeybindingOverrides,
-  platform: PlatformName = detectPlatform(),
-): readonly CommandKeyBindingRow[] {
-  const { bindings, shadowedBy } = keyBindingResolution(defaults, overrides, platform)
-  const applied = new Map(appliedOverrides(overrides))
-  const live = liveBindingsByCommand(bindings)
-  const defaultKeys = defaultKeysByCommand(defaults)
-
-  return platformCommands.map(({ id: command }) =>
-    commandKeyBindingRow({
-      applied,
-      command,
-      defaultKeys: defaultKeys.get(command) ?? [],
-      live: live.get(command) ?? [],
-      shadowedBy: shadowedBy.get(command) ?? null,
-    }),
-  )
 }
 
 export function keyBindingResolution(
@@ -90,8 +65,8 @@ export function keyBindingResolution(
   const kept = preset.bindings.filter(
     (binding) => !binding.command || !overridden.has(binding.command),
   )
-  const bound = entries.flatMap(([command, keys]) =>
-    userKeyBinding(defaults, command, keys, platform),
+  const bound = entries.flatMap(([command, chords]) =>
+    chords.flatMap((keys) => userKeyBinding(defaults, command, keys, platform)),
   )
   const resolved = liveKeyBindings(kept, bound)
   return {
@@ -164,23 +139,32 @@ function overrideReport(
 ): BindingResolutionEntry[] {
   const known = knownCommands()
   const report: BindingResolutionEntry[] = []
-  for (const [command, keys] of Object.entries(overrides)) {
-    if (!known.has(command) || (keys !== null && !isBindableChord(keys))) {
-      report.push({
-        bindingId: `user:${command}`,
-        command,
-        keys,
-        reason: known.has(command) ? 'invalid-chord' : 'unknown-command',
-        winner: null,
-      })
-    }
+  for (const [command, list] of Object.entries(overrides)) {
+    report.push(...invalidOverrideReport(command, list ?? [], known))
   }
   for (const [index, binding] of defaults.entries()) {
     if (!binding.command || !applied.has(binding.command)) continue
-    const reason = overrides[binding.command] === null ? 'unbound' : 'replaced'
-    report.push(resolutionEntry(binding, index, reason))
+    const unbound = (overrides[binding.command] ?? []).length === 0
+    report.push(resolutionEntry(binding, index, unbound ? 'unbound' : 'replaced'))
   }
   return report
+}
+
+function invalidOverrideReport(
+  command: string,
+  list: readonly string[],
+  known: ReadonlySet<string>,
+): BindingResolutionEntry[] {
+  const entry = (keys: string | null, reason: BindingResolutionEntry['reason']) => ({
+    bindingId: `user:${command}:${keys ?? ''}`,
+    command,
+    keys,
+    reason,
+    winner: null,
+  })
+  if (!known.has(command)) return [entry(list[0] ?? null, 'unknown-command')]
+
+  return list.filter((keys) => !isBindableChord(keys)).map((keys) => entry(keys, 'invalid-chord'))
 }
 
 function liveKeyBindings(
@@ -188,6 +172,7 @@ function liveKeyBindings(
   bound: readonly PlatformKeyBinding[],
 ): KeyBindingResolution {
   const shadowedBy = new Map<PlatformCommandId, PlatformCommandId>()
+  const lostChords: LostChord[] = []
   const report: BindingResolutionEntry[] = []
   const liveOverrides: PlatformKeyBinding[] = []
   const bindings: PlatformKeyBinding[] = []
@@ -201,7 +186,7 @@ function liveKeyBindings(
       continue
     }
     if (winner) {
-      recordShadowedCommand(shadowedBy, binding, winner)
+      recordShadowedCommand(shadowedBy, lostChords, binding, winner)
       report.push(resolutionEntry(binding, report.length, 'override', winner.command))
       continue
     }
@@ -212,7 +197,7 @@ function liveKeyBindings(
   for (const binding of kept) {
     const winner = bindingClaimingKey(liveOverrides, binding)
     if (winner) {
-      recordShadowedCommand(shadowedBy, binding, winner)
+      recordShadowedCommand(shadowedBy, lostChords, binding, winner)
       report.push(resolutionEntry(binding, report.length, 'override', winner.command))
       continue
     }
@@ -221,7 +206,7 @@ function liveKeyBindings(
   }
 
   bindings.push(...liveOverrides.reverse())
-  return { bindings, report, shadowedBy }
+  return { bindings, report, shadowedBy, lostChords }
 }
 
 function bindingClaimingKey(
@@ -233,6 +218,7 @@ function bindingClaimingKey(
 
 function recordShadowedCommand(
   shadowedBy: Map<PlatformCommandId, PlatformCommandId>,
+  lostChords: LostChord[],
   shadowed: PlatformKeyBinding,
   winner: PlatformKeyBinding,
 ) {
@@ -242,19 +228,24 @@ function recordShadowedCommand(
   if (!winner.command) return
 
   shadowedBy.set(shadowed.command, winner.command)
+  lostChords.push({ command: shadowed.command, keys: shadowed.keys, winner: winner.command })
 }
 
+/** Each known command's bindable chords; an empty list is an unbind. */
 function appliedOverrides(
   overrides: KeybindingOverrides,
-): readonly (readonly [PlatformCommandId, string | null])[] {
+): readonly (readonly [PlatformCommandId, readonly string[]])[] {
   const known = knownCommands()
-  const entries: (readonly [PlatformCommandId, string | null])[] = []
+  const entries: (readonly [PlatformCommandId, readonly string[]])[] = []
 
-  for (const [command, keys] of Object.entries(overrides)) {
+  for (const [command, list] of Object.entries(overrides)) {
     if (!isPlatformCommandId(command, known)) continue
-    if (keys !== null && !isBindableChord(keys)) continue
 
-    entries.push([command, keys])
+    const chords = [...new Set((list ?? []).filter(isBindableChord))]
+    // A list whose every chord is invalid is not a deliberate unbind; keep the defaults.
+    if (chords.length === 0 && (list ?? []).length > 0) continue
+
+    entries.push([command, chords])
   }
 
   return entries
@@ -275,11 +266,9 @@ function isPlatformCommandId(
 function userKeyBinding(
   defaults: readonly PlatformKeyBinding[],
   command: PlatformCommandId,
-  keys: string | null,
+  keys: string,
   platform: PlatformName,
 ): readonly PlatformKeyBinding[] {
-  if (keys === null) return []
-
   const chord = parsedChord(keys, platform)
   // The defaults carry the panes and event handling the command was designed
   // for; only the keys are the user's to change. A command bound in six panes
@@ -325,81 +314,4 @@ function bindingTemplates(
 
 function commandDefaultPane(command: PlatformCommandId): PlatformKeyBinding['pane'] {
   return defaultBindingPane(platformCommand(command)?.target)
-}
-
-function commandKeyBindingRow({
-  applied,
-  command,
-  defaultKeys,
-  live,
-  shadowedBy,
-}: {
-  readonly applied: ReadonlyMap<PlatformCommandId, string | null>
-  readonly command: PlatformCommandId
-  readonly defaultKeys: readonly string[]
-  readonly live: readonly PlatformKeyBinding[]
-  readonly shadowedBy: PlatformCommandId | null
-}): CommandKeyBindingRow {
-  const primary = live[0]
-  const effectiveKeys = live.map((binding) => binding.keys)
-  if (primary) {
-    return {
-      command,
-      defaultKeys,
-      effectiveKeys,
-      keys: primary.keys,
-      shadowedBy: null,
-      source: primary.source,
-    }
-  }
-
-  const source: KeyBindingSource = applied.has(command) ? 'user' : 'default'
-  // The dead key still shows: it is what the row is configured with, and it is
-  // the only way to see which shortcut the winner took.
-  if (shadowedBy) {
-    return {
-      command,
-      defaultKeys,
-      effectiveKeys,
-      keys: applied.get(command) ?? firstKeys(defaultKeys),
-      shadowedBy,
-      source,
-    }
-  }
-
-  return { command, defaultKeys, effectiveKeys, keys: null, shadowedBy: null, source }
-}
-
-function liveBindingsByCommand(bindings: readonly PlatformKeyBinding[]) {
-  const byCommand = new Map<PlatformCommandId, PlatformKeyBinding[]>()
-
-  for (const binding of bindings) {
-    if (!binding.command) continue
-
-    const commandBindings = byCommand.get(binding.command) ?? []
-    commandBindings.push(binding)
-    byCommand.set(binding.command, commandBindings)
-  }
-
-  return byCommand
-}
-
-function firstKeys(defaultKeys: readonly string[]): string | null {
-  if (defaultKeys.length === 0) return null
-
-  return defaultKeys[0]
-}
-
-function defaultKeysByCommand(bindings: readonly PlatformKeyBinding[]) {
-  const byCommand = new Map<PlatformCommandId, string[]>()
-
-  for (const binding of bindings) {
-    if (!binding.command) continue
-
-    const keys = byCommand.get(binding.command) ?? []
-    keys.push(binding.keys)
-    byCommand.set(binding.command, keys)
-  }
-
-  return byCommand
 }

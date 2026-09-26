@@ -549,8 +549,10 @@ export const selectors = {
   shortcutsSearch: (page: Page) =>
     page.getByRole('textbox', { name: 'Search keyboard shortcuts', exact: true }),
   shortcutsList: (page: Page) => page.getByRole('listbox', { name: 'Keyboard shortcuts' }),
-  shortcutRow: (page: Page, command: string) =>
-    page.locator(`[data-shortcut-command="${command}"]`),
+  shortcutRow: (page: Page, command: string, keys?: string) =>
+    page.locator(
+      `[data-shortcut-command="${command}"]${keys ? `[data-shortcut-keys="${keys}"]` : ''}`,
+    ),
   shortcutRecorder: (page: Page, title: string) =>
     page.getByRole('textbox', { name: `Press the new shortcut for ${title}`, exact: true }),
   shortcutFilter: (page: Page, name: 'All' | 'Custom' | 'Conflicts' | 'Unassigned') =>

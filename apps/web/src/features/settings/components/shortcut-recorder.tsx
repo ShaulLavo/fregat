@@ -84,7 +84,7 @@ export function ShortcutRecorder({
           tabIndex={0}
         >
           {keys ? (
-            <ShortcutKeys keys={[keys]} platform={platform} size='md' />
+            <ShortcutKeys keys={keys} platform={platform} size='md' />
           ) : (
             <span className='text-muted-foreground text-xs'>
               {keyboardSeen ? 'Press the keys' : 'Waiting for a hardware keyboard'}

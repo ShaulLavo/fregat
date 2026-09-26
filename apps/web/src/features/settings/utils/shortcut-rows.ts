@@ -2,11 +2,12 @@ import type { KeybindingOverrides } from '@workspace/contracts'
 import { unique } from '@workspace/utils/collections'
 import {
   isBindableChord,
+  keysConflict,
   normalizedChord,
   type PlatformName,
 } from '@workspace/client-core/commands/chord'
 
-import { keyBindingResolution } from '@/keymap/active-bindings'
+import { keyBindingResolution, type LostChord } from '@/keymap/active-bindings'
 import { platformCommandSpec } from '@/keymap/command-registry'
 import { platformCommands } from '@/keymap/table'
 import type { PlatformCommandId, PlatformKeyBinding } from '@/keymap/types'
@@ -15,18 +16,23 @@ import { formatChord } from '@/keymap/utils/format-keys'
 /** Custom and Removed are the user's; Default is the preset's. */
 export type ShortcutSource = 'default' | 'custom' | 'removed'
 
+/** One chord of one command, as VS Code lists them; an unbound command has one row with no chord. */
 export type ShortcutRow = {
+  /** Unique across rows: the command, then the chord. */
+  readonly id: string
   readonly command: PlatformCommandId
   readonly title: string
-  /** Every configured chord: the live ones, or what a shadowed row is configured with. */
-  readonly keys: readonly string[]
-  /** Where the chords apply, one entry per distinct pane and condition. */
+  /** This row's chord; null on an unbound command. */
+  readonly keys: string | null
+  /** Every chord the command is configured with, which Add, Change and Remove rewrite. */
+  readonly commandKeys: readonly string[]
+  /** Where this chord applies, one entry per distinct pane and condition. */
   readonly places: readonly string[]
   /** Null on an unassigned row the user never touched. */
   readonly source: ShortcutSource | null
-  /** The command that took this row's chord. */
+  /** The command that took this chord. */
   readonly shadowedBy: PlatformCommandId | null
-  /** The commands this row took a chord from. */
+  /** The commands this chord took a shortcut from. */
   readonly shadows: readonly PlatformCommandId[]
 }
 
@@ -62,43 +68,50 @@ const CONDITION_WORDS: Readonly<Record<string, string>> = {
   '!tabFocusMode': 'Tab inserts',
 }
 
-/** One row per command, bound (shadowed included) before unbound, then by title. */
+/** One row per chord, bound (shadowed included) before unbound, then by title and chord order. */
 export function shortcutRows(
   defaults: readonly PlatformKeyBinding[],
   overrides: KeybindingOverrides,
   platform: PlatformName,
 ): readonly ShortcutRow[] {
-  const { bindings, shadowedBy } = keyBindingResolution(defaults, overrides, platform)
-  const live = bindingsByCommand(bindings)
+  const resolution = keyBindingResolution(defaults, overrides, platform)
+  const live = bindingsByCommand(resolution.bindings)
   const preset = bindingsByCommand(defaults)
-  const shadows = new Map<PlatformCommandId, PlatformCommandId[]>()
-  for (const [loser, winner] of shadowedBy) {
-    shadows.set(winner, [...(shadows.get(winner) ?? []), loser])
-  }
 
-  const rows = platformCommands.map(({ id }) =>
-    shortcutRow({
+  const rows = platformCommands.flatMap(({ id }) =>
+    commandRows({
       command: id,
       live: live.get(id) ?? [],
-      override: appliedOverride(overrides, id),
-      platform,
+      lost: resolution.lostChords,
+      override: appliedOverride(overrides, id, platform),
       preset: preset.get(id) ?? [],
-      shadowedBy: shadowedBy.get(id) ?? null,
-      shadows: shadows.get(id) ?? [],
     }),
   )
 
   return rows.toSorted(
     (left, right) =>
-      Number(left.keys.length === 0) - Number(right.keys.length === 0) ||
-      left.title.localeCompare(right.title),
+      Number(left.keys === null) - Number(right.keys === null) ||
+      left.title.localeCompare(right.title) ||
+      left.commandKeys.indexOf(left.keys ?? '') - right.commandKeys.indexOf(right.keys ?? ''),
   )
+}
+
+/** The list a command would carry with one chord added, replaced or removed. */
+export function shortcutListWith(
+  row: ShortcutRow,
+  change: { readonly add: string } | { readonly replace: string } | { readonly remove: true },
+): readonly string[] {
+  if ('add' in change) return unique([...row.commandKeys, change.add])
+  if ('remove' in change) return row.commandKeys.filter((keys) => keys !== row.keys)
+  if (row.keys === null) return [change.replace]
+
+  return unique(row.commandKeys.map((keys) => (keys === row.keys ? change.replace : keys)))
 }
 
 export function shortcutFilterMatches(row: ShortcutRow, filter: ShortcutFilter): boolean {
   if (filter === 'custom') return row.source === 'custom' || row.source === 'removed'
   if (filter === 'conflicts') return row.shadowedBy !== null || row.shadows.length > 0
-  if (filter === 'unassigned') return row.keys.length === 0
+  if (filter === 'unassigned') return row.keys === null
 
   return true
 }
@@ -137,7 +150,7 @@ export function shortcutRowsWithChord(
 ): readonly ShortcutRow[] {
   const chord = normalizedChord(keys, platform)
 
-  return rows.filter((row) => row.keys.some((candidate) => candidate === chord))
+  return rows.filter((row) => row.keys === chord)
 }
 
 /** VS Code shows the id inline only when the search matched it; the title is enough otherwise. */
@@ -176,74 +189,88 @@ export function shortcutTitle(command: PlatformCommandId): string {
   return platformCommandSpec(command)?.title ?? command
 }
 
-function shortcutRow({
+function commandRows({
   command,
   live,
+  lost,
   override,
-  platform,
   preset,
-  shadowedBy,
-  shadows,
 }: {
   readonly command: PlatformCommandId
   readonly live: readonly PlatformKeyBinding[]
-  readonly override: string | null | undefined
-  readonly platform: PlatformName
+  readonly lost: readonly LostChord[]
+  readonly override: readonly string[] | undefined
   readonly preset: readonly PlatformKeyBinding[]
-  readonly shadowedBy: PlatformCommandId | null
-  readonly shadows: readonly PlatformCommandId[]
-}): ShortcutRow {
-  const configured = configuredBindings(live, preset, override, shadowedBy)
-  const keys =
-    live.length === 0 && typeof override === 'string'
-      ? [normalizedChord(override, platform)]
-      : unique(configured.map((binding) => binding.keys))
-
-  return {
-    command,
-    title: shortcutTitle(command),
-    keys,
-    places: keys.length === 0 ? [] : unique(configured.map(shortcutPlace)),
-    source: shortcutSource(override, keys),
-    shadowedBy,
-    shadows,
+}): ShortcutRow[] {
+  const title = shortcutTitle(command)
+  const commandKeys = override ?? unique(preset.map((binding) => binding.keys))
+  const source = shortcutSource(override, commandKeys)
+  if (commandKeys.length === 0) {
+    const row = { command, commandKeys, keys: null, places: [], shadowedBy: null, shadows: [] }
+    return [{ ...row, id: command, source, title }]
   }
+
+  return commandKeys.map((keys) => {
+    const liveHere = live.filter((binding) => binding.keys === keys)
+    const taken = lost.find((chord) => chord.command === command && chord.keys === keys)
+    const shadowedBy = liveHere.length > 0 ? null : (taken?.winner ?? null)
+
+    return {
+      command,
+      commandKeys,
+      id: `${command} ${keys}`,
+      keys,
+      places: unique(placesOf(liveHere, preset, keys).map(shortcutPlace)),
+      shadowedBy,
+      shadows: [
+        ...new Set(
+          lost
+            .filter((chord) => chord.winner === command && keysConflict(chord.keys, keys))
+            .map((chord) => chord.command),
+        ),
+      ],
+      source,
+      title,
+    }
+  })
 }
 
-/** A shadowed row keeps its configured chord and places: they are what the winner took. */
-function configuredBindings(
-  live: readonly PlatformKeyBinding[],
+/** Live bindings where the chord works, else where it is configured (what a winner took). */
+function placesOf(
+  liveHere: readonly PlatformKeyBinding[],
   preset: readonly PlatformKeyBinding[],
-  override: string | null | undefined,
-  shadowedBy: PlatformCommandId | null,
-): readonly PlatformKeyBinding[] {
-  if (live.length > 0) return live
-  if (shadowedBy === null || override === null) return []
+  keys: string,
+): readonly Pick<PlatformKeyBinding, 'editorWhen' | 'pane'>[] {
+  if (liveHere.length > 0) return liveHere
 
-  return preset
+  const presetHere = preset.filter((binding) => binding.keys === keys)
+  if (presetHere.length > 0) return presetHere
+
+  return preset.length > 0 ? preset : [{ editorWhen: undefined, pane: 'any' }]
 }
 
 function shortcutSource(
-  override: string | null | undefined,
-  keys: readonly string[],
+  override: readonly string[] | undefined,
+  commandKeys: readonly string[],
 ): ShortcutSource | null {
-  if (override === null) return 'removed'
-  if (typeof override === 'string') return 'custom'
+  if (override === undefined) return commandKeys.length > 0 ? 'default' : null
 
-  return keys.length > 0 ? 'default' : null
+  return override.length === 0 ? 'removed' : 'custom'
 }
 
-/** The override the resolver applies; an unknown command or unbindable chord is ignored there too. */
+/** The list the resolver applies, normalized; an unknown command or all-invalid list is ignored there too. */
 function appliedOverride(
   overrides: KeybindingOverrides,
   command: PlatformCommandId,
-): string | null | undefined {
+  platform: PlatformName,
+): readonly string[] | undefined {
   if (!Object.hasOwn(overrides, command)) return undefined
 
-  const keys = overrides[command]
-  if (keys === null) return null
+  const list = overrides[command] ?? []
+  const chords = list.filter(isBindableChord)
+  if (chords.length === 0 && list.length > 0) return undefined
 
-  return isBindableChord(keys) ? keys : undefined
+  return unique(chords.map((keys) => normalizedChord(keys, platform)))
 }
 
 function bindingsByCommand(bindings: readonly PlatformKeyBinding[]) {
@@ -258,7 +285,7 @@ function bindingsByCommand(bindings: readonly PlatformKeyBinding[]) {
 }
 
 function shortcutHaystack(row: ShortcutRow, platform: PlatformName): string {
-  const labels = row.keys.map((keys) => `${keys} ${formatChord(keys, platform)}`).join(' ')
+  const labels = row.keys ? `${row.keys} ${formatChord(row.keys, platform)}` : ''
 
   return `${row.command} ${row.title} ${labels}`.toLowerCase()
 }

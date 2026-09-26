@@ -12,11 +12,7 @@ import {
 } from '@workspace/client-core/commands/focus'
 
 import { activeBindings } from '@workspace/client-core/commands/bindings'
-import {
-  commandKeyBindings,
-  keyBindingResolution,
-  resolvedPlatformKeyBindings,
-} from '@/keymap/active-bindings'
+import { keyBindingResolution, resolvedPlatformKeyBindings } from '@/keymap/active-bindings'
 import { commandHotkeyMeta, platformCommandSpec } from '@/keymap/command-registry'
 import { defaultPlatformKeyBindings, presetPlatformKeyBindings } from '@/keymap/default-bindings'
 import type { PlatformCommandId, PlatformKeyBinding } from '@/keymap/types'
@@ -52,7 +48,7 @@ describe('resolvedPlatformKeyBindings', () => {
   it('keeps every pane a command is bound in when its keys are overridden', () => {
     const resolved = resolvedPlatformKeyBindings(
       defaultPlatformKeyBindings('linux'),
-      { 'workspace.undoSessionAction': 'Mod+Alt+Z' },
+      { 'workspace.undoSessionAction': ['Mod+Alt+Z'] },
       'linux',
     )
     const overridden = resolved.filter(
@@ -71,7 +67,7 @@ describe('resolvedPlatformKeyBindings', () => {
   it('replaces every default a command had with the one hotkey the user chose', () => {
     const resolved = resolvedPlatformKeyBindings(
       defaultPlatformKeyBindings('linux'),
-      { 'workspace.showCommandPalette': 'Mod+Alt+K' },
+      { 'workspace.showCommandPalette': ['Mod+Alt+K'] },
       'linux',
     )
 
@@ -88,7 +84,7 @@ describe('resolvedPlatformKeyBindings', () => {
   it('keeps the pane and event handling the default was written with', () => {
     const resolved = resolvedPlatformKeyBindings(
       defaultPlatformKeyBindings('linux'),
-      { 'workspace.gotoSymbol': 'Mod+Alt+Y' },
+      { 'workspace.gotoSymbol': ['Mod+Alt+Y'] },
       'linux',
     )
 
@@ -105,7 +101,7 @@ describe('resolvedPlatformKeyBindings', () => {
   it('keeps a keyless editor command scoped to the editor when rebound', () => {
     const resolved = resolvedPlatformKeyBindings(
       defaultPlatformKeyBindings('linux'),
-      { 'editor.editor.action.peekDefinition': 'F1' },
+      { 'editor.editor.action.peekDefinition': ['F1'] },
       'linux',
     )
 
@@ -137,7 +133,7 @@ describe('resolvedPlatformKeyBindings', () => {
     // registry lookup alone would silently drop their overrides.
     const resolved = resolvedPlatformKeyBindings(
       defaultPlatformKeyBindings('linux'),
-      { 'workspace.newSession': 'Mod+Alt+Q' },
+      { 'workspace.newSession': ['Mod+Alt+Q'] },
       'linux',
     )
 
@@ -147,7 +143,7 @@ describe('resolvedPlatformKeyBindings', () => {
   it('ignores an override for a command this build does not have', () => {
     const resolved = resolvedPlatformKeyBindings(
       defaultPlatformKeyBindings('linux'),
-      { 'workspace.notACommand': 'Mod+Alt+K' },
+      { 'workspace.notACommand': ['Mod+Alt+K'] },
       'linux',
     )
 
@@ -157,7 +153,7 @@ describe('resolvedPlatformKeyBindings', () => {
   it('leaves the default in place when the override is not a hotkey', () => {
     const resolved = resolvedPlatformKeyBindings(
       defaultPlatformKeyBindings('linux'),
-      { 'workspace.saveFile': 'Mod+Nonsense' },
+      { 'workspace.saveFile': ['Mod+Nonsense'] },
       'linux',
     )
 
@@ -167,7 +163,7 @@ describe('resolvedPlatformKeyBindings', () => {
   it('drops the binding whose key an override took instead of keeping a dead one', () => {
     const resolved = resolvedPlatformKeyBindings(
       defaultPlatformKeyBindings('linux'),
-      { 'workspace.saveFile': 'Mod+B' },
+      { 'workspace.saveFile': ['Mod+B'] },
       'linux',
     )
 
@@ -180,7 +176,7 @@ describe('resolvedPlatformKeyBindings', () => {
     // global override of the same chord takes nothing away from it.
     const resolved = resolvedPlatformKeyBindings(
       defaultPlatformKeyBindings('linux'),
-      { 'workspace.togglePanel': 'Mod+F' },
+      { 'workspace.togglePanel': ['Mod+F'] },
       'linux',
     )
 
@@ -191,7 +187,7 @@ describe('resolvedPlatformKeyBindings', () => {
   it('keeps only the later of two overrides that name the same key', () => {
     const resolved = resolvedPlatformKeyBindings(
       defaultPlatformKeyBindings('linux'),
-      { 'workspace.saveFile': 'Mod+Alt+J', 'workspace.togglePanel': 'Mod+Alt+J' },
+      { 'workspace.saveFile': ['Mod+Alt+J'], 'workspace.togglePanel': ['Mod+Alt+J'] },
       'linux',
     )
 
@@ -202,126 +198,11 @@ describe('resolvedPlatformKeyBindings', () => {
   it('leaves the command with its other default when only one key is taken', () => {
     const resolved = resolvedPlatformKeyBindings(
       defaultPlatformKeyBindings('linux'),
-      { 'workspace.togglePanel': 'F1' },
+      { 'workspace.togglePanel': ['F1'] },
       'linux',
     )
 
     expect(keysFor(resolved, 'workspace.showCommandPalette')).toEqual(['Mod+Shift+P'])
-  })
-})
-
-describe('commandKeyBindings', () => {
-  it('reports the default binding until the user overrides it', () => {
-    expect(commandKeyBindings(defaultPlatformKeyBindings('linux'), {}, 'linux')).toContainEqual({
-      command: 'workspace.saveFile',
-      defaultKeys: ['Mod+S'],
-      effectiveKeys: ['Mod+S'],
-      keys: 'Mod+S',
-      shadowedBy: null,
-      source: 'default',
-    })
-  })
-
-  it('shows the override in force beside the defaults it replaced', () => {
-    const rows = commandKeyBindings(
-      defaultPlatformKeyBindings('linux'),
-      { 'workspace.showCommandPalette': 'Mod+Alt+K' },
-      'linux',
-    )
-
-    expect(rows).toContainEqual({
-      command: 'workspace.showCommandPalette',
-      defaultKeys: ['Mod+Shift+P', 'F1'],
-      effectiveKeys: ['Mod+Alt+K'],
-      keys: 'Mod+Alt+K',
-      shadowedBy: null,
-      source: 'user',
-    })
-  })
-
-  it('lists a command that only the user has bound', () => {
-    const rows = commandKeyBindings(
-      defaultPlatformKeyBindings('linux'),
-      { 'workspace.focusEditor': 'Mod+Alt+E' },
-      'linux',
-    )
-
-    expect(rows).toContainEqual({
-      command: 'workspace.focusEditor',
-      defaultKeys: [],
-      effectiveKeys: ['Mod+Alt+E'],
-      keys: 'Mod+Alt+E',
-      shadowedBy: null,
-      source: 'user',
-    })
-  })
-
-  it('reports an unbind as no keys at all', () => {
-    const rows = commandKeyBindings(
-      defaultPlatformKeyBindings('linux'),
-      { 'workspace.saveFile': null },
-      'linux',
-    )
-
-    expect(rows).toContainEqual({
-      command: 'workspace.saveFile',
-      defaultKeys: ['Mod+S'],
-      effectiveKeys: [],
-      keys: null,
-      shadowedBy: null,
-      source: 'user',
-    })
-  })
-
-  it('names the command that took the key instead of calling a dead binding live', () => {
-    const rows = commandKeyBindings(
-      defaultPlatformKeyBindings('linux'),
-      { 'workspace.saveFile': 'Mod+B' },
-      'linux',
-    )
-
-    expect(rows).toContainEqual({
-      command: 'workspace.toggleSidebarVisibility',
-      defaultKeys: ['Mod+B'],
-      effectiveKeys: [],
-      keys: 'Mod+B',
-      shadowedBy: 'workspace.saveFile',
-      source: 'default',
-    })
-  })
-
-  it('marks the losing override when two of them name the same key', () => {
-    const rows = commandKeyBindings(
-      defaultPlatformKeyBindings('linux'),
-      { 'workspace.saveFile': 'Mod+Alt+J', 'workspace.togglePanel': 'Mod+Alt+J' },
-      'linux',
-    )
-
-    expect(rows).toContainEqual({
-      command: 'workspace.saveFile',
-      defaultKeys: ['Mod+S'],
-      effectiveKeys: [],
-      keys: 'Mod+Alt+J',
-      shadowedBy: 'workspace.togglePanel',
-      source: 'user',
-    })
-  })
-
-  it('leaves a command alone when only one of its two defaults is taken', () => {
-    const rows = commandKeyBindings(
-      defaultPlatformKeyBindings('linux'),
-      { 'workspace.togglePanel': 'F1' },
-      'linux',
-    )
-
-    expect(rows).toContainEqual({
-      command: 'workspace.showCommandPalette',
-      defaultKeys: ['Mod+Shift+P', 'F1'],
-      effectiveKeys: ['Mod+Shift+P'],
-      keys: 'Mod+Shift+P',
-      shadowedBy: null,
-      source: 'default',
-    })
   })
 })
 
@@ -674,7 +555,7 @@ function keysFor(bindings: readonly PlatformKeyBinding[], command: PlatformComma
 it('resolves a two-stroke override without collapsing to its last stroke', () => {
   const resolved = resolvedPlatformKeyBindings(
     defaultPlatformKeyBindings('linux'),
-    { 'workspace.showSettings': 'Mod+K Mod+B' },
+    { 'workspace.showSettings': ['Mod+K Mod+B'] },
     'linux',
   )
   const settings = resolved.find((candidate) => candidate.command === 'workspace.showSettings')
@@ -687,37 +568,30 @@ it.each([
   ['Mod+K', 'Mod+K Mod+S'],
 ])('reports default %s shadowed by user %s', (defaultKeys, overrideKeys) => {
   const defaults = [binding(defaultKeys, { command: 'workspace.showSettings' }), binding('Mod+S')]
-  const overrides = { 'workspace.saveFile': overrideKeys }
-  const resolved = resolvedPlatformKeyBindings(defaults, overrides, 'linux')
-  expect(commands(resolved)).toEqual(['workspace.saveFile'])
-  expect(commandKeyBindings(defaults, overrides, 'linux')).toContainEqual(
-    expect.objectContaining({
-      command: 'workspace.showSettings',
-      shadowedBy: 'workspace.saveFile',
-    }),
-  )
+  const overrides = { 'workspace.saveFile': [overrideKeys] }
+  const resolution = keyBindingResolution(defaults, overrides, 'linux')
+  expect(commands(resolution.bindings)).toEqual(['workspace.saveFile'])
+  expect(resolution.shadowedBy.get('workspace.showSettings')).toBe('workspace.saveFile')
 })
 
 it('reports a duplicate chord override as shadowed by the later override', () => {
-  const rows = commandKeyBindings(
+  const resolution = keyBindingResolution(
     defaultPlatformKeyBindings('linux'),
     {
-      'workspace.saveFile': 'Mod+K Mod+V',
-      'workspace.togglePanel': 'Mod+K Mod+V',
+      'workspace.saveFile': ['Mod+K Mod+V'],
+      'workspace.togglePanel': ['Mod+K Mod+V'],
     },
     'linux',
   )
-  expect(rows).toContainEqual(
-    expect.objectContaining({ command: 'workspace.saveFile', shadowedBy: 'workspace.togglePanel' }),
-  )
+  expect(resolution.shadowedBy.get('workspace.saveFile')).toBe('workspace.togglePanel')
 })
 
 it('keeps sibling chord overrides in the same pane', () => {
   const resolved = resolvedPlatformKeyBindings(
     defaultPlatformKeyBindings('linux'),
     {
-      'workspace.saveFile': 'Mod+K Mod+V',
-      'workspace.togglePanel': 'Mod+K Mod+B',
+      'workspace.saveFile': ['Mod+K Mod+V'],
+      'workspace.togglePanel': ['Mod+K Mod+B'],
     },
     'linux',
   )
@@ -728,25 +602,25 @@ it('keeps sibling chord overrides in the same pane', () => {
 it('keeps a sibling chord when its conflicting prefix override is shadowed', () => {
   const defaults = defaultPlatformKeyBindings('linux')
   const overrides = {
-    'workspace.saveFile': 'Mod+K Mod+V',
-    'workspace.toggleSidebarVisibility': 'Mod+K',
-    'workspace.togglePanel': 'Mod+K Mod+B',
+    'workspace.saveFile': ['Mod+K Mod+V'],
+    'workspace.toggleSidebarVisibility': ['Mod+K'],
+    'workspace.togglePanel': ['Mod+K Mod+B'],
   }
   const resolved = resolvedPlatformKeyBindings(defaults, overrides, 'linux')
 
   expect(keysFor(resolved, 'workspace.saveFile')).toEqual(['Mod+K Mod+V'])
   expect(keysFor(resolved, 'workspace.toggleSidebarVisibility')).toEqual([])
   expect(keysFor(resolved, 'workspace.togglePanel')).toEqual(['Mod+K Mod+B'])
-  expect(commandKeyBindings(defaults, overrides, 'linux')).toContainEqual(
-    expect.objectContaining({ command: 'workspace.saveFile', shadowedBy: null }),
-  )
+  expect(
+    keyBindingResolution(defaults, overrides, 'linux').shadowedBy.has('workspace.saveFile'),
+  ).toBe(false)
 })
 
 it('keeps a default chord when its conflicting prefix override is shadowed', () => {
   const defaults = defaultPlatformKeyBindings('linux')
   const overrides = {
-    'workspace.toggleSidebarVisibility': 'Mod+K',
-    'workspace.togglePanel': 'Mod+K Mod+B',
+    'workspace.toggleSidebarVisibility': ['Mod+K'],
+    'workspace.togglePanel': ['Mod+K Mod+B'],
   }
   const resolved = resolvedPlatformKeyBindings(defaults, overrides, 'linux')
 
@@ -809,14 +683,10 @@ it('reports partial alias loss without marking the command fully shadowed', () =
     binding('Mod+,', { command: 'workspace.showSettings' }),
     binding('Mod+K Mod+S', { command: 'workspace.showSettings' }),
   ]
-  const overrides = { 'workspace.togglePanel': 'Mod+K Mod+S' }
-  expect(commandKeyBindings(defaults, overrides, 'linux')).toContainEqual(
-    expect.objectContaining({
-      command: 'workspace.showSettings',
-      effectiveKeys: ['Mod+,'],
-      shadowedBy: null,
-    }),
-  )
+  const overrides = { 'workspace.togglePanel': ['Mod+K Mod+S'] }
+  expect(
+    keysFor(resolvedPlatformKeyBindings(defaults, overrides, 'linux'), 'workspace.showSettings'),
+  ).toEqual(['Mod+,'])
   expect(keyBindingResolution(defaults, overrides, 'linux').report).toContainEqual(
     expect.objectContaining({
       command: 'workspace.showSettings',
@@ -832,8 +702,8 @@ it('reports invalid spelling independently from unknown commands', () => {
   const resolved = keyBindingResolution(
     defaults,
     {
-      'workspace.saveFile': 'NotAHotkey',
-      'workspace.doesNotExist': 'Mod+J',
+      'workspace.saveFile': ['NotAHotkey'],
+      'workspace.doesNotExist': ['Mod+J'],
     },
     'linux',
   )

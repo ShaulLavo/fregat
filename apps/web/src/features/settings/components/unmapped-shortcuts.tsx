@@ -38,7 +38,7 @@ export function UnmappedShortcuts({
             <span className='truncate font-mono' title={entry.command}>
               {entry.command}
             </span>
-            <ShortcutKeys keys={[entry.keys]} platform={platform} />
+            <ShortcutKeys keys={entry.keys} platform={platform} />
             <span className='text-muted-foreground text-2xs col-span-2'>{entry.reason}</span>
           </div>
         ))}

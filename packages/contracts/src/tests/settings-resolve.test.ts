@@ -302,10 +302,10 @@ describe('the shipping registry', () => {
 
   it('accepts a real keybinding override from the user file', () => {
     const { values, diagnostics } = resolveSettings([
-      layer('user', { 'keybindings.overrides': { 'workspace.saveFile': 'Mod+Alt+S' } }),
+      layer('user', { 'keybindings.overrides': { 'workspace.saveFile': ['Mod+Alt+S'] } }),
     ])
 
-    expect(values['keybindings.overrides']).toEqual({ 'workspace.saveFile': 'Mod+Alt+S' })
+    expect(values['keybindings.overrides']).toEqual({ 'workspace.saveFile': ['Mod+Alt+S'] })
     expect(diagnostics).toEqual([])
   })
 })

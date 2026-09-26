@@ -184,7 +184,7 @@ stays safe to read, share and export.
 
 ### Details
 
-- `keybindings.overrides`: In settings.json this is command id to shortcut: one hotkey, or two separated by a single space. A missing command keeps its default; null unbinds it.
+- `keybindings.overrides`: In settings.json this is command id to its complete list of shortcuts, each one hotkey or two separated by a single space. A missing command keeps its defaults; null or an empty list unbinds it.
 
 ## Language servers
 

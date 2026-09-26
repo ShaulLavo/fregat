@@ -28,8 +28,11 @@ afterEach(() => {
     Object.defineProperty(HTMLElement.prototype, 'offsetHeight', originalOffsetHeight)
 })
 
-function row(command: string) {
-  const element = document.querySelector<HTMLElement>(`[data-shortcut-command="${command}"]`)
+function row(command: string, keys?: string) {
+  const chord = keys === undefined ? '' : `[data-shortcut-keys="${keys}"]`
+  const element = document.querySelector<HTMLElement>(
+    `[data-shortcut-command="${command}"]${chord}`,
+  )
   expect(element).not.toBeNull()
   return element as HTMLElement
 }
@@ -59,12 +62,12 @@ test('lists commands by title, with their keys, where and source', async ({ clie
   renderWithProviders(<KeybindingSection />)
   await showOnly('Show command palette')
 
-  const palette = row('workspace.showCommandPalette')
+  const palette = row('workspace.showCommandPalette', 'Mod+Shift+P')
   expect(palette).toHaveTextContent('Show command palette')
   expect(palette).toHaveTextContent('Everywhere')
   expect(palette).toHaveTextContent('Default')
-  // F1 is its second chord; the row shows the first and counts the rest.
-  expect(palette).toHaveTextContent('+1')
+  // F1 is its second chord, on a row of its own.
+  expect(row('workspace.showCommandPalette', 'F1')).toHaveTextContent('Default')
 })
 
 test('the search box narrows the list and says so when nothing matches', async ({ client }) => {
@@ -93,7 +96,9 @@ test('recording writes nothing until Enter, then Reset takes the override out', 
   expect(await overrides()).not.toHaveProperty('workspace.saveFile')
 
   press(recorder, 'Enter')
-  await waitFor(async () => expect((await overrides())['workspace.saveFile']).toBe('Mod+Alt+J'))
+  await waitFor(async () =>
+    expect((await overrides())['workspace.saveFile']).toEqual(['Mod+Alt+J']),
+  )
 
   fireEvent.contextMenu(row('workspace.saveFile'))
   await userEvent.click(await screen.findByRole('menuitem', { name: 'Reset to default' }))
@@ -128,10 +133,14 @@ test('records two strokes, and Escape clears before it closes', async ({ client 
   press(recorder, 's', { ctrl: true })
   press(recorder, 'Enter')
 
-  await waitFor(async () => expect((await overrides())['workspace.saveFile']).toBe('Mod+K Mod+S'))
+  await waitFor(async () =>
+    expect((await overrides())['workspace.saveFile']).toEqual(['Mod+K Mod+S']),
+  )
 })
 
-test('Remove shortcut writes null, which the row shows as Removed', async ({ client }) => {
+test('Remove shortcut on the last chord writes an empty list, shown as Removed', async ({
+  client,
+}) => {
   expect(client).toBeDefined()
   renderWithProviders(<KeybindingSection />)
   await showOnly('Save')
@@ -139,8 +148,44 @@ test('Remove shortcut writes null, which the row shows as Removed', async ({ cli
   fireEvent.contextMenu(row('workspace.saveFile'))
   await userEvent.click(await screen.findByRole('menuitem', { name: /^Remove shortcut/ }))
 
-  await waitFor(async () => expect((await overrides())['workspace.saveFile']).toBeNull())
+  await waitFor(async () => expect((await overrides())['workspace.saveFile']).toEqual([]))
   await waitFor(() => expect(row('workspace.saveFile')).toHaveTextContent('Removed'))
+})
+
+test('Add another shortcut keeps the command’s chords and appends one', async ({ client }) => {
+  expect(client).toBeDefined()
+  renderWithProviders(<KeybindingSection />)
+  await showOnly('Show command palette')
+
+  fireEvent.contextMenu(row('workspace.showCommandPalette', 'F1'))
+  await userEvent.click(await screen.findByRole('menuitem', { name: 'Add another shortcut' }))
+  const recorder = await screen.findByRole('textbox', {
+    name: 'Press the new shortcut for Show command palette',
+  })
+  press(recorder, 'F7')
+  press(recorder, 'Enter')
+
+  await waitFor(async () =>
+    expect((await overrides())['workspace.showCommandPalette']).toEqual([
+      'Mod+Shift+P',
+      'F1',
+      'F7',
+    ]),
+  )
+  await waitFor(() => expect(row('workspace.showCommandPalette', 'F7')).toHaveTextContent('Custom'))
+})
+
+test('Remove shortcut on one of two chords keeps the other', async ({ client }) => {
+  expect(client).toBeDefined()
+  renderWithProviders(<KeybindingSection />)
+  await showOnly('Show command palette')
+
+  fireEvent.contextMenu(row('workspace.showCommandPalette', 'F1'))
+  await userEvent.click(await screen.findByRole('menuitem', { name: /^Remove shortcut/ }))
+
+  await waitFor(async () =>
+    expect((await overrides())['workspace.showCommandPalette']).toEqual(['Mod+Shift+P']),
+  )
 })
 
 test('an untouched row offers nothing to reset', async ({ client }) => {
@@ -158,7 +203,7 @@ test('the Custom filter counts and shows changed commands', async ({ client }) =
   await saveSettings(
     {
       mutationId: 'shortcuts-custom-filter',
-      operations: [{ command: 'workspace.saveFile', keys: 'Mod+Alt+J', kind: 'keybinding.set' }],
+      operations: [{ command: 'workspace.saveFile', keys: ['Mod+Alt+J'], kind: 'keybinding.set' }],
       target: 'user',
     },
     getClient(),

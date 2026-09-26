@@ -41,7 +41,7 @@ export function ShortcutRow({
   const where = takenBy ? `Taken by ${takenBy}` : shortcutPlacesLabel(row.places)
   const source = shortcutSourceLabel(row.source)
   const modified = row.source === 'custom' || row.source === 'removed'
-  const bound = row.keys.length > 0
+  const bound = row.keys !== null
 
   return (
     <ListRow
@@ -52,6 +52,8 @@ export function ShortcutRow({
         '@max-3xl/settings:h-12 @max-3xl/settings:flex-col @max-3xl/settings:items-stretch @max-3xl/settings:justify-center @max-3xl/settings:gap-0.5',
       )}
       data-shortcut-command={row.command}
+      data-shortcut-keys={row.keys ?? undefined}
+      data-shortcut-row={row.id}
       onContextMenu={(event: MouseEvent<HTMLDivElement>) => {
         event.preventDefault()
         onMenu(event.currentTarget)
@@ -74,7 +76,9 @@ export function ShortcutRow({
           ) : null}
         </span>
         <span className='flex min-w-0 shrink-0 items-center gap-1 @3xl/settings:overflow-hidden'>
-          <ShortcutKeys keys={row.keys} platform={platform} struck={takenBy !== null} />
+          {row.keys ? (
+            <ShortcutKeys keys={row.keys} platform={platform} struck={takenBy !== null} />
+          ) : null}
           {keptNote ? (
             <WarningIcon
               aria-label={keptNote}
@@ -137,8 +141,8 @@ function rowTitle(
   platform: PlatformName,
 ): string {
   const parts = [`${row.title} (${row.command})`]
-  if (row.keys.length > 0)
-    parts.push(row.keys.map((keys) => formatChord(keys, platform)).join(', '))
+  if (row.keys) parts.push(formatChord(row.keys, platform))
+  if (row.commandKeys.length > 1) parts.push(`${row.commandKeys.length} shortcuts`)
   if (row.places.length > 0) parts.push(row.places.join('; '))
   if (row.shadowedBy) parts.push(where)
   if (keptNote) parts.push(keptNote)
