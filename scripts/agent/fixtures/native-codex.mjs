@@ -503,6 +503,17 @@ function resetCreditAccount(message) {
 }
 
 function handle(message) {
+  if (scenario === 'session-no-flicker' && message.method === 'turn/start') {
+    const turn = startOwnTurn(message)
+    const text = promptText(message)
+    agentMessage(
+      turn,
+      `${turn}-answer`,
+      Array.from({ length: 45 }, (_, i) => `${text} row ${i}`).join('\n\n'),
+    )
+    endTurn(turn, 'completed')
+    return
+  }
   if (scenario.startsWith('mcp-') && scenario !== 'mcp-approval' && handleMcpStatus(message)) return
   if (scenario === 'chat-history-pages' && message.method === 'turn/start')
     return historyPages(message)

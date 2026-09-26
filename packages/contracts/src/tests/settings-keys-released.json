@@ -91,6 +91,7 @@
     "models.favorites",
     "models.hidden",
     "models.order",
+    "prefetch.diffs",
     "prefetch.enabled",
     "prefetch.files",
     "providers.instances",

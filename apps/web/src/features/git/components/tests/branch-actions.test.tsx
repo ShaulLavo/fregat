@@ -1,3 +1,5 @@
+import type { GitPullRequestState } from '@workspace/contracts'
+import { gitKeys } from '@/lib/query-keys'
 import { usePushRemoteMutation } from '@/features/git/hooks/use-push-remote-mutation'
 import { usePushAndOpenPullRequestMutation } from '@/features/git/hooks/use-push-and-open-pull-request-mutation'
 import { registerEnvironmentQueryClient } from '@/lib/environments/state/query-clients'
@@ -174,6 +176,76 @@ test('push queues behind push-and-open for the same checkout', async ({ client, 
     barrier.resolve()
     await shipping
     await pushing
+    rendered.unmount()
+  }
+})
+
+test('retains the previous worktree actions while the next worktree loads', async ({
+  client,
+  server,
+}) => {
+  void client
+  const first = await clonedRepo(server.root)
+  const second = await clonedRepo(path.join(server.root, 'second'))
+  await writeFile(path.join(first.repo, 'readme.md'), 'two\n')
+  runGit(first.repo, ['commit', '-am', 'ahead'], { cwdMode: 'option' })
+  runGit(second.repo, ['checkout', '-b', 'new-branch'], { cwdMode: 'option' })
+  const barrier = Promise.withResolvers<void>()
+  const forgeBarrier = Promise.withResolvers<void>()
+  const queryClient = createTestQueryClient()
+  queryClient.setQueryData<GitPullRequestState>(gitKeys.pullRequestState('repo'), {
+    branch: 'main',
+    support: 'ready',
+    forge: { kind: 'github', name: 'GitHub', host: 'github.com' },
+    pullRequest: {
+      number: 17,
+      state: 'open',
+      draft: false,
+      title: 'First',
+      url: 'https://github.com/fixture/repo/pull/17',
+    },
+  })
+  const observed = createObservedInProcessClient(server, async (request) => {
+    const url = new URL(request.url)
+    if (url.pathname === '/git/pull-request' && url.searchParams.get('path') === 'second/repo')
+      await forgeBarrier.promise
+    if (
+      url.pathname === '/git/branch-remote-state' &&
+      url.searchParams.get('path') === 'second/repo'
+    )
+      await barrier.promise
+  })
+  registerEnvironmentQueryClient(queryClient, activeServerOrigin(), observed)
+  const rendered = renderWithProviders(<BranchActions pullRequestTitle='First' rootPath='repo' />, {
+    queryClient,
+  })
+  try {
+    await screen.findByRole('button', { name: 'Push 1' })
+    expect(screen.getByRole('link', { name: '#17' })).toHaveAttribute(
+      'href',
+      'https://github.com/fixture/repo/pull/17',
+    )
+    rendered.rerender(<BranchActions pullRequestTitle='Second' rootPath='second/repo' />)
+    expect(screen.getByRole('button', { name: 'Push 1' })).toBeDisabled()
+    expect(screen.getByRole('status', { name: 'Loading branch actions' })).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'Publish' })).toBeNull()
+    await act(async () => {
+      barrier.resolve()
+    })
+    await waitFor(() =>
+      expect(queryClient.getQueryData(gitKeys.branchRemoteState('second/repo'))).toBeDefined(),
+    )
+    expect(screen.getByRole('button', { name: 'Push 1' })).toBeDisabled()
+    expect(screen.getByRole('link', { name: '#17' })).toBeVisible()
+    await act(async () => {
+      forgeBarrier.resolve()
+    })
+    await screen.findByRole('button', { name: 'Publish' })
+    expect(screen.queryByRole('link', { name: '#17' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Push 1' })).toBeNull()
+  } finally {
+    barrier.resolve()
+    forgeBarrier.resolve()
     rendered.unmount()
   }
 })

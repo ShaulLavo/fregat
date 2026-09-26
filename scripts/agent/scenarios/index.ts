@@ -1,5 +1,14 @@
+import { sessionNoFlicker } from './session-no-flicker'
 import { restNoFlicker } from './rest-no-flicker'
 import { deferredDialogs } from './deferred-dialogs'
+import { rootSwitchNoFlicker } from './root-switch-no-flicker'
+import { turnFilesNoFlicker } from './turn-files-no-flicker'
+import { branchActionsNoFlicker } from './branch-actions-no-flicker'
+import {
+  diffNoFlicker,
+  savedComparisonNoFlicker,
+  historyComparisonNoFlicker,
+} from './comparison-no-flicker'
 import { textFieldFkeys } from './text-field-fkeys'
 import { settingsRoutePreparation } from './settings-route-preparation'
 import { settingsModuleFailure } from './settings-module-failure'
@@ -230,6 +239,7 @@ import { quickOpenNewFile } from './quick-open-new-file'
 import { projectSettings } from './project-settings'
 import { workspaceTwoRoots } from './workspace-two-roots'
 import { quickOpenLinkedFile } from './quick-open-linked-file'
+import { paletteThemeNoFlicker, studioThemeNoFlicker } from './code-theme-no-flicker'
 import { quickOpenNoFlicker } from './quick-open-no-flicker'
 import { gitHistorySearchNoFlicker } from './git-history-search-no-flicker'
 import { logsSearchNoFlicker } from './logs-search-no-flicker'
@@ -309,6 +319,7 @@ import { gitMergeRequest } from './git-merge-request'
 import { gitClonePublish } from './git-clone-publish'
 import { worktreeSetupImport } from './worktree-setup-import'
 import { gitHistory } from './git-history'
+import { gitHistoryNoFlicker } from './git-history-no-flicker'
 import { editorCaretBurst } from './editor-caret-burst'
 import { editorFocusClicks } from './editor-focus-clicks'
 import { editorProportionalFont } from './editor-proportional-font'
@@ -327,6 +338,9 @@ import { demoThemeStartup } from './demo-theme-startup'
 import { demoWallpaperStartup } from './demo-wallpaper-startup'
 
 export const scenarios: readonly Scenario[] = [
+  diffNoFlicker,
+  savedComparisonNoFlicker,
+  historyComparisonNoFlicker,
   terminalHistory,
   responseDelivery,
   archiveLifecycle,
@@ -369,6 +383,7 @@ export const scenarios: readonly Scenario[] = [
   chatStashContext,
   chatStream,
   chatHistoryPages,
+  sessionNoFlicker,
   chatQueue,
   providerModelOptions,
   draftRecovery,
@@ -527,7 +542,12 @@ export const scenarios: readonly Scenario[] = [
   projectSettings,
   workspaceTwoRoots,
   quickOpenLinkedFile,
+  rootSwitchNoFlicker,
   quickOpenNoFlicker,
+  paletteThemeNoFlicker,
+  studioThemeNoFlicker,
+  turnFilesNoFlicker,
+  branchActionsNoFlicker,
   gitHistorySearchNoFlicker,
   logsSearchNoFlicker,
   searchTypeDelete,
@@ -557,6 +577,7 @@ export const scenarios: readonly Scenario[] = [
   demoThemeStartup,
   demoWallpaperStartup,
   gitHistory,
+  gitHistoryNoFlicker,
   editorLargePaste,
   editorFastScroll,
   editorDiagnosticsLifecycle,

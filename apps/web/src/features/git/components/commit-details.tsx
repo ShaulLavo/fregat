@@ -1,5 +1,6 @@
-import { Spinner } from '@workspace/ui/components/spinner'
 import { blobDiffQueryOptions } from '@/features/git/utils/blob-diff-query'
+import { useHeldUntilReady } from '@/hooks/use-held-until-ready'
+import { Spinner } from '@workspace/ui/components/spinner'
 import { useListbox } from '@workspace/ui/patterns/use-listbox'
 import { CaretDownIcon, CopyIcon, XIcon } from '@phosphor-icons/react'
 import {
@@ -26,8 +27,8 @@ import { clientErrorMessage } from '@/lib/client-error-taxonomy'
 import { historyMessageBody } from '@/features/git/utils/history-presentation'
 
 export function CommitDetails({
-  rootPath,
-  commit,
+  rootPath: nextRoot,
+  commit: nextCommit,
   onClose,
   onOpen,
 }: {
@@ -36,6 +37,10 @@ export function CommitDetails({
   onClose: () => void
   onOpen: (file: GitCommitFile) => void
 }) {
+  const requested = useCommitDetails(nextRoot, nextCommit)
+  const ready = !requested.isPending && !requested.isPlaceholderData
+  const rootPath = useHeldUntilReady(nextRoot, ready)
+  const commit = useHeldUntilReady(nextCommit, ready)
   const details = useCommitDetails(rootPath, commit)
   const shownCommit = details.data?.id ?? commit
   const navigation = useNavigation()
@@ -43,8 +48,18 @@ export function CommitDetails({
   const open = panels.gitCommitDetailsOpen
   const { view, updateView } = useHistoryView()
   const scrollRef = useRef<HTMLDivElement>(null)
-  const initialScrollTop = useRef(view.detailsScrollTop)
-  const [activePath, setActivePath] = useState<string | null>(null)
+  const scrollPosition = useRef({ rootPath, commit, top: view.detailsScrollTop })
+  const [activeFile, setActiveFile] = useState<{
+    rootPath: string
+    commit: string
+    path: string | null
+  }>({ rootPath, commit, path: null })
+  if (activeFile.rootPath !== rootPath || activeFile.commit !== commit)
+    setActiveFile({ rootPath, commit, path: null })
+  const activePath = activeFile.path
+  function setActivePath(path: string | null) {
+    setActiveFile({ rootPath, commit, path })
+  }
   const fileList = useListbox({
     role: 'tree',
     items: (details.data?.files ?? []).map((file) => ({
@@ -61,8 +76,14 @@ export function CommitDetails({
   })
   const loadedCommit = details.data?.id
   useLayoutEffect(() => {
-    if (loadedCommit && scrollRef.current) scrollRef.current.scrollTop = initialScrollTop.current
-  }, [loadedCommit])
+    if (!loadedCommit || !scrollRef.current) return
+    if (
+      scrollPosition.current.rootPath !== rootPath ||
+      scrollPosition.current.commit !== loadedCommit
+    )
+      scrollPosition.current = { rootPath, commit: loadedCommit, top: 0 }
+    scrollRef.current.scrollTop = scrollPosition.current.top
+  }, [loadedCommit, rootPath])
   return (
     <Collapsible
       render={<section aria-label='Commit details' />}
@@ -86,7 +107,7 @@ export function CommitDetails({
           />
           {shownCommit.slice(0, 10)}
         </CollapsibleTrigger>
-        {details.isFetching ? <Spinner size='xs' /> : null}
+        {requested.isFetching ? <Spinner label='Loading selected commit' size='xs' /> : null}
         <ToolbarButton
           label='Copy commit hash'
           onClick={() => {
