@@ -94,6 +94,7 @@ import { chatCardNarrow } from './chat-card-narrow'
 import { chatComposerInsert } from './chat-composer-insert'
 import { chatDisclosureSettle } from './chat-disclosure-settle'
 import { chatTurnAnatomy } from './chat-turn-anatomy'
+import { phoneShell } from './phone-shell'
 import { chatSleepingSession } from './chat-sleeping-session'
 import { chatSessionGoal } from './chat-session-goal'
 import { fileTreeHoverPrefetch } from './file-tree-hover-prefetch'
@@ -550,6 +551,7 @@ export const scenarios: readonly Scenario[] = [
   chatComposerInsert,
   chatDisclosureSettle,
   chatTurnAnatomy,
+  phoneShell,
   chatSleepingSession,
   chatSessionGoal,
   fileTreeHoverPrefetch,

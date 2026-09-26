@@ -3,6 +3,8 @@
 export const BOOT_MIRROR_KEY = 'platform.settings-boot-mirror.v1'
 export const PALETTE_BOOT_KEY = 'platform.palette-boot.v1'
 export const PALETTE_STYLE_ID = 'platform-palette'
+/** The JSON script in index.html naming each shell's chunks. */
+export const SHELL_CHUNKS_ID = 'shell-chunks'
 
 /** The desktop wallpaper the boot script preloads, handed to the app that renders it. */
 export type BootWallpaperPreload = {

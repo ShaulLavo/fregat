@@ -11,6 +11,10 @@ export const SETTINGS_DOCUMENT_TOKEN = 'settings'
 export const ADDRESS_MODES = ['chat', 'workbench'] as const
 export type AddressMode = (typeof ADDRESS_MODES)[number]
 
+/** Screens the phone shell pushes above a session. */
+export const PHONE_SCREENS = ['changes', 'file', 'terminal'] as const
+export type PhoneScreen = (typeof PHONE_SCREENS)[number]
+
 /**
  * A closed record, and that is the whitelist that makes the deny-list structural: a
  * store the encoder must never reach — the terminal command inbox, the composer inbox —
@@ -45,6 +49,8 @@ export type Address = {
   /** The four dev params, by name. Bounded on purpose — see `DEV_SEARCH_KEYS`. */
   readonly passthrough: Readonly<Record<string, string>>
   readonly rail: 'active' | 'archived' | null
+  /** The phone shell's pushed screen, so Back pops it; the workbench ignores it. */
+  readonly screen: PhoneScreen | null
   /** `s.*` — the search buffer's query and flags. Never its replacement text. */
   readonly search: Readonly<Record<string, string>> | null
   /** Settings category filter; tab membership and selection live in tabs/document/editor. */
@@ -76,6 +82,7 @@ export function emptyAddress(): Address {
     mode: null,
     passthrough: {},
     rail: null,
+    screen: null,
     search: null,
     settings: null,
     side: null,
@@ -209,6 +216,7 @@ function serializeSearch(address: Address) {
   if (address.tool && address.tool !== 'git') params.set('tool', address.tool)
   if (address.rail && address.rail !== 'active') params.set('rail', address.rail)
   if (address.diff) params.set('diff', address.diff)
+  if (address.screen) params.set('screen', address.screen)
   if (address.settings) params.set('settings', address.settings)
   for (const [key, value] of Object.entries(address.logs ?? {})) {
     if (value) params.set(`${LOGS_PREFIX}${key}`, value)
@@ -265,6 +273,7 @@ function searchFields(params: URLSearchParams, rawSearch: string) {
     search: prefixedGroup(params, SEARCH_PREFIX),
     passthrough: passthroughFrom(params),
     rail: pick(params.get('rail'), ['active', 'archived'] as const),
+    screen: pick(params.get('screen'), PHONE_SCREENS),
     settings: params.get('settings') || null,
     side: pick(params.get('side'), ['chat', 'files', 'git', 'logs', 'search'] as const),
     tabs: parseTabsValue(tabs),

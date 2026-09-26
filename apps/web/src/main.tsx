@@ -41,6 +41,8 @@ import { installEditorPerformanceTraceFromUrl } from '@/features/editor/state/pe
 import { reportReactError } from '@/lib/react-error-reporting.ts'
 import { applicationHost } from '@/lib/application-host'
 import { configureIntentPrediction } from '@/lib/intent-prefetch-options'
+import { useShellStore, watchShellKind } from '@/lib/shell/state/store'
+import { shellQueryOptions } from '@/features/workspace/utils/shell-query'
 
 installEditorPerformanceTraceFromUrl()
 configureIntentPrediction()
@@ -80,6 +82,12 @@ for (const font of fontsInUse(boot))
 // Preserve explicit fields before Router normalizes defaults; boot merges them with the cache.
 const initialHref = applicationHost()?.initialAddress ?? selectInitialAddress(window.location.href)
 const initialIntent = parseAddressIntent(initialHref)
+// Only a phone booting from the bare app URL; a window narrowed later keeps its session.
+useShellStore.setState({
+  phoneStartsAtSessions:
+    useShellStore.getState().kind === 'phone' &&
+    initialHref !== selectInitialAddress(window.location.href, null),
+})
 const routerHistory = applicationHost()?.history ?? createBrowserHistory()
 const initialBrowserHref = browserAddressHref(initialHref)
 if (routerHistory.location.href !== initialBrowserHref) routerHistory.replace(initialBrowserHref)
@@ -93,7 +101,14 @@ const restoredWorkspace = bootstrap
   .getState()
   .application?.getSnapshot()
   .editor.workspaceStore.getState()
-const warmViews: Promise<unknown>[] = []
+// The boot script already preloads the chosen shell's chunks; this evaluates them before the first render.
+const warmViews: Promise<unknown>[] = [
+  resourceQueryClient
+    .query(shellQueryOptions(useShellStore.getState().kind))
+    .then(() => undefined)
+    .catch(() => undefined),
+]
+watchShellKind()
 if (restoredWorkspace?.selectedTabContent?.kind === 'settings')
   warmViews.push(
     resourceQueryClient

@@ -66,7 +66,12 @@ import { cn } from '@workspace/ui/lib/utils'
 const EMPTY_SEARCH_MATCHES = {}
 const RAIL_DND_MODIFIERS = [restrictToVerticalAxis]
 
-export function SessionRail() {
+export function SessionRail({
+  showsActive = true,
+}: {
+  /** False where the list is its own screen: no session is open beside it to mark. */
+  readonly showsActive?: boolean
+}) {
   const { activeSession, addProject, project, ready, transport } = useChatModeSession()
   const { reorderProject, reorderSession } = useChatRailOrder()
   const sensors = useRailDragSensors()
@@ -94,12 +99,13 @@ export function SessionRail() {
   const incompleteSearch = useSessionSearchStore(
     (state) => state.matchedQuery === query.trim() && state.unavailable.length > 0,
   )
-  const activeSessionKey = activeSession.sessionId
-    ? scopedSessionKey({
-        environmentId: transport.environmentId,
-        sessionId: activeSession.sessionId,
-      })
-    : null
+  const activeSessionKey =
+    showsActive && activeSession.sessionId
+      ? scopedSessionKey({
+          environmentId: transport.environmentId,
+          sessionId: activeSession.sessionId,
+        })
+      : null
   const activeProjectId = project?.id ?? null
   // Keep model items stable across cursor updates; rebuilding them wakes every row.
   const model = useMemo(

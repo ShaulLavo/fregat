@@ -25,16 +25,14 @@ import type { SessionRailItem } from '@workspace/client-core/chat/rail/model'
 import { ToolPaneHeader } from '@workspace/ui/patterns/tool-pane-header'
 import { cn } from '@workspace/ui/lib/utils'
 
-export function StageHeader({
-  contextUsage,
-  projectTitle,
-  session,
-}: {
+export type StageHeaderProps = {
   readonly contextUsage: ContextUsage | null
   readonly projectTitle: string | null
   /** Null while the stage is on the composer — there is no session to name or act on. */
   readonly session: SessionRailItem | null
-}) {
+}
+
+export function StageHeader({ contextUsage, projectTitle, session }: StageHeaderProps) {
   const contextMeterEnabled = useSettingValue('chat.contextWindowMeterEnabled')
   const { rootPath } = useChatModeSession()
   const editing = useSessionRenaming(session, 'header')

@@ -2,17 +2,16 @@
 
 ## Status and authorization
 
-- Status: DIRECTION APPROVED (owner, 2026-09-25); research done and owner questions answered 2026-09-25
-  (see "Research findings"). Next: the split into executable plans.
-  iPhone (WebKit) behaviour is unmeasured: Playwright WebKit does not start on this host.
+- Status: IN PROGRESS (wave 2, lane P). Phases 1–2 implemented 2026-09-26 (phone shell frame and
+  screens); Phase 3 (touch) and Phase 4 (sessions and pairing) follow in their own pull requests.
+  Owner check pending: a real iPhone and Android phone (Phase 5). iPhone (WebKit) behaviour is
+  unmeasured: Playwright WebKit does not start on this host.
 - Priority: P2. Large product question; Plan 142 (Web Push) delivers the first away-from-desk
   value without it.
 - Effort: XL overall, unknown until the direction is set. The discussion itself is S.
 - Risk: HIGH. The wrong scope turns a workbench into two half-products.
 - Planned at: Platform `c2af88b4`, 2026-09-24. Origin: the 2026-09-24 reference survey (Paseo,
   Orca, T3 Code).
-- Work in the current checkout; no branches, worktrees, commits, pushes or PRs unless
-  separately requested.
 
 ## Outcome
 
@@ -428,6 +427,44 @@ The split this plan promised:
 ## Phases
 
 See "Proposed phases" under Research findings. The owner answered its questions on 2026-09-25.
+
+### Phases 1–2: shell frame and screens (implemented 2026-09-26)
+
+- **Boot switch.** `lib/shell` picks the shell from one synchronous check (`(pointer: coarse)` or a
+  window under 720px) in the pre-paint boot script, which sets `data-shell` on the root and
+  `modulepreload`s the phone shell's chunks (named by `scripts/shell-chunks-plugin.ts`). At runtime
+  three media queries follow the breakpoints with hysteresis (enter under 720px, leave at 800px, a
+  coarse pointer never leaves), and the workspace view keeps the current shell until the other's
+  chunk has loaded (`useDisplayedShell`). State stays above both shells (`KeepAliveProvider`, the
+  stores, the query cache), so a switch loses no draft and parks terminals.
+- **Stack.** `features/phone`: sessions → session → changes, file or terminal. The level is the
+  address: chat mode with no session is the list, and a new `screen` field
+  (`?screen=changes|file|terminal`) names the pushed screen, so the browser's Back gesture walks the
+  stack. Opening a document on the phone pushes `screen=file`, whichever surface opened it. The
+  header's Back pops history this shell pushed and otherwise replaces the entry with the parent. A
+  cold start from the bare app URL lands on the list; a link or notification keeps its session.
+- **Screens.** Each is its own lazy chunk behind `useHeldUntilReady` (the list and a session warm in
+  idle time). Sessions reuses the rail; Session reuses `ChatStage` with a phone header (Back, title
+  over project or status, Changes, Terminal, the session menu); Changes reuses the chat Git tool
+  (`GitToolPane`); File reuses one `EditorGroup` with the phone bar in place of its tab strip,
+  the editor's title actions, and previous/next file within the diff's scope ("2 of 5"); Terminal
+  reuses the session's kept PTY (`SessionTerminal`).
+- **Frame.** `viewport-fit=cover` and `interactive-widget=resizes-content`; safe-area padding; a
+  `visualViewport` keyboard inset for iOS; `h-dvh`. A phone density step in `globals.css`
+  (`:root[data-shell='phone']`: 48px bars, 44px controls and rows, text-xs 13px and text-sm 15px),
+  16px fields so iOS never zooms, a `phone:` variant, and no shortcut chips (`Kbd` hides itself).
+- **Tooling.** `agent:browser --touch` (and `capture.touch` on a scenario) emulates a touch phone;
+  `waitForApp` accepts the phone shell. Scenario `phone-shell` walks the whole stack on a fixture
+  repository with a scripted mock turn and checks nothing scrolls sideways.
+- **First load.** Measured on the same machine state, the app entry's initial graph now ships as one
+  chunk (`scripts/initial-chunk.ts`, a `codeSplitting` group traced from `main.tsx`): desktop
+  first load fell by 30 KB gzip against `origin/main`, and the phone shell adds nothing to it. The
+  workbench stays in the entry: splitting it out as its own lazy chunk (the Direction's "a phone
+  never downloads the workbench") measured +11 KB to +70 KB on the desktop from chunk fragmentation,
+  for a phone first load of 1.01 MB instead of 1.75 MB. Recorded as a follow-up, not done.
+
+Owner check pending: the phone shell on a real iPhone (WebKit: focus zoom, keyboard inset, safe
+areas, Back swipe) and an Android phone (`interactive-widget`), through the mesh.
 
 ## Follow-up items
 
