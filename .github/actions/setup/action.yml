@@ -8,12 +8,6 @@ inputs:
   ghostty-ref:
     description: Git ref of the ShaulLavo/ghostty-webgpu checkout the ghostty-webgpu link resolves to.
     default: c490d8625b913853f062df9051a92295963abff5
-  alignment-reference:
-    description: Also provide the pinned pingdotgg/t3code checkout at references/t3code, which the parity checks and some tests read.
-    default: 'false'
-  t3code-ref:
-    description: Commit of pingdotgg/t3code the alignment evidence is pinned to.
-    default: 7445aa733ada33e45289e5aa5055f79142556513
 
 runs:
   using: composite
@@ -135,20 +129,3 @@ runs:
     - name: Install dependencies
       shell: bash
       run: bun install --frozen-lockfile
-
-    - name: Restore alignment reference
-      id: t3code
-      if: ${{ inputs.alignment-reference == 'true' }}
-      uses: actions/cache@v4
-      with:
-        path: references/t3code
-        key: t3code-${{ inputs.t3code-ref }}
-
-    - name: Checkout alignment reference
-      if: ${{ inputs.alignment-reference == 'true' && steps.t3code.outputs.cache-hit != 'true' }}
-      uses: actions/checkout@v4
-      with:
-        repository: pingdotgg/t3code
-        ref: ${{ inputs.t3code-ref }}
-        path: references/t3code
-        persist-credentials: false
