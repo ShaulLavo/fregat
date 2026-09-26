@@ -338,7 +338,16 @@ function handleMcpStatus(message) {
   // Opening a thread falls through to the shared handler; only its per-thread config is recorded.
   if (message.method === 'thread/start' || message.method === 'thread/resume') {
     threadConfig = message.params?.config ?? {}
-    record({ event: message.method, config: message.params?.config ?? null })
+    // Record switch state and binding presence; the bearer stays out of fixture evidence.
+    record({
+      event: message.method,
+      config: Object.fromEntries(
+        Object.entries(threadConfig).filter(([key]) => key.endsWith('.enabled')),
+      ),
+      platformMcp:
+        typeof threadConfig['mcp_servers.platform.url'] === 'string' &&
+        threadConfig['features.mcp_2026_07_28'] === true,
+    })
     return false
   }
   if (message.method === 'mcpServerStatus/list') {

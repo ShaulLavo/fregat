@@ -32,10 +32,10 @@ export const mcpStatus = isolatedNativeScenario({
       (entry) => entry.event === 'thread/start' || entry.event === 'thread/resume',
     )
     deepStrictEqual(
-      opened.map((entry) => [entry.event, entry.config]),
+      opened.map((entry) => [entry.event, entry.config, entry.platformMcp]),
       [
-        ['thread/start', null],
-        ['thread/resume', { 'mcp_servers.linear.enabled': false }],
+        ['thread/start', {}, true],
+        ['thread/resume', { 'mcp_servers.linear.enabled': false }, true],
       ],
     )
   },
