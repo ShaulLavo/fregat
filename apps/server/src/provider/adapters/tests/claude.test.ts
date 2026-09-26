@@ -1,5 +1,5 @@
 import { BackgroundTaskRegistry } from '../../background-liveness'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterAll, assert, beforeAll, describe, expect, it, vi } from 'vitest'
@@ -1060,6 +1060,41 @@ describe('ClaudeProviderAdapter', () => {
     )
     expect(readies.map((event) => event.turnId)).toEqual(['turn-1', wakeupTurnId])
     await harness.adapter.stopAll()
+  it('keeps unapproved project MCP servers off, and restarts the idle session on approval', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'platform-claude-project-mcp-'))
+    const cwd = path.join(root, 'repo')
+    const configDir = path.join(root, 'claude-config')
+    await mkdir(configDir, { recursive: true })
+    await mkdir(cwd, { recursive: true })
+    await writeFile(
+      path.join(cwd, '.mcp.json'),
+      JSON.stringify({ mcpServers: { deploy: { command: 'deploy-server' } } }),
+    )
+    const harness = claudeHarness(true, undefined, { CLAUDE_CONFIG_DIR: configDir })
+    const input = { ...sessionStartInput({}), cwd }
+    try {
+      await harness.adapter.startRuntime(input)
+      expect(latestOptions(harness).settings).toMatchObject({ disabledMcpjsonServers: ['deploy'] })
+      expect(await harness.adapter.mcpServers({ sessionId: input.sessionId })).toContainEqual({
+        error: null,
+        name: 'deploy',
+        status: 'unapproved',
+      })
+
+      await harness.adapter.approveMcpServer({ name: 'deploy', sessionId: input.sessionId })
+
+      expect(harness.queries).toHaveLength(2)
+      expect(latestOptions(harness).settings).toBeUndefined()
+      expect(
+        JSON.parse(await readFile(path.join(cwd, '.claude', 'settings.local.json'), 'utf8')),
+      ).toEqual({ enabledMcpjsonServers: ['deploy'] })
+      await expect(
+        harness.adapter.approveMcpServer({ name: 'deploy', sessionId: input.sessionId }),
+      ).rejects.toMatchObject({ code: 'provider.MCP_SERVER_NOT_AWAITING_APPROVAL' })
+    } finally {
+      await harness.adapter.stopAll()
+      await rm(root, { force: true, recursive: true })
+    }
   })
 
   it('rejects a second turn while one is still in flight', async () => {
@@ -1473,7 +1508,11 @@ describe('ClaudeProviderAdapter catalog', () => {
   })
 })
 
-function claudeHarness(acknowledgeStop = true, historyRunner?: ClaudeHistoryRunner): ClaudeHarness {
+function claudeHarness(
+  acknowledgeStop = true,
+  historyRunner?: ClaudeHistoryRunner,
+  env?: NodeJS.ProcessEnv,
+): ClaudeHarness {
   const events: ProviderRuntimeEvent[] = []
   const options: Options[] = []
   const prompts: SDKUserMessage[] = []
@@ -1481,6 +1520,7 @@ function claudeHarness(acknowledgeStop = true, historyRunner?: ClaudeHistoryRunn
   const queries: FakeClaudeQuery[] = []
 
   const adapter = new ClaudeProviderAdapter({
+    ...(env ? { env } : {}),
     historyRunner,
     attachmentsDir,
     auth: signedInClaudeAuth(),

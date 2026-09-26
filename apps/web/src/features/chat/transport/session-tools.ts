@@ -33,6 +33,15 @@ export async function reconnectMcpServer(ref: ScopedSessionRef, name: string) {
   })
 }
 
+/** Resolves with the server list after the approval, which restarts an idle session. */
+export async function approveMcpServer(ref: ScopedSessionRef, name: string) {
+  const response = await sessionControls(ref).mcp({ name }).approve.post()
+  return unwrapEdenResponse<ProviderSessionMcp>(response, {
+    emptyMessage: 'the approval response carried no server list',
+    requireData: true,
+  })
+}
+
 export async function signInMcpServer(ref: ScopedSessionRef, name: string) {
   const response = await sessionControls(ref).mcp({ name })['sign-in'].post()
   const result = unwrapEdenResponse<ProviderMcpSignIn>(response, {

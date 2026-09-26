@@ -627,6 +627,8 @@ export type ProviderAdapter = {
   /** The session's MCP servers; null when it has no live provider process to ask. */
   mcpServers?: (input: { sessionId: SessionId }) => Promise<ProviderMcpServer[] | null>
   reconnectMcpServer?: (input: { name: string; sessionId: SessionId }) => Promise<void>
+  /** Approves a checkout's project server this session turned off, and restarts an idle session. */
+  approveMcpServer?: (input: { name: string; sessionId: SessionId }) => Promise<void>
   signInMcpServer?: (input: { name: string; sessionId: SessionId }) => Promise<ProviderMcpSignIn>
   /** Hooks configured for the checkout; null when the session has no live provider process. */
   configuredHooks?: (input: {

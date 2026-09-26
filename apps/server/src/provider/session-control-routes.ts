@@ -73,6 +73,11 @@ export function sessionControlRoutes(providerService: ProviderService) {
       { params: serverParamsSchema, response: providerSessionMcpSchema },
     )
     .post(
+      '/providers/sessions/:sessionId/mcp/:name/approve',
+      ({ params }) => providerService.approveMcpServer(params),
+      { params: serverParamsSchema, response: providerSessionMcpSchema },
+    )
+    .post(
       '/providers/sessions/:sessionId/mcp/:name/sign-in',
       ({ params }) => providerService.signInMcpServer(params),
       { params: serverParamsSchema, response: providerMcpSignInSchema },

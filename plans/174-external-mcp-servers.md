@@ -149,6 +149,22 @@ Each phase ships and deploys on its own; phases 1, 3, 5 and 6 change the server
    the idle CLI. Files: `provider/adapters/utils/claude-query-options.ts`, a new
    `provider/adapters/utils/claude-project-mcp.ts`, chat popover. Scenario: a fixture repository
    whose project server stays off until approved.
+   Landed 2026-09-26 (wave 2 lane B). `provider/adapters/utils/claude-project-mcp.ts` reads the
+   checkout's `.mcp.json` names at every Claude CLI start and turns the unapproved ones off with
+   `settings.disabledMcpjsonServers`; the unapproved set is part of the session's reuse key, so an
+   approval (or a new server) gets a new CLI. The popover shows those rows as "Not approved" with
+   Approve (`POST /providers/sessions/:id/mcp/:name/approve`), which appends the name to the
+   checkout's `.claude/settings.local.json` `enabledMcpjsonServers` and restarts an idle session
+   (a busy one picks it up at its next turn).
+   Decided 2026-09-26: recommendation (wave 2): approvals count only from files the repository
+   cannot ship: the instance's `settings.json` (`enableAllProjectMcpServers`,
+   `enabledMcpjsonServers`), its `.claude.json` `projects[cwd]` entry, and a
+   `.claude/settings.local.json` that git does not track. The checkout's `.claude/settings.json`
+   and a committed `settings.local.json` are the repository's own words, so they approve nothing,
+   and Approve refuses to write into a tracked `settings.local.json`. This is stricter than the
+   CLI, which reads approvals from project settings too.
+   Not run: the fixture-repository scenario, which needs a real Claude session (a hard stop in
+   wave 2). Covered instead by adapter, file-rule and popover tests with the fake CLI.
 3. **MCP servers settings page (M).** A Settings › MCP servers page per machine and provider
    instance: rows grouped by source, with status, tools, auth and the file each row lives in.
    Server: `GET /providers/instances/:id/mcp` reads through a probe process (the Claude

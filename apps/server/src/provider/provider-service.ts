@@ -954,6 +954,12 @@ export class ProviderService {
     return this.sessionMcp(input.sessionId)
   }
 
+  async approveMcpServer(input: { name: string; sessionId: SessionId }) {
+    const adapter = this.requireSessionControl(input.sessionId, 'approveMcpServer')
+    await adapter.approveMcpServer?.(input)
+    return this.sessionMcp(input.sessionId)
+  }
+
   async signInMcpServer(input: { name: string; sessionId: SessionId }) {
     const adapter = this.requireSessionControl(input.sessionId, 'signInMcpServer')
     const signIn = adapter.signInMcpServer
@@ -976,7 +982,7 @@ export class ProviderService {
 
   private requireSessionControl(
     sessionId: SessionId,
-    control: 'reconnectMcpServer' | 'signInMcpServer' | 'controlGoal',
+    control: 'approveMcpServer' | 'reconnectMcpServer' | 'signInMcpServer' | 'controlGoal',
   ) {
     this.requireRunning()
     const adapter = this.routeSession(sessionId)?.adapter
