@@ -63,8 +63,6 @@ jobs:
 
       - name: Setup
         uses: ./.github/actions/setup
-        with:
-          alignment-reference: true
 
       - name: Cache Playwright browsers
         if: ${{ matrix.suite.browser }}

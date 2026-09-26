@@ -9,7 +9,7 @@
 
 ## Reference Clones
 
-- Upstream code we compare against (vscode, t3code, opencode, codex, …) lives in `references/` at the repo root, gitignored. Check there before cloning; add new clones there, not in `/work/projects/references/`. CI and tests resolve `references/t3code` by relative path.
+- Upstream code we compare against (vscode, t3code, opencode, codex, …) lives in `references/` at the repo root, gitignored. Check there before cloning; add new clones there, not in `/work/projects/references/`. Tests and `scripts/parity` resolve `references/t3code` by relative path; CI does not fetch it, so those checks skip there and run locally.
 - Pull a clone that is behind before relying on it. If a plan pins an upstream commit (Plan 126), record the new head and what changed in that plan.
 
 ## Code Organization

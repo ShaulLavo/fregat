@@ -683,6 +683,38 @@ describe('workspace index', () => {
     },
   )
 
+  it('counts files per language key for a held root, leaving ignored files out', async () => {
+    const root = await fixtureRoot()
+    await mkdir(path.join(root, 'app/src'), { recursive: true })
+    await writeFile(path.join(root, 'app/src/a.ts'), 'export {}\n')
+    await writeFile(path.join(root, 'app/src/B.TS'), 'export {}\n')
+    await writeFile(path.join(root, 'app/Dockerfile'), 'FROM scratch\n')
+    await writeFile(path.join(root, 'app/.gitignore'), '*.log\n')
+    await writeFile(path.join(root, 'app/debug.log'), 'noise\n')
+    const service = testService(root)
+    const signal = new AbortController().signal
+
+    try {
+      expect(await service.languageCensus('app', signal)).toEqual({
+        counts: {},
+        readiness: 'cold',
+        scanRoot: null,
+      })
+
+      const hold = await holdRoot(service, 'app')
+      const census = await service.languageCensus('app', signal)
+      await hold.release()
+
+      expect(census).toEqual({
+        counts: { '.gitignore': 1, '.ts': 2, dockerfile: 1 },
+        readiness: 'ready',
+        scanRoot: path.join(root, 'app'),
+      })
+    } finally {
+      await service.close()
+    }
+  })
+
   it('opens a root without building an index for it', async () => {
     const root = await fixtureRoot()
     await mkdir(path.join(root, 'a'), { recursive: true })

@@ -51,6 +51,7 @@ import {
   resolveWorkspaceAddress,
 } from './workspace-address'
 import { WorkspaceIndexScopes } from './workspace-index-scopes'
+import { languageCensus } from './language-census'
 import type {
   CopyBody,
   CreateFileBody,
@@ -206,6 +207,36 @@ export class FileSystemService {
   /** The index whose root is exactly `root` (workspace-relative), while one is held or warm. */
   workspaceIndex(root: string) {
     return this.workspaceIndexes.get(this.paths.resolve(root).absolutePath)
+  }
+
+  /**
+   * Files per language key under `root`, from its index once the first build settles. A root no
+   * client holds has no index and answers `cold` with no counts; so does a build still running
+   * when the request ends.
+   */
+  languageCensus(root: string, signal: AbortSignal) {
+    return observeRequestOperation(
+      { area: 'fs', operation: 'language_census', path: root },
+      () => this.languageCensusObserved(root, signal),
+      (result) => ({
+        keyCount: Object.keys(result.counts).length,
+        readiness: result.readiness,
+      }),
+    )
+  }
+
+  private async languageCensusObserved(root: string, signal: AbortSignal) {
+    const absoluteRoot = this.paths.resolve(root).absolutePath
+    const index = await this.workspaceIndexes.settled(absoluteRoot, signal)
+    const status = index?.status()
+    const readiness = status?.readiness ?? 'cold'
+    // A stale index still holds every entry, so its counts stand.
+    const counted = readiness === 'ready' || readiness === 'stale'
+    return {
+      counts: counted && index ? languageCensus(index) : {},
+      readiness,
+      scanRoot: status?.scanRoot ?? null,
+    }
   }
 
   /** `files.searchIndexLimit` and `files.searchIndexIdleMinutes`, read when they apply. */
