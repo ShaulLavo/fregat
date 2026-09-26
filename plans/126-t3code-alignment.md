@@ -74,6 +74,23 @@ Parked: EXT-07 and EXT-09 (Plan 087 automation, Plan 143 research, per-OS matrix
    `#N`, so a fork's pull request looks like any other until hovered. (a) Hover only; (b) visible
    `owner/repo#N` on the badge, costing rail row width. **Recommendation: (a).** One worktree has
    one pull request, and the row is narrow.
+6. **LIFE-06: the per-session auto-settle switch needs a database reset.** (Raised 2026-09-26 by
+   wave 2 lane W; not built.) Upstream stores `autoSettleDisabledAt` on the thread row. Ours would
+   add an `auto_settle_disabled_at` column to `sessions`, and since Plan 132 Phase 4 any schema
+   change bumps `SCHEMA_VERSION`: the server then refuses the dev and production databases (both
+   at `user_version` 1 today) until they are moved aside, losing sessions and history again.
+   (a) Bump the schema for this column and reset at the deploy; (b) hold LIFE-06 until another
+   schema change is due and take one reset for both; (c) close LIFE-06 on the per-project
+   `chat.projectAutoSettle` alone. **Recommendation: (b).** The switch is small, and each reset
+   costs the owner every session.
+7. **LIFE-04 idle shells: which terminals does settling close?** (Raised 2026-09-26 by wave 2
+   lane W; not built.) Upstream `1a0c915c` closes a settled thread's shells that sit at an idle
+   prompt, keeping their output. Here ordinary shells belong to the worktree and outlive any one
+   session, and a session's own terminals run the agent CLI, not a shell, so neither maps
+   directly. (a) When the last session on a worktree settles or archives, close that worktree's
+   shells whose foreground is the shell itself, keeping their history; (b) close nothing and
+   close LIFE-04's idle-shell part as not applicable. No recommendation: (a) changes who owns a
+   worktree shell, which Plan 149 settled.
 
 ## Kept by the owner (2026-09-26)
 
