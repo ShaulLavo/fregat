@@ -470,6 +470,7 @@ function validConfig(
   return {
     wrapColumn: config.wrapColumn,
     wrapBreak: config.wrapBreak ?? 'character',
+    wrapAdvance: config.wrapAdvance ?? null,
     tabSize: config.tabSize,
     injectedTextRows: config.injectedTextRows,
     foldMap: config.foldMap?.snapshot.length === snapshot.length ? config.foldMap : null,
@@ -484,6 +485,7 @@ function globalMetricsChanged(
   return (
     before.wrapColumn !== after.wrapColumn ||
     before.wrapBreak !== after.wrapBreak ||
+    before.wrapAdvance !== after.wrapAdvance ||
     before.tabSize !== after.tabSize
   )
 }

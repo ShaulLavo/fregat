@@ -132,16 +132,7 @@ function buildLine(context: BuildContext, row: number): ProjectionNode {
   const { snapshot, config, counters } = context
   const { start, end } = snapshot.lineRange(row)
   const inline = inlineSummary(end - start, config.inlineMap?.rowReplacements.get(row) ?? [])
-  const wrap = summarizeDocumentWrap(
-    snapshot,
-    start,
-    end,
-    inline,
-    config.wrapColumn,
-    config.tabSize,
-    counters,
-    config.wrapBreak,
-  )
+  const wrap = summarizeDocumentWrap(snapshot, start, end, inline, config, counters)
   const injections = context.injected.get(row) ?? []
   const before = injections
     .filter((input) => input.placement === 'before')
@@ -157,13 +148,7 @@ function buildLine(context: BuildContext, row: number): ProjectionNode {
 function injectedSummary(input: InjectedTextRow, config: DisplayProjectionConfig): InjectedSummary {
   return {
     input,
-    wrap: summarizeReadWrap(
-      input.text.length,
-      (from, to) => input.text.slice(from, to),
-      config.wrapColumn,
-      config.tabSize,
-      config.wrapBreak,
-    ),
+    wrap: summarizeReadWrap(input.text.length, (from, to) => input.text.slice(from, to), config),
   }
 }
 

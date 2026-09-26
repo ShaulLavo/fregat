@@ -81,6 +81,13 @@ function measure(name: string, input: DisplayProjectionInput): void {
   source.dispose()
 }
 
+/** A stand-in glyph table: widths vary by code point, as a proportional face's do. */
+const ADVANCES = Float32Array.from({ length: 0x10000 }, (_, code) => 4 + (code % 7))
+const PROPORTIONAL_ADVANCE = {
+  width: 80 * 7,
+  advance: (codePoint: number) => ADVANCES[codePoint & 0xffff]!,
+}
+
 for (const lines of LINE_COUNTS) {
   const pieceSnapshot = createPieceTableSnapshot(buildText(lines))
   const input: DisplayProjectionInput = {
@@ -98,6 +105,12 @@ for (const lines of LINE_COUNTS) {
     foldMap: foldMapFor(input, pieceSnapshot),
     wrapColumn: 80,
     wrapBreak: 'word',
+  })
+  measure('folds + proportional wraps', {
+    ...input,
+    foldMap: foldMapFor(input, pieceSnapshot),
+    wrapColumn: 80,
+    wrapAdvance: PROPORTIONAL_ADVANCE,
   })
   const projection = new DisplayProjection(input)
   const after = createDocumentTextSnapshot(insertIntoPieceTable(pieceSnapshot, 0, 'new\n'))

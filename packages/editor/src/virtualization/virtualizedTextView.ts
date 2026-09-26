@@ -14,6 +14,7 @@ import type { FoldMap } from '../foldMap'
 import { nextGraphemeBoundary, previousGraphemeBoundary } from '../graphemes'
 import type { ResolvedSuspiciousCharactersOptions } from '../unicodeHighlight'
 import { type AtomicRanges, atomicRangesForInlineMap } from '../atomicRanges'
+import { glyphAdvancesFor, type GlyphAdvances } from './glyphAdvances'
 import { type InlineMap, revealInlineMap } from '../inlineMap'
 import { normalizeTabSize, type InjectedTextRow } from '../displayTransforms'
 import { createStringTextSnapshot, type TextSnapshot } from '../documentTextSnapshot'
@@ -422,6 +423,8 @@ export class VirtualizedTextView {
       foldMarkerByKey: new Map(),
       wrapEnabled: options.wrap ?? false,
       wrapBreak: options.wrapBreak ?? 'character',
+      wrapAdvance: null,
+      glyphs: measuredFace.monospace ? null : glyphAdvancesFor(scrollElement),
       tabSize,
       tokenGroups: new Map(),
       rowTokenSignatures: new Map(),
@@ -817,6 +820,7 @@ export class VirtualizedTextView {
     invalidateScrollElementPadding(this.scrollElement)
     const face = measuredTextFace(this.scrollElement, view.textMetrics)
     view.monospace = face.monospace
+    view.glyphs = face.monospace ? null : glyphAdvancesFor(this.scrollElement)
     const rowHeightValue = normalizeRowHeight(view.lineHeightOverride ?? face.metrics.rowHeight)
     this.applyMetrics({ rowHeight: rowHeightValue, characterWidth: face.metrics.characterWidth })
     return view.metrics
@@ -828,13 +832,19 @@ export class VirtualizedTextView {
     invalidateScrollElementPadding(this.scrollElement)
     const face = measuredTextFace(this.scrollElement, view.textMetrics)
     const rowHeight = normalizeRowHeight(view.lineHeightOverride ?? face.metrics.rowHeight)
+    const glyphs = face.monospace ? null : glyphAdvancesFor(this.scrollElement)
     const unchanged =
       rowHeight === view.metrics.rowHeight &&
       face.metrics.characterWidth === view.metrics.characterWidth &&
       face.monospace === view.monospace
-    if (unchanged) return null
+    if (unchanged) {
+      // A late face can keep the average width and still move single glyphs.
+      if (glyphs !== view.glyphs) this.applyGlyphs(glyphs)
+      return null
+    }
 
     view.monospace = face.monospace
+    view.glyphs = glyphs
     this.applyMetrics({ rowHeight, characterWidth: face.metrics.characterWidth })
     return view.metrics
   }
@@ -917,9 +927,20 @@ export class VirtualizedTextView {
     return true
   }
 
+  private applyGlyphs(glyphs: GlyphAdvances | null): void {
+    const view = this.view
+    view.glyphs = glyphs
+    clearRowGeometryCaches(view)
+    resetContentWidthScan(view)
+    view.lastRenderedRowsKey = ''
+    if (this.refreshWrapWidth()) return
+    updateVirtualizerRows(view)
+  }
+
   private applyMetrics(metrics: BrowserTextMetrics): void {
     const view = this.view
     view.metrics = metrics
+    resetContentWidthScan(view)
     clearRowGeometryCaches(view)
     const rowHeightValue = metrics.rowHeight
     applyRowHeight(view, rowHeightValue)
@@ -1791,6 +1812,7 @@ export class VirtualizedTextView {
     const changed = refreshDisplayProjectionForWrapWidth(
       view,
       horizontalViewportColumns(view, viewportWidth),
+      viewportWidth,
     )
     if (!changed) return false
 

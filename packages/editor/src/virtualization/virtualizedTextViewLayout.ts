@@ -12,7 +12,8 @@ import { updateInlineMapForEdit } from '../inlineMap'
 import type { SelectionAffinity } from '../selections'
 import type { TextEdit } from '../tokens'
 import type { TextEditBatch } from '../textEditBatch'
-import type { DisplayProjectionTransition } from './displayProjectionTypes'
+import type { DisplayProjectionTransition, WrapAdvance } from './displayProjectionTypes'
+import { PROPORTIONAL_WRAP_MARGIN_PX } from './glyphAdvances'
 import { clamp } from '../style-utils'
 import {
   foldMapMatchesText,
@@ -156,7 +157,9 @@ export function setFoldStateLayout(
 export function refreshDisplayProjection(
   view: VirtualizedTextViewInternal,
   viewportColumns: number | null,
+  viewportWidth = view.virtualizer.getSnapshot().viewportWidth,
 ): void {
+  view.wrapAdvance = proportionalWrapAdvance(view, viewportWidth)
   view.model.projection.reconfigure({
     textSnapshot: view.model.textSnapshot,
     foldMap: view.model.foldMap,
@@ -164,6 +167,7 @@ export function refreshDisplayProjection(
     injectedTextRows: view.model.injectedTextRows,
     wrapColumn: view.wrapEnabled ? viewportColumns : null,
     wrapBreak: view.wrapBreak,
+    wrapAdvance: view.wrapAdvance,
     tabSize: view.tabSize,
   })
   view.model.wrapColumn = view.wrapEnabled ? viewportColumns : null
@@ -175,12 +179,32 @@ export function refreshDisplayProjection(
 export function refreshDisplayProjectionForWrapWidth(
   view: VirtualizedTextViewInternal,
   viewportColumns: number,
+  viewportWidth: number,
 ): boolean {
   if (!view.wrapEnabled) return false
-  if (viewportColumns === view.model.wrapColumn) return false
+  const advance = proportionalWrapAdvance(view, viewportWidth)
+  if (viewportColumns === view.model.wrapColumn && advance === view.wrapAdvance) return false
 
-  refreshDisplayProjection(view, viewportColumns)
+  refreshDisplayProjection(view, viewportColumns, viewportWidth)
   return true
+}
+
+/**
+ * Wrap by measured advances once the face is not monospace, where columns place breaks a glyph or
+ * more from the edge. The same object comes back while width and face hold, so the projection can
+ * tell a real change by identity.
+ */
+function proportionalWrapAdvance(
+  view: VirtualizedTextViewInternal,
+  viewportWidth: number,
+): WrapAdvance | null {
+  const glyphs = view.glyphs
+  if (!view.wrapEnabled || !glyphs || viewportWidth <= 0) return null
+  const width = Math.max(1, viewportWidth - view.currentGutterWidth - PROPORTIONAL_WRAP_MARGIN_PX)
+  const current = view.wrapAdvance
+  if (current && current.width === width && current.glyphs === glyphs) return current
+
+  return { width, glyphs, advance: (codePoint) => glyphs.advance(codePoint) }
 }
 
 export function setWrapEnabledLayout(

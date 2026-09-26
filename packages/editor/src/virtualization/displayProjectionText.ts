@@ -14,10 +14,16 @@ import type {
   InlineSummary,
   InlineTextPart,
   ProjectionCounters,
-  WrapBreak,
   WrapSummary,
 } from './displayProjectionTypes'
-import { appendWordWrapText, createWordWrapLine, type UnbreakableRuns } from './wordWrap'
+import {
+  appendWordWrapText,
+  createWordWrapLine,
+  lineBreakRules,
+  needsLineBreakRules,
+  type UnbreakableRuns,
+  type WrapConfig,
+} from './wordWrap'
 
 export function inlineSummary(
   length: number,
@@ -123,28 +129,30 @@ export function summarizeDocumentWrap(
   start: number,
   end: number,
   inline: InlineSummary | null,
-  width: number | null,
-  tabSize: number,
+  config: WrapConfig,
   counters: ProjectionCounters,
-  wrapBreak: WrapBreak = 'character',
 ): WrapSummary {
   const length = inline?.mapping.displayLength ?? end - start
+  const width = config.wrapColumn
   if (!width || !Number.isFinite(width) || width <= 0) return uniformWrap(length, null)
   counters.summaryLinesMeasured += 1
-  if (wrapBreak === 'word') {
+  if (needsLineBreakRules(config)) {
     const readRange = inline
       ? (from: number, to: number) => readProjectedText(snapshot, start, inline, from, to, counters)
       : (from: number, to: number) => read(snapshot, start + from, start + to, counters)
-    return summarizeWordWrap(length, readRange, width, tabSize, unbreakableRuns(inline))
+    return summarizeRuleWrap(length, readRange, config, unbreakableRuns(inline))
   }
   if (inline)
     return summarizeReadWrap(
       length,
       (from, to) => readProjectedText(snapshot, start, inline, from, to, counters),
-      width,
-      tabSize,
+      config,
     )
-  return summarizeMeasuredWrap(measureTextSnapshotRange(snapshot, start, end), width, tabSize)
+  return summarizeMeasuredWrap(
+    measureTextSnapshotRange(snapshot, start, end),
+    width,
+    config.tabSize,
+  )
 }
 
 function summarizeMeasuredWrap(
@@ -176,12 +184,12 @@ function summarizeMeasuredWrap(
 export function summarizeReadWrap(
   length: number,
   readRange: (start: number, end: number) => string,
-  width: number | null,
-  tabSize: number,
-  wrapBreak: WrapBreak = 'character',
+  config: WrapConfig,
 ): WrapSummary {
+  const width = config.wrapColumn
+  const tabSize = config.tabSize
   if (!width || !Number.isFinite(width) || width <= 0) return uniformWrap(length, null)
-  if (wrapBreak === 'word') return summarizeWordWrap(length, readRange, width, tabSize, [])
+  if (needsLineBreakRules(config)) return summarizeRuleWrap(length, readRange, config, [])
   const ends: number[] = []
   const state = { visual: 0, segmentVisual: 0, hasTabs: false }
   const normalizedWidth = Math.max(1, Math.floor(width))
@@ -201,25 +209,22 @@ export function summarizeReadWrap(
 }
 
 /**
- * Word breaks always come back explicit: a line that never breaks can still be wider than a row
- * (spaces hanging past the edge, a run too wide to split), which a uniform summary would cut.
+ * A line that never breaks can still be longer than a uniform row holds (spaces hanging past the
+ * edge, narrow glyphs, a run too wide to split), so any such line comes back explicit.
  */
-function summarizeWordWrap(
+function summarizeRuleWrap(
   length: number,
   readRange: (start: number, end: number) => string,
-  width: number,
-  tabSize: number,
+  config: WrapConfig,
   runs: UnbreakableRuns,
 ): WrapSummary {
   const line = createWordWrapLine()
-  const normalizedWidth = Math.max(1, Math.floor(width))
+  const rules = lineBreakRules(config)
   for (let start = 0; start < length; start += 4096) {
     const text = readRange(start, Math.min(length, start + 4096))
-    appendWordWrapText(line, text, 0, text.length, normalizedWidth, tabSize, runs)
+    appendWordWrapText(line, text, 0, text.length, rules, runs)
   }
-  if (line.ends.length === 0 && Math.max(length, line.visual) <= normalizedWidth) {
-    return uniformWrap(length, null)
-  }
+  if (line.ends.length === 0) return uniformWrap(length, null)
   const ends = Uint32Array.from([...line.ends, length])
   return { kind: 'indexed', length, ends, rows: ends.length }
 }

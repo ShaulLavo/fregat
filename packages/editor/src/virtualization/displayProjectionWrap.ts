@@ -4,7 +4,10 @@ import type { BuildContext } from './displayProjectionBuild'
 import {
   appendWordWrapText,
   createWordWrapLine,
+  lineBreakRules,
+  needsLineBreakRules,
   resetWordWrapLine,
+  type LineBreakRules,
   type WordWrapLine,
 } from './wordWrap'
 
@@ -24,8 +27,9 @@ type WrapScan = {
   completed: number
   readonly width: number
   readonly tabSize: number
-  /** Present when rows end at word boundaries; the character path leaves it null. */
+  /** Present unless rows end at plain column counts, which keep the leaner loop below. */
   readonly word: WordWrapLine | null
+  readonly rules: LineBreakRules
 }
 
 export function buildWrappedSpan(
@@ -59,7 +63,8 @@ function buildWrappedBlock(
     completed: 0,
     width: Math.max(1, Math.floor(config.wrapColumn!)),
     tabSize: config.tabSize,
-    word: config.wrapBreak === 'word' ? createWordWrapLine() : null,
+    word: needsLineBreakRules(config) ? createWordWrapLine() : null,
+    rules: lineBreakRules(config),
   }
   const start = snapshot.lineStart(startRow)
   const end = endRow >= snapshot.lineCount ? snapshot.length : snapshot.lineStart(endRow)
@@ -94,11 +99,11 @@ function scanWrapChunk(text: string, state: WrapScan): void {
 function scanWordWrapChunk(text: string, state: WrapScan, word: WordWrapLine): void {
   let start = 0
   for (let end = text.indexOf('\n'); end !== -1; end = text.indexOf('\n', start)) {
-    appendWordWrapText(word, text, start, end, state.width, state.tabSize)
+    appendWordWrapText(word, text, start, end, state.rules)
     finishLine(state)
     start = end + 1
   }
-  appendWordWrapText(word, text, start, text.length, state.width, state.tabSize)
+  appendWordWrapText(word, text, start, text.length, state.rules)
 }
 
 function appendCodeUnit(code: number, state: WrapScan): void {
@@ -142,8 +147,9 @@ function appendTabbedLine(state: WrapScan): void {
 function adoptWordLine(state: WrapScan, word: WordWrapLine): void {
   state.length = word.length
   state.rows = word.ends.length + 1
-  // A line wider than a row stays explicit even unbroken: its spaces hang past the edge.
-  if (word.ends.length > 0 || Math.max(word.length, word.visual) > state.width) {
+  // A uniform row holds `width` code units, so a longer line that did not break (spaces hanging
+  // past the edge, narrow glyphs) needs its one end written out.
+  if (word.ends.length > 0 || word.length > state.width) {
     state.explicitEnds = true
     state.ends = word.ends.slice()
   }

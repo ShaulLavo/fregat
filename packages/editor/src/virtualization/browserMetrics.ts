@@ -1,5 +1,6 @@
 import { EditorDisposableStore, MutableEditorDisposable } from '../editor/disposables'
 import type { EditorDisposable } from '../plugins'
+import { clearGlyphAdvancesCache } from './glyphAdvances'
 
 export type BrowserTextMetrics = {
   readonly rowHeight: number
@@ -87,6 +88,7 @@ export function observeBrowserTextMetricsInvalidation(
 
 export function clearBrowserTextMetricsCache(): void {
   metricsCache = new WeakMap<Document, Map<string, MeasuredTextMetrics>>()
+  clearGlyphAdvancesCache()
 }
 
 function measureTextMetrics(element: HTMLElement): MeasuredTextMetrics {
