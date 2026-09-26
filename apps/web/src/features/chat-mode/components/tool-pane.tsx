@@ -1,5 +1,4 @@
-import { useStatus } from '@/features/git/hooks/use-status'
-import { useHeldUntilReady } from '@/hooks/use-held-until-ready'
+import { usePanelRoot } from '@/features/git/hooks/use-panel-root'
 import { ToolPane as PaneShell } from '@workspace/ui/patterns/tool-pane'
 import type { GitFileStatus } from '@workspace/contracts'
 import { filesystemPath } from '@/lib/documents/utils/identity'
@@ -57,8 +56,7 @@ export function ToolPane({
   // worktree; the difference only appears once one has its own.
   const toolRoot = useSessionToolRoot()
   const holdsGit = tab === 'git' && diffScope.scope.kind === 'working-tree'
-  const nextStatus = useStatus(holdsGit ? toolRoot : null)
-  const shownGitRoot = useHeldUntilReady(toolRoot, !holdsGit || !nextStatus.isPending)
+  const shownGitRoot = usePanelRoot(toolRoot, holdsGit)
   useSessionCheckoutRefresh()
   const terminalSessionId = useSessionTerminalId()
   if (tab !== 'terminal') {

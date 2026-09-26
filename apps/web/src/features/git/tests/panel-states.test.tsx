@@ -1,3 +1,4 @@
+import { gitKeys } from '@/lib/query-keys'
 import { GitChangesPanel } from '@/features/workbench/components/git-changes-panel'
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import { registerEnvironmentQueryClient } from '@/lib/environments/state/query-clients'
@@ -103,5 +104,56 @@ test('root switches retain the branch header and changes until the target status
   } finally {
     released.resolve()
     rendered.unmount()
+  }
+})
+
+test('graph root switches hold the branch header until the matching history is ready', async ({
+  client,
+  server,
+}) => {
+  void client
+  for (const root of ['alpha', 'beta']) {
+    const repo = path.join(server.root, root)
+    await mkdir(repo)
+    runGit(repo, ['init', '-b', root], { cwdMode: 'option' })
+    runGit(repo, ['commit', '--allow-empty', '-m', `${root} commit`], { cwdMode: 'option' })
+  }
+  const historyEntered = Promise.withResolvers<void>()
+  const historyReleased = Promise.withResolvers<void>()
+  const observed = createObservedInProcessClient(server, async (request) => {
+    if (new URL(request.url).pathname !== '/git/history') return
+    const body = await request.clone().json()
+    if (body.path !== 'beta') return
+    historyEntered.resolve()
+    await historyReleased.promise
+  })
+  const queryClient = createTestQueryClient()
+  registerEnvironmentQueryClient(queryClient, activeServerOrigin(), observed)
+  const view = (root: string) => (
+    <EditorStateProvider>
+      <GitChangesPanel rootPath={filesystemPath(root)} />
+    </EditorStateProvider>
+  )
+  const rendered = renderWithProviders(view('alpha'), { queryClient })
+  try {
+    await screen.findByRole('textbox', { name: 'Commit message' })
+    fireEvent.click(screen.getByRole('tab', { name: 'Graph' }))
+    await screen.findByText(/1 commit/)
+    rendered.rerender(view('beta'))
+    await historyEntered.promise
+    await waitFor(() => expect(queryClient.getQueryData(gitKeys.status('beta'))).toBeDefined())
+    expect(screen.getByText('alpha', { exact: true })).toBeVisible()
+    expect(screen.getByRole('listbox', { name: 'Commit history' })).toBeVisible()
+    expect(screen.queryByText('beta', { exact: true })).toBeNull()
+    expect(screen.getByRole('status', { name: 'Loading Git' })).toBeVisible()
+    historyReleased.resolve()
+    await screen.findByText('beta', { exact: true })
+    expect(screen.getByText('beta', { exact: true })).toBeVisible()
+    expect(screen.queryByText('alpha', { exact: true })).toBeNull()
+    expect(screen.queryByRole('status', { name: 'Loading Git' })).toBeNull()
+  } finally {
+    historyReleased.resolve()
+    rendered.unmount()
+    queryClient.clear()
   }
 })

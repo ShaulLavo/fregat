@@ -1288,5 +1288,17 @@
     "to": "workbench",
     "module": "features/workbench/utils/panels.ts",
     "reason": "shared → lib: createDefaultWorkbenchPanels, normalizeWorkbenchPanels, type WorkbenchPanels is reused by workspace outside workbench; move this shared behavior with its consumers."
+  },
+  {
+    "from": "chat-mode",
+    "to": "git",
+    "module": "features/git/hooks/use-panel-root.ts",
+    "reason": "owner: The composed Git header and body share the root held until status and visible history are ready."
+  },
+  {
+    "from": "workbench",
+    "to": "git",
+    "module": "features/git/hooks/use-panel-root.ts",
+    "reason": "owner: The composed Git header and body share the root held until status and visible history are ready."
   }
 ]
