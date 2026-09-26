@@ -28,7 +28,7 @@ import {
   DEFAULT_WORKBENCH_FEEL,
   WORKBENCH_FEELS,
 } from './boot-defaults'
-import { defineSetting, type SettingDescriptor } from './registry'
+import { applySettingDependencies, defineSetting, type SettingDescriptor } from './registry'
 import { WORKSPACE_SEARCH_LIMIT_MAX } from '../workspace-search'
 
 /**
@@ -672,6 +672,7 @@ export const SETTINGS_REGISTRY = {
     scope: 'application',
     widget: 'number',
     category: 'Editor',
+    dependsOn: 'editor.history.persist',
     description: 'Days a closed file keeps its stored undo history before it is dropped.',
     keywords: ['undo', 'history', 'ttl', 'expire', 'persist'],
   }),
@@ -682,6 +683,7 @@ export const SETTINGS_REGISTRY = {
     scope: 'application',
     widget: 'number',
     category: 'Editor',
+    dependsOn: 'editor.history.persist',
     description:
       'Total stored undo history across closed files, in UTF-16 code units. The least recently saved files go first when it is exceeded.',
     visibility: 'advanced',
@@ -1185,6 +1187,7 @@ export const SETTINGS_REGISTRY = {
     scope: 'machine',
     widget: 'boolean',
     category: 'Language servers',
+    dependsOn: 'lsp.semanticTokens.enabled',
     description:
       'Ask delta-capable language servers for only the tokens an edit changed. Saves bandwidth, parse time and garbage on every keystroke.',
     visibility: 'advanced',
@@ -1325,6 +1328,11 @@ export function settingRowIds(id: SettingId): readonly SettingId[] {
   return [id, ...SETTING_IDS.filter((other) => descriptorFor(other).rowOwner === id)]
 }
 
+/** The key this one's row sits under (`dependsOn`); `registryProblems` checks it is registered. */
+export function settingParentId(id: SettingId): SettingId | undefined {
+  return descriptorFor(id).dependsOn as SettingId | undefined
+}
+
 /**
  * Registry defaults as a resolved document.
  *
@@ -1334,10 +1342,17 @@ export function settingRowIds(id: SettingId): readonly SettingId[] {
  * every resolve would re-register the whole binding table on unrelated writes.
  */
 export const DEFAULT_SETTING_VALUES: SettingsValues = Object.freeze(
-  Object.fromEntries(
-    Object.entries(SETTINGS_REGISTRY).map(([id, descriptor]) => [id, descriptor.default]),
-  ),
+  defaultValues(),
 ) as SettingsValues
+
+function defaultValues(): Record<string, unknown> {
+  const values: Record<string, unknown> = Object.fromEntries(
+    Object.entries(SETTINGS_REGISTRY).map(([id, descriptor]) => [id, descriptor.default]),
+  )
+  applySettingDependencies(SETTINGS_REGISTRY, values)
+
+  return values
+}
 
 /**
  * Runtime schema for a whole resolved document.
@@ -1348,11 +1363,18 @@ export const DEFAULT_SETTING_VALUES: SettingsValues = Object.freeze(
  * but it cannot drift, because `SettingsValues` is itself derived from the same
  * table this is built from.
  */
-export const settingsValuesSchema = v.object(
-  Object.fromEntries(
-    Object.entries(SETTINGS_REGISTRY).map(([id, descriptor]) => [
-      id,
-      v.optional(descriptor.schema, descriptor.default),
-    ]),
-  ) as Record<string, v.GenericSchema>,
+export const settingsValuesSchema = v.pipe(
+  v.object(
+    Object.fromEntries(
+      Object.entries(SETTINGS_REGISTRY).map(([id, descriptor]) => [
+        id,
+        v.optional(descriptor.schema, descriptor.default),
+      ]),
+    ) as Record<string, v.GenericSchema>,
+  ),
+  // A key filled from its default still has to read off under a parent that is off.
+  v.transform((values: Record<string, unknown>) => {
+    applySettingDependencies(SETTINGS_REGISTRY, values)
+    return values
+  }),
 ) as unknown as v.GenericSchema<unknown, SettingsValues>

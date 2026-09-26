@@ -6,6 +6,7 @@ import {
   isSettingId,
   SETTING_IDS,
   SETTINGS_REGISTRY,
+  settingParentId,
   settingsValuesSchema,
   type SettingsValues,
 } from '../settings/keys'
@@ -215,8 +216,51 @@ describe('settings registry', () => {
 
   it('derives defaults from the descriptors rather than a second list', () => {
     for (const id of SETTING_IDS) {
+      if (settingParentId(id) !== undefined) continue
       expect(DEFAULT_SETTING_VALUES[id]).toBe(descriptorFor(id).default)
     }
+  })
+
+  it('reads a boolean child as off while its parent defaults to off', () => {
+    expect(descriptorFor('lsp.semanticTokens.enabled').default).toBe(false)
+    expect(descriptorFor('lsp.semanticTokens.delta').default).toBe(true)
+    expect(DEFAULT_SETTING_VALUES['lsp.semanticTokens.delta']).toBe(false)
+  })
+
+  it('rejects a dependsOn parent the page cannot place the child under', () => {
+    const toggle = (overrides: { category?: string; dependsOn?: string } = {}) =>
+      defineSetting({
+        schema: v.boolean(),
+        default: true,
+        scope: 'window',
+        widget: 'boolean',
+        category: 'X',
+        description: 'x',
+        ...overrides,
+      })
+    const problems = registryProblems({
+      'a.parent': toggle(),
+      'a.child': toggle({ dependsOn: 'a.parent' }),
+      'a.grandchild': toggle({ dependsOn: 'a.child' }),
+      'a.missing': toggle({ dependsOn: 'a.nothing' }),
+      'a.number': defineSetting({
+        schema: v.number(),
+        default: 1,
+        scope: 'window',
+        widget: 'number',
+        category: 'X',
+        description: 'x',
+      }),
+      'a.underNumber': toggle({ dependsOn: 'a.number' }),
+      'a.elsewhere': toggle({ category: 'Y', dependsOn: 'a.parent' }),
+    })
+
+    expect(problems.map((problem) => problem.id)).toEqual([
+      'a.grandchild',
+      'a.missing',
+      'a.underNumber',
+      'a.elsewhere',
+    ])
   })
 
   it('parses an empty document into a complete set of defaults', () => {

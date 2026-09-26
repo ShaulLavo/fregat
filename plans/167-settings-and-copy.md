@@ -4,6 +4,12 @@
 
 - Status: PROPOSED — READY; D1–D4 decided by the owner on 2026-09-25. The owner asked for it the
   same day, after reading the `lsp.semanticTokens.delta` row.
+- Part D (`dependsOn`) landed 2026-09-26 (wave 2, lane S): registry field and check, the
+  resolver and `DEFAULT_SETTING_VALUES` read a boolean child as off under an off parent, the row is
+  indented and disabled with "Applies while <parent> is on", schema hover and reference name the
+  parent, scenario `settings-dependent-row`. First users: `lsp.semanticTokens.delta` under
+  `lsp.semanticTokens.enabled`; `editor.history.persistDays` and `persistBudget` under
+  `editor.history.persist` (non-boolean children keep their value; only the row is disabled).
 - Already landed with this plan: `lsp.semanticTokens.delta` defaults to on, its description is
   rewritten, and `AGENTS.md` has a **Copy** section (say what a thing is; never what it is not).
 - Effort: L. Three independent parts; each is its own phase and can ship alone.

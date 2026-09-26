@@ -519,6 +519,10 @@ export const selectors = {
     page.getByRole('dialog', { name: 'Physical dialog', exact: true }),
   physicalRow: (page: Page) => page.getByRole('option', { name: 'Silent row', exact: true }),
   settingsHeader: (page: Page) => page.locator('[data-settings-header]'),
+  settingsSwitch: (page: Page, title: string) =>
+    page.getByRole('switch', { name: title, exact: true }),
+  settingsDependencyNote: (page: Page, parentTitle: string) =>
+    page.getByText(`Applies while ${parentTitle} is on`, { exact: true }),
   settingsContinuousSeams: (page: Page) =>
     page.getByRole('switch', { name: 'Continuous panel background', exact: true }),
   settingsDensity: (page: Page) =>
