@@ -10,7 +10,13 @@
 - Verified after merging `origin/main`: 46 spellcheck tests, 327 core tests including the
   touched overlay and editor tests, `check-turbo-inputs`, workspace typecheck, and health.
   `health:write` found no public API baseline change; unrelated timer line-number churn was discarded.
-- Remaining PR checklist: Editor PR, Platform merge and pin, gates, scenario and Platform PR.
+- PRs: [Editor #57](https://github.com/ShaulLavo/singapore/pull/57) and dependent
+  [Platform #104](https://github.com/ShaulLavo/fregat/pull/104). Platform merged main, pinned
+  the Editor head, and passed gates, repository typecheck, 44 focused settings/menu tests,
+  and the `editor-spellcheck` scenario on port 5238. All four screenshots were inspected in
+  `/work/tmp/fregat-evidence/20260926T174952Z-scenario-editor-spellcheck/`; Vite was stopped.
+- CI follow-up: the packages job now installs Firefox and WebKit for spellcheck's engine
+  tests. Its first run failed because only Chromium was installed; local three-engine tests passed.
 - Kind: Implementation
 - Owner: Cross-repo
 - Priority: P2

@@ -25,8 +25,7 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
-  # Three jobs side by side: checks, core's tests (the longest, and the only ones that need
-  # Firefox and WebKit), and every other package's tests.
+  # Three jobs side by side: checks, core's tests, and every other package's tests.
   check:
     name: Typecheck, lint, catalog
     runs-on: ubuntu-latest
@@ -96,7 +95,7 @@ jobs:
 
       - name: Install Playwright browsers
         working-directory: packages/editor
-        run: ./node_modules/.bin/playwright install --with-deps chromium chromium-headless-shell
+        run: ./node_modules/.bin/playwright install --with-deps chromium chromium-headless-shell firefox webkit
 
       # The worker test imports built packages; turbo replays the build from the cache.
       - name: Build packages
