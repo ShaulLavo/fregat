@@ -15,6 +15,7 @@ import { machineNameSchema, machineSchema, type MachineDefinition } from '../mac
 import { providerDriverKindSchema, type ProviderDriverKind } from '../orchestration-runtime'
 import {
   keybindingCommandIdSchema,
+  keybindingListSchema,
   modelRefListSchema,
   modelRefSchema,
   providerEnvironmentVariableSchema,
@@ -78,7 +79,8 @@ export type ResetSettingsOperation = {
 export type SetKeybindingOperation = {
   readonly kind: 'keybinding.set'
   readonly command: string
-  readonly keys: string | null
+  /** The command's complete list; `null` unbinds it. */
+  readonly keys: readonly string[] | null
 }
 
 export type RemoveKeybindingOperation = {
@@ -290,7 +292,7 @@ export const settingsOperationSchemasByKind = {
   'keybinding.set': v.strictObject({
     kind: v.literal('keybinding.set'),
     command: keybindingCommandIdSchema,
-    keys: v.nullable(trimmedNonEmptyStringSchema),
+    keys: keybindingListSchema,
   }),
   'keybinding.remove': v.strictObject({
     kind: v.literal('keybinding.remove'),
@@ -516,7 +518,10 @@ function setKeybinding(
   operation: SetKeybindingOperation,
 ): Readonly<Record<string, unknown>> {
   const current = recordSetting(raw, 'keybindings.overrides')
-  if (Object.hasOwn(current, operation.command) && current[operation.command] === operation.keys) {
+  if (
+    Object.hasOwn(current, operation.command) &&
+    jsonEqual(current[operation.command], operation.keys)
+  ) {
     return raw
   }
 

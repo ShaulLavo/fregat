@@ -64,20 +64,22 @@ or unbind it to return Ctrl+K to the shell. On macOS, `Mod` is Command.
 
 ## Settings and display
 
-`keybindings.overrides` is an application-scoped record from command ID to a shortcut string or
-`null`. A string contains one hotkey or two separated by a single space. A missing command keeps
-its defaults; `null` removes all shortcuts for that command. The contract rejects malformed shape
-before a keyed write reaches disk, and the keymap validates each stroke's grammar.
+`keybindings.overrides` is an application-scoped record from command ID to the command's complete
+list of shortcuts, or `null`. Each entry is one hotkey or two separated by a single space. A missing
+command keeps its defaults; `null` or `[]` removes all its shortcuts; a list replaces the defaults.
+Every chord in the list applies in every pane and editor condition the command's defaults use. The
+contract rejects malformed shape before a keyed write reaches disk, and the keymap validates each
+stroke's grammar; a list whose every chord is invalid keeps the defaults.
 
-The recorder saves ordinary single shortcuts immediately. An existing chord prefix waits for a
-second stroke. Enter saves that prefix alone, Backspace removes it, and Escape cancels. Settings
-search matches command IDs, titles, canonical notation, and displayed shortcut labels, including
-secondary defaults. Menus keep the first shortcut as the primary hint.
+The shortcuts page lists one row per chord, as VS Code does. The recorder writes nothing until
+Enter or Save, shows the commands the chord would take first, and records Backspace as a key;
+Escape clears, then closes. Add another shortcut appends to the list, Remove drops one chord, and
+Reset deletes the command's entry. Settings search matches command IDs, titles, canonical
+notation, and displayed shortcut labels. Menus keep the first shortcut as the primary hint.
 
 A hand-edited override with malformed shape invalidates the whole `keybindings.overrides` value
-and produces an `invalid-value` diagnostic. The generated JSON Schema includes the shape pattern for editor
-validation. The record does not support per-pane user overrides or several user shortcuts for one
-command.
+and produces an `invalid-value` diagnostic. The generated JSON Schema includes the shape pattern for
+editor validation. The record does not support per-pane user overrides.
 
 ## Enabled defaults
 
