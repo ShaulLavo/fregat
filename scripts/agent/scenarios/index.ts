@@ -64,6 +64,15 @@ import { copyFeedback } from './copy-feedback'
 import { fileLabelCohesion } from './file-label-cohesion'
 import { checkpointStates } from './checkpoint-states'
 import { sessionActionsSurfaces } from './session-actions-surfaces'
+import { exportTranscript } from './export-transcript'
+import { claudeHookRows } from './hook-rows'
+import { claudeBackgroundTasks } from './background-tasks'
+import { claudeCustomAgent } from './custom-agent'
+import { customAgentProviderSwitch } from './custom-agent-switch'
+import { claudeContextPopover } from './context-popover'
+import { claudeManualCompaction, codexManualCompaction } from './manual-compaction'
+import { claudeSessionTools, codexSessionTools } from './session-tools'
+import { claudeSessionFork, codexSessionFork } from './session-fork'
 import { searchFileActions } from './search-file-actions'
 import { settingsStaleDiagnostics } from './settings-stale-diagnostics'
 import { fontPicker } from './font-picker'
@@ -112,6 +121,8 @@ import { gitDiscardConfirm } from './git-discard-confirm'
 import { commandPaletteTypeBurst } from './command-palette-type-burst'
 import { paletteScriptsPending } from './palette-scripts-pending'
 import { settingsModelsPending } from './settings-models-pending'
+import { settingsProviderUpdate } from './settings-provider-update'
+import { claudeUsageImport } from './claude-usage-import'
 import { chatFollowUp } from './chat-follow-up'
 import { chatDiffSyntax } from './chat-diff-syntax'
 import { editorSplitDrag } from './editor-split-drag'
@@ -327,6 +338,18 @@ export const scenarios: readonly Scenario[] = [
   fileLabelCohesion,
   checkpointStates,
   sessionActionsSurfaces,
+  exportTranscript,
+  claudeHookRows,
+  claudeBackgroundTasks,
+  claudeCustomAgent,
+  customAgentProviderSwitch,
+  claudeContextPopover,
+  claudeManualCompaction,
+  codexManualCompaction,
+  claudeSessionTools,
+  codexSessionTools,
+  claudeSessionFork,
+  codexSessionFork,
   searchFileActions,
   chatFollowUp,
   chatDiffSyntax,
@@ -361,6 +384,8 @@ export const scenarios: readonly Scenario[] = [
   commandPaletteTypeBurst,
   paletteScriptsPending,
   settingsModelsPending,
+  settingsProviderUpdate,
+  claudeUsageImport,
   editorThemePreview,
   editorSyntaxBenchmark('native'),
   editorNativeCoverage('light'),

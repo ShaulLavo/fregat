@@ -399,10 +399,10 @@
       "title": "Expose explicit context compaction without consuming the draft",
       "report": "interaction.md",
       "wave": "4",
-      "status": "open",
-      "evidence_level": "source-reviewed",
+      "status": "verified",
+      "evidence_level": "scenario-verified",
       "acceptance": "interaction.md, INTERACTION-06, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": ["scripts/agent/scenarios/manual-compaction.ts"]
     },
     {
       "id": "INTERACTION-07",
@@ -456,10 +456,10 @@
       "title": "Implement manual compaction with ordered follow-up handling",
       "report": "runtime.md",
       "wave": "4",
-      "status": "open",
-      "evidence_level": "source-reviewed",
+      "status": "verified",
+      "evidence_level": "scenario-verified",
       "acceptance": "runtime.md, RUNTIME-05, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": ["scripts/agent/scenarios/manual-compaction.ts"]
     },
     {
       "id": "RUNTIME-06",
@@ -533,10 +533,10 @@
       "title": "Expose capability-driven provider update operations",
       "report": "runtime.md",
       "wave": "4",
-      "status": "open",
-      "evidence_level": "source-reviewed",
+      "status": "verified",
+      "evidence_level": "scenario-verified",
       "acceptance": "runtime.md, RUNTIME-10, Acceptance / verification",
-      "execution_evidence": []
+      "execution_evidence": ["scripts/agent/scenarios/settings-provider-update.ts"]
     },
     {
       "id": "EXT-01",

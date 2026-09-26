@@ -27,6 +27,7 @@ import {
 import * as v from 'valibot'
 import { writeAttachmentFromDataUrl } from '../../../attachments/store'
 import { ClaudeProviderAdapter } from '../claude'
+import type { ClaudeHistoryRunner } from '../../claude-discovery'
 import { ClaudeAuthRunner } from '../utils/claude-auth'
 import { resolveClaudeExecutable } from '../utils/claude-executable'
 import {
@@ -67,7 +68,10 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
  */
 const INITIALIZE_RESPONSE = {
   account: { email: 'dev@example.com', subscriptionType: 'max' },
-  agents: [],
+  agents: [
+    { description: ' Reviews a diff ', model: 'sonnet', name: 'reviewer' },
+    { description: 'Unnamed', name: ' ' },
+  ],
   available_output_styles: ['default'],
   commands: [],
   models: claudeModelRows(),
@@ -106,6 +110,30 @@ type FakeWaiter = {
  */
 class FakeClaudeQuery implements AsyncIterable<SDKMessage> {
   readonly setModelCalls: Array<string | undefined> = []
+  readonly stoppedTasks: string[] = []
+  readonly getContextUsage = async () => ({
+    categories: [
+      { color: 'a', kind: 'used' as const, name: 'System tools', tokens: 9_000 },
+      { color: 'b', kind: 'used' as const, name: 'Messages', tokens: 3_000 },
+      { color: 'c', kind: 'deferred' as const, name: 'MCP tools (deferred)', tokens: 21_000 },
+      { color: 'd', kind: 'buffer' as const, name: 'Autocompact buffer', tokens: 13_000 },
+      { color: 'e', kind: 'free' as const, name: 'Free space', tokens: 175_000 },
+    ],
+    maxTokens: 200_000,
+    rawMaxTokens: 200_000,
+    totalTokens: 12_000,
+  })
+  readonly reconnected: string[] = []
+  readonly mcpServerStatus = async () => [
+    { name: 'linear', status: 'connected' as const },
+    { error: 'spawn ENOENT', name: 'broken', status: 'failed' as const },
+  ]
+  readonly reconnectMcpServer = async (name: string) => {
+    this.reconnected.push(name)
+  }
+  readonly stopTask = async (taskId: string) => {
+    this.stoppedTasks.push(taskId)
+  }
   acknowledgeClose = true
   closeCalls = 0
   interruptCalls = 0
@@ -206,6 +234,38 @@ afterAll(async () => {
 })
 
 describe('ClaudeProviderAdapter', () => {
+  it('pins the native fork entry before the source grows, including a fork of its latest turn', async () => {
+    let prompts = 2
+    const harness = claudeHarness(true, async () =>
+      Array.from({ length: prompts }, (_, index) => [
+        { role: 'user', sourceId: `user-${index}`, text: 'Prompt', createdAt: null },
+        { role: 'assistant', sourceId: `answer-${index}`, text: 'Answer', createdAt: null },
+      ]).flat(),
+    )
+    const input = sessionStartInput({})
+    const fork = await harness.adapter.prepareFork({
+      cwd: input.cwd,
+      sessionId: input.sessionId,
+      providerTurnId: 'user-1',
+      conversationId: input.sessionId,
+    })
+    prompts = 3
+    try {
+      await harness.adapter.startRuntime({
+        ...input,
+        sessionId: v.parse(sessionIdSchema, '00000000-0000-4000-8000-000000000123'),
+        fork,
+      })
+      expect(latestOptions(harness)).toMatchObject({
+        forkSession: true,
+        resume: input.sessionId,
+        resumeSessionAt: 'answer-1',
+      })
+    } finally {
+      await harness.adapter.stopAll()
+    }
+  })
+
   it('retains a failed-close handle until a later positive query exit', async () => {
     const harness = claudeHarness(false)
     const input = sessionStartInput({})
@@ -305,6 +365,58 @@ describe('ClaudeProviderAdapter', () => {
 
     latestQuery(harness).emit(successResult())
     await pending
+    await harness.adapter.stopAll()
+  })
+
+  it('reports the turn usage as an estimate, then the measured window minus the reserve', async () => {
+    const harness = claudeHarness()
+    const pending = harness.adapter.sendTurn(providerTurnInput())
+    await waitForEvent(harness, 'turn.started')
+    latestQuery(harness).emit({
+      ...successResult(),
+      usage: {
+        cache_creation_input_tokens: 20,
+        cache_read_input_tokens: 11_000,
+        input_tokens: 10,
+        output_tokens: 300,
+        output_tokens_details: { thinking_tokens: 280 },
+      },
+    } as SDKMessage)
+    await pending
+    await waitFor(
+      () =>
+        harness.events.filter((event) => event.type === 'conversation.token-usage.updated')
+          .length === 2,
+      'both context snapshots',
+    )
+
+    const [turn, context] = harness.events.filter(
+      (event) => event.type === 'conversation.token-usage.updated',
+    )
+    expect(turn?.payload).toEqual({
+      usage: {
+        cachedInputTokens: 11_000,
+        cacheWriteTokens: 20,
+        estimated: true,
+        inputTokens: 10,
+        outputTokens: 300,
+        reasoningOutputTokens: 280,
+        usedTokens: 11_330,
+      },
+    })
+    expect(context?.payload).toEqual({
+      usage: {
+        compactsAutomatically: true,
+        maxTokens: 187_000,
+        reserveTokens: 13_000,
+        segments: [
+          { kind: 'used', name: 'System tools', tokens: 9_000 },
+          { kind: 'used', name: 'Messages', tokens: 3_000 },
+          { kind: 'deferred', name: 'MCP tools (deferred)', tokens: 21_000 },
+        ],
+        usedTokens: 12_000,
+      },
+    })
     await harness.adapter.stopAll()
   })
 
@@ -869,6 +981,57 @@ describe('ClaudeProviderAdapter', () => {
     await harness.adapter.stopAll()
   })
 
+  it('reports the non-ambient background roster and stops one task by id', async () => {
+    const harness = claudeHarness()
+    await harness.adapter.startRuntime(sessionStartInput({}))
+    const query = latestQuery(harness)
+    await waitForEvent(harness, 'conversation.started')
+
+    query.emit(
+      systemMessage({
+        subtype: 'background_tasks_changed',
+        tasks: [
+          { task_id: 'sleep', task_type: 'local_bash', description: 'sleep 600' },
+          { task_id: 'watch', task_type: 'monitor', description: 'Watcher', ambient: true },
+        ],
+      }),
+    )
+    expect(await waitForEvent(harness, 'tasks.roster')).toMatchObject({
+      payload: { tasks: [{ description: 'sleep 600', taskId: 'sleep', taskType: 'local_bash' }] },
+    })
+    await harness.adapter.stopBackgroundTask({
+      sessionId: v.parse(sessionIdSchema, SESSION_ID),
+      taskId: 'sleep',
+    })
+    expect(query.stoppedTasks).toEqual(['sleep'])
+    await harness.adapter.stopAll()
+  })
+
+  it('lists the agent definitions the CLI can run a session as', async () => {
+    const harness = claudeHarness()
+    const catalog = await harness.adapter.listCommands({ cwd: '/tmp/workspace' })
+
+    expect(catalog.agents).toEqual([
+      { description: 'Reviews a diff', model: 'sonnet', name: 'reviewer' },
+    ])
+    await harness.adapter.stopAll()
+  })
+
+  it('reports MCP servers from the live query and reconnects one by name', async () => {
+    const harness = claudeHarness()
+    const sessionId = v.parse(sessionIdSchema, SESSION_ID)
+    expect(await harness.adapter.mcpServers({ sessionId })).toBeNull()
+    await harness.adapter.startRuntime(sessionStartInput({}))
+
+    expect(await harness.adapter.mcpServers({ sessionId })).toEqual([
+      { error: null, name: 'linear', status: 'connected' },
+      { error: 'spawn ENOENT', name: 'broken', status: 'failed' },
+    ])
+    await harness.adapter.reconnectMcpServer({ name: 'broken', sessionId })
+    expect(latestQuery(harness).reconnected).toEqual(['broken'])
+    await harness.adapter.stopAll()
+  })
+
   it('preserves monitor classification across progress and ignores metadata after completion', async () => {
     const harness = claudeHarness()
     const liveness = new BackgroundTaskRegistry()
@@ -1197,7 +1360,7 @@ function signedInAuth() {
   })
 }
 
-function claudeHarness(acknowledgeStop = true): ClaudeHarness {
+function claudeHarness(acknowledgeStop = true, historyRunner?: ClaudeHistoryRunner): ClaudeHarness {
   const events: ProviderRuntimeEvent[] = []
   const options: Options[] = []
   const prompts: SDKUserMessage[] = []
@@ -1205,6 +1368,7 @@ function claudeHarness(acknowledgeStop = true): ClaudeHarness {
   const queries: FakeClaudeQuery[] = []
 
   const adapter = new ClaudeProviderAdapter({
+    historyRunner,
     attachmentsDir,
     auth: signedInAuth(),
     createQuery: (input) => {
@@ -1720,11 +1884,12 @@ const MESSAGE_MAPPINGS: ReadonlyArray<{
     }),
   },
   {
-    event: null,
+    event: 'tasks.roster',
     message: systemMessage({
       subtype: 'background_tasks_changed',
       tasks: [{ description: 'dev server', task_id: 'task-2', task_type: 'shell' }],
     }),
+    payload: { tasks: [{ description: 'dev server', taskId: 'task-2', taskType: 'shell' }] },
   },
   {
     event: null,

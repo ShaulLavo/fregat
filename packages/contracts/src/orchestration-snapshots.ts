@@ -22,6 +22,8 @@ import {
   orchestrationSessionSchema,
   orchestrationSessionLifecycleEntries,
   sessionAttentionEntries,
+  sessionAgentSchema,
+  sessionForkSourceSchema,
   sessionOriginSchema,
   trimmedNonEmptyStringSchema,
 } from './chat-model'
@@ -58,6 +60,8 @@ export const orchestrationSessionShellSchema = v.object({
   id: sessionIdSchema,
   worktreeId: worktreeIdSchema,
   origin: sessionOriginSchema,
+  forkedFrom: v.optional(v.nullable(sessionForkSourceSchema)),
+  agent: v.optional(v.nullable(sessionAgentSchema)),
   ...sessionAttentionEntries,
   ...orchestrationSessionLifecycleEntries,
   title: trimmedNonEmptyStringSchema,
@@ -133,6 +137,15 @@ export const orchestrationSessionDetailPageInputSchema = v.object({
     ),
     ORCHESTRATION_SESSION_DETAIL_PAGE_SIZE,
   ),
+})
+
+/**
+ * The whole session for an export, oldest first and never windowed. Read only on
+ * request: its size grows with the session.
+ */
+export const orchestrationSessionTranscriptSchema = v.object({
+  session: orchestrationSessionSchema,
+  proposedPlans: v.array(orchestrationProposedPlanSchema),
 })
 
 /** Rows are oldest-first, so a caller prepends the page as it arrives. */
@@ -337,6 +350,9 @@ export type OrchestrationSessionDetailPageInput = v.InferInput<
 >
 export type OrchestrationSessionDetailPage = v.InferOutput<
   typeof orchestrationSessionDetailPageSchema
+>
+export type OrchestrationSessionTranscript = v.InferOutput<
+  typeof orchestrationSessionTranscriptSchema
 >
 export type OrchestrationProjectShell = v.InferOutput<typeof orchestrationProjectShellSchema>
 export type OrchestrationWorktreeShell = v.InferOutput<typeof orchestrationWorktreeShellSchema>

@@ -17,6 +17,8 @@ export function importedHistoryMessages(
     role: message.role,
     text: message.text,
     createdAt: message.createdAt ?? importedAt,
+    attachments: [],
+    turnId: null,
   }))
 }
 

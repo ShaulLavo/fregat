@@ -516,7 +516,7 @@ Suggested order:
 
 1. ~~Plan 138~~ — implemented 2026-09-24.
 2. Quick wins: ~~Plan 141 Phases 1–3~~ (meter, per-turn recording, usage page; 2026-09-25), the
-   small Plan 145 plans (~~approval-rules~~, merged in `89c58188`), and the small new Plan 126 rows.
+   small Plan 145 plans (~~approval-rules~~, merged in `89c58188`; ~~the rest~~, lane L3), and the small new Plan 126 rows.
 3. ~~Plan 142~~ — implemented 2026-09-25 (completion wave, lane L5). The phone checks and the
    owner question are in the [delivery record](docs/web-push.md).
 4. The research phases of Plans 139 and 140. Plan 140's diagnostics work waits on Plans 087 and
@@ -560,7 +560,7 @@ Suggested order:
    machine's inotify watches. Phases 1–2 need no decision.
 7. Plan 177's research (requested 2026-09-26). Its Phase 0 first-paint measurement is also the
    baseline for Plans 170 and 176.
-8. Then Claude rewind and fork ([Plan 145 fork](plans/145-harness-controls/fork.md), Plan 126
+8. Then Claude rewind and fork ([Plan 145 fork](plans/145-harness-controls.md), done, Plan 126
    RUNTIME-01) and the Plan 139 research phase.
 
 ## UI refresh lane
@@ -576,8 +576,8 @@ surfaces, the file picker and the site. The owner is taking it one topic at a ti
 | [159](plans/159-file-picker.md)               | File and folder picker rewrite: columns, real previews, thumbnails, history keys                                          |
 | 160 (done, lane L2)                           | Reasoning fold, turn receipts, live tail, model marker, tool details, plan steps, subagents, ultra sparkle                |
 | 161 (done, lane L2)                           | Approval lifecycle, stopped turns, streaming holds, folding rules, hostile-state scenarios                                |
-| [162](plans/162-context-and-cost.md)          | Context breakdown, usable-window fullness, session totals, usage-page honesty (after Plan 141)                            |
-| 163 (done, lane L2)                           | Screenshot attachment in the composer (export lives in Plan 145's export plan)                                            |
+| ~~162~~                                       | Done 2026-09-25 (lane L3): context breakdown, usable window, session total, usage-page honesty                            |
+| 163 (done, lane L2)                           | Screenshot attachment in the composer (export shipped with Plan 145)                                                      |
 | [164](plans/164-what-feels-right-in-neon.md)  | First pass shipped (Inter, one mono, `section-label`, radius); a metadata font sweep is left                              |
 | 165 (done)                                    | Nerd Fonts + Fontsource on demand; interface-font setting; curated autocomplete picker                                    |
 | [166](plans/166-shortcuts-editor.md)          | Keyboard shortcuts page rebuilt from VS Code research: full-width list, save on Enter, several per command                |

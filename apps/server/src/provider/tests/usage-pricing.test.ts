@@ -15,6 +15,7 @@ import { ProviderAdapterRegistry } from '../provider-adapter-registry'
 import { ProviderPriceCatalog } from '../price-catalog'
 import { providerRoutes } from '../routes'
 import type { ProviderRuntimeEvent } from '../types'
+import { ProviderMaintenance } from '../provider-maintenance'
 import { ProviderUsageHistoryReader } from '../usage-history'
 import { ProviderUsageRecorder } from '../usage-recorder'
 import { ProviderUsageStore } from '../usage-store'
@@ -60,6 +61,7 @@ it('serves automatically priced usage from the real catalog, recorder and histor
       registry,
       new ProviderUsageStore(registry),
       new ProviderUsageHistoryReader(database),
+      new ProviderMaintenance(registry),
     )
     const response = await app.handle(
       new Request('http://localhost/providers/usage/history?days=7&utcOffsetMinutes=0'),

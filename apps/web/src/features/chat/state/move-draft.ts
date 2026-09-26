@@ -40,6 +40,8 @@ export async function moveDraft(
     rootPath: destination.worktree.path,
     baseWorktreeId: destination.worktree.id,
     worktreeTarget: { kind: 'current', worktreeId: destination.worktree.id },
+    // Agent definitions are files on one machine; another machine starts from its default.
+    ...(sameMachine && draft.identity?.agent ? { agent: draft.identity.agent } : {}),
     createdAt: new Date().toISOString(),
   })
   store.restoreContent(to, draft)

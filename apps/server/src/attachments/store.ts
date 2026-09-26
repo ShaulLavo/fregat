@@ -159,8 +159,8 @@ export async function deleteAttachmentBlobs(input: {
       const removed = await removeAttachmentFile(filePath)
       if (attachment.id.startsWith('upload-')) {
         await removeAttachmentFile(path.join(input.attachmentsDir, `${attachment.id}.json`))
-        input.ownership!.release(attachment.id)
       }
+      input.ownership?.release(attachment.id)
       return removed ? 1 : 0
     })
   }

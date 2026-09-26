@@ -3,6 +3,7 @@ import * as v from 'valibot'
 
 import { workLogEntryLabel } from '@/features/chat/utils/tool-label'
 import { chatWorkLogEntries } from '@/features/chat/utils/work-log'
+import { isPinnedWorkLogEntry } from '@/features/chat/utils/activity-visibility'
 import { TEST_SESSION_ID } from '../../../../../test/factories/chat'
 import { ingestProviderActivities } from '../../../../../test/factories/provider-activities'
 import { expect, test } from '../../../../../test/fixtures'
@@ -13,6 +14,25 @@ const runtime = {
   sessionId: TEST_SESSION_ID,
   turnId: v.parse(turnIdSchema, 'turn-1'),
 }
+
+test.each(['blocked', 'error'] as const)(
+  'keeps a %s hook visible when its work group is collapsed',
+  async (outcome) => {
+    const activities = await ingestProviderActivities([
+      {
+        ...runtime,
+        eventId: `hook-${outcome}`,
+        type: 'hook.completed',
+        payload: { hookId: 'hook-1', hookName: 'Check', hookEvent: 'PreToolUse', outcome },
+      },
+    ])
+    const entries = chatWorkLogEntries({ activities })
+
+    expect(entries).toHaveLength(1)
+    expect(entries[0]).toMatchObject({ sourceKind: 'hook.completed', tone: 'error', hookCount: 1 })
+    expect(entries.filter(isPinnedWorkLogEntry)).toEqual(entries)
+  },
+)
 
 test.each([
   {

@@ -106,6 +106,24 @@ export const sessionDomainErrors = defineErrorCatalog('orchestration', {
     why: 'The turn that asked finished, was stopped, or the server restarted, so the agent stopped waiting.',
     fix: 'Send a new message if the agent should try again.',
   },
+  COMPACT_EMPTY: {
+    status: 409,
+    message: 'There is no conversation to compact yet.',
+    why: 'Compaction summarises earlier turns, and this session has none.',
+    fix: 'Send a message first.',
+  },
+  FORK_TURN_RUNNING: {
+    status: 409,
+    message: 'A turn still running cannot be forked.',
+    why: 'A fork carries the conversation through a finished turn; this one has not finished.',
+    fix: 'Wait for the turn to finish, or fork from an earlier turn.',
+  },
+  FORK_TURN_NOT_FOUND: {
+    status: 404,
+    message: 'That turn is not in the session any more.',
+    why: 'The fork point names a turn the session no longer holds, usually after a rewind.',
+    fix: 'Reload the session and fork from a turn the timeline shows.',
+  },
   LIFECYCLE_RESTORE_UNAVAILABLE: {
     status: 409,
     message: 'The original session action is unavailable.',

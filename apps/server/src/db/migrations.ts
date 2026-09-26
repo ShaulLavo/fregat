@@ -35,7 +35,11 @@ export const platformMigrations: readonly Migration[] = [
   { version: 28, name: 'session_lifecycle_revision', up: applySessionLifecycleRevision },
   { version: 29, name: 'turn_end_reason', up: applyTurnEndReason },
   { version: 30, name: 'message_model_selection', up: applyMessageModelSelection },
+  { version: 31, name: 'session_fork_and_agent', up: applySessionForkAndAgent },
+  { version: 32, name: 'provider_usage_source', up: applyProviderUsageSource },
+  { version: 36, name: 'provider_usage_import_requests', up: applyProviderUsageImportRequests },
   { version: 37, name: 'terminal_session_cleanup', up: applyTerminalSessionCleanup },
+  { version: 38, name: 'provider_reset_credit_attempts', up: applyProviderResetCreditAttempts },
 ]
 
 function applyTerminalSessionCleanup(database: PlatformDatabase) {
@@ -48,12 +52,33 @@ function applySessionLifecycleRevision(database: PlatformDatabase) {
   )
 }
 
+function applyProviderUsageImportRequests(database: PlatformDatabase) {
+  database.run(sql`CREATE TABLE provider_usage_import_requests (
+    billing_scope TEXT NOT NULL, billing_key TEXT NOT NULL, model TEXT NOT NULL,
+    session_id TEXT NOT NULL, turn_id TEXT NOT NULL, provider_instance_id TEXT NOT NULL,
+    recorded_at TEXT NOT NULL, amounts_json TEXT NOT NULL,
+    PRIMARY KEY (billing_scope, billing_key, model)
+  )`)
+  database.run(
+    sql`CREATE INDEX provider_usage_import_requests_turn_idx ON provider_usage_import_requests (session_id, turn_id, model)`,
+  )
+}
+
 function applyMessageModelSelection(database: PlatformDatabase) {
   database.run(sql`ALTER TABLE projection_session_messages ADD COLUMN model_selection_json TEXT`)
 }
 
 function applyTurnEndReason(database: PlatformDatabase) {
   database.run(sql`ALTER TABLE projection_turns ADD COLUMN end_reason TEXT`)
+}
+
+function applyProviderUsageSource(database: PlatformDatabase) {
+  database.run(sql`ALTER TABLE provider_usage_turns ADD COLUMN source TEXT NOT NULL DEFAULT 'live'`)
+}
+
+function applySessionForkAndAgent(database: PlatformDatabase) {
+  database.run(sql`ALTER TABLE projection_sessions ADD COLUMN forked_from_json TEXT`)
+  database.run(sql`ALTER TABLE projection_sessions ADD COLUMN agent TEXT`)
 }
 
 function applyWorktreeSetup(database: PlatformDatabase) {
@@ -615,3 +640,15 @@ const WORKTREE_LIFECYCLE_SCHEMA = [
   `CREATE TABLE projection_terminal_leases (terminal_lease_id TEXT PRIMARY KEY NOT NULL, worktree_id TEXT NOT NULL REFERENCES projection_worktrees(worktree_id), runtime_epoch TEXT NOT NULL, state TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)`,
   `CREATE INDEX projection_terminal_leases_worktree_idx ON projection_terminal_leases(worktree_id)`,
 ]
+
+function applyProviderResetCreditAttempts(database: PlatformDatabase) {
+  database.run(sql`CREATE TABLE provider_reset_credit_attempts (
+    account_key TEXT PRIMARY KEY NOT NULL,
+    credit_id TEXT NOT NULL,
+    idempotency_key TEXT NOT NULL,
+    confirmed_at TEXT NOT NULL,
+    outcome TEXT CHECK (outcome IN ('reset', 'nothingToReset', 'noCredit', 'alreadyRedeemed')),
+    settled_at TEXT,
+    CHECK ((outcome IS NULL) = (settled_at IS NULL))
+  )`)
+}

@@ -248,7 +248,17 @@ export const useChatInputDraftStore = create<ChatInputDraftStore>((set, get) => 
   },
   setModelSelection: (target, modelSelection) => {
     set((state) =>
-      updateDraftForTarget(state, target, (draft) => withDraftPatch(draft, { modelSelection })),
+      updateDraftForTarget(state, target, (draft) => {
+        const identity = draft.identity
+        const changedProvider =
+          modelSelection &&
+          identity?.agent &&
+          identity.agent.providerInstanceId !== modelSelection.providerInstanceId
+        return withDraftPatch(draft, {
+          modelSelection,
+          identity: changedProvider ? { ...identity, agent: null } : identity,
+        })
+      }),
     )
     draftPersist.maybeExecute()
   },

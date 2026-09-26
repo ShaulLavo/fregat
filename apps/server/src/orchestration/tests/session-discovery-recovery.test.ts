@@ -17,6 +17,38 @@ function metadata(cwd: string | null): ProviderDiscoveredSession {
 }
 
 describe('session discovery reconciliation', () => {
+  it('retries a failed usage read while the imported messages remain unchanged', async () => {
+    const fixture = await discoveryFixture()
+    let reads = 0
+    const reconciler = new SessionDiscoveryReconciler({
+      ...fixture,
+      dispatch: (command) => fixture.engine.dispatch(command),
+      providerService: {
+        ...fixture.providerHistory,
+        discoveryInstances: () => [instance],
+        discoverSessions: async () => [metadata(fixture.main)],
+        importSessionUsage: async () => {
+          reads += 1
+          if (reads === 1) throw new TypeError('Fixture transcript temporarily unavailable')
+          return 1
+        },
+      },
+    })
+    try {
+      await fixture.register()
+      await reconciler.scan()
+      const first = await fixture.engine.shellSnapshot()
+      await reconciler.scan()
+      expect(reads).toBe(2)
+      expect((await fixture.engine.shellSnapshot()).snapshotSequence).toBe(first.snapshotSequence)
+      await reconciler.scan()
+      expect(reads).toBe(2)
+    } finally {
+      await reconciler.close()
+      await fixture.close()
+    }
+  })
+
   it('imports every session from one discovery call for all roots', async () => {
     const fixture = await discoveryFixture()
     const rows = Array.from({ length: 105 }, (_, index) => ({

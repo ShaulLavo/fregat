@@ -1,3 +1,4 @@
+import { downloadTextFile } from '@/features/chat/utils/download-text-file'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import type { OrchestrationProposedPlan } from '@workspace/contracts'
 import { Badge } from '@workspace/ui/components/badge'
@@ -91,9 +92,10 @@ export function ProposedPlanCard({ plan }: { plan: OrchestrationProposedPlan }) 
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() =>
-                  downloadPlanMarkdown(
+                  downloadTextFile(
                     proposedPlanExportFilename(plan.planMarkdown),
                     exportMarkdown,
+                    'text/markdown',
                   )
                 }
               >
@@ -138,12 +140,4 @@ export function ProposedPlanCard({ plan }: { plan: OrchestrationProposedPlan }) 
       </div>
     </article>
   )
-}
-
-function downloadPlanMarkdown(filename: string, markdown: string) {
-  const link = document.createElement('a')
-  link.download = filename
-  link.href = URL.createObjectURL(new Blob([markdown], { type: 'text/markdown' }))
-  link.click()
-  URL.revokeObjectURL(link.href)
 }

@@ -165,6 +165,24 @@ export function orchestrationRoutes(
           query: sessionDetailQuerySchema,
         },
       )
+      .get(
+        '/session-transcript',
+        ({ query }) =>
+          observeRequestOperation(
+            chatOperationContext('orchestration.session_transcript', {
+              sessionId: query.sessionId,
+            }),
+            async () => engine.sessionTranscript(query.sessionId),
+            (transcript) => ({
+              activityCount: transcript.session.activities.length,
+              messageCount: transcript.session.messages.length,
+              proposedPlanCount: transcript.proposedPlans.length,
+            }),
+          ),
+        {
+          query: sessionDetailQuerySchema,
+        },
+      )
       .post(
         '/session-search',
         ({ body }) =>

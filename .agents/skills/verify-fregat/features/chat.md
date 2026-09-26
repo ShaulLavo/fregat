@@ -42,6 +42,22 @@ The chat mode button in the window toolbar, or an address URL with `/chat/`.
 
 `scenario session-actions-surfaces` creates one metadata-only session (no provider turn) and drives the shared session actions from every surface: Rename from the rail row, Pin/Unpin and Rename from the chat stage header, then Rename, Snooze/Unsnooze, a cancelled Delete and Archive from the editor sidebar chat header. Each result is read back from the server's shell snapshot; the session is deleted at the end. Rename runs only after its menu has closed — an open popup pulls focus back and the field would blur shut.
 
+`scenario export-transcript` exports one disposable session four ways — Export as Markdown and as JSON from the rail menu, Export Conversation as Markdown from the message menu, and the palette's Export transcript — and reads each download. The session's provider instance does not exist, so its turn fails at once and spends no tokens. The transcript comes from `GET /orchestration/session-transcript`, which is unwindowed: the web itself holds only the latest 200 rows.
+
+`scenario claude-hook-rows` runs real Claude (Haiku) in a fixture repository whose project PreToolUse hook blocks every Bash call, and checks the work log lists `PreToolUse:Bash blocked` with the hook's message under it. Silent successful hooks never get a row; they are counted into one `hook.summary` row at turn end.
+
+`scenario claude-session-fork` and `scenario codex-session-fork` run real providers: three turns each name a fruit, Fork from Here on the second answer opens a `(fork)` session beside the source whose timeline stops at turn 2, and asked for the fruits it answers mango and kiwi, never papaya. The harness fork happens on the fork's first turn.
+
+`scenario claude-manual-compaction` and `scenario codex-manual-compaction` run one real turn, type a draft, and pick Compact Conversation from the session menu. The compaction runs as its own turn (`/compact` for Claude, `thread/compact/start` for Codex), the timeline shows one "Context compacted" row, and the draft is still in the composer. Each takes 15–30 s.
+
+`scenario claude-background-tasks` has real Claude (Haiku) start `sleep 600` and `sleep 700` in the background; the header's Background tasks popover lists both, and stopping one leaves the other. The list polls every 3 s only while the popover is open, since the roster lives in the provider process.
+
+`scenario claude-session-tools` gives real Claude (Haiku) a fixture with two project MCP servers, one working and one whose command does not exist; the header's MCP servers and hooks popover shows Connected, and Failed with the error, and Reconnect runs. `scenario codex-session-tools` reads the same popover for Codex: the user's servers and the fixture's `preToolUse` hook from `hooks/list`. Both need a turn first, since the lists come from the live provider process.
+
+`scenario claude-custom-agent` gives real Claude (Haiku) a fixture with `.claude/agents/reviewer.md`; the new-session strip's Run as menu lists it among the built-in agents, a session started as it opens its reply with the agent's marker line, and the header shows a `reviewer` chip. The shared Editor checkout reloading mid-edit blanks the page; rerun if the page errors name an Editor module.
+
+`scenario claude-context-popover` turns on `chat.contextWindowMeterEnabled` on its throwaway server, runs one real Haiku turn and opens the context ring: a category meter with a legend (System prompt, Messages, …), deferred tools listed apart, and "This session" with tokens and a cost.
+
 `scenario chat-diff-syntax --url <session-diff-address>` checks painted syntax colors in a session checkpoint diff.
 
 Commands dispatch over the orchestration socket when it is live and over HTTP otherwise. The HTTP path refetches the shell snapshot itself.

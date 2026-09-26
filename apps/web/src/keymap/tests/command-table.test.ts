@@ -33,6 +33,7 @@ const TEXT_MENU_EDITOR_COMMANDS = [
 ] as const
 
 const ASYNC_COMMAND_IDS = [
+  'workspace.exportTranscript',
   'workspace.undoSessionAction',
   'workspace.redoSessionAction',
   'fileTree.undo',
@@ -219,6 +220,7 @@ const TAB_OPEN_COMMAND_IDS = [
 ] as const satisfies readonly PlatformCommandId[]
 
 const CHAT_MODE_COMMAND_IDS = [
+  'workspace.exportTranscript',
   'workspace.newSession',
   'workspace.toggleSessionRail',
 ] satisfies readonly PlatformCommandId[]

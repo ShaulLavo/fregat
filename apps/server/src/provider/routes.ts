@@ -10,6 +10,12 @@ import {
   providerUsageHistoryQuerySchema,
   providerUsageHistorySchema,
   providerUsageResultSchema,
+  providerResetCreditBodySchema,
+  providerResetCreditResultSchema,
+  providerUsageSessionTotalSchema,
+  providerUpdateAdvisorySchema,
+  providerUpdateResultSchema,
+  sessionIdSchema,
   trimmedNonEmptyStringSchema,
   type ProviderAuth,
   type ProviderCommandCatalog,
@@ -21,11 +27,13 @@ import {
   recordChatPipelineInfo,
   recordChatPipelineWarning,
 } from '../orchestration/orchestration-logging'
-import { providerErrors } from '../observability/structured-errors'
+import { createInternalError, providerErrors } from '../observability/structured-errors'
 import type { ProviderAdapterRegistry } from './provider-adapter-registry'
+import type { ProviderMaintenance } from './provider-maintenance'
 import type { ProviderAdapter } from './types'
 import type { ProviderUsageHistoryReader } from './usage-history'
 import type { ProviderUsageStore } from './usage-store'
+import type { ProviderResetCredits } from './reset-credits'
 
 /** Every method the provider CLI accepts; the client renders one choice per entry. */
 const SIGN_IN_METHODS = providerSignInMethodSchema.options
@@ -48,16 +56,40 @@ export function providerRoutes(
   adapterRegistry: ProviderAdapterRegistry,
   usage: ProviderUsageStore,
   history: ProviderUsageHistoryReader,
+  maintenance: ProviderMaintenance,
+  resetCredits?: ProviderResetCredits,
 ) {
   return new Elysia({ name: 'provider-routes' })
     .get('/providers', () => adapterRegistry.listProviders(), {
       response: providerListResultSchema,
     })
-    .get('/providers/usage', () => usage.read(), { response: providerUsageResultSchema })
+    .get('/providers/usage', async () => (resetCredits ? resetCredits.readUsage() : usage.read()), {
+      response: providerUsageResultSchema,
+    })
+    .post(
+      '/providers/:providerInstanceId/reset-credit',
+      async ({ params, body }) => {
+        if (!resetCredits) throw createInternalError('Reset credits are unavailable.')
+        return resetCredits.redeem(params.providerInstanceId, body)
+      },
+      {
+        params: instanceParamsSchema,
+        body: providerResetCreditBodySchema,
+        response: providerResetCreditResultSchema,
+      },
+    )
     .get('/providers/usage/history', ({ query }) => history.read(query), {
       query: providerUsageHistoryQuerySchema,
       response: providerUsageHistorySchema,
     })
+    .get(
+      '/providers/usage/sessions/:sessionId',
+      ({ params }) => history.readSession(params.sessionId),
+      {
+        params: v.object({ sessionId: sessionIdSchema }),
+        response: providerUsageSessionTotalSchema,
+      },
+    )
     .get(
       '/providers/:providerInstanceId/commands',
       ({ params, query }) =>
@@ -67,6 +99,16 @@ export function providerRoutes(
         query: commandCatalogQuerySchema,
         response: providerCommandCatalogSchema,
       },
+    )
+    .get(
+      '/providers/:providerInstanceId/update',
+      ({ params }) => maintenance.advisory(params.providerInstanceId),
+      { params: instanceParamsSchema, response: providerUpdateAdvisorySchema },
+    )
+    .post(
+      '/providers/:providerInstanceId/update',
+      ({ params }) => maintenance.update(params.providerInstanceId),
+      { params: instanceParamsSchema, response: providerUpdateResultSchema },
     )
     .group('/providers/:providerInstanceId/auth', (auth) =>
       auth
@@ -159,6 +201,7 @@ async function readCommandCatalog(
   try {
     const catalog = await adapter.listCommands(cwd ? { cwd } : {})
     recordChatPipelineInfo('chat.pipeline.provider_commands.list', {
+      agentCount: catalog.agents?.length ?? 0,
       commandCount: catalog.commands.length,
       cwd,
       installed: true,
@@ -188,7 +231,7 @@ async function readCommandCatalog(
 }
 
 function emptyCommandCatalog(providerInstanceId: ProviderInstanceId): ProviderCommandCatalog {
-  return { commands: [], providerInstanceId, skills: [], supported: false }
+  return { agents: [], commands: [], providerInstanceId, skills: [], supported: false }
 }
 
 /**

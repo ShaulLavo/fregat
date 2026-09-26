@@ -68,7 +68,10 @@ describe('codexModelCapabilities', () => {
     'uses Standard when the native default %s is absent from choices',
     (defaultServiceTier) => {
       const caps = codexModelCapabilities(
-        model({ serviceTiers: [{ id: 'flex', name: 'Flexible' }], defaultServiceTier }),
+        model({
+          serviceTiers: [{ id: 'flex', name: 'Flexible', description: '' }],
+          defaultServiceTier,
+        }),
       )
       expect(caps?.optionDescriptors?.[1]).toMatchObject({
         currentValue: 'default',
@@ -80,8 +83,8 @@ describe('codexModelCapabilities', () => {
     },
   )
 
-  it.each([undefined, [], [{ id: 4, name: 'Broken' }]])(
-    'validates new native fields and falls back to speed tiers (%j)',
+  it.each([undefined, [], [{ id: ' ', name: 'Blank', description: '' }]])(
+    'falls back to speed tiers without usable service tiers (%j)',
     (serviceTiers) => {
       const caps = codexModelCapabilities(
         model({ serviceTiers, additionalSpeedTiers: ['fast', 'flex'] }),

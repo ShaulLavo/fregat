@@ -23,6 +23,7 @@ import {
 } from './chat-ids'
 import {
   chatAttachmentUploadsSchema,
+  chatAttachmentSchema,
   userInputAttachmentUploadsSchema,
   importedSessionMessageSchema,
   isoDateTimeSchema,
@@ -39,6 +40,9 @@ import {
   orchestrationSessionActivitySchema,
   orderKeySchema,
   sourceProposedPlanReferenceSchema,
+  sessionAgentSchema,
+  sessionTurnKindSchema,
+  sessionForkSourceSchema,
   trimmedNonEmptyStringSchema,
 } from './chat-model'
 import {
@@ -117,6 +121,7 @@ export const sessionCreateCommandSchema = v.object({
   modelSelection: modelSelectionSchema,
   runtimeMode: v.optional(runtimeModeSchema, DEFAULT_RUNTIME_MODE),
   interactionMode: v.optional(interactionModeSchema, DEFAULT_INTERACTION_MODE),
+  agent: v.optional(sessionAgentSchema),
 })
 
 export const sessionTurnBootstrapCreateSessionSchema = v.object({
@@ -125,6 +130,7 @@ export const sessionTurnBootstrapCreateSessionSchema = v.object({
   modelSelection: modelSelectionSchema,
   runtimeMode: v.optional(runtimeModeSchema, DEFAULT_RUNTIME_MODE),
   interactionMode: v.optional(interactionModeSchema, DEFAULT_INTERACTION_MODE),
+  agent: v.optional(sessionAgentSchema),
 })
 
 export const sessionTurnBootstrapSchema = v.object({
@@ -286,6 +292,8 @@ export const sessionTurnStartCommandSchema = v.object({
   interactionMode: v.optional(interactionModeSchema, DEFAULT_INTERACTION_MODE),
   sourceProposedPlan: v.optional(sourceProposedPlanReferenceSchema),
   bootstrap: v.optional(sessionTurnBootstrapSchema),
+  /** `compact` asks the harness to compact the conversation instead of answering the text. */
+  kind: v.optional(sessionTurnKindSchema),
 })
 
 export const sessionTurnInterruptCommandSchema = v.object({
@@ -342,12 +350,31 @@ export const sessionCheckpointRevertCommandSchema = v.object({
   restoreFiles: v.boolean(),
 })
 
+/**
+ * A new session carrying the source's conversation through one completed turn.
+ * It shares the source's checkout; files are never restored.
+ */
+export const sessionForkCommandSchema = v.object({
+  ...commandBaseSchema,
+  type: v.literal('session.fork'),
+  sessionId: sessionIdSchema,
+  sourceSessionId: sessionIdSchema,
+  throughTurnId: turnIdSchema,
+})
+
+const preparedSessionForkCommandSchema = v.object({
+  ...sessionForkCommandSchema.entries,
+  native: sessionForkSourceSchema.entries.native,
+  attachmentCopies: v.optional(v.record(v.string(), chatAttachmentSchema), {}),
+})
+
 export const clientOrchestrationCommandSchema = v.variant('type', [
   projectCreateCommandSchema,
   projectMetaUpdateCommandSchema,
   projectReorderCommandSchema,
   projectDeleteCommandSchema,
   sessionCreateCommandSchema,
+  sessionForkCommandSchema,
   sessionMetaUpdateCommandSchema,
   sessionDeleteCommandSchema,
   sessionArchiveCommandSchema,
@@ -379,6 +406,7 @@ export const sessionRuntimeSetCommandSchema = v.object({
   type: v.literal('session.runtime.set'),
   sessionId: sessionIdSchema,
   runtime: sessionRuntimeStateSchema,
+  providerTurnId: v.optional(trimmedNonEmptyStringSchema),
   createdAt: isoDateTimeSchema,
 })
 
@@ -631,6 +659,7 @@ export const orchestrationCommandSchema = v.variant('type', [
   sessionUserInputRespondCommandSchema,
   sessionUserInputDismissCommandSchema,
   sessionCheckpointRevertCommandSchema,
+  preparedSessionForkCommandSchema,
   worktreeRetryCommandSchema,
   worktreeCleanupCommandSchema,
   worktreeForceCleanupCommandSchema,
@@ -664,6 +693,7 @@ export type ProjectMetaUpdateCommand = v.InferOutput<typeof projectMetaUpdateCom
 export type ProjectReorderCommand = v.InferOutput<typeof projectReorderCommandSchema>
 export type ProjectDeleteCommand = v.InferOutput<typeof projectDeleteCommandSchema>
 export type SessionCreateCommand = v.InferOutput<typeof sessionCreateCommandSchema>
+export type SessionForkCommand = v.InferOutput<typeof sessionForkCommandSchema>
 export type SessionTurnBootstrapCreateSession = v.InferOutput<
   typeof sessionTurnBootstrapCreateSessionSchema
 >

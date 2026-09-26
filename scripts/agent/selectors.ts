@@ -141,6 +141,9 @@ export const selectors = {
       .getByRole('dialog', { name: 'Wallpaper', exact: true })
       .getByRole('button', { name: 'Close', exact: true }),
   popupMenu: (page: Page) => page.getByRole('menu'),
+  draftAgent: (page: Page) => page.getByRole('button', { name: 'Run the session as an agent' }),
+  draftAgentChoice: (page: Page, name: string) =>
+    page.getByRole('menuitemradio').filter({ hasText: name }),
   modelPickerTrigger: (page: Page) =>
     page.getByRole('button', { name: 'Provider and model', exact: true }),
   modelPickerPanel: (page: Page) =>
@@ -800,6 +803,10 @@ export const selectors = {
     page.getByRole('status', { name: 'Loading settings', exact: true }),
   settingsModelsLoading: (page: Page) => page.getByRole('status', { name: 'Loading models' }),
   settingsNoModels: (page: Page) => page.getByText('No models are available yet.'),
+  settingsProviderRow: (page: Page, providerInstanceId: string) =>
+    page.locator(`[data-provider-instance="${providerInstanceId}"]`),
+  providerUpdateChecking: (page: Page) =>
+    page.getByRole('status', { name: 'Checking for updates' }),
   paletteScriptsLoading: (page: Page) => page.getByRole('status', { name: 'Loading scripts' }),
   paletteNoScripts: (page: Page) => page.getByText('No scripts in this project.'),
   paletteDialog: (page: Page) => page.getByRole('dialog', { name: 'Command Palette', exact: true }),

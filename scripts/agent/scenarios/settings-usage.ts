@@ -1,4 +1,5 @@
 import type {
+  ProviderUsageDayRow,
   ProviderUsageHistory,
   ProviderUsageModelRow,
 } from '../../../packages/contracts/src/index'
@@ -23,11 +24,26 @@ const localDay = new Intl.DateTimeFormat('en-CA').format
 /** A month of mixed spend: Claude priced by its CLI, one Codex model with no price. */
 function historyFixture(): ProviderUsageHistory {
   const since = rangeStart(30)
-  const daily = [2, 5, 6, 12, 20, 21, 27, 29].map((offset, index) => ({
-    costUsd: 0.4 + index * 0.35,
-    day: localDay(new Date(since.getTime() + offset * DAY_MS + DAY_MS / 2)),
-    tokens: 120_000 + index * 40_000,
-  }))
+  const day = (offset: number) => localDay(new Date(since.getTime() + offset * DAY_MS + DAY_MS / 2))
+  const daily: ProviderUsageDayRow[] = [2, 5, 6, 12, 20, 21, 27, 29].map((offset, index) => {
+    const costUsd = 0.4 + index * 0.35
+    const tokens = 120_000 + index * 40_000
+    return {
+      costUsd,
+      day: day(offset),
+      models: [{ costUsd, driverKind: 'claude', model: 'claude-opus-5-5', tokens }],
+      tokens,
+      unpricedTokens: 0,
+    }
+  })
+  // A day of only unpriced usage: measured by cost it draws no bar, so it gets a marker.
+  daily.splice(4, 0, {
+    costUsd: null,
+    day: day(15),
+    models: [{ costUsd: null, driverKind: 'codex', model: 'unknown-model', tokens: 4_100_000 }],
+    tokens: 4_100_000,
+    unpricedTokens: 4_100_000,
+  })
   const model = (
     fields: Pick<ProviderUsageModelRow, 'costSource' | 'costUsd' | 'driverKind' | 'model'>,
   ): ProviderUsageModelRow => ({
@@ -35,6 +51,7 @@ function historyFixture(): ProviderUsageHistory {
     cacheWriteTokens: 40_000,
     inputTokens: 90_000,
     outputTokens: 60_000,
+    rates: null,
     reasoningTokens: 12_000,
     turns: 14,
     ...fields,
@@ -57,6 +74,19 @@ function historyFixture(): ProviderUsageHistory {
         model: 'claude-haiku-4-5',
       }),
       model({ costSource: 'catalog', costUsd: 1.82, driverKind: 'codex', model: 'gpt-6-astra' }),
+      model({
+        costSource: 'provider',
+        costUsd: 0.21,
+        driverKind: 'claude',
+        model: 'claude-sonnet-5',
+      }),
+      model({
+        costSource: 'provider',
+        costUsd: 0.0042,
+        driverKind: 'claude',
+        model: 'claude-fable-5-1',
+      }),
+      model({ costSource: 'catalog', costUsd: 0.003, driverKind: 'codex', model: 'gpt-5.5-mini' }),
       model({ costSource: 'none', costUsd: null, driverKind: 'codex', model: 'unknown-model' }),
     ],
     purposes: [
@@ -101,7 +131,13 @@ export const settingsUsage: Scenario = {
       await openUsageSettings(page)
       await selectors.usageSummary(page).waitFor({ timeout: 20_000 })
       strictEqual(await selectors.usageChartBars(page).count(), 30, 'one bar slot per day')
-      strictEqual(await selectors.usageModelRows(page).count(), 4, 'one row per model')
+      strictEqual(await selectors.usageModelRows(page).count(), 5, 'top five, the rest folded')
+      await selectors
+        .usageSection(page)
+        .getByRole('button', { name: /^2 more · / })
+        .click()
+      strictEqual(await selectors.usageModelRows(page).count(), 7, 'the fold opens in place')
+      await selectors.usageSection(page).getByText('$0.0042', { exact: true }).waitFor()
       strictEqual(
         await selectors.usageSection(page).getByRole('spinbutton').count(),
         0,
@@ -113,7 +149,7 @@ export const settingsUsage: Scenario = {
         'unknown model stays unpriced',
       )
       strictEqual(
-        await selectors.usageSummary(page).getByText('Estimated API cost', { exact: true }).count(),
+        await selectors.usageSummary(page).getByText('Estimated cost', { exact: true }).count(),
         1,
       )
       await page.mouse.move(0, 0)

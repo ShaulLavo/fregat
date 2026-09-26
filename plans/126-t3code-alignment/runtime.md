@@ -206,6 +206,24 @@ T3 MCP server upstream injects into ACP and OpenCode sessions.
 - **Dependencies:** Interaction command menu path and existing queued-start recovery.
 - **Acceptance / tests:** Empty conversation rejects; idle Codex compacts once; second compact while busy rejects; two follow-ups execute in order after success; compaction failure/Stop marks queued follow-ups retryable without sending them; restart during compaction does not replay the command or lose ownership. Claude and new providers follow their pinned adapter's supported behavior.
 - **Bounded absence search:** `compactThread`, `compactSession`, `thread/compact`, `/compact`, `isCompact` in provider/orchestration/contracts/client-core/chat-mode; only notification handling, generated schema and test text, no callable manual path.
+- **Measured 2026-09-25 (lane L3, before building):**
+  - Codex 0.157 `thread/compact/start {threadId}` answers `{}` at once, then runs as an ordinary
+    native turn: `turn/started` → `contextCompaction` item → `thread/tokenUsage/updated` →
+    `turn/completed` (about 15 s on a one-turn thread). It sends no `thread/compacted`. So a
+    manual compaction can be a Platform turn whose provider turn attaches on `turn/started`, and
+    the existing busy/queue rules hold follow-ups behind it.
+  - Claude: `compact` is in the probed command catalog, and a `/compact` user prompt through the
+    SDK compacts: `compact_boundary` (`trigger: 'manual'`, pre/post tokens), a summary user
+    message, `<local-command-stdout>Compacted </local-command-stdout>`, then a `result` with
+    subtype `success` and empty text (about 20 s). It is a turn with a result like any other.
+- **Delivered 2026-09-25 (lane L3):** `session.turn.start` takes `kind: 'compact'`. The decider
+  rejects it on a session with no prompt (`COMPACT_EMPTY`) and, like any start, over a running turn
+  (`START_STATE_CONFLICT`). Codex sends `thread/compact/start` and settles on the native turn it
+  starts; its `contextCompaction` item becomes the timeline's "Context compacted". Claude sends
+  `/compact` as the prompt. Because compaction is a turn, follow-ups queue behind it, Stop and
+  failure settle it like a turn, and boot recovery marks it "Turn interrupted" without replaying.
+  Tests: `orchestration/tests/session-fork.test.ts`, `provider/adapters/tests/codex.test.ts`.
+  Scenarios `claude-manual-compaction` and `codex-manual-compaction` pass.
 
 ### RUNTIME-06 — Preserve advertised model option descriptors and service tiers
 
@@ -233,15 +251,15 @@ T3 MCP server upstream injects into ACP and OpenCode sessions.
 ### RUNTIME-08 — Publish account usage limits and wire reset-credit redemption
 
 - Decided 2026-09-25: owner — build with boundary fixtures only. Nothing is spent until the owner does one live redemption.
-- **Status / priority / confidence:** Confirmed partial implementation; P2; HIGH.
-- **Evidence:** Upstream `apps/server/src/provider/Drivers/CodexDriver.ts:285-328` serializes redemption per account with an idempotency key and refresh verification; `apps/server/src/ws.ts:2390-2411` exposes it with enabled-instance/capability checks; `apps/web/src/components/usage/UsageLimits.tsx:209` invokes it. Local `apps/server/src/provider/adapters/codex.ts:1355` and `claude.ts:844` emit rate-limit events, but `packages/contracts/src/provider.ts:105-131` has no usage-window/reset-credit snapshot or action. `apps/web/src/features/chat/utils/activity-visibility.ts:9` hides the raw rate event.
-- **Impact:** Native rate telemetry does not provide upstream account-level usage windows or a usable reset-credit action.
+- **Status / priority / confidence:** Fixture implementation complete; owner live redemption pending; P2; HIGH.
+- **Evidence:** `provider/reset-credits.ts` persists account-scoped attempts in migration 38; `provider/adapters/codex.ts` rechecks native account identity and consumes the selected credit with the durable key. `features/chat/components/reset-credit-action.tsx` confirms the action and the mutation settles the usage cache.
+- **Impact:** Codex account usage now includes a confirmed reset-credit action; ambiguous outcomes remain retryable with the same native attempt.
 - **Effort / risk:** L; HIGH for a command that spends an account resource.
 - **Implementation boundary:** Provider usage snapshot/refresh and account-keyed redemption service → contracts/route/mutation → interaction usage UI. Preserve account identity distinct from instance ID: instances sharing a credential home must share redemption serialization and pending idempotency. Do not put credentials into snapshots or logs.
 - **Dependencies:** Interaction usage surfaces; provider instance identity already exists.
 - **Acceptance / tests:** Account windows update after provider events and explicit refresh. Two instances for one account cannot consume twice concurrently; retry reuses the unresolved idempotency key. Disabled/unsupported instance cannot redeem. Refresh failure does not claim confirmed new limits. Use third-party/native boundary fixtures; no real credit consumption during automated verification.
 - **Related plan:** Plan 141 (usage and rate limits) implements the quota surfaces and the usage page (EXT-17). This group keeps the upstream acceptance cases.
-- **Bounded search:** `usageLimits`, `consumeResetCredit`, `rateLimitReset`, `rateLimits` across local provider/contracts/chat-mode/client-core; only event emission/normalization exists, not the action/snapshot workflow.
+- **Verification:** Boundary fixtures cover account switches, cross-home concurrency, timeout/restart, persisted credit selection, malformed timestamps and equivalent-instant replay. The HTTP route and confirmation UI are exercised without live credit consumption.
 
 ### RUNTIME-09 — Match response delivery modes and paragraph default
 
@@ -266,6 +284,19 @@ T3 MCP server upstream injects into ACP and OpenCode sessions.
 - **Acceptance / tests:** Supported instance advertises update and executes its declared command once; unsupported/manual-only remains informative. Two requests serialize and observe shared state. Failure retains usable provider details; completion verifies installed version and refreshes catalog. Updating one environment never acts on another's binary.
 - **2026-09-24 delta:** Post-pin `96c4bfa0` checks each harness's installed version against remote compatibility ranges (supported, graceful, unsupported) and `7e65b226` shares sign-in flows and credential bindings across instances. Version verification stays in this group. Plan 138 owns which Claude binary runs and the version the snapshot reports; do not build a second version probe. See [delta record](delta-2026-09-24.md).
 - **Bounded search:** `maintenance`, `updateProvider`, `providerUpdate`, `installProvider`, `latestVersion` in local provider/settings/contracts/settings UI found no production maintenance route. This does not claim every upstream provider supports one-click install.
+- **Delivered 2026-09-25 (lane L3):** `GET`/`POST /providers/:id/update` over `ProviderMaintenance`.
+  The install method comes from the CLI's resolved path, as upstream decides it: the CLI's own
+  `update` for a standalone install, `npm install --global --prefix <prefix>` or `bun add --global`
+  where the path proves that owner. mise, Homebrew, the SDK-bundled Claude and unknown installs are
+  manual-only and show their command. Homebrew is one-click upstream and manual here, because the
+  keg path alone does not prove which `brew` owns it. The latest version comes from the npm
+  registry, cached for an hour. Updates sharing an install run one at a time through a scoped
+  mutation, and a queued click finds nothing left to do. After an update the adapter forgets its
+  executable and the snapshot re-probes. Settings › Providers shows the installed version, the
+  latest version, and an Update button or a copyable command. Tests:
+  `provider/utils/tests/update-method.test.ts` and `provider/tests/provider-maintenance.test.ts`
+  (real fake binary). Scenario `settings-provider-update` updates a fixture codex. Not built: the
+  post-pin compatibility ranges from the 2026-09-24 delta.
 
 ## Matched or rejected first-pass claims
 

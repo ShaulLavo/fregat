@@ -37,7 +37,7 @@ export function MessageMenu({
   return (
     <MenuSurface
       anchor={anchor}
-      className='w-60'
+      className='min-w-60'
       menu={menu}
       onOpenChange={onOpenChange}
       open

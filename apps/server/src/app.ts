@@ -1,3 +1,4 @@
+import { sessionControlRoutes } from './provider/session-control-routes'
 import { createAttachmentOwnership } from './attachments/ownership'
 import { selectTitleModel } from './orchestration/title-generation'
 import { errorMessage } from '@workspace/contracts'
@@ -76,8 +77,10 @@ import { ProviderSessionDirectory } from './provider/provider-session-directory'
 import { ProviderService } from './provider/provider-service'
 import { ProviderUsageHistoryReader } from './provider/usage-history'
 import { ProviderPriceCatalog } from './provider/price-catalog'
+import { ProviderMaintenance } from './provider/provider-maintenance'
 import { ProviderUsageRecorder } from './provider/usage-recorder'
 import { ProviderUsageStore } from './provider/usage-store'
+import { ProviderResetCredits } from './provider/reset-credits'
 import { MachineService, type MachineServiceOptions } from './machines/service'
 import { machineRoutes } from './machines/routes'
 import type { TailnetStatusCommand } from './machines/tailnet-hosts'
@@ -265,6 +268,11 @@ export function createApp(options: AppOptions) {
     sessionDirectory: new ProviderSessionDirectory(database),
   })
   const providerUsage = new ProviderUsageStore(providerAdapterRegistry)
+  const providerResetCredits = new ProviderResetCredits(
+    database,
+    providerAdapterRegistry,
+    providerUsage,
+  )
   const providerPrices = new ProviderPriceCatalog(database)
   const providerUsageRecorder = new ProviderUsageRecorder(
     database,
@@ -272,8 +280,12 @@ export function createApp(options: AppOptions) {
     providerPrices,
   )
   const providerUsageHistory = new ProviderUsageHistoryReader(database)
+  const providerMaintenance = new ProviderMaintenance(providerAdapterRegistry)
   providerService.subscribeRuntimeEvents((event) => providerUsage.accept(event))
   providerService.subscribeUsage((event, purpose) => providerUsageRecorder.accept(event, purpose))
+  providerService.subscribeImportedUsage((input, usage) =>
+    providerUsageRecorder.importTurns(input, usage),
+  )
   const orchestration = new OrchestrationEngine(database, {
     responseStreamingMode: (projectId) => {
       const values = settings.snapshot().values
@@ -387,6 +399,8 @@ export function createApp(options: AppOptions) {
     orchestration,
     machines,
     providerPrices,
+    providerMaintenance,
+    providerResetCredits,
     sessionPush,
   )
 
@@ -471,7 +485,16 @@ export function createApp(options: AppOptions) {
     })
     .post('/terminal/clear', ({ body }) => terminal.clear(body), { body: terminalClearInputSchema })
     .post('/terminal/kill', ({ body }) => terminal.kill(body), { body: terminalKillInputSchema })
-    .use(providerRoutes(providerAdapterRegistry, providerUsage, providerUsageHistory))
+    .use(
+      providerRoutes(
+        providerAdapterRegistry,
+        providerUsage,
+        providerUsageHistory,
+        providerMaintenance,
+        providerResetCredits,
+      ),
+    )
+    .use(sessionControlRoutes(providerService))
     .use(orchestrationRoutes(orchestration, checkpointDiff, sessionSearch, checkpointHunks))
     .use(
       attachmentRoutes({
@@ -545,6 +568,8 @@ function appCleanup(
   orchestration: OrchestrationEngine,
   machines: MachineService,
   providerPrices: ProviderPriceCatalog,
+  providerMaintenance: ProviderMaintenance,
+  providerResetCredits: ProviderResetCredits,
   sessionPush: SessionNoticePush,
 ) {
   let closed = false
@@ -566,6 +591,8 @@ function appCleanup(
     await orchestration.close()
     await providerService.shutdown()
     providerPrices.close()
+    providerMaintenance.close()
+    providerResetCredits.close()
     await fs.close()
     await flushObservability()
   }

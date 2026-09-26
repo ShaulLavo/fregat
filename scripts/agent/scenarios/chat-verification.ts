@@ -5,6 +5,7 @@ import {
 } from '../../../packages/contracts/src/index'
 import * as v from 'valibot'
 import type { Page } from 'playwright'
+import { releaseFixture } from '../fixture-workspace'
 import { selectors } from '../selectors'
 
 export async function readShell(page: Page, base: string) {
@@ -146,4 +147,68 @@ export async function openModelPickerInNewSession(page: Page) {
   const panel = selectors.modelPickerPanel(page)
   await panel.waitFor({ timeout: 10_000 })
   return panel
+}
+
+/** Waits for the agent's reply marker. The prompt names it too, so the reply is the second match. */
+export async function waitForReply(page: Page, marker: string) {
+  const matches = selectors.chatMessages(page).getByText(marker)
+  const deadline = Date.now() + 120_000
+  while (Date.now() < deadline) {
+    if ((await matches.count()) >= 2) return
+    await Bun.sleep(250)
+  }
+  ok(false, `The agent never replied ${marker}`)
+}
+
+/** The composer re-mounts once the session loads, which drops text typed before it. */
+export async function typePrompt(page: Page, prompt: string) {
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    await selectors.chatMessage(page).fill(prompt)
+    await Bun.sleep(300)
+    if (await selectors.chatSend(page).isEnabled()) return
+  }
+  ok(false, 'The composer never accepted the prompt')
+}
+
+/** Stops and deletes a real-provider scenario's sessions, then its project and fixture. */
+export async function removeScenarioSessions(
+  page: Page,
+  orchestration: string,
+  input: { fixture: string; projectId: string | null; sessions: readonly string[] },
+) {
+  for (const sessionId of input.sessions) {
+    await dispatch(page, orchestration, { type: 'session.runtime.stop', sessionId })
+    await dispatch(page, orchestration, { type: 'session.delete', sessionId })
+  }
+  if (input.projectId)
+    await dispatch(page, orchestration, {
+      type: 'project.delete',
+      projectId: input.projectId,
+      force: true,
+    })
+  await releaseFixture(input.fixture)
+}
+
+/** Creates a full-access session on a fixture worktree and opens it in the rail. */
+export async function openScenarioSession(
+  page: Page,
+  orchestration: string,
+  input: {
+    model: { providerInstanceId: string; model: string }
+    sessionId: string
+    title: string
+    worktreeId: string
+  },
+) {
+  await dispatch(page, orchestration, {
+    type: 'session.create',
+    sessionId: input.sessionId,
+    title: input.title,
+    worktreeTarget: { kind: 'current', worktreeId: input.worktreeId },
+    modelSelection: input.model,
+    runtimeMode: 'full-access',
+  })
+  await selectors.sessionSearch(page).fill(input.title)
+  await selectors.sessionByTitle(page, input.title).click()
+  await page.waitForURL((url) => url.href.includes(input.sessionId))
 }

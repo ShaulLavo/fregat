@@ -57,7 +57,12 @@ test('the scripted turn streams reasoning, a plan that drops a step, four calls 
   ])
   expect(plans.map((event) => event.payload.plan.length)).toEqual([4, 3])
   expect(new Set(agents)).toEqual(new Set(['mock-reviewer', 'mock-checker']))
-  expect(kinds.slice(-3)).toEqual(['assistant.complete', 'usage.totals', 'turn.completed'])
+  expect(kinds.slice(-4)).toEqual([
+    'assistant.complete',
+    'usage.totals',
+    'conversation.token-usage.updated',
+    'turn.completed',
+  ])
 })
 
 test('a scripted mock offers the effort levels, and the plain mock keeps its one-line answer', async () => {
@@ -75,6 +80,7 @@ test('a scripted mock offers the effort levels, and the plain mock keeps its one
     'assistant.delta',
     'assistant.complete',
     'usage.totals',
+    'conversation.token-usage.updated',
     'turn.completed',
   ])
 })

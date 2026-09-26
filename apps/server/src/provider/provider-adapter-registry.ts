@@ -295,6 +295,14 @@ export class ProviderAdapterRegistry {
     return adapter
   }
 
+  /** The instance's adapter with the environment its CLI runs in, for maintenance. */
+  updateTarget(providerInstanceId: ProviderInstanceId) {
+    const instance = this.instances.get(providerInstanceId)
+    if (!instance) throw createInternalError(`Provider instance not found: ${providerInstanceId}`)
+
+    return { adapter: instance.adapter, env: instance.env }
+  }
+
   /** Keeps a utility turn's adapter alive across settings reconciliation. */
   acquireInstanceLease(providerInstanceId: ProviderInstanceId): ProviderAdapterLease {
     const adapter = this.getByInstance(providerInstanceId)
