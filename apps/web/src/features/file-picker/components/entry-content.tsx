@@ -25,9 +25,19 @@ export function EntryContent({
 }) {
   const origin = serverEndpoint(originForQueryClient(useQueryClient()))
   const kind = previewKind(entry)
-  const tile = <EntryPreviewTile entry={entry} />
+  const tile = (
+    <div className='flex min-h-0 flex-1 items-center justify-center'>
+      <EntryPreviewTile entry={entry} />
+    </div>
+  )
   if (kind === 'image')
-    return <FileThumbnail fallback={tile} src={previewImageUrl(origin, entry.path)} />
+    return (
+      <FileThumbnail
+        className='h-full min-h-0'
+        fallback={tile}
+        src={previewImageUrl(origin, entry.path)}
+      />
+    )
   if (kind === 'text') return <TextPreview fallback={tile} name={entry.name} path={entry.path} />
   if (kind === 'folder')
     return <FolderPreview accept={accept} entry={entry} mode={mode} showHidden={showHidden} />

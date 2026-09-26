@@ -47,7 +47,7 @@ export function FolderPreview({
   return (
     <ul
       aria-label={`Inside ${entry.name}`}
-      className='flex w-full min-w-0 flex-col text-left text-xs'
+      className='flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-y-auto overscroll-contain text-left text-xs'
     >
       {children.map((child) => (
         <li

@@ -21,7 +21,7 @@ export function FilePreviewPanel({ item }: { readonly item: FilePaletteItem | nu
   return (
     <section
       aria-label='File preview'
-      className='max-h-[35dvh] shrink-0 overflow-hidden px-3 pb-3'
+      className='flex max-h-[35dvh] shrink-0 flex-col overflow-hidden px-3 pb-3'
       data-file-preview={entry.path}
       title={settled.pathLabel}
     >

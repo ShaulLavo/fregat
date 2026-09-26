@@ -247,6 +247,36 @@ export async function fetchFile(
   }
 }
 
+/** The first `maxBytes` of a text file, for a preview; a binary file fails with FILE_IS_BINARY. */
+export async function fetchFileHead(
+  path: string,
+  maxBytes: number,
+  signal: AbortSignal,
+  client: Client,
+) {
+  return observeClientOperation(
+    {
+      ...clientLogContext(client),
+      action: 'fs.head',
+      area: 'fs',
+      maxBytes,
+      method: 'GET',
+      path,
+      route: '/fs/head',
+      signal,
+    },
+    async () => {
+      const response = await client.fs.head.get({
+        query: { maxBytes, path },
+        fetch: { signal },
+      })
+      if (response.error) throw createRpcError(response.error)
+      return response.data
+    },
+    (head) => ({ size: head.size, truncated: head.truncated }),
+  )
+}
+
 export async function fetchQuickOpenFiles(
   {
     path,

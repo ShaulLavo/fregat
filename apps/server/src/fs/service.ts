@@ -17,7 +17,7 @@ import { DEFAULT_MAX_TEXT_FILE_BYTES, MAX_TEXT_FILE_BYTES_UPPER_BOUND } from './
 import { statPath } from './stat'
 import { readUserPlaces } from './places'
 import { readTree } from './tree'
-import { getBlobFile, readTextFile } from './read'
+import { getBlobFile, readTextFile, readTextHead } from './read'
 import { writeTextFile } from './write'
 import { textFileVersion } from './version'
 import { AppWrites } from './app-writes'
@@ -303,6 +303,14 @@ export class FileSystemService {
           concurrency: this.treeConcurrency,
         }),
       (result) => ({ entryCount: result.entries.length }),
+    )
+  }
+
+  head(path: string, maxBytes: number) {
+    return observeRequestOperation(
+      { area: 'fs', maxBytes, operation: 'head', path },
+      () => readTextHead(this.paths, path, maxBytes),
+      (result) => ({ size: result.size, truncated: result.truncated }),
     )
   }
 

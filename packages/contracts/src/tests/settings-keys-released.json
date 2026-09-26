@@ -60,6 +60,7 @@
     "files.autoSave",
     "files.autoSaveDelay",
     "files.picker.view",
+    "files.previewKilobytes",
     "files.searchIndexIdleMinutes",
     "files.searchIndexLimit",
     "files.showHidden",

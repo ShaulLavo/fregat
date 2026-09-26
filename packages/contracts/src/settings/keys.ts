@@ -1137,6 +1137,17 @@ export const SETTINGS_REGISTRY = {
       'How the file picker shows a folder: columns, a list, or icons. Auto uses columns when choosing a folder and a list when choosing a file.',
     keywords: ['files', 'folders', 'picker', 'columns', 'list', 'icons', 'finder'],
   }),
+  'files.previewKilobytes': defineSetting({
+    schema: v.pipe(v.number(), v.integer(), v.minValue(4), v.maxValue(1024)),
+    default: 64,
+    scope: 'application',
+    widget: 'number',
+    category: 'Files',
+    title: 'Text preview size',
+    description:
+      'Kilobytes of a text file the file picker and quick open read for their preview. A longer file shows its first part and says how much of it that is.',
+    keywords: ['files', 'preview', 'picker', 'quick open', 'size', 'kilobytes'],
+  }),
   'files.showHidden': defineSetting({
     schema: v.boolean(),
     default: false,

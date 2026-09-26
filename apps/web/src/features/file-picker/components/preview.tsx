@@ -30,27 +30,30 @@ export function PreviewPane({
 }) {
   const [settled] = useDebouncedValue(entry, { wait: PREVIEW_SETTLE_MS })
   const shown = settled
-  const fetching = useIsFetching({ queryKey: filePreviewKeys.preview(shown?.path ?? '') }) > 0
+  const fetching = useIsFetching({ queryKey: filePreviewKeys.file(shown?.path ?? '') }) > 0
 
   return (
     <ToolPane
       actions={fetching ? <Spinner label='Loading preview' size='xs' /> : null}
       title='Preview'
       className='h-full'
-      bodyClassName='flex flex-col gap-(--density-section-padding) p-(--density-section-padding)'
+      bodyClassName='flex flex-col p-(--density-section-padding)'
+      scroll={false}
     >
       {shown ? (
         <div
-          className='flex min-h-0 flex-1 flex-col items-center gap-(--density-section-gap)'
+          className='flex min-h-0 flex-1 flex-col gap-(--density-section-gap)'
           data-file-preview={shown.path}
         >
-          <div className='flex max-h-72 min-h-0 w-full shrink justify-center overflow-hidden'>
+          <div className='flex min-h-0 w-full flex-1 flex-col items-center'>
             <EntryContent accept={accept} entry={shown} mode={mode} showHidden={showHidden} />
           </div>
-          <div className='w-full min-w-0 text-center' title={shown.path}>
-            <div className='truncate text-xs font-medium'>{shown.name}</div>
+          <div className='flex shrink-0 flex-col gap-(--density-control-gap)'>
+            <div className='w-full min-w-0 text-center' title={shown.path}>
+              <div className='truncate text-xs font-medium'>{shown.name}</div>
+            </div>
+            <EntryFacts entry={shown} />
           </div>
-          <EntryFacts entry={shown} />
         </div>
       ) : (
         <NoPreview isSearching={isSearching} mode={mode} />

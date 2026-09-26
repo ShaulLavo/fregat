@@ -9,6 +9,7 @@ import {
   lookupWorkspaceAddressesBodySchema,
   openWorkspaceRootBodySchema,
   pathQuerySchema,
+  headQuerySchema,
   readQuerySchema,
   recordRecentBodySchema,
   recentsQuerySchema,
@@ -45,6 +46,9 @@ export function fsRoutes(fs: FileSystemService) {
       // The dev server asks whether a change it saw is the app's own save.
       .get('/app-write', ({ query }) => fs.isAppWrite(query.path, query.version), {
         query: appWriteQuerySchema,
+      })
+      .get('/head', ({ query }) => fs.head(query.path, query.maxBytes), {
+        query: headQuerySchema,
       })
       .get('/read', ({ query }) => fs.read(query.path, query.acceptTextOnly), {
         query: readQuerySchema,

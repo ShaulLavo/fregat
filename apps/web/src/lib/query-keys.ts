@@ -34,7 +34,8 @@ export const filePickerKeys = {
 
 export const filePreviewKeys = {
   all: ['file-preview'] as const,
-  preview: (path: string) => [...filePreviewKeys.all, path] as const,
+  file: (path: string) => [...filePreviewKeys.all, path] as const,
+  preview: (path: string, maxBytes: number) => [...filePreviewKeys.file(path), maxBytes] as const,
 }
 
 export const gitKeys = {
