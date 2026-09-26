@@ -1,12 +1,14 @@
+import { useMemo } from 'react'
 import { cssFamily, type FontRole } from '@workspace/contracts'
-import { Shimmer } from '@workspace/ui/components/shimmer'
+import { Spinner } from '@workspace/ui/components/spinner'
+import { useHeldUntilReady } from '@/hooks/use-held-until-ready'
 import { cn } from '@workspace/ui/lib/utils'
 
 import { useFontSample } from '@/features/settings/hooks/use-font-sample'
 
 /**
- * `text` drawn in the font `fontRef` names. Until the subset arrives it shimmers in the role's
- * fallback face; a font that will not download stays in the fallback, still readable.
+ * `text` drawn in the font `fontRef` names. A loaded sample stays whole until the next
+ * subset arrives; a failed download settles to the role's fallback face.
  */
 export function FontSample({
   className,
@@ -26,12 +28,18 @@ export function FontSample({
   text: string
 }) {
   const { family, pending } = useFontSample(fontRef, sampleText ?? text, serverSample)
+  // useHeldUntilReady stores this value during render and needs stable identity.
+  const next = useMemo(() => ({ family, text }), [family, text])
+  const shown = useHeldUntilReady(next, !pending)
   const fallback = role === 'ui' ? 'var(--font-ui)' : 'var(--font-code)'
-  const style = family ? { fontFamily: `${cssFamily(family)}, ${fallback}` } : undefined
+  const style = shown.family ? { fontFamily: `${cssFamily(shown.family)}, ${fallback}` } : undefined
 
   return (
-    <span className={cn('truncate', className)} style={style}>
-      {pending ? <Shimmer>{text}</Shimmer> : text}
-    </span>
+    <>
+      <span className={cn('truncate', className)} style={style} title={shown.text}>
+        {shown.text}
+      </span>
+      {pending ? <Spinner size='xs' label='Loading font sample' /> : null}
+    </>
   )
 }

@@ -205,6 +205,7 @@ export const selectors = {
       .getByRole('log', { name: 'Messages', exact: true })
       .locator('[data-index] > [data-timeline-row-id]'),
   timelineJumpToLatest: (page: Page) => page.locator('[data-slot="tail-jump-button"]'),
+  breadcrumbLoadedSelector: '[aria-label="Breadcrumbs"] [data-breadcrumb-item]',
   breadcrumbCrumb: (page: Page, label: string) =>
     page
       .getByRole('navigation', { name: 'Breadcrumbs', exact: true })
@@ -271,6 +272,10 @@ export const selectors = {
   newTerminal: (page: Page) => page.getByRole('button', { name: 'New terminal', exact: true }),
   projectMenu: (page: Page) => page.getByRole('button', { name: 'Switch project', exact: true }),
   openFolderMenu: (page: Page) => page.getByRole('menuitem', { name: 'Open folder…', exact: true }),
+  pickerLoadedRowsSelector: '[role="dialog"] [role="option"]',
+  settingsContentSelector: '[aria-label="Settings form"], .editor-virtualized-viewport',
+  fontSampleReadySelector: '[aria-label="Code font"] span[style]:not(:has([data-slot="shimmer"]))',
+  settingsFormView: (page: Page) => page.getByRole('tab', { name: 'Settings', exact: true }),
   pickerDialog: (page: Page) => page.getByRole('dialog', { name: 'Choose folder', exact: true }),
   pickerList: (page: Page) => page.getByRole('listbox', { name: 'Folders and files', exact: true }),
   pickerOptions: (page: Page) =>
@@ -317,6 +322,8 @@ export const selectors = {
   quickOpenPreviewHeaderSelector: '[aria-label="File preview"] header',
   quickOpenPreviewTextSelector: '[aria-label="File preview"] [data-file-preview-text]',
   quickOpenPreview: (page: Page) => page.getByRole('region', { name: 'File preview', exact: true }),
+  pickerFolderColumn: (page: Page, path: string) =>
+    page.locator(`[data-picker-column-folder="${path.replace(/^\//u, '')}"]`),
   pickerColumn: (page: Page, index: number) => page.locator(`[data-picker-column="${index}"]`),
   pickerColumnBox: (page: Page, index: number) =>
     page.locator('[data-picker-column-folder]').nth(index),

@@ -29,11 +29,10 @@ import { StatusMessage } from '@/components/status-message'
 import { ViewToggle } from '@/features/settings/components/view-toggle'
 import { useHasWorkspace } from '@/features/settings/hooks/use-has-workspace'
 import { useSettingsActions } from '@/features/settings/hooks/use-settings-actions'
-import { useSettingsDisplay } from '@/features/settings/hooks/use-settings-display'
+import { useHeldDisplay } from '@/features/settings/hooks/use-held-display'
 import { useSettingsOwner } from '@/lib/settings-owner/hooks/use-settings-owner'
 import { SettingsOwnerProvider } from '@/features/settings/providers/owner-provider'
-import { useSettingsScope, writableSettingsScope } from '@/features/settings/state/scope-store'
-import { useSettingsView } from '@/features/settings/state/view-store'
+import { writableSettingsScope } from '@/features/settings/state/scope-store'
 import { isSettingAvailable } from '@/features/settings/utils/availability'
 import { matchingSettingIds } from '@workspace/client-core/settings/search'
 import { documentBackdrop } from '@/lib/platform/backdrop'
@@ -62,21 +61,25 @@ export function SettingsPage({
   tabId?: TabId
 } = {}) {
   const navigation = useNavigation()
-  const view = useSettingsView()
-  const scope = useSettingsScope()
-  // The defaults tab is a document only: there is no form for values nobody set.
-  const showJson = (view === 'json' || scope === 'default') && tabId !== undefined
   const editorOwner = useQueryClient()
   const settingsOwner = useSettingsOwner()
-  const { document, projection } = useSettingsDisplay(showJson ? editorOwner : undefined)
-  const { isSaving } = useSettingsActions()
+  const {
+    document,
+    projection,
+    showJson,
+    scope,
+    owner,
+    pending,
+    liveDocument: shownDocument,
+  } = useHeldDisplay(tabId, liveDocument)
+  const { isSaving } = useSettingsActions(owner)
   const editorHasWorkspace = useHasWorkspace()
   const hasWorkspace =
     showJson || editorOwner === settingsOwner
       ? editorHasWorkspace
       : Boolean(document.data?.layers.some((layer) => layer.id === 'workspace'))
   const query = useSettingsSearch()
-  const scrollRef = useReloadView(showJson ? editorOwner : settingsOwner, Boolean(document.data))
+  const scrollRef = useReloadView(owner, Boolean(document.data))
   const setQuery = selectSettingsSearch
   const searchRef = useRef<HTMLInputElement>(null)
   const rootRef = useRef<HTMLDivElement | null>(null)
@@ -134,161 +137,167 @@ export function SettingsPage({
   const onlyUsage = shown.length === 1 && shown[0]?.[0] === 'Usage'
 
   return (
-    <ToolPane
-      className='@container/settings h-full min-w-0'
-      bodyClassName='flex flex-col'
-      scroll={false}
-      ref={setRootRef}
-      tabIndex={-1}
-      header={
-        <PageHeader
-          actions={
-            <div className='flex items-center justify-end gap-1'>
-              {tabId ? <ViewToggle /> : null}
-              <SettingsOwnerProvider
-                key={showJson ? 'editor' : 'global'}
-                queryClient={showJson ? editorOwner : settingsOwner}
-              >
-                {project ? null : <PageActions scope={writableSettingsScope(scope)} />}
-              </SettingsOwnerProvider>
-            </div>
-          }
-          scope={<ScopeTabs hasDefaults={tabId !== undefined} hasWorkspace={hasWorkspace} />}
-          search={
-            showJson ? null : (
-              <InputGroup className='min-w-0 flex-1'>
-                <InputGroupAddon align='inline-start'>
-                  <MagnifyingGlassIcon aria-hidden />
-                </InputGroupAddon>
-                <InputGroupInput
-                  aria-label='Search settings'
-                  autoCapitalize='off'
-                  autoComplete='off'
-                  autoCorrect='off'
-                  autoFocus={active}
-                  ref={searchRef}
-                  onChange={(event) => setQuery(event.currentTarget.value)}
-                  placeholder='Search settings'
-                  spellCheck={false}
-                  value={query}
-                />
-              </InputGroup>
-            )
-          }
-          summary={
-            showJson ? null : (
-              <div className='flex flex-wrap items-center gap-2'>
-                {/* `visible` is already query-filtered, so "of N" only says something while a
-              category narrows the list further; otherwise it printed the same number twice. */}
-                <p className='text-muted-foreground text-xs tabular-nums'>
-                  {project ? 'Project settings' : null}
-                  {!project && onlyUsage ? 'Usage report' : null}
-                  {!project && !onlyUsage && (
-                    <>
-                      {selectedCategory ? `${shownCount(shown)} of ` : ''}
-                      {visible.length} {visible.length === 1 ? 'setting' : 'settings'}
-                    </>
-                  )}
-                </p>
-                {isSaving ? (
-                  <span className='text-muted-foreground flex items-center gap-1 text-xs'>
-                    <Spinner size='xs' label='Saving settings' />
-                    Saving
-                  </span>
-                ) : null}
-                {project ? (
-                  <Button
-                    aria-label='Show all settings'
-                    onClick={() => selectSettingsProject(null)}
-                    size='sm'
-                    variant='secondary'
-                  >
-                    {project.title}
-                    <XIcon aria-hidden />
-                  </Button>
-                ) : null}
-                {/* Clear a category supplied by an incoming address. */}
-                {selectedCategory ? (
-                  <Button
-                    aria-label={`Clear the ${selectedCategory} filter and show every setting`}
-                    onClick={() => void navigation.setSettingsCategory(null)}
-                    size='sm'
-                    variant='secondary'
-                  >
-                    {selectedCategory}
-                    <XIcon aria-hidden />
-                  </Button>
-                ) : null}
+    <SettingsOwnerProvider queryClient={owner}>
+      <ToolPane
+        className='@container/settings h-full min-w-0'
+        bodyClassName='flex flex-col'
+        scroll={false}
+        ref={setRootRef}
+        tabIndex={-1}
+        header={
+          <PageHeader
+            actions={
+              <div className='flex items-center justify-end gap-1'>
+                {pending ? <Spinner label='Loading settings view' size='xs' /> : null}
+                {tabId ? <ViewToggle shownView={showJson ? 'json' : 'form'} /> : null}
+                <SettingsOwnerProvider key={showJson ? 'editor' : 'global'} queryClient={owner}>
+                  {project ? null : <PageActions scope={writableSettingsScope(scope)} />}
+                </SettingsOwnerProvider>
               </div>
-            )
-          }
-        />
-      }
-    >
-      {/* Escape returns to the search box from anywhere in the list, so a
+            }
+            scope={
+              <ScopeTabs
+                shownScope={scope}
+                hasDefaults={tabId !== undefined}
+                hasWorkspace={hasWorkspace}
+              />
+            }
+            search={
+              showJson ? null : (
+                <InputGroup className='min-w-0 flex-1'>
+                  <InputGroupAddon align='inline-start'>
+                    <MagnifyingGlassIcon aria-hidden />
+                  </InputGroupAddon>
+                  <InputGroupInput
+                    aria-label='Search settings'
+                    autoCapitalize='off'
+                    autoComplete='off'
+                    autoCorrect='off'
+                    autoFocus={active}
+                    ref={searchRef}
+                    onChange={(event) => setQuery(event.currentTarget.value)}
+                    placeholder='Search settings'
+                    spellCheck={false}
+                    value={query}
+                  />
+                </InputGroup>
+              )
+            }
+            summary={
+              showJson ? null : (
+                <div className='flex flex-wrap items-center gap-2'>
+                  {/* `visible` is already query-filtered, so "of N" only says something while a
+              category narrows the list further; otherwise it printed the same number twice. */}
+                  <p className='text-muted-foreground text-xs tabular-nums'>
+                    {project ? 'Project settings' : null}
+                    {!project && onlyUsage ? 'Usage report' : null}
+                    {!project && !onlyUsage && (
+                      <>
+                        {selectedCategory ? `${shownCount(shown)} of ` : ''}
+                        {visible.length} {visible.length === 1 ? 'setting' : 'settings'}
+                      </>
+                    )}
+                  </p>
+                  {isSaving ? (
+                    <span className='text-muted-foreground flex items-center gap-1 text-xs'>
+                      <Spinner size='xs' label='Saving settings' />
+                      Saving
+                    </span>
+                  ) : null}
+                  {project ? (
+                    <Button
+                      aria-label='Show all settings'
+                      onClick={() => selectSettingsProject(null)}
+                      size='sm'
+                      variant='secondary'
+                    >
+                      {project.title}
+                      <XIcon aria-hidden />
+                    </Button>
+                  ) : null}
+                  {/* Clear a category supplied by an incoming address. */}
+                  {selectedCategory ? (
+                    <Button
+                      aria-label={`Clear the ${selectedCategory} filter and show every setting`}
+                      onClick={() => void navigation.setSettingsCategory(null)}
+                      size='sm'
+                      variant='secondary'
+                    >
+                      {selectedCategory}
+                      <XIcon aria-hidden />
+                    </Button>
+                  ) : null}
+                </div>
+              )
+            }
+          />
+        }
+      >
+        {/* Escape returns to the search box from anywhere in the list, so a
           keyboard user is never more than one key from starting over. Captured
           on the container rather than per row — every control below would
           otherwise need its own handler, and a new widget would silently miss
           it. */}
-      {showJson ? (
-        <div className='flex min-h-0 flex-1 flex-col'>
-          <div className='px-(--density-section-padding) pt-(--density-section-padding)'>
+        {showJson && tabId !== undefined ? (
+          <div className='flex min-h-0 flex-1 flex-col'>
+            <div className='px-(--density-section-padding) pt-(--density-section-padding)'>
+              <MalformedBanner layers={document.data.layers} />
+            </div>
+            <div className='min-h-0 flex-1'>
+              <SettingsJsonView
+                active={active}
+                diagnostics={document.data.diagnostics}
+                file={selectedFile}
+                liveDocument={shownDocument}
+                rootPath={rootPath}
+                scope={scope}
+                tabId={tabId}
+              />
+            </div>
+          </div>
+        ) : (
+          <div
+            aria-label='Settings form'
+            role='region'
+            ref={scrollRef}
+            className='min-h-0 min-w-0 flex-1 overflow-y-auto p-(--density-section-padding) [overflow-anchor:none] @max-3xl/settings:[&_[data-slot=button]]:min-h-10 @max-3xl/settings:[&_[data-slot=input-group]]:h-10 @max-3xl/settings:[&_[data-slot=select-trigger]]:min-h-10 @max-3xl/settings:[&_input]:h-10 @max-3xl/settings:[&_input]:text-base'
+            onKeyDown={(event) => {
+              if (event.key !== 'Escape') return
+              // Not while a control is mid-interaction: a recorder is capturing, and
+              // a text field treats Escape as "discard my edit".
+              if (event.defaultPrevented) return
+              searchRef.current?.focus()
+            }}
+          >
             <MalformedBanner layers={document.data.layers} />
+            <DiagnosticsBanner diagnostics={projection.diagnostics} />
+            <fieldset className='min-w-0' inert={pending}>
+              {project ? <ProjectSection project={project} /> : null}
+              {project ? null : shown.length === 0 ? (
+                <StatusMessage>{emptySettingsMessage(query, selectedCategory)}</StatusMessage>
+              ) : (
+                shown.map(([category, ids]) => (
+                  <section className='mb-6' key={category}>
+                    <h2 className='text-foreground mb-1 text-sm font-semibold'>{category}</h2>
+                    {category === 'Usage' ? <UsageSection /> : null}
+                    {ids.includes('chat.keepImportedSessionsUpdated') ? <ImportSection /> : null}
+                    {category === 'Chat' && showPush ? <PushSection snapshot={projection} /> : null}
+                    {ids.map((id, index) => (
+                      <SettingRow
+                        id={id}
+                        key={id}
+                        snapshot={projection}
+                        underParent={isUnderParent(ids, index)}
+                      />
+                    ))}
+                  </section>
+                ))
+              )}
+            </fieldset>
           </div>
-          <div className='min-h-0 flex-1'>
-            <SettingsJsonView
-              active={active}
-              diagnostics={document.data.diagnostics}
-              file={selectedFile}
-              liveDocument={liveDocument}
-              rootPath={rootPath}
-              scope={scope}
-              tabId={tabId}
-            />
-          </div>
-        </div>
-      ) : (
-        <div
-          aria-label='Settings form'
-          role='region'
-          ref={scrollRef}
-          className='min-h-0 min-w-0 flex-1 overflow-y-auto p-(--density-section-padding) [overflow-anchor:none] @max-3xl/settings:[&_[data-slot=button]]:min-h-10 @max-3xl/settings:[&_[data-slot=input-group]]:h-10 @max-3xl/settings:[&_[data-slot=select-trigger]]:min-h-10 @max-3xl/settings:[&_input]:h-10 @max-3xl/settings:[&_input]:text-base'
-          onKeyDown={(event) => {
-            if (event.key !== 'Escape') return
-            // Not while a control is mid-interaction: a recorder is capturing, and
-            // a text field treats Escape as "discard my edit".
-            if (event.defaultPrevented) return
-            searchRef.current?.focus()
-          }}
-        >
-          <MalformedBanner layers={document.data.layers} />
-          <DiagnosticsBanner diagnostics={projection.diagnostics} />
-          <fieldset className='min-w-0'>
-            {project ? <ProjectSection project={project} /> : null}
-            {project ? null : shown.length === 0 ? (
-              <StatusMessage>{emptySettingsMessage(query, selectedCategory)}</StatusMessage>
-            ) : (
-              shown.map(([category, ids]) => (
-                <section className='mb-6' key={category}>
-                  <h2 className='text-foreground mb-1 text-sm font-semibold'>{category}</h2>
-                  {category === 'Usage' ? <UsageSection /> : null}
-                  {ids.includes('chat.keepImportedSessionsUpdated') ? <ImportSection /> : null}
-                  {category === 'Chat' && showPush ? <PushSection snapshot={projection} /> : null}
-                  {ids.map((id, index) => (
-                    <SettingRow
-                      id={id}
-                      key={id}
-                      snapshot={projection}
-                      underParent={isUnderParent(ids, index)}
-                    />
-                  ))}
-                </section>
-              ))
-            )}
-          </fieldset>
-        </div>
-      )}
-    </ToolPane>
+        )}
+      </ToolPane>
+    </SettingsOwnerProvider>
   )
 }
 

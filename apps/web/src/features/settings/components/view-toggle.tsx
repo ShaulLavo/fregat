@@ -16,11 +16,11 @@ import { selectSettingsView, useSettingsView, type SettingsView } from '../state
  * the scope picks which file, this picks how to look at it, and putting them on
  * one row read as four peers.
  */
-export function ViewToggle() {
+export function ViewToggle({ shownView }: { shownView?: SettingsView }) {
   const view = useSettingsView()
 
   return (
-    <Tabs value={view} onValueChange={(next: SettingsView) => selectView(next)}>
+    <Tabs value={shownView ?? view} onValueChange={(next: SettingsView) => selectView(next)}>
       <TabsList aria-label='Settings view' variant='segmented'>
         <ViewTab icon={<SlidersHorizontalIcon aria-hidden />} label='Settings' value='form' />
         <ViewTab icon={<CodeIcon aria-hidden />} label='settings.json' value='json' />
@@ -50,6 +50,7 @@ function ViewTab({
         render={
           <TabsTab
             aria-label={label}
+            onClick={() => selectView(value)}
             className='w-(--density-control-height-sm) px-0'
             value={value}
           />

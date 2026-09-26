@@ -12,16 +12,18 @@ import { selectSettingsView } from '../state/view-store'
  * also switches to the JSON view: a form for values nobody set has nothing to do.
  */
 export function ScopeTabs({
+  shownScope,
   hasDefaults,
   hasWorkspace,
 }: {
+  shownScope?: SettingsScope
   hasDefaults: boolean
   hasWorkspace: boolean
 }) {
   const scope = useSettingsScope()
 
   return (
-    <Tabs value={scope} onValueChange={(next: SettingsScope) => selectScope(next)}>
+    <Tabs value={shownScope ?? scope} onValueChange={(next: SettingsScope) => selectScope(next)}>
       <TabsList aria-label='Settings scope'>
         <ScopeTab label='User' scope='user' />
         <ScopeTab
@@ -56,7 +58,12 @@ function ScopeTab({
   scope: SettingsScope
 }) {
   return (
-    <TabsTab disabled={disabledReason !== null} title={disabledReason ?? undefined} value={scope}>
+    <TabsTab
+      onClick={() => selectScope(scope)}
+      disabled={disabledReason !== null}
+      title={disabledReason ?? undefined}
+      value={scope}
+    >
       {label}
     </TabsTab>
   )
