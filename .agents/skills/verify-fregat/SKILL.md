@@ -39,6 +39,8 @@ bun run logs --since 5m [--level warn] [--area editor]    # the structured log, 
 
 Scenarios live in `scripts/agent/scenarios/`. They open a file through the command palette and exercise one surface: `editor-large-paste`, `editor-fast-scroll`, `editor-type-burst`. When you touch a surface with no scenario, add one. Selectors live in `scripts/agent/selectors.ts`; add there, never inline. The stable handles are `aria-label="Window toolbar"`, the editor textarea `role="textbox"` named `Editor input`, the viewport `.editor-virtualized-viewport` (click that, not the textarea), the palette input `[data-slot="command-input"]`, and editor tabs `[data-editor-tab-path]`.
 
+A scenario that needs two owners calls `connectSecondOwner` (`scripts/agent/second-owner.ts`): it starts a second throwaway server from this checkout and connects it as a Remote URL machine, as `project-grouping` does.
+
 A scenario that makes a fixture workspace releases it with `releaseFixture` from `scripts/agent/fixture-workspace.ts`, not `rm`: the workspace's terminal shell persists by design and its language servers idle for minutes, so a bare `rm` leaves them running on the server under test.
 
 A second window in the same browser context stalls against the dev server. Each tab holds four event streams (`/settings/events`, `/machines/events`, two `/fs/events`), and a browser allows six HTTP/1.1 connections per host across every tab in a profile, so a second tab's requests queue until a stream closes — for tens of seconds, and a keypress that needs a read looks like it did nothing. Open a second window with `browser.newContext()`, which has its own pool. The mesh serves HTTP/2 and is unaffected; the desktop app talks HTTP/1.1 to `127.0.0.1`.

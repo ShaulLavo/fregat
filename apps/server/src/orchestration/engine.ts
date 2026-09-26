@@ -1,3 +1,4 @@
+import { SETUP_TIMEOUT_MS } from './setup-runner'
 import { commandUploadClaim } from './command-attachments'
 import { withAttachmentLanes } from '../attachments/lanes'
 import { createAttachmentOwnership, type AttachmentOwnership } from '../attachments/ownership'
@@ -13,10 +14,17 @@ import { TerminalHandoffs, type TerminalHandoff } from './terminal-handoffs'
 import type { AgentTerminalResolver, AgentTerminalProcess } from '../terminal/agent-launch'
 import { sessionIdentityErrors } from '../provider/structured-errors'
 import { realpath } from 'node:fs/promises'
+import path from 'node:path'
 import { WorktreeExecutionGate } from './worktree-execution-gate'
 import { WorktreeLifecycleReactor } from './worktree-lifecycle-reactor'
+import { requireReadyWorktree } from './worktree-decider'
+import { PullRequestSyncReactor, type BranchPullRequestLookup } from './pull-request-sync-reactor'
+import { SessionSettlementReactor } from './session-settlement-reactor'
+import { WorktreeCleanupReactor } from './worktree-cleanup-reactor'
+import { autoSettlementAt, pendingPullRequest, type AutoSettleRules } from './utils/auto-settlement'
 import { WorktreeCommandPreparation } from './worktree-command-preparation'
 import { TerminalLeaseController } from './terminal-lease-controller'
+import { remoteHost, remoteRepositoryPath } from '../git/forges/detect'
 import { GitWorktreeService } from '../git/worktrees'
 import type { TerminalService } from '../terminal/service'
 import { worktreeRuntimeErrors } from './worktree-runtime-errors'
@@ -30,6 +38,7 @@ import {
   orchestrationCommandSchema,
   type OrchestrationCommand,
   type OrchestrationDispatchResult,
+  type OrchestrationCommandResult,
   type OrchestrationEvent,
   type OrchestrationSessionDetailPageInput,
   commandIdSchema,
@@ -37,6 +46,9 @@ import {
   errorStringField,
   type ClientOrchestrationCommand,
   type OrchestrationCommandReceipt,
+  type WorktreeSubmoduleMode,
+  parsePullRequestReference,
+  pullRequestReferenceRepository,
 } from '@workspace/contracts'
 import * as v from 'valibot'
 
@@ -51,6 +63,7 @@ import { requireActionableSourcePlan } from './command-invariants'
 
 import { CheckpointReactor } from './checkpoint-reactor'
 import { isDurableCommandRejection, OrchestrationCommandReceipts } from './command-receipts'
+import { lifecycleResult } from './lifecycle-restore'
 import { decideOrchestrationCommand } from './decider'
 import { OrchestrationEventStore, type OrchestrationDatabase } from './event-store'
 import { OrchestrationProjectionPipeline } from './projection-pipeline'
@@ -102,6 +115,13 @@ export type OrchestrationEngineOptions = {
     | import('./response-delivery').ResponseStreamingMode
     | Promise<import('./response-delivery').ResponseStreamingMode>
   titleModel?: (projectId: string) => Promise<ModelSelection>
+  worktreeSubmodules?: (projectId: string) => WorktreeSubmoduleMode
+  /** Automatic settlement rules for a project; absent, nothing settles on its own. */
+  autoSettleRules?: (projectId: string) => AutoSettleRules
+  /** The project's setting: remove a worktree once its last session is deleted. */
+  worktreeCleanupOnDelete?: (projectId: string) => boolean
+  /** Reads each dedicated worktree's pull request; absent, nothing is synced. */
+  pullRequestLookup?: BranchPullRequestLookup
 
   keepImportedSessionsUpdated?: () => boolean
   providerService?: ProviderService
@@ -134,6 +154,10 @@ export class OrchestrationEngine {
   private checkpointReactor: CheckpointReactor | null = null
   private deletionReactor: SessionDeletionReactor | null = null
   private discovery: SessionDiscoveryReconciler | null = null
+  private pullRequestSync: PullRequestSyncReactor | null = null
+  private autoSettleRules: OrchestrationEngineOptions['autoSettleRules']
+  private settlement: SessionSettlementReactor | null = null
+  private worktreeCleanup: WorktreeCleanupReactor | null = null
   private titleReactor: SessionTitleReactor | null = null
   private readonly keepImportedSessionsUpdated: () => boolean
   private providerService: ProviderService | null = null
@@ -154,6 +178,7 @@ export class OrchestrationEngine {
   constructor(database: OrchestrationDatabase, options: OrchestrationEngineOptions = {}) {
     this.keepImportedSessionsUpdated = options.keepImportedSessionsUpdated ?? (() => false)
     this.attachmentsDir = options.attachmentsDir ?? defaultAttachmentsDir()
+    this.autoSettleRules = options.autoSettleRules
     this.database = database
     this.attachmentOwnership = createAttachmentOwnership(database)
     this.registration = options.registration
@@ -183,7 +208,10 @@ export class OrchestrationEngine {
         this.readModel = this.snapshotQuery.fullReadModel()
         this.providerCommandReactor = this.createProviderCommandReactor(options)
         this.createWorktreeLifecycle(options)
-        this.createDeletionReactor()
+        this.createPullRequestSync(options)
+        this.createSettlement(options)
+        this.createWorktreeCleanup(options)
+        this.createDeletionReactor(options.terminalService)
         this.createDiscoveryReconciler()
       },
       recover: () => this.recover(),
@@ -191,6 +219,11 @@ export class OrchestrationEngine {
         this.reactorsStarted = true
         if (this.worktreeReactor) this.domainEvents.subscribe(this.worktreeReactor)
         if (this.deletionReactor) this.domainEvents.subscribe(this.deletionReactor)
+        for (const reactor of [this.pullRequestSync, this.settlement, this.worktreeCleanup]) {
+          if (!reactor) continue
+          this.domainEvents.subscribe(reactor)
+          reactor.start()
+        }
         this.subscribeProviderCommandReactor()
         this.scheduleQueuedStarts()
         this.discovery?.start()
@@ -428,7 +461,11 @@ export class OrchestrationEngine {
     await this.ready
     await this.titleReactor?.close()
     await this.discovery?.close()
+    await this.pullRequestSync?.close()
+    await this.settlement?.close()
+    await this.worktreeCleanup?.close()
     this.unsubscribeGitMutations?.()
+    await this.worktreeReactor?.closeSetups()
     await this.worktreeReactor?.drain()
     await this.queue
   }
@@ -440,7 +477,7 @@ export class OrchestrationEngine {
   ) {
     verifyReceiptIntent(receipt, type, fingerprint)
     if (receipt.status === 'rejected') throw previouslyRejectedCommandError(receipt)
-    return { deduped: true, sequence: receipt.resultSequence, result: receipt.result }
+    return { deduped: true, sequence: receipt.resultSequence, ...receiptResult(receipt.result) }
   }
 
   private dispatchNow(
@@ -463,13 +500,13 @@ export class OrchestrationEngine {
       reactorCount: committed.published.reactorCount,
       reactorFailures: committed.published.failures,
       sequence: committed.sequence,
-      result: committed.receipt.result,
+      ...receiptResult(committed.receipt.result),
     })
 
     return {
       deduped: false,
       sequence: committed.sequence,
-      result: committed.receipt.result,
+      ...receiptResult(committed.receipt.result),
     }
   }
 
@@ -513,10 +550,15 @@ export class OrchestrationEngine {
         throw sessionImportErrors.CONTINUED({ internal: { sessionId: command.sessionId } })
       }
       this.requireCommandRuntimeOwnership(command)
+      if (command.type === 'session.auto-settle') this.requireAutoSettleCurrent(command)
       if (command.type === 'session.turn.steer')
         this.providerService?.requireSteeringAvailable(command.sessionId)
       this.requireSourceProposedPlan(command)
-      const pendingEvents = decideOrchestrationCommand(command, this.readModel)
+      const restoreReceipt =
+        command.type === 'session.lifecycle.restore'
+          ? this.receipts.find(command.restoreCommandId)
+          : null
+      const pendingEvents = decideOrchestrationCommand(command, this.readModel, restoreReceipt)
       recordChatPipelineInfo('chat.pipeline.command.decided', {
         ...summary,
         eventCount: pendingEvents.length,
@@ -530,6 +572,36 @@ export class OrchestrationEngine {
       this.recordDispatchFailure(command, summary, error, fingerprint)
       throw error
     }
+  }
+
+  // Checked on the dispatch queue, so nothing can land between this read and the decision.
+  private requireAutoSettleCurrent(
+    command: Extract<OrchestrationCommand, { type: 'session.auto-settle' }>,
+  ) {
+    const changed = this.eventStore.hasSessionEventAfter(
+      command.sessionId,
+      command.snapshotSequence,
+    )
+    const liveness = this.providerService?.backgroundLiveness(command.sessionId) ?? null
+    const session = this.readModel.sessions.get(command.sessionId)
+    const worktree = session && this.readModel.worktrees.get(session.worktreeId)
+    const rules = worktree && this.autoSettleRules?.(worktree.projectId)
+    const settledAt =
+      session && worktree && rules
+        ? autoSettlementAt({
+            session,
+            pullRequest: worktree.pullRequest,
+            pendingPullRequest: pendingPullRequest(worktree),
+            backgroundLive: liveness !== null,
+            now: Date.now(),
+            rules,
+          })
+        : null
+    if (!changed && settledAt === command.settledAt) return
+    throw sessionDomainErrors.AUTO_SETTLE_STALE({
+      sessionId: command.sessionId,
+      internal: { changedAfter: command.snapshotSequence, changed, liveness },
+    })
   }
 
   private requireSourceProposedPlan(command: OrchestrationCommand | ClientOrchestrationCommand) {
@@ -619,7 +691,7 @@ export class OrchestrationEngine {
       const result =
         command.type === 'project.create' || command.type === 'project.revive'
           ? registrationResult(command, this.readModel)
-          : null
+          : lifecycleResult(command, this.readModel)
       const receipt = receipts.recordAccepted(
         command,
         eventStore.currentSequence(),
@@ -646,8 +718,9 @@ export class OrchestrationEngine {
     })
   }
 
-  private createDeletionReactor() {
+  private createDeletionReactor(terminals: TerminalService | undefined) {
     const reactor = new SessionDeletionReactor({
+      terminals: terminals ?? null,
       attachmentsDir: this.attachmentsDir,
       database: this.database,
       providerService: this.providerService,
@@ -786,6 +859,68 @@ export class OrchestrationEngine {
     }
   }
 
+  private createPullRequestSync(options: OrchestrationEngineOptions) {
+    if (!this.registration || !options.pullRequestLookup) return
+    const git = this.registration.git
+    this.pullRequestSync = new PullRequestSyncReactor({
+      lookup: options.pullRequestLookup,
+      lookupIdentities: (worktree, remoteUrl, numbers) =>
+        git.readPullRequestsByNumber(worktree.canonicalPath, remoteUrl, numbers),
+      headName: async (worktree) =>
+        (await git.pushTarget(worktree.canonicalPath, worktree.branch ?? ''))?.branch ??
+        worktree.branch ??
+        '',
+      dispatch: (command) => this.enqueue(command),
+      getReadModel: () => this.readModel,
+    })
+  }
+
+  private createSettlement(options: OrchestrationEngineOptions) {
+    const rules = options.autoSettleRules
+    if (!rules) return
+    this.settlement = new SessionSettlementReactor({
+      getReadModel: () => this.readModel,
+      dispatch: (command) => this.enqueue(command),
+      rules,
+      backgroundLive: (sessionId) => this.providerService?.backgroundLiveness(sessionId) != null,
+    })
+  }
+
+  private createWorktreeCleanup(options: OrchestrationEngineOptions) {
+    if (!this.registration) return
+    const git = this.registration.git
+    const onDelete = options.worktreeCleanupOnDelete
+    this.worktreeCleanup = new WorktreeCleanupReactor({
+      getReadModel: () => this.readModel,
+      dispatch: (command) => this.enqueue(command),
+      cleanupOnDelete: (projectId) => onDelete?.(projectId) ?? false,
+      deletionRemovesWorktree: (sequence) => this.eventStore.deletionRemovesWorktree(sequence),
+      obstacle: (worktree) =>
+        git.removalObstacle({ path: worktree.canonicalPath, branch: worktree.branch }),
+    })
+  }
+
+  /** Runs a worktree cleanup sweep now, as after a settings change, and waits for it. */
+  async cleanupWorktrees() {
+    await this.ready
+    this.worktreeCleanup?.schedule()
+    await this.worktreeCleanup?.drain()
+  }
+
+  /** Runs a settlement sweep now, as after a settings change, and waits for it. */
+  async settleSessions() {
+    await this.ready
+    this.settlement?.schedule()
+    await this.settlement?.drain()
+  }
+
+  /** Test seam: settle an in-flight pull request sweep, then run one more. */
+  async syncPullRequests() {
+    await this.ready
+    this.pullRequestSync?.schedule()
+    await this.pullRequestSync?.drain()
+  }
+
   private createWorktreeLifecycle(options: OrchestrationEngineOptions) {
     this.providerService?.setWorktreeExecution({
       acquire: ({ sessionId, cwd }) => {
@@ -818,15 +953,14 @@ export class OrchestrationEngine {
       gate: this.worktreeExecutionGate,
       provider: () => this.providerService,
       terminal: options.terminalService,
+      submodules: options.worktreeSubmodules ?? (() => 'recursive'),
       dispatch: (command) => this.enqueue(command),
       getReadModel: () => this.readModel,
     })
     this.worktreeReactor = reactor
     this.unsubscribeGitMutations = this.registration.git.subscribeMutations(
       async (checkoutPath) => {
-        const worktree = [...this.readModel.worktrees.values()].find(
-          (row) => row.canonicalPath === checkoutPath && !row.retiredAt,
-        )
+        const worktree = this.liveWorktreeAtCanonical(checkoutPath)
         if (worktree) await reactor.refresh(worktree.id)
       },
     )
@@ -1079,23 +1213,140 @@ export class OrchestrationEngine {
   }
 
   async refreshWorktreeMetadata(checkoutPath: string) {
-    await this.ready
-    if (!this.registration) return
-    const canonicalPath = await realpath(this.registration.paths.resolve(checkoutPath).absolutePath)
-    const worktree = [...this.readModel.worktrees.values()].find(
-      (row) => row.canonicalPath === canonicalPath && !row.retiredAt,
-    )
+    const worktree = await this.liveWorktreeAt(checkoutPath)
     if (worktree) await this.worktreeReactor?.refresh(worktree.id)
   }
 
+  /**
+   * A session in its own worktree at a pull request's head. The head is fetched to `pr/<n>`, the
+   * worktree starts from it, and for a pull request from this repository the worktree then
+   * tracks its branch, so pushes, the header and the pull request sync follow the request.
+   */
+  async startPullRequestSession(input: {
+    worktreeId: WorktreeId
+    reference: string
+    modelSelection: ModelSelection
+  }) {
+    await this.ready
+    const number = parsePullRequestReference(input.reference)
+    if (number === null)
+      throw sessionDomainErrors.PULL_REQUEST_REFERENCE_INVALID({
+        internal: { referenceLength: input.reference.length },
+      })
+    if (!this.registration)
+      throw worktreeRuntimeErrors.UNAVAILABLE({ internal: { at: 'pull-request-session' } })
+    const git = this.registration.git
+    const base = requireReadyWorktree(this.readModel, input.worktreeId)
+    const { detail, remoteName, remoteUrl } = await git.resolvePullRequest(base.path, number)
+    requireSameRepository(input.reference, remoteUrl)
+    const branch = `pr/${number}`
+    await git.fetchPullRequestHead({
+      path: base.path,
+      remote: detail.headSource?.url ?? remoteName,
+      expectedCommit: detail.headSource?.commit,
+      ref: detail.headFetchRef,
+      branch,
+    })
+    const sessionId = crypto.randomUUID()
+    const worktreeId = crypto.randomUUID()
+    await this.dispatchClientCommand({
+      type: 'session.create',
+      commandId: `pull-request-${crypto.randomUUID()}`,
+      sessionId,
+      title: `#${number} ${detail.title}`.slice(0, 200),
+      worktreeTarget: {
+        kind: 'new',
+        worktreeId,
+        baseWorktreeId: base.id,
+        baseBranch: branch,
+        skipSetup: detail.crossRepository,
+      },
+      modelSelection: input.modelSelection,
+    })
+    const worktree = await this.readyWorktree(worktreeId, number)
+    if (!detail.crossRepository)
+      await git.trackRemoteBranch({
+        path: worktree.path,
+        remote: remoteName,
+        branch: detail.headRefName,
+      })
+    await this.worktreeReactor?.refresh(worktree.id)
+    await this.enqueue({
+      type: 'worktree.pull-request.sync',
+      commandId: v.parse(commandIdSchema, `pr-association-${crypto.randomUUID()}`),
+      worktreeId: worktree.id,
+      branch: worktree.branch ?? '',
+      pullRequest: {
+        status: 'found',
+        ...detail,
+        closedAt: detail.closedAt ?? null,
+        identity: { remoteUrl, number },
+      },
+    })
+    this.pullRequestSync?.schedule()
+    return { sessionId, worktreeId, pullRequest: detail }
+  }
+
+  private async readyWorktree(worktreeId: string, number: number) {
+    // Include the runner's full setup deadline and a minute for checkout creation.
+    const attempts = (SETUP_TIMEOUT_MS + 60_000) / 100
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+      const worktree = this.readModel.worktrees.get(worktreeId)
+      if (worktree?.lifecycle.state === 'ready') return worktree
+      if (worktree?.lifecycle.state === 'creation-failed')
+        throw sessionDomainErrors.PULL_REQUEST_WORKTREE_FAILED({
+          number,
+          internal: { worktreeId, errorCode: worktree.lifecycle.errorCode },
+        })
+      await Bun.sleep(100)
+    }
+    throw sessionDomainErrors.PULL_REQUEST_WORKTREE_FAILED({
+      number,
+      internal: { worktreeId, reason: 'timeout' },
+    })
+  }
+
+  /** Registers a checkout the server made itself, such as a finished clone, as a project. */
+  async registerCheckout(absolutePath: string) {
+    const receipt = await this.dispatchClientCommand({
+      type: 'project.create',
+      commandId: `register-${crypto.randomUUID()}`,
+      title: path.basename(absolutePath),
+      workspaceRoot: absolutePath,
+      defaultModelSelection: null,
+    })
+    return receipt.result?.projectId ?? null
+  }
+
+  async worktreeProjectId(checkoutPath: string) {
+    return (await this.liveWorktreeAt(checkoutPath))?.projectId ?? null
+  }
+
+  /** The project of a checkout git reported by its absolute root. */
+  async checkoutProjectId(rootAbsolutePath: string) {
+    await this.ready
+    return this.liveWorktreeAtCanonical(await realpath(rootAbsolutePath))?.projectId ?? null
+  }
+
   async worktreeBaseCommit(checkoutPath: string) {
+    const worktree = await this.liveWorktreeAt(checkoutPath)
+    return worktree?.ownership === 'platform' ? worktree.baseCommit : null
+  }
+
+  private async liveWorktreeAt(checkoutPath: string) {
     await this.ready
     if (!this.registration) return null
-    const canonicalPath = await realpath(this.registration.paths.resolve(checkoutPath).absolutePath)
-    const worktree = [...this.readModel.worktrees.values()].find(
-      (row) => row.canonicalPath === canonicalPath && !row.retiredAt,
+    return this.liveWorktreeAtCanonical(
+      await realpath(this.registration.paths.resolve(checkoutPath).absolutePath),
     )
-    return worktree?.ownership === 'platform' ? worktree.baseCommit : null
+  }
+
+  private liveWorktreeAtCanonical(canonicalPath: string) {
+    return (
+      [...this.readModel.worktrees.values()].find(
+        (row) => row.canonicalPath === canonicalPath && !row.retiredAt,
+      ) ?? null
+    )
   }
 
   async worktreeCleanupPreview(worktreeId: WorktreeId) {
@@ -1320,5 +1571,27 @@ function previouslyRejectedCommandError(
     commandId: receipt.commandId,
     internal: { storedError: receipt.error },
     message: receipt.error ?? undefined,
+  })
+}
+
+function receiptResult(result: OrchestrationCommandResult | null) {
+  if (result && 'kind' in result) return { result: null, lifecycle: result }
+  return { result }
+}
+
+/** A pasted URL names its repository; the same number in another one is another pull request. */
+function requireSameRepository(reference: string, remoteUrl: string) {
+  const named = pullRequestReferenceRepository(reference)
+  if (!named) return
+  const host = remoteHost(remoteUrl)
+  const path = remoteRepositoryPath(remoteUrl)?.toLowerCase()
+  if (named.host === host && named.path === path) return
+  throw sessionDomainErrors.PULL_REQUEST_OTHER_REPOSITORY({
+    repository: named.path,
+    internal: {
+      referenceHost: named.host,
+      remoteHost: host,
+      remotePathMatches: named.path === path,
+    },
   })
 }

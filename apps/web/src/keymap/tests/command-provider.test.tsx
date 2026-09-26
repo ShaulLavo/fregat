@@ -1,3 +1,5 @@
+import { settingsPageQueryOptions } from '@/features/settings/utils/page-query'
+import { primaryQueryClient } from '@/lib/environments/state/query-clients'
 import { BUNDLED_THEMES, resolveThemeSettings } from '@workspace/contracts'
 import { wallpaperPng } from '../../../test/factories/wallpaper'
 import { getClient } from '@/lib/client'
@@ -56,6 +58,7 @@ test.each([
   ['workspace.showUsage', 'usage'],
   ['workspace.showTransparencySettings', 'workbench.surface'],
 ] as const)('%s opens the settings controls matching its search', async (command, query) => {
+  await primaryQueryClient().fetchQuery(settingsPageQueryOptions)
   const queryClient = createTestQueryClient()
   queryClient.setQueryData(settingsKeys.document(), await fetchSettings(undefined, getClient()))
   selectSettingsCategory('Machines')
@@ -414,5 +417,17 @@ test('bundle wallpaper toggle retains the active variant image', async ({ client
       source,
     })
   }
+  view.unmount()
+})
+
+test('start from pull request explains the missing checkout when no folder is open', async () => {
+  const queryClient = createTestQueryClient()
+  const view = renderCommandProvider(queryClient)
+  await waitFor(() => expect(capturedBus).not.toBeNull())
+  act(() => {
+    capturedBus!.dispatch('workspace.startPullRequestSession', invocation())
+  })
+  expect(await screen.findByRole('dialog', { name: 'Start from pull request' })).toBeVisible()
+  expect(screen.getByText('Open a project checkout to start from its pull requests.')).toBeVisible()
   view.unmount()
 })

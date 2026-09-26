@@ -1,4 +1,4 @@
-import { defineMetadata } from './metadata'
+import { defineMetadata, type CommandKeyDefault } from './metadata'
 import { sessionJumpCommandId, type SessionJumpPosition } from './session-jump'
 
 export const workspaceCommandMetadata = {
@@ -21,6 +21,50 @@ export const workspaceCommandMetadata = {
     undoCategory: 'workspace-operation',
     when: ['workspaceOpen', 'workspaceEditRedoable'],
     title: 'Redo workspace edit',
+  }),
+  'workspace.undoSessionAction': defineMetadata({
+    category: 'Workspace',
+    description: 'Undo the latest session lifecycle action.',
+    id: 'workspace.undoSessionAction',
+    execution: 'async',
+    // Every pane without its own undo; the composer, editors, terminals and the file tree keep theirs.
+    // The terminal keeps Control+Z for suspend, so the TUI rail takes U.
+    keys: [
+      ...(['global', 'git', 'logs', 'problems', 'search', 'settings'] as const).map(
+        (pane): CommandKeyDefault => ({
+          chord: ['Mod+Z'],
+          pane,
+          preventDefault: true,
+          yieldsToTextEntry: true,
+        }),
+      ),
+      { chord: ['U'], pane: 'chat', platforms: ['tui'] },
+    ],
+    target: 'workspace',
+    undoCategory: 'workspace-operation',
+    when: ['sessionActionUndoable'],
+    title: 'Undo session action',
+  }),
+  'workspace.redoSessionAction': defineMetadata({
+    category: 'Workspace',
+    description: 'Redo the session lifecycle action undone last.',
+    id: 'workspace.redoSessionAction',
+    execution: 'async',
+    keys: [
+      ...(['global', 'git', 'logs', 'problems', 'search', 'settings'] as const).map(
+        (pane): CommandKeyDefault => ({
+          chord: ['Mod+Shift+Z'],
+          pane,
+          preventDefault: true,
+          yieldsToTextEntry: true,
+        }),
+      ),
+      { chord: ['Shift+U'], pane: 'chat', platforms: ['tui'] },
+    ],
+    target: 'workspace',
+    undoCategory: 'workspace-operation',
+    when: ['sessionActionRedoable'],
+    title: 'Redo session action',
   }),
   'fileTree.undo': defineMetadata({
     category: 'Workspace',
@@ -149,6 +193,26 @@ export const workspaceCommandMetadata = {
     undoCategory: 'view-only',
     when: [],
     title: 'Open font settings',
+  }),
+  'workspace.cloneRepository': defineMetadata({
+    category: 'Git',
+    description: 'Clone a repository into a new folder and open it as a project.',
+    id: 'workspace.cloneRepository',
+    execution: 'sync',
+    target: 'workspace',
+    undoCategory: 'view-only',
+    when: [],
+    title: 'Clone repository…',
+  }),
+  'workspace.startPullRequestSession': defineMetadata({
+    category: 'Git',
+    description: "Start a session in its own worktree at a pull request's head.",
+    id: 'workspace.startPullRequestSession',
+    execution: 'sync',
+    target: 'workspace',
+    undoCategory: 'view-only',
+    when: [],
+    title: 'Start session from pull request…',
   }),
   'workspace.showUsage': defineMetadata({
     category: 'Chat',

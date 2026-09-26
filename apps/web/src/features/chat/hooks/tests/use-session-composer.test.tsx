@@ -29,7 +29,7 @@ import {
 } from '../../state/chat-input-draft-store'
 import { resetChatMessageIntents } from '../../state/chat-message-intents'
 import { useChatProjectionStore } from '../../state/chat-projection-store'
-import { providerListQueryOptions } from '../../utils/provider-query'
+import { providerListQueryOptions } from '@/lib/provider-query'
 import { chatInputUploadAttachments } from '../../utils/input-attachments'
 import type { ChatInputSubmitPayload } from '../../utils/composed-message'
 

@@ -35,6 +35,7 @@ import {
   useSessionSelectionStore,
 } from '@/features/chat-mode/state/session-selection-store'
 import { resetRailOrderIntents } from '@/features/chat-mode/state/rail-order-intents'
+import { resetSessionUndo } from '@/features/chat-mode/state/session-undo'
 import { useSessionRailStore } from '@/features/chat-mode/state/session-rail-store'
 import { useSessionMultiSelectStore } from '@/features/chat-mode/state/session-multi-select-store'
 import { useChatProjectionStore } from '@/features/chat/state/chat-projection-store'
@@ -55,6 +56,7 @@ import { readWorkspaceCache } from '@/features/workspace/state/cache'
 import { inProcessOrchestrationSocketFactory } from '@workspace/client-core/test/in-process-orchestration-socket'
 import { renderWithProviders } from '../render'
 import { EditorStateProvider } from '@/features/editor/providers/state-provider'
+import type { FocusService } from '@/lib/focus/state/service'
 import type { TestServer } from '../server'
 
 let harnessOriginSequence = 0
@@ -134,6 +136,7 @@ export async function createRailHarness(
   useWorktreeManagerStore.getState().closeManager()
   resetSessionSelectionStore()
   resetRailOrderIntents()
+  resetSessionUndo()
   useSessionMultiSelectStore.getState().clear()
   useSessionRailStore.setState({
     collapsedProjectIds: [],
@@ -202,13 +205,18 @@ function firstRow(harness: RailHarness) {
   return model.sessions.find((session) => session.id === harness.sessionIds[0]) ?? null
 }
 
-function renderInHarness(harness: RailHarness, children: ReactNode) {
+export function renderInRailHarness(
+  harness: RailHarness,
+  children: ReactNode,
+  focusService?: FocusService,
+) {
   return renderWithProviders(
     <EditorStateProvider runtime={harness.application.getSnapshot().editor}>
       <ChatModeSessionContext value={harness.context}>{children}</ChatModeSessionContext>
     </EditorStateProvider>,
     {
       application: harness.application,
+      focusService,
       queryClient: harness.application.getSnapshot().queryClient,
     },
   )
@@ -218,9 +226,10 @@ export function renderRailHarness(
   harness: RailHarness,
   header = false,
   onRender: ProfilerOnRenderCallback = () => {},
+  focusService?: FocusService,
 ) {
   const row = firstRow(harness)
-  return renderInHarness(
+  return renderInRailHarness(
     harness,
     <ChatRailOrderProvider>
       {header ? (
@@ -239,6 +248,7 @@ export function renderRailHarness(
       <ProjectDeleteDialog />
       <ProjectRenameDialog />
     </ChatRailOrderProvider>,
+    focusService,
   )
 }
 
@@ -249,7 +259,7 @@ export function renderRailHarness(
  */
 export function renderSessionHeaders(harness: RailHarness) {
   const row = firstRow(harness)
-  return renderInHarness(
+  return renderInRailHarness(
     harness,
     <>
       <section aria-label='Stage header'>

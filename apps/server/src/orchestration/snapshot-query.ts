@@ -121,6 +121,7 @@ export class OrchestrationSnapshotQuery {
       )
       model.sessions.set(row.sessionId, {
         ...session,
+        lifecycleRevision: row.lifecycleRevision,
         latestFailureSequence: row.latestFailureSequence,
         latestInterruptionSequence: row.latestInterruptionSequence,
         runtimeSequence: row.runtimeSequence,
@@ -482,6 +483,7 @@ export class OrchestrationSnapshotQuery {
     const session = sessionFromRow(row, [], [], this.sessionRuntime(sessionId))
     model.sessions.set(sessionId, {
       ...session,
+      lifecycleRevision: row.lifecycleRevision,
       latestFailureSequence: row.latestFailureSequence,
       latestInterruptionSequence: row.latestInterruptionSequence,
       runtimeSequence: row.runtimeSequence,

@@ -24,6 +24,8 @@ import {
   FloppyDiskIcon,
   FolderOpenIcon,
   GaugeIcon,
+  GitForkIcon,
+  GitPullRequestIcon,
   GearSixIcon,
   GitDiffIcon,
   ImageIcon,
@@ -55,6 +57,10 @@ import {
   type SessionTraversalDirection,
 } from '@/features/chat-mode/state/session-commands'
 import { setChatModeSessionRailOpen, showChatModeToolTab } from '@/features/chat-mode/utils/panels'
+import {
+  undoLatestSessionAction,
+  redoLatestSessionAction,
+} from '@/features/chat-mode/state/session-undo'
 import { documentKey } from '@/lib/documents/utils/identity'
 import { runMutation } from '@/lib/mutations/run'
 import { copyTextToClipboard } from '@/lib/clipboard'
@@ -500,6 +506,16 @@ export const workspaceCommands = [
     run: ({ runtime }) => operationStart(runtime.workspaceEdits.redo()),
   }),
   defineCommand({
+    ...workspaceCommandMetadata['workspace.undoSessionAction'],
+    icon: ArrowCounterClockwiseIcon,
+    run: () => operationStart(undoLatestSessionAction()),
+  }),
+  defineCommand({
+    ...workspaceCommandMetadata['workspace.redoSessionAction'],
+    icon: ArrowClockwiseIcon,
+    run: () => operationStart(redoLatestSessionAction()),
+  }),
+  defineCommand({
     ...workspaceCommandMetadata['fileTree.undo'],
     icon: ArrowCounterClockwiseIcon,
     run: (context) => reverseFileOperationStart(context, 'undo'),
@@ -597,6 +613,22 @@ export const workspaceCommands = [
       transitionStart(
         runtime.shell.showSettings(invocation.origin as FocusTargetToken | null, 'font'),
       ),
+  }),
+  defineCommand({
+    ...workspaceCommandMetadata['workspace.cloneRepository'],
+    icon: GitForkIcon,
+    run: ({ runtime }) => {
+      runtime.shell.showCloneRepository()
+      return { status: 'handled' }
+    },
+  }),
+  defineCommand({
+    ...workspaceCommandMetadata['workspace.startPullRequestSession'],
+    icon: GitPullRequestIcon,
+    run: ({ runtime }) => {
+      runtime.shell.showStartPullRequestSession()
+      return { status: 'handled' }
+    },
   }),
   defineCommand({
     ...workspaceCommandMetadata['workspace.showUsage'],

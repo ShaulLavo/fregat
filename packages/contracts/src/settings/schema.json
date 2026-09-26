@@ -2,6 +2,18 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "additionalProperties": false,
   "properties": {
+    "chat.autoSettleAfterDays": {
+      "default": 3,
+      "description": "Move a session to Settled once it has had no activity for this many days, including existing sessions. 0 turns it off.",
+      "maximum": 365,
+      "minimum": 0,
+      "type": "integer"
+    },
+    "chat.autoSettleOnMerge": {
+      "default": true,
+      "description": "Move a session to Settled when its worktree's pull request is merged. A closed pull request settles it whenever automatic settlement is on.",
+      "type": "boolean"
+    },
     "chat.confirmSessionDelete": {
       "default": true,
       "description": "Ask before permanently deleting one or more conversations.",
@@ -50,6 +62,28 @@
       "default": false,
       "description": "Show the Plan mode picker and /plan and /default commands for providers that support them. Stored draft preferences are retained while hidden.",
       "type": "boolean"
+    },
+    "chat.projectAutoSettle": {
+      "additionalProperties": {
+        "properties": {
+          "afterDays": {
+            "maximum": 365,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "onMerge": {
+            "type": "boolean"
+          }
+        },
+        "required": [],
+        "type": "object"
+      },
+      "default": {},
+      "description": "Automatic settlement overrides keyed by project UUID on this machine.",
+      "propertyNames": {
+        "type": "string"
+      },
+      "type": "object"
     },
     "chat.projectGrouping": {
       "default": "repository",
@@ -122,6 +156,11 @@
         "type": "string"
       },
       "type": "object"
+    },
+    "chat.pushNotifications": {
+      "default": false,
+      "description": "Push to every device registered below when a session needs attention or completes. Held back while a window of this server is visible and focused.",
+      "type": "boolean"
     },
     "chat.responseStreamingMode": {
       "default": "paragraph",
@@ -385,6 +424,56 @@
       "default": false,
       "description": "Show dot-prefixed files and folders in file pickers.",
       "type": "boolean"
+    },
+    "git.autoPull": {
+      "default": false,
+      "description": "Fast-forward a project checkout on its default branch when its upstream moves. A checkout with changes, local commits or another branch checked out is left alone.",
+      "type": "boolean"
+    },
+    "git.projectAutoPull": {
+      "additionalProperties": {
+        "type": "boolean"
+      },
+      "default": {},
+      "description": "Automatic default-branch pull keyed by project UUID on this machine.",
+      "propertyNames": {
+        "type": "string"
+      },
+      "type": "object"
+    },
+    "git.projectWorktreeCleanupOnDelete": {
+      "additionalProperties": {
+        "type": "boolean"
+      },
+      "default": {},
+      "description": "Worktree removal after the last session is deleted, keyed by project UUID on this machine.",
+      "propertyNames": {
+        "type": "string"
+      },
+      "type": "object"
+    },
+    "git.projectWorktreeSubmodules": {
+      "additionalProperties": {
+        "enum": ["none", "recursive", "top-level"],
+        "type": "string"
+      },
+      "default": {},
+      "description": "Submodule modes for new worktrees keyed by project UUID on this machine.",
+      "propertyNames": {
+        "type": "string"
+      },
+      "type": "object"
+    },
+    "git.worktreeCleanupOnDelete": {
+      "default": false,
+      "description": "Remove a session worktree once every session using it is deleted and has stopped, including earlier deletions. A worktree with uncommitted changes, ignored files other than node_modules, or another branch checked out stays.",
+      "type": "boolean"
+    },
+    "git.worktreeSubmodules": {
+      "default": "recursive",
+      "description": "Initialize every nested submodule, only the ones this repository declares, or none when a session creates a worktree.",
+      "enum": ["none", "recursive", "top-level"],
+      "type": "string"
     },
     "keybindings.overrides": {
       "additionalProperties": {

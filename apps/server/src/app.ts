@@ -71,6 +71,11 @@ import { themeRoutes } from './themes/routes'
 import { DEFAULT_PROVIDER_INSTANCES } from './provider/drivers/built-in'
 import { mergeProviderInstanceConfigs } from './provider/utils/instance-config-merge'
 import { SettingsStore, type SettingsStoreOptions } from './settings/store'
+import { worktreeSubmoduleMode } from './git/submodules'
+import { autoPullEnabled } from './git/auto-pull'
+import { autoSettleRules } from './orchestration/utils/auto-settle-settings'
+import { readBranchPullRequests, type ForgeBoundaries } from './git/pull-request'
+import type { BranchPullRequestLookup } from './orchestration/pull-request-sync-reactor'
 import { TerminalService, type TerminalPtyFactory } from './terminal/service'
 import { wallpaperRoutes } from './wallpaper/routes'
 import { webRoutes, type WebOptions } from './web/routes'
@@ -84,6 +89,12 @@ import { MachineService, type MachineServiceOptions } from './machines/service'
 import { machineRoutes } from './machines/routes'
 import type { TailnetStatusCommand } from './machines/tailnet-hosts'
 import { createMachineProxyRoutes } from './machines/proxy'
+import type { PushFetcher } from './push/delivery'
+import { pushRoutes } from './push/routes'
+import { PushService } from './push/service'
+import { sessionLink } from './push/session-link'
+import { SessionNoticePush } from './push/session-notices'
+import { ClientPresence } from './orchestration/client-presence'
 
 import type { LogReaderService } from './observability/log-reader'
 
@@ -107,6 +118,10 @@ export type AppOptions = FileSystemServiceOptions & {
     database?: OrchestrationDatabase
     providerAdapterRegistry?: ProviderAdapterRegistry
     providerRuntime?: boolean
+    /** Null turns pull request sync off; tests never reach a forge. */
+    pullRequestLookup?: BranchPullRequestLookup | null
+    /** Test seam: the forge CLIs and APIs the git service calls. */
+    forgeBoundaries?: ForgeBoundaries
   }
   lsp?: {
     /**
@@ -126,6 +141,7 @@ export type AppOptions = FileSystemServiceOptions & {
   /** The origin forwarded to remote machines as this app's web origin. */
   webOrigin?: string
   web?: WebOptions
+  push?: { fetcher?: PushFetcher }
 }
 
 const appOrchestration = new WeakMap<object, OrchestrationEngine>()
@@ -148,7 +164,10 @@ const appCleanups = new WeakMap<object, () => Promise<void>>()
 export function createApp(options: AppOptions) {
   const fs = new FileSystemService(options)
   const git = new GitService(fs.paths, {
+    autoPullPolicy: (root) =>
+      autoPullEnabled(settings, () => orchestration.checkoutProjectId(root)),
     maxTextFileBytes: fs.info().maxTextFileBytes,
+    forgeBoundaries: options.orchestration?.forgeBoundaries,
   })
   const database = options.orchestration?.database ?? getDefaultPlatformDatabase()
   // The schema has to exist before anything below reads this handle: the
@@ -271,6 +290,19 @@ export function createApp(options: AppOptions) {
     },
     keepImportedSessionsUpdated: () =>
       settings.snapshot().values['chat.keepImportedSessionsUpdated'],
+    worktreeSubmodules: (projectId) => worktreeSubmoduleMode(settings, projectId),
+    autoSettleRules: (projectId) => autoSettleRules(settings, projectId),
+    worktreeCleanupOnDelete: (projectId) => {
+      const values = settings.snapshot().values
+      return (
+        values['git.projectWorktreeCleanupOnDelete'][projectId] ??
+        values['git.worktreeCleanupOnDelete']
+      )
+    },
+    pullRequestLookup:
+      options.orchestration?.pullRequestLookup === undefined
+        ? (input) => readBranchPullRequests(input)
+        : (options.orchestration.pullRequestLookup ?? undefined),
     providerService,
     terminalService: terminal,
     attachmentsDir: options.orchestration?.attachmentsDir,
@@ -279,12 +311,30 @@ export function createApp(options: AppOptions) {
       ? { checkpointGit: git, providerService }
       : false,
   })
+  settings.onChange(() => {
+    runDetached(() => orchestration.settleSessions(), { area: 'chat', operation: 'auto_settle' })
+    runDetached(() => orchestration.cleanupWorktrees(), {
+      area: 'worktree',
+      operation: 'auto_cleanup',
+    })
+  })
   const identity = readEnvironmentIdentity(database)
   const serverConfig = orchestrationWsServerConfig(identity)
   const commitMessages = new CommitMessageGenerator(git, providerAdapterRegistry, providerService)
   const checkpointDiff = new OrchestrationCheckpointDiffQuery(database, git)
   const sessionSearch = new OrchestrationSessionSearchQuery(database)
   const auth = createAuthConfig(options.auth)
+  const push = new PushService({ database, settings, fetcher: options.push?.fetcher })
+  const presence = new ClientPresence()
+  const sessionPush = new SessionNoticePush({
+    environmentId: identity.id,
+    engine: orchestration,
+    settings,
+    presence,
+    push,
+    link: ({ notice, worktreeId }) =>
+      sessionLink(orchestration, fs, notice.ref.sessionId, worktreeId),
+  })
   const machines = new MachineService({
     ...options.machines,
     environmentId: identity.id,
@@ -328,6 +378,7 @@ export function createApp(options: AppOptions) {
     orchestration,
     machines,
     providerPrices,
+    sessionPush,
   )
 
   const app = new Elysia({ name: 'platform' })
@@ -358,7 +409,7 @@ export function createApp(options: AppOptions) {
       recordClientInstance(request)
     })
     // Auth runs after the WS upgrade so the browser receives the explicit 1008 refusal.
-    .use(orchestrationWsRoutes(orchestration, auth, identity))
+    .use(orchestrationWsRoutes(orchestration, auth, identity, presence))
     .onBeforeHandle(authGuard(auth))
     .use(
       machineRoutes(
@@ -381,6 +432,9 @@ export function createApp(options: AppOptions) {
           label: hostname(),
           protocolVersion: serverConfig.protocolVersion,
           serverVersion: serverConfig.serverVersion,
+          release: options.web?.serverReleaseFile
+            ? path.basename(path.dirname(options.web.serverReleaseFile))
+            : null,
           capabilities: {
             sessionSettlement: true,
             sessionSnooze: true,
@@ -438,6 +492,7 @@ export function createApp(options: AppOptions) {
     .use(fontRoutes(fonts))
     .use(wallpaperRoutes())
     .use(settingsRoutes(settings))
+    .use(pushRoutes(push))
     .use(themeRoutes(palettes))
     .use(bundleRoutes(bundles))
     .use(wallpaperLibraryRoutes(wallpapers))
@@ -445,6 +500,9 @@ export function createApp(options: AppOptions) {
       gitRoutes(git, commitMessages, {
         resolveBaseCommit: (checkoutPath) => orchestration.worktreeBaseCommit(checkoutPath),
         refreshMetadata: (checkoutPath) => orchestration.refreshWorktreeMetadata(checkoutPath),
+        registerClone: (absolutePath) => orchestration.registerCheckout(absolutePath),
+        submoduleMode: async (checkoutPath) =>
+          worktreeSubmoduleMode(settings, await orchestration.worktreeProjectId(checkoutPath)),
       }),
     )
     .use(fsRoutes(fs))
@@ -497,6 +555,7 @@ function appCleanup(
   orchestration: OrchestrationEngine,
   machines: MachineService,
   providerPrices: ProviderPriceCatalog,
+  sessionPush: SessionNoticePush,
 ) {
   let closed = false
 
@@ -504,6 +563,7 @@ function appCleanup(
     if (closed) return
 
     closed = true
+    sessionPush.close()
     await machines.close()
     await terminal.dispose()
     // Language servers are child processes. Without this, jdtls, gopls and

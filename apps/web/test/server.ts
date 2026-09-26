@@ -10,6 +10,7 @@ import {
   migratePlatformDatabase,
   MockProviderAdapter,
   ProviderAdapterRegistry,
+  releaseSource,
   testSettingsOptions,
   type AppOptions,
   type MetadataDatabaseHandle,
@@ -88,6 +89,8 @@ export async function makeTestServer({
         attachmentsDir: path.join(root, '.platform-test', 'attachments'),
         database: database.db,
         providerRuntime,
+        // The default lookup runs the real forge CLI; tests record pull requests themselves.
+        pullRequestLookup: null,
         // Never the default registry: its Codex and Claude adapters shell out to
         // real CLIs, so any route that touches a provider would spawn a binary,
         // read the developer's own machine, and answer differently per checkout.
@@ -100,7 +103,12 @@ export async function makeTestServer({
       workspaceEditDriver,
       workspaceEditJournalRoot,
       workspaceRoot: root,
-      machines: { tailnetStatusCommand: async () => '{"BackendState":"Stopped"}', ...machines },
+      machines: {
+        tailnetStatusCommand: async () => '{"BackendState":"Stopped"}',
+        // Tests run the server from source; they stand for a production primary with no release.
+        releaseSource: releaseSource('/platform-test/no-release/server'),
+        ...machines,
+      },
     })
 
   let app = buildApp()

@@ -23,7 +23,10 @@ export type IsolatedServer = {
  * directory under `/work/tmp`, all removed when the run ends. The shared Vite page reaches
  * it through `window.platformDevServerUrl`.
  */
-export async function startIsolatedServer(webOrigin: URL): Promise<IsolatedServer> {
+export async function startIsolatedServer(
+  webOrigin: URL,
+  pathPrefix?: string,
+): Promise<IsolatedServer> {
   const directory = mkdtempSync('/work/tmp/fregat-agent-')
   const home = path.join(directory, 'home')
   const logs = path.join(directory, 'logs')
@@ -41,6 +44,7 @@ export async function startIsolatedServer(webOrigin: URL): Promise<IsolatedServe
     // The run copies this log before the server stops, so a 5 s batch would drop the run's tail.
     OBSERVABILITY_BATCH_INTERVAL_MS: '200',
     OBSERVABILITY_DIR: logs,
+    PATH: pathPrefix ? `${pathPrefix}${path.delimiter}${process.env.PATH ?? ''}` : process.env.PATH,
     // Offers the mock provider driver, so a scenario can script a whole turn.
     PLATFORM_AGENT_HARNESS: '1',
     PLATFORM_HOME: home,
@@ -53,7 +57,12 @@ export async function startIsolatedServer(webOrigin: URL): Promise<IsolatedServe
   }
   delete env.FS_METADATA_DB
   const child = Bun.spawn({
-    cmd: [process.execPath, 'src/index.ts'],
+    cmd: [
+      process.execPath,
+      '--preload',
+      new URL('./push-boundary.ts', import.meta.url).pathname,
+      'src/index.ts',
+    ],
     cwd: SERVER_ROOT,
     env,
     stderr: Bun.file(path.join(directory, 'server.stderr')),
