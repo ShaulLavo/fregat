@@ -218,6 +218,33 @@ describe('ProviderService', () => {
     }
   })
 
+  it('reads a goal set with /goal, and pauses and clears it through the service', async () => {
+    const fixture = createFixture()
+    const adapter = new MockProviderAdapter()
+    const service = new ProviderService({
+      adapterRegistry: new ProviderAdapterRegistry([adapter]),
+      sessionDirectory: new ProviderSessionDirectory(fixture.database),
+    })
+    const turn = { ...providerTurnInput(), messageText: '/goal Make the suite green' }
+    try {
+      await service.sendTurn(turn)
+      await service.drainRuntimeEvents()
+      expect(service.sessionGoal(turn.sessionId)).toMatchObject({
+        controllable: true,
+        goal: { objective: 'Make the suite green', status: 'active' },
+      })
+      expect(
+        await service.controlGoal({ action: 'pause', sessionId: turn.sessionId }),
+      ).toMatchObject({ goal: { status: 'paused' } })
+      expect(
+        await service.controlGoal({ action: 'clear', sessionId: turn.sessionId }),
+      ).toMatchObject({ goal: null })
+    } finally {
+      await service.shutdown()
+      fixture.close()
+    }
+  })
+
   it('keeps a runtime working toward an active goal, and reclaims it once the goal pauses', async () => {
     vi.useFakeTimers()
     const fixture = createFixture()
