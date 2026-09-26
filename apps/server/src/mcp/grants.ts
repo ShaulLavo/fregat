@@ -36,9 +36,10 @@ export class McpGrantRegistry {
     return this.byToken.get(token) ?? null
   }
 
-  revoke(sessionId: string) {
+  revoke(sessionId: string, runtimeEpoch?: string) {
     const token = this.tokenBySession.get(sessionId)
     if (!token) return
+    if (runtimeEpoch !== undefined && this.byToken.get(token)?.runtimeEpoch !== runtimeEpoch) return
     this.byToken.delete(token)
     this.tokenBySession.delete(sessionId)
   }

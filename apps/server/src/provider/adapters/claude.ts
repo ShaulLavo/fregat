@@ -615,8 +615,8 @@ export class ClaudeProviderAdapter
     const session = await ClaudeAgentSession.start({
       ...(input.agent ? { agent: input.agent } : {}),
       fork,
-      onCreated: (session) => this.sessions.set(input.sessionId, session),
       ...(input.platformMcp ? { platformMcp: input.platformMcp } : {}),
+      onCreated: (session) => this.sessions.set(input.sessionId, session),
       attachmentsDir: this.attachmentsDir,
       createQuery: this.createQuery,
       cwd,
@@ -756,7 +756,6 @@ class ClaudeAgentSession extends SessionContext {
       ...(input.agent ? { agent: input.agent } : {}),
       fork: input.fork,
       persistSession: input.ephemeral ? false : undefined,
-      ...(input.platformMcp ? { platformMcp: input.platformMcp } : {}),
       interactionMode: input.interactionMode,
       model: input.model,
       reasoning: input.reasoning,
@@ -781,6 +780,31 @@ class ClaudeAgentSession extends SessionContext {
         CLAUDE_INIT_TIMEOUT_MS,
         'Claude session start timed out.',
       )
+      if (input.platformMcp) {
+        // The SDK serializes initial mcpServers into argv and its spawn debug log.
+        await withClaudeTimeout(
+          query
+            .setMcpServers({
+              platform: {
+                alwaysLoad: true,
+                headers: { Authorization: `Bearer ${input.platformMcp.token}` },
+                type: 'http',
+                url: input.platformMcp.url,
+              },
+            })
+            .then(
+              (result) => {
+                if (Object.keys(result.errors).length > 0)
+                  throw createInternalError('Platform MCP connection failed.')
+              },
+              () => {
+                throw createInternalError('Platform MCP connection failed.')
+              },
+            ),
+          CLAUDE_INIT_TIMEOUT_MS,
+          'Platform MCP connection timed out.',
+        )
+      }
       session.status = 'ready'
     } catch (error) {
       recordChatPipelineWarning('chat.pipeline.claude_session.start.failed', {

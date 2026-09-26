@@ -394,11 +394,16 @@ export class ProviderService {
     })
     this.requireSdkOwnership(input.sessionId)
     this.recordLaunch(input, adapter)
-    const session = await adapter.startRuntime({
-      ...providerRuntimeStartInput(input, input.runtimePayload, continuation),
-      ...this.mcpBinding(input.sessionId, input.runtimeEpoch, input.runtimePayload.cwd),
-      ...(!existing && input.fork ? { fork: input.fork.native } : {}),
-    })
+    const session = await adapter
+      .startRuntime({
+        ...providerRuntimeStartInput(input, input.runtimePayload, continuation),
+        ...this.mcpBinding(input.sessionId, input.runtimeEpoch, input.runtimePayload.cwd),
+        ...(!existing && input.fork ? { fork: input.fork.native } : {}),
+      })
+      .catch((error: unknown) => {
+        this.mcp?.grants.revoke(input.sessionId, input.runtimeEpoch)
+        throw error
+      })
     this.requireRunning()
     const binding = this.sessionDirectory.upsert({
       adapterKey: adapter.adapterKey,
@@ -1282,6 +1287,9 @@ export class ProviderService {
     this.adapterSubscriptions.set(providerInstanceId, {
       adapter,
       unsubscribe: adapter.subscribeEvents((event) => {
+        // Revoke synchronously, including startup failures and exits queued behind a turn.
+        if (event.type === 'runtime.exited')
+          this.mcp?.grants.revoke(event.sessionId, event.runtimeEpoch)
         void this.runtimeEvents.enqueue({ adapter, event, providerInstanceId }).catch((error) => {
           recordChatPipelineWarning('chat.pipeline.provider_service.runtime_stream.failed', {
             adapterKey: adapter.adapterKey,
@@ -1325,8 +1333,6 @@ export class ProviderService {
     this.backgroundTasks.accept(task.event)
     this.acceptTaskRoster(task.event)
     this.acceptSchedules(task.event)
-    // An exited process took its token's only holder with it.
-    if (task.event.type === 'runtime.exited') this.mcp?.grants.revoke(task.event.sessionId)
     this.goals.accept(task.event)
     this.recordRuntimeEvent(task.event, task.adapter)
     this.publishUsage(task.event, 'turn')

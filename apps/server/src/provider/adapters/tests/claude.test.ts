@@ -1302,7 +1302,8 @@ describe('ClaudeProviderAdapter', () => {
     const harness = claudeHarness()
     const platformMcp = { token: 'grant-token', url: 'http://127.0.0.1:3301/mcp' }
     await harness.adapter.startRuntime({ ...sessionStartInput({}), platformMcp })
-    expect(latestOptions(harness).mcpServers).toEqual({
+    expect(latestOptions(harness).mcpServers).toBeUndefined()
+    expect(harness.queries.at(-1)?.mcpBindings[0]).toEqual({
       platform: {
         alwaysLoad: true,
         headers: { Authorization: 'Bearer grant-token' },
