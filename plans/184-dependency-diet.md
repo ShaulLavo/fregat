@@ -124,7 +124,7 @@ Merged #113 → #114 → #119 → #117 → #118 → #120 onto `fe39528db`, then 
 replace missing-text placeholders, unresolved packages fail generation, and runtime
 notices resolve through the declaring workspace.
 
-Main advanced while this integration ran. Merged `86843435b` and resolved its wallpaper changes by adding header-only and single-rendition operations to the isolated Bun worker. Imports remain lazy, color sampling requests the library's display rendition, and uploads retain full decoding and process deadlines. The separate main build proved the `apps/web/src/lib` pin stale: 69,219 gzip bytes exceeds the old 68,670 allowance. Only that owner is re-pinned to the main baseline; integrated size is 69,627. Total and all other owner pins stay unchanged.
+Main advanced while this integration ran. Merged `86843435b` and resolved its wallpaper changes by adding header-only and single-rendition operations to the isolated Bun worker. Imports remain lazy, color sampling requests the library's display rendition, and uploads retain full decoding and process deadlines. The final branch also includes main `4e10670dd` and uses that revision's bundle pins unchanged.
 
 | Measurement                   | Main `86843435b` |  Integrated |      Change |
 | ----------------------------- | ---------------: | ----------: | ----------: |
@@ -144,3 +144,5 @@ Frozen workspace/runtime installs, gates including knip, every workspace typeche
 The six deduplication targets each have one package root. Workspace typechecks skip
 the shared Editor auto-rebuild step. No deployment or live model calls; macOS and
 device push delivery remain unverified. Evidence: `/work/tmp/w2-184-integration-evidence/`.
+
+Final checks after syncing main `4e10670dd`: gates, all workspace typechecks and the bundle gate pass. First-load script gzip is 1,742,952 bytes against the unchanged main limit of 1,754,164.
