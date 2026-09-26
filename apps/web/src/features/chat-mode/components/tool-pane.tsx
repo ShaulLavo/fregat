@@ -2,32 +2,23 @@ import { usePanelRoot } from '@/features/git/hooks/use-panel-root'
 import { ToolPane as PaneShell } from '@workspace/ui/patterns/tool-pane'
 import type { GitFileStatus } from '@workspace/contracts'
 import { filesystemPath } from '@/lib/documents/utils/identity'
-import { Tabs, TabsList, TabsTab } from '@workspace/ui/components/tabs'
-import { PaneBar } from '@workspace/ui/components/pane-bar'
 
 import { SearchPane } from '@/features/workspace/components/search-pane'
 import type { EditorTabConflictMap } from '@/features/workspace/utils/tab-types'
-import { TurnFiles } from '@/features/chat-mode/components/turn-files'
-import { CheckpointLoading } from '@/features/chat-mode/components/checkpoint-loading'
-import { CheckpointState } from '@/features/chat-mode/components/checkpoint-state'
-import { checkpointAvailability } from '@/lib/checkpoint-availability'
-import { useSessionTerminalId } from '@/features/chat-mode/hooks/use-session-terminal-id'
 import { useSessionToolRoot } from '@/features/chat-mode/hooks/use-session-tool-root'
 import { useSessionCheckoutRefresh } from '@/features/chat-mode/hooks/use-session-checkout-refresh'
 import { useSessionDiffScope } from '@/features/chat/hooks/use-session-diff-scope'
-import { Panel as GitPanel } from '@/features/git/components/panel'
 
 import { LogsPanel } from '@/features/logs/components/panel'
-import { DeferredTerminalPanel } from '@/features/terminal/components/deferred-panel'
-import { KeepAliveSlot } from '@/lib/keep-alive/components/keep-alive-slot'
 import { CodePanel } from '@/features/workbench/components/code-panel'
 import { DiagnosticsPanel } from '@/features/workbench/components/diagnostics-panel'
 import { FileNavigatorPanel } from '@/features/workbench/components/file-navigator-panel'
 import { GitPaneHeader } from '@/features/workbench/components/git-pane-header'
+import { GitToolPane } from '@/features/chat-mode/components/git-tool-pane'
+import { SessionTerminal } from '@/features/chat-mode/components/session-terminal'
 import { ToolPaneHeader } from '@/components/tool-pane-header'
 import type { WorkbenchPanels } from '@/features/workbench/utils/panels'
 import type { ChatModeToolTab } from '@/features/chat-mode/utils/panels'
-import { RenderErrorBoundary } from '@workspace/ui/patterns/render-error-boundary'
 
 type SessionDiffScopeState = ReturnType<typeof useSessionDiffScope>
 
@@ -58,7 +49,6 @@ export function ToolPane({
   const holdsGit = tab === 'git' && diffScope.scope.kind === 'working-tree'
   const shownGitRoot = usePanelRoot(toolRoot, holdsGit)
   useSessionCheckoutRefresh()
-  const terminalSessionId = useSessionTerminalId()
   if (tab !== 'terminal') {
     return toolBody({
       conflicts,
@@ -79,19 +69,7 @@ export function ToolPane({
       scroll={false}
       header={<ToolPaneHeader tab='terminal' />}
     >
-      {/* Kept, so another tool, a collapsed pane or another session never ends this shell. */}
-      <KeepAliveSlot id={`chat-terminals:${terminalSessionId}`} scope='chat-terminals'>
-        {(attached) => (
-          <RenderErrorBoundary label='Terminal'>
-            <DeferredTerminalPanel
-              active={attached}
-              className='h-full'
-              rootPath={toolRoot}
-              sessionId={terminalSessionId}
-            />
-          </RenderErrorBoundary>
-        )}
-      </KeepAliveSlot>
+      <SessionTerminal />
     </PaneShell>
   )
 }
@@ -126,7 +104,14 @@ function toolBody({
     )
   }
   if (tab === 'files') return <FileNavigatorPanel rootPath={filesystemPath(toolRoot)} />
-  if (tab === 'git') return gitToolPane(toolRoot, diffScope, gitLoading)
+  if (tab === 'git')
+    return (
+      <GitToolPane
+        diffScope={diffScope}
+        header={<GitPaneHeader rootPath={toolRoot} loading={gitLoading} />}
+        rootPath={toolRoot}
+      />
+    )
   if (tab === 'logs') return <LogsPanel active />
   if (tab === 'search') return <SearchPane rootPath={toolRoot} />
 
@@ -139,61 +124,4 @@ function toolBody({
       <DiagnosticsPanel />
     </PaneShell>
   )
-}
-
-/**
- * Mounts the header itself rather than reusing `GitChangesPanel`, which carries
- * its own: the scope bar has to sit between the header and the panel body, and
- * that panel belongs to the workbench sidebar too.
- */
-function gitToolPane(rootPath: string, diffScope: SessionDiffScopeState, loading: boolean) {
-  const { latestTurnId, scope, selectTurnScope, selectWorkingTreeScope } = diffScope
-
-  return (
-    <PaneShell
-      className='h-full min-w-0 overflow-hidden'
-      scroll={false}
-      header={<GitPaneHeader rootPath={rootPath} loading={loading} />}
-      subheader={
-        <PaneBar>
-          <Tabs
-            value={scope.kind}
-            onValueChange={(next: typeof scope.kind) => {
-              if (next === 'working-tree') return selectWorkingTreeScope()
-              if (latestTurnId) selectTurnScope(latestTurnId)
-            }}
-          >
-            <TabsList aria-label='Diff scope' variant='segmented'>
-              <TabsTab value='working-tree'>Working tree</TabsTab>
-              {/* A session with no checkpoint has no turn to show; an inert tab says so. */}
-              <TabsTab
-                disabled={!latestTurnId}
-                value='turn'
-                // Clicking the selected tab changes no value; from an older turn it returns to the latest.
-                onClick={() => {
-                  if (scope.kind === 'turn' && latestTurnId) selectTurnScope(latestTurnId)
-                }}
-              >
-                Turn
-              </TabsTab>
-            </TabsList>
-          </Tabs>
-        </PaneBar>
-      }
-    >
-      {scope.kind === 'turn' ? (
-        turnScopeBody(rootPath, diffScope)
-      ) : (
-        <GitPanel rootPath={filesystemPath(rootPath)} />
-      )}
-    </PaneShell>
-  )
-}
-
-function turnScopeBody(rootPath: string, { openTurnFile, turnSummary }: SessionDiffScopeState) {
-  const availability = checkpointAvailability(turnSummary)
-  if (availability.kind === 'pending') return <CheckpointLoading />
-  if (availability.kind !== 'available') return <CheckpointState availability={availability} />
-
-  return <TurnFiles rootPath={rootPath} summary={availability.summary} onOpenFile={openTurnFile} />
 }

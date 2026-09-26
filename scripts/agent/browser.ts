@@ -56,6 +56,7 @@ Options
   --width      viewport width, 320–4096 CSS pixels (look/scenario)
   --height     viewport height, 240–4096 CSS pixels (look/scenario)
   --scale      device pixel ratio, 1–3 (look/scenario)
+  --touch      emulate a touch phone: coarse pointer and touch events (look/scenario)
   --product-wallpaper image override for a real product scenario capture
   --shared-dev drive the running dev API server instead of a throwaway one
 
@@ -93,6 +94,7 @@ async function main() {
       width: { type: 'string' },
       height: { type: 'string' },
       scale: { type: 'string' },
+      touch: { type: 'boolean', default: false },
       doctor: { type: 'boolean', default: false },
       engine: { type: 'string', default: 'chromium' },
       file: { type: 'string' },
@@ -110,10 +112,16 @@ async function main() {
     throw createScriptError('--static-dir is only supported by look without --doctor.')
   if (values['product-wallpaper'] && verb !== 'scenario')
     throw createScriptError('--product-wallpaper is only supported by scenario.')
-  if ((values.width || values.height || values.scale) && verb !== 'look' && verb !== 'scenario')
+  if (
+    (values.width || values.height || values.scale || values.touch) &&
+    verb !== 'look' &&
+    verb !== 'scenario'
+  )
     throw createScriptError(
-      '--width, --height and --scale are only supported by look and scenario.',
+      '--width, --height, --scale and --touch are only supported by look and scenario.',
     )
+  if (values.touch && values.engine === 'firefox')
+    throw createScriptError('--touch needs --engine chromium or webkit.')
   if (!isEngine(values.engine))
     throw createScriptError(`--engine must be one of ${ENGINES.join(', ')}.`)
   if (values.engine !== 'chromium' && verb === 'trace')
@@ -124,6 +132,7 @@ async function main() {
       width: values.width ?? scenario?.capture?.width?.toString(),
       height: values.height ?? scenario?.capture?.height?.toString(),
       scale: values.scale ?? scenario?.capture?.scale?.toString(),
+      touch: values.touch || scenario?.capture?.touch,
     }),
     consoleCapture: !values['no-console'],
     site: values.site || Boolean(values['static-dir']),
@@ -624,6 +633,7 @@ async function withPage(
     permissions: options.engine === 'chromium' ? chromiumPermissions(options) : [],
     viewport: { width: options.width, height: options.height },
     deviceScaleFactor: options.scale,
+    ...(options.touch ? { hasTouch: true, isMobile: true } : {}),
     ...(options.productWallpaper ? { userAgent: PRODUCT_USER_AGENT } : {}),
   })
   if (options.server)
@@ -649,6 +659,7 @@ async function withPage(
       consoleCapture: options.consoleCapture,
       viewport: { width: options.width, height: options.height },
       deviceScaleFactor: options.scale,
+      touch: options.touch,
       screenshotPixels: {
         width: options.width * options.scale,
         height: options.height * options.scale,

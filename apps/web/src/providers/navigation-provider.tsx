@@ -1,7 +1,6 @@
 import { useEffect, type ReactNode } from 'react'
 import { RouterProvider } from '@tanstack/react-router'
 import { NavigationContext } from '@/providers/navigation-context'
-import { bindNavigation } from '@/state/navigation-binding'
 import type { Navigation } from '@/state/navigation'
 
 export function NavigationProvider({
@@ -12,11 +11,9 @@ export function NavigationProvider({
   readonly children: ReactNode
 }) {
   useEffect(() => {
-    const unbind = bindNavigation(navigation)
     const flush = () => navigation.router.history.flush()
     window.addEventListener('pagehide', flush)
     return () => {
-      unbind()
       flush()
       window.removeEventListener('pagehide', flush)
     }

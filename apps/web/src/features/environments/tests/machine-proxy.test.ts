@@ -119,6 +119,8 @@ test('relays text and binary WebSocket frames exactly, including input sent befo
     target,
     machineProxyHeaders(request, remoteWebOrigin),
     'dev',
+    // A host's own socket holds no device.
+    () => () => {},
   )
   const frames = ['{ "n": 9007199254740993 }', 'true', '007', '', Buffer.from([0, 255, 128])]
 

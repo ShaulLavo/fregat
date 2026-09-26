@@ -26,6 +26,7 @@ import { SettingsJsonView } from '@/features/settings/components/json-view'
 import { UsageSection } from '@/features/settings/components/usage-section'
 import { matchesUsageSearch } from '@/features/settings/utils/usage'
 import { PushSection } from '@/features/settings/components/push-section'
+import { PairingSection } from '@/features/settings/components/pairing-section'
 import { matchesPushSearch } from '@/features/settings/utils/push-device'
 import { SettingRow } from '@/features/settings/components/setting-row'
 import { useShortcutRows } from '@/features/settings/hooks/use-shortcut-rows'
@@ -294,6 +295,7 @@ export function SettingsPage({
                       <h2 className='text-foreground mb-1 text-sm font-semibold'>{category}</h2>
                       {category === 'Usage' ? <UsageSection /> : null}
                       {category === MCP_CATEGORY ? <McpSection /> : null}
+                      {category === 'Machines' ? <PairingSection /> : null}
                       {ids.includes('chat.keepImportedSessionsUpdated') ? <ImportSection /> : null}
                       {category === 'Chat' && showPush ? (
                         <PushSection snapshot={projection} />

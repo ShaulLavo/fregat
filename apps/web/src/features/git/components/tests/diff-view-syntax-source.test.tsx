@@ -18,7 +18,7 @@ import { onTestFinished, vi } from 'vitest'
 import { DiffView } from '@/features/git/components/diff-view'
 import { fetchDiff } from '@/features/git/utils/api'
 import { saveSettings } from '@/features/settings/utils/api'
-import { blobDiffQueryKey, fetchBlobDiff } from '@/features/git/utils/blob-diff-query'
+import { blobDiffQueryKey, fetchBlobDiff } from '@/lib/blob-diff-query'
 import { diffDocumentQueryKey } from '@/features/git/utils/diff-document-query'
 import {
   editorShikiHighlighterProvider,

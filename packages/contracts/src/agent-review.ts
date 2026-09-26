@@ -37,7 +37,7 @@ export const agentReviewFindingSchema = v.object({
   /** 0 is the most urgent, as Codex ranks review findings. */
   priority: v.nullable(v.number()),
   confidence: v.nullable(v.number()),
-  /** Relative to the checkout, like the git diff paths. */
+  /** The server path of the file, as the git diffs name it. */
   path: v.string(),
   startLine: lineNumberSchema,
   endLine: lineNumberSchema,

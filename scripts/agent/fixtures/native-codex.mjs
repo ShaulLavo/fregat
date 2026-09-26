@@ -502,6 +502,72 @@ function resetCreditAccount(message) {
   })
 }
 
+const FIXTURE_REVIEW = {
+  findings: [
+    {
+      title: 'Lost value',
+      body: 'The second line drops the first value.',
+      confidence_score: 0.8,
+      priority: 1,
+      code_location: { absolute_file_path: 'a.txt', line_range: { start: 1, end: 2 } },
+    },
+  ],
+  overall_correctness: 'patch is incorrect',
+  overall_explanation: 'One value is lost.',
+  overall_confidence_score: 0.7,
+}
+
+/** A plain reply per turn, several lines long, for the review-context and citation scenarios. */
+function handleContextReply(message) {
+  if (message.method !== 'turn/start') return false
+
+  const turn = startOwnTurn(message)
+  const input = promptText(message)
+  record({ event: 'turn/start', input })
+  // A review asks for structured output: one finding on the first two lines of a.txt.
+  if (message.params.outputSchema) {
+    agentMessage(turn, `${turn}-review`, JSON.stringify(FIXTURE_REVIEW))
+    endTurn(turn, 'completed')
+    return true
+  }
+  // Working notes, then a command: once the turn settles they fold behind its summary row.
+  if (input.includes('Walk me through it.')) {
+    agentMessage(
+      turn,
+      `${turn}-note`,
+      ['CONTEXT_NOTE', '', 'Reading the cache module.', 'Checking the expiry timer.'].join('\n'),
+    )
+    send({
+      method: 'item/completed',
+      params: {
+        threadId,
+        turnId: turn,
+        item: {
+          id: `${turn}-read`,
+          type: 'commandExecution',
+          command: 'cat cache.ts',
+          status: 'completed',
+          exitCode: 0,
+          aggregatedOutput: 'export const cache = new Map()\n',
+        },
+      },
+    })
+  }
+  agentMessage(
+    turn,
+    `${turn}-answer`,
+    [
+      `CONTEXT_REPLY ${turnCount}`,
+      '',
+      'The cache keeps one entry per key.',
+      'Entries expire after ten minutes.',
+      'A miss reads through to the store.',
+    ].join('\n'),
+  )
+  endTurn(turn, 'completed')
+  return true
+}
+
 /** A blocking `item/tool/requestUserInput` question whose answer the work log keeps. */
 function handleQuestionHistory(message) {
   if (message.id === 992 && !message.method) {
@@ -540,6 +606,16 @@ function handleQuestionHistory(message) {
 
 function handle(message) {
   if (scenario === 'question-history' && handleQuestionHistory(message)) return
+  if (
+    [
+      'chat-review-context',
+      'chat-assistant-citation',
+      'chat-citation-elsewhere',
+      'chat-finding-source',
+    ].includes(scenario) &&
+    handleContextReply(message)
+  )
+    return
   if (scenario === 'session-no-flicker' && message.method === 'turn/start') {
     const turn = startOwnTurn(message)
     const text = promptText(message)
