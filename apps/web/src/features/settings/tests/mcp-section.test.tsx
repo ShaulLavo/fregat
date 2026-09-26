@@ -10,6 +10,8 @@ import {
 import { MockProviderAdapter } from 'server/testing'
 import * as v from 'valibot'
 
+import { McpConfigRow } from '@/features/settings/components/mcp-config-row'
+import { providerSnapshot } from '../../../../test/factories/chat'
 import { McpSection } from '@/features/settings/components/mcp-section'
 import { expect, test } from '../../../../test/fixtures'
 import { createInProcessClient } from '../../../../test/client'
@@ -159,4 +161,36 @@ test('refuses the reserved name before anything is written', async () => {
     restore()
     await server.cleanup()
   }
+})
+
+test('offers copying approved rows and hides copying on unapproved project rows', async () => {
+  const instance = providerSnapshot({
+    providerInstanceId: v.parse(providerInstanceIdSchema, 'claude'),
+  })
+  const target = providerSnapshot({
+    providerInstanceId: v.parse(providerInstanceIdSchema, 'codex'),
+  })
+  const server = {
+    ...new McpConfigAdapter().servers[0]!,
+    name: 'deploy',
+    scope: 'project' as const,
+  }
+  const rendered = renderWithProviders(
+    <McpConfigRow
+      folder='/repo'
+      instance={instance}
+      instances={[instance, target]}
+      server={server}
+    />,
+  )
+  expect(screen.getByRole('button', { name: 'Also add deploy to…' })).toBeVisible()
+  rendered.rerender(
+    <McpConfigRow
+      folder='/repo'
+      instance={instance}
+      instances={[instance, target]}
+      server={{ ...server, status: 'unapproved' }}
+    />,
+  )
+  expect(screen.queryByRole('button', { name: 'Also add deploy to…' })).toBeNull()
 })
