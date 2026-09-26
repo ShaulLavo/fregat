@@ -522,6 +522,14 @@ export const selectors = {
   chooseFolder: (page: Page) => page.getByRole('button', { name: 'Choose folder', exact: true }),
   settingsDialog: (page: Page) => page.getByRole('dialog', { name: 'Settings', exact: true }),
   settingsSearch: (page: Page) => page.getByRole('textbox', { name: 'Search settings' }),
+  settingsShowAll: (page: Page) => page.getByRole('button', { name: 'Show all settings' }),
+  settingsCategoryHeading: (page: Page, name: string) =>
+    page.getByRole('heading', { name, exact: true }),
+  projectSettingsSection: (page: Page, title: string) =>
+    page.getByRole('region', { name: `${title} settings` }),
+  projectSetting: (page: Page, name: string) => page.getByRole('combobox', { name, exact: true }),
+  projectSettingOption: (page: Page, name: string | RegExp) =>
+    page.getByRole('option', { name, exact: true }),
   settingsFeel: (page: Page) => page.getByRole('combobox', { name: 'Feel', exact: true }),
   feelOption: (page: Page, name: string) => page.getByRole('option', { name, exact: true }),
   physicalGallery: (page: Page) => page.locator('[data-physical-gallery]'),

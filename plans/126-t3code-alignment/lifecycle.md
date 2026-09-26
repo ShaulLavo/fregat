@@ -170,6 +170,7 @@ LIFE-01/02 implementation shipped on 2026-09-20; [delivery evidence](archive-del
 - **Verification:** Extend menu tests, draft persistence tests, and `components/tests/worktree-cleanup-eligibility.test.tsx`; add deletion/draft browser scenario. Real in-process cleanup test must assert filesystem and provider state, not only dispatched action names.
 
 - **Owner question (completion wave, 2026-09-25):** where the owner-scoped Project settings destination lives. The plan gives no recommendation, so it is not built. Session-owned terminal cleanup landed (lane L5).
+- **Project settings (wave 2 lane W, 2026-09-26):** built per the owner's decision (plan 126 question 2, (a)). "Project Settings" in the project menu and the session row menu opens the settings page narrowed to that project, read from and written to the machine that owns it through one `project.set` operation per override. Rows: response streaming, settle after days, settle on merge, default-branch pull, worktree submodules, worktree removal after deletion. The title-generation model has no model widget anywhere yet and stays JSON-only; the grouping override belongs to the viewing client's rail. Scenario `project-settings`.
 
 ### LIFE-13 — P2: Offer Undo for settle, snooze, archive and unpin, with a mod+z binding
 

@@ -27,6 +27,7 @@ import {
   type SettingsOperation,
   type SettingsValues,
   type SettingsWriteTarget,
+  type SetProjectOverrideOperation,
   type ColorMode,
   type ThemeVariantPatch,
 } from '@workspace/contracts'
@@ -251,6 +252,10 @@ export function useSettingsActions() {
       submit(targetFor('models.hidden'), [{ hidden, kind: 'model.setHidden', ref }]),
     setModelFavorite: (ref: ModelRef, favorite: boolean) =>
       submit(targetFor('models.favorites'), [{ favorite, kind: 'model.setFavorite', ref }]),
+    setProjectOverride: (operation: Omit<SetProjectOverrideOperation, 'kind'>) =>
+      submit(targetFor(operation.key), [
+        { ...operation, kind: 'project.set' } as SetProjectOverrideOperation,
+      ]),
     setProviderEnabled: (instance: ProviderInstanceConfig, enabled: boolean) =>
       submit(targetFor('providers.instances'), [providerEnabledOperation(instance, enabled)]),
     setSetting,
