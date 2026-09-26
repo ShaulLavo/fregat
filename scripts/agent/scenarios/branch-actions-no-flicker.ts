@@ -7,7 +7,7 @@ import { dispatch, openChat } from './chat-verification'
 import {
   registerFixtureProject,
   settingsSnapshot,
-  restoreUserSettings,
+  writeRawSetting,
   writeSettings,
 } from './native-provider-verification'
 
@@ -76,7 +76,7 @@ export const branchActionsNoFlicker: Scenario = {
       for (const projectId of new Set(fixtures.map((fixture) => fixture.projectId)))
         await dispatch(page, base, { type: 'project.delete', projectId, force: true })
       for (const fixture of fixtures) await releaseFixture(fixture.root)
-      await restoreUserSettings(page, api, before, ['providers.instances'])
+      await writeRawSetting(page, api, 'providers.instances', before.values['providers.instances'])
     }
   },
 }
