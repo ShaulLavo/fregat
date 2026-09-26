@@ -15,7 +15,7 @@ const CHILD_SCAN_LIMIT = 1000
 /**
  * Folders that hold the projects this machine opens: parents of opened workspaces and picked
  * folders, kept when they hold two or more git checkouts or two opened ones. `covered` paths
- * (home, places, drives) already have a row.
+ * (home, drives) already have a row.
  */
 export async function readProjectFolders(
   paths: WorkspacePaths,

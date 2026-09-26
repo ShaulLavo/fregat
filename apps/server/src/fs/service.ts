@@ -284,13 +284,10 @@ export class FileSystemService {
       readUserPlaces(this.paths, this.placeSources),
       readDrives(this.paths, this.driveSources),
     ])
-    const covered = new Set([
-      this.homePath,
-      ...places.map((place) => place.path),
-      ...drives.map((drive) => drive.path),
-    ])
+    const covered = new Set([this.homePath, ...drives.map((drive) => drive.path)])
     const projects = await readProjectFolders(this.paths, this.metadata, covered)
-    return { drives, places, projects }
+    const projectPaths = new Set(projects.map((folder) => folder.path))
+    return { drives, places: places.filter((place) => !projectPaths.has(place.path)), projects }
   }
 
   stat(path: string) {

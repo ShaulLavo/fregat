@@ -30,7 +30,7 @@ subjects and reads `blank-frames-0`, like `quick-open-no-flicker`.
 | #   | Where                                                                                                        | Switch                       | Flash                                    | Status        |
 | --- | ------------------------------------------------------------------------------------------------------------ | ---------------------------- | ---------------------------------------- | ------------- |
 | 1   | `features/file-picker/components/preview.tsx`                                                                | picker selection             | tile/skeleton under new name             | **fixed**     |
-| 2   | `features/command-palette/components/file-preview-panel.tsx`, `lib/file-preview/components/text-preview.tsx` | quick-open highlight         | panel blanks and collapses               | confirmed     |
+| 2   | `features/command-palette/components/file-preview-panel.tsx`, `lib/file-preview/components/text-preview.tsx` | quick-open highlight         | panel blanks and collapses               | **fixed**     |
 | 3   | `features/command-palette/components/code-theme-preview-panel.tsx`, `lib/code-theme/hooks/use-preview.ts`    | palette theme arrow          | new label over skeleton                  | confirmed     |
 | 4   | `features/theme-studio/components/code-tab.tsx`                                                              | theme studio list            | skeleton                                 | confirmed     |
 | 5   | `features/git/components/history.tsx` (`key={selected}`), `commit-details.tsx`, `utils/history-query.ts`     | commit selection             | new hash over skeleton                   | confirmed     |
@@ -76,3 +76,16 @@ restoration. No provider turn runs.
 - After evidence: `/work/tmp/fregat-evidence/20260926T190147Z-scenario-root-switch-no-flicker/`.
   Screenshots read back. DOM tests cover first load, delayed/superseded/error Git switches and
   commit drafts; tree record tests cover per-root expansion and scroll retention.
+## Row 2 proof
+
+Quick open holds the shown file with `useHeldUntilReady`, including its filename, until its head
+read or image decode settles. `TextPreview` observes that ready result, so a failed read is shown
+without starting another read. The shared 64 KB default head budget is unchanged.
+
+`quick-open-no-flicker` uses fixture files and delays head reads by 300 ms. Preview blank frames:
+31 before, 0 after. Search-list blank frames: 0 before and after. Every sampled frame retained the
+preview height and paired its header with the shown body; all three subjects painted. DOM tests
+cover successful, binary and missing-file reads.
+
+- Before: `/work/tmp/fregat-evidence/20260926T184042Z-scenario-quick-open-no-flicker/`
+- After: `/work/tmp/fregat-evidence/20260926T184641Z-scenario-quick-open-no-flicker/`

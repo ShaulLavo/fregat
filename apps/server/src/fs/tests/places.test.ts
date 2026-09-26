@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -88,6 +88,23 @@ describe('filesystem places', () => {
     expect((await places(root, app)).projects).toEqual([
       { label: 'code', path: 'code', repoCount: 3 },
     ])
+  })
+
+  it('shows a bookmarked project folder once when its path is a symlink', async () => {
+    const root = await fixtureRoot()
+    await mkdir(path.join(root, 'home'))
+    for (const name of ['alpha', 'beta'])
+      await mkdir(path.join(root, 'code', name, '.git'), { recursive: true })
+    await symlink(path.join(root, 'code'), path.join(root, 'home', 'Projects'))
+    const app = testApp(root)
+    await request(app, '/fs/recents', {
+      method: 'POST',
+      body: JSON.stringify({ path: 'code/alpha' }),
+    })
+
+    const result = await places(root, app)
+    expect(result.places).toEqual([])
+    expect(result.projects).toEqual([{ label: 'code', path: 'code', repoCount: 2 }])
   })
 
   it('drops a projects folder once it is deleted, though its picks remain', async () => {

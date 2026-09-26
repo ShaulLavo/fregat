@@ -29,6 +29,7 @@ export function LocationButton({
           aria-current={selected ? 'page' : undefined}
           className={cn(
             SIDEBAR_NAV_BUTTON_BASE_CLASS,
+            location.detail && 'h-auto py-(--density-row-padding-y)',
             selected && SIDEBAR_NAV_BUTTON_SELECTED_CLASS,
             !selected && SIDEBAR_NAV_BUTTON_IDLE_CLASS,
           )}
@@ -38,12 +39,14 @@ export function LocationButton({
           variant='ghost'
         >
           <LocationIcon location={location} selected={selected} />
-          <span className='truncate'>{location.label}</span>
-          {location.detail ? (
-            <span className='text-muted-foreground text-2xs ml-auto shrink-0 font-mono tabular-nums'>
-              {location.detail}
-            </span>
-          ) : null}
+          <span className='min-w-0 flex-1'>
+            <span className='block truncate'>{location.label}</span>
+            {location.detail ? (
+              <span className='text-muted-foreground text-2xs block font-mono whitespace-pre-line tabular-nums'>
+                {location.detail}
+              </span>
+            ) : null}
+          </span>
         </Button>
       </ContextMenuTrigger>
       <LocationMenu location={location} />

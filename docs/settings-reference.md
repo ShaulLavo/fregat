@@ -229,6 +229,13 @@ stays safe to read, share and export.
 
 - `models.hidden`: Only turned-off models are stored, so a model a provider adds later appears in the picker on its own.
 
+## Prefetch
+
+| Setting            | Default | Scope       | What it does                                                                                                                                                                                        |
+| ------------------ | ------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `prefetch.enabled` | `true`  | application | Start loading what a press will open while the pointer heads for it or a key moves to it, so it paints at once. Folder listings follow this switch; each other surface has its own switch under it. |
+| `prefetch.files`   | `true`  | application | Read a file and colour its syntax while the pointer heads for its tree row, tab or definition link. Applies while `prefetch.enabled` is on.                                                         |
+
 ## Providers
 
 | Setting               | Default | Scope       | What it does                                                       |

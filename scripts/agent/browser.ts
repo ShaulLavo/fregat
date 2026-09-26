@@ -118,8 +118,13 @@ async function main() {
     throw createScriptError(`--engine must be one of ${ENGINES.join(', ')}.`)
   if (values.engine !== 'chromium' && verb === 'trace')
     throw createScriptError('trace records a Chrome trace and needs --engine chromium.')
+  const scenario = name && verb !== 'look' && verb !== 'caches' ? scenarioNamed(name) : undefined
   const options: Options = {
-    ...captureSize(values),
+    ...captureSize({
+      width: values.width ?? scenario?.capture?.width?.toString(),
+      height: values.height ?? scenario?.capture?.height?.toString(),
+      scale: values.scale ?? scenario?.capture?.scale?.toString(),
+    }),
     consoleCapture: !values['no-console'],
     site: values.site || Boolean(values['static-dir']),
     productCapture:
@@ -143,7 +148,6 @@ async function main() {
     url: values['static-dir'] ? STATIC_PREVIEW_URL : values.url,
     workspace: values.workspace,
   }
-  const scenario = name && verb !== 'look' && verb !== 'caches' ? scenarioNamed(name) : undefined
   // trace and renders drive the scenario too, so the guard covers every verb that takes one.
   if (scenario && !scenario.surface && !scenario.readOnly && isProduction(options.url))
     throw createScriptError(
@@ -285,7 +289,7 @@ async function runScenario(scenario: Scenario, options: Options) {
     const started = performance.now()
     let failure: string | null = null
     try {
-      await scenario.run(page, { file: options.file, server: options.server, step })
+      await scenario.run(page, { evidence, file: options.file, server: options.server, step })
       if (scenario.inspect) await evidence.json('inspection.json', await scenario.inspect(page))
     } catch (error) {
       failure = error instanceof Error ? error.message : String(error)
@@ -340,6 +344,7 @@ async function traceScenario(scenario: Scenario, options: Options) {
     let failure: string | null = null
     try {
       await scenario.run(page, {
+        evidence,
         file: options.file,
         server: options.server,
         step: async (label) => {
@@ -414,6 +419,7 @@ async function countRenders(scenario: Scenario, options: Options) {
     let failure: string | null = null
     try {
       await scenario.run(page, {
+        evidence,
         file: options.file,
         server: options.server,
         step: async (label) => {
