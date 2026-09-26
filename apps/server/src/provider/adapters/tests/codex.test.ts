@@ -343,10 +343,25 @@ function handle(message) {
     record({ event: message.method, params: message.params });
     const base = { resourceTemplates: [], resources: [], tools: {} };
     send({ id: message.id, result: { data: [
-      { ...base, name: 'linear', authStatus: 'oAuth', runtimeStatus: 'connected' },
+      { ...base, name: 'linear', authStatus: 'oAuth', runtimeStatus: 'connected', httpOrigin: 'https://mcp.linear.app', tools: { list_issues: { name: 'list_issues', inputSchema: {} } } },
       { ...base, name: 'github', authStatus: 'notLoggedIn', runtimeStatus: 'authenticationRequired' },
       { ...base, name: 'broken', authStatus: 'unsupported', runtimeStatus: 'failed', toolsError: 'spawn ENOENT' },
     ], nextCursor: null } });
+    return;
+  }
+  if (message.method === 'config/read') {
+    record({ event: message.method, params: message.params });
+    const user = { name: { type: 'user', file: '/home/dev/.codex/config.toml', profile: null }, version: 'v1' };
+    const project = { name: { type: 'project', dotCodexFolder: '/repo/.codex' }, version: 'v2' };
+    send({ id: message.id, result: {
+      config: { mcp_servers: {
+        linear: { url: 'https://mcp.linear.app/mcp' },
+        github: { url: 'https://api.github.test/mcp' },
+        broken: { command: 'broken-server', env: { TOKEN: 'secret' } },
+      } },
+      origins: { 'mcp_servers.linear.url': user, 'mcp_servers.github.url': user, 'mcp_servers.broken.command': project },
+      layers: null,
+    } });
     return;
   }
   if (message.method === 'config/mcpServer/reload') {
@@ -2869,9 +2884,36 @@ describe('CodexProviderAdapter', () => {
         await adapter.startRuntime(input)
 
         expect(await adapter.mcpServers({ sessionId: input.sessionId })).toEqual([
-          { error: null, name: 'linear', status: 'connected' },
-          { error: null, name: 'github', status: 'needs-auth' },
-          { error: 'spawn ENOENT', name: 'broken', status: 'failed' },
+          {
+            auth: 'signed-in',
+            error: null,
+            name: 'linear',
+            origin: 'https://mcp.linear.app',
+            source: 'user',
+            status: 'connected',
+            tools: ['list_issues'],
+            transport: 'http',
+          },
+          {
+            auth: 'signed-out',
+            error: null,
+            name: 'github',
+            origin: null,
+            source: 'user',
+            status: 'needs-auth',
+            tools: [],
+            transport: 'http',
+          },
+          {
+            auth: 'unsupported',
+            error: 'spawn ENOENT',
+            name: 'broken',
+            origin: null,
+            source: 'project',
+            status: 'failed',
+            tools: [],
+            transport: 'stdio',
+          },
         ])
         await adapter.reconnectMcpServer({ name: 'broken', sessionId: input.sessionId })
         expect(

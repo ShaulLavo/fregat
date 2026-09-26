@@ -125,6 +125,11 @@ import {
   defaultProjectMcpApprovalsPath,
   unapprovedProjectMcpServers,
 } from './utils/claude-project-mcp'
+import {
+  ClaudeMcpStatusWatch,
+  claudeMcpServer,
+  gatedProjectMcpServer,
+} from './utils/claude-mcp-status'
 import { asRecord, numberField, stringField } from './utils/records'
 import { noop, runtimeEventId } from './utils/runtime-ids'
 import { sessionInputFromTurn } from './utils/session-input'
@@ -729,6 +734,7 @@ class ClaudeAgentSession extends SessionContext {
   private readonly resumed: boolean
   /** Project servers this session started with turned off, awaiting the owner's approval. */
   private readonly unapprovedProjectMcp: readonly string[]
+  private readonly mcpStatusWatch = new ClaudeMcpStatusWatch()
   private conversationStarted: boolean
 
   private constructor(input: {
@@ -1050,16 +1056,35 @@ class ClaudeAgentSession extends SessionContext {
   async mcpServers(): Promise<ProviderMcpServer[] | null> {
     if (!this.query) return null
 
-    const servers: ProviderMcpServer[] = (await this.query.mcpServerStatus()).map((server) => ({
-      error: server.error ?? null,
-      name: server.name,
-      status: this.awaitsApproval(server.name) ? 'unapproved' : server.status,
-    }))
+    const servers: ProviderMcpServer[] = (await this.query.mcpServerStatus()).map((server) =>
+      claudeMcpServer(server, this.awaitsApproval(server.name)),
+    )
     const listed = new Set(servers.map((server) => server.name))
     const gated = this.unapprovedProjectMcp
       .filter((name) => !listed.has(name))
-      .map((name) => ({ error: null, name, status: 'unapproved' as const }))
+      .map(gatedProjectMcpServer)
     return [...servers, ...gated]
+  }
+
+  /** Claude has no status stream: read it at `init` and each turn end, and warn on a new failure. */
+  private async reportMcpStatus(message: SDKMessage) {
+    try {
+      const servers = await this.mcpServers()
+      if (!servers) return
+
+      for (const server of this.mcpStatusWatch.changed(servers)) {
+        this.emitRuntimeNotification(
+          'mcp.status.updated',
+          { status: { error: server.error, name: server.name, status: server.status } },
+          message,
+        )
+      }
+    } catch (error) {
+      recordChatPipelineWarning('chat.pipeline.claude_session.mcp_status.failed', {
+        error,
+        sessionId: this.sessionId,
+      })
+    }
   }
 
   awaitsApproval(name: string) {
@@ -1730,6 +1755,7 @@ class ClaudeAgentSession extends SessionContext {
     if (!this.activeTurn) this.adoptHarnessTurn(this.nextHarnessOrigin ?? 'provider', message.uuid)
 
     this.emitRuntimeNotification('runtime.configured', { config: asRecord(message) }, message)
+    void this.reportMcpStatus(message)
   }
 
   private confirmSessionId(sessionId: string) {
@@ -1919,6 +1945,7 @@ class ClaudeAgentSession extends SessionContext {
       message,
     )
     void this.emitContextUsage(message)
+    void this.reportMcpStatus(message)
 
     const turn = this.activeTurn
     if (!turn) {

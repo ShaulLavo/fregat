@@ -4,6 +4,11 @@ import path from 'node:path'
 import { defaultAttachmentsDir } from '../../attachments/store'
 import { resolveCodexAttachments } from './utils/codex-attachments'
 import { codexAsyncQuestions } from './utils/codex-async-questions'
+import {
+  codexMcpDefinitions,
+  codexMcpServer,
+  type CodexMcpDefinition,
+} from './utils/codex-mcp-status'
 import { offeredOptions, offeredResponse, type ApprovalOffer } from './utils/approval-offers'
 import { codexCommandApprovalOffers } from './utils/codex-command-approval'
 import { parseCodexElicitation } from './utils/codex-elicitation'
@@ -793,18 +798,11 @@ class CodexAppServerSession extends SessionContext {
   }
 
   async mcpServers(): Promise<ProviderMcpServer[]> {
-    const servers: ProviderMcpServer[] = []
-    let cursor: string | null = null
-    do {
-      const page: CodexClientRequestResultByMethod['mcpServerStatus/list'] =
-        await this.client.request('mcpServerStatus/list', {
-          threadId: this.providerConversationMarker,
-          ...(cursor ? { cursor } : {}),
-        })
-      servers.push(...page.data.map(codexMcpServer))
-      cursor = page.nextCursor ?? null
-    } while (cursor)
-    return servers
+    const [statuses, definitions] = await Promise.all([
+      listCodexMcpStatus(this.client, this.providerConversationMarker),
+      readCodexMcpDefinitions(this.client, this.cwd),
+    ])
+    return statuses.map((server) => codexMcpServer(server, definitions.get(server.name)))
   }
 
   async reloadMcpServers() {
@@ -2784,6 +2782,30 @@ async function readCodexUsage(client: CodexAppServerRpcClient): Promise<Provider
   }
 }
 
+async function listCodexMcpStatus(client: CodexAppServerRpcClient, threadId: string | null) {
+  const servers: CodexMcpServerStatus[] = []
+  let cursor: string | null = null
+  do {
+    const page: CodexClientRequestResultByMethod['mcpServerStatus/list'] = await client.request(
+      'mcpServerStatus/list',
+      { threadId, ...(cursor ? { cursor } : {}) },
+    )
+    servers.push(...page.data)
+    cursor = page.nextCursor ?? null
+  } while (cursor)
+  return servers
+}
+
+/** Sources and transports are extras: an app-server that cannot read its config still lists status. */
+async function readCodexMcpDefinitions(client: CodexAppServerRpcClient, cwd: string) {
+  try {
+    return codexMcpDefinitions(await client.request('config/read', { cwd }))
+  } catch (error) {
+    recordChatPipelineWarning('chat.pipeline.codex_session.mcp_config_read.failed', { error })
+    return new Map<string, CodexMcpDefinition>()
+  }
+}
+
 async function inspectCodexHistory<T>(
   env: NodeJS.ProcessEnv,
   read: (client: CodexAppServerRpcClient) => Promise<T>,
@@ -3007,25 +3029,6 @@ async function openCodexSession(
     REQUEST_TIMEOUT_MS,
     (response) => v.parse(codexSessionResumeSchema, response),
   )
-}
-
-function codexMcpServer(server: CodexMcpServerStatus): ProviderMcpServer {
-  return {
-    error: server.toolsError ?? null,
-    name: server.name,
-    status: codexMcpStatus(server),
-  }
-}
-
-function codexMcpStatus(server: CodexMcpServerStatus): ProviderMcpServer['status'] {
-  const runtime = server.runtimeStatus
-  if (runtime === 'connected') return 'connected'
-  if (runtime === 'disabled') return 'disabled'
-  if (runtime === 'failed' || runtime === 'cancelled') return 'failed'
-  if (runtime === 'authenticationRequired' || server.authStatus === 'notLoggedIn')
-    return 'needs-auth'
-
-  return 'pending'
 }
 
 function codexConfiguredHook(hook: CodexHookMetadata): ProviderConfiguredHook {

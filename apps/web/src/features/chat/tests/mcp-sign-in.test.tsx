@@ -17,13 +17,22 @@ import {
   MetadataProviderAdapter,
   makeSessionDomainFixture,
 } from '../../../../test/factories/session-domain'
+import { mcpServer } from '../../../../test/factories/mcp-server'
 
 class SignInAdapter extends MetadataProviderAdapter {
   readonly response = Promise.withResolvers<ProviderMcpSignIn>()
   signInRequested = false
 
   async mcpServers(): Promise<ProviderMcpServer[]> {
-    return [{ name: 'github', status: 'needs-auth', error: null }]
+    return [
+      mcpServer({
+        auth: 'signed-out',
+        name: 'github',
+        origin: 'https://api.github.test',
+        status: 'needs-auth',
+        transport: 'http',
+      }),
+    ]
   }
 
   async signInMcpServer() {

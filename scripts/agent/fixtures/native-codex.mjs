@@ -242,7 +242,97 @@ function historyPages(message) {
   })
 }
 
+/** Plan 174: what `mcpServerStatus/list` and `config/read` report for the MCP scenarios. */
+const MCP_TOOL = (name) => ({ name, inputSchema: { type: 'object' } })
+const MCP_STATUS = [
+  {
+    name: 'linear',
+    authStatus: 'oAuth',
+    runtimeStatus: 'connected',
+    httpOrigin: 'https://mcp.linear.app',
+    tools: { list_issues: MCP_TOOL('list_issues'), create_issue: MCP_TOOL('create_issue') },
+    resources: [],
+    resourceTemplates: [],
+  },
+  {
+    name: 'sentry',
+    authStatus: 'notLoggedIn',
+    runtimeStatus: 'authenticationRequired',
+    httpOrigin: 'https://mcp.sentry.dev',
+    tools: {},
+    resources: [],
+    resourceTemplates: [],
+  },
+  {
+    name: 'broken',
+    authStatus: 'unsupported',
+    runtimeStatus: 'failed',
+    toolsError: 'spawn platform-fixture-missing-mcp-binary ENOENT',
+    tools: {},
+    resources: [],
+    resourceTemplates: [],
+  },
+]
+function mcpConfig() {
+  const user = {
+    name: { type: 'user', file: join(root, 'config.toml'), profile: null },
+    version: 'v1',
+  }
+  const project = {
+    name: { type: 'project', dotCodexFolder: join(process.cwd(), '.codex') },
+    version: 'v1',
+  }
+  return {
+    config: {
+      mcp_servers: {
+        linear: { url: 'https://mcp.linear.app/mcp' },
+        sentry: { url: 'https://mcp.sentry.dev/mcp' },
+        broken: { command: 'platform-fixture-missing-mcp-binary' },
+      },
+    },
+    origins: {
+      'mcp_servers.linear.url': user,
+      'mcp_servers.sentry.url': user,
+      'mcp_servers.broken.command': project,
+    },
+    layers: null,
+  }
+}
+function handleMcpStatus(message) {
+  if (message.method === 'mcpServerStatus/list') {
+    record({ event: message.method, threadId: message.params?.threadId ?? null })
+    send({ id: message.id, result: { data: MCP_STATUS, nextCursor: null } })
+    return true
+  }
+  if (message.method === 'config/read') {
+    send({ id: message.id, result: mcpConfig() })
+    return true
+  }
+  if (message.method === 'hooks/list') {
+    send({
+      id: message.id,
+      result: { data: [{ cwd: message.params.cwds[0], errors: [], warnings: [], hooks: [] }] },
+    })
+    return true
+  }
+  if (message.method !== 'turn/start') return false
+
+  const turn = startOwnTurn(message)
+  send({
+    method: 'mcpServer/startupStatus/updated',
+    params: {
+      name: 'broken',
+      status: 'failed',
+      error: 'spawn platform-fixture-missing-mcp-binary ENOENT',
+    },
+  })
+  agentMessage(turn, `${turn}-answer`, 'MCP_STATUS_READY')
+  endTurn(turn, 'completed')
+  return true
+}
+
 function handle(message) {
+  if (scenario === 'mcp-status' && handleMcpStatus(message)) return
   if (scenario === 'chat-history-pages' && message.method === 'turn/start')
     return historyPages(message)
   if (scenario === 'chat-stream' && message.method === 'turn/start') return streamWorkLog(message)

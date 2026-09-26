@@ -141,6 +141,14 @@ Each phase ships and deploys on its own; phases 1, 3, 5 and 6 change the server
    `packages/contracts/src/provider.ts`, `provider/adapters/claude.ts`, `codex.ts`,
    `features/chat/components/mcp-server-row.tsx`, `utils/mcp-status.ts`; scenario
    `claude-session-tools` asserts the failure row.
+   Landed 2026-09-26 (wave 2 lane M). Codex's source and transport come from `config/read`
+   (`origins` names the layer per key; `config/read` and `config/batchWrite` joined the generated
+   protocol), and a failed read leaves them empty rather than failing the list. The popover prints
+   the facts under each name (`User · https://mcp.linear.app · 2 tools`). Claude reads
+   `mcpServerStatus()` after `init` and at each result and reports a server once when it moves into
+   `failed` or `needs-auth`; the chat row reads "… needs sign-in" for the latter.
+   Not run: `claude-session-tools` (a real Claude turn, a wave 2 hard stop). Covered by adapter
+   tests with the fake CLI and the fixture-Codex scenario `mcp-status`.
 2. **Trust gate for Claude project servers (M, blocked on Q2).** At Claude CLI start, read the
    checkout's `.mcp.json` names and Claude's approval (`enableAllProjectMcpServers`,
    `enabledMcpjsonServers` in the user, project and local settings files). Unapproved names go

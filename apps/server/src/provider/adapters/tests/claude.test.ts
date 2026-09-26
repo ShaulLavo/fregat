@@ -1077,9 +1077,14 @@ describe('ClaudeProviderAdapter', () => {
       await harness.adapter.startRuntime(input)
       expect(latestOptions(harness).settings).toMatchObject({ disabledMcpjsonServers: ['deploy'] })
       expect(await harness.adapter.mcpServers({ sessionId: input.sessionId })).toContainEqual({
+        auth: 'unknown',
         error: null,
         name: 'deploy',
+        origin: null,
+        source: 'project',
         status: 'unapproved',
+        tools: [],
+        transport: null,
       })
 
       await harness.adapter.approveMcpServer({ name: 'deploy', sessionId: input.sessionId })
@@ -1182,11 +1187,50 @@ describe('ClaudeProviderAdapter', () => {
     await harness.adapter.startRuntime(sessionStartInput({}))
 
     expect(await harness.adapter.mcpServers({ sessionId })).toEqual([
-      { error: null, name: 'linear', status: 'connected' },
-      { error: 'spawn ENOENT', name: 'broken', status: 'failed' },
+      {
+        auth: 'unknown',
+        error: null,
+        name: 'linear',
+        origin: 'https://mcp.linear.app',
+        source: 'user',
+        status: 'connected',
+        tools: ['list_issues'],
+        transport: 'http',
+      },
+      {
+        auth: 'unsupported',
+        error: 'spawn ENOENT',
+        name: 'broken',
+        origin: null,
+        source: 'project',
+        status: 'failed',
+        tools: [],
+        transport: 'stdio',
+      },
     ])
     await harness.adapter.reconnectMcpServer({ name: 'broken', sessionId })
     expect(latestQuery(harness).reconnected).toEqual(['broken'])
+    await harness.adapter.stopAll()
+  })
+
+  it('reports a Claude MCP server once when it fails or needs sign-in, like Codex startup status', async () => {
+    const harness = claudeHarness()
+    await runOwnTurn(harness, providerTurnInput(), 'First.')
+    await waitFor(() => mcpAlerts(harness).length === 1, 'the failed server was not reported')
+    expect(mcpAlerts(harness)[0]?.payload.status).toEqual({
+      error: 'spawn ENOENT',
+      name: 'broken',
+      status: 'failed',
+    })
+
+    const query = latestQuery(harness)
+    query.mcpStatus = [...query.mcpStatus, { name: 'github', status: 'needs-auth' }]
+    await runOwnTurn(harness, providerTurnInput({ turnId: 'turn-2' }), 'Second.')
+    await waitFor(() => mcpAlerts(harness).length === 2, 'the signed-out server was not reported')
+    expect(mcpAlerts(harness).map((event) => event.payload.status)).toEqual([
+      { error: 'spawn ENOENT', name: 'broken', status: 'failed' },
+      { error: null, name: 'github', status: 'needs-auth' },
+    ])
     await harness.adapter.stopAll()
   })
 
@@ -2120,6 +2164,13 @@ async function runOwnTurn(harness: ClaudeHarness, input: ProviderTurnInput, repl
   query.emit(successResult())
   query.emit(commandLifecycle(uuid, 'completed'))
   await pending
+}
+
+function mcpAlerts(harness: ClaudeHarness) {
+  return harness.events.filter(
+    (event): event is Extract<ProviderRuntimeEvent, { type: 'mcp.status.updated' }> =>
+      event.type === 'mcp.status.updated',
+  )
 }
 
 function turnsStarted(harness: ClaudeHarness) {

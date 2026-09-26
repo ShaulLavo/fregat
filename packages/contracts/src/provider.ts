@@ -306,10 +306,29 @@ export const providerMcpServerStatusSchema = v.picklist([
   'unapproved',
 ])
 
+export const providerMcpTransportSchema = v.picklist(['stdio', 'http', 'sse', 'sdk'])
+
+export const providerMcpAuthSchema = v.picklist([
+  'unsupported',
+  'signed-in',
+  'signed-out',
+  'unknown',
+])
+
+/**
+ * One MCP server as the harness reports it. No configuration values: commands, headers and
+ * environment can hold secrets, so only the HTTP origin leaves the server.
+ */
 export const providerMcpServerSchema = v.object({
   name: trimmedNonEmptyStringSchema,
   status: providerMcpServerStatusSchema,
   error: v.nullable(v.string()),
+  /** Where the definition lives: `user`, `project`, `local`, `plugin`, `claudeai`, … (open set). */
+  source: v.nullable(v.string()),
+  transport: v.nullable(providerMcpTransportSchema),
+  origin: v.nullable(v.string()),
+  tools: v.array(v.string()),
+  auth: providerMcpAuthSchema,
 })
 
 /**
@@ -349,6 +368,8 @@ export const providerSessionHooksSchema = v.object({
 
 export type ProviderMcpServer = v.InferOutput<typeof providerMcpServerSchema>
 export type ProviderMcpServerStatus = v.InferOutput<typeof providerMcpServerStatusSchema>
+export type ProviderMcpTransport = v.InferOutput<typeof providerMcpTransportSchema>
+export type ProviderMcpAuth = v.InferOutput<typeof providerMcpAuthSchema>
 export type ProviderSessionMcp = v.InferOutput<typeof providerSessionMcpSchema>
 export type ProviderMcpSignIn = v.InferOutput<typeof providerMcpSignInSchema>
 export type ProviderConfiguredHook = v.InferOutput<typeof providerConfiguredHookSchema>
