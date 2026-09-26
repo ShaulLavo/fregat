@@ -90,10 +90,9 @@ function browserRequestOrigin(request: Request): string | null {
   const origin = request.headers.get('origin')
   if (origin !== null) return origin
 
-  // Browsers omit Origin on GET navigations, including a download link from the dev page on
-  // another port (same-site). The referrer must still resolve to an exact allowlisted origin.
-  const site = request.headers.get('sec-fetch-site')
-  if (site !== 'same-origin' && site !== 'same-site') return null
+  // Browsers omit Origin on same-origin GETs. The referrer must still
+  // resolve to an exact allowlisted origin, including behind a mesh proxy.
+  if (request.headers.get('sec-fetch-site') !== 'same-origin') return null
 
   const referer = request.headers.get('referer')
   return referer ? (URL.parse(referer)?.origin ?? null) : null
