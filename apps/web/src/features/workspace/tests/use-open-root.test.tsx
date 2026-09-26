@@ -10,12 +10,7 @@ import {
   useOpenWorkspaceRoot,
   type OpenWorkspaceRootResult,
 } from '@/features/workspace/hooks/use-open-root'
-import {
-  createFileContent,
-  ensureFolderPath,
-  fetchRecentEntries,
-  fetchServerInfo,
-} from '@/lib/file-server'
+import { createFileContent, ensureFolderPath, fetchRecentEntries } from '@/lib/file-server'
 import { expect, test } from '../../../../test/fixtures'
 import { renderApplication } from '../../../../test/render'
 import { createAddressTestRuntime } from '../../../../test/factories/address-runtime'
@@ -62,7 +57,7 @@ test('opening a folder through an alias keeps its canonical root and workspace I
   expect(store.getState().rootFolder?.workspaceAddress).toEqual(address)
 })
 
-test('makes the latest rapid valid open the editor and index root', async ({ client, server }) => {
+test('makes the latest rapid valid open the editor root', async ({ client }) => {
   void client
   await ensureFolderPath(filesystemPath('a'), getClient())
   await ensureFolderPath(filesystemPath('b'), getClient())
@@ -74,17 +69,10 @@ test('makes the latest rapid valid open the editor and index root', async ({ cli
 
   await waitFor(() => expect(store.getState().rootFolder?.path).toBe('b'))
   await waitFor(() => expect(results).toContainEqual({ path: 'b', result: 'opened' }))
-  await waitFor(async () => {
-    const info = await fetchServerInfo(new AbortController().signal, getClient())
-    expect(info.workspaceIndex?.scanRoot).toBe(path.join(server.root, 'b'))
-  })
   expect(results).toContainEqual({ path: 'a', result: 'superseded' })
 })
 
-test('does not retarget the index when a newer folder open is rejected', async ({
-  client,
-  server,
-}) => {
+test('keeps the editor root when a newer folder open is rejected', async ({ client }) => {
   void client
   await ensureFolderPath(filesystemPath('valid'), getClient())
   await createFileContent(filesystemPath('not-a-folder.txt'), 'file\n', getClient())
@@ -92,17 +80,13 @@ test('does not retarget the index when a newer folder open is rejected', async (
 
   await userEvent.click(screen.getByRole('button', { name: 'Open valid' }))
   await waitFor(() => expect(store.getState().rootFolder?.path).toBe('valid'))
-  const baseline = await fetchServerInfo(new AbortController().signal, getClient())
 
   await userEvent.click(screen.getByRole('button', { name: 'Open not-a-folder.txt' }))
   await waitFor(() =>
     expect(results).toContainEqual({ path: 'not-a-folder.txt', result: 'failed' }),
   )
-  const afterRejectedOpen = await fetchServerInfo(new AbortController().signal, getClient())
 
   expect(store.getState().rootFolder?.path).toBe('valid')
-  expect(afterRejectedOpen.workspaceIndex?.scanRoot).toBe(baseline.workspaceIndex?.scanRoot)
-  expect(afterRejectedOpen.workspaceIndex?.scanRoot).toBe(path.join(server.root, 'valid'))
 })
 
 test('does not start a root open when the workspace mutation gate refuses it', async ({

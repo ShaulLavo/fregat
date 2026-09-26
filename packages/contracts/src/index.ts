@@ -13,7 +13,12 @@ export {
   type FileTreeResult,
   type TreeEntry,
 } from './tree-entry'
-export type { ServerInfo, WorkspaceIndexReadiness, WorkspaceIndexStatus } from './fs-info'
+export type {
+  ServerInfo,
+  WorkspaceIndexReadiness,
+  WorkspaceIndexScopeStatus,
+  WorkspaceIndexStatus,
+} from './fs-info'
 export { decodedAsText } from './file-result'
 export type { FileResult, TextDecodeMetadata, TextEncodingLabel } from './file-result'
 export {

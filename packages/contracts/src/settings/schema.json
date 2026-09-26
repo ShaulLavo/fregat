@@ -474,6 +474,20 @@
       "enum": ["auto", "columns", "icons", "list"],
       "type": "string"
     },
+    "files.searchIndexIdleMinutes": {
+      "default": 15,
+      "description": "Minutes a folder keeps its file index after the last window showing it closes, so reopening it searches at full speed at once.",
+      "maximum": 1440,
+      "minimum": 0,
+      "type": "integer"
+    },
+    "files.searchIndexLimit": {
+      "default": 4,
+      "description": "How many open folders keep a file index for fast search at once. Opening one more drops the least recently used index; search there reads the disk until the folder is opened again.",
+      "maximum": 64,
+      "minimum": 1,
+      "type": "integer"
+    },
     "files.showHidden": {
       "default": false,
       "description": "Show dot-prefixed files and folders in file pickers.",
