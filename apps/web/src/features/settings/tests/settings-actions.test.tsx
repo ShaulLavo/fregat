@@ -10,6 +10,7 @@ import { expect, test } from '../../../../test/fixtures'
 import { AppProviders, createTestQueryClient } from '../../../../test/render'
 import { Toaster } from '@workspace/ui/components/sonner'
 import { useSettingsActions } from '@/features/settings/hooks/use-settings-actions'
+import { useSettingsSaving } from '@/features/settings/hooks/use-settings-saving'
 import { useSettingsIntentStore } from '@/features/settings/state/intent-store'
 import {
   discardFailedSettingsIntent,
@@ -35,8 +36,12 @@ test('publishes semantic intent before three scoped transports can settle', asyn
   const queryClient = createTestQueryClient()
   const confirmed = await fetchSettings(undefined, getClient())
   queryClient.setQueryData(settingsKeys.document(), confirmed)
-  const first = renderHook(() => useSettingsActions(), { wrapper: wrapper(queryClient) })
-  const second = renderHook(() => useSettingsActions(), { wrapper: wrapper(queryClient) })
+  const first = renderHook(() => ({ ...useSettingsActions(), isSaving: useSettingsSaving() }), {
+    wrapper: wrapper(queryClient),
+  })
+  const second = renderHook(() => ({ ...useSettingsActions(), isSaving: useSettingsSaving() }), {
+    wrapper: wrapper(queryClient),
+  })
   let submissions: SettingsSubmission[] = []
   const firstTransport = controlledClient.controller.deferNextSettingsWrite()
 
@@ -120,7 +125,9 @@ test('automatic transport retries retain one projected intent and one mutation i
   const confirmed = await fetchSettings(undefined, getClient())
   queryClient.setQueryData(settingsKeys.document(), confirmed)
   controller.rejectNextSettingsWrite(temporaryWriteFailure('first'))
-  const actions = renderHook(() => useSettingsActions(), { wrapper: wrapper(queryClient) })
+  const actions = renderHook(() => ({ ...useSettingsActions(), isSaving: useSettingsSaving() }), {
+    wrapper: wrapper(queryClient),
+  })
   const captured: { current?: SettingsSubmission } = {}
 
   act(() => {
@@ -133,11 +140,11 @@ test('automatic transport retries retain one projected intent and one mutation i
   await controller.waitForSettingsWriteRequest(1)
   controller.rejectNextSettingsWrite(temporaryWriteFailure('second'))
   expect(projectedValue(confirmed, 'workbench.colorTheme')).toBe('dark')
-  expect(actions.result.current.isSaving).toBe(true)
+  await waitFor(() => expect(actions.result.current.isSaving).toBe(true))
 
   await controller.waitForSettingsWriteRequest(2)
   expect(projectedValue(confirmed, 'workbench.colorTheme')).toBe('dark')
-  expect(actions.result.current.isSaving).toBe(true)
+  await waitFor(() => expect(actions.result.current.isSaving).toBe(true))
 
   await controller.waitForSettingsWriteRequest(3)
   await expect(submission.settled).resolves.toBe('acknowledged')
@@ -165,7 +172,7 @@ test('exhausted retries remove only their intent and Retry reuses its mutation i
   const confirmed = await fetchSettings(undefined, getClient())
   queryClient.setQueryData(settingsKeys.document(), confirmed)
   controller.rejectNextSettingsWrite(temporaryWriteFailure('first'))
-  const actions = renderHook(() => useSettingsActions(), {
+  const actions = renderHook(() => ({ ...useSettingsActions(), isSaving: useSettingsSaving() }), {
     wrapper: wrapper(queryClient, true),
   })
   const captured: { current?: SettingsSubmission } = {}
@@ -233,7 +240,7 @@ test('WRITE_CONTENDED does not retry and leaves unrelated projection active', as
     message: 'Injected coordinator contention',
     status: 503,
   })
-  const actions = renderHook(() => useSettingsActions(), {
+  const actions = renderHook(() => ({ ...useSettingsActions(), isSaving: useSettingsSaving() }), {
     wrapper: wrapper(queryClient, true),
   })
   const captured: { current?: SettingsSubmission } = {}
@@ -280,7 +287,7 @@ test('an admitted SSE acknowledgement survives a later HTTP failure without Retr
   const confirmed = await fetchSettings(undefined, getClient())
   queryClient.setQueryData(settingsKeys.document(), confirmed)
   const deferred = controller.deferNextSettingsWrite()
-  const actions = renderHook(() => useSettingsActions(), {
+  const actions = renderHook(() => ({ ...useSettingsActions(), isSaving: useSettingsSaving() }), {
     wrapper: wrapper(queryClient, true),
   })
   const captured: { current?: SettingsSubmission } = {}
@@ -358,7 +365,9 @@ test('derives targets from the projected layers without crossing application sco
   const queryClient = createTestQueryClient()
   queryClient.setQueryData(settingsKeys.document(), confirmed)
   resetSettingsIntentStore()
-  const actions = renderHook(() => useSettingsActions(), { wrapper: wrapper(queryClient) })
+  const actions = renderHook(() => ({ ...useSettingsActions(), isSaving: useSettingsSaving() }), {
+    wrapper: wrapper(queryClient),
+  })
   let submissions: SettingsSubmission[] = []
 
   act(() => {
@@ -393,7 +402,9 @@ test('a deterministic rejection exposes same-id Retry and explicit Discard', asy
   resetSettingsIntentStore()
   const queryClient = createTestQueryClient()
   queryClient.setQueryData(settingsKeys.document(), await fetchSettings(undefined, getClient()))
-  const actions = renderHook(() => useSettingsActions(), { wrapper: wrapper(queryClient) })
+  const actions = renderHook(() => ({ ...useSettingsActions(), isSaving: useSettingsSaving() }), {
+    wrapper: wrapper(queryClient),
+  })
   const captured: { current?: SettingsSubmission } = {}
 
   act(() => {

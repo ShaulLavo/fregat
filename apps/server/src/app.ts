@@ -1,3 +1,5 @@
+import { McpGrantRegistry } from './mcp/grants'
+import { mcpRoutes } from './mcp/routes'
 import { AgentDiagnosticsReader } from './lsp/agent-diagnostics'
 import { AgentReviewService } from './review/agent-review'
 import { agentReviewRoutes } from './review/routes'
@@ -126,6 +128,8 @@ export type AppOptions = FileSystemServiceOptions & {
     root?: string
     /** Populate the wallpaper picker from packaged artwork during startup. */
     seedWallpapers?: boolean
+    /** After seeding, add this machine's installed Omarchy backgrounds. */
+    importOmarchyWallpapers?: boolean
   }
   orchestration?: {
     attachmentsDir?: string
@@ -154,6 +158,8 @@ export type AppOptions = FileSystemServiceOptions & {
   settings?: Omit<SettingsStoreOptions, 'workspaceRoot'>
   /** The origin forwarded to remote machines as this app's web origin. */
   webOrigin?: string
+  /** Serves Platform's MCP tools to provider agents at this loopback URL; absent serves none. */
+  mcp?: { readonly endpoint: string }
   web?: WebOptions
   /** Staged releases and Restart. Absent leaves both inert, as in dev and tests. */
   update?: UpdateOptions
@@ -273,6 +279,14 @@ export function createApp(options: AppOptions) {
           durationMs: Math.round(performance.now() - started),
           ...result,
         })
+        if (!options.themes?.importOmarchyWallpapers) return
+        const importStarted = performance.now()
+        const omarchy = await wallpapers.importInstalledOmarchy()
+        recordProcessInfo('wallpapers.omarchy-import', {
+          durationMs: Math.round(performance.now() - importStarted),
+          installed: omarchy !== null,
+          ...omarchy,
+        })
       },
       { area: 'wallpaper', operation: 'library.seed' },
     )
@@ -317,8 +331,10 @@ export function createApp(options: AppOptions) {
   settings.onChange(() => {
     runDetached(reconcileProviderSettings, { area: 'provider', operation: 'reconcile' })
   })
+  const mcpGrants = new McpGrantRegistry()
   const providerService = new ProviderService({
     adapterRegistry: providerAdapterRegistry,
+    ...(options.mcp ? { mcp: { endpoint: options.mcp.endpoint, grants: mcpGrants } } : {}),
     sessionDirectory: new ProviderSessionDirectory(database),
   })
   const providerUsage = new ProviderUsageStore(providerAdapterRegistry)
@@ -494,6 +510,16 @@ export function createApp(options: AppOptions) {
     // mounted after one parent `onBeforeHandle` inherits the parent's later
     // hooks too, which would put the auth guard in front of index.html.
     .use(webRoutes(options.web ?? {}, update, terminal))
+    // Before the browser guard, which refuses the Origin-less requests agents send.
+    .use(
+      options.mcp
+        ? mcpRoutes({
+            allowedOrigins: auth.allowedOrigins,
+            endpoint: options.mcp.endpoint,
+            grants: mcpGrants,
+          })
+        : new Elysia({ name: 'mcp-routes' }),
+    )
     .onBeforeHandle(({ request }) => {
       recordClientInstance(request)
     })
