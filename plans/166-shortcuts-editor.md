@@ -296,3 +296,5 @@ today shows sidebar settings only; the Toggle sidebar shortcut appears only when
 
 **Recommendation: (b).** One search box finds both a setting and its shortcut, which is the point
 of D1 keeping the editor inside Settings; `matchingKeybindingRows` already does the matching.
+
+Decided 2026-09-26: owner — (b).
