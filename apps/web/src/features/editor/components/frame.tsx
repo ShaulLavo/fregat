@@ -1,6 +1,9 @@
 import { EditorHost } from '@singapore-editor/react'
 import {
   memo,
+  useEffect,
+  useEffectEvent,
+  useState,
   type ComponentProps,
   type KeyboardEvent,
   type MouseEvent,
@@ -17,15 +20,40 @@ type EditorFrameProps = {
   targetRef?: Ref<HTMLDivElement>
   children?: ReactNode
   onRequestCloseOverlay?: (restoreOrigin: boolean) => void
+  /** Changes each time a command asks for the text menu at the caret. */
+  textMenuRequest?: number | null
 }
 
 export const EditorFrame = memo(
-  ({ active, controller, targetRef, children, onRequestCloseOverlay }: EditorFrameProps) => {
+  ({
+    active,
+    controller,
+    targetRef,
+    children,
+    onRequestCloseOverlay,
+    textMenuRequest = null,
+  }: EditorFrameProps) => {
     const contextMenu = useContextMenu()
+    const [menuOffset, setMenuOffset] = useState<number | null>(null)
+
+    // The input element rides on the caret's row, so it anchors the menu where the caret is.
+    const openAtCaret = useEffectEvent(() => {
+      const editor = controller.getEditor()
+      if (!editor) return
+      setMenuOffset(caretOffset(controller))
+      contextMenu.openAtElement(editor.getInputElement())
+    })
+
+    useEffect(() => {
+      if (textMenuRequest !== null) openAtCaret()
+    }, [textMenuRequest])
 
     // `contextmenu` bubbles out of the editor's own DOM, so the frame is the
     // one element we own that sees every right-click inside the editor.
     function handleContextMenu(event: MouseEvent<HTMLDivElement>) {
+      setMenuOffset(
+        controller.getEditor()?.textOffsetFromPoint(event.clientX, event.clientY) ?? null,
+      )
       contextMenu.openAtEvent(event, event.currentTarget)
     }
 
@@ -37,7 +65,7 @@ export const EditorFrame = memo(
         return
       }
 
-      contextMenu.openOnMenuKey(event)
+      if (contextMenu.openOnMenuKey(event)) setMenuOffset(caretOffset(controller))
     }
 
     // On the host's own wrapper, so a press in an overlay rendered as `children` never closes it.
@@ -58,9 +86,18 @@ export const EditorFrame = memo(
         </div>
         {children}
         {contextMenu.anchor ? (
-          <EditorTextMenu anchor={contextMenu.anchor} onOpenChange={contextMenu.onOpenChange} />
+          <EditorTextMenu
+            anchor={contextMenu.anchor}
+            editor={controller.getEditor()}
+            offset={menuOffset}
+            onOpenChange={contextMenu.onOpenChange}
+          />
         ) : null}
       </div>
     )
   },
 )
+
+function caretOffset(controller: EditorFrameProps['controller']): number | null {
+  return controller.getEditor()?.getSelections()[0]?.headOffset ?? null
+}

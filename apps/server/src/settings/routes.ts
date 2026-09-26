@@ -135,6 +135,7 @@ function operationSettingIds(value: unknown): SettingId[] {
   if (value.kind === 'model.setFavorite') return ['models.favorites']
   if (value.kind === 'model.setOrder') return ['models.order']
   if (value.kind === 'provider.setEnabled') return ['providers.instances']
+  if (value.kind === 'spellcheck.setWord') return ['spellcheck.words']
 
   return []
 }

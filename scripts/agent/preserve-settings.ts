@@ -30,6 +30,17 @@ export async function writeUserOperations(page: Page, operations: readonly Setti
   )
 }
 
+/** The value the user layer itself holds for `key`, as the settings API reports it. */
+export async function readUserSetting(page: Page, key: string): Promise<unknown> {
+  const { base, headers } = settingsApi(page)
+  const snapshot: unknown = await (await page.request.get(`${base}settings`, { headers })).json()
+  ok(snapshot && typeof snapshot === 'object' && 'layers' in snapshot)
+  ok(Array.isArray(snapshot.layers))
+  const user: unknown = snapshot.layers.find((layer) => layer.id === 'user')
+  ok(user && typeof user === 'object' && 'raw' in user && user.raw && typeof user.raw === 'object')
+  return (user.raw as Record<string, unknown>)[key]
+}
+
 export async function writeUserSetting(page: Page, key: string, value: unknown) {
   await writeUserOperations(page, [{ kind: 'set', key, value }])
 }

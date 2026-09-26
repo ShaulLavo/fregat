@@ -1,3 +1,4 @@
+import { SpellcheckService } from '@singapore-editor/spellcheck'
 import { LanguageServerDocuments } from '@/features/editor/state/language-server-documents'
 import { openLanguageServerBuffers } from '@/features/editor/utils/open-language-server-buffers'
 import { activeEditorTabForWorkbenchPanels } from '@/features/workbench/utils/panels'
@@ -103,6 +104,8 @@ export function createEditorRuntime({
   )
   const documentSyncController = new LanguageServerDocumentSyncController()
   const languageServerDocuments = new LanguageServerDocuments()
+  // One dictionary worker for every editor on the page; it starts on the first word checked.
+  const spellcheck = new SpellcheckService()
   const retainLanguageServers = () =>
     languageServerDocuments.retain(
       openLanguageServerBuffers(workspaceStore.getState(), documentStore.getState()),
@@ -232,6 +235,7 @@ export function createEditorRuntime({
     editorOpenBenchmarkControl,
     documentSyncController,
     languageServerDocuments,
+    spellcheck,
     workspaceEditService,
     workspaceEditHost,
     saveService,
@@ -248,6 +252,7 @@ export function createEditorRuntime({
       disposed = true
       for (const unsubscribe of subscriptions) unsubscribe()
       languageServerDocuments.dispose()
+      spellcheck.dispose()
       historyPersistence.dispose()
       fileOpenIntentOwner.disposeNow()
       workspaceEditService.dispose()

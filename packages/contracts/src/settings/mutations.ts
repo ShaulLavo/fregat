@@ -49,6 +49,7 @@ const NON_SCALAR_SETTING_IDS = [
   'git.projectWorktreeSubmodules',
   'git.projectWorktreeCleanupOnDelete',
   'workbench.theme.customizations',
+  'spellcheck.words',
 ] as const satisfies readonly SettingId[]
 
 type NonScalarSettingId = (typeof NON_SCALAR_SETTING_IDS)[number]
@@ -108,6 +109,12 @@ export type SetModelFavoriteOperation = {
   readonly favorite: boolean
 }
 
+type SetSpellingWordOperation = {
+  readonly kind: 'spellcheck.setWord'
+  readonly word: string
+  readonly accepted: boolean
+}
+
 export type SetModelOrderOperation = {
   readonly kind: 'model.setOrder'
   readonly order: readonly ModelRef[]
@@ -146,6 +153,7 @@ export type SettingsOperation =
   | SetModelFavoriteOperation
   | SetModelOrderOperation
   | SetProviderEnabledOperation
+  | SetSpellingWordOperation
 
 export type SettingsMutationRequest = {
   readonly mutationId: string
@@ -259,6 +267,11 @@ export const settingsOperationSchemasByKind = {
   'model.setOrder': v.strictObject({
     kind: v.literal('model.setOrder'),
     order: modelRefListSchema,
+  }),
+  'spellcheck.setWord': v.strictObject({
+    kind: v.literal('spellcheck.setWord'),
+    word: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(100)),
+    accepted: v.boolean(),
   }),
   'provider.setEnabled': v.strictObject({
     kind: v.literal('provider.setEnabled'),
@@ -378,6 +391,9 @@ export function settingsOperationResourceKeys(
     return [memberResourceKey('models.favorites', modelResourceId(operation.ref))]
   }
   if (operation.kind === 'model.setOrder') return [settingResourceKey('models.order')]
+  if (operation.kind === 'spellcheck.setWord') {
+    return [memberResourceKey('spellcheck.words', operation.word)]
+  }
 
   return [memberResourceKey('providers.instances', operation.providerInstanceId)]
 }
@@ -416,6 +432,7 @@ function applySettingsOperation(
   if (operation.kind === 'model.setOrder') {
     return replaceSetting(raw, 'models.order', operation.order)
   }
+  if (operation.kind === 'spellcheck.setWord') return setSpellingWord(raw, operation)
 
   return setProviderEnabled(raw, operation)
 }
@@ -514,6 +531,18 @@ function setModelMembership(
   return replaceSetting(raw, key, next)
 }
 
+/** Writes one word into this layer's own record, leaving the words other layers hold alone. */
+function setSpellingWord(
+  raw: Readonly<Record<string, unknown>>,
+  operation: SetSpellingWordOperation,
+): Readonly<Record<string, unknown>> {
+  const current = raw['spellcheck.words']
+  const words = isRecord(current) ? current : {}
+  if (words[operation.word] === operation.accepted) return raw
+
+  return replaceSetting(raw, 'spellcheck.words', { ...words, [operation.word]: operation.accepted })
+}
+
 function setProviderEnabled(
   raw: Readonly<Record<string, unknown>>,
   operation: SetProviderEnabledOperation,
@@ -608,6 +637,7 @@ function touchedSettingIds(operation: SettingsOperation): readonly SettingId[] {
   if (operation.kind === 'model.setHidden') return ['models.hidden']
   if (operation.kind === 'model.setFavorite') return ['models.favorites']
   if (operation.kind === 'model.setOrder') return ['models.order']
+  if (operation.kind === 'spellcheck.setWord') return ['spellcheck.words']
 
   return ['providers.instances']
 }

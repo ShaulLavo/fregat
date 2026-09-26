@@ -364,6 +364,22 @@ describe('settings operation reducer', () => {
     expect(unstarred.raw['models.favorites']).toEqual([MODEL_B])
   })
 
+  it('writes one spellcheck word into the layer, keeping the words it already holds', () => {
+    const added = applyIdempotently(
+      { 'spellcheck.words': { fregat: true } },
+      { kind: 'spellcheck.setWord', word: 'worktree', accepted: true },
+    )
+    expect(added.raw['spellcheck.words']).toEqual({ fregat: true, worktree: true })
+    expect(added.touchedSettingIds).toEqual(['spellcheck.words'])
+
+    const unaccepted = applyIdempotently(added.raw, {
+      kind: 'spellcheck.setWord',
+      word: 'fregat',
+      accepted: false,
+    })
+    expect(unaccepted.raw['spellcheck.words']).toEqual({ fregat: false, worktree: true })
+  })
+
   it('replaces model order atomically and resets an empty order', () => {
     const ordered = applyIdempotently(
       { 'models.order': [MODEL_B], untouched: true },

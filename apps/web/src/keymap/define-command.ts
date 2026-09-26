@@ -14,6 +14,7 @@ import type { QueryClient } from '@tanstack/react-query'
 
 import type { EditorCommands } from '@/features/editor/state/commands'
 import type { EditorWorkspaceStoreApi } from '@/features/editor/state/workspace-state'
+import type { EditorUiStoreApi } from '@/features/editor/state/ui-state'
 import type { Theme } from '@/features/settings/providers/theme-context'
 import type { SettingsSubmission } from '@workspace/client-core/settings/intent-store'
 import type { ChatModePanels } from '@/features/chat-mode/utils/panels'
@@ -62,6 +63,7 @@ export type WorkspaceCommandRuntime = {
     readonly store: EditorDocumentStoreApi
   }
   readonly editor: EditorCommands
+  readonly editorUi: EditorUiStoreApi
   readonly files: {
     readonly openFileAtRef: (path: FilesystemPath, ref: string) => Promise<boolean>
   }
