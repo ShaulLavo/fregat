@@ -30,7 +30,7 @@ const AFTER = [...HEAD, 'export const value = target() + 2', ...FILLER]
 export const editorPressParticipants: Scenario = {
   name: 'editor-press-participants',
   description:
-    'Presses a plugin claims never reach caret placement (E050 row 5): a double-click on a diff separator leaves the diff unfocused, and Ctrl+click follows a definition in the diff and in the editor.',
+    'Presses a plugin claims never reach caret placement (E050 row 5): a double-click on a diff separator leaves the diff unfocused, arrow keys do not rest the caret on one, and Ctrl+click follows a definition in the diff and in the editor.',
   async run(page, { step }) {
     const fixture = await createModifiedFileFixture('press-participants', 'a.ts', BEFORE, AFTER)
     try {
@@ -55,6 +55,17 @@ export const editorPressParticipants: Scenario = {
       await selectors.diffExpandRows(page).first().dblclick()
       await step('separator-double-click')
       await assertSeparatorUntouched(page)
+
+      // filler2 (line 7) sits right above a trailing separator: no code row lies beyond it. Down
+      // from filler1 reaches filler2, and the next Down and Right must leave the caret there.
+      const start = await textPoint(page, 'filler1 = 1', 'filler1', diffPaneSelector)
+      await page.mouse.click(start.x, start.y)
+      await page.keyboard.press('ArrowDown')
+      await page.keyboard.press('End')
+      await page.keyboard.press('ArrowDown')
+      await page.keyboard.press('ArrowRight')
+      await step('arrows-at-separator')
+      await waitForCaretLine(page, 'export const filler2 = 2')
 
       await ctrlClick(page, 'target() + 2', 'target', diffPaneSelector)
       await step('diff-definition')

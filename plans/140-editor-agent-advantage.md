@@ -126,14 +126,16 @@ agent is `application` or `machine`, never `window`.
    `chat.activeFileContext` shows the active file as a removable chip and sends it as a mention.
    Scenario `editor-add-to-chat`.
 3. Fix with AI, per `docs/diagnostic-ai-fix-plan.md`.
-   **Partly done 2026-09-25 (lane L8):** the shared handoff (`lib/diagnostic-ai`: request model,
+   **Done 2026-09-25 (lane L8):** the shared handoff (`lib/diagnostic-ai`: request model,
    bounded excerpt with unsaved text, stale-range refusal `DIAGNOSTIC_CHANGED`, keyed mutation
    `diagnosticAiMutationKeys.fix`; `state/diagnostic-fix.ts` behind `DiagnosticFixProvider`) and
    the Problems list entry (a per-row button, and `Mod+.` on the active problem so the tree keeps
    one Tab stop), and the keyboard diagnostic popup (`DiagnosticPeekFixButton`, reading the
    tracked range against the text as it is now). Scenario `problems-panel-rows` covers both.
-   **Left:** the hover action, which needs a generic per-note action in the Editor repo; handed
-   to lane L7.
+   **Hover done (lane L7):** generic per-diagnostic Editor actions call L8's shared draft
+   mutation. The caller was reverted while Platform #33 was pending and restored on
+   2026-09-26 after #33 reached main. The `editor-diagnostic-hover-fix` scenario proves the
+   exact diagnostic and unsaved source reach the draft through keyboard activation.
 4. Diagnostics feedback, by the route D2 picks.
 5. Symbol-tool steering hooks, after plan 088.
 

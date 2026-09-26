@@ -2,6 +2,7 @@ import { useUnicodeHighlights } from '@/features/editor/hooks/use-unicode-highli
 import type { TabId } from '@/lib/documents/utils/types'
 import type { EditorTheme } from '@singapore-editor/core/rendering'
 import {
+  createDiffEditorOptions,
   createDiffPlugin,
   type DiffFile,
   type DiffGutterSide,
@@ -16,19 +17,17 @@ import { useDiffLanguage } from '@/features/editor/hooks/use-diff-language'
 import { useDiffRows } from '@/features/editor/hooks/use-diff-rows'
 import { useEditorTypography } from '@/features/editor/hooks/use-editor-typography'
 import type { DiffLanguageServerContext } from '@/features/editor/utils/diff-language-context'
-import {
-  DIFF_CURSOR_LINE_HIGHLIGHT,
-  DIFF_KEYMAP,
-  DIFF_DETECT_INDENTATION,
-} from '@/features/editor/utils/diff-options'
-import {
-  createDiffScrollBridgePlugin,
-  type DiffScrollPosition,
-} from '@/features/editor/utils/diff-scroll-bridge'
+import { HOSTED_EDITOR_KEYMAP } from '@/keymap/editor-keymap'
 import { log } from '@/lib/client-logging'
 import { useEditorFocusTarget } from '@/lib/focus/hooks/use-editor-target'
-import { createDiffPresentationBinding } from '@/features/editor/state/diff-presentation'
-import type { DiffPanePresentation } from '@/features/editor/state/tab-presentation'
+import {
+  bindDiffPlugin,
+  createDiffPresentationBinding,
+} from '@/features/editor/state/diff-presentation'
+import type {
+  DiffPanePresentation,
+  DiffScrollPosition,
+} from '@/features/editor/state/tab-presentation'
 
 /**
  * One side of a diff: a real read-only `Editor` holding a synthetic buffer of the projected rows,
@@ -62,6 +61,8 @@ export function DiffPane({
   onRegisterEditor?: (side: DiffGutterSide, editor: Editor | null) => void
   onScroll?: (side: DiffGutterSide, position: DiffScrollPosition) => void
 }) {
+  // Diff syntax reads row N's tokens from source line N; a patch holds only the lines git printed.
+  const highlight = syntaxHighlight && file?.isPartial !== true
   // Manual memo: `plugin` is a useLayoutEffect dependency, and the compiler's cache is a
   // cache, not an identity guarantee — when it recomputes, the useLayoutEffect re-runs.
   const plugin = useMemo(
@@ -71,10 +72,14 @@ export function DiffPane({
         regions,
         side,
         syntaxBackend,
-        syntaxHighlight,
+        syntaxHighlight: highlight,
       }),
-    [regions, side, syntaxBackend, syntaxHighlight],
+    [highlight, regions, side, syntaxBackend],
   )
+  useLayoutEffect(() => {
+    if (!presentation) return
+    return bindDiffPlugin(presentation, plugin)
+  }, [plugin, presentation])
   const { rows, text, tokensRevision } = useDiffRows(plugin, file)
   const diffLanguagePlugin = useDiffLanguage(file, rows, theme, languageServer)
   const unicodeHighlights = useUnicodeHighlights()
@@ -88,24 +93,20 @@ export function DiffPane({
   const plugins = [
     plugin,
     unicodeHighlights.plugin,
-    onScroll ? createDiffScrollBridgePlugin((position) => onScroll(side, position)) : null,
     diffLanguagePlugin,
     persistence?.plugin,
   ].filter((entry) => entry !== null && entry !== undefined)
   const typography = useEditorTypography()
   const controller = useEditor({
+    ...createDiffEditorOptions(),
     presentationReady: false,
     suspiciousCharacters: unicodeHighlights.options,
-    cursorLineHighlight: DIFF_CURSOR_LINE_HIGHLIGHT,
     // No `document`: the React wrapper pushes text through `openDocument`, which takes no scroll
     // position from us and therefore lands back at the top — so every expansion toggle, and every
     // keystroke behind a compare-saved diff, would throw the reader's place away. `setText` is the
     // one that carries the scroll position across, and it is what the package's own contract names.
-    detectIndentation: DIFF_DETECT_INDENTATION,
-    documentMode: 'static',
-    editability: 'readonly',
     ...typography,
-    keymap: DIFF_KEYMAP,
+    keymap: HOSTED_EDITOR_KEYMAP,
     // Only the diff plugin: the critical core set would bring line and fold gutters, find, merge
     // conflicts, shiki and LSP, none of which a diff had — and a fold gutter would break the
     // row-index identity the comment layer reads line numbers off.
@@ -145,7 +146,7 @@ export function DiffPane({
       installedProjection.current?.editor !== editor ||
       installedProjection.current.text !== text
     ) {
-      editor.setText(text, { documentMode: 'static', languageId: null, tokens })
+      editor.setText(text, { tokens })
       installedProjection.current = { editor, text }
     } else {
       editor.setTokens(tokens)
@@ -167,13 +168,21 @@ export function DiffPane({
       languageId: file?.languageId,
       side,
       backend: syntaxBackend.kind,
-      enabled: syntaxHighlight,
+      enabled: highlight,
       tokenCount: tokens.length,
       oldLineCount: file?.oldLines.length,
       newLineCount: file?.newLines.length,
       partial: file?.isPartial,
     })
-  }, [controller, file, plugin, rows, side, syntaxBackend, syntaxHighlight, tokensRevision])
+  }, [controller, file, highlight, plugin, rows, side, syntaxBackend, tokensRevision])
+
+  useLayoutEffect(() => {
+    const editor = controller.getEditor()
+    if (!editor || !onScroll) return
+
+    const subscription = editor.onDidScroll((position) => onScroll(side, position))
+    return () => subscription.dispose()
+  }, [controller, onScroll, side])
 
   useLayoutEffect(() => {
     if (!onRegisterEditor) return

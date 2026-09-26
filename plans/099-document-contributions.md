@@ -1,6 +1,6 @@
 # Plan 099: Route document consumers through one contribution runtime
 
-Status: proposed. Unit 0 research partial (2026-09-25): inventory, baseline identity and probes done; harness extension and calibrated controls left for the unit 1 lane. Requested on 2026-09-12.
+Status: proposed. The session diff source correction has landed (2026-09-25). Unit 0 research partial (2026-09-25): inventory, baseline identity and probes done; harness extension and calibrated controls left for the unit 1 lane. Requested on 2026-09-12.
 Owner: Editor and Platform. Priority P1, effort XL, change risk high.
 Inspected Platform: `2f9528ac1e147615cf81431ef8509f551af4b290`.
 Inspected Editor: `64926519bfdd39f4afcfae225019a932d3e27785`.
@@ -103,6 +103,34 @@ patches may still display changed lines, but cannot masquerade as complete synta
 binary, oversized, or unavailable blob prevents complete loading, expose that state and omit
 unsupported syntax. Do not silently invent empty source text. Keep this distinction in the typed
 contract so every contribution uses the same source semantics.
+
+#### Landed 2026-09-25: diff source correction (completion wave)
+
+The correction above landed in Platform on its own; the runtime stays parked.
+
+- Checkpoint file, turn and session diffs load the displayed entry's blob pair through
+  `fetchBlobDiff`, the snapshot path, and splice only its complete texts into that entry
+  (`withCheckpointSources`). The entry keeps its checkpoint patch, ids, paths and query adapter.
+  Summary requests stay patch-only; other listed files load nothing.
+- The a3737dd0 path replaced the list with the blob route's answer, whose hunks do not apply the
+  checkpoint's whitespace policy. `editorDiffFiles(…, 'patch')` now keeps the checkpoint's hunks
+  over the complete sources.
+- A side that exists but has no object id is never requested, so the blob route cannot supply
+  empty text for it. An entry lacking text for an existing side stays a partial `DiffFile`.
+- `DiffPane` turns diff syntax off for a partial file, and `DiffView` shows "Changed lines only.
+  Syntax colors need the whole file." That covers missing ids, an unavailable pair (its error
+  still shows) and a pair over the text limit, for snapshot diffs too.
+- Proof: `diff-view-syntax-source.test.tsx` failed on the partial cases before the fix, with
+  rows painted from another line's tokens. `client-core` `diff-files.test.ts` failed before on the
+  whitespace-policy and one-sided-text cases. `scenario checkpoint-diff-tokens` covers the complete state, and with `FS_DEV_MAX_TEXT_FILE_BYTES=500` the partial one.
+- Review fixes: the drawn file takes the entry's rooted paths (the patch header holds
+  repo-relative ones), and a whitespace-only context line puts its drawn text in the old source,
+  because git `-w` prints it with its new text and the split view's old pane draws that text.
+  Tests cover added, deleted and renamed entries and a late blob answer for a previous entry;
+  the scenario also checks split view under tree-sitter and Shiki.
+- Unit 2 still owns moving the partial/complete distinction into Editor's `diffSyntax`, which
+  currently parses whatever lines it is given. A context line with a different text per side
+  also belongs there: `DiffHunkLine` carries one text.
 
 ## Chosen architecture
 
@@ -782,8 +810,9 @@ and complete validation. Writing the plan does not schedule production execution
   decision; this plan provides no production abstraction or implementation dependency for it.
 - [E014](../../Editor/plans/e014-parallel-search.md) must reuse the common reader and job lifecycle
   if parallel search is implemented. This plan does not add a parallel search engine.
-- [Plan 071](071-syntax-highlight-retry.md) remains separate retry policy. Common endpoint lifecycle
-  must not accidentally introduce retries or replay failed requests as part of this refactor.
+- The highlight retry (Plan 071, landed with Editor E050 row 11) stays in the syntax controller.
+  Common endpoint lifecycle must not accidentally introduce retries or replay failed requests as
+  part of this refactor.
 
 ## Completion checklist
 

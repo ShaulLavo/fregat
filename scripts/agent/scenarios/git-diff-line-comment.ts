@@ -4,7 +4,7 @@ import path from 'node:path'
 import type { Scenario } from './index'
 import type { Page } from 'playwright'
 import { fixtureGit, openFixtureWorkspace, releaseFixture } from '../fixture-workspace'
-import { openGitPanel, selectors } from '../selectors'
+import { chooseColorMode, openGitPanel, selectors } from '../selectors'
 import { createScriptError } from '../../structured-errors'
 
 const LINES = Array.from({ length: 40 }, (_, index) => `const line${index + 1} = ${index + 1}`)
@@ -40,6 +40,14 @@ export const gitDiffLineComment: Scenario = {
       await dragChangedLine(page)
       await step('expanded-selection')
       await assertLabel(page, 'expanded')
+      await chooseColorMode(page, 'dark')
+      await dragChangedLine(page)
+      await step('dark-expanded-selection')
+      await assertLabel(page, 'dark')
+      await chooseColorMode(page, 'light')
+      await dragChangedLine(page)
+      await step('light-expanded-selection')
+      await assertLabel(page, 'light')
 
       // A comment joins the review draft instead of the composer text.
       await page.getByRole('button', { name: 'Comment', exact: true }).click()

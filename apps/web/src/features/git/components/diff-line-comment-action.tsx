@@ -3,7 +3,6 @@ import { ChatCircleIcon, NotePencilIcon, XIcon } from '@phosphor-icons/react'
 import {
   diffRowAtEvent,
   type DiffFile,
-  type DiffRegionStore,
   type DiffRenderRow,
   type DiffRowHit,
 } from '@singapore-editor/diff'
@@ -20,7 +19,6 @@ import {
   diffRowsForAddress,
   selectedText,
   selectedDiffRows,
-  stackedDiffRows,
   type DiffLineAddress,
   type SelectedDiffText,
 } from '../utils/diff-line-selection'
@@ -35,12 +33,12 @@ import {
 export function DiffLineCommentAction({
   file,
   hostRef,
-  regions,
+  getStackedRows,
   rootPath,
 }: {
   file: DiffFile
   hostRef: RefObject<HTMLElement | null>
-  regions: DiffRegionStore
+  getStackedRows: () => readonly DiffRenderRow[]
   rootPath: string
 }) {
   const { attachText } = useAttachToComposer(rootPath)
@@ -75,7 +73,7 @@ export function DiffLineCommentAction({
       const head = diffRowAtEvent(event)
       const headRow = head?.side === start.side ? head.rowIndex : start.rowIndex
       const dragged = selectedDiffRows(start.rows, start.rowIndex, headRow)
-      const stackedRows = stackedDiffRows(file, regions.getExpandedRegions())
+      const stackedRows = getStackedRows()
       const next = canonicalAddress(diffLineAddress(dragged), stackedRows)
       setAddress(next)
       setSelected(next ? selectedText(file, stackedRows, next) : null)
@@ -88,7 +86,7 @@ export function DiffLineCommentAction({
       host.removeEventListener('mousedown', onMouseDown, true)
       host.ownerDocument.removeEventListener('mouseup', onMouseUp)
     }
-  }, [file, hostRef, regions])
+  }, [file, getStackedRows, hostRef])
 
   if (!address) return null
 

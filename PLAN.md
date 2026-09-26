@@ -16,8 +16,7 @@ Git history is the archive.
 
 The [Editor backlog](../Editor/plans/README.md) contains 30 stable entries from its 22-topic
 wishlist. Its suggested order is advisory; promote selected work into this execution roadmap
-when scheduled. Completed entries link to permanent references. The backlog also links the
-existing Plan 071 syntax-retry proposal.
+when scheduled. Completed entries link to permanent references.
 
 ## Verified completed foundations
 
@@ -118,7 +117,7 @@ records the per-host comparison and the owner checks still pending on the Mac.
 
 ## Document contribution refactor
 
-[Plan 099](plans/099-document-contributions.md) is proposed; implementation has not started.
+[Plan 099](plans/099-document-contributions.md) is proposed; its session diff source correction is implemented in L7 (2026-09-25).
 Decided 2026-09-25: owner — units 0–1 are approved to start; units 2–7 stay gated as the plan says.
 It extends Editor's existing buffer owner with one committed-revision publication path and a
 document contribution runtime. Tree-sitter, Shiki, minimap, and language-service adapters share
@@ -451,7 +450,7 @@ Suggested order (steps 1–4 done by 2026-09-23; step 5 is in progress):
    decided by substring match, and the desktop app can kill a process it does not own. Both are
    small and both need a `--server` or desktop restart, so batch them.
 2. [E047](../Editor/docs/display/e047-point-queries.md), then
-   [Plan 130](plans/130-ask-the-editor.md) Phases 1 and 4. One point query in the Editor removes the
+   Plan 130 Phases 1 and 4. One point query in the Editor removes the
    search-result row arithmetic, the unicode hover's marker scan and the residue in `diffRowAtEvent`.
    Done: E047 landed in Editor `6656eb7`, and Plan 130 Phases 1, 2 and 4 are implemented and verified.
 3. [E048](../Editor/docs/display/e048-minimap-document-space.md) and
@@ -461,11 +460,11 @@ Suggested order (steps 1–4 done by 2026-09-23; step 5 is in progress):
    `f715d11`; Plan 133's four phases 2026-09-23, D1 moved to Plan 134 and closed there.
 5. [E050](../Editor/docs/architecture/e050-host-obligations.md) row by row, each unlocking its Plan 130
    Phase 5 item. In progress: rows re-checked 2026-09-24; row 1 (`setText` with tokens), row 5 (press
-   participants), row 6 (plugin keymap context keys) and typography options (2026-09-25) done.
-   Rows 8 (`onDidScroll`) and 4 (theme keys) unlock Plan 130 Phase 5 items 8 and 10; the rest are
-   Editor-only. Plan 130 Phase 3 (`getStackedRows`) is a separate small Editor change.
+   participants), row 6 (plugin keymap context keys) and typography options (2026-09-25) done;
+   rows 2, 7, 8, 9, 11 and the rest of row 5 done 2026-09-25 (lane L7), row 8 closing Plan 130
+   item 8. Row 4 and `getStackedRows` close Plan 130 on 2026-09-25. The diff comment layer asks the mounted plugin, and theme colours flow through EditorTheme; light/dark browser proof passes.
 
-Left in the lane: Plan 132 Phases 2–4, the Plan 130 remainder and the E050 rows.
+Left in the lane: Plan 132 Phases 2–4. E050 and Plan 130 are complete.
 
 The owner decided Plan 132 D4 on 2026-09-21: the server's migrations are deleted and the schema
 starts from scratch (Plan 132 Phase 4). External-change
@@ -487,18 +486,20 @@ asked which large agent features Platform lacks. The owner grouped the answers i
 Research plans do enough research to be correct, then their research phase rewrites their own
 phases or splits them into executable plans; not all research happens up front.
 
-| Plan                                          | Kind                   | Owns                                                                                                                        |
-| --------------------------------------------- | ---------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| 138 (done)                                    | executable             | Claude models from the Claude CLI; chat runs the installed CLI                                                              |
-| [139](plans/139-acting-on-agent-diffs.md)     | research               | Keep or undo agent edits per hunk, batched diff comments to the agent, review mode, second-model review, plan line feedback |
-| [140](plans/140-editor-agent-advantage.md)    | research               | Editor context into chat, fix with AI, diagnostics fed back to the agent                                                    |
-| [141](plans/141-usage-and-rate-limits.md)     | executable             | Rate-limit meter, usage page with cost, usage history                                                                       |
-| 142 (done)                                    | executable             | Web Push from the mesh server                                                                                               |
-| [143](plans/143-phone-layout.md)              | direction approved     | What the phone is for; web layout versus the later companion app                                                            |
-| [144](plans/144-unattended-agent-work.md)     | research               | Scheduled, looping and multi-agent work: surface what the harnesses already do, build only the rest                         |
-| [145](plans/145-harness-controls.md)          | small executable plans | Fork, approval rules, MCP status, background tasks, hooks, custom agents, compact, export                                   |
-| [172](plans/172-shared-undo-stack.md)         | research               | One undo/redo stack behind Mod+Z, extracted from the existing undo implementations; Plan 126 LIFE-13 first                  |
-| [173](plans/173-two-devices-one-workspace.md) | research               | Two clients opening a workspace on one server: per-client open generations, what the losing client sees                     |
+| Plan                                           | Kind                   | Owns                                                                                                                        |
+| ---------------------------------------------- | ---------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| 138 (done)                                     | executable             | Claude models from the Claude CLI; chat runs the installed CLI                                                              |
+| [139](plans/139-acting-on-agent-diffs.md)      | research               | Keep or undo agent edits per hunk, batched diff comments to the agent, review mode, second-model review, plan line feedback |
+| [140](plans/140-editor-agent-advantage.md)     | research               | Editor context into chat, fix with AI, diagnostics fed back to the agent                                                    |
+| [141](plans/141-usage-and-rate-limits.md)      | executable             | Rate-limit meter, usage page with cost, usage history                                                                       |
+| 142 (done)                                     | executable             | Web Push from the mesh server                                                                                               |
+| [143](plans/143-phone-layout.md)               | direction approved     | What the phone is for; web layout versus the later companion app                                                            |
+| [144](plans/144-unattended-agent-work.md)      | research               | Scheduled, looping and multi-agent work: surface what the harnesses already do, build only the rest                         |
+| [145](plans/145-harness-controls.md)           | small executable plans | Fork, approval rules, MCP status, background tasks, hooks, custom agents, compact, export                                   |
+| [172](plans/172-shared-undo-stack.md)          | research               | One undo/redo stack behind Mod+Z, extracted from the existing undo implementations; Plan 126 LIFE-13 first                  |
+| [173](plans/173-two-devices-one-workspace.md)  | research               | Two clients opening a workspace on one server: per-client open generations, what the losing client sees                     |
+| [186](plans/186-pull-request-sync-rate.md)     | executable             | PR sync off switch and poll rate: open or unknown only, idle and hidden backoff, forge rate-limit headers (LIFE-14)         |
+| [187](plans/187-setup-scripts-in-terminals.md) | executable             | Setup scripts run in a visible, interruptible terminal, as T3 Code does (EXT-04)                                            |
 
 [Plan 126](plans/126-t3code-alignment.md) also gained the T3 features shipped after its
 2026-09-19 audit, and four reopened non-parity decisions.
@@ -518,6 +519,10 @@ Suggested order:
    undo/redo stack replaces the latest-undo slot).
 8. Plan 173's research before Plan 143's phone shell: the phone becomes a second client of the
    same server.
+9. Plans 186 and 187 and Plan 172's work item 1 (session Mod+Z only while the Undo notice shows),
+   any time: follow-ups the owner ordered 2026-09-26 from the direction audit. The owner kept
+   auto-settle, multi-model send, five forges, the terminal host and the remote install model as
+   shipped ([Plan 126](plans/126-t3code-alignment.md#kept-by-the-owner-2026-09-26)).
 
 ## Daily-driver lane
 
@@ -576,6 +581,7 @@ surfaces, the file picker and the site. The owner is taking it one topic at a ti
 | [180](plans/180-file-icon-variants.md)          | Quick research: more glyphs, variants and per-mode colours from the icon pack we already use                              |
 | [181](plans/181-chat-timeline-end-anchoring.md) | The chat timeline on TanStack's end anchoring after a 3.14.13 upgrade; prerequisite to 178's virtualization               |
 | [182](plans/182-search-view-rendering.md)       | Quick research: why the full search view renders slowly, and what would fix it                                            |
+| [188](plans/188-server-typescript-only.md)      | Platform uses only the server TypeScript backend; the browser worker stays an Editor feature (owner ruling, closes 153)   |
 
 Suggested order:
 

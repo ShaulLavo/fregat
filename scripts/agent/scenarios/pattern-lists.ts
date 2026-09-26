@@ -125,7 +125,9 @@ export const sessionRail: Scenario = {
         .sessionRail(page)
         .evaluate((element) => element === element.ownerDocument.activeElement),
       true,
-      await page.evaluate(() => document.activeElement?.outerHTML.slice(0, 600)),
+      await page.evaluate(
+        () => document.activeElement?.outerHTML.slice(0, 600) ?? 'no active element',
+      ),
     )
     await step('next-session')
     const list = selectors.sessionRail(page)

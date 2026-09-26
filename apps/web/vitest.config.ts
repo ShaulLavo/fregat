@@ -5,7 +5,7 @@ import { defineConfig } from 'vitest/config'
 
 // Shared resolution so every project reads the same `@/` paths as the app.
 const alias = {
-  '@': path.resolve(__dirname, './src'),
+  '@': path.resolve(import.meta.dirname, './src'),
 }
 const reactPlugin = () => react({ compiler: true })
 

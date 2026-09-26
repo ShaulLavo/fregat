@@ -203,7 +203,7 @@ describe.runIf(process.platform === 'linux')('native watch structure changes', (
 })
 
 describe.runIf(process.platform === 'linux')('native watch lifetime', () => {
-  it('returns to no watches after repeated opens and closes', async () => {
+  it('keeps one idle recursive watch after repeated opens and closes', async () => {
     const base = await fixtureRoot()
     const root = path.join(base, 'root')
     await mkdir(path.join(root, 'src'), { recursive: true })
@@ -228,10 +228,68 @@ describe.runIf(process.platform === 'linux')('native watch lifetime', () => {
       await expect
         .poll(() => hub.info())
         .toMatchObject({
-          nativeWatcherCount: 0,
+          nativeWatcherCount: 1,
+          idleWatcherCount: 1,
           openFileWatcherCount: 0,
           shallowWatcherCount: 0,
         })
+    } finally {
+      await hub.close()
+    }
+  })
+})
+
+describe.runIf(process.platform === 'linux')('idle recursive watches', () => {
+  it('serves the next stream from the idle watch without attaching again', async () => {
+    const root = await fixtureRoot()
+    await mkdir(path.join(root, 'src/deep'), { recursive: true })
+    const hub = new FileChangeHub(createWorkspacePaths(root), { enabled: true })
+    try {
+      const firstAbort = new AbortController()
+      const first = collect(hub.stream(['src'], firstAbort.signal))
+      await expect.poll(() => first.length).toBeGreaterThan(0)
+      firstAbort.abort()
+      await expect.poll(() => hub.info()).toMatchObject({ idleWatcherCount: 1 })
+
+      const secondAbort = new AbortController()
+      const second = collect(hub.stream(['src'], secondAbort.signal))
+      await expect.poll(() => second.length).toBeGreaterThan(0)
+      expect(second[0]).toMatchObject({ watch: first[0]?.type === 'ready' ? first[0].watch : {} })
+      expect(hub.info()).toMatchObject({ nativeWatcherCount: 1, idleWatcherCount: 0 })
+
+      await writeFile(path.join(root, 'src/deep/file.txt'), 'x')
+      await expect.poll(() => paths(second), { timeout: 3000 }).toContain('src/deep/file.txt')
+      secondAbort.abort()
+    } finally {
+      await hub.close()
+    }
+  })
+
+  it('closes an idle watch when an active root needs its room', async () => {
+    const root = await fixtureRoot()
+    await mkdir(path.join(root, 'one/x'), { recursive: true })
+    await mkdir(path.join(root, 'two/y'), { recursive: true })
+    const hub = new FileChangeHub(createWorkspacePaths(root), {
+      enabled: true,
+      directoryLimit: () => 3,
+    })
+    try {
+      const firstAbort = new AbortController()
+      const first = collect(hub.stream(['one'], firstAbort.signal))
+      await expect.poll(() => first.length).toBeGreaterThan(0)
+      firstAbort.abort()
+      await expect.poll(() => hub.info()).toMatchObject({ idleWatcherCount: 1 })
+
+      const secondAbort = new AbortController()
+      const second = collect(hub.stream(['two'], secondAbort.signal))
+      await expect.poll(() => second.length).toBeGreaterThan(0)
+      expect(second[0]).toMatchObject({ watch: { mode: 'recursive', directoryCount: 2 } })
+      expect(hub.info()).toMatchObject({
+        nativeWatcherCount: 1,
+        idleWatcherCount: 0,
+        watchedDirectoryCount: 2,
+      })
+      secondAbort.abort()
     } finally {
       await hub.close()
     }

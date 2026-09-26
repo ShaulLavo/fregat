@@ -40,7 +40,7 @@ import {
 /**
  * Type-derivation gate for the event catalog.
  *
- * These are declarations, not assertions: `tsgo --noEmit` is what enforces them.
+ * These are declarations, not assertions: `tsc --noEmit` is what enforces them.
  * They exist because `orchestrationEventSchema` is derived from
  * `ORCHESTRATION_EVENT_PAYLOADS` through one assertion on an `Object.entries`
  * map, and that assertion is only honest while the union it rebuilds stays
@@ -57,7 +57,7 @@ type TypeEquals<TLeft, TRight> = [TLeft] extends [TRight]
 const _catalogCoversTheUnion: TypeEquals<OrchestrationEvent['type'], OrchestrationEventType> = true
 
 // …and it is still a union of literals, not `string`. If it widened, this
-// assignment would start succeeding and tsgo would report an unused directive.
+// assignment would start succeeding and tsc would report an unused directive.
 // @ts-expect-error 'session.turn-started' is deliberately not an event
 const _rejectsSyntheticTurnEvent: OrchestrationEventType = 'session.turn-started'
 

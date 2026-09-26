@@ -76,6 +76,8 @@ export function useTerminalLinks(rootPath: string) {
         })
         if (links.length === 0) return undefined
 
+        // Registered from panel's terminal-ready effect event; ghostty calls it on click, after commit.
+        // oxlint-disable-next-line react/rules-of-hooks
         return links.map((link) => ghosttyLink(link, openTerminalPathLink))
       },
     })

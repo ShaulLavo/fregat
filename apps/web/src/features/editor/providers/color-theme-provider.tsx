@@ -1,3 +1,4 @@
+import { interfaceTheme } from '@/features/editor/utils/interface-theme'
 import {
   createElement,
   useEffect,
@@ -105,7 +106,7 @@ export function EditorColorThemeProvider({ children }: { readonly children: Reac
     colorMode: resolvedTheme,
     committedThemeId,
     definition: loadedTheme?.definition ?? null,
-    editorTheme: loadedTheme?.editorTheme ?? {},
+    editorTheme: interfaceTheme(loadedTheme?.editorTheme ?? {}),
     registration: loadedTheme?.registration ?? null,
     shikiTheme,
     shikiThemeResolver,

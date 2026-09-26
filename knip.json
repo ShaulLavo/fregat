@@ -1,6 +1,5 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "ignoreDependencies": ["@typescript/native-preview"],
   "workspaces": {
     "apps/desktop": {
       "entry": ["src/bun/index.ts", "src/preload/index.ts", "electrobun.config.ts"]
@@ -71,7 +70,6 @@
         "prod.ts",
         "tui.ts",
         "web-layering.mjs",
-        "lint/web-boundaries.mjs",
         "skills/port-pstack.ts",
         "themes/import-omarchy-palette.ts",
         "themes/import-omarchy-wallpapers.ts",

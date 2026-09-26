@@ -1,7 +1,1 @@
-[
-  {
-    "file": "packages/ui/src/patterns/virtual-list.tsx",
-    "cause": "incompatible-library",
-    "reason": "TanStack Virtual's useVirtualizer returns functions that cannot be memoized safely. This is why the memo() guards on VirtualList rows exist."
-  }
-]
+[]

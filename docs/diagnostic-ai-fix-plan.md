@@ -1,6 +1,6 @@
 # Fix diagnostics with AI
 
-Status: the shared handoff, the Problems list and the keyboard popup are implemented (Plan 140 P3, 2026-09-25); the hover entry is open and needs the Editor change below. Cover every error and warning in diagnostic hover messages, the keyboard diagnostic popup, and the Problems list.
+Status: implemented (Plan 140 P3). The shared handoff, the Problems list and the keyboard popup landed with lane L8 (Platform #33, 2026-09-25). The hover entry (lane L7, Platform #37) calls L8's `useDiagnosticFix` through the per-diagnostic hover actions on Editor main (Editor #36); it was reverted while #33 was pending and restored once #33 reached main. Every error and warning is covered in diagnostic hover messages, the keyboard diagnostic popup, and the Problems list.
 
 Clicking **Fix with AI** opens a chat draft containing the diagnostic and its source context. The user reviews and sends it through the existing agent workflow. Keep native language-server quick fixes alongside it. This action must work even when the server offers no code actions.
 
@@ -68,3 +68,12 @@ Platform also had a separate replay defect. The proxy suppresses duplicate `didO
 The regression test failed before the proxy fix. All 71 proxy tests and the server typecheck passed afterward. The proxy change is local and has not been deployed. It fixes missing diagnostics on reconnect, not TypeScript's declaration-rebuild invalidation.
 
 A durable fix for the declaration issue remains separate. Evaluate resolving workspace imports against source during development or changing Editor's build publication so consumers never observe JavaScript without its declarations. Prove the chosen change against the linked-package reproduction. Do not hide TS7016 or add an ambient declaration that erases the module's types.
+
+## Hover verification
+
+`editor-diagnostic-hover-fix` opens a real TypeScript error, edits the source without saving,
+then invokes its hover action with Enter. The resulting draft carries the exact diagnostic
+and the unsaved source excerpt. Browser evidence on 2026-09-25 is in
+`/work/tmp/fregat-evidence/20260925T192101Z-scenario-editor-diagnostic-hover-fix/`.
+Editor action tests also cover pointer/Space activation, pending and failed actions,
+progressive hover updates, Escape focus and stale diagnostic refusal.

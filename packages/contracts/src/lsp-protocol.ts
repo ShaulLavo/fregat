@@ -27,16 +27,10 @@ export const LSP_SEMANTIC_TOKENS_REFRESH = 'workspace/semanticTokens/refresh'
 export const LSP_DIAGNOSTIC_REFRESH = 'workspace/diagnostic/refresh'
 
 /**
- * Why the socket is about to close.
- *
- * Broadcast immediately before the proxy closes a client socket, because a bare
- * close is indistinguishable from a healthy idle one: the browser transport
- * clears its handlers and reports nothing, so a language server that died left
- * the status indicator saying `'ready'`. `$/`-prefixed because it is
- * implementation-defined, which the protocol permits and requires a client to
- * tolerate.
+ * Why the socket is about to close; a bare close reads like a healthy idle one. The method
+ * `@singapore-editor/lsp` names, so the editor reports the close as `LspServerExitedError`.
  */
-export const LSP_SERVER_EXITED = '$/platform/serverExited'
+export const LSP_SERVER_EXITED = '$/serverExited'
 
 export const LSP_FEATURE_IDS = [
   'completion',
@@ -91,4 +85,11 @@ export type LspServerExitedParams = {
   readonly exitSignal: string | null
   /** The tail of the child's stderr, when it wrote any. Absent, never empty. */
   readonly stderrTail?: string
+  /** The catalog's guidance for a backend that died; absent when this app closed it. */
+  readonly error?: {
+    readonly code?: string
+    readonly message: string
+    readonly why?: string
+    readonly fix?: string
+  }
 }

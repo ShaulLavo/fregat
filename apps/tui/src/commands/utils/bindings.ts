@@ -1,5 +1,4 @@
 import { bindingsCollide, defaultBindingPane } from '@workspace/client-core/commands/bindings'
-import { parseHotkey } from '@tanstack/hotkeys'
 import type { KeybindingOverrides } from '@workspace/contracts'
 import {
   commandMetadata,
@@ -11,6 +10,7 @@ import {
   isBindableChord,
   normalizedChord,
   chordStrokes,
+  parseKeyStroke,
 } from '@workspace/client-core/commands/chord'
 import type { FocusArea } from '@workspace/client-core/commands/focus'
 
@@ -105,7 +105,7 @@ export function terminalBindingReason(
   if (keys === null) return null
   if (!isBindableChord(keys))
     return 'Invalid shortcut. Use one stroke or a Control chord with at most two strokes.'
-  const strokes = chordStrokes(keys).map((stroke) => parseHotkey(stroke, 'linux'))
+  const strokes = chordStrokes(keys).flatMap((stroke) => parseKeyStroke(stroke, 'linux') ?? [])
   for (const [index, stroke] of strokes.entries()) {
     if (stroke.meta) return 'Meta shortcuts are reserved by the desktop. Use Control.'
     if (stroke.ctrl && ['S', 'Q', 'I', 'J', 'M', '['].includes(stroke.key.toUpperCase()))

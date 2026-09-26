@@ -1,6 +1,7 @@
-import { LspTransportClosedError } from '@singapore-editor/lsp'
+import { LspServerExitedError, LspTransportClosedError } from '@singapore-editor/lsp'
 import { LspConnectionPool, type LspConnectionPoolEvent } from '@singapore-editor/lsp-plugin'
 
+import { serverExitFields } from '@/features/editor/utils/server-exit-fields'
 import { thrownErrorMessage } from '@/lib/client-error-taxonomy'
 import { isAbortError } from '@/lib/abort-error'
 import { log } from '@/lib/client-logging'
@@ -74,14 +75,17 @@ function eventLevel(event: LspConnectionPoolEvent): 'debug' | 'info' | 'warn' {
   // `error` means reconnecting gave up, whatever the close code: the server's bare close() is 1000.
   // An AbortError is this side's suspended environment refusing the socket.
   if (event.kind === 'error') return isAbortError(event.error) ? 'info' : 'warn'
+  // After an announced server exit, `reconnecting` is the client's only record of the restart.
+  if (event.kind === 'reconnecting')
+    return event.error instanceof LspServerExitedError ? 'info' : 'debug'
   if (event.kind === 'ready' || event.kind === 'closed') return 'info'
 
   return 'debug'
 }
 
-/** The same fields the server's `lsp.socket.close` records, from this end of the socket. */
+/** The server's `lsp.socket.close` fields from this end, or what the exit notice before it said. */
 function closeFields(error: unknown) {
-  if (!(error instanceof LspTransportClosedError)) return {}
+  if (!(error instanceof LspTransportClosedError)) return serverExitFields(error)
 
   return {
     code: error.code,

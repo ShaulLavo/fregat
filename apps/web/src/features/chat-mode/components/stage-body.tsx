@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useSyncExternalStore } from 'react'
 import { useNavigation } from '@/hooks/use-navigation'
 import { useSessionSelectionStore } from '@/features/chat-mode/state/session-selection-store'
 import type { SessionId } from '@workspace/contracts'
@@ -26,6 +26,8 @@ export function StageBody({
 }) {
   const selection = useSessionSelectionStore((state) => state.selection)
   const navigation = useNavigation()
+  const navigating =
+    useSyncExternalStore(navigation.subscribe, navigation.getSnapshot).status === 'pending'
   const machines = useDraftMachines(
     project ? { environmentId: transport.environmentId, projectId: project.id } : null,
   )
@@ -35,7 +37,10 @@ export function StageBody({
     selection.projectId === project?.id
       ? selection.draftId
       : null
+  // A pending navigation decides where chat lands; opening a draft now would supersede it,
+  // and a superseded folder switch hands the project back, which re-runs this effect.
   useEffect(() => {
+    if (navigating) return
     if (draftId || !ready || !project || !worktree || !activeSessionShowsComposer(activeSession))
       return
     void navigation.openChat({
@@ -47,7 +52,16 @@ export function StageBody({
       newDraft: true,
       replace: true,
     })
-  }, [draftId, ready, project, worktree, activeSession, navigation, transport.environmentId])
+  }, [
+    navigating,
+    draftId,
+    ready,
+    project,
+    worktree,
+    activeSession,
+    navigation,
+    transport.environmentId,
+  ])
   // Before anything else: with no project there is no session to resolve, and a
   // composer that cannot send is the state this screen exists to replace.
   if (!ready) return <StageEmptyState />

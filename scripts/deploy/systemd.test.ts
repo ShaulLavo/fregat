@@ -31,6 +31,8 @@ test('the unit checks for approved promotion before startup and treats Restart a
   expect(lines.indexOf('ExecStart=/opt/bun /srv/platform/current/server/index.js')).toBe(pre + 1)
   expect(lines).toContain('SuccessExitStatus=143 75')
   expect(lines).toContain('RestartForceExitStatus=75')
+  expect(lines).toContain('RestartSec=250ms')
+  expect(lines).toContain('RestartMaxDelaySec=10s')
   expect(lines).toContain('Environment=PLATFORM_PRODUCTION_ROOT=/srv/platform')
 })
 

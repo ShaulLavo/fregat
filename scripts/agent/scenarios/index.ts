@@ -5,6 +5,7 @@ import { cachedProtocolStartup } from './cached-protocol-startup'
 import { editorLspTabSwitch } from './editor-lsp-tab-switch'
 import { editorLspServerExit } from './editor-lsp-server-exit'
 import { editorTypography } from './editor-typography'
+import { editorDecodeReveal } from './editor-decode-reveal'
 import { responseDelivery } from './response-delivery'
 import { draftRecovery } from './draft-recovery'
 import { composerDefaults } from './composer-defaults'
@@ -67,6 +68,7 @@ import { chatTimelinePattern } from './chat-timeline-pattern'
 import { copyFeedback } from './copy-feedback'
 import { fileLabelCohesion } from './file-label-cohesion'
 import { checkpointStates } from './checkpoint-states'
+import { checkpointDiffTokens } from './checkpoint-diff-tokens'
 import { sessionActionsSurfaces } from './session-actions-surfaces'
 import { exportTranscript } from './export-transcript'
 import { claudeHookRows } from './hook-rows'
@@ -177,8 +179,10 @@ import { editorLspCompletion } from './editor-lsp-completion'
 import { editorExternalDeletion } from './editor-external-deletion'
 import { fileTreeUndo } from './file-tree-undo'
 import { editorDefinitionCrlf } from './editor-definition-crlf'
+import { editorDiagnosticHoverFix } from './editor-diagnostic-hover-fix'
 import { editorLspHover } from './editor-lsp-hover'
 import { editorLspDeprecated } from './editor-lsp-deprecated'
+import { editorLspUnnecessary } from './editor-lsp-unnecessary'
 import { editorLspRenameKey } from './editor-lsp-rename-key'
 import { editorLspSignatureHelp } from './editor-lsp-signature-help'
 import { editorMarkdownPunctuation } from './editor-markdown-punctuation'
@@ -188,6 +192,7 @@ import { themeBundlePalette } from './theme-bundle-palette'
 import { settingsColdLoad } from './settings-cold-load'
 import { settingsDefaults } from './settings-defaults'
 import { projectMenu } from './project-menu'
+import { workspaceSwitch } from './workspace-switch'
 import { sidebarSettingsButton } from './sidebar-settings-button'
 import { fileIcons } from './file-icons'
 import { searchInputUndo } from './search-input-undo'
@@ -250,6 +255,7 @@ import { gitDiffExpandTokens } from './git-diff-expand-tokens'
 import { editorPressParticipants } from './editor-press-participants'
 import { editorWidgetKeys } from './editor-widget-keys'
 import { gitDiffLineComment } from './git-diff-line-comment'
+import { gitDiffFold } from './git-diff-fold'
 import { gitCommitMessageFile } from './git-commit-message-file'
 import { gitCommitMessagePersists } from './git-commit-message-persists'
 import { gitCommitSlowHook } from './git-commit-slow-hook'
@@ -362,6 +368,7 @@ export const scenarios: readonly Scenario[] = [
   copyFeedback,
   fileLabelCohesion,
   checkpointStates,
+  checkpointDiffTokens,
   sessionActionsSurfaces,
   exportTranscript,
   claudeHookRows,
@@ -443,10 +450,13 @@ export const scenarios: readonly Scenario[] = [
   editorFormatChord,
   editorLspCompletion,
   editorLspHover,
+  editorDiagnosticHoverFix,
   editorLspDeprecated,
+  editorLspUnnecessary,
   editorLspTabSwitch,
   editorLspServerExit,
   editorTypography,
+  editorDecodeReveal,
   editorDefinitionCrlf,
   editorExternalDeletion,
   fileTreeUndo,
@@ -475,6 +485,7 @@ export const scenarios: readonly Scenario[] = [
   settingsRoutePreparation,
   settingsModuleFailure,
   projectMenu,
+  workspaceSwitch,
   sidebarSettingsButton,
   fontPicker,
   fontPickerHover,
@@ -501,6 +512,7 @@ export const scenarios: readonly Scenario[] = [
   editorPressParticipants,
   editorWidgetKeys,
   gitDiffLineComment,
+  gitDiffFold,
   chatCardNarrow,
   chatComposerInsert,
   chatDisclosureSettle,

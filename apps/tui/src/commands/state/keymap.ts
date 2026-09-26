@@ -4,8 +4,12 @@ import {
   type KeymapBinding,
   type KeymapNode,
 } from '@singapore-editor/core/keymap'
-import { parseHotkey } from '@tanstack/hotkeys'
-import { CHORD_TIMEOUT_MS, parsedChord } from '@workspace/client-core/commands/chord'
+import {
+  CHORD_TIMEOUT_MS,
+  parseKeyStroke,
+  parsedChord,
+  type KeyStroke,
+} from '@workspace/client-core/commands/chord'
 
 import type { CommandBus } from '@/commands/state/bus'
 import type { FocusRegistry } from '@/commands/state/focus'
@@ -128,18 +132,8 @@ function makeTrie(bindings: readonly TerminalBinding[], focus: FocusRegistry) {
       })
       .map((binding) => {
         const chord = parsedChord(binding.keys, 'linux')
-        const first = parseHotkey(binding.keys.split(' ')[0], 'linux')
-        return {
-          chord,
-          payload: {
-            ...binding,
-            firesWhileTyping:
-              first.ctrl ||
-              /^F\d+$/u.test(first.key) ||
-              first.key === 'Escape' ||
-              first.key === 'Tab',
-          },
-        }
+        const first = parseKeyStroke(binding.keys.split(' ')[0], 'linux')
+        return { chord, payload: { ...binding, firesWhileTyping: firesWhileTyping(first) } }
       }),
     'linux',
   )
@@ -149,4 +143,11 @@ function swallow(event: TerminalKeyEvent) {
   event.preventDefault()
   event.stopPropagation()
   return true
+}
+
+function firesWhileTyping(stroke: KeyStroke | null): boolean {
+  if (!stroke) return false
+  return (
+    stroke.ctrl || /^F\d+$/u.test(stroke.key) || stroke.key === 'Escape' || stroke.key === 'Tab'
+  )
 }

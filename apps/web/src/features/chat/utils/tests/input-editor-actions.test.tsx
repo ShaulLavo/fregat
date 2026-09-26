@@ -83,17 +83,21 @@ test('inserting a mention writes it through the grammar and leaves the caret aft
 test('a focusing insert focuses only once the DOM holds the inserted text', async () => {
   const editor = mountChatInputEditor('read ')
   const root = editor.getRootElement()
-  const seenAtFocus: string[] = []
+  const seenAtFocus: { text: string; decorators: number }[] = []
   const focus = editor.focus.bind(editor)
   vi.spyOn(editor, 'focus').mockImplementation((...args) => {
-    seenAtFocus.push(root?.textContent ?? '')
+    seenAtFocus.push({
+      text: root?.textContent ?? '',
+      decorators: root?.querySelectorAll('[data-lexical-decorator]').length ?? 0,
+    })
     focus(...args)
   })
 
   insertChatInputMention(editor, 'src/app.ts', { focus: true })
 
-  // The chip renders the basename.
-  await vi.waitFor(() => expect(seenAtFocus).toEqual(['read app.ts ']))
+  // Lexical's DOM holds the chip's node at focus; React fills in its label afterwards.
+  await vi.waitFor(() => expect(seenAtFocus).toEqual([{ text: 'read  ', decorators: 1 }]))
+  await vi.waitFor(() => expect(root?.textContent).toBe('read app.ts '))
   await vi.waitFor(() => expect(document.activeElement).toBe(root))
 })
 

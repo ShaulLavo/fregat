@@ -3,6 +3,14 @@ import type { Locator, Page } from 'playwright'
 export const fileIconSelector = '[data-file-icon], [style*="vscode-icons/"]'
 export const wallpaperLayerSelector = '[data-workbench] img[data-workbench-wallpaper-layer="still"]'
 export const diffPaneSelector = '.editor-diff-pane'
+export const editorRowSelector = '[data-editor-virtual-row]'
+export const sharedTokenHighlightPrefix = 'editor-shared-token-'
+/** The decode plugin's hidden-rows class, its diffusion overlay, and one overlay glyph. */
+export const decodeSelectors = {
+  active: '.editor-decode-active',
+  glyphLayer: '.editor-decode-glyph-layer',
+  glyph: '.editor-decode-glyph',
+} as const
 export const searchEditorSelector = '[aria-label="Search result editor"]'
 export const searchEditorFileRowSelector = '[role="treeitem"][aria-level="1"]'
 export const selectedEditorFileTabSelector = '[data-editor-tab-path][aria-selected="true"]'
@@ -579,7 +587,10 @@ export const selectors = {
       .nth(index),
   historyRestore: (page: Page) => page.getByRole('button', { name: 'Restore', exact: true }),
   diffRows: (page: Page) => page.locator('.editor-diff-pane [data-editor-virtual-row]'),
+  diffPanes: (page: Page) => page.locator(diffPaneSelector),
   diffExpandRows: (page: Page) => page.locator('.editor-diff-pane .editor-diff-row-expandable'),
+  diffPartialNotice: (page: Page) =>
+    page.getByRole('status').filter({ hasText: 'Changed lines only.' }),
   diffLineSelectionLabel: (page: Page) =>
     page
       .getByRole('button', { name: 'Ask the agent about these lines', exact: true })
@@ -591,6 +602,8 @@ export const selectors = {
   workspaceEditApplyAll: (page: Page) =>
     page.getByRole('button', { name: 'Apply all', exact: true }),
   toast: (page: Page, title: string) => page.locator('[data-sonner-toast]', { hasText: title }),
+  /** Every element on the page whose own text contains `text`, for counting how often a message shows. */
+  textAnywhere: (page: Page, text: string) => page.getByText(text),
   toastAction: (page: Page, title: string, label: string) =>
     page
       .locator('[data-sonner-toast]', { hasText: title })
@@ -847,6 +860,8 @@ export const selectors = {
   editorSurface: (page: Page) => page.locator('.editor-virtualized-viewport'),
   editorFindInput: (page: Page) => page.getByRole('textbox', { name: 'Find', exact: true }),
   editorFindCount: (page: Page) => page.locator('.editor-find-count'),
+  editorFindWidget: (page: Page) => page.locator('.editor-find-widget'),
+  editorMinimap: (page: Page) => page.locator('.editor-minimap-right'),
   terminalSurface: (page: Page) =>
     page.locator('[data-slot="tool-pane"][aria-label="Terminal"]:visible'),
   paletteRowSelector: '[data-slot="command-list"] [role="option"]',
@@ -1096,19 +1111,6 @@ export async function hoverTokenColor(page: Page, word: string): Promise<boolean
   return /(^|;)\s*color:/.test(style ?? '')
 }
 
-/** The text under every range of the CSS highlight whose name ends with `suffix`. */
-export async function highlightTexts(page: Page, suffix: string): Promise<string[]> {
-  // A string: this package types without the DOM, and the callback runs in the page.
-  return (await page.evaluate(`((suffix) => {
-    const texts = []
-    for (const [name, highlight] of CSS.highlights) {
-      if (!name.endsWith(suffix)) continue
-      for (const range of highlight) texts.push(range.toString())
-    }
-    return texts
-  })(${JSON.stringify(suffix)})`)) as string[]
-}
-
 /** Rests the pointer on the first on-screen occurrence of the word, under `within`, until the hover shows. */
 /**
  * The centre of `part` where it first appears inside `context` on screen, under `within`. The
@@ -1179,4 +1181,33 @@ export function focusedEditorTextBeforeCaret(): string {
   const selection = document.getSelection()
   if (!input || selection?.anchorNode !== input.firstChild) return ''
   return (input.textContent ?? '').slice(0, selection.anchorOffset)
+}
+
+/** Actual colored highlight ranges, including syntax twins and untokenized overlay ranges. */
+export async function diagnosticTagPaint(page: Page, kind: 'fade' | 'strike') {
+  return page.evaluate(`((kind) => {
+    const styles = new Map()
+    const visit = rules => {
+      for (const rule of rules) {
+        if (rule.cssRules) visit(rule.cssRules)
+        const name = rule.selectorText?.match(/::highlight\\(([^)]+)\\)/)?.[1]
+        if (name) styles.set(name, rule.style)
+      }
+    }
+    for (const sheet of document.styleSheets) visit(sheet.cssRules)
+    const painted = []
+    for (const [name, highlight] of CSS.highlights) {
+      const style = styles.get(name)
+      if (!style) continue
+      const matches = kind === 'strike' ? style.textDecoration.includes('line-through') : style.color.includes('color-mix') && style.color.includes('transparent')
+      if (!matches) continue
+      for (const range of highlight) {
+        const live = document.createRange()
+        live.setStart(range.startContainer, range.startOffset)
+        live.setEnd(range.endContainer, range.endOffset)
+        painted.push({ text: live.toString(), color: style.color, decoration: style.textDecoration })
+      }
+    }
+    return painted
+  })(${JSON.stringify(kind)})`) as Promise<{ text: string; color: string; decoration: string }[]>
 }

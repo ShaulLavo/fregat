@@ -115,7 +115,7 @@ test('a restore uses the action receipt even when a projection has moved ahead',
 test('recording a new action while a restore settles keeps the new redo branch empty', async () => {
   const history = createSessionLifecycleHistory()
   history.record('archive', [entry('a', 1)])
-  let release = (_: SessionLifecycleUndoEntry | null) => {}
+  let release: (value: SessionLifecycleUndoEntry | null) => void = () => {}
   const waiting = new Promise<SessionLifecycleUndoEntry | null>((resolve) => {
     release = resolve
   })

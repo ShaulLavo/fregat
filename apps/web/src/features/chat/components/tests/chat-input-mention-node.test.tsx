@@ -1,4 +1,4 @@
-import { beforeEach } from 'vitest'
+import { beforeEach, vi } from 'vitest'
 import {
   resetChatInputDraftStore,
   useChatInputDraftStore,
@@ -59,13 +59,13 @@ test('backspace on a selected chip removes it instead of doing nothing', () => {
   expect(composer.text).toBe('read  now')
 })
 
-test('pasting a serialized prompt rehydrates its mentions as chips', () => {
+test('pasting a serialized prompt rehydrates its mentions as chips', async () => {
   const composer = renderComposer('')
 
   composer.paste('look at @"src/my file.ts" please')
 
   expect(composer.text).toBe('look at @"src/my file.ts" please')
-  expect(composer.chip('src/my file.ts')?.textContent).toBe('my file.ts')
+  await vi.waitFor(() => expect(composer.chip('src/my file.ts')?.textContent).toBe('my file.ts'))
 })
 
 // Lexical's own plain-text paste needs a live DOM selection, which no synthetic
