@@ -74,6 +74,12 @@ export const sessionIdentityErrors = defineErrorCatalog('provider', {
     why: 'The session was deleted, belongs to another checkout, or has work in progress.',
     fix: 'Wait for the active turn to finish and reopen the session in its own checkout.',
   },
+  MCP_SERVER_NOT_AWAITING_APPROVAL: {
+    status: 409,
+    message: 'That MCP server is not waiting for approval.',
+    why: "Only a server from the checkout's .mcp.json that this session turned off can be approved.",
+    fix: 'Reopen the MCP list; the server may already be approved.',
+  },
   APPROVAL_DECISION_NOT_OFFERED: {
     status: 409,
     message: 'This approval does not offer that choice',

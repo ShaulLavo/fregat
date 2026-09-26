@@ -22,6 +22,8 @@ export const chatMutationKeys = {
     ['chat', 'rewind', environmentId, sessionId] as const,
   pendingRequestResponse: (environmentId: string, sessionId: string) =>
     ['chat', 'pending-request-response', environmentId, sessionId] as const,
+  approveMcpServer: (environmentId: string, sessionId: string) =>
+    ['chat', 'approve-mcp-server', environmentId, sessionId] as const,
   reconnectMcpServer: (environmentId: string, sessionId: string) =>
     ['chat', 'reconnect-mcp-server', environmentId, sessionId] as const,
   signInMcpServer: (environmentId: string, sessionId: string) =>

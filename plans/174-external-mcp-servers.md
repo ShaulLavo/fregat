@@ -149,6 +149,20 @@ Each phase ships and deploys on its own; phases 1, 3, 5 and 6 change the server
    the idle CLI. Files: `provider/adapters/utils/claude-query-options.ts`, a new
    `provider/adapters/utils/claude-project-mcp.ts`, chat popover. Scenario: a fixture repository
    whose project server stays off until approved.
+   Landed 2026-09-26 (wave 2 lane B). `provider/adapters/utils/claude-project-mcp.ts` reads every
+   `.mcp.json` the CLI loads (the session folder and each folder above it) at every Claude CLI
+   start and turns the unapproved servers off with `settings.disabledMcpjsonServers`; the
+   unapproved set is part of the session's reuse key, so an approval or a changed server gets a new
+   CLI. The popover shows them as "Not approved" with Approve
+   (`POST /providers/sessions/:id/mcp/:name/approve`), which restarts an idle session.
+   Decided 2026-09-26: review of #82 (wave 2), replacing this phase's first cut: approvals live in
+   the Platform state home (`claude-project-mcp-approvals.json`) and name a fingerprint of the
+   server's definition in every file that defines it, so a pull that changes its command, arguments
+   or environment asks again. No file inside a checkout approves anything, including
+   `.claude/settings.local.json` (a repository can ship one, as a file or through a symlink) and
+   the CLI's own name-only approvals.
+   Not run: the fixture-repository scenario, which needs a real Claude session (a hard stop in
+   wave 2). Covered instead by adapter, file-rule and popover tests with the fake CLI.
 3. **MCP servers settings page (M).** A Settings › MCP servers page per machine and provider
    instance: rows grouped by source, with status, tools, auth and the file each row lives in.
    Server: `GET /providers/instances/:id/mcp` reads through a probe process (the Claude

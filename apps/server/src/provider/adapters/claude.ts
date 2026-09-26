@@ -120,6 +120,11 @@ import {
   type ResolvedAttachment,
 } from './utils/claude-turn-input'
 import { claudeUserInputAnswers, claudeUserInputQuestions } from './utils/claude-user-input'
+import {
+  approveProjectMcpServer,
+  defaultProjectMcpApprovalsPath,
+  unapprovedProjectMcpServers,
+} from './utils/claude-project-mcp'
 import { asRecord, numberField, stringField } from './utils/records'
 import { noop, runtimeEventId } from './utils/runtime-ids'
 import { sessionInputFromTurn } from './utils/session-input'
@@ -167,6 +172,8 @@ export type ClaudeAdapterOptions = {
   binaryPath?: string
   createQuery?: ClaudeCreateQuery
   displayLabel?: string
+  /** Where approved project MCP servers are recorded; the Platform state home by default. */
+  projectMcpApprovalsFile?: string
   enabled?: boolean
   /**
    * Per-instance spawn env. Isolation rides on `CLAUDE_CONFIG_DIR`, never on
@@ -242,6 +249,9 @@ export class ClaudeProviderAdapter
   private initializationProbe: Promise<ClaudeInitialization> | null = null
   /** The overage-included bucket's model, learned from `get_usage`; the stream never names it. */
   private scopedUsageModel: string | null = null
+  /** What each live session started from, so approving a project server can restart it. */
+  private readonly startInputs = new Map<SessionId, ProviderRuntimeStartInput>()
+  private readonly projectMcpApprovalsFile: string
 
   /**
    * `createQuery` is the seam every test depends on: without it each test spawns
@@ -264,6 +274,8 @@ export class ClaudeProviderAdapter
     this.auth =
       options.auth ?? new ClaudeAuthRunner({ command: () => this.executablePath(), env: this.env })
     this.createQuery = options.createQuery ?? defaultClaudeCreateQuery
+    this.projectMcpApprovalsFile =
+      options.projectMcpApprovalsFile ?? defaultProjectMcpApprovalsPath()
     this.discoveryRunner = options.discoveryRunner
     this.historyRunner = options.historyRunner
     this.settings = {
@@ -504,6 +516,33 @@ export class ClaudeProviderAdapter
     await session.reconnectMcpServer(name)
   }
 
+  async approveMcpServer({ name, sessionId }: { name: string; sessionId: SessionId }) {
+    recordChatPipelineInfo('chat.pipeline.claude_adapter.mcp_approve', { name, sessionId })
+    const session = this.sessions.get(sessionId)
+    const input = this.startInputs.get(sessionId)
+    if (!session || !input)
+      throw sessionIdentityErrors.SESSION_NOT_RUNNING({ internal: { sessionId } })
+    if (!session.awaitsApproval(name))
+      throw sessionIdentityErrors.MCP_SERVER_NOT_AWAITING_APPROVAL({
+        internal: { name, sessionId },
+      })
+    const approved = await approveProjectMcpServer({
+      approvalsFile: this.projectMcpApprovalsFile,
+      cwd: normalizeWorkspaceCwd(input.cwd),
+      name,
+    })
+    if (!approved)
+      throw sessionIdentityErrors.MCP_SERVER_NOT_AWAITING_APPROVAL({
+        internal: { name, sessionId },
+      })
+    // A busy session picks the approval up at its next turn, when the gate no longer matches.
+    if (session.isBusy()) return
+    await this.ensureRuntimeSession({
+      ...input,
+      resumeExisting: input.resumeExisting || session.hasConversation(),
+    })
+  }
+
   async stopBackgroundTask({ sessionId, taskId }: { sessionId: SessionId; taskId: string }) {
     recordChatPipelineInfo('chat.pipeline.claude_adapter.stop_task', { sessionId, taskId })
     const session = this.sessions.get(sessionId)
@@ -559,6 +598,11 @@ export class ClaudeProviderAdapter
     // what made "plan" silently behave as whatever the session started in.
     const interactionMode = input.interactionMode ?? DEFAULT_INTERACTION_MODE
     const ephemeral = input.ephemeral ?? false
+    const unapprovedProjectMcp = await unapprovedProjectMcpServers({
+      approvalsFile: this.projectMcpApprovalsFile,
+      cwd,
+    })
+    this.startInputs.set(input.sessionId, input)
     if (
       existing?.matches({
         cwd,
@@ -568,6 +612,7 @@ export class ClaudeProviderAdapter
         model,
         reasoningKey,
         runtimeMode: input.runtimeMode,
+        unapprovedProjectMcp,
       })
     ) {
       recordChatPipelineInfo('chat.pipeline.claude_adapter.session.reuse', {
@@ -631,6 +676,7 @@ export class ClaudeProviderAdapter
       runtimeEpoch: input.runtimeEpoch,
       scopedUsageModel: () => this.scopedUsageModel,
       sessionId: input.sessionId,
+      unapprovedProjectMcp,
     })
     this.sessions.set(input.sessionId, session)
     recordChatPipelineInfo('chat.pipeline.claude_adapter.session.started', {
@@ -681,6 +727,9 @@ class ClaudeAgentSession extends SessionContext {
   private readonly announcedLimitStops = new Set<string>()
   private readonly scopedUsageModel: () => string | null
   private readonly resumed: boolean
+  /** Project servers this session started with turned off, awaiting the owner's approval. */
+  private readonly unapprovedProjectMcp: readonly string[]
+  private conversationStarted: boolean
 
   private constructor(input: {
     attachmentsDir: string
@@ -696,9 +745,12 @@ class ClaudeAgentSession extends SessionContext {
     runtimeEpoch: string
     scopedUsageModel: () => string | null
     sessionId: SessionId
+    unapprovedProjectMcp: readonly string[]
   }) {
     super(input)
     this.resumed = input.resumeExisting === true
+    this.conversationStarted = this.resumed
+    this.unapprovedProjectMcp = input.unapprovedProjectMcp
     this.attachmentsDir = input.attachmentsDir
     this.scopedUsageModel = input.scopedUsageModel
     this.interactionMode = input.interactionMode
@@ -727,6 +779,7 @@ class ClaudeAgentSession extends SessionContext {
     runtimeEpoch: string
     scopedUsageModel: () => string | null
     sessionId: SessionId
+    unapprovedProjectMcp: readonly string[]
   }) {
     recordChatPipelineInfo('chat.pipeline.claude_session.start', {
       interactionMode: input.interactionMode,
@@ -759,6 +812,7 @@ class ClaudeAgentSession extends SessionContext {
       resumeExisting: input.resumeExisting,
       runtimeMode: input.runtimeMode,
       sessionId,
+      unapprovedProjectMcpServers: [...input.unapprovedProjectMcp],
     })
 
     try {
@@ -805,8 +859,11 @@ class ClaudeAgentSession extends SessionContext {
     model: string
     reasoningKey: string
     runtimeMode: RuntimeMode
+    unapprovedProjectMcp: readonly string[]
   }) {
     if (!this.isActive()) return false
+    // The gate is a spawn-time setting: an approval (or a new .mcp.json server) needs a new CLI.
+    if (this.unapprovedProjectMcp.join('\0') !== input.unapprovedProjectMcp.join('\0')) return false
     if (this.runtimeEpoch !== input.runtimeEpoch) return false
     if (this.cwd !== input.cwd) return false
     if (this.ephemeral !== input.ephemeral) return false
@@ -857,6 +914,7 @@ class ClaudeAgentSession extends SessionContext {
       messageId,
       providerBindingHandle: this.providerBindingHandle(),
     })
+    this.conversationStarted = true
     const turn = activeProviderTurn({ canonicalTurnId: input.turnId, messageId })
     // Minted locally and stamped on the prompt: `command_lifecycle` frames report
     // it as queued, started and completed, which is how this turn is told apart
@@ -992,11 +1050,28 @@ class ClaudeAgentSession extends SessionContext {
   async mcpServers(): Promise<ProviderMcpServer[] | null> {
     if (!this.query) return null
 
-    return (await this.query.mcpServerStatus()).map((server) => ({
+    const servers: ProviderMcpServer[] = (await this.query.mcpServerStatus()).map((server) => ({
       error: server.error ?? null,
       name: server.name,
-      status: server.status,
+      status: this.awaitsApproval(server.name) ? 'unapproved' : server.status,
     }))
+    const listed = new Set(servers.map((server) => server.name))
+    const gated = this.unapprovedProjectMcp
+      .filter((name) => !listed.has(name))
+      .map((name) => ({ error: null, name, status: 'unapproved' as const }))
+    return [...servers, ...gated]
+  }
+
+  awaitsApproval(name: string) {
+    return this.unapprovedProjectMcp.includes(name)
+  }
+
+  isBusy() {
+    return this.activeTurn !== null || this.pendingTurn !== null
+  }
+
+  hasConversation() {
+    return this.conversationStarted
   }
 
   async reconnectMcpServer(name: string) {

@@ -4,6 +4,7 @@ import { EmptyState } from '@workspace/ui/components/empty-state'
 import { LoadingState } from '@workspace/ui/components/loading-state'
 
 import { McpServerRow } from '@/features/chat/components/mcp-server-row'
+import { useApproveMcpServer } from '@/features/chat/hooks/use-approve-mcp-server'
 import { useReconnectMcpServer } from '@/features/chat/hooks/use-reconnect-mcp-server'
 import type { useSessionMcp } from '@/features/chat/hooks/use-session-mcp'
 import { useSignInMcpServer } from '@/features/chat/hooks/use-sign-in-mcp-server'
@@ -17,6 +18,7 @@ export function SessionMcpList({
   readonly mcp: ReturnType<typeof useSessionMcp>
   readonly sessionRef: ScopedSessionRef
 }) {
+  const approve = useApproveMcpServer(sessionRef)
   const reconnect = useReconnectMcpServer(sessionRef)
   const signIn = useSignInMcpServer(sessionRef)
   const reconnecting = useMutationState({
@@ -36,7 +38,17 @@ export function SessionMcpList({
     },
     select: (mutation) => mutation.state.variables,
   })
-  const busy = [...reconnecting, ...signingIn]
+  const approving = useMutationState({
+    filters: {
+      mutationKey: chatMutationKeys.approveMcpServer(
+        sessionRef.environmentId,
+        sessionRef.sessionId,
+      ),
+      status: 'pending',
+    },
+    select: (mutation) => mutation.state.variables,
+  })
+  const busy = [...approving, ...reconnecting, ...signingIn]
 
   if (mcp.isPending)
     return (
@@ -64,6 +76,7 @@ export function SessionMcpList({
       canReconnect={mcp.data.canReconnect}
       canSignIn={mcp.data.canSignIn}
       key={server.name}
+      onApprove={() => approve.mutate(server.name)}
       onReconnect={() => reconnect.mutate(server.name)}
       onSignIn={() => signIn.mutate(server.name)}
       server={server}
