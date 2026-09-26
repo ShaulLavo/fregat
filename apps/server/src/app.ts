@@ -1,3 +1,4 @@
+import { AgentDiagnosticsReader } from './lsp/agent-diagnostics'
 import { sessionControlRoutes } from './provider/session-control-routes'
 import { createAttachmentOwnership } from './attachments/ownership'
 import { selectTitleModel } from './orchestration/title-generation'
@@ -274,6 +275,12 @@ export function createApp(options: AppOptions) {
       { area: 'wallpaper', operation: 'library.seed' },
     )
   }
+  // Read lazily: the language-server pool is built further down, and hooks only ask during turns.
+  const agentDiagnostics = new AgentDiagnosticsReader({
+    enabled: () => settings.snapshot().values['agent.diagnosticsFeedback'],
+    pool: () => lspPool,
+    settings: () => lspSettings(),
+  })
   const providerAdapterRegistry: ProviderAdapterRegistry =
     options.orchestration?.providerAdapterRegistry ??
     createDefaultProviderAdapterRegistry(
@@ -295,6 +302,7 @@ export function createApp(options: AppOptions) {
         // the deferral would never resolve.
         hasLiveSessions: (providerInstanceId) =>
           providerService.hasActiveRuntimeForInstance(providerInstanceId),
+        services: { agentDiagnostics },
       },
     )
   // A saved provider list is inert unless something re-runs the registry when
