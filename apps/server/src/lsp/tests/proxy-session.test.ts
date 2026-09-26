@@ -1536,14 +1536,20 @@ describe('LspSessionPool watched files', () => {
       params: { unregisterations: [{ id: 'watch-1', method: 'workspace/didChangeWatchedFiles' }] },
     })
     await expect.poll(() => fixture.serverResponse('unwatch-1')).toBeDefined()
-    await expect.poll(() => fixture.hub().info().nativeWatcherCount).toBe(0)
+    // A released recursive watch stays attached, idle, for the next holder.
+    await expect.poll(() => heldWatchers(fixture.hub())).toBe(0)
 
     fixture.respond(watchRegistration('watch-2', `${fixture.match.root}/**/*`))
     await expect.poll(() => fixture.serverResponse('watch-2')).toBeDefined()
     fixture.pool.disposeAll()
-    await expect.poll(() => fixture.hub().info().nativeWatcherCount).toBe(0)
+    await expect.poll(() => heldWatchers(fixture.hub())).toBe(0)
   })
 })
+
+function heldWatchers(hub: FileChangeHub) {
+  const info = hub.info()
+  return info.nativeWatcherCount - info.idleWatcherCount
+}
 
 const watchHubs = new Map<string, FileChangeHub>()
 
