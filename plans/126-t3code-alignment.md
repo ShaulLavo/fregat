@@ -68,6 +68,12 @@ Parked: EXT-07 and EXT-09 (Plan 087 automation, Plan 143 research, per-OS matrix
    pricing; (b) add a manual price override for unpriced models. **Recommendation: (a).** Your
    141 decision already chose automatic pricing, and unknown prices never show a wrong number. S if (b).
    Decided 2026-09-26: owner — (a); models.dev already prices every model it knows.
+5. **LIFE-14: repository visible on the badge?** (Raised 2026-09-26 by wave 2 lane W.) Upstream
+   shows the repository as a column in its linked-pull-request panel. Ours names it in the rail
+   badge's hover title and accessible name (`Pull request owner/repo#N · …`) and keeps the visible
+   `#N`, so a fork's pull request looks like any other until hovered. (a) Hover only; (b) visible
+   `owner/repo#N` on the badge, costing rail row width. **Recommendation: (a).** One worktree has
+   one pull request, and the row is narrow.
 
 ## Kept by the owner (2026-09-26)
 
