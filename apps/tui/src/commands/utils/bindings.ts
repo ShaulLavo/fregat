@@ -39,21 +39,28 @@ export function effectiveTerminalBindings(overrides: KeybindingOverrides, kitty 
   const diagnostics: BindingDiagnostic[] = []
   const replaced = new Set<CommandId>()
   const user: TerminalBinding[] = []
-  for (const [id, keys] of Object.entries(overrides)) {
+  for (const [id, list] of Object.entries(overrides)) {
     const command = commandById(id)
-    const reason = command ? terminalBindingReason(command.id, keys, kitty) : 'Unknown command.'
-    if (reason || !command) {
-      diagnostics.push({ command: id, keys, reason: reason ?? 'Unknown command.' })
+    if (!command) {
+      diagnostics.push({ command: id, keys: list?.[0] ?? null, reason: 'Unknown command.' })
       continue
     }
+    const chords = (list ?? []).filter((keys) => {
+      const reason = terminalBindingReason(command.id, keys, kitty)
+      if (reason) diagnostics.push({ command: id, keys, reason })
+      return reason === null
+    })
+    // A list with nothing usable here keeps the defaults; an empty list unbinds.
+    if (chords.length === 0 && (list ?? []).length > 0) continue
     replaced.add(command.id)
-    if (keys !== null)
+    for (const keys of chords) {
       user.push({
         command: command.id,
         keys: terminalChord(keys),
         source: 'user',
         pane: defaultPane(command.id),
       })
+    }
   }
   const authored = commandMetadata.flatMap((command) =>
     (command.keys ?? [])

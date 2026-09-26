@@ -1,3 +1,4 @@
+import { Spinner } from '@workspace/ui/components/spinner'
 import type { GitHistoryRef } from '@workspace/contracts'
 import {
   ArrowClockwiseIcon,
@@ -83,6 +84,7 @@ export function HistoryToolbar({
             ))}
           </SelectContent>
         </Select>
+        {busy ? <Spinner label='Loading selected history' size='xs' /> : null}
         <ToolbarButton label='Go to current commit' onClick={() => onRefChange('HEAD')}>
           <CrosshairIcon />
         </ToolbarButton>

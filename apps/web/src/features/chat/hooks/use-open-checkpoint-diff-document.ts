@@ -23,6 +23,7 @@ import {
 } from '@/lib/checkpoint-diff-query'
 import type { ChatTurnDiffSummary } from '@workspace/client-core/chat/types'
 import { useNavigation } from '@/hooks/use-navigation'
+import { claimDiffIntent } from '@/lib/intent-prefetch/state/query-intent'
 
 export function useOpenCheckpointDiffDocument() {
   const queryClient = useQueryClient()
@@ -43,6 +44,7 @@ export function useOpenCheckpointDiffDocument() {
     const owner = filesystemPath(rootPath)
     const operation = navigation.getSnapshot()
     const rangeInput = checkpointDiffInputForSummary(summary)
+    claimDiffIntent(queryClient, checkpointDiffQueryKey(rangeInput))
     const diffs = cachedCountedTurnDiff(queryClient, rangeInput) ?? (await rangeDiffs(rangeInput))
     if (navigation.getSnapshot() !== operation) return false
     if (!path) {
@@ -96,6 +98,7 @@ export function useOpenCheckpointDiffDocument() {
     const owner = filesystemPath(rootPath)
     const operation = navigation.getSnapshot()
     const input = checkpointFullSessionDiffInputForSummary(summary)
+    claimDiffIntent(queryClient, checkpointDiffQueryKey(input))
     const diffs = await queryClient.query({
       queryFn: ({ signal, client }) =>
         fetchCheckpointDiff(input, signal, clientForQueryClient(client)),

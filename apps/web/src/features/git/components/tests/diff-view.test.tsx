@@ -77,9 +77,9 @@ test('a two-edit file maps to one diff carrying both changes and the whole file'
   expect(file?.hunks.length).toBe(2)
   expect(file?.newLines).toContain('line two')
   expect(file?.oldLines).toContain('line 2')
-  // The plain diff route sends no file text, so the model can only be the
-  // patch's own hunks. `isPartial` is what tells the view it cannot expand.
-  expect(file?.isPartial).toBe(true)
+  expect(file?.isPartial).toBe(false)
+  expect(diffs[0]?.oldText).toBe(`${FORTY_LINES}\n`)
+  expect(diffs[0]?.newText).toBe(twoEditFile())
 })
 
 test('whole-file text produces an expandable, fully-typed model', async ({ client, server }) => {

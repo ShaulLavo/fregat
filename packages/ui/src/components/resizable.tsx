@@ -182,4 +182,8 @@ function resizableLayoutStorageKey(storageKey: string) {
 
 export { PersistedResizablePanelGroup, ResizableHandle, ResizablePanel, ResizablePanelGroup }
 
-export type { PanelImperativeHandle, PanelSize } from 'react-resizable-panels'
+export type {
+  GroupImperativeHandle,
+  PanelImperativeHandle,
+  PanelSize,
+} from 'react-resizable-panels'

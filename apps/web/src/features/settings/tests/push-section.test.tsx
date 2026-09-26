@@ -317,7 +317,10 @@ test('settings search reaches the push section by its own words', async ({ clien
   const rendered = renderWithProviders(<SettingsPage />)
 
   try {
-    await userEvent.type(await screen.findByLabelText('Search settings'), 'push devices')
+    await userEvent.type(
+      await screen.findByRole('textbox', { name: 'Search settings' }),
+      'push devices',
+    )
     expect(await screen.findByRole('heading', { name: 'Push notifications' })).toBeVisible()
   } finally {
     rendered.unmount()
@@ -329,7 +332,7 @@ test('the page shows the push switch once, inside the push section', async ({ cl
   const rendered = renderWithProviders(<SettingsPage />)
 
   try {
-    const search = await screen.findByLabelText('Search settings')
+    const search = await screen.findByRole('textbox', { name: 'Search settings' })
     // The search store outlives a render, so the previous test's query may still be there.
     await userEvent.clear(search)
     await userEvent.type(search, 'push session')

@@ -217,6 +217,12 @@ function parkedWorkspacesFromCache(state: CachedWorkspaceState, activeRootPath: 
   return parked
 }
 
+export function selectedTabContentForRoot(state: EditorWorkspaceStore, rootPath: string) {
+  if (state.rootFolder?.path === rootPath) return state.selectedTabContent
+  const parked = state.parkedWorkspaces.get(rootPath)
+  return parked ? activeEditorContentForWorkbenchPanels(parked.workbenchPanels) : null
+}
+
 export function editorWorkspaceSelectionForWorkbenchPanels(
   workbenchPanels: WorkbenchPanels,
   options: { currentOpenTabContents?: readonly TabContent[] } = {},

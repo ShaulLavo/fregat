@@ -1,11 +1,16 @@
+import { Spinner } from '@workspace/ui/components/spinner'
+import { useCodeThemePreview } from '@/lib/code-theme/hooks/use-preview'
 import { colorThemeItemValue, scopedPaletteFilter } from '@/features/command-palette/utils/query'
 import { useEditorColorTheme } from '@/lib/editor-theme/hooks/use-editor-color-theme'
 import { CodeThemePreview } from '@/lib/code-theme/components/preview'
-import { editorThemeOptions } from '@/lib/code-theme/utils/catalog'
+import { editorThemeColorMode, editorThemeOptions } from '@/lib/code-theme/utils/catalog'
 
 export function CodeThemePreviewPanel({ query }: { readonly query: string }) {
   const { selectedThemeId, committedThemeId, colorMode } = useEditorColorTheme()
-  const theme = editorThemeOptions(colorMode).find((option) => option.id === selectedThemeId)
+  const preview = useCodeThemePreview(selectedThemeId)
+  const theme = editorThemeOptions(editorThemeColorMode(preview.themeId) ?? colorMode).find(
+    (option) => option.id === preview.themeId,
+  )
   const matchesSearch =
     theme &&
     scopedPaletteFilter(colorThemeItemValue(theme.id), query, [
@@ -15,7 +20,7 @@ export function CodeThemePreviewPanel({ query }: { readonly query: string }) {
       theme.source,
     ]) > 0
   let status = 'Saved theme'
-  if (selectedThemeId !== committedThemeId) {
+  if (preview.themeId !== committedThemeId) {
     status = matchesSearch ? 'Preview' : 'Last preview'
   }
 
@@ -28,14 +33,17 @@ export function CodeThemePreviewPanel({ query }: { readonly query: string }) {
         className='text-muted-foreground flex items-center justify-between gap-3 px-3 py-2 text-xs'
         aria-live='polite'
         aria-atomic='true'
-        title={theme ? `${theme.id} (${theme.source})` : selectedThemeId}
+        title={theme ? `${theme.id} (${theme.source})` : preview.themeId}
       >
         <span className='text-foreground truncate font-medium'>
-          {theme?.label ?? selectedThemeId}
+          {theme?.label ?? preview.themeId}
         </span>
-        <span className='shrink-0'>{status}</span>
+        <span className='flex shrink-0 items-center gap-(--density-control-gap)'>
+          {preview.isFetching && <Spinner label='Loading code theme preview' size='xs' />}
+          {status}
+        </span>
       </div>
-      <CodeThemePreview themeId={selectedThemeId} className='border-0' />
+      <CodeThemePreview preview={preview} className='border-0' />
     </section>
   )
 }

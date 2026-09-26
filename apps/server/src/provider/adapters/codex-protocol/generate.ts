@@ -55,6 +55,8 @@ const CLIENT_REQUEST_METHODS = [
   'mcpServerStatus/list',
   'mcpServer/oauth/login',
   'config/mcpServer/reload',
+  'config/read',
+  'config/batchWrite',
 ] as const
 
 /**
@@ -63,6 +65,10 @@ const CLIENT_REQUEST_METHODS = [
  */
 const PARAMETERLESS_REQUEST_RESPONSES: Partial<Record<ClientRequestMethod, string>> = {
   'config/mcpServer/reload': 'McpServerRefreshResponse',
+}
+/** Requests whose response type is not their params type renamed. */
+const NAMED_REQUEST_RESPONSES: Partial<Record<ClientRequestMethod, string>> = {
+  'config/batchWrite': 'ConfigWriteResponse',
 }
 const NO_PARAMS_SCHEMA_NAME = 'NoParams'
 
@@ -354,6 +360,11 @@ function responseTypeName(entry: MethodEntry) {
       `Codex protocol entry has no params and no named response: ${entry.method}`,
     )
   }
+  const named = isClientRequestMethod(entry.method)
+    ? NAMED_REQUEST_RESPONSES[entry.method]
+    : undefined
+  if (named) return named
+
   const paramsType = requiredType(entry)
   if (paramsType.endsWith('Params')) return `${paramsType.slice(0, -'Params'.length)}Response`
 
