@@ -1,6 +1,6 @@
 # Plan 178: parity harness
 
-- Status: PROPOSED. Size M. First sub-plan; every other one depends on it.
+- Status: DONE 2026-09-26 (wave 2, lane T). Size M. First sub-plan; every other one depends on it.
 - Owns: the tooling that proves a replacement kept the tree's look and behaviour.
 
 ## Outcome
@@ -53,3 +53,30 @@ it passes before any replacement starts.
 
 Any surface that is rebuilt and must look the same: the git changes list, the session rail and
 search results when they adopt the primitives this plan builds.
+
+## Landed
+
+- **Run it:** `WEB_PORT=<port> bun run agent:browser scenario tree-parity` (scale 2, 1440×900 by
+  default). Drift fails the run; `tree-parity/<state>/<combo>.diff.png` and `.styles.txt` in the
+  evidence directory show it. `TREE_PARITY_UPDATE=1` rewrites the baseline, `TREE_PARITY_STATES`
+  limits the states. Committed baseline: `scripts/agent/baselines/tree-parity/` (60 PNGs and gzipped
+  style maps, about 5 MB).
+- **Pieces:** fixture `scripts/agent/tree-parity/fixture.ts` (every git state including a merge
+  conflict, flattened chains, a long name, an unreadable folder, a 48-file folder for sticky rows);
+  state drivers `states.ts` (real input; `/fs/read` and `/fs/tree` held open or failed through
+  routes); probe `probe.ts` (the `scope` line is the one switch out-of-the-root changes, part
+  selectors are in `PARTS`); dependency-free pixel diff `pixel-diff.ts` (browser codecs, channel
+  tolerance 2).
+- **Checked:** two compare runs in a row with zero mismatched pixels and zero style lines; a 0.5px
+  name padding fails the style diff (45 lines per combo), a 4% darker `--success` on added rows fails
+  the pixel diff (650–940 pixels per combo) and the style diff.
+- **Behaviour:** `packages/tree/src/tests/parity-{keyboard,scroll-menu,drag,chrome}.browser.tsx`
+  (45 tests, real keys, mouse, wheel and CDP touch through `vitest.config.ts` commands; the helpers
+  in `parity-harness.tsx` resolve the shadow root or the host, so they survive out-of-the-root), and
+  the scenario `tree-parity-behaviour` for what needs the app (Mod+F, folder hover prefetch, focus
+  after delete, deferred create, reload restore, a real row drag onto the composer).
+- **Baselines outside the repo:** `trace` and `renders` of `tree-sticky-scroll` in
+  `/work/reports/tree-parity/baselines/`. `workspace-open-large-root` fails on `origin/main` before
+  the tree opens, so it has none.
+- **Spec corrections** found while pinning today's behaviour are in the parity spec under
+  "Harness findings".

@@ -213,8 +213,12 @@ import { searchResultLinePick } from './search-result-line-pick'
 import { paneRenderCrash } from './pane-render-crash'
 import type { Page } from 'playwright'
 import type { IsolatedServer } from '../isolated-server'
+import type { CaptureSize } from '../capture-options'
+import type { Evidence } from '../evidence'
 
 type ScenarioContext = {
+  /** This run's evidence directory, for scenarios that write more than step screenshots. */
+  readonly evidence: Evidence
   readonly file: string
   /** The throwaway API server, when the run started one. */
   readonly server?: IsolatedServer
@@ -230,6 +234,8 @@ export type Scenario = {
   readonly notifications?: boolean
   readonly name: string
   readonly description: string
+  /** Viewport and device scale this scenario captures at unless the command line sets them. */
+  readonly capture?: Partial<CaptureSize>
   readonly run: (page: Page, context: ScenarioContext) => Promise<void>
   readonly inspect?: (page: Page) => Promise<unknown>
   /**
@@ -283,6 +289,8 @@ import { editorEditContextInput } from './editor-edit-context-input'
 import { editorProduct } from './editor-product'
 import { treeFileClicks } from './tree-file-clicks'
 import { treeStickyScroll } from './tree-sticky-scroll'
+import { treeParity } from './tree-parity'
+import { treeParityBehaviour } from './tree-parity-behaviour'
 import { demoWorkspace } from './demo-workspace'
 import { demoAgentGit } from './demo-agent-git'
 import { demoReset } from './demo-reset'
@@ -559,6 +567,8 @@ export const scenarios: readonly Scenario[] = [
   editorEditContextInput,
   editorProduct,
   treeStickyScroll,
+  treeParity,
+  treeParityBehaviour,
   treeFileClicks,
 ]
 
