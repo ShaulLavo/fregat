@@ -1,5 +1,8 @@
-import { parseHotkey, type ParsedHotkey } from '@tanstack/hotkeys'
-import type { PlatformName } from '@workspace/client-core/commands/chord'
+import {
+  parseKeyStroke,
+  type KeyStroke,
+  type PlatformName,
+} from '@workspace/client-core/commands/chord'
 
 import type { HeldModifiers } from '@/keymap/utils/held-modifiers'
 import { hotkeyTokenLabel } from '@/keymap/utils/format-keys'
@@ -39,16 +42,17 @@ function singleStrokes(
   bindings: readonly PlatformKeyBinding[],
   command: PlatformCommandId,
   platform: PlatformName,
-): readonly ParsedHotkey[] {
-  const strokes: ParsedHotkey[] = []
+): readonly KeyStroke[] {
+  const strokes: KeyStroke[] = []
   for (const binding of bindings) {
     if (binding.command !== command || binding.chord.length !== 1) continue
-    strokes.push(parseHotkey(binding.keys, platform))
+    const stroke = parseKeyStroke(binding.keys, platform)
+    if (stroke) strokes.push(stroke)
   }
   return strokes
 }
 
-function sameModifiers(stroke: ParsedHotkey, held: HeldModifiers) {
+function sameModifiers(stroke: KeyStroke, held: HeldModifiers) {
   return (
     stroke.alt === held.alt &&
     stroke.ctrl === held.ctrl &&
@@ -57,7 +61,7 @@ function sameModifiers(stroke: ParsedHotkey, held: HeldModifiers) {
   )
 }
 
-function ariaShortcut(stroke: ParsedHotkey) {
+function ariaShortcut(stroke: KeyStroke) {
   const parts: string[] = []
   if (stroke.ctrl) parts.push('Control')
   if (stroke.meta) parts.push('Meta')
