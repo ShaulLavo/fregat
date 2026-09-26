@@ -12,10 +12,10 @@ import { TestEditorStateProvider } from './editor-state-provider'
 import { renderWithProviders } from '../render'
 import { unsupportedChatTransport } from './chat-transport'
 
-export function renderCachedChatSelection(sessionId: SessionId) {
+export function renderCachedChatSelection(sessionId: SessionId, nextSessionId?: SessionId) {
   return renderChatSurface(
     <ChatTransportProvider>
-      <SessionSelection sessionId={sessionId} />
+      <SessionSelection sessionId={sessionId} nextSessionId={nextSessionId} />
     </ChatTransportProvider>,
   )
 }
@@ -43,12 +43,21 @@ function renderChatSurface(children: ReactNode) {
   )
 }
 
-function SessionSelection({ sessionId }: { readonly sessionId: SessionId }) {
+function SessionSelection({
+  sessionId,
+  nextSessionId,
+}: {
+  readonly sessionId: SessionId
+  readonly nextSessionId?: SessionId
+}) {
   const [selected, setSelected] = useState<SessionId | null>(null)
   const transport = useChatTransport()
   return (
     <>
       <Button onClick={() => setSelected(sessionId)}>Open cached session</Button>
+      {nextSessionId ? (
+        <Button onClick={() => setSelected(nextSessionId)}>Open next session</Button>
+      ) : null}
       <ChatView
         activeSessionId={selected}
         transport={transport}

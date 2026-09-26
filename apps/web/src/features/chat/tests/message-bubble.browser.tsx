@@ -5,6 +5,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { flushSync } from 'react-dom'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { page } from 'vitest/browser'
 
 import { TestEditorStateProvider as EditorStateProvider } from '../../../../test/factories/editor-state-provider'
 import { AppProviders, createTestQueryClient, seedBootMirrorTheme } from '../../../../test/render'
@@ -294,8 +295,9 @@ describe('MessageBubble browser rendering', () => {
       )
     })
 
+    await page.getByRole('article').hover()
     await vi.waitFor(() => expect(revertButton()).toBeVisible())
-    revertButton().click()
+    await page.getByRole('button', { name: 'Revert to checkpoint before this turn' }).click()
     await vi.waitFor(() => {
       expect(revertToCheckpoint).toHaveBeenCalledWith(2, expect.any(String))
     })

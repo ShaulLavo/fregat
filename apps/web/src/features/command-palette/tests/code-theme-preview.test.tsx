@@ -1,6 +1,7 @@
 import { getClient } from '@/lib/client'
-import { screen, waitFor, within } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { assert } from 'vitest'
 
 import { expect, test } from '../../../../test/fixtures'
 import { createTestQueryClient, renderWithLoadedDialogs } from '../../../../test/render'
@@ -9,6 +10,8 @@ import { TestEditorStateProvider } from '../../../../test/factories/editor-state
 import { CommandPalette } from '@/components/command-palette'
 import { fetchSettings } from '@/features/settings/utils/api'
 import { settingsKeys } from '@workspace/client-core/settings/query-keys'
+import { loadCodeThemePreview } from '@/lib/code-theme/state/preview'
+import { colorThemeIdFromItemValue } from '@/features/command-palette/utils/query'
 
 test('code theme sample follows highlighted rows and labels a retained sample after an empty search', async ({
   controlledClient,
@@ -32,22 +35,22 @@ test('code theme sample follows highlighted rows and labels a retained sample af
   expect(sample.closest('[cmdk-list]')).toBeNull()
 
   await user.hover(screen.getByRole('option', { name: 'Monokai' }))
+  // The label and tokens swap together after the cold Shiki query settles.
+  await act(() => loadCodeThemePreview('monokai'))
   await waitFor(() => expect(within(sample).getByText('Monokai')).toBeInTheDocument())
   expect(within(sample).getByText('Preview')).toBeInTheDocument()
-  // The first sample loads Shiki's core, engine and grammar chunks, which a cold CI worker can
-  // take longer than waitFor's default second to import.
-  await waitFor(
-    () => expect(sample.querySelector('pre[data-theme-id="monokai"]')).toBeInTheDocument(),
-    { timeout: 5_000 },
-  )
+  expect(sample.querySelector('pre[data-theme-id="monokai"]')).toBeInTheDocument()
   expect(controlledClient.controller.settingsWriteCount).toBe(0)
 
   await user.keyboard('{ArrowDown}')
-  const highlightedName = screen
-    .getByRole('option', { selected: true })
-    .querySelector('span')?.textContent
+  const highlighted = screen.getByRole('option', { selected: true })
+  const highlightedName = highlighted.querySelector('span')?.textContent
+  const highlightedId = colorThemeIdFromItemValue(highlighted.getAttribute('data-value') ?? '')
+  assert(highlightedName && highlightedId)
   expect(highlightedName).not.toBe('Monokai')
-  await waitFor(() => expect(within(sample).getByText(highlightedName!)).toBeInTheDocument())
+  await act(() => loadCodeThemePreview(highlightedId))
+  await waitFor(() => expect(within(sample).getByText(highlightedName)).toBeInTheDocument())
+  expect(sample.querySelector(`pre[data-theme-id="${highlightedId}"]`)).toBeInTheDocument()
 
   await user.type(input, 'zzzzzzzzzzzzzzzzzzzzzzzzzzzz')
   expect(screen.getByText('No matching code themes')).toBeInTheDocument()

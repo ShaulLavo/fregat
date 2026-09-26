@@ -1,3 +1,4 @@
+import os from 'node:os'
 import path from 'node:path'
 import { createRequire } from 'node:module'
 import tailwindcss from '@tailwindcss/vite'
@@ -23,6 +24,15 @@ const sharedMarkdown = ['unified', 'remark-parse', 'remark-gfm', 'unist-util-vis
 
 const devServerHost = process.env.WEB_HOST ?? '127.0.0.1'
 const devServerPort = portFromEnv(process.env, 'WEB_PORT', 5173)
+
+/**
+ * Bun's isolated linker can symlink a dependency (`@fontsource-variable/*`, at least under
+ * install contention) straight into the shared cache instead of copying it into the
+ * workspace; a real path there is otherwise outside every `fs.allow` root and Vite 403s it.
+ */
+export function bunInstallCacheRoot(env: NodeJS.ProcessEnv = process.env): string {
+  return env.BUN_INSTALL_CACHE_DIR ?? path.join(os.homedir(), '.bun', 'install', 'cache')
+}
 
 export default defineConfig(({ command, isPreview, mode }) => {
   const packages = command === 'serve' && !isPreview ? readDevSources(import.meta.dirname) : []
@@ -88,7 +98,7 @@ export default defineConfig(({ command, isPreview, mode }) => {
     },
     server: {
       fs: {
-        allow: [workspaceRoot, ...packages.map((pkg) => pkg.checkout)],
+        allow: [workspaceRoot, bunInstallCacheRoot(), ...packages.map((pkg) => pkg.checkout)],
       },
       host: devServerHost,
       port: devServerPort,
