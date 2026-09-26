@@ -32,7 +32,7 @@ export function HandlesTab() {
         </ResizablePanelGroup>
       </Section>
       <Section
-        detail='Pixel columns in a scrolling strip: WidthHandle. Drag, ←/→ when focused, double-click to reset.'
+        detail='Pixel columns in a scrolling strip: WidthHandle. Drag it, use the arrow keys once focused, or double-click to reset.'
         title='Column handle'
       >
         <div className='bg-background flex h-32 overflow-x-auto'>
