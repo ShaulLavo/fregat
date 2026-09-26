@@ -1,13 +1,9 @@
-/**
- * iOS Safari fires no `contextmenu` on a long press, so no surface's context menu opens there.
- * This dispatches one at the press point for every `onContextMenu` handler at once. It waits
- * past the 500ms Android Chrome and Base UI's own triggers use, and stands down for good once the
- * platform shows it fires its own. A Base UI trigger stops its touch from reaching `window`.
- */
+// iOS fires no `contextmenu` on a long press; this dispatches one for every surface's handler.
+// Native text selection wins on selectable text, and a platform with its own menu turns this off.
 const LONG_PRESS_MS = 550
 const MOVE_TOLERANCE_PX = 10
-/** How long after the press the lifted finger's click is swallowed. */
-const CLICK_GUARD_MS = 800
+/** A native `contextmenu` this soon after a finger lifts still belongs to that press. */
+const NATIVE_AFTER_LIFT_MS = 700
 
 type Press = {
   readonly target: EventTarget
@@ -17,7 +13,14 @@ type Press = {
 }
 
 export function installLongPressContextMenu(target: Window = window) {
+  const document = target.document
   let press: Press | null = null
+  /** This touch opened a menu: its lift must not also press what is under the finger. */
+  let fired = false
+  let touching = false
+  let liftedAt = Number.NEGATIVE_INFINITY
+  /** The last lifted press opened a menu; a native one right after it is the same request. */
+  let liftedAfterFire = false
   let dispatching = false
   let platformFires = false
 
@@ -29,7 +32,8 @@ export function installLongPressContextMenu(target: Window = window) {
   function fire() {
     const current = press
     press = null
-    if (!current) return
+    if (!current || !(target.getSelection()?.isCollapsed ?? true)) return
+    fired = true
     dispatching = true
     current.target.dispatchEvent(
       new MouseEvent('contextmenu', {
@@ -40,13 +44,16 @@ export function installLongPressContextMenu(target: Window = window) {
       }),
     )
     dispatching = false
-    guardNextClick(target)
   }
 
   function onTouchStart(event: TouchEvent) {
     cancel()
+    fired = false
+    liftedAfterFire = false
+    touching = true
     const touch = event.touches[0]
     if (platformFires || event.touches.length !== 1 || !touch || !event.target) return
+    if (startsOnSelectableText(document, event.target, touch.clientX, touch.clientY)) return
     press = {
       target: event.target,
       x: touch.clientX,
@@ -62,36 +69,65 @@ export function installLongPressContextMenu(target: Window = window) {
     if (moved > MOVE_TOLERANCE_PX) cancel()
   }
 
-  function onContextMenu() {
-    if (dispatching || !press) return
+  // Cancelling the lift is what stops the compatibility mouse events and the click, however long
+  // the finger was held.
+  function onTouchEnd(event: TouchEvent) {
+    touching = false
+    liftedAt = performance.now()
+    cancel()
+    liftedAfterFire = fired
+    if (!fired) return
+    fired = false
+    if (event.cancelable) event.preventDefault()
+  }
+
+  function onTouchCancel() {
+    touching = false
+    fired = false
+    cancel()
+  }
+
+  function onContextMenu(event: MouseEvent) {
+    if (dispatching) return
+    if (!touching && performance.now() - liftedAt > NATIVE_AFTER_LIFT_MS) return
     platformFires = true
     cancel()
-  }
-
-  const options = { capture: true, passive: true } as const
-  target.addEventListener('touchstart', onTouchStart, { passive: true })
-  target.addEventListener('touchmove', onTouchMove, options)
-  target.addEventListener('touchend', cancel, options)
-  target.addEventListener('touchcancel', cancel, options)
-  target.addEventListener('scroll', cancel, options)
-  target.addEventListener('contextmenu', onContextMenu, { capture: true })
-  return () => {
-    cancel()
-    target.removeEventListener('touchstart', onTouchStart)
-    target.removeEventListener('touchmove', onTouchMove, options)
-    target.removeEventListener('touchend', cancel, options)
-    target.removeEventListener('touchcancel', cancel, options)
-    target.removeEventListener('scroll', cancel, options)
-    target.removeEventListener('contextmenu', onContextMenu, { capture: true })
-  }
-}
-
-/** The finger lifts after the menu opened; its click must not also press what it is on. */
-function guardNextClick(target: Window) {
-  const swallow = (event: Event) => {
+    if (!fired && !(liftedAfterFire && !touching)) return
+    // This press already opened the menu; the native event would open it a second time.
     event.preventDefault()
     event.stopPropagation()
   }
-  target.addEventListener('click', swallow, { capture: true, once: true })
-  setTimeout(() => target.removeEventListener('click', swallow, { capture: true }), CLICK_GUARD_MS)
+
+  function onSelectionChange() {
+    if (!(target.getSelection()?.isCollapsed ?? true)) cancel()
+  }
+
+  const passive = { capture: true, passive: true } as const
+  const active = { capture: true, passive: false } as const
+  target.addEventListener('touchstart', onTouchStart, passive)
+  target.addEventListener('touchmove', onTouchMove, passive)
+  target.addEventListener('touchend', onTouchEnd, active)
+  target.addEventListener('touchcancel', onTouchCancel, passive)
+  target.addEventListener('scroll', cancel, passive)
+  target.addEventListener('contextmenu', onContextMenu, { capture: true })
+  document.addEventListener('selectionchange', onSelectionChange)
+  return () => {
+    cancel()
+    target.removeEventListener('touchstart', onTouchStart, passive)
+    target.removeEventListener('touchmove', onTouchMove, passive)
+    target.removeEventListener('touchend', onTouchEnd, active)
+    target.removeEventListener('touchcancel', onTouchCancel, passive)
+    target.removeEventListener('scroll', cancel, passive)
+    target.removeEventListener('contextmenu', onContextMenu, { capture: true })
+    document.removeEventListener('selectionchange', onSelectionChange)
+  }
+}
+
+/** Selectable text under the finger: a long press there is the platform's text selection. */
+function startsOnSelectableText(document: Document, target: EventTarget, x: number, y: number) {
+  if (!(target instanceof Element)) return false
+  const view = document.defaultView
+  if (!view || view.getComputedStyle(target).userSelect === 'none') return false
+  const range = document.caretRangeFromPoint?.(x, y)
+  return range?.startContainer.nodeType === Node.TEXT_NODE
 }
