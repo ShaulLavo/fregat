@@ -23,6 +23,7 @@ export const appearanceKeys = {
 export const filePickerKeys = {
   all: ['file-picker'] as const,
   serverInfo: () => [...filePickerKeys.all, 'server-info'] as const,
+  places: () => [...filePickerKeys.all, 'places'] as const,
   directories: () => [...filePickerKeys.all, 'directories'] as const,
   directory: (path: string, query: string, mode: 'file' | 'folder', showHidden: boolean) =>
     [...filePickerKeys.directories(), { mode, path, query, showHidden }] as const,

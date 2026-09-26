@@ -8,7 +8,7 @@ import { filePreviewKeys } from '@/lib/query-keys'
 import { EntryContent } from '@/features/file-picker/components/entry-content'
 import { EntryFacts } from '@/features/file-picker/components/entry-facts'
 import { NoPreview } from '@/features/file-picker/components/no-preview'
-import type { FilePickerIconMode, FilePickerMode } from '@/features/file-picker/utils/model'
+import type { FilePickerMode } from '@/features/file-picker/utils/model'
 import { PREVIEW_SETTLE_MS } from '@/lib/file-preview/utils/preview'
 
 /**
@@ -19,7 +19,6 @@ export function PreviewPane({
   accept,
   className = 'hidden lg:flex',
   entry,
-  iconMode,
   isSearching,
   mode,
   showHidden,
@@ -27,7 +26,6 @@ export function PreviewPane({
   accept?: readonly string[]
   className?: string
   entry: FsEntry | null
-  iconMode: FilePickerIconMode
   isSearching: boolean
   mode: FilePickerMode
   showHidden: boolean
@@ -49,13 +47,7 @@ export function PreviewPane({
           data-file-preview={shown.path}
         >
           <div className='flex max-h-72 min-h-0 w-full shrink justify-center overflow-hidden'>
-            <EntryContent
-              accept={accept}
-              entry={shown}
-              iconMode={iconMode}
-              mode={mode}
-              showHidden={showHidden}
-            />
+            <EntryContent accept={accept} entry={shown} mode={mode} showHidden={showHidden} />
           </div>
           <div className='w-full min-w-0 text-center' title={shown.path}>
             <div className='truncate text-xs font-medium'>{shown.name}</div>

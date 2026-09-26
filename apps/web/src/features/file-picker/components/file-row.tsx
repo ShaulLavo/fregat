@@ -9,9 +9,9 @@ import {
   isPickableEntry,
   kindLabel,
   type FilePickerMode,
-  type FilePickerIconMode,
 } from '@/features/file-picker/utils/model'
 import {
+  ENTRY_NAME_TEXT,
   fileListGridClass,
   formatFileListModified,
   fileListSizeLabel,
@@ -25,7 +25,6 @@ import { FILE_PICKER_INTENT_PREFIX } from '@/features/file-picker/utils/intent'
 export function FileRow({
   accept,
   entry,
-  iconMode,
   rowProps,
   isBusy,
   mode,
@@ -38,7 +37,6 @@ export function FileRow({
 }: {
   accept?: readonly string[]
   entry: FsEntry
-  iconMode: FilePickerIconMode
   rowProps: ReturnType<ReturnType<typeof useListbox>['rowProps']>
   isBusy: boolean
   mode: FilePickerMode
@@ -90,15 +88,10 @@ export function FileRow({
       role='option'
       title={entry.path}
     >
-      <div className='flex min-w-0 items-center gap-2'>
-        <EntryIcon
-          className='size-(--icon-size) shrink-0'
-          entry={entry}
-          iconMode={iconMode}
-          selected={selected}
-        />
+      <div className='flex min-w-0 items-center gap-(--density-control-gap)'>
+        <EntryIcon className='size-(--icon-size) shrink-0' entry={entry} open={selected} />
         <div className='min-w-0 flex-1 truncate'>
-          <span>{entry.name}</span>
+          <span className={ENTRY_NAME_TEXT}>{entry.name}</span>
           {showPath ? (
             <span className='text-muted-foreground text-2xs ml-2'>{displayPath(entry.path)}</span>
           ) : null}

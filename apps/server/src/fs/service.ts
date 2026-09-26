@@ -15,6 +15,7 @@ import { FileChangeHub } from './watch'
 import { entryFromStat } from './entry'
 import { DEFAULT_MAX_TEXT_FILE_BYTES, MAX_TEXT_FILE_BYTES_UPPER_BOUND } from './limits'
 import { statPath } from './stat'
+import { readUserPlaces } from './places'
 import { readTree } from './tree'
 import { getBlobFile, readTextFile } from './read'
 import { writeTextFile } from './write'
@@ -75,6 +76,8 @@ export type FileSystemServiceOptions = {
   workspaceRoot?: string
   systemRoot?: string
   homeDirectory?: string
+  /** xdg-user-dirs' `user-dirs.dirs`; defaults to the one under the home's config directory. */
+  userDirsFile?: string
   watch?: boolean
   maxSearchContentBytes?: number
   maxTextFileBytes?: number
@@ -126,6 +129,8 @@ export class FileSystemService {
   readonly systemRoot
   readonly defaultPath
   readonly metadata
+  private readonly homeDirectory
+  private readonly userDirsFile
   private readonly appWrites = new AppWrites()
   private readonly maxSearchContentBytes
   private readonly maxTextFileBytes
@@ -151,6 +156,8 @@ export class FileSystemService {
       excludedNames: [driveJournalName(process.getuid?.() ?? 0)],
     })
     this.homePath = resolveHomePath(this.paths, homeDirectory)
+    this.homeDirectory = homeDirectory
+    this.userDirsFile = options.userDirsFile ?? defaultUserDirsFile(options.homeDirectory)
     this.defaultPath = this.homePath
     this.metadata = new FsMetadataStore({
       database: options.metadataDatabase,
@@ -213,6 +220,16 @@ export class FileSystemService {
       workspaceIndexes: this.workspaceIndexes.statuses(),
       ...this.changes.info(),
     }
+  }
+
+  places() {
+    return observeRequestOperation(
+      { area: 'fs', operation: 'places' },
+      async () => ({
+        places: await readUserPlaces(this.paths, this.homeDirectory, this.userDirsFile),
+      }),
+      (result) => ({ placeCount: result.places.length }),
+    )
   }
 
   stat(path: string) {
@@ -913,6 +930,14 @@ function watchStreamSummary(
     status,
     subscribedRootCount: paths.length || 1,
   }
+}
+
+// An injected home (tests, a second owner) reads its own config, never the process's XDG_CONFIG_HOME.
+function defaultUserDirsFile(injectedHome: string | undefined) {
+  const configHome = injectedHome
+    ? path.join(injectedHome, '.config')
+    : process.env.XDG_CONFIG_HOME || path.join(homedir(), '.config')
+  return path.join(configHome, 'user-dirs.dirs')
 }
 
 function resolveHomePath(paths: ReturnType<typeof createWorkspacePaths>, homeDirectory: string) {

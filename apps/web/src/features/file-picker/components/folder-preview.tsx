@@ -5,8 +5,10 @@ import { LoadingState } from '@workspace/ui/components/loading-state'
 import type { FsEntry } from '@/lib/file-system-types'
 import { EntryIcon } from '@/features/file-picker/components/entry-icon'
 import { directoryQueryOptions } from '@/features/file-picker/utils/directory-query'
-import type { FilePickerIconMode, FilePickerMode } from '@/features/file-picker/utils/model'
+import type { FilePickerMode } from '@/features/file-picker/utils/model'
 import { sortFilePickerEntries } from '@/features/file-picker/utils/sort-entries'
+import { ENTRY_NAME_TEXT } from '@/features/file-picker/utils/rows'
+import { cn } from '@workspace/ui/lib/utils'
 import { PREVIEW_CHILDREN } from '@/features/file-picker/utils/preview'
 import { filterPickerEntries } from '@/features/file-picker/utils/type-filter'
 
@@ -16,13 +18,11 @@ const BY_NAME = { direction: 'ascending', key: 'name' } as const
 export function FolderPreview({
   accept,
   entry,
-  iconMode,
   mode,
   showHidden,
 }: {
   accept?: readonly string[]
   entry: FsEntry
-  iconMode: FilePickerIconMode
   mode: FilePickerMode
   showHidden: boolean
 }) {
@@ -51,17 +51,12 @@ export function FolderPreview({
     >
       {children.map((child) => (
         <li
-          className='flex h-(--density-row-height) min-w-0 items-center gap-2'
+          className='flex h-(--density-row-height) min-w-0 items-center gap-(--density-control-gap)'
           key={child.path}
           title={child.path}
         >
-          <EntryIcon
-            className='size-(--icon-size-sm)'
-            entry={child}
-            iconMode={iconMode}
-            selected={false}
-          />
-          <span className='truncate'>{child.name}</span>
+          <EntryIcon className='size-(--icon-size)' entry={child} />
+          <span className={cn('truncate', ENTRY_NAME_TEXT)}>{child.name}</span>
         </li>
       ))}
     </ul>

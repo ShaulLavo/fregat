@@ -132,6 +132,18 @@ export const filePickerBrowse: Scenario = {
         ),
         '→ moves one tile in the grid',
       )
+      ok(
+        (await selectors.pickerView(page, 'Icons').getAttribute('aria-selected')) === 'true',
+        'The Icons tab is the pressed one',
+      )
+      // The indicator slides for --duration-enter; a screenshot inside that slide shows the old tab.
+      await page.waitForFunction(() => {
+        const list = document.querySelector('[role="tablist"][aria-label="View"]')
+        const tab = list?.querySelector('[role="tab"][aria-selected="true"]')
+        const indicator = list?.querySelector('[data-slot="tabs-indicator"]')
+        if (!tab || !indicator) return false
+        return Math.abs(tab.getBoundingClientRect().x - indicator.getBoundingClientRect().x) < 1
+      })
       await step('icons-grid')
       await page.keyboard.press('Escape')
     } finally {

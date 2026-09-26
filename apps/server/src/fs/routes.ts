@@ -35,6 +35,7 @@ import { sseResponse, toErrorYieldingSse, toSse } from '../sse'
 export function fsRoutes(fs: FileSystemService) {
   return new Elysia({ name: 'fs-routes' }).group('/fs', (app) =>
     app
+      .get('/places', () => fs.places())
       .get('/stat', ({ query }) => fs.stat(query.path), {
         query: pathQuerySchema,
       })

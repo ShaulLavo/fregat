@@ -8,18 +8,14 @@ import type { FsEntry } from '@/lib/file-system-types'
 import { isDirectoryEntry } from '@/lib/file-system-types'
 import { INTENT_PREFETCH_HIT_SLOP_PX } from '@/lib/intent-prefetch-options'
 import { EntryIcon } from '@/features/file-picker/components/entry-icon'
+import { ENTRY_NAME_TEXT } from '@/features/file-picker/utils/rows'
 import { DIRECTORY_QUERY_STALE_MS } from '@/features/file-picker/utils/directory-query'
-import {
-  isPickableEntry,
-  type FilePickerIconMode,
-  type FilePickerMode,
-} from '@/features/file-picker/utils/model'
+import { isPickableEntry, type FilePickerMode } from '@/features/file-picker/utils/model'
 
 /** A name and its icon; a folder carries the caret that says a column opens to its right. */
 export function ColumnRow({
   accept,
   entry,
-  iconMode,
   isBusy,
   mode,
   onDirectoryIntent,
@@ -29,7 +25,6 @@ export function ColumnRow({
 }: {
   accept?: readonly string[]
   entry: FsEntry
-  iconMode: FilePickerIconMode
   isBusy: boolean
   mode: FilePickerMode
   onDirectoryIntent: (path: string) => void
@@ -53,7 +48,7 @@ export function ColumnRow({
     <ListRow
       {...rowProps}
       className={cn(
-        'flex w-full cursor-default items-center gap-2 text-left',
+        'flex w-full cursor-default items-center text-left',
         !isPickableEntry(entry, mode, accept) && !directory && 'text-muted-foreground',
       )}
       disabled={isBusy}
@@ -65,13 +60,8 @@ export function ColumnRow({
         if (!isBusy) onDoubleClick(entry)
       }}
     >
-      <EntryIcon
-        className='size-(--icon-size) shrink-0'
-        entry={entry}
-        iconMode={iconMode}
-        selected={selected}
-      />
-      <span className='min-w-0 flex-1 truncate'>{entry.name}</span>
+      <EntryIcon className='size-(--icon-size) shrink-0' entry={entry} open={selected} />
+      <span className={cn('min-w-0 flex-1 truncate', ENTRY_NAME_TEXT)}>{entry.name}</span>
       {directory ? (
         <CaretRightIcon
           aria-hidden='true'

@@ -57,7 +57,6 @@ import {
   pickerCopy,
   toPickedEntry,
   type EntriesLoadState,
-  type FilePickerIconMode,
   type FilePickerMode,
 } from '@/features/file-picker/utils/model'
 import { NewFolderPopover } from '@/features/file-picker/components/new-folder-popover'
@@ -79,6 +78,7 @@ import {
 import { useFilePickerSession } from '@/features/file-picker/state/picker'
 import { useDirectoryLoad } from '@/features/file-picker/hooks/use-directory-load'
 import { useRecentEntries } from '@/features/file-picker/hooks/use-recent-entries'
+import { usePlaces } from '@/features/file-picker/hooks/use-places'
 import { useServerInfoForOpen } from '@/features/file-picker/hooks/use-server-info-for-open'
 import {
   isBackShortcut,
@@ -100,7 +100,6 @@ import { useSettingsActions } from '@/features/settings/hooks/use-settings-actio
 
 type FilePickerDialogProps = {
   accept?: readonly string[]
-  iconMode?: FilePickerIconMode
   mode?: FilePickerMode
   open: boolean
   value: PickedFsEntry | null
@@ -114,7 +113,6 @@ export type { FilePickerMode }
 
 export function FilePickerDialog({
   accept,
-  iconMode,
   mode = 'folder',
   open,
   value,
@@ -150,6 +148,7 @@ export function FilePickerDialog({
     serverInfo,
     showHidden,
   })
+  const { places, refresh: refreshPlaces } = usePlaces(open, serverInfo)
   const { loadState: recentState, refresh: refreshRecents } = useRecentEntries({
     mode,
     open,
@@ -237,7 +236,6 @@ export function FilePickerDialog({
   const hiddenManagedByPolicy = policyControlledIds(settingsLayers).includes('files.showHidden')
   const hiddenSettingDisabled = !settings || hiddenManagedByPolicy
   const copy = pickerCopy(mode)
-  const displayedIconMode = iconMode ?? (mode === 'file' ? 'vscode' : 'default')
   // The list rows consume these actions through context, so identity must stay
   // stable while typing or scrolling to avoid rerendering every visible row.
   const sessionActions: FilePickerSessionActions = {
@@ -258,7 +256,7 @@ export function FilePickerDialog({
   }, [preloadDirectory, focusedEntry])
 
   function refresh() {
-    void Promise.all([refreshDirectory(), refreshRecents(), refreshServerInfo()])
+    void Promise.all([refreshDirectory(), refreshRecents(), refreshPlaces(), refreshServerInfo()])
   }
 
   function goBack() {
@@ -650,6 +648,7 @@ export function FilePickerDialog({
             <MobileLocations
               currentPath={session.currentPath}
               homePath={homePath}
+              places={places}
               recentState={recentState}
             />
           </div>
@@ -658,6 +657,7 @@ export function FilePickerDialog({
             <PlacesSidebar
               currentPath={session.currentPath}
               homePath={homePath}
+              places={places}
               recentState={recentState}
             />
             <div className='bg-background min-h-0' ref={middleRef}>
@@ -665,7 +665,6 @@ export function FilePickerDialog({
                 <ColumnsView
                   accept={activeAccept}
                   currentPath={session.currentPath}
-                  iconMode={displayedIconMode}
                   isBusy={listInteractionPending}
                   mode={mode}
                   showHidden={showHidden}
@@ -683,7 +682,6 @@ export function FilePickerDialog({
               ) : view === 'icons' ? (
                 <IconsView
                   entries={entries}
-                  iconMode={displayedIconMode}
                   isBusy={listInteractionPending}
                   listRef={listRef}
                   loadState={loadState}
@@ -708,7 +706,6 @@ export function FilePickerDialog({
                   <FileList
                     accept={activeAccept}
                     entries={entries}
-                    iconMode={displayedIconMode}
                     isBusy={listInteractionPending}
                     isSearching={isSearching}
                     listRef={listRef}
@@ -729,7 +726,6 @@ export function FilePickerDialog({
             <PreviewPane
               accept={activeAccept}
               entry={previewEntry}
-              iconMode={displayedIconMode}
               isSearching={isSearching}
               mode={mode}
               showHidden={showHidden}
@@ -755,7 +751,7 @@ export function FilePickerDialog({
             </PaneBar>
           ) : null}
           <DialogFooter className='flex h-(--bar-height) shrink-0 flex-row items-center justify-between gap-(--density-control-gap) px-(--bar-padding-x) sm:justify-between'>
-            <SelectedSummary entry={selectedPickable} iconMode={displayedIconMode} mode={mode} />
+            <SelectedSummary entry={selectedPickable} mode={mode} />
             <span
               className='text-muted-foreground text-2xs ml-auto shrink-0 font-mono tabular-nums'
               role='status'

@@ -63,7 +63,6 @@ function pickerList(
     <FilePickerSessionActionsContext value={actions}>
       <FileList
         entries={entries}
-        iconMode='default'
         isBusy={false}
         isSearching={false}
         loadState={loadState}

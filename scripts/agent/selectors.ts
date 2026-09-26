@@ -283,7 +283,8 @@ export const selectors = {
     page
       .getByRole('dialog', { name: 'Choose folder', exact: true })
       .getByRole('option')
-      .filter({ hasText: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`) }),
+      // Folder glyphs carry whitespace between their paths, so the name follows it.
+      .filter({ hasText: new RegExp(`^\\s*${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`) }),
   pickerHiddenToggle: (page: Page, shown: boolean) =>
     page.getByRole('button', {
       name: shown ? 'Hide hidden files' : 'Show hidden files',

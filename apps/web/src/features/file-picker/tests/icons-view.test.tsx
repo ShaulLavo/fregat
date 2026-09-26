@@ -13,7 +13,6 @@ function icons(loadState: EntriesLoadState, onRetry = () => {}) {
     >
       <IconsView
         entries={[]}
-        iconMode='default'
         isBusy={false}
         listRef={createRef()}
         mode='folder'

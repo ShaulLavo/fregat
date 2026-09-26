@@ -9,7 +9,7 @@ import { isDirectoryEntry } from '@/lib/file-system-types'
 import { ColumnLoading } from '@/features/file-picker/components/column-loading'
 import { ColumnRow } from '@/features/file-picker/components/column-row'
 import { directoryQueryOptions } from '@/features/file-picker/utils/directory-query'
-import type { FilePickerIconMode, FilePickerMode } from '@/features/file-picker/utils/model'
+import type { FilePickerMode } from '@/features/file-picker/utils/model'
 import { filterPickerEntries } from '@/features/file-picker/utils/type-filter'
 import { sortFilePickerEntries } from '@/features/file-picker/utils/sort-entries'
 
@@ -23,7 +23,6 @@ export function PickerColumn({
   accept,
   active,
   column,
-  iconMode,
   isBusy,
   mode,
   path,
@@ -41,7 +40,6 @@ export function PickerColumn({
   accept?: readonly string[]
   active: boolean
   column: number
-  iconMode: FilePickerIconMode
   isBusy: boolean
   mode: FilePickerMode
   path: string
@@ -136,7 +134,6 @@ export function PickerColumn({
           <ColumnRow
             accept={accept}
             entry={entry}
-            iconMode={iconMode}
             isBusy={isBusy}
             mode={mode}
             rowProps={list.rowProps(entry.path)}
