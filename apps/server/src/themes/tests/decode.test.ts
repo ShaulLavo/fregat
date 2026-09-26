@@ -1,12 +1,41 @@
 import { expect, test } from 'vitest'
 import { PNG } from 'pngjs'
-import { decodeWallpaper, MAX_WALLPAPER_BYTES } from '../wallpapers/decode'
+import {
+  decodeWallpaper,
+  deriveRendition,
+  MAX_WALLPAPER_BYTES,
+  readWallpaperHeader,
+} from '../wallpapers/decode'
 
 function still(width = 48, height = 32) {
   const image = new PNG({ width, height })
   image.data.fill(255)
   return PNG.sync.write(image)
 }
+
+test('reads a header without decoding pixel data or creating renditions', async () => {
+  const headerOnly = still().subarray(0, 33)
+  expect(await readWallpaperHeader(headerOnly)).toEqual({
+    width: 48,
+    height: 32,
+    extension: 'png',
+    contentType: 'image/png',
+  })
+  await expect(decodeWallpaper(headerOnly)).rejects.toMatchObject({ code: 'wallpapers.INVALID' })
+})
+
+test.each(['thumbnail', 'display'] as const)(
+  'derives an oriented %s from a stored original',
+  async (kind) => {
+    const file = new URL('./fixtures/oriented.jpg', import.meta.url).pathname
+    const rendition = await deriveRendition(file, kind)
+    expect(await new Bun.Image(rendition).metadata()).toEqual({
+      width: 32,
+      height: 48,
+      format: 'webp',
+    })
+  },
+)
 
 test.each(['png', 'jpeg', 'webp'] as const)(
   'decodes %s and keeps small renditions within source bounds',

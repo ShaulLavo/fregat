@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { TooltipProvider } from '@workspace/ui/components/tooltip'
-import type { ProviderMcpServer, ProviderMcpSignIn, ScopedSessionRef } from '@workspace/contracts'
+import type { ProviderMcpServer, ScopedSessionRef } from '@workspace/contracts'
 import { vi } from 'vitest'
 import { http, HttpResponse } from 'msw'
 import { server as requests } from '../../../../test/msw/server'
@@ -17,13 +17,34 @@ import {
   MetadataProviderAdapter,
   makeSessionDomainFixture,
 } from '../../../../test/factories/session-domain'
+import { mcpServer } from '../../../../test/factories/mcp-server'
+
+const AUTHORIZATION =
+  'https://auth.example.test/login?redirect_uri=http%3A%2F%2F127.0.0.1%3A43111%2Fcallback&state=s-1'
+
+type SignInFlow = {
+  authorizationUrl: string
+  done: Promise<void>
+  finish: (callbackUrl: URL) => Promise<void>
+  cancel: () => void
+}
 
 class SignInAdapter extends MetadataProviderAdapter {
-  readonly response = Promise.withResolvers<ProviderMcpSignIn>()
+  readonly response = Promise.withResolvers<SignInFlow>()
+  readonly finished: string[] = []
+  readonly outcome = Promise.withResolvers<void>()
   signInRequested = false
 
   async mcpServers(): Promise<ProviderMcpServer[]> {
-    return [{ name: 'github', status: 'needs-auth', error: null }]
+    return [
+      mcpServer({
+        auth: 'signed-out',
+        name: 'github',
+        origin: 'https://api.github.test',
+        status: 'needs-auth',
+        transport: 'http',
+      }),
+    ]
   }
 
   async signInMcpServer() {
@@ -37,7 +58,7 @@ function McpList({ sessionRef }: { sessionRef: ScopedSessionRef }) {
   return <SessionMcpList mcp={mcp} sessionRef={sessionRef} />
 }
 
-test('offers an explicit sign-in link after a delayed OAuth response without opening a popup', async () => {
+test('offers the sign-in page after a delayed OAuth response, and finishes with a pasted address', async () => {
   requests.use(http.get('https://models.dev/api.json', () => HttpResponse.json({})))
   const fixture = await makeSessionDomainFixture({ environmentId: TEST_ENVIRONMENT_ID })
   const adapter = new SignInAdapter()
@@ -69,12 +90,28 @@ test('offers an explicit sign-in link after a delayed OAuth response without ope
       fireEvent.click(screen.getByRole('button', { name: 'Sign in to github' }))
       await waitFor(() => expect(adapter.signInRequested).toBe(true))
       expect(screen.queryByRole('link')).toBeNull()
-      adapter.response.resolve({ authorizationUrl: 'https://auth.example.test/login' })
-      const link = await screen.findByRole('link', { name: 'Continue sign-in to github' })
-      expect(link).toHaveAttribute('href', 'https://auth.example.test/login')
+      adapter.response.resolve({
+        authorizationUrl: AUTHORIZATION,
+        cancel: () => adapter.outcome.reject(new Error('cancelled')),
+        done: adapter.outcome.promise,
+        finish: async (callbackUrl) => {
+          adapter.finished.push(callbackUrl.href)
+          adapter.outcome.resolve()
+        },
+      })
+      const link = await screen.findByRole('link', { name: 'Open sign-in page for github' })
+      expect(link).toHaveAttribute('href', AUTHORIZATION)
       expect(link).toHaveAttribute('target', '_blank')
       expect(link.getAttribute('rel')).toContain('noopener')
       expect(popup).not.toHaveBeenCalled()
+
+      // From a phone the page ends on the server's loopback; the pasted address finishes there.
+      fireEvent.change(screen.getByLabelText(/Paste that address here/), {
+        target: { value: 'http://localhost:43111/callback?code=c&state=s-1' },
+      })
+      fireEvent.click(screen.getByRole('button', { name: 'Finish' }))
+      expect(await screen.findByText('Signed in to github')).toBeInTheDocument()
+      expect(adapter.finished).toEqual(['http://127.0.0.1:43111/callback?code=c&state=s-1'])
     } finally {
       view.unmount()
     }

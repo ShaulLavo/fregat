@@ -1,3 +1,5 @@
+import { use } from 'react'
+import { SettingsDisplayContext } from '@/features/settings/providers/display-context'
 import { useStore } from 'zustand'
 import { createStore } from 'zustand/vanilla'
 
@@ -18,5 +20,6 @@ export function selectSettingsView(next: SettingsView) {
 }
 
 export function useSettingsView(): SettingsView {
-  return useStore(store)
+  const requested = useStore(store)
+  return use(SettingsDisplayContext)?.view ?? requested
 }

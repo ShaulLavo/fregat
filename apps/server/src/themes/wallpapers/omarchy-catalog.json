@@ -1,0 +1,558 @@
+{
+  "repository": "basecamp/omarchy",
+  "commit": "e1614f2bdb94f7df11eda072644b31e1e118f1ba",
+  "wallpapers": [
+    {
+      "theme": "catppuccin-latte",
+      "file": "1-color-fade.webp",
+      "asset": "c4cb211770713984e630ef6eebfb6cfb03169124c98765fd52f82ee0bfd36603",
+      "bytes": 10126
+    },
+    {
+      "theme": "catppuccin-latte",
+      "file": "omarchy.webp",
+      "asset": "8482e189755138084295e90f353b8efe8d3e575d7bc3fc3ed756d1e890242d32",
+      "bytes": 714
+    },
+    {
+      "theme": "catppuccin",
+      "file": "1-totoro.webp",
+      "asset": "4896da620ed3016b7e52eede8db8169591a9fa4856064db4039521be96f724b6",
+      "bytes": 46504
+    },
+    {
+      "theme": "catppuccin",
+      "file": "2-waves.webp",
+      "asset": "5fe347ef9814dbf1d5bc73a96381b8fe4908ed0f7e4293d2c3c8d860b46041ce",
+      "bytes": 639444
+    },
+    {
+      "theme": "catppuccin",
+      "file": "3-blue-eye.webp",
+      "asset": "70743c244575253b72f17978060f87239e0125575195f64e288479666129954a",
+      "bytes": 217056
+    },
+    {
+      "theme": "catppuccin",
+      "file": "omarchy.webp",
+      "asset": "24cb9211e2191edefadd093976526d3606167343a636eb9ff123b40d4e594329",
+      "bytes": 716
+    },
+    {
+      "theme": "ethereal",
+      "file": "1-cosmic.webp",
+      "asset": "e3241507d4ba5cc25ae4bdf746401e4b65ce7a06cead4d83c49461587addab63",
+      "bytes": 327998
+    },
+    {
+      "theme": "ethereal",
+      "file": "2-meadow.webp",
+      "asset": "60b1eeb738d876094738388ac061e0daa739250eac52b49e4fb83b35d9395f6d",
+      "bytes": 864376
+    },
+    {
+      "theme": "ethereal",
+      "file": "omarchy.webp",
+      "asset": "651b237dfd573aad2da6946d4a87bb4d9c1bec1b4511ce2489effb319e6a1779",
+      "bytes": 716
+    },
+    {
+      "theme": "everforest",
+      "file": "1-tree-tops.webp",
+      "asset": "2360752bcfb976e65148b47f696d48cca0d94bb782ab1d7321c26c71bf2b2278",
+      "bytes": 221494
+    },
+    {
+      "theme": "everforest",
+      "file": "omarchy.webp",
+      "asset": "5a7f4ba2911401d90595d73a93e7ed5f5c2eacfad3343eb75b2bf127547c6419",
+      "bytes": 716
+    },
+    {
+      "theme": "flexoki-light",
+      "file": "1-orb.webp",
+      "asset": "37f8c1ff2e7a95f1a15cbb0394be5642b8e9813638866c79a10537d6553ee90f",
+      "bytes": 96890
+    },
+    {
+      "theme": "flexoki-light",
+      "file": "2-omarchy.webp",
+      "asset": "a3a3d457c6547bb8a94dd7da06b14deab572bdf78ae597bb6eb8a6a81b04f0bb",
+      "bytes": 4268
+    },
+    {
+      "theme": "gruvbox",
+      "file": "1-the-backwater.jpg",
+      "asset": "13cfc6ae370af984c08a820ff81b56a0febb0fbfe9712a6db128b94d14ecaac6",
+      "bytes": 4127598
+    },
+    {
+      "theme": "gruvbox",
+      "file": "2-flower-basket.webp",
+      "asset": "66c8d1df13776bcbf377b9463a981141c546b1fc0e87cd27aad8b2f81a98db77",
+      "bytes": 1038098
+    },
+    {
+      "theme": "gruvbox",
+      "file": "3-village-square.jpg",
+      "asset": "9ac4d52dbef06876a838e9cf9f97813dd86e99d2b977d9d11c5f389be6451cdc",
+      "bytes": 1924485
+    },
+    {
+      "theme": "gruvbox",
+      "file": "4-idyllic-procession.jpg",
+      "asset": "be0ae73263a5eb69416fb13547826a60806859aa31bb031053afc73de60a55c5",
+      "bytes": 1908429
+    },
+    {
+      "theme": "gruvbox",
+      "file": "5-leaves.jpg",
+      "asset": "cdbd3cd7b34a2c8e7e74818af5101a8531786878b0a3afcb8f6985b27394f66d",
+      "bytes": 443959
+    },
+    {
+      "theme": "gruvbox",
+      "file": "omarchy.webp",
+      "asset": "08859bab0fd1f3e103bb73b94c3e1ad8a91efc4761a85906063e7cca277c07e9",
+      "bytes": 716
+    },
+    {
+      "theme": "hackerman",
+      "file": "1-synth-scape.jpg",
+      "asset": "c7d2594935f204e0df1b43dfe7a12389ea1c1d3fd8e57a92a9f08497f27a377e",
+      "bytes": 2330372
+    },
+    {
+      "theme": "hackerman",
+      "file": "2-geometric.webp",
+      "asset": "b330e6d1fe7c48447c0547201fe65783c3269ea195ccfd8202fc9530816f504d",
+      "bytes": 685254
+    },
+    {
+      "theme": "hackerman",
+      "file": "omarchy.webp",
+      "asset": "3dd5cd56cd743e4578aa2cfd2eeb536460f14d7b034730205d02b34b8c739c7a",
+      "bytes": 716
+    },
+    {
+      "theme": "kanagawa",
+      "file": "1-kanagawa.jpg",
+      "asset": "9b817d717688539f0db87603b661992839c3cbb5d4918a02a4efc05c9f88b27d",
+      "bytes": 1624027
+    },
+    {
+      "theme": "kanagawa",
+      "file": "omarchy.webp",
+      "asset": "e27fe79776337f0e80c2051d6d981c2ee4cca170584f455e27395de4bc3ff6c5",
+      "bytes": 716
+    },
+    {
+      "theme": "last-horizon",
+      "file": "1-eyes-wide.webp",
+      "asset": "53cc2eea25bd75435d77d2b3cc9339841dfdcd5a52c51a1e02dda14a3e527bd4",
+      "bytes": 201876
+    },
+    {
+      "theme": "last-horizon",
+      "file": "2-blink.webp",
+      "asset": "eaec03ab843739754979987944064bb46d283e47e36aa5d8d8f9d75cd9997155",
+      "bytes": 333810
+    },
+    {
+      "theme": "last-horizon",
+      "file": "3-bokeh.webp",
+      "asset": "f91b253da6bb173d6cccf41a165e683d5d656bbf5d9169493831f96422781c30",
+      "bytes": 63620
+    },
+    {
+      "theme": "last-horizon",
+      "file": "4-new-horizons.jpg",
+      "asset": "6b13ec842e3617d7c9c113612664f56b8ffec5fb76d0613bb1c84914f12feb5f",
+      "bytes": 1293016
+    },
+    {
+      "theme": "lumon",
+      "file": "01-united-in-severance.webp",
+      "asset": "cdfb3d4cb22077ed5f2a73ac8822b6c4e3614a210c5947194c046078ab5073a5",
+      "bytes": 39018
+    },
+    {
+      "theme": "lumon",
+      "file": "02-opinions-equally.webp",
+      "asset": "ecf20fa95f659643fb37e05910b92e82195aa673f3c58a2a51e20ce1127dc7c5",
+      "bytes": 253452
+    },
+    {
+      "theme": "lumon",
+      "file": "omarchy.webp",
+      "asset": "2581cb9d50fcdbf3d426a1f611b610eae157769ddcb6d4e22a8796ade9b8a036",
+      "bytes": 716
+    },
+    {
+      "theme": "lupine",
+      "file": "01-cherry-blossom-bokeh.webp",
+      "asset": "99ad4abf2685fab5aab31ebcea09988ca1f689c80b1e2f1c50f6e3d6e7c9296a",
+      "bytes": 620524
+    },
+    {
+      "theme": "lupine",
+      "file": "02-cherry-blossom-white.webp",
+      "asset": "175cf3ad34a1d5fcec8fbec12c7c700a23fbb1fd800e5e4a0e1f766e05a04e24",
+      "bytes": 1957592
+    },
+    {
+      "theme": "lupine",
+      "file": "03-pastel-clouds.webp",
+      "asset": "134bb172af81e60457f90bc8142e06dd43db27cbb1eb15ddb57d3b8fcce8698f",
+      "bytes": 753312
+    },
+    {
+      "theme": "lupine",
+      "file": "04-elegant-blue-wave.webp",
+      "asset": "0fb09c0d2dd456cfe31980ed102b8cac91a08d9ceda342780d11778b9423356c",
+      "bytes": 208514
+    },
+    {
+      "theme": "lupine",
+      "file": "05-abstract-wave.webp",
+      "asset": "f7ed1e829d3a53a9451c91b7f59cde257bffe6901c8810f352dd944e2f65d67f",
+      "bytes": 146796
+    },
+    {
+      "theme": "lupine",
+      "file": "06-omarchy.webp",
+      "asset": "069bca2eb0e28b6c6edbc54940e7a63f647a203d95243b26bdd3f3721e32b21a",
+      "bytes": 716
+    },
+    {
+      "theme": "matte-black",
+      "file": "0-ship-at-sea.jpg",
+      "asset": "55fa691adfd3fb8a9102b826a28d8de679938f04879799da499b8ace2fe039ac",
+      "bytes": 1681677
+    },
+    {
+      "theme": "matte-black",
+      "file": "1-dark-waters.webp",
+      "asset": "317ef6c39eedde976c59a6eb4c782837a661a91089ab7857516368dc92d0481b",
+      "bytes": 332512
+    },
+    {
+      "theme": "matte-black",
+      "file": "2-dot-hands.webp",
+      "asset": "a51e0dc5406d054ddfe16dc732ada4061c733a9e6f985a3ff773ba1e803ad3a0",
+      "bytes": 236190
+    },
+    {
+      "theme": "matte-black",
+      "file": "omarchy.webp",
+      "asset": "b867ba75dc29b073f43e22170a48a8f80365939b16481a54541184ab13d98cec",
+      "bytes": 716
+    },
+    {
+      "theme": "miasma",
+      "file": "01-nature-of-fear.webp",
+      "asset": "8bc5f2863a9eea9e3eff738d4461ab45f0fca83fc1b1d7d289edcd03c05540a4",
+      "bytes": 63996
+    },
+    {
+      "theme": "miasma",
+      "file": "02-crowned.webp",
+      "asset": "b2871e00f96ed65f8c179bfc14dd2388d695bd618543478c2e5f7b8875f6417d",
+      "bytes": 134442
+    },
+    {
+      "theme": "miasma",
+      "file": "omarchy.webp",
+      "asset": "5081d894e997352ec6d0e3085a6bedf41e45b2a0f13d43df58ffb634dac69d5a",
+      "bytes": 716
+    },
+    {
+      "theme": "nord",
+      "file": "0-black-moon.jpg",
+      "asset": "6873fbf7d4cbb9a39604094dd8d804eb6d231e63ecf56e5c297aae90358eff81",
+      "bytes": 3255290
+    },
+    {
+      "theme": "nord",
+      "file": "1-city-view.webp",
+      "asset": "b649b9082dd4b75ab232c2d4981b4ee6f42df2b822785dbc9e3a939e6e8e2894",
+      "bytes": 355776
+    },
+    {
+      "theme": "nord",
+      "file": "2-night-hawks.webp",
+      "asset": "43ff26ab2a1b1f50afd49c7a797280f4f31765bc3fea1a15661bbf5774824089",
+      "bytes": 697878
+    },
+    {
+      "theme": "nord",
+      "file": "omarchy.webp",
+      "asset": "877160694eb975f33d7fc25e542e248c48994540f46eba928a48c22c2e0ffe60",
+      "bytes": 716
+    },
+    {
+      "theme": "osaka-jade",
+      "file": "1-glowing-city.webp",
+      "asset": "d234c4a7c8c65da307c5fcc66396f7ed0a5cff4344100e02772c4cc4ce8a5946",
+      "bytes": 313622
+    },
+    {
+      "theme": "osaka-jade",
+      "file": "2-shaded-entrance.webp",
+      "asset": "0aca4b1e8d514ddf388b6b7a9db5e6c7a176e06cfd615b4a3c998a83d65467fb",
+      "bytes": 504030
+    },
+    {
+      "theme": "osaka-jade",
+      "file": "3-mountain-moon.webp",
+      "asset": "9d2fa1be731069627b68f99656eef9f66d255fc0d8c7ce132b4e4868fbe42fbf",
+      "bytes": 327058
+    },
+    {
+      "theme": "osaka-jade",
+      "file": "omarchy.webp",
+      "asset": "c3d1300d8fe70de7ad98e6a12e5e3d179d862e2a944b534a3bc83dbc7f079a4e",
+      "bytes": 716
+    },
+    {
+      "theme": "retro-82",
+      "file": "1-in-the-groove.webp",
+      "asset": "c9d9efdf70c010370d6fc3ba1bbfc1861857bd09d64e8b56bd8dd11054778d8a",
+      "bytes": 854620
+    },
+    {
+      "theme": "retro-82",
+      "file": "2-dusk-guardian.webp",
+      "asset": "7a10101c1a1ceec3e5bda6d28cd550daf527e3fc0985b7d3a4cef6959a708a9e",
+      "bytes": 484858
+    },
+    {
+      "theme": "retro-82",
+      "file": "3-glassy-lines.webp",
+      "asset": "e95d96bb3c79f92cac9324a20cca6c39da54e0f1baa27adad680ac6c3161df1b",
+      "bytes": 2374162
+    },
+    {
+      "theme": "retro-82",
+      "file": "4-gateway.webp",
+      "asset": "50fe74a71465640aa143c3e30ae970f7a54d57561ed5bc4fe3f4af2233ab2459",
+      "bytes": 807956
+    },
+    {
+      "theme": "retro-82",
+      "file": "5-zen-boat.webp",
+      "asset": "016408d45f598e42434aac4c5c0ead75661e1d2297e4f6a9f8d69c38d0d4606a",
+      "bytes": 1216728
+    },
+    {
+      "theme": "retro-82",
+      "file": "6-abstract-pyramids.webp",
+      "asset": "4f55fac00d3c294423c48e9074fa310b7fa63df9de82e26a66ac0ca63cd4ece6",
+      "bytes": 2347944
+    },
+    {
+      "theme": "retro-82",
+      "file": "7-the-journey.webp",
+      "asset": "21984307e38e77af0af1fc02706efdcc49127421d443d5c4bbe3ff6ce7fbc51c",
+      "bytes": 825734
+    },
+    {
+      "theme": "retro-82",
+      "file": "8-glitter-glass.webp",
+      "asset": "8a70dc2c556fa67cc46a405bf38600a8ca55d8fe7f8de2ee7f020aeb52c19ced",
+      "bytes": 601034
+    },
+    {
+      "theme": "retro-82",
+      "file": "omarchy.webp",
+      "asset": "08fbd2db38c5fac9ea15de7f449db0bf0e70cf5c77fe02ed016834d545c4e872",
+      "bytes": 716
+    },
+    {
+      "theme": "ristretto",
+      "file": "0-launch.webp",
+      "asset": "42d3a7bfe5cbf36361e8c0152c9fca2c6e3302e779690aed5a2d6ea0ab985044",
+      "bytes": 68118
+    },
+    {
+      "theme": "ristretto",
+      "file": "1-color-curves.webp",
+      "asset": "9f2c1043dc36901f2f5979ad39fdad5b111cdbd38927e8332e82f28cf7f81754",
+      "bytes": 51580
+    },
+    {
+      "theme": "ristretto",
+      "file": "2-coffee-beans.jpg",
+      "asset": "a2d67d86044009fc7c7066f4c7be55c6471ab5f2517a40b2a4a6d3ba1a0cc0cd",
+      "bytes": 1196995
+    },
+    {
+      "theme": "ristretto",
+      "file": "3-industrial-moon.webp",
+      "asset": "83ba5c5564ccc39aff868e03fc5704b6da146120c55eb28bdcab227e1d510c2d",
+      "bytes": 206608
+    },
+    {
+      "theme": "ristretto",
+      "file": "omarchy.webp",
+      "asset": "d2db907ffc0655c73bbfb29e7d17796341d8d3bdfad72d7a3c3b408b1e996582",
+      "bytes": 716
+    },
+    {
+      "theme": "rose-pine",
+      "file": "1-funky-shapes.webp",
+      "asset": "f8920bfbe3fdff6a42a9c920e87aa4b7d590d4b01862948ffbc4e484339f2b81",
+      "bytes": 133650
+    },
+    {
+      "theme": "rose-pine",
+      "file": "2-dot-map.webp",
+      "asset": "0353093a4aafcefd8193914e4f9c82db0c9d2867cb0e16556ff86693bd8690ab",
+      "bytes": 344352
+    },
+    {
+      "theme": "rose-pine",
+      "file": "3-omarchy-plants.webp",
+      "asset": "1cf5444e546016a26c8d0335fe0743a21f0499820f41444a8d95e2fe4c65dca1",
+      "bytes": 132598
+    },
+    {
+      "theme": "rose-pine",
+      "file": "omarchy.webp",
+      "asset": "16822b99638ea53c1e115a3b1ccde7e9a1d1125f9f00621afba31d8f947cff5a",
+      "bytes": 716
+    },
+    {
+      "theme": "solitude",
+      "file": "1-on-pole.webp",
+      "asset": "09c685ceed958826924f258a3f19d63c1e546b85200e725f0f7b478b458eee71",
+      "bytes": 1487492
+    },
+    {
+      "theme": "solitude",
+      "file": "2-wreakage.webp",
+      "asset": "a73f0bdedef731b3aec8654cc3f9d71a02093cf2c43f1f023623602908013cac",
+      "bytes": 1153372
+    },
+    {
+      "theme": "solitude",
+      "file": "3-climb.jpg",
+      "asset": "aa7a31ba7f87b6b0a88ff3c9e57241672a71f862251e9ba5659ffa004cda66b7",
+      "bytes": 2510503
+    },
+    {
+      "theme": "solitude",
+      "file": "4-ether.webp",
+      "asset": "a2f4e10bcb17b8ecec151c37f1335f7b365111619525d597c8f3852c2db53e97",
+      "bytes": 581468
+    },
+    {
+      "theme": "solitude",
+      "file": "5-eyed.jpg",
+      "asset": "eb88ed0233f58f4427ea96879469393751126ac115ed06f2bc1aaa1f9b6f22c6",
+      "bytes": 2178852
+    },
+    {
+      "theme": "tokyo-night",
+      "file": "0-winding-road.webp",
+      "asset": "b149c3e1c8ce383812e7bc3170c2cf8b160ca583d72d59173cd42efdb79ced2b",
+      "bytes": 653482
+    },
+    {
+      "theme": "tokyo-night",
+      "file": "1-quattro.webp",
+      "asset": "c9b96c106d2758113986a8ddb621f3867edf65e09a89dad51abb9fc5f3447146",
+      "bytes": 625422
+    },
+    {
+      "theme": "tokyo-night",
+      "file": "2-swirl-buck.webp",
+      "asset": "d068aa0ce70685b336fa15dfb8b8df96c03a75e045cb32fe101319c8d284105a",
+      "bytes": 344156
+    },
+    {
+      "theme": "tokyo-night",
+      "file": "3-sunset-lake.webp",
+      "asset": "eabc95e4d5e2396b967970458f51a1a2ead80d5cad88a4d303af58989f5f8c49",
+      "bytes": 364966
+    },
+    {
+      "theme": "tokyo-night",
+      "file": "4-omakub.webp",
+      "asset": "1de02e50e19b1884c9195f1553cbb686ae0642963789b34d0a9f4f0478f80aa7",
+      "bytes": 184050
+    },
+    {
+      "theme": "tokyo-night",
+      "file": "5-oma-cityscape.jpg",
+      "asset": "22e1d639722b33fa6f0d3ac2733450b4bae961b481f5665cb16397bc5f714e5c",
+      "bytes": 1408419
+    },
+    {
+      "theme": "tokyo-night",
+      "file": "6-oma.webp",
+      "asset": "1dae1555422c3713381f09dd20b8ed91eaaf42cf73e73bfe255dfefe89b1d004",
+      "bytes": 280578
+    },
+    {
+      "theme": "tokyo-night",
+      "file": "omarchy.webp",
+      "asset": "ef9c6d4c7763a1d56e97e4e5300ffd45d10995e35273e8b16d3a1e4b36a45566",
+      "bytes": 716
+    },
+    {
+      "theme": "vantablack",
+      "file": "0-dot-hands.webp",
+      "asset": "a51e0dc5406d054ddfe16dc732ada4061c733a9e6f985a3ff773ba1e803ad3a0",
+      "bytes": 236190
+    },
+    {
+      "theme": "vantablack",
+      "file": "1-twisted-stairs.webp",
+      "asset": "05e1442a8b8b344b3123e1760a9d19c11f97c3db6dd3353a0c83b4ef18d61e06",
+      "bytes": 163340
+    },
+    {
+      "theme": "vantablack",
+      "file": "2-layers-deep.webp",
+      "asset": "059720c4eb4967bbce84a7e8be2e86e9cd7f9c2c1ea0880c215462f7270b31cd",
+      "bytes": 107244
+    },
+    {
+      "theme": "vantablack",
+      "file": "3-layers-stacked.webp",
+      "asset": "6c00ce0c4fb8c4248a939820184d9b92e0ccffebbc7a22a6687f8b293437bad3",
+      "bytes": 83534
+    },
+    {
+      "theme": "vantablack",
+      "file": "omarchy.webp",
+      "asset": "7575cee823ff9bb253be3f1f92b87bfac4c99daca770d9166a000d1ce4d2b03d",
+      "bytes": 712
+    },
+    {
+      "theme": "white",
+      "file": "1-white.webp",
+      "asset": "2f2f42f7ad3ba978951f137e214404c2c4a52318a60105ded5e74ddfe8ed80f2",
+      "bytes": 100582
+    },
+    {
+      "theme": "white",
+      "file": "2-white.webp",
+      "asset": "e81aed7c2782d2caba1fd1f070d8a9b35f8f86fb65bb87498067876e09fe498f",
+      "bytes": 63850
+    },
+    {
+      "theme": "white",
+      "file": "3-white.webp",
+      "asset": "33f968945dec6c82a80938e09bef09bbca86ce020d683a3bf286ff5327e2ab48",
+      "bytes": 85154
+    },
+    {
+      "theme": "white",
+      "file": "omarchy.webp",
+      "asset": "4f59ff985e0bf7d1518a3e0de6d2757cb6a2cbd5fb0fd2c4918853cee5f8fad7",
+      "bytes": 716
+    }
+  ]
+}

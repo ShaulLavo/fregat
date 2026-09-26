@@ -648,6 +648,43 @@ export const SETTINGS_REGISTRY = {
     description: 'Choose a wallpaper and turn it on or off without losing the selection.',
     keywords: ['wallpaper', 'background', 'desktop'],
   }),
+  'workbench.wallpaper.omarchyCatalog': defineSetting({
+    schema: v.boolean(),
+    default: true,
+    scope: 'application',
+    widget: 'boolean',
+    category: 'Appearance',
+    title: 'Omarchy wallpapers from GitHub',
+    description:
+      'List every Omarchy theme wallpaper in the picker. Picking one downloads it from a pinned Omarchy commit on GitHub.',
+    keywords: ['wallpaper', 'omarchy', 'github', 'download'],
+  }),
+  'workbench.wallpaper.previewCloud': defineSetting({
+    schema: v.pipe(v.string(), v.regex(/^[A-Za-z0-9_-]*$/)),
+    default: '',
+    scope: 'application',
+    widget: 'string',
+    category: 'Appearance',
+    title: 'Wallpaper preview cloud',
+    details:
+      'The account needs fetched URLs allowed for raw.githubusercontent.com (Cloudinary Settings → Security). Empty loads full-size previews from GitHub.',
+    description:
+      'Cloudinary cloud name that resizes Omarchy wallpaper previews through its fetch mode.',
+    keywords: ['wallpaper', 'cloudinary', 'preview', 'thumbnail'],
+  }),
+  'workbench.wallpaper.downloadTimeoutMs': defineSetting({
+    schema: v.pipe(v.number(), v.integer(), v.minValue(1000), v.maxValue(600_000)),
+    default: 60_000,
+    // Machine scope: the right wait depends on this box's network.
+    scope: 'machine',
+    widget: 'number',
+    category: 'Appearance',
+    title: 'Wallpaper download timeout',
+    description:
+      'Milliseconds a picked Omarchy wallpaper may take to download from GitHub before the download stops.',
+    visibility: 'advanced',
+    keywords: ['wallpaper', 'omarchy', 'github', 'download', 'timeout'],
+  }),
   'workbench.tree.indentGuides': defineSetting({
     schema: v.picklist(['none', 'onHover', 'always'] as const),
     default: 'always',
@@ -1172,6 +1209,18 @@ export const SETTINGS_REGISTRY = {
       'Read a file and colour its syntax while the pointer heads for its tree row, tab or definition link.',
     keywords: ['prefetch', 'preload', 'files', 'tree', 'tabs', 'hover', 'syntax'],
   }),
+  'prefetch.diffs': defineSetting({
+    schema: v.boolean(),
+    default: true,
+    scope: 'application',
+    widget: 'boolean',
+    category: 'Prefetch',
+    dependsOn: 'prefetch.enabled',
+    title: 'Prefetch diffs',
+    description:
+      'Load changes, commit files and checkpoint diffs when their rows are hovered or active.',
+    keywords: ['prefetch', 'preload', 'diffs', 'git', 'history', 'checkpoints'],
+  }),
   'files.autoSave': defineSetting({
     schema: v.picklist(['off', 'afterDelay', 'onFocusChange', 'onWindowChange'] as const),
     default: 'off',
@@ -1500,7 +1549,7 @@ export const SETTINGS_REGISTRY = {
     title: 'Shortcuts',
     description: 'Every command and its keys.',
     details:
-      'In settings.json this is command id to shortcut: one hotkey, or two separated by a single space. A missing command keeps its default; null unbinds it.',
+      'In settings.json this is command id to its complete list of shortcuts, each one hotkey or two separated by a single space. A missing command keeps its defaults; null or an empty list unbinds it.',
     // The one key that merges rather than replaces: a later layer should be able
     // to bind a command without dropping every other binding the user set.
     merge: 'record',

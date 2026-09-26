@@ -9,8 +9,7 @@ import {
   type AssetId,
   type WallpaperColors,
 } from '@workspace/contracts'
-import { displayName, type WallpaperLibrary } from './library'
-import { wallpaperErrors } from './structured-errors'
+import type { WallpaperLibrary } from './library'
 
 /** Enough pixels to find a wallpaper's colors; more only costs time. */
 const SAMPLE_WIDTH = 64
@@ -27,13 +26,10 @@ export async function wallpaperColors(
   id: AssetId,
 ): Promise<WallpaperColors> {
   await library.read(id)
-  const directory = await library.assetDirectory(id)
   const cache = path.join(library.directory, `${id}.colors.json`)
   const cached = await readColors(cache)
   if (cached) return cached
-  const display = path.join(directory, displayName(id))
-  if (!(await Bun.file(display).exists()))
-    throw wallpaperErrors.NOT_FOUND({ internal: { at: 'colors', asset: id } })
+  const display = await library.rendition(id, 'display')
   const image = new Bun.Image(display)
   const { width, height } = await image.metadata()
   const scale = Math.max(SAMPLE_WIDTH / width, SAMPLE_HEIGHT / height)

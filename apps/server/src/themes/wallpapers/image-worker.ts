@@ -22,20 +22,28 @@ async function decode(bytes: Uint8Array) {
     throw wallpaperErrors.INVALID({ internal: { reason: 'format', format } })
   if (hasAnimation(bytes, format))
     throw wallpaperErrors.INVALID({ internal: { reason: 'animation', format } })
+  const extension = format === 'jpeg' ? 'jpg' : format
+  const header = { width, height, extension, contentType: `image/${format}` }
+  const mode = process.argv[2]
+  if (mode === 'header') return header
+  if (mode === 'thumbnail' || mode === 'display') return renderRendition(bytes, mode)
+  if (mode !== 'decode')
+    throw wallpaperErrors.INVALID({ internal: { reason: 'worker-mode', mode } })
   // Decode every source row before accepting it; a downsample alone can skip corrupt rows.
   await new Bun.Image(bytes, options).png().bytes()
   const [thumbnail, display] = await Promise.all([
-    new Bun.Image(bytes, options)
-      .resize(480, 300, { fit: 'inside', withoutEnlargement: true })
-      .webp({ quality: 75 })
-      .bytes(),
-    new Bun.Image(bytes, options)
-      .resize(2560, 2560, { fit: 'inside', withoutEnlargement: true })
-      .webp({ quality: 85 })
-      .bytes(),
+    renderRendition(bytes, 'thumbnail'),
+    renderRendition(bytes, 'display'),
   ])
-  const extension = format === 'jpeg' ? 'jpg' : format
-  return { width, height, extension, contentType: `image/${format}`, thumbnail, display }
+  return { ...header, thumbnail, display }
+}
+
+function renderRendition(bytes: Uint8Array, kind: 'thumbnail' | 'display') {
+  const size = kind === 'thumbnail' ? ([480, 300] as const) : ([2560, 2560] as const)
+  return new Bun.Image(bytes, options)
+    .resize(...size, { fit: 'inside', withoutEnlargement: true })
+    .webp({ quality: kind === 'thumbnail' ? 75 : 85 })
+    .bytes()
 }
 
 function hasAnimation(bytes: Uint8Array, format: string) {

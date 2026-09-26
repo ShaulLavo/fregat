@@ -388,7 +388,8 @@ async function editBoth(repo: string, client: Client) {
   for (const name of ['first', 'second']) {
     await writeFile(path.join(repo, `${name}.ts`), `${editedLines(name).join('\n')}\n`)
     const [diff] = await fetchDiff(`repo/${name}.ts`, false, undefined, client)
-    diffs.push(diff!)
+    const { oldText: _old, newText: _new, ...patch } = diff!
+    diffs.push(patch)
     await writeFile(path.join(repo, `${name}.ts`), 'unrelated working copy\n')
   }
 
@@ -406,7 +407,8 @@ async function stagedEntry(repo: string, client: Client, change: 'added' | 'dele
   }
   const [entry] = await fetchDiff(`repo/${file}`, true, undefined, client)
 
-  return entry!
+  const { oldText: _old, newText: _new, ...patch } = entry!
+  return patch
 }
 
 async function useSplitView(client: Client) {

@@ -6,9 +6,7 @@ import { descriptorFor, type SettingId, type SettingValue } from './keys'
 
 /**
  * What the record widget can edit: string keys to a string or an explicit
- * unbind. This is the widget's own input contract, not a copy of any key's
- * schema — `keybindings.overrides` is the only key using it today and its
- * schema is narrower (a command-id pattern, a trimmed non-empty value).
+ * unbind. This is the widget's own input contract; no registered key uses it today.
  */
 const recordControlSchema = v.record(v.string(), v.nullable(v.string()))
 

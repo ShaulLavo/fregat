@@ -11,14 +11,14 @@ test.each(['index.html', '.prettierrc', 'next.config.js', 'component.tsx', 'unkn
     const svg = container.querySelector('svg')!
     const sprite = document.createElement('div')
     sprite.innerHTML = fileTreeIconsForPaths([name]).spriteSheet ?? ''
-    const symbol = sprite.querySelector(`#app-vscode-icon-${icon.name}`)!
+    const symbol = sprite.querySelector(`#app-vscode-icon-${svg.getAttribute('data-file-icon')}`)!
 
     expect(svg.getAttribute('viewBox')).toBe(symbol.getAttribute('viewBox'))
     expect(Array.from(svg.querySelectorAll('path'), (path) => path.getAttribute('d'))).toEqual(
       Array.from(symbol.querySelectorAll('path'), (path) => path.getAttribute('d')),
     )
     expect(svg.querySelector('image, use')).toBeNull()
-    expect(svg.getAttribute('style')).not.toContain('mask')
+    expect(svg.getAttribute('style') ?? '').not.toContain('mask')
   },
 )
 
@@ -45,4 +45,14 @@ test('repeated gradient icons reference their own definitions', () => {
   for (const [index, svg] of icons.entries()) {
     expect(svg.querySelector('path[fill^="url"]')?.getAttribute('fill')).toBe(`url(#${ids[index]})`)
   }
+})
+
+test('the icon takes its hue as a class, with no inline colour', () => {
+  const { container } = renderWithProviders(
+    <FileTypeIcon icon={iconForEntry({ name: 'main.c', type: 'file' })} />,
+  )
+  const svg = container.querySelector('svg')!
+
+  expect(svg.getAttribute('class')).toContain('text-file-icon-blue')
+  expect(svg.getAttribute('style')).toBeNull()
 })

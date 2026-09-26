@@ -70,8 +70,8 @@ test('saved key overrides update real keyboard dispatch and palette labels immed
   try {
     await act(async () => {
       const submission = state.owner.submit('user', [
-        { kind: 'keybinding.set', command: 'workspace.showCommandPalette', keys: 'F7' },
-        { kind: 'keybinding.set', command: 'workspace.showSettings', keys: 'F8' },
+        { kind: 'keybinding.set', command: 'workspace.showCommandPalette', keys: ['F7'] },
+        { kind: 'keybinding.set', command: 'workspace.showSettings', keys: ['F8'] },
       ])
       if (submission.kind === 'submitted') await submission.settled
     })
@@ -111,7 +111,7 @@ test.for(['F10', null])(
     expect(state.kind).toBe('ready')
     if (state.kind !== 'ready') return
     const submission = state.owner.submit('user', [
-      { kind: 'keybinding.set', command: 'workspace.quit', keys },
+      { kind: 'keybinding.set', command: 'workspace.quit', keys: keys === null ? null : [keys] },
     ])
     if (submission.kind === 'submitted') await submission.settled
     let exits = 0
