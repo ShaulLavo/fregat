@@ -187,6 +187,13 @@ export function createApp(options: AppOptions) {
   // keeps a test run from writing into the developer's real settings.
   const settings = new SettingsStore({ ...options.settings, workspaceRoot: fs.paths.workspaceRoot })
   fs.watchDirectoryLimit = () => settings.snapshot().values['files.watchDirectoryLimit']
+  let watchDirectoryLimit = settings.snapshot().values['files.watchDirectoryLimit']
+  settings.onChange(() => {
+    const next = settings.snapshot().values['files.watchDirectoryLimit']
+    if (next === watchDirectoryLimit) return
+    watchDirectoryLimit = next
+    fs.rebalanceWatchLimit()
+  })
   const themesRoot = options.themes?.root ?? platformHomePath()
   const wallpapers = new WallpaperLibrary({
     directory: path.join(themesRoot, 'wallpapers'),

@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import type { WatchServerMessage } from '../contracts'
 import { createWorkspacePaths } from '../path'
+import { NativeWatchHost } from '../native-watch-host'
 import { FileChangeHub } from '../watch'
 
 const roots: string[] = []
@@ -347,6 +348,75 @@ describe.runIf(process.platform === 'linux')('native watch limit and unreadable 
 
       await writeFile(path.join(root, 'two/y/deep.txt'), 'x')
       await expect.poll(() => paths(second), { timeout: 3000 }).toContain('two/y/deep.txt')
+    } finally {
+      firstAbort.abort()
+      secondAbort.abort()
+      await hub.close()
+    }
+  })
+})
+
+describe.runIf(process.platform === 'linux')('native watch limit changes', () => {
+  it('sheds a recursive watch when the limit drops below it, and regrows it when the limit rises', async () => {
+    const root = await fixtureRoot()
+    await mkdir(path.join(root, 'a/b'), { recursive: true })
+    let limit = 10
+    const hub = new FileChangeHub(createWorkspacePaths(root), {
+      enabled: true,
+      directoryLimit: () => limit,
+    })
+    const abort = new AbortController()
+    const events = collect(hub.stream([''], abort.signal))
+    const coverages = () => events.filter((event) => event.type === 'coverage')
+    try {
+      await expect.poll(() => events.length).toBeGreaterThan(0)
+      expect(events[0]).toMatchObject({ watch: { mode: 'recursive', directoryCount: 3 } })
+
+      limit = 2
+      hub.rebalance()
+      await expect.poll(() => coverages().length).toBe(1)
+      expect(coverages()[0]).toMatchObject({ path: '', watch: { mode: 'limited', limit: 2 } })
+      expect(hub.info()).toMatchObject({ watchedDirectoryCount: 0 })
+
+      limit = 10
+      hub.rebalance()
+      await expect.poll(() => coverages().length).toBe(2)
+      expect(coverages()[1]).toMatchObject({ watch: { mode: 'recursive', directoryCount: 3 } })
+      await writeFile(path.join(root, 'a/b/deep.txt'), 'x')
+      await expect.poll(() => paths(events), { timeout: 3000 }).toContain('a/b/deep.txt')
+    } finally {
+      abort.abort()
+      await hub.close()
+    }
+  })
+})
+
+describe.runIf(process.platform === 'linux')('native watch worker failure', () => {
+  it('reports the failure, drops the dead watch, and a late release leaves its replacement alone', async () => {
+    const root = await fixtureRoot()
+    await writeFile(path.join(root, '.crash-once'), '')
+    const crashing = new NativeWatchHost(
+      path.join(import.meta.dirname, 'fixtures/crashing-watch-worker.ts'),
+    )
+    const hub = new FileChangeHub(createWorkspacePaths(root), { enabled: true, native: crashing })
+    const firstAbort = new AbortController()
+    const secondAbort = new AbortController()
+    const first = collect(hub.stream([''], firstAbort.signal))
+    try {
+      await expect.poll(() => first.some((event) => event.type === 'error')).toBe(true)
+      expect(first.find((event) => event.type === 'error')).toMatchObject({
+        code: 'WATCH_FAILED',
+        path: '',
+      })
+      expect(hub.info()).toMatchObject({ nativeWatcherCount: 0 })
+
+      const second = collect(hub.stream([''], secondAbort.signal))
+      await expect.poll(() => second.length).toBeGreaterThan(0)
+      expect(hub.info()).toMatchObject({ nativeWatcherCount: 1 })
+
+      firstAbort.abort()
+      await delay(50)
+      expect(hub.info()).toMatchObject({ nativeWatcherCount: 1 })
     } finally {
       firstAbort.abort()
       secondAbort.abort()

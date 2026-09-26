@@ -602,7 +602,10 @@ class WorkspaceIndexEventWatcher implements WorkspaceIndexWatchSubscription {
 
   private resumeWhenWatched(coverage: WatchCoverage) {
     this.coverage = coverage
-    if (coverage.mode !== 'recursive') return
+    if (coverage.mode === 'limited') {
+      this.flushChain = this.flushChain.then(() => this.index.turnOff('watch-limit'))
+      return
+    }
     this.flushChain = this.flushChain.then(async () => {
       await this.index.turnOn('watch-limit-freed')
     })

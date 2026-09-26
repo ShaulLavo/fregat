@@ -7,6 +7,9 @@ import type {
 
 export type { NativeWatchError } from './native-watch-protocol'
 
+/** The error code every watch reports when the worker holding it dies. */
+export const WATCH_WORKER_FAILED = 'WATCH_WORKER_FAILED'
+
 export type NativeWatchCallbacks = {
   readonly event: (event: string, filename: string) => void
   readonly error: (error: NativeWatchError) => void
@@ -27,13 +30,20 @@ type NativeWatch = {
 }
 
 // Dev runs the source and the bundle keeps the built copy beside `index.js`, so one relative path serves both.
-const workerPath = path.join(import.meta.dirname, 'watch-worker.ts')
+const defaultWorkerPath = path.join(import.meta.dirname, 'watch-worker.ts')
 
 /** Owns the worker that runs every native `fs.watch` for one file change hub. */
 export class NativeWatchHost {
   private worker: Worker | null = null
   private nextId = 1
   private readonly watches = new Map<number, NativeWatch>()
+
+  private readonly workerPath: string
+
+  /** `workerPath` is a test seam for a worker that fails. */
+  constructor(workerPath = defaultWorkerPath) {
+    this.workerPath = workerPath
+  }
 
   watch(absolutePath: string, recursive: boolean, callbacks: NativeWatchCallbacks) {
     const id = this.nextId++
@@ -62,7 +72,7 @@ export class NativeWatchHost {
     if (this.worker) return this.worker
     // Bun reads `ref`; the DOM typing that wins in this project does not declare it.
     const options: WorkerOptions & { ref: boolean } = { ref: false }
-    const worker = new Worker(workerPath, options)
+    const worker = new Worker(this.workerPath, options)
     worker.onmessage = (message: MessageEvent<NativeWatchResponse>) => this.receive(message.data)
     worker.onerror = (event) => this.failAll(worker, event.message)
     this.worker = worker
@@ -99,11 +109,13 @@ export class NativeWatchHost {
     if (this.worker !== worker) return
     this.worker = null
     worker.terminate()
-    const error = { message: `native watch worker failed: ${message}` }
-    for (const watch of this.watches.values()) {
+    const error = { code: WATCH_WORKER_FAILED, message: `native watch worker failed: ${message}` }
+    // Taken first: a holder that closes its watch while hearing of the failure finds nothing to send.
+    const failed = [...this.watches.values()]
+    this.watches.clear()
+    for (const watch of failed) {
       watch.attached.resolve({ status: 'failed', error })
       watch.callbacks.error(error)
     }
-    this.watches.clear()
   }
 }

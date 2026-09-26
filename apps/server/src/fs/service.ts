@@ -179,6 +179,11 @@ export class FileSystemService {
     this.changes.directoryLimit = read
   }
 
+  /** After `files.watchDirectoryLimit` changes: watches over it shed, limited roots that now fit grow. */
+  rebalanceWatchLimit() {
+    this.changes.rebalance()
+  }
+
   info() {
     return {
       workspaceRoot: this.paths.workspaceRoot,
