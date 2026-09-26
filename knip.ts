@@ -10,6 +10,7 @@ const extraEntries: Record<string, string[]> = {
   editor: ['src/**/*.worker.ts', 'bench/**/*.ts', 'test/types/**/*.ts'],
   find: ['bench/**/*.ts'],
   minimap: ['src/**/*.worker.ts', 'bench/**/*.ts'],
+  spellcheck: ['src/**/*.worker.ts', 'bench/**/*.ts'],
   'tree-sitter': ['src/**/*.worker.ts', 'bench/**/*.ts'],
   'typescript-lsp': ['src/**/*.worker.ts', 'bench/**/*.ts'],
 }

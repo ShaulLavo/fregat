@@ -21,6 +21,7 @@
         "@singapore-editor/gutters": "workspace:*",
         "@singapore-editor/minimap": "workspace:*",
         "@singapore-editor/scope-lines": "workspace:*",
+        "@singapore-editor/spellcheck": "workspace:*",
         "@singapore-editor/textbuffer": "workspace:*",
         "@singapore-editor/tree-sitter-languages": "workspace:*",
         "@singapore-editor/typescript-lsp": "workspace:*",
@@ -323,6 +324,29 @@
         "solid-js": ">=1.8 <2",
       },
     },
+    "packages/spellcheck": {
+      "name": "@singapore-editor/spellcheck",
+      "version": "0.1.1",
+      "dependencies": {
+        "cspell-trie-lib": "10.3.4",
+      },
+      "devDependencies": {
+        "@playwright/test": "^1.63.0",
+        "@singapore-editor/core": "workspace:*",
+        "@singapore-editor/tree-sitter-languages": "workspace:*",
+        "@types/node": "^26.6.3",
+        "@typescript/native-preview": "7.0.0-dev.20260707.2",
+        "@vitest/browser-playwright": "^5.0.2",
+        "happy-dom": "^20.14.5",
+        "oxfmt": "0.70.0",
+        "oxlint": "1.85.0",
+        "typescript": "~6.0.3",
+        "vitest": "^5.0.2",
+      },
+      "peerDependencies": {
+        "@singapore-editor/core": "workspace:*",
+      },
+    },
     "packages/textbuffer": {
       "name": "@singapore-editor/textbuffer",
       "version": "0.1.0",
@@ -425,6 +449,8 @@
   },
   "packages": {
     "@blazediff/core": ["@blazediff/core@1.10.0", "", {}, "sha512-AOQff0zgR7cGsZL+4E7hVkmujoPUpm0J9xzWGWZj5wCjd3gmxESXAPfKyuzs93VdpQNFhHlBhfOjrcZ+XTERtQ=="],
+
+    "@cspell/cspell-types": ["@cspell/cspell-types@10.3.4", "", {}, "sha512-BFUDEATv9lhIa/JPK+BYulWEQcKmGHS0x8XLNeN+OeZtXNKOPGbvpgbXBRjQ33XqNuuOGRHulcok8M2998xA3w=="],
 
     "@emnapi/core": ["@emnapi/core@1.11.2", "", { "dependencies": { "@emnapi/wasi-threads": "1.2.2", "tslib": "^2.4.0" } }, "sha512-TC8MkTuZUtcTSiFeuC0ksCh9QIJ5+F21MvZ4Wn4ORfYaFJ/0dsiudv5tVkejgwZlwQ39jL9WWDe2lz8x0WglOA=="],
 
@@ -676,6 +702,8 @@
 
     "@singapore-editor/solid": ["@singapore-editor/solid@workspace:packages/solid"],
 
+    "@singapore-editor/spellcheck": ["@singapore-editor/spellcheck@workspace:packages/spellcheck"],
+
     "@singapore-editor/stress": ["@singapore-editor/stress@workspace:examples/stress"],
 
     "@singapore-editor/textbuffer": ["@singapore-editor/textbuffer@workspace:packages/textbuffer"],
@@ -789,6 +817,8 @@
     "comma-separated-tokens": ["comma-separated-tokens@2.0.3", "", {}, "sha512-Fu4hJdvzeylCfQPp9SGWidpzrMs7tTrlu6Vb8XGaRGck8QSNZJJp538Wrb60Lax4fPwR64ViY468OIUTbRlGZg=="],
 
     "convert-source-map": ["convert-source-map@2.0.0", "", {}, "sha512-Kvp459HrV2FEJ1CAsi1Ku+MY3kasH19TFykTz2xWmMeq6bk2NU3XXvfJ+Q61m0xktWwt+1HSYf3JZsTms3aRJg=="],
+
+    "cspell-trie-lib": ["cspell-trie-lib@10.3.4", "", { "peerDependencies": { "@cspell/cspell-types": "10.3.4" } }, "sha512-JgdMuAfYEzUTfbi0yVId/Nu3uze119QqU4Ss3oSD8li3IrmgCcNIk/RcDtfx+6dl20bmnXacx+J2xfXj6gPfiA=="],
 
     "csstype": ["csstype@3.2.3", "", {}, "sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ=="],
 

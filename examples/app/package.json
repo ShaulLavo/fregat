@@ -21,6 +21,7 @@
     "@singapore-editor/gutters": "workspace:*",
     "@singapore-editor/minimap": "workspace:*",
     "@singapore-editor/scope-lines": "workspace:*",
+    "@singapore-editor/spellcheck": "workspace:*",
     "@singapore-editor/textbuffer": "workspace:*",
     "@singapore-editor/tree-sitter-languages": "workspace:*",
     "@singapore-editor/typescript-lsp": "workspace:*"

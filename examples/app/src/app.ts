@@ -10,6 +10,7 @@ import { createEditorFindPlugin } from '@singapore-editor/find'
 import { createFoldGutterPlugin, createLineGutterPlugin } from '@singapore-editor/gutters'
 import { createMinimapPlugin } from '@singapore-editor/minimap'
 import { createScopeLinesPlugin, createStickyScrollPlugin } from '@singapore-editor/scope-lines'
+import { createSpellcheckPlugin, SpellcheckService } from '@singapore-editor/spellcheck'
 import {
   css,
   html,
@@ -110,6 +111,8 @@ export function mountApp(): void {
     createScopeLinesPlugin(),
     createStickyScrollPlugin(),
     createMinimapPlugin(),
+    // Prose in plain text and Markdown; comments and strings too, to show the code path.
+    createSpellcheckPlugin({ service: new SpellcheckService(), scope: 'proseAndCode' }),
     typeScriptLsp,
   ]
   // `?modal` turns on the E028 modal editing proof.

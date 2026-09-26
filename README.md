@@ -30,7 +30,7 @@ gutters, find, minimap, syntax and language servers are separate packages. nothi
 
 ## packages
 
-`core` (the `editor` folder), `gutters`, `find`, `markdown`, `minimap`, `scope-lines`, `diff`, `panes`, `tree-sitter`, `tree-sitter-languages`, `lsp`, `plugin-ui`, `lsp-plugin`, `typescript-lsp`, `decode`, `react`, `solid`. all under `@singapore-editor/`, one folder each in `packages/`
+`core` (the `editor` folder), `gutters`, `find`, `markdown`, `minimap`, `scope-lines`, `diff`, `panes`, `tree-sitter`, `tree-sitter-languages`, `lsp`, `plugin-ui`, `lsp-plugin`, `typescript-lsp`, `decode`, `spellcheck`, `react`, `solid`. all under `@singapore-editor/`, one folder each in `packages/`
 
 ## running the repo
 

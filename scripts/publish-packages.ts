@@ -20,6 +20,7 @@ const PACKAGE_DIRS = [
   'packages/lsp-plugin',
   'packages/typescript-lsp',
   'packages/diff',
+  'packages/spellcheck',
 ] as const
 
 interface PackageManifest {

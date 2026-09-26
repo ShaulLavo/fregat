@@ -1515,6 +1515,9 @@ function mixRangeHighlightChunkSignature(
     chunk.text.length,
   )
   let mixed = mixSignatureHash(hash, row.index)
+  // Text replacement collapses live DOM ranges even when their source offsets stay unchanged.
+  mixed = mixSignatureHash(mixed, row.textRevision)
+  mixed = mixSignatureHash(mixed, row.tokenHighlightSlotId)
   mixed = mixSignatureHash(mixed, chunk.localStart)
   mixed = mixSignatureHash(mixed, chunk.startOffset)
   mixed = mixSignatureHash(mixed, localStart)
@@ -1567,8 +1570,9 @@ function refreshHighlightOverlayMask(view: VirtualizedTextViewInternal): void {
   }
   view.rangeHighlightRuleVersion++
   view.tokenPaletteDirty = true
-  renderTokenHighlights(view)
   for (const group of view.rangeHighlightGroups.values()) renderRangeHighlight(view, group.name)
+  renderTokenHighlights(view)
+  orderRangeHighlights(view)
   rebuildStyleRules(view)
 }
 
@@ -1595,7 +1599,8 @@ function syncOverlayBaseGroups(view: VirtualizedTextViewInternal): void {
       existing.signature = staleRangeHighlightSignature()
       continue
     }
-    const style = { ...overlayColorStyle({}, ranges[0]!.overlay), zIndex: -1 }
+    // WebKit omits text decorations from negative-priority highlights.
+    const style = { ...overlayColorStyle({}, ranges[0]!.overlay), zIndex: 0 }
     view.overlayBaseGroups.set(
       key,
       createOverlayPaintGroup(nextOverlayBaseName(view), ranges, style),
@@ -1707,9 +1712,28 @@ function appendOverlayTokenSegments(
 
 function orderRangeHighlights(view: VirtualizedTextViewInternal): void {
   if (view.highlightOverlayMask.length === 0 || !view.highlightRegistry) return
+  orderOverlayBases(view)
   const groups = orderedPaintGroups(view)
   if (rangeHighlightsInOrder(view.highlightRegistry, groups)) return
   for (const group of groups) reregisterPaintGroup(view, group)
+}
+
+function orderOverlayBases(view: VirtualizedTextViewInternal): void {
+  const registry = view.highlightRegistry
+  if (!registry?.entries) return
+  const bases = new Set([...view.overlayBaseGroups.values()].map((group) => group.name))
+  const producers = new Set(orderedPaintGroups(view).map((group) => group.name))
+  const isProducer = (name: string) =>
+    name.startsWith(SHARED_TOKEN_HIGHLIGHT_PREFIX) || producers.has(name)
+  const entries = [...registry.entries()]
+  const lastBase = entries.findLastIndex(([name]) => bases.has(name))
+  if (lastBase < 0 || !entries.slice(0, lastBase).some(([name]) => isProducer(name))) return
+  // Equal-priority syntax and semantic colors must paint above the foreground base.
+  for (const [name, highlight] of entries) {
+    if (!isProducer(name)) continue
+    registry.delete(name)
+    registry.set(name, highlight)
+  }
 }
 
 function orderedPaintGroups(view: VirtualizedTextViewInternal): VirtualizedTextHighlightGroup[] {

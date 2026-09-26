@@ -1,6 +1,22 @@
 # E058: Spellcheck for text the editor paints itself
 
 - Status: Proposed
+- PR preparation: plain-text paint regression fails before the fix in WebKit, with zero
+  spelling-colour pixels. The overlay base now uses priority zero and is ordered below syntax
+  and semantic producers. The regression checks range offsets before and after typing too.
+- The atomic-text-update browser regression reproduced the reported 0–0 range in all three
+  engines. Range signatures now include the mounted row revision and slot identity, so a
+  text-node rewrite or remount rebuilds live DOM ranges even at unchanged source offsets.
+- Verified after merging `origin/main`: 46 spellcheck tests, 327 core tests including the
+  touched overlay and editor tests, `check-turbo-inputs`, workspace typecheck, and health.
+  `health:write` found no public API baseline change; unrelated timer line-number churn was discarded.
+- PRs: [Editor #57](https://github.com/ShaulLavo/singapore/pull/57) and dependent
+  [Platform #104](https://github.com/ShaulLavo/fregat/pull/104). Platform merged main, pinned
+  the Editor head, and passed gates, repository typecheck, 44 focused settings/menu tests,
+  and the `editor-spellcheck` scenario on port 5238. All four screenshots were inspected in
+  `/work/tmp/fregat-evidence/20260926T174952Z-scenario-editor-spellcheck/`; Vite was stopped.
+- CI follow-up: the packages job now installs Firefox and WebKit for spellcheck's engine
+  tests. Its first run failed because only Chromium was installed; local three-engine tests passed.
 - Kind: Implementation
 - Owner: Cross-repo
 - Priority: P2
@@ -86,6 +102,7 @@ Out of scope:
   nspell had a 97 ms maximum and 81.3% top-5. typo-js took 430 ms per suggestion. Harper is an
   8 MB wasm using 284 MB. SymSpell used 105 MB. A home-grown `Set` engine had an 84 ms p95. The
   choice between the dependency and our own code is owner question 1.
+
 - **Dictionaries are vendored data, not packages.** en_US is cspell's `en_US.trie.gz` (298 KB,
   SCOWL size 70). en_GB is built from SCOWL's hunspell pair with `hunspell-reader` and
   `cspell-trie-lib` (123k words, 153 KB gzip). `scripts/build-dictionaries.ts` (proposed) is run by
@@ -110,6 +127,7 @@ Out of scope:
 
   A per-language `*-spell.scm` query with `@spell` / `@nospell` (Neovim's model) replaces the
   capture-name rules wherever the colour names are wrong.
+
 - **What runs when.** The contribution checks the mounted rows plus one screen above and below. A
   60-line viewport tokenizes in 0.2 ms. Only words missing from a per-document verdict cache go to
   the worker. Before painting, the reply is mapped from its sync point to the current text with
@@ -136,11 +154,37 @@ Out of scope:
    (`check(words) → misspelled`, `suggest(word, n)`), tokenizer and skip rules.
    - Evidence: node tests on the tokenizer; a bench script that reproduces the findings table on the
      same corpora.
+   - Done 2026-09-26 (`packages/spellcheck`). `bun run bench:engine` under Node 26: init 55 ms,
+     82,674 words checked in 27 ms, suggestions 4.3 ms median / 8.3 ms p95, top-1 71.6%, top-5
+     89.0%. The worker, with the dictionary inlined, is 407 KB gzip and loads on the first request.
+   - Decided 2026-09-26: recommendation (wave 2). One merged trie, `english.trie.gz` (347 KB gzip):
+     en_US's stored forms, the 2,440 en_GB words en_US lacks, and the software terms. A suggestion
+     walk costs about the same over a small trie as a large one: three tries measured 12 ms median,
+     one trie 4.3 ms.
 2. **View contribution (Editor, M).** Viewport window, verdict cache, sync-point mapping, caret-word
    hold-back, capture demand decoupled from replacement providers, prose ranges per language,
    feature token, demo.
    - Evidence: a Chromium, Firefox and WebKit paint test (as E053 did) and a typing test showing no
      mark on the word in progress.
+   - Done 2026-09-26 (`createSpellcheckPlugin`, `EDITOR_SPELLCHECK_FEATURE`, demo in
+     `examples/app`). Core gained `requestSyntaxCaptures`, `getSyntaxCaptures` and
+     `getInlineReplacementRanges` on the view contribution context, and a public
+     `Editor.getFeature`. Tests: a paint test and the worker in Chromium, Firefox and WebKit; a
+     typing test with real keys; a Markdown test with the real grammar; happy-dom tests for a reply
+     landing after an edit, hold-back, replace and undo, accepted words and chips.
+   - Decided 2026-09-26: recommendation (wave 2). The worker answers with a verdict per word, never
+     offsets, and marks are re-derived from the current text on every update, so a late reply cannot
+     paint stale ranges; the sync-point mapping is not needed.
+   - Decided 2026-09-26: recommendation (wave 2). The mark is an `overlay` text decoration, not a
+     `zIndex` style: WebKit draws a highlight's wavy line only when the highlight also sets a text
+     colour, and the overlay paints each token's own colour back. WebKit draws it straight at small
+     sizes. An LSP error on the same word draws its own line.
+   - Markdown skips `text.reference`, which covers link text as well as labels.
+   - Measured (`bun run bench:typing`, Chromium, 2,000 lines, 300 keystrokes): spellcheck's own work
+     is 1.2 ms median per keystroke with no marks on screen. With marks it is 5 ms, most of it the
+     E053 overlay mask, which the view rebuilds on every text change while any overlay is mounted and
+     again on each overlay update. Tokenization is about 1 ms, so moving it to the worker would not
+     remove this; making the overlay mask incremental would.
 3. **Platform wiring (Platform, M).**
    - Settings keys:
      - `editor.spellcheck`: `'off' | 'prose' | 'proseAndCode'`, default `'prose'`
@@ -153,6 +197,12 @@ Out of scope:
      section at the caret.
    - Evidence: an `editor-spellcheck` scenario (type, look, right-click, pick, add a word, reload)
      and `look` screenshots.
+   - Done 2026-09-26 on Platform branch `w2/e2-e058`. `editor.spellcheck` defaults to `'off'`
+     (owner question 3). `chat.spellcheck` is registered with its consumer, the composer (Plan 171
+     phase 3). `spellcheck.language` is dropped: English is the only dictionary and nothing would
+     read it. Dictionary words are written by a `spellcheck.setWord` settings operation into the
+     chosen layer's own record. The scenario reopens the workspace in place of a bare reload,
+     because a bare reload of a fixture workspace answers `fs/read` with 404.
 4. **Composer (Platform, inside Plan 171 phase 3, S).** Register the contribution in the composer
    host. Chips are skipped as replacements.
    - Evidence: a `chat-composer-editing` scenario step with a misspelled word.
@@ -185,6 +235,7 @@ Out of scope:
   **Decided 2026-09-26: owner — (a).** The owner asked about harvesting the browser's native
   spellcheck through the hidden input first; it cannot work (the input holds a slice, no API exposes
   misspellings, EditContext disables it).
+
 - **Owner question 2: which English.**
   - (a) en-US
   - (b) en-GB
@@ -193,6 +244,22 @@ Out of scope:
   **Recommendation:** (c). The repository writes both (`behavior` 177, `behaviour` 94), and (c)
   flags the fewest words (166 distinct against 182).
   **Decided 2026-09-26: recommendation (coordinator) — (c).**
+
+- **Owner question 3: typing cost of marks in files.** `bun run bench:typing` (Chromium, 2,000
+  lines, 300 keystrokes): spellcheck's own work per keystroke is 1.2 ms median with no marks on
+  screen and about 5 ms with marks; the whole keystroke costs about 9 ms more than with spellcheck
+  off. Tokenization is about 1 ms. The rest is the E053 overlay mask, which the view rebuilds on
+  every text change while any overlay is mounted, and again on each overlay update.
+  - (a) Make the overlay mask incremental in core (a follow-up for lane E1).
+  - (b) Paint a plain highlight outside WebKit, which draws the wavy line only when the highlight
+    sets a colour; this means detecting the engine.
+  - (c) Keep the overlay, and default `editor.spellcheck` to `'off'` for files until (a) lands, with
+    `chat.spellcheck` on: composer text is a few lines.
+
+  **Recommendation:** (c) now, then (a).
+  **Decided 2026-09-26: recommendation (wave 2) — (c).** The incremental overlay mask is recorded as
+  a core follow-up for lane E1.
+
 - **Decided 2026-09-26: research recommendation.** English only. Permissive dictionaries exist for
   English, Dutch and Russian, and Hebrew exists only as AGPL-3.0 hspell, so Hebrew words are skipped,
   never marked.

@@ -652,6 +652,15 @@ export type EditorViewContributionContext = {
     style: VirtualizedTextHighlightStyle,
   ): void
   clearRangeHighlight(name: string): void
+  /**
+   * Asks for raw syntax captures until disposed. They cost payload on every parse, so nothing gets
+   * them unasked; a `tokens` update follows each set that lands.
+   */
+  requestSyntaxCaptures(): EditorDisposable
+  /** The current text's captures; null until a requested parse of this text version has landed. */
+  getSyntaxCaptures(): readonly EditorSyntaxCapture[] | null
+  /** Source spans painted as something else: hidden markup, chips, phantom text excluded. */
+  getInlineReplacementRanges(): readonly TextOffsetRange[]
 }
 
 export type EditorViewContributionUpdateKind =
