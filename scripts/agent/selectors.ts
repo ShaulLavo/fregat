@@ -578,8 +578,8 @@ export const selectors = {
   settingsDensityOption: (page: Page, density: 'compact' | 'cozy') =>
     page.getByRole('option', { name: density, exact: true }),
   settingsJsonView: (page: Page) => page.getByRole('tab', { name: 'settings.json', exact: true }),
-  settingsScopeTab: (page: Page, name: 'User' | 'Workspace' | 'Defaults') =>
-    page.getByRole('tab', { name, exact: true }),
+  settingsScopeTab: (page: Page, name: 'User' | 'Workspace' | 'Defaults', selected?: boolean) =>
+    page.getByRole('tab', { name, exact: true, selected }),
   settingsDefaultsBanner: (page: Page) => page.getByText('Defaults are read-only', { exact: true }),
   settingsRowActions: (page: Page, id: string) =>
     page.getByRole('button', { name: `Actions for ${id}`, exact: true }),
