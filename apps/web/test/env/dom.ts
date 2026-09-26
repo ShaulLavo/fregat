@@ -4,7 +4,8 @@ import { activeServerOrigin } from '@/lib/client'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
 import { TEST_ENVIRONMENT_ID } from '../factories/chat'
 import { cleanup } from '@testing-library/react'
-import { afterAll, afterEach, beforeAll } from 'vitest'
+import { toast } from 'sonner'
+import { afterAll, afterEach, beforeAll, beforeEach } from 'vitest'
 
 import { createInProcessClient } from '../client'
 import { installTestClient } from '../factories/client-binding'
@@ -39,8 +40,20 @@ afterAll(async () => {
   server = undefined
 })
 
+/** sonner removes a closing toast this long later, on a timer nothing clears. */
+const TOAST_REMOVAL_MS = 200
+let toastsBefore = new Set<string | number>()
+
+beforeEach(() => {
+  toastsBefore = new Set(toast.getHistory().map((shown) => shown.id))
+})
+
 // Unmount anything React Testing Library rendered between tests so the happy-dom
-// document never leaks state across cases.
-afterEach(() => {
+// document never leaks state across cases. A test that showed a toast also waits out
+// sonner's removal timer: fired after the environment is torn down, its setState reads
+// `window` and fails the whole run.
+afterEach(async () => {
   cleanup()
+  if (!toast.getHistory().some((shown) => !toastsBefore.has(shown.id))) return
+  await new Promise((resolve) => setTimeout(resolve, TOAST_REMOVAL_MS + 20))
 })
