@@ -296,7 +296,7 @@ jobs:
 
       - name: Browser test (tree)
         if: ${{ !cancelled() }}
-        run: bun run --cwd packages/tree test:browser
+        run: bun run --cwd apps/web test:tree-browser
 
   # The one status to read: red when any job failed or was cancelled; a job skipped because the
   # change cannot affect it counts as passed.
