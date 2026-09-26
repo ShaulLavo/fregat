@@ -31,6 +31,7 @@
     "@singapore-editor/core": "workspace:*",
     "@singapore-editor/decode": "workspace:*",
     "@singapore-editor/find": "workspace:*",
+    "@singapore-editor/gutters": "workspace:*",
     "@singapore-editor/lsp": "workspace:*",
     "@singapore-editor/markdown": "workspace:*",
     "@singapore-editor/minimap": "workspace:*",
