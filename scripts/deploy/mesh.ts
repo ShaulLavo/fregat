@@ -1,6 +1,5 @@
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
-import { parseArgs } from 'node:util'
 
 import {
   checkoutRoot,
@@ -34,19 +33,28 @@ import {
   type Release,
 } from './release'
 import { log, output, run } from './run'
-import { installUnit, notifyServer, restartInto } from './systemd'
+import { parseDeployArgs, type DeployOptions, type RestartRequest } from './args'
+import { requestRestart, requireStaged } from './restart'
+import { installUnit, notifyServer, restartInto, waitForServerRelease } from './systemd'
 import {
   liveCheckCommand,
   liveCheckUnitName,
   signalServer,
   type LiveCheckTarget,
 } from './systemd/promote'
-import { createScriptError } from '../structured-errors'
+import { readHomeSetting } from '../home-setting'
+import { productionStateHome } from '../state-home'
+import { createScriptError, scriptFailureText } from '../structured-errors'
 
 const usage = `Usage: bun run deploy [options]
 
   --server            Build the server too and stage the release. The app shows "Update available";
-                      the server restarts when someone clicks Restart.
+                      the server restarts when someone clicks Restart, or at once with --restart.
+  --restart           Restart into the staged release: the Restart button's request, which waits
+                      for busy sessions up to developer.deployRestartWaitMinutes. Alone, it builds
+                      nothing and restarts into what an earlier --server deploy staged.
+  --interrupt         With --restart, end busy turns and restart now. Needed inside a Platform chat,
+                      whose own turn counts as busy.
                       Without it the release reuses the running server bundle and goes live at once,
                       or, while a server release is staged, builds on it and goes live at Restart.
   --slug=<name>       Release name suffix. Defaults to the branch name.
@@ -62,41 +70,18 @@ const LIVE_CHECK_WAIT_MS = 240_000
 try {
   await main()
 } catch (error) {
-  console.error(error instanceof Error ? error.message : String(error))
+  console.error(scriptFailureText(error))
   process.exit(1)
 }
 
 async function main() {
-  const { values } = parseArgs({
-    args: Bun.argv.slice(2),
-    options: {
-      help: { type: 'boolean', default: false },
-      reason: { type: 'string' },
-      rollback: { type: 'boolean', default: false },
-      server: { type: 'boolean', default: false },
-      'skip-live-check': { type: 'boolean', default: false },
-      slug: { type: 'string' },
-    },
-    strict: true,
-  })
-  if (values.help) {
-    console.log(usage)
-    return
-  }
-  if (values.rollback) {
-    await rollback(values['skip-live-check'])
-    return
-  }
+  const command = parseDeployArgs(Bun.argv.slice(2))
+  if (command.kind === 'help') return console.log(usage)
+  if (command.kind === 'rollback') return rollback(!command.liveCheck)
+  if (command.kind === 'restart') return restartStaged(command.request, command.liveCheck)
 
-  await deploy({
-    liveCheck: !values['skip-live-check'],
-    reason: values.reason ?? null,
-    server: values.server,
-    slug: values.slug,
-  })
+  await deploy(command.options)
 }
-
-type DeployOptions = { liveCheck: boolean; reason: string | null; server: boolean; slug?: string }
 
 async function deploy(options: DeployOptions) {
   await preflight()
@@ -134,7 +119,7 @@ async function deploy(options: DeployOptions) {
   await installUnit()
   assertUnmoved(release, staged)
   if (options.server || staged) {
-    await stage(release, options.server ? null : staged, options.liveCheck)
+    await stage(release, options.server ? null : staged, options)
     return
   }
 
@@ -143,9 +128,13 @@ async function deploy(options: DeployOptions) {
   console.log(`\n[deploy] ${release.name} is live at ${meshUrl}`)
 }
 
-async function stage(release: Release, carrier: string | null, liveCheckEnabled: boolean) {
+async function stage(release: Release, carrier: string | null, options: DeployOptions) {
   stagePending(release)
   const outcome = await notifyServer(release.name)
+  if (outcome === 'staged' && options.restart) {
+    await restartStaged(options.restart, options.liveCheck)
+    return
+  }
   if (outcome === 'staged') {
     const on = carrier
       ? ` (on the staged server ${path.basename(carrier)}; it goes live at Restart)`
@@ -158,8 +147,25 @@ async function stage(release: Release, carrier: string | null, liveCheckEnabled:
     return
   }
   log('systemd', `${serverUnit} ${outcome} into ${release.name}`)
-  if (liveCheckEnabled) await awaitLiveCheck(liveTarget(release.directory, release.previous))
+  if (options.liveCheck) await awaitLiveCheck(liveTarget(release.directory, release.previous))
   console.log(`\n[deploy] ${release.name} is live at ${meshUrl}`)
+}
+
+/** Restarts into the staged release through the server's own restart route, then checks it. */
+async function restartStaged(request: RestartRequest, liveCheckEnabled: boolean) {
+  const staged = requireStaged(pendingRelease(), productionRoot)
+  const target = liveTarget(staged, currentRelease())
+  const waitMinutes = readHomeSetting(productionStateHome, 'developer.deployRestartWaitMinutes')
+  log('restart', `restarting ${serverUnit} into ${target.name}`)
+  await requestRestart({
+    interrupt: request.interrupt,
+    waitMs: waitMinutes * 60_000,
+    insidePlatform: Bun.env.PLATFORM_PRODUCTION_ROOT === productionRoot,
+  })
+  await waitForServerRelease(target.name)
+  // Promotion starts the check unless the release was deployed with --skip-live-check.
+  if (liveCheckEnabled && readBuildConfig(staged)?.liveCheck !== false) await awaitLiveCheck(target)
+  console.log(`\n[deploy] ${target.name} is live at ${meshUrl}`)
 }
 
 function assertUnmoved(release: Release, staged: string | null) {

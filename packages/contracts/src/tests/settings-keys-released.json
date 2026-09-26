@@ -31,6 +31,7 @@
     "chat.sendShortcut",
     "chat.sessionSortOrder",
     "chat.textGenerationModel",
+    "developer.deployRestartWaitMinutes",
     "developer.devServerIdleMinutes",
     "developer.simulatedLatencyMs",
     "editor.codeTheme.dark",

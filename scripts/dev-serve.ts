@@ -1,10 +1,7 @@
-import { existsSync, readFileSync } from 'node:fs'
 import { hostname } from 'node:os'
 import path from 'node:path'
-import * as v from 'valibot'
-import { SETTINGS_REGISTRY } from '../packages/contracts/src/settings/keys'
 import { observabilityEnvFromFile } from '../packages/observability/src/env-file'
-import { parseSettingsDocument } from '../apps/server/src/settings/json-document'
+import { readHomeSetting } from './home-setting'
 import { requireFreeDevPorts } from './port-holders'
 import { devPorts } from './runtime-network'
 import { devStateHome } from './state-home'
@@ -34,7 +31,7 @@ async function serve() {
     const all = [ports.web, ports.api, ports.webUpstream, ports.apiUpstream]
     await requireFreeDevPorts('127.0.0.1', all, route)
   }
-  const idle = idleMinutes()
+  const idle = readHomeSetting(env.PLATFORM_HOME ?? devStateHome, IDLE_SETTING)
   await mesh([
     'serve',
     hostname(),
@@ -63,17 +60,6 @@ async function unserve() {
 async function routeExists() {
   const listing = await meshOutput(['serve', 'ls'])
   return listing.split('\n').some((line) => line.trim().split(/\s+/)[0] === route)
-}
-
-/** The dev server's own settings file decides; a missing or invalid value is the registry default. */
-function idleMinutes() {
-  const descriptor = SETTINGS_REGISTRY[IDLE_SETTING]
-  const file = path.join(env.PLATFORM_HOME ?? devStateHome, 'settings.json')
-  if (!existsSync(file)) return descriptor.default
-
-  const { values } = parseSettingsDocument(readFileSync(file, 'utf8'))
-  const parsed = v.safeParse(descriptor.schema, values[IDLE_SETTING])
-  return parsed.success ? parsed.output : descriptor.default
 }
 
 async function mesh(args: readonly string[]) {

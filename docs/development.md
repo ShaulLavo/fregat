@@ -52,7 +52,7 @@ on a machine with mesh, `bun run dev:serve` registers the dev pair as a mesh rou
 
 ## shipping it
 
-`bun run deploy` builds the web app, verifies the candidate, swaps a symlink and runs a headless check against the live url. nothing restarts, so open terminals and agent sessions survive it. server changes need `bun run deploy --server`, which restarts the unit and drops every live session, so do not reach for it on web-only work
+`bun run deploy` builds the web app, verifies the candidate, swaps a symlink and runs a headless check against the live url. nothing restarts, so open terminals and agent sessions survive it. server changes need `bun run deploy --server`, which stages the release; the app shows "Update available" and the server restarts when someone clicks Restart. `bun run deploy --server --restart` sends that request itself: it waits for running sessions to finish (`developer.deployRestartWaitMinutes`, 30 by default), then restarts and waits for the live check. `--interrupt` ends busy turns and restarts at once, which a deploy run from inside a Platform chat needs because its own turn counts as busy. a restart ends every live session, so do not reach for `--server` on web-only work
 
 `bun run deploy --rollback` moves back one release. `GET /platform/release` answers whether a change actually landed, reporting the served release, its commit, and the dirty-file count it was built from
 

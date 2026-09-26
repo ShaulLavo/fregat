@@ -168,7 +168,7 @@ async function restartServer(control: ServerControl) {
 }
 
 /** Waits for the server to report the target release's own name. */
-async function waitForServerRelease(expected: string, control: ServerControl) {
+export async function waitForServerRelease(expected: string, control = liveControl) {
   const timeoutMs = 60_000
   const deadline = control.now() + timeoutMs
   while (control.now() < deadline) {

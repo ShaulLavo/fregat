@@ -984,6 +984,21 @@ export const SETTINGS_REGISTRY = {
     visibility: 'advanced',
     keywords: ['developer', 'dev server', 'mesh', 'idle', 'vite'],
   }),
+  'developer.deployRestartWaitMinutes': defineSetting({
+    schema: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(1440)),
+    // Long enough for a typical agent turn to finish; a session busy for longer is stuck or
+    // background work, which the caller should interrupt on purpose.
+    default: 30,
+    // Machine scope: `bun run deploy --restart` reads it from this machine's production home.
+    scope: 'machine',
+    widget: 'number',
+    category: 'Developer',
+    title: 'Deploy restart wait',
+    description:
+      'Minutes `bun run deploy --restart` waits for running sessions to finish before it gives up. `--interrupt` restarts at once and ends those turns.',
+    visibility: 'advanced',
+    keywords: ['developer', 'deploy', 'restart', 'update', 'busy', 'wait'],
+  }),
   'window.transparency': defineSetting({
     // Who supplies the see-through, not how much of it there is.
     //

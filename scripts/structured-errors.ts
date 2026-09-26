@@ -29,6 +29,25 @@ export const scriptErrors = defineErrorCatalog('scripts', {
     why: 'The shared dev server is a mesh route, and mesh refused or failed the change.',
     fix: 'Read the mesh output above; `mesh serve ls` shows the routes and `mesh version` must be v0.1.52 or later.',
   },
+  NOTHING_STAGED: {
+    status: 409,
+    message: 'No release is staged to restart into.',
+    why: '`--restart` promotes the release `deploy --server` staged, and there is none.',
+    fix: 'Run `bun run deploy --server --restart` to build, stage and restart in one step.',
+  },
+  RESTART_BUSY: {
+    status: 409,
+    message: ({ count, minutes }: { count: number; minutes: number }) =>
+      `${count} session${count === 1 ? '' : 's'} stayed busy for ${minutes} minutes, so the server kept running.`,
+    why: 'A restart ends running turns, so `--restart` waits for them to finish, as the Restart button does.',
+    fix: 'Run `bun run deploy --restart` again later, or add `--interrupt` to end those turns now. Inside a Platform chat your own turn counts as busy, so use `--interrupt` there.',
+  },
+  RESTART_REQUEST_FAILED: {
+    status: 502,
+    message: ({ detail }: { detail: string }) => `The restart request failed: ${detail}`,
+    why: '`--restart` sends the Restart button’s request to the production server on loopback.',
+    fix: 'Check that the server runs (`systemctl --user status platform-prod`) and read `journalctl --user -u platform-prod -n 50`.',
+  },
 })
 
 export function createScriptError(message: string) {

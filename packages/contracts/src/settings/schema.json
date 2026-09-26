@@ -227,6 +227,13 @@
       "required": ["model", "providerInstanceId"],
       "type": "object"
     },
+    "developer.deployRestartWaitMinutes": {
+      "default": 30,
+      "description": "Minutes `bun run deploy --restart` waits for running sessions to finish before it gives up. `--interrupt` restarts at once and ends those turns.",
+      "maximum": 1440,
+      "minimum": 1,
+      "type": "integer"
+    },
     "developer.devServerIdleMinutes": {
       "default": 15,
       "description": "Minutes the shared dev server keeps running after its last connection closes; mesh then stops it and starts it again on the next connection. Takes effect the next time `bun run dev:serve` runs.",
