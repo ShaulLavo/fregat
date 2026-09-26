@@ -1,3 +1,4 @@
+import { platformReadTools } from '../../mcp/tool-names'
 import { spawn } from 'node:child_process'
 import { ProviderProcessLifetime } from './process-lifetime'
 import { createInternalError, isEvlogError } from '../../observability/structured-errors'
@@ -226,9 +227,6 @@ type ClaudeRuntimeEventPayload<Type extends ProviderRuntimeEvent['type']> = Extr
   ProviderRuntimeEvent,
   { payload: unknown; type: Type }
 >['payload']
-
-/** `mcp__<server>__<tool>`: the tools Platform's own endpoint serves this session. */
-const PLATFORM_MCP_TOOL_PREFIX = 'mcp__platform__'
 
 export class ClaudeProviderAdapter
   extends RuntimeAdapter<ClaudeAgentSession>
@@ -723,6 +721,7 @@ class ClaudeAgentSession extends SessionContext {
   private nextHarnessOrigin: ProviderTurnOrigin | null = null
   /** This CLI reports `command_lifecycle`, so an owner turn is running only once its own frame says so. */
   private lifecycleReported = false
+  private platformMcpName: string | null = null
   private query: Query | null = null
   private pumpCompletion: Promise<void> | null = null
   private streamEnded = true
@@ -838,11 +837,12 @@ class ClaudeAgentSession extends SessionContext {
         'Claude session start timed out.',
       )
       if (input.platformMcp) {
+        const name = `platform_${crypto.randomUUID().replaceAll('-', '')}`
         // The SDK serializes initial mcpServers into argv and its spawn debug log.
         await withClaudeTimeout(
           query
             .setMcpServers({
-              platform: {
+              [name]: {
                 alwaysLoad: true,
                 headers: { Authorization: `Bearer ${input.platformMcp.token}` },
                 type: 'http',
@@ -851,7 +851,7 @@ class ClaudeAgentSession extends SessionContext {
             })
             .then(
               (result) => {
-                if (Object.keys(result.errors).length > 0)
+                if (Object.keys(result.errors).length > 0 || !result.added.includes(name))
                   throw createInternalError('Platform MCP connection failed.')
               },
               () => {
@@ -861,6 +861,7 @@ class ClaudeAgentSession extends SessionContext {
           CLAUDE_INIT_TIMEOUT_MS,
           'Platform MCP connection timed out.',
         )
+        session.platformMcpName = name
       }
       session.status = 'ready'
     } catch (error) {
@@ -2147,8 +2148,16 @@ class ClaudeAgentSession extends SessionContext {
     if (this.runtimeMode === 'full-access') {
       return Promise.resolve({ behavior: 'allow', updatedInput: toolInput })
     }
-    // Platform's own tools only read, inside the session's checkout.
-    if (toolName.startsWith(PLATFORM_MCP_TOOL_PREFIX))
+    // HTTP servers installed by setMcpServers report dynamic provenance; the name is per runtime.
+    if (
+      this.isActive() &&
+      this.platformMcpName !== null &&
+      options.mcpServer?.source === 'dynamic' &&
+      options.mcpServer.name === this.platformMcpName &&
+      Object.values(platformReadTools).some(
+        (tool) => toolName === `mcp__${this.platformMcpName}__${tool}`,
+      )
+    )
       return Promise.resolve({ behavior: 'allow', updatedInput: toolInput })
 
     return this.requestApproval(toolName, toolInput, options)

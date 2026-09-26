@@ -1,8 +1,9 @@
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client'
 import { Elysia } from 'elysia'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
+import * as fs from 'node:fs/promises'
+import { mkdir, mkdtemp, rename, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { Database } from 'bun:sqlite'
@@ -19,11 +20,18 @@ import { ProviderSessionDirectory } from '../../provider/provider-session-direct
 import { McpGrantRegistry } from '../grants'
 import { mcpRoutes } from '../routes'
 
+// Wrap only OS I/O; the MCP route, grant resolver and actual filesystem stay real.
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const fs = await importOriginal<typeof import('node:fs/promises')>()
+  return { ...fs, readFile: vi.fn(fs.readFile), open: vi.fn(fs.open) }
+})
+
 const ENDPOINT = 'http://127.0.0.1:39087/mcp'
 const ORIGIN = 'http://localhost:5173'
 const cleanups: (() => Promise<unknown> | unknown)[] = []
 
 afterEach(async () => {
+  vi.resetAllMocks()
   for (const cleanup of cleanups.splice(0).reverse()) await cleanup()
 })
 
@@ -76,16 +84,155 @@ function post(app: Handler, headers: Record<string, string>, body: unknown = {})
 }
 
 describe('the checkout boundary', () => {
-  it('reads a file in its own checkout, and nothing in a sibling with the same paths', async () => {
+  it.each(['file', 'ancestor'])(
+    'rejects an outward %s replacement at the filesystem open boundary',
+    async (kind) => {
+      const root = await mkdtemp(path.join(tmpdir(), 'platform-mcp-swap-'))
+      cleanups.push(() => rm(root, { force: true, recursive: true }))
+      const inside = path.join(root, 'checkout/src')
+      const outside = path.join(root, 'sibling/src')
+      await mkdir(inside, { recursive: true })
+      await mkdir(outside, { recursive: true })
+      await writeFile(path.join(inside, 'target.txt'), 'allowed')
+      await writeFile(path.join(outside, 'target.txt'), 'outside-secret')
+      const { app, grants } = endpoint()
+      const token = grants.issue({
+        cwd: path.join(root, 'checkout'),
+        runtimeEpoch: 'e1',
+        sessionId: 'a',
+      })
+      expect((await callTool(app, token, 'read_file', { path: 'src/target.txt' })).content).toEqual(
+        [{ type: 'text', text: 'allowed' }],
+      )
+      let swapped = false
+      const swap = async (file: unknown) => {
+        if (swapped || typeof file !== 'string' || !file.endsWith('/src/target.txt')) return
+        swapped = true
+        const from = kind === 'ancestor' ? inside : path.join(inside, 'target.txt')
+        const to = kind === 'ancestor' ? outside : path.join(outside, 'target.txt')
+        await rename(from, `${from}.held`)
+        await symlink(to, from)
+      }
+      const { readFile: read, open } =
+        await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises')
+      vi.mocked(fs.readFile).mockImplementation(async (...args) => {
+        await swap(args[0])
+        return read(...args)
+      })
+      vi.mocked(fs.open).mockImplementation(async (...args) => {
+        await swap(args[0])
+        return open(...args)
+      })
+      const result = await callTool(app, token, 'read_file', { path: 'src/target.txt' })
+      expect(swapped).toBe(true)
+      expect(result.isError).toBe(true)
+      expect(JSON.stringify(result)).not.toContain('outside-secret')
+    },
+  )
+
+  it.each([{ startLine: 1, endLine: 1 }, { startLine: 1 }, { endLine: 1 }, {}])(
+    'enforces the file byte limit for range %j',
+    async (range) => {
+      const root = await mkdtemp(path.join(tmpdir(), 'platform-mcp-size-'))
+      cleanups.push(() => rm(root, { force: true, recursive: true }))
+      await writeFile(path.join(root, 'huge.txt'), 'x'.repeat(512 * 1024 + 1))
+      const { app, grants } = endpoint()
+      const token = grants.issue({ cwd: root, runtimeEpoch: 'e1', sessionId: 'a' })
+      const result = await callTool(app, token, 'read_file', { path: 'huge.txt', ...range })
+      expect(result.isError).toBe(true)
+      expect(JSON.stringify(result)).not.toContain('x'.repeat(1024))
+    },
+  )
+
+  it('streams a requested line range without reading the rest of the file', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'platform-mcp-range-'))
+    cleanups.push(() => rm(root, { force: true, recursive: true }))
+    await writeFile(path.join(root, 'range.txt'), 'first\nsecond\n' + 'z'.repeat(400_000))
+    const { app, grants } = endpoint()
+    const token = grants.issue({ cwd: root, runtimeEpoch: 'e1', sessionId: 'a' })
+    const read = vi.mocked(fs.readFile)
+    const calls: unknown[][][] = []
+    const { open } = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises')
+    vi.mocked(fs.open).mockImplementation(async (...args) => {
+      const handle = await open(...args)
+      if (String(args[0]).endsWith('/range.txt')) calls.push(vi.spyOn(handle, 'read').mock.calls)
+      return handle
+    })
+    const result = await callTool(app, token, 'read_file', {
+      path: 'range.txt',
+      startLine: 2,
+      endLine: 2,
+    })
+    expect(result.content).toEqual([{ type: 'text', text: 'second' }])
+    expect(read.mock.calls.filter(([file]) => file === path.join(root, 'range.txt'))).toEqual([])
+    expect(calls.flat()).toHaveLength(1)
+  })
+
+  it('caps a file that grows after fstat and bounds decoded text bytes', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'platform-mcp-growth-'))
+    cleanups.push(() => rm(root, { force: true, recursive: true }))
+    const target = path.join(root, 'growing.txt')
+    await writeFile(target, 'initial')
+    await writeFile(path.join(root, 'invalid-utf8.txt'), Buffer.alloc(200_000, 0xff))
+    const { app, grants } = endpoint()
+    const token = grants.issue({ cwd: root, runtimeEpoch: 'e1', sessionId: 'a' })
+    const { open } = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises')
+    vi.mocked(fs.open).mockImplementation(async (...args) => {
+      const handle = await open(...args)
+      if (!String(args[0]).endsWith('/growing.txt')) return handle
+      const stat = handle.stat.bind(handle)
+      vi.spyOn(handle, 'stat').mockImplementation(async () => {
+        const info = await stat()
+        await writeFile(target, 'g'.repeat(512 * 1024 + 1))
+        return info
+      })
+      return handle
+    })
+    for (const file of ['growing.txt', 'invalid-utf8.txt']) {
+      const result = await callTool(app, token, 'read_file', { path: file, startLine: 1 })
+      expect(result.isError).toBe(true)
+      expect(JSON.stringify(result).length).toBeLessThan(1024)
+    }
+  })
+
+  it('keeps UTF-8 and line boundaries intact across read chunks', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'platform-mcp-chunks-'))
+    cleanups.push(() => rm(root, { force: true, recursive: true }))
+    const line = 'a'.repeat(16_381) + '🙂'
+    const content = line + '\nsecond\nthird\n'
+    await writeFile(path.join(root, 'utf8.txt'), content)
+    const { app, grants } = endpoint()
+    const token = grants.issue({ cwd: root, runtimeEpoch: 'e1', sessionId: 'a' })
+    expect(
+      (await callTool(app, token, 'read_file', { path: 'utf8.txt', startLine: 1, endLine: 1 }))
+        .content,
+    ).toEqual([{ type: 'text', text: line }])
+    expect(
+      (await callTool(app, token, 'read_file', { path: 'utf8.txt', startLine: 2, endLine: 3 }))
+        .content,
+    ).toEqual([{ type: 'text', text: 'second\nthird' }])
+    expect((await callTool(app, token, 'read_file', { path: 'utf8.txt' })).content).toEqual([
+      { type: 'text', text: content },
+    ])
+  })
+
+  it.each([
+    ['a', 'b'],
+    ['b', 'a'],
+  ])('confines checkout %s against sibling %s with matching paths', async (owner, sibling) => {
     const root = await mkdtemp(path.join(tmpdir(), 'platform-mcp-boundary-'))
     cleanups.push(() => rm(root, { force: true, recursive: true }))
     for (const name of ['a', 'b']) {
       await mkdir(path.join(root, name, 'src'), { recursive: true })
       await writeFile(path.join(root, name, 'src/secret.ts'), `export const owner = '${name}'\n`)
     }
-    await symlink(path.join(root, 'b/src'), path.join(root, 'a/linked'))
+    await symlink(path.join(root, sibling, 'src'), path.join(root, owner, 'linked'))
     const { app, grants } = endpoint()
-    const token = grants.issue({ cwd: path.join(root, 'a'), runtimeEpoch: 'e1', sessionId: 'a' })
+    const token = grants.issue({
+      cwd: path.join(root, owner),
+      runtimeEpoch: 'e1',
+      sessionId: owner,
+    })
     const read = async (file: string) => {
       const result = await callTool(app, token, 'read_file', { path: file })
       const [content] = result.content as { text: string }[]
@@ -94,12 +241,12 @@ describe('the checkout boundary', () => {
 
     expect(await read('src/secret.ts')).toEqual({
       error: false,
-      text: "export const owner = 'a'\n",
+      text: `export const owner = '${owner}'\n`,
     })
-    expect(await read(path.join(root, 'a/src/secret.ts'))).toMatchObject({ error: false })
+    expect(await read(path.join(root, owner, 'src/secret.ts'))).toMatchObject({ error: false })
     for (const escape of [
-      path.join(root, 'b/src/secret.ts'),
-      '../b/src/secret.ts',
+      path.join(root, sibling, 'src/secret.ts'),
+      `../${sibling}/src/secret.ts`,
       'linked/secret.ts',
     ])
       expect(await read(escape)).toMatchObject({ error: true })

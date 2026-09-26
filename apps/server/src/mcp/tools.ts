@@ -1,13 +1,15 @@
-import { readFile, stat } from 'node:fs/promises'
+import type { FileHandle } from 'node:fs/promises'
+import { FsError } from '../fs/errors'
 
 import { McpServer } from '@modelcontextprotocol/server'
 import * as v from 'valibot'
 
-import { resolveGrantPath } from './boundary'
+import { openGrantFile } from './boundary'
+import { platformReadTools } from './tool-names'
 import type { McpGrant } from './grants'
 import { toolInput } from './input-schema'
 
-/** More than an agent reads at once; a bigger file is read by range. */
+/** A hard bound on both scanned file bytes and returned text, including line-range reads. */
 const READ_LIMIT_BYTES = 512 * 1024
 
 const readFileInput = toolInput(
@@ -33,7 +35,7 @@ export function platformMcpServer(grant: McpGrant | null) {
   const server = new McpServer({ name: 'platform', version: '1.0.0' })
   if (!grant) return server
   server.registerTool(
-    'workspace_info',
+    platformReadTools.workspaceInfo,
     {
       description: 'The Platform session and checkout this agent works in.',
       annotations: { readOnlyHint: true },
@@ -44,9 +46,10 @@ export function platformMcpServer(grant: McpGrant | null) {
     },
   )
   server.registerTool(
-    'read_file',
+    platformReadTools.readFile,
     {
-      description: "Reads a text file in this session's checkout, whole or by line range.",
+      description:
+        "Reads a text file up to 512 KiB in this session's checkout, whole or by line range.",
       inputSchema: readFileInput,
       annotations: { readOnlyHint: true },
     },
@@ -62,13 +65,49 @@ async function readInside(
   grant: McpGrant,
   input: { path: string; startLine?: number; endLine?: number },
 ) {
-  const target = await resolveGrantPath(grant, input.path)
-  const info = await stat(target.absolutePath)
-  if (!info.isFile()) return `${target.relativePath} is not a file.`
-  if (info.size > READ_LIMIT_BYTES && input.startLine === undefined)
-    return `${target.relativePath} is ${info.size} bytes; read it by line range.`
-  const lines = (await readFile(target.absolutePath, 'utf8')).split('\n')
-  const start = (input.startLine ?? 1) - 1
-  const end = input.endLine ?? lines.length
-  return lines.slice(start, end).join('\n')
+  const file = await openGrantFile(grant, input.path)
+  try {
+    const info = await file.stat()
+    if (!info.isFile()) throw new FsError('NOT_A_FILE')
+    if (info.size > READ_LIMIT_BYTES) throw new FsError('FILE_TOO_LARGE')
+    return await readLines(file, input.startLine ?? 1, input.endLine ?? Infinity)
+  } finally {
+    await file.close()
+  }
+}
+
+type LineSelection = { line: number; parts: Buffer[]; start: number; end: number }
+
+async function readLines(file: FileHandle, start: number, end: number) {
+  if (end < start) return ''
+  const selection: LineSelection = { line: 1, parts: [], start, end }
+  let scanned = 0
+  for (;;) {
+    const buffer = Buffer.allocUnsafe(Math.min(16 * 1024, READ_LIMIT_BYTES - scanned + 1))
+    const { bytesRead } = await file.read(buffer, 0, buffer.length, null)
+    if (bytesRead === 0) break
+    scanned += bytesRead
+    // fstat is only a snapshot: a writer can grow the file after the size check.
+    if (scanned > READ_LIMIT_BYTES) throw new FsError('FILE_TOO_LARGE')
+    if (selectLines(buffer.subarray(0, bytesRead), selection)) break
+  }
+  const text = Buffer.concat(selection.parts).toString('utf8')
+  if (Buffer.byteLength(text) > READ_LIMIT_BYTES) throw new FsError('FILE_TOO_LARGE')
+  return text
+}
+
+function selectLines(chunk: Buffer, selection: LineSelection) {
+  let offset = 0
+  let start = selection.line >= selection.start ? 0 : -1
+  for (let newline = chunk.indexOf(10); newline !== -1; newline = chunk.indexOf(10, offset)) {
+    if (selection.line === selection.end) {
+      if (start !== -1) selection.parts.push(chunk.subarray(start, newline))
+      return true
+    }
+    selection.line += 1
+    offset = newline + 1
+    if (selection.line === selection.start) start = offset
+  }
+  if (start !== -1) selection.parts.push(chunk.subarray(start))
+  return false
 }
