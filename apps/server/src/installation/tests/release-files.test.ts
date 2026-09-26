@@ -80,7 +80,6 @@ test('manifest versions come from bun.lock, with the server workspace resolution
     typescript: 'typescript@7.0.0',
     'site/typescript': 'typescript@5.0.0',
     'typescript-language-server': 'typescript-language-server@6.0.0',
-    jszip: 'jszip@3.10.1',
     'subset-font': 'subset-font@2.4.0',
   })
   expect(JSON.parse(runtimeManifest(lock))).toEqual({
@@ -91,7 +90,6 @@ test('manifest versions come from bun.lock, with the server workspace resolution
       '@anthropic-ai/claude-agent-sdk': '1.2.3',
       typescript: '7.0.0',
       'typescript-language-server': '6.0.0',
-      jszip: '3.10.1',
       'subset-font': '2.4.0',
     },
   })
@@ -112,7 +110,7 @@ test('a runtime package missing from bun.lock fails the manifest', () => {
     expect.objectContaining({
       code: 'installation.RUNTIME_PACKAGE_MISSING',
       message:
-        'bun.lock resolves no version for the server runtime packages @anthropic-ai/claude-agent-sdk, typescript-language-server, jszip, subset-font.',
+        'bun.lock resolves no version for the server runtime packages @anthropic-ai/claude-agent-sdk, typescript-language-server, subset-font.',
     }),
   )
 })

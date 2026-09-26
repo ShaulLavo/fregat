@@ -13,7 +13,6 @@ export const RUNTIME_PACKAGES = [
   '@anthropic-ai/claude-agent-sdk',
   'typescript',
   'typescript-language-server',
-  'jszip',
   'subset-font',
 ] as const
 

@@ -27,7 +27,16 @@ release installs that carry every package the server loads at runtime.
    bundle, run from `/`): before, `Cannot find package 'subset-font'`; after, both load.
 2. **`cheerio` out.** One call site scrapes nerdfonts.com and costs 22% of the 4.7 MB server bundle.
    Use the GitHub releases API.
+   Implemented with slice 3 on `w2/cx-184-fonts`: validate the release asset JSON and keep
+   the existing ZIP URLs and cached font files. Only HTTPS assets under the Nerd Fonts
+   release path are accepted.
 3. **`jszip` out.** Download the `.tar.xz` and use system `tar`, or `fflate`.
+   Implemented with `fflate` 0.8.3, MIT notice in `apps/web/public/licenses/fflate.txt`.
+   Only the selected face is inflated. JSZip leaves the release runtime manifest.
+   Same-command server builds: 5,139,731 → 4,080,290 bytes, down 1,059,441 bytes or 20.6%.
+   Lock resolutions: 1,346 → 1,326. Font and release tests: 41 passed. A frozen production
+   runtime install and bundled Nerd Font extraction passed from `/`. All workspace typechecks
+   passed. Evidence: `/work/tmp/w2-184-fonts-evidence/`.
 4. **`web-push` isolated, never dropped.** Web push and the `web-push` package both stay. For the
    permissive-only goal, move the two call sites (`push/vapid.ts`, `push/delivery.ts`) and the
    package into a small package of their own, loaded by dynamic import only when push is used (a
