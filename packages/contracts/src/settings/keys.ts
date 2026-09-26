@@ -83,6 +83,18 @@ export const SETTINGS_REGISTRY = {
     description:
       'Show the Plan mode picker and /plan and /default commands for providers that support them. Stored draft preferences are retained while hidden.',
   }),
+  'agent.diagnosticsFeedback': defineSetting({
+    schema: v.boolean(),
+    default: true,
+    scope: 'application',
+    widget: 'boolean',
+    category: 'Chat',
+    title: 'Errors after agent edits',
+    details:
+      'Only errors the edit introduced, from the language server already open for that file: up to 10 per file.',
+    description:
+      'After an agent edits a file, tell it the errors that edit introduced, so it can fix them in the same turn.',
+  }),
   'chat.activeFileContext': defineSetting({
     schema: v.boolean(),
     default: false,

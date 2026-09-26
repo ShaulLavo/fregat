@@ -2,6 +2,12 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "additionalProperties": false,
   "properties": {
+    "agent.diagnosticsFeedback": {
+      "default": true,
+      "description": "After an agent edits a file, tell it the errors that edit introduced, so it can fix them in the same turn.",
+      "markdownDescription": "After an agent edits a file, tell it the errors that edit introduced, so it can fix them in the same turn.\n\nOnly errors the edit introduced, from the language server already open for that file: up to 10 per file.",
+      "type": "boolean"
+    },
     "chat.activeFileContext": {
       "default": false,
       "description": "Show the file open in the editor as a chip in the composer. While the chip is there, sending mentions that file. Remove the chip to send without it.",
