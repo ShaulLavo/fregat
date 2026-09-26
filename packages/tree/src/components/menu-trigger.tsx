@@ -4,13 +4,14 @@ import { Icon } from './Icon'
 import { useMenuTrigger } from '../hooks/use-menu-trigger'
 import type { FileTreeRowDom } from '../hooks/useFileTreeRowDom'
 import type { MenuTriggerStore } from '../state/menu-trigger'
-import { CONTEXT_MENU_SLOT_NAME, CONTEXT_MENU_TRIGGER_TYPE } from '../utils/constants'
+import { CONTEXT_MENU_TRIGGER_TYPE } from '../utils/constants'
 import type { FileTreeContextMenuOpenContext } from '../utils/model/publicTypes'
 import type { FileTreeResolvedIcon } from '../utils/render/iconResolver'
 import { menuTriggerAnchorStyle } from '../utils/render/menu-trigger-style'
 
 export function MenuTrigger({
   anchorRef,
+  contentHostRef,
   triggerRef,
   store,
   dom,
@@ -26,6 +27,7 @@ export function MenuTrigger({
   openMenu,
 }: {
   anchorRef: RefObject<HTMLDivElement | null>
+  contentHostRef: RefObject<HTMLDivElement | null>
   triggerRef: RefObject<HTMLButtonElement | null>
   store: MenuTriggerStore
   dom: FileTreeRowDom
@@ -85,7 +87,7 @@ export function MenuTrigger({
       >
         <Icon {...icon} />
       </button>
-      {isOpen ? <slot name={CONTEXT_MENU_SLOT_NAME} /> : null}
+      {isOpen ? <div data-type='context-menu-content' ref={contentHostRef} /> : null}
     </div>
   )
 }

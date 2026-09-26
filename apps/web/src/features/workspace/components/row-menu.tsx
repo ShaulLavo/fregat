@@ -33,9 +33,6 @@ export function TreeRowMenu({
       // MenuSurface restores its captured FocusService origin after dismissal.
       onOpenChange={(next) => next || menuContext.close({ restoreFocus: false })}
       open
-      // The popup portals to <body>; without this the tree's composedPath
-      // outside-click check would treat our own items as outside clicks.
-      popupProps={{ 'data-file-tree-context-menu-root': 'true' }}
       surface='files.row'
     />
   )

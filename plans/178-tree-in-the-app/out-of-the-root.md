@@ -1,6 +1,6 @@
 # Plan 178: out of the root
 
-- Status: PROPOSED. Size M. After [parity-harness](parity-harness.md).
+- Status: DONE 2026-09-26 (wave 2, lane T). Size M. After [parity-harness](parity-harness.md).
 - Owns: deleting the custom element, the shadow root and the second React root. Nothing changes on
   screen.
 
@@ -60,3 +60,46 @@ zero drift.
 ## Verification
 
 Harness: zero pixel and style drift across the matrix. Every tree scenario in the index passes.
+
+## Landed
+
+- The tree is a `<div data-file-tree>` in the caller's React root: `FileTree` renders `FileTreeView`
+  keyed by model, the sprites, and the caller's `renderContextMenu` output. The model notifies the
+  component through `subscribeView`/`getViewProps(version)` where it used to call a second root.
+  Deleted: `web-components.ts`, `state/renderer.ts`, `slotHost.ts`, `cssWrappers.ts`,
+  `scrollbarGutter.ts`, the tag, slot, style and unsafe-CSS constants, `render()`/`unmount()`, the
+  `id`, `unsafeCSS` and header composition options, and the host-density bookkeeping.
+- `style.css` sits in `@layer file-tree`, nested under `[data-file-tree]` (`:host` became `&`),
+  ordered after Tailwind's layers. The app's overrides moved from `treeUnsafeCss` into
+  `features/workspace/components/tree-pane.css` in `@layer file-tree-app`.
+- What light DOM changed, and the tree's sheet now undoes (the harness found each): Tailwind's
+  preflight (`box-sizing`, `margin`, `padding`, `border-*` go back to the browser's with `revert`;
+  inputs get their `line-height` back), the app's `* { scrollbar-width: thin }` (the scroller
+  sets `auto`) and `* { scrollbar-color }` (the scroller inherits it, as it did through the root).
+  The scrollbar lane is measured from the laid-out scroller once, replacing the probe element.
+- Shadow branches gone from `focusHelpers`, `useFileTreeDrag` (the preview mounts inside the
+  wrapper), `dragPointer` (no geometry fallback), `use-context-menu` and `contextMenuAnchor`.
+  A caller's portalled menu is recognised by marking the events React routes through the tree
+  (`markTreeOwnedEvent`), so the outside-click listener runs in the bubble phase. The row menu's
+  `data-file-tree-context-menu-root`, `MenuSurface`'s `popupProps`, the tooltip layer's
+  `eventOrigin` and the focus service's composed walk are deleted with their shadow tests.
+- The active-guide `<style>` is scoped to the tree's own id.
+- Sprites render inside each tree's wrapper; their ids are document-wide now and identical per
+  tree, so a second tree resolves the same symbols.
+
+### Verification
+
+- `tree-parity`: zero pixel and style drift across all 60 captures; `tree-parity-behaviour`
+  green; `packages/tree` 241 tests (the parity tests unchanged); app `tree-pane` browser and dom
+  tests, `use-fs-actions`, focus service and tooltip-layer tests green.
+- Guarding scenarios: `files-tree`, `search-file-actions`, `editor-external-edit`,
+  `chat-composer-insert`, `file-tree-hover-prefetch`, `tree-sticky-scroll`, `tree-file-clicks`
+  pass. `workbench-list-focus`, `file-picker-navigation`, `copy-feedback`, `file-tree-undo`,
+  `workspace-open-unreadable-child`, `workspace-switch-click-during-open` and
+  `workspace-open-large-root` fail on `origin/main` at the same step (git panel, file picker,
+  session rail and toolbar waits), unrelated to the tree.
+- **Scroll cost (Plan 179 finding).** `trace tree-sticky-scroll`, two runs each against main at
+  the same commit: the eight scroll steps sum to 92 and 120 ms on main, 154 and 185 ms here;
+  style recalculation (`UpdateLayoutTree`) during the scroll is 45 and 75 ms on main, 126 and
+  197 ms here. Rows now match the app's global sheet, as the Risks section expected. Per the plan
+  this is recorded for [Plan 179](../179-isolating-foreign-content.md), not a reason to restore the root.
