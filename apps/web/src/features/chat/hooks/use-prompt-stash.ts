@@ -1,10 +1,8 @@
-import { SKIP_DOM_SELECTION_TAG } from 'lexical'
 import { useStore } from 'zustand'
-import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { errorMessage } from '@/lib/error-message'
-import { $setChatInputText } from '../utils/input-editor-actions'
+import { useChatInputEditorActions } from './use-chat-input-editor-actions'
 import { useChatInputDraftStore, type ChatInputDraftTarget } from '../state/chat-input-draft-store'
 import { promptStashStoreFor, type PromptStashEntry } from '../state/prompt-stash-store'
 import { transferStash } from '../state/stash-transfer'
@@ -12,7 +10,7 @@ import { chatMutationKeys } from '../utils/mutation-keys'
 import { toastError } from '@/lib/toast-error'
 
 export function usePromptStash(draftTarget: ChatInputDraftTarget) {
-  const [editor] = useLexicalComposerContext()
+  const editor = useChatInputEditorActions()
   const activeTarget = useRef<ChatInputDraftTarget | null>(draftTarget)
   useLayoutEffect(() => {
     activeTarget.current = draftTarget
@@ -44,8 +42,7 @@ export function usePromptStash(draftTarget: ChatInputDraftTarget) {
         return
       }
       if (useChatInputDraftStore.getState().getDraft(draftTarget).prompt !== content.prompt) return
-      editor.update(() => $setChatInputText(content.prompt), { tag: SKIP_DOM_SELECTION_TAG })
-      if (action.kind === 'restore') editor.focus()
+      editor.replacePrompt(content.prompt, action.kind === 'restore')
       setMenuOpen(false)
     },
     onError: (error) => toastError(errorMessage(error, 'Could not transfer the message stash.')),
@@ -60,7 +57,7 @@ export function usePromptStash(draftTarget: ChatInputDraftTarget) {
         !(event.metaKey || event.ctrlKey)
       )
         return
-      if (!editor.getRootElement()?.contains(document.activeElement)) return
+      if (!editor.hasFocus()) return
       event.preventDefault()
       mutate({ target: draftTarget, action: { kind: 'stash' } })
     }

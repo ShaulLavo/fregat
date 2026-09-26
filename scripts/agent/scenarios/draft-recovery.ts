@@ -38,7 +38,7 @@ export const draftRecovery: Scenario = {
       await selectors.chatNewSession(page).click()
       await page.waitForURL((url) => url.href !== previousAddress)
       await previousComposer?.waitForElementState('hidden')
-      await selectors.chatMessage(page).fill(first)
+      await selectors.fillChatMessage(page, first)
       await selectors.chatComposerFileInput(page).setInputFiles({
         name: 'draft-notes.txt',
         mimeType: 'text/plain',
@@ -53,7 +53,7 @@ export const draftRecovery: Scenario = {
       await selectors.chatNewSession(page).click()
       await page.waitForURL((url) => url.href !== firstAddress)
       await firstComposer?.waitForElementState('hidden')
-      await selectors.chatMessage(page).fill(second)
+      await selectors.fillChatMessage(page, second)
       notStrictEqual(page.url(), firstAddress)
       await selectors.recoverableDraft(page, first).waitFor()
       await page.reload()
@@ -98,7 +98,7 @@ export const draftRecovery: Scenario = {
         const remove = selectors.discardDraft(page, title)
         if (await remove.isVisible()) await remove.click()
       }
-      await selectors.chatMessage(page).fill('')
+      await selectors.fillChatMessage(page, '')
       await Promise.all(ticketReads)
       for (const upload of issued)
         await page.request.delete(`${upload.url}/${upload.id}`, {

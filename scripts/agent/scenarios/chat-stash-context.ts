@@ -21,14 +21,14 @@ export const chatStashContext = isolatedNativeScenario({
     await selectors.chatStash(page, 1).click()
     await selectors.chatStashEntry(page, 'stash.png').click()
     await selectors.chatStagedFile(page, 'stash.png').waitFor()
-    await selectors.chatMessage(page).fill('Read this complete stashed message.')
+    await selectors.fillChatMessage(page, 'Read this complete stashed message.')
     await attachFile(page, {
       name: 'notes.txt',
       mimeType: 'text/plain',
       buffer: Buffer.from('General file verification.\n'),
     })
     await stashDraft(page, 'notes.txt')
-    await selectors.chatMessage(page).fill('Keep this separate idea.')
+    await selectors.fillChatMessage(page, 'Keep this separate idea.')
     await page.reload()
     await selectors.chatStash(page, 1).click()
     await selectors.chatStashEntry(page, 'Read this complete stashed message.').click()
@@ -52,7 +52,7 @@ export const chatStashContext = isolatedNativeScenario({
     strictEqual(await selectors.chatMessage(page).textContent(), 'Keep this separate idea.')
     await selectors.chatStagedFile(page, 'notes.txt').waitFor({ state: 'hidden' })
     await step('separate-message-preserved')
-    await selectors.chatMessage(page).fill('')
+    await selectors.fillChatMessage(page, '')
   },
 })
 

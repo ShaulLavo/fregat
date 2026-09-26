@@ -12,7 +12,7 @@ export const backgroundLiveness = isolatedNativeScenario({
   fixture: new URL('../fixtures/native-codex.mjs', import.meta.url),
   async drive(page, { step, root, orchestration, sessionId }) {
     const title = `background-liveness verification ${sessionId.slice(0, 8)}`
-    await selectors.chatMessage(page).fill('Run the isolated child fixture.')
+    await selectors.fillChatMessage(page, 'Run the isolated child fixture.')
     await selectors.chatSend(page).click()
     for (let attempt = 0; attempt < 100; attempt += 1) {
       const shell = await readShell(page, orchestration)

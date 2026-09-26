@@ -4,11 +4,9 @@ import * as v from 'valibot'
 
 import {
   chatInputCommandItems,
-  chatInputLineBoundaryOffset,
   chatInputMentionCommandItems,
   chatInputRangeReplacement,
   chatInputStandaloneSlashCommand,
-  chatInputSurroundClose,
   detectChatInputTrigger,
   groupChatInputCommandItems,
   searchChatInputSlashCommands,
@@ -101,22 +99,6 @@ describe('chat input logic', () => {
         text: 'read @src/app.ts now',
       }),
     ).toBeNull()
-  })
-
-  it('resolves line boundaries against the logical line the caret sits on', () => {
-    const text = 'first line\nsecond line'
-
-    expect(chatInputLineBoundaryOffset(text, 22, 'start')).toBe(11)
-    expect(chatInputLineBoundaryOffset(text, 11, 'end')).toBe(22)
-    expect(chatInputLineBoundaryOffset(text, 4, 'start')).toBe(0)
-    expect(chatInputLineBoundaryOffset(text, 4, 'end')).toBe(10)
-    expect(chatInputLineBoundaryOffset('\nsecond', 0, 'start')).toBe(0)
-  })
-
-  it('pairs surround symbols and ignores everything else', () => {
-    expect(chatInputSurroundClose('(')).toBe(')')
-    expect(chatInputSurroundClose('`')).toBe('`')
-    expect(chatInputSurroundClose('a')).toBeNull()
   })
 
   it('keeps a finished slash command triggered through its trailing blanks', () => {

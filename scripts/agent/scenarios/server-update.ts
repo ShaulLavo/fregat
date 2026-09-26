@@ -80,7 +80,7 @@ async function drive(
   ok(staged.includes('Update available'), `The status item must announce the update: ${staged}`)
   await step('update-available')
 
-  await selectors.chatMessage(page).fill('QUEUE_START')
+  await selectors.fillChatMessage(page, 'QUEUE_START')
   await selectors.chatSend(page).click()
   await waitForNativeEvent(root, 'turn/start', 'The native turn must start')
   await selectors.serverUpdateRestart(page).click()

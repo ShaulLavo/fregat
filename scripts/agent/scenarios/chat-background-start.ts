@@ -34,7 +34,7 @@ export const chatBackgroundStart = isolatedNativeScenario({
 
     const composer = selectors.chatMessage(page)
     for (const prompt of PROMPTS) {
-      await composer.fill(prompt)
+      await selectors.fillChatMessage(page, prompt)
       await composer.press('Control+Enter')
       await page.waitForFunction(
         (text) => !document.querySelector('[aria-label="Message"]')?.textContent?.includes(text),

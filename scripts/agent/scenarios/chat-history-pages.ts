@@ -6,7 +6,7 @@ export const chatHistoryPages = isolatedNativeScenario({
   description: 'Reload a long conversation and load its earlier messages through the timeline.',
   fixture: new URL('../fixtures/native-codex.mjs', import.meta.url),
   async drive(page, { step }) {
-    await selectors.chatMessage(page).fill('Create the history page fixture.')
+    await selectors.fillChatMessage(page, 'Create the history page fixture.')
     await selectors.chatSend(page).click()
     await selectors
       .chatMessages(page)

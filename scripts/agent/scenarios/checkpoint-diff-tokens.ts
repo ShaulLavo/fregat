@@ -70,7 +70,7 @@ export const checkpointDiffTokens = isolatedNativeScenario({
         ],
       }),
     )
-    await selectors.chatMessage(page).fill('Edit both files.')
+    await selectors.fillChatMessage(page, 'Edit both files.')
     await selectors.chatSend(page).click()
     await selectors.chatMessages(page).getByText('CHECKPOINT_TURN_DONE').first().waitFor()
     const git = selectors.chatToolTab(page, 'Git')

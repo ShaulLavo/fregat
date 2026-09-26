@@ -1,4 +1,4 @@
-import type { LexicalEditor } from 'lexical'
+import type { Editor } from '@singapore-editor/core/editor'
 import { useEffect, useEffectEvent, type RefObject } from 'react'
 
 import { appendOnce } from '@/features/chat/utils/append-once'
@@ -22,7 +22,7 @@ import { composerAccepts, type ComposerTarget } from '@/lib/composer-attach/util
  */
 export function useComposerInbox(
   draftTarget: ChatInputDraftTarget,
-  editorRef: RefObject<LexicalEditor | null>,
+  editorRef: RefObject<Editor | null>,
   /** The editor mounts a render after this component, and text needs a caret. */
   editorReady: boolean,
   /** Other roots that name this composer, such as the workspace a linked worktree came from. */
@@ -61,7 +61,7 @@ export function useComposerInbox(
 function applyComposerInboxEntries(
   entries: readonly ComposerInboxEntry[],
   draftTarget: ChatInputDraftTarget,
-  editor: LexicalEditor | null,
+  editor: Editor | null,
 ) {
   const drafts = useChatInputDraftStore.getState()
   const contexts = entries.flatMap((entry) =>
@@ -79,12 +79,12 @@ function applyComposerInboxEntries(
   }
 }
 
-function insertTextEntries(entries: readonly ComposerInboxEntry[], editor: LexicalEditor) {
+function insertTextEntries(entries: readonly ComposerInboxEntry[], editor: Editor) {
   const text = entries.flatMap((entry) => (entry.kind === 'text' ? [entry.text] : [])).join('\n\n')
   if (text) insertChatInputText(editor, `${text} `, { focus: true })
 }
 
-function appendTextEntries(entries: readonly ComposerInboxEntry[], editor: LexicalEditor) {
+function appendTextEntries(entries: readonly ComposerInboxEntry[], editor: Editor) {
   const appends = entries.flatMap((entry) => (entry.kind === 'append' ? [entry.text] : []))
   if (appends.length === 0) return
 

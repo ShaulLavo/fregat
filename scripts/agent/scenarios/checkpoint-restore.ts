@@ -23,7 +23,7 @@ const watchRestore = `(() => {
 })()`
 
 async function sendTurn(page: Page, text: string, index: number) {
-  await selectors.chatMessage(page).fill(text)
+  await selectors.fillChatMessage(page, text)
   await selectors.chatSend(page).click()
   await selectors.chatMessages(page).getByText('CHECKPOINT_TURN_DONE').nth(index).waitFor()
 }

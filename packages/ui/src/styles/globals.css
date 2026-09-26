@@ -1210,6 +1210,24 @@
   background: var(--workbench-editor-minimap-background);
 }
 
+.chat-composer-editor-host .editor-virtualized {
+  --editor-background: transparent !important;
+  --editor-foreground: var(--foreground) !important;
+  --editor-caret-color: var(--foreground) !important;
+  --editor-gutter-background: transparent !important;
+  --editor-cursor-line-gutter-background: transparent;
+  --editor-cursor-line-row-background: transparent;
+  --editor-selection-background: color-mix(in oklch, var(--primary) 24%, transparent);
+  --editor-selection-inactive-background: color-mix(in oklch, var(--primary) 14%, transparent);
+
+  flex: 1;
+  min-height: 0;
+  background: transparent !important;
+  overscroll-behavior: contain;
+  /* Wrapped prose never scrolls sideways; the extent estimate counts monospace columns. */
+  overflow-x: hidden !important;
+}
+
 .search-result-excerpt-editor-host {
   height: 28px;
 }

@@ -29,7 +29,7 @@ async function sendWithOptions(
   prompt: string,
   expected: { model: string; effort?: string; serviceTier?: string },
 ) {
-  await selectors.chatMessage(page).fill(prompt)
+  await selectors.fillChatMessage(page, prompt)
   await selectors.chatSend(page).click()
   await selectors.chatExactText(page, `ACK_${prompt}`).waitFor()
   const entries = (await nativeLog(root)).filter((entry) => entry.event === 'turn/start')

@@ -11,7 +11,7 @@ export const fileAttachments = isolatedNativeScenario({
   async drive(page, { step }) {
     const content = 'General file verification.\n'
     const prompt = 'Read the attached verification file.'
-    await selectors.chatMessage(page).fill(prompt)
+    await selectors.fillChatMessage(page, prompt)
     await selectors
       .chatComposerFileInput(page)
       .setInputFiles({ name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from(content) })

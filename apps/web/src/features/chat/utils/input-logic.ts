@@ -1,3 +1,4 @@
+import type { EditorAutoClosingPair } from '@singapore-editor/core/extensions'
 import { clampComposerCursor as clampCursor } from '@workspace/contracts'
 import {
   activeComposerMention,
@@ -39,8 +40,6 @@ export type ChatInputRangeReplacement = {
   rangeStart: number
   text: string
 }
-
-export type ChatInputLineEdge = 'end' | 'start'
 
 export type ChatInputSlashCommand = 'default' | 'plan'
 
@@ -107,19 +106,19 @@ const CHAT_INPUT_SLASH_COMMANDS: readonly ChatInputCommandItem[] = [
  * Typing an opening symbol while text is selected wraps the selection instead of
  * replacing it — the editing affordance a prose composer is most often missing.
  */
-const CHAT_INPUT_SURROUND_PAIRS = new Map<string, string>([
-  ['"', '"'],
-  ["'", "'"],
-  ['(', ')'],
-  ['*', '*'],
-  ['<', '>'],
-  ['[', ']'],
-  ['_', '_'],
-  ['`', '`'],
-  ['{', '}'],
-  ['«', '»'],
-  ['“', '”'],
-])
+export const CHAT_INPUT_SURROUND_PAIRS: readonly EditorAutoClosingPair[] = [
+  { close: '"', open: '"', quote: true },
+  { close: "'", open: "'", quote: true },
+  { close: ')', open: '(' },
+  { close: '*', open: '*', quote: true },
+  { close: '>', open: '<' },
+  { close: ']', open: '[' },
+  { close: '_', open: '_', quote: true },
+  { close: '`', open: '`', quote: true },
+  { close: '}', open: '{' },
+  { close: '»', open: '«' },
+  { close: '”', open: '“' },
+]
 
 const SENSITIVE_MENTION_PATH_WORDS = new Set([
   'apikey',
@@ -215,27 +214,6 @@ function spliceEndForTrailingSpace(text: string, rangeEnd: number, replacement: 
   if (text[rangeEnd] !== ' ') return rangeEnd
 
   return rangeEnd + 1
-}
-
-export function chatInputSurroundClose(character: string) {
-  return CHAT_INPUT_SURROUND_PAIRS.get(character) ?? null
-}
-
-/**
- * Home/End target the logical line, not the wrapped visual one: the browser's
- * own `lineboundary` motion needs a live DOM selection, and on macOS it never
- * runs for these keys at all.
- */
-export function chatInputLineBoundaryOffset(text: string, cursor: number, edge: ChatInputLineEdge) {
-  const safeCursor = clampCursor(text, cursor)
-  if (edge === 'end') {
-    const lineEnd = text.indexOf('\n', safeCursor)
-
-    return lineEnd === -1 ? text.length : lineEnd
-  }
-  if (safeCursor === 0) return 0
-
-  return text.lastIndexOf('\n', safeCursor - 1) + 1
 }
 
 function chatInputMentionReplacement(path: string) {

@@ -10,7 +10,7 @@ export const asyncQuestions = isolatedNativeScenario({
     'Answer optional native questions while running and idle, reload and dismiss, and verify native turn messages.',
   fixture: new URL('../fixtures/native-codex.mjs', import.meta.url),
   async drive(page, { step, root, orchestration, sessionId }) {
-    await selectors.chatMessage(page).fill('Ask isolated optional questions.')
+    await selectors.fillChatMessage(page, 'Ask isolated optional questions.')
     await selectors.chatSend(page).click()
     await selectors
       .asyncQuestion(page, 'Verification running question')

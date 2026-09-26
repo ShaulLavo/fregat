@@ -1,5 +1,4 @@
 import { TEST_ENVIRONMENT_ID } from '../../../../test/factories/chat'
-import { LexicalComposer } from '@lexical/react/LexicalComposer'
 import type { ProviderInstanceId } from '@workspace/contracts'
 import '@workspace/ui/globals.css'
 import { Button } from '@workspace/ui/components/button'
@@ -22,7 +21,6 @@ import { afterEach, expect, test } from 'vitest'
 import { ChatInputAttachmentList } from '@/features/chat/components/chat-input-attachment-list'
 import { ChatInputCommandMenu } from '@/features/chat/components/chat-input-command-menu'
 import { ChatInputEditor } from '@/features/chat/components/chat-input-editor'
-import { CHAT_INPUT_EDITOR_NODES } from '@/features/chat/components/chat-input-mention-node'
 import { ChatInputSubmitButton } from '@/features/chat/components/chat-input-submit-button'
 import { ChatPanelStatus } from '@/features/chat/components/chat-panel-status'
 import { ChatPanelHeader } from '@/features/chat/components/chat-panel-header'
@@ -299,29 +297,22 @@ test('custom composer, picker, search, and references chrome follows density', a
     <AppProviders queryClient={createTestQueryClient()}>
       <EditorStateProvider>
         <TooltipProvider delay={0}>
-          <LexicalComposer
-            initialConfig={{
-              namespace: 'density-contract',
-              nodes: CHAT_INPUT_EDITOR_NODES,
-              onError: (error) => {
-                throw error
-              },
+          <ChatInputEditor
+            disabled={false}
+            draftTarget={{
+              draftKey: 'density-contract',
+              environmentId: TEST_ENVIRONMENT_ID,
+              rootPath: '/repo',
             }}
-          >
-            <ChatInputEditor
-              disabled={false}
-              draftKey='density-contract'
-              placeholder='Message'
-              rootPath='/repo'
-              trigger={null}
-              onCommandMenuCommit={() => false}
-              onCommandMenuMove={() => false}
-              onEditorReady={() => undefined}
-              onImageFiles={async () => true}
-              onSubmitRequest={() => Promise.resolve(false)}
-              onTriggerChange={() => undefined}
-            />
-          </LexicalComposer>
+            placeholder='Message'
+            trigger={null}
+            onCommandMenuCommit={() => false}
+            onCommandMenuMove={() => false}
+            onEditorReady={() => undefined}
+            onImageFiles={async () => true}
+            onSubmitRequest={() => Promise.resolve(false)}
+            onTriggerChange={() => undefined}
+          />
           <ChatInputAttachmentList
             attachments={[attachment]}
             disabled={false}

@@ -19,12 +19,12 @@ export const chatArtifactTemplate = isolatedNativeScenario({
     strictEqual(await messages.getByText('::artifact-template', { exact: false }).count(), 0)
     await step('template-card')
 
-    await selectors.chatMessage(page).fill('Please:')
+    await selectors.fillChatMessage(page, 'Please:')
     await card.getByRole('button', { name: 'Use', exact: true }).click()
     await card.getByRole('button', { name: 'Use', exact: true }).click()
     await page.waitForTimeout(300)
     strictEqual((await selectors.chatMessage(page).innerText()).trim(), `Please: ${PROMPT}`)
     await step('prompt-appended-once')
-    await selectors.chatMessage(page).fill('')
+    await selectors.fillChatMessage(page, '')
   },
 })

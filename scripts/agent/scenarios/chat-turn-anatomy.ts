@@ -223,7 +223,7 @@ async function ultrathinkWord(page: Page, step: Step, evidence: Evidence) {
   await burst.waitFor({ state: 'detached', timeout: 5_000 })
 
   // Ultra to a typed Ultrathink is a new level, so it plays again.
-  await selectors.chatMessage(page).fill('Please ultrathink about the parser.')
+  await selectors.fillChatMessage(page, 'Please ultrathink about the parser.')
   const wordBurst = await burstPlays()
   const burstStart = Date.now()
   const word = selectors.effortRainbow(selectors.chatMessage(page))
@@ -278,7 +278,7 @@ async function ultrathinkWord(page: Page, step: Step, evidence: Evidence) {
   equal(rainbowRows.join(), 'Ultra,Ultrathink', 'Only the ultra rows wear the rainbow')
   for (const probe of caret)
     equal(probe.painted, 'ultrathink', `The word keeps its rainbow: ${probe.label} ${probe.html}`)
-  await selectors.chatMessage(page).fill('')
+  await selectors.fillChatMessage(page, '')
 }
 
 /** A caret next to, inside, or typing beside the word must leave it painted. */
@@ -309,13 +309,13 @@ async function caretKeepsRainbow(page: Page, word: Locator, step: Step) {
   await probe('typing at the end')
   await page.mouse.click(box.x + 1, box.y + box.height / 2)
   await probe('caret before the word')
-  await composer.fill('')
+  await selectors.fillChatMessage(page, '')
   await composer.click()
   await page.keyboard.type('Please ultrathink', { delay: 40 })
   await probe('typed the word')
   await page.keyboard.type(' about it', { delay: 40 })
   await probe('typing after the word')
-  await composer.fill('Please ultrathink about the parser.')
+  await selectors.fillChatMessage(page, 'Please ultrathink about the parser.')
   return probes
 }
 
@@ -345,11 +345,11 @@ async function streamingReasoning(page: Page) {
 /** The same transcript in dark mode and at cozy density. */
 async function otherLooks(page: Page, step: Step, base: string) {
   await writeSettings(page, base, [{ kind: 'set', key: 'workbench.colorTheme', value: 'dark' }])
-  await selectors.chatMessage(page).fill('Please ultrathink about the parser.')
+  await selectors.fillChatMessage(page, 'Please ultrathink about the parser.')
   // Past the ultra burst, so the shot shows the resting rainbow.
   await page.waitForTimeout(1_600)
   await step('dark-mode')
-  await selectors.chatMessage(page).fill('')
+  await selectors.fillChatMessage(page, '')
   await writeSettings(page, base, [
     { kind: 'reset', keys: ['workbench.colorTheme'] },
     { kind: 'set', key: 'workbench.density', value: 'cozy' },

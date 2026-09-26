@@ -59,7 +59,7 @@ async function control(
 }
 
 async function enqueue(page: Page, prompt: string) {
-  await selectors.chatMessage(page).fill(prompt)
+  await selectors.fillChatMessage(page, prompt)
   await selectors.chatQueue(page).click()
   await selectors.chatQueuedEntry(page, prompt).waitFor()
 }
@@ -166,7 +166,7 @@ export const chatQueue = isolatedNativeScenario({
     try {
       await writeSettings(page, base, [{ kind: 'reset', keys: ['chat.followUpBehavior'] }])
       strictEqual((await settingsSnapshot(page, base)).values['chat.followUpBehavior'], 'queue')
-      await selectors.chatMessage(page).fill('QUEUE_START')
+      await selectors.fillChatMessage(page, 'QUEUE_START')
       await selectors.chatSend(page).click()
       await waitForInputs(root, 1)
       await enqueue(page, 'QUEUE_A')
@@ -209,7 +209,7 @@ export const chatQueue = isolatedNativeScenario({
       await expectQueued(page, 0)
       strictEqual(await selectors.chatMessage(page).textContent(), 'QUEUE_RESTORE')
       await step('send-now-and-restore')
-      await selectors.chatMessage(page).fill('')
+      await selectors.fillChatMessage(page, '')
 
       const terminalText = await attachTerminal(page, state)
       const issued = page.waitForResponse(
@@ -226,7 +226,7 @@ export const chatQueue = isolatedNativeScenario({
       uploadPath = `${base}/attachments/uploads/${ticket.attachment.id}`
       await selectors.chatStagedFile(page, 'queued.txt').waitFor()
       await enqueue(page, 'QUEUE_RECOVER')
-      await selectors.chatMessage(page).fill('EXISTING_DRAFT')
+      await selectors.fillChatMessage(page, 'EXISTING_DRAFT')
       await selectors.chatStop(page).click()
       await expectQueued(page, 0)
       await selectors.chatStagedFile(page, 'queued.txt').waitFor()

@@ -32,7 +32,7 @@ export const sessionBranchDrift = isolatedNativeScenario({
       throw createScriptError(`The new worktree starts on its own branch, read ${before}`)
     await step('dedicated-worktree')
 
-    await selectors.chatMessage(page).fill('Start a feature branch.')
+    await selectors.fillChatMessage(page, 'Start a feature branch.')
     await selectors.chatSend(page).click()
     await selectors.chatMessages(page).getByText('CHECKPOINT_TURN_DONE').first().waitFor()
     await chip.getByText(AGENT_BRANCH, { exact: true }).waitFor({ timeout: 15_000 })

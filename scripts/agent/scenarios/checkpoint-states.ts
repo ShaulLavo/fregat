@@ -17,7 +17,7 @@ export async function prepareFixture() {
 }
 
 async function sendTurn(page: Page, text: string) {
-  await selectors.chatMessage(page).fill(text)
+  await selectors.fillChatMessage(page, text)
   await selectors.chatSend(page).click()
   await selectors.chatMessages(page).getByText('CHECKPOINT_TURN_DONE').nth(0).waitFor()
 }
@@ -55,7 +55,7 @@ export const checkpointStates = isolatedNativeScenario({
     await selectors.turnFiles(page).getByRole('treeitem').first().waitFor({ timeout: 15_000 })
     await step('available')
 
-    await selectors.chatMessage(page).fill('Say done without editing anything.')
+    await selectors.fillChatMessage(page, 'Say done without editing anything.')
     await selectors.chatSend(page).click()
     await selectors.chatMessages(page).getByText('CHECKPOINT_TURN_DONE').nth(1).waitFor()
     await selectors.gitDiffScope(page, 'Working tree').click()

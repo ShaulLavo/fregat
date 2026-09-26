@@ -138,7 +138,7 @@ export const sessionUndo: Scenario = {
       await step('archive-undone-by-mod-z-reopens')
 
       const draft = 'draft kept by its own undo'
-      await selectors.chatMessage(page).fill(draft)
+      await selectors.fillChatMessage(page, draft)
       await act(charlie, 'Mark as settled')
       await selectors.sessionInShelf(page, charlie, 'Settled').waitFor()
       await selectors.chatMessage(page).click()

@@ -48,7 +48,7 @@ test('draft choices, shared chips and dirty worktree cleanup survive deletion an
       created = id
     },
   })
-  expect(screen.getByRole('textbox', { name: 'Message' })).toHaveTextContent(
+  expect(screen.getByRole('textbox', { name: 'Message' })).toHaveValue(
     'Keep this in the current checkout',
   )
   await waitFor(() => expect(screen.getByRole('button', { name: 'Send message' })).toBeEnabled())
@@ -90,9 +90,7 @@ test('draft choices, shared chips and dirty worktree cleanup survive deletion an
   expect(screen.getByRole('button', { name: 'Start from branch' })).toHaveTextContent(
     'From release',
   )
-  expect(screen.getByRole('textbox', { name: 'Message' })).toHaveTextContent(
-    'Create a separate checkout',
-  )
+  expect(screen.getByRole('textbox', { name: 'Message' })).toHaveValue('Create a separate checkout')
   await waitFor(() => expect(screen.getByRole('button', { name: 'Send message' })).toBeEnabled())
   await userEvent.click(screen.getByRole('button', { name: 'Send message' }))
   await waitFor(() => expect(created).not.toBeNull())

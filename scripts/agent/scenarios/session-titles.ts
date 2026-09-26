@@ -93,7 +93,7 @@ export const sessionTitles = isolatedNativeScenario({
       await selectors.sessionByTitle(page, seed).click()
       await page.waitForURL((url) => url.href.includes(sessionId))
       await step('isolated-title-session-ready')
-      await selectors.chatMessage(page).fill(seed)
+      await selectors.fillChatMessage(page, seed)
       await selectors.chatSend(page).click()
       await selectors.sessionSearch(page).fill('')
       await waitTitle(title)

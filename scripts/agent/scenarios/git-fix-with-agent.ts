@@ -57,7 +57,7 @@ export const gitFixWithAgent: Scenario = {
         throw createScriptError('The composer did not name the failed step')
       if (text.includes(EXISTING_DRAFT))
         throw createScriptError('Fix with AI reused the open chat instead of starting a new one')
-      await composer.fill('')
+      await selectors.fillChatMessage(page, '')
 
       await openGitPanel(page)
       await writeFile(path.join(fixture, 'a.txt'), 'fixed\n')

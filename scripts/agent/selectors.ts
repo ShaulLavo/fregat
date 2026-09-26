@@ -736,6 +736,18 @@ export const selectors = {
   chatFileDownload: (page: Page, name: string) =>
     page.getByRole('link', { name: `Download ${name}`, exact: true }),
   chatMessage: (page: Page) => page.getByRole('textbox', { name: 'Message', exact: true }),
+  /** The composer's painted text, which is what a pointer lands on. */
+  chatComposer: (page: Page) => page.getByTestId('chat-input-editor'),
+  /** The prompt as the composer holds it, read from its input rather than the painted rows. */
+  chatPromptText: async (page: Page) =>
+    (await page.getByRole('textbox', { name: 'Message', exact: true }).innerText()).trim(),
+  /** Replaces the prompt the way a user would: select all, delete, type. */
+  fillChatMessage: async (page: Page, text: string) => {
+    await page.getByTestId('chat-input-editor').click()
+    await page.keyboard.press('ControlOrMeta+A')
+    await page.keyboard.press('Delete')
+    if (text) await page.keyboard.insertText(text)
+  },
   chatNewSession: (page: Page) => page.getByRole('button', { name: 'New session', exact: true }),
   chatCorrection: (page: Page) =>
     page.getByRole('button', { name: 'Send correction', exact: true }),

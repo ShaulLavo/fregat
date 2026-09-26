@@ -17,7 +17,7 @@ export const spinnerPalette = isolatedNativeScenario({
       await writeUserSetting(page, 'workbench.theme', sage)
       await writeUserSetting(page, 'workbench.colorTheme', 'dark')
       const title = `spinner-palette verification ${sessionId.slice(0, 8)}`
-      await selectors.chatMessage(page).fill('Keep working.')
+      await selectors.fillChatMessage(page, 'Keep working.')
       await selectors.chatSend(page).click()
       await selectors.sessionStatus(page, title, 'Working').waitFor()
       await step('sage-dark-working')

@@ -77,10 +77,7 @@ test('selecting a cached session keeps its transcript readable and resumes detai
     fireEvent.click(view.getByRole('button', { name: 'Open cached session' }))
     expect(view.getByText('Cached question')).toBeInTheDocument()
     expect(view.getByText('Connection closed')).toBeInTheDocument()
-    expect(view.getByRole('textbox', { name: 'Message' })).toHaveAttribute(
-      'contenteditable',
-      'true',
-    )
+    expect(view.getByRole('textbox', { name: 'Message' })).not.toHaveAttribute('readonly')
     expect(createSocket).not.toHaveBeenCalled()
     const live = createChatTransport(activeServerOrigin(), { createSocket })
     act(() => {
@@ -248,10 +245,7 @@ test('a provider interrupt failure restores Stop and a retry waits for its own o
       useChatProjectionStore.getState().syncSessionDetailSnapshot(TEST_ENVIRONMENT_ID, snapshot)
     })
     expect(view.queryByRole('button', { name: 'Stopping…' })).not.toBeInTheDocument()
-    expect(view.getByRole('textbox', { name: 'Message' })).toHaveAttribute(
-      'contenteditable',
-      'true',
-    )
+    expect(view.getByRole('textbox', { name: 'Message' })).not.toHaveAttribute('readonly')
   } finally {
     view.unmount()
     disconnect()
@@ -362,9 +356,7 @@ test('correction retry consumes content while model and mode choices reach the n
     await waitFor(() => expect(view.getByRole('button', { name: 'Send correction' })).toBeEnabled())
     fireEvent.click(view.getByRole('button', { name: 'Send correction' }))
     await waitFor(() => expect(view.getByText('Your message was not sent.')).toBeVisible())
-    expect(view.getByRole('textbox', { name: 'Message' })).toHaveTextContent(
-      'Use the existing files.',
-    )
+    expect(view.getByRole('textbox', { name: 'Message' })).toHaveValue('Use the existing files.')
     expect(useChatInputDraftStore.getState().getDraft(target).prompt).toBe(
       'Use the existing files.',
     )
@@ -379,9 +371,6 @@ test('correction retry consumes content while model and mode choices reach the n
           command.type === 'session.turn.steer' && command.turnId === running.latestTurn?.turnId,
       ),
     ).toBe(true)
-    await waitFor(() =>
-      expect(view.getByRole('textbox', { name: 'Message' })).toHaveTextContent(''),
-    )
     await waitFor(() => expect(view.getByText('Use the existing files.')).toBeVisible())
     expect(useChatInputDraftStore.getState().getDraft(target)).toMatchObject({
       prompt: '',
@@ -438,7 +427,6 @@ test('correction retry consumes content while model and mode choices reach the n
         interactionMode: null,
       }),
     )
-    expect(view.getByRole('textbox', { name: 'Message' }).textContent).toBe('')
   } finally {
     view.unmount()
     disconnect()

@@ -49,7 +49,7 @@ async function driveComposer(
   await selectors.iconHintControl(page, `Remove ${image.name}`).click()
   await attachment.waitFor({ state: 'detached' })
 
-  await selectors.chatMessage(page).fill(PROMPT)
+  await selectors.fillChatMessage(page, PROMPT)
   await page.keyboard.press('Control+s')
   const stash = selectors.iconHintControl(page, 'Stashed prompts: 1')
   await captureHint(page, stash, 'Stashed prompts: 1', step, 'stash-hint')
@@ -75,7 +75,7 @@ async function cleanupComposer(page: Page, imageName: string) {
     await page.keyboard.press('Escape')
   }
   const message = selectors.chatMessage(page)
-  if (await message.isVisible()) await message.fill('')
+  if (await message.isVisible()) await selectors.fillChatMessage(page, '')
 }
 
 export const chatIconHints: Scenario = {

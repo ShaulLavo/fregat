@@ -8,7 +8,6 @@ import { withActiveFileMention } from '@/features/chat/utils/active-file-mention
 import { useSettingValue } from '@/hooks/use-setting-value'
 import { resolveComposerInteractionMode } from '@workspace/client-core/chat/composer-interaction'
 import { useEnvironmentId } from '@/lib/environments/hooks/use-environment-id'
-import { LexicalComposer, type InitialConfigType } from '@lexical/react/LexicalComposer'
 import { useQuery } from '@tanstack/react-query'
 import type {
   InteractionMode,
@@ -16,17 +15,21 @@ import type {
   ProviderInstanceId,
   RuntimeMode,
 } from '@workspace/contracts'
-import { $setSelection, type LexicalEditor } from 'lexical'
+import type { Editor } from '@singapore-editor/core/editor'
 import { use, useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from 'react'
 import { cn } from '@workspace/ui/lib/utils'
 
 import {
-  $setChatInputText,
   clearChatInputEditor,
   insertChatInputMention,
   readChatInputText,
   replaceChatInputEditorRange,
+  syncChatInputText,
 } from '@/features/chat/utils/input-editor-actions'
+import {
+  ChatInputEditorContext,
+  type ChatInputEditorActions,
+} from '@/features/chat/providers/chat-input-editor-context'
 import { composerDropCarriesFiles, composerDropMentionPath } from '../utils/composer-drop'
 import {
   chatInputUploadAttachments,
@@ -50,7 +53,6 @@ import { chatSubmissionValidation } from '@/features/chat/utils/submission-valid
 import { Spinner } from '@workspace/ui/components/spinner'
 import { ChatModelPickerProvider } from '../providers/model-picker-provider'
 import {
-  readChatInputDraftPrompt,
   selectChatInputDraftAttachments,
   selectChatInputDraftTerminalContexts,
   useChatInputDraftStore,
@@ -61,10 +63,9 @@ import { ChatInputAttachmentList } from './chat-input-attachment-list'
 import { ChatInputActions } from './chat-input-actions'
 import { ChatInputCommandMenu } from './chat-input-command-menu'
 import { ChatInputEditor } from './chat-input-editor'
-import { ChatInputUltrathinkPlugin } from './chat-input-ultrathink-plugin'
+import { ChatInputUltrathink } from './chat-input-ultrathink'
 import { EffortBurst } from './effort-burst'
 import { ChatInputTerminalContextList } from './chat-input-terminal-context-list'
-import { CHAT_INPUT_EDITOR_NODES } from './chat-input-mention-node'
 import { useFocusTarget } from '@/lib/focus/hooks/use-target'
 import type { ComposerPendingAction } from '@/features/chat/utils/composer-state'
 
@@ -148,7 +149,7 @@ export function ChatInput({
   const clearStoredDraftContent = useChatInputDraftStore((store) => store.clearDraftContent)
   const removeTerminalContext = useChatInputDraftStore((store) => store.removeTerminalContext)
   const setInteractionMode = useChatInputDraftStore((store) => store.setInteractionMode)
-  const editorRef = useRef<LexicalEditor | null>(null)
+  const editorRef = useRef<Editor | null>(null)
   // State as well as the ref: the inbox only splices text once a caret exists,
   // and a ref cannot wake the effect that is waiting for one.
   const [editorReady, setEditorReady] = useState(false)
@@ -168,7 +169,6 @@ export function ChatInput({
     },
     editorReady,
   )
-  const initialDraft = readChatInputDraftPrompt(draftTarget)
   const [activeCommandItemId, setActiveCommandItemId] = useState<string | null>(null)
   const imagePreparation = useAttachmentPreparation(draftTarget)
   const sessionProvider = useProvider(sessionProviderInstanceId ?? undefined)
@@ -218,16 +218,14 @@ export function ChatInput({
   // a spinner over rows that are already usable.
   const commandMenuLoading =
     trigger?.kind === 'mention' ? projectEntries.isSearching : commandCatalog.isFetching
-  const initialConfig: InitialConfigType = {
-    editorState: () => {
-      // Restoring a draft must not take focus from the session list.
-      $setChatInputText(initialDraft)
-      $setSelection(null)
-    },
-    namespace: `platform-chat-input:${inputKey}`,
-    nodes: CHAT_INPUT_EDITOR_NODES,
-    onError: (error) => {
-      throw error
+  const [composerEditor, setComposerEditor] = useState<Editor | null>(null)
+  const editorActions: ChatInputEditorActions = {
+    hasFocus: () => editorRef.current?.getInputElement().contains(document.activeElement) ?? false,
+    replacePrompt: (text, focus) => {
+      const editor = editorRef.current
+      if (!editor) return
+      syncChatInputText(editor, text)
+      if (focus) editor.focus()
     },
   }
 
@@ -243,11 +241,12 @@ export function ChatInput({
     setActiveCommandItemId(commandMenuItems[0]?.id ?? null)
   }, [activeCommandItemId, commandMenuItems])
 
-  const handleEditorReady = (editor: LexicalEditor | null) => {
+  const handleEditorReady = (editor: Editor | null) => {
     editorRef.current = editor
     setEditorReady(editor !== null)
+    setComposerEditor(editor)
   }
-  function clearDraft(editor: LexicalEditor | null, keepDraft: boolean) {
+  function clearDraft(editor: Editor | null, keepDraft: boolean) {
     if (editor && editorRef.current === editor) clearChatInputEditor(editor)
 
     // A correction or a background start consumes content; the picks apply to the next turn.
@@ -385,7 +384,8 @@ export function ChatInput({
 
   function handleComposerDrop(event: DragEvent<HTMLElement>) {
     setDropTargetActive(false)
-    if (composerDisabled) return
+    // A drop on the text already went through the editor's paste handlers.
+    if (event.defaultPrevented || composerDisabled) return
 
     // A dragged tree row before images: it is not a `Files` drag, so the image
     // path would ignore it and the editor would paste a raw absolute path.
@@ -435,7 +435,7 @@ export function ChatInput({
               onSelect={handleCommandItemSelect}
             />
           ) : null}
-          <LexicalComposer initialConfig={initialConfig} key={inputKey}>
+          <ChatInputEditorContext value={editorActions}>
             {/* The whole composer is the drop target, not just the text area:
                 dropping on the attachment strip or the action row used to do
                 nothing at all. */}
@@ -453,10 +453,10 @@ export function ChatInput({
             >
               <EffortBurst key={draftKey} draftTarget={draftTarget} />
               <ChatInputEditor
+                key={inputKey}
                 disabled={composerDisabled}
-                draftKey={draftKey}
+                draftTarget={draftTarget}
                 placeholder='Use @ to mention, / for commands.'
-                rootPath={rootPath}
                 trigger={trigger}
                 onCommandMenuCommit={handleCommandMenuCommit}
                 onCommandMenuMove={handleCommandMenuMove}
@@ -465,7 +465,7 @@ export function ChatInput({
                 onSubmitRequest={handleSubmit}
                 onTriggerChange={setTrigger}
               />
-              <ChatInputUltrathinkPlugin />
+              <ChatInputUltrathink draftTarget={draftTarget} editor={composerEditor} />
               <ReviewDraftBar comments={reviewComments} disabled={composerDisabled} />
               {activeFile.path ? (
                 <ActiveFileChip
@@ -517,7 +517,7 @@ export function ChatInput({
                 </div>
               ) : null}
             </div>
-          </LexicalComposer>
+          </ChatInputEditorContext>
           {footer}
         </form>
       </ChatModelPickerProvider>

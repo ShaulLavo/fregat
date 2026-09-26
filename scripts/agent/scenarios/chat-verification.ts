@@ -164,7 +164,7 @@ export async function waitForReply(page: Page, marker: string) {
 /** The composer re-mounts once the session loads, which drops text typed before it. */
 export async function typePrompt(page: Page, prompt: string) {
   for (let attempt = 0; attempt < 10; attempt += 1) {
-    await selectors.chatMessage(page).fill(prompt)
+    await selectors.fillChatMessage(page, prompt)
     await Bun.sleep(300)
     if (await selectors.chatSend(page).isEnabled()) return
   }

@@ -1,6 +1,6 @@
 import { TEST_ENVIRONMENT_ID as FIXTURE_ENVIRONMENT_ID } from '../../../../../test/factories/chat'
 import { renderHook } from '@testing-library/react'
-import type { LexicalEditor } from 'lexical'
+import type { Editor } from '@singapore-editor/core/editor'
 import { beforeEach } from 'vitest'
 import type { RefObject } from 'react'
 
@@ -35,7 +35,7 @@ beforeEach(() => {
 })
 
 /** No editor yet is the real first-render state, not a contrived one. */
-function noEditor(): RefObject<LexicalEditor | null> {
+function noEditor(): RefObject<Editor | null> {
   return { current: null }
 }
 

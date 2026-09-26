@@ -106,7 +106,7 @@ export async function openSecondWindow(page: Page, orchestration: string) {
 }
 
 export async function sendPrompt(page: Page, prompt: string) {
-  await selectors.chatMessage(page).fill(prompt)
+  await selectors.fillChatMessage(page, prompt)
   await selectors.chatSend(page).click()
 }
 

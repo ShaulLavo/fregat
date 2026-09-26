@@ -19,10 +19,6 @@ import { createScriptError } from '../../structured-errors'
 const DRAFT_TEXT = 'carry this draft across worktrees'
 const LINKED_BRANCH = 'feature/strip'
 
-async function draftText(page: Page) {
-  return (await selectors.chatMessage(page).innerText()).trim()
-}
-
 /** The workspace trigger carries the base worktree's path as its title. */
 async function waitForBase(page: Page, path: string) {
   await page
@@ -135,7 +131,7 @@ export const chatDraftContextStrip: Scenario = {
       await selectors.chatNewSession(page).click()
       await page.waitForURL((url) => url.href !== landed, { timeout: 20_000 })
       await workspace.waitFor({ timeout: 20_000 })
-      await selectors.chatMessage(page).fill(DRAFT_TEXT)
+      await selectors.fillChatMessage(page, DRAFT_TEXT)
       strictEqual((await workspace.innerText()).trim(), 'Current checkout')
       await step('strip-current-checkout')
 
@@ -195,13 +191,13 @@ export const chatDraftContextStrip: Scenario = {
       await page.getByRole('menuitemradio', { name: new RegExp(`^${LINKED_BRANCH}`) }).click()
       await waitForBase(page, linked)
       strictEqual((await workspace.innerText()).trim(), 'Worktree')
-      strictEqual(await draftText(page), DRAFT_TEXT)
+      strictEqual(await selectors.chatPromptText(page), DRAFT_TEXT)
       await step('moved-to-linked-worktree')
 
       await workspace.click()
       await selectors.menuRadio(page, 'Current checkout').click()
       await waitForBase(page, fixture)
-      strictEqual(await draftText(page), DRAFT_TEXT)
+      strictEqual(await selectors.chatPromptText(page), DRAFT_TEXT)
       await step('moved-back')
 
       const machine = selectors.draftMachine(page)
@@ -211,7 +207,7 @@ export const chatDraftContextStrip: Scenario = {
         await step('machine-menu')
         await page.keyboard.press('Escape')
       }
-      await selectors.chatMessage(page).fill('')
+      await selectors.fillChatMessage(page, '')
       managed = await prepareManagedCheckout(page, projectId, fixture)
       await selectors.manageWorktrees(page).click()
       await selectors.worktreeManager(page).waitFor()

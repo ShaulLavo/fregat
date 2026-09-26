@@ -195,7 +195,7 @@ type Turns = {
 
 async function startTurn(page: Page, turns: Turns, text: string) {
   await turns.control('hold')
-  await selectors.chatMessage(page).fill(text)
+  await selectors.fillChatMessage(page, text)
   await selectors.chatSend(page).click()
   await selectors.sessionStatus(page, turns.title, 'Working').waitFor({ timeout: 30_000 })
 }

@@ -64,7 +64,7 @@ async function statusByName(rows: Locator) {
 }
 
 async function checkpointRows(page: Page, step: (name: string) => Promise<void>) {
-  await selectors.chatMessage(page).fill('Apply the fixture edits.')
+  await selectors.fillChatMessage(page, 'Apply the fixture edits.')
   await selectors.chatSend(page).click()
   const tree = selectors.changedFilesTree(page).last()
   await tree.waitFor({ timeout: 30_000 })

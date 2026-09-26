@@ -17,14 +17,14 @@ export const checkpointRewind: Scenario = {
     try {
       await selectors.sessionSearch(page).fill(title)
       await selectors.sessionByTitle(page, title).click()
-      await selectors.chatMessage(page).fill(prompt)
+      await selectors.fillChatMessage(page, prompt)
       await selectors.chatSend(page).click()
       await selectors
         .chatMessages(page)
         .getByText('REWIND_VERIFIED', { exact: true })
         .waitFor({ timeout: 90_000 })
       await selectors.chatSend(page).waitFor({ timeout: 30_000 })
-      await selectors.chatMessage(page).fill('Keep this newer draft.')
+      await selectors.fillChatMessage(page, 'Keep this newer draft.')
       await step('completed-conversation-with-new-draft')
       await selectors.chatRewind(page).first().click({ force: true })
       await selectors.rewindDialog(page).waitFor()

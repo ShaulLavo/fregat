@@ -28,7 +28,7 @@ export const sessionNotifications = isolatedNativeScenario({
       await control('hold')
       await selectors.sessionByTitle(page, title).click()
       await page.waitForURL((url) => url.href.includes(sessionId))
-      await selectors.chatMessage(page).fill('Complete the isolated notification turn.')
+      await selectors.fillChatMessage(page, 'Complete the isolated notification turn.')
       await selectors.chatSend(page).click()
       await selectors.sessionStatus(page, title, 'Working').waitFor()
     }

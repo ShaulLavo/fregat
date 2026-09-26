@@ -19,6 +19,13 @@ function isTextEntryElement(
     return !NON_TEXT_INPUT_TYPES.has(target.type.toLowerCase())
   if (target instanceof HTMLTextAreaElement) return true
   if (target instanceof HTMLSelectElement) return true
+  if (!(target instanceof HTMLElement)) return false
+  // An EditContext host takes typing without being contenteditable, so it has to be named.
+  if (hasEditContext(target)) return true
 
-  return target instanceof HTMLElement && target.isContentEditable
+  return target.isContentEditable
+}
+
+function hasEditContext(element: HTMLElement) {
+  return 'editContext' in element && element.editContext != null
 }

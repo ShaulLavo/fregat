@@ -9,7 +9,7 @@ export const chatMarkdownFence = isolatedNativeScenario({
     'An assistant message with a fenced ts block paints more than one token colour once Shiki loads.',
   fixture: new URL('../fixtures/native-codex.mjs', import.meta.url),
   async drive(page, { step }) {
-    await selectors.chatMessage(page).fill('Reply with a fenced TypeScript block.')
+    await selectors.fillChatMessage(page, 'Reply with a fenced TypeScript block.')
     await selectors.chatSend(page).click()
     const body = selectors.chatCodeBlockBody(page, 'ts')
     await body.getByText(/MARKDOWN_FENCE_VERIFIED/).waitFor({ timeout: 30_000 })
