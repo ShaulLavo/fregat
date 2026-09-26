@@ -60,14 +60,8 @@ jobs:
 
       - name: Setup
         uses: ./.github/actions/setup
-
-      - name: Checkout pinned alignment reference
-        uses: actions/checkout@v4
         with:
-          repository: pingdotgg/t3code
-          ref: 7445aa733ada33e45289e5aa5055f79142556513
-          path: references/t3code
-          persist-credentials: false
+          alignment-reference: true
 
       - name: Alignment evidence records
         run: python3 scripts/parity/check.py
@@ -170,14 +164,8 @@ jobs:
 
       - name: Setup
         uses: ./.github/actions/setup
-
-      - name: Checkout pinned alignment reference
-        uses: actions/checkout@v4
         with:
-          repository: pingdotgg/t3code
-          ref: 7445aa733ada33e45289e5aa5055f79142556513
-          path: references/t3code
-          persist-credentials: false
+          alignment-reference: true
 
       - name: Cache Hutch store
         if: ${{ matrix.suite.devkit }}
