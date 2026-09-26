@@ -284,6 +284,10 @@ Decided 2026-09-26: owner — B.
 measured 7× faster than A's best (151–155 ms against 1,176 ms on the same fling), and A's remaining
 cost is the row DOM each file brings, which one editor's virtualizer already recycles.
 
+Decided 2026-09-26: owner — A, recycled many editors: phases 1, 1b, 2, 3 and P1. The one-editor
+phases (E1–E5, R1–R5) and the multibuffer (M1) are not scheduled; this pass's findings stay as their
+design if they come back.
+
 **Q4. How do long lines scroll sideways, now that the whole view is one editor?**
 
 - A. Each file block scrolls sideways on its own, as today: a per-block x offset in the Editor, with a
@@ -296,6 +300,8 @@ cost is the row DOM each file brings, which one editor's virtualizer already rec
 **Recommendation: A.** It keeps the feature the owner likes. It measured 158–177 ms against 151–155 ms
 per fling and 2.1 ms of script for 40 sideways steps. The Editor work is one bounded feature that does
 not depend on Q3.
+
+Decided 2026-09-26: moot under Q3 = A; recycled editors keep per-file sideways scroll as today.
 
 ## Proposed phases
 
