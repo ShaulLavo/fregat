@@ -19,6 +19,8 @@ import { chatStream } from './chat-stream'
 import { chatHistoryPages } from './chat-history-pages'
 import { chatStashContext } from './chat-stash-context'
 import { chatQueue } from './chat-queue'
+import { chatQueueAway } from './chat-queue-away'
+import { chatQueueStopUpload } from './chat-queue-stop-upload'
 import { providerModelOptions } from './provider-model-options'
 import { fileAttachments } from './file-attachments'
 import { sessionTitles } from './session-titles'
@@ -39,8 +41,10 @@ import { nativePermissionGrant } from './native-permission-grant'
 import { resetCreditRedemption } from './reset-credit-redemption'
 import { pullRequestLookupFailure } from './pull-request-lookup-failure'
 import { streamOverflow } from './stream-overflow'
+import { questionHistory } from './question-history'
 import { chatScreenshot } from './chat-screenshot'
 import { chatMultipleModels } from './chat-multiple-models'
+import { chatMultipleModelsLostAck } from './chat-multiple-models-lost-ack'
 import { chatComposerEditing } from './chat-composer-editing'
 import { chatArtifactTemplate } from './chat-artifact-template'
 import { chatModelFavorites } from './chat-model-favorites'
@@ -350,8 +354,10 @@ export const scenarios: readonly Scenario[] = [
   resetCreditRedemption,
   pullRequestLookupFailure,
   streamOverflow,
+  questionHistory,
   chatScreenshot,
   chatMultipleModels,
+  chatMultipleModelsLostAck,
   chatComposerEditing,
   chatArtifactTemplate,
   chatModelFavorites,
@@ -369,6 +375,8 @@ export const scenarios: readonly Scenario[] = [
   chatStream,
   chatHistoryPages,
   chatQueue,
+  chatQueueAway,
+  chatQueueStopUpload,
   providerModelOptions,
   draftRecovery,
   asyncQuestions,

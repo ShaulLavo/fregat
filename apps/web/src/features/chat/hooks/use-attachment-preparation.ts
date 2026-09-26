@@ -86,7 +86,10 @@ export function useAttachmentPreparation(target: ChatInputDraftTarget) {
     error: filesBlocked
       ? 'This environment cannot currently accept files. Your draft is preserved.'
       : error,
+    /** Send stays closed: a file is uploading, failed, or the environment takes no files. */
     preparing: preparing || blocked || filesBlocked,
+    /** A file is being read or uploaded right now. */
+    working: preparing,
     isPreparing: () =>
       filesBlocked ||
       chatInputAttachmentsPreparing(useChatInputDraftStore.getState(), target) ||

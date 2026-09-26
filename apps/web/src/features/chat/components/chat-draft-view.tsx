@@ -194,6 +194,17 @@ export function ChatDraftView({
     return { ...outcome, sessionId: submission.command.sessionId }
   }
 
+  function unsettledFanOut(payload: ChatInputSubmitPayload, worktreeTarget: SessionWorktreeTarget) {
+    const retryKey = draftSubmissionKey({
+      agent: selectedAgent,
+      payload,
+      environmentId: transport.environmentId,
+      worktreeTarget,
+      fanOut: true,
+    })
+    return unsettledSubmissions.current.has(retryKey)
+  }
+
   /** `background` (Ctrl/Cmd+Enter) starts the session and keeps the user on a fresh draft. */
   async function handleSend(
     payload: ChatInputSubmitPayload,
@@ -213,7 +224,10 @@ export function ChatDraftView({
       setSendError(backgroundError)
       return 'rejected'
     }
-    if (models.length > 1 && !background) return sendToModels(payload, models, operation)
+    // A model left over from a fan-out retries its own start, on its own new worktree.
+    const fanOutRetry = models.length === 1 && unsettledFanOut(payload, target)
+    if ((models.length > 1 || fanOutRetry) && !background)
+      return sendToModels(payload, models, operation)
 
     const outcome = await startSession(payload, target, { background })
     if (!outcome.ok) {
