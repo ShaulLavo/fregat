@@ -25,6 +25,7 @@ import { browserAddressHref } from '@/features/address/utils/browser-url'
 import { createBrowserHistory } from '@tanstack/react-router'
 import { createApplicationRouter } from '@/state/router'
 import { createNavigation } from '@/state/navigation'
+import { bindNavigation } from '@/state/navigation-binding'
 import { canPlaceEditorTab } from '@/features/workbench/state/group-geometry'
 import { NavigationProvider } from '@/providers/navigation-provider'
 import { LoggingErrorBoundary } from '@/components/logging-error-boundary.tsx'
@@ -88,6 +89,7 @@ if (routerHistory.location.href !== initialBrowserHref) routerHistory.replace(in
 routerHistory.flush()
 const router = createApplicationRouter({ history: routerHistory, resources: resourceQueryClient })
 const navigation = createNavigation(router, initialIntent, { canPlaceTab: canPlaceEditorTab })
+bindNavigation(navigation)
 
 beginReloadBudget()
 const bootstrap = prepareWithinReloadBudget(() => createBootstrap(navigation))
