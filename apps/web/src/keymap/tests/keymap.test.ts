@@ -44,6 +44,28 @@ describe('activePlatformKeyBindings', () => {
 })
 
 describe('resolvedPlatformKeyBindings', () => {
+  it('keeps every pane a command is bound in when its keys are overridden', () => {
+    const resolved = resolvedPlatformKeyBindings(
+      defaultPlatformKeyBindings('linux'),
+      { 'workspace.undoSessionAction': 'Mod+Alt+Z' },
+      'linux',
+    )
+    const overridden = resolved.filter(
+      (binding) => binding.command === 'workspace.undoSessionAction',
+    )
+
+    expect(overridden.map((binding) => binding.pane).toSorted()).toEqual([
+      'git',
+      'global',
+      'logs',
+      'problems',
+      'search',
+      'settings',
+    ])
+    expect(overridden.every((binding) => binding.keys === 'Mod+Alt+Z')).toBe(true)
+    expect(commands(activeBindings(resolved, 'git'))).toContain('workspace.undoSessionAction')
+  })
+
   it('replaces every default a command had with the one hotkey the user chose', () => {
     const resolved = resolvedPlatformKeyBindings(
       defaultPlatformKeyBindings('linux'),
