@@ -284,3 +284,50 @@ test('refuses a recorded chord shadowed by a later override', async ({ client })
   expect(recorder).toBeInTheDocument()
   expect((await overrides())['workspace.saveFile']).toEqual(['Mod+Alt+J'])
 })
+
+test('warns before taking a chord in one pane and keeps that loss in Conflicts', async ({
+  client,
+}) => {
+  expect(client).toBeDefined()
+  renderWithProviders(<KeybindingSection />)
+  await showOnly('workspace.toggleCheckpointChange')
+  fireEvent.doubleClick(row('workspace.toggleCheckpointChange'))
+  const recorder = await screen.findByRole('textbox', { name: /Press the new shortcut for/ })
+  press(recorder, 'z', { ctrl: true })
+  expect(await screen.findByText('Used by 1 command')).toBeDefined()
+  expect(screen.getByText('Undo session action')).toBeDefined()
+  expect(within(screen.getByRole('dialog')).getByText('Git', { exact: true })).toBeDefined()
+  press(recorder, 'Enter')
+  await waitFor(async () =>
+    expect((await overrides())['workspace.toggleCheckpointChange']).toEqual(['Mod+Z']),
+  )
+  await userEvent.clear(screen.getByLabelText(SEARCH))
+  await showOnly('Undo session action')
+  await userEvent.click(screen.getByRole('tab', { name: /Conflicts/ }))
+  const undo = row('workspace.undoSessionAction')
+  expect(undo).toHaveTextContent('Taken in Git')
+  expect(undo.querySelector('.line-through')).toBeNull()
+})
+
+test('adding an unrelated chord does not repeat an existing chord conflict', async ({ client }) => {
+  expect(client).toBeDefined()
+  await saveSettings(
+    {
+      mutationId: 'shortcuts-existing-clash',
+      target: 'user',
+      operations: [{ command: 'workspace.saveFile', keys: ['Mod+P'], kind: 'keybinding.set' }],
+    },
+    getClient(),
+  )
+  renderWithProviders(<KeybindingSection />)
+  await showOnly('Save')
+  fireEvent.contextMenu(row('workspace.saveFile'))
+  await userEvent.click(await screen.findByRole('menuitem', { name: 'Add another shortcut' }))
+  const recorder = await screen.findByRole('textbox', { name: 'Press the new shortcut for Save' })
+  press(recorder, 'j', { ctrl: true, alt: true })
+  expect(screen.queryByText(/Used by/)).toBeNull()
+  press(recorder, 'Enter')
+  await waitFor(async () =>
+    expect((await overrides())['workspace.saveFile']).toEqual(['Mod+P', 'Mod+Alt+J']),
+  )
+})

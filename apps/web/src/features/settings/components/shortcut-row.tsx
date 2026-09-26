@@ -6,6 +6,7 @@ import type { HTMLAttributes, MouseEvent } from 'react'
 
 import { ShortcutKeys } from '@/features/settings/components/shortcut-keys'
 import {
+  shortcutConflictLabel,
   shortcutIdMatches,
   shortcutPlacesLabel,
   shortcutSourceLabel,
@@ -38,7 +39,8 @@ export function ShortcutRow({
   rowProps: HTMLAttributes<HTMLDivElement> & { 'aria-selected': boolean }
 }) {
   const takenBy = row.shadowedBy ? shortcutTitle(row.shadowedBy) : null
-  const where = takenBy ? `Taken by ${takenBy}` : shortcutPlacesLabel(row.places)
+  const where = shortcutConflictLabel(row) ?? shortcutPlacesLabel(row.places)
+  const hasLoss = row.losses.length > 0
   const source = shortcutSourceLabel(row.source)
   const modified = row.source === 'custom' || row.source === 'removed'
   const bound = row.keys !== null
@@ -60,7 +62,7 @@ export function ShortcutRow({
       }}
       onDoubleClick={onChange}
       role='option'
-      title={rowTitle(row, where, keptNote, platform)}
+      title={rowTitle(row, keptNote, platform)}
     >
       {modified ? (
         <span
@@ -93,11 +95,11 @@ export function ShortcutRow({
         <span
           className={cn(
             'flex min-w-0 items-center gap-1',
-            takenBy && 'text-warning',
+            hasLoss && 'text-warning',
             !where && '@max-3xl/settings:hidden',
           )}
         >
-          {takenBy ? <WarningIcon aria-hidden className='size-(--icon-size-sm) shrink-0' /> : null}
+          {hasLoss ? <WarningIcon aria-hidden className='size-(--icon-size-sm) shrink-0' /> : null}
           <span className='truncate'>{where}</span>
         </span>
         <span
@@ -134,17 +136,13 @@ export function ShortcutRow({
 }
 
 /** Everything the row cannot show: the id, every chord, every place, and who took a chord. */
-function rowTitle(
-  row: ShortcutRowModel,
-  where: string,
-  keptNote: string | null,
-  platform: PlatformName,
-): string {
+function rowTitle(row: ShortcutRowModel, keptNote: string | null, platform: PlatformName): string {
   const parts = [`${row.title} (${row.command})`]
   if (row.keys) parts.push(formatChord(row.keys, platform))
   if (row.commandKeys.length > 1) parts.push(`${row.commandKeys.length} shortcuts`)
   if (row.places.length > 0) parts.push(row.places.join('; '))
-  if (row.shadowedBy) parts.push(where)
+  for (const loss of row.losses)
+    parts.push(`Taken by ${shortcutTitle(loss.winner)} in ${loss.place}`)
   if (keptNote) parts.push(keptNote)
 
   return parts.join(' · ')

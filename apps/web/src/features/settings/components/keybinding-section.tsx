@@ -23,16 +23,15 @@ import { useShortcutRows } from '@/features/settings/hooks/use-shortcut-rows'
 import { SettingsScrollerContext } from '@/features/settings/providers/scroller-context'
 import { noteKeyboardEvent } from '@/features/settings/state/keyboard-seen'
 import { useSettingsSearch } from '@/features/settings/state/search-store'
+import { shortcutConflicts } from '@/features/settings/utils/shortcut-conflicts'
 import { shortcutReport } from '@/features/settings/utils/shortcut-report'
 import {
   matchingShortcutRows,
   shortcutFilterCounts,
   shortcutFilterMatches,
-  shortcutPlacesLabel,
   shortcutRows,
   shortcutListWith,
   shortcutRowsWithChord,
-  shortcutTitle,
   type ShortcutFilter,
   type ShortcutRow as ShortcutRowModel,
 } from '@/features/settings/utils/shortcut-rows'
@@ -133,13 +132,12 @@ export function KeybindingSection() {
   }
 
   function preview(command: PlatformCommandId, list: readonly string[], keys: string) {
-    const candidate = shortcutRows(defaults.bindings, { ...overrides, [command]: list }, platform)
-    const takes = candidate
-      .filter((row) => row.shadowedBy === command && row.command !== command)
-      .map((row) => ({ title: row.title, where: shortcutPlacesLabel(row.places) }))
-
-    const winner = candidate.find((row) => row.command === command && row.keys === keys)?.shadowedBy
-    return { blockedBy: winner ? shortcutTitle(winner) : null, kept: kept(keys), takes }
+    const candidate = keyBindingResolution(
+      defaults.bindings,
+      { ...overrides, [command]: list },
+      platform,
+    )
+    return { ...shortcutConflicts(candidate.lostChords, command, keys), kept: kept(keys) }
   }
 
   return (

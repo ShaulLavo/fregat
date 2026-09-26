@@ -177,3 +177,12 @@ describe('shortcut search', () => {
     expect(exact).toEqual(['workspace.showCommandPalette F1'])
   })
 })
+
+it('keeps a partial pane loss in conflicts while the chord survives elsewhere', () => {
+  const rows = shortcutRows(defaults, { 'workspace.toggleCheckpointChange': ['Mod+Z'] }, 'linux')
+  const undo = row(rows, 'workspace.undoSessionAction')
+  expect(undo.places).toContain('Settings')
+  expect(undo.places).not.toContain('Git')
+  expect(undo.shadowedBy).toBeNull()
+  expect(shortcutFilterMatches(undo, 'conflicts')).toBe(true)
+})

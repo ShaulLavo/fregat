@@ -40,10 +40,11 @@ export type KeyBindingResolution = {
   readonly lostChords: readonly LostChord[]
 }
 
-export type LostChord = {
+export type LostChord = Pick<PlatformKeyBinding, 'pane' | 'editorWhen'> & {
   readonly command: PlatformCommandId
   readonly keys: string
   readonly winner: PlatformCommandId
+  readonly winnerKeys: string
 }
 
 export function resolvedPlatformKeyBindings(
@@ -228,7 +229,14 @@ function recordShadowedCommand(
   if (!winner.command) return
 
   shadowedBy.set(shadowed.command, winner.command)
-  lostChords.push({ command: shadowed.command, keys: shadowed.keys, winner: winner.command })
+  lostChords.push({
+    command: shadowed.command,
+    keys: shadowed.keys,
+    pane: shadowed.pane,
+    editorWhen: shadowed.editorWhen,
+    winner: winner.command,
+    winnerKeys: winner.keys,
+  })
 }
 
 /** Each known command's bindable chords; an empty list is an unbind. */

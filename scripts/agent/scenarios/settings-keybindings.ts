@@ -87,6 +87,42 @@ export const settingsKeybindings: Scenario = {
     await waitForOverride(page, 'workspace.goToLine', undefined)
     await selectors.shortcutFilter(page, 'All').click()
 
+    await writeUserOperations(page, [
+      { kind: 'keybinding.set', command: 'workspace.saveFile', keys: ['Mod+Alt+J'] },
+      { kind: 'keybinding.set', command: 'workspace.togglePanel', keys: ['Mod+Alt+K'] },
+    ])
+    await showOnly(page, 'Save')
+    await selectors.shortcutRow(page, 'workspace.saveFile').click({ button: 'right' })
+    await selectors.shortcutMenuItem(page, /^Change shortcut/).click()
+    await selectors.shortcutRecorder(page, 'Save').press('Control+Alt+K')
+    await page.getByText(/Taken by Toggle panel/).waitFor()
+    ok(await page.getByRole('button', { name: 'Save', exact: true }).isDisabled())
+    await selectors.shortcutRecorder(page, 'Save').press('Enter')
+    await waitForList(page, 'workspace.saveFile', ['Mod+Alt+J'])
+    await step('desktop-losing-override')
+    await selectors.shortcutRecorder(page, 'Save').press('Escape')
+    await selectors.shortcutRecorder(page, 'Save').press('Escape')
+    await writeUserOperations(page, [{ kind: 'reset', keys: ['keybindings.overrides'] }])
+
+    await showOnly(page, 'workspace.toggleCheckpointChange')
+    await selectors.shortcutRow(page, 'workspace.toggleCheckpointChange').dblclick()
+    const checkpointRecorder = selectors.shortcutRecorder(page, 'Undo or reapply turn change')
+    await checkpointRecorder.press('Control+Z')
+    await page.getByText('Used by 1 command', { exact: true }).waitFor()
+    await page.getByText('Undo session action', { exact: true }).waitFor()
+    await step('desktop-partial-pane-warning')
+    await checkpointRecorder.press('Enter')
+    await waitForList(page, 'workspace.toggleCheckpointChange', ['Mod+Z'])
+    await showOnly(page, 'Undo session action')
+    await selectors.shortcutFilter(page, 'Conflicts').click()
+    await selectors
+      .shortcutRow(page, 'workspace.undoSessionAction', 'Mod+Z')
+      .getByText('Taken in Git')
+      .waitFor()
+    await step('desktop-partial-pane-conflicts')
+    await writeUserOperations(page, [{ kind: 'reset', keys: ['keybindings.overrides'] }])
+    await selectors.shortcutFilter(page, 'All').click()
+
     // Several shortcuts per command: add F7 beside the palette's defaults, run it by both, remove it.
     await showOnly(page, 'Show command palette')
     await selectors

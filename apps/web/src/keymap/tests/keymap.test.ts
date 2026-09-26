@@ -789,3 +789,44 @@ it('prefers an executable binding over a browser reservation in either order', (
     )
   }
 })
+
+it('retains the pane and editor conditions of each lost binding', () => {
+  const defaults = [
+    binding('Mod+Z', { command: 'workspace.undoSessionAction', pane: 'git' }),
+    binding('Mod+Z', { command: 'workspace.undoSessionAction', pane: 'settings' }),
+    binding('Mod+J', { command: 'workspace.toggleCheckpointChange', pane: 'git' }),
+    binding('Mod+Q', { command: 'workspace.saveFile', pane: 'editor', editorWhen: ['writable'] }),
+    binding('Mod+R', { command: 'workspace.goToLine', pane: 'editor' }),
+  ]
+  const resolution = keyBindingResolution(
+    defaults,
+    {
+      'workspace.toggleCheckpointChange': ['Mod+Z'],
+      'workspace.goToLine': ['Mod+Q'],
+    },
+    'linux',
+  )
+  expect(resolution.lostChords).toContainEqual(
+    expect.objectContaining({
+      command: 'workspace.undoSessionAction',
+      keys: 'Mod+Z',
+      pane: 'git',
+      winner: 'workspace.toggleCheckpointChange',
+      winnerKeys: 'Mod+Z',
+    }),
+  )
+  expect(resolution.lostChords).toContainEqual(
+    expect.objectContaining({
+      command: 'workspace.saveFile',
+      pane: 'editor',
+      editorWhen: ['writable'],
+    }),
+  )
+  expect(resolution.bindings).toContainEqual(
+    expect.objectContaining({
+      command: 'workspace.undoSessionAction',
+      keys: 'Mod+Z',
+      pane: 'settings',
+    }),
+  )
+})

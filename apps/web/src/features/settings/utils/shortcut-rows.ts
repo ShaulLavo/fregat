@@ -34,6 +34,7 @@ export type ShortcutRow = {
   readonly shadowedBy: PlatformCommandId | null
   /** The commands this chord took a shortcut from. */
   readonly shadows: readonly PlatformCommandId[]
+  readonly losses: readonly { readonly winner: PlatformCommandId; readonly place: string }[]
 }
 
 export const SHORTCUT_FILTERS = ['all', 'custom', 'conflicts', 'unassigned'] as const
@@ -110,7 +111,7 @@ export function shortcutListWith(
 
 export function shortcutFilterMatches(row: ShortcutRow, filter: ShortcutFilter): boolean {
   if (filter === 'custom') return row.source === 'custom' || row.source === 'removed'
-  if (filter === 'conflicts') return row.shadowedBy !== null || row.shadows.length > 0
+  if (filter === 'conflicts') return row.losses.length > 0 || row.shadows.length > 0
   if (filter === 'unassigned') return row.keys === null
 
   return true
@@ -175,7 +176,7 @@ export function shortcutSourceLabel(source: ShortcutSource | null): string {
   return ''
 }
 
-function shortcutPlace(binding: Pick<PlatformKeyBinding, 'editorWhen' | 'pane'>): string {
+export function shortcutPlace(binding: Pick<PlatformKeyBinding, 'editorWhen' | 'pane'>): string {
   const pane = binding.pane ?? 'any'
   const words = [
     PANE_WORDS[pane] ?? pane,
@@ -206,14 +207,22 @@ function commandRows({
   const commandKeys = override ?? unique(preset.map((binding) => binding.keys))
   const source = shortcutSource(override, commandKeys)
   if (commandKeys.length === 0) {
-    const row = { command, commandKeys, keys: null, places: [], shadowedBy: null, shadows: [] }
+    const row = {
+      command,
+      commandKeys,
+      keys: null,
+      places: [],
+      shadowedBy: null,
+      shadows: [],
+      losses: [],
+    }
     return [{ ...row, id: command, source, title }]
   }
 
   return commandKeys.map((keys) => {
     const liveHere = live.filter((binding) => binding.keys === keys)
-    const taken = lost.find((chord) => chord.command === command && chord.keys === keys)
-    const shadowedBy = liveHere.length > 0 ? null : (taken?.winner ?? null)
+    const taken = lost.filter((chord) => chord.command === command && chord.keys === keys)
+    const shadowedBy = liveHere.length > 0 ? null : (taken[0]?.winner ?? null)
 
     return {
       command,
@@ -222,6 +231,7 @@ function commandRows({
       keys,
       places: unique(placesOf(liveHere, preset, keys).map(shortcutPlace)),
       shadowedBy,
+      losses: taken.map((chord) => ({ winner: chord.winner, place: shortcutPlace(chord) })),
       shadows: [
         ...new Set(
           lost
@@ -288,4 +298,11 @@ function shortcutHaystack(row: ShortcutRow, platform: PlatformName): string {
   const labels = row.keys ? `${row.keys} ${formatChord(row.keys, platform)}` : ''
 
   return `${row.command} ${row.title} ${labels}`.toLowerCase()
+}
+
+export function shortcutConflictLabel(row: ShortcutRow): string | null {
+  if (row.shadowedBy) return `Taken by ${shortcutTitle(row.shadowedBy)}`
+  if (row.losses.length === 0) return null
+
+  return `Taken in ${shortcutPlacesLabel(unique(row.losses.map((loss) => loss.place)))}`
 }
