@@ -146,6 +146,39 @@ export const providerListResultSchema = v.object({
 })
 
 /**
+ * How an instance's CLI got onto the machine. Only `native`, `npm` and `bun` update in
+ * one click: those are installs whose owner the path proves. The rest name a command.
+ */
+export const providerUpdateMethodSchema = v.picklist([
+  'native',
+  'npm',
+  'bun',
+  'mise',
+  'homebrew',
+  'bundled',
+  'unknown',
+])
+
+export const providerUpdateAdvisorySchema = v.object({
+  providerInstanceId: providerInstanceIdSchema,
+  installedVersion: v.nullable(trimmedNonEmptyStringSchema),
+  latestVersion: v.nullable(trimmedNonEmptyStringSchema),
+  /** `unknown` when either version could not be read. */
+  status: v.picklist(['current', 'behind', 'unknown']),
+  method: providerUpdateMethodSchema,
+  canUpdate: v.boolean(),
+  /** The one-click command, or the one to run by hand; null when none is known. */
+  command: v.nullable(trimmedNonEmptyStringSchema),
+  checkedAt: isoDateTimeSchema,
+})
+
+export const providerUpdateResultSchema = v.object({
+  /** `unchanged` when the CLI was already current, or the command left the version as it was. */
+  outcome: v.picklist(['updated', 'unchanged']),
+  advisory: providerUpdateAdvisorySchema,
+})
+
+/**
  * One slash command a provider advertises. `name` never carries the leading
  * slash: the composer owns that character, and providers disagree about whether
  * it belongs to the name.
@@ -175,10 +208,24 @@ const providerSkillSchema = v.object({
   enabled: v.boolean(),
 })
 
+/** An agent definition the harness can run a session as: project, user or plugin. */
+export const providerAgentSchema = v.object({
+  name: trimmedNonEmptyStringSchema,
+  description: v.string(),
+  model: v.nullable(v.string()),
+})
+
+export const providerAgentSelectionSchema = v.object({
+  name: trimmedNonEmptyStringSchema,
+  providerInstanceId: providerInstanceIdSchema,
+})
+export type ProviderAgentSelection = v.InferOutput<typeof providerAgentSelectionSchema>
+
 export const providerCommandCatalogSchema = v.object({
   providerInstanceId: providerInstanceIdSchema,
   commands: v.array(providerSlashCommandSchema),
   skills: v.array(providerSkillSchema),
+  agents: v.array(providerAgentSchema),
   /**
    * False when the provider cannot answer at all — no listing path, or the probe
    * failed. Discovery only feeds a menu, so the read degrades to an empty
@@ -187,6 +234,77 @@ export const providerCommandCatalogSchema = v.object({
   supported: v.boolean(),
 })
 
+/** One live background task: a background shell, a monitor or a backgrounded subagent. */
+export const providerBackgroundTaskSchema = v.object({
+  taskId: trimmedNonEmptyStringSchema,
+  taskType: v.string(),
+  description: v.string(),
+})
+
+/** `supported` is false when the session's provider cannot list or stop background tasks. */
+export const providerBackgroundTasksSchema = v.object({
+  supported: v.boolean(),
+  tasks: v.array(providerBackgroundTaskSchema),
+})
+
+export const providerMcpServerStatusSchema = v.picklist([
+  'connected',
+  'failed',
+  'needs-auth',
+  'pending',
+  'disabled',
+])
+
+export const providerMcpServerSchema = v.object({
+  name: trimmedNonEmptyStringSchema,
+  status: providerMcpServerStatusSchema,
+  error: v.nullable(v.string()),
+})
+
+/**
+ * A session's MCP servers as its provider reports them. `running` is false when
+ * the session has no live provider process to ask; the lists are then empty.
+ */
+export const providerSessionMcpSchema = v.object({
+  running: v.boolean(),
+  canReconnect: v.boolean(),
+  canSignIn: v.boolean(),
+  servers: v.array(providerMcpServerSchema),
+})
+
+export const providerMcpSignInSchema = v.object({
+  authorizationUrl: v.pipe(
+    v.string(),
+    v.url(),
+    v.regex(/^https?:\/\//i, 'Use an HTTP or HTTPS sign-in address.'),
+  ),
+})
+
+export const providerConfiguredHookSchema = v.object({
+  eventName: v.string(),
+  matcher: v.nullable(v.string()),
+  handler: v.string(),
+  sourcePath: v.string(),
+  enabled: v.boolean(),
+})
+
+/** Hooks configured for a session's checkout. Claude reads its own settings files and lists none. */
+export const providerSessionHooksSchema = v.object({
+  running: v.boolean(),
+  supported: v.boolean(),
+  hooks: v.array(providerConfiguredHookSchema),
+  errors: v.array(v.string()),
+})
+
+export type ProviderMcpServer = v.InferOutput<typeof providerMcpServerSchema>
+export type ProviderMcpServerStatus = v.InferOutput<typeof providerMcpServerStatusSchema>
+export type ProviderSessionMcp = v.InferOutput<typeof providerSessionMcpSchema>
+export type ProviderMcpSignIn = v.InferOutput<typeof providerMcpSignInSchema>
+export type ProviderConfiguredHook = v.InferOutput<typeof providerConfiguredHookSchema>
+export type ProviderSessionHooks = v.InferOutput<typeof providerSessionHooksSchema>
+export type ProviderAgent = v.InferOutput<typeof providerAgentSchema>
+export type ProviderBackgroundTask = v.InferOutput<typeof providerBackgroundTaskSchema>
+export type ProviderBackgroundTasks = v.InferOutput<typeof providerBackgroundTasksSchema>
 export type ProviderSignInMethod = v.InferOutput<typeof providerSignInMethodSchema>
 export type ProviderLoginState = v.InferOutput<typeof providerLoginStateSchema>
 export type ProviderLoginAttempt = v.InferOutput<typeof providerLoginAttemptSchema>
@@ -200,6 +318,9 @@ export type ProviderModel = v.InferOutput<typeof providerModelSchema>
 export type ProviderInstanceSettings = v.InferOutput<typeof providerInstanceSettingsSchema>
 export type ProviderSnapshot = v.InferOutput<typeof providerSnapshotSchema>
 export type ProviderListResult = v.InferOutput<typeof providerListResultSchema>
+export type ProviderUpdateMethod = v.InferOutput<typeof providerUpdateMethodSchema>
+export type ProviderUpdateAdvisory = v.InferOutput<typeof providerUpdateAdvisorySchema>
+export type ProviderUpdateResult = v.InferOutput<typeof providerUpdateResultSchema>
 export type ProviderSlashCommand = v.InferOutput<typeof providerSlashCommandSchema>
 export type ProviderSkill = v.InferOutput<typeof providerSkillSchema>
 export type ProviderCommandCatalog = v.InferOutput<typeof providerCommandCatalogSchema>

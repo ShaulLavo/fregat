@@ -5,6 +5,8 @@ export const settingsMutationKeys = {
   notificationPermission: () => ['settings', 'notification-permission'] as const,
   importSessions: (providerInstanceId: ProviderInstanceId) =>
     ['settings', 'session-import', providerInstanceId] as const,
+  providerUpdate: (providerInstanceId: ProviderInstanceId) =>
+    ['settings', 'provider-update', providerInstanceId] as const,
   rawSave: (key: DocumentKey) => ['settings', 'raw-save', key] as const,
   push: {
     subscribe: ['push', 'subscribe'] as const,

@@ -1,5 +1,9 @@
 import {
+  ArrowsInIcon,
+  BracketsCurlyIcon,
   CopyIcon,
+  DownloadSimpleIcon,
+  MarkdownLogoIcon,
   ArrowsClockwiseIcon,
   ArchiveIcon,
   CheckIcon,
@@ -72,8 +76,15 @@ export type SessionActionsMenuContext = {
   readonly copyPath: () => void
   readonly copyBranch: (() => void) | null
   readonly copySessionId: () => void
+  /** A session with no user message has nothing to export. */
+  readonly hasMessages: boolean
+  readonly copyTranscript: () => void
+  readonly exportTranscript: (format: 'markdown' | 'json') => void
   readonly archived: boolean
   readonly canStopAgent: boolean
+  /** Null when there is nothing to compact yet or a turn is running. */
+  readonly compact: (() => void) | null
+  readonly compactPending: boolean
   readonly archive: () => void
   readonly deleteSession: () => void
   readonly rename: () => void
@@ -200,8 +211,39 @@ export function sessionActionsMenu(
         run: context.copySessionId,
       }),
     ]),
+    section('export', [
+      actionItem({
+        disabled: !context.hasMessages,
+        icon: MarkdownLogoIcon,
+        id: 'copyTranscript',
+        label: 'Copy as Markdown',
+        run: context.copyTranscript,
+      }),
+      actionItem({
+        disabled: !context.hasMessages,
+        icon: DownloadSimpleIcon,
+        id: 'exportMarkdown',
+        label: 'Export as Markdown…',
+        run: () => context.exportTranscript('markdown'),
+      }),
+      actionItem({
+        disabled: !context.hasMessages,
+        icon: BracketsCurlyIcon,
+        id: 'exportJson',
+        label: 'Export as JSON…',
+        run: () => context.exportTranscript('json'),
+      }),
+    ]),
     ...(contributions.project ? [contributions.project] : []),
     section('agent', [
+      context.compact &&
+        actionItem({
+          disabled: context.compactPending,
+          icon: ArrowsInIcon,
+          id: 'compact',
+          label: 'Compact Conversation',
+          run: context.compact,
+        }),
       context.canStopAgent &&
         actionItem({
           icon: StopCircleIcon,

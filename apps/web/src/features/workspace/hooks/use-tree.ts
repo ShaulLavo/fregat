@@ -18,16 +18,19 @@ import { log } from '@/lib/client-logging'
 import { createCoalescedLogQueue } from '@/lib/coalesced-log'
 import { canonicalTreePath, toTreePath } from '@/lib/path-formatters'
 import { fileSystemKeys } from '@/lib/query-keys'
+import { hasPrefetchRoom } from '@/lib/prefetch-room'
 import {
   type DirectoryLoadOptions,
   markDirectoryError,
   markDirectoryLoading,
   mergeDirectoryLoad,
+  replaceDirectoryLoad,
   shouldLoadDirectory,
   treeModelWithDirectoryLoads,
   type TreeModel,
 } from '@/lib/tree-model'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { errorStringField } from '@workspace/contracts'
 
 const DIRECTORY_LOAD_SKIPPED_LOG_DELAY_MS = 250
 const directoryLoadSkippedLogs = createCoalescedLogQueue({
@@ -72,6 +75,7 @@ export function useWorkspaceTreeForRootPath(rootPath: string | null) {
       area: 'file-tree',
       entryPath: entry.path,
       retry: options.retry === true,
+      refresh: options.refresh === true,
       rootPath,
       treePath: canonicalPath,
     })
@@ -87,7 +91,7 @@ export function useWorkspaceTreeForRootPath(rootPath: string | null) {
         queryFn: ({ signal, client }) =>
           fetchTree(entry.path, signal, clientForQueryClient(client)),
         queryKey: directoryKey,
-        staleTime: FILE_TREE_PREFETCH_STALE_MS,
+        staleTime: options.refresh ? 0 : FILE_TREE_PREFETCH_STALE_MS,
       })
       .then((result) =>
         queryClient.setQueryData(rootTreeKey, (model: TreeModel | undefined) => {
@@ -101,23 +105,27 @@ export function useWorkspaceTreeForRootPath(rootPath: string | null) {
             rootPath,
             treePath: canonicalPath,
           })
-          return mergeDirectoryLoad(model, rootPath, result, canonicalPath)
+          return options.refresh
+            ? replaceDirectoryLoad(model, rootPath, result)
+            : mergeDirectoryLoad(model, rootPath, result, canonicalPath)
         }),
       )
       .catch((error: unknown) => {
         const message = errorMessage(error)
+        const denied = errorStringField(error, 'code') === 'PERMISSION_DENIED'
         log.warn({
           action: 'file-tree.directory.load.error',
           area: 'file-tree',
           entryPath: entry.path,
           error: { message },
+          denied,
           rootPath,
           treePath: canonicalPath,
         })
         queryClient.setQueryData(rootTreeKey, (model: TreeModel | undefined) => {
           if (!model) return model
 
-          return markDirectoryError(model, canonicalPath, message)
+          return markDirectoryError(model, canonicalPath, { message, denied })
         })
       })
   }
@@ -127,6 +135,7 @@ export function useWorkspaceTreeForRootPath(rootPath: string | null) {
     if (treeState.status !== 'ready') return
     if (!isDirectoryEntry(entry)) return
     if (!shouldLoadDirectory(treeState.data, treePath)) return
+    if (!hasPrefetchRoom(queryClient, fileSystemKeys.tree(rootPath))) return
 
     void queryClient.prefetchQuery({
       queryFn: ({ signal, client }) => fetchTree(entry.path, signal, clientForQueryClient(client)),

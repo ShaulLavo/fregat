@@ -64,6 +64,15 @@ import { copyFeedback } from './copy-feedback'
 import { fileLabelCohesion } from './file-label-cohesion'
 import { checkpointStates } from './checkpoint-states'
 import { sessionActionsSurfaces } from './session-actions-surfaces'
+import { exportTranscript } from './export-transcript'
+import { claudeHookRows } from './hook-rows'
+import { claudeBackgroundTasks } from './background-tasks'
+import { claudeCustomAgent } from './custom-agent'
+import { customAgentProviderSwitch } from './custom-agent-switch'
+import { claudeContextPopover } from './context-popover'
+import { claudeManualCompaction, codexManualCompaction } from './manual-compaction'
+import { claudeSessionTools, codexSessionTools } from './session-tools'
+import { claudeSessionFork, codexSessionFork } from './session-fork'
 import { searchFileActions } from './search-file-actions'
 import { settingsStaleDiagnostics } from './settings-stale-diagnostics'
 import { fontPicker } from './font-picker'
@@ -78,6 +87,12 @@ import { chatComposerInsert } from './chat-composer-insert'
 import { chatDisclosureSettle } from './chat-disclosure-settle'
 import { chatTurnAnatomy } from './chat-turn-anatomy'
 import { fileTreeHoverPrefetch } from './file-tree-hover-prefetch'
+import {
+  filePickerPrefetchBound,
+  workspaceOpenLargeRoot,
+  workspaceOpenUnreadableChild,
+  workspaceSwitchClickDuringOpen,
+} from './large-folder'
 import { wallpaperBootHandoff } from './wallpaper-boot-handoff'
 import { chatGitTabSwitch } from './chat-git-tab-switch'
 import { chatGitTurnRows } from './chat-git-turn-rows'
@@ -94,6 +109,11 @@ import { machineProtocolMismatch } from './machine-protocol-mismatch'
 import { wallpaperIconHints } from './wallpaper-icon-hints'
 import { terminalBackground } from './terminal-background'
 import { bottomPanelPersistence } from './bottom-panel-persistence'
+import { sidebarToggle } from './sidebar-toggle'
+import { itemNavigation } from './item-navigation'
+import { shortcutHints } from './shortcut-hints'
+import { editorAddToChat } from './editor-add-to-chat'
+import { markdownSplitView } from './markdown-split-view'
 import { gitOpenAllDiffsSpam } from './git-open-all-diffs-spam'
 import { gitStageSettles } from './git-stage-settles'
 import { gitChangesScroll } from './git-changes-scroll'
@@ -115,6 +135,8 @@ import { themeStudioLibrary } from './theme-studio-library'
 import { commandPaletteTypeBurst } from './command-palette-type-burst'
 import { paletteScriptsPending } from './palette-scripts-pending'
 import { settingsModelsPending } from './settings-models-pending'
+import { settingsProviderUpdate } from './settings-provider-update'
+import { claudeUsageImport } from './claude-usage-import'
 import { chatFollowUp } from './chat-follow-up'
 import { chatDiffSyntax } from './chat-diff-syntax'
 import { editorSplitDrag } from './editor-split-drag'
@@ -328,6 +350,18 @@ export const scenarios: readonly Scenario[] = [
   fileLabelCohesion,
   checkpointStates,
   sessionActionsSurfaces,
+  exportTranscript,
+  claudeHookRows,
+  claudeBackgroundTasks,
+  claudeCustomAgent,
+  customAgentProviderSwitch,
+  claudeContextPopover,
+  claudeManualCompaction,
+  codexManualCompaction,
+  claudeSessionTools,
+  codexSessionTools,
+  claudeSessionFork,
+  codexSessionFork,
   searchFileActions,
   chatFollowUp,
   chatDiffSyntax,
@@ -350,6 +384,11 @@ export const scenarios: readonly Scenario[] = [
   editorOfflineResync,
   terminalBackground,
   bottomPanelPersistence,
+  sidebarToggle,
+  itemNavigation,
+  shortcutHints,
+  editorAddToChat,
+  markdownSplitView,
   gitOpenAllDiffsSpam,
   gitStageSettles,
   gitChangesScroll,
@@ -371,6 +410,8 @@ export const scenarios: readonly Scenario[] = [
   commandPaletteTypeBurst,
   paletteScriptsPending,
   settingsModelsPending,
+  settingsProviderUpdate,
+  claudeUsageImport,
   editorThemePreview,
   editorSyntaxBenchmark('native'),
   editorNativeCoverage('light'),
@@ -445,6 +486,10 @@ export const scenarios: readonly Scenario[] = [
   chatDisclosureSettle,
   chatTurnAnatomy,
   fileTreeHoverPrefetch,
+  workspaceOpenLargeRoot,
+  workspaceOpenUnreadableChild,
+  workspaceSwitchClickDuringOpen,
+  filePickerPrefetchBound,
   wallpaperBootHandoff,
   chatGitTabSwitch,
   chatGitTurnRows,

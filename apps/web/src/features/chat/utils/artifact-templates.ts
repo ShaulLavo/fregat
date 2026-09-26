@@ -26,7 +26,7 @@ export type ArtifactTemplate = {
 }
 
 export type ArtifactTemplateSegment =
-  | { readonly kind: 'markdown'; readonly markdown: string }
+  | { readonly kind: 'markdown'; readonly markdown: string; readonly lineOffset: number }
   | { readonly kind: 'artifact-template'; readonly template: ArtifactTemplate }
 
 const LABEL_BY_KIND: Record<ArtifactTemplateKind, string> = {
@@ -99,18 +99,20 @@ export function splitArtifactTemplateMarkdown(
   markdown: string,
   streaming = false,
 ): ArtifactTemplateSegment[] {
-  if (!markdown.includes(DIRECTIVE)) return [{ kind: 'markdown', markdown }]
+  if (!markdown.includes(DIRECTIVE)) return [{ kind: 'markdown', markdown, lineOffset: 0 }]
 
   const segments: ArtifactTemplateSegment[] = []
   const lines = markdown.split('\n')
   let pending: string[] = []
+  let lineOffset = 0
   let fence: string | null = null
   for (const [index, line] of lines.entries()) {
     fence = nextFence(fence, line)
     const template = fence === null ? directiveTemplate(line) : null
     if (template) {
-      pushMarkdown(segments, pending)
+      pushMarkdown(segments, pending, lineOffset)
       pending = []
+      lineOffset = index + 1
       segments.push({ kind: 'artifact-template', template })
       continue
     }
@@ -118,7 +120,7 @@ export function splitArtifactTemplateMarkdown(
       continue
     pending.push(line)
   }
-  pushMarkdown(segments, pending)
+  pushMarkdown(segments, pending, lineOffset)
 
   return segments
 }
@@ -153,9 +155,13 @@ function nextFence(open: string | null, line: string) {
   return marker[0] === open[0] && marker.length >= open.length ? null : open
 }
 
-function pushMarkdown(segments: ArtifactTemplateSegment[], lines: readonly string[]) {
+function pushMarkdown(
+  segments: ArtifactTemplateSegment[],
+  lines: readonly string[],
+  lineOffset: number,
+) {
   const markdown = lines.join('\n')
-  if (markdown.trim()) segments.push({ kind: 'markdown', markdown })
+  if (markdown.trim()) segments.push({ kind: 'markdown', markdown, lineOffset })
 }
 
 function isArtifactKind(value: string | undefined): value is ArtifactTemplateKind {

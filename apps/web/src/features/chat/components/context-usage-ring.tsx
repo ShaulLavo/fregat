@@ -1,6 +1,8 @@
+import type { ScopedSessionRef } from '@workspace/contracts'
 import { Button } from '@workspace/ui/components/button'
 
 import { TickerNumber } from '@/components/ticker-number'
+import { ContextUsageDetails } from '@/features/chat/components/context-usage-details'
 import { Popover, PopoverContent, PopoverTrigger } from '@workspace/ui/components/popover'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import { cn } from '@workspace/ui/lib/utils'
@@ -24,10 +26,13 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS
  */
 export function ContextUsageRing({
   compact = false,
+  sessionRef,
   usage,
 }: {
   /** Narrow composer: the ring alone, with the readout left to the popover. */
   readonly compact?: boolean
+  /** The session whose cost the popover totals; a draft has none. */
+  readonly sessionRef?: ScopedSessionRef | null
   readonly usage: ContextUsage
 }) {
   const percent = usage.ratio === null ? null : Math.round(usage.ratio * 100)
@@ -78,6 +83,7 @@ export function ContextUsageRing({
                   </svg>
                   {compact ? null : (
                     <span className='text-2xs tabular-nums'>
+                      {usage.estimated ? '~' : ''}
                       {percent === null ? (
                         formatContextTokens(usage.usedTokens)
                       ) : (
@@ -93,27 +99,8 @@ export function ContextUsageRing({
         />
         <TooltipContent>{contextUsageLabel(usage, percent)}</TooltipContent>
       </Tooltip>
-      <PopoverContent align='end' className='w-64 text-xs' side='top'>
-        <div className='flex items-baseline justify-between gap-3'>
-          <span className='text-muted-foreground font-medium'>Context window</span>
-          <span className='tabular-nums'>{tokenSummary(usage)}</span>
-        </div>
-        {usage.ratio === null ? (
-          <p className='text-muted-foreground mt-1.5 leading-snug'>
-            This provider did not report a window size, so the share used is unknown.
-          </p>
-        ) : null}
-        {usage.totalProcessedTokens === null ? null : (
-          <div className='mt-1.5 flex items-baseline justify-between gap-3'>
-            <span className='text-muted-foreground'>Processed this session</span>
-            <span className='tabular-nums'>{formatContextTokens(usage.totalProcessedTokens)}</span>
-          </div>
-        )}
-        {usage.compactsAutomatically ? (
-          <p className='text-muted-foreground mt-1.5 leading-snug'>
-            This provider compacts the context on its own when it fills.
-          </p>
-        ) : null}
+      <PopoverContent align='end' className='w-72 text-xs' side='top'>
+        <ContextUsageDetails sessionRef={sessionRef ?? null} usage={usage} />
       </PopoverContent>
     </Popover>
   )
@@ -125,12 +112,6 @@ function contextUsageLabel(usage: ContextUsage, percent: number | null) {
   }
 
   return `Context ${percent}% full`
-}
-
-function tokenSummary(usage: ContextUsage) {
-  if (usage.maxTokens === null) return `${formatContextTokens(usage.usedTokens)} used`
-
-  return `${formatContextTokens(usage.usedTokens)} / ${formatContextTokens(usage.maxTokens)}`
 }
 
 function toneClass(ratio: number | null) {

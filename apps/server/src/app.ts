@@ -1,3 +1,4 @@
+import { sessionControlRoutes } from './provider/session-control-routes'
 import { createAttachmentOwnership } from './attachments/ownership'
 import { selectTitleModel } from './orchestration/title-generation'
 import { errorMessage } from '@workspace/contracts'
@@ -47,6 +48,7 @@ import {
 } from './observability'
 import { OrchestrationEngine } from './orchestration/engine'
 import { requireWorktree } from './orchestration/read-model'
+import { OrchestrationCheckpointHunks } from './orchestration/checkpoint-hunks'
 import { OrchestrationCheckpointDiffQuery } from './orchestration/checkpoint-diff-query'
 import type { OrchestrationDatabase } from './orchestration/event-store'
 import { orchestrationRoutes } from './orchestration/routes'
@@ -75,8 +77,10 @@ import { ProviderSessionDirectory } from './provider/provider-session-directory'
 import { ProviderService } from './provider/provider-service'
 import { ProviderUsageHistoryReader } from './provider/usage-history'
 import { ProviderPriceCatalog } from './provider/price-catalog'
+import { ProviderMaintenance } from './provider/provider-maintenance'
 import { ProviderUsageRecorder } from './provider/usage-recorder'
 import { ProviderUsageStore } from './provider/usage-store'
+import { ProviderResetCredits } from './provider/reset-credits'
 import { MachineService, type MachineServiceOptions } from './machines/service'
 import { machineRoutes } from './machines/routes'
 import type { TailnetStatusCommand } from './machines/tailnet-hosts'
@@ -186,6 +190,14 @@ export function createApp(options: AppOptions) {
   // app was given — in tests that is the in-memory database, which is what
   // keeps a test run from writing into the developer's real settings.
   const settings = new SettingsStore({ ...options.settings, workspaceRoot: fs.paths.workspaceRoot })
+  fs.watchDirectoryLimit = () => settings.snapshot().values['files.watchDirectoryLimit']
+  let watchDirectoryLimit = settings.snapshot().values['files.watchDirectoryLimit']
+  settings.onChange(() => {
+    const next = settings.snapshot().values['files.watchDirectoryLimit']
+    if (next === watchDirectoryLimit) return
+    watchDirectoryLimit = next
+    fs.rebalanceWatchLimit()
+  })
   const themesRoot = options.themes?.root ?? platformHomePath()
   const wallpapers = new WallpaperLibrary({
     directory: path.join(themesRoot, 'wallpapers'),
@@ -256,6 +268,11 @@ export function createApp(options: AppOptions) {
     sessionDirectory: new ProviderSessionDirectory(database),
   })
   const providerUsage = new ProviderUsageStore(providerAdapterRegistry)
+  const providerResetCredits = new ProviderResetCredits(
+    database,
+    providerAdapterRegistry,
+    providerUsage,
+  )
   const providerPrices = new ProviderPriceCatalog(database)
   const providerUsageRecorder = new ProviderUsageRecorder(
     database,
@@ -263,8 +280,12 @@ export function createApp(options: AppOptions) {
     providerPrices,
   )
   const providerUsageHistory = new ProviderUsageHistoryReader(database)
+  const providerMaintenance = new ProviderMaintenance(providerAdapterRegistry)
   providerService.subscribeRuntimeEvents((event) => providerUsage.accept(event))
   providerService.subscribeUsage((event, purpose) => providerUsageRecorder.accept(event, purpose))
+  providerService.subscribeImportedUsage((input, usage) =>
+    providerUsageRecorder.importTurns(input, usage),
+  )
   const orchestration = new OrchestrationEngine(database, {
     responseStreamingMode: (projectId) => {
       const values = settings.snapshot().values
@@ -314,6 +335,14 @@ export function createApp(options: AppOptions) {
   const serverConfig = orchestrationWsServerConfig(identity)
   const commitMessages = new CommitMessageGenerator(git, providerAdapterRegistry, providerService)
   const checkpointDiff = new OrchestrationCheckpointDiffQuery(database, git)
+  const checkpointHunks = new OrchestrationCheckpointHunks({
+    runWorkspaceOperation: (sessionId, operation) =>
+      orchestration.runWorkspaceOperation(sessionId, operation),
+    activeRuntimes: () => providerService.listActiveRuntimes(),
+    diffs: checkpointDiff,
+    git,
+    readModel: () => orchestration.readModelSnapshot(),
+  })
   const sessionSearch = new OrchestrationSessionSearchQuery(database)
   const auth = createAuthConfig(options.auth)
   const push = new PushService({ database, settings, fetcher: options.push?.fetcher })
@@ -370,6 +399,8 @@ export function createApp(options: AppOptions) {
     orchestration,
     machines,
     providerPrices,
+    providerMaintenance,
+    providerResetCredits,
     sessionPush,
   )
 
@@ -454,8 +485,17 @@ export function createApp(options: AppOptions) {
     })
     .post('/terminal/clear', ({ body }) => terminal.clear(body), { body: terminalClearInputSchema })
     .post('/terminal/kill', ({ body }) => terminal.kill(body), { body: terminalKillInputSchema })
-    .use(providerRoutes(providerAdapterRegistry, providerUsage, providerUsageHistory))
-    .use(orchestrationRoutes(orchestration, checkpointDiff, sessionSearch))
+    .use(
+      providerRoutes(
+        providerAdapterRegistry,
+        providerUsage,
+        providerUsageHistory,
+        providerMaintenance,
+        providerResetCredits,
+      ),
+    )
+    .use(sessionControlRoutes(providerService))
+    .use(orchestrationRoutes(orchestration, checkpointDiff, sessionSearch, checkpointHunks))
     .use(
       attachmentRoutes({
         attachmentsDir: options.orchestration?.attachmentsDir,
@@ -529,6 +569,8 @@ function appCleanup(
   orchestration: OrchestrationEngine,
   machines: MachineService,
   providerPrices: ProviderPriceCatalog,
+  providerMaintenance: ProviderMaintenance,
+  providerResetCredits: ProviderResetCredits,
   sessionPush: SessionNoticePush,
 ) {
   let closed = false
@@ -550,6 +592,8 @@ function appCleanup(
     await orchestration.close()
     await providerService.shutdown()
     providerPrices.close()
+    providerMaintenance.close()
+    providerResetCredits.close()
     await fs.close()
     await flushObservability()
   }

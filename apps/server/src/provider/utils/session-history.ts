@@ -8,6 +8,11 @@ export const sessionHistoryInputSchema = v.object({
   cwd: v.pipe(v.string(), v.minLength(1)),
 })
 
+export const sessionUsageInputSchema = v.object({
+  ...sessionHistoryInputSchema.entries,
+  usage: v.literal(true),
+})
+
 export const historyMessagesSchema = v.array(
   v.object({
     sourceId: v.pipe(v.string(), v.minLength(1)),
@@ -26,6 +31,11 @@ const messageBodySchema = v.looseObject({
   content: v.union([v.string(), v.array(contentBlockSchema)]),
 })
 
+const claudeMessageMetadataSchema = v.object({
+  is_meta: v.optional(v.boolean()),
+  isCompactSummary: v.optional(v.boolean()),
+})
+
 export function claudeHistoryMessages(
   messages: readonly SessionMessage[],
 ): ProviderHistoryMessage[] {
@@ -34,6 +44,8 @@ export function claudeHistoryMessages(
 
 function claudeHistoryMessage(message: SessionMessage): ProviderHistoryMessage[] {
   if (message.type !== 'user' && message.type !== 'assistant') return []
+  const metadata = v.parse(claudeMessageMetadataSchema, message)
+  if (metadata.is_meta || metadata.isCompactSummary) return []
   const body = v.parse(messageBodySchema, message.message)
   const text =
     typeof body.content === 'string'
@@ -42,6 +54,12 @@ function claudeHistoryMessage(message: SessionMessage): ProviderHistoryMessage[]
           .filter((block) => block.type === 'text')
           .map((block) => block.text ?? '')
           .join('\n\n')
-  if (!text.trim()) return []
+  if (message.type === 'user' && /^\[Request interrupted by user(?: for tool use)?\]/.test(text))
+    return []
+  const imagePrompt =
+    message.type === 'user' &&
+    Array.isArray(body.content) &&
+    body.content.some((block) => block.type === 'image')
+  if (!text.trim() && !imagePrompt) return []
   return [{ sourceId: message.uuid, role: message.type, text, createdAt: null }]
 }

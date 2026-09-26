@@ -3,14 +3,7 @@ import type {
   ProviderOptionChoice,
   ProviderOptionDescriptor,
 } from '@workspace/contracts'
-import * as v from 'valibot'
 import type { CodexModel } from '../codex-protocol'
-
-const tierSchema = v.object({
-  id: v.pipe(v.string(), v.trim(), v.nonEmpty()),
-  name: v.pipe(v.string(), v.trim(), v.nonEmpty()),
-  description: v.optional(v.string()),
-})
 
 const effortLabels: Readonly<Record<string, string>> = {
   none: 'None',
@@ -57,15 +50,16 @@ export function codexModelCapabilities(model: CodexModel): ProviderModelCapabili
 }
 
 function serviceTierChoices(model: CodexModel): ProviderOptionChoice[] {
-  // These native fields postdate our protocol pin; validate them at this boundary.
-  const parsed = v.safeParse(v.array(tierSchema), model.serviceTiers)
-  if (parsed.success && parsed.output.length > 0) {
-    return parsed.output.map((tier) => ({
-      id: tier.id,
-      label: tier.name,
-      ...(tier.description?.trim() ? { description: tier.description.trim() } : {}),
-    }))
-  }
+  const tiers = (model.serviceTiers ?? []).flatMap((tier) => {
+    const id = tier.id.trim()
+    const label = tier.name.trim()
+    if (!id || !label) return []
+
+    const description = tier.description.trim()
+    return [{ id, label, ...(description ? { description } : {}) }]
+  })
+  if (tiers.length > 0) return tiers
+
   return (model.additionalSpeedTiers ?? []).flatMap((tier) => {
     const id = tier.trim()
     return id ? [{ id, label: id === 'fast' ? 'Fast' : id }] : []

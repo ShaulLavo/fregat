@@ -24,7 +24,7 @@ stays safe to read, share and export.
 | Setting                             | Default                                        | Scope       | What it does                                                                                                                                      |
 | ----------------------------------- | ---------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `workbench.colorTheme`              | `"system"`                                     | window      | Light or dark, or follow the operating system.                                                                                                    |
-| `workbench.theme`                   | `null`                                         | application | App colors, code colors, wallpaper and surfaces, in a light and a dark version. Try them in the theme studio.                                     |
+| `workbench.theme`                   | `null`                                         | application | A light and dark version of your app colors, code colors, wallpaper and material.                                                                 |
 | `workbench.theme.customizations`    | `{}`                                           | application | Part overrides saved separately for each theme bundle and mode.                                                                                   |
 | `tui.theme.colors`                  | `"theme"`                                      | application | Use the selected theme bundle or the terminal host colors in the TUI.                                                                             |
 | `workbench.palette`                 | `"graphite"`                                   | application | Colors for app backgrounds, text, borders, accents and the terminal. Pick a palette or make your own.                                             |
@@ -32,7 +32,6 @@ stays safe to read, share and export.
 | `editor.codeTheme.light`            | `"light-plus"`                                 | window      | Colors for code in editors and chat code blocks when the app uses light mode.                                                                     |
 | `workbench.reduceMotion`            | `false`                                        | window      | Slow terminal loading indicators while keeping progress visible.                                                                                  |
 | `workbench.fontFamily`              | `"bundled:inter"`                              | window      | Font for the words the app writes: titles, labels, menus and prose.                                                                               |
-| `workbench.feel`                    | `"flat"`                                       | window      | Motion and control depth: Flat, Seam, Brisk, Relaxed or Playful.                                                                                  |
 | `workbench.density`                 | `"compact"`                                    | window      | Use tighter compact spacing or roomier cozy spacing throughout the app.                                                                           |
 | `workbench.surface.opacity`         | `80`                                           | window      | How opaque panels and sidebars are over the wallpaper. 100 turns the glass material off.                                                          |
 | `workbench.surface.contentOpacity`  | `50`                                           | window      | How opaque the extra layer under the editor, terminal and settings is. It sits on top of the panel, so 0 leaves them as see-through as a sidebar. |
@@ -49,6 +48,7 @@ stays safe to read, share and export.
 | `chat.followUpBehavior`              | `"queue"`                                                                                   | application | Queue messages during a running turn or send them immediately as corrections. Ctrl/Cmd+Enter uses the other behavior.                                                                                                                                                                                                  |
 | `chat.sendShortcut`                  | `"enter"`                                                                                   | application | Which key sends a message. enter: Enter sends and Shift+Enter adds a line. mod-enter-multiline: like enter until the message has a second line, then Ctrl/Cmd+Enter sends. mod-enter: Ctrl/Cmd+Enter sends and Enter adds a line. Where Ctrl/Cmd+Enter sends, Shift+Ctrl/Cmd+Enter takes the other follow-up behavior. |
 | `chat.planModeEnabled`               | `false`                                                                                     | application | Show the Plan mode picker and /plan and /default commands for providers that support them. Stored draft preferences are retained while hidden.                                                                                                                                                                         |
+| `chat.activeFileContext`             | `false`                                                                                     | application | Show the file open in the editor as a chip in the composer. While the chip is there, sending mentions that file. Remove the chip to send without it.                                                                                                                                                                   |
 | `chat.contextWindowMeterEnabled`     | `false`                                                                                     | application | Show conversation context occupancy in the composer and session header. Provider quota information is independent.                                                                                                                                                                                                     |
 | `chat.responseStreamingMode`         | `"paragraph"`                                                                               | application | Publish assistant responses by paragraph, complete turn, or individual token.                                                                                                                                                                                                                                          |
 | `chat.projectResponseStreamingModes` | `{}`                                                                                        | application | Response streaming mode overrides keyed by project UUID on this machine.                                                                                                                                                                                                                                               |
@@ -86,6 +86,7 @@ stays safe to read, share and export.
 | `editor.history.persist`                      | `true`                     | application | Keep undo history for closed files in this browser, so reopening a file or reloading the window brings it back. A file that changed on disk in the meantime starts fresh.                                                                                        |
 | `editor.history.persistDays`                  | `30`                       | application | Days a closed file keeps its stored undo history before it is dropped.                                                                                                                                                                                           |
 | `editor.history.persistBudget`                | `67108864`                 | application | Total stored undo history across closed files, in UTF-16 code units. The least recently saved files go first when it is exceeded.                                                                                                                                |
+| `editor.markdownView`                         | `"preview"`                | window      | How markdown files open: source text, source beside a rendered view, or rendered in place while you edit. Cycle markdown view changes one file.                                                                                                                  |
 | `editor.diff.viewMode`                        | `"stacked"`                | window      | Show diffs side by side or stacked.                                                                                                                                                                                                                              |
 | `editor.inputRoute`                           | `"edit-context"`           | application | How typed text reaches the editor. EditContext (Chromium) receives IME, autocorrect and dictation edits with their exact ranges instead of reading them back out of a hidden textarea; other browsers always use the textarea. _(restart)_                       |
 | `editor.retainedTextBudget`                   | `67108864`                 | machine     | Total text the editor keeps resident across the active and parked projects, in UTF-16 code units, re-checked at a project switch and a tab close. The active project is charged first and is never trimmed, so a large one leaves less room for parked projects. |
@@ -99,12 +100,12 @@ stays safe to read, share and export.
 
 ## Files
 
-| Setting               | Default  | Scope       | What it does                                                                                                                             |
-| --------------------- | -------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `files.autoSave`      | `"off"`  | window      | Save edited files automatically, and when.                                                                                               |
-| `files.autoSaveDelay` | `1000`   | window      | Milliseconds of quiet before an automatic save, when saving after a delay.                                                               |
-| `files.picker.view`   | `"auto"` | application | How the file picker shows a folder: columns, a list, or icons. Auto uses columns when choosing a folder and a list when choosing a file. |
-| `files.showHidden`    | `false`  | window      | Show dot-prefixed files and folders in file pickers.                                                                                     |
+| Setting                     | Default  | Scope   | What it does                                                                                                                                        |
+| --------------------------- | -------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `files.autoSave`            | `"off"`  | window  | Save edited files automatically, and when.                                                                                                          |
+| `files.autoSaveDelay`       | `1000`   | window  | Milliseconds of quiet before an automatic save, when saving after a delay.                                                                          |
+| `files.showHidden`          | `false`  | window  | Show dot-prefixed files and folders in file pickers.                                                                                                |
+| `files.watchDirectoryLimit` | `200000` | machine | How many folders all open workspaces may watch for live changes together. A workspace that would pass it updates its top level and open files only. |
 
 ## Git
 
@@ -119,10 +120,10 @@ stays safe to read, share and export.
 
 ## Keyboard shortcuts
 
-| Setting                 | Default     | Scope       | What it does                                                                                                                                  |
-| ----------------------- | ----------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `keybindings.preset`    | `"default"` | application | Editor shortcuts to use before applying your overrides. Default uses the native editor pack; vscode uses the VS Code pack.                    |
-| `keybindings.overrides` | `{}`        | application | Command id to shortcut: one hotkey or two separated by a single space. A missing key keeps the default; an explicit null unbinds the command. |
+| Setting                 | Default     | Scope       | What it does                                                                                                                                                  |
+| ----------------------- | ----------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `keybindings.preset`    | `"default"` | application | Shortcuts your overrides apply on top of. VS Code keeps VS Code bindings. Platform starts from them and adds its own keys for tabs, chats and sidebar panels. |
+| `keybindings.overrides` | `{}`        | application | Command id to shortcut: one hotkey or two separated by a single space. A missing key keeps the default; an explicit null unbinds the command.                 |
 
 ## Language servers
 
@@ -174,16 +175,6 @@ stays safe to read, share and export.
 | `search.maxResults`       | `20000`     | window | How many matches a workspace search returns.            |
 | `search.maxResultFiles`   | `20000`     | window | How many files a workspace search returns matches from. |
 | `search.quickOpenLimit`   | `80`        | window | How many files the file picker lists.                   |
-
-## Sounds
-
-| Setting                         | Default | Scope       | What it does                                                                              |
-| ------------------------------- | ------- | ----------- | ----------------------------------------------------------------------------------------- |
-| `workbench.sounds.controls`     | `false` | application | Play clicks when pressing controls and changing values with the pointer.                  |
-| `workbench.sounds.errors`       | `false` | application | Play a short rattle when an error toast appears.                                          |
-| `workbench.sounds.git`          | `false` | application | Play two rising clicks when a commit is created, a push finishes or a pull request opens. |
-| `workbench.sounds.terminalBell` | `false` | application | Play a click when a terminal program rings the bell.                                      |
-| `workbench.sounds.volume`       | `50`    | application | Loudness of every sound, agent notifications included.                                    |
 
 ## Terminal
 

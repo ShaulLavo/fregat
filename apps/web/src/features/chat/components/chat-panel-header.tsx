@@ -13,6 +13,8 @@ import { ChatCircleIcon, ClockCounterClockwiseIcon, PlusIcon } from '@phosphor-i
 import { chatSessionPreview, formatChatDateLabel } from '@/features/chat/utils/formatters'
 import { ToolPaneHeader } from '@/components/tool-pane-header'
 import { SessionActionsButton } from '@/components/session-actions-button'
+import { BackgroundTasksButton } from '@/features/chat/components/background-tasks-button'
+import { SessionToolsButton } from '@/features/chat/components/session-tools-button'
 import { SessionRename } from '@/components/session-rename'
 import { useSessionRenaming } from '@/hooks/use-session-renaming'
 import type { ChatSessionListProjection } from '@workspace/client-core/chat/selectors'
@@ -114,6 +116,8 @@ export function ChatPanelHeader({
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
+          {session ? <BackgroundTasksButton sessionRef={session.ref} /> : null}
+          {session ? <SessionToolsButton sessionRef={session.ref} /> : null}
           {session ? <SessionActionsButton session={session} surface='sidebar' /> : null}
         </>
       }

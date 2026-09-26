@@ -1,6 +1,13 @@
 # Two markdown modes: split view and live preview
 
-Status: proposed, implementation not started. Requested 2026-09-13.
+Status: Phase 1 done (completion wave, lane L8, 2026-09-25): the mode setting
+`editor.markdownView` (default live preview, the behaviour before this plan; source; split),
+Cycle markdown view (per-document, in the palette and the editor title), the rendered pane
+(`features/workbench/components/markdown-preview-pane.tsx`) with the chat renderer and the
+editor's fence theme (highlighters moved to `lib/code-highlight`), workspace links and images,
+and scroll sync both ways. Scenario `markdown-split-view` drives all of it. Phase 2 stays parked on Plan 111.
+Default mode: live preview, the behaviour before this plan (no recommendation was written;
+Decided 2026-09-25 by keeping the existing behaviour).
 
 The editor already renders markdown as formatted text while the buffer keeps holding markdown source — [`@singapore-editor/markdown`](../../Editor/packages/markdown/src/index.ts) hides fences, drops heading `#`, collapses links to their labels, and restores the source under the caret so it stays editable. That is Obsidian's Live Preview, and it was built as an experiment. It looks right and it is incomplete.
 
@@ -20,16 +27,16 @@ This plan does not delete it. It gives markdown **two modes**: a split view, whi
 
 ## Decisions
 
-| Decision                                         | Proposed behavior                                                                                                                                                                                                                     |
-| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| D1 — two modes, not one                          | Markdown files open in **source**, **split**, or **live preview**. Source is the current plain editor. The experiment becomes live preview rather than being deleted.                                                                 |
-| D2 — the mode is a setting, not a constant       | A registry entry in `packages/contracts/src/settings/keys.ts` per [AGENTS.md § Settings](../AGENTS.md#settings), registered in the same pass as its consumer, with a per-document override that does not persist as a global default. |
-| D3 — split view ships first                      | It depends only on Plan 107 and answers the immediate need. Live preview waits for Plan 111's findings rather than accreting more adjacency heuristics.                                                                               |
-| D4 — one renderer                                | The split view's rendered pane is `@workspace/markdown` from Plan 107, with healing and incremental parsing disabled — a file on disk is not a stream. Same package as chat, so a fence highlights identically in both.               |
-| D5 — live preview moves to an AST                | Finishing live preview means driving it from a markdown parse, not from generically-named highlight captures. Containment-and-adjacency recovery is the experiment's ceiling and the reason it is incomplete, not a detail to extend. |
-| D6 — block widgets are the missing primitive     | Rendered tables, images and fences are block-level replacements, which `InlineReplacementSpec` cannot express. Whether the editor gains that primitive, and in what shape, is Plan 111's question and this plan's dependency.         |
-| D7 — scroll sync is positional, not proportional | Split view scroll sync maps source line to rendered block through the AST's position data. Proportional scrolling desynchronizes on any document with a long fence.                                                                   |
-| D8 — no new syntax yet                           | Wiki links, callouts, embeds and backlinks are Obsidian features, not markdown. They are a later plan and are named here only so live preview's design leaves room for them.                                                          |
+| Decision                                         | Proposed behavior                                                                                                                                                                                                                                             |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D1 — two modes, not one                          | Markdown files open in **source**, **split**, or **live preview**. Source is the current plain editor. The experiment becomes live preview rather than being deleted.                                                                                         |
+| D2 — the mode is a setting, not a constant       | A registry entry in `packages/contracts/src/settings/keys.ts` per [AGENTS.md § Settings](../AGENTS.md#settings), registered in the same pass as its consumer, with a per-document override that does not persist as a global default.                         |
+| D3 — split view ships first                      | It depends only on Plan 107 and answers the immediate need. Live preview waits for Plan 111's findings rather than accreting more adjacency heuristics.                                                                                                       |
+| D4 — one renderer                                | The split view's rendered pane is `@workspace/markdown` from Plan 107, with healing and incremental parsing disabled — a file on disk is not a stream. Same package as chat, so a fence highlights identically in both.                                       |
+| D5 — live preview leaves highlight captures      | **Replaced 2026-09-26 by [Plan 176](176-markdown-parser.md).** Live preview leaves highlight captures; which parser replaces them (tree-sitter with a preview query, a grown scanner, `@lezer/markdown`, a Rust parser or remark) is 176's measured decision. |
+| D6 — block widgets are the missing primitive     | Rendered tables, images and fences are block-level replacements, which `InlineReplacementSpec` cannot express. Whether the editor gains that primitive, and in what shape, is Plan 111's question and this plan's dependency.                                 |
+| D7 — scroll sync is positional, not proportional | Split view scroll sync maps source line to rendered block through the AST's position data. Proportional scrolling desynchronizes on any document with a long fence.                                                                                           |
+| D8 — no new syntax yet                           | Wiki links, callouts, embeds and backlinks are Obsidian features, not markdown. They are a later plan and are named here only so live preview's design leaves room for them.                                                                                  |
 
 ## Phase 1 — split view
 
@@ -41,11 +48,11 @@ This plan does not delete it. It gives markdown **two modes**: a split view, whi
 
 Completion: a markdown file can be edited in source with a live rendered pane beside it, fences match the editor's theme, and scrolling either pane tracks the other through a document containing a hundred-line fence.
 
-## Phase 2 — live preview, after Plan 111
+## Phase 2 — live preview, after Plans 111 and 176
 
-Blocked on Plan 111's comparison. The steps below are the intended shape, not a commitment ahead of its findings.
+Blocked on Plan 111 Phase 1 (`trigger: 'edit'` sources) and Plan 176's owner question 1. The steps below are the intended shape, not a commitment ahead of its findings.
 
-1. **Re-source the structure (D5).** Drive replacements from a markdown AST with position data rather than from highlight captures. The existing structural recovery in `replacements.ts` is deleted, not extended.
+1. **Re-source the structure (D5).** Drive replacements from the parser [Plan 176](176-markdown-parser.md) picks, with position data, rather than from highlight captures. Plan 176 recommends `@lezer/markdown` on the main thread (its owner question 1), parsed to the viewport inside the edit operation so the first frame is decorated, and its Phases 1–2 are this step. The existing structural recovery in `replacements.ts` is deleted, not extended.
 2. **Block widgets (D6).** Whatever primitive Plan 111 concludes the editor needs, so a table, an image and a fence can each be replaced by a rendered block that the caret can enter and leave predictably.
 3. **Caret semantics.** Source reappears under the caret, as today, but defined against the AST: entering a node's range reveals its syntax, leaving it re-renders. Selection across a boundary must not lose characters — the current implementation's stated fallback is to leave malformed markdown alone, and that guarantee is kept.
 4. **Undo and edit correctness.** A replacement is a view concern; the buffer holds source at all times. Every editing gesture over a replaced range produces the same buffer as it would in source mode. This is the test surface, not the visuals.

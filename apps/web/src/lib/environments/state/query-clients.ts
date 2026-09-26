@@ -8,6 +8,7 @@ import {
   createQueryClientOwnerMissingError,
 } from '@workspace/client-core/environments/utils/structured-errors'
 import { installFileSnapshotQueryCachePolicy } from '@/lib/file-snapshot-query-cache'
+import { retryUnlessClientError } from '@/lib/environments/utils/query-retry'
 
 type QueryClientOwner = {
   readonly client: Client
@@ -31,7 +32,7 @@ export function queryClientFor(origin: string): QueryClient {
     defaultOptions: {
       queries: {
         gcTime: 5 * 60 * 1000,
-        retry: 1,
+        retry: retryUnlessClientError,
         staleTime: 10 * 1000,
       },
     },

@@ -19,6 +19,7 @@ import {
   createDefaultWorkbenchPanels,
   setWorkbenchBottomTab,
   setWorkbenchSidebarTab,
+  showWorkbenchSidebarTab,
 } from '@/features/workbench/utils/panels'
 
 export function applyAddressFields({
@@ -42,11 +43,7 @@ export function applyAddressFields({
     if (address.mode === 'chat' && address.editor && address.tool === 'editor')
       state.setChatModePanels(showChatModeToolTab(state.chatModePanels, 'editor'))
     if (address.chat)
-      state.setWorkbenchPanels({
-        ...state.workbenchPanels,
-        activeSidebarTab: 'chat',
-        sidebarOpen: true,
-      })
+      state.setWorkbenchPanels(showWorkbenchSidebarTab(state.workbenchPanels, 'chat'))
     return
   }
   applyPanels(address, workspaceStore, reason)

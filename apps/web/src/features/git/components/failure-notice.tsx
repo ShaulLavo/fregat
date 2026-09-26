@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react'
 import { ToolbarButton } from '@/components/toolbar-button'
 import { log } from '@/lib/client-logging'
 
-import { useAttachToComposer } from '@/features/chat/hooks/use-attach-to-composer'
+import { useAttachToComposer } from '@/lib/composer-attach/hooks/use-attach-to-composer'
 import { useLatestFailure } from '@/features/git/hooks/use-latest-failure'
 import {
   commitProgressStoreFor,
@@ -18,7 +18,7 @@ import { gitFailureLabel, gitFailurePrompt } from '@/features/git/utils/failure-
 export function FailureNotice({ rootPath }: { readonly rootPath: string }) {
   const failure = useLatestFailure(rootPath)
   const queryClient = useQueryClient()
-  const { attachTextToNewChat } = useAttachToComposer()
+  const { attachTextToNewChat } = useAttachToComposer(rootPath)
   const [dismissedId, setDismissedId] = useState<number | null>(null)
 
   const shownId = failure && failure.mutationId !== dismissedId ? failure.mutationId : null
@@ -44,7 +44,7 @@ export function FailureNotice({ rootPath }: { readonly rootPath: string }) {
       rootPath,
       lines.map((line) => line.text),
     )
-    void attachTextToNewChat('git-failure', prompt, rootPath).then((attached) => {
+    void attachTextToNewChat('git-failure', prompt).then((attached) => {
       if (attached) setDismissedId(current.mutationId)
     })
   }

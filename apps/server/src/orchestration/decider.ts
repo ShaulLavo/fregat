@@ -1,3 +1,4 @@
+import { forkAttachment, forkMessages } from './utils/fork-messages'
 import { restoreLifecycle } from './lifecycle-restore'
 import { questionAnswerHistory } from './question-answer-history'
 import { approvalResponseEvents, endedApprovalEvents } from './approval-admission'
@@ -124,6 +125,8 @@ function decideCommandEvents(
     case 'session.create':
     case 'session.discover':
       return sessionCreated(command, model, at)
+    case 'session.fork':
+      return sessionForked(command, model, at)
     case 'session.discovery-metadata.update':
       return discoveryMetadataUpdated(command, model, at)
     case 'session.provider-start.claim':
@@ -465,6 +468,7 @@ function sessionCreated(
   return [
     ...creation,
     event(command, at, 'session.created', {
+      ...(command.agent ? { agent: command.agent } : {}),
       createdAt: at,
       interactionMode: command.interactionMode ?? DEFAULT_INTERACTION_MODE,
       modelSelection: command.modelSelection,
@@ -474,6 +478,60 @@ function sessionCreated(
       sessionId: command.sessionId,
       title: command.title,
       updatedAt: at,
+    }),
+  ]
+}
+
+function sessionForked(
+  command: Extract<OrchestrationCommand, { type: 'session.fork' }>,
+  model: OrchestrationReadModel,
+  at: string,
+) {
+  const source = requireSessionNotDeleted(model, command.sourceSessionId)
+  requireWorktree(model, source.worktreeId)
+  requireSessionAbsent(model, command.sessionId)
+  const kept = forkMessages(source, command.throughTurnId)
+  return [
+    event(command, at, 'session.created', {
+      createdAt: at,
+      ...(source.agent ? { agent: source.agent } : {}),
+      forkedFrom: {
+        native: command.native,
+        sessionId: command.sourceSessionId,
+        turnId: command.throughTurnId,
+      },
+      interactionMode: source.interactionMode,
+      modelSelection: source.modelSelection,
+      origin: 'platform',
+      runtimeMode: source.runtimeMode,
+      sessionId: command.sessionId,
+      title: `${source.title} (fork)`,
+      updatedAt: at,
+      worktreeId: source.worktreeId,
+    }),
+    event(command, at, 'session.history-imported', {
+      messages: kept.flatMap((message, index) =>
+        message.role === 'system'
+          ? []
+          : [
+              {
+                createdAt: message.createdAt,
+                id: v.parse(
+                  messageIdSchema,
+                  `fork:${command.sessionId}:${String(index).padStart(10, '0')}`,
+                ),
+                role: message.role,
+                text: message.text,
+                turnId: message.turnId,
+                modelSelection: message.modelSelection,
+                attachments: message.attachments.map((attachment) =>
+                  forkAttachment(attachment, command.attachmentCopies),
+                ),
+              },
+            ],
+      ),
+      sessionId: command.sessionId,
+      sourceUpdatedAt: at,
     }),
   ]
 }
@@ -789,10 +847,16 @@ function sessionSet(
   at: string,
 ) {
   const session = requireSessionNotDeleted(model, command.sessionId)
-  const sessionSetEvent = event(command, at, 'session.runtime-set', {
-    runtime: command.runtime,
-    sessionId: command.sessionId,
-  })
+  const sessionSetEvent = event(
+    command,
+    at,
+    'session.runtime-set',
+    {
+      runtime: command.runtime,
+      sessionId: command.sessionId,
+    },
+    { metadata: command.providerTurnId ? { providerTurnId: command.providerTurnId } : {} },
+  )
   const status = command.runtime.status
   const wakes = status === 'starting' || status === 'running'
   if (!wakes) return [sessionSetEvent]
@@ -840,12 +904,20 @@ function activityEnvelopeMetadata(
   return { requestId: v.parse(approvalRequestIdSchema, requestId) }
 }
 
+/** There is nothing to compact before the conversation has a prompt. */
+function requireCompactable(session: OrchestrationProjectedSession | undefined) {
+  if (session?.messages.some((message) => message.role === 'user')) return
+
+  throw sessionDomainErrors.COMPACT_EMPTY({ internal: { sessionId: session?.id ?? null } })
+}
+
 function turnStartRequested(
   command: Extract<OrchestrationCommand, { type: 'session.turn.start' }>,
   model: OrchestrationReadModel,
   at: string,
 ) {
   const bootstrapEvent = bootstrapSessionCreated(command, model, at)
+  if (command.kind === 'compact') requireCompactable(model.sessions.get(command.sessionId))
   if (!bootstrapEvent) {
     const session = requireSessionNotArchived(model, command.sessionId, command.type)
     requireProviderInstance(session, command.modelSelection)
@@ -896,6 +968,7 @@ function turnStartRequested(
         sessionId: command.sessionId,
         titleSeed: command.titleSeed,
         turnId: command.turnId,
+        ...(command.kind ? { kind: command.kind } : {}),
       },
       { causationEventId: messageEvent.eventId },
     ),
@@ -979,6 +1052,7 @@ function bootstrapSessionCreated(
   return [
     ...creation,
     event(command, at, 'session.created', {
+      ...(createSession.agent ? { agent: createSession.agent } : {}),
       createdAt: at,
       interactionMode: createSession.interactionMode ?? DEFAULT_INTERACTION_MODE,
       modelSelection: createSession.modelSelection,

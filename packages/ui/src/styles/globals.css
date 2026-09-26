@@ -1296,50 +1296,197 @@
   }
 }
 
-/* Effort sparkle: the highest reasoning levels twinkle. Opacity only, so it runs
-   on the compositor; faster at max. Reduced motion keeps a still sprinkle. */
+/* Ultra efforts. The rainbow is a fixed identity like the brand marks: seven hues
+   at one lightness and chroma, lifted in dark mode so each letter stays legible. */
 :root {
-  --effort-sparkle-duration-xhigh: 2.6s;
-  --effort-sparkle-duration-max: 1.7s;
+  --rainbow-1: oklch(0.6 0.18 25);
+  --rainbow-2: oklch(0.63 0.16 55);
+  --rainbow-3: oklch(0.66 0.15 85);
+  --rainbow-4: oklch(0.6 0.15 150);
+  --rainbow-5: oklch(0.58 0.15 245);
+  --rainbow-6: oklch(0.56 0.17 285);
+  --rainbow-7: oklch(0.6 0.18 330);
+  --rainbow-spectrum: linear-gradient(
+    90deg,
+    var(--rainbow-1),
+    var(--rainbow-2),
+    var(--rainbow-3),
+    var(--rainbow-4),
+    var(--rainbow-5),
+    var(--rainbow-6),
+    var(--rainbow-7),
+    var(--rainbow-1)
+  );
+  --duration-rainbow-drift: 2.4s;
+  --duration-burst-ultra: 1.1s;
+  --duration-burst-max: 0.8s;
 }
 
-@keyframes app-effort-twinkle {
-  0%,
-  72%,
-  100% {
-    opacity: 0;
-  }
+.dark {
+  --rainbow-1: oklch(0.76 0.13 25);
+  --rainbow-2: oklch(0.8 0.12 55);
+  --rainbow-3: oklch(0.86 0.12 90);
+  --rainbow-4: oklch(0.8 0.12 150);
+  --rainbow-5: oklch(0.78 0.11 245);
+  --rainbow-6: oklch(0.76 0.12 285);
+  --rainbow-7: oklch(0.78 0.13 330);
+}
 
-  86% {
-    opacity: 0.45;
+/* The size is two spectra wide and the drift moves one whole tile, so the loop is seamless. */
+@keyframes app-rainbow-drift {
+  to {
+    background-position-x: 200%;
   }
 }
 
-@utility effort-sparkle-cell {
-  opacity: 0;
-  animation: app-effort-twinkle var(--effort-sparkle-duration) linear infinite;
+/* Paused until `rainbow-live`, so leaving a hover freezes the colours where they are. */
+@utility rainbow-text {
+  background-image: var(--rainbow-spectrum);
+  background-size: 200% 100%;
+  background-clip: text;
+  /* Not `color`: a focused menu row repaints every descendant's colour. */
+  -webkit-text-fill-color: transparent;
+  animation: app-rainbow-drift var(--duration-rainbow-drift) linear infinite paused;
 
   @media (prefers-reduced-motion: reduce) {
     animation: none;
-    opacity: 0.18;
   }
 }
 
-/* The composer's "ultrathink", one hue per letter through the CSS Highlight API. */
-::highlight(ultrathink-0) {
-  color: var(--destructive);
+@utility rainbow-live {
+  animation-play-state: running;
 }
 
-::highlight(ultrathink-1) {
-  color: var(--warning);
+@keyframes app-rainbow-hue {
+  to {
+    filter: hue-rotate(360deg);
+  }
 }
 
-::highlight(ultrathink-2) {
-  color: var(--success);
+/* The rainbow on an svg gradient; its drift turns the hues, paused until `rainbow-live`. */
+@utility rainbow-hue {
+  animation: app-rainbow-hue var(--duration-rainbow-drift) linear infinite paused;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+
+  & stop:nth-child(1) {
+    stop-color: var(--rainbow-1);
+  }
+
+  & stop:nth-child(2) {
+    stop-color: var(--rainbow-2);
+  }
+
+  & stop:nth-child(3) {
+    stop-color: var(--rainbow-3);
+  }
+
+  & stop:nth-child(4) {
+    stop-color: var(--rainbow-4);
+  }
+
+  & stop:nth-child(5) {
+    stop-color: var(--rainbow-5);
+  }
+
+  & stop:nth-child(6) {
+    stop-color: var(--rainbow-6);
+  }
+
+  & stop:nth-child(7) {
+    stop-color: var(--rainbow-7);
+  }
 }
 
-::highlight(ultrathink-3) {
-  color: var(--info);
+/* The one-shot burst when the effort rises to max or an ultra level: bands cross the
+   composer under its content, and a wash settles behind them. Ultra is the bigger one:
+   longer, brighter, a trailing second band. Transform and opacity only. */
+@utility effort-burst-ultra {
+  --burst-duration: var(--duration-burst-ultra);
+  --burst-peak: 0.5;
+  --burst-trail-peak: 0.3;
+  --burst-wash-peak: 0.14;
+  --burst-band: linear-gradient(
+    90deg,
+    transparent 15%,
+    var(--rainbow-6),
+    var(--rainbow-7),
+    var(--rainbow-1),
+    var(--rainbow-2),
+    var(--rainbow-3),
+    var(--rainbow-4),
+    var(--rainbow-5),
+    transparent 85%
+  );
+  --burst-wash: var(--rainbow-spectrum);
+}
+
+@utility effort-burst-max {
+  --burst-duration: var(--duration-burst-max);
+  --burst-peak: 0.32;
+  --burst-wash-peak: 0.07;
+  --burst-band: linear-gradient(
+    90deg,
+    transparent 30%,
+    var(--rainbow-1),
+    var(--rainbow-2),
+    var(--rainbow-3),
+    transparent 70%
+  );
+  --burst-wash: linear-gradient(90deg, var(--rainbow-1), var(--rainbow-3));
+}
+
+@keyframes app-effort-sweep {
+  from {
+    opacity: 0;
+    transform: translateX(-100%);
+  }
+
+  30%,
+  60% {
+    opacity: var(--burst-peak);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+}
+
+@keyframes app-effort-wash {
+  from,
+  to {
+    opacity: 0;
+  }
+
+  45% {
+    opacity: var(--burst-wash-peak);
+  }
+}
+
+@utility effort-sweep {
+  background-image: var(--burst-band);
+  opacity: 0;
+  animation: app-effort-sweep var(--burst-duration) var(--ease-in-out-strong) var(--burst-delay, 0s)
+    both;
+
+  @media (prefers-reduced-motion: reduce) {
+    display: none;
+  }
+}
+
+@utility effort-sweep-trail {
+  --burst-peak: var(--burst-trail-peak);
+  --burst-delay: calc(var(--burst-duration) * 0.2);
+}
+
+/* Outlasts the trailing band, so its animationend is the burst's end. Reduced motion keeps it. */
+@utility effort-wash {
+  background-image: var(--burst-wash);
+  opacity: 0;
+  animation: app-effort-wash calc(var(--burst-duration) * 1.2) var(--ease-out-strong) both;
 }
 
 /* BEGIN GENERATED SPRINGS */

@@ -8,22 +8,29 @@ import type {
   ModelSelection,
   ProviderApprovalDecision,
   ProviderApprovalOption,
+  ProviderAgent,
   ProviderAuth,
+  ProviderBackgroundTask,
   ProviderDriverKind,
+  ProviderMcpServer,
+  ProviderMcpSignIn,
+  ProviderSessionHooks,
   ProviderInstanceId,
   ProviderLoginAttempt,
   ProviderSignInMethod,
   ProviderSkill,
   ProviderSlashCommand,
   SessionRuntimeStatus,
+  SessionTurnKind,
   ProviderSnapshot,
   ProviderUserInputAnswers,
   RuntimeMode,
   SessionId,
+  SessionForkSource,
   TurnId,
   UserInputQuestions,
 } from '@workspace/contracts'
-import type { ProviderUsageTotals } from './utils/usage-totals'
+import type { ProviderUsageAmounts, ProviderUsageTotals } from './utils/usage-totals'
 import type { ProviderUsageProbe, ProviderUsageUpdate } from './utils/usage-windows'
 
 export type ProviderTurnInput = {
@@ -33,6 +40,8 @@ export type ProviderTurnInput = {
   ephemeral?: boolean
   resumeExisting?: boolean
   interactionMode: InteractionMode
+  /** `compact` compacts the conversation instead of answering `messageText`. */
+  kind?: SessionTurnKind
   messageText: string
   modelSelection: ModelSelection
   sessionId: SessionId
@@ -49,8 +58,14 @@ export type ProviderTurnInput = {
   turnId: TurnId
 }
 
+/** Captured when the fork is created, before the source can advance again. */
+export type ProviderForkStart = SessionForkSource['native']
+
 export type ProviderRuntimeStartInput = {
   runtimeEpoch: string
+  /** The harness agent definition the session runs as; set at the first start. */
+  agent?: string
+  fork?: ProviderForkStart
   resumeExisting?: boolean
   cwd: string
   ephemeral?: boolean
@@ -140,6 +155,9 @@ type ProviderRuntimeSessionState = 'active' | 'idle' | 'archived' | 'closed' | '
 type ProviderRuntimeTurnState = 'completed' | 'failed' | 'interrupted' | 'cancelled'
 
 type ProviderRuntimePlanStepStatus = 'pending' | 'inProgress' | 'completed'
+
+/** `blocked` is a hook that refused the action it guarded, which is not the same as failing. */
+export type ProviderHookOutcome = 'success' | 'blocked' | 'error' | 'cancelled'
 
 export type ProviderRuntimeEvent = ProviderRuntimeEventPayload & { runtimeEpoch: string }
 
@@ -375,6 +393,11 @@ export type ProviderRuntimeEventPayload =
       payload: { unifiedDiff: string }
     })
   | (ProviderRuntimeBaseEvent & {
+      /** Every live, non-ambient background task; replaces the previous set. */
+      type: 'tasks.roster'
+      payload: { tasks: ProviderBackgroundTask[] }
+    })
+  | (ProviderRuntimeBaseEvent & {
       type: 'hook.started'
       payload: { hookEvent: string; hookId: string; hookName: string }
     })
@@ -386,8 +409,10 @@ export type ProviderRuntimeEventPayload =
       type: 'hook.completed'
       payload: {
         exitCode?: number
+        hookEvent?: string
         hookId: string
-        outcome: 'success' | 'error' | 'cancelled'
+        hookName?: string
+        outcome: ProviderHookOutcome
         output?: string
         stderr?: string
         stdout?: string
@@ -482,6 +507,7 @@ export type ProviderCommandCatalogInput = {
 }
 
 export type ProviderCommandCatalogResult = {
+  agents: ProviderAgent[]
   commands: ProviderSlashCommand[]
   skills: ProviderSkill[]
 }
@@ -504,11 +530,25 @@ export type ProviderSessionHistoryInput = {
   cwd: string
 }
 
+export type ProviderForkInput = ProviderSessionHistoryInput & {
+  conversationId: string
+  providerTurnId: string
+}
+
 export type ProviderHistoryMessage = {
   sourceId: string
   role: 'user' | 'assistant'
   text: string
   createdAt: string | null
+}
+
+/** One turn's usage for one model, read back from a transcript of a session begun elsewhere. */
+export type ProviderImportedUsage = ProviderUsageAmounts & {
+  billingKey: string
+  /** Stable across re-reads: the prompt that opened the turn. */
+  turnKey: string
+  model: string
+  recordedAt: string
 }
 
 export type ProviderAdapterRuntime = {
@@ -536,13 +576,22 @@ export type ProviderAdapter = {
   capabilities: ProviderAdapterCapabilities
   driverKind: ProviderDriverKind
   discoverSessions?: (input: ProviderSessionDiscoveryInput) => Promise<ProviderDiscoveredSession[]>
-  /** The CLI this instance spawns. Present on drivers whose sessions resume in a terminal. */
+  /** The CLI this instance spawns. */
   executablePath?: () => Promise<string>
+  /** Drops a remembered executable and version, after the CLI on disk was replaced. */
+  forgetExecutable?: () => void
   readSessionHistory?: (input: ProviderSessionHistoryInput) => Promise<ProviderHistoryMessage[]>
+  readSessionUsage?: (input: ProviderSessionHistoryInput) => Promise<ProviderImportedUsage[]>
+  prepareFork?: (input: ProviderForkInput) => Promise<ProviderForkStart>
   /**
    * One full read of the account's plan windows, outside any turn. Throws when the
    * provider could not answer; the usage store keeps what it had.
    */
+  consumeResetCredit?: (input: {
+    idempotencyKey: string
+    accountKey: string
+    creditId: string
+  }) => Promise<import('@workspace/contracts').ProviderResetCreditOutcome>
   readUsage?: () => Promise<ProviderUsageProbe>
   hasRuntime: (input: { sessionId: SessionId }) => Promise<boolean>
   interruptTurn: (input: ProviderTurnControlInput) => Promise<void>
@@ -553,6 +602,17 @@ export type ProviderAdapter = {
   listCommands?: (input: ProviderCommandCatalogInput) => Promise<ProviderCommandCatalogResult>
   respondApproval: (input: ProviderApprovalResponseInput) => Promise<void>
   respondUserInput: (input: ProviderUserInputResponseInput) => Promise<void>
+  /** The session's MCP servers; null when it has no live provider process to ask. */
+  mcpServers?: (input: { sessionId: SessionId }) => Promise<ProviderMcpServer[] | null>
+  reconnectMcpServer?: (input: { name: string; sessionId: SessionId }) => Promise<void>
+  signInMcpServer?: (input: { name: string; sessionId: SessionId }) => Promise<ProviderMcpSignIn>
+  /** Hooks configured for the checkout; null when the session has no live provider process. */
+  configuredHooks?: (input: {
+    cwd: string
+    sessionId: SessionId
+  }) => Promise<Pick<ProviderSessionHooks, 'errors' | 'hooks'> | null>
+  /** Stops one background task without stopping the agent. */
+  stopBackgroundTask?: (input: { sessionId: SessionId; taskId: string }) => Promise<void>
   prepareRollbackSession: (input: {
     numTurns: number
     sessionId: SessionId

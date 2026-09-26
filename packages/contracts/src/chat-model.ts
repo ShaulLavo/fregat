@@ -270,6 +270,9 @@ export const importedSessionMessageSchema = v.object({
   role: v.picklist(['user', 'assistant']),
   text: v.string(),
   createdAt: isoDateTimeSchema,
+  attachments: v.optional(chatAttachmentsSchema, []),
+  turnId: v.optional(v.nullable(turnIdSchema), null),
+  modelSelection: v.optional(modelSelectionSchema),
 })
 
 export const orchestrationMessageSchema = v.object({
@@ -474,6 +477,26 @@ export const orchestrationSessionLifecycleEntries = {
 } as const
 
 export const sessionOriginSchema = v.picklist(['platform', 'discovered'])
+
+/**
+ * The harness agent definition a session runs as (Claude's `--agent`). Chosen at
+ * start; it selects a system prompt and tools, so it never changes afterwards.
+ */
+export const sessionAgentSchema = v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(200))
+
+/** A turn that compacts the conversation rather than answering a prompt. */
+export const sessionTurnKindSchema = v.picklist(['compact'])
+
+export const sessionForkSourceSchema = v.object({
+  sessionId: sessionIdSchema,
+  turnId: turnIdSchema,
+  native: v.object({
+    conversationId: trimmedNonEmptyStringSchema,
+    boundaryId: trimmedNonEmptyStringSchema,
+  }),
+})
+export type SessionForkSource = v.InferOutput<typeof sessionForkSourceSchema>
+export type SessionTurnKind = v.InferOutput<typeof sessionTurnKindSchema>
 export const sessionAttentionStateSchema = v.picklist(['needs-input', 'working', 'settled'])
 export const sessionAttentionReasonSchema = v.nullable(
   v.picklist(['approval', 'user-input', 'interruption', 'worktree', 'failure', 'plan', 'active']),
@@ -507,6 +530,8 @@ export const orchestrationSessionSchema = v.object({
   id: sessionIdSchema,
   worktreeId: worktreeIdSchema,
   origin: sessionOriginSchema,
+  forkedFrom: v.optional(v.nullable(sessionForkSourceSchema)),
+  agent: v.optional(v.nullable(sessionAgentSchema)),
   ...sessionAttentionEntries,
   title: trimmedNonEmptyStringSchema,
   modelSelection: modelSelectionSchema,

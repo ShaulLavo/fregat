@@ -434,3 +434,104 @@ test('hiding the document cancels the pending chord', () => {
   expect(harness.result.current.pendingChord).toBeNull()
   visibility.mockRestore()
 })
+
+test('leaves AltGraph character entry unclaimed even when its physical key matches a shortcut', () => {
+  const harness = mountChordRuntime('workspace.toggleWallpaper', 'Ctrl+Alt+2')
+  const input = document.createElement('input')
+  document.body.append(input)
+  const event = new KeyboardEvent('keydown', {
+    bubbles: true,
+    cancelable: true,
+    ctrlKey: true,
+    altKey: true,
+    code: 'Digit2',
+    key: '²',
+  })
+  Object.defineProperty(event, 'getModifierState', { value: (key: string) => key === 'AltGraph' })
+  act(() => {
+    input.dispatchEvent(event)
+  })
+  expect(event.defaultPrevented).toBe(false)
+  expect(harness.calls).toEqual([])
+  input.remove()
+})
+
+test.each([
+  ['workspace.fixDiagnostic', 'fixDiagnostic'],
+  ['workspace.toggleCheckpointChange', 'toggleCheckpointChange'],
+] as const)(
+  'dispatches the rebound %s action to its registered target with exact modifiers',
+  (command, capability) => {
+    const harness = mountChordRuntime(command, 'Ctrl+U')
+    const element = document.createElement('div')
+    document.body.append(element)
+    let calls = 0
+    const registration = harness.focus.register({
+      area: 'problems',
+      id: { kind: 'problems' },
+      element,
+      capabilities: {
+        [capability]: () => {
+          calls++
+          return true
+        },
+      },
+      onIntent: () => false,
+    })
+    expect(pressKey(element, { key: 'u', ctrlKey: true, shiftKey: true }).defaultPrevented).toBe(
+      false,
+    )
+    expect(calls).toBe(0)
+    expect(pressKey(element, { key: 'u', ctrlKey: true }).defaultPrevented).toBe(true)
+    expect(calls).toBe(1)
+    registration.unregister()
+    element.remove()
+  },
+)
+
+test.each([
+  ['Ctrl+Alt+2', '2', 'Digit2'],
+  ['Ctrl+Alt+B', 'b', 'KeyB'],
+  ['Ctrl+Alt+ArrowRight', 'ArrowRight', 'ArrowRight'],
+] as const)('keeps a logical AltGraph shortcut available: %s', (binding, key, code) => {
+  const harness = mountChordRuntime('workspace.toggleWallpaper', binding)
+  const event = new KeyboardEvent('keydown', {
+    bubbles: true,
+    cancelable: true,
+    ctrlKey: true,
+    altKey: true,
+    key,
+    code,
+  })
+  Object.defineProperty(event, 'getModifierState', {
+    value: (modifier: string) => modifier === 'AltGraph',
+  })
+  act(() => {
+    document.body.dispatchEvent(event)
+  })
+  expect(event.defaultPrevented).toBe(true)
+  expect(harness.calls).toEqual([false])
+})
+
+test.each([
+  ['Ctrl+Alt+]', ']', 'Digit9'],
+  ['Ctrl+Alt+[', '[', 'Digit8'],
+] as const)('leaves a character AltGraph typed to the text control: %s', (binding, key, code) => {
+  const harness = mountChordRuntime('workspace.toggleWallpaper', binding)
+  const event = new KeyboardEvent('keydown', {
+    bubbles: true,
+    cancelable: true,
+    ctrlKey: true,
+    altKey: true,
+    key,
+    code,
+  })
+  Object.defineProperty(event, 'getModifierState', {
+    value: (modifier: string) => modifier === 'AltGraph',
+  })
+  act(() => {
+    document.body.dispatchEvent(event)
+  })
+  expect(event.defaultPrevented).toBe(false)
+  expect(harness.calls).toEqual([])
+})

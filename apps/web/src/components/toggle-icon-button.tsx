@@ -9,6 +9,7 @@ export function ToggleIconButton({
   active,
   command,
   icon,
+  keyShortcuts,
   label,
   tooltipSide = 'bottom',
   onClick,
@@ -17,6 +18,7 @@ export function ToggleIconButton({
   /** The command the click stands for; its bound key shows in the tooltip. */
   readonly command?: PlatformCommandId
   readonly icon: ReactNode
+  readonly keyShortcuts?: string
   readonly label: string
   readonly tooltipSide?: 'left' | 'right' | 'bottom'
   readonly onClick: () => void
@@ -27,6 +29,7 @@ export function ToggleIconButton({
       <TooltipTrigger
         render={
           <Button
+            aria-keyshortcuts={keyShortcuts}
             aria-label={label}
             aria-pressed={active}
             className={cn('text-muted-foreground', active && 'bg-accent text-accent-foreground')}

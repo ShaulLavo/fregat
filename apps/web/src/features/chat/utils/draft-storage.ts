@@ -6,6 +6,7 @@ import {
   interactionModeSchema,
   projectIdSchema,
   worktreeIdSchema,
+  providerAgentSelectionSchema,
   sessionWorktreeTargetSchema,
   modelSelectionSchema,
   runtimeModeSchema,
@@ -47,6 +48,8 @@ const draftIdentitySchema = v.object({
   rootPath: v.string(),
   baseWorktreeId: worktreeIdSchema,
   worktreeTarget: sessionWorktreeTargetSchema,
+  /** The agent definition the new session runs as; null runs the harness default. */
+  agent: v.optional(v.nullable(providerAgentSelectionSchema)),
   createdAt: v.string(),
 })
 export type DraftIdentity = v.InferOutput<typeof draftIdentitySchema>

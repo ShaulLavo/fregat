@@ -54,7 +54,7 @@ export class WorktreeCommandPreparation {
   }
 
   async prepare(
-    command: Exclude<ClientOrchestrationCommand, { type: 'project.create' }>,
+    command: Exclude<ClientOrchestrationCommand, { type: 'project.create' | 'session.fork' }>,
     fingerprint: string,
   ): Promise<OrchestrationCommand> {
     const target = creationTarget(command)

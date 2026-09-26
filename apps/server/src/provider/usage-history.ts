@@ -1,14 +1,17 @@
 import type {
   ProviderUsageCostSource,
+  ProviderUsageDayModel,
   ProviderUsageDayRow,
   ProviderUsageHistory,
   ProviderUsageHistoryQuery,
   ProviderUsageModelRow,
   ProviderUsagePurpose,
   ProviderUsagePurposeRow,
+  ProviderUsageRates,
+  ProviderUsageSessionTotal,
 } from '@workspace/contracts'
 import { usageTokenCount } from '@workspace/contracts'
-import { gte, sql } from 'drizzle-orm'
+import { eq, gte, sql } from 'drizzle-orm'
 import type { PlatformDatabase } from '../db/client'
 import { providerUsageTurns as turns } from '../db/schema'
 
@@ -48,10 +51,14 @@ export class ProviderUsageHistoryReader {
     const since = rangeStart(this.now(), query)
     const groups = this.groups(query, since)
 
+    const rates = this.modelRates(since)
     return {
       daily: dailyRows(groups),
       days: query.days,
-      models: modelRows(groups),
+      models: modelRows(groups).map((row) => ({
+        ...row,
+        rates: row.costSource === 'catalog' ? (rates.get(modelKey(row)) ?? null) : null,
+      })),
       purposes: this.purposeRows(groups, since),
       since,
       totals: {
@@ -63,6 +70,56 @@ export class ProviderUsageHistoryReader {
           usageTokenCount,
         ),
       },
+    }
+  }
+
+  /** One set of rates per model, only when every catalog-priced turn in the range used it. */
+  private modelRates(since: string) {
+    const rows = this.database
+      .selectDistinct({
+        driverKind: turns.driverKind,
+        model: turns.model,
+        priceSnapshot: turns.priceSnapshot,
+      })
+      .from(turns)
+      .where(sql`${turns.recordedAt} >= ${since} AND ${turns.priceSnapshot} IS NOT NULL`)
+      .all()
+    const byModel = new Map<string, ProviderUsageRates[]>()
+    for (const row of rows) {
+      if (!row.priceSnapshot) continue
+      const key = modelKey(row)
+      const { cacheRead, cacheWrite, input, output } = row.priceSnapshot
+      byModel.set(key, [...(byModel.get(key) ?? []), { cacheRead, cacheWrite, input, output }])
+    }
+    const rates = new Map<string, ProviderUsageRates>()
+    for (const [key, entries] of byModel) {
+      const distinct = new Set(entries.map((entry) => JSON.stringify(entry)))
+      if (distinct.size === 1 && entries[0]) rates.set(key, entries[0])
+    }
+    return rates
+  }
+
+  /** Everything recorded for one session, every purpose included. */
+  readSession(sessionId: string): ProviderUsageSessionTotal {
+    const row = this.database
+      .select({
+        cacheReadTokens: sql<number>`coalesce(sum(${turns.cacheReadTokens}), 0)`,
+        cacheWriteTokens: sql<number>`coalesce(sum(${turns.cacheWriteTokens}), 0)`,
+        costUsd: sql<number | null>`sum(${turns.costUsd})`,
+        inputTokens: sql<number>`coalesce(sum(${turns.inputTokens}), 0)`,
+        outputTokens: sql<number>`coalesce(sum(${turns.outputTokens}), 0)`,
+        turns: sql<number>`count(DISTINCT ${turns.turnId})`,
+        unpricedTokens: sql<number>`coalesce(sum(CASE WHEN ${turns.costUsd} IS NULL THEN ${turns.inputTokens} + ${turns.outputTokens} + ${turns.cacheReadTokens} + ${turns.cacheWriteTokens} ELSE 0 END), 0)`,
+      })
+      .from(turns)
+      .where(eq(turns.sessionId, sessionId))
+      .get()
+
+    return {
+      costUsd: row?.costUsd ?? null,
+      tokens: row ? usageTokenCount(row) : 0,
+      turns: row?.turns ?? 0,
+      unpricedTokens: row?.unpricedTokens ?? 0,
     }
   }
 
@@ -137,10 +194,16 @@ function offsetModifier(utcOffsetMinutes: number) {
   return `${utcOffsetMinutes >= 0 ? '+' : ''}${utcOffsetMinutes} minutes`
 }
 
-function modelRows(groups: readonly UsageGroup[]): ProviderUsageModelRow[] {
-  const byModel = new Map<string, ProviderUsageModelRow>()
+function modelKey(row: { readonly driverKind: string; readonly model: string }) {
+  return `${row.driverKind}\0${row.model}`
+}
+
+type ModelTotals = Omit<ProviderUsageModelRow, 'rates'>
+
+function modelRows(groups: readonly UsageGroup[]): ModelTotals[] {
+  const byModel = new Map<string, ModelTotals>()
   for (const group of groups) {
-    const key = `${group.driverKind}\0${group.model}`
+    const key = modelKey(group)
     const row = byModel.get(key)
     byModel.set(key, row ? addModelGroup(row, group) : modelRow(group))
   }
@@ -151,7 +214,7 @@ function modelRows(groups: readonly UsageGroup[]): ProviderUsageModelRow[] {
   )
 }
 
-function modelRow(group: UsageGroup): ProviderUsageModelRow {
+function modelRow(group: UsageGroup): ModelTotals {
   return {
     cacheReadTokens: group.cacheReadTokens,
     cacheWriteTokens: group.cacheWriteTokens,
@@ -167,7 +230,7 @@ function modelRow(group: UsageGroup): ProviderUsageModelRow {
 }
 
 /** The weakest source wins, so a model with any unpriced usage says its cost is incomplete. */
-function addModelGroup(row: ProviderUsageModelRow, group: UsageGroup): ProviderUsageModelRow {
+function addModelGroup(row: ModelTotals, group: UsageGroup): ModelTotals {
   const costSource =
     COST_SOURCE_RANK[group.costSource] > COST_SOURCE_RANK[row.costSource]
       ? group.costSource
@@ -189,15 +252,45 @@ function addModelGroup(row: ProviderUsageModelRow, group: UsageGroup): ProviderU
 function dailyRows(groups: readonly UsageGroup[]): ProviderUsageDayRow[] {
   const byDay = new Map<string, ProviderUsageDayRow>()
   for (const group of groups) {
-    const row = byDay.get(group.day) ?? { costUsd: null, day: group.day, tokens: 0 }
+    const row = byDay.get(group.day) ?? {
+      costUsd: null,
+      day: group.day,
+      models: [],
+      tokens: 0,
+      unpricedTokens: 0,
+    }
+    const tokens = usageTokenCount(group)
     byDay.set(group.day, {
-      ...row,
       costUsd: addCost(row.costUsd, group.costUsd),
-      tokens: row.tokens + usageTokenCount(group),
+      day: group.day,
+      models: addDayModel(row.models, group, tokens),
+      tokens: row.tokens + tokens,
+      unpricedTokens: row.unpricedTokens + (group.costSource === 'none' ? tokens : 0),
     })
   }
 
   return [...byDay.values()].toSorted((left, right) => left.day.localeCompare(right.day))
+}
+
+function addDayModel(
+  models: readonly ProviderUsageDayModel[],
+  group: UsageGroup,
+  tokens: number,
+): ProviderUsageDayModel[] {
+  const existing = models.find(
+    (model) => model.model === group.model && model.driverKind === group.driverKind,
+  )
+  if (!existing)
+    return [
+      ...models,
+      { costUsd: group.costUsd, driverKind: group.driverKind, model: group.model, tokens },
+    ]
+
+  return models.map((model) =>
+    model === existing
+      ? { ...model, costUsd: addCost(model.costUsd, group.costUsd), tokens: model.tokens + tokens }
+      : model,
+  )
 }
 
 function addCost(left: number | null, right: number | null) {

@@ -24,6 +24,7 @@ export function useTooltipLayer(describedById: string) {
   const timer = useRef<number | undefined>(undefined)
   const closedAt = useRef(0)
   const anchor = useRef<HTMLElement | null>(null)
+  const pressed = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
     function clearTimer() {
@@ -58,12 +59,28 @@ export function useTooltipLayer(describedById: string) {
     }
 
     function show(event: Event) {
-      open(tooltipTargetFor(event.target))
+      open(tooltipTargetFor(eventOrigin(event)))
+    }
+
+    // Chromium can skip `pointerover` inside a shadow root after a click there; moves still say
+    // where the pointer is, so a changed owner opens or hides here too.
+    function follow(event: Event) {
+      const next = tooltipTargetFor(eventOrigin(event))
+      const element = next?.element ?? null
+      // A press hides the tooltip; it stays hidden over that control until the pointer leaves it.
+      if (element !== pressed.current) pressed.current = null
+      if (element === anchor.current || (element !== null && element === pressed.current)) return
+      open(next)
+    }
+
+    function hideOnPress(event: Event) {
+      pressed.current = tooltipTargetFor(eventOrigin(event))?.element ?? null
+      hide()
     }
 
     // Pointer focus is ignored, not treated as a leave: a menu focuses the item under the pointer.
     function showOnFocus(event: FocusEvent) {
-      const next = tooltipTargetFor(event.target)
+      const next = tooltipTargetFor(eventOrigin(event))
       if (!next?.element.matches(':focus-visible')) return
 
       open(next)
@@ -71,7 +88,8 @@ export function useTooltipLayer(describedById: string) {
 
     // Only the anchor's own blur ends it: focus leaving some other menu item is not a leave.
     function hideOnBlur(event: FocusEvent) {
-      if (!(event.target instanceof Node) || !anchor.current?.contains(event.target)) return
+      const origin = eventOrigin(event)
+      if (!(origin instanceof Node) || !anchor.current?.contains(origin)) return
 
       hide()
     }
@@ -84,14 +102,16 @@ export function useTooltipLayer(describedById: string) {
 
     // Capture: a row that stops propagation must not strand the tooltip open.
     document.addEventListener('pointerover', show, true)
-    document.addEventListener('pointerdown', hide, true)
+    document.addEventListener('pointermove', follow, true)
+    document.addEventListener('pointerdown', hideOnPress, true)
     document.addEventListener('focusin', showOnFocus, true)
     document.addEventListener('focusout', hideOnBlur, true)
     document.addEventListener('keydown', hideOnEscape, true)
     return () => {
       clearTimer()
       document.removeEventListener('pointerover', show, true)
-      document.removeEventListener('pointerdown', hide, true)
+      document.removeEventListener('pointermove', follow, true)
+      document.removeEventListener('pointerdown', hideOnPress, true)
       document.removeEventListener('focusin', showOnFocus, true)
       document.removeEventListener('focusout', hideOnBlur, true)
       document.removeEventListener('keydown', hideOnEscape, true)
@@ -122,4 +142,9 @@ export function useTooltipLayer(describedById: string) {
   }, [target, describedById])
 
   return target
+}
+
+// A shadow root retargets events to its host; the element under the pointer is the path's first.
+function eventOrigin(event: Event) {
+  return event.composedPath()[0] ?? event.target
 }

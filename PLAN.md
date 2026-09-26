@@ -112,12 +112,9 @@ Default and VS Code presets, conditional bindings, and Settings resolution diagn
 
 See [shared keymap delivery](docs/keymap/delivery.md) for the paired revision, verification, and boundaries.
 
-[Plan 080](plans/080-platform-keybinding-modes.md) is the proposed follow-up for Platform and VS Code
-keyboard modes across the app. Platform defaults start from VS Code bindings and document intentional
-differences. Whole-sidebar Cmd+B is the first milestone. Editor tabs and chats share navigation keys,
-while numbered panel shortcuts use a separate combination. Held-modifier hints follow the matching
-targets. Interaction rules are confirmed; the exact keys remain proposed. Implementation follows
-the delivered shared runtime and has not started.
+Plan 080 is done: Platform and VS Code keyboard modes across the app, whole-sidebar Cmd+B, shared
+tab-or-chat navigation, numbered panels and held-modifier badges. [Keyboard modes](docs/keymap/modes.md)
+records the per-host comparison and the owner checks still pending on the Mac.
 
 ## Document contribution refactor
 
@@ -408,6 +405,10 @@ CodeMirror 6 decorations and Lexical's decorator nodes, and gates Plan 108 Phase
 Obsidian mode, and the question of whether the chat composer still needs Lexical.
 Decided 2026-09-25: owner — 111's research is authorized with the composer as its first consumer,
 and runs before the next wave.
+[Plan 176](plans/176-markdown-parser.md) replaces Plan 108 D5 (decided 2026-09-26: owner): it
+measures which parser drives live preview, with tree-sitter as the lead against `@lezer/markdown`, a
+Rust parser and remark, and whether the winner can also replace remark in chat. Plan 108 Phase 2
+waits on it.
 [Plan 171](plans/171-composer-on-our-editor.md) is that composer migration: it inventories what
 the composer uses Lexical for and orders the Editor gaps to close, with 111 first (decided
 2026-09-25: owner — delete Lexical; the replacement is our own editor).
@@ -515,7 +516,7 @@ Suggested order:
 
 1. ~~Plan 138~~ — implemented 2026-09-24.
 2. Quick wins: ~~Plan 141 Phases 1–3~~ (meter, per-turn recording, usage page; 2026-09-25), the
-   small Plan 145 plans (~~approval-rules~~, merged in `89c58188`), and the small new Plan 126 rows.
+   small Plan 145 plans (~~approval-rules~~, merged in `89c58188`; ~~the rest~~, lane L3), and the small new Plan 126 rows.
 3. ~~Plan 142~~ — implemented 2026-09-25 (completion wave, lane L5). The phone checks and the
    owner question are in the [delivery record](docs/web-push.md).
 4. The research phases of Plans 139 and 140. Plan 140's diagnostics work waits on Plans 087 and
@@ -537,6 +538,8 @@ of the plans, both logs and the service journal named what stands in the way. Th
 | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | 146 (done)                                     | Dev and prod stop sharing `~/.platform`; each `agent:browser` run gets its own server and state                          |
 | [147](plans/147-log-hygiene-and-noise-gate.md) | Producer fixes, level rules, the reaper give-up, ACK timeout vs overflow, a `logs:census` gate                           |
+| [175](plans/175-large-folder-open.md)          | Opening a huge folder: watch limit, unreadable folders, switch not cancelled by clicks, bounded prefetch                 |
+| [177](plans/177-prefetch-every-press.md)       | Prefetch on intent for every async press (diffs, chats, quick open, search), per-surface toggles                         |
 | [148](plans/148-restart-when-idle.md)          | `deploy --server` stages; the server restarts when no turn is running                                                    |
 | [149](plans/149-terminal-host.md)              | A PTY host that survives server restarts                                                                                 |
 | 150 (done)                                     | Remote servers are checked for protocol; a stale one relaunches or reads "Server out of date"                            |
@@ -553,7 +556,11 @@ Suggested order:
 5. ~~Plan 150~~ — done 2026-09-25 (completion wave): protocol check at both ends of the SSH
    launch, stale relaunch, structured machine errors, "Server out of date". Plan 151 done 2026-09-25
    (completion wave; live Mac update is an owner check). Plan 152 done the same day.
-6. Then Claude rewind and fork ([Plan 145 fork](plans/145-harness-controls/fork.md), Plan 126
+6. Plan 175, reported 2026-09-26: opening `/work` froze the server for 10.8 s and took 92% of the
+   machine's inotify watches. Phases 1–2 need no decision.
+7. Plan 177's research (requested 2026-09-26). Its Phase 0 first-paint measurement is also the
+   baseline for Plans 170 and 176.
+8. Then Claude rewind and fork ([Plan 145 fork](plans/145-harness-controls.md), done, Plan 126
    RUNTIME-01) and the Plan 139 research phase.
 
 ## UI refresh lane
@@ -562,16 +569,21 @@ Requested 2026-09-25. A survey of 14 component libraries
 ([docs/ui-research](docs/ui-research/README.md)) listed what to take for the base components, chat
 surfaces, the file picker and the site. The owner is taking it one topic at a time.
 
-| Plan                                        | Owns                                                                                                       |
-| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| 160 (done, lane L2)                         | Reasoning fold, turn receipts, live tail, model marker, tool details, plan steps, subagents, ultra sparkle |
-| 161 (done, lane L2)                         | Approval lifecycle, stopped turns, streaming holds, folding rules, hostile-state scenarios                 |
-| [162](plans/162-context-and-cost.md)        | Context breakdown, usable-window fullness, session totals, usage-page honesty (after Plan 141)             |
-| 163 (done, lane L2)                         | Screenshot attachment in the composer (export lives in Plan 145's export plan)                             |
-| 165 (done)                                  | Nerd Fonts + Fontsource on demand; interface-font setting; curated autocomplete picker                     |
-| [166](plans/166-shortcuts-editor.md)        | Keyboard shortcuts page rebuilt from VS Code research: full-width list, save on Enter, several per command |
-| [155](plans/155-site-demo-replica.md)       | Placeholder: the site hero becomes an animated replica of the app, like cursor.com                         |
-| [156](plans/156-documents-in-the-editor.md) | Placeholder, far future: PDF, DOCX, XLSX, PPTX and CSV as editor documents agents can edit                 |
+| Plan                                            | Owns                                                                                                                      |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| 160 (done, lane L2)                             | Reasoning fold, turn receipts, live tail, model marker, tool details, plan steps, subagents, ultra sparkle                |
+| 161 (done, lane L2)                             | Approval lifecycle, stopped turns, streaming holds, folding rules, hostile-state scenarios                                |
+| ~~162~~                                         | Done 2026-09-25 (lane L3): context breakdown, usable window, session total, usage-page honesty                            |
+| 163 (done, lane L2)                             | Screenshot attachment in the composer (export shipped with Plan 145)                                                      |
+| 165 (done)                                      | Nerd Fonts + Fontsource on demand; interface-font setting; curated autocomplete picker                                    |
+| [166](plans/166-shortcuts-editor.md)            | Keyboard shortcuts page rebuilt from VS Code research: full-width list, save on Enter, several per command                |
+| [155](plans/155-site-demo-replica.md)           | Placeholder: the site hero becomes an animated replica of the app, like cursor.com                                        |
+| [156](plans/156-documents-in-the-editor.md)     | Placeholder, far future: PDF, DOCX, XLSX, PPTX and CSV as editor documents agents can edit                                |
+| [178](plans/178-tree-in-the-app.md)             | Plan of plans: the file tree rebuilt on app primitives (VirtualList, useListbox, dnd-kit, icons, Tailwind) at full parity |
+| [179](plans/179-isolating-foreign-content.md)   | Where a shadow root earns its place: mermaid, previews, an editor style-recalc experiment                                 |
+| [180](plans/180-file-icon-variants.md)          | Quick research: more glyphs, variants and per-mode colours from the icon pack we already use                              |
+| [181](plans/181-chat-timeline-end-anchoring.md) | The chat timeline on TanStack's end anchoring after a 3.14.13 upgrade; prerequisite to 178's virtualization               |
+| [182](plans/182-search-view-rendering.md)       | Quick research: why the full search view renders slowly, and what would fix it                                            |
 
 Suggested order:
 
@@ -586,6 +598,11 @@ Suggested order:
 6. Plans 155 and 156 are placeholders; their research phases run when the site or documents matter.
 7. Plan 166 any time; its research phase runs first, and it takes 102 P3, 157 and 080 from `main` as
    they land.
+8. Plan 178: the parity harness first, then out-of-the-root and app-owned state; Q1–Q5 before the
+   sub-plans they gate. Plan 179's Phase 0 instruments (style recalc split out of `trace`) any time;
+   its editor experiment reuses Plan 178's scroll baseline.
+9. Plan 181 before Plan 178's virtualization sub-plan: it upgrades TanStack Virtual and makes the
+   `VirtualList` key stable, which 178 builds on. Plan 182's research any time.
 
 ## Parked plans
 

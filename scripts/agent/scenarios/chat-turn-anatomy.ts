@@ -11,8 +11,20 @@ const FRAME = 'apps/web/src/features/chat/utils/work-log.ts:30'
 
 type Evidence = {
   liveRowHeights: number[]
-  reducedMotionCell: { animationName: string; opacity: string } | null
-  ultrathinkRanges: number
+  maxBurst: { sweeps: number; rainbowOnTrigger: number } | null
+  reducedMotionSweep: string | null
+  caret: { label: string; painted: string | null; html: string }[]
+  ultra: {
+    levelBurst: boolean
+    wordBurst: boolean
+    burstMs: number
+    triggerLabel: string | null
+    word: string | null
+    wordDrift: string
+    driftAtRest: string
+    driftOnHover: string
+    rainbowRows: string[]
+  } | null
 }
 
 const evidenceByPage = new WeakMap<Page, Evidence>()
@@ -21,16 +33,22 @@ const evidenceByPage = new WeakMap<Page, Evidence>()
 export const chatTurnAnatomy: Scenario = {
   name: 'chat-turn-anatomy',
   description:
-    'A scripted mock turn: reasoning fold, fixed live tail, settled summary with failures, stack-frame links, dropped plan step, agent tree, effort sparkle, the model marker and the reader-kept reasoning fold.',
+    'A scripted mock turn: reasoning fold, fixed live tail, settled summary with failures, stack-frame links, dropped plan step, agent tree, max and ultra effort bursts, the ultra rainbow, the model marker and the reader-kept reasoning fold.',
   inspect: async (page) => evidenceByPage.get(page) ?? null,
   async run(page, { step }) {
-    const evidence: Evidence = { liveRowHeights: [], reducedMotionCell: null, ultrathinkRanges: 0 }
+    const evidence: Evidence = {
+      liveRowHeights: [],
+      maxBurst: null,
+      reducedMotionSweep: null,
+      caret: [],
+      ultra: null,
+    }
     evidenceByPage.set(page, evidence)
     const { base, cleanup, sessionId } = await createScriptedSession(page, await openChat(page))
     try {
       await firstTurn(page, step, evidence)
       await verifyTurnDuration(page, `${base}/orchestration`, sessionId)
-      await effortSparkle(page, step, evidence)
+      await maxBurst(page, step, evidence)
       await secondTurn(page, step)
       await thirdTurn(page, step)
       await ultrathinkWord(page, step, evidence)
@@ -99,22 +117,34 @@ async function verifyTurnDuration(page: Page, orchestration: string, sessionId: 
   ok(!/Worked for \d+ms/.test(await fold.innerText()), 'The fold reports seconds of work')
 }
 
-async function effortSparkle(page: Page, step: Step, evidence: Evidence) {
+async function maxBurst(page: Page, step: Step, evidence: Evidence) {
   await selectors.modelOptions(page).click()
   await page.getByRole('menuitemradio', { name: 'Max', exact: true }).click()
-  const cells = selectors.modelOptions(page).locator('[data-effort-sparkle="max"] > span')
-  await cells.first().waitFor({ state: 'attached' })
-  await step('sparkle-max')
+  const burst = selectors.effortBurst(page, 'max')
+  await burst.waitFor({ state: 'attached' })
+  // Mid-sweep, so the screenshot shows the band crossing.
+  await page.waitForTimeout(300)
+  await step('burst-max')
+  evidence.maxBurst = {
+    sweeps: await burst.locator('.effort-sweep').count(),
+    rainbowOnTrigger: await selectors.effortRainbow(selectors.modelOptions(page)).count(),
+  }
+  await burst.waitFor({ state: 'detached' })
+  equal(evidence.maxBurst.sweeps, 1, 'Max plays the smaller, single-band burst')
+  equal(evidence.maxBurst.rainbowOnTrigger, 0, 'Max leaves the trigger plain')
 
+  // Leaving and re-entering max replays it; reduced motion keeps only the wash.
   await page.emulateMedia({ reducedMotion: 'reduce' })
-  evidence.reducedMotionCell = await cells.first().evaluate((cell) => {
-    const style = getComputedStyle(cell)
-    return { animationName: style.animationName, opacity: style.opacity }
-  })
-  await step('sparkle-reduced-motion')
+  await selectors.modelOptions(page).click()
+  await page.getByRole('menuitemradio', { name: 'High', exact: true }).click()
+  await selectors.modelOptions(page).click()
+  await page.getByRole('menuitemradio', { name: 'Max', exact: true }).click()
+  evidence.reducedMotionSweep = await burst
+    .locator('.effort-sweep')
+    .evaluate((sweep) => getComputedStyle(sweep).display)
+  await burst.waitFor({ state: 'detached' })
   await page.emulateMedia({ reducedMotion: 'no-preference' })
-  equal(evidence.reducedMotionCell.animationName, 'none', 'Reduced motion stops the twinkle')
-  ok(Number(evidence.reducedMotionCell.opacity) > 0, 'Reduced motion keeps a still sprinkle')
+  equal(evidence.reducedMotionSweep, 'none', 'Reduced motion drops the moving band')
 }
 
 async function secondTurn(page: Page, step: Step) {
@@ -164,14 +194,129 @@ async function thirdTurn(page: Page, step: Step) {
 }
 
 async function ultrathinkWord(page: Page, step: Step, evidence: Evidence) {
+  const trigger = selectors.modelOptions(page)
+  const burst = selectors.effortBurst(page, 'ultra')
+  const burstPlays = () =>
+    burst
+      .waitFor({ state: 'attached', timeout: 2_000 })
+      .then(() => true)
+      .catch(() => false)
+
+  // An `ultra` level id, the one Codex uses.
+  await trigger.click()
+  await page.getByRole('menuitemradio', { name: 'Ultra', exact: true }).click()
+  const levelBurst = await burstPlays()
+  await page.waitForTimeout(350)
+  await step('burst-ultra')
+  await burst.waitFor({ state: 'detached', timeout: 5_000 })
+
+  // Ultrathink from the menu is a stored level: the prompt stays empty.
+  await trigger.click()
+  await page.getByRole('menuitemradio', { name: 'Ultrathink', exact: true }).click()
+  const storedBurst = await burstPlays()
+  await step('menu-ultrathink-stored')
+  const storedPrompt = await selectors.chatMessage(page).innerText()
+  const storedLabel = await selectors.effortRainbow(trigger).textContent()
+  await burst.waitFor({ state: 'detached', timeout: 5_000 })
+  await trigger.click()
+  await page.getByRole('menuitemradio', { name: 'Ultra', exact: true }).click()
+  await burst.waitFor({ state: 'detached', timeout: 5_000 })
+
+  // Ultra to a typed Ultrathink is a new level, so it plays again.
   await selectors.chatMessage(page).fill('Please ultrathink about the parser.')
-  await page.waitForFunction(() => (CSS.highlights.get('ultrathink-0')?.size ?? 0) > 0)
-  evidence.ultrathinkRanges = await page.evaluate(
-    () => CSS.highlights.get('ultrathink-0')?.size ?? 0,
-  )
-  ok(evidence.ultrathinkRanges > 0, 'The composer colours the word ultrathink')
+  const wordBurst = await burstPlays()
+  const burstStart = Date.now()
+  const word = selectors.effortRainbow(selectors.chatMessage(page))
+  await word.waitFor()
   await step('composer-ultrathink')
+  await burst.waitFor({ state: 'detached', timeout: 5_000 })
+  const burstMs = Date.now() - burstStart
+
+  const label = selectors.effortRainbow(trigger)
+  const playState = (locator: Locator) =>
+    locator.evaluate((node) => getComputedStyle(node).animationPlayState)
+  const driftAtRest = await playState(label)
+  await trigger.hover()
+  const driftOnHover = await playState(label)
+  await step('trigger-ultra-hover')
+  await trigger.click()
+  await page.getByRole('menuitemradio', { name: 'Ultrathink', exact: true }).waitFor()
+  const rainbowRows = await page
+    .getByRole('menuitemradio')
+    .filter({ has: page.locator('.rainbow-text') })
+    .allInnerTexts()
+  // The word in the body locks the menu, so its rows are read, not hovered.
+  await step('menu-ultra-rows')
+  await page.keyboard.press('Escape')
+  const replayed = await burst.count()
+  const caret = await caretKeepsRainbow(page, word, step)
+
+  evidence.ultra = {
+    levelBurst,
+    wordBurst,
+    burstMs,
+    triggerLabel: await label.textContent(),
+    word: await word.textContent(),
+    wordDrift: await playState(word),
+    driftAtRest,
+    driftOnHover,
+    rainbowRows,
+  }
+  evidence.caret = caret
+  ok(levelBurst, 'Picking Ultra plays the ultra burst')
+  ok(wordBurst, 'Ultra to Ultrathink plays it again')
+  ok(burstMs < 2_500, `The ultra burst ends on its own: ${burstMs}ms`)
+  equal(replayed, 0, 'Hovering and opening the menu do not replay it')
+  ok(storedBurst, 'Ultrathink from the menu plays the burst')
+  equal(storedPrompt.trim(), '', 'Ultrathink from the menu leaves the prompt alone')
+  equal(storedLabel, 'Ultrathink', 'The trigger paints the stored Ultrathink')
+  equal(evidence.ultra.word, 'ultrathink', 'The composer word is one rainbow span')
+  equal(evidence.ultra.wordDrift, 'running', 'The composer word drifts')
+  equal(evidence.ultra.triggerLabel, 'Ultrathink', 'The trigger paints the ultra effort')
+  equal(driftAtRest, 'paused', 'The trigger rainbow rests until hovered')
+  equal(driftOnHover, 'running', 'Hover sets the trigger rainbow drifting')
+  equal(rainbowRows.join(), 'Ultra,Ultrathink', 'Only the ultra rows wear the rainbow')
+  for (const probe of caret)
+    equal(probe.painted, 'ultrathink', `The word keeps its rainbow: ${probe.label} ${probe.html}`)
   await selectors.chatMessage(page).fill('')
+}
+
+/** A caret next to, inside, or typing beside the word must leave it painted. */
+async function caretKeepsRainbow(page: Page, word: Locator, step: Step) {
+  const composer = selectors.chatMessage(page)
+  const probes: { label: string; painted: string | null; html: string }[] = []
+  const probe = async (label: string) => {
+    await page.waitForTimeout(200)
+    await step(`caret-${label.replaceAll(' ', '-')}`)
+    probes.push({
+      label,
+      painted: await selectors
+        .effortRainbow(composer)
+        .first()
+        .textContent({ timeout: 500 })
+        .catch(() => null),
+      html: await composer.innerHTML(),
+    })
+  }
+  const box = await word.boundingBox()
+  if (!box) throw new Error('the painted word has no box')
+  await page.mouse.click(box.x + box.width - 1, box.y + box.height / 2)
+  await probe('caret after the word')
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2)
+  await probe('caret inside the word')
+  await page.keyboard.press('End')
+  await page.keyboard.type(' now', { delay: 40 })
+  await probe('typing at the end')
+  await page.mouse.click(box.x + 1, box.y + box.height / 2)
+  await probe('caret before the word')
+  await composer.fill('')
+  await composer.click()
+  await page.keyboard.type('Please ultrathink', { delay: 40 })
+  await probe('typed the word')
+  await page.keyboard.type(' about it', { delay: 40 })
+  await probe('typing after the word')
+  await composer.fill('Please ultrathink about the parser.')
+  return probes
 }
 
 async function stackFrame(page: Page, step: Step) {
@@ -200,8 +345,11 @@ async function streamingReasoning(page: Page) {
 /** The same transcript in dark mode and at cozy density. */
 async function otherLooks(page: Page, step: Step, base: string) {
   await writeSettings(page, base, [{ kind: 'set', key: 'workbench.colorTheme', value: 'dark' }])
-  await page.waitForTimeout(500)
+  await selectors.chatMessage(page).fill('Please ultrathink about the parser.')
+  // Past the ultra burst, so the shot shows the resting rainbow.
+  await page.waitForTimeout(1_600)
   await step('dark-mode')
+  await selectors.chatMessage(page).fill('')
   await writeSettings(page, base, [
     { kind: 'reset', keys: ['workbench.colorTheme'] },
     { kind: 'set', key: 'workbench.density', value: 'cozy' },

@@ -4,12 +4,12 @@ import {
   type MarkdownProps,
 } from '@workspace/markdown/components/markdown'
 import { CodeHighlighterContext } from '@workspace/markdown/providers/code-highlighter-context'
-import { useCodeHighlighter } from '@/lib/code-highlight/hooks/use-code-highlighter'
 import { cn } from '@workspace/ui/lib/utils'
 import { useQueryClient } from '@tanstack/react-query'
 import { Fragment, type ClipboardEvent } from 'react'
 
 import { serverEndpoint } from '@/lib/client'
+import { useCodeHighlighter } from '@/lib/code-highlight/hooks/use-code-highlighter'
 import { originForQueryClient } from '@/lib/environments/state/query-clients'
 import { useEnvironmentsStore } from '@/lib/environments/state/store'
 
@@ -49,11 +49,11 @@ export function AssistantMarkdown({
   streaming?: boolean
   text: string
 }) {
+  const highlighter = useCodeHighlighter()
   const { openFileReference, rootPath, workspacePath } = useOpenFileReference()
   const owner = originForQueryClient(useQueryClient())
   const environment = useEnvironmentsStore((state) => state.entries[owner])
   const origin = serverEndpoint(environment?.origin ?? owner)
-  const highlighter = useCodeHighlighter()
   const renderedText = normalizeAgentMarkdown(text)
   const mermaid = useMermaid(renderedText, streaming)
   const fileLinkActions = { openFileReference, rootPath }
@@ -82,7 +82,7 @@ export function AssistantMarkdown({
   const segments = splitArtifactTemplateMarkdown(renderedText, streaming)
   const onlyMarkdown =
     segments.length === 1 && segments[0]?.kind === 'markdown' ? segments[0].markdown : null
-  const renderMarkdown = (markdown: string, live: boolean) => (
+  const renderMarkdown = (markdown: string, live: boolean, lineOffset = 0) => (
     <Markdown
       caret={live}
       className={cn('max-w-full min-w-0 break-words whitespace-pre-wrap', className)}
@@ -91,6 +91,7 @@ export function AssistantMarkdown({
       remarkPlugins={remarkPlugins}
       streaming={live}
       text={markdown}
+      sourceLineOffset={lineOffset}
     />
   )
 
@@ -101,7 +102,9 @@ export function AssistantMarkdown({
     }
     const live = streaming && index === segments.length - 1
 
-    return <Fragment key={index}>{renderMarkdown(segment.markdown, live)}</Fragment>
+    return (
+      <Fragment key={index}>{renderMarkdown(segment.markdown, live, segment.lineOffset)}</Fragment>
+    )
   }
 
   return (

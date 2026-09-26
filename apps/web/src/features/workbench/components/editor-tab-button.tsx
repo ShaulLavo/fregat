@@ -18,6 +18,11 @@ import { Shimmer } from '@workspace/ui/components/shimmer'
 import { cn } from '@workspace/ui/lib/utils'
 import { LockSimpleIcon } from '@phosphor-icons/react'
 import { useUnavailableEnvironment } from '@/lib/environments/hooks/use-unavailable-environment'
+import { useEditorWorkspaceState } from '@/features/editor/state/workspace-state'
+import { editorTabPosition } from '@/features/workbench/utils/tab-position'
+import { ShortcutHintBadge } from '@/components/shortcut-hint-badge'
+import { useKeyShortcuts } from '@/keymap/hooks/use-key-shortcuts'
+import { selectItemCommandId } from '@/keymap/types'
 
 export function EditorTabButton({
   closeTargets,
@@ -49,6 +54,11 @@ export function EditorTabButton({
     ? { ...tab, name: `${tab.name} (deleted)`, title: `${tab.title} (deleted on disk)` }
     : tab
   const unavailable = useUnavailableEnvironment()
+  const position = useEditorWorkspaceState((state) =>
+    editorTabPosition(state.workbenchPanels, state.uiMode, tab.id),
+  )
+  const itemCommand = position ? selectItemCommandId(position) : null
+  const keyShortcuts = useKeyShortcuts(itemCommand)
   const intentPrefetchRef = useEditorTabIntentPrefetch(tab)
   const { requestCloseTab, selectTab } = useEditorTabActions()
   // Stable ref composition keeps Foresight and DnD from re-registering on every render.
@@ -72,11 +82,12 @@ export function EditorTabButton({
       {...dragAttributes}
       {...dragListeners}
       aria-busy={loading || undefined}
+      aria-keyshortcuts={keyShortcuts}
       aria-selected={tab.active}
       className={barTabClassName(
         tab.active,
         cn(
-          'group/proof-tab focus-ring-inset max-w-48 min-w-0 cursor-grab touch-none text-left outline-none active:cursor-grabbing',
+          'group/proof-tab focus-ring-inset relative max-w-48 min-w-0 cursor-grab touch-none text-left outline-none active:cursor-grabbing',
           dragging && 'relative z-10 text-muted-foreground text-2xs',
         ),
       )}
@@ -98,6 +109,7 @@ export function EditorTabButton({
       onClick={handleSelectTab}
     >
       <FileTypeIcon className='size-(--icon-size-sm) shrink-0 object-contain' icon={tab.icon} />
+      <ShortcutHintBadge className='top-0.5 left-0.5' command={itemCommand} />
       {editorTabTitle(displayTab, loading)}
       {unavailable ? (
         <LockSimpleIcon

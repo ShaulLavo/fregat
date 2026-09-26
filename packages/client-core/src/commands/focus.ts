@@ -35,6 +35,7 @@ export type FocusTargetId =
   | { readonly kind: 'git'; readonly rootPath: string }
   | { readonly kind: 'logs' }
   | { readonly kind: 'problems' }
+  | { readonly kind: 'turn-changes'; readonly key: string }
   | {
       readonly kind: 'search'
       readonly rootPath: string
@@ -85,6 +86,7 @@ function sameEditorTarget(left: Extract<FocusTargetId, { kind: 'editor' }>, righ
 export function focusTargetIdsEqual(left: FocusTargetId, right: FocusTargetId): boolean {
   if (left.kind !== right.kind) return false
   if (left.kind === 'editor') return sameEditorTarget(left, right)
+  if (left.kind === 'turn-changes') return right.kind === left.kind && left.key === right.key
   if (left.kind === 'tui-widget') return right.kind === left.kind && left.key === right.key
   if (left.kind === 'chat-composer') return right.kind === left.kind && left.key === right.key
   if (left.kind === 'file-tree') {

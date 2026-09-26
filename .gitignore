@@ -39,8 +39,7 @@ npm-debug.log*
 .DS_Store
 *.pem
 .kiro/
-references/
-.desloppify/
+/references/
 
 # Playwright MCP output (screenshots, snapshots, console/network logs)
 .playwright-mcp/

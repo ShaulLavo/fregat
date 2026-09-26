@@ -2,6 +2,7 @@ import type { ProviderInstanceConfig } from '@workspace/contracts'
 import { Badge } from '@workspace/ui/components/badge'
 import { Switch } from '@workspace/ui/components/switch'
 
+import { ProviderUpdate } from '@/features/settings/components/provider-update'
 import { ProviderValues } from '@/features/settings/components/provider-values'
 import { useSettingsActions } from '@/features/settings/hooks/use-settings-actions'
 
@@ -17,7 +18,10 @@ export function ProviderRow({
   const binary = instance.binaryPath === '' ? 'Resolved from PATH' : instance.binaryPath
 
   return (
-    <div className='flex flex-col gap-1 px-(--density-control-padding-x) py-(--density-section-gap)'>
+    <div
+      className='flex flex-col gap-1 px-(--density-control-padding-x) py-(--density-section-gap)'
+      data-provider-instance={instance.providerInstanceId}
+    >
       <div
         className='flex items-center gap-(--density-control-gap)'
         title={`${instance.providerInstanceId} · ${binary}`}
@@ -31,6 +35,7 @@ export function ProviderRow({
         />
       </div>
       <ProviderValues agentView={agentView} instance={instance} />
+      <ProviderUpdate label={label} providerInstanceId={instance.providerInstanceId} />
     </div>
   )
 }

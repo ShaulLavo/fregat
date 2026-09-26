@@ -1,8 +1,10 @@
-import { screen } from '@testing-library/react'
+import { fireEvent, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { OrchestrationProposedPlan } from '@workspace/contracts'
 
 import { ProposedPlanCard } from '@/features/chat/components/proposed-plan-card'
+import { ChatWorkspaceRootContext } from '@/features/chat/providers/workspace-root-context'
+import { resetReviewDraftStore, useReviewDraftStore } from '@/lib/review-draft/state/store'
 import { TestEditorStateProvider as EditorStateProvider } from '../../../../../test/factories/editor-state-provider'
 import { expect, test } from '../../../../../test/fixtures'
 import { renderWithProviders } from '../../../../../test/render'
@@ -47,12 +49,38 @@ test('an open plan is not labelled implemented', () => {
   expect(screen.queryByText('Implemented')).not.toBeInTheDocument()
 })
 
+test('a comment on selected plan lines joins the review draft with those lines', async () => {
+  resetReviewDraftStore()
+  renderCard(proposedPlan())
+  const item = await screen.findByText('Drain it on boot')
+  const range = document.createRange()
+  range.selectNodeContents(item)
+  document.getSelection()?.removeAllRanges()
+  document.getSelection()?.addRange(range)
+  fireEvent.mouseUp(item)
+
+  await userEvent.click(await screen.findByRole('button', { name: 'Comment on the selection' }))
+  await userEvent.type(screen.getByRole('textbox', { name: 'Review comment' }), 'Only once{Enter}')
+
+  expect(useReviewDraftStore.getState().comments).toMatchObject([
+    {
+      anchor: { kind: 'plan', lines: { start: 4, end: 4 } },
+      body: 'Only once',
+      destination: { rootPath: '/repo' },
+      quote: 'About the proposed plan, line 4:\n\n> 2. Drain it on boot',
+    },
+  ])
+  resetReviewDraftStore()
+})
+
 // The card renders real chat markdown, which reaches for the editor commands
 // behind its file links.
 function renderCard(plan: OrchestrationProposedPlan) {
   renderWithProviders(
     <EditorStateProvider>
-      <ProposedPlanCard plan={plan} />
+      <ChatWorkspaceRootContext value={{ canonicalPath: '/repo', path: '/repo' }}>
+        <ProposedPlanCard plan={plan} />
+      </ChatWorkspaceRootContext>
     </EditorStateProvider>,
   )
 }
@@ -99,3 +127,36 @@ function proposedPlan(
     ...overrides,
   } as OrchestrationProposedPlan
 }
+
+test.each([
+  { markdown: '# Plan\n\nRun tests\n\nRun tests', text: 'Run tests', occurrence: 1, line: 5 },
+  { markdown: '# Plan\n\nUse **strict** mode', text: 'Use strict mode', occurrence: 0, line: 3 },
+  {
+    markdown:
+      '# Plan\n\nRun tests\n\n::artifact-template{artifact_kind="document" display_name="Design" skill_name="artifact-template-design" skill_directory="/skills/design"}\n\nRun tests',
+    text: 'Run tests',
+    occurrence: 1,
+    line: 7,
+  },
+])(
+  'anchors selected rendered text at its source location: $markdown',
+  async ({ markdown, text, occurrence, line }) => {
+    resetReviewDraftStore()
+    renderCard(proposedPlan({ planMarkdown: markdown }))
+    const items = await screen.findAllByText(
+      (_, element) => element?.tagName === 'P' && element.textContent === text,
+    )
+    const item = items[occurrence]!
+    const range = document.createRange()
+    range.selectNodeContents(item)
+    document.getSelection()?.removeAllRanges()
+    document.getSelection()?.addRange(range)
+    fireEvent.mouseUp(item)
+    await userEvent.click(await screen.findByRole('button', { name: 'Comment on the selection' }))
+    await userEvent.type(screen.getByRole('textbox', { name: 'Review comment' }), 'Do this{Enter}')
+    expect(useReviewDraftStore.getState().comments[0]?.anchor).toMatchObject({
+      lines: { start: line, end: line },
+    })
+    resetReviewDraftStore()
+  },
+)

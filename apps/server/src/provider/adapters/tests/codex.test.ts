@@ -71,7 +71,10 @@ function fakeSession(turns = []) {
     ephemeral: false,
     id: 'provider-thread-1',
     modelProvider: 'openai',
+    path: process.env.PLATFORM_FAKE_CODEX_MODE === 'resumed-token-usage' ? require('node:path').join(process.env.PLATFORM_FAKE_CODEX_PROJECT, 'rollout.jsonl') : null,
     preview: 'Say hello',
+    projectId: null,
+    sessionId: 'provider-session-1',
     source: 'appServer',
     status: { type: 'idle' },
     turns,
@@ -311,7 +314,21 @@ function handle(message) {
     return;
   }
   if (message.method === 'account/read') {
-    send({ id: message.id, result: { account: { type: 'apiKey' }, requiresOpenaiAuth: false } });
+    const account = mode?.startsWith('reset-credit') ? { type: 'chatgpt', email: 'fixture@example.test', planType: 'pro' } : { type: 'apiKey' };
+    send({ id: message.id, result: { account, requiresOpenaiAuth: false } });
+    return;
+  }
+  if (message.method === 'account/rateLimits/read') {
+    send({ id: message.id, result: {
+      accountId: mode === 'reset-credit-other-account' ? 'fixture-account-b' : 'fixture-account-a',
+      rateLimits: { planType: 'pro' },
+      rateLimitResetCredits: { availableCount: 1, credits: [{ id: 'fixture-credit', resetType: 'codexRateLimits', status: 'available', grantedAt: 0 }] },
+    } });
+    return;
+  }
+  if (message.method === 'account/rateLimitResetCredit/consume') {
+    record({ event: message.method, params: message.params });
+    send({ id: message.id, result: { outcome: 'alreadyRedeemed' } });
     return;
   }
   if (message.method === 'model/list') {
@@ -320,6 +337,63 @@ function handle(message) {
       id: message.id,
       result: { data: [model], nextCursor: null },
     });
+    return;
+  }
+  if (message.method === 'mcpServerStatus/list') {
+    record({ event: message.method, params: message.params });
+    const base = { resourceTemplates: [], resources: [], tools: {} };
+    send({ id: message.id, result: { data: [
+      { ...base, name: 'linear', authStatus: 'oAuth', runtimeStatus: 'connected' },
+      { ...base, name: 'github', authStatus: 'notLoggedIn', runtimeStatus: 'authenticationRequired' },
+      { ...base, name: 'broken', authStatus: 'unsupported', runtimeStatus: 'failed', toolsError: 'spawn ENOENT' },
+    ], nextCursor: null } });
+    return;
+  }
+  if (message.method === 'config/mcpServer/reload') {
+    record({ event: message.method, params: message.params });
+    send({ id: message.id, result: {} });
+    return;
+  }
+  if (message.method === 'mcpServer/oauth/login') {
+    record({ event: message.method, params: message.params });
+    send({ id: message.id, result: { authorizationUrl: 'https://auth.example.test/login' } });
+    return;
+  }
+  if (message.method === 'hooks/list') {
+    record({ event: message.method, params: message.params });
+    const hook = { currentHash: 'h', displayOrder: 0, enabled: true, eventName: 'preToolUse', isManaged: false, key: 'k', source: 'project', sourcePath: '/repo/.codex/hooks.toml', timeoutSec: 30, trustStatus: 'trusted' };
+    send({ id: message.id, result: { data: [{ cwd: message.params.cwds[0], errors: [], warnings: ['one hook skipped'], hooks: [
+      { ...hook, handlerType: 'command', command: 'guard.sh', matcher: 'shell' },
+      { ...hook, key: 'k2', handlerType: 'mcpTool', server: 'linear', tool: 'check' },
+    ] }] } });
+    return;
+  }
+  if (message.method === 'thread/compact/start') {
+    record({ event: message.method, params: message.params });
+    send({ id: message.id, result: {} });
+    const turn = { id: 'compact-turn-1', status: 'inProgress', items: [] };
+    send({ method: 'turn/started', params: { threadId: message.params.threadId, turn } });
+    send({ method: 'item/started', params: { threadId: message.params.threadId, turnId: turn.id, item: { id: 'compaction-1', type: 'contextCompaction' } } });
+    send({ method: 'item/completed', params: { threadId: message.params.threadId, turnId: turn.id, item: { id: 'compaction-1', type: 'contextCompaction' } } });
+    send({ method: 'turn/completed', params: { threadId: message.params.threadId, turn: { ...turn, status: 'completed' } } });
+    return;
+  }
+  if ((mode === 'fork' || mode === 'fork-advanced') && message.method === 'thread/turns/list') {
+    record({ event: 'thread/turns/list', params: message.params });
+    const turns = ['source-turn-3', 'source-turn-2', 'source-turn-1'].map((id) => ({ id }));
+    if (mode === 'fork-advanced') turns.unshift({ id: 'source-turn-4' });
+    if (message.params.sortDirection === 'asc') turns.reverse();
+    send({ id: message.id, result: { data: turns.slice(0, message.params.limit), nextCursor: null } });
+    return;
+  }
+  if (message.method === 'thread/fork') {
+    record({ event: 'thread/fork', params: message.params });
+    send({ id: message.id, result: {
+      cwd: '/Users/shaul/Desktop/platform', model: 'gpt-5.5',
+      approvalPolicy: 'never', approvalsReviewer: 'user',
+      modelProvider: 'openai', sandbox: { type: 'dangerFullAccess' },
+      thread: { ...fakeSession(), id: 'forked-thread' },
+    } });
     return;
   }
   if (message.method === 'thread/resume') {
@@ -370,6 +444,11 @@ function handle(message) {
     if (mode !== 'echo-mode-params' && !assertTurnParams(message)) return;
     if (mode === 'hold-turn-start') return;
     process.stderr.write('2026-05-28T00:00:00Z INFO codex: harmless diagnostic\\n');
+    if (mode === 'hook-blocked') {
+      const run = { id: 'hook-run-1', displayOrder: 0, entries: [], eventName: 'preToolUse', executionMode: 'sync', handlerType: 'command', scope: 'turn', sourcePath: '/repo/.codex/hooks/guard.sh', startedAt: 1, status: 'running' };
+      send({ method: 'hook/started', params: { threadId: 'provider-thread-1', turnId: fakeTurn().id, run } });
+      send({ method: 'hook/completed', params: { threadId: 'provider-thread-1', turnId: fakeTurn().id, run: { ...run, status: 'blocked', entries: [{ kind: 'feedback', text: 'rm is not allowed here' }] } } });
+    }
     if (mode === 'stderr-diagnostics') {
       process.stderr.write('2026-09-07T05:01:31Z ERROR codex_api::transport: failed to connect to websocket\\n');
       process.stderr.write('Authentication required: sign in again\\n');
@@ -485,7 +564,7 @@ function handle(message) {
         },
       });
     }
-    if (mode === 'token-usage') {
+    if (mode === 'token-usage' || mode === 'resumed-token-usage') {
       send({
         method: 'thread/tokenUsage/updated',
         params: {
@@ -744,6 +823,7 @@ type FakeCodexLogEntry = {
   readonly params?: Record<string, unknown>
   readonly cwds?: readonly string[] | null
   readonly event:
+    | 'account/rateLimitResetCredit/consume'
     | 'skills/list'
     | 'spawn'
     | 'turn/start'
@@ -772,6 +852,76 @@ type EchoedModeParams = {
 }
 
 describe('CodexProviderAdapter', () => {
+  it('passes the stable reset-credit key through the native boundary fixture', async () => {
+    await withFakeCodex(
+      async ({ spawnLogPath }) => {
+        const adapter = new CodexProviderAdapter()
+        const usage = await adapter.readUsage()
+        assert(usage.kind === 'reading' && usage.resetCredits)
+        expect(
+          await adapter.consumeResetCredit({
+            idempotencyKey: 'fixture-reset-key',
+            accountKey: usage.resetCredits.accountKey,
+            creditId: 'fixture-credit',
+          }),
+        ).toBe('alreadyRedeemed')
+        expect(
+          (await readFakeCodexLog(spawnLogPath)).filter(
+            (entry) => entry.event === 'account/rateLimitResetCredit/consume',
+          ),
+        ).toEqual([
+          {
+            event: 'account/rateLimitResetCredit/consume',
+            params: { idempotencyKey: 'fixture-reset-key', creditId: 'fixture-credit' },
+          },
+        ])
+      },
+      { mode: 'reset-credit' },
+    )
+  })
+
+  it('refuses a native account switch before reset credit consumption', async () => {
+    await withFakeCodex(
+      async ({ spawnLogPath }) => {
+        const adapter = new CodexProviderAdapter()
+        const before = await adapter.readUsage()
+        assert(before.kind === 'reading' && before.resetCredits)
+        process.env.PLATFORM_FAKE_CODEX_MODE = 'reset-credit-other-account'
+        await expect(
+          adapter.consumeResetCredit({
+            idempotencyKey: 'fixture-reset-key',
+            accountKey: before.resetCredits.accountKey,
+            creditId: 'fixture-credit',
+          }),
+        ).rejects.toThrow('account changed')
+        expect(
+          (await readFakeCodexLog(spawnLogPath)).filter(
+            (entry) => entry.event === 'account/rateLimitResetCredit/consume',
+          ),
+        ).toEqual([])
+      },
+      { mode: 'reset-credit' },
+    )
+  })
+
+  it('does not consume reset credits for an API-key account', async () => {
+    await withFakeCodex(async ({ spawnLogPath }) => {
+      const adapter = new CodexProviderAdapter()
+      await expect(
+        adapter.consumeResetCredit({
+          idempotencyKey: 'fixture-reset-key',
+          accountKey: 'unavailable',
+          creditId: 'fixture-credit',
+        }),
+      ).rejects.toThrow('signed-in Codex account')
+      expect(
+        (await readFakeCodexLog(spawnLogPath)).filter(
+          (entry) => entry.event === 'account/rateLimitResetCredit/consume',
+        ),
+      ).toEqual([])
+    })
+  })
+
   it('rejects malformed imported conversation text', () => {
     expect(
       v.safeParse(codexHistoryResponseSchema, {
@@ -1053,6 +1203,31 @@ describe('CodexProviderAdapter', () => {
         }
       },
       { mode: 'local-image' },
+    )
+  })
+
+  it('maps a hook run summary to one paired, named hook with its outcome', async () => {
+    await withFakeCodex(
+      async () => {
+        const adapter = new CodexProviderAdapter()
+        const events: ProviderRuntimeEvent[] = []
+        collectAdapterEvents(adapter, events)
+        await adapter.sendTurn(providerTurnInput())
+        await settleRuntimeEvents()
+        await adapter.stopAll()
+
+        expect(events.filter((event) => event.type.startsWith('hook.'))).toMatchObject([
+          {
+            payload: { hookEvent: 'preToolUse', hookId: 'hook-run-1', hookName: 'guard.sh' },
+            type: 'hook.started',
+          },
+          {
+            payload: { hookId: 'hook-run-1', outcome: 'blocked', output: 'rm is not allowed here' },
+            type: 'hook.completed',
+          },
+        ])
+      },
+      { mode: 'hook-blocked' },
     )
   })
 
@@ -2271,6 +2446,59 @@ describe('CodexProviderAdapter', () => {
     )
   })
 
+  it('captures native totals before billing the first resumed Codex turn', async () => {
+    await withFakeCodex(
+      async ({ projectPath }) => {
+        await writeFile(
+          path.join(projectPath, 'rollout.jsonl'),
+          JSON.stringify({
+            type: 'event_msg',
+            payload: {
+              type: 'token_count',
+              info: {
+                total_token_usage: {
+                  input_tokens: 2000,
+                  cached_input_tokens: 800,
+                  output_tokens: 500,
+                },
+              },
+            },
+          }) + '\n',
+        )
+        const adapter = new CodexProviderAdapter()
+        const events: ProviderRuntimeEvent[] = []
+        collectAdapterEvents(adapter, events)
+        try {
+          await adapter.sendTurn({
+            ...providerTurnInput(),
+            providerResumeCursor: 'provider-thread-1',
+          })
+          await settleRuntimeEvents()
+          const totals = events.flatMap((event) =>
+            event.type === 'usage.totals' ? event.payload.totals : [],
+          )
+          expect(totals).toMatchObject([
+            {
+              inputTokens: 1200,
+              outputTokens: 500,
+              scope: 'provider-thread-1',
+              continuesEarlierTurns: true,
+            },
+            {
+              inputTokens: 1600,
+              outputTokens: 600,
+              scope: 'provider-thread-1',
+              continuesEarlierTurns: true,
+            },
+          ])
+        } finally {
+          await adapter.stopAll()
+        }
+      },
+      { mode: 'resumed-token-usage' },
+    )
+  })
+
   it('reads token usage from the tokenUsage notification field', async () => {
     await withFakeCodex(
       async () => {
@@ -2444,6 +2672,137 @@ describe('CodexProviderAdapter', () => {
       { mode: 'malformed-thread-start' },
     )
   })
+
+  it('compacts through thread/compact/start and settles on the native turn it starts', async () => {
+    await withFakeCodex(async ({ spawnLogPath }) => {
+      const adapter = new CodexProviderAdapter()
+      const events: ProviderRuntimeEvent[] = []
+      collectAdapterEvents(adapter, events)
+      try {
+        await adapter.sendTurn({ ...providerTurnInput(), kind: 'compact', messageText: '/compact' })
+        await settleRuntimeEvents()
+        const records = await readFakeCodexLog(spawnLogPath)
+        expect(records.map((record) => record.event)).toContain('thread/compact/start')
+        expect(records.map((record) => record.event)).not.toContain('turn/start')
+        expect(events.filter((event) => event.type === 'turn.completed')).toMatchObject([
+          { turnId: providerTurnInput().turnId },
+        ])
+        expect(events.filter((event) => event.type === 'conversation.state.changed')).toMatchObject(
+          [{ payload: { state: 'compacted' }, turnId: providerTurnInput().turnId }],
+        )
+      } finally {
+        await adapter.stopAll()
+      }
+    })
+  })
+
+  it('reads MCP server states and configured hooks from the live app-server', async () => {
+    await withFakeCodex(async ({ spawnLogPath }) => {
+      const adapter = new CodexProviderAdapter()
+      const input = providerTurnInput()
+      try {
+        expect(await adapter.mcpServers({ sessionId: input.sessionId })).toBeNull()
+        await adapter.startRuntime(input)
+
+        expect(await adapter.mcpServers({ sessionId: input.sessionId })).toEqual([
+          { error: null, name: 'linear', status: 'connected' },
+          { error: null, name: 'github', status: 'needs-auth' },
+          { error: 'spawn ENOENT', name: 'broken', status: 'failed' },
+        ])
+        await adapter.reconnectMcpServer({ name: 'broken', sessionId: input.sessionId })
+        expect(
+          await adapter.signInMcpServer({ name: 'github', sessionId: input.sessionId }),
+        ).toEqual({ authorizationUrl: 'https://auth.example.test/login' })
+        expect(await adapter.configuredHooks({ cwd: '/repo', sessionId: input.sessionId })).toEqual(
+          {
+            errors: ['one hook skipped'],
+            hooks: [
+              {
+                enabled: true,
+                eventName: 'preToolUse',
+                handler: 'guard.sh',
+                matcher: 'shell',
+                sourcePath: '/repo/.codex/hooks.toml',
+              },
+              {
+                enabled: true,
+                eventName: 'preToolUse',
+                handler: 'linear · check',
+                matcher: null,
+                sourcePath: '/repo/.codex/hooks.toml',
+              },
+            ],
+          },
+        )
+        const records = await readFakeCodexLog(spawnLogPath)
+        expect(records).toContainEqual({
+          event: 'mcpServer/oauth/login',
+          params: { name: 'github', threadId: 'provider-thread-1' },
+        })
+      } finally {
+        await adapter.stopAll()
+      }
+    })
+  })
+
+  it('refuses a fork point the source conversation no longer holds', async () => {
+    await withFakeCodex(
+      async () => {
+        const adapter = new CodexProviderAdapter()
+        try {
+          const input = providerTurnInput()
+          await expect(
+            adapter.prepareFork({
+              cwd: input.cwd,
+              sessionId: input.sessionId,
+              conversationId: 'source-conversation',
+              providerTurnId: 'reverted-turn',
+            }),
+          ).rejects.toThrow('The fork point is not in the source conversation')
+        } finally {
+          await adapter.stopAll()
+        }
+      },
+      { mode: 'fork' },
+    )
+  })
+
+  it.each(['fork', 'fork-advanced'])(
+    'keeps the captured native fork boundary when the source is %s',
+    async (mode) => {
+      await withFakeCodex(
+        async ({ spawnLogPath }) => {
+          const adapter = new CodexProviderAdapter()
+          try {
+            const input = providerTurnInput()
+            const captured = await adapter.prepareFork({
+              cwd: input.cwd,
+              sessionId: input.sessionId,
+              conversationId: 'source-thread',
+              providerTurnId: 'source-turn-2',
+            })
+            const runtime = await adapter.startRuntime({
+              ...providerTurnInput(),
+              fork: captured,
+            })
+            const records = await readFakeCodexLog(spawnLogPath)
+            expect(records).toContainEqual({
+              event: 'thread/fork',
+              params: expect.objectContaining({
+                excludeTurns: true,
+                lastTurnId: 'source-turn-2',
+                threadId: 'source-thread',
+              }),
+            })
+            expect(runtime.providerResumeCursor).toBe('forked-thread')
+          } finally {
+            await adapter.stopAll()
+          }
+        },
+        { mode },
+      )
+    },
+  )
 
   it('resumes using metadata even when Codex returns unfamiliar historical items', async () => {
     await withFakeCodex(async ({ spawnLogPath }) => {

@@ -4,6 +4,9 @@ import { WorktreeChip } from '@/features/chat-mode/components/worktree-chip'
 import { SessionAttentionIndicator } from '@/features/chat-mode/components/session-attention-indicator'
 import { CaretRightIcon } from '@phosphor-icons/react'
 
+import { BackgroundTasksButton } from '@/features/chat/components/background-tasks-button'
+import { SessionAgentChip } from '@/features/chat/components/session-agent-chip'
+import { SessionToolsButton } from '@/features/chat/components/session-tools-button'
 import { ContextUsageRing } from '@/features/chat/components/context-usage-ring'
 import type { ContextUsage } from '@workspace/client-core/chat/context-usage'
 import {
@@ -58,7 +61,12 @@ export function StageHeader({
             </span>
           ) : null}
           {session ? <SessionTitleStatus sessionRef={session.ref} /> : null}
-          {contextMeterEnabled && contextUsage ? <ContextUsageRing usage={contextUsage} /> : null}
+          {contextMeterEnabled && contextUsage ? (
+            <ContextUsageRing sessionRef={session?.ref ?? null} usage={contextUsage} />
+          ) : null}
+          {session ? <SessionAgentChip sessionRef={session.ref} /> : null}
+          {session ? <BackgroundTasksButton sessionRef={session.ref} /> : null}
+          {session ? <SessionToolsButton sessionRef={session.ref} /> : null}
           {session ? <SessionActionsButton session={session} surface='header' /> : null}
         </>
       }

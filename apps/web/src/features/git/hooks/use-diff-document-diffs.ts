@@ -7,7 +7,7 @@ import {
   checkpointDiffRetry,
   checkpointDiffRetryDelay,
   fetchCheckpointDiff,
-} from '@/features/chat/utils/checkpoint-diff-query'
+} from '@/lib/checkpoint-diff-query'
 import { errorMessage } from '@/lib/error-message'
 
 import { blobDiffQueryOptions } from '@/features/git/utils/blob-diff-query'

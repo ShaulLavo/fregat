@@ -133,6 +133,9 @@ export const selectors = {
   hint: (page: Page, label: string) =>
     page.locator('[data-slot="tooltip-content"]').filter({ hasText: label }),
   popupMenu: (page: Page) => page.getByRole('menu'),
+  draftAgent: (page: Page) => page.getByRole('button', { name: 'Run the session as an agent' }),
+  draftAgentChoice: (page: Page, name: string) =>
+    page.getByRole('menuitemradio').filter({ hasText: name }),
   modelPickerTrigger: (page: Page) =>
     page.getByRole('button', { name: 'Provider and model', exact: true }),
   modelPickerPanel: (page: Page) =>
@@ -145,6 +148,9 @@ export const selectors = {
   modelPickerOption: (page: Page, label: string) =>
     page.getByRole('option').filter({ has: page.getByText(label, { exact: true }) }),
   modelOptions: (page: Page) => page.getByRole('button', { name: 'Model options', exact: true }),
+  /** The one-shot burst under the composer when the effort rises to max or ultra. */
+  effortBurst: (page: Page, tier: 'max' | 'ultra') => page.locator(`[data-effort-burst="${tier}"]`),
+  effortRainbow: (scope: Locator) => scope.locator('.rainbow-text'),
   modelOptionChoice: (page: Page, group: string, choice: string) =>
     page
       .getByRole('group', { name: group, exact: true })
@@ -276,6 +282,24 @@ export const selectors = {
       .getByRole('tab', { name: view, exact: true }),
   pickerStatus: (page: Page) =>
     page.getByRole('dialog', { name: 'Choose folder', exact: true }).getByRole('status').last(),
+  pickerChoose: (page: Page) =>
+    page
+      .getByRole('dialog', { name: 'Choose folder', exact: true })
+      .getByRole('button', { name: 'Choose folder', exact: true }),
+  liveUpdatesLimited: (page: Page) =>
+    page.getByRole('button', { name: 'Live updates limited', exact: true }),
+  navigationTarget: (page: Page) => page.locator('[data-navigation-target]'),
+  navigationShield: (page: Page) => page.locator('[data-navigation-shield]'),
+  treeItemFixWithAi: (page: Page, name: string) =>
+    page
+      .getByLabel('Folder tree', { exact: true })
+      .getByRole('treeitem', { name, exact: true })
+      .getByRole('button', { name: 'Fix with AI', exact: true }),
+  treeItemDecoration: (page: Page, name: string) =>
+    page
+      .getByLabel('Folder tree', { exact: true })
+      .getByRole('treeitem', { name, exact: true })
+      .locator('[data-item-section="decoration"]'),
   pickerCurrentFolderHeading: (page: Page) =>
     page
       .getByRole('listbox', { name: 'Folders and files', exact: true })
@@ -562,6 +586,11 @@ export const selectors = {
   /** Its title is the open workspace's root path. */
   projectSwitcher: (page: Page) =>
     page.getByRole('button', { name: 'Switch project', exact: true }),
+  sidebarToggle: (page: Page, mode: 'Workbench' | 'Chat') =>
+    page.getByRole('button', {
+      name: mode === 'Workbench' ? 'Toggle sidebar' : 'Toggle sessions',
+      exact: true,
+    }),
   workspaceMode: (page: Page, mode: 'Workbench' | 'Chat') =>
     page.getByRole('button', { name: `${mode} mode`, exact: true }),
   workspaceRail: (page: Page, mode: 'Workbench' | 'Chat') =>
@@ -790,6 +819,10 @@ export const selectors = {
     page.getByRole('status', { name: 'Loading settings', exact: true }),
   settingsModelsLoading: (page: Page) => page.getByRole('status', { name: 'Loading models' }),
   settingsNoModels: (page: Page) => page.getByText('No models are available yet.'),
+  settingsProviderRow: (page: Page, providerInstanceId: string) =>
+    page.locator(`[data-provider-instance="${providerInstanceId}"]`),
+  providerUpdateChecking: (page: Page) =>
+    page.getByRole('status', { name: 'Checking for updates' }),
   paletteScriptsLoading: (page: Page) => page.getByRole('status', { name: 'Loading scripts' }),
   paletteNoScripts: (page: Page) => page.getByText('No scripts in this project.'),
   paletteDialog: (page: Page) => page.getByRole('dialog', { name: 'Command Palette', exact: true }),
@@ -896,6 +929,7 @@ export const selectors = {
 export const chords = {
   commandPalette: 'Control+Shift+P',
   togglePanel: 'Control+J',
+  toggleSidebar: 'Control+B',
 }
 
 export async function waitForApp(page: Page, timeoutMs = 45_000) {

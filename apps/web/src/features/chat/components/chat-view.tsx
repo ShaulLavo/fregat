@@ -1,3 +1,4 @@
+import { ComposerRootsContext } from '@/lib/composer-attach/providers/roots-context'
 import { ChatWorkspaceRootContext } from '@/features/chat/providers/workspace-root-context'
 import { LoadingState } from '@workspace/ui/components/loading-state'
 import { useActiveChatProjection } from '@/features/chat/hooks/use-active-projection'
@@ -8,7 +9,7 @@ import {
   correctionUnavailableReason,
 } from '@/features/chat/utils/composer-state'
 import type { ModelSelection, SessionId } from '@workspace/contracts'
-import { useEffect, useMemo, useState } from 'react'
+import { use, useEffect, useMemo, useState } from 'react'
 
 import { notifyChatCommandError } from '@/features/chat/notify-command-error'
 import type { ChatTransport } from '@/features/chat/transport/chat-transport'
@@ -66,6 +67,7 @@ export function ChatView({
     draftKey: activeSessionId,
     rootPath,
   }
+  const outerRoots = use(ComposerRootsContext)
   const session = useActiveChatProjection(sessionSelector)
   const currentDetail = useActiveChatProjection(
     (state) =>
@@ -165,110 +167,116 @@ export function ChatView({
   }
 
   return (
-    <section className='flex min-h-0 flex-1 flex-col'>
-      <CheckpointRevertDialog
-        turnCount={pendingCheckpoint?.turnCount ?? null}
-        disabled={busy || sending || revertingCheckpoint}
-        pending={revertingCheckpoint}
-        onCancel={() => setPendingCheckpoint(null)}
-        onConfirm={handleConfirmRevert}
-        canRestoreFiles={session.worktree.kind === 'linked'}
-        error={rewind.isError ? errorMessage(rewind.error, 'Could not rewind this session.') : null}
-      />
-      <ChatWorkspaceRootContext value={session.worktree}>
-        <ChatTransportContext value={transport}>
-          <ChatTimelineActionsProvider
-            retry={{
-              blocked: busy || composer.sendBlocked,
-              carryOn: () => void composer.send(carryOnPayload(session)),
-              tryAgain: tryAgain ? () => void composer.send(tryAgain) : null,
-            }}
-            revertToCheckpoint={handleRevertToCheckpoint}
-          >
-            <MessagesTimeline
-              checkpointRevertPending={revertingCheckpoint || !currentDetail}
-              optimisticMessages={optimisticMessages}
-              session={session}
-            />
-          </ChatTimelineActionsProvider>
-        </ChatTransportContext>
-      </ChatWorkspaceRootContext>
-      <ChatRuntimeStatus commandFailure={sendError ?? composer.error} session={session} />
-      {/* The panels sit above the composer rather than inside it: each one is a
+    <ComposerRootsContext
+      value={[...outerRoots, session.worktree.path, session.worktree.canonicalPath]}
+    >
+      <section className='flex min-h-0 flex-1 flex-col'>
+        <CheckpointRevertDialog
+          turnCount={pendingCheckpoint?.turnCount ?? null}
+          disabled={busy || sending || revertingCheckpoint}
+          pending={revertingCheckpoint}
+          onCancel={() => setPendingCheckpoint(null)}
+          onConfirm={handleConfirmRevert}
+          canRestoreFiles={session.worktree.kind === 'linked'}
+          error={
+            rewind.isError ? errorMessage(rewind.error, 'Could not rewind this session.') : null
+          }
+        />
+        <ChatWorkspaceRootContext value={session.worktree}>
+          <ChatTransportContext value={transport}>
+            <ChatTimelineActionsProvider
+              retry={{
+                blocked: busy || composer.sendBlocked,
+                carryOn: () => void composer.send(carryOnPayload(session)),
+                tryAgain: tryAgain ? () => void composer.send(tryAgain) : null,
+              }}
+              revertToCheckpoint={handleRevertToCheckpoint}
+            >
+              <MessagesTimeline
+                checkpointRevertPending={revertingCheckpoint || !currentDetail}
+                optimisticMessages={optimisticMessages}
+                session={session}
+              />
+            </ChatTimelineActionsProvider>
+          </ChatTransportContext>
+        </ChatWorkspaceRootContext>
+        <ChatRuntimeStatus commandFailure={sendError ?? composer.error} session={session} />
+        {/* The panels sit above the composer rather than inside it: each one is a
           request holding the turn open, so it stays visible while the user
           types their answer. */}
-      <ChatComposerModesProvider
-        dispatchCommand={transport.dispatchCommand}
-        draftTarget={draftTarget}
-        sessionId={session.id}
-      >
-        <ChatPendingRequestsProvider
-          disabledReason={disabledReason}
-          transport={transport}
+        <ChatComposerModesProvider
+          dispatchCommand={transport.dispatchCommand}
+          draftTarget={draftTarget}
           sessionId={session.id}
         >
-          <ComposerActivityStatus
-            connection={connection}
-            pendingAction={composerPendingAction({
-              sending,
-              interrupting,
-              awaitingProjection: optimisticMessages.length > 0 && !busy,
-              session,
-            })}
-            session={session}
-          />
-          <PendingApprovalPanel />
-          <PendingUserInputPanel />
-          <ChatPlanFollowUpProvider
-            draftTarget={draftTarget}
-            disabledReason={
-              disabledReason ??
-              (sending || revertingCheckpoint ? 'Finishing the current action…' : null)
-            }
+          <ChatPendingRequestsProvider
+            disabledReason={disabledReason}
             transport={transport}
-            onSessionCreated={onSessionCreated}
             sessionId={session.id}
           >
-            <PlanFollowUpBanner draftTarget={draftTarget} />
-          </ChatPlanFollowUpProvider>
-          {session.origin === 'discovered' && !session.latestTurn && !session.runtime ? (
-            <ImportedChatNotice />
-          ) : null}
-          <QueuedMessages
-            messages={composer.queue}
-            disabled={composer.sendBlocked}
-            onSendNow={composer.sendNow}
-            onRestore={composer.restore}
-          />
-          <ChatInput
-            busy={busy}
-            correctionDisabledReason={correctionUnavailableReason(session)}
-            disabledReason={disabledReason}
-            pendingAction={composerPendingAction({
-              sending,
-              interrupting,
-              awaitingProjection: optimisticMessages.length > 0 && !busy,
-              session,
-            })}
-            disabled={
-              sending ||
-              interrupting ||
-              revertingCheckpoint ||
-              (!busy && session.worktree.lifecycle.state !== 'ready')
-            }
-            draftKey={session.id}
-            error={null}
-            interactionMode={session.interactionMode}
-            modelSelection={session.modelSelection}
-            sessionProviderInstanceId={session.modelSelection.providerInstanceId}
-            rootPath={rootPath}
-            runtimeMode={session.runtimeMode}
-            onPersistModelSelection={handlePersistModelSelection}
-            onStop={composer.stop}
-            onSubmit={composer.send}
-          />
-        </ChatPendingRequestsProvider>
-      </ChatComposerModesProvider>
-    </section>
+            <ComposerActivityStatus
+              connection={connection}
+              pendingAction={composerPendingAction({
+                sending,
+                interrupting,
+                awaitingProjection: optimisticMessages.length > 0 && !busy,
+                session,
+              })}
+              session={session}
+            />
+            <PendingApprovalPanel />
+            <PendingUserInputPanel />
+            <ChatPlanFollowUpProvider
+              draftTarget={draftTarget}
+              disabledReason={
+                disabledReason ??
+                (sending || revertingCheckpoint ? 'Finishing the current action…' : null)
+              }
+              transport={transport}
+              onSessionCreated={onSessionCreated}
+              sessionId={session.id}
+            >
+              <PlanFollowUpBanner draftTarget={draftTarget} />
+            </ChatPlanFollowUpProvider>
+            {session.origin === 'discovered' && !session.latestTurn && !session.runtime ? (
+              <ImportedChatNotice />
+            ) : null}
+            <QueuedMessages
+              messages={composer.queue}
+              disabled={composer.sendBlocked}
+              onSendNow={composer.sendNow}
+              onRestore={composer.restore}
+            />
+            <ChatInput
+              busy={busy}
+              correctionDisabledReason={correctionUnavailableReason(session)}
+              disabledReason={disabledReason}
+              pendingAction={composerPendingAction({
+                sending,
+                interrupting,
+                awaitingProjection: optimisticMessages.length > 0 && !busy,
+                session,
+              })}
+              disabled={
+                sending ||
+                interrupting ||
+                revertingCheckpoint ||
+                (!busy && session.worktree.lifecycle.state !== 'ready')
+              }
+              draftKey={session.id}
+              error={null}
+              interactionMode={session.interactionMode}
+              modelSelection={session.modelSelection}
+              sessionProviderInstanceId={session.modelSelection.providerInstanceId}
+              rootPath={rootPath}
+              runtimeMode={session.runtimeMode}
+              onPersistModelSelection={handlePersistModelSelection}
+              onStop={composer.stop}
+              onSubmit={composer.send}
+            />
+          </ChatPendingRequestsProvider>
+        </ChatComposerModesProvider>
+      </section>
+    </ComposerRootsContext>
   )
 }

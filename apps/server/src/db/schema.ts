@@ -1,5 +1,6 @@
 import type { RecordedModelPrice } from '../provider/utils/model-prices'
 import type { UsageContribution } from '../provider/utils/usage-contributions'
+import type { ProviderUsageAmounts } from '../provider/utils/usage-totals'
 import {
   TURN_END_REASONS,
   providerUsagePurposeSchema,
@@ -61,6 +62,10 @@ export const providerUsageTurns = sqliteTable(
     accountKey: text('account_key'),
     /** `turn` for chat; `title` and `commit-message` for the app's own generations. */
     purpose: text('purpose', { enum: providerUsagePurposeSchema.options }).notNull(),
+    /** `import` for turns read back from a transcript of a session begun outside Platform. */
+    source: text('source', { enum: ['live', 'import'] })
+      .notNull()
+      .default('live'),
     recordedAt: text('recorded_at').notNull(),
     inputTokens: integer('input_tokens').notNull(),
     outputTokens: integer('output_tokens').notNull(),
@@ -84,6 +89,24 @@ export const providerPriceCatalog = sqliteTable('provider_price_catalog', {
   id: integer('id').primaryKey(),
   snapshotJson: text('snapshot_json').notNull(),
 })
+
+export const providerUsageImportRequests = sqliteTable(
+  'provider_usage_import_requests',
+  {
+    billingScope: text('billing_scope').notNull(),
+    billingKey: text('billing_key').notNull(),
+    model: text('model').notNull(),
+    sessionId: text('session_id').notNull(),
+    turnId: text('turn_id').notNull(),
+    providerInstanceId: text('provider_instance_id').notNull(),
+    recordedAt: text('recorded_at').notNull(),
+    amounts: text('amounts_json', { mode: 'json' }).$type<ProviderUsageAmounts>().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.billingScope, table.billingKey, table.model] }),
+    index('provider_usage_import_requests_turn_idx').on(table.sessionId, table.turnId, table.model),
+  ],
+)
 
 /** The last running totals seen per session, provider conversation and model. */
 export const providerUsageBaselines = sqliteTable(
@@ -415,6 +438,8 @@ export const projectionSessions = sqliteTable(
      * narrate".
      */
     planProgressJson: text('plan_progress_json'),
+    forkedFromJson: text('forked_from_json'),
+    agent: text('agent'),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull(),
     archivedAt: text('archived_at'),
@@ -638,3 +663,12 @@ export type ProjectionSessionRuntimeRow = typeof projectionSessionRuntime.$infer
 export type ProjectionSessionProposedPlanRow = typeof projectionSessionProposedPlans.$inferSelect
 export type ProjectionSessionCheckpointRow = typeof projectionSessionCheckpoints.$inferSelect
 export type ProviderSessionRuntimeRow = typeof providerSessionRuntime.$inferSelect
+
+export const providerResetCreditAttempts = sqliteTable('provider_reset_credit_attempts', {
+  accountKey: text('account_key').primaryKey(),
+  creditId: text('credit_id').notNull(),
+  idempotencyKey: text('idempotency_key').notNull(),
+  confirmedAt: text('confirmed_at').notNull(),
+  outcome: text('outcome', { enum: ['reset', 'nothingToReset', 'noCredit', 'alreadyRedeemed'] }),
+  settledAt: text('settled_at'),
+})

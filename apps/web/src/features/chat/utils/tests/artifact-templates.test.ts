@@ -42,25 +42,27 @@ test('accepts the template metadata Codex emits and rejects malformed metadata',
 
 test('splits a directive line into a card between the Markdown around it', () => {
   expect(splitArtifactTemplateMarkdown(`Made it.\n\n${DIRECTIVE}\n\nUse it any time.`)).toEqual([
-    { kind: 'markdown', markdown: 'Made it.\n' },
+    { kind: 'markdown', lineOffset: 0, markdown: 'Made it.\n' },
     { kind: 'artifact-template', template: TEMPLATE },
-    { kind: 'markdown', markdown: '\nUse it any time.' },
+    { kind: 'markdown', lineOffset: 3, markdown: '\nUse it any time.' },
   ])
 })
 
 test('leaves a malformed directive and one inside a code fence as literal Markdown', () => {
   const malformed = '::artifact-template{artifact_kind="document" skill_name="x"}'
   expect(splitArtifactTemplateMarkdown(malformed)).toEqual([
-    { kind: 'markdown', markdown: malformed },
+    { kind: 'markdown', lineOffset: 0, markdown: malformed },
   ])
   const fenced = `\`\`\`md\n${DIRECTIVE}\n\`\`\``
-  expect(splitArtifactTemplateMarkdown(fenced)).toEqual([{ kind: 'markdown', markdown: fenced }])
+  expect(splitArtifactTemplateMarkdown(fenced)).toEqual([
+    { kind: 'markdown', lineOffset: 0, markdown: fenced },
+  ])
 })
 
 test('holds an unfinished directive while streaming, then settles into one card', () => {
   const partial = `Made it.\n${DIRECTIVE.slice(0, 40)}`
   expect(splitArtifactTemplateMarkdown(partial, true)).toEqual([
-    { kind: 'markdown', markdown: 'Made it.' },
+    { kind: 'markdown', lineOffset: 0, markdown: 'Made it.' },
   ])
   expect(
     splitArtifactTemplateMarkdown(`Made it.\n${DIRECTIVE}`, true).filter(

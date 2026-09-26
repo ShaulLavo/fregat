@@ -99,8 +99,12 @@ describe('platform migration ledger', () => {
     expect(applied.map(({ version, name }) => ({ version, name }))).toEqual([
       { version: 29, name: 'turn_end_reason' },
       { version: 30, name: 'message_model_selection' },
+      { version: 31, name: 'session_fork_and_agent' },
+      { version: 32, name: 'provider_usage_source' },
       { version: 35, name: 'worktree_base_branch' },
+      { version: 36, name: 'provider_usage_import_requests' },
       { version: 37, name: 'terminal_session_cleanup' },
+      { version: 38, name: 'provider_reset_credit_attempts' },
     ])
     expect(columnNames(handle, 'projection_turns')).toContain('end_reason')
     expect(columnNames(handle, 'projection_session_messages')).toContain('model_selection_json')
@@ -143,8 +147,12 @@ describe('platform migration ledger', () => {
       { version: 28, name: 'session_lifecycle_revision' },
       { version: 29, name: 'turn_end_reason' },
       { version: 30, name: 'message_model_selection' },
+      { version: 31, name: 'session_fork_and_agent' },
+      { version: 32, name: 'provider_usage_source' },
       { version: 35, name: 'worktree_base_branch' },
+      { version: 36, name: 'provider_usage_import_requests' },
       { version: 37, name: 'terminal_session_cleanup' },
+      { version: 38, name: 'provider_reset_credit_attempts' },
     ])
     expect(columnNames(handle, 'push_devices')).toContain('revision')
     expect(columnNames(handle, 'projection_sessions')).toContain('lifecycle_revision')
