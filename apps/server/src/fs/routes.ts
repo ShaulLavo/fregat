@@ -6,6 +6,7 @@ import {
   createFolderBodySchema,
   deleteBodySchema,
   eventsQuerySchema,
+  languageCensusQuerySchema,
   lookupWorkspaceAddressesBodySchema,
   openWorkspaceRootBodySchema,
   pathQuerySchema,
@@ -91,6 +92,12 @@ export function fsRoutes(fs: FileSystemService) {
         {
           query: eventsQuerySchema,
         },
+      )
+      // Waits for the root's first index build, bounded by the request.
+      .get(
+        '/workspace-index/languages',
+        ({ query, request }) => fs.languageCensus(query.root, request.signal),
+        { query: languageCensusQuerySchema },
       )
       // Recents that are gone are skipped and pruned from the store.
       .get('/recents', ({ query }) => fs.recents(query), {
