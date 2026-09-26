@@ -1,3 +1,5 @@
+import { use } from 'react'
+import { SettingsDisplayContext } from '@/features/settings/providers/display-context'
 import type { SettingsViewTarget, SettingsWriteTarget } from '@workspace/contracts'
 import { useStore } from 'zustand'
 import { createStore } from 'zustand/vanilla'
@@ -17,7 +19,8 @@ export function selectSettingsScope(next: SettingsScope) {
 }
 
 export function useSettingsScope(): SettingsScope {
-  return useStore(store)
+  const requested = useStore(store)
+  return use(SettingsDisplayContext)?.scope ?? requested
 }
 
 /** The layer a write from this page goes to. The defaults tab writes nothing, so it falls back to user. */

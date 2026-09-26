@@ -1,3 +1,4 @@
+import { SettingsDisplayProvider } from '@/features/settings/providers/display-provider'
 import { useReloadView } from '@/features/settings/hooks/use-reload-view'
 import { ToolPane } from '@workspace/ui/patterns/tool-pane'
 import { workspaceRoot } from '@/lib/documents/utils/identity'
@@ -137,7 +138,7 @@ export function SettingsPage({
   const onlyUsage = shown.length === 1 && shown[0]?.[0] === 'Usage'
 
   return (
-    <SettingsOwnerProvider queryClient={owner}>
+    <SettingsDisplayProvider queryClient={owner} scope={scope} view={showJson ? 'json' : 'form'}>
       <ToolPane
         className='@container/settings h-full min-w-0'
         bodyClassName='flex flex-col'
@@ -149,19 +150,13 @@ export function SettingsPage({
             actions={
               <div className='flex items-center justify-end gap-1'>
                 {pending ? <Spinner label='Loading settings view' size='xs' /> : null}
-                {tabId ? <ViewToggle shownView={showJson ? 'json' : 'form'} /> : null}
+                {tabId ? <ViewToggle /> : null}
                 <SettingsOwnerProvider key={showJson ? 'editor' : 'global'} queryClient={owner}>
                   {project ? null : <PageActions scope={writableSettingsScope(scope)} />}
                 </SettingsOwnerProvider>
               </div>
             }
-            scope={
-              <ScopeTabs
-                shownScope={scope}
-                hasDefaults={tabId !== undefined}
-                hasWorkspace={hasWorkspace}
-              />
-            }
+            scope={<ScopeTabs hasDefaults={tabId !== undefined} hasWorkspace={hasWorkspace} />}
             search={
               showJson ? null : (
                 <InputGroup className='min-w-0 flex-1'>
@@ -297,7 +292,7 @@ export function SettingsPage({
           </div>
         )}
       </ToolPane>
-    </SettingsOwnerProvider>
+    </SettingsDisplayProvider>
   )
 }
 

@@ -1,4 +1,5 @@
-import { useMemo } from 'react'
+import { registerDisplayedSelection } from '@/features/settings/state/selection'
+import { useLayoutEffect, useMemo } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useHeldUntilReady } from '@/hooks/use-held-until-ready'
 import { useSettingsDisplay } from '@/features/settings/hooks/use-settings-display'
@@ -32,5 +33,15 @@ export function useHeldDisplay(
     (!showJson || liveDocument?.key === documentKey(settingsJsonDocument(scope)))
   // Errors settle too: a failed subject must be reachable rather than held forever.
   const shown = useHeldUntilReady(next, ready || display.document.isError)
+  const shownScope = shown.scope
+  const shownJson = shown.showJson
+  useLayoutEffect(() => {
+    if (!tabId) return
+    return registerDisplayedSelection(
+      editorOwner,
+      tabId,
+      shownJson ? { kind: 'json', target: shownScope } : { kind: 'form' },
+    )
+  }, [editorOwner, tabId, shownJson, shownScope])
   return { ...(shown.showJson ? json : form), ...shown, pending: shown !== next }
 }
