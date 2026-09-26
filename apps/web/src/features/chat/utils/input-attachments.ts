@@ -23,12 +23,6 @@ export function filesFromTransfer(dataTransfer: DataTransfer | null) {
   return filesFromFileList(dataTransfer.files)
 }
 
-export function filesFromClipboard(clipboardData: DataTransfer | null) {
-  if (!clipboardData) return []
-
-  return filesFromFileList(clipboardData.files)
-}
-
 /**
  * The shape the composer submits. `dataUrl` is kept — it is the only copy of
  * the bytes, and stripping it here is what used to make every pasted image a

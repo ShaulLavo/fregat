@@ -46,6 +46,7 @@ import {
 import { useProjectEntrySearch } from '../hooks/use-project-entry-search'
 import { providerCommandCatalogQueryOptions } from '@/features/chat/utils/composer-skills'
 import { useComposerInbox } from '../hooks/use-composer-inbox'
+import { useChatInputSpellcheck } from '@/features/chat/hooks/use-chat-input-spellcheck'
 import { ComposerRootsContext } from '@/lib/composer-attach/providers/roots-context'
 import { useAttachmentPreparation } from '@/features/chat/hooks/use-attachment-preparation'
 import { useProvider } from '@/features/chat/hooks/use-provider'
@@ -233,6 +234,7 @@ export function ChatInput({
   // hold them — the terminal is often right-clicked while the sidebar is on
   // Files, so the reveal that follows is what mounts this component.
   useComposerInbox(draftTarget, editorRef, editorReady, aliasRoots)
+  useChatInputSpellcheck(composerEditor)
 
   useEffect(() => {
     const activeItemStillPresent = commandMenuItems.some((item) => item.id === activeCommandItemId)

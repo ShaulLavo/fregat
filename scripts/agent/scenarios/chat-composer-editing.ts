@@ -11,7 +11,7 @@ import { isolatedNativeScenario, withUserSetting } from './native-provider-verif
 export const chatComposerEditing = isolatedNativeScenario({
   name: 'chat-composer-editing',
   description:
-    'Composer on the Editor: mod-enter keeps Enter for new lines, a menu-picked and a hand-typed @mention become chips, the caret steps over a chip and one Backspace deletes it, an IME commit lands, a large paste folds (Ctrl+Shift+V keeps it inline), a pasted mention becomes a chip, and a two-line message with a chip sends on Ctrl+Enter; then the same composer at phone width. Fixture provider only.',
+    'Composer on the Editor: mod-enter keeps Enter for new lines, a menu-picked and a hand-typed @mention become chips, the caret steps over a chip and one Backspace deletes it, an IME commit lands, a large paste folds (Ctrl+Shift+V keeps it inline), a pasted mention becomes a chip, a misspelled word is marked, and a two-line message with a chip sends on Ctrl+Enter; then the same composer at phone width. Fixture provider only.',
   fixture: new URL('../fixtures/native-codex.mjs', import.meta.url),
   async drive(page, { step, orchestration }) {
     const composer = selectors.chatComposer(page)
@@ -77,6 +77,33 @@ export const chatComposerEditing = isolatedNativeScenario({
     await chips.first().waitFor()
     strictEqual(await selectors.chatPromptText(page), 'read @package.json')
     await step('pasted-mention-chips')
+
+    await selectors.fillChatMessage(page, '')
+    await page.keyboard.type('the list settles befor the cursor', { delay: 20 })
+    await page
+      .waitForFunction(
+        // Spelling paints as an overlay whose rule draws the wavy line; its name is the editor's.
+        () => {
+          const rules = [...document.styleSheets].flatMap((sheet) => [...sheet.cssRules])
+          return [...CSS.highlights.entries()].some(
+            ([name, highlight]) =>
+              [...highlight].some((range) => !(range as AbstractRange).collapsed) &&
+              rules.some(
+                (rule) =>
+                  rule.cssText.includes(`::highlight(${name})`) && /wavy/.test(rule.cssText),
+              ),
+          )
+        },
+        undefined,
+        { timeout: 10_000 },
+      )
+      .catch(async () => {
+        const names = await page.evaluate(() =>
+          [...CSS.highlights.entries()].map(([name, h]) => `${name}:${h.size}`).join(' '),
+        )
+        throw new Error(`No spelling highlight. Highlights: ${names}`)
+      })
+    await step('misspelling-marked')
 
     await withUserSetting(
       page,

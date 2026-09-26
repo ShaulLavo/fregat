@@ -83,6 +83,15 @@ export const SETTINGS_REGISTRY = {
     description:
       'Show the Plan mode picker and /plan and /default commands for providers that support them. Stored draft preferences are retained while hidden.',
   }),
+  'chat.spellcheck': defineSetting({
+    schema: v.boolean(),
+    default: true,
+    scope: 'application',
+    widget: 'boolean',
+    category: 'Chat',
+    title: 'Spellcheck',
+    description: 'Underline misspelled English words in the message box.',
+  }),
   'chat.activeFileContext': defineSetting({
     schema: v.boolean(),
     default: false,

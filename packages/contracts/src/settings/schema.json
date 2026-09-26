@@ -185,6 +185,11 @@
       "enum": ["created_at", "updated_at"],
       "type": "string"
     },
+    "chat.spellcheck": {
+      "default": true,
+      "description": "Underline misspelled English words in the message box.",
+      "type": "boolean"
+    },
     "chat.textGenerationModel": {
       "default": {
         "model": "gpt-5.6-luna",

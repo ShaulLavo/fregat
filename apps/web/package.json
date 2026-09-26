@@ -58,6 +58,7 @@
     "@singapore-editor/plugin-ui": "0.1.0",
     "@singapore-editor/react": "0.1.1",
     "@singapore-editor/scope-lines": "0.1.1",
+    "@singapore-editor/spellcheck": "0.1.1",
     "@singapore-editor/textbuffer": "0.1.0",
     "@singapore-editor/tree-sitter": "0.1.1",
     "@singapore-editor/tree-sitter-languages": "0.1.1",

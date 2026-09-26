@@ -7,7 +7,7 @@ import { basename } from '@/lib/path-formatters'
  * The visible half of a mention. The editor paints it over the mention's `@path` text, which stays
  * the message; the node the editor mounts it into already refuses the caret.
  */
-export function ChatInputMentionChip({ path }: { readonly path: string }) {
+function ChatInputMentionChip({ path }: { readonly path: string }) {
   return (
     <span
       className='bg-muted text-foreground inline-flex max-w-full items-baseline gap-1 rounded-md px-1 align-baseline font-mono text-[0.9em] leading-tight select-none'
