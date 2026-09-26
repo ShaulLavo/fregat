@@ -24,10 +24,10 @@ afterEach(() => {
 describe('FileTree browser behavior', () => {
   it('restores the initial virtual window and reports user scrolling', async () => {
     const onScrollTopChange = vi.fn()
-    const { shadowRoot } = await mountBrowserTree({ initialScrollTop: 480, onScrollTopChange })
-    const scroll = virtualScroll(shadowRoot)
+    const { tree } = await mountBrowserTree({ initialScrollTop: 480, onScrollTopChange })
+    const scroll = virtualScroll(tree)
     expect(scroll.scrollTop).toBe(480)
-    expect(rowButton(shadowRoot, 'src/features/a-20.ts')).toBeTruthy()
+    expect(rowButton(tree, 'src/features/a-20.ts')).toBeTruthy()
     scroll.scrollTop = 360
     scroll.dispatchEvent(new Event('scroll'))
     await vi.waitFor(() => expect(onScrollTopChange).toHaveBeenLastCalledWith(360))
@@ -39,12 +39,11 @@ describe('FileTree browser behavior', () => {
       const renderMenu = vi.fn(
         (item: FileTreeContextMenuItem, _context: FileTreeContextMenuOpenContext) => {
           const menu = document.createElement('div')
-          menu.dataset.fileTreeContextMenuRoot = 'true'
           menu.textContent = item.path
           return menu
         },
       )
-      const { shadowRoot } = await mountBrowserTree({
+      const { tree } = await mountBrowserTree({
         composition: { contextMenu: { enabled: true, triggerMode, render: renderMenu } },
         renderRowDecoration,
       })
@@ -52,39 +51,35 @@ describe('FileTree browser behavior', () => {
       renderRowDecoration.mockClear()
 
       for (const path of ['src/features/a-0.ts', 'src/features/a-1.ts', 'src/features/a-2.ts']) {
-        rowButton(shadowRoot, path).dispatchEvent(
-          new PointerEvent('pointerover', { bubbles: true }),
-        )
+        rowButton(tree, path).dispatchEvent(new PointerEvent('pointerover', { bubbles: true }))
         await settleBrowserFrames()
         if (triggerMode === 'right-click') continue
-        const anchor = shadowRoot.querySelector<HTMLElement>('[data-type="context-menu-anchor"]')
+        const anchor = tree.querySelector<HTMLElement>('[data-type="context-menu-anchor"]')
         expect(anchor?.getBoundingClientRect().top).toBeCloseTo(
-          rowButton(shadowRoot, path).getBoundingClientRect().top,
+          rowButton(tree, path).getBoundingClientRect().top,
           1,
         )
       }
       expect(renderRowDecoration.mock.calls.length).toBe(0)
 
-      const trigger = shadowRoot.querySelector<HTMLButtonElement>(
-        '[data-type="context-menu-trigger"]',
-      )
+      const trigger = tree.querySelector<HTMLButtonElement>('[data-type="context-menu-trigger"]')
       expect(trigger?.dataset.visible).toBe(triggerMode === 'both' ? 'true' : 'false')
-      rowButton(shadowRoot, 'src/features/a-2.ts').dispatchEvent(
+      rowButton(tree, 'src/features/a-2.ts').dispatchEvent(
         new PointerEvent('pointerout', { bubbles: true, relatedTarget: document.body }),
       )
       await settleBrowserFrames()
       expect(
-        shadowRoot.querySelector<HTMLElement>('[data-type="context-menu-anchor"]')?.dataset.visible,
+        tree.querySelector<HTMLElement>('[data-type="context-menu-anchor"]')?.dataset.visible,
       ).toBe('false')
       expect(renderRowDecoration.mock.calls.length).toBe(0)
-      rowButton(shadowRoot, 'src/features/a-2.ts').dispatchEvent(
+      rowButton(tree, 'src/features/a-2.ts').dispatchEvent(
         new PointerEvent('pointerover', { bubbles: true }),
       )
       await settleBrowserFrames()
       if (triggerMode === 'both') {
         trigger?.click()
       } else {
-        rowButton(shadowRoot, 'src/features/a-2.ts').dispatchEvent(
+        rowButton(tree, 'src/features/a-2.ts').dispatchEvent(
           new MouseEvent('contextmenu', { bubbles: true }),
         )
       }
@@ -92,7 +87,7 @@ describe('FileTree browser behavior', () => {
       expect(renderMenu.mock.calls[0]?.[0].path).toBe('src/features/a-2.ts')
       renderMenu.mock.calls[0]?.[1].close({ restoreFocus: false })
       await settleBrowserFrames()
-      const keyboardRow = rowButton(shadowRoot, 'src/features/a-1.ts')
+      const keyboardRow = rowButton(tree, 'src/features/a-1.ts')
       keyboardRow.focus()
       keyboardRow.dispatchEvent(
         new KeyboardEvent('keydown', { bubbles: true, key: 'F10', shiftKey: true }),
@@ -114,75 +109,73 @@ describe('FileTree browser behavior', () => {
       menu.textContent = item.path
       return menu
     })
-    const { shadowRoot } = await mountBrowserTree({
+    const { tree } = await mountBrowserTree({
       composition: { contextMenu: { enabled: true, triggerMode: 'both', render: renderMenu } },
       renderRowDecoration,
     })
-    const scroll = virtualScroll(shadowRoot)
+    const scroll = virtualScroll(tree)
     scroll.scrollTop = 120
     scroll.dispatchEvent(new Event('scroll', { bubbles: true }))
-    await vi.waitFor(() =>
-      expect(virtualRoot(shadowRoot).hasAttribute('data-is-scrolling')).toBe(false),
-    )
+    await vi.waitFor(() => expect(virtualRoot(tree).hasAttribute('data-is-scrolling')).toBe(false))
     await settleBrowserFrames()
     renderRowDecoration.mockClear()
-    const stickyRow = shadowRoot.querySelector<HTMLElement>(
+    const stickyRow = tree.querySelector<HTMLElement>(
       '[data-file-tree-sticky-path="src/features/"]',
     )
     expect(stickyRow).not.toBeNull()
     stickyRow!.dispatchEvent(new PointerEvent('pointerover', { bubbles: true }))
     await settleBrowserFrames()
-    const anchor = shadowRoot.querySelector<HTMLElement>('[data-type="context-menu-anchor"]')
+    const anchor = tree.querySelector<HTMLElement>('[data-type="context-menu-anchor"]')
     expect(anchor?.getBoundingClientRect().top).toBeCloseTo(
       stickyRow!.getBoundingClientRect().top,
       1,
     )
     expect(renderRowDecoration.mock.calls.length).toBe(0)
-    shadowRoot.querySelector<HTMLButtonElement>('[data-type="context-menu-trigger"]')?.click()
+    tree.querySelector<HTMLButtonElement>('[data-type="context-menu-trigger"]')?.click()
     await vi.waitFor(() => expect(renderMenu).toHaveBeenCalledTimes(1))
     expect(renderMenu.mock.calls[0]?.[0].path).toBe('src/features/')
     expect(scroll.scrollTop).toBe(120)
   })
 
   it('renders rows, scrolls, keeps sticky rows, handles keyboard focus, and starts rename', async () => {
-    const { model: currentModel, shadowRoot } = await mountBrowserTree()
-    const firstRow = rowButton(shadowRoot, 'src/features/')
+    const { model: currentModel, tree } = await mountBrowserTree()
+    const firstRow = rowButton(tree, 'src/features/')
     expect(firstRow.getAttribute('role')).toBe('treeitem')
 
-    const changedRow = rowButton(shadowRoot, 'src/features/a-3.ts')
+    const changedRow = rowButton(tree, 'src/features/a-3.ts')
     expect(changedRow.dataset.itemGitStatus).toBe('modified')
 
     firstRow.focus()
     firstRow.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowDown' }))
 
     await vi.waitFor(() => {
-      expect(activePath(shadowRoot)).toBe('src/features/a-0.ts')
+      expect(activePath(tree)).toBe('src/features/a-0.ts')
     })
 
-    const scrollElement = virtualScroll(shadowRoot)
+    const scrollElement = virtualScroll(tree)
     scrollElement.scrollTop = 120
     scrollElement.dispatchEvent(new Event('scroll', { bubbles: true }))
 
     await vi.waitFor(() => {
-      expect(shadowRoot.querySelector('[data-file-tree-sticky-path="src/features/"]')).toBeTruthy()
-      expect(virtualRoot(shadowRoot).dataset.scrollAtTop).toBeUndefined()
+      expect(tree.querySelector('[data-file-tree-sticky-path="src/features/"]')).toBeTruthy()
+      expect(virtualRoot(tree).dataset.scrollAtTop).toBeUndefined()
     })
 
     currentModel.startRenaming('src/features/a-3.ts')
 
     await vi.waitFor(() => {
-      const input = shadowRoot.querySelector<HTMLInputElement>('[data-item-rename-input]')
+      const input = tree.querySelector<HTMLInputElement>('[data-item-rename-input]')
       expect(input?.value).toBe('a-3.ts')
     })
   })
 
   it('preserves scroll position when selecting a visible row by pointer', async () => {
-    const { model: currentModel, shadowRoot } = await mountBrowserTree()
-    const scrollElement = virtualScroll(shadowRoot)
+    const { model: currentModel, tree } = await mountBrowserTree()
+    const scrollElement = virtualScroll(tree)
     scrollElement.scrollTop = 120
     scrollElement.dispatchEvent(new Event('scroll', { bubbles: true }))
 
-    const selectedRow = rowButton(shadowRoot, 'src/features/a-3.ts')
+    const selectedRow = rowButton(tree, 'src/features/a-3.ts')
 
     const previousScrollTop = scrollElement.scrollTop
     selectedRow.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0, detail: 1 }))
@@ -197,9 +190,9 @@ describe('FileTree browser behavior', () => {
   })
 
   it('changes density in place while preserving tree state and the logical scroll anchor', async () => {
-    const { model: currentModel, shadowRoot } = await mountBrowserTree()
-    const host = document.querySelector<HTMLElement>('file-tree-container')
-    const scrollElement = virtualScroll(shadowRoot)
+    const { model: currentModel, tree } = await mountBrowserTree()
+    const host = document.querySelector<HTMLElement>('[data-file-tree]')
+    const scrollElement = virtualScroll(tree)
 
     currentModel.focusPath('src/features/a-3.ts')
     currentModel.getItem('src/features/a-3.ts')?.select()
@@ -215,7 +208,7 @@ describe('FileTree browser behavior', () => {
     currentModel.setDensity('compact', 20)
 
     await vi.waitFor(() => {
-      const visibleRow = shadowRoot.querySelector<HTMLButtonElement>(
+      const visibleRow = tree.querySelector<HTMLButtonElement>(
         'button[data-item-path]:not([data-file-tree-sticky-row="true"])',
       )
       expect(host?.style.getPropertyValue('--trees-item-height')).toBe('20px')
@@ -230,14 +223,14 @@ describe('FileTree browser behavior', () => {
     currentModel.focus()
 
     await vi.waitFor(() => {
-      expect(activePath(shadowRoot)).toBe('src/features/a-27.ts')
+      expect(activePath(tree)).toBe('src/features/a-27.ts')
     })
     scrollElement.scrollTop = compactScrollTop
     scrollElement.dispatchEvent(new Event('scroll', { bubbles: true }))
 
     await vi.waitFor(() => {
       expect(scrollElement.scrollTop).toBe(compactScrollTop)
-      expect(shadowRoot.querySelector('[data-file-tree-sticky-path="src/features/"]')).toBeTruthy()
+      expect(tree.querySelector('[data-file-tree-sticky-path="src/features/"]')).toBeTruthy()
     })
 
     currentModel.setDensity('compact', 24)
@@ -246,7 +239,7 @@ describe('FileTree browser behavior', () => {
       const expectedScrollTop = Math.round(compactScrollTop * (24 / 20))
       expect(scrollElement.scrollTop).toBe(expectedScrollTop)
       expect(scrollElement.scrollTop).toBeGreaterThan(compactMaxScrollTop)
-      expect(activePath(shadowRoot)).toBe('src/features/a-27.ts')
+      expect(activePath(tree)).toBe('src/features/a-27.ts')
     })
     const directory = currentModel.getItem('src/features/')
     expect(directory != null && 'isExpanded' in directory && directory.isExpanded()).toBe(true)
@@ -255,24 +248,24 @@ describe('FileTree browser behavior', () => {
   })
 
   it('preserves keyboard branch order for rename, selection, and directional navigation', async () => {
-    const { model: currentModel, shadowRoot } = await mountBrowserTree()
-    const directoryRow = rowButton(shadowRoot, 'src/features/')
+    const { model: currentModel, tree } = await mountBrowserTree()
+    const directoryRow = rowButton(tree, 'src/features/')
     directoryRow.focus()
 
     dispatchTreeKey(directoryRow, 'F2')
     await vi.waitFor(() => {
-      expect(shadowRoot.querySelector<HTMLInputElement>('[data-item-rename-input]')?.value).toBe(
+      expect(tree.querySelector<HTMLInputElement>('[data-item-rename-input]')?.value).toBe(
         'features',
       )
     })
-    const renameInput = shadowRoot.querySelector<HTMLInputElement>('[data-item-rename-input]')
+    const renameInput = tree.querySelector<HTMLInputElement>('[data-item-rename-input]')
     expect(renameInput).not.toBeNull()
     dispatchRenameKey(renameInput as HTMLInputElement, 'Escape')
 
     await vi.waitFor(() => {
-      expect(shadowRoot.querySelector('[data-item-rename-input]')).toBeNull()
+      expect(tree.querySelector('[data-item-rename-input]')).toBeNull()
     })
-    const restoredDirectoryRow = rowButton(shadowRoot, 'src/features/')
+    const restoredDirectoryRow = rowButton(tree, 'src/features/')
     dispatchTreeKey(restoredDirectoryRow, 'a', { ctrlKey: true })
     await vi.waitFor(() => {
       expect(currentModel.getSelectedPaths().length).toBeGreaterThan(2)
@@ -284,30 +277,30 @@ describe('FileTree browser behavior', () => {
 
     dispatchTreeKey(restoredDirectoryRow, 'End')
     await vi.waitFor(() => {
-      expect(activePath(shadowRoot)).toBe('src/features/a-27.ts')
+      expect(activePath(tree)).toBe('src/features/a-27.ts')
     })
-    dispatchTreeKey(rowButton(shadowRoot, 'src/features/a-27.ts'), 'Home')
+    dispatchTreeKey(rowButton(tree, 'src/features/a-27.ts'), 'Home')
     await vi.waitFor(() => {
-      expect(activePath(shadowRoot)).toBe('src/features/')
+      expect(activePath(tree)).toBe('src/features/')
     })
 
     currentModel.focusPath('src/features/')
     await vi.waitFor(() => {
-      expect(activePath(shadowRoot)).toBe('src/features/')
+      expect(activePath(tree)).toBe('src/features/')
     })
-    dispatchTreeKey(rowButton(shadowRoot, 'src/features/'), 'ArrowLeft')
+    dispatchTreeKey(rowButton(tree, 'src/features/'), 'ArrowLeft')
     await vi.waitFor(() => {
-      expect(rowButton(shadowRoot, 'src/features/').getAttribute('aria-expanded')).toBe('false')
+      expect(rowButton(tree, 'src/features/').getAttribute('aria-expanded')).toBe('false')
     })
-    dispatchTreeKey(rowButton(shadowRoot, 'src/features/'), 'ArrowRight')
+    dispatchTreeKey(rowButton(tree, 'src/features/'), 'ArrowRight')
     await vi.waitFor(() => {
-      expect(rowButton(shadowRoot, 'src/features/').getAttribute('aria-expanded')).toBe('true')
+      expect(rowButton(tree, 'src/features/').getAttribute('aria-expanded')).toBe('true')
     })
   })
 
   it('cancels an earlier smooth reveal when the new target is already visible', async () => {
-    const { model: currentModel, shadowRoot } = await mountBrowserTree()
-    const scrollElement = virtualScroll(shadowRoot)
+    const { model: currentModel, tree } = await mountBrowserTree()
+    const scrollElement = virtualScroll(tree)
 
     flushSync(() => {
       currentModel.scrollToPath('src/features/a-20.ts', { behavior: 'smooth', focus: false })
@@ -321,17 +314,17 @@ describe('FileTree browser behavior', () => {
 
     expect(scrollElement.scrollTop).toBe(0)
     expect(
-      rowButton(shadowRoot, 'src/features/a-0.ts').getBoundingClientRect().top,
+      rowButton(tree, 'src/features/a-0.ts').getBoundingClientRect().top,
     ).toBeGreaterThanOrEqual(scrollElement.getBoundingClientRect().top)
   })
 
   it('settles a late scroll event after cancelling a reveal already in view', async () => {
-    const { model: currentModel, shadowRoot } = await mountBrowserTree({
+    const { model: currentModel, tree } = await mountBrowserTree({
       pathCount: 80,
       stickyFolders: false,
     })
-    const scrollElement = virtualScroll(shadowRoot)
-    await startSmoothReveal(currentModel, shadowRoot)
+    const scrollElement = virtualScroll(tree)
+    await startSmoothReveal(currentModel, tree)
 
     flushSync(() => {
       currentModel.scrollToPath('src/features/a-0.ts', { behavior: 'smooth', focus: false })
@@ -342,24 +335,24 @@ describe('FileTree browser behavior', () => {
 
     expect(scrollElement.scrollTop).toBeLessThanOrEqual(20)
     expect(
-      rowButton(shadowRoot, 'src/features/a-0.ts').getBoundingClientRect().top,
+      rowButton(tree, 'src/features/a-0.ts').getBoundingClientRect().top,
     ).toBeGreaterThanOrEqual(scrollElement.getBoundingClientRect().top)
   })
 
   it('invalidates a cancelled reveal when projection order changes its row', async () => {
-    const { model: currentModel, shadowRoot } = await mountBrowserTree({
+    const { model: currentModel, tree } = await mountBrowserTree({
       pathCount: 80,
       stickyFolders: false,
     })
-    const scrollElement = virtualScroll(shadowRoot)
-    await startSmoothReveal(currentModel, shadowRoot)
+    const scrollElement = virtualScroll(tree)
+    await startSmoothReveal(currentModel, tree)
     flushSync(() => {
       currentModel.scrollToPath('src/features/a-0.ts', { behavior: 'smooth', focus: false })
     })
     flushSync(() => {
       currentModel.resetPaths([...browserPaths(80), 'src/features/0-before.ts'])
     })
-    const rows = shadowRoot.querySelectorAll<HTMLButtonElement>('button[data-item-path]')
+    const rows = tree.querySelectorAll<HTMLButtonElement>('button[data-item-path]')
     expect(rows[1]?.dataset.itemPath).toBe('src/features/0-before.ts')
     expect(rows[2]?.dataset.itemPath).toBe('src/features/a-0.ts')
 
@@ -368,17 +361,17 @@ describe('FileTree browser behavior', () => {
 
     expect(scrollElement.scrollTop).toBe(24)
     expect(
-      rowButton(shadowRoot, 'src/features/a-0.ts').getBoundingClientRect().top,
+      rowButton(tree, 'src/features/a-0.ts').getBoundingClientRect().top,
     ).toBeGreaterThanOrEqual(scrollElement.getBoundingClientRect().top)
   })
 
   it('discards a cancelled reveal when its path is removed', async () => {
-    const { model: currentModel, shadowRoot } = await mountBrowserTree({
+    const { model: currentModel, tree } = await mountBrowserTree({
       pathCount: 80,
       stickyFolders: false,
     })
-    const scrollElement = virtualScroll(shadowRoot)
-    await startSmoothReveal(currentModel, shadowRoot)
+    const scrollElement = virtualScroll(tree)
+    await startSmoothReveal(currentModel, tree)
     flushSync(() => {
       currentModel.scrollToPath('src/features/a-0.ts', { behavior: 'smooth', focus: false })
     })
@@ -386,7 +379,7 @@ describe('FileTree browser behavior', () => {
       currentModel.remove('src/features/a-0.ts')
     })
     expect(currentModel.getItem('src/features/a-0.ts')).toBeNull()
-    const rows = shadowRoot.querySelectorAll<HTMLButtonElement>('button[data-item-path]')
+    const rows = tree.querySelectorAll<HTMLButtonElement>('button[data-item-path]')
     expect(rows[1]?.dataset.itemPath).toBe('src/features/a-1.ts')
 
     scrollElement.scrollTop = 24
@@ -396,7 +389,7 @@ describe('FileTree browser behavior', () => {
   })
 
   it('a missing scroll row does not suppress an explicit focus request', async () => {
-    const { model: currentModel, shadowRoot } = await mountBrowserTree({ pathCount: 80 })
+    const { model: currentModel, tree } = await mountBrowserTree({ pathCount: 80 })
     const outsideButton = document.createElement('button')
     document.body.prepend(outsideButton)
     outsideButton.focus()
@@ -410,16 +403,16 @@ describe('FileTree browser behavior', () => {
 
     expect(currentModel.getItem('src/features/a-79.ts')).toBeNull()
     expect(currentModel.getFocusedPath()).toBe('src/features/a-0.ts')
-    expect(activePath(shadowRoot)).toBe('src/features/a-0.ts')
+    expect(activePath(tree)).toBe('src/features/a-0.ts')
   })
 
   it('a cancelled reveal cannot overwrite a newer scroll request', async () => {
-    const { model: currentModel, shadowRoot } = await mountBrowserTree({
+    const { model: currentModel, tree } = await mountBrowserTree({
       pathCount: 80,
       stickyFolders: false,
     })
-    const scrollElement = virtualScroll(shadowRoot)
-    await startSmoothReveal(currentModel, shadowRoot)
+    const scrollElement = virtualScroll(tree)
+    await startSmoothReveal(currentModel, tree)
 
     flushSync(() => {
       currentModel.scrollToPath('src/features/a-0.ts', { behavior: 'smooth', focus: false })
@@ -435,12 +428,12 @@ describe('FileTree browser behavior', () => {
   })
 
   it('a cancelled reveal yields to subsequent user scrolling', async () => {
-    const { model: currentModel, shadowRoot } = await mountBrowserTree({
+    const { model: currentModel, tree } = await mountBrowserTree({
       pathCount: 80,
       stickyFolders: false,
     })
-    const scrollElement = virtualScroll(shadowRoot)
-    await startSmoothReveal(currentModel, shadowRoot)
+    const scrollElement = virtualScroll(tree)
+    await startSmoothReveal(currentModel, tree)
 
     flushSync(() => {
       currentModel.scrollToPath('src/features/a-0.ts', { behavior: 'smooth', focus: false })
@@ -453,22 +446,22 @@ describe('FileTree browser behavior', () => {
   })
 
   it('settles controller scroll requests and opens search from a printable row key', async () => {
-    const { model: currentModel, shadowRoot } = await mountBrowserTree()
-    const directoryRow = rowButton(shadowRoot, 'src/features/')
+    const { model: currentModel, tree } = await mountBrowserTree()
+    const directoryRow = rowButton(tree, 'src/features/')
     directoryRow.focus()
-    const scrollElement = virtualScroll(shadowRoot)
+    const scrollElement = virtualScroll(tree)
 
     currentModel.scrollToPath('src/features/a-20.ts', { focus: false, offset: 'center' })
     await vi.waitFor(() => {
       expect(scrollElement.scrollTop).toBeGreaterThan(0)
     })
     expect(currentModel.getFocusedPath()).toBe('src/features/')
-    expect(activePath(shadowRoot)).toBe('src/features/')
+    expect(activePath(tree)).toBe('src/features/')
 
     currentModel.scrollToPath('src/features/a-20.ts', { offset: 'nearest' })
     await vi.waitFor(() => {
       expect(currentModel.getFocusedPath()).toBe('src/features/a-20.ts')
-      expect(activePath(shadowRoot)).toBeNull()
+      expect(activePath(tree)).toBeNull()
     })
 
     currentModel.cleanUp()
@@ -477,15 +470,15 @@ describe('FileTree browser behavior', () => {
     root = null
     document.body.innerHTML = ''
     const searchTree = await mountSearchTree('retain')
-    const searchRow = rowButton(searchTree.shadowRoot, 'README.md')
+    const searchRow = rowButton(searchTree.tree, 'README.md')
     searchRow.focus()
     dispatchTreeKey(searchRow, 'w')
 
     await vi.waitFor(() => {
       expect(searchTree.model.isSearchOpen()).toBe(true)
       expect(searchTree.model.getSearchValue()).toBe('w')
-      expect(searchTree.shadowRoot.activeElement).toBe(
-        searchTree.shadowRoot.querySelector('[data-file-tree-search-input]'),
+      expect(focusedIn(searchTree.tree)).toBe(
+        searchTree.tree.querySelector('[data-file-tree-search-input]'),
       )
     })
   })
@@ -494,8 +487,8 @@ describe('FileTree browser behavior', () => {
     const outsideButton = document.createElement('button')
     outsideButton.type = 'button'
     document.body.prepend(outsideButton)
-    const { model: currentModel, shadowRoot } = await mountBrowserTree()
-    const scrollElement = virtualScroll(shadowRoot)
+    const { model: currentModel, tree } = await mountBrowserTree()
+    const scrollElement = virtualScroll(tree)
 
     outsideButton.focus()
     currentModel.focusPath('src/features/a-20.ts')
@@ -506,14 +499,14 @@ describe('FileTree browser behavior', () => {
 
     currentModel.focus()
     await vi.waitFor(() => {
-      expect(activePath(shadowRoot)).toBe('src/features/a-20.ts')
+      expect(activePath(tree)).toBe('src/features/a-20.ts')
       expect(scrollElement.scrollTop).toBeGreaterThan(0)
     })
 
     outsideButton.focus()
     currentModel.focus()
     await vi.waitFor(() => {
-      expect(activePath(shadowRoot)).toBe('src/features/a-20.ts')
+      expect(activePath(tree)).toBe('src/features/a-20.ts')
     })
   })
 
@@ -521,48 +514,48 @@ describe('FileTree browser behavior', () => {
     const outsideButton = document.createElement('button')
     outsideButton.type = 'button'
     document.body.prepend(outsideButton)
-    const { model: currentModel, shadowRoot } = await mountBrowserTree()
+    const { model: currentModel, tree } = await mountBrowserTree()
 
     currentModel.focusPath('src/features/a-3.ts')
     currentModel.focus()
     await vi.waitFor(() => {
-      expect(activePath(shadowRoot)).toBe('src/features/a-3.ts')
+      expect(activePath(tree)).toBe('src/features/a-3.ts')
     })
 
     flushSync(() => root?.unmount())
     root = null
     outsideButton.focus()
-    const remountedShadowRoot = await renderBrowserTree(currentModel)
+    const remountedTree = await renderBrowserTree(currentModel)
 
     expect(document.activeElement).toBe(outsideButton)
-    expect(activePath(remountedShadowRoot)).toBeNull()
+    expect(activePath(remountedTree)).toBeNull()
   })
 
   it('retains an engaged search across blur and refocuses it without clearing the query', async () => {
     const outsideButton = document.createElement('button')
     outsideButton.type = 'button'
     document.body.prepend(outsideButton)
-    const { model: currentModel, shadowRoot } = await mountSearchTree('retain')
-    const searchInput = await openSearch(currentModel, shadowRoot, 'worker')
+    const { model: currentModel, tree } = await mountSearchTree('retain')
+    const searchInput = await openSearch(currentModel, tree, 'worker')
 
     outsideButton.focus()
     await vi.waitFor(() => {
-      expect(shadowRoot.activeElement).not.toBe(searchInput)
+      expect(focusedIn(tree)).not.toBe(searchInput)
     })
     expect(currentModel.isSearchOpen()).toBe(true)
     expect(currentModel.getSearchValue()).toBe('worker')
 
     currentModel.openSearch()
     await vi.waitFor(() => {
-      expect(shadowRoot.activeElement).toBe(searchInput)
+      expect(focusedIn(tree)).toBe(searchInput)
     })
     expect(currentModel.getSearchValue()).toBe('worker')
   })
 
   it('inherits the consuming light color scheme for search colors', async () => {
-    const { shadowRoot } = await mountSearchTree('retain', 'light')
-    const host = document.querySelector<HTMLElement>('file-tree-container')
-    const searchInput = shadowRoot.querySelector<HTMLInputElement>('[data-file-tree-search-input]')
+    const { tree } = await mountSearchTree('retain', 'light')
+    const host = document.querySelector<HTMLElement>('[data-file-tree]')
+    const searchInput = tree.querySelector<HTMLInputElement>('[data-file-tree-search-input]')
 
     expect(host).not.toBeNull()
     expect(searchInput).not.toBeNull()
@@ -571,37 +564,37 @@ describe('FileTree browser behavior', () => {
   })
 
   it('keeps rename active for composing keys and commits on ordinary Enter', async () => {
-    const { model: currentModel, shadowRoot } = await mountBrowserTree()
-    const input = await beginRename(currentModel, shadowRoot, 'src/features/a-3.ts')
+    const { model: currentModel, tree } = await mountBrowserTree()
+    const input = await beginRename(currentModel, tree, 'src/features/a-3.ts')
     setRenameValue(input, 'renamed.ts')
 
     dispatchRenameKey(input, 'Enter', { isComposing: true })
-    await expectRenameToRemainActive(shadowRoot)
+    await expectRenameToRemainActive(tree)
 
     dispatchRenameKey(input, 'Escape', { legacyComposition: true })
-    await expectRenameToRemainActive(shadowRoot)
+    await expectRenameToRemainActive(tree)
 
     dispatchRenameKey(input, 'Enter')
     await vi.waitFor(() => {
-      expect(shadowRoot.querySelector('[data-item-rename-input]')).toBeNull()
+      expect(tree.querySelector('[data-item-rename-input]')).toBeNull()
       expect(currentModel.getItem('src/features/renamed.ts')).not.toBeNull()
     })
   })
 
   it('keeps rename active for legacy composition and cancels on ordinary Escape', async () => {
-    const { model: currentModel, shadowRoot } = await mountBrowserTree()
-    const input = await beginRename(currentModel, shadowRoot, 'src/features/a-3.ts')
+    const { model: currentModel, tree } = await mountBrowserTree()
+    const input = await beginRename(currentModel, tree, 'src/features/a-3.ts')
     setRenameValue(input, 'should-not-land.ts')
 
     dispatchRenameKey(input, 'Escape', { isComposing: true })
-    await expectRenameToRemainActive(shadowRoot)
+    await expectRenameToRemainActive(tree)
 
     dispatchRenameKey(input, 'Enter', { legacyComposition: true })
-    await expectRenameToRemainActive(shadowRoot)
+    await expectRenameToRemainActive(tree)
 
     dispatchRenameKey(input, 'Escape')
     await vi.waitFor(() => {
-      expect(shadowRoot.querySelector('[data-item-rename-input]')).toBeNull()
+      expect(tree.querySelector('[data-item-rename-input]')).toBeNull()
       expect(currentModel.getItem('src/features/a-3.ts')).not.toBeNull()
       expect(currentModel.getItem('src/features/should-not-land.ts')).toBeNull()
     })
@@ -613,8 +606,8 @@ describe('FileTree browser behavior', () => {
   ])(
     'applies $searchBlurBehavior policy to search Enter, click, Escape, and focus',
     async ({ keepsSearchOpen, searchBlurBehavior }) => {
-      const { model: currentModel, shadowRoot } = await mountSearchTree(searchBlurBehavior)
-      const searchInput = await openSearch(currentModel, shadowRoot, 'worker')
+      const { model: currentModel, tree } = await mountSearchTree(searchBlurBehavior)
+      const searchInput = await openSearch(currentModel, tree, 'worker')
       const focusedPathBeforeEnter = currentModel.getFocusedPath()
       expect(focusedPathBeforeEnter).not.toBeNull()
 
@@ -624,13 +617,13 @@ describe('FileTree browser behavior', () => {
         expect(currentModel.isSearchOpen()).toBe(keepsSearchOpen)
       })
       if (keepsSearchOpen) {
-        expect(shadowRoot.activeElement).toBe(searchInput)
+        expect(focusedIn(tree)).toBe(searchInput)
       } else {
-        expect(activePath(shadowRoot)).toBe(focusedPathBeforeEnter)
+        expect(activePath(tree)).toBe(focusedPathBeforeEnter)
       }
 
-      const reopenedInput = await openSearch(currentModel, shadowRoot, 'worker')
-      const clickedResult = rowButton(shadowRoot, 'src/utils/worker-b.ts')
+      const reopenedInput = await openSearch(currentModel, tree, 'worker')
+      const clickedResult = rowButton(tree, 'src/utils/worker-b.ts')
       clickedResult.dispatchEvent(
         new MouseEvent('mousedown', { bubbles: true, button: 0, detail: 1 }),
       )
@@ -641,10 +634,10 @@ describe('FileTree browser behavior', () => {
         expect(currentModel.isSearchOpen()).toBe(keepsSearchOpen)
       })
       if (keepsSearchOpen) {
-        expect(shadowRoot.activeElement).toBe(reopenedInput)
+        expect(focusedIn(tree)).toBe(reopenedInput)
       }
 
-      const escapeInput = await openSearch(currentModel, shadowRoot, 'worker')
+      const escapeInput = await openSearch(currentModel, tree, 'worker')
       dispatchSearchKey(escapeInput, 'Escape')
       await vi.waitFor(() => {
         expect(currentModel.isSearchOpen()).toBe(false)
@@ -655,15 +648,15 @@ describe('FileTree browser behavior', () => {
 
 async function beginRename(
   currentModel: FileTreeModel,
-  shadowRoot: ShadowRoot,
+  tree: ParentNode,
   path: string,
 ): Promise<HTMLInputElement> {
   currentModel.startRenaming(path)
   await vi.waitFor(() => {
-    expect(shadowRoot.querySelector('[data-item-rename-input]')).not.toBeNull()
+    expect(tree.querySelector('[data-item-rename-input]')).not.toBeNull()
   })
 
-  const input = shadowRoot.querySelector<HTMLInputElement>('[data-item-rename-input]')
+  const input = tree.querySelector<HTMLInputElement>('[data-item-rename-input]')
   expect(input).not.toBeNull()
   return input as HTMLInputElement
 }
@@ -689,9 +682,9 @@ function dispatchRenameKey(
   input.dispatchEvent(event)
 }
 
-async function expectRenameToRemainActive(shadowRoot: ShadowRoot): Promise<void> {
+async function expectRenameToRemainActive(tree: ParentNode): Promise<void> {
   await vi.waitFor(() => {
-    expect(shadowRoot.querySelector('[data-item-rename-input]')).not.toBeNull()
+    expect(tree.querySelector('[data-item-rename-input]')).not.toBeNull()
   })
 }
 
@@ -746,7 +739,7 @@ async function mountBrowserTree(
   })
   model = mountedModel
 
-  return { model: mountedModel, shadowRoot: await renderBrowserTree(mountedModel) }
+  return { model: mountedModel, tree: await renderBrowserTree(mountedModel) }
 }
 
 async function renderBrowserTree(mountedModel: FileTreeModel) {
@@ -766,7 +759,7 @@ async function renderBrowserTree(mountedModel: FileTreeModel) {
     )
   })
 
-  return await waitForShadowRoot()
+  return await waitForTree()
 }
 
 async function mountSearchTree(
@@ -794,24 +787,24 @@ async function mountSearchTree(
     root?.render(<FileTree aria-label='Search files' model={mountedModel} />)
   })
 
-  return { model: mountedModel, shadowRoot: await waitForShadowRoot() }
+  return { model: mountedModel, tree: await waitForTree() }
 }
 
 async function openSearch(
   currentModel: FileTreeModel,
-  shadowRoot: ShadowRoot,
+  tree: ParentNode,
   query: string,
 ): Promise<HTMLInputElement> {
   if (!currentModel.isSearchOpen()) {
     currentModel.openSearch(query)
   }
 
-  const input = shadowRoot.querySelector<HTMLInputElement>('[data-file-tree-search-input]')
+  const input = tree.querySelector<HTMLInputElement>('[data-file-tree-search-input]')
   expect(input).not.toBeNull()
   await vi.waitFor(() => {
     expect(currentModel.isSearchOpen()).toBe(true)
     expect(input?.value).toBe(query)
-    expect(shadowRoot.activeElement).toBe(input)
+    expect(focusedIn(tree)).toBe(input)
   })
 
   return input as HTMLInputElement
@@ -827,19 +820,25 @@ function browserPaths(pathCount = 28) {
   return paths
 }
 
-async function waitForShadowRoot() {
+async function waitForTree() {
   await vi.waitFor(() => {
-    expect(document.querySelector('file-tree-container')?.shadowRoot).toBeTruthy()
+    expect(document.querySelector('[data-file-tree] [role="tree"]')).toBeTruthy()
   })
 
-  const shadowRoot = document.querySelector('file-tree-container')?.shadowRoot
-  if (!shadowRoot) throw new Error('missing file tree shadow root')
+  const tree = document.querySelector<HTMLElement>('[data-file-tree]')
+  if (!tree) throw new Error('missing file tree')
 
-  return shadowRoot
+  return tree
 }
 
-function rowButton(shadowRoot: ShadowRoot, path: string) {
-  const button = shadowRoot.querySelector<HTMLButtonElement>(
+/** The focused element when it is inside `tree`. */
+function focusedIn(tree: ParentNode) {
+  const active = document.activeElement
+  return active && tree.contains(active) ? active : null
+}
+
+function rowButton(tree: ParentNode, path: string) {
+  const button = tree.querySelector<HTMLButtonElement>(
     `button[data-item-path="${path}"]:not([data-file-tree-sticky-row="true"])`,
   )
   if (!button) throw new Error(`missing row ${path}`)
@@ -847,24 +846,22 @@ function rowButton(shadowRoot: ShadowRoot, path: string) {
   return button
 }
 
-function activePath(shadowRoot: ShadowRoot) {
-  const activeElement = shadowRoot.activeElement
+function activePath(tree: ParentNode) {
+  const activeElement = focusedIn(tree)
   if (!(activeElement instanceof HTMLElement)) return null
 
   return activeElement.dataset.itemPath ?? null
 }
 
-function virtualRoot(shadowRoot: ShadowRoot) {
-  const rootElement = shadowRoot.querySelector<HTMLElement>(
-    '[data-file-tree-virtualized-root="true"]',
-  )
+function virtualRoot(tree: ParentNode) {
+  const rootElement = tree.querySelector<HTMLElement>('[data-file-tree-virtualized-root="true"]')
   if (!rootElement) throw new Error('missing virtual root')
 
   return rootElement
 }
 
-function virtualScroll(shadowRoot: ShadowRoot) {
-  const scrollElement = shadowRoot.querySelector<HTMLElement>(
+function virtualScroll(tree: ParentNode) {
+  const scrollElement = tree.querySelector<HTMLElement>(
     '[data-file-tree-virtualized-scroll="true"]',
   )
   if (!scrollElement) throw new Error('missing virtual scroll')
@@ -872,12 +869,12 @@ function virtualScroll(shadowRoot: ShadowRoot) {
   return scrollElement
 }
 
-async function startSmoothReveal(currentModel: FileTreeModel, shadowRoot: ShadowRoot) {
+async function startSmoothReveal(currentModel: FileTreeModel, tree: ParentNode) {
   currentModel.setDensity('compact', 20)
   await expect
-    .poll(() => rowButton(shadowRoot, 'src/features/a-0.ts').getBoundingClientRect().height)
+    .poll(() => rowButton(tree, 'src/features/a-0.ts').getBoundingClientRect().height)
     .toBe(20)
-  const scrollElement = virtualScroll(shadowRoot)
+  const scrollElement = virtualScroll(tree)
   scrollElement.scrollTop = 10
   await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
   flushSync(() => {

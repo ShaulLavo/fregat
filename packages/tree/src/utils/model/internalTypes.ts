@@ -24,11 +24,6 @@ export interface FileTreeScrollRequest {
   offset: FileTreeScrollOffset
   visibleIndex: number
 }
-export interface FileTreeSlotHost {
-  clearSlotContent(slotName: string): void
-  setSlotContent(slotName: string, content: HTMLElement | null): void
-}
-
 export interface FileTreeViewProps extends Omit<FileTreeRenderOptions, 'initialVisibleRowCount'> {
   composition?: FileTreeCompositionOptions
   controller: import('./FileTreeController').FileTreeController
@@ -50,5 +45,4 @@ export interface FileTreeViewProps extends Omit<FileTreeRenderOptions, 'initialV
   searchEnabled?: boolean
   searchFakeFocus?: boolean
   searchPlaceholder?: string
-  slotHost?: FileTreeSlotHost
 }

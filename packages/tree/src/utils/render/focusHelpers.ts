@@ -14,23 +14,11 @@ export function focusElement(element: HTMLElement | null): boolean {
   }
 
   element.focus({ preventScroll: true })
-  const rootNode = element.getRootNode()
-  if (rootNode instanceof ShadowRoot) {
-    return rootNode.activeElement === element
-  }
-
   return document.activeElement === element
 }
 
-// Reads the actual focused element from the tree's shadow root so focus sync
-// logic can work even when document.activeElement points at the host.
+/** The focused element when it is inside the tree, else null. */
 export function getActiveTreeElement(rootElement: HTMLElement): HTMLElement | null {
-  const rootNode = rootElement.getRootNode()
-  if (rootNode instanceof ShadowRoot) {
-    const activeElement = rootNode.activeElement
-    return activeElement instanceof HTMLElement ? activeElement : null
-  }
-
   const activeElement = document.activeElement
   return activeElement instanceof HTMLElement && rootElement.contains(activeElement)
     ? activeElement

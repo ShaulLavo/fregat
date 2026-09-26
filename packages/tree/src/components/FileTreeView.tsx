@@ -22,7 +22,6 @@ import { useFileTreeDrag } from '../hooks/useFileTreeDrag'
 import { useFileTreeFocusSync } from '../hooks/useFileTreeFocusSync'
 import { useFileTreeKeyboard } from '../hooks/useFileTreeKeyboard'
 import { type FileTreeRowDom, useFileTreeRowDom } from '../hooks/useFileTreeRowDom'
-import { HEADER_SLOT_NAME } from '../utils/constants'
 import { FileTreeController } from '../utils/model/FileTreeController'
 import type { FileTreeStickyRowCandidate, FileTreeViewProps } from '../utils/model/internalTypes'
 import {
@@ -169,14 +168,19 @@ function computeFileTreeViewLayoutState({
 // misaligns sticky virtualization in layouts where a slotted header leaves a
 // half-pixel scrollport.
 
-function getFileTreeGuideStyleText(focusedParentPath: string | null): string {
+function getFileTreeGuideStyleText(
+  treeDomId: string | undefined,
+  focusedParentPath: string | null,
+): string {
   if (focusedParentPath == null) {
     return ''
   }
 
-  const escapedPath = focusedParentPath.replaceAll('\\', '\\\\').replaceAll('"', '\\"')
+  const escape = (value: string) => value.replaceAll('\\', '\\\\').replaceAll('"', '\\"')
+  // A document-level rule, so it names this tree; other trees keep their own guides.
+  const scope = treeDomId == null ? '' : `[id="${escape(treeDomId)}"] `
   // Focus reveals the ancestor; its level colour deliberately stays unchanged.
-  return `[data-item-section="spacing-item"][data-ancestor-path="${escapedPath}"] { opacity: var(--trees-indent-guide-active-opacity); }`
+  return `${scope}[data-item-section="spacing-item"][data-ancestor-path="${escape(focusedParentPath)}"] { opacity: var(--trees-indent-guide-active-opacity); }`
 }
 
 function getFileTreeRootDomId(instanceId: string | undefined): string | undefined {
@@ -201,7 +205,6 @@ export function FileTreeView({
   searchEnabled = false,
   searchFakeFocus = false,
   searchPlaceholder = 'Search…',
-  slotHost,
   stickyFolders = false,
   initialScrollTop,
   onScrollTopChange,
@@ -253,6 +256,15 @@ export function FileTreeView({
     initialFocusedScrollAppliedRef.current = false
     initialFocusedScrollControllerRef.current = controller
   }, [controller])
+  // The scroller's right padding subtracts the real scrollbar lane, whose width the app's
+  // scrollbar styles decide, so it is measured once the scroller is laid out.
+  useLayoutEffect(() => {
+    const scroll = getScroll()
+    const root = getRoot()
+    if (!scroll || !root) return
+    const lane = scroll.offsetWidth - scroll.clientWidth
+    root.style.setProperty('--trees-scrollbar-gutter-measured', `${Math.max(lane, 0)}px`)
+  }, [getRoot, getScroll])
   const previousRenamingPathRef = useRef<string | null>(null)
   const ignoredInheritanceCache = useMemo(() => new Map<string, boolean>(), [])
   const [, setControllerRevision] = useState(0)
@@ -990,6 +1002,7 @@ export function FileTreeView({
   const focusedRowHasVisibleAnchor = focusedRowIsVisible || focusedRowIsSticky
   const {
     anchorRef: contextMenuAnchorRef,
+    contentHostRef: contextMenuContentHostRef,
     clearHoverPath,
     closeContextMenu,
     closeContextMenuRef,
@@ -1020,7 +1033,6 @@ export function FileTreeView({
     focusedRowHasVisibleAnchor,
     isScrolling: isScrollingRef,
     markActiveItem: markContextMenuActiveItem,
-    slotHost,
     ownsDomFocus,
     preserveStickyAtScrollTop,
   })
@@ -1130,7 +1142,10 @@ export function FileTreeView({
         controller.getVisibleRows(focusedIndex, focusedIndex)[0] ??
         null)
       : null
-  const guideStyleText = getFileTreeGuideStyleText(focusedVisibleRow?.ancestorPaths.at(-1) ?? null)
+  const guideStyleText = getFileTreeGuideStyleText(
+    treeDomId,
+    focusedVisibleRow?.ancestorPaths.at(-1) ?? null,
+  )
   const activeDescendantId =
     isSearchOpen && focusedPath != null
       ? getFileTreeFocusedRowDomId(instanceId, focusedPath, !focusedRowIsMounted)
@@ -1313,7 +1328,6 @@ export function FileTreeView({
         data-file-tree-guide-style='true'
         dangerouslySetInnerHTML={{ __html: guideStyleText }}
       />
-      <slot name={HEADER_SLOT_NAME} data-type='header-slot' />
       {searchEnabled ? (
         <div data-file-tree-search-container data-open={isSearchOpen ? 'true' : 'false'}>
           <input
@@ -1435,6 +1449,7 @@ export function FileTreeView({
       {contextMenuEnabled ? (
         <MenuTrigger
           anchorRef={contextMenuAnchorRef}
+          contentHostRef={contextMenuContentHostRef}
           triggerRef={contextMenuTriggerRef}
           store={triggerStore}
           dom={dom}

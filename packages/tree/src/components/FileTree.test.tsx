@@ -51,7 +51,11 @@ describe('FileTree React integration', () => {
         <>
           <FileTree aria-label='Files' model={model} />
           <output data-testid='selection'>{selectedPaths.join(',')}</output>
-          <button type='button' onClick={() => model.getItem('src/b.ts')?.select()}>
+          <button
+            data-testid='select-b'
+            type='button'
+            onClick={() => model.getItem('src/b.ts')?.select()}
+          >
             Select B
           </button>
         </>
@@ -61,11 +65,11 @@ describe('FileTree React integration', () => {
     flushSync(() => root?.render(<Harness />))
 
     await vi.waitFor(() => {
-      expect(document.querySelector('file-tree-container')?.shadowRoot).toBeTruthy()
+      expect(document.querySelector('[data-file-tree] [role="tree"]')).toBeTruthy()
       expect(document.querySelector('[data-testid="selection"]')?.textContent).toBe('src/a.ts')
     })
 
-    document.querySelector('button')?.click()
+    clickButton('select-b')
 
     await vi.waitFor(() => {
       expect(document.querySelector('[data-testid="selection"]')?.textContent).toBe(
@@ -102,13 +106,13 @@ describe('FileTree React integration', () => {
     }
 
     flushSync(() => root?.render(<Harness />))
-    const shadowRoot = await waitForShadowRoot()
-    expect(rowButton(shadowRoot, 'src/a.ts').dataset.itemGitStatus).toBeUndefined()
+    const tree = await waitForTree()
+    expect(rowButton(tree, 'src/a.ts').dataset.itemGitStatus).toBeUndefined()
 
     clickButton('set-git-status')
 
     await vi.waitFor(() => {
-      expect(rowButton(shadowRoot, 'src/a.ts').dataset.itemGitStatus).toBe('modified')
+      expect(rowButton(tree, 'src/a.ts').dataset.itemGitStatus).toBe('modified')
     })
   })
 
@@ -140,13 +144,13 @@ describe('FileTree React integration', () => {
     }
 
     flushSync(() => root?.render(<Harness />))
-    const shadowRoot = await waitForShadowRoot()
-    expect(fileIconHref(shadowRoot, 'src/a.ts')).toBe('#first-file-icon')
+    const tree = await waitForTree()
+    expect(fileIconHref(tree, 'src/a.ts')).toBe('#first-file-icon')
 
     clickButton('set-icons')
 
     await vi.waitFor(() => {
-      expect(fileIconHref(shadowRoot, 'src/a.ts')).toBe('#second-file-icon')
+      expect(fileIconHref(tree, 'src/a.ts')).toBe('#second-file-icon')
     })
   })
 
@@ -181,10 +185,10 @@ describe('FileTree React integration', () => {
     }
 
     flushSync(() => root?.render(<Harness />))
-    const shadowRoot = await waitForShadowRoot()
-    const host = document.querySelector<HTMLElement>('file-tree-container')
+    const tree = await waitForTree()
+    const host = document.querySelector<HTMLElement>('[data-file-tree]')
     expect(host?.style.getPropertyValue('--trees-item-height')).toBe('20px')
-    expect(rowButton(shadowRoot, 'src/a.ts').style.minHeight).toBe('20px')
+    expect(rowButton(tree, 'src/a.ts').style.minHeight).toBe('20px')
 
     clickButton('set-density')
 
@@ -192,10 +196,9 @@ describe('FileTree React integration', () => {
       expect(capturedModels.latest).toBe(capturedModels.first)
       expect(capturedModels.first?.getItemHeight()).toBe(24)
       expect(host?.style.getPropertyValue('--trees-item-height')).toBe('24px')
-      expect(rowButton(shadowRoot, 'src/a.ts').style.minHeight).toBe('24px')
+      expect(rowButton(tree, 'src/a.ts').style.minHeight).toBe('24px')
       expect(
-        shadowRoot.querySelector<HTMLElement>('[data-file-tree-virtualized-list="true"]')?.style
-          .height,
+        tree.querySelector<HTMLElement>('[data-file-tree-virtualized-list="true"]')?.style.height,
       ).toBe('72px')
     })
 
@@ -203,7 +206,7 @@ describe('FileTree React integration', () => {
 
     await vi.waitFor(() => {
       expect(host?.style.getPropertyValue('--trees-item-height')).toBe('20px')
-      expect(rowButton(shadowRoot, 'src/a.ts').style.minHeight).toBe('20px')
+      expect(rowButton(tree, 'src/a.ts').style.minHeight).toBe('20px')
     })
   })
 
@@ -217,20 +220,20 @@ describe('FileTree React integration', () => {
     })
 
     flushSync(() => root?.render(<FileTree aria-label='Files' model={treeModel} />))
-    const shadowRoot = await waitForShadowRoot()
+    const tree = await waitForTree()
 
     treeModel.setLoadingPaths(['src/a.ts'])
 
     await vi.waitFor(() => {
-      expect(rowButton(shadowRoot, 'src/a.ts').getAttribute('aria-busy')).toBe('true')
-      expect(rowButton(shadowRoot, 'src/a.ts').dataset.itemLoading).toBe('true')
-      expect(rowButton(shadowRoot, 'src/b.ts').dataset.itemLoading).toBeUndefined()
+      expect(rowButton(tree, 'src/a.ts').getAttribute('aria-busy')).toBe('true')
+      expect(rowButton(tree, 'src/a.ts').dataset.itemLoading).toBe('true')
+      expect(rowButton(tree, 'src/b.ts').dataset.itemLoading).toBeUndefined()
     })
 
     treeModel.setLoadingPaths([])
 
     await vi.waitFor(() => {
-      expect(rowButton(shadowRoot, 'src/a.ts').dataset.itemLoading).toBeUndefined()
+      expect(rowButton(tree, 'src/a.ts').dataset.itemLoading).toBeUndefined()
     })
   })
 
@@ -250,59 +253,13 @@ describe('FileTree React integration', () => {
       })
 
       flushSync(() => root?.render(<FileTree aria-label='Files' model={treeModel} />))
-      const shadowRoot = await waitForShadowRoot()
+      const tree = await waitForTree()
 
-      expect(fileIconHref(shadowRoot, 'unknown.xyz')).toBe('#test-generic-file')
-      expect(fileIconHref(shadowRoot, 'src/index.ts')).toBe(expectedTypeScriptIcon)
+      expect(fileIconHref(tree, 'unknown.xyz')).toBe('#test-generic-file')
+      expect(fileIconHref(tree, 'src/index.ts')).toBe(expectedTypeScriptIcon)
       treeModel.cleanUp()
     },
   )
-
-  it('reuses one mounted renderer and survives queued unmount/remount timing', async () => {
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    const host = document.createElement('file-tree-container')
-    document.body.append(host)
-    const treeModel = new FileTreeModel({
-      initialExpansion: 'open',
-      paths: ['src/', 'src/a.ts', 'src/b.ts'],
-    })
-
-    treeModel.render({ fileTreeContainer: host })
-    const shadowRoot = await waitForHostShadowRoot(host)
-    await vi.waitFor(() => {
-      expect(rowButton(shadowRoot, 'src/a.ts')).toBeTruthy()
-    })
-
-    treeModel.render({ fileTreeContainer: host })
-    treeModel.setComposition(treeModel.getComposition())
-    treeModel.setGitStatus([{ path: 'src/a.ts', status: 'modified' }])
-    treeModel.setIcons(fileIconRemap('updated-file-icon'))
-    await vi.waitFor(() => {
-      expect(rowButton(shadowRoot, 'src/a.ts').dataset.itemGitStatus).toBe('modified')
-      expect(fileIconHref(shadowRoot, 'src/a.ts')).toBe('#updated-file-icon')
-    })
-
-    treeModel.unmount()
-    treeModel.render({ fileTreeContainer: host })
-    await vi.waitFor(() => {
-      expect(rowButton(shadowRoot, 'src/b.ts')).toBeTruthy()
-    })
-
-    treeModel.unmount()
-    await Promise.resolve()
-    await vi.waitFor(() => {
-      expect(shadowRoot.querySelector('[role="tree"]')).toBeNull()
-    })
-
-    treeModel.render({ fileTreeContainer: host })
-    await vi.waitFor(() => {
-      expect(rowButton(shadowRoot, 'src/a.ts').dataset.itemGitStatus).toBe('modified')
-    })
-    expect(errorSpy).not.toHaveBeenCalled()
-    expect(warnSpy).not.toHaveBeenCalled()
-    treeModel.cleanUp()
-  })
 
   it('mounts and cleans up through the public React wrapper without runtime warnings', async () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
@@ -316,9 +273,9 @@ describe('FileTree React integration', () => {
     })
 
     flushSync(() => root?.render(<FileTree aria-label='Files' model={treeModel} />))
-    const shadowRoot = await waitForShadowRoot()
+    const tree = await waitForTree()
     await vi.waitFor(() => {
-      expect(rowButton(shadowRoot, 'src/a.ts')).toBeTruthy()
+      expect(rowButton(tree, 'src/a.ts')).toBeTruthy()
     })
 
     flushSync(() => root?.render(<FileTree aria-label='Files' model={treeModel} />))
@@ -358,12 +315,12 @@ describe('FileTree React integration', () => {
         </>,
       ),
     )
-    const firstHost = document.querySelector('file-tree-container')
-    const shadowRoot = await waitForShadowRoot()
+    const firstHost = document.querySelector('[data-file-tree]')
+    const tree = await waitForTree()
     await vi.waitFor(() => {
-      expect(
-        shadowRoot.querySelector<HTMLInputElement>('[data-file-tree-search-input]')?.value,
-      ).toBe('first')
+      expect(tree.querySelector<HTMLInputElement>('[data-file-tree-search-input]')?.value).toBe(
+        'first',
+      )
     })
 
     const outsideButton = document.querySelector<HTMLButtonElement>('[data-testid="outside"]')
@@ -372,7 +329,7 @@ describe('FileTree React integration', () => {
     firstModel.closeSearch()
     await vi.waitFor(() => {
       expect(
-        shadowRoot.querySelector('[data-file-tree-search-container]')?.getAttribute('data-open'),
+        tree.querySelector('[data-file-tree-search-container]')?.getAttribute('data-open'),
       ).toBe('false')
     })
 
@@ -387,10 +344,10 @@ describe('FileTree React integration', () => {
       ),
     )
     await vi.waitFor(() => {
-      expect(document.querySelector('file-tree-container')).toBe(firstHost)
-      expect(
-        shadowRoot.querySelector<HTMLInputElement>('[data-file-tree-search-input]')?.value,
-      ).toBe('second')
+      expect(document.querySelector('[data-file-tree]')).toBe(firstHost)
+      expect(tree.querySelector<HTMLInputElement>('[data-file-tree-search-input]')?.value).toBe(
+        'second',
+      )
     })
     expect(document.activeElement).toBe(outsideButton)
 
@@ -407,7 +364,6 @@ describe('FileTree React integration', () => {
     const renderMenu = vi.fn(
       (item: FileTreeContextMenuItem, context: FileTreeContextMenuOpenContext) => {
         const menu = document.createElement('div')
-        menu.dataset.fileTreeContextMenuRoot = 'true'
         menu.textContent = item.path
         openedItems.push(item)
         openedContexts.push(context)
@@ -428,8 +384,8 @@ describe('FileTree React integration', () => {
     })
 
     flushSync(() => root?.render(<FileTree aria-label='Files' model={treeModel} />))
-    const shadowRoot = await waitForShadowRoot()
-    rowButton(shadowRoot, 'src/a.ts').dispatchEvent(
+    const tree = await waitForTree()
+    rowButton(tree, 'src/a.ts').dispatchEvent(
       new MouseEvent('contextmenu', {
         bubbles: true,
         clientX: 37,
@@ -455,7 +411,7 @@ describe('FileTree React integration', () => {
 
     treeModel.getItem('src/b.ts')?.select()
     await vi.waitFor(() => {
-      expect(rowButton(shadowRoot, 'src/b.ts').getAttribute('aria-selected')).toBe('true')
+      expect(rowButton(tree, 'src/b.ts').getAttribute('aria-selected')).toBe('true')
     })
     expect(renderMenu).toHaveBeenCalledTimes(1)
     treeModel.cleanUp()
@@ -494,10 +450,10 @@ describe('FileTree React integration', () => {
     })
 
     flushSync(() => root?.render(<FileTree aria-label='Files' model={treeModel} />))
-    const shadowRoot = await waitForShadowRoot()
-    const tree = shadowRoot.querySelector<HTMLElement>('[role="tree"]')
-    expect(tree).not.toBeNull()
-    tree?.dispatchEvent(
+    const tree = await waitForTree()
+    const treeRoot = tree.querySelector<HTMLElement>('[role="tree"]')
+    expect(treeRoot).not.toBeNull()
+    treeRoot?.dispatchEvent(
       new KeyboardEvent('keydown', {
         bubbles: true,
         composed: true,
@@ -521,9 +477,7 @@ describe('FileTree React integration', () => {
     await vi.waitFor(() => {
       expect(onClose).toHaveBeenCalledTimes(1)
       expect(
-        shadowRoot
-          .querySelector('[data-type="context-menu-trigger"]')
-          ?.getAttribute('aria-expanded'),
+        tree.querySelector('[data-type="context-menu-trigger"]')?.getAttribute('aria-expanded'),
       ).toBe('false')
     })
     treeModel.cleanUp()
@@ -539,37 +493,26 @@ function fileIconRemap(iconName: string): FileTreeIcons {
   }
 }
 
-async function waitForShadowRoot() {
+async function waitForTree() {
   await vi.waitFor(() => {
-    expect(document.querySelector('file-tree-container')?.shadowRoot).toBeTruthy()
+    expect(document.querySelector('[data-file-tree] [role="tree"]')).toBeTruthy()
   })
 
-  const shadowRoot = document.querySelector('file-tree-container')?.shadowRoot
-  if (!shadowRoot) throw new Error('missing file tree shadow root')
+  const tree = document.querySelector<HTMLElement>('[data-file-tree]')
+  if (!tree) throw new Error('missing file tree')
 
-  return shadowRoot
+  return tree
 }
 
-async function waitForHostShadowRoot(host: HTMLElement): Promise<ShadowRoot> {
-  await vi.waitFor(() => {
-    expect(host.shadowRoot).toBeTruthy()
-  })
-
-  const shadowRoot = host.shadowRoot
-  if (!shadowRoot) throw new Error('missing file tree shadow root')
-
-  return shadowRoot
-}
-
-function rowButton(shadowRoot: ShadowRoot, path: string) {
-  const button = shadowRoot.querySelector<HTMLButtonElement>(`button[data-item-path="${path}"]`)
+function rowButton(tree: ParentNode, path: string) {
+  const button = tree.querySelector<HTMLButtonElement>(`button[data-item-path="${path}"]`)
   if (!button) throw new Error(`missing row ${path}`)
 
   return button
 }
 
-function fileIconHref(shadowRoot: ShadowRoot, path: string) {
-  const iconUse = rowButton(shadowRoot, path).querySelector<SVGUseElement>(
+function fileIconHref(tree: ParentNode, path: string) {
+  const iconUse = rowButton(tree, path).querySelector<SVGUseElement>(
     '[data-item-section="icon"] use',
   )
   if (!iconUse) throw new Error(`missing file icon ${path}`)

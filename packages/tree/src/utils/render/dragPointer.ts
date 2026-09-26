@@ -9,48 +9,9 @@ export const TOUCH_LONG_PRESS_MOVE_THRESHOLD = 10
 const DRAG_EDGE_SCROLL_THRESHOLD = 40
 const DRAG_EDGE_SCROLL_MAX_SPEED = 18
 
-export function getPointElement(
-  rootNode: Document | ShadowRoot,
-  clientX: number,
-  clientY: number,
-): HTMLElement | null {
-  const pointRoot = rootNode as Document & {
-    elementFromPoint?: (x: number, y: number) => Element | null
-  }
-  const documentElementFromPoint = document.elementFromPoint?.bind(document) ?? null
-  const element =
-    pointRoot.elementFromPoint?.(clientX, clientY) ??
-    documentElementFromPoint?.(clientX, clientY) ??
-    null
-  if (rootNode instanceof ShadowRoot && (element == null || !rootNode.contains(element))) {
-    return getShadowPointElementByGeometry(rootNode, clientX, clientY)
-  }
-
+export function getPointElement(clientX: number, clientY: number): HTMLElement | null {
+  const element = document.elementFromPoint?.(clientX, clientY) ?? null
   return element instanceof HTMLElement ? element : null
-}
-
-function getShadowPointElementByGeometry(
-  rootNode: ShadowRoot,
-  clientX: number,
-  clientY: number,
-): HTMLElement | null {
-  const candidates = Array.from(
-    rootNode.querySelectorAll<HTMLElement>('[data-type="item"], [data-item-flattened-subitem]'),
-  )
-  for (let index = candidates.length - 1; index >= 0; index--) {
-    const candidate = candidates[index]
-    const rect = candidate.getBoundingClientRect()
-    if (
-      clientX >= rect.left &&
-      clientX <= rect.right &&
-      clientY >= rect.top &&
-      clientY <= rect.bottom
-    ) {
-      return candidate
-    }
-  }
-
-  return null
 }
 
 export function resolveDropTargetFromElement(

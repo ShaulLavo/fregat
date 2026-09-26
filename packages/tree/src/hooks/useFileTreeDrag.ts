@@ -108,14 +108,10 @@ export function useFileTreeDrag(options: UseFileTreeDragOptions): FileTreeDragHa
     dragPointRef.current = null
   }
 
+  // Inside the tree's wrapper, so the clone keeps the tree's styles.
   const mountDragPreview = (preview: HTMLElement): void => {
-    const rootNode = getRoot()?.getRootNode()
-    if (rootNode instanceof ShadowRoot) {
-      rootNode.append(preview)
-      return
-    }
-
-    document.body.append(preview)
+    const host = getRoot()?.closest<HTMLElement>('[data-file-tree]')
+    ;(host ?? document.body).append(preview)
   }
 
   const clearTouchDragResources = (): void => {
@@ -140,9 +136,7 @@ export function useFileTreeDrag(options: UseFileTreeDragOptions): FileTreeDragHa
   }
 
   const syncDropTargetFromPoint = (clientX: number, clientY: number): FileTreeDropTarget | null => {
-    const rootNode = getRoot()?.getRootNode()
-    const pointRoot = rootNode instanceof ShadowRoot ? rootNode : document
-    const pointElement = getPointElement(pointRoot, clientX, clientY)
+    const pointElement = getPointElement(clientX, clientY)
     const nextTarget = resolveDropTargetFromElement(pointElement)
     controller.setDragTarget(nextTarget)
     return controller.getDragSession()?.target ?? null

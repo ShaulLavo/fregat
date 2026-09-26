@@ -1,4 +1,4 @@
-import { CONTEXT_MENU_SLOT_NAME, CONTEXT_MENU_TRIGGER_TYPE } from '../constants'
+import { CONTEXT_MENU_TRIGGER_TYPE } from '../constants'
 import type {
   FileTreeContextMenuItem,
   FileTreeContextMenuOpenContext,
@@ -7,24 +7,28 @@ import type {
 import { focusElement } from './focusHelpers'
 import { getFileTreeRowAriaLabel } from './rowIdentity'
 
+const treeOwnedEvents = new WeakSet<Event>()
+
+/**
+ * Marks an event React routed through the tree, portals included: a menu the caller renders into
+ * `<body>` is still the tree's, so its clicks are not outside clicks.
+ */
+export function markTreeOwnedEvent(event: Event): void {
+  treeOwnedEvents.add(event)
+}
+
 export function isEventInContextMenu(event: Event): boolean {
+  if (treeOwnedEvents.has(event)) return true
+
   for (const entry of event.composedPath()) {
-    if (!(entry instanceof HTMLElement)) {
-      continue
-    }
+    if (!(entry instanceof HTMLElement)) continue
 
-    if (entry.dataset.fileTreeContextMenuRoot === 'true') {
-      return true
-    }
-
+    const type = entry.dataset.type
     if (
-      entry.dataset.type === 'context-menu-anchor' ||
-      entry.dataset.type === CONTEXT_MENU_TRIGGER_TYPE
+      type === 'context-menu-anchor' ||
+      type === 'context-menu-content' ||
+      type === CONTEXT_MENU_TRIGGER_TYPE
     ) {
-      return true
-    }
-
-    if (entry.getAttribute('slot') === CONTEXT_MENU_SLOT_NAME) {
       return true
     }
   }
