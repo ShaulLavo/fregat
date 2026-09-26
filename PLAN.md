@@ -589,6 +589,7 @@ surfaces, the file picker and the site. The owner is taking it one topic at a ti
 | [156](plans/156-documents-in-the-editor.md)   | Placeholder, far future: PDF, DOCX, XLSX, PPTX and CSV as editor documents agents can edit                                |
 | [178](plans/178-tree-in-the-app.md)           | Plan of plans: the file tree rebuilt on app primitives (VirtualList, useListbox, dnd-kit, icons, Tailwind) at full parity |
 | [179](plans/179-isolating-foreign-content.md) | Where a shadow root earns its place: mermaid, previews, an editor style-recalc experiment                                 |
+| [180](plans/180-file-icon-variants.md)        | Quick research: more glyphs, variants and per-mode colours from the icon pack we already use                              |
 
 Suggested order:
 

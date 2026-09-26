@@ -31,7 +31,8 @@ built-in sets and sprite injection are gone.
    mode that rows use. Gradient ids are unique once, so the per-instance rewrite is not needed.
 2. **Hue tokens.** Thirteen hue tokens (light and dark) in `globals.css`, replacing the per-icon
    hex. The colour table (`getBuiltInFileIconColor`) moves to `lib/file-icons.ts` and maps each icon
-   to a hue. The owner picks `bun`'s colour (Q1).
+   to a hue. The tree's hues win where the two differ (`bun` is mauve, Q1); per-mode colours or
+   other variants wait for [Plan 180](../180-file-icon-variants.md).
 3. **Rows.** Tree rows call `iconForEntry` with the real stem logic. `FileLabel` gains a folder kind
    so it can render the chevron-only lead the tree uses today.
 4. **Delete** `builtInIcons.ts` (781 lines), `iconResolver.ts`, `Icon.tsx`, `iconConfig.ts`,

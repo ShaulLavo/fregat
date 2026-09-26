@@ -30,8 +30,8 @@ session rail and search results drop their synthetic-keydown hacks.
 
 1. **`useListContextMenu`** in `keymap/menus/hooks/`: one menu per list; right-click anchors at the
    pointer, Shift+F10 and the ContextMenu key anchor at the cursor row's rect; the target is the
-   right-clicked row, or the selection when that row is in it (Q2 decides whether the tree changes
-   from "one row"); `returnFocusTo` the list; suppressed while the list's `data-scrolling` is set
+   right-clicked row, or the selection when that row is in it, per list (the tree keeps one row,
+   Q2); `returnFocusTo` the list; suppressed while the list's `data-scrolling` is set
    and during touch; closes on user scroll and when its row is removed.
 2. **Tree.** `row-menu.tsx` uses it. Rename from the menu keeps `takesFocus`. The menu row keeps its
    hover fill while open.
@@ -39,7 +39,7 @@ session rail and search results drop their synthetic-keydown hacks.
 
 ## Parity
 
-Parity spec "Menu": anchoring, one-row target (unless Q2), Escape restores focus, outside click,
+Parity spec "Menu": anchoring, one-row target (Q2), Escape restores focus, outside click,
 scroll and row removal close it. The overlay that eats input goes; Base UI's modal handling covers
 outside clicks. The harness test for "input under the menu is ignored" decides whether it needs a
 replacement.

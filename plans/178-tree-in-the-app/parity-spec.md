@@ -192,7 +192,7 @@ Mod+Shift+E reach the app keymap.
 
 ## Quirks
 
-Keep or fix is an owner decision (index § Decisions, Q2).
+Answered 2026-09-26 (index § Decisions, Q2): 1, 8 and 9 are bugs and get fixed; the rest stay.
 
 1. F2 is not gated on `mutationsEnabled`: with mutations off, the row moves and nothing is written.
 2. Starting a rename on a file selects it, which opens it in the editor.
@@ -207,7 +207,7 @@ Keep or fix is an owner decision (index § Decisions, Q2).
 
 ## Parity-vs-rule conflicts
 
-Where keeping today's look breaks an AGENTS.md rule. Each needs a verdict (index § Decisions, Q1).
+Where keeping today's look breaks an AGENTS.md rule. Verdicts are in the index § Decisions, Q1.
 
 | Current look                                                  | Rule                                   |
 | ------------------------------------------------------------- | -------------------------------------- |

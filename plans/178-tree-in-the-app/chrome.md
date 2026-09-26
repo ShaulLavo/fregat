@@ -22,8 +22,9 @@ hand-rolled copies.
 - **Build:** a `FilterField` pattern in `packages/ui/src/patterns/` on `PaneBar` + `InputGroup`:
   magnifier addon, clear button with a tooltip, Escape clears then blurs, ArrowDown moves into the
   list, `retain` or `clear` on blur, and an imperative `seed(char)`.
-- **Parity:** the bar at `--bar-height`, the input at the height and look the owner picks in Q1
-  (today's 28 / 32px bordered field or the `Input` primitive's). No-match state per Q2 quirk 10.
+- **Parity:** the bar at `--bar-height`. The input aligns to the `Input` primitive (Q1): no visible
+  border, the control-height token (today it renders 4px taller), `focus-ring-within`. An empty
+  result keeps today's collapsed tree (Q2, quirk 10).
 - **Adopters:** the five above.
 
 ## Inline rename
@@ -35,8 +36,8 @@ hand-rolled copies.
 - **Build:** an `InlineRenameInput` pattern on `Input`: settle once, Enter / Escape / blur, IME
   guard, stops pointer events reaching the row, an `initialSelection` range, `aria-invalid` with the
   validation message.
-- **Parity:** today's borderless look inside the row, or the rounded-row look replaced by a square
-  one (Q1). Whole-name selection stays unless the owner picks stem-only (Q2).
+- **Parity:** today's borderless look inside the row; the rename row turns square like every other
+  row (Q1). The whole name stays selected, extension included (Q2).
 - **Adopters:** session and terminal rename.
 
 ## Scrollbar

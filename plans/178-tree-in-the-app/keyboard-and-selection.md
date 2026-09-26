@@ -48,23 +48,22 @@ Delete key.
    the tree seeds `FilterField` (letters and digits only, per quirk 3).
 4. **Activation.** Enter and Space call the list's `onActivate`: select only this row, toggle a
    folder, open a file. Same outcome as today's native click.
-5. **Focus model.** Q3 decides between `aria-activedescendant` (the `useListbox` model, one tab stop,
-   real focus only in the rename input) and keeping a roving tab stop. With activedescendant the
-   cursor row is kept mounted by `keepMounted` and the parked-row machinery is gone.
+5. **Focus model** (Q3): `aria-activedescendant` with one tab stop, the `useListbox` model. Real DOM
+   focus only enters the rename and filter inputs. The cursor row is kept mounted by `keepMounted`,
+   and the parked-row machinery is gone.
 6. **Sticky hand-off.** Keyboard moves that start on a sticky row keep the sticky position
    (`stickyFocusMode.ts`); a sticky-row click reveals the real row below its sticky parents. Both
    move into the tree's `onActiveKeyDown` and row click on top of `useListbox`.
-7. **Keymap commands.** Web bindings with `pane: 'file-tree'`: `fileTree.rename` (F2),
-   `fileTree.delete` (Delete, Mod+Backspace), `fileTree.newFile`, `fileTree.newFolder`,
-   `fileTree.refresh`. Mod+A yields to text entry. F2 is gated on `mutationsEnabled` if the owner
-   fixes quirk 1.
+7. **Keymap commands.** F2 becomes `fileTree.rename` with a web binding (`pane: 'file-tree'`),
+   gated on `mutationsEnabled` (quirk 1, fixed). Mod+A yields to text entry. No new bindings: the
+   web keeps no Delete or refresh key (Q2), though the commands are one binding away.
 8. **Rail.** The session rail moves onto the selection model and gains Shift+Arrow ranges. Its store
    keeps only what the model does not own.
 
 ## Parity
 
 Parity spec "Keyboard", "Selection and focus", and the pointer lines for Mod-click, Shift-click,
-sticky-row click. Quirks 2–5 per the owner's Q2 answers.
+sticky-row click. Quirks 2–5 stay as they are (Q2).
 
 ## Delete
 

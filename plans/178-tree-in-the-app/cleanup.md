@@ -7,14 +7,13 @@
 ## Work
 
 1. **Stylesheet.** `packages/tree/src/styles/style.css` is gone. So are `treeStyle`,
-   `treeUnsafeCss`, `fileTreeStyle`, `--workbench-tree-*` (replaced by tree tokens or dropped per
-   Q1), every `--trees-*` variable, and the package's `sideEffects` entry.
+   `treeUnsafeCss`, `fileTreeStyle`, `--workbench-tree-*` (replaced by tree tokens), every `--trees-*` variable, and the package's `sideEffects` entry.
 2. **Package.** `@workspace/tree` exports the model only. Drop `react`, `react-dom` and `zustand`
    from its dependencies, its `browser` test project, `FileTree.test.tsx`, `public-api.test.ts`.
    Its node tests stay.
 3. **Census.** `web-design-census.mjs` and `react-compiler-census.mjs` roots cover the moved view;
    `packages/tree` leaves the compiler census (no React left). The allow lists hold only Q1
-   verdicts, each with its reason.
+   exceptions, each citing it.
 4. **Rules and docs.**
    - `AGENTS.md:80`: the tree follows the list rules; delete "the shadow-root file tree retains its
      own keyboard model".
