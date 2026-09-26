@@ -3,7 +3,7 @@ import { useListbox } from '@workspace/ui/patterns/use-listbox'
 import { useRef } from 'react'
 
 /** A studio column: arrows move the choice and the app repaints; there is nothing to commit. */
-export function useStudioList({
+export function useChoiceList({
   items,
   activeId,
   onActiveChange,

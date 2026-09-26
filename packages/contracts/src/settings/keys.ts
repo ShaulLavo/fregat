@@ -418,15 +418,6 @@ export const SETTINGS_REGISTRY = {
     visibility: 'internal',
     description: 'Part overrides saved separately for each theme bundle and mode.',
   }),
-  'tui.theme.colors': defineSetting({
-    schema: v.picklist(['theme', 'terminal']),
-    default: 'theme',
-    scope: 'application',
-    widget: 'enum',
-    category: 'Appearance',
-    title: 'Terminal app colors',
-    description: 'Use the selected theme bundle or the terminal host colors in the TUI.',
-  }),
   'workbench.palette': defineSetting({
     // A palette id, bundled or from the user's library on the primary server.
     // Application scope: a workspace file cannot name a palette that exists
@@ -436,14 +427,13 @@ export const SETTINGS_REGISTRY = {
     scope: 'application',
     widget: 'palette',
     category: 'Appearance',
-    // Chosen in the theme studio, which writes it as part of the theme.
-    visibility: 'internal',
     title: 'App colors',
     description:
-      'Colors for app backgrounds, text, borders, accents and the terminal. Pick a palette or make your own.',
+      'Colors for app backgrounds, text, borders, accents and the terminal. Pick a palette here, or edit its colors in the theme studio.',
     keywords: [
       'palette',
       'colour',
+      'colors',
       'sage',
       'graphite',
       'teal',
@@ -459,11 +449,9 @@ export const SETTINGS_REGISTRY = {
     scope: 'window',
     widget: 'code-theme',
     category: 'Appearance',
-    // Chosen in the theme studio, which writes it as part of the theme.
-    visibility: 'internal',
     title: 'Code theme in dark mode',
     description: 'Colors for code in editors and chat code blocks when the app uses dark mode.',
-    keywords: ['syntax', 'highlighting', 'theme', 'native', 'vscode', 'colour'],
+    keywords: ['syntax', 'highlighting', 'theme', 'code', 'native', 'vscode', 'colour'],
   }),
   'editor.codeTheme.light': defineSetting({
     schema: v.pipe(v.string(), v.minLength(1)),
@@ -471,11 +459,81 @@ export const SETTINGS_REGISTRY = {
     scope: 'window',
     widget: 'code-theme',
     category: 'Appearance',
-    // Chosen in the theme studio, which writes it as part of the theme.
-    visibility: 'internal',
     title: 'Code theme in light mode',
     description: 'Colors for code in editors and chat code blocks when the app uses light mode.',
-    keywords: ['syntax', 'highlighting', 'theme', 'native', 'vscode', 'colour'],
+    keywords: ['syntax', 'highlighting', 'theme', 'code', 'native', 'vscode', 'colour'],
+  }),
+  'workbench.wallpaper': defineSetting({
+    schema: wallpaperSelectionSchema,
+    default: DEFAULT_WALLPAPER_SELECTION,
+    scope: 'application',
+    widget: 'wallpaper',
+    category: 'Appearance',
+    title: 'Wallpaper',
+    details:
+      "Desktop shows the server machine's current wallpaper: Omarchy's current background on Linux, the desktop picture on macOS. On a Linux screen the compositor already shows the desktop behind the window, so Desktop draws nothing there.",
+    description:
+      'The image behind the panes: one from the library, an upload, the desktop wallpaper, or none. None keeps the chosen image for later.',
+    keywords: ['wallpaper', 'background', 'desktop', 'image', 'upload'],
+  }),
+  'workbench.surface.opacity': defineSetting({
+    schema: percentSchema,
+    default: 80,
+    scope: 'window',
+    widget: 'number',
+    category: 'Appearance',
+    title: 'Pane opacity',
+    description:
+      'How opaque panels and sidebars are over the wallpaper. 100 turns the glass material off.',
+    keywords: ['panes', 'surfaces', 'transparency', 'opacity', 'glass', 'material', 'blur'],
+  }),
+  'workbench.surface.contentOpacity': defineSetting({
+    schema: percentSchema,
+    default: 50,
+    scope: 'window',
+    widget: 'number',
+    category: 'Appearance',
+    title: 'Content opacity',
+    // Drives --content-opacity: the well is a second layer over a panel that
+    // already painted one, so 50 over 80 composites to 90.
+    details:
+      "This layer sits over the panel's own surface, so 50 over a panel at 80 makes the ground behind code and terminal text 90% opaque: text stays readable and a trace of the wallpaper shows through.",
+    description:
+      'How opaque the extra layer under the editor, terminal and settings is. It sits on top of the panel, so 0 leaves them as see-through as a sidebar.',
+    keywords: ['content', 'surfaces', 'transparency', 'opacity', 'glass', 'editor', 'terminal'],
+  }),
+  'workbench.surface.blur': defineSetting({
+    // Clamped rather than open: at `window` scope a cloned repository can set
+    // this, and an unbounded backdrop-filter blur is a real GPU cost.
+    schema: v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(40)),
+    default: 9,
+    scope: 'window',
+    widget: 'number',
+    category: 'Appearance',
+    title: 'Backdrop blur',
+    details:
+      "Capped at 40 px. A repository's settings file can set this, and a large backdrop blur costs GPU time on every frame.",
+    description: 'Backdrop blur radius, in pixels, behind translucent surfaces.',
+    keywords: ['blur', 'surfaces', 'glass', 'transparency', 'material', 'vibrancy'],
+  }),
+  'workbench.surface.saturation': defineSetting({
+    schema: v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(400)),
+    default: 160,
+    scope: 'window',
+    widget: 'number',
+    category: 'Appearance',
+    title: 'Backdrop saturation',
+    description: 'Backdrop saturation, as a percentage, behind translucent surfaces.',
+    keywords: ['saturation', 'surfaces', 'glass', 'transparency', 'material', 'vibrancy'],
+  }),
+  'tui.theme.colors': defineSetting({
+    schema: v.picklist(['theme', 'terminal']),
+    default: 'theme',
+    scope: 'application',
+    widget: 'enum',
+    category: 'Appearance',
+    title: 'Terminal app colors',
+    description: 'Use the selected theme bundle or the terminal host colors in the TUI.',
   }),
   'workbench.reduceMotion': defineSetting({
     schema: v.boolean(),
@@ -579,60 +637,6 @@ export const SETTINGS_REGISTRY = {
     description: 'Use tighter compact spacing or roomier cozy spacing throughout the app.',
     keywords: ['density', 'compact', 'cozy', 'spacing', 'padding', 'appearance'],
   }),
-  'workbench.surface.opacity': defineSetting({
-    schema: percentSchema,
-    default: 80,
-    scope: 'window',
-    widget: 'number',
-    category: 'Appearance',
-    // Chosen in the theme studio, which writes it as part of the theme.
-    visibility: 'internal',
-    description:
-      'How opaque panels and sidebars are over the wallpaper. 100 turns the glass material off.',
-    keywords: ['transparency', 'opacity', 'glass', 'material', 'blur'],
-  }),
-  'workbench.surface.contentOpacity': defineSetting({
-    schema: percentSchema,
-    default: 50,
-    scope: 'window',
-    widget: 'number',
-    category: 'Appearance',
-    // Chosen in the theme studio, which writes it as part of the theme.
-    visibility: 'internal',
-    // Drives --content-opacity: the well is a second layer over a panel that
-    // already painted one, so 50 over 80 composites to 90.
-    details:
-      "This layer sits over the panel's own surface, so 50 over a panel at 80 makes the ground behind code and terminal text 90% opaque: text stays readable and a trace of the wallpaper shows through.",
-    description:
-      'How opaque the extra layer under the editor, terminal and settings is. It sits on top of the panel, so 0 leaves them as see-through as a sidebar.',
-    keywords: ['transparency', 'opacity', 'editor', 'terminal', 'content'],
-  }),
-  'workbench.surface.blur': defineSetting({
-    // Clamped rather than open: at `window` scope a cloned repository can set
-    // this, and an unbounded backdrop-filter blur is a real GPU cost.
-    schema: v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(40)),
-    default: 9,
-    scope: 'window',
-    widget: 'number',
-    category: 'Appearance',
-    // Chosen in the theme studio, which writes it as part of the theme.
-    visibility: 'internal',
-    details:
-      "Capped at 40 px. A repository's settings file can set this, and a large backdrop blur costs GPU time on every frame.",
-    description: 'Backdrop blur radius, in pixels, behind translucent surfaces.',
-    keywords: ['blur', 'glass', 'material', 'vibrancy'],
-  }),
-  'workbench.surface.saturation': defineSetting({
-    schema: v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(400)),
-    default: 160,
-    scope: 'window',
-    widget: 'number',
-    category: 'Appearance',
-    description: 'Backdrop saturation, as a percentage, behind translucent surfaces.',
-    // Chosen in the theme studio, which writes it as part of the theme.
-    visibility: 'internal',
-    keywords: ['saturation', 'glass', 'material', 'vibrancy'],
-  }),
   'workbench.surface.continuousSeams': defineSetting({
     schema: v.boolean(),
     default: false,
@@ -646,19 +650,6 @@ export const SETTINGS_REGISTRY = {
     description:
       'Paint one background across panels and the resize handles between them, so the panels read as one surface. Off, the wallpaper shows in the gaps between panels.',
     keywords: ['seam', 'handle', 'divider', 'wallpaper', 'surface', 'glass'],
-  }),
-  'workbench.wallpaper': defineSetting({
-    schema: wallpaperSelectionSchema,
-    default: DEFAULT_WALLPAPER_SELECTION,
-    scope: 'application',
-    widget: 'wallpaper',
-    category: 'Appearance',
-    // Chosen in the theme studio, which writes it as part of the theme.
-    visibility: 'internal',
-    details:
-      "Desktop shows the server machine's current wallpaper: Omarchy's current background on Linux, the desktop picture on macOS. On a Linux screen the compositor already shows the desktop behind the window, so Desktop draws nothing there.",
-    description: 'Choose a wallpaper and turn it on or off without losing the selection.',
-    keywords: ['wallpaper', 'background', 'desktop'],
   }),
   'workbench.tree.indentGuides': defineSetting({
     schema: v.picklist(['none', 'onHover', 'always'] as const),

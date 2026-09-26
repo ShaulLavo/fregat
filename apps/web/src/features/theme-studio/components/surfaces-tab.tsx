@@ -1,13 +1,9 @@
 import type { ThemeVariant, ThemeVariantPatch } from '@workspace/contracts'
 import { Button } from '@workspace/ui/components/button'
-import { Slider } from '@workspace/ui/components/slider'
 
-import {
-  MATERIAL_LABELS,
-  MATERIAL_LIMITS,
-  MATERIAL_UNITS,
-  SURFACE_PRESETS,
-} from '@/features/theme-studio/utils/surfaces'
+import { MaterialSlider } from '@/lib/appearance/components/material-slider'
+import { MATERIAL_LABELS } from '@/lib/appearance/utils/material'
+import { SURFACE_PRESETS } from '@/features/theme-studio/utils/surfaces'
 import { jsonEqual } from '@workspace/contracts'
 
 const FIELDS = ['opacity', 'contentOpacity', 'blur', 'saturation'] as const
@@ -26,17 +22,12 @@ export function SurfacesTab({
         {FIELDS.map((field) => (
           <label className='contents' key={field}>
             <span className='text-xs'>{MATERIAL_LABELS[field]}</span>
-            <Slider
-              aria-label={MATERIAL_LABELS[field]}
-              max={MATERIAL_LIMITS[field]}
-              min={0}
+            <MaterialSlider
+              field={field}
+              label={MATERIAL_LABELS[field]}
               value={material[field]}
-              onValueChange={(value: number) => onEdit({ material: { [field]: value } })}
+              onChange={(value) => onEdit({ material: { [field]: value } })}
             />
-            <span className='text-muted-foreground text-right font-mono text-xs tabular-nums'>
-              {material[field]}
-              {MATERIAL_UNITS[field]}
-            </span>
           </label>
         ))}
       </div>

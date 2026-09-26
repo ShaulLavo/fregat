@@ -5,7 +5,8 @@ import { ListRow } from '@workspace/ui/patterns/list-row'
 import type { useListbox } from '@workspace/ui/patterns/use-listbox'
 
 import { libraryImageUrl } from '@/lib/wallpapers/state/queries'
-import { cardSwatches, cardWallpaper } from '@/features/theme-studio/utils/card'
+import { cardWallpaper } from '@/features/theme-studio/utils/card'
+import { paletteSwatches } from '@/lib/appearance/utils/swatches'
 
 /** A theme's identity, not a preview: the app behind the dock is the preview. */
 export function ThemeCard({
@@ -26,7 +27,7 @@ export function ThemeCard({
   variant: ThemeVariant
 }) {
   const wallpaper = cardWallpaper(variant)
-  const swatches = cardSwatches(palette, mode)
+  const swatches = paletteSwatches(palette, mode)
 
   return (
     <ListRow

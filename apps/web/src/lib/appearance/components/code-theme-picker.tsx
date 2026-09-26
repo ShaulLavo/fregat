@@ -1,40 +1,43 @@
 import { Spinner } from '@workspace/ui/components/spinner'
 import { ToolPane } from '@workspace/ui/patterns/tool-pane'
 import { useCodeThemePreview } from '@/lib/code-theme/hooks/use-preview'
-import type { ColorMode, ThemeVariantPatch } from '@workspace/contracts'
+import type { ColorMode } from '@workspace/contracts'
+import { cn } from '@workspace/ui/lib/utils'
 import { ListRow } from '@workspace/ui/patterns/list-row'
 import { VirtualList } from '@workspace/ui/patterns/virtual-list'
 
 import { CodeThemePreview } from '@/lib/code-theme/components/preview'
 import { editorThemeColorMode, editorThemeOptions } from '@/lib/code-theme/utils/catalog'
-import { useStudioList } from '@/features/theme-studio/hooks/use-studio-list'
+import { useChoiceList } from '@/lib/appearance/hooks/use-choice-list'
 
 /**
- * The code colors for the half on screen. The editor behind the dock and chat code blocks follow
- * them; the sample beside the list covers a root with nothing open.
+ * The code themes for one mode, with a sample beside the list: the editor and chat code blocks
+ * follow the choice, and the sample covers a root with nothing open.
  */
-export function CodeTab({
-  codeTheme,
+export function CodeThemePicker({
+  className,
   mode,
-  onEdit,
+  value,
+  onChange,
 }: {
-  codeTheme: string
+  className?: string
   mode: ColorMode
-  onEdit: (patch: ThemeVariantPatch) => void
+  value: string
+  onChange: (id: string) => void
 }) {
   const options = editorThemeOptions(mode)
-  const preview = useCodeThemePreview(codeTheme)
+  const preview = useCodeThemePreview(value)
   const theme = editorThemeOptions(editorThemeColorMode(preview.themeId) ?? mode).find(
     (option) => option.id === preview.themeId,
   )
-  const { containerRef, virtualRef, list } = useStudioList({
+  const { containerRef, virtualRef, list } = useChoiceList({
     items: options.map((option) => ({ id: option.id, label: option.label })),
-    activeId: codeTheme,
-    onActiveChange: (id) => onEdit({ codeTheme: id }),
+    activeId: value,
+    onActiveChange: onChange,
   })
 
   return (
-    <div className='flex h-full min-h-0 gap-(--density-section-padding) px-(--bar-padding-x) py-(--density-section-gap)'>
+    <div className={cn('flex h-full min-h-0 gap-(--density-section-padding)', className)}>
       <VirtualList
         {...list.containerProps}
         activeIndex={list.activeIndex}
@@ -47,7 +50,7 @@ export function CodeTab({
           <ListRow
             {...list.rowProps(option.id)}
             role='option'
-            selected={option.id === codeTheme}
+            selected={option.id === value}
             title={`${option.label} · ${option.subtitle}`}
           >
             <span className='min-w-0 flex-1 truncate'>{option.label}</span>

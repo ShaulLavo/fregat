@@ -44,6 +44,7 @@ const DIAGNOSTIC_LABELS: Record<SettingsDiagnostic['kind'], string> = {
   'unknown-key': 'unknown setting',
   migrated: 'moved to a new setting',
   'removed-key': 'no longer a setting',
+  'set-by-theme': 'set by the theme',
 }
 
 export function settingsDiagnosticLabel(kind: SettingsDiagnostic['kind']) {

@@ -4,6 +4,7 @@ import { SETTINGS_MUTATION_KEY } from '@/features/settings/utils/mutation-keys'
 import { nowMs } from '@workspace/utils/timing'
 import * as v from 'valibot'
 import {
+  shownColorMode,
   themePartPatch,
   resolveThemeSettings,
   type ThemeBundle,
@@ -124,8 +125,7 @@ export function useSettingsActions(owner?: QueryClient) {
     const theme = current?.values['workbench.theme']
     const patch = operation.kind === 'set' ? themePartPatch(operation) : null
     if (!theme || !patch || target !== 'user') return submit(target, [operation], initiator)
-    const preference = current.values['workbench.colorTheme']
-    let mode = preference === 'system' ? systemColorMode() : preference
+    let mode = shownColorMode(current.values['workbench.colorTheme'], systemColorMode())
     if (key === 'editor.codeTheme.light') mode = 'light'
     if (key === 'editor.codeTheme.dark') mode = 'dark'
     return submit('user', [{ kind: 'theme.customize', id: theme.id, mode, patch }], initiator)

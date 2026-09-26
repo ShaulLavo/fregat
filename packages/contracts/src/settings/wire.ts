@@ -28,6 +28,7 @@ const settingsDiagnosticSchema = v.object({
     'invalid-value',
     'migrated',
     'removed-key',
+    'set-by-theme',
   ] as const),
   id: v.string(),
   layer: settingsLayerIdSchema,

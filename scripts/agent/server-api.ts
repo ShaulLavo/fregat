@@ -12,3 +12,18 @@ export function serverApi(page: Page) {
     : `http://localhost:${process.env.PORT ?? '3001'}`
   return { base, headers: { origin: url.origin } }
 }
+
+export type UserSettings = Readonly<Record<string, unknown>>
+
+/** The user layer exactly as the file holds it, read from the server under test. */
+export async function userSettings(page: Page): Promise<UserSettings> {
+  const { base, headers } = serverApi(page)
+  const document = (await (await page.request.get(`${base}/settings`, { headers })).json()) as {
+    layers: { id: string; raw: UserSettings }[]
+  }
+  return document.layers.find((layer) => layer.id === 'user')?.raw ?? {}
+}
+
+export function selectedThemeId(settings: UserSettings) {
+  return (settings['workbench.theme'] as { id?: string } | null | undefined)?.id ?? null
+}

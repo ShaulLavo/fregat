@@ -618,6 +618,9 @@ export const selectors = {
   settingsScopeTab: (page: Page, name: 'User' | 'Workspace' | 'Defaults', selected?: boolean) =>
     page.getByRole('tab', { name, exact: true, selected }),
   settingsDefaultsBanner: (page: Page) => page.getByText('Defaults are read-only', { exact: true }),
+  settingsRow: (page: Page, id: string) => page.locator(`[data-setting-row="${id}"]`),
+  settingsSlider: (page: Page, title: string) =>
+    page.getByRole('slider', { name: title, exact: true }),
   settingsRowActions: (page: Page, id: string) =>
     page.getByRole('button', { name: `Actions for ${id}`, exact: true }),
   pushSection: (page: Page) =>

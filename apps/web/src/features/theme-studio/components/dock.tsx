@@ -7,9 +7,9 @@ import { useBundles } from '@/lib/appearance/hooks/use-bundles'
 import { useEditorColorTheme } from '@/lib/editor-theme/hooks/use-editor-color-theme'
 import { useStudioStore } from '@/lib/theme-studio/state/studio-store'
 import { DockHeader } from '@/features/theme-studio/components/dock-header'
-import { CodeTab } from '@/features/theme-studio/components/code-tab'
+import { CodeThemePicker } from '@/lib/appearance/components/code-theme-picker'
 import { ColorsTab } from '@/features/theme-studio/components/colors-tab'
-import { WallpaperTab } from '@/features/theme-studio/components/wallpaper-tab'
+import { WallpaperLibrary } from '@/lib/appearance/components/wallpaper-library'
 import { useDraftPalette } from '@/features/theme-studio/hooks/use-draft-palette'
 import { useSavePaletteEdits } from '@/features/theme-studio/hooks/use-save-palette-edits'
 import { useSettingsOwner } from '@/lib/settings-owner/hooks/use-settings-owner'
@@ -33,6 +33,8 @@ import { selectWallpaper } from '@/lib/wallpapers/utils/selection'
 import type { AssetId, ThemeVariant, ThemeVariantPatch } from '@workspace/contracts'
 import { useIsMutating } from '@tanstack/react-query'
 import { paletteMutationKeys } from '@/features/theme-studio/utils/mutation-keys'
+
+const TAB_PADDING = 'px-(--bar-padding-x) py-(--density-section-gap)'
 
 /**
  * The theme studio: a strip along the bottom of a workbench that stays live and full size above
@@ -197,7 +199,8 @@ export function Dock() {
             />
           ) : null}
           {store.tab === 'wallpaper' && draft ? (
-            <WallpaperTab
+            <WallpaperLibrary
+              className={TAB_PADDING}
               colors={draftPalette.colors}
               value={draft.variants[mode].wallpaper}
               onChange={(source) =>
@@ -207,7 +210,12 @@ export function Dock() {
             />
           ) : null}
           {store.tab === 'code' && draft ? (
-            <CodeTab codeTheme={draft.variants[mode].codeTheme} mode={mode} onEdit={edit} />
+            <CodeThemePicker
+              className={TAB_PADDING}
+              mode={mode}
+              value={draft.variants[mode].codeTheme}
+              onChange={(codeTheme) => edit({ codeTheme })}
+            />
           ) : null}
           {store.tab === 'surfaces' && draft ? (
             <SurfacesTab material={draft.variants[mode].material} onEdit={edit} />

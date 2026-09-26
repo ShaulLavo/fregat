@@ -3,6 +3,7 @@ import { isRecord } from '@workspace/utils/objects'
 import { jsonEqual } from './json-equal'
 import { SETTINGS_REGISTRY, type SettingId, type SettingsValues } from './keys'
 import { migrateSetting } from './migrations'
+import { THEME_PART_KEYS } from '../themes/part-keys'
 import {
   applySettingDependencies,
   type RegistryValues,
@@ -74,6 +75,7 @@ type SettingsDiagnosticKind =
   | 'invalid-value'
   | 'migrated'
   | 'removed-key'
+  | 'set-by-theme'
 
 /**
  * Something a layer held that did not become a value. Never thrown: one bad key
@@ -127,8 +129,28 @@ export function resolveSettings(
   const registry = options.registry ?? SETTINGS_REGISTRY
   const diagnostics: SettingsDiagnostic[] = []
   const contributions = collectContributions(registry, layers, diagnostics)
+  const values = buildValues(registry, contributions, options.previous)
 
-  return { values: buildValues(registry, contributions, options.previous), diagnostics }
+  return { values, diagnostics: [...diagnostics, ...themePartDiagnostics(values, contributions)] }
+}
+
+/**
+ * With a theme selected, the theme sets its parts, so a user-file value for one does nothing.
+ * Workspace and policy values still apply over the theme.
+ */
+function themePartDiagnostics(
+  values: Record<string, unknown>,
+  contributions: Map<string, Contribution[]>,
+): SettingsDiagnostic[] {
+  const theme = values['workbench.theme']
+  if (!isRecord(theme) || typeof theme.name !== 'string') return []
+  const detail = `${theme.name} is selected, so its value applies. Settings › Appearance edits the theme's value.`
+
+  return THEME_PART_KEYS.flatMap((id) =>
+    contributions.get(id)?.some((entry) => entry.layer === 'user')
+      ? [{ kind: 'set-by-theme' as const, id, layer: 'user' as const, detail }]
+      : [],
+  )
 }
 
 /**

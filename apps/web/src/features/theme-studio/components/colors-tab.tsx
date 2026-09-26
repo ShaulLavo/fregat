@@ -1,13 +1,5 @@
-import {
-  paletteSupportsMode,
-  type ColorMode,
-  type Palette,
-  type PaletteColors,
-  type PaletteId,
-} from '@workspace/contracts'
+import type { ColorMode, Palette, PaletteColors, PaletteId } from '@workspace/contracts'
 import { Button } from '@workspace/ui/components/button'
-import { ListRow } from '@workspace/ui/patterns/list-row'
-import { VirtualList } from '@workspace/ui/patterns/virtual-list'
 import {
   deriveFromAccent,
   deriveFromBackground,
@@ -19,11 +11,10 @@ import { usePaletteActions } from '@/features/theme-studio/hooks/use-palette-act
 import { ColorField } from '@/features/theme-studio/components/color-field'
 import { PaletteContrast } from '@/features/theme-studio/components/palette-contrast'
 import { PaletteImportDialog } from '@/features/theme-studio/components/palette-import-dialog'
-import { cardSwatches } from '@/features/theme-studio/utils/card'
-import { useStudioList } from '@/features/theme-studio/hooks/use-studio-list'
+import { PaletteList } from '@/lib/appearance/components/palette-list'
 
 /**
- * App and terminal colors for the half on screen: the palettes on the left, the half's own
+ * App and terminal colors for the half on screen: the palette list on the left, the half's own
  * background and accent on the right. An edit makes a copy named after the theme.
  */
 export function ColorsTab({
@@ -42,43 +33,14 @@ export function ColorsTab({
   const { catalog } = usePalette()
   const { create } = usePaletteActions()
   const [importing, setImporting] = useState(false)
-  const options = catalog.filter((entry) => paletteSupportsMode(entry, mode))
-  const { containerRef, virtualRef, list } = useStudioList({
-    items: options.map((entry) => ({ id: entry.id, label: entry.name })),
-    activeId: palette && options.some((entry) => entry.id === palette.id) ? palette.id : null,
-    onActiveChange: (id) => onChoose(id as PaletteId),
-  })
 
   return (
     <div className='flex h-full min-h-0 gap-(--density-section-padding) px-(--bar-padding-x) py-(--density-section-gap)'>
-      <VirtualList
-        {...list.containerProps}
-        activeIndex={list.activeIndex}
-        aria-label='Palettes'
-        className='focus-ring-inset w-64 shrink-0 outline-none'
-        getKey={(entry) => entry.id}
-        handleRef={virtualRef}
-        items={options}
-        renderRow={(entry) => (
-          <ListRow
-            {...list.rowProps(entry.id)}
-            role='option'
-            selected={entry.id === palette?.id}
-            title={entry.name}
-          >
-            <span className='min-w-0 flex-1 truncate'>{entry.name}</span>
-            <span aria-hidden='true' className='flex shrink-0 gap-0.5'>
-              {cardSwatches(entry, mode).map((color, index) => (
-                <span
-                  className='size-2.5 rounded-md'
-                  key={index}
-                  style={{ backgroundColor: color }}
-                />
-              ))}
-            </span>
-          </ListRow>
-        )}
-        scrollRef={containerRef}
+      <PaletteList
+        className='w-64 shrink-0'
+        mode={mode}
+        value={palette?.id ?? null}
+        onChange={onChoose}
       />
       {colors ? (
         <div className='flex min-w-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain'>

@@ -2,6 +2,7 @@ import { NotificationModeWidget } from '@/features/settings/components/widgets/n
 import { ThemeWidget } from '@/features/settings/components/widgets/theme-widget'
 import {
   descriptorFor,
+  shownColorMode,
   SCALAR_SETTING_IDS,
   settingControl,
   settingParentId,
@@ -10,6 +11,7 @@ import {
   type ScalarSettingId,
   type SettingsValues,
   type SettingValue,
+  type ColorMode,
 } from '@workspace/contracts'
 
 import { KeybindingSection } from '@/features/settings/components/keybinding-section'
@@ -24,6 +26,13 @@ import { SegmentedWidget } from '@/features/settings/components/widgets/segmente
 import { isFontSettingId } from '@/features/settings/utils/font-options'
 import { FontWidget } from '@/features/settings/components/widgets/font-widget'
 import { NumberWidget } from '@/features/settings/components/widgets/number-widget'
+import { CodeThemeWidget } from '@/features/settings/components/widgets/code-theme-widget'
+import { PaletteWidget } from '@/features/settings/components/widgets/palette-widget'
+import { SurfaceWidget } from '@/features/settings/components/widgets/surface-widget'
+import { WallpaperWidget } from '@/features/settings/components/widgets/wallpaper-widget'
+import { useSystemColorMode } from '@/features/settings/hooks/use-system-color-mode'
+import { themePartModeNote } from '@/features/settings/utils/theme-part-mode'
+import { surfaceField } from '@/lib/appearance/utils/material'
 import { StringWidget } from '@/features/settings/components/widgets/string-widget'
 import { settingInspection } from '@/features/settings/hooks/use-setting-inspection'
 import { useSettingsActions } from '@/features/settings/hooks/use-settings-actions'
@@ -53,6 +62,11 @@ export function SettingRow({
   const disabledReason = descriptor.readOnlyReason ?? inspection.disabledReason
   const dependencyNote = settingDependencyNote(id, snapshot.values)
   const value = snapshot.values[id]
+  // The same mode the value was resolved for and a part write targets.
+  const mode = shownColorMode(snapshot.values['workbench.colorTheme'], useSystemColorMode())
+  // A theme only takes writes from User settings; a workspace value applies in both modes.
+  const themed = scope === 'user' && snapshot.values['workbench.theme'] !== null
+  const modeNote = themePartModeNote(id, themed, mode)
   // Full width, like the theme picker: a list of every command does not fit half a row.
   const fullWidth = descriptor.widget === 'theme' || descriptor.widget === 'keybindings'
   const hasCodePreview =
@@ -68,6 +82,7 @@ export function SettingRow({
         underParent && 'pl-(--density-section-padding)',
       )}
       data-depends-on={settingParentId(id)}
+      data-setting-row={id}
     >
       <div className='flex min-w-0 flex-col gap-1 @max-3xl/settings:wrap-anywhere'>
         <div className='flex flex-wrap items-center gap-2'>
@@ -100,7 +115,9 @@ export function SettingRow({
             </span>
           ) : null}
         </div>
-        <p className='text-muted-foreground text-xs'>{descriptor.description}</p>
+        <p className='text-muted-foreground text-xs'>
+          {modeNote ? `${descriptor.description} ${modeNote}` : descriptor.description}
+        </p>
         {alsoModifiedIn.length > 0 ? (
           // Without this a value set in another layer looks like the row is
           // simply wrong: the control shows the resolved value and nothing says
@@ -129,6 +146,8 @@ export function SettingRow({
         <SettingControl
           disabled={disabledReason !== null || dependencyNote !== null}
           id={id}
+          mode={mode}
+          themed={themed}
           onChange={(next) => {
             if (!SCALAR_SETTING_IDS.includes(id as ScalarSettingId)) return
             setSetting(id as ScalarSettingId, next as SettingsValues[ScalarSettingId], scope)
@@ -147,11 +166,16 @@ export function SettingRow({
 function SettingControl({
   disabled,
   id,
+  mode,
   onChange,
+  themed,
   value,
 }: {
   disabled: boolean
   id: SettingId
+  /** The mode on screen, which a theme part row edits. */
+  mode: ColorMode
+  themed: boolean
   // Every registered value type, not `never`. A handler that accepts nothing is
   // assignable to no widget — which is what forced a cast at every branch —
   // where one that accepts all of them is assignable to each in turn.
@@ -163,6 +187,19 @@ function SettingControl({
   if (control.widget === 'theme') return <ThemeWidget disabled={disabled} />
   if (control.widget === 'boolean') {
     return <BooleanWidget checked={control.value} disabled={disabled} id={id} onChange={onChange} />
+  }
+
+  const field = surfaceField(id)
+  if (control.widget === 'number' && field) {
+    return (
+      <SurfaceWidget
+        disabled={disabled}
+        field={field}
+        label={settingRowTitle(id)}
+        value={control.value}
+        onCommit={onChange}
+      />
+    )
   }
 
   if (control.widget === 'number') {
@@ -193,6 +230,28 @@ function SettingControl({
 
   if (control.widget === 'font' && isFontSettingId(id)) {
     return <FontWidget disabled={disabled} id={id} onChange={onChange} value={control.value} />
+  }
+
+  if (control.widget === 'code-theme') {
+    return <CodeThemeWidget disabled={disabled} id={id} value={control.value} onChange={onChange} />
+  }
+
+  if (control.widget === 'palette') {
+    return (
+      <PaletteWidget
+        disabled={disabled}
+        mode={mode}
+        themed={themed}
+        value={control.value}
+        onChange={onChange}
+      />
+    )
+  }
+
+  if (control.widget === 'wallpaper') {
+    return (
+      <WallpaperWidget disabled={disabled} mode={mode} value={control.value} onChange={onChange} />
+    )
   }
 
   if (control.widget === 'string' || control.widget === 'multiline') {
