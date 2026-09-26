@@ -30,6 +30,7 @@ export const filePickerKeys = {
   recents: () => [...filePickerKeys.all, 'recents'] as const,
   recentList: (mode: 'file' | 'folder', showHidden: boolean) =>
     [...filePickerKeys.recents(), 'list', { mode, showHidden }] as const,
+  imageReady: (src: string) => [...filePickerKeys.all, 'image-ready', src] as const,
 }
 
 export const filePreviewKeys = {

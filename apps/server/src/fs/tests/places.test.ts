@@ -21,9 +21,9 @@ describe('filesystem places', () => {
     await mkdir(path.join(root, 'home', 'Documents'), { recursive: true })
     await mkdir(path.join(root, 'home', 'Downloads'))
 
-    expect(await places(root)).toEqual([
-      { id: 'documents', path: 'home/Documents' },
-      { id: 'downloads', path: 'home/Downloads' },
+    expect((await places(root)).places).toEqual([
+      { kind: 'documents', label: 'Documents', path: 'home/Documents' },
+      { kind: 'downloads', label: 'Downloads', path: 'home/Downloads' },
     ])
   })
 
@@ -44,10 +44,73 @@ describe('filesystem places', () => {
       ].join('\n'),
     )
 
-    expect(await places(root)).toEqual([
-      { id: 'documents', path: 'home/Papers' },
-      { id: 'downloads', path: 'elsewhere/Incoming' },
+    expect((await places(root)).places).toEqual([
+      { kind: 'documents', label: 'Documents', path: 'home/Papers' },
+      { kind: 'downloads', label: 'Downloads', path: 'elsewhere/Incoming' },
     ])
+  })
+
+  it('adds GTK bookmarks and dev folders once each, after the home folders', async () => {
+    const root = await fixtureRoot()
+    const home = path.join(root, 'home')
+    await mkdir(path.join(home, '.config', 'gtk-3.0'), { recursive: true })
+    await mkdir(path.join(home, 'Downloads'))
+    await mkdir(path.join(home, 'Projects'))
+    await mkdir(path.join(root, 'work', 'my stuff'), { recursive: true })
+    await writeFile(
+      path.join(home, '.config', 'gtk-3.0', 'bookmarks'),
+      [
+        `file://${path.join(home, 'Downloads')} Downloads`,
+        `file://${encodeURI(path.join(root, 'work', 'my stuff'))} Stuff`,
+        'sftp://host/srv Server',
+        `file://${path.join(root, 'gone')}`,
+      ].join('\n'),
+    )
+
+    expect((await places(root)).places).toEqual([
+      { kind: 'downloads', label: 'Downloads', path: 'home/Downloads' },
+      { kind: 'bookmark', label: 'Stuff', path: 'work/my stuff' },
+      { kind: 'folder', label: 'Projects', path: 'home/Projects' },
+    ])
+  })
+
+  it('offers the parent of opened projects with its checkout count', async () => {
+    const root = await fixtureRoot()
+    await mkdir(path.join(root, 'home'))
+    for (const name of ['alpha', 'beta', 'gamma'])
+      await mkdir(path.join(root, 'code', name, '.git'), { recursive: true })
+    await mkdir(path.join(root, 'code', 'notes'))
+    await mkdir(path.join(root, 'lonely', 'one'), { recursive: true })
+    const app = testApp(root)
+    for (const folder of ['code/alpha', 'lonely/one'])
+      await request(app, '/fs/recents', { method: 'POST', body: JSON.stringify({ path: folder }) })
+
+    expect((await places(root, app)).projects).toEqual([
+      { label: 'code', path: 'code', repoCount: 3 },
+    ])
+  })
+
+  it('drops a projects folder once it is deleted, though its picks remain', async () => {
+    const root = await fixtureRoot()
+    await mkdir(path.join(root, 'home'))
+    for (const name of ['alpha', 'beta'])
+      await mkdir(path.join(root, 'gone', name), { recursive: true })
+    const app = testApp(root)
+    for (const folder of ['gone/alpha', 'gone/beta'])
+      await request(app, '/fs/recents', { method: 'POST', body: JSON.stringify({ path: folder }) })
+    expect((await places(root, app)).projects).toEqual([
+      { label: 'gone', path: 'gone', repoCount: 0 },
+    ])
+
+    await rm(path.join(root, 'gone'), { recursive: true })
+
+    expect((await places(root, app)).projects).toEqual([])
+  })
+
+  it('always offers the browsable root as a drive', async () => {
+    const root = await fixtureRoot()
+    const { drives } = await places(root)
+    expect(drives[0]).toMatchObject({ label: path.basename(root), path: '' })
   })
 
   it('parses only absolute and $HOME-relative values', () => {
@@ -59,8 +122,8 @@ describe('filesystem places', () => {
   })
 })
 
-async function places(root: string) {
-  const app = createTestApp({
+function testApp(root: string) {
+  return createTestApp({
     auth: { allowedOrigins: [TRUSTED_ORIGIN] },
     homeDirectory: path.join(root, 'home'),
     settings: testSettingsOptions(root),
@@ -68,12 +131,22 @@ async function places(root: string) {
     watch: false,
     workspaceRoot: root,
   })
+}
+
+async function request(app: ReturnType<typeof testApp>, route: string, init: RequestInit = {}) {
   const response = await app.handle(
-    new Request('http://local/fs/places', { headers: { origin: TRUSTED_ORIGIN } }),
+    new Request(`http://local${route}`, {
+      ...init,
+      headers: { 'content-type': 'application/json', origin: TRUSTED_ORIGIN },
+    }),
   )
   expect(response.status).toBe(200)
-  const payload = (await response.json()) as { places: unknown[] }
-  return payload.places
+  return response
+}
+
+async function places(root: string, app = testApp(root)) {
+  const response = await request(app, '/fs/places')
+  return (await response.json()) as { drives: unknown[]; places: unknown[]; projects: unknown[] }
 }
 
 async function fixtureRoot() {

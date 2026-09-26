@@ -1126,6 +1126,31 @@ export const SETTINGS_REGISTRY = {
     description: 'Milliseconds of quiet before an automatic save, when saving after a delay.',
     keywords: ['autosave', 'delay', 'debounce', 'files'],
   }),
+  'files.picker.pinnedLocations': defineSetting({
+    schema: v.array(v.string()),
+    default: [],
+    // Machine scope: the paths name folders on the machine being browsed.
+    scope: 'machine',
+    widget: 'list',
+    visibility: 'internal',
+    category: 'Files',
+    title: 'Pinned picker locations',
+    description:
+      'Folders pinned to the top of the file picker sidebar on this machine, as paths from the browsable root.',
+    keywords: ['files', 'folders', 'picker', 'pin', 'favorites', 'sidebar', 'places'],
+  }),
+  'files.picker.hiddenLocations': defineSetting({
+    schema: v.array(v.string()),
+    default: [],
+    scope: 'machine',
+    widget: 'list',
+    visibility: 'internal',
+    category: 'Files',
+    title: 'Removed picker locations',
+    description:
+      'Places, project folders and drives removed from the file picker sidebar on this machine, as paths from the browsable root.',
+    keywords: ['files', 'folders', 'picker', 'hide', 'remove', 'sidebar', 'places'],
+  }),
   'files.picker.view': defineSetting({
     schema: v.picklist(['auto', 'columns', 'list', 'icons'] as const),
     default: 'auto',
