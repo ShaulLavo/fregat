@@ -50,9 +50,9 @@ Completion: a markdown file can be edited in source with a live rendered pane be
 
 ## Phase 2 — live preview, after Plans 111 and 176
 
-Blocked on Plan 111's comparison. The steps below are the intended shape, not a commitment ahead of its findings.
+Blocked on Plan 111 Phase 1 (`trigger: 'edit'` sources) and Plan 176's owner question 1. The steps below are the intended shape, not a commitment ahead of its findings.
 
-1. **Re-source the structure (D5).** Drive replacements from the parser [Plan 176](176-markdown-parser.md) picks, with position data, rather than from highlight captures. The existing structural recovery in `replacements.ts` is deleted, not extended.
+1. **Re-source the structure (D5).** Drive replacements from the parser [Plan 176](176-markdown-parser.md) picks, with position data, rather than from highlight captures. Plan 176 recommends `@lezer/markdown` on the main thread (its owner question 1), parsed to the viewport inside the edit operation so the first frame is decorated, and its Phases 1–2 are this step. The existing structural recovery in `replacements.ts` is deleted, not extended.
 2. **Block widgets (D6).** Whatever primitive Plan 111 concludes the editor needs, so a table, an image and a fence can each be replaced by a rendered block that the caret can enter and leave predictably.
 3. **Caret semantics.** Source reappears under the caret, as today, but defined against the AST: entering a node's range reveals its syntax, leaving it re-renders. Selection across a boundary must not lose characters — the current implementation's stated fallback is to leave malformed markdown alone, and that guarantee is kept.
 4. **Undo and edit correctness.** A replacement is a view concern; the buffer holds source at all times. Every editing gesture over a replaced range produces the same buffer as it would in source mode. This is the test surface, not the visuals.
