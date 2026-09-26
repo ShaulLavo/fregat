@@ -11,15 +11,15 @@ import { defineConfig } from 'vitest/config'
 // `node` and `dom` projects too - pointing their client at a file server only
 // this run ever spawns. A separate config is the only boundary that holds.
 const alias = {
-  '@': path.resolve(__dirname, './src'),
+  '@': path.resolve(import.meta.dirname, './src'),
 }
 
 // A linked package resolves outside the workspace, so Vite's fs allowlist blocks the non-JS
 // files it fetches at runtime: ghostty's wasm artifact, the Editor's worker scripts.
-const workspacePackages = path.resolve(__dirname, '../../packages')
+const workspacePackages = path.resolve(import.meta.dirname, '../../packages')
 const linkedPackageRoots = [
   ...['ghostty-webgpu'].flatMap((name) =>
-    [__dirname, path.resolve(__dirname, '../..')].flatMap((base) => {
+    [import.meta.dirname, path.resolve(import.meta.dirname, '../..')].flatMap((base) => {
       const candidate = path.join(base, 'node_modules', name)
       return fs.existsSync(candidate) ? [fs.realpathSync(candidate)] : []
     }),
@@ -42,7 +42,7 @@ process.env.VITEST_BROWSER_FILE_SERVER_URL = browserFileServerUrl
 export default defineConfig({
   plugins: [react({ compiler: true }), tailwindcss()],
   resolve: { alias, dedupe: ['react', 'react-dom'] },
-  server: { fs: { allow: [path.resolve(__dirname, '../..'), ...linkedPackageRoots] } },
+  server: { fs: { allow: [path.resolve(import.meta.dirname, '../..'), ...linkedPackageRoots] } },
   define: {
     // Browser tests talk to the spawned file server directly: the
     // Vitest browser runner serves tests from its own API server, so
