@@ -22,7 +22,7 @@ for (const setting of ['prefetch.enabled', 'prefetch.diffs'] as const) {
   })
 }
 
-test('four reads per client, shared leases, leave aborts only the last unclaimed read', async ({
+test('four reads per client, shared leases, leave retains unclaimed reads until settlement', async ({
   client,
 }) => {
   void client
@@ -47,7 +47,7 @@ test('four reads per client, shared leases, leave aborts only the last unclaimed
   releases[0]!()
   expect(signals[0]!.aborted).toBe(false)
   shared()
-  expect(signals[0]!.aborted).toBe(true)
+  expect(signals[0]!.aborted).toBe(false)
   claimDiffIntent(queryClient, options(1).queryKey)
   releases[1]!()
   expect(signals[1]!.aborted).toBe(false)
@@ -56,6 +56,7 @@ test('four reads per client, shared leases, leave aborts only the last unclaimed
   releases[2]!()
   expect(signals[2]!.aborted).toBe(false)
   unsubscribe()
+  expect(signals[2]!.aborted).toBe(false)
   releases[3]!()
   releases[4]!()
   queryClient.clear()

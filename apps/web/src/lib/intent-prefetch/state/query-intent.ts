@@ -1,5 +1,6 @@
 import {
   hashKey,
+  QueryObserver,
   type QueryClient,
   type QueryKey,
   type QueryExecuteOptions,
@@ -10,7 +11,7 @@ import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import { clientLogContext } from '@/lib/environments/state/log-context'
 
 type Lease = { users: number; claimed: boolean; claim: () => void; end: () => void }
-// Leases own cancellation only. Answers and in-flight work belong to the query cache.
+// Leases track row intent and claims. Answers and in-flight work belong to the query cache.
 const leases = new WeakMap<QueryClient, Map<string, Lease>>()
 const diffReads = {
   predicate: (query: { queryKey: QueryKey }) =>
@@ -66,26 +67,32 @@ export function startDiffIntent<T, K extends QueryKey>(
     },
   }
   owned.set(key, lease)
+  // Keep the fetch observed until settlement even if a viewer mounts and leaves mid-read.
+  const observer = new QueryObserver(client, { ...options, enabled: false })
+  const unsubscribe = observer.subscribe(() => {})
   void client.query(options).then(
-    (data) =>
+    (data) => {
+      unsubscribe()
       event.set({
         prepareMs: performance.now() - started,
         bytes: new TextEncoder().encode(JSON.stringify(data)).byteLength,
         workerMs: 0,
-      }),
-    () =>
+      })
+    },
+    () => {
+      unsubscribe()
       event.end({
         outcome: client.getQueryState(options.queryKey)?.status === 'error' ? 'failed' : 'aborted',
-      }),
+      })
+    },
   )
   return () => releaseDiffIntent(client, options.queryKey, lease)
 }
 
 function releaseDiffIntent(client: QueryClient, key: QueryKey, lease: Lease) {
   if (--lease.users > 0) return
+  // The server cannot abort these Git reads. Keep the request fetching until its response
+  // settles so leaving a row cannot admit more work while its Git processes still run.
   lease.end()
   leases.get(client)?.delete(hashKey(key))
-  const query = client.getQueryCache().find({ queryKey: key, exact: true })
-  if (!lease.claimed && query?.getObserversCount() === 0)
-    void client.cancelQueries({ queryKey: key, exact: true })
 }

@@ -188,9 +188,17 @@ Implemented 2026-09-26 in wave 2 lane F, awaiting coordinator merge. The `prefet
 application setting depends on the master. Git change and commit file rows prepare their read on
 hover, focus and the keyboard cursor; checkpoint turn files and changed-files cards share the turn
 read; history prepares the cursor's neighbours. Query-owned leases deduplicate, cap the diff family
-at four per environment, cancel abandoned reads, and preserve a read claimed by a press or mounted
-observer. No hover issues a provider command. Commit details hold their displayed subject while the
+at four per environment, and keep admitted reads fetching through row leave until the response
+settles. Git read routes do not propagate aborts, so client cancellation would free room while the
+server keeps working. Checkpoint open commands claim the shared read for both clicks and keyboard
+activation, including when the counted-turn read is still pending. No hover issues a provider command. Commit details hold their displayed subject while the
 next query resolves.
+
+PR #136 review fixes are covered by real delayed Git subprocesses and the checkpoint turn-files
+list. Leaving eight rows admits four Git operations; revisiting shares the pending read, and
+settlement frees capacity. Enter survives cursor movement and list unmount while both turn reads
+are pending; click remains covered. Admitted queries retain an observer through settlement so a
+viewer mounting and unmounting cannot abort them.
 
 The response-seeding prerequisite was missing: `/git/diff` returned patches without sources.
 Single-file responses now include the immutable blob text using the existing text-size guards;
