@@ -636,6 +636,30 @@ export const SETTINGS_REGISTRY = {
     description: 'Choose a wallpaper and turn it on or off without losing the selection.',
     keywords: ['wallpaper', 'background', 'desktop'],
   }),
+  'workbench.wallpaper.omarchyCatalog': defineSetting({
+    schema: v.boolean(),
+    default: true,
+    scope: 'application',
+    widget: 'boolean',
+    category: 'Appearance',
+    title: 'Omarchy wallpapers from GitHub',
+    description:
+      'List every Omarchy theme wallpaper in the picker. Picking one downloads it from a pinned Omarchy commit on GitHub.',
+    keywords: ['wallpaper', 'omarchy', 'github', 'download'],
+  }),
+  'workbench.wallpaper.previewCloud': defineSetting({
+    schema: v.pipe(v.string(), v.regex(/^[A-Za-z0-9_-]*$/)),
+    default: '',
+    scope: 'application',
+    widget: 'string',
+    category: 'Appearance',
+    title: 'Wallpaper preview cloud',
+    details:
+      'The account needs fetched URLs allowed for raw.githubusercontent.com (Cloudinary Settings → Security). Empty loads full-size previews from GitHub.',
+    description:
+      'Cloudinary cloud name that resizes Omarchy wallpaper previews through its fetch mode.',
+    keywords: ['wallpaper', 'cloudinary', 'preview', 'thumbnail'],
+  }),
   'workbench.tree.indentGuides': defineSetting({
     schema: v.picklist(['none', 'onHover', 'always'] as const),
     default: 'always',

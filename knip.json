@@ -77,6 +77,7 @@
         "check-linked-sources.ts",
         "generate-unicode-confusables.mjs",
         "themes/import-omarchy-theme.ts",
+        "themes/generate-omarchy-catalog.ts",
         "parity/background.ts",
         "parity/composer-defaults.ts",
         "parity/follow-ups.ts",

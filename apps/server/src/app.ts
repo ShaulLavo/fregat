@@ -266,9 +266,11 @@ export function createApp(options: AppOptions) {
       async () => {
         const started = performance.now()
         const result = await wallpapers.seed()
+        const omarchy = await wallpapers.importInstalledOmarchy()
         recordProcessInfo('wallpapers.seed', {
           durationMs: Math.round(performance.now() - started),
           ...result,
+          omarchy,
         })
       },
       { area: 'wallpaper', operation: 'library.seed' },

@@ -981,6 +981,7 @@ export {
   type WallpaperSource,
   type WallpaperSelection,
   type WallpaperAsset,
+  type WallpaperCatalogEntry,
 } from './themes/wallpaper'
 
 export * from './themes/bundle'

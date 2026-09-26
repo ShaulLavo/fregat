@@ -68,6 +68,7 @@
     "hooks:install": "lefthook install",
     "hooks:pre-commit": "lefthook run pre-commit",
     "themes:import-omarchy": "bun scripts/themes/import-omarchy-theme.ts",
+    "themes:omarchy-catalog": "bun scripts/themes/generate-omarchy-catalog.ts",
     "dupes:functions": "bun scripts/lint/duplicate-functions.mjs",
     "gates": "bun run dupes:functions && bun run dupes && bun run design:census && bun run compiler:census && bun run errors:census && bun run query:check && bun run unused:check",
     "syntax:coverage": "bun apps/web/scripts/syntax-coverage.ts",

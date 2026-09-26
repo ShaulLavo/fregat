@@ -32,6 +32,12 @@ export const wallpaperErrors = defineErrorCatalog('wallpapers', {
     why: 'The asset is absent from the library.',
     fix: 'Refresh the library and select an existing image.',
   },
+  DOWNLOAD: {
+    status: 502,
+    message: 'Omarchy wallpaper could not be downloaded.',
+    why: 'GitHub did not return the pinned wallpaper file.',
+    fix: 'Check the network connection and pick the wallpaper again.',
+  },
   DIRECTORY: {
     status: 400,
     message: 'Wallpaper directory could not be imported.',

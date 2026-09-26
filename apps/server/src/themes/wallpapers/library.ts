@@ -11,12 +11,14 @@ import {
   type AssetId,
   type BundledWallpaper,
   type WallpaperAsset,
+  type WallpaperCatalogEntry,
 } from '@workspace/contracts'
 import * as v from 'valibot'
 import type { SettingsStore } from '../../settings/store'
 import { decodeWallpaper, deriveStoredWallpaper, MAX_WALLPAPER_BYTES } from './decode'
 import { wallpaperErrors } from './structured-errors'
 import { readBundledWallpaper } from './bundled'
+import { OMARCHY_CATALOG, wallpaperStem } from './omarchy-catalog'
 
 export const OMARCHY_THEMES_DIRECTORY = '/usr/share/omarchy/themes'
 type Provenance = WallpaperAsset['provenance'][number]
@@ -84,6 +86,59 @@ export class WallpaperLibrary {
     return assets
   }
 
+  /** Omarchy wallpapers on GitHub that no library entry covers yet, matched by theme and file stem. */
+  catalog(assets: readonly WallpaperAsset[]): WallpaperCatalogEntry[] {
+    if (!this.#settings.snapshot().values['workbench.wallpaper.omarchyCatalog']) return []
+    const installed = new Set<string>()
+    for (const asset of assets) {
+      const bundled = bundledWallpaperFor(asset.id)
+      if (bundled) installed.add(catalogKey(bundled.theme, bundled.file))
+      for (const item of asset.provenance) {
+        if (item.kind === 'omarchy') installed.add(catalogKey(item.theme, path.basename(item.path)))
+      }
+    }
+    return OMARCHY_CATALOG.filter((entry) => !installed.has(catalogKey(entry.theme, entry.file)))
+  }
+
+  installCatalog(id: AssetId) {
+    const entry = OMARCHY_CATALOG.find((item) => item.asset === id)
+    if (!entry) throw wallpaperErrors.NOT_FOUND({ internal: { at: 'catalog', asset: id } })
+    return this.#serialize(async () => {
+      const existing = await this.#readIndex(id)
+      if (existing) return existing
+      const bytes = await this.#download(entry)
+      return this.#install(bytes, `${entry.theme} · ${entry.file}`, {
+        kind: 'omarchy',
+        theme: entry.theme,
+        path: entry.source,
+      })
+    })
+  }
+
+  async #download(entry: WallpaperCatalogEntry) {
+    const response = await fetch(entry.source).catch((cause: unknown) => {
+      throw wallpaperErrors.DOWNLOAD({
+        cause: cause instanceof Error ? cause : undefined,
+        internal: { asset: entry.asset, stage: 'request' },
+      })
+    })
+    if (!response.ok)
+      throw wallpaperErrors.DOWNLOAD({
+        internal: { asset: entry.asset, stage: 'status', status: response.status },
+      })
+    const bytes = new Uint8Array(await response.arrayBuffer())
+    if (bytes.byteLength > MAX_WALLPAPER_BYTES)
+      throw wallpaperErrors.TOO_LARGE({
+        internal: { at: 'catalog', bytes: bytes.byteLength, limit: MAX_WALLPAPER_BYTES },
+      })
+    const hash = createHash('sha256').update(bytes).digest('hex')
+    if (hash !== entry.asset)
+      throw wallpaperErrors.DOWNLOAD({
+        internal: { asset: entry.asset, stage: 'hash', observed: hash, bytes: bytes.byteLength },
+      })
+    return bytes
+  }
+
   async read(id: AssetId): Promise<WallpaperAsset> {
     const asset = await this.#readIndex(id)
     if (asset) return asset
@@ -128,6 +183,21 @@ export class WallpaperLibrary {
       }
       return { seeded }
     })
+  }
+
+  /** Imports this machine's Omarchy backgrounds, if Omarchy is installed; repeat runs add only new files. */
+  async importInstalledOmarchy() {
+    const present = await stat(OMARCHY_THEMES_DIRECTORY).then(
+      (entry) => entry.isDirectory(),
+      () => false,
+    )
+    if (!present) return null
+    const { themes, skipped } = await this.importDirectory(OMARCHY_THEMES_DIRECTORY)
+    return {
+      themes: Object.keys(themes).length,
+      assets: new Set(Object.values(themes).flat()).size,
+      skipped: skipped.length,
+    }
   }
 
   delete(id: AssetId) {
@@ -300,6 +370,10 @@ export class WallpaperLibrary {
     this.#pending = result.catch(() => undefined)
     return result
   }
+}
+
+function catalogKey(theme: string, file: string) {
+  return `${theme}/${wallpaperStem(file)}`
 }
 
 export function displayName(id: AssetId) {

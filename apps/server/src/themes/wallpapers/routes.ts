@@ -1,4 +1,3 @@
-import { stat } from 'node:fs/promises'
 import path from 'node:path'
 import { Elysia, t } from 'elysia'
 import { observeRequestOperation } from '../../observability'
@@ -17,13 +16,10 @@ export function wallpaperLibraryRoutes(library: WallpaperLibrary) {
       .get('', () =>
         observeRequestOperation(
           { area: 'wallpaper', operation: 'library.list', sourceKind: 'library' },
-          async () => ({
-            assets: await library.list(),
-            omarchyAvailable: await stat(OMARCHY_THEMES_DIRECTORY).then(
-              (entry) => entry.isDirectory(),
-              () => false,
-            ),
-          }),
+          async () => {
+            const assets = await library.list()
+            return { assets, catalog: library.catalog(assets) }
+          },
         ),
       )
       .post(
@@ -44,6 +40,18 @@ export function wallpaperLibraryRoutes(library: WallpaperLibrary) {
             () => library.importDirectory(body.path ?? OMARCHY_THEMES_DIRECTORY),
           ),
         { body: t.Object({ path: t.Optional(t.String()) }) },
+      )
+      .post('/catalog/:id', ({ params }) =>
+        observeRequestOperation(
+          {
+            area: 'wallpaper',
+            operation: 'library.catalog-install',
+            sourceKind: 'library',
+            assetId: params.id,
+          },
+          () => library.installCatalog(parseAssetId(params.id)),
+          (asset) => ({ assetId: asset.id }),
+        ),
       )
       .get('/:id/asset', ({ params }) => media(library, params.id, 'asset'))
       .get('/:id/display', ({ params }) => media(library, params.id, 'display'))
