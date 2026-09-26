@@ -1060,6 +1060,8 @@ describe('ClaudeProviderAdapter', () => {
     )
     expect(readies.map((event) => event.turnId)).toEqual(['turn-1', wakeupTurnId])
     await harness.adapter.stopAll()
+  })
+
   it('keeps unapproved project MCP servers off, and restarts the idle session on approval', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'platform-claude-project-mcp-'))
     const cwd = path.join(root, 'repo')

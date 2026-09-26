@@ -1067,7 +1067,7 @@ class ClaudeAgentSession extends SessionContext {
   }
 
   isBusy() {
-    return this.activeTurn !== null
+    return this.activeTurn !== null || this.pendingTurn !== null
   }
 
   hasConversation() {
