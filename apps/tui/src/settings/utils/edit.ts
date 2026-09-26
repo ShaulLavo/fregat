@@ -1,3 +1,4 @@
+import { providerEnabledOperation } from '@workspace/client-core/settings/operations'
 import {
   descriptorFor,
   resolveThemeSettings,
@@ -201,18 +202,5 @@ function providerOperations(next: unknown, snapshot: SettingsSnapshot) {
         current.find((entry) => entry.providerInstanceId === provider.providerInstanceId)
           ?.enabled !== provider.enabled,
     )
-    .map((provider) =>
-      operation({
-        kind: 'provider.setEnabled',
-        providerInstanceId: provider.providerInstanceId,
-        enabled: provider.enabled,
-        createIfMissing: {
-          driverKind: provider.driverKind,
-          displayLabel: provider.displayLabel,
-          binaryPath: provider.binaryPath,
-          config: provider.config,
-          environment: provider.environment.map(({ name }) => ({ name, value: '' })),
-        },
-      }),
-    )
+    .map((provider) => providerEnabledOperation(provider, provider.enabled))
 }

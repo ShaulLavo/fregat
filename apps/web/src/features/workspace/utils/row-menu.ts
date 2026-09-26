@@ -11,10 +11,8 @@ import {
   TrashIcon,
 } from '@phosphor-icons/react'
 
-import type { GitFileStatus } from '@workspace/contracts'
+import { isStagedStatus, isWorktreeStatus, type GitFileStatus } from '@workspace/contracts'
 
-import { isWorktreeStatus } from '@/lib/git-status'
-import { isStagedStatus } from '@/lib/git-status'
 import { actionItem, section, type Menu } from '@/keymap/menus/utils/model'
 
 export type RowGitActions = {

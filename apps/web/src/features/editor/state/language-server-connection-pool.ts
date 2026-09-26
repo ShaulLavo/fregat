@@ -1,8 +1,8 @@
-import { errorMessage } from '@workspace/contracts'
 import { LspServerExitedError, LspTransportClosedError } from '@singapore-editor/lsp'
 import { LspConnectionPool, type LspConnectionPoolEvent } from '@singapore-editor/lsp-plugin'
 
 import { serverExitFields } from '@/features/editor/utils/server-exit-fields'
+import { thrownErrorMessage } from '@/lib/client-error-taxonomy'
 import { isAbortError } from '@/lib/abort-error'
 import { log } from '@/lib/client-logging'
 
@@ -63,7 +63,7 @@ function report(event: LspConnectionPoolEvent): void {
     ...(event.durationMs === undefined ? {} : { durationMs: event.durationMs }),
     ...(event.reachedReady === undefined ? {} : { reachedReady: event.reachedReady }),
     ...(event.methods === undefined ? {} : { methods: event.methods }),
-    ...(event.error === undefined ? {} : { error: errorMessage(event.error) }),
+    ...(event.error === undefined ? {} : { error: thrownErrorMessage(event.error) }),
     ...closeFields(event.error),
   }
 

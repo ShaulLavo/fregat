@@ -17,7 +17,7 @@ export async function readDiffFiles(
   const files = await Promise.all(
     snapshots.map(async (snapshot) => {
       if (!snapshot.oldObjectId && !snapshot.newObjectId) return [snapshot]
-      const blobs = requireEdenData(
+      return requireEdenData(
         await client.git.diff.blob.get({
           query: {
             path: snapshot.path,
@@ -28,13 +28,6 @@ export async function readDiffFiles(
           fetch: { signal },
         }),
       )
-      // The blob route re-roots patch paths; the requested snapshot owns file identity.
-      return blobs.map((blob) => ({
-        ...blob,
-        path: snapshot.path,
-        oldPath: snapshot.oldPath,
-        staged,
-      }))
     }),
   )
   return editorDiffFiles(files.flat())

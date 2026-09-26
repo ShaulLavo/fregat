@@ -200,8 +200,7 @@ export function searchResultIdByOffset({
   const fallback = offset >= 0 ? 0 : items.length - 1
   if (activeIndex < 0) return items[fallback]?.id ?? null
 
-  const startIndex = activeIndex < 0 ? fallback : activeIndex
-  const nextIndex = clampIndex(startIndex + offset, items.length)
+  const nextIndex = clampIndex(activeIndex + offset, items.length)
   return items[nextIndex]?.id ?? null
 }
 
@@ -268,7 +267,7 @@ function searchResultIndex(items: readonly SearchResultItem[], id: SearchResultI
 }
 
 export function clampIndex(index: number, length: number) {
-  return Math.min(Math.max(index, 0), length - 1)
+  return Math.max(Math.min(index, length - 1), 0)
 }
 
 function searchResultGroupId(path: string) {

@@ -1,5 +1,4 @@
 import { filesystemPath } from '@/lib/documents/utils/identity'
-import { execFileSync } from 'node:child_process'
 import { onlineManager } from '@tanstack/react-query'
 import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import { onTestFinished } from 'vitest'
@@ -7,6 +6,7 @@ import { onTestFinished } from 'vitest'
 import { queryClientFor } from '@/lib/environments/state/query-clients'
 import { createGitCommitHarness } from '../../../../../test/factories/git-commit'
 import { expect, test } from '../../../../../test/fixtures'
+import { runGit } from '../../../../../test/factories/git'
 
 const cases = [
   { id: 0, name: 'active checkout', switchAway: false, newerDraft: false },
@@ -42,9 +42,9 @@ test.for(cases)(
     if (scenario.newerDraft) act(() => h.ownerA.getState().setCommitMessage('Next A commit'))
     act(() => onlineManager.setOnline(true))
     await waitFor(() => expect(mutation?.state.status).toBe('success'))
-    expect(
-      execFileSync('git', ['log', '-1', '--format=%s'], { cwd: h.cwd, encoding: 'utf8' }).trim(),
-    ).toBe('Commit owned by A')
+    expect(runGit(h.cwd, ['log', '-1', '--format=%s'], { cwdMode: 'option' }).stdout.trim()).toBe(
+      'Commit owned by A',
+    )
     if (scenario.switchAway)
       expect(
         h.application.getSnapshot().editor.gitStoreForRoot(filesystemPath('repo')).getState()

@@ -1,28 +1,20 @@
-import { createSubscriptions } from '@workspace/utils/subscriptions'
-import { useSyncExternalStore } from 'react'
+import { useStore } from 'zustand'
+import { createStore } from 'zustand/vanilla'
 
 /**
  * Which category the settings page is showing, or null for all of them.
- *
- * Module-level for the same reason as the scope store: only the active editor tab
- * mounts, and a Settings tab that forgot which section you were reading every time
- * you glanced at another file would feel broken.
+ * Module-level because only the active editor tab mounts, and the section must survive a tab switch.
  */
-let category: string | null = null
-const subscriptions = createSubscriptions()
-const subscribe = subscriptions.subscribe
+const store = createStore<string | null>(() => null)
 
 export function selectSettingsCategory(next: string | null) {
-  if (next === category) return
-
-  category = next
-  subscriptions.notify()
+  store.setState(next, true)
 }
 
 export function readSettingsCategory() {
-  return category
+  return store.getState()
 }
 
 export function useSettingsCategory() {
-  return useSyncExternalStore(subscribe, readSettingsCategory, readSettingsCategory)
+  return useStore(store)
 }

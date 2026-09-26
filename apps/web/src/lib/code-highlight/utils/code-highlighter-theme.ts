@@ -39,6 +39,7 @@ export function createEditorCodeHighlighter({
   const highlighter = createShikiHighlighter({ themeKey, themes })
 
   return {
+    dispose: () => highlighter.dispose(),
     highlight(input, onResult) {
       const result = highlighter.highlight(input, (highlighted) =>
         onResult(normalizeTokenColors(highlighted, input.language, editorTheme)),

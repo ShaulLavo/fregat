@@ -1,9 +1,7 @@
 import type { DocumentKey, FilesystemPath } from '@/lib/documents/utils/types'
-import { createContext, use } from 'react'
-import { useStore } from 'zustand'
 import { createStore, type StoreApi } from 'zustand/vanilla'
 
-import { clientErrors } from '@/lib/structured-errors'
+import { createStoreContext } from '@/lib/store-context'
 
 type FilesystemConflictEventType = 'changed' | 'deleted' | 'renamed'
 
@@ -39,22 +37,13 @@ export type EditorConflictStore = EditorConflictStoreState & EditorConflictStore
 
 export type EditorConflictStoreApi = StoreApi<EditorConflictStore>
 
-export const EditorConflictStateContext = createContext<EditorConflictStoreApi | null>(null)
-
-export function useEditorConflictStoreApi() {
-  const store = use(EditorConflictStateContext)
-  if (!store) {
-    throw clientErrors.CONTEXT_MISSING({
-      message: 'useEditorConflictStoreApi must be used within EditorStateProvider',
-    })
-  }
-
-  return store
-}
-
-export function useEditorConflictState<T>(selector: (state: EditorConflictStore) => T): T {
-  return useStore(useEditorConflictStoreApi(), selector)
-}
+export const {
+  Context: EditorConflictStateContext,
+  useStoreApi: useEditorConflictStoreApi,
+  useSelector: useEditorConflictState,
+} = createStoreContext<EditorConflictStoreApi>(
+  'useEditorConflictStoreApi must be used within EditorStateProvider',
+)
 
 export function createEditorConflictStore() {
   return createStore<EditorConflictStore>()((set) => ({

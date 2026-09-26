@@ -10,7 +10,7 @@ import { useDiffLanguageContext } from '@/features/editor/hooks/use-diff-languag
 import { useEditorDocumentState } from '@/features/editor/state/document-state'
 import type { DiffLanguageHost } from '@/features/editor/utils/diff-language-context'
 import { useSelectedFile } from '@/features/workspace/hooks/use-selected-file'
-import { languageIdForFilePath } from '@/features/editor/utils/file-path'
+import { languageIdForFilePath } from '@/lib/file-language'
 import { useSettingValue } from '@/hooks/use-setting-value'
 
 /**

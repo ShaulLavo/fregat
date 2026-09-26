@@ -2,7 +2,7 @@ import { Alert } from '@workspace/ui/components/alert'
 import { useDiffReloadView } from '@/features/git/hooks/use-diff-reload-view'
 import { diffDocumentQueryKey } from '@/features/git/utils/diff-document-query'
 import { filesystemPath } from '@/lib/documents/utils/identity'
-import { languageIdForFilePath } from '@/features/editor/utils/file-path'
+import { languageIdForFilePath } from '@/lib/file-language'
 import { useMemo, useRef } from 'react'
 
 import { DiffEditor } from '@/features/editor/components/diff-editor'

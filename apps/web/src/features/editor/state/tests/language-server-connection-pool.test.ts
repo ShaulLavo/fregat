@@ -1,3 +1,4 @@
+import { EdenFetchError } from '@elysia/eden'
 import {
   createWebSocketLspTransport,
   LSP_SERVER_EXITED,
@@ -106,6 +107,21 @@ test('a socket this side refused for a suspended environment logs at info', asyn
 
   expect(log.info.events('lsp.connection.error')).toHaveLength(1)
   expect(log.warn.events('lsp.connection.error')).toEqual([])
+})
+
+test('a connection error thrown by Eden logs the server message', () => {
+  const log = recordLevels()
+  const rejection = new EdenFetchError(502, {
+    error: { code: 'lsp.SESSION_FAILED', message: 'Language server did not start' },
+  })
+  const lease = acquire({ origin: 'http://localhost:3001', rootPath: '/repo/eden' }, () => {
+    throw rejection
+  })
+
+  expect(log.warn.events('lsp.connection.error')).toEqual([
+    expect.objectContaining({ error: 'Language server did not start' }),
+  ])
+  lease.release()
 })
 
 test('a restart after an announced exit records what the exit said, at info', async () => {

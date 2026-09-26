@@ -41,7 +41,10 @@ export function useDirectoryTransition({
   const preloadDirectory = (path: string) => {
     if (!enabled || path === currentPath) return
 
-    return queryClient.prefetchQuery(directoryQueryOptions({ mode, path, query: '', showHidden }))
+    return queryClient
+      .query(directoryQueryOptions({ mode, path, query: '', showHidden }))
+      .then(() => undefined)
+      .catch(() => undefined)
   }
 
   /** A row's hover or scroll intent: a guess, so it waits when enough listings are already loading. */
@@ -60,7 +63,7 @@ export function useDirectoryTransition({
     }
 
     try {
-      await queryClient.fetchQuery(directoryQueryOptions({ mode, path, query: '', showHidden }))
+      await queryClient.query(directoryQueryOptions({ mode, path, query: '', showHidden }))
     } catch (cause) {
       if (requestId !== requestIdRef.current) return false
 

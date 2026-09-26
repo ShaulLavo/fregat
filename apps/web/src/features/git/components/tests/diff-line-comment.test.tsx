@@ -1,6 +1,5 @@
 import { getClient } from '@/lib/client'
 import { filesystemPath } from '@/lib/documents/utils/identity'
-import { execFileSync } from 'node:child_process'
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
@@ -21,6 +20,7 @@ import { expect, test } from '../../../../../test/fixtures'
 import { renderWithProviders } from '../../../../../test/render'
 import { saveSettings } from '@/features/settings/utils/api'
 import { editorRowPoint, stubEditorViewport } from '../../../../../test/env/editor-viewport'
+import { runGit } from '../../../../../test/factories/git'
 
 // Real git, real routes, and the editor's real diff view, which answers where a
 // press landed through `diffRowAtEvent`. Only the CSS Custom Highlight API is stubbed —
@@ -193,20 +193,14 @@ function stubHighlightApi() {
 async function twoEditRepo(root: string, { alsoEditLine35 = false } = {}) {
   const repo = path.join(root, 'repo')
   await mkdir(repo, { recursive: true })
-  git(repo, 'init', '-b', 'main')
-  git(repo, 'config', 'user.email', 'test@example.com')
-  git(repo, 'config', 'user.name', 'Test')
+  runGit(repo, ['init', '-b', 'main'], { cwdMode: 'option' })
   await writeFile(path.join(repo, 'lines.ts'), `${FORTY_LINES}\n`)
-  git(repo, 'add', 'lines.ts')
-  git(repo, 'commit', '-m', 'init')
+  runGit(repo, ['add', 'lines.ts'], { cwdMode: 'option' })
+  runGit(repo, ['commit', '-m', 'init'], { cwdMode: 'option' })
   const edited = FORTY_LINES.replace('line 2\n', 'line two\n')
   const text = alsoEditLine35 ? edited.replace('line 35\n', 'thirty five\n') : edited
   await writeFile(path.join(repo, 'lines.ts'), `${text}\n`)
   const diff = (await fetchDiff('repo/lines.ts', false, undefined, getClient()))[0]!
 
   return { documentInfo: snapshotComparison(diff), repo }
-}
-
-function git(cwd: string, ...args: string[]) {
-  return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: 'pipe' })
 }

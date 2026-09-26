@@ -1,4 +1,5 @@
-import type { LogsFilterState } from '@/features/logs/utils/filter-params'
+import { LOG_TIME_RANGES, LOG_DASHBOARD_LEVELS } from '@workspace/contracts'
+import type { LogsFilterState } from '@workspace/client-core/logs/filters'
 
 /**
  * `log.*` — the dashboard's filters.
@@ -19,8 +20,7 @@ export function logsParamsFor(filters: LogsFilterState, defaults: LogsFilterStat
   return Object.keys(params).length > 0 ? params : null
 }
 
-const TIME_RANGES = new Set(['15m', '1h', '6h', '24h', 'all'])
-const LEVELS = new Set(['all', 'debug', 'info', 'warn', 'error'])
+const LEVELS = ['all', ...LOG_DASHBOARD_LEVELS] as const
 
 export function logsFiltersFor(
   params: Readonly<Record<string, string>> | null,
@@ -34,16 +34,10 @@ export function logsFiltersFor(
 
   return {
     area: params.area ?? defaults.area,
-    // Validated, not cast: a typo'd level reached the server as a filter value and
-    // 422'd the whole dashboard with nothing to say why.
-    level: LEVELS.has(params.level ?? '')
-      ? (params.level as LogsFilterState['level'])
-      : defaults.level,
+    level: LEVELS.find((level) => level === params.level) ?? defaults.level,
     search: params.find ?? defaults.search,
     slowMs: Number.isFinite(slowMs) && slowMs >= 0 ? slowMs : defaults.slowMs,
     source: params.src ?? defaults.source,
-    timeRange: TIME_RANGES.has(params.since ?? '')
-      ? (params.since as LogsFilterState['timeRange'])
-      : defaults.timeRange,
+    timeRange: LOG_TIME_RANGES.find((range) => range === params.since) ?? defaults.timeRange,
   }
 }

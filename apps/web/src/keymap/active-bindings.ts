@@ -1,7 +1,7 @@
+import { bindingsCollide, defaultBindingPane } from '@workspace/client-core/commands/bindings'
 import { detectPlatform } from '@tanstack/hotkeys'
 import type { KeybindingOverrides } from '@workspace/contracts'
 
-import type { FocusArea } from '@/lib/focus/state/service'
 import {
   chordKeys,
   isBindableChord,
@@ -58,18 +58,6 @@ export function resolvedPlatformKeyBindings(
   return keyBindingResolution(defaults, overrides, platform).bindings
 }
 
-export function activePlatformKeyBindings(
-  bindings: readonly PlatformKeyBinding[],
-  focusedPane: FocusArea,
-): readonly PlatformKeyBinding[] {
-  // Pane-specific candidates precede globals; ties retain preset order.
-  return bindings
-    .filter((binding) => bindingMatchesFocusedPane(binding, focusedPane))
-    .toSorted(
-      (left, right) => bindingPriority(right, focusedPane) - bindingPriority(left, focusedPane),
-    )
-}
-
 export function commandKeyBindings(
   defaults: readonly PlatformKeyBinding[],
   overrides: KeybindingOverrides,
@@ -122,7 +110,7 @@ function resolvePresetBindings(defaults: readonly PlatformKeyBinding[]) {
   for (const [index, binding] of defaults.entries()) {
     const executable = binding.command
       ? null
-      : defaults.find((candidate) => candidate.command && collidesWith(candidate, binding))
+      : defaults.find((candidate) => candidate.command && bindingsCollide(candidate, binding))
     if (executable) {
       report.push(resolutionEntry(binding, index, 'reservation-replaced', executable.command))
       continue
@@ -235,13 +223,7 @@ function bindingClaimingKey(
   candidates: readonly PlatformKeyBinding[],
   binding: PlatformKeyBinding,
 ): PlatformKeyBinding | null {
-  return candidates.find((candidate) => collidesWith(candidate, binding)) ?? null
-}
-
-function collidesWith(candidate: PlatformKeyBinding, binding: PlatformKeyBinding) {
-  if (!keysConflict(candidate.keys, binding.keys)) return false
-
-  return (candidate.pane ?? 'any') === (binding.pane ?? 'any')
+  return candidates.find((candidate) => bindingsCollide(candidate, binding)) ?? null
 }
 
 function recordShadowedCommand(
@@ -255,20 +237,6 @@ function recordShadowedCommand(
   if (!winner.command) return
 
   shadowedBy.set(shadowed.command, winner.command)
-}
-
-function bindingMatchesFocusedPane(binding: PlatformKeyBinding, focusedPane: FocusArea) {
-  if (!binding.pane) return true
-  if (binding.pane === 'any') return true
-
-  return binding.pane === focusedPane
-}
-
-function bindingPriority(binding: PlatformKeyBinding, focusedPane: FocusArea) {
-  if (focusedPane && binding.pane === focusedPane) return 2
-  if (!binding.pane || binding.pane === 'any') return 1
-
-  return 0
 }
 
 function appliedOverrides(
@@ -330,7 +298,7 @@ function userKeyBinding(
 }
 
 function commandDefaultPane(command: PlatformCommandId): PlatformKeyBinding['pane'] {
-  return platformCommand(command)?.target === 'editor' ? 'editor' : 'any'
+  return defaultBindingPane(platformCommand(command)?.target)
 }
 
 function commandKeyBindingRow({

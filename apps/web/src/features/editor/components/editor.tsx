@@ -14,7 +14,7 @@ import {
   createDecodePluginLoader,
 } from '@/features/editor/utils/plugins'
 import { selectionForDefinition } from '@/features/editor/utils/position'
-import { languageIdForFilePath } from '@/features/editor/utils/file-path'
+import { languageIdForFilePath } from '@/lib/file-language'
 import type { EditorStatusBarSource } from '@/features/editor/state/status-bar-source'
 import type { EditorRenderDocument } from '@/features/editor/utils/render-document'
 import { useCommitMessageEditorFocus } from '@/features/editor/hooks/use-commit-message-editor-focus'

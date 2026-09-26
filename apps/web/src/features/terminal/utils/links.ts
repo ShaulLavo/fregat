@@ -1,5 +1,5 @@
 import { looksLikeHostname } from '@/lib/hostname'
-import { pathLeaf as basename } from '@/lib/path-formatters'
+import { pathLeaf } from '@/lib/path-formatters'
 import {
   resolveInlineCodeFileReference,
   type MarkdownFileReference,
@@ -316,7 +316,7 @@ function withoutDiagnosticLabel(token: string): PathCandidate {
   if (label.includes('.') || label.includes('/')) return { shift: 0, text: token }
 
   const rest = token.slice(colon + 1)
-  if (!hasExtension(basename(withoutPosition(rest)))) return { shift: 0, text: token }
+  if (!hasExtension(pathLeaf(withoutPosition(rest)))) return { shift: 0, text: token }
 
   return { shift: colon + 1, text: rest }
 }
@@ -326,7 +326,7 @@ function isPathShaped(candidate: string) {
   if (bare.length === 0) return false
   if (looksLikeHostname(bare)) return false
 
-  return !hasNumericExtension(basename(bare))
+  return !hasNumericExtension(pathLeaf(bare))
 }
 
 /**

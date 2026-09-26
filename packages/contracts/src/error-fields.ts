@@ -43,20 +43,38 @@ export function errorMessage(error: unknown) {
   return String(error)
 }
 
-export function errorSummary(error: unknown) {
-  if (error instanceof Error) {
+export type ErrorSummaryOptions = {
+  /** Applies to `message`, `fix` and `why`; omitted keeps them whole. */
+  readonly limit?: ErrorStringFieldOptions
+  /** Adds the catalog's `fix` and `why`, which the RPC wire form leaves out. */
+  readonly guidance?: boolean
+}
+
+export function errorSummary(error: unknown, options: ErrorSummaryOptions = {}) {
+  const code = errorStringField(error, 'code')
+  // `statusCode` first, the server's order, so both ends of one request log the same number.
+  const status = errorNumberField(error, 'statusCode') ?? errorNumberField(error, 'status')
+  const limit = options.limit ?? {}
+  if (!(error instanceof Error)) {
     return {
-      code: errorStringField(error, 'code'),
-      message: error.message,
-      name: error.name,
-      status: errorNumberField(error, 'statusCode') ?? errorNumberField(error, 'status'),
+      code,
+      message: limitErrorStringField(String(error), limit),
+      name: typeof error,
+      status,
     }
   }
 
   return {
-    message: String(error),
-    name: typeof error,
+    code,
+    ...(options.guidance ? errorGuidance(error, limit) : {}),
+    message: limitErrorStringField(error.message, limit),
+    name: error.name,
+    status,
   }
+}
+
+function errorGuidance(error: Error, limit: ErrorStringFieldOptions) {
+  return { fix: errorStringField(error, 'fix', limit), why: errorStringField(error, 'why', limit) }
 }
 
 export function nodeErrorCode(error: unknown) {

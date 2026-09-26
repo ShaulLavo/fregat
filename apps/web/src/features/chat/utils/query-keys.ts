@@ -32,6 +32,8 @@ export const projectEntryQueryKeys = {
     [...projectEntryQueryKeys.all, rootPath, query, limit] as const,
 }
 
+export const mermaidQueryKeys = { library: ['chat', 'mermaid'] as const }
+
 export const sessionTranscriptKeys = {
   transcript: (environmentId: EnvironmentId, sessionId: SessionId) =>
     ['chat', 'session-transcript', environmentId, sessionId] as const,

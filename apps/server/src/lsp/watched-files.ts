@@ -3,11 +3,11 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { isRecord } from '@workspace/utils/objects'
 
-import { isOutsideRoot } from '../fs/path'
+import { isOutsideRoot, isSameOrDescendant } from '../fs/path'
 import { linkedDirectories, outermostTargets, type LinkedDirectory } from '../fs/linked-directories'
 import type { TreeWatch, TreeWatchChange, TreeWatchSource } from '../fs/tree-watch'
 import { lspErrors } from '../observability/structured-errors'
-import { fileUriForPath } from './language'
+import { fileUriForNativePath } from './language'
 
 export const DID_CHANGE_WATCHED_FILES = 'workspace/didChangeWatchedFiles'
 
@@ -154,8 +154,9 @@ export class LspWatchedFiles {
     return watchers.map((watcher) => {
       const reached = this.links.filter(
         (link) =>
-          isSameOrInside(watcher.base, link.link) ||
-          (isSameOrInside(watcher.base, this.root) && isSameOrInside(watcher.base, link.target)),
+          isSameOrDescendant(watcher.base, link.link) ||
+          (isSameOrDescendant(watcher.base, this.root) &&
+            isSameOrDescendant(watcher.base, link.target)),
       )
       if (reached.length === 0) return watcher
       const linked = outermostTargets(reached).map((target) => boundedWatch(target, this.root))
@@ -181,7 +182,7 @@ export class LspWatchedFiles {
       const waiting = watchers.some(
         (watcher) =>
           watchKey(watcher.watch) !== watchKey(watcher.intended) &&
-          isSameOrInside(created, watcher.intended.path),
+          isSameOrDescendant(created, watcher.intended.path),
       )
       if (!waiting) continue
       void this.attach(id, watchers, watchers).catch(() => {
@@ -231,7 +232,7 @@ export class LspWatchedFiles {
     if (change.type !== 'deleted') this.reattachAppeared(change.path)
     for (const candidate of this.aliases(change)) {
       if (!this.matches(candidate)) continue
-      const uri = fileUriForPath(candidate.path)
+      const uri = fileUriForNativePath(candidate.path)
       const previous = this.pending.get(uri)
       this.pending.set(uri, {
         type: mergeChange(previous?.type, changeType(candidate.type)),
@@ -332,7 +333,7 @@ function splitAbsolutePattern(pattern: string) {
 export function boundedWatch(base: string, root: string): TreeWatch {
   const modules = nodeModulesDirectory(base)
   if (modules) return { depth: 'shallow', path: modules }
-  if (isSameOrInside(base, root)) return { depth: 'recursive', path: root }
+  if (isSameOrDescendant(base, root)) return { depth: 'recursive', path: root }
   return { depth: 'recursive', path: base }
 }
 
@@ -353,7 +354,7 @@ async function existingWatch(watcher: Watcher, root: string): Promise<Watcher> {
     directory = parent
   }
   if (directory === intended.path) return { ...watcher, watch: intended }
-  if (isSameOrInside(directory, root))
+  if (isSameOrDescendant(directory, root))
     return { ...watcher, watch: { depth: 'recursive', path: root } }
   return { ...watcher, watch: { depth: 'shallow', path: directory } }
 }
@@ -364,11 +365,6 @@ async function isDirectory(target: string) {
   } catch {
     return false
   }
-}
-
-/** Whether `ancestor` is `target` or contains it. */
-function isSameOrInside(ancestor: string, target: string) {
-  return !isOutsideRoot(path.relative(ancestor, target))
 }
 
 type PendingChange = { readonly type: FileChangeType; readonly directory: boolean }

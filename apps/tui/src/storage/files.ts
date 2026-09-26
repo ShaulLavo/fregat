@@ -6,7 +6,7 @@ import { environmentIdSchema, type EnvironmentId } from '@workspace/contracts'
 import * as v from 'valibot'
 
 import { createTuiError } from '@/host/utils/structured-errors'
-import { parseRecentCommands, RECENT_COMMANDS } from '@/storage/recents'
+import { recentCommands, RECENT_COMMANDS } from '@/storage/recent-commands-policy'
 
 type Update = (current: string | null) => string | null
 
@@ -132,5 +132,5 @@ function createStorage(database: Database, environmentId: EnvironmentId) {
 export type FileStorage = Awaited<ReturnType<typeof openFileStorage>>
 
 function validateItem(key: string, value: string) {
-  if (key === RECENT_COMMANDS) parseRecentCommands(value)
+  if (key === RECENT_COMMANDS) recentCommands.parse(value)
 }

@@ -26,7 +26,8 @@ import {
 } from '@workspace/contracts'
 import { isRecord } from '@workspace/utils/objects'
 import * as v from 'valibot'
-import { errorSummary, recordRequestContext, recordRequestWarning } from '../observability'
+import { AsyncQueue } from '../async-queue'
+import { operatorErrorSummary, recordRequestContext, recordRequestWarning } from '../observability'
 import {
   discardStagedSettingsFile,
   editSettingsText,
@@ -334,29 +335,13 @@ export class SettingsStore {
 
   async *changes(signal?: AbortSignal): AsyncGenerator<SettingsEvent> {
     this.assertOperational()
-    const queue: SettingsEvent[] = []
-    let wake: (() => void) | null = null
-    const stop = this.onChange((event) => {
-      queue.push(event)
-      wake?.()
-    })
-    const onAbort = () => wake?.()
-    signal?.addEventListener('abort', onAbort, { once: true })
+    const queue = new AsyncQueue<SettingsEvent>({ signal })
+    const stop = this.onChange((event) => queue.push(event))
 
     try {
-      while (!signal?.aborted) {
-        if (queue.length === 0) {
-          await new Promise<void>((resolve) => {
-            wake = resolve
-          })
-          wake = null
-          continue
-        }
-
-        yield queue.shift() as SettingsEvent
-      }
+      yield* queue
     } finally {
-      signal?.removeEventListener('abort', onAbort)
+      queue.close()
       stop()
     }
   }
@@ -1045,7 +1030,7 @@ export class SettingsStore {
         area: 'settings',
         operation: 'invalidate',
         settings: { secretRefsStale: true },
-        error: errorSummary(error),
+        error: operatorErrorSummary(error),
       })
     }
   }

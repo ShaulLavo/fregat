@@ -8,10 +8,8 @@ import {
 
 import type { ChatInputAttachment } from '@/features/chat/state/chat-input-draft-store'
 
-import {
-  classifyChatImageFile,
-  MAX_CHAT_ATTACHMENT_ENCODED_BYTES,
-} from '@/features/chat/utils/input-attachment-limits'
+import { MAX_CHAT_ATTACHMENT_ENCODED_BYTES } from '@workspace/client-core/chat/attachments'
+import { classifyChatImageFile } from '@/features/chat/utils/input-attachment-limits'
 import {
   compressImageToByteLimit,
   type ImageCompressionFailureReason,

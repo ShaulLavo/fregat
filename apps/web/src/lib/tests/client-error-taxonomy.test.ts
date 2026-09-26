@@ -1,7 +1,13 @@
+import { EdenFetchError } from '@elysia/eden'
 import { vi } from 'vitest'
 
 import { expect, test } from '../../../test/fixtures'
-import { reportError, toClientError, toConnectionError } from '@/lib/client-error-taxonomy'
+import {
+  reportError,
+  thrownErrorMessage,
+  toClientError,
+  toConnectionError,
+} from '@/lib/client-error-taxonomy'
 import { createEnvironmentProtocolMismatchError } from '@workspace/client-core/environments/utils/structured-errors'
 import { log, observeClientOperation } from '@/lib/client-logging'
 import { sanitizeRecord } from '@workspace/observability/sanitize'
@@ -118,4 +124,33 @@ test('a connection failure keeps the catalog code, why and fix', () => {
     code: 'CONNECTION_FAILED',
     message: 'plain',
   })
+})
+
+test('a thrown message keeps the words of an Error and never stringifies an Eden rejection', () => {
+  const structured = new EdenFetchError(502, {
+    error: { code: 'lsp.SESSION_FAILED', message: 'Language server did not start' },
+  })
+  const fsCoded = new EdenFetchError(404, { error: { code: 'NOT_FOUND' } })
+
+  expect(structured.message).toBe('[object Object]')
+  expect(thrownErrorMessage(structured)).toBe('Language server did not start')
+  expect(thrownErrorMessage(fsCoded)).toBe('The requested file or folder could not be found.')
+  expect(thrownErrorMessage(new EdenFetchError(500, { detail: 'x' }))).toBe(
+    'Something unexpected went wrong.',
+  )
+  expect(thrownErrorMessage(new EdenFetchError(500, 'Upstream timed out'))).toBe(
+    'Upstream timed out',
+  )
+  expect(thrownErrorMessage(new Error('socket closed'))).toBe('socket closed')
+  expect(thrownErrorMessage(new Error(''))).toBe('Something unexpected went wrong.')
+})
+
+test('fs codes read through the shared peel, then off a bare top-level code', () => {
+  expect(toClientError(new EdenFetchError(404, { error: { code: 'NOT_FOUND' } })).category).toBe(
+    'not_found',
+  )
+  expect(toClientError({ code: 'FILE_TOO_LARGE', value: 'Payload Too Large' }).category).toBe(
+    'too_large',
+  )
+  expect(toClientError({ error: { code: 7, message: 'numeric code' } }).category).toBe('unknown')
 })

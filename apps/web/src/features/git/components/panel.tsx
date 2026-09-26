@@ -14,7 +14,7 @@ import { History } from '@/features/git/components/history'
 import { useNavigation } from '@/hooks/use-navigation'
 
 import { useEditorWorkspaceState } from '@/features/editor/state/workspace-state'
-import { errorMessage } from '@/lib/file-server'
+import { clientErrorMessage } from '@/lib/client-error-taxonomy'
 import { useStatusDisplay } from '@/features/git/hooks/use-status-display'
 
 import { changeRows } from '@/features/git/utils/change-rows'
@@ -93,7 +93,7 @@ export function Panel({ className, rootPath }: ComponentProps<'section'> & { roo
                 {status.isFetching ? <Spinner /> : null}Retry
               </Button>
             }
-            description={errorMessage(status.error)}
+            description={clientErrorMessage(status.error)}
             title='Git is unavailable'
             tone='error'
           />

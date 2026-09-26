@@ -9,7 +9,7 @@ import { sessionTokenFor } from '@/features/address/utils/session-token'
 import { searchParamsFor } from '@/features/address/utils/search-params'
 import { diffScopeParam } from '@/features/address/utils/diff-scope'
 import { useSessionSelectionStore } from '@/features/chat-mode/state/session-selection-store'
-import type { SessionSelection } from '@/features/chat-mode/utils/active-session'
+import type { ChatSelection } from '@/lib/chat-selection'
 import {
   useChatProjectionStore,
   selectChatProjectionSlice,
@@ -30,7 +30,7 @@ import type { ApplicationRuntime } from '@/state/application-runtime'
 export function scopedMainSelection(
   environmentId: EnvironmentId,
   rootPath: string | undefined,
-): SessionSelection {
+): ChatSelection {
   const selection = useSessionSelectionStore.getState().selection
   if (
     selection.kind === 'auto' ||
@@ -93,7 +93,7 @@ export async function workspaceAddressFor(
 }
 
 async function rememberedSessionToken(
-  selection: SessionSelection,
+  selection: ChatSelection,
   environmentId: EnvironmentId,
   rootPath: string,
 ) {
@@ -118,7 +118,7 @@ async function rememberedSessionToken(
   return sessionTokenFor(selection)
 }
 
-function rememberedDiffScope(selection: SessionSelection) {
+function rememberedDiffScope(selection: ChatSelection) {
   if (selection.kind !== 'session') return null
   const key = scopedSessionKey(selection)
   const scope =

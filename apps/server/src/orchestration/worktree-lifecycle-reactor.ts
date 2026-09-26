@@ -1,4 +1,4 @@
-import type { WorkspacePaths } from '../fs/path'
+import { isOutsideRoot, type WorkspacePaths } from '../fs/path'
 import * as v from 'valibot'
 import path from 'node:path'
 import { lstat } from 'node:fs/promises'
@@ -705,13 +705,7 @@ export class WorktreeLifecycleReactor {
     const root = await this.options.git.managedRoot(current.canonicalPath)
     for (const entry of await this.options.git.entries(current.canonicalPath)) {
       const relative = path.relative(root, entry.absolutePath)
-      if (
-        !relative ||
-        relative.startsWith('..') ||
-        relative.includes(path.sep) ||
-        path.isAbsolute(relative)
-      )
-        continue
+      if (!relative || isOutsideRoot(relative) || relative.includes(path.sep)) continue
       if (
         [...this.options.getReadModel().worktrees.values()].some(
           (row) => row.canonicalPath === entry.absolutePath,

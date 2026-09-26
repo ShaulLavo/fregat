@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import type { GitPublishRequest } from '@workspace/contracts'
 import { afterEach, describe, expect, it } from 'vitest'
-import { runGit } from '../../../test/factories/git-worktree'
+import { runGit } from '../../testing/git'
 import { DEFAULT_MAX_TEXT_FILE_BYTES } from '../../fs/limits'
 import { createWorkspacePaths } from '../../fs/path'
 import type { RunProcess } from '../forges/types'
@@ -108,15 +108,19 @@ describe('publish', () => {
       'acme/app',
       '--private',
     ])
-    expect(await runGit(bare, ['branch', '--format', '%(refname:short)'])).toBe('main')
-    expect(await runGit(work, ['rev-parse', '--abbrev-ref', 'main@{u}'])).toBe('origin/main')
+    expect((await runGit(bare, ['branch', '--format', '%(refname:short)'])).stdout.trimEnd()).toBe(
+      'main',
+    )
+    expect((await runGit(work, ['rev-parse', '--abbrev-ref', 'main@{u}'])).stdout.trimEnd()).toBe(
+      'origin/main',
+    )
   })
 
   it('adds the remote and pushes nothing when there is no commit yet', async () => {
     const { root, work } = await checkout({ commit: false })
     const result = await service(root, github().run).publish(request)
     expect(result.status).toBe('remote-added')
-    expect(await runGit(work, ['remote'])).toBe('origin')
+    expect((await runGit(work, ['remote'])).stdout.trimEnd()).toBe('origin')
   })
 
   it('reports a failed push after the repository exists, keeping the remote', async () => {
@@ -124,7 +128,7 @@ describe('publish', () => {
     const result = await service(root, github().run).publish(request)
     expect(result.status).toBe('push-failed')
     expect(result.pushError).toBeTruthy()
-    expect(await runGit(work, ['remote'])).toBe('origin')
+    expect((await runGit(work, ['remote'])).stdout.trimEnd()).toBe('origin')
   })
 
   it('creates nothing when the forge is not signed in', async () => {
@@ -134,7 +138,7 @@ describe('publish', () => {
       'GitHub is not ready: nobody is signed in',
     )
     expect(forge.calls.some((argv) => argv[2] === 'create')).toBe(false)
-    expect(await runGit(work, ['remote'])).toBe('')
+    expect((await runGit(work, ['remote'])).stdout.trimEnd()).toBe('')
   })
 
   it('names the remote origin-1 when origin already points elsewhere', async () => {

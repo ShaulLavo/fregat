@@ -74,7 +74,8 @@
 - Three loaders from `@workspace/ui`, nothing hand-rolled: `LoadingState` (skeleton for a region with no content yet, mirroring the loaded view's primitives, one placeholder per element), `Spinner` (anything else; `size` `xs` rows, `sm` control icon, `md` panel, `lg` surface; none inside `Button`; no `text-*` class), `Shimmer` (inline in a running sentence only).
 - Branch on pending before empty; loading and empty must never look alike. Do not defeat `LoadingState`'s 120ms delay or add `motion-reduce:` at call sites.
 - Render failures: `RenderErrorBoundary` (`@workspace/ui/patterns/render-error-boundary`) at each seam `ToolPane` does not cover, with `resetKeys` set to the shown identity. Local boundaries do not log (the root's `onCaughtError` does). Query and mutation failures stay state; no `throwOnError`. Keep boundaries below anything that must stay mounted (terminals).
-- Content that must outlive its layout (terminals) goes through `lib/keep-alive` (`KeepAliveProvider`, `KeepAliveSlot`, `useKeptIds`); kept content sees the provider's context, and stands down via `attached`.
+- Content that must outlive its layout (terminals) goes through `lib/keep-alive` (`KeepAliveProvider`, `KeepAliveSlot`, `useKeptIds`); kept content sees the provider's context, and stands down via `attached`. Connection notices overlay the retained host (`features/terminal/components/panel.tsx`).
+- Observe rendered children with a Fragment ref and `observeUsing` (`editor-tab-bar.tsx`); keep wrappers that own layout. Text in a height-capped `pre` changes its scroll boundary without resizing, so `activity-detail-section.tsx` keeps a mutation observer.
 
 ## Truncation
 
@@ -92,6 +93,7 @@
 - Reads are queries (even over POST), effects are mutations, including local work and code imports. Outside React, run the same `mutationOptions` through `runMutation` (`lib/mutations/run.ts`). No bare `await client.x.post()` behind a `useState` flag, no promise caches, no local `pending` booleans: in-flight state comes from `useIsMutating`/`useMutationState` via the feature's `mutation-keys.ts`.
 - A mutation settles the cache before it resolves (`setQueryData` with the response, else `invalidateQueries`), even when the socket will also deliver it.
 - Concurrent calls of one mutation serialize with `scope: { id }`; the second checks the first's result before acting. Retries live in `retry`/`retryDelay`.
+- Imperative reads use `client.query` / `client.infiniteQuery`; `bun run query:check` fails on the deprecated `fetchQuery`, `prefetchQuery` and `ensureQueryData` families.
 - Exceptions carry a comment: streaming transports (terminal input, orchestration frames) and intent queues (`runIntent`, `runTreeIntent`, `runWorkspaceMutation`). They still settle the cache.
 
 ## Logs And Errors
@@ -111,7 +113,7 @@
 ## Dev, Gates, Verification
 
 - A dev server is always running (Vite on 5173, API on 3001); never start another. State homes: production `~/.platform`, dev `/work/platform-dev/home`, each `agent:browser` run a temp home. `/dev` (and `/platform/dev` on the mesh) is a component gallery; add a tab for anything worth eyeballing.
-- `bun run gates` (`dupes:functions`, `dupes`, `design:census`, `compiler:census`, `errors:census`) runs in pre-commit, `verify` and CI. `bun run hooks:pre-commit` is not a dry run: it stages what it fixes.
+- `bun run gates` (`dupes:functions`, `dupes`, `design:census`, `compiler:census`, `errors:census`, `query:check`) runs in pre-commit, `verify` and CI. `bun run hooks:pre-commit` is not a dry run: it stages what it fixes.
 - Prove changes with the `verify-fregat` skill (`bun run agent:browser look|scenario|trace|renders|caches`); evidence lands in `/work/tmp/fregat-evidence/<run>/`. Read the screenshot back and name the directory. Performance claims cite `trace --compare`, render claims `renders` before and after, settlement claims `caches`. Reproduce a bug on its surface before fixing it. A surface with no scenario gets one in `scripts/agent/scenarios/`, selectors in `scripts/agent/selectors.ts`.
 
 ## Deployment: The Mesh

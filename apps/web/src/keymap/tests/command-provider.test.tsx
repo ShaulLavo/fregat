@@ -59,7 +59,7 @@ test.each([
   ['workspace.showUsage', 'usage'],
   ['workspace.showTransparencySettings', 'workbench.surface'],
 ] as const)('%s opens the settings controls matching its search', async (command, query) => {
-  await primaryQueryClient().fetchQuery(settingsPageQueryOptions)
+  await primaryQueryClient().query(settingsPageQueryOptions)
   const queryClient = createTestQueryClient()
   queryClient.setQueryData(settingsKeys.document(), await fetchSettings(undefined, getClient()))
   selectSettingsCategory('Machines')

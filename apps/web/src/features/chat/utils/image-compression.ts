@@ -8,10 +8,8 @@
  * has. No React, no module-level mutable state.
  */
 
-import {
-  MAX_COMPRESSIBLE_SOURCE_BYTES,
-  type ChatImageMimeType,
-} from '@/features/chat/utils/input-attachment-limits'
+import { type ChatAttachmentMimeType } from '@workspace/contracts'
+import { MAX_COMPRESSIBLE_SOURCE_BYTES } from '@/features/chat/utils/input-attachment-limits'
 
 /**
  * Longest edge kept when an image has to be re-encoded. Sized so a typical
@@ -103,7 +101,7 @@ export function scaledImageDimensions(width: number, height: number, maxDimensio
   }
 }
 
-type EncodedImage = { blob: Blob; mimeType: ChatImageMimeType }
+type EncodedImage = { blob: Blob; mimeType: ChatAttachmentMimeType }
 
 /**
  * `over-budget` means the codec ran and its smallest output still overflowed;
@@ -189,13 +187,13 @@ async function encodeOnSurface(
  * screenshots with transparency survive intact. Browsers that cannot encode it
  * hand back a differently-typed blob, which is our signal to fall back.
  */
-async function preferredEncoding(surface: EncodeSurface): Promise<ChatImageMimeType> {
+async function preferredEncoding(surface: EncodeSurface): Promise<ChatAttachmentMimeType> {
   const probe = await encodeSurface(surface, 'image/webp', QUALITY_LADDER[0])
 
   return probe ? 'image/webp' : 'image/jpeg'
 }
 
-function drawBitmap(surface: EncodeSurface, bitmap: ImageBitmap, mimeType: ChatImageMimeType) {
+function drawBitmap(surface: EncodeSurface, bitmap: ImageBitmap, mimeType: ChatAttachmentMimeType) {
   const { height, width } = surface.canvas
 
   try {
@@ -215,7 +213,7 @@ function drawBitmap(surface: EncodeSurface, bitmap: ImageBitmap, mimeType: ChatI
 
 async function encodeSurface(
   surface: EncodeSurface,
-  type: ChatImageMimeType,
+  type: ChatAttachmentMimeType,
   quality: number,
 ): Promise<Blob | null> {
   try {
@@ -234,14 +232,14 @@ async function encodeSurface(
   }
 }
 
-function encodeBlob(surface: EncodeSurface, type: ChatImageMimeType, quality: number) {
+function encodeBlob(surface: EncodeSurface, type: ChatAttachmentMimeType, quality: number) {
   if (surface.kind === 'offscreen') return surface.canvas.convertToBlob({ quality, type })
 
   return elementBlob(surface.canvas, type, quality)
 }
 
 /** `toBlob` predates promises and reports "no encoding" as a null callback. */
-function elementBlob(canvas: HTMLCanvasElement, type: ChatImageMimeType, quality: number) {
+function elementBlob(canvas: HTMLCanvasElement, type: ChatAttachmentMimeType, quality: number) {
   return new Promise<Blob | null>((resolve) => {
     canvas.toBlob(resolve, type, quality)
   })
@@ -315,7 +313,7 @@ function canEncodeImages() {
  * Re-encoding changes the container, so a name like `shot.png` would lie about
  * its contents. Swap the extension to match what we actually produced.
  */
-function compressedFileName(name: string, mimeType: ChatImageMimeType) {
+function compressedFileName(name: string, mimeType: ChatAttachmentMimeType) {
   const extension = mimeType === 'image/webp' ? '.webp' : '.jpg'
   const dotIndex = name.lastIndexOf('.')
   const base = dotIndex > 0 ? name.slice(0, dotIndex) : name

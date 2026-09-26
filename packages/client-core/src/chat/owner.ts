@@ -2,10 +2,17 @@ import {
   errorStringField,
   ORCHESTRATION_REPLAY_MAX_EVENTS,
   type ClientOrchestrationCommand,
+  type EnvironmentId,
   type OrchestrationDispatchResult,
   type SessionId,
 } from '@workspace/contracts'
 
+import { QueryClient } from '@tanstack/query-core'
+import {
+  createSessionEarlierPages,
+  earlierPageQueryOptions,
+  type SessionEarlierPages,
+} from './earlier-pages'
 import type { Client } from '../transport/client'
 import type { OrchestrationRpcClient } from '../transport/orchestration-rpc-client'
 import { chatCommandSummary } from '@workspace/contracts'
@@ -43,6 +50,7 @@ export type ChatOwnerSnapshot = {
 
 export type ChatOwnerOptions = {
   readonly client: Client
+  readonly environmentId: EnvironmentId
   readonly rpc: OrchestrationRpcClient
   readonly record?: (event: Record<string, unknown>) => void
 }
@@ -57,7 +65,9 @@ export class ChatOwner {
   private readonly options: ChatOwnerOptions
   private shell: AbortController | null = null
   private detail: AbortController | null = null
-  private earlier: Promise<boolean> | null = null
+  private readonly pageClient = new QueryClient()
+  private readonly earlier: SessionEarlierPages
+  private unsubscribeEarlier: (() => void) | undefined
   private started = false
   private state: ChatOwnerSnapshot = {
     projection: createInitialChatProjectionSlice(),
@@ -71,6 +81,19 @@ export class ChatOwner {
 
   constructor(options: ChatOwnerOptions) {
     this.options = options
+    this.earlier = createSessionEarlierPages({
+      environmentId: options.environmentId,
+      queryClient: this.pageClient,
+      projection: () => this.state.projection,
+      read: (input) => options.rpc.sessionDetailPage(input),
+      prepend: (page) =>
+        this.project(prependChatProjectionSessionDetailPage(this.state.projection, page)),
+      onError: (error, sessionId) =>
+        this.fail(error, 'Earlier messages could not be loaded.', {
+          operation: 'earlier',
+          sessionId,
+        }),
+    })
   }
 
   getSnapshot = () => this.state
@@ -90,6 +113,7 @@ export class ChatOwner {
 
   async refresh() {
     if (this.lifetime.signal.aborted) return
+    this.resetEarlier()
     this.shell?.abort()
     this.detail?.abort()
     const controller = new AbortController()
@@ -114,7 +138,7 @@ export class ChatOwner {
     if (sessionId === this.state.selectedSessionId && this.detail && !this.detail.signal.aborted)
       return
     this.detail?.abort()
-    this.earlier = null
+    this.resetEarlier()
     this.publish({
       selectedSessionId: sessionId,
       detailLoading: false,
@@ -160,9 +184,8 @@ export class ChatOwner {
     if (!sessionId || this.lifetime.signal.aborted) return Promise.resolve(false)
     if (!selectChatSessionHasEarlier(this.state.projection, sessionId))
       return Promise.resolve(false)
-    if (this.earlier) return this.earlier
-    this.earlier = this.readEarlier(sessionId)
-    return this.earlier
+    this.publish({ error: null })
+    return this.earlier.load(sessionId)
   }
 
   async readTranscript(sessionId: SessionId): Promise<ChatSession> {
@@ -176,9 +199,21 @@ export class ChatOwner {
       syncChatProjectionShellSnapshot(createInitialChatProjectionSlice(), shell),
       detail,
     )
+    const historyLifetime = globalThis.crypto.randomUUID()
     while (selectChatSessionHasEarlier(projection, sessionId)) {
       const input = chatSessionEarlierPageInput(projection, sessionId)
-      const page = await this.options.rpc.sessionDetailPage(input)
+      const page = await this.pageClient.query(
+        earlierPageQueryOptions(
+          {
+            environmentId: this.options.environmentId,
+            lifetime: historyLifetime,
+            generation: 0,
+            historySequence: projection.sessionHistorySequenceById[sessionId] ?? 0,
+            input,
+          },
+          (boundary) => this.options.rpc.sessionDetailPage(boundary),
+        ),
+      )
       signal.throwIfAborted()
       projection = prependChatProjectionSessionDetailPage(projection, page)
       if (page.hasEarlier && !page.messages.length && !page.activities.length)
@@ -206,6 +241,9 @@ export class ChatOwner {
     this.lifetime.abort(createOrchestrationRpcClosedError())
     this.shell?.abort()
     this.detail?.abort()
+    this.unsubscribeEarlier?.()
+    this.earlier.dispose()
+    this.pageClient.clear()
     this.listeners.clear()
   }
 
@@ -221,12 +259,17 @@ export class ChatOwner {
   }
 
   private openSelectedSession() {
+    this.resetEarlier()
     this.detail?.abort()
     this.detail = null
     const sessionId = this.state.selectedSessionId
     if (!sessionId) return
     const controller = new AbortController()
     this.detail = controller
+    const earlier = this.earlier.observer(sessionId)
+    this.unsubscribeEarlier = earlier.subscribe((result) =>
+      this.publish({ loadingEarlier: result.isFetching }),
+    )
     this.publish({ detailLoading: true })
     void this.watchSession(sessionId, controller)
   }
@@ -335,27 +378,11 @@ export class ChatOwner {
     if (replay) this.project(applyChatProjectionEvents(this.state.projection, replay.events))
   }
 
-  private async readEarlier(sessionId: SessionId) {
-    this.publish({ loadingEarlier: true, error: null })
-    try {
-      const page = await this.options.rpc.sessionDetailPage(
-        chatSessionEarlierPageInput(this.state.projection, sessionId),
-      )
-      this.project(prependChatProjectionSessionDetailPage(this.state.projection, page))
-      return !this.lifetime.signal.aborted
-    } catch (error) {
-      if (sessionId === this.state.selectedSessionId)
-        this.fail(error, 'Earlier messages could not be loaded.', {
-          operation: 'earlier',
-          sessionId,
-        })
-      return false
-    } finally {
-      if (sessionId === this.state.selectedSessionId) {
-        this.earlier = null
-        this.publish({ loadingEarlier: false })
-      }
-    }
+  private resetEarlier() {
+    this.unsubscribeEarlier?.()
+    this.unsubscribeEarlier = undefined
+    this.earlier.reset()
+    this.publish({ loadingEarlier: false })
   }
 
   private fail(error: unknown, fallback: string, context: Record<string, unknown>) {

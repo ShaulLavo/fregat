@@ -1,5 +1,6 @@
 import { lineStartOffset } from '@workspace/utils/strings'
 import { errorMessage } from '@workspace/contracts'
+import { fileUriForNativePath } from './language'
 import { elapsedMs } from '@workspace/utils/timing'
 import { createInternalError, lspErrors } from '../observability/structured-errors'
 
@@ -15,11 +16,15 @@ import { isRecord } from '@workspace/utils/objects'
 import type { ChildProcessWithoutNullStreams } from 'node:child_process'
 
 import type { LspServerHandle, LspServerMatch } from './registry'
-import { fileUriForPath } from './language'
 import { LspStdioMessageReader, writeLspStdioMessage } from './stdio-rpc'
 import { DID_CHANGE_WATCHED_FILES, LspWatchedFiles, type FileEvent } from './watched-files'
 import type { TreeWatchSource } from '../fs/tree-watch'
-import { errorSummary, limitText, recordProcessInfo, recordProcessWarning } from '../observability'
+import {
+  operatorErrorSummary,
+  limitText,
+  recordProcessInfo,
+  recordProcessWarning,
+} from '../observability'
 
 type JsonRpcId = number | string | null
 
@@ -918,11 +923,11 @@ class PooledLspProxySession {
 
   private async initializeRequest(message: JsonRpcRequest): Promise<JsonRpcRequest> {
     const params = isRecord(message.params) ? { ...message.params } : {}
-    params.rootUri = fileUriForPath(this.match.root)
+    params.rootUri = fileUriForNativePath(this.match.root)
     params.workspaceFolders = [
       {
         name: this.match.server.id,
-        uri: fileUriForPath(this.match.root),
+        uri: fileUriForNativePath(this.match.root),
       },
     ]
     params.processId = this.process.pid ?? null
@@ -1308,7 +1313,7 @@ class PooledLspProxySession {
       this.respondToServer(message.id, [
         {
           name: this.match.server.id,
-          uri: fileUriForPath(this.match.root),
+          uri: fileUriForNativePath(this.match.root),
         },
       ])
       return true
@@ -1399,7 +1404,7 @@ class PooledLspProxySession {
     } catch (error) {
       recordProcessWarning('lsp.watched_files.register_failed', {
         area: 'lsp',
-        error: errorSummary(error),
+        error: operatorErrorSummary(error),
         registrationCount: registrations.length,
         rootPath: this.rootPath,
         serverId: this.match.server.id,
@@ -1547,7 +1552,7 @@ class PooledLspProxySession {
     } catch (error) {
       recordProcessWarning('lsp.framing_failed', {
         area: 'lsp',
-        error: errorSummary(error),
+        error: operatorErrorSummary(error),
         serverId: this.match.server.id,
         ...this.reader.stats,
       })

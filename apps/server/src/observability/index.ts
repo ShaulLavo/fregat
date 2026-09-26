@@ -12,7 +12,7 @@ export {
   recordProcessWarning,
 } from './runtime'
 export {
-  errorSummary,
+  operatorErrorSummary,
   limitText,
   observeRequestOperation,
   recordClientInstance,

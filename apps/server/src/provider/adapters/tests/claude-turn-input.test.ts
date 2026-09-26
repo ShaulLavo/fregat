@@ -45,11 +45,15 @@ describe('claudeImageMediaType', () => {
     expect(claudeImageMediaType('  IMAGE/PNG ')).toBe('image/png')
   })
 
+  it('accepts the aliases the upload gate accepts', () => {
+    expect(claudeImageMediaType('image/jpg')).toBe('image/jpeg')
+    expect(claudeImageMediaType('image/png; charset=binary')).toBe('image/png')
+  })
+
   it('rejects image types the API cannot read', () => {
     expect(claudeImageMediaType('image/bmp')).toBeNull()
     expect(claudeImageMediaType('image/svg+xml')).toBeNull()
     expect(claudeImageMediaType('image/heic')).toBeNull()
-    expect(claudeImageMediaType('image/jpg')).toBeNull()
     expect(claudeImageMediaType('application/pdf')).toBeNull()
   })
 })

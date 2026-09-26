@@ -1,10 +1,9 @@
 import { isString } from '@workspace/utils/objects'
 import { elapsedMs } from '@workspace/utils/timing'
-import { readFile, realpath, stat, writeFile } from 'node:fs/promises'
+import { readFile, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { FsError } from '../fs/errors'
 import type { WorkspacePath, WorkspacePaths } from '../fs/path'
-import { toPosix } from '../fs/path'
 import { limitText, recordGitCommand, recordRequestContext } from '../observability'
 import type {
   GitBranchRemoteState,
@@ -17,8 +16,12 @@ import type {
   GitShipResult,
   WorktreeSubmoduleMode,
 } from '@workspace/contracts'
-import { errorMessage } from '@workspace/contracts'
-import { withGitRepositoryLane, withGitRepositoryLaneStream } from './repository-lane'
+import { errorMessage, isBinaryGitDiff } from '@workspace/contracts'
+import {
+  gitCommonDirectory,
+  withGitRepositoryLane,
+  withGitRepositoryLaneStream,
+} from './repository-lane'
 import { parseBranches } from './branches'
 import { commandOutput, gitErrorMessage } from './command'
 import { commitMessageTemplate, hasCommitMessageText } from './commit-message'
@@ -211,10 +214,7 @@ export class GitService {
       ttlMs: options.statusCacheTtlMs ?? STATUS_CACHE_TTL_MS,
     })
     this.upstreamFetch = new UpstreamFetchScheduler({
-      resolveCommonDir: async (rootAbsolutePath) => {
-        const result = await this.git(rootAbsolutePath, ['rev-parse', '--git-common-dir'])
-        return path.resolve(rootAbsolutePath, result.stdout.trim())
-      },
+      resolveCommonDir: (rootAbsolutePath) => this.commonDirectory(rootAbsolutePath),
       runFetch: async (rootAbsolutePath, remote) => {
         await this.git(rootAbsolutePath, ['fetch', remote])
       },
@@ -240,9 +240,8 @@ export class GitService {
     await Promise.all([...this.mutationListeners].map((listener) => listener(cwd)))
   }
 
-  private async commonDirectory(cwd: string) {
-    const result = await this.git(cwd, ['rev-parse', '--git-common-dir'])
-    return realpath(path.resolve(cwd, result.stdout.trim()))
+  private commonDirectory(cwd: string) {
+    return gitCommonDirectory({ rootAbsolutePath: cwd, run: (args) => this.git(cwd, args) })
   }
 
   async repo(input = '') {
@@ -324,11 +323,13 @@ export class GitService {
     const repository = await this.requiredRepositoryLocation(query.path || query.oldPath || '')
     const oldPath = query.oldPath ?? query.path
     const rawPatch = await this.blobPatch(repository, query)
+    // parseDiff below re-roots the patch's paths under repository.rootPath, so the
+    // paths written into it here must already be repo-root-relative, not workspace-relative.
     const patch = rewriteBlobPatchPaths(rawPatch, {
       newObjectId: query.newObjectId,
       oldObjectId: query.oldObjectId,
-      oldPath,
-      path: query.path,
+      oldPath: repositoryRelativePath(repository.rootPath, oldPath),
+      path: repositoryRelativePath(repository.rootPath, query.path),
     })
     const diffs = parseDiff(patch, repository.rootPath, false)
 
@@ -560,7 +561,7 @@ export class GitService {
    */
   async *commitProgress(body: GitCommitBody): AsyncGenerator<GitCommitProgressEvent> {
     const runner = await this.repositoryRunner(body.path)
-    yield* withGitRepositoryLaneStream(await this.commonDirectory(runner.rootAbsolutePath), () =>
+    yield* withGitRepositoryLaneStream(await gitCommonDirectory(runner), () =>
       this.commitProgressInLane(body),
     )
   }
@@ -1163,13 +1164,10 @@ export class GitService {
 
   private pathspecForRepository(rootAbsolutePath: string, input = '') {
     const absolutePath = this.resolveServicePath(input).absolutePath
-    const relative = path.relative(rootAbsolutePath, absolutePath)
-    if (relative === '') return null
-    if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
-      throw new FsError('GIT_REPOSITORY_NOT_FOUND')
-    }
+    const relative = relativeInsideRoot(rootAbsolutePath, absolutePath)
+    if (relative === null) throw new FsError('GIT_REPOSITORY_NOT_FOUND')
 
-    return toPosix(relative)
+    return relative || null
   }
 
   private resolveServicePath(input = '') {
@@ -1232,7 +1230,7 @@ export class GitService {
     repository: GitRepositoryLocation,
     diff: GitFileDiff,
   ): Promise<GitFileDiff> {
-    if (isBinaryDiff(diff)) return diff
+    if (isBinaryGitDiff(diff)) return diff
     if (await this.isDiffTooLarge(repository, diff)) return diff
 
     const [oldObjectId, newObjectId] = await Promise.all([
@@ -1252,7 +1250,7 @@ export class GitService {
     diff: GitFileDiff,
     query: GitBlobDiffQuery,
   ): Promise<GitFileDiff> {
-    if (isBinaryDiff(diff)) return this.withBlobObjectIds(diff, query)
+    if (isBinaryGitDiff(diff)) return this.withBlobObjectIds(diff, query)
     if (await this.isBlobDiffTooLarge(repository, query)) {
       return this.withBlobObjectIds(diff, query)
     }
@@ -1744,10 +1742,6 @@ function positiveInteger(value: number | undefined, fallback: number) {
  */
 function isBinaryText(text: string) {
   return text.includes('\u0000')
-}
-
-function isBinaryDiff(diff: GitFileDiff) {
-  return diff.patch.includes('\nBinary files ') || diff.patch.includes('\nGIT binary patch')
 }
 
 function isTooLarge(size: number | null, maxBytes: number) {

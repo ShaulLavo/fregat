@@ -1,5 +1,5 @@
 import { archivePartFiles, readArchivePart } from './archive-parts'
-import { mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
+import { mkdir, readdir, readFile, rm } from 'node:fs/promises'
 import path from 'node:path'
 import {
   DEFAULT_PALETTE_ID,
@@ -12,6 +12,7 @@ import {
 } from '@workspace/contracts'
 import * as v from 'valibot'
 
+import { writeFileAtomic } from '../fs/atomic-write'
 import { recordRequestContext } from '../observability'
 import type { SettingsStore } from '../settings/store'
 import { themeErrors } from './structured-errors'
@@ -162,10 +163,11 @@ export class PaletteLibrary {
 
   async #writeFile(document: PaletteDocument): Promise<void> {
     await mkdir(this.#directory, { recursive: true })
-    const target = path.join(this.#directory, this.#fileName(document.id))
-    const staging = `${target}.${process.pid}.tmp`
-    await writeFile(staging, `${JSON.stringify(document, null, 2)}\n`)
-    await rename(staging, target)
+    await writeFileAtomic(
+      path.join(this.#directory, this.#fileName(document.id)),
+      `${JSON.stringify(document, null, 2)}\n`,
+      { durability: 'rename' },
+    )
   }
 
   #fileName(id: PaletteId): string {

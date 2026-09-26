@@ -1,17 +1,18 @@
-import * as v from 'valibot'
+import { createObservableStore } from '@/host/state/observable-store'
 import type { Client } from '@workspace/client-core/transport/client'
-import { requireEdenData, parseEdenSseStream } from '@workspace/client-core/transport/eden'
-import { normalizeEdenDates } from '@workspace/client-core/transport/normalize-dates'
 import {
-  logDashboardSummarySchema,
-  logEventsResultSchema,
-  logLiveStreamItemSchema,
-  type LogDashboardSummary,
-  type LogEventsResult,
-  type LogDashboardFilters,
+  fetchLogEvents,
+  fetchLogSummary,
+  subscribeLogEvents,
+} from '@workspace/client-core/logs/api'
+import { mergeLiveLogItems, mergeLiveLogEvents } from '@workspace/client-core/logs/live-cache'
+import type {
+  LogDashboardSummary,
+  LogEventsResult,
+  LogDashboardFilters,
 } from '@workspace/contracts'
 import { connectionFailure } from '@/connection/utils/failure'
-import { addLogSummary, mergeLogEvent, mergeLogSnapshot } from '@/logs/utils/events'
+import { addLogSummary } from '@/logs/utils/events'
 
 type State = {
   kind: 'loading' | 'ready' | 'failed'
@@ -21,52 +22,48 @@ type State = {
   live: boolean
 }
 export function createLogsWorkbench(client: Client) {
-  const listeners = new Set<() => void>()
   let controller = new AbortController()
-  let disposed = false
-  let state: State = {
+
+  const store = createObservableStore<State>({
     kind: 'loading',
     result: { events: [], detailsById: {}, total: 0, nextCursor: null },
     summary: null,
     message: '',
     live: false,
-  }
-  function publish(next: State) {
-    if (disposed) return
-    state = next
-    for (const listener of listeners) listener()
-  }
+  })
+  const publish = store.replace
   async function tail(filters: LogDashboardFilters, signal: AbortSignal) {
     try {
-      const stream = requireEdenData(
-        await client._log.dashboard.live.get({ query: filters, fetch: { signal } }),
-      )
-      if (!signal.aborted) publish({ ...state, live: true })
-      for await (const event of parseEdenSseStream(stream)) {
+      for await (const item of subscribeLogEvents(filters, signal, client, () => {
+        if (!signal.aborted) publish({ ...store.value, live: true })
+      })) {
         if (signal.aborted) return
-        if (event.event === 'heartbeat') continue
-        const item = v.parse(logLiveStreamItemSchema, event.data)
-        const duplicate = state.result.detailsById[item.event.id] !== undefined
+        const result = mergeLiveLogItems(store.value.result, [item])
+        const duplicate = result === store.value.result
         const summary =
-          state.summary && !duplicate
-            ? addLogSummary(state.summary, item.event, filters.slowMs ?? 500)
-            : state.summary
-        publish({ ...state, result: mergeLogEvent(state.result, item), summary })
+          store.value.summary && !duplicate
+            ? addLogSummary(store.value.summary, item.event, filters.slowMs ?? 500)
+            : store.value.summary
+        publish({ ...store.value, result, summary, live: true })
       }
       if (!signal.aborted)
-        publish({ ...state, live: false, message: 'Live connection ended. Refresh to reconnect.' })
+        publish({
+          ...store.value,
+          live: false,
+          message: 'Live connection ended. Refresh to reconnect.',
+        })
     } catch (error) {
       if (!signal.aborted)
-        publish({ ...state, live: false, message: connectionFailure(error).message })
+        publish({ ...store.value, live: false, message: connectionFailure(error).message })
     }
   }
   async function refresh(filters: LogDashboardFilters = {}, paused = false) {
-    if (disposed) return
+    if (store.disposed) return
     controller.abort()
     controller = new AbortController()
     const signal = controller.signal
     publish({
-      ...state,
+      ...store.value,
       kind: 'loading',
       result: { events: [], detailsById: {}, total: 0, nextCursor: null },
       message: '',
@@ -74,47 +71,38 @@ export function createLogsWorkbench(client: Client) {
     })
     if (!paused) void tail(filters, signal)
     try {
-      const [eventsResponse, summaryResponse] = await Promise.all([
-        client._log.dashboard.events.get({ query: { ...filters, limit: 300 }, fetch: { signal } }),
-        client._log.dashboard.summary.get({ query: filters, fetch: { signal } }),
+      const [result, snapshotSummary] = await Promise.all([
+        fetchLogEvents(filters, signal, client),
+        fetchLogSummary(filters, signal, client),
       ])
-      const result = v.parse(
-        logEventsResultSchema,
-        normalizeEdenDates(requireEdenData(eventsResponse)),
-      )
-      let summary = v.parse(
-        logDashboardSummarySchema,
-        normalizeEdenDates(requireEdenData(summaryResponse)),
-      )
-      for (const event of state.result.events) {
-        if (!result.detailsById[event.id])
+      if (signal.aborted) return
+      let summary = snapshotSummary
+      const snapshotIds = new Set(result.events.map((event) => event.id))
+      for (const event of store.value.result.events) {
+        if (!snapshotIds.has(event.id))
           summary = addLogSummary(summary, event, filters.slowMs ?? 500)
       }
       if (!signal.aborted)
         publish({
-          ...state,
+          ...store.value,
           kind: 'ready',
-          result: mergeLogSnapshot(result, state.result),
+          result: mergeLiveLogEvents(result, store.value.result.events, {
+            detailsById: store.value.result.detailsById,
+          }),
           summary,
         })
     } catch (error) {
       if (!signal.aborted)
-        publish({ ...state, kind: 'failed', message: connectionFailure(error).message })
+        publish({ ...store.value, kind: 'failed', message: connectionFailure(error).message })
     }
   }
   return {
-    getSnapshot: () => state,
-    subscribe(listener: () => void) {
-      listeners.add(listener)
-      return () => {
-        listeners.delete(listener)
-      }
-    },
+    getSnapshot: store.getSnapshot,
+    subscribe: store.subscribe,
     refresh,
     dispose() {
-      disposed = true
+      store.dispose()
       controller.abort()
-      listeners.clear()
     },
   }
 }

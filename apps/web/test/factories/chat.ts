@@ -240,6 +240,7 @@ export function chatWorktree(
     ownership: 'protected',
     createdAt: timestamp(0),
     updatedAt: timestamp(1),
+    retiredAt: null,
     ...overrides,
   }
 }

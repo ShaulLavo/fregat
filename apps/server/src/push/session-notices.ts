@@ -1,6 +1,6 @@
 import { scopedSessionKey, type EnvironmentId, type SessionNotice } from '@workspace/contracts'
 import {
-  errorSummary,
+  operatorErrorSummary,
   recordProcessInfo,
   recordProcessWarning,
   runDetached,
@@ -66,7 +66,9 @@ export class SessionNoticePush {
         await this.followStream(signal)
       } catch (error) {
         if (signal.aborted) return
-        recordProcessWarning('push.session_notices.stream_failed', { error: errorSummary(error) })
+        recordProcessWarning('push.session_notices.stream_failed', {
+          error: operatorErrorSummary(error),
+        })
       }
       await pause(this.options.retryMs ?? RETRY_MS, signal)
     }

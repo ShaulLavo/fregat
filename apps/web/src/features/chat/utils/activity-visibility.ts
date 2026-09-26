@@ -1,50 +1,7 @@
-import {
-  APPROVAL_ANSWER_SUBMITTED_KIND,
-  TURN_ENDED_ACTIVITY_KIND,
-  type OrchestrationSessionActivity,
-} from '@workspace/contracts'
-
-import { chatActivityHasFailure } from '@/features/chat/utils/activity-presentation'
 import type { ChatWorkLogEntry } from '@/features/chat/utils/work-log'
 import { isWorkLogToolEntry } from '@/features/chat/utils/tool-label'
 import { formatChatElapsed } from '@/features/chat/utils/formatters'
 import { isWorkLogFailure } from '@/features/chat/utils/work-row'
-
-const QUIET_ACTIVITY_KINDS = new Set([
-  APPROVAL_ANSWER_SUBMITTED_KIND,
-  TURN_ENDED_ACTIVITY_KIND,
-  'account.updated',
-  'account.rate-limits.updated',
-  'auth.status',
-  'mcp.status.updated',
-  'mcp.oauth.completed',
-  'model.rerouted',
-  'config.warning',
-  'deprecation.notice',
-  'files.persisted',
-  'conversation.realtime.started',
-  'conversation.realtime.item-added',
-  'conversation.realtime.audio.delta',
-  'conversation.realtime.closed',
-  'task.started',
-  'task.updated',
-  'tool.progress',
-  'tool.summary',
-  'turn.diff.updated',
-  'context-window.updated',
-])
-
-export function isVisibleChatActivity(activity: OrchestrationSessionActivity) {
-  if (
-    activity.kind === 'runtime.warning' &&
-    activity.summary.endsWith('(no displayable text content)')
-  )
-    return false
-  if (chatActivityHasFailure(activity)) return true
-  if (activity.summary === 'Checkpoint captured') return false
-
-  return !QUIET_ACTIVITY_KINDS.has(activity.kind)
-}
 
 /** A collapsed group still shows every failure, every request and every tool call still running. */
 export function isPinnedWorkLogEntry(entry: ChatWorkLogEntry) {

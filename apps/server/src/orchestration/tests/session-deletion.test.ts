@@ -5,13 +5,13 @@ import path from 'node:path'
 import { afterEach, expect, test } from 'vitest'
 import {
   createOrchestrationFixture,
-  executeGit,
   FIXTURE_SESSION_ID,
   mockRuntime,
   sessionFrom,
 } from '../../../test/factories/orchestration'
 import { MockProviderAdapter } from '../../provider/adapters/mock'
 import { GitWorktreeService } from '../../git/worktrees'
+import { runGit } from '../../testing/git'
 
 const fixtures: Awaited<ReturnType<typeof createOrchestrationFixture>>[] = []
 afterEach(async () => {
@@ -21,19 +21,10 @@ afterEach(async () => {
 test('deleting one session preserves its real Git worktree and the other session sharing it', async () => {
   const fixture = await createOrchestrationFixture()
   fixtures.push(fixture)
-  await executeGit(fixture.checkout, 'init', '-b', 'main')
+  await runGit(fixture.checkout, ['init', '-b', 'main'], { cwdMode: 'option' })
   await writeFile(path.join(fixture.checkout, 'keep.txt'), 'shared checkout file')
-  await executeGit(fixture.checkout, 'add', '.')
-  await executeGit(
-    fixture.checkout,
-    '-c',
-    'user.name=Test',
-    '-c',
-    'user.email=test@example.invalid',
-    'commit',
-    '-m',
-    'initial',
-  )
+  await runGit(fixture.checkout, ['add', '.'], { cwdMode: 'option' })
+  await runGit(fixture.checkout, ['commit', '-m', 'initial'], { cwdMode: 'option' })
   const adapter = new MockProviderAdapter()
   await fixture.restart(mockRuntime(adapter))
   await fixture.register()
@@ -41,7 +32,9 @@ test('deleting one session preserves its real Git worktree and the other session
   const { worktree } = await worktrees.create({
     path: fixture.checkout,
     worktreeId: v.parse(worktreeIdSchema, 'dde613a3-4f1c-4910-9f43-f4ec70846daf'),
-    baseCommit: await executeGit(fixture.checkout, 'rev-parse', 'HEAD'),
+    baseCommit: (
+      await runGit(fixture.checkout, ['rev-parse', 'HEAD'], { cwdMode: 'option' })
+    ).stdout.trim(),
     branch: 'worktree/dde613a3-4f1c-4910-9f43-f4ec70846daf',
   })
   const registration = await fixture.register(worktree.absolutePath)
@@ -63,7 +56,11 @@ test('deleting one session preserves its real Git worktree and the other session
   expect(await readFile(path.join(worktree.absolutePath, 'keep.txt'), 'utf8')).toBe(
     'shared checkout file',
   )
-  expect(await executeGit(worktree.absolutePath, 'status', '--porcelain')).toBe('')
+  expect(
+    (
+      await runGit(worktree.absolutePath, ['status', '--porcelain'], { cwdMode: 'option' })
+    ).stdout.trim(),
+  ).toBe('')
   expect((await worktrees.list(fixture.checkout)).map((entry) => entry.absolutePath)).toContain(
     worktree.absolutePath,
   )

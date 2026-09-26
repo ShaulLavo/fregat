@@ -26,10 +26,6 @@ export function formatDuration(durationMs: number | null) {
   return `${Math.round(durationMs)}ms`
 }
 
-export function formatLogPrimary(event: LogEventSummary) {
-  return event.action ?? event.operation ?? event.path ?? event.message ?? 'log event'
-}
-
 export function formatLogSecondary(event: LogEventSummary) {
   return [event.area, event.source, event.method, event.status]
     .filter((value) => value !== null && value !== undefined && value !== '')

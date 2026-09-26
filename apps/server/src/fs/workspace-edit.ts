@@ -1,6 +1,8 @@
-import { syncPath } from './sync-path'
+import { atomicTemporaryPath, writeFileAtomic } from './atomic-write'
+import { fsyncVia } from './fsync'
+import { statOptionalVia } from './mutation-target'
 import { sameItems as sameStrings } from '@workspace/utils/collections'
-import { toPosix as toPortablePath } from './path'
+import { isSameOrDescendant, toPosix } from './path'
 import { createHash, randomUUID } from 'node:crypto'
 import type { Stats } from 'node:fs'
 import path from 'node:path'
@@ -26,11 +28,7 @@ import type {
 import { isByteExactText } from './text-encoding'
 import { fileVersion } from './version'
 import { FsError } from './errors'
-import {
-  fileOperationWriteId,
-  isProvisionalWorkspaceEditState,
-  nodeErrorCode,
-} from '@workspace/contracts'
+import { fileOperationWriteId, isProvisionalWorkspaceEditState } from '@workspace/contracts'
 import { slashPathsOverlap } from '@workspace/utils/slash-paths'
 import type { WorkspacePaths } from './path'
 import type { FileChangeHub } from './watch'
@@ -722,9 +720,7 @@ export class WorkspaceEditController {
   }
 
   private async historyLists(canonicalWorkspace: string, category: WorkspaceEditCategory) {
-    const workspace = toPortablePath(
-      path.relative(this.paths.workspaceRootReal, canonicalWorkspace),
-    )
+    const workspace = toPosix(path.relative(this.paths.workspaceRootReal, canonicalWorkspace))
     const entries = this.manifests()
       .filter((manifest) => manifest.category === category && manifest.workspace === workspace)
       .sort((left, right) => right.historySequence - left.historySequence)
@@ -1302,7 +1298,7 @@ export class WorkspaceEditController {
     mode: ReadMode = 'content',
   ): Promise<ActualResource> {
     const absolutePath = await this.resolveTarget(workspaceAbsolute, relativePath)
-    const stats = await this.lstatOptional(absolutePath)
+    const stats = await statOptionalVia(this.driver.lstat, absolutePath)
     if (!stats) return { exists: false, path: relativePath }
     if (stats.isSymbolicLink()) throw new FsError('WORKSPACE_EDIT_INVALID')
     if (mode === 'entry') return entryResource(relativePath, stats)
@@ -1329,7 +1325,7 @@ export class WorkspaceEditController {
     if (stats.isSymbolicLink() || !stats.isDirectory()) throw new FsError('WORKSPACE_EDIT_INVALID')
     const canonical = await this.driver.realpath(target.absolutePath)
     this.paths.assertRealInside(canonical)
-    const expected = toPortablePath(path.relative(this.paths.workspaceRootReal, canonical))
+    const expected = toPosix(path.relative(this.paths.workspaceRootReal, canonical))
     if (expected !== target.relativePath) throw new FsError('WORKSPACE_EDIT_INVALID')
 
     return canonical
@@ -1367,9 +1363,12 @@ export class WorkspaceEditController {
     let candidate = target
 
     while (true) {
-      const stats = await this.lstatOptional(candidate)
+      const stats = await statOptionalVia(this.driver.lstat, candidate)
       if (stats) {
         if (stats.isSymbolicLink()) throw new FsError('WORKSPACE_EDIT_INVALID')
+        // ENOTDIR reads as missing, so a path under a file is refused here, before prepare stages it.
+        if (candidate !== target && !stats.isDirectory())
+          throw ancestorNotDirectoryError(workspaceAbsolute, candidate)
         const canonical = await this.driver.realpath(candidate)
         assertInside(workspaceAbsolute, canonical)
       }
@@ -1392,7 +1391,7 @@ export class WorkspaceEditController {
       if (step.kind !== 'move' || !step.to.startsWith('journal:')) continue
       if (!step.from.startsWith('workspace:')) continue
       const source = this.resolvePathReference(manifest, step.from)
-      const stats = await this.lstatOptional(source)
+      const stats = await statOptionalVia(this.driver.lstat, source)
       if (!stats) continue
       const remaining = MAX_WORKSPACE_EDIT_OPERATION_BYTES - incoming
       incoming += stats.isDirectory() ? await this.measureTree(source, remaining) : stats.size
@@ -1419,7 +1418,7 @@ export class WorkspaceEditController {
   private async journalHeldBytes(manifest: WorkspaceEditJournalManifest) {
     const journal = this.journalOf(manifest.operationId)
     const stage = journal.storedPath(manifest.operationId, 'stage')
-    if (!(await this.lstatOptional(stage))) return 0
+    if (!(await statOptionalVia(this.driver.lstat, stage))) return 0
 
     return this.measureTree(stage, Number.POSITIVE_INFINITY)
   }
@@ -1930,7 +1929,7 @@ export class WorkspaceEditController {
           reference.slice('workspace:'.length),
         )
       : this.resolvePathReference(manifest, reference)
-    const stats = await this.lstatOptional(target)
+    const stats = await statOptionalVia(this.driver.lstat, target)
     if (!stats) return { exists: false, reference }
     const type = resourceType(stats)
     if (!type) throw new FsError('WORKSPACE_EDIT_STALE')
@@ -1977,7 +1976,7 @@ export class WorkspaceEditController {
       if (parent.isSymbolicLink() || !parent.isDirectory()) {
         throw new FsError('WORKSPACE_EDIT_STALE')
       }
-      const stats = await this.lstatOptional(target)
+      const stats = await statOptionalVia(this.driver.lstat, target)
       if (stats?.isSymbolicLink()) throw new FsError('WORKSPACE_EDIT_STALE')
     }
   }
@@ -1989,7 +1988,7 @@ export class WorkspaceEditController {
   ) {
     const from = this.resolvePathReference(manifest, step.from)
     const to = this.resolvePathReference(manifest, step.to)
-    const source = await this.lstatOptional(from)
+    const source = await statOptionalVia(this.driver.lstat, from)
     if (!source) return true
 
     return source.dev === (await this.driver.stat(path.dirname(to))).dev
@@ -2017,7 +2016,7 @@ export class WorkspaceEditController {
     const from = this.resolvePathReference(manifest, step.from)
     const to = this.resolvePathReference(manifest, step.to)
     await this.copyIntoPlace(manifest, from, to, step.to)
-    await syncPath(this.driver, path.dirname(to))
+    await fsyncVia(this.driver.open, path.dirname(to))
   }
 
   /** Copies beside the destination and renames into place, so a crash never leaves half a copy there. */
@@ -2061,7 +2060,7 @@ export class WorkspaceEditController {
       const entries = await this.driver.readdir(target, { withFileTypes: true })
       for (const entry of entries) await this.syncTree(path.join(target, entry.name))
     }
-    await syncPath(this.driver, target)
+    await fsyncVia(this.driver.open, target)
   }
 
   private async createEmptyPath(
@@ -2075,8 +2074,8 @@ export class WorkspaceEditController {
     } else {
       await this.driver.writeFile(target, new Uint8Array(), { flag: 'wx', mode: 0o600 })
     }
-    await syncPath(this.driver, target)
-    await syncPath(this.driver, path.dirname(target))
+    await fsyncVia(this.driver.open, target)
+    await fsyncVia(this.driver.open, path.dirname(target))
   }
 
   /** Compensation only: removes an empty created resource or a copy this operation made. */
@@ -2084,7 +2083,7 @@ export class WorkspaceEditController {
     const target = this.workspaceTarget(manifest, relativePath)
     const stats = await this.driver.lstat(target)
     await this.driver.rm(target, { force: false, recursive: stats.isDirectory() })
-    await syncPath(this.driver, path.dirname(target))
+    await fsyncVia(this.driver.open, path.dirname(target))
   }
 
   private async applyWrite(
@@ -2097,10 +2096,7 @@ export class WorkspaceEditController {
     const bytes = await this.journalOf(manifest.operationId).readStage(manifest.operationId, stage)
     const current = await this.driver.lstat(target)
     if (!current.isFile() || current.isSymbolicLink()) throw new FsError('WORKSPACE_EDIT_STALE')
-    const temporary = path.join(
-      path.dirname(target),
-      `.${path.basename(target)}.${randomUUID()}.tmp`,
-    )
+    const temporary = atomicTemporaryPath(target)
     const mode = direction === 'reverse' ? step.beforeMode : current.mode
     const temporaryRelativePath = path.posix.join(
       path.posix.dirname(step.path),
@@ -2110,22 +2106,16 @@ export class WorkspaceEditController {
       joinRelative(manifest.workspace, temporaryRelativePath),
     ])
 
-    let replaced = false
-    try {
-      await this.driver.writeFile(temporary, bytes, { flag: 'wx', mode })
-      await this.driver.chmod(temporary, mode)
-      await syncPath(this.driver, temporary)
-      await this.driver.rename(temporary, target)
-      replaced = true
-      if (direction === 'reverse') {
-        const beforeTime = new Date(step.beforeMtimeMs)
-        await this.driver.utimes(target, beforeTime, beforeTime)
-        await syncPath(this.driver, target)
-      }
-      await syncPath(this.driver, path.dirname(target))
-    } finally {
-      if (!replaced) await this.driver.rm(temporary, { force: true, recursive: false })
-    }
+    await writeFileAtomic(target, bytes, {
+      driver: this.driver,
+      durability: 'fsync-all',
+      mode,
+      temporary,
+    })
+    if (direction !== 'reverse') return
+    const beforeTime = new Date(step.beforeMtimeMs)
+    await this.driver.utimes(target, beforeTime, beforeTime)
+    await fsyncVia(this.driver.open, target)
   }
 
   private resolvePathReference(manifest: WorkspaceEditJournalManifest, reference: string) {
@@ -2162,16 +2152,7 @@ export class WorkspaceEditController {
   }
 
   private async pathExists(target: string) {
-    return (await this.lstatOptional(target)) !== null
-  }
-
-  private async lstatOptional(target: string) {
-    try {
-      return await this.driver.lstat(target)
-    } catch (error) {
-      if (nodeErrorCode(error) === 'ENOENT') return null
-      throw error
-    }
+    return (await statOptionalVia(this.driver.lstat, target)) !== null
   }
 
   private async result(manifest: WorkspaceEditJournalManifest): Promise<WorkspaceEditResult> {
@@ -2207,7 +2188,7 @@ export class WorkspaceEditController {
   ): Promise<WorkspaceEditResultEntry | null> {
     try {
       const target = await this.resolveTarget(this.workspaceAbsolute(manifest), relativePath)
-      const stats = await this.lstatOptional(target)
+      const stats = await statOptionalVia(this.driver.lstat, target)
       if (!stats) return { exists: false, path: relativePath }
       if (stats.isSymbolicLink()) return null
       if (stats.isDirectory()) {
@@ -2683,7 +2664,7 @@ export class WorkspaceEditController {
   }
 
   private async fsyncDirectories(...targets: string[]) {
-    for (const target of new Set(targets)) await syncPath(this.driver, target)
+    for (const target of new Set(targets)) await fsyncVia(this.driver.open, target)
   }
 }
 
@@ -3074,6 +3055,12 @@ function occupiedError(relativePath: string) {
   )
 }
 
+function ancestorNotDirectoryError(workspaceAbsolute: string, ancestor: string) {
+  return new FsError('WORKSPACE_EDIT_INVALID', undefined, undefined, {
+    internal: { ancestorNotDirectory: toPosix(path.relative(workspaceAbsolute, ancestor)) },
+  })
+}
+
 function occupiedReferenceError(reference: string) {
   if (!reference.startsWith('workspace:')) return new FsError('WORKSPACE_EDIT_STALE')
 
@@ -3364,25 +3351,17 @@ function assertRelativeWorkspaceEditPath(input: string) {
 }
 
 function assertInside(root: string, target: string) {
-  const relative = path.relative(root, target)
-  if (relative === '') return
-  if (relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative))
-    return
+  if (isSameOrDescendant(root, target)) return
 
   throw new FsError('WORKSPACE_EDIT_INVALID')
-}
-
-export function isSameOrDescendant(root: string, target: string) {
-  const relative = path.relative(root, target)
-  if (relative === '') return true
-  if (relative === '..') return false
-  return !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative)
 }
 
 function pathsOverlap(left: string, right: string) {
   return isSameOrDescendant(left, right) || isSameOrDescendant(right, left)
 }
 
+// A plain template join: search-shared's normalises (`a/` + `b` → `a/b`), and nothing proves the
+// journal-loaded `manifest.workspace` prefix and relative halves are already normalised.
 function joinRelative(prefix: string, relativePath: string) {
   if (!prefix) return relativePath
   return `${prefix}/${relativePath}`

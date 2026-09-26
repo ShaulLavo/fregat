@@ -1023,6 +1023,33 @@ describe('workspace edit transactions', () => {
     expect(await readText(fixture, 'real-folder/nested.txt')).toBe('nested')
   })
 
+  it('rejects a destination under a file at prepare and allocates no journal', async () => {
+    const fixture = await createFixture()
+    await seedFile(fixture, 'a.txt', 'a')
+    const source = await seedFile(fixture, 'source.txt', 'source')
+    const underFile: readonly WorkspacePersistenceOperation[] = [
+      createOperation(0, 'a.txt/b.txt'),
+      renameOperation(0, 'source.txt', 'a.txt/b.txt', source, missingPrecondition(), false),
+      {
+        destination: missingPrecondition(),
+        index: 0,
+        kind: 'copy',
+        newPath: 'a.txt/b.txt',
+        oldPath: 'source.txt',
+        source: { kind: 'present', type: 'file' },
+      },
+    ]
+
+    for (const operation of underFile) {
+      const operationId = randomUUID()
+      await expect(
+        fixture.service.workspaceEditPrepare(prepareRequest(operationId, [operation])),
+      ).rejects.toMatchObject({ code: 'WORKSPACE_EDIT_INVALID' })
+      expect(await pathExists(path.join(fixture.journalRoot, operationId))).toBe(false)
+    }
+    expect(await readTexts(fixture, ['a.txt', 'source.txt'])).toEqual(['a', 'source'])
+  })
+
   it('stages a resource on another device by copy then remove and restores it', async () => {
     const fixture = await createFixture({
       driver: (workspaceRoot, journalRoot) => splitDeviceDriver(workspaceRoot, journalRoot),

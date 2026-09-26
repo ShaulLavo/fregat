@@ -59,6 +59,7 @@ export function domainBootstrap() {
         ownership: 'protected',
         createdAt: DOMAIN_AT,
         updatedAt: DOMAIN_AT,
+        retiredAt: null,
       },
       2,
     ),

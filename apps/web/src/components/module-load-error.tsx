@@ -21,9 +21,14 @@ export function ModuleLoadError({
           title={`Unable to load ${label}`}
           tone='error'
           action={
-            <Button size='sm' variant='outline' onClick={onRetry}>
-              Retry
-            </Button>
+            <div className='flex gap-(--density-gap-tight)'>
+              <Button size='sm' variant='outline' onClick={onRetry}>
+                Retry
+              </Button>
+              <Button size='sm' variant='outline' onClick={() => window.location.reload()}>
+                Reload
+              </Button>
+            </div>
           }
         />
       }

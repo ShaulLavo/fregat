@@ -1,10 +1,10 @@
 import { use } from 'react'
 
 import { CommandBusContext } from '@/keymap/providers/bus-context'
-import { createClientInvariantError } from '@/lib/structured-errors'
+import { requireContext } from '@/lib/require-context'
 
 export function useBusBinding() {
   const value = use(CommandBusContext)
-  if (!value) throw createClientInvariantError('CommandBusProvider is missing')
+  requireContext(value, 'CommandBusProvider is missing')
   return value
 }

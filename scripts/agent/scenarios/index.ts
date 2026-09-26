@@ -1,3 +1,5 @@
+import { settingsRoutePreparation } from './settings-route-preparation'
+import { settingsModuleFailure } from './settings-module-failure'
 import { connectionRefusalRetention } from './connection-refusal-retention'
 import { cachedProtocolStartup } from './cached-protocol-startup'
 import { editorLspTabSwitch } from './editor-lsp-tab-switch'
@@ -9,6 +11,8 @@ import { draftRecovery } from './draft-recovery'
 import { composerDefaults } from './composer-defaults'
 import { sessionNotifications } from './session-notifications'
 import { terminalHistory } from './terminal-history'
+import { chatStream } from './chat-stream'
+import { chatHistoryPages } from './chat-history-pages'
 import { chatStashContext } from './chat-stash-context'
 import { chatQueue } from './chat-queue'
 import { providerModelOptions } from './provider-model-options'
@@ -109,6 +113,7 @@ import { chatDraftContextStrip } from './chat-draft-context-strip'
 import { machineConnectError } from './machine-connect-error'
 import { machineProtocolMismatch } from './machine-protocol-mismatch'
 import { wallpaperIconHints } from './wallpaper-icon-hints'
+import { terminalOfflineHost } from './terminal-offline-host'
 import { terminalBackground } from './terminal-background'
 import { terminalRenderer, terminalRendererWebgl } from './terminal-renderer'
 import { bottomPanelPersistence } from './bottom-panel-persistence'
@@ -316,6 +321,8 @@ export const scenarios: readonly Scenario[] = [
   codexApprovalRules,
   fileAttachments,
   chatStashContext,
+  chatStream,
+  chatHistoryPages,
   chatQueue,
   providerModelOptions,
   draftRecovery,
@@ -398,6 +405,7 @@ export const scenarios: readonly Scenario[] = [
   editorLinkedPackage,
   editorOfflineResync,
   terminalBackground,
+  terminalOfflineHost,
   terminalRenderer,
   terminalRendererWebgl,
   bottomPanelPersistence,
@@ -475,6 +483,8 @@ export const scenarios: readonly Scenario[] = [
   themeBundlePalette,
   settingsDefaults,
   settingsColdLoad,
+  settingsRoutePreparation,
+  settingsModuleFailure,
   projectMenu,
   workspaceSwitch,
   serverRestart,

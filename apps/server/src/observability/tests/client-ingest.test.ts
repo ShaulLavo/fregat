@@ -71,6 +71,33 @@ describe('recordClientLog', () => {
     expect(emitted).toHaveLength(2)
   })
 
+  test('bounds untrusted payloads and redacts stacks and credentials', () => {
+    emitted.length = 0
+    const wide = Object.fromEntries(Array.from({ length: 60 }, (_, index) => [`k${index}`, index]))
+    recordClientLog(
+      {
+        ...clientPayload(),
+        error: { message: 'failed', name: 'Error', stack: 'Error: failed\n    at private.ts:1' },
+        items: Array.from({ length: 30 }, (_, index) => index),
+        message: 'm'.repeat(2500),
+        nested: { a: { b: { c: { d: { e: { f: 'deep' } } } } } },
+        request: { headers: { authorization: 'Bearer secret' }, token: 'secret' },
+        wide,
+      },
+      ingestRequest(),
+    )
+
+    const fields = emitted[0]?.fields
+    expect(fields).toMatchObject({
+      error: { message: 'failed', name: 'Error', stack: '[redacted]' },
+      items: Array.from({ length: 25 }, (_, index) => index),
+      message: 'm'.repeat(2000),
+      nested: { a: { b: { c: { d: { e: '[truncated]' } } } } },
+      request: { headers: { authorization: '[redacted]' }, token: '[redacted]' },
+    })
+    expect(Object.keys(fields?.wide as object)).toHaveLength(50)
+  })
+
   test('bounds dedupe retention and admits an evicted event again', () => {
     emitted.length = 0
     for (let index = 0; index <= 1_024; index += 1) {

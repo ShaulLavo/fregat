@@ -1,5 +1,5 @@
 import { comparisonDisplayPath } from '@/lib/documents/utils/labels'
-import type { GitFileDiff } from '@workspace/contracts'
+import { isBinaryGitDiff, type GitFileDiff } from '@workspace/contracts'
 import type { DiffFile } from '@singapore-editor/diff'
 
 import { toTreePath } from '@/lib/path-formatters'
@@ -31,7 +31,7 @@ export function unrenderableDiffNotice(
   info: GitComparison,
   rootPath: string,
 ): string {
-  if (diffs.some(isBinaryDiff)) return 'Binary file — no text diff to show.'
+  if (diffs.some(isBinaryGitDiff)) return 'Binary file — no text diff to show.'
 
   const renamed = diffs.find(isRenamedDiff)
   if (renamed) {
@@ -39,10 +39,6 @@ export function unrenderableDiffNotice(
   }
 
   return emptyDiffNotice(info, rootPath)
-}
-
-function isBinaryDiff(diff: GitFileDiff) {
-  return diff.patch.includes('Binary files ') || diff.patch.includes('GIT binary patch')
 }
 
 function isRenamedDiff(diff: GitFileDiff) {

@@ -1,6 +1,7 @@
 import path from 'node:path'
+import { workspaceSearchGlobPath } from '@workspace/contracts'
 import { FsError } from '../fs/errors'
-import { toPosix } from '../fs/path'
+import { isOutsideRoot, toPosix } from '../fs/path'
 import type { GitPathsBody } from './contracts'
 
 export function mutationPaths(body: GitPathsBody) {
@@ -39,25 +40,13 @@ export function joinPath(rootPath: string, childPath: string | undefined) {
 }
 
 export function repositoryRelativePath(rootPath: string, filePath: string) {
-  if (!rootPath) return filePath
-  if (filePath === rootPath) return ''
-
-  const prefix = `${rootPath}/`
-  if (!filePath.startsWith(prefix)) return filePath
-
-  return filePath.slice(prefix.length)
+  return workspaceSearchGlobPath(rootPath, filePath)
 }
 
-/**
- * Posix path from `root` down to `candidate`, or null when it escapes. The
- * containment rule is deliberately the same one `WorkspacePaths.assertInside`
- * enforces, so anything this maps is also a path the filesystem layer accepts.
- */
+/** Posix path from `root` down to `candidate`: `''` for the root itself, null when it escapes. */
 export function relativeInsideRoot(root: string, candidate: string) {
   const relative = path.relative(root, candidate)
-  if (relative === '') return ''
-  if (relative === '..' || relative.startsWith(`..${path.sep}`)) return null
-  if (path.isAbsolute(relative)) return null
+  if (isOutsideRoot(relative)) return null
 
   return toPosix(relative)
 }

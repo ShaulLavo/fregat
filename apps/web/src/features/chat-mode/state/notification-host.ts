@@ -33,7 +33,7 @@ export function createNotificationHost({
     const audio = feedbackOutput('agent')
     if (!audio) return
     try {
-      const buffer = await queryClient.fetchQuery(
+      const buffer = await queryClient.query(
         queryOptions({
           queryKey: chatNotificationQueryKeys.sound(kind),
           staleTime: Infinity,

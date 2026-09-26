@@ -34,6 +34,17 @@ export function workspaceSearchGlobPatterns(value: readonly string[] | string | 
   return normalizedGlobPatterns(value)
 }
 
+/** `path` relative to `rootPath` for glob matching; a path outside the root passes through. */
+export function workspaceSearchGlobPath(rootPath: string, path: string) {
+  if (!rootPath) return path
+  if (path === rootPath) return ''
+
+  const prefix = `${rootPath}/`
+  if (!path.startsWith(prefix)) return path
+
+  return path.slice(prefix.length)
+}
+
 function normalizedGlobPatterns(values: readonly string[]) {
   const patterns: string[] = []
   for (const value of values) {

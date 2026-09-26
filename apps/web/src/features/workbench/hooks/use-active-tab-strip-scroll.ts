@@ -1,11 +1,14 @@
-import { prefersReducedMotion } from '@/features/workbench/utils/wallpaper'
-import { useCallback, useLayoutEffect, useRef } from 'react'
+import { useCallback, useLayoutEffect, useRef, type FragmentInstance } from 'react'
 
 import {
   createTabStripMetrics,
   type TabStripMetrics,
 } from '@/features/workbench/state/tab-strip-metrics'
-import { tabStripScrollLeft } from '@/features/workbench/utils/tab-strip-scroll'
+import {
+  tabStripScrollLeft,
+  scrollGutter,
+  revealBehavior,
+} from '@/features/workbench/utils/tab-strip-scroll'
 
 /**
  * Scrolls the strip to the selected tab. Anything that opens a file — the tree,
@@ -19,6 +22,7 @@ export function useActiveTabStripScroll(
 ) {
   const tabsKey = tabIds.join(' ')
   const stripRef = useRef<HTMLDivElement>(null)
+  const tabsRef = useRef<FragmentInstance>(null)
   const metricsRef = useRef<TabStripMetrics | null>(null)
   const hasRevealedRef = useRef(false)
 
@@ -30,6 +34,7 @@ export function useActiveTabStripScroll(
 
     const metrics = createTabStripMetrics(strip)
     metricsRef.current = metrics
+    if (tabsRef.current) metrics.observeTabs(tabsRef.current)
     return () => {
       hasRevealedRef.current = false
       metricsRef.current = null
@@ -60,22 +65,13 @@ export function useActiveTabStripScroll(
     strip.scrollTo({ behavior, left })
   }, [activeTabId])
 
-  // The strip metrics and a drag target can share one stable callback ref.
-  return useCallback(
+  // compiler:memos: same keys, but this ref callback must keep identity to avoid DOM/drag re-registration.
+  const setStripRef = useCallback(
     (node: HTMLDivElement | null) => {
       stripRef.current = node
       onNode?.(node)
     },
     [onNode],
   )
-}
-
-/** The strip's own `scroll-padding`, so a revealed tab never sits flush against the edge. */
-function scrollGutter(strip: HTMLElement): number {
-  return Number.parseFloat(getComputedStyle(strip).scrollPaddingInlineStart) || 0
-}
-
-/** Motion is the point, but not against the wishes of someone who asked the OS for less of it. */
-function revealBehavior(): ScrollBehavior {
-  return prefersReducedMotion() ? 'auto' : 'smooth'
+  return { setStripRef, tabsRef }
 }

@@ -1,11 +1,20 @@
 import { useDelayedVisible } from '@workspace/ui/hooks/use-delayed-visible'
 import { cn } from '@workspace/ui/lib/utils'
 
+import { connectionNoticeText } from '@/features/terminal/utils/connection-notice'
+
 // A socket that is back within this reconnected; a notice for a frame reads as a failure.
 const NOTICE_DELAY_MS = 600
 
 /** Over saved or frozen output while the terminal socket is away. */
-export function ConnectionNotice({ restarting }: { readonly restarting: boolean }) {
+export function ConnectionNotice({
+  restarting,
+  unreachable,
+}: {
+  readonly restarting: boolean
+  /** The unreachable machine's name, when that is why the socket is away. */
+  readonly unreachable: string | null
+}) {
   const visible = useDelayedVisible(NOTICE_DELAY_MS)
   if (!visible) return null
 
@@ -17,9 +26,7 @@ export function ConnectionNotice({ restarting }: { readonly restarting: boolean 
         restarting ? 'text-muted-foreground' : 'text-warning',
       )}
     >
-      {restarting
-        ? 'Server restarting. The terminal reconnects when it is back.'
-        : 'Terminal connection pending. Saved output is read-only.'}
+      {connectionNoticeText(restarting, unreachable)}
     </p>
   )
 }

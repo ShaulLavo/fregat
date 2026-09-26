@@ -1,8 +1,6 @@
-import { clientErrors } from '@/lib/structured-errors'
+import { createStoreContext } from '@/lib/store-context'
 import type { FileResult } from '@/lib/file-system-types'
 import { type EditorScrollPosition } from '@singapore-editor/core/editor'
-import { createContext, use } from 'react'
-import { useStore } from 'zustand'
 import { subscribeWithSelector } from 'zustand/middleware'
 import { createStore, type Mutate, type StoreApi } from 'zustand/vanilla'
 import type { DocumentRetention } from '@/features/editor/utils/document-retention'
@@ -181,22 +179,13 @@ export type EditorDocumentStoreApi = Mutate<
   [['zustand/subscribeWithSelector', never]]
 >
 
-export const EditorDocumentStateContext = createContext<EditorDocumentStoreApi | null>(null)
-
-export function useEditorDocumentStoreApi() {
-  const store = use(EditorDocumentStateContext)
-  if (!store) {
-    throw clientErrors.CONTEXT_MISSING({
-      message: 'useEditorDocumentStoreApi must be used within EditorStateProvider',
-    })
-  }
-
-  return store
-}
-
-export function useEditorDocumentState<T>(selector: (state: EditorDocumentStore) => T): T {
-  return useStore(useEditorDocumentStoreApi(), selector)
-}
+export const {
+  Context: EditorDocumentStateContext,
+  useStoreApi: useEditorDocumentStoreApi,
+  useSelector: useEditorDocumentState,
+} = createStoreContext<EditorDocumentStoreApi>(
+  'useEditorDocumentStoreApi must be used within EditorStateProvider',
+)
 
 export function createEditorDocumentStore(options: CreateEditorDocumentStoreOptions = {}) {
   return createStore<EditorDocumentStore>()(

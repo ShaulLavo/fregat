@@ -1,4 +1,4 @@
-import { adaptWebSocket, isAbnormalWebSocketClose } from '../utils/websocket'
+import { adaptWebSocket, isAbnormalWebSocketClose, webSocketQueryValue } from '../utils/websocket'
 import {
   LSP_SERVER_EXITED,
   type LspNegotiatedSemanticTokens,
@@ -404,24 +404,9 @@ function websocketObject(value: unknown): LspWebSocket | null {
   if (!socket) return null
   return {
     ...socket,
-    path: queryValue(socket.data, 'path') ?? '',
-    root: queryValue(socket.data, 'root') ?? '',
-    serverId: queryValue(socket.data, 'server'),
-  }
-}
-
-function queryValue(data: unknown, key: string) {
-  if (!isRecord(data)) return null
-  if (isRecord(data.query)) {
-    const value = data.query[key]
-    if (typeof value === 'string') return value
-  }
-  if (typeof data.url !== 'string') return null
-
-  try {
-    return new URL(data.url).searchParams.get(key)
-  } catch {
-    return null
+    path: webSocketQueryValue(socket.data, 'path') ?? '',
+    root: webSocketQueryValue(socket.data, 'root') ?? '',
+    serverId: webSocketQueryValue(socket.data, 'server'),
   }
 }
 

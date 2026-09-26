@@ -1,12 +1,12 @@
-import path from 'node:path'
-import { expect, it } from 'vitest'
-import { isInsidePath } from '../../../utils/path'
+import { describe, expect, it } from 'vitest'
+import { documentUriForFileName, fileNameForUri } from '../shared/boundary'
 
-it('accepts a double-dot prefix while rejecting parents and sibling paths', () => {
-  const root = path.resolve('/workspace/project')
-
-  expect(isInsidePath(root, path.join(root, '..foo'))).toBe(true)
-  expect(isInsidePath(root, path.dirname(root))).toBe(false)
-  expect(isInsidePath(root, path.resolve(root, '../sibling'))).toBe(false)
-  expect(isInsidePath(root, root)).toBe(true)
+describe.runIf(process.platform !== 'win32')('native TypeScript workspace URIs', () => {
+  it.each(['normal.ts', 'a\\b.ts'])('round-trips %s through its workspace URI', (name) => {
+    const context = { root: '/workspace', workspaceRoot: '/workspace' }
+    const fileName = `/workspace/${name}`
+    const uri = documentUriForFileName(context, fileName)
+    expect(uri).toBe(`file:///${encodeURIComponent(name)}`)
+    expect(fileNameForUri(context, uri)).toBe(fileName)
+  })
 })

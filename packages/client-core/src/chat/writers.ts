@@ -1,5 +1,9 @@
 import { retainPendingMessageQuestions } from './pending-user-input'
-import { isProviderTurnFailureActivity } from '@workspace/contracts'
+import {
+  assistantTurnState,
+  isProviderTurnFailureActivity,
+  shouldRetainAfterRevert,
+} from '@workspace/contracts'
 import { shellItemKey } from './shell-item-key'
 import { projectWorktreeEvent } from './worktree-event'
 import {
@@ -1328,7 +1332,7 @@ function writeAssistantMessageTurnState(
       requestedAt: latestTurn?.requestedAt ?? event.payload.createdAt,
       sourceProposedPlan: latestTurn?.sourceProposedPlan,
       startedAt: latestTurn?.startedAt ?? event.payload.createdAt,
-      state: assistantMessageLatestTurnState(latestTurn?.state, event.payload.streaming),
+      state: assistantTurnState(latestTurn?.state, !event.payload.streaming),
       turnId: event.payload.turnId,
     },
     pendingSourceProposedPlan: current?.pendingSourceProposedPlan,
@@ -1642,23 +1646,6 @@ function checkpointStatusToLatestTurnState(status: ChatTurnDiffSummary['status']
   if (status === 'missing') return 'interrupted'
 
   return 'completed'
-}
-
-function assistantMessageLatestTurnState(
-  current: OrchestrationLatestTurn['state'] | undefined,
-  streaming: boolean,
-) {
-  if (streaming) return current ?? 'running'
-  if (current === 'interrupted' || current === 'error') return current
-
-  return 'completed'
-}
-
-function shouldRetainAfterRevert<TTurnId extends string | null>(
-  turnId: TTurnId,
-  retainedTurnIds: ReadonlySet<TurnId>,
-) {
-  return turnId === null || retainedTurnIds.has(turnId as TurnId)
 }
 
 function isWorktreeOrchestrationEvent(

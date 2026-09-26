@@ -4,6 +4,7 @@ export {
   effectiveEntryType,
   isDirectoryEntry,
   isFileEntry,
+  isPickableEntry,
   matchesEntryType,
   type EntryTypeCarrier,
   type EntryTypeFilter,
@@ -12,6 +13,7 @@ export {
   type FileTreeResult,
   type TreeEntry,
 } from './tree-entry'
+export type { ServerInfo, WorkspaceIndexReadiness, WorkspaceIndexStatus } from './fs-info'
 export { decodedAsText } from './file-result'
 export type { FileResult, TextDecodeMetadata, TextEncodingLabel } from './file-result'
 export {
@@ -42,6 +44,7 @@ export type {
   GitCommitFile,
   GitCommitDetails,
   GitFileStatus,
+  GitFileStatusValue,
   GitLineStat,
   GitLineChange,
   GitPullRequest,
@@ -68,6 +71,14 @@ export type {
   GitShipResult,
 } from './git'
 export { GIT_FORGE_KINDS, WORKTREE_SUBMODULE_MODES } from './git'
+export {
+  GIT_FILE_STATUSES,
+  GIT_OBJECT_ID_PATTERN,
+  isBinaryGitDiff,
+  isGitFileStatus,
+  isStagedStatus,
+  isWorktreeStatus,
+} from './git'
 export type { WatchClientMessage, WatchCoverage, WatchServerMessage } from './watch-events'
 export {
   parseTerminalClientMessage,
@@ -100,10 +111,13 @@ export {
 } from './workspace-search-preview'
 export {
   createWorkspaceSearchMatcher,
+  isWholeWordMatch,
+  workspaceSearchGlobPath,
   workspaceSearchGlobPatterns,
   type WorkspaceSearchMatcher,
   type WorkspaceSearchTextMatch,
 } from './workspace-search-match'
+export { fileUriForPath } from './file-uri'
 export {
   compareFuzzyRankedTargets,
   fuzzyRank,
@@ -157,6 +171,8 @@ export {
 } from './chat-ids'
 export {
   CHAT_ATTACHMENT_FILE_EXTENSIONS,
+  CHAT_ATTACHMENT_MIME_TYPES,
+  normalizeChatAttachmentMimeType,
   CHAT_ATTACHMENT_URL_PREFIX,
   chatAttachmentExtension,
   chatAttachmentSchema,
@@ -433,6 +449,9 @@ export {
 } from './machine-connections'
 export {
   logDashboardLevelSchema,
+  LOG_DASHBOARD_LEVELS,
+  LOG_TIME_RANGES,
+  type LogTimeRange,
   logDashboardSummarySchema,
   logDashboardTimelineBucketCount,
   logEventsResultSchema,
@@ -950,13 +969,13 @@ export { clampComposerCursor } from './composer-tokens'
 
 export { isProviderTurnFailureActivity } from './provider-activity'
 
-export { isWholeWordMatch } from './workspace-search-match'
+export { assistantTurnState, shouldRetainAfterRevert } from './orchestration-projection'
 
 export { queryPieces } from './fuzzy-rank'
 
 export { orchestrationReplaySummary } from './orchestration-replay-summary'
 
-export { errorSummary } from './error-fields'
+export { errorSummary, type ErrorSummaryOptions } from './error-fields'
 
 export { planStepStatus } from './plan-step-status'
 

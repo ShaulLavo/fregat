@@ -14,12 +14,6 @@
   {
     "from": "address",
     "to": "chat-mode",
-    "module": "features/chat-mode/utils/active-session.ts",
-    "reason": "owner: URL restoration coordinates feature state; this module supplies SessionSelection."
-  },
-  {
-    "from": "address",
-    "to": "chat-mode",
     "module": "features/chat-mode/utils/panels.ts",
     "reason": "owner: URL restoration coordinates feature state; this module supplies createDefaultChatModePanels, isChatModeToolTab, showChatModeToolTab."
   },
@@ -648,12 +642,6 @@
     "reason": "shared → lib: DiffLanguageHost is reused by git outside editor; move this shared behavior with its consumers."
   },
   {
-    "from": "git",
-    "to": "editor",
-    "module": "features/editor/utils/file-path.ts",
-    "reason": "shared → lib: languageIdForFilePath is reused by git outside editor; move this shared behavior with its consumers."
-  },
-  {
     "from": "search",
     "to": "editor",
     "module": "features/editor/state/document-state.tsx",
@@ -670,12 +658,6 @@
     "to": "editor",
     "module": "features/editor/state/workspace-state.tsx",
     "reason": "couple: search and editor coordinate the same document or session state through useEditorWorkspaceStoreApi; separate that ownership before draining this edge."
-  },
-  {
-    "from": "search",
-    "to": "editor",
-    "module": "features/editor/utils/file-path.ts",
-    "reason": "shared → lib: languageIdForFilePath is reused by search outside editor; move this shared behavior with its consumers."
   },
   {
     "from": "search",
@@ -1030,12 +1012,6 @@
     "to": "chat-mode",
     "module": "features/chat-mode/components/surface-view.tsx",
     "reason": "owner: Workspace selects the chat mode surface as one of its root layouts."
-  },
-  {
-    "from": "workspace",
-    "to": "chat-mode",
-    "module": "features/chat-mode/utils/active-session.ts",
-    "reason": "shared → lib: SessionSelection is reused by workspace outside chat-mode; move this shared behavior with its consumers."
   },
   {
     "from": "workspace",

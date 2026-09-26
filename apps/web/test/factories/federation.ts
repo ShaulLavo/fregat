@@ -1,4 +1,3 @@
-import { execFileSync } from 'node:child_process'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { onTestFinished } from 'vitest'
@@ -30,6 +29,7 @@ import { createProjectRegistrationCommand } from '@workspace/client-core/chat/re
 import { installTestClient } from './client-binding'
 import { createInProcessClient } from '../client'
 import { makeTestServer, type TestServer } from '../server'
+import { runGit } from './git'
 
 export async function createFederationHarness(serverA: TestServer, remote?: TestServer) {
   const serverB =
@@ -134,10 +134,9 @@ export async function registerFederatedProject(
 ) {
   const path = join(server.root, 'repo')
   await mkdir(path)
-  execFileSync('git', ['init', '-b', 'main'], { cwd: path, stdio: 'pipe' })
-  execFileSync('git', ['remote', 'add', 'origin', 'https://example.com/federated/fixture.git'], {
-    cwd: path,
-    stdio: 'pipe',
+  runGit(path, ['init', '-b', 'main'], { cwdMode: 'option' })
+  runGit(path, ['remote', 'add', 'origin', 'https://example.com/federated/fixture.git'], {
+    cwdMode: 'option',
   })
   await writeFile(join(path, 'shared.txt'), suffix)
   const response = await client.orchestration.commands.post(

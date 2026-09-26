@@ -3,7 +3,7 @@ import { createStructuredError } from '../observability/structured-errors'
 import type { PlatformDatabase } from '../db/client'
 import { agentHistoryCleaned, deleteAgentHistory, TerminalHistory } from './history'
 import { isNonEmptyString as isString } from '@workspace/utils/objects'
-import { adaptWebSocket } from '../utils/websocket'
+import { adaptWebSocket, webSocketQueryValue } from '../utils/websocket'
 import { elapsedMs } from '@workspace/utils/timing'
 import { terminalAgentLease, type AgentTerminalResolver } from './agent-launch'
 import { sessionIdentityErrors } from '../provider/structured-errors'
@@ -26,7 +26,6 @@ import {
   type TerminalClientMessage,
   type TerminalServerMessage,
 } from '@workspace/contracts'
-import { isRecord } from '@workspace/utils/objects'
 
 import { authenticateWebSocketData, type AuthConfig } from '../auth'
 import { FsError, isFsError } from '../fs/errors'
@@ -1312,9 +1311,9 @@ function terminalWebSocketObject(value: unknown): TerminalWebSocket | null {
 
 function openInputFromWebSocketData(data: unknown): TerminalOpenInput | null {
   const result = v.safeParse(terminalOpenInputSchema, {
-    worktreeId: queryValueFromWebSocketData(data, 'worktreeId'),
-    terminalId: queryValueFromWebSocketData(data, 'terminalId'),
-    agentSessionId: queryValueFromWebSocketData(data, 'agentSessionId') ?? undefined,
+    worktreeId: webSocketQueryValue(data, 'worktreeId'),
+    terminalId: webSocketQueryValue(data, 'terminalId'),
+    agentSessionId: webSocketQueryValue(data, 'agentSessionId') ?? undefined,
     cols: optionalQueryNumber(data, 'cols'),
     rows: optionalQueryNumber(data, 'rows'),
   })
@@ -1322,22 +1321,8 @@ function openInputFromWebSocketData(data: unknown): TerminalOpenInput | null {
 }
 
 function optionalQueryNumber(data: unknown, key: string) {
-  const value = queryValueFromWebSocketData(data, key)
+  const value = webSocketQueryValue(data, key)
   return value === null ? undefined : Number(value)
-}
-
-function queryValueFromWebSocketData(data: unknown, key: string) {
-  if (!isRecord(data)) return null
-  if (isRecord(data.query) && typeof data.query[key] === 'string') {
-    return data.query[key]
-  }
-  if (typeof data.url !== 'string') return null
-
-  try {
-    return new URL(data.url).searchParams.get(key)
-  } catch {
-    return null
-  }
 }
 
 /** Exported so the orchestration engine can rebuild an agent handoff's key at boot. */
@@ -1403,6 +1388,7 @@ function terminalEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   }
 }
 
+// Keeps its own fallback: contracts' `errorMessage` would print `[object Object]` in the terminal.
 function terminalSpawnErrorMessage(error: unknown) {
   if (error instanceof FsError) return error.message
   if (error instanceof Error) return error.message

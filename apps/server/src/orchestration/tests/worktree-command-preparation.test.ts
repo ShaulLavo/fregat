@@ -2,16 +2,13 @@ import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { afterEach, expect, test } from 'vitest'
 import { closeTestApps } from '../../../test/server'
-import {
-  createOrchestrationFixture,
-  executeGit,
-  FIXTURE_MODEL,
-} from '../../../test/factories/orchestration'
+import { createOrchestrationFixture, FIXTURE_MODEL } from '../../../test/factories/orchestration'
 import {
   lifecycleSessionId,
   lifecycleWorktreeId,
   worktreeLifecycleFixture,
 } from '../../../test/factories/worktree-lifecycle'
+import { runGit } from '../../testing/git'
 
 const fixtures: Awaited<ReturnType<typeof worktreeLifecycleFixture>>[] = []
 const directoryFixtures: Awaited<ReturnType<typeof createOrchestrationFixture>>[] = []
@@ -46,7 +43,7 @@ test('accepted duplicate intent reuses its receipt before branch checks or HEAD 
     lifecycleWorktreeId,
   )?.baseCommit
   await writeFile(path.join(fixture.root, 'tracked.txt'), 'new HEAD')
-  await executeGit(fixture.root, 'commit', '-am', 'move base after acceptance')
+  await runGit(fixture.root, ['commit', '-am', 'move base after acceptance'], { cwdMode: 'option' })
   expect((await fixture.engine.dispatchClientCommand(command)).deduped).toBe(true)
   expect(
     (await fixture.engine.readModelSnapshot()).worktrees.get(lifecycleWorktreeId)?.baseCommit,

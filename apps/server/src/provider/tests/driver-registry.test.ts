@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import {
@@ -216,6 +216,76 @@ describe('provider status cache', () => {
     })
     expect(cold.hydrate(WORK, v.parse(providerDriverKindSchema, 'codex'))).toBeNull()
     expect(cold.hydrate(PERSONAL, MOCK_DRIVER_KIND)).toBeNull()
+    expect(await readdir(directory)).toEqual([`${WORK}.json`])
+  })
+
+  it('removes its temp file when the snapshot cannot replace the target', async () => {
+    const directory = await fixtureRoot()
+    await mkdir(path.join(directory, `${WORK}.json`))
+    const registry = createRegistry(new ProviderStatusCache({ directory }))
+    await registry.reconcile([instance(WORK, {})])
+
+    await registry.refreshSnapshot(WORK)
+
+    expect(await readdir(directory)).toEqual([`${WORK}.json`])
+  })
+})
+
+describe('provider registry change stream', () => {
+  it('yields registry changes in order until its signal aborts', async () => {
+    const registry = createRegistry()
+    const controller = new AbortController()
+    const changes = registry.streamChanges(controller.signal)[Symbol.asyncIterator]()
+    const first = changes.next()
+
+    await registry.reconcile([instance(WORK, {})])
+    await registry.reconcile([instance(WORK, {}), instance(PERSONAL, {})])
+
+    expect(await first).toEqual({
+      done: false,
+      value: { providerInstanceIds: [WORK], type: 'providers.changed' },
+    })
+    expect(await changes.next()).toEqual({
+      done: false,
+      value: { providerInstanceIds: [WORK, PERSONAL], type: 'providers.changed' },
+    })
+
+    controller.abort()
+    expect(await changes.next()).toEqual({ done: true, value: undefined })
+  })
+
+  it('releases every consumer parked in next() when its signal aborts', async () => {
+    const registry = createRegistry()
+    const controller = new AbortController()
+    const changes = registry.streamChanges(controller.signal)[Symbol.asyncIterator]()
+    const parked = changes.next()
+    const queued = changes.next()
+
+    controller.abort()
+
+    expect(await Promise.all([parked, queued])).toEqual([
+      { done: true, value: undefined },
+      { done: true, value: undefined },
+    ])
+  })
+
+  it('ends at once when its signal is already aborted', async () => {
+    const registry = createRegistry()
+    const changes = registry.streamChanges(AbortSignal.abort())[Symbol.asyncIterator]()
+
+    expect(await changes.next()).toEqual({ done: true, value: undefined })
+  })
+
+  it('ends a parked consumer when the registry is disposed', async () => {
+    const registry = createRegistry()
+    const changes = registry.streamChanges(new AbortController().signal)[Symbol.asyncIterator]()
+    const parked = changes.next()
+
+    await registry.dispose()
+
+    expect(await parked).toEqual({ done: true, value: undefined })
+    const late = registry.streamChanges(new AbortController().signal)[Symbol.asyncIterator]()
+    expect(await late.next()).toEqual({ done: true, value: undefined })
   })
 })
 

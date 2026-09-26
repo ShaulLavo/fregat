@@ -25,7 +25,7 @@ import { sseResponse, toSse } from '../sse'
 import type { GitService } from './service'
 import { GitWorktreeService } from './worktrees'
 import { GitHistory } from './history'
-import { errorSummary, recordRequestWarning } from '../observability/logging'
+import { operatorErrorSummary, recordRequestWarning } from '../observability/logging'
 
 export function gitRoutes(
   git: GitService,
@@ -207,7 +207,9 @@ async function readBaseBranches(
   try {
     return await read()
   } catch (error) {
-    recordRequestWarning('worktree base branches unavailable', { error: errorSummary(error) })
+    recordRequestWarning('worktree base branches unavailable', {
+      error: operatorErrorSummary(error),
+    })
     return null
   }
 }

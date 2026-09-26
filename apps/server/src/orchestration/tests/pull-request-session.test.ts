@@ -5,7 +5,8 @@ import * as v from 'valibot'
 import { modelSelectionSchema } from '@workspace/contracts'
 import { afterEach, expect, test, vi } from 'vitest'
 import { closeTestApps } from '../../../test/server'
-import { executeGit, FIXTURE_MODEL } from '../../../test/factories/orchestration'
+import { FIXTURE_MODEL } from '../../../test/factories/orchestration'
+import { runGit } from '../../testing/git'
 import { worktreeLifecycleFixture } from '../../../test/factories/worktree-lifecycle'
 import type { ForgeBoundaries } from '../../git/pull-request'
 import type { RunProcess } from '../../git/forges/types'
@@ -73,18 +74,20 @@ async function withPullRequest(
   const base = await mkdtemp(path.join(tmpdir(), 'platform-pr-remote-'))
   scratch.push(base)
   const bare = path.join(base, 'app.git')
-  await executeGit(base, 'init', '--bare', '-b', 'main', bare)
-  await executeGit(fixture.root, 'remote', 'add', 'origin', remote)
-  await executeGit(fixture.root, 'config', `url.${bare}.insteadOf`, remote)
-  await executeGit(fixture.root, 'push', '-q', 'origin', 'main')
-  await executeGit(fixture.root, 'checkout', '-q', '-b', 'feature/pr')
+  await runGit(base, ['init', '--bare', '-b', 'main', bare], { cwdMode: 'option' })
+  await runGit(fixture.root, ['remote', 'add', 'origin', remote], { cwdMode: 'option' })
+  await runGit(fixture.root, ['config', `url.${bare}.insteadOf`, remote], { cwdMode: 'option' })
+  await runGit(fixture.root, ['push', '-q', 'origin', 'main'], { cwdMode: 'option' })
+  await runGit(fixture.root, ['checkout', '-q', '-b', 'feature/pr'], { cwdMode: 'option' })
   await writeFile(path.join(fixture.root, 'greeting.txt'), 'hello from the pull request\n')
-  await executeGit(fixture.root, 'add', 'greeting.txt')
-  await executeGit(fixture.root, 'commit', '-q', '-m', 'greeting')
-  await executeGit(fixture.root, 'push', '-q', 'origin', 'feature/pr')
-  await executeGit(bare, 'update-ref', 'refs/pull/7/head', 'refs/heads/feature/pr')
-  await executeGit(fixture.root, 'checkout', '-q', 'main')
-  await executeGit(fixture.root, 'branch', '-q', '-D', 'feature/pr')
+  await runGit(fixture.root, ['add', 'greeting.txt'], { cwdMode: 'option' })
+  await runGit(fixture.root, ['commit', '-q', '-m', 'greeting'], { cwdMode: 'option' })
+  await runGit(fixture.root, ['push', '-q', 'origin', 'feature/pr'], { cwdMode: 'option' })
+  await runGit(bare, ['update-ref', 'refs/pull/7/head', 'refs/heads/feature/pr'], {
+    cwdMode: 'option',
+  })
+  await runGit(fixture.root, ['checkout', '-q', 'main'], { cwdMode: 'option' })
+  await runGit(fixture.root, ['branch', '-q', '-D', 'feature/pr'], { cwdMode: 'option' })
   return { fixture, bare }
 }
 
@@ -109,10 +112,14 @@ test('a pull request URL opens a session in its own worktree at the head, tracki
   expect(await readFile(path.join(checkout, 'greeting.txt'), 'utf8')).toBe(
     'hello from the pull request\n',
   )
-  expect(await executeGit(checkout, 'rev-parse', '--abbrev-ref', '@{u}')).toBe('origin/feature/pr')
+  expect(
+    (
+      await runGit(checkout, ['rev-parse', '--abbrev-ref', '@{u}'], { cwdMode: 'option' })
+    ).stdout.trim(),
+  ).toBe('origin/feature/pr')
 
   await writeFile(path.join(checkout, 'greeting.txt'), 'reviewed\n')
-  await executeGit(checkout, 'commit', '-qam', 'review')
+  await runGit(checkout, ['commit', '-qam', 'review'], { cwdMode: 'option' })
   const response = await fixture.app.handle(
     new Request('http://localhost/git/push', {
       method: 'POST',
@@ -121,7 +128,9 @@ test('a pull request URL opens a session in its own worktree at the head, tracki
     }),
   )
   expect(response.status, await response.clone().text()).toBe(200)
-  expect(await executeGit(bare, 'show', 'feature/pr:greeting.txt')).toBe('reviewed')
+  expect(
+    (await runGit(bare, ['show', 'feature/pr:greeting.txt'], { cwdMode: 'option' })).stdout.trim(),
+  ).toBe('reviewed')
 
   await fixture.engine.syncPullRequests()
   expect(
@@ -150,7 +159,9 @@ test('a fork pull request starts at its head without tracking a branch this remo
   expect(await readFile(path.join(checkout, 'greeting.txt'), 'utf8')).toBe(
     'hello from the pull request\n',
   )
-  await expect(executeGit(checkout, 'rev-parse', '--abbrev-ref', '@{u}')).rejects.toThrow()
+  await expect(
+    runGit(checkout, ['rev-parse', '--abbrev-ref', '@{u}'], { cwdMode: 'option' }),
+  ).rejects.toThrow()
   state = 'MERGED'
   await fixture.restart()
   await fixture.engine.syncPullRequests()
@@ -185,10 +196,10 @@ test('a pull request URL from another repository starts nothing', async () => {
 
 test('push and open reports a pushed branch and a refused pull request as two outcomes', async () => {
   const { fixture } = await withPullRequest()
-  await executeGit(fixture.root, 'checkout', '-q', '-b', 'feature/new')
+  await runGit(fixture.root, ['checkout', '-q', '-b', 'feature/new'], { cwdMode: 'option' })
   await writeFile(path.join(fixture.root, 'new.txt'), 'new\n')
-  await executeGit(fixture.root, 'add', 'new.txt')
-  await executeGit(fixture.root, 'commit', '-qm', 'new')
+  await runGit(fixture.root, ['add', 'new.txt'], { cwdMode: 'option' })
+  await runGit(fixture.root, ['commit', '-qm', 'new'], { cwdMode: 'option' })
   const response = await fixture.app.handle(
     new Request('http://localhost/git/push-and-pull-request', {
       method: 'POST',
@@ -236,18 +247,19 @@ test.for([false, true])(
       },
     })
     const fork = path.join(path.dirname(bare), 'fork')
-    await executeGit(path.dirname(bare), 'clone', bare, fork)
-    await executeGit(fork, 'config', 'user.name', 'Fork')
-    await executeGit(fork, 'config', 'user.email', 'fork@example.invalid')
-    await executeGit(fork, 'checkout', 'feature/pr')
+    await runGit(path.dirname(bare), ['clone', bare, fork], { cwdMode: 'option' })
+    await runGit(fork, ['config', 'user.name', 'Fork'], { cwdMode: 'option' })
+    await runGit(fork, ['config', 'user.email', 'fork@example.invalid'], { cwdMode: 'option' })
+    await runGit(fork, ['checkout', 'feature/pr'], { cwdMode: 'option' })
     await writeFile(path.join(fork, 'greeting.txt'), 'fork head\n')
-    await executeGit(fork, 'commit', '-am', 'fork head')
-    commit = changed ? '0'.repeat(40) : await executeGit(fork, 'rev-parse', 'HEAD')
-    await executeGit(
+    await runGit(fork, ['commit', '-am', 'fork head'], { cwdMode: 'option' })
+    commit = changed
+      ? '0'.repeat(40)
+      : (await runGit(fork, ['rev-parse', 'HEAD'], { cwdMode: 'option' })).stdout.trim()
+    await runGit(
       fixture.root,
-      'config',
-      `url.${fork}.insteadOf`,
-      'https://bitbucket.org/contributor/app.git',
+      ['config', `url.${fork}.insteadOf`, 'https://bitbucket.org/contributor/app.git'],
+      { cwdMode: 'option' },
     )
     const starting = fixture.engine.startPullRequestSession({
       worktreeId: fixture.registration.worktreeId,
@@ -263,7 +275,9 @@ test.for([false, true])(
     const checkout =
       (await fixture.engine.readModelSnapshot()).worktrees.get(started.worktreeId)?.canonicalPath ??
       ''
-    expect(await executeGit(checkout, 'rev-parse', 'HEAD')).toBe(commit)
+    expect(
+      (await runGit(checkout, ['rev-parse', 'HEAD'], { cwdMode: 'option' })).stdout.trim(),
+    ).toBe(commit)
     expect(await readFile(path.join(checkout, 'greeting.txt'), 'utf8')).toBe('fork head\n')
   },
 )

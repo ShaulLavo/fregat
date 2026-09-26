@@ -1,4 +1,5 @@
 import { createTabStripMetrics } from '@/features/workbench/state/tab-strip-metrics'
+import { vi } from 'vitest'
 import { expect, test } from '../../../../test/fixtures'
 
 function mountStrip(tabIds: readonly string[]) {
@@ -48,7 +49,7 @@ test('answering from the cache measures nothing', () => {
   strip.remove()
 })
 
-test('a new tab order refuses to answer until the strip is measured under it', async () => {
+test('a new tab order uses measured fallback before resize observation arrives', () => {
   const strip = mountStrip(['a', 'b'])
   const metrics = createTabStripMetrics(strip)
   expect(metrics.boundsFor('b')).not.toBeNull()
@@ -61,8 +62,7 @@ test('a new tab order refuses to answer until the strip is measured under it', a
   expect(metrics.boundsFor('b')).toBeNull()
   expect(metrics.boundsFor('c')).toBeNull()
 
-  await new Promise((resolve) => setTimeout(resolve))
-  expect(metrics.boundsFor('c')).not.toBeNull()
+  expect(metrics.measure('c')).not.toBeNull()
   metrics.dispose()
   strip.remove()
 })
@@ -112,6 +112,30 @@ test('the measured fallback speaks the same content space as the cache', () => {
 
   expect(metrics.measure('b')).toEqual(metrics.boundsFor('b'))
   expect(metrics.measure('missing')).toBeNull()
+  metrics.dispose()
+  strip.remove()
+})
+
+test('a marker added inside a tab does not force a new geometry read', async () => {
+  const strip = mountStrip(['a'])
+  const metrics = createTabStripMetrics(strip)
+  const reads = vi.spyOn(Element.prototype, 'getBoundingClientRect')
+  strip.firstElementChild?.appendChild(document.createElement('span'))
+  await new Promise((resolve) => setTimeout(resolve))
+  expect(reads).not.toHaveBeenCalled()
+  reads.mockRestore()
+  metrics.dispose()
+  strip.remove()
+})
+
+test('an equal-width reorder refreshes the cache on the next frame', async () => {
+  const strip = mountStrip(['a', 'b'])
+  const metrics = createTabStripMetrics(strip)
+  strip.prepend(strip.lastElementChild!)
+  metrics.noteTabs('b a')
+  expect(metrics.boundsFor('a')).toBeNull()
+  await new Promise(requestAnimationFrame)
+  expect(metrics.boundsFor('a')).toEqual(metrics.measure('a'))
   metrics.dispose()
   strip.remove()
 })

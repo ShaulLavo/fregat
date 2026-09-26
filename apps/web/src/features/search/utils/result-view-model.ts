@@ -5,7 +5,7 @@ import { searchMatchPreviewRange as searchResultContentPreviewRange } from '@/fe
 import type { EditorSyntaxLanguageId } from '@singapore-editor/core/syntax'
 import type { WorkspaceSearchMatch } from '@workspace/contracts'
 
-import { languageIdForFilePath } from '@/features/editor/utils/file-path'
+import { languageIdForFilePath } from '@/lib/file-language'
 import type { WorkspaceSearchFileGroup } from '@/features/search/state/buffer-state'
 import { searchMatchDisplay, type SearchMatchDisplay } from '@/features/search/utils/match-display'
 import {

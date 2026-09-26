@@ -5,7 +5,6 @@ import type {
   GitCloneProgressEvent,
   GitPublishRequest,
   GitPublishResult,
-  GitCommitProgressEvent,
   GitCommitResult,
   GitPullRequestCreateResult,
   GitShipResult,
@@ -14,6 +13,7 @@ import type {
 
 import type { Client } from '@/lib/client'
 import { observeClientOperation } from '@/lib/client-logging'
+import { readGitCommitStream } from '@workspace/client-core/git/commit-stream'
 import { parseEdenSseStream } from '@workspace/client-core/transport/eden'
 import { unwrapEdenResponse } from '@/lib/eden-events'
 import { createClientError } from '@workspace/client-core/errors'
@@ -50,10 +50,7 @@ export async function fetchGitFile(
         query: { path, ref },
       })
 
-      return unwrapEdenResponse(response, {
-        emptyMessage: 'git server returned an empty response',
-        requireData: true,
-      })
+      return unwrapGit(response)
     },
     (result) => ({ length: result.content.length }),
   )
@@ -73,10 +70,7 @@ export async function fetchStatus(
         fetch: { signal },
       })
 
-      return unwrapEdenResponse(response, {
-        requireData: true,
-        emptyMessage: 'git server returned an empty response',
-      })
+      return unwrapGit(response)
     },
     (result) => ({ fileCount: result.files.length, hasRepository: result.repository !== null }),
   )
@@ -96,10 +90,7 @@ export async function fetchDiff(
         fetch: { signal },
       })
 
-      return unwrapEdenResponse(response, {
-        requireData: true,
-        emptyMessage: 'git server returned an empty response',
-      })
+      return unwrapGit(response)
     },
     (diffs) => ({ diffCount: diffs.length }),
   )
@@ -111,10 +102,7 @@ export async function generateCommitMessage(path: string, signal: AbortSignal, c
     async () => {
       const response = await client.git['commit-message'].post({ path }, { fetch: { signal } })
 
-      return unwrapEdenResponse(response, {
-        requireData: true,
-        emptyMessage: 'git server returned an empty response',
-      })
+      return unwrapGit(response)
     },
     (result) => ({
       model: result.modelSelection.model,
@@ -132,10 +120,7 @@ export async function stagePaths(paths: readonly string[], client: Client) {
   return observeGitPathsOperation(client, 'git.stage', paths, async () => {
     const response = await client.git.stage.post({ paths: Array.from(paths) })
 
-    return unwrapEdenResponse(response, {
-      requireData: true,
-      emptyMessage: 'git server returned an empty response',
-    })
+    return unwrapGit(response)
   })
 }
 
@@ -147,10 +132,7 @@ export async function unstagePaths(paths: readonly string[], client: Client) {
   return observeGitPathsOperation(client, 'git.unstage', paths, async () => {
     const response = await client.git.unstage.post({ paths: Array.from(paths) })
 
-    return unwrapEdenResponse(response, {
-      requireData: true,
-      emptyMessage: 'git server returned an empty response',
-    })
+    return unwrapGit(response)
   })
 }
 
@@ -158,10 +140,7 @@ export async function discardPaths(paths: readonly string[], client: Client) {
   return observeGitPathsOperation(client, 'git.discard', paths, async () => {
     const response = await client.git.discard.post({ paths: Array.from(paths) })
 
-    return unwrapEdenResponse(response, {
-      requireData: true,
-      emptyMessage: 'git server returned an empty response',
-    })
+    return unwrapGit(response)
   })
 }
 
@@ -196,10 +175,7 @@ export async function commitChangesStreaming(
     },
     async () => {
       const response = await client.git['commit-stream'].post({ message, path, source })
-      const stream = unwrapEdenResponse(response, {
-        requireData: true,
-        emptyMessage: 'git server returned an empty response',
-      })
+      const stream = unwrapGit(response)
 
       return readCommitProgress(stream, onProgress)
     },
@@ -216,24 +192,12 @@ async function readCommitProgress(
   stream: unknown,
   onProgress: (line: { stream: 'stderr' | 'stdout'; text: string }) => void,
 ): Promise<GitCommitResult> {
-  let result: GitCommitResult | null = null
+  const outcome = await readGitCommitStream(stream, onProgress)
+  if (outcome.kind === 'failed') throw createGitCommitFailure(outcome.message)
+  if (outcome.kind === 'ended-without-result')
+    throw createGitCommitFailure('git commit ended without reporting a result')
 
-  for await (const event of parseEdenSseStream(stream)) {
-    // Sent through a hook's silences, such as a typecheck that prints nothing for a minute.
-    if (event.event === 'heartbeat') continue
-
-    const data = event.data as GitCommitProgressEvent
-    if (data.kind === 'progress') {
-      onProgress({ stream: data.stream, text: data.text })
-      continue
-    }
-    if (data.kind === 'failed') throw createGitCommitFailure(data.message)
-
-    result = data.result
-  }
-  if (!result) throw createGitCommitFailure('git commit ended without reporting a result')
-
-  return result
+  return outcome.result
 }
 
 export async function fetchRemote(path: string, client: Client) {
@@ -242,10 +206,7 @@ export async function fetchRemote(path: string, client: Client) {
     async () => {
       const response = await client.git.fetch.post({ path })
 
-      return unwrapEdenResponse(response, {
-        requireData: true,
-        emptyMessage: 'git server returned an empty response',
-      })
+      return unwrapGit(response)
     },
     outputSummary,
   )
@@ -257,10 +218,7 @@ export async function pullRemote(path: string, client: Client) {
     async () => {
       const response = await client.git.pull.post({ path })
 
-      return unwrapEdenResponse(response, {
-        requireData: true,
-        emptyMessage: 'git server returned an empty response',
-      })
+      return unwrapGit(response)
     },
     outputSummary,
   )
@@ -350,10 +308,7 @@ export async function pushRemote(path: string, client: Client) {
     async () => {
       const response = await client.git.push.post({ path })
 
-      return unwrapEdenResponse(response, {
-        requireData: true,
-        emptyMessage: 'git server returned an empty response',
-      })
+      return unwrapGit(response)
     },
     outputSummary,
   )
@@ -372,10 +327,7 @@ export async function fetchBranchRemoteState(
         query: { path },
       })
 
-      return unwrapEdenResponse<GitBranchRemoteState>(response, {
-        requireData: true,
-        emptyMessage: 'git server returned an empty response',
-      })
+      return unwrapGit<GitBranchRemoteState>(response)
     },
     (state) => ({ ahead: state.ahead, hasUpstream: state.hasUpstream }),
   )
@@ -394,10 +346,7 @@ export async function fetchPullRequestState(
         query: { path },
       })
 
-      return unwrapEdenResponse<GitPullRequestState>(response, {
-        requireData: true,
-        emptyMessage: 'git server returned an empty response',
-      })
+      return unwrapGit<GitPullRequestState>(response)
     },
     (state) => ({ pullRequestNumber: state.pullRequest?.number ?? null, support: state.support }),
   )
@@ -423,10 +372,7 @@ export async function createPullRequest(input: PullRequestInput, client: Client)
     async () => {
       const response = await client.git['pull-request'].post(pullRequestBody(input))
 
-      return unwrapEdenResponse<GitPullRequestCreateResult>(response, {
-        requireData: true,
-        emptyMessage: 'git server returned an empty response',
-      })
+      return unwrapGit<GitPullRequestCreateResult>(response)
     },
     (result) => ({ kind: result.kind }),
   )
@@ -449,11 +395,22 @@ export async function pushAndOpenPullRequest(input: PullRequestInput, client: Cl
 }
 
 export async function syncRemote(path: string, client: Client) {
-  return observeGitOperation({ action: 'git.sync_remote', path }, async () => {
-    const pull = await pullRemote(path, client)
-    const push = await pushRemote(path, client)
+  return observeGitOperation(
+    { ...clientLogContext(client), action: 'git.sync_remote', path },
+    async () => {
+      const pull = await pullRemote(path, client)
+      const push = await pushRemote(path, client)
 
-    return { pull, push }
+      return { pull, push }
+    },
+  )
+}
+
+/** Every git route answers with a body; an empty one is a server fault. */
+export function unwrapGit<T>(response: { data?: T | null; error?: unknown }) {
+  return unwrapEdenResponse(response, {
+    requireData: true,
+    emptyMessage: 'git server returned an empty response',
   })
 }
 

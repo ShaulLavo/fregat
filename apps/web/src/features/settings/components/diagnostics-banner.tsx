@@ -1,13 +1,5 @@
-import { Alert, AlertDescription, AlertTitle } from '@workspace/ui/components/alert'
+import { DiagnosticGroup } from '@/features/settings/components/diagnostic-group'
 import type { SettingsDiagnostic } from '@workspace/contracts'
-
-const LABELS: Record<SettingsDiagnostic['kind'], string> = {
-  'invalid-value': 'invalid value',
-  'scope-not-allowed': 'not allowed in that scope',
-  'unknown-key': 'unknown setting',
-  migrated: 'moved to a new setting',
-  'removed-key': 'no longer a setting',
-}
 
 /**
  * The kinds where the user's value did not survive.
@@ -54,32 +46,5 @@ export function DiagnosticsBanner({ diagnostics }: { diagnostics: readonly Setti
         />
       ) : null}
     </div>
-  )
-}
-
-function DiagnosticGroup({
-  diagnostics,
-  summary,
-  tone,
-}: {
-  readonly diagnostics: readonly SettingsDiagnostic[]
-  readonly summary: string
-  readonly tone: 'warning' | 'info'
-}) {
-  return (
-    <Alert role='status' variant={tone}>
-      <AlertTitle>{summary}</AlertTitle>
-      <AlertDescription>
-        <ul className='flex flex-col gap-0.5'>
-          {diagnostics.map((diagnostic) => (
-            <li key={`${diagnostic.layer}:${diagnostic.id}`}>
-              <code>{diagnostic.id}</code> in {diagnostic.layer} settings —{' '}
-              {LABELS[diagnostic.kind]}
-              {diagnostic.detail ? `: ${diagnostic.detail}` : ''}
-            </li>
-          ))}
-        </ul>
-      </AlertDescription>
-    </Alert>
   )
 }

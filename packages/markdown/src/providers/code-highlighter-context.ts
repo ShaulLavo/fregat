@@ -12,6 +12,7 @@ export type HighlightInput = {
  * provides it here.
  */
 export type CodeHighlighter = {
+  readonly dispose: () => void
   /** Returns tokens synchronously when the grammar is loaded, otherwise calls back. */
   readonly highlight: (
     input: HighlightInput,

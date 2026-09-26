@@ -1,3 +1,4 @@
+import { resourceQueryClient } from '@/lib/resources/state/query-client'
 import { beginReloadBudget, prepareWithinReloadBudget } from '@/lib/reload-budget'
 import { loadEditorThemeForSelection } from '@/features/editor/state/color-theme-store'
 import { createBootstrap } from '@/state/bootstrap'
@@ -70,7 +71,11 @@ log.info({
 })
 // index.html already started these faces from the boot mirror; the queries adopt them, and are
 // the same ones AppearanceProvider asks for once settings confirm.
-for (const font of fontsInUse(boot)) void primaryQueryClient().prefetchQuery(fontQueryOptions(font))
+for (const font of fontsInUse(boot))
+  void primaryQueryClient()
+    .query(fontQueryOptions(font))
+    .then(() => undefined)
+    .catch(() => undefined)
 
 // Preserve explicit fields before Router normalizes defaults; boot merges them with the cache.
 const initialHref = applicationHost()?.initialAddress ?? selectInitialAddress(window.location.href)
@@ -79,7 +84,7 @@ const routerHistory = applicationHost()?.history ?? createBrowserHistory()
 const initialBrowserHref = browserAddressHref(initialHref)
 if (routerHistory.location.href !== initialBrowserHref) routerHistory.replace(initialBrowserHref)
 routerHistory.flush()
-const router = createApplicationRouter({ history: routerHistory })
+const router = createApplicationRouter({ history: routerHistory, resources: resourceQueryClient })
 const navigation = createNavigation(router, initialIntent, { canPlaceTab: canPlaceEditorTab })
 
 beginReloadBudget()
@@ -90,12 +95,22 @@ const restoredWorkspace = bootstrap
   .editor.workspaceStore.getState()
 const warmViews: Promise<unknown>[] = []
 if (restoredWorkspace?.selectedTabContent?.kind === 'settings')
-  warmViews.push(primaryQueryClient().prefetchQuery(settingsPageQueryOptions))
+  warmViews.push(
+    resourceQueryClient
+      .query(settingsPageQueryOptions)
+      .then(() => undefined)
+      .catch(() => undefined),
+  )
 if (
   restoredWorkspace?.workbenchPanels.bottomPanelOpen &&
   restoredWorkspace.workbenchPanels.activeBottomTab === 'terminal'
 )
-  warmViews.push(primaryQueryClient().prefetchQuery(terminalPanelQueryOptions))
+  warmViews.push(
+    resourceQueryClient
+      .query(terminalPanelQueryOptions)
+      .then(() => undefined)
+      .catch(() => undefined),
+  )
 if (restoredWorkspace)
   warmViews.push(
     loadEditorThemeForSelection(
@@ -130,8 +145,14 @@ createRoot(document.getElementById('root')!, {
 // After the first frame, so opening a terminal or settings never waits on the
 // network. A failed prefetch is silent: the query retries when the pane opens.
 const prefetchDeferredChunks = () => {
-  void primaryQueryClient().prefetchQuery(terminalPanelQueryOptions)
-  void primaryQueryClient().prefetchQuery(settingsPageQueryOptions)
+  void resourceQueryClient
+    .query(terminalPanelQueryOptions)
+    .then(() => undefined)
+    .catch(() => undefined)
+  void resourceQueryClient
+    .query(settingsPageQueryOptions)
+    .then(() => undefined)
+    .catch(() => undefined)
 }
 if ('requestIdleCallback' in window) window.requestIdleCallback(prefetchDeferredChunks)
 else setTimeout(prefetchDeferredChunks, 2000)

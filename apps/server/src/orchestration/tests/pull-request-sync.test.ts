@@ -4,7 +4,7 @@ import { PullRequestSyncReactor } from '../pull-request-sync-reactor'
 import { afterEach, expect, test } from 'vitest'
 import type { GitPullRequest } from '@workspace/contracts'
 import { closeTestApps } from '../../../test/server'
-import { executeGit } from '../../../test/factories/orchestration'
+import { runGit } from '../../testing/git'
 import {
   lifecycleWorktreeId,
   worktreeLifecycleFixture,
@@ -78,7 +78,7 @@ test("a dedicated worktree's pull request reaches the shell and follows its bran
   // The registered main checkout is shared, so it is never asked about.
   expect(forge.requests.flat()).not.toContain('main')
 
-  await executeGit(worktree.canonicalPath, 'checkout', '-q', '-b', 'renamed')
+  await runGit(worktree.canonicalPath, ['checkout', '-q', '-b', 'renamed'], { cwdMode: 'option' })
   await fixture.engine.refreshWorktreeMetadata(worktree.path)
   await fixture.engine.syncPullRequests()
   expect(forge.requests.at(-1)).toEqual(['renamed'])

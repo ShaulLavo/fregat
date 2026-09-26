@@ -16,7 +16,7 @@ export function ActivityDetailSection({
   label: string
   value: string
 }) {
-  const scrollRef = useWorkLogScroll(`detail:${activityId}:${label}`, value.length)
+  const { scrollRef } = useWorkLogScroll(`detail:${activityId}:${label}`, value.length, 'text')
   const json = label === 'Input' ? prettyJsonInput(value) : null
   const output = label === 'Output' || label === 'Result'
   const className = cn(

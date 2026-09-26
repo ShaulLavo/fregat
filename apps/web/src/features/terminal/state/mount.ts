@@ -1,3 +1,5 @@
+import { initializeGhostty } from '@/features/terminal/state/runtime'
+import type { ServerSocket } from '@workspace/client-core/transport/socket'
 import { createReplayGate } from '@/features/terminal/state/replay'
 import { errorMessage } from '@/lib/error-message'
 import { fetchTerminalCheckout } from '@/features/terminal/state/register-checkout'
@@ -13,13 +15,13 @@ import {
   type WorktreeId,
 } from '@workspace/contracts'
 import {
-  GhosttyRuntime,
   Terminal,
+  type GhosttyRuntime,
   type GhosttyWebGpuTerminalSubscription,
   type TerminalScrollbar,
 } from 'ghostty-webgpu'
 import { addLifecycleFlush } from '@/lib/lifecycle-flush'
-import { connectTerminalSocket, type EdenServerSocket } from '@/lib/server-sockets'
+import { connectTerminalSocket } from '@/lib/server-sockets'
 import { sendTerminalClientMessage } from '@/features/terminal/utils/socket'
 import { reportError, toClientError } from '@/lib/client-error-taxonomy'
 import { fontStack } from '@/lib/fonts/utils/stack'
@@ -31,7 +33,6 @@ import { elapsedMs, nowMs } from '@workspace/utils/timing'
 
 export type TerminalInputSender = (data: string) => boolean
 type TerminalDimensions = { cols: number; rows: number }
-let ghosttyRuntimePromise: Promise<GhosttyRuntime> | null = null
 
 export function mountTerminal({
   origin,
@@ -74,7 +75,7 @@ export function mountTerminal({
   let scrollDisposable: GhosttyWebGpuTerminalSubscription | null = null
   let titleDisposable: GhosttyWebGpuTerminalSubscription | null = null
   let bellDisposable: GhosttyWebGpuTerminalSubscription | null = null
-  let socket: EdenServerSocket | null = null
+  let socket: ServerSocket | null = null
   let disposeSocket: (() => void) | undefined
   let terminal: Terminal | null = null
   let terminalDimensions: TerminalDimensions | null = null
@@ -328,25 +329,11 @@ function currentTerminalDimensions(terminal: Terminal) {
   }
 }
 
-function initializeGhostty() {
-  if (ghosttyRuntimePromise) return ghosttyRuntimePromise
-
-  const loading = GhosttyRuntime.create()
-  ghosttyRuntimePromise = loading
-  void loading.catch(() => {
-    if (ghosttyRuntimePromise === loading) ghosttyRuntimePromise = null
-  })
-  return loading
-}
-
 function openTerminalUri(uri: string) {
   window.open(uri, '_blank', 'noopener,noreferrer')
 }
 
-function sendTerminalResize(
-  socket: EdenServerSocket | null,
-  dimensions: TerminalDimensions | null,
-) {
+function sendTerminalResize(socket: ServerSocket | null, dimensions: TerminalDimensions | null) {
   if (!dimensions) return false
 
   return sendTerminalClientMessage(socket, {
@@ -356,7 +343,7 @@ function sendTerminalResize(
   })
 }
 
-function closeTerminalSocket(socket: EdenServerSocket | null) {
+function closeTerminalSocket(socket: ServerSocket | null) {
   if (!socket) return
   if (socket.readyState === 3) return
   if (socket.readyState === 2) return

@@ -1,4 +1,4 @@
-import { errorSummary } from './logging'
+import { operatorErrorSummary } from './logging'
 import { recordProcessWarning } from './runtime'
 
 type DetachedContext = {
@@ -28,5 +28,5 @@ export function runDetached(operation: () => Promise<unknown>, context: Detached
 }
 
 function recordDetachedFailure(error: unknown, context: DetachedContext) {
-  recordProcessWarning('detached.failed', { ...context, error: errorSummary(error) })
+  recordProcessWarning('detached.failed', { ...context, error: operatorErrorSummary(error) })
 }

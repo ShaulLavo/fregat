@@ -8,13 +8,18 @@ import type {
 } from '@workspace/contracts'
 
 import {
-  effectiveEntryType,
+  isPickableEntry,
   type FileTreeEntry,
   type WorkspaceAddress,
   type WorkspaceSearchMatch,
 } from '@workspace/contracts'
 
-export { effectiveEntryType, isDirectoryEntry, isFileEntry } from '@workspace/contracts'
+export {
+  effectiveEntryType,
+  isDirectoryEntry,
+  isFileEntry,
+  type ServerInfo,
+} from '@workspace/contracts'
 
 export type FileResult = Omit<WireFileResult, 'path'> & { readonly path: FilesystemPath }
 export type StatResult = Omit<FileSystemEntryMetadata, 'path' | 'canonicalPath'> & {
@@ -60,22 +65,6 @@ export function entryFromResponse(value: FileTreeEntry): TreeEntry {
 
 export type SearchScope = 'current' | 'system'
 
-type WorkspaceIndexStatus = {
-  entryCount: number
-  errorMessage?: string
-  fileCount: number
-  lastFullScanAtMs?: number
-  lastFullScanDurationMs?: number
-  lastIncrementalUpdateAtMs?: number
-  pendingCreatedPathCount: number
-  readiness: 'cold' | 'building' | 'ready' | 'stale' | 'failed' | 'off'
-  rebuildReason?: string
-  scanRoot: string | null
-  scanWarningCount: number
-  skippedEntryCount: number
-  staleEntryCount: number
-}
-
 export type FsEntry = TreeEntry & {
   searchScope?: SearchScope
 }
@@ -83,14 +72,6 @@ export type FsEntry = TreeEntry & {
 export type FindMatch = Omit<WorkspaceSearchMatch, 'path'> & {
   path: FilesystemPath
   searchScope?: SearchScope
-}
-
-export type ServerInfo = {
-  ok: boolean
-  workspaceRoot: string
-  workspaceIndex?: WorkspaceIndexStatus
-  defaultPath: string
-  homePath: string
 }
 
 export type PickedFsEntry = FsEntry & { workspaceAddress?: WorkspaceAddress } & (
@@ -104,6 +85,5 @@ export type PickedFsEntry = FsEntry & { workspaceAddress?: WorkspaceAddress } & 
   )
 
 export function isPickedFsEntry(entry: FsEntry): entry is PickedFsEntry {
-  const type = effectiveEntryType(entry)
-  return type === 'file' || type === 'directory'
+  return isPickableEntry(entry)
 }

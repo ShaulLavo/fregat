@@ -455,3 +455,58 @@ it('keeps publication during snapshot delivery and falls back after losing the l
     workspace.close()
   }
 })
+
+describe('stream hub batches', () => {
+  it('delivers batches in publish order across a parked reader and a queued burst', async () => {
+    const workspace = createShellWorkspace(1)
+    const hub = new OrchestrationStreamHub()
+    const budget = new LiveStreamBudget()
+    const batches = hub.subscribe(budget)
+    const sessionId = workspace.sessionIds[0]!
+    const publish = (text: string) => {
+      const events = workspace.commit([assistantDeltaEvent(sessionId, text)])
+      hub.publish(events)
+      return events.map((event) => event.sequence)
+    }
+    const read = async () => {
+      const result = await batches.next()
+      if (result.done) return expect.unreachable('expected a batch')
+      return result.value.map((item) => item.value.sequence)
+    }
+    try {
+      const parked = read()
+      const published = [publish('one'), publish('two'), publish('three')]
+      const received = [await parked, await read(), await read()]
+      published.push(publish('four'))
+      received.push(await read())
+
+      expect(received).toEqual(published)
+    } finally {
+      await batches.return(undefined)
+      budget.dispose()
+      workspace.close()
+    }
+  })
+
+  it('an early return unsubscribes and releases the batches it never delivered', async () => {
+    const workspace = createShellWorkspace(1)
+    const hub = new OrchestrationStreamHub()
+    const budget = new LiveStreamBudget()
+    const batches = hub.subscribe(budget)
+    const sessionId = workspace.sessionIds[0]!
+    try {
+      hub.publish(workspace.commit([assistantDeltaEvent(sessionId, 'delivered')]))
+      hub.publish(workspace.commit([assistantDeltaEvent(sessionId, 'queued')]))
+      await batches.next()
+      expect(budget.usage.items).toBe(2)
+
+      await batches.return(undefined)
+
+      expect(hub.subscriberCount).toBe(0)
+      expect(budget.usage.items).toBe(1)
+    } finally {
+      budget.dispose()
+      workspace.close()
+    }
+  })
+})

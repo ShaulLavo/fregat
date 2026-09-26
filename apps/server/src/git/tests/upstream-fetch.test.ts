@@ -1,6 +1,11 @@
+import { mkdir, mkdtemp, rename, rm, symlink } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { runGit } from '../../testing/git'
 import { FsError } from '../../fs/errors'
+import { gitCommonDirectory } from '../repository-lane'
 import { parseUpstreamRemote, UpstreamFetchScheduler } from '../upstream-fetch'
 
 const STATUS_WITH_UPSTREAM = statusOutput('origin/main')
@@ -70,6 +75,38 @@ describe('UpstreamFetchScheduler', () => {
     expect(fetches).toEqual(['/repo'])
   })
 
+  // GitService schedules with `rev-parse --show-toplevel` roots, which are already real, so a
+  // symlinked root only reaches the scheduler directly.
+  it('shares one fetch budget between a symlinked root and its target', async () => {
+    const base = await mkdtemp(path.join(tmpdir(), 'platform-upstream-fetch-'))
+    try {
+      const root = path.join(base, 'repo')
+      const link = path.join(base, 'link')
+      await mkdir(root)
+      await runGit(root, ['init', '-b', 'main'])
+      await symlink(root, link)
+      const fetches: string[] = []
+      const scheduler = new UpstreamFetchScheduler({
+        resolveCommonDir: (rootAbsolutePath) =>
+          gitCommonDirectory({
+            rootAbsolutePath,
+            run: async (args) => ({
+              stdout: (await runGit(rootAbsolutePath, args)).stdout.trimEnd(),
+            }),
+          }),
+        runFetch: async (fetchRoot) => {
+          fetches.push(fetchRoot)
+        },
+      })
+
+      await scheduler.schedule(root, STATUS_WITH_UPSTREAM)
+      await scheduler.schedule(link, STATUS_WITH_UPSTREAM)
+      expect(fetches).toEqual([root])
+    } finally {
+      await rm(base, { recursive: true, force: true })
+    }
+  })
+
   it('keeps separate budgets for distinct common dirs and remotes', async () => {
     const fetches: string[] = []
     const scheduler = testScheduler(async (root, remote) => {
@@ -111,9 +148,87 @@ describe('UpstreamFetchScheduler', () => {
     expect(attempts).toBe(3)
   })
 
+  it('shares concurrent resolution and retries a failed lookup on the next request', async () => {
+    vi.useRealTimers()
+    const resolveCommonDir = vi
+      .fn(async () => '/common')
+      .mockRejectedValueOnce(new Error('fixture failure'))
+    const runFetch = vi.fn(async () => {})
+    const scheduler = new UpstreamFetchScheduler({
+      repositoryIdentity: async () => ['fixture'],
+      resolveCommonDir,
+      runFetch,
+    })
+    await Promise.all([
+      scheduler.schedule('/repo', STATUS_WITH_UPSTREAM),
+      scheduler.schedule('/repo', STATUS_WITH_UPSTREAM),
+    ])
+    expect(resolveCommonDir).toHaveBeenCalledTimes(1)
+    expect(runFetch).not.toHaveBeenCalled()
+    await Promise.all([
+      scheduler.schedule('/repo', STATUS_WITH_UPSTREAM),
+      scheduler.schedule('/repo', STATUS_WITH_UPSTREAM),
+    ])
+    expect(resolveCommonDir).toHaveBeenCalledTimes(2)
+    expect(runFetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('fetches repositories with external Git metadata and rechecks their location', async () => {
+    const base = await mkdtemp(path.join(tmpdir(), 'platform-upstream-external-'))
+    const root = path.join(base, 'checkout')
+    const firstGit = path.join(base, 'first.git')
+    const secondGit = path.join(base, 'second.git')
+    try {
+      await mkdir(root)
+      await runGit(base, ['init', '--bare', firstGit])
+      await runGit(base, ['init', '--bare', secondGit])
+      await runGit(base, ['--git-dir', firstGit, 'config', 'core.worktree', root])
+      await runGit(base, ['--git-dir', secondGit, 'config', 'core.worktree', root])
+      let gitDir = firstGit
+      const resolveCommonDir = vi.fn((rootAbsolutePath: string) =>
+        gitCommonDirectory({
+          rootAbsolutePath,
+          run: async (args) => ({
+            stdout: (await runGit(root, ['--git-dir', gitDir, ...args])).stdout.trimEnd(),
+          }),
+        }),
+      )
+      const runFetch = vi.fn(async () => {})
+      const scheduler = new UpstreamFetchScheduler({ resolveCommonDir, runFetch })
+      await scheduler.schedule(root, STATUS_WITH_UPSTREAM)
+      expect(runFetch).toHaveBeenCalledTimes(1)
+      gitDir = secondGit
+      await scheduler.schedule(root, STATUS_WITH_UPSTREAM)
+      expect(resolveCommonDir).toHaveBeenCalledTimes(2)
+      expect(runFetch).toHaveBeenCalledTimes(2)
+    } finally {
+      await rm(base, { recursive: true, force: true })
+    }
+  })
+
+  it('resolves a replacement repository at the same path without reusing the old lookup', async () => {
+    const base = await mkdtemp(path.join(tmpdir(), 'platform-upstream-replaced-'))
+    const root = path.join(base, 'repo')
+    const resolveCommonDir = vi.fn(async () => path.join(root, '.git'))
+    const scheduler = new UpstreamFetchScheduler({ resolveCommonDir, runFetch: async () => {} })
+    try {
+      await mkdir(path.join(root, '.git'), { recursive: true })
+      await scheduler.schedule(root, STATUS_WITH_UPSTREAM)
+      await scheduler.schedule(root, STATUS_WITH_UPSTREAM)
+      expect(resolveCommonDir).toHaveBeenCalledTimes(1)
+      await rename(root, path.join(base, 'previous'))
+      await mkdir(path.join(root, '.git'), { recursive: true })
+      await scheduler.schedule(root, STATUS_WITH_UPSTREAM)
+      expect(resolveCommonDir).toHaveBeenCalledTimes(2)
+    } finally {
+      await rm(base, { recursive: true, force: true })
+    }
+  })
+
   it('skips fetching when the common dir cannot be resolved', async () => {
     const fetches: string[] = []
     const scheduler = new UpstreamFetchScheduler({
+      repositoryIdentity: async () => ['fixture'],
       resolveCommonDir: async () => {
         throw new FsError('GIT_COMMAND_FAILED', 'not a repository')
       },
@@ -138,6 +253,7 @@ function testScheduler(
   options: { commonDirByRoot?: Record<string, string> } = {},
 ) {
   return new UpstreamFetchScheduler({
+    repositoryIdentity: async (root) => [root],
     resolveCommonDir: async (rootAbsolutePath) =>
       options.commonDirByRoot?.[rootAbsolutePath] ?? `${rootAbsolutePath}/.git`,
     runFetch,

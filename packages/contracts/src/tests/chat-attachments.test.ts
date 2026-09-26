@@ -110,3 +110,7 @@ describe('chat attachment blob urls', () => {
     expect(chatAttachmentExtension('application/pdf')).toBeNull()
   })
 })
+
+it('normalizes JPEG aliases and MIME parameters before choosing a blob extension', () => {
+  expect(chatAttachmentExtension(' IMAGE/JPG; charset=binary ')).toBe('.jpg')
+})

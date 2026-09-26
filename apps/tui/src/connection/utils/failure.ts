@@ -1,21 +1,16 @@
 import { errorStringField, TUI_CLIENT_ORIGIN } from '@workspace/contracts'
-import { isRecord } from '@workspace/utils/objects'
+import { rpcErrorPayload } from '@workspace/client-core/transport/rpc-error'
 
 export type ConnectionFailure = ReturnType<typeof connectionFailure>
 
 export function connectionFailure(error: unknown) {
-  const detail = failureDetails(error)
+  const detail = rpcErrorPayload(error)
   const code = errorStringField(detail, 'code') ?? 'TUI_CONNECTION_FAILED'
   return {
     message: errorStringField(detail, 'message') ?? 'Could not reach the Platform server.',
     fix: errorStringField(detail, 'fix') ?? failureFix(code),
     code,
   }
-}
-
-function failureDetails(error: unknown): unknown {
-  if (!isRecord(error) || !isRecord(error.value)) return error
-  return isRecord(error.value.error) ? error.value.error : error.value
 }
 
 function failureFix(code: string) {

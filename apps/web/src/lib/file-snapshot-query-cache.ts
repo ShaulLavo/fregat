@@ -54,12 +54,26 @@ export function setFileSnapshotQueryData(
   pruneFileSnapshotQueryCache(queryClient)
 }
 
+/** Removes the old entry before writing the new one, so a move never overfills the cache cap. */
+export function moveFileSnapshotQueryData(
+  queryClient: QueryClient,
+  from: FilesystemPath,
+  to: FilesystemPath,
+) {
+  const queryKey = fileSystemKeys.fileSnapshot(from)
+  const file = queryClient.getQueryData<FileResult>(queryKey)
+  queryClient.removeQueries({ exact: true, queryKey })
+  if (!file) return
+
+  setFileSnapshotQueryData(queryClient, { ...file, path: to })
+}
+
 export function ensureFileSnapshotQuery(
   queryClient: QueryClient,
   path: FilesystemPath,
   config: FileSnapshotQueryConfig = {},
 ) {
-  return queryClient.fetchQuery(fileSnapshotQueryOptions(path, config))
+  return queryClient.query(fileSnapshotQueryOptions(path, config))
 }
 
 export function installFileSnapshotQueryCachePolicy(queryClient: QueryClient) {

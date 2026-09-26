@@ -17,7 +17,7 @@ import { useCloneRepositoryMutation } from '@/features/git/hooks/use-clone-repos
 import type { CloneProgress } from '@/features/git/utils/api'
 import { cloneDestination } from '@/features/git/utils/clone-destination'
 import { cloneProgressLabel } from '@/features/git/utils/clone-progress-label'
-import { errorMessage } from '@/lib/file-server'
+import { clientErrorMessage } from '@/lib/client-error-taxonomy'
 
 /** Clones a repository into a new folder and opens it as a project. */
 export function CloneRepositoryDialog({
@@ -113,7 +113,7 @@ export function CloneRepositoryDialog({
             </p>
           ) : null}
           {clone.error && !cancel?.signal.aborted ? (
-            <InlineError message={errorMessage(clone.error)} title='Clone repository' />
+            <InlineError message={clientErrorMessage(clone.error)} title='Clone repository' />
           ) : null}
           <DialogFooter>
             <Button type='button' variant='outline' onClick={() => close(false)}>

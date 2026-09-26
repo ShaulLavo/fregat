@@ -1,3 +1,4 @@
+import type { FragmentInstance } from 'react'
 import type { TabStripScrollBounds } from '@/features/workbench/utils/tab-strip-scroll'
 
 const TAB_SELECTOR = '[data-editor-tab-id]'
@@ -9,6 +10,7 @@ type TabStripGeometry = Omit<TabStripScrollBounds, 'gutter'>
 export type TabStripMetrics = {
   /** The store's tab order, noted in the commit that renders it. A new order voids the cache. */
   noteTabs(key: string): void
+  observeTabs(fragment: FragmentInstance): void
   /** Content-space bounds for a tab, or null when the cache cannot prove it is current. */
   boundsFor(tabId: string): TabStripGeometry | null
   /** The same bounds, measured. The fallback for a strip the cache cannot vouch for. */
@@ -18,26 +20,17 @@ export type TabStripMetrics = {
   dispose(): void
 }
 
-/**
- * Tab offsets kept outside the render, so revealing the active tab is arithmetic instead of a pair
- * of `getBoundingClientRect` calls. Those ran in a layout effect, right after React had rewritten
- * the editor beneath them, and forced a full layout 36 times in a 22s profile — almost always to
- * conclude the tab was already visible.
- *
- * Everything is in the strip's content space, and the window is reported at the offset the strip is
- * *heading* for. A reveal animates, so asking whether a tab is visible where the strip happens to
- * be mid-flight would let a switch decide to do nothing and then be carried somewhere the tab is
- * not. Measurements are taken from observer callbacks, which run after layout, so they are free.
- */
+// Cache content-space bounds. During smooth scrolling, the target offset owns visibility.
 export function createTabStripMetrics(strip: HTMLElement): TabStripMetrics {
   const offsets = new Map<string, { left: number; width: number }>()
-  const observed = new Set<Element>()
+  let tabs: FragmentInstance | null = null
   let scrollLeft = strip.scrollLeft
   let clientWidth = strip.clientWidth
   // The order the store last announced, and the order the cache last measured under.
   let tabsKey = ''
   let measuredKey = ''
   let pendingTarget: number | null = null
+  let layoutFrame: number | null = null
 
   const readLayout = (): void => {
     const stripBox = strip.getBoundingClientRect()
@@ -45,34 +38,14 @@ export function createTabStripMetrics(strip: HTMLElement): TabStripMetrics {
     scrollLeft = strip.scrollLeft
     offsets.clear()
 
-    const present = new Set<Element>()
     for (const element of strip.querySelectorAll<HTMLElement>(TAB_SELECTOR)) {
       const id = element.dataset.editorTabId
       if (!id) continue
 
-      present.add(element)
       offsets.set(id, contentBox(element.getBoundingClientRect(), stripBox, scrollLeft))
     }
 
     measuredKey = tabsKey
-    syncObserved(present)
-  }
-
-  // Each tab is watched too: a rename changes a width without changing the strip's own box, and a
-  // width the cache has not caught up with would reveal the tab to the wrong offset.
-  const syncObserved = (present: Set<Element>): void => {
-    for (const element of observed) {
-      if (present.has(element)) continue
-
-      resize.unobserve(element)
-      observed.delete(element)
-    }
-    for (const element of present) {
-      if (observed.has(element)) continue
-
-      resize.observe(element)
-      observed.add(element)
-    }
   }
 
   const onScroll = (): void => {
@@ -91,9 +64,7 @@ export function createTabStripMetrics(strip: HTMLElement): TabStripMetrics {
   }
 
   const resize = new ResizeObserver(readLayout)
-  const mutations = new MutationObserver(readLayout)
   resize.observe(strip)
-  mutations.observe(strip, { childList: true, subtree: true })
   strip.addEventListener('scroll', onScroll, { passive: true })
   strip.addEventListener('scrollend', abandonTarget)
   strip.addEventListener('wheel', abandonTarget, { passive: true })
@@ -101,8 +72,20 @@ export function createTabStripMetrics(strip: HTMLElement): TabStripMetrics {
   readLayout()
 
   return {
+    observeTabs: (fragment) => {
+      tabs?.unobserveUsing(resize)
+      tabs = fragment
+      fragment.observeUsing(resize)
+    },
     noteTabs: (key) => {
+      if (tabsKey === key) return
       tabsKey = key
+      // Reordering equal-width children changes positions without a resize notification.
+      if (layoutFrame !== null) return
+      layoutFrame = requestAnimationFrame(() => {
+        layoutFrame = null
+        readLayout()
+      })
     },
     boundsFor: (tabId) => {
       // Observers measure after the commit's layout effects, so a tab added, removed or dragged in
@@ -140,9 +123,10 @@ export function createTabStripMetrics(strip: HTMLElement): TabStripMetrics {
       pendingTarget = value
     },
     dispose: () => {
+      if (layoutFrame !== null) cancelAnimationFrame(layoutFrame)
       resize.disconnect()
-      mutations.disconnect()
-      observed.clear()
+      tabs?.unobserveUsing(resize)
+      tabs = null
       strip.removeEventListener('scroll', onScroll)
       strip.removeEventListener('scrollend', abandonTarget)
       strip.removeEventListener('wheel', abandonTarget)

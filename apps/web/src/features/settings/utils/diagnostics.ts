@@ -1,3 +1,4 @@
+import { settingsDiagnosticLabel } from '@workspace/client-core/settings/humanize'
 import { offsetToLspPosition } from '@singapore-editor/lsp/positions'
 import { type lsp } from '@singapore-editor/lsp'
 import type {
@@ -10,14 +11,6 @@ import type {
 
 const ERROR = 1
 const WARNING = 2
-
-const DIAGNOSTIC_LABELS: Record<SettingsDiagnostic['kind'], string> = {
-  'invalid-value': 'invalid value',
-  'scope-not-allowed': 'not allowed in this scope',
-  'unknown-key': 'unknown setting',
-  migrated: 'moved to a new setting',
-  'removed-key': 'no longer a setting',
-}
 
 /**
  * A migrated key is not a mistake the user made, so it does not get a warning
@@ -73,7 +66,7 @@ function settingsValueDiagnostic(
 
   return {
     code: diagnostic.kind,
-    message: `${diagnostic.id} — ${DIAGNOSTIC_LABELS[diagnostic.kind]}${detail}`,
+    message: `${diagnostic.id} — ${settingsDiagnosticLabel(diagnostic.kind)}${detail}`,
     range: lspRange(text, range),
     severity: SEVERITIES[diagnostic.kind],
     source: 'settings',

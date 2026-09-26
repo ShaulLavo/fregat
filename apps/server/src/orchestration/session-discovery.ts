@@ -1,5 +1,5 @@
 import { realpath } from 'node:fs/promises'
-import path from 'node:path'
+import { isSameOrDescendant } from '../fs/path'
 import {
   commandIdSchema,
   type ModelSelection,
@@ -14,7 +14,7 @@ import { GitWorktreeService } from '../git/worktrees'
 import { DEFAULT_CLAUDE_MODEL } from '../provider/adapters/utils/claude-models'
 import type { ProviderService } from '../provider/provider-service'
 import type { ProviderDiscoveredSession, ProviderHistoryMessage } from '../provider/types'
-import { errorSummary } from '../observability/logging'
+import { operatorErrorSummary } from '../observability/logging'
 import { isEvlogError } from '../observability/structured-errors'
 import { recordChatPipelineInfo, recordChatPipelineWarning } from './orchestration-logging'
 import type { OrchestrationReadModel, OrchestrationProjectedWorktree } from './read-model'
@@ -352,7 +352,8 @@ export class SessionDiscoveryReconciler {
     const model = this.options.getReadModel()
     const candidates = [...model.worktrees.values()]
       .filter(
-        (worktree) => !worktree.retiredAt && containsPath(worktree.canonicalPath, canonicalCwd),
+        (worktree) =>
+          !worktree.retiredAt && isSameOrDescendant(worktree.canonicalPath, canonicalCwd),
       )
       .sort((left, right) => right.canonicalPath.length - left.canonicalPath.length)
     const candidate = candidates[0]
@@ -470,22 +471,14 @@ function recordScanFailure(
 
 function discoveryErrorDetails(error: unknown) {
   return {
-    ...errorSummary(error),
+    ...operatorErrorSummary(error),
     ...(isEvlogError(error) ? { internal: error.internal } : {}),
-    ...(error instanceof Error && error.cause ? { cause: errorSummary(error.cause) } : {}),
+    ...(error instanceof Error && error.cause ? { cause: operatorErrorSummary(error.cause) } : {}),
   }
 }
 
 function commandId(kind: string, ...parts: readonly (string | number)[]) {
   return v.parse(commandIdSchema, internalCommandKey(kind, ...parts))
-}
-
-function containsPath(root: string, candidate: string) {
-  const relative = path.relative(root, candidate)
-  return (
-    relative === '' ||
-    (!relative.startsWith(`..${path.sep}`) && relative !== '..' && !path.isAbsolute(relative))
-  )
 }
 
 function discoveryModel(

@@ -1,3 +1,5 @@
+import { prefersReducedMotion } from './wallpaper'
+
 export type TabStripScrollBounds = {
   /** Breathing room kept between a revealed tab and the strip edge. */
   readonly gutter: number
@@ -26,4 +28,12 @@ export function tabStripScrollLeft(bounds: TabStripScrollBounds): number | null 
   if (clippedRight > 0) return bounds.scrollLeft + clippedRight
 
   return null
+}
+
+export function scrollGutter(strip: HTMLElement): number {
+  return Number.parseFloat(getComputedStyle(strip).scrollPaddingInlineStart) || 0
+}
+
+export function revealBehavior(): ScrollBehavior {
+  return prefersReducedMotion() ? 'auto' : 'smooth'
 }

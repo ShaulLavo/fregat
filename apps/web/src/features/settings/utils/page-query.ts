@@ -6,6 +6,7 @@ export const settingsPageQueryOptions = queryOptions({
   queryKey: settingsQueryKeys.pageModule,
   queryFn: () => import('@/features/settings/components/page'),
   staleTime: 'static',
+  structuralSharing: false,
   gcTime: Infinity,
   // The browser may already have the chunk while offline.
   networkMode: 'always',

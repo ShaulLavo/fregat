@@ -1,16 +1,25 @@
+import { vi } from 'vitest'
 import { render } from '@testing-library/react'
-import { StrictMode } from 'react'
+import { Fragment, StrictMode } from 'react'
 
 import { useActiveTabStripScroll } from '@/features/workbench/hooks/use-active-tab-strip-scroll'
 import { expect, test } from '../../../../test/fixtures'
 
-function Strip({ activeTabId }: { activeTabId: string | null }) {
-  const stripRef = useActiveTabStripScroll(activeTabId, ['a', 'b'])
-
+function Strip({
+  activeTabId,
+  tabIds = ['a', 'b'],
+}: {
+  activeTabId: string | null
+  tabIds?: readonly string[]
+}) {
+  const { setStripRef, tabsRef } = useActiveTabStripScroll(activeTabId, tabIds)
   return (
-    <div ref={stripRef}>
-      <button data-editor-tab-id='a' type='button' />
-      <button data-editor-tab-id='b' type='button' />
+    <div ref={setStripRef}>
+      <Fragment ref={tabsRef}>
+        {tabIds.map((id) => (
+          <button key={id} data-editor-tab-id={id} type='button' />
+        ))}
+      </Fragment>
     </div>
   )
 }
@@ -184,4 +193,20 @@ test('missing matchMedia keeps the shared default of allowing motion', () => {
     restoreMotion()
     restoreRects()
   }
+})
+
+test('Fragment observation follows tabs added and removed without watching their descendants', () => {
+  const observe = vi.spyOn(ResizeObserver.prototype, 'observe')
+  const unobserve = vi.spyOn(ResizeObserver.prototype, 'unobserve')
+  const view = render(<Strip activeTabId='a' tabIds={['a']} />)
+  const first = view.container.querySelector('[data-editor-tab-id="a"]')
+  expect(observe).toHaveBeenCalledWith(first)
+  view.rerender(<Strip activeTabId='a' tabIds={['a', 'b']} />)
+  const second = view.container.querySelector('[data-editor-tab-id="b"]')
+  expect(observe).toHaveBeenCalledWith(second)
+  view.rerender(<Strip activeTabId='a' tabIds={['a']} />)
+  expect(unobserve).toHaveBeenCalledWith(second)
+  view.unmount()
+  observe.mockRestore()
+  unobserve.mockRestore()
 })

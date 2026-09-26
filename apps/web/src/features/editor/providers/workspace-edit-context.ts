@@ -6,7 +6,7 @@ import {
 import { createContext, use } from 'react'
 
 import type { WorkspaceEditService } from '@/features/editor/state/workspace-edit-service'
-import { clientErrors } from '@/lib/structured-errors'
+import { requireContext } from '@/lib/require-context'
 
 const unsupportedWorkspaceEditResult: ApplyWorkspaceEditResult = {
   code: 'workspace-edit-host-unavailable',
@@ -46,10 +46,8 @@ export function useWorkspaceDocumentSyncController(): LanguageServerDocumentSync
 
 export function useWorkspaceEditService(): WorkspaceEditService {
   const service = use(WorkspaceEditServiceContext)
-  if (service) return service
-  throw clientErrors.CONTEXT_MISSING({
-    message: 'useWorkspaceEditService must be used within WorkspaceEditProvider',
-  })
+  requireContext(service, 'useWorkspaceEditService must be used within WorkspaceEditProvider')
+  return service
 }
 
 export function useOptionalWorkspaceEditService(): WorkspaceEditService | null {

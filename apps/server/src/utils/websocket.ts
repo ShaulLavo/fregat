@@ -12,6 +12,20 @@ export function adaptWebSocket(value: unknown) {
   }
 }
 
+/** Elysia's parsed `query` first, then the upgrade URL; a malformed URL reads as absent. */
+export function webSocketQueryValue(data: unknown, key: string): string | null {
+  if (!isRecord(data)) return null
+  const parsed = isRecord(data.query) ? data.query[key] : undefined
+  if (typeof parsed === 'string') return parsed
+  if (typeof data.url !== 'string') return null
+
+  try {
+    return new URL(data.url).searchParams.get(key)
+  } catch {
+    return null
+  }
+}
+
 /** 1000 normal, 1001 going away, 1005 no code given: the closes a healthy client makes. */
 const ORDINARY_CLOSE_CODES = new Set([1000, 1001, 1005])
 

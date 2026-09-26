@@ -5,7 +5,7 @@ import { CommandProvider } from '@/commands/providers/command-provider'
 import { Workspace } from '@/components/workspace'
 import { connectionFailure } from '@/connection/utils/failure'
 import type { SessionState, SettingsSession } from '@/connection/state/session'
-import { recordRecentCommand } from '@/storage/recents'
+import { recentCommands } from '@/storage/recent-commands-policy'
 import type { Theme } from '@/theme/utils/theme'
 import { useSettingValue } from '@/settings/hooks/use-setting-value'
 import { useRenderer } from '@opentui/react'
@@ -50,7 +50,7 @@ export function Foundation({
       handlers={{}}
       overrides={overrides}
       kitty={renderer.capabilities?.kitty_keyboard ?? false}
-      onExecuted={(id) => recordRecentCommand(state.storage, id)}
+      onExecuted={(id) => recentCommands.record(state.storage, id)}
       onError={(error) => {
         const reason = connectionFailure(error)
         setFailure(reason.message)

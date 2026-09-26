@@ -1,5 +1,6 @@
 import { errorNumberField, type WatchServerMessage } from '@workspace/contracts'
 import { parseEdenSseStream } from '@workspace/client-core/transport/eden'
+import { transportErrors } from '@workspace/client-core/transport/structured-errors'
 import { rpcErrorPayload } from '@workspace/client-core/transport/rpc-error'
 import type { Client } from '@/lib/client'
 import { clientErrors } from '@/lib/structured-errors'
@@ -26,7 +27,7 @@ export async function streamWorkspaceEvents(
       internal: { scope, fileCount: files.length, httpStatus: response.status },
     })
   if (!response.data)
-    throw clientErrors.EDEN_STREAM_MISSING({
+    throw transportErrors.EDEN_STREAM_MISSING({
       label: 'File watcher',
       internal: { scope, fileCount: files.length },
     })

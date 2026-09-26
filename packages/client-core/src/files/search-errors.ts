@@ -1,12 +1,6 @@
 import { defineErrorCatalog } from 'evlog'
 
-export const clientErrors = defineErrorCatalog('client', {
-  EDEN_STREAM_MISSING: {
-    status: 502,
-    message: ({ label }: { label: string }) => `${label} response did not include a stream.`,
-    why: 'The RPC call succeeded without the SSE body required by the caller.',
-    fix: 'Verify the server route returns an event stream for this request.',
-  },
+export const searchErrors = defineErrorCatalog('search', {
   SEARCH_EVENT_ERROR: {
     status: 502,
     message: ({ message }: { message: string }) => message,

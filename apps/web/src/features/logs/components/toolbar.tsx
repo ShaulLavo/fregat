@@ -1,7 +1,8 @@
 import type { LogDashboardBreakdownItem, LogDashboardLevel } from '@workspace/contracts'
 import { MagnifyingGlassIcon } from '@phosphor-icons/react'
 
-import type { LogsFilterState, LogTimeRange } from '@/features/logs/utils/filter-params'
+import type { LogsFilterState } from '@workspace/client-core/logs/filters'
+import type { LogTimeRange } from '@workspace/contracts'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@workspace/ui/components/input-group'
 import { PaneBar } from '@workspace/ui/components/pane-bar'
 import {

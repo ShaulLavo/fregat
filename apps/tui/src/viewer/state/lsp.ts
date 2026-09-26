@@ -6,10 +6,10 @@ import { createRpcError } from '@workspace/client-core/transport/rpc-error'
 import { readServerPaths } from '@workspace/client-core/files/read'
 import { LSP_SERVER_EXITED } from '@workspace/contracts'
 import type { SettingsSession } from '@/connection/state/session'
-import type { ServiceSocket } from '@/connection/utils/service-socket'
+import type { ServerSocket } from '@workspace/client-core/transport/socket'
 import { connectionFailure } from '@/connection/utils/failure'
 import { createTuiError } from '@/host/utils/structured-errors'
-import { lspLanguageForPath } from '@/viewer/utils/language'
+import { languageIdForFilePath, lspLanguageIdForPath } from '@workspace/client-core/files/language'
 import {
   diagnosticsSchema,
   definitionLocations,
@@ -33,7 +33,7 @@ export function createViewerLsp({
 }) {
   const lifetime = new AbortController()
   const signal = AbortSignal.any([lifetime.signal, session.signal])
-  let socket: ServiceSocket | null = null
+  let socket: ServerSocket | null = null
   let workspaceRoot = ''
   let uri = ''
   const publish = (
@@ -63,6 +63,9 @@ export function createViewerLsp({
   })
   async function connect() {
     publish('loading')
+    // Same fallback as the web editor, so a server-matched override extension still connects.
+    const languageId =
+      lspLanguageIdForPath(filePath) ?? languageIdForFilePath(filePath) ?? 'plaintext'
     const [paths, matches] = await Promise.all([
       readServerPaths({ client: session.client, signal }),
       session.client.lsp.match.get({
@@ -101,7 +104,7 @@ export function createViewerLsp({
     signal.throwIfAborted()
     publish('ready')
     await client.notify('textDocument/didOpen', {
-      textDocument: { uri, languageId: lspLanguageForPath(filePath), version: 1, text: content },
+      textDocument: { uri, languageId, version: 1, text: content },
     })
     session.record({
       area: 'tui.viewer.lsp',
@@ -150,7 +153,7 @@ export function createViewerLsp({
   }
 }
 
-function createSocketTransport(socket: ServiceSocket) {
+function createSocketTransport(socket: ServerSocket) {
   const listeners = new Set<LspTransportHandler>()
   socket.addEventListener('message', (event) => {
     if (typeof event.data !== 'string') return
@@ -167,7 +170,7 @@ function createSocketTransport(socket: ServiceSocket) {
   }
 }
 
-function socketReady(socket: ServiceSocket, signal: AbortSignal) {
+function socketReady(socket: ServerSocket, signal: AbortSignal) {
   if (socket.readyState === 1) return Promise.resolve()
   return new Promise<void>((resolve, reject) => {
     const cleanup = () => {

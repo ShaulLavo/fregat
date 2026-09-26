@@ -37,6 +37,10 @@ test('a top-level file row hosts new entries at the pane root', () => {
   expect(containerTreePath('a.ts', false)).toBe('')
 })
 
+test('a directory path with a trailing slash groups under its parent', () => {
+  expect(containerTreePath('src/lib/', false)).toBe('src')
+})
+
 test('a new file placeholder lands inside the container', () => {
   expect(
     newEntryTreePath({ containerPath: 'src', existingPaths: new Set(), isFolder: false }),
@@ -100,4 +104,9 @@ test('names come from the last segment, slash or not', () => {
   expect(entryName('src/lib/a.ts')).toBe('a.ts')
   expect(entryName('src/lib/')).toBe('lib')
   expect(entryName('a.ts')).toBe('a.ts')
+})
+
+test('an empty path has no name, and doubled slashes collapse', () => {
+  expect(entryName('')).toBe('')
+  expect(entryName('src//lib//')).toBe('lib')
 })

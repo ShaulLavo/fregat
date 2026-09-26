@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterAll, afterEach, beforeAll, expect, test } from 'vitest'
 import { closeTestApps } from '../../../test/server'
-import { executeGit } from '../../../test/factories/orchestration'
+import { runGit } from '../../testing/git'
 import {
   lifecycleWorktreeId,
   worktreeLifecycleFixture,
@@ -31,18 +31,20 @@ afterEach(async () => {
 async function repository(files: Record<string, string>) {
   const root = await mkdtemp(path.join(tmpdir(), 'platform-submodule-'))
   scratch.push(root)
-  await executeGit(root, 'init', '-b', 'main')
-  await executeGit(root, 'config', 'user.name', 'Submodule Test')
-  await executeGit(root, 'config', 'user.email', 'submodule@example.invalid')
+  await runGit(root, ['init', '-b', 'main'], { cwdMode: 'option' })
+  await runGit(root, ['config', 'user.name', 'Submodule Test'], { cwdMode: 'option' })
+  await runGit(root, ['config', 'user.email', 'submodule@example.invalid'], { cwdMode: 'option' })
   for (const [name, text] of Object.entries(files)) await writeFile(path.join(root, name), text)
-  await executeGit(root, 'add', '.')
-  await executeGit(root, 'commit', '-m', 'initial')
+  await runGit(root, ['add', '.'], { cwdMode: 'option' })
+  await runGit(root, ['commit', '-m', 'initial'], { cwdMode: 'option' })
   return root
 }
 
 async function addSubmodule(root: string, url: string, name: string) {
-  await executeGit(root, '-c', 'protocol.file.allow=always', 'submodule', 'add', url, name)
-  await executeGit(root, 'commit', '-m', `add ${name}`)
+  await runGit(root, ['-c', 'protocol.file.allow=always', 'submodule', 'add', url, name], {
+    cwdMode: 'option',
+  })
+  await runGit(root, ['commit', '-m', `add ${name}`], { cwdMode: 'option' })
 }
 
 /** Root → middle → leaf, so recursive and top-level produce different trees. */
@@ -120,13 +122,11 @@ test('none leaves submodules empty, and status offers them for an explicit init'
 
 test('a failed submodule clone keeps the worktree and reports the empty submodule', async () => {
   const fixture = await nestedFixture()
-  const middle = await executeGit(
-    fixture.root,
-    'config',
-    '--file',
-    '.gitmodules',
-    'submodule.middle.url',
-  )
+  const middle = (
+    await runGit(fixture.root, ['config', '--file', '.gitmodules', 'submodule.middle.url'], {
+      cwdMode: 'option',
+    })
+  ).stdout.trim()
   await rm(middle, { recursive: true, force: true })
   const worktree = await fixture.create()
   expect(worktree.lifecycle.state).toBe('ready')

@@ -258,3 +258,15 @@ function match({
     type: 'file',
   }
 }
+
+it('expands named groups, surrounding text and unmatched captures in web replacements', () => {
+  const plan = workspaceSearchReplacePlan({
+    matches: [match({ column: 8, endColumn: 10, line: 1 })],
+    query: { ...QUERY, matchMode: 'regex', query: '(?<first>a)(x)?b' },
+    replaceText: "$<first>/$2/$`/$'/$0",
+    text: 'before ab after',
+  })
+  expect(applyWorkspaceSearchReplaceEdits('before ab after', plan.edits)).toBe(
+    'before a//before / after/ab after',
+  )
+})

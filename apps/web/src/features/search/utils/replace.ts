@@ -1,3 +1,4 @@
+import { expandRegexReplacement } from '@workspace/client-core/files/search-replace'
 import { isWholeWordMatch } from '@workspace/contracts'
 import { textSnapshotLineRange } from '@/features/editor/utils/text-snapshot'
 import type { TextEdit, TextSnapshot } from '@singapore-editor/core/document'
@@ -31,7 +32,7 @@ type TextLineRange = {
 type SearchReplaceText = string | TextSnapshot
 
 type ReplacementMatch = {
-  captures: readonly string[] | null
+  captures: RegExpExecArray | null
   from: number
   to: number
 }
@@ -169,7 +170,7 @@ function regexReplacementMatch(
     if (!isExactRegexMatch(match, from, to)) continue
     if (!isWholeWordMatch(line, from, to, query.wholeWord)) return null
 
-    return { captures: Array.from(match), from, to }
+    return { captures: match, from, to }
   }
 
   return null
@@ -178,76 +179,11 @@ function regexReplacementMatch(
 function searchReplacementText(
   query: WorkspaceSearchReplaceQuery,
   replaceText: string,
-  captures: readonly string[] | null,
+  captures: RegExpExecArray | null,
 ) {
   if (query.matchMode !== 'regex') return replaceText
 
-  return regexReplacementText(replaceText, captures)
-}
-
-function regexReplacementText(replaceText: string, captures: readonly string[] | null) {
-  let result = ''
-
-  for (let index = 0; index < replaceText.length; index += 1) {
-    const escaped = replacementEscapeAt(replaceText, index)
-    if (escaped) {
-      result += escaped.value
-      index = escaped.nextIndex
-      continue
-    }
-
-    const capture = replacementCaptureAt(replaceText, index, captures)
-    if (capture) {
-      result += capture.value
-      index = capture.nextIndex
-      continue
-    }
-
-    result += replaceText[index]
-  }
-
-  return result
-}
-
-function replacementEscapeAt(source: string, index: number) {
-  if (source[index] !== '\\') return null
-
-  const next = source[index + 1]
-  if (next === 'n') return { nextIndex: index + 1, value: '\n' }
-  if (next === 't') return { nextIndex: index + 1, value: '\t' }
-  if (next === '\\') return { nextIndex: index + 1, value: '\\' }
-
-  return null
-}
-
-function replacementCaptureAt(source: string, index: number, captures: readonly string[] | null) {
-  if (source[index] !== '$') return null
-
-  const next = source[index + 1]
-  if (next === '$') return { nextIndex: index + 1, value: '$' }
-  if (next === '&' || next === '0') return { nextIndex: index + 1, value: captures?.[0] ?? '' }
-
-  return numberedReplacementCaptureAt(source, index, captures)
-}
-
-function numberedReplacementCaptureAt(
-  source: string,
-  index: number,
-  captures: readonly string[] | null,
-) {
-  const first = source[index + 1]
-  if (!first || !isDigit(first) || first === '0') return null
-
-  const second = source[index + 2]
-  const twoDigit = second && isDigit(second) ? Number(`${first}${second}`) : null
-  if (twoDigit !== null && captures?.[twoDigit] !== undefined) {
-    return { nextIndex: index + 2, value: captures[twoDigit] ?? '' }
-  }
-
-  const oneDigit = Number(first)
-  if (captures?.[oneDigit] === undefined) return null
-
-  return { nextIndex: index + 1, value: captures[oneDigit] ?? '' }
+  return captures ? expandRegexReplacement(replaceText, captures) : replaceText
 }
 
 function regexMatches(line: string, regex: RegExp) {
@@ -386,8 +322,4 @@ function compareEditsAscending(left: TextEdit, right: TextEdit) {
 
 function compareEditsDescending(left: TextEdit, right: TextEdit) {
   return right.from - left.from || right.to - left.to
-}
-
-function isDigit(value: string) {
-  return /^\d$/u.test(value)
 }

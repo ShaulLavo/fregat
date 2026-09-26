@@ -7,7 +7,7 @@ import {
 import { highlightCacheKey } from '@workspace/markdown/utils/highlight'
 import { diffLanguageDocuments } from '@/features/editor/utils/diff-documents'
 import { contentRevisionForText } from '@/features/editor/utils/text-snapshot'
-import { shikiThemeContentHash } from '@/features/editor/utils/theme-content-hash'
+import { shikiThemeContentHash } from '@/lib/code-theme/utils/content-hash'
 import { searchResultItems } from '@/features/search/utils/result-items'
 import { expect, test } from './fixtures'
 import { searchResultGroup } from './factories/search-results'

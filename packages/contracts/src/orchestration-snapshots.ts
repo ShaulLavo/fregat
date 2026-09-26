@@ -35,7 +35,8 @@ import {
 } from './orchestration-runtime'
 
 export const orchestrationProjectShellSchema = v.omit(orchestrationProjectSchema, ['deletedAt'])
-export const orchestrationWorktreeShellSchema = v.omit(orchestrationWorktreeSchema, ['retiredAt'])
+/** Carries `retiredAt` so a retired worktree reads `worktreeCreationCapability` the same on client and server. */
+export const orchestrationWorktreeShellSchema = orchestrationWorktreeSchema
 
 /**
  * The kernel of a plan, sized for a rail row: which step the session is on and

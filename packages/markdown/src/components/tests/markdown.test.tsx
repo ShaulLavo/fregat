@@ -1,4 +1,4 @@
-import { act, render, waitFor } from '@testing-library/react'
+import { act, cleanup, render, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, test } from 'vitest'
 
 import type { MarkdownCodeBlockProps } from '../../providers/render-context'
@@ -6,6 +6,7 @@ import { setMarkdownExtensionLoaders } from '../../state/extensions'
 import { Markdown } from '../markdown'
 
 afterEach(() => {
+  cleanup()
   setMarkdownExtensionLoaders(null)
 })
 

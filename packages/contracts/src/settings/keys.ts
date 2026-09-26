@@ -1,3 +1,4 @@
+import { LOG_TIME_RANGES } from '../log-dashboard'
 import { modelSelectionSchema } from '../orchestration-runtime'
 import { DEFAULT_CODEX_PROVIDER_SETTINGS } from '../provider'
 import { themeBundleSchema, themeCustomizationsSchema } from '../themes/bundle'
@@ -937,7 +938,7 @@ export const SETTINGS_REGISTRY = {
     keywords: ['chat', 'plan', 'mode', 'interaction'],
   }),
   'logs.defaultTimeRange': defineSetting({
-    schema: v.picklist(['15m', '1h', '6h', '24h', 'all'] as const),
+    schema: v.picklist(LOG_TIME_RANGES),
     default: '1h',
     scope: 'window',
     widget: 'enum',

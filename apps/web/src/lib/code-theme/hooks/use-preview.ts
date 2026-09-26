@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import type { TokensResult } from 'shiki/core'
-
-import { loadCodeThemePreview } from '@/lib/code-theme/state/preview'
+import { codeThemePreviewQueryOptions } from '@/lib/code-theme/state/preview'
+import { resourceQueryClient } from '@/lib/resources/state/query-client'
 
 type PreviewState =
   | { readonly themeId: string; readonly kind: 'loading' }
@@ -9,22 +9,8 @@ type PreviewState =
   | { readonly themeId: string; readonly kind: 'error' }
 
 export function useCodeThemePreview(themeId: string): PreviewState {
-  const [state, setState] = useState<PreviewState>({ kind: 'loading', themeId })
-
-  useEffect(() => {
-    let active = true
-    void loadCodeThemePreview(themeId).then(
-      (result) => {
-        if (active) setState({ kind: 'ready', result, themeId })
-      },
-      () => {
-        if (active) setState({ kind: 'error', themeId })
-      },
-    )
-    return () => {
-      active = false
-    }
-  }, [themeId])
-
-  return state.themeId === themeId ? state : { kind: 'loading', themeId }
+  const query = useQuery(codeThemePreviewQueryOptions(themeId), resourceQueryClient)
+  if (query.isPending) return { kind: 'loading', themeId }
+  if (query.isError) return { kind: 'error', themeId }
+  return { kind: 'ready', result: query.data, themeId }
 }

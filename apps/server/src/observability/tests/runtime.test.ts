@@ -16,6 +16,7 @@ import { createInProcessOrchestrationSocket } from '../../../test/orchestration-
 import { flushObservability, initializeObservability, resetObservabilityForTests } from '../runtime'
 import { settingsErrors } from '../../settings/structured-errors'
 import { testSettingsOptions, type TestSettingsOverrides } from '../../settings/testing'
+import { runGit } from '../../testing/git'
 import type { WebOptions } from '../../web/routes'
 
 const TRUSTED_ORIGIN = 'http://localhost:5173'
@@ -877,21 +878,6 @@ async function readLogText(logDir: string) {
 
 async function initGitRepository(root: string) {
   await runGit(root, ['init'])
-}
-
-async function runGit(root: string, args: readonly string[]) {
-  const process = Bun.spawn(['git', '-C', root].concat(args), {
-    stderr: 'pipe',
-    stdout: 'pipe',
-  })
-  const [stdout, stderr, exitCode] = await Promise.all([
-    new Response(process.stdout).text(),
-    new Response(process.stderr).text(),
-    process.exited,
-  ])
-  if (exitCode === 0) return { stderr, stdout }
-
-  throw new Error(`${stderr}${stdout}`.trim())
 }
 
 function delay(ms: number) {

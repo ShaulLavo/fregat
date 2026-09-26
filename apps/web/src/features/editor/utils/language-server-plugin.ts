@@ -1,9 +1,8 @@
-import { languageIdForFilePath } from '@/features/editor/utils/file-path'
+import { languageIdForFilePath } from '@/lib/file-language'
 import type { EditorTextBuffer } from '@singapore-editor/core/document'
 import { createLanguageServerDocument } from '@singapore-editor/lsp-plugin'
 import { createEditorLanguageServerStatusSource } from '@/features/editor/state/language-server-status-source'
 import type { LanguageServerDocuments } from '@/features/editor/state/language-server-documents'
-import { fileUriForPath } from '@/lib/file-uri'
 import type { LanguageServerDocumentSyncController } from '@singapore-editor/lsp-plugin/document-sync-controller'
 import type {
   LanguageServerDefinitionTarget,
@@ -22,6 +21,7 @@ import type {
 } from '@singapore-editor/lsp-plugin'
 import { createLanguageServerSetPlugin } from '@singapore-editor/lsp-plugin/websocket'
 import {
+  fileUriForPath,
   errorMessage,
   LSP_FEATURE_IDS,
   LSP_SEMANTIC_TOKENS_REFRESH,
@@ -31,7 +31,7 @@ import {
 
 import { languageServerConnectionProvider } from '@/features/editor/state/language-server-connection-pool'
 import type { EditorLanguageServerStatusSource } from '@/features/editor/state/language-server-status-source'
-import { lspLanguageIdForPath } from '@/features/editor/utils/lsp-language-id'
+import { lspLanguageIdForPath } from '@workspace/client-core/files/language'
 import { SemanticTokenController } from '@/features/editor/state/semantic-token-controller'
 import {
   LANGUAGE_SERVER_CLIENT_INFO,

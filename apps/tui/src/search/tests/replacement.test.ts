@@ -96,7 +96,7 @@ test.for([
   ['a', '(?<name>a)', '$<missing>/$<>'],
   ['a', '(a)', '$<missing>'],
   ['a', '(a)', '$<missing$1>'],
-  ['a', '(a)', '$10/$01/$0/$00'],
+  ['a', '(a)', '$10/$01/$00'],
   ['b', '(a)?b', '$12'],
   ['abcdefghij', '(a)(b)(c)(d)(e)(f)(g)(h)(i)(j)', '$10/$99/$09'],
   ['before ab after', '(a)(b)', "$`/$&/$'/$$/$2$1"],
@@ -206,4 +206,13 @@ test('prepared replacement retains its owner and inputs and submits only once', 
     read.release()
     await other.cleanup()
   }
+})
+
+test('expands escaped newlines, tabs, backslashes and the full-match zero alias', () => {
+  const result = replacementText(
+    'ab',
+    { ...query, query: '(a)(b)', matchMode: 'regex', wholeWord: false },
+    '$0\\n$2\\t$1\\\\',
+  )
+  expect(result.content).toBe('ab\nb\ta\\')
 })

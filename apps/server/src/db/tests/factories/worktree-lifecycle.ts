@@ -47,6 +47,7 @@ export function seedVersion11Worktrees(database: PlatformDatabase) {
         ownership: 'external',
         createdAt: DOMAIN_AT,
         updatedAt: DOMAIN_AT,
+        retiredAt: null,
       },
       6,
     ),

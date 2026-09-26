@@ -1,4 +1,4 @@
-import { deepStrictEqual } from 'node:assert/strict'
+import { deepStrictEqual, ok } from 'node:assert/strict'
 import type { Page } from 'playwright'
 import { runPaletteCommand, selectors } from '../selectors'
 import type { Scenario } from './index'
@@ -24,13 +24,21 @@ export const terminalBackground: Scenario = {
   name: 'terminal-background',
   description: 'Compare terminal background layers in code and chat modes.',
   async run(page, { step }) {
+    await selectors.workspaceMode(page, 'Workbench').click()
     await runPaletteCommand(page, 'Show terminal')
     await selectors.terminalSurface(page).first().waitFor()
+    const canvas = selectors.terminalSurface(page).first().locator('canvas').first()
+    await canvas.waitFor()
+    const originalCanvas = await canvas.elementHandle()
     const code = await backgrounds(page)
     await step('code-terminal')
-    await runPaletteCommand(page, 'Chat mode')
+    await selectors.workspaceMode(page, 'Chat').click()
     await selectors.terminalTool(page).click()
     await selectors.terminalSurface(page).first().waitFor()
+    ok(
+      await originalCanvas?.evaluate((node) => node.isConnected),
+      'Mode change retains the terminal renderer',
+    )
     const chat = await backgrounds(page)
     await step('chat-terminal')
     console.log(JSON.stringify({ code, chat }))

@@ -1,3 +1,4 @@
+import { createObservableStore } from '@/host/state/observable-store'
 import type { Client } from '@workspace/client-core/transport/client'
 import { streamWorkspaceSearch } from '@workspace/client-core/files/search-client'
 import type { WorkspaceSearchMatch, WorkspaceSearchQuery } from '@workspace/contracts'
@@ -15,17 +16,18 @@ type State = {
 type SearchOutcome = 'complete' | 'truncated' | 'aborted' | 'failed'
 
 export function createSearchWorkbench(client: Client) {
-  const listeners = new Set<() => void>()
   let current = new AbortController()
-  let disposed = false
-  let state: State = { key: '', kind: 'empty', matches: [], message: '', truncated: false }
-  function publish(next: State) {
-    if (disposed) return
-    state = next
-    for (const listener of listeners) listener()
-  }
+
+  const store = createObservableStore<State>({
+    key: '',
+    kind: 'empty',
+    matches: [],
+    message: '',
+    truncated: false,
+  })
+  const publish = store.replace
   async function search(query: WorkspaceSearchQuery) {
-    if (disposed) return
+    if (store.disposed) return
     current.abort()
     const controller = new AbortController()
     current = controller
@@ -96,18 +98,12 @@ export function createSearchWorkbench(client: Client) {
   }
 
   return {
-    getSnapshot: () => state,
-    subscribe(listener: () => void) {
-      listeners.add(listener)
-      return () => {
-        listeners.delete(listener)
-      }
-    },
+    getSnapshot: store.getSnapshot,
+    subscribe: store.subscribe,
     search,
     dispose() {
-      disposed = true
+      store.dispose()
       current.abort()
-      listeners.clear()
     },
   }
 }

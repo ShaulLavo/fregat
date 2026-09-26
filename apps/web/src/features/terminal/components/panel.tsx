@@ -351,13 +351,14 @@ export function TerminalPanel({
         />
       ) : null}
       {/* Keyed: the socket reconnects just after a restart ends, so the warning waits afresh. */}
-      {!socketConnected && (savedPaint || hasLivePaint) ? (
+      {!socketConnected && (machineUnavailable || savedPaint || hasLivePaint) ? (
         <ConnectionNotice
           key={serverRestarting ? 'restarting' : 'pending'}
           restarting={serverRestarting}
+          unreachable={unavailable ? (unavailable.label ?? unavailable.name) : null}
         />
       ) : null}
-      {terminalFailure?.identity === terminalMountIdentity ? (
+      {!machineUnavailable && terminalFailure?.identity === terminalMountIdentity ? (
         <div
           role='alert'
           className='absolute inset-0 flex flex-col items-center justify-center gap-(--density-gap-tight) p-4'
@@ -366,7 +367,10 @@ export function TerminalPanel({
           <FixWithAgentButton error={{ message: terminalFailure.message, title: 'Terminal' }} />
         </div>
       ) : null}
-      {!savedPaint && !hasLivePaint && terminalFailure?.identity !== terminalMountIdentity ? (
+      {!machineUnavailable &&
+      !savedPaint &&
+      !hasLivePaint &&
+      terminalFailure?.identity !== terminalMountIdentity ? (
         <div className='pointer-events-none absolute inset-0 flex items-center justify-center'>
           <Spinner size='md' label='Opening terminal' />
         </div>

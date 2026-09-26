@@ -29,6 +29,7 @@ import { OrchestrationCheckpointDiffQuery } from '../checkpoint-diff-query'
 import { checkpointRefForSessionTurn } from '../checkpoint-refs'
 import { OrchestrationEngine } from '../engine'
 import { ProviderRuntimeIngestion } from '../provider-runtime-ingestion'
+import { runGit } from '../../testing/git'
 
 const now = '2026-06-01T00:00:00.000Z'
 const later = '2026-06-01T00:01:00.000Z'
@@ -704,8 +705,6 @@ async function fixtureRoot() {
 async function gitFixtureRoot() {
   const root = await fixtureRoot()
   await runGit(root, ['init'])
-  await runGit(root, ['config', 'user.email', 'test@example.com'])
-  await runGit(root, ['config', 'user.name', 'Test User'])
 
   return root
 }
@@ -725,7 +724,9 @@ async function commitFile(root: string, file: string, content: string) {
 }
 
 async function gitRefExists(root: string, ref: string) {
-  const result = await runGit(root, ['rev-parse', '--verify', '--quiet', `${ref}^{commit}`], true)
+  const result = await runGit(root, ['rev-parse', '--verify', '--quiet', `${ref}^{commit}`], {
+    allowFailure: true,
+  })
 
   return result.exitCode === 0
 }
@@ -750,16 +751,4 @@ async function stagedStatusEntries(root: string) {
     .split('\n')
     .filter((line) => line.length > 0)
     .filter((line) => line[0] !== ' ' && line[0] !== '?')
-}
-
-async function runGit(root: string, args: readonly string[], allowFailure = false) {
-  const child = Bun.spawn(['git', '-C', root].concat(args), { stderr: 'pipe', stdout: 'pipe' })
-  const [stdout, stderr, exitCode] = await Promise.all([
-    new Response(child.stdout).text(),
-    new Response(child.stderr).text(),
-    child.exited,
-  ])
-  if (allowFailure || exitCode === 0) return { exitCode, stderr, stdout }
-
-  throw new TypeError(`${stderr}${stdout}`.trim())
 }

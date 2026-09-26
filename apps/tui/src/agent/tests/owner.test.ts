@@ -26,6 +26,7 @@ import { createControlledInProcessTransport } from '../../../test/client'
 import {
   draftChatTurn,
   openTestChat,
+  holdSessionPageResponses,
   loseNextDispatchAcknowledgement,
   appendChatMessages,
   conversationTurns,
@@ -342,3 +343,51 @@ test('renaming a paged session preserves the loaded transcript', async ({ server
     session.dispose()
   }
 })
+
+test.for(['old-first', 'new-first'] as const)(
+  'A to B to A ignores the old page lifetime with %s responses',
+  async (order, { server }) => {
+    const transport = createControlledInProcessTransport(server)
+    const { session, chat } = await openTestChat(server, { createSocket: transport.createSocket })
+    const held = holdSessionPageResponses(transport)
+    try {
+      await expect.poll(() => chat.getSnapshot().status).toBe('ready')
+      const worktreeId = await session.ensureWorktree('')
+      const first = draftChatTurn(worktreeId, 'A')
+      const second = draftChatTurn(worktreeId, 'B')
+      await chat.dispatch(first.command)
+      await chat.dispatch(second.command)
+      await appendChatMessages(server, {
+        sessionId: first.command.sessionId,
+        count: ORCHESTRATION_SESSION_DETAIL_PAGE_SIZE + 5,
+      })
+      chat.selectSession(first.command.sessionId)
+      await expect.poll(() => chat.getSnapshot().detailLoading).toBe(false)
+      const previous = chat.loadEarlier()
+      await expect.poll(() => held.responses.length).toBe(1)
+      chat.selectSession(second.command.sessionId)
+      await expect.poll(() => chat.getSnapshot().detailLoading).toBe(false)
+      chat.selectSession(first.command.sessionId)
+      await expect.poll(() => chat.getSnapshot().detailLoading).toBe(false)
+      const current = chat.loadEarlier()
+      await expect.poll(() => held.responses.length).toBe(2)
+      if (order === 'new-first') {
+        held.responses[1]?.()
+        expect(await current).toBe(true)
+      }
+      held.responses[0]?.()
+      expect(await previous).toBe(false)
+      if (order === 'old-first') {
+        expect(chat.getSnapshot().loadingEarlier).toBe(true)
+        held.responses[1]?.()
+        expect(await current).toBe(true)
+      }
+      expect(chat.getSnapshot().loadingEarlier).toBe(false)
+      expect(chat.getSnapshot().error).toBeNull()
+    } finally {
+      for (const release of held.responses) release()
+      held.restore()
+      session.dispose()
+    }
+  },
+)

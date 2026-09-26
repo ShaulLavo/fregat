@@ -10,9 +10,8 @@ import { filePathsForTabs, filesystemResource } from '@/lib/documents/utils/capa
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import type { FilesystemPath } from '@/lib/documents/utils/types'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
-import { setFileSnapshotQueryData } from '@/lib/file-snapshot-query-cache'
+import { moveFileSnapshotQueryData } from '@/lib/file-snapshot-query-cache'
 import { fetchWorkspaceEditHistory } from '@/lib/file-server'
-import type { FileResult } from '@/lib/file-system-types'
 import { runMutation } from '@/lib/mutations/run'
 import { fileSystemKeys } from '@/lib/query-keys'
 import type { EditorDocumentStoreApi } from '@/features/editor/state/document-state'
@@ -194,7 +193,7 @@ async function readHistory(runtime: FileOperationRuntime) {
   const query = fileOperationHistoryQuery(runtime.queryClient, runtime.rootPath)
   for (let attempt = 1; ; attempt += 1) {
     try {
-      return await runtime.queryClient.fetchQuery(query)
+      return await runtime.queryClient.query(query)
     } catch (error) {
       if (!isCancelledError(error) || attempt === 3) throw error
     }
@@ -247,13 +246,10 @@ function moveEditorPaths(owners: DocumentOwners, move: DocumentMove) {
     move.to,
   )
   for (const rename of renames) {
-    const queryKey = fileSystemKeys.fileSnapshot(rename.from)
-    const file = owners.queryClient.getQueryData<FileResult>(queryKey)
-    if (file) {
-      setFileSnapshotQueryData(owners.queryClient, { ...file, path: filesystemPath(rename.to) })
-    }
-    owners.renameLiveEditorDocument(filesystemPath(rename.from), filesystemPath(rename.to))
-    owners.queryClient.removeQueries({ exact: true, queryKey })
+    const from = filesystemPath(rename.from)
+    const to = filesystemPath(rename.to)
+    moveFileSnapshotQueryData(owners.queryClient, from, to)
+    owners.renameLiveEditorDocument(from, to)
   }
 }
 

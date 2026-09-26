@@ -4,10 +4,10 @@ import { afterEach, describe, expect, it } from 'vitest'
 import {
   gitWorktreeFixture,
   provisionWorktree,
-  runGit,
   worktreeA,
   worktreeB,
 } from '../../../test/factories/git-worktree'
+import { runGit } from '../../testing/git'
 import { gitWorktreeCreateBodySchema } from '../contracts'
 import { gitWorktreeErrors } from '../utils/worktree-errors'
 import * as v from 'valibot'
@@ -65,7 +65,7 @@ describe('worktree provisioning', () => {
   })
   it('starts from a named local branch instead of HEAD, and refuses one that does not exist', async () => {
     const fixture = await fixtureRepo()
-    const start = await runGit(fixture.root, ['rev-parse', 'HEAD'])
+    const start = (await runGit(fixture.root, ['rev-parse', 'HEAD'])).stdout.trimEnd()
     await runGit(fixture.root, ['branch', 'release'])
     await writeFile(path.join(fixture.root, 'tracked.txt'), 'later\n')
     await runGit(fixture.root, ['commit', '-am', 'head moved'])
@@ -111,11 +111,13 @@ describe('worktree provisioning', () => {
     await writeFile(path.join(fixture.root, 'tracked.txt'), 'later\n')
     await runGit(fixture.root, ['commit', '-am', 'base moved'])
     await runGit(fixture.root, ['branch', other.branch])
-    const collision = await runGit(fixture.root, ['rev-parse', other.branch])
+    const collision = (await runGit(fixture.root, ['rev-parse', other.branch])).stdout.trimEnd()
     await expect(fixture.worktrees.create({ ...other, path: fixture.root })).rejects.toMatchObject({
       code: gitWorktreeErrors.WORKTREE_BRANCH_EXISTS.code,
     })
-    expect(await runGit(fixture.root, ['rev-parse', other.branch])).toBe(collision)
+    expect((await runGit(fixture.root, ['rev-parse', other.branch])).stdout.trimEnd()).toBe(
+      collision,
+    )
   })
   it('creates from a linked base through the canonical common directory', async () => {
     const fixture = await fixtureRepo()
@@ -176,9 +178,9 @@ describe('guarded worktree removal', () => {
     expect(
       (await fixture.worktrees.remove({ ...created.target, mode: 'safe' })).worktrees,
     ).toHaveLength(1)
-    expect(await runGit(fixture.root, ['rev-parse', created.prepared.branch])).toBe(
-      created.prepared.baseCommit,
-    )
+    expect(
+      (await runGit(fixture.root, ['rev-parse', created.prepared.branch])).stdout.trimEnd(),
+    ).toBe(created.prepared.baseCommit)
     expect(await fixture.worktrees.inspect(created.target)).toEqual({
       pathExists: false,
       adminExists: false,
@@ -318,9 +320,9 @@ describe('guarded worktree removal', () => {
       fixture.worktrees.remove({ ...created.target, mode: 'safe' }),
     ).rejects.toMatchObject({ code: gitWorktreeErrors.WORKTREE_ADMIN_STALE.code })
     expect((await fixture.worktrees.inspect(other.target)).pathExists).toBe(true)
-    expect(await runGit(fixture.root, ['worktree', 'list', '--porcelain'])).toContain(
-      created.worktree.absolutePath,
-    )
+    expect(
+      (await runGit(fixture.root, ['worktree', 'list', '--porcelain'])).stdout.trimEnd(),
+    ).toContain(created.worktree.absolutePath)
   })
   it('never excludes forged Git administration from its fingerprint', async () => {
     const fixture = await fixtureRepo()

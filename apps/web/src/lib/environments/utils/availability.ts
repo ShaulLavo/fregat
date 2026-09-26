@@ -5,10 +5,9 @@ import { defineErrorCatalog } from 'evlog'
 const availabilityErrors = defineErrorCatalog('environment', {
   MACHINE_UNAVAILABLE: {
     status: 503,
-    message: ({ machine }: { machine: string }) =>
-      `${machine} is unreachable. Your changes remain in this editor.`,
-    why: 'The environment that owns this document is disconnected.',
-    fix: 'Reconnect the owning machine in Settings → Machines, then save again.',
+    message: ({ machine }: { machine: string }) => `${machine} is unreachable.`,
+    why: 'The machine that runs this action is disconnected.',
+    fix: 'Reconnect the machine in Settings → Machines, then try again.',
   },
 })
 
@@ -37,6 +36,6 @@ export function createMachineUnavailableError(entry: EnvironmentEntry) {
     status: definition.status,
     message: definition.message({ machine }),
     why: definition.why,
-    fix: `Reconnect ${machine} in Settings → Machines, then save again.`,
+    fix: `Reconnect ${machine} in Settings → Machines, then try again.`,
   })
 }

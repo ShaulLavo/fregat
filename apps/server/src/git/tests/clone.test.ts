@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import type { GitCloneProgressEvent } from '@workspace/contracts'
 import { afterEach, describe, expect, it } from 'vitest'
-import { runGit } from '../../../test/factories/git-worktree'
+import { runGit } from '../../testing/git'
 import { DEFAULT_MAX_TEXT_FILE_BYTES } from '../../fs/limits'
 import { createWorkspacePaths } from '../../fs/path'
 import { cloneUrl, parseCloneProgress } from '../clone'
@@ -68,7 +68,9 @@ describe('clone', () => {
     const outcomes = await Promise.all([collect(first), collect(second)])
     expect(outcomes.flat().filter((event) => event.kind === 'result')).toHaveLength(1)
     expect(outcomes.flat().filter((event) => event.kind === 'failed')).toHaveLength(1)
-    expect(await runGit(path.join(root, 'race'), ['status', '--porcelain'])).toBe('')
+    expect(
+      (await runGit(path.join(root, 'race'), ['status', '--porcelain'])).stdout.trimEnd(),
+    ).toBe('')
     expect((await readdir(root)).filter((entry) => entry.startsWith('.platform-clone-'))).toEqual(
       [],
     )

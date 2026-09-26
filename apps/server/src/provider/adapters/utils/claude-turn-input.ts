@@ -1,5 +1,5 @@
 import type { SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
-import type { ChatAttachment } from '@workspace/contracts'
+import { normalizeChatAttachmentMimeType, type ChatAttachment } from '@workspace/contracts'
 
 /**
  * Pure SDKUserMessage builder. Bytes are supplied by the caller, so this module
@@ -23,20 +23,9 @@ export type ResolvedAttachment =
     }
   | { attachment: ChatAttachment; path: string }
 
-/**
- * The allowlist guard. `chatAttachmentSchema` only enforces `/^image\//i`, so
- * this — deliberately the same four types as `extensionForMimeType` in
- * attachments/utils/paths.ts — is the real gate. Unsupported types are dropped
- * rather than thrown on, so one stray `image/bmp` cannot fail an entire turn.
- */
+/** Same normalisation as the upload gate, so an accepted `image/jpg` is not dropped here. */
 export function claudeImageMediaType(mimeType: string): ClaudeImageMediaType | null {
-  const normalized = mimeType.trim().toLowerCase()
-
-  if (normalized === 'image/jpeg') return 'image/jpeg'
-  if (normalized === 'image/png') return 'image/png'
-  if (normalized === 'image/gif') return 'image/gif'
-  if (normalized === 'image/webp') return 'image/webp'
-  return null
+  return normalizeChatAttachmentMimeType(mimeType)
 }
 
 /**

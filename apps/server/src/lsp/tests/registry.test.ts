@@ -125,6 +125,16 @@ describe('LSP server registry', () => {
     })
   })
 
+  it.runIf(process.platform !== 'win32')(
+    'keeps literal backslashes in ESLint workspace URIs',
+    () => {
+      const eslint = lspServersFor(NO_OVERRIDES).find((server) => server.id === 'eslint')
+      expect(eslint?.configuration?.('/workspace/a\\b')).toMatchObject({
+        workspaceFolder: { uri: 'file:///workspace/a%5Cb' },
+      })
+    },
+  )
+
   it('switches python support to ty when enabled', () => {
     const ids = lspServersFor({ servers: {}, languageServers: {}, tyForPython: true }).map(
       (server) => server.id,

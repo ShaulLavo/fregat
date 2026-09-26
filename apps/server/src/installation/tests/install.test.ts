@@ -1,4 +1,4 @@
-import { mkdir, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises'
+import { mkdir, readdir, readFile, realpath, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { expect } from 'vitest'
 import { test } from '../../../test/factories/installation'
@@ -21,6 +21,8 @@ test('installation is repeatable and discoverable with neither Bun nor the launc
   const original = await readFile(launcher, 'utf8')
   expect(await installServerLauncher(options)).toBe(launcher)
   expect(await readFile(launcher, 'utf8')).toBe(original)
+  expect((await stat(launcher)).mode & 0o777).toBe(0o700)
+  expect(await readdir(path.dirname(launcher))).toEqual(['platform-server'])
 
   const probe = Bun.spawn(['/bin/sh', '-c', probeCommand()], {
     env: { HOME: homeDirectory, PATH: '/usr/bin:/bin' },

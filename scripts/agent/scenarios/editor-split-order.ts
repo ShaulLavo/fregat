@@ -23,7 +23,7 @@ export const editorSplitOrder: Scenario = {
     )
     await step('independent-tab-orders')
 
-    await openFileByName(page, 'docs/editor-splits-plan.md')
+    await openFileByName(page, 'docs/settings-reference.md')
     await page.waitForTimeout(250)
     const withThird = await tabs(page, 1)
     strictEqual(withThird.length, 3)

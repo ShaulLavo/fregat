@@ -46,3 +46,9 @@ export function matchesEntryType(entry: EntryTypeCarrier, entryType?: EntryTypeF
 
   return entry.targetType === entryType
 }
+
+/** A pickable entry resolves to a file or directory, following a symlink's target type. */
+export function isPickableEntry(entry: EntryTypeCarrier) {
+  const type = effectiveEntryType(entry)
+  return type === 'directory' || type === 'file'
+}

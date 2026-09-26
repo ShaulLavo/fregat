@@ -3,7 +3,7 @@ import { createContext, use } from 'react'
 
 import type { ChatTransport } from '@/features/chat/transport/chat-transport'
 import type { ActiveSession } from '@/features/chat-mode/utils/active-session'
-import { clientErrors } from '@/lib/structured-errors'
+import { requireContext } from '@/lib/require-context'
 
 export type ChatModeSession = {
   readonly activeSession: ActiveSession
@@ -37,11 +37,6 @@ export function useOptionalChatModeSession() {
 
 export function useChatModeSession() {
   const session = use(ChatModeSessionContext)
-  if (!session) {
-    throw clientErrors.CONTEXT_MISSING({
-      message: 'useChatModeSession must be used within ChatModeSessionProvider',
-    })
-  }
-
+  requireContext(session, 'useChatModeSession must be used within ChatModeSessionProvider')
   return session
 }

@@ -2,7 +2,12 @@ import { workspaceIndexForSearch } from './search-shared'
 import { elapsedMs } from '@workspace/utils/timing'
 import { homedir } from 'node:os'
 import path from 'node:path'
-import { effectiveEntryType, type WorkspaceAddressId } from '@workspace/contracts'
+import {
+  effectiveEntryType,
+  isPickableEntry,
+  type ServerInfo,
+  type WorkspaceAddressId,
+} from '@workspace/contracts'
 import { platformHomePath } from '../home'
 import { createWorkspacePaths } from './path'
 import { FileChangeHub } from './watch'
@@ -24,7 +29,7 @@ import {
   type MutationTargetKind,
 } from './mutation-target'
 import {
-  errorSummary,
+  operatorErrorSummary,
   observeRequestOperation,
   recordProcessWarning,
   recordRequestContext,
@@ -190,7 +195,7 @@ export class FileSystemService {
     this.changes.rebalance()
   }
 
-  info() {
+  info(): ServerInfo {
     return {
       workspaceRoot: this.paths.workspaceRoot,
       systemRoot: this.systemRoot,
@@ -761,11 +766,6 @@ export class FileSystemService {
   }
 }
 
-function isPickableEntry(entry: TreeEntry) {
-  const type = effectiveEntryType(entry)
-  return type === 'directory' || type === 'file'
-}
-
 function matchesRecentQuery(entry: TreeEntry, query: RecentsQuery) {
   if (!query.showHidden && hasHiddenPathSegment(entry.path)) return false
   if (query.mode === 'file') return true
@@ -921,7 +921,7 @@ async function* observedSearchEvents(
       recordRequestError(error, searchStreamSummary(options, startedAt, state, outcome))
       recordStreamSummary({
         ...searchStreamSummary(options, startedAt, state, outcome),
-        error: errorSummary(error),
+        error: operatorErrorSummary(error),
       })
       return
     }
@@ -971,7 +971,7 @@ async function* observedWatchEvents(
     recordRequestError(error, watchStreamSummary(paths, startedAt, state, 'error'))
     recordStreamSummary({
       ...watchStreamSummary(paths, startedAt, state, 'error'),
-      error: errorSummary(error),
+      error: operatorErrorSummary(error),
     })
     throw error
   }

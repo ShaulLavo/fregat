@@ -13,6 +13,7 @@ import {
   nodeWorkspaceEditFileSystemDriver,
   type WorkspaceEditFileSystemDriver,
 } from '../fs/workspace-edit-journal'
+import { runGit } from '../testing/git'
 
 const TRUSTED_ORIGIN = 'http://localhost:5173'
 const roots: string[] = []
@@ -1477,6 +1478,38 @@ describe('git rpc', () => {
       { newFileMissing: true, path: 'deleted.txt' },
     ])
   })
+
+  it('keeps the workspace-relative path when the repository is nested', async () => {
+    const root = await fixtureRoot()
+    const repoDir = path.join(root, 'repo')
+    await mkdir(repoDir)
+    await initGitRepository(repoDir)
+    await writeFile(path.join(repoDir, 'a.ts'), 'before\n')
+    await runGit(repoDir, ['add', 'a.ts'])
+    await runGit(repoDir, ['commit', '-m', 'initial'])
+    await writeFile(path.join(repoDir, 'a.ts'), 'after\n')
+    const app = testApp(root)
+
+    const live = await app.handle(
+      new Request('http://local/git/diff?path=repo/a.ts', {
+        headers: trustedOriginHeaders(),
+      }),
+    )
+    expect(live.status).toBe(200)
+    const [snapshot] = (await live.json()) as GitDiffTestPayload
+    await writeFile(path.join(repoDir, 'a.ts'), 'later\n')
+
+    const stale = await app.handle(
+      new Request(`http://local/git/diff/blob?${blobDiffParams(snapshot)}`, {
+        headers: trustedOriginHeaders(),
+      }),
+    )
+
+    expect(stale.status).toBe(200)
+    const [diff] = (await stale.json()) as GitDiffTestPayload
+    expect(diff.path).toBe('repo/a.ts')
+    expect(diff.oldPath).toBeUndefined()
+  })
 })
 
 type GitStatusTestPayload = {
@@ -1617,23 +1650,6 @@ async function fixtureRoot() {
 
 async function initGitRepository(root: string) {
   await runGit(root, ['init'])
-  await runGit(root, ['config', 'user.email', 'test@example.com'])
-  await runGit(root, ['config', 'user.name', 'Test User'])
-}
-
-async function runGit(root: string, args: readonly string[]) {
-  const process = Bun.spawn(['git', '-C', root].concat(args), {
-    stderr: 'pipe',
-    stdout: 'pipe',
-  })
-  const [stdout, stderr, exitCode] = await Promise.all([
-    new Response(process.stdout).text(),
-    new Response(process.stderr).text(),
-    process.exited,
-  ])
-  if (exitCode === 0) return { stderr, stdout }
-
-  throw new Error(`${stderr}${stdout}`.trim())
 }
 
 function trustedOriginHeaders(headers: HeadersInit = {}) {

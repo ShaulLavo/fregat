@@ -8,13 +8,8 @@ import { Spinner } from '@workspace/ui/components/spinner'
 import { WorktreeChip } from '@/features/chat-mode/components/worktree-chip'
 import { WorktreeCleanupDialog } from '@/features/chat-mode/components/worktree-cleanup-dialog'
 import { useWorktreeActions } from '@/features/chat-mode/hooks/use-worktree-actions'
-import {
-  canForceCleanupWorktree,
-  canReleaseWorktree,
-  canRetainWorktree,
-  canRetryWorktree,
-  cleanupStatusLabel,
-} from '@workspace/client-core/chat/worktrees/cleanup'
+import { cleanupStatusLabel } from '@workspace/client-core/chat/worktrees/cleanup'
+import { worktreeActions } from '@workspace/client-core/chat/worktrees/actions'
 import { worktreeLabel } from '@workspace/client-core/chat/worktrees/label'
 import { InlineError } from '@/components/inline-error'
 import { WorktreeSetupStatus } from '@/features/chat-mode/components/worktree-setup-status'
@@ -29,8 +24,7 @@ export function WorktreeManagerRow({
   readonly worktree: OrchestrationWorktreeShell
 }) {
   const actions = useWorktreeActions({ environmentId, worktreeId: worktree.id })
-  const eligibility = worktree.cleanupEligibility
-  const eligible = eligibility.reason === 'eligible'
+  const choices = worktreeActions(worktree, false)
   return (
     <li className='flex flex-col gap-2 py-3'>
       <div className='flex min-w-0 items-center gap-2'>
@@ -47,82 +41,21 @@ export function WorktreeManagerRow({
       />
       {actions.error ? <InlineError message={actions.error} title='Worktree action' /> : null}
       <div className='flex flex-wrap gap-1'>
-        {eligible && worktree.lifecycle.state === 'ready' ? (
+        {choices.map((choice) => (
           <Button
+            key={choice.value}
             size='sm'
-            variant='outline'
+            variant={choice.value === 'release' ? 'ghost' : 'outline'}
             disabled={actions.pending}
-            onClick={() => void actions.run('worktree.cleanup')}
+            onClick={() => {
+              if (choice.kind === 'run') return void actions.run(choice.command)
+              if (choice.value === 'release') return actions.requestRelease()
+              return void actions.preview(choice.value)
+            }}
           >
-            Clean up
+            {choice.value === 'cleanup' ? 'Clean up' : choice.name}
           </Button>
-        ) : null}
-        {canRetryWorktree(worktree) ? (
-          <Button
-            size='sm'
-            variant='outline'
-            disabled={actions.pending}
-            onClick={() =>
-              void actions.run(
-                worktree.lifecycle.state === 'creation-failed'
-                  ? 'worktree.retry'
-                  : 'worktree.cleanup',
-              )
-            }
-          >
-            Retry
-          </Button>
-        ) : null}
-        {canRetainWorktree(worktree) ? (
-          <Button
-            size='sm'
-            variant='outline'
-            disabled={actions.pending}
-            onClick={() => void actions.run('worktree.retain')}
-          >
-            Retain checkout
-          </Button>
-        ) : null}
-        {canForceCleanupWorktree(worktree) ? (
-          <Button
-            size='sm'
-            variant='outline'
-            disabled={actions.pending}
-            onClick={() => void actions.preview('force')}
-          >
-            Discard changes…
-          </Button>
-        ) : null}
-        {worktree.ownership === 'unclaimed' ? (
-          <Button
-            size='sm'
-            variant='outline'
-            disabled={actions.pending}
-            onClick={() => void actions.run('worktree.adopt')}
-          >
-            Adopt checkout
-          </Button>
-        ) : null}
-        {canReleaseWorktree(worktree) ? (
-          <Button
-            size='sm'
-            variant='ghost'
-            disabled={actions.pending}
-            onClick={actions.requestRelease}
-          >
-            Release…
-          </Button>
-        ) : null}
-        {eligibility.canResolveMissing ? (
-          <Button
-            size='sm'
-            variant='outline'
-            disabled={actions.pending}
-            onClick={() => void actions.preview('missing')}
-          >
-            Resolve missing checkout…
-          </Button>
-        ) : null}
+        ))}
       </div>
       <WorktreeCleanupDialog
         confirmation={actions.confirmation}

@@ -1,9 +1,9 @@
 import { isAbortError } from '@/lib/abort-error'
 import { elapsedMs } from '@workspace/utils/timing'
-import { limitDiagnosticString, sanitizeRecord } from '@workspace/observability/sanitize'
+import { sanitizeRecord } from '@workspace/observability/sanitize'
 import { initLogger, isLevelEnabled, log as evlog, type DrainContext, type LogLevel } from 'evlog'
 import { createHttpLogDrain } from 'evlog/http'
-import { errorNumberField, errorStringField } from '@workspace/contracts'
+import { errorSummary } from '@workspace/contracts'
 import { observabilityEnabledFromEnv } from '@workspace/observability/env'
 
 import { annotateClientError } from '@/lib/client-error-context'
@@ -113,6 +113,7 @@ export async function observeClientOperation<T>(
       log[failedOperationLevel(level)]({
         ...baseEvent,
         durationMs: elapsedMs(startedAt),
+        // No limit here: `safeClientEvent` keeps the head 2000 characters of every string.
         error: errorSummary(error),
         outcome: classifyError?.(error) ?? 'error',
       })
@@ -201,26 +202,6 @@ function clientErrorContext(event: ClientLogEvent): Record<string, unknown> {
   const { action: _action, area: _area, ...context } = event
 
   return context
-}
-
-function errorSummary(error: unknown) {
-  const code = errorStringField(error, 'code')
-  const status = errorNumberField(error, 'status') ?? errorNumberField(error, 'statusCode')
-  if (error instanceof Error) {
-    return {
-      code,
-      message: limitDiagnosticString(error.message),
-      name: error.name,
-      status,
-    }
-  }
-
-  return {
-    code,
-    message: limitDiagnosticString(String(error)),
-    name: typeof error,
-    status,
-  }
 }
 
 function failedOperationLevel(level: ClientLogLevel | undefined): ClientLogLevel {

@@ -1,4 +1,3 @@
-import { execFileSync } from 'node:child_process'
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
@@ -16,6 +15,7 @@ import { expect, test } from '../../../../../test/fixtures'
 import { createInProcessClient } from '../../../../../test/client'
 import { renderWithProviders } from '../../../../../test/render'
 import { makeTestServer, type TestServer } from '../../../../../test/server'
+import { runGit } from '../../../../../test/factories/git'
 
 const GENERATED_MESSAGE = 'feat: add generated feature'
 
@@ -64,7 +64,7 @@ test('generates from an untracked working diff, fills the input, and never commi
   await withProviderServer(adapter, async (server) => {
     const repo = await initRepo(server.root, 'repo')
     await writeFile(path.join(repo, 'feature.ts'), 'export const feature = true\n')
-    const headBefore = git(repo, 'rev-parse', 'HEAD')
+    const headBefore = runGit(repo, ['rev-parse', 'HEAD'], { cwdMode: 'option' }).stdout.trim()
 
     renderControls('repo', true)
     await waitFor(() =>
@@ -86,8 +86,12 @@ test('generates from an untracked working diff, fills the input, and never commi
       options: { reasoningEffort: 'low' },
       providerInstanceId: 'codex',
     })
-    expect(git(repo, 'rev-parse', 'HEAD')).toBe(headBefore)
-    expect(git(repo, 'status', '--porcelain')).toContain('?? feature.ts')
+    expect(runGit(repo, ['rev-parse', 'HEAD'], { cwdMode: 'option' }).stdout.trim()).toBe(
+      headBefore,
+    )
+    expect(runGit(repo, ['status', '--porcelain'], { cwdMode: 'option' }).stdout.trim()).toContain(
+      '?? feature.ts',
+    )
   })
 })
 
@@ -97,7 +101,7 @@ test('prefers the staged diff instead of mixing in working changes', async () =>
   await withProviderServer(adapter, async (server) => {
     const repo = await initRepo(server.root, 'repo')
     await writeFile(path.join(repo, 'staged.ts'), 'export const staged = true\n')
-    git(repo, 'add', 'staged.ts')
+    runGit(repo, ['add', 'staged.ts'], { cwdMode: 'option' })
     await writeFile(path.join(repo, 'working.ts'), 'export const working = true\n')
     renderControls('repo', true)
 
@@ -386,17 +390,11 @@ async function withProviderServer(
 async function initRepo(root: string, name: string) {
   const repo = path.join(root, name)
   await mkdir(repo, { recursive: true })
-  git(repo, 'init', '-b', 'main')
-  git(repo, 'config', 'user.email', 'test@example.com')
-  git(repo, 'config', 'user.name', 'Test')
+  runGit(repo, ['init', '-b', 'main'], { cwdMode: 'option' })
   await writeFile(path.join(repo, 'readme.md'), 'initial\n')
-  git(repo, 'add', 'readme.md')
-  git(repo, 'commit', '-m', 'init')
+  runGit(repo, ['add', 'readme.md'], { cwdMode: 'option' })
+  runGit(repo, ['commit', '-m', 'init'], { cwdMode: 'option' })
   return repo
-}
-
-function git(cwd: string, ...args: string[]) {
-  return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: 'pipe' }).trim()
 }
 
 async function waitForProviderTurn(adapter: MockProviderAdapter) {

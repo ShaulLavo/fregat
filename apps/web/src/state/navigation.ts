@@ -89,7 +89,8 @@ import type { EditorRuntime } from '@/features/editor/state/runtime'
 import type { SearchBufferOptionPatch } from '@/features/search/state/buffer-state'
 import { searchParamsFor } from '@/features/address/utils/search-params'
 import { logsParamsFor } from '@/features/address/utils/logs-params'
-import { defaultLogsFilterState, type LogsFilterState } from '@/features/logs/utils/filter-params'
+import { defaultLogsFilterState } from '@/features/logs/utils/filter-params'
+import { type LogsFilterState } from '@workspace/client-core/logs/filters'
 import { settingsCategorySlug } from '@/features/address/utils/settings-category'
 import { shareableAddress } from '@/features/address/state/storage'
 import { buildAddressLocation } from '@/features/address/utils/route-options'
@@ -670,7 +671,7 @@ export function createNavigation(
       return ownedRequest(owner, async ({ application, address }) => {
         const staged = row.section === 'staged'
         // Query signal only: a fetch shared by key must not die with one caller's navigation.
-        const diffs = await application.getSnapshot().queryClient.fetchQuery({
+        const diffs = await application.getSnapshot().queryClient.query({
           queryFn: ({ signal, client }) =>
             fetchDiff(row.file.path, staged, signal, clientForQueryClient(client)),
           queryKey: gitKeys.diff(row.file.path, staged),
@@ -722,7 +723,7 @@ export function createNavigation(
       return ownedRequest(owner, async ({ application, address, isCurrent }) => {
         const runtime = application.getSnapshot()
         // Query signal only: a fetch shared by key must not die with one caller's navigation.
-        const file = await runtime.queryClient.fetchQuery({
+        const file = await runtime.queryClient.query({
           queryKey: gitKeys.file(path, ref),
           staleTime: Infinity,
           queryFn: ({ signal, client }) =>

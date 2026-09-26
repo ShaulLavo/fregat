@@ -1,7 +1,11 @@
 import { isPresent } from '@workspace/utils/objects'
 import type { ModelSelection, ProviderModel, ProviderSnapshot } from '@workspace/contracts'
 
-import { errorSummary, observeRequestOperation, recordRequestWarning } from '../observability'
+import {
+  operatorErrorSummary,
+  observeRequestOperation,
+  recordRequestWarning,
+} from '../observability'
 import type { ProviderAdapterRegistry } from '../provider/provider-adapter-registry'
 import type { ProviderService } from '../provider/provider-service'
 import type { GitCommitMessageResult, GitCommitMessageSource } from './contracts'
@@ -142,13 +146,13 @@ export class CommitMessageGenerator {
 
       recordRequestWarning('git.commit_message.provider_failed', {
         patchLength: context.patch.length,
-        providerError: errorSummary(error),
+        providerError: operatorErrorSummary(error),
         model: selected.modelSelection.model,
         providerInstanceId: selected.modelSelection.providerInstanceId,
       })
       throw gitCommitMessageErrors.COMMIT_MESSAGE_PROVIDER_FAILED({
         providerInstanceId: selected.modelSelection.providerInstanceId,
-        reason: errorSummary(error).message,
+        reason: operatorErrorSummary(error).message,
         cause: error instanceof Error ? error : undefined,
         internal: {
           model: selected.modelSelection.model,

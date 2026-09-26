@@ -1,3 +1,5 @@
+import * as v from 'valibot'
+
 /**
  * A slice of terminal output handed to the agent as context.
  *
@@ -5,12 +7,24 @@
  * are 1-based rows of that terminal's buffer, scrollback included, so the agent
  * can talk about "line 812" the same way the user reads it on screen.
  */
-export type TerminalContextSelection = {
-  readonly lineEnd: number
-  readonly lineStart: number
-  readonly source: string
-  readonly text: string
-}
+export const terminalContextSchema = v.pipe(
+  v.object({
+    source: v.pipe(v.string(), v.trim(), v.minLength(1)),
+    text: v.pipe(v.string(), v.transform(normalizeTerminalContextText), v.minLength(1)),
+    lineStart: v.pipe(
+      v.number(),
+      v.finite(),
+      v.transform((line) => Math.max(1, Math.floor(line))),
+    ),
+    lineEnd: v.pipe(v.number(), v.finite(), v.transform(Math.floor)),
+  }),
+  v.transform((selection) => ({
+    ...selection,
+    lineEnd: Math.max(selection.lineStart, selection.lineEnd),
+  })),
+)
+
+export type TerminalContextSelection = v.InferOutput<typeof terminalContextSchema>
 
 const PREVIEW_LIMIT = 80
 
@@ -53,19 +67,8 @@ export function normalizeTerminalContextText(text: string) {
 export function normalizeTerminalContextSelection(
   selection: TerminalContextSelection,
 ): TerminalContextSelection | null {
-  const text = normalizeTerminalContextText(selection.text)
-  const source = selection.source.trim()
-  if (text.length === 0) return null
-  if (source.length === 0) return null
-
-  const lineStart = Math.max(1, Math.floor(selection.lineStart))
-
-  return {
-    lineEnd: Math.max(lineStart, Math.floor(selection.lineEnd)),
-    lineStart,
-    source,
-    text,
-  }
+  const result = v.safeParse(terminalContextSchema, selection)
+  return result.success ? result.output : null
 }
 
 export function formatTerminalContextRange(selection: {

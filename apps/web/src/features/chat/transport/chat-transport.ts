@@ -12,6 +12,7 @@ import type {
   SessionId,
 } from '@workspace/contracts'
 
+import type { EarlierPageObserver } from '@workspace/client-core/chat/earlier-pages'
 import type { OrchestrationStreamInput } from '@workspace/client-core/transport/streams'
 
 export type ChatTransport = {
@@ -20,6 +21,7 @@ export type ChatTransport = {
   close(): void
   retainSessionDetail(sessionId: SessionId): () => void
   loadEarlierPage(sessionId: SessionId): Promise<boolean>
+  earlierPageObserver(sessionId: SessionId | null): EarlierPageObserver
   dispatchCommand: (command: ClientOrchestrationCommand) => Promise<OrchestrationDispatchResult>
   replayEvents: (input: OrchestrationReplayEventsInput) => Promise<OrchestrationReplayEventsResult>
   shellStream: (input?: OrchestrationStreamInput) => AsyncIterable<OrchestrationShellStreamItem>

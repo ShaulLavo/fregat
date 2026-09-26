@@ -20,6 +20,9 @@ test('completion reads actual checkout files and provider catalog, omitting disa
     }
     const files = await readCompletions({ ...base, text: 'Read @alp' })
     expect(files.map((item) => item.text)).toEqual(['Read @alpha.txt '])
+    await writeFile(`${server.root}/alpha beta.txt`, 'spaced')
+    const quoted = await readCompletions({ ...base, text: 'Read @"alpha b' })
+    expect(quoted.map((item) => item.text)).toEqual(['Read @"alpha beta.txt" '])
     const nested = await readCompletions({ ...base, text: '@src/ot' })
     expect(nested.map((item) => item.text)).toEqual(['@src/other.ts '])
     const commands = await readCompletions({ ...base, text: '/rev' })

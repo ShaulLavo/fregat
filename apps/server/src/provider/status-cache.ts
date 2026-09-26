@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import {
   providerSnapshotSchema,
@@ -7,6 +7,7 @@ import {
   type ProviderSnapshot,
 } from '@workspace/contracts'
 import * as v from 'valibot'
+import { writeFileAtomicSync } from '../fs/atomic-write'
 import { recordChatPipelineWarning } from '../orchestration/orchestration-logging'
 import { platformHomePath } from '../home'
 
@@ -112,13 +113,8 @@ export class ProviderStatusCache {
     const filePath = this.filePath(snapshot.providerInstanceId)
     if (!filePath) return
 
-    // Written through a temp file: a half-flushed snapshot read on the next
-    // boot would show the wrong account as signed in.
-    const temporaryPath = `${filePath}.${process.pid}.tmp`
     try {
-      mkdirSync(path.dirname(filePath), { recursive: true })
-      writeFileSync(temporaryPath, `${JSON.stringify(snapshot)}\n`)
-      renameSync(temporaryPath, filePath)
+      writeSnapshotFile(filePath, snapshot)
     } catch (error) {
       recordChatPipelineWarning('chat.pipeline.provider_status_cache.write.failed', {
         error,
@@ -133,6 +129,13 @@ export class ProviderStatusCache {
 
     return path.join(this.directory, `${instanceId}.json`)
   }
+}
+
+// Written through a temp file: a half-flushed snapshot read on the next
+// boot would show the wrong account as signed in.
+function writeSnapshotFile(filePath: string, snapshot: ProviderSnapshot) {
+  mkdirSync(path.dirname(filePath), { recursive: true })
+  writeFileAtomicSync(filePath, `${JSON.stringify(snapshot)}\n`, { durability: 'rename' })
 }
 
 /**

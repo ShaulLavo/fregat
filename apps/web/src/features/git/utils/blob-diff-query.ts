@@ -2,7 +2,7 @@ import type { GitFileDiff } from '@workspace/contracts'
 import { clientLogContext } from '@/lib/environments/state/log-context'
 import type { Client } from '@/lib/client'
 import { observeClientOperation } from '@/lib/client-logging'
-import { unwrapEdenResponse } from '@/lib/eden-events'
+import { unwrapGit } from '@/features/git/utils/api'
 import { gitKeys } from '@/lib/query-keys'
 import type { UseQueryOptions } from '@tanstack/react-query'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
@@ -59,25 +59,8 @@ export async function fetchBlobDiff(
         },
       })
 
-      const diffs = unwrapEdenResponse<GitFileDiff[]>(response, {
-        requireData: true,
-        emptyMessage: 'git server returned an empty response',
-      })
-
-      return diffs.map((diff) => withRequestedPaths(diff, query))
+      return unwrapGit<GitFileDiff[]>(response)
     },
     (diffs) => ({ diffCount: diffs.length }),
   )
-}
-
-/**
- * `/git/diff/blob` re-roots the paths it parses back out of the patch, so a
- * blob diff for `repo/a.ts` comes back as `repo/repo/a.ts`. The request already
- * names the exact pair being diffed — one blob against one blob — so take the
- * identity from the request and keep only the content from the response.
- */
-function withRequestedPaths(diff: GitFileDiff, query: BlobDiffRequest): GitFileDiff {
-  const renamed = Boolean(query.oldPath && query.oldPath !== query.path)
-
-  return { ...diff, oldPath: renamed ? query.oldPath : undefined, path: query.path }
 }

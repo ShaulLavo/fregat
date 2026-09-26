@@ -4,7 +4,7 @@ import { createCommandHarness } from '../../../test/commands'
 import { renderAgentNavigation } from '../../../test/factories/agent-navigation'
 import { paletteOptions } from '@/commands/utils/palette'
 import { effectiveTerminalBindings } from '@/commands/utils/bindings'
-import { readRecentCommands, recordRecentCommand } from '@/storage/recents'
+import { recentCommands } from '@/storage/recent-commands-policy'
 
 for (const [chatQuery, workbenchQuery] of [
   ['Show chat', 'Open workbench'],
@@ -17,13 +17,13 @@ for (const [chatQuery, workbenchQuery] of [
     const { frame, ready } = harness
     try {
       await expect.poll(() => frame.renderer.currentFocusedRenderable?.id).toBe('agent-composer')
-      recordRecentCommand(ready.storage, 'agent.clearScope')
-      recordRecentCommand(ready.storage, 'agent.openWorkbench')
+      recentCommands.record(ready.storage, 'agent.clearScope')
+      recentCommands.record(ready.storage, 'agent.openWorkbench')
       await runPaletteCommand(frame, chatQuery)
-      await expect.poll(() => readRecentCommands(ready.storage)[0]).toBe('workspace.revealChat')
+      await expect.poll(() => recentCommands.read(ready.storage)[0]).toBe('workspace.revealChat')
       await expect.poll(() => frame.renderer.currentFocusedRenderable?.id).toBe('agent-composer')
       await runPaletteCommand(frame, workbenchQuery)
-      await expect.poll(() => readRecentCommands(ready.storage)[0]).toBe('workspace.openWorkbench')
+      await expect.poll(() => recentCommands.read(ready.storage)[0]).toBe('workspace.openWorkbench')
       await expect
         .poll(() => frame.renderer.currentFocusedRenderable?.id)
         .toBe('workbench-file-tree')

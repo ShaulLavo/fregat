@@ -1,4 +1,5 @@
-import { ok, strictEqual } from 'node:assert/strict'
+import { fail, ok, strictEqual } from 'node:assert/strict'
+import { writeFile } from 'node:fs/promises'
 import { orchestrationDispatchResultSchema } from '../../../packages/contracts/src/index'
 import type { Page } from 'playwright'
 import * as v from 'valibot'
@@ -48,6 +49,38 @@ async function registerCheckout(page: Page, workspaceRoot: string) {
   return result.projectId
 }
 
+async function prepareManagedCheckout(page: Page, projectId: string, root: string) {
+  const base = `${fixtureApiBase(page)}/orchestration`
+  const shell = await readShell(page, base)
+  const worktree = shell.worktrees.find(
+    (item) => item.projectId === projectId && item.canonicalPath === root,
+  )
+  ok(worktree, 'Fixture has a primary checkout')
+  const sessionId = crypto.randomUUID()
+  const worktreeId = crypto.randomUUID()
+  await dispatch(page, base, {
+    type: 'session.create',
+    sessionId,
+    title: 'Release confirmation fixture',
+    worktreeTarget: { kind: 'new', worktreeId, baseWorktreeId: worktree.id },
+    modelSelection: { providerInstanceId: 'codex', model: 'mock-model' },
+  })
+  const deadline = Date.now() + 20_000
+  while (Date.now() < deadline) {
+    const current = (await readShell(page, base)).worktrees.find((item) => item.id === worktreeId)
+    if (current?.lifecycle.state === 'ready') {
+      await writeFile(
+        `${current.canonicalPath}/keep.txt`,
+        'Keep this fixture checkout for confirmation.\n',
+      )
+      await dispatch(page, base, { type: 'session.delete', sessionId })
+      return { path: current.canonicalPath, id: worktreeId }
+    }
+    await Bun.sleep(50)
+  }
+  fail('Managed fixture checkout did not become ready')
+}
+
 async function createRecordedBranch(page: Page, root: string) {
   const orchestration = `${fixtureApiBase(page)}/orchestration`
   const base = await registerFixtureProject(page, orchestration, root)
@@ -83,6 +116,7 @@ export const chatDraftContextStrip: Scenario = {
     const fixture = await createGitFixture('draft-strip')
     const linked = `${fixture}-linked`
     let projectId: string | null = null
+    let managed: { path: string; id: string } | null = null
     let recordedWorktreeId: string | null = null
     let recordedSessionId: string | null = null
     try {
@@ -178,6 +212,22 @@ export const chatDraftContextStrip: Scenario = {
         await page.keyboard.press('Escape')
       }
       await selectors.chatMessage(page).fill('')
+      managed = await prepareManagedCheckout(page, projectId, fixture)
+      await selectors.manageWorktrees(page).click()
+      await selectors.worktreeManager(page).waitFor()
+      await selectors.releaseWorktree(page).first().click()
+      const release = selectors.releaseWorktreeDialog(page)
+      await release.waitFor()
+      ok(
+        (await release.innerText()).includes('cleanup ownership'),
+        'Release explains its ownership change',
+      )
+      await step('shared-worktree-release-confirmation')
+      await selectors.cancelWorktreeRelease(page).click()
+      await release.waitFor({ state: 'hidden' })
+      await selectors.worktreeManager(page).waitFor()
+      await step('worktree-release-cancelled')
+      await page.keyboard.press('Escape')
     } finally {
       if (recordedSessionId)
         await dispatch(page, `${fixtureApiBase(page)}/orchestration`, {
@@ -189,12 +239,18 @@ export const chatDraftContextStrip: Scenario = {
           type: 'worktree.release',
           worktreeId: recordedWorktreeId,
         })
+      if (managed)
+        await dispatch(page, `${fixtureApiBase(page)}/orchestration`, {
+          type: 'worktree.release',
+          worktreeId: managed.id,
+        })
       if (projectId)
         await dispatch(page, `${fixtureApiBase(page)}/orchestration`, {
           type: 'project.delete',
           projectId,
           force: true,
         })
+      if (managed) await releaseFixture(managed.path)
       await releaseFixture(linked)
       await releaseFixture(fixture)
     }

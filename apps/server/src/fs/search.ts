@@ -15,7 +15,7 @@ import {
 } from '@workspace/contracts'
 
 import { FsError, mapNodeError } from './errors'
-import { defaultIgnoredNames, type WorkspacePaths } from './path'
+import { defaultIgnoredNames, isOutsideRoot, type WorkspacePaths } from './path'
 import { searchWithFallback } from './search-fallback'
 import { workspaceGitIgnoreMatcher } from './search-gitignore'
 import { SearchMeasurementRecorder, type SearchProviderRun } from './search-measurement'
@@ -651,7 +651,7 @@ async function linkLeavesRoot(context: FindContext, entryPath: string, workspace
     const target = await realpath(path.join(context.root.absolutePath, entryPath))
     const fromRoot = path.relative(workspaceRoot, target)
     if (path.isAbsolute(fromRoot)) return true
-    if (fromRoot !== '..' && !fromRoot.startsWith(`..${path.sep}`)) return false
+    if (!isOutsideRoot(fromRoot)) return false
 
     // A link to an ancestor would walk the workspace again through itself.
     return !workspaceRoot.startsWith(`${target}${path.sep}`)

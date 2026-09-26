@@ -13,8 +13,11 @@ import {
   isBuiltinEditorThemeId,
   type BuiltinEditorThemeDefinition,
 } from '@/lib/code-theme/utils/catalog'
-import { shikiThemeContentHash } from '@/features/editor/utils/theme-content-hash'
-import { loadVscodeThemeRegistration } from '@workspace/client-core/themes/registration'
+import { shikiThemeContentHash } from '@/lib/code-theme/utils/content-hash'
+import { themeRegistrationQueryOptions } from '@/lib/code-theme/state/registration-query'
+import { resourceQueryClient } from '@/lib/resources/state/query-client'
+import { codeThemeQueryKeys } from '@/lib/code-theme/utils/query-keys'
+import { editorQueryKeys } from '@/features/editor/utils/query-keys'
 import { readSettingsMirror } from '@/lib/settings-boot-mirror'
 import { log } from '@/lib/client-logging'
 import { clientErrors, createClientInvariantError } from '@/lib/structured-errors'
@@ -36,11 +39,6 @@ const DEFAULT_DEFINITION_BY_COLOR_MODE = {
 
 const vscodeThemeDefinitionById = new Map(VSCODE_THEMES.map((theme) => [theme.id, theme]))
 const editorColorThemeListeners = new Set<() => void>()
-const loadedThemeById = new Map<string, Promise<LoadedEditorColorTheme>>()
-// Registrations cached for synchronous reads (the shiki plugin resolves theme
-// registrations at worker-session creation, with no await).
-const registrationByIdSync = new Map<string, VscodeThemeRegistration>()
-const registrationContentHashById = new Map<string, string>()
 
 let selectionByColorMode: Record<EditorColorMode, string> | null = null
 let activeEditorColorMode: EditorColorMode = 'dark'
@@ -127,7 +125,9 @@ export function activeShikiThemeId(): string {
 export function getLoadedVscodeThemeRegistration(
   themeId: string,
 ): ShikiWorkerThemeRegistration | undefined {
-  const registration = registrationByIdSync.get(themeId)
+  const registration = resourceQueryClient.getQueryData(
+    themeRegistrationQueryOptions(themeId).queryKey,
+  )?.registration
   if (!registration?.name) return undefined
 
   return registration as ShikiWorkerThemeRegistration
@@ -144,7 +144,10 @@ export async function resolveEditorShikiThemeRegistration(
 }
 
 export function getResolvedShikiThemeContentHash(themeId: string): string {
-  return registrationContentHashById.get(themeId) ?? shikiThemeContentHash(themeId)
+  return (
+    resourceQueryClient.getQueryData(themeRegistrationQueryOptions(themeId).queryKey)
+      ?.contentHash ?? shikiThemeContentHash(themeId)
+  )
 }
 
 export function subscribeEditorColorTheme(listener: () => void): () => void {
@@ -206,7 +209,9 @@ export function loadedEditorThemeForSelection(
       resolvedThemeId: builtin.id,
     }
   const definition = vscodeThemeDefinitionById.get(themeId)
-  const registration = registrationByIdSync.get(themeId)
+  const registration = resourceQueryClient.getQueryData(
+    themeRegistrationQueryOptions(themeId).queryKey,
+  )?.registration
   if (!definition || !registration) return null
   return {
     definition,
@@ -228,100 +233,82 @@ export function resetEditorColorThemeStore() {
   selectionByColorMode = null
   activeEditorColorMode = 'dark'
   previewTheme = null
-  loadedThemeById.clear()
-  registrationByIdSync.clear()
-  registrationContentHashById.clear()
+  resourceQueryClient.removeQueries({ queryKey: editorQueryKeys.themes })
+  resourceQueryClient.removeQueries({ queryKey: codeThemeQueryKeys.registrations })
   editorColorThemeListeners.clear()
 }
 
 function loadBuiltinEditorTheme(
   builtin: BuiltinEditorThemeDefinition,
 ): Promise<LoadedEditorColorTheme> {
-  const cached = loadedThemeById.get(builtin.id)
-  if (cached) return cached
-
-  const loaded = Promise.resolve({
-    definition: null,
-    editorTheme: builtin.editorTheme,
-    registration: null,
-    resolvedThemeId: builtin.id,
-  } satisfies LoadedEditorColorTheme)
-
-  loadedThemeById.set(builtin.id, loaded)
-  return loaded
+  return resourceQueryClient.query({
+    queryKey: editorQueryKeys.theme(builtin.id),
+    queryFn: () => ({
+      definition: null,
+      editorTheme: builtin.editorTheme,
+      registration: null,
+      resolvedThemeId: builtin.id,
+    }),
+    staleTime: 'static',
+    gcTime: Infinity,
+    networkMode: 'always',
+    structuralSharing: false,
+  })
 }
 
-function loadEditorTheme(
+async function loadEditorTheme(
   definition: VscodeThemeDefinition,
   colorMode: EditorColorMode,
 ): Promise<LoadedEditorColorTheme> {
-  const cached = loadedThemeById.get(definition.id)
-  if (cached) return cached
-
-  const loaded = loadVscodeThemeRegistration(definition)
-    .then((registration) => {
-      cacheRegistration(definition.id, registration)
-      if (themeIdIsCurrentlySelected(definition.id)) notifyEditorColorThemeListeners()
-      return {
-        definition,
-        registration,
-        editorTheme: editorThemeFromVscodeTheme(registration),
-        resolvedThemeId: definition.id,
-      } satisfies LoadedEditorColorTheme
+  try {
+    return await resourceQueryClient.query({
+      queryKey: editorQueryKeys.theme(definition.id),
+      queryFn: async () => {
+        const { registration } = await resourceQueryClient.query(
+          themeRegistrationQueryOptions(definition),
+        )
+        if (themeIdIsCurrentlySelected(definition.id)) notifyEditorColorThemeListeners()
+        return {
+          definition,
+          registration,
+          editorTheme: editorThemeFromVscodeTheme(registration),
+          resolvedThemeId: definition.id,
+        }
+      },
+      staleTime: 'static',
+      gcTime: Infinity,
+      networkMode: 'always',
+      structuralSharing: false,
+      retry: false,
     })
-    .catch((error: unknown) => {
-      loadedThemeById.delete(definition.id)
-      log.error({
-        action: 'editor.color-theme.load_failed',
-        area: 'editor',
-        colorMode,
-        themeId: definition.id,
-        error,
-      })
-
-      const fallback = DEFAULT_DEFINITION_BY_COLOR_MODE[colorMode]
-      if (fallback.id === definition.id) throw error
-
-      return loadEditorTheme(fallback, colorMode)
+  } catch (error) {
+    log.error({
+      action: 'editor.color-theme.load_failed',
+      area: 'editor',
+      colorMode,
+      themeId: definition.id,
+      error,
     })
-
-  loadedThemeById.set(definition.id, loaded)
-  return loaded
+    const fallback = DEFAULT_DEFINITION_BY_COLOR_MODE[colorMode]
+    if (fallback.id === definition.id) throw error
+    return loadEditorTheme(fallback, colorMode)
+  }
 }
 
-function ensureRegistrationLoaded(
+async function ensureRegistrationLoaded(
   themeId: string,
   { silent = false }: { readonly silent?: boolean } = {},
 ): Promise<void> {
-  if (registrationByIdSync.has(themeId)) return Promise.resolve()
-  // The selection path is already loading this id; wait for it to land in the
-  // sync cache rather than starting a duplicate import.
-  const inFlight = loadedThemeById.get(themeId)
-  if (inFlight) {
-    return inFlight.then(() => undefined).catch(() => undefined)
-  }
-
-  // Built-in themes carry their palette inline — nothing to import, and nothing
-  // the shiki worker would accept.
   const definition = vscodeThemeDefinitionById.get(themeId)
-  if (!definition) return Promise.resolve()
-
-  return loadVscodeThemeRegistration(definition)
-    .then((registration) => {
-      cacheRegistration(themeId, registration)
-      // Preview notification can race this import; notify again once its registration exists.
-      if (silent) return
-      if (!themeIdIsCurrentlySelected(themeId)) return
-      notifyEditorColorThemeListeners()
-    })
-    .catch((error: unknown) => {
-      log.error({
-        action: 'editor.color-theme.preview_load_failed',
-        area: 'editor',
-        themeId,
-        error,
-      })
-    })
+  if (!definition) return
+  const options = themeRegistrationQueryOptions(definition)
+  if (resourceQueryClient.getQueryData(options.queryKey)) return
+  try {
+    await resourceQueryClient.query(options)
+    if (!silent && themeIdIsCurrentlySelected(themeId)) notifyEditorColorThemeListeners()
+  } catch (error) {
+    log.error({ action: 'editor.color-theme.preview_load_failed', area: 'editor', themeId, error })
+  }
 }
 
 function readSelectionByColorMode(): Record<EditorColorMode, string> {
@@ -355,11 +342,6 @@ function activeShikiThemeSubscriptionSnapshot(): string {
     themeId,
     getResolvedShikiThemeContentHash(themeId),
   ].join(':')
-}
-
-function cacheRegistration(themeId: string, registration: VscodeThemeRegistration) {
-  registrationByIdSync.set(themeId, registration)
-  registrationContentHashById.set(themeId, shikiThemeContentHash(themeId, registration))
 }
 
 function themeIdIsCurrentlySelected(themeId: string): boolean {

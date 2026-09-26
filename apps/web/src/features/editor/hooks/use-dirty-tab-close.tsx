@@ -18,7 +18,7 @@ import {
   editorTabRecordsForWorkbenchPanels,
   type WorkbenchPanels,
 } from '@/features/workbench/utils/panels'
-import { errorMessage } from '@/lib/file-server'
+import { clientErrorMessage } from '@/lib/client-error-taxonomy'
 import { useFocusService } from '@/lib/focus/hooks/use-service'
 import {
   focusTargetById,
@@ -371,7 +371,7 @@ async function saveAndClosePendingTab(pendingClose: PendingClose, context: SaveA
     await context.closeTabs(pendingClose.tabIds)
     context.advancePendingClose()
   } catch (error: unknown) {
-    context.setSaveError(errorMessage(error))
+    context.setSaveError(clientErrorMessage(error))
   } finally {
     context.setSaving(false)
   }

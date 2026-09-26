@@ -166,7 +166,7 @@ export class ProviderMaintenance {
     const npm = providerPackage(driverKind)
     if (!npm) return null
     try {
-      return await this.client.fetchQuery({
+      return await this.client.query({
         queryKey: ['provider', 'latest-version', npm],
         queryFn: ({ signal }) => this.fetchLatest(npm, signal),
         staleTime: LATEST_STALE_MS,

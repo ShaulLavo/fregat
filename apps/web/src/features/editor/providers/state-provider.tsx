@@ -59,9 +59,10 @@ export function EditorStateProvider({
   useLayoutEffect(() => {
     runtime.languageServerDocuments.configure(languageServerMatchConfiguration.generation)
     fileOpenIntentOwner.setRelatedPrefetch((rootPath, path) =>
-      queryClient.prefetchQuery(
-        languageServerMatchQueryOptions(rootPath, path, languageServerMatchConfiguration),
-      ),
+      queryClient
+        .query(languageServerMatchQueryOptions(rootPath, path, languageServerMatchConfiguration))
+        .then(() => undefined)
+        .catch(() => undefined),
     )
   }, [fileOpenIntentOwner, languageServerMatchConfiguration, queryClient, runtime])
 

@@ -1,3 +1,4 @@
+import { workspaceProjectTitle } from '@workspace/client-core/chat/commands'
 import { confirmedEnvironmentId } from '@/lib/environments/state/domain'
 import { orchestrationDispatchResultSchema } from '@workspace/contracts'
 import { queryOptions, type QueryClient } from '@tanstack/react-query'
@@ -19,7 +20,7 @@ export function terminalCheckoutQueryOptions(rootPath: string) {
 }
 
 export function fetchTerminalCheckout(queryClient: QueryClient, rootPath: string) {
-  return queryClient.fetchQuery(terminalCheckoutQueryOptions(rootPath))
+  return queryClient.query(terminalCheckoutQueryOptions(rootPath))
 }
 
 async function registerTerminalCheckout(
@@ -29,7 +30,7 @@ async function registerTerminalCheckout(
 ) {
   const origin = originForQueryClient(queryClient)
   confirmedEnvironmentId(origin)
-  const title = rootPath.split('/').filter(Boolean).at(-1) ?? 'Workspace'
+  const title = workspaceProjectTitle(rootPath)
   const response = await clientForQueryClient(queryClient).orchestration.commands.post(
     createProjectRegistrationCommand({ workspaceRoot: rootPath, title }),
     { fetch: { signal } },

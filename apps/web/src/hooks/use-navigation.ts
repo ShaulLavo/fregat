@@ -1,9 +1,9 @@
 import { use } from 'react'
 import { NavigationContext } from '@/providers/navigation-context'
-import { createClientInvariantError } from '@/lib/structured-errors'
+import { requireContext } from '@/lib/require-context'
 
 export function useNavigation() {
   const navigation = use(NavigationContext)
-  if (!navigation) throw createClientInvariantError('NavigationProvider is missing.')
+  requireContext(navigation, 'NavigationProvider is missing.')
   return navigation
 }

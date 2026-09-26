@@ -4,12 +4,13 @@ import path from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { DEFAULT_SETTING_VALUES, type WatchCoverage } from '@workspace/contracts'
 import {
-  errorSummary,
+  operatorErrorSummary,
   recordProcessWarning,
   recordRequestContext,
   recordRequestWarning,
   runDetached,
 } from '../observability'
+import { AsyncQueue } from '../async-queue'
 import { countDirectories } from './directory-count'
 import { NativeWatchHost, WATCH_WORKER_FAILED, type NativeWatchError } from './native-watch-host'
 import { OpenFileWatches } from './open-file-watches'
@@ -52,9 +53,6 @@ type WatcherEntry = {
   resolved?: AttachedWatch
   /** When the last holder let go of a recursive watch that stays attached for the next one. */
   idleSince?: number
-}
-type WakeSlot = {
-  current: (() => void) | null
 }
 type TransactionBarrier = {
   readonly internalPaths: Set<string>
@@ -718,25 +716,20 @@ export class FileChangeHub {
     files: Set<string>,
     options: WatchStreamOptions,
   ) {
-    const queue: WatchServerMessage[] = [{ type: 'ready', root: '' }]
-    const wake: WakeSlot = { current: null }
-
+    const queue = new AsyncQueue<WatchServerMessage>({ signal })
     const listener = (event: WatchServerMessage) => {
       const visible = streamEvent(event, files, options.includeIgnored ?? false)
       if (!visible || !deliverWatchEvent(visible, subscribed, files, options.onlyFiles)) return
 
       queue.push(visible)
-      wake.current?.()
     }
 
-    const abort = () => wake.current?.()
     let releases: WatchRelease[] = []
     const coverages: WatchRootCoverage[] = []
     const startedAt = performance.now()
     // A files stream owns a watch per file, so its `ready` never waits on a project crawl.
     const roots = options.onlyFiles ? new Set<string>() : subscribed
     listeners.add(listener)
-    signal?.addEventListener('abort', abort)
 
     try {
       for (const input of roots) {
@@ -750,7 +743,9 @@ export class FileChangeHub {
         for (const file of files) releases.push(await this.retainOpenFile(file, roots))
       }
       const coverage = streamCoverage(coverages)
-      if (coverage) queue[0] = { type: 'ready', root: '', watch: coverage }
+      queue.unshift(
+        coverage ? { type: 'ready', root: '', watch: coverage } : { type: 'ready', root: '' },
+      )
       recordRequestContext({
         watch: {
           scope: options.onlyFiles ? 'files' : 'project',
@@ -761,11 +756,11 @@ export class FileChangeHub {
         },
       })
 
-      yield* drainWatchQueue(queue, signal, wake)
+      yield* queue
     } finally {
+      queue.close()
       await releaseWatchers(releases)
       listeners.delete(listener)
-      signal?.removeEventListener('abort', abort)
     }
   }
 
@@ -776,7 +771,7 @@ export class FileChangeHub {
       recordRequestWarning('fs.watch.open_file_failed', {
         area: 'fs',
         path: file,
-        error: errorSummary(error),
+        error: operatorErrorSummary(error),
       })
       this.emit(watchError(error, file))
       return noop
@@ -914,36 +909,6 @@ function renamedDeleteEvent(event: RenameWatchServerMessage): WatchServerMessage
     version: event.version,
     writeId: event.writeId,
   }
-}
-
-async function* drainWatchQueue(
-  queue: WatchServerMessage[],
-  signal: AbortSignal | undefined,
-  wake: WakeSlot,
-) {
-  while (!signal?.aborted) {
-    const event = queue.shift()
-    if (event) {
-      yield event
-      continue
-    }
-
-    await waitForWatchQueue(signal, wake)
-  }
-}
-
-function waitForWatchQueue(signal: AbortSignal | undefined, wake: WakeSlot) {
-  return new Promise<void>((resolve) => {
-    const finish = () => {
-      if (wake.current === finish) wake.current = null
-      signal?.removeEventListener('abort', finish)
-      resolve()
-    }
-
-    wake.current = finish
-    signal?.addEventListener('abort', finish, { once: true })
-    if (signal?.aborted) finish()
-  })
 }
 
 function shouldDeliver(event: WatchServerMessage, subscribed: Set<string>) {
@@ -1114,7 +1079,7 @@ async function withNativeContentVersion(
       area: 'fs',
       operation: 'watch_event',
       path: relativePath,
-      error: errorSummary(error),
+      error: operatorErrorSummary(error),
     })
     return entry
   }
@@ -1187,6 +1152,7 @@ function watchError(error: unknown, path: string): WatchServerMessage {
   }
 }
 
+// Keeps its own fallback: contracts' `errorMessage` would print `[object Object]` in the watch error.
 function errorMessage(error: unknown) {
   if (error instanceof Error) return error.message
 

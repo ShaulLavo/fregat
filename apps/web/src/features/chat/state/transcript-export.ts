@@ -51,7 +51,7 @@ export async function copySessionTranscript(ref: ScopedSessionRef) {
 async function readTranscript(ref: ScopedSessionRef) {
   try {
     const queryClient = queryClientFor(confirmedEnvironmentOrigin(ref.environmentId))
-    return await queryClient.fetchQuery(sessionTranscriptQueryOptions(ref))
+    return await queryClient.query(sessionTranscriptQueryOptions(ref))
   } catch (error) {
     toastError('Could not read the conversation', {
       description: errorMessage(error, 'The session transcript could not be loaded.'),

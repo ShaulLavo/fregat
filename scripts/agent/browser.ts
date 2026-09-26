@@ -477,24 +477,6 @@ async function countRenders(scenario: Scenario, options: Options) {
   })
 }
 
-type CacheDump = readonly {
-  readonly origin: string
-  readonly queries: readonly {
-    readonly key: string
-    readonly status: string
-    readonly fetchStatus: string
-    readonly stale: boolean
-    readonly observers: number
-    readonly updatedAgoMs: number | null
-  }[]
-  readonly mutations: readonly {
-    readonly key: string
-    readonly status: string
-    readonly scope: string | null
-    readonly variables: string
-  }[]
-}[]
-
 async function dumpCaches(options: Options) {
   const evidence = await createEvidence('caches', new URL(options.url).pathname)
   return withPage(options, evidence, async (page) => {
@@ -504,12 +486,12 @@ async function dumpCaches(options: Options) {
       return 1
     }
     await page.waitForTimeout(2_000)
-    const dump = (await page.evaluate(readCaches)) as CacheDump
+    const dump = await page.evaluate(readCaches)
     await evidence.json('caches.json', dump)
     const lines = ['# caches', '']
     for (const client of dump) {
       lines.push(
-        `## ${client.origin}`,
+        `## ${client.label}`,
         '',
         `queries: ${client.queries.length}, mutations: ${client.mutations.length}`,
         '',
@@ -556,15 +538,28 @@ function readCaches() {
     getQueryCache(): { getAll(): AnyQuery[] }
     getMutationCache(): { getAll(): AnyMutation[] }
   }
-  const clients = (globalThis as { __fregatQueryClients?: Map<string, AnyClient> })
-    .__fregatQueryClients
-  if (!clients) return []
+  const registry = globalThis as {
+    __fregatQueryClients?: Map<string, AnyClient>
+    __fregatResourceQueryClient?: AnyClient
+  }
+  const clients = [...(registry.__fregatQueryClients ?? new Map<string, AnyClient>())].map(
+    ([origin, client]) => ({ scope: 'environment', label: origin, origin, client }),
+  )
+  if (registry.__fregatResourceQueryClient)
+    clients.push({
+      scope: 'resources',
+      label: 'Browser resources',
+      origin: '',
+      client: registry.__fregatResourceQueryClient,
+    })
   const compact = (value: unknown) => {
     const text = JSON.stringify(value) ?? String(value)
     return text.length > 80 ? `${text.slice(0, 77)}…` : text
   }
-  return [...clients.entries()].map(([origin, client]) => ({
-    origin,
+  return clients.map(({ scope, label, origin, client }) => ({
+    scope,
+    label,
+    origin: origin || null,
     queries: client
       .getQueryCache()
       .getAll()

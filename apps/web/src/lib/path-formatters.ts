@@ -1,7 +1,8 @@
 import { filesystemPath } from '@/lib/documents/utils/identity'
 import type { FilesystemPath } from '@/lib/documents/utils/types'
 
-// Display labels fall back to 'Root'; pathLeaf below preserves an empty leaf.
+// Three leaf answers for '' and 'a/': basename gives 'Root' and 'a', pathLeaf '' and '',
+// lastPathSegment '' and 'a'. Each caller depends on its own answer.
 export function basename(path: string) {
   const parts = path.split('/').filter(Boolean)
   return parts.at(-1) ?? 'Root'
@@ -33,6 +34,7 @@ export function formatSize(size: number) {
   return `${value.toFixed(value >= 10 || exponent === 0 ? 0 : 1)} ${units[exponent]}`
 }
 
+// Names the root and keeps outside paths; workspaceRelativePath and toWorkspaceRelative return null outside.
 export function toTreePath(path: string, rootPath: string) {
   if (path === rootPath) return basename(path)
   if (!rootPath) return path
@@ -55,4 +57,9 @@ export function matchesWorkspaceRoot(path: string, rootPath: string) {
 
 export function pathLeaf(path: string) {
   return path.slice(path.lastIndexOf('/') + 1)
+}
+
+export function lastPathSegment(path: string) {
+  const parts = path.split('/').filter(Boolean)
+  return parts.at(-1) ?? path
 }

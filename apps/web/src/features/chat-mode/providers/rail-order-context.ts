@@ -1,6 +1,6 @@
 import { createContext, use } from 'react'
 
-import { clientErrors } from '@/lib/structured-errors'
+import { requireContext } from '@/lib/require-context'
 
 /**
  * Dropping a row is an app-level command — it mints an order key and dispatches
@@ -19,11 +19,6 @@ export const ChatRailOrderContext = createContext<ChatRailOrder | null>(null)
 
 export function useChatRailOrder() {
   const railOrder = use(ChatRailOrderContext)
-  if (!railOrder) {
-    throw clientErrors.CONTEXT_MISSING({
-      message: 'useChatRailOrder must be used within ChatRailOrderProvider',
-    })
-  }
-
+  requireContext(railOrder, 'useChatRailOrder must be used within ChatRailOrderProvider')
   return railOrder
 }

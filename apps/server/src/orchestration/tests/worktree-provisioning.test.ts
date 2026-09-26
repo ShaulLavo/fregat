@@ -2,13 +2,13 @@ import { unlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { afterEach, expect, test } from 'vitest'
 import { closeTestApps } from '../../../test/server'
-import { executeGit } from '../../../test/factories/orchestration'
 import {
   interruptProvisioning,
   lifecycleSessionId,
   lifecycleWorktreeId,
   worktreeLifecycleFixture,
 } from '../../../test/factories/worktree-lifecycle'
+import { runGit } from '../../testing/git'
 
 const fixtures: Awaited<ReturnType<typeof worktreeLifecycleFixture>>[] = []
 afterEach(async () => {
@@ -32,14 +32,18 @@ test('failed creation blocks the original message and retry forks the saved comm
   })
   await unlink(failed.canonicalPath)
   await writeFile(path.join(fixture.root, 'tracked.txt'), 'base moved\n')
-  await executeGit(fixture.root, 'commit', '-am', 'move base')
-  await executeGit(fixture.root, 'checkout', '-b', 'later-base')
+  await runGit(fixture.root, ['commit', '-am', 'move base'], { cwdMode: 'option' })
+  await runGit(fixture.root, ['checkout', '-b', 'later-base'], { cwdMode: 'option' })
   await fixture.command({ type: 'worktree.retry', worktreeId: lifecycleWorktreeId })
   await fixture.engine.providerRuntimeIdle()
   const model = await fixture.engine.readModelSnapshot()
   expect(model.worktrees.get(lifecycleWorktreeId)?.lifecycle.state).toBe('ready')
   expect(model.worktrees.get(lifecycleWorktreeId)).toMatchObject({ baseBranch: 'main' })
-  expect(await executeGit(failed.canonicalPath, 'rev-parse', 'HEAD')).toBe(failed.baseCommit)
+  expect(
+    (
+      await runGit(failed.canonicalPath, ['rev-parse', 'HEAD'], { cwdMode: 'option' })
+    ).stdout.trim(),
+  ).toBe(failed.baseCommit)
   expect(fixture.adapter.startedTurns).toHaveLength(1)
   expect(fixture.adapter.startedTurns[0]?.cwd).toBe(failed.canonicalPath)
   expect(

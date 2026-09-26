@@ -1,4 +1,11 @@
-import type { HighlighterCore, ThemeRegistrationAny, TokensResult } from 'shiki/core'
+import { QueryClient } from '@tanstack/query-core'
+import { markdownResourceKeys } from '../state/query-keys'
+import type {
+  createHighlighterCore,
+  HighlighterCore,
+  ThemeRegistrationAny,
+  TokensResult,
+} from 'shiki/core'
 import { bundledLanguages, bundledLanguagesInfo } from 'shiki/langs'
 
 import type { CodeHighlighter, HighlightInput } from '../providers/code-highlighter-context'
@@ -7,6 +14,7 @@ export type ShikiHighlighterOptions = {
   /** Light and dark palettes. Both are registered; tokens carry both colours. */
   readonly themes: readonly [ThemeRegistrationAny, ThemeRegistrationAny]
   readonly themeKey: string
+  readonly createCore?: typeof createHighlighterCore
 }
 
 const PLAIN_TEXT = 'text'
@@ -31,28 +39,26 @@ export function resolveLanguage(language: string): string {
 export function createShikiHighlighter({
   themes,
   themeKey,
+  createCore = loadHighlighterCore,
 }: ShikiHighlighterOptions): CodeHighlighter {
   const [light, dark] = [namedTheme(themes[0], 'light'), namedTheme(themes[1], 'dark')]
-  let core: HighlighterCore | null = null
-  let ready: Promise<HighlighterCore> | null = null
-  // Created on the first fence, not at construction, so building a
-  // highlighter during render has no side effect.
-  function highlighterCore(): Promise<HighlighterCore> {
-    ready ??= loadHighlighterCore([light, dark]).then(
-      (highlighter) => {
-        core = highlighter
-        return highlighter
-      },
-      (error: unknown) => {
-        // The next fence tries again instead of inheriting a rejected promise.
-        ready = null
-        throw error
-      },
-    )
-    return ready
-  }
-  const loadedLanguages = new Set<string>([PLAIN_TEXT])
-  const loading = new Map<string, Promise<void>>()
+  const resources = new QueryClient()
+  let disposed = false
+  const coreOptions = {
+    queryKey: markdownResourceKeys.core,
+    queryFn: async () => {
+      const { createJavaScriptRegexEngine } = await import('shiki/engine/javascript')
+      const engine = createJavaScriptRegexEngine({ forgiving: true })
+      const core = await createCore({ engine, langs: [], themes: [light, dark] })
+      if (disposed) core.dispose()
+      return core
+    },
+    staleTime: 'static',
+    gcTime: Infinity,
+    networkMode: 'always',
+    structuralSharing: false,
+    retry: false,
+  } as const
 
   function tokens(highlighter: HighlighterCore, code: string, language: string): TokensResult {
     return highlighter.codeToTokens(code, {
@@ -61,35 +67,44 @@ export function createShikiHighlighter({
     })
   }
 
-  function load(language: string): Promise<void> {
-    const pending = loading.get(language)
-    if (pending) return pending
-
-    const grammar = bundledLanguages[language as keyof typeof bundledLanguages]
-    const promise = highlighterCore().then(
-      async (highlighter) => {
-        // A grammar that fails to load renders as plain text for the session.
-        if (grammar) await highlighter.loadLanguage(grammar).catch(noop)
-        loadedLanguages.add(language)
+  function load(language: string) {
+    return resources.query({
+      queryKey: markdownResourceKeys.language(language),
+      queryFn: async () => {
+        const highlighter = await resources.query(coreOptions)
+        const grammar = bundledLanguages[language as keyof typeof bundledLanguages]
+        // A broken grammar stays plain for this highlighter lifetime, including streamed chunks.
+        if (grammar) await highlighter.loadLanguage(grammar).catch(() => undefined)
+        return true
       },
-      // A core that failed to load is retried by the next fence.
-      () => void loading.delete(language),
-    )
-    loading.set(language, promise)
-
-    return promise
+      staleTime: 'static',
+      gcTime: Infinity,
+      networkMode: 'always',
+      structuralSharing: false,
+      retry: false,
+    })
   }
 
   return {
+    dispose() {
+      if (disposed) return
+      disposed = true
+      resources.getQueryData<HighlighterCore>(markdownResourceKeys.core)?.dispose()
+      resources.clear()
+    },
     highlight({ code, language }: HighlightInput, onResult) {
+      if (disposed) return null
       const resolved = resolveLanguage(language)
-      if (core && loadedLanguages.has(resolved)) return safeTokens(core, code, resolved)
-
-      void load(resolved).then(() => {
-        if (!core) return
-        onResult(safeTokens(core, code, resolved))
-      })
-
+      const core = resources.getQueryData<HighlighterCore>(markdownResourceKeys.core)
+      if (core && resources.getQueryData(markdownResourceKeys.language(resolved)))
+        return safeTokens(core, code, resolved)
+      void load(resolved)
+        .then(() => {
+          if (disposed) return
+          const loaded = resources.getQueryData<HighlighterCore>(markdownResourceKeys.core)
+          if (loaded) onResult(safeTokens(loaded, code, resolved))
+        })
+        .catch(() => undefined)
       return null
     },
     themeKey,
@@ -103,16 +118,11 @@ export function createShikiHighlighter({
 }
 
 // Shiki loads with the first fence; a static import would put it in the entry chunk.
-async function loadHighlighterCore(themes: ThemeRegistrationAny[]): Promise<HighlighterCore> {
-  const [{ createHighlighterCore }, { createJavaScriptRegexEngine }] = await Promise.all([
-    import('shiki/core'),
-    import('shiki/engine/javascript'),
-  ])
-  return createHighlighterCore({
-    engine: createJavaScriptRegexEngine({ forgiving: true }),
-    langs: [],
-    themes,
-  })
+async function loadHighlighterCore(
+  ...args: Parameters<typeof createHighlighterCore>
+): Promise<HighlighterCore> {
+  const { createHighlighterCore } = await import('shiki/core')
+  return createHighlighterCore(...args)
 }
 
 function namedTheme(
@@ -121,5 +131,3 @@ function namedTheme(
 ): ThemeRegistrationAny & { name: string } {
   return { ...theme, name: theme.name ?? `markdown-${slot}` }
 }
-
-function noop() {}

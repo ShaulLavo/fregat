@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { LogEventDetail, LogEventSummary, LogEventsResult } from '@workspace/contracts'
 
-import { mergeLiveLogEvent, mergeLiveLogEvents } from '@/features/logs/state/live-cache'
+import { mergeLiveLogEvent, mergeLiveLogEvents } from '@workspace/client-core/logs/live-cache'
 
 describe('mergeLiveLogEvent', () => {
   it('prepends unique live events and increments the visible total', () => {
@@ -36,6 +36,17 @@ describe('mergeLiveLogEvent', () => {
 })
 
 describe('mergeLiveLogEvents', () => {
+  it('places late frames by timestamp and counts only new ids even without cached details', () => {
+    const current = result([event({ id: 'newest', timestamp: '2026-05-25T10:02:00.000Z' })])
+    const next = mergeLiveLogEvents(current, [
+      event({ id: 'late', timestamp: '2026-05-25T10:01:00.000Z' }),
+      event({ id: 'newest', timestamp: '2026-05-25T10:02:00.000Z' }),
+    ])
+
+    expect(next?.events.map((candidate) => candidate.id)).toEqual(['newest', 'late'])
+    expect(next?.total).toBe(2)
+  })
+
   it('prepends a live batch in newest-first arrival order', () => {
     const current = result([event({ id: 'old' })])
     const next = mergeLiveLogEvents(current, [event({ id: 'a' }), event({ id: 'b' })])

@@ -62,7 +62,10 @@ import {
 import { elapsedMs } from '@workspace/utils/timing'
 import { durationBetweenMs } from '@workspace/utils/timing'
 import { dismissSaveError, notifySaveError } from '@/features/settings/utils/notify-save-error'
-import { providerEnabledOperation, themeCustomization } from '@/features/settings/utils/operations'
+import {
+  providerEnabledOperation,
+  themeCustomization,
+} from '@workspace/client-core/settings/operations'
 import { admitSettingsMutationResult } from '@/features/settings/state/snapshot-admission'
 import { annotateClientError, clientErrorMetadata } from '@/lib/client-error-context'
 import { log } from '@/lib/client-logging'

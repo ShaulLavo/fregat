@@ -14,6 +14,7 @@ type ClientErrorReport = {
 }
 
 const sanitizeDiagnosticValue = createDiagnosticSanitizer({
+  // No limit here: `safeClientEvent` keeps the head 2000 characters of every string.
   formatString: (value) => value,
   errorFields: (error) => ({
     code: errorStringField(error, 'code'),

@@ -5,7 +5,8 @@ import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 import { createClientInvariantError } from '@/lib/structured-errors'
 
 import { FilePickerDialog, type FilePickerMode } from '@/components/file-picker-dialog'
-import { errorMessage, statPath } from '@/lib/file-server'
+import { clientErrorMessage } from '@/lib/client-error-taxonomy'
+import { statPath } from '@/lib/file-server'
 import {
   isDirectoryEntry,
   isFileEntry,
@@ -145,7 +146,7 @@ async function handleNativePickResult(
     scope.warn('Native picker entry hydration failed.', { error })
     scope.set({ outcome: 'error' })
     toastError('Could not open selected path', {
-      description: errorMessage(error),
+      description: clientErrorMessage(error),
     })
   } finally {
     scope.end({ durationMs: elapsedMs(startedAt) })
@@ -163,7 +164,7 @@ async function selectedNativePath(
   } catch (error) {
     if (isActive()) {
       scope.increment('picker.errorCount')
-      scope.warn('Native picker failed.', { message: errorMessage(error) })
+      scope.warn('Native picker failed.', { message: clientErrorMessage(error) })
       scope.set({ outcome: 'error' })
     }
 

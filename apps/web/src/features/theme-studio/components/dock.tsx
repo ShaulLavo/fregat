@@ -93,7 +93,7 @@ export function Dock() {
   async function colorsFromImage(asset: AssetId) {
     if (!draftPalette.colors) return
     try {
-      const colors = await owner.fetchQuery(wallpaperColorsOptions(asset))
+      const colors = await owner.query(wallpaperColorsOptions(asset))
       draftPalette.setColors((current, currentMode) =>
         paletteFromWallpaperColors(colors, currentMode, current),
       )

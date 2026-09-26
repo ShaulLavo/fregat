@@ -273,11 +273,9 @@ records the fixes, baseline corrections, and focused checks. Plan 096 is also co
 `isRecord`, subscriptions) and added the `dupes` / `dupes:functions` gates. What remains in those five
 plans is the divergent helpers, where a decision picks which behaviour wins; the gates cannot see them.
 
-[Plan 091](plans/091-error-and-timing-helpers.md), [Plan 092](plans/092-path-and-uri-helpers.md),
-[Plan 093](plans/093-web-react-and-store-ceremony.md), and
-[Plan 094](plans/094-client-core-web-tui-parity.md) consolidate on top of those fixes.
-[Plan 095](plans/095-server-plumbing.md) can proceed independently of the middle plans,
-while preserving the same defect regressions. Plan 096 is complete; its
+The completion wave (lane L6, 2026-09-25) finished Plans 091, 092, 093 and 095 and deleted them;
+the owner decided 091 §9.3 (adopt the cause routing) and 093 §5.1 (the theme context keeps `undefined`).
+Plan 094 is complete; its [verification record](docs/verification/2026-09-25-client-core-parity.md) records the shared policies and host boundaries. Plan 096 is complete; its
 [web layering reference](docs/web-layering.md) records the implementation and review.
 
 The middle plans consolidate onto the shared packages. Plan 091 widens the observability sanitizer,
@@ -425,27 +423,17 @@ deduped in `vite.config.ts`.
 
 ## React compiler and pane lifetime lane
 
-Requested 2026-09-20. Plan 127 precedes
-[Plan 128](plans/128-react-19-patterns.md). Plan 127 is done (`d5e7f213`, `e93ff779`) and deleted:
-the compiler census runs in `gates`, and `lib/keep-alive` keeps terminals mounted across layout
-changes. Plan 128 is not started and is partly obsolete. `2acc3b73` deleted the server's detach TTL,
-so no shell is killed ten minutes after an unmount, and keep-alive covers its first two terminal
-sites. The completion wave runs it rewritten small: A1.3, B2 and the `AGENTS.md` section.
+Plans 127 and 128 are done and deleted. The compiler census runs in `gates`, and
+`lib/keep-alive` retains terminal content across layout changes. Terminal connection notices
+now overlay the host. Tab strips and work-log groups observe Fragment children; capped text
+keeps mutation observation. Current rules are in `AGENTS.md`, with regressions, browser checks
+and before/after traces in [the verification record](docs/verification/2026-09-25-retained-panes.md).
 
-Plan 127 is the repair pass. It turns the React Compiler's diagnostics on, pins them with a census
-beside the design census, clears the `ref={focusTarget.ref}` bailouts, stops the bottom panel and its
-collapse from unmounting every terminal, settles git stage,
-unstage and discard from the response the server already computed, and takes one command-bus capture
-per palette keystroke instead of one per row. Plan 128 follows with the written rules and the two
-prerequisites the remaining pane work waits behind: `packages/tree` lifetime, and a `VirtualList`
-contract for hiding and revealing a populated list. Its `AGENTS.md` sections are the deliverable,
-because none of its three patterns can be gated by tooling.
-
-Neither plan reorders another lane. The scoped error boundary and the `<Activity>` counter-example
-are shared with Plan 109 ([boot and first load](docs/boot-and-first-load.md)); whichever lands first owns the
-implementation and the others consume it. Verification tooling reconciles with Plan 119 and mutation
-shape with Plan 118. No measurement has been taken for either plan: the dev server is down, only the
-mesh answers, and every `agent:browser` line in both is a prescription for the implementer.
+Plan 135 is complete and deleted. Query now owns browser and Markdown resource acquisition,
+IndexedDB connections, server lookups, settings recovery, and shared web/TUI history pages.
+The deprecated-API gate runs in `verify`, `gates`, and CI, and L6's final rebase migrated the
+lanes that merged before it. The [verification record](docs/verification/2026-09-25-query-ownership.md)
+records cache lifetimes, route preparation, regressions, browser evidence and bundle measurements.
 
 ## Workaround removal lane
 

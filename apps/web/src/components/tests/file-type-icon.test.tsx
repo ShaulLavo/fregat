@@ -22,6 +22,13 @@ test.each(['index.html', '.prettierrc', 'next.config.js', 'component.tsx', 'unkn
   },
 )
 
+test('tree file-name icons key on the last path segment', () => {
+  const byFileName = fileTreeIconsForPaths(['src/Unlisted.file']).byFileName
+
+  expect(Object.keys(byFileName ?? {})).toContain('unlisted.file')
+  expect(Object.keys(byFileName ?? {})).not.toContain('src/unlisted.file')
+})
+
 test('repeated gradient icons reference their own definitions', () => {
   const icon = iconForEntry({ name: 'next.config.js', type: 'file' })
   const { container } = renderWithProviders(

@@ -2,6 +2,7 @@ import { getBuiltInFileIconColor } from '@workspace/tree'
 import type { FileTreeIconConfig, RemappedIcon } from '@workspace/tree'
 
 import { VSCODE_ICON_GLYPHS } from '@/lib/vscode-icon-glyphs'
+import { lastPathSegment } from '@/lib/path-formatters'
 
 export type FileIconEntry = {
   name: string
@@ -562,7 +563,7 @@ function fileTreeFileNameIconsForPaths(paths: readonly string[]) {
   for (const path of paths) {
     if (path.endsWith('/')) continue
 
-    const name = basenameForIconPath(path)
+    const name = lastPathSegment(path)
     icons[normalizeName(name)] = treeIconReference(iconNameForFile(name))
   }
 
@@ -626,11 +627,6 @@ function treeIconReference(name: VscodeIconName): RemappedIcon {
 
 function treeIconSymbolName(name: VscodeIconName) {
   return `${TREE_ICON_SYMBOL_PREFIX}${name}`
-}
-
-function basenameForIconPath(path: string) {
-  const parts = path.split('/').filter(Boolean)
-  return parts.at(-1) ?? path
 }
 
 function tokenForIconName(name: VscodeIconName) {

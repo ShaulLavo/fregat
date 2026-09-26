@@ -16,7 +16,8 @@ import { GitService } from '../../src/git/service'
 import { GitWorktreeService } from '../../src/git/worktrees'
 import { createWorkspacePaths } from '../../src/fs/path'
 import { DEFAULT_MAX_TEXT_FILE_BYTES } from '../../src/fs/limits'
-import { executeGit, FIXTURE_MODEL } from './orchestration'
+import { FIXTURE_MODEL } from './orchestration'
+import { runGit } from '../../src/testing/git'
 
 export const lifecycleWorktreeId = v.parse(worktreeIdSchema, '11111111-1111-4111-8111-111111111169')
 export const lifecycleSessionId = v.parse(sessionIdSchema, '22222222-2222-4222-8222-222222222269')
@@ -31,13 +32,11 @@ export async function worktreeLifecycleFixture(
   } = {},
 ) {
   const root = await mkdtemp(path.join(tmpdir(), 'platform-lifecycle-'))
-  await executeGit(root, 'init', '-b', 'main')
-  await executeGit(root, 'config', 'user.name', 'Lifecycle Test')
-  await executeGit(root, 'config', 'user.email', 'lifecycle@example.invalid')
+  await runGit(root, ['init', '-b', 'main'], { cwdMode: 'option' })
   await writeFile(path.join(root, 'tracked.txt'), 'initial\n')
   await writeFile(path.join(root, '.gitignore'), 'ignored.txt\n')
-  await executeGit(root, 'add', '.')
-  await executeGit(root, 'commit', '-m', 'initial')
+  await runGit(root, ['add', '.'], { cwdMode: 'option' })
+  await runGit(root, ['commit', '-m', 'initial'], { cwdMode: 'option' })
   const database = createTestDatabase()
   migratePlatformDatabase(database.db)
   let adapter = new MockProviderAdapter(options.adapter)

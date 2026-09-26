@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import type { GitAutoPullState } from '@workspace/contracts'
 import { afterEach, describe, expect, it } from 'vitest'
-import { runGit } from '../../../test/factories/git-worktree'
+import { runGit } from '../../testing/git'
 import { DEFAULT_MAX_TEXT_FILE_BYTES } from '../../fs/limits'
 import { createWorkspacePaths } from '../../fs/path'
 import { withGitRepositoryLane } from '../repository-lane'
@@ -38,7 +38,7 @@ async function fixture(enabled = true) {
     await runGit(upstream, ['push', '--quiet', 'origin', 'main'])
     await runGit(checkout, ['fetch', '--quiet', 'origin'])
   }
-  const head = () => runGit(checkout, ['rev-parse', 'HEAD'])
+  const head = async () => (await runGit(checkout, ['rev-parse', 'HEAD'])).stdout.trimEnd()
   const read = async () => (await git.status('checkout', true)).autoPull
   /** Reads until the detached pull settles. */
   const settle = async () => {
@@ -71,7 +71,7 @@ describe('automatic default-branch pull', () => {
     const repo = await fixture()
     expect(await repo.read()).toEqual({ state: 'current' })
     await repo.advance()
-    const target = await runGit(repo.checkout, ['rev-parse', 'origin/main'])
+    const target = (await runGit(repo.checkout, ['rev-parse', 'origin/main'])).stdout.trimEnd()
     expect(await repo.read()).toEqual({ state: 'pulling' })
     expect(await repo.settle()).toEqual({ state: 'current' })
     expect(await repo.head()).toBe(target)
@@ -198,7 +198,7 @@ describe('automatic default-branch pull', () => {
     await rm(lock)
     expect((await repo.read())?.state).toBe('failed')
     expect(await repo.head()).toBe(before)
-    expect(await runGit(repo.checkout, ['status', '--porcelain'])).toBe('')
+    expect((await runGit(repo.checkout, ['status', '--porcelain'])).stdout.trimEnd()).toBe('')
   })
 })
 

@@ -1,15 +1,10 @@
 import { use } from 'react'
 
 import { CommandPaletteActionsContext } from '@/features/command-palette/providers/actions-context'
-import { clientErrors } from '@/lib/structured-errors'
+import { requireContext } from '@/lib/require-context'
 
 export function useActions() {
   const actions = use(CommandPaletteActionsContext)
-  if (!actions) {
-    throw clientErrors.CONTEXT_MISSING({
-      message: 'useActions must be used within CommandPaletteActionsContext',
-    })
-  }
-
+  requireContext(actions, 'useActions must be used within CommandPaletteActionsContext')
   return actions
 }

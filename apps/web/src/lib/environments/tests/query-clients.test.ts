@@ -110,7 +110,7 @@ test('pins refetches to their owning real server after the active environment sw
 
   try {
     let firstServerReads = 0
-    const initial = await first.fetchQuery({
+    const initial = await first.query({
       queryKey: ['health'],
       queryFn: async ({ client: queryClient }) => {
         firstServerReads += 1
@@ -123,7 +123,7 @@ test('pins refetches to their owning real server after the active environment sw
     useEnvironmentsStore.getState().activate(originB)
     await first.invalidateQueries({ refetchType: 'all' })
     const resultA = v.parse(healthDescriptorSchema, first.getQueryData(['health']))
-    const resultB = await second.fetchQuery({
+    const resultB = await second.query({
       queryKey: ['health'],
       queryFn: async ({ client: queryClient }) =>
         v.parse(

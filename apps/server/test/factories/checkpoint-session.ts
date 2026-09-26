@@ -20,6 +20,7 @@ import { DEFAULT_MAX_TEXT_FILE_BYTES } from '../../src/fs/limits'
 import { createWorkspacePaths } from '../../src/fs/path'
 import { GitService } from '../../src/git/service'
 import { OrchestrationEngine } from '../../src/orchestration/engine'
+import { runGit } from '../../src/testing/git'
 
 export const checkpointSessionId = v.parse(sessionIdSchema, '00000000-0000-4000-8000-000000000001')
 const projectId = v.parse(projectIdSchema, '10000000-0000-4000-8000-000000000001')
@@ -104,19 +105,4 @@ export async function dispatchCheckpointSession(
     turnId: v.parse(turnIdSchema, 'turn-1'),
     type: 'session.turn.diff.complete',
   })
-}
-
-export async function runGit(root: string, args: readonly string[]) {
-  const process = Bun.spawn(['git', '-C', root].concat(args), {
-    stderr: 'pipe',
-    stdout: 'pipe',
-  })
-  const [stdout, stderr, exitCode] = await Promise.all([
-    new Response(process.stdout).text(),
-    new Response(process.stderr).text(),
-    process.exited,
-  ])
-  if (exitCode === 0) return { stderr, stdout }
-
-  throw new TypeError(`${stderr}${stdout}`.trim())
 }

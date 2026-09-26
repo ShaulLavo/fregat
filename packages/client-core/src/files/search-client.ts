@@ -15,7 +15,8 @@ import type {
 
 import type { Client } from '../transport/client'
 import { parseEdenSseStream, type EdenSseEvent } from '../transport/eden'
-import { clientErrors } from './search-errors'
+import { transportErrors } from '../transport/structured-errors'
+import { searchErrors } from './search-errors'
 
 export type WorkspaceSearchResult = {
   count: number
@@ -54,7 +55,7 @@ export async function collectWorkspaceSearch(
   // No terminal field is defaulted: a defaulted `truncated: false` reads as a
   // finished run. Belt-and-braces — the producer already throws without `done`.
   if (!done)
-    throw clientErrors.SEARCH_INCOMPLETE({
+    throw searchErrors.SEARCH_INCOMPLETE({
       matchCount: matches.length,
       internal: { at: 'collect' },
     })
@@ -81,11 +82,11 @@ export async function* streamWorkspaceSearch(
     fetch: { signal },
   })
   if (response.error)
-    throw clientErrors.SEARCH_FAILED({
+    throw searchErrors.SEARCH_FAILED({
       status: response.status,
       internal: { matchMode: query.matchMode, caseSensitive: query.caseSensitive === true },
     })
-  if (!response.data) throw clientErrors.EDEN_STREAM_MISSING({ label: 'Search' })
+  if (!response.data) throw transportErrors.EDEN_STREAM_MISSING({ label: 'Search' })
 
   let matchCount = 0
   let terminated = false
@@ -101,7 +102,7 @@ export async function* streamWorkspaceSearch(
 
   // Throwing, not returning: `for await` discards a generator's return value with
   // no diagnostic, so a consumer's catch is the only enforceable handoff.
-  if (!terminated) throw clientErrors.SEARCH_INCOMPLETE({ matchCount, internal: { at: 'stream' } })
+  if (!terminated) throw searchErrors.SEARCH_INCOMPLETE({ matchCount, internal: { at: 'stream' } })
 }
 
 function workspaceSearchRequestQuery(query: WorkspaceSearchQuery) {
@@ -129,13 +130,13 @@ function workspaceSearchEventFromSse(event: EdenSseEvent): WorkspaceSearchEvent 
   if (event.event === 'warning') return warningEventFromData(event.data)
   if (event.event === 'done') return doneEventFromData(event.data)
   if (event.event === 'error') {
-    throw clientErrors.SEARCH_EVENT_ERROR({
+    throw searchErrors.SEARCH_EVENT_ERROR({
       message: searchEventError(event.data),
       internal: { at: 'sse-error-event' },
     })
   }
 
-  throw clientErrors.UNEXPECTED_SEARCH_EVENT({
+  throw searchErrors.UNEXPECTED_SEARCH_EVENT({
     event: event.event,
     internal: { known: ['match', 'warning', 'done', 'error'] },
   })
@@ -144,7 +145,7 @@ function workspaceSearchEventFromSse(event: EdenSseEvent): WorkspaceSearchEvent 
 function matchEvent(data: unknown): WorkspaceSearchEvent {
   const match = searchEventMatch(data)
   if (!match)
-    throw clientErrors.SEARCH_MATCH_INVALID({
+    throw searchErrors.SEARCH_MATCH_INVALID({
       internal: { fields: isRecord(data) ? Object.keys(data) : typeof data },
     })
 
@@ -189,16 +190,16 @@ function doneEventFromData(data: unknown): WorkspaceSearchDoneEvent {
   // Naming the field is the whole point: a `done` event that fabricates an empty
   // finished run is indistinguishable from a real one without it.
   if (!isRecord(data))
-    throw clientErrors.SEARCH_DONE_INVALID({ internal: { missing: 'object', saw: typeof data } })
+    throw searchErrors.SEARCH_DONE_INVALID({ internal: { missing: 'object', saw: typeof data } })
   const fields = Object.keys(data)
   if (typeof data.count !== 'number')
-    throw clientErrors.SEARCH_DONE_INVALID({ internal: { missing: 'count', fields } })
+    throw searchErrors.SEARCH_DONE_INVALID({ internal: { missing: 'count', fields } })
   if (typeof data.path !== 'string')
-    throw clientErrors.SEARCH_DONE_INVALID({ internal: { missing: 'path', fields } })
+    throw searchErrors.SEARCH_DONE_INVALID({ internal: { missing: 'path', fields } })
   if (typeof data.query !== 'string')
-    throw clientErrors.SEARCH_DONE_INVALID({ internal: { missing: 'query', fields } })
+    throw searchErrors.SEARCH_DONE_INVALID({ internal: { missing: 'query', fields } })
   if (typeof data.truncated !== 'boolean')
-    throw clientErrors.SEARCH_DONE_INVALID({ internal: { missing: 'truncated', fields } })
+    throw searchErrors.SEARCH_DONE_INVALID({ internal: { missing: 'truncated', fields } })
 
   return {
     count: data.count,

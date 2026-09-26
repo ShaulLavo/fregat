@@ -11,7 +11,7 @@ import { vi } from 'vitest'
 
 import { useEditorCommands } from '@/features/editor/hooks/use-editor-commands'
 import { useEditorRuntime } from '@/features/editor/hooks/use-runtime'
-import { languageIdForFilePath } from '@/features/editor/utils/file-path'
+import { languageIdForFilePath } from '@/lib/file-language'
 import { notifyChangedFilesystemConflict } from '@/features/workspace/state/event-conflict-adapter'
 import { createFileContent, ensureFolderPath, fetchFile } from '@/lib/file-server'
 import { setFileSnapshotQueryData } from '@/lib/file-snapshot-query-cache'

@@ -14,6 +14,7 @@ import {
   type WorkspaceSearchMatch,
   type WorkspaceSearchMeasurement,
   type WorkspaceSearchQuery,
+  workspaceSearchGlobPath,
   workspaceSearchPreview,
 } from '@workspace/contracts'
 
@@ -387,17 +388,7 @@ function canSearchOpenBuffer(
   if (!query.includeContent) return false
   if (query.entryType && query.entryType !== 'file') return false
   if (!isPathInWorkspace(document.path, query.path)) return false
-  if (!matcher.pathMatches(globMatchPath(query.path, document.path))) return false
+  if (!matcher.pathMatches(workspaceSearchGlobPath(query.path, document.path))) return false
 
   return true
-}
-
-function globMatchPath(rootPath: string, path: string) {
-  if (!rootPath) return path
-  if (path === rootPath) return ''
-
-  const prefix = `${rootPath}/`
-  if (!path.startsWith(prefix)) return path
-
-  return path.slice(prefix.length)
 }

@@ -1,7 +1,8 @@
 import { isTypeScriptFileName } from './shared/file-type'
+import { canReadPath, openDocumentForFileName } from './shared/boundary'
 import { samePath } from '../../utils/path'
 import { normalizeNativePath } from '../../utils/path'
-import { isInsidePath } from '../../utils/path'
+import { isSameOrDescendant } from '../../fs/path'
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 
@@ -64,8 +65,8 @@ type ProjectConfig = {
 }
 
 export class TypeScriptLspSession {
-  private readonly root: string
-  private readonly workspaceRoot: string
+  readonly root: string
+  readonly workspaceRoot: string
   private readonly sendMessage: (message: string) => void
   private readonly documents = new Map<lsp.DocumentUri, OpenDocument>()
   private readonly diagnosticTimers = new Map<lsp.DocumentUri, ReturnType<typeof setTimeout>>()
@@ -230,7 +231,7 @@ export class TypeScriptLspSession {
     const files = new Set(configFileNames.map(normalizeNativePath))
     for (const document of this.documents.values()) files.add(document.fileName)
     return Array.from(files).filter(
-      (fileName) => isTypeScriptFileName(fileName) && isInsidePath(this.root, fileName),
+      (fileName) => isTypeScriptFileName(fileName) && isSameOrDescendant(this.root, fileName),
     )
   }
 
@@ -260,7 +261,7 @@ export class TypeScriptLspSession {
   ): string | null {
     for (const reference of parsed.projectReferences ?? []) {
       const referenceConfig = referencedConfigFileName(configFileName, reference)
-      if (!isInsidePath(this.root, referenceConfig)) continue
+      if (!isSameOrDescendant(this.root, referenceConfig)) continue
       if (this.configIncludesFile(referenceConfig, fileName)) return referenceConfig
     }
     return null
@@ -318,16 +319,16 @@ export class TypeScriptLspSession {
 
   private readFile(fileName: string): string | undefined {
     const normalized = normalizeNativePath(fileName)
-    const openDocument = this.documentForFileName(normalized)
+    const openDocument = openDocumentForFileName(this.documents, normalized)
     if (openDocument) return openDocument.text
-    if (!this.canReadFile(normalized)) return undefined
+    if (!canReadPath(this, normalized)) return undefined
     return ts.sys.readFile(normalized)
   }
 
   private fileExists(fileName: string): boolean {
     const normalized = normalizeNativePath(fileName)
-    if (this.documentForFileName(normalized)) return true
-    if (!this.canReadFile(normalized)) return false
+    if (openDocumentForFileName(this.documents, normalized)) return true
+    if (!canReadPath(this, normalized)) return false
     return ts.sys.fileExists(normalized)
   }
 
@@ -339,41 +340,29 @@ export class TypeScriptLspSession {
     depth?: number,
   ): string[] {
     const normalized = normalizeNativePath(rootDir)
-    if (!this.canReadDirectory(normalized)) return []
+    if (!canReadPath(this, normalized)) return []
     return ts.sys
       .readDirectory(normalized, extensions, excludes, includes, depth)
       .map(normalizeNativePath)
-      .filter((fileName) => this.canReadFile(fileName))
+      .filter((fileName) => canReadPath(this, fileName))
   }
 
   private directoryExists(directoryName: string): boolean {
     const normalized = normalizeNativePath(directoryName)
-    if (!this.canReadDirectory(normalized)) return false
+    if (!canReadPath(this, normalized)) return false
     return ts.sys.directoryExists(normalized)
   }
 
   private getDirectories(directoryName: string): string[] {
     const normalized = normalizeNativePath(directoryName)
-    if (!this.canReadDirectory(normalized)) return []
+    if (!canReadPath(this, normalized)) return []
     return ts.sys.getDirectories(normalized).map(normalizeNativePath)
   }
 
   private realpath(fileName: string): string {
     const normalized = normalizeNativePath(fileName)
     const real = normalizeNativePath(ts.sys.realpath?.(normalized) ?? normalized)
-    return this.canReadFile(real) || this.canReadDirectory(real) ? real : normalized
-  }
-
-  private canReadFile(fileName: string): boolean {
-    if (isInsidePath(this.root, fileName)) return true
-    if (isInsidePath(this.workspaceRoot, fileName)) return true
-    return isInsidePath(typeScriptLibDirectory(), fileName)
-  }
-
-  private canReadDirectory(directoryName: string): boolean {
-    if (isInsidePath(this.root, directoryName)) return true
-    if (isInsidePath(this.workspaceRoot, directoryName)) return true
-    return isInsidePath(typeScriptLibDirectory(), directoryName)
+    return canReadPath(this, real) ? real : normalized
   }
 
   private scriptSnapshot(fileName: string): ts.IScriptSnapshot | undefined {
@@ -384,15 +373,9 @@ export class TypeScriptLspSession {
   private scriptVersion(fileName: string): string {
     const normalized = normalizeNativePath(fileName)
     return String(
-      this.documentForFileName(normalized)?.version ?? this.scriptVersions.get(normalized),
+      openDocumentForFileName(this.documents, normalized)?.version ??
+        this.scriptVersions.get(normalized),
     )
-  }
-
-  private documentForFileName(fileName: string): OpenDocument | null {
-    for (const document of this.documents.values()) {
-      if (samePath(document.fileName, fileName)) return document
-    }
-    return null
   }
 
   private sortedDocuments(): readonly OpenDocument[] {
@@ -403,7 +386,7 @@ export class TypeScriptLspSession {
 
   private nearestConfigFile(fileName: string): string | null {
     let directory = path.dirname(fileName)
-    while (isInsidePath(this.root, directory)) {
+    while (isSameOrDescendant(this.root, directory)) {
       const config = path.join(directory, 'tsconfig.json')
       if (existsSync(config)) return normalizeNativePath(config)
       if (samePath(directory, this.root)) return null
@@ -540,10 +523,6 @@ function referencedConfigFileName(
   const basePath = path.resolve(path.dirname(parentConfigFileName), reference.path)
   if (path.extname(basePath) === '.json') return normalizeNativePath(basePath)
   return normalizeNativePath(path.join(basePath, 'tsconfig.json'))
-}
-
-function typeScriptLibDirectory(): string {
-  return normalizeNativePath(path.dirname(ts.getDefaultLibFilePath(defaultCompilerOptions())))
 }
 
 function parseIncomingMessage(data: string | ArrayBuffer | Uint8Array): unknown {

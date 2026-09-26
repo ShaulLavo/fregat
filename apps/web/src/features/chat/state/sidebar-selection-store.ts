@@ -1,24 +1,9 @@
-import type { EnvironmentId, ProjectId, SessionId } from '@workspace/contracts'
+import type { ChatSelection } from '@/lib/chat-selection'
 import { create } from 'zustand'
 
-export type SidebarSelection =
-  | { readonly kind: 'auto' }
-  | {
-      readonly kind: 'draft'
-      readonly draftId?: string
-      readonly environmentId: EnvironmentId
-      readonly projectId: ProjectId
-    }
-  | {
-      readonly kind: 'session'
-      readonly environmentId: EnvironmentId
-      readonly projectId: ProjectId
-      readonly sessionId: SessionId
-    }
-
 type SidebarSelectionStore = {
-  readonly selection: SidebarSelection
-  readonly restoreSelection: (selection: SidebarSelection) => void
+  readonly selection: ChatSelection
+  readonly restoreSelection: (selection: ChatSelection) => void
 }
 
 export const useSidebarSelectionStore = create<SidebarSelectionStore>((set) => ({

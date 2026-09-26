@@ -26,3 +26,9 @@ export function codeHighlighterForTheme(options: {
 
   return created
 }
+
+if (import.meta.hot)
+  import.meta.hot.dispose(() => {
+    for (const highlighter of highlighters.values()) highlighter.dispose()
+    highlighters.clear()
+  })

@@ -20,7 +20,13 @@ const RESERVED_PREFIXES = [
   'settings-json:',
   'settings:',
 ]
-const PUBLIC_SCHEMAS = new Set(['sessionIdSchema'])
+const PUBLIC_SCHEMAS = new Set([
+  'sessionIdSchema',
+  'GIT_FILE_STATUSES',
+  'normalizeChatAttachmentMimeType',
+  'LOG_TIME_RANGES',
+  'LOG_DASHBOARD_LEVELS',
+])
 
 function containsDocumentPrefix(value) {
   const withoutContainerVariants = value.replace(/@[\w.-]+\/settings:/g, '')

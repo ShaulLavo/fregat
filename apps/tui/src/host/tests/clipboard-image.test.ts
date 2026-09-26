@@ -1,4 +1,6 @@
+import { MAX_CHAT_ATTACHMENT_ENCODED_BYTES } from '@workspace/client-core/chat/attachments'
 import { MAX_CHAT_ATTACHMENT_BYTES } from '@workspace/contracts'
+import { attachmentFromBytes } from '@/agent-stage/state/attachments'
 import { readClipboardImage } from '@/host/clipboard-image'
 import { clipboardBoundary } from '../../../test/factories/clipboard'
 import { test, expect } from '../../../test/fixtures'
@@ -13,7 +15,7 @@ test('clipboard images retain binary bytes, enforce the attachment limit, and di
   const image = await readClipboardImage(signal, boundary.create)
   expect(image?.bytes).toBe(bytes)
   expect(image?.mimeType).toBe('image/png')
-  expect(boundary.configurations).toEqual([{ maxReadBytes: MAX_CHAT_ATTACHMENT_BYTES }])
+  expect(boundary.configurations).toEqual([{ maxReadBytes: MAX_CHAT_ATTACHMENT_ENCODED_BYTES }])
   expect(boundary.reads[0]?.signal).toBe(signal)
   expect(boundary.reads[0]?.preferredTypes).toContain('image/png')
   expect(boundary.disposed).toBe(true)
@@ -39,4 +41,10 @@ test('a cancelled clipboard read returns without an attachment', async () => {
   const boundary = clipboardBoundary({ status: 'cancelled' })
   expect(await readClipboardImage(new AbortController().signal, boundary.create)).toBeNull()
   expect(boundary.disposed).toBe(true)
+})
+
+test('rejects an image whose data URL exceeds the shared wire budget', () => {
+  const bytes = new Uint8Array(MAX_CHAT_ATTACHMENT_BYTES)
+  bytes.set([137, 80, 78, 71, 13, 10, 26, 10])
+  expect(() => attachmentFromBytes(bytes, 'large.png', [])).toThrow()
 })

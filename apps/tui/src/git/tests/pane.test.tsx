@@ -3,9 +3,10 @@ import { Application } from '@/components/application'
 import { test, expect } from '../../../test/fixtures'
 import { renderTui } from '../../../test/render'
 import { createTestSettingsSession } from '../../../test/factories/session'
-import { prepareGitWorkbench, gitCommand } from '../../../test/factories/git-workbench'
+import { prepareGitWorkbench } from '../../../test/factories/git-workbench'
 import { runPaletteCommand } from '../../../test/actions'
 import { createWorkbenchFrame } from '../../../test/factories/workbench-frame'
+import { runGit } from 'server/testing'
 
 test('Git pane commands remain in the palette and commit restores native focus', async ({
   server,
@@ -58,7 +59,7 @@ test('Git pane commands remain in the palette and commit restores native focus',
         return frame.captureCharFrame()
       })
       .toContain('Committed staged changes.')
-    expect(await gitCommand(server.root, 'log', '-1', '--format=%s')).toContain(
+    expect((await runGit(server.root, ['log', '-1', '--format=%s'])).stdout).toContain(
       'Commit from TUI pane',
     )
     await expect
@@ -108,7 +109,7 @@ test('a failed push restores the selected diff and keeps its error visible', asy
         return frame.captureCharFrame()
       })
       .toContain('changed line')
-    expect(await gitCommand(server.root, 'diff', '--name-only')).toBe('sample.txt\n')
+    expect((await runGit(server.root, ['diff', '--name-only'])).stdout).toBe('sample.txt\n')
   } finally {
     await fixture.cleanup()
   }

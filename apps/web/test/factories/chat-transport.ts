@@ -1,3 +1,5 @@
+import { QueryClient, QueryObserver } from '@tanstack/query-core'
+import type { OrchestrationSessionDetailPage } from '@workspace/contracts'
 import { TEST_ENVIRONMENT_ID } from './chat'
 import type { ChatTransport } from '@/features/chat/transport/chat-transport'
 import { createClientError } from '@workspace/client-core/errors'
@@ -12,12 +14,17 @@ import { createClientError } from '@workspace/client-core/errors'
  * that happens to build an transport.
  */
 export function unsupportedChatTransport(overrides: Partial<ChatTransport> = {}): ChatTransport {
+  const earlier = new QueryObserver<OrchestrationSessionDetailPage>(new QueryClient(), {
+    queryKey: ['test', 'earlier'],
+    enabled: false,
+  })
   return {
     environmentId: TEST_ENVIRONMENT_ID,
     closed: false,
     close: () => unsupported('close'),
     retainSessionDetail: () => unsupported('retainSessionDetail'),
     loadEarlierPage: () => unsupported('loadEarlierPage'),
+    earlierPageObserver: () => earlier,
     dispatchCommand: () => unsupported('dispatchCommand'),
     replayEvents: () => unsupported('replayEvents'),
     shellStream: () => unsupportedStream('shellStream'),

@@ -1,3 +1,4 @@
+import { AsyncQueue } from '../async-queue'
 import { LiveStreamBudget, type RetainedLiveItem } from './live-stream-budget'
 import { errorMessage as reactorErrorMessage } from '@workspace/contracts'
 import { referencingSessionIds, worktreesAffectedByEvent } from './worktree-projection'
@@ -165,28 +166,22 @@ export class OrchestrationStreamHub {
     budget: LiveStreamBudget,
     signal?: AbortSignal,
   ): AsyncGenerator<RetainedLiveItem<OrchestrationEvent>[]> {
-    const queue: RetainedLiveItem<OrchestrationEvent>[][] = []
-    const waiters: Array<(value: IteratorResult<RetainedLiveItem<OrchestrationEvent>[]>) => void> =
-      []
-    let closed = false
+    const batches = new AsyncQueue<RetainedLiveItem<OrchestrationEvent>[]>()
     const close = () => subscriber.close()
     const subscriber: EventSubscriber = {
       close: () => {
-        if (closed) return
-        closed = true
+        if (batches.closed) return
+        for (const items of batches.close()) budget.release(items)
         this.subscribers.delete(subscriber)
         recordChatPipelineInfo('chat.pipeline.stream_hub.unsubscribe', {
           subscriberCount: this.subscribers.size,
         })
         signal?.removeEventListener('abort', close)
         budget.signal.removeEventListener('abort', close)
-        for (const items of queue) budget.release(items)
-        queue.length = 0
-        while (waiters.length > 0) waiters.shift()?.({ done: true, value: undefined })
       },
       publish: (events) => {
-        if (closed) return
-        publishRetainedEvents(events, budget, queue, waiters)
+        if (batches.closed) return
+        publishRetainedEvents(events, budget, batches)
       },
     }
     this.subscribers.add(subscriber)
@@ -196,7 +191,7 @@ export class OrchestrationStreamHub {
     signal?.addEventListener('abort', close, { once: true })
     budget.signal.addEventListener('abort', close, { once: true })
     if (signal?.aborted || budget.signal.aborted) close()
-    return eventBatchGenerator(subscriber, queue, waiters, budget, signal)
+    return eventBatchGenerator(subscriber, batches)
   }
 
   private retain(events: OrchestrationEvent[]) {
@@ -721,26 +716,15 @@ function coalesceDeadline(delayMs: number) {
   return { cancel: () => clearTimeout(timer), promise }
 }
 
+// Pulls with `next()`: `for await` would close the queue on an early return, and
+// `subscriber.close()` would then skip the unsubscribe and the budget release.
 async function* eventBatchGenerator(
   subscriber: EventSubscriber,
-  queue: RetainedLiveItem<OrchestrationEvent>[][],
-  waiters: Array<(value: IteratorResult<RetainedLiveItem<OrchestrationEvent>[]>) => void>,
-  budget: LiveStreamBudget,
-  signal?: AbortSignal,
+  batches: AsyncQueue<RetainedLiveItem<OrchestrationEvent>[]>,
 ): AsyncGenerator<RetainedLiveItem<OrchestrationEvent>[]> {
   try {
-    while (!signal?.aborted && !budget.signal.aborted) {
-      const next = queue.shift()
-      if (next) {
-        yield next
-        continue
-      }
-
-      const result = await new Promise<IteratorResult<RetainedLiveItem<OrchestrationEvent>[]>>(
-        (resolve) => {
-          waiters.push(resolve)
-        },
-      )
+    while (true) {
+      const result = await batches.next()
       if (result.done) return
 
       yield result.value
@@ -760,17 +744,10 @@ function isDetailEventForSession(event: OrchestrationEvent, sessionId: string) {
 function publishRetainedEvents(
   events: OrchestrationEvent[],
   budget: LiveStreamBudget,
-  queue: RetainedLiveItem<OrchestrationEvent>[][],
-  waiters: Array<(value: IteratorResult<RetainedLiveItem<OrchestrationEvent>[]>) => void>,
+  batches: AsyncQueue<RetainedLiveItem<OrchestrationEvent>[]>,
 ) {
   try {
-    const retained = budget.replace([], events)
-    const waiter = waiters.shift()
-    if (waiter) {
-      waiter({ done: false, value: retained })
-      return
-    }
-    queue.push(retained)
+    batches.push(budget.replace([], events))
   } catch (error) {
     if (!budget.signal.aborted) throw error
   }

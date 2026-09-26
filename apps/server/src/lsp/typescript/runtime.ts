@@ -1,9 +1,10 @@
-import { lstat, realpath, stat, readFile } from 'node:fs/promises'
+import { lstat, realpath, readFile, stat } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import * as v from 'valibot'
 
+import { statOptionalVia } from '../../fs/mutation-target'
 import { createStructuredError } from '../../observability/structured-errors'
 import { spawnCommand } from '../installers'
 import type { LspServerHandle } from '../registry'
@@ -97,25 +98,18 @@ async function readPackage(packagePath: string) {
 
 async function fileExists(filePath: string): Promise<boolean> {
   try {
-    return (await stat(filePath)).isFile()
+    return (await statOptionalVia(stat, filePath, 'absent'))?.isFile() ?? false
   } catch (cause) {
-    if (hasCode(cause, 'ENOENT') || hasCode(cause, 'ENOTDIR')) return false
     throw invalidRuntime(filePath, 'The TypeScript entrypoint could not be inspected.', cause)
   }
 }
 
 async function pathExists(filePath: string): Promise<boolean> {
   try {
-    await lstat(filePath)
-    return true
+    return (await statOptionalVia(lstat, filePath, 'absent')) !== null
   } catch (cause) {
-    if (hasCode(cause, 'ENOENT') || hasCode(cause, 'ENOTDIR')) return false
     throw invalidRuntime(filePath, 'The TypeScript package could not be inspected.', cause)
   }
-}
-
-function hasCode(value: unknown, code: string) {
-  return value instanceof Error && 'code' in value && value.code === code
 }
 
 function invalidRuntime(packagePath: string, why: string, cause?: unknown) {

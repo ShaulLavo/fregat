@@ -1,6 +1,6 @@
 import { workspaceRelativePath } from '@/lib/workspace-relative-path'
 import { looksLikeHostname } from '@/lib/hostname'
-import { pathLeaf as basename } from '@/lib/path-formatters'
+import { pathLeaf } from '@/lib/path-formatters'
 /**
  * Turns the file references agents write in prose — `src/foo.ts:42`,
  * `[foo](src/foo.ts)`, `/abs/path.ts#L12` — into editor-openable targets.
@@ -78,7 +78,7 @@ export function resolveInlineCodeFileReference(
   if (!positioned && !candidate.includes('/')) return null
   if (!looksLikePath(position.bare)) return null
   if (isHostnameReference(position.bare.split('/')[0] ?? position.bare, positioned)) return null
-  if (!positioned && !FILE_EXTENSION.test(basename(position.bare))) return null
+  if (!positioned && !FILE_EXTENSION.test(pathLeaf(position.bare))) return null
 
   return fileReference(position, rootPath)
 }
@@ -160,7 +160,7 @@ function looksLikePath(bare: string) {
   if (!bare.startsWith('/')) return bare.includes('/') || FILE_EXTENSION.test(bare)
   if (FILE_ROOT_PREFIXES.some((prefix) => bare.startsWith(prefix))) return true
 
-  return FILE_EXTENSION.test(basename(bare))
+  return FILE_EXTENSION.test(pathLeaf(bare))
 }
 
 /** `127.0.0.1`, `example.com/x`, `1.2.3` — hosts and versions, not files. */

@@ -1,10 +1,14 @@
+import type { FragmentInstance } from 'react'
+
+export type WorkLogContent = { kind: 'text' } | { kind: 'rows'; fragment: FragmentInstance }
+
 type WorkLogScrollAnchor = { id: string; offset: number }
 type WorkLogScrollPosition = { top: number; left: number; anchor: WorkLogScrollAnchor | null }
 
 const positions = new Map<string, WorkLogScrollPosition>()
 const MAX_POSITIONS = 500
 
-export function attachWorkLogScroll(element: HTMLElement, key: string) {
+export function attachWorkLogScroll(element: HTMLElement, key: string, content: WorkLogContent) {
   const saved = positions.get(key)
   if (saved) {
     element.scrollTop = saved.top
@@ -17,10 +21,11 @@ export function attachWorkLogScroll(element: HTMLElement, key: string) {
     atEnd = isAtEnd(element)
     savePosition(key, element)
   }
-  // Child disclosures change the scroll boundary without rerendering their group.
-  const mutationObserver = new MutationObserver(remember)
+  // Capped text can grow its scroll boundary without changing its observed box.
+  const mutationObserver = content.kind === 'text' ? new MutationObserver(remember) : null
   const resizeObserver = new ResizeObserver(remember)
-  mutationObserver.observe(element, { childList: true, characterData: true, subtree: true })
+  mutationObserver?.observe(element, { childList: true, characterData: true, subtree: true })
+  if (content.kind === 'rows') content.fragment.observeUsing(resizeObserver)
   resizeObserver.observe(element)
   element.addEventListener('scroll', remember, { passive: true })
   remember()
@@ -33,7 +38,8 @@ export function attachWorkLogScroll(element: HTMLElement, key: string) {
       remember()
     },
     dispose() {
-      mutationObserver.disconnect()
+      mutationObserver?.disconnect()
+      if (content.kind === 'rows') content.fragment.unobserveUsing(resizeObserver)
       resizeObserver.disconnect()
       element.removeEventListener('scroll', remember)
     },

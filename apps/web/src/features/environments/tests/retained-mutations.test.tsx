@@ -1,7 +1,6 @@
 import { readEnvironmentDescriptor } from '@/lib/environments/utils/descriptor'
 import { environmentScopedStorage } from '@/lib/environments/state/scoped-storage'
 import { confirmedEnvironmentId } from '@/lib/environments/state/domain'
-import { execFileSync } from 'node:child_process'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
@@ -25,6 +24,7 @@ import { createInProcessClient } from '../../../../test/client'
 import { expect, test } from '../../../../test/fixtures'
 import { renderApplication } from '../../../../test/render'
 import { makeTestServer } from '../../../../test/server'
+import { runGit } from '../../../../test/factories/git'
 
 const originA = 'http://localhost:37211'
 const originB = 'http://localhost:37212'
@@ -37,7 +37,7 @@ test('an offline Git mutation resumes on A while its provider is unmounted and B
   for (const root of [server.root, secondServer.root]) {
     const repo = join(root, 'repo')
     await mkdir(repo)
-    execFileSync('git', ['init', '-b', 'main'], { cwd: repo, stdio: 'pipe' })
+    runGit(repo, ['init', '-b', 'main'], { cwdMode: 'option' })
     await writeFile(join(repo, 'shared.txt'), 'separate checkout\n')
   }
 
@@ -107,16 +107,14 @@ test('an offline Git mutation resumes on A while its provider is unmounted and B
 
     expect(application.getSnapshot().origin).toBe(originB)
     expect(
-      execFileSync('git', ['diff', '--cached', '--name-only'], {
-        cwd: join(server.root, 'repo'),
-        encoding: 'utf8',
-      }).trim(),
+      runGit(join(server.root, 'repo'), ['diff', '--cached', '--name-only'], {
+        cwdMode: 'option',
+      }).stdout.trim(),
     ).toBe('shared.txt')
     expect(
-      execFileSync('git', ['diff', '--cached', '--name-only'], {
-        cwd: join(secondServer.root, 'repo'),
-        encoding: 'utf8',
-      }).trim(),
+      runGit(join(secondServer.root, 'repo'), ['diff', '--cached', '--name-only'], {
+        cwdMode: 'option',
+      }).stdout.trim(),
     ).toBe('')
   } finally {
     view.unmount()

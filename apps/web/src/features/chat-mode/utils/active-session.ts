@@ -1,21 +1,7 @@
 import { selectChatSessionsForProject } from '@workspace/client-core/chat/selectors'
 import { comparePinnedSessions } from '@workspace/client-core/chat/rail/session-order'
 import type { EnvironmentId, ProjectId, SessionId } from '@workspace/contracts'
-
-export type SessionSelection =
-  | { readonly kind: 'auto' }
-  | {
-      readonly kind: 'draft'
-      readonly draftId?: string
-      readonly environmentId: EnvironmentId
-      readonly projectId: ProjectId
-    }
-  | {
-      readonly kind: 'session'
-      readonly environmentId: EnvironmentId
-      readonly projectId: ProjectId
-      readonly sessionId: SessionId
-    }
+import type { ChatSelection } from '@/lib/chat-selection'
 
 export type ActiveSession =
   /** No session picked yet: show the newest one, or the composer when there are none. */
@@ -55,7 +41,7 @@ export function activeSession({
   readonly projectId: ProjectId | null
   /** True while the pick is the restored one — nothing in this session has chosen yet. */
   readonly restored?: boolean
-  readonly selection: SessionSelection
+  readonly selection: ChatSelection
   readonly sessionIds: readonly SessionId[]
 }): ActiveSession {
   const newest: ActiveSession = { status: 'auto', sessionId: sessionIds[0] ?? null }
@@ -78,7 +64,7 @@ export function activeSession({
 }
 
 export function isDraftFor(
-  selection: SessionSelection,
+  selection: ChatSelection,
   environmentId: EnvironmentId,
   projectId: ProjectId,
 ) {

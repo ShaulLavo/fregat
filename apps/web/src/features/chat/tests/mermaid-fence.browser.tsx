@@ -35,13 +35,13 @@ afterEach(() => {
   setMermaidLoader(null)
 })
 
-function renderDiagram(streaming: boolean) {
+function renderDiagram(streaming: boolean, text = DIAGRAM) {
   flushSync(() => {
     root?.render(
       <AppProviders queryClient={queryClient}>
         <TestEditorStateProvider>
           <ChatWorkspaceRootContext value={null}>
-            <AssistantMarkdown streaming={streaming} text={DIAGRAM} />
+            <AssistantMarkdown streaming={streaming} text={text} />
           </ChatWorkspaceRootContext>
         </TestEditorStateProvider>
       </AppProviders>,
@@ -58,6 +58,19 @@ function mermaidDiagram() {
 }
 
 describe('mermaid fences', () => {
+  it('renders a diagram, math, raw HTML, and highlighted code together', async () => {
+    const text = `${DIAGRAM}\n<kbd>Ctrl</kbd>\n\n$$\nx^2\n$$\n\n\`\`\`typescript\nconst value = 1\n\`\`\`\n`
+    renderDiagram(false, text)
+    await vi.waitFor(() => expect(mermaidDiagram()).not.toBeNull(), { timeout: 15_000 })
+    await vi.waitFor(() => expect(document.querySelector('kbd')?.textContent).toBe('Ctrl'))
+    await vi.waitFor(() => expect(document.querySelector('.katex')).not.toBeNull())
+    await vi.waitFor(() =>
+      expect(
+        document.querySelector('[data-language="typescript"] [style*="--shiki-dark"]'),
+      ).not.toBeNull(),
+    )
+  }, 30_000)
+
   it('stays a code block while streaming, then renders once the message settles', async () => {
     renderDiagram(true)
 
@@ -75,8 +88,9 @@ describe('mermaid fences', () => {
     expect(loadedMermaid()).not.toBeNull()
   }, 30_000)
 
-  it('keeps the code block when the plugin fails to load', async () => {
-    setMermaidLoader(() => Promise.reject(new Error('offline')))
+  it('keeps code blocks after a failed load across diagram remounts', async () => {
+    const load = vi.fn(() => Promise.reject(new Error('offline')))
+    setMermaidLoader(load)
 
     renderDiagram(false)
 
@@ -85,5 +99,12 @@ describe('mermaid fences', () => {
     expect(mermaidCodeBlock()).not.toBeNull()
     expect(mermaidDiagram()).toBeNull()
     expect(loadedMermaid()).toBeNull()
+    renderDiagram(false, '')
+    expect(mermaidCodeBlock()).toBeNull()
+    renderDiagram(false)
+    await vi.waitFor(() => expect(mermaidCodeBlock()).not.toBeNull())
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    expect(load).toHaveBeenCalledTimes(1)
+    expect(mermaidDiagram()).toBeNull()
   })
 })

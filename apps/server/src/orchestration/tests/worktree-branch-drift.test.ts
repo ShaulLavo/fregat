@@ -1,7 +1,7 @@
 import path from 'node:path'
 import { afterEach, expect, test } from 'vitest'
 import { closeTestApps } from '../../../test/server'
-import { executeGit } from '../../../test/factories/orchestration'
+import { runGit } from '../../testing/git'
 import {
   lifecycleWorktreeId,
   worktreeLifecycleFixture,
@@ -18,7 +18,7 @@ test("an agent's branch checkout in its dedicated worktree becomes the worktree 
   const fixture = await worktreeLifecycleFixture({
     adapter: {
       beforeComplete: async () => {
-        await executeGit(worktreePath, 'checkout', '-q', '-b', 'agent/feature')
+        await runGit(worktreePath, ['checkout', '-q', '-b', 'agent/feature'], { cwdMode: 'option' })
       },
     },
   })
@@ -35,7 +35,7 @@ test("an agent's branch checkout in its dedicated worktree becomes the worktree 
 test('the shared checkout records a branch switch as checkout metadata only', async () => {
   const fixture = await worktreeLifecycleFixture()
   fixtures.push(fixture)
-  await executeGit(fixture.root, 'checkout', '-q', '-b', 'elsewhere')
+  await runGit(fixture.root, ['checkout', '-q', '-b', 'elsewhere'], { cwdMode: 'option' })
   await fixture.engine.refreshWorktreeMetadata('')
   const model = await fixture.engine.readModelSnapshot()
   expect(model.worktrees.get(fixture.registration.worktreeId)?.branch).toBe('elsewhere')

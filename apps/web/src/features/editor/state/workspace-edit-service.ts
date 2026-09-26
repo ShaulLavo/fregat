@@ -13,7 +13,6 @@ import type {
   WorkspaceTextReplaySegmentInput,
 } from '@singapore-editor/lsp-plugin/workspace-edit'
 import { prepareWorkspaceTextReplay } from '@singapore-editor/lsp-plugin/workspace-edit'
-import { fileNameToDocumentUri } from '@singapore-editor/lsp-plugin/paths'
 import { type LanguageServerDocumentSyncController } from '@singapore-editor/lsp-plugin/document-sync-controller'
 import {
   type ApplyWorkspaceEditRequest,
@@ -72,9 +71,9 @@ import {
   type WorkspaceFileSnapshot,
   type WorkspaceMutationProjectionReceipt,
 } from '@/features/editor/state/file-sync-service'
-import { toClientError } from '@/lib/client-error-taxonomy'
+import { thrownErrorMessage } from '@/lib/client-error-taxonomy'
 import { createClientError } from '@workspace/client-core/errors'
-import { isProvisionalWorkspaceEditState } from '@workspace/contracts'
+import { fileUriForPath, isProvisionalWorkspaceEditState } from '@workspace/contracts'
 import { log } from '@/lib/client-logging'
 import { createHistoryBuffer } from '@/features/editor/state/history-buffer'
 import { createClientInvariantError } from '@/lib/structured-errors'
@@ -1301,7 +1300,7 @@ export class WorkspaceEditService {
       if (!settled) this.ownOperationIds.delete(prepared.operationId)
       return {
         code: 'workspace-edit-rolled-back',
-        message: errorMessage(error),
+        message: thrownErrorMessage(error),
         status: 'rolled-back',
       }
     }
@@ -1312,7 +1311,7 @@ export class WorkspaceEditService {
     return {
       affectedPaths: recovery.affectedPaths,
       code: 'workspace-edit-recovery-required',
-      message: errorMessage(error),
+      message: thrownErrorMessage(error),
       status: 'recovery-required',
     }
   }
@@ -2098,7 +2097,7 @@ class TextChangeSources implements TextChangePreparation {
 
   readonly readText = (path: FilesystemPath): Promise<TextChangeSource> => {
     this.assertOpen()
-    const canonical = workspacePathFromFileUri(fileNameToDocumentUri(path), this.root)
+    const canonical = workspacePathFromFileUri(fileUriForPath(path), this.root)
     const previous = this.reads.get(canonical)
     if (previous) return previous
     const pending = this.capture(canonical)
@@ -2169,7 +2168,7 @@ function sourceTextOperation(
   const snapshot = evidence.buffer.getSnapshot()
   return {
     kind: 'text-document',
-    uri: fileNameToDocumentUri(evidence.source.path),
+    uri: fileUriForPath(evidence.source.path),
     version: null,
     edits: edits.map((edit) => {
       const start = offsetToPoint(snapshot, edit.from)
@@ -2993,10 +2992,10 @@ function transitionDocumentUri(
     throw workspaceEditError('snapshot-drift', 'Live document URI transition became stale')
   }
   options.documentSyncController?.transitionDocumentUri({
-    fromUri: fileNameToDocumentUri(fromPath),
+    fromUri: fileUriForPath(fromPath),
     syncPoint: rotated.syncPoint,
     textSnapshot: target.buffer.getTextSnapshot(),
-    toUri: fileNameToDocumentUri(toPath),
+    toUri: fileUriForPath(toPath),
   })
 }
 
@@ -3268,7 +3267,7 @@ function resultForPreparationError(error: unknown, signal: AbortSignal): ApplyWo
 }
 
 function failureResult(error: unknown): ApplyWorkspaceEditResult {
-  return failedResult(errorCode(error), errorMessage(error))
+  return failedResult(errorCode(error), thrownErrorMessage(error))
 }
 
 function failedResult(code: string, message: string): ApplyWorkspaceEditResult {
@@ -3278,11 +3277,6 @@ function failedResult(code: string, message: string): ApplyWorkspaceEditResult {
 function errorCode(error: unknown): string {
   if (!error || typeof error !== 'object' || !('code' in error)) return 'workspace-edit-failed'
   return typeof error.code === 'string' ? error.code : 'workspace-edit-failed'
-}
-
-function errorMessage(error: unknown): string {
-  if (error instanceof Error && error.message) return error.message
-  return toClientError(error).message
 }
 
 function isAbortFailure(error: unknown): boolean {

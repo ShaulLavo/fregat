@@ -1,6 +1,7 @@
 import { realpath } from 'node:fs/promises'
-import path from 'node:path'
+import { isSameOrDescendant } from '../fs/path'
 import type { SessionId } from '@workspace/contracts'
+import { gitCommonDirectory } from '../git/repository-lane'
 import type { GitService } from '../git/service'
 import type { ProviderRuntimeBindingWithMetadata } from '../provider/provider-session-directory'
 import { sessionMayWrite } from './command-invariants'
@@ -36,11 +37,7 @@ export async function assertRewindIsolation({
       internal: { check: 'repository-root', worktreeId: worktree.id },
     })
   const gitDir = await repository.run(['rev-parse', '--absolute-git-dir'])
-  const commonDir = await repository.run(['rev-parse', '--git-common-dir'])
-  if (
-    (await realpath(gitDir.stdout.trim())) ===
-    (await realpath(path.resolve(cwd, commonDir.stdout.trim())))
-  )
+  if ((await realpath(gitDir.stdout.trim())) === (await gitCommonDirectory(repository)))
     throw checkpointErrors.WORKSPACE_NOT_ISOLATED({
       internal: { check: 'shared-git-dir', worktreeId: worktree.id },
     })
@@ -90,7 +87,7 @@ function otherRuntimeCwds(
 async function overlapsAny(cwd: string, candidates: Iterable<string>) {
   for (const candidate of candidates) {
     const other = await existingRealPath(candidate)
-    if (other && (isWithin(cwd, other) || isWithin(other, cwd))) return true
+    if (other && (isSameOrDescendant(cwd, other) || isSameOrDescendant(other, cwd))) return true
   }
   return false
 }
@@ -103,12 +100,4 @@ async function existingRealPath(candidate: string) {
       return null
     throw error
   }
-}
-
-function isWithin(parent: string, child: string) {
-  const relative = path.relative(parent, child)
-  return (
-    relative === '' ||
-    (!path.isAbsolute(relative) && relative !== '..' && !relative.startsWith(`..${path.sep}`))
-  )
 }

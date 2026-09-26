@@ -1,7 +1,10 @@
 import * as v from 'valibot'
 import { isoDateTimeSchema, nonNegativeIntegerSchema } from './chat-model'
 
-export const logDashboardLevelSchema = v.picklist(['debug', 'error', 'info', 'warn'])
+export const LOG_DASHBOARD_LEVELS = ['debug', 'error', 'info', 'warn'] as const
+export const LOG_TIME_RANGES = ['15m', '1h', '6h', '24h', 'all'] as const
+export type LogTimeRange = (typeof LOG_TIME_RANGES)[number]
+export const logDashboardLevelSchema = v.picklist(LOG_DASHBOARD_LEVELS)
 
 const logDashboardFiltersSchema = v.object({
   areas: v.optional(v.array(v.string())),

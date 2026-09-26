@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
+import { defaultLogsFilterState } from '@/features/logs/utils/filter-params'
 import {
-  defaultLogsFilterState,
   logDashboardFilters,
   logFilterQuery,
   logToolbarOptionFilters,
-} from '@/features/logs/utils/filter-params'
+} from '@workspace/client-core/logs/filters'
 
 describe('logDashboardFilters', () => {
   it('serializes selected filters and relative time ranges', () => {

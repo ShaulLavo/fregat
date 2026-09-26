@@ -1,6 +1,7 @@
 import type { MachineEvent } from '@workspace/contracts'
+import { AsyncQueue } from '../async-queue'
 
-type Listener = { client: string; push: (event: MachineEvent) => void; wake: () => void }
+type Listener = { client: string; queue: AsyncQueue<MachineEvent> }
 
 export class MachineEvents {
   private readonly listeners = new Set<Listener>()
@@ -9,7 +10,7 @@ export class MachineEvents {
   publish(event: MachineEvent, client?: string) {
     for (const listener of this.listeners) {
       if (client && listener.client !== client) continue
-      listener.push(event)
+      listener.queue.push(event)
     }
   }
 
@@ -18,35 +19,20 @@ export class MachineEvents {
   }
 
   async *subscribe(client: string, initial: readonly MachineEvent[], signal: AbortSignal) {
-    const queue = [...initial]
-    let wake: (() => void) | null = null
-    const listener: Listener = {
-      client,
-      push: (event) => {
-        queue.push(event)
-        wake?.()
-      },
-      wake: () => wake?.(),
-    }
+    if (this.closed) return
+
+    const listener: Listener = { client, queue: new AsyncQueue({ initial, signal }) }
     this.listeners.add(listener)
-    signal.addEventListener('abort', listener.wake, { once: true })
     try {
-      while (!this.closed && !signal.aborted) {
-        const event = queue.shift()
-        if (event) yield event
-        else
-          await new Promise<void>((resolve) => {
-            wake = resolve
-          })
-      }
+      yield* listener.queue
     } finally {
       this.listeners.delete(listener)
-      signal.removeEventListener('abort', listener.wake)
+      listener.queue.close()
     }
   }
 
   close() {
     this.closed = true
-    for (const listener of this.listeners) listener.wake()
+    for (const listener of this.listeners) listener.queue.close()
   }
 }

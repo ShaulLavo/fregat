@@ -38,7 +38,7 @@ export function useOpenCheckpointDiffDocument() {
     const owner = filesystemPath(rootPath)
     const operation = navigation.getSnapshot()
     const rangeInput = checkpointDiffInputForSummary(summary)
-    const diffs = await queryClient.fetchQuery({
+    const diffs = await queryClient.query({
       queryFn: ({ signal, client }) =>
         fetchCheckpointDiff(rangeInput, signal, clientForQueryClient(client)),
       queryKey: checkpointDiffQueryKey(rangeInput),
@@ -87,7 +87,7 @@ export function useOpenCheckpointDiffDocument() {
     const owner = filesystemPath(rootPath)
     const operation = navigation.getSnapshot()
     const input = checkpointFullSessionDiffInputForSummary(summary)
-    const diffs = await queryClient.fetchQuery({
+    const diffs = await queryClient.query({
       queryFn: ({ signal, client }) =>
         fetchCheckpointDiff(input, signal, clientForQueryClient(client)),
       queryKey: checkpointDiffQueryKey(input),

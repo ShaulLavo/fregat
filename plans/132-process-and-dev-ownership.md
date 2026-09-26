@@ -150,6 +150,11 @@ last, against the final migration chain. Constraint: production already has migr
 to version 30, so the one schema must cover everything through the final merged chain, and the
 backup is taken from that version-30 database.
 
+Final-rebase work (2026-09-26): Phase 4 runs on lane L6 (PR #36) at its final rebase, after every
+other lane has merged, when the coordinator releases it. The same rebase reruns the Plan 135 P0
+sweep: `bun run query:check` over the code the other lanes landed, fixing any deprecated Query API
+access they added.
+
 ## Research questions
 
 1. **Vite dev server memory: leak or load?** On 2026-09-25 per-lane Vite dev servers grew to

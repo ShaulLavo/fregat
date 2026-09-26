@@ -18,7 +18,11 @@ export function usePushSubscribe() {
       mutationFn: async () => {
         // First, while the click still counts as a user gesture.
         await requestPushPermission()
-        const { publicKey, devices } = await owner.ensureQueryData(pushDevicesQueryOptions())
+        // `static` reuses cached devices, as ensureQueryData did, and fetches only on a miss.
+        const { publicKey, devices } = await owner.query({
+          ...pushDevicesQueryOptions(),
+          staleTime: 'static',
+        })
         const registration = await subscribeThisDevice(
           publicKey,
           devices.map((device) => device.id),

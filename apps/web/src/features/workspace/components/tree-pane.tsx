@@ -9,7 +9,7 @@ import type { FileTreeModel } from '@workspace/tree'
 import { WarningCircleIcon } from '@phosphor-icons/react'
 import { EmptyState } from '@workspace/ui/components/empty-state'
 
-import { containerTreePath } from '@/features/workspace/utils/entry-paths'
+import { containerTreePath, entryName } from '@/features/workspace/utils/entry-paths'
 import { fileTreeIndentGuideVariables } from '@/features/workspace/utils/indent-guide-style'
 import {
   loadExpandedDirectories,
@@ -556,17 +556,11 @@ function dropTargetTreePath(context: FileTreeDropContext | FileTreeDropResult) {
 }
 
 function dropDestinationTreePath(fromTreePath: string, targetTreePath: string) {
-  const basename = treePathBasename(fromTreePath)
+  const basename = entryName(fromTreePath)
   if (!basename) return ''
   if (!targetTreePath) return basename
 
   return `${targetTreePath}/${basename}`
-}
-
-function treePathBasename(treePath: string) {
-  const segments = canonicalTreePath(treePath).split('/').filter(Boolean)
-
-  return segments.at(-1) ?? ''
 }
 
 const treeStyle = {

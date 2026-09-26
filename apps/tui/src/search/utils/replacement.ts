@@ -1,3 +1,4 @@
+import { expandRegexReplacement } from '@workspace/client-core/files/search-replace'
 import { createWorkspaceSearchMatcher, type WorkspaceSearchQuery } from '@workspace/contracts'
 
 export function replacementText(text: string, query: WorkspaceSearchQuery, replacement: string) {
@@ -27,24 +28,8 @@ function replaceRegexLine(
   for (const result of results) {
     const start = result.index
     if (!allowed.has(`${start}:${start + result[0].length}`)) continue
-    const expanded = expandReplacement(replacement, result, line)
+    const expanded = expandRegexReplacement(replacement, result)
     output = `${output.slice(0, start)}${expanded}${output.slice(start + result[0].length)}`
   }
   return output
-}
-function expandReplacement(replacement: string, match: RegExpExecArray, line: string) {
-  const tokens = match.groups ? /\$(\$|&|`|'|\d{1,2}|<[^>]*>)/gu : /\$(\$|&|`|'|\d{1,2})/gu
-  return replacement.replace(tokens, (token: string, name: string) => {
-    if (name === '$') return '$'
-    if (name === '&') return match[0]
-    if (name === '`') return line.slice(0, match.index)
-    if (name === "'") return line.slice(match.index + match[0].length)
-    if (name.startsWith('<')) return match.groups?.[name.slice(1, -1)] ?? ''
-    const index = Number(name)
-    if (index > 0 && index < match.length) return match[index] ?? ''
-    const firstDigit = Number(name[0])
-    if (name.length === 2 && firstDigit > 0 && firstDigit < match.length)
-      return `${match[firstDigit] ?? ''}${name[1]}`
-    return token
-  })
 }

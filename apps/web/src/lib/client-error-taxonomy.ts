@@ -1,4 +1,5 @@
 import { isConnectivityError } from '@workspace/client-core/transport/connectivity-error'
+import { rpcErrorPayload } from '@workspace/client-core/transport/rpc-error'
 import { isObject } from '@workspace/utils/objects'
 import type { ConnectionError, ErrorCategory } from '@workspace/contracts'
 import { agentErrorReport } from './agent-error-report'
@@ -97,6 +98,18 @@ export function toClientError(input: unknown): ClientError {
 
 export function clientErrorMessage(input: unknown): string {
   return toClientError(input).message
+}
+
+/** An `Error`'s own words when it has some; anything else, an Eden rejection included, gets the taxonomy's. */
+export function thrownErrorMessage(input: unknown): string {
+  if (input instanceof Error && input.message && !carriesEdenBody(input)) return input.message
+
+  return clientErrorMessage(input)
+}
+
+// `EdenFetchError` sets `message` to `String(value)`, which reads `[object Object]` for a JSON body.
+function carriesEdenBody(error: Error): boolean {
+  return 'value' in error && isObject(error.value)
 }
 
 /**
@@ -201,35 +214,15 @@ function isAbortError(input: unknown): boolean {
   return false
 }
 
+// The web layer over the shared peel: a bare top-level `code` on the input also counts.
 export function extractFsErrorCode(input: unknown): FsErrorCode | null {
-  if (!input || typeof input !== 'object') return null
-
-  if ('value' in input) {
-    const code = fsErrorCodeFromErrorContainer((input as { value: unknown }).value)
-    if (code) return code
-  }
-
-  const direct = fsErrorCodeFromErrorContainer(input)
-  if (direct) return direct
-
-  if ('code' in input) {
-    const raw = (input as { code: unknown }).code
-    if (isFsErrorCode(raw)) return raw
-  }
-
-  return null
+  return fsErrorCode(rpcErrorPayload(input)) ?? fsErrorCode(input)
 }
 
-function fsErrorCodeFromErrorContainer(value: unknown): FsErrorCode | null {
-  if (!value || typeof value !== 'object') return null
-  if (!('error' in value)) return null
+function fsErrorCode(value: unknown): FsErrorCode | null {
+  if (!isObject(value)) return null
 
-  const error = (value as { error: unknown }).error
-  if (!error || typeof error !== 'object') return null
-  if (!('code' in error)) return null
-
-  const code = (error as { code: unknown }).code
-  return isFsErrorCode(code) ? code : null
+  return isFsErrorCode(value.code) ? value.code : null
 }
 
 function isFsErrorCode(value: unknown): value is FsErrorCode {
@@ -245,12 +238,7 @@ function isFsErrorCode(value: unknown): value is FsErrorCode {
  * code would throw away the `fix` the server took care to write.
  */
 function structuredError(input: unknown) {
-  if (!input || typeof input !== 'object') return null
-
-  const container = 'value' in input ? (input as { value: unknown }).value : input
-  if (!container || typeof container !== 'object') return null
-
-  const error = 'error' in container ? (container as { error: unknown }).error : container
+  const error = rpcErrorPayload(input)
   if (!isObject(error)) return null
 
   const code = text(error.code)

@@ -23,7 +23,7 @@ import { InlineError } from '@/components/inline-error'
 import { DialogField } from '@/features/git/components/dialog-field'
 import { usePublishRepositoryMutation } from '@/features/git/hooks/use-publish-repository-mutation'
 import { FORGE_OPTIONS, forgeOption } from '@/features/git/utils/publish-form'
-import { errorMessage } from '@/lib/file-server'
+import { clientErrorMessage } from '@/lib/client-error-taxonomy'
 
 /** Creates the repository on a forge and pushes this checkout to it. */
 export function PublishRepositoryDialog({
@@ -142,7 +142,7 @@ export function PublishRepositoryDialog({
             </DialogField>
           </div>
           {publish.error ? (
-            <InlineError message={errorMessage(publish.error)} title='Publish repository' />
+            <InlineError message={clientErrorMessage(publish.error)} title='Publish repository' />
           ) : null}
           <DialogFooter>
             <Button type='button' variant='outline' onClick={() => onOpenChange(false)}>

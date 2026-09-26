@@ -8,13 +8,12 @@ import {
   orchestrationCommandSchema,
   turnIdSchema,
 } from '@workspace/contracts'
-import { checkpointRefForSessionTurn, orchestrationForApp } from 'server/testing'
+import { checkpointRefForSessionTurn, orchestrationForApp, runGit } from 'server/testing'
 import * as v from 'valibot'
 
 import { TurnFiles } from '@/features/chat-mode/components/turn-files'
 import { expect, test } from '../../../../../test/fixtures'
 import { createRailHarness } from '../../../../../test/factories/rail-harness'
-import { executeDomainGit } from '../../../../../test/factories/session-domain'
 import { renderWithProviders } from '../../../../../test/render'
 
 const IDENTITY = ['-c', 'user.email=t@example.com', '-c', 'user.name=T'] as const
@@ -27,17 +26,19 @@ test('undoes one change of a turn from its row and puts it back', async ({ clien
   // The repository exists before the project registers, so its worktree is a git checkout.
   const root = server.root
   const file = join(root, 'app.txt')
-  await executeDomainGit(root, 'init', '--quiet')
+  await runGit(root, ['init', '--quiet'], { cwdMode: 'option' })
   await writeFile(file, `${before.join('\n')}\n`)
-  await executeDomainGit(root, 'add', 'app.txt')
-  await executeDomainGit(root, ...IDENTITY, 'commit', '-qm', 'zero')
+  await runGit(root, ['add', 'app.txt'], { cwdMode: 'option' })
+  await runGit(root, [...IDENTITY, 'commit', '-qm', 'zero'], { cwdMode: 'option' })
   const h = await createRailHarness(client, server, ['Turn session'], '')
   const sessionId = h.sessionIds[0]!
-  await executeDomainGit(root, 'update-ref', checkpointRefForSessionTurn(sessionId, 0), 'HEAD')
+  await runGit(root, ['update-ref', checkpointRefForSessionTurn(sessionId, 0), 'HEAD'], {
+    cwdMode: 'option',
+  })
   await writeFile(file, `${after.join('\n')}\n`)
-  await executeDomainGit(root, ...IDENTITY, 'commit', '-qam', 'one')
+  await runGit(root, [...IDENTITY, 'commit', '-qam', 'one'], { cwdMode: 'option' })
   const checkpointRef = checkpointRefForSessionTurn(sessionId, 1)
-  await executeDomainGit(root, 'update-ref', checkpointRef, 'HEAD')
+  await runGit(root, ['update-ref', checkpointRef, 'HEAD'], { cwdMode: 'option' })
   await orchestrationForApp(server.app).dispatch(
     v.parse(orchestrationCommandSchema, {
       assistantMessageId: v.parse(messageIdSchema, 'message-1'),

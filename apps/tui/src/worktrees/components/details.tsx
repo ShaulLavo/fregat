@@ -19,12 +19,8 @@ import { WorktreeChip } from '@/worktrees/components/chip'
 import { WorktreeCleanupDialog } from '@/worktrees/components/cleanup-dialog'
 import { WorktreeDescription } from '@/worktrees/components/description'
 import { createWorktreeActions } from '@/worktrees/state/actions'
-import {
-  openableWorktree,
-  selectableWorktree,
-  worktreeActions,
-  worktreeFailure,
-} from '@/worktrees/utils/choices'
+import { worktreeActions } from '@workspace/client-core/chat/worktrees/actions'
+import { openableWorktree, selectableWorktree, worktreeFailure } from '@/worktrees/utils/choices'
 
 export function WorktreeDetails({
   session,
@@ -58,7 +54,8 @@ export function WorktreeDetails({
   const pending = actions.pending || opening
   const current = worktree.id === currentWorktreeId
   const options = worktreeActions(worktree, current).map((action) => ({
-    ...action,
+    name: action.name,
+    description: action.description,
     value: () => {
       void store.request(action.value)
     },

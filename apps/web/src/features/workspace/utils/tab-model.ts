@@ -1,6 +1,4 @@
-import { isWorktreeStatus } from '@/lib/git-status'
-import { isStagedStatus } from '@/lib/git-status'
-import type { GitFileStatus } from '@workspace/contracts'
+import { isStagedStatus, isWorktreeStatus, type GitFileStatus } from '@workspace/contracts'
 import type {
   EditorTabConflictMap,
   EditorTabDiffSource,
@@ -9,7 +7,7 @@ import type {
 import { gitStatusSymbol, type GitSymbolSource } from '@/lib/git-status-symbols'
 
 import { iconForEntry } from '@/lib/file-icons'
-import { basename } from '@/lib/path-formatters'
+import { toTreePath } from '@/lib/path-formatters'
 import { documentSourcePath, tabFileResource } from '@/lib/documents/utils/capabilities'
 import {
   comparisonShortHash,
@@ -67,15 +65,11 @@ export function editorTabModel({
 }
 
 function tabRelativeCopyPath(path: string, rootPath: string) {
-  const normalizedPath = normalizedCopyPath(path)
   const normalizedRoot = normalizedCopyPath(rootPath)
-  if (!normalizedRoot) return normalizedPath
-  if (normalizedPath === normalizedRoot) return basename(normalizedPath)
+  // toTreePath answers 'Root' for an empty path under an empty root; a copy wants ''.
+  if (!normalizedRoot) return normalizedCopyPath(path)
 
-  const rootPrefix = `${normalizedRoot}/`
-  if (!normalizedPath.startsWith(rootPrefix)) return normalizedPath
-
-  return normalizedPath.slice(rootPrefix.length)
+  return toTreePath(normalizedCopyPath(path), normalizedRoot)
 }
 
 function normalizedCopyPath(path: string) {

@@ -138,7 +138,7 @@ test('inactive environment commands refresh their slice and terminal registratio
         .recordDescriptor(origin, { ...descriptor, environmentId: OTHER_ENVIRONMENT_ID }),
     ).toThrow()
     await expect(
-      queryClientFor(origin).fetchQuery({ ...terminalCheckoutQueryOptions(''), staleTime: 0 }),
+      queryClientFor(origin).query({ ...terminalCheckoutQueryOptions(''), staleTime: 0 }),
     ).rejects.toMatchObject({ code: 'ENVIRONMENT_IDENTITY_DRIFT' })
   } finally {
     useEnvironmentsStore.setState(previousEnvironments, true)

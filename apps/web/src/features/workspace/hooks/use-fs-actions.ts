@@ -32,10 +32,10 @@ import {
   moveLabel,
 } from '@/features/workspace/utils/file-operation-labels'
 import { workspaceMutationKeys } from '@/features/workspace/utils/mutation-keys'
-import { toClientError } from '@/lib/client-error-taxonomy'
+import { clientErrorMessage, toClientError } from '@/lib/client-error-taxonomy'
 import { isDirectoryEntry } from '@/lib/file-system-types'
 import { fileSystemKeys } from '@/lib/query-keys'
-import { deletePath, errorMessage } from '@/lib/file-server'
+import { deletePath } from '@/lib/file-server'
 import { canonicalTreePath, toTreePath } from '@/lib/path-formatters'
 import type { TreeModel, TreePathMove } from '@/lib/tree-model'
 
@@ -245,7 +245,7 @@ export function useFsActions({
       setDeletePermanently(true)
       return
     }
-    setDeleteError(errorMessage(outcome.error))
+    setDeleteError(clientErrorMessage(outcome.error))
   }
 
   /** Only after the dialog has said so: the journal cannot hold this delete. */
@@ -264,7 +264,7 @@ export function useFsActions({
       closeDeleteDialog()
       return
     }
-    setDeleteError(errorMessage(outcome.error))
+    setDeleteError(clientErrorMessage(outcome.error))
   }
 
   function confirmDelete() {

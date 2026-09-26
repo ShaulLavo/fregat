@@ -1,3 +1,4 @@
+import { settingsPageQueryOptions } from '@/features/settings/utils/page-query'
 import { createRoute } from '@tanstack/react-router'
 import { encodePath, encodeSegment } from '@workspace/client-core/address/path-token'
 import { sessionIdSchema } from '@workspace/contracts'
@@ -59,7 +60,13 @@ export const remoteWorkbenchRoute = createRoute({
 export function workbenchChildren<
   TParent extends typeof localWorkbenchRoute | typeof remoteWorkbenchRoute,
 >(parent: TParent) {
-  const settings = createRoute({ getParentRoute: () => parent, path: 'settings' })
+  const settings = createRoute({
+    getParentRoute: () => parent,
+    path: 'settings',
+    loader: ({ context }) => {
+      void context.resources.query(settingsPageQueryOptions).catch(() => undefined)
+    },
+  })
   const search = createRoute({ getParentRoute: () => parent, path: 's' })
   const file = createRoute({
     getParentRoute: () => parent,

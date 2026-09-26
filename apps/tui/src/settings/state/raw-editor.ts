@@ -1,3 +1,4 @@
+import { createObservableStore } from '@/host/state/observable-store'
 import type { SettingsOwner } from '@workspace/client-core/settings/owner'
 import {
   errorStringField,
@@ -29,38 +30,37 @@ export function createRawSettingsEditor({
   const signal = parentSignal
     ? AbortSignal.any([controller.signal, parentSignal])
     : controller.signal
-  const listeners = new Set<() => void>()
-  let state: RawEditorState = {
-    phase: 'idle',
-    ...document(owner.getSnapshot().snapshot, target),
-    error: null,
-  }
-  const publish = (next: RawEditorState) => {
-    if (signal.aborted) return
-    state = next
-    for (const listener of listeners) listener()
-  }
+
+  const store = createObservableStore<RawEditorState>(
+    {
+      phase: 'idle',
+      ...document(owner.getSnapshot().snapshot, target),
+      error: null,
+    },
+    { signal: signal },
+  )
+  const publish = store.replace
   const edit = async (reload = false) => {
-    if (signal.aborted || state.phase === 'editing' || state.phase === 'saving') return
-    publish({ ...state, phase: 'editing', error: null })
+    if (signal.aborted || store.value.phase === 'editing' || store.value.phase === 'saving') return
+    publish({ ...store.value, phase: 'editing', error: null })
     try {
-      if (reload) publish({ ...state, ...document(await owner.refresh(signal), target) })
+      if (reload) publish({ ...store.value, ...document(await owner.refresh(signal), target) })
       const text = await editText({
-        text: state.text,
+        text: store.value.text,
         signal,
       })
       signal.throwIfAborted()
       if (text === null) {
-        publish({ ...state, phase: 'done' })
+        publish({ ...store.value, phase: 'done' })
         return
       }
-      publish({ ...state, phase: 'saving', text })
-      await owner.writeRaw(target, text, state.revision, signal)
-      publish({ ...state, phase: 'done' })
+      publish({ ...store.value, phase: 'saving', text })
+      await owner.writeRaw(target, text, store.value.revision, signal)
+      publish({ ...store.value, phase: 'done' })
     } catch (error) {
       const conflict = errorStringField(error, 'code') === 'settings.RAW_REVISION_STALE'
       publish({
-        ...state,
+        ...store.value,
         phase: 'failed',
         error: conflict
           ? 'Settings changed elsewhere. Draft kept. Discard and reload to edit current settings.'
@@ -70,15 +70,12 @@ export function createRawSettingsEditor({
     }
   }
   return {
-    getSnapshot: () => state,
-    subscribe(listener: () => void) {
-      listeners.add(listener)
-      return () => listeners.delete(listener)
-    },
+    getSnapshot: store.getSnapshot,
+    subscribe: store.subscribe,
     edit,
     dispose() {
       controller.abort()
-      listeners.clear()
+      store.dispose()
     },
   }
 }

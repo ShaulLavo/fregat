@@ -11,6 +11,8 @@ export type LanguageServerMatchConfigurationSnapshot = {
 }
 
 export const editorQueryKeys = {
+  themes: ['editor', 'theme'] as const,
+  theme: (id: string) => ['editor', 'theme', id] as const,
   storedHistory: (id: string) => ['editor', 'stored-history', id] as const,
   languageServerMatches: (
     rootPath: string,

@@ -226,7 +226,7 @@ test('search covers the full history, filters literal messages and authors, and 
   const author = await client.git.history.post({
     path: 'history-repo',
     ref: 'HEAD',
-    search: 'HISTORY@EXAMPLE.COM',
+    search: 'TEST@EXAMPLE.INVALID',
   })
   expect(author.data?.commits).toHaveLength(100)
   expect(author.data?.next).not.toBeNull()

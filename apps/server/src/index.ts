@@ -8,7 +8,7 @@ import { getDefaultPlatformDatabase } from './db/client'
 import { platformHomePath } from './home'
 import { readEnvironmentIdentity } from './db/environment-identity'
 import {
-  errorSummary,
+  operatorErrorSummary,
   flushObservability,
   initializeObservability,
   recordProcessError,
@@ -107,7 +107,7 @@ function installCrashHandlers() {
     if (crashing) return
 
     crashing = true
-    recordProcessError('server.unhandled_rejection', { error: errorSummary(reason) })
+    recordProcessError('server.unhandled_rejection', { error: operatorErrorSummary(reason) })
     void crash()
   })
 }

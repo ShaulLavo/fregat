@@ -4,13 +4,14 @@ import * as v from 'valibot'
 import { orchestrationCommandSchema } from '@workspace/contracts'
 import { afterEach, expect, test } from 'vitest'
 import { closeTestApps } from '../../../test/server'
-import { executeGit, FIXTURE_MODEL } from '../../../test/factories/orchestration'
+import { FIXTURE_MODEL } from '../../../test/factories/orchestration'
 import {
   lifecycleSessionId,
   lifecycleWorktreeId,
   stopLifecycleEffects,
   worktreeLifecycleFixture,
 } from '../../../test/factories/worktree-lifecycle'
+import { runGit } from '../../testing/git'
 
 const fixtures: Awaited<ReturnType<typeof worktreeLifecycleFixture>>[] = []
 afterEach(async () => {
@@ -58,12 +59,10 @@ test.each(['intent', 'branch', 'checkout', 'ready'] as const)(
       }),
     )
     if (window === 'branch')
-      await executeGit(
+      await runGit(
         fixture.root,
-        'update-ref',
-        `refs/heads/${prepared.branch}`,
-        prepared.baseCommit,
-        '0'.repeat(40),
+        ['update-ref', `refs/heads/${prepared.branch}`, prepared.baseCommit, '0'.repeat(40)],
+        { cwdMode: 'option' },
       )
     if (window === 'checkout' || window === 'ready')
       await stopped.git.create({ ...prepared, path: fixture.root })
@@ -125,9 +124,13 @@ test.each(['accepted', 'removed'] as const)(
         .state,
     ).toBe('removed')
     await expect(stat(worktree.canonicalPath)).rejects.toMatchObject({ code: 'ENOENT' })
-    expect(await executeGit(fixture.root, 'rev-parse', `refs/heads/${worktree.branch}`)).toBe(
-      worktree.baseCommit,
-    )
+    expect(
+      (
+        await runGit(fixture.root, ['rev-parse', `refs/heads/${worktree.branch}`], {
+          cwdMode: 'option',
+        })
+      ).stdout.trim(),
+    ).toBe(worktree.baseCommit)
   },
 )
 

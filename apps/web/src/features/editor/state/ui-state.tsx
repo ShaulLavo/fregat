@@ -5,11 +5,9 @@ import {
 import type { LanguageServerDefinitionTarget } from '@singapore-editor/lsp-plugin/websocket'
 import type { LanguageServerReferencesResult } from '@singapore-editor/lsp-plugin'
 import type { ReactEditorController } from '@singapore-editor/react'
-import { createContext, use } from 'react'
-import { useStore } from 'zustand'
 import { createStore, type StoreApi } from 'zustand/vanilla'
 
-import { clientErrors } from '@/lib/structured-errors'
+import { createStoreContext } from '@/lib/store-context'
 import type { TabId } from '@/lib/documents/utils/types'
 import { TabPresentations } from '@/features/editor/state/tab-presentation'
 
@@ -47,22 +45,13 @@ export type EditorUiStore = EditorUiStoreState & EditorUiStoreActions
 
 export type EditorUiStoreApi = StoreApi<EditorUiStore>
 
-export const EditorUiStateContext = createContext<EditorUiStoreApi | null>(null)
-
-export function useEditorUiStoreApi() {
-  const store = use(EditorUiStateContext)
-  if (!store) {
-    throw clientErrors.CONTEXT_MISSING({
-      message: 'useEditorUiStoreApi must be used within EditorStateProvider',
-    })
-  }
-
-  return store
-}
-
-export function useEditorUiState<T>(selector: (state: EditorUiStore) => T): T {
-  return useStore(useEditorUiStoreApi(), selector)
-}
+export const {
+  Context: EditorUiStateContext,
+  useStoreApi: useEditorUiStoreApi,
+  useSelector: useEditorUiState,
+} = createStoreContext<EditorUiStoreApi>(
+  'useEditorUiStoreApi must be used within EditorStateProvider',
+)
 
 export function createEditorUiStore() {
   const tabPresentation = new TabPresentations()

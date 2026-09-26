@@ -1,5 +1,8 @@
 import * as v from 'valibot'
-import { appendTerminalContextsToPrompt } from '@workspace/client-core/chat/terminal-context'
+import {
+  appendTerminalContextsToPrompt,
+  type TerminalContextSelection,
+} from '@workspace/client-core/chat/terminal-context'
 
 export const promptElementSchema = v.object({
   id: v.string(),
@@ -8,17 +11,11 @@ export const promptElementSchema = v.object({
   label: v.string(),
   text: v.string(),
 })
-export const terminalContextSchema = v.object({
-  source: v.string(),
-  lineStart: v.number(),
-  lineEnd: v.number(),
-  text: v.string(),
-})
 export type PromptElement = v.InferOutput<typeof promptElementSchema>
 export type PromptContent = {
   readonly text: string
   readonly elements?: readonly PromptElement[]
-  readonly terminalContexts?: readonly v.InferOutput<typeof terminalContextSchema>[]
+  readonly terminalContexts?: readonly TerminalContextSelection[]
 }
 
 export function expandedPrompt(draft: PromptContent) {

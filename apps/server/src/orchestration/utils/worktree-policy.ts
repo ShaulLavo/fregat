@@ -1,23 +1,12 @@
 import type {
   OrchestrationWorktree,
   WorktreeCleanupEligibility,
-  WorktreeCreationCapability,
   SessionDeletionState,
 } from '@workspace/contracts'
 
 type Reference = {
   readonly deletedAt: string | null
   readonly deletion: SessionDeletionState | null
-}
-
-export function worktreeCreationCapability(
-  worktree: Pick<OrchestrationWorktree, 'lifecycle' | 'retiredAt'>,
-  repositoryKind: 'git' | 'directory',
-): WorktreeCreationCapability {
-  if (worktree.retiredAt || worktree.lifecycle.state !== 'ready')
-    return { allowed: false, reason: 'base-not-ready' }
-  if (repositoryKind !== 'git') return { allowed: false, reason: 'not-git' }
-  return { allowed: true }
 }
 
 export function worktreeCleanupEligibility(

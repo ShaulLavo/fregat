@@ -20,6 +20,7 @@
     "test": "vitest run --project node --project dom"
   },
   "dependencies": {
+    "@tanstack/query-core": "^5.104.0",
     "@types/hast": "^3.0.5",
     "@types/mdast": "^4.0.4",
     "hast-util-to-jsx-runtime": "^2.3.6",

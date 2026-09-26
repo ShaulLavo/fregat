@@ -12,15 +12,13 @@ import {
 } from '@/features/workbench/utils/panels'
 import type { CachedWorkspaceSlice, CachedWorkspaceState } from '@/features/workspace/state/cache'
 import { emptyWorkspaceSlice, emptyWorkspaceState } from '@/features/workspace/state/cache'
-import { clientErrors } from '@/lib/structured-errors'
+import { createStoreContext } from '@/lib/store-context'
 import { sameTabContent, tabContentKey } from '@/lib/documents/utils/tabs'
 import type {
   EditorViewScrollPosition,
   ReopenScrollPosition,
   TabContent,
 } from '@/lib/documents/utils/types'
-import { createContext, use } from 'react'
-import { useStore } from 'zustand'
 import { subscribeWithSelector } from 'zustand/middleware'
 import { createStore, type Mutate, type StoreApi } from 'zustand/vanilla'
 
@@ -68,22 +66,13 @@ export type EditorWorkspaceStoreApi = Mutate<
   [['zustand/subscribeWithSelector', never]]
 >
 
-export const EditorWorkspaceStateContext = createContext<EditorWorkspaceStoreApi | null>(null)
-
-export function useEditorWorkspaceStoreApi() {
-  const store = use(EditorWorkspaceStateContext)
-  if (!store) {
-    throw clientErrors.CONTEXT_MISSING({
-      message: 'useEditorWorkspaceStoreApi must be used within EditorStateProvider',
-    })
-  }
-
-  return store
-}
-
-export function useEditorWorkspaceState<T>(selector: (state: EditorWorkspaceStore) => T): T {
-  return useStore(useEditorWorkspaceStoreApi(), selector)
-}
+export const {
+  Context: EditorWorkspaceStateContext,
+  useStoreApi: useEditorWorkspaceStoreApi,
+  useSelector: useEditorWorkspaceState,
+} = createStoreContext<EditorWorkspaceStoreApi>(
+  'useEditorWorkspaceStoreApi must be used within EditorStateProvider',
+)
 
 export function createEditorWorkspaceStore(
   initialState: CachedWorkspaceState = emptyWorkspaceState(),

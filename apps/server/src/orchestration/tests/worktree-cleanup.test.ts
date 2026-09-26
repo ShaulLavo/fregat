@@ -2,7 +2,8 @@ import { mkdir, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { afterEach, expect, test } from 'vitest'
 import { closeTestApps } from '../../../test/server'
-import { executeGit, FIXTURE_MODEL } from '../../../test/factories/orchestration'
+import { FIXTURE_MODEL } from '../../../test/factories/orchestration'
+import { runGit } from '../../testing/git'
 import {
   lifecycleSessionId,
   lifecycleWorktreeId,
@@ -59,7 +60,9 @@ test('a deletion that asks for it removes the worktree and keeps its branch', as
   const removed = await deleteSession(fixture, true)
   expect(removed?.lifecycle.state).toBe('removed')
   expect(await exists(created.canonicalPath)).toBe(false)
-  await executeGit(fixture.root, 'rev-parse', '--verify', `refs/heads/${created.branch}`)
+  await runGit(fixture.root, ['rev-parse', '--verify', `refs/heads/${created.branch}`], {
+    cwdMode: 'option',
+  })
 })
 
 test('without the request or the setting the worktree stays', async () => {
@@ -81,7 +84,10 @@ test('the project setting removes it after any deletion', async () => {
 test.each([
   ['a changed file', (root: string) => writeFile(path.join(root, 'tracked.txt'), 'edited\n')],
   ['an ignored file', (root: string) => writeFile(path.join(root, 'ignored.txt'), 'secret\n')],
-  ['another branch', (root: string) => executeGit(root, 'checkout', '-b', 'elsewhere')],
+  [
+    'another branch',
+    (root: string) => runGit(root, ['checkout', '-b', 'elsewhere'], { cwdMode: 'option' }),
+  ],
 ])('%s keeps the worktree', async (_name, change) => {
   const fixture = await fixtureWith(() => ({ 'git.worktreeCleanupOnDelete': true }))
   const created = await fixture.create()
@@ -94,7 +100,9 @@ test('an ignored node_modules does not keep it', async () => {
   const fixture = await fixtureWith(() => ({ 'git.worktreeCleanupOnDelete': true }))
   const created = await fixture.create()
   await writeFile(path.join(created.canonicalPath, '.gitignore'), 'ignored.txt\nnode_modules/\n')
-  await executeGit(created.canonicalPath, 'commit', '-am', 'ignore dependencies')
+  await runGit(created.canonicalPath, ['commit', '-am', 'ignore dependencies'], {
+    cwdMode: 'option',
+  })
   await mkdir(path.join(created.canonicalPath, 'node_modules', 'left-pad'), { recursive: true })
   await writeFile(path.join(created.canonicalPath, 'node_modules', 'left-pad', 'index.js'), '')
   expect((await deleteSession(fixture))?.lifecycle.state).toBe('removed')

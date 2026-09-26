@@ -28,7 +28,7 @@ test('preview query reads exact uploaded bytes from the real owner route', async
   const url = attachmentFileUrl(attachment, server.origin)
   const queryClient = new QueryClient()
   try {
-    expect(await queryClient.fetchQuery(attachmentTextOptions(url, fetcher))).toBe(content)
+    expect(await queryClient.query(attachmentTextOptions(url, fetcher))).toBe(content)
     const response = await fetcher(url)
     expect(response.headers.get('content-disposition')).toContain('notes.txt')
     expect(await response.text()).toBe(content)
@@ -43,7 +43,7 @@ test('missing attachment rejects the preview query instead of showing empty cont
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   try {
     await expect(
-      queryClient.fetchQuery(
+      queryClient.query(
         attachmentTextOptions(
           `${server.origin}/attachments/missing.bin`,
           directInProcessFetcher(server),

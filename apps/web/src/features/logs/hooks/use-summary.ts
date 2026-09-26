@@ -3,8 +3,8 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import type { LogDashboardFilters } from '@workspace/contracts'
 
 import { logsKeys } from '@/features/logs/utils/query-keys'
-import { fetchLogSummary } from '@/features/logs/utils/api'
-import { logFilterQuery } from '@/features/logs/utils/filter-params'
+import { fetchLogSummary } from '@workspace/client-core/logs/api'
+import { logFilterQuery } from '@workspace/client-core/logs/filters'
 
 export function useLogSummary(filters: LogDashboardFilters, enabled = true) {
   const queryFilters = logFilterQuery(filters)

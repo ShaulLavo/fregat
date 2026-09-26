@@ -1,5 +1,7 @@
-import * as v from 'valibot'
-import { commandIdSchema, worktreeIdSchema } from '@workspace/contracts'
+import {
+  createProjectRegistrationCommand,
+  projectRegistrationResult,
+} from '@workspace/client-core/chat/registration'
 import { readServerPaths } from '@workspace/client-core/files/read'
 import { absolutePickerPath } from '@workspace/client-core/files/path-input'
 import type { Client } from '@workspace/client-core/transport/client'
@@ -18,13 +20,12 @@ export async function ensureWorktree({
 }) {
   const paths = await readServerPaths({ client, signal })
   const workspaceRoot = absolutePickerPath(rootPath, paths.workspaceRoot)
-  const result = await rpc.dispatchCommand({
-    type: 'project.create',
-    commandId: v.parse(commandIdSchema, crypto.randomUUID()),
-    workspaceRoot,
-    title: workspaceRoot.split('/').filter(Boolean).at(-1) ?? 'Root',
-    defaultModelSelection: null,
-  })
+  const result = await rpc.dispatchCommand(
+    createProjectRegistrationCommand({
+      workspaceRoot,
+      title: workspaceRoot.split('/').filter(Boolean).at(-1) ?? 'Root',
+    }),
+  )
   signal.throwIfAborted()
-  return v.parse(v.object({ worktreeId: worktreeIdSchema }), result.result).worktreeId
+  return projectRegistrationResult(result).worktreeId
 }

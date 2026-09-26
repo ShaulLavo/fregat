@@ -1,7 +1,7 @@
 import path from 'node:path'
 import { afterEach, expect, test } from 'vitest'
 import { closeTestApps } from '../../../test/server'
-import { executeGit } from '../../../test/factories/orchestration'
+import { runGit } from '../../testing/git'
 import {
   lifecycleSessionId,
   lifecycleWorktreeId,
@@ -19,13 +19,13 @@ test.each(['release', undefined])(
   async (baseBranch) => {
     const fixture = await worktreeLifecycleFixture({ baseBranch })
     fixtures.push(fixture)
-    await executeGit(fixture.root, 'branch', 'release')
-    await executeGit(fixture.root, 'checkout', '-b', 'active-source')
+    await runGit(fixture.root, ['branch', 'release'], { cwdMode: 'option' })
+    await runGit(fixture.root, ['checkout', '-b', 'active-source'], { cwdMode: 'option' })
     const created = await fixture.create()
     expect(created).toMatchObject({ baseBranch: baseBranch ?? 'active-source' })
     await expectBaseBranch(fixture, baseBranch ?? 'active-source')
 
-    await executeGit(fixture.root, 'checkout', '-b', 'later-source')
+    await runGit(fixture.root, ['checkout', '-b', 'later-source'], { cwdMode: 'option' })
     await fixture.engine.refreshWorktreeMetadata(created.path)
     await fixture.restart()
     await expectBaseBranch(fixture, baseBranch ?? 'active-source')
@@ -35,9 +35,9 @@ test.each(['release', undefined])(
 test('a detached creation source stays unknown after a branch is checked out', async () => {
   const fixture = await worktreeLifecycleFixture()
   fixtures.push(fixture)
-  await executeGit(fixture.root, 'checkout', '--detach')
+  await runGit(fixture.root, ['checkout', '--detach'], { cwdMode: 'option' })
   expect(await fixture.create()).toMatchObject({ baseBranch: null })
-  await executeGit(fixture.root, 'checkout', 'main')
+  await runGit(fixture.root, ['checkout', 'main'], { cwdMode: 'option' })
   await fixture.restart()
   await expectBaseBranch(fixture, null)
 })
@@ -46,7 +46,9 @@ test('registered external worktrees never acquire an inferred parent', async () 
   const fixture = await worktreeLifecycleFixture()
   fixtures.push(fixture)
   const external = path.join(fixture.root, 'external')
-  await executeGit(fixture.root, 'worktree', 'add', '-b', 'external-child', external, 'main')
+  await runGit(fixture.root, ['worktree', 'add', '-b', 'external-child', external, 'main'], {
+    cwdMode: 'option',
+  })
   await fixture.command({
     type: 'project.create',
     title: 'External checkout',
@@ -73,7 +75,7 @@ test('a different branch in a managed checkout never inherits its creation paren
   const created = await fixture.create()
   await expectBaseBranch(fixture, 'main')
 
-  await executeGit(created.canonicalPath, 'switch', '-c', 'feature')
+  await runGit(created.canonicalPath, ['switch', '-c', 'feature'], { cwdMode: 'option' })
   await fixture.engine.refreshWorktreeMetadata(created.path)
   await fixture.restart()
   expect(await listedWorktrees(fixture)).toEqual(
@@ -86,7 +88,9 @@ test('a different branch in a managed checkout never inherits its creation paren
     ]),
   )
 
-  await executeGit(created.canonicalPath, 'switch', `worktree/${lifecycleWorktreeId}`)
+  await runGit(created.canonicalPath, ['switch', `worktree/${lifecycleWorktreeId}`], {
+    cwdMode: 'option',
+  })
   await expectBaseBranch(fixture, 'main')
 })
 

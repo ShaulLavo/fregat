@@ -3,10 +3,10 @@ import type { LogDashboardFilters, LogEventsResult, LogLiveStreamItem } from '@w
 import { useEffect, useMemo } from 'react'
 
 import { logsKeys } from '@/features/logs/utils/query-keys'
-import { subscribeLogEvents } from '@/features/logs/utils/api'
+import { subscribeLogEvents } from '@workspace/client-core/logs/api'
 import { createLiveEventBatcher } from '@/features/logs/state/live-batcher'
-import { logFilterQuery } from '@/features/logs/utils/filter-params'
-import { mergeLiveLogItems } from '@/features/logs/state/live-cache'
+import { logFilterQuery } from '@workspace/client-core/logs/filters'
+import { mergeLiveLogItems } from '@workspace/client-core/logs/live-cache'
 import type { Client } from '@/lib/client'
 import { clientForQueryClient } from '@/lib/environments/state/query-clients'
 

@@ -19,7 +19,7 @@ export async function admitDiscard(owner: QueryClient, rootPath: string, paths: 
   admitGitWrite(owner)
   const expected = owner.getQueryData<GitStatusResult>(gitKeys.status(rootPath))
   await owner.cancelQueries({ queryKey: gitKeys.status(rootPath), exact: true })
-  const status = await owner.fetchQuery({
+  const status = await owner.query({
     queryKey: gitKeys.status(rootPath),
     queryFn: ({ signal }) => fetchStatus(rootPath, signal, clientForQueryClient(owner), true),
     staleTime: 0,
@@ -28,6 +28,16 @@ export async function admitDiscard(owner: QueryClient, rootPath: string, paths: 
     throw changedStatus()
   admitGitWrite(owner)
   return status
+}
+
+/** An index write that deletes from disk is admitted as a discard. */
+export async function admitIndexWrite(
+  owner: QueryClient,
+  rootPath: string,
+  discards: readonly string[] | undefined,
+) {
+  if (discards) return admitDiscard(owner, rootPath, discards)
+  admitGitWrite(owner)
 }
 
 function statusIdentity(status: GitStatusResult, paths: readonly string[]) {

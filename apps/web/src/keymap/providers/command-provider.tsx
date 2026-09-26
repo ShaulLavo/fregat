@@ -252,7 +252,7 @@ export function CommandProvider({ children }: { readonly children: ReactNode }) 
         adaptersRef.current.setDiffViewMode('editor.diff.viewMode', mode, undefined, initiator),
       setTheme: (value, initiator) => adaptersRef.current.setTheme(value, initiator),
       nextWallpaper: async () => {
-        const library = await settingsOwner.fetchQuery(wallpaperLibraryOptions())
+        const library = await settingsOwner.query(wallpaperLibraryOptions())
         if (!library.assets.length) return false
         const selection = readCommandSettingsSnapshot(
           settingsOwner,

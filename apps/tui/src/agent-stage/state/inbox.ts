@@ -6,7 +6,7 @@ import {
   type TerminalContextSelection,
 } from '@workspace/client-core/chat/terminal-context'
 import type { FileStorage } from '@/storage/files'
-import { terminalContextSchema } from '@/agent-stage/utils/prompt'
+import { terminalContextSchema } from '@workspace/client-core/chat/terminal-context'
 
 export function queuePrompt(
   storage: FileStorage,

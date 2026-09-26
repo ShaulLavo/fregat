@@ -6,6 +6,7 @@ export const terminalPanelQueryOptions = queryOptions({
   queryKey: terminalQueryKeys.panelModule,
   queryFn: () => import('@/features/terminal/components/panel'),
   staleTime: 'static',
+  structuralSharing: false,
   gcTime: Infinity,
   // The browser may already have the chunk while offline.
   networkMode: 'always',

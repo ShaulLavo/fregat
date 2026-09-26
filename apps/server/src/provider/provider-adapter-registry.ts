@@ -22,6 +22,7 @@ import {
   recordChatPipelineInfo,
   recordChatPipelineWarning,
 } from '../orchestration/orchestration-logging'
+import { AsyncQueue } from '../async-queue'
 import { ProviderCredentialWatch } from './credential-watch'
 import type { AnyProviderDriver, ProviderInstanceConfig } from './driver'
 import { DEFAULT_PROVIDER_INSTANCES, productProviderDrivers } from './drivers/built-in'
@@ -83,6 +84,7 @@ type LiveProviderInstance = {
 export class ProviderAdapterRegistry {
   private readonly activeLeaseCounts = new Map<ProviderInstanceId, number>()
   private readonly changeListeners = new Set<ProviderAdapterRegistryChangeListener>()
+  private readonly changeStreams = new Set<AsyncQueue<ProviderAdapterRegistryChange>>()
   private readonly credentialWatch = new ProviderCredentialWatch((providerInstanceIds) => {
     void this.refreshInstances(providerInstanceIds)
   })
@@ -280,8 +282,9 @@ export class ProviderAdapterRegistry {
     }
   }
 
-  streamChanges(): AsyncIterable<ProviderAdapterRegistryChange> {
-    return providerAdapterRegistryChangeStream(this)
+  /** Ends when `signal` aborts or the registry is disposed; both release a parked `next()`. */
+  streamChanges(signal: AbortSignal): AsyncIterable<ProviderAdapterRegistryChange> {
+    return { [Symbol.asyncIterator]: () => this.changeStream(signal) }
   }
 
   adapter(providerInstanceId: ProviderInstanceId) {
@@ -398,6 +401,7 @@ export class ProviderAdapterRegistry {
     this.disposed = true
     this.desiredEntries = null
     this.leaseDeferredInstances.clear()
+    for (const changes of this.changeStreams) changes.close()
     this.changeListeners.clear()
     await this.reconcileChain
     this.credentialWatch.stop()
@@ -549,6 +553,21 @@ export class ProviderAdapterRegistry {
     this.instances.clear()
     for (const [providerInstanceId, instance] of ordered) {
       this.instances.set(providerInstanceId, instance)
+    }
+  }
+
+  private async *changeStream(signal: AbortSignal) {
+    if (signal.aborted || this.disposed) return
+
+    const changes = new AsyncQueue<ProviderAdapterRegistryChange>({ signal })
+    const unsubscribe = this.subscribeChanges((change) => changes.push(change))
+    this.changeStreams.add(changes)
+    try {
+      yield* changes
+    } finally {
+      this.changeStreams.delete(changes)
+      changes.close()
+      unsubscribe()
     }
   }
 
@@ -730,34 +749,4 @@ function compareProviderSnapshots(left: ProviderSnapshot, right: ProviderSnapsho
     left.driverKind.localeCompare(right.driverKind) ||
     left.providerInstanceId.localeCompare(right.providerInstanceId)
   )
-}
-
-function providerAdapterRegistryChangeStream(adapterRegistry: ProviderAdapterRegistry) {
-  return {
-    async *[Symbol.asyncIterator]() {
-      const queue: ProviderAdapterRegistryChange[] = []
-      const waiters: Array<() => void> = []
-      const unsubscribe = adapterRegistry.subscribeChanges((change) => {
-        queue.push(change)
-        waiters.shift()?.()
-      })
-
-      try {
-        for (;;) {
-          const change = queue.shift()
-          if (change) {
-            yield change
-            continue
-          }
-
-          await new Promise<void>((resolve) => {
-            waiters.push(resolve)
-          })
-        }
-      } finally {
-        unsubscribe()
-        waiters.splice(0)
-      }
-    },
-  }
 }

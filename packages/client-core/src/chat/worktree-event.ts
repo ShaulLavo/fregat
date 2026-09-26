@@ -1,8 +1,9 @@
-import type {
-  OrchestrationEvent,
-  OrchestrationWorktreeShell,
-  RepositoryKind,
-  WorktreeLifecycle,
+import {
+  worktreeCreationCapability,
+  type OrchestrationEvent,
+  type OrchestrationWorktreeShell,
+  type RepositoryKind,
+  type WorktreeLifecycle,
 } from '@workspace/contracts'
 
 type WorktreeEvent = Extract<OrchestrationEvent, { type: `worktree.${string}` }>
@@ -20,7 +21,13 @@ export function projectWorktreeEvent(
     const base =
       held ??
       registeredWorktree(
-        { ...payload, kind: 'linked', ownership: 'platform', registrationGeneration: 0 },
+        {
+          ...payload,
+          kind: 'linked',
+          ownership: 'platform',
+          registrationGeneration: 0,
+          retiredAt: null,
+        },
         repositoryKind,
       )
     return {
@@ -44,7 +51,13 @@ export function projectWorktreeEvent(
   if (event.type === 'worktree.orphan-registered') {
     const payload = event.payload
     const base = registeredWorktree(
-      { ...payload, kind: 'linked', ownership: 'unclaimed', registrationGeneration: 0 },
+      {
+        ...payload,
+        kind: 'linked',
+        ownership: 'unclaimed',
+        registrationGeneration: 0,
+        retiredAt: null,
+      },
       repositoryKind,
     )
     return {
@@ -76,6 +89,7 @@ export function projectWorktreeEvent(
       updatedAt: event.payload.updatedAt,
     }
   const lifecycle = nextLifecycle(held.lifecycle, event)
+  const retiredAt = lifecycle.state === 'retired' ? lifecycle.retiredAt : held.retiredAt
   let ownership = held.ownership
   if (event.type === 'worktree.released') ownership = 'external'
   if (event.type === 'worktree.adopted') ownership = 'platform'
@@ -84,10 +98,14 @@ export function projectWorktreeEvent(
     ownership,
     baseBranch: event.type === 'worktree.released' ? null : held.baseBranch,
     lifecycle,
+    retiredAt,
     operationId: 'operationId' in lifecycle ? lifecycle.operationId : null,
     headCommit: event.type === 'worktree.created' ? event.payload.headCommit : held.headCommit,
     removedAt: event.type === 'worktree.removed' ? event.payload.removedAt : held.removedAt,
-    worktreeCreationCapability: creationCapability(lifecycle, repositoryKind),
+    worktreeCreationCapability: worktreeCreationCapability(
+      { lifecycle, retiredAt },
+      repositoryKind,
+    ),
     updatedAt: event.occurredAt,
   }
 }
@@ -96,11 +114,16 @@ function registeredWorktree(
   payload: Registration,
   repositoryKind: RepositoryKind,
 ): OrchestrationWorktreeShell {
+  // A registered/revived worktree carries its own retiredAt: a revival that races a later
+  // retirement must not read `ready` on the client while the server already reads `base-not-ready`.
+  const lifecycle: WorktreeLifecycle = payload.retiredAt
+    ? { state: 'retired', retiredAt: payload.retiredAt }
+    : { state: 'ready' }
   return {
     ...payload,
     id: payload.worktreeId,
     operationId: null,
-    lifecycle: { state: 'ready' },
+    lifecycle,
     baseBranch: null,
     baseWorktreeId: null,
     baseCommit: null,
@@ -113,22 +136,16 @@ function registeredWorktree(
     removedAt: null,
     pullRequest: null,
     setup: null,
-    worktreeCreationCapability: creationCapability({ state: 'ready' }, repositoryKind),
+    worktreeCreationCapability: worktreeCreationCapability(
+      { lifecycle, retiredAt: payload.retiredAt },
+      repositoryKind,
+    ),
     cleanupEligibility: {
       reason: 'not-ready',
       nonDeletedSessionCount: 0,
       canResolveMissing: false,
     },
   }
-}
-
-function creationCapability(
-  lifecycle: WorktreeLifecycle,
-  kind: RepositoryKind,
-): OrchestrationWorktreeShell['worktreeCreationCapability'] {
-  if (lifecycle.state !== 'ready') return { allowed: false, reason: 'base-not-ready' }
-  if (kind !== 'git') return { allowed: false, reason: 'not-git' }
-  return { allowed: true }
 }
 
 function nextLifecycle(held: WorktreeLifecycle, event: WorktreeEvent): WorktreeLifecycle {

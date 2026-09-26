@@ -9,8 +9,8 @@ import {
   checkpointRepository,
   checkpointSessionId as sessionId,
   dispatchCheckpointSession,
-  runGit,
 } from '../../../test/factories/checkpoint-session'
+import { runGit } from '../../testing/git'
 
 const cleanups: (() => Promise<void> | void)[] = []
 
