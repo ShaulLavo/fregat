@@ -28,10 +28,19 @@ import { settingInspection } from '@/features/settings/hooks/use-setting-inspect
 import { useSettingsActions } from '@/features/settings/hooks/use-settings-actions'
 import type { SettingsProjection } from '@/features/settings/hooks/use-settings-projection'
 import { useSettingsScope, writableSettingsScope } from '@/features/settings/state/scope-store'
-import { settingRowTitle } from '@workspace/client-core/settings/humanize'
+import { settingDependencyNote, settingRowTitle } from '@workspace/client-core/settings/humanize'
 import { cn } from '@workspace/ui/lib/utils'
 
-export function SettingRow({ id, snapshot }: { id: SettingId; snapshot: SettingsProjection }) {
+export function SettingRow({
+  id,
+  snapshot,
+  underParent = false,
+}: {
+  id: SettingId
+  snapshot: SettingsProjection
+  /** The parent's row is right above this one, so the indent reads as belonging to it. */
+  underParent?: boolean
+}) {
   const descriptor = descriptorFor(id)
   const scope = writableSettingsScope(useSettingsScope())
   const { setSetting } = useSettingsActions()
@@ -41,8 +50,7 @@ export function SettingRow({ id, snapshot }: { id: SettingId; snapshot: Settings
   // on the page rather than in a commit message. It outranks the scope reason —
   // no scope makes a read-only key writable.
   const disabledReason = descriptor.readOnlyReason ?? inspection.disabledReason
-  const parentId = settingParentId(id)
-  const parentOff = parentId !== undefined && snapshot.values[parentId] === false
+  const dependencyNote = settingDependencyNote(id, snapshot.values)
   const value = snapshot.values[id]
   const hasCodePreview =
     descriptor.widget === 'code-theme' ||
@@ -54,9 +62,9 @@ export function SettingRow({ id, snapshot }: { id: SettingId; snapshot: Settings
       className={cn(
         'flex flex-col gap-(--density-control-gap) py-(--density-section-padding) @3xl/settings:items-start @3xl/settings:justify-between @3xl/settings:gap-6',
         descriptor.widget !== 'theme' && '@3xl/settings:flex-row',
-        parentId !== undefined && 'pl-(--density-section-padding)',
+        underParent && 'pl-(--density-section-padding)',
       )}
-      data-depends-on={parentId}
+      data-depends-on={settingParentId(id)}
     >
       <div className='flex min-w-0 flex-col gap-1 @max-3xl/settings:wrap-anywhere'>
         <div className='flex flex-wrap items-center gap-2'>
@@ -105,11 +113,7 @@ export function SettingRow({ id, snapshot }: { id: SettingId; snapshot: Settings
           </p>
         ) : null}
         {disabledReason ? <p className='text-warning text-xs'>{disabledReason}</p> : null}
-        {parentOff ? (
-          <p className='text-muted-foreground text-xs'>
-            Applies while {settingRowTitle(parentId)} is on
-          </p>
-        ) : null}
+        {dependencyNote ? <p className='text-muted-foreground text-xs'>{dependencyNote}</p> : null}
       </div>
 
       <div
@@ -120,7 +124,7 @@ export function SettingRow({ id, snapshot }: { id: SettingId; snapshot: Settings
         )}
       >
         <SettingControl
-          disabled={disabledReason !== null || parentOff}
+          disabled={disabledReason !== null || dependencyNote !== null}
           id={id}
           onChange={(next) => {
             if (!SCALAR_SETTING_IDS.includes(id as ScalarSettingId)) return

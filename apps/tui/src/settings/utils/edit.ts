@@ -10,16 +10,19 @@ import {
   type SettingId,
   type SettingsOperation,
   type SettingsSnapshot,
+  type SettingsValues,
   type SettingsWriteTarget,
 } from '@workspace/contracts'
 import * as v from 'valibot'
 import { createClientError } from '@workspace/client-core/errors'
+import { settingDependencyNote } from '@workspace/client-core/settings/humanize'
 import type { SettingsOwner } from '@workspace/client-core/settings/owner'
 
 export function settingEditDisabledReason(
   id: SettingId | undefined,
   target: SettingsWriteTarget,
   enabled: boolean,
+  values: SettingsValues,
 ) {
   if (!enabled) return 'Reconnect before editing settings.'
   if (!id) return 'Select a setting first.'
@@ -27,7 +30,7 @@ export function settingEditDisabledReason(
   if (descriptor.readOnlyReason) return descriptor.readOnlyReason
   if (!layerAllowsScope(target, descriptor.scope))
     return 'This setting can only be changed in user settings.'
-  return null
+  return settingDependencyNote(id, values)
 }
 
 export function settingDraft(

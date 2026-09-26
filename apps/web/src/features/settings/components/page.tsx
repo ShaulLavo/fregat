@@ -258,8 +258,13 @@ export function SettingsPage({
                   {category === 'Usage' ? <UsageSection /> : null}
                   {ids.includes('chat.keepImportedSessionsUpdated') ? <ImportSection /> : null}
                   {category === 'Chat' && showPush ? <PushSection snapshot={projection} /> : null}
-                  {ids.map((id) => (
-                    <SettingRow id={id} key={id} snapshot={projection} />
+                  {ids.map((id, index) => (
+                    <SettingRow
+                      id={id}
+                      key={id}
+                      snapshot={projection}
+                      underParent={isUnderParent(ids, index)}
+                    />
                   ))}
                 </section>
               ))
@@ -311,6 +316,14 @@ function groupByCategory(ids: readonly SettingId[]): Map<string, SettingId[]> {
   }
 
   return categories
+}
+
+/** True when this row's parent is shown above it in the same section. */
+function isUnderParent(ids: readonly SettingId[], index: number): boolean {
+  const parent = settingParentId(ids[index]!)
+  if (parent === undefined) return false
+
+  return ids.slice(0, index).includes(parent)
 }
 
 /** A `dependsOn` row follows its parent's row, so its indent reads as belonging to it. */
