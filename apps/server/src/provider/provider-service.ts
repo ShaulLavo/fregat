@@ -500,6 +500,7 @@ export class ProviderService {
     }
     const task = new ProviderTextGenerationTask({
       interrupt,
+      outputSchema: input.outputSchema,
       providerInstanceId,
       purpose: input.purpose,
       ...ids,

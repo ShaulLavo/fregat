@@ -19,7 +19,7 @@ export const REVIEW_PATCH_BUDGET = 600_000
 
 type ReviewRun = {
   readonly generation: Omit<ProviderTextGenerationInput, 'modelSelection' | 'purpose' | 'signal'>
-  readonly patchLength: number | null
+  readonly patchBytes: number | null
 }
 
 /** Asks a chosen provider and model to review a change and returns its findings on the lines. */
@@ -39,7 +39,7 @@ export class AgentReviewService {
   }
 
   review(request: AgentReviewRequest, signal?: AbortSignal): Promise<AgentReviewResult> {
-    let patchLength: number | null = null
+    let patchBytes: number | null = null
     return observeRequestOperation(
       {
         area: 'review',
@@ -50,7 +50,7 @@ export class AgentReviewService {
       async () => {
         const checkout = await this.git.repositoryRunner(request.rootPath)
         const run = await this.reviewRun(request, checkout.rootAbsolutePath)
-        patchLength = run.patchLength
+        patchBytes = run.patchBytes
         const answer = await this.ask(request, run, signal)
         const output = readReviewOutput(answer.structured, answer.text)
         if (!output)
@@ -71,7 +71,7 @@ export class AgentReviewService {
       (result) => ({
         findingCount: result.findings.length,
         model: request.reviewer.model,
-        patchLength,
+        patchBytes,
         unplacedCount: result.unplacedCount,
       }),
     )
@@ -106,7 +106,7 @@ export class AgentReviewService {
           interactionMode: 'plan',
           messageText: checkoutReviewPrompt(target),
         },
-        patchLength: null,
+        patchBytes: null,
       }
     const diffs = await this.targetDiffs(target, request.rootPath)
     const patch = diffs.map((diff) => diff.patch.trimEnd()).join('\n')
@@ -114,15 +114,16 @@ export class AgentReviewService {
       throw agentReviewErrors.REVIEW_NOTHING_TO_REVIEW({
         internal: { targetKind: target.kind, fileCount: diffs.length },
       })
-    if (patch.length > REVIEW_PATCH_BUDGET)
+    const patchBytes = Buffer.byteLength(patch, 'utf8')
+    if (patchBytes > REVIEW_PATCH_BUDGET)
       throw agentReviewErrors.REVIEW_PATCH_TOO_LARGE({
-        size: patch.length,
+        size: patchBytes,
         budget: REVIEW_PATCH_BUDGET,
         internal: { targetKind: target.kind, fileCount: diffs.length },
       })
     return {
       generation: { messageText: patchReviewPrompt(target, patch) },
-      patchLength: patch.length,
+      patchBytes,
     }
   }
 

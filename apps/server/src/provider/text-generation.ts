@@ -49,7 +49,9 @@ export class ProviderTextGenerationTask {
   readonly sessionId: SessionId
   readonly turnId: TurnId
   private canonicalText = ''
-  private fallbackText = ''
+  private finalText = ''
+  private readonly messageText = new Map<string, string>()
+  private readonly requiresFinalOutput: boolean
   private interactionRequired = false
   private readonly interruptTextGeneration: InterruptTextGeneration
   private runtimeError: string | null = null
@@ -59,11 +61,13 @@ export class ProviderTextGenerationTask {
 
   constructor(input: {
     interrupt: InterruptTextGeneration
+    outputSchema?: ProviderTextGenerationInput['outputSchema']
     providerInstanceId: ProviderInstanceId
     purpose: ProviderUsagePurpose
     sessionId: SessionId
     turnId: TurnId
   }) {
+    this.requiresFinalOutput = input.outputSchema !== undefined
     this.interruptTextGeneration = input.interrupt
     this.providerInstanceId = input.providerInstanceId
     this.purpose = input.purpose
@@ -74,12 +78,22 @@ export class ProviderTextGenerationTask {
   accept(event: ProviderRuntimeEvent) {
     if (event.sessionId !== this.sessionId) return false
 
-    if (event.type === 'assistant.delta') this.canonicalText += event.delta
+    if (event.type === 'assistant.delta') {
+      this.canonicalText += event.delta
+      this.messageText.set(
+        event.messageId,
+        (this.messageText.get(event.messageId) ?? '') + event.delta,
+      )
+    }
+    if (event.type === 'assistant.complete') {
+      this.finalText = this.messageText.get(event.messageId) ?? this.finalText
+      this.messageText.delete(event.messageId)
+    }
     if (event.type === 'content.delta' && event.payload.streamKind === 'assistant_text') {
       this.streamedText += event.payload.delta
     }
     if (event.type === 'item.completed' && event.payload.itemType === 'assistant_message') {
-      this.fallbackText = event.payload.detail ?? this.fallbackText
+      this.finalText = event.payload.detail ?? ''
     }
     if (event.type === 'turn.structured-output') this.structured = event.payload.value
     if (event.type === 'runtime.error') this.runtimeError = event.payload.message
@@ -103,7 +117,9 @@ export class ProviderTextGenerationTask {
       interactionRequired: this.interactionRequired,
       state: this.state,
       structured: this.structured,
-      text: generatedText(this.canonicalText, this.streamedText, this.fallbackText),
+      text: this.requiresFinalOutput
+        ? this.finalText
+        : generatedText(this.canonicalText, this.streamedText, this.finalText),
     }
   }
 }

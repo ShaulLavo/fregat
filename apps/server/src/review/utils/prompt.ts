@@ -15,7 +15,8 @@ export function patchReviewPrompt(target: AgentReviewTarget, patch: string) {
   return [
     `Review the following ${patchTargetLabel(target)}.`,
     RUBRIC,
-    'For code_location.absolute_file_path give the file path exactly as the patch names it after `b/`.',
+    'For code_location.absolute_file_path give the repository-relative path from the diff header,',
+    'removing only its one `a/` or `b/` prefix. Preserve actual directories named `a` or `b`.',
     '',
     '```diff',
     patch.trimEnd(),

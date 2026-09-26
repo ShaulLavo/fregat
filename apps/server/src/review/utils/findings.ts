@@ -75,7 +75,7 @@ function placeFinding(
 }
 
 function repositoryRelative(filePath: string, checkout: Checkout) {
-  const cleaned = filePath.trim().replace(/^[ab]\//, '')
+  const cleaned = filePath.trim()
   const relative = path.isAbsolute(cleaned)
     ? path.relative(checkout.rootAbsolutePath, cleaned)
     : path.posix.normalize(cleaned)

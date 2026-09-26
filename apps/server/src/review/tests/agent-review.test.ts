@@ -89,6 +89,38 @@ describe('agent review', () => {
     expect(adapter.startedTurns).toHaveLength(0)
   })
 
+  it.each(['a', 'b'])(
+    'preserves a real top-level %s directory in a finding path',
+    async (directory) => {
+      const root = await fixtureRepo()
+      await mkdir(path.join(root, directory, 'src'), { recursive: true })
+      await writeFile(path.join(root, directory, 'src/sum.ts'), 'export const sum = 0\n')
+      await writeFile(path.join(root, 'src/sum.ts'), 'export const sum = 1\n')
+      const adapter = new MockProviderAdapter({
+        responseText: answer(root).replace('"src/sum.ts"', `"${directory}/src/sum.ts"`),
+      })
+      const response = await review(testApp(root, adapter), { kind: 'uncommitted' })
+      expect(response.status).toBe(200)
+      const result = await response.json()
+      expect(result.findings[0].path).toBe(`${directory}/src/sum.ts`)
+      expect(adapter.startedTurns[0]?.messageText).toContain(`+++ b/${directory}/src/sum.ts`)
+    },
+  )
+
+  it('refuses a multibyte patch over the byte budget before starting a provider turn', async () => {
+    const root = await fixtureRepo()
+    const content = '界'.repeat(REVIEW_PATCH_BUDGET / 2)
+    expect(content.length).toBeLessThan(REVIEW_PATCH_BUDGET)
+    await writeFile(path.join(root, 'big.txt'), content)
+    const adapter = new MockProviderAdapter({ responseText: answer(root) })
+    const response = await review(testApp(root, adapter), { kind: 'uncommitted' })
+    expect(response.status).toBe(413)
+    const payload = await response.json()
+    expect(payload.error.code).toContain('REVIEW_PATCH_TOO_LARGE')
+    expect(payload.error.message).toContain('900 KB')
+    expect(adapter.startedTurns).toHaveLength(0)
+  })
+
   it('reads a commit from the checkout itself, read-only', async () => {
     const root = await fixtureRepo()
     const sha = (await runGit(root, ['rev-parse', 'HEAD'])).stdout.trim()
