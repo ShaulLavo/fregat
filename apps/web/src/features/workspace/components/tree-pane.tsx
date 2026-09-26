@@ -1,12 +1,7 @@
 import { captureTree, savedTree } from '@/features/workspace/state/tree-reload'
 import { addLifecycleFlush } from '@/lib/lifecycle-flush'
 import { disabledFileQueryKey } from '@/features/workspace/utils/query-keys'
-import type {
-  FileTreeDropContext,
-  FileTreeDropResult,
-  FileTreeRenameEvent,
-  FileTreeRowDecorationContext,
-} from '@workspace/tree'
+import type { FileTreeDropContext, FileTreeDropResult, FileTreeRenameEvent } from '@workspace/tree'
 import { FileTree } from '@workspace/tree'
 import { useFileTree } from '@workspace/tree'
 import type { GitStatusEntry } from '@workspace/tree'
@@ -26,6 +21,8 @@ import { DeleteEntryDialog } from '@/features/workspace/components/delete-entry-
 import { TreeLoading } from '@/features/workspace/components/tree-loading'
 import { useFileTreeActions } from '@/features/workspace/hooks/use-file-tree-actions'
 import { useFileTreeIntentPrefetch } from '@/features/workspace/hooks/use-file-tree-intent-prefetch'
+import { useWatchCoverage } from '@/hooks/use-watch-coverage'
+import { treeDecorationKey, treeRowDecoration } from '@/features/workspace/utils/tree-decoration'
 import { useEditorColorTheme } from '@/lib/editor-theme/hooks/use-editor-color-theme'
 import { useRowHeight } from '@workspace/ui/patterns/use-row-height'
 import { useFileTreeMutationEvents } from '@/features/workspace/hooks/use-file-tree-mutation-events'
@@ -162,12 +159,14 @@ function ReadyTreePane({
   const completeRenameRef = useRef(fsActions.completeRename)
   const createEntryRef = useRef(fsActions.actions.createEntry)
   const revealActiveFileRef = useRef<() => boolean>(() => false)
+  const limited = useWatchCoverage(rootPath)?.mode === 'limited'
   const loadExpandedDirectoriesForCurrentModel = useEffectEvent((currentTree: FileTreeModel) => {
     expandedDirectoryPathsRef.current = loadExpandedDirectories(
       currentTree,
       model,
       loadDirectory,
       expandedDirectoryPathsRef.current,
+      limited,
     )
   })
   const publishVisibleTreeItemCount = useEffectEvent((currentTree: FileTreeModel) => {
@@ -234,9 +233,10 @@ function ReadyTreePane({
     tree.setLoadingPaths(loadingTreePath ? [loadingTreePath] : [])
   }, [loadingTreePath, tree])
   // A folder's load state lives in the model, which the tree's own rendering never reads.
+  const decorationKey = treeDecorationKey(model)
   useLayoutEffect(() => {
     tree.refreshDecorations()
-  }, [model.errorByDirectoryPath, model.loadingDirectoryPaths, tree])
+  }, [decorationKey, tree])
   useFileTreeMutationEvents({ rootPath, tree })
 
   useFileTreeIntentPrefetch({
@@ -493,19 +493,6 @@ function updateSelectionSyncState(
 
   state.rootPath = rootPath
   state.selectedFilePath = selectedFilePath
-}
-
-function treeRowDecoration(model: TreeModel, context: FileTreeRowDecorationContext) {
-  const treePath = canonicalTreePath(context.item.path)
-  const error = model.errorByDirectoryPath.get(treePath)
-  if (error?.denied) {
-    const path = model.entriesByTreePath.get(treePath)?.path ?? treePath
-    return { text: 'no access', title: `The server's user cannot read /${path}` }
-  }
-  if (error) return { text: 'error', title: error.message }
-  if (model.loadingDirectoryPaths.has(treePath)) return { text: 'loading' }
-
-  return null
 }
 
 function canDragTreePaths(model: TreeModel, paths: readonly string[], movePending: boolean) {

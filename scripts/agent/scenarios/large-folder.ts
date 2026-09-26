@@ -58,6 +58,18 @@ async function expectNoAccess(page: Page) {
     .waitFor({ timeout: 10_000 })
 }
 
+// Nothing watches below the top of a limited root, so a folder is read again when it is expanded.
+async function expectExpandRereads(page: Page, folder: string) {
+  const nested = selectors.treeItem(page, 'nested')
+  await nested.click()
+  await selectors.treeItem(page, 'd0').waitFor()
+  await nested.click()
+  await selectors.treeItem(page, 'd0').waitFor({ state: 'hidden' })
+  await mkdir(path.join(folder, 'nested', 'appeared-while-collapsed'))
+  await nested.click()
+  await selectors.treeItem(page, 'appeared-while-collapsed').waitFor({ timeout: 10_000 })
+}
+
 async function expectTopLevelLive(page: Page, folder: string) {
   await writeFile(path.join(folder, 'arrived.txt'), 'arrived\n')
   await selectors.treeItem(page, 'arrived.txt').waitFor({ timeout: 10_000 })
@@ -85,7 +97,13 @@ export const workspaceOpenLargeRoot: Scenario = {
       await step('no-access')
       await expectTopLevelLive(page, fixture.big)
       await step('top-level-live')
+      await expectExpandRereads(page, fixture.big)
+      await step('expand-rereads')
       strictEqual(await page.locator('[data-sonner-toast]').count(), 0, 'Opening must not toast')
+
+      await writeUserSetting(page, 'files.watchDirectoryLimit', DEFAULT_LIMIT)
+      await selectors.liveUpdatesLimited(page).waitFor({ state: 'hidden', timeout: 10_000 })
+      await step('limit-raised-full-watch')
     } finally {
       await writeUserSetting(page, 'files.watchDirectoryLimit', DEFAULT_LIMIT)
       await fixture.release()
@@ -137,8 +155,10 @@ export const workspaceSwitchClickDuringOpen: Scenario = {
       })
       await pickFolder(page, second, 'target')
       await selectors.navigationTarget(page).filter({ hasText: 'Opening target' }).waitFor()
+      await selectors.navigationShield(page).waitFor()
       await step('opening-status')
-      await selectors.treeItem(page, 'b.ts').click()
+      // The shield takes the click; forcing it past Playwright's check is what a user's click does.
+      await selectors.treeItem(page, 'b.ts').click({ force: true })
       await waitForWorkspace(page, path.join(second, 'target'))
       await selectors.treeItem(page, 'c.ts').waitFor({ timeout: 10_000 })
       await step('switched')

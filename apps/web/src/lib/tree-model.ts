@@ -24,6 +24,8 @@ export type TreePathMove = {
 
 export type DirectoryLoadOptions = {
   retry?: boolean
+  /** Read a loaded directory again; a limited root has no watch to say what changed in it. */
+  refresh?: boolean
 }
 
 export function treeModel(result: TreeResult, rootPath: string): TreeModel {
@@ -66,7 +68,7 @@ export function shouldLoadDirectory(
   options: DirectoryLoadOptions = {},
 ) {
   const canonicalPath = canonicalTreePath(treePath)
-  if (model.loadedDirectoryPaths.has(canonicalPath)) return false
+  if (model.loadedDirectoryPaths.has(canonicalPath) && !options.refresh) return false
   if (model.loadingDirectoryPaths.has(canonicalPath)) return false
   if (model.errorByDirectoryPath.has(canonicalPath) && !options.retry) return false
 

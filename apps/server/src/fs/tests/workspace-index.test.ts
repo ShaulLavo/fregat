@@ -540,6 +540,36 @@ describe('workspace index', () => {
     },
   )
 
+  it.runIf(process.platform === 'linux')(
+    'builds the index once a raised limit lets a limited root be watched in full',
+    async () => {
+      const root = await fixtureRoot()
+      await mkdir(path.join(root, 'big/a/b'), { recursive: true })
+      await writeFile(path.join(root, 'big/a/b/deep.ts'), 'export {}\n')
+      const service = new FileSystemService({
+        metadataDatabasePath: ':memory:',
+        workspaceEditJournalRoot: path.join(root, '.workspace-edit-journals'),
+        workspaceRoot: root,
+      })
+      let limit = 2
+      service.watchDirectoryLimit = () => limit
+
+      try {
+        await service.openWorkspaceRoot({ generation: 1, path: 'big' })
+        await waitForStatus(activeServiceIndex(service), 'off')
+
+        limit = 10
+        service.rebalanceWatchLimit()
+
+        await waitForStatus(activeServiceIndex(service), 'ready')
+        expect(activeServiceIndex(service).get('a/b/deep.ts')).toMatchObject({ type: 'file' })
+        expect(activeServiceIndex(service).status().rebuildReason).toBe('watch-limit-freed')
+      } finally {
+        await service.close()
+      }
+    },
+  )
+
   // Root reads every directory, so only an ordinary user can see an unreadable one.
   it.skipIf(process.getuid?.() === 0)(
     'answers a listing of an unreadable folder with 403',
