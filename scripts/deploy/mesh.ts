@@ -57,6 +57,7 @@ const usage = `Usage: bun run deploy [options]
   --help`
 
 const MIN_FREE_BYTES = 2 * 1024 ** 3
+const LIVE_CHECK_WAIT_MS = 240_000
 
 try {
   await main()
@@ -96,8 +97,6 @@ async function main() {
 }
 
 type DeployOptions = { liveCheck: boolean; reason: string | null; server: boolean; slug?: string }
-
-const LIVE_CHECK_WAIT_MS = 240_000
 
 async function deploy(options: DeployOptions) {
   await preflight()
