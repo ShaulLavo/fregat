@@ -26,9 +26,13 @@ The settings command, the gear button at the bottom of the sidebar rail, or an a
 
 `scenario settings-responsive` checks 40px touch controls and 16px search text in narrow Settings, with search below the scope tabs, then verifies both return to a shared bar in a wide pane.
 
+`scenario settings-keybindings` drives the shortcuts editor at 1440 in a workbench tab (record a chord and check nothing is written before Enter, the clash shown before saving, Escape then Escape, Record keys search, the Custom filter, Reset from the row menu) and at 390 in the full-screen dialog (settings search brings the list, a 48px row, a tap opens the row menu, Remove writes `null`). It reads `keybindings.overrides` from the throwaway server after each write. `/dev/shortcuts` shows the same rows and the recorder over fixture overrides, for a phone check with no settings state.
+
 `scenario wallpaper-icon-hints` creates an unselected wallpaper fixture through the API, hovers its action control on the studio Wallpaper tab and opens its menu. Cleanup deletes that fixture and asserts user settings are unchanged.
 
 ## Gotchas
+
+The shortcut list windows against the settings page's own scroller (`SettingsScrollerContext`, `scrollMargin`). The virtualizer learns the scroll offset from the next scroll event, so a press right after a scroll used to reveal the wrong row and move the pressed one away before the click landed; `virtualRowInView` reads the DOM first. Measure the list's offset in a passive effect: a parent's ref attaches after its children's layout effects.
 
 `scenario color-mode-preview` checks saved Dark and System highlights, React View Transition snapshots in both directions, rapid keyboard previews, filtering, Escape restoration, and reduced motion. It checks that individual colors do not animate inside the snapshots and restores the original setting.
 

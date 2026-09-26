@@ -38,6 +38,7 @@ function sessionRowForWorktree(page: Page, worktreeId: string) {
 }
 
 export const selectors = {
+  pullRequestLookupRetry: (page: Page) => page.locator('[data-pull-request-lookup-retry]'),
   liveWorkLogToggle: (page: Page) =>
     page.locator('[data-live-activity]').getByRole('button').first(),
   workLogGroup: (page: Page) => page.getByRole('region', { name: 'Tool calls', exact: true }),
@@ -147,6 +148,8 @@ export const selectors = {
     page
       .getByRole('region', { name: 'App access', exact: true })
       .getByRole('button', { name: label, exact: true }),
+  genericApproval: (page: Page) =>
+    page.getByRole('region', { name: 'Approval requested', exact: true }),
   commandApproval: (page: Page) => page.getByRole('region', { name: 'Run a command', exact: true }),
   commandApprovalDecision: (page: Page, label: string | RegExp) =>
     page
@@ -559,6 +562,18 @@ export const selectors = {
     page.getByRole('dialog', { name: 'Physical dialog', exact: true }),
   physicalRow: (page: Page) => page.getByRole('option', { name: 'Silent row', exact: true }),
   settingsHeader: (page: Page) => page.locator('[data-settings-header]'),
+  shortcutsSearch: (page: Page) =>
+    page.getByRole('textbox', { name: 'Search keyboard shortcuts', exact: true }),
+  shortcutsList: (page: Page) => page.getByRole('listbox', { name: 'Keyboard shortcuts' }),
+  shortcutRow: (page: Page, command: string) =>
+    page.locator(`[data-shortcut-command="${command}"]`),
+  shortcutRecorder: (page: Page, title: string) =>
+    page.getByRole('textbox', { name: `Press the new shortcut for ${title}`, exact: true }),
+  shortcutFilter: (page: Page, name: 'All' | 'Custom' | 'Conflicts' | 'Unassigned') =>
+    page.getByRole('tab', { name: new RegExp(`^${name}`) }),
+  shortcutRecordKeys: (page: Page) =>
+    page.getByRole('button', { name: 'Record keys', exact: true }),
+  shortcutMenuItem: (page: Page, name: RegExp) => page.getByRole('menuitem', { name }),
   settingDetailsButton: (page: Page, title: string) =>
     page.getByRole('button', { name: `About ${title}`, exact: true }),
   settingsSwitch: (page: Page, title: string) =>
@@ -783,6 +798,9 @@ export const selectors = {
     page.getByRole('button', { name: 'Send correction', exact: true }),
   chatStop: (page: Page) => page.getByRole('button', { name: 'Stop current turn', exact: true }),
   chatSend: (page: Page) => page.getByRole('button', { name: 'Send message', exact: true }),
+  reviewChanges: (page: Page) =>
+    page.getByRole('button', { name: 'Review changes', exact: true }).first(),
+  reviewComments: (page: Page) => page.getByRole('group', { name: 'Review comments' }),
   sleepingSchedules: (page: Page) =>
     page.getByRole('button', { name: /^(Sleeping until|Wake-up due)/ }).first(),
   cancelSchedules: (page: Page) =>
@@ -997,7 +1015,11 @@ export const selectors = {
   historyList: (page: Page) => page.getByRole('listbox', { name: 'Commit history' }),
   historyRowSelector: '[data-history-commit]',
   logRowSelector: '[data-log-row-summary]',
-  /** Every rendered assistant answer in the chat timeline, for page-side frame samplers. */
+  chatAssistantMarkdown: (page: Page) =>
+    page.locator(
+      `${chatMessagesLogSelector} article:not(:has([data-user-message-body])) [data-chat-markdown]`,
+    ),
+  /** Every rendered markdown body in the chat timeline, including user messages. */
   chatMarkdownSelector: '[role="log"][aria-label="Messages"] [data-chat-markdown]',
   chatCodeBlockSelector: '[data-markdown="code-block"]',
   logCopyButtons: (page: Page) => page.getByRole('button', { name: 'Copy log event', exact: true }),
