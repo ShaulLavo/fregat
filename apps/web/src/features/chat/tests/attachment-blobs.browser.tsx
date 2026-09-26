@@ -57,13 +57,14 @@ test('the staged-byte budget rejects an oversized blob without storing it', asyn
 test('an aborted removal rejects and preserves the stored attachment', async () => {
   await storeAttachmentBlob('one', new Blob(['retained']))
   const remove = IDBObjectStore.prototype.delete
-  vi.spyOn(IDBObjectStore.prototype, 'delete').mockImplementationOnce(
-    function (this: IDBObjectStore, key) {
-      const request = remove.call(this, key)
-      request.addEventListener('success', () => this.transaction.abort())
-      return request
-    },
-  )
+  vi.spyOn(IDBObjectStore.prototype, 'delete').mockImplementationOnce(function (
+    this: IDBObjectStore,
+    key,
+  ) {
+    const request = remove.call(this, key)
+    request.addEventListener('success', () => this.transaction.abort())
+    return request
+  })
   await expect(deleteAttachmentBlob('one')).rejects.toThrow(
     'The staged attachment could not be removed.',
   )
