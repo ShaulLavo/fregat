@@ -1,3 +1,4 @@
+import { Spinner } from '@workspace/ui/components/spinner'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@workspace/ui/components/tooltip'
 import type { FilesystemPath } from '@/lib/documents/utils/types'
 import { CrosshairIcon, FilePlusIcon, FolderPlusIcon } from '@phosphor-icons/react'
@@ -12,11 +13,13 @@ import type { LoadState } from '@/lib/load-state'
 import type { TreeModel } from '@/lib/tree-model'
 
 export function FileNavigatorHeader({
+  loading,
   rootPath,
   treeState,
   treeToolbarStore,
   visibleTreeItemCountStore,
 }: {
+  readonly loading: boolean
   readonly rootPath: FilesystemPath
   readonly treeState: LoadState<TreeModel>
   readonly treeToolbarStore: TreeToolbarStore
@@ -39,6 +42,7 @@ export function FileNavigatorHeader({
     <ToolPaneHeader
       actions={
         <>
+          {loading ? <Spinner label='Loading files' size='xs' /> : null}
           <LiveUpdatesLimited rootPath={rootPath} />
           <Tooltip>
             <TooltipTrigger

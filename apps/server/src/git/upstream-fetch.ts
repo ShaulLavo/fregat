@@ -1,4 +1,3 @@
-import { AsyncThrottler } from '@tanstack/pacer/async-throttler'
 import { QueryClient } from '@tanstack/query-core'
 import { nodeErrorCode } from '@workspace/contracts'
 import { stat } from 'node:fs/promises'
@@ -29,7 +28,7 @@ type UpstreamFetchSchedulerOptions = {
  */
 export class UpstreamFetchScheduler {
   private readonly lookups = new QueryClient()
-  private readonly throttlersByKey = new Map<string, AsyncThrottler<UpstreamFetcher>>()
+  private readonly nextFetchByKey = new Map<string, number>()
   private readonly failureCooldownMs: number
   private readonly intervalMs: number
   private readonly resolveCommonDir: (rootAbsolutePath: string) => Promise<string>
@@ -54,8 +53,23 @@ export class UpstreamFetchScheduler {
     const commonDir = await this.commonDir(rootAbsolutePath)
     if (!commonDir) return
 
-    const throttler = this.throttler(`${commonDir}\u0000${remote}`)
-    await throttler.maybeExecute(rootAbsolutePath, remote)
+    const key = `${commonDir}\u0000${remote}`
+    if (Date.now() < (this.nextFetchByKey.get(key) ?? 0)) return
+    this.nextFetchByKey.set(key, Infinity)
+    let cooldown = this.intervalMs
+    try {
+      await this.runFetch(rootAbsolutePath, remote)
+    } catch (error) {
+      cooldown = this.failureCooldownMs
+      recordProcessWarning('git.upstream_fetch.failed', {
+        area: 'git',
+        error: operatorErrorSummary(error),
+        operation: 'upstream_fetch',
+        remote,
+        root: rootAbsolutePath,
+      })
+    }
+    this.nextFetchByKey.set(key, Date.now() + cooldown)
   }
 
   private async commonDir(rootAbsolutePath: string) {
@@ -78,35 +92,6 @@ export class UpstreamFetchScheduler {
       })
       return null
     }
-  }
-
-  private throttler(key: string) {
-    const existing = this.throttlersByKey.get(key)
-    if (existing) return existing
-
-    let lastFetchFailed = false
-    const throttler = new AsyncThrottler(this.runFetch, {
-      // One attempt per throttled execution; retry pacing is the cooldown's job.
-      asyncRetryerOptions: { maxAttempts: 1 },
-      leading: true,
-      onError: (error, [rootAbsolutePath, remote]) => {
-        lastFetchFailed = true
-        recordProcessWarning('git.upstream_fetch.failed', {
-          area: 'git',
-          error: operatorErrorSummary(error),
-          operation: 'upstream_fetch',
-          remote,
-          root: rootAbsolutePath,
-        })
-      },
-      onSuccess: () => {
-        lastFetchFailed = false
-      },
-      trailing: false,
-      wait: () => (lastFetchFailed ? this.failureCooldownMs : this.intervalMs),
-    })
-    this.throttlersByKey.set(key, throttler)
-    return throttler
   }
 }
 

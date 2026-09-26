@@ -1,3 +1,4 @@
+// Modified for Platform from Pierre. Apache-2.0; see LICENSE-pierre and UPSTREAM.md.
 import { createTreeError } from '../structured-errors'
 
 import type {

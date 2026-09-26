@@ -1,5 +1,5 @@
 import { CaretRightIcon } from '@phosphor-icons/react'
-import { useForesight } from '@foresightjs/react'
+import { useForesight } from '@/hooks/use-foresight'
 import { cn } from '@workspace/ui/lib/utils'
 import { ListRow } from '@workspace/ui/patterns/list-row'
 import type { useListbox } from '@workspace/ui/patterns/use-listbox'

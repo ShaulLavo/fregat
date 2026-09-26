@@ -78,7 +78,7 @@ class RecordingSocket implements LspProxySocket {
 
 describe('the errors an agent edit introduced, from a running language server', () => {
   it.each(RUNTIMES)(
-    'reads the disk edit with $packageName (pulled unopened, or published after the editor syncs)',
+    'reads the disk edit with $packageName (unopened, or after the editor syncs)',
     async ({ packageName, native }) => {
       const clean = 'export const count: number = 1\n'
       const broken = 'export const count: number = "one"\n'
@@ -104,7 +104,7 @@ describe('the errors an agent edit introduced, from a running language server', 
 
       expect(await reading).toEqual({
         text: broken,
-        mode: native ? 'pull' : 'push',
+        mode: 'pull',
         errors: [
           { code: '2322', line: 1, message: "Type 'string' is not assignable to type 'number'." },
         ],
@@ -215,7 +215,10 @@ async function openAgentFile(
   await expect.poll(() => publishedErrors(socket, uri), { timeout: 20_000 }).toEqual(codes)
 }
 
-async function agentFileFixture(packageName: string, clean: string) {
+async function agentFileFixture(
+  packageName: (typeof RUNTIMES)[number]['packageName'],
+  clean: string,
+) {
   const fixture = await installedTypeScriptRuntimeFixture(packageName, {
     'package.json': '{"private":true,"type":"module"}\n',
     'tsconfig.json': '{"compilerOptions":{"strict":true},"files":["probe.ts"]}\n',
@@ -641,7 +644,7 @@ type Probe = {
 }
 
 async function openProbe(
-  packageName: string,
+  packageName: (typeof RUNTIMES)[number]['packageName'],
   files: Readonly<Record<string, string>>,
   source: string,
 ): Promise<Probe> {

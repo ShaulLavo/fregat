@@ -1,3 +1,4 @@
+// Modified for Platform from Pierre. Apache-2.0; see LICENSE-pierre and UPSTREAM.md.
 import type { GitStatus } from './publicTypes'
 
 export const GIT_STATUS_LABEL: Record<GitStatus, string | null> = {

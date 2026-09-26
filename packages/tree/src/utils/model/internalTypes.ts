@@ -1,3 +1,4 @@
+// Modified for Platform from Pierre. Apache-2.0; see LICENSE-pierre and UPSTREAM.md.
 import type { FileTreeIcons } from '../iconConfig'
 import type { GitStatus } from '../publicTypes'
 import type {

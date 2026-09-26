@@ -4,11 +4,12 @@ import { http, HttpResponse, type RequestHandler } from 'msw'
 // server reaches out to (font downloads, GitHub release assets, provider APIs).
 // Our own Elysia server is never mocked here; tests drive it in-process.
 export const handlers: RequestHandler[] = [
-  http.get('https://www.nerdfonts.com/font-downloads', () =>
-    HttpResponse.html(`
-      <a href="https://github.com/ryanoasis/nerd-fonts/releases/download/v3.4.0/FiraCode.zip">Download</a>
-      <a href="https://github.com/ryanoasis/nerd-fonts/releases/download/v3.4.0/JetBrainsMono.zip">Download</a>
-    `),
+  http.get('https://api.github.com/repos/ryanoasis/nerd-fonts/releases/latest', () =>
+    HttpResponse.json({
+      assets: ['FiraCode', 'JetBrainsMono'].map((name) => ({
+        browser_download_url: `https://github.com/ryanoasis/nerd-fonts/releases/download/v3.4.0/${name}.zip`,
+      })),
+    }),
   ),
   http.get('https://api.fontsource.org/v1/fonts', () =>
     HttpResponse.json([

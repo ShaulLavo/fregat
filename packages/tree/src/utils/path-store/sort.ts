@@ -1,3 +1,4 @@
+// Modified for Platform from Pierre. Apache-2.0; see LICENSE-pierre and UPSTREAM.md.
 import type { PreparedPath, SegmentSortKey, SegmentTable } from './internal-types'
 import { PATH_STORE_NODE_KIND_DIRECTORY } from './internal-types'
 import { PATH_STORE_NODE_KIND_FILE } from './internal-types'

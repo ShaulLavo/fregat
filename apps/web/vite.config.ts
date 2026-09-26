@@ -1,4 +1,6 @@
+import os from 'node:os'
 import path from 'node:path'
+import { createRequire } from 'node:module'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig, type Plugin } from 'vite'
@@ -17,8 +19,20 @@ import { bootAppearancePlugin } from './scripts/boot-appearance-plugin'
 import { phosphorWeightPlugin } from './scripts/phosphor-weight-plugin'
 
 const workspaceRoot = path.resolve(import.meta.dirname, '../..')
+const markdownRequire = createRequire(path.join(workspaceRoot, 'packages/markdown/package.json'))
+const sharedMarkdown = ['unified', 'remark-parse', 'remark-gfm', 'unist-util-visit']
+
 const devServerHost = process.env.WEB_HOST ?? '127.0.0.1'
 const devServerPort = portFromEnv(process.env, 'WEB_PORT', 5173)
+
+/**
+ * Bun's isolated linker can symlink a dependency (`@fontsource-variable/*`, at least under
+ * install contention) straight into the shared cache instead of copying it into the
+ * workspace; a real path there is otherwise outside every `fs.allow` root and Vite 403s it.
+ */
+export function bunInstallCacheRoot(env: NodeJS.ProcessEnv = process.env): string {
+  return env.BUN_INSTALL_CACHE_DIR ?? path.join(os.homedir(), '.bun', 'install', 'cache')
+}
 
 export default defineConfig(({ command, isPreview, mode }) => {
   const packages = command === 'serve' && !isPreview ? readDevSources(import.meta.dirname) : []
@@ -76,14 +90,15 @@ export default defineConfig(({ command, isPreview, mode }) => {
     resolve: {
       alias: {
         '@': path.resolve(import.meta.dirname, './src'),
+        // Isolated installs resolve these from their owning workspace, where they are declared.
+        ...Object.fromEntries(sharedMarkdown.map((name) => [name, markdownRequire.resolve(name)])),
       },
-      // evlog resolves as two peer variants of one version (the root pins an older vite), and both
-      // copies ship; one is enough because its config lives on globalThis.
-      dedupe: ['react', 'react-dom', 'evlog'],
+      // Linked checkouts share the app's React, hotkey manager and evlog globals.
+      dedupe: ['react', 'react-dom', 'evlog', '@tanstack/hotkeys'],
     },
     server: {
       fs: {
-        allow: [workspaceRoot, ...packages.map((pkg) => pkg.checkout)],
+        allow: [workspaceRoot, bunInstallCacheRoot(), ...packages.map((pkg) => pkg.checkout)],
       },
       host: devServerHost,
       port: devServerPort,

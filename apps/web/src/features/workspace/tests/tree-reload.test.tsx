@@ -6,6 +6,8 @@ import { treeModelWithDirectoryLoads } from '@/lib/tree-model'
 import { fileSystemKeys } from '@/lib/query-keys'
 import {
   captureTree,
+  confirmTreeRoot,
+  forgetTree,
   prepareTreeReload,
   savedTree,
   TREE_RELOAD_MAX_BYTES,
@@ -58,12 +60,33 @@ test('reload preserves directory coverage and view state without admitting query
   expect(reloaded.getQueryData(fileSystemKeys.tree(root))).toBeUndefined()
   captureTree(owner, model, { ...saved.record, scrollTop: 86 })
   expect(savedTree(owner, root, null)?.record.scrollTop).toBe(86)
+  const otherRoot = filesystemPath('other')
+  const otherModel = treeModelWithDirectoryLoads({ path: otherRoot, entries: [] }, otherRoot, [])
+  captureTree(owner, otherModel, { ...saved.record, root: otherRoot, expanded: [], scrollTop: 12 })
+  expect(savedTree(owner, root, null)?.record.scrollTop).toBe(86)
+  expect(savedTree(owner, root, null)?.record.expanded).toEqual(['empty/'])
+  expect(savedTree(owner, otherRoot, null)?.record.scrollTop).toBe(12)
   captureTree(
     owner,
     { ...model, paths: Array.from({ length: 1501 }, (_, index) => String(index)) },
     saved.record,
   )
   expect(savedTree(owner, root, null)).toBeNull()
+  captureTree(owner, model, saved.record)
+  forgetTree(owner, otherRoot)
+  expect(savedTree(owner, root, null)).not.toBeNull()
+  const retained = new QueryClient()
+  prepareTreeReload(retained, testScopedStorage)
+  expect(savedTree(retained, root, null)).not.toBeNull()
+  forgetTree(owner, root)
+  const removed = new QueryClient()
+  prepareTreeReload(removed, testScopedStorage)
+  expect(savedTree(removed, root, null)).toBeNull()
+  captureTree(owner, model, saved.record)
+  expect(savedTree(owner, root, null)).toBeNull()
+  confirmTreeRoot(owner, root)
+  captureTree(owner, model, saved.record)
+  expect(savedTree(owner, root, null)).not.toBeNull()
 })
 
 test('invalid and oversized observations cannot restore', () => {

@@ -682,7 +682,7 @@ export function createNavigation(
     openFile,
     openContent,
     openChat,
-    startComposerDraft: createComposerDraftNavigation(coordinator, openChat),
+    ...createComposerDraftNavigation(coordinator, openChat),
     openWorkspace,
     openDiff({ owner, row }: { readonly owner: EditorWorkspaceStoreApi; readonly row: ChangeRow }) {
       const staged = row.section === 'staged'
