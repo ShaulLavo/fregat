@@ -52,8 +52,13 @@ export class DevicePairing {
     this.now = options.now ?? Date.now
   }
 
+  /** A settings store that cannot answer leaves pairing on: it fails closed. */
   isRequired() {
-    return this.required()
+    try {
+      return this.required()
+    } catch {
+      return true
+    }
   }
 
   admit(header: HeaderReader): Admission {
@@ -96,7 +101,8 @@ export class DevicePairing {
 
   /** True when the request may go on: from this machine, from a paired device, or pairing is off. */
   allows(header: HeaderReader) {
-    return !this.required() || this.admit(header).trust !== 'unpaired'
+    // Trust first: this machine's own requests never read the settings, which may be mid-recovery.
+    return this.admit(header).trust !== 'unpaired' || !this.isRequired()
   }
 
   issueLink(header: HeaderReader) {
