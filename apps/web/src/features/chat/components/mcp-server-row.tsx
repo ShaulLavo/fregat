@@ -73,6 +73,6 @@ export function McpServerRow({
 function mcpServerHint(server: ProviderMcpServer, canSignIn: boolean) {
   if (server.status === 'needs-auth' && !canSignIn) return 'Sign in with /mcp in Claude Code.'
   if (server.status === 'unapproved')
-    return "Comes from this checkout's .mcp.json. Approve to let sessions here start it."
+    return 'Defined by a .mcp.json in this folder or above it. Approve to let sessions start it; a changed definition asks again.'
   return server.error
 }

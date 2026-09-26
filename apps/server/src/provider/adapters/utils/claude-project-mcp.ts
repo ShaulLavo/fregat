@@ -1,92 +1,110 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
-import { homedir } from 'node:os'
+import { createHash } from 'node:crypto'
+import { mkdir, readFile, realpath, rename, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { isRecord } from '@workspace/utils/objects'
+import { platformHomePath } from '../../../home'
 
 /**
- * A checkout's `.mcp.json` servers run commands the repository chose. The Claude CLI asks before
- * starting them; an SDK session does not, so each unapproved name is turned off at CLI start
- * (`disabledMcpjsonServers`) until the owner approves it. Approvals count only from files the
- * repository cannot ship: the user's settings, the user's `.claude.json`, and a
- * `.claude/settings.local.json` git does not track.
+ * A checkout's `.mcp.json` servers run commands the repository chose, and the Claude CLI loads
+ * `.mcp.json` from the session folder and every folder above it. An SDK session starts them without
+ * the approval the CLI asks for, so each one this server has not approved is turned off at CLI start
+ * (`disabledMcpjsonServers`). An approval names the server's exact definition: a pull that changes
+ * its command, arguments or environment needs a new one. Approvals live in the Platform state home,
+ * where no repository can put one.
  */
-export async function unapprovedProjectMcpServers(input: { cwd: string; env?: NodeJS.ProcessEnv }) {
-  const names = await projectMcpServerNames(input.cwd)
-  if (names.length === 0) return []
-
-  const approvals = await Promise.all([
-    approvalsIn(await readJson(path.join(claudeConfigDir(input.env), 'settings.json'))),
-    approvalsIn(projectEntry(await readJson(claudeStatePath(input.env)), input.cwd)),
-    localApprovals(input.cwd),
-  ])
-  if (approvals.some((approval) => approval.all)) return []
-
-  const approved = new Set(approvals.flatMap((approval) => approval.names))
-  return names.filter((name) => !approved.has(name)).sort()
+export function defaultProjectMcpApprovalsPath() {
+  return platformHomePath('claude-project-mcp-approvals.json')
 }
 
-/** Adds `name` to the checkout's local `enabledMcpjsonServers`, keeping every other key. */
-export async function approveProjectMcpServer(input: { cwd: string; name: string }) {
-  const file = localSettingsPath(input.cwd)
-  const settings = (await readJson(file)) ?? {}
-  const enabled = stringList(settings.enabledMcpjsonServers)
-  if (enabled.includes(input.name)) return
+type ProjectMcpServer = { readonly fingerprint: string; readonly name: string }
+type Approvals = { readonly approved: Readonly<Record<string, string>> }
 
-  await mkdir(path.dirname(file), { recursive: true })
-  const next = { ...settings, enabledMcpjsonServers: [...enabled, input.name] }
-  await writeFile(file, `${JSON.stringify(next, null, 2)}\n`)
+export async function unapprovedProjectMcpServers(input: { approvalsFile: string; cwd: string }) {
+  const servers = await projectMcpServers(input.cwd)
+  if (servers.length === 0) return []
+
+  const approved = new Set(Object.keys((await readApprovals(input.approvalsFile)).approved))
+  return servers
+    .filter((server) => !approved.has(server.fingerprint))
+    .map((server) => server.name)
+    .sort()
 }
 
-export function isLocalSettingsTracked(cwd: string) {
-  const result = Bun.spawnSync(
-    ['git', '-C', cwd, 'ls-files', '--error-unmatch', '.claude/settings.local.json'],
-    { stderr: 'ignore', stdout: 'ignore' },
-  )
-  return result.exitCode === 0
+/** Approves `name` as every `.mcp.json` above `cwd` defines it right now. */
+export async function approveProjectMcpServer(input: {
+  approvalsFile: string
+  cwd: string
+  name: string
+}) {
+  const server = (await projectMcpServers(input.cwd)).find((entry) => entry.name === input.name)
+  if (!server) return false
+
+  const approvals = await readApprovals(input.approvalsFile)
+  const next: Approvals = {
+    approved: { ...approvals.approved, [server.fingerprint]: server.name },
+  }
+  await mkdir(path.dirname(input.approvalsFile), { recursive: true })
+  const staging = `${input.approvalsFile}.${process.pid}.tmp`
+  await writeFile(staging, `${JSON.stringify(next, null, 2)}\n`, { mode: 0o600 })
+  await rename(staging, input.approvalsFile)
+  return true
 }
 
-async function projectMcpServerNames(cwd: string) {
-  const config = await readJson(path.join(cwd, '.mcp.json'))
-  const servers = config?.mcpServers
-  return isRecord(servers) ? Object.keys(servers) : []
+/** Every server the CLI would load, fingerprinted by each file that defines it and how. */
+async function projectMcpServers(cwd: string): Promise<ProjectMcpServer[]> {
+  const definitions = new Map<string, Array<[string, unknown]>>()
+  for (const file of await mcpConfigFiles(cwd)) {
+    const servers = (await readJson(file))?.mcpServers
+    if (!isRecord(servers)) continue
+    for (const [name, definition] of Object.entries(servers)) {
+      const entries = definitions.get(name) ?? []
+      entries.push([file, definition])
+      definitions.set(name, entries)
+    }
+  }
+  return [...definitions].map(([name, entries]) => ({
+    fingerprint: fingerprint(name, entries),
+    name,
+  }))
 }
 
-async function localApprovals(cwd: string) {
-  if (isLocalSettingsTracked(cwd)) return { all: false, names: [] }
-
-  return approvalsIn(await readJson(localSettingsPath(cwd)))
-}
-
-function approvalsIn(settings: Record<string, unknown> | null) {
-  return {
-    all: settings?.enableAllProjectMcpServers === true,
-    names: stringList(settings?.enabledMcpjsonServers),
+async function mcpConfigFiles(cwd: string) {
+  const files: string[] = []
+  let directory = await realpath(cwd).catch(() => path.resolve(cwd))
+  for (;;) {
+    const file = path.join(directory, '.mcp.json')
+    const resolved = await realpath(file).catch(() => null)
+    if (resolved) files.push(resolved)
+    const parent = path.dirname(directory)
+    if (parent === directory) return files
+    directory = parent
   }
 }
 
-function projectEntry(state: Record<string, unknown> | null, cwd: string) {
-  const projects = state?.projects
-  if (!isRecord(projects)) return null
-  const entry = projects[cwd]
-  return isRecord(entry) ? entry : null
+function fingerprint(name: string, entries: ReadonlyArray<[string, unknown]>) {
+  return createHash('sha256')
+    .update(stableJson([name, entries]))
+    .digest('hex')
 }
 
-function localSettingsPath(cwd: string) {
-  return path.join(cwd, '.claude', 'settings.local.json')
+function stableJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`
+  if (!isRecord(value)) return JSON.stringify(value) ?? 'null'
+  const keys = Object.keys(value).sort()
+  return `{${keys.map((key) => `${JSON.stringify(key)}:${stableJson(value[key])}`).join(',')}}`
 }
 
-function claudeConfigDir(env: NodeJS.ProcessEnv | undefined) {
-  return env?.CLAUDE_CONFIG_DIR ?? process.env.CLAUDE_CONFIG_DIR ?? path.join(homedir(), '.claude')
-}
+async function readApprovals(file: string): Promise<Approvals> {
+  const approved = (await readJson(file))?.approved
+  if (!isRecord(approved)) return { approved: {} }
 
-/** The CLI keeps `.claude.json` inside `CLAUDE_CONFIG_DIR` when set, else beside it in home. */
-function claudeStatePath(env: NodeJS.ProcessEnv | undefined) {
-  const configDir = env?.CLAUDE_CONFIG_DIR ?? process.env.CLAUDE_CONFIG_DIR
-  return configDir ? path.join(configDir, '.claude.json') : path.join(homedir(), '.claude.json')
-}
-
-function stringList(value: unknown) {
-  return Array.isArray(value) ? value.filter((entry) => typeof entry === 'string') : []
+  return {
+    approved: Object.fromEntries(
+      Object.entries(approved).filter(
+        (entry): entry is [string, string] => typeof entry[1] === 'string',
+      ),
+    ),
+  }
 }
 
 async function readJson(file: string): Promise<Record<string, unknown> | null> {

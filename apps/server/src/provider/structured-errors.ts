@@ -80,12 +80,6 @@ export const sessionIdentityErrors = defineErrorCatalog('provider', {
     why: "Only a server from the checkout's .mcp.json that this session turned off can be approved.",
     fix: 'Reopen the MCP list; the server may already be approved.',
   },
-  MCP_APPROVAL_FILE_TRACKED: {
-    status: 409,
-    message: 'Approvals cannot be saved in a file the repository tracks.',
-    why: '.claude/settings.local.json is committed to this repository, so approvals in it would come from the repository, not from you.',
-    fix: 'Untrack it with git rm --cached .claude/settings.local.json, then approve again.',
-  },
   APPROVAL_DECISION_NOT_OFFERED: {
     status: 409,
     message: 'This approval does not offer that choice',

@@ -1063,14 +1063,13 @@ describe('ClaudeProviderAdapter', () => {
   it('keeps unapproved project MCP servers off, and restarts the idle session on approval', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'platform-claude-project-mcp-'))
     const cwd = path.join(root, 'repo')
-    const configDir = path.join(root, 'claude-config')
-    await mkdir(configDir, { recursive: true })
+    const approvalsFile = path.join(root, 'state', 'approvals.json')
     await mkdir(cwd, { recursive: true })
     await writeFile(
       path.join(cwd, '.mcp.json'),
       JSON.stringify({ mcpServers: { deploy: { command: 'deploy-server' } } }),
     )
-    const harness = claudeHarness(true, undefined, { CLAUDE_CONFIG_DIR: configDir })
+    const harness = claudeHarness(true, undefined, approvalsFile)
     const input = { ...sessionStartInput({}), cwd }
     try {
       await harness.adapter.startRuntime(input)
@@ -1085,9 +1084,9 @@ describe('ClaudeProviderAdapter', () => {
 
       expect(harness.queries).toHaveLength(2)
       expect(latestOptions(harness).settings).toBeUndefined()
-      expect(
-        JSON.parse(await readFile(path.join(cwd, '.claude', 'settings.local.json'), 'utf8')),
-      ).toEqual({ enabledMcpjsonServers: ['deploy'] })
+      expect(Object.values(JSON.parse(await readFile(approvalsFile, 'utf8')).approved)).toEqual([
+        'deploy',
+      ])
       await expect(
         harness.adapter.approveMcpServer({ name: 'deploy', sessionId: input.sessionId }),
       ).rejects.toMatchObject({ code: 'provider.MCP_SERVER_NOT_AWAITING_APPROVAL' })
@@ -1511,7 +1510,7 @@ describe('ClaudeProviderAdapter catalog', () => {
 function claudeHarness(
   acknowledgeStop = true,
   historyRunner?: ClaudeHistoryRunner,
-  env?: NodeJS.ProcessEnv,
+  projectMcpApprovalsFile?: string,
 ): ClaudeHarness {
   const events: ProviderRuntimeEvent[] = []
   const options: Options[] = []
@@ -1520,7 +1519,7 @@ function claudeHarness(
   const queries: FakeClaudeQuery[] = []
 
   const adapter = new ClaudeProviderAdapter({
-    ...(env ? { env } : {}),
+    ...(projectMcpApprovalsFile ? { projectMcpApprovalsFile } : {}),
     historyRunner,
     attachmentsDir,
     auth: signedInClaudeAuth(),

@@ -122,7 +122,7 @@ import {
 import { claudeUserInputAnswers, claudeUserInputQuestions } from './utils/claude-user-input'
 import {
   approveProjectMcpServer,
-  isLocalSettingsTracked,
+  defaultProjectMcpApprovalsPath,
   unapprovedProjectMcpServers,
 } from './utils/claude-project-mcp'
 import { asRecord, numberField, stringField } from './utils/records'
@@ -172,6 +172,8 @@ export type ClaudeAdapterOptions = {
   binaryPath?: string
   createQuery?: ClaudeCreateQuery
   displayLabel?: string
+  /** Where approved project MCP servers are recorded; the Platform state home by default. */
+  projectMcpApprovalsFile?: string
   enabled?: boolean
   /**
    * Per-instance spawn env. Isolation rides on `CLAUDE_CONFIG_DIR`, never on
@@ -249,6 +251,7 @@ export class ClaudeProviderAdapter
   private scopedUsageModel: string | null = null
   /** What each live session started from, so approving a project server can restart it. */
   private readonly startInputs = new Map<SessionId, ProviderRuntimeStartInput>()
+  private readonly projectMcpApprovalsFile: string
 
   /**
    * `createQuery` is the seam every test depends on: without it each test spawns
@@ -271,6 +274,8 @@ export class ClaudeProviderAdapter
     this.auth =
       options.auth ?? new ClaudeAuthRunner({ command: () => this.executablePath(), env: this.env })
     this.createQuery = options.createQuery ?? defaultClaudeCreateQuery
+    this.projectMcpApprovalsFile =
+      options.projectMcpApprovalsFile ?? defaultProjectMcpApprovalsPath()
     this.discoveryRunner = options.discoveryRunner
     this.historyRunner = options.historyRunner
     this.settings = {
@@ -521,11 +526,15 @@ export class ClaudeProviderAdapter
       throw sessionIdentityErrors.MCP_SERVER_NOT_AWAITING_APPROVAL({
         internal: { name, sessionId },
       })
-    const cwd = normalizeWorkspaceCwd(input.cwd)
-    if (isLocalSettingsTracked(cwd))
-      throw sessionIdentityErrors.MCP_APPROVAL_FILE_TRACKED({ internal: { name, sessionId } })
-
-    await approveProjectMcpServer({ cwd, name })
+    const approved = await approveProjectMcpServer({
+      approvalsFile: this.projectMcpApprovalsFile,
+      cwd: normalizeWorkspaceCwd(input.cwd),
+      name,
+    })
+    if (!approved)
+      throw sessionIdentityErrors.MCP_SERVER_NOT_AWAITING_APPROVAL({
+        internal: { name, sessionId },
+      })
     // A busy session picks the approval up at its next turn, when the gate no longer matches.
     if (session.isBusy()) return
     await this.ensureRuntimeSession({
@@ -589,7 +598,10 @@ export class ClaudeProviderAdapter
     // what made "plan" silently behave as whatever the session started in.
     const interactionMode = input.interactionMode ?? DEFAULT_INTERACTION_MODE
     const ephemeral = input.ephemeral ?? false
-    const unapprovedProjectMcp = await unapprovedProjectMcpServers({ cwd, env: this.env })
+    const unapprovedProjectMcp = await unapprovedProjectMcpServers({
+      approvalsFile: this.projectMcpApprovalsFile,
+      cwd,
+    })
     this.startInputs.set(input.sessionId, input)
     if (
       existing?.matches({

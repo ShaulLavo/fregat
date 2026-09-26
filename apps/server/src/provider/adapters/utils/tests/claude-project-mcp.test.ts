@@ -1,8 +1,7 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, expect, test } from 'vitest'
-import { gitFixtureEnv } from '../../../../testing/git-identity'
 import { approveProjectMcpServer, unapprovedProjectMcpServers } from '../claude-project-mcp'
 
 const roots: string[] = []
@@ -10,75 +9,63 @@ afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => rm(root, { force: true, recursive: true })))
 })
 
-/** A checkout whose `.mcp.json` declares two servers, and a Claude config home with no approvals. */
+/** A repository with a `.mcp.json` at its top, a subfolder to open, and an approvals file outside. */
 async function checkout() {
   const root = await mkdtemp(path.join(tmpdir(), 'platform-project-mcp-'))
   roots.push(root)
-  const cwd = path.join(root, 'repo')
-  const configDir = path.join(root, 'claude-config')
-  await mkdir(path.join(cwd, '.claude'), { recursive: true })
-  await mkdir(configDir, { recursive: true })
-  await writeJson(path.join(cwd, '.mcp.json'), {
+  const repo = path.join(root, 'repo')
+  const cwd = path.join(repo, 'packages', 'app')
+  await mkdir(cwd, { recursive: true })
+  await writeJson(path.join(repo, '.mcp.json'), {
     mcpServers: { deploy: { command: 'deploy-server' }, docs: { command: 'docs-server' } },
   })
-  return { configDir, cwd, env: { CLAUDE_CONFIG_DIR: configDir } }
+  return { approvalsFile: path.join(root, 'state', 'approvals.json'), cwd, repo }
 }
 
 async function writeJson(file: string, value: unknown) {
   await writeFile(file, JSON.stringify(value))
 }
 
-function git(cwd: string, ...args: string[]) {
-  const result = Bun.spawnSync(['git', '-C', cwd, ...args], {
-    env: { ...process.env, ...gitFixtureEnv },
-  })
-  if (result.exitCode !== 0) throw new TypeError(`git ${args.join(' ')} failed`)
-}
+test('servers from a .mcp.json above the session folder are off until approved', async () => {
+  const input = await checkout()
 
-test('every project server is off until something the repository cannot ship approves it', async () => {
-  const { cwd, env } = await checkout()
-
-  expect(await unapprovedProjectMcpServers({ cwd, env })).toEqual(['deploy', 'docs'])
+  expect(await unapprovedProjectMcpServers(input)).toEqual(['deploy', 'docs'])
+  expect(await approveProjectMcpServer({ ...input, name: 'deploy' })).toBe(true)
+  expect(await unapprovedProjectMcpServers(input)).toEqual(['docs'])
 })
 
-test('approvals count from user settings, .claude.json and an untracked local file', async () => {
-  const user = await checkout()
-  await writeJson(path.join(user.configDir, 'settings.json'), { enabledMcpjsonServers: ['docs'] })
-  expect(await unapprovedProjectMcpServers(user)).toEqual(['deploy'])
+test('a changed definition needs a new approval', async () => {
+  const input = await checkout()
+  await approveProjectMcpServer({ ...input, name: 'deploy' })
 
-  const state = await checkout()
-  await writeJson(path.join(state.configDir, '.claude.json'), {
-    projects: { [state.cwd]: { enableAllProjectMcpServers: true } },
+  await writeJson(path.join(input.repo, '.mcp.json'), {
+    mcpServers: {
+      deploy: { args: ['--exfiltrate'], command: 'deploy-server' },
+      docs: { command: 'docs-server' },
+    },
   })
-  expect(await unapprovedProjectMcpServers(state)).toEqual([])
 
-  const local = await checkout()
-  await approveProjectMcpServer({ cwd: local.cwd, name: 'deploy' })
-  expect(await unapprovedProjectMcpServers(local)).toEqual(['docs'])
+  expect(await unapprovedProjectMcpServers(input)).toEqual(['deploy', 'docs'])
 })
 
-test("the repository's own settings cannot approve its servers", async () => {
-  const { cwd, env } = await checkout()
-  await writeJson(path.join(cwd, '.claude', 'settings.json'), { enableAllProjectMcpServers: true })
-  await writeJson(path.join(cwd, '.claude', 'settings.local.json'), {
+test("the repository's own files approve nothing, symlinked or not, in git or not", async () => {
+  const input = await checkout()
+  const shipped = path.join(input.repo, 'shipped-claude')
+  await mkdir(shipped)
+  await writeJson(path.join(shipped, 'settings.local.json'), {
+    enableAllProjectMcpServers: true,
     enabledMcpjsonServers: ['deploy', 'docs'],
   })
-  git(cwd, 'init', '--quiet')
-  git(cwd, 'add', '--force', '.claude/settings.local.json')
+  await writeJson(path.join(shipped, 'settings.json'), { enableAllProjectMcpServers: true })
+  await symlink(shipped, path.join(input.repo, '.claude'))
 
-  expect(await unapprovedProjectMcpServers({ cwd, env })).toEqual(['deploy', 'docs'])
+  expect(await unapprovedProjectMcpServers(input)).toEqual(['deploy', 'docs'])
 })
 
-test('approving keeps the local settings already there', async () => {
-  const { cwd } = await checkout()
-  const file = path.join(cwd, '.claude', 'settings.local.json')
-  await writeJson(file, { enabledMcpjsonServers: ['docs'], permissions: { allow: ['Bash(ls)'] } })
+test('a folder with no .mcp.json above it has nothing to approve', async () => {
+  const input = await checkout()
+  await rm(path.join(input.repo, '.mcp.json'))
 
-  await approveProjectMcpServer({ cwd, name: 'deploy' })
-  await approveProjectMcpServer({ cwd, name: 'deploy' })
-
-  expect(JSON.parse(await readFile(file, 'utf8'))).toEqual({
-    enabledMcpjsonServers: ['docs', 'deploy'],
-    permissions: { allow: ['Bash(ls)'] },
-  })
+  expect(await unapprovedProjectMcpServers(input)).toEqual([])
+  expect(await approveProjectMcpServer({ ...input, name: 'deploy' })).toBe(false)
 })
