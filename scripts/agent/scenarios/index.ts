@@ -1,3 +1,4 @@
+import { textFieldFkeys } from './text-field-fkeys'
 import { settingsRoutePreparation } from './settings-route-preparation'
 import { settingsModuleFailure } from './settings-module-failure'
 import { connectionRefusalRetention } from './connection-refusal-retention'
@@ -504,6 +505,7 @@ export const scenarios: readonly Scenario[] = [
   settingsDefaults,
   settingsColdLoad,
   settingsRoutePreparation,
+  textFieldFkeys,
   settingsModuleFailure,
   projectMenu,
   workspaceSwitch,

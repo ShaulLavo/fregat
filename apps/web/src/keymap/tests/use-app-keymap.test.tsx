@@ -222,6 +222,7 @@ test('an unavailable chord completion is still swallowed after the prefix commit
 function mountChordRuntime(
   command: PlatformCommandId = 'workspace.toggleWallpaper',
   keys = 'Mod+K Mod+S',
+  yieldsToTextEntry = false,
 ) {
   const calls: boolean[] = []
   const focus = new FocusService()
@@ -240,7 +241,7 @@ function mountChordRuntime(
     queryClient: createTestQueryClient(),
   })
   const bindings = [
-    binding(keys, { command, platform: detectPlatform() }),
+    binding(keys, { command, platform: detectPlatform(), yieldsToTextEntry }),
     binding('F2', { command: 'workspace.focusEditor', platform: detectPlatform() }),
   ]
   const props: { focusedPane: FocusArea; focusedTarget: FocusTargetToken | null } = {
@@ -535,3 +536,44 @@ test.each([
   expect(event.defaultPrevented).toBe(false)
   expect(harness.calls).toEqual([])
 })
+
+const functionKeys = Array.from({ length: 12 }, (_, index) => `F${index + 1}`)
+
+test.each(functionKeys)(
+  '%s reaches commands from text entry, including rebound yielding commands',
+  (key) => {
+    const harness = mountChordRuntime('workspace.toggleWallpaper', key, true)
+    const input = document.createElement('input')
+    document.body.append(input)
+    input.focus()
+    try {
+      const event = pressKey(input, { code: key, key })
+      expect(event.defaultPrevented).toBe(true)
+      expect(harness.calls).toEqual([false])
+    } finally {
+      input.remove()
+    }
+  },
+)
+
+test.each([
+  ['x', { key: 'x', code: 'KeyX' }],
+  ['ArrowLeft', { key: 'ArrowLeft' }],
+  ['Shift+F1', { key: 'F1', shiftKey: true }],
+  ['Alt+F1', { key: 'F1', altKey: true }],
+  ['F13', { key: 'F13' }],
+] satisfies readonly (readonly [string, KeyboardEventInit])[])(
+  '%s still yields to a focused text field',
+  (keys, init) => {
+    const harness = mountChordRuntime('workspace.toggleWallpaper', keys)
+    const input = document.createElement('input')
+    document.body.append(input)
+    input.focus()
+    try {
+      expect(pressKey(input, init).defaultPrevented).toBe(false)
+      expect(harness.calls).toEqual([])
+    } finally {
+      input.remove()
+    }
+  },
+)
