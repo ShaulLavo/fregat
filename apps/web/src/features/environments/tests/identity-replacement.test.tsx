@@ -1,5 +1,5 @@
 import userEvent from '@testing-library/user-event'
-import { vi } from 'vitest'
+import { onTestFinished, vi } from 'vitest'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, waitFor } from '@testing-library/react'
 import * as v from 'valibot'
@@ -7,6 +7,9 @@ import { environmentIdSchema, healthDescriptorSchema } from '@workspace/contract
 import { createEnvironmentEntry } from '@workspace/client-core/environments/utils/connection'
 import { selectServerConnection } from '@workspace/client-core/environments/state/store'
 import { ConnectionGate } from '@/features/environments/components/connection-gate'
+import { PickerDialog } from '@/features/environments/components/picker-dialog'
+import { MachineConnectionRows } from '@/features/chat-mode/components/machine-connection-rows'
+import { MachineRow } from '@/features/settings/components/machine-row'
 import { transportFor } from '@/features/chat/state/active-transports'
 import { EnvironmentConnectionsContext } from '@/providers/environment-connections-context'
 import { primaryServerOrigin } from '@/lib/client'
@@ -22,6 +25,9 @@ import { createBootstrap } from '@/state/bootstrap'
 import { createTestNavigation } from '../../../../test/factories/navigation'
 import { createFederationHarness } from '../../../../test/factories/federation'
 import { expect, test } from '../../../../test/fixtures'
+import { renderWithProviders } from '../../../../test/render'
+import type { TestServer } from '../../../../test/server'
+import type { createInProcessClient } from '../../../../test/client'
 
 test('a replaced primary database is adopted without user action', async ({ client }) => {
   const replacedId = v.parse(environmentIdSchema, crypto.randomUUID())
@@ -92,20 +98,42 @@ test('a replaced primary database is adopted without user action', async ({ clie
   }
 })
 
-test('a replaced remote database shows the gate, and Trust replacement connects to it', async ({
-  server,
-  client,
-}) => {
+/** A remote machine this browser remembers under an identity its server no longer has. */
+async function driftedRemote(server: TestServer, client: ReturnType<typeof createInProcessClient>) {
   const replacedId = v.parse(environmentIdSchema, crypto.randomUUID())
-  const remote = 'http://localhost:37902'
   const remoteDescriptor = v.parse(healthDescriptorSchema, (await client.health.get()).data)
   recordEnvironmentCacheBinding(environmentScopedStorage(replacedId), {
     names: ['remote'],
-    origin: remote,
+    origin: 'http://localhost:37902',
     descriptor: { ...remoteDescriptor, environmentId: replacedId },
   })
   writeConnectedMachines(new Set(['remote']))
   const h = await createFederationHarness(server)
+  onTestFinished(() => localStorage.clear())
+  return { h, replacedId }
+}
+
+async function expectTrusted(
+  h: Awaited<ReturnType<typeof createFederationHarness>>,
+  replacedId: string,
+) {
+  await waitFor(() =>
+    expect(
+      h.connections.store.getState().machines.find((machine) => machine.name === 'remote')?.phase,
+    ).toBe('live'),
+  )
+  expect(useEnvironmentsStore.getState().entries[h.originB]?.environmentId).toBe(
+    h.descriptorB.environmentId,
+  )
+  expect(transportFor(h.descriptorB.environmentId)?.closed).toBe(false)
+  expect(globalChromeStorage.keys(`env:${replacedId}|`)).toEqual([])
+}
+
+test('a replaced remote database shows the gate, and Trust replacement connects to it', async ({
+  server,
+  client,
+}) => {
+  const { h, replacedId } = await driftedRemote(server, client)
   const view = render(
     <QueryClientProvider client={queryClientFor(h.originB)}>
       <EnvironmentConnectionsContext value={h.connections}>
@@ -121,18 +149,55 @@ test('a replaced remote database shows the gate, and Trust replacement connects 
     expect(screen.getByText(/Trust replacement connects to the new database/)).toBeVisible()
     await userEvent.click(trust)
     await screen.findByText('Remote workbench')
-    expect(useEnvironmentsStore.getState().entries[h.originB]?.environmentId).toBe(
-      h.descriptorB.environmentId,
-    )
-    await waitFor(() =>
-      expect(
-        h.connections.store.getState().machines.find((machine) => machine.name === 'remote')?.phase,
-      ).toBe('live'),
-    )
-    expect(transportFor(h.descriptorB.environmentId)?.closed).toBe(false)
-    expect(globalChromeStorage.keys(`env:${replacedId}|`)).toEqual([])
+    await expectTrusted(h, replacedId)
   } finally {
     view.unmount()
-    localStorage.clear()
   }
+})
+
+test('the rail notice for a replaced remote offers Trust replacement in place of Retry', async ({
+  server,
+  client,
+}) => {
+  const { h, replacedId } = await driftedRemote(server, client)
+  useEnvironmentsStore.setState({ activeOrigin: h.originB })
+  renderWithProviders(<MachineConnectionRows />, { connections: h.connections })
+  expect(await screen.findByText('Remote fixture · Machine identity changed')).toBeVisible()
+  expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull()
+  await userEvent.click(screen.getByRole('button', { name: 'Trust replacement' }))
+  await expectTrusted(h, replacedId)
+})
+
+test('the settings row for a replaced remote offers Trust replacement in place of Retry now', async ({
+  server,
+  client,
+}) => {
+  const { h, replacedId } = await driftedRemote(server, client)
+  renderWithProviders(
+    <MachineRow
+      name='remote'
+      machine={{ kind: 'origin', url: h.originB, label: 'Remote fixture' }}
+      disabled={false}
+    />,
+    { connections: h.connections },
+  )
+  expect(await screen.findByText('Machine identity changed')).toBeVisible()
+  expect(screen.queryByRole('button', { name: 'Retry now' })).toBeNull()
+  await userEvent.click(screen.getByRole('button', { name: 'Trust replacement' }))
+  await expectTrusted(h, replacedId)
+})
+
+test('the connect picker offers Trust replacement for a replaced remote and closes once it is live', async ({
+  server,
+  client,
+}) => {
+  const { h, replacedId } = await driftedRemote(server, client)
+  const onClose = vi.fn()
+  renderWithProviders(<PickerDialog mode='connect' onClose={onClose} />, {
+    connections: h.connections,
+  })
+  expect(await screen.findByText('Machine identity changed')).toBeVisible()
+  await userEvent.click(screen.getByRole('button', { name: 'Trust replacement' }))
+  await expectTrusted(h, replacedId)
+  expect(onClose).toHaveBeenCalledOnce()
 })

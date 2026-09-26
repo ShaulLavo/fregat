@@ -37,13 +37,18 @@ export function ConnectionGate({
   })
   const machine = connections.machines.find((machine) => machine.origin === origin)
   const drifted = connection.phase === 'identity-drift'
+  async function reconnect() {
+    const primary = origin === primaryServerOrigin()
+    if (drifted && primary) return connections.trustPrimary()
+    if (drifted && machine) return connections.trustMachine(machine.name)
+    if (primary) return connections.retryPrimary()
+    if (machine) return connections.retryMachine(machine.name)
+  }
   const retry = useMutation({
     mutationKey: environmentMutationKeys.machine('connect', machine?.name ?? '@primary'),
     scope: { id: `environment-retry:${origin}` },
     mutationFn: async () => {
-      if (drifted) await connections.trustReplacement(origin)
-      else if (origin === primaryServerOrigin()) await connections.retryPrimary()
-      else if (machine) await connections.retryMachine(machine.name)
+      await reconnect()
       await query.refetch()
     },
   })

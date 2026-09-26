@@ -10,9 +10,16 @@ const RELOADED_FOR = 'platform.environments.identity-reload'
 export function replacePrimaryIdentity(
   expected: string,
   received: string,
-  reload: () => void = () => window.location.reload(),
+  {
+    reload = () => window.location.reload(),
+    asked = false,
+  }: {
+    readonly reload?: () => void
+    /** The person chose Trust replacement, so a repeated replacement reloads again. */
+    readonly asked?: boolean
+  } = {},
 ): boolean {
-  const outcome = replacementOutcome(forgetCachedEnvironment(expected), received)
+  const outcome = replacementOutcome(forgetCachedEnvironment(expected), received, asked)
   log.warn({
     action: 'environment.identity.replace',
     area: 'environments',
@@ -29,10 +36,10 @@ export function replacePrimaryIdentity(
   return true
 }
 
-function replacementOutcome(forgotten: boolean, received: string) {
+function replacementOutcome(forgotten: boolean, received: string, asked: boolean) {
   if (!forgotten) return 'storage-kept'
   // A server whose health and handshake disagree would otherwise reload this tab forever.
-  if (readReloadedFor() === received) return 'repeated'
+  if (!asked && readReloadedFor() === received) return 'repeated'
   return 'reload'
 }
 

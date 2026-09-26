@@ -33,7 +33,7 @@ export function createBootstrap(
   const stopIdentityWatch = useEnvironmentsStore.subscribe((state) => {
     const connection = selectServerConnection(state, primaryServerOrigin())
     if (connection.phase !== 'identity-drift' || replacingIdentity) return
-    replacingIdentity = replacePrimaryIdentity(connection.expected, connection.received, reload)
+    replacingIdentity = replacePrimaryIdentity(connection.expected, connection.received, { reload })
   })
 
   function start() {

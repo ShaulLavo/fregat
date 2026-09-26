@@ -563,22 +563,24 @@ export function createEnvironmentConnections({
       localPort: entry.localPort,
     })
   }
-  /** Accepts the identity a replaced server now answers with and drops what was cached for the old one. */
-  async function trustReplacement(origin: string): Promise<void> {
-    origin = canonicalServerOrigin(origin)
-    const expected = useEnvironmentsStore.getState().entries[origin]?.environmentId
-    if (origin === primaryServerOrigin()) {
-      const connection = selectServerConnection(useEnvironmentsStore.getState(), origin)
-      if (connection.phase === 'identity-drift')
-        replacePrimaryIdentity(connection.expected, connection.received)
-      return
-    }
-    const machine = store.getState().machines.find((entry) => entry.origin === origin)
-    if (!machine) return
-    notices.reset(`machine:${machine.name}`)
-    if (expected) forgetEnvironment(expected, origin)
-    update(machine.name, { environmentId: null, lastError: null })
-    await connectMachine(machine.name)
+  /** The page's own server answers with a new identity: forget the old one and reload. */
+  function trustPrimary() {
+    const connection = selectServerConnection(
+      useEnvironmentsStore.getState(),
+      primaryServerOrigin(),
+    )
+    if (connection.phase !== 'identity-drift') return
+    replacePrimaryIdentity(connection.expected, connection.received, { asked: true })
+  }
+  /** Accepts the identity a replaced machine now answers with and drops what was cached for the old one. */
+  async function trustMachine(name: string): Promise<ConnectionResult> {
+    const machine = machineFor(name)
+    notices.reset(`machine:${name}`)
+    // A machine that points at another owner's server shares that identity; only its own claim goes.
+    if (machine.environmentId && machine.origin && !hasAnotherOwner(machine))
+      forgetEnvironment(machine.environmentId, machine.origin)
+    update(name, { environmentId: null, lastError: null })
+    return connectMachine(name)
   }
   function forgetEnvironment(environmentId: EnvironmentId, origin: string) {
     stopConnection(environmentId)
@@ -760,7 +762,8 @@ export function createEnvironmentConnections({
     updateServer,
     cancelMachine,
     retryPrimary,
-    trustReplacement,
+    trustPrimary,
+    trustMachine,
     retryMachine: async (name: string) => {
       notices.reset(`machine:${name}`)
       const machine = machineFor(name)
