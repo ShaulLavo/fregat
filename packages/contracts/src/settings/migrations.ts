@@ -91,6 +91,21 @@ export const SETTING_MIGRATIONS: readonly SettingMigration[] = [
         : { enabled: true, source: { kind: 'desktop' } },
     samples: [true, false],
   },
+  {
+    kind: 'removed',
+    from: 'workbench.wallpaper.omarchyCatalog',
+    reason: 'The wallpaper picker always lists Omarchy wallpapers.',
+  },
+  {
+    kind: 'removed',
+    from: 'workbench.wallpaper.previewCloud',
+    reason: 'Omarchy wallpaper previews load from GitHub.',
+  },
+  {
+    kind: 'removed',
+    from: 'workbench.wallpaper.downloadTimeoutMs',
+    reason: 'Wallpaper downloads run until GitHub answers.',
+  },
 ]
 
 const BY_FROM: ReadonlyMap<string, SettingMigration> = new Map(
