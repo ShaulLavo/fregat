@@ -1,4 +1,4 @@
-import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk'
+import type { SDKMessage, Query } from '@anthropic-ai/claude-agent-sdk'
 import { ClaudeAuthRunner } from '../../src/provider/adapters/utils/claude-auth'
 import { claudeModelRows } from './claude-models'
 
@@ -67,6 +67,11 @@ type FakeWaiter = {
  * waiter list, and call recorders for the control requests the adapter uses.
  */
 export class FakeClaudeQuery implements AsyncIterable<SDKMessage> {
+  readonly mcpBindings: Parameters<Query['setMcpServers']>[0][] = []
+  readonly setMcpServers: Query['setMcpServers'] = async (servers) => {
+    this.mcpBindings.push(servers)
+    return { added: Object.keys(servers), removed: [], errors: {} }
+  }
   readonly setModelCalls: Array<string | undefined> = []
   readonly stoppedTasks: string[] = []
   readonly getContextUsage = async () => ({
