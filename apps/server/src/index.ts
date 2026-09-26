@@ -75,6 +75,7 @@ export const app = createApp({
     // After the POST answer flushes; closeApp runs before the listener stops.
     restart: (record) => setImmediate(() => stop({ reason: 'restart', record })),
   },
+  mcp: { endpoint: `http://${hostname === '::1' ? '[::1]' : hostname}:${port}/mcp` },
   web: { root: webRoot, serverReleaseFile },
   webOrigin: configuredOrigins?.[0] ?? loopbackOrigins(hostname, port)[0],
   workspaceRoot: configuredWorkspaceRoot,

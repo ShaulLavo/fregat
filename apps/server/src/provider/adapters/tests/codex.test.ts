@@ -368,6 +368,13 @@ function handle(message) {
     ] }] } });
     return;
   }
+  if (message.method === 'config/read') {
+    const origins = process.env.PLATFORM_FAKE_CODEX_MODE === 'platform-mcp-configured'
+      ? { 'mcp_servers.platform.url': { name: { type: 'user' }, version: '1' } }
+      : {};
+    send({ id: message.id, result: { config: {}, origins } });
+    return;
+  }
   if (message.method === 'thread/goal/set') {
     record({ event: message.method, params: message.params });
     const goal = { threadId: message.params.threadId, objective: (globalThis.goalObjective = message.params.objective ?? globalThis.goalObjective ?? 'Ship it'), status: message.params.status ?? 'active', tokenBudget: 1000, tokensUsed: 10, timeUsedSeconds: 3, createdAt: 1, updatedAt: 2 };
@@ -1376,6 +1383,52 @@ describe('CodexProviderAdapter', () => {
         expect(sessions).toHaveLength(1)
       },
       { mode: 'echo-mode-params' },
+    )
+  })
+
+  it('binds Platform’s MCP endpoint per thread, on the 2026-07-28 client', async () => {
+    await withFakeCodex(async ({ spawnLogPath }) => {
+      const adapter = new CodexProviderAdapter()
+      const platformMcp = { token: 'grant-token', url: 'http://127.0.0.1:3301/mcp' }
+      try {
+        await adapter.sendTurn({ ...providerTurnInput(), platformMcp })
+        const records = await readFakeCodexLog(spawnLogPath)
+        expect(records.find((record) => record.event === 'thread/start')?.params).toMatchObject({
+          config: {
+            'features.mcp_2026_07_28': true,
+            'mcp_servers.platform.http_headers': { Authorization: 'Bearer grant-token' },
+            'mcp_servers.platform.url': 'http://127.0.0.1:3301/mcp',
+            suppress_unstable_features_warning: true,
+          },
+        })
+      } finally {
+        await adapter.stopAll()
+      }
+    })
+  })
+
+  it('leaves the binding out, and says why, when the user config names its own platform server', async () => {
+    await withFakeCodex(
+      async ({ spawnLogPath }) => {
+        const adapter = new CodexProviderAdapter()
+        const events: ProviderRuntimeEvent[] = []
+        collectAdapterEvents(adapter, events)
+        const platformMcp = { token: 'grant-token', url: 'http://127.0.0.1:3301/mcp' }
+        try {
+          await adapter.sendTurn({ ...providerTurnInput(), platformMcp })
+          await settleRuntimeEvents()
+          const records = await readFakeCodexLog(spawnLogPath)
+          expect(
+            records.find((record) => record.event === 'thread/start')?.params,
+          ).not.toHaveProperty('config')
+          expect(events.filter((event) => event.type === 'runtime.warning')).toMatchObject([
+            { payload: { message: expect.stringContaining('its own MCP server named platform') } },
+          ])
+        } finally {
+          await adapter.stopAll()
+        }
+      },
+      { mode: 'platform-mcp-configured' },
     )
   })
 

@@ -1,3 +1,5 @@
+import { McpGrantRegistry } from './mcp/grants'
+import { mcpRoutes } from './mcp/routes'
 import { sessionControlRoutes } from './provider/session-control-routes'
 import { createAttachmentOwnership } from './attachments/ownership'
 import { selectTitleModel } from './orchestration/title-generation'
@@ -151,6 +153,8 @@ export type AppOptions = FileSystemServiceOptions & {
   settings?: Omit<SettingsStoreOptions, 'workspaceRoot'>
   /** The origin forwarded to remote machines as this app's web origin. */
   webOrigin?: string
+  /** Serves Platform's MCP tools to provider agents at this loopback URL; absent serves none. */
+  mcp?: { readonly endpoint: string }
   web?: WebOptions
   /** Staged releases and Restart. Absent leaves both inert, as in dev and tests. */
   update?: UpdateOptions
@@ -307,8 +311,10 @@ export function createApp(options: AppOptions) {
   settings.onChange(() => {
     runDetached(reconcileProviderSettings, { area: 'provider', operation: 'reconcile' })
   })
+  const mcpGrants = new McpGrantRegistry()
   const providerService = new ProviderService({
     adapterRegistry: providerAdapterRegistry,
+    ...(options.mcp ? { mcp: { endpoint: options.mcp.endpoint, grants: mcpGrants } } : {}),
     sessionDirectory: new ProviderSessionDirectory(database),
   })
   const providerUsage = new ProviderUsageStore(providerAdapterRegistry)
@@ -483,6 +489,16 @@ export function createApp(options: AppOptions) {
     // mounted after one parent `onBeforeHandle` inherits the parent's later
     // hooks too, which would put the auth guard in front of index.html.
     .use(webRoutes(options.web ?? {}, update, terminal))
+    // Before the browser guard, which refuses the Origin-less requests agents send.
+    .use(
+      options.mcp
+        ? mcpRoutes({
+            allowedOrigins: auth.allowedOrigins,
+            endpoint: options.mcp.endpoint,
+            grants: mcpGrants,
+          })
+        : new Elysia({ name: 'mcp-routes' }),
+    )
     .onBeforeHandle(({ request }) => {
       recordClientInstance(request)
     })

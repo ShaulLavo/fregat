@@ -78,6 +78,7 @@ import type {
   ProviderSessionHistoryInput,
   ProviderForkInput,
   ProviderSignInInput,
+  PlatformMcpBinding,
   ProviderTurnInput,
   ProviderUserInputResponseInput,
 } from '../types'
@@ -225,6 +226,9 @@ type ClaudeRuntimeEventPayload<Type extends ProviderRuntimeEvent['type']> = Extr
   ProviderRuntimeEvent,
   { payload: unknown; type: Type }
 >['payload']
+
+/** `mcp__<server>__<tool>`: the tools Platform's own endpoint serves this session. */
+const PLATFORM_MCP_TOOL_PREFIX = 'mcp__platform__'
 
 export class ClaudeProviderAdapter
   extends RuntimeAdapter<ClaudeAgentSession>
@@ -660,6 +664,7 @@ export class ClaudeProviderAdapter
       ...(input.agent ? { agent: input.agent } : {}),
       fork,
       onCreated: (session) => this.sessions.set(input.sessionId, session),
+      ...(input.platformMcp ? { platformMcp: input.platformMcp } : {}),
       attachmentsDir: this.attachmentsDir,
       createQuery: this.createQuery,
       cwd,
@@ -763,6 +768,7 @@ class ClaudeAgentSession extends SessionContext {
     agent?: string
     fork?: ClaudeForkOptions
     onCreated: (session: ClaudeAgentSession) => void
+    platformMcp?: PlatformMcpBinding
     attachmentsDir: string
     createQuery: ClaudeCreateQuery
     cwd: string
@@ -806,6 +812,7 @@ class ClaudeAgentSession extends SessionContext {
       ...(input.agent ? { agent: input.agent } : {}),
       fork: input.fork,
       persistSession: input.ephemeral ? false : undefined,
+      ...(input.platformMcp ? { platformMcp: input.platformMcp } : {}),
       interactionMode: input.interactionMode,
       model: input.model,
       reasoning: input.reasoning,
@@ -2116,6 +2123,9 @@ class ClaudeAgentSession extends SessionContext {
     if (this.runtimeMode === 'full-access') {
       return Promise.resolve({ behavior: 'allow', updatedInput: toolInput })
     }
+    // Platform's own tools only read, inside the session's checkout.
+    if (toolName.startsWith(PLATFORM_MCP_TOOL_PREFIX))
+      return Promise.resolve({ behavior: 'allow', updatedInput: toolInput })
 
     return this.requestApproval(toolName, toolInput, options)
   }
