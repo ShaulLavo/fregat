@@ -3,7 +3,7 @@ import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 import { expect, test } from '../../../../test/fixtures'
-import { createTestQueryClient, renderWithProviders } from '../../../../test/render'
+import { createTestQueryClient, renderWithLoadedDialogs } from '../../../../test/render'
 import { createTestApplicationRuntime } from '../../../../test/factories/application-runtime'
 import { TestEditorStateProvider } from '../../../../test/factories/editor-state-provider'
 import { wallpaperPng } from '../../../../test/factories/wallpaper'
@@ -26,7 +26,7 @@ test('the highlighted wallpaper previews, Escape drops it unsaved, and a pick is
     command: { paletteOpen: true, paletteSearch: 'wallpaper x' },
     queryClient,
   }
-  const first = renderWithProviders(
+  const first = await renderWithLoadedDialogs(
     <TestEditorStateProvider>
       <CommandPalette />
     </TestEditorStateProvider>,
@@ -46,7 +46,7 @@ test('the highlighted wallpaper previews, Escape drops it unsaved, and a pick is
   expect(controlledClient.controller.settingsWriteCount).toBe(0)
   first.unmount()
 
-  renderWithProviders(
+  await renderWithLoadedDialogs(
     <TestEditorStateProvider>
       <CommandPalette />
     </TestEditorStateProvider>,

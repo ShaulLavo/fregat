@@ -3,7 +3,7 @@ import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 import { expect, test } from '../../../../test/fixtures'
-import { createTestQueryClient, renderWithProviders } from '../../../../test/render'
+import { createTestQueryClient, renderWithLoadedDialogs } from '../../../../test/render'
 import { createTestApplicationRuntime } from '../../../../test/factories/application-runtime'
 import { TestEditorStateProvider } from '../../../../test/factories/editor-state-provider'
 import { CommandPalette } from '@/components/command-palette'
@@ -22,7 +22,7 @@ test('app colors preview cancels without saving and selection updates the shared
     command: { paletteOpen: true, paletteSearch: 'colors sage' },
     queryClient,
   }
-  const first = renderWithProviders(
+  const first = await renderWithLoadedDialogs(
     <TestEditorStateProvider>
       <CommandPalette />
     </TestEditorStateProvider>,
@@ -40,7 +40,7 @@ test('app colors preview cancels without saving and selection updates the shared
   expect(controlledClient.controller.settingsWriteCount).toBe(0)
   first.unmount()
 
-  renderWithProviders(
+  await renderWithLoadedDialogs(
     <TestEditorStateProvider>
       <CommandPalette />
     </TestEditorStateProvider>,
