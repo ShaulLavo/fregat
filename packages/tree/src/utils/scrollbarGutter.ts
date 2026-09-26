@@ -1,3 +1,4 @@
+// Modified for Platform from Pierre. Apache-2.0; see LICENSE-pierre and UPSTREAM.md.
 import {
   FILE_TREE_SCROLLBAR_GUTTER_MEASURED_PROPERTY,
   FILE_TREE_SCROLLBAR_GUTTER_STYLE_ATTRIBUTE,

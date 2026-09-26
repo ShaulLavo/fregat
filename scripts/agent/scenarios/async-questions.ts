@@ -34,6 +34,24 @@ export const asyncQuestions = isolatedNativeScenario({
     ])
     await selectors.questionAttachment(page, 'verification.png').waitFor()
     await selectors.questionAttachment(page, 'question.txt').waitFor()
+    // Unsent answers keep their attachments across a reload, like the composer's draft.
+    const running = selectors.asyncQuestion(page, 'Verification running question')
+    for (let attempt = 0; attempt < 200; attempt++) {
+      const text = await running.innerText()
+      if (!/\d+%/.test(text) && !text.includes('Upload failed')) break
+      await page.waitForTimeout(50)
+    }
+    await page.reload()
+    await selectors
+      .asyncQuestion(page, 'Verification running question')
+      .waitFor({ timeout: 30_000 })
+    await selectors.questionAttachment(page, 'verification.png').waitFor({ timeout: 10_000 })
+    await selectors.questionAttachment(page, 'question.txt').waitFor()
+    ok(
+      !(await running.innerText()).includes('Upload failed'),
+      'Uploaded question attachments stay ready across the reload',
+    )
+    await step('question-attachments-after-reload')
     await selectors.questionPrompt(page, 'Verification running question').click()
     await page.keyboard.press('1')
     await selectors.asyncQuestionAction(page, 'Verification running question', 'Submit').click()

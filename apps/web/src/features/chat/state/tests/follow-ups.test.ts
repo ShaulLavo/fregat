@@ -9,7 +9,12 @@ import {
   session,
   TEST_ENVIRONMENT_ID,
 } from '../../../../../test/factories/chat'
-import { queuedFollowUps, useFollowUpStore, type QueuedFollowUp } from '../follow-up-store'
+import {
+  queuedFollowUps,
+  queuedSessions,
+  useFollowUpStore,
+  type QueuedFollowUp,
+} from '../follow-up-store'
 import {
   resetChatInputDraftStore,
   useChatInputDraftStore,
@@ -29,6 +34,16 @@ const target = { environmentId: owner.environmentId, draftKey: owner.sessionId, 
 beforeEach(() => {
   useFollowUpStore.setState({ queues: {} })
   resetChatInputDraftStore()
+})
+
+test('the sessions with queued work are the ones a root sender keeps delivering to', () => {
+  const store = useFollowUpStore.getState()
+  const otherSession = { ...owner, sessionId: fixtureSessionId(2) }
+  store.enqueue(owner, message('A'))
+  store.enqueue(otherSession, message('B'))
+  expect(queuedSessions(useFollowUpStore.getState())).toEqual([owner, otherSession])
+  store.take(owner, 'A')
+  expect(queuedSessions(useFollowUpStore.getState())).toEqual([otherSession])
 })
 
 test('taking a follow-up reanchors the remaining FIFO messages without crossing session or environment ownership', () => {

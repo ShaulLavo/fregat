@@ -479,13 +479,13 @@ export function ChatInput({
                 disabled={composerDisabled}
                 onRemove={handleRemoveTerminalContext}
               />
-              {imagePreparation.preparing ? (
+              {imagePreparation.working ? (
                 <div
                   className='text-muted-foreground flex items-center gap-2 px-3 pb-2 text-xs'
                   role='status'
                 >
                   <Spinner size='xs' />
-                  Preparing images…
+                  Preparing attachments…
                 </div>
               ) : null}
               <ChatInputAttachmentList

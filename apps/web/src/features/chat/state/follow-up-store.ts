@@ -27,6 +27,8 @@ export type QueuedFollowUp = {
 
 type FollowUpStore = {
   queues: Record<string, readonly QueuedFollowUp[]>
+  /** The session each queue belongs to, so a sender can reach sessions nobody has open. */
+  owners: Record<string, ScopedSessionRef>
   enqueue: (ref: ScopedSessionRef, message: QueuedFollowUp) => void
   take: (ref: ScopedSessionRef, id: string, toolId?: string | null) => QueuedFollowUp | undefined
   remove: (ref: ScopedSessionRef, id: string) => QueuedFollowUp | undefined
@@ -38,9 +40,11 @@ const EMPTY_QUEUE: readonly QueuedFollowUp[] = []
 
 export const useFollowUpStore = create<FollowUpStore>((set, get) => ({
   queues: {},
+  owners: {},
   enqueue: (ref, message) => {
     const key = scopedSessionKey(ref)
     set((state) => ({
+      owners: { ...state.owners, [key]: ref },
       queues: { ...state.queues, [key]: [...(state.queues[key] ?? []), message] },
     }))
   },
@@ -72,6 +76,7 @@ export const useFollowUpStore = create<FollowUpStore>((set, get) => ({
   hold: (ref, message) => {
     const key = scopedSessionKey(ref)
     set((state) => ({
+      owners: { ...state.owners, [key]: ref },
       queues: {
         ...state.queues,
         [key]: [
@@ -105,4 +110,12 @@ function replaceQueue(
   if (queue.length) next[key] = queue
   else delete next[key]
   return next
+}
+
+/** Sessions with queued follow-ups, in queue order of first arrival. */
+export function queuedSessions(state: Pick<FollowUpStore, 'owners' | 'queues'>) {
+  return Object.keys(state.queues).flatMap((key) => {
+    const owner = state.owners[key]
+    return owner ? [owner] : []
+  })
 }
