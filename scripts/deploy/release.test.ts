@@ -39,31 +39,40 @@ test('reads real git status, renames included', () => {
   }
 })
 
-test('a candidate without the terminal host bundle fails verification', async () => {
-  const directory = mkdtempSync(path.join(tmpdir(), 'platform-deploy-candidate-'))
-  try {
-    const web = path.join(directory, 'web')
-    const server = path.join(directory, 'server')
-    mkdirSync(path.join(web, 'assets'), { recursive: true })
-    mkdirSync(path.join(server, 'runtime'), { recursive: true })
-    writeFileSync(path.join(web, 'index.html'), `<script src="${webBase}assets/main.js"></script>`)
-    writeFileSync(path.join(web, 'assets/editor.wasm'), '')
-    for (const file of [
-      'index.js',
-      'remote-support.js',
-      'watch-worker.ts',
-      'runtime/package.json',
-      'runtime/bun.lock',
-    ])
-      writeFileSync(path.join(server, file), '')
-    const release: Release = { name: 'candidate', directory, web, server, previous: null }
+test.each(['pty-host.js', 'image-worker.ts', 'THIRD_PARTY_NOTICES.txt'])(
+  'a candidate without %s fails verification',
+  async (missing) => {
+    const directory = mkdtempSync(path.join(tmpdir(), 'platform-deploy-candidate-'))
+    try {
+      const web = path.join(directory, 'web')
+      const server = path.join(directory, 'server')
+      mkdirSync(path.join(web, 'assets'), { recursive: true })
+      mkdirSync(path.join(server, 'runtime'), { recursive: true })
+      writeFileSync(
+        path.join(web, 'index.html'),
+        `<script src="${webBase}assets/main.js"></script>`,
+      )
+      writeFileSync(path.join(web, 'assets/editor.wasm'), '')
+      for (const file of [
+        'index.js',
+        'remote-support.js',
+        'watch-worker.ts',
+        'runtime/package.json',
+        'runtime/bun.lock',
+        'pty-host.js',
+        'image-worker.ts',
+        'THIRD_PARTY_NOTICES.txt',
+      ].filter((file) => file !== missing))
+        writeFileSync(path.join(server, file), '')
+      const release: Release = { name: 'candidate', directory, web, server, previous: null }
 
-    await expect(verifyCandidateFiles(release)).rejects.toThrow(
-      'server/pty-host.js is missing; deploy with --server to rebuild the server',
-    )
-    writeFileSync(path.join(server, 'pty-host.js'), '')
-    await expect(verifyCandidateFiles(release)).resolves.toBeUndefined()
-  } finally {
-    rmSync(directory, { force: true, recursive: true })
-  }
-})
+      await expect(verifyCandidateFiles(release)).rejects.toThrow(
+        `server/${missing} is missing; deploy with --server to rebuild the server`,
+      )
+      writeFileSync(path.join(server, missing), '')
+      await expect(verifyCandidateFiles(release)).resolves.toBeUndefined()
+    } finally {
+      rmSync(directory, { force: true, recursive: true })
+    }
+  },
+)

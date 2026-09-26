@@ -330,3 +330,18 @@ Written down so we are aware; nothing here is scheduled because of licences alon
 - **Wallpapers:** kept as they are. Omarchy ships the same images.
 - **Project licence (§2):** not decided; the repos stay without a LICENSE for now.
 - **Spawned tools and Mermaid:** unchanged.
+
+## Build attribution, Plan 184
+
+The notices slice generates `/licenses/THIRD_PARTY_NOTICES.txt` from the emitted web modules
+and bundled fonts. Server builds write `THIRD_PARTY_NOTICES.txt` beside the bundle from its
+module paths and the installed runtime dependency closure; the release serves it at
+`/licenses/server.txt`. `/licenses/` indexes both texts and the separate notices for the
+Pierre fork and icons, t3code ports, the vendored shadcn stylesheet, Ghostty, the Editor's
+language grammars, Inter and JetBrains Mono.
+
+`packages/tree/LICENSE-pierre` retains the upstream Apache licence, and the 46 surviving files
+matching the documented fork path map carry modification headers. Notice generation records
+missing package licence files explicitly. Runtime packages for other operating systems retain
+the licence files provided in their npm installations. This attribution work does not change
+the owner decisions recorded above or claim to resolve the grammar and artwork audit.
