@@ -23,7 +23,15 @@ export function isRestartDisconnect(error: unknown): boolean {
   if ('value' in error && isConnectivityError(error.value)) return true
   if ('status' in error && typeof error.status === 'number' && GATEWAY_STATUSES.has(error.status))
     return true
-  return 'cause' in error && error.cause !== error && isRestartDisconnect(error.cause)
+  const cause = causeOf(error)
+  return cause !== undefined && cause !== error && isRestartDisconnect(cause)
+}
+
+// createClientError keeps an Error on `cause` and anything else (an Eden envelope) on `internal.cause`.
+function causeOf(error: object): unknown {
+  if ('cause' in error && error.cause !== undefined) return error.cause
+  if (!('internal' in error) || !isObject(error.internal)) return undefined
+  return error.internal.cause
 }
 
 export function showsRestarting(
