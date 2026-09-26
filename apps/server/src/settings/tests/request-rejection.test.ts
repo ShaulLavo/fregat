@@ -51,7 +51,7 @@ describe('settings request rejection', () => {
 
   it('distinguishes a setting that is not written with `set`', () => {
     expect(reject(write([{ kind: 'set', key: 'keybindings.overrides', value: {} }])).message).toBe(
-      'Cannot set keybindings.overrides: this setting is changed by its own operation kind, not by `set`',
+      'Cannot set keybindings.overrides: this setting changes only through its own operation kind',
     )
   })
 

@@ -55,7 +55,7 @@ export function requestRejection(input: unknown, issues: readonly Issue[]) {
   if (!SCALAR_IDS.has(operation.key)) {
     return settingsErrors.WRITE_INVALID({
       key: operation.key,
-      reason: 'this setting is changed by its own operation kind, not by `set`',
+      reason: 'this setting changes only through its own operation kind',
     })
   }
 
