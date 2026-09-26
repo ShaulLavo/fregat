@@ -25,6 +25,9 @@ import { matchesUsageSearch } from '@/features/settings/utils/usage'
 import { PushSection } from '@/features/settings/components/push-section'
 import { matchesPushSearch } from '@/features/settings/utils/push-device'
 import { SettingRow } from '@/features/settings/components/setting-row'
+import { useShortcutRows } from '@/features/settings/hooks/use-shortcut-rows'
+import { SettingsScrollerContext } from '@/features/settings/providers/scroller-context'
+import { matchingShortcutRows } from '@/features/settings/utils/shortcut-rows'
 import { StatusMessage } from '@/components/status-message'
 import { ViewToggle } from '@/features/settings/components/view-toggle'
 import { useHasWorkspace } from '@/features/settings/hooks/use-has-workspace'
@@ -82,6 +85,7 @@ export function SettingsPage({
   const rootRef = useRef<HTMLDivElement | null>(null)
   const selectedCategory = useSettingsCategory()
   const project = useSettingsProject()
+  const shortcuts = useShortcutRows()
   const { ref: focusTargetRef } = useFocusTarget<HTMLDivElement>(
     {
       area: 'settings',
@@ -111,7 +115,14 @@ export function SettingsPage({
   // `matchingSettingIds` already searches rows rather than keys, so a key edited
   // from another row is folded into its owner here rather than dropped.
   const environment = { backdrop: documentBackdrop(), isShell: isDesktop() }
-  const visible = matchingSettingIds(query).filter(
+  // Settings search finds shortcuts too: a command that matches brings its list along.
+  const shortcutsMatch =
+    query.trim() !== '' &&
+    matchingShortcutRows(shortcuts.rows, query, shortcuts.platform).length > 0
+  const matched = matchingSettingIds(query)
+  if (shortcutsMatch && !matched.includes('keybindings.overrides'))
+    matched.push('keybindings.overrides')
+  const visible = matched.filter(
     (id) =>
       (descriptorFor(id).visibility ?? 'user') !== 'internal' &&
       isSettingAvailable(id, environment),
@@ -119,6 +130,7 @@ export function SettingsPage({
   // The push switch renders inside the push section, beside the devices it sends to.
   const categories = groupByCategory(visible.filter((id) => id !== 'chat.pushNotifications'))
   if (matchesUsageSearch(query)) categories.set('Usage', [])
+  moveCategoryLast(categories, SHORTCUTS_CATEGORY)
   const showPush =
     matchesPushSearch(query) ||
     visible.includes('chat.notificationMode') ||
@@ -252,7 +264,7 @@ export function SettingsPage({
           aria-label='Settings form'
           role='region'
           ref={scrollRef}
-          className='min-h-0 min-w-0 flex-1 overflow-y-auto p-(--density-section-padding) [overflow-anchor:none] @max-3xl/settings:[&_[data-slot=button]]:min-h-10 @max-3xl/settings:[&_[data-slot=input-group]]:h-10 @max-3xl/settings:[&_[data-slot=select-trigger]]:min-h-10 @max-3xl/settings:[&_input]:h-10 @max-3xl/settings:[&_input]:text-base'
+          className='min-h-0 min-w-0 flex-1 overflow-y-auto p-(--density-section-padding) [overflow-anchor:none] @max-3xl/settings:[&_[data-slot=button]]:min-h-10 @max-3xl/settings:[&_[data-slot=input-group]]:h-10 @max-3xl/settings:[&_[data-slot=select-trigger]]:min-h-10 @max-3xl/settings:[&_[data-slot=tabs-tab]]:min-h-10 @max-3xl/settings:[&_input]:h-10 @max-3xl/settings:[&_input]:text-base'
           onKeyDown={(event) => {
             if (event.key !== 'Escape') return
             // Not while a control is mid-interaction: a recorder is capturing, and
@@ -263,33 +275,46 @@ export function SettingsPage({
         >
           <MalformedBanner layers={document.data.layers} />
           <DiagnosticsBanner diagnostics={projection.diagnostics} />
-          <fieldset className='min-w-0'>
-            {project ? <ProjectSection project={project} /> : null}
-            {project ? null : shown.length === 0 ? (
-              <StatusMessage>{emptySettingsMessage(query, selectedCategory)}</StatusMessage>
-            ) : (
-              shown.map(([category, ids]) => (
-                <section className='mb-6' key={category}>
-                  <h2 className='text-foreground mb-1 text-sm font-semibold'>{category}</h2>
-                  {category === 'Usage' ? <UsageSection /> : null}
-                  {ids.includes('chat.keepImportedSessionsUpdated') ? <ImportSection /> : null}
-                  {category === 'Chat' && showPush ? <PushSection snapshot={projection} /> : null}
-                  {ids.map((id, index) => (
-                    <SettingRow
-                      id={id}
-                      key={id}
-                      snapshot={projection}
-                      underParent={isUnderParent(ids, index)}
-                    />
-                  ))}
-                </section>
-              ))
-            )}
-          </fieldset>
+          <SettingsScrollerContext value={scrollRef}>
+            <fieldset className='min-w-0'>
+              {project ? <ProjectSection project={project} /> : null}
+              {project ? null : shown.length === 0 ? (
+                <StatusMessage>{emptySettingsMessage(query, selectedCategory)}</StatusMessage>
+              ) : (
+                shown.map(([category, ids]) => (
+                  <section className='mb-6' key={category}>
+                    <h2 className='text-foreground mb-1 text-sm font-semibold'>{category}</h2>
+                    {category === 'Usage' ? <UsageSection /> : null}
+                    {ids.includes('chat.keepImportedSessionsUpdated') ? <ImportSection /> : null}
+                    {category === 'Chat' && showPush ? <PushSection snapshot={projection} /> : null}
+                    {ids.map((id, index) => (
+                      <SettingRow
+                        id={id}
+                        key={id}
+                        snapshot={projection}
+                        underParent={isUnderParent(ids, index)}
+                      />
+                    ))}
+                  </section>
+                ))
+              )}
+            </fieldset>
+          </SettingsScrollerContext>
         </div>
       )}
     </ToolPane>
   )
+}
+
+const SHORTCUTS_CATEGORY = 'Keyboard shortcuts'
+
+/** The shortcut list is hundreds of rows; anything after it would be out of reach. */
+function moveCategoryLast(categories: Map<string, SettingId[]>, category: string) {
+  const ids = categories.get(category)
+  if (!ids) return
+
+  categories.delete(category)
+  categories.set(category, ids)
 }
 
 /**

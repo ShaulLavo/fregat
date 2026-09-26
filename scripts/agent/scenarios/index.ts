@@ -139,6 +139,7 @@ import { connectionFrame } from './connection-frame'
 import { settingsValueGrids } from './settings-value-grids'
 import { settingsDependentRow } from './settings-dependent-row'
 import { settingsRowDetails } from './settings-row-details'
+import { settingsKeybindings } from './settings-keybindings'
 import { tailFollow } from './tail-follow'
 import { checkpointRestore } from './checkpoint-restore'
 import { themeStudioAsync } from './theme-studio-async'
@@ -438,6 +439,7 @@ export const scenarios: readonly Scenario[] = [
   settingsValueGrids,
   settingsDependentRow,
   settingsRowDetails,
+  settingsKeybindings,
   tailFollow,
   checkpointRestore,
   filePickerBrowse,

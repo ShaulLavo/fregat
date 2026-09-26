@@ -30,6 +30,17 @@ export async function writeUserOperations(page: Page, operations: readonly Setti
   )
 }
 
+/** The resolved value of one key on the server behind the page. */
+export async function readSetting(page: Page, key: string): Promise<unknown> {
+  const { base, headers } = settingsApi(page)
+  const snapshot: unknown = await (await page.request.get(`${base}settings`, { headers })).json()
+  ok(snapshot && typeof snapshot === 'object' && 'values' in snapshot)
+  const values = snapshot.values
+  ok(values && typeof values === 'object')
+
+  return (values as Record<string, unknown>)[key]
+}
+
 export async function writeUserSetting(page: Page, key: string, value: unknown) {
   await writeUserOperations(page, [{ kind: 'set', key, value }])
 }

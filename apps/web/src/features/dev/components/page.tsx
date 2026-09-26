@@ -1,6 +1,7 @@
 import { BAR_TAB_STRIP_CLASS, barTabClassName } from '@workspace/ui/patterns/bar-tabs'
 import { LoadersTab } from '@/features/dev/components/loaders-tab'
 import { PhysicalTab } from '@/features/dev/components/physical-tab'
+import { ShortcutsTab } from '@/features/dev/components/shortcuts-tab'
 import { HandlesTab } from '@/features/dev/components/handles-tab'
 import { DEV_TABS, devTabForPath, devTabHref } from '@/features/dev/utils/tabs'
 
@@ -28,6 +29,7 @@ export function DevPage() {
       <main className='bg-content-well min-h-0 flex-1 overflow-auto'>
         {active === 'loaders' && <LoadersTab />}
         {active === 'physical' && <PhysicalTab />}
+        {active === 'shortcuts' && <ShortcutsTab />}
         {active === 'handles' && <HandlesTab />}
       </main>
     </div>

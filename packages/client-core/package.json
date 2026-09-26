@@ -33,6 +33,7 @@
     "./commands/item-position": "./src/commands/item-position.ts",
     "./commands/focus": "./src/commands/focus.ts",
     "./commands/chord": "./src/commands/chord.ts",
+    "./commands/browser-kept": "./src/commands/browser-kept.ts",
     "./commands/palette": "./src/commands/palette.ts",
     "./settings/intent-store": "./src/settings/intent-store.ts",
     "./optimistic/queue": "./src/optimistic/queue.ts",
