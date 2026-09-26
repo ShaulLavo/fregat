@@ -14,6 +14,7 @@ import { useDraftMachines } from '@/features/chat-mode/hooks/use-draft-machines'
 
 export function StageBody({
   activeSession,
+  switching,
   transport,
   project,
   worktree,
@@ -21,6 +22,7 @@ export function StageBody({
   rootPath,
   onSessionCreated,
 }: Pick<ChatModeSession, 'activeSession' | 'transport' | 'project' | 'worktree' | 'ready'> & {
+  readonly switching: boolean
   readonly rootPath: string
   readonly onSessionCreated: (sessionId: SessionId) => void
 }) {
@@ -94,9 +96,9 @@ export function StageBody({
 
   return (
     <ChatView
+      switching={switching}
       activeSessionId={activeSession.sessionId}
       transport={transport}
-      key={activeSession.sessionId}
       rootPath={rootPath}
       onSessionCreated={onSessionCreated}
     />
