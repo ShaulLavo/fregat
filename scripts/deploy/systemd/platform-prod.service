@@ -3,6 +3,8 @@
 Description=Platform production server
 After=network-online.target
 Wants=network-online.target
+# Never give up: a crash loop is paced by the backoff below.
+StartLimitIntervalSec=0
 
 [Service]
 Type=simple
@@ -11,7 +13,10 @@ WorkingDirectory={{PRODUCTION_ROOT}}
 ExecStartPre=-{{BUN}} {{PRODUCTION_ROOT}}/bin/promote.ts {{PRODUCTION_ROOT}}
 ExecStart={{BUN}} {{PRODUCTION_ROOT}}/current/server/index.js
 Restart=on-failure
-RestartSec=3
+# Restart (exit 75) comes back at once; a crash loop backs off to 10s.
+RestartSec=250ms
+RestartSteps=5
+RestartMaxDelaySec=10s
 # 143: Bun's exit on SIGTERM. 75: the server's exit after Restart.
 SuccessExitStatus=143 75
 RestartForceExitStatus=75
