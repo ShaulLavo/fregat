@@ -1,3 +1,4 @@
+import type { AgentDiagnosticsSource } from '../lsp/agent-diagnostics'
 import type { ProviderDriverKind, ProviderInstanceId } from '@workspace/contracts'
 import type { ProviderAdapter } from './types'
 
@@ -46,6 +47,11 @@ type ProviderDriverCapabilities = ProviderAdapter['capabilities'] & {
   multiInstance: boolean
 }
 
+/** App services a driver may hand its adapter; absent in tests and harnesses. */
+export type ProviderDriverServices = {
+  readonly agentDiagnostics?: AgentDiagnosticsSource
+}
+
 type ProviderDriverCreateInput<Config> = {
   /** Settings-level binary override. Drivers that get their binary elsewhere ignore it. */
   binaryPath?: string
@@ -55,6 +61,7 @@ type ProviderDriverCreateInput<Config> = {
   /** Fully resolved spawn env: base env + driver-derived vars + user overrides. */
   env: NodeJS.ProcessEnv
   providerInstanceId: ProviderInstanceId
+  services: ProviderDriverServices
 }
 
 type ProviderInstanceHandle = {

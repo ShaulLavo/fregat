@@ -1,3 +1,8 @@
+import { McpGrantRegistry } from './mcp/grants'
+import { mcpRoutes } from './mcp/routes'
+import { AgentDiagnosticsReader } from './lsp/agent-diagnostics'
+import { AgentReviewService } from './review/agent-review'
+import { agentReviewRoutes } from './review/routes'
 import { sessionControlRoutes } from './provider/session-control-routes'
 import { createAttachmentOwnership } from './attachments/ownership'
 import { selectTitleModel } from './orchestration/title-generation'
@@ -151,6 +156,8 @@ export type AppOptions = FileSystemServiceOptions & {
   settings?: Omit<SettingsStoreOptions, 'workspaceRoot'>
   /** The origin forwarded to remote machines as this app's web origin. */
   webOrigin?: string
+  /** Serves Platform's MCP tools to provider agents at this loopback URL; absent serves none. */
+  mcp?: { readonly endpoint: string }
   web?: WebOptions
   /** Staged releases and Restart. Absent leaves both inert, as in dev and tests. */
   update?: UpdateOptions
@@ -274,6 +281,12 @@ export function createApp(options: AppOptions) {
       { area: 'wallpaper', operation: 'library.seed' },
     )
   }
+  // Read lazily: the language-server pool is built further down, and hooks only ask during turns.
+  const agentDiagnostics = new AgentDiagnosticsReader({
+    enabled: () => settings.snapshot().values['agent.diagnosticsFeedback'],
+    pool: () => lspPool,
+    settings: () => lspSettings(),
+  })
   const providerAdapterRegistry: ProviderAdapterRegistry =
     options.orchestration?.providerAdapterRegistry ??
     createDefaultProviderAdapterRegistry(
@@ -295,6 +308,7 @@ export function createApp(options: AppOptions) {
         // the deferral would never resolve.
         hasLiveSessions: (providerInstanceId) =>
           providerService.hasActiveRuntimeForInstance(providerInstanceId),
+        services: { agentDiagnostics },
       },
     )
   // A saved provider list is inert unless something re-runs the registry when
@@ -307,8 +321,10 @@ export function createApp(options: AppOptions) {
   settings.onChange(() => {
     runDetached(reconcileProviderSettings, { area: 'provider', operation: 'reconcile' })
   })
+  const mcpGrants = new McpGrantRegistry()
   const providerService = new ProviderService({
     adapterRegistry: providerAdapterRegistry,
+    ...(options.mcp ? { mcp: { endpoint: options.mcp.endpoint, grants: mcpGrants } } : {}),
     sessionDirectory: new ProviderSessionDirectory(database),
   })
   const providerUsage = new ProviderUsageStore(providerAdapterRegistry)
@@ -379,6 +395,7 @@ export function createApp(options: AppOptions) {
   const serverConfig = orchestrationWsServerConfig(identity)
   const commitMessages = new CommitMessageGenerator(git, providerAdapterRegistry, providerService)
   const checkpointDiff = new OrchestrationCheckpointDiffQuery(database, git)
+  const agentReviews = new AgentReviewService({ checkpointDiff, git, providers: providerService })
   const checkpointHunks = new OrchestrationCheckpointHunks({
     runWorkspaceOperation: (sessionId, operation) =>
       orchestration.runWorkspaceOperation(sessionId, operation),
@@ -483,6 +500,16 @@ export function createApp(options: AppOptions) {
     // mounted after one parent `onBeforeHandle` inherits the parent's later
     // hooks too, which would put the auth guard in front of index.html.
     .use(webRoutes(options.web ?? {}, update, terminal))
+    // Before the browser guard, which refuses the Origin-less requests agents send.
+    .use(
+      options.mcp
+        ? mcpRoutes({
+            allowedOrigins: auth.allowedOrigins,
+            endpoint: options.mcp.endpoint,
+            grants: mcpGrants,
+          })
+        : new Elysia({ name: 'mcp-routes' }),
+    )
     .onBeforeHandle(({ request }) => {
       recordClientInstance(request)
     })
@@ -553,6 +580,7 @@ export function createApp(options: AppOptions) {
       ),
     )
     .use(sessionControlRoutes(providerService))
+    .use(agentReviewRoutes(agentReviews))
     .use(orchestrationRoutes(orchestration, checkpointDiff, sessionSearch, checkpointHunks))
     .use(
       attachmentRoutes({

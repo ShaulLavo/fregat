@@ -15,7 +15,7 @@ import { writeRootFolderCache } from '@/features/workspace/state/cache'
 import { useCommand } from '@/keymap/hooks/use-command'
 import { TestCommandProvider } from '../../../../test/factories/command-runtime'
 import { expect, test } from '../../../../test/fixtures'
-import { renderWithProviders } from '../../../../test/render'
+import { renderWithLoadedDialogs } from '../../../../test/render'
 import { useFocusService } from '@/lib/focus/hooks/use-service'
 import { useFocusTarget } from '@/lib/focus/hooks/use-target'
 import { focusTargetById } from '@/lib/focus/state/service'
@@ -31,7 +31,7 @@ test.afterEach(() => {
 test('waits for async command settlement before closing and restoring its origin', async () => {
   const submission = deferredSettingsSubmission()
   const setWallpaperEnabled = vi.fn(() => submission.value)
-  renderPalette({ setWallpaperEnabled })
+  await renderPalette({ setWallpaperEnabled })
   const user = userEvent.setup()
   const origin = screen.getByRole('button', { name: 'Open palette from editor' })
 
@@ -51,7 +51,7 @@ test('waits for async command settlement before closing and restoring its origin
 })
 
 test('does not overwrite a command destination that acknowledged another overlay', async () => {
-  renderPalette({ settingsDestination: true })
+  await renderPalette({ settingsDestination: true })
   const user = userEvent.setup()
   const origin = screen.getByRole('button', { name: 'Open palette from editor' })
   const settings = screen.getByRole('button', { name: 'Settings overlay' })
@@ -66,7 +66,7 @@ test('does not overwrite a command destination that acknowledged another overlay
 })
 
 test('restores a captured nested overlay after dismissal', async () => {
-  renderPalette()
+  await renderPalette()
   const user = userEvent.setup()
   const settings = screen.getByRole('button', { name: 'Settings overlay' })
 
@@ -85,7 +85,7 @@ function renderPalette({
   readonly setWallpaperEnabled?: () => SettingsSubmission
   readonly settingsDestination?: boolean
 } = {}) {
-  return renderWithProviders(
+  return renderWithLoadedDialogs(
     <EditorStateProvider>
       <PaletteRuntime
         setWallpaperEnabled={setWallpaperEnabled}
