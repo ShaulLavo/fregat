@@ -1172,6 +1172,18 @@ export const SETTINGS_REGISTRY = {
       'Read a file and colour its syntax while the pointer heads for its tree row, tab or definition link.',
     keywords: ['prefetch', 'preload', 'files', 'tree', 'tabs', 'hover', 'syntax'],
   }),
+  'prefetch.diffs': defineSetting({
+    schema: v.boolean(),
+    default: true,
+    scope: 'application',
+    widget: 'boolean',
+    category: 'Prefetch',
+    dependsOn: 'prefetch.enabled',
+    title: 'Prefetch diffs',
+    description:
+      'Load changes, commit files and checkpoint diffs when their rows are hovered or active.',
+    keywords: ['prefetch', 'preload', 'diffs', 'git', 'history', 'checkpoints'],
+  }),
   'files.autoSave': defineSetting({
     schema: v.picklist(['off', 'afterDelay', 'onFocusChange', 'onWindowChange'] as const),
     default: 'off',

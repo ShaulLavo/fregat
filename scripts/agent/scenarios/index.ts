@@ -104,6 +104,7 @@ import { chatSessionGoal } from './chat-session-goal'
 import { chatAgentReview } from './chat-agent-review'
 import { fileTreeHoverPrefetch } from './file-tree-hover-prefetch'
 import { prefetchChatSwitch } from './prefetch-chat-switch'
+import { prefetchDiffQueries } from './prefetch-diff-queries'
 import { prefetchFirstPaint } from './prefetch-first-paint'
 import { prefetchSettings } from './prefetch-settings'
 import {
@@ -572,6 +573,7 @@ export const scenarios: readonly Scenario[] = [
   chatAgentReview,
   fileTreeHoverPrefetch,
   prefetchFirstPaint,
+  prefetchDiffQueries,
   prefetchChatSwitch,
   prefetchSettings,
   workspaceOpenLargeRoot,

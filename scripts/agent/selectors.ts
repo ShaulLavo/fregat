@@ -4,6 +4,7 @@ import { createScriptError } from '../structured-errors'
 export const fileIconSelector = '[data-file-icon], [style*="vscode-icons/"]'
 export const wallpaperLayerSelector = '[data-workbench] img[data-workbench-wallpaper-layer="still"]'
 export const diffPaneSelector = '.editor-diff-pane'
+export const diffContentRowSelector = '.editor-diff-pane [data-editor-virtual-row]'
 export const editorViewportSelector = '.editor-virtualized-viewport'
 /** Rows the markdown live preview has decorated (headings, lists, emphasis). */
 export const markdownPreviewRowSelector = '[class*="editor-inline-"]'
@@ -1036,6 +1037,7 @@ export const selectors = {
       .getByRole('button', { name: 'Retry' }),
   historyRows: (page: Page) => page.locator('[data-history-commit]'),
   historyCircles: (page: Page) => page.locator('[data-history-commit] svg circle'),
+  historyFileSelector: '[data-history-file]',
   historyFiles: (page: Page) => page.locator('[data-history-file]'),
   historyDetails: (page: Page) => page.getByRole('region', { name: 'Commit details' }),
   historyInformation: (page: Page) =>
