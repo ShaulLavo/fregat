@@ -495,6 +495,13 @@ export const selectors = {
     page
       .getByRole('navigation', { name: 'Tool tabs' })
       .getByRole('button', { name: 'Terminal', exact: true }),
+  codeThemePreviewHeaderSelector:
+    '[aria-label="Code theme sample"] [aria-live] > span:first-child, [aria-label="Theme studio"] [data-slot="tool-pane-header"] .font-medium',
+  codeThemePreviewContentSelector: '[data-code-theme-preview] pre[data-theme-id]',
+  studioCodeColors: (page: Page) =>
+    selectors.themeStudio(page).getByRole('listbox', { name: 'Code colors' }),
+  codeThemeDialog: (page: Page) =>
+    page.getByRole('dialog', { name: 'Choose code theme', exact: true }),
   codeThemeOptions: (page: Page) => page.locator('[data-value^="color-theme:"]'),
   codeThemeOption: (page: Page, id: string) => page.locator(`[data-value="color-theme:${id}"]`),
   wallpaperAsset: (page: Page, id: string) =>
